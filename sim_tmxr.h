@@ -1,6 +1,6 @@
 /* sim_tmxr.h: terminal multiplexor definitions
 
-   Copyright (c) 2001-2003, Robert M Supnik
+   Copyright (c) 2001-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   29-Dec-03	RMS	Added output stall support, increased buffer size
    22-Dec-02	RMS	Added break support (from Mark Pizzolato)
    20-Aug-02	RMS	Added tmxr_open_master, tmxr_close_master, tmxr.port
    30-Dec-01	RMS	Renamed tmxr_fstatus, added tmxr_fstats
@@ -38,8 +39,8 @@
 
 #define TMXR_V_VALID	15
 #define TMXR_VALID	(1 << TMXR_V_VALID)
-#define TMXR_MAXBUF	128				/* buffer size */
-#define TMXR_GUARD	8				/* buffer guard */
+#define TMXR_MAXBUF	256				/* buffer size */
+#define TMXR_GUARD	12				/* buffer guard */
 #define TMXR_MAXLIN	64				/* max lines */
 
 struct tmln {
@@ -76,7 +77,7 @@ int32 tmxr_poll_conn (TMXR *mp);
 void tmxr_reset_ln (TMLN *lp);
 int32 tmxr_getc_ln (TMLN *lp);
 void tmxr_poll_rx (TMXR *mp);
-void tmxr_putc_ln (TMLN *lp, int32 chr);
+t_stat tmxr_putc_ln (TMLN *lp, int32 chr);
 void tmxr_poll_tx (TMXR *mp);
 t_stat tmxr_open_master (TMXR *mp, char *cptr);
 t_stat tmxr_close_master (TMXR *mp);

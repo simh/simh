@@ -23,8 +23,12 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Oct-03	RMS	Added DMA/DMC support
    25-Apr-03	RMS	Revised for extended file support
 */
+
+#ifndef _H316_DEFS_H_
+#define _H316_DEFS_H_	0
 
 #include "sim_defs.h"					/* simulator defns */
 
@@ -35,6 +39,10 @@
 #define STOP_HALT	3				/* HALT */
 #define STOP_IBKPT	4				/* breakpoint */
 #define STOP_IND	5				/* indirect loop */
+#define STOP_DMAER	6				/* DMA error */
+#define STOP_MTWRP	7				/* MT write protected */
+#define STOP_DPOVR	8				/* DP write overrun */
+#define STOP_DPFMT	9				/* DP invalid format */
 
 /* Memory */
 
@@ -56,10 +64,14 @@
 
 /* CPU options */
 
+#define UNIT_V_MSIZE	(UNIT_V_UF + 0)			/* dummy mask */
 #define UNIT_V_EXT	(UNIT_V_UF + 1)			/* extended mem */
 #define UNIT_V_HSA	(UNIT_V_UF + 2)			/* high speed arith */
+#define UNIT_V_DMC	(UNIT_V_UF + 3)			/* DMC */
+#define UNIT_MSIZE	(1u << UNIT_V_MSIZE)
 #define UNIT_EXT	(1u << UNIT_V_EXT)
 #define UNIT_HSA	(1u << UNIT_V_HSA)
+#define UNIT_DMC	(1u << UNIT_V_DMC)
 
 /* Instruction format */
 
@@ -84,8 +96,42 @@
 #define ioSKS		1				/* skip if set */
 #define ioINA		2				/* input to A */
 #define ioOTA		3				/* output from A */
+#define ioEND		4				/* channel end */
 
-/* I/O devices */
+/* Device information block */
+
+struct h316_dib {
+	uint32		dev;				/* device number */
+	uint32		chan;				/* dma/dmc channel */
+	uint32		num;				/* number of slots */
+	int32		(*io) (int32 inst, int32 fnc, int32 dat, int32 dev);  };
+
+typedef struct h316_dib DIB;
+
+/* DMA/DMC channel numbers */
+
+#define IOBUS		0				/* IO bus */
+#define DMA_MIN		1				/* 4 DMA channels */
+#define DMA_MAX		4
+#define DMC_MIN		1				/* 16 DMC channels */
+#define DMC_MAX		16
+
+#define DMA1		(DMA_MIN)
+#define DMC1		(DMA_MAX+DMC_MIN)
+
+/* DMA/DMC bit assignments in channel request word */
+
+#define DMA_V_DMA1	0				/* DMA channels */
+#define DMC_V_DMC1	4				/* DMC channels */
+#define SET_CH_REQ(x)	chan_req = chan_req | (1 << (x))
+#define Q_DMA(x)	(((x) >= 0) && ((x) < DMC_V_DMC1))
+
+/* DMA/DMC definitions */
+
+#define DMA_IN		0100000				/* input flag */
+#define DMC_BASE	020				/* DMC memory base */
+
+/* I/O device codes */
 
 #define PTR		001				/* paper tape reader */
 #define PTP		002				/* paper tape punch */
@@ -93,11 +139,11 @@
 #define TTY		004				/* console */
 #define CDR		005				/* card reader */
 #define MT		010				/* mag tape data */
-#define KEYS		020				/* keys (CPU) */
+#define CLK_KEYS	020				/* clock/keys (CPU) */
 #define FHD		022				/* fixed head disk */
 #define DMA		024				/* DMA control */
 #define DP		025				/* moving head disk */
-#define OPT		034				/* SKS/OCP option */
+#define DEV_MAX		64
 
 /* Interrupt flags, definitions correspond to SMK bits */
 
@@ -119,7 +165,7 @@
 #define IOT_V_REASON	17
 #define IOT_V_SKIP	16
 #define IOT_SKIP	(1u << IOT_V_SKIP)
-#define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* stop on error */
+#define IORETURN(f,v)	(((f)? (v): SCPE_OK) << IOT_V_REASON)
 #define IOBADFNC(x)	(((stop_inst) << IOT_V_REASON) | (x))
 #define IOSKIP(x)	(IOT_SKIP | (x))
 
@@ -137,8 +183,17 @@
 #define INT_ON		(1u << INT_V_ON)
 #define INT_PENDING	(INT_ON | INT_NODEF)
 
-#define SET_READY(x)	dev_ready = dev_ready | (x)
-#define CLR_READY(x)	dev_ready = dev_ready & ~(x)
-#define TST_READY(x)	((dev_ready & (x)) != 0)
-#define CLR_ENABLE(x)	dev_enable = dev_enable & ~(x)
-#define TST_INTREQ(x)	((dev_ready & dev_enable & (x)) != 0)
+#define SET_INT(x)	dev_int = dev_int | (x)
+#define CLR_INT(x)	dev_int = dev_int & ~(x)
+#define TST_INT(x)	((dev_int & (x)) != 0)
+#define CLR_ENB(x)	dev_enb = dev_enb & ~(x)
+#define TST_INTREQ(x)	((dev_int & dev_enb & (x)) != 0)
+
+/* Prototypes */
+
+t_stat io_set_iobus (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat io_set_dma (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat io_set_dmc (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat io_show_chan (FILE *st, UNIT *uptr, int32 val, void *desc);
+
+#endif

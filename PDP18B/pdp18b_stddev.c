@@ -29,6 +29,7 @@
    tto		teleprinter
    clk		clock
 
+   29-Dec-03	RMS	Added console backpressure support
    26-Jul-03	RMS	Increased PTP, TTO timeouts for PDP-15 operating systems
 			Added hardware read-in mode support for PDP-7/9/15
    25-Apr-03	RMS	Revised for extended file support
@@ -839,40 +840,40 @@ t_stat tti_svc (UNIT *uptr)
 #if defined (KSR28)					/* Baudot... */
 int32 c;
 
-sim_activate (&tti_unit, tti_unit.wait);		/* continue poll */
+sim_activate (uptr, uptr->wait);			/* continue poll */
 if (tti_state & TTI_2ND) {				/* char waiting? */
-	tti_unit.buf = tti_state & TTI_MASK;		/* return char */
+	uptr->buf = tti_state & TTI_MASK;		/* return char */
 	tti_state = tti_state & ~TTI_2ND;  }		/* not waiting */
 else {	if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;
 	c = tti_trans[c & 0177];			/* translate char */
 	if (c == 0) return SCPE_OK;			/* untranslatable? */
 	if (((c & TTI_FIGURES) == (tti_state & TTI_FIGURES)) ||
-	    (c & TTI_BOTH)) tti_unit.buf = c & TTI_MASK;
+	    (c & TTI_BOTH)) uptr->buf = c & TTI_MASK;
 	else {
-	    tti_unit.buf = (c & TTI_FIGURES)?
+	    uptr->buf = (c & TTI_FIGURES)?
 		BAUDOT_FIGURES: BAUDOT_LETTERS;
 	    tti_state = c | TTI_2ND;  }  }		/* set 2nd waiting */
 
 #else							/* ASCII... */
 int32 c, out;
 
-sim_activate (&tti_unit, tti_unit.wait);		/* continue poll */
+sim_activate (uptr, uptr->wait);			/* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
 out = c & 0177;						/* mask echo to 7b */
 if (c & SCPE_BREAK) c = 0;				/* break? */
-else if (tti_unit.flags & UNIT_KSR) {			/* KSR? */
+else if (uptr->flags & UNIT_KSR) {			/* KSR? */
 	if (islower (out)) out = toupper (out);		/* convert to UC */
 	c = out | 0200;  }				/* set TTY bit */
-else c = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);	/* no, 7b/8b */
-if ((tti_unit.flags & UNIT_HDX) && out && 		/* half duplex and */
+else c = c & ((uptr->flags & UNIT_8B)? 0377: 0177);	/* no, 7b/8b */
+if ((uptr->flags & UNIT_HDX) && out && 			/* half duplex and */
     (!(tto_unit.flags & UNIT_KSR) ||			/* 7b/8b or */
 	  ((out >= 007) && (out <= 0137)))) {		/* in range? */
 	sim_putchar (out);				/* echo */
 	tto_unit.pos = tto_unit.pos + 1;  }
-tti_unit.buf = c;					/* got char */
+uptr->buf = c;						/* got char */
 
 #endif
-tti_unit.pos = tti_unit.pos + 1;
+uptr->pos = uptr->pos + 1;
 SET_INT (TTI);						/* set flag */
 return SCPE_OK;
 }
@@ -926,24 +927,27 @@ t_stat tto_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-SET_INT (TTO);						/* set flag */
 #if defined (KSR28)					/* Baudot... */
-if (tto_unit.buf == BAUDOT_FIGURES) {			/* set figures? */
+if (uptr->buf == BAUDOT_FIGURES)			/* set figures? */
 	tto_state = TTO_FIGURES;
-	return SCPE_OK;  }
-if (tto_unit.buf == BAUDOT_LETTERS) {			/* set letters? */
+else if (uptr->buf == BAUDOT_LETTERS)			/* set letters? */
 	tto_state = 0;
-	return SCPE_OK;  }
-c = tto_trans[tto_unit.buf + tto_state];		/* translate */
+else {	c = tto_trans[uptr->buf + tto_state];		/* translate */
+
 #else
-if (tto_unit.flags & UNIT_KSR) {			/* KSR? */
-	c = tto_unit.buf & 0177;
-	if (islower (c)) c = toupper (c);
-	if ((c < 007) || (c > 0137)) return SCPE_OK;  }
-else c = tto_unit.buf & ((tto_unit.flags & UNIT_8B)? 0377: 0177);
+c = uptr->buf & 0177;					/* assume 7b or KSR */
+if (!(uptr->flags & UNIT_KSR) ||			/* 7b/8b or */
+	  ((c >= 007) && (c <= 0137))) {		/* in range? */
+	if ((uptr->flags & UNIT_KSR) && islower (c))	/* KSR? */
+	    c = toupper (c);
+	else if (tto_unit.flags & UNIT_8B) c = uptr->buf;
 #endif
-if ((r = sim_putchar (c)) != SCPE_OK) return r;
-tto_unit.pos = tto_unit.pos + 1;
+
+	if ((r = sim_putchar_s (c)) != SCPE_OK) {	/* output; error? */
+	    sim_activate (uptr, uptr->wait);		/* retry? */
+	    return ((r == SCPE_STALL)? SCPE_OK: r);  }  }
+SET_INT (TTO);						/* set flag */
+uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
 

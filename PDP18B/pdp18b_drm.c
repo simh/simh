@@ -25,6 +25,7 @@
 
    drm		(PDP-4,PDP-7) Type 24 serial drum
 
+   26-Oct-03	RMS	Cleaned up buffer copy code
    05-Dec-02	RMS	Updated from Type 24 documentation
    22-Nov-02	RMS	Added PDP-4 support
    05-Feb-02	RMS	Added DIB, device number support
@@ -165,6 +166,7 @@ t_stat drm_svc (UNIT *uptr)
 {
 int32 i;
 uint32 da;
+int32 *fbuf = uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	drm_err = 1;					/* set error */
@@ -173,13 +175,13 @@ if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 
 da = drm_da * DRM_NUMWDS;				/* compute dev addr */
 for (i = 0; i < DRM_NUMWDS; i++, da++) {		/* do transfer */
-	if (uptr->FUNC == DRM_READ) {
-	    if (MEM_ADDR_OK (drm_ma))			/* read, check nxm */
-		M[drm_ma] = *(((int32 *) uptr->filebuf) + da);  }
-	else {
+	if (uptr->FUNC == DRM_READ) {			/* read? */
+	    if (MEM_ADDR_OK (drm_ma))			/* if !nxm */
+		M[drm_ma] = fbuf[da];  }		/* read word */
+	else {						/* write */
 	    if ((drm_wlk >> (drm_da >> 4)) & 1) drm_err = 1;
-	    else {
-	    	*(((int32 *) uptr->filebuf) + da) = M[drm_ma];
+	    else {					/* not locked */
+	    	fbuf[da] = M[drm_ma];			/* write word */
 		if (da >= uptr->hwmark) uptr->hwmark = da + 1;  }  }
 	drm_ma = (drm_ma + 1) & 0177777;  }		/* incr mem addr */
 drm_da = (drm_da + 1) & DRM_SMASK;			/* incr dev addr */

@@ -28,6 +28,7 @@
    tti		keyboard
    tto		teleprinter
 
+   29-Oct-03	RMS	Added PTR FIODEC-to-ASCII translation (from Phil Budne)
    07-Sep-03	RMS	Changed ioc to ios
    30-Aug-03	RMS	Revised PTR to conform to Maintenance Manual;
 			added deadlock prevention on errors
@@ -42,10 +43,14 @@
    07-Sep-01	RMS	Moved function prototypes
    10-Jun-01	RMS	Fixed comment
    30-Oct-00	RMS	Standardized device naming
+
+   Note: PTP timeout must be >10X faster that TTY output timeout for Macro
+   to work correctly!
 */
 
 #include "pdp1_defs.h"
 
+#define FIODEC_STOP	013				/* stop code */
 #define FIODEC_UC	074
 #define FIODEC_LC	072
 #define UC_V		6				/* upper case */
@@ -55,10 +60,16 @@
 #define TT_WIDTH	077
 #define TTI		0
 #define TTO		1
+#define UNIT_V_ASCII	(UNIT_V_UF + 0)			/* ASCII/binary mode */
+#define UNIT_ASCII	(1 << UNIT_V_ASCII)
+#define PTR_LEADER	20				/* ASCII leader chars */
 
 int32 ptr_state = 0;
 int32 ptr_wait = 0;
 int32 ptr_stopioe = 0;
+int32 ptr_uc = 0;					/* upper/lower case */
+int32 ptr_hold = 0;					/* holding buffer */
+int32 ptr_leader = PTR_LEADER;				/* leader count */
 int32 ptp_stopioe = 0;
 int32 tti_hold = 0;					/* tti hold buf */
 int32 tty_buf = 0;					/* tty buffer */
@@ -68,6 +79,7 @@ extern int32 sbs, ios, ioh, cpls, iosta;
 extern int32 PF, IO, PC, TA;
 extern int32 M[];
 
+int ptr_get_ascii (UNIT *uptr);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat tti_svc (UNIT *uptr);
@@ -76,6 +88,7 @@ t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
 t_stat tty_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
+t_stat ptr_attach (UNIT *uptr, char *cptr);
 
 /* Character translation tables */
 
@@ -128,20 +141,28 @@ UNIT ptr_unit = {
 
 REG ptr_reg[] = {
 	{ ORDATA (BUF, ptr_unit.buf, 18) },
+	{ FLDATA (UC, ptr_uc, UC_V) },
 	{ FLDATA (DONE, iosta, IOS_V_PTR) },
 	{ FLDATA (RPLS, cpls, CPLS_V_PTR) },
+	{ ORDATA (HOLD, ptr_hold, 9), REG_HRO },
 	{ ORDATA (STATE, ptr_state, 5), REG_HRO },
 	{ FLDATA (WAIT, ptr_wait, 0), REG_HRO },
 	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
+	{ DRDATA (LEADER, ptr_leader, 6), REG_HRO },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
 	{ NULL }  };
 
+MTAB ptr_mod[] = {
+	{ UNIT_ASCII, UNIT_ASCII, "ASCII", "ASCII", NULL },
+	{ UNIT_ASCII, 0,          "FIODEC", "FIODEC", NULL },
+	{ 0 }  };
+
 DEVICE ptr_dev = {
-	"PTR", &ptr_unit, ptr_reg, NULL,
+	"PTR", &ptr_unit, ptr_reg, ptr_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptr_reset,
-	&ptr_boot, NULL, NULL,
+	&ptr_boot, &ptr_attach, NULL,
 	NULL, 0 };
 
 /* PTP data structures
@@ -179,7 +200,7 @@ DEVICE ptp_dev = {
 
 UNIT tty_unit[] = {
 	{ UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT },
-	{ UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT }  };
+	{ UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT * 10 }  };
 
 REG tty_reg[] = {
 	{ ORDATA (BUF, tty_buf, 6) },
@@ -240,34 +261,73 @@ t_stat ptr_svc (UNIT *uptr)
 {
 int32 temp;
 
-if ((ptr_unit.flags & UNIT_ATT) == 0) {			/* attached? */
+if ((uptr->flags & UNIT_ATT) == 0) {			/* attached? */
 	if (ptr_wait) ptr_wait = ioh = 0;		/* if wait, clr ioh */
 	if ((cpls & CPLS_PTR) || ptr_stopioe) return SCPE_UNATT;
 	return SCPE_OK;  }
-if ((temp = getc (ptr_unit.fileref)) == EOF) {		/* end of file? */
+if ((uptr->flags & UNIT_ASCII) && (ptr_state == 0))	/* ASCII mode, alpha read? */
+	temp = ptr_get_ascii (uptr);			/* get processed char */
+else if ((temp = getc (uptr->fileref)) != EOF)		/* no, get raw char */
+	uptr->pos = uptr->pos + 1;			/* if not eof, count */
+if (temp == EOF) {					/* end of file? */
 	if (ptr_wait) ptr_wait = ioh = 0;		/* if wait, clr ioh */
-	if (feof (ptr_unit.fileref)) {
+	if (feof (uptr->fileref)) {
 	    if ((cpls & CPLS_PTR) || ptr_stopioe) printf ("PTR end of file\n");
 	    else return SCPE_OK;  }
 	else perror ("PTR I/O error");
-	clearerr (ptr_unit.fileref);
+	clearerr (uptr->fileref);
 	return SCPE_IOERR;  }
-ptr_unit.pos = ptr_unit.pos + 1;
-if (ptr_state == 0) ptr_unit.buf = temp & 0377;		/* alpha */
+if (ptr_state == 0) uptr->buf = temp & 0377;		/* alpha */
 else if (temp & 0200) {					/* binary */
 	ptr_state = ptr_state - 6;
-	ptr_unit.buf = ptr_unit.buf | ((temp & 077) << ptr_state);  }
+	uptr->buf = uptr->buf | ((temp & 077) << ptr_state);  }
 if (ptr_state == 0) {					/* done? */
 	if (cpls & CPLS_PTR) {				/* completion pulse? */
 	    iosta = iosta & ~IOS_PTR;			/* clear flag */
-	    IO = ptr_unit.buf;				/* fill IO */
+	    IO = uptr->buf;				/* fill IO */
 	    ios = 1;					/* restart */
 	    cpls = cpls & ~CPLS_PTR;  }
 	else {						/* no, interrupt */
 	    iosta = iosta | IOS_PTR;			/* set flag */
 	    sbs = sbs | SB_RQ;  }  }			/* req seq break */
-else sim_activate (&ptr_unit, ptr_unit.wait);		/* get next char */
+else sim_activate (uptr, uptr->wait);			/* get next char */
 return SCPE_OK;
+}
+
+/* Read next ASCII character */
+
+int ptr_get_ascii (UNIT *uptr)
+{
+int c;
+int32 in;
+
+if (ptr_leader > 0) {					/* leader? */
+	ptr_leader = ptr_leader - 1;			/* count down */
+	return 0;  }
+if (ptr_hold & CW) {					/* char waiting? */
+	in = ptr_hold & TT_WIDTH;			/* return char */
+	ptr_hold = 0;  }				/* not waiting */
+else {	for (;;) {					/* until valid char */
+	    if ((c = getc (uptr->fileref)) == EOF)	/* get next char, EOF? */
+		return FIODEC_STOP;			/* return STOP */
+	    uptr->pos = uptr->pos + 1;			/* count char */
+	    c = c & 0177;				/* cut to 7b */
+	    if (c == '\n') c = '\r';			/* NL -> CR */
+	    else if (c == '\r') continue;		/* ignore CR */
+	    in = ascii_to_fiodec[c];			/* convert char */
+	    if ((in == 0) && (c != ' ')) continue;	/* ignore unknowns */	    
+	    if ((in & BOTH) || ((in & UC) == ptr_uc))	/* case match? */
+		in = in & TT_WIDTH;			/* cut to 6b */
+	    else {					/* no, case shift */
+		ptr_hold = in | CW;			/* set char waiting */
+		ptr_uc = in & UC;			/* set case */
+		in = ptr_uc? FIODEC_UC: FIODEC_LC;  }	/* return case */
+	    break;  }
+	}						/* end else */
+in = in * 010040201;					/* even parity from */
+in = in | 027555555400;					/* HACKMEM 167 */
+in = in % (9 << 7);
+return in & 0377;
 }
 
 /* Reset routine */
@@ -276,11 +336,21 @@ t_stat ptr_reset (DEVICE *dptr)
 {
 ptr_state = 0;						/* clear state */
 ptr_wait = 0;
+ptr_hold = 0;
+ptr_uc = 0;
 ptr_unit.buf = 0;
 cpls = cpls & ~CPLS_PTR;
 iosta = iosta & ~IOS_PTR;				/* clear flag */
 sim_cancel (&ptr_unit);					/* deactivate unit */
 return SCPE_OK;
+}
+
+/* Attach routine */
+
+t_stat ptr_attach (UNIT *uptr, char *cptr)
+{
+ptr_leader = PTR_LEADER;				/* set up leader */
+return attach_unit (uptr, cptr);
 }
 
 /* Bootstrap routine */
@@ -341,13 +411,13 @@ if (cpls & CPLS_PTP) {					/* completion pulse? */
 	cpls = cpls & ~CPLS_PTP;  }
 iosta = iosta | IOS_PTP;				/* set flag */
 sbs = sbs | SB_RQ;					/* req seq break */
-if ((ptp_unit.flags & UNIT_ATT) == 0)			/* not attached? */
+if ((uptr->flags & UNIT_ATT) == 0)			/* not attached? */
 	return IORETURN (ptp_stopioe, SCPE_UNATT);
-if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {	/* I/O error? */
+if (putc (uptr->buf, uptr->fileref) == EOF) {	/* I/O error? */
 	perror ("PTP I/O error");
-	clearerr (ptp_unit.fileref);
+	clearerr (uptr->fileref);
 	return SCPE_IOERR;  }
-ptp_unit.pos = ptp_unit.pos + 1;
+uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
 
@@ -417,24 +487,22 @@ return SCPE_OK;
 
 t_stat tto_svc (UNIT *uptr)
 {
-int32 out;
+int32 c;
+t_stat r;
 
+if (tty_buf == FIODEC_UC) tty_uc = UC;			/* upper case? */
+else if (tty_buf == FIODEC_LC) tty_uc = 0;		/* lower case? */
+else {	c = fiodec_to_ascii[tty_buf | tty_uc];		/* translate */
+	if (c && ((r = sim_putchar_s (c)) != SCPE_OK)) {/* output; error? */
+	    sim_activate (uptr, uptr->wait);		/* retry */
+	    return ((r == SCPE_STALL)? SCPE_OK: r);  }  }
 if (cpls & CPLS_TTO) {					/* completion pulse? */
 	ios = 1;					/* restart */
 	cpls = cpls & ~CPLS_TTO;  }
 iosta = iosta | IOS_TTO;				/* set flag */
 sbs = sbs | SB_RQ;					/* req seq break */
-if (tty_buf == FIODEC_UC) {				/* upper case? */
-	tty_uc = UC;
-	return SCPE_OK;  }
-if (tty_buf == FIODEC_LC) {				/* lower case? */
-	tty_uc = 0;
-	return SCPE_OK;  }
-out = fiodec_to_ascii[tty_buf | tty_uc];		/* translate */
-if (out == 0) return SCPE_OK;				/* no translation? */
-sim_putchar (out);
 uptr->pos = uptr->pos + 1;
-if (out == '\r') {					/* cr? add lf */
+if (c == '\r') {					/* cr? add lf */
 	sim_putchar ('\n');
 	uptr->pos = uptr->pos + 1;  }
 return SCPE_OK;

@@ -1,6 +1,6 @@
 /* pdp11_stddev.c: PDP-11 standard I/O devices simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti,tto	DL11 terminal input/output
    clk		KW11L line frequency clock
 
+   29-Dec-03	RMS	Added console backpressure support
    25-Apr-03	RMS	Revised for extended file support
    01-Mar-03	RMS	Added SET/SHOW CLOCK FREQ, SET TTI CTRL-C
    22-Nov-02	RMS	Changed terminal default to 7B for UNIX
@@ -319,10 +320,12 @@ t_stat tto_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
+c = tto_unit.buf & ((tto_unit.flags & UNIT_8B)? 0377: 0177);
+if ((r = sim_putchar_s (c)) != SCPE_OK) {		/* output; error? */
+	sim_activate (uptr, uptr->wait);		/* try again */
+	return ((r == SCPE_STALL)? SCPE_OK: r);  }	/* !stall? report */
 tto_csr = tto_csr | CSR_DONE;
 if (tto_csr & CSR_IE) SET_INT (TTO);
-c = tto_unit.buf & ((tto_unit.flags & UNIT_8B)? 0377: 0177);
-if ((r = sim_putchar (c)) != SCPE_OK) return r;
 tto_unit.pos = tto_unit.pos + 1;
 return SCPE_OK;
 }

@@ -28,6 +28,10 @@
 
   Modification history:
 
+  01-Dec-03  DTH  Added reflections, tweaked decnet fix items
+  25-Nov-03  DTH  Verified DECNET_FIX, reversed ifdef to mainstream code
+  14-Nov-03  DTH  Added #ifdef DECNET_FIX for problematic duplicate detection code
+  07-Jun-03  MP   Added WIN32 support for DECNET duplicate address detection.
   05-Jun-03  DTH  Added used to struct eth_packet
   01-Feb-03  MP   Changed some uint8 strings to char* to reflect usage 
   22-Oct-02  DTH  Added all_multicast and promiscuous support
@@ -47,14 +51,17 @@
 
 /* structure declarations */
 
-#define ETH_PROMISC        1          /* promiscuous mode = true */
-#define ETH_TIMEOUT       -1          /* read timeout in milliseconds (immediate) */
-#define ETH_FILTER_MAX    20          /* maximum address filters */
-#define ETH_BPF_INS_MAX  500          /* maximum bpf instructions */
-#define ETH_DEV_NAME_MAX 256          /* maximum device name size */
-#define ETH_DEV_DESC_MAX 256          /* maximum device description size */
-#define ETH_MIN_PACKET    60          /* minimum ethernet packet size */
-#define ETH_MAX_PACKET  1514          /* maximum ethernet packet size */
+#define ETH_PROMISC            1      /* promiscuous mode = true */
+#define ETH_TIMEOUT           -1      /* read timeout in milliseconds (immediate) */
+#define ETH_FILTER_MAX        20      /* maximum address filters */
+#define ETH_DEV_NAME_MAX     256      /* maximum device name size */
+#define ETH_DEV_DESC_MAX     256      /* maximum device description size */
+#define ETH_MIN_PACKET        60      /* minimum ethernet packet size */
+#define ETH_MAX_PACKET      1514      /* maximum ethernet packet size */
+
+#define DECNET_SELF_FRAME(dnet_mac, msg)    \
+    ((memcmp(dnet_mac, msg  , 6) == 0) &&   \
+     (memcmp(dnet_mac, msg+6, 6) == 0))
 
 struct eth_packet {
   uint8   msg[1518];
@@ -98,6 +105,9 @@ struct eth_device {
   ETH_MAC       filter_address[ETH_FILTER_MAX]; /* filtering addresses */
   ETH_BOOL      promiscuous;                    /* promiscuous mode flag */
   ETH_BOOL      all_multicast;                  /* receive all multicast messages */
+  int32         decnet_self_sent;               /* loopback packets sent but not seen */
+  ETH_MAC       decnet_addr;                    /* decnet address of interface */
+  int           reflections;                    /* packet reflections on interface */
 };
 
 typedef struct eth_device  ETH_DEV;

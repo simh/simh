@@ -1,6 +1,6 @@
 /* pdp10_lp20.c: PDP-10 LP20 line printer simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lp20		line printer
 
+   29-Dec-03	RMS	Fixed bug in scheduling
    25-Apr-03	RMS	Revised for extended file support
    29-Sep-02	RMS	Added variable vector support
 			Modified to use common Unibus routines
@@ -283,7 +284,7 @@ case 00:						/* LPCSA */
 	    if ((lpcsa & CSA_GO) == 0) {		/* not set before? */
 		if (lpcsb & CSB_ERR) lpcsb = lpcsb | CSB_GOE;
 		lpcsum = 0;				/* clear checksum */
-		sim_activate (&lp20_unit, lp20_unit.time);  }  }
+		sim_activate (&lp20_unit, lp20_unit.wait);  }  }
 	else sim_cancel (&lp20_unit);			/* go clr, stop DMA */
 	lpcsa = (lpcsa & ~CSA_RW) | (data & CSA_RW);
 	break;

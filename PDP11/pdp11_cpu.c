@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu		PDP-11 CPU (J-11 microprocessor)
 
+   29-Dec-03	RMS	Formalized 18b Qbus support
+   21-Dec-03	RMS	Added autoconfiguration controls
    05-Jun-03	RMS	Fixed bugs in memory size table
    12-Mar-03	RMS	Added logical name support
    01-Feb-03	RMS	Changed R display to follow PSW<rs>, added SP display
@@ -276,6 +278,7 @@ int32 stop_vecabort = 1;				/* stop on vec abort */
 int32 stop_spabort = 1;					/* stop on SP abort */
 int32 wait_enable = 0;					/* wait state enable */
 int32 cpu_log = 0;					/* logging */
+int32 autcon_enb = 1;					/* autoconfig enable */
 uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
@@ -323,6 +326,8 @@ void set_r_display (int32 rs, int32 cm);
 
 extern t_stat build_dib_tab (int32 ubm);
 extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
 extern t_stat iopageR (int32 *data, uint32 addr, int32 access);
 extern t_stat iopageW (int32 data, uint32 addr, int32 access);
 extern int32 calc_ints (int32 nipl, int32 trq);
@@ -532,6 +537,7 @@ REG cpu_reg[] = {
 	{ GRDATA (UDPAR7, APRFILE[077], 8, 16, 16) },
 	{ GRDATA (UDPDR7, APRFILE[077], 8, 16, 0) },
 	{ BRDATA (UBMAP, ub_map, 8, 22, UBM_LNT_LW) },
+	{ FLDATA (AUTOCON, autcon_enb, 0), REG_HRO },
 	{ BRDATA (PCQ, pcq, 8, 16, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
@@ -539,10 +545,10 @@ REG cpu_reg[] = {
 	{ NULL}  };
 
 MTAB cpu_mod[] = {
-	{ UNIT_MAP, UNIT_18B, "18b addressing", "18B", NULL },
+	{ UNIT_MAP, UNIT_18B, "18b Unibus", "U18", &cpu_set_bus },
 	{ UNIT_MAP, UNIT_UBM, "22b Unibus + RH70", "URH70", &cpu_set_bus },
 	{ UNIT_MAP, UNIT_UBM + UNIT_RH11, "22b Unibus + RH11", "URH11", &cpu_set_bus },
-	{ UNIT_MAP, 0, "22b addressing", "22B", &cpu_set_bus },
+	{ UNIT_MAP, 0, "22b Qbus", "Q22", &cpu_set_bus },
 	{ UNIT_CIS, UNIT_CIS, "CIS", "CIS", NULL },
 	{ UNIT_CIS, 0, "no CIS", "NOCIS", NULL },
 	{ UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size},
@@ -566,6 +572,10 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 4186112, NULL, "4M", &cpu_set_size},
 	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
 	  NULL, &show_iospace },
+	{ MTAB_XTD|MTAB_VDV, 1, "AUTOCONFIG", "AUTOCONFIG",
+	  &set_autocon, &show_autocon },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "NOAUTOCONFIG",
+	  &set_autocon, NULL },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -2467,23 +2477,24 @@ for (i = 0; i < clim; i = i + 2) nM[i >> 1] = M[i >> 1];
 free (M);
 M = nM;
 MEMSIZE = val;
-return cpu_set_bus (uptr, (cpu_unit.flags & UNIT_MAP) | 1, cptr, desc);  }
+return cpu_set_bus (uptr, cpu_unit.flags, cptr, desc);  }
 
 /* Bus configuration, disable Unibus or Qbus devices */
 
 t_stat cpu_set_bus (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 DEVICE *dptr;
-uint32 i, target;
+uint32 i, mask;
 
-if ((MEMSIZE <= UNIMEMSIZE) || (val & UNIT_18B) ||
-   (!(val & 1) && ((uint32) val == (cpu_unit.flags & UNIT_MAP)))) return SCPE_OK;
-if (val & UNIT_MAP) target = DEV_QBUS;			/* going to Ubus? */
-else target = DEV_UBUS;					/* going to Qbus */
+if ((val & UNIT_MAP) || (val & UNIT_18B))		/* Unibus variant? */
+	mask = DEV_UBUS;
+else if (MEMSIZE <= UNIMEMSIZE)				/* 18b Qbus? */
+	mask = DEV_QBUS | DEV_Q18;
+else mask = DEV_QBUS;					/* must be 22b */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
 	if ((dptr->flags & DEV_DISABLE) &&		/* disable-able? */
 	    !(dptr->flags & DEV_DIS) &&			/* enabled? */
-	    ((dptr->flags & (DEV_QBUS|DEV_UBUS)) == target)) {
+	    ((dptr->flags & mask) == 0)) {		/* not allowed? */
 	    printf ("Disabling %s\n", sim_dname (dptr));
 	    if (sim_log) fprintf (sim_log, "Disabling %s\n", sim_dname (dptr));
 	    dptr->flags = dptr->flags | DEV_DIS;  }  }

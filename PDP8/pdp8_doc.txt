@@ -59,6 +59,8 @@ sim/pdp8/	pdp8_defs.h
 		pdp8_rl.c
 		pdp8_rx.c
 		pdp8_sys.c
+		pdp8_td.c
+		pdp8_tsc.c
 		pdp8_tt.c
 		pdp8_ttx.c
 
@@ -72,6 +74,7 @@ name(s)
 CPU		PDP-8/E CPU with 4KW-32KW of memory
 -		KE8E extended arithmetic element (EAE)
 -		KM8E memory management and timeshare control
+TSC		TSC8-75 ETOS operating system timeshare control
 PTR,PTP		PC8E paper tape reader/punch
 TTI,TTO		KL8E console terminal
 TTIX,TTOX	KL8JA additional terminals
@@ -83,6 +86,7 @@ DF		DF32/DS32 fixed head disk controller with 1-4 platters
 RL		RL8A/RL01 cartridge disk controller with four drives
 RX		RX8E/RX01, RX28/RX02 floppy disk controller with two drives
 DT		TC08/TU56 DECtape controller with eight drives
+TD		TD8E/TU56 DECtape controller with two drives
 MT		TM8E/TU10 magnetic tape controller with eight drives
 
 Most devices can be disabled or enabled, by the commands:
@@ -102,17 +106,28 @@ default is the RF08.  To change the disk at device numbers 60-61:
 	sim> SET DF ENABLED, or		enable DF32
 	sim> SET RL ENABLED		enable RL8A
 
+The PDP-8 can only support one of the set {TC08, TD8E} using the default
+device numbers, since both use device number 77.  The default is the
+TC08.  To change the DECtape controller to the TD8E:
+
+	sim> SET DT DISABLED		disable TC08
+	sim> SET TD ENABLED		enable TD8E
+
 Alternately, the device conflict can be eliminated by changing device
 numbers:
 
 	sim> SET RL DEV=50
 	sim> SET RL ENA
+	sim> SET TD DEV=74
+	sim> SET TD ENA
 
 However, devices can only be BOOTed with their default device numbers.
 
-The PDP-8 simulator implements one unique stop condition: if an undefined
-instruction (unimplemented IOT or OPR) is decoded, and register STOP_INST
-is set, the simulator halts.
+The PDP-8 simulator implements several unique stop conditions:
+
+	- if an undefined instruction (unimplemented IOT or OPR) is
+	  decoded, and register STOP_INST
+	- if a simulated DECtape runs off the end of its reel
 
 The PDP-8 loader supports both RIM format and BIN format tapes.  If the file
 extension is .RIM, or the -r switch is specified with LOAD, the file is
@@ -172,9 +187,38 @@ control registers for the interrupt system.
 	STOP_INST	1	stop on undefined instruction
 	WRU		8	interrupt character
 
-2.2 Programmed I/O Devices
+The CPU can maintain a history of the most recently executed instructions.
+This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
 
-2.2.1 PC8E Paper Tape Reader (PTR)
+	SET CPU HISTORY		clear history buffer
+	SET CPU HISTORY=0	disable history
+	SET CPU HISTORY=n	enable history, display length = n
+	SHOW CPU HISTORY	print CPU history
+
+The maximum length for the history is 65536 entries.
+
+2.2 TSC8-75 ETOS Timeshare Control (TSC)
+
+ETOS is a timeshared operating system for the PDP-8, providing multiple
+virtual OS/8 environments for up to 32 users.  It requires a special
+timeshare control option, the TSC8-75.  The TSC8-75 is normally disabled;
+to run ETOS, it must be enabled with the command:
+
+	SET TSC ENABLED
+
+The TSC8-75 implements these registers:
+
+	IR			most recently trapped instruction
+	PC			PC of most recently trapped instruction
+	CDF			1 if trapped instruction is CDF, 0 otherwise
+	ENB			interrupt enable flag
+	INT			interrupt pending flag
+
+Except for operation of ETOS, the TSC8-75 should be left disabled.
+
+2.3 Programmed I/O Devices
+
+2.3.1 PC8E Paper Tape Reader (PTR)
 
 The paper tape reader (PTR) reads data from a disk file.  The POS
 register specifies the number of the next data item to be read.  Thus, 
@@ -207,7 +251,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.2 PC8E Paper Tape Punch (PTP)
+2.3.2 PC8E Paper Tape Punch (PTP)
 
 The paper tape punch (PTP) writes data to a disk file.  The POS register
 specifies the number of the next data item to bewritten.  Thus, by
@@ -234,7 +278,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.3 KL8E Terminal Input (TTI)
+2.3.3 KL8E Terminal Input (TTI)
 
 The terminal interfaces (TTI, TTO) can be set to one of three modes:
 KSR, 7B, or 8B.  In KSR mode, lower case input and output characters
@@ -261,7 +305,7 @@ to simulate typing ^C:
 
 	SET TTI CTRL-C
 
-2.2.4 KL8E Terminal Output (TTO)
+2.3.4 KL8E Terminal Output (TTO)
 
 The terminal output (TTO) writes to the simulator console window.  It
 implements these registers:
@@ -275,7 +319,7 @@ implements these registers:
 	POS		32	number of characters output
 	TIME		24	time from I/O initiation to interrupt
 
-2.2.5 LE8E Line Printer (LPT)
+2.3.5 LE8E Line Printer (LPT)
 
 The line printer (LPT) writes data to a disk file.  The POS register
 specifies the number of the next data item to be read or written.  Thus,
@@ -302,7 +346,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.6 DK8E Line-Frequency Clock (CLK)
+2.3.6 DK8E Line-Frequency Clock (CLK)
 
 The real-time clock (CLK) frequency can be adjusted as follows:
 
@@ -323,7 +367,7 @@ The clock implements these registers:
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
 
-2.2.7 KL8JA Additional Terminals (TTIX, TTOX)
+2.3.7 KL8JA Additional Terminals (TTIX, TTOX)
 
 The additional terminals consist of two independent devices, TTIX and
 TTOX.  The entire set is modelled as a terminal multiplexor, with TTIX
@@ -378,9 +422,58 @@ The output device (TTOX) implements these registers:
 The additional terminals do not support save and restore.  All open
 connections are lost when the simulator shuts down or TTIX is detached.
 
-2.3 Moving Head Disks
+2.3.8 TD8E/TU56 DECtape (TD)
 
-2.3.1 RK8E Cartridge Disk (RK)
+The TD8E is a programmed I/O, non-interrupt controller, supporting two
+DECtape drives (0 and 1).  The TD8E simulator puts a high burden on the
+host processor, because tape activity is simulated a line (3b) at a time.
+Unless the PDP-8 software requires the TD8E, the TC08 should be used
+to simulate DECtapes.  The TD8E is disabled by default.
+
+TD8E options include the ability to make units write enabled or write
+locked.
+
+	SET DTn LOCKED		set unit n write locked
+	SET DTn WRITEENABLED	set unit n write enabled
+
+Units can also be set ONLINE or OFFLINE.  The TD8E supports the BOOT command.
+
+The TD8E supports supports PDP-8 format, PDP-11 format, and 18b format
+DECtape images.  ATTACH tries to determine the tape format from the DECtape
+image; the user can force a particular format with switches:
+
+	-r			PDP-8 format
+	-s			PDP-11 format
+	-t			18b format
+
+The TD8E controller is a data-only simulator; the timing and mark
+track, and block header and trailer, are not stored.  Thus, read always
+produces standard values for header and trailer words, and write throws
+header and trailer words into the bit bucket.
+
+The TD8E controller implements these registers:
+
+	name		size	comments
+
+	TDCMD		4	command register
+	TDDAT		12	data register
+	TDMTK		6	mark track register
+	TDSLF		1	single line flag
+	TDQLF		1	quad line flag
+	TDTME		1	timing error flag
+	TDQL		2	quad line counter
+	LTIME		31	time between lines
+	DCTIME		31	time to decelerate to a full stop
+	POS[0:7]	32	position, in lines, units 0-7
+	STATT[0:7]	18	unit state, units 0-7
+
+The LTIME parameter should not be changed, or OS/8 may fail to run
+correctly.  The DCTIME parameter should always be at least 100 times
+greater than LTIME.  Acceleration time is 75% of deceleration time.
+
+2.4 Moving Head Disks
+
+2.4.1 RK8E Cartridge Disk (RK)
 
 RK8E options include the ability to make units write enabled or write locked:
 
@@ -414,7 +507,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.3.2 RL8A Cartridge Disk (RL)
+2.4.2 RL8A Cartridge Disk (RL)
 
 RL8A options include the ability to make units write enabled or write locked:
 
@@ -455,7 +548,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.4 RX8E/RX01, RX28/RX02 Floppy Disk (RX)
+2.5 RX8E/RX01, RX28/RX02 Floppy Disk (RX)
 
 The RX can be configured as an RX8E with two RX01 drives, or an RX28 with
 two RX02 drives:
@@ -513,12 +606,12 @@ Error handling is as follows:
 RX01 and RX02 data files are buffered in memory; therefore, end of file
 and OS I/O errors cannot occur.
 
-2.5 Fixed Head Disks
+2.6 Fixed Head Disks
 
 Either the RF08 or the DF32 can be present in a configuration, but
 not both, with default device addressing.
 
-2.5.1 RF08/RS08 Fixed Head Disk (RF)
+2.6.1 RF08/RS08 Fixed Head Disk (RF)
 
 RF08 options include the ability to set the number of platters to a
 fixed value between 1 and 4, or to autosize the number of platters
@@ -564,7 +657,7 @@ Error handling is as follows:
 RF08 data files are buffered in memory; therefore, end of file and OS
 I/O errors cannot occur.
 
-2.5.2 DF32/DS32 Fixed Head Disk (RF)
+2.6.2 DF32/DS32 Fixed Head Disk (RF)
 
 DF32 options include the ability to set the number of platters to a
 fixed value between 1 and 4, or to autosize the number of platters
@@ -610,10 +703,10 @@ Error handling is as follows:
 DF32 data files are buffered in memory; therefore, end of file and OS
 I/O errors cannot occur.
 
-2.6 TC08/TU56 DECtape (DT)
+2.7 TC08/TU56 DECtape (DT)
 
 DECtapes drives are numbered 1-8; in the simulator, drive 8 is unit 0.
-DECtape options include the ability to make units write enabled or write
+TC08 options include the ability to make units write enabled or write
 locked.
 
 	SET DTn LOCKED		set unit n write locked
@@ -629,7 +722,7 @@ image; the user can force a particular format with switches:
 	-s			PDP-11 format
 	-t			18b format
 
-The DECtape controller is a data-only simulator; the timing and mark
+The TC08 controller is a data-only simulator; the timing and mark
 track, and block header and trailer, are not stored.  Thus, the WRITE
 TIMING AND MARK TRACK function is not supported; the READ ALL function
 always returns the hardware standard block header and trailer; and the
@@ -648,7 +741,6 @@ The DECtape controller implements these registers:
 	CA		12	current address (memory location 7754)
 	WC		12	word count (memory location 7755)
 	LTIME		31	time between lines
-	ACTIME		31	time to accelerate to full speed
 	DCTIME		31	time to decelerate to a full stop
 	SUBSTATE	2	read/write command substate
 	POS[0:7]	32	position, in lines, units 0-7
@@ -659,10 +751,11 @@ among the DECtape parameters, or the DECtape simulator will fail to
 operate correctly.
 
 	- LTIME must be at least 6
-	- ACTIME must be less than DCTIME, and both need to be at
-	  least 100 times LTIME
+	- DCTIME needs to be at least 100 times LTIME
 
-2.7 TM8E Magnetic Tape (MT)
+Acceleration time is set to 75% of deceleration time.
+
+2.8 TM8E Magnetic Tape (MT)
 
 Magnetic tape options include the ability to make units write enabled or
 or write locked.
@@ -700,7 +793,7 @@ Error handling is as follows:
 
 	OS I/O error		parity error; if STOP_IOE, stop
 
-2.8 Symbolic Display and Input
+2.9 Symbolic Display and Input
 
 The PDP-8 simulator implements symbolic display and input.  Display is
 controlled by command line switches:

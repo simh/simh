@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V3.0-2
-Date:	15-Sep-2003
+Subj:	Simulator Usage, V3.1
+Date:	15-Dec-2003
 
 			COPYRIGHT NOTICE
 
@@ -81,7 +81,7 @@ The simulators recognize or require a few compile-time #defines:
 - The PDP-11 and VAX simulators optionally support Ethernet.  To
   include Ethernet emulation, USE_NETWORK must be defined as part
   of the compilation command line.  At present, Ethernet support is
-  available only on Windows, Linux, NetBSD, and OpenBSD.
+  available only on Windows, Linux, NetBSD, OpenBSD, and Alpha VMS.
 
 - The PDP-11 and VAX simulators optionally support disks and serial
   devices files greater than 2GB.  To include large device support,
@@ -794,7 +794,7 @@ CPU		y	y	y	y	y
 FPU		-	y	-	-	h
 EIS/CIS		-	h	-	-	-
 console		y	y	y	y	y
-paper tape	y	y	y	h	y
+paper tape	y	y	y	y	y
 card reader	-	-	-	-	-
 line printer	y	y	y	h	y
 clock		y	y	y	-	y
@@ -817,12 +817,12 @@ card reader	y	-	-	-	-
 line printer	y	y	y	h	y
 clock		-	y	y	h	y
 extra terminal	-	y	y	-	y
-hard disk	-	y	y	-	y
-fixed disk	-	n	-	-	-
+hard disk	h	y	y	-	y
+fixed disk	-	n	-	h	-
 floppy disk	-	-	h	-	-
 drum		-	n	-	-	-
 DECtape		-	-	-	-	-
-mag tape	y	y	y	-	y
+mag tape	y	y	y	h	y
 
 	system	GRI-909	1620	i16	i32	SDS940
 device
@@ -853,8 +853,18 @@ Revision History (covering Rev 2.0 to present)
 Starting with Rev 2.7, detailed revision histories can be found
 in file sim_rev.c.
 
+Rev 3.1, Dec, 03
+	Added Alpha/VMS, FreeBSD, Mac OS/X Ethernet library support
+	Added Eclipse floating point and interval timer support
+	 (from Charles Owen)
+	Added PDP-1 parallel drum support
+	Added PDP-8 TSC8-75 and TD8E support
+	Added H316/516 DMA/DMC, magtape, fixed head disk support
+	Added PDP-8, PDP-15, 32b Interdata instruction history support
+
 Rev 3.0, May, 03
 	Added logical name support
+	Added instruction history support
 	Added multiple tape format support
 	Added 64b address support
 	Added PDP-4 EAE support

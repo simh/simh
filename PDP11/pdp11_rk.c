@@ -1,6 +1,6 @@
-/* pdp11_rk.c: RK11 cartridge disk simulator
+/* pdp11_rk.c: RK11/RKV11 cartridge disk simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   rk		RK11/RK05 cartridge disk
+   rk		RK11/RKV11/RK05 cartridge disk
 
+   29-Dec-03	RMS	Added RKV11 support
    29-Sep-02	RMS	Added variable address support to bootstrap
 			Added vector change/display support
 			Revised mapping mnemonics
@@ -261,7 +262,7 @@ DEVICE rk_dev = {
 	RK_NUMDR, 8, 24, 1, 8, 16,
 	NULL, NULL, &rk_reset,
 	&rk_boot, NULL, NULL,
-	&rk_dib, DEV_DISABLE | DEV_UBUS };
+	&rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 };
 
 /* I/O dispatch routine, I/O addresses 17777400 - 17777416
 

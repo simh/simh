@@ -205,6 +205,7 @@ return rval;
 t_stat dsk_svc (UNIT *uptr)
 {
 int32 i, da, pa;
+int16 *fbuf = uptr->filebuf;
 
 dev_busy = dev_busy & ~INT_DSK;				/* clear busy */
 dev_done = dev_done | INT_DSK;				/* set done */
@@ -218,13 +219,12 @@ da = dsk_da * DSK_NUMWD;				/* calc disk addr */
 if (uptr->FUNC == iopS) {				/* read? */
 	for (i = 0; i < DSK_NUMWD; i++) {		/* copy sector */
 	    pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
-	    if (MEM_ADDR_OK (pa)) M[pa] =
-		*(((int16 *) uptr->filebuf) + da + i);  }
+	    if (MEM_ADDR_OK (pa)) M[pa] = fbuf[da + i];  }
 	dsk_ma = (dsk_ma + DSK_NUMWD) & AMASK;  }
 if (uptr->FUNC == iopP) {				/* write? */
 	for (i = 0; i < DSK_NUMWD; i++) {		/* copy sector */
 	    pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
-	    *(((int16 *) uptr->filebuf) + da + i) = M[pa];  }
+	    fbuf[da + i] = M[pa];  }
 	if (((uint32) (da + i)) >= uptr->hwmark)	/* past end? */
 	    uptr->hwmark = da + i + 1;			/* upd hwmark */
 	dsk_ma = (dsk_ma + DSK_NUMWD + 3) & AMASK;  }

@@ -26,6 +26,7 @@
    rf		(PDP-9) RF09/RF09
 		(PDP-15) RF15/RS09
 
+   26-Oct-03	RMS	Cleaned up buffer copy code
    26-Jul-03	RMS	Fixed bug in set size routine
    14-Mar-03	RMS	Fixed variable platter interaction with save/restore
    03-Mar-03	RMS	Fixed autosizing
@@ -239,6 +240,7 @@ return dat;
 t_stat rf_svc (UNIT *uptr)
 {
 int32 f, pa, d, t;
+int32 *fbuf = uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	rf_updsta (RFS_NED | RFS_DON);			/* set nxd, done */
@@ -251,9 +253,8 @@ do {	if ((uint32) rf_da >= uptr->capac) {		/* disk overflow? */
 	M[RF_WC] = (M[RF_WC] + 1) & DMASK;		/* incr word count */
  	pa = M[RF_CA] = (M[RF_CA] + 1) & AMASK;		/* incr mem addr */
 	if ((f == FN_READ) && MEM_ADDR_OK (pa))		/* read? */
-	    M[pa] = *(((int32 *) uptr->filebuf) + rf_da);
-	if ((f == FN_WCHK) &&				/* write check? */
-	    (M[pa] != *(((int32 *) uptr->filebuf) + rf_da))) {
+	    M[pa] = fbuf[rf_da];
+	if ((f == FN_WCHK) && (M[pa] != fbuf[rf_da])) {	/* write check? */
 	    rf_updsta (RFS_WCE);			/* flag error */
 	    break;  }
 	if (f == FN_WRITE) {				/* write? */
@@ -262,8 +263,8 @@ do {	if ((uint32) rf_da >= uptr->capac) {		/* disk overflow? */
 	    if ((rf_wlk[d] >> t) & 1) {			/* write locked? */
 		rf_updsta (RFS_WLO);
 		break;  }
-	    else {
-	    	*(((int32 *) uptr->filebuf) + rf_da) = M[pa];
+	    else {					/* not locked */
+	    	fbuf[rf_da] = M[pa];			/* write word */
 		if (((uint32) rf_da) >= uptr->hwmark) uptr->hwmark = rf_da + 1;  }  }
 	rf_da = rf_da + 1;				/* incr disk addr */
 	}

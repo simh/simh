@@ -546,9 +546,9 @@ for (i = 0; dptr = sim_devices[i]; i++) {		/* loop thru devices */
 	if (tplte == NULL) tplte = dflt_tplte;		/* none? use default */
 	for ( ; *tplte != TPL_END; tplte++) {		/* loop thru template */
 	    t = (dno + *tplte) & DEV_MAX;		/* loop thru template */
-	    dmsk = 1u << (t & 0x1F);		/* bit to test */
+	    dmsk = 1u << (t & 0x1F);			/* bit to test */
 	    doff = t / 32;				/* word to test */
-	    if (dmap[doff] & dmsk) {		/* in use? */
+	    if (dmap[doff] & dmsk) {			/* in use? */
 		printf ("Device number conflict, devno = %02X\n", t);
 		if (sim_log) fprintf (sim_log,
 		    "Device number conflict, devno = %02X\n", t);

@@ -25,6 +25,8 @@
 
    mta		magnetic tape
 
+   22-Nov-03	CEO	DIB returns # records skipped after space fwd
+   22-Nov-03	CEO	Removed cancel of tape events in IORST
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised for magtape library
@@ -397,6 +399,7 @@ case CU_SPACEF:						/* space forward */
 	    }
 	while (mta_wc != 0);
 	mta_upddsta (uptr, uptr->USTAT | STA_RDY);
+	mta_ma = mta_wc;				/* Word count = # records */
 	break;
 
 case CU_SPACER:						/* space reverse */
@@ -408,6 +411,7 @@ case CU_SPACER:						/* space reverse */
 	    }
 	while (mta_wc != 0);
 	mta_upddsta (uptr, uptr->USTAT | STA_RDY);
+	mta_ma = mta_wc;				/* Word count = # records */
 	break;
 
 default:						/* reserved */
@@ -503,8 +507,15 @@ dev_done = dev_done & ~INT_MTA;				/* clear done, int */
 int_req = int_req & ~INT_MTA;
 mta_cu = mta_wc = mta_ma = mta_sta = 0;			/* clear registers */
 mta_ep = 0;
+
+/* AOS Installer does an IORST after a tape rewind command but before it can
+   be serviced, yet expects the tape to have been rewound */
+
 for (u = 0; u < MTA_NUMDR; u++) {			/* loop thru units */
 	uptr = mta_dev.units + u;
+	if (sim_is_active (uptr) &&			/* active and */
+	   (uptr->flags & STA_REW))			/* rewinding? */
+	    sim_tape_rewind (uptr);			/* update tape */
 	sim_tape_reset (uptr);				/* clear pos flag */
 	sim_cancel (uptr);				/* cancel activity */
 	if (uptr->flags & UNIT_ATT) uptr->USTAT = STA_RDY |
@@ -556,34 +567,35 @@ return SCPE_OK;
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int))
 
 static const int32 boot_rom[] = {
-	060222,			/* NIOC 0,MTA		; clear disk */
-	020417,			/* LDA 0,UNIT		; unit */
-	024417,			/* LDA 1,REWIND		; cmd */
+	0060222,		/* NIOC 0,MTA		; clear disk */
+	0020417,		/* LDA 0,UNIT		; unit */
+	0024417,		/* LDA 1,REWIND		; cmd */
 	0107000,		/* ADD 0,1		; cmd + unit */
-	065122,			/* DOAS 1,MTA		; start rewind */
-	070422,			/* DIA 2,MTA		; get status */
+	0065122,		/* DOAS 1,MTA		; start rewind */
+	0070422,		/* DIA 2,MTA		; get status */
 	0151213,		/* MOVR# 2,2,SNC	; skip if done */
-	000776,			/* JMP .-2 */
+	0000776,		/* JMP .-2 */
 	0126400,		/* SUB 1,1 		; ma, wc = 0 */
-	066022,			/* DOB 1,MTA */
-	067022,			/* DOC 1,MTA */
-	061122,			/* DOAS 0,MTA		; start read */
-	070422,			/* DIA 2,MTA		; get status */
+	0066022,		/* DOB 1,MTA */
+	0067022,		/* DOC 1,MTA */
+	0061122,		/* DOAS 0,MTA		; start read */
+	0070422,		/* DIA 2,MTA		; get status */
 	0151213,		/* MOVR# 2,2,SNC	; skip if done */
-	000776,			/* JMP .-2 */
-	000377,			/* JMP 377 */
-	000000,			/* UNIT: */
-	000010			/* REWIND: 10 */
+	0000776,		/* JMP .-2 */
+	0000377,		/* JMP 377 */
+	0000000,		/* UNIT: */
+	0000010			/* REWIND: 10 */
 };
 
 t_stat mta_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
-extern int32 saved_PC;
+extern int32 saved_PC, SR;
 
 sim_tape_rewind (&mta_unit[unitno]);
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 M[BOOT_UNIT] = (unitno & CU_M_UNIT) << CU_V_UNIT;
 saved_PC = BOOT_START;
+SR = 0100000 + DEV_MTA;
 return SCPE_OK;
 }

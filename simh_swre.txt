@@ -421,10 +421,6 @@ does not support the SIMH sockets library.
 
 	sim> attach dt fb15_32k.dtp
 
-- Turn on the API option:
-
-	sim> set cpu api
-
 - Assign a TCP/IP port to the Telnet listener for the second terminal:
 
 	sim> assign tti1 <port #>	-- 4000 typically works
@@ -691,8 +687,8 @@ UNIX V7 is contained on two 10MB disk images.  To boot UNIX V7:
 	sim> set ttp ena
 	sim> set pas dev=12
 	sim> set mt dev=85
-	sim> att -e dp0 iu6_dp0.dsk
-	sim> att -e dp1 iu6_dp1.dsk
+	sim> att -e dp0 iu7_dp0.dsk
+	sim> att -e dp1 iu7_dp1.dsk
 	sim> boot dp0
 	Boot
 	: dsk(1,0)unix

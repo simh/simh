@@ -1,6 +1,5 @@
 /* sim_ether.c: OS-dependent network routines
   ------------------------------------------------------------------------------
-
    Copyright (c) 2002-2003, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -53,6 +52,27 @@
 
   Modification history:
 
+  15-Dec-03  MP   polished generic libpcap support.
+  05-Dec-03  DTH  Genericized eth_devices() and #ifdefs
+  03-Dec-03  MP   Added Solaris support
+  02-Dec-03  DTH  Corrected decnet fix to use reflection counting
+  01-Dec-03  DTH  Added BPF source filtering and reflection counting
+  28-Nov-03  DTH  Rewrote eth_devices using universal pcap_findalldevs()
+  25-Nov-03  DTH  Verified DECNET_FIX, reversed ifdef to mainstream code
+  19-Nov-03  MP   Fixed BPF functionality on Linux/BSD.
+  17-Nov-03  DTH  Added xBSD simplification
+  14-Nov-03  DTH  Added #ifdef DECNET_FIX for problematic duplicate detection code
+  13-Nov-03  DTH  Merged in __FreeBSD__ support
+  21-Oct-03  MP   Added enriched packet dumping for debugging
+  20-Oct-03  MP   Added support for multiple ethernet devices on VMS
+  20-Sep-03  Ankan Add VMS support (Alpha only)
+  29-Sep-03  MP   Changed separator character in eth_fmt_mac to be ":" to
+                  format ethernet addresses the way the BPF compile engine
+                  wants to see them.
+                  Added BPF support to filter packets
+                  Added missing printf in eth_close
+  07-Jun-03  MP   Added WIN32 support for DECNET duplicate address detection.
+  06-Jun-03  MP   Fixed formatting of Ethernet Protocol Type in eth_packet_trace
   30-May-03  DTH  Changed WIN32 to _WIN32 for consistency
   07-Mar-03  MP   Fixed Linux implementation of PacketGetAdapterNames to also
                   work on Red Hat 6.2-sparc and Debian 3.0r1-sparc.
@@ -102,18 +122,28 @@
   20-Aug-02  DTH  Created Sim_Ether for O/S independant ethernet implementation
 
   ------------------------------------------------------------------------------
-
-  Work left to do:
-    1) Addition of other host Operating Systems (VMS, MAC, etc..)
-    2) Possible efficiency increase by using BPF filtering
-
-  ------------------------------------------------------------------------------
 */
 
-
+#include <ctype.h>
 #include "sim_ether.h"
+#include "sim_sock.h"
 
 extern FILE *sim_log;
+
+/* make common BSD code a bit easier to read in this file */
+/* OS/X seems to define and compile using one of these BSD types */
+#if defined(__NetBSD__) || defined (__OpenBSD__) || defined (__FreeBSD__)
+#define xBSD 1
+#endif
+
+/* make common winpcap code a bit easier to read in this file */
+#if defined(_WIN32) || defined(VMS)
+#define WIN_PCAP 1
+#define HAS_PCAP_SENDPACKET 1
+#define PCAP_READ_TIMEOUT -1
+#else
+#define PCAP_READ_TIMEOUT  1
+#endif
 
 /*============================================================================*/
 /*                  OS-independant ethernet routines                          */
@@ -122,7 +152,7 @@ extern FILE *sim_log;
 void eth_mac_fmt(ETH_MAC* mac, char* buff)
 {
   uint8* m = (uint8*) mac;
-  sprintf(buff, "%02X-%02X-%02X-%02X-%02X-%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
+  sprintf(buff, "%02X:%02X:%02X:%02X:%02X:%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
   return;
 }
 
@@ -183,8 +213,7 @@ uint32 eth_crc32(uint32 crc, const void* vbuf, size_t len)
   return(crc ^ mask);
 }
 
-
-void eth_packet_trace(ETH_PACK* packet, char* msg)
+void eth_packet_trace_ex(ETH_PACK* packet, char* msg, int dmp)
 {
   char src[20];
   char dst[20];
@@ -192,8 +221,43 @@ void eth_packet_trace(ETH_PACK* packet, char* msg)
   uint32 crc = eth_crc32(0, packet->msg, packet->len);
   eth_mac_fmt((ETH_MAC*)&packet->msg[0], dst);
   eth_mac_fmt((ETH_MAC*)&packet->msg[6], src);
-  printf("Eth: %s  dst: %s  src: %s  protocol: %d  len: %d  crc: %X\n",
-         msg, dst, src, *proto, packet->len, crc);
+  printf("Eth: %s  dst: %s  src: %s  proto: 0x%04X  len: %d  crc: %X\r\n",
+         msg, dst, src, ntohs(*proto), packet->len, crc);
+  if (dmp) {
+    int i, same, group, sidx, oidx;
+    char outbuf[80], strbuf[18];
+    static char hex[] = "0123456789ABCDEF";
+    for (i=same=0; i<packet->len; i += 16) {
+      if ((i > 0) && (0 == memcmp(&packet->msg[i], &packet->msg[i-16], 16))) {
+        ++same;
+        continue;
+      }
+      if (same > 0) {
+        printf("%04X thru %04X same as above\r\n", i-(16*same), i-1);
+        same = 0;
+      }
+      group = (((packet->len - i) > 16) ? 16 : (packet->len - i));
+      for (sidx=oidx=0; sidx<group; ++sidx) {
+        outbuf[oidx++] = ' ';
+        outbuf[oidx++] = hex[(packet->msg[i+sidx]>>4)&0xf];
+        outbuf[oidx++] = hex[packet->msg[i+sidx]&0xf];
+        if (isprint(packet->msg[i+sidx]))
+          strbuf[sidx] = packet->msg[i+sidx];
+        else
+          strbuf[sidx] = '.';
+      }
+      outbuf[oidx] = '\0';
+      strbuf[sidx] = '\0';
+      printf("%04X%-48s %s\r\n", i, outbuf, strbuf);
+    }
+    if (same > 0)
+      printf("%04X thru %04X same as above\r\n", i-(16*same), packet->len-1);
+  }
+}
+
+void eth_packet_trace(ETH_PACK* packet, char* msg)
+{
+  eth_packet_trace_ex(packet, msg, packet->len > 1514);
 }
 
 char* eth_getname(int number, char* name)
@@ -211,14 +275,14 @@ void eth_zero(ETH_DEV* dev)
 {
   /* set all members to NULL OR 0 */
   memset(dev, 0, sizeof(ETH_DEV));
+  dev->reflections = -1;                          /* not established yet */
 }
 
 /*============================================================================*/
 /*                        Non-implemented versions                            */
 /*============================================================================*/
 
-#if !defined (_WIN32) && !defined(linux) && !defined(__NetBSD__) && \
-    !defined (__OpenBSD__) || !defined (USE_NETWORK)
+#if !defined (USE_NETWORK)
 t_stat eth_open (ETH_DEV* dev, char* name)
   {return SCPE_NOFNC;}
 t_stat eth_close (ETH_DEV* dev)
@@ -235,22 +299,29 @@ int eth_devices (int max, ETH_LIST* dev)
 #else	 /* endif unimplemented */
 
 /*============================================================================*/
-/*                WIN32, Linux, NetBSD, and OpenBSD routines                  */
-/*                   Uses WinPcap and libpcap packages                        */
+/*      WIN32, Linux, and xBSD routines use WinPcap and libpcap packages      */
+/*        OpenVMS Alpha uses a WinPcap port and an associated execlet         */
 /*============================================================================*/
 
-#include <ctype.h>
 #include <pcap.h>
-#ifdef _WIN32
-#include <packet32.h>
-#endif /* _WIN32 */
-#if defined (__NetBSD__) || defined (__OpenBSD__)
+#include <string.h>
+#ifdef xBSD
 #include <sys/ioctl.h>
-#include <net/bpf.h>
-#endif /* __NetBSD__ || __OpenBSD__*/
-#if defined (linux) || defined(__NetBSD__) || defined (__OpenBSD__)
-#include <fcntl.h>
-#endif /* linux || __NetBSD__ || __OpenBSD__ */
+#endif /* xBSD */
+
+#if !defined (HAS_PCAP_SENDPACKET)
+/* libpcap has no function to write a packet, so we need to implement
+   pcap_sendpacket() for compatibility with the WinPcap base code.
+   Return value: 0=Success, -1=Failure */
+int pcap_sendpacket(pcap_t* handle, u_char* msg, int len)
+{
+#if defined (linux)
+  return (send(pcap_fileno(handle), msg, len, 0) == len)? 0 : -1;
+#else
+  return (write(pcap_fileno(handle), msg, len) == len)? 0 : -1;
+#endif /* linux */
+}
+#endif /* !HAS_PCAP_SENDPACKET */
 
 t_stat eth_open(ETH_DEV* dev, char* name)
 {
@@ -259,6 +330,7 @@ t_stat eth_open(ETH_DEV* dev, char* name)
   char temp[1024];
   char* savname = name;
   int   num;
+  char* msg;
 
   /* initialize device */
   eth_zero(dev);
@@ -276,52 +348,96 @@ t_stat eth_open(ETH_DEV* dev, char* name)
 
   /* attempt to connect device */
   memset(errbuf, 0, sizeof(errbuf));
-  dev->handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, -1, errbuf);
+  dev->handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
   if (!dev->handle) { /* can't open device */
-    printf ("Eth: pcap_open_live error - %s\n", errbuf);
-    if (sim_log) fprintf (sim_log, "Eth: pcap_open_live error - %s\n", errbuf);
+    msg = "Eth: pcap_open_live error - %s\r\n";
+    printf (msg, errbuf);
+    if (sim_log) fprintf (sim_log, msg, errbuf);
     return SCPE_OPENERR;
   } else {
-    printf ("Eth: opened %s\n", savname);
-    if (sim_log) fprintf (sim_log, "Eth: opened %s\n", savname);
+    msg = "Eth: opened %s\r\n";
+    printf (msg, savname);
+    if (sim_log) fprintf (sim_log, msg, savname);
   }
 
   /* save name of device */
   dev->name = malloc(strlen(savname)+1);
   strcpy(dev->name, savname);
 
-#if defined (__NetBSD__) || defined(__OpenBSD__)
+#if defined (xBSD)
   /* Tell the kernel that the header is fully-formed when it gets it.
-     This is required in order to fake the src address.
-     Code is embedded in braces to create a scope for the local variable */
+     This is required in order to fake the src address. */
   {
-  int one = 1;
-  ioctl(pcap_fileno(dev->handle), BIOCSHDRCMPLT, &one);
+    int one = 1;
+    ioctl(pcap_fileno(dev->handle), BIOCSHDRCMPLT, &one);
   }
-#endif /* __NetBSD__ || __OpenBSD__ */
+#endif /* xBSD */
 
-#if defined(linux) || defined(__NetBSD__) || defined (__OpenBSD__)
-  /* set file non-blocking */
-  fcntl(pcap_fileno(dev->handle), F_SETFL, fcntl(pcap_fileno(dev->handle), F_GETFL, 0) | O_NONBLOCK);
-#endif /* linux || __NetBSD__ || __OpenBSD__ */
-
+#if !defined (WIN_PCAP)
+  /* set ethernet device non-blocking so pcap_dispatch() doesn't hang */
+  if (pcap_setnonblock (dev->handle, 1, errbuf) == -1) {
+    msg = "Eth: Failed to set non-blocking: %s\r\n";
+    printf (msg, errbuf);
+    if (sim_log) fprintf (sim_log, msg, errbuf);
+  }
+#endif
   return SCPE_OK;
 }
 
 t_stat eth_close(ETH_DEV* dev)
 {
+  char* msg = "Eth: closed %s\r\n";
+
   /* make sure device exists */
   if (!dev) return SCPE_UNATT;
 
   /* close the device */
   pcap_close(dev->handle);
-  if (sim_log) fprintf (sim_log, "Eth: closed %s\n", dev->name);
+  printf (msg, dev->name);
+  if (sim_log) fprintf (sim_log, msg, dev->name);
 
   /* clean up the mess */
   free(dev->name);
   eth_zero(dev);
 
   return SCPE_OK;
+}
+
+t_stat eth_reflect(ETH_DEV* dev, ETH_MAC mac)
+{
+  ETH_PACK send, recv;
+  t_stat status;
+  int i;
+
+  /* build a packet */
+  memset (&send, 0, sizeof(ETH_PACK));
+  send.len = ETH_MIN_PACKET;                              /* minimum packet size */
+  memcpy(&send.msg[0], mac, sizeof(ETH_MAC));             /* target address */
+  memcpy(&send.msg[6], mac, sizeof(ETH_MAC));             /* source address */
+  send.msg[12] = 0x90;                                    /* loopback packet type */
+  for (i=14; i<send.len; i++)
+    send.msg[i] = 32 + i;                                 /* gibberish */
+
+  /* send the packet */
+  status = eth_write (dev, &send, NULL);
+
+  /* empty the read queue and count the reflections */
+  dev->reflections = 0;
+  do {
+    memset (&recv, 0, sizeof(ETH_PACK));
+    status = eth_read (dev, &recv, NULL);
+    if (memcmp(send.msg, recv.msg, ETH_MIN_PACKET)== 0)
+      dev->reflections++;
+  } while (recv.len > 0);
+
+#ifdef ETH_DEBUG
+  {
+    char* msg = "Eth: reflections = %d\r\n";
+    printf (msg, dev->reflections);
+    if (sim_log) fprintf (sim_log, msg, dev->reflections);
+  }
+#endif
+  return dev->reflections;
 }
 
 t_stat eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
@@ -341,6 +457,11 @@ t_stat eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
     eth_packet_trace (packet, "writing");
 #endif
     status = pcap_sendpacket((pcap_t*)dev->handle, (u_char*)packet->msg, packet->len);
+
+    /* detect sending of decnet loopback packet */
+    if ((status == 0) && DECNET_SELF_FRAME(dev->decnet_addr, packet->msg)) 
+      dev->decnet_self_sent += dev->reflections;
+
   } /* if packet->len */
 
   /* call optional write callback function */
@@ -353,42 +474,18 @@ t_stat eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
 void eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data)
 {
   ETH_DEV*  dev = (ETH_DEV*) info;
+  int to_me = 1;
 
-  /* receive packet filter */
-  int to_me = 0;
-  int from_me = 0;
-  int i;
-  for (i = 0; i < ETH_FILTER_MAX; i++) {
-    if (memcmp(data,     dev->filter_address[i], 6) == 0) to_me = 1;
-#ifdef _WIN32
-    /*
-    WinPcap has a known bug/feature that whenever a packet is transmitted,
-    it is looped back into the receive buffers. This is not consistant with the
-    behavior of real ethernet adapters, so the extra packets must be disposed of.
+  /* detect sending of decnet loopback packet */
+  if (DECNET_SELF_FRAME(dev->decnet_addr, data)) {
+    /* lower reflection count - if already zero, pass it on */
+    if (dev->decnet_self_sent > 0) {
+      dev->decnet_self_sent--;
+      to_me = 0;
+    }
+  }
 
-    This behavior is seen when starting DECNET; DECNET broadcasts a packet
-    with the same source and destination addresses to make sure that no other
-    ethernet adapter on the network is using the DECNET address that it wants.
-    If it sees this test packet coming back in, it assumes that another node on
-    the network has the same DECNET address and refuses to start, giving an
-    "Invalid media address" error.
-
-    This code section was ifdef'd for _WIN32 only to allow other OS's a chance to
-    properly implement the above behavior. If it breaks the ethernet simulator
-    on other platforms, remove the ifdef so that it will affect your platform,
-    and then notify the author so that he can fix the ifdef. :-)
-    */
-    if (memcmp(&data[6], dev->filter_address[i], 6) == 0) from_me = 1;
-#endif
-  } /* for */
-
-  /* all multicast mode? */
-  if (dev->all_multicast && (data[0] & 0x01)) to_me = 1;
-
-  /* promiscuous mode? */
-  if (dev->promiscuous) to_me = 1;
-
-  if (to_me && !from_me) {
+  if (to_me) {
 
     /* set data in passed read packet */
     dev->read_packet->len = header->len;
@@ -401,8 +498,7 @@ void eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* 
     /* call optional read callback function */
     if (dev->read_callback)
       (dev->read_callback)(0);
-
-  } /* if to_me && !from_me */
+  }
 }
 
 t_stat eth_read(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
@@ -422,7 +518,7 @@ t_stat eth_read(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
   /* set optional callback routine */
   dev->read_callback = routine;
 
-  /* dispatch read request to either receive a packet (after filtering) or timeout */
+  /* dispatch read request to either receive a filtered packet or timeout */
   do {
     status = pcap_dispatch((pcap_t*)dev->handle, 1, &eth_callback, (u_char*)dev);
   } while ((status) && (0 == packet->len));
@@ -433,6 +529,14 @@ t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* addresses,
                   ETH_BOOL all_multicast, ETH_BOOL promiscuous)
 {
   int i;
+  bpf_u_int32  bpf_subnet, bpf_netmask;
+  char buf[110+66*ETH_FILTER_MAX];
+  char errbuf[PCAP_ERRBUF_SIZE];
+  struct bpf_program bpf;
+  char mac[20];
+  char* buf2;
+  char* msg;
+  t_stat status;
 
   /* make sure device exists */
   if (!dev) return SCPE_UNATT;
@@ -444,7 +548,7 @@ t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* addresses,
     if (!addresses) return SCPE_ARG;
 
   /* clear filter array */
-  memset(dev->filter_address, 0, sizeof(ETH_MAC) * ETH_FILTER_MAX);
+  memset(dev->filter_address, 0, sizeof(dev->filter_address));
 
   /* set new filter addresses */
   for (i = 0; i < addr_count; i++)
@@ -454,178 +558,185 @@ t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* addresses,
   dev->all_multicast = all_multicast;
   dev->promiscuous   = promiscuous;
 
+#ifdef ETH_DEBUG
+  printf("Eth: Filter Set\r\n");
+  for (i = 0; i < addr_count; i++) {
+    char mac[20];
+    eth_mac_fmt(&dev->filter_address[i], mac);
+    printf("  Addr[%d]: %s\r\n", i, mac);
+  }
+  printf("%s%s\r\n", dev->all_multicast ? "  All Multicast\r\n" : "", 
+                     dev->promiscuous   ? "  Promiscuous\r\n"   : "");
+#endif
+
+  /* test reflections */
+  if (dev->reflections == -1)
+    status = eth_reflect(dev, dev->filter_address[0]);
+
+  /* setup BPF filters and other fields to minimize packet delivery */
+  strcpy(buf, "");
+
+  /* construct destination filters - since the real ethernet interface was set
+     into promiscuous mode by eth_open(), we need to filter out the packets that
+     our simulated interface doesn't want. */
+  if (!dev->promiscuous) {
+    for (i = 0; i < addr_count; i++) {
+      eth_mac_fmt(&dev->filter_address[i], mac);
+      if (!strstr(buf, mac))    /* eliminate duplicates */
+        sprintf(&buf[strlen(buf)], "%s(ether dst %s)", (*buf) ? " or " : "", mac);
+    }
+    if (dev->all_multicast)
+      sprintf(&buf[strlen(buf)], "%s(ether multicast)", (*buf) ? " or " : "");
+  }
+
+  /* construct source filters - this prevents packets from being reflected back 
+     by systems where WinPcap and libpcap cause packet reflections. Note that
+     some systems do not reflect packets at all. This *assumes* that the 
+     simulated NIC will not send out packets with multicast source fields. */
+  if ((addr_count > 0) && (dev->reflections > 0)) {
+    if (strlen(buf) > 0)
+      sprintf(&buf[strlen(buf)], " and ");
+    sprintf (&buf[strlen(buf)], "not (");
+    buf2 = &buf[strlen(buf)];
+    for (i = 0; i < addr_count; i++) {
+      if (dev->filter_address[i][0] & 0x01) continue; /* skip multicast addresses */
+      eth_mac_fmt(&dev->filter_address[i], mac);
+      if (!strstr(buf2, mac))   /* eliminate duplicates */
+        sprintf(&buf2[strlen(buf2)], "%s(ether src %s)", (*buf2) ? " or " : "", mac);
+    }
+    sprintf (&buf[strlen(buf)], ")");
+  }
+  /* When starting, DECnet sends out a packet with the source and destination
+     addresses set to the same value as the DECnet MAC address. This packet is
+     designed to find and help diagnose DECnet address conflicts. Normally, this
+     packet would not be seen by the sender, only by the other machine that has
+     the same DECnet address. If the ethernet subsystem is reflecting packets,
+     DECnet will fail to start if it sees the reflected packet, since it thinks
+     another system is using this DECnet address. We have to let these packets
+     through, so that if another machine has the same DECnet address that we
+     can detect it. Both eth_write() and eth_callback() help by checking the
+     reflection count - eth_write() adds the reflection count to
+     dev->decnet_self_sent, and eth_callback() check the value - if the
+     dev->decnet_self_sent count is zero, then the packet has come from another
+     machine with the same address, and needs to be passed on to the simulated
+     machine. */
+  memset(dev->decnet_addr, 0, sizeof(ETH_MAC));
+  /* check for decnet address in filters */
+  if ((addr_count) && (dev->reflections > 0)) {
+    for (i = 0; i < addr_count; i++) {
+      eth_mac_fmt(&dev->filter_address[i], mac);
+      if (memcmp(mac, "AA:00:04", 8) == 0) {
+        memcpy(dev->decnet_addr, &dev->filter_address[i], sizeof(ETH_MAC));
+        /* let packets through where dst and src are the same as our decnet address */
+        sprintf (&buf[strlen(buf)], " or ((ether dst %s) and (ether src %s))", mac, mac);
+        break;
+      }
+    }
+  }
+
+#ifdef ETH_DEBUG
+  msg = "Eth: BPF string is: |%s|\r\n";
+  printf (msg, buf);
+  if (sim_log) fprintf (sim_log, msg, buf);
+#endif
+
+
+  /* get netmask, which is required for compiling */
+  if (pcap_lookupnet(dev->handle, &bpf_subnet, &bpf_netmask, errbuf)<0) {
+      bpf_netmask = 0;
+  }
+  /* compile filter string */
+  if ((status = pcap_compile(dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
+    sprintf(errbuf, "%s", pcap_geterr(dev->handle));
+    msg = "Eth: pcap_compile error: %s\r\n";
+    printf(msg, errbuf);
+    if (sim_log) fprintf (sim_log, msg, errbuf);
+    /* show erroneous BPF string */
+    msg = "Eth: BPF string is: |%s|\r\n";
+    printf (msg, buf);
+    if (sim_log) fprintf (sim_log, msg, buf);
+  } else {
+    /* apply compiled filter string */
+    if ((status = pcap_setfilter(dev->handle, &bpf)) < 0) {
+      sprintf(errbuf, "%s", pcap_geterr(dev->handle));
+      msg = "Eth: pcap_setfilter error: %s\r\n";
+      printf(msg, errbuf);
+      if (sim_log) fprintf (sim_log, msg, errbuf);
+    } else {
+#if !defined (WIN_PCAP)
+      /* set file non-blocking */
+      status = pcap_setnonblock (dev->handle, 1, errbuf);
+#endif
+    }
+    pcap_freecode(&bpf);
+  }
+
   return SCPE_OK;
+}
+
+/*
+     The libpcap provided API pcap_findalldevs() on most platforms, will 
+     leverage the getifaddrs() API if it is available in preference to 
+     alternate platform specific methods of determining the interface list.
+
+     A limitation of getifaddrs() is that it returns only interfaces which
+     have associated addresses.  This may not include all of the interesting
+     interfaces that we are interested in since a host may have dedicated
+     interfaces for a simulator, which is otherwise unused by the host.
+
+     One could hand craft the the build of libpcap to specifically use 
+     alternate methods to implement pcap_findalldevs().  However, this can 
+     get tricky, and would then result in a sort of deviant libpcap.
+
+     Additionally, we're really only interested in Ethernet LAN type 
+     interfaces here.  It would be nice if the flags provided by pcap_if_t
+     actually told us if an interface was a Point to Point or a LAN interface 
+     and if it was an ethernet.  This isn't implemented anywhere.
+
+     This routine exists to allow platform specific code to validate and/or 
+     extend the set of available interfaces to include any that are not
+     returned by pcap_findalldevs.
+
+*/
+int eth_host_devices(int used, int max, ETH_LIST* list)
+{
+  return used;
 }
 
 int eth_devices(int max, ETH_LIST* list)
 {
-  int   i, index, len;
-  uint8 buffer[2048];
-  uint8 buffer2[2048];
-  uint8* cptr = buffer2;
-  unsigned long size = sizeof(buffer);
-  unsigned long ret;
+  pcap_if_t* alldevs;
+  pcap_if_t* dev;
+  int i;
+  char errbuf[PCAP_ERRBUF_SIZE];
 
-  /* get names of devices from packet driver */
-  ret = PacketGetAdapterNames(buffer, &size);
-
-  /* device names in ascii or unicode format? */
-  if ((buffer[1] == 0) && (buffer[3] == 0)) { /* unicode.. <sigh> */
-    int i = 0;
-    int cptr_inc = 2;
-    /* want to use buffer for scanning, so copy to buffer2 */
-    memcpy (buffer2, buffer, sizeof(buffer));
-    /* convert unicode to ascii (assuming every other byte is zero) */
-    while (cptr < (buffer2 + sizeof(buffer2))) {
-      buffer[i] = *cptr;
-      if ((buffer[i] == 0) && (buffer[i-1] == 0)) { /* end of unicode devices */
-        /* descriptions are in ascii, so change increment */
-        cptr_inc = 1;
-      }
-      cptr += cptr_inc;
-      i++;
+  /* retrieve the device list */
+  if (pcap_findalldevs(&alldevs, errbuf) == -1) {
+    char* msg = "Eth: error in pcap_findalldevs: %s\r\n";
+    printf (msg, errbuf);
+    if (sim_log) fprintf (sim_log, msg, errbuf);
+  } else {
+    /* copy device list into the passed structure */
+    for (i=0, dev=alldevs; dev; dev=dev->next) {
+      if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name))) continue;
+      list[i].num = i;
+      sprintf(list[i].name, "%s", dev->name);
+      if (dev->description)
+        sprintf(list[i].desc, "%s", dev->description);
+      else
+        sprintf(list[i].desc, "%s", "No description available");
+      if (i++ >= max) break;
     }
+
+    /* free device list */
+    pcap_freealldevs(alldevs);
   }
 
-  /* scan ascii string and load list*/
-  index = 0;
-  cptr = buffer;
-  /* extract device names and numbers */
-  while (len = strlen(cptr)) {
-    list[index].num = index;
-    strcpy(list[index].name, cptr);
-    cptr += len + 1;
-    index++;
-  }
-  cptr += 2;
-  /* extract device descriptions */
-  for (i=0; i < index; i++) {
-    len = strlen(cptr);
-    strcpy(list[i].desc, cptr);
-    cptr += len + 1;
-  }
-  return index; /* count of devices */
+  /* Add any host specific devices and/or validate those already found */
+  i = eth_host_devices(i, max, list);
+
+  /* return device count */
+  return i;
 }
 
-#endif /* (_WIN32 || linux || __NetBSD__ || __OpenBSD__) && USE_NETWORK */
-
-/*============================================================================*/
-/*                          linux-specific code                               */
-/*============================================================================*/
-
-#if defined (linux) && defined (USE_NETWORK)
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <features.h>    /* for the glibc version number */
-#if (__GLIBC__ >= 2 && __GLIBC_MINOR >= 1) || __GLIBC__ >= 3
-#include <netpacket/packet.h>
-#include <net/ethernet.h>     /* the L2 protocols */
-#else /*__GLIBC__*/
-#include <asm/types.h>
-#include <linux/if.h>
-#include <linux/if_arp.h>
-#include <linux/if_packet.h>
-#include <linux/if_ether.h>   /* The L2 protocols */
-#endif /*__GLIBC__*/
-
-int pcap_sendpacket(pcap_t* handle, u_char* msg, int len)
-{
-  return (send(pcap_fileno(handle), msg, len, 0) == len)?0:-1;
-}
-
-int PacketGetAdapterNames(char* buffer, unsigned long* size)
-{
-  struct ifreq ifr;
-  int iindex = 1;
-  int sock = socket(PF_PACKET, SOCK_RAW, 0);
-  int ptr = 0;
-
-  ifr.ifr_ifindex = iindex;
-
-  while (ioctl(sock, SIOCGIFNAME, &ifr) == 0) {
-	  /* Only use ethernet interfaces */
-	  if ((0 == ioctl(sock, SIOCGIFHWADDR, &ifr)) &&
-	      (ifr.ifr_hwaddr.sa_family == ARPHRD_ETHER)) {
-	    strcpy(buffer+ptr, ifr.ifr_name);
-	    ptr += strlen(buffer+ptr)+1;
-  	}
-	  ifr.ifr_ifindex = ++iindex;
-  }
-  if (ptr == 0) { /* Found any Ethernet Interfaces? */
-    /* No, so try some good guesses since the SIOCGIFNAME ioctl
-       doesn't always return the ethernet interfaces, at least not
-	     Debian or Red Hat running on sparc boxes. */
-
-    for (iindex=0; iindex < 10; ++iindex) {
-      sprintf(ifr.ifr_name, "eth%d", iindex);
-	    if ((0 == ioctl(sock, SIOCGIFHWADDR, &ifr)) &&
-	       (ifr.ifr_hwaddr.sa_family == ARPHRD_ETHER)) {
-	      strcpy(buffer+ptr, ifr.ifr_name);
-	      ptr += strlen(buffer+ptr)+1;
-	    }
-	  }
-  }
-
-  close(sock);
-
-  buffer[ptr++] = '\0';
-  buffer[ptr++] = '\0';
-  *size = ptr;
-}
-
-#endif /* linux && USE_NETWORK */
-
-/*============================================================================*/
-/*                          NetBSD/OpenBSD-specific code                      */
-/*============================================================================*/
-
-#if (defined (__NetBSD__) || defined(__OpenBSD__)) && defined (USE_NETWORK)
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <net/if_dl.h>
-#include <net/if_types.h>
-#include <ifaddrs.h>
-#include <string.h>
-
-int pcap_sendpacket(pcap_t* handle, u_char* msg, int len)
-{
-  return (write(pcap_fileno(handle), msg, len) == len)?0:-1;
-}
-
-int PacketGetAdapterNames(char* buffer, unsigned long* size)
-{
-  const struct sockaddr_dl *sdl;
-  struct ifaddrs *ifap, *ifa;
-  char *p;
-  int ptr = 0;
-
-  if (getifaddrs(&ifap) != 0) {
-    *size = 0;
-    return (0);
-  }
-
-  p = NULL;
-  for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr->sa_family != AF_LINK)
-      continue;
-    if (p && strcmp(p, ifa->ifa_name) == 0)
-      continue;
-    sdl = (const struct sockaddr_dl *) ifa->ifa_addr;
-    if (sdl->sdl_type != IFT_ETHER)
-      continue;
-
-    strcpy(buffer+ptr, ifa->ifa_name);
-    ptr += strlen(ifa->ifa_name)+1;
-  }
-
-  freeifaddrs(ifap);
-
-  buffer[ptr++] = '\0';
-  buffer[ptr++] = '\0';
-  *size = ptr;
-
-  return (ptr);
-}
-
-#endif /* (__NetBSD__ || __OpenBSD__) && USE_NETWORK */
-
+#endif /* USE_NETWORK */

@@ -25,6 +25,7 @@
 
    ipli, iplo	12556B interprocessor link pair
 
+   21-Dec-03	RMS	Adjusted ipl_ptime for TSB (from Mike Gemeny)
    09-May-03	RMS	Added network device flag
    31-Jan-03	RMS	Links are full duplex (found by Mike Gemeny)
 */
@@ -49,7 +50,7 @@
 extern uint32 PC;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 extern FILE *sim_log;
-int32 ipl_ptime = 400;					/* polling interval */
+int32 ipl_ptime = 31;					/* polling interval */
 int32 ipl_stopioe = 0;					/* stop on error */
 int32 ipl_hold[2] = { 0 };				/* holding character */
 
@@ -339,7 +340,7 @@ return SCPE_OK;
 
 t_stat ipl_detach (UNIT *uptr)
 {
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;	/* attached? */
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* attached? */
 if (uptr->flags & UNIT_ACTV) sim_close_sock (uptr->DSOCKET, 1);
 else {	if (uptr->flags & UNIT_ESTB)			/* if established, */
 	    sim_close_sock (uptr->DSOCKET, 0);		/* close data socket */

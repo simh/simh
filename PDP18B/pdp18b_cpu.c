@@ -1,6 +1,6 @@
 /* pdp18b_cpu.c: 18b PDP CPU simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,10 @@
 
    cpu		PDP-4/7/9/15 central processor
 
+   31-Dec-03	RMS	Fixed bug in cpu_set_hist
+   02-Nov-03	RMS	Changed PDP-9,-15 default to API
+   26-Oct-03	RMS	Fixed bug in PDP-4,-7,-9 autoincrement addressing
+   19-Sep-03	RMS	Changed instruction history to be dynamically sized
    31-Aug-03	RMS	Added instruction history
 			Fixed PDP-15-specific implementation of API priorities
    16-Aug-03	RMS	Fixed PDP-15-specific handling of EAE unsigned mul/div
@@ -277,9 +281,11 @@
 #define UNIT_XVM	(1 << UNIT_V_XVM)
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
-#define HIST_SIZE	4096
 #define HIST_API	0x40000000
 #define HIST_PI		0x20000000
+#define HIST_PC		0x10000000
+#define HIST_MIN	64
+#define HIST_MAX	65536
 #define HIST_M_LVL	0x3F
 #define HIST_V_LVL	6
 struct InstHistory {
@@ -303,7 +309,7 @@ struct InstHistory {
 #define PROT_DFLT	0
 #define ASW_DFLT	017763
 #else
-#define API_DFLT	UNIT_NOAPI			/* for now */
+#define API_DFLT	0
 #define PROT_DFLT	UNIT_PROT
 #define ASW_DFLT	017720
 #endif
@@ -355,7 +361,7 @@ int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
 int32 hst_p = 0;					/* history pointer */
 int32 hst_lnt = 0;					/* history length */
-static struct InstHistory hst[HIST_SIZE] = { { 0 } };	/* instruction history */
+struct InstHistory *hst = NULL;				/* instruction history */
 
 extern int32 sim_int_char;
 extern int32 sim_interval;
@@ -1510,7 +1516,7 @@ t_stat Ia (int32 ma, int32 *ea, t_bool jmp)
 int32 t;
 t_stat sta = MM_OK;
 
-if ((ma & B_DAMASK) == 010) {				/* autoindex? */
+if ((ma & B_DAMASK & ~07) == 010) {			/* autoindex? */
 	Read (ma, &t, DF);				/* add 1 before use */
 	t = (t + 1) & DMASK;
 	sta = Write (ma, t, DF);  }
@@ -1588,7 +1594,7 @@ t_stat Ia (int32 ma, int32 *ea, t_bool jmp)
 int32 t;
 t_stat sta = MM_OK;
 
-if ((ma & B_DAMASK) == 010) {				/* autoindex? */
+if ((ma & B_DAMASK & ~07) == 010) {			/* autoindex? */
 	ma = ma & 017;					/* always in bank 0 */
 	Read (ma, &t, DF);				/* +1 before use */
 	t = (t + 1) & DMASK;
@@ -1799,7 +1805,7 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 if (usmd && (sw & SWMASK ('V'))) {
 	if (XVM) addr = RelocXVM (addr, REL_C);
 	else if (RELOC) addr = Reloc15 (addr, REL_C);
-	if (addr < 0) return STOP_MME;  }
+	if ((int32) addr < 0) return STOP_MME;  }
 #endif
 if (addr >= MEMSIZE) return SCPE_NXM;
 if (vptr != NULL) *vptr = M[addr] & DMASK;
@@ -1814,7 +1820,7 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 if (usmd && (sw & SWMASK ('V'))) {
 	if (XVM) addr = RelocXVM (addr, REL_C);
 	else if (RELOC) addr = Reloc15 (addr, REL_C);
-	if (addr < 0) return STOP_MME;  }
+	if ((int32) addr < 0) return STOP_MME;  }
 #endif
 if (addr >= MEMSIZE) return SCPE_NXM;
 M[addr] = val & DMASK;
@@ -1933,11 +1939,20 @@ int32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-	for (i = 0; i < HIST_SIZE; i++) hst[i].pc = 0;
+	for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+	hst_p = 0;
 	return SCPE_OK;  }
-lnt = (int32) get_uint (cptr, 10, HIST_SIZE, &r);
-if (r != SCPE_OK) return SCPE_ARG;
-hst_lnt = lnt;
+lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+hst_p = 0;
+if (hst_lnt) {
+	free (hst);
+	hst_lnt = 0;
+	hst = NULL;  }
+if (lnt) {
+	hst = calloc (sizeof (struct InstHistory), lnt);
+	if (hst == NULL) return SCPE_MEM;
+	hst_lnt = lnt;  }
 return SCPE_OK;
 }
 
@@ -1952,25 +1967,26 @@ extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
 	UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
-di = hst_p + HIST_SIZE - hst_lnt;			/* work forward */
+fprintf (st, "PC      L AC      MQ      IR\n\n");
+di = hst_p;						/* work forward */
 for (k = 0; k < hst_lnt; k++) {				/* print specified */
-	h = &hst[(di++) % HIST_SIZE];			/* entry pointer */
-	if (h->pc == 0) continue;			/* filled in? */
-	if (h->pc & (HIST_API | HIST_PI)) {		/* interrupt event? */
+	h = &hst[(di++) % hst_lnt];			/* entry pointer */
+	if (h->pc & HIST_PC) {				/* instruction? */
+	    l = (h->lac >> 18) & 1;			/* link */
+	    fprintf (st, "%06o  %o %06o  %06o  ", h->pc & AMASK, l, h->lac & DMASK, h->mq);
+	    sim_eval[0] = h->ir;
+	    sim_eval[1] = h->ir1;
+	    if ((fprint_sym (st, h->pc & AMASK, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+		fprintf (st, "(undefined) %06o", h->ir);
+	    }						/* end else instruction */
+	else if (h->pc & (HIST_API | HIST_PI)) {	/* interrupt event? */
 	    if (h->pc & HIST_PI)			/* PI? */
-		fprintf (st, "%06o PI LVL 0-4 =", h->pc & AMASK);
-		else fprintf (st, "%06o API %d LVL 0-4 =", h->pc & AMASK, h->mq);
+		fprintf (st, "%06o  PI LVL 0-4 =", h->pc & AMASK);
+		else fprintf (st, "%06o  API %d LVL 0-4 =", h->pc & AMASK, h->mq);
 	    for (j = API_HLVL; j >= 0; j--)
 		fprintf (st, " %02o", (h->ir >> (j * HIST_V_LVL)) & HIST_M_LVL);
 	    }
-	else {						/* instruction */
-	    l = (h->lac >> 18) & 1;			/* link */
-	    fprintf (st, "%06o %o %06o %06o ", h->pc, l, h->lac & DMASK, h->mq);
-	    sim_eval[0] = h->ir;
-	    sim_eval[1] = h->ir1;
-	    if ((fprint_sym (st, h->pc, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
-		fprintf (st, "(undefined) %06o", h->ir);
-	    }						/* end else instruction */
+	else continue;					/* invalid */
 	fputc ('\n', st);				/* end line */
 	}						/* end for */
 return SCPE_OK;
@@ -1980,13 +1996,17 @@ return SCPE_OK;
 
 void cpu_inst_hist (int32 addr, int32 inst)
 {
-hst[hst_p].pc = addr;
+t_value word;
+
+hst[hst_p].pc = addr | HIST_PC;
 hst[hst_p].ir = inst;
-if (cpu_ex (&hst[hst_p].ir1, (addr + 1) & AMASK, &cpu_unit, SWMASK ('V')))
+if (cpu_ex (&word, (addr + 1) & AMASK, &cpu_unit, SWMASK ('V')))
 	hst[hst_p].ir1 = 0;
+else hst[hst_p].ir1 = word;
 hst[hst_p].lac = LAC;
 hst[hst_p].mq = MQ;
-hst_p = (hst_p + 1) % HIST_SIZE;
+hst_p = (hst_p + 1);
+if (hst_p >= hst_lnt) hst_p = 0;
 return;
 }
 
@@ -2001,6 +2021,7 @@ for (j = 0; j < API_HLVL+1; j++) hst[hst_p].ir =
 hst[hst_p].ir1 = 0;
 hst[hst_p].lac = 0;
 hst[hst_p].mq = lvl;
-hst_p = (hst_p + 1) % HIST_SIZE;
+hst_p = (hst_p + 1);
+if (hst_p >= hst_lnt) hst_p = 0;
 return;
 }

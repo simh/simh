@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Oct-03    MP      Changed WIN32 winsock include to use winsock2.h to
+                        avoid a conflict if sim_sock.h and sim_ether.h get
+                        included by the same module.
    20-Mar-03	RMS	Added missing timerclear definition for VMS (from
 			Robert Alan Byer)
    15-Feb-03	RMS	Added time.h for EMX (from Holger Veit)
@@ -39,7 +42,7 @@
 
 #if defined (_WIN32)					/* Windows */
 #undef INT_PTR						/* hack, hack */
-#include <winsock.h>
+#include <winsock2.h>
 
 #elif !defined (__OS2__) || defined (__EMX__)		/* VMS, Mac, Unix, OS/2 EMX */
 #define WSAGetLastError()	errno			/* Windows macros */

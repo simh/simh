@@ -259,6 +259,16 @@ control registers for the interrupt system.
 				most recent PC change first
 	WRU		8	interrupt character
 
+The CPU can maintain a history of the most recently executed instructions.
+This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
+
+	SET CPU HISTORY		clear history buffer
+	SET CPU HISTORY=0	disable history
+	SET CPU HISTORY=n	enable history, display length = n
+	SHOW CPU HISTORY	print CPU history
+
+The maximum length for the history is 65536 entries.
+
 2.3 Selector Channel (SELCH)
 
 An Interdata system can have 1 to 4 selector channels (SELCH0, SELCH1,

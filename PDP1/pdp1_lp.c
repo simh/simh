@@ -143,27 +143,27 @@ if (cpls & CPLS_LPT) {					/* completion pulse? */
 sbs = sbs | SB_RQ;					/* req seq break */
 if (lpt_spc) {						/* space? */
 	iosta = iosta | IOS_SPC;			/* set flag */
-	if ((lpt_unit.flags & UNIT_ATT) == 0)		/* attached? */
+	if ((uptr->flags & UNIT_ATT) == 0)		/* attached? */
 	    return IORETURN (lpt_stopioe, SCPE_UNATT);
-	fputs (lpt_cc[lpt_spc & 07], lpt_unit.fileref);	/* print cctl */
-	if (ferror (lpt_unit.fileref)) {		/* error? */
+	fputs (lpt_cc[lpt_spc & 07], uptr->fileref);	/* print cctl */
+	if (ferror (uptr->fileref)) {			/* error? */
 	    perror ("LPT I/O error");
-	    clearerr (lpt_unit.fileref);
+	    clearerr (uptr->fileref);
 	    return SCPE_IOERR;  }
 	lpt_ovrpr = 0;  }				/* dont overprint */
 else {	iosta = iosta | IOS_PNT;			/* print */
-	if ((lpt_unit.flags & UNIT_ATT) == 0)		/* attached? */
+	if ((uptr->flags & UNIT_ATT) == 0)		/* attached? */
 	    return IORETURN (lpt_stopioe, SCPE_UNATT);
-	if (lpt_ovrpr) fputc ('\r', lpt_unit.fileref);	/* overprint? */
-	fputs (lpt_buf, lpt_unit.fileref);		/* print buffer */
-	if (ferror (lpt_unit.fileref)) {		/* test error */
+	if (lpt_ovrpr) fputc ('\r', uptr->fileref);	/* overprint? */
+	fputs (lpt_buf, uptr->fileref);			/* print buffer */
+	if (ferror (uptr->fileref)) {			/* test error */
 	    perror ("LPT I/O error");
-	    clearerr (lpt_unit.fileref);
+	    clearerr (uptr->fileref);
 	    return SCPE_IOERR;  }
 	lpt_bptr = 0;
 	for (i = 0; i <= LPT_BSIZE; i++) lpt_buf[i] = 0; /* clear buffer */
 	lpt_ovrpr = 1;  }				/* set overprint */
-lpt_unit.pos = ftell (lpt_unit.fileref);		/* update position */
+lpt_unit.pos = ftell (uptr->fileref);			/* update position */
 return SCPE_OK;
 }
 

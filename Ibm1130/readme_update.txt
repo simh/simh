@@ -2,6 +2,18 @@ Version: 10 July 2003
 
 History (partial):
 
+2003-11-15	Changed default value of TTO STIME to 200. It was
+		defined using a constant from sim_defs.h which was
+		changed from 10 to 100 at some point. APL\1130 has a
+		sychronization bug & hangs if the console output complete
+		interrupt occurs between the XIO SENSE and WAIT instructions.
+		This bug is hit frequently if the delay time is set to
+		100 instructions. 10 worked reliably, but is really not realistic,
+ 		and 200 may not be adequate in all cases, but we'll try 200 for now.
+
+2003-11-00	Updated GUI to allow drag and drop to simulated card
+		reader, tear-off from simulated printer
+
 2003-07-10	Fixed disk and console terminal bugs uncovered by
 		APL\1130. Added APL keyboard and output font support
 		to enable use of APL\1130. APL will be released soon.

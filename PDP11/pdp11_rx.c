@@ -121,7 +121,7 @@ int32 rx_cwait = 100;					/* command time */
 int32 rx_swait = 10;					/* seek, per track */
 int32 rx_xwait = 1;					/* tr set time */
 uint8 rx_buf[RX_NUMBY] = { 0 };				/* sector buffer */
-static int32 bptr = 0;					/* buffer pointer */
+int32 rx_bptr = 0;					/* buffer pointer */
 int32 rx_enb = 1;					/* device enable */
 
 DEVICE rx_dev;
@@ -157,7 +157,7 @@ REG rx_reg[] = {
 	{ ORDATA (RXTA, rx_track, 8) },
 	{ ORDATA (RXSA, rx_sector, 8) },
 	{ DRDATA (STAPTR, rx_state, 3), REG_RO },
-	{ DRDATA (BUFPTR, bptr, 7)  },
+	{ DRDATA (BUFPTR, rx_bptr, 7)  },
 	{ FLDATA (INT, IREQ (RX), INT_V_RX) },
 	{ FLDATA (ERR, rx_csr, RXCS_V_ERR) },
 	{ FLDATA (TR, rx_csr, RXCS_V_TR) },
@@ -237,7 +237,7 @@ case 0:							/* RXCS */
 	if ((data & CSR_GO) && (rx_state == IDLE)) {	/* new function? */
 	    rx_csr = data & (RXCS_IE + RXCS_DRV + RXCS_FUNC);
 	    drv = ((rx_csr & RXCS_DRV)? 1: 0);		/* reselect drive */
-	    bptr = 0;					/* clear buf pointer */
+	    rx_bptr = 0;				/* clear buf pointer */
 	    switch (RXCS_GETFNC (data)) {		/* case on func */
 	    case RXCS_FILL:
 		rx_state = FILL;			/* state = fill */
@@ -287,10 +287,10 @@ return SCPE_OK;
    RWDS		Save sector, set TR, set RWDT
    RWDT		Save track, set RWXFR
    RWXFR	Read/write buffer
-   FILL		copy ir to rx_buf[bptr], advance ptr
-		if bptr > max, finish command, else set tr
-   EMPTY	if bptr > max, finish command, else
-		copy rx_buf[bptr] to ir, advance ptr, set tr
+   FILL		copy ir to rx_buf[rx_bptr], advance ptr
+		if rx_bptr > max, finish command, else set tr
+   EMPTY	if rx_bptr > max, finish command, else
+		copy rx_buf[rx_bptr] to ir, advance ptr, set tr
    CMD_COMPLETE	copy requested data to ir, finish command
    INIT_COMPLETE read drive 0, track 1, sector 1 to buffer, finish command
 
@@ -302,6 +302,7 @@ t_stat rx_svc (UNIT *uptr)
 {
 int32 i, func;
 uint32 da;
+int8 *fbuf = uptr->filebuf;
 
 func = RXCS_GETFNC (rx_csr);				/* get function */
 switch (rx_state) {					/* case on state */
@@ -310,17 +311,17 @@ case IDLE:						/* idle */
 	return SCPE_IERR;				/* done */
 
 case EMPTY:						/* empty buffer */
-	if (bptr >= RX_NUMBY) rx_done (0, 0);		/* done all? */
+	if (rx_bptr >= RX_NUMBY) rx_done (0, 0);	/* done all? */
 	else {
-	    rx_dbr = rx_buf[bptr];			/* get next */
-	    bptr = bptr + 1;
+	    rx_dbr = rx_buf[rx_bptr];			/* get next */
+	    rx_bptr = rx_bptr + 1;
 	    rx_csr = rx_csr | RXCS_TR;  }		/* set xfer */
 	break;
 
 case FILL:						/* fill buffer */
-	rx_buf[bptr] = rx_dbr;				/* write next */
-	bptr = bptr + 1;
-	if (bptr < RX_NUMBY) rx_csr = rx_csr | RXCS_TR;	/* if more, set xfer */
+	rx_buf[rx_bptr] = rx_dbr;			/* write next */
+	rx_bptr = rx_bptr + 1;
+	if (rx_bptr < RX_NUMBY) rx_csr = rx_csr | RXCS_TR; /* more? set xfer */
 	else rx_done (0, 0);				/* else done */
 	break;
 
@@ -350,13 +351,13 @@ case RWXFR:
 	if (func == RXCS_WRDEL) rx_esr = rx_esr | RXES_DD;	/* del data? */
 	if (func == RXCS_READ) {			/* read? */
 	    for (i = 0; i < RX_NUMBY; i++)
-		rx_buf[i] = *(((int8 *) uptr->filebuf) + da + i);  }
+		rx_buf[i] = fbuf[da + i];  }
 	else {
 	    if (uptr->flags & UNIT_WPRT) {		/* write and locked? */
 		rx_done (RXES_WLK, 0100);		/* done, error */
 		break;  }
 	    for (i = 0; i < RX_NUMBY; i++)		/* write */
-		*(((int8 *) uptr->filebuf) + da + i) = rx_buf[i];
+		fbuf[da + i] = rx_buf[i];
 	    da = da + RX_NUMBY;
 	    if (da > uptr->hwmark) uptr->hwmark = da;  }
 	rx_done (0, 0);					/* done */
@@ -377,7 +378,7 @@ case INIT_COMPLETE:					/* init complete */
 	    break;	}
 	da = CALC_DA (1, 1);				/* track 1, sector 1 */
 	for (i = 0; i < RX_NUMBY; i++)			/* read sector */
-	    rx_buf[i] = *(((int8 *) uptr->filebuf) + da + i);
+	    rx_buf[i] = fbuf[da + i];
 	rx_done (RXES_ID, 0);				/* set done */
 	if ((rx_unit[1].flags & UNIT_ATT) == 0) rx_ecode = 0020;
 	break;  }					/* end case state */

@@ -1,6 +1,6 @@
 /* hp2100_stddev.c: HP2100 standard devices simulator
 
-   Copyright (c) 1993-2003, Robert M. Supnik
+   Copyright (c) 1993-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tty		12531C buffered teleprinter interface
    clk		12539C time base generator
 
+   29-Mar-03	RMS	Added support for console backpressure
    25-Apr-03	RMS	Added extended file support
    22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Revised BOOT command for IBL ROMs
@@ -538,15 +539,20 @@ return dat;
 
 t_stat tto_out (int32 c)
 {
-t_stat ret = SCPE_OK;
+t_stat r;
 
 if (tty_mode & TM_PRI) {				/* printing? */
 	if (tty_unit[TTO].flags & UNIT_UC) {		/* UC only? */
 	    c = c & 0177;
 	    if (islower (c)) c = toupper (c);  }
 	else c = c & ((tty_unit[TTO].flags & UNIT_8B)? 0377: 0177);
-	ret = sim_putchar (c);				/* output char */
+	if (r = sim_putchar_s (c)) return r;		/* output char */
 	tty_unit[TTO].pos = tty_unit[TTO].pos + 1;  }
+return SCPE_OK;
+}
+
+t_stat ttp_out (int32 c)
+{
 if (tty_mode & TM_PUN) {				/* punching? */
 	if ((tty_unit[TTP].flags & UNIT_ATT) == 0)	/* attached? */
 	    return IORETURN (ttp_stopioe, SCPE_UNATT);
@@ -555,7 +561,7 @@ if (tty_mode & TM_PUN) {				/* punching? */
 	    clearerr (tty_unit[TTP].fileref);
 	    return SCPE_IOERR;  }
 	tty_unit[TTP].pos = ftell (tty_unit[TTP].fileref);  }
-return ret;
+return SCPE_OK;
 }
 
 t_stat tti_svc (UNIT *uptr)
@@ -574,19 +580,25 @@ if (tty_mode & TM_KBD) {				/* keyboard enabled? */
 	tty_buf = c;					/* put char in buf */
 	tty_unit[TTI].pos = tty_unit[TTI].pos + 1;
 	setFLG (dev);					/* set flag */
-	if (c) return tto_out (c);  }			/* echo or punch? */
+	if (c) {
+	    tto_out (c);				/* echo? */
+	    return ttp_out (c);  }  }			/* punch? */
 return SCPE_OK;
 }
 
 t_stat tto_svc (UNIT *uptr)
 {
 int32 c, dev;
+t_stat r;
 
+c = tty_buf;						/* get char */
+tty_buf = 0377;						/* defang buf */
+if ((r = tto_out (c)) != SCPE_OK) {			/* output; error? */
+	sim_activate (uptr, uptr->wait);		/* retry */
+	return ((r == SCPE_STALL)? SCPE_OK: r);  }	/* !stall? report */
 dev = tty_dib.devno;					/* get device no */
 setFLG (dev);						/* set done flag */
-c = tty_buf;
-tty_buf = 0377;						/* defang buf */
-return tto_out (c);					/* print and/or punch */
+return ttp_out (c);					/* punch if enabled */
 }
 
 /* Reset routine */

@@ -1,4 +1,4 @@
-SIMH FAQ, 15-Sep-2003
+SIMH FAQ, 31-Dec-2003
 
 1 General
 
@@ -158,22 +158,22 @@ The documentation contains more details on supported models and peripherals.
 	Host System	Compiler		comments
 
 	OpenVMS/VAX	DEC C		no 64b support; no Ethernet support
-	OpenVMS/Alpha	DEC C		no Ethernet support
+	OpenVMS/Alpha	DEC C		Ethernet support provided in pcap-vms
 
 	Windows 9x or	Mingw/gcc or	requires WinPcap for Ethernet support
 	Windows 2000 or	Visual C++ or
 	Windows XP	Borland C++
 
-	Mac OS/X			no Ethernet support
+	Mac OS/X			requires libpcap for Ethernet support
 
-	Linux		gcc
+	Linux		gcc		requires libpcap for Ethernet support
 	Tru64 UNIX	DEC C		no Ethernet support
 	AIX				no Ethernet support
 	Solaris				no Ethernet support
 	HP/UX				no Ethernet support
-	NetBSD		gcc
-	OpenBSD		gcc
-	FreeBSD		gcc		no Ethernet support
+	NetBSD		gcc		requires libpcap for Ethernet support
+	OpenBSD		gcc		requires libpcap for Ethernet support
+	FreeBSD		gcc		requires libpcap for Ethernet support
 
 	OS/2		EMX		no Ethernet support
 
@@ -247,6 +247,14 @@ Download the SIMH source kit, and UNZIP it using the /TEXT=AUTO qualifier to
 the directory that you want SIMH to reside in.  Use MMK or MMS and the
 descrip.mms file to build the binaries.
 
+On a VAX use:
+
+$ MMx
+
+On a Alpha use:
+$ MMx/MACRO=("__ALPHA__=1")              !Without ethernet support
+$ MMx/MACRO=("__ALPHA__=1","__PCAP__=1") !With    ethernet support
+
 UNZIP can be found on the VMS freeware CDs, or from www.info-zip.org
 MMK   can be found on the VMS freeware CDs, or from www.madgoat.com
 MMS   can be licensed from HP/Compaq/Digital.
@@ -254,7 +262,7 @@ MMS   can be licensed from HP/Compaq/Digital.
 Note that the PDP-10 emulator cannot be built and used on VAX/VMS, because
 the DEC C compiler for VAX/VMS does not support 64-bit integers.  DEC C on
 on Alpha VMS has the required 64-bit capability to build and run all of the
-emulators.
+emulators. Ethernet support is only available on Alpha VMS 7.3-1 and above.
 
 --------------------------------------------------------------------------------
 
@@ -355,7 +363,7 @@ use the various network copy programs (FTP, DECNET) to transfer files.
 
 2.9 Can I connect real devices on the host computer to SIMH?
 
-No.
+Not yet.
 
 --------------------------------------------------------------------------------
 

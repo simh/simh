@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tti,tto	KL8E terminal input/output
 
+   29-Dec-03	RMS	Added console output backpressure support
    25-Apr-03	RMS	Revised for extended file support
    02-Mar-02	RMS	Added SET TTI CTRL-C
    22-Dec-02	RMS	Added break support
@@ -233,13 +234,15 @@ t_stat tto_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-dev_done = dev_done | INT_TTO;				/* set done */
-int_req = INT_UPDATE;					/* update interrupts */
 if (tto_unit.flags & UNIT_KSR) {			/* UC only? */
 	c = tto_unit.buf & 0177;
 	if (islower (c)) c = toupper (c);  }
 else c = tto_unit.buf & ((tto_unit.flags & UNIT_8B)? 0377: 0177);
-if ((r = sim_putchar (c)) != SCPE_OK) return r;
+if ((r = sim_putchar_s (c)) != SCPE_OK) {		/* output char; error? */
+	sim_activate (uptr, uptr->wait);		/* try again */
+	return ((r == SCPE_STALL)? SCPE_OK: r);  }	/* if !stall, report */
+dev_done = dev_done | INT_TTO;				/* set done */
+int_req = INT_UPDATE;					/* update interrupts */
 tto_unit.pos = tto_unit.pos + 1;
 return SCPE_OK;
 }

@@ -57,10 +57,10 @@
 // -------------------------------------------------------------------------------------------
 
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <memory.h>
 #include <ctype.h>
+#include <string.h>
 #include "ibm1130_fmt.h"
 
 #define MAXLINE		81									// maximum output line size

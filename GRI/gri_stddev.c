@@ -1,6 +1,6 @@
 /* gri_stddev.c: GRI-909 standard devices
 
-   Copyright (c) 2001-2003, Robert M Supnik
+   Copyright (c) 2001-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    hsp		S42-006 high speed punch
    rtc		real time clock
 
+   29-Dec-03	RMS	Added support for console backpressure
    25-Apr-03	RMS	Revised for extended file support
    22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7b/8B support to terminal
@@ -246,12 +247,14 @@ t_stat tto_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-dev_done = dev_done | INT_TTO;				/* set ready */
 if (tto_unit.flags & UNIT_KSR) {			/* KSR? */
 	c = tto_unit.buf & 0177;			/* force 7b */
 	if (islower (c)) c = toupper (c);  }		/* cvt to UC */
 else c = tto_unit.buf & ((tto_unit.flags & UNIT_8B)? 0377: 0177);
-if ((r = sim_putchar (c)) != SCPE_OK) return r;		/* output */
+if ((r = sim_putchar_s (c)) != SCPE_OK) {		/* output; error? */
+	sim_activate (uptr, uptr->wait);		/* try again */
+	return ((r == SCPE_STALL)? SCPE_OK: r);  }	/* !stall? report */
+dev_done = dev_done | INT_TTO;				/* set ready */
 tto_unit.pos = tto_unit.pos + 1;
 return SCPE_OK;
 }

@@ -25,6 +25,7 @@
 
    rf		RF08 fixed head disk
 
+   26-Oct-03	RMS	Cleaned up buffer copy code
    26-Jul-03	RMS	Fixed bug in set size routine
    14-Mar-03	RMS	Fixed variable platter interaction with save/restore
    03-Mar-03	RMS	Fixed autosizing
@@ -274,6 +275,7 @@ return AC;
 t_stat rf_svc (UNIT *uptr)
 {
 int32 pa, t, mex;
+int16 *fbuf = uptr->filebuf;
 
 UPDATE_PCELL;						/* update photocell */
 if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
@@ -290,13 +292,14 @@ do {	if ((uint32) rf_da >= rf_unit.capac) {		/* disk overflow? */
  	M[RF_MA] = (M[RF_MA] + 1) & 07777;		/* incr mem addr */
 	pa = mex | M[RF_MA]; 				/* add extension */
 	if (uptr->FUNC == RF_READ) {			/* read? */
-	    if (MEM_ADDR_OK (pa))			/* check nxm */
-		M[pa] = *(((int16 *) uptr->filebuf) + rf_da);  }
+	    if (MEM_ADDR_OK (pa))			/* if !nxm */
+		M[pa] = fbuf[rf_da];  }			/* read word */
 	else {						/* write */
 	    t = ((rf_da >> 15) & 030) | ((rf_da >> 14) & 07);
-	    if ((rf_wlk >> t) & 1) rf_sta = rf_sta | RFS_WLS;
-	    else {
-	    	*(((int16 *) uptr->filebuf) + rf_da) = M[pa];
+	    if ((rf_wlk >> t) & 1)			/* write locked? */
+		rf_sta = rf_sta | RFS_WLS;
+	    else {					/* not locked */
+	    	fbuf[rf_da] = M[pa];			/* write word */
 		if (((uint32) rf_da) >= uptr->hwmark) uptr->hwmark = rf_da + 1;  }  }
 	rf_da = (rf_da + 1) & 03777777;  }		/* incr disk addr */
 while ((M[RF_WC] != 0) && (rf_burst != 0));		/* brk if wc, no brst */

@@ -2,9 +2,8 @@
 // Microsoft Visual C++ generated include file.
 // Used by ibm1130.rc
 //
-
 #define IDB_CONSOLE                     101
-#define IDC_HAND			102
+#define IDC_HAND                        102
 
 // Next default values for new objects
 // 

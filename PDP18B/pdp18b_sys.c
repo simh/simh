@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Oct-03	RMS	Added DECtape off reel message
    30-Jul-03	RMS	Fixed FPM class mask
    18-Jul-03	RMS	Added FP15 support
    02-Mar-03	RMS	Split loaders apart for greater flexibility
@@ -170,7 +171,8 @@ const char *sim_stop_messages[] = {
 	"Invalid API interrupt",
 	"Non-standard device number",
 	"Memory management error",
-	"FP15 instruction disabled"  };
+	"FP15 instruction disabled",
+	"DECtape off reel"  };
 
 /* Binary loaders */
 

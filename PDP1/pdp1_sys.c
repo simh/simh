@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Dec-03	RMS	Added parallel drum support, drum mnemonics
+   18-Oct-03	RMS	Added DECtape off reel message
    01-Sep-03	RMS	Added support for loading in multiple fields
    22-Jul-03	RMS	Updated for "hardware" RIM loader
    05-Dec-02	RMS	Added drum support
@@ -48,6 +50,7 @@ extern DEVICE tty_dev;
 extern DEVICE lpt_dev;
 extern DEVICE dt_dev;
 extern DEVICE drm_dev;
+extern DEVICE drp_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern int32 M[];
@@ -80,6 +83,7 @@ DEVICE *sim_devices[] = {
 	&lpt_dev,
 	&dt_dev,
 	&drm_dev,
+	&drp_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -89,11 +93,12 @@ const char *sim_stop_messages[] = {
 	"Breakpoint",
 	"Nested XCT's",
 	"Nested indirect addresses",
-	"Infinite I/O wait state"  };
+	"Infinite I/O wait state",
+	"DECtape off reel"  };
 
 /* Binary loader - supports both RIM format and Macro block format */
 
-int32 getw (FILE *inf)
+int32 pdp1_getw (FILE *inf)
 {
 int32 i, tmp, word;
 
@@ -111,11 +116,11 @@ t_stat rim_load (FILE *inf, int32 fld)
 int32 origin, val;
 
 for (;;) {
-	if ((val = getw (inf)) < 0) return SCPE_FMT;
+	if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
 	if (((val & 0760000) == OP_DIO) ||		/* DIO? */
 	    ((val & 0760000) == OP_DAC)) {		/* hack - Macro1 err */
 	    origin = val & DAMASK;
-	    if ((val = getw (inf)) < 0) return SCPE_FMT;
+	    if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
 	    M[fld | origin] = val;  }
 	else if ((val & 0760000) == OP_JMP) {		/* JMP? */
 	    PC = fld | (val & DAMASK);
@@ -130,23 +135,23 @@ t_stat blk_load (FILE *inf, int32 fld)
 int32 val, start, count, csum;
 
 for (;;) {
-	if ((val = getw (inf)) < 0) return SCPE_FMT;	/* get word, EOF? */
+	if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT; /* get word, EOF? */
 	if ((val & 0760000) == OP_DIO) {		/* DIO? */
 	    csum = val;					/* init checksum */
 	    start = val & DAMASK;			/* starting addr */
-	    if ((val = getw (inf)) < 0) return SCPE_FMT;
+	    if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
 	    if ((val & 0760000) != OP_DIO) return SCPE_FMT;
 	    csum = csum + val;
 	    if (csum > 0777777) csum = (csum + 1) & 0777777;
 	    count = (val & DAMASK) - start + 1;		/* block count */
 	    if (count <= 0) return SCPE_FMT;
 	    while (count--) {				/* loop on data */
-		if ((val = getw (inf)) < 0) return SCPE_FMT;
+		if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
 		csum = csum + val;
 		if (csum > 0777777) csum = (csum + 1) & 0777777;
 		M[fld | start] = val;
 		start = (start + 1) & DAMASK;  }
-	    if ((val = getw (inf)) < 0) return SCPE_FMT;
+	    if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
 	    if (val != csum) return SCPE_CSUM;  }
 	else if ((val & 0760000) == OP_JMP) {		/* JMP? */
 	    PC = fld | (val & DAMASK);
@@ -213,6 +218,9 @@ static const char *opcode[] = {
  "LSM", "ESM", "CBS",
  "LEM", "EEM", "CKS",
  "MSE", "MLC", "MRD", "MWR", "MRS",
+ "DIA", "DBA", "DWC", "DRA", "DCL",
+ "DRD", "DWR", "DBL", "DCN",
+ "DTD", "DSE", "DSP",
 
  "SKP", "SKP I", "CLO",
  "SFT", "LAW", "OPR",
@@ -265,6 +273,9 @@ static const int32 opc_val[] = {
  0720054+I_NPN, 0720055+I_NPN, 0720056+I_NPN,
  0720074+I_NPN, 0724074+I_NPN, 0720033+I_NPN,
  0720301+I_NPN, 0720401+I_NPN, 0720501+I_NPN, 0720601+I_NPN, 0720701+I_NPN, 
+ 0720061+I_NPN, 0722061+I_NPN, 0720062+I_NPN, 0722062+I_NPN, 0720063+I_NPN,
+ 0720161+I_NPN, 0721161+I_NPN, 0720162+I_NPN, 0721162+I_NPN,
+ 0720163+I_NPN, 0720164+I_NPN, 0721164+I_NPN,
 
  0640000+I_NPN, 0650000+I_NPN, 0651600+I_NPN,
  0660000+I_NPN, 0700000+I_LAW, 0760000+I_NPN,

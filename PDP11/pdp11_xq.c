@@ -69,6 +69,27 @@
 
   Modification history:
 
+  03-Dec-03  DTH  Added minimum name length to show xq eth
+  25-Nov-03  DTH  Reworked interrupts to fix broken XQB implementation
+  19-Nov-03  MP   Rearranged timer reset sequencing to allow for a device to be
+                  disabled after it had been enabled.
+  17-Nov-03  DTH  Standardized #include of timeb.h
+  28-Sep-03  MP   - Fixed bug in xq_process_setup which would leave the
+                  device in promiscuous or all multicast mode once it
+                  ever had been there.
+                  - Fixed output format in show_xq_sanity to end in "\n"
+                  - Added display of All Multicase and promiscuous to
+                  xq_show_filters
+                  - The stuck in All Multicast or Promiscuous issue is 
+                  worse than previously thought.  See comments in 
+                  xq_process_setup.                  
+                  - Change xq_setmac to also allow ":" as a address 
+                  separator character, since sim_ether's eth_mac_fmt
+                  formats them with this separator character.
+                  - Changed xq_sw_reset to behave more like the set of
+                  actions described in Table 3-6 of the DELQA manua.
+                  The manual mentions "N/A" which I'm interpreting to
+                  mean "Not Affected".
   05-Jun-03  DTH  Added receive packet splitting
   03-Jun-03  DTH  Added SHOW XQ FILTERS
   02-Jun-03  DTH  Added SET/SHOW XQ STATS (packet statistics), runt & giant processing
@@ -92,7 +113,7 @@
                   of Receiver Enabled.  This was an issue since the
                   it seems that at least VMS's XQ driver makes this
                   transition often and the resulting overhead reduces
-                  the simulated CPU instruction execution thruput by
+                  the simulated CPU instruction execution throughput by
                   about 40%.  I start the system id timer on device
                   reset and it fires once a second so that it can
                   leverage the reasonably recalibrated tmr_poll value.
@@ -100,7 +121,7 @@
                   dynamically computed clock values to achieve an
                   approximate interval of 100 per second.  This is
                   more than sufficient for normal system behaviour
-                  expecially since we service recieves with every
+                  expecially since we service receives with every
                   transmit.  The previous fixed value of 2500
                   attempted to get 200/sec but it was a guess that
                   didn't adapt.  On faster host systems (possibly
@@ -128,7 +149,7 @@
   05-Dec-02  MP   Restructured the flow of processing in xq_svc so that eth_read
                   is called repeatedly until either a packet isn't found or
                   there is no room for another one in the queue.  Once that has
-                  been done, xq_processrdbl is called to pass the queued packets
+                  been done, xq_process_rdbl is called to pass the queued packets
                   into the simulated system as space is available there.
                   xq_process_rdbl is also called at the beginning of xq_svc to
                   drain the queue into the simulated system, making more room
@@ -216,8 +237,6 @@ t_stat xq_process_xbdl(CTLR* xq);
 t_stat xq_dispatch_xbdl(CTLR* xq);
 void xq_start_receiver(void);
 void xq_sw_reset(CTLR* xq);
-int32 xq_inta (void);
-int32 xq_intb (void);
 t_stat xq_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat xq_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void xq_start_santmr(CTLR* xq);
@@ -230,6 +249,9 @@ void xqa_read_callback(int status);
 void xqb_read_callback(int status);
 void xqa_write_callback(int status);
 void xqb_write_callback(int status);
+void xq_setint (CTLR* xq);
+void xq_clrint (CTLR* xq);
+int32 xq_int (void);
 
 struct xq_device    xqa = {
   xqa_read_callback,                        /* read callback routine */
@@ -249,7 +271,7 @@ struct xq_device    xqb = {
 
 /* SIMH device structures */
 DIB xqa_dib = { IOBA_XQ, IOLN_XQ, &xq_rd, &xq_wr,
-		1, IVCL (XQ), 0, { &xq_inta } };
+		1, IVCL (XQ), 0, { &xq_int } };
 
 UNIT xqa_unit[] = {
  { UDATA (&xq_svc, UNIT_ATTABLE + UNIT_DISABLE, 2047) },  /* receive timer */
@@ -268,6 +290,7 @@ REG xqa_reg[] = {
   { GRDATA ( XBDL, xqa.xbdl, XQ_RDX, 32, 0) },
   { GRDATA ( VAR,  xqa.var,  XQ_RDX, 16, 0) },
   { GRDATA ( CSR,  xqa.csr,  XQ_RDX, 16, 0) },
+  { FLDATA ( INT,  xqa.irq, 0) },
   { GRDATA ( SETUP_PRM, xqa.setup.promiscuous, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SETUP_MLT, xqa.setup.multicast, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SETUP_L1, xqa.setup.l1, XQ_RDX, 32, 0), REG_HRO},
@@ -279,7 +302,7 @@ REG xqa_reg[] = {
 };
 
 DIB xqb_dib = { IOBA_XQB, IOLN_XQB, &xq_rd, &xq_wr,
-		1, IVCL (XQ), 0, { &xq_intb } };
+		1, IVCL (XQ), 0, { &xq_int } };
 
 UNIT xqb_unit[] = {
  { UDATA (&xq_svc, UNIT_ATTABLE + UNIT_DISABLE, 2047) },  /* receive timer */
@@ -298,6 +321,7 @@ REG xqb_reg[] = {
   { GRDATA ( XBDL, xqb.xbdl, XQ_RDX, 32, 0) },
   { GRDATA ( VAR,  xqb.var,  XQ_RDX, 16, 0) },
   { GRDATA ( CSR,  xqb.csr,  XQ_RDX, 16, 0) },
+  { FLDATA ( INT,  xqb.irq, 0) },
   { GRDATA ( SETUP_PRM, xqb.setup.promiscuous, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SETUP_MLT, xqb.setup.multicast, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SETUP_L1, xqb.setup.l1, XQ_RDX, 32, 0), REG_HRO},
@@ -372,7 +396,7 @@ void xq_csr_changes(CTLR* xq, uint16 data);
 void xq_var_changes(CTLR* xq, uint16 data);
 
 /* sanity timer debugging */
-#include <sys\timeb.h>
+#include <sys/timeb.h>
 struct timeb start, finish;
 
 #endif /* XQ_DEBUG */
@@ -575,7 +599,9 @@ t_stat xq_setmac (UNIT* uptr, int32 val, char* cptr, void* desc)
   if (len != 17) return SCPE_ARG;
   /* make sure byte separators are OK */
   for (i=2; i<len; i=i+3) {
-    if ((cptr[i] != '-') && (cptr[i] != '.')) return SCPE_ARG;
+    if ((cptr[i] != '-') && 
+        (cptr[i] != '.') &&
+        (cptr[i] != ':')) return SCPE_ARG;
     cptr[i] = '\0';
   }
   /* get and set address bytes */
@@ -601,15 +627,17 @@ t_stat xq_setmac (UNIT* uptr, int32 val, char* cptr, void* desc)
 t_stat xq_showeth (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
 #define XQ_MAX_LIST 10
-  int i;
   ETH_LIST  list[XQ_MAX_LIST];
   int number = eth_devices(XQ_MAX_LIST, list);
 
   fprintf(st, "ETH devices:\n");
-  if (number)
+  if (number) {
+    int i, min, len;
+    for (i=0, min=0; i<number; i++)
+      if ((len = strlen(list[i].name)) > min) min = len;
     for (i=0; i<number; i++)
-      fprintf(st,"  %d  %s (%s)\n", i, list[i].name, list[i].desc);
-  else
+      fprintf(st,"  %d  %-*s (%s)\n", i, min, list[i].name, list[i].desc);
+  } else
     fprintf(st, "  no network devices are available\n");
   return SCPE_OK;
 }
@@ -662,6 +690,10 @@ t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
     eth_mac_fmt((ETH_MAC*)xq->var->setup.macs[i], buffer);
     fprintf(st, "  [%2d]: %s\n", i, buffer);
   };
+  if (xq->var->setup.multicast)
+    fprintf(st, "All Multicast Receive Mode\n");
+  if (xq->var->setup.promiscuous)
+    fprintf(st, "Promiscuous Receive Mode\n");
   return SCPE_OK;
 }
 
@@ -695,8 +727,8 @@ t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, void* desc)
 
   fprintf(st, "sanity=");
   switch (xq->var->sanity.enabled) {
-    case 0:  fprintf(st, "OFF"); break;
-    case 1:  fprintf(st, "ON");  break;
+    case 0:  fprintf(st, "OFF\n"); break;
+    case 1:  fprintf(st, "ON\n");  break;
   }
   return SCPE_OK;
 }
@@ -724,7 +756,7 @@ t_stat xq_nxm_error(CTLR* xq)
 
   /* interrupt if required */
   if (xq->var->csr & XQ_CSR_IE)
-    SET_INT(XQ);
+    xq_setint(xq);
 
   return SCPE_OK;
 }
@@ -761,7 +793,7 @@ void xq_write_callback (CTLR* xq, int status)
   /* update csr */
   xq->var->csr |= XQ_CSR_XI;
   if (xq->var->csr & XQ_CSR_IE)
-    SET_INT(XQ);
+    xq_setint(xq);
 
   /* reset sanity timer */
   xq_reset_santmr(xq);
@@ -846,7 +878,7 @@ t_stat xq_process_rbdl(CTLR* xq)
   uint16 b_length, w_length, rbl;
   uint32 address;
   struct xq_msg_itm* item;
-  char* rbuf;
+  uint8* rbuf;
 
 #ifdef XQ_DEBUG
   fprintf(stderr,"%s: CSR - Processing read\n", xq->dev->name);
@@ -906,7 +938,7 @@ t_stat xq_process_rbdl(CTLR* xq)
 #endif
         /* pad runts with zeros up to minimum size - this allows "legal" (size - 60)
            processing of those weird short ARP packets that seem to occur occasionally */
-        memset(&item->packet.msg[rbl], 0, ETH_MIN_PACKET);
+        memset(&item->packet.msg[rbl], 0, ETH_MIN_PACKET-rbl);
         rbl = ETH_MIN_PACKET;
       };
 
@@ -976,7 +1008,7 @@ t_stat xq_process_rbdl(CTLR* xq)
     /* mark transmission complete */
     xq->var->csr |= XQ_CSR_RI;
     if (xq->var->csr & XQ_CSR_IE)
-      SET_INT(XQ);
+      xq_setint(xq);
 
     /* set to next bdl (implicit chain) */
     xq->var->rbdl_ba += 12;
@@ -1059,15 +1091,42 @@ t_stat xq_process_setup(CTLR* xq)
         xq->var->setup.macs[i+7][j] = xq->var->write_buffer.msg[(i + 0101) + (j * 8)];
     }
 
+  /*
+     Under VMS the setup packet that is passed to turn promiscuous 
+     off after it has been on doesn't seem to follow the rules documented 
+     in both the DEQNA and DELQA manuals.
+     These rules seem to say that setup packets less than 128 should only 
+     modify the address filter set and probably not the All-Multicast and 
+     Promiscuous modes, however, VMS V5-5 and V7.3 seem to send a 127 byte 
+     packet to turn this functionality off.  I'm not sure how real hardware 
+     behaves in this case, since the only consequence is extra interrupt 
+     load.  To realize and retain the benefits of the newly added BPF 
+     functionality in sim_ether, I've modified the logic implemented here
+     to disable Promiscuous mode when a "small" setup packet is processed.
+     I'm deliberately not modifying the All-Multicast mode the same way
+     since I don't have an observable case of its behavior.  These two 
+     different modes come from very different usage situations:
+        1) Promiscuous mode is usually entered for relatively short periods 
+           of time due to the needs of a specific application program which
+           is doing some sort of management/monitoring function (i.e. tcpdump)
+        2) All-Multicast mode is only entered by the OS Kernel Port Driver
+           when it happens to have clients (usually network stacks or service 
+           programs) which as a group need to listen to more multicast ethernet
+           addresses than the 12 (or so) which the hardware supports directly.
+     so, I believe that the All-Multicast mode, is first rarely used, and if 
+     it ever is used, once set, it will probably be set either forever or for 
+     long periods of time, and the additional interrupt processing load to
+     deal with the distinctly lower multicast traffic set is clearly lower than
+     that of the promiscuous mode.
+  */
+  xq->var->setup.promiscuous = 0;
   /* process high byte count */
   if (xq->var->write_buffer.len > 128) {
     uint16 len = xq->var->write_buffer.len;
     uint16 led, san;
 
-    if (len & XQ_SETUP_MC)
-      xq->var->setup.multicast = 1;
-    if (len & XQ_SETUP_PM)
-      xq->var->setup.promiscuous = 1;
+    xq->var->setup.multicast = (0 != (len & XQ_SETUP_MC));
+    xq->var->setup.promiscuous = (0 != (len & XQ_SETUP_PM));
     if (led = (len & XQ_SETUP_LD) >> 2) {
       switch (led) {
         case 1: xq->var->setup.l1 = 0; break;
@@ -1214,7 +1273,7 @@ t_stat xq_process_xbdl(CTLR* xq)
         /* mark transmission complete */
         xq->var->csr |= XQ_CSR_XI;
         if (xq->var->csr & XQ_CSR_IE)
-          SET_INT(XQ);
+          xq_setint(xq);
 
         /* now trigger "read" of setup or loopback packet */
         if (~xq->var->csr & XQ_CSR_RL)
@@ -1446,13 +1505,26 @@ void xq_sw_reset(CTLR* xq)
     xq->var->csr |= XQ_CSR_OK;
 
   /* clear CPU interrupts */
-  CLR_INT(XQ);
+  xq_clrint(xq);
 
   /* flush read queue */
   xq_clear_queue(&xq->var->ReadQ);
 
   /* clear setup info */
-  memset (&xq->var->setup, 0, sizeof(xq->var->setup));
+  xq->var->setup.multicast = 0;
+  xq->var->setup.promiscuous = 0;
+  if (xq->var->etherface) {
+    int count = 0;
+    ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
+    ETH_MAC filters[XQ_FILTER_MAX + 1];
+
+    /* set ethernet filter */
+    /* memcpy (filters[count++], xq->mac, sizeof(ETH_MAC)); */
+    for (i = 0; i < XQ_FILTER_MAX; i++)
+      if (memcmp(zeros, &xq->var->setup.macs[i], sizeof(ETH_MAC)))
+        memcpy (filters[count++], xq->var->setup.macs[i], sizeof(ETH_MAC));
+    eth_filter (xq->var->etherface, count, filters, xq->var->setup.multicast, xq->var->setup.promiscuous);
+    }
 }
 
 /* write registers: */
@@ -1676,7 +1748,7 @@ t_stat xq_process_bootrom (CTLR* xq)
   /* mark transmission complete */
   xq->var->csr |= XQ_CSR_RI;
   if (xq->var->csr & XQ_CSR_IE)
-    SET_INT(XQ);
+    xq_setint(xq);
 
   /* reset sanity timer */
   xq_reset_santmr(xq);
@@ -1724,8 +1796,8 @@ t_stat xq_wr_csr(CTLR* xq, int32 data)
   /* check and correct CPU interrupt state */
   old_int_state = (saved_csr      & XQ_CSR_IE) && (saved_csr    & (XQ_CSR_XI | XQ_CSR_RI));
   new_int_state = (xq->var->csr   & XQ_CSR_IE) && (xq->var->csr & (XQ_CSR_XI | XQ_CSR_RI));
-  if ( old_int_state && !new_int_state) CLR_INT(XQ);
-  if (!old_int_state &&  new_int_state) SET_INT(XQ);
+  if ( old_int_state && !new_int_state) xq_clrint(xq);
+  if (!old_int_state &&  new_int_state) xq_setint(xq);
 
 #ifdef VM_PDP11
   /* request boot/diagnostic rom? [PDP-11 only] */
@@ -1803,12 +1875,6 @@ t_stat xq_reset(DEVICE* dptr)
   /* init control status register */
   xq->var->csr = XQ_CSR_RL | XQ_CSR_XL;
 
-  /* reset ethernet interface */
-  if (xq->var->etherface) {
-    status = eth_filter (xq->var->etherface, 1, &xq->var->mac, 0, 0);
-    xq->var->csr |= XQ_CSR_OK;
-  }
-
   /* init read queue (first time only) */
   status = xq_init_queue (xq, &xq->var->ReadQ);
   if (status != SCPE_OK)
@@ -1816,6 +1882,11 @@ t_stat xq_reset(DEVICE* dptr)
 
   /* clear read queue */
   xq_clear_queue(&xq->var->ReadQ);
+
+  /* reset ethernet interface */
+  if (xq->var->etherface) {
+    status = eth_filter (xq->var->etherface, 1, &xq->var->mac, 0, 0);
+    xq->var->csr |= XQ_CSR_OK;
 
   /* start sanity timer if power-on SANITY is set */
   switch (xq->var->type) {
@@ -1830,6 +1901,8 @@ t_stat xq_reset(DEVICE* dptr)
       xq_start_idtmr(xq);
       break;
   };
+  }
+
 
   return SCPE_OK;
 }
@@ -1841,11 +1914,9 @@ void xq_start_santmr(CTLR* xq)
   /* must be recalculated each time since tmr_poll is a dynamic number */
   const int32 quarter_sec = (clk_tps * tmr_poll) / 4;
 
-#if 0
 #ifdef XQ_DEBUG
   fprintf(stderr,"%s: SANITY TIMER ENABLED, qsecs: %d, poll:%d\n",
     xq->dev->name, xq->var->sanity.quarter_secs, tmr_poll);
-#endif
 #endif
   if (sim_is_active(xq_santmr))   /* cancel timer, just in case */
     sim_cancel(xq_santmr);
@@ -1897,12 +1968,10 @@ t_stat xq_sansvc(UNIT* uptr)
     If this section is entered, it means that the sanity timer has expired
     without being reset, and the controller must reboot the processor.
     */
-#if 0
 #ifdef XQ_DEBUG
     ftime(&finish);
     fprintf(stderr,"%s: SANITY TIMER EXPIRED, qsecs: %d, poll: %d, elapsed: %d\n",
            xq->dev->name, xq->var->sanity.quarter_secs, tmr_poll, finish.time - start.time);
-#endif
 #endif
     xq_boot_host();
   }
@@ -1944,6 +2013,9 @@ t_stat xq_system_id (CTLR* xq, const ETH_MAC dest, uint16 receipt_id)
   uint8* const msg = &system_id.msg[0];
   t_stat status;
 
+#ifdef XQ_DEBUG
+  fprintf(stderr,"%s: SYSTEM ID BROADCAST\n", xq->dev->name);
+#endif
   memset (&system_id, 0, sizeof(system_id));
   memcpy (&msg[0], dest, sizeof(ETH_MAC));
   memcpy (&msg[6], xq->var->setup.valid ? xq->var->setup.macs[0] : xq->var->mac, sizeof(ETH_MAC));
@@ -2089,6 +2161,9 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
   /* turn on transceiver power indicator */
   xq->var->csr |= XQ_CSR_OK;
 
+  /* reset the device with the new attach info */
+  xq_reset(xq->dev);
+
   return SCPE_OK;
 }
 
@@ -2098,6 +2173,7 @@ t_stat xq_detach(UNIT* uptr)
 {
   t_stat status;
   CTLR* xq = xq_unit2ctlr(uptr);
+  int i;
 
   if (uptr->flags & UNIT_ATT) {
     status = eth_close (xq->var->etherface);
@@ -2106,6 +2182,9 @@ t_stat xq_detach(UNIT* uptr)
     free(uptr->filename);
     uptr->filename = NULL;
     uptr->flags &= ~UNIT_ATT;
+    /* cancel all timers (ethernet, sanity, system_id) */
+    for (i=0; i<3; i++)
+        sim_cancel(&xq->unit[i]);
   }
 
   /* turn off transceiver power indicator */
@@ -2114,14 +2193,38 @@ t_stat xq_detach(UNIT* uptr)
   return SCPE_OK;
 }
 
-int32 xq_inta (void)
+void xq_setint(CTLR* xq)
 {
-  return xqa_dib.vec;
+  xq->var->irq = 1;
+  SET_INT(XQ);
+  return;
 }
 
-int32 xq_intb (void)
+void xq_clrint(CTLR* xq)
 {
-  return xqb_dib.vec;
+  int i;
+  xq->var->irq = 0;                               /* set controller irq off */
+  /* clear master interrupt? */
+  for (i=0; i<XQ_MAX_CONTROLLERS; i++)            /* check all controllers.. */
+    if (xq_ctrl[i].var->irq) {                    /* if any irqs enabled */
+      SET_INT(XQ);                                /* set master interrupt on */
+      return;
+    }
+  CLR_INT(XQ);                                    /* clear master interrupt */
+  return;
+}
+
+int32 xq_int (void)
+{
+  int i;
+  for (i=0; i<XQ_MAX_CONTROLLERS; i++) {
+    CTLR* xq = &xq_ctrl[i];
+    if (xq->var->irq) {                           /* if interrupt pending */
+      xq_clrint(xq);                              /* clear interrupt */
+      return xq->dib->vec;                        /* return vector */
+    }
+  }
+  return 0;                                       /* no interrupt request active */
 }
 
 /*==============================================================================

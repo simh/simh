@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Oct-03	RMS	Added DECtape off reel message
    18-Jul-03	RMS	Added FP15 support
 			Added XVM support
 			Added EAE option for PDP-4
@@ -110,6 +111,7 @@
 #define STOP_NONSTD	6				/* non-std dev num */
 #define STOP_MME	7				/* mem mgt error */
 #define STOP_FPDIS	8				/* fp inst, fpp disabled */
+#define STOP_DTOFF	9				/* DECtape off reel */
 
 /* Peripheral configuration */
 

@@ -1,6 +1,6 @@
 /* nova_tt.c: NOVA console terminal simulator
 
-   Copyright (c) 1993-2003, Robert M. Supnik
+   Copyright (c) 1993-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti		terminal input
    tto		terminal output
 
+   29-Dec-03	RMS	Added console backpressure support
    25-Apr-03	RMS	Revised for extended file support
    05-Jan-02	RMS	Fixed calling sequence for setmod
    03-Oct-02	RMS	Added DIBs
@@ -188,14 +189,17 @@ return 0;
 
 t_stat tto_svc (UNIT *uptr)
 {
-int32 c, temp;
+int32 c;
+t_stat r;
 
+c = tto_unit.buf & 0177;
+if ((tto_unit.flags & UNIT_DASHER) && (c == 031)) c = '\b';
+if ((r = sim_putchar_s (c)) != SCPE_OK) {		/* output; error? */
+	sim_activate (uptr, uptr->wait);		/* try again */
+	return ((r == SCPE_STALL)? SCPE_OK: r);  }	/* !stall? report */
 dev_busy = dev_busy & ~INT_TTO;				/* clear busy */
 dev_done = dev_done | INT_TTO;				/* set done */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-c = tto_unit.buf & 0177;
-if ((tto_unit.flags & UNIT_DASHER) && (c == 031)) c = '\b';
-if ((temp = sim_putchar (c)) != SCPE_OK) return temp;
 tto_unit.pos = tto_unit.pos + 1;
 return SCPE_OK;
 }

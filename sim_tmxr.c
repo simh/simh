@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   01-Nov-03	RMS	Cleaned up attach routine
    09-Mar-03	RMS	Fixed bug in SHOW CONN
    22-Dec-02	RMS	Fixed bugs in IAC+IAC receive and transmit sequences
 			Added support for received break (all from by Mark Pizzolato)
@@ -268,23 +269,23 @@ return;
 	*lp	=	pointer to line descriptor
 	chr	=	characters
    Outputs:
-	none
+	status	=	ok, connection lost, or stall
 */
 
-void tmxr_putc_ln (TMLN *lp, int32 chr)
+t_stat tmxr_putc_ln (TMLN *lp, int32 chr)
 {
-if (lp->conn == 0) return;				/* no conn? done */
-if (lp->txbpi < TMXR_MAXBUF) {				/* room for char? */
+if (lp->conn == 0) return SCPE_LOST;			/* no conn? lost */
+if (lp->txbpi < (TMXR_MAXBUF - 1)) {			/* room for char (+ IAC)? */
 	lp->txb[lp->txbpi] = (char) chr;		/* buffer char */
 	lp->txbpi = lp->txbpi + 1;			/* adv pointer */
-	if (((char) chr == TN_IAC) &&			/* IAC? */
-	    (lp->txbpi < TMXR_MAXBUF)) {		/* room for char? */
+	if ((char) chr == TN_IAC) {			/* IAC? */
 	    lp->txb[lp->txbpi] = (char) chr;		/* IAC + IAC */
 	    lp->txbpi = lp->txbpi + 1;  }		/* adv pointer */	
 	if (lp->txbpi > (TMXR_MAXBUF - TMXR_GUARD))	/* near full? */
-	    lp->xmte = 0;  }				/* disable line */
-else lp->xmte = 0;					/* disable line */
-return;
+	    lp->xmte = 0;				/* disable line */
+	return SCPE_OK;  }				/* char sent */
+lp->xmte = 0;						/* no room, dsbl line */
+return SCPE_STALL;					/* char not sent */
 }
 
 /* Poll for output
@@ -362,12 +363,6 @@ t_stat tmxr_attach (TMXR *mp, UNIT *uptr, char *cptr)
 char* tptr;
 t_stat r;
 
-if (uptr->flags & UNIT_ATT) {				/* attached? */
-	DEVICE *dptr = find_dev_from_unit (uptr);	/* find device */
-	if (dptr == NULL) return SCPE_IERR;
-	if (dptr->detach != NULL) r = dptr->detach (uptr);
-	else r = detach_unit (uptr);			/* detach unit */
-	if (r != SCPE_OK) return r;  }
 tptr = malloc (strlen (cptr) + 1);			/* get string buf */
 if (tptr == NULL) return SCPE_MEM;			/* no more mem? */
 r = tmxr_open_master (mp, cptr);			/* open master socket */
@@ -404,7 +399,7 @@ return SCPE_OK;
 
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr)
 {
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;	/* attached? */
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* attached? */
 tmxr_close_master (mp);					/* close master socket */
 free (uptr->filename);					/* free port string */
 uptr->filename = NULL;

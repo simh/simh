@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-1 Simulator Usage
-Date:	15-Sep-2003
+Date:	15-Dec-2003
 
 			COPYRIGHT NOTICE
 
@@ -65,6 +65,7 @@ PTR,PTP		integral paper tape reader/punch
 TTY		console typewriter
 LPT		Type 62 line printer
 DRM		Type 24 serial drum
+DRP		Type 23 parallel drum
 DT		Type 550 Microtape (DECtape)
 
 The PDP-1 simulator implements the following unique stop conditions:
@@ -77,6 +78,7 @@ The PDP-1 simulator implements the following unique stop conditions:
 	  instruction execution
 	- I/O wait, and no I/O operations outstanding (i.e, no I/O
 	  completion will ever occur)
+	- a simulated DECtape runs off the end of its reel
 
 The PDP-1 loader supports RIM format tapes and BLK format tapes.  If
 the file to be loaded has an extension of .BIN, or switch -B is specified,
@@ -302,7 +304,6 @@ The DECtape controller implements these registers:
 	BEF		1	block end flag
 	ERF		1	error flag
 	LTIME		31	time between lines
-	ACTIME		31	time to accelerate to full speed
 	DCTIME		31	time to decelerate to a full stop
 	SUBSTATE	2	read/write command substate
 	POS[0:7]	32	position, in lines, units 0-7
@@ -313,10 +314,19 @@ among the DECtape parameters, or the DECtape simulator will fail to
 operate correctly.
 
 	- LTIME must be at least 6
-	- ACTIME must be less than DCTIME, and both need to be at
-	  least 100 times LTIME
+	- DCTIME needs to be at least 100 times LTIME
 
-2.4 Type 24 Serial Drum (DRM)
+Acceleration time is set to 75% of deceleration time.
+
+2.4 Drums
+
+The PDP-1 supported two drums: the Type 23 parallel drum (DRP) and
+the Type 24 serial drum (DRM).  Both use device addresses 061-064;
+accordingly, only one can be enabled at a time.  By default, the
+Type 24 serial drum is enabled, and the Type 23 parallel drum is
+disabled.
+
+2.4.1 Type 24 Serial Drum (DRM)
 
 The serial drum (DRM) implements these registers:
 
@@ -324,12 +334,40 @@ The serial drum (DRM) implements these registers:
 
 	DA		9	drum address (sector number)
 	MA		16	current memory address
-	INT		1	interrupt pending flag
 	DONE		1	device done flag
 	ERR		1	error flag
 	WLK		32	write lock switches
 	TIME		24	rotational latency, per word
 	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+Drum data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.4.2 Type 23 Parallel Drum (DRP)
+
+The parallel drum (DRP) implements these registers:
+
+	name		size	comments
+
+	TA		12	track address
+	RDF		5	read field
+	RDE		1	read enable flag
+	WRF		5	write field
+	WRF		1	write enable flag
+	MA		16	current memory address
+	WC		12	word count
+	BUSY		1	device busy flag
+	ERR		1	error flag
+	TIME		24	rotational latency, per word
+	STOP_IOE	1	stop on I/O error
+
 
 Error handling is as follows:
 

@@ -29,6 +29,10 @@
 
 #include "altairz80_defs.h"
 
+#if !defined (_WIN32)
+#include <unistd.h>
+#endif
+
 #define PCQ_SIZE	64													/* must be 2**n												*/
 #define PCQ_SIZE_LOG2	6												/* log2 of PCQ_SIZE										*/
 #define PCQ_MASK	(PCQ_SIZE - 1)
@@ -1686,14 +1690,18 @@ int32 sim_instr (void) {
 	register uint32 SP;
 	register uint32 IX;
 	register uint32 IY;
-	register uint32 temp, acu, sum, cbits;
-	register uint32 op, adr;
+	register uint32 temp = 0;
+	register uint32 acu = 0;
+	register uint32 sum;
+	register uint32 cbits;
+	register uint32 op;
+	register uint32 adr;
 	/*	tStates contains the number of t-states executed. One t-state is executed
 			in one microsecond on a 1MHz CPU. tStates is used real-time simulation		*/
 	register uint32 tStates;
 	uint32 tStatesInSlice; /* number of t-states in 10 mSec time-slice */
 	uint32 startTime;
-	int32 br1, br2, tStateModifier;
+	int32 br1, br2, tStateModifier = FALSE;
 
 	pc = saved_PC & ADDRMASK;					/* load local PC */
 	af[af_sel] = AF_S;
@@ -1744,7 +1752,16 @@ int32 sim_instr (void) {
 				/* clockFrequency != 0 implies that real time clock is available */
 				startTime += sliceLength;
 				tStates -= tStatesInSlice;
+#if defined (_WIN32)
 				while (sim_os_msec() <= startTime) {}		/* poor man's sleep */
+#else
+				{
+					uint32 now;
+					if (startTime > (now = sim_os_msec())) {
+						usleep(1000 * (startTime - now));
+					}
+				}
+#endif
 			}
 
 			if (timerInterrupt && (IFF & 1)) {

@@ -122,8 +122,8 @@ DEVICE rad_dev = {
 t_stat rad (uint32 fnc, uint32 inst, uint32 *dat)
 {
 int32 t, lun, new_ch;
-uint32 *wptr;
 uint32 p;
+uint32 *fbuf = rad_unit.filebuf;
 
 switch (fnc) {						/* case function */
 case IO_CONN:						/* connect */
@@ -181,9 +181,8 @@ case IO_READ:						/* read */
     if (p >= rad_unit.capac) {				/* end of disk? */
 	rad_end_op (CHF_ERR | CHF_EOR);			/* set rad err */
 	return SCPE_OK;  }
-    wptr = ((uint32 *) rad_unit.filebuf) + p;		/* ptr to word */
-    if (rad_sba & 1) *dat = *wptr & 07777;		/* odd byte? */
-    else *dat = (*wptr >> 12) & 07777;			/* even */
+    if (rad_sba & 1) *dat = fbuf[p] & 07777;		/* odd byte? */
+    else *dat = (fbuf[p] >> 12) & 07777;		/* even */
     rad_sba = rad_adjda (rad_sba, 1);			/* next byte */
     break;
 
@@ -197,9 +196,8 @@ case IO_WRITE:
 	(rad_wrp & (1 << RAD_GETLUN (rad_da)))) {	/* write prot? */
 	rad_end_op (CHF_ERR | CHF_EOR);			/* set rad err */
 	return SCPE_OK;  }
-    wptr = ((uint32 *) rad_unit.filebuf) + p;		/* ptr to word */
-    if (rad_sba & 1) *wptr = *wptr | (*dat & 07777);	/* odd byte? */
-    else *wptr = (*dat & 07777) << 12;			/* even */
+    if (rad_sba & 1) fbuf[p] = fbuf[p] | (*dat & 07777);	/* odd byte? */
+    else fbuf[p] = (*dat & 07777) << 12;		/* even */
     if (p >= rad_unit.hwmark) rad_unit.hwmark = p + 1;	/* mark hiwater */
     rad_sba = rad_adjda (rad_sba, 1);			/* next byte */
     break;
@@ -239,11 +237,11 @@ return SCPE_OK;
 t_stat rad_fill (int32 sba)
 {
 uint32 p = rad_da * RAD_NUMWD;
+uint32 *fbuf = rad_unit.filebuf;
 int32 wa = (sba + 1) >> 1;				/* whole words */
 
 if (sba && (p < rad_unit.capac)) {			/* fill needed? */
-    for ( ; wa < RAD_NUMWD; wa++)
-	*(((uint32 *) rad_unit.filebuf) + p + wa) = 0;
+    for ( ; wa < RAD_NUMWD; wa++) fbuf[p + wa] = 0;
     if ((p + wa) >= rad_unit.hwmark) rad_unit.hwmark = p + wa + 1;
     rad_adjda (sba, RAD_NUMWD - 1);  }			/* inc da */
 return SCPE_OK;

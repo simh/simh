@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   cpu			Interdata 16b CPU
+
+   22-Sep-03	RMS	Added additional instruction decode types
    07-Feb-03	RMS	Fixed bug in SETM, SETMR (found by Mark Pizzolato)
 
    The register state for the Interdata 16b CPU is:
@@ -266,7 +269,7 @@ const uint16 decrom[256] = {
 	OP_NO | OP_816,			/* FXR */
 	OP_NO | OP_816,			/* FLR */
 	0, 0, 0,			/* 30:32 */
-	OP_RR | OP_816E | OP_PRV,	/* LPSR */
+	OP_NO | OP_816E | OP_PRV,	/* LPSR */
 	0, 0, 0, 0,			/* 34:37 */
 	OP_NO | OP_816 | OP_DPF,	/* LDR */
 	OP_NO | OP_816 | OP_DPF,	/* CDR */
@@ -328,8 +331,8 @@ const uint16 decrom[256] = {
 	OP_NO | OP_716,			/* SRLS */
 	OP_NO | OP_716,			/* SLLS */
 	OP_NO,				/* STBR */
-	OP_NO,				/* LDBR */
-	OP_NO | OP_716,			/* EXBR */
+	OP_RR,				/* LDBR */
+	OP_RR | OP_716,			/* EXBR */
 	OP_NO | OP_716 | OP_PRV,	/* EPSR */
 	OP_RR | OP_PRV,			/* WBR */
 	OP_RR | OP_PRV,			/* RBR */
@@ -364,8 +367,8 @@ const uint16 decrom[256] = {
 	OP_RX | OP_ID4,			/* STM */
 	OP_RX | OP_ID4,			/* LM */
 	OP_RX,				/* STB */
-	OP_RX,				/* LDB */
-	OP_RX | OP_716,			/* CLB */
+	OP_RXB,				/* LDB */
+	OP_RXB | OP_716,		/* CLB */
 	OP_RX | OP_ID4 | OP_PRV,	/* AL */
 	OP_RXH | OP_PRV,		/* WB */
 	OP_RXH | OP_PRV,		/* RB */
@@ -552,6 +555,7 @@ while (reason == 0) {					/* loop until halted */
 uint32 dev, drom, inc, lim, opnd;
 uint32 op, r1, r1p1, r2, ea, oPC;
 uint32 rslt, t, map;
+uint32 ir1, ir2, ityp;
 int32 sr, st;
 
 if (sim_interval <= 0) {				/* check clock queue */
@@ -606,11 +610,13 @@ if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) {	/* breakpoint? */
 
 sim_interval = sim_interval - 1;
 
-t = ReadH (oPC = PC);					/* fetch instr */
-op = (t >> 8) & 0xFF;					/* isolate op, R1, R2 */
-r1 = (t >> 4) & 0xF;
-r2 = t & 0xF;
+ir1 = ReadH (oPC = PC);					/* fetch instr */
+op = (ir1 >> 8) & 0xFF;					/* isolate op, R1, R2 */
+r1 = (ir1 >> 4) & 0xF;
+r2 = ir1 & 0xF;
 drom = decrom[op];
+ityp = drom & OP_MASK;
+
 if ((drom == 0) || (drom & dec_flgs)) {			/* not in model? */
 	if (stop_inst) reason = STOP_RSRV;		/* stop or */
 	else cc = swap_psw (ILOPSW, cc);		/* swap PSW */
@@ -618,26 +624,41 @@ if ((drom == 0) || (drom & dec_flgs)) {			/* not in model? */
 if ((drom & OP_PRV) && (PSW & PSW_PRO)) {		/* priv & protected? */
 	cc = swap_psw (ILOPSW, cc);			/* swap PSW */
 	continue;  }
-switch (drom & OP_MASK) {				/* decode instruction */
+
+switch (ityp) {						/* decode instruction */
 case OP_NO:						/* no operand */
 	opnd = r2;					/* assume short */
 	break;
+
 case OP_RR:						/* reg-reg */
 	opnd = R[r2];					/* operand is R2 */
 	break;
+
 case OP_RS:						/* reg-storage */
 case OP_RX:						/* reg-mem */
 	PC = (PC + 2) & VAMASK;				/* increment PC */
-	ea = ReadH (PC);				/* fetch address */
-	if (r2) ea = (ea + R[r2]) & VAMASK;		/* index calculation */
+	ir2 = ea = ReadH (PC);				/* fetch address */
+	if (r2) ea = (ir2 + R[r2]) & VAMASK;		/* index calculation */
 	opnd = ea;					/* operand is ea */
 	break;
-case OP_RXH:						/* reg-mem read */
+
+case OP_RXB:						/* reg-mem byte */
 	PC = (PC + 2) & VAMASK;				/* increment PC */
-	ea = ReadH (PC);				/* fetch address */
+	ir2 = ea = ReadH (PC);				/* fetch address */
+	if (r2) ea = (ea + R[r2]) & VAMASK;		/* index calculation */
+	opnd = ReadB (ea);				/* fetch operand */
+	break;
+
+case OP_RXH:						/* reg-mem halfword */
+	PC = (PC + 2) & VAMASK;				/* increment PC */
+	ir2 = ea = ReadH (PC);				/* fetch address */
 	if (r2) ea = (ea + R[r2]) & VAMASK;		/* index calculation */
 	opnd = ReadH (ea);				/* fetch operand */
-	break;  }
+	break;
+	
+default:
+	return SCPE_IERR;  }
+
 PC = (PC + 2) & VAMASK;					/* increment PC */
 switch (op) {						/* case on opcode */
 
@@ -672,11 +693,9 @@ case 0xD0:						/* STM - RX */
 	    ea = (ea + 2) & VAMASK;  }			/* incr mem addr */
 	break;
 
-case 0x93:						/* LDBR - NO */
-	R[r1] = R[r2] & DMASK8;				/* load byte */
-	break;
-case 0xD3:						/* LDB - RX */
-	R[r1] = ReadB (ea);				/* load byte */
+case 0x93:						/* LDBR - RR */
+case 0xD3:						/* LDB - RXB */
+	R[r1] = opnd & DMASK8;				/* load byte */
 	break;
 
 case 0x92:						/* STBR - NO */
@@ -686,8 +705,8 @@ case 0xD2:						/* STB - RX */
 	WriteB (ea, R[r1] & DMASK8);			/* store byte */
 	break;
 
-case 0x94:						/* EXBR - NO */
-	R[r1] = (R[r2] >> 8) | ((R[r2] & DMASK8) << 8);
+case 0x94:						/* EXBR - RR */
+	R[r1] = (opnd >> 8) | ((opnd & DMASK8) << 8);
 	break;
 
 /* Control instructions */
@@ -792,8 +811,7 @@ case 0xC5:						/* CLHI - RS */
 	if (((R[r1] ^ opnd) & (~opnd ^ rslt)) & SIGN16) cc = cc | CC_V;
 	break;
 
-case 0xD4:						/* CLB - RX */
-	opnd = ReadB (ea);				/* get operand */
+case 0xD4:						/* CLB - RXB */
 	t = R[r1] & DMASK8;
 	rslt = (t - opnd) & DMASK16;			/* result */
 	CC_GL_16 (rslt);				/* set G,L */
@@ -1118,7 +1136,7 @@ case 0xC2:						/* LPSW - RX */
 	if (PSW & PSW_SQI) cc = testsysq (cc);		/* test for q */
 	break;
 
-case 0x95:						/* EPSR - RR */
+case 0x95:						/* EPSR - NO */
 	R[r1] = BUILD_PSW (cc);				/* save PSW */
 case 0x33:						/* LPSR - NO */
 	cc = newPSW (R[r2]);				/* load new PSW */

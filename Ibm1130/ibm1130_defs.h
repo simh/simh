@@ -260,6 +260,8 @@ void xio_error 			(char *msg);
 void   bail (char *msg);
 t_stat load_cr_boot (int drv, int switches);
 t_stat cr_boot (int unitno, DEVICE *dptr);
+t_stat cr_rewind (void);
+t_stat cr_detach (UNIT *uptr);
 void   calc_ints (void);							/* recalculate interrupt bitmask */
 void   trace_io (char *fmt, ...);					/* debugging printout */
 void   scp_panic (char *msg);						/* bail out of simulator */
@@ -269,9 +271,12 @@ char   hollerith_to_ascii (uint16 hol);				/* for debugging use only */
 t_bool gdu_active (void);
 void   remark_cmd (char *remark);
 void   stuff_cmd (char *cmd);
+t_bool stuff_and_wait (char *cmd, int timeout, int delay);
 void   update_gui (t_bool force);
 void   sim_init (void);
 t_stat register_cmd (char *name, t_stat (*action)(int32 flag, char *ptr), int arg, char *help);
+t_stat basic_attach (UNIT *uptr, char *cptr);
+char * quotefix (char * cptr);
 
 /* GUI interface routines */
 t_bool keyboard_is_busy (void);

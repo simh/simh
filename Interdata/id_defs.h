@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Carl Friend and Al Kossow,
    who provided key documents about the Interdata product line.
 
+   22-Sep-03	RMS	Added additional instruction decode types
    21-Jun-03	RMS	Changed subroutine argument for ARM compiler conflict
    25-Apr-03	RMS	Revised for extended file support
    28-Feb-03	RMS	Changed magtape device default to 0x85
@@ -188,9 +189,10 @@ struct BlockIO {
 #define OP_RS		0x0003				/* 16b: reg-storage */
 #define OP_RI1		0x0003				/* 32b: reg-imm 16b */
 #define OP_RX		0x0004				/* all: reg-mem */
-#define OP_RXH		0x0005				/* all: reg-mem, rd HW */
-#define OP_RXF		0x0006				/* 32b: reg-mem, rd FW */
-#define OP_RI2		0x0007				/* 32b: reg-imm 32b */
+#define OP_RXB		0x0005				/* all: reg-mem, rd BY */
+#define OP_RXH		0x0006				/* all: reg-mem, rd HW */
+#define OP_RXF		0x0007				/* 32b: reg-mem, rd FW */
+#define OP_RI2		0x0008				/* 32b: reg-imm 32b */
 #define OP_MASK		0x000F
 
 #define OP_ID4		0x0010				/* 16b: ID4 */

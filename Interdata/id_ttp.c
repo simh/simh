@@ -1,6 +1,6 @@
 /* id_ttp.c: Interdata PASLA console interface
 
-   Copyright (c) 2000-2003, Robert M. Supnik
+   Copyright (c) 2000-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttp		console (on PAS)
 
+   29-Dec-03	RMS	Added support for console backpressure
    25-Apr-03	RMS	Revised for extended file support
 */
 
@@ -195,16 +196,18 @@ t_stat ttpo_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-ttp_sta = ttp_sta & ~STA_BSY;				/* not busy */
-if (ttp_tarm) SET_INT (v_TTP + 1);			/* set intr */
 if (uptr->flags & UNIT_8B)				/* 8b? */
 	c = pas_par (ttp_cmd, uptr->buf);		/* apply parity */
 else {	c = uptr->buf & 0x7F;				/* mask char */
 	if ((uptr->flags & UNIT_UC) && islower (c))
 	    c = toupper (c);  }				/* cvt to UC */
-if (!(uptr->flags & UNIT_8B) &&				/* UC or 7b? */
-	((c == 0) || (c == 0x7F))) return SCPE_OK;	/* supr NULL, DEL */
-if ((r = sim_putchar (c)) != SCPE_OK) return r;		/* output */
+if ((uptr->flags & UNIT_8B) ||				/* UC or 7b? */
+	((c != 0) && (c != 0x7F))){			/* supr NULL, DEL */
+	if ((r = sim_putchar_s (c)) != SCPE_OK) {	/* output; error? */
+	    sim_activate (uptr, uptr->wait);		/* try again */
+	    return ((r == SCPE_STALL)? SCPE_OK: r);  }  }
+ttp_sta = ttp_sta & ~STA_BSY;				/* not busy */
+if (ttp_tarm) SET_INT (v_TTP + 1);			/* set intr */
 uptr->pos = uptr->pos + 1;				/* incr count */
 return SCPE_OK;
 }

@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Dec-03	RMS	Added support for parallel drum
+   18-Oct-03	RMS	Added DECtape off reel message
    22-Jul-03	RMS	Updated for "hardware" RIM loader
 			Revised to detect I/O wait hang
    05-Dec-02	RMS	Added IOT skip support (required by drum)
@@ -36,6 +38,7 @@
 
    Automatic multiply/divide	Type 10
    Memory extension control	Type 15
+   Parallel drum		Type 23
    Serial drum			Type 24
    Line printer control		Type 62
    Microtape (DECtape) control	Type 550
@@ -51,6 +54,7 @@
 #define STOP_XCT	4				/* nested XCT's */
 #define STOP_IND	5				/* nested indirects */
 #define STOP_WAIT	6				/* IO wait hang */
+#define STOP_DTOFF	7				/* DECtape off reel */
 
 /* Memory */
 
@@ -92,6 +96,7 @@
 #define IOS_V_SQB	11				/* sequence break */
 #define IOS_V_PNT	2				/* print done */
 #define IOS_V_SPC	1				/* space done */
+#define IOS_V_DRP	0				/* parallel drum busy */
 
 #define IOS_LPN		(1 << IOS_V_LPN)
 #define IOS_PTR		(1 << IOS_V_PTR)
@@ -102,6 +107,7 @@
 #define IOS_SQB		(1 << IOS_V_SQB)
 #define IOS_PNT		(1 << IOS_V_PNT)
 #define IOS_SPC		(1 << IOS_V_SPC)
+#define IOS_DRP		(1 << IOS_V_DRP)
 
 /* Completion pulses */
 

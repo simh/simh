@@ -5,6 +5,10 @@
    Brian Knittel
 
    Revision History:
+
+   2003.11.23 - Fixed bug in new routine "quotefix" that made sim crash
+   			    for all non-Windows builds :(
+
    2003.06.15 - added output translation code to accomodate APL font
    				added input translation feature to assist emulation of 1130 console keyboard for APL
    				changes to console input and output IO emulation, fixed bugs exposed by APL interpreter
@@ -197,7 +201,7 @@ DEVICE tti_dev = {
 	"KEYBOARD", &tti_unit, tti_reg, tti_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tti_reset,
-	NULL, NULL, NULL };
+	NULL, basic_attach, NULL };
 
 /* TTO data structures
 
@@ -206,7 +210,11 @@ DEVICE tti_dev = {
    tto_reg	TTO register list
 */
 
-UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
+		// 14-Nov-03 -- the wait time was SERIAL_OUT_WAIT, but recent versions of SIMH reduced
+		// this to 100, and wouldn't you know it, APL\1130 has about 120 instructions between the XIO WRITE
+		// to the console and the associated WAIT.
+
+UNIT tto_unit = { UDATA (&tto_svc, 0, 0), 200 };
 
 REG tto_reg[] = {
 	{ ORDATA (BUF, tto_unit.buf, 16) },
@@ -227,7 +235,7 @@ DEVICE tto_dev = {
 	"TTO", &tto_unit, tto_reg, tto_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tto_reset,
-	NULL, NULL, NULL };
+	NULL, basic_attach, NULL };
 
 /* Terminal input routines
 
@@ -270,6 +278,8 @@ void xio_1131_console (int32 iocc_addr, int32 func, int32 modify)
 			ch = (ReadW(iocc_addr) >> 8) & 0xFF;		/* get character to write */
 			tto_unit.buf = emit_conout_character(ch);	/* output character and save write status */
 
+//			fprintf(stderr, "[CONOUT] %02x\n", ch);
+
 			SETBIT(tto_dsw, TT_DSW_PRINTER_BUSY);
 			sim_activate(&tto_unit, tto_unit.wait);		/* schedule interrupt */
 			break;
@@ -288,6 +298,8 @@ void xio_1131_console (int32 iocc_addr, int32 func, int32 modify)
 			sprintf(msg, "Invalid console XIO function %x", func);
 			xio_error(msg);
 	}
+
+//	fprintf(stderr, "After XIO             %04x %04x\n", tti_dsw, tto_dsw);
 }
 
 // emit_conout_character - write character with 1130 console code 'ch'
@@ -344,6 +356,8 @@ static t_stat tti_svc (UNIT *uptr)
 		return SCPE_OK;
 													/* otherwise, so ^E can interrupt the simulator, */
 	sim_activate(&tti_unit, tti_unit.wait);			/* always continue polling keyboard */
+
+	assert(sim_clock_queue != NULL);
 
 	temp = sim_poll_kbd();
 
@@ -411,6 +425,8 @@ static t_stat tti_svc (UNIT *uptr)
 	SETBIT(ILSW[4], ILSW_4_CONSOLE);
 	calc_ints();
 
+//	fprintf(stderr, "TTI interrupt svc SET %04x %04x\n", tti_dsw, tto_dsw);
+
 	return SCPE_OK;
 }
 
@@ -433,6 +449,35 @@ static t_stat tti_reset (DEVICE *dptr)
 	return SCPE_OK;
 }
 
+// basic_attach - fix quotes in filename, then call standard unit attach routine
+
+t_stat basic_attach (UNIT *uptr, char *cptr)
+{
+	return attach_unit(uptr, quotefix(cptr));	/* fix quotes in filenames & attach */
+}
+
+// quotefix - strip off quotes around filename, if present
+
+char * quotefix (char * cptr)
+{
+#ifdef WIN32									/* do this only for Windows builds, for the time being */
+	char *c;
+	int quote;
+
+	if (*cptr == '"' || *cptr == '\'') {
+		quote = *cptr++;						/* remember quote and skip over it */
+
+		for (c = cptr; *c && *c != quote; c++)
+			;									/* find closing quote, or end of string */
+
+		if (*c)									/* terminate string at closing quote */
+			*c = '\0';
+	}
+
+#endif
+	return cptr;								/* return pointer to cleaned-up name */
+}
+
 t_bool keyboard_is_busy (void)					/* return TRUE if keyboard is not expecting a character */
 {
 	return (tti_dsw & TT_DSW_KEYBOARD_BUSY);
@@ -445,6 +490,8 @@ static t_stat tto_svc (UNIT *uptr)
 
 	SETBIT(ILSW[4], ILSW_4_CONSOLE);
 	calc_ints();
+
+//	fprintf(stderr, "TTO interrupt svc SET %04x %04x\n", tti_dsw, tto_dsw);
 
 	return (t_stat) tto_unit.buf;				/* return status saved during output conversion */
 }
@@ -824,7 +871,10 @@ static t_stat map_conout_character (int ch)
 			curcol--;
 	}
 	else if (n_os_mappings && ch != (unsigned char) IGNR_) {
-		if (curcol > maxcol) {			// first time in this column, no overstrike possible yet
+		if (curcol >= MAX_OUTPUT_COLUMNS)
+			map_conout_character('\x81');		// precede with automatic carriage return/line feed, I guess
+		
+		if (curcol > maxcol) {					// first time in this column, no overstrike possible yet
 			os_buf[curcol].nin = 0;
 			maxcol = curcol;
 		}
@@ -853,7 +903,7 @@ static t_stat map_conout_character (int ch)
 			}
 		}
 
-		if (curcol < MAX_OUTPUT_COLUMNS)
+		if (curcol < MAX_OUTPUT_COLUMNS)		// this should now never happen, as we automatically return
 			curcol++;
 	}
 
@@ -897,18 +947,15 @@ static t_stat font_cmd (int32 flag, char *cptr)
 	if (! *cptr) return SCPE_2FARG;					/* argument missing */
 
 	fname = cptr;									/* save start */
-	while (*cptr && (*cptr > ' ')) {
-	    if (*cptr == '\'' || *cptr == '"') {		/* quoted string */
-			quote = *cptr;							/* remember quote character */
-			strcpy(cptr, cptr+1);					/* slide string down over the quote */
+    if (*cptr == '\'' || *cptr == '"') {			/* quoted string */
+		quote = *cptr++;							/* remember quote character */
+		fname++;									/* skip the quote */
 
-			while (*cptr && *cptr != quote)			/* find closing quote */
-				cptr++;
-
-			if (*cptr == quote)						/* if closer was found, slide down over it */
-				strcpy(cptr, cptr+1);
-		}
-	    else										/* skip over regular character */
+		while (*cptr && (*cptr != quote))			/* find closing quote */
+			cptr++;
+	}
+	else {
+		while (*cptr && (*cptr > ' '))				/* find terminating blank */
 	    	cptr++; 
 	}
 	*cptr = '\0';									/* terminate name */

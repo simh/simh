@@ -1,6 +1,6 @@
 /* pdp10_fe.c: PDP-10 front end (console terminal) simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fe		KS10 console front end
 
+   29-Dec-03	RMS	Added console backpressure support
    25-Apr-03	RMS	Revised for extended file support
    22-Dec-02	RMS	Added break support
    30-May-02	RMS	Widened COUNT to 32b
@@ -108,9 +109,8 @@ void fe_intr (void)
 {
 if (M[FE_CTYOUT] & FE_CVALID) {				/* char to print? */
 	feo_unit.buf = (int32) M[FE_CTYOUT] & 0177;	/* pick it up */
-	sim_putchar (feo_unit.buf);			/* type it */
 	feo_unit.pos = feo_unit.pos + 1;
-	sim_activate (&feo_unit, feo_unit.time);  }	/* sched completion */
+	sim_activate (&feo_unit, feo_unit.wait);  }	/* sched completion */
 else if ((M[FE_CTYIN] & FE_CVALID) == 0) {		/* input char taken? */
 	sim_cancel (&fei_unit);				/* sched immediate */
 	sim_activate (&fei_unit, 0);  };		/* keyboard poll */
@@ -119,6 +119,11 @@ return;
 
 t_stat feo_svc (UNIT *uptr)
 {
+t_stat r;
+
+if ((r = sim_putchar_s (uptr->buf)) != SCPE_OK) {	/* output; error? */
+	sim_activate (uptr, uptr->wait);		/* try again */
+	return ((r == SCPE_STALL)? SCPE_OK: r);  }	/* !stall? report */
 M[FE_CTYOUT] = 0;					/* clear char */
 apr_flg = apr_flg | APRF_CON;				/* interrupt KS10 */
 return SCPE_OK;

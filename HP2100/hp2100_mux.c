@@ -25,6 +25,7 @@
 
    mux,muxl,muxc	12920A terminal multiplexor
 
+   21-Dec-03	RMS	Added invalid character screening for TSB (from Mike Gemeny)
    09-May-03	RMS	Added network device flag
    01-Nov-02	RMS	Added 7B/8B support
    22-Aug-02	RMS	Updated for changes to sim_tmxr
@@ -526,7 +527,10 @@ if (mux_ldsc[ln].conn) {				/* connected? */
 		if (mux_xpar[ln] & OTL_DIAG)		/* xmt diag? */
 		    mux_diag (mux_xbuf[ln]);		/* before munge */
 		mux_xdon[ln] = 1;			/* set done */
-		tmxr_putc_ln (lp, c);			/* output char */
+		if (!(muxl_unit[ln].flags & UNIT_8B) &&	/* not transparent? */
+		    (c != 0x7f) &&  (c != 0x13) &&	/* not del, ^S? */
+		    (c != 0x11) && (c != 0x5))		/* not ^Q, ^E? */
+		     tmxr_putc_ln (lp, c);		/* output char */
 		tmxr_poll_tx (&mux_desc);  }  }		/* poll xmt */
 	else {						/* buf full */
 	    tmxr_poll_tx (&mux_desc);			/* poll xmt */

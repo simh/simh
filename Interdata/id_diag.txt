@@ -69,7 +69,7 @@ sim> boot pt0
 
 Breakpoint: PC: 00C2 (EXBR R8,R6)
 
-sim> run 100
+sim> run 2d0
 
 MODEL 8/16E PROCESSOR TEST PART 2  06-212R00
 CPU
@@ -96,7 +96,7 @@ Breakpoint, PC: 00C0 (8800)
 
 sim> d 234a 0202			; patch to use
 sim> d 234c a4a8			; TTY as console
-sim> d 17a b1e4
+sim> d 17a b 1e4
 sim> run 100
 
 SERIES SIXTEEN PROCESSOR TEST PART 1  06-242F01R00

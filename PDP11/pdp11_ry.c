@@ -1,6 +1,6 @@
-/* pdp11_ry.c: RY11/RX02 floppy disk simulator
+/* pdp11_ry.c: RX211/RXV21/RX02 floppy disk simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ry		RY11/RX02 floppy disk
+   ry		RX211/RXV21/RX02 floppy disk
 
+   29-Dec-03	RMS	Added RXV21 support
    19-May-03	RMS	Revised for new conditional compilation scheme
    25-Apr-03	RMS	Revised for extended file support
    14-Mar-03	RMS	Fixed variable size interaction with save/restore
@@ -146,7 +147,6 @@ int32 ry_cwait = 100;					/* command time */
 int32 ry_swait = 10;					/* seek, per track */
 int32 ry_xwait = 1;					/* tr set time */
 uint8 rx2xb[RY_NUMBY] = { 0 };				/* sector buffer */
-int32 ry_enb = 0;					/* device enable */
 
 DEVICE ry_dev;
 t_stat ry_rd (int32 *data, int32 PA, int32 access);
@@ -227,7 +227,7 @@ DEVICE ry_dev = {
 	RX_NUMDR, 8, 20, 1, 8, 8,
 	NULL, NULL, &ry_reset,
 	&ry_boot, &ry_attach, NULL,
-	&ry_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS };
+	&ry_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_Q18 };
 
 /* I/O dispatch routine, I/O addresses 17777170 - 17777172
 
@@ -341,6 +341,7 @@ t_stat ry_svc (UNIT *uptr)
 int32 i, t, func, bps;
 static uint8 estat[8];
 uint32 ba, da;
+int8 *fbuf = uptr->filebuf;
 
 func = RYCS_GETFNC (ry_csr);				/* get function */
 bps = (ry_csr & RYCS_DEN)? RY_NUMBY: RX_NUMBY;		/* get sector size */
@@ -401,12 +402,12 @@ case RWXFR:						/* read/write */
 	if (func == RYCS_WRDEL) ry_esr = ry_esr | RYES_DD;	/* del data? */
 	if (func == RYCS_READ) {			/* read? */
 		for (i = 0; i < bps; i++)
-		    rx2xb[i] = *(((int8 *) uptr->filebuf) + da + i);  }
+		    rx2xb[i] = fbuf[da + i];  }
 	else {	if (uptr->flags & UNIT_WPRT) {		/* write and locked? */
 		    ry_done (0, 0100);			/* done, error */
 		    break;  }
 		for (i = 0; i < bps; i++)		/* write */
-		    *(((int8 *) uptr->filebuf) + da + i) = rx2xb[i];
+		    fbuf[da + i] = rx2xb[i];
 		da = da + bps;
 		if (da > uptr->hwmark) uptr->hwmark = da;  }
 	ry_done (0, 0);					/* done */
@@ -420,8 +421,7 @@ case SDCNF:						/* confirm set density */
 	sim_activate (uptr, ry_cwait * 100);		/* schedule operation */
 	break;
 case SDXFR:						/* erase disk */
-	for (i = 0; i < (int32) uptr->capac; i++)
-		*(((int8 *) uptr->filebuf) + i) = 0;
+	for (i = 0; i < (int32) uptr->capac; i++) fbuf[i] = 0;
 	uptr->hwmark = uptr->capac;
 	if (ry_csr & RYCS_DEN) uptr->flags = uptr->flags | UNIT_DEN;
 	else uptr->flags = uptr->flags & ~UNIT_DEN;
@@ -462,7 +462,7 @@ case INIT_COMPLETE:					/* init complete */
 		break;	}
 	da = CALC_DA (1, 1, bps);			/* track 1, sector 1 */
 	for (i = 0; i < bps; i++)			/* read sector */
-		rx2xb[i] = *(((int8 *) uptr->filebuf) + da + i);
+		rx2xb[i] = fbuf[da + i];
 	ry_done (RYES_ID, 0);				/* set done */
 	if ((ry_unit[1].flags & UNIT_ATT) == 0) ry_ecode = 0020;
 	break;  }					/* end case state */

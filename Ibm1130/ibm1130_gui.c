@@ -11,6 +11,10 @@
  * This is not a supported product, but I welcome bug reports and fixes.
  * Mail to simh@ibm1130.org
  *
+ * 02-Dec-02 BLK	Changed display, added printer and card reader icons
+ *					Added drag and drop support for scripts and card decks
+ *					Added support for physical card reader and printer (hides icons)
+ *
  * 17-May-02 BLK	Pulled out of ibm1130_cpu.c
  */
 
@@ -31,6 +35,14 @@
 #else
 #  define UPDATE_INTERVAL	5000 			// GUI: set to 100000/f where f = desired updates/second of 1130 time
 #endif
+
+#define UNIT_V_CR_EMPTY	   (UNIT_V_UF + 5)			/* NOTE: THESE MUST MATCH THE DEFINITION IN ibm1130_cr.c */
+#define UNIT_CR_EMPTY	   (1u << UNIT_V_CR_EMPTY)
+#define UNIT_V_PHYSICAL	   (UNIT_V_UF + 9)
+#define UNIT_PHYSICAL	   (1u << UNIT_V_PHYSICAL)
+
+#define UNIT_V_PHYSICAL_PTR	(UNIT_V_UF + 10)		/* NOTE: THESE MUST MATCH THE DEFINITION IN ibm1130_prt.c */
+#define UNIT_PHYSICAL_PTR (1u << UNIT_V_PHYSICAL_PTR)
 
 /* ------------------------------------------------------------------------
  * Function declarations
@@ -71,6 +83,10 @@ DEVICE console_dev = {
 
 extern char *read_line (char *cptr, int size, FILE *stream);
 extern FILE *sim_log;
+extern DEVICE *find_unit (char *cptr, UNIT **uptr);
+
+extern UNIT cr_unit;									/* pointers to 1442 and 1132 (1403) printers */
+extern UNIT prt_unit;
 
 #ifndef GUI_SUPPORT
 	void update_gui (int force)				  {}		/* stubs for non-GUI builds */
@@ -84,10 +100,11 @@ extern FILE *sim_log;
 	static void init_console_window (void) 	  {}
 	static void destroy_console_window (void) {}
 
-	t_stat console_reset (DEVICE *dptr)		  {return SCPE_OK;}
-	void stuff_cmd (char *cmd) 				  {}
-	char *read_cmdline (char *ptr, int size, FILE *stream)  {return read_line(ptr, size, stream);}
-	void remark_cmd (char *remark)			  {printf("%s\n", remark); if (sim_log) fprintf(sim_log, "%s\n", remark);}
+	t_stat console_reset (DEVICE *dptr)		  					{return SCPE_OK;}
+	void   stuff_cmd (char *cmd) 				  				{}
+	t_bool stuff_and_wait (char *cmd, int timeout, int delay)	{return FALSE;}
+	char  *read_cmdline (char *ptr, int size, FILE *stream)		{return read_line(ptr, size, stream);}
+	void   remark_cmd (char *remark)			  				{printf("%s\n", remark); if (sim_log) fprintf(sim_log, "%s\n", remark);}
 #else
 
 t_stat console_reset (DEVICE *dptr)
@@ -134,15 +151,29 @@ void scp_panic (char *msg)
 #define IDC_RESET				14
 #define IDC_PROGRAM_LOAD		15
 
+#define IDC_TEAR				16	// standard button
+#define IDC_1442				17	// device images
+#define IDC_1132				18
+
 #define LAMPTIME        500			// 500 msec delay on updating
 #define FLASH_TIMER_ID    1
 #define UPDATE_TIMER_ID   2
+
+#define RUNSWITCH_X 689				// center of the run mode switch dial
+#define RUNSWITCH_Y 107
+#define TOGGLES_X	122				// left edge of series of toggle switches
+
+#define TXTBOX_X 	200				// text labels showing attached devices
+#define TXTBOX_Y	300
+#define TXTBOX_WIDTH   	195
+#define TXTBOX_HEIGHT	 12
 
 static BOOL   class_defined = FALSE;
 static HWND   hConsoleWnd = NULL;
 static HBITMAP hBitmap = NULL;
 static HFONT  hFont = NULL;
 static HFONT  hBtnFont = NULL;
+static HFONT  hTinyFont = NULL;
 static HBRUSH hbLampOut = NULL;
 static HBRUSH hbWhite = NULL;
 static HBRUSH hbBlack = NULL;
@@ -164,41 +195,80 @@ static char szConsoleClassName[] = "1130CONSOLE";
 static DWORD PumpID = 0;
 static HANDLE hPump = INVALID_HANDLE_VALUE;
 static int bmwid, bmht;
+static HANDLE hbm1442_full, hbm1442_empty, hbm1442_eof, hbm1442_middle;
+static HANDLE hbm1132_full, hbm1132_empty;
 
 static struct tag_btn {
-	int x, y;
+	int x, y, wx, wy;
 	char *txt;
 	BOOL pushable, state;
 	COLORREF clr;
 	HBRUSH hbrLit, hbrDark;
 	HWND   hBtn;
+	BOOL   subclassed;
+
 } btn[] = {
-	0, 0,	"KEYBOARD\nSELECT",		FALSE,	FALSE,	RGB(255,255,180),	NULL, NULL, NULL, 
-	0, 1,	"DISK\nUNLOCK",			FALSE, 	TRUE,	RGB(255,255,180),	NULL, NULL, NULL, 
-	0, 2, 	"RUN",					FALSE,	FALSE,	RGB(0,255,0),		NULL, NULL, NULL, 
-	0, 3,	"PARITY\nCHECK",		FALSE,	FALSE,	RGB(255,0,0),		NULL, NULL, NULL, 
+	0, 0, BUTTON_WIDTH, BUTTON_HEIGHT,	"KEYBOARD\nSELECT",		FALSE,	FALSE,	RGB(255,255,180),	NULL, NULL, NULL,	TRUE,
+	0, 1, BUTTON_WIDTH, BUTTON_HEIGHT,	"DISK\nUNLOCK",			FALSE, 	TRUE,	RGB(255,255,180),	NULL, NULL, NULL,	TRUE,
+	0, 2, BUTTON_WIDTH, BUTTON_HEIGHT,	"RUN",					FALSE,	FALSE,	RGB(0,255,0),		NULL, NULL, NULL,	TRUE,
+	0, 3, BUTTON_WIDTH, BUTTON_HEIGHT,	"PARITY\nCHECK",		FALSE,	FALSE,	RGB(255,0,0),		NULL, NULL, NULL,	TRUE,
 
-	1, 0,	"",						FALSE, 	FALSE,	RGB(255,255,180),	NULL, NULL, NULL, 
-	1, 1,	"FILE\nREADY",			FALSE, 	FALSE,	RGB(0,255,0),		NULL, NULL, NULL, 
-	1, 2,	"FORMS\nCHECK",			FALSE, 	FALSE,	RGB(255,255,0),		NULL, NULL, NULL, 
-	1, 3,	"POWER\nON",			FALSE, 	TRUE,	RGB(255,255,180),	NULL, NULL, NULL, 
+	1, 0, BUTTON_WIDTH, BUTTON_HEIGHT,	"",						FALSE, 	FALSE,	RGB(255,255,180),	NULL, NULL, NULL,	TRUE,
+	1, 1, BUTTON_WIDTH, BUTTON_HEIGHT,	"FILE\nREADY",			FALSE, 	FALSE,	RGB(0,255,0),		NULL, NULL, NULL,	TRUE,
+	1, 2, BUTTON_WIDTH, BUTTON_HEIGHT,	"FORMS\nCHECK",			FALSE, 	FALSE,	RGB(255,255,0),		NULL, NULL, NULL,	TRUE,
+	1, 3, BUTTON_WIDTH, BUTTON_HEIGHT,	"POWER\nON",			FALSE, 	TRUE,	RGB(255,255,180),	NULL, NULL, NULL,	TRUE,
 
-	2, 0,	"POWER",				TRUE,	FALSE,	RGB(255,255,180), 	NULL, NULL, NULL, 
-	2, 1,	"PROGRAM\nSTART",		TRUE,	FALSE,	RGB(0,255,0),		NULL, NULL, NULL, 
-	2, 2,	"PROGRAM\nSTOP",		TRUE,	FALSE,	RGB(255,0,0),		NULL, NULL, NULL, 
-	2, 3,	"LOAD\nIAR",			TRUE,	FALSE,	RGB(0,0,255),		NULL, NULL, NULL, 
+	2, 0, BUTTON_WIDTH, BUTTON_HEIGHT,	"POWER",				TRUE,	FALSE,	RGB(255,255,180), 	NULL, NULL, NULL,	TRUE,
+	2, 1, BUTTON_WIDTH, BUTTON_HEIGHT,	"PROGRAM\nSTART",		TRUE,	FALSE,	RGB(0,255,0),		NULL, NULL, NULL,	TRUE,
+	2, 2, BUTTON_WIDTH, BUTTON_HEIGHT,	"PROGRAM\nSTOP",		TRUE,	FALSE,	RGB(255,0,0),		NULL, NULL, NULL,	TRUE,
+	2, 3, BUTTON_WIDTH, BUTTON_HEIGHT,	"LOAD\nIAR",			TRUE,	FALSE,	RGB(0,0,255),		NULL, NULL, NULL,	TRUE,
 
-	3, 0,	"KEYBOARD",				TRUE, 	FALSE,	RGB(255,255,180),	NULL, NULL, NULL, 
-	3, 1,	"IMM\nSTOP",			TRUE, 	FALSE,	RGB(255,0,0),		NULL, NULL, NULL, 
-	3, 2,	"CHECK\nRESET",			TRUE, 	FALSE,	RGB(0,0,255),		NULL, NULL, NULL, 
-	3, 3,	"PROGRAM\nLOAD",		TRUE, 	FALSE,	RGB(0,0,255),		NULL, NULL, NULL, 
+	3, 0, BUTTON_WIDTH, BUTTON_HEIGHT,	"KEYBOARD",				TRUE, 	FALSE,	RGB(255,255,180),	NULL, NULL, NULL,	TRUE,
+	3, 1, BUTTON_WIDTH, BUTTON_HEIGHT,	"IMM\nSTOP",			TRUE, 	FALSE,	RGB(255,0,0),		NULL, NULL, NULL,	TRUE,
+	3, 2, BUTTON_WIDTH, BUTTON_HEIGHT,	"CHECK\nRESET",			TRUE, 	FALSE,	RGB(0,0,255),		NULL, NULL, NULL,	TRUE,
+	3, 3, BUTTON_WIDTH, BUTTON_HEIGHT,	"PROGRAM\nLOAD",		TRUE, 	FALSE,	RGB(0,0,255),		NULL, NULL, NULL,	TRUE,
+							
+	TXTBOX_X+40, TXTBOX_Y+25, 35, 12, 	"Tear",					TRUE,	FALSE,	0,					NULL, NULL, NULL,	FALSE,
+	635, 238, 110, 110,                 "EMPTY_1442",			TRUE,   FALSE,  0,					NULL, NULL, NULL,	FALSE,
+	635, 366, 110, 110,                 "EMPTY_1132",		    TRUE,   FALSE,  0,					NULL, NULL, NULL,	FALSE,
+//	635, 366, 110, 110,                 "EMPTY_1132",		    TRUE,   FALSE,  0,					NULL, NULL, NULL,	FALSE,
 };
 #define NBUTTONS (sizeof(btn) / sizeof(btn[0]))
+
+#define STATE_1442_EMPTY	0		// no cards (no file attached)
+#define STATE_1442_FULL		1		// cards in hopper (file attached at BOF)
+#define STATE_1442_MIDDLE	2		// cards in hopper and stacker (file attached, neither EOF nor BOF)
+#define STATE_1442_EOF		3		// cards in stacker (file attached, at EOF)
+#define STATE_1442_HIDDEN	4		// simulator is attached to physical card reader
+
+#define STATE_1132_EMPTY	0		// no paper hanging out of printer
+#define STATE_1132_FULL		1		// paper hanging out of printer
+#define STATE_1132_HIDDEN	2		// printer is attached to physical printer
+
+static struct tag_txtbox {
+	int x, y;
+	char *txt;
+	char *unitname;
+	int idctrl;
+} txtbox[] = {
+	TXTBOX_X, TXTBOX_Y, 	"Card Reader",	"CR",		-1,
+	TXTBOX_X, TXTBOX_Y+ 25, "Printer",		"PRT",		IDC_1132,
+	TXTBOX_X, TXTBOX_Y+ 50, "Disk 1",		"DSK0",		-1,
+	TXTBOX_X, TXTBOX_Y+ 75, "Disk 2",		"DSK1",		-1,
+	TXTBOX_X, TXTBOX_Y+100, "Disk 3",		"DSK2",		-1,
+	TXTBOX_X, TXTBOX_Y+125, "Disk 4",		"DSK3",		-1,
+	TXTBOX_X, TXTBOX_Y+150, "Disk 5",		"DSK4",		-1,
+};
+#define NTXTBOXES (sizeof(txtbox) / sizeof(txtbox[0]))
+
+#define TXTBOX_BOTTOM	(TXTBOX_Y+150)
 
 static void init_console_window (void);
 static void destroy_console_window (void);
 LRESULT CALLBACK ConsoleWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 static DWORD WINAPI Pump (LPVOID arg);
+static void accept_dropped_file (HANDLE hDrop);
+static void tear_printer (void);
 
 #define NIXOBJECT(hObj) if (hObj != NULL) {DeleteObject(hObj); hObj = NULL;}
 
@@ -249,6 +319,7 @@ static void destroy_console_window (void)
 	NIXOBJECT(hbLampOut)
 	NIXOBJECT(hFont)
 	NIXOBJECT(hBtnFont);
+	NIXOBJECT(hTinyFont);
 	NIXOBJECT(hcHand)
 	NIXOBJECT(hSwitchPen)
 	NIXOBJECT(hLtGreyPen)
@@ -322,6 +393,7 @@ void update_gui (BOOL force)
 	BOOL state;
 	static int in_here = FALSE;
 	static int32 displayed = 0;
+	RECT xin;
 
 	if ((int32)(console_unit.flags & UNIT_DISPLAY) != displayed) {		// setting has changed
 		displayed = console_unit.flags & UNIT_DISPLAY;
@@ -380,9 +452,9 @@ void update_gui (BOOL force)
 	if ((wait_state|wait_lamp) != shown_wait)
 			{shown_wait= (wait_state|wait_lamp); RedrawRegion(hConsoleWnd, 380,  77, 414,  97);}
 	if (CES != shown_ces)
-			{shown_ces = CES; 		 RepaintRegion(hConsoleWnd, 115, 230, 478, 275);}	/* console entry sw: do erase bkgnd */
+			{shown_ces = CES; 		 RepaintRegion(hConsoleWnd, TOGGLES_X-7, 230, TOGGLES_X+360, 275);}	/* console entry sw: do erase bkgnd */
 	if (RUNMODE != shown_runmode)
-			{shown_runmode = RUNMODE;RepaintRegion(hConsoleWnd, 270, 359, 330, 418);}
+			{shown_runmode = RUNMODE;RepaintRegion(hConsoleWnd, RUNSWITCH_X-50, RUNSWITCH_Y-50, RUNSWITCH_X+50, RUNSWITCH_Y+50);}
 
 	int_lamps = 0;
 
@@ -413,6 +485,55 @@ void update_gui (BOOL force)
 			EnableWindow(btn[i].hBtn, state);
 			btn[i].state = state;
 		}
+	}
+
+	if (force) {									// if force flag is set, update text region
+		SetRect(&xin, TXTBOX_X, TXTBOX_Y, TXTBOX_X+TXTBOX_WIDTH, TXTBOX_BOTTOM+2*TXTBOX_HEIGHT);
+		InvalidateRect(hConsoleWnd, &xin, TRUE);
+	}
+
+	state = ((cr_unit.flags & UNIT_ATT) == 0) ? STATE_1442_EMPTY  :
+			 (cr_unit.flags & UNIT_PHYSICAL)  ? STATE_1442_HIDDEN :
+			 (cr_unit.flags & UNIT_CR_EMPTY)  ? STATE_1442_EOF    : 
+			  cr_unit.pos 					  ? STATE_1442_MIDDLE :
+			  								    STATE_1442_FULL;
+
+	if (state != btn[IDC_1442].state) {
+		if (state == STATE_1442_HIDDEN)
+			ShowWindow(btn[IDC_1442].hBtn, SW_HIDE);
+		else {
+			if (btn[IDC_1442].state == STATE_1442_HIDDEN)
+				ShowWindow(btn[IDC_1442].hBtn, SW_SHOWNA);
+
+			SendMessage(btn[IDC_1442].hBtn, STM_SETIMAGE, IMAGE_BITMAP,
+				(LPARAM) (
+					(state == STATE_1442_FULL)   ? hbm1442_full   :
+					(state == STATE_1442_MIDDLE) ? hbm1442_middle : 
+					(state == STATE_1442_EOF)    ? hbm1442_eof    :
+					hbm1442_empty));
+		}
+
+		btn[IDC_1442].state = state;
+	}
+
+	state = ((prt_unit.flags & UNIT_ATT) == 0)    ? STATE_1132_EMPTY  :
+			 (prt_unit.flags & UNIT_PHYSICAL_PTR) ? STATE_1132_HIDDEN :
+			  prt_unit.pos						  ? STATE_1132_FULL :
+			  								        STATE_1132_EMPTY;
+
+	if (state != btn[IDC_1132].state) {
+		if (state == STATE_1132_HIDDEN)
+			ShowWindow(btn[IDC_1132].hBtn, SW_HIDE);
+		else {
+			if (btn[IDC_1132].state == STATE_1132_HIDDEN)
+				ShowWindow(btn[IDC_1132].hBtn, SW_SHOWNA);
+
+			SendMessage(btn[IDC_1132].hBtn, STM_SETIMAGE, IMAGE_BITMAP,
+				(LPARAM) (
+					(state == STATE_1132_FULL) ? hbm1132_full : hbm1132_empty));
+		}
+
+		btn[IDC_1132].state = state;
 	}
 
 	in_here = FALSE;
@@ -472,6 +593,9 @@ void PaintButton (LPDRAWITEMSTRUCT dis)
 	char *txt, *tstart;
 
 	if (! BETWEEN(i, 0, NBUTTONS-1))
+		return;
+
+	if (! btn[i].subclassed)
 		return;
 
 	FillRect(dis->hDC, &dis->rcItem, ((btn[i].pushable || power) && IsWindowEnabled(btn[i].hBtn)) ? btn[i].hbrLit : btn[i].hbrDark);
@@ -565,7 +689,7 @@ HWND CreateSubclassedButton (HWND hwParent, int i)
 	int r, g, b;
 
 	y = bmht - (4*BUTTON_HEIGHT) + BUTTON_HEIGHT * btn[i].y;
-	x = (btn[i].x < 2) ? (btn[i].x*BUTTON_WIDTH) : (bmwid - (4-btn[i].x)*BUTTON_WIDTH);
+	x = (btn[i].x < 2) ? (btn[i].x*BUTTON_WIDTH) : (598 - (4-btn[i].x)*BUTTON_WIDTH);
 
 	if ((hBtn = CreateWindow("BUTTON", btn[i].txt, WS_CHILD|WS_VISIBLE|BS_CENTER|BS_MULTILINE|BS_OWNERDRAW,
 			x, y, BUTTON_WIDTH, BUTTON_HEIGHT, hwParent, (HMENU) i, hInstance, NULL)) == NULL)
@@ -654,12 +778,16 @@ static DWORD WINAPI Pump (LPVOID arg)
 		hFont     = CreateFont(-10, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, FIXED_PITCH, FF_SWISS, "Arial");
 	if (hBtnFont  == NULL)
 		hBtnFont  = CreateFont(-12, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, FIXED_PITCH, FF_SWISS, "Arial");
+	if (hTinyFont == NULL)
+		hTinyFont = CreateFont(-10, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, FIXED_PITCH, FF_SWISS, "Arial");
 
 	if (hConsoleWnd == NULL) {						/* create window */
-		if ((hConsoleWnd = CreateWindow(szConsoleClassName, "IBM 1130", WS_OVERLAPPED, 0, 0, 200, 200, NULL, NULL, hInstance, NULL)) == NULL) {
+		if ((hConsoleWnd = CreateWindow(szConsoleClassName, "IBM 1130", WS_OVERLAPPED|WS_CLIPCHILDREN, 0, 0, 200, 200, NULL, NULL, hInstance, NULL)) == NULL) {
 			PumpID = 0;
 			return 0;
 		}
+
+		DragAcceptFiles(hConsoleWnd, TRUE);			/* let it accept dragged files (scripts) */
 	}
 
 	GetObject(hBitmap, sizeof(bm), &bm);			/* get bitmap size */
@@ -667,11 +795,51 @@ static DWORD WINAPI Pump (LPVOID arg)
 	bmht  = bm.bmHeight;
 
 	for (i = 0; i < NBUTTONS; i++) {
-		CreateSubclassedButton(hConsoleWnd, i);
+		if (! btn[i].subclassed)
+			continue;
 
+		CreateSubclassedButton(hConsoleWnd, i);
 		if (! btn[i].pushable)
 			EnableWindow(btn[i].hBtn, btn[i].state);
 	}
+
+// This isn't needed anymore, now that we have the big printer icon -- it acts like a button now
+//	i = IDC_TEAR;
+//	btn[i].hBtn = CreateWindow("BUTTON", btn[i].txt, WS_CHILD|WS_VISIBLE|BS_CENTER,
+//			btn[i].x, btn[i].y, btn[i].wx, btn[i].wy, hConsoleWnd, (HMENU) i, hInstance, NULL);
+//
+//	SendMessage(btn[i].hBtn, WM_SETFONT, (WPARAM) hTinyFont, TRUE);
+
+	hbm1442_full   = LoadBitmap(hInstance, "FULL_1442");
+	hbm1442_empty  = LoadBitmap(hInstance, "EMPTY_1442");
+	hbm1442_eof    = LoadBitmap(hInstance, "EOF_1442");
+	hbm1442_middle = LoadBitmap(hInstance, "MIDDLE_1442");
+	hbm1132_full   = LoadBitmap(hInstance, "FULL_1132");
+	hbm1132_empty  = LoadBitmap(hInstance, "EMPTY_1132");
+
+	i = IDC_1442;
+
+	btn[i].hBtn = CreateWindow("STATIC", btn[i].txt, WS_CHILD|WS_VISIBLE|SS_BITMAP|SS_SUNKEN|WS_BORDER|SS_REALSIZEIMAGE|SS_NOTIFY,
+			btn[i].x, btn[i].y, btn[i].wx, btn[i].wy, hConsoleWnd, (HMENU) i, hInstance, NULL);
+	btn[i].state = STATE_1442_EMPTY;
+
+//	wx = SendMessage(btn[i].hBtn, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM) hbm1442_full);
+	wx = SendMessage(btn[i].hBtn, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM) hbm1442_empty);
+
+	i = IDC_1132;
+
+	btn[i].hBtn = CreateWindow("STATIC", btn[i].txt, WS_CHILD|WS_VISIBLE|SS_BITMAP|SS_SUNKEN|WS_BORDER|SS_REALSIZEIMAGE|SS_NOTIFY,
+			btn[i].x, btn[i].y, btn[i].wx, btn[i].wy, hConsoleWnd, (HMENU) i, hInstance, NULL);
+	btn[i].state = FALSE;
+
+	wx = SendMessage(btn[i].hBtn, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM) hbm1132_empty);
+
+//	for (i = 0; i < NTXTBOXES; i++) {
+//		txtbox[i].hBox = CreateWindow("EDIT", txtbox[i].txt, 
+//				WS_CHILD|WS_VISIBLE|ES_LEFT|ES_READONLY,
+//				txtbox[i].x, txtbox[i].y, TXTBOX_WIDTH, TXTBOX_HEIGHT, hConsoleWnd, (HMENU) (i+100), hInstance, NULL);
+//		SendMessage(txtbox[i].hBox, WM_SETFONT, (WPARAM) hTinyFont, TRUE);
+//	}
 
 	GetWindowRect(hConsoleWnd, &r);					/* get window size as created */
 	wx = r.right  - r.left + 1;
@@ -711,8 +879,9 @@ static DWORD WINAPI Pump (LPVOID arg)
 		DispatchMessage(&msg);
 	}
 
-	if (hConsoleWnd != NULL) {
-		DestroyWindow(hConsoleWnd);						/* but if a quit message got posted, clean up */
+	if (hConsoleWnd != NULL) { 
+		DragAcceptFiles(hConsoleWnd, FALSE);		/* unregister as drag/drop target */
+		DestroyWindow(hConsoleWnd);					/* but if a quit message got posted, clean up */
 		hConsoleWnd = NULL;
 	}
 
@@ -753,11 +922,12 @@ static void DrawBits (HDC hDC, int x, int y, int bits, int nbits, int mask, char
  * DrawToggles - display the console sense switches
  * ------------------------------------------------------------------------ */
 
+
 static void DrawToggles (HDC hDC, int bits)
 {
 	int b, x;
 
-	for (b = 0x8000, x = 122; b != 0; b >>= 1) {
+	for (b = 0x8000, x = TOGGLES_X; b != 0; b >>= 1) {
 		if (shown_ces & b) {			/* up */
 			SelectObject(hDC, hbWhite);
 			Rectangle(hDC, x, 232, x+9, 240);
@@ -789,10 +959,10 @@ void DrawRunmode (HDC hDC, int mode)
 	ca = cos(angle);
 	sa = sin(angle);
 
-	x0 = 301 + (int) (20.*ca + 0.5);		/* inner radius */
-	y0 = 389 - (int) (20.*sa + 0.5);
-	x1 = 301 + (int) (25.*ca + 0.5);		/* outer radius */
-	y1 = 389 - (int) (25.*sa + 0.5);
+	x0 = RUNSWITCH_X + (int) (20.*ca + 0.5);		/* inner radius */
+	y0 = RUNSWITCH_Y - (int) (20.*sa + 0.5);
+	x1 = RUNSWITCH_X + (int) (25.*ca + 0.5);		/* outer radius */
+	y1 = RUNSWITCH_Y - (int) (25.*sa + 0.5);
 
 	hOldPen = SelectObject(hDC, hSwitchPen);
 
@@ -812,7 +982,7 @@ static BOOL HandleClick (HWND hWnd, int xh, int yh, BOOL actual)
 {
 	int b, x, r, ang, i;
 
-	for (b = 0x8000, x = 122; b != 0; b >>= 1) {
+	for (b = 0x8000, x = TOGGLES_X; b != 0; b >>= 1) {
 		if (BETWEEN(xh, x-3, x+8+3) && BETWEEN(yh, 230, 275)) {
 			if (actual) {
 				CES ^= b;						/* a hit. Invert the bit and redisplay */
@@ -823,9 +993,9 @@ static BOOL HandleClick (HWND hWnd, int xh, int yh, BOOL actual)
 		x += (b & 0x1111) ? 31 : 21;
 	}
 
-	if (BETWEEN(xh, 245, 355) && BETWEEN(yh, 345, 425)) {		/* hit near rotary switch */
-		ang = (int) (atan2(301.-xh, 389.-yh)*180./3.1415926);	/* this does implicit 90 deg rotation by the way */
-		r = (int) sqrt((xh-301)*(xh-301)+(yh-389)*(yh-389));
+	if (BETWEEN(xh, RUNSWITCH_X-50, RUNSWITCH_X+50) && BETWEEN(yh, RUNSWITCH_Y-50, RUNSWITCH_Y+50)) {		/* hit near rotary switch */
+		ang = (int) (atan2(RUNSWITCH_X-xh, RUNSWITCH_Y-yh)*180./3.1415926);	/* this does implicit 90 deg rotation by the way */
+		r = (int) sqrt((xh-RUNSWITCH_X)*(xh-RUNSWITCH_X)+(yh-RUNSWITCH_Y)*(yh-RUNSWITCH_Y));
 		if (r > 12) {
 			for (i = MODE_LOAD; i <= MODE_INT_RUN; i++) {
 				if (BETWEEN(ang, i*45-12, i*45+12)) {
@@ -852,13 +1022,19 @@ static BOOL HandleClick (HWND hWnd, int xh, int yh, BOOL actual)
  * RepaintRegion-> repaint with background redraw. Used for toggles which change position.
  * ------------------------------------------------------------------------ */
 
-static void DrawConsole (HDC hDC)
+static void DrawConsole (HDC hDC, PAINTSTRUCT *ps)
 {
 	static char digits[] = " 0 1 2 3 4 5 6 7 8 9101112131415";
 	static char cccs[]   = "3216 8 4 2 1";
 	static char cnds[]   = " C V";
 	static char waits[]  = " W";
 	HFONT hOldFont, hOldBrush;
+	RECT xout, xin;
+	int i, n;
+	DEVICE *dptr;
+	UNIT *uptr;
+	t_bool enab;
+	char nametemp[50], *dispname;
 
 	hOldFont  = SelectObject(hDC, hFont);			/* use that tiny font */
 	hOldBrush = SelectObject(hDC, hbWhite);
@@ -885,6 +1061,47 @@ static void DrawConsole (HDC hDC)
 
 	SelectObject(hDC, hOldFont);
 	SelectObject(hDC, hOldBrush);
+
+	SetBkColor(hDC, RGB(0,0,0));
+
+	SetRect(&xin, TXTBOX_X, TXTBOX_Y, TXTBOX_X+TXTBOX_WIDTH, TXTBOX_BOTTOM+TXTBOX_HEIGHT);
+	if (IntersectRect(&xout, &xin, &ps->rcPaint)) {
+		hOldFont = SelectObject(hDC, hTinyFont);
+
+		for (i = 0; i < NTXTBOXES; i++) {
+			enab = FALSE;
+
+			dptr = find_unit(txtbox[i].unitname, &uptr);
+			if (dptr != NULL && uptr != NULL) {
+				if (uptr->flags & UNIT_DIS) {
+					SetTextColor(hDC, RGB(128,0,0));
+				}
+				else if (uptr->flags & UNIT_ATT) {
+					SetTextColor(hDC, RGB(0,0,255));
+					if ((n = strlen(uptr->filename)) > 30) {
+						strcpy(nametemp, "...");
+						strcpy(nametemp+3, uptr->filename+n-30);
+						dispname = nametemp;						
+					}
+					else
+						dispname = uptr->filename;
+
+					TextOut(hDC, txtbox[i].x+25, txtbox[i].y+TXTBOX_HEIGHT, dispname, strlen(dispname));
+					SetTextColor(hDC, RGB(255,255,255));
+					enab = TRUE;
+				}
+				else {
+					SetTextColor(hDC, RGB(128,128,128));
+				}
+				TextOut(hDC, txtbox[i].x, txtbox[i].y, txtbox[i].txt, strlen(txtbox[i].txt));
+			}
+
+			if (txtbox[i].idctrl >= 0)
+				EnableWindow(btn[txtbox[i].idctrl].hBtn, enab);
+		}
+
+		SelectObject(hDC, hOldFont);
+	}
 }
 
 /* ------------------------------------------------------------------------ 
@@ -914,11 +1131,11 @@ void gui_run (int running)
 	flash_run();								/* keep run lamp active for a while after we stop running */
 } 
 
-void HandleCommand (HWND hWnd, WPARAM wParam, LPARAM lParam)
+void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
 {
 	int i;
 
-	switch (wParam) {
+	switch (idCtl) {
 		case IDC_POWER:						/* toggle system power */
 			power = ! power;
 			reset_all(0);
@@ -1009,6 +1226,21 @@ void HandleCommand (HWND hWnd, WPARAM wParam, LPARAM lParam)
 					remark_cmd("IPL failed");
 			}
 			break;
+
+		case IDC_TEAR:						/* "tear off printer output" */
+		case IDC_1132:						/* do same if they click on the printer icon */
+			if (btn[IDC_1132].state && (wNotify == STN_CLICKED || wNotify == STN_DBLCLK))
+				tear_printer();
+			break;
+
+		case IDC_1442:
+			if (btn[IDC_1442].state == STATE_1442_FULL || wNotify == STN_DBLCLK)
+				stuff_cmd("detach cr");
+			else if (btn[IDC_1442].state != STATE_1442_EMPTY && wNotify == STN_CLICKED) {
+				cr_rewind();
+				update_gui(TRUE);
+			}
+			break;
 	}
 	
 	update_gui(FALSE);
@@ -1050,12 +1282,17 @@ LRESULT CALLBACK ConsoleWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 
 		case WM_PAINT:
 			hDC = BeginPaint(hWnd, &ps);
-			DrawConsole(hDC);
+			DrawConsole(hDC, &ps);
 			EndPaint(hWnd, &ps);
 			break;
 
-		case WM_COMMAND:			/* button click */
-			HandleCommand(hWnd, wParam, lParam);
+		case WM_COMMAND:							/* button click */
+			HandleCommand(hWnd, HIWORD(wParam), LOWORD(wParam), (HWND) lParam);
+			break;
+
+		case WM_CTLCOLOREDIT:						/* text color for edit controls */
+			SetBkColor((HDC) wParam, RGB(0,0,0));
+			SetTextColor((HDC) wParam, RGB(255,255,255));
 			break;
 
 		case WM_DRAWITEM:
@@ -1083,6 +1320,10 @@ LRESULT CALLBACK ConsoleWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 				hFlashTimer = 0;
 			}
 			update_gui(FALSE);
+			break;
+
+		case WM_DROPFILES:
+			accept_dropped_file((HANDLE) wParam);		// console window - dragged file is a script or card deck
 			break;
 
 		default:
@@ -1160,6 +1401,81 @@ void disk_unlocked (int unlocked)
 		EnableWindow(btn[IDC_DISK_UNLOCK].hBtn, unlocked);
 }
 
+static void accept_dropped_file (HANDLE hDrop)
+{
+	int nfiles;
+	char fname[MAX_PATH], cmd[MAX_PATH+50], *deckfile;
+	BOOL cardreader;
+	POINT pt;
+	HWND hWndDrop;
+
+	nfiles = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);		// get file count,
+	DragQueryFile(hDrop, 0, fname, sizeof(fname));			// get first filename
+	DragQueryPoint(hDrop, &pt);								// get location of drop
+	DragFinish(hDrop);
+
+	if (nfiles <= 0)							// hmm, this seems unlikely to occur, but better check
+		return;
+
+	if (running) {								// can only accept a drop while processor is stopped
+		MessageBeep(0);
+		return;
+	}
+
+	if ((hWndDrop = ChildWindowFromPoint(hConsoleWnd, pt)) == btn[IDC_1442].hBtn)
+		cardreader = TRUE;									// file was dropped onto 1442 card reader
+	else if (hWndDrop == NULL || hWndDrop == hConsoleWnd)
+		cardreader = FALSE;									// file was dropped onto console window, not a button
+	else {
+		MessageBeep(0);										// file was dropped onto another button
+		return;
+	}
+
+	if (nfiles > 1) {							// oops, we wouldn't know what order to read them in
+		MessageBox(hConsoleWnd, "You may only drop one file at a time", "", MB_OK);
+		return;
+	}
+
+												// if shift key is down, prepend @ to name (make it a deck file)
+	deckfile = ((GetKeyState(VK_SHIFT) & 0x8000) && cardreader) ? "@" : "";
+
+	sprintf(cmd, "%s \"%s%s\"", cardreader ? "attach cr" : "do", deckfile, fname);
+	stuff_cmd(cmd);
+}
+
+static void tear_printer (void)
+{
+	char cmd[MAX_PATH+100], filename[MAX_PATH];
+
+	if ((prt_unit.flags & UNIT_ATT) == 0)
+		return;
+
+	strcpy(filename, prt_unit.filename);				// save current attached filename
+
+	if (! stuff_and_wait("detach prt", 1000, 0))		// detach it
+		return;
+
+	sprintf(cmd, "view \"%s\"", filename);				// spawn notepad to view it
+	if (! stuff_and_wait(cmd, 3000, 500))
+		return;
+
+// no, now we have them click the card reader icon twice to unload the deck. more flexible that way
+//	if (! stuff_and_wait("detach cr", 1000, 0))			// detach the card reader so they can edit the deck file
+//		return;
+
+	unlink(filename);									// delete the file
+
+	sprintf(cmd, "attach prt \"%s\"", filename);		// reattach
+	stuff_cmd(cmd);
+}
+
+#ifdef XXX
+	if ((hBtn = CreateWindow("BUTTON", btn[i].txt, WS_CHILD|WS_VISIBLE|BS_CENTER|BS_MULTILINE|BS_OWNERDRAW,
+			x, y, BUTTON_WIDTH, BUTTON_HEIGHT, hwParent, (HMENU) i, hInstance, NULL)) == NULL)
+		return NULL;
+
+#endif
+
 CRITICAL_SECTION critsect;
 
 void begin_critical_section (void)
@@ -1201,6 +1517,7 @@ static DWORD WINAPI CmdThread (LPVOID arg)
 		WaitForSingleObject(hCmdReadEvent, INFINITE);		/* wait for request */
 		read_line(cmdbuffer, sizeof(cmdbuffer), stdin);		/* read one line */
 		scp_stuffed = FALSE;								/* say how we got it */
+		scp_reading = FALSE;
 		SetEvent(hCmdReadyEvent);							/* notify main thread a line is ready */
 	}
 	return 0;
@@ -1225,11 +1542,8 @@ char *read_cmdline (char *ptr, int size, FILE *stream)
 
 	SetEvent(hCmdReadEvent);								/* let read thread get one line */
 	WaitForSingleObject(hCmdReadyEvent, INFINITE);			/* wait for read thread or GUI to respond */
-
-	scp_reading = FALSE;
-
 	strncpy(ptr, cmdbuffer, MIN(size, sizeof(cmdbuffer)));	/* copy line to caller's buffer */
-	
+
 	for (cptr = ptr; isspace(*cptr); cptr++)				/* absorb spaces */
 		;
 
@@ -1247,7 +1561,56 @@ void stuff_cmd (char *cmd)
 {
 	strcpy(cmdbuffer, cmd);									/* save the string */
 	scp_stuffed = TRUE;										/* note where it came from */
+	scp_reading = FALSE;
+	ResetEvent(hCmdReadEvent);								/* clear read request event */
 	SetEvent(hCmdReadyEvent);								/* notify main thread a line is ready */
+}
+
+// my_yield - process GUI messages. It's not apparent why stuff_and_wait would block,
+// since it sleeps in the GUI thread while scp runs in the main thread. However,
+// at the end of every command scp calls update_gui, which can result in messages
+// being sent to the GUI thread. So, the GUI thread has to process messages while
+// stuff_and_wait is waiting.
+
+static void my_yield (void)
+{
+	MSG msg;
+					// multitask
+    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+    }
+}
+
+// stuff_and_wait -- stuff a command and wait for the emulator to process the command
+// and come back to prompt for another
+
+t_bool stuff_and_wait (char *cmd, int timeout, int delay)
+{
+	scp_reading = FALSE;
+
+	stuff_cmd(cmd);
+
+	while (! scp_reading) {
+		if (timeout < 0)
+			return FALSE;
+
+		my_yield();
+		if (scp_reading)
+			break;
+
+		Sleep(50);
+		if (timeout)
+			if ((timeout -= 50) <= 0)
+				timeout = -1;
+
+		my_yield();
+	}
+
+	if (delay)
+		Sleep(delay);
+
+	return TRUE;
 }
 
 /* remark_cmd - print a remark from inside a command processor. This routine takes
@@ -1257,8 +1620,14 @@ void stuff_cmd (char *cmd)
 
 void remark_cmd (char *remark)
 {
+	if (scp_reading) {
+		putchar('\n');
+		if (sim_log) putc('\n', sim_log);
+	}
+
 	printf("%s\n", remark);
 	if (sim_log) fprintf(sim_log, "%s\n", remark);
+
 	if (scp_reading) {
 		printf("sim> ");
 		if (sim_log) fprintf(sim_log, "sim> ");

@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU simulator
 
-   Copyright (c) 1998-2003, Robert M Supnik
+   Copyright (c) 1998-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,10 @@
 
    cpu		CVAX central processor
 
+   31-Dec-03	RMS	Fixed bug in set_cpu_hist
+   21-Dec-03	RMS	Added autoconfiguration controls
+   29-Oct-03	RMS	Fixed WriteB declaration (found by Mark Pizzolato)
+   23-Sep-03	RMS	Revised instruction history for dynamic sizing
    17-May-03	RMS	Fixed operand order in EMODx
    23-Apr-03	RMS	Revised for 32b/64b t_addr
    05-Jan-02	RMS	Added memory size restore support
@@ -172,7 +176,8 @@
 				Write (va + 4, rh, L_LONG, WA);  } \
 			else {	R[rn] = rl; R[rnplus1] = rh;  }
 
-#define HIST_SIZE	4096
+#define HIST_MIN	128
+#define HIST_MAX	65536
 struct InstHistory {
 	int32		iPC;
 	int32		PSL;
@@ -217,10 +222,11 @@ int32 mchk_va, mchk_ref;				/* mem ref param */
 int32 ibufl, ibufh;					/* prefetch buf */
 int32 ibcnt, ppc;					/* prefetch ctl */
 int32 cpu_log = 0;					/* logging */
+int32 autcon_enb = 1;					/* autoconfig enable */
 jmp_buf save_env;
 REG *pcq_r = NULL;					/* PC queue reg ptr */
 int32 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
-static struct InstHistory hst[HIST_SIZE] = { { 0 } };	/* instruction history */
+struct InstHistory *hst = NULL;				/* instruction history */
 
 const uint32 byte_mask[33] = { 0x00000000,
  0x00000001, 0x00000003, 0x00000007, 0x0000000F,
@@ -312,7 +318,7 @@ extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 Read (uint32 va, int32 lnt, int32 acc);
 extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
 extern int32 ReadB (uint32 pa);
-extern int32 WriteB (uint32 pa, int32 val);
+extern void WriteB (uint32 pa, int32 val);
 extern int32 Test (uint32 va, int32 acc, int32 *status);
 extern int32 ReadLP (uint32 pa);
 extern int32 eval_int (void);
@@ -321,6 +327,8 @@ extern void set_map_reg (void);
 extern void rom_wr (int32 pa, int32 val, int32 lnt);
 extern uint16 drom[NUM_INST][MAX_SPEC + 1];
 extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
@@ -392,6 +400,7 @@ REG cpu_reg[] = {
 	{ BRDATA (PCQ, pcq, 16, 32, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ HRDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ HRDATA (BADABO, badabo, 32), REG_HRO },
+	{ FLDATA (AUTOCON, autcon_enb, 0), REG_HRO },
 	{ HRDATA (WRU, sim_int_char, 8) },
 	{ NULL }  };
 
@@ -406,6 +415,10 @@ MTAB cpu_mod[] = {
 	  NULL, &show_iospace },
 	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "HISTORY", "HISTORY",
 	  &cpu_set_hist, &cpu_show_hist },
+	{ MTAB_XTD|MTAB_VDV, 1, "AUTOCONFIG", "AUTOCONFIG",
+	  &set_autocon, &show_autocon },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "NOAUTOCONFIG",
+	  &set_autocon, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, NULL, "VIRTUAL", &cpu_show_virt },
 	{ 0 }  };
 
@@ -999,16 +1012,14 @@ else {	numspec = numspec & DR_NSPMASK;			/* get # specifiers */
 /* Optionally record instruction history */
 
 if (hst_lnt) {
-	struct InstHistory *h = &hst[hst_p];
-	int32 i;
-
-	hst_p = (hst_p + 1) % HIST_SIZE;
-	h->iPC = fault_PC;
-	h->PSL = PSL | cc;
-	h->opc = opc;
-	h->brdest = brdisp + PC;
+	hst[hst_p].iPC = fault_PC;
+	hst[hst_p].PSL = PSL | cc;
+	hst[hst_p].opc = opc;
+	hst[hst_p].brdest = brdisp + PC;
 	for (i = 0; i < (numspec & DR_NSPMASK); i++)
-	    h->opnd[i] = opnd[i];
+	    hst[hst_p].opnd[i] = opnd[i];
+	hst_p = hst_p + 1;
+	if (hst_p >= hst_lnt) hst_p = 0;
 	}
 
 /* Dispatch to instructions */
@@ -2446,11 +2457,20 @@ int32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-	for (i = 0; i < HIST_SIZE; i++) hst[i].iPC = 0;
+	for (i = 0; i < hst_lnt; i++) hst[i].iPC = 0;
+	hst_p = 0;
 	return SCPE_OK;  }
-lnt = (int32) get_uint (cptr, 10, HIST_SIZE, &r);
-if (r != SCPE_OK) return SCPE_ARG;
-hst_lnt = lnt;
+lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+hst_p = 0;
+if (hst_lnt) {
+	free (hst);
+	hst_lnt = 0;
+	hst = NULL;  }
+if (lnt) {
+	hst = calloc (sizeof (struct InstHistory), lnt);
+	if (hst == NULL) return SCPE_MEM;
+	hst_lnt = lnt;  }
 return SCPE_OK;
 }
 
@@ -2463,9 +2483,9 @@ struct InstHistory *h;
 extern char *opcode[];
 
 if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
-di = hst_p + HIST_SIZE - hst_lnt;			/* work forward */
+di = hst_p;						/* work forward */
 for (k = 0; k < hst_lnt; k++) {				/* print specified */
-	h = &hst[(di++) % HIST_SIZE];			/* entry pointer */
+	h = &hst[(di++) % hst_lnt];			/* entry pointer */
 	if (h->iPC == 0) continue;			/* filled in? */
 	fprintf(st, "%08X %08X  ", h->iPC, h->PSL);	/* PC, PSL */
 	numspec = drom[h->opc][0] & DR_NSPMASK;		/* #specifiers */

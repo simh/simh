@@ -25,6 +25,8 @@
 
    rb		RB09 fixed head disk
 
+   26-Oct-03	RMS	Cleaned up buffer copy code
+
    The RB09 is a head-per-track disk.  It uses the single cycle data break
    facility.  To minimize overhead, the entire RB09 is buffered in memory.
 
@@ -219,6 +221,7 @@ return r;
 t_stat rb_svc (UNIT *uptr)
 {
 int32 t, sw;
+int32 *fbuf = uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	rb_updsta (RBS_NRY | RBS_DON);			/* set nxd, done */
@@ -230,11 +233,11 @@ do {	if (rb_sta & RBS_WR) {				/* write? */
 	    if ((rb_wlk >> sw) & 1) {			/* write locked? */
 		rb_updsta (RBS_ILA | RBS_DON);
 		break;  }
-	    else {
-	    	*(((int32 *) uptr->filebuf) + rb_da) = M[rb_ma];
+	    else {					/* not locked */
+	    	fbuf[rb_da] = M[rb_ma];			/* write word */
 		if (((t_addr) rb_da) >= uptr->hwmark) uptr->hwmark = rb_da + 1;  }  }
 	else if (MEM_ADDR_OK (rb_ma))			/* read, valid addr? */
-	    M[rb_ma] = *(((int32 *) uptr->filebuf) + rb_da);
+	    M[rb_ma] = fbuf[rb_da];			/* read word */
 	rb_wc = (rb_wc + 1) & 0177777;			/* incr word count */
  	rb_ma = (rb_ma + 1) & AMASK;			/* incr mem addr */
 	rb_da = rb_da + 1;				/* incr disk addr */

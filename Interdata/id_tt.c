@@ -25,6 +25,7 @@
 
    tt		console
 
+   29-Dec-03	RMS	Added support for console backpressure
    25-Apr-03	RMS	Revised for extended file support
    11-Jan-03	RMS	Added TTP support
    22-Dec-02	RMS	Added break support
@@ -192,16 +193,18 @@ t_stat tto_svc (UNIT *uptr)
 int32 ch;
 t_stat r;
 
-if (!tt_rd) {						/* write mode? */
-	tt_sta = tt_sta & ~STA_BSY;			/* clear busy */
-	if (tt_arm) SET_INT (v_TT);  }			/* if armed, intr */
 if (uptr->flags & UNIT_KSR) {				/* KSR mode? */
 	ch = uptr->buf & 0x7F;				/* mask to 7b */
 	if (islower (ch)) ch = toupper (ch);  }		/* cvt to UC */
 else ch = uptr->buf & ((tt_unit[TTO].flags & UNIT_8B)? 0xFF: 0x7F);
-if (!(uptr->flags & UNIT_8B) &&				/* KSR or 7b? */
-	((ch == 0) || (ch == 0x7F))) return SCPE_OK;	/* supr NULL, DEL */
-if ((r = sim_putchar (ch)) != SCPE_OK) return r;	/* output */
+if ((uptr->flags & UNIT_8B) ||				/* KSR or 7b? */
+	((ch != 0) && (ch != 0x7F))) {			/* supr NULL, DEL */
+	if ((r = sim_putchar_s (ch)) != SCPE_OK) {	/* output; error? */
+	    sim_activate (uptr, uptr->wait);		/* try again */
+	    return ((r == SCPE_STALL)? SCPE_OK: r);  }  }
+if (!tt_rd) {						/* write mode? */
+	tt_sta = tt_sta & ~STA_BSY;			/* clear busy */
+	if (tt_arm) SET_INT (v_TT);  }			/* if armed, intr */
 uptr->pos = uptr->pos + 1;				/* incr count */
 return SCPE_OK;
 }

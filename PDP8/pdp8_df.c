@@ -25,6 +25,7 @@
 
    df		DF32 fixed head disk
 
+   26-Oct-03	RMS	Cleaned up buffer copy code
    26-Jul-03	RMS	Fixed bug in set size routine
    14-Mar-03	RMS	Fixed variable platter interaction with save/restore
    03-Mar-03	RMS	Fixed autosizing
@@ -231,6 +232,7 @@ t_stat df_svc (UNIT *uptr)
 {
 int32 pa, t, mex;
 uint32 da;
+int16 *fbuf = uptr->filebuf;
 
 UPDATE_PCELL;						/* update photocell */
 if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
@@ -247,13 +249,13 @@ do {	if (da >= uptr->capac) {			/* nx disk addr? */
  	M[DF_MA] = (M[DF_MA] + 1) & 07777;		/* incr mem addr */
 	pa = mex | M[DF_MA]; 				/* add extension */
 	if (uptr->FUNC == DF_READ) {			/* read? */
-	    if (MEM_ADDR_OK (pa))			/* check nxm */
-		M[pa] = *(((int16 *) uptr->filebuf) + da);  }
+	    if (MEM_ADDR_OK (pa)) M[pa] = fbuf[da];  }	/* if !nxm, read wd */
 	else {						/* write */
 	    t = (da >> 14) & 07;			/* check wr lock */
-	    if ((df_wlk >> t) & 1) df_sta = df_sta | DFS_WLS;
+	    if ((df_wlk >> t) & 1)			/* locked? set err */
+		df_sta = df_sta | DFS_WLS;
 	    else {					/* not locked */
-	    	*(((int16 *) uptr->filebuf) + da) = M[pa];
+	    	fbuf[da] = M[pa];			/* write word */
 		if (da >= uptr->hwmark) uptr->hwmark = da + 1;  }  }
 	da = (da + 1) & 0377777;  }			/* incr disk addr */
 while ((M[DF_WC] != 0) && (df_burst != 0));		/* brk if wc, no brst */

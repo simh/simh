@@ -17,6 +17,7 @@
    16-Aug-02 BLK	Fixed bug in multiply instruction; didn't work with negative values
    18-Mar-03 BLK	Fixed bug in divide instruction; didn't work with negative values
    23-Jul-03 BLK	Prevented tti polling in CGI mode
+   24-Nov-03 BLK	Fixed carry bit error in subtract and subtract double, found by Bob Flanders
 
    The register state for the IBM 1130 CPU is:
 
@@ -556,6 +557,8 @@ t_stat sim_instr (void)
 				if (cpu_unit.flags & UNIT_ATT)
 					trace_io("* XIO %s %s mod %02x addr %04x", xio_funcs[iocc_func], xio_devs[iocc_dev], iocc_mod, iocc_addr);
 
+//				fprintf(stderr, "* XIO %s %s mod %02x addr %04x\n", xio_funcs[iocc_func], xio_devs[iocc_dev], iocc_mod, iocc_addr);
+
 				ACC = 0;					/* ACC is destroyed, and default XIO_SENSE_DEV result is 0 */
 
 				switch (iocc_func) {
@@ -895,7 +898,7 @@ t_stat sim_instr (void)
 				src2 = ReadW(eaddr);
 				ACC  = (ACC-src2) & 0xFFFF;
 
-				C = src2 < src;
+				C = src < src2;
 				if (! V)
 					V = SIGN_BIT((src ^ src2) & (src ^ ACC));
 				break;
@@ -907,7 +910,7 @@ t_stat sim_instr (void)
 				ACC  = (dst >> 16) & 0xFFFF;
 				EXT  = dst & 0xFFFF;
 
-				C = (unsigned int32) src2 < (unsigned int32) src;
+				C = (unsigned int32) src < (unsigned int32) src2;
 				if (! V)
 					V = DWSIGN_BIT((src ^ src2) & (src ^ dst));
 				break;
@@ -1527,7 +1530,7 @@ static t_stat cpu_attach (UNIT *uptr, char *cptr)
 		fclose(fd);
 	}
 
-	return attach_unit(uptr, cptr);
+	return attach_unit(uptr, quotefix(cptr));			/* fix quotes in filenames & attach */
 }
 
 static void trace_instruction (void)
@@ -1795,6 +1798,7 @@ static void cgi_stop(t_stat reason)
 		ORIGIN orig;
 		char *msg;
 	} pretstop[] = {
+		0x8000, O_FORTRAN, "I/O attempted on invalid unit # or uninstalled device (just a guess)",
 		0xF000, O_FORTRAN, "No *IOCS was specified but I/O was attempted",
 		0xF001, O_FORTRAN, "Local unit defined incorrectly, or no *IOCS for specified device",
 		0xF002, O_FORTRAN, "Requested record exceeds buffer size",

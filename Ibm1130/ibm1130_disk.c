@@ -513,7 +513,7 @@ static t_stat dsk_attach (UNIT *uptr, char *cptr)
 		SETBIT(uptr->flags, UNIT_ROABLE|UNIT_MUSTBUF);		// but don't set the UNIT_RONLY flag so DMS can write to the buffered image
 	}
 
-	if ((rval = attach_unit(uptr, cptr)) != SCPE_OK) {		// mount new disk
+	if ((rval = attach_unit(uptr, quotefix(cptr))) != SCPE_OK) {		// mount new disk
 		SETBIT(dsk_dsw[drv], DSK_DSW_NOT_READY);
 		return rval;
 	}

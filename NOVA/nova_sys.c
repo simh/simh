@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Nov-03	CEO	Added symbolic support for LEF instruction
    17-Sep-01	RMS	Removed multiconsole support
    31-May-01	RMS	Added multiconsole support
    14-Mar-01	RMS	Revised load/dump interface (again)
@@ -43,16 +44,23 @@ extern DEVICE cpu_dev;
 extern UNIT cpu_unit;
 #if defined (ECLIPSE)
 extern DEVICE map_dev;
+extern DEVICE fpu_dev;
+extern DEVICE pit_dev;
+extern int32 Usermap;
+extern int32 MapStat;
 #endif
-extern DEVICE ptr_dev, ptp_dev;
+extern DEVICE ptr_dev;
+extern DEVICE ptp_dev;
 extern DEVICE plt_dev;
-extern DEVICE tti_dev, tto_dev;
-extern DEVICE tti1_dev, tto1_dev;
-extern DEVICE clk_dev, lpt_dev;
-extern DEVICE dkp_dev, dsk_dev;
+extern DEVICE tti_dev;
+extern DEVICE tto_dev;
+extern DEVICE tti1_dev;
+extern DEVICE tto1_dev;
+extern DEVICE clk_dev;
+extern DEVICE lpt_dev;
+extern DEVICE dkp_dev;
+extern DEVICE dsk_dev;
 extern DEVICE mta_dev;
-extern UNIT tti_unit, tto_unit;
-extern UNIT tti1_unit, tto1_unit;
 extern REG cpu_reg[];
 extern uint16 M[];
 extern int32 saved_PC;
@@ -81,13 +89,21 @@ DEVICE *sim_devices[] = {
 	&cpu_dev,
 #if defined (ECLIPSE)
 	&map_dev,
+	&fpu_dev,
+	&pit_dev,
 #endif
-	&ptr_dev, &ptp_dev,
-	&tti_dev, &tto_dev,
-	&tti1_dev, &tto1_dev,
-	&clk_dev, &plt_dev,
-	&lpt_dev, &dsk_dev,
-	&dkp_dev, &mta_dev,
+	&ptr_dev,
+	&ptp_dev,
+	&tti_dev,
+	&tto_dev,
+	&tti1_dev,
+	&tto1_dev,
+	&clk_dev,
+	&plt_dev,
+	&lpt_dev,
+	&dsk_dev,
+	&dkp_dev,
+	&mta_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -256,7 +272,7 @@ static const char *opcode[] = {
  "BTO", "BTZ", "SBZ", "SZBO",
  "LOB", "LRB", "COB", "LDB",
  "STB", "PSH", "POP",
- "LMP", "SYSC",
+ "LMP", "SYC",
  "PSHR", "POPB", "BAM", "POPJ",
          "RTN", "BLM", "DIVX",
  "MUL", "MULS", "DIV", "DIVS",
@@ -366,6 +382,9 @@ static const char *opcode[] = {
  "DIC", "DICS", "DICC", "DICP",
  "DOC", "DOCS", "DOCC", "DOCP",
  "SKPBN", "SKPBZ", "SKPDN", "SKPDZ",
+#if defined (ECLIPSE)
+  "LEF", "LEF", "LEF", "LEF",
+#endif
  NULL };
 
 static const opc_val[] = {
@@ -379,7 +398,7 @@ static const opc_val[] = {
  0102010+I_2AC, 0102110+I_2AC, 0102210+I_2AC, 0102310+I_2AC,
  0102410+I_2AC, 0102510+I_2AC, 0102610+I_2AC, 0102710+I_2AC,
  0103010+I_2AC, 0103110+I_2AC, 0103210+I_2AC,
- 0113410+I_NPN, 0103510+I_RSI,
+ 0113410+I_NPN, 0103510+I_2AC,
  0103710+I_NPN, 0107710+I_NPN, 0113710+I_NPN, 0117710+I_NPN,
                 0127710+I_NPN, 0133710+I_NPN, 0137710+I_NPN,
  0143710+I_NPN, 0147710+I_NPN, 0153710+I_NPN, 0157710+I_NPN,
@@ -489,6 +508,9 @@ static const opc_val[] = {
  0062400+I_RD, 0062500+I_RD, 0062600+I_RD, 0062700+I_RD,
  0063000+I_RD, 0063100+I_RD, 0063200+I_RD, 0063300+I_RD,
  0063400+I_D, 0063500+I_D, 0063600+I_D, 0063700+I_D,
+#if defined (ECLIPSE)
+ 0064000+I_D, 0070000+I_D, 0074000+I_D, 0076000+I_D,
+#endif
  -1 };
  
 static const char *skip[] = {
@@ -579,8 +601,8 @@ int32 ind, mode, disp, dev;
 int32 byac, extind, extdisp, xop;
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
-c1 = (val[0] >> 8) & 0177;
-c2 = val[0] & 0177;
+c1 =  ((int32) val[0] >> 8) & 0177;
+c2 = (int32) val[0] & 0177;
 if (sw & SWMASK ('A')) {				/* ASCII? */
 	fprintf (of, (c2 < 040)? "<%03o>": "%c", c2);
 	return SCPE_OK;  }
@@ -592,7 +614,7 @@ if (!(sw & SWMASK ('M'))) return SCPE_ARG;		/* mnemonic? */
 
 /* Instruction decode */
 
-inst = val[0];
+inst = (int32) val[0];
 for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
     if ((opc_val[i] & 0177777) == (inst & masks[j])) {	/* match? */
@@ -605,8 +627,8 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	dev = I_GETDEV (inst);				/* IOT fields */
 	byac = I_GETPULSE (inst);			/* byte fields */
 	xop = I_GETXOP (inst);				/* XOP fields */
-	extind = val[1] & A_IND;			/* extended fields */
-	extdisp = val[1] & AMASK;
+	extind = (int32) val[1] & A_IND;		/* extended fields */
+	extdisp = (int32) val[1] & AMASK;
 	for (dv = 0; (dev_val[dv] >= 0) && (dev_val[dv] != dev); dv++) ;
 
 	switch (j) {					/* switch on class */
@@ -617,6 +639,13 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	    fprintf (of, "%s %-o", opcode[i], dst);
 	    break;
 	case I_V_D:					/* dev only */
+#if defined (ECLIPSE)
+	    if (Usermap && (MapStat & 0100)) {		/* the evil LEF mode */
+		fprintf (of, "LEF %-o,", dst);
+		fprint_addr (of, addr, ind, mode, disp, FALSE, cflag);
+		break;
+		}
+#endif
 	    if (dev_val[dv] >= 0)
 		fprintf (of, "%s %s", opcode[i], device[dv]);
 	    else fprintf (of, "%s %-o", opcode[i], dev);
@@ -671,7 +700,10 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	    return -1;
 	case I_V_XP:					/* XOP */
 	    fprintf (of, "%s %-o,%-o,%-o", opcode[i], src, dst, xop);
-	    break;  }					/* end case */
+	    break;  					/* end case */
+	default:
+		fprintf (of, "??? [%-o]", inst);
+		break;	}
 	return SCPE_OK;  }				/* end if */
 	}						/* end for */
 return SCPE_ARG;
@@ -726,12 +758,12 @@ else if (*cptr == '-') {				/* - sign? */
 	cptr++;  }	
 if (*cptr != 0) {					/* number? */
 	cptr = get_glyph (cptr, gbuf, ',');		/* get glyph */
-	d = get_uint (gbuf, 8, AMASK, &r);
+	d = (int32) get_uint (gbuf, 8, AMASK, &r);
 	if (r != SCPE_OK) return NULL;
 	pflag = pflag | A_NUM;  }
 if (*cptr != 0) {					/* index? */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get glyph */
-	x = get_uint (gbuf, 8, I_M_DST, &r);
+	x = (int32) get_uint (gbuf, 8, I_M_DST, &r);
 	if ((r != SCPE_OK) || (x < 2)) return NULL;
 	pflag = pflag | A_NX;  }
 
@@ -786,10 +818,10 @@ char gbuf[CBUFSIZE];
 t_stat r;
 
 cptr = get_glyph (cptr, gbuf, ',');			/* get register */
-val[0] = get_uint (gbuf, 8, I_M_SRC, &r);
+val[0] = (int32) get_uint (gbuf, 8, I_M_SRC, &r);
 if (r != SCPE_OK) return NULL;
 cptr = get_glyph (cptr, gbuf, term);			/* get register */
-val[1] = get_uint (gbuf, 8, I_M_DST, &r);
+val[1] = (int32) get_uint (gbuf, 8, I_M_DST, &r);
 if (r != SCPE_OK) return NULL;
 return cptr;
 }
@@ -837,13 +869,13 @@ case I_V_NPN:						/* no operand */
 	break;
 case I_V_R:						/* IOT reg */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get register */
-	d = get_uint (gbuf, 8, I_M_DST, &r);
+	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	val[0] = val[0] | (d << I_V_DST);		/* put in place */
 	break;
 case I_V_RD:						/* IOT reg,dev */
 	cptr = get_glyph (cptr, gbuf, ',');		/* get register */
-	d = get_uint (gbuf, 8, I_M_DST, &r);
+	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	val[0] = val[0] | (d << I_V_DST);		/* put in place */
 case I_V_D:						/* IOT dev */
@@ -852,13 +884,13 @@ case I_V_D:						/* IOT dev */
 		    (strcmp (device[i], gbuf) != 0); i++);
 	if (device[i] != NULL) val[0] = val[0] | dev_val[i];
 	else {
-	    d = get_uint (gbuf, 8, I_M_DEV, &r);
+	    d = (int32) get_uint (gbuf, 8, I_M_DEV, &r);
 	    if (r != SCPE_OK) return SCPE_ARG;
 	    val[0] = val[0] | (d << I_V_DEV);  }
 	break;
 case I_V_RM:						/* reg, addr */
 	cptr = get_glyph (cptr, gbuf, ',');		/* get register */
-	d = get_uint (gbuf, 8, I_M_DST, &r);
+	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	val[0] = val[0] | (d << I_V_DST);		/* put in place */
 case I_V_M:						/* addr */
@@ -889,33 +921,33 @@ case I_V_2AC:						/* reg, reg */
 	break;
 case I_V_RSI:						/* reg, short imm */
 	cptr = get_glyph (cptr, gbuf, ',');		/* get immediate */
-	d = get_uint (gbuf, 8, I_M_SRC + 1, &r);
+	d = (int32) get_uint (gbuf, 8, I_M_SRC + 1, &r);
 	if ((d == 0) || (r != SCPE_OK)) return SCPE_ARG;
 	val[0] = val[0] | ((d - 1) << I_V_SRC);		/* put in place */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get register */
-	d = get_uint (gbuf, 8, I_M_DST, &r);
+	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	val[0] = val[0] | (d << I_V_DST);		/* put in place */
 	break;
 case I_V_RLI:						/* reg, long imm */
 	cptr = get_glyph (cptr, gbuf, ',');		/* get immediate */
-	val[1] = get_uint (gbuf, 8, DMASK, &r);
+	val[1] = (int32) get_uint (gbuf, 8, DMASK, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	cptr = get_glyph (cptr, gbuf, 0);		/* get register */
-	d = get_uint (gbuf, 8, I_M_DST, &r);
+	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	val[0] = val[0] | (d << I_V_DST);		/* put in place */
 	rtn = -1;
 	break;
 case I_V_LI:						/* long imm */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get immediate */
-	val[1] = get_uint (gbuf, 8, DMASK, &r);
+	val[1] = (int32) get_uint (gbuf, 8, DMASK, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	rtn = -1;
 	break;
 case I_V_RLM:						/* reg, long mem */
 	cptr = get_glyph (cptr, gbuf, ',');		/* get register */
-	d = get_uint (gbuf, 8, I_M_DST, &r);
+	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	val[0] = val[0] | (d << I_V_DST);		/* put in place */
 case I_V_LM:						/* long mem */
@@ -927,7 +959,7 @@ case I_V_LM:						/* long mem */
 	break;
 case I_V_FRM:						/* flt reg, long mem */
 	cptr = get_glyph (cptr, gbuf, ',');		/* get register */
-	d = get_uint (gbuf, 8, I_M_DST, &r);
+	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	val[0] = val[0] | (d << I_V_DST);		/* put in place */
 	cptr = get_addr (cptr, addr, TRUE, cflag, amd);
@@ -948,7 +980,7 @@ case I_V_XP:						/* XOP */
 	if (cptr == NULL) return SCPE_ARG;
 	val[0] = val[0] | (amd[0] << I_V_SRC) | (amd[1] << I_V_DST);	
 	cptr = get_glyph (cptr, gbuf, 0);		/* get argument */
-	d = get_uint (gbuf, 8, I_M_XOP, &r);
+	d = (int32) get_uint (gbuf, 8, I_M_XOP, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	val[0] = val[0] | (d << I_V_XOP);
 	break;  }					/* end case */

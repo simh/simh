@@ -25,6 +25,7 @@
 
    hk		RK611/RK06/RK07 disk
 
+   29-Dec-03	RMS	Added 18b Qbus support
    25-Apr-03	RMS	Revised for extended file support
 
    This is a somewhat abstracted implementation of the RK611, more closely
@@ -438,7 +439,7 @@ DEVICE hk_dev = {
 	HK_NUMDR, HK_RDX, 24, 1, HK_RDX, HK_WID,
 	NULL, NULL, &hk_reset,
 	&hk_boot, &hk_attach, &hk_detach,
-	&hk_dib, DEV_DISABLE | DEV_UBUS };
+	&hk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 };
 
 /* I/O dispatch routines, I/O addresses 17777440 - 17777476 */
 

@@ -4,6 +4,15 @@
 
    Brian Knittel
    Revision History
+
+   2003.12.02 - Added -p option for physical line printer output (flushes
+   				output buffer after each line). When using a physical printer on
+   				Windows, be sure to set printer to "send output directly to printer"
+   				to disable spooling, otherwise nothing appears until printer is
+				detatched.
+
+   2003.11.25 - Changed magic filename for standard output to "(stdout)".
+
    2002.09.13 - Added 1403 support. New file, taken from part of ibm1130_stddev.c
 
    Note: The 1403 is much faster, even in emulation, because it takes much
@@ -88,6 +97,7 @@ static int32 prt_twait = 50;								/* transfer wait, for 1403 operations */
 #define UNIT_V_PARITYCHECK	(UNIT_V_UF + 7)					/* error flags for 1403 */
 #define UNIT_V_RINGCHECK	(UNIT_V_UF + 8)
 #define UNIT_V_SYNCCHECK	(UNIT_V_UF + 9)
+#define UNIT_V_PHYSICAL_PTR	(UNIT_V_UF + 10)				/* this appears in ibm1130_gui as well */
 
 #define UNIT_FORMCHECK	  (1u << UNIT_V_FORMCHECK)
 #define UNIT_DATACHECK	  (1u << UNIT_V_DATACHECK)
@@ -99,13 +109,15 @@ static int32 prt_twait = 50;								/* transfer wait, for 1403 operations */
 #define UNIT_PARITYCHECK  (1u << UNIT_V_PARITYCHECK)	
 #define UNIT_RINGCHECK	  (1u << UNIT_V_RINGCHECK)
 #define UNIT_SYNCCHECK	  (1u << UNIT_V_SYNCCHECK)
+#define UNIT_PHYSICAL_PTR (1u << UNIT_V_PHYSICAL_PTR)
 
 UNIT prt_unit[] = {
 	{ UDATA (&prt_svc, UNIT_ATTABLE, 0) },
 };
 
-#define IS_1403(uptr)  (uptr->flags & UNIT_1403)					/* model test */
-#define IS_1132(uptr) ((uptr->flags & UNIT_1403) == 0)				/* model test */
+#define IS_1403(uptr)      (uptr->flags & UNIT_1403)					/* model test */
+#define IS_1132(uptr)     ((uptr->flags & UNIT_1403) == 0)				/* model test */
+#define IS_PHYSICAL(uptr)  (uptr->flags & UNIT_PHYSICAL_PTR)
 
 /* Parameter in the unit descriptor (1132 printer) */
 
@@ -118,8 +130,8 @@ REG prt_reg[] = {
 	{ HRDATA (PRTDSW, PRT_DSW, 16) },					/* device status word */
 	{ DRDATA (STIME,  prt_swait, 24), PV_LEFT },		/* line skip wait */
 	{ DRDATA (CTIME,  prt_cwait, 24), PV_LEFT },		/* character rotation wait */
-	{ DRDATA (CTIME,  prt_fwait, 24), PV_LEFT },		/* 1403 fast wait */
-	{ DRDATA (CTIME,  prt_twait, 24), PV_LEFT },		/* 1403 transfer wait */
+	{ DRDATA (FTIME,  prt_fwait, 24), PV_LEFT },		/* 1403 fast wait */
+	{ DRDATA (TTIME,  prt_twait, 24), PV_LEFT },		/* 1403 transfer wait */
 	{ NULL }  };
 
 MTAB prt_mod[] = {
@@ -174,6 +186,8 @@ cccgi[] = {
 };
 
 #include "ibm1130_prtwheel.h"
+
+extern int32 sim_switches;
 
 // cc_format_1132 and cc_format_1403 - turn cctape bits into proper format for DSW or status read
 
@@ -239,7 +253,7 @@ static void newpage (FILE *fd)
 		putc('\f', fd);									// formfeed
 }
 
-static void flush_prt_line (FILE *fd, int spacemode)
+static void flush_prt_line (FILE *fd, int spacemode, t_bool phys_flush)
 {
 	int r;
 
@@ -262,6 +276,7 @@ static void flush_prt_line (FILE *fd, int spacemode)
 		else
 			prt_nnl++;
 
+		prt_unit->pos++;									// note something written
 		return;
 	}
 
@@ -296,7 +311,11 @@ static void flush_prt_line (FILE *fd, int spacemode)
 
 	reset_prt_line();
 
+	prt_unit->pos++;										// note something written
 	prt_nnl++;												// queue a newline
+
+	if (phys_flush)											// if physical printer, send buffered output to device
+		fflush(fd);
 }
 
 // 1132 printer commands
@@ -412,7 +431,7 @@ static t_stat prt1132_svc (UNIT *uptr)
 	}
 
 	if (uptr->flags & UNIT_SPACING) {
-		flush_prt_line(uptr->fileref, UNIT_SPACING);
+		flush_prt_line(uptr->fileref, UNIT_SPACING, IS_PHYSICAL(uptr));
 
 		CLRBIT(PRT_DSW, PRT1132_DSW_CHANNEL_MASK|PRT1132_DSW_PRINTER_BUSY|PRT1132_DSW_CARRIAGE_BUSY);
 		SETBIT(PRT_DSW, cc_format_1132(cctape[prt_row]) | PRT1132_DSW_SPACE_RESPONSE);
@@ -423,7 +442,7 @@ static t_stat prt1132_svc (UNIT *uptr)
 
 	if (uptr->flags & UNIT_SKIPPING) {
 		do {
-			flush_prt_line(uptr->fileref, UNIT_SKIPPING);
+			flush_prt_line(uptr->fileref, UNIT_SKIPPING, IS_PHYSICAL(uptr));
 			CLRBIT(PRT_DSW, PRT1132_DSW_CHANNEL_MASK);
 			SETBIT(PRT_DSW, cc_format_1132(cctape[prt_row]));
 		} while ((cctape[prt_row] & CC_1132_BITS) == 0);			// slew directly to a cc tape punch
@@ -569,7 +588,7 @@ static t_stat prt1403_svc(UNIT *uptr)
 	}
 	else if (uptr->flags & UNIT_SKIPPING) {
 		do {												// find line with exact match of tape punches
-			flush_prt_line(uptr->fileref, UNIT_SKIPPING);
+			flush_prt_line(uptr->fileref, UNIT_SKIPPING, IS_PHYSICAL(uptr));
 		} while (cctape[prt_row] != SKIPTARGET);			// slew directly to requested cc tape punch
 
 		CLRBIT(uptr->flags, UNIT_SKIPPING);					// done with this
@@ -579,7 +598,7 @@ static t_stat prt1403_svc(UNIT *uptr)
 		SETBIT(ILSW[4], ILSW_4_1403_PRINTER);
 	}
 	else if (uptr->flags & UNIT_SPACING) {
-		flush_prt_line(uptr->fileref, UNIT_SPACING);
+		flush_prt_line(uptr->fileref, UNIT_SPACING, IS_PHYSICAL(uptr));
 
 		CLRBIT(uptr->flags, UNIT_SPACING);					// done with this
 		CLRBIT(PRT_DSW, PRT1403_DSW_CARRIAGE_BUSY);
@@ -685,9 +704,14 @@ static t_stat prt_attach (UNIT *uptr, char *cptr)
 		}
 	}
 
+	if (sim_switches & SWMASK('P'))						/* set physical (unbuffered) printer flag */
+		SETBIT(uptr->flags, UNIT_PHYSICAL_PTR);
+	else
+		CLRBIT(uptr->flags, UNIT_PHYSICAL_PTR);
+
 	sim_cancel(uptr);
 
-	if (strcmp(cptr, "-") == 0) {						/* connect printer to stdout */
+	if (strcmp(cptr, "(stdout)") == 0) {				/* connect printer to stdout */
 		if (uptr -> flags & UNIT_DIS) return SCPE_UDIS;	/* disabled? */
 		uptr->filename = calloc(CBUFSIZE, sizeof(char));
 		strcpy(uptr->filename, "(stdout)");
@@ -695,11 +719,13 @@ static t_stat prt_attach (UNIT *uptr, char *cptr)
 		SETBIT(uptr->flags, UNIT_ATT);
 		uptr->pos = 0;
 	}
-	else if ((rval = attach_unit(uptr, cptr)) != SCPE_OK) {
-		return rval;
+	else {
+		if ((rval = attach_unit(uptr, quotefix(cptr))) != SCPE_OK)
+			return rval;
 	}
 
-	fseek(uptr->fileref, 0, SEEK_END);			/* if we opened an existing file, append to it */
+	fseek(uptr->fileref, 0, SEEK_END);					/* if we opened an existing file, append to it */
+	uptr->pos = ftell(uptr->fileref);
 
 	if (IS_1132(uptr)) {
 		CLRBIT(ILSW[1], ILSW_1_1132_PRINTER);
@@ -743,7 +769,7 @@ static t_stat prt_detach (UNIT *uptr)
 {
 	t_stat rval;
 
-	flush_prt_line(uptr->fileref, TRUE);
+	flush_prt_line(uptr->fileref, TRUE, TRUE);
 
 	if (uptr->fileref == stdout) {
 		CLRBIT(uptr->flags, UNIT_ATT);

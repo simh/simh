@@ -28,6 +28,7 @@
    tti		keyboard
    tto		teleprinter
 
+   29-Dec-03	RMS	Added console backpressure support
    25-Apr-03	RMS	Revised for extended file support
 */
 
@@ -468,7 +469,7 @@ tti_unit.pos = tti_unit.pos + 1;
 if (ascii_to_sds[temp] >= 0) {
     tti_unit.buf = ascii_to_sds[temp];			/* internal rep */
     sim_putchar (temp);					/* echo */
-    if (temp == 015) sim_putchar (012);			/* lf after cr */
+    if (temp == '\r') sim_putchar ('\n');		/* lf after cr */
     xfr_req = xfr_req | XFR_TTI;  }			/* set xfr flag */
 else sim_putchar (007);					/* ding! */
 return SCPE_OK;
@@ -499,7 +500,7 @@ return SCPE_OK;
 
 t_stat tto (uint32 fnc, uint32 inst, uint32 *dat)
 {
-int32 asc, new_ch;
+int32 new_ch;
 
 switch (fnc) {						/* case function */
 case IO_CONN:
@@ -517,16 +518,8 @@ case IO_DISC:						/* disconnect */
 case IO_WRITE:						/* write */
     xfr_req = xfr_req & ~XFR_TTO;			/* clr xfr flag */
     tto_unit.buf = (*dat) & 077;			/* save data */
-    if (tto_unit.buf == TT_CR) {			/* control chars? */
-	sim_putchar (015);				/* CR generates LF */
-	tto_unit.pos = tto_unit.pos + 1;
-	asc = 012;  }
-    else if (tto_unit.buf == TT_BS) asc = '\b';
-    else if (tto_unit.buf == TT_TB) asc = '\t';
-    else asc = sds_to_ascii[tto_unit.buf];		/* translate */
-    tto_unit.pos = tto_unit.pos + 1;			/* inc position */
     sim_activate (&tto_unit, tto_unit.wait);		/* activate */
-    return sim_putchar (asc);				/* output */
+    break;
 
 case IO_WREOR:						/* write eor */
     break;
@@ -541,7 +534,21 @@ return SCPE_OK;
 
 t_stat tto_svc (UNIT *uptr)
 {
+int32 asc;
+t_stat r;
+
+if (uptr->buf == TT_CR) asc = '\r';			/* control chars? */
+else if (uptr->buf == TT_BS) asc = '\b';
+else if (uptr->buf == TT_TB) asc = '\t';
+else asc = sds_to_ascii[uptr->buf];			/* translate */
+if ((r = sim_putchar_s (asc)) != SCPE_OK) {		/* output; error? */
+    sim_activate (uptr, uptr->wait);			/* retry */
+    return ((r == SCPE_STALL)? SCPE_OK: r);  }		/* !stall? report */
+uptr->pos = uptr->pos + 1;				/* inc position */
 chan_set_ordy (tto_dib.chan);				/* tto rdy */
+if (asc == '\r') {					/* CR? */
+    sim_putchar ('\n');					/* add lf */
+    uptr->pos = uptr->pos + 1;  }			/* inc position */
 return SCPE_OK;
 }
 

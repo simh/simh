@@ -1,6 +1,6 @@
 /* pdp11_tm.c: PDP-11 magnetic tape simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tm		TM11/TU10 magtape
 
+   29-Dec-03	RMS	Added 18b Qbus support
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised for magtape library, added logging
@@ -231,7 +232,7 @@ DEVICE tm_dev = {
 	TM_NUMDR, 10, 31, 1, 8, 8,
 	NULL, NULL, &tm_reset,
 	&tm_boot, &tm_attach, &tm_detach,
-	&tm_dib, DEV_DISABLE | DEV_UBUS };
+	&tm_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 };
 
 /* I/O dispatch routine, I/O addresses 17772520 - 17772532
 

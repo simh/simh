@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,14 +28,127 @@
 #define _SIM_REV_H_	0
 
 #define	SIM_MAJOR	3
-#define SIM_MINOR	0
-#define SIM_PATCH	2
+#define SIM_MINOR	1
+#define SIM_PATCH	0
 
-/* V3.0 revision history 
+/* V3.1 revision history 
 
 patch	date		module(s) and fix(es)
 
-  2	tbd		scp.c:
+  0	29-Dec-03	sim_defs.h, scp.c: added output stall status
+
+			all console emulators: added output stall support
+
+			sim_ether.c (Dave Hittner, Mark Pizzolato, Anders Ahgren):
+			-- added Alpha/VMS support
+			-- added FreeBSD, Mac OS/X support
+			-- added TUN/TAP support
+			-- added DECnet duplicate address detection
+
+			all memory buffered devices (fixed head disks, floppy disks):
+			-- cleaned up buffer copy code
+
+			all DECtapes:
+			-- fixed reverse checksum in read all
+			-- added DECtape off reel message
+			-- simplified timing
+
+			eclipse_cpu.c (Charles Owen):
+			-- added floating point support
+			-- added programmable interval timer support
+			-- bug fixes
+
+			h316_cpu.c:
+			-- added instruction history
+			-- added DMA/DMC support
+			-- added device ENABLE/DISABLE support
+			-- change default to HSA option included
+
+			h316_dp.c: added moving head disk support
+
+			h316_fhd.c: added fixed head disk support
+
+			h316_mt.c: added magtape support
+
+			h316_sys.c: added new device support
+
+			nova_dkp.c (Charles Owen):
+			-- fixed bug in flag clear sequence
+			-- added diagnostic mode support for disk sizing
+
+`			nova_mt.c (Charles Owen):
+			-- fixed bug, space operations return record count
+			-- fixed bug, reset doesn't cancel rewind
+
+			nova_sys.c: added floating point, timer support (from Charles Owen)
+
+			i1620_cpu.c: fixed bug in branch digit (found by Dave Babcock)
+
+			pdp1_drm.c:
+			-- added parallel drum support
+			-- fixed bug in serial drum instructin decoding
+
+			pdp1_sys.c: added parallel drum support, mnemonics
+
+			pdp11_cpu.c:
+			-- added autoconfiguration controls
+			-- added support for 18b-only Qbus devices
+			-- cleaned up addressing/bus definitions
+
+			pdp11_rk.c, pdp11_ry.c, pdp11_tm.c, pdp11_hk.c:
+			-- added Q18 attribute
+
+			pdp11_io.c:
+			-- added autoconfiguration controls
+			-- fixed bug in I/O configuration (found by Dave Hittner)
+
+			pdp11_rq.c:
+			-- revised MB->LBN conversion for greater accuracy
+			-- fixed bug with multiple RAUSER drives
+
+			pdp11_tc.c: changed to be off by default (base config is Qbus)
+
+			pdp11_xq.c (Dave Hittner, Mark Pizzolato):
+			-- fixed second controller interrupts
+			-- fixed bugs in multicast and promiscuous setup
+  
+			pdp18b_cpu.c:
+			-- added instruction history
+			-- fixed PDP-4,-7,-9 autoincrement bug
+			-- change PDP-7,-9 default to API option included
+
+			pdp8_defs.h, pdp8_sys.c:
+			-- added DECtape off reel message
+			-- added support for TSC8-75 (ETOS) option
+			-- added support for TD8E controller
+
+			pdp8_cpu.c: added instruction history
+
+			pdp8_rx.c:
+			-- fixed bug in RX28 read status (found by Charles Dickman)
+			-- fixed double density write
+
+			pdp8_td.c: added TD8E controller
+
+			pdp8_tsc.c: added TSC8-75 option
+
+			vax_cpu.c:
+			-- revised instruction history for dynamic sizing
+			-- added autoconfiguration controls
+
+			vax_io.c:
+			-- added autoconfiguration controls
+			-- fixed bug in I/O configuration (found by Dave Hittner)
+
+			id16_cpu.c: revised instruction decoding
+
+			id32_cpu.c:
+			-- revised instruction decoding
+			-- added instruction history
+
+/* V3.0 revision history 
+
+  2	15-Sep-03	scp.c:
 			-- fixed end-of-file problem in dep, idep
 			-- fixed error on trailing spaces in dep, idep
 

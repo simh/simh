@@ -46,7 +46,6 @@ extern int32 saved_PC;
 */
 
 char sim_name[]    = "IBM 1130";
-char sim_version[] = "V0.30";
 
 REG *sim_PC = &cpu_reg[0];
 

@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    cpu		central processor
 
+   31-Dec-03	RMS	Fixed bug in set_cpu_hist
+   13-Oct-03	RMS	Added instruction history
+			Added TSC8-75 support (from Bernhard Baehr)
    12-Mar-03	RMS	Added logical name support
    04-Oct-02	RMS	Revamped device dispatching, added device number support
    06-Jan-02	RMS	Added device enable/disable routines
@@ -184,11 +187,22 @@
 
 #define PCQ_SIZE	64				/* must be 2**n */
 #define PCQ_MASK	(PCQ_SIZE - 1)
-#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
+#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = MA
 #define UNIT_V_NOEAE	(UNIT_V_UF)			/* EAE absent */
 #define UNIT_NOEAE	(1 << UNIT_V_NOEAE)
 #define UNIT_V_MSIZE	(UNIT_V_UF+1)			/* dummy mask */
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+
+#define HIST_PC		0x40000000
+#define HIST_MIN	64
+#define HIST_MAX	65536
+struct InstHistory {
+	int32		pc;
+	int32		ea;
+	int16		ir;
+	int16		opnd;
+	int16		lac;
+	int16		mq; };
 
 uint16 M[MAXMEMSIZE] = { 0 };				/* main memory */
 int32 saved_LAC = 0;					/* saved L'AC */
@@ -203,6 +217,10 @@ int32 SC = 0;						/* EAE shift count */
 int32 UB = 0;						/* User mode Buffer */
 int32 UF = 0;						/* User mode Flag */
 int32 OSR = 0;						/* Switch Register */
+int32 tsc_ir = 0;					/* TSC8-75 IR */
+int32 tsc_pc = 0;					/* TSC8-75 PC */
+int32 tsc_cdf = 0;					/* TSC8-75 CDF flag */
+int32 tsc_enb = 0;					/* TSC8-75 enabled */
 int16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
@@ -211,6 +229,9 @@ int32 int_enable = INT_INIT_ENABLE;			/* intr enables */
 int32 int_req = 0;					/* intr requests */
 int32 stop_inst = 0;					/* trap on ill inst */
 int32 (*dev_tab[DEV_MAX])(int32 IR, int32 dat);		/* device dispatch */
+int32 hst_p = 0;					/* history pointer */
+int32 hst_lnt = 0;					/* history length */
+struct InstHistory *hst = NULL;				/* instruction history */
 
 extern int32 sim_interval;
 extern int32 sim_int_char;
@@ -223,6 +244,8 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_bool build_dev_tab (void);
 
 /* CPU data structures
@@ -275,6 +298,8 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 24576, NULL, "24K", &cpu_set_size },
 	{ UNIT_MSIZE, 28672, NULL, "28K", &cpu_set_size },
 	{ UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size },
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "HISTORY", "HISTORY",
+	  &cpu_set_hist, &cpu_show_hist },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -335,9 +360,8 @@ sim_interval = sim_interval - 1;
    major opcode.  For IOT, the extra decode points are not useful;
    for OPR, only the group flag (IR<3>) is used.
 
-   The following macros define the address calculations for data and
-   jump calculations.  Data calculations return a full 15b extended
-   address, jump calculations a 12b field-relative address.
+   AND, TAD, ISZ, DCA calculate a full 15b effective address.
+   JMS, JMP calculate a 12b field-relative effective address.
 
    Autoindex calculations always occur within the same field as the
    instruction fetch.  The field must exist; otherwise, the instruction
@@ -346,84 +370,103 @@ sim_interval = sim_interval - 1;
    Note that MA contains IF'PC.
 */
 
-#define ZERO_PAGE	MA = IF | (IR & 0177)
-#define CURR_PAGE	MA = (MA & 077600) | (IR & 0177)
-#define INDIRECT	if ((MA & 07770) != 00010) MA = DF | M[MA]; \
-			else MA = DF | (M[MA] = (M[MA] + 1) & 07777)
+if (hst_lnt) {						/* history enabled? */
+	int32 ea;
 
-#define ZERO_PAGE_J	MA = IR & 0177
-#define CURR_PAGE_J	MA = (MA & 007600) | (IR & 0177)
-#define INDIRECT_J	if ((MA & 07770) != 00010) MA = M[MA]; \
-			else MA = (M[MA] = (M[MA] + 1) & 07777)
-#define CHANGE_FIELD	IF = IB; UF = UB; \
-			int_req = int_req | INT_NO_CIF_PENDING
+	hst_p = (hst_p + 1);				/* next entry */
+	if (hst_p >= hst_lnt) hst_p = 0;
+	hst[hst_p].pc = MA | HIST_PC;			/* save PC, IR, LAC, MQ */
+	hst[hst_p].ir = IR;
+	hst[hst_p].lac = LAC;
+	hst[hst_p].mq = MQ;
+	if (IR < 06000) {				/* mem ref? */
+	    if (IR & 0200) ea = (MA & 077600) | (IR & 0177);
+	    else ea = IF | (IR & 0177);			/* direct addr */
+	    if (IR & 0400) {				/* indirect? */
+		if (IR < 04000) {			/* mem operand? */
+		    if ((ea & 07770) != 00010) ea = DF | M[ea];
+		    else ea = DF | ((M[ea] + 1) & 07777);  }
+		else {					/* no, jms/jmp */
+		    if ((ea & 07770) != 00010) ea = IB | M[ea];
+		    else ea = IB | ((M[ea] + 1) & 07777);  }
+		}
+	    hst[hst_p].ea = ea;				/* save eff addr */
+	    hst[hst_p].opnd = M[ea];			/* save operand */
+	    }
+	}
 
 switch ((IR >> 7) & 037) {				/* decode IR<0:4> */
 
 /* Opcode 0, AND */
 
 case 000:						/* AND, dir, zero */
-	ZERO_PAGE;
+	MA = IF | (IR & 0177);				/* dir addr, page zero */
 	LAC = LAC & (M[MA] | 010000);
 	break;
 case 001:						/* AND, dir, curr */
-	CURR_PAGE;
+	MA = (MA & 077600) | (IR & 0177);		/* dir addr, curr page */
 	LAC = LAC & (M[MA] | 010000);
 	break;
 case 002:						/* AND, indir, zero */
-	ZERO_PAGE;
-	INDIRECT;
+	MA = IF | (IR & 0177);				/* dir addr, page zero */
+	if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+	else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
 	LAC = LAC & (M[MA] | 010000);
 	break;
 case 003:						/* AND, indir, curr */
-	CURR_PAGE;
-	INDIRECT;
+	MA = (MA & 077600) | (IR & 0177);		/* dir addr, curr page */
+	if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+	else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
 	LAC = LAC & (M[MA] | 010000);
 	break;
 
 /* Opcode 1, TAD */
 
 case 004:						/* TAD, dir, zero */
-	ZERO_PAGE;
+	MA = IF | (IR & 0177);				/* dir addr, page zero */
 	LAC = (LAC + M[MA]) & 017777;
 	break;
 case 005:						/* TAD, dir, curr */
-	CURR_PAGE;
+	MA = (MA & 077600) | (IR & 0177);		/* dir addr, curr page */
 	LAC = (LAC + M[MA]) & 017777;
 	break;
 case 006:						/* TAD, indir, zero */
-	ZERO_PAGE;
-	INDIRECT;
+	MA = IF | (IR & 0177);				/* dir addr, page zero */
+	if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+	else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
 	LAC = (LAC + M[MA]) & 017777;
 	break;
 case 007:						/* TAD, indir, curr */
-	CURR_PAGE;
-	INDIRECT;
+	MA = (MA & 077600) | (IR & 0177);		/* dir addr, curr page */
+	if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+	else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
 	LAC = (LAC + M[MA]) & 017777;
 	break;
 
 /* Opcode 2, ISZ */
 
 case 010:						/* ISZ, dir, zero */
-	ZERO_PAGE;
+	MA = IF | (IR & 0177);				/* dir addr, page zero */
 	M[MA] = MB = (M[MA] + 1) & 07777;		/* field must exist */
 	if (MB == 0) PC = (PC + 1) & 07777;
 	break;
 case 011:						/* ISZ, dir, curr */
-       	CURR_PAGE;
+	MA = (MA & 077600) | (IR & 0177);		/* dir addr, curr page */
 	M[MA] = MB = (M[MA] + 1) & 07777;		/* field must exist */
 	if (MB == 0) PC = (PC + 1) & 07777;
 	break;
 case 012:						/* ISZ, indir, zero */
-	ZERO_PAGE;
-	INDIRECT;
+	MA = IF | (IR & 0177);				/* dir addr, page zero */
+	if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+	else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
 	MB = (M[MA] + 1) & 07777;
 	if (MEM_ADDR_OK (MA)) M[MA] = MB;
 	if (MB == 0) PC = (PC + 1) & 07777;
 	break;
 case 013:						/* ISZ, indir, curr */
-	CURR_PAGE;
-	INDIRECT;
+	MA = (MA & 077600) | (IR & 0177);		/* dir addr, curr page */
+	if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+	else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
 	MB = (M[MA] + 1) & 07777;
 	if (MEM_ADDR_OK (MA)) M[MA] = MB;
 	if (MB == 0) PC = (PC + 1) & 07777;
@@ -432,91 +475,178 @@ case 013:						/* ISZ, indir, curr */
 /* Opcode 3, DCA */
 
 case 014:						/* DCA, dir, zero */
-	ZERO_PAGE;
+	MA = IF | (IR & 0177);				/* dir addr, page zero */
 	M[MA] = LAC & 07777;
 	LAC = LAC & 010000;
 	break;
 case 015:						/* DCA, dir, curr */
-	CURR_PAGE;
+	MA = (MA & 077600) | (IR & 0177);		/* dir addr, curr page */
 	M[MA] = LAC & 07777;
 	LAC = LAC & 010000;
 	break;
 case 016:						/* DCA, indir, zero */
-	ZERO_PAGE;
-	INDIRECT;
+	MA = IF | (IR & 0177);				/* dir addr, page zero */
+	if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+	else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
 	if (MEM_ADDR_OK (MA)) M[MA] = LAC & 07777;
 	LAC = LAC & 010000;
 	break;
 case 017:						/* DCA, indir, curr */
-	CURR_PAGE;
-	INDIRECT;
+	MA = (MA & 077600) | (IR & 0177);		/* dir addr, curr page */
+	if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+	else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
 	if (MEM_ADDR_OK (MA)) M[MA] = LAC & 07777;
 	LAC = LAC & 010000;
 	break;
 
-/* Opcode 4, JMS */
+/* Opcode 4, JMS.  From Bernhard Baehr's description of the TSC8-75:
+
+   (In user mode) the current JMS opcode is moved to the ERIOT register, the ECDF
+   flag is cleared. The address of the JMS instruction is loaded into the ERTB
+   register and the TSC8-75 I/O flag is raised. When the TSC8-75 is enabled, the
+   target addess of the JMS is loaded into PC, but nothing else (loading of IF, UF,
+   clearing the interrupt inhibit flag, storing of the return address in the first
+   word of the subroutine) happens. When the TSC8-75 is disabled, the JMS is performed
+   as usual. */
 
 case 020:						/* JMS, dir, zero */
-	ZERO_PAGE_J;
-	CHANGE_FIELD;
-	MA = IF | MA;
 	PCQ_ENTRY;
-	if (MEM_ADDR_OK (MA)) M[MA] = PC;
+	MA = IR & 0177;					/* dir addr, page zero */
+	if (UF) {					/* user mode? */
+	    tsc_ir = IR;				/* save instruction */
+	    tsc_cdf = 0;  }				/* clear flag */
+	if (UF && tsc_enb) {				/* user mode, TSC enab? */
+	    tsc_pc = (PC - 1) & 07777;			/* save PC */
+	    int_req = int_req | INT_TSC;  }		/* request intr */
+	else {						/* normal */
+	    IF = IB;					/* change IF */
+	    UF = UB;					/* change UF */
+	    int_req = int_req | INT_NO_CIF_PENDING;	/* clr intr inhibit */
+	    MA = IF | MA;
+	    if (MEM_ADDR_OK (MA)) M[MA] = PC;  }
 	PC = (MA + 1) & 07777;
 	break;
 case 021:						/* JMS, dir, curr */
-	CURR_PAGE_J;
-	CHANGE_FIELD;
-	MA = IF | MA;
 	PCQ_ENTRY;
-	if (MEM_ADDR_OK (MA)) M[MA] = PC;
+	MA = (MA & 007600) | (IR & 0177);		/* dir addr, curr page */
+	if (UF) {					/* user mode? */
+	    tsc_ir = IR;				/* save instruction */
+	    tsc_cdf = 0;  }				/* clear flag */
+	if (UF && tsc_enb) {				/* user mode, TSC enab? */
+	    tsc_pc = (PC - 1) & 07777;			/* save PC */
+	    int_req = int_req | INT_TSC;  }		/* request intr */
+	else {						/* normal */
+	    IF = IB;					/* change IF */
+	    UF = UB;					/* change UF */
+	    int_req = int_req | INT_NO_CIF_PENDING;	/* clr intr inhibit */
+	    MA = IF | MA;
+	    if (MEM_ADDR_OK (MA)) M[MA] = PC;  }
 	PC = (MA + 1) & 07777;
 	break;
 case 022:						/* JMS, indir, zero */
-	ZERO_PAGE;
-	INDIRECT_J;
-	CHANGE_FIELD;
-	MA = IF | MA;
 	PCQ_ENTRY;
-	if (MEM_ADDR_OK (MA)) M[MA] = PC;
+	MA = IF | (IR & 0177);				/* dir addr, page zero */
+	if ((MA & 07770) != 00010) MA = M[MA];		/* indirect; autoinc? */
+	else MA = (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
+	if (UF) {					/* user mode? */
+	    tsc_ir = IR;				/* save instruction */
+	    tsc_cdf = 0;  }				/* clear flag */
+	if (UF && tsc_enb) {				/* user mode, TSC enab? */
+	    tsc_pc = (PC - 1) & 07777;			/* save PC */
+	    int_req = int_req | INT_TSC;  }		/* request intr */
+	else {						/* normal */
+	    IF = IB;					/* change IF */
+	    UF = UB;					/* change UF */
+	    int_req = int_req | INT_NO_CIF_PENDING;	/* clr intr inhibit */
+	    MA = IF | MA;
+	    if (MEM_ADDR_OK (MA)) M[MA] = PC;  }
 	PC = (MA + 1) & 07777;
 	break;
 case 023:						/* JMS, indir, curr */
-	CURR_PAGE;
-	INDIRECT_J;
-	CHANGE_FIELD;
-	MA = IF | MA;
 	PCQ_ENTRY;
-	if (MEM_ADDR_OK (MA)) M[MA] = PC;
+	MA = (MA & 077600) | (IR & 0177);		/* dir addr, curr page */
+	if ((MA & 07770) != 00010) MA = M[MA];		/* indirect; autoinc? */
+	else MA = (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
+	if (UF) {					/* user mode? */
+	    tsc_ir = IR;				/* save instruction */
+	    tsc_cdf = 0;  }				/* clear flag */
+	if (UF && tsc_enb) {				/* user mode, TSC enab? */
+	    tsc_pc = (PC - 1) & 07777;			/* save PC */
+	    int_req = int_req | INT_TSC;  }		/* request intr */
+	else {						/* normal */
+	    IF = IB;					/* change IF */
+	    UF = UB;					/* change UF */
+	    int_req = int_req | INT_NO_CIF_PENDING;	/* clr intr inhibit */
+	    MA = IF | MA;
+	    if (MEM_ADDR_OK (MA)) M[MA] = PC;  }
 	PC = (MA + 1) & 07777;
 	break;
+
+/* Opcode 5, JMP.  From Bernhard Baehr's description of the TSC8-75:
 
-/* Opcode 5, JMP */
+   (In user mode) the current JMP opcode is moved to the ERIOT register, the ECDF
+   flag is cleared. The address of the JMP instruction is loaded into the ERTB
+   register and the TSC8-75 I/O flag is raised. Then the JMP is performed as usual
+   (including the setting of IF, UF and clearing the interrupt inhibit flag). */
 
 case 024:						/* JMP, dir, zero */
-	ZERO_PAGE_J;
-	CHANGE_FIELD;
 	PCQ_ENTRY;
+	MA = IR & 0177;					/* dir addr, page zero */
+	if (UF) {					/* user mode? */
+	    tsc_ir = IR;				/* save instruction */
+	    tsc_cdf = 0;				/* clear flag */
+	    if (tsc_enb) {				/* TSC8 enabled? */
+		tsc_pc = (PC - 1) & 07777;		/* save PC */
+		int_req = int_req | INT_TSC;  }  }	/* request intr */
+	IF = IB;					/* change IF */
+	UF = UB;					/* change UF */
+	int_req = int_req | INT_NO_CIF_PENDING;		/* clr intr inhibit */
 	PC = MA;
 	break;
 case 025:						/* JMP, dir, curr */
-	CURR_PAGE_J;
-	CHANGE_FIELD;
 	PCQ_ENTRY;
+	MA = (MA & 007600) | (IR & 0177);		/* dir addr, curr page */
+	if (UF) {					/* user mode? */
+	    tsc_ir = IR;				/* save instruction */
+	    tsc_cdf = 0;				/* clear flag */
+	    if (tsc_enb) {				/* TSC8 enabled? */
+		tsc_pc = (PC - 1) & 07777;		/* save PC */
+		int_req = int_req | INT_TSC;  }  }	/* request intr */
+	IF = IB;					/* change IF */
+	UF = UB;					/* change UF */
+	int_req = int_req | INT_NO_CIF_PENDING;		/* clr intr inhibit */
 	PC = MA;
 	break;
 case 026:						/* JMP, indir, zero */
-	ZERO_PAGE;
-	INDIRECT_J;
-	CHANGE_FIELD;
 	PCQ_ENTRY;
+	MA = IF | (IR & 0177);				/* dir addr, page zero */
+	if ((MA & 07770) != 00010) MA = M[MA];		/* indirect; autoinc? */
+	else MA = (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
+	if (UF) {					/* user mode? */
+	    tsc_ir = IR;				/* save instruction */
+	    tsc_cdf = 0;				/* clear flag */
+	    if (tsc_enb) {				/* TSC8 enabled? */
+		tsc_pc = (PC - 1) & 07777;		/* save PC */
+		int_req = int_req | INT_TSC;  }  }	/* request intr */
+	IF = IB;					/* change IF */
+	UF = UB;					/* change UF */
+	int_req = int_req | INT_NO_CIF_PENDING;		/* clr intr inhibit */
 	PC = MA;
 	break;
 case 027:						/* JMP, indir, curr */
-	CURR_PAGE;
-	INDIRECT_J;
-	CHANGE_FIELD;
 	PCQ_ENTRY;
+	MA = (MA & 077600) | (IR & 0177);		/* dir addr, curr page */
+	if ((MA & 07770) != 00010) MA = M[MA];		/* indirect; autoinc? */
+	else MA = (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
+	if (UF) {					/* user mode? */
+	    tsc_ir = IR;				/* save instruction */
+	    tsc_cdf = 0;				/* clear flag */
+	    if (tsc_enb) {				/* TSC8 enabled? */
+		tsc_pc = (PC - 1) & 07777;		/* save PC */
+		int_req = int_req | INT_TSC;  }  }	/* request intr */
+	IF = IB;					/* change IF */
+	UF = UB;					/* change UF */
+	int_req = int_req | INT_NO_CIF_PENDING;		/* clr intr inhibit */
 	PC = MA;
 	break;
 
@@ -601,7 +731,11 @@ case 034:case 035:					/* OPR, group 1 */
 	    break;  }					/* uses address path */
 	break;						/* end group 1 */
 
-/* OPR group 2 */
+/* OPR group 2.  From Bernhard Baehr's description of the TSC8-75:
+
+   (In user mode) HLT (7402), OSR (7404) and microprogrammed combinations with
+   HLT and OSR: Additional to raising a user mode interrupt, the current OPR
+   opcode is moved to the ERIOT register and the ECDF flag is cleared. */
 
 case 036:case 037:					/* OPR, groups 2, 3 */
 	if ((IR & 01) == 0) {				/* group 2 */
@@ -657,7 +791,10 @@ case 036:case 037:					/* OPR, groups 2, 3 */
 		if ((LAC < 04000) && (LAC != 0)) PC = (PC + 1) & 07777;
 		break;	}				/* end switch skips */
 	    if (IR & 0200) LAC = LAC & 010000;		/* CLA */
-	    if ((IR & 06) && UF) int_req = int_req | INT_UF;
+	    if ((IR & 06) && UF) {			/* user mode? */
+	        int_req = int_req | INT_UF;		/* request intr */
+		tsc_ir = IR;				/* save instruction */
+		tsc_cdf = 0;  }			/* clear flag */
 	    else {
 	    	if (IR & 04) LAC = LAC | OSR;		/* OSR */
 		if (IR & 02) reason = STOP_HALT;  }	/* HLT */
@@ -745,7 +882,8 @@ case 036:case 037:					/* OPR, groups 2, 3 */
 	case 021:					/* mode B: DAD */
 	    if (emode) {
 		MA = IF | PC;
-		INDIRECT;				/* defer state */
+		if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+		else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
 		MQ = MQ + M[MA];
 		MA = DF | ((MA + 1) & 07777);
 		LAC = (LAC & 07777) + M[MA] + (MQ >> 12);
@@ -764,7 +902,8 @@ case 036:case 037:					/* OPR, groups 2, 3 */
 	case 022:					/* mode B: DST */
 	    if (emode) {
 		MA = IF | PC;
-		INDIRECT;				/* defer state */
+		if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+		else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
 		if (MEM_ADDR_OK (MA)) M[MA] = MQ & 07777;
 		MA = DF | ((MA + 1) & 07777);
 		if (MEM_ADDR_OK (MA))  M[MA] = LAC & 07777;
@@ -773,7 +912,10 @@ case 036:case 037:					/* OPR, groups 2, 3 */
 	    LAC = LAC | SC;				/* mode A: SCA then */
 	case 002:					/* MUY */
 	    MA = IF | PC;
-	    if (emode) { INDIRECT; }			/* mode B: defer */
+	    if (emode) {				/* mode B: defer */
+		if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+		else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
+		}
 	    temp = (MQ * M[MA]) + (LAC & 07777);
 	    LAC = (temp >> 12) & 07777;
 	    MQ = temp & 07777;
@@ -788,7 +930,10 @@ case 036:case 037:					/* OPR, groups 2, 3 */
 	    LAC = LAC | SC;				/* mode A: SCA then */
 	case 003:					/* DVI */
 	    MA = IF | PC;
-	    if (emode) { INDIRECT; }			/* mode B: defer */
+	    if (emode) {				/* mode B: defer */
+		if ((MA & 07770) != 00010) MA = DF | M[MA];	/* indirect; autoinc? */
+		else MA = DF | (M[MA] = (M[MA] + 1) & 07777);	/* incr before use */
+		}
 	    if ((LAC & 07777) >= M[MA]) {		/* overflow? */
 		LAC = LAC | 010000;			/* set link */
 		MQ = ((MQ << 1) + 1) & 07777;		/* rotate MQ */
@@ -873,11 +1018,18 @@ case 036:case 037:					/* OPR, groups 2, 3 */
 	    break;  }					/* end switch */
 	break;						/* end case 7 */
 
-/* Opcode 6, IOT */
+/* Opcode 6, IOT.  From Bernhard Baehr's description of the TSC8-75:
+
+   (In user mode) Additional to raising a user mode interrupt, the current IOT
+   opcode is moved to the ERIOT register. When the IOT is a CDF instruction (62x1),
+   the ECDF flag is set, otherwise it is cleared. */
 
 case 030:case 031:case 032:case 033:			/* IOT */
 	if (UF) {					/* privileged? */
-	    int_req = int_req | INT_UF;
+	    int_req = int_req | INT_UF;			/* request intr */
+	    tsc_ir = IR;				/* save instruction */
+	    if ((IR & 07707) == 06201) tsc_cdf = 1;	/* set/clear flag */
+	    else tsc_cdf = 0;
 	    break;  }
 	device = (IR >> 3) & 077;			/* device = IR<3:8> */
 	pulse = IR & 07;				/* pulse = IR<9:11> */
@@ -922,6 +1074,7 @@ case 030:case 031:case 032:case 033:			/* IOT */
 		dev_done = 0;
 		int_enable = INT_INIT_ENABLE;
 		LAC = 0;
+		reset_all (1);				/* reset all dev */
 		break;  }				/* end switch pulse */
 	    break;					/* end case 0 */
 
@@ -1142,4 +1295,59 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* add devices */
 	    }						/* end if enb */
 	}						/* end for i */
 return FALSE;
+}
+
+/* Set history */
+
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i, lnt;
+t_stat r;
+
+if (cptr == NULL) {
+	for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+	hst_p = 0;
+	return SCPE_OK;  }
+lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+hst_p = 0;
+if (hst_lnt) {
+	free (hst);
+	hst_lnt = 0;
+	hst = NULL;  }
+if (lnt) {
+	hst = calloc (sizeof (struct InstHistory), lnt);
+	if (hst == NULL) return SCPE_MEM;
+	hst_lnt = lnt;  }
+return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 l, k, di;
+t_value sim_eval;
+struct InstHistory *h;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+	UNIT *uptr, int32 sw);
+
+if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+fprintf (st, "PC     L AC    MQ    ea     IR\n\n");
+di = hst_p;						/* work forward */
+for (k = 0; k < hst_lnt; k++) {				/* print specified */
+	h = &hst[(++di) % hst_lnt];			/* entry pointer */
+	if (h->pc & HIST_PC) {				/* instruction? */
+	    l = (h->lac >> 12) & 1;			/* link */
+	    fprintf (st, "%05o  %o %04o  %04o  ", h->pc & ADDRMASK, l, h->lac & 07777, h->mq);
+	    if (h->ir < 06000) fprintf (st, "%05o  ", h->ea);
+	    else fprintf (st, "       ");
+	    sim_eval = h->ir;
+	    if ((fprint_sym (st, h->pc & ADDRMASK, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+		fprintf (st, "(undefined) %04o", h->ir);
+	    if (h->ir < 04000) fprintf (st, "  [%04o]", h->opnd);
+	    fputc ('\n', st);				/* end line */
+	    }						/* end else instruction */
+	}						/* end for */
+return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* vaxmod_defs.h: VAX model-specific definitions file
 
-   Copyright (c) 1998-2002, Robert M Supnik
+   Copyright (c) 1998-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Dec-03	RMS	Added Q18 definition for PDP11 compatibility
    22-Dec-02	RMS	Added BDR halt enable definition
    11-Nov-02	RMS	Added log bits for XQ
    10-Oct-02	RMS	Added DEQNA/DELQA, multiple RQ, autoconfigure support
@@ -204,9 +205,11 @@
 
 #define DEV_V_UBUS	(DEV_V_UF + 0)			/* Unibus */
 #define DEV_V_QBUS	(DEV_V_UF + 1)			/* Qbus */
-#define DEV_V_FLTA	(DEV_V_UF + 2)			/* flt addr */
+#define DEV_V_Q18	(DEV_V_UF + 2)			/* Qbus, mem <= 256KB */
+#define DEV_V_FLTA	(DEV_V_UF + 3)			/* flt addr */
 #define DEV_UBUS	(1u << DEV_V_UBUS)
 #define DEV_QBUS	(1u << DEV_V_QBUS)
+#define DEV_Q18		(1u << DEV_V_Q18)
 #define DEV_FLTA	(1u << DEV_V_FLTA)
 
 #define UNIBUS		FALSE				/* 22b only */

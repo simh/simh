@@ -25,6 +25,7 @@
 
    lpt		1443 line printer
 
+   29-Dec-03	RMS	Fixed bug in scheduling
    25-Apr-03	RMS	Revised for extended file support
 */
 
@@ -217,7 +218,7 @@ if ((lpt_unit.flags & UNIT_ATT) == 0) {			/* not attached? */
 	return SCPE_UNATT;  }
 
 ind[IN_PRBSY] = 1;					/* print busy */
-sim_activate (&lpt_unit, lpt_unit.time);		/* start timer */
+sim_activate (&lpt_unit, lpt_unit.wait);		/* start timer */
 
 for (i = LPT_WIDTH; i <= LPT_BSIZE; i++)		/* clear unprintable */
 	lpt_buf[i] = ' ';

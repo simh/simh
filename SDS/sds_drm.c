@@ -179,6 +179,7 @@ t_stat drm_svc (UNIT *uptr)
 {
 int32 t, rda;
 uint32 dpc, dwd;
+uint32 *fbuf = uptr->filebuf;
 
 if (drm_sta != DRM_SXFR) {				/* fetch drum prog? */
     dpc = M[DRM_PC];					/* get drum PC */
@@ -225,10 +226,10 @@ else {							/* transfer word */
 	CRETIOE (drm_stopioe, SCPE_UNATT);  }
     if (drm_rw) {					/* write? */
 	dwd = M[drm_ca];				/* get mem word */
-	*(((uint32 *) uptr->filebuf) + drm_da) = dwd;	/* write to drum */
+	fbuf[drm_da] = dwd;				/* write to drum */
 	if (drm_da >= uptr->hwmark) uptr->hwmark = drm_da + 1;  }
     else {						/* read */
-	dwd = *(((uint32 *) uptr->filebuf) + drm_da);	/* get drum word */
+	dwd = fbuf[drm_da];				/* get drum word */
 	M[drm_ca] = dwd;  }				/* write to mem */
     drm_da = drm_da + 1;				/* inc drum addr */
     if (drm_da >= DRM_SIZE) drm_da = 0;			/* wrap */
@@ -243,7 +244,7 @@ else {							/* transfer word */
     else {						/* end xfr */
 #if defined (DRM_PAR)
 	if ((drm_da & DRM_M_WD) && drm_rw) {		/* wr end mid sector? */
-	    *(((uint32 *) uptr->filebuf) + drm_da) = drm_par << 12;
+	    M[drm_da] = drm_par << 12;			/* clobber data */
 	    if (drm_da >= uptr->hwmark) uptr->hwmark = drm_da + 1;  }
 #endif
 	drm_sta = DRM_SFET;				/* back to fetch */

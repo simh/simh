@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Oct-03	RMS	Added TSC8-75, TD8E support, DECtape off reel message
    25-Apr-03	RMS	Revised for extended file support
    30-Dec-01	RMS	Revised for new TTX
    26-Nov-01	RMS	Added RL8A support
@@ -43,13 +44,15 @@
 
 extern DEVICE cpu_dev;
 extern UNIT cpu_unit;
+extern DEVICE tsc_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
 extern DEVICE clk_dev, lpt_dev;
 extern DEVICE rk_dev, rl_dev;
 extern DEVICE rx_dev;
 extern DEVICE df_dev, rf_dev;
-extern DEVICE dt_dev, mt_dev;
+extern DEVICE dt_dev, td_dev;
+extern DEVICE mt_dev;
 extern DEVICE ttix_dev, ttox_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
@@ -74,14 +77,23 @@ int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = {
 	&cpu_dev,
-	&ptr_dev, &ptp_dev,
-	&tti_dev, &tto_dev,
-	&ttix_dev, &ttox_dev,
-	&clk_dev, &lpt_dev,
-	&rk_dev, &rl_dev,
+	&tsc_dev,
+	&ptr_dev,
+	&ptp_dev,
+	&tti_dev,
+	&tto_dev,
+	&ttix_dev,
+	&ttox_dev,
+	&clk_dev,
+	&lpt_dev,
+	&rk_dev,
+	&rl_dev,
 	&rx_dev,
-	&df_dev, &rf_dev,
-	&dt_dev, &mt_dev,
+	&df_dev,
+	&rf_dev,
+	&dt_dev,
+	&td_dev,
+	&mt_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -89,7 +101,8 @@ const char *sim_stop_messages[] = {
 	"Unimplemented instruction",
 	"HALT instruction",
 	"Breakpoint",
-	"Non-standard device number"  };
+	"Non-standard device number",
+	"DECtape off reel"  };
 
 /* Binary loader
 
@@ -230,6 +243,8 @@ static const char *opcode[] = {
  "RLCB", "RLSA", "RLWC",
  "RRER", "RRWC", "RRCA", "RRCB",
  "RRSA", "RRSI", "RLSE",
+ "ETDS", "ESKP", "ECTF", "ECDF",
+ "ERTB", "ESME", "ERIOT", "ETEN",
 
  "CDF", "CIF", "CIF CDF",
  "AND", "TAD", "ISZ", "DCA", "JMS", "JMP", "IOT",
@@ -287,6 +302,8 @@ static const int32 opc_val[] = {
  06604+I_NPN, 06605+I_NPN, 06607+I_NPN,
  06610+I_NPN, 06611+I_NPN, 06612+I_NPN, 06613+I_NPN,
  06614+I_NPN, 06615+I_NPN, 06617+I_NPN,
+ 06360+I_NPN, 06361+I_NPN, 06362+I_NPN, 06363+I_NPN,
+ 06364+I_NPN, 06365+I_NPN, 06366+I_NPN, 06367+I_NPN,
 
  06201+I_FLD, 06202+I_FLD, 06203+I_FLD,
  00000+I_MRF, 01000+I_MRF, 02000+I_MRF, 03000+I_MRF,
@@ -411,7 +428,7 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	case I_V_OP3:					/* operate group 3 */
 	    sp = fprint_opr (of, inst & 0320, j, 0);
 	    if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
-	    break;  }				/* end case */
+	    break;  }					/* end case */
 	return SCPE_OK;  }				/* end if */
 	}						/* end for */
 return SCPE_ARG;

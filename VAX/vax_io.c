@@ -25,6 +25,9 @@
 
    qba		Qbus adapter
 
+   21-Dec-03	RMS	Fixed bug in autoconfigure vector assignment; added controls
+   21-Nov-03	RMS	Added check for interrupt slot conflict (found by Dave Hittner)
+   29-Oct-03	RMS	Fixed WriteX declaration (found by Mark Pizzolato)
    19-Apr-03	RMS	Added optimized byte and word DMA routines
    12-Mar-03	RMS	Added logical name support
    22-Dec-02	RMS	Added console halt support
@@ -100,15 +103,16 @@ extern UNIT cpu_unit;
 extern int32 PSL, SISR, trpirq, mem_err, hlt_pin;
 extern int32 p1;
 extern int32 ssc_bto;
+extern int32 autcon_enb;
 extern jmp_buf save_env;
 extern DEVICE *sim_devices[];
 
 extern int32 ReadB (uint32 pa);
 extern int32 ReadW (uint32 pa);
 extern int32 ReadL (uint32 pa);
-extern int32 WriteB (uint32 pa, int32 val);
-extern int32 WriteW (uint32 pa, int32 val);
-extern int32 WriteL (uint32 pa, int32 val);
+extern void WriteB (uint32 pa, int32 val);
+extern void WriteW (uint32 pa, int32 val);
+extern void WriteL (uint32 pa, int32 val);
 extern FILE *sim_log;
 
 t_stat dbl_rd (int32 *data, int32 addr, int32 access);
@@ -653,6 +657,24 @@ for (i = ma = 0; i < bc; i = i + 4, buf++) {		/* by lw */
 return 0;
 }
 
+/* Enable/disable autoconfiguration */
+
+t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr != NULL) return SCPE_ARG;
+autcon_enb = val;
+return auto_config (0, 0);
+}
+
+/* Show autoconfiguration status */
+
+t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "autoconfiguration ");
+fprintf (st, autcon_enb? "enabled": "disabled");
+return SCPE_OK;
+}
+
 /* Change device address */
 
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc)
@@ -674,7 +696,8 @@ if ((newba <= IOPAGEBASE) ||				/* must be > 0 */
     (newba % ((uint32) val))) return SCPE_ARG;		/* check modulus */
 dibp->ba = newba;					/* store */
 dptr->flags = dptr->flags & ~DEV_FLTA;			/* not floating */
-return auto_config (0, 0);				/* autoconfigure */
+autcon_enb = 0;						/* autoconfig off */
+return SCPE_OK;
 }
 
 /* Show device address */
@@ -730,6 +753,8 @@ if ((r != SCPE_OK) || (newvec <= VEC_Q) ||
     ((newvec + (dibp->vnum * 4)) >= (VEC_Q + 01000)) ||
     (newvec & ((dibp->vnum > 1)? 07: 03))) return SCPE_ARG;
 dibp->vec = newvec;
+dptr->flags = dptr->flags & ~DEV_FLTA;			/* not floating */
+autcon_enb = 0;						/* autoconfig off */
 return SCPE_OK;
 }
 
@@ -783,14 +808,20 @@ return FALSE;
 
 /* Build interrupt tables */
 
-void build_int_vec (int32 vloc, int32 ivec, int32 (*iack)(void) )
+t_bool build_int_vec (int32 vloc, int32 ivec, int32 (*iack)(void) )
 {
 int32 ilvl = vloc / 32;
 int32 ibit = vloc % 32;
 
-if (iack != NULL) int_ack[ilvl][ibit] = iack;
-else int_vec[ilvl][ibit] = ivec;
-return;
+if (iack != NULL) {
+	if (int_ack[ilvl][ibit] &&
+	   (int_ack[ilvl][ibit] != iack)) return TRUE;
+	 int_ack[ilvl][ibit] = iack;  }
+else if (ivec != 0) {
+	if (int_vec[ilvl][ibit] &&
+	    (int_vec[ilvl][ibit] != ivec)) return TRUE;
+	int_vec[ilvl][ibit] = ivec;  }
+return FALSE;
 }
 
 /* Build dib_tab from device list */
@@ -809,9 +840,15 @@ for (i = j = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
 	dibp = (DIB *) dptr->ctxt;			/* get DIB */
 	if (dibp && !(dptr->flags & DEV_DIS)) {		/* defined, enabled? */
 	    if (dibp->vnum > VEC_DEVMAX) return SCPE_IERR;
-	    for (k = 0; k < dibp->vnum; k++)		/* loop thru vec */
-	        build_int_vec (dibp->vloc + k,		/* add vector */
-		    dibp->vec + (k * 4), dibp->ack[k]);
+	    for (k = 0; k < dibp->vnum; k++) {		/* loop thru vec */
+	        if (build_int_vec (dibp->vloc + k,	/* add vector */
+		    dibp->vec + (k * 4), dibp->ack[k])) {
+		    printf ("Device %s interrupt slot conflict at %d\n",
+			sim_dname (dptr), dibp->vloc + k);
+		    if (sim_log) fprintf (sim_log,
+			"Device %s interrupt slot conflict at %d\n",
+			sim_dname (dptr), dibp->vloc + k);
+		    return SCPE_IERR;  }  }
 	    if (dibp->lnt != 0) {			/* I/O addresses? */
 		dib_tab[j++] = dibp;			/* add DIB to dib_tab */
 		if (j >= DIB_MAX) return SCPE_IERR;  }	/* too many? */	
@@ -922,6 +959,7 @@ DIB *dibp;
 int32 i, j, k;
 extern DEVICE *find_dev (char *ptr);
 
+if (autcon_enb == 0) return SCPE_OK;			/* enabled? */
 if (rank > AUTO_LNT) return SCPE_IERR;			/* legal rank? */
 if (rank) auto_tab[rank - 1].num = nctrl;		/* update num? */
 for (i = 0, autp = auto_tab; i < AUTO_LNT; i++) {	/* loop thru table */

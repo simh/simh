@@ -25,6 +25,9 @@
 
    dkp		moving head disk
 
+   28-Nov-03	CEO	Boot from DP now puts device address in SR
+   24-Nov-03	CEO	Added support for disk sizing on 6099/6103
+   19-Nov-03	CEO	Corrected major DMA Mapping bug
    25-Apr-03	RMS	Revised autosizing
    08-Oct-02	RMS	Added DIB
    06-Jan-02	RMS	Revised enable/disable support
@@ -225,7 +228,7 @@
 #define TYPE_6070	8
 #define SECT_6070	24
 #define SURF_6070	4
-#define CYL_6070		408
+#define CYL_6070	408
 #define SIZE_6070	(SECT_6070 * SURF_6070 * CYL_6070 * DKP_NUMWD)
 #define NFMT_6070	TRUE
 
@@ -278,11 +281,13 @@ extern UNIT cpu_unit;
 extern int32 int_req, dev_busy, dev_done, dev_disable;
 
 int32 dkp_ma = 0;					/* memory address */
+int32 dkp_map = 0;					/* DCH map 0=A 3=B */
 int32 dkp_ussc = 0;					/* unit/sf/sc/cnt */
 int32 dkp_fccy = 0;					/* flags/cylinder */
 int32 dkp_sta = 0;					/* status register */
 int32 dkp_swait = 100;					/* seek latency */
 int32 dkp_rwait = 100;					/* rotate latency */
+int32 dkp_diagmode = 0;					/* diagnostic mode */
 
 DEVICE dkp_dev;
 int32 dkp (int32 pulse, int32 code, int32 AC);
@@ -322,6 +327,8 @@ REG dkp_reg[] = {
 	{ FLDATA (BUSY, dev_busy, INT_V_DKP) },
 	{ FLDATA (DONE, dev_done, INT_V_DKP) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_DKP) },
+	{ FLDATA (DIAG, dkp_diagmode, 0) },
+	{ ORDATA (MAP, dkp_map, 2) },
 	{ DRDATA (STIME, dkp_swait, 24), PV_LEFT },
 	{ DRDATA (RTIME, dkp_rwait, 24), PV_LEFT },
 	{ URDATA (CAPAC, dkp_unit[0].capac, 10, T_ADDR_W, 0,
@@ -452,22 +459,32 @@ case ioDIA:						/* DIA */
 	rval = dkp_sta;
 	break;
 case ioDOA:						/* DOA */
+	if (AC & 0100000)				/* clear rw done? */
+	    dkp_sta = dkp_sta & ~(STA_CYL|STA_XCY|STA_UNS|STA_CRC);
 	if ((dev_busy & INT_DKP) == 0) {
 	    dkp_fccy = AC;				/* save cmd, cyl */
 	    dkp_sta = dkp_sta & ~(AC & FCCY_FLAGS);  }
+	if ((dkp_sta & STA_DFLGS) == 0)			/* done flags = 0? */
+	    dev_done = dev_done & ~INT_DKP;		/* clear intr */
 	break;
 case ioDIB:						/* DIB */
 	rval = dkp_ma;					/* return buf addr */
 	break;
 case ioDOB:						/* DOB */
-	if ((dev_busy & INT_DKP) == 0) dkp_ma = 
-	    AC & (drv_tab[dtype].newf? DMASK: AMASK);
+	if ((dev_busy & INT_DKP) == 0) {
+	    dkp_ma = AC & (drv_tab[dtype].newf? DMASK: AMASK);
+	    if (AC & 0100000) dkp_map = 3;		/* high bit is map */
+	    else dkp_map = 0;
+	    }
 	break;
 case ioDIC:						/* DIC */
 	rval = dkp_ussc;				/* return unit, sect */
 	break;
 case ioDOC:						/* DOC */
 	if ((dev_busy & INT_DKP) == 0) dkp_ussc = AC;	/* save unit, sect */
+	if (((dtype == TYPE_6099) ||			/* for 6099 and 6103 */
+	    (dtype == TYPE_6103)) &&			/* if data<0> set, */
+	    AC & 010000) dkp_diagmode = 1;		/* set diagnostic mode */
 	break;  }					/* end switch code */
 
 /* IOT, continued */
@@ -478,7 +495,14 @@ case iopS:						/* start */
 	dev_busy = dev_busy | INT_DKP;			/* set busy */
 	dev_done = dev_done & ~INT_DKP;			/* clear done */
 	int_req = int_req & ~INT_DKP;			/* clear int */
-	if (dkp_go ()) break;				/* new cmd, error? */
+	if (dkp_diagmode) {				/* in diagnostic mode? */
+	    dkp_diagmode = 0;				/* reset it */
+	    if (dtype == TYPE_6099) dkp_ussc = 010002;	/* return size bits */
+	    if (dtype == TYPE_6103) dkp_ussc = 010003;	/* for certain types */
+	    } 
+	else {						/* normal mode ... */
+	    if (dkp_go ()) break;			/* new cmd, error? */
+	    }
 	dev_busy = dev_busy & ~INT_DKP;			/* clear busy */
 	dev_done = dev_done | INT_DKP;			/* set done */
 	int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
@@ -558,6 +582,13 @@ static uint16 tbuf[DKP_NUMWD];				/* transfer buffer */
 
 rval = SCPE_OK;
 dtype = GET_DTYPE (uptr->flags);			/* get drive type */
+if (dkp_diagmode) {					/* diagnostic mode? */
+	dkp_sta = (dkp_sta | STA_DONE);			/* Set error bit only */
+	dev_busy = dev_busy & ~INT_DKP;			/* clear busy */
+	dev_done = dev_done | INT_DKP;			/* set done */
+	int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
+	return SCPE_OK;					/* do not do function */
+	}
 if (uptr->FUNC == FCCY_SEEK) {				/* seek? */
 	if (uptr->CYL >= drv_tab[dtype].cyl)		/* bad cylinder? */
 	    dkp_sta = dkp_sta | STA_ERR | STA_CYL;
@@ -597,14 +628,14 @@ else {	sc = 16 - GET_COUNT (dkp_ussc);			/* get sector count */
 		for ( ; awc < DKP_NUMWD; awc++) tbuf[awc] = 0;
 		if (err = ferror (uptr->fileref)) break;
 		for (dx = 0; dx < DKP_NUMWD; dx++) {	/* loop thru buffer */
-		    pa = MapAddr (0, dkp_ma);
+		    pa = MapAddr (dkp_map, (dkp_ma & AMASK));
 		    if (MEM_ADDR_OK (pa)) M[pa] = tbuf[dx];
 	            dkp_ma = (dkp_ma + 1) & AMASK;  }  }  }
 
 	if (uptr->FUNC == FCCY_WRITE) {			/* write? */
 	    for (sx = 0; sx < sc; sx++) {		/* loop thru sectors */
 		for (dx = 0; dx < DKP_NUMWD; dx++) {	/* loop into buffer */
-		    pa = MapAddr (0, dkp_ma);
+		    pa = MapAddr (dkp_map, (dkp_ma & AMASK));
 		    tbuf[dx] = M[pa];
 	            dkp_ma = (dkp_ma + 1) & AMASK;  }
 		fxwrite (tbuf, sizeof(int16), DKP_NUMWD, uptr->fileref);
@@ -641,6 +672,8 @@ dev_busy = dev_busy & ~INT_DKP;				/* clear busy */
 dev_done = dev_done & ~INT_DKP;				/* clear done, int */
 int_req = int_req & ~INT_DKP;
 dkp_fccy = dkp_ussc = dkp_ma = dkp_sta = 0;		/* clear registers */
+dkp_diagmode = 0;					/* clear diagnostic mode */
+dkp_map = 0;
 for (u = 0; u < DKP_NUMDR; u++) {			/* loop thru units */
 	uptr = dkp_dev.units + u;
 	sim_cancel (uptr);				/* cancel activity */
@@ -685,33 +718,33 @@ return SCPE_OK;
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int))
 
 static const int32 boot_rom[] = {
-	060233,			/* NIOC 0,DKP		; clear disk */
-	020420,			/* LDA 0,USSC 		; unit, sfc, sec, cnt */
-	063033,			/* DOC 0,DKP		; select disk */
-	020417,			/* LDA 0,SEKCMD		; command, cylinder */
-	061333,			/* DOAP 0,DKP		; start seek */
-	024415,			/* LDA 1,SEKDN */
-	060433,			/* DIA 0,DKP		; get status */
+	0060233,		/* NIOC 0,DKP		; clear disk */
+	0020420,		/* LDA 0,USSC 		; unit, sfc, sec, cnt */
+	0063033,		/* DOC 0,DKP		; select disk */
+	0020417,		/* LDA 0,SEKCMD		; command, cylinder */
+	0061333,		/* DOAP 0,DKP		; start seek */
+	0024415,		/* LDA 1,SEKDN */
+	0060433,		/* DIA 0,DKP		; get status */
 	0123415,		/* AND# 1,0,SZR		; skip if done */
-	000776,			/* JMP .-2 */
+	0000776,		/* JMP .-2 */
 	0102400,		/* SUB 0,0 		; mem addr = 0 */
-	062033,			/* DOB 0,DKP */
-	020411,			/* LDA 0,REDCMD		; command, cylinder */
-	061133,			/* DOAS 0,DKP		; start read */
-	060433,			/* DIA 0, DKP		; get status */
+	0062033,		/* DOB 0,DKP */
+	0020411,		/* LDA 0,REDCMD		; command, cylinder */
+	0061133,		/* DOAS 0,DKP		; start read */
+	0060433,		/* DIA 0, DKP		; get status */
 	0101113,		/* MOVL# 0,0,SNC	; skip if done */
-	000776,			/* JMP .-2 */
-	000377,			/* JMP 377 */
-	000016,			/* USSC: 0.B1+0.B7+0.B11+16 */
+	0000776,		/* JMP .-2 */
+	0000377,		/* JMP 377 */
+	0000016,		/* USSC: 0.B1+0.B7+0.B11+16 */
 	0175000,		/* SEKCMD: 175000 */
-	074000,			/* SEKDN: 074000 */
+	0074000,		/* SEKDN: 074000 */
 	0174000			/* REDCMD: 174000 */
 };
 
 t_stat dkp_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i, dtype;
-extern int32 saved_PC;
+extern int32 saved_PC, SR;
 
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 unitno = unitno & USSC_M_UNIT;
@@ -719,5 +752,6 @@ dtype = GET_DTYPE (dkp_unit[unitno].flags);
 M[BOOT_UNIT] = M[BOOT_UNIT] | (unitno << USSC_V_UNIT);
 if (drv_tab[dtype].newf) M[BOOT_SEEK] = 0176000;
 saved_PC = BOOT_START;
+SR = 0100000 + DEV_DKP;
 return SCPE_OK;
 }

@@ -25,6 +25,7 @@
 
    lpt		line printer
 
+   24-Oct-03	RMS	Added DMA/DMC support
    25-Apr-03	RMS	Revised for extended file support
    30-May-02	RMS	Widened POS to 32b
 
@@ -55,8 +56,10 @@
 	lpt_crpos		carriage position (0-1)
 	lpt_svcst		service state (shuttle, paper advance)
 	lpt_svcch		channel for paper advance (0 = no adv)
-	lpt_xfer		transfer ready flag
+	lpt_rdy			transfer ready flag
 	lpt_prdn		printing done flag
+	lpt_dma			use DMA/DMC
+	lpt_eor			DMA/DMC end of range
 */
 
 #include "h316_defs.h"
@@ -67,22 +70,26 @@
 #define LPT_SVCSH	01				/* shuttle */
 #define LPT_SVCPA	02				/* paper advance */
 
-extern int32 dev_ready, dev_enable;
+extern int32 dev_int, dev_enb;
 extern int32 stop_inst;
+extern uint32 chan_req;
 
 int32 lpt_wdpos = 0;					/* word position */
 int32 lpt_drpos = 0;					/* drum position */
 int32 lpt_crpos = 0;					/* carriage position */
 int32 lpt_svcst = 0;					/* service state */
 int32 lpt_svcch = 0;					/* service channel */
-int32 lpt_xfer = 0;					/* transfer flag */
+int32 lpt_rdy = 0;					/* transfer flag */
 int32 lpt_prdn = 1;					/* printing done */
+int32 lpt_dma = 0;					/* use DMA/DMC */
+int32 lpt_eor = 0;					/* DMA/DMC end range */
 char lpt_buf[LPT_WIDTH + 1] = { 0 };			/* line buffer */
 int32 lpt_xtime = 5;					/* transfer time */
 int32 lpt_etime = 50;					/* end of scan time */
 int32 lpt_ptime = 5000;					/* paper adv time */
 int32 lpt_stopioe = 0;					/* stop on error */
 
+int32 lptio (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 
@@ -94,16 +101,20 @@ t_stat lpt_reset (DEVICE *dptr);
    lpt_reg	LPT register list
 */
 
+DIB lpt_dib = { LPT, IOBUS, 1, &lptio };
+
 UNIT lpt_unit = { UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0) };
 
 REG lpt_reg[] = {
 	{ DRDATA (WDPOS, lpt_wdpos, 6) },
 	{ DRDATA (DRPOS, lpt_drpos, 6) },
 	{ FLDATA (CRPOS, lpt_crpos, 0) },
-	{ FLDATA (XFER, lpt_xfer, 0) },
+	{ FLDATA (RDY, lpt_rdy, 0) },
+	{ FLDATA (EOR, lpt_eor, 0) },
+	{ FLDATA (DMA, lpt_dma, 0) },
 	{ FLDATA (PRDN, lpt_prdn, 0) },
-	{ FLDATA (INTREQ, dev_ready, INT_V_LPT) },
-	{ FLDATA (ENABLE, dev_enable, INT_V_LPT) },
+	{ FLDATA (INTREQ, dev_int, INT_V_LPT) },
+	{ FLDATA (ENABLE, dev_enb, INT_V_LPT) },
 	{ ORDATA (SVCST, lpt_svcst, 2) },
 	{ ORDATA (SVCCH, lpt_svcch, 2) },
 	{ BRDATA (BUF, lpt_buf, 8, 8, 120) },
@@ -118,12 +129,14 @@ DEVICE lpt_dev = {
 	"LPT", &lpt_unit, lpt_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &lpt_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&lpt_dib, DEV_DISABLE };
 
 /* IO routine */
 
-int32 lptio (int32 inst, int32 fnc, int32 dat)
+int32 lptio (int32 inst, int32 fnc, int32 dat, int32 dev)
 {
+int32 ch = lpt_dib.chan - 1;				/* DMA/DMC chan */
 int32 chr;
 
 switch (inst) {						/* case on opcode */
@@ -133,13 +146,26 @@ case ioOCP:						/* OCP */
 	    lpt_svcst = lpt_svcst | LPT_SVCPA;		/* set state */
 	    lpt_svcch = fnc >> 1;			/* save channel */
 	    sim_activate (&lpt_unit, lpt_ptime);
-	    CLR_READY (INT_LPT);			/* clear int */
+	    CLR_INT (INT_LPT);				/* clear int */
 	    break;
-	case 007:					/* init scan */
+	case 003:					/* init scan DMA/DMC */
 	    lpt_prdn = 0;				/* clear pr done */
 	    lpt_wdpos = 0;				/* init scan pos */
-	    if (!sim_is_active (&lpt_unit)) lpt_xfer = 1;
-	    CLR_READY (INT_LPT);			/* clear int */
+	    lpt_eor = 0;
+	    if (ch >= 0) lpt_dma = 1;			/* try for DMA/DMC */
+	    lpt_dma = 0;
+	    if (!sim_is_active (&lpt_unit)) {
+		lpt_rdy = 1;
+		if (lpt_dma) SET_CH_REQ (ch);  }
+	    CLR_INT (INT_LPT);				/* clear int */
+	    break;
+	case 007:					/* init scan IO bus*/
+	    lpt_prdn = 0;				/* clear pr done */
+	    lpt_wdpos = 0;				/* init scan pos */
+	    lpt_eor = 0;
+	    lpt_dma = 0;				/* IO bus */
+	    if (!sim_is_active (&lpt_unit)) lpt_rdy = 1;
+	    CLR_INT (INT_LPT);				/* clear int */
 	    break;
 	default:
 	    return IOBADFNC (dat);  }
@@ -148,7 +174,7 @@ case ioOCP:						/* OCP */
 case ioSKS:						/* SKS */
 	switch (fnc) {					/* case on fnc */
 	case 000:					/* if xfer rdy */
-	    if (lpt_xfer) return IOSKIP (dat);
+	    if (lpt_rdy) return IOSKIP (dat);
 	    break;
 	case 002:					/* if !alarm */
 	    if (lpt_unit.flags & UNIT_ATT) return IOSKIP (dat);
@@ -187,8 +213,8 @@ case ioSKS:						/* SKS */
 
 case ioOTA:						/* OTA */
 	if (fnc) return IOBADFNC (dat);			/* only fnc 0 */
-	if (lpt_xfer) {					/* xfer ready? */
-	    lpt_xfer = 0;				/* clear xfer */
+	if (lpt_rdy) {					/* xfer ready? */
+	    lpt_rdy = 0;				/* clear xfer */
 	    chr = (dat >> (lpt_crpos? 0: 8)) & 077;	/* get 6b char */
 	    if (chr == lpt_drpos) {			/* match drum pos? */
 		if (chr < 040) chr = chr | 0100;
@@ -207,6 +233,10 @@ case ioOTA:						/* OTA */
 		}					/* end if endscan */
 	    else sim_activate (&lpt_unit, lpt_xtime);
 	    return IOSKIP (dat);  }			/* skip return */
+	break;
+
+case ioEND:						/* end DMA/DMC */
+	lpt_eor = 1;					/* set end range */
 	break;  }					/* end case op */
 return dat;
 }
@@ -216,6 +246,7 @@ return dat;
 t_stat lpt_svc (UNIT *uptr)
 {
 int32 i;
+int32 ch = lpt_dib.chan - 1;				/* DMA/DMC chan */
 static const char *lpt_cc[] = {
 	"\r",
 	"\n",
@@ -224,12 +255,18 @@ static const char *lpt_cc[] = {
 
 if ((lpt_unit.flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (lpt_stopioe, SCPE_UNATT);
-lpt_xfer = 1;
+if (lpt_dma) {						/* DMA/DMC? */
+	if (lpt_eor) SET_INT (INT_LPT);			/* end range? intr */
+	else {
+	    lpt_rdy = 1;				/* set ready */
+	    SET_CH_REQ (ch);  }  }			/* get more data */
+else lpt_rdy = 1;					/* IO, continue scan */
+if (lpt_dma && lpt_eor) SET_INT (INT_LPT);		/* end of range? */
 if (lpt_svcst & LPT_SVCSH) {				/* shuttling */
-	SET_READY (INT_LPT);				/* interrupt */
+	SET_INT (INT_LPT);				/* interrupt */
 	if (lpt_crpos == 0) lpt_prdn = 1;  }
 if (lpt_svcst & LPT_SVCPA) {				/* paper advance */
-	SET_READY (INT_LPT);				/* interrupt */
+	SET_INT (INT_LPT);				/* interrupt */
 	for (i = LPT_WIDTH - 1; i >= 0; i++)  {
 	    if (lpt_buf[i] != ' ') break;  }
 	lpt_buf[i + 1] = 0;
@@ -250,12 +287,14 @@ int32 i;
 
 lpt_wdpos = lpt_drpos = lpt_crpos = 0;			/* clear positions */
 lpt_svcst = lpt_svcch = 0;				/* idle state */
-lpt_xfer = 0;						/* not rdy to xfer */
+lpt_rdy = 0;						/* not rdy to xfer */
 lpt_prdn = 1;						/* printing done */
+lpt_eor = 0;
+lpt_dma = 0;
 for (i = 0; i < LPT_WIDTH; i++) lpt_buf[i] = ' ';	/* clear buffer */
 lpt_buf[LPT_WIDTH] = 0;
-CLR_READY (INT_LPT);					/* clear int, enb */
-CLR_ENABLE (INT_LPT);
+CLR_INT (INT_LPT);					/* clear int, enb */
+CLR_ENB (INT_LPT);
 sim_cancel (&lpt_unit);					/* deactivate unit */
 return SCPE_OK;
 }

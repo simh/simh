@@ -5,8 +5,12 @@
 #
 ifeq ($(WIN32),)
 #Unix Environments
+ifeq ($(OSTYPE),solaris)
+OS_CCDEFS = -lsocket -lnsl -I /usr/local/include
+CC = gcc -O2 -g -lm $(OS_CCDEFS) -L /usr/local/lib -I . -D_GNU_SOURCE
+else
 CC = gcc -O2 -lm -I . 
-#CC = gcc -O2 -g -lm -I . 
+endif
 ifeq ($(USE_NETWORK),)
 else
 NETWORK_OPT = -DUSE_NETWORK -lpcap
@@ -53,7 +57,7 @@ ECLIPSE = ${NOVAD}eclipse_cpu.c ${NOVAD}eclipse_tt.c ${NOVAD}nova_sys.c \
 	${NOVAD}nova_dkp.c ${NOVAD}nova_dsk.c ${NOVAD}nova_lp.c \
 	${NOVAD}nova_mta.c ${NOVAD}nova_plt.c ${NOVAD}nova_pt.c \
 	${NOVAD}nova_clk.c ${NOVAD}nova_tt1.c
-ECLIPSE_OPT = -I ${NOVAD} -DECLIPSE
+ECLIPSE_OPT = -I ${NOVAD} -DECLIPSE -DUSE_INT64 
 
 
 
@@ -108,14 +112,16 @@ PDP8 = ${PDP8D}pdp8_cpu.c ${PDP8D}pdp8_clk.c ${PDP8D}pdp8_df.c \
 	${PDP8D}pdp8_dt.c ${PDP8D}pdp8_lp.c ${PDP8D}pdp8_mt.c \
 	${PDP8D}pdp8_pt.c ${PDP8D}pdp8_rf.c ${PDP8D}pdp8_rk.c \
 	${PDP8D}pdp8_rx.c ${PDP8D}pdp8_sys.c ${PDP8D}pdp8_tt.c \
-	${PDP8D}pdp8_ttx.c ${PDP8D}pdp8_rl.c
+	${PDP8D}pdp8_ttx.c ${PDP8D}pdp8_rl.c ${PDP8D}pdp8_tsc.c \
+	${PDP8D}pdp8_td.c
 PDP8_OPT = -I ${PDP8D}
 
 
 
 H316D = H316/
 H316 = ${H316D}h316_stddev.c ${H316D}h316_lp.c ${H316D}h316_cpu.c \
-	${H316D}h316_sys.c
+	${H316D}h316_sys.c ${H316D}h316_mt.c ${H316D}h316_fhd.c \
+	${H316D}h316_dp.c
 H316_OPT = -I ${H316D}
 
 

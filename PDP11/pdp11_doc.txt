@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	15-Sep-2003
+Date:	15-Dec-2003
 
 			COPYRIGHT NOTICE
 
@@ -127,6 +127,7 @@ The PDP-11 simulator implements several unique stop conditions:
 	- trap condition 'n' occurs, and register STOP_TRAP<n> is set
 	- wait state entered, and no I/O operations outstanding
 	  (ie, no interrupt can ever occur)
+	- a simulated DECtape runs off the end of its reel
 
 The PDP-11 loader supports standard binary format tapes.  The DUMP command
 is not implemented.
@@ -289,11 +290,13 @@ In addition to autoconfiguration, most devices support the SET ADDRESS
 command, which allows the I/O page address of the device to be changed,
 and the SET VECTOR command, which allows the vector of the device to be
 changed.  Explicitly setting the I/O address of a device which normally
-uses autoconfiguration DISABLES autoconfiguration for that device.  As
-a consequence, the user may have to manually configure all other
-autoconfigured devices, because the autoconfiguration algorithm no
-longer recognizes the explicitly configured device.  A device can be
-reset to autoconfigure with the SET <device> AUTOCONFIGURE command. 
+uses autoconfiguration DISABLES autoconfiguration for that device and for
+the entire system.  As a consequence, the user may have to manually configure
+all other autoconfigured devices, because the autoconfiguration algorithm
+no longer recognizes the explicitly configured device.  A device can be
+reset to autoconfigure with the SET <device> AUTOCONFIGURE command.  Auto-
+configuration can be restored for the entire system with the SET CPU
+AUTOCONFIGURE command.
 
 The current I/O map can be displayed with the SHOW CPU IOSPACE command.
 Addresses that have set by autoconfiguration are marked with an asterisk (*). 
@@ -994,7 +997,6 @@ The TC controller implements these registers:
 	IE		1	interrupt enable flag
 	CTIME		31	time to complete transport stop
 	LTIME		31	time between lines
-	ACTIME		31	time to accelerate to full speed
 	DCTIME		31	time to decelerate to a full stop
 	SUBSTATE	2	read/write command substate
 	POS[0:7]	32	position, in lines, units 0-7
@@ -1005,8 +1007,9 @@ among the DECtape parameters, or the DECtape simulator will fail to
 operate correctly.
 
 	- LTIME must be at least 6
-	- ACTIME must be less than DCTIME, and both need to be at
-	  least 100 times LTIME
+	- DCTIME needs to be at least 100 times LTIME
+
+Acceleration time is set to 75% of deceleration time.
 
 2.9 Magnetic Tape Controllers
 	

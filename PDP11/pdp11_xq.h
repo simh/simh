@@ -28,6 +28,7 @@
 
   Modification history:
 
+  25-Nov-03  DTH  Added interrupt request flag
   02-Jun-03  DTH  Added struct xq_stats
   28-May-03  DTH  Made xq_msg_que.item dynamic
   28-May-03  MP   Optimized structures, removed rtime variable
@@ -152,6 +153,7 @@ struct xq_device {
   uint16            xbdl[2];
   uint16            var;
   uint16            csr;
+  uint32            irq;                  /* interrupt request flag */
 
   /* buffers, etc. */
   struct xq_setup   setup;

@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Oct-03	RMS	Added TSC8-75 support
    04-Oct-02	RMS	Added variable device number support
    20-Jan-02	RMS	Fixed bug in TTx interrupt enable initialization
    25-Nov-01	RMS	Added RL8A support
@@ -45,6 +46,7 @@
 #define STOP_HALT	2				/* HALT */
 #define STOP_IBKPT	3				/* breakpoint */
 #define STOP_NOTSTD	4				/* non-std devno */
+#define STOP_DTOFF	5				/* DECtape off reel */
 
 /* Memory */
 
@@ -86,6 +88,7 @@ typedef struct pdp8_dib DIB;
 #define DEV_TTI		003				/* console input */
 #define DEV_TTO		004				/* console output */
 #define DEV_CLK		013				/* clock */
+#define DEV_TSC		036
 #define DEV_KJ8		040				/* extra terminals */
 #define DEV_DF		060				/* DF32 */
 #define DEV_RF		060				/* RF08 */
@@ -95,6 +98,7 @@ typedef struct pdp8_dib DIB;
 #define DEV_RK		074				/* RK8E */
 #define DEV_RX		075				/* RX8E/RX28 */
 #define DEV_DTA		076				/* TC08 */
+#define DEV_TD8E	077				/* TD8E */
 
 /* Interrupt flags
 
@@ -143,7 +147,8 @@ typedef struct pdp8_dib DIB;
 #define INT_V_RL	(INT_V_DIRECT+6)		/* RL8A */
 #define INT_V_PWR	(INT_V_DIRECT+7)		/* power int */
 #define INT_V_UF	(INT_V_DIRECT+8)		/* user int */
-#define INT_V_OVHD	(INT_V_DIRECT+9)		/* overhead start */
+#define INT_V_TSC	(INT_V_DIRECT+9)		/* TSC8-75 int */
+#define INT_V_OVHD	(INT_V_DIRECT+10)		/* overhead start */
 #define INT_V_NO_ION_PENDING (INT_V_OVHD+0)		/* ion pending */
 #define INT_V_NO_CIF_PENDING (INT_V_OVHD+1)		/* cif pending */
 #define INT_V_ION	(INT_V_OVHD+2)			/* interrupts on */
@@ -171,6 +176,7 @@ typedef struct pdp8_dib DIB;
 #define INT_RL		(1 << INT_V_RL)
 #define INT_PWR		(1 << INT_V_PWR)
 #define INT_UF		(1 << INT_V_UF)
+#define INT_TSC		(1 << INT_V_TSC)
 #define INT_NO_ION_PENDING (1 << INT_V_NO_ION_PENDING)
 #define INT_NO_CIF_PENDING (1 << INT_V_NO_CIF_PENDING)
 #define INT_ION		(1 << INT_V_ION)

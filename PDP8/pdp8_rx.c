@@ -25,6 +25,8 @@
 
    rx		RX8E/RX01, RX28/RX02 floppy disk
 
+   05-Nov-03	RMS	Fixed bug in RX28 read status (found by Charles Dickman)
+   26-Oct-03	RMS	Cleaned up buffer copy code, fixed double density write
    25-Apr-03	RMS	Revised for extended file support
    14-Mar-03	RMS	Fixed variable size interaction with save/restore
    03-Mar-03	RMS	Fixed autosizing
@@ -129,7 +131,7 @@ int32 rx_swait = 10;					/* seek, per track */
 int32 rx_xwait = 1;					/* tr set time */
 int32 rx_stopioe = 0;					/* stop on error */
 uint8 rx_buf[RX2_NUMBY] = { 0 };			/* sector buffer */
-static int32 bptr = 0;					/* buffer pointer */
+int32 rx_bptr = 0;					/* buffer pointer */
 
 DEVICE rx_dev;
 int32 rx (int32 IR, int32 AC);
@@ -167,7 +169,7 @@ REG rx_reg[] = {
 	{ ORDATA (RXTA, rx_track, 8) },
 	{ ORDATA (RXSA, rx_sector, 8) },
 	{ DRDATA (STAPTR, rx_state, 4), REG_RO },
-	{ DRDATA (BUFPTR, bptr, 8)  },
+	{ DRDATA (BUFPTR, rx_bptr, 8)  },
 	{ FLDATA (TR, rx_tr, 0) },
 	{ FLDATA (ERR, rx_err, 0) },
 	{ FLDATA (DONE, dev_done, INT_V_RX) },
@@ -226,7 +228,7 @@ case 1:							/* LCD */
 	dev_done = dev_done & ~INT_RX;			/* clear done, int */
 	int_req = int_req & ~INT_RX;
 	rx_tr = rx_err = 0;				/* clear flags */
-	bptr = 0;					/* clear buf pointer */
+	rx_bptr = 0;					/* clear buf pointer */
 	if (rx_28 && (AC & RXCS_MODE)) {		/* RX28 8b mode? */
 	    rx_dbr = rx_csr = AC & 0377;		/* save 8b */
 	    rx_tr = 1;					/* xfer is ready */
@@ -287,9 +289,11 @@ switch (RXCS_GETFNC (rx_csr)) {				/* decode command */
 case RXCS_FILL:
 	rx_state = FILL;				/* state = fill */
 	rx_tr = 1;					/* xfer is ready */
+	rx_esr = rx_esr & RXES_ID;			/* clear errors */
 	break;
 case RXCS_EMPTY:
 	rx_state = EMPTY;				/* state = empty */
+	rx_esr = rx_esr & RXES_ID;			/* clear errors */
 	sim_activate (&rx_unit[drv], rx_xwait);		/* sched xfer */
 	break;
 case RXCS_READ: case RXCS_WRITE: case RXCS_WRDEL:
@@ -301,6 +305,7 @@ case RXCS_SDEN:
 	if (rx_28) {					/* RX28? */
 	    rx_state = SDCNF;				/* state = get conf */
 	    rx_tr = 1;					/* xfer is ready */
+	    rx_esr = rx_esr & RXES_ID;			/* clear errors */
 	    break;  }					/* else fall thru */
 default:
 	rx_state = CMD_COMPLETE;			/* state = cmd compl */
@@ -315,10 +320,10 @@ return;
    RWDS		Save sector, set TR, set RWDT
    RWDT		Save track, set RWXFR
    RWXFR	Read/write buffer
-   FILL		copy dbr to rx_buf[bptr], advance ptr
-   		if bptr > max, finish command, else set tr
-   EMPTY	if bptr > max, finish command, else
-		copy rx_buf[bptr] to dbr, advance ptr, set tr
+   FILL		copy dbr to rx_buf[rx_bptr], advance ptr
+   		if rx_bptr > max, finish command, else set tr
+   EMPTY	if rx_bptr > max, finish command, else
+		copy rx_buf[rx_bptr] to dbr, advance ptr, set tr
    CMD_COMPLETE	copy requested data to dbr, finish command
    INIT_COMPLETE read drive 0, track 1, sector 1 to buffer, finish command
 
@@ -329,12 +334,13 @@ return;
 t_stat rx_svc (UNIT *uptr)
 {
 int32 i, func, byptr, bps, wps;
+int8 *fbuf = uptr->filebuf;
 uint32 da;
 #define PTR12(x) (((x) + (x) + (x)) >> 1)
 
-if (rx_28 && (uptr->flags & UNIT_DEN))
-	bps = RX2_NUMBY;
-else bps = RX_NUMBY;
+if (rx_28 && (uptr->flags & UNIT_DEN))			/* RX28 and double density? */
+	bps = RX2_NUMBY;				/* double bytes/sector */
+else bps = RX_NUMBY;					/* RX8E, normal count */
 wps = bps / 2;
 func = RXCS_GETFNC (rx_csr);				/* get function */
 switch (rx_state) {					/* case on state */
@@ -344,40 +350,40 @@ case IDLE:						/* idle */
 
 case EMPTY:						/* empty buffer */
 	if (rx_csr & RXCS_MODE) {			/* 8b xfer? */
-	    if (bptr >= bps) {				/* done? */
+	    if (rx_bptr >= bps) {			/* done? */
 		rx_done (0, 0);				/* set done */
 		break;  }				/* and exit */
-	    rx_dbr = rx_buf[bptr];  }			/* else get data */
+	    rx_dbr = rx_buf[rx_bptr];  }		/* else get data */
 	else {
-	    byptr = PTR12 (bptr);			/* 12b xfer */
-	    if (bptr >= wps) {				/* done? */
+	    byptr = PTR12 (rx_bptr);			/* 12b xfer */
+	    if (rx_bptr >= wps) {			/* done? */
 		rx_done (0, 0);				/* set done */
 		break;  }				/* and exit */
-	    rx_dbr = (bptr & 1)?			/* get data */
+	    rx_dbr = (rx_bptr & 1)?			/* get data */
 		((rx_buf[byptr] & 017) << 8) | rx_buf[byptr + 1]:
 		(rx_buf[byptr] << 4) | ((rx_buf[byptr + 1] >> 4) & 017);  }
-	bptr = bptr + 1;
+	rx_bptr = rx_bptr + 1;
 	rx_tr = 1;
 	break;
 
 case FILL:						/* fill buffer */
 	if (rx_csr & RXCS_MODE) {			/* 8b xfer? */
-	    rx_buf[bptr] = rx_dbr;			/* fill buffer */
-	    bptr = bptr + 1;
-	    if (bptr < bps) rx_tr = 1;			/* if more, set xfer */
+	    rx_buf[rx_bptr] = rx_dbr;			/* fill buffer */
+	    rx_bptr = rx_bptr + 1;
+	    if (rx_bptr < bps) rx_tr = 1;		/* if more, set xfer */
 	    else rx_done (0, 0);  }			/* else done */
 	else {
- 	    byptr = PTR12 (bptr);			/* 12b xfer */
-	    if (bptr & 1) {				/* odd or even? */
+ 	    byptr = PTR12 (rx_bptr);			/* 12b xfer */
+	    if (rx_bptr & 1) {				/* odd or even? */
 		rx_buf[byptr] = (rx_buf[byptr] & 0360) | ((rx_dbr >> 8) & 017);
 		rx_buf[byptr + 1] = rx_dbr & 0377;  }
 	    else {
 		rx_buf[byptr] = (rx_dbr >> 4) & 0377;
 		rx_buf[byptr + 1] = (rx_dbr & 017) << 4;  }
-	    bptr = bptr + 1;
-	    if (bptr < wps) rx_tr = 1;			/* if more, set xfer */
+	    rx_bptr = rx_bptr + 1;
+	    if (rx_bptr < wps) rx_tr = 1;		/* if more, set xfer */
 	    else {
-		for (i = PTR12 (RX_NUMWD); i < RX_NUMBY; i++)
+		for (i = PTR12 (wps); i < bps; i++)
 		    rx_buf[i] = 0;			/* else fill sector */
 		rx_done (0, 0);  }  }			/* set done */
 	break;
@@ -412,15 +418,13 @@ case RWXFR:						/* transfer */
 	da = CALC_DA (rx_track, rx_sector, bps);	/* get disk address */
 	if (func == RXCS_WRDEL) rx_esr = rx_esr | RXES_DD;	/* del data? */
 	if (func == RXCS_READ) {			/* read? */
-	    for (i = 0; i < bps; i++)
-		rx_buf[i] = *(((int8 *) uptr->filebuf) + da + i);  }
+	    for (i = 0; i < bps; i++) rx_buf[i] = fbuf[da + i];  }
 	else {						/* write */
 	    if (uptr->flags & UNIT_WPRT) {		/* locked? */
 		rx_done (0, 0100);			/* done, error */
 		break;  }
-	    for (i = 0; i < RX_NUMBY; i++)		/* write */
-		*(((int8 *) uptr->filebuf) + da + i) = rx_buf[i];
-	    da = da + RX_NUMBY;
+	    for (i = 0; i < bps; i++) fbuf[da + i] = rx_buf[i];
+	    da = da + bps;
 	    if (da > uptr->hwmark) uptr->hwmark = da;  }
 	rx_done (0, 0);					/* done */
 	break;
@@ -433,8 +437,7 @@ case SDCNF:						/* confirm set density */
 	sim_activate (uptr, rx_cwait * 100);		/* schedule operation */
 	break;
 case SDXFR:						/* erase disk */
-	for (i = 0; i < (int32) uptr->capac; i++)
-	    *(((int8 *) uptr->filebuf) + i) = 0;
+	for (i = 0; i < (int32) uptr->capac; i++) fbuf[i] = 0;
 	uptr->hwmark = uptr->capac;
 	if (rx_csr & RXCS_DEN) uptr->flags = uptr->flags | UNIT_DEN;
 	else uptr->flags = uptr->flags & ~UNIT_DEN;
@@ -445,7 +448,13 @@ case CMD_COMPLETE:					/* command complete */
 	if (func == RXCS_ECODE) {			/* read ecode? */
 	    rx_dbr = rx_ecode;				/* set dbr */
 	    rx_done (0, -1);  }				/* don't update */
-	else rx_done (0, 0);
+	else if (rx_28) {				/* no, read sta; RX28? */
+	    rx_esr = rx_esr & ~RXES_DERR;		/* assume dens match */
+	    if (((uptr->flags & UNIT_DEN) != 0) ^	/* densities mismatch? */
+		((rx_csr & RXCS_DEN) != 0))
+		rx_done (RXES_DERR, 0240);		/* yes, error */
+	    else rx_done (0, 0);  }			/* no, ok */
+	else rx_done (0, 0);				/* RX8E status */
 	break;
 
 case INIT_COMPLETE:					/* init complete */
@@ -456,7 +465,7 @@ case INIT_COMPLETE:					/* init complete */
 	    break;	}
 	da = CALC_DA (1, 1, bps);			/* track 1, sector 1 */
 	for (i = 0; i < bps; i++)			/* read sector */
-	    rx_buf[i] = *(((int8 *) uptr->filebuf) + da + i);
+	    rx_buf[i] = fbuf[da + i];
 	rx_done (RXES_ID, 0);				/* set done */
 	if ((rx_unit[1].flags & UNIT_ATT) == 0) rx_ecode = 0020;
 	break;  }					/* end case state */
@@ -475,7 +484,7 @@ rx_state = IDLE;					/* now idle */
 dev_done = dev_done | INT_RX;				/* set done */
 int_req = INT_UPDATE;					/* update ints */
 rx_esr = (rx_esr | esr_flags) & ~(RXES_DRDY|RXES_RX02|RXES_DEN);
-if (rx_28) rx_esr = rx_esr | RXES_RX02;			/* update estat */
+if (rx_28) rx_esr = rx_esr | RXES_RX02;			/* RX28? */
 if (rx_unit[drv].flags & UNIT_ATT) {			/* update drv rdy */
 	rx_esr = rx_esr | RXES_DRDY;
 	if (rx_unit[drv].flags & UNIT_DEN)		/* update density */

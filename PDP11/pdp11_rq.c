@@ -26,6 +26,8 @@
 
    rq		RQDX3 disk controller
 
+   07-Oct-03	RMS	Fixed problem with multiple RAUSER drives
+   17-Sep-03	RMS	Fixed MB to LBN conversion to be more accurate
    11-Jul-03	RMS	Fixed bug in user disk size (found by Chaskiel M Grundman)
    19-May-03	RMS	Revised for new conditional compilation scheme
    25-Apr-03	RMS	Revised for extended file support
@@ -1422,7 +1424,8 @@ int32 rq_rw_valid (MSC *cp, int32 pkt, UNIT *uptr, uint32 cmd)
 uint32 dtyp = GET_DTYPE (uptr->flags);			/* get drive type */
 uint32 lbn = GETP32 (pkt, RW_LBNL);			/* get lbn */
 uint32 bc = GETP32 (pkt, RW_BCL);			/* get byte cnt */
-uint32 maxlbn = drv_tab[dtyp].lbn;			/* get max lbn */
+uint32 maxlbn = uptr->capac / RQ_NUMBY;			/* get max lbn */
+/* uint32 maxlbn = drv_tab[dtyp].lbn;			/* get max lbn */
 
 if ((uptr->flags & UNIT_ATT) == 0)			/* not attached? */
 	return (ST_OFL | SB_OFL_NV);			/* offl no vol */
@@ -1866,6 +1869,7 @@ return;
 void rq_putr_unit (MSC *cp, int32 pkt, UNIT *uptr, uint32 lu, t_bool all)
 {
 uint32 dtyp = GET_DTYPE (uptr->flags);			/* get drive type */
+uint32 maxlbn = uptr->capac / RQ_NUMBY;			/* get max lbn */
 
 cp->pak[pkt].d[ONL_MLUN] = lu;				/* unit */
 cp->pak[pkt].d[ONL_UFL] = uptr->uf | UF_RPL | RQ_WPH (uptr) | RQ_RMV (uptr);
@@ -1878,7 +1882,7 @@ cp->pak[pkt].d[ONL_UIDD] = (UID_DISK << ONL_UIDD_V_CLS) |
 	(drv_tab[dtyp].mod << ONL_UIDD_V_MOD);		/* UID hi */
 PUTP32 (pkt, ONL_MEDL, drv_tab[dtyp].med);		/* media type */
 if (all) {						/* if long form */
-	PUTP32 (pkt, ONL_SIZL, drv_tab[dtyp].lbn);	/* user LBNs */
+	PUTP32 (pkt, ONL_SIZL, maxlbn);			/* user LBNs */
 	cp->pak[pkt].d[ONL_VSNL] = 01234 + lu;		/* vol serial # */
 	cp->pak[pkt].d[ONL_VSNH] = 0;  }
 return;
@@ -2012,13 +2016,13 @@ if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
 if (cptr) {
 	cap = (int32) get_uint (cptr, 10, max, &r);
 	if ((r != SCPE_OK) || (cap < RA8U_MINC)) return SCPE_ARG;
-	drv_tab[val].lbn = cap << (20 - 9);  }
+	drv_tab[val].lbn = cap * 1954;  }
 uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
 uptr->capac = ((t_addr) drv_tab[val].lbn) * RQ_NUMBY;
 return SCPE_OK;
 }
 
-/* Show unit type (and capacity if user defined) */
+/* Show unit type */
 
 t_stat rq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
@@ -2034,7 +2038,6 @@ int32 dtyp = GET_DTYPE (uptr->flags);
 MSC *cp = rq_ctxmap[uptr->cnum];
 t_stat r;
 
-uptr->capac = drv_tab[dtyp].lbn * RQ_NUMBY;
 r = attach_unit (uptr, cptr);
 if (r != SCPE_OK) return r;
 if (cp->csta == CST_UP) uptr->flags = uptr->flags | UNIT_ATP;

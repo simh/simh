@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   02-Nov-03	RMS	Fixed bug in branch digit (found by Dave Babcock)
    21-Aug-03	RMS	Fixed bug in immediate index add (found by Michael Short)
    25-Apr-03	RMS	Changed t_addr to uint32 throughout
    18-Oct-02	RMS	Fixed bugs in invalid result testing (found by Hans Pufal)
@@ -567,10 +568,10 @@ case OP_BB:
 	else reason = STOP_INVRTN;			/* MAR check */
 	break;
 
-/* Branch on digit (zero) - P,Q are valid */
+/* Branch on digit (not zero) - P,Q are valid */
 
 case OP_BD:
-	if ((M[QAR] & DIGIT) == 0) {			/* digit == 0? */
+	if ((M[QAR] & DIGIT) != 0) {			/* digit != 0? */
 	    BRANCH (PAR);  }				/* branch */
 	break;
 

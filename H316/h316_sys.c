@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Oct-03	RMS	Added DMA/DMC support
    17-Sep-01	RMS	Removed multiconsole support
 */
 
@@ -31,9 +32,14 @@
 
 extern DEVICE cpu_dev;
 extern UNIT cpu_unit;
-extern DEVICE ptr_dev, ptp_dev;
-extern DEVICE tty_dev, lpt_dev;
+extern DEVICE ptr_dev;
+extern DEVICE ptp_dev;
+extern DEVICE tty_dev;
+extern DEVICE lpt_dev;
 extern DEVICE clk_dev;
+extern DEVICE dp_dev;
+extern DEVICE fhd_dev;
+extern DEVICE mt_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
 extern int32 sim_switches;
@@ -54,10 +60,16 @@ REG *sim_PC = &cpu_reg[0];
 
 int32 sim_emax = 1;
 
-DEVICE *sim_devices[] = { &cpu_dev,
-	&ptr_dev, &ptp_dev,
-	&tty_dev, &lpt_dev,
+DEVICE *sim_devices[] = {
+	&cpu_dev,
+	&ptr_dev,
+	&ptp_dev,
+	&tty_dev,
+	&lpt_dev,
 	&clk_dev,
+	&dp_dev,
+	&fhd_dev,
+	&mt_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -66,7 +78,11 @@ const char *sim_stop_messages[] = {
 	"Unimplemented I/O device",
 	"HALT instruction",
 	"Breakpoint",
-	"Indirect address loop"  };
+	"Indirect address loop",
+	"DMA error",
+	"MT write protected",
+	"DP write overrun, track destroyed",
+	"DP track format invalid"  };
 
 /* Binary loader
 

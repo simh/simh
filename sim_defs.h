@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Dec-03	RMS	Added output stall status
    15-Jun-03	RMS	Added register flag REG_VMIO
    23-Apr-03	RMS	Revised for 32b/64b t_addr
    14-Mar-03	RMS	Lengthened default serial output wait
@@ -196,6 +197,7 @@ typedef unsigned int32		t_addr;
 #define SCPE_MTRLNT	(SCPE_BASE + 38)		/* tape rec lnt error */
 #define SCPE_LOST	(SCPE_BASE + 39)		/* Telnet conn lost */
 #define SCPE_TTMO	(SCPE_BASE + 40)		/* Telnet conn timeout */
+#define SCPE_STALL	(SCPE_BASE + 41)		/* Telnet conn stall */
 #define SCPE_KFLAG	0010000				/* tti data flag */
 #define SCPE_BREAK	0020000				/* tti break flag */
 
@@ -474,6 +476,7 @@ int32 sim_rtcn_init (int32 time, int32 tmr);
 int32 sim_rtcn_calb (int32 time, int32 tmr);
 t_stat sim_poll_kbd (void);
 t_stat sim_putchar (int32 out);
+t_stat sim_putchar_s (int32 out);
 BRKTAB *sim_brk_fnd (t_addr loc);
 t_bool sim_brk_test (t_addr bloc, int32 btyp);
 void sim_os_sleep (unsigned int sec);

@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    xu		DEUNA/DELUNA Ethernet interface (stub)
+
+   22-Dec-03	RMS	Added second (stub) device
 */
 
 #if defined (VM_PDP10)					/* PDP10 version */
@@ -61,3 +63,29 @@ DEVICE xu_dev = {
 	NULL, NULL, NULL,
 	NULL, NULL, NULL,
 	&xu_dib, DEV_DIS | DEV_UBUS };
+
+#if defined (VM_PDP11)
+
+/* XUB data structures
+
+   xub_dev	XUB device descriptor
+   xub_unit	XUB unit list
+   xub_reg	XUB register list
+*/
+
+DIB xub_dib = { IOBA_XUB, IOLN_XUB, NULL, NULL,
+		1, IVCL (XU), VEC_XU, { NULL } };
+
+UNIT xub_unit = { UDATA (NULL, 0, 0) };
+
+REG xub_reg[] = {
+	{ NULL }  };
+
+DEVICE xub_dev = {
+	"XUB", &xub_unit, xub_reg, NULL,
+	1, 8, 8, 1, 8, 8,
+	NULL, NULL, NULL,
+	NULL, NULL, NULL,
+	&xub_dib, DEV_DIS | DEV_UBUS };
+
+#endif

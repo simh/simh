@@ -23,8 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Dec-03	RMS	Added second DEUNA/DELUA support
+   18-Oct-03	RMS	Added DECtape off reel message
    06-May-03	RMS	Added support for second DEQNA/DELQA
-   09-Jan-03	RMS	Added DELUA support
+   09-Jan-03	RMS	Added DELUA/DEUNA support
    17-Oct-02	RMS	Fixed bugs in branch, SOB address parsing
    09-Oct-02	RMS	Added DELQA support
    12-Sep-02	RMS	Added TMSCP, KW11P, RX211 support, RAD50 examine
@@ -64,7 +66,7 @@ extern DEVICE dt_dev;
 extern DEVICE tm_dev, ts_dev;
 extern DEVICE tq_dev;
 extern DEVICE xq_dev, xqb_dev;
-extern DEVICE xu_dev;
+extern DEVICE xu_dev, xub_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint16 *M;
@@ -113,6 +115,7 @@ DEVICE *sim_devices[] = {
 	&xq_dev,
 	&xqb_dev,
 	&xu_dev,
+	&xub_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -138,7 +141,8 @@ const char *sim_stop_messages[] = {
 	"Trap vector fetch abort",
 	"Trap stack push abort",
 	"RQDX3 consistency error",
-	"Sanity timer expired"  };
+	"Sanity timer expired"
+	"DECtape off reel"  };
 
 /* Binary loader.
 

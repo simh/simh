@@ -25,6 +25,7 @@
 
    mt		12559A 3030 nine track magnetic tape
 
+   21-Dec-03	RMS	Adjusted msc_ctime for TSB (from Mike Gemeny)
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised for magtape library
@@ -92,7 +93,7 @@ int32 mtc_fnc = 0;					/* function */
 int32 mtc_sta = 0;					/* status register */
 int32 mtc_dtf = 0;					/* data xfer flop */
 int32 mtc_1st = 0;					/* first svc flop */
-int32 mtc_ctime = 1000;					/* command wait */
+int32 mtc_ctime = 40;					/* command wait */
 int32 mtc_gtime = 1000;					/* gap stop time */
 int32 mtc_xtime = 15;					/* data xfer time */
 int32 mtc_stopioe = 1;					/* stop on error */

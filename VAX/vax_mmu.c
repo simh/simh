@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Sep-03	RMS	Fixed upper/lower case linkage problems on VMS
    01-Jun-03	RMS	Fixed compilation problem with USE_ADDR64
 
    This module contains the instruction simulators for
@@ -63,9 +64,9 @@ extern int32 SISR;
 extern jmp_buf save_env;
 extern UNIT cpu_unit;
 
-int32 p0br, p0lr;					/* dynamic copies */
-int32 p1br, p1lr;					/* altered per ucode */
-int32 sbr, slr;
+int32 d_p0br, d_p0lr;					/* dynamic copies */
+int32 d_p1br, d_p1lr;					/* altered per ucode */
+int32 d_sbr, d_slr;
 extern int32 mchk_va, mchk_ref;				/* for mcheck */
 TLBENT stlb[VA_TBSIZE], ptlb[VA_TBSIZE];
 static const int32 insert[4] = {
@@ -407,23 +408,23 @@ int32 tlbpte, ptead, pte, tbi, vpn;
 static TLBENT zero_pte = { 0, 0 };
 
 if (va & VA_S0) {					/* system space? */
-	if (ptidx >= slr) MM_ERR (PR_LNV);		/* system */
-	ptead = sbr + ptidx;  }
+	if (ptidx >= d_slr) MM_ERR (PR_LNV);		/* system */
+	ptead = d_sbr + ptidx;  }
 else {	if (va & VA_P1) {				/* P1? */
-	    if (ptidx < p1lr) MM_ERR (PR_LNV);
-	    ptead = p1br + ptidx;  }
+	    if (ptidx < d_p1lr) MM_ERR (PR_LNV);
+	    ptead = d_p1br + ptidx;  }
 	else {						/* P0 */
-	    if (ptidx >= p0lr)
+	    if (ptidx >= d_p0lr)
 	    MM_ERR (PR_LNV);
-	    ptead = p0br + ptidx;  }
+	    ptead = d_p0br + ptidx;  }
 	if ((ptead & VA_S0) == 0)
 	    ABORT (STOP_PPTE);				/* ppte must be sys */
 	vpn = VA_GETVPN (ptead);			/* get vpn, tbi */
 	tbi = VA_GETTBI (vpn);
 	if (stlb[tbi].tag != vpn) {			/* in sys tlb? */
 	    ptidx = ((uint32) ptead) >> 7;		/* xlate like sys */
-	    if (ptidx >= slr) MM_ERR (PR_PLNV);
-	    pte = ReadLP (sbr + ptidx);			/* get system pte */
+	    if (ptidx >= d_slr) MM_ERR (PR_PLNV);
+	    pte = ReadLP (d_sbr + ptidx);		/* get system pte */
 	    if ((pte & PTE_V) == 0) MM_ERR (PR_PTNV);	/* spte TNV? */
 	    stlb[tbi].tag = vpn;			/* set stlb tag */
 	    stlb[tbi].pte = cvtacc[PTE_GETACC (pte)] |
@@ -452,12 +453,12 @@ return stlb[tbi];
 
 extern void set_map_reg (void)
 {
-p0br = P0BR & ~03;
-p1br = (P1BR - 0x800000) & ~03;				/* VA<30> >> 7 */
-sbr = (SBR - 0x1000000) & ~03;				/* VA<31> >> 7 */
-p0lr = (P0LR << 2);
-p1lr = (P1LR << 2) + 0x800000;				/* VA<30> >> 7 */
-slr = (SLR << 2) + 0x1000000;				/* VA<31> >> 7 */
+d_p0br = P0BR & ~03;
+d_p1br = (P1BR - 0x800000) & ~03;			/* VA<30> >> 7 */
+d_sbr = (SBR - 0x1000000) & ~03;			/* VA<31> >> 7 */
+d_p0lr = (P0LR << 2);
+d_p1lr = (P1LR << 2) + 0x800000;			/* VA<30> >> 7 */
+d_slr = (SLR << 2) + 0x1000000;				/* VA<31> >> 7 */
 return;
 }
 

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	VAX Simulator Usage
-Date:	15-Jul-2003
+Date:	15-Dec-2003
 
 			COPYRIGHT NOTICE
 
@@ -213,7 +213,7 @@ This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
 	SET CPU HISTORY=n	enable history, display length = n
 	SHOW CPU HISTORY	print CPU history
 
-The maximum length for the history is 4096 entries.
+The maximum length for the history is 65536 entries.
 
 2.1.2 Translation Buffer (TLB)
 
@@ -328,11 +328,13 @@ In addition to autoconfiguration, most devices support the SET ADDRESS
 command, which allows the I/O page address of the device to be changed,
 and the SET VECTOR command, which allows the vector of the device to be
 changed.  Explicitly setting the I/O address of a device which normally
-uses autoconfiguration DISABLES autoconfiguration for that device.  As
-a consequence, the user may have to manually configure all other
-autoconfigured devices, because the autoconfiguration algorithm no
-longer recognizes the explicitly configured device.  A device can be
-reset to autoconfigure with the SET <device> AUTOCONFIGURE command. 
+uses autoconfiguration DISABLES autoconfiguration for that device and for
+the entire system.  As a consequence, the user may have to manually configure
+all other autoconfigured devices, because the autoconfiguration algorithm
+no longer recognizes the explicitly configured device.  A device can be
+reset to autoconfigure with the SET <device> AUTOCONFIGURE command.  Auto-
+configuration can be restored for the entire system with the SET CPU
+AUTOCONFIGURE command.
 
 The current I/O map can be displayed with the SHOW CPU IOSPACE command.
 Addresses that have set by autoconfiguration are marked with an asterisk (*). 

@@ -1,6 +1,6 @@
 /* h316_cpu.c: Honeywell 316/516 CPU simulator
 
-   Copyright (c) 1999-2003, Robert M. Supnik
+   Copyright (c) 1999-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu		H316/H516 CPU
 
+   31-Dec-03	RMS	Fixed bug in cpu_set_hist
+   24-Oct-03	RMS	Added DMA/DMC support, instruction history
    30-Dec-01	RMS	Added old PC queue
    03-Nov-01	RMS	Fixed NOHSA modifier
    30-Nov-01	RMS	Added extended SET/SHOW support
@@ -167,10 +169,10 @@
 
    2. Interrupts.  Interrupts are maintained by two parallel variables:
 
-	dev_ready 	device ready flags
-	dev_enable	device interrupt enable flags
+	dev_int 	device interrupt flags
+	dev_enb		device interrupt enable flags
 
-      In addition, dev_ready contains the interrupt enable and interrupt no
+      In addition, dev_int contains the interrupt enable and interrupt no
       defer flags.  If interrupt enable and interrupt no defer are set, and
       at least one interrupt request is pending, then an interrupt occurs.
       The order of flags in these variables corresponds to the order
@@ -194,8 +196,6 @@
 #define PCQ_MASK	(PCQ_SIZE - 1)
 #define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
 #define PCQ_TOP		pcq[pcq_p]
-#define UNIT_V_MSIZE	(UNIT_V_UF)			/* dummy mask */
-#define UNIT_MSIZE	(1u << UNIT_V_MSIZE)
 #define m7		0001000				/* for generics */
 #define m8		0000400
 #define m9		0000200
@@ -206,6 +206,20 @@
 #define m14		0000004
 #define m15		0000002
 #define m16		0000001
+
+#define HIST_PC		0x40000000
+#define HIST_C		0x20000000
+#define HIST_EA		0x10000000
+#define HIST_MIN	64
+#define HIST_MAX	65536
+struct InstHistory {
+	int32		pc;
+	int32		ir;
+	int32		ar;
+	int32		br;
+	int32		xr;
+	int32		ea;
+	int32		opnd;  };
 
 uint16 M[MAXMEMSIZE] = { 0 };				/* memory */
 int32 saved_AR = 0;					/* A register */
@@ -219,27 +233,44 @@ int32 extoff_pending = 0;				/* extend off pending */
 int32 dp = 0;						/* double mode */
 int32 sc = 0;						/* shift count */
 int32 ss[4];						/* sense switches */
-int32 dev_ready = 0;					/* dev ready */
-int32 dev_enable = 0;					/* dev enable */
+int32 dev_int = 0;					/* dev ready */
+int32 dev_enb = 0;					/* dev enable */
 int32 ind_max = 8;					/* iadr nest limit */
 int32 stop_inst = 1;					/* stop on ill inst */
 int32 stop_dev = 2;					/* stop on ill dev */
 uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
-int32 dlog = 0;						/* debug log */
-int32 turnoff = 0;
+uint32 dma_nch = DMA_MAX;				/* number of chan */
+uint32 dma_ad[DMA_MAX] = { 0 };				/* DMA addresses */
+uint32 dma_wc[DMA_MAX] = { 0 };				/* DMA word count */
+uint32 dma_eor[DMA_MAX] = { 0 };			/* DMA end of range */
+uint32 chan_req = 0;					/* channel requests */
+uint32 chan_map[DMA_MAX + DMC_MAX] = { 0 };		/* chan->dev map */
+int32 (*iotab[DEV_MAX])(int32 inst, int32 fnc, int32 dat, int32 dev) = { NULL };
+int32 hst_p = 0;					/* history pointer */
+int32 hst_lnt = 0;					/* history length */
+struct InstHistory *hst = NULL;				/* instruction history */
 
 extern int32 sim_int_char;
 extern int32 sim_interval;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
 extern FILE *sim_log;
+extern DEVICE *sim_devices[];
 
+t_bool devtab_init (void);
+int32 dmaio (int32 inst, int32 fnc, int32 dat, int32 dev);
+int32 undio (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_noext (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_show_dma (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 	UNIT *uptr, int32 sw);
@@ -252,7 +283,9 @@ extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
    cpu_mod	CPU modifiers list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK + UNIT_EXT,
+DIB cpu_dib = { DMA, IOBUS, 1, &dmaio };
+
+UNIT cpu_unit = { UDATA (NULL, UNIT_FIX+UNIT_BINK+UNIT_EXT+UNIT_HSA+UNIT_DMC,
 		MAXMEMSIZE) };
 
 REG cpu_reg[] = {
@@ -270,19 +303,23 @@ REG cpu_reg[] = {
 	{ FLDATA (SS2, ss[1], 0) },
 	{ FLDATA (SS3, ss[2], 0) },
 	{ FLDATA (SS4, ss[3], 0) },
-	{ FLDATA (ION, dev_ready, INT_V_ON) },
-	{ FLDATA (INODEF, dev_ready, INT_V_NODEF) },
-	{ ORDATA (DEVRDY, dev_ready, 16), REG_RO },
-	{ ORDATA (DEVENB, dev_enable, 16), REG_RO },
-	{ FLDATA (MPERDY, dev_ready, INT_V_MPE) },
-	{ FLDATA (MPEENB, dev_enable, INT_V_MPE) },
+	{ FLDATA (ION, dev_int, INT_V_ON) },
+	{ FLDATA (INODEF, dev_int, INT_V_NODEF) },
+	{ ORDATA (DEVINT, dev_int, 16), REG_RO },
+	{ ORDATA (DEVENB, dev_enb, 16), REG_RO },
+	{ ORDATA (CHREQ, chan_req, DMA_MAX + DMC_MAX) },
+	{ BRDATA (DMAAD, dma_ad, 8, 16, DMA_MAX) },
+	{ BRDATA (DMAWC, dma_wc, 8, 16, DMA_MAX) },
+	{ BRDATA (DMAEOR, dma_eor, 8, 1, DMA_MAX) },
+	{ ORDATA (DMANCH, dma_nch, 3), REG_HRO },
+	{ FLDATA (MPERDY, dev_int, INT_V_MPE) },
+	{ FLDATA (MPEENB, dev_enb, INT_V_MPE) },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ FLDATA (STOP_DEV, stop_dev, 1) },
 	{ DRDATA (INDMAX, ind_max, 8), REG_NZ + PV_LEFT },
 	{ BRDATA (PCQ, pcq, 8, 15, PCQ_SIZE), REG_RO + REG_CIRC },
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
-	{ FLDATA (DLOG, dlog, 0), REG_HIDDEN },
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
@@ -296,47 +333,42 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size },
 	{ UNIT_MSIZE, 24576, NULL, "24K", &cpu_set_size },
 	{ UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size },
+	{ MTAB_XTD | MTAB_VDV, 0, "channels", "CHANNELS",
+		&cpu_set_nchan, &cpu_show_nchan, NULL },
+	{ UNIT_DMC, 0, "no DMC", "NODMC", NULL },
+	{ UNIT_DMC, UNIT_DMC, "DMC", "DMC", NULL },
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "HISTORY", "HISTORY",
+		&cpu_set_hist, &cpu_show_hist },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DMA1", NULL,
+		NULL, &cpu_show_dma, NULL },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DMA2", NULL,
+		NULL, &cpu_show_dma, NULL },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 2, "DMA3", NULL,
+		NULL, &cpu_show_dma, NULL },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 3, "DMA4", NULL,
+		NULL, &cpu_show_dma, NULL },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
 	1, 8, 15, 1, 8, 16,
 	&cpu_ex, &cpu_dep, &cpu_reset,
-	NULL, NULL, NULL };
-
-/* I/O dispatch */
-
-int32 undio (int32 op, int32 func, int32 AR);
-extern int32 ptrio (int32 op, int32 func, int32 AR);
-extern int32 ptpio (int32 op, int32 func, int32 AR);
-extern int32 lptio (int32 op, int32 func, int32 AR);
-extern int32 ttyio (int32 op, int32 func, int32 AR);
-extern int32 clkio (int32 op, int32 func, int32 AR);
-
-int32 (*iotab[64])() = {
-	&undio, &ptrio, &ptpio, &lptio, &ttyio, &undio, &undio, &undio,
-	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
-	&clkio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
-	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
-	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
-	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
-	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
-	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio  };
-
+	NULL, NULL, NULL,
+	&cpu_dib, 0 };
 
 t_stat sim_instr (void)
 {
 extern UNIT clk_unit;
-int32 AR, BR, MB, Y, t1, t2, t3, skip;
+int32 AR, BR, MB, Y, t1, t2, t3, skip, dev;
 uint32 ut;
 t_stat reason;
 t_stat Ea (int32 inst, int32 *addr);
-void Write (int32 val, int32 addr);
+void Write (int32 addr, int32 val);
 int32 Add16 (int32 val1, int32 val2);
 int32 Add31 (int32 val1, int32 val2);
 int32 Operate (int32 MB, int32 AR);
 
-#define Read(x)		M[(x)]
+#define Read(ad)	M[(ad)]
 #define GETDBL_S(h,l)	(((h) << 15) | ((l) & MMASK))
 #define GETDBL_U(h,l)	(((h) << 16) | (l))
 #define PUTDBL_S(x)	AR = ((x) >> 15) & DMASK; \
@@ -349,12 +381,12 @@ int32 Operate (int32 MB, int32 AR);
 
 /* Restore register state */
 
+if (devtab_init ()) return SCPE_STOP;			/* init tables */
 AR = saved_AR & DMASK;					/* restore reg */
 BR = saved_BR & DMASK;
 XR = saved_XR & DMASK;
 PC = PC & ((cpu_unit.flags & UNIT_EXT)? X_AMASK: NX_AMASK); /* mask PC */
 reason = 0;
-turnoff = 0;
 sim_rtc_init (clk_unit.wait);				/* init calibration */
 
 /* Main instruction fetch/decode loop */
@@ -363,13 +395,58 @@ while (reason == 0) {					/* loop until halted */
 if (sim_interval <= 0) {				/* check clock queue */
 	if (reason = sim_process_event ()) break;  }
 
-if ((dev_ready & (INT_PENDING | dev_enable)) > INT_PENDING) {	/* int req? */
+/* Channel breaks (DMA and DMC) */
+
+if (chan_req) {						/* channel request? */
+	int32 i, t, ch, dev, st, end, ad, dmcad;
+	t_stat r;
+	for (i = 0, ch = chan_req; ch != 0; i++, ch = ch >> 1) {
+	    if (ch & 1) {				/* req on chan i? */
+		dev = chan_map[i];			/* get dev for chan */
+		if (iotab[dev] == &undio) return SCPE_IERR;
+		chan_req = chan_req & ~(1 << i);	/* clear req */
+		if (Q_DMA (i)) st = dma_ad[i];		/* DMA? */
+		else {					/* DMC */
+		    dmcad = DMC_BASE + ((i - DMC_V_DMC1) << 1);
+		    st = Read (dmcad);  }		/* DMC ctrl word */
+		ad = st & X_AMASK;			/* get curr addr */
+		if (st & DMA_IN) {			/* input? */
+		    t = iotab[dev] (ioINA, 0, 0, dev);	/* input word */
+		    if ((t & IOT_SKIP) == 0) return STOP_DMAER;
+		    if (r = (t >> IOT_V_REASON)) return r;
+		    Write (ad, t & DMASK);  }		/* write to mem */
+		else {					/* no, output */
+		    t = iotab[dev] (ioOTA, 0, Read (ad), dev);	/* output word */
+		    if ((t & IOT_SKIP) == 0) return STOP_DMAER;
+		    if (r = (t >> IOT_V_REASON)) return r;  }
+		if (Q_DMA (i)) {			/* DMA? */
+		    dma_ad[i] = (dma_ad[i] & DMA_IN) | ((ad + 1) & X_AMASK);
+		    dma_wc[i] = (dma_wc[i] + 1) & 077777; /* update wc */
+		    if (dma_wc[i] == 0) {		/* done? */
+			dma_eor[i] = 1;			/* set end of range */
+			t = iotab[dev] (ioEND, 0, 0, dev);	/* send end range */
+		        if (r = (t >> IOT_V_REASON)) return r;  }  }
+		else {					/* DMC */
+		    st = (st & DMA_IN) | ((ad + 1) & X_AMASK);
+		    Write (dmcad, st);			/* update start */
+		    end = Read (dmcad + 1);		/* get end */
+		    if (((ad ^ end) & X_AMASK) == 0) {	/* start == end? */
+			t = iotab[dev] (ioEND, 0, 0, dev);	/* send end range */
+		        if (r = (t >> IOT_V_REASON)) return r;  }  }
+		}					/* end if chan i */
+	    }						/* end for */
+	}						/* end if chan_req */
+
+
+/* Interrupts */
+
+if ((dev_int & (INT_PENDING | dev_enb)) > INT_PENDING) {	/* int req? */
 	pme = ext;					/* save extend */
 	if (cpu_unit.flags & UNIT_EXT) ext = 1;		/* ext opt? extend on */
-	dev_ready = dev_ready & ~INT_ON;		/* intr off */
-	turnoff = 0;
-	if (dlog && sim_log) fprintf (sim_log, "Interrupt\n");
+	dev_int = dev_int & ~INT_ON;			/* intr off */
 	MB = 0120000 | M_INT;  }			/* inst = JST* 63 */
+
+/* Instruction fetch */
 
 else {	if (sim_brk_summ &&
 	    sim_brk_test (PC, SWMASK ('E'))) {		/* breakpoint? */
@@ -378,16 +455,17 @@ else {	if (sim_brk_summ &&
 	Y = PC;						/* set mem addr */
 	MB = Read (Y);					/* fetch instr */
 	PC = NEWA (Y, Y + 1);				/* incr PC */
-	dev_ready = dev_ready | INT_NODEF;  }
+	dev_int = dev_int | INT_NODEF;  }
 
 sim_interval = sim_interval - 1;
-if (dlog && sim_log && !turnoff) {			/* cycle log? */
-	int32 op = I_GETOP (MB) & 017;			/* core opcode */
-	t_value val = MB;
-	fprintf (sim_log, "A= %06o C= %1o P= %05o (", AR, C, PC);
-	fprint_sym (sim_log, Y, &val, &cpu_unit, SWMASK ('M'));
-	fprintf (sim_log, ")");
-	if ((op == 0) || (op == 014)) fprintf (sim_log, "\n");  }
+if (hst_lnt) {						/* instr hist? */
+	hst_p = (hst_p + 1);				/* next entry */
+	if (hst_p >= hst_lnt) hst_p = 0;
+	hst[hst_p].pc = Y | HIST_PC | (C? HIST_C: 0);	/* fill slots */
+	hst[hst_p].ir = MB;
+	hst[hst_p].ar = AR;
+	hst[hst_p].br = BR;
+	hst[hst_p].xr = XR;  }
 
 /* Memory reference instructions */
 
@@ -397,12 +475,6 @@ case 001: case 021: case 041: case 061:			/* JMP */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	PCQ_ENTRY;					/* save PC */
 	PC = NEWA (PC, Y);				/* set new PC */
-	if (dlog && sim_log) {				/* logging? */
-	    int32 op = I_GETOP (M[PC]) & 017;		/* get target */
-	    if ((op == 014) && (PC == (PCQ_TOP - 2))) { /* jmp .-1 to IO? */
-		turnoff = 1;				/* yes, stop */
-		fprintf (sim_log, "Idle loop detected\n");  }
-	    else turnoff = 0;  }			/* no, log */
 	if (extoff_pending) ext = extoff_pending = 0;	/* cond ext off */
 	break;
 
@@ -423,10 +495,10 @@ case 003: case 023: case 043: case 063:			/* ANA */
 case 004: case 024: case 044: case 064:			/* STA */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	if (dp) {					/* double prec? */
-	    if ((Y & 1) == 0) Write (AR, Y);		/* if even, store A */
-	    Write (BR, Y | 1);				/* store B */
+	    if ((Y & 1) == 0) Write (Y, AR);		/* if even, store A */
+	    Write (Y | 1, BR);				/* store B */
 	    sc = 0;  }
-	else Write (AR, Y);				/* no, store word */
+	else Write (Y, AR);				/* no, store word */
 	break;
 
 case 005: case 025: case 045: case 065:			/* ERA */
@@ -461,7 +533,7 @@ case 007: case 027: case 047: case 067:			/* SUB */
 case 010: case 030: case 050: case 070:			/* JST */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	MB = NEWA (Read (Y), PC);			/* merge old PC */
-	Write (MB, Y);
+	Write (Y, MB);
 	PCQ_ENTRY;
 	PC = NEWA (PC, Y + 1);				/* set new PC */
 	break;
@@ -476,20 +548,20 @@ case 011: case 031: case 051: case 071:			/* CAS */
 case 012: case 032: case 052: case 072:			/* IRS */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	MB = (Read (Y) + 1) & DMASK;			/* incr, rewrite */
-	Write (MB, Y);
+	Write (Y, MB);
 	if (MB == 0) PC = NEWA (PC, PC + 1);		/* skip if zero */
 	break;
 
 case 013: case 033: case 053: case 073:			/* IMA */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	MB = Read (Y);
-	Write (AR, Y);					/* A to mem */
+	Write (Y, AR);					/* A to mem */
 	AR = MB;					/* mem to A */
 	break;
 
 case 015: case 055:					/* STX */
 	if (reason = Ea (MB & ~IDX, &Y)) break;		/* eff addr */
-	Write (XR, Y);					/* store XR */
+	Write (Y, XR);					/* store XR */
 	break;
 
 case 035: case 075:					/* LDX */
@@ -525,35 +597,32 @@ case 017: case 037: case 057: case 077:			/* DIV */
 /* I/O instructions */
 
 case 014:						/* OCP */
-	t2 = iotab[MB & DEVMASK] (ioOCP, I_GETFNC (MB), AR);
+	dev = MB & DEVMASK;
+	t2 = iotab[dev] (ioOCP, I_GETFNC (MB), AR, dev);
 	reason = t2 >> IOT_V_REASON;
-	turnoff = 0;
 	break;
 
 case 034:						/* SKS */
-	t2 = iotab[MB & DEVMASK] (ioSKS, I_GETFNC (MB), AR);
+	dev = MB & DEVMASK;
+	t2 = iotab[dev] (ioSKS, I_GETFNC (MB), AR, dev);
 	reason = t2 >> IOT_V_REASON;
-	if (t2 & IOT_SKIP) {				/* skip? */
-	    PC = NEWA (PC, PC + 1);
-	    turnoff = 0;  }
+	if (t2 & IOT_SKIP) PC = NEWA (PC, PC + 1);	/* skip? */
 	break;
 
 case 054:						/* INA */
+	dev = MB & DEVMASK;
 	if (MB & INCLRA) AR = 0;
-	t2 = iotab[MB & DEVMASK] (ioINA, I_GETFNC (MB), AR);
+	t2 = iotab[dev] (ioINA, I_GETFNC (MB & ~INCLRA), AR, dev);
 	reason = t2 >> IOT_V_REASON;
-	if (t2 & IOT_SKIP) {				/* skip? */
-	    PC = NEWA (PC, PC + 1);
-	    turnoff = 0;  }
+	if (t2 & IOT_SKIP) PC = NEWA (PC, PC + 1);	/* skip? */
 	AR = t2 & DMASK;				/* data */
 	break;
 
 case 074:						/* OTA */
-	t2 = iotab[MB & DEVMASK] (ioOTA, I_GETFNC (MB), AR);
+	dev = MB & DEVMASK;
+	t2 = iotab[dev] (ioOTA, I_GETFNC (MB), AR, dev);
 	reason = t2 >> IOT_V_REASON;
-	if (t2 & IOT_SKIP) {				/* skip? */
-	    PC = NEWA (PC, PC + 1);
-	    turnoff = 0;  }
+	if (t2 & IOT_SKIP) PC = NEWA (PC, PC + 1);	/* skip? */
 	break;
 
 /* Control */
@@ -571,8 +640,7 @@ case 000:
 		ext = 1;
 		extoff_pending = 0;  }			/* DXA */
 	    else extoff_pending = 1;  }
-	if (MB & m12)					/* RMP */
-	    dev_ready = dev_ready & ~INT_MPE;
+	if (MB & m12) CLR_INT (INT_MPE);		/* RMP */
 	if (MB & m11) {					/* SCA, INK */
 	    if (MB & m15)				/* INK */
 		AR = (C << 15) | (dp << 14) | (pme << 13) | (sc & 037);
@@ -594,9 +662,9 @@ case 000:
 	    BR = AR;
 	    AR = sc;  }
 	if (MB & m8)					/* ENB */
-	    dev_ready = (dev_ready | INT_ON) & ~INT_NODEF;
+	    dev_int = (dev_int | INT_ON) & ~INT_NODEF;
 	if (MB & m7)					/* INH */
-	    dev_ready = dev_ready & ~INT_ON;
+	    dev_int = dev_int & ~INT_ON;
 	break;
 
 /* Shift
@@ -841,15 +909,17 @@ else {							/* non-extend */
 	    Y = NEWA (Y, IR + ((IR & IDX)? XR: 0));  }	/* post-index */
 	}						/* end else */
 *addr = Y = Y & X_AMASK;				/* return addr */
-if (dlog && sim_log && !turnoff)			/* cycle log? */
-	fprintf (sim_log, " EA= %06o [%06o]\n", Y, M[Y]);
+if (hst_lnt) {						/* history? */
+	hst[hst_p].pc = hst[hst_p].pc | HIST_EA;
+	hst[hst_p].ea = Y;
+	hst[hst_p].opnd = Read (Y);  }
 if (i >= ind_max) return STOP_IND;			/* too many ind? */
 return SCPE_OK;
 }
 
 /* Write memory */
 
-void Write (int32 val, int32 addr)
+void Write (int32 addr, int32 val)
 {
 if (((addr == 0) || (addr >= 020)) && MEM_ADDR_OK (addr))
 	M[addr] = val;
@@ -878,9 +948,33 @@ return r;
 
 /* Unimplemented I/O device */
 
-int32 undio (int32 op, int32 fnc, int32 val)
+int32 undio (int32 op, int32 fnc, int32 val, int32 dev)
 {
 return ((stop_dev << IOT_V_REASON) | val);
+}
+
+/* DMA control */
+
+int32 dmaio (int32 inst, int32 fnc, int32 dat, int32 dev)
+{
+int32 ch = (fnc - 1) & 03;
+
+switch (inst) {						/* case on opcode */
+case ioOCP:						/* OCP */
+	if ((fnc >= 001) && (fnc <= 004)) {		/* load addr ctr */
+	    dma_ad[ch] = dat;
+	    dma_wc[ch] = 0;
+	    dma_eor[ch] = 0;  }
+	else if ((fnc >= 011) && (fnc <= 014))		/* load range ctr */
+	    dma_wc[ch] = (dma_wc[ch] | dat) & 077777;
+	else return IOBADFNC (dat);			/* undefined */
+	break;
+case ioINA:						/* INA */
+	if ((fnc >= 011) && (fnc <= 014)) {
+	    if (dma_eor[ch]) return dat;		/* end range? nop */
+	    return IOSKIP (0100000 | dma_wc[ch]);  }	/* return range */
+	else return IOBADFNC (dat);  }
+return dat;
 }
 
 /* Undefined operate instruction.  This code is reached when the
@@ -1027,12 +1121,16 @@ return ARx;
 
 t_stat cpu_reset (DEVICE *dptr)
 {
+int32 i;
+
 saved_AR = saved_BR = saved_XR = 0;
 C = 0;
 dp = 0;
 ext = pme = extoff_pending = 0;
-dev_ready = dev_ready & ~INT_PENDING;
-dev_enable = 0;
+dev_int = dev_int & ~INT_PENDING;
+dev_enb = 0;
+for (i = 0; i < DMA_MAX; i++) dma_ad[i] = dma_wc[i] = dma_eor[i] = 0;
+chan_req = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
@@ -1084,5 +1182,218 @@ if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
 	return SCPE_OK;
 MEMSIZE = val;
 for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+return SCPE_OK;
+}
+
+t_stat cpu_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+uint32 i, newmax;
+t_stat r;
+
+if (cptr == NULL) return SCPE_ARG;
+newmax = get_uint (cptr, 10, DMA_MAX, &r);		/* get new max */
+if ((r != SCPE_OK) || (newmax == dma_nch)) return r;	/* err or no chg? */
+dma_nch = newmax;					/* set new max */
+for (i = newmax; i <DMA_MAX; i++) {			/* reset chan */
+	dma_ad[i] = dma_wc[i] = dma_eor[i] = 0;
+	chan_req = chan_req & ~(1 << i);  }
+return SCPE_OK;
+}
+
+/* Show DMA channels */
+
+t_stat cpu_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if (dma_nch) fprintf (st, "DMA channels = %d", dma_nch);
+else fprintf (st, "no DMA channels");
+return SCPE_OK;
+}
+
+/* Show channel state */
+
+t_stat cpu_show_dma (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if ((val < 0) || (val >= DMA_MAX)) return SCPE_IERR;
+fputs ((dma_ad[val] & DMA_IN)? "Input": "Output", st);
+fprintf (st, ", addr = %06o, count = %06o, ", dma_ad[val] & X_AMASK, dma_wc[val]);
+fprintf (st, "end of range %s\n", (dma_eor[val]? "set": "clear"));
+return SCPE_OK;
+}
+
+/* Set I/O device to IOBUS / DMA channel / DMC channel */
+
+t_stat io_set_iobus (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+DEVICE *dptr;
+DIB *dibp;
+
+if (val || cptr || (uptr == NULL)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+dibp->chan = 0;
+return SCPE_OK;
+}
+
+t_stat io_set_dma (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+DEVICE *dptr;
+DIB *dibp;
+uint32 newc;
+t_stat r;
+
+if ((cptr == NULL) || (uptr == NULL)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+if (dma_nch == 0) return SCPE_NOFNC;
+newc = get_uint (cptr, 10, DMA_MAX, &r);		/* get new */
+if ((r != SCPE_OK) || (newc == 0) || (newc > dma_nch)) return SCPE_ARG;
+dibp->chan = (newc - DMA_MIN) + DMA_V_DMA1 + 1;		/* store */
+return SCPE_OK;
+}
+
+t_stat io_set_dmc (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+DEVICE *dptr;
+DIB *dibp;
+uint32 newc;
+t_stat r;
+
+if ((cptr == NULL) || (uptr == NULL)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+if (!(cpu_unit.flags & UNIT_DMC)) return SCPE_NOFNC;
+newc = get_uint (cptr, 10, DMC_MAX, &r);		/* get new */
+if ((r != SCPE_OK) || (newc == 0)) return SCPE_ARG;
+dibp->chan = (newc - DMC_MIN) + DMC_V_DMC1 + 1;		/* store */
+return SCPE_OK;
+}
+
+/* Show channel configuration */
+
+t_stat io_show_chan (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+DEVICE *dptr;
+DIB *dibp;
+
+if (uptr == NULL) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+if (dibp->chan == 0) fprintf (st, "IO bus");
+else if (dibp->chan < (DMC_V_DMC1 + 1))
+	fprintf (st, "DMA channel %d", dibp->chan);
+else fprintf (st, "DMC channel %d", dibp->chan - DMC_V_DMC1);
+return SCPE_OK;
+}
+
+/* Set up I/O dispatch and channel maps */
+
+t_bool devtab_init (void)
+{
+DEVICE *dptr;
+DIB *dibp;
+uint32 i, j, dno, chan;
+
+for (i = 0; i < DEV_MAX; i++) iotab[i] = NULL;
+for (i = 0; i < (DMA_MAX + DMC_MAX); i++) chan_map[i] = 0;
+for (i = 0; dptr = sim_devices[i]; i++) {		/* loop thru devices */
+	dibp = (DIB *) dptr->ctxt;			/* get DIB */
+	if ((dibp == NULL) || (dptr->flags & DEV_DIS)) continue; /* exist, enabled? */
+	dno = dibp->dev;				/* device number */
+	for (j = 0; j < dibp->num; j++) {		/* repeat for slots */
+	    if (iotab[dno + j]) {			/* conflict? */
+		printf ("%s device number conflict, devno = %02o\n", sim_dname (dptr), dno + j);
+		if (sim_log) fprintf (sim_log,
+		    "%s device number conflict, devno = %02o\n", sim_dname (dptr), dno + j);
+	        return TRUE;  }
+	    iotab[dno + j] = dibp->io;			/* set I/O routine */
+	    }						/* end for */
+	if (dibp->chan) {				/* DMA/DMC? */
+	    chan = dibp->chan - 1;
+	    if ((chan >= 0) && (chan < DMC_V_DMC1) && (chan >= dma_nch)) {
+	        printf ("%s configured for DMA channel %d\n", sim_dname (dptr), chan + 1);
+		if (sim_log) fprintf (sim_log,
+		    "%s configured for DMA channel %d\n", sim_dname (dptr), chan + 1);
+		return TRUE;  }
+	    if ((chan >= DMC_V_DMC1) && !(cpu_unit.flags & UNIT_DMC)) {
+		printf ("%s configured for DMC, option disabled\n", sim_dname (dptr));
+		if (sim_log) fprintf (sim_log, 
+		    "%s configured for DMC, option disabled\n", sim_dname (dptr));
+		return TRUE;  }
+	    if (chan_map[chan]) {			/* channel conflict? */
+		printf ("%s DMA/DMC channel conflict, devno = %02o\n", sim_dname (dptr), dno);
+		if (sim_log) fprintf (sim_log,
+		    "%s DMA/DMC channel conflict, devno = %02o\n", sim_dname (dptr), dno);
+		return TRUE;  }
+	    chan_map[chan] = dno;  }			/* channel back map */
+	}						/* end for */
+for (i = 0; i < DEV_MAX; i++) {				/* fill in blanks */
+	if (iotab[i] == NULL) iotab[i] = &undio;  }
+return FALSE;
+}
+
+/* Set history */
+
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i, lnt;
+t_stat r;
+
+if (cptr == NULL) {
+	for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+	hst_p = 0;
+	return SCPE_OK;  }
+lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+hst_p = 0;
+if (hst_lnt) {
+	free (hst);
+	hst_lnt = 0;
+	hst = NULL;  }
+if (lnt) {
+	hst = calloc (sizeof (struct InstHistory), lnt);
+	if (hst == NULL) return SCPE_MEM;
+	hst_lnt = lnt;  }
+return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 cr, k, di, op;
+t_value sim_eval;
+struct InstHistory *h;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+	UNIT *uptr, int32 sw);
+static uint8 has_opnd[16] = {
+ 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1 };
+
+if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+fprintf (st, "PC     C A       B       X       ea     IR\n\n");
+di = hst_p;						/* work forward */
+for (k = 0; k < hst_lnt; k++) {				/* print specified */
+	h = &hst[(++di) % hst_lnt];			/* entry pointer */
+	if (h->pc & HIST_PC) {				/* instruction? */
+	    cr = (h->pc & HIST_C)? 1: 0;		/* carry */
+	    fprintf (st, "%05o  %o %06o  %06o  %06o  ",
+		h->pc & X_AMASK, cr, h->ar, h->br, h->xr);
+	    if (h->pc & HIST_EA) fprintf (st, "%05o  ", h->ea);
+	    else fprintf (st, "       ");
+	    sim_eval = h->ir;
+	    if ((fprint_sym (st, h->pc & X_AMASK, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+		fprintf (st, "(undefined) %06o", h->ir);
+	    op = I_GETOP (h->ir) & 017;			/* base op */
+	    if (has_opnd[op]) fprintf (st, "  [%06o]", h->opnd);
+	    fputc ('\n', st);				/* end line */
+	    }						/* end else instruction */
+	}						/* end for */
 return SCPE_OK;
 }

@@ -485,6 +485,8 @@ The moving head disk controller implements these registers:
 	DONE		1	device done flag
 	DISABLE		1	interrupt disable flag
 	INT		1	interrupt pending flag
+	DIAG		1	diagnostic mode flag
+	MAP		2	map select
 	STIME		24	seek time, per cylinder
 	RTIME		24	rotational delay
 

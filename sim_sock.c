@@ -182,7 +182,7 @@ SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr)
 int32 sta, err;
 #if defined (macintosh) 
 socklen_t size;
-#elif defined (_WIN32) || defined (__EMX__)
+#elif defined (_WIN32) || defined (__EMX__) || defined (__APPLE__)
 int size;
 #else 
 size_t size; 

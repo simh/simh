@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Nov-03	CEO	Added support for PIT device
    19-Jan-03	RMS	Changed CMASK to CDMASK for Apple Dev kit conflict
    03-Oct-02	RMS	Added device information structure
    22-Dec-00	RMS	Added Bruce Ray's second terminal support
@@ -174,6 +175,7 @@
 #define DEV_ADCV	030				/* A/D converter */
 #define DEV_DKP		033				/* disk pack */
 #define DEV_CAS		034				/* cassette */
+#define DEV_PIT		043				/* programmable interval timer */
 #define DEV_TTI1	050				/* second console input */
 #define DEV_TTO1	051				/* second console output */
 #define DEV_CPU		077				/* CPU control */
@@ -211,6 +213,7 @@ typedef struct nova_dib DIB;
    Priority (for INTA) runs from low numbers to high
 */
 
+#define INT_V_PIT   	2				/* PIT */
 #define INT_V_DKP	3				/* moving head disk */
 #define INT_V_DSK	4				/* fixed head disk */
 #define INT_V_MTA	5				/* magnetic tape */
@@ -227,6 +230,7 @@ typedef struct nova_dib DIB;
 #define INT_V_NO_ION_PENDING 16				/* ion delay */
 #define INT_V_ION 	17				/* interrupts on */
 
+#define INT_PIT		(1 << INT_V_PIT)
 #define INT_DKP		(1 << INT_V_DKP)
 #define INT_DSK		(1 << INT_V_DSK)
 #define INT_MTA		(1 << INT_V_MTA)
@@ -247,6 +251,7 @@ typedef struct nova_dib DIB;
 
 /* PI disable bits */
 
+#define PI_PIT		0001000
 #define PI_DKP		0000400
 #define PI_DSK		0000100
 #define PI_MTA		0000040

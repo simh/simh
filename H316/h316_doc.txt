@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	H316 Simulator Usage
-Date:	15-Jul-2003
+Date:	15-Nov-2003
 
 			COPYRIGHT NOTICE
 
@@ -41,15 +41,20 @@ The H316 requires the following files:
 sim/		sim_defs.h
 		sim_rev.h
 		sim_sock.h
+		sim_tape.h
 		sim_tmxr.h
 		scp.c
 		scp_tty.c
 		sim_sock.c
+		sim_tape.c
 		sim_tmxr.c
 
 sim/h316/	h316_defs.h
 		h316_cpu.c
+		h316_fhd.c
 		h316_lp.c
+		h316_mt.c
+		h316_dp.c
 		h316_stddev.c
 		h316_sys.c
 
@@ -66,6 +71,9 @@ PTP		316/516-52 paper tape punch
 TTY		316/516-33 console terminal
 CLK		316/516-12 real time clock
 LPT		316/516 line printer
+FHD		4400 fixed head disk
+DP		4623/4653/4720 disk pack controller with eight drives
+MT		4100 seven track magtape with four drives
 
 The H316/H516 simulator implements several unique stop conditions:
 
@@ -73,12 +81,19 @@ The H316/H516 simulator implements several unique stop conditions:
 	- reference to an undefined I/O device, and STOP_DEV is set
 	- more than INDMAX indirect references are detected during
 	  memory reference address decoding
+	- DMA/DMC direction does not agree with I/O device operation
+	- a write operation is initiated on a write locked magtape
+	  unit (hangs the real system)
+	- a disk write overruns the specified record size (destroys
+	  the rest of the track on the real system)
+	- a disk track has an illegal format
 
 The H316/H516 loader is not implemented.
 
 2.1 CPU
 
-CPU options include choice of instruction set and memory size.
+CPU options include choice of instruction set, memory size, DMC option,
+and number of DMA channels.
 
 	SET CPU HSA		high speed arithmetic instructions
 	SET CPU NOHSA		no high speed arithmetic instructions
@@ -88,10 +103,19 @@ CPU options include choice of instruction set and memory size.
 	SET CPU 16K		set memory size = 16K
 	SET CPU 24K		set memory size = 24K
 	SET CPU 32K		set memory size = 32K
+	SET CPU DMC		enable DMC option
+	SET CPU NODMC		disable DMC option
+	SET CPU DMA=n		set number of DMA channels to n (0-4)
 
 If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
-portion of memory is lost.  Initial memory size is 32K.
+portion of memory is lost.  Initial memory size is 32K.  The HSA and DMC
+options are enabled, and four DMA channels are configured.
+
+The CPU includes special show commands to display the state of the DMA
+channels:
+
+	SHOW CPU DMAn		show DMA channel n
 
 CPU registers include the visible state of the processor as well as the
 control registers for the interrupt system.
@@ -114,6 +138,10 @@ control registers for the interrupt system.
 	INTREQ		16	interrupt requests
 	DEVRDY		16	device ready flags (read only)
 	DEVENB		16	device interrupt enable flags (read only)
+	CHREQ		20	DMA/DMC channel requests
+	DMAAD[0:3]	16	DMA channel current address, channels 1-4
+	DMAWC[0:3]	15	DMA channel word count, channels 1-4
+	DMAEOR[0:3]	1	DMA end of range flag, channels 1-4
 	STOP_INST	1	stop on undefined instruction
 	STOP_DEV	1	stop on undefined device
 	INDMAX		1	indirect address limit
@@ -230,11 +258,20 @@ The clock implements these registers:
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
 
-2.2.5 316/516 Line Printer (LPT)
+2.3 316/516 Line Printer (LPT)
 
 The line printer (LPT) writes data to a disk file.  The POS register
 specifies the number of the next data item to be written.  Thus,
 by changing POS, the user can backspace or advance the printer.
+
+The line printer can be connected to the IO bus, a DMC channel, or
+a DMA channel:
+
+	SET LPT IOBUS		connect to IO bus
+	SET LPT DMC=n		connect to DMC channel n (1-16)
+	SET LPT DMA=n		connect to DMA channel n (1-4)
+
+By default, the line printer is connected to the IO bus.
 
 The line printer implements these registers:
 
@@ -243,8 +280,10 @@ The line printer implements these registers:
 	WDPOS		6	word position in current scan
 	DRPOS		6	drum position
 	CRPOS		1	carriage position
-	XFER		1	transfer ready flag
 	PRDN		1	print done flag
+	RDY		1	ready flag
+	EOR		1	(DMA/DMC) end of range flag
+	DMA		1	transfer using DMA/DMC
 	INTREQ		1	device interrupt request
 	ENABLE		1	device interrupt enable
 	SVCST		2	service state
@@ -265,7 +304,207 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.3 Symbolic Display and Input
+2.4 4400 Fixed Head Disk (FHD)
+
+Fixed head disk options include the ability to set the number of
+surfaces to a fixed value between 1 and 16, or to autosize the number
+of surfaces from the attached file:
+
+	SET FHD 1S		one surface (98K)
+	SET FHD 2S		two platters (196K)
+	:
+	SET FHD 16S		sixteen surfaces (1568K)
+	SET FHD AUTOSIZE	autosized on attach
+
+The default is one surface.
+
+The fixed head disk can be connected to the IO bus, a DMC channel, or
+a DMA channel:
+
+	SET FHD IOBUS		connect to IO bus
+	SET FHD DMC=n		connect to DMC channel n (1-16)
+	SET FHD DMA=n		connect to DMA channel n (1-4)
+
+By default, the fixed head disk is connected to the IO bus.
+
+
+The fixed head disk implements these registers:
+
+	name		size	comments
+
+	CW1		16	control word 1 (read write, surface, track)
+	CW2		16	control word 2 (character address)
+	BUF		16	data buffer
+	BUSY		1	controller busy flag
+	RDY		1	transfer ready flag
+	DTE		1	data transfer error flag
+	ACE		1	access error flag
+	EOR		1	(DMA/DMC) end of range
+	DMA		1	transfer using DMA/DMC
+	CSUM		1	transfer parity checksum
+	INTREQ		1	device interrupt request
+	ENABLE		1	device interrupt enable
+	TIME		24	delay between words
+	STOP_IOE	1	stop on I/O error
+
+The fixed head disk does not support the BOOT command.
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+Fixed head disk data files are buffered in memory; therefore, end of file
+and OS I/O errors cannot occur.
+
+2.5 4100 7-track Magnetic Tape (MT)
+
+Magnetic tape options include the ability to make units write enabled or
+or write locked.
+
+	SET MTn LOCKED		set unit n write locked
+	SET MTn WRITEENABLED	set unit n write enabled
+
+Units can be set ONLINE or OFFLINE, and WRITEENABLED or write LOCKED.
+
+The magtape controller can be connected to the IO bus, a DMC channel, or
+a DMA channel:
+
+	SET MT IOBUS		connect to IO bus
+	SET MT DMC=n		connect to DMC channel n (1-16)
+	SET MT DMA=n		connect to DMA channel n (1-4)
+
+By default, the magtape controller is connected to the IO bus.
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	BUF		16	data buffer
+	USEL		2	unit select
+	BUSY		1	controller busy flag
+	RDY		1	transfer ready flag
+	ERR		1	error flag
+	EOF		1	end of file flag
+	EOR		1	(DMA/DMC) end of range
+	DMA		1	transfer using DMA/DMC
+	MDIRQ		1	motion done interrupt request
+	INTREQ		1	device interrupt request
+	ENABLE		1	device interrupt enable
+	DBUF[0:65535]	8	transfer buffer
+	BPTR		17	transfer buffer pointer
+	BMAX		17	transfer size (reads)
+	CTIME		24	start/stop time
+	XTIME		24	delay between words
+	POS[0:3]	32	position, units 0-3
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		tape not ready; if STOP_IOE, stop
+
+	end of file		bad tape
+
+	OS I/O error		parity error; if STOP_IOE, stop
+
+2.6 4623/4651/4720 Disk Packs (DP)
+
+The disk controller can be configured as a 4623, supporting 10 surface
+disk packs; a 4651, supporting 2 surface disk packs; or a 4720, supporting
+20 surface disk packs:
+
+	SET DP 4623		controller is 4623
+	SET DP 4651		controller is 4651
+	SET DP 4720		controller is 4720
+
+The default is 4651.  All disk packs on the controller must be of the
+same type.  Units can be set ONLINE or OFFLINE, and WRITEENABLED or
+write LOCKED.
+
+The disk pack controller can be connected to a DMC channel or a DMA
+channel; it cannot be connected to the IO bus:
+
+	SET DP DMC=n		connect to DMC channel n (1-16)
+	SET DP DMA=n		connect to DMA channel n (1-4)
+
+The disk pack controller supports variable track formatting.  Each track
+can contain between 1 and 103 records, with a minimum size of 1 word and
+a maximum size of 1893 words.  Record addresses are unconstrained.  The
+simulator provides a command to perform a simple, fixed record size format
+of a new disk:
+
+	SET DPn FORMAT=k	format unit n with k words per record
+	SET -R DPn FORMAT=k	format unit n with k records per track
+
+Record addresses can either be geometric (cylinder/track/sector) or simple
+sequential starting from 0:
+
+	SET DPn FORMAT=k	format with geometric record addresses
+	SET -S DPn FORMAT=k	format with sequential record addresses
+
+Geometric address have the cylinder number in bits<1:8>, the head number in
+bits<9:13>, and the sector number in bits <14:16>.
+
+A summary of the current format, and its validity, can be obtained with
+the command:
+
+	SHOW DPn FORMAT		display format of unit n
+
+To accomodate the variable formatting, each track is allocated 2048 words
+in the data file.  A record consists of a three word header, the data, and
+a five word trailer:
+
+	word 0		record length in words, not including header/trailer
+	word 1		record address
+	word 2		number of extension words used (0-4)
+	word 3		start of data record
+	word 3+n-1	end of data record
+	word 3+n..7+n	record trailer: up to four extension words,
+			plus checksum
+
+A record can "grow" by up to four words without disrupting the track formatting;
+writing more than four extra words destroys the formatting of the rest of the
+track and causes a simulator error.
+
+The disk pack controller implements these registers:
+
+	name		size	comments
+
+	STA		16	status
+	BUF		16	data buffer
+	FNC		4	controller function
+	CW1		16	command word 1
+	CW2		16	command word 2
+	CSUM		16	record checksum
+	BUSY		1	controller busy
+	RDY		1	transfer ready
+	EOR		1	(DMA/DMC) end of range
+	DEFINT		1	seek deferred interrupt pending
+	INTREQ		1	interrupt request
+	ENABLE		1	interrupt enable
+	TBUF[0:2047]	16	track buffer
+	RPTR		11	pointer to start of record in track buffer
+	WPTR		11	pointer to current word in record
+	BCTR		15	bit counter for formatting
+	STIME		24	seek time, per cylinder
+	XTIME		24	transfer time, per word
+	BTIME		24	controller busy time
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		pack off line; if STOP_IOE, stop
+
+	end of file		ignored
+
+	OS I/O error		data error; if STOP_IOE, stop
+
+2.7 Symbolic Display and Input
 
 The H316/H516 simulator implements symbolic display and input.  Display is
 controlled by command line switches:

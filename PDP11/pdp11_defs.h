@@ -26,6 +26,8 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   22-Dec-03	RMS	Added second DEUNA/DELUA support
+   18-Oct-03	RMS	Added DECtape off reel message
    19-May-03	RMS	Revised for new conditional compilation
    05-Apr-03	RMS	Fixed bug in MMR1 update (found by Tim Stark)
    28-Feb-03	RMS	Added TM logging support
@@ -295,6 +297,7 @@ typedef struct fpac fpac_t;
 #define STOP_SPABORT	(TRAP_V_MAX + 5)		/* abort trap push */
 #define STOP_RQ		(TRAP_V_MAX + 6)		/* RQDX3 panic */
 #define STOP_SANITY	(TRAP_V_MAX + 7)		/* sanity timer exp */
+#define STOP_DTOFF	(TRAP_V_MAX + 8)		/* DECtape off reel */
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* cond error return */
 
 /* Timers */
@@ -312,9 +315,11 @@ typedef struct fpac fpac_t;
 
 #define DEV_V_UBUS	(DEV_V_UF + 0)			/* Unibus */
 #define DEV_V_QBUS	(DEV_V_UF + 1)			/* Qbus */
-#define DEV_V_FLTA	(DEV_V_UF + 2)			/* flt addr */
+#define DEV_V_Q18	(DEV_V_UF + 2)			/* Qbus with <= 256KB */
+#define DEV_V_FLTA	(DEV_V_UF + 3)			/* flt addr */
 #define DEV_UBUS	(1u << DEV_V_UBUS)
 #define DEV_QBUS	(1u << DEV_V_QBUS)
+#define DEV_Q18		(1u << DEV_V_Q18)
 #define DEV_FLTA	(1u << DEV_V_FLTA)
 
 #define UNIBUS		(cpu_18b || cpu_ubm)		/* T if 18b */
@@ -341,11 +346,13 @@ struct pdp_dib {
 
 typedef struct pdp_dib DIB;
 
-/* I/O page layout - RQB,RQC,RQD float based on number of DZ's */
+/* I/O page layout - XUB, RQB,RQC,RQD float based on number of DZ's */
 
 #define IOBA_DZ		(IOPAGEBASE + 000100)		/* DZ11 */
 #define IOLN_DZ		010
-#define IOBA_RQB	(IOPAGEBASE + 000334 +  (020 * (DZ_MUXES / 2)))
+#define IOBA_XUB	(IOPAGEBASE + 000330 + (020 * (DZ_MUXES / 2)))
+#define IOLN_XUB	010
+#define IOBA_RQB	(IOPAGEBASE + 000334 + (020 * (DZ_MUXES / 2)))
 #define IOLN_RQB	004
 #define IOBA_RQC	(IOPAGEBASE + IOBA_RQB + IOLN_RQB)
 #define IOLN_RQC	004

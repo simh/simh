@@ -291,6 +291,7 @@ t_stat drc_svc (UNIT *uptr)
 {
 int32 devd, trk, sec;
 uint32 da;
+uint16 *bptr = uptr->filebuf;
 
 if ((uptr->flags & UNIT_ATT) == 0) {
 	drc_sta = DRS_ABO;
@@ -304,7 +305,7 @@ da = ((trk * DR_NUMSC) + sec) * DR_NUMWD;
 
 if (drc_cw & CW_WR) {					/* write? */
 	if ((da < uptr->capac) && (sec < DR_NUMSC)) {
-	    *(((uint16 *) uptr->filebuf) + da + drd_ptr) = drd_obuf;
+	    bptr[da + drd_ptr] = drd_obuf;
 	    if (((uint32) (da + drd_ptr)) >= uptr->hwmark)
 		uptr->hwmark = da + drd_ptr + 1;  }
 	drd_ptr = dr_incda (trk, sec, drd_ptr);		/* inc disk addr */
@@ -313,12 +314,12 @@ if (drc_cw & CW_WR) {					/* write? */
 	    sim_activate (uptr, dr_time);  }		/* sched next word */
 	else if (drd_ptr) {				/* done, need to fill? */
 	    for ( ; drd_ptr < DR_NUMWD; drd_ptr++)
-		 *(((uint16 *) uptr->filebuf) + da + drd_ptr) = 0;  }
+		 bptr[da + drd_ptr] = 0;  }
 	}						/* end write */
 else {							/* read */
 	if (CMD (devd)) {				/* dch active? */
 	    if ((da >= uptr->capac) || (sec >= DR_NUMSC)) drd_ibuf = 0;
-	    else drd_ibuf = *(((uint16 *) uptr->filebuf) + da + drd_ptr);
+	    else drd_ibuf = bptr[da + drd_ptr];
 	    drd_ptr = dr_incda (trk, sec, drd_ptr);
 	    setFLG (devd);				/* set dch flg */
 	    sim_activate (uptr, dr_time);  }		/* sched next word */
@@ -367,6 +368,7 @@ if (sz == 0) return SCPE_IERR;
 uptr->capac = sz;
 return attach_unit (uptr, cptr);
 }
+
 /* Set size routine */
 
 t_stat dr_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)

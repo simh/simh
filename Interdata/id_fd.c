@@ -276,6 +276,7 @@ return 0;
 t_stat fd_svc (UNIT *uptr)
 {
 uint32 i, u, tk, sc, crc, fnc, da;
+uint8 *fbuf = uptr->filebuf;
 
 u = uptr - fd_dev.units;				/* get unit number */
 fnc = GET_FNC (uptr->FNC);				/* get function */
@@ -296,9 +297,9 @@ case FNC_RD:						/* read, buf empty */
 	if (fd_dte (uptr, FALSE)) return SCPE_OK;	/* xfr error? */
 	da = GET_DA (uptr->LRN);			/* get disk addr */
 	for (i = 0; i < FD_NUMBY; i++)			/* read sector */
-	    fdxb[i] = *(((uint8 *) uptr->filebuf) + da + i);
-	if (*(((uint8 *) uptr->filebuf) + FD_SIZE  + uptr->LRN - 1)) {
-	    fd_sta = fd_sta | STA_DEL;			/* deleted? set err */
+	    fdxb[i] = fbuf[da + i];
+	if (fbuf[FD_SIZE  + uptr->LRN - 1]) {		/* deleted? set err */
+	    fd_sta = fd_sta | STA_DEL;
 	    fd_es[u][0] = fd_es[u][0] | ES0_DEL;  }
 	fd_es[u][2] = GET_SEC (uptr->LRN);		/* set ext sec/trk */
 	fd_es[u][3] = GET_TRK (uptr->LRN);
@@ -313,9 +314,8 @@ case FNC_WR: case FNC_DEL:				/* write block */
 	    for (i = fd_bptr; i < FD_NUMBY; i++)	/* pad sector */
 		fdxb[i] = fd_db;
 	    for (i = 0; i < FD_NUMBY; i++)		/* write sector */
-		*(((uint8 *) uptr->filebuf) + da + i) = fdxb[i];
-	    *(((uint8 *) uptr->filebuf) + FD_SIZE + uptr->LRN - 1) =
-		(fnc == FNC_DEL)? 1: 0;			/* write dir */
+		fbuf[da + i] = fdxb[i];			/* then dir */
+	    fbuf[FD_SIZE + uptr->LRN - 1] = ((fnc == FNC_DEL)? 1: 0);
 	    uptr->hwmark = uptr->capac;			/* rewrite all */
 	    fd_es[u][2] = GET_SEC (uptr->LRN);		/* set ext sec/trk */
 	    fd_es[u][3] = GET_TRK (uptr->LRN);
