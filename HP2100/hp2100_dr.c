@@ -35,6 +35,7 @@
    
    The drum control channel does not have any of the traditional flip-flops.
 
+   26-Aug-04	RMS	Fixed CLC to stop operation (from Dave Bryan)
    26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
 			Revised boot rom to use IBL algorithm
 			Implemented DMA SRQ (follows FLG)
@@ -248,6 +249,7 @@ case ioCTL:						/* control clear/set */
 	if (IR & I_AB) {				/* CLC */
 	    clrCMD (devd);				/* clr "ctl" */
 	    clrFSR (devd);				/* clr flg */
+	    sim_cancel (&drc_unit);			/* cancel curr op */
 	    drc_sta = drc_sta & ~DRS_SAC;  }		/* clear SAC flag */
 	else if (!CMD (devd)) {				/* STC, not set? */
 	    setCMD (devd);				/* set "ctl" */

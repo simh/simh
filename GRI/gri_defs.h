@@ -43,13 +43,10 @@
       overflow is handled.  Answer: EAO is a package of ROM subroutines
       with just four functions: multiply, divide, arithmetic right shift,
       and normalize.
-
-   Outstanding issues:
-
-   1. Is there any interaction between the byte swapper and the byte packer?
-   2. Is SOV testable even if the FOA is not ADD?
-   3. How does the EAO handle divide overflow?  Answer: set link.
-   4. What are the other EAO functions beside multiply and divide?
+   4. Is SOV testable even if the FOA is not ADD?  Answer: AOV and SOV are
+      calculated regardless of the function.
+   5. How does the EAO handle divide overflow?  Answer: set link.
+   6. What are the other EAO functions beside multiply and divide?
       Answer: arithmetic right shift, normalize.
 */
 
@@ -172,11 +169,13 @@ struct gdev {
 #define MSR_V_AOV	0				/* arith carry */
 #define MSR_BOV		(1u << MSR_V_BOV)
 #define MSR_L		(1u << MSR_V_L)
+#define MSR_FOA		(MSR_M_FOA << MSR_V_FOA)
 #define MSR_SOV		(1u << MSR_V_SOV)
 #define MSR_AOV		(1u << MSR_V_AOV)
 #define MSR_GET_FOA(x)	(((x) >> MSR_V_FOA) & MSR_M_FOA)
 #define MSR_PUT_FOA(x,n)	(((x) & ~(MSR_M_FOA << MSR_V_FOA)) | \
 			(((n) & MSR_M_FOA) << MSR_V_FOA))
+#define MSR_RW		(MSR_BOV|MSR_L|MSR_FOA|MSR_SOV|MSR_AOV)
 
 /* Real time clock */
 

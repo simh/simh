@@ -26,6 +26,16 @@
    ms		13181A 7970B 800bpi nine track magnetic tape
 		13183A 7970E 1600bpi nine track magnetic tape
 
+   14-Aug-04	JDB	Fixed many functional and timing problems (from Dave Bryan)
+			- fixed erroneous execution of rejected command
+			- fixed erroneous execution of select-only command
+			- fixed erroneous execution of clear command
+			- fixed odd byte handling for read
+			- fixed spurious odd byte status on 13183A EOF
+			- modified handling of end of medium
+			- added detailed timing, with fast and realistic modes
+			- added reel sizes to simulate end of tape
+			- added debug printouts
    06-Jul-04	RMS	Fixed spurious timing error after CLC (found by Dave Bryan)
    26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
 			Fixed SR setting in IBL
@@ -53,9 +63,6 @@
 
    If the byte count is odd, the record is padded with an extra byte
    of junk.  File marks are represented by a byte count of 0.
-
-   Unusually among HP peripherals, the 12559 does not have a command flop,
-   and its flag and flag buffer power up as clear rather than set.
 */
 
 #include "hp2100_defs.h"
@@ -66,6 +73,9 @@
 #define DBSIZE		(1 << DB_N_SIZE)		/* max data cmd */
 #define FNC		u3				/* function */
 #define UST		u4				/* unit status */
+#define REEL		u5				/* tape reel size */
+
+#define TCAP		(300 * 12 * 800)		/* 300 ft capacity at 800bpi */
 
 /* Command - msc_fnc */
 
@@ -82,6 +92,7 @@
 #define FNC_RWS		00105				/* rewind and offline */
 #define FNC_WFM		00211				/* write file mark */
 #define FNC_RFF		00223				/* "read file fwd" */
+#define FNC_CMPL	00400				/* completion state */
 #define FNC_V_SEL	9				/* select */
 #define FNC_M_SEL	017
 #define FNC_GETSEL(x)	(((x) >> FNC_V_SEL) & FNC_M_SEL)
@@ -92,6 +103,8 @@
 #define FNF_REV		00040				/* reverse */
 #define FNF_RWD		00100				/* rewind */
 #define FNF_CHS		00400				/* change select */
+
+#define FNC_SEL         ((FNC_M_SEL << FNC_V_SEL) | FNF_CHS)
 
 /* Status - stored in msc_sta, unit.UST (u), or dynamic (d) */
 
@@ -105,7 +118,7 @@
 #define STA_BUSY	0000400				/* ctrl busy */
 #define STA_EOF		0000200				/* end of file */
 #define STA_BOT		0000100				/* beg of tape (u) */
-#define STA_EOT		0000040				/* end of tape (u) */
+#define STA_EOT		0000040				/* end of tape (d) */
 #define STA_TIM		0000020				/* timing error */
 #define STA_REJ		0000010				/* programming error */
 #define STA_WLK		0000004				/* write locked (d) */
@@ -118,20 +131,51 @@ extern uint32 PC, SR;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
 extern int32 sim_switches;
 extern UNIT cpu_unit;
+extern FILE *sim_deb;
 
 int32 ms_ctype = 0;					/* ctrl type */
+int32 ms_timing = 1;					/* timing type */
 int32 msc_sta = 0;					/* status */
 int32 msc_buf = 0;					/* buffer */
 int32 msc_usl = 0;					/* unit select */
 int32 msc_1st = 0;
-int32 msc_ctime = 1000;					/* command wait */
-int32 msc_gtime = 1000;					/* gap stop time */
-int32 msc_rtime = 1000;					/* rewind wait */
-int32 msc_xtime = 15;					/* data xfer time */
 int32 msc_stopioe = 1;					/* stop on error */
 int32 msd_buf = 0;					/* data buffer */
 uint8 msxb[DBSIZE] = { 0 };				/* data buffer */
 t_mtrlnt ms_ptr = 0, ms_max = 0;			/* buffer ptrs */
+
+/* Hardware timing at 45 IPS                  13181                  13183           
+   (based on 1580 instr/msec)          instr   msec    SCP   instr    msec    SCP
+                                      --------------------   --------------------
+   - BOT start delay        : btime = 161512  102.22   184   252800  160.00   288
+   - motion cmd start delay : ctime =  14044    8.89    16    17556   11.11    20
+   - GAP traversal time     : gtime = 175553  111.11   200   105333   66.67   120
+   - IRG traversal time     : itime =  24885   15.75     -    27387   17.33     -
+   - rewind initiation time : rtime =    878    0.56     1      878    0.56     1
+   - data xfer time / word  : xtime =     88   55.56us   -       44  27.78us    - 
+
+   NOTE: The 13181-60001 Rev. 1629 tape diagnostic fails test 17B subtest 6 with
+         "E116 BYTE TIME SHORT" if the correct data transfer time is used for
+          13181A interface.  Set "xtime" to 115 (instructions) to pass that
+          diagnostic.  Rev. 2040 of the tape diagnostic fixes this problem and
+          passes with the correct data transfer time.
+*/
+
+int32 msc_btime = 0;					/* BOT start delay */
+int32 msc_ctime = 0;					/* motion cmd start delay */
+int32 msc_gtime = 0;					/* GAP traversal time */
+int32 msc_itime = 0;					/* IRG traversal time */
+int32 msc_rtime = 0;					/* rewind initiation time */
+int32 msc_xtime = 0;					/* data xfer time / word */
+
+typedef int32 TIMESET[6];				/* set of controller times */
+
+int32 *const timers[] = { &msc_btime, &msc_ctime, &msc_gtime,
+                          &msc_itime, &msc_rtime, &msc_xtime };
+
+const TIMESET times[3] = { { 161512, 14044, 175553, 24885, 878,  88 },	/* 13181A */
+                           { 252800, 17556, 105333, 27387, 878,  44 },	/* 13183A */
+                           {      1,  1000,      1,     1, 100,  10 } };/* FAST */
 
 DEVICE msd_dev, msc_dev;
 int32 msdio (int32 inst, int32 IR, int32 dat);
@@ -144,6 +188,11 @@ t_stat msc_boot (int32 unitno, DEVICE *dptr);
 t_stat ms_map_err (UNIT *uptr, t_stat st);
 t_stat ms_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ms_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat ms_set_timing (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ms_show_timing (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat ms_set_reelsize (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, void *desc);
+void ms_config_timing (void);
 
 /* MSD data structures
 
@@ -213,10 +262,14 @@ REG msc_reg[] = {
 	{ URDATA (POS, msc_unit[0].pos, 10, T_ADDR_W, 0, MS_NUMDR, PV_LEFT) },
 	{ URDATA (FNC, msc_unit[0].FNC, 8, 8, 0, MS_NUMDR, REG_HRO) },
 	{ URDATA (UST, msc_unit[0].UST, 8, 12, 0, MS_NUMDR, REG_HRO) },
+	{ URDATA (REEL, msc_unit[0].REEL, 10, 2, 0, MS_NUMDR, REG_HRO) },
+	{ DRDATA (BTIME, msc_btime, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (CTIME, msc_ctime, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (GTIME, msc_gtime, 24), REG_NZ + PV_LEFT },
+	{ DRDATA (ITIME, msc_itime, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (RTIME, msc_rtime, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (XTIME, msc_xtime, 24), REG_NZ + PV_LEFT },
+	{ FLDATA (TIMING, ms_timing, 0), REG_HRO },
 	{ FLDATA (STOP_IOE, msc_stopioe, 0) },
 	{ FLDATA (CTYPE, ms_ctype, 0), REG_HRO },
 	{ ORDATA (DEVNO, msc_dib.devno, 6), REG_HRO },
@@ -225,6 +278,8 @@ REG msc_reg[] = {
 MTAB msc_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+	{ MTAB_XTD|MTAB_VUN, 0, "REEL", "REEL",
+		&ms_set_reelsize, &ms_show_reelsize, NULL },
 	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
 		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 	{ MTAB_XTD | MTAB_VDV, 0, NULL, "13181A",
@@ -233,6 +288,12 @@ MTAB msc_mod[] = {
 		&ms_settype, NULL, NULL },
 	{ MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL,
 		NULL, &ms_showtype, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, NULL, "REALTIME",
+		&ms_set_timing, NULL, NULL },
+	{ MTAB_XTD | MTAB_VDV, 1, NULL, "FASTTIME",
+		&ms_set_timing, NULL, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, "TIMING", NULL,
+		NULL, &ms_show_timing, NULL },
 	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
 		&hp_setdev, &hp_showdev, &msd_dev },
 	{ 0 }  };
@@ -242,7 +303,7 @@ DEVICE msc_dev = {
 	MS_NUMDR, 10, 31, 1, 8, 8,
 	NULL, NULL, &msc_reset,
 	&msc_boot, &msc_attach, &msc_detach,
-	&msc_dib, DEV_DISABLE };
+	&msc_dib, DEV_DISABLE | DEV_DEBUG };
 
 /* IOT routines */
 
@@ -289,7 +350,7 @@ return dat;
 
 int32 mscio (int32 inst, int32 IR, int32 dat)
 {
-int32 i, devc, devd;
+int32 i, devc, devd, sched_time;
 t_stat st;
 UNIT *uptr = msc_dev.units + msc_usl;
 static const uint8 map_sel[16] = {
@@ -309,6 +370,8 @@ case ioSFS:						/* skip flag set */
 	if (FLG (devc) != 0) PC = (PC + 1) & VAMASK;
 	break;
 case ioOTX:						/* output */
+	if (DEBUG_PRS (msc_dev))
+	    fprintf (sim_deb, ">>MSC OTx: Command = %06o\n", dat);
 	msc_buf = dat;
 	msc_sta = msc_sta & ~STA_REJ;			/* clear reject */
 	if ((dat & 0377) == FNC_CLR) break;		/* clear always ok */
@@ -326,19 +389,26 @@ case ioOTX:						/* output */
 case ioLIX:						/* load */
 	dat = 0;
 case ioMIX:						/* merge */
-	dat = dat | ((msc_sta | uptr->UST) & ~STA_DYN);
+	dat = dat | (msc_sta & ~STA_DYN);		/* get card status */
 	if (uptr->flags & UNIT_ATT) {			/* online? */
-	    if (sim_is_active (uptr))			/* busy */
+	    dat = dat | uptr->UST;			/* add unit status */
+	    if (sim_is_active (uptr) &&			/* TBSY unless RWD at BOT */
+		!((uptr->FNC & FNF_RWD) && (uptr->UST & STA_BOT)))
 		dat = dat | STA_TBSY;
 	    if (sim_tape_wrp (uptr))			/* write prot? */
-		dat = dat | STA_WLK;  }
+		dat = dat | STA_WLK;
+	    if (uptr->REEL &&
+		sim_tape_eot (uptr, (TCAP << uptr->REEL) << ms_ctype))
+		dat = dat | STA_EOT; }
 	else dat = dat | STA_TBSY | STA_LOCAL;
 	if (ms_ctype) dat = dat | STA_PE |		/* 13183A? */
 	    (msc_usl << STA_V_SEL);	
+	if (DEBUG_PRS (msc_dev))
+	    fprintf (sim_deb, ">>MSC LIx: Status = %06o\n", dat);
 	break;
 case ioCTL:						/* control clear/set */
 	if (IR & I_CTL) { clrCTL (devc); }		/* CLC */
-	else {						/* STC */
+	else if (!(msc_sta & STA_REJ)) {		/* STC, last cmd rejected? */
 	    if ((msc_buf & 0377) == FNC_CLR) {		/* clear? */
 		for (i = 0; i < MS_NUMDR; i++) {	/* loop thru units */
 		    if (sim_is_active (&msc_unit[i]) &&	/* write in prog? */
@@ -346,18 +416,35 @@ case ioCTL:						/* control clear/set */
 			if (st = sim_tape_wrrecf (uptr, msxb, ms_ptr | MTR_ERF))
 			    ms_map_err (uptr, st);  }
 		    if ((msc_unit[i].UST & STA_REW) == 0)
-			sim_cancel (&msc_unit[i]);  }	/* stop if now rew */
-		clrCTL (devc);				/* init device */
-		setFSR (devc);
-		clrCTL (devd);
-		setFSR (devd);
-		msc_sta = msd_buf = msc_buf = msc_1st = 0;
+			sim_cancel (&msc_unit[i]);  }	/* stop if not rew */
+		setCTL (devc);				/* set CTL for STC */
+		setFSR (devc);                          /* set FLG for completion */
+		msc_sta = msc_1st = 0;                  /* clr ctlr status */
+		if (DEBUG_PRS (msc_dev))
+		    fputs (">>MSC STC: Controller cleared\n", sim_deb);
 		return SCPE_OK;  }
 	    uptr->FNC = msc_buf & 0377;			/* save function */
-	    if (uptr->FNC & FNF_RWD)			/* rewind? */
-	        sim_activate (uptr, msc_rtime);		/* fast response */
-	    else sim_activate (uptr, msc_ctime);	/* schedule op */
-	    uptr->UST = 0;				/* clear status */
+	    if (uptr->FNC & FNF_RWD) {			/* rewind? */
+		if (!(uptr->UST & STA_BOT))		/* not at BOT? */
+		    uptr->UST = STA_REW;		/* set rewinding */
+		sched_time = msc_rtime; }		/* set response time */
+	    else {
+		if (uptr-> UST & STA_BOT)		/* at BOT? */
+		    sched_time = msc_btime;		/* use BOT start time */
+		else if ((uptr->FNC == FNC_GAP) || (uptr->FNC == FNC_GFM))
+		    sched_time = msc_gtime;		/* use gap traversal time */
+		else sched_time = 0;
+		if (uptr->FNC != FNC_GAP)
+		    sched_time += msc_ctime;		/* add base command time */
+		if (uptr->FNC & FNF_MOT)		/* motion command? */
+		    uptr->UST = 0; }			/* clear BOT status */
+	    if (msc_buf & ~FNC_SEL) {			/* NOP for unit sel alone */
+		sim_activate (uptr, sched_time);	/* else schedule op */
+		if (DEBUG_PRS (msc_dev)) fprintf (sim_deb,
+		    ">>MSC STC: Unit %d command %03o scheduled, time = %d\n",
+		    msc_usl, uptr->FNC, sched_time); }
+	    else if (DEBUG_PRS (msc_dev))
+		fputs (">>MSC STC: Unit select (NOP)\n", sim_deb);
 	    msc_sta = STA_BUSY;				/* ctrl is busy */
 	    msc_1st = 1;
 	    setCTL (devc);  }				/* go */
@@ -381,29 +468,34 @@ return dat;
 
 t_stat msc_svc (UNIT *uptr)
 {
-int32 devc, devd;
+int32 devc, devd, unum, cap;
 t_mtrlnt tbc;
 t_stat st, r = SCPE_OK;
 
 devc = msc_dib.devno;					/* get device nos */
 devd = msd_dib.devno;
+unum = uptr - msc_dev.units;				/* get unit number */
 
-if ((uptr->flags & UNIT_ATT) == 0) {			/* offline? */
+if ((uptr->FNC != FNC_RWS) && !(uptr->flags & UNIT_ATT)) {  /* offline? */
 	msc_sta = (msc_sta | STA_REJ) & ~STA_BUSY;	/* reject */
 	setFSR (devc);					/* set cch flg */
 	return IORETURN (msc_stopioe, SCPE_UNATT);  }
 
 switch (uptr->FNC) {					/* case on function */
-case FNC_REW:						/* rewind */
 case FNC_RWS:						/* rewind offline */
+	detach_unit (uptr);				/* detach == offline */
+	break;						/* we're done */
+
+case FNC_REW:						/* rewind */
 	if (uptr->UST & STA_REW) {			/* rewind in prog? */
-	    sim_tape_rewind (uptr);			/* done */
-	    uptr->UST = STA_BOT;			/* set BOT status */
-	    if (uptr->FNC & FNF_OFL) detach_unit (uptr);
-	    return SCPE_OK;  }
-	uptr->UST = STA_REW;				/* set rewinding */
-	sim_activate (uptr, msc_ctime);			/* sched completion */
-	break;						/* "done" */
+	    uptr->FNC |= FNC_CMPL;			/* set compl state */
+	    sim_activate (uptr, msc_ctime);  }		/* sched completion */
+	break;						/* anyway, ctrl done */
+
+case FNC_REW | FNC_CMPL:				/* complete rewind */
+	sim_tape_rewind (uptr);				/* rewind tape */
+	uptr->UST = STA_BOT;				/* set BOT status */
+	return SCPE_OK;					/* drive is free */
 
 case FNC_GFM:						/* gap file mark */
 case FNC_WFM:						/* write file mark */
@@ -430,17 +522,16 @@ case FNC_BSR:
 	break;
 
 case FNC_FSF:
-	while ((st = sim_tape_sprecf (uptr, &tbc)) == MTSE_OK) ;
-	if (st == MTSE_TMK)				/* stopped by tmk? */
-	    msc_sta = msc_sta | STA_EOF | STA_ODD;	/* normal status */
-	else r = ms_map_err (uptr, st);			/* map error */
+	cap = (TCAP << uptr->REEL) << ms_ctype;
+	while ((st = sim_tape_sprecf (uptr, &tbc)) == MTSE_OK) {
+	    if (uptr->REEL && sim_tape_eot (uptr, cap))
+		break;  }				/* EOT stops */
+	r = ms_map_err (uptr, st);			/* map error */
 	break;
 
 case FNC_BSF:
 	while ((st = sim_tape_sprecr (uptr, &tbc)) == MTSE_OK) ;
-	if (st == MTSE_TMK)				/* stopped by tmk? */
-	    msc_sta = msc_sta | STA_EOF | STA_ODD;	/* normal status */
-	else r = ms_map_err (uptr, st);			/* map error */
+	r = ms_map_err (uptr, st);			/* map error */
 	break;
 
 /* Unit service, continued */
@@ -454,21 +545,27 @@ case FNC_RC:						/* read */
 	    else if (st != MTSE_OK) {			/* other error? */
 		r = ms_map_err (uptr, st);		/* map error */
 		if (r == SCPE_OK) {			/* recoverable? */
-		    sim_activate (uptr, msc_gtime);	/* sched IRG */
-		    uptr->FNC = 0;			/* NOP func */
+		    sim_activate (uptr, msc_itime);	/* sched IRG */
+		    uptr->FNC |= FNC_CMPL;      	/* set completion */
 		    return SCPE_OK;  }
 		break;  }				/* err, done */
+	    if (ms_ctype) msc_sta = msc_sta | STA_ODD;	/* set ODD for 13183A */
+	    if (DEBUG_PRS (msc_dev)) fprintf (sim_deb,
+		">>MSC svc: Unit %d read %d word record\n", unum, ms_max / 2);
 	    }
 	if (CTL (devd) && (ms_ptr < ms_max)) {		/* DCH on, more data? */
 	    if (FLG (devd)) msc_sta = msc_sta | STA_TIM | STA_PAR;
-	    msd_buf = ((uint16) msxb[ms_ptr] << 8) | msxb[ms_ptr + 1];
+	    msd_buf = ((uint16) msxb[ms_ptr] << 8) |
+		      ((ms_ptr + 1 == ms_max) ? 0 : msxb[ms_ptr + 1]);
 	    ms_ptr = ms_ptr + 2;
 	    setFSR (devd);				/* set dch flg */
 	    sim_activate (uptr, msc_xtime);		/* re-activate */
 	    return SCPE_OK;  }
-	sim_activate (uptr, msc_gtime);			/* sched IRG */
+	if (ms_max & 1) msc_sta = msc_sta | STA_ODD;    /* set ODD by rec len */
+	else msc_sta = msc_sta & ~STA_ODD;
+	sim_activate (uptr, msc_itime);			/* sched IRG */
 	if (uptr->FNC == FNC_RFF) msc_1st = 1;		/* diagnostic? */
-	else uptr->FNC = 0;				/* NOP func */
+	else uptr->FNC |= FNC_CMPL;      	        /* set completion */
 	return SCPE_OK;
 
 case FNC_WC:						/* write */
@@ -485,11 +582,13 @@ case FNC_WC:						/* write */
 	    sim_activate (uptr, msc_xtime);		/* re-activate */
 	    return SCPE_OK;  }
 	if (ms_ptr) {					/* any data? write */
+	    if (DEBUG_PRS (msc_dev)) fprintf (sim_deb,
+		">>MSC svc: Unit %d wrote %d word record\n", unum, ms_ptr / 2);
 	    if (st = sim_tape_wrrecf (uptr, msxb, ms_ptr)) {	/* write, err? */
 		r = ms_map_err (uptr, st);		/* map error */
 		break;  }  }
-	sim_activate (uptr, msc_gtime);			/* sched IRG */
-	uptr->FNC = 0;					/* NOP func */
+	sim_activate (uptr, msc_itime);			/* sched IRG */
+	uptr->FNC |= FNC_CMPL;				/* set completion */
 	return SCPE_OK;
 
 default:						/* unknown */
@@ -497,22 +596,30 @@ default:						/* unknown */
 
 setFSR (devc);						/* set cch flg */
 msc_sta = msc_sta & ~STA_BUSY;				/* update status */
-return SCPE_OK;
+if (DEBUG_PRS (msc_dev)) fprintf (sim_deb,
+	">>MSC svc: Unit %d command %03o complete\n", unum, uptr->FNC & 0377);
+return r;
 }
 
 /* Map tape error status */
 
 t_stat ms_map_err (UNIT *uptr, t_stat st)
 {
+int32 unum = uptr - msc_dev.units;			/* get unit number */
+
+if (DEBUG_PRS (msc_dev)) fprintf (sim_deb,
+	">>MSC err: Unit %d tape library status = %d\n", unum, st);
+
 switch (st) {
 case MTSE_FMT:						/* illegal fmt */
 case MTSE_UNATT:					/* unattached */
 	msc_sta = msc_sta | STA_REJ;			/* reject */
 case MTSE_OK:						/* no error */
 	return SCPE_IERR;				/* never get here! */
+case MTSE_EOM:						/* end of medium */
 case MTSE_TMK:						/* end of file */
-	msc_sta = msc_sta | STA_EOF | STA_ODD;		/* eof (also sets odd) */
-	break;
+	msc_sta = msc_sta | STA_EOF | (ms_ctype ? 0 : STA_ODD);
+	break;                                          /* EOF also sets ODD for 13181A */
 case MTSE_INVRL:					/* invalid rec lnt */
 	msc_sta = msc_sta | STA_PAR;
 	return SCPE_MTRLNT;
@@ -521,11 +628,10 @@ case MTSE_IOERR:					/* IO error */
 	if (msc_stopioe) return SCPE_IOERR;
 	break;
 case MTSE_RECE:						/* record in error */
-case MTSE_EOM:						/* end of medium */
 	msc_sta = msc_sta | STA_PAR;			/* error */
 	break;
 case MTSE_BOT:						/* reverse into BOT */
-	uptr->UST = STA_BOT;				/* set status */
+	msc_sta = msc_sta | STA_BOT;                    /* set BOT status */
 	break;
 case MTSE_WRP:						/* write protect */
 	msc_sta = msc_sta | STA_REJ;			/* reject */
@@ -553,7 +659,10 @@ for (i = 0; i < MS_NUMDR; i++) {
 	uptr = msc_dev.units + i;
 	sim_tape_reset (uptr);
 	sim_cancel (uptr);
-	uptr->UST = 0;  }
+	if ((uptr->flags & UNIT_ATT) && sim_tape_bot (uptr))
+	    uptr->UST = STA_BOT;
+	else uptr->UST = 0;  }
+ms_config_timing ();
 return SCPE_OK;
 }
 
@@ -564,8 +673,7 @@ t_stat msc_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);			/* attach unit */
-if (r != SCPE_OK) return r;				/* update status */
-uptr->UST = STA_BOT;
+if (r == SCPE_OK) uptr->UST = STA_BOT;			/* tape starts at BOT */
 return r;
 }
 
@@ -575,6 +683,36 @@ t_stat msc_detach (UNIT* uptr)
 {
 uptr->UST = 0;						/* update status */
 return sim_tape_detach (uptr);				/* detach unit */
+}
+
+/* Configure timing */
+
+void ms_config_timing (void)
+{
+int32 i, tset;
+
+tset = (ms_timing << 1) | (ms_timing? 0 : ms_ctype);	/* select timing set */
+for (i = 0; i < (sizeof (timers) / sizeof (timers[0])); i++)
+	*timers[i] = times[tset][i];			/* assign times */
+}
+
+/* Set controller timing */
+
+t_stat ms_set_timing (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if ((val < 0) || (val > 1) || (cptr != NULL)) return SCPE_ARG;
+ms_timing = val;
+ms_config_timing ();
+return SCPE_OK;
+}
+
+/* Show controller timing */
+
+t_stat ms_show_timing (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if (ms_timing) fputs ("fast timing", st);
+else fputs ("realistic timing", st);
+return SCPE_OK;
 }
 
 /* Set controller type */
@@ -587,6 +725,7 @@ if ((val < 0) || (val > 1) || (cptr != NULL)) return SCPE_ARG;
 for (i = 0; i < MS_NUMDR; i++) {
 	if (msc_unit[i].flags & UNIT_ATT) return SCPE_ALATT;  }
 ms_ctype = val;
+ms_config_timing ();					/* update for new type */
 return SCPE_OK;
 }
 
@@ -596,6 +735,43 @@ t_stat ms_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 if (ms_ctype) fprintf (st, "13183A");
 else fprintf (st, "13181A");
+return SCPE_OK;
+}
+
+/* Set unit reel size */
+
+t_stat ms_set_reelsize (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 reel;
+t_stat status;
+
+if (cptr == NULL) return SCPE_ARG;
+reel = (int32) get_uint (cptr, 10, 2400, &status);
+if (status != SCPE_OK) return status;
+else switch (reel) {
+	case 0:
+		uptr->REEL = 0;				/* type 0 = unlimited */
+		break;
+	case 600:
+		uptr->REEL = 1;				/* type 1 = 600 foot */
+		break;
+	case 1200:
+		uptr->REEL = 2;				/* type 2 = 1200 foot */
+		break;
+	case 2400:
+		uptr->REEL = 3;				/* type 3 = 2400 foot */
+		break;
+	default:
+		return SCPE_ARG; }
+return SCPE_OK;
+}
+
+/* Show unit reel size */
+
+t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if (uptr->REEL == 0) fputs ("unlimited size", st);
+else fprintf (st, "%4d foot reel", 300 << uptr->REEL);
 return SCPE_OK;
 }
 
@@ -678,3 +854,4 @@ SR = (SR & IBL_OPT) | IBL_MS | (dev << IBL_V_DEV);	/* set SR */
 if ((sim_switches & SWMASK ('S')) && AR) SR = SR | 1;	/* skip? */
 return SCPE_OK;
 }
+

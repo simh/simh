@@ -26,6 +26,8 @@
    Ultimately, this will be a place to hide processing of various tape formats,
    as well as OS-specific direct hardware access.
 
+   28-Jul-04	RMS	Fixed bug in writing error records (found by Dave Bryan)
+		RMS	Fixed incorrect error codes (found by Dave Bryan)
    05-Jan-04	RMS	Revised for file I/O library
    25-Apr-03	RMS	Added extended file support
    28-Mar-03	RMS	Added E11 and TPC format support
@@ -364,8 +366,8 @@ t_mtrlnt sbc;
 MT_CLR_PNU (uptr);
 if ((uptr->flags & UNIT_ATT) == 0) return MTSE_UNATT;	/* not attached? */
 if (sim_tape_wrp (uptr)) return MTSE_WRP;		/* write prot? */
-if (f == MTUF_F_STD) sbc = (bc + 1) & ~1;
-else sbc = bc;
+if (f == MTUF_F_STD) sbc = MTR_L ((bc + 1) & ~1);
+else sbc = MTR_L (bc);
 sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* set pos */
 sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
 sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
@@ -427,7 +429,7 @@ t_stat st;
 if (MT_TST_PNU (uptr)) {
 	MT_CLR_PNU (uptr);
 	*bc = 0;
-	return SCPE_OK;  }
+	return MTSE_OK;  }
 st = sim_tape_rdlntr (uptr, bc);			/* get record length */
 *bc = MTR_L (*bc);
 return st;
@@ -479,7 +481,7 @@ t_stat sim_tape_ioerr (UNIT *uptr)
 {
 perror ("Magtape library I/O error");
 clearerr (uptr->fileref);
-return SCPE_IOERR;
+return MTSE_IOERR;
 }
 
 /* Set tape format */

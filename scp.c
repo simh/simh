@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Aug-04	RMS	Qualified RESTORE detach with SIM_SW_REST
+   17-Jul-04	RMS	Added ECHO command (from Dave Bryan)
    12-Jul-04	RMS	Fixed problem ATTACHing to read only files
 			(found by John Dundas)
    28-May-04	RMS	Added SET/SHOW CONSOLE
@@ -247,6 +249,7 @@ t_stat brk_cmd (int32 flag, char *ptr);
 t_stat do_cmd (int32 flag, char *ptr);
 t_stat help_cmd (int32 flag, char *ptr);
 t_stat spawn_cmd (int32 flag, char *ptr);
+t_stat echo_cmd (int32 flag, char *ptr);
 
 /* Set and show command processors */
 
@@ -521,6 +524,8 @@ static CTAB cmd_table[] = {
 	  "sh{ow} <unit> {arg,...}  show unit parameters\n"  },
 	{ "DO", &do_cmd, 0,
 	  "do <file> {arg,arg...}   process command file\n" },
+	{ "ECHO", &echo_cmd, 0,
+	  "echo <string>            display <string>\n" },
 	{ "HELP", &help_cmd, 0,
 	  "h{elp}                   type this message\n"
 	  "h{elp} <command>         type help for command\n" },
@@ -701,6 +706,15 @@ printf ("\n");
 
 return SCPE_OK;
 }
+
+/* Echo command */
+
+t_stat echo_cmd (int32 flag, char *cptr)
+{
+puts (cptr);
+if (sim_log) fprintf (sim_log, "%s\n", cptr);
+return SCPE_OK;
+}
 
 /* Do command */
 
@@ -734,7 +748,7 @@ do {	cptr = read_line (cbuf, CBUFSIZE, fpin);	/* get cmd line */
 	if (cptr == NULL) break;			/* exit on eof */
 	if (*cptr == 0) continue;			/* ignore blank */
 	if (echo) printf("do> %s\n", cptr);		/* echo if -v */
-	if (sim_log) fprintf (sim_log, "do> %s\n", cptr);
+	if (echo && sim_log) fprintf (sim_log, "do> %s\n", cptr);
 	cptr = get_glyph (cptr, gbuf, 0);		/* get command glyph */
 	sim_switches = 0;				/* init switches */
 	if (strcmp (gbuf, "DO") == 0) {			/* don't recurse */
@@ -1937,11 +1951,11 @@ for ( ;; ) {						/* device loop */
 	    if (!(dptr->flags & DEV_NET) ||		/* if not net dev or */
 	        !(uptr->flags & UNIT_ATT) ||		/* not currently att */
 		(buf[0] == 0)) {			/* or will not be att */
+		sim_switches = SIM_SW_REST;		/* att-det/rest */
 		r = scp_detach_unit (dptr, uptr);	/* detach old */
 		if (r != SCPE_OK) return r;
 		if (buf[0] != 0) {			/* any file? */
 		    uptr->flags = uptr->flags & ~UNIT_DIS;
-		    sim_switches = SIM_SW_REST;		/* attach/rest */
 		    if (flg & UNIT_RO)			/* [V2.10+] saved flgs & RO? */
 			sim_switches |= SWMASK ('R');	/* RO attach */
 		    r = scp_attach_unit (dptr, uptr, buf);

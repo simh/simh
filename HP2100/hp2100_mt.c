@@ -25,6 +25,7 @@
 
    mt		12559A 3030 nine track magnetic tape
 
+   14-Aug-04	RMS	Modified handling of end of medium (suggested by Dave Bryan)
    06-Jul-04	RMS	Fixed spurious timing error after CLC (found by Dave Bryan)
    26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
 			Implemented DMA SRQ (follows FLG)
@@ -408,7 +409,7 @@ default:						/* unknown */
 
 setFSR (devc);						/* set cch flg */
 mtc_sta = mtc_sta & ~STA_BUSY;				/* not busy */
-return SCPE_OK;
+return r;
 }
 
 /* Map tape error status */
@@ -421,6 +422,7 @@ case MTSE_UNATT:					/* unattached */
 	mtc_sta = mtc_sta | STA_REJ;			/* reject */
 case MTSE_OK:						/* no error */
 	return SCPE_IERR;				/* never get here! */
+case MTSE_EOM:						/* end of medium */
 case MTSE_TMK:						/* end of file */
 	mtc_sta = mtc_sta | STA_EOF;			/* eof */
 	break;
@@ -432,7 +434,6 @@ case MTSE_INVRL:					/* invalid rec lnt */
 	mtc_sta = mtc_sta | STA_PAR;
 	return SCPE_MTRLNT;
 case MTSE_RECE:						/* record in error */
-case MTSE_EOM:						/* end of medium */
 	mtc_sta = mtc_sta | STA_PAR;			/* error */
 	break;
 case MTSE_BOT:						/* reverse into BOT */

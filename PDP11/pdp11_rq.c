@@ -26,6 +26,7 @@
 
    rq		RQDX3 disk controller
 
+   24-Jul-04	RMS	VAX controllers luns start with 0 (from Andreas Cejna)
    05-Feb-04	RMS	Revised for file I/O library
    25-Jan-04	RMS	Revised for device debug support
    12-Jan-04	RMS	Fixed bug in interrupt control (found by Tom Evans)
@@ -2077,7 +2078,13 @@ for (i = 0, cidx = -1; i < RQ_NUMCT; i++) {		/* find ctrl num */
 if (cidx < 0) return SCPE_IERR;				/* not found??? */
 cp = rq_ctxmap[cidx];					/* get context */
 cp->cnum = cidx;					/* init index */
+
+#if defined (VM_VAX)					/* VAX */
+cp->ubase = 0;						/* unit base = 0 */
+#else							/* PDP-11 */
 cp->ubase = cidx * RQ_NUMDR;				/* init unit base */
+#endif
+
 cp->csta = CST_S1;					/* init stage 1 */
 cp->s1dat = 0;						/* no S1 data */
 dibp->vec = 0;						/* no vector */

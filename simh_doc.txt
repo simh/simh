@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V3.2-1
-Date:	15-Jun-2004
+Subj:	Simulator Usage, V3.2-3
+Date:	20-Aug-2004
 
 			COPYRIGHT NOTICE
 
@@ -704,6 +704,11 @@ quotation marks.
 
 If the switch -V is specified, the commands in the file are echoed
 before they are executed.
+
+The ECHO command is a useful way of annotating command files.  ECHO
+prints out its argument on the console:
+
+	sim> ECHO <string>		-- output string to console
 
 3.13 Executing System Commands
 

@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Aug-04	RMS	Added OS/2 EMX fixes (from Holger Veit)
    14-Jul-04	RMS	Revised Windows console code (from Dave Bryan)
    28-May-04	RMS	Added SET/SHOW CONSOLE
 		RMS	Added break, delete character maps
@@ -471,7 +472,6 @@ return SCPE_OK;
 #include <fcntl.h>
 #include <io.h>
 #include <windows.h>
-#include <signal.h>
 #define RAW_MODE 0
 static HANDLE std_input;
 static DWORD saved_mode;
@@ -490,7 +490,7 @@ if (!GetConsoleMode(std_input, &saved_mode) ||
 	!SetConsoleMode(std_input, RAW_MODE)) return SCPE_TTYERR;
 if (sim_log) {
 	fflush (sim_log);
-	setmode (_fileno (sim_log), _O_BINARY);  }
+	_setmode (_fileno (sim_log), _O_BINARY);  }
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 return SCPE_OK;
 }
@@ -528,7 +528,7 @@ if (c != 0177) _putch (c);
 return SCPE_OK;
 }
 
-/* OS/2 routines, from Bruce Ray */
+/* OS/2 routines, from Bruce Ray and Holger Veit */
 
 #elif defined (__OS2__)
 
@@ -558,8 +558,19 @@ t_stat sim_os_poll_kbd (void)
 {
 int c;
 
+#if defined (__EMX__)
+switch (c = _read_kbd(0,0,0)) {			/* EMX has _read_kbd */
+case -1:					/* no char*/
+	return SCPE_OK;
+case 0:						/* char pending */
+	c = _read_kbd(0,1,0);
+	break;
+default:					/* got char */
+	break; }
+#else
 if (!kbhit ()) return SCPE_OK;
 c = getch();
+#endif
 if ((c & 0177) == sim_del_char) c = 0177;
 if ((c & 0177) == sim_int_char) return SCPE_STOP;
 if (sim_brk_char && ((c & 0177) == sim_brk_char)) return SCPE_BREAK;
@@ -569,7 +580,11 @@ return c | SCPE_KFLAG;
 t_stat sim_os_putchar (int32 c)
 {
 if (c != 0177) {
+#if defined (__EMX__)
+	putchar (c);
+#else
 	putch (c);
+#endif
 	fflush (stdout);  }
 return SCPE_OK;
 }

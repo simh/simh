@@ -315,8 +315,8 @@ case ioCTL:						/* control clear/set */
 	    setCTL (devc);				/* set ctl */
 	    if (!CMD (devc)) {				/* cmd clr? */
 		setCMD (devc);				/* set cmd, ctl */
-		drv = CW_GETDRV (dqc_obuf);			/* get fnc, drv */
-		fnc = CW_GETFNC (dqc_obuf);			/* from cmd word */
+		drv = CW_GETDRV (dqc_obuf);		/* get fnc, drv */
+		fnc = CW_GETFNC (dqc_obuf);		/* from cmd word */
 		switch (fnc) {				/* case on fnc */
 		case FNC_SEEK: case FNC_RCL:		/* seek, recal */
 		case FNC_CHK:				/* check */
@@ -352,9 +352,11 @@ return;
 
 void dq_goc (int32 fnc, int32 drv, int32 time)
 {
-if (sim_is_active (&dqc_unit[drv])) {			/* still seeking? */
+int32 t;
+
+if (t = sim_is_active (&dqc_unit[drv])) {		/* still seeking? */
 	sim_cancel (&dqc_unit[drv]);			/* cancel */
-	time = time + dqc_stime;  }			/* take longer */
+	time = time + t;  }				/* include seek time */
 dqc_sta[drv] = 0;					/* clear status */
 dq_ptr = 0;						/* init buf ptr */
 dqc_busy = drv + 1;					/* set busy */
@@ -456,7 +458,7 @@ case FNC_STA:						/* read status */
 	if (CMD (devd)) {				/* dch active? */
 	    if (dqc_unit[drv].flags & UNIT_ATT)		/* attached? */
 		dqd_ibuf = dqc_sta[drv] & ~STA_DID;
-	    else dqd_ibuf = STA_NRDY;
+	    else dqd_ibuf = STA_NRDY|STA_BSY;
 	    if (drv) dqd_ibuf = dqd_ibuf | STA_DID;
 	    setFSR (devd);				/* set dch flg */
 	    clrCMD (devd);				/* clr dch cmd */

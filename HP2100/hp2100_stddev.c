@@ -28,6 +28,7 @@
    tty		12531C buffered teleprinter interface
    clk		12539C time base generator
 
+   15-Aug-04	RMS	Added tab to control char set (from Dave Bryan)
    14-Jul-04	RMS	Generalized handling of control char echoing
 			(from Dave Bryan)
    26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
@@ -76,9 +77,10 @@
 #define BS_FLAG		CHAR_FLAG('\b')
 #define LF_FLAG		CHAR_FLAG('\n')
 #define CR_FLAG		CHAR_FLAG('\r')
+#define HT_FLAG		CHAR_FLAG('\t')
 
 #define FULL_SET	0xFFFFFFFF
-#define CNTL_SET	(BEL_FLAG | BS_FLAG | LF_FLAG | CR_FLAG)
+#define CNTL_SET	(BEL_FLAG | BS_FLAG | HT_FLAG | LF_FLAG | CR_FLAG)
 
 #define UNIT_V_8B	(UNIT_V_UF + 0)			/* 8B */
 #define UNIT_V_UC	(UNIT_V_UF + 1)			/* UC only */

@@ -26,6 +26,8 @@
    The author gratefully acknowledges the help of Stephen Shirron, Antonio
    Carlini, and Kevin Peterson in providing specifications for the Qbus VAX's
 
+   30-Aug-04	RMS	Added octa, h_floating instructin definitions
+   24-Aug-04	RMS	Added compatibility mode definitions
    18-Apr-04	RMS	Added octa, fp, string definitions
    19-May-03	RMS	Revised for new conditional compilation scheme
    14-Jul-02	RMS	Added infinite loop message
@@ -60,7 +62,8 @@
 #define ABORT_MCHK	(-SCB_MCHK)			/* machine check */
 #define ABORT_RESIN	(-SCB_RESIN)			/* rsvd instruction */
 #define ABORT_RESAD	(-SCB_RESAD)			/* rsvd addr mode */
-#define ABORT_RESOP	(-SCB_RESOP)			/* rsvd operand */
+#define ABORT_RESOP	(-SCB_RESOP)			/* rsvd operand */	
+#define ABORT_CMODE	(-SCB_CMODE)			/* comp mode fault */
 #define ABORT_ARITH	(-SCB_ARITH)			/* arithmetic trap */
 #define ABORT_ACV	(-SCB_ACV)			/* access violation */
 #define ABORT_TNV	(-SCB_TNV)			/* transl not vaid */
@@ -71,6 +74,7 @@
 #define FLT_OVFL_FAULT	p1 = FLT_OVRFLO, ABORT (ABORT_ARITH)
 #define FLT_DZRO_FAULT	p1 = FLT_DIVZRO, ABORT (ABORT_ARITH)
 #define FLT_UNFL_FAULT	p1 = FLT_UNDFLO, ABORT (ABORT_ARITH)
+#define CMODE_FAULT(cd)	p1 = (cd), ABORT (ABORT_CMODE)
 #define MACH_CHECK(cd)	p1 = (cd), ABORT (ABORT_MCHK)
 
 /* Address space */
@@ -150,6 +154,8 @@
 
 /* PSL, PSW, and condition codes */
 
+#define PSL_V_CM	31				/* compatibility mode */
+#define PSL_CM		(1 << PSL_V_CM)
 #define PSL_V_TP	30				/* trace pending */
 #define PSL_TP		(1 << PSL_V_TP)
 #define PSL_V_FPD	27				/* first part done */
@@ -239,6 +245,10 @@
 #define TIR_TRAP	(TIR_M_TRAP << TIR_V_TRAP)
 #define TRAP_INTOV	(1 << TIR_V_TRAP)		/* integer overflow */
 #define TRAP_DIVZRO	(2 << TIR_V_TRAP)		/* divide by zero */
+#define TRAP_FLTOVF	(3 << TIR_V_TRAP)		/* flt overflow */
+#define TRAP_FLTDIV	(4 << TIR_V_TRAP)		/* flt/dec div by zero */
+#define TRAP_FLTUND	(5 << TIR_V_TRAP)		/* flt underflow */
+#define TRAP_DECOVF	(6 << TIR_V_TRAP)		/* decimal overflow */
 #define TRAP_SUBSCR	(7 << TIR_V_TRAP)		/* subscript range */
 #define SET_TRAP(x)	trpirq = (trpirq & PSL_M_IPL) | (x)
 #define CLR_TRAPS	trpirq = trpirq & ~TIR_TRAP
@@ -251,6 +261,50 @@
 #define FLT_OVRFLO	0x8				/* flt overflow */
 #define FLT_DIVZRO	0x9				/* flt div by zero */
 #define FLT_UNDFLO	0xA				/* flt underflow */
+
+/* Compatability mode fault parameters */
+
+#define CMODE_RSVI	0x0				/* reserved instr */
+#define CMODE_BPT	0x1				/* BPT */
+#define CMODE_IOT	0x2				/* IOT */
+#define CMODE_EMT	0x3				/* EMT */
+#define CMODE_TRAP	0x4				/* TRAP */
+#define CMODE_ILLI	0x5				/* illegal instr */
+#define CMODE_ODD	0x6				/* odd address */
+
+/* EDITPC suboperators */
+
+#define EO_END		0x00				/* end */
+#define EO_END_FLOAT	0x01				/* end float */
+#define EO_CLR_SIGNIF	0x02				/* clear signif */
+#define EO_SET_SIGNIF	0x03				/* set signif */
+#define EO_STORE_SIGN	0x04				/* store sign */
+#define EO_LOAD_FILL	0x40				/* load fill */
+#define EO_LOAD_SIGN	0x41				/* load sign */
+#define EO_LOAD_PLUS	0x42				/* load sign if + */
+#define EO_LOAD_MINUS	0x43				/* load sign if - */
+#define EO_INSERT	0x44				/* insert */
+#define EO_BLANK_ZERO	0x45				/* blank zero */
+#define EO_REPL_SIGN	0x46				/* replace sign */
+#define EO_ADJUST_LNT	0x47				/* adjust length */
+#define EO_FILL		0x80				/* fill */
+#define EO_MOVE		0x90				/* move */
+#define EO_FLOAT	0xA0				/* float */
+#define EO_RPT_MASK	0x0F				/* rpt mask */
+#define EO_RPT_FLAG	0x80				/* rpt flag */
+
+/* EDITPC R2 packup parameters */
+
+#define ED_V_SIGN	8				/* sign */
+#define ED_M_SIGN	0xFF
+#define ED_SIGN		(ED_M_SIGN << ED_V_SIGN)
+#define ED_V_FILL	0				/* fill */
+#define ED_M_FILL	0xFF
+#define ED_FILL		(ED_M_FILL << ED_V_FILL)
+#define ED_GETSIGN(x)	(((x) >> ED_V_SIGN) & ED_M_SIGN)
+#define ED_GETFILL(x)	(((x) >> ED_V_FILL) & ED_M_FILL)
+#define ED_PUTSIGN(r,x)	(((r) & ~ED_SIGN) | (((x) << ED_V_SIGN) & ED_SIGN))
+#define ED_PUTFILL(r,x)	(((r) & ~ED_FILL) | (((x) << ED_V_FILL) & ED_FILL))
 
 /* SCB offsets */
 
@@ -265,6 +319,7 @@
 #define SCB_TNV		0x24				/* TNV */
 #define SCB_TP		0x28				/* trace pending */
 #define SCB_BPT		0x2C				/* BPT instr */
+#define SCB_CMODE	0x30				/* comp mode fault */
 #define SCB_ARITH	0x34				/* arith fault */
 #define SCB_CHMK	0x40 				/* CHMK */
 #define SCB_CHME	0x44 				/* CHME */
@@ -458,10 +513,16 @@ enum opcodes {
  BBS, BBC, BBSS, BBCS, BBSC, BBCC, BBSSI, BBCCI,
  BLBS, BLBC, FFS, FFC, CMPV, CMPZV, EXTV, EXTZV,
  INSV, ACBL, AOBLSS, AOBLEQ, SOBGEQ, SOBGTR, CVTLB, CVTLW,
- ASHP, CVTLP, CALLG, CALLS, XFC, CVTGF = 0x133,
- ADDG2= 0x140, ADDG3, SUBG2, SUBG3, MULG2, MULG3, DIVG2, DIVG3,
+ ASHP, CVTLP, CALLG, CALLS, XFC, CVTDH = 0x132, CVTGF = 0x133,
+ ADDG2 = 0x140, ADDG3, SUBG2, SUBG3, MULG2, MULG3, DIVG2, DIVG3,
  CVTGB, CVTGW, CVTGL, CVTRGL, CVTBG, CVTWG, CVTLG, ACBG,
- MOVG, CMPG, MNEGG, TSTG, EMODG, POLYG, CVTFG = 0x199 };
+ MOVG, CMPG, MNEGG, TSTG, EMODG, POLYG, CVTGH,
+ ADDH2 = 0x160, ADDH3, SUBH2, SUBH3, MULH2, MULH3, DIVH2, DIVH3,
+ CVTHB, CVTHW, CVTHL, CVTRHL, CVTBH, CVTWH, CVTLH, ACBH,
+ MOVH, CMPH, MNEGH, TSTH, EMODH, POLYH, CVTHG,
+ CLRO = 0x176, MOVO, MOVAO, PUSHAO,
+ CVTFH = 0x198, CVTFG = 0x199,
+ CVTHF = 0x1F6, CVTHD = 0x1F7 };
 
 /* Repeated operations */
 
@@ -482,6 +543,7 @@ enum opcodes {
 #define BRANCHB(d)	PCQ_ENTRY, PC = PC + SXTB (d), FLUSH_ISTR
 #define BRANCHW(d)	PCQ_ENTRY, PC = PC + SXTW (d), FLUSH_ISTR
 #define JUMP(d)		PCQ_ENTRY, PC = (d), FLUSH_ISTR
+#define CMODE_JUMP(d)	PCQ_ENTRY, PC = (d)
 #define SETPC(d)	PC = (d), FLUSH_ISTR
 #define FLUSH_ISTR	ibcnt = 0, ppc = -1
 

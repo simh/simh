@@ -1446,7 +1446,7 @@ default:						/* others */
 return val;
 }
 
-/* Emulated instructions
+/* Emulated CIS instructions
 
 	opnd[0:5] =	six operands to be pushed (if PSL<fpd> = 0)
 	cc	=	condition codes
@@ -1458,7 +1458,7 @@ return val;
    In both cases, the exception occurs in the current mode.
 */
 
-int32 op_emulate (int32 *opnd, int32 cc, int32 opc, int32 acc)
+int32 op_cis (int32 *opnd, int32 cc, int32 opc, int32 acc)
 {
 int32 vec;
 
@@ -1468,7 +1468,9 @@ if (PSL & PSL_FPD) {					/* FPD set? */
 	Write (SP - 4, PSL | cc, L_LONG, WA);		/* push PSL */
 	SP = SP - 8;					/* decr stk ptr */
 	vec = ReadLP ((SCBB + SCB_EMULFPD) & PAMASK);  }
-else {	Read (SP - 1, L_BYTE, WA);			/* wchk stack */
+else {	if (opc == CVTPL)				/* CVTPL? handle .wl */
+	    opnd[2] = (opnd[2] >= 0)? ~opnd[2]: opnd[3];
+	Read (SP - 1, L_BYTE, WA);			/* wchk stack */
 	Write (SP - 48, opc, L_LONG, WA);		/* push opcode */
 	Write (SP - 44, fault_PC, L_LONG, WA);		/* push old PC */
 	Write (SP - 40, opnd[0], L_LONG, WA);		/* push operands */

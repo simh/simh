@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	HP2100 Simulator Usage
-Date:	30-Jun-2004
+Date:	20-Aug-2004
 
 			COPYRIGHT NOTICE
 
@@ -256,11 +256,11 @@ when started.
 In addition, most devices can be enabled or disabled.  To enable a
 device, use the SET <dev> ENABLED command:
 
-	sim> SET DP ENABLED
+	sim> SET DPC ENABLED
 
 To disable a device, use the SET <dev> DISABLED command:
 
-	sim> SET DP DISABLED
+	sim> SET DPC DISABLED
 
 For devices with more than one device number, disabling or enabling any
 device in the set disables all the devices.
@@ -643,8 +643,8 @@ The 12557A/13210A disk controller can be configured as either a
 12557A, supporting 2.5MB drives, or a 13210A, supporting 5MB drives,
 with the commands:
 
-	SET DP 12557A		2.5MB drives
-	SET DP 13210A		5.0MB drives
+	SET DPC 12557A		2.5MB drives
+	SET DPC 13210A		5.0MB drives
 
 Drive types cannot be intermixed; the controller is configured for
 one type or the other.  The 13210A (for 7900/7901 disks) is selected
@@ -688,7 +688,7 @@ The device controller implements these registers:
 	name		size	comments
 
 	OBUF		16	output buffer
-	BUSY		3	busy (unit #, + 1, of active unit)
+	BUSY		4	busy (unit #, + 1, of active unit)
 	CNT		5	check record count
 	CMD		1	controller enable
 	CTL		1	interrupt enable
@@ -696,6 +696,7 @@ The device controller implements these registers:
 	FBF		1	controller ready buffer
 	SRQ		1	controller DMA service request
 	EOC		1	end of cylinder pending
+	POLL		1	attention polling enabled
 	RARC[0:3]	8	record address register cylinder, drives 0-3
 	RARH[0:3]	2	record address register head, drives 0-3
 	RARS[0:3]	4	record address register sector, drives 0-3
@@ -715,7 +716,7 @@ Error handling is as follows:
 
 	OS I/O error	report error and stop
 
-2.6 12565A Disk Controller (DQC, DRC) with 2883 Drives
+2.6 12565A Disk Controller (DQC, DQD) with 2883 Drives
 
 The 12565A disk controller has two separate devices, a data channel and
 a device controller.  The data channel includes a 128-word (one sector)
@@ -899,19 +900,26 @@ Magnetic tape options include the ability to make the unit write enabled
 or write locked, and the ability to select the 13181A (800 bpi) controller
 or the 13183A (1600 bpi) controller.
 
-	SET MTn LOCKED		set unit n write locked
-	SET MTn WRITEENABLED	set unit n write enabled
-	SET MT 13181A		set controller to 13181A
-	SET MT 13183A		set controller to 13183A
+	SET MSCn LOCKED		set unit n write locked
+	SET MSCn WRITEENABLED	set unit n write enabled
+	SET MSC 13181A		set controller to 13181A
+	SET MSC 13183A		set controller to 13183A
+	SET MSC REALTIME	set controller to actual timing
+	SET MSC FASTIME		set controller to optimized timing (default)
+	SET MSCn REEL=length	set unit tape reel size
+				0 = unlimited (default)
+				600 = 600 feet
+				1200 = 1200 feet
+				2400 = 2400 feet
 
 The 13181A/13183A mag tape drive has two separate devices, a data channel
 and a device controller.  The data channel includes a maximum record
 sized buffer for reads and writes.  The device controller includes the
 tape units.
 
-The 13181A/13183A supports the BOOT command.  BOOT MS loads the IBL for
+The 13181A/13183A supports the BOOT command.  BOOT MSC loads the IBL for
 7970B/E magnetic tape drives into memory and starts it running.  BOOT -S
-MS causes the loader to space forward the number of files specified in
+MSC causes the loader to space forward the number of files specified in
 the A register before starting to load data.  The switch register (S) is
 set automatically to the value expected by the IBL loader:
 
@@ -947,7 +955,11 @@ The device controller implements these registers:
 	FBF		1	controller ready buffer
 	SRQ		1	controller DMA service request
 	POS[0:3]	32	magtape position
+	BTIME		24	BOT start delay time
 	CTIME		24	command delay time
+	GTIME		24	gap traversal time
+	ITIME		24	IRG traversal time
+	RTIME		24	rewind initiation time
 	XTIME		24	interword transfer delay time
 	STOP_IOE	1	stop on I/O error
 

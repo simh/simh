@@ -25,6 +25,7 @@
 
    cpu		GRI-909 CPU
 
+   18-Jul-04	RMS	Fixed missing ao_update calls in AX, AY write
    17-Jul-04	RMS	Revised MSR, EAO based on additional documentation
    14-Mar-03	RMS	Fixed bug in SC queue tracking
 
@@ -381,7 +382,7 @@ extern UNIT rtc_unit;
 
 SC = SC & AMASK;					/* load local PC */
 reason = 0;
-AO = ao_update ();					/* update AO */
+ao_update ();						/* update AO */
 sim_rtc_init (rtc_unit.wait);				/* init calibration */
 
 /* Main instruction fetch/decode loop */
@@ -517,7 +518,7 @@ else {	SC = (SC + 1) & AMASK;				/* incr SC */
 
 /* Simulation halted */
 
-AO = ao_update ();					/* update AO */
+ao_update ();						/* update AO */
 scq_r->qptr = scq_p;					/* update sc q ptr */
 return reason;
 }
@@ -700,12 +701,12 @@ return SWR;
 
 uint32 msr_rd (uint32 src)
 {
-return MSR;
+return MSR & MSR_RW;
 }
 
 t_stat msr_wr (uint32 src, uint32 dat)
 {
-MSR = dat;						/* new MSR */
+MSR = dat & MSR_RW;					/* new MSR */
 ao_update ();						/* update AOV */
 return SCPE_OK;
 }
@@ -714,28 +715,27 @@ return SCPE_OK;
 
 uint32 ao_update (void)
 {
-int32 t;
-int32 af = MSR_GET_FOA (MSR);
+uint32 af = MSR_GET_FOA (MSR);
 
 switch (af) {
 case AO_ADD:
-	t = (AX + AY) & DMASK;				/* add */
+	AO = (AX + AY) & DMASK;				/* add */
 	break;
 case AO_AND:
-	t = AX & AY;					/* and */
+	AO = AX & AY;					/* and */
 	break;
 case AO_XOR:						/* xor */
-	t = AX ^ AY;
+	AO = AX ^ AY;
 	break;
 case AO_IOR:
-	t = AX | AY;					/* or */
+	AO = AX | AY;					/* or */
 	break;  }
 if ((AX + AY) & CBIT) MSR = MSR | MSR_AOV;		/* always calc AOV */
 else MSR = MSR & ~MSR_AOV;
 if (SIGN & ((AX ^ (AX + AY)) & (~AX ^ AY)))		/* always calc SOV */
 	MSR = MSR | MSR_SOV;
 else MSR = MSR & ~MSR_SOV;
-return t;
+return AO;
 }
 
 uint32 ax_rd (uint32 src)
@@ -746,6 +746,7 @@ return AX;
 t_stat ax_wr (uint32 dst, uint32 dat)
 {
 AX = dat;
+ao_update ();
 return SCPE_OK;
 }
 
@@ -757,18 +758,19 @@ return AY;
 t_stat ay_wr (uint32 dst, uint32 dat)
 {
 AY = dat;
+ao_update ();
 return SCPE_OK;
 }
 
 uint32 ao_rd (uint32 src)
 {
-AO = ao_update ();
-return AO;
+return ao_update ();
 }
 
 t_stat ao_fo (uint32 op)
 {
 uint32 t = OP_GET_FOA (op);				/* get func */
+
 MSR = MSR_PUT_FOA (MSR, t);				/* store in MSR */
 ao_update ();						/* update AOV */
 return SCPE_OK;

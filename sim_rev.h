@@ -29,11 +29,50 @@
 
 #define	SIM_MAJOR	3
 #define SIM_MINOR	2
-#define SIM_PATCH	2
+#define SIM_PATCH	3
 
 /* V3.2 revision history 
 
 patch	date		module(s) and fix(es)
+
+  3	03-Sep-04	scp.c:
+			- added ECHO command (from Dave Bryan)
+			- qualified RESTORE detach with SIM_SW_REST
+
+			sim_console: added OS/2 EMX fixes (from Holger Veit)
+
+			sim_sock.h: added missing definition for OS/2 (from Holger Veit)
+
+			hp2100_cpu.c: changed error stops to report PC not PC + 1
+			(from Dave Bryan)
+
+			hp2100_dp.c: functional and timing fixes (from Dave Bryan)
+			- controller sets ATN for all commands except read status
+			- controller resumes polling for ATN interrupts after read status
+			- check status on unattached drive set busy and not ready
+			- check status tests wrong unit for write protect status
+			- drive on line sets ATN, will set FLG if polling
+
+			hp2100_dr.c: fixed CLC to stop operation (from Dave Bryan)
+
+			hp2100_ms.c: functional and timing fixes (from Dave Bryan)
+			- fixed erroneous execution of rejected command
+			- fixed erroneous execution of select-only command
+			- fixed erroneous execution of clear command
+			- fixed odd byte handling for read
+			- fixed spurious odd byte status on 13183A EOF
+			- modified handling of end of medium
+			- added detailed timing, with fast and realistic modes
+			- added reel sizes to simulate end of tape
+			- added debug printouts
+
+			hp2100_mt.c: modified handling of end of medium (from Dave Bryan)
+
+			hp2100_stddev.c: added tab to control char set (from Dave Bryan)
+
+			pdp11_rq.c: VAX controllers luns start at 0 (from Andreas Cejna)
+
+			vax_cpu.c: fixed bug in EMODD/G, second word of quad dst not probed
 
   2	17-Jul-04	scp.c: fixed problem ATTACHing to read only files
 			(found by John Dundas)
@@ -52,7 +91,7 @@ patch	date		module(s) and fix(es)
 
   1	10-Jul-04	scp.c: added SET/SHOW CONSOLE subhierarchy
 
-			hp2100_cpu.c: fixed bugs and added features from Dave Bryan
+			hp2100_cpu.c: fixes and added features (from Dave Bryan)
 			- SBT increments B after store
 			- DMS console map must check dms_enb
 			- SFS x,C and SFC x,C work

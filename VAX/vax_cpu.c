@@ -25,6 +25,7 @@
 
    cpu		CVAX central processor
 
+   02-Sep-04	RMS	Fixed bug in EMODD/G, second word of quad dst not probed
    28-Jun-04	RMS	Fixed bug in DIVBx, DIVWx (reported by Peter Trimmel)
    18-Apr-04	RMS	Added octaword macros
    25-Jan-04	RMS	Removed local debug logging support
@@ -333,7 +334,7 @@ extern int32 op_emodg (int32 *opnd, int32 *rh, int32 *intgr, int32 *flg);
 extern void op_polyf (int32 *opnd, int32 acc);
 extern void op_polyd (int32 *opnd, int32 acc);
 extern void op_polyg (int32 *opnd, int32 acc);
-extern int32 op_emulate (int32 *opnd, int32 cc, int32 opc, int32 acc);
+extern int32 op_cis (int32 *opnd, int32 cc, int32 opc, int32 acc);
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 Read (uint32 va, int32 lnt, int32 acc);
 extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
@@ -497,11 +498,14 @@ else if (abortval < 0) {				/* mm or rsrv or int */
 	temp = fault_PC - PC;				/* delta PC if needed */
 	SETPC (fault_PC);				/* restore PC */
 	switch (-abortval) {				/* case on abort code */
-	case SCB_RESIN: case SCB_RESAD: case SCB_RESOP:	/* reserved fault */
+	case SCB_RESIN:					/* rsrv inst fault */
+	case SCB_RESAD:					/* rsrv addr fault */
+	case SCB_RESOP:					/* rsrv opnd fault */
 	    if (in_ie) ABORT (STOP_INIE);		/* in exc? panic */
 	    cc = intexc (-abortval, cc, 0, IE_EXC);	/* take exception */
 	    GET_CUR;					/* PSL<cur> changed */
 	    break;
+	case SCB_CMODE:					/* comp mode fault */
 	case SCB_ARITH:					/* arithmetic fault */
 	    if (in_ie) ABORT (STOP_INIE);		/* in exc? panic */
 	    cc = intexc (-abortval, cc, 0, IE_EXC);	/* take exception */
@@ -511,7 +515,8 @@ else if (abortval < 0) {				/* mm or rsrv or int */
 	    SP = SP - 4;
 	    in_ie = 0;
 	    break;
-	case SCB_ACV: case SCB_TNV:			/* mem management */
+	case SCB_ACV:					/* ACV fault */
+	case SCB_TNV:					/* TNV fault */
 	    if (in_ie) {				/* in exception? */
 		if (PSL & PSL_IS) ABORT (STOP_INIE);	/* on is? panic */
 		cc = intexc (SCB_KSNV, cc, 0, IE_SVE);	/* ksnv */
@@ -1049,7 +1054,7 @@ if (hst_lnt) {
 	hst[hst_p].PSL = PSL | cc;
 	hst[hst_p].opc = opc;
 	hst[hst_p].brdest = brdisp + PC;
-	for (i = 0; i < (numspec & DR_NSPMASK); i++)
+	for (i = 0; i < OPND_SIZE; i++)
 	    hst[hst_p].opnd[i] = opnd[i];
 	hst_p = hst_p + 1;
 	if (hst_p >= hst_lnt) hst_p = 0;
@@ -2197,7 +2202,9 @@ case EMODF:
 
 case EMODD:
 	r = op_emodd (opnd, &rh, &temp, &flg);
-	if (op7 < 0) Read (op8, L_LONG, WA);
+	if (op7 < 0) {
+	    Read (op8, L_BYTE, WA);
+	    Read ((op8 + 7) & LMASK, L_BYTE, WA);  }
 	if (op5 >= 0) R[op5] = temp;
 	else Write (op6, temp, L_LONG, WA);
 	WRITE_Q (r, rh);
@@ -2207,7 +2214,9 @@ case EMODD:
 
 case EMODG:
 	r = op_emodg (opnd, &rh, &temp, &flg);
-	if (op7 < 0) Read (op8, L_LONG, WA);
+	if (op7 < 0) {
+	    Read (op8, L_BYTE, WA);
+	    Read ((op8 + 7) & LMASK, L_BYTE, WA);  }
 	if (op5 >= 0) R[op5] = temp;
 	else Write (op6, temp, L_LONG, WA);
 	WRITE_Q (r, rh);
@@ -2263,16 +2272,15 @@ case MFPR:
 	CC_IIZP_L (r);
 	break;
 
-/* Emulated instructions */
+/* Emulated CIS instructions */
 
 case CVTPL:
-	opnd[2] = (opnd[2] >= 0)? ~opnd[2]: opnd[3];
 case MOVP: case CMPP3: case CMPP4: case CVTLP:
 case CVTPS: case CVTSP: case CVTTP: case CVTPT:
 case ADDP4: case ADDP6: case SUBP4: case SUBP6:
 case MULP: case DIVP: case ASHP: case CRC:
 case MOVTC: case MOVTUC: case MATCHC: case EDITPC:
-	cc = op_emulate (opnd, cc, opc, acc);
+	cc = op_cis (opnd, cc, opc, acc);
 	break;
 default:
 	RSVD_INST_FAULT;

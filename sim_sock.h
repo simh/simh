@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Aug-04	HV	Added missing definition for OS/2 (from Holger Veit)
    22-Oct-03    MP      Changed WIN32 winsock include to use winsock2.h to
                         avoid a conflict if sim_sock.h and sim_ether.h get
                         included by the same module.
@@ -63,6 +64,11 @@
 #include <ioctl.h>					/* for ioctl */
 #if !defined (timerclear)
 #define timerclear(tvp)         (tvp)->tv_sec = (tvp)->tv_usec = 0
+#endif
+#endif
+#if defined(__EMX__)					/* OS/2 unique */
+#if !defined (timerclear)
+#define timerclear(tvp)		(tvp)->tv_sec = (tvp)->tv_usec = 0
 #endif
 #endif
 

@@ -13,7 +13,7 @@ endif
 CC = gcc -std=c99 -O2 -g -lm $(OS_CCDEFS) -I .
 ifeq ($(USE_NETWORK),)
 else
-NETWORK_OPT = -DUSE_NETWORK -lpcap  -isystem /usr/local/include -L /usr/local/lib
+NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a
 endif
 else
 #Win32 Environments

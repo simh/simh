@@ -673,7 +673,6 @@ r = attach_unit (uptr, cptr);				/* attach unit */
 if (r != SCPE_OK) return r;				/* error? */
 uptr->CYL = 0;
 if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
 if ((p = ftell (uptr->fileref)) == 0) return SCPE_OK;
 for (i = 0; drv_tab[i].surf != 0; i++) {
 	if (p <= drv_tab[i].size) {

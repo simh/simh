@@ -1,180 +1,1078 @@
-HP2100 Diagnostics
+                      SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
+                      ====================================
+                             Last update: 2004-08-28
 
-CPU						status		writeup		sources
 
-24315	Memory reference group			passed		in 21MX CE	no
-	- LOAD diagnostic
-	- RUN 100
-	- HLT 77, PC = 3353
+The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
+Diagnostic programs were obtained from magnetic tape, HP 24396-13601 Rev. 2040.
+The most exhaustive test sets were selected for each diagnostic, except as
+noted below.
 
-24316	Alter/skip group			passed		in 21MX CE	no
-	- LOAD diagnostic
-	- RUN 100
-	- HLT 77, PC = 633 
+The test system configuration is the default SIMH configuration with these
+exceptions:
 
-24317	Shift/rotate group			passed		in 21MX CE	no
-	- LOAD diagnostic
-	- RUN 100
-	- HLT 77, PC = 1726
+ * All I/O devices are enabled.
+ * The CPU is configured as a 21MX with 128KW of memory.
 
-24296	Diagnostic configurator			passed		in 21MX CE	no
-	- LOAD configurator
-	- SET CPU 21MX
-	- ATTACH PTR binary image of
-	  diagnostic to be configured
-	- D S XXYY, where XX = device number
-	  of PTR, YY = device number of TTY
-	- RUN 2
-	- HLT 77, PC = 77237 (for 32K mem)
+Detailed diagnostic configuration, operation, and results are given after the
+summary table.  These may be used to duplicate the diagnostic results.
 
-24319	Extended arithmetic group		passed		in 21MX CE	no
-	- load diagnostic via configurator
-	- D S 0
-	- RUN 100
-	- prints diagnostic name
-	- prints END OF PASS 1 and halts
+The results of the diagnostic runs are summarized below:
 
-13206	IOP for 2100				passed		13206 manual	no
-	- load diagnostic via configurator
-	- D S 0
-	- SET CPU 2100
-	- SET CPU IOP
-	- RUN 2000
-	- prints diagnostic name
-	- prints section names, PASS 000001, and halts
-	- note: will not pass interruptibility tests
 
-13207	IOP for 21MX				passed		13207 manual	no
-	- load diagnostic via configurator
-	- D S 13
-	- SET CPU 21MX
-	- SET CPU IOP
-	- RUN 100
-	- HLT 74, PC = 2425
-	- D S 0
-	- CON
-	- prints diagnostic name
-	- prints section names, PASS 000001, and halts
+                                                 Date  SIMH
+ DSN    Diagnostic Name                          Code  Vers.  Result
+------  ---------------------------------------  ----  -----  -------------
+000200  Diagnostic Configurator Pretest          1627  3.2-3  Passed
 
-24320	Floating point				passed		in 21MX CE	no
-	- load diagnostic via configurator
-	- D S 0
-	- RUN 100
-	- prints diagnostic name
-	- prints PASS 000001 and halts
+101100  Memory Reference Instruction Group       1624  3.2-3  Passed
+101001  Alter-Skip Instruction Group             1431  3.2-3  Passed
+101002  Shift-Rotate Instruction Group           1431  3.2-3  Passed
+102200  Core Memory (2100/16/15/14)              1624    -    No simulation
+102104  Semiconductor Memory (21MX)              1644  3.2-3  Passed *
 
-12943-1	Extended instruction group, part 1	passed		12943 manual	no
-	- load diagnostic via configurator
-	- D S 0
-	- RUN 100
-	- prints diagnostic name
-	- prints PASS 000001 and halts
+101004  EAU Instruction Group                    1431  3.2-3  Passed
+101207  Floating Point Instruction Group         1551  3.2-3  Passed
+102305  Memory Protect/Parity Error              1705  3.2-3  Passed *
 
-12943-2	Extended instruction group, part 2	passed		12943 manual	no
-	- load diagnostic via configurator
-	- D S XX, where XX = device number
-	  of TTY
-	- RUN 100
-	- HLT 74, PC = 2406
-	- D S 0
-	- CONTINUE
-	- prints diagnostic name
-	- prints PASS 000001 and halts
+101206  Power Fail/Auto Restart                  1635    -    No simulation
+141103  I/O Instruction Group                    1810  3.2-3  Passed
+143300  General Purpose Register                 1813  3.2-3  Passed
+101220  Direct Memory Access                     1705  3.2-3  Passed
 
-24322	Dual channel port controller		passed		in 21MX CE	no
-	- load diagnostic via configurator
-	- SET LPS ENA
-	- SET LPS DIAG
-	- D S XX, where XX = device number
-	  of LPS
-	- RUN 100
-	- HALT 74, PC = 1541
-	- D S 0
-	- CONTINUE
-	- prints diagnostic name
-	- prints H324 PRESS PRESET AND RUN
-	- HLT 24, PC = 2312
-	- RESET ALL
-	- CONTINUE
-	- prints PASS 000001 and halts
+101011  Extended Instruction Group (Index)       1432  3.2-3  Passed
+101112  Extended Instruction Group (Word, Byte)  1728  3.2-3  Passed
+101110  2100 Fast FORTRAN Package                1632    -    No simulation
+101213  M/E-Series Fast FORTRAN Package 1        1822    -    No simulation
+101115  M/E-Series Fast FORTRAN Package 2        1632    -    No simulation
+101121  F-Series FPP/SIS/FFP                     1926    -    No simulation
 
-12892	Memory protect-parity error		passed		in 21MX CE	no
-	- load diagnostic via configurator
-	- disable all I/O devices except
-	  PTR, TTY, clock
-	- D S 1400XX, where XX = device number
-	  of PTR
-	- RUN 100
-	- HLT 74, PC = 2444
-	- D S 1000 (test select mode)
-	- CONTINUE
-	- prints diagnostic name
-	- HLT 75, PC = 2026
-	- D S 0
-	- D A 31777 (tests 10-11 can't be run)
-	- Rings bell and prints
-	  H314 PRESS HALT,PRESET AND RUN WITHIN 30 SECONDS
-	- WRU (CTRL+E) to interrupt simulation
-	- RESET ALL
-	- CONTINUE
-	- prints PASS 000001 and halts
+102103  Memory Expansion Unit                    1830  3.2-3  Passed
+102103  Semiconductor Memory Microcoded 21MX     1644    -    No simulation
+103301  Time Base Generator                      1830  3.2-3  Passed
+103115  12936 Privileged Interrupt               1643    -    No simulation
+103105  12908/12978 WCS 256 Word                 1502    -    No simulation
+103023  13197 WCS 1024 Word                      1640    -    No simulation
+103207  12889 Hardwired Serial Interface         1717    -    No simulation
+103122  59310 Interface Bus Interface            1728    -    No simulation
 
-12929	Memory expansion unit (DMS)		passed		in 21MX CE	no
-	- load diagnostic via configurator
-	- SET CPU 64K
-	- SET LPS ENA
-	- SET LPS DIAG
-	- D S XX, where XX = device number
-	  of LPS
-	- RUN 100
-	- HLT 74, PC = 2435
-	- D S 0
-	- CONTINUE
-	- Prints H115 PRESS HALT-PRESET-RUN IN LESS THAN 10 SECONDS
-	- WRU (CTRL+E) to interrupt simulation
-	- RESET ALL
-	- CONTINUE
-	- Prints H117 PRESET TEST COMPLETE
-	- Prints PASS 000001 and halts
-	- Test 23 won't run at >256K mem
-	  (real 21MX limited to 304K)
+103003  12587 Asynchronous Data Set Interface    1553    -    No simulation
+103110  12920 Asynchronous Multiplexer (Data)    1805    -    Not tested
+103011  12920 Asynchronous Multiplexer (Cntl)    1444    -    Not tested
+103012  12621 Synchronous Data Set (Receive)     1532    -    No simulation
+103013  12621 Synchronous Data Set (Send)        1532    -    No simulation
+103116  12967 Synchronous Interface              1438    -    No simulation
+103017  12966 Asynchronous Data Set              1519    -    No simulation
+103121  12968 Asynchronous Comm. Interface       1602    -    No simulation
+103024  12821 ICD Disc Interface                 1928    -    No simulation
 
-Peripherals
+105102  2607 Line Printer                        1446    -    Not tested
+145103  2613/17/18 Line Printer                  1633    -    No simulation
+105106  2631 Printer                             1913    -    No simulation
+105107  2635 Printing Terminal                   1913    -    No simulation
+105105  2608 Line Printer                        2026    -    No simulation
+105104  9866 Line Printer                        1541    -    No simulation
 
-12531	TTY test				passed		in 21MX CE	no
-	- set TTY TTIME to 100
-	- run with test select = 173
-	- remaining tests can't be run
-12539	time base generator			passed		in 21MX CE	no
-	- runs with CLK in diag mode
-12597	reader/punch				passed		in 21MX CE	no
-	- set PTP TIME to 100
-	- run with test select a=4017
-	- remaining tests can't be run
-12984	2767 line printer			passed		in 21MX CE	no
-	- set LPS PTIME, CTIME to 100
-	- run with test select a = 15
-	- remaining tests can't be run
-12960	7900/7901 disk				passed		in 21MX CE	no
-12965	2883/2884 disk				passed		12965 manual	no
-12559	3030 magtape				not run		no documentation
-13181	7970B magtape				partial		in 21MX CE	no
-	- initial s = 102030
-	- set MSC CTIME to 180000
-	- do not change MSC XTIME
-	- attach scratch tapes to units 0,1
-	- set s = 1201 (suppress CRC/LRC)
-	- run with test select a = 37757, b = 7767
-	- tests 4, 14, 15 are timing dependent
-	- test 19 uses non-supported read rev
-13183	7970E magtape				not run		in 21MX CE	no
-12920	multiplexor				not run		in 21MX CE	no
+111104  12732 Flexible Disc Subsystem            1708    -    No simulation
+151302  7900/01 Cartridge Disc                   1805  3.2-3  Partial **
+151403  7905/06/20/25 Disc                       1805    -    No simulation
+104117  92900 Terminal Subsystem                 1814    -    No simulation
 
-Bug List (post-release)
+112200  9-Track Magnetic Tape (7970, 13181/3)    2040  3.2-3  Partial **
+112102  7/9-Track Magnetic Tape (13184 Interf.)  1629    -    No simulation
+010000  Diagnostic Cross Link                    1627    -    No simulation
+011000  7900/05/20 Disc Initialization           1627    -    No simulation
+146200  Paper Tape Reader/Punch                  1725    -    Not tested
+107000  Digital Plotter Interface (CALCOMP)      1540    -    No simulation
+113100  2892 Card Reader                         1537    -    No simulation
+113001  2894 Card Reader Punch                   1728    -    No simulation
+104003  Teleprinter                              1509    -    Not tested
+104007  2615 Vodeo Terminal                      1347    -    No simulation
+103006  12909B PROM Writer                       1420    -    No simulation
 
-1. SFS x,C and SFC x,C work for all devices, not just device 1.
-2. DMS protection does not disable conventional memory protection.
-3. Memory protect violation clears automatically when the interrupt is acknowledged.
-4. SFS/SFC 5 is not gated by protection enabled.
+ * A subset of the tests available in the diagnostic were selected, and these
+   passed without error.  See the detailed descriptions below for more
+   information regarding the test selections.
 
-3. SBT increments B after the byte store.
+** Multiple runs of the diagnostic in different modes are required for complete
+   test coverage, and some of these runs failed, while others succeeded.  See
+   the detailed descriptions below for more information regarding the test
+   results.
+
+
+
+
+DETAILED DIAGNOSTIC EXECUTION AND RESULTS
+=========================================
+
+Each execution note below presumes that the target diagnostic has been loaded.
+For all runs other than the diagnostic configurator pretest, the configurator
+was used in automatic mode to load the target diagnostic via its Diagnostic
+Serial Number (DSN), as follows:
+
+  sim> attach -r MSC0 24396-13601-REV-2040.tape
+  sim> deposit S 000000
+  sim> boot MSC0
+
+  HALT instruction 102077
+
+  sim> deposit A [DSN]
+  sim> deposit B 000000
+  sim> deposit S 113011
+  sim> run 100
+
+For the pretest, only the first three commands above were used to load the
+diagnostic configurator.
+
+
+
+--------------------------------------------
+DSN 000200 - Diagnostic Configurator Pretest
+--------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> deposit S 000011
+                sim> run 2
+
+TEST REPORT:    HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+-----------------------------------------------
+DSN 101100 - Memory Reference Instruction Group
+-----------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> deposit S 000000
+                sim> run 100
+
+TEST REPORT:    HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+------------------------------------
+DSN 101001 - Alter-Skip Instructions
+------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> deposit S 000000
+                sim> run 100
+
+TEST REPORT:    HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+--------------------------------------
+DSN 101002 - Shift-Rotate Instructions
+--------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> deposit S 000000
+                sim> run 100
+
+TEST REPORT:    HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------------
+DSN 102104 - Semiconductor Memory
+---------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> deposit S 001000
+                sim> run 100
+
+                HALT instruction 102075
+
+                sim> deposit A 054437
+                sim> run
+
+TEST REPORT:    HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     Tests 5, 6, 7, 11, 12, and 14 are not executed.  These tests are
+                designed specifically for the 4K RAM chips present on the
+                hardware and aren't relevant to simulation (the other tests
+                verify that the simulator accesses memory properly with and
+                without DMS).
+
+
+
+----------------------------------
+DSN 101004 - EAU Instruction Group
+----------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> deposit S 000000
+                sim> run 100
+
+TEST REPORT:    2100 SERIES EAU DIAGNOSTIC
+                END OF PASS        1
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------------------------
+DSN 101207 - Floating Point Instruction Group
+---------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> deposit S 000000
+                sim> run 100
+
+TEST REPORT:    2100-21MX FLOATING POINT DIAGNOSTIC
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+----------------------------------------
+DSN 102305 - Memory Protect/Parity Error
+----------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> deposit S 140014
+                sim> run 100
+
+                HALT instruction 102074
+
+                sim> deposit S 001000
+                sim> run
+
+                HALT instruction 102075
+
+                sim> deposit A 031777
+                sim> deposit S 000000
+                sim> run
+
+TEST REPORT:    MEMORY PROTECT-PARITY ERROR DIAGNOSTIC
+
+                H314 PRESS HALT,PRESET AND RUN WITHIN 30 SECONDS
+
+                [CTRL+E]
+                Simulation stopped
+
+                sim> reset
+                sim> go
+
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     Test 10 tests parity error detection, and test 11 tests memory
+                protect card alternate jumper settings.  Neither of these
+                features are simulated.
+
+
+
+----------------------------------
+DSN 141103 - I/O Instruction Group
+----------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> set lps diag
+                sim> deposit S 000014
+                sim> run 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> run
+
+TEST REPORT:    I-O INSTRUCTION GROUP & CHANNEL OR
+                EXTENDER DIAGNOSTIC DSN 141103
+                H033 SET S-REG TO 125252, PRESS RUN
+
+                HALT instruction 102033
+
+                sim> deposit S 125252
+                sim> go
+
+                H033 SET S-REG TO 052525, PRESS RUN
+
+                HALT instruction 102033
+
+                sim> deposit S 052525
+                sim> go
+
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                HALT instruction 102024
+
+                sim> reset
+                sim> go
+
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+-------------------------------------
+DSN 143300 - General Purpose Register
+-------------------------------------
+
+TESTED DEVICE:  LPS (hp2100_lps.c)
+
+CONFIGURATION:  sim> set lps diag
+                sim> deposit S 000014
+                sim> run 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> run
+
+TEST REPORT:    GENERAL PURPOSE REGISTER DIAGNOSTIC,  DSN 143300
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                HALT instruction 102024
+
+                sim> reset
+                sim> go
+
+                H025 BASIC I-O COMPLETED
+
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------------
+DSN 101220 - Direct Memory Access
+---------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> set lps diag
+                sim> deposit S 000014
+                sim> run 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> run
+
+TEST REPORT:    DMA-DCPC DIAGNOSTIC
+
+                H324 PRESS PRESET AND RUN
+
+                HALT instruction 107024
+
+                sim> reset
+                sim> go
+
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+-----------------------------------------------
+DSN 101011 - Extended Instruction Group (Index)
+-----------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> deposit S 0
+                sim> run 100
+
+TEST REPORT:    EIG (INDEX) DIAGNOSTIC
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------------------------------------
+DSN 101011 - Extended Instruction Group (Word, Byte, Bit)
+---------------------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> deposit S 000014
+                sim> run 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> run
+
+TEST REPORT:    EIG (WORD,BYTE,BIT) DIAGNOSTIC  DSN 101112
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+----------------------------------
+DSN 102103 - Memory Expansion Unit
+----------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> set lps diag
+                sim> deposit S 000014
+                sim> run 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> run
+
+TEST REPORT:    MEMORY EXPANSION MODULE DIAGNOSTIC, DSN = 102103
+                H115 PRESS HALT-PRESET-RUN IN LESS THAN 10 SECONDS
+
+                [CTRL+E]
+                Simulation stopped
+
+                sim> reset
+                sim> go
+
+                H117 PRESET TEST COMPLETE
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+--------------------------------
+DSN 103301 - Time Base Generator
+--------------------------------
+
+TESTED DEVICE:  CLK (hp2100_stddev.c)
+
+CONFIGURATION:  sim> set clk diag
+                sim> deposit S 100013
+                sim> run 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> run
+
+TEST REPORT:    TBG DIAGNOSTIC, DSN = 103301
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                HALT instruction 102024
+
+                sim> reset
+                sim> go
+
+                H025 BI-O COMP
+                H030 TEST 01 IN PROGRESS
+                H030 TEST 02 IN PROGRESS
+                H030 TEST 03 IN PROGRESS
+                H030 TEST 04 IN PROGRESS
+                H030 TEST 05 IN PROGRESS
+                H030 TEST 06 IN PROGRESS
+                H030 TEST 07 IN PROGRESS
+                H030 TEST 10 IN PROGRESS
+                H030 TEST 11 IN PROGRESS
+                H030 TEST 12 IN PROGRESS
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+--------------------------------------------------
+DSN 103110 - 12920 Asynchronous Multiplexer (Data)
+--------------------------------------------------
+
+TESTED DEVICE:  MUX, MUXL (hp2100_mux.c)
+
+CONFIGURATION:
+
+TEST REPORT:
+
+TEST RESULT:    Not tested.
+
+
+
+--------------------------------------------------
+DSN 103011 - 12920 Asynchronous Multiplexer (Cntl)
+--------------------------------------------------
+
+TESTED DEVICE:  MUXM (hp2100_mux.c)
+
+CONFIGURATION:
+
+TEST REPORT:
+
+TEST RESULT:    Not tested.
+
+
+
+------------------------------
+DSN 105102 - 2607 Line Printer
+------------------------------
+
+TESTED DEVICE:  LPT (hp2100_lpt.c)
+
+CONFIGURATION:
+
+TEST REPORT:
+
+TEST RESULT:    Not tested.
+
+
+
+----------------------------------------------------------
+DSN 151302 - 7900/01 Cartridge Disc Memory (multiple unit)
+----------------------------------------------------------
+
+TESTED DEVICE:  DP (hp2100_dp.c)
+
+CONFIGURATION:  sim> attach DPC0 scratch.U0.7900.disc
+                sim> attach DPC1 scratch.U1.7900.disc
+                sim> attach DPC2 scratch.U2.7900.disc
+                sim> attach DPC3 scratch.U3.7900.disc
+                sim> deposit S 000022
+                sim> run 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000004
+                sim> run
+
+                H0 7900/7901 CARTRIDGE DISC MEMORY DIAGNOSTIC
+                H24 CYLINDER TABLE
+                000,001,002,004,008,016,032,064,128,202
+                H25 WISH TO CHANGE?
+                NO
+
+                H27 PATTERN TABLE
+                000000  177777  125252  052525  007417
+                170360  162745  163346  155555  022222
+                H25 WISH TO CHANGE?
+                NO
+
+                H62 TYPE A FOR HEADS 0,1;B FOR 2,3;C FOR ALTERNATELY 0,1 THEN 2,3
+                C
+
+                H23  00020 ERRORS/PASS ALLOWED
+                H25 WISH TO CHANGE?
+                NO
+
+                H37 UNIT TABLE/ 01 DRIVE(S); 0
+                H25 WISH TO CHANGE?
+                YES
+
+                H34 ENTER UNIT NUMBERS(0-3)SEPARATED BY COMMAS
+                0,1,2,3
+
+                H37 UNIT TABLE/ 04 DRIVE(S); 0 1 2 3
+                H25 WISH TO CHANGE?
+
+                [CTRL+E]
+                Simulation stopped
+
+                sim> deposit S 000000
+                sim> go
+
+                NO
+
+TEST REPORT:    H65 LONG  PASS  0001,HEADS 0/1,UNIT 00, 0000 ERRORS
+                H65 LONG  PASS  0002,HEADS 0/1,UNIT 01, 0000 ERRORS
+                H65 LONG  PASS  0003,HEADS 0/1,UNIT 02, 0000 ERRORS
+                H65 LONG  PASS  0004,HEADS 0/1,UNIT 03, 0000 ERRORS,MULTI-DRIVE
+                H65 LONG  PASS  0005,HEADS 2/3,UNIT 00, 0000 ERRORS
+                H65 LONG  PASS  0006,HEADS 2/3,UNIT 01, 0000 ERRORS
+                H65 LONG  PASS  0007,HEADS 2/3,UNIT 02, 0000 ERRORS
+                H65 LONG  PASS  0008,HEADS 2/3,UNIT 03, 0000 ERRORS,MULTI-DRIVE
+
+                [CTRL+E]
+                Simulation stopped
+
+TEST RESULT:    Passed.
+
+
+
+-------------------------------------------------------------
+DSN 151302 - 7900/01 Cartridge Disc Memory (user interaction)
+-------------------------------------------------------------
+
+TESTED DEVICE:  DP (hp2100_dp.c)
+
+CONFIGURATION:  sim> attach DPC0 scratch.U0.7900.disc
+                sim> deposit S 000022
+                sim> run 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000160
+                sim> run
+
+TEST REPORT:    H0 7900/7901 CARTRIDGE DISC MEMORY DIAGNOSTIC
+                H66 SET OVERRIDE SWITCH,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> go
+
+                H46 READ IN STEP  04
+                E64 STATUS IS 000000 SHOULD BE  000010
+                H51 CYL 0000 HEAD 00 SECTOR 00 WORD COUNT 0128 UNIT 00
+
+                HALT instruction 102001
+
+                sim> go
+
+                H22 CYCLIC CHECK IN STEP  04
+                E64 STATUS IS 000000 SHOULD BE  000010
+                H51 CYL 0000 HEAD 00 SECTOR 00 WORD COUNT 0001 UNIT 00
+
+                HALT instruction 102001
+
+                sim> go
+
+                H67 CLEAR OVERRIDE SWITCH,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> go
+
+                H46 READ IN STEP  07
+                E64 STATUS IS 000000 SHOULD BE  000031
+                H51 CYL 0001 HEAD 00 SECTOR 00 WORD COUNT 0128 UNIT 00
+
+                HALT instruction 102001
+
+                sim> go
+
+                H45 WRITE  IN STEP  08
+                E64 STATUS IS 000000 SHOULD BE  000011
+                H51 CYL 0000 HEAD 00 SECTOR 00 WORD COUNT 0128 UNIT 00
+
+                HALT instruction 102001
+
+                sim> go
+
+                H36 INITIALIZE DATA  IN STEP  09
+                E64 STATUS IS 000000 SHOULD BE  000011
+                H51 CYL 0000 HEAD 00 SECTOR 00 WORD COUNT 6144 UNIT 00
+
+                HALT instruction 102001
+
+                sim> go
+
+                H66 SET OVERRIDE SWITCH,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> go
+
+                H67 CLEAR OVERRIDE SWITCH,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> go
+
+                H70 UNLOAD UNIT  0,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> detach DPC0
+                sim> go
+
+                H40 PROTECT U/D THEN READY UNIT  0
+
+                [CTRL+E]
+                Simulation stopped
+
+                sim> set DPC0 LOCKED
+                sim> attach DPC0 scratch.U0.7900.disc
+                sim> go
+
+                H41 CLEAR U/D PROTECT,LOAD,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> set DPC0 WRITEENABLED
+                sim> go
+
+                H71 PRESS PRESET(S) THEN PRESS RUN
+
+                HALT instruction 102002
+
+                sim> reset
+                sim> go
+
+                H65 SHORT PASS  0001,HEADS 0/1,UNIT 00, 0005 ERRORS
+
+                [CTRL+E]
+                Simulation stopped
+
+TEST RESULT:    Passed with expected errors.
+
+TEST NOTES:     Steps 4, 7, 8, and 9 test the defective and protected cylinder
+                bits and the FORMAT switch.  Neither of these features are
+                simulated.
+
+
+
+-------------------------------
+DSN 151403 - 7905/06/20/25 Disc
+-------------------------------
+
+TESTED DEVICE:  DS (hp2100_ds.c)
+
+CONFIGURATION:
+
+TEST REPORT:
+
+TEST RESULT:    Not tested.
+
+
+
+-------------------------------------------------
+DSN 112200 - 9-Track Magnetic Tape (7970B, 13181)
+-------------------------------------------------
+
+DEVICE:         MS (hp2100_ms.c)
+
+CONFIGURATION:  sim> detach MSC0
+
+                sim> set MSC 13181A
+                sim> set MSC REALTIME
+
+                sim> attach MSC0 scratch.U0.7970.tape
+                sim> attach MSC1 scratch.U1.7970.tape
+                sim> attach MSC2 scratch.U2.7970.tape
+                sim> attach MSC3 scratch.U3.7970.tape
+
+                sim> deposit S 102030
+                sim> run 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000217
+                sim> run
+
+TEST REPORT:    7970-13181 DIAG.
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                HALT instruction 102024
+
+                sim> reset
+                sim> go
+
+                H025 BI-O COMP
+                H025 FOR DATA CH
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                HALT instruction 102024
+
+                sim> reset
+                sim> go
+
+                H025 BI-O COMP
+                H025 FOR CMND CH
+                H154 UNIT 000000
+                H034 UNIT ON-LINE
+                H155 STATUS IS      0 000 000 001 000 000
+                H154 UNIT 000001
+                H034 UNIT ON-LINE
+                H155 STATUS IS      0 000 000 001 000 000
+                H154 UNIT 000002
+                H034 UNIT ON-LINE
+                H155 STATUS IS      0 000 000 001 000 000
+                H154 UNIT 000003
+                H034 UNIT ON-LINE
+                H155 STATUS IS      0 000 000 001 000 000
+
+                H154 UNIT 000000
+                H102 RECORD 000117
+                H054 COMMAND 000061
+                H155 STATUS IS      0 000 000 000 000 000
+                H155 AND SHOULD BE  0 000 000 000 000 000
+
+                TEST  23
+                E135 LRCC ERROR
+
+                HALT instruction 106035
+
+                sim> go
+
+                H154 UNIT 000000
+                H102 RECORD 000117
+                H054 COMMAND 000061
+                H155 STATUS IS      0 000 000 000 000 000
+                H155 AND SHOULD BE  0 000 000 000 000 000
+                E141 CRCC ERROR
+
+                HALT instruction 106041
+
+                sim> go
+
+                H126 EXCHANGE REELS
+
+                HALT instruction 106026
+
+                sim> attach MSC0 scratch.U3.7970.tape
+                sim> attach MSC1 scratch.U2.7970.tape
+                sim> attach MSC2 scratch.U1.7970.tape
+                sim> attach MSC3 scratch.U0.7970.tape
+                sim> go
+
+                H127 SET SW 13 TO LOOP
+
+                HALT instruction 106027
+
+                sim> go
+
+                H130 REMOVE WRITE RING
+
+                HALT instruction 106030
+
+                sim> set MSC0 LOCKED
+                sim> go
+
+                H131 REPLACE WRITE RING
+
+                HALT instruction 106031
+
+                sim> set MSC0 WRITEENABLED
+                sim> go
+
+                H137 PUT TAPE UNIT ON-LINE
+
+                HALT instruction 106037
+
+                sim> attach MSC0 scratch.U0.7970.tape
+                sim> go
+
+                H137 PUT TAPE UNIT ON-LINE
+
+                HALT instruction 106037
+
+                sim> attach MSC1 scratch.U1.7970.tape
+                sim> go
+
+                H137 PUT TAPE UNIT ON-LINE
+
+                HALT instruction 106037
+
+                sim> attach MSC2 scratch.U2.7970.tape
+                sim> go
+
+                H137 PUT TAPE UNIT ON-LINE
+
+                HALT instruction 106037
+
+                sim> attach MSC3 scratch.U3.7970.tape
+                sim> go
+
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed with expected errors.
+
+TEST NOTES:     Test 23 verifies the LRCC and CRCC values obtained from the
+                interface.  Neither of these features are simulated.  (Setting
+                bit 7 of the S register during configuration eliminates most
+                LRCC/CRCC checks but does not inhibit test 23.)
+
+                If test 34 is selected manually, E065 WRITE ERROR will occur.
+                This is due to the implementation of the tape simulation
+                library.  Test 34 writes data in a single record until a data
+                error or EOT occurs (conceivably 20+ megabytes for the largest
+                reel size at 800 bpi).  Because the tape simulation library
+                writes complete records, the 7970 simulator must use a data
+                buffer to accumulate the entire record before calling
+                "sim_tape_wrrecf" to write the record.  The simulator uses a
+                data buffer of 32768 words.  When the buffer is full,
+                parity-error status will be returned to the program.
+
+
+
+-------------------------------------------------
+DSN 112200 - 9-Track Magnetic Tape (7970E, 13183)
+-------------------------------------------------
+
+DEVICE:         MS (hp2100_ms.c)
+
+CONFIGURATION:  sim> detach MSC0
+
+                sim> set MSC 13183A
+                sim> set MSC REALTIME
+
+                sim> attach MSC0 scratch.U0.7970.tape
+                sim> attach MSC1 scratch.U1.7970.tape
+                sim> attach MSC2 scratch.U2.7970.tape
+                sim> attach MSC3 scratch.U3.7970.tape
+
+                sim> deposit S 104030
+                sim> run 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000017
+                sim> run
+
+TEST REPORT:    7970-13183 DIAG.
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                HALT instruction 102024
+
+                sim> reset
+                sim> go
+
+                H025 BI-O COMP
+                H025 FOR DATA CH
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                HALT instruction 102024
+
+                sim> reset
+                sim> go
+
+                H025 BI-O COMP
+                H025 FOR CMND CH
+                H154 UNIT 000000
+                H034 UNIT ON-LINE
+                H155 STATUS IS      1 000 000 001 000 000
+                H154 UNIT 000001
+                H034 UNIT ON-LINE
+                H155 STATUS IS      1 010 000 001 000 000
+                H154 UNIT 000002
+                H034 UNIT ON-LINE
+                H155 STATUS IS      1 100 000 001 000 000
+                H154 UNIT 000003
+                H034 UNIT ON-LINE
+                H155 STATUS IS      1 110 000 001 000 000
+
+                H126 EXCHANGE REELS
+
+                HALT instruction 106026
+
+                sim> attach MSC0 scratch.U3.7970.tape
+                sim> attach MSC1 scratch.U2.7970.tape
+                sim> attach MSC2 scratch.U1.7970.tape
+                sim> attach MSC3 scratch.U0.7970.tape
+                sim> go
+
+                H127 SET SW 13 TO LOOP
+
+                HALT instruction 106027
+
+                sim> go
+
+                H130 REMOVE WRITE RING
+
+                HALT instruction 106030
+
+                sim> set MSC0 LOCKED
+                sim> go
+
+                H131 REPLACE WRITE RING
+
+                HALT instruction 106031
+
+                sim> set MSC0 WRITEENABLED
+                sim> go
+
+                H137 PUT TAPE UNIT ON-LINE
+
+                HALT instruction 106037
+
+                sim> attach MSC0 scratch.U0.7970.tape
+                sim> go
+
+                H137 PUT TAPE UNIT ON-LINE
+
+                HALT instruction 106037
+
+                sim> attach MSC1 scratch.U1.7970.tape
+                sim> go
+
+                H137 PUT TAPE UNIT ON-LINE
+
+                HALT instruction 106037
+
+                sim> attach MSC2 scratch.U2.7970.tape
+                sim> go
+
+                H137 PUT TAPE UNIT ON-LINE
+
+                HALT instruction 106037
+
+                sim> attach MSC3 scratch.U3.7970.tape
+                sim> go
+
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+------------------------------------
+DSN 146200 - Paper Tape Reader/Punch
+------------------------------------
+
+TESTED DEVICE:  PTR (hp2100_stddev.c)
+
+CONFIGURATION:
+
+TEST REPORT:
+
+TEST RESULT:    Not tested.
+
+
+
+------------------------
+DSN 104003 - Teleprinter
+------------------------
+
+TESTED DEVICE:  TTY (hp2100_stddev.c)
+
+CONFIGURATION:
+
+TEST REPORT:
+
+TEST RESULT:    Not tested.

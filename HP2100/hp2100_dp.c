@@ -26,6 +26,14 @@
    dp		12557A 2871 disk subsystem
 		13210A 7900 disk subsystem
 
+   20-Aug-04	JDB	Fixes from Dave Bryan
+			- Check status on unattached drive set busy and not ready
+			- Check status tests wrong unit for write protect status
+			- Drive on line sets ATN, will set FLG if polling
+   15-Aug-04	RMS	Controller resumes polling for ATN interrupts after
+			read status (found by Dave Bryan)
+   22-Jul-04	RMS	Controller sets ATN for all commands except
+			read status (found by Dave Bryan)
    21-Apr-04	RMS	Fixed typo in boot loader (found by Dave Bryan)
    26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
 			Fixed SR setting in IBL
@@ -42,6 +50,29 @@
    07-Sep-01	RMS	Moved function prototypes
    29-Nov-00	RMS	Made variable names unique
    21-Nov-00	RMS	Fixed flag, buffer power up state
+
+   The simulator uses a number of state variables:
+
+   dpc_busy		set to drive number + 1 when the controller is busy
+			of the unit in use
+   dpd_xfer		set to 1 if the data channel is executing a data transfer
+   dpd_wval		set to 1 by OTx if either !dpc_busy or dpd_xfer
+   dpc_poll		set to 1 if attention polling is enabled
+
+   dpc_busy and dpd_xfer are set together at the start of a read, write, refine,
+   or init.  When data transfers are complete (CLC DC), dpd_xfer is cleared, but the
+   operation is not necessarily over.  When the operation is complete, dpc_busy
+   is cleared and the command channel flag is set.
+
+   dpc_busy && !dpd_xfer && STC DC (controller is busy, data channel transfer has
+   been terminated by CLC DC, but a word has been placed in the data channel buffer)
+   indicates data overrun.
+
+   dpd_wval is used in write operations to fill out the sector buffer with 0's
+   if only a partial sector has been transferred.
+
+   dpc_poll indicates whether seek completion polling can occur.  It is cleared
+   by reset and CLC CC and set by issuance of a seek or completion of check status.
 */
 
 #include "hp2100_defs.h"
@@ -78,9 +109,9 @@
 #define  FNC_AR		013				/* address */
 #define	 FNC_SEEK1	020				/* fake - seek1 */
 #define  FNC_SEEK2	021				/* fake - seek2 */
-#define  FNC_SEEK3	022				/* fake - seek3 */
 #define  FNC_CHK1	023				/* fake - check1 */
 #define  FNC_AR1	024				/* fake - arec1 */
+#define  FNC_STA1	025				/* fake - sta1 */
 #define CW_V_DRV	0				/* drive */
 #define CW_M_DRV	03
 #define CW_GETDRV(x)	(((x) >> CW_V_DRV) & CW_M_DRV)
@@ -134,6 +165,7 @@ extern UNIT cpu_unit;
 
 int32 dp_ctype = 1;					/* ctrl type */
 int32 dpc_busy = 0;					/* cch unit */
+int32 dpc_poll = 0;					/* cch poll enable */
 int32 dpc_cnt = 0;					/* check count */
 int32 dpc_eoc = 0;					/* end of cyl */
 int32 dpc_stime = 100;					/* seek time */
@@ -228,7 +260,7 @@ UNIT dpc_unit[] = {
 
 REG dpc_reg[] = {
 	{ ORDATA (OBUF, dpc_obuf, 16) },
-	{ ORDATA (BUSY, dpc_busy, 3), REG_RO },
+	{ ORDATA (BUSY, dpc_busy, 4), REG_RO },
 	{ ORDATA (CNT, dpc_cnt, 5) },
 	{ FLDATA (CMD, dpc_dib.cmd, 0) },
 	{ FLDATA (CTL, dpc_dib.ctl, 0) },
@@ -236,6 +268,7 @@ REG dpc_reg[] = {
 	{ FLDATA (FBF, dpc_dib.fbf, 0) },
 	{ FLDATA (SRQ, dpc_dib.srq, 0) },
 	{ FLDATA (EOC, dpc_eoc, 0) },
+	{ FLDATA (POLL, dpc_poll, 0) },
 	{ BRDATA (RARC, dpc_rarc, 8, 8, DP_NUMDRV) },
 	{ BRDATA (RARH, dpc_rarh, 8, 2, DP_NUMDRV) },
 	{ BRDATA (RARS, dpc_rars, 8, 4, DP_NUMDRV) },
@@ -350,7 +383,8 @@ case ioCTL:						/* control clear/set */
 	    if (dpc_busy) sim_cancel (&dpc_unit[dpc_busy - 1]);
 	    sim_cancel (&dpd_unit);			/* cancel dch */
 	    dpd_xfer = 0;				/* clr dch xfer */
-	    dpc_busy = 0;  }				/* clr cch busy */
+	    dpc_busy = 0;				/* clr cch busy */
+	    dpc_poll = 0;  }				/* clr cch poll */
 	else {						/* STC */
 	    setCTL (devc);				/* set ctl */
 	    if (!CMD (devc)) {				/* is cmd clr? */
@@ -358,9 +392,13 @@ case ioCTL:						/* control clear/set */
 		drv = CW_GETDRV (dpc_obuf);		/* get fnc, drv */
 		fnc = CW_GETFNC (dpc_obuf);		/* from cmd word */
 		switch (fnc) {				/* case on fnc */
+		case FNC_SEEK:				/* seek */
+		    dpc_poll = 1;			/* enable polling */
+		    dp_god (fnc, drv, dpc_dtime);	/* sched dch xfr */
+		    break;
 		case FNC_STA:				/* rd sta */
 		    if (dp_ctype) { clrFSR (devd); }	/* 13210? clr dch flag */
-		case FNC_SEEK: case FNC_CHK:		/* seek, check */
+		case FNC_CHK:				/* check */
 		case FNC_AR:				/* addr rec */
 		    dp_god (fnc, drv, dpc_dtime);	/* sched dch xfr */
 		    break;
@@ -391,15 +429,18 @@ return;
 
 void dp_goc (int32 fnc, int32 drv, int32 time)
 {
-if (sim_is_active (&dpc_unit[drv])) {			/* still seeking? */
+int32 t;
+
+if (t = sim_is_active (&dpc_unit[drv])) {		/* still seeking? */
 	sim_cancel (&dpc_unit[drv]);			/* stop seek */
 	dpc_sta[drv] = dpc_sta[drv] & ~STA_BSY;		/* clear busy */
-	time = time + dpc_stime;  }			/* take longer */
+	time = time + t;  }				/* include seek time */
 dp_ptr = 0;						/* init buf ptr */
 dpc_eoc = 0;						/* clear end cyl */
 dpc_busy = drv + 1;					/* set busy */
 dpd_xfer = 1;						/* xfer in prog */
 dpc_unit[drv].FNC = fnc;				/* save function */
+dpc_sta[drv] = dpc_sta[drv] & ~STA_ATN;			/* clear ATN */
 sim_activate (&dpc_unit[drv], time);			/* activate unit */
 return;
 }
@@ -425,7 +466,7 @@ return;
 
 t_stat dpd_svc (UNIT *uptr)
 {
-int32 drv, devc, devd, st;
+int32 i, drv, devc, devd, st;
 
 drv = uptr->CYL;					/* get drive no */
 devc = dpc_dib.devno;					/* get cch devno */
@@ -478,7 +519,8 @@ case FNC_AR1:						/* arec, need hd/sec */
 	    setFSR (devc);				/* set cch flg */
 	    clrCMD (devc);				/* clr cch cmd */
 	    setFSR (devd);				/* set dch flg */
-	    clrCMD (devd);  }				/* clr dch cmd */
+	    clrCMD (devd);				/* clr dch cmd */
+	    dpc_sta[drv] = dpc_sta[drv] | STA_ATN; }	/* set drv attn */
 	else sim_activate (uptr, dpc_xtime);		/* no, wait more */
 	break;
 
@@ -488,8 +530,8 @@ case FNC_STA:						/* read status */
 		dpd_ibuf = dpc_sta[drv] & ~STA_ERR;	/* clear err */
 		if (dp_ctype) dpd_ibuf =		/* 13210? */
 		    (dpd_ibuf & ~(STA_MBZ13 | STA_PROT)) |
-		    (uptr->flags & UNIT_WPRT? STA_PROT: 0);  }
-	    else dpd_ibuf = STA_NRDY;			/* not ready */
+		    (dpc_unit[drv].flags & UNIT_WPRT? STA_PROT: 0);  }
+	    else dpd_ibuf = STA_NRDY|STA_BSY;		/* not ready */
 	    if (dpd_ibuf & STA_ALLERR)			/* errors? set flg */
 		dpd_ibuf = dpd_ibuf | STA_ERR;
 	    setFSR (devd);				/* set dch flg */
@@ -498,8 +540,16 @@ case FNC_STA:						/* read status */
 	    dpc_sta[drv] = dpc_sta[drv] &		/* clr sta flags */
 		~(STA_ATN | STA_1ST | STA_OVR |
 		STA_RWU | STA_ACU | STA_EOC |
-		STA_AER | STA_FLG | STA_DTE);  }
-	else sim_activate (uptr, dpc_xtime);		/* wait more */
+		STA_AER | STA_FLG | STA_DTE);
+	    uptr->FNC = FNC_STA1;  }			/* advance state */
+	sim_activate (uptr, dpc_xtime);			/* no, wait more */
+	break;
+case FNC_STA1:						/* read sta, poll */
+	dpc_poll = 1;					/* enable polling */
+	for (i = 0; i < DP_NUMDRV; i++) {		/* loop thru drives */
+	    if (dpc_sta[i] & STA_ATN) {			/* any ATN set? */
+		setFSR (devc);				/* set cch flg */
+		break;  }  }
 	break;
 
 case FNC_CHK:						/* check, need cnt */
@@ -547,7 +597,9 @@ if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
 	clrCMD (devc);					/* clr cch cmd */
 	dpc_sta[drv] = 0;				/* clr status */
 	dpc_busy = 0;					/* ctlr is free */
-	dpd_xfer = dpd_wval = 0;
+	dpc_poll = 0;					/* polling disabled */
+	dpd_xfer = 0;
+	dpd_wval = 0;
 	return SCPE_OK;  }
 switch (uptr->FNC) {					/* case function */
 
@@ -556,11 +608,7 @@ case FNC_SEEK2:						/* seek done */
 	if (uptr->CYL >= DP_NUMCY) {			/* invalid cyl? */
 	    dpc_sta[drv] = dpc_sta[drv] | STA_SKE;
 	    uptr->CYL = DP_NUMCY - 1;  }
-case FNC_SEEK3:						/* waiting for flag */
-	if (dpc_busy || FLG (devc)) {			/* ctrl busy? wait */
-	    uptr->FNC = FNC_SEEK3;			/* next state */
-	    sim_activate (uptr, dpc_xtime);  }
-	else {
+	if (dpc_poll) {					/* polling enabled? */
 	    setFSR (devc);				/* set cch flg */
 	    clrCMD (devc);  }				/* clear cmd */
 	return SCPE_OK;
@@ -639,7 +687,7 @@ case FNC_WD:						/* write */
 default:
 	return SCPE_IERR;  }				/* end case fnc */
 
-if (!dp_ctype) dpc_sta[drv] = dpc_sta[drv] | STA_ATN;	/* 12559 sets ATN */
+dpc_sta[drv] = dpc_sta[drv] | STA_ATN;			/* set ATN */
 setFSR (devc);						/* set cch flg */
 clrCMD (devc);						/* clr cch cmd */
 dpc_busy = 0;						/* ctlr is free */
@@ -661,6 +709,7 @@ hp_enbdis_pair (&dpc_dev, &dpd_dev);			/* make pair cons */
 dpd_ibuf = dpd_obuf = 0;				/* clear buffers */
 dpc_busy = dpc_obuf = 0;
 dpc_eoc = 0;
+dpc_poll = 0;
 dpd_xfer = dpd_wval = 0;
 dp_ptr = 0;
 dpc_dib.cmd = dpd_dib.cmd = 0;				/* clear cmd */
@@ -690,7 +739,11 @@ t_stat r;
 drv = uptr - dpc_dev.units;				/* get drive no */
 r = attach_unit (uptr, cptr);				/* attach unit */
 if (r != SCPE_OK) return r;
-dpc_sta[drv] = dpc_sta[drv] | STA_1ST;			/* update status */
+dpc_sta[drv] = dpc_sta[drv] | STA_ATN | STA_1ST;	/* update status */
+if (dpc_poll) {						/* polling enabled? */
+	dpc_dib.fbf = 1;				/* set fbf */
+	dpc_dib.flg = 1;				/* set flg */
+	dpc_dib.srq = 1; }				/* srq follows flg */
 return r;
 }
 

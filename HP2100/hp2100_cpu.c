@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Jul-04	RMS	Fixed bug in breakpoint test (reported by Dave Bryan)
+			Back up PC on instruction errors (from Dave Bryan)
    14-May-04	RMS	Fixed bugs and added features from Dave Bryan
 			- SBT increments B after store
 			- DMS console map must check dms_enb
@@ -801,11 +803,9 @@ if (intrq && ((intrq <= PRO) || !ion_defer)) {		/* interrupt request? */
 else {	iotrap = 0;					/* normal instruction */
 	err_PC = PC;					/* save PC for error */
 	if (sim_brk_summ &&				/* any breakpoints? */
-	    sim_brk_test (PC, ALL_BKPTS) &&		/* at this location? */
-	    (sim_brk_test (PC, SWMASK ('E')) ||		/* unconditional? */
-	     sim_brk_test (PC, dms_enb?			/* or right type for DMS? */
-			(dms_ump? SWMASK ('U'): SWMASK ('S')):
-			SWMASK ('N')))) {
+	    sim_brk_test (PC, SWMASK ('E') |		/* unconditional or */
+		(dms_enb? (dms_ump? SWMASK ('U'): SWMASK ('S')):
+		SWMASK ('N')))) {			/* or right type for DMS? */
 	    reason = STOP_IBKPT;			/* stop simulation */
 	    break;  }
 	if (mp_evrff) mp_viol = PC;			/* if ok, upd mp_viol */
@@ -1823,6 +1823,8 @@ if (reason == STOP_INDINT) {				/* indirect intr? */
 if (iotrap && (reason == STOP_HALT)) MR = intaddr;	/* HLT in trap cell? */
 else MR = (PC - 1) & VAMASK;				/* no, M = P - 1 */
 TR = ReadIO (MR, dms_ump);				/* last word fetched */
+if ((reason == STOP_RSRV) || (reason == STOP_IODV) ||	/* instr error? */
+    (reason == STOP_IND)) PC = err_PC;			/* back up PC */
 saved_AR = AR & DMASK;
 saved_BR = BR & DMASK;
 dms_upd_sr ();						/* update dms_sr */
