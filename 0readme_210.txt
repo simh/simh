@@ -1,4 +1,4 @@
-Notes For V2.10-0
+Notes For V2.10-1
 
 WARNING: V2.10 has reorganized and renamed some of the definition
 files for the PDP-10, PDP-11, and VAX.  Be sure to delete all
@@ -171,6 +171,10 @@ currently available only for Windows, Linux, NetBSD, and OpenBSD.
   in the memory protect and DMS functions.  The moving head disks
   (DP, DQ) were revised to simulate the hardware more accurately.
   Missing functions in DQ (address skip, read address) were added.
+- PDP-10 tape wouldn't boot, and then wouldn't read (reported by
+  Michael Thompson and Harris Newman, respectively)
+- PDP-1 typewriter is half duplex, with only one shift state for
+  both input and output (found by Derek Peschel)
 
 2.2 HP 2100 Debugging
 

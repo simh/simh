@@ -32,6 +32,13 @@
 
 patch	date		module(s) and fix(es)
 
+  1	21-Nov-02	pdp1_stddev.c: changed typewriter to half duplex
+			(found by Derek Peschel)
+
+			pdp10_tu.c:
+			-- fixed bug in bootstrap (reported by Michael Thompson)
+			-- fixed bug in read (reported by Harris Newman)
+
   0	15-Nov-02	SCP and libraries
 			scp.c:
 			-- added Telnet console support

@@ -61,7 +61,7 @@ name(s)
 
 CPU		PDP-1 CPU with up to 64KW of memory
 PTR,PTP		integral paper tape reader/punch
-TTY		console typewriter
+TTI,TTO		Flexowriter typewriter input/output
 LPT		Type 62 line printer
 DT		Type 550 Microtape (DECtape)
 
@@ -187,30 +187,32 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.3 Console Typewriter (TTY)
+2.2.3 Terminal Input (TTI)
 
-The Typewriter is a half-duplex electric typewriter (originally a
-Friden Flexowriter, later an IBM Sorobon B).  It has only a single
-buffer and a single carriage state but distinct input and output
-done and interrupt flags.  The typewriter input (TTY unit 0) polls
-the console keyboard for input.  The typewriter output (TTY unit 1)
-writes to the simulator console window.
-
-The typewriter implements these registers:
+The terminal input (TTI) polls the console keyboard for input.  It
+implements these registers:
 
 	name		size	comments
 
-	BUF		6	typewriter buffer
-	UC		1	upper case/lower case state flag
-	RPLS		1	return restart pulse flag
-	KDONE		1	input ready flag
-	KPOS		32	number of characters input
-	KTIME		24	keyboard polling interval
-	TDONE		1	output done flag
-	TPOS		32	number of characters output
-	TTIME		24	time from I/O initiation to interrupt
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	POS		32	number of characters input
+	TIME		24	keyboard polling interval
 
-2.2.4 Type 62 Line Printer (LPT)
+2.2.4 Terminal Output (TTO)
+
+The terminal output (TTO) writes to the simulator console window.
+It implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	RPLS		1	return restart pulse flag
+	POS		32	number of characters output
+	TIME		24	time from I/O initiation to interrupt
+
+2.2.5 Type 62 Line Printer (LPT)
 
 The paper line printer (LPT) writes data to a disk file.  The POS
 register specifies the number of the next data item to be written.

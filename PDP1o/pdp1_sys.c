@@ -23,7 +23,6 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   21-Nov-02	RMS	Changed typewriter to half duplex
    20-Aug-02	RMS	Added DECtape support
    17-Sep-01	RMS	Removed multiconsole support
    13-Jul-01	RMS	Fixed RIM loader format
@@ -40,7 +39,7 @@
 
 extern DEVICE cpu_dev;
 extern DEVICE ptr_dev, ptp_dev;
-extern DEVICE tty_dev;
+extern DEVICE tti_dev, tto_dev;
 extern DEVICE lpt_dev, dt_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
@@ -69,7 +68,8 @@ DEVICE *sim_devices[] = {
 	&cpu_dev,
 	&ptr_dev,
 	&ptp_dev,
-	&tty_dev,
+	&tti_dev,
+	&tto_dev,
 	&lpt_dev,
 	&dt_dev,
 	NULL };

@@ -25,6 +25,7 @@
 
    rp		RH/RP/RM moving head disks
 
+   21-Nov-02	RMS	Fixed bug in bootstrap (reported by Michael Thompson)
    29-Sep-02	RMS	Added variable vector support
 			New data structures
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support support
@@ -1029,8 +1030,8 @@ return SCPE_OK;
 static const d10 boot_rom_dec[] = {
 	0515040000001,			/* boot:hrlzi 1,1	; uba # */
 	0201000140001,			/*	movei 0,140001	; vld,fst,pg 1 */
-	0713001000000+IOBA_UBMAP+1,	/*	wrio 0,763001(1); set ubmap */
-	0435040000000+IOBA_RP,		/*	iori 1,776700	; rh addr */
+	0713001000000+(IOBA_UBMAP+1 & RMASK),	/*	wrio 0,763001(1); set ubmap */
+	0435040000000+(IOBA_RP & RMASK),	/*	iori 1,776700	; rh addr */
 	0202040000000+FE_RHBASE,	/*	movem 1,FE_RHBASE */
 	0201000000040,			/*	movei 0,40	; ctrl reset */
 	0713001000010,			/*	wrio 0,10(1)	; ->RPCS2 */
@@ -1076,8 +1077,8 @@ static const d10 boot_rom_dec[] = {
 static const d10 boot_rom_its[] = {
 	0515040000001,			/* boot:hrlzi 1,1	; uba # */
 	0201000140001,			/*	movei 0,140001	; vld,fst,pg 1 */
-	0715000000000+IOBA_UBMAP+1,	/*	iowrq 0,763001	; set ubmap */
-	0435040000000+IOBA_RP,		/*	iori 1,776700	; rh addr */
+	0715000000000+(IOBA_UBMAP+1 & RMASK),	/*	iowrq 0,763001	; set ubmap */
+	0435040000000+(IOBA_RP & RMASK),	/*	iori 1,776700	; rh addr */
 	0202040000000+FE_RHBASE,	/*	movem 1,FE_RHBASE */
 	0201000000040,			/*	movei 0,40	; ctrl reset */
 	0715001000010,			/*	iowrq 0,10(1)	; ->RPCS2 */

@@ -28,7 +28,6 @@
    tti		keyboard
    tto		teleprinter
 
-   21-Nov-02	RMS	Changed typewriter to half duplex (found by Derek Peschel)
    06-Oct-02	RMS	Revised for V2.10
    30-May-02	RMS	Widened POS to 32b
    29-Nov-01	RMS	Added read only unit support
@@ -41,23 +40,18 @@
 
 #define FIODEC_UC	074
 #define FIODEC_LC	072
-#define UC_V		6				/* upper case */
-#define UC		(1 << UC_V)
-#define BOTH		(1 << (UC_V + 1))		/* both cases */
-#define CW		(1 << (UC_V + 2))		/* char waiting */
+#define UC		0100				/* upper case */
+#define BOTH		0200				/* both cases */
+#define CW		0400				/* char waiting */
 #define TT_WIDTH	077
-#define TTI		0
-#define TTO		1
 
 extern int32 sbs, ioc, iosta, PF, IO, PC;
 extern int32 M[];
 
 int32 ptr_rpls = 0, ptr_stopioe = 0, ptr_state = 0;
 int32 ptp_rpls = 0, ptp_stopioe = 0;
-int32 tti_hold = 0;					/* tti hold buf */
-int32 tto_rpls = 0;					/* tto restart */
-int32 tty_buf = 0;					/* tty buffer */
-int32 tty_uc = 0;					/* tty uc/lc */
+int32 tti_state = 0;
+int32 tto_rpls = 0, tto_state = 0;
 
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
@@ -65,7 +59,8 @@ t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
-t_stat tty_reset (DEVICE *dptr);
+t_stat tti_reset (DEVICE *dptr);
+t_stat tto_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 
 /* Character translation tables */
@@ -160,34 +155,52 @@ DEVICE ptp_dev = {
 	NULL, NULL, NULL,
 	NULL, 0 };
 
-/* TTY data structures
+/* TTI data structures
 
-   tty_dev	TTY device descriptor
-   tty_unit	TTY unit
-   tty_reg	TTY register list
+   tti_dev	TTI device descriptor
+   tti_unit	TTI unit
+   tti_reg	TTI register list
 */
 
-UNIT tty_unit[] = {
-	{ UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT },
-	{ UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT }  };
+UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
 
-REG tty_reg[] = {
-	{ ORDATA (BUF, tty_buf, 6) },
-	{ FLDATA (UC, tty_uc, UC_V) },
-	{ FLDATA (RPLS, tto_rpls, 0) },
-	{ ORDATA (HOLD, tti_hold, 9), REG_HRO },
-	{ FLDATA (KDONE, iosta, IOS_V_TTI) },
-	{ DRDATA (KTIME, tty_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (KPOS, tty_unit[TTI].pos, 32), PV_LEFT },
-	{ FLDATA (TDONE, iosta, IOS_V_TTO) },
-	{ DRDATA (TTIME, tty_unit[TTO].wait, 24), PV_LEFT },
-	{ DRDATA (TPOS, tty_unit[TTO].pos, 32), PV_LEFT },
+REG tti_reg[] = {
+	{ ORDATA (BUF, tti_unit.buf, 6) },
+	{ FLDATA (DONE, iosta, IOS_V_TTI) },
+	{ ORDATA (STATE, tti_state, 10), REG_HRO },
+	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
+	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
-DEVICE tty_dev = {
-	"TTY", tty_unit, tty_reg, NULL,
-	2, 10, 31, 1, 8, 8,
-	NULL, NULL, &tty_reset,
+DEVICE tti_dev = {
+	"TTI", &tti_unit, tti_reg, NULL,
+	1, 10, 31, 1, 8, 8,
+	NULL, NULL, &tti_reset,
+	NULL, NULL, NULL,
+	NULL, 0 };
+
+/* TTO data structures
+
+   tto_dev	TTO device descriptor
+   tto_unit	TTO unit
+   tto_reg	TTO register list
+*/
+
+UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
+
+REG tto_reg[] = {
+	{ ORDATA (BUF, tto_unit.buf, 6) },
+	{ FLDATA (DONE, iosta, IOS_V_TTO) },
+	{ FLDATA (RPLS, tto_rpls, 0) },
+	{ ORDATA (STATE, tto_state, 10), REG_HRO },
+	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
+	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
+	{ NULL }  };
+
+DEVICE tto_dev = {
+	"TTO", &tto_unit, tto_reg, NULL,
+	1, 10, 31, 1, 8, 8,
+	NULL, NULL, &tto_reset,
 	NULL, NULL, NULL,
 	NULL, 0 };
 
@@ -313,38 +326,26 @@ sim_cancel (&ptp_unit);					/* deactivate unit */
 return SCPE_OK;
 }
 
-/* Typewriter IOT routines */
+/* Terminal input: IOT routine */
 
 int32 tti (int32 inst, int32 dev, int32 data)
 {
 iosta = iosta & ~IOS_TTI;				/* clear flag */
 if (inst & (IO_WAIT | IO_CPLS))				/* wait or sync? */
-	return (STOP_RSRV << IOT_V_REASON) | (tty_buf & 077);
-return tty_buf & 077;
+	return (STOP_RSRV << IOT_V_REASON) | (tti_unit.buf & 077);
+return tti_unit.buf & 077;
 }
 
-int32 tto (int32 inst, int32 dev, int32 data)
-{
-iosta = iosta & ~IOS_TTO;				/* clear flag */
-tto_rpls = 0;
-tty_buf = data & TT_WIDTH;				/* load buffer */
-sim_activate (&tty_unit[TTO], tty_unit[TTO].wait);	/* activate unit */
-if (GEN_CPLS (inst)) {					/* comp pulse? */
-	ioc = 0;
-	tto_rpls = 1;  }
-return data;
-}
-
-/* Unit service routines */
+/* Unit service */
 
 t_stat tti_svc (UNIT *uptr)
 {
 int32 in, temp;
 
-sim_activate (uptr, uptr->wait);			/* continue poll */
-if (tti_hold & CW) {					/* char waiting? */
-	tty_buf = tti_hold & TT_WIDTH;			/* return char */
-	tti_hold = 0;  }				/* not waiting */
+sim_activate (&tti_unit, tti_unit.wait);		/* continue poll */
+if (tti_state & CW) {					/* char waiting? */
+	tti_unit.buf = tti_state & TT_WIDTH;		/* return char */
+	tti_state = tti_state & ~CW;  }			/* not waiting */
 else {	if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;
 	temp = temp & 0177;
 	if (temp == 0177) temp = '\b';			/* rubout? bs */
@@ -352,17 +353,43 @@ else {	if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;
 	if (temp == '\r') sim_putchar ('\n');		/* cr? add nl */
 	in = ascii_to_fiodec[temp];			/* translate char */
 	if (in == 0) return SCPE_OK;			/* no xlation? */
-	if ((in & BOTH) || ((in & UC) == (tty_uc & UC)))
-		tty_buf = in & TT_WIDTH;
-	else {	tty_uc = in & UC;			/* shift case */
-		tty_buf = tty_uc? FIODEC_UC: FIODEC_LC;
-		tti_hold = in | CW;  }  }		/* set 2nd waiting */
+	if ((in & BOTH) || ((in & UC) == (tti_state & UC)))
+		tti_unit.buf = in & TT_WIDTH;
+	else {	tti_unit.buf = (in & UC)? FIODEC_UC: FIODEC_LC;
+		tti_state = in | CW;  }  }		/* set 2nd waiting */
 iosta = iosta | IOS_TTI;				/* set flag */
 sbs = sbs | SB_RQ;					/* req seq break */
 PF = PF | 040;						/* set prog flag 1 */
-uptr->pos = uptr->pos + 1;
+tti_unit.pos = tti_unit.pos + 1;
 return SCPE_OK;
 }
+
+/* Reset routine */
+
+t_stat tti_reset (DEVICE *dptr)
+{
+tti_unit.buf = 0;					/* clear buffer */
+tti_state = 0;						/* clear state */
+iosta = iosta & ~IOS_TTI;				/* clear flag */
+sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
+return SCPE_OK;
+}
+
+/* Terminal output: IOT routine */
+
+int32 tto (int32 inst, int32 dev, int32 data)
+{
+iosta = iosta & ~IOS_TTO;				/* clear flag */
+tto_rpls = 0;
+tto_unit.buf = data & TT_WIDTH;				/* load buffer */
+sim_activate (&tto_unit, tto_unit.wait);		/* activate unit */
+if (GEN_CPLS (inst)) {					/* comp pulse? */
+	ioc = 0;
+	tto_rpls = 1;  }
+return data;
+}
+
+/* Unit service */
 
 t_stat tto_svc (UNIT *uptr)
 {
@@ -371,32 +398,30 @@ int32 out;
 iosta = iosta | IOS_TTO;				/* set flag */
 sbs = sbs | SB_RQ;					/* req seq break */
 ioc = ioc | tto_rpls;					/* process restart */
-if (tty_buf == FIODEC_UC) {				/* upper case? */
-	tty_uc = UC;
+if (tto_unit.buf == FIODEC_UC) {			/* upper case? */
+	tto_state = UC;
 	return SCPE_OK;  }
-if (tty_buf == FIODEC_LC) {				/* lower case? */
-	tty_uc = 0;
+if (tto_unit.buf == FIODEC_LC) {			/* lower case? */
+	tto_state = 0;
 	return SCPE_OK;  }
-out = fiodec_to_ascii[tty_buf | tty_uc];		/* translate */
+out = fiodec_to_ascii[tto_unit.buf | tto_state];	/* translate */
 if (out == 0) return SCPE_OK;				/* no translation? */
 sim_putchar (out);
-uptr->pos = uptr->pos + 1;
+tto_unit.pos = tto_unit.pos + 1;
 if (out == '\r') {					/* cr? add lf */
 	sim_putchar ('\n');
-	uptr->pos = uptr->pos + 1;  }
+	tto_unit.pos = tto_unit.pos + 1;  }
 return SCPE_OK;
 }
 
 /* Reset routine */
 
-t_stat tty_reset (DEVICE *dptr)
+t_stat tto_reset (DEVICE *dptr)
 {
-tty_buf = 0;						/* clear buffer */
-tty_uc = 0;						/* clear case */
-tti_hold = 0;						/* clear hold buf */
-tto_rpls = 0;						/* clear reset pulse */
-iosta = iosta & ~(IOS_TTI | IOS_TTO);			/* clear flag */
-sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* activate keyboard */
-sim_cancel (&tty_unit[TTO]);				/* stop printer */
+tto_unit.buf = 0;					/* clear buffer */
+tto_state = 0;						/* clear state */
+tto_rpls = 0;
+iosta = iosta & ~IOS_TTO;				/* clear flag */
+sim_cancel (&tto_unit);					/* deactivate unit */
 return SCPE_OK;
 }
