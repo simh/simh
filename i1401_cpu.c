@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Aug-01	RMS	Removed register in declarations
    07-Dec-00	RMS	Fixed bugs found by Charles Owen
 			-- 4,7 char NOPs are legal
 			-- 1 char B is chained BCE
@@ -364,7 +365,7 @@ char bcd_to_ascii[64] = {
 t_stat sim_instr (void)
 {
 extern int32 sim_interval;
-register int32 IS, D, ilnt, flags;
+int32 IS, D, ilnt, flags;
 int32 op, xa, t, wm, dev, unit;
 int32 a, b, i, bsave, carry;
 int32 qzero, qawm, qbody, qsign, qdollar, qaster, qdecimal;

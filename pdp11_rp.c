@@ -25,6 +25,8 @@
 
    rp		RH/RP/RM moving head disks
 
+   20-Aug-01	RMS	Added bad block option in attach
+   13-Jul-01	RMS	Changed fread call to fxread (found by Peter Schorn)
    14-May-01	RMS	Added check for unattached drive
    25-Apr-01	RMS	Added device enable/disable support
    21-Apr-01	RMS	Implemented UAI function
@@ -848,7 +850,7 @@ case FNC_READ:						/* read */
 	    err = ferror (uptr -> fileref);
 	    }						/* end if */
 	else {						/* read, wchk */
-	    awc = fread (dbuf, sizeof (uint16), wc, uptr -> fileref);
+	    awc = fxread (dbuf, sizeof (uint16), wc, uptr -> fileref);
 	    err = ferror (uptr -> fileref);
 	    for ( ; awc < wc; awc++) dbuf[awc] = 0;
 	    for (twc = 0; twc < wc; twc++) {
@@ -965,7 +967,8 @@ update_rpcs (CS1_SC, drv);
 
 if ((uptr -> flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */
 if (fseek (uptr -> fileref, 0, SEEK_END)) return SCPE_OK;
-if ((p = ftell (uptr -> fileref)) == 0) return SCPE_OK;
+if ((p = ftell (uptr -> fileref)) == 0)
+	return pdp11_bad_block (uptr, drv_tab[GET_DTYPE (uptr -> flags)].sect, RP_NUMWD);
 for (i = 0; drv_tab[i].sect != 0; i++) {
     if (p <= (drv_tab[i].size * (int) sizeof (int16))) {
 	uptr -> flags = (uptr -> flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);

@@ -25,6 +25,8 @@
 
    cpu		KS10 central processor
 
+   10-Aug-01	RMS	Removed register in declarations
+   17-Jul-01	RMS	Moved function prototype
    19-May-01	RMS	Added workaround for TOPS-20 V4.1 boot bug
    29-Apr-01	RMS	Fixed modifier naming conflict
 			Fixed XCTR/XCTRI, UMOVE/UMOVEM, BLTUB/BLTBU for ITS
@@ -509,7 +511,6 @@ extern t_bool lpmr (a10 ea, int32 prv);
 
 extern int32 pi_ub_vec (int32 lvl, int32 *uba);
 extern UNIT tim_unit;
-extern int32 sim_rtc_init (int32 time);
 
 d10 adjsp (d10 val, a10 ea);
 void ibp (a10 ea, int32 pflgs);
@@ -565,9 +566,9 @@ static t_stat jrst_tab[16] = {
 	JRST_U, JRST_U, JRST_U, 0, JRST_E, JRST_U, JRST_E, JRST_E,
 	JRST_UIO, 0, JRST_UIO, 0, JRST_E, JRST_U, 0, 0 };
 
-register d10 inst;
-register a10 PC;
-register int32 pflgs;
+d10 inst;
+a10 PC;
+int32 pflgs;
 int32 pager_flags = 0;					/* pager: trap flags */
 t_bool pager_pi = FALSE;				/* pager: in pi seq */
 int abortval = 0;					/* abort value */
@@ -602,12 +603,12 @@ if ((abortval > 0) || pager_pi) {			/* stop or pi err? */
 /* Page fail - checked against KS10 ucode */
 
 else if (abortval == PAGE_FAIL) {			/* page fail */
-	register d10 mb;
+	d10 mb;
 	if (rlog) xtcln (rlog);				/* clean up extend */
 	rlog = 0;					/* clear log */
 	if (pflgs & TRAP_CYCLE) flags = pager_flags;	/* trap? get flags */
 	if (!T20 || ITS) {				/* TOPS-10 or ITS */
-		register a10 ea;
+		a10 ea;
 		if (ITS) ea = epta + EPT_ITS_PAG + (pi_m2lvl[pi_act] * 3);
 		else ea = upta + UPT_T10_PAG;
 		WriteP (ea, pager_word); 		/* write page fail wd */
@@ -625,10 +626,9 @@ else PC = pager_PC;					/* intr, restore PC */
 /* Main instruction fetch/decode loop: check clock queue, intr, trap, bkpt */
 
 for ( ;; ) {						/* loop until ABORT */
-register int32 op, ac, i, st, xr, xct_cnt;
-register a10 ea;
-register d10 mb, indrct;
-d10 rs[2];
+int32 op, ac, i, st, xr, xct_cnt;
+a10 ea;
+d10 mb, indrct, rs[2];
 
 pager_PC = PC;						/* update pager PC */
 pflgs = 0;						/* not in PXCT or trap */
@@ -1548,8 +1548,8 @@ return;
 
 a10 calc_ea (d10 inst, int32 prv)
 {
-register int32 i, ea, xr;
-register d10 indrct;
+int32 i, ea, xr;
+d10 indrct;
 
 for (indrct = inst, i = 0; i < ind_max; i++) {
 	ea = GET_ADDR (indrct);
@@ -1571,8 +1571,8 @@ return ea;
 
 a10 calc_ioea (d10 inst, int32 pflgs)
 {
-register int32 xr;
-register a10 ea;
+int32 xr;
+a10 ea;
 
 xr = GET_XR (inst);
 ea = GET_ADDR (inst);
@@ -1591,8 +1591,8 @@ return ea;
 
 d10 calc_jrstfea (d10 inst, int32 pflgs)
 {
-register int32 i, xr;
-register d10 mb;
+int32 i, xr;
+d10 mb;
 
 for (i = 0; i < ind_max; i++) {
 	mb = inst;
@@ -1610,8 +1610,8 @@ return (mb & DMASK);
 
 void ibp (a10 ea, int32 pflgs)
 {
-register int32 p, s;
-register d10 bp;
+int32 p, s;
+d10 bp;
 
 bp = ReadM (ea, MM_OPND);				/* get byte ptr */
 p = GET_P (bp);						/* get P and S */
@@ -1629,9 +1629,9 @@ return;
 
 d10 ldb (a10 ea, int32 pflgs)
 {
-register a10 ba;
-register int32 p, s;
-register d10 bp, wd;
+a10 ba;
+int32 p, s;
+d10 bp, wd;
 
 bp = Read (ea, MM_OPND);				/* get byte ptr */
 p = GET_P (bp);						/* get P and S */
@@ -1647,9 +1647,9 @@ return wd;
 
 void dpb (d10 val, a10 ea, int32 pflgs)
 {
-register a10 ba;
-register int32 p, s;
-register d10 bp, wd, mask;
+a10 ba;
+int32 p, s;
+d10 bp, wd, mask;
 
 bp = Read (ea, MM_OPND);				/* get byte ptr */
 p = GET_P (bp);						/* get P and S */

@@ -25,6 +25,7 @@
 
    rx		RX11/RX01 floppy disk
 
+   17-Jul-01	RMS	Fixed warning from VC++ 6.0
    26-Apr-01	RMS	Added device enable/disable support
    13-Apr-01	RMS	Revised for register arrays
    15-Feb-01	RMS	Corrected bootstrap string
@@ -166,13 +167,14 @@ switch ((PA >> 1) & 1) {				/* decode PA<1> */
 case 0:							/* RXCS */
 	rx_csr = rx_csr & RXCS_IMP;			/* clear junk */
 	*data = rx_csr & RXCS_ROUT;
-	return SCPE_OK;
+	break;
 case 1:							/* RXDB */
 	if (rx_state == EMPTY) {			/* empty? */
 		sim_activate (&rx_unit[0], rx_xwait);
 		rx_csr = rx_csr & ~RXCS_TR;  }		/* clear xfer */
 	*data = rx_dbr;					/* return data */
-	return SCPE_OK;  }				/* end switch PA */
+	break;  }					/* end switch PA */
+return SCPE_OK;
 }
 
 t_stat rx_wr (int32 data, int32 PA, int32 access)
@@ -224,7 +226,7 @@ case 0:							/* RXCS */
 	else if ((rx_csr & (RXCS_DONE + CSR_IE)) == RXCS_DONE)
 		int_req = int_req | INT_RX;
 	rx_csr = (rx_csr & ~RXCS_RW) | (data & RXCS_RW);
-	return SCPE_OK;					/* end case RXCS */
+	break;						/* end case RXCS */
 
 /* Accessing RXDB, two cases:
    1. Write idle, write
@@ -243,8 +245,9 @@ case 1:							/* RXDB */
 		sim_activate (&rx_unit[drv],		/* sched done */
 			rx_swait * abs (rx_track - rx_unit[drv].TRACK));
 		rx_csr = rx_csr & ~RXCS_TR;  }		/* clear xfer */
-	return SCPE_OK;					/* end case RXDB */
+	break;						/* end case RXDB */
 	}						/* end switch PA */
+return SCPE_OK;
 }
 
 /* Unit service; the action to be taken depends on the transfer state:

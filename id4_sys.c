@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Jul-01	RMS	Fixed warning from VC++ 6.0
    27-May-01	RMS	Added multiconsole support
    14-Mar-01	RMS	Revised load/dump interface (again)
    30-Oct-00	RMS	Added support for examine to file
@@ -302,7 +303,7 @@ case I_V_R:						/* register */
 	if ((r2 = get_reg (gbuf, 0, regflt)) < 0) return SCPE_ARG;
 	val[0] = val[0] | r2;
 	if (*cptr != 0) return SCPE_ARG;
-	return SCPE_OK;
+	break;
 
 case I_V_FX:						/* float-memory */
 	regflt = TRUE;					/* fall thru */
@@ -319,4 +320,5 @@ case I_V_X:						/* memory */
 	if ((r2 = get_reg (tptr + 1, ')', FALSE)) < 0) return SCPE_ARG;
 	val[0] = val[0] | r2;
 	return -1;  }					/* end case */
+return SCPE_OK;
 }

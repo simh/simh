@@ -25,6 +25,8 @@
 
    cpu		PDP-11 CPU (J-11 microprocessor)
 
+   10-Aug-01	RMS	Removed register from declarations
+   17-Jul-01	RMS	Fixed warning from VC++ 6.0
    01-Jun-01	RMS	Added DZ11 support
    23-Apr-01	RMS	Added RK611 support
    05-Apr-01	RMS	Added TS11/TSV05 support
@@ -564,10 +566,9 @@ t_stat sim_instr (void)
 extern int32 sim_interval;
 extern UNIT *sim_clock_queue;
 extern UNIT clk_unit;
-extern int32 sim_rtc_init (int32 time);
-register int32 IR, srcspec, srcreg, dstspec, dstreg;
-register int32 src, src2, dst;
-register int32 i, t, sign, oldrs, trapnum;
+int32 IR, srcspec, srcreg, dstspec, dstreg;
+int32 src, src2, dst;
+int32 i, t, sign, oldrs, trapnum;
 int32 abortval;
 volatile int32 trapea;
 t_stat reason;
@@ -2104,16 +2105,17 @@ t_stat SR_MMR012_rd (int32 *data, int32 pa, int32 access)
 switch ((pa >> 1) & 3) {				/* decode pa<2:1> */
 case 0:							/* SR */
 	*data = SR;
-	return SCPE_OK;
+	break;
 case 1:							/* MMR0 */
 	*data = MMR0 & MMR0_IMP;
-	return SCPE_OK;
+	break;
 case 2:							/* MMR1 */
 	*data = MMR1;
-	return SCPE_OK;
+	break;
 case 3:							/* MMR2 */
 	*data = MMR2;
-	return SCPE_OK;  }				/* end switch pa */
+	break;  }					/* end switch pa */
+return SCPE_OK;
 }
 
 t_stat SR_MMR012_wr (int32 data, int32 pa, int32 access)

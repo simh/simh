@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Jul-01	RMS	Added additional function prototypes
    27-May-01	RMS	Added multiple console support
    15-May-01	RMS	Increased string buffer size
    25-Feb-01	RMS	Revisions for V2.6
@@ -311,6 +312,7 @@ EXTERN t_stat sim_activate (UNIT *uptr, int32 interval);
 EXTERN t_stat sim_cancel (UNIT *uptr);
 EXTERN int32 sim_is_active (UNIT *uptr);
 EXTERN double sim_gtime (void);
+EXTERN uint32 sim_grtime (void);
 EXTERN t_stat attach_unit (UNIT *uptr, char *cptr);
 EXTERN t_stat detach_unit (UNIT *uptr);
 EXTERN t_stat reset_all (int start_device);
@@ -321,5 +323,8 @@ EXTERN char *get_glyph (char *iptr, char *optr, char mchar);
 EXTERN char *get_glyph_nc (char *iptr, char *optr, char mchar);
 EXTERN t_value get_uint (char *cptr, int radix, t_value max, t_stat *status);
 EXTERN t_value strtotv (char *cptr, char **endptr, int radix);
+EXTERN int32 sim_rtc_init (int32 time);
+EXTERN int32 sim_rtc_calb (int32 ticksper);
 EXTERN t_stat set_console (UNIT *uptr, int32 flag);
 EXTERN t_stat sim_putcons (int32 out, UNIT *uptr);
+

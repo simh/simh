@@ -1,0 +1,1046 @@
+/* h316_cpu.c: Honeywell 316/516 CPU simulator
+
+   Copyright (c) 1993-2001, Robert M. Supnik
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Robert M Supnik shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Robert M Supnik.
+
+   The register state for the Honeywell 316/516 CPU is:
+
+   AR<1:16>		A register
+   BR<1:16>		B register
+   XR<1:16>		X register
+   PC<1:16>		P register (program counter)
+   Y<1:16>		memory address register
+   MB<1:16>		memory data register
+   C			overflow flag
+   EXT			extend mode flag
+   DP			double precision mode flag
+   SC<1:5>		shift count
+   SR[1:4]<0>		sense switches 1-4
+
+   The Honeywell 316/516 has six instruction formats: memory reference,
+   I/O, control, shift, skip, and operate.
+
+   The memory reference format is:
+
+     1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+   |in|xr|     op    |sc|           offset         | memory reference
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
+   <13:10>	mnemonic	action
+
+   0000		(other)		see control, shift, skip, operate instructions
+   0001		JMP		P = MA
+   0010		LDA		A = M[MA]
+   0011		ANA		A = A & M[MA]
+   0100		STA		M[MA] = A
+   0101		ERA		A = A ^ M[MA]
+   0110		ADD		A = A + M[MA]
+   0111		SUB		A = A - M[MA]
+   1000		JST		M[MA] = P, P = MA + 1
+   1001		CAS		skip if A == M[MA], double skip if A < M[MA]
+   1010		IRS		M[MA] = M[MA] + 1, skip if M[MA] == 0
+   1011		IMA		A <=> M[MA]
+   1100		(I/O)		see I/O instructions
+   1101		LDX/STX		X = M[MA] (xr = 1), M[MA] = x (xr = 0)
+   1110		MPY		multiply
+   1111		DIV		divide
+
+   In non-extend mode, memory reference instructions can access an address
+   space of 16K words.  Multiple levels of indirection are supported, and
+   each indirect word supplies its own indirect and index bits.
+
+   <1,2,7>	mode				action
+
+   0,0,0	sector zero direct		MA = IR<8:0>
+   0,0,1	current direct			MA = P<13:9>'IR<8:0>
+   0,1,0	sector zero indexed		MA = IR<8:0> + X
+   0,1,1	current direct			MA = P<13:9>'IR<8:0> + X
+   1,0,0	sector zero indirect		MA = M[IR<8:0>]
+   1,0,1	current indirect		MA = M[P<13:9>'IR<8:0>]
+   1,1,0	sector zero indirect indexed	MA = M[IR<8:0> + X]
+   1,1,1	current indirect indexed	MA = M[MA = P<13:9>'IR<8:0> + X]
+
+   In extend mode, memory reference instructions can access an address
+   space of 32K words.  Multiple levels of indirection are supported, but
+   only post-indexing, based on the original instruction word index flag,
+   is allowed.
+*/
+
+/* The control format is:
+
+     1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+   | 0  0  0  0  0  0|           opcode            | control
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
+   The shift format is:
+
+     1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+   | 0  1  0  0  0  0|dr|sz|type |   shift count   | shift
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+                       |  | \-+-/
+                       |  |   |
+                       |  |   +--------------------- type
+                       |  +------------------------- long/A only
+                       +---------------------------- right/left
+
+   The skip format is:
+
+     1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+   | 1  0  0  0  0  0|rv|po|pe|ev|ze|s1|s2|s3|s4|cz| skip
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+                       |  |  |  |  |  |  |  |  |  |
+                       |  |  |  |  |  |  |  |  |  +- skip if C = 0
+                       |  |  |  |  |  |  |  |  +---- skip if ssw 4 = 0
+                       |  |  |  |  |  |  |  +------- skip if ssw 3 = 0
+                       |  |  |  |  |  |  +---------- skip if ssw 2 = 0
+                       |  |  |  |  |  +------------- skip if ssw 1 = 0
+                       |  |  |  |  +---------------- skip if A == 0
+                       |  |  |  +------------------- skip if A<0> == 0
+                       |  |  +---------------------- skip if mem par err
+                       |  +------------------------- skip if A<15> = 0
+                       +---------------------------- reverse skip sense
+
+   The operate format is:
+
+     1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+   | 1  1  0  0  0  0|           opcode            | operate
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
+   The I/O format is:
+
+     1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+   | op  | 1  1  0  0|  function |      device     | I/O transfer
+   +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
+   The IO transfer instruction controls the specified device.
+   Depending on the opcode, the instruction may set or clear
+   the device flag, start or stop I/O, or read or write data.
+*/
+
+/* This routine is the instruction decode routine for the Honeywell
+   316/516.  It is called from the simulator control program to execute
+   instructions in simulated memory, starting at the simulated PC.
+   It runs until 'reason' is set non-zero.
+
+   General notes:
+
+   1. Reasons to stop.  The simulator can be stopped by:
+
+	HALT instruction
+	breakpoint encountered
+	infinite indirection loop
+	unimplemented instruction and stop_inst flag set
+	unknown I/O device and stop_dev flag set
+	I/O error in I/O simulator
+
+   2. Interrupts.  Interrupts are maintained by two parallel variables:
+
+	dev_ready 	device ready flags
+	dev_enable	device interrupt enable flags
+
+      In addition, dev_ready contains the interrupt enable and interrupt no
+      defer flags.  If interrupt enable and interrupt no defer are set, and
+      at least one interrupt request is pending, then an interrupt occurs.
+      The order of flags in these variables corresponds to the order
+      in the SMK instruction.
+ 
+   3. Non-existent memory.  On the H316/516, reads to non-existent memory
+      return zero, and writes are ignored.  In the simulator, the
+      largest possible memory is instantiated and initialized to zero.
+      Thus, only writes need be checked against actual memory size.
+
+   4. Adding I/O devices.  These modules must be modified:
+
+	h316_defs.h	add interrupt request definition
+	h316_cpu.c	add device information table entry
+	h316_sys.c	add sim_devices table entry
+*/
+
+#include "h316_defs.h"
+
+#define ILL_ADR_FLAG	0100000
+#define save_ibkpt	(cpu_unit.u3)
+#define UNIT_V_MSIZE	(UNIT_V_UF)			/* dummy mask */
+#define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+#define m7		0001000				/* for generics */
+#define m8		0000400
+#define m9		0000200
+#define m10		0000100
+#define m11		0000040
+#define m12		0000020
+#define m13		0000010
+#define m14		0000004
+#define m15		0000002
+#define m16		0000001
+
+uint16 M[MAXMEMSIZE] = { 0 };				/* memory */
+int32 saved_AR = 0;					/* A register */
+int32 saved_BR = 0;					/* B register */
+int32 saved_XR = 0;					/* X register */
+int32 PC = 0;						/* P register */
+int32 C = 0;						/* C register */
+int32 ext = 0;						/* extend mode */
+int32 pme = 0;						/* prev mode extend */
+int32 extoff_pending = 0;				/* extend off pending */
+int32 dp = 0;						/* double mode */
+int32 sc = 0;						/* shift count */
+int32 ss[4];						/* sense switches */
+int32 dev_ready = 0;					/* dev ready */
+int32 dev_enable = 0;					/* dev enable */
+int32 ind_max = 8;					/* iadr nest limit */
+int32 stop_inst = 1;					/* stop on ill inst */
+int32 stop_dev = 2;					/* stop on ill dev */
+int32 ibkpt_addr = ILL_ADR_FLAG | X_AMASK;		/* breakpoint addr */
+int32 old_PC = 0;					/* previous PC */
+int32 dlog = 0;						/* debug log */
+int32 turnoff = 0;
+
+extern int32 sim_int_char;
+extern FILE *sim_log;
+extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
+	UNIT *uptr, int32 sw);
+t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
+t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
+t_stat cpu_reset (DEVICE *dptr);
+t_stat cpu_svc (UNIT *uptr);
+t_stat cpu_set_noext (UNIT *uptr, int32 value);
+t_stat cpu_set_size (UNIT *uptr, int32 value);
+
+/* CPU data structures
+
+   cpu_dev	CPU device descriptor
+   cpu_unit	CPU unit descriptor
+   cpu_reg	CPU register list
+   cpu_mod	CPU modifiers list
+*/
+
+UNIT cpu_unit = { UDATA (&cpu_svc, UNIT_FIX + UNIT_BINK + UNIT_EXT,
+		MAXMEMSIZE) };
+
+REG cpu_reg[] = {
+	{ ORDATA (P, PC, 15) },
+	{ ORDATA (A, saved_AR, 16) },
+	{ ORDATA (B, saved_BR, 16) },
+	{ ORDATA (X, XR, 16) },
+	{ ORDATA (SC, sc, 16) },
+	{ FLDATA (C, C, 0) },
+	{ FLDATA (EXT, ext, 0) },
+	{ FLDATA (PME, pme, 0) },
+	{ FLDATA (EXT_OFF, extoff_pending, 0) },
+	{ FLDATA (DP, dp, 0) },
+	{ FLDATA (SS1, ss[0], 0) },
+	{ FLDATA (SS2, ss[1], 0) },
+	{ FLDATA (SS3, ss[2], 0) },
+	{ FLDATA (SS4, ss[3], 0) },
+	{ FLDATA (ION, dev_ready, INT_V_ON) },
+	{ FLDATA (INODEF, dev_ready, INT_V_NODEF) },
+	{ ORDATA (DEVRDY, dev_ready, 16), REG_RO },
+	{ ORDATA (DEVENB, dev_enable, 16), REG_RO },
+	{ FLDATA (MPERDY, dev_ready, INT_V_MPE) },
+	{ FLDATA (MPEENB, dev_enable, INT_V_MPE) },
+	{ FLDATA (STOP_INST, stop_inst, 0) },
+	{ FLDATA (STOP_DEV, stop_dev, 1) },
+	{ DRDATA (INDMAX, ind_max, 8), REG_NZ + PV_LEFT },
+	{ ORDATA (OLDP, old_PC, 15), REG_RO },
+	{ ORDATA (BREAK, ibkpt_addr, 16) },
+	{ ORDATA (WRU, sim_int_char, 8) },
+	{ FLDATA (DLOG, dlog, 0) },
+	{ FLDATA (HEXT, cpu_unit.flags, UNIT_V_EXT), REG_HRO },
+	{ FLDATA (HSA, cpu_unit.flags, UNIT_V_HSA), REG_HRO },
+	{ NULL }  };
+
+MTAB cpu_mod[] = {
+	{ UNIT_EXT, 0, "no extend", "NOEXTEND", &cpu_set_noext },
+	{ UNIT_EXT, UNIT_EXT, "extend", "EXTEND", NULL },
+	{ UNIT_HSA, 0, "no HSA", "HSA", NULL },
+	{ UNIT_HSA, UNIT_HSA, "HSA", "HSA", NULL },
+	{ UNIT_MSIZE, 4096, NULL, "4K", &cpu_set_size },
+	{ UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size },
+	{ UNIT_MSIZE, 12288, NULL, "12K", &cpu_set_size },
+	{ UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size },
+	{ UNIT_MSIZE, 24576, NULL, "24K", &cpu_set_size },
+	{ UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size },
+	{ 0 }  };
+
+DEVICE cpu_dev = {
+	"CPU", &cpu_unit, cpu_reg, cpu_mod,
+	1, 8, 15, 1, 8, 16,
+	&cpu_ex, &cpu_dep, &cpu_reset,
+	NULL, NULL, NULL };
+
+/* I/O dispatch */
+
+int32 undio (int32 op, int32 func, int32 AR);
+extern int32 ptrio (int32 op, int32 func, int32 AR);
+extern int32 ptpio (int32 op, int32 func, int32 AR);
+extern int32 lptio (int32 op, int32 func, int32 AR);
+extern int32 ttyio (int32 op, int32 func, int32 AR);
+extern int32 clkio (int32 op, int32 func, int32 AR);
+
+int32 (*iotab[64])() = {
+	&undio, &ptrio, &ptpio, &lptio, &ttyio, &undio, &undio, &undio,
+	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
+	&clkio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
+	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
+	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
+	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
+	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio,
+	&undio, &undio, &undio, &undio, &undio, &undio, &undio, &undio  };
+
+
+t_stat sim_instr (void)
+{
+extern int32 sim_interval;
+extern UNIT clk_unit;
+int32 AR, BR, MB, Y, t1, t2, t3, skip;
+unsigned int32 ut;
+t_stat reason;
+t_stat Ea (int32 inst, int32 *addr);
+void Write (int32 val, int32 addr);
+int32 Add16 (int32 val1, int32 val2);
+int32 Add31 (int32 val1, int32 val2);
+int32 Operate (int32 MB, int32 AR);
+
+#define Read(x)		M[(x)]
+#define GETDBL_S(h,l)	(((h) << 15) | ((l) & MMASK))
+#define GETDBL_U(h,l)	(((h) << 16) | (l))
+#define PUTDBL_S(x)	AR = ((x) >> 15) & DMASK; \
+			BR = (BR & SIGN) | ((x) & MMASK)
+#define PUTDBL_U(x)	AR = ((x) >> 16) & DMASK; \
+			BR = (x) & DMASK
+#define SEXT(x)		(((x) & SIGN)? ((x) | ~DMASK): ((x) & DMASK))
+#define NEWA(c,n)	(ext? (((c) & ~X_AMASK) | ((n) & X_AMASK)): \
+			      (((c) & ~NX_AMASK) | ((n) & NX_AMASK)))
+
+/* Restore register state */
+
+AR = saved_AR & DMASK;					/* restore reg */
+BR = saved_BR & DMASK;
+XR = saved_XR & DMASK;
+PC = PC & ((cpu_unit.flags & UNIT_EXT)? X_AMASK: NX_AMASK); /* mask PC */
+reason = 0;
+turnoff = 0;
+sim_rtc_init (clk_unit.wait);				/* init calibration */
+
+/* Main instruction fetch/decode loop */
+
+while (reason == 0) {					/* loop until halted */
+if (sim_interval <= 0) {				/* check clock queue */
+	if (reason = sim_process_event ()) break;  }
+
+if ((dev_ready & (INT_PENDING | dev_enable)) > INT_PENDING) {	/* int req? */
+	pme = ext;					/* save extend */
+	if (cpu_unit.flags & UNIT_EXT) ext = 1;		/* ext opt? extend on */
+	dev_ready = dev_ready & ~INT_ON;		/* intr off */
+	turnoff = 0;
+	if (dlog && sim_log) fprintf (sim_log, "Interrupt\n");
+	MB = 0120000 | M_INT;  }			/* inst = JST* 63 */
+
+else {	if (PC == ibkpt_addr) {				/* breakpoint? */
+		save_ibkpt = ibkpt_addr;		/* save address */
+		ibkpt_addr = ibkpt_addr | ILL_ADR_FLAG;	/* disable */
+		sim_activate (&cpu_unit, 1);		/* sched re-enable */
+		reason = STOP_IBKPT;			/* stop simulation */
+		break;  }
+	Y = PC;						/* set mem addr */
+	MB = Read (Y);					/* fetch instr */
+	PC = NEWA (Y, Y + 1);				/* incr PC */
+	dev_ready = dev_ready | INT_NODEF;  }
+sim_interval = sim_interval - 1;
+if (dlog && sim_log && !turnoff) {			/* cycle log? */
+	int32 op = I_GETOP (MB) & 017;			/* core opcode */
+	t_value val = MB;
+	fprintf (sim_log, "A= %06o C= %1o P= %05o (", AR, C, PC);
+	fprint_sym (sim_log, Y, &val, &cpu_unit, SWMASK ('M'));
+	fprintf (sim_log, ")");
+	if ((op == 0) || (op == 014)) fprintf (sim_log, "\n");  }
+
+/* Memory reference instructions */
+
+switch (I_GETOP (MB)) {					/* case on <1:6> */
+case 001: case 021: case 041: case 061:			/* JMP */
+	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	old_PC = PC;					/* save PC */
+	PC = NEWA (PC, Y);				/* set new PC */
+	if (dlog && sim_log) {				/* logging? */
+		int32 op = I_GETOP (M[PC]) & 017;	/* get target */
+		if ((op == 014) && (PC == (old_PC - 2))) { /* jmp .-1 to IO? */
+			turnoff = 1;			/* yes, stop */
+			fprintf (sim_log, "Idle loop detected\n");  }
+		else turnoff = 0;  }			/* no, log */
+	if (extoff_pending) ext = extoff_pending = 0;	/* cond ext off */
+	break;
+case 002: case 022: case 042: case 062:			/* LDA */
+	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	if (dp) {					/* double prec? */
+		AR = Read (Y & ~1);			/* get doubleword */
+		BR = Read (Y | 1);
+		sc = 0;  }
+	else AR = Read (Y);				/* no, get word */
+	break;
+case 003: case 023: case 043: case 063:			/* ANA */
+	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	AR = AR & Read (Y);
+	break;
+case 004: case 024: case 044: case 064:			/* STA */
+	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	if (dp) {					/* double prec? */
+		if ((Y & 1) == 0) Write (AR, Y);	/* if even, store A */
+		Write (BR, Y | 1);			/* store B */
+		sc = 0;  }
+	else Write (AR, Y);				/* no, store word */
+	break;
+case 005: case 025: case 045: case 065:			/* ERA */
+	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	AR = AR ^ Read (Y);
+	break;
+case 006: case 026: case 046: case 066:			/* ADD */
+	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	if (dp) {					/* double prec? */
+		t1 = GETDBL_S (AR, BR);			/* get A'B */
+		t2 = GETDBL_S (Read (Y & ~1), Read (Y | 1));
+		t1 = Add31 (t1, t2);			/* 31b add */
+		PUTDBL_S (t1);
+		sc = 0;  }
+	else AR = Add16 (AR, Read (Y));			/* no, 16b add */
+	break;
+case 007: case 027: case 047: case 067:			/* SUB */
+	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	if (dp) {					/* double prec? */
+		t1 = GETDBL_S (AR, BR);			/* get A'B */
+		t2 = GETDBL_S (Read (Y & ~1), Read (Y | 1));
+		t1 = Add31 (t1, -t2);			/* 31b sub */
+		PUTDBL_S (t1);
+		sc = 0;  }
+	else AR = Add16 (AR, (-Read (Y)) & DMASK);	/* no, 16b sub */
+	break;
+
+/* Memory reference instructions */
+
+case 010: case 030: case 050: case 070:			/* JST */
+	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	MB = NEWA (Read (Y), PC);			/* merge old PC */
+	Write (MB, Y);
+	old_PC = PC;
+	PC = NEWA (PC, Y + 1);				/* set new PC */
+	break;
+case 011: case 031: case 051: case 071:			/* CAS */
+	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	MB = Read (Y);
+	if (AR == MB) PC = NEWA (PC, PC + 1);
+	else if (SEXT (AR) < SEXT (MB)) PC = NEWA (PC, PC + 2);
+	break;
+case 012: case 032: case 052: case 072:			/* IRS */
+	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	MB = (Read (Y) + 1) & DMASK;			/* incr, rewrite */
+	Write (MB, Y);
+	if (MB == 0) PC = NEWA (PC, PC + 1);		/* skip if zero */
+	break;
+case 013: case 033: case 053: case 073:			/* IMA */
+	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	MB = Read (Y);
+	Write (AR, Y);					/* A to mem */
+	AR = MB;					/* mem to A */
+	break;
+case 015: case 055:					/* STX */
+	if (reason = Ea (MB & ~IDX, &Y)) break;		/* eff addr */
+	Write (XR, Y);					/* store XR */
+	break;
+case 035: case 075:					/* LDX */
+	if (reason = Ea (MB & ~IDX, &Y)) break;		/* eff addr */
+	XR = Read (Y);					/* load XR */
+	break;
+case 016: case 036: case 056: case 076:			/* MPY */
+	if (cpu_unit.flags & UNIT_HSA) {		/* installed? */
+		if (reason = Ea (MB, &Y)) break;	/* eff addr */
+		t1 = SEXT (AR) * SEXT (Read (Y));
+		PUTDBL_S (t1);
+		sc = 0;  }
+	else reason = stop_inst;
+	break;
+case 017: case 037: case 057: case 077:			/* DIV */
+	if (cpu_unit.flags & UNIT_HSA) {		/* installed? */
+		if (reason = Ea (MB, &Y)) break;	/* eff addr */
+		t2 = SEXT (Read (Y));			/* divr */
+		if (t2) {				/* divr != 0? */
+			t1 = GETDBL_S (AR, BR);		/* get A'B */
+			BR = (t1 % t2) & DMASK;		/* remainder */
+			t1 = t1 / t2;			/* quotient */
+			AR = t1 & DMASK;
+			if ((t1 > MMASK) || (t1 < (-SIGN))) C = 1;
+			else C = 0;
+			sc = 0;  }
+		else C = 1;  }
+	else reason = stop_inst;
+	break;
+
+/* I/O instructions */
+
+case 014:						/* OCP */
+	t2 = iotab[MB & DEVMASK] (ioOCP, I_GETFNC (MB), AR);
+	reason = t2 >> IOT_V_REASON;
+	turnoff = 0;
+	break;
+case 034:						/* SKS */
+	t2 = iotab[MB & DEVMASK] (ioSKS, I_GETFNC (MB), AR);
+	reason = t2 >> IOT_V_REASON;
+	if (t2 & IOT_SKIP) {				/* skip? */
+		PC = NEWA (PC, PC + 1);
+		turnoff = 0;  }
+	break;
+case 054:						/* INA */
+	if (MB & INCLRA) AR = 0;
+	t2 = iotab[MB & DEVMASK] (ioINA, I_GETFNC (MB), AR);
+	reason = t2 >> IOT_V_REASON;
+	if (t2 & IOT_SKIP) {				/* skip? */
+		PC = NEWA (PC, PC + 1);
+		turnoff = 0;  }
+	AR = t2 & DMASK;				/* data */
+	break;
+case 074:						/* OTA */
+	t2 = iotab[MB & DEVMASK] (ioOTA, I_GETFNC (MB), AR);
+	reason = t2 >> IOT_V_REASON;
+	if (t2 & IOT_SKIP) {				/* skip? */
+		PC = NEWA (PC, PC + 1);
+		turnoff = 0;  }
+	break;
+
+/* Control */
+
+case 000:
+	if ((MB & 1) == 0) {				/* HLT */
+		reason = STOP_HALT;
+		break;  }
+	if (MB & m14) {					/* SGL, DBL */
+		if (cpu_unit.flags & UNIT_HSA) dp = (MB & m15)? 1: 0;
+		else reason = stop_inst;  }
+	if (MB & m13) {					/* DXA, EXA */
+		if (!(cpu_unit.flags & UNIT_EXT)) reason = stop_inst;
+		else if (MB & m15) {			/* EXA */
+			ext = 1;
+			extoff_pending = 0;  }		/* DXA */
+		else extoff_pending = 1;  }
+	if (MB & m12)					/* RMP */
+		dev_ready = dev_ready & ~INT_MPE;
+	if (MB & m11) {					/* SCA, INK */
+		if (MB & m15)				/* INK */
+			AR = (C << 15) | (dp << 14) | (pme << 13) | (sc & 037);
+		else if (cpu_unit.flags & UNIT_HSA)	/* SCA */
+			AR = sc & 037;
+		else reason = stop_inst;  }
+	else if (MB & m10) {				/* NRM */
+		if (cpu_unit.flags & UNIT_HSA) {
+			for (sc = 0;
+			    (sc <= 32) && ((AR & SIGN) != ((AR << 1) & SIGN));
+			     sc++) {
+				AR = (AR & SIGN) | ((AR << 1) & MMASK) |
+				     ((BR >> 14) & 1);
+				BR = (BR & SIGN) | ((BR << 1) & MMASK);  }
+			sc = sc & 037;  }
+		else reason = stop_inst;  }
+	else if (MB & m9) {				/* IAB */
+		sc = BR;
+		BR = AR;
+		AR = sc;  }
+	if (MB & m8)					/* ENB */
+		dev_ready = (dev_ready | INT_ON) & ~INT_NODEF;
+	if (MB & m7)					/* INH */
+		dev_ready = dev_ready & ~INT_ON;
+	break;
+
+/* Shift
+
+   Shifts are microcoded as follows:
+
+	op<7>	=	right/left
+	op<8>	=	long/short
+	op<9>	=	shift/rotate (rotate bits "or" into new position)
+	op<10>	=	logical/arithmetic
+
+   If !op<7> && op<10> (right arithmetic), A<1> propagates rightward
+   If op<7> && op<10> (left arithmetic), C is set if A<1> changes state
+   If !op<8> && op<10> (long arithmetic), B<1> is skipped
+
+   This microcoding "explains" how the 4 undefined opcodes actually work
+	003	=	long arith rotate right, skip B<1>, propagate A<1>,
+			bits rotated out "or" into A<1>
+	007	=	short arith rotate right, propagate A<1>,
+			bits rotated out "or" into A<1>
+	013	=	long arith rotate left, skip B<1>, C = overflow
+	017	=	short arith rotate left, C = overflow
+*/
+
+case 020:
+	C = 0;						/* clear C */
+	sc = 0;						/* clear sc */
+	if ((t1 = (-MB) & SHFMASK) == 0) break;		/* shift count */
+	switch (I_GETFNC (MB)) {			/* case shift fnc */
+	case 000:					/* LRL */
+		if (t1 > 32) ut = 0;			/* >32? all 0 */
+		else {	ut = GETDBL_U (AR, BR);		/* get A'B */
+			C = (ut >> (t1 - 1)) & 1;	/* C = last out */
+			ut = ut >> t1;  }		/* log right */
+		PUTDBL_U (ut);				/* store A,B */
+		break;
+	case 001:					/* LRS */
+		if (t1 > 31) t1 = 31;			/* limit to 31 */
+		t2 = GETDBL_S (SEXT (AR), BR);		/* get A'B signed */
+		C = (t2 >> (t1 - 1)) & 1;		/* C = last out */
+		t2 = t2 >> t1;				/* arith right */
+		PUTDBL_S (t2);				/* store A,B */
+		break;
+	case 002:					/* LRR */
+		t2 = t1 % 32;				/* mod 32 */
+		ut = GETDBL_U (AR, BR);			/* get A'B */
+		ut = (ut >> t2) | (ut << (32 - t2));	/* rot right */
+		C = (ut >> 31) & 1;			/* C = A<1> */
+		PUTDBL_U (ut);				/* store A,B */
+		break;
+	case 003:					/* "long right arot" */
+		if (reason = stop_inst) break;		/* stop on undef? */
+		for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
+			C = BR & 1;			/* C = last out */
+			BR = (BR & SIGN) | ((AR & 1) << 14) |
+			     ((BR & MMASK) >> 1);
+			AR = ((AR & SIGN) | (C << 15)) | (AR >> 1);  }
+		break;
+	case 004:					/* LGR */
+		if (t1 > 16) AR = 0;			/* > 16? all 0 */
+		else {	C = (AR >> (t1 - 1)) & 1;	/* C = last out */
+			AR = (AR >> t1) & DMASK;  }	/* log right */
+		break;
+	case 005:					/* ARS */
+		if (t1 > 16) t1 = 16;			/* limit to 16 */
+		C = ((SEXT (AR)) >> (t1 - 1)) & 1;	/* C = last out */
+		AR = ((SEXT (AR)) >> t1) & DMASK;	/* arith right */
+		break; 
+	case 006:					/* ARR */
+		t2 = t1 % 16;				/* mod 16 */
+		AR = ((AR >> t2) | (AR << (16 - t2))) & DMASK;
+		C = (AR >> 15) & 1;			/* C = A<1> */
+		break;
+	case 007:					/* "short right arot" */
+		if (reason = stop_inst) break;		/* stop on undef? */
+		for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
+			C = AR & 1;			/* C = last out */
+			AR = ((AR & SIGN) | (C << 15)) | (AR >> 1);  }
+		break;
+
+/* Shift, continued */
+
+	case 010:					/* LLL */
+		if (t1 > 32) ut = 0;			/* > 32? all 0 */
+		else {	ut = GETDBL_U (AR, BR);		/* get A'B */
+			C = (ut >> (32 - t1)) & 1;	/* C = last out */
+			ut = ut << t1;  }		/* log left */
+		PUTDBL_U (ut);				/* store A,B */
+		break;
+	case 011:					/* LLS */
+		if (t1 > 31) t1 = 31;			/* limit to 31 */
+		t2 = GETDBL_S (SEXT (AR), BR);		/* get A'B */
+		t3 = t2 << t1;				/* "arith" left */
+		PUTDBL_S (t3);				/* store A'B */
+		if ((t2 >> (31 - t1)) !=		/* shf out = sgn? */
+		   ((AR & SIGN)? -1: 0)) C = 1;
+		break;
+	case 012:					/* LLR */
+		t2 = t1 % 32;				/* mod 32 */
+		ut = GETDBL_U (AR, BR);			/* get A'B */
+		ut = (ut << t2) | (ut >> (32 - t2));	/* rot left */
+		C = ut & 1;				/* C = B<16> */
+		PUTDBL_U (ut);				/* store A,B */
+		break;
+	case 013:					/* "long left arot" */
+		if (reason = stop_inst) break;		/* stop on undef? */
+		for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
+			AR = (AR << 1) | ((BR >> 14) & 1);
+			BR = (BR & SIGN) | ((BR << 1) & MMASK) |
+			     ((AR >> 16) & 1);
+			if ((AR & SIGN) != ((AR >> 1) & SIGN)) C = 1;
+			AR = AR & DMASK;  }
+		break;
+	case 014:					/* LGL */
+		if (t1 > 16) AR = 0;			/* > 16? all 0 */
+		else {	C = (AR >> (16 - t1)) & 1;	/* C = last out */
+			AR = (AR << t1) & DMASK;  }	/* log left */
+		break;
+	case 015:					/* ALS */
+		if (t1 > 16) t1 = 16;			/* limit to 16 */
+		t2 = SEXT (AR);				/* save AR */
+		AR = (AR << t1) & DMASK;		/* "arith" left */
+		if ((t2 >> (16 - t1)) !=		/* shf out + sgn */
+		    ((AR & SIGN)? -1: 0)) C = 1;
+		break;
+	case 016:					/* ALR */
+		t2 = t1 % 16;				/* mod 16 */
+		AR = ((AR << t2) | (AR >> (16 - t2))) & DMASK;
+		C = AR & 1;				/* C = A<16> */
+		break;
+	case 017:					/* "short left arot" */
+		if (reason = stop_inst) break;		/* stop on undef? */
+		for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
+			if ((AR & SIGN) != ((AR << 1) & SIGN)) C = 1;
+			AR = ((AR << 1) | (AR >> 15)) & DMASK;  }
+		break;  }				/* end case fnc */
+	break;
+
+/* Skip */
+
+case 040:
+	skip = 0;
+	if (((MB & 000001) && C) ||			/* SSC */
+	    ((MB & 000002) && ss[3]) ||			/* SS4 */
+	    ((MB & 000004) && ss[2]) ||			/* SS3 */
+	    ((MB & 000010) && ss[1]) ||			/* SS2 */
+	    ((MB & 000020) && ss[0]) ||			/* SS1 */
+	    ((MB & 000040) && AR) ||			/* SNZ */
+	    ((MB & 000100) && (AR & 1)) ||		/* SLN */
+	    ((MB & 000200) && (TST_INTREQ (INT_MPE))) ||	/* SPS */
+	    ((MB & 000400) && (AR & SIGN))) skip = 1;	/* SMI */
+	if ((MB & 001000) == 0) skip = skip ^ 1;	/* reverse? */
+	PC = NEWA (PC, PC + skip);
+	break;
+
+/* Operate */
+
+case 060:
+	if (MB == 0140024) AR = AR ^ SIGN;		/* CHS */
+	else if (MB == 0140040) AR = 0;			/* CRA */
+	else if (MB == 0140100) AR = AR & ~SIGN;	/* SSP */
+	else if (MB == 0140200) C = 0;			/* RCB */
+	else if (MB == 0140320) {			/* CSA */
+		C = (AR & SIGN) >> 15;
+		AR = AR & ~SIGN;  }
+	else if (MB == 0140401) AR = AR ^ DMASK;	/* CMA */
+	else if (MB == 0140407) {			/* TCA */
+		AR = (-AR) & DMASK;
+		sc = 0;  }
+	else if (MB == 0140500) AR = AR | SIGN;		/* SSM */
+	else if (MB == 0140600) C = 1;			/* SCB */
+	else if (MB == 0141044) AR = AR & 0177400;	/* CAR */
+	else if (MB == 0141050) AR = AR & 0377;		/* CAL */
+	else if (MB == 0141140) AR = AR >> 8;		/* ICL */
+	else if (MB == 0141206) AR = Add16 (AR, 1);	/* AOA */
+	else if (MB == 0141216) AR = Add16 (AR, C);	/* ACA */
+	else if (MB == 0141240) AR = (AR << 8) & DMASK;	/* ICR */
+	else if (MB == 0141340)				/* ICA */
+		AR = ((AR << 8) | (AR >> 8)) & DMASK;
+	else if (reason = stop_inst) break;
+	else AR = Operate (MB, AR);			/* undefined */
+	break;
+	}						/* end case op */
+}							/* end while */
+
+saved_AR = AR & DMASK;
+saved_BR = BR & DMASK;
+saved_XR = XR & DMASK;
+return reason;
+}
+
+/* Effective address
+
+   The effective address calculation consists of three phases:
+   - base address calculation: 0/pagenumber'displacement
+   - (extend): indirect address resolution
+     (non-extend): pre-indexing
+   - (extend): post-indexing
+     (non-extend): indirect address/post-indexing resolution
+ 
+   In extend mode, address calculations are carried out to 16b
+   and masked to 15b at exit.  In non-extend mode, address bits
+   <1:2> are preserved by the NEWA macro; address bit <1> is
+   masked at exit.
+*/
+
+t_stat Ea (int32 IR, int32 *addr)
+{
+int32 i = 0;
+int32 Y = IR & (IA | DISP);				/* ind + disp */
+
+if (IR & SC) Y = ((PC - 1) & PAGENO) | Y;		/* cur sec? + pageno */
+if (ext) {						/* extend mode? */
+	for (i = 0; (i < ind_max) && (Y & IA); i++) {	/* resolve ind addr */
+		Y = Read (Y & X_AMASK);  }		/* get ind addr */
+	if (IR & IDX) Y = Y + XR;			/* post-index */
+	}						/* end if ext */
+else {							/* non-extend */
+	Y = NEWA (PC, Y + ((IR & IDX)? XR: 0));		/* pre-index */
+	for (i = 0; (i < ind_max) && (IR & IA); i++) {	/* resolve ind addr */
+		IR = Read (Y & X_AMASK);		/* get ind addr */
+		Y = NEWA (Y, IR + ((IR & IDX)? XR: 0));  } /* post-index */
+	}						/* end else */
+*addr = Y = Y & X_AMASK;				/* return addr */
+if (dlog && sim_log && !turnoff)			/* cycle log? */
+	fprintf (sim_log, " EA= %06o [%06o]\n", Y, M[Y]);
+if (i >= ind_max) return STOP_IND;			/* too many ind? */
+return SCPE_OK;
+}
+
+/* Write memory */
+
+void Write (int32 val, int32 addr)
+{
+if (((addr == 0) || (addr >= 020)) && MEM_ADDR_OK (addr))
+	M[addr] = val;
+return;
+}
+
+/* Add */
+
+int32 Add16 (int32 v1, int32 v2)
+{
+int32 r = v1 + v2;
+C = 0;
+if (((v1 ^ ~v2) & (v1 ^ r)) & SIGN) C = 1;
+return (r & DMASK);
+}
+
+int32 Add31 (int32 v1, int32 v2)
+{
+int32 r = v1 + v2;
+C = 0;
+if (((v1 ^ ~v2) & (v1 ^ r)) & (1u << 30)) C = 1;
+return r;
+}
+
+/* Unimplemented I/O device */
+
+int32 undio (int32 op, int32 fnc, int32 val)
+{
+return ((stop_dev << IOT_V_REASON) | val);
+}
+
+/* Undefined operate instruction.  This code is reached when the
+   opcode does not correspond to a standard operate instruction.
+   It simulates the behavior of the actual logic.
+
+   An operate instruction executes in 4 or 6 phases.  A 'normal'
+   instruction takes 4 phases:
+
+	t1		t1
+	t2/tlate	t2/t2 extended into t3
+	t3/tlate	t3
+	t4		t4
+
+   A '1.5 cycle' instruction takes 6 phases:
+
+	t1		t1
+	t2/tlate	t2/t2 extended into t3
+	t3/tlate	t3
+	t2/tlate	'special' t2/t2 extended into t3
+	t3/tlate	t3
+	t4		t4
+
+   The key signals, by phase, are the following
+
+	tlate	EASTL	enable A to sum leg 1 (else 0)
+			(((m12+m16)x!azzzz)+(m9+m11+azzzz)
+		EASBM	enable 0 to sum leg 2 (else 177777)
+			(m9+m11+azzzz)
+		JAMKN	jam carry network to 0 = force XOR
+			((m12+m16)x!azzzz)
+		EIKI7	force carry into adder
+			((m15x(C+!m13))x!JAMKN)
+
+	t3	CLDTR	set D to 177777 (always)
+		ESDTS	enable adder sum to D (always)
+		SETAZ	enable repeat cycle = set azzzz
+			(m8xm15)
+
+   if azzzz {
+	t2	CLATR	clear A register (due to azzzz)
+		EDAHS	enable D high to A high register (due to azzzz)
+		EDALS	enable D low to A low register (due to azzzz)
+		
+	tlate, t3 as above
+	}
+
+	t4	CLATR	clear A register
+			(m11+m15+m16)
+		CLA1R	clear A1 register
+			(m10+m14)
+		EDAHS	enable D high to A high register
+			((m11xm14)+m15+m16)
+		EDALS	enable D low to A low register
+			((m11xm13)+m15+m16)
+		ETAHS	enable D transposed to A high register
+			(m9xm11)
+		ETALS	enable D transposed to A low register
+			(m10xm11)
+		EDA1R	enable D1 to A1 register
+			((m8xm10)+m14)
+		CBITL	clear C, conditionally set C from adder output
+			(m9x!m11)
+		CBITG	conditionally set C if D1
+			(m10xm12xD1)
+		CBITE	unconditionally set C
+			(m8xm9)
+*/
+
+int32 Operate (int32 MB, int32 AR)
+{
+int32 D, jamkn, eiki7, easbm, eastl, setaz;
+int32 clatr, cla1r, edahs, edals, etahs, etals, eda1r;
+int32 cbitl, cbitg, cbite;
+int32 aleg, bleg, ARx;
+
+/* Phase tlate */
+
+ARx = AR;						/* default */
+jamkn = (MB & (m12+m16)) != 0;				/* m12+m16 */
+easbm = (MB & (m9+m11)) != 0;				/* m9+m11 */
+eastl = jamkn || easbm;					/* m9+m11+m12+m16 */
+setaz = (MB & (m8+m15)) == (m8+m15);			/* m8xm15*/
+eiki7 = (MB & m15) && (C || !(MB & m13));		/* cin */
+aleg = eastl? AR: 0;					/* a input */
+bleg = easbm? 0: DMASK;					/* b input */
+if (jamkn) D = aleg ^ bleg;				/* jammin? xor */
+else D = (aleg + bleg + eiki7) & DMASK;			/* else add */
+
+/* Possible repeat at end of tlate - special t2, repeat tlate */
+
+if (setaz) {
+	ARx = D;					/* forced: t2 */
+	aleg = ARx;					/* forced: tlate */
+	bleg = 0;					/* forced */
+	jamkn = 0;					/* forced */
+	D = (aleg + bleg + eiki7) & DMASK;		/* forced add */
+	sc = 0;  }					/* ends repeat */
+
+/* Phase t4 */
+
+clatr = (MB & (m11+m15+m16)) != 0;			/* m11+m15+m16 */
+cla1r = (MB & (m10+m14)) != 0;				/* m10+m14 */
+edahs = ((MB & (m11+m14)) == (m11+m14)) ||		/* (m11xm14)+m15+m16 */
+	(MB & (m15+m16));
+edals = ((MB & (m11+m13)) == (m11+m13)) ||		/* (m11xm13)+m15+m16 */
+	(MB & (m15+m16));
+etahs = (MB & (m9+m11)) == (m9+m11);			/* m9xm11 */
+etals = (MB & (m10+m11)) == (m10+m11);			/* m10xm11 */
+eda1r = ((MB & (m8+m10)) == (m8+m10)) || (MB & m14);	/* (m8xm10)+m14 */
+cbitl = (MB & (m9+m11)) == m9;				/* m9x!m11 */
+cbite = (MB & (m8+m9)) == (m8+m9);			/* m8xm9 */
+cbitg = (MB & (m10+m12)) == (m10+m12);			/* m10xm12 */
+
+if (clatr) ARx = 0;					/* clear A */
+if (cla1r) ARx = ARx & ~SIGN;				/* clear A1 */
+if (edahs) ARx = ARx | (D & 0177400);			/* D hi to A hi */
+if (edals) ARx = ARx | (D & 0000377); 			/* D lo to A lo */
+if (etahs) ARx = ARx | ((D << 8) & 0177400); 		/* D lo to A hi */
+if (etals) ARx = ARx | ((D >> 8) & 0000377);		/* D hi to A lo */
+if (eda1r) ARx = ARx | (D & SIGN);			/* D1 to A1 */
+if (cbitl) {						/* ovflo to C */
+
+/* Overflow calculation.  Cases:
+
+	aleg	bleg	cin	overflow
+
+	0	x	x	can't overflow
+	A	0	0	can't overflow
+	A	-1	1	can't overflow
+	A	0	1	overflow if 77777 -> 100000
+	A	-1	0	overflow if 100000 -> 77777
+*/
+
+	if (!jamkn &&
+           ((bleg && !eiki7 && (D == 0077777)) ||
+	    (!bleg && eiki7 && (D == 0100000)))) C = 1;
+	else C = 0;  }
+if (cbite || (cbitg && (D & SIGN))) C = 1;		/* C = 1 */
+return ARx;
+}
+
+/* Reset routines */
+
+t_stat cpu_reset (DEVICE *dptr)
+{
+saved_AR = saved_BR = saved_XR = 0;
+C = 0;
+dp = 0;
+ext = pme = extoff_pending = 0;
+dev_ready = dev_ready & ~INT_PENDING;
+dev_enable = 0;
+return cpu_svc (&cpu_unit);
+}
+
+/* Memory examine */
+
+t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
+{
+int32 d;
+
+if (addr >= MEMSIZE) return SCPE_NXM;
+if (addr == 0) d = saved_XR;
+else d = M[addr];
+if (vptr != NULL) *vptr = d & DMASK;
+return SCPE_OK;
+}
+
+/* Memory deposit */
+
+t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
+{
+if (addr >= MEMSIZE) return SCPE_NXM;
+if (addr == 0) saved_XR = val & DMASK;
+else M[addr] = val & DMASK;
+return SCPE_OK;
+}
+
+/* Breakpoint service */
+
+t_stat cpu_svc (UNIT *uptr)
+{
+if ((ibkpt_addr & ~ILL_ADR_FLAG) == save_ibkpt) ibkpt_addr = save_ibkpt;
+save_ibkpt = -1;
+return SCPE_OK;
+}
+
+/* Option processors */
+
+t_stat cpu_set_noext (UNIT *uptr, int32 value)
+{
+if (MEMSIZE > (NX_AMASK + 1)) return SCPE_ARG;
+return SCPE_OK;
+}
+
+t_stat cpu_set_size (UNIT *uptr, int32 value)
+{
+int32 mc = 0;
+t_addr i;
+
+if ((value <= 0) || (value > MAXMEMSIZE) || ((value & 07777) != 0) ||
+    (((cpu_unit.flags & UNIT_EXT) == 0) && (value > (NX_AMASK + 1))))
+	return SCPE_ARG;
+for (i = value; i < MEMSIZE; i++) mc = mc | M[i];
+if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
+	return SCPE_OK;
+MEMSIZE = value;
+for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+return SCPE_OK;
+}

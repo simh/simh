@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Aug-01	RMS	Enabled DZ11
    27-May-01	RMS	Added multiconsole support
    29-Apr-01	RMS	Fixed format for RDPCST, WRPCST
 			Added CLRCSH for ITS
@@ -38,7 +39,7 @@ extern DEVICE cpu_dev, pag_dev;
 extern DEVICE tim_dev, fe_dev, uba_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE rp_dev, tu_dev;
-/* extern DEVICE dz_dev; */
+extern DEVICE dz_dev;
 extern DEVICE lp20_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
@@ -64,11 +65,16 @@ int32 sim_emax = 1;
 
 DEVICE *sim_devices[] = { 
 	&cpu_dev,
-	&pag_dev, &tim_dev,
-	&fe_dev, &uba_dev,
-	&ptr_dev, &ptp_dev,
-	&lp20_dev, /* &dz_dev, */
-	&rp_dev, &tu_dev,
+	&pag_dev,
+	&tim_dev,
+	&fe_dev,
+	&uba_dev,
+	&ptr_dev,
+	&ptp_dev,
+	&lp20_dev,
+	&dz_dev,
+	&rp_dev,
+	&tu_dev,
 	NULL };
 
 UNIT *sim_consoles = NULL;

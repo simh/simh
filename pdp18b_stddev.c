@@ -29,6 +29,7 @@
    tto		teleprinter
    clk		clock
 
+   17-Jul-01	RMS	Moved function prototype
    10-Jun-01	RMS	Cleaned up IOT decoding to reflect hardware
    27-May-01	RMS	Added multiconsole support
    10-Mar-01	RMS	Added funny format loader support
@@ -71,8 +72,6 @@ t_stat ptp_attach (UNIT *uptr, char *cptr);
 t_stat ptr_detach (UNIT *uptr);
 t_stat ptp_detach (UNIT *uptr);
 t_stat ptr_boot (int32 unitno);
-extern int32 sim_rtc_init (int32 time);
-extern int32 sim_rtc_calb (int32 tps);
 extern t_stat sim_poll_kbd (void);
 extern t_stat sim_putchar (int32 out);
 

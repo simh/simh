@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Jul-01	RMS	Fixed bug in symbolic output (found by Peter Schorn)
    27-May-01	RMS	Added multiconsole support
    14-Mar-01	RMS	Revised load/dump interface (again)
    30-Oct-00	RMS	Added support for examine to file
@@ -197,14 +198,15 @@ if (sw & SWMASK ('S')) {				/* string? */
 if ((sw & SWMASK ('M')) == 0) return SCPE_ARG;
 
 if ((val[0] & WM) == 0) return STOP_NOWM;		/* WM under op? */
-flags = op_table[val[0] & CHAR];			/* get flags */
+op = val[0]& CHAR;					/* isolate op */
+flags = op_table[op];					/* get flags */
 for (ilnt = 1; ilnt < sim_emax; ilnt++) if (val[ilnt] & WM) break;
 if (flags & HNOP) ilnt = 1;				/* halt, nop? */
 else if ((flags & NOWM) && (ilnt > 7)) ilnt = 7;	/* cs, swm? */
 else if ((op == OP_B) && (ilnt > 4) && (val[4] == BCD_BLANK)) ilnt = 4;
 else if (ilnt > 8) ilnt = 8;				/* cap length */
 if ((flags & len_table[ilnt]) == 0) return STOP_INVL;	/* legal length? */
-fprintf (of, "%s",opcode[val[0] & CHAR]);		/* print opcode */
+fprintf (of, "%s",opcode[op]);				/* print opcode */
 if (ilnt > 2) {						/* A address? */
 	if ((flags & IO) && (val[1] == BCD_PERCNT)) fprintf (of, " %%%c%c",
 		bcd_to_ascii[val[2]], bcd_to_ascii[val[3]]);

@@ -25,6 +25,9 @@
 
    rp		RH/RP/RM moving head disks
 
+   23-Aug-01	RMS	Added read/write header stubs for ITS
+				(found by Mirian Crzig Lennox) 
+   13-Jul-01	RMS	Changed fread call to fxread (found by Peter Schorn)
    14-May-01	RMS	Added check for unattached drive
 
    The "Massbus style" disks consisted of several different large
@@ -88,7 +91,9 @@
 #define  FNC_SEARCH	014				/* search */
 #define  FNC_WCHK	024				/* write check */
 #define  FNC_WRITE	030				/* write */
+#define  FNC_WRITEH	031				/* write w/ headers */
 #define  FNC_READ	034				/* read */
+#define  FNC_READH	035				/* read w/ headers */
 #define CS1_IE		CSR_IE				/* int enable */
 #define CS1_DONE	CSR_DONE			/* ready */
 #define CS1_V_UAE	8				/* Unibus addr ext */
@@ -711,9 +716,11 @@ case FNC_SEARCH:					/* search */
 	uptr -> CYL = dc;				/* save cylinder */
 	return;
 
+case FNC_WRITEH:						/* write headers */
 case FNC_WRITE:						/* write */
 case FNC_WCHK:						/* write check */
 case FNC_READ:						/* read */
+case FNC_READH:						/* read headers */
 	rpcs2 = rpcs2 & ~CS2_ERR;			/* clear errors */
 	rpcs1 = rpcs1 & ~(CS1_TRE | CS1_MCPE | CS1_DONE);
 	if ((GET_CY (dc) >= drv_tab[dtype].cyl) ||	/* bad cylinder */
@@ -790,6 +797,7 @@ case FNC_WRITE:						/* write */
 		break;  }
 case FNC_WCHK:						/* write check */
 case FNC_READ:						/* read */
+case FNC_READH:						/* read headers */
 	ba = GET_UAE (rpcs1) | rpba;			/* get byte addr */
 	wc10 = (0200000 - rpwc) >> 1;			/* get PDP-10 wc */
 	da = GET_DA (rpdc, rpda, dtype) * RP_NUMWD;	/* get disk addr */
@@ -822,7 +830,7 @@ case FNC_READ:						/* read */
 	    err = ferror (uptr -> fileref);
 	    }						/* end if */
 	else {						/* read, wchk */
-	    awc10 = fread (dbuf, sizeof (d10), wc10, uptr -> fileref);
+	    awc10 = fxread (dbuf, sizeof (d10), wc10, uptr -> fileref);
 	    err = ferror (uptr -> fileref);
 	    for ( ; awc10 < wc10; awc10++) dbuf[awc10] = 0;
 	    for (twc10 = 0; twc10 < wc10; twc10++) {
@@ -862,6 +870,7 @@ case FNC_READ:						/* read */
 		perror ("RP I/O error");
 		clearerr (uptr -> fileref);
 		return SCPE_IOERR;  }
+case FNC_WRITEH:						/* write headers stub */
 	update_rpcs (CS1_DONE, drv);			/* set done */
 	break;  }					/* end case func */
 return SCPE_OK;

@@ -25,6 +25,7 @@
 
    clk		real-time clock
 
+   17-Mar-01	RMS	Moved function prototype
    05-Mar-01	RMS	Added clock calibration
    24-Sep-97	RMS	Fixed bug in unit service (found by Charles Owen)
 */
@@ -37,8 +38,6 @@ int32 clk_time[4] = { 16000, 100000, 10000, 1000 };	/* freq table */
 int32 clk_tps[4] = { 60, 10, 100, 1000 };		/* ticks per sec */
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
-extern int32 sim_rtc_init (int32 time);
-extern int32 sim_rtc_calb (int32 tps);
 
 /* CLK data structures
 

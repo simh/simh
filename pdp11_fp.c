@@ -529,6 +529,7 @@ case 7:							/* @d(R) */
 	PC = (PC + 2) & 0177777;
 	adr = ReadW (((R[reg] + adr) & 0177777) | dsenable);
 	return (adr | dsenable);  }			/* end switch */
+return 0;
 }
 
 /* Read integer operand

@@ -90,6 +90,8 @@
    The KL10 added extended precision (11-bit exponent) floating point
    format (so-called G floating).  These instructions were not
    implemented in the KS10 and are treated as MUUO's.
+
+   10-Aug-01	RMS	Removed register in declarations
 */
 
 #include "pdp10_defs.h"
@@ -195,9 +197,9 @@ return TRUE;
 
 void mul (d10 s1, d10 s2, d10 *rs)
 {
-register uint64 a = ABS (s1);
-register uint64 b = ABS (s2);
-register uint64 t, u, r;
+uint64 a = ABS (s1);
+uint64 b = ABS (s2);
+uint64 t, u, r;
 
 if ((a == 0) || (b == 0)) {				/* operand = 0? */
 	rs[0] = rs[1] = 0;				/* result 0 */
@@ -228,8 +230,8 @@ return;
 
 t_bool divi (int32 ac, d10 b, d10 *rs)
 {
-register int32 p1 = ADDAC (ac, 1);
-register d10 dvr = ABS (b);				/* make divr positive */
+int32 p1 = ADDAC (ac, 1);
+d10 dvr = ABS (b);				/* make divr positive */
 int64 t;
 int32 i;
 d10 dvd[2];
@@ -356,7 +358,7 @@ return;
 
 d10 fad (d10 op1, d10 op2, t_bool rnd, int32 inv)
 {
-register int32 ediff;
+int32 ediff;
 UFP a, b, t;
 
 if (inv) op2 = NEG (op2);				/* subtract? -b */
@@ -500,7 +502,7 @@ return;
 void dfad (int32 ac, d10 *rs, int32 inv)
 {
 int32 p1 = ADDAC (ac, 1);
-register int32 ediff;
+int32 ediff;
 UFP a, b, t;
 
 if (inv) { DMOVN (rs); }				/* subtract? -b */

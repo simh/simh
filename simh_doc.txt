@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V2.6a
-Date:	15-Jun-01
+Subj:	Simulator Usage, V2.6b
+Date:	15-Sep-01
 
 			COPYRIGHT NOTICE
 
@@ -46,9 +46,10 @@ information on each of the individual simulators.
 1. Compiling And Running A Simulator
 
 The simulators have been tested on VAX VMS, Alpha VMS, Alpha UNIX, Intel
-FreeBSD, Intel LINUX, and Windows 95/Windows NT (Visual C++ environment).
-Porting to other environments will require changes to the operating system
-dependent code in scp_tty.c.
+FreeBSD, Intel LINUX, Windows 9x/Me/NT/2000 (Visual C++ environment),
+Macintosh 9 and X (CodeWarrior environment), and OS/2.  Porting to other
+environments will require changes to the operating system dependent code
+in scp_tty.c and scp_sock.c.
 
 To compile the simulators on VMS, use these commands (note that separate
 compilations are required for each of the 18b PDP's):
@@ -81,8 +82,9 @@ On version of VMS prior to 6.2, the simulators must then be defined as
 foreign commands so that they can be started by name.
 
 To compile the simulators on Alpha UNIX or any UNIX variant which supports
-the POSIX compliant TERMIOS interface, use the following commands (note
-that separate compilations are required for each of the 18b PDP's):
+the POSIX compliant TERMIOS interface (including Linux and Mac OS X), use
+the following commands (note that separate compilations are required for
+each of the 18b PDP's):
 
 	% cc pdp8_*.c scp*.c -lm -o pdp8
 	% cc pdp11_*.c scp*.c -lm -o pdp11
@@ -108,6 +110,17 @@ Since 64b integer declarations vary, sim_defs.h has conditional
 declarations for Windows (_int64) and Digital UNIX (long).  The default
 is GNU C (long long).  If your compiler uses a different convention,
 you will have to edit sim_defs.h and modify the conditionals.
+
+To compile the simulators on Windows 9x/ME/NT/2000 and Visual C++,
+each simulator must be set up as a separate project.  Under the VC++
+file menu, select New, select Project Workspace, select Console
+Application, and type in the name of the simulator.  In the project
+files view, select Add Files To Project and add in all the files for
+that simulator (e.g., all files beginning nova_ for the Nova), plus
+sim_defs.h, scp.c, and scp_tty.c.  If the project requires the DZ11,
+also add in scp_sock.h and scp_sock.c.  If the project requires a
+command line switch, add the switches to the C/C++ tab of the
+Configuration dialog.  The simulator should then build properly.
 
 To start the simulator, simply type its name.  The simulator takes
 one optional argument, a startup command file.  If specified, this
@@ -4553,6 +4566,259 @@ TIM) or an octal number in the range 0 - 0177.
 The simulator recognizes the standard MACRO alternate mnemonics (CLEAR
 for SETZ, OR for IORI), the individual definitions for JRST and JFCL
 variants, and the extended instruction mnemonics.
+
+13. H316/H516 Features
+
+The Honeywell 316/516 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		H316/H516 CPU with 16/32KW memory
+PTR		316/516-50 paper tape reader
+PTP		316/516-52 paper tape punch
+TTY		316/516-33 console terminal
+CLK		316/516-12 real time clock
+LPT		316/516 line printer
+
+The H316/H516 simulator implements several unique stop conditions:
+
+	- decode of an undefined instruction, and STOP_INST is et
+	- reference to an undefined I/O device, and STOP_DEV is set
+	- more than INDMAX indirect references are detected during
+	  memory reference address decoding
+
+The H316/H516 loader is not implemented.
+
+13.1 CPU
+
+CPU options include choice of instruction set and memory size.
+
+	SET CPU HSA		high speed arithmetic instructions
+	SET CPU NOHSA		no high speed arithmetic instructions
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 12K		set memory size = 12K
+	SET CPU 16K		set memory size = 16K
+	SET CPU 24K		set memory size = 24K
+	SET CPU 32K		set memory size = 32K
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 32K.
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	P		15	program counter
+	A		16	A register
+	B		16	B register
+	X		16	index register
+	SC		16	shift count
+	C		1	carry flag
+	EXT		1	extend flag
+	PME		1	previous mode extend flag
+	EXT_OFF		1	extend off pending flag
+	DP		1	double precision flag
+	SS1..4		1	sense switches 1..4
+	ION		1	interrupts enabled
+	INODEF		1	interrupts not deferred
+	INTREQ		16	interrupt requests
+	DEVRDY		16	device ready flags (read only)
+	DEVENB		16	device interrupt enable flags (read only)
+	STOP_INST	1	stop on undefined instruction
+	STOP_DEV	1	stop on undefined device
+	INDMAX		1	indirect address limit
+	OLDP		15	PC prior to last JMP, JSB, or interrupt
+	BREAK		16	breakpoint address (177777 to disable)
+	WRU		8	interrupt character
+
+13.2 Programmed I/O Devices
+
+13.2.1 316/516-50 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.
+Thus, by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader supports the BOOT command.  BOOT PTR copies the
+absolute binary loader into memory and starts it running.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INTREQ		1	device interrupt request
+	READY		1	device ready
+	ENABLE		1	device interrupts enabled
+	POS		31	position in the input or output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+				0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+13.2.2 316/516-52 Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written.
+Thus, by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INTREQ		1	device interrupt request
+	READY		1	device ready
+	ENABLE		1	device interrupts enabled
+	POWER		1	device powered up
+	POS		31	position in the input or output file
+	TIME		24	time from I/O initiation to interrupt
+	PWRTIME		24	time from I/O request to power up
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+13.2.3 316/516-33 Console Teletype (TTY)
+
+The terminal reads and writes to the controlling console port.  It has
+one option, UC; when set, it automatically converts lower case input
+to upper case.  This is on by default.
+
+The terminal these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	MODE		1	read/write mode
+	INTREQ		1	device interrupt request
+	READY		1	device ready
+	ENABLE		1	device interrupts enabled
+	KPOS		31	number of characters input
+	KTIME		24	keyboard polling interval
+	TPOS		31	number of characters output
+	TTIME		24	time from I/O initiation to interrupt
+
+13.2.4 316/516-12 Real Time Clock (CLK)
+
+The real time clock (CLK) implements these registers:
+
+	name		size	comments
+
+	INTREQ		1	device interrupt request
+	READY		1	device ready
+	ENABLE		1	device interrupts enabled
+	TIME		24	clock interval
+
+13.2.5 316/5116 Line Printer (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The line printer implements these registers:
+
+	name		size	comments
+
+	WDPOS		6	word position in current scan
+	DRPOS		6	drum position
+	CRPOS		1	carriage position
+	XFER		1	transfer ready flag
+	PRDN		1	print done flag
+	INTREQ	1	device interrupt request
+	ENABLE	1	device interrupt enable
+	SVCST		2	service state
+	SVCCH		2	service channel
+	BUF		8	buffer
+	POS		31	number of characters output
+	XTIME		24	delay between transfers
+	ETIME		24	delay at end of scan
+	PTIME		24	delay for shuttle/line advance
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of paper
+
+	OS I/O error	x	report error and stop
+
+13.3 Symbolic Display and Input
+
+The H316/H516 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as two character string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			two character sixbit string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard H316/H516 assembler syntax.  There are six
+instruction classes: memory reference, I/O, control, shift, skip, and
+operate.
+
+Memory reference instructions have the format
+
+	memref{*} {C/Z} address{,1}
+
+where * signifies indirect, C a current sector reference, Z a sector zero
+reference, and 1 indexed.  The address is an octal number in the range 0 -
+077777; if C or Z is specified, the address is a page offset in the range
+0 - 0777.  Normally, C is not needed; the simulator figures out from the
+address what mode to use.  However, when referencing memory outside the CPU
+(eg, disks), there is no valid PC, and C must be used to specify current
+sector addressing.
+
+I/O instructions have the format
+
+	io pulse+device
+
+The pulse+device is an octal number in the range 0 - 01777.
+
+Control and operate instructions consist of a single opcode
+
+	opcode
+
+Shift instructions have the format
+
+	shift n
+
+where n is an octal number in the range 0-77.
+
+Skip instructions have the format
+
+	sub-op sub-op sub-op...
+
+The simulator checks that the combination of sub-opcodes is legal.
 
 Appendix 1: File Representations
 
@@ -4642,21 +4908,21 @@ floppy disk	y	y	y	-	-
 DECtape		y	y	-	-	d
 mag tape	h	y/both	y	-	h
 
-	system	1401	2100	Id4	PDP-10
+	system	1401	2100	Id4	PDP-10	H316
 device
-CPU		d	y	h	y
-FPU		-	-	h	y
-CIS		-	-	-	y
-console		h	y	h	y
-paper tape	-	h	h	h
-card reader	h	h	-	-
-line printer	h	-	-	y
-clock		-	h	-	y
-hard disk	-	h	-	y
-fixed disk	-	h	-	-
-floppy disk	-	-	-	-
-DECtape		-	-	-	-
-mag tape	h	h	-	y
+CPU		d	y	h	y	h
+FPU		-	-	h	y	-
+CIS		-	-	-	y	-
+console		h	y	h	y	h
+paper tape	-	h	h	h	h
+card reader	h	h	-	-	-
+line printer	h	-	-	y	h
+clock		-	h	-	y	h
+hard disk	-	h	-	y	-
+fixed disk	-	h	-	-	-
+floppy disk	-	-	-	-	-
+DECtape		-	-	-	-	-
+mag tape	h	h	-	y	-
 
 legend:		y = runs operating system or sample program
 		d = runs diagnostics
@@ -4665,6 +4931,19 @@ legend:		y = runs operating system or sample program
 		- = not applicable
 
 Revision History (since Rev 1.1)
+
+Rev 2.6b, Jul, 01
+		Added H316/516 simulator
+		Added Macintosh support from Louis Chrétien, Peter Schorn,
+			and Ben Supnik
+		Added bad block table option to PDP-11 RL, RP
+		Fixed bugs found by Peter Schorn
+			Endian error in PDP-10, PDP-11 RP
+			Space reverse error in PDP-11 TS
+			Symbolic input in 1401
+		Fixed bug in PDP-1 RIM loader found by Derek Peschel
+		Fixed bug in Nova fixed head disk
+		Removed register in declarations
 
 Rev 2.6a, Jun, 01
 		Fixed bug (found by Dave Conroy) in big-endian I/O
@@ -4870,12 +5149,14 @@ Phil Budne		Solaris port testing
 Max Burnet		PDP information, documentation, and software
 James Carpenter		LINUX port testing
 Chip Charlot		PDP-11 RT-11, RSTS/E, RSX-11M legal permissions
+Louis Chrétien		Macintosh porting
 Dave Conroy		HP 21xx documentation
 L Peter Deutsch		PDP-1 LISP software
 Ethan Dicks		PDP-11 2.9 BSD debugging
 Carl Friend		Nova and Interdata documentation, and RDOS software
 Megan Gentry		PDP-11 integer debugging, make file
-Dave Gesswein		PDP-8/9/15 documentation and diagnostics
+Dave Gesswein		PDP-8 and PDP-9.15 documentation, PDP-8 DECtape and
+			 paper tape images, PDP-9/15 DECtape images
 Dick Greeley		PDP-8 OS/8 and PDP-10 TOPS-10/20 legal permissions
 Gordon Greene		PDP-1 LISP machine readable source
 Lynne Grettum		PDP-11 RT-11, RSTS/E, RSX-11M legal permissions
@@ -4889,39 +5170,44 @@ Mark Hittinger		PDP-10 debugging
 Jay Jaeger		IBM 1401 information
 Doug Jones		PDP-8 information, simulator, and software
 Al Kossow		HP 21xx, Varian 620, TI 990, DEC documentation and software
+Arthur Krewat		DZ11 update for the PDP-10
 Don Lewine		Nova documentation and legal permissions
 Tim Litt		PDP-10 hardware documentation and schematics,
-			tape images, and software sources
+			 tape images, and software sources
 Scott McGregor		PDP-11 UNIX legal permissions
 Jeff Moffatt		HP 2100 information, documentation, and software
 Alec Muffett		Solaris port testing
 Thord Nilson		DZ11 implementation
 Charles Owen		Nova moving head disk debugging, Altair simulator,
-			IBM 1401 diagnostics, debugging, and magtape boot
+			 IBM 1401 diagnostics, debugging, and magtape boot
+Derek Peschel		PDP-10 debugging
 Paul Pierce		IBM 1401 diagnostics, media recovery
 Hans Pufal		PDP-10 debugging
 Bruce Ray		Software, documentation, bug fixes, and new devices
-			for the Nova
+			 for the Nova
 Craig St Clair		PDP documentation
 Richard Schedler	Public repository maintenance
+Peter Schorn		Macintosh porting
 Stephen Schultz		PDP-11 2.11 BSD debugging
 Olaf Seibert		NetBSD port testing
 Brian & Barry Silverman	PDP-1 simulator and software
 Tim Shoppa		Nova documentation, RDOS software, PDP-10 and PDP-11
-			software archive
+			 software archive
 Michael Somos		PDP-1 debugging
 Hans-Michael Stahl	OS/2 port testing, TERMIOS implementation
 Tim Stark		PDP-10 simulator
 Larry Stewart		Initial suggestion for the project
-Bill Strecker	Permission to revert copyrights
+Bill Strecker		Permission to revert copyrights
 Chris Suddick		PDP-11 floating point debugging
+Ben Supnik		Macintosh timing routine
 Ben Thomas		VMS character-by-character I/O routines
 Warren Toomey		PDP-11 UNIX software
 Deb Toivonen		DEC documentation
-Mike Umbricht		DEC documentation
+Mike Umbricht		DEC documentation, H316 documentation and schematics
 Leendert Van Doorn	PDP-11 UNIX V6 debugging, TERMIOS implementation
 David Waks		PDP-8 ESI-X and PDP-7 SIM8 software
 Tom West		Nova documentation
+Adrian Wise		H316 simulator, documentation, and software
 John Wilson		PDP-11 simulator and software
 
 In addition, the following companies have graciously licensed their

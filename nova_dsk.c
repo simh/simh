@@ -25,6 +25,7 @@
 
    dsk	fixed head disk
 
+   23-Aug-01	RMS	Fixed bug in write watermarking
    26-Apr-01	RMS	Added device enable/disable support
    10-Dec-00	RMS	Added Eclipse support
    15-Oct-00	RMS	Editorial changes
@@ -159,7 +160,7 @@ if ((pulse == iopP) && ((dsk_wlk >> GET_DISK (dsk_da)) & 1)) {	/* wrt lock? */
 	return rval;  }
 
 if (pulse & 1) {					/* read or write? */
-	if (((t_addr) (dsk_da * DSK_NUMWD)) >= dsk_unit.capac) {	/* invalid sector? */
+	if (((t_addr) (dsk_da * DSK_NUMWD)) >= dsk_unit.capac) { /* inv sev? */
 		dev_done = dev_done | INT_DSK;		/* set done */
 		int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
 		dsk_stat = DSKS_ERR + DSKS_NSD;		/* set status */
@@ -197,6 +198,8 @@ if (uptr -> FUNC == iopP) {				/* write? */
 	for (i = 0; i < DSK_NUMWD; i++) {		/* copy sector */
 		pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
 		*(((int16 *) uptr -> filebuf) + da + i) = M[pa];  }
+	if (((t_addr) (da + i)) >= uptr -> hwmark)	/* past end? */
+		uptr -> hwmark = da + i + 1;		/* upd hwmark */
 	dsk_ma = (dsk_ma + DSK_NUMWD + 3) & AMASK;  }
 
 dsk_stat = 0;						/* set status */

@@ -25,6 +25,8 @@
 
    cpu		central processor
 
+   10-Aug-01	RMS	Removed register from declarations
+   17-Jul-01	RMS	Moved function prototype
    07-Jun-01	RMS	Fixed bug in JMS to non-existent memory
    25-Apr-01	RMS	Added device enable/disable support
    18-Mar-01	RMS	Added DF32 support
@@ -271,12 +273,11 @@ DEVICE cpu_dev = {
 t_stat sim_instr (void)
 {
 extern int32 sim_interval;
-register int32 IR, MB, IF, DF, LAC, MQ;
-register t_addr PC, MA;
+int32 IR, MB, IF, DF, LAC, MQ;
+t_addr PC, MA;
 int32 device, pulse, temp, iot_data;
 t_stat reason;
 extern UNIT clk_unit;
-extern int32 sim_rtc_init (int32 time);
 extern int32 tti (int32 pulse, int32 AC);
 extern int32 tto (int32 pulse, int32 AC);
 extern int32 ptr (int32 pulse, int32 AC);

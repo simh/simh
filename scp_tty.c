@@ -23,9 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Jul-01	RMS	Added Macintosh support (from Louis Chretien, Peter Schorn,
+				and Ben Supnik)
    15-May-01	RMS	Added logging support
    05-Mar-01	RMS	Added clock calibration support
-   08-Dec-00	BKR	Added OS/2 support
+   08-Dec-00	BKR	Added OS/2 support (from Bruce Ray)
    18-Aug-98	RMS	Added BeOS support
    13-Oct-97	RMS	Added NetBSD terminal support
    25-Jan-97	RMS	Added POSIX terminal I/O support
@@ -44,7 +46,7 @@
 
    sim_os_msec	-	return elapsed time in msec
 
-   Versions are included for VMS, Windows, OS/2, BSD UNIX, and POSIX UNIX.
+   Versions are included for VMS, Windows, OS/2, Macintosh, BSD UNIX, and POSIX UNIX.
    The POSIX UNIX version works with LINUX.
 */
 
@@ -53,7 +55,7 @@
 int32 sim_int_char = 005;				/* interrupt character */
 extern FILE *sim_log;
 
-/* VMS routines */
+/* VMS routines, from Ben Thomas */
 
 #if defined (VMS)
 #define __TTYROUTINES 0
@@ -255,9 +257,9 @@ return GetTickCount ();
 
 #endif
 
-/* OS/2 routines */
+/* OS/2 routines, from Bruce Ray */
 
-#ifdef __OS2__
+#if defined (__OS2__)
 #define __TTYROUTINES 0
 #include <conio.h>
 
@@ -306,6 +308,180 @@ const t_bool rtc_avail = FALSE;
 uint32 sim_os_msec ()
 {
 return 0;
+}
+
+#endif
+
+/* Metrowerks CodeWarrior Macintosh routines, from Louis Chretien,
+   Peter Schorn, and Ben Supnik
+*/
+
+#if defined (__MWERKS__) && defined (macintosh)
+#define __TTYROUTINES 0
+
+#include <Timer.h>
+#include <console.h>
+#include <Mactypes.h>
+#include <string.h>
+#include <sioux.h>
+#include <siouxglobals.h>
+#include <Traps.h>
+
+extern char sim_name[];
+extern pSIOUXWin SIOUXTextWindow;
+static CursHandle iBeamCursorH = NULL;			/* contains the iBeamCursor */
+
+static void updateCursor(void) {
+	WindowPtr window;
+	window = FrontWindow();
+	if (SIOUXIsAppWindow(window)) {
+		GrafPtr savePort;
+		Point localMouse;
+		GetPort(&savePort);
+		SetPort(window);
+		GetGlobalMouse(&localMouse);
+		GlobalToLocal(&localMouse);
+		if (PtInRect(localMouse, &(*SIOUXTextWindow->edit)->viewRect) && iBeamCursorH) {
+			SetCursor(*iBeamCursorH);
+		} 
+		else {
+			SetCursor(&qd.arrow);
+		}
+		TEIdle(SIOUXTextWindow->edit);
+		SetPort(savePort);
+	} 
+	else {
+		SetCursor(&qd.arrow);
+		TEIdle(SIOUXTextWindow->edit);
+	}
+	return;
+}
+
+int ps_kbhit(void) {
+  EventRecord event;
+  int c;
+	updateCursor();
+	SIOUXUpdateScrollbar();
+	while (GetNextEvent(updateMask | osMask | mDownMask | mUpMask | activMask |
+		 highLevelEventMask | diskEvt, &event)) {
+		SIOUXHandleOneEvent(&event);
+	}
+	if (SIOUXQuitting) {
+		exit(1);
+	}
+  if (EventAvail(keyDownMask,&event)) {
+		c = event.message&charCodeMask;
+		if ((event.modifiers & cmdKey) && (c > 0x20)) {
+			GetNextEvent(keyDownMask, &event);
+			SIOUXHandleOneEvent(&event);
+			if (SIOUXQuitting) {
+				exit(1);
+			}
+			return false;
+		}
+  	return true;
+  }
+  else {
+  	return false;
+  } 
+}
+
+int ps_getch(void) {
+  int c;
+  EventRecord event;
+  fflush(stdout);
+	updateCursor();
+	while(!GetNextEvent(keyDownMask,&event)) {
+		if (GetNextEvent(updateMask | osMask | mDownMask | mUpMask | activMask |
+			 highLevelEventMask | diskEvt, &event)) {
+			SIOUXUpdateScrollbar();
+			SIOUXHandleOneEvent(&event);
+		}
+	}
+	if (SIOUXQuitting) {
+		exit(1);
+	}
+	c = event.message&charCodeMask;
+	if ((event.modifiers & cmdKey) && (c > 0x20)) {
+		SIOUXUpdateMenuItems();
+		SIOUXDoMenuChoice(MenuKey(c));
+	}
+	if (SIOUXQuitting) {
+		exit(1);
+	}
+   return c;
+}
+
+t_stat ttinit (void) {
+/* Note that this only works if the call to ttinit comes before any output to the console */
+	int i;
+	char title[50] = " "; /* this blank will later be replaced by the number of characters */
+	unsigned char ptitle[50];
+	SIOUXSettings.autocloseonquit	= TRUE;
+	SIOUXSettings.asktosaveonclose = FALSE;
+	SIOUXSettings.showstatusline = FALSE;
+	SIOUXSettings.columns = 80;
+	SIOUXSettings.rows = 40;
+	SIOUXSettings.toppixel = 42;
+	SIOUXSettings.leftpixel	= 6;
+	iBeamCursorH = GetCursor(iBeamCursor);
+	strcat(title, sim_name);
+	strcat(title, " Simulator");
+	title[0] = strlen(title) - 1;			/* Pascal string done */
+	for (i = 0; i <= title[0]; i++) {		/* copy to unsigned char */
+		ptitle[i] = title[i];
+	}
+	SIOUXSetTitle(ptitle);
+	return SCPE_OK;
+}
+
+t_stat ttrunstate (void)
+{
+return SCPE_OK;
+}
+
+t_stat ttcmdstate (void)
+{
+return SCPE_OK;
+}
+
+t_stat ttclose (void)
+{
+return SCPE_OK;
+}
+
+t_stat sim_poll_kbd (void)
+{
+int c;
+
+if (!ps_kbhit ()) return SCPE_OK;
+c = ps_getch();
+if ((c & 0177) == '\b') c = 0177;
+if ((c & 0177) == sim_int_char) return SCPE_STOP;
+return c | SCPE_KFLAG;
+}
+
+t_stat sim_putchar (int32 c)
+{
+if (c != 0177) {
+	putchar (c);
+	fflush (stdout) ;
+	if (sim_log) fputc (c, sim_log);  }
+return SCPE_OK;
+}
+
+const t_bool rtc_avail = TRUE;
+
+uint32 sim_os_msec (void)
+{
+unsigned long long micros;
+UnsignedWide macMicros;
+unsigned long millis;
+		
+Microseconds (&macMicros);
+micros = *((unsigned long long *) &macMicros);
+millis = micros / 1000LL;
+return (uint32) millis;
 }
 
 #endif
@@ -406,7 +582,7 @@ return msec;
 
 #endif
 
-/* POSIX UNIX routines */
+/* POSIX UNIX routines, from Leendert Van Doorn */
 
 #if !defined (__TTYROUTINES)
 #include <termios.h>

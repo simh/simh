@@ -25,6 +25,8 @@
 
    cpu		Nova central processor
 
+   10-Aug-01	RMS	Removed register in declarations
+   17-Jul-01	RMS	Moved function prototype
    26-Apr-01	RMS	Added device enable/disable support
    05-Mar-01	RMS	Added clock calibration
    22-Dec-00	RMS	Added Bruce Ray's second terminal
@@ -365,11 +367,10 @@ DEVICE cpu_dev = {
 t_stat sim_instr (void)
 {
 extern int32 sim_interval;
-register int32 PC, IR, i;
-register t_stat reason;
+int32 PC, IR, i;
+t_stat reason;
 void mask_out (int32 mask);
 extern int32 clk_sel, clk_time[4];
-extern int32 sim_rtc_init (int32 time);
 
 /* Restore register state */
 
@@ -386,7 +387,7 @@ if (sim_interval <= 0) {				/* check clock queue */
 	if (reason = sim_process_event ()) break;  }
 
 if (int_req > INT_PENDING) {				/* interrupt? */
-	register int32 MA, indf;
+	int32 MA, indf;
 	int_req = int_req & ~INT_ION;
 	old_PC = M[INT_SAV] = PC;
 	if (int_req & INT_STK) {			/* stack overflow? */
@@ -415,7 +416,7 @@ sim_interval = sim_interval - 1;
 /* Operate instruction */
 
 if (IR & I_OPR) {					/* operate? */
-	register int32 src, srcAC, dstAC;
+	int32 src, srcAC, dstAC;
 	srcAC = I_GETSRC (IR);				/* get reg decodes */
 	dstAC = I_GETDST (IR);
 	switch (I_GETCRY (IR)) {			/* decode carry */
@@ -474,7 +475,7 @@ if (IR & I_OPR) {					/* operate? */
 	switch (I_GETSKP (IR)) {			/* decode skip */
 	case 0:						/* nop */
 		if ((IR & I_NLD) && (cpu_unit.flags & UNIT_STK)) {
-			register int32 indf, MA;	/* Nova 3 or 4 trap */
+			int32 indf, MA;		/* Nova 3 or 4 trap */
 			old_PC = M[TRP_SAV] = (PC - 1) & AMASK;
 			MA = TRP_JMP;			/* jmp @47 */
 			for (i = 0, indf = 1; indf && (i < ind_max); i++) {
@@ -514,7 +515,7 @@ if (IR & I_OPR) {					/* operate? */
 /* Memory reference instructions */
 
 else if (IR < 060000) {					/* mem ref? */
-	register int32 src, MA, indf;
+	int32 src, MA, indf;
 	MA = I_GETDISP (IR);				/* get disp */
 	switch (I_GETMODE (IR)) {			/* decode mode */
 	case 0:						/* page zero */
@@ -587,7 +588,7 @@ else if (IR < 060000) {					/* mem ref? */
 /* IOT instruction */
 
 else {							/* IOT */
-	register int32 dstAC, pulse, code, device, iodata;
+	int32 dstAC, pulse, code, device, iodata;
 	dstAC = I_GETDST (IR);				/* decode fields */
 	code = I_GETIOT (IR);
 	pulse = I_GETPULSE (IR);
@@ -655,7 +656,7 @@ else {							/* IOT */
 			break;
 		case ioDOB:				/* store byte */
 			if (cpu_unit.flags & UNIT_BYT) {
-				register int32 MA, val;
+				int32 MA, val;
 				MA = AC[pulse] >> 1;
 				val = AC[dstAC] & 0377;
 				if (MEM_ADDR_OK (MA)) M[MA] = (AC[pulse] & 1)?
@@ -716,7 +717,7 @@ else {							/* IOT */
 			break;
 		case ioDOC:
 			if ((dstAC == 2) && (cpu_unit.flags & UNIT_MDV)) {
-				register unsigned int32 mddata, uAC0, uAC1, uAC2;
+				uint32 mddata, uAC0, uAC1, uAC2;
 				uAC0 = (unsigned int32) AC[0];
 				uAC1 = (unsigned int32) AC[1];
 				uAC2 = (unsigned int32) AC[2];
@@ -732,7 +733,7 @@ else {							/* IOT */
 						AC[1] = mddata / uAC2;
 						AC[0] = mddata % uAC2;  }  }  }
 			if ((dstAC == 3) && (cpu_unit.flags & UNIT_BYT)) {
-				register int32 mddata;
+				int32 mddata;
 				if (pulse == iopC) {	/* muls */
 					mddata = (SEXT (AC[1]) * SEXT (AC[2])) +
 						SEXT (AC[0]);

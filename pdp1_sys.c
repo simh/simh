@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Jul-01	RMS	Fixed RIM loader format
    27-May-01	RMS	Added multiconsole support
    14-Mar-01	RMS	Revised load/dump interface (again)
    30-Oct-00	RMS	Added support for examine to file
@@ -102,7 +103,8 @@ int32 origin, val;
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 for (;;) {
 	if ((val = getword (fileref)) < 0) return SCPE_FMT;
-	if ((val & 0770000) == 0240000) {		/* DAC? */
+	if (((val & 0770000) == 0320000) ||		/* DIO? */
+	    ((val & 0770000) == 0240000)) {		/* DAC? - incorrect */
 		origin = val & 07777;
 		if ((val = getword (fileref)) < 0) return SCPE_FMT;
 		if (MEM_ADDR_OK (origin)) M[origin++] = val;  }

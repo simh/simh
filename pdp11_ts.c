@@ -25,6 +25,8 @@
 
    ts		TS11/TSV05 magtape
 
+   13-Jul-01	RMS	Fixed bug in space reverse (found by Peter Schorn)
+
    Magnetic tapes are represented as a series of variable 8b records
    of the form:
 
@@ -425,7 +427,8 @@ t_mtrlnt prvp;
 t_bool tmkprv = FALSE;
 
 msgrfc = fc;
-do {	tc = ts_spacer (uptr, 0, FALSE);		/* space rev */
+do {	prvp = uptr -> pos;				/* save cur pos */
+	tc = ts_spacer (uptr, 0, FALSE);		/* space rev */
 	if (GET_X (tc) & XS0_TMK) {			/* tape mark? */
 		msgrfc = (msgrfc - 1) & DMASK;		/* decr wc */
 		if (tmkprv && (wchopt & WCH_ESS) &&

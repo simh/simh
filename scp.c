@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Jul-01	RMS	Minor changes for Macintosh port
    12-Jun-01	RMS	Fixed bug in big-endian I/O (found by Dave Conroy)
    27-May-01	RMS	Added multiple console support
    16-May-01	RMS	Added logging
@@ -303,17 +304,17 @@ static CTAB cmd_table[] = {
 
 /* Main command loop */
 
-printf ("\n%s simulator V2.6a\n", sim_name);
-end_test.i = 1;						/* test endian-ness */
-sim_end = end_test.c[0];
-if (sim_emax <= 0) sim_emax = 1;
-if ((sim_eval = calloc (sim_emax, sizeof (t_value))) == NULL) {
-	printf ("Unable to allocate examine buffer\n");
-	return 0;  };
+#if defined (__MWERKS__) && defined (macintosh)
+argc = ccommand(&argv);
+#endif
+
 if ((stat = ttinit ()) != SCPE_OK) {
 	printf ("Fatal terminal initialization error\n%s\n",
 		scp_error_messages[stat - SCPE_BASE]);
 	return 0;  }
+printf ("\n%s simulator V2.6b\n", sim_name);
+end_test.i = 1;						/* test endian-ness */
+sim_end = end_test.c[0];
 stop_cpu = 0;
 sim_interval = 0;
 sim_time = sim_rtime = 0;
@@ -321,6 +322,10 @@ noqueue_time = 0;
 sim_clock_queue = NULL;
 sim_is_running = 0;
 sim_log = NULL;
+if (sim_emax <= 0) sim_emax = 1;
+if ((sim_eval = calloc (sim_emax, sizeof (t_value))) == NULL) {
+	printf ("Unable to allocate examine buffer\n");
+	return 0;  };
 if ((stat = reset_all (0)) != SCPE_OK) {
 	printf ("Fatal simulator initialization error\n%s\n",
 		scp_error_messages[stat - SCPE_BASE]);

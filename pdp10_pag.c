@@ -25,6 +25,8 @@
 
    pag		KS10 pager
 
+   21-Aug-01	RMS	Fixed bug in ITS paging (found by Miriam Lennox)
+			Removed register from declarations
    19-May-01	RMS	Added workaround for TOPS-20 V4.1 boot bug
    03-May-01	RMS	Fixed bug in indirect page table pointer processing
    29-Apr-01	RMS	Added CLRCSH for ITS, fixed LPMR
@@ -155,7 +157,7 @@ DEVICE pag_dev = {
 
 d10 Read (a10 ea, int32 prv)
 {
-register int32 pa, vpn, xpte;
+int32 pa, vpn, xpte;
 
 if (ea < AC_NUM) return (prv? ac_prv[ea]: ac_cur[ea]);	/* AC request */
 vpn = PAG_GETVPN (ea);					/* get page num */
@@ -168,7 +170,7 @@ return M[pa];						/* return data */
 
 d10 ReadM (a10 ea, int32 prv)
 {
-register int32 pa, vpn, xpte;
+int32 pa, vpn, xpte;
 
 if (ea < AC_NUM) return (prv? ac_prv[ea]: ac_cur[ea]);	/* AC request */
 vpn = PAG_GETVPN (ea);					/* get page num */
@@ -181,7 +183,7 @@ return M[pa];						/* return data */
 
 d10 ReadE (a10 ea)
 {
-register int32 pa, vpn, xpte;
+int32 pa, vpn, xpte;
 
 if (ea < AC_NUM) return AC(ea);				/* AC? use current */
 if (!PAGING) return M[ea];				/* phys? no mapping */
@@ -202,7 +204,7 @@ return M[ea];						/* return data */
 
 void Write (a10 ea, d10 val, int32 prv)
 {
-register int32 pa, vpn, xpte;
+int32 pa, vpn, xpte;
 
 if (ea < AC_NUM) {					/* AC request */
 	if (prv) ac_prv[ea] = val;			/* write AC */
@@ -218,7 +220,7 @@ return;
 
 void WriteE (a10 ea, d10 val)
 {
-register int32 pa, vpn, xpte;
+int32 pa, vpn, xpte;
 
 if (ea < AC_NUM) AC(ea) = val;				/* AC? use current */
 else if (!PAGING) M[ea] = val;				/* phys? no mapping */
@@ -241,7 +243,7 @@ return;
 
 t_bool AccViol (a10 ea, int32 prv, int32 mode)
 {
-register int32 vpn, xpte;
+int32 vpn, xpte;
 
 if (ea < AC_NUM) return FALSE;				/* AC request */
 vpn = PAG_GETVPN (ea);					/* get page num */
@@ -303,7 +305,7 @@ if (ITS) {						/* ITS paging */
 	vpn = ITS_GETVPN (ea);				/* get ITS pagno */
 	if (tbl == uptbl)
 		ptead = ((ea & RSIGN)? dbr2: dbr1) + ((vpn >> 1) & 077);
-	else ptead = ((ea & RSIGN)? dbr4: dbr3) + ((vpn >> 1) & 077);
+	else ptead = ((ea & RSIGN)? dbr3: dbr4) + ((vpn >> 1) & 077);
 	ptewd = ReadP (ptead);				/* get PTE pair */
 	pte = (int32) ((ptewd >> ((vpn & 1)? 0: 18)) & RMASK);
 	acc = ITS_GETACC (pte);				/* get access */

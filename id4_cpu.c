@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Aug-01	RMS	Removed register in declarations
    07-Oct-00	RMS	Overhauled I/O subsystem
    14-Apr-99	RMS	Changed t_addr to unsigned
 
@@ -243,10 +244,10 @@ DEVICE cpu_dev = {
 t_stat sim_instr (void)
 {
 extern int32 sim_interval;
-register int32 dev, i, j, r, t;
-register int32 PC, OP, R1, R2, EA, CC;
+int32 dev, i, j, r, t;
+int32 PC, OP, R1, R2, EA, CC;
 int32 inc, lim;
-register t_stat reason;
+t_stat reason;
 
 /* Restore register state */
 
@@ -638,7 +639,7 @@ case 0x97:						/* RBR */
 case 0xDF:						/* AI */
 case 0x9F:						/* AIR */
 	for (i = t = 0; i < INTSZ; i++) {		/* loop thru array */
-		register unsigned int32 temp;
+		uint32 temp;
 		if (temp = int_req[i] & int_enb[i]) {	/* loop thru word */
 			for (j = 0; j < 32; j++) {
 				if (temp & INT_V(j)) break;

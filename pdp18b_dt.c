@@ -26,6 +26,7 @@
    dt		(PDP-9) TC02/TU55 DECtape
 		(PDP-15) TC15/TU56 DECtape
 
+   17-Jul-01	RMS	Moved function prototype
    11-May-01	RMS	Fixed bug in reset
    26-Apr-01	RMS	Added device enable/disable support
    15-Mar-01	RMS	Added 129th word to PDP-8 format
@@ -254,7 +255,6 @@ void dt_seterr (UNIT *uptr, int32 e);
 int32 dt_comobv (int32 val);
 int32 dt_csum (UNIT *uptr, int32 blk);
 int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos);
-extern uint32 sim_grtime (void);
 extern int32 sim_is_running;
 
 /* DT data structures

@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Aug-01	RMS	Updated bad block inquiry
+   17-Jul-01	RMS	Fixed warning from VC++ 6.0
    27-May-01	RMS	Added multiconsole support
    05-Apr-01	RMS	Added support for TS11/TSV05
    14-Mar-01	RMS	Revised load/dump interface (again)
@@ -207,7 +209,7 @@ int16 *buf;
 
 if ((sec < 2) || (wds < 16)) return SCPE_ARG;
 if ((uptr -> flags & UNIT_ATT) == 0) return SCPE_UNATT;
-if (!get_yn ("Overwrite last track? [N]", FALSE)) return SCPE_OK;
+if (!get_yn ("Create bad block table on last track? [N]", FALSE)) return SCPE_OK;
 da = (uptr -> capac - (sec * wds)) * sizeof (int16);
 if (fseek (uptr -> fileref, da, SEEK_SET)) return SCPE_IOERR;
 if ((buf = malloc (wds * sizeof (int16))) == NULL) return SCPE_MEM;
@@ -429,43 +431,43 @@ static const char *fname [] =
 int32 fprint_spec (FILE *of, t_addr addr, int32 spec, t_value nval,
 	int32 flag, int32 iflag)
 {
-int32 reg;
+int32 reg, mode;
+static const int32 rgwd[8] = { 0, 0, 0, 0, 0, 0, -1, -1 };
+static const int32 pcwd[8] = { 0, 0, -1, -1, 0, 0, -1, -1 };
 
 reg = spec & 07;
-switch ((spec >> 3) & 07) {
+mode = ((spec >> 3) & 07);
+switch (mode) {
 case 0:
 	if (iflag) fprintf (of, "%s", rname[reg]);
 	else fprintf (of, "%s", fname[reg]);
-	return 0;
+	break;
 case 1:
 	fprintf (of, "(%s)", rname[reg]);
-	return 0;
+	break;
 case 2:
-	if (reg != 7) {
-		fprintf (of, "(%s)+", rname[reg]);
-		return 0;  }
-	else {	fprintf (of, "#%-o", nval);
-		return -1;  }
+	if (reg != 7) fprintf (of, "(%s)+", rname[reg]);
+	else fprintf (of, "#%-o", nval);
+	break;
 case 3:
-	if (reg != 7) {
-		fprintf (of, "@(%s)+", rname[reg]);
-		return 0;  }
-	else {	fprintf (of, "@#%-o", nval);
-		return -1;  }
+	if (reg != 7) fprintf (of, "@(%s)+", rname[reg]);
+	else fprintf (of, "@#%-o", nval);
+	break;
 case 4:
 	fprintf (of, "-(%s)", rname[reg]);
-	return 0;
+	break;
 case 5:
 	fprintf (of, "@-(%s)", rname[reg]);
-	return 0;
+	break;
 case 6:
 	if ((reg != 7) || !flag) fprintf (of, "%-o(%s)", nval, rname[reg]);
 	else fprintf (of, "%-o", (nval + addr + 4) & 0177777);
-	return -1;
+	break;
 case 7:
 	if ((reg != 7) || !flag) fprintf (of, "@%-o(%s)", nval, rname[reg]);
 	else fprintf (of, "@%-o", (nval + addr + 4) & 0177777);
-	return -1;  }					/* end case */
+	break;  }					/* end case */
+return ((reg == 07)? pcwd[mode]: rgwd[mode]);
 }
 
 /* Symbolic decode

@@ -25,6 +25,7 @@
 
    clk		real time clock
 
+   17-Jul-01	RMS	Moved function prototype
    05-Mar-01	RMS	Added clock calibration support
 
    Note: includes the IOT's for both the PDP-8/E and PDP-8/A clocks
@@ -35,7 +36,6 @@
 extern int32 int_req, int_enable, dev_done, stop_inst;
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
-extern int32 sim_rtc_calb (int32 tps);
 int32 clk_tps = 60;
 
 /* CLK data structures

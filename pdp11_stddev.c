@@ -27,6 +27,8 @@
    tti,tto	DL11 terminal input/output
    clk		KW11L line frequency clock
 
+   17-Jul-01	RMS	Moved function prototype
+   04-Jul-01	RMS	Added DZ11 support
    05-Mar-01	RMS	Added clock calibration support
    30-Oct-00	RMS	Standardized register order
    25-Jun-98	RMS	Fixed bugs in paper tape error handling
@@ -44,6 +46,7 @@
 #define TTOCSR_RW	(CSR_IE)
 #define CLKCSR_IMP	(CSR_IE)			/* real-time clock */
 #define CLKCSR_RW	(CSR_IE)
+#define CLK_DELAY	8000
 
 extern int32 int_req;
 int32 ptr_csr = 0;					/* control/status */
@@ -54,6 +57,8 @@ int32 tti_csr = 0;					/* control/status */
 int32 tto_csr = 0;					/* control/status */
 int32 clk_csr = 0;					/* control/status */
 int32 clk_tps = 60;					/* ticks/second */
+int32 dz_poll = CLK_DELAY;				/* DZ poll inteval */
+
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat tti_svc (UNIT *uptr);
@@ -70,7 +75,6 @@ t_stat ptp_attach (UNIT *uptr, char *ptr);
 t_stat ptp_detach (UNIT *uptr);
 extern t_stat sim_poll_kbd (void);
 extern t_stat sim_putchar (int32 out);
-extern int32 sim_rtc_calb (int32 ticksper);
 
 /* PTR data structures
 
@@ -487,8 +491,12 @@ return SCPE_OK;
 
 t_stat clk_svc (UNIT *uptr)
 {
+int32 t;
+
 if (clk_csr & CSR_IE) int_req = int_req | INT_CLK;
-sim_activate (&clk_unit, sim_rtc_calb (clk_tps));	/* reactivate unit */
+t = sim_rtc_calb (clk_tps);				/* calibrate clock */
+sim_activate (&clk_unit, t);				/* reactivate unit */
+dz_poll = t;						/* set DZ poll */
 return SCPE_OK;
 }
 
@@ -497,5 +505,6 @@ t_stat clk_reset (DEVICE *dptr)
 clk_csr = 0;
 int_req = int_req & ~INT_CLK;
 sim_activate (&clk_unit, clk_unit.wait);		/* activate unit */
+dz_poll = clk_unit.wait;				/* set DZ poll */
 return SCPE_OK;
 }

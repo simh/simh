@@ -25,6 +25,8 @@
 
    cpu		PDP-4/7/9/15 central processor
 
+   10-Aug-01	RMS	Removed register from declarations
+   17-Jul-01	RMS	Moved function prototype
    27-May-01	RMS	Added second Teletype support, fixed bug in API
    18-May-01	RMS	Added PDP-9,-15 API option
    16-May-01	RMS	Fixed bugs in protection checks
@@ -441,12 +443,11 @@ DEVICE cpu_dev = {
 t_stat sim_instr (void)
 {
 extern int32 sim_interval;
-register int32 PC, LAC, MQ;
+int32 PC, LAC, MQ;
 int32 api_int, api_cycle, skp;
 int32 iot_data, device, pulse;
 t_stat reason;
 extern UNIT clk_unit;
-extern int32 sim_rtc_init (int32 time);
 extern int32 tti (int32 pulse, int32 AC);
 extern int32 tto (int32 pulse, int32 AC);
 extern int32 ptr (int32 pulse, int32 AC);
@@ -589,7 +590,7 @@ extern int32 tto1 (int32 pulse, int32 AC);
 /* Restore register state */
 
 #if defined (PDP15)
-register int32 epcmask, damask;
+int32 epcmask, damask;
 
 damask = memm? 017777: 07777;				/* set dir addr mask */
 epcmask = ADDRMASK & ~damask;				/* extended PC mask */
@@ -611,8 +612,8 @@ api_cycle = 0;						/* not API cycle */
 /* Main instruction fetch/decode loop: check trap and interrupt */
 
 while (reason == 0) {					/* loop until halted */
-register int32 IR, MA, t, xct_count;
-register int32 link_init, fill;
+int32 IR, MA, t, xct_count;
+int32 link_init, fill;
 
 if (sim_interval <= 0) {				/* check clock queue */
 	if (reason = sim_process_event ()) break;

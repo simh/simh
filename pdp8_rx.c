@@ -25,6 +25,7 @@
 
    rx		RX8E/RX01 floppy disk
 
+   17-Jul-01	RMS	Fixed warning from VC++ 6
    26-Apr-01	RMS	Added device enable/disable support
    13-Apr-01	RMS	Revised for register arrays
    14-Apr-99	RMS	Changed t_addr to unsigned
@@ -161,7 +162,7 @@ int32 drv;
 
 switch (pulse) {					/* decode IR<9:11> */
 case 0:							/* unused */
-	return AC;
+	break;
 case 1:							/* LCD */
 	if (rx_state != IDLE) return AC;		/* ignore if busy */
 	rx_dbr = rx_csr = AC;				/* save new command */
@@ -209,31 +210,32 @@ case 2:							/* XDR */
 		sim_activate (&rx_unit[drv],		/* sched done */
 			rx_swait * abs (rx_track - rx_unit[drv].TRACK));
 		break;  }				/* end switch state */
-	return AC;
+	break;
 case 3:							/* STR */
 	if (rx_tr != 0) {
 		rx_tr = 0;
 		return IOT_SKP + AC;  }
-	return AC;
+	break;
 case 4:							/* SER */
 	if (rx_err != 0) {
 		rx_err = 0;
 		return IOT_SKP + AC;  }
-	return AC;
+	break;
 case 5:							/* SDN */
 	if ((dev_done & INT_RX) != 0) {
 		dev_done = dev_done & ~INT_RX;
 		int_req = int_req & ~INT_RX;
 		return IOT_SKP + AC;  }
-	return AC;
+	break;
 case 6:							/* INTR */
 	if (AC & 1) int_enable = int_enable | INT_RX;
 	else int_enable = int_enable & ~INT_RX;
 	int_req = INT_UPDATE;
-	return AC;
+	break;
 case 7:							/* INIT */
 	rx_reset (&rx_dev);				/* reset device */
-	return AC;  }					/* end case pulse */
+	break;  }					/* end case pulse */
+return AC;
 }
 
 /* Unit service; the action to be taken depends on the transfer state:

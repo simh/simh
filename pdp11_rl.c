@@ -25,6 +25,8 @@
 
    rl		RL11(RLV12)/RL01/RL02 cartridge disk
 
+   20-Aug-01	RMS	Added bad block option in attach
+   17-Jul-01	RMS	Fixed warning from VC++ 6.0
    26-Apr-01	RMS	Added device enable/disable support
    25-Mar-01	RMS	Fixed block fill calculation
    15-Feb-01	RMS	Corrected bootstrap string
@@ -262,21 +264,22 @@ case 0:							/* RLCS */
 	if (sim_is_active (uptr)) rlcs = rlcs & ~RLCS_DRDY;
 	else rlcs = rlcs | RLCS_DRDY;			/* see if ready */
 	*data = rlcs;
-	return SCPE_OK;
+	break;
 case 1:							/* RLBA */
 	*data = rlba & RLBA_IMP;
-	return SCPE_OK;
+	break;
 case 2:							/* RLDA */
 	*data = rlda;
-	return SCPE_OK;
+	break;
 case 3:							/* RLMP */
 	*data = rlmp;
 	rlmp = rlmp1;					/* ripple data */
 	rlmp1 = rlmp2;
-	return SCPE_OK;
+	break;
 case 4:							/* RLBAE */
 	*data = rlbae & RLBAE_IMP;
-	return SCPE_OK;  }				/* end switch */
+	break;  }					/* end switch */
+return SCPE_OK;
 }
 
 t_stat rl_wr (int32 data, int32 PA, int32 access)
@@ -324,29 +327,30 @@ case 0:							/* RLCS */
 		break;
 	default:					/* data transfer */
 		sim_activate (uptr, rl_swait);		/* activate unit */
-		break;  }			/* end switch func */
-	return SCPE_OK;					/* end case RLCS */
+		break;  }				/* end switch func */
+	break;						/* end case RLCS */
 
 case 1:							/* RLBA */
 	if (access == WRITEB) data = (PA & 1)?
 		(rlba & 0377) | (data << 8): (rlba & ~0377) | data;
 	rlba = data & RLBA_IMP;
-	return SCPE_OK;
+	break;
 case 2:							/* RLDA */
 	if (access == WRITEB) data = (PA & 1)?
 		(rlda & 0377) | (data << 8): (rlda & ~0377) | data;
 	rlda = data;
-	return SCPE_OK;
+	break;
 case 3:							/* RLMP */
 	if (access == WRITEB) data = (PA & 1)?
 		(rlmp & 0377) | (data << 8): (rlmp & ~0377) | data;
 	rlmp = rlmp1 = rlmp2 = data;
-	return SCPE_OK;
+	break;
 case 4:							/* RLBAE */
 	if (PA & 1) return SCPE_OK;
 	rlbae = data & RLBAE_IMP;
 	rlcs = (rlcs & ~RLCS_MEX) | ((rlbae & RLCS_M_MEX) << RLCS_V_MEX);
-	return SCPE_OK;  }				/* end switch */
+	break;  }					/* end switch */
+return SCPE_OK;
 }
 
 /* Service unit timeout
@@ -491,7 +495,8 @@ uptr -> capac = (uptr -> flags & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
 r = attach_unit (uptr, cptr);
 if ((r != SCPE_OK) || ((uptr -> flags & UNIT_AUTO) == 0)) return r;
 if (fseek (uptr -> fileref, 0, SEEK_END)) return SCPE_OK;
-if ((p = ftell (uptr -> fileref)) == 0) return SCPE_OK;
+if ((p = ftell (uptr -> fileref)) == 0)
+	return pdp11_bad_block (uptr, RL_NUMSC, RL_NUMWD);
 if (p > (RL01_SIZE * sizeof (int16))) {
 	uptr -> flags = uptr -> flags | UNIT_RL02;
 	uptr -> capac = RL02_SIZE;  }

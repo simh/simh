@@ -22,6 +22,11 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   tim		timer subsystem
+
+   17-Jul-01	RMS	Moved function prototype
+   04-Jul-01	RMS	Added DZ11 support
 */
 
 #include "pdp10_defs.h"
@@ -29,8 +34,10 @@
 
 #define TIM_N_HWRE	12				/* hwre bits */
 #define TIM_HWRE	0000000010000			/* hwre incr */
+#define TIM_DELAY	500
+#define TIM_TPS		1001				/* ticks per sec */
+#define DZ_MULT		(TIM_TPS / 60)			/* DZ poll multiplier */
 #define TB_MASK		037777777777777777777;		/* 71 - 12 bits */
-#define TPS		1001				/* ticks per sec */
 #define UNIT_V_Y2K	(UNIT_V_UF)			/* Y2K compliant OS */
 #define UNIT_Y2K	(1u << UNIT_V_Y2K)
 
@@ -43,6 +50,7 @@ d10 ttg = 0;						/* time to go */
 d10 period = 0;						/* period */
 d10 quant = 0;						/* ITS quantum */
 int32 diagflg = 0;					/* diagnostics? */
+int32 dz_poll = TIM_DELAY * DZ_MULT;			/* DZ11 poll */
 
 t_stat tim_svc (UNIT *uptr);
 t_stat tim_reset (DEVICE *dptr);
@@ -51,7 +59,6 @@ extern d10 ReadM (a10 ea, int32 prv);
 extern void Write (a10 ea, d10 val, int32 prv);
 extern void WriteP (a10 ea, d10 val);
 extern int32 pi_eval (void);
-extern sim_rtc_calb (int32 tps);
 
 /* TIM data structures
 
@@ -60,7 +67,7 @@ extern sim_rtc_calb (int32 tps);
    tim_reg	TIM register list
 */
 
-UNIT tim_unit = { UDATA (&tim_svc, 0, 0), 500 };
+UNIT tim_unit = { UDATA (&tim_svc, 0, 0), TIM_DELAY };
 
 REG tim_reg[] = {
 	{ ORDATA (TIMEBASE, timebase, 71 - TIM_N_HWRE) },
@@ -121,8 +128,11 @@ return FALSE;
 
 t_stat tim_svc (UNIT *uptr)
 {
-sim_activate (&tim_unit,				/* reactivate unit */
-	(diagflg? tim_unit.wait: sim_rtc_calb (TPS)));
+int32 t;
+
+t = diagflg? tim_unit.wait: sim_rtc_calb (TIM_TPS);	/* calibrate clock */
+sim_activate (&tim_unit, t);				/* reactivate unit */
+dz_poll = t * DZ_MULT;					/* set DZ poll */
 timebase = (timebase + 1) & TB_MASK;			/* increment timebase */
 ttg = ttg - TIM_HWRE;					/* decrement timer */
 if (ttg <= 0) {						/* timeout? */
@@ -142,6 +152,7 @@ t_stat tim_reset (DEVICE *dptr)
 period = ttg = 0;					/* clear timer */
 apr_flg = apr_flg & ~APRF_TIM;				/* clear interrupt */
 sim_activate (&tim_unit, tim_unit.wait);		/* activate unit */
+dz_poll = tim_unit.wait * DZ_MULT;			/* set DZ poll */
 return SCPE_OK;
 }
 

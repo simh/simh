@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Aug-01	RMS	Removed register in declarations
    26-Nov-00	RMS	Fixed bug in dual device number routine
    21-Nov-00	RMS	Fixed bug in reset routine
    15-Oct-00	RMS	Added dynamic device number support
@@ -456,7 +457,7 @@ struct hpdev infotab[] = {
 t_stat sim_instr (void)
 {
 extern int32 sim_interval;
-register int32 IR, MA, absel, i, t, intrq, dmarq;
+int32 IR, MA, absel, i, t, intrq, dmarq;
 int32 err_PC, M1, dev, iodata, op, sc, q, r, wc;
 t_stat reason;
 
@@ -694,7 +695,7 @@ else if ((IR & NMROP) == IOT) {				/* I/O? */
 /* Extended instructions */
 
 else if (cpu_unit.flags & (UNIT_2100 | UNIT_21MX)) {	/* ext instr? */
-	register int32 awc;
+	int32 awc;
 
 	op = (IR >> 4) & 0277;				/* get opcode */
 	if (ext_addr[op]) {				/* extended mem ref? */

@@ -25,7 +25,9 @@
 
    uba		Unibus adapters
 
-   1-Jun-01	RMS	Updated DZ11 vectors
+   25-Aug-01	RMS	Enabled DZ11
+   21-Aug-01	RMS	Updated DZ11 disable
+   01-Jun-01	RMS	Updated DZ11 vectors
    12-May-01	RMS	Fixed typo
 
    The KS10 uses the PDP-11 Unibus for its I/O, via adapters.  While
@@ -75,7 +77,7 @@
 int32 ubcs[UBANUM] = { 0 };				/* status registers */
 int32 ubmap[UBANUM][UMAP_MEMSIZE] = { 0 };		/* Unibus maps */
 int32 int_req = 0;					/* interrupt requests */
-int32 dev_enb = -1 & ~(INT_PTR | INT_PTP);		/* device enables */
+int32 dev_enb = -1 & ~(INT_PTR | INT_PTP | INT_DZ0RX);	/* device enables */
 
 /* Map IO controller numbers to Unibus adapters: -1 = non-existent */
 
@@ -162,7 +164,7 @@ struct iolink iotable[] = {
 			&rp_rd, &rp_wr },		/* disk */
 	{ IO_UBA3+IO_TMBASE, IO_UBA3+IO_TMBASE+033, 0,
 			&tu_rd, &tu_wr },		/* mag tape */
-/*	{ IO_UBA3+IO_DZBASE, IO_UBA3+IO_DZBASE+07, INT_DZ,
+	{ IO_UBA3+IO_DZBASE, IO_UBA3+IO_DZBASE+07, INT_DZ0RX,
 			&dz0_rd, &dz0_wr },		/* terminal mux */
 	{ IO_UBA3+IO_LPBASE, IO_UBA3+IO_LPBASE+017, 0,
 			&lp20_rd, &lp20_wr },		/* line printer */
