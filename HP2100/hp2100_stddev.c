@@ -13,9 +13,9 @@
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTI_CTLILITY,
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LII_CTLLE FOR ANY CLAIM, DAMAGES OR OTHER LII_CTLILITY, WHETHER
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
@@ -23,11 +23,14 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ptr		12597A-002 paper tape reader
-   ptp		12597A-005 paper tape punch
+   ptr		12597A-002 paper tape reader interface
+   ptp		12597A-005 paper tape punch interface
    tty		12531C buffered teleprinter interface
    clk		12539C time base generator
 
+   13-Sep-04	JDB	Added paper tape loop mode, DIAG/READER modifiers to PTR
+			Added PV_LEFT to PTR TRLLIM register
+			Modified CLK to permit disable
    15-Aug-04	RMS	Added tab to control char set (from Dave Bryan)
    14-Jul-04	RMS	Generalized handling of control char echoing
 			(from Dave Bryan)
@@ -57,6 +60,10 @@
    The reader and punch, like most HP devices, have a command flop.  The
    teleprinter and clock do not.
 
+   Reader diagnostic mode simulates a tape loop by rewinding the tape image file
+   upon EOF.  Normal mode EOF action is to supply TRLLIM nulls and then either
+   return SCPE_IOERR or SCPE_OK without setting the device flag.
+
    The clock autocalibrates.  If the specified clock frequency is below
    10Hz, the clock service routine runs at 10Hz and counts down a repeat
    counter before generating an interrupt.  Autocalibration will not work
@@ -66,6 +73,13 @@
    This turns off autocalibration and divides the longest time intervals down
    by 10**3.  The clk_time values were chosen to allow the diagnostic to
    pass its clock calibration test.
+
+   References:
+   - 2748B Tape Reader Operating and Service Manual (02748-90041, Oct-1977)
+   - 12597A 8-Bit Duplex Register Interface Kit Operating and Service Manual
+            (12597-9002, Sep-1974)
+   - 12539C Time Base Generator Interface Kit Operating and Service Manual
+            (12539-90008, Jan-1975)
 */
 
 #include "hp2100_defs.h"
@@ -170,7 +184,7 @@ REG ptr_reg[] = {
 	{ FLDATA (FBF, ptr_dib.fbf, 0) },
 	{ FLDATA (SRQ, ptr_dib.srq, 0) },
 	{ DRDATA (TRLCTR, ptr_trlcnt, 8), REG_HRO },
-	{ DRDATA (TRLLIM, ptr_trllim, 8) },
+	{ DRDATA (TRLLIM, ptr_trllim, 8), PV_LEFT },
 	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
@@ -178,6 +192,8 @@ REG ptr_reg[] = {
 	{ NULL }  };
 
 MTAB ptr_mod[] = {
+	{ UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", NULL },
+	{ UNIT_DIAG, 0, "reader mode", "READER", NULL },
 	{ MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&hp_setdev, &hp_showdev, &ptr_dev },
 	{ 0 }  };
@@ -327,7 +343,7 @@ DEVICE clk_dev = {
 	1, 0, 0, 0, 0, 0,
 	NULL, NULL, &clk_reset,
 	NULL, NULL, NULL,
-	&clk_dib, 0 };
+	&clk_dib, DEV_DISABLE };
 
 /* Paper tape reader: IOT routine */
 
@@ -377,15 +393,20 @@ dev = ptr_dib.devno;					/* get device no */
 clrCMD (dev);						/* clear cmd */
 if ((ptr_unit.flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (ptr_stopioe, SCPE_UNATT);
-if ((temp = getc (ptr_unit.fileref)) == EOF) {		/* read byte, error? */
+while ((temp = getc (ptr_unit.fileref)) == EOF) {	/* read byte, error? */
 	if (feof (ptr_unit.fileref)) {			/* end of file? */
-	    if (ptr_trlcnt >= ptr_trllim) {		/* added all trailer? */	
-		if (ptr_stopioe) {			/* stop on error? */
-		    printf ("PTR end of file\n");
-		    return SCPE_IOERR;  }
-	        else return SCPE_OK;  }			/* no, just hang */
-	    ptr_trlcnt++;				/* count trailer */
-	    temp = 0;  }				/* read a zero */
+	    if ((ptr_unit.flags & UNIT_DIAG) && (ptr_unit.pos > 0)) {
+		rewind (ptr_unit.fileref);		/* rewind if loop mode */
+		ptr_unit.pos = 0;  }
+	    else {
+		if (ptr_trlcnt >= ptr_trllim) {		/* added all trailer? */	
+		    if (ptr_stopioe) {			/* stop on error? */
+			printf ("PTR end of file\n");
+			return SCPE_IOERR;  }
+		    else return SCPE_OK;  }		/* no, just hang */
+		ptr_trlcnt++;				/* count trailer */
+		temp = 0;				/* read a zero */
+		break;  }  }
 	else {						/* no, real error */
 	    perror ("PTR I/O error");
 	    clearerr (ptr_unit.fileref);

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	IBM 1620 Simulator Usage
-Date:	15-Feb-2004
+Date:	15-Nov-2004
 
 			COPYRIGHT NOTICE
 
@@ -188,6 +188,17 @@ interrupt system.
 				most recent IR1 change first
 	WRU		8	interrupt character
 
+The CPU can maintain a history of the most recently executed instructions.
+This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
+
+	SET CPU HISTORY		clear history buffer
+	SET CPU HISTORY=0	disable history
+	SET CPU HISTORY=n	enable history, length = n
+	SHOW CPU HISTORY	print CPU history
+	SHOW CPU HISTORY=n	print first n entries of CPU history
+
+The maximum length for the history is 65536 entries.
+
 2.2 Console Typewriter (TTY)
 
 The console typewriter (TTY) is a half-duplex console.  The typewriter
@@ -361,7 +372,7 @@ pack options include the ability to enable address writing (formatting).
 	SET DPn ADDROFF		set unit n address enable off
 	SET DPn ADDRON		set unit n address enable on
 
-Units can also be set ONLINE or OFFLINE.
+Units can also be set ENABLED or DISABLED.
 
 Unlike most simulated disks, the 1311 includes explicit representation
 for sector addresses.  This is to support non-standard formats, such as

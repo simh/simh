@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Nov-04	WVS	Added data printout support
    16-Mar-03	RMS	Fixed mnemonic for MCS
    03-Jun-02	RMS	Added 1311 support
    18-May-02	RMS	Added -D feature from Van Snyder
@@ -157,7 +158,7 @@ return SCPE_OK;
 
 const char *opcode[64] = {
  NULL,  "R",   "W",  "WR",  "P",   "RP",  "WP",  "WRP",
- "RF",  "WF",  NULL, "MA",  "MUL", NULL,  NULL,  NULL,
+ "SRF", "SPF", NULL, "MA",  "MUL", NULL,  NULL,  NULL,
  NULL,  "CS",  "S",  NULL,  "MTF", "BWZ", "BBE", NULL,
  "MZ",  "MCS", NULL, "SWM", "DIV", NULL,  NULL,  NULL,
  NULL,  NULL,  "SS", "LCA", "MCW", "NOP", NULL,  "MCM",
@@ -180,6 +181,21 @@ else fprintf (of, " %d", addr);
 return;
 }
 
+/* Print unknown opcode as data */
+
+t_stat dcw (FILE *of, int32 op, t_value *val)
+{
+int32 i;
+
+fprintf (of, "DCW @%c", bcd_to_ascii[op]);		 /* assume it's data */
+for (i = 1; i < sim_emax; i++) {
+        if (val[i] & WM) break;
+        fprintf (of, "%c", bcd_to_ascii[val[i]]);
+	}
+fprintf (of, "@");
+return -(i - 1);					/* return # chars */
+}
+
 /* Symbolic decode
 
    Inputs:
@@ -224,13 +240,14 @@ if ((sw & SWMASK ('M')) == 0) return SCPE_ARG;
 
 if ((val[0] & WM) == 0) return STOP_NOWM;		/* WM under op? */
 op = val[0]& CHAR;					/* isolate op */
+if (opcode[op] == NULL) return dcw (of, op, val);	/* invalid op */
 flags = op_table[op];					/* get flags */
 for (ilnt = 1; ilnt < sim_emax; ilnt++) if (val[ilnt] & WM) break;
 if ((flags & (NOWM | HNOP)) && (ilnt > 7)) ilnt = 7;	/* cs, swm, h, nop? */
 else if ((op == OP_B) && (ilnt > 4) && (val[4] == BCD_BLANK)) ilnt = 4;
 else if ((ilnt > 8) && (op != OP_NOP)) ilnt = 8;	/* cap length */
-if (((flags & len_table[ilnt]) == 0) &&			/* valid lnt, */
-	((op != OP_NOP) == 0)) return STOP_INVL;	/* nop? */
+if (((flags & len_table[ilnt]) == 0) &&			/* invalid lnt, */
+	(op != OP_NOP)) return dcw (of, op, val);	/* not nop? */
 fprintf (of, "%s",opcode[op]);				/* print opcode */
 if (ilnt > 2) {						/* A address? */
 	if (((flags & IO) || (op == OP_NOP)) && (val[1] == BCD_PERCNT))

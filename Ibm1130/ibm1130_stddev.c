@@ -6,6 +6,8 @@
 
    Revision History:
 
+   2004.10.22 - Removed stub for xio_1134_papertape as it's now a supported device
+
    2003.11.23 - Fixed bug in new routine "quotefix" that made sim crash
    			    for all non-Windows builds :(
 
@@ -90,12 +92,11 @@
 static void badio (char *dev)
 {
 // the real 1130 just ignores attempts to use uninstalled devices. They get tested
-// at times, so it's best to be quiet about this
+// at times, so it's best to just be quiet about this
 // printf("%s I/O is not yet supported", dev);
-// wait_state = WAIT_INVALID_OP;
 }
 
-void xio_1134_papertape	(int32 addr, int32 func, int32 modify)			{badio("papertape");}
+// void xio_1134_papertape	(int32 addr, int32 func, int32 modify)			{badio("papertape");}
 void xio_1627_plotter	(int32 addr, int32 func, int32 modify)			{badio("plotter");}
 void xio_1231_optical	(int32 addr, int32 func, int32 modify)			{badio("optical mark");}
 void xio_2501_card		(int32 addr, int32 func, int32 modify)			{badio("2501 card");}

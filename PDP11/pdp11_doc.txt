@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	15-Jun-2004
+Date:	15-Nov-2004
 
 			COPYRIGHT NOTICE
 
@@ -59,12 +59,14 @@ sim/		scp.h
 		sim_timer.c
 		sim_tmxr.c
 
-sim/pdp11/	pdp11_defs.h
+sim/pdp11/	pdp11_cpumod.h
+		pdp11_defs.h
 		pdp11_mscp.h
 		pdp11_uqssp.h
 		pdp11_xq.h
 		pdp11_xq_bootrom.h
 		pdp11_cpu.c
+		pdp11_cpumod.c
 		pdp11_dz.c
 		pdp11_fp.c
 		pdp11_hk.c
@@ -72,18 +74,20 @@ sim/pdp11/	pdp11_defs.h
 		pdp11_lp.c
 		pdp11_pclk.c
 		pdp11_pt.c
+		pdp11_rh.c
 		pdp11_rk.c
 		pdp11_rl.c
 		pdp11_rp.c
 		pdp11_rq.c
-		pdp11_tq.c
 		pdp11_rx.c
 		pdp11_ry.c
 		pdp11_stddev.c
 		pdp11_sys.c
 		pdp11_tc.c
 		pdp11_tm.c
+		pdp11_tq.c
 		pdp11_ts.c
+		pdp11_tu.c
 		pdp11_vh.c
 		pdp11_xq.c
 		pdp11_xu.c
@@ -95,31 +99,32 @@ The PDP-11 simulator is configured as follows:
 device		simulates
 name(s)
 
-CPU		J-11 CPU with 256KB of memory
--		FP11 floating point unit (FPA)
--		CIS11 commercial instruction set (CIS, off by default)
+CPU		PDP-11 CPU with 256KB of memory
 PTR,PTP		PC11 paper tape reader/punch
 TTI,TTO		DL11 console terminal
 LPT		LP11 line printer
 CLK		line frequency clock
 PCLK		KW11P programmable clock
 DZ		DZ11 8-line terminal multiplexor (up to 4)
-VH		DHQ11 8-line terminal multiplexor (up to 4)
+VH		DHU11/DHQ11 8-line terminal multiplexor (up to 4)
 RK		RK11/RK05 cartridge disk controller with eight drives
 HK		RK611/RK06(7) cartridge disk controller with eight drives
 RL		RLV12/RL01(2) cartridge disk controller with four drives
-RP		RM02/03/05/80, RP04/05/06/07 Massbus style controller
+RH		RH11/RH70 Massbus adapter (up to 2)
+RP		RM02/03/05/80, RP04/05/06/07 Massbus disks
 		with eight drives
-RQ		RQDX3 MSCP controller with four drives
-RQB		second RQDX3 MSCP controller with four drives
-RQC		third RQDX3 MSCP controller with four drives
-RQD		fourth RQDX3 MSCP controller with four drives
+RQ		RQDX3/UDA50 MSCP controller with four drives
+RQB		second RQDX3/UDA50 MSCP controller with four drives
+RQC		third RQDX3/UDA50 MSCP controller with four drives
+RQD		fourth RQDX3/UDA50 MSCP controller with four drives
 RX		RX11/RX01 floppy disk controller with two drives
 RY		RX211/RX01 floppy disk controller with two drives
 TC		TC11/TU56 DECtape controller with eight drives
 TM		TM11/TU10 magnetic tape controller with eight drives
 TS		TS11/TSV05 magnetic tape controller with one drive
-TQ		TQK50 TMSCP magnetic tape controller with four drives
+TQ		TQK50/TU81 TMSCP magnetic tape controller with four drives
+TU		TM02/TM03 magnetic tape formatter with eight
+		TE16/TU45/TU77 drives
 XQ		DELQA/DEQNA Qbus Ethernet controller
 XQB		second DELQA/DEQNA Qbus Ethernet controller
 XU		DEUNA/DELUA Unibus Ethernet controller
@@ -140,19 +145,44 @@ The PDP-11 simulator implements several unique stop conditions:
 The PDP-11 loader supports standard binary format tapes.  The DUMP command
 is not implemented.
 
-2.1 CPU
+2.1 CPU and System
 
-The CPU options include CPU mapping configuration (18b Unibus, 22b Unibus
-with RH70-style controllers, 22b Unibus with RH11 style controllers, and
-22b Qbus), the CIS instruction set, and the size of main memory.
+2.1.1 CPU
 
-	SET CPU U18		Unibus, no I/O map, 18b addressing
-	SET CPU URH11		Unibus, I/O map with 22b addressing,
-				18b mapped RH11 controller
-	SET CPU URH70		Unibus, I/O map with 22b addressing,
-				22b unmapped RH70 controller
-	SET CPU Q22		Qbus, no I/O map, 22b addressing
-	SET CPU NOCIS		disable CIS instructions (default)
+The CPU options include CPU type, CPU instruction set options for the
+specified type, and the size of main memory.
+
+	SET CPU 11/03		set CPU type to 11/03
+	SET CPU 11/04		set CPU type to 11/04
+	SET CPU 11/05		set CPU type to 11/05
+	SET CPU 11/20		set CPU type to 11/20
+	SET CPU 11/23		set CPU type to 11/23
+	SET CPU 11/23+		set CPU type to 11/23+
+	SET CPU 11/24		set CPU type to 11/24
+	SET CPU 11/34		set CPU type to 11/34
+	SET CPU 11/40		set CPU type to 11/40
+	SET CPU 11/44		set CPU type to 11/44
+	SET CPU 11/45		set CPU type to 11/45
+	SET CPU 11/53		set CPU type to 11/53
+	SET CPU 11/60		set CPU type to 11/60
+	SET CPU 11/70		set CPU type to 11/70
+	SET CPU 11/73		set CPU type to 11/73
+	SET CPU 11/73B		set CPU type to 11/73B
+	SET CPU 11/83		set CPU type to 11/83
+	SET CPU 11/84		set CPU type to 11/84
+	set CPU 11/93		set CPU type to 11/93
+	set CPU 11/94		set CPU type to 11/94
+	SET CPU U18		deprecated; same as 11/45
+	SET CPU URH11		deprecated; same as 11/84
+	SET CPU URH70		deprecated; same as 11/70
+	SET CPU Q22		deprecated; same as 11/73
+	SET CPU NOEIS		disable EIS instructions
+	SET CPU EIS		enable EIS instructions
+	SET CPU NOFIS		disable FIS instructions
+	SET CPU FIS		enable FIS instructions
+	SET CPU NOFPP		disable FPP instructions
+	SET CPU FPP		enable FPP instructions
+	SET CPU NOCIS		disable CIS instructions
 	SET CPU CIS		enable CIS instructions
 	SET CPU 16K		set memory size = 16KB
 	SET CPU 32K		set memory size = 32KB
@@ -170,9 +200,37 @@ with RH70-style controllers, 22b Unibus with RH11 style controllers, and
 	SET CPU 3072K (or 3M)	set memory size = 3072KB
 	SET CPU 4096K (or 4M)	set memory size = 4096KB
 
-The CPU implements a show command to display the I/O address space map:
+The CPU types and their capabilities are shown in the following table:
 
-	SHOW CPU IOSPACE	show I/O space address map
+type	bus	memory	MMU?	Umap?	EIS?	FIS?	FPP?	CIS?
+
+11/03	Q	64K	no	no	std	opt	no	no
+11/04	U	64K	no	no	no	no	no	no
+11/05	U	64K	no	no	no	no	no	no
+11/20	U	64K	no	no	no	no	no	no
+11/23	Q	4M	std	no	std	no	opt	opt
+11/23+	Q	4M	std	no	std	no	opt	opt
+11/24	U	4M	std	std	std	no	opt	opt
+11/34	U	256K	std	no	std	no	opt	no
+11/40	U	256K	std	no	std	opt	no	no
+11/44	U	4M	std	std	std	no	opt	opt
+11/45	U	256K	std	no	std	no	opt	no
+11/53	Q	4M	std	no	std	no	std	opt
+11/60	U	256K	std	no	std	no	std	no
+11/70	U	4M	std	std	std	no	opt	no
+11/73	Q	4M	std	no	std	no	std	opt
+11/73B	Q	4M	std	no	std	no	std	opt
+11/83	Q	4M	std	no	std	no	std	opt
+11/84	U	4M	std	std	std	no	std	opt
+11/93	Q	4M	std	no	std	no	std	opt
+11/94	U	4M	std	std	std	no	std	opt
+
+If a capability is standard, it cannot be disabled; if a capability is
+not included, it cannot be enabled.
+
+The CPU implements a show command to display the I/O address assignments:
+
+	SHOW CPU IOSPACE	show I/O space address assignments
 
 If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
@@ -180,31 +238,6 @@ portion of memory is lost.  Initial memory size is 256KB.  If memory size
 is being increased to more than 256KB, or the bus structue is being changed,
 the simulator asks whether it should disable peripherals that can't run
 in the current bus structure.
-
-DMA peripherals function differently, depending on whether the CPU is
-configured for 18B, URH11, URH70, or 22B addressing and I/O:
-
-	peripheral	18B	URH11	URH70	22B
-
-	RK		18b	18b	18b	won't work, disabled
-	HK		18b	18b	18b	SC02/C 22b, works
-						only with Ultrix-11
-	RL		18b	18b	18b	22b RLV12
-	RP		18b	18b	22b	22b third party
-	RQ		18b	18b	18b	22b RQDX3
-	RY		18b	18b	18b	won't work, disabled
-	TC		18b	18b	18b	won't work, disabled
-	TM		18b	18b	18b	won't work, disabled
-	TS		18b	18b	18b	22b TSV05
-	TQ		18b	18b	18b	22b TQK50
-	XQ		18b	won't work,	22b DELQA
-				disabled
-	XU		18b	18b	18b	won't work, disabled
-
-Non-DMA peripherals work the same in all configurations.  Unibus-only
-peripherals should be disabled in a Qbus (22B) configuration with more
-than 256KB of memory, and Qbus-only peripherals should be disabled in
-a Unibus (URH11 or URH70) configuration with more than 256KB of memory.
 
 These switches are recognized when examining or depositing in CPU memory:
 
@@ -215,8 +248,8 @@ These switches are recognized when examining or depositing in CPU memory:
 	-u			if mem mgt enabled, force user mode
 	-p			if mem mgt enabled, force previous mode
 
-CPU registers include the visible state of the processor as well as the
-control registers for the interrupt system.
+CPU registers include the architectural state of the PDP-11 processor
+as well as the control registers for the interrupt system.
 
 	name		size	comments
 
@@ -238,14 +271,8 @@ control registers for the interrupt system.
 	  Z		1	  zero flag, PSW<2>
 	  V		1	  overflow flag, PSW<1>
 	  C		1	  carry flag, PSW<0>
-	SR		16	front panel switches
-	DR		16	front panel display
-	MEMERR		16	memory error register
-	CCR		16	cache control register
-	MAINT		16	maintenance register
-	HITMISS		16	hit/miss register
-	CPUERR		16	CPU error register
 	PIRQ		16	programmed interrupt requests
+	STKLIM		16	stack limit
 	FAC0H..FAC5H	32	FAC0..FAC5, high 32 bits
 	FAC0L..FAC5L	32	FAC0..FAC5, low 32 bits
 	FPS		16	floating point status
@@ -254,9 +281,8 @@ control registers for the interrupt system.
 	MMR0..3		16	memory management registers 0..3
 	{K/S/U}{I/D}{PAR/PDR}{0..7}
 			16	memory management registers
-	UBMAP[0:63]	16	Unibus map registers
-	INT		32	interrupt pending flags
-	TRAP		18	trap pending flags
+	IREQ[0:7]	32	interrupt pending flags, IPL 0-7
+	TRAPS		18	trap pending flags
 	WAIT		0	wait state flag
 	WAIT_ENABLE	0	wait state enable flag
 	STOP_TRAPS	18	stop on trap flags
@@ -266,7 +292,87 @@ control registers for the interrupt system.
 				most recent PC change first
 	WRU		8	interrupt character
 
-2.2 I/O Device Addressing
+2.1.2 System Registers (SYSTEM)
+
+The SYSTEM device implements registers that vary from system to system:
+
+	name	models			size	comments
+
+	SR	11/04, 11/05, 11/20,	16	switch register or
+		11/23+, 11/34, 11/40,		configuration register
+		11/44, 11/45, 11/60,
+		11/70, 11/73B, 11/83,
+		11/84, 11/93, 11/94
+	DR	11/04, 11/05, 11/20,	16	display register or
+		1123+, 11/24, 11/34,		board LEDs
+		11/70, 11/73B, 11/83,
+		11/84, 11/93, 11/94
+	MEMERR	11/44, 11/60, 11/70,	16	memory error register
+		11/53, 11/73, 11/73B,
+		11/83, 11/84, 11/93,
+		11/94
+	CCR	11/44, 11/60, 11/70,	16	cache control register
+		11/53, 11/73, 11/73B,
+		11/83, 11/84, 11/93,
+		11/94
+	MAINT	11/23+, 11/44, 11/70,	16	maintenance register
+		11/53, 11/73, 11/73B,
+		11/83, 11/84, 11/93,
+		11/94
+	HITMISS	11/44, 11/60, 11/70,	16	hit/miss register
+		11/53, 11/73, 11/73B,
+		11/83, 11/84, 11/93,
+		11/94
+	CPUERR	11/24, 11/44, 11/70,	16	CPU error register
+		11/53, 11/73, 11/73B,
+		11/83, 11/84, 11/93,
+		11/94
+	MBRK	11/45, 11/70		16	microbreak register
+	JCSR	11/53, 11/73B, 11/83,	16	board control/status
+		11/84, 11/93, 11/94
+	JPCR	11/23+, 11/53, 11/73B,	16	page control register
+		11/83, 11/84, 11/93,
+		11/94
+	JASR	11/93, 11/94		16	additional status
+	UDCR	11/84, 11/94		16	Unibus map diag control
+	UDDR	11/84, 11/94		16	Unibus map diag data
+	UCSR	11/84, 11/94		16	Unibus map control/status
+	ULAST	11/24			23	last Unibus map result
+
+2.2 I/O Devices
+
+2.2.1 Unibus and Qbus DMA Devices
+
+DMA peripherals function differently, depending on whether the CPU is
+configured for Unibus or Qbus, and whether the Unibus system supports
+22b direct memory access (11/70 with RH70 controllers):
+
+	peripheral	11/70	all	Qbus
+			+RH70	other
+				Unibus
+
+	RK		18b	18b	disabled
+	HK		18b	18b	disabled
+	RL		18b	18b	22b RLV12
+	RP		22b	18b	22b third party
+	RQ		18b	18b	22b RQDX3
+	RY		18b	18b	disabled
+	TC		18b	18b	disabled
+	TM		18b	18b	disabled
+	TS		18b	18b	22b TSV05
+	TQ		18b	18b	22b TQK50
+	TU		22b	18b	22b third party
+	VH		18b	18b	22b DHQ11
+	XQ		disabled	22b DELQA
+	XU		18b	18b	disabled
+
+Non-DMA peripherals work the same in all configurations.  Unibus-only
+peripherals are disabled in a Qbusconfiguration, and Qbus-only
+peripherals are disabled in a Unibus configuration.  In addition,
+Qbus DMA peripherals with only 18b addressing capability are
+disabled in a Qbus configuration with more than 256KB memory.
+
+2.2.2 I/O Device Addressing
 
 PDP-11 I/O space is not large enough to allow all possible devices to be
 configured simultaneously at fixed addresses.  Instead, many devices have
@@ -274,6 +380,7 @@ floating addresses; that is, the assigned device address depends on the
 presense of other devices in the configuration:
 
 	DZ11		all instances have floating addresses
+	DHU11/DHQ11	all instances have floating addresses
 	RL11		first instance has fixed address, rest floating
 	RX11/RX211	first instance has fixed address, rest floating
 	DEUNA/DELUA	first instance has fixed address, rest floating
@@ -550,8 +657,8 @@ locked, single or double density, or autosized:
 	SET RYn DOUBLE		set unit n double density (default)
 	SET RYn AUTOSIZE	set unit n autosized
 
-The RX211 supports the BOOT command.  The RX211 will not function
-properly in a Qbus (22B) system with more than 256KB of memory.
+The RX211 supports the BOOT command.  The RX211 is disabled in a
+Qbus (Q22) system with more than 256KB of memory.
 
 The RX211 implements these registers:
 
@@ -597,9 +704,9 @@ locked:
 	SET RKn LOCKED		set unit n write locked
 	SET RKn WRITEENABLED	set unit n write enabled
 
-Units can also be set ONLINE or OFFLINE.  The RK11 supports the BOOT
-command.  The RK11 will not function properly in a Qbus (22B) system
-with more than 256KB of memory.
+Units can also be set ENABLED or DISABLED.  The RK11 supports the BOOT
+command.  The RK11 is disabled in a Qbus (Q22) system with more than
+256KB of memory.
 
 The RK11 implements these registers:
 
@@ -648,11 +755,8 @@ a DEC standard 044 compliant bad block table on the last track:
 
 The size options can be used only when a unit is not attached to a file.
 The bad block option can be used only when a unit is attached to a file.
-Units can be set ONLINE or OFFLINE.  The RK611 supports the BOOT command.
-The RK611 will not function properly in a Qbus (22B) system with more
-than 256KB of memory using standard DEC software.  The simulator implements
-a third-party extension of addressing capability to 22b; this is only
-supported by Ultrix-11.
+Units can be set ENABLED or DISABLED.  The RK611 supports the BOOT command.
+The RK611 is disabled in a Qbus (Q22) system with more than 256KB of memory.
 
 The RK611 implements these registers:
 
@@ -704,10 +808,9 @@ a DEC standard 044 compliant bad block table on the last track:
 
 The size options can be used only when a unit is not attached to a file.
 The bad block option can be used only when a unit is attached to a file.
-Units can be set ONLINE or OFFLINE.  The RL11 supports the BOOT command.
-In an 18B or Unibus system, the RL behaves like an RL11 with 18b
-addressing; in a Qbus (22B) system, the RL behaves like the RLV12 with
-22b addressing.
+Units can be set ENABLED or DISABLED.  The RL11 supports the BOOT command.
+In a Unibus system, the RL behaves like an RL11 with 18b addressing; in
+a Qbus (Q22) system, the RL behaves like the RLV12 with 22b addressing.
 
 The RL11 implements these registers:
 
@@ -737,14 +840,34 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.6 RM02/03/05/80, RP04/05/06/07 Disk Pack Drives (RP)
+2.6 Massbus Subsystems
 
-The RP controller implements a "Massbus style" 22b direct interface
-for large disk drives.  It is more abstract than other device simulators,
-with just enough detail to run operating system drivers.  In addition,
-the RP controller conflates the details of the RM series controllers
-with the RP series controllers, although there were detailed differences.
+2.6.1 RH70/RH11 Massbus Adapters (RHA, RHB)
 
+The RH70/RH11 Massbus adapters interface Massbus peripherals to the
+memory bus or Unibus of the CPU.  The simulator provides two Massbus
+adapters.  The first, RHA, is configured for the RP family of disk
+drives.  The second, RHB, is configured for the TU family of tape
+controllers.  By default, RHA is enabled and RHB is disabled.
+
+Each RH adapter implements these registers:
+
+	CS1		16	control/status register 1
+	WC		16	word count
+	BA		16	bus address
+	CS2		16	control/status register 2
+	DB		16	data buffer
+	BAE		6	bus address extension
+	CS3		16	control/status register 3
+	IFF		1	transfer complete interrupt request flop
+	INT		1	interrupt pending flag
+	SC		1	special condition (CSR1<15>)
+	DONE		1	device done flag (CSR1<7>)
+	IE		1	interrupt enable flag (CSR1<6>)
+
+2.6.2 RM02/03/05/80, RP04/05/06/07 Disk Pack Drives (RP)
+
+The RP controller implements the Massbus family of large disk drives.
 RP options include the ability to set units write enabled or write
 locked, to set the drive type to one of six disk types, or autosize,
 and to write a DEC standard 044 compliant bad block table on the last
@@ -763,37 +886,29 @@ track:
 
 The type options can be used only when a unit is not attached to a file.
 The bad block option can be used only when a unit is attached to a file.
-Units can be set ONLINE or OFFLINE.  The RP controller supports the
+Units can be set ENABLED or DISABLED.  The RP controller supports the
 BOOT command.  In a Unibus system, the RP can implement either 18b
-(RH11) addressing or 22b (RH70) addressing.  In a Qbus (22B) system,
+(URH11) addressing or 22b (URH70) addressing.  In a Qbus (Q22) system,
 the RP always implements 22b addressing.
 
-The RP controller implements these registers:
+The RP controller implements the registers listed below.  Registers
+suffixed with [0:7] are replicated per drive.
 
 	name		size	comments
 
-	RPCS1		16	control/status 1
-	RPWC		16	word count
-	RPBA		16	bus address
-	RPDA		16	desired surface, sector
-	RPCS2		16	control/status 2
-	RPDS[0:7]	16	drive status, drives 0-7
-	RPER1[0:7]	16	drive errors, drives 0-7
-	RPOF		16	offset
-	RPDC		16	desired cylinder
-	RPER2		16	error status 2
-	RPER3		16	error status 3
-	RPEC1		16	ECC syndrome 1
-	RPEC2		16	ECC syndrome 2
-	RPMR		16	maintenance register
-	RPDB		16	data buffer
-	RPBAE		6	bus address extension
-	RPCS3		16	control/status 3
-	IFF		1	transfer complete interrupt request flop
-	INT		1	interrupt pending flag
-	SC		1	special condition (CSR1<15>)
-	DONE		1	device done flag (CSR1<7>)
-	IE		1	interrupt enable flag (CSR1<6>)
+	CS1[0:7]	16	current operation
+	DA[0:7]		16	desired surface, sector
+	DS[0:7]		16	drive status
+	ER1[0:7]	16	drive errors
+	OF[0:7]		16	offset
+	DC[0:7]		16	desired cylinder
+	ER2[0:7]	16	error status 2
+	ER3[0:7]	16	error status 3
+	EC1[0:7]	16	ECC syndrome 1
+	EC2[0:7]	16	ECC syndrome 2
+	MR[0:7]		16	maintenance register
+	MR2[0:7]	16	maintenance register 2 (RM only)
+	HR[0:7]		16	holding register (RM only)
 	STIME		24	seek time, per cylinder
 	RTIME		24	rotational delay
 	STOP_IOE	1	stop on I/O error
@@ -809,7 +924,49 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.7 RQDX3 MSCP Disk Controllers (RQ, RQB, RQC, RQD)
+2.6.3 TM02/TM03/TE16/TU45/TU77 Magtapes (TU)
+
+The TU controller implementes the Massbus family of 800/1600bpi tape
+drives.  TU options include the ability to select the formatter type
+(TM02 or TM03), to set the drive type to one of three drives (TE16,
+TU45, or TU77), and to set the drives write enabled or write locked.
+
+	SET TU TM02		set controller type to TM02
+	SET TU TM03		set controller type to TM03
+	set TUn TE16		set drive type to TE16
+	SET TUn TU45		set drive type to TU45
+	SET TUn TU77		set drive type to TU77
+
+Units can be set ENABLED or DISABLED.  The TU controller supports the 
+BOOT command.  In a Unibus system, the TU can implement either 18b
+(URH11) addressing or 22b (URH70) addressing.  In a Qbus (Q22) system,
+the TU always implements 22b addressing.
+
+The TU controller implements the following registers:
+
+	name		size	comments
+
+	CS1		6	current operation
+	FC		16	frame count
+	FS		16	formatter status
+	ER		16	formatter errors
+	CC		16	check character
+	MR		16	maintenance register
+	TC		16	tape control register
+	TIME		24	operation execution time
+	STOP_IOE	1	stop of I/O error
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		tape not ready; if STOP_IOE, stop
+
+	end of file		bad tape
+
+	OS I/O error		parity error; if STOP_IOE, stop
+
+2.7 RQDX3/UDA50 MSCP Disk Controllers (RQ, RQB, RQC, RQD)
 
 The simulator implements four MSCP disk controllers, RQ, RQB, RQC, RQD.
 Initially, RQB, RQC, and RQD are disabled.  Each RQ controller simulates
@@ -831,16 +988,18 @@ of many disk types:
 	SET RQn RA90		set type to RA90
 	SET RQn RA92		set type to RA92
 	SET RQn RRD40		set type to RRD40 (CD ROM)
-	SET RQn RAUSER{=n}	set type to RA81 with n LBNs
+	SET RQn RAUSER{=n}	set type to RA81 with n MB's
+	SET -L RQn RAUSER{=n}	set type to RA81 with n LBN's
 
 The type options can be used only when a unit is not attached to a file.
 RAUSER is a "user specified" disk; the user can specify the size of the
-disk in logical block numbers (LBN's, 512 bytes each).  The minimum size
-is 50MB; the maximum size is 2GB.
+disk in either MB (1000000 bytes) or logical block numbers (LBN's, 512
+bytes each).  The minimum size is 5MB; the maximum size is 2GB.
 
-Units can also be set ONLINE or OFFLINE.  Each RQ controller supports the
-BOOT command.  In a Unibus system, an RQ supports 18b addressing.  In
-a Qbus (22B) system, an RQ supports 22b addressing.
+Units can also be set ENABLED or DISABLED.  Each RQ controller supports the
+BOOT command.  In a Unibus system, an RQ supports 18b addressing and
+identifies itself as a UDA50.  In a Qbus (Q22) system, an RQ supports 22b
+addressing and identifies itself as an RQDX3.
 
 Each RQ controller implements the following special SHOW commands:
 
@@ -907,9 +1066,8 @@ locked.
 	SET DTn LOCKED		set unit n write locked
 	SET DTn WRITEENABLED	set unit n write enabled
 
-Units can be set ONLINE or OFFLINE.  The TC11 supports the BOOT command.
-The TC11 will not function properly in a 22B (Qbus) system with more
-than 256KB of memory.
+Units can be set ENABLED or DISABLED.  The TC11 supports the BOOT command.
+The TC11 is automatically disabled in a Qbus system.
 
 The TC11 supports supports PDP-8 format, PDP-11 format, and 18b format
 DECtape images.  ATTACH tries to determine the tape format from the DECtape
@@ -965,7 +1123,7 @@ locked.
 	SET TMn LOCKED		set unit n write locked
 	SET TMn WRITEENABLED	set unit n write enabled
 
-Units can be set ONLINE or OFFLINE.
+Units can be set ENABLED or DISABLED.
 
 The TM11 supports the BOOT command.  The bootstrap supports both original
 and DEC standard boot formats.  Originally, a tape bootstrap read and
@@ -974,8 +1132,8 @@ standard bootstrap skipped the first record and read and executed the
 second.  The DEC standard is the default; to bootstrap an original format
 tape, use the -o switch.
 
-The TM11 will not function properly in a Qbus (22B) system with more
-than 256KB of memory
+The TM11 is automatically disabled in a Qbus (Q22) system with more than
+256KB of memory.
 
 The TM controller implements these registers:
 
@@ -1017,7 +1175,7 @@ The TS11 supports the BOOT command.  The bootstrap supports only DEC
 standard boot formats.  To allow for ANSI labels, the DEC standard
 bootstrap skipped the first record and read and executed the second.
 In a Unibus system, the TS behaves like the TS11 and implements 18b
-addresses.  In a Qbus (22B) system, the TS behaves like the TSV05
+addresses.  In a Qbus (Q22) system, the TS behaves like the TSV05
 and implements 22b addresses.
 
 The TS controller implements these registers:
@@ -1077,7 +1235,7 @@ specify the controller type and tape length:
 User-specified capacity must be between 50 and 2000 MB.
 
 The TQ controller supports the BOOT command.   In a Unibus system, the
-TQ supports 18b addressing.  In a Qbus (22B) system, the TQ supports
+TQ supports 18b addressing.  In a Qbus (Q22) system, the TQ supports
 22b addressing.
 
 The TQ controller implements the following special SHOW commands:

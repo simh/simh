@@ -69,6 +69,7 @@ extern int32	int_vec[IPL_HLVL][32];
 #include "pdp11_defs.h"
 extern int32	int_req[IPL_HLVL];
 extern int32	int_vec[IPL_HLVL][32];
+extern int32	cpu_opt;
 #endif
 
 #include "sim_sock.h"
@@ -1054,8 +1055,8 @@ static void doDMA (	int32	vh,
 		pa |= (lp->tbuf2 & TB2_M_TBUFFAD) << 16;
 		status = chan << CSR_V_TX_LINE;
 		while (lp->tbuffct) {
-			char	buf;
-			if (Map_ReadB (pa, 1, &buf, MAP)) {
+			uint8	buf;
+			if (Map_ReadB (pa, 1, &buf)) {
 				status |= CSR_TX_DMA_ERR;
 				lp->tbuffct = 0;
 				break;
@@ -1233,10 +1234,6 @@ static t_stat vh_clear (	int32	vh,
 static t_stat vh_reset (	DEVICE	*dptr	)
 {
 	int32	i;
-#if     defined (VM_PDP11)
-	/* import from pdp11_cpu.c: */
-	extern int32	cpu_18b, cpu_ubm;
-#endif
 
 	for (i = 0; i < (VH_MUXES * VH_LINES); i++)
 		vh_parm[i].tmln = &vh_ldsc[i];

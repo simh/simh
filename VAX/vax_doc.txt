@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	VAX Simulator Usage
-Date:	15-Jun-2004
+Date:	15-Nov-2004
 
 			COPYRIGHT NOTICE
 
@@ -61,14 +61,19 @@ sim/		scp.h
 
 sim/vax/	vax_defs.h
 		vaxmod_defs.h
+		vax_cis.c
+		vax_cmode.c
 		vax_cpu.c
 		vax_cpu1.c
 		vax_fpa.c
 		vax_io.c
 		vax_mmu.c
+		vax_octa.c
 		vax_stddev.c
 		vax_sys.c
+		vax_syscm.c
 		vax_sysdev.c
+		vax_syslist.c
 
 sim/pdp11/	pdp11_mscp.h
 		pdp11_uqssp.h
@@ -76,7 +81,6 @@ sim/pdp11/	pdp11_mscp.h
 		pdp11_xq_bootrom.h
 		pdp11_dz.c
 		pdp11_lp.c
-		pdp11_pt.c
 		pdp11_rl.c
 		pdp11_ry.c
 		pdp11_rq.c
@@ -102,14 +106,13 @@ CPU		KA655 CPU with 16MB-64MB of memory, or
 TLB		translation buffer
 ROM		read-only memory
 NVR		non-volatile memory
-SYSD		system devices
 QBA		Qbus adapter
-PTR,PTP		PCV11 paper tape reader/punch
+SYSD		system devices
 TTI,TTO		console terminal
-LPT		LPV11 line printer
 CLK		real-time clock
 DZ		DZV11 4-line terminal multiplexor (up to 4)
 VH		DHQ11 8-line terminal multiplexor (up to 4)
+LPT		LPV11 line printer
 RL		RLV12/RL01(2) cartridge disk controller with four drives
 RQ		RQDX3 MSCP controller with four drives
 RQB		second RQDX3 MSCP controller with four drives
@@ -121,7 +124,7 @@ TQ		TQK50 TMSCP magnetic tape controller with four drives
 XQ		DELQA/DEQNA Ethernet controller
 XQB		second DELQA/DEQNA Ethernet controller
 
-The PTR, PTP, LPT, DZ, RL, RQ, RQB, RQC, RQD, RY, TS, TQ, XQ, and XQB
+The DZ, VH, LPT, RL, RQ, RQB, RQC, RQD, RY, TS, TQ, XQ, and XQB
 devices can be set DISABLED.  RQB, RQC, RQD, and XQB are disabled by
 default.
 
@@ -161,7 +164,12 @@ The CPU implements a show command to display the I/O address map:
 
 	SHOW CPU IOSPACE	show I/O space address map
 
-Notes of the memory size:
+The CPU also implements a command to display a virtual to physical address
+translation:
+
+	SHOW CPU VIRTUAL=n	show translation for address n
+
+Notes on memory size:
 
 - The real KA655 CPU only supported 16MB to 64MB of memory.  The simulator
   provides a KA655"X" mode, which increases supported memory to 512MB.
@@ -178,8 +186,8 @@ Notes of the memory size:
   parameter set called PHYSICXAL PAGES (viewable from "MCR SYSGEN SHOW
   PHYSICALPAGES").  PHYSICALPAGES limits the maximum number of physical pages
   of memory the OS will recognize.  If it is set to a lower value than the
-  new extended memory size of the machine, then only the first PHYSICALPAGES
-  of memory will be recognized, otherwise the actual size of the extended
+  new memory size of the machine, then only the first PHYSICALPAGES of
+  memory will be recognized, otherwise the actual size of the extended
   memory will be realized by VMS upon each boot.  Some users and/or sites
   may specify the PHYSICALPAGES parameter in the input file to AUTOGEN
   (SYS$SYSTEM:MODPARAMS.DAT).  If PHYSICALPAGES is specified there, it will
@@ -211,6 +219,14 @@ These switches are recognized when examining or depositing in CPU memory
 	-d			data radix is decimal
 	-o			data radix is octal
 	-h			data radix is hexadecimal
+
+These switches are recognized when examining or depositing in CPU memory
+only:
+
+	-m			examine (only) VAX instructions
+	-p			examine/deposit PDP-11 (compatibility mode)
+				instructions
+	-r			examine (only) RADIX50 encoded data
 	-v			interpret address as virtual, current mode
 
 CPU registers include the visible state of the processor as well as the
@@ -240,9 +256,8 @@ control registers for the interrupt system.
 	SLR		22	system length register
 	SISR		16	software interrupt summary register
 	ASTLVL		4	AST level register
-	CADR		8	cache disable register
-	MSER		8	memory system error register
-	MAPEN		1	memory management enable flag
+	MAPEN		1	memory management enable
+	PME		1	performance monitor enable
 	TRPIRQ		8	trap/interrupt pending
 	CRDERR		1	correctible read data error flag
 	MEMERR		1	memory error flag
@@ -255,8 +270,9 @@ This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
 
 	SET CPU HISTORY		clear history buffer
 	SET CPU HISTORY=0	disable history
-	SET CPU HISTORY=n	enable history, display length = n
+	SET CPU HISTORY=n	enable history, length = n
 	SHOW CPU HISTORY	print CPU history
+	SHOW CPU HISTORY=n	print first n entries of CPU history
 
 The maximum length for the history is 65536 entries.
 
@@ -271,13 +287,41 @@ translation buffer entry consists of two 32b words, as follows:
 
 An invalid entry is indicated by a tag of FFFFFFFF.
 
-2.1.3 Read-only memory (ROM)
+2.1.3 Qbus Adapter (QBA)
+
+The QBA represents the CQBIC Qbus adapter chip.  It recognizes the
+following options:
+
+	SET QBA AUTOCONFIGURE	enable autoconfiguration
+	SET QBA NOAUTOCONFIGURE	disable autoconfiguration
+
+and the following display command:
+
+	SHOW QBA IOSPACE	show IO space addresses
+
+The QBA registers are:
+
+	name		size	comments
+
+	SCR		16	system configuration register
+	DSER		8	DMA system error register
+	MEAR		13	master error address register
+	SEAR		20	slave error address register
+	MBR		29	Qbus map base register
+	IPC		16	interprocessor communications register
+	IPL17		32	IPL 17 interrupt flags
+	IPL16		32	IPL 16 interrupt flags
+	IPL15		32	IPL 15 interrupt flags
+	IPL14		32	IPL 14 interrupt flags
+
+2.1.4 Read-only memory (ROM)
 
 The boot ROM consists of a single unit, representing the 128KB boot ROM.
 It has no registers.  The boot ROM is loaded with a binary byte stream
 using the LOAD -r command:
 
-	LOAD -r KA655.BIN	load boot ROM image KA655.BIN
+	LOAD -r KA655.BIN	load ROM image KA655.BIN (normal memory)
+	LOAD -r KA655X.BIN	laod ROM image KA655X.BIN (extended memory)
 
 ROM accesses a use a calibrated delay that slows ROM-based execution to
 about 500K instructions per second.  This delay is required to make the
@@ -287,7 +331,7 @@ is controlled with the commands:
 	SET ROM NODELAY		ROM runs like RAM
 	SET ROM DELAY		ROM runs slowly
 
-2.1.4 Non-volatile Memory (NVR)
+2.1.5 Non-volatile Memory (NVR)
 
 The NVR consists of a single unit, representing 1KB of battery-backed up
 memory.  When the simulator starts, NVR is cleared to 0, and the SSC
@@ -298,15 +342,20 @@ other memories, so that NVR state can be preserved across simulator runs.
 
 Successfully loading an NVR image clears the SSC battery-low indicator.
 
-2.1.5 System Devices (SYSD)
+2.1.6 System Devices (SYSD)
 
-The system devices are the facilities implemented in KA655 CPU board,
-the CMCTL memory controller, and the SSC system support chip.  Note that
-the simulation of these devices is incomplete and is intended strictly
-to allow the patched bootstrap code to run.  The SYSD registers are:
+The system devices are the system-specific facilities implemented in the
+CVAX chip, the KA655 CPU board, the CMCTL memory controller, and the SSC
+system support chip.  Note that the simulation of these devices is
+incomplete and is intended strictly to allow the patched bootstrap and
+console code to run.  The SYSD registers are:
 
 	name		size	comments
 
+	CADR		8	cache disable register
+	MSER		8	memory system error register
+	CONPC		32	PC at console halt
+	CONPSL		32	PSL at console halt
 	CMCSR[0:17]	32	CMCTL control and status registers
 	CACR		8	second-level cache control register
 	BDR		8	front panel jumper register
@@ -334,23 +383,6 @@ the console firmware responds to all these conditions by entering its
 interactive command mode.  If BDR<7> is clear, the console firmware
 boots the operating system in response to these conditions.
 
-2.1.6 Qbus Adapter (QBA)
-
-The QBA represents the CQBIC Qbus adapter chip.  The QBA registers are:
-
-	name		size	comments
-
-	SCR		16	system configuration register
-	DSER		8	DMA system error register
-	MEAR		13	master error address register
-	SEAR		20	slave error address register
-	MBR		29	Qbus map base register
-	IPC		16	interprocessor communications register
-	IPL17		32	IPL 17 interrupt flags
-	IPL16		32	IPL 16 interrupt flags
-	IPL15		32	IPL 15 interrupt flags
-	IPL14		32	IPL 14 interrupt flags
-
 2.2 I/O Device Addressing
 
 Qbus I/O space is not large enough to allow all possible devices to be
@@ -359,6 +391,7 @@ floating addresses; that is, the assigned device address depends on the
 presense of other devices in the configuration:
 
 	DZ11		all instances have floating addresses
+	DQH11		all instances have floating addresses
 	RL11		first instance has fixed address, rest floating
 	RX11/RX211	first instance has fixed address, second floating
 	MSCP disk	first instance has fixed address, rest floating
@@ -366,7 +399,7 @@ presense of other devices in the configuration:
 
 To maintain addressing consistency as the configuration changes, the
 simulator implements DEC's standard I/O address and vector autoconfiguration
-algorithms for devices DZ, RL, RQ, and TQ.  This allows the user to
+algorithms for devices DZ, VH, RL, RQ, and TQ.  This allows the user to
 enable or disable devices without needing to manage I/O addresses
 and vectors.
 
@@ -379,10 +412,10 @@ the entire system.  As a consequence, the user may have to manually configure
 all other autoconfigured devices, because the autoconfiguration algorithm
 no longer recognizes the explicitly configured device.  A device can be
 reset to autoconfigure with the SET <device> AUTOCONFIGURE command.  Auto-
-configuration can be restored for the entire system with the SET CPU
+configuration can be restored for the entire system with the SET QBA
 AUTOCONFIGURE command.
 
-The current I/O map can be displayed with the SHOW CPU IOSPACE command.
+The current I/O map can be displayed with the SHOW QBA IOSPACE command.
 Addresses that have set by autoconfiguration are marked with an asterisk (*). 
 
 All devices support the SHOW ADDRESS and SHOW VECTOR commands, which display
@@ -390,69 +423,7 @@ the device address and vector, respectively.
 
 2.3 Programmed I/O Devices
 
-2.3.1 PC11 Paper Tape Reader (PTR)
-
-The paper tape reader (PTR) reads data from a disk file.  The POS
-register specifies the number of the next data item to be read.  Thus,
-by changing POS, the user can backspace or advance the reader.
-
-The paper tape reader implements these registers:
-
-	name		size	comments
-
-	BUF		8	last data item processed
-	CSR		16	control/status register
-	INT		1	interrupt pending flag
-	ERR		1	error flag (CSR<15>)
-	BUSY		1	busy flag (CSR<11>)
-	DONE		1	device done flag (CSR<7>)
-	IE		1	interrupt enable flag (CSR<6>)
-	POS		32	position in the input file
-	TIME		24	time from I/O initiation to interrupt
-	STOP_IOE	1	stop on I/O error
-
-Error handling is as follows:
-
-	error	     STOP_IOE	processed as
-
-	not attached	1	report error and stop
-			0	out of tape
-
-	end of file	1	report error and stop
-			0	out of tape
-
-	OS I/O error	x	report error and stop
-
-2.3.2 PC11 Paper Tape Punch (PTP)
-
-The paper tape punch (PTP) writes data to a disk file.  The POS
-register specifies the number of the next data item to be written. 
-Thus, by by changing POS, the user can backspace or advance the punch.
-
-The paper tape punch implements these registers:
-
-	name		size	comments
-
-	BUF		8	last data item processed
-	CSR		16	control/status register
-	INT		1	interrupt pending flag
-	ERR		1	error flag (CSR<15>)
-	DONE		1	device done flag (CSR<7>)
-	IE		1	interrupt enable flag (CSR<6>)
-	POS		32	position in the output file
-	TIME		24	time from I/O initiation to interrupt
-	STOP_IOE	1	stop on I/O error
-
-Error handling is as follows:
-
-	error	     STOP_IOE	processed as
-
-	not attached	1	report error and stop
-			0	out of tape
-
-	OS I/O error	x	report error and stop
-
-2.3.3 Terminal Input (TTI)
+2.3.1 Terminal Input (TTI)
 
 The terminal interfaces (TTI, TTO) can be set to one of two modes:
 7B or 8B.  In 7B mode, input and output characters are masked  to 7
@@ -478,7 +449,7 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
-2.3.4 Terminal Output (TTO)
+2.3.2 Terminal Output (TTO)
 
 The terminal output (TTO) writes to the simulator console window.  It
 implements these registers:
@@ -494,7 +465,7 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	time from I/O initiation to interrupt
 
-2.3.5 Line Printer (LPT)
+2.3.3 Line Printer (LPT)
 
 The line printer (LPT) writes data to a disk file.  The POS register
 specifies the number of the next data item to be written.  Thus,
@@ -523,7 +494,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.3.6 Real-Time Clock (CLK)
+2.3.4 Real-Time Clock (CLK)
 
 The clock (CLK) implements these registers:
 
@@ -540,7 +511,9 @@ The clock (CLK) implements these registers:
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
 
-2.4 RLV12/RL01,RL02 Cartridge Disk (RL)
+2.4 Disks
+
+2.4.1 RLV12/RL01,RL02 Cartridge Disk (RL)
 
 RLV12 options include the ability to set units write enabled or write locked,
 to set the drive size to RL01, RL02, or autosize, and to write a DEC standard
@@ -555,7 +528,7 @@ to set the drive size to RL01, RL02, or autosize, and to write a DEC standard
 
 The size options can be used only when a unit is not attached to a file.  The
 bad block option can be used only when a unit is attached to a file.  Units
-can also be set ONLINE or OFFLINE.
+can also be set ENABLED or DISABLED.
 
 The RL11 implements these registers:
 
@@ -585,7 +558,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.5 RQDX3 MSCP Disk Controllers (RQ, RQB, RQC, RQD)
+2.4.2 RQDX3 MSCP Disk Controllers (RQ, RQB, RQC, RQD)
 
 The simulator implements four MSCP disk controllers, RQ, RQB, RQC, RQD.
 Initially, RQB, RQC, and RQD are disabled.  Each RQ controller simulates
@@ -607,13 +580,15 @@ of many disk types:
 	SET RQn RA90		set type to RA90
 	SET RQn RA92		set type to RA92
 	SET RQn RAUSER{=n}	set type to RA81 with n MB's
+	SET -L RQn RAUSER{=n}	set type to RA81 with n LBN's
 
 The type options can be used only when a unit is not attached to a file.
 RAUSER is a "user specified" disk; the user can specify the size of the
-disk in megabytes.  The minimum size is 50MB. The maximum size is 2GB if
-the simulator is compiled without 64b addressing, 1000GB with 64b addressing.
+disk in either MB (1000000 bytes) or logical block numbers (LBN's, 512
+bytes each).  The minimum size is 5MB; the maximum size is 2GB without
+extended addressing, 1000GB with extended addressing.
 
-Units can also be set ONLINE or OFFLINE.
+Units can also be set ENABLED or DISABLED.
 
 Each RQ controller implements the following special SHOW commands:
 
@@ -657,6 +632,10 @@ Each RQ controller implements these registers:
 	PKTS[33*32]	16	packet buffers, 33W each,
 				32 entries
 
+While VMS is not timing sensitive, most of the BSD-derived operating systems
+(NetBSD, OpenBSD, etc) are.  The QTIME and XTIME parameters are set to
+values that allow these operating systems to run correctly.
+
 Error handling is as follows:
 
 	error	     		processed as
@@ -667,7 +646,7 @@ Error handling is as follows:
 
 	OS I/O error		report error and stop
 
-2.6 RXV21/RX02 Floppy Disk (RY)
+2.4.3 RXV21/RX02 Floppy Disk (RY)
 
 RXV21 options include the ability to set units write enabled or write
 locked, single or double density, or autosized:
@@ -714,7 +693,9 @@ Error handling is as follows:
 RX02 data files are buffered in memory; therefore, end of file and OS
 I/O errors cannot occur.
 
-2.7 TSV11/TSV05 Magnetic Tape (TS)
+2.5 Tapes
+
+2.5.1 TSV11/TSV05 Magnetic Tape (TS)
 
 TS options include the ability to make the unit write enabled or write locked.
 
@@ -762,7 +743,7 @@ Error handling is as follows:
 
 	OS I/O error		fatal tape error
 
-2.8 TQK50 TMSCP Disk Controller (TQ)
+2.5.2 TQK50 TMSCP Disk Controller (TQ)
 
 The TQ controller simulates the TQK50 TMSCP disk controller.  TQ options
 include the ability to set units write enabled or write locked, and to
@@ -832,9 +813,9 @@ Error handling is as follows:
 
 	OS I/O error		report error and stop
 
-2.8 Communications Devices
+2.6 Communications Devices
 
-2.8.1 DZV11 Terminal Multiplexor (DZ)
+2.6.1 DZV11 Terminal Multiplexor (DZ)
 
 The DZV11 is an 4-line terminal multiplexor.  Up to 4 DZ11's (16 lines)
 are supported.  The number of lines can be changed with the command
@@ -909,7 +890,7 @@ The DZV11 implements these registers:
 The DZV11 does not support save and restore.  All open connections are
 lost when the simulator shuts down or the DZ is detached.
 
-2.8.2 DHQ11 Terminal Multiplexor (VH)
+2.6.2 DHQ11 Terminal Multiplexor (VH)
 
 The DHQ11 is an 8-line terminal multiplexor for Qbus systems.  Up
 to 4 DHQ11's are supported.
@@ -989,7 +970,7 @@ from SCP:
 The DHQ11 does not support save and restore.  All open connections
 are lost when the simulator shuts down or the VH is detached.
 
-2.9  DELQA/DEQNA Qbus Ethernet Controllers (XQ, XQB)
+2.6.3 DELQA/DEQNA Qbus Ethernet Controllers (XQ, XQB)
 
 The simulator implements two DELQA/DEQNA Qbus Ethernet controllers (XQ,
 XQB).  Initially, XQ is enabled, and XQB is disabled.  Options allow
@@ -1072,26 +1053,29 @@ not limited to the ~1.5Mbit/sec of the real DEQNA/DELQA controllers,
 nor the 10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet
 (100 Mbit/sec) card, and "Feel the Power!" :-)
 
-2.10 Symbolic Display and Input
+2.7 Symbolic Display and Input
 
 The VAX simulator implements symbolic display and input.  Display is
 controlled by command line switches:
 
-	-a			display as ASCII character
-	-c			display as ASCII string
+	-a,-c			display as ASCII data
 	-m			display instruction mnemonics
+	-p			display compatibility mode mnemonics
+	-r			display RADIX50 encoding
 
 Input parsing is controlled by the first character typed in or by command
 line switches:
 
-	' or -a			ASCII character
-	" or -c			ASCII string
+	' or -a			ASCII characters (determined by length)
+	" or -c			ASCII string (maximum 60 characters)
+	-p			compatibility mode instruction mnemonic
 	alphabetic		instruction mnemonic
 	numeric			octal number
 
-Instruction input uses standard VAX assembler syntax.
+VAX instruction input uses standard VAX assembler syntax.  Compatibility
+mode instruction input uses standard PDP-11 assembler syntax.
 
-The syntax for specifiers is as follows:
+The syntax for VAX specifiers is as follows:
 
 syntax		specifier	displacement	comments
 

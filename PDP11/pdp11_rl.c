@@ -25,6 +25,7 @@
 
    rl		RL11(RLV12)/RL01/RL02 cartridge disk
 
+   30-Sep-04	RMS	Revised Unibus interface
    04-Jan-04	RMS	Changed sim_fsize calling sequence
    19-May-03	RMS	Revised for new conditional compilation scheme
    25-Apr-03	RMS	Revised for extended file support
@@ -73,14 +74,10 @@
 
 #elif defined (VM_VAX)					/* VAX version */
 #include "vax_defs.h"
-extern int32 int_req[IPL_HLVL];
-extern int32 int_vec[IPL_HLVL][32];
 
 #else							/* PDP-11 version */
 #include "pdp11_defs.h"
-extern int32 int_req[IPL_HLVL];
-extern int32 int_vec[IPL_HLVL][32];
-extern int32 cpu_18b, cpu_ubm;
+extern int32 cpu_opt;
 #endif
 
 /* Constants */
@@ -191,7 +188,6 @@ extern int32 cpu_18b, cpu_ubm;
 
 #define RLBAE_IMP	0000077				/* implemented */
 
-extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
 
@@ -462,13 +458,13 @@ if ((func >= RLCS_READ) && (err == 0)) {		/* read (no hdr)? */
 	i = fxread (rlxb, sizeof (int16), wc, uptr->fileref);
 	err = ferror (uptr->fileref);
 	for ( ; i < wc; i++) rlxb[i] = 0;		/* fill buffer */
-	if (t = Map_WriteW (ma, wc << 1, rlxb, MAP)) {	/* store buffer */
+	if (t = Map_WriteW (ma, wc << 1, rlxb)) {	/* store buffer */
 	    rlcs = rlcs | RLCS_ERR | RLCS_NXM;		/* nxm */
 	    wc = wc - t;  }				/* adjust wc */
 	}						/* end read */
 
 if ((func == RLCS_WRITE) && (err == 0)) {		/* write? */
-	if (t = Map_ReadW (ma, wc << 1, rlxb, MAP)) {	/* fetch buffer */
+	if (t = Map_ReadW (ma, wc << 1, rlxb)) {	/* fetch buffer */
 	    rlcs = rlcs | RLCS_ERR | RLCS_NXM;		/* nxm */
 	    wc = wc - t;  }				/* adj xfer lnt */
 	if (wc) {					/* any xfer? */
@@ -484,7 +480,7 @@ if ((func == RLCS_WCHK) && (err == 0)) {		/* write check? */
 	for ( ; i < wc; i++) rlxb[i] = 0;		/* fill buffer */
 	awc = wc;					/* save wc */
 	for (wc = 0; (err == 0) && (wc < awc); wc++)  {	/* loop thru buf */
-	    if (Map_ReadW (ma + (wc << 1), 2, &comp, MAP)) { /* mem wd */
+	    if (Map_ReadW (ma + (wc << 1), 2, &comp)) {	/* mem wd */
 		rlcs = rlcs | RLCS_ERR | RLCS_NXM;	/* nxm */
 		break;  }
 	    if (comp != rlxb[wc])			/* check to buf */
@@ -535,7 +531,7 @@ for (i = 0; i < RL_NUMDR; i++) {
 	uptr = rl_dev.units + i;
 	sim_cancel (uptr);
 	uptr->STAT = 0;  }
-if (rlxb == NULL) rlxb = calloc (RL_MAXFR, sizeof (unsigned int16));
+if (rlxb == NULL) rlxb = calloc (RL_MAXFR, sizeof (uint16));
 if (rlxb == NULL) return SCPE_MEM;
 return SCPE_OK;
 }
@@ -635,6 +631,7 @@ static const uint16 boot_rom[] = {
 t_stat rl_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
+extern uint16 *M;
 extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
@@ -650,4 +647,6 @@ t_stat rl_boot (int32 unitno, DEVICE *dptr)
 {
 return SCPE_NOFNC;
 }
+
 #endif
+

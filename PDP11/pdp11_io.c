@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Sep-04	RMS	Revised Unibus interface
    28-May-04	RMS	Revised I/O dispatching (from John Dundas)
    25-Jan-04	RMS	Removed local debug logging support
    21-Dec-03	RMS	Fixed bug in autoconfigure vector assignment; added controls
@@ -43,18 +44,20 @@
 extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
 extern int32 ub_map[UBM_LNT_LW];
-extern int32 cpu_bme, cpu_18b, cpu_ubm;
+extern int32 cpu_opt, cpu_bme;
 extern int32 trap_req, ipl;
 extern int32 cpu_log;
 extern int32 autcon_enb;
+extern int32 uba_last;
 extern FILE *sim_log;
 extern DEVICE *sim_devices[], cpu_dev;
 extern UNIT cpu_unit;
 
 int32 calc_ints (int32 nipl, int32 trq);
 
-extern DIB cpu0_dib, cpu1_dib, cpu2_dib;
-extern DIB cpu3_dib, cpu4_dib, ubm_dib;
+extern t_stat cpu_build_dib (void);
+extern void init_mbus_tab (void);
+extern t_stat build_mbus_tab (DEVICE *dptr, DIB *dibp);
 
 /* I/O data structures */
 
@@ -65,14 +68,6 @@ static DIB *iodibp[IOPAGESIZE >> 1];
 int32 int_vec[IPL_HLVL][32];				/* int req to vector */
 
 int32 (*int_ack[IPL_HLVL][32])(void);			/* int ack routines */
-
-static DIB *std_dib[] = {				/* standard DIBs */
-	&cpu0_dib,
-	&cpu1_dib,
-	&cpu2_dib,
-	&cpu3_dib,
-	&cpu4_dib,
-	NULL };
 
 static const int32 pirq_bit[7] = {
 	INT_V_PIR1, INT_V_PIR2, INT_V_PIR3, INT_V_PIR4,
@@ -152,52 +147,48 @@ return 0;
    even = low 16b, bit <0> clear
    odd  = high 6b
 
-   The Unibus map is stored as an array of longwords
+   The Unibus map is stored as an array of longwords.
+   These routines are only reachable if a Unibus map is configured.
 */
 
 t_stat ubm_rd (int32 *data, int32 addr, int32 access)
 {
-if (cpu_ubm) {
-	int32 pg = (addr >> 2) & UBM_M_PN;
-	*data = (addr & 2)? ((ub_map[pg] >> 16) & 077):
-		(ub_map[pg] & 0177776);
-	return SCPE_OK;  }
-return SCPE_NXM;
+int32 pg = (addr >> 2) & UBM_M_PN;
+
+*data = (addr & 2)? ((ub_map[pg] >> 16) & 077):
+	(ub_map[pg] & 0177776);
+return SCPE_OK;
 }
 
 t_stat ubm_wr (int32 data, int32 addr, int32 access)
 {
-if (cpu_ubm) {
-	int32 sc, pg = (addr >> 2) & UBM_M_PN;
-	if (access == WRITEB) {
-	    sc = (addr & 3) << 3;
-	    ub_map[pg] = (ub_map[pg] & ~(0377 << sc)) |
-		((data & 0377) << sc);  }
-	else {
-	    sc = (addr & 2) << 3;
-	    ub_map[pg] = (ub_map[pg] & ~(0177777 << sc)) |
-		((data & 0177777) << sc);  }
-	ub_map[pg] = ub_map[pg] & 017777776;
-	return SCPE_OK;  }
-return SCPE_NXM;
+int32 sc, pg = (addr >> 2) & UBM_M_PN;
+if (access == WRITEB) {
+	sc = (addr & 3) << 3;
+	ub_map[pg] = (ub_map[pg] & ~(0377 << sc)) |
+	    ((data & 0377) << sc);  }
+else {	sc = (addr & 2) << 3;
+	ub_map[pg] = (ub_map[pg] & ~(0177777 << sc)) |
+	    ((data & 0177777) << sc);  }
+ub_map[pg] = ub_map[pg] & 017777776;
+return SCPE_OK;
 }
 
 /* Mapped memory access routines for DMA devices */
 
-#define BUSMASK(m)	((cpu_18b || (cpu_ubm && (m)))? UNIMASK: PAMASK)
+#define BUSMASK		((UNIBUS)? UNIMASK: PAMASK)
 
-/* Map I/O address to memory address */
+/* Map I/O address to memory address - caller checks cpu_bme */
 
-t_bool Map_Addr (uint32 ba, uint32 *ma)
+uint32 Map_Addr (uint32 ba)
 {
-if (cpu_bme) {						/* bus map on? */
-	int32 pg = UBM_GETPN (ba);			/* map entry */
-	int32 off = UBM_GETOFF (ba);			/* offset */
-	if (pg != UBM_M_PN)				/* last page? */
-	    *ma = (ub_map[pg] + off) & PAMASK;		/* no, use map */
-	else *ma = (IOPAGEBASE + off) & PAMASK;  }	/* yes, use fixed */
-else *ma = ba;						/* else physical */
-return TRUE;
+int32 pg = UBM_GETPN (ba);				/* map entry */
+int32 off = UBM_GETOFF (ba);				/* offset */
+
+if (pg != UBM_M_PN)					/* last page? */
+	uba_last = (ub_map[pg] + off) & PAMASK;		/* no, use map */
+else uba_last = (IOPAGEBASE + off) & PAMASK;		/* yes, use fixed */
+return uba_last;
 }
 
 /* I/O buffer routines, aligned access
@@ -206,96 +197,108 @@ return TRUE;
    Map_ReadW 	-	fetch word buffer from memory
    Map_WriteB 	-	store byte buffer into memory
    Map_WriteW 	-	store word buffer into memory
+
+   These routines are used only for Unibus and Qbus devices.
+   Massbus devices have their own IO routines.  As a result,
+   the historic 'map' parameter is no longer needed.
+
+   - In a U18 configuration, the map is always disabled.
+     Device addresses are trimmed to 18b.
+   - In a U22 configuration, the map is always configured
+     (although it may be disabled).  Device addresses are
+     trimmed to 18b.
+   - In a Qbus configuration, the map is always disabled.
+     Device addresses are trimmed to 22b.
 */
 
-int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf, t_bool map)
+int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf)
 {
 uint32 alim, lim, ma;
 
-ba = ba & BUSMASK (map);				/* trim address */
+ba = ba & BUSMASK;					/* trim address */
 lim = ba + bc;
-if (map && cpu_bme) {					/* map req & on? */
-    for ( ; ba < lim; ba++) {				/* by bytes */
-	Map_Addr (ba, &ma);				/* map addr */
-	if (!ADDR_IS_MEM (ma)) return (lim - ba);	/* NXM? err */
-	if (ma & 1) *buf++ = (M[ma >> 1] >> 8) & 0377;	/* get byte */
-	else *buf++ = M[ma >> 1] & 0377;  }
-    return 0;  }
+if (cpu_bme) {						/* map enabled? */
+	for ( ; ba < lim; ba++) {			/* by bytes */
+	    ma = Map_Addr (ba);				/* map addr */
+	    if (!ADDR_IS_MEM (ma)) return (lim - ba);	/* NXM? err */
+	    if (ma & 1) *buf++ = (M[ma >> 1] >> 8) & 0377; /* get byte */
+	    else *buf++ = M[ma >> 1] & 0377;  }
+	return 0;  }
 else {							/* physical */
-    if (ADDR_IS_MEM (lim)) alim = lim;			/* end ok? */
-    else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;		/* no, strt ok? */
-    else return bc;					/* no, err */
-    for ( ; ba < alim; ba++) {				/* by bytes */
-	if (ba & 1) *buf++ = (M[ba >> 1] >> 8) & 0377;	/* get byte */
-	else *buf++ = M[ba >> 1] & 0377;  }
-    return (lim - alim);  }
+	if (ADDR_IS_MEM (lim)) alim = lim;		/* end ok? */
+	else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;	/* no, strt ok? */
+	else return bc;					/* no, err */
+	for ( ; ba < alim; ba++) {			/* by bytes */
+	    if (ba & 1) *buf++ = (M[ba >> 1] >> 8) & 0377; /* get byte */
+	    else *buf++ = M[ba >> 1] & 0377;  }
+	return (lim - alim);  }
 }
 
-int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf, t_bool map)
+int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf)
 {
 uint32 alim, lim, ma;
 
-ba = (ba & BUSMASK (map)) & ~01;			/* trim, align addr */
+ba = (ba & BUSMASK) & ~01;				/* trim, align addr */
 lim = ba + (bc & ~01);
-if (map && cpu_bme) {					/* map req & on? */
-    for (; ba < lim; ba = ba + 2) {			/* by words */
-	Map_Addr (ba, &ma);				/* map addr */
-	if (!ADDR_IS_MEM (ma)) return (lim - ba);	/* NXM? err */
-	*buf++ = M[ma >> 1];  }
-     return 0;  }
+if (cpu_bme) {						/* map enabled? */
+	for (; ba < lim; ba = ba + 2) {			/* by words */
+	    ma = Map_Addr (ba);				/* map addr */
+	    if (!ADDR_IS_MEM (ma)) return (lim - ba);	/* NXM? err */
+	    *buf++ = M[ma >> 1];  }
+	return 0;  }
 else {							/* physical */
-    if (ADDR_IS_MEM (lim)) alim = lim;			/* end ok? */
-    else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;		/* no, strt ok? */
-    else return bc;					/* no, err */
-    for ( ; ba < alim; ba = ba + 2) {			/* by words */
-	*buf++ = M[ba >> 1];  }
-    return (lim - alim);  }
+	if (ADDR_IS_MEM (lim)) alim = lim;		/* end ok? */
+	else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;	/* no, strt ok? */
+	else return bc;					/* no, err */
+	for ( ; ba < alim; ba = ba + 2) {		/* by words */
+	    *buf++ = M[ba >> 1];  }
+	return (lim - alim);  }
 }
 
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf, t_bool map)
+int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf)
 {
 uint32 alim, lim, ma;
 
-ba = ba & BUSMASK (map);				/* trim address */
+ba = ba & BUSMASK;					/* trim address */
 lim = ba + bc;
-if (map && cpu_bme) {					/* map req & on? */
-    for ( ; ba < lim; ba++) {				/* by bytes */
-	Map_Addr (ba, &ma);				/* map addr */
-	if (!ADDR_IS_MEM (ma)) return (lim - ba);	/* NXM? err */
-	if (ma & 1) M[ma >> 1] = (M[ma >> 1] & 0377) |
+if (cpu_bme) {						/* map enabled? */
+	for ( ; ba < lim; ba++) {			/* by bytes */
+	    ma = Map_Addr (ba);				/* map addr */
+	    if (!ADDR_IS_MEM (ma)) return (lim - ba);	/* NXM? err */
+	    if (ma & 1) M[ma >> 1] = (M[ma >> 1] & 0377) |
 		((uint16) *buf++ << 8);
-	else M[ma >> 1] = (M[ma >> 1] & ~0377) | *buf++;  }
-    return 0;  }
+	    else M[ma >> 1] = (M[ma >> 1] & ~0377) | *buf++;  }
+	return 0;  }
 else {							/* physical */
-    if (ADDR_IS_MEM (lim)) alim = lim;			/* end ok? */
-    else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;		/* no, strt ok? */
-    else return bc;					/* no, err */
-    for ( ; ba < alim; ba++) {				/* by bytes */
-	if (ba & 1) M[ba >> 1] = (M[ba >> 1] & 0377) |
+	if (ADDR_IS_MEM (lim)) alim = lim;		/* end ok? */
+	else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;	/* no, strt ok? */
+	else return bc;					/* no, err */
+	for ( ; ba < alim; ba++) {			/* by bytes */
+	    if (ba & 1) M[ba >> 1] = (M[ba >> 1] & 0377) |
 		((uint16) *buf++ << 8);
-	else M[ba >> 1] = (M[ba >> 1] & ~0377) | *buf++;  }
-    return (lim - alim);  }
+	    else M[ba >> 1] = (M[ba >> 1] & ~0377) | *buf++;  }
+	return (lim - alim);  }
 }
 
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf, t_bool map)
+int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
 {
 uint32 alim, lim, ma;
 
-ba = (ba & BUSMASK (map)) & ~01;			/* trim, align addr */
+ba = (ba & BUSMASK) & ~01;				/* trim, align addr */
 lim = ba + (bc & ~01);
-if (map && cpu_bme) {					/* map req & on? */
-    for (; ba < lim; ba = ba + 2) {			/* by words */
-	Map_Addr (ba, &ma);				/* map addr */
-	if (!ADDR_IS_MEM (ma)) return (lim - ba);	/* NXM? err */
-	M[ma >> 1] = *buf++;  }				/* store word */
-    return 0;  }
+if (cpu_bme) {						/* map enabled? */
+	for (; ba < lim; ba = ba + 2) {			/* by words */
+	    ma = Map_Addr (ba);				/* map addr */
+	    if (!ADDR_IS_MEM (ma)) return (lim - ba);	/* NXM? err */
+	    M[ma >> 1] = *buf++;  }			/* store word */
+	return 0;  }
 else {							/* physical */
-    if (ADDR_IS_MEM (lim)) alim = lim;			/* end ok? */
-    else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;		/* no, strt ok? */
-    else return bc;					/* no, err */
-    for ( ; ba < alim; ba = ba + 2) {			/* by words */
-	M[ba >> 1] = *buf++;  }
-    return (lim - alim);  }
+	if (ADDR_IS_MEM (lim)) alim = lim;		/* end ok? */
+	else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;	/* no, strt ok? */
+	else return bc;					/* no, err */
+	for ( ; ba < alim; ba = ba + 2) {		/* by words */
+	    M[ba >> 1] = *buf++;  }
+	return (lim - alim);  }
 }
 
 /* Enable/disable autoconfiguration */
@@ -311,8 +314,7 @@ return auto_config (0, 0);
 
 t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf (st, "autoconfiguration ");
-fprintf (st, autcon_enb? "enabled": "disabled");
+fprintf (st, "autoconfiguration %s", (autcon_enb? "on": "off"));
 return SCPE_OK;
 }
 
@@ -421,36 +423,26 @@ else {	fprintf (st, "vector=%o", vec);
 return SCPE_OK;
 }
 
-/* Build dispatch tables */
+/* Init Unibus tables */
 
-t_stat build_dsp_tab (DEVICE *dptr, DIB *dibp)
+void init_ubus_tab (void)
 {
-uint32 i, idx;
+int32 i, j;
 
-if ((dptr == NULL) || (dibp == NULL)) return SCPE_IERR;	/* validate args */
-for (i = 0; i < dibp->lnt; i = i + 2) {			/* create entries */
-	idx = ((dibp->ba + i) & IOPAGEMASK) >> 1;	/* index into disp */
-	if ((iodispR[idx] && dibp->rd &&		/* conflict? */
-	    (iodispR[idx] != dibp->rd)) ||
-	    (iodispW[idx] && dibp->wr &&
-	    (iodispW[idx] != dibp->wr))) {
-	    printf ("Device %s address conflict at %08o\n",
-		sim_dname (dptr), dibp->ba);
-	    if (sim_log) fprintf (sim_log,
-		"Device %s address conflict at %08o\n",
-		sim_dname (dptr), dibp->ba);
-	    return SCPE_STOP;
-	    }
-	if (dibp->rd) iodispR[idx] = dibp->rd;		/* set rd dispatch */
-	if (dibp->wr) iodispW[idx] = dibp->wr;		/* set wr dispatch */
-	iodibp[idx] = dibp;				/* remember DIB */
-	}
-return SCPE_OK;
+for (i = 0; i < IPL_HLVL; i++) {			/* clear intr tab */
+	for (j = 0; j < 32; j++) {
+	    int_vec[i][j] = 0;
+	    int_ack[i][j] = NULL;  }  }
+for (i = 0; i < (IOPAGESIZE >> 1); i++) {		/* clear dispatch tab */
+	iodispR[i] = NULL;
+	iodispW[i] = NULL;
+	iodibp[i] = NULL;  }
+return;
 }
 
-/* Build interrupt tables */
+/* Build Unibus tables */
 
-t_stat build_int_vec (DEVICE *dptr, DIB *dibp)
+t_stat build_ubus_tab (DEVICE *dptr, DIB *dibp)
 {
 int32 i, idx, vec, ilvl, ibit;
 
@@ -475,45 +467,53 @@ for (i = 0; i < dibp->vnum; i++) {			/* loop thru vec */
 	if (dibp->ack[i]) int_ack[ilvl][ibit] = dibp->ack[i];
 	else if (vec) int_vec[ilvl][ibit] = vec;
 	}
+for (i = 0; i < (int32) dibp->lnt; i = i + 2) {		/* create entries */
+	idx = ((dibp->ba + i) & IOPAGEMASK) >> 1;	/* index into disp */
+	if ((iodispR[idx] && dibp->rd &&		/* conflict? */
+	    (iodispR[idx] != dibp->rd)) ||
+	    (iodispW[idx] && dibp->wr &&
+	    (iodispW[idx] != dibp->wr))) {
+	    printf ("Device %s address conflict at %08o\n",
+		sim_dname (dptr), dibp->ba);
+	    if (sim_log) fprintf (sim_log,
+		"Device %s address conflict at %08o\n",
+		sim_dname (dptr), dibp->ba);
+	    return SCPE_STOP;
+	    }
+	if (dibp->rd) iodispR[idx] = dibp->rd;		/* set rd dispatch */
+	if (dibp->wr) iodispW[idx] = dibp->wr;		/* set wr dispatch */
+	iodibp[idx] = dibp;				/* remember DIB */
+	}
 return SCPE_OK;
 }
 
 /* Build tables from device list */
 
-t_stat build_dib_tab (int32 ubm)
+t_stat build_dib_tab (void)
 {
-int32 i, j;
+int32 i;
 DEVICE *dptr;
 DIB *dibp;
 t_stat r;
 
-for (i = 0; i < IPL_HLVL; i++) {			/* clear intr tab */
-	for (j = 0; j < 32; j++) {
-	    int_vec[i][j] = 0;
-	    int_ack[i][j] = NULL;  }  }
-for (i = 0; i < (IOPAGESIZE >> 1); i++) {		/* clear dispatch tab */
-	iodispR[i] = NULL;
-	iodispW[i] = NULL;
-	iodibp[i] = NULL;  }
+init_ubus_tab ();					/* init Unibus tables */
+init_mbus_tab ();					/* init Massbus tables */
 for (i = 0; i < 7; i++)					/* seed PIRQ intr */
 	int_vec[i + 1][pirq_bit[i]] = VEC_PIRQ;
+if (r = cpu_build_dib ()) return r;			/* build CPU entries */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
 	dibp = (DIB *) dptr->ctxt;			/* get DIB */
 	if (dibp && !(dptr->flags & DEV_DIS)) {		/* defined, enabled? */
-	    if (r = build_int_vec (dptr, dibp))		/* add to intr tab */
-		return r;
-	    if (r = build_dsp_tab (dptr, dibp))		/* add to dispatch tab */
-		return r;
+	    if (dptr->flags & DEV_MBUS) {		/* Massbus? */
+		if (r = build_mbus_tab (dptr, dibp))	/* add to Mbus tab */
+		    return r;
+		}
+	    else {					/* no, Unibus */
+		if (r = build_ubus_tab (dptr, dibp))	/* add to Unibus tab */
+		    return r;
+		}
 	    }						/* end if enabled */
 	}						/* end for */
-for (i = 0; std_dib[i] != NULL; i++) {			/* loop thru std */
-	if (r = build_dsp_tab (&cpu_dev, std_dib[i]))	/* add to dispatch tab */
-	    return r;
-	}
-if (ubm) {						/* Unibus map? */
-	if (r = build_dsp_tab (&cpu_dev, &ubm_dib))	/* add to dispatch tab */
-	    return r;
-	}
 return SCPE_OK;
 }
 
@@ -525,7 +525,7 @@ uint32 i, j;
 DEVICE *dptr;
 DIB *dibp;
 
-if (build_dib_tab (cpu_ubm)) return SCPE_OK;		/* build IO page */
+if (build_dib_tab ()) return SCPE_OK;			/* build IO page */
 for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {	/* loop thru entries */
 	if (iodibp[i] && (iodibp[i] != dibp)) {		/* new block? */
 	    dibp = iodibp[i];				/* DIB for block */

@@ -25,6 +25,7 @@
 
    cpu		KS10 central processor
 
+   10-Nov-04	RMS	Added instruction history
    08-Oct-02	RMS	Revised to build dib_tab dynamically
 			Added SHOW IOSPACE
    30-Dec-01	RMS	Added old PC queue
@@ -136,6 +137,15 @@
 #define UNIT_V_MSIZE	(UNIT_V_T20V41 + 1)		/* dummy mask */
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
+#define HIST_PC		0x40000000
+#define HIST_MIN	64
+#define HIST_MAX	65536
+struct InstHistory {
+	a10		pc;
+	a10		ea;
+	d10		ir;
+	d10		ac; };
+
 d10 *M = NULL;						/* memory */
 d10 acs[AC_NBLK * AC_NUM] = { 0 };			/* AC blocks */
 d10 *ac_cur, *ac_prv;					/* AC cur, prv (dyn) */
@@ -178,6 +188,9 @@ a10 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
 jmp_buf save_env;
+int32 hst_p = 0;					/* history pointer */
+int32 hst_lnt = 0;					/* history length */
+struct InstHistory *hst = NULL;				/* instruction history */
 
 extern int32 sim_int_char;
 extern int32 sim_interval;
@@ -189,6 +202,8 @@ extern UNIT tim_unit;
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 d10 adjsp (d10 val, a10 ea);
 void ibp (a10 ea, int32 pflgs);
 d10 ldb (a10 ea, int32 pflgs);
@@ -375,6 +390,8 @@ MTAB cpu_mod[] = {
 	{ UNIT_ITS+UNIT_T20V41, UNIT_ITS, "ITS microcode", "ITS", NULL },
 	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
 	  NULL, &show_iospace },
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
+	  &cpu_set_hist, &cpu_show_hist },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -742,7 +759,14 @@ for (indrct = inst, i = 0; i < ind_max; i++) {		/* calc eff addr */
 	if (TST_IND (indrct)) indrct = Read (ea, MM_EA);
 	else break;  }
 if (i >= ind_max)
-	 ABORT (STOP_IND);				/* too many ind? stop */
+	ABORT (STOP_IND);				/* too many ind? stop */
+if (hst_lnt) {						/* history enabled? */
+	hst_p = (hst_p + 1);				/* next entry */
+	if (hst_p >= hst_lnt) hst_p = 0;
+	hst[hst_p].pc = pager_PC | HIST_PC;
+	hst[hst_p].ea = ea;
+	hst[hst_p].ir = inst;
+	hst[hst_p].ac = AC(ac);  }
 switch (op) {						/* case on opcode */
 
 /* UUO's (0000 - 0077) - checked against KS10 ucode */
@@ -2099,4 +2123,64 @@ rptr = find_reg ("AC0", NULL, &cpu_dev);
 if (rptr == NULL) return;
 for (i = 0; i < AC_NUM; i++, rptr++) rptr->loc = (void *) (acbase + i);
 return;
+}
+
+/* Set history */
+
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i, lnt;
+t_stat r;
+
+if (cptr == NULL) {
+	for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+	hst_p = 0;
+	return SCPE_OK;  }
+lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+hst_p = 0;
+if (hst_lnt) {
+	free (hst);
+	hst_lnt = 0;
+	hst = NULL;  }
+if (lnt) {
+	hst = calloc (sizeof (struct InstHistory), lnt);
+	if (hst == NULL) return SCPE_MEM;
+	hst_lnt = lnt;  }
+return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 k, di, lnt;
+char *cptr = (char *) desc;
+t_stat r;
+t_value sim_eval;
+struct InstHistory *h;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+	UNIT *uptr, int32 sw);
+
+if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+if (cptr) {
+	lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+	if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;  }
+else lnt = hst_lnt;
+di = hst_p - lnt;					/* work forward */
+if (di < 0) di = di + hst_lnt;
+fprintf (st, "PC      AC            EA      IR\n\n");
+for (k = 0; k < lnt; k++) {				/* print specified */
+	h = &hst[(++di) % hst_lnt];			/* entry pointer */
+	if (h->pc & HIST_PC) {				/* instruction? */
+	    fprintf (st, "%06o  ", h->pc & AMASK);
+	    fprintf (st, "%012o  ", h->ac);
+	    fprintf (st, "%06o  ", h->ea);
+	    sim_eval = h->ir;
+	    if ((fprint_sym (st, h->pc & AMASK, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+		fprintf (st, "(undefined) %012o", h->ir);
+	    fputc ('\n', st);				/* end line */
+	    }						/* end else instruction */
+	}						/* end for */
+return SCPE_OK;
 }

@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Sep-04	RMS	Added conditionals for full VAX
+			Moved emulation to vax_cis.c
+			Moved model-specific IPRs to system module
    27-Jan-04	RMS	Added device logging support
 			Fixed EXTxV, INSV double register PC reference fault
    30-Apr-02	RMS	Fixed interrupt/exception handler to clear traps
@@ -56,14 +59,6 @@
 	- MTPR, MFPR
 	- LDPCTX, SVPCTX
 	- (interrupt and exception routine) 
-
-   Emulated instructions:
-	- MOVP, CMPP3, CMPP4, ASHP
-	- ADDP4, ADDP6, SUBP4, SUBP6
-	- MULP, DIVP, CVTLP, CVTPL,
-	- CVTPT, CVTTP, CVTPS, CVTSP
-	- EDITPC, CRC
-	- MATCHC, MOVTC, MOVTUC
 */
 
 #include "vax_defs.h"
@@ -89,15 +84,13 @@ extern int32 PSL;
 extern int32 SCBB, PCBB, SBR, SLR;
 extern int32 P0BR, P0LR, P1BR, P1LR;
 extern int32 ASTLVL, SISR, mapen;
-extern int32 CADR, MSER;
+extern int32 pme;
 extern int32 trpirq;
 extern int32 p1, p2;
-extern int32 conpsl, conpc;
 extern int32 fault_PC;
 extern int32 pcq[PCQ_SIZE];
 extern int32 pcq_p;
 extern int32 in_ie;
-extern int32 mchk_va;
 extern int32 sim_interval;
 extern int32 ibcnt, ppc;
 extern FILE *sim_deb;
@@ -114,6 +107,7 @@ extern void zap_tb_ent (uint32 va);
 extern t_bool chk_tb_ent (uint32 va);
 extern int32 ReadIPR (int32 rg);
 extern void WriteIPR (int32 rg, int32 val);
+extern t_bool BadCmPSL (int32 newpsl);
 extern jmp_buf save_env;
 
 /* Branch on bit and no modify
@@ -221,7 +215,7 @@ if (rn >= 0) {						/* in registers? */
 	    if (rn >= nSP) RSVD_ADDR_FAULT;		/* if PC, fault */
 	    mask = byte_mask[pos + size - 32];		/* insert fragment */
 	    val = ins >> (32 - pos);
-	    R[rnplus1] = (vfldrp1 & ~mask) | (val & mask);  }
+	    R[rn + 1] = (vfldrp1 & ~mask) | (val & mask);  }
 	mask = byte_mask[size] << pos;			/* insert field */
 	val = ins << pos;
 	R[rn] = (R[rn] & ~mask) | (val & mask);  }
@@ -807,7 +801,6 @@ case MVC_FRWD:						/* move forward */
 	for (i = 0; i < 3; i++) {			/* head, align, tail */
 	    lnt = looplnt[i];				/* length for loop */
 	    for (j = 0; j < mlnt[i]; j = j + lnt, sim_interval--) {
-/*		if (sim_interval == 0) ABORT (ABORT_INTR); */
 		wd = Read (R[1], lnt, RA);		/* read src */
 		Write (R[3], wd, lnt, WA);		/* write dst */
 		R[1] = R[1] + lnt;			/* inc src addr */
@@ -822,7 +815,6 @@ case MVC_BACK:						/* move backward */
 	for (i = 0; i < 3; i++) {			/* head, align, tail */
 	    lnt = looplnt[i];				/* length for loop */
 	    for (j = 0; j < mlnt[i]; j = j + lnt, sim_interval--) {
-/*		if (sim_interval == 0) ABORT (ABORT_INTR); */
 		wd = Read (R[1] - lnt, lnt, RA);	/* read src */
 		Write (R[3] - lnt, wd, lnt, WA);	/* write dst */
 		R[1] = R[1] - lnt;			/* dec src addr */
@@ -844,7 +836,6 @@ FILL:
 	    if (lnt == L_LONG) fill = 
 		(((uint32) fill) << 24) | (fill << 16) | (fill << 8) | fill;
 	    for (j = 0; j < mlnt[i]; j = j + lnt, sim_interval--) {
-/*		if (sim_interval == 0) ABORT (ABORT_INTR); */
 		Write (R[3], fill, lnt, WA);		/* write fill */
 		R[3] = R[3] + lnt;			/* inc dst addr */
 		R[4] = R[4] - lnt;  }  }		/* dec fill lnt */
@@ -899,7 +890,6 @@ else {	R[1] = opnd[1];					/* src1len */
 	PSL = PSL | PSL_FPD;  }
 R[2] = R[2] & STR_LNMASK;				/* mask src2len */
 for (s1 = s2 = 0; ((R[0] | R[2]) & STR_LNMASK) != 0; sim_interval--) {
-/*	if (sim_interval == 0) ABORT (ABORT_INTR);	/* timer event */
 	if (R[0] & STR_LNMASK) s1 = Read (R[1], L_BYTE, RA);	/* src1? read */
 	else s1 = fill;					/* no, use fill */
 	if (R[2]) s2 = Read (R[3], L_BYTE, RA);		/* src2? read */
@@ -941,7 +931,6 @@ else {	match = opnd[0];				/* get operands */
 	R[1] = opnd[2];					/* src addr */
 	PSL = PSL | PSL_FPD;  }
 for ( ; (R[0] & STR_LNMASK) != 0; sim_interval-- ) {	/* loop thru string */
-/*	if (sim_interval == 0) ABORT (ABORT_INTR);	/* timer event? */
 	c = Read (R[1], L_BYTE, RA);			/* get src byte */
 	if ((c == match) ^ skpc) break;			/* match & locc? */
 	R[0] = (R[0] & ~STR_LNMASK) | ((R[0] - 1) & STR_LNMASK);
@@ -978,7 +967,6 @@ else {	R[1] = opnd[1];					/* src addr */
 	R[0] = STR_PACK (mask, opnd[0]);		/* srclen + FPD data */
 	PSL = PSL | PSL_FPD;  }
 for ( ; (R[0] & STR_LNMASK) != 0; sim_interval-- ) {	/* loop thru string */
-/*	if (sim_interval == 0) ABORT (ABORT_INTR);	/* timer event? */
 	c = Read (R[1], L_BYTE, RA);			/* get byte */
 	t = Read (R[3] + c, L_BYTE, RA);		/* get table ent */
 	if (((t & mask) != 0) ^ spanc) break;		/* test vs instr */
@@ -1084,13 +1072,14 @@ let	PSL	=	current PSL
 Rule	SRM formulation			    Comment
 ----	---------------			    -------
  1	tmp<25:24> GEQ PSL<25:24>	    tmp<cur_mode> GEQ PSL<cur_mode>
- 2	tmp<26> LEQ PSL<26>		    tmp<is> LEQ tmp<is>
+ 2	tmp<26> LEQ PSL<26>		    tmp<is> LEQ PSL<is>
  3	tmp<26> = 1 => tmp<25:24> = 0	    tmp<is> = 1 => tmp<cur_mode> = ker
  4	tmp<26> = 1 => tmp<20:16> > 0	    tmp<is> = 1 => tmp<ipl> > 0
  5	tmp<20:16> > 0 => tmp<25:24> = 0    tmp<ipl> > 0 => tmp<cur_mode> = ker
  6	tmp<25:24> LEQ tmp<23:22>	    tmp<cur_mode> LEQ tmp<prv_mode>
  7	tmp<20:16> LEQ PSL<20:16>	    tmp<ipl> LEQ PSL<ipl>
  8	tmp<31,29:28,21,15:8> = 0	    tmp<mbz> = 0
+ 9	tmp<31> = 1 => tmp<cur_mode> = 3, tmp<prv_mode> = 3>, tmp<fpd,is,ipl> = 0 
 */
 
 int32 op_rei (int32 acc)
@@ -1099,7 +1088,7 @@ int32 newpc = Read (SP, L_LONG, RA);
 int32 newpsl = Read (SP + 4, L_LONG, RA);
 int32 newcur = PSL_GETCUR (newpsl);
 int32 oldcur = PSL_GETCUR (PSL);
-int32 newipl;
+int32 newipl, i;
 
 if ((newpsl & PSL_MBZ) ||				/* rule 8 */
 	(newcur < oldcur)) RSVD_OPND_FAULT;		/* rule 1 */
@@ -1114,6 +1103,10 @@ else {							/* to k, skip 3,5,6 */
 	    RSVD_OPND_FAULT;				/* else skip 2,4 */
 	if (newipl > PSL_GETIPL (PSL)) RSVD_OPND_FAULT;	/* test rule 7 */
 	}						/* end if kernel */
+if (newpsl & PSL_CM) {					/* setting cmode? */
+	if (BadCmPSL (newpsl)) RSVD_OPND_FAULT;		/* validate PSL */
+	for (i = 0; i < 7; i++) R[i] = R[i] & WMASK;	/* mask R0-R6, PC */
+	newpc = newpc & WMASK;  }
 SP = SP + 8;						/* pop stack */
 if (PSL & PSL_IS) IS = SP;				/* save stack */
 else STK[oldcur] = SP;
@@ -1164,6 +1157,7 @@ P0LR = ReadLP (pcbpa + 84);
 P1BR = ReadLP (pcbpa + 88);
 P1LR = ReadLP (pcbpa + 92);
 ASTLVL = (P0LR >> 24) & AST_MASK;			/* restore AST */
+pme = (P1LR >> 31) & 1;					/* restore PME */
 P0BR = P0BR & BR_MASK;
 P0LR = P0LR & LR_MASK;
 P1BR = P1BR & BR_MASK;
@@ -1340,12 +1334,6 @@ case MT_SIRR:						/* SIRR */
 case MT_SISR:						/* SISR */
 	SISR = val & SISR_MASK;
 	break;
-case MT_CADR:						/* CADR */
-	CADR = (val & CADR_RW) | CADR_MBO;
-	break;
-case MT_MSER:						/* MSER */
-	MSER = MSER & MSER_HM;
-	break;
 case MT_MAPEN:						/* MAPEN */
 	mapen = val & 1;
 case MT_TBIA:						/* TBIA */
@@ -1354,12 +1342,11 @@ case MT_TBIA:						/* TBIA */
 case MT_TBIS:						/* TBIS */
 	zap_tb_ent (val);
 	break;
-case MT_SID:
-case MT_CONPC:
-case MT_CONPSL:
-	RSVD_OPND_FAULT;				/* read only */
 case MT_TBCHK:						/* TBCHK */
 	if (chk_tb_ent (val)) cc = cc | CC_V;
+	break;
+case MT_PME:						/* PME */
+	pme = val & 1;
 	break;
 default:
 	WriteIPR (prn, val);				/* others */
@@ -1417,23 +1404,11 @@ case MT_ASTLVL:						/* ASTLVL */
 case MT_SISR:						/* SISR */
 	val = SISR & SISR_MASK;
 	break;
-case MT_CADR:						/* CADR */
-	val = CADR & 0xFF;
-	break;
-case MT_MSER:						/* MSER */
-	val = MSER & 0xFF;
-	break;
-case MT_CONPC:						/* console PC */
-	val = conpc;
-	break;
-case MT_CONPSL:						/* console PSL */
-	val = conpsl;
-	break;
 case MT_MAPEN:						/* MAPEN */
-	val = mapen;
+	val = mapen & 1;
 	break;
-case MT_SID:						/* SID */
-	val = CVAX_SID | CVAX_UREV;
+case MT_PME:
+	val = pme & 1;
 	break;
 case MT_SIRR:
 case MT_TBIA:
@@ -1444,46 +1419,4 @@ default:						/* others */
 	val = ReadIPR (prn);				/* read from SSC */
 	break;  }
 return val;
-}
-
-/* Emulated CIS instructions
-
-	opnd[0:5] =	six operands to be pushed (if PSL<fpd> = 0)
-	cc	=	condition codes
-	opc	=	opcode
-
-   If FPD is set, push old PC and PSL on stack, vector thru SCB.
-   If FPD is clear, push opcode, old PC, operands, new PC, and PSL
-	on stack, vector thru SCB.
-   In both cases, the exception occurs in the current mode.
-*/
-
-int32 op_cis (int32 *opnd, int32 cc, int32 opc, int32 acc)
-{
-int32 vec;
-
-if (PSL & PSL_FPD) {					/* FPD set? */
-	Read (SP - 1, L_BYTE, WA);			/* wchk stack */
-	Write (SP - 8, fault_PC, L_LONG, WA);		/* push old PC */	
-	Write (SP - 4, PSL | cc, L_LONG, WA);		/* push PSL */
-	SP = SP - 8;					/* decr stk ptr */
-	vec = ReadLP ((SCBB + SCB_EMULFPD) & PAMASK);  }
-else {	if (opc == CVTPL)				/* CVTPL? handle .wl */
-	    opnd[2] = (opnd[2] >= 0)? ~opnd[2]: opnd[3];
-	Read (SP - 1, L_BYTE, WA);			/* wchk stack */
-	Write (SP - 48, opc, L_LONG, WA);		/* push opcode */
-	Write (SP - 44, fault_PC, L_LONG, WA);		/* push old PC */
-	Write (SP - 40, opnd[0], L_LONG, WA);		/* push operands */
-	Write (SP - 36, opnd[1], L_LONG, WA);
-	Write (SP - 32, opnd[2], L_LONG, WA);
-	Write (SP - 28, opnd[3], L_LONG, WA);
-	Write (SP - 24, opnd[4], L_LONG, WA);
-	Write (SP - 20, opnd[5], L_LONG, WA);
-	Write (SP - 8, PC, L_LONG, WA);			/* push cur PC */
-	Write (SP - 4, PSL | cc, L_LONG, WA);		/* push PSL */
-	SP = SP - 48;					/* decr stk ptr */
-	vec = ReadLP ((SCBB + SCB_EMULATE) & PAMASK);  }
-PSL = PSL & ~(PSL_TP | PSL_FPD | PSW_DV | PSW_FU | PSW_IV | PSW_T);
-JUMP (vec & ~03);					/* set new PC */
-return 0;						/* set new cc's */
 }

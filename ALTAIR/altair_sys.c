@@ -173,7 +173,7 @@ return (SCPE_OK);
 	status	=	error code
 */
 
-int32 fprint_sym (FILE *of, int32 addr, unsigned int32 *val,
+int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
 	UNIT *uptr, int32 sw)
 {
 int32 cflag, c1, c2, inst, adr;
@@ -220,7 +220,7 @@ return -(oplen[inst] - 1);
 	status	=	error status
 */
 
-int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, unsigned int32 *val, int32 sw)
+int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw)
 {
 int32 cflag, i = 0, j, r;
 char gbuf[CBUFSIZE];
@@ -229,11 +229,11 @@ cflag = (uptr == NULL) || (uptr == &cpu_unit);
 while (isspace (*cptr)) cptr++;				/* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
 	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = (unsigned int) cptr[0];
+	val[0] = (uint32) cptr[0];
 	return SCPE_OK;  }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* ASCII string? */
 	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = ((unsigned int) cptr[0] << 8) + (unsigned int) cptr[1];
+	val[0] = ((uint32) cptr[0] << 8) + (uint32) cptr[1];
 	return SCPE_OK;  }
 
 /* An instruction: get opcode (all characters until null, comma,

@@ -25,6 +25,7 @@
 
    cpu			Interdata 32b CPU
 
+   06-Nov-04	RMS	Added =n to SHOW HISTORY
    25-Jan-04	RMS	Revised for device debug support
    31-Dec-03	RMS	Fixed bug in cpu_set_hist
    22-Sep-03	RMS	Added additional instruction decode types
@@ -561,7 +562,7 @@ MTAB cpu_mod[] = {
 	{ UNIT_TYPE, UNIT_DPFP | UNIT_832, "8/32", "832", NULL },
 	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, NULL, "CONSINT",
 		&cpu_set_consint, NULL, NULL },
-	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "HISTORY", "HISTORY",
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
 	  &cpu_set_hist, &cpu_show_hist },
 	{ 0 }  };
 
@@ -2106,16 +2107,23 @@ return SCPE_OK;
 
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-uint32 op, k, di;
+uint32 op, k, di, lnt;
+char *cptr = (char *) desc;
 t_value sim_eval[6];
+t_stat r;
 struct InstHistory *h;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
 	UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+if (cptr) {
+	lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+	if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;  }
+else lnt = hst_lnt;
+di = hst_p - lnt;					/* work forward */
+if (di < 0) di = di + hst_lnt;
 fprintf (st, "PC     r1       operand  ea     IR\n\n");
-di = hst_p;						/* work forward */
-for (k = 0; k < hst_lnt; k++) {				/* print specified */
+for (k = 0; k < lnt; k++) {				/* print specified */
 	h = &hst[(di++) % hst_lnt];			/* entry pointer */
 	if (h->pc & HIST_PC) {				/* instruction? */
 	    fprintf (st, "%06X %08X %08X ", h->pc & VAMASK32, h->r1, h->opnd);

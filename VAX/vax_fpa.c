@@ -1,4 +1,4 @@
-/* vax_fpa.c - VAX floating point accelerator simulator
+/* vax_fpa.c - VAX f_, d_, g_floating instructions
 
    Copyright (c) 1998-2004, Robert M Supnik
 
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Sep-04	RMS	Comment and formating changes based on vax_octa.c
    18-Apr-04	RMS	Moved format definitions to vax_defs.h
    19-Jun-03	RMS	Simplified add algorithm
    16-May-03	RMS	Fixed bug in floating to integer convert overflow
@@ -40,9 +41,6 @@
 
 #include "vax_defs.h"
 #include <setjmp.h>
-
-#define M32		0xFFFFFFFF			/* 32b */
-#define M16		0x0000FFFF
 
 extern int32 R[16];
 extern int32 PSL;
@@ -124,8 +122,8 @@ else {	if (sc > 63) {					/* left shift */
 	else {
 	    r = src << sc;				/* do shift */
 	    *flg = (src != (r >> sc));  }  }		/* ovflo test */
-*rh = (int32) (r >> 32);				/* hi result */
-return ((int32) r);					/* lo result */
+*rh = (int32) ((r >> 32) & LMASK);			/* hi result */
+return ((int32) (r & LMASK));				/* lo result */
 }
 
 /* Extended multiply subroutine */
@@ -136,8 +134,8 @@ t_int64 lmpy = mpy;
 t_int64 lmpc = mpc;
 
 lmpy = lmpy * lmpc;
-*rh = ((int32) (lmpy >> 32));
-return (int32) lmpy;
+*rh = (int32) ((lmpy >> 32) & LMASK);
+return ((int32) (lmpy & LMASK));
 }
 
 /* Extended divide
@@ -153,10 +151,10 @@ int32 quo, rem;
 
 *flg = CC_V;						/* assume error */
 *rh = 0;
-ldvr = ((opnd[0] & LSIGN)? -opnd[0]: opnd[0]) & M32;	/* |divisor| */
+ldvr = ((opnd[0] & LSIGN)? -opnd[0]: opnd[0]) & LMASK;	/* |divisor| */
 ldvd = CONCAT (opnd[2], opnd[1]);			/* 64b dividend */
 if (opnd[2] & LSIGN) ldvd = -ldvd;			/* |dividend| */
-if (((ldvd >> 32) & M32) >= ldvr) return opnd[1];	/* divide work? */
+if (((ldvd >> 32) & LMASK) >= ldvr) return opnd[1];	/* divide work? */
 quo = (int32) (ldvd / ldvr);				/* do divide */
 rem = (int32) (ldvd % ldvr);
 if ((opnd[0] ^ opnd[2]) & LSIGN) {			/* result -? */
@@ -165,8 +163,8 @@ if ((opnd[0] ^ opnd[2]) & LSIGN) {			/* result -? */
 else if (quo & LSIGN) return opnd[1];
 if (opnd[2] & LSIGN) rem = -rem;			/* sign of rem */
 *flg = 0;						/* no overflow */
-*rh = rem;						/* set rem */
-return quo;						/* return quo */
+*rh = rem & LMASK;					/* set rem */
+return (quo & LMASK);					/* return quo */
 }
 
 /* Compare floating */
@@ -250,7 +248,7 @@ if (ubexp <= UF_V_NM) {
 else {	*flg = CC_V;					/* set overflow */
 	if (ubexp > (UF_V_NM + 32)) return 0;
 	a.frac = a.frac << (ubexp - UF_V_NM - 1);  }	/* no rnd bit */
-return ((int32) (a.sign? (a.frac ^ M32) + 1: a.frac));
+return ((int32) ((a.sign? (a.frac ^ LMASK) + 1: a.frac) & LMASK));
 }
 
 /* Extended modularize
@@ -269,7 +267,7 @@ UFP a, b;
 unpackf (opnd[0], &a);					/* unpack operands */
 unpackf (opnd[2], &b);
 a.frac = a.frac | (((t_uint64) opnd[1]) << 32);		/* extend src1 */
-vax_fmul (&a, &b, 32, FD_BIAS, M32);			/* multiply */
+vax_fmul (&a, &b, 32, FD_BIAS, LMASK);			/* multiply */
 vax_fmod (&a, FD_BIAS, intgr, flg);			/* sep int & frac */
 return rpackfd (&a, NULL);				/* return frac */
 }
@@ -345,16 +343,16 @@ if ((a->exp == 0) || (b->exp == 0)) {			/* zero argument? */
 	return;  }
 a->sign = a->sign ^ b->sign;				/* sign of result */
 a->exp = a->exp + b->exp - bias;			/* add exponents */
-ah = (a->frac >> 32) & M32;				/* split operands */
-bh = (b->frac >> 32) & M32;				/* into 32b chunks */
+ah = (a->frac >> 32) & LMASK;				/* split operands */
+bh = (b->frac >> 32) & LMASK;				/* into 32b chunks */
 rhi = ah * bh;						/* high result */
 if (prec > 32) {					/* 64b needed? */
-	al = a->frac & M32;
-	bl = b->frac & M32;
+	al = a->frac & LMASK;
+	bl = b->frac & LMASK;
 	rmid1 = ah * bl;
 	rmid2 = al * bh;
 	rlo = al * bl;
-	rhi = rhi + ((rmid1 >> 32) & M32) + ((rmid2 >> 32) & M32);
+	rhi = rhi + ((rmid1 >> 32) & LMASK) + ((rmid2 >> 32) & LMASK);
 	rmid1 = rlo + (rmid1 << 32);			/* add mid1 to lo */
 	if (rmid1 < rlo) rhi = rhi + 1;			/* carry? incr hi */
 	rmid2 = rmid1 + (rmid2 << 32);			/* add mid2 to to */
@@ -516,9 +514,7 @@ return r->sign | (r->exp << G_V_EXP) | UF_GETGHI (r->frac);
 
 #else							/* 32b code */
 
-#define WORDSWAP(x)	((((x) & 0xFFFF) << 16) | (((x) >> 16) & 0xFFFF))
-#define INC32(x)	(((x) + 1) & M32)
-#define NEG32(x)	(((~(x)) + 1) & M32)
+#define WORDSWAP(x)	((((x) & WMASK) << 16) | (((x) >> 16) & WMASK))
 
 struct udp {
 	uint32		lo;
@@ -599,7 +595,7 @@ int32 sign = mpy ^ mpc;					/* sign of result */
 
 if (mpy & LSIGN) mpy = -mpy;				/* abs value */
 if (mpc & LSIGN) mpc = -mpc;
-dp_imul (mpy & M32, mpc & M32, &r);			/* 32b * 32b -> 64b */
+dp_imul (mpy & LMASK, mpc & LMASK, &r);			/* 32b * 32b -> 64b */
 if (sign & LSIGN) dp_neg (&r);				/* negative result? */
 *rh = r.hi;
 return r.lo;
@@ -622,19 +618,19 @@ dvd.hi = opnd[2];
 *flg = CC_V;						/* assume error */
 *rh = 0;
 if (dvd.hi & LSIGN) dp_neg (&dvd);			/* |dividend| */
-if (dvr & LSIGN) dvr = NEG32 (dvr);			/* |divisor| */
+if (dvr & LSIGN) dvr = NEG (dvr);			/* |divisor| */
 if (dvd.hi >= dvr) return opnd[1];			/* divide work? */
 for (i = quo = 0; i < 32; i++) {			/* 32 iterations */
 	quo = quo << 1;					/* shift quotient */
 	dp_lsh (&dvd, 1);				/* shift dividend */
 	if (dvd.hi >= dvr) {				/* step work? */
-	    dvd.hi = (dvd.hi - dvr) & M32;		/* subtract dvr */
+	    dvd.hi = (dvd.hi - dvr) & LMASK;		/* subtract dvr */
 	    quo = quo + 1;  }  }
 if ((opnd[0] ^ opnd[2]) & LSIGN) {			/* result -? */
-	quo = NEG32 (quo);				/* negate */
+	quo = NEG (quo);				/* negate */
 	if (quo && ((quo & LSIGN) == 0)) return opnd[1];  } /* right sign? */
 else if (quo & LSIGN) return opnd[1];
-if (opnd[2] & LSIGN) *rh = NEG32 (dvd.hi);		/* sign of rem */
+if (opnd[2] & LSIGN) *rh = NEG (dvd.hi);		/* sign of rem */
 else *rh = dvd.hi;
 *flg = 0;						/* no overflow */
 return quo;						/* return quo */
@@ -686,7 +682,7 @@ if (val < 0) {						/* negative? */
 	val = -val;  }
 else a.sign = 0;					/* else sign = + */
 a.exp = 32 + ((opc & 0x100)? G_BIAS: FD_BIAS);		/* initial exp */
-a.frac.hi = val & M32;					/* fraction */
+a.frac.hi = val & LMASK;					/* fraction */
 a.frac.lo = 0;
 norm (&a);						/* normalize */
 if (opc & 0x100) return rpackg (&a, rh);		/* pack and return */
@@ -719,7 +715,7 @@ if (ubexp <= UF_V_NM) {					/* exp in range? */
 else {	*flg = CC_V;					/* always ovflo */
 	if (ubexp > (UF_V_NM + 32)) return 0;		/* in ext range? */
 	dp_lsh (&a.frac, ubexp - UF_V_NM - 1);  }	/* no rnd bit */
-return (a.sign? NEG32 (a.frac.lo): a.frac.lo);		/* return lo frac */
+return (a.sign? NEG (a.frac.lo): a.frac.lo);		/* return lo frac */
 }
 
 /* Extended modularize
@@ -738,7 +734,7 @@ UFP a, b;
 unpackf (opnd[0], &a);					/* unpack operands */
 unpackf (opnd[2], &b);
 a.frac.hi = a.frac.hi | opnd[1];			/* extend src1 */
-vax_fmul (&a, &b, 32, FD_BIAS, M32);			/* multiply */
+vax_fmul (&a, &b, 32, FD_BIAS, LMASK);			/* multiply */
 vax_fmod (&a, FD_BIAS, intgr, flg);			/* sep int & frac */
 return rpackfd (&a, NULL);				/* return frac */
 }
@@ -835,13 +831,15 @@ if (prec > 32) {					/* 64b needed? */
 	dp_imul (a->frac.hi, b->frac.lo, &rmid1);	/* cross products */
 	dp_imul (a->frac.lo, b->frac.hi, &rmid2);
 	dp_imul (a->frac.lo, b->frac.lo, &rlo);		/* low result */
-	rhi.lo = (rhi.lo + rmid1.hi) & M32;		/* add hi cross */
-	if (rhi.lo < rmid1.hi) rhi.hi = INC32 (rhi.hi);	/* to low high res */
-	rhi.lo = (rhi.lo + rmid2.hi) & M32;
-	if (rhi.lo < rmid2.hi) rhi.hi = INC32 (rhi.hi);
-	rlo.hi = (rlo.hi + rmid1.lo) & M32;		/* add mid1 to low res */
+	rhi.lo = (rhi.lo + rmid1.hi) & LMASK;		/* add hi cross */
+	if (rhi.lo < rmid1.hi)				/* to low high res */
+	    rhi.hi = (rhi.hi + 1) & LMASK;
+	rhi.lo = (rhi.lo + rmid2.hi) & LMASK;
+	if (rhi.lo < rmid2.hi)
+	     rhi.hi = (rhi.hi + 1) & LMASK;
+	rlo.hi = (rlo.hi + rmid1.lo) & LMASK;		/* add mid1 to low res */
 	if (rlo.hi < rmid1.lo) dp_inc (&rhi);		/* carry? incr high res */
-	rlo.hi = (rlo.hi + rmid2.lo) & M32;		/* add mid2 to low res */
+	rlo.hi = (rlo.hi + rmid2.lo) & LMASK;		/* add mid2 to low res */
 	if (rlo.hi < rmid1.hi) dp_inc (&rhi);  }	/* carry? incr high res */
 a->frac.hi = rhi.hi;					/* mask low fraction */
 a->frac.lo = rhi.lo & ~mask;
@@ -925,24 +923,24 @@ return 0;						/* hi, lo equal */
 
 void dp_add (UDP *a, UDP *b)
 {
-a->lo = (a->lo + b->lo) & M32;				/* add lo */
+a->lo = (a->lo + b->lo) & LMASK;			/* add lo */
 if (a->lo < b->lo) a->hi = a->hi + 1;			/* carry? */
-a->hi = (a->hi + b->hi) & M32;				/* add hi */
+a->hi = (a->hi + b->hi) & LMASK;			/* add hi */
 return;
 }
 
 void dp_inc (UDP *a)
 {
-a->lo = (a->lo + 1) & M32;				/* inc lo */
-if (a->lo == 0) a->hi = (a->hi + 1) & M32;		/* carry? inc hi */
+a->lo = (a->lo + 1) & LMASK;				/* inc lo */
+if (a->lo == 0) a->hi = (a->hi + 1) & LMASK;		/* carry? inc hi */
 return;
 }
 
 void dp_sub (UDP *a, UDP *b)
 {
 if (a->lo < b->lo) a->hi = a->hi - 1;			/* borrow? decr hi */
-a->lo = (a->lo - b->lo) & M32;				/* sub lo */
-a->hi = (a->hi - b->hi) & M32;				/* sub hi */
+a->lo = (a->lo - b->lo) & LMASK;			/* sub lo */
+a->hi = (a->hi - b->hi) & LMASK;			/* sub hi */
 return;
 }
 
@@ -950,11 +948,11 @@ void dp_lsh (UDP *r, uint32 sc)
 {
 if (sc > 63) r->hi = r->lo = 0;				/* > 63? result 0 */
 else if (sc > 31) {					/* [32,63]? */
-	r->hi = (r->lo << (sc - 32)) & M32;
+	r->hi = (r->lo << (sc - 32)) & LMASK;
 	r->lo = 0;  }
 else if (sc != 0) {
-	r->hi = ((r->hi << sc) | (r->lo >> (32 - sc))) & M32;
-	r->lo = (r->lo << sc) & M32;  }
+	r->hi = ((r->hi << sc) | (r->lo >> (32 - sc))) & LMASK;
+	r->lo = (r->lo << sc) & LMASK;  }
 return;
 }
 
@@ -962,11 +960,11 @@ void dp_rsh (UDP *r, uint32 sc)
 {
 if (sc > 63) r->hi = r->lo = 0;				/* > 63? result 0 */
 else if (sc > 31) {					/* [32,63]? */
-	r->lo = (r->hi >> (sc - 32)) & M32;
+	r->lo = (r->hi >> (sc - 32)) & LMASK;
 	r->hi = 0;  }
 else if (sc != 0) {
-	r->lo = ((r->lo >> sc) | (r->hi << (32 - sc))) & M32;
-	r->hi = (r->hi >> sc) & M32;  }
+	r->lo = ((r->lo >> sc) | (r->hi << (32 - sc))) & LMASK;
+	r->hi = (r->hi >> sc) & LMASK;  }
 return;
 }
 
@@ -974,9 +972,9 @@ void dp_rsh_s (UDP *r, uint32 sc, uint32 neg)
 {
 dp_rsh (r, sc);						/* do unsigned right */
 if (neg && sc) {					/* negative? */
-	if (sc > 63) r->hi = r->lo = M32;		/* > 63? result -1 */
+	if (sc > 63) r->hi = r->lo = LMASK;		/* > 63? result -1 */
 	else {
-	    UDP ones = { M32, M32 };
+	    UDP ones = { LMASK, LMASK };
 	    dp_lsh (&ones, 64 - sc);			/* shift ones */
 	    r->hi = r->hi | ones.hi;			/* or into result */
 	    r->lo = r->lo | ones.lo;  }  }
@@ -990,28 +988,28 @@ uint32 ah, bh, al, bl, rhi, rlo, rmid1, rmid2;
 if ((a == 0) || (b == 0)) {				/* zero argument? */
 	r->hi = r->lo = 0;				/* result is zero */
 	return;  }
-ah = (a >> 16) & M16;					/* split operands */
-bh = (b >> 16) & M16;					/* into 16b chunks */
-al = a & M16;
-bl = b & M16;
+ah = (a >> 16) & WMASK;					/* split operands */
+bh = (b >> 16) & WMASK;					/* into 16b chunks */
+al = a & WMASK;
+bl = b & WMASK;
 rhi = ah * bh;						/* high result */
 rmid1 = ah * bl;
 rmid2 = al * bh;
 rlo = al * bl;
-rhi = rhi + ((rmid1 >> 16) & M16) + ((rmid2 >> 16) & M16);
-rmid1 = (rlo + (rmid1 << 16)) & M32;			/* add mid1 to lo */
+rhi = rhi + ((rmid1 >> 16) & WMASK) + ((rmid2 >> 16) & WMASK);
+rmid1 = (rlo + (rmid1 << 16)) & LMASK;			/* add mid1 to lo */
 if (rmid1 < rlo) rhi = rhi + 1;				/* carry? incr hi */
-rmid2 = (rmid1 + (rmid2 << 16)) & M32;			/* add mid2 to to */
+rmid2 = (rmid1 + (rmid2 << 16)) & LMASK;			/* add mid2 to to */
 if (rmid2 < rmid1) rhi = rhi + 1;			/* carry? incr hi */
-r->hi = rhi & M32;					/* mask result */
+r->hi = rhi & LMASK;					/* mask result */
 r->lo = rmid2;
 return;
 }
 
 void dp_neg (UDP *r)
 {
-r->lo = NEG32 (r->lo);
-r->hi = (~r->hi + (r->lo == 0)) & M32;
+r->lo = NEG (r->lo);
+r->hi = (~r->hi + (r->lo == 0)) & LMASK;
 return;
 }
 
@@ -1307,11 +1305,11 @@ unpackf (wd, &r);					/* unpack C0 */
 res = rpackfd (&r, NULL);				/* first result */
 for (i = 0; (i < deg) && a.exp; i++) {			/* loop */
 	unpackf (res, &r);				/* unpack result */
-	vax_fmul (&r, &a, 32, FD_BIAS, M32);		/* r = r * arg */
+	vax_fmul (&r, &a, 32, FD_BIAS, LMASK);		/* r = r * arg */
 	wd = Read (ptr, L_LONG, RD);			/* get Cnext */
 	ptr = ptr + 4;
 	unpackf (wd, &c);				/* unpack Cnext */
-	vax_fadd (&r, &c, M32);				/* r = r + Cnext */
+	vax_fadd (&r, &c, LMASK);			/* r = r + Cnext */
 	res = rpackfd (&r, NULL);  }			/* round and pack */
 R[0] = res;
 R[1] = R[2] = 0;

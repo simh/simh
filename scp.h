@@ -23,12 +23,52 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Sep-04	RMS	Added reset_all_p
    14-Feb-04	RMS	Added debug prototypes (from Dave Hittner)
    02-Jan-04	RMS	Split out from SCP
 */
 
 #ifndef _SIM_SCP_H_
 #define _SIM_SCP_H_	0
+
+/* run_cmd parameters */
+
+#define RU_RUN		0				/* run */
+#define RU_GO		1				/* go */
+#define RU_STEP		2				/* step */
+#define RU_CONT		3				/* continue */
+#define RU_BOOT		4				/* boot */
+
+/* get_sim_opt parameters */
+
+#define CMD_OPT_SW	001				/* switches */
+#define CMD_OPT_OF	002				/* output file */
+#define CMD_OPT_SCH	004				/* search */
+#define CMD_OPT_DFT	010				/* defaults */
+
+/* Command processors */
+
+t_stat reset_cmd (int32 flag, char *ptr);
+t_stat exdep_cmd (int32 flag, char *ptr);
+t_stat eval_cmd (int32 flag, char *ptr);
+t_stat load_cmd (int32 flag, char *ptr);
+t_stat run_cmd (int32 flag, char *ptr);
+t_stat attach_cmd (int32 flag, char *ptr);
+t_stat detach_cmd (int32 flag, char *ptr);
+t_stat assign_cmd (int32 flag, char *ptr);
+t_stat deassign_cmd (int32 flag, char *ptr);
+t_stat save_cmd (int32 flag, char *ptr);
+t_stat restore_cmd (int32 flag, char *ptr);
+t_stat exit_cmd (int32 flag, char *ptr);
+t_stat set_cmd (int32 flag, char *ptr);
+t_stat show_cmd (int32 flag, char *ptr);
+t_stat brk_cmd (int32 flag, char *ptr);
+t_stat do_cmd (int32 flag, char *ptr);
+t_stat help_cmd (int32 flag, char *ptr);
+t_stat spawn_cmd (int32 flag, char *ptr);
+t_stat echo_cmd (int32 flag, char *ptr);
+
+/* Utility routines */
 
 t_stat sim_process_event (void);
 t_stat sim_activate (UNIT *uptr, int32 interval);
@@ -40,8 +80,10 @@ int32 sim_qcount (void);
 t_stat attach_unit (UNIT *uptr, char *cptr);
 t_stat detach_unit (UNIT *uptr);
 t_stat reset_all (uint32 start_device);
+t_stat reset_all_p (uint32 start_device);
 char *sim_dname (DEVICE *dptr);
 t_stat get_yn (char *ques, t_stat deflt);
+char *get_sim_opt (int32 opt, char *cptr, t_stat *st);
 char *get_glyph (char *iptr, char *optr, char mchar);
 char *get_glyph_nc (char *iptr, char *optr, char mchar);
 t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status);
@@ -50,6 +92,9 @@ char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
 t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp);
 t_value strtotv (char *cptr, char **endptr, uint32 radix);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
+CTAB *find_cmd (char *gbuf);
+DEVICE *find_dev (char *ptr);
+DEVICE *find_unit (char *ptr, UNIT **uptr);
 DEVICE *find_dev_from_unit (UNIT *uptr);
 REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
 CTAB *find_ctab (CTAB *tab, char *gbuf);

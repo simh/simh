@@ -26,6 +26,10 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   30-Sep-04	RMS	Added Massbus support
+			Removed Map_Addr prototype
+			Removed map argument from Unibus routines
+			Added framework for model selection
    28-May-04	RMS	Added DHQ support
    25-Jan-04	RMS	Removed local debug logging support
    22-Dec-03	RMS	Added second DEUNA/DELUA support
@@ -68,9 +72,11 @@
 
 /* Architectural constants */
 
-#define STKLIM		0400				/* stack limit */
+#define STKL_R		0340				/* stack limit */
+#define STKL_Y		0400
 #define VASIZE		0200000				/* 2**16 */
 #define VAMASK		(VASIZE - 1)			/* 2**16 - 1 */
+#define MEMSIZE64K	0200000				/* 2**16 */
 #define INIMEMSIZE 	001000000			/* 2**18 */
 #define UNIMEMSIZE	001000000			/* 2**18 */
 #define UNIMASK		(UNIMEMSIZE - 1)		/* 2**18 - 1 */
@@ -82,6 +88,149 @@
 #define MEMSIZE		(cpu_unit.capac)
 #define ADDR_IS_MEM(x)	(((t_addr) (x)) < MEMSIZE)
 #define DMASK		0177777
+
+/* CPU models */
+
+#define MOD_1103	0
+#define MOD_1104	1
+#define MOD_1105	2
+#define MOD_1120	3
+#define MOD_1123	4
+#define MOD_1123P	5
+#define MOD_1124	6
+#define MOD_1134	7
+#define MOD_1140	8
+#define MOD_1144	9
+#define MOD_1145	10
+#define MOD_1160	11
+#define MOD_1170	12
+#define MOD_1173	13
+#define MOD_1153	14
+#define MOD_1173B	15
+#define MOD_1183	16
+#define MOD_1184	17
+#define MOD_1193	18
+#define MOD_1194	19
+#define MOD_T		20
+
+#define CPUT_03		(1u << MOD_1103)		/* LSI-11 */
+#define CPUT_04		(1u << MOD_1104)		/* 11/04 */
+#define CPUT_05		(1u << MOD_1105)		/* 11/05 */
+#define CPUT_20		(1u << MOD_1120)		/* 11/20 */
+#define CPUT_23		(1u << MOD_1123)		/* 11/23 */
+#define CPUT_23P	(1u << MOD_1123P)		/* 11/23+ */
+#define CPUT_24		(1u << MOD_1124)		/* 11/24 */
+#define CPUT_34		(1u << MOD_1134)		/* 11/34 */
+#define CPUT_40		(1u << MOD_1140)		/* 11/40 */
+#define CPUT_44		(1u << MOD_1144)		/* 11/44 */
+#define CPUT_45		(1u << MOD_1145)		/* 11/45 */
+#define CPUT_60		(1u << MOD_1160)		/* 11/60 */
+#define CPUT_70		(1u << MOD_1170)		/* 11/70 */
+#define CPUT_73		(1u << MOD_1173)		/* 11/73 */
+#define CPUT_53		(1u << MOD_1153)		/* 11/53 */
+#define CPUT_73B	(1u << MOD_1173B)		/* 11/73B */
+#define CPUT_83		(1u << MOD_1183)		/* 11/83 */
+#define CPUT_84		(1u << MOD_1184)		/* 11/84 */
+#define CPUT_93		(1u << MOD_1193)		/* 11/93 */
+#define CPUT_94		(1u << MOD_1194)		/* 11/94 */
+#define CPUT_T		(1u << MOD_T)			/* T-11 */
+
+#define CPUT_F		(CPUT_23|CPUT_23P|CPUT_24)	/* all F11's */
+#define CPUT_J		(CPUT_53|CPUT_73|CPUT_73B| \
+			 CPUT_83|CPUT_84|CPUT_93|CPUT_94)
+#define CPUT_JB		(CPUT_73B|CPUT_83|CPUT_84)	/* KDJ11B */
+#define CPUT_JE		(CPUT_93|CPUT_94)		/* KDJ11E */
+#define CPUT_JU		(CPUT_84|CPUT_94)		/* KTJ11B UBA */
+#define CPUT_ALL	0xFFFFFFFF
+
+/* CPU options */
+
+#define BUS_U		(1u << 0)			/* Unibus */
+#define BUS_Q		(0)				/* Qbus */
+#define OPT_EIS		(1u << 1)			/* EIS */
+#define OPT_FIS		(1u << 2)			/* FIS */
+#define OPT_FPP		(1u << 3)			/* FPP */
+#define OPT_CIS		(1u << 4)			/* CIS */
+#define OPT_MMU		(1u << 5)			/* MMU */
+#define OPT_RH11	(1u << 6)			/* RH11 */
+#define OPT_PAR		(1u << 7)			/* parity */
+#define OPT_UBM		(1u << 8)			/* UBM */
+
+#define CPUT(x)		((cpu_type & (x)) != 0)
+#define CPUO(x)		((cpu_opt & (x)) != 0)
+#define UNIBUS		(cpu_opt & BUS_U)
+
+/* Feature sets
+
+   SDSD			source addr, source fetch, dest addr, dest fetch
+   SR			switch register
+   DR			display register
+   RTT			RTT instruction
+   SXS			SXT, XOR, SOB instructions
+   MARK			MARK instruction
+   SPL			SPL instruction
+   MXPY			MTPI, MTPD, MFPI, MFPD instructions
+   MXPS			MTPS, MFPS instructions
+   MFPT			MFPT instruction
+   CSM			CSM instruction
+   TSWLK		TSTSET, WRLCK instructions
+   PSW			PSW register
+   EXPT			explicit PSW writes can alter T-bit
+   IOSR			general registers readable from programs in IO space
+   2REG			dual register set
+   MMR3			MMR3 register
+   MMTR			mem mgt traps
+   STKLR		STKLIM register
+   STKLF		fixed stack limit
+   SID			supervisor mode, I/D spaces
+   ODD			odd address trap
+   HALT4		halt in kernel mode traps to 4
+   JREG4		JMP/JSR R traps to 4
+   STKA			stop on stack abort
+   LTCR			LTC CSR
+   LTCM			LTC CSR<7>
+*/
+
+#define IS_SDSD		(CPUT_20|CPUT_F|CPUT_40|CPUT_60|CPUT_J|CPUT_T)
+#define HAS_SR		(CPUT_04|CPUT_05|CPUT_20|CPUT_34|CPUT_40| \
+			 CPUT_44|CPUT_45|CPUT_60|CPUT_70)
+#define HAS_DR		(CPUT_04|CPUT_05|CPUT_20|CPUT_24|CPUT_34| \
+			 CPUT_40|CPUT_45|CPUT_60|CPUT_70)
+#define HAS_RTT		(CPUT_03|CPUT_04|CPUT_F|CPUT_34|CPUT_40| \
+			 CPUT_44|CPUT_45|CPUT_60|CPUT_70|CPUT_J|CPUT_T)
+#define HAS_SXS		(CPUT_03|CPUT_F|CPUT_34|CPUT_40|CPUT_44| \
+			 CPUT_45|CPUT_60|CPUT_70|CPUT_J|CPUT_T)
+#define HAS_MARK	(CPUT_03|CPUT_F|CPUT_34|CPUT_40|CPUT_44| \
+			 CPUT_45|CPUT_60|CPUT_70|CPUT_J)
+#define HAS_SPL		(CPUT_44|CPUT_45|CPUT_70|CPUT_J)
+#define HAS_MXPY	(CPUT_F|CPUT_34|CPUT_40|CPUT_44|CPUT_45| \
+			 CPUT_60|CPUT_70|CPUT_J)
+#define HAS_MXPS	(CPUT_03|CPUT_F|CPUT_34|CPUT_J|CPUT_T)
+#define HAS_MFPT	(CPUT_F|CPUT_44|CPUT_J|CPUT_T)
+#define HAS_CSM		(CPUT_44|CPUT_J)
+#define HAS_TSWLK	(CPUT_J)
+#define HAS_PSW		(CPUT_04|CPUT_05|CPUT_20|CPUT_F|CPUT_34|CPUT_40| \
+			 CPUT_44|CPUT_45|CPUT_60|CPUT_70|CPUT_J)
+#define HAS_EXPT	(CPUT_04|CPUT_05|CPUT_20)
+#define HAS_IOSR	(CPUT_04|CPUT_05)
+#define HAS_2REG	(CPUT_45|CPUT_70|CPUT_J)
+#define HAS_MMR3	(CPUT_F|CPUT_44|CPUT_45|CPUT_70|CPUT_J)
+#define HAS_MMTR	(CPUT_45|CPUT_70)
+#define HAS_STKLR	(CPUT_45|CPUT_60|CPUT_70)
+#define HAS_STKLF	(CPUT_04|CPUT_05|CPUT_20|CPUT_F|CPUT_34| \
+			 CPUT_40|CPUT_44|CPUT_J)
+#define HAS_SID		(CPUT_44|CPUT_45|CPUT_70|CPUT_J)
+#define HAS_ODD		(CPUT_04|CPUT_05|CPUT_20|CPUT_34|CPUT_40| \
+			 CPUT_44|CPUT_45|CPUT_60|CPUT_70|CPUT_J)
+#define HAS_HALT4	(CPUT_44|CPUT_45|CPUT_70|CPUT_J)
+#define HAS_JREG4	(CPUT_03|CPUT_04|CPUT_05|CPUT_20|CPUT_F| \
+			 CPUT_34|CPUT_40|CPUT_60|CPUT_T)
+#define STOP_STKA	(CPUT_03|CPUT_04|CPUT_05|CPUT_20|CPUT_34|CPUT_44)
+#define HAS_LTCR	(CPUT_04|CPUT_05|CPUT_20|CPUT_23P|CPUT_24| \
+			 CPUT_34|CPUT_40|CPUT_44|CPUT_45|CPUT_60| \
+			 CPUT_70|CPUT_J)
+#define HAS_LTCM	(CPUT_04|CPUT_05|CPUT_20|CPUT_24|CPUT_34| \
+			 CPUT_40|CPUT_44|CPUT_45|CPUT_60|CPUT_70|CPUT_J)
 
 /* Protection modes */
 
@@ -106,10 +255,13 @@
 #define PSW_V_N 	3
 #define PSW_V_TBIT 	4				/* trace trap */
 #define PSW_V_IPL	5				/* int priority */
+#define PSW_V_FPD	8				/* first part done */
 #define PSW_V_RS	11				/* register set */
 #define PSW_V_PM	12				/* previous mode */
 #define PSW_V_CM	14				/* current mode */
-#define PSW_RW		0174357				/* read/write bits */
+#define PSW_CC		017
+#define PSW_TBIT	(1 << PSW_V_TBIT)
+#define PSW_PM		(3 << PSW_V_PM)
 
 /* FPS */
 
@@ -139,18 +291,25 @@
 #define PIRQ_IMP	0177356				/* implemented bits */
 #define PIRQ_RW		0177000				/* read/write bits */
 
+/* STKLIM */
+
+#define STKLIM_RW	0177400
+
 /* MMR0 */
 
 #define MMR0_MME	0000001				/* mem mgt enable */
 #define MMR0_V_PAGE	1				/* offset to pageno */
 #define MMR0_M_PAGE	077				/* mask for pageno */
 #define MMR0_PAGE	(MMR0_M_PAGE << MMR0_V_PAGE)
+#define MMR0_IC		0000200				/* instr complete */
+#define MMR0_MAINT	0000400				/* maintenance */
+#define MMR0_TENB	0001000				/* trap enable */
+#define MMR0_TRAP	0010000				/* mem mgt trap */
 #define MMR0_RO		0020000				/* read only error */
 #define MMR0_PL		0040000				/* page lnt error */
 #define MMR0_NR		0100000				/* no access error */
 #define MMR0_FREEZE	0160000				/* if set, no update */
-#define MMR0_IMP	0160177				/* implemented bits */
-#define MMR0_RW		0160001				/* read/write bits */
+#define MMR0_WR		0171401				/* writeable bits */
 
 /* MMR3 */
 
@@ -160,18 +319,23 @@
 #define MMR3_CSM	010				/* CSM enable */
 #define MMR3_M22E	020				/* 22b mem mgt enbl */
 #define MMR3_BME	040				/* DMA bus map enbl */
-#define MMR3_IMP	077				/* implemented bits */
-#define MMR3_RW		077				/* read/write bits */
+
+/* PAR */
+
+#define PAR_18B		0007777				/* 18b addressing */
+#define PAR_22B		0177777				/* 22b addressing */
 
 /* PDR */
 
-#define PDR_PRD		0000002				/* page readable */
-#define PDR_PWR		0000004				/* page writeable */
+#define PDR_ACF		0000007				/* access control */
+#define PDR_ACS		0000006				/* 2b access control */
 #define PDR_ED		0000010				/* expansion dir */
 #define PDR_W		0000100				/* written flag */
+#define PDR_A		0000200				/* access flag */
 #define PDR_PLF		0077400				/* page lnt field */
-#define PDR_IMP		0177516				/* implemented bits */
-#define PDR_RW		0177416				/* read/write bits */
+#define PDR_NOC		0100000				/* don't cache */
+
+#define PDR_PRD		0000003				/* page readable if 2 */
 
 /* Virtual address */
 
@@ -189,6 +353,7 @@
 #define UBM_M_PN	037
 #define UBM_V_OFF	0				/* offset */
 #define UBM_M_OFF	017777
+#define UBM_PAGSIZE	(UBM_M_OFF + 1)			/* page size */
 #define UBM_GETPN(x)	(((x) >> UBM_V_PN) & UBM_M_PN)
 #define UBM_GETOFF(x)	((x) & UBM_M_OFF)
 
@@ -202,26 +367,11 @@
 #define CPUE_HALT	0200				/* HALT not kernel */
 #define CPUE_IMP	0374				/* implemented bits */
 
-/* Maintenance register */
-
-#define MAINT_V_UQ	9				/* Q/U flag */
-#define MAINT_Q		(0 << MAINT_V_UQ)		/* Qbus */
-#define MAINT_U		(1 << MAINT_V_UQ)
-#define MAINT_V_FPA	8				/* FPA flag */
-#define MAINT_NOFPA	(0 << MAINT_V_FPA)
-#define MAINT_FPA	(1 << MAINT_V_FPA)
-#define MAINT_V_TYP	4				/* system type */
-#define MAINT_KDJ	(1 << MAINT_V_TYP)		/* KDJ11A */
-#define MAINT_V_HTRAP	3				/* trap 4 on HALT */
-#define MAINT_HTRAP	(1 << MAINT_V_HTRAP)
-#define MAINT_V_BPOK	0				/* power OK */
-#define MAINT_BPOK	(1 << MAINT_V_BPOK)
-
 /* Floating point accumulators */
 
 struct fpac {
-	unsigned int32	l;				/* low 32b */
-	unsigned int32	h;				/* high 32b */
+	uint32		l;				/* low 32b */
+	uint32		h;				/* high 32b */
 };
 typedef struct fpac fpac_t;
 
@@ -322,15 +472,13 @@ typedef struct fpac fpac_t;
 #define DEV_V_QBUS	(DEV_V_UF + 1)			/* Qbus */
 #define DEV_V_Q18	(DEV_V_UF + 2)			/* Qbus with <= 256KB */
 #define DEV_V_FLTA	(DEV_V_UF + 3)			/* flt addr */
+#define DEV_V_MBUS	(DEV_V_UF + 4)			/* Massbus */
+#define DEV_V_FFUF	(DEV_V_UF + 5)			/* first free flag */
 #define DEV_UBUS	(1u << DEV_V_UBUS)
 #define DEV_QBUS	(1u << DEV_V_QBUS)
 #define DEV_Q18		(1u << DEV_V_Q18)
 #define DEV_FLTA	(1u << DEV_V_FLTA)
-
-#define UNIBUS		(cpu_18b || cpu_ubm)		/* T if 18b */
-
-#define MAP		1				/* mapped */
-#define NOMAP		0				/* not mapped */
+#define DEV_MBUS	(1u << DEV_V_MBUS)
 
 #define DEV_RDX		8				/* default device radix */
 
@@ -369,8 +517,18 @@ typedef struct pdp_dib DIB;
 #define IOLN_UBM	(UBM_LNT_LW * sizeof (int32))
 #define IOBA_RQ		(IOPAGEBASE + 012150)		/* RQDX3 */
 #define IOLN_RQ		004
-#define IOBA_APR	(IOPAGEBASE + 012200)		/* APRs */
-#define IOLN_APR	0200
+#define IOBA_SUP	(IOPAGEBASE + 012200)		/* supervisor APR's */
+#define IOLN_SUP	0100
+#define IOBA_KIPDR	(IOPAGEBASE + 012300)		/* kernel APR's */
+#define IOLN_KIPDR	020
+#define IOBA_KDPDR	(IOPAGEBASE + 012320)
+#define IOLN_KDPDR	020
+#define IOBA_KIPAR	(IOPAGEBASE + 012340)
+#define IOLN_KIPAR	020
+#define IOBA_KDPAR	(IOPAGEBASE + 012360)
+#define IOLN_KDPAR	020
+#define IOBA_TU		(IOPAGEBASE + 012440)		/* TU */
+#define IOLN_TU		040
 #define IOBA_MMR3	(IOPAGEBASE + 012516)		/* MMR3 */
 #define IOLN_MMR3	002
 #define IOBA_TM		(IOPAGEBASE + 012520)		/* TM11 */
@@ -403,6 +561,8 @@ typedef struct pdp_dib DIB;
 #define IOLN_HK		040
 #define IOBA_LPT	(IOPAGEBASE + 017514)		/* LP11 */
 #define IOLN_LPT	004
+#define IOBA_CTL	(IOPAGEBASE + 017520)		/* board ctrl */
+#define IOLN_CTL	010
 #define IOBA_CLK	(IOPAGEBASE + 017546)		/* KW11L */
 #define IOLN_CLK	002
 #define IOBA_PTR	(IOPAGEBASE + 017550)		/* PC11 reader */
@@ -413,12 +573,26 @@ typedef struct pdp_dib DIB;
 #define IOLN_TTI	004
 #define IOBA_TTO	(IOPAGEBASE + 017564)		/* DL11 xmt */
 #define IOLN_TTO	004
-#define IOBA_SRMM	(IOPAGEBASE + 017570)		/* SR, MMR0-2 */
-#define IOLN_SRMM	010
-#define IOBA_APR1	(IOPAGEBASE + 017600)		/* APRs */
-#define IOLN_APR1	0100
+#define IOBA_SR		(IOPAGEBASE + 017570)		/* SR */
+#define IOLN_SR		002
+#define IOBA_MMR012	(IOPAGEBASE + 017572)		/* MMR0-2 */
+#define IOLN_MMR012	006
+#define IOBA_UIPDR	(IOPAGEBASE + 017600)		/* user APR's */
+#define IOLN_UIPDR	020
+#define IOBA_UDPDR	(IOPAGEBASE + 017620)
+#define IOLN_UDPDR	020
+#define IOBA_UIPAR	(IOPAGEBASE + 017640)
+#define IOLN_UIPAR	020
+#define IOBA_UDPAR	(IOPAGEBASE + 017660)
+#define IOLN_UDPAR	020
+#define IOBA_GPR	(IOPAGEBASE + 017700)		/* GPR's */
+#define IOLN_GPR	010
+#define IOBA_UCTL	(IOPAGEBASE + 017730)		/* UBA ctrl */
+#define IOLN_UCTL	010
 #define IOBA_CPU	(IOPAGEBASE + 017740)		/* CPU reg */
-#define IOLN_CPU	040
+#define IOLN_CPU	036
+#define IOBA_PSW	(IOPAGEBASE + 017776)		/* PSW */
+#define IOLN_PSW	002
 
 /* Interrupt assignments; within each level, priority is right to left */
 
@@ -445,7 +619,8 @@ typedef struct pdp_dib DIB;
 #define INT_V_RY	11
 #define INT_V_XQ	12
 #define INT_V_XU	13
-#define INT_V_PIR5	14
+#define INT_V_TU	14
+#define INT_V_PIR5	15
 
 #define INT_V_TTI	0				/* BR4 */
 #define INT_V_TTO	1
@@ -479,6 +654,7 @@ typedef struct pdp_dib DIB;
 #define INT_RY		(1u << INT_V_RY)
 #define INT_XQ		(1u << INT_V_XQ)
 #define INT_XU		(1u << INT_V_XU)
+#define INT_TU		(1u << INT_V_TU)
 #define INT_PIR5	(1u << INT_V_PIR5)
 #define INT_PTR		(1u << INT_V_PTR)
 #define INT_PTP		(1u << INT_V_PTP)
@@ -509,6 +685,7 @@ typedef struct pdp_dib DIB;
 #define IPL_RY		5
 #define IPL_XQ		5
 #define IPL_XU		5
+#define IPL_TU		5
 #define IPL_PTR		4
 #define IPL_PTP		4
 #define IPL_TTI		4
@@ -545,6 +722,7 @@ typedef struct pdp_dib DIB;
 #define VEC_DTA		0214
 #define VEC_TM		0224
 #define VEC_TS		0224
+#define VEC_TU		0224
 #define VEC_RP		0254
 #define VEC_TQ		0260
 #define VEC_RX		0264
@@ -571,6 +749,16 @@ typedef struct pdp_dib DIB;
 #define SET_INT(dv)	int_req[IPL_##dv] = int_req[IPL_##dv] | (INT_##dv)
 #define CLR_INT(dv)	int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
 
+/* Massbus definitions */
+
+#define MBA_NUM		2				/* number of MBA's */
+#define MBA_RP		0				/* MBA for RP */
+#define MBA_TU		1				/* MBA for TU */
+#define MBA_RMASK	037				/* max 32 reg */
+#define MBE_NXD		1				/* nx drive */
+#define MBE_NXR		2				/* nx reg */
+#define MBE_GOE		3				/* err on GO */
+
 /* CPU and FPU macros */
 
 #define update_MM	((MMR0 & MMR0_FREEZE) == 0)
@@ -582,16 +770,27 @@ typedef struct pdp_dib DIB;
 
 /* Function prototypes */
 
-t_bool Map_Addr (uint32 qa, uint32 *ma);
-int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf, t_bool map);
-int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf, t_bool map);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf, t_bool map);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf, t_bool map);
+int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
+int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat auto_config (uint32 rank, uint32 num);
+t_stat build_ubus_tab (DEVICE *dptr, DIB *dibp);
+
+int32 mba_rdbufW (uint32 mbus, int32 bc, uint16 *buf);
+int32 mba_wrbufW (uint32 mbus, int32 bc, uint16 *buf);
+int32 mba_chbufW (uint32 mbus, int32 bc, uint16 *buf);
+int32 mba_get_bc (uint32 mbus);
+int32 mba_get_csr (uint32 mbus);
+void mba_upd_ata (uint32 mbus, uint32 val);
+void mba_set_exc (uint32 mbus);
+void mba_set_don (uint32 mbus);
+t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #endif

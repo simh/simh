@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   07-Nov-04	RMS	Added instruction history
    26-Mar-04	RMS	Fixed warnings with -std=c99
    02-Nov-03	RMS	Fixed bug in branch digit (found by Dave Babcock)
    21-Aug-03	RMS	Fixed bug in immediate index add (found by Michael Short)
@@ -98,6 +99,14 @@
 #define PCQ_MASK	(PCQ_SIZE - 1)
 #define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = saved_PC
 
+#define HIST_PC		0x40000000
+#define HIST_MIN	64
+#define HIST_MAX	65536
+struct InstHistory {
+	uint16		vld;
+	uint16		pc;
+	uint8		inst[INST_LEN]; };
+
 uint8 M[MAXMEMSIZE] = { 0 };				/* main memory */
 uint32 saved_PC = 0;					/* saved PC */
 uint32 IR2 = 1;						/* inst reg 2 */
@@ -113,6 +122,9 @@ int32 ind_max = 16;					/* iadr nest limit */
 uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
+int32 hst_p = 0;					/* history pointer */
+int32 hst_lnt = 0;					/* history length */
+struct InstHistory *hst = NULL;				/* instruction history */
 uint8 ind[NUM_IND] = { 0 };				/* indicators */
 
 extern int32 sim_int_char;
@@ -129,6 +141,8 @@ t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_save (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_table (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 int32 get_2d (uint32 ad);
 t_stat get_addr (uint32 alast, int32 lnt, t_bool indexok, uint32 *addr);
@@ -228,6 +242,8 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 60000, NULL, "60K", &cpu_set_size },
 	{ UNIT_MSIZE, 0, NULL, "SAVE", &cpu_set_save },
 	{ UNIT_MSIZE, 0, NULL, "TABLE", &cpu_set_table },
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
+	  &cpu_set_hist, &cpu_show_hist },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -484,6 +500,16 @@ if (flags & (IF_VQA | IF_4QA | IF_NQX)) {		/* need Q? */
 	    reason = reason + (STOP_INVQDG - STOP_INVPDG);
 	    break;  }  }
 else if (flags & IF_IMM) QAR = qla;			/* immediate? */
+
+if (hst_lnt) {						/* history enabled? */
+	hst_p = (hst_p + 1);				/* next entry */
+	if (hst_p >= hst_lnt) hst_p = 0;
+	hst[hst_p].vld = 1;
+	hst[hst_p].pc = PC;	
+	for (i = 0; i < INST_LEN; i++)
+	    hst[hst_p].inst[i] = M[(PC + i) % MEMSIZE];
+	}
+
 PC = PC + INST_LEN;					/* advance PC */
 switch (op) {						/* case on op */
 
@@ -1882,5 +1908,67 @@ for (i = 0; i < MUL_TABLE_LEN; i++)			/* set mul table */
 if (((cpu_unit.flags & IF_MII) == 0) || val) {		/* set add table */
 	for (i = 0; i < ADD_TABLE_LEN; i++)
 		M[ADD_TABLE + i] = std_add_table[i];  }
+return SCPE_OK;
+}
+
+/* Set history */
+
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i, lnt;
+t_stat r;
+
+if (cptr == NULL) {
+	for (i = 0; i < hst_lnt; i++) hst[i].vld = 0;
+	hst_p = 0;
+	return SCPE_OK;  }
+lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+hst_p = 0;
+if (hst_lnt) {
+	free (hst);
+	hst_lnt = 0;
+	hst = NULL;  }
+if (lnt) {
+	hst = calloc (sizeof (struct InstHistory), lnt);
+	if (hst == NULL) return SCPE_MEM;
+	hst_lnt = lnt;  }
+return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 i, k, di, lnt;
+char *cptr = (char *) desc;
+t_value sim_eval[INST_LEN];
+t_stat r;
+struct InstHistory *h;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+	UNIT *uptr, int32 sw);
+
+if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+if (cptr) {
+	lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+	if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;  }
+else lnt = hst_lnt;
+di = hst_p - lnt;					/* work forward */
+if (di < 0) di = di + hst_lnt;
+fprintf (st, "PC     IR\n\n");
+for (k = 0; k < lnt; k++) {				/* print specified */
+	h = &hst[(++di) % hst_lnt];			/* entry pointer */
+	if (h->vld) {					/* instruction? */
+	    fprintf (st, "%05d  ", h->pc);
+	    for (i = 0; i < INST_LEN; i++)
+		sim_eval[i] = h->inst[i];
+	    if ((fprint_sym (st, h->pc, sim_eval, &cpu_unit, SWMASK ('M'))) > 0) {
+		fprintf (st, "(undefined)");
+		for (i = 0; i < INST_LEN; i++)
+		    fprintf (st, "% 02X", h->inst[i]);
+		}
+	    fputc ('\n', st);				/* end line */
+	    }						/* end else instruction */
+	}						/* end for */
 return SCPE_OK;
 }

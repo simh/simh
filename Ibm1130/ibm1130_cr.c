@@ -18,6 +18,8 @@
  * This is not a supported product, but I welcome bug reports and fixes.
  * Mail to simh@ibm1130.org
 
+ *  Update 2004-06-05: Removed "feedcycle" from cr_reset. Reset should not touch the card reader.
+
  *  Update 2004-04-12: Changed ascii field of CPCODE to unsigned char, caught a couple
  					   other potential problems with signed characters used as subscript indexes.
 
@@ -337,6 +339,7 @@ static t_stat cr_reset    (DEVICE *dptr);
 static t_stat cr_set_code (UNIT *uptr, int32 match, char *cptr, void *desc);
 static t_stat cr_attach   (UNIT *uptr, char *cptr);
 static int32  guess_cr_code (void);
+static void	  feedcycle	  (t_bool load, t_bool punching);
 
 static t_stat cp_reset	  (DEVICE *dptr);
 static t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc);
@@ -400,7 +403,7 @@ static int32 cp_count= 0;
 
 #define COLUMN		u4										/* column field in unit record */
 
-UNIT cr_unit = { UDATA (&cr_svc, UNIT_ATTABLE|UNIT_ROABLE, 0) };
+UNIT cr_unit = { UDATA (&cr_svc, UNIT_ATTABLE|UNIT_ROABLE|UNIT_CR_EMPTY, 0) };
 UNIT cp_unit = { UDATA (NULL,    UNIT_ATTABLE, 0) };
 
 MTAB cr_mod[] = {
@@ -916,7 +919,7 @@ t_stat load_cr_boot (int drvno, int switches)
 t_stat cr_boot (int unitno, DEVICE *dptr)
 {
 	t_stat rval;
-	uint16 buf[80];
+//	uint16 buf[80];
 	int i;
 
 	if ((rval = reset_all(0)) != SCPE_OK)
@@ -933,13 +936,15 @@ t_stat cr_boot (int unitno, DEVICE *dptr)
 	if (cr_unit.fileref == NULL)				/* this will happen if no file in deck file can be opened */
 		return SCPE_IOERR;
 
-	if (fxread(buf, sizeof(buf[0]), 80, cr_unit.fileref) != 80)
-		return SCPE_IOERR;
+	feedcycle(TRUE, FALSE);
+
+//	if (fxread(buf, sizeof(buf[0]), 80, cr_unit.fileref) != 80)
+//		return SCPE_IOERR;
 
 	IAR = 0;									/* Program Load sets IAR = 0 */
 
 	for (i = 0; i < 80; i++)					/* shift 12 bits into 16 */
-		WriteW(i, (buf[i] & 0xF800) | ((buf[i] & 0x0400) ? 0x00C0 : 0x0000) | ((buf[i] & 0x03F0) >> 4));
+		WriteW(i, (readstation[i] & 0xF800) | ((readstation[i] & 0x0400) ? 0x00C0 : 0x0000) | ((readstation[i] & 0x03F0) >> 4));
 
 	return SCPE_OK;
 }
@@ -1422,19 +1427,19 @@ static t_stat cr_reset (DEVICE *dptr)
 		return SCPE_OK;
 	}
 
-	SETBIT(cr_unit.flags, UNIT_CR_EMPTY);			/* assume hopper empty */
-
-	if (cr_unit.flags & UNIT_ATT) {
+//	SETBIT(cr_unit.flags, UNIT_CR_EMPTY);			/* assume hopper empty */
+//
+//	if (cr_unit.flags & UNIT_ATT) {
 //		if (deckfile != NULL) {						/* do NOT rewind the deck file */
 //			fseek(deckfile, 0, SEEK_SET);
 //			nextdeck();
 //		}
 //		else 
 //			checkdeck();
-
-		if (cr_unit.fileref != NULL)
-			feedcycle(FALSE, FALSE);
-	}
+//
+//		if (cr_unit.fileref != NULL)
+//			feedcycle(FALSE, FALSE);
+//	}
 
 	return SCPE_OK;
 }

@@ -775,7 +775,7 @@ static void tracesector (int iswrite, int nwords, int addr, int sector)
 	}
 
 	printf("* %04x: %3d /%04x %c %3d.%d ",
-		prev_IAR, nwords, addr, iswrite ? '>' : '<', sector/8, sector%8);
+		prev_IAR, nwords, addr, iswrite ? 'W' : 'R', sector/8, sector%8);
 
 	if (name == NULL) {								// look up sector in SLET
 		for (i = 0; i < MAXSLET; i++) {

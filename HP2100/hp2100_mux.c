@@ -25,6 +25,7 @@
 
    mux,muxl,muxc	12920A terminal multiplexor
 
+   07-Oct-04	JDB	Allow enable/disable from any device
    26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
 			Implemented DMA SRQ (follows FLG)
    05-Jan-04	RMS	Revised for tmxr library changes
@@ -41,6 +42,10 @@
 
    The lower data card has no CMD flop; the control card has no CMD flop.
    The upper data card has none of the usual flops.
+
+   Reference:
+   - 12920A Asynchronous Multiplexer Interface Kits Operating and Service
+            Manual (12920-90001, Oct-1972)
 */
 
 #include "hp2100_defs.h"
@@ -163,7 +168,7 @@ int32 muxuio (int32 inst, int32 IR, int32 dat);
 int32 muxcio (int32 inst, int32 IR, int32 dat);
 t_stat muxi_svc (UNIT *uptr);
 t_stat muxo_svc (UNIT *uptr);
-t_stat mux_reset (DEVICE *dptr);
+t_stat muxc_reset (DEVICE *dptr);
 t_stat mux_attach (UNIT *uptr, char *cptr);
 t_stat mux_detach (UNIT *uptr);
 t_stat mux_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -235,7 +240,7 @@ MTAB muxu_mod[] = {
 DEVICE muxu_dev = {
 	"MUX", &muxu_unit, muxu_reg, muxu_mod,
 	1, 10, 31, 1, 8, 8,
-	&tmxr_ex, &tmxr_dep, &mux_reset,
+	&tmxr_ex, &tmxr_dep, &muxc_reset,
 	NULL, &mux_attach, &mux_detach,
 	&muxu_dib, DEV_NET | DEV_DISABLE };
 
@@ -301,9 +306,9 @@ REG muxl_reg[] = {
 DEVICE muxl_dev = {
 	"MUXL", muxl_unit, muxl_reg, muxl_mod,
 	MUX_LINES, 10, 31, 1, 8, 8,
-	NULL, NULL, &mux_reset,
+	NULL, NULL, &muxc_reset,
 	NULL, NULL, NULL,
-	&muxl_dib, 0 };
+	&muxl_dib, DEV_DISABLE };
 
 /* MUXM data structures
 
@@ -338,9 +343,9 @@ MTAB muxc_mod[] = {
 DEVICE muxc_dev = {
 	"MUXM", &muxc_unit, muxc_reg, muxc_mod,
 	1, 10, 31, 1, 8, 8,
-	NULL, NULL, &mux_reset,
+	NULL, NULL, &muxc_reset,
 	NULL, NULL, NULL,
-	&muxc_dib, 0 };
+	&muxc_dib, DEV_DISABLE };
 
 /* IOT routines: data cards */
 
@@ -634,15 +639,18 @@ return;
 
 /* Reset routine */
 
-t_stat mux_reset (DEVICE *dptr)
+t_stat muxc_reset (DEVICE *dptr)
 {
 int32 i, t;
 
-if (muxu_dev.flags & DEV_DIS) {				/* enb/dis dev */
-	muxl_dev.flags = muxu_dev.flags | DEV_DIS;
-	muxc_dev.flags = muxc_dev.flags | DEV_DIS;  }
-else {	muxl_dev.flags = muxl_dev.flags & ~DEV_DIS;
-	muxc_dev.flags = muxc_dev.flags & ~DEV_DIS;  }
+if (dptr == &muxc_dev) {				/* make all consistent */
+	hp_enbdis_pair (dptr, &muxl_dev);
+	hp_enbdis_pair (dptr, &muxu_dev);  }
+else if (dptr == &muxl_dev) {
+	hp_enbdis_pair (dptr, &muxc_dev);
+	hp_enbdis_pair (dptr, &muxu_dev);  }
+else {	hp_enbdis_pair (dptr, &muxc_dev);
+	hp_enbdis_pair (dptr, &muxl_dev);  }
 muxl_dib.cmd = muxl_dib.ctl = 0;			/* init lower */
 muxl_dib.flg = muxl_dib.fbf = muxl_dib.srq = 1;
 muxu_dib.cmd = muxu_dib.ctl = 0;			/* upper not */

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Nova Simulator Usage
-Date:	15-Mar-2004
+Date:	15-Nov-2004
 
 			COPYRIGHT NOTICE
 
@@ -540,7 +540,7 @@ write locked, and to select the type of drive:
 	SET DPn 6103		set unit n to 6103
 	SET DPn 4231		set unit n to 4231
 
-Units can also be set ONLINE or OFFLINE.  The moving head disk controller
+Units can also be set ENABLED or DISABLED.  The moving head disk controller
 supports the BOOT command.
 
 All drives have 256 16b words per sector.  The other disk parameters are:
@@ -594,7 +594,7 @@ or write locked.
 	SET MTn LOCKED		set unit n write locked
 	SET MTn WRITEENABLED	set unit n write enabled
 
-Units can also be set ONLINE or OFFLINE.  The magnetic tape controller
+Units can also be set ENABLED or DISABLED.  The magnetic tape controller
 supports the BOOT command.
 
 The magnetic tape controller implements these registers:

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V3.2-3
-Date:	20-Aug-2004
+Subj:	Simulator Usage, V3.3
+Date:	15-Nov-2004
 
 			COPYRIGHT NOTICE
 
@@ -40,8 +40,7 @@ bob AT supnik DOT org, but a response is not guaranteed.
 The simulators use a common command interface.  This memorandum describes
 the features of the command interface.  The details of each simulator are
 documented in separate, machine-specific memoranda.
-
-
+
 1. Compiling And Running A Simulator
 
 The simulators have been tested on VAX VMS, Alpha VMS, Alpha UNIX,
@@ -181,7 +180,7 @@ simulators with Ethernet support.
 
 1.2.2 Compiling Under MinGW
 
-MinGW (Minimum GCC for Windows) is a free C compiler available from
+MinGW (Minimalist GNU for Windows) is a free C compiler available from
 http://www.mingw.org.  The distribution includes a batch file
 (build_mingw.bat) that will build all the simulators from source.
 By default, the PDP-11 and VAX are built without Ethernet support.  To
@@ -308,9 +307,11 @@ Note: SAVE file format compresses zeroes to minimize file size.
 3.3 Resetting Devices
 
 The RESET command (abbreviation RE) resets a device or the entire
-simulator to a predefined condition:
+simulator to a predefined condition.  If switch -p is specified,
+the device is reset to its power-up state:
 
 	sim> RESET(cr)			-- reset all devices
+	sim> RESET -p(cr)		-- powerup all devices
 	sim> RESET ALL(cr)		-- reset all devices
 	sim> RESET <device>(cr)		-- reset specified device
 
@@ -481,7 +482,15 @@ Examples:
 Note: to terminate an interactive command, simply type a bad value (eg,
 XYZ) when input is requested.
 
-3.6 Running Programs
+3.6 Evaluating Instructions
+
+The EVAL command evaluates a symbolic instruction and returns the
+equivalent numeric value.  This is useful for obtaining numeric arguments
+for a search command:
+
+	sim> EVAL <expression>
+
+3.7 Running Programs
 
 The RUN command (abbreviated RU) resets all devices, deposits its argument
 (if given) in the PC, and starts execution.  If no argument is given,
@@ -502,12 +511,12 @@ The BOOT command (abbreviated BO) bootstraps the device and unit given
 by its argument.  If no unit is supplied, unit 0 is bootstrapped.  The
 specified unit must be attached.
 
-3.7 Stopping Programs
+3.8 Stopping Programs
 
 Programs run until the simulator detects an error or stop condition, or
 until the user forces a stop condition.
 
-3.7.1 Simulator Detected Stop Conditions
+3.8.1 Simulator Detected Stop Conditions
 
 These simulator-detected conditions stop simulation:
 
@@ -524,13 +533,13 @@ These simulator-detected conditions stop simulation:
 	- Processor condition.  Certain processor conditions can stop
 	  simulation; these are described with the individual simulators.
 
-3.7.2 User Specified Stop Conditions
+3.8.2 User Specified Stop Conditions
 
 Typing the interrupt character stops simulation.  The interrupt character
 is defined by the WRU (where are you) console option and is initially set
 to 005 (^E).
 
-3.7.3 Breakpoints
+3.8.3 Breakpoints
 
 A simulator may offer breakpoint capability.  A simulator may define
 breakpoints of different types, identified by letter (for example, E
@@ -568,15 +577,16 @@ Locations with breakpoints of the specified type are displayed.
 
 Finally, breakpoints can be cleared by the NOBREAK command.
 
-3.8 Setting Device Parameters
+3.9 Setting Device Parameters
 
-The SET command (abbreviated SE) changes the status of a device parameter:
+The SET command (abbreviated SE) changes the status of one or more device
+parameters:
 
-	sim> SET <device> <parameter>{=<value}
+	sim> SET <device> <parameter>{=<value},{<parameter>{=<value>},...}
 
-or a unit parameter:
+or one or more unit parameters:
 
-	sim> SET <unit> <parameter>{=<value>}
+	sim> SET <unit> <parameter>{=<value>},{<parameter>{=<value>},...}
 
 Most parameters are simulator and device specific.  Disk drives, for
 example, can usually be set WRITEENABLED or write LOCKED; if a device
@@ -589,35 +599,43 @@ All devices recognize the following parameters:
 	DEC		sets the data radix = 10
 	HEX		sets the data radix = 16
 
-3.9 Displaying Parameters and Status
+3.10 Displaying Parameters and Status
 
-The SHOW CONFIGURATION command shows the simulator configuration and
-the status of all simulated devices and units.
+The SHOW command (abbreviated SH) displays the status of one or more device
+parameters:
 
-The SHOW DEVICES command shows the configuration of all simulated
-devices.
+	sim> SHOW {<modifiers} <device> <parameter>{=<value>},
+		{<parameter>{=<value>},...}
 
-The SHOW MODIFIERS command shows the modifiers available on all
-simulated devices.
+or one or more unit parameters:
 
-The SHOW QUEUE command shows the state of the simulator event queue.
-Times are in "simulation units", typically one unit per instruction
-execution, relative to the current simulation time.
+	sim> SHOW {<modifiers} <unit> <parameter>{=<value>},
+		{<parameter>{=<value>},...}
 
-The SHOW TIME command shows the number of time units elapsed since
-the last RUN command.
+There are two kinds of modifiers: switches and output file.  Switches have
+been described previously.  The output file modifier redirects command output
+to a file instead of the console.  An output file modifier consists of @
+followed by a valid file name.
 
-The SHOW <device> command shows the status of the named simulated
-device. SHOW <device> <parameter> shows the value of the named
-parameter, if it can display a value.  All devices implement parameters
-RADIX (the display radix), MODIFIERS (list of valid modifiers), and
-NAMES (logical name).
+All devices implement parameters RADIX (the display radix), MODIFIERS
+(list of valid modifiers), and NAMES (logical name).  Other device and
+unit parameters are implementation-specific.
 
-The SHOW <unit> command shows the status of the named simulated unit.
-SHOW <unit> <parameter> shows the value of the named parameter, if
-it can display a value.
+SHOW is also used to display global simulation state:
+ 
+- SHOW CONFIGURATION shows the simulator configuration and the status
+  of all simulated devices and units.
+- SHOW DEVICES shows the configuration of all simulated devices.
+- SHOW MODIFIERS shows the modifiers available on all simulated devices.
+- SHOW QUEUE shows the state of the simulator event queue.  Times are
+  in "simulation units", typically one unit per instruction execution,
+  relative to the current simulation time.
+- SHOW TIME shows the number of time units elapsed since the last RUN
+  command.
+- SHOW <device> shows the status of the named simulated device.
+- SHOW <unit> shows the status of the named simulated unit.
 
-3.10 Altering The Simulated Configuration
+3.11 Altering The Simulated Configuration
 
 In most simulators, the SET <device> DISABLED command removes the
 specified device from the configuration.  A DISABLED device is
@@ -625,12 +643,12 @@ invisible to running programs.  The device can still be RESET but
 it cannot be ATTAChed, DETACHed, or BOOTed.  SET <device> ENABLED
 restores a disabled device to a configuration.
 
-Most multi-unit devices allow units to be placed online or offline:
+Most multi-unit devices allow units to be enabled or disabled:
 
-	sim> SET <unit> ONLINE
-	sim> SET <unit> OFFLINE
+	sim> SET <unit> ENABLED
+	sim> SET <unit> DISABLED
 
-When a unit is offline, it will not be displayed by SHOW DEVICE.
+When a unit is disabled, it will not be displayed by SHOW DEVICE.
 
 The standard device names can be supplemented with logical names.
 Logical names must be unique within a simulator (that is, they cannot
@@ -651,7 +669,7 @@ To show all logical names:
 
 	sim> SHOW NAMES
 
-3.11 Console Options
+3.12 Console Options
 
 Console options are controlled by the SET CONSOLE command.
 
@@ -689,7 +707,12 @@ The SHOW CONSOLE command displays the current state of console options:
 	sim> SHOW CONSOLE BRK		-- show value assigned to BREAK
 	sim> SHOW CONSOLE DEL		-- show value assigned to DELETE
 
-3.12 Executing Command Files
+Both SET CONSOLE and SHOW CONSOLE accept multiple parameters, separated by
+commas, e.g.,
+
+	SIM> SET CONSOLE WRU=5,DEL=177	-- set code values for WRU and DEL
+
+3.13 Executing Command Files
 
 The simulator can execute command files with the DO command:
 
@@ -710,7 +733,9 @@ prints out its argument on the console:
 
 	sim> ECHO <string>		-- output string to console
 
-3.13 Executing System Commands
+If there is no argument, ECHO prints a blank line on the console.
+
+3.14 Executing System Commands
 
 The simulator can execute operating system commands with the ! (spawn)
 command:
@@ -720,7 +745,7 @@ command:
 If no operating system command is provided, the simulator attempts to
 launch the host operating system's command shell.
 
-3.14 Getting Help
+3.15 Getting Help
 
 The HELP command prints out information about a command or about all
 commands:
@@ -728,17 +753,17 @@ commands:
 	sim> HELP			-- print all HELP messages
 	sim> HELP <command>		-- print HELP for command
 
-3.15 Controlling Debugging
+3.16 Controlling Debugging
 
 Some simulated devices may provide debug printouts to help in diagnosing
 complicated problems.  Debug output may be sent to a variety of places,
 or disabled entirely:
 
-	sim> SET DEBUG STDOUT		-- direct debug output to stdout
-	sim> SET DEBUG STDERR		-- direct debug output to stderr
-	sim> SET DEBUG LOG		-- direct debug output to log file
-	sim> SET DEBUG <filename>	-- direct debug output to file
-	sim> SET NODEBUG		-- disable debug output
+	sim> SET CONSOLE DEBUG=STDOUT	  -- direct debug output to stdout
+	sim> SET CONSOLE DEBUG=STDERR	  -- direct debug output to stderr
+	sim> SET CONSOLE DEBUG=LOG	  -- direct debug output to log file
+	sim> SET CONSOLE DEBUG=<filename> -- direct debug output to file
+	sim> SET CONSOLE NODEBUG	  -- disable debug output
 
 If debug output is enabled, individual devices can be controlled with the
 SET command.  If a device has only a single debug flag:
@@ -755,7 +780,7 @@ If the device has individual, named debug flags:
 If debug output is directed to stdout, it will be intermixed with normal
 simulator output.
 
-3.16 Exiting The Simulator
+3.17 Exiting The Simulator
 
 EXIT (synonyms QUIT and BYE) returns control to the operating system.
 
@@ -871,7 +896,7 @@ mag tape	y	y	y	-	h
 device
 CPU		y	y	y	h	y
 FPU		-	y	y	-	y
-EIS/CIS		-	y	y	-	-
+EIS/CIS		-	y	y	-	h
 console		h	y	y	h	y
 paper tape	-	y	h	h	y
 card reader	y	-	-	-	-
@@ -880,7 +905,7 @@ clock		-	y	y	h	y
 extra terminal	-	y	y	-	y
 hard disk	h	y	y	-	y
 fixed disk	-	h	-	h	-
-floppy disk	-	-	h	-	-
+floppy disk	-	-	h	-	y
 drum		-	h	-	-	-
 DECtape		-	-	-	-	-
 mag tape	y	y	y	h	y
@@ -932,7 +957,14 @@ Revision History (covering Rev 2.0 to present)
 Starting with Rev 2.7, detailed revision histories can be found
 in file sim_rev.c.
 
-Rev 3.2, Feb, 04
+Rev 3.3, Nov, 04
+	Added PDP-11/VAX DHQ11 support
+	Added PDP-11/VAX TM02/TM03 support
+	Added PDP-11 model-specific emulation support
+	Added full VAX support
+	Replaced SET ONLINE/OFFLINE with SET ENABLED/DISABLED
+
+Rev 3.2, Apr, 04
 	Added LGP-30/LGP-21 simulator
 	Added global SHOW modifier capability
 	Added global SET DEBUG modifier

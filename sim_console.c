@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Nov-04	RMS	Moved SET/SHOW DEBUG under CONSOLE hierarchy
+   28-Oct-04	JDB	Fixed SET CONSOLE to allow comma-separated parameters
    20-Aug-04	RMS	Added OS/2 EMX fixes (from Holger Veit)
    14-Jul-04	RMS	Revised Windows console code (from Dave Bryan)
    28-May-04	RMS	Added SET/SHOW CONSOLE
@@ -94,8 +96,8 @@ TMLN sim_con_ldsc = { 0 };				/* console line descr */
 TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc };		/* console line mux */
 
 extern volatile int32 stop_cpu;
-extern int32 sim_quiet;
-extern FILE *sim_log;
+extern int32 sim_quiet, sim_deb_close;
+extern FILE *sim_log, *sim_deb;
 extern DEVICE *sim_devices[];
 
 /* Set/show data structures */
@@ -108,6 +110,8 @@ static CTAB set_con_tab[] = {
 	{ "NOTELNET", &sim_set_notelnet, 0 },
 	{ "LOG", &sim_set_logon, 0 },
 	{ "NOLOG", &sim_set_logoff, 0 },
+	{ "DEBUG", &sim_set_debon, 0 },
+	{ "NODEBUG", &sim_set_deboff, 0 },
 	{ NULL, NULL, 0 }  };
 
 static SHTAB show_con_tab[] = {
@@ -116,6 +120,7 @@ static SHTAB show_con_tab[] = {
 	{ "DEL", &sim_show_kmap, KMAP_DEL },
 	{ "LOG", &sim_show_log, 0 },
 	{ "TELNET", &sim_show_telnet, 0 },
+	{ "DEBUG", &sim_show_debug, 0 },
 	{ NULL, NULL, 0 }  };
 
 static int32 *cons_kmap[] = {
@@ -141,7 +146,7 @@ t_stat r;
 
 if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;
 while (*cptr != 0) {					/* do all mods */
-	cptr = get_glyph_nc (cptr, gbuf, 0);		/* get modifier */
+	cptr = get_glyph_nc (cptr, gbuf, ',');		/* get modifier */
 	if (cvptr = strchr (gbuf, '=')) *cvptr++ = 0;	/* = value? */
 	get_glyph (gbuf, gbuf, 0);			/* modifier to UC */
 	if (ctptr = find_ctab (set_con_tab, gbuf)) {	/* match? */
@@ -243,6 +248,54 @@ t_stat sim_show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 if (cptr && (*cptr != 0)) return SCPE_2MARG;
 if (sim_log) fputs ("Logging enabled\n", st);
 else fputs ("Logging disabled\n", st);
+return SCPE_OK;
+}
+
+/* Set debug routine */
+
+t_stat sim_set_debon (int32 flag, char *cptr)
+{
+char *tptr, gbuf[CBUFSIZE];
+
+if (*cptr == 0) return SCPE_2FARG;			/* need arg */
+tptr = get_glyph (cptr, gbuf, 0);			/* get file name */
+if (*tptr != 0) return SCPE_2MARG;			/* now eol? */
+sim_set_deboff (0, NULL);				/* close cur debug */
+if (strcmp (gbuf, "LOG") == 0) {			/* debug to log? */
+	if (sim_log == NULL) return SCPE_ARG;		/* any log? */
+	sim_deb = sim_log;  }
+else if (strcmp (gbuf, "STDOUT") == 0) sim_deb = stdout; /* debug to stdout? */
+else if (strcmp (gbuf, "STDERR") == 0) sim_deb = stderr; /* debug to stderr? */
+else {	cptr = get_glyph_nc (cptr, gbuf, 0);		/* reparse */
+	sim_deb = sim_fopen (gbuf, "a");		/* open debug */
+	if (sim_deb == NULL) return SCPE_OPENERR;	/* error? */
+	sim_deb_close = 1;  }				/* need close */
+if (!sim_quiet) printf ("Debug output to \"%s\"\n", gbuf);
+if (sim_log) fprintf (sim_log, "Debug output to \"%s\"\n", gbuf);
+return SCPE_OK;
+}
+
+ /* Set nodebug routine */
+
+t_stat sim_set_deboff (int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0)) return SCPE_2MARG;		/* now eol? */
+if (sim_deb == NULL) return SCPE_OK;			/* no log? */
+if (!sim_quiet) printf ("Debug output disabled\n");
+if (sim_log) fprintf (sim_log, "Debug output disabled\n");
+if (sim_deb_close) fclose (sim_deb);			/* close if needed */
+sim_deb_close = 0;
+sim_deb = NULL;
+return SCPE_OK;
+}
+
+/* Show debug routine */
+
+t_stat sim_show_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0)) return SCPE_2MARG;
+if (sim_deb) fputs ("Debug output enabled\n", st);
+else fputs ("Debug output disabled\n", st);
 return SCPE_OK;
 }
 
@@ -368,26 +421,26 @@ return r;						/* return status */
 #include <unistd.h>
 
 #define EFN 0
-unsigned int32 tty_chan = 0;
+uint32 tty_chan = 0;
 
 typedef struct {
 	unsigned short sense_count;
 	unsigned char sense_first_char;
 	unsigned char sense_reserved;
-	unsigned int32 stat;
-	unsigned int32 stat2; } SENSE_BUF;
+	unsigned int stat;
+	unsigned int stat2; } SENSE_BUF;
 
 typedef struct {
-	unsigned int16 status;
-	unsigned int16 count;
-	unsigned int32 dev_status; } IOSB;
+	unsigned short status;
+	unsigned short count;
+	unsigned int dev_status; } IOSB;
 
 SENSE_BUF cmd_mode = { 0 };
 SENSE_BUF run_mode = { 0 };
 
 t_stat sim_ttinit (void)
 {
-unsigned int32 status;
+unsigned int status;
 IOSB iosb;
 $DESCRIPTOR (terminal_device, "tt");
 

@@ -23,8 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ipli, iplo	12556B interprocessor link pair
+   ipli, iplo	12566B interprocessor link pair
 
+   07-Oct-04	JDB	Fixed enable/disable from either device
    26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
 			Implemented DMA SRQ (follows FLG)
    21-Dec-03	RMS	Adjusted ipl_ptime for TSB (from Mike Gemeny)
@@ -163,7 +164,7 @@ int32 iplio (UNIT *uptr, int32 inst, int32 IR, int32 dat)
 {
 uint32 u, dev, odev;
 int32 sta;
-int8 msg[2];
+char msg[2];
 
 dev = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
@@ -222,7 +223,7 @@ return dat;
 t_stat ipl_svc (UNIT *uptr)
 {
 int32 u, nb, dev;
-int8 msg[2];
+char msg[2];
 
 u = uptr - ipl_unit;					/* get link number */
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;	/* not attached? */
@@ -270,7 +271,8 @@ t_stat ipl_reset (DEVICE *dptr)
 DIB *dibp = (DIB *) dptr->ctxt;
 UNIT *uptr = dptr->units;
 
-hp_enbdis_pair (&ipli_dev, &iplo_dev);			/* make pair cons */
+hp_enbdis_pair (dptr,					/* make pair cons */
+	(dptr == &ipli_dev)? &iplo_dev: &ipli_dev);
 dibp->cmd = dibp->ctl = 0;				/* clear cmd, ctl */
 dibp->flg = dibp->fbf = dibp->srq = 1;			/* set flg, fbf, srq */
 uptr->IBUF = uptr->OBUF = 0;				/* clr buffers */

@@ -24,8 +24,9 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    tti,tto	DL11 terminal input/output
-   clk		KW11L line frequency clock
+   clk		KW11L (and other) line frequency clock
 
+   11-Oct-04	RMS	Added clock model dependencies
    28-May-04	RMS	Removed SET TTI CTRL-C
    29-Dec-03	RMS	Added console backpressure support
    25-Apr-03	RMS	Revised for extended file support
@@ -65,11 +66,15 @@
 
 extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
+extern int32 cpu_type;
 
 int32 tti_csr = 0;					/* control/status */
 int32 tto_csr = 0;					/* control/status */
 int32 clk_csr = 0;					/* control/status */
 int32 clk_tps = 60;					/* ticks/second */
+int32 clk_default = 60;					/* default ticks/second */
+int32 clk_fie = 0;					/* force IE = 1 */
+int32 clk_fnxm = 0;					/* force NXM on reg */
 int32 tmxr_poll = CLK_DELAY;				/* term mux poll */
 int32 tmr_poll = CLK_DELAY;				/* timer poll */
 
@@ -85,6 +90,7 @@ t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat clk_rd (int32 *data, int32 PA, int32 access);
 t_stat clk_wr (int32 data, int32 PA, int32 access);
 t_stat clk_svc (UNIT *uptr);
+int32 clk_inta (void);
 t_stat clk_reset (DEVICE *dptr);
 t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -175,7 +181,7 @@ DEVICE tto_dev = {
 */
 
 DIB clk_dib = { IOBA_CLK, IOLN_CLK, &clk_rd, &clk_wr,
-		1, IVCL (CLK), VEC_CLK, { NULL } };
+		1, IVCL (CLK), VEC_CLK, { &clk_inta } };
 
 UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 8000 };
 
@@ -185,7 +191,10 @@ REG clk_reg[] = {
 	{ FLDATA (DONE, clk_csr, CSR_V_DONE) },
 	{ FLDATA (IE, clk_csr, CSR_V_IE) },
 	{ DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
+	{ DRDATA (TPS, clk_tps, 16), PV_LEFT + REG_HRO },
+	{ DRDATA (DEFTPS, clk_default, 16), PV_LEFT + REG_HRO },
+	{ FLDATA (FIE, clk_fie, 0), REG_HIDDEN },
+	{ FLDATA (FNXM, clk_fnxm, 0), REG_HIDDEN },
 	{ NULL }  };
 
 MTAB clk_mod[] = {
@@ -334,20 +343,32 @@ tto_unit.flags = (tto_unit.flags & ~UNIT_8B) | val;
 return SCPE_OK;
 }
 
+/* The line time clock has a few twists and turns through the history of 11's
+
+   LSI-11		no CSR
+   LSI-11/23 (KDF11A)	no CSR
+   PDP-11/23+ (KDF11B)	no monitor bit
+   PDP-11/24 (KDF11U)	monitor bit clears on IAK
+*/
+
 /* Clock I/O address routines */
 
 t_stat clk_rd (int32 *data, int32 PA, int32 access)
 {
-*data = clk_csr & CLKCSR_IMP;
+if (clk_fnxm) return SCPE_NXM;				/* not there??? */
+if (CPUT (HAS_LTCM)) *data = clk_csr & CLKCSR_IMP;	/* monitor bit? */
+else *data = clk_csr & (CLKCSR_IMP & ~CSR_DONE);	/* no, just IE */
 return SCPE_OK;
 }
 
 t_stat clk_wr (int32 data, int32 PA, int32 access)
 {
+if (clk_fnxm) return SCPE_NXM;				/* not there??? */
 if (PA & 1) return SCPE_OK;
 clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
-if ((data & CSR_DONE) == 0) clk_csr = clk_csr & ~CSR_DONE;
-if (((clk_csr & CSR_IE) == 0) ||			/* unless IE+DONE */
+if (CPUT (HAS_LTCM) && ((data & CSR_DONE) == 0))		/* monitor bit? */
+	clk_csr = clk_csr & ~CSR_DONE;			/* clr if zero */
+if ((((clk_csr & CSR_IE) == 0) && !clk_fie) ||		/* unless IE+DONE */
     ((clk_csr & CSR_DONE) == 0)) CLR_INT (CLK);		/* clr intr */
 return SCPE_OK;
 }
@@ -359,7 +380,7 @@ t_stat clk_svc (UNIT *uptr)
 int32 t;
 
 clk_csr = clk_csr | CSR_DONE;				/* set done */
-if (clk_csr & CSR_IE) SET_INT (CLK);
+if ((clk_csr & CSR_IE) || clk_fie) SET_INT (CLK);
 t = sim_rtcn_calb (clk_tps, TMR_CLK);			/* calibrate clock */
 sim_activate (&clk_unit, t);				/* reactivate unit */
 tmr_poll = t;						/* set timer poll */
@@ -367,10 +388,21 @@ tmxr_poll = t;						/* set mux poll */
 return SCPE_OK;
 }
 
+/* Clock interrupt acknowledge */
+
+int32 clk_inta (void)
+{
+if (CPUT (CPUT_24)) clk_csr = clk_csr & ~CSR_DONE;
+return clk_dib.vec;
+}
+
 /* Clock reset */
 
 t_stat clk_reset (DEVICE *dptr)
 {
+if (CPUT (HAS_LTCR)) clk_fie = clk_fnxm = 0;		/* reg there? */
+else clk_fie = clk_fnxm = 1;				/* no, BEVENT */
+clk_tps = clk_default;					/* set default tps */
 clk_csr = CSR_DONE;					/* set done */
 CLR_INT (CLK);
 sim_activate (&clk_unit, clk_unit.wait);		/* activate unit */
@@ -385,7 +417,7 @@ t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if (cptr) return SCPE_ARG;
 if ((val != 50) && (val != 60)) return SCPE_IERR;
-clk_tps = val;
+clk_tps = clk_default = val;
 return SCPE_OK;
 }
 
@@ -393,6 +425,6 @@ return SCPE_OK;
 
 t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
+fprintf (st, "%dHz", clk_tps);
 return SCPE_OK;
 }

@@ -25,6 +25,7 @@
 
    tq		TQK50 tape controller
 
+   30-Sep-04	RMS	Revised Unibus interface
    12-Jun-04	RMS	Fixed bug in reporting write protect (reported by Lyle Bickley)
    18-Apr-04	RMS	Fixed TQK70 media ID and model byte (found by Robert Schaffrath)
    26-Mar-04	RMS	Fixed warnings with -std=c99
@@ -45,14 +46,16 @@
 
 #elif defined (VM_VAX)					/* VAX version */
 #include "vax_defs.h"
-extern int32 int_req[IPL_HLVL];
-extern int32 int_vec[IPL_HLVL][32];
+#if (UNIBUS)
+#define INIT_TYPE	TQU_TYPE
+#else
+#define INIT_TYPE	TQ5_TYPE
+#endif
 
 #else							/* PDP-11 version */
 #include "pdp11_defs.h"
-extern int32 int_req[IPL_HLVL];
-extern int32 int_vec[IPL_HLVL][32];
-extern int32 cpu_18b, cpu_ubm;
+#define INIT_TYPE	TQ5_TYPE
+extern int32 cpu_opt;
 #endif
 
 #include "pdp11_uqssp.h"
@@ -236,7 +239,7 @@ int32 tq_itime = 200;					/* init time, except */
 int32 tq_itime4 = 10;					/* stage 4 */
 int32 tq_qtime = 200;					/* queue time */
 int32 tq_xtime = 500;					/* transfer time */
-int32 tq_typ = TQ5_TYPE;				/* device type */
+int32 tq_typ = INIT_TYPE;				/* device type */
 
 /* Command table - legal modifiers (low 16b) and flags (high 16b) */
 
@@ -506,7 +509,7 @@ else base = tq_comm + SA_COMM_CI;
 lnt = tq_comm + tq_cq.lnt + tq_rq.lnt - base;		/* comm lnt */
 if (lnt > SA_COMM_MAX) lnt = SA_COMM_MAX;		/* paranoia */
 for (i = 0; i < (lnt >> 1); i++) zero[i] = 0;		/* clr buffer */
-if (Map_WriteW (base, lnt, zero, MAP))			/* zero comm area */
+if (Map_WriteW (base, lnt, zero))			/* zero comm area */
 	return tq_fatal (PE_QWE);			/* error? */
 tq_sa = SA_S4 | (drv_tab[tq_typ].uqpm << SA_S4C_V_MOD) |/* send step 4 */
 	((drv_tab[tq_typ].cver & 0xFF) << SA_S4C_V_VER);
@@ -1062,7 +1065,7 @@ case OP_RD:case OP_ACC:case OP_CMP:			/* read-like op */
 	    wbc = bc;  }				/* set working bc */
 	else wbc = tbc;
 	if (cmd == OP_RD) {				/* read? */
-	    if (t = Map_WriteB (ba, wbc, tqxb, MAP)) {	/* store, nxm? */
+	    if (t = Map_WriteB (ba, wbc, tqxb)) {	/* store, nxm? */
 		PUTP32 (pkt, RW_BCL, wbc - t);		/* adj bc */
 		if (tq_hbe (uptr, ba + wbc - t))	/* post err log */
 		    tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, tbc);	
@@ -1078,7 +1081,7 @@ case OP_RD:case OP_ACC:case OP_CMP:			/* read-like op */
 		else {
 		    mba = ba + i;
 		    dby = tqxb[i];  }
-		if (Map_ReadB (mba, 1, &mby, MAP)) {	/* fetch, nxm? */
+		if (Map_ReadB (mba, 1, &mby)) {		/* fetch, nxm? */
 		    PUTP32 (pkt, RW_BCL, i);		/* adj bc */
 		    if (tq_hbe (uptr, mba))		/* post err log */
 			tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, tbc);
@@ -1094,7 +1097,7 @@ case OP_RD:case OP_ACC:case OP_CMP:			/* read-like op */
 	break;
 
 case OP_WR:						/* write */
-	if (t = Map_ReadB (ba, bc, tqxb, MAP)) {	/* fetch buf, nxm? */
+	if (t = Map_ReadB (ba, bc, tqxb)) {		/* fetch buf, nxm? */
 	    PUTP32 (pkt, RW_BCL, 0);			/* no bytes xfer'd */
 	    if (tq_hbe (uptr, ba + bc - t))		/* post err log */
 		tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, bc);	
@@ -1481,7 +1484,7 @@ if ((desc & UQ_DESC_OWN) == 0) {			/* none */
 if (!tq_deqf (pkt)) return ERR;				/* get cmd pkt */
 tq_hat = 0;						/* dsbl hst timer */
 addr = desc & UQ_ADDR;					/* get Q22 addr */
-if (Map_ReadW (addr + UQ_HDR_OFF, TQ_PKT_SIZE, tq_pkt[*pkt].d, MAP))
+if (Map_ReadW (addr + UQ_HDR_OFF, TQ_PKT_SIZE, tq_pkt[*pkt].d))
 	return tq_fatal (PE_PRE);			/* read pkt */
 return tq_putdesc (&tq_cq, desc);			/* release desc */
 }
@@ -1516,7 +1519,7 @@ if ((GETP (pkt, UQ_HCTC, TYP) == UQ_TYP_SEQ) &&		/* seq packet? */
 	cr = (tq_credits >= 14)? 14: tq_credits;	/* max 14 credits */
 	tq_credits = tq_credits - cr;			/* decr credits */
 	tq_pkt[pkt].d[UQ_HCTC] |= ((cr + 1) << UQ_HCTC_V_CR);  }
-if (Map_WriteW (addr + UQ_HDR_OFF, lnt, tq_pkt[pkt].d, MAP))
+if (Map_WriteW (addr + UQ_HDR_OFF, lnt, tq_pkt[pkt].d))
 	return tq_fatal (PE_PWE);			/* write pkt */
 tq_enqh (&tq_freq, pkt);				/* pkt is free */
 tq_pbsy = tq_pbsy - 1;					/* decr busy cnt */
@@ -1531,7 +1534,7 @@ t_bool tq_getdesc (struct uq_ring *ring, uint32 *desc)
 uint32 addr = ring->ba + ring->idx;
 uint16 d[2];
 
-if (Map_ReadW (addr, 4, d, MAP))				/* fetch desc */
+if (Map_ReadW (addr, 4, d))				/* fetch desc */
 	return tq_fatal (PE_QRE);			/* err? dead */
 *desc = ((uint32) d[0]) | (((uint32) d[1]) << 16);
 return OK;
@@ -1551,13 +1554,13 @@ uint16 d[2];
 
 d[0] = newd & 0xFFFF;					/* 32b to 16b */
 d[1] = (newd >> 16) & 0xFFFF;
-if (Map_WriteW (addr, 4, d, MAP))			/* store desc */
+if (Map_WriteW (addr, 4, d))				/* store desc */
 	return tq_fatal (PE_QWE);			/* err? dead */
 if (desc & UQ_DESC_F) {					/* was F set? */
 	if (ring->lnt <= 4) tq_ring_int (ring);		/* lnt = 1? intr */
 	else {	prva = ring->ba +			/* prv desc */
 			((ring->idx - 4) & (ring->lnt - 1));
-		if (Map_ReadW (prva, 4, d, MAP))		/* read prv */
+		if (Map_ReadW (prva, 4, d))		/* read prv */
 			return tq_fatal (PE_QRE);
 		prvd = ((uint32) d[0]) | (((uint32) d[1]) << 16);
 		if (prvd & UQ_DESC_OWN) tq_ring_int (ring);  }  }
@@ -1652,7 +1655,7 @@ void tq_ring_int (struct uq_ring *ring)
 uint32 iadr = tq_comm + ring->ioff;			/* addr intr wd */
 uint16 flag = 1;
 
-Map_WriteW (iadr, 2, &flag, MAP);			/* write flag */
+Map_WriteW (iadr, 2, &flag);				/* write flag */
 if (tq_dib.vec) SET_INT (TQ);				/* if enb, intr */
 return;
 }
@@ -1712,7 +1715,8 @@ UNIT *uptr;
 tq_csta = CST_S1;					/* init stage 1 */
 tq_s1dat = 0;						/* no S1 data */
 tq_dib.vec = 0;						/* no vector */
-tq_sa = SA_S1 | SA_S1C_Q22 | SA_S1C_DI | SA_S1C_MP;	/* init SA val */
+if (UNIBUS) tq_sa = SA_S1 | SA_S1C_DI | SA_S1C_MP;	/* Unibus? */
+else tq_sa = SA_S1 | SA_S1C_Q22 | SA_S1C_DI | SA_S1C_MP; /* init SA val */
 tq_cflgs = CF_RPL;					/* ctrl flgs off */
 tq_htmo = TQ_DHTMO;					/* default timeout */
 tq_hat = tq_htmo;					/* default timer */
@@ -1870,6 +1874,7 @@ t_stat tq_boot (int32 unitno, DEVICE *dptr)
 {
 return SCPE_NOFNC;
 }
+
 #endif
 
 /* Special show commands */
@@ -1887,7 +1892,7 @@ fprintf (st, "ring, base = %x, index = %d, length = %d\n",
 	 rp->ba, rp->idx >> 2, rp->lnt >> 2);
 #endif
 for (i = 0; i < (rp->lnt >> 2); i++) {
-	if (Map_ReadW (rp->ba + (i << 2), 4, d, MAP)) {
+	if (Map_ReadW (rp->ba + (i << 2), 4, d)) {
 		fprintf (st, " %3d: non-existent memory\n", i);
 		break;  }
 	desc = ((uint32) d[0]) | (((uint32) d[1]) << 16);

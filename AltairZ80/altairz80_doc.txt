@@ -1,7 +1,7 @@
 To:   Users
 From: Peter Schorn
 Subj: AltairZ80 Simulator Usage
-Date: 15-Feb-2004
+Date: 12-Apr-2004
 
       COPYRIGHT NOTICE
 
@@ -61,6 +61,7 @@ sim/AltairZ80/altairz80_defs.h
 
 2. Revision History
 
+- 12-Apr-2004, Peter Schorn (added MAP/NOMAP capability to switch off key mapping)
 - 26-Jan-2004, Peter Schorn (added support for t-state stepping)
 - 25-Feb-2003, Peter Schorn (added support for real time simulation)
 -  9-Oct-2002, Peter Schorn (added support for simulated hard disk)
@@ -132,7 +133,9 @@ the MITS Disk Basic and Altair DOS require about a minimum of 24K.
   SET CPU ITRAP  Causes the simulator to halt if an invalid opcode
       is detected (depending on the chosen CPU).
   SET CPU NOITRAP  Does not stop on an invalid Opcode.  This is
-      how the real 8080 works.
+      how the real 8080 works. Note that some software such as 4K Basic
+      apparently tries to execute nonexistent 8080 instructions. Therefore
+      it is advisable in this case to SET CPU NOITRAP.
 
   SET CPU 4K
   SET CPU 8K
@@ -248,17 +251,28 @@ a simple stream of 8-bit bytes.
   SET SIO TTY      Bit 8 is set to zero on console output
   SET SIO ANSI     Bit 8 is not touched on console output
 
-  SET SIO ALL      Console input support lower- and upper case
+  SET SIO ALL      Console input remain unchanged
   SET SIO UPPER    Console input is transformed to upper case characters only
                    (This feature is useful for most Altair software)
+                   SET SIO MAP must also have been executed for this
+                   option to take effect - otherwise no mapping occurs.
 
   SET SIO BS       Map the delete character to backspace
+                   SET SIO MAP must also have been executed for this
+                   option to take effect - otherwise no mapping occurs.
   SET SIO DEL      Map the backspace character to delete
+                   SET SIO MAP must also have been executed for this
+                   option to take effect - otherwise no mapping occurs.
 
   SET SIO QUIET    Do not print warning messages
   SET SIO VERBOSE  Print warning messages (useful for debugging)
                    The register SIOWL determines how often the same warning
                    is displayed. The default is 3.
+
+  SET SIO MAP      Enable mapping of characters
+                   (see also SET SIO ALL/UPPER/BS/DEL)
+  SET SIO NOMAP    Disable mapping of characters
+                   (see also SET SIO ALL/UPPER/BS/DEL)
 
   You can also attach the SIO to a port:
 
@@ -382,7 +396,7 @@ TYPE will print an ASCII file.  DUMP will dump a binary one.  LS is a
 better DIR than DIR.  ASM will assemble .ASM files to Hex, LOAD will "load"
 them to binary format (.COM).  ED is a simple editor, #A command will bring
 the source file to the buffer, T command will "type" lines, L will move
-lines, E exits the editor.  20L20T will move down 20 lines, and type 20. 
+lines, E exits the editor.  20L20T will move down 20 lines, and type 20.
 Very DECish.  DDT is the debugger, DO is a batch-type command processor. A
 sample batch file that will assemble and write out the bootable CP/M image
 (on drive A) is "SYSCPM2.SUB".  To run it, type "DO SYSCPM2".
@@ -814,6 +828,7 @@ trick is to get the Switch Register right).
 
   sim> set cpu 8080     ;note 4k Basic will not run on a Z80 CPU
   sim> set sio upper    ;4k Basic does not like lower case letters as input
+  sim> set cpu noitrap  ;4k Basic likes to execute non 8080 instructions - ignore
   sim> set sio ansi     ;4k Basic produces 8-bit output, strip to seven bits
   sim> d sr 8           ;good setting for the Switch Register
   sim> load 4kbas.bin 0 ;load it at 0

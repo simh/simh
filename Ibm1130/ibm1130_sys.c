@@ -27,7 +27,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 
-extern DEVICE cpu_dev, console_dev, dsk_dev, cr_dev, cp_dev;
+extern DEVICE cpu_dev, console_dev, dsk_dev, cr_dev, cp_dev, ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev, prt_dev, log_dev;
 extern DEVICE gdu_dev, console_dev;
 
@@ -59,6 +59,8 @@ DEVICE *sim_devices[] = {
 	&tti_dev,			/* console keyboard, selectric printer */
 	&tto_dev,
 	&prt_dev,			/* 1132 printer */
+	&ptr_dev,			/* 1134 paper tape reader */
+	&ptp_dev,			/* 1055 paper tape punch */
 	&console_dev,		/* console display (windows GUI) */
 	&gdu_dev,			/* 2250 display */
 	NULL

@@ -231,7 +231,7 @@ for (i = 0; i < mp->lines; i++) {			/* loop thru lines */
 /* Examine new data, remove TELNET cruft before making input available */
 
 	    for (; j < lp->rxbpi; ) {			/* loop thru char */
-		char tmp = lp->rxb[j];			/* get char */
+		signed char tmp = lp->rxb[j];		/* get char */
 		switch (lp->tsta) {			/* case tlnt state */
 		case TNS_NORM:				/* normal */
 		    if (tmp == TN_IAC) {		/* IAC? */

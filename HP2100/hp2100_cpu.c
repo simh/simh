@@ -23,6 +23,22 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   CPU		2116A/2100A/21MXE central processing unit
+   MP		12892B memory protect
+   DMA0,DMA1	12895A/12897B direct memory access/dual channel port controller
+
+   25-Sep-04	JDB	Moved MP into its own device; added MP option jumpers
+			Modified DMA to allow disabling
+			Modified SET CPU 2100/2116 to truncate memory > 32K
+			Added -F switch to SET CPU to force memory truncation
+			Fixed S-register behavior on 2116
+			Fixed LIx/MIx behavior for DMA on 2116 and 2100
+			Fixed LIx/MIx behavior for empty I/O card slots
+			Modified WRU to be REG_HRO
+			Added BRK and DEL to save console settings
+			Fixed use of "unsigned int16" in cpu_reset
+			Modified memory size routine to return SCPE_INCOMP if
+			 memory size truncation declined
    20-Jul-04	RMS	Fixed bug in breakpoint test (reported by Dave Bryan)
 			Back up PC on instruction errors (from Dave Bryan)
    14-May-04	RMS	Fixed bugs and added features from Dave Bryan
@@ -67,6 +83,12 @@
    26-Nov-00	RMS	Fixed bug in dual device number routine
    21-Nov-00	RMS	Fixed bug in reset routine
    15-Oct-00	RMS	Added dynamic device number support
+
+   References:
+   - 21MX M-Series Computer, HP 2108B and HP 2112B, Operating and Reference Manual
+       (02108-90037, Apr-1979)
+   - HP 1000 M/E/F-Series Computers Engineering and Reference Documentation
+       (92851-90001, Mar-1981)
 
    The register state for the HP 2116 CPU is:
 
@@ -308,20 +330,26 @@
 #define UNIT_V_21MX	(UNIT_V_UF + 1)			/* 21MX */
 #define UNIT_V_EAU	(UNIT_V_UF + 2)			/* EAU */
 #define UNIT_V_FP	(UNIT_V_UF + 3)			/* FP */
-#define UNIT_V_MPR	(UNIT_V_UF + 4)			/* mem prot */
-#define UNIT_V_DMS	(UNIT_V_UF + 5)			/* DMS */
-#define UNIT_V_IOP	(UNIT_V_UF + 6)			/* 2100 IOP */
-#define UNIT_V_IOPX	(UNIT_V_UF + 7)			/* 21MX IOP */
-#define UNIT_V_MSIZE	(UNIT_V_UF + 8)			/* dummy mask */
+#define UNIT_V_DMS	(UNIT_V_UF + 4)			/* DMS */
+#define UNIT_V_IOP	(UNIT_V_UF + 5)			/* 2100 IOP */
+#define UNIT_V_IOPX	(UNIT_V_UF + 6)			/* 21MX IOP */
+#define UNIT_V_MSIZE	(UNIT_V_UF + 7)			/* dummy mask */
+#define UNIT_2116	(0)
 #define UNIT_2100	(1 << UNIT_V_2100)
 #define UNIT_21MX	(1 << UNIT_V_21MX)
 #define UNIT_EAU	(1 << UNIT_V_EAU)
 #define UNIT_FP		(1 << UNIT_V_FP)
-#define UNIT_MPR	(1 << UNIT_V_MPR)
 #define UNIT_DMS	(1 << UNIT_V_DMS)
 #define UNIT_IOP	(1 << UNIT_V_IOP)
 #define UNIT_IOPX	(1 << UNIT_V_IOPX)
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+
+#define UNIT_V_MP_JSB	(UNIT_V_UF + 0)			/* MP jumper W5 out */
+#define UNIT_V_MP_INT	(UNIT_V_UF + 1)			/* MP jumper W6 out */
+#define UNIT_V_MP_SEL1	(UNIT_V_UF + 2)			/* MP jumper W7 out */
+#define UNIT_MP_JSB	(1 << UNIT_V_MP_JSB)
+#define UNIT_MP_INT	(1 << UNIT_V_MP_INT)
+#define UNIT_MP_SEL1	(1 << UNIT_V_MP_SEL1)
 
 #define MOD_2116	1
 #define MOD_2100	2
@@ -378,18 +406,23 @@ struct opt_table {					/* options table */
 	int32	cpuf;  };
 
 static struct opt_table opt_val[] = {
-	{ UNIT_EAU, MOD_2116 },
-	{ UNIT_FP,  MOD_2100 },
-	{ UNIT_MPR, MOD_2100 | MOD_21MX },
-	{ UNIT_DMS, MOD_21MX },
-	{ UNIT_IOP, MOD_2100 | MOD_21MX },
+	{ UNIT_EAU,  MOD_2116 },
+	{ UNIT_FP,   MOD_2100 },
+	{ UNIT_DMS,  MOD_21MX },
+	{ UNIT_IOP,  MOD_2100 | MOD_21MX },
+	{ UNIT_2116, MOD_2116 | MOD_2100 | MOD_21MX },
+	{ UNIT_2100, MOD_2116 | MOD_2100 | MOD_21MX },
+	{ UNIT_21MX, MOD_2116 | MOD_2100 | MOD_21MX },
 	{ 0, 0 }  };
 
 extern int32 sim_interval;
 extern int32 sim_int_char;
+extern int32 sim_brk_char;
+extern int32 sim_del_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
 extern FILE *sim_log;
 extern DEVICE *sim_devices[];
+extern int32 sim_switches;
 extern char halt_msg[];
 
 t_stat Ea (uint32 IR, uint32 *addr, uint32 irq);
@@ -421,6 +454,7 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
+t_stat mp_reset (DEVICE *dptr);
 t_stat dma0_reset (DEVICE *dptr);
 t_stat dma1_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -458,13 +492,6 @@ REG cpu_reg[] = {
 	{ FLDATA (ION, ion, 0) },
 	{ FLDATA (ION_DEFER, ion_defer, 0) },
 	{ ORDATA (CIR, intaddr, 6) },
-	{ FLDATA (MPCTL, dev_ctl[PRO/32], INT_V (PRO)) },
-	{ FLDATA (MPFLG, dev_flg[PRO/32], INT_V (PRO)) },
-	{ FLDATA (MPFBF, dev_fbf[PRO/32], INT_V (PRO)) },
-	{ ORDATA (MPFR, mp_fence, 15) },
-	{ ORDATA (MPVR, mp_viol, 16) },
-	{ FLDATA (MPMEV, mp_mevff, 0) },
-	{ FLDATA (MPEVR, mp_evrff, 0) },
 	{ FLDATA (DMSENB, dms_enb, 0) },
 	{ FLDATA (DMSCUR, dms_ump, VA_N_PAG) },
 	{ ORDATA (DMSSR, dms_sr, 16) },
@@ -476,7 +503,9 @@ REG cpu_reg[] = {
 	{ DRDATA (INDMAX, ind_max, 16), REG_NZ + PV_LEFT },
 	{ BRDATA (PCQ, pcq, 8, 15, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
-	{ ORDATA (WRU, sim_int_char, 8) },
+	{ ORDATA (WRU, sim_int_char, 8), REG_HRO },
+	{ ORDATA (BRK, sim_brk_char, 8), REG_HRO },
+	{ ORDATA (DEL, sim_del_char, 8), REG_HRO },
 	{ ORDATA (HCMD, dev_cmd[0], 32), REG_HRO },
 	{ ORDATA (LCMD, dev_cmd[1], 32), REG_HRO },
 	{ ORDATA (HCTL, dev_ctl[0], 32), REG_HRO },
@@ -490,15 +519,18 @@ REG cpu_reg[] = {
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
-	{ UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_MPR+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
-	  0, NULL, "2116", NULL },
-	{ UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_MPR+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
-	  UNIT_2100+UNIT_EAU, NULL, "2100", NULL },
-	{ UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_MPR+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
-	  UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_MPR+UNIT_DMS, NULL, "21MX", NULL },
-	{ UNIT_2100+UNIT_21MX, 0,         "2116", NULL, NULL },
-	{ UNIT_2100+UNIT_21MX, UNIT_2100, "2100", NULL, NULL },
-	{ UNIT_2100+UNIT_21MX, UNIT_21MX, "21MX", NULL, NULL },
+	{ UNIT_2116+UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
+	  UNIT_2116, NULL, "2116", &cpu_set_opt,
+	  NULL, (void *) UNIT_2116 },
+	{ UNIT_2116+UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
+	  UNIT_2100+UNIT_EAU, NULL, "2100", &cpu_set_opt,
+	  NULL, (void *) UNIT_2100 },
+	{ UNIT_2116+UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
+	  UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_DMS, NULL, "21MX", &cpu_set_opt,
+	  NULL, (void *) UNIT_21MX },
+	{ UNIT_2116+UNIT_2100+UNIT_21MX, UNIT_2116, "2116", NULL, NULL },
+	{ UNIT_2116+UNIT_2100+UNIT_21MX, UNIT_2100, "2100", NULL, NULL },
+	{ UNIT_2116+UNIT_2100+UNIT_21MX, UNIT_21MX, "21MX", NULL, NULL },
 	{ UNIT_EAU, UNIT_EAU, "EAU",   "EAU",   &cpu_set_opt,
 	  NULL, (void *) UNIT_EAU },
 	{ UNIT_EAU, 0,        "no EAU", "NOEAU", &cpu_set_opt,
@@ -507,10 +539,6 @@ MTAB cpu_mod[] = {
 	  NULL, (void *) UNIT_FP },
 	{ UNIT_FP,  0,        "no FP",  "NOFP",  &cpu_set_opt,
 	  NULL, (void *) UNIT_FP },
-	{ UNIT_MPR, UNIT_MPR, "MPR",   "MPR",   &cpu_set_opt,
-	  NULL, (void *) UNIT_MPR },
-	{ UNIT_MPR, 0,        "no MPR", "NOMPR", &cpu_set_opt,
-	  NULL, (void *) UNIT_MPR },
 	{ UNIT_DMS, UNIT_DMS, "DMS",   "DMS",   &cpu_set_opt,
 	  NULL, (void *) UNIT_DMS },
 	{ UNIT_DMS, 0,        "no DMS", "NODMS", &cpu_set_opt,
@@ -538,6 +566,43 @@ DEVICE cpu_dev = {
 	&cpu_ex, &cpu_dep, &cpu_reset,
 	&cpu_boot, NULL, NULL };
 
+/* Memory protect data structures
+
+   mp_dev	MP device descriptor
+   mp_unit	MP unit descriptor
+   mp_reg	MP register list
+   mp_mod	MP modifiers list
+*/
+
+UNIT mp_unit = { UDATA (NULL, UNIT_MP_SEL1, 0) };
+
+REG mp_reg[] = {
+	{ FLDATA (CTL, dev_ctl[PRO/32], INT_V (PRO)) },
+	{ FLDATA (FLG, dev_flg[PRO/32], INT_V (PRO)) },
+	{ FLDATA (FBF, dev_fbf[PRO/32], INT_V (PRO)) },
+	{ ORDATA (FR, mp_fence, 15) },
+	{ ORDATA (VR, mp_viol, 16) },
+	{ FLDATA (MEV, mp_mevff, 0) },
+	{ FLDATA (EVR, mp_evrff, 0) },
+	{ NULL }  };
+
+MTAB mp_mod[] = {
+	{ UNIT_MP_JSB, UNIT_MP_JSB, "JSB (W5) in", "JSBIN", NULL },
+	{ UNIT_MP_JSB, 0, "JSB (W5) out", "JSBOUT", NULL },
+	{ UNIT_MP_INT, UNIT_MP_INT, "INT (W6) in", "INTIN", NULL },
+	{ UNIT_MP_INT, 0, "INT (W6) out", "INTOUT", NULL },
+	{ UNIT_MP_SEL1, UNIT_MP_SEL1, "SEL1 (W7) in", "SEL1IN", NULL },
+	{ UNIT_MP_SEL1, 0, "SEL1 (W7) out", "SEL1OUT", NULL },
+	{ 0 }  };
+
+DEVICE mp_dev = {
+	"MP", &mp_unit, mp_reg, mp_mod,
+	1, 8, 1, 1, 8, 16,
+	NULL, NULL, &mp_reset,
+	NULL, NULL, NULL,
+	NULL, DEV_DISABLE | DEV_DIS };
+
+
 /* DMA controller data structures
 
    dmax_dev	DMAx device descriptor
@@ -560,7 +625,8 @@ DEVICE dma0_dev = {
 	"DMA0", &dma0_unit, dma0_reg, NULL,
 	1, 8, 1, 1, 8, 16,
 	NULL, NULL, &dma0_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, DEV_DISABLE  };
 
 UNIT dma1_unit = { UDATA (NULL, 0, 0) };
 
@@ -578,7 +644,8 @@ DEVICE dma1_dev = {
 	"DMA1", &dma1_unit, dma1_reg, NULL,
 	1, 8, 1, 1, 8, 16,
 	NULL, NULL, &dma1_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, DEV_DISABLE  };
 
 /* Extended instruction decode tables */
 
@@ -715,6 +782,17 @@ reason = 0;
 
 /* Restore I/O state */
 
+if (mp_dev.flags & DEV_DIS) dtab[PRO] = NULL;
+else dtab[PRO] = &proio;				/* set up MP dispatch */
+if (dma0_dev.flags & DEV_DIS) dtab[DMA0] = dtab[DMALT0] = NULL;
+else {							/* set up DMA0 dispatch */
+	dtab[DMA0] = &dmpio;
+	dtab[DMALT0] = &dmsio;  }
+if (dma1_dev.flags & DEV_DIS) dtab[DMA1] = dtab[DMALT1] = NULL;
+else {							/* set up DMA1 dispatch */
+	dtab[DMA1] = &dmpio;
+	dtab[DMALT1] = &dmsio;  }
+
 for (i = VARDEV; i <= I_DEVMASK; i++) dtab[i] = NULL;	/* clr disp table */
 dev_cmd[0] = dev_cmd[0] & M_FXDEV;			/* clear dynamic info */
 dev_ctl[0] = dev_ctl[0] & M_FXDEV;
@@ -846,6 +924,8 @@ case 0034:case 0035:case 0036:case 0037:
 case 0230:case 0231:case 0232:case 0233:
 case 0234:case 0235:case 0236:case 0237:
 	if (reason = Ea (IR, &MA, intrq)) break;	/* JSB */
+	if ((mp_unit.flags & UNIT_MP_JSB) && CTL (PRO) && (MA < mp_fence))
+	    ABORT (ABORT_PRO);				/* MP if W7 (JSB) out */
 	WriteW (MA, PC);				/* store PC */
 	PCQ_ENTRY;
 	PC = (MA + 1) & VAMASK;				/* jump */
@@ -1850,8 +1930,9 @@ uint32 i, MA;
 MA = IR & (I_IA | I_DISP);				/* ind + disp */
 if (IR & I_CP) MA = ((PC - 1) & I_PAGENO) | MA;		/* current page? */
 for (i = 0; (i < ind_max) && (MA & I_IA); i++) {	/* resolve multilevel */
-	if ((i >= 2) && irq &&				/* >3 levels, int req, */
-	    (cpu_unit.flags & UNIT_MPR))		/* mprot installed? */
+	if (irq &&					/* int req? */
+	    ((i >= 2) || (mp_unit.flags & UNIT_MP_INT)) && /* ind > 3 or W6 out? */
+	    !(mp_unit.flags & DEV_DIS))			/* MP installed? */
 	    return STOP_INDINT;				/* break out */
 	MA = ReadW (MA & VAMASK);  }
 if (i >= ind_max) return STOP_IND;			/* indirect loop? */
@@ -1868,8 +1949,9 @@ uint32 i, MA;
 MA = ReadW (PC);					/* get next address */
 PC = (PC + 1) & VAMASK;
 for (i = 0; (i < ind_max) && (MA & I_IA); i++) {	/* resolve multilevel */
-	if ((i >= 2) && irq &&				/* >3 levels, int req, */
-	    (cpu_unit.flags & UNIT_MPR))		/* mprot installed? */
+	if (irq &&					/* int req? */
+	    ((i >= 2) || (mp_unit.flags & UNIT_MP_INT)) && /* ind > 3 or W6 out? */
+	    !(mp_unit.flags & DEV_DIS))			/* MP installed? */
 	    return STOP_INDINT;				/* break out */
 	MA = ReadW (MA & VAMASK);  }
 if (i >= ind_max) return STOP_IND;			/* indirect loop? */
@@ -1922,7 +2004,8 @@ uint32 dev, sop, iodata, ab;
 ab = (ir & I_AB)? 1: 0;					/* get A/B select */
 dev = ir & I_DEVMASK;					/* get device */
 sop = I_GETIOOP (ir);					/* get subopcode */
-if (!iotrap && CTL (PRO) && ((sop == ioHLT) || (dev != OVF))) {	/* protected? */
+if (!iotrap && CTL (PRO) &&				/* protected? */
+    ((sop == ioHLT) || ((dev != OVF) && (mp_unit.flags & UNIT_MP_SEL1)))) {
 	if (sop == ioLIX) ABREG[ab] = 0;		/* A/B writes anyway */
 	ABORT (ABORT_PRO);  }
 iodata = devdisp (dev, sop, ir, ABREG[ab]);		/* process I/O */
@@ -2248,6 +2331,8 @@ return dms_sr;
 
 /* Device 0 (CPU) I/O routine
 
+   NOTE: LIx/MIx reads floating I/O bus (0 on all machines).
+
    From Dave Bryan: RTE uses the undocumented instruction "SFS 0,C" to both test
    and turn off the interrupt system.  This is confirmed in the "RTE-6/VM
    Technical Specifications" manual (HP 92084-90015), section 2.3.1 "Process
@@ -2295,7 +2380,9 @@ if (IR & I_HC) ion = 0;					/* HC option */
 return dat;
 }
 
-/* Device 1 (overflow) I/O routine */
+/* Device 1 (overflow) I/O routine
+
+   NOTE: The S register is read-only on the 2115/2116. */
 
 int32 ovfio (int32 inst, int32 IR, int32 dat)
 {
@@ -2316,7 +2403,7 @@ case ioLIX:						/* load */
 	dat = SR;
 	break;
 case ioOTX:						/* output */
-	SR = dat;
+	if (cpu_unit.flags & (UNIT_2100 | UNIT_21MX)) SR = dat;
 	break;
 default:
 	break;  }
@@ -2348,8 +2435,6 @@ return dat;
 
 int32 proio (int32 inst, int32 IR, int32 dat)
 {
-if ((cpu_unit.flags & UNIT_MPR) == 0)			/* not installed? */
-	return nulio (inst, IR, dat);			/* non-existent dev */
 switch (inst) {						/* case on opcode */
 case ioSFC:						/* skip flag clear */
 	if (!mp_mevff) PC = (PC + 1) & VAMASK;		/* skip if mem prot */
@@ -2407,7 +2492,9 @@ default:
 return dat;
 }
 
-/* Devices 6,7 (primary DMA) I/O routine */
+/* Devices 6,7 (primary DMA) I/O routine
+
+   NOTE: LIx/MIx reads floating S-bus (1 on 21MX, 0 on 2116/2100). */
 
 int32 dmpio (int32 inst, int32 IR, int32 dat)
 {
@@ -2426,8 +2513,10 @@ case ioSFC:						/* skip flag clear */
 case ioSFS:						/* skip flag set */
 	if (FLG (DMA0 + ch) != 0) PC = (PC + 1) & VAMASK;
 	break;
-case ioMIX: case ioLIX:					/* load, merge */
-	dat = DMASK;
+case ioLIX:						/* load */
+	dat = 0;
+case ioMIX:						/* merge */
+	if (cpu_unit.flags & UNIT_21MX) dat = DMASK;
 	break;
 case ioOTX:						/* output */
 	dmac[ch].cw1 = dat;
@@ -2495,19 +2584,27 @@ else {	if (inp) {					/* last cycle, input? */
 return;
 }
 
-/* Unimplemented device routine */
+/* Unimplemented device routine
+
+   NOTE: For SC < 10, LIx/MIx reads floating S-bus (-1 on 21MX, 0 on 2116/2100).
+	 For SC >= 10, LIx/MIx reads floating I/O bus (0 on all machines). */
 
 int32 nulio (int32 inst, int32 IR, int32 dat)
 {
+int32 devd;
+
+devd = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
 case ioSFC:						/* skip flag clear */
 	PC = (PC + 1) & VAMASK;
-	return (stop_dev << IOT_V_REASON) | dat;
-case ioSFS:						/* skip flag set */
-	return (stop_dev << IOT_V_REASON) | dat;
+	break;
+case ioLIX:						/* load */
+	dat = 0;
+case ioMIX:						/* merge */
+	if ((devd < VARDEV) && (cpu_unit.flags & UNIT_21MX)) dat = DMASK;
+	break;
 default:
 	break;  }
-if (IR & I_HC) { clrFLG (IR & I_DEVMASK); }		/* HC option */
 return (stop_dev << IOT_V_REASON) | dat;
 }
 
@@ -2522,30 +2619,35 @@ clrCMD (PWR);
 clrCTL (PWR);
 clrFLG (PWR);
 clrFBF (PWR);
-clrCMD (PRO);
-clrCTL (PRO);
-clrFLG (PRO);
-clrFBF (PRO);
 dev_srq[0] = dev_srq[0] & ~M_FXDEV;
-mp_fence = 0;						/* init mprot */
-mp_viol = 0;
-mp_mevff = 0;
-mp_evrff = 1;
 dms_enb = dms_ump = 0;					/* init DMS */
 dms_sr = 0;
 dms_vr = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
 sim_brk_types = ALL_BKPTS;
 sim_brk_dflt = SWMASK ('E');
-if (M == NULL) M = calloc (PASIZE, sizeof (unsigned int16));
+if (M == NULL) M = calloc (PASIZE, sizeof (uint16));
 if (M == NULL) return SCPE_MEM;
 if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 return SCPE_OK;
 }
 
+t_stat mp_reset (DEVICE *dptr)
+{
+clrCTL (PRO);
+clrFLG (PRO);
+clrFBF (PRO);
+mp_fence = 0;						/* init mprot */
+mp_viol = 0;
+mp_mevff = 0;
+mp_evrff = 1;
+return SCPE_OK;
+}
+
 t_stat dma0_reset (DEVICE *tptr)
 {
+hp_enbdis_pair (&dma0_dev, &dma1_dev);			/* make pair cons */
 clrCMD (DMA0);
 clrCTL (DMA0);
 setFLG (DMA0);
@@ -2556,6 +2658,7 @@ return SCPE_OK;
 
 t_stat dma1_reset (DEVICE *tptr)
 {
+hp_enbdis_pair (&dma1_dev, &dma0_dev);			/* make pair cons */
 clrCMD (DMA1);
 clrCTL (DMA1);
 setFLG (DMA1);
@@ -2601,9 +2704,10 @@ uint32 i;
 if ((val <= 0) || (val > PASIZE) || ((val & 07777) != 0) ||
 	(!(uptr->flags & UNIT_21MX) && (val > 32768)))
 	return SCPE_ARG;
-for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
-if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
-	return SCPE_OK;
+if (!(sim_switches & SWMASK ('F'))) {			/* force truncation? */
+    for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
+    if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
+	return SCPE_INCOMP;  }
 MEMSIZE = val;
 for (i = MEMSIZE; i < PASIZE; i++) M[i] = 0;
 return SCPE_OK;
@@ -2679,7 +2783,11 @@ for (i = 0; cdptr = sim_devices[i]; i++) {
 return FALSE;
 }
 
-/* Configuration validation */
+/* Configuration validation
+
+   Memory is trimmed to 32K if 2116 or 2100 is selected.
+   Memory protect is enabled if 2100 or 21MX or DMS is selected.
+   DMA is enabled if 2116 or 2100 or 21MX is selected. */
 
 t_bool cpu_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
@@ -2689,15 +2797,22 @@ int32 mod, i;
 mod = MOD_2116;
 if (uptr->flags & UNIT_2100) mod = MOD_2100;
 else if (uptr->flags & UNIT_21MX) mod = MOD_21MX;
-for (i = 0; opt_val[i].optf != 0; i++) {
+for (i = 0; opt_val[i].cpuf != 0; i++) {
 	if ((opt == opt_val[i].optf) && (mod & opt_val[i].cpuf)) {
 	    if ((mod == MOD_2100) && (val == UNIT_FP))
 		uptr->flags = uptr->flags & ~UNIT_IOP;
 	    if ((opt == UNIT_IOP) && val) {
-		if (mod == MOD_2100) uptr->flags =
-		    (uptr->flags & ~UNIT_FP) | UNIT_IOP | UNIT_MPR;
-		if (mod == MOD_21MX) uptr->flags |= UNIT_IOPX | UNIT_MPR;  }
-	    if (val == UNIT_DMS) uptr->flags |= UNIT_MPR;
+		if (mod == MOD_2100)
+		    uptr->flags = (uptr->flags & ~UNIT_FP) | UNIT_IOP;
+		if (mod == MOD_21MX) uptr->flags |= UNIT_IOPX;  }
+	    if (opt == UNIT_2116) mp_dev.flags = mp_dev.flags | DEV_DIS;
+	    else if ((val == UNIT_DMS) || (opt == UNIT_2100) || (opt == UNIT_21MX))
+		mp_dev.flags = mp_dev.flags & ~DEV_DIS;
+	    if ((opt == UNIT_2116) || (opt == UNIT_2100) || (opt == UNIT_21MX)) {
+		dma0_dev.flags = dma0_dev.flags & ~DEV_DIS;
+		dma1_dev.flags = dma1_dev.flags & ~DEV_DIS;  }
+	    if (((opt == UNIT_2116) || (opt == UNIT_2100)) && (MEMSIZE > 32768))
+		return cpu_set_size (uptr, 32768, cptr, desc);
 	    return SCPE_OK;  }  }
 return SCPE_NOFNC;
 }

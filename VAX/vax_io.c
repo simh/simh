@@ -1,4 +1,4 @@
-/* vax_io.c: VAX Qbus IO simulator
+/* vax_io.c: VAX 3900 Qbus IO simulator
 
    Copyright (c) 1998-2004, Robert M Supnik
 
@@ -25,6 +25,10 @@
 
    qba		Qbus adapter
 
+   30-Sep-04	RMS	Revised Qbus interface
+			Moved mem_err, crd_err interrupts here from vax_cpu.c
+   09-Sep-04	RMS	Integrated powerup into RESET (with -p)
+   05-Sep-04	RMS	Added CRD interrupt handling
    28-May-04	RMS	Revised I/O dispatching (from John Dundas)
    21-Mar-04	RMS	Added RXV21 support
    21-Dec-03	RMS	Fixed bug in autoconfigure vector assignment; added controls
@@ -99,14 +103,15 @@ int32 cq_mear = 0;					/* MEAR */
 int32 cq_sear = 0;					/* SEAR */
 int32 cq_mbr = 0;					/* MBR */
 int32 cq_ipc = 0;					/* IPC */
+int32 autcon_enb = 1;					/* autoconfig enable */
 
 extern uint32 *M;
 extern UNIT cpu_unit;
-extern int32 PSL, SISR, trpirq, mem_err, hlt_pin;
+extern int32 PSL, SISR, trpirq, mem_err, crd_err, hlt_pin;
 extern int32 p1;
 extern int32 ssc_bto;
-extern int32 autcon_enb;
 extern jmp_buf save_env;
+extern int32 sim_switches;
 extern DEVICE *sim_devices[];
 
 extern int32 ReadB (uint32 pa);
@@ -123,6 +128,10 @@ int32 eval_int (void);
 void cq_merr (int32 pa);
 void cq_serr (int32 pa);
 t_stat qba_reset (DEVICE *dptr);
+t_bool map_addr (uint32 qa, uint32 *ma);
+t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* Qbus adapter data structures
 
@@ -146,10 +155,20 @@ REG qba_reg[] = {
 	{ HRDATA (IPL16, int_req[2], 32), REG_RO },
 	{ HRDATA (IPL15, int_req[1], 32), REG_RO },
 	{ HRDATA (IPL14, int_req[0], 32), REG_RO },
+	{ FLDATA (AUTOCON, autcon_enb, 0), REG_HRO },
 	{ NULL }  };
 
+MTAB qba_mod[] = {
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
+	  NULL, &show_iospace },
+	{ MTAB_XTD|MTAB_VDV, 1, "AUTOCONFIG", "AUTOCONFIG",
+	  &set_autocon, &show_autocon },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "NOAUTOCONFIG",
+	  &set_autocon, NULL },
+	{ 0 }  };
+
 DEVICE qba_dev = {
-	"QBA", &qba_unit, qba_reg, NULL,
+	"QBA", &qba_unit, qba_reg, qba_mod,
 	1, 0, 0, 0, 0, 0,
 	NULL, NULL, &qba_reset,
 	NULL, NULL, NULL,
@@ -256,6 +275,7 @@ static const int32 sw_int_mask[IPL_SMAX] = {
 
 if (hlt_pin) return IPL_HLTPIN;				/* hlt pin int */
 if ((ipl < IPL_MEMERR) && mem_err) return IPL_MEMERR;	/* mem err int */
+if ((ipl < IPL_CRDERR) && crd_err) return IPL_CRDERR;	/* crd err int */
 for (i = IPL_HMAX; i >= IPL_HMIN; i--) {		/* chk hwre int */
 	if (i <= ipl) return 0;				/* at ipl? no int */
 	if (int_req[i - IPL_HMIN]) return i;  }		/* req != 0? int */
@@ -273,6 +293,14 @@ int32 get_vector (int32 lvl)
 int32 i;
 int32 l = lvl - IPL_HMIN;
 
+if (lvl == IPL_MEMERR) {				/* mem error? */
+	mem_err = 0;
+	return SCB_MEMERR;  }
+if (lvl == IPL_CRDERR) {				/* CRD error? */
+	crd_err = 0;
+	return SCB_CRDERR;  }
+if (lvl > IPL_HMAX) {					/* error req lvl? */
+	ABORT (STOP_UIPL);  }				/* unknown intr */
 for (i = 0; int_req[l] && (i < 32); i++) {
 	if ((int_req[l] >> i) & 1) {
 	    int_req[l] = int_req[l] & ~(1u << i);
@@ -486,38 +514,37 @@ reset_all (5);						/* from qba on... */
 return;
 }
 
-/* Reset CQBIC */
-
-t_stat qba_reset (DEVICE *dptr)
-{
-int32 i;
-
-cq_scr = (cq_scr & CQSCR_BHL) | CQSCR_POK;
-cq_dser = cq_mear = cq_sear = cq_ipc = 0;
-for (i = 0; i < IPL_HLVL; i++) int_req[i] = 0;
-return SCPE_OK;
-}
-
 /* Powerup CQBIC */
 
 t_stat qba_powerup (void)
 {
 cq_mbr = 0;
 cq_scr = CQSCR_POK;
-return qba_reset (&qba_dev);
+return SCPE_OK;
+}
+
+/* Reset CQBIC */
+
+t_stat qba_reset (DEVICE *dptr)
+{
+int32 i;
+
+if (sim_switches & SWMASK ('P')) qba_powerup ();
+cq_scr = (cq_scr & CQSCR_BHL) | CQSCR_POK;
+cq_dser = cq_mear = cq_sear = cq_ipc = 0;
+for (i = 0; i < IPL_HLVL; i++) int_req[i] = 0;
+return SCPE_OK;
 }
 
-/* I/O buffer routines, aligned access
+/* Qbus I/O buffer routines, aligned access
 
-   map_ReadB	-	fetch byte buffer from memory
-   map_ReadW 	-	fetch word buffer from memory
-   map_ReadL 	-	fetch longword buffer from memory
-   map_WriteB 	-	store byte buffer into memory
-   map_WriteW 	-	store word buffer into memory
-   map_WriteL 	-	store longword buffer into memory
+   Map_ReadB	-	fetch byte buffer from memory
+   Map_ReadW 	-	fetch word buffer from memory
+   Map_WriteB 	-	store byte buffer into memory
+   Map_WriteW 	-	store word buffer into memory
 */
 
-int32 map_readB (uint32 ba, int32 bc, uint8 *buf)
+int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf)
 {
 int32 i;
 uint32 ma, dat;
@@ -544,7 +571,7 @@ else {	for (i = ma = 0; i < bc; i = i + 4, buf++) {	/* by longwords */
 return 0;
 }
 
-int32 map_readW (uint32 ba, int32 bc, uint16 *buf)
+int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf)
 {
 int32 i;
 uint32 ma,dat;
@@ -571,23 +598,7 @@ else {	for (i = ma = 0; i < bc; i = i + 4, buf++) {	/* by longwords */
 return 0;
 }
 
-int32 map_readL (uint32 ba, int32 bc, uint32 *buf)
-{
-int32 i;
-uint32 ma;
-
-ba = ba & ~03;
-bc = bc & ~03;
-for (i = ma = 0; i < bc; i = i + 4, buf++) {		/* by lw */
-	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		!ADDR_IS_MEM (ma)) return (bc - i);  }
-	*buf = ReadL (ma);
-	ma = ma + 4;  }
-return 0;
-}
-
-int32 map_writeB (uint32 ba, int32 bc, uint8 *buf)
+int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf)
 {
 int32 i;
 uint32 ma, dat;
@@ -614,7 +625,7 @@ else {	for (i = ma = 0; i < bc; i = i + 4, buf++) {	/* by longwords */
 return 0;
 }
 
-int32 map_writeW (uint32 ba, int32 bc, uint16 *buf)
+int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
 {
 int32 i;
 uint32 ma, dat;
@@ -638,22 +649,6 @@ else {	for (i = ma = 0; i < bc; i = i + 4, buf++) {	/* by longwords */
 	    WriteL (ma, dat);				/* store lw */
 	    ma = ma + 4;  }
 	}
-return 0;
-}
-
-int32 map_writeL (uint32 ba, int32 bc, uint32 *buf)
-{
-int32 i;
-uint32 ma;
-
-ba = ba & ~03;
-bc = bc & ~03;
-for (i = ma = 0; i < bc; i = i + 4, buf++) {		/* by lw */
-	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		!ADDR_IS_MEM (ma)) return (bc - i);  }
-	WriteL (ma, *buf);
-	ma = ma + 4;  }
 return 0;
 }
 

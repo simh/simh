@@ -75,7 +75,8 @@ BSC32_SBRS= \
 	$(INTDIR)/ibm1130_fmt.sbr \
 	$(INTDIR)/sim_console.sbr \
 	$(INTDIR)/sim_fio.sbr \
-	$(INTDIR)/sim_timer.sbr
+	$(INTDIR)/sim_timer.sbr \
+	$(INTDIR)/ibm1130_ptrp.sbr
 
 $(OUTDIR)/ibm1130.bsc : $(OUTDIR)  $(BSC32_SBRS)
     $(BSC32) @<<
@@ -105,7 +106,8 @@ LINK32_OBJS= \
 	$(INTDIR)/ibm1130_fmt.obj \
 	$(INTDIR)/sim_console.obj \
 	$(INTDIR)/sim_fio.obj \
-	$(INTDIR)/sim_timer.obj
+	$(INTDIR)/sim_timer.obj \
+	$(INTDIR)/ibm1130_ptrp.obj
 
 $(OUTDIR)/ibm1130.exe : $(OUTDIR)  $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
@@ -158,7 +160,8 @@ BSC32_SBRS= \
 	$(INTDIR)/ibm1130_fmt.sbr \
 	$(INTDIR)/sim_console.sbr \
 	$(INTDIR)/sim_fio.sbr \
-	$(INTDIR)/sim_timer.sbr
+	$(INTDIR)/sim_timer.sbr \
+	$(INTDIR)/ibm1130_ptrp.sbr
 
 $(OUTDIR)/ibm1130.bsc : $(OUTDIR)  $(BSC32_SBRS)
     $(BSC32) @<<
@@ -189,7 +192,8 @@ LINK32_OBJS= \
 	$(INTDIR)/ibm1130_fmt.obj \
 	$(INTDIR)/sim_console.obj \
 	$(INTDIR)/sim_fio.obj \
-	$(INTDIR)/sim_timer.obj
+	$(INTDIR)/sim_timer.obj \
+	$(INTDIR)/ibm1130_ptrp.obj
 
 $(OUTDIR)/ibm1130.exe : $(OUTDIR)  $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
@@ -377,10 +381,10 @@ DEP_SIM_C=\
 	\pdp11\supnik\sim_console.h\
 	\pdp11\supnik\sim_timer.h\
 	\pdp11\supnik\sim_fio.h\
-	d:\progra~1\micros~1\include\winsock2.h\
+	D:\PROGRA~1\MICROS~1\INCLUDE\WinSock2.h\
 	\MSVC20\INCLUDE\sys\TYPES.H\
-	d:\progra~1\micros~1\include\qos.h\
-	d:\winddk\2600\inc\wxp\guiddef.h
+	D:\PROGRA~1\MICROS~1\INCLUDE\Qos.h\
+	D:\WINDDK\2600\inc\wxp\guiddef.h
 
 $(INTDIR)/sim_console.obj :  $(SOURCE)  $(DEP_SIM_C) $(INTDIR)
    $(CPP) $(CPP_PROJ)  $(SOURCE) 
@@ -392,7 +396,7 @@ $(INTDIR)/sim_console.obj :  $(SOURCE)  $(DEP_SIM_C) $(INTDIR)
 SOURCE=\pdp11\supnik\sim_fio.c
 DEP_SIM_F=\
 	..\sim_defs.h\
-	d:\progra~1\micros~1\include\BASETSD.H\
+	D:\PROGRA~1\MICROS~1\INCLUDE\BaseTsd.h\
 	\pdp11\supnik\scp.h\
 	\pdp11\supnik\sim_console.h\
 	\pdp11\supnik\sim_timer.h\
@@ -408,7 +412,7 @@ $(INTDIR)/sim_fio.obj :  $(SOURCE)  $(DEP_SIM_F) $(INTDIR)
 SOURCE=\pdp11\supnik\sim_timer.c
 DEP_SIM_TI=\
 	..\sim_defs.h\
-	d:\progra~1\micros~1\include\BASETSD.H\
+	D:\PROGRA~1\MICROS~1\INCLUDE\BaseTsd.h\
 	\pdp11\supnik\scp.h\
 	\pdp11\supnik\sim_console.h\
 	\pdp11\supnik\sim_timer.h\
@@ -416,6 +420,14 @@ DEP_SIM_TI=\
 
 $(INTDIR)/sim_timer.obj :  $(SOURCE)  $(DEP_SIM_TI) $(INTDIR)
    $(CPP) $(CPP_PROJ)  $(SOURCE) 
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=.\ibm1130_ptrp.c
+
+$(INTDIR)/ibm1130_ptrp.obj :  $(SOURCE)  $(INTDIR)
 
 # End Source File
 # End Group

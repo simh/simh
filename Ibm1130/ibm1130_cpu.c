@@ -18,6 +18,8 @@
    18-Mar-03 BLK	Fixed bug in divide instruction; didn't work with negative values
    23-Jul-03 BLK	Prevented tti polling in CGI mode
    24-Nov-03 BLK	Fixed carry bit error in subtract and subtract double, found by Bob Flanders
+   20-Oct-04 BLK	Changed "(unsigned int32)" to "(uint32)" to accomodate improved definitions of simh types
+   					Also commented out my echo command as it's now a standard simh command
 
    The register state for the IBM 1130 CPU is:
 
@@ -127,6 +129,7 @@
 #define UPDATE_BY_TIMER
 #define ENABLE_BACKTRACE
 #define CGI_SUPPORT
+// #define USE_MY_ECHO_CMD				/* simh now has echo command built in */
 
 static void cgi_start(void);
 static void cgi_stop(t_stat reason);
@@ -888,7 +891,7 @@ t_stat sim_instr (void)
 				ACC  = (dst >> 16) & 0xFFFF;
 				EXT  = dst & 0xFFFF;
 
-				C = (unsigned int32) dst < (unsigned int32) src;
+				C = (uint32) dst < (uint32) src;
 				if (! V)
 					V = DWSIGN_BIT((~src ^ src2) & (src ^ dst));
 				break;
@@ -910,7 +913,7 @@ t_stat sim_instr (void)
 				ACC  = (dst >> 16) & 0xFFFF;
 				EXT  = dst & 0xFFFF;
 
-				C = (unsigned int32) src < (unsigned int32) src2;
+				C = (uint32) src < (uint32) src2;
 				if (! V)
 					V = DWSIGN_BIT((src ^ src2) & (src ^ dst));
 				break;
@@ -1280,6 +1283,7 @@ t_stat register_cmd (char *name, t_stat (*action)(int32 flag, char *ptr), int ar
 	return SCPE_OK;
 }
 
+#ifdef USE_MY_ECHO_CMD
 /* ------------------------------------------------------------------------ 
  * echo_cmd - just echo the command line
  * ------------------------------------------------------------------------ */
@@ -1289,6 +1293,7 @@ static t_stat echo_cmd (int flag, char *cptr)
 	printf("%s\n", cptr);
 	return SCPE_OK;
 }
+#endif
 
 /* ------------------------------------------------------------------------ 
  * sim_init - initialize simulator upon startup of scp, before reset
@@ -1319,7 +1324,9 @@ void sim_init (void)
 	register_cmd("CGI",       &cgi_cmd,       0, "cgi                      run simulator in CGI mode\n");
 #endif
 
+#ifdef USE_MY_ECHO_CMD
 	register_cmd("ECHO",      &echo_cmd,      0, "echo args...             echo arguments passed to command\n");
+#endif
 }
 
 /* ------------------------------------------------------------------------ 

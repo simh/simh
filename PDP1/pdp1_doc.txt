@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-1 Simulator Usage
-Date:	15-Feb-2004
+Date:	15-Nov-2004
 
 			COPYRIGHT NOTICE
 
@@ -150,6 +150,17 @@ control registers for the interrupt system.
 	IND_MAX		8	maximum nested indirect addresses
 	WRU		8	interrupt character
 
+The CPU can maintain a history of the most recently executed instructions.
+This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
+
+	SET CPU HISTORY		clear history buffer
+	SET CPU HISTORY=0	disable history
+	SET CPU HISTORY=n	enable history, length = n
+	SHOW CPU HISTORY	print CPU history
+	SHOW CPU HISTORY=n	print first n entries of CPU history
+
+The maximum length for the history is 65536 entries.
+
 2.2 Programmed I/O Devices
 
 2.2.1 Paper Tape Reader (PTR)
@@ -280,7 +291,7 @@ locked.
 	SET DTn WRITEENABLED	set unit n write enabled
 	SET DTn LOCKED		set unit n write locked
 
-Units can also be set ONLINE or OFFLINE.
+Units can also be set ENABLED or DISABLED.
 
 The DECtape controller can be disabled and enabled with the SET DT DISABLED
 and SET DT ENABLED commands, respectively.

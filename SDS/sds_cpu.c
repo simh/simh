@@ -23,6 +23,12 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   cpu		central processor
+   rtc		real time clock
+
+   07-Nov-04	RMS	Added instruction history
+   01-Mar-03	RMS	Added SET/SHOW RTC FREQ support
+
    The system state for the SDS 940 is:
 
    A<0:23>		A register
@@ -38,11 +44,6 @@
    EM2<0:2>		memory extension, block 2
    EM3<0:2>		memory extension, block 3
    bpt			breakpoint switches
-
-   cpu		central processor
-   rtc		real time clock
-
-   01-Mar-03	RMS	Added SET/SHOW RTC FREQ support
 */
 
 /* The SDS 940 has three instruction format -- memory reference, register change,
@@ -137,6 +138,21 @@
 #define UNIT_V_MSIZE	(UNIT_V_GENIE + 1)		/* dummy mask */
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
+#define HIST_XCT	1				/* instruction */
+#define HIST_INT	2				/* interrupt cycle */
+#define HIST_TRP	3				/* trap cycle */
+#define HIST_MIN	64
+#define HIST_MAX	65536
+#define HIST_NOEA	0x40000000
+struct InstHistory {
+	uint32		typ;
+	uint32		pc;
+	uint32		ir;
+	uint32		a;
+	uint32		b;
+	uint32		x;
+	uint32		ea; };
+
 uint32 M[MAXMEMSIZE] = { 0 };				/* memory */
 uint32 A, B, X;						/* registers */
 uint32 P;						/* program counter */
@@ -169,6 +185,9 @@ int32 stop_inviop = 1;					/* stop inv io op */
 uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
+int32 hst_p = 0;					/* history pointer */
+int32 hst_lnt = 0;					/* history length */
+struct InstHistory *hst = NULL;				/* instruction history */
 int32 rtc_pie = 0;					/* rtc pulse ie */
 int32 rtc_tps = 60;					/* rtc ticks/sec */
 
@@ -181,6 +200,8 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat Ea (uint32 wd, uint32 *va);
 t_stat EaSh (uint32 wd, uint32 *va);
 t_stat Read (uint32 va, uint32 *dat);
@@ -195,6 +216,7 @@ void Div48 (uint32 dvdh, uint32 dvdl, uint32 dvr);
 void RotR48 (uint32 sc);
 void ShfR48 (uint32 sc, uint32 sgn);
 t_stat one_inst (uint32 inst, uint32 pc, uint32 mode);
+void inst_hist (uint32 inst, uint32 pc, uint32 typ);
 t_stat rtc_inst (uint32 inst);
 t_stat rtc_svc (UNIT *uptr);
 t_stat rtc_reset (DEVICE *dptr);
@@ -262,6 +284,8 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size },
 	{ UNIT_MSIZE, 49152, NULL, "48K", &cpu_set_size },
 	{ UNIT_MSIZE, 65536, NULL, "64K", &cpu_set_size },
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
+	  &cpu_set_hist, &cpu_show_hist },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -371,6 +395,7 @@ if (ion && !ion_defer && int_reqhi) {			/* int request? */
 	tinst = ReadP (pa);				/* get inst */
 	save_mode = usr_mode;				/* save mode */
 	usr_mode = 0;					/* switch to mon */
+	if (hst_lnt) inst_hist (tinst, P, HIST_INT);	/* record inst */
 	if (pa != VEC_RTCP) {				/* normal intr? */
 	    tr = one_inst (tinst, P, save_mode);	/* exec intr inst */
 	    if (tr) {					/* stop code? */
@@ -396,6 +421,7 @@ else {							/* normal instr */
 	P = (P + 1) & VA_MASK;				/* incr PC */
 	if (reason == SCPE_OK) {			/* fetch ok? */
 	    ion_defer = 0;				/* clear ion */
+	    if (hst_lnt) inst_hist (inst, save_P, HIST_XCT);
 	    reason = one_inst (inst, save_P, usr_mode); /* exec inst */
 	    if (reason > 0) {				/* stop code? */
 		if (reason != STOP_HALT) P = save_P;
@@ -411,6 +437,7 @@ else {							/* normal instr */
 	    save_mode = usr_mode;			/* save mode */
 	    usr_mode = 0;				/* switch to mon */
 	    mon_usr_trap = 0;
+	    if (hst_lnt) inst_hist (tinst, save_P, HIST_TRP);
 	    tr = one_inst (tinst, save_P, save_mode);	/* trap inst */
 	    if (tr) {					/* stop code? */
 		usr_mode = save_mode;			/* restore mode */
@@ -838,7 +865,9 @@ t_stat r;
 for (i = 0; i < ind_lim; i++) {				/* count indirects */
 	if (wd & I_IDX) va = (va & VA_USR) | ((va + X) & VA_MASK);
 	*addr = va;
-	if ((wd & I_IND) == 0) return SCPE_OK;		/* indirect? */
+	if ((wd & I_IND) == 0) {			/* end of ind chain? */
+	    if (hst_lnt) hst[hst_p].ea = *addr;		/* record */
+	    return SCPE_OK;  }
 	if (r = Read (va, &wd)) return r;		/* read ind; fails? */
 	va = (va & VA_USR) | (wd & XVA_MASK);
 	}
@@ -859,6 +888,7 @@ for (i = 0; i < ind_lim; i++) {				/* count indirects */
 	    if (wd & I_IDX) *addr = (va & (VA_MASK & ~I_SHFMSK)) |
 		((va + X) & I_SHFMSK);			/* 9b indexing */
 	    else *addr = va & VA_MASK;
+	    if (hst_lnt) hst[hst_p].ea = *addr;		/* record */
 	    return SCPE_OK;  }
 	if (wd & I_IDX) va = (va & VA_USR) | ((va + X) & VA_MASK);
 	if (r = Read (va, &wd)) return r;		/* read ind; fails? */
@@ -1278,5 +1308,84 @@ return SCPE_OK;
 t_stat rtc_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 fprintf (st, (rtc_tps == 50)? "50Hz": "60Hz");
+return SCPE_OK;
+}
+
+/* Record history */
+
+void inst_hist (uint32 ir, uint32 pc, uint32 tp)
+{
+hst_p = (hst_p + 1);					/* next entry */
+if (hst_p >= hst_lnt) hst_p = 0;
+hst[hst_p].typ = tp | (OV << 4);
+hst[hst_p].pc = pc;
+hst[hst_p].ir = ir;
+hst[hst_p].a = A;
+hst[hst_p].b = B;
+hst[hst_p].x = X;
+hst[hst_p].ea = HIST_NOEA;
+return;
+}
+
+/* Set history */
+
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i, lnt;
+t_stat r;
+
+if (cptr == NULL) {
+	for (i = 0; i < hst_lnt; i++) hst[i].typ = 0;
+	hst_p = 0;
+	return SCPE_OK;  }
+lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+hst_p = 0;
+if (hst_lnt) {
+	free (hst);
+	hst_lnt = 0;
+	hst = NULL;  }
+if (lnt) {
+	hst = calloc (sizeof (struct InstHistory), lnt);
+	if (hst == NULL) return SCPE_MEM;
+	hst_lnt = lnt;  }
+return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 ov, k, di, lnt;
+char *cptr = (char *) desc;
+t_stat r;
+t_value sim_eval;
+struct InstHistory *h;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+	UNIT *uptr, int32 sw);
+static char *cyc[] = { "   ", "   ", "INT", "TRP" };
+
+if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+if (cptr) {
+	lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+	if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;  }
+else lnt = hst_lnt;
+di = hst_p - lnt;					/* work forward */
+if (di < 0) di = di + hst_lnt;
+fprintf (st, "CYC PC    OV A        B        X        EA      IR\n\n");
+for (k = 0; k < lnt; k++) {				/* print specified */
+	h = &hst[(++di) % hst_lnt];			/* entry pointer */
+	if (h->typ) {					/* instruction? */
+	    ov = (h->typ >> 4) & 1;			/* overflow */
+	    fprintf (st, "%s %05o %o  %08o %08o %08o ", cyc[h->typ & 3],
+		h->pc, ov, h->a, h->b, h->x);
+	    if (h->ea & HIST_NOEA) fprintf (st, "      ");
+	    else fprintf (st, "%05o ", h->ea);
+	    sim_eval = h->ir;
+	    if ((fprint_sym (st, h->pc, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+		fprintf (st, "(undefined) %08o", h->ir);
+	    fputc ('\n', st);				/* end line */
+	    }						/* end else instruction */
+	}						/* end for */
 return SCPE_OK;
 }

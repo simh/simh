@@ -25,6 +25,7 @@
 
    ry		RX211/RXV21/RX02 floppy disk
 
+   30-Sep-04	RMS	Revised Unibus interface
    21-Mar-04	RMS	Added VAX support
    29-Dec-03	RMS	Added RXV21 support
    19-May-03	RMS	Revised for new conditional compilation scheme
@@ -372,8 +373,8 @@ case FEXFR:						/* transfer */
 		break;  }
 	if (func == RYCS_FILL) {			/* fill? read */
 		for (i = 0; i < RY_NUMBY; i++) rx2xb[i] = 0;
-		t = Map_ReadB (ba, ry_wc << 1, rx2xb, MAP);  }
-	else t = Map_WriteB (ba, ry_wc << 1, rx2xb, MAP);
+		t = Map_ReadB (ba, ry_wc << 1, rx2xb);  }
+	else t = Map_WriteB (ba, ry_wc << 1, rx2xb);
 	ry_wc = t >> 1;					/* adjust wc */
 	ry_done (t? RYES_NXM: 0, 0);			/* done */
 	break;
@@ -428,7 +429,7 @@ case SDCNF:						/* confirm set density */
 	break;
 case SDXFR:						/* erase disk */
 	for (i = 0; i < (int32) uptr->capac; i++) fbuf[i] = 0;
-	uptr->hwmark = uptr->capac;
+	uptr->hwmark = (uint32) uptr->capac;
 	if (ry_csr & RYCS_DEN) uptr->flags = uptr->flags | UNIT_DEN;
 	else uptr->flags = uptr->flags & ~UNIT_DEN;
 	ry_done (0, 0);
@@ -452,7 +453,7 @@ case ESXFR:
 		   ((ry_unit[0].flags & UNIT_DEN)? 0020: 0) |
 		   ((ry_csr & RYCS_DEN)? 0001: 0);
 	estat[7] = uptr->TRACK;
-	t = Map_WriteB (ba, 8, estat, MAP);		/* DMA to memory */
+	t = Map_WriteB (ba, 8, estat);			/* DMA to memory */
 	ry_done (t? RYES_NXM: 0, 0);			/* done */
 	break;
 

@@ -25,6 +25,7 @@
 
    cpu			Interdata 16b CPU
 
+   07-Nov-04	RMS	Added instruction history
    22-Sep-03	RMS	Added additional instruction decode types
    07-Feb-03	RMS	Fixed bug in SETM, SETMR (found by Mark Pizzolato)
 
@@ -151,6 +152,17 @@
 #define UNIT_816E	(1 << UNIT_V_816E)
 #define UNIT_TYPE	(UNIT_ID4 | UNIT_716 | UNIT_816 | UNIT_816E)
 
+#define HIST_MIN	64
+#define HIST_MAX	65536
+struct InstHistory {
+	uint16		vld;
+	uint16		pc;
+	uint16		ir1;
+	uint16		ir2;
+	uint16		r1;
+	uint16		ea;
+	uint16		opnd; };
+
 #define SEXT16(x)	(((x) & SIGN16)? ((int32) ((x) | 0xFFFF8000)): \
 			 ((int32) ((x) & 0x7FFF)))
 #define CC_GL_16(x)	if ((x) & SIGN16) cc = CC_L; \
@@ -190,7 +202,9 @@ REG *pcq_r = NULL;					/* PC queue reg ptr */
 uint32 dec_flgs = 0;					/* decode flags */
 uint32 fp_in_hwre = 0;					/* ucode/hwre fp */
 uint32 pawidth = PAWIDTH16;				/* phys addr mask */
-uint32 cpu_log = 0;					/* debug logging */
+uint32 hst_p = 0;					/* history pointer */
+uint32 hst_lnt = 0;					/* history length */
+struct InstHistory *hst = NULL;				/* instruction history */
 struct BlockIO blk_io;					/* block I/O status */
 uint32 (*dev_tab[DEVNO])(uint32 dev, uint32 op, uint32 datout) = { NULL };
 
@@ -216,6 +230,8 @@ t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_consint (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 extern t_bool devtab_init (void);
 extern void int_eval (void);
@@ -478,7 +494,6 @@ REG cpu_reg[] = {
 	{ BRDATA (PCQ, pcq, 16, 16, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ HRDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ HRDATA (WRU, sim_int_char, 8) },
-	{ HRDATA (DBGLOG, cpu_log, 16), REG_HIDDEN },
 	{ HRDATA (BLKIOD, blk_io.dfl, 16), REG_HRO },
 	{ HRDATA (BLKIOC, blk_io.cur, 16), REG_HRO },
 	{ HRDATA (BLKIOE, blk_io.end, 16), REG_HRO },
@@ -500,6 +515,8 @@ MTAB cpu_mod[] = {
 	{ UNIT_TYPE, UNIT_816E, "8/16E", "816E", &cpu_set_model },
 	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, NULL, "CONSINT",
 		&cpu_set_consint, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
+	  &cpu_set_hist, &cpu_show_hist },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -658,6 +675,17 @@ case OP_RXH:						/* reg-mem halfword */
 	
 default:
 	return SCPE_IERR;  }
+
+if (hst_lnt) {						/* instruction history? */
+	hst[hst_p].vld = 1;
+	hst[hst_p].pc = oPC;
+	hst[hst_p].ir1 = ir1;
+	hst[hst_p].ir2 = ir2;
+	hst[hst_p].r1 = R[r1];
+	hst[hst_p].ea = ea;
+	hst[hst_p].opnd = opnd;
+	hst_p = hst_p + 1;
+	if (hst_p >= hst_lnt) hst_p = 0;  }
 
 PC = (PC + 2) & VAMASK;					/* increment PC */
 switch (op) {						/* case on opcode */
@@ -1734,5 +1762,68 @@ t_stat cpu_set_consint (UNIT *uptr, int32 val, char *cptr, void *desc)
 if ((uptr->flags & (UNIT_716 | UNIT_816 | UNIT_816E)) == 0)
 	return SCPE_NOFNC;
 if (PSW & PSW_AIO) SET_INT (v_DS);
+return SCPE_OK;
+}
+
+/* Set history */
+
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+uint32 i, lnt;
+t_stat r;
+
+if (cptr == NULL) {
+	for (i = 0; i < hst_lnt; i++) hst[i].vld = 0;
+	hst_p = 0;
+	return SCPE_OK;  }
+lnt = (uint32) get_uint (cptr, 10, HIST_MAX, &r);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+hst_p = 0;
+if (hst_lnt) {
+	free (hst);
+	hst_lnt = 0;
+	hst = NULL;  }
+if (lnt) {
+	hst = calloc (sizeof (struct InstHistory), lnt);
+	if (hst == NULL) return SCPE_MEM;
+	hst_lnt = lnt;  }
+return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+uint32 op, k, di, lnt;
+char *cptr = (char *) desc;
+t_value sim_eval[4];
+t_stat r;
+struct InstHistory *h;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+	UNIT *uptr, int32 sw);
+
+if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+if (cptr) {
+	lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+	if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;  }
+else lnt = hst_lnt;
+di = hst_p - lnt;					/* work forward */
+if (di < 0) di = di + hst_lnt;
+fprintf (st, "PC    r1    opnd  ea    IR\n\n");
+for (k = 0; k < lnt; k++) {				/* print specified */
+	h = &hst[(di++) % hst_lnt];			/* entry pointer */
+	if (h->vld) {					/* instruction? */
+	    fprintf (st, "%04X  %04X  %04X  ", h->pc, h->r1, h->opnd);
+	    sim_eval[0] = op = (h->ir1 >> 8) & 0xFF;
+	    sim_eval[1] = h->ir1 & 0xFF;
+	    sim_eval[2] = (h->ir2 >> 8) & 0xFF;
+	    sim_eval[3] = h->ir2 & 0xFF;
+	    if (OP_TYPE (op) >= OP_RX) fprintf (st, "%04X  ", h->ea);
+	    else fprintf (st, "      ");
+	    if ((fprint_sym (st, h->pc, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+		fprintf (st, "(undefined) %04X", h->ir1);
+	    fputc ('\n', st);				/* end line */
+	    }						/* end if instruction */
+	}						/* end for */
 return SCPE_OK;
 }

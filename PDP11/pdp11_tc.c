@@ -25,6 +25,7 @@
 
    tc		TC11/TU56 DECtape
 
+   30-Sep-04	RMS	Revised Unibus interface
    25-Jan-04	RMS	Revised for device debug support
    09-Jan-04	RMS	Changed sim_fsize calling sequence, added STOP_OFFR
    29-Dec-03	RMS	Changed initial status to disabled (in Qbus system)
@@ -737,7 +738,8 @@ int32 dir = mot & DTS_DIR;
 int32 fnc = DTS_GETFNC (uptr->STATE);
 int32 *fbuf = uptr->filebuf;
 int32 blk, wrd, relpos, dat;
-uint32 ba, ma, mma;
+uint32 ba, ma;
+uint16 wbuf;
 
 /* Motion cases
 
@@ -799,15 +801,12 @@ case DTS_OFR:						/* off reel */
 case FNC_READ:						/* read */
 	wrd = DT_LIN2WD (uptr->pos, uptr);		/* get word # */
 	if (!dt_substate) {				/* !wc ovf? */
-	    tcwc = tcwc & DMASK;			/* incr MA, WC */
-	    tcba = tcba & DMASK;
 	    ma = (CSR_GETMEX (tccm) << 16) | tcba;	/* form 18b addr */
-	    if (!Map_Addr (ma, &mma) ||			/* map addr */
-		!ADDR_IS_MEM (mma)) {			/* nx mem? */
+	    ba = (blk * DTU_BSIZE (uptr)) + wrd;	/* buffer ptr */
+	    tcdt = wbuf = fbuf[ba] & DMASK;		/* read word */
+	    if (Map_WriteW (ma, 2, &wbuf)) {		/* store, nxm? */
 		dt_seterr (uptr, STA_NXM);
 		break;  }
-	    ba = (blk * DTU_BSIZE (uptr)) + wrd;	/* buffer ptr */
-	    M[mma >> 1] = tcdt = fbuf[ba] & DMASK;	/* read word */
 	    tcwc = (tcwc + 1) & DMASK;			/* incr MA, WC */
 	    tcba = (tcba + 2) & DMASK;
 	    if (tcba <= 1) tccm = CSR_INCMEX (tccm);
@@ -835,11 +834,10 @@ case FNC_WRIT:						/* write */
 	if (dt_substate) tcdt = 0;			/* wc ovf? fill */
 	else {
 	    ma = (CSR_GETMEX (tccm) << 16) | tcba;	/* form 18b addr */
-	    if (!Map_Addr (ma, &mma) ||			/* map addr */
-		!ADDR_IS_MEM (mma)) {			/* nx mem? */
+	    if (Map_ReadW (ma, 2, &wbuf)) {		/* fetch word */
 		dt_seterr (uptr, STA_NXM);
 		break;  }
-	    else tcdt = M[mma >> 1];			/* get word */
+	    tcdt = wbuf;				/* get word */
 	    tcwc = (tcwc + 1) & DMASK;			/* incr MA, WC */
 	    tcba = (tcba + 2) & DMASK;
 	    if (tcba <= 1) tccm = CSR_INCMEX (tccm);  }

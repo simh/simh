@@ -26,7 +26,8 @@
    The author gratefully acknowledges the help of Stephen Shirron, Antonio
    Carlini, and Kevin Peterson in providing specifications for the Qbus VAX's
 
-   30-Aug-04	RMS	Added octa, h_floating instructin definitions
+   02-Sep-04	RMS	Added octa specifier definitions
+   30-Aug-04	RMS	Added octa, h_floating instruction definitions
    24-Aug-04	RMS	Added compatibility mode definitions
    18-Apr-04	RMS	Added octa, fp, string definitions
    19-May-03	RMS	Revised for new conditional compilation scheme
@@ -77,6 +78,16 @@
 #define CMODE_FAULT(cd)	p1 = (cd), ABORT (ABORT_CMODE)
 #define MACH_CHECK(cd)	p1 = (cd), ABORT (ABORT_MCHK)
 
+/* Recovery queue */
+
+#define RQ_RN		0xF				/* register */
+#define RQ_V_LNT	4				/* length */
+#define RQ_M_LNT	0x7				/* 0,1,2,3,4 */
+#define RQ_DIR		0x800				/* 0 = -, 1 = + */
+#define RQ_REC(d,r)	(((d) << RQ_V_LNT) | (r))
+#define RQ_GETRN(x)	((x) & RQ_RN)
+#define RQ_GETLNT(x)	(((x) >> RQ_V_LNT) & RQ_M_LNT)
+
 /* Address space */
 
 #define VAMASK		0xFFFFFFFF			/* virt addr mask */
@@ -98,6 +109,7 @@
 #define L_WORD		2				/* data type */
 #define L_LONG		4
 #define L_QUAD		8
+#define L_OCTA		16
 #define NUM_INST	512				/* one byte+two byte */
 #define MAX_SPEC	6				/* max spec/instr */
 
@@ -145,7 +157,6 @@
 #define SP		R[nSP]
 #define PC		R[nPC]
 #define RGMASK		0xF
-#define rnplus1		((rn + 1) & RGMASK)
 #define KSP		STK[KERN]
 #define ESP		STK[EXEC]
 #define SSP		STK[SUPV]
@@ -166,13 +177,13 @@
 #define PSL_V_PRV	22				/* previous mode */
 #define PSL_M_MODE	0x3				/* mode mask */
 #define PSL_CUR		(PSL_M_MODE << PSL_V_CUR)
-#define PSL_PRV		(PSL_M_MODE << PSL_V_CUR)
+#define PSL_PRV		(PSL_M_MODE << PSL_V_PRV)
 #define PSL_V_IPL	16				/* int priority lvl */
 #define PSL_M_IPL	0x1F
 #define PSL_IPL		(PSL_M_IPL << PSL_V_IPL)
 #define PSL_IPL1	(0x01 << PSL_V_IPL)
 #define PSL_IPL1F	(0x1F << PSL_V_IPL)
-#define PSL_MBZ		(0xB0200000 | PSW_MBZ)		/* must be zero */
+#define PSL_MBZ		(0x30200000 | PSW_MBZ)		/* must be zero */
 #define PSW_MBZ		0xFF00				/* must be zero */
 #define PSW_DV		0x80				/* dec ovflo enable */
 #define PSW_FU		0x40				/* flt undflo enable */
@@ -351,73 +362,96 @@
 
 #define DR_F		0x80				/* FPD ok flag */
 #define DR_NSPMASK	0x07				/* #specifiers */
-#define DR_USPMASK	0x70				/* #spec, sym_ */
+#define DR_V_USPMASK	4
+#define DR_M_USPMASK	0x70				/* #spec, sym_ */
+#define DR_GETNSP(x)	((x) & DR_NSPMASK)
+#define DR_GETUSP(x)	(((x) >> DR_V_USPMASK) & DR_M_USPMASK)
 
 /* Decode ROM: specifier entry */
 
-#define DR_ACMASK	0xC				/* type */
-#define DR_LNMASK	0x3				/* length mask */
+#define DR_ACMASK	0x300				/* type */
+#define DR_SPFLAG	0x008				/* special decode */
+#define DR_LNMASK	0x007				/* length mask */
 #define DR_LNT(x)	(1 << (x & DR_LNMASK))		/* disp to lnt */
+
+/* Decode ROM: length */
+
+#define DR_BYTE		0x000				/* byte */
+#define DR_WORD		0x001				/* word */
+#define DR_LONG		0x002				/* long */
+#define DR_QUAD		0x003				/* quad */
+#define DR_OCTA		0x004				/* octa */
 
 /* Decode ROM: operand type  */
 
-#define SH0		0x00				/* short literal */
-#define SH1		0x10
-#define SH2		0x20
-#define SH3		0x30
-#define IDX		0x40				/* indexed */
-#define GRN		0x50				/* register */
-#define RGD		0x60				/* register def */
-#define ADC		0x70				/* autodecrement */
-#define AIN		0x80				/* autoincrement */
-#define AID		0x90				/* autoinc def */
-#define BDP		0xA0				/* byte disp */
-#define BDD		0xB0				/* byte disp def */
-#define WDP		0xC0				/* word disp */
-#define WDD		0xD0				/* word disp def */
-#define LDP		0xE0				/* long disp */
-#define LDD		0xF0				/* long disp def */
+#define SH0		0x000				/* short literal */
+#define SH1		0x010
+#define SH2		0x020
+#define SH3		0x030
+#define IDX		0x040				/* indexed */
+#define GRN		0x050				/* register */
+#define RGD		0x060				/* register def */
+#define ADC		0x070				/* autodecrement */
+#define AIN		0x080				/* autoincrement */
+#define AID		0x090				/* autoinc def */
+#define BDP		0x0A0				/* byte disp */
+#define BDD		0x0B0				/* byte disp def */
+#define WDP		0x0C0				/* word disp */
+#define WDD		0x0D0				/* word disp def */
+#define LDP		0x0E0				/* long disp */
+#define LDD		0x0F0				/* long disp def */
+
+/* Decode ROM: access type */
+
+#define DR_R		0x000				/* read */
+#define DR_M		0x100				/* modify */
+#define DR_A		0x200				/* address */
+#define DR_W		0x300				/* write */
 
 /* Decode ROM: access type and length */
 
-#define RB		0x0				/* .rb */
-#define RW		0x1				/* .rw */
-#define RL		0x2				/* .rl */
-#define RQ		0x3				/* .rq */
-#define MB		0x4				/* .mb */
-#define MW		0x5				/* .mw */
-#define ML		0x6				/* .ml */
-#define MQ		0x7				/* .mq */
-#define AB		0x8				/* .ab */
-#define AW		0x9				/* .aw */
-#define AL		0xA				/* .al */
-#define AQ		0xB				/* .aq */
-#define WB		0xC				/* .wb */
-#define WW		0xD				/* .ww */
-#define WL		0xE				/* .wl */
-#define WQ		0xF				/* .wq */
+#define RB		(DR_R|DR_BYTE)
+#define RW		(DR_R|DR_WORD)
+#define RL		(DR_R|DR_LONG)
+#define RQ		(DR_R|DR_QUAD)
+#define RO		(DR_R|DR_OCTA)
+#define MB		(DR_M|DR_BYTE)
+#define MW		(DR_M|DR_WORD)
+#define ML		(DR_M|DR_LONG)
+#define MQ		(DR_M|DR_QUAD)
+#define MO		(DR_M|DR_OCTA)
+#define AB		(DR_A|DR_BYTE)
+#define AW		(DR_A|DR_WORD)
+#define AL		(DR_A|DR_LONG)
+#define AQ		(DR_A|DR_QUAD)
+#define AO		(DR_A|DR_OCTA)
+#define WB		(DR_W|DR_BYTE)
+#define WW		(DR_W|DR_WORD)
+#define WL		(DR_W|DR_LONG)
+#define WQ		(DR_W|DR_QUAD)
+#define WO		(DR_W|DR_OCTA)
 
 /* Special dispatches.
 
    vb	=	variable bit field, treated as wb except for register
    rf	=	f_floating, treated as rl except for short literal
-   rd	=	d_floating, treated as rl except for short literal
-   rg	=	g_floating, treated as rl except for short literal
+   rd	=	d_floating, treated as rq except for short literal
+   rg	=	g_floating, treated as rq except for short literal
+   rh	=	h_floating, treated as ro except for short literal
    bw	=	branch byte displacement
    bw	=	branch word displacement
 
    The 'underlying' access type and length must be correct for
-   indexing, which only looks at the low order 4b.  rg works because
-   rq and mq are treated identically.
+   indexing.  rg works because rq and mq are treated identically.
 */
 
-#define VB		(0x100|WB)			/* .vb */
-#define RF		(0x100|RL)			/* .rf */
-#define RD		(0x100|RQ)			/* .rd */
-#define RG		(0x100|MQ)			/* .rg */
-#define BB		(0x1F0|WB)			/* byte branch */
-#define BW		(0x1F0|WW)			/* word branch */
-#define OC		(0x1F0|WQ)			/* octa, sym_ */
+#define VB		(DR_SPFLAG|WB)			/* .vb */
+#define RF		(DR_SPFLAG|RL)			/* .rf */
+#define RD		(DR_SPFLAG|RQ)			/* .rd */
+#define RG		(DR_SPFLAG|MQ)			/* .rg */
+#define RH		(DR_SPFLAG|RO)			/* .rh */
+#define BB		(DR_SPFLAG|WB|6)		/* byte branch */
+#define BW		(DR_SPFLAG|WB|7)		/* word branch */
 
 /* Probe results and memory management fault codes */
 
@@ -456,6 +490,8 @@
 #define MT_SIRR		20
 #define MT_SISR		21
 #define MT_ICCS		24
+#define MT_NICR		25
+#define MT_ICR		26
 #define MT_TODR		27
 #define MT_CSRS		28
 #define MT_CSRD		29
@@ -465,14 +501,10 @@
 #define MT_RXDB		33
 #define MT_TXCS		34
 #define MT_TXDB		35
-#define MT_CADR		37
-#define MT_MSER		39
-#define MT_CONPC	42
-#define MT_CONPSL	43
-#define MT_IORESET	55
 #define MT_MAPEN	56
 #define MT_TBIA		57
 #define MT_TBIS		58
+#define MT_PME		61
 #define MT_SID		62
 #define MT_TBCHK	63
 
@@ -520,7 +552,7 @@ enum opcodes {
  ADDH2 = 0x160, ADDH3, SUBH2, SUBH3, MULH2, MULH3, DIVH2, DIVH3,
  CVTHB, CVTHW, CVTHL, CVTRHL, CVTBH, CVTWH, CVTLH, ACBH,
  MOVH, CMPH, MNEGH, TSTH, EMODH, POLYH, CVTHG,
- CLRO = 0x176, MOVO, MOVAO, PUSHAO,
+ CLRO = 0x17C, MOVO, MOVAO, PUSHAO,
  CVTFH = 0x198, CVTFG = 0x199,
  CVTHF = 0x1F6, CVTHD = 0x1F7 };
 
@@ -588,10 +620,6 @@ enum opcodes {
 #define CC_IIZZ_Q(rl,rh) \
 		if ((rh) & LSIGN) cc = CC_N; \
 		else if (((rl) | (rh)) == 0) cc = CC_Z; \
-		else cc = 0
-#define CC_IIZZ_O(rl,rm2,rm1,rh) \
-		if ((rh) & LSIGN) cc = CC_N; \
-		else if (((rl) | (rm2) | (rm1) | (rh)) == 0) cc = CC_Z; \
 		else cc = 0
 #define CC_IIZZ_FP	CC_IIZZ_W
 
@@ -679,6 +707,10 @@ enum opcodes {
 
 /* Model dependent definitions */
 
+#if defined (VAX_780)
+#include "vax780_defs.h"
+#else
 #include "vaxmod_defs.h"
+#endif
 
 #endif							/* _VAX_DEFS_H */

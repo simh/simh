@@ -507,7 +507,7 @@ for (i = 0; i < RL_NUMDR; i++) {
 	uptr = rl_dev.units + i;
 	sim_cancel (uptr);
 	uptr->STAT = 0;  }
-if (rlxb == NULL) rlxb = calloc (RL_MAXFR, sizeof (unsigned int8));
+if (rlxb == NULL) rlxb = calloc (RL_MAXFR, sizeof (uint8));
 if (rlxb == NULL) return SCPE_MEM;
 return SCPE_OK;
 }

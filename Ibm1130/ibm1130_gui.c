@@ -46,6 +46,11 @@
 #define UNIT_V_PHYSICAL_PTR	(UNIT_V_UF + 10)		/* NOTE: THESE MUST MATCH THE DEFINITION IN ibm1130_prt.c */
 #define UNIT_PHYSICAL_PTR (1u << UNIT_V_PHYSICAL_PTR)
 
+// I think I had it wrong; Program Load actually does start the processor after
+// reading in the card?
+
+#define PROGRAM_LOAD_STARTS_CPU
+
 /* ------------------------------------------------------------------------
  * Function declarations
  * ------------------------------------------------------------------------ */
@@ -1229,9 +1234,12 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
 		case IDC_PROGRAM_LOAD:
 			if (! running) {				/* if card reader is attached to a file, do cold start read of one card */
 				IAR = 0;					/* reset IAR */
-//				stuff_cmd("boot cr");
+#ifdef PROGRAM_LOAD_STARTS_CPU
+				stuff_cmd("boot cr");
+#else
 				if (cr_boot(0, NULL) != SCPE_OK)	/* load boot card */
 					remark_cmd("IPL failed");
+#endif
 			}
 			break;
 

@@ -25,6 +25,7 @@
 
    cpu		PDP-4/7/9/15 central processor
 
+   06-Nov-04	RMS	Added =n to SHOW HISTORY
    26-Mar-04	RMS	Fixed warning from -std=c99
    14-Jan-04	RMS	Fixed g_mode in XVM implementation
 			PDP-15 index, autoincrement generate 18b addresses
@@ -543,7 +544,7 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 114688, NULL, "112K", &cpu_set_size },
 	{ UNIT_MSIZE, 131072, NULL, "128K", &cpu_set_size },
 #endif
-	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "HISTORY", "HISTORY",
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
 	  &cpu_set_hist, &cpu_show_hist },
 	{ 0 }  };
 
@@ -1966,16 +1967,23 @@ return SCPE_OK;
 
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-int32 l, j, k, di;
+int32 l, j, k, di, lnt;
+char *cptr = (char *) desc;
 t_value sim_eval[2];
+t_stat r;
 struct InstHistory *h;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
 	UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+if (cptr) {
+	lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+	if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;  }
+else lnt = hst_lnt;
+di = hst_p - lnt;					/* work forward */
+if (di < 0) di = di + hst_lnt;
 fprintf (st, "PC      L AC      MQ      IR\n\n");
-di = hst_p;						/* work forward */
-for (k = 0; k < hst_lnt; k++) {				/* print specified */
+for (k = 0; k < lnt; k++) {				/* print specified */
 	h = &hst[(di++) % hst_lnt];			/* entry pointer */
 	if (h->pc & HIST_PC) {				/* instruction? */
 	    l = (h->lac >> 18) & 1;			/* link */

@@ -605,7 +605,7 @@ int32 xu_command(CTLR* xu)
     };
 
   /* Grab the PCB from the host. */
-  rstatus = Map_ReadW(xu->var->pcbb, 8, xu->var->pcb, MAP);
+  rstatus = Map_ReadW(xu->var->pcbb, 8, xu->var->pcb);
   if (rstatus != SCPE_OK)
     return PCSR0_PCEI + 1;
 
@@ -621,19 +621,19 @@ int32 xu_command(CTLR* xu)
       break;
 
     case FC_RDPA:			/* read default physical address */
-      wstatus = Map_WriteW(xu->var->pcbb + 2, 6, (uint16*)xu->var->mac, MAP);
+      wstatus = Map_WriteW(xu->var->pcbb + 2, 6, (uint16*)xu->var->mac);
       if (wstatus != SCPE_OK)
         return PCSR0_PCEI + 1;
       break;
 
     case FC_RPA:			/* read current physical address */
-      wstatus = Map_WriteW(xu->var->pcbb + 2, 6, (uint16*)&xu->var->setup.macs[0], MAP);
+      wstatus = Map_WriteW(xu->var->pcbb + 2, 6, (uint16*)&xu->var->setup.macs[0]);
       if (wstatus != SCPE_OK)
         return PCSR0_PCEI + 1;
       break;
 
     case FC_WPA:			/* write current physical address */
-      rstatus = Map_ReadW(xu->var->pcbb + 2, 6, (uint16*)&xu->var->setup.macs[0], MAP);
+      rstatus = Map_ReadW(xu->var->pcbb + 2, 6, (uint16*)&xu->var->setup.macs[0]);
       if (xu->var->pcb[1] & 1) return PCSR0_PCEI;
       break;
 
@@ -641,7 +641,7 @@ int32 xu_command(CTLR* xu)
       mtlen = (xu->var->pcb[2] & 0xFF00) >> 8;
       if (mtlen > 10) return PCSR0_PCEI;
       udbb = xu->var->pcb[1] | ((xu->var->pcb[2] & 03) << 16);
-      rstatus = Map_ReadW(udbb, mtlen * 6, (uint16*) &xu->var->setup.macs[1], MAP);
+      rstatus = Map_ReadW(udbb, mtlen * 6, (uint16*) &xu->var->setup.macs[1]);
       if (rstatus == SCPE_OK) {
         xu->var->setup.mac_count = mtlen + 1;
         status = eth_filter (xu->var->etherface, xu->var->setup.mac_count,
@@ -664,7 +664,7 @@ int32 xu_command(CTLR* xu)
 
       /* Write UDB to host memory. */
       udbb = xu->var->pcb[1] + ((xu->var->pcb[2] & 3) << 16);
-      wstatus = Map_WriteW(udbb, 12, xu->var->pcb, MAP);
+      wstatus = Map_WriteW(udbb, 12, xu->var->pcb);
       if (wstatus != SCPE_OK)
         return PCSR0_PCEI+1;
       break;
@@ -677,7 +677,7 @@ int32 xu_command(CTLR* xu)
 
       /* Read UDB into local memory. */
       udbb = xu->var->pcb[1] + ((xu->var->pcb[2] & 3) << 16);
-      rstatus = Map_ReadW(udbb, 12, xu->var->udb, MAP);
+      rstatus = Map_ReadW(udbb, 12, xu->var->udb);
       if (rstatus != SCPE_OK)
         return PCSR0_PCEI+1;
 
@@ -740,7 +740,7 @@ int32 xu_command(CTLR* xu)
 
       /* transfer udb to host */
       udbb = xu->var->pcb[1] + ((xu->var->pcb[2] & 3) << 16);
-      wstatus = Map_WriteW(udbb, 68, xu->var->udb, MAP);
+      wstatus = Map_WriteW(udbb, 68, xu->var->udb);
       if (wstatus != SCPE_OK) {
         xu->var->pcsr0 |= PCSR0_PCEI;
       }
@@ -752,7 +752,7 @@ int32 xu_command(CTLR* xu)
 
     case FC_RMODE:			/* read mode register */
       value = xu->var->mode;
-      wstatus = Map_WriteW(xu->var->pcbb+2, 2, &value, MAP);
+      wstatus = Map_WriteW(xu->var->pcbb+2, 2, &value);
       if (wstatus != SCPE_OK)
         return PCSR0_PCEI + 1;
       break;
@@ -775,11 +775,11 @@ int32 xu_command(CTLR* xu)
     case FC_RSTAT:			/* read extended status */
     case FC_RCSTAT:			/* read and clear extended status */
       value = xu->var->stat;
-      wstatus = Map_WriteW(xu->var->pcbb+2, 2, &value, MAP);
+      wstatus = Map_WriteW(xu->var->pcbb+2, 2, &value);
       value = 10;
-      wstatus2 = Map_WriteW(xu->var->pcbb+4, 2, &value, MAP);
+      wstatus2 = Map_WriteW(xu->var->pcbb+4, 2, &value);
       value = 32;
-      wstatus3 = Map_WriteW(xu->var->pcbb+6, 2, &value, MAP);
+      wstatus3 = Map_WriteW(xu->var->pcbb+6, 2, &value);
       if ((wstatus != SCPE_OK) || (wstatus2 != SCPE_OK) || (wstatus3 != SCPE_OK))
         return PCSR0_PCEI + 1;
 
@@ -824,7 +824,7 @@ void xu_process_receive(CTLR* xu)
 
     /* get next receive buffer */
     ba = xu->var->rdrb + (xu->var->relen * 2) * xu->var->rxnext;
-    rstatus = Map_ReadW (ba, 8, xu->var->rxhdr, MAP);
+    rstatus = Map_ReadW (ba, 8, xu->var->rxhdr);
     if (rstatus) {
       /* tell host bus read failed */
       xu->var->stat |= STAT_ERRS | STAT_MERR | STAT_TMOT | STAT_RRNG;
@@ -882,7 +882,7 @@ void xu_process_receive(CTLR* xu)
       wlen = slen;
 
     /* transfer chained packet to host buffer */
-    wstatus = Map_WriteB (segb, wlen, &item->packet.msg[off], MAP);
+    wstatus = Map_WriteB (segb, wlen, &item->packet.msg[off]);
     if (wstatus) {
       /* error during write */
       xu->var->stat |= STAT_ERRS | STAT_MERR | STAT_TMOT | STAT_RRNG;
@@ -938,7 +938,7 @@ void xu_process_receive(CTLR* xu)
     xu->var->rxhdr[2] &= ~RXR_OWN;              /* clear ownership flag */
 
     /* update the ring entry in host memory. */
-    wstatus = Map_WriteW (ba, 8, xu->var->rxhdr, MAP);
+    wstatus = Map_WriteW (ba, 8, xu->var->rxhdr);
     if (wstatus) {
       /* tell host bus write failed */
       xu->var->stat |= STAT_ERRS | STAT_MERR | STAT_TMOT | STAT_RRNG;
@@ -978,7 +978,7 @@ void xu_process_transmit(CTLR* xu)
 
     /* get next transmit buffer */
     ba = xu->var->tdrb + (xu->var->telen * 2) * xu->var->txnext;
-    rstatus = Map_ReadW (ba, 8, xu->var->txhdr, MAP);
+    rstatus = Map_ReadW (ba, 8, xu->var->txhdr);
     if (rstatus) {
       /* tell host bus read failed */
       xu->var->stat |= STAT_ERRS | STAT_MERR | STAT_TMOT | STAT_TRNG;
@@ -1007,7 +1007,7 @@ void xu_process_transmit(CTLR* xu)
       giant = 1;
     }
     if (wlen > 0) {
-      rstatus = Map_ReadB(segb, wlen, &xu->var->write_buffer.msg[off], MAP);
+      rstatus = Map_ReadB(segb, wlen, &xu->var->write_buffer.msg[off]);
       if (rstatus) {
         /* tell host bus read failed */
         xu->var->stat |= STAT_ERRS | STAT_MERR | STAT_TMOT | STAT_TRNG;
@@ -1078,7 +1078,7 @@ void xu_process_transmit(CTLR* xu)
     xu->var->txhdr[2] &= ~TXR_OWN;
 
     /* update transmit buffer */
-    wstatus = Map_WriteW (ba, 8, xu->var->txhdr, MAP);
+    wstatus = Map_WriteW (ba, 8, xu->var->txhdr);
     if (wstatus) {
       /* tell host bus write failed */
       xu->var->pcsr0 |= PCSR0_PCEI;

@@ -25,6 +25,7 @@
 
    mt		12559A 3030 nine track magnetic tape
 
+   07-Oct-04	JDB	Allow enable/disable from either device
    14-Aug-04	RMS	Modified handling of end of medium (suggested by Dave Bryan)
    06-Jul-04	RMS	Fixed spurious timing error after CLC (found by Dave Bryan)
    26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
@@ -111,6 +112,7 @@ DEVICE mtd_dev, mtc_dev;
 int32 mtdio (int32 inst, int32 IR, int32 dat);
 int32 mtcio (int32 inst, int32 IR, int32 dat);
 t_stat mtc_svc (UNIT *uptr);
+t_stat mtd_reset (DEVICE *dptr);
 t_stat mtc_reset (DEVICE *dptr);
 t_stat mtc_attach (UNIT *uptr, char *cptr);
 t_stat mtc_detach (UNIT *uptr);
@@ -156,7 +158,7 @@ MTAB mtd_mod[] = {
 DEVICE mtd_dev = {
 	"MTD", &mtd_unit, mtd_reg, mtd_mod,
 	1, 10, 16, 1, 8, 8,
-	NULL, NULL, &mtc_reset,
+	NULL, NULL, &mtd_reset,
 	NULL, NULL, NULL,
 	&mtd_dib, DEV_DISABLE | DEV_DIS };
 
@@ -446,6 +448,12 @@ return SCPE_OK;
 }
 
 /* Reset routine */
+
+t_stat mtd_reset (DEVICE *dptr)
+{
+hp_enbdis_pair (&mtd_dev, &mtc_dev);			/* make pair cons */
+return mtc_reset (dptr);				/* do common reset */
+}
 
 t_stat mtc_reset (DEVICE *dptr)
 {

@@ -23,6 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Sep-04	RMS	Fixed bugs in character display and parse
+   30-Sep-04	RMS	Fixed bugs in parsing indirect displacement modes
+			Added compatibility mode support
+   04-Sep-04	RMS	Added octa instruction support
+   02-Sep-04	RMS	Fixed parse branch return status
    13-Jul-04	RMS	Fixed bad block routine
    16-Jun-04	RMS	Added DHQ11 support
    21-Mar-04	RMS	Added RXV21 support
@@ -37,35 +42,21 @@
 #include "vax_defs.h"
 #include <ctype.h>
 
-extern DEVICE cpu_dev;
-extern DEVICE tlb_dev;
-extern DEVICE rom_dev;
-extern DEVICE nvr_dev;
-extern DEVICE sysd_dev;
-extern DEVICE qba_dev;
-extern DEVICE ptr_dev, ptp_dev;
-extern DEVICE tti_dev, tto_dev;
-extern DEVICE csi_dev, cso_dev;
-extern DEVICE lpt_dev;
-extern DEVICE clk_dev;
-extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
-extern DEVICE rl_dev;
-extern DEVICE ry_dev;
-extern DEVICE ts_dev;
-extern DEVICE tq_dev;
-extern DEVICE dz_dev;
-extern DEVICE vh_dev;
-extern DEVICE xq_dev, xqb_dev;
+#if defined (FULL_VAX)
+#define ODC(x)		(x)
+#else
+#define ODC(x)		((x) << DR_V_USPMASK)
+#endif
+
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
-extern uint32 *M;
 extern int32 saved_PC;
+extern int32 PSL;
 extern int32 sim_switches;
 
-extern void WriteB (int32 pa, int32 val);
-extern void rom_wr (int32 pa, int32 val, int32 lnt);
 t_stat fprint_sym_m (FILE *of, uint32 addr, t_value *val);
 int32 fprint_sym_qoimm (FILE *of, t_value *val, int32 vp, int32 lnt);
+t_stat parse_char (char *cptr, t_value *val, int32 lnt);
 t_stat parse_sym_m (char *cptr, uint32 addr, t_value *val);
 int32 parse_brdisp (char *cptr, uint32 addr, t_value *val,
 	int32 vp, int32 lnt, t_stat *r);
@@ -74,6 +65,9 @@ int32 parse_spec (char *cptr, uint32 addr, t_value *val,
 char *parse_rnum (char *cptr, int32 *rn);
 int32 parse_sym_qoimm (int32 *lit, t_value *val, int32 vp,
 	int lnt, int32 minus);
+
+extern t_stat fprint_sym_cm (FILE *of, t_addr addr, t_value *bytes, int32 sw);
+t_stat parse_sym_cm (char *cptr, t_addr addr, t_value *bytes, int32 sw);
 
 /* SCP data structures and interface routines
 
@@ -85,40 +79,9 @@ int32 parse_sym_qoimm (int32 *lit, t_value *val, int32 vp,
    sim_load		binary loader
 */
 
-char sim_name[] = "VAX";
-
 REG *sim_PC = &cpu_reg[0];
 
 int32 sim_emax = 60;
-
-DEVICE *sim_devices[] = { 
-	&cpu_dev,
-	&tlb_dev,
-	&rom_dev,
-	&nvr_dev,
-	&sysd_dev,
-	&qba_dev,
-	&tti_dev,
-	&tto_dev,
-	&csi_dev,
-	&cso_dev,
-	&clk_dev,
-	&ptr_dev,
-	&ptp_dev,
-	&lpt_dev,
-	&dz_dev,
-	&vh_dev,
-	&rl_dev,
-	&rq_dev,
-	&rqb_dev,
-	&rqc_dev,
-	&rqd_dev,
-	&ry_dev,
-	&ts_dev,
-	&tq_dev,
-	&xq_dev,
-	&xqb_dev,
-	NULL };
 
 const char *sim_stop_messages[] = {
 	"Unknown error",
@@ -134,48 +97,6 @@ const char *sim_stop_messages[] = {
 	"Sanity timer expired",
 	"Unknown error",
 	"Unknown abort code" };
-
-/* Binary loader
-
-   The binary loader handles absolute system images, that is, system
-   images linked /SYSTEM.  These are simply a byte stream, with no
-   origin or relocation information.
-
-   -r		load ROM
-   -n		load NVR
-   -o		for memory, specify origin
-*/
-
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
-{
-t_stat r;
-int32 i;
-uint32 origin, limit;
-extern int32 ssc_cnf;
-#define SSCCNF_BLO	0x80000000
-
-if (flag) return SCPE_ARG;				/* dump? */
-if (sim_switches & SWMASK ('R')) {			/* ROM? */
-	origin = ROMBASE;
-	limit = ROMBASE + ROMSIZE;  }
-else if (sim_switches & SWMASK ('N')) {			/* NVR? */
-	origin = NVRBASE;
-	limit = NVRBASE + NVRSIZE;
-	ssc_cnf = ssc_cnf & ~SSCCNF_BLO;  }
-else {	origin = 0;					/* memory */
-	limit = (uint32) cpu_unit.capac;
-	if (sim_switches & SWMASK ('O')) {		/* origin? */
-	    origin = (int32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
-	    if (r != SCPE_OK) return SCPE_ARG;  }  }
-
-while ((i = getc (fileref)) != EOF) {			/* read byte stream */
-	if (origin >= limit) return SCPE_NXM;		/* NXM? */
-	if (sim_switches & SWMASK ('R'))		/* ROM? */
-	    rom_wr (origin, i, L_BYTE);			/* not writeable */
-	else WriteB (origin, i);			/* store byte */
-	origin = origin + 1;  }
-return SCPE_OK;
-}
 
 /* Factory bad block table creation routine
 
@@ -534,7 +455,7 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 0,	0,	0,	0,	0,	0,	0,
 0,	0,	0,	0,	0,	0,	0,		/* 130-13F */
 0,	0,	0,	0,	0,	0,	0,
-0x20,	RD,	OC,	0,	0,	0,	0,		/* CVTDH */
+ODC(2),	RD,	WO,	0,	0,	0,	0,		/* CVTDH */
 2,	RG,	WL,	0,	0,	0,	0,		/* CVTGF */
 0,	0,	0,	0,	0,	0,	0,
 0,	0,	0,	0,	0,	0,	0,
@@ -570,7 +491,7 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 1,	RG,	0,	0,	0,	0,	0,		/* TSTG */
 5,	RG,	RW,	RG,	WL,	WQ,	0,		/* EMODG */
 3,	RG,	RW,	AB,	0,	0,	0,		/* POLYG */
-0x20,	RG,	OC,	0,	0,	0,	0,		/* CVTGH */
+ODC(2),	RG,	WO,	0,	0,	0,	0,		/* CVTGH */
 0,	0,	0,	0,	0,	0,	0,		/* reserved */
 0,	0,	0,	0,	0,	0,	0,		/* reserved */
 0,	0,	0,	0,	0,	0,	0,		/* reserved */
@@ -580,38 +501,38 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 0,	0,	0,	0,	0,	0,	0,		/* reserved */
 0,	0,	0,	0,	0,	0,	0,		/* reserved */
 0,	0,	0,	0,	0,	0,	0,		/* reserved */
-0x20,	OC,	OC,	0,	0,	0,	0,		/* ADDH2 */
-0x30,	OC,	OC,	OC,	0,	0,	0,		/* ADDH3 */
-0x20,	OC,	OC,	0,	0,	0,	0,		/* SUBH2 */
-0x30,	OC,	OC,	OC,	0,	0,	0,		/* SUBH3 */
-0x20,	OC,	OC,	0,	0,	0,	0,		/* MULH2 */
-0x30,	OC,	OC,	OC,	0,	0,	0,		/* MULH3 */
-0x20,	OC,	OC,	0,	0,	0,	0,		/* DIVH2 */
-0x30,	OC,	OC,	OC,	0,	0,	0,		/* DIVH3 */
-0x20,	OC,	WB,	0,	0,	0,	0,		/* CVTHB */
-0x20,	OC,	WW,	0,	0,	0,	0,		/* CVTHW */
-0x20,	OC,	WL,	0,	0,	0,	0,		/* CVTHL */
-0x20,	OC,	WL,	0,	0,	0,	0,		/* CVTRHL */
-0x20,	RB,	OC,	0,	0,	0,	0,		/* CVTBH */
-0x20,	RW,	OC,	0,	0,	0,	0,		/* CVTWH */
-0x20,	RL,	OC,	0,	0,	0,	0,		/* CVTLH */
-0x40,	OC,	OC,	OC,	BW,	0,	0,		/* ACBH */
-0x20,	OC,	OC,	0,	0,	0,	0,		/* MOVH */
-0x20,	OC,	OC,	0,	0,	0,	0,		/* CMPH */
-0x20,	OC,	OC,	0,	0,	0,	0,		/* MNEGH */
-0x10,	OC,	0,	0,	0,	0,	0,		/* TSTH */
-0x50,	OC,	RW,	OC,	WL,	OC,	0,		/* EMODH */
-0x30,	OC,	RW,	AB,	0,	0,	0,		/* POLYH */
-0x20,	OC,	WQ,	0,	0,	0,	0,		/* CVTHG */
+ODC(2),	RH,	MO,	0,	0,	0,	0,		/* ADDH2 */
+ODC(3),	RH,	RH,	WO,	0,	0,	0,		/* ADDH3 */
+ODC(2),	RH,	MO,	0,	0,	0,	0,		/* SUBH2 */
+ODC(3),	RH,	RH,	WO,	0,	0,	0,		/* SUBH3 */
+ODC(2),	RH,	MO,	0,	0,	0,	0,		/* MULH2 */
+ODC(3),	RH,	RH,	WO,	0,	0,	0,		/* MULH3 */
+ODC(2),	RH,	MO,	0,	0,	0,	0,		/* DIVH2 */
+ODC(3),	RH,	RH,	WO,	0,	0,	0,		/* DIVH3 */
+ODC(2),	RH,	WB,	0,	0,	0,	0,		/* CVTHB */
+ODC(2),	RH,	WW,	0,	0,	0,	0,		/* CVTHW */
+ODC(2),	RH,	WL,	0,	0,	0,	0,		/* CVTHL */
+ODC(2),	RH,	WL,	0,	0,	0,	0,		/* CVTRHL */
+ODC(2),	RB,	WO,	0,	0,	0,	0,		/* CVTBH */
+ODC(2),	RW,	WO,	0,	0,	0,	0,		/* CVTWH */
+ODC(2),	RL,	WO,	0,	0,	0,	0,		/* CVTLH */
+ODC(4),	RH,	RH,	MO,	BW,	0,	0,		/* ACBH */
+ODC(2),	RH,	RO,	0,	0,	0,	0,		/* MOVH */
+ODC(2),	RH,	RH,	0,	0,	0,	0,		/* CMPH */
+ODC(2),	RH,	WO,	0,	0,	0,	0,		/* MNEGH */
+ODC(1),	RH,	0,	0,	0,	0,	0,		/* TSTH */
+ODC(5),	RH,	RW,	RH,	WL,	WO,	0,		/* EMODH */
+ODC(3),	RH,	RW,	AB,	0,	0,	0,		/* POLYH */
+ODC(2),	RH,	WQ,	0,	0,	0,	0,		/* CVTHG */
 0,	0,	0,	0,	0,	0,	0,		/* reserved */
 0,	0,	0,	0,	0,	0,	0,		/* reserved */
 0,	0,	0,	0,	0,	0,	0,		/* reserved */
 0,	0,	0,	0,	0,	0,	0,		/* reserved */
 0,	0,	0,	0,	0,	0,	0,		/* reserved */
-0x10,	OC,	0,	0,	0,	0,	0,		/* CLRO */
-0x20,	OC,	OC,	0,	0,	0,	0,		/* MOVO */
-0x20,	OC,	WL,	0,	0,	0,	0,		/* MOVAO*/
-0x10,	OC,	0,	0,	0,	0,	0,		/* PUSHAO*/
+ODC(1),	WO,	0,	0,	0,	0,	0,		/* CLRO */
+ODC(2),	RO,	RO,	0,	0,	0,	0,		/* MOVO */
+ODC(2),	AO,	WL,	0,	0,	0,	0,		/* MOVAO*/
+ODC(1),	AO,	0,	0,	0,	0,	0,		/* PUSHAO*/
 0,	0,	0,	0,	0,	0,	0,		/* 180-18F */
 0,	0,	0,	0,	0,	0,	0,
 0,	0,	0,	0,	0,	0,	0,
@@ -636,7 +557,7 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 0,	0,	0,	0,	0,	0,	0,
 0,	0,	0,	0,	0,	0,	0,
 0,	0,	0,	0,	0,	0,	0,
-0x20,	RF,	OC,	0,	0,	0,	0,		/* CVTFH */
+ODC(2),	RF,	WO,	0,	0,	0,	0,		/* CVTFH */
 2,	RF,	WQ,	0,	0,	0,	0,		/* CVTFG */
 0,	0,	0,	0,	0,	0,	0,
 0,	0,	0,	0,	0,	0,	0,
@@ -730,8 +651,8 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 0,	0,	0,	0,	0,	0,	0,
 0,	0,	0,	0,	0,	0,	0,
 0,	0,	0,	0,	0,	0,	0,
-0x20,	OC,	WL,	0,	0,	0,	0,		/* CVTHF */
-0x20,	OC,	WQ,	0,	0,	0,	0,		/* CVTHD */
+ODC(2),	RH,	WL,	0,	0,	0,	0,		/* CVTHF */
+ODC(2),	RH,	WQ,	0,	0,	0,	0,		/* CVTHD */
 0,	0,	0,	0,	0,	0,	0,
 0,	0,	0,	0,	0,	0,	0,
 0,	0,	0,	0,	0,	0,	0,
@@ -847,6 +768,8 @@ t_stat r;
 DEVICE *dptr;
 
 if (uptr == NULL) uptr = &cpu_unit;			/* anon = CPU */
+if ((sw & SIM_SW_STOP) && (PSL & PSL_CM))		/* stop in CM? */
+	sw = sw | SWMASK ('P');				/* force CM print */
 dptr = find_dev_from_unit (uptr);			/* find dev */
 if (dptr == NULL) return SCPE_IERR;
 if (dptr->dwidth != 8) return SCPE_ARG;			/* byte dev only */
@@ -858,19 +781,22 @@ if (sw & SWMASK ('D')) rdx = 10;			/* get radix */
 else if (sw & SWMASK ('O')) rdx = 8;
 else if (sw & SWMASK ('H')) rdx = 16;
 else rdx = dptr->dradix;
-vp = 0;							/* init ptr */
 if ((sw & SWMASK ('A')) || (sw & SWMASK ('C'))) {	/* char format? */
-	if (sw & SWMASK ('C')) lnt = sim_emax;		/* -c -> string */
-	if ((val[0] & 0x7F) == 0) return SCPE_ARG;
-	while (vp < lnt) {				/* print string */
-	    if ((c = (int32) val[vp++] & 0x7F) == 0) break;
+	for (vp = lnt - 1; vp >= 0; vp--) {
+	    c = (int32) val[vp] & 0x7F;
 	    fprintf (of, (c < 0x20)? "<%02X>": "%c", c);  }
-	return -(vp - 1);  }				/* return # chars */
+	return -(lnt - 1);  }				/* return # chars */
 
-if (sw & SWMASK ('M') && (uptr == &cpu_unit)) {		/* inst format? */
+if ((sw & (SWMASK ('P') | SWMASK ('R'))) &&		/* cmode or rad50? */
+	(uptr == &cpu_unit)) {
+	r = fprint_sym_cm (of, addr, val, sw);		/* decode inst */
+	if (r <= 0) return r;  }
+
+if ((sw & SWMASK ('M')) && (uptr == &cpu_unit)) {	/* inst format? */
 	r = fprint_sym_m (of, addr, val);		/* decode inst */
 	if (r <= 0) return r;  }
 
+vp = 0;							/* init ptr */
 GETNUM (num, lnt);					/* get number */
 fprint_val (of, (uint32) num, rdx, lnt * 8, PV_RZRO);
 return -(vp - 1);
@@ -896,8 +822,8 @@ vp = 0;							/* init ptr */
 inst = (int32) val[vp++];				/* get opcode */
 if (inst == 0xFD) inst = 0x100 | (int32) val[vp++];	/* 2 byte op? */
 if (opcode[inst] == NULL) return SCPE_ARG;		/* defined? */
-numspec = drom[inst][0] & DR_NSPMASK;			/* get # spec */
-if (numspec == 0) numspec = (drom[inst][0] & DR_USPMASK) >> 4;
+numspec = DR_GETNSP (drom[inst][0]);			/* get # spec */
+if (numspec == 0) DR_GETUSP (drom[inst][0]);
 fprintf (of, "%s", opcode[inst]);			/* print name */
 for (i = 0; i < numspec; i++) {				/* loop thru spec */
 	fputc (i? ',': ' ', of);			/* separator */
@@ -931,7 +857,7 @@ for (i = 0; i < numspec; i++) {				/* loop thru spec */
 	    case AIN:					/* (Rn)+, #n */
 		if (rn != nPC) fprintf (of, "(%-s)+", regname[rn]);
 		else {
-		    if (disp == OC)
+		    if (DR_LNT (disp) == L_OCTA)
 			vp = fprint_sym_qoimm (of, val, vp, 4);
 		    else if (DR_LNT (disp) == L_QUAD)
 			vp = fprint_sym_qoimm (of, val, vp, 2);
@@ -1037,13 +963,16 @@ if (sw & SWMASK ('D')) rdx = 10;			/* get radix */
 else if (sw & SWMASK ('O')) rdx = 8;
 else if (sw & SWMASK ('H')) rdx = 16;
 else rdx = dptr->dradix;
-vp = 0;
-if ((sw & SWMASK ('A')) || (sw & SWMASK ('C'))) {	/* char format? */
-	if (sw & SWMASK ('C')) lnt = sim_emax;		/* -c -> string */
-	if (*cptr == 0) return SCPE_ARG;
-	while ((vp < lnt) && *cptr) {			/* get chars */
-	    val[vp++] = *cptr++;  }
-	return -(vp - 1);  }				/* return # chars */
+
+if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++))	/* ASCII char? */
+	return parse_char (cptr, val, lnt);
+if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++))	/* ASCII string? */
+	return parse_char (cptr, val, sim_emax);
+
+if ((sw & (SWMASK ('P') | SWMASK ('R'))) &&		/* cmode or rad50? */
+	(uptr == &cpu_unit)) {
+	r = parse_sym_cm (cptr, addr, val, sw);		/* try to parse */
+	if (r <= 0) return r;  }
 
 if (uptr == &cpu_unit) {				/* cpu only */
 	r = parse_sym_m (cptr, addr, val);		/* try to parse inst */
@@ -1051,8 +980,31 @@ if (uptr == &cpu_unit) {				/* cpu only */
 
 num = (int32) get_uint (cptr, rdx, maxv[lnt], &r);	/* get number */
 if (r != SCPE_OK) return r;
+vp = 0;
 PUTNUM (num, lnt);					/* store */
 return -(lnt - 1);
+}
+
+/* Character input for -a or -c
+
+   Inputs:
+	*cptr	=	pointer to input string
+	addr	=	current PC
+	*val	=	pointer to output values
+   Outputs:
+	status	=	> 0   error code
+			<= 0  -number of extra words
+*/
+
+t_stat parse_char (char *cptr, t_value *val, int32 lnt)
+{
+int32 vp;
+
+if (*cptr == 0) return SCPE_ARG;
+vp = 0;
+while ((vp < lnt) && *cptr) {				/* get chars */
+	val[vp++] = *cptr++;  }
+return -(vp - 1);					/* return # chars */
 }
 
 /* Symbolic input for -m
@@ -1082,8 +1034,8 @@ if (opc < 0) return SCPE_ARG;				/* undefined? */
 vp = 0;
 if (opc >= 0x100) val[vp++] = 0xFD;			/* 2 byte? */
 val[vp++] = opc & 0xFF;					/* store opcode */
-numspec = drom[opc][0] & DR_NSPMASK;			/* get # specifiers */
-if (numspec == 0) numspec = (drom[opc][0] & DR_USPMASK) >> 4;
+numspec = DR_GETNSP (drom[opc][0]);			/* get # specifiers */
+if (numspec == 0) numspec = DR_GETUSP (drom[opc][0]);
 for (i = 1; i <= numspec; i++) {			/* loop thru specs */
 	if (i == numspec) cptr = get_glyph (cptr, gbuf, 0);
 	else cptr = get_glyph (cptr, gbuf, ',');	/* get specifier */
@@ -1116,8 +1068,10 @@ int32 k, dest, num;
 
 dest = (int32) get_uint (cptr, 16, 0xFFFFFFFF, r);	/* get value */
 num = dest - (addr + vp + lnt + 1);			/* compute offset */
-if ((num > (lnt? 32767: 127)) || (num < (lnt? -32768: -128))) return SCPE_ARG;
-PUTNUM (num, lnt + 1);					/* store offset */
+if ((num > (lnt? 32767: 127)) || (num < (lnt? -32768: -128)))
+	*r = SCPE_ARG;
+else {	PUTNUM (num, lnt + 1);				/* store offset */
+	*r = SCPE_OK;  }
 return vp;
 }
 
@@ -1223,7 +1177,7 @@ case SP_FI|SP_LIT|SP_NUM:				/* I^#n */
 case SP_FI|SP_LIT|SP_PLUS|SP_NUM:			/* I^#+n */
 case SP_FI|SP_LIT|SP_MINUS|SP_NUM:			/* I^#-n */
 	val[vp++] = nPC | AIN;
-	disp = (disp == OC)? DR_LNMASK + 1: disp & DR_LNMASK;
+	disp = disp & DR_LNMASK;
 	switch (disp) {					/* case spec lnt */
 	case 00:					/* check fit */
 	    if ((litsize > 0) || (lit[0] < 0) || 
@@ -1243,7 +1197,7 @@ case SP_FI|SP_LIT|SP_MINUS|SP_NUM:			/* I^#-n */
 	    if (litsize > 1) PARSE_LOSE;
 	    vp = parse_sym_qoimm (lit, val, vp, 2, fl & SP_MINUS);
 	    break;
-	case DR_LNMASK + 1:
+	case 04:
 	    vp = parse_sym_qoimm (lit, val, vp, 4, fl & SP_MINUS);
 	    break;  }				/* end case disp */
 	break;
@@ -1271,7 +1225,7 @@ case SP_IND|SP_MINUS|SP_NUM|SP_IDX:			/* @-d(rn) */
 	    else if (lit[0] <= SEL_LIM (0x7FFF, 0x8000, 0xFFFF)) {
 		dispsize = 2;
 		mode = WDP;  }  }
-	val[vp++] = mode | rn | ((fl & SP_IND)? 1: 0);
+	val[vp++] = mode | rn | ((fl & SP_IND)? 0x10: 0);
 	SPUTNUM (lit[0], dispsize);
 	break;
 case SP_FB|SP_NUM|SP_IDX:				/* B^d(rn) */
@@ -1282,7 +1236,7 @@ case SP_IND|SP_FB|SP_PLUS|SP_NUM|SP_IDX:		/* @B^+d(rn) */
 case SP_IND|SP_FB|SP_MINUS|SP_NUM|SP_IDX:		/* @B^-d(rn) */
 	if ((litsize > 0) || (lit[0] < 0) || 
 	    (lit[0] > SEL_LIM (0x7F, 0x80, 0xFF))) PARSE_LOSE;
-	val[vp++] = rn | BDP | ((fl & SP_IND)? 1: 0);
+	val[vp++] = rn | BDP | ((fl & SP_IND)? 0x10: 0);
 	SPUTNUM (lit[0], 1);
 	break;
 case SP_FW|SP_NUM|SP_IDX:				/* W^d(rn) */
@@ -1293,7 +1247,7 @@ case SP_IND|SP_FW|SP_PLUS|SP_NUM|SP_IDX:		/* @W^+d(rn) */
 case SP_IND|SP_FW|SP_MINUS|SP_NUM|SP_IDX:		/* @W^-d(rn) */
 	if ((litsize > 0) || (lit[0] < 0) ||
 	    (lit[0] > SEL_LIM (0x7FFF, 0x8000, 0xFFFF))) PARSE_LOSE;
-	val[vp++] = rn | WDP | ((fl & SP_IND)? 1: 0);
+	val[vp++] = rn | WDP | ((fl & SP_IND)? 0x10: 0);
 	SPUTNUM (lit[0], 2);
 	break;
 case SP_FL|SP_NUM|SP_IDX:				/* L^d(rn) */
@@ -1303,8 +1257,8 @@ case SP_IND|SP_FL|SP_NUM|SP_IDX:			/* @L^d(rn) */
 case SP_IND|SP_FL|SP_PLUS|SP_NUM|SP_IDX:		/* @L^+d(rn) */
 case SP_IND|SP_FL|SP_MINUS|SP_NUM|SP_IDX:		/* @L^-d(rn) */
 	if ((litsize > 0) || (lit[0] < 0)) PARSE_LOSE;
-	val[vp++] = rn | LDP | ((fl & SP_IND)? 1: 0);
-	SPUTNUM (lit[0], 2);
+	val[vp++] = rn | LDP | ((fl & SP_IND)? 0x10: 0);
+	SPUTNUM (lit[0], 4);
 	break;
 case SP_NUM:						/* n */
 case SP_IND|SP_NUM:					/* @n */

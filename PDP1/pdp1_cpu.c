@@ -25,6 +25,7 @@
 
    cpu		PDP-1 central processor
 
+   09-Nov-04	RMS	Added instruction history
    07-Sep-03	RMS	Added additional explanation on I/O simulation
    01-Sep-03	RMS	Added address switches for hardware readin
    23-Jul-03	RMS	Revised to detect I/O wait hang
@@ -229,6 +230,18 @@
 #define UNIT_MDV	(1 << UNIT_V_MDV)
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
+#define HIST_PC		0x40000000
+#define HIST_V_SHF	18
+#define HIST_MIN	64
+#define HIST_MAX	65536
+struct InstHistory {
+	uint32		pc;
+	uint32		ir;
+	uint32		ovac;
+	uint32		pfio;
+	uint32		ea;
+	uint32		opnd;  };
+
 int32 M[MAXMEMSIZE] = { 0 };				/* memory */
 int32 AC = 0;						/* AC */
 int32 IO = 0;						/* IO */
@@ -252,6 +265,9 @@ int32 ind_max = 16;					/* nested ind limit */
 uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
+int32 hst_p = 0;					/* history pointer */
+int32 hst_lnt = 0;					/* history length */
+struct InstHistory *hst = NULL;				/* instruction history */
 
 extern UNIT *sim_clock_queue;
 extern int32 sim_int_char;
@@ -261,6 +277,8 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 extern int32 ptr (int32 inst, int32 dev, int32 dat);
 extern int32 ptp (int32 inst, int32 dev, int32 dat);
@@ -355,6 +373,8 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size },
 	{ UNIT_MSIZE, 49152, NULL, "48K", &cpu_set_size },
 	{ UNIT_MSIZE, 65536, NULL, "64K", &cpu_set_size },
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
+	  &cpu_set_hist, &cpu_show_hist },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -408,6 +428,13 @@ IR = M[MA];						/* fetch instruction */
 PC = INCR_ADDR (PC);					/* increment PC */
 xct_count = 0;						/* track nested XCT's */
 sim_interval = sim_interval - 1;
+if (hst_lnt) {						/* history enabled? */
+	hst_p = (hst_p + 1);				/* next entry */
+	if (hst_p >= hst_lnt) hst_p = 0;
+	hst[hst_p].pc = MA | HIST_PC;			/* save PC, IR, LAC, MQ */
+	hst[hst_p].ir = IR;
+	hst[hst_p].ovac = (OV << HIST_V_SHF) | AC;
+	hst[hst_p].pfio = (PF << HIST_V_SHF) | IO;  }
 
 xct_instr:						/* label for XCT */
 if ((IR == (OP_JMP+IA+1)) && ((MA & EPCMASK) == 0) && (sbs & SB_ON)) {
@@ -430,7 +457,13 @@ if ((op < 032) && (op != 007)) {			/* mem ref instr */
 		    if ((t & IA) == 0) break;  }
 		if (i >= ind_max) {			/* indirect loop? */
 		    reason = STOP_IND;
-		    break;  }  }  }  }
+		    break;  }				/* end if loop */
+		}					/* end else !extm */
+	    }						/* end if indirect */
+	if (hst_p) {					/* history enabled? */
+	    hst[hst_p].ea = MA;
+	    hst[hst_p].opnd = M[MA];  }
+	}
 
 switch (op) {						/* decode IR<0:4> */
 
@@ -850,5 +883,72 @@ if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
 	return SCPE_OK;
 MEMSIZE = val;
 for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+return SCPE_OK;
+}
+
+/* Set history */
+
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i, lnt;
+t_stat r;
+
+if (cptr == NULL) {
+	for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+	hst_p = 0;
+	return SCPE_OK;  }
+lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+hst_p = 0;
+if (hst_lnt) {
+	free (hst);
+	hst_lnt = 0;
+	hst = NULL;  }
+if (lnt) {
+	hst = calloc (sizeof (struct InstHistory), lnt);
+	if (hst == NULL) return SCPE_MEM;
+	hst_lnt = lnt;  }
+return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 ov, pf, op, k, di, lnt;
+char *cptr = (char *) desc;
+t_stat r;
+t_value sim_eval;
+struct InstHistory *h;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+	UNIT *uptr, int32 sw);
+
+if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+if (cptr) {
+	lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+	if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;  }
+else lnt = hst_lnt;
+di = hst_p - lnt;					/* work forward */
+if (di < 0) di = di + hst_lnt;
+fprintf (st, "PC      OV AC     IO     PF EA      IR\n\n");
+for (k = 0; k < lnt; k++) {				/* print specified */
+	h = &hst[(++di) % hst_lnt];			/* entry pointer */
+	if (h->pc & HIST_PC) {				/* instruction? */
+	    ov = (h->ovac >> HIST_V_SHF) & 1;		/* overflow */
+	    pf = (h->pfio >> HIST_V_SHF) & 077;		/* prog flags */
+	    op = ((h->ir >> 13) & 037);			/* get opcode */
+	    fprintf (st, "%06o  %o  %06o %06o %02o ",
+		h->pc & AMASK, ov, h->ovac & DMASK, h->pfio & DMASK, pf);
+	    if ((op < 032) && (op != 007))		/* mem ref instr */
+		fprintf (st, "%06o  ", h->ea);
+	    else fprintf (st, "        ");
+	    sim_eval = h->ir;
+	    if ((fprint_sym (st, h->pc & AMASK, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+		fprintf (st, "(undefined) %06o", h->ir);
+	    else if ((op < 032) && (op != 007))		/* mem ref instr */
+		fprintf (st, " [%06o]", h->opnd);
+	    fputc ('\n', st);				/* end line */
+	    }						/* end else instruction */
+	}						/* end for */
 return SCPE_OK;
 }

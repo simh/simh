@@ -25,6 +25,7 @@
 
    rk		RK11/RKV11/RK05 cartridge disk
 
+   30-Sep-04	RMS	Revised Unibus interface
    24-Jan-04	RMS	Added increment inhibit, overrun detection, formatting
    29-Dec-03	RMS	Added RKV11 support
    29-Sep-02	RMS	Added variable address support to bootstrap
@@ -484,12 +485,12 @@ if (wc && (err == 0)) {					/* seek ok? */
 	    for ( ; i < wc; i++) rkxb[i] = 0;		/* fill buf */
 	    }
 	if (rkcs & RKCS_INH) {				/* incr inhibit? */
-	    if (t = Map_WriteW (ma, 2, &rkxb[wc - 1], MAP)) {	/* store last */
+	    if (t = Map_WriteW (ma, 2, &rkxb[wc - 1])) {	/* store last */
 		rker = rker | RKER_NXM;			/* NXM? set flag */
 		wc = 0;  }				/* no transfer */
 	    }
 	else {						/* normal store */
-	    if (t = Map_WriteW (ma, wc << 1, rkxb, MAP)) {	/* store buf */
+	    if (t = Map_WriteW (ma, wc << 1, rkxb)) {	/* store buf */
 		rker = rker | RKER_NXM;			/* NXM? set flag */
 		wc = wc - t;  }				/* adj wd cnt */
 	    }
@@ -497,13 +498,13 @@ if (wc && (err == 0)) {					/* seek ok? */
 
     case RKCS_WRITE:					/* write */
 	if (rkcs & RKCS_INH) {				/* incr inhibit? */
-	    if (t = Map_ReadW (ma, 2, &comp, MAP)) {	/* get 1st word */
+	    if (t = Map_ReadW (ma, 2, &comp)) {		/* get 1st word */
 		rker = rker | RKER_NXM;			/* NXM? set flag */
 		wc = 0;  }				/* no transfer */
 	    for (i = 0; i < wc; i++) rkxb[i] = comp;	/* all words same */
 	    }
 	else {						/* normal fetch */
-	    if (t = Map_ReadW (ma, wc << 1, rkxb, MAP)) {	/* get buf */
+	    if (t = Map_ReadW (ma, wc << 1, rkxb)) {	/* get buf */
 		rker = rker | RKER_NXM;			/* NXM? set flg */
 		wc = wc - t;  }				/* adj wd cnt */
 	    }
@@ -523,7 +524,7 @@ if (wc && (err == 0)) {					/* seek ok? */
 	for ( ; i < wc; i++) rkxb[i] = 0;		/* fill buf */
 	awc = wc;					/* save wc */
 	for (wc = 0, cma = ma; wc < awc; wc++)  {	/* loop thru buf */
-	    if (Map_ReadW (cma, 2, &comp, MAP)) {	/* mem wd */
+	    if (Map_ReadW (cma, 2, &comp)) {		/* mem wd */
 		rker = rker | RKER_NXM;			/* NXM? set flg */
 		break;  }
 	    if (comp != rkxb[wc])  {			/* match to disk? */
@@ -618,7 +619,7 @@ for (i = 0; i < RK_NUMDR; i++) {
 	sim_cancel (uptr);
 	uptr->CYL = uptr->FUNC = 0;
 	uptr->flags = uptr->flags & ~UNIT_SWLK;  }
-if (rkxb == NULL) rkxb = calloc (RK_MAXFR, sizeof (unsigned int16));
+if (rkxb == NULL) rkxb = calloc (RK_MAXFR, sizeof (uint16));
 if (rkxb == NULL) return SCPE_MEM;
 return SCPE_OK;
 }

@@ -1,4 +1,4 @@
-/* vax_sysreg.c: VAX system registers simulator
+/* vax_sysdev.c: VAX 3900 system-specific logic
 
    Copyright (c) 1998-2004, Robert M Supnik
 
@@ -23,9 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   This module contains the CVAX system-specific devices implemented in the
-   CMCTL memory controller and the SSC system support chip.  (The architecturally
-   specified devices are implemented in module vax_stddev.c.)
+   This module contains the CVAX chip and VAX 3900 system-specific registers
+   and devices.
 
    rom		bootstrap ROM (no registers)
    nvr		non-volatile ROM (no registers)
@@ -33,6 +32,11 @@
    cso		console storage output
    sysd		system devices (SSC miscellany)
 
+   30-Sep-04	RMS	Moved CADR, MSER, CONPC, CONPSL, machine_check, cpu_boot,
+			 con_halt here from vax_cpu.c
+			Moved model-specific IPR's here from vax_cpu1.c
+   09-Sep-04	RMS	Integrated powerup into RESET (with -p)
+			Added model-specific registers and routines from CPU
    23-Jan-04	MP	Added extended physical memory support (Mark Pizzolato)
    07-Jun-03	MP	Added calibrated delay to ROM reads (Mark Pizzolato)
 			Fixed calibration problems interval timer (Mark Pizzolato)
@@ -162,6 +166,17 @@
 
 #define SSCADS_MASK	0x3FFFFFFC			/* match or mask */
 
+extern int32 R[16];
+extern int32 STK[5];
+extern int32 PSL;
+extern int32 SISR;
+extern int32 mapen;
+extern int32 pcq[PCQ_SIZE];
+extern int32 pcq_p;
+extern int32 ibcnt, ppc;
+extern int32 in_ie;
+extern int32 mchk_va, mchk_ref;
+extern int32 fault_PC;
 extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
 extern UNIT clk_unit;
@@ -174,6 +189,9 @@ extern int32 cpu_extmem;
 
 uint32 *rom = NULL;					/* boot ROM */
 uint32 *nvr = NULL;					/* non-volatile mem */
+int32 CADR = 0;						/* cache disable reg */
+int32 MSER = 0;						/* mem sys error reg */
+int32 conpc, conpsl;					/* console reg */
 int32 csi_csr = 0;					/* control/status */
 int32 cso_csr = 0;					/* control/status */
 int32 cmctl_reg[CMCTLSIZE >> 2] = { 0 };		/* CMCTL reg */
@@ -232,7 +250,10 @@ void tmr_incr (int32 tmr, uint32 inc);
 int32 tmr0_inta (void);
 int32 tmr1_inta (void);
 int32 parity (int32 val, int32 odd);
+t_stat sysd_powerup (void);
 
+extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
+extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 cqmap_rd (int32 pa);
 extern void cqmap_wr (int32 pa, int32 val, int32 lnt);
 extern int32 cqipc_rd (int32 pa);
@@ -377,6 +398,10 @@ UNIT sysd_unit[] = {
 	{ UDATA (&tmr_svc, 0, 0) }  };
 
 REG sysd_reg[] = {
+	{ HRDATA (CADR, CADR, 8) },
+	{ HRDATA (MSER, MSER, 8) },
+	{ HRDATA (CONPC, conpc, 32) },
+	{ HRDATA (CONPSL, conpsl, 32) },
 	{ BRDATA (CMCSR, cmctl_reg, 16, 32, CMCTLSIZE >> 2) },
 	{ HRDATA (CACR, ka_cacr, 8) },
 	{ HRDATA (BDR, ka_bdr, 8) },
@@ -478,15 +503,12 @@ int32 rg = ((pa - ROMBASE) & ROMAMASK) >> 2;
 return rom_read_delay (rom[rg]);
 }
 
-void rom_wr (int32 pa, int32 val, int32 lnt)
+void rom_wr_B (int32 pa, int32 val)
 {
 int32 rg = ((pa - ROMBASE) & ROMAMASK) >> 2;
+int32 sc = (pa & 3) << 3;
 
-if (lnt < L_LONG) {					/* byte or word? */
-	int32 sc = (pa & 3) << 3;			/* merge */
-	int32 mask = (lnt == L_WORD)? 0xFFFF: 0xFF;
-	rom[rg] = ((val & mask) << sc) | (rom[rg] & ~(mask << sc));  }
-else rom[rg] = val;
+rom[rg] = ((val & 0xFF) << sc) | (rom[rg] & ~(0xFF << sc));
 return;
 }
 
@@ -590,7 +612,7 @@ uptr->flags = uptr->flags | (UNIT_ATTABLE | UNIT_BUFABLE);
 r = attach_unit (uptr, cptr);
 if (r != SCPE_OK)
 	uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
-else {	uptr->hwmark = uptr->capac;
+else {	uptr->hwmark = (uint32) uptr->capac;
 	ssc_cnf = ssc_cnf & ~SSCCNF_BLO;  }
 return r;
 }
@@ -736,6 +758,21 @@ case MT_TXDB:						/* TXDB */
 case MT_TODR:
 	val = todr_rd ();
 	break;
+case MT_CADR:						/* CADR */
+	val = CADR & 0xFF;
+	break;
+case MT_MSER:						/* MSER */
+	val = MSER & 0xFF;
+	break;
+case MT_CONPC:						/* console PC */
+	val = conpc;
+	break;
+case MT_CONPSL:						/* console PSL */
+	val = conpsl;
+	break;
+case MT_SID:						/* SID */
+	val = CVAX_SID | CVAX_UREV;
+	break;
 default:
 	ssc_bto = ssc_bto | SSCBTO_BTO;			/* set BTO */
 	val = 0;
@@ -774,9 +811,19 @@ case MT_TXCS:						/* TXCS */
 case MT_TXDB:						/* TXDB */
 	txdb_wr (val);
 	break;
+case MT_CADR:						/* CADR */
+	CADR = (val & CADR_RW) | CADR_MBO;
+	break;
+case MT_MSER:						/* MSER */
+	MSER = MSER & MSER_HM;
+	break;
 case MT_IORESET:					/* IORESET */
 	ioreset_wr (val);
 	break;
+case MT_SID:
+case MT_CONPC:
+case MT_CONPSL:						/* halt reg */
+	RSVD_OPND_FAULT;
 default:
 	ssc_bto = ssc_bto | SSCBTO_BTO;			/* set BTO */
 	break;  }
@@ -878,7 +925,7 @@ case 16:						/* err status */
 case 17:						/* csr */
 	return cmctl_reg[rg] & CMCSR_MASK;
 case 18:						/* KA655X ext mem */
-	if (cpu_extmem) return MEMSIZE;
+	if (cpu_extmem) return ((int32) MEMSIZE);
 	MACH_CHECK (MCHK_READ);  }
 return 0;
 }
@@ -941,7 +988,7 @@ int32 sysd_hlt_enb (void)
 return ka_bdr & BDR_BRKENB;
 }
 
-/* Cache diagnostic space - byte/word merges done in WriteReg */
+/* Cache diagnostic space */
 
 int32 cdg_rd (int32 pa)
 {
@@ -1260,12 +1307,82 @@ int32 tmr1_inta (void)
 return tmr_tivr[1];
 }
 
+/* Machine check */
+
+int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
+{
+int32 i, st1, st2, p2, hsir, acc;
+
+if (p1 & 0x80) p1 = p1 + mchk_ref;			/* mref? set v/p */
+p2 = mchk_va + 4;					/* save vap */
+for (i = hsir = 0; i < 16; i++) {			/* find hsir */
+	if ((SISR >> i) & 1) hsir = i;  }
+st1 = ((((uint32) opc) & 0xFF) << 24) |
+	(hsir << 16) |
+	((CADR & 0xFF) << 8) |
+	(MSER & 0xFF);
+st2 = 0x00C07000 + (delta & 0xFF);
+cc = intexc (SCB_MCHK, cc, 0, IE_SVE);			/* take exception */
+acc = ACC_MASK (KERN);					/* in kernel mode */
+in_ie = 1;
+SP = SP - 20;						/* push 5 words */
+Write (SP, 16, L_LONG, WA);				/* # bytes */
+Write (SP + 4, p1, L_LONG, WA);				/* mcheck type */
+Write (SP + 8, p2, L_LONG, WA);				/* address */
+Write (SP + 12, st1, L_LONG, WA);			/* state 1 */
+Write (SP + 16, st2, L_LONG, WA);			/* state 2 */
+in_ie = 0;
+return cc;
+}
+
+/* Console entry */
+
+int32 con_halt (int32 code, int32 cc)
+{
+int32 temp;
+
+conpc = PC;						/* save PC */
+conpsl = ((PSL | cc) & 0xFFFF00FF) | CON_HLTINS;	/* PSL, param */
+temp = (PSL >> PSL_V_CUR) & 0x7;			/* get is'cur */
+if (temp > 4) conpsl = conpsl | CON_BADPSL;		/* invalid? */
+else STK[temp] = SP;					/* save stack */
+if (mapen) conpsl = conpsl | CON_MAPON;			/* mapping on? */
+mapen = 0;						/* turn off map */
+SP = IS;						/* set SP from IS */
+PSL = PSL_IS | PSL_IPL1F;				/* PSL = 41F0000 */
+JUMP (ROMBASE);						/* PC = 20040000 */
+return 0;						/* new cc = 0 */
+}
+
+/* Bootstrap */
+
+t_stat cpu_boot (int32 unitno, DEVICE *dptr)
+{
+extern t_stat load_cmd (int32 flag, char *cptr);
+extern FILE *sim_log;
+t_stat r;
+
+PC = ROMBASE;
+PSL = PSL_IS | PSL_IPL1F;
+conpc = 0;
+conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
+if (rom == NULL) return SCPE_IERR;
+if (*rom == 0) {					/* no boot? */
+	printf ("Loading boot code from ka655x.bin\n");
+	if (sim_log) fprintf (sim_log, 
+	    "Loading boot code from ka655x.bin\n");
+	r = load_cmd (0, "-R ka655x.bin");
+	if (r != SCPE_OK) return r;  }
+return SCPE_OK;
+}
+
 /* SYSD reset */
 
 t_stat sysd_reset (DEVICE *dptr)
 {
 int32 i;
 
+if (sim_switches & SWMASK ('P')) sysd_powerup ();	/* powerup? */
 for (i = 0; i < 2; i++) {
 	tmr_csr[i] = tmr_tnir[i] = tmr_tir[i] = 0;
 	tmr_inc[i] = tmr_sav[i] = 0;
@@ -1296,6 +1413,6 @@ ssc_base = SSCBASE;
 ssc_cnf = ssc_cnf & SSCCNF_BLO;
 ssc_bto = 0;
 ssc_otp = 0;
-return sysd_reset (&sysd_dev);
+return SCPE_OK;
 }
 

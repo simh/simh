@@ -669,11 +669,11 @@ void xq_write_callback (CTLR* xq, int status)
   xq->var->stats.xmit += 1;
   /* update write status words */
   if (status == 0) { /* success */
-    wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, write_success, NOMAP);
+    wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, write_success);
   } else { /* failure */
     sim_debug(DBG_WRN, xq->dev, "Packet Write Error!\n");
     xq->var->stats.fail += 1;
-    wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, write_failure, NOMAP);
+    wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, write_failure);
   }
   if (wstatus) {
     xq_nxm_error(xq);
@@ -760,8 +760,8 @@ t_stat xq_process_rbdl(CTLR* xq)
 
     /* get receive bdl from memory */
     xq->var->rbdl_buf[0] = 0xFFFF;
-    wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0], NOMAP);
-    rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1], NOMAP);
+    wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0]);
+    rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1]);
     if (rstatus || wstatus) return xq_nxm_error(xq);
 
     /* invalid buffer? */
@@ -780,7 +780,7 @@ t_stat xq_process_rbdl(CTLR* xq)
     if (!xq->var->ReadQ.count) break;
 
     /* get status words */
-    rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4], NOMAP);
+    rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
     if (rstatus) return xq_nxm_error(xq);
 
     /* get host memory address */
@@ -828,7 +828,7 @@ t_stat xq_process_rbdl(CTLR* xq)
     item->packet.used += rbl;
     
     /* send data to host */
-    wstatus = Map_WriteB(address, rbl, rbuf, NOMAP);
+    wstatus = Map_WriteB(address, rbl, rbuf);
     if (wstatus) return xq_nxm_error(xq);
 
     /* set receive size into RBL - RBL<10:8> maps into Status1<10:8>,
@@ -860,7 +860,7 @@ t_stat xq_process_rbdl(CTLR* xq)
     }
 
     /* update read status words*/
-    wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4], NOMAP);
+    wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
     if (wstatus) return xq_nxm_error(xq);
 
     /* remove packet from queue */
@@ -901,7 +901,7 @@ t_stat xq_process_mop(CTLR* xq)
       case 0:   /* MOP Termination */
         break;
       case 1:   /* MOP Read Ethernet Address */
-        wstatus = Map_WriteB(address, sizeof(ETH_MAC), (uint8*) &xq->var->setup.macs[0], NOMAP);
+        wstatus = Map_WriteB(address, sizeof(ETH_MAC), (uint8*) &xq->var->setup.macs[0]);
         if (wstatus) return xq_nxm_error(xq);
         break;
       case 2:   /* MOP Reset System ID */
@@ -1062,9 +1062,9 @@ t_stat xq_process_xbdl(CTLR* xq)
   while (1) {
 
     /* Get transmit bdl from memory */
-    rstatus = Map_ReadW (xq->var->xbdl_ba,    12, &xq->var->xbdl_buf[0], NOMAP);
+    rstatus = Map_ReadW (xq->var->xbdl_ba,    12, &xq->var->xbdl_buf[0]);
     xq->var->xbdl_buf[0] = 0xFFFF;
-    wstatus = Map_WriteW(xq->var->xbdl_ba,     2, &xq->var->xbdl_buf[0], NOMAP);
+    wstatus = Map_WriteW(xq->var->xbdl_ba,     2, &xq->var->xbdl_buf[0]);
     if (rstatus || wstatus) return xq_nxm_error(xq);
 
     /* invalid buffer? */
@@ -1093,7 +1093,7 @@ t_stat xq_process_xbdl(CTLR* xq)
     /* add to transmit buffer, making sure it's not too big */
     if ((xq->var->write_buffer.len + b_length) > sizeof(xq->var->write_buffer.msg))
       b_length = sizeof(xq->var->write_buffer.msg) - xq->var->write_buffer.len;
-    rstatus = Map_ReadB(address, b_length, &xq->var->write_buffer.msg[xq->var->write_buffer.len], NOMAP);
+    rstatus = Map_ReadB(address, b_length, &xq->var->write_buffer.msg[xq->var->write_buffer.len]);
     if (rstatus) return xq_nxm_error(xq);
     xq->var->write_buffer.len += b_length;
 
@@ -1112,7 +1112,7 @@ t_stat xq_process_xbdl(CTLR* xq)
         }
 
         /* update write status */
-        wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, (uint16*) write_success, NOMAP);
+        wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, (uint16*) write_success);
         if (wstatus) return xq_nxm_error(xq);
 
         /* clear write buffer */
@@ -1145,7 +1145,7 @@ t_stat xq_process_xbdl(CTLR* xq)
 
       sim_debug(DBG_WRN, xq->dev, "XBDL processing implicit chain buffer segment\n");
       /* update bdl status words */
-      wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, (uint16*) implicit_chain_status, NOMAP);
+      wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, (uint16*) implicit_chain_status);
       if(wstatus) return xq_nxm_error(xq);
     }
 
@@ -1175,8 +1175,8 @@ t_stat xq_dispatch_rbdl(CTLR* xq)
 
   /* get first receive buffer */
   xq->var->rbdl_buf[0] = 0xFFFF;
-  wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0], NOMAP);
-  rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1], NOMAP);
+  wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0]);
+  rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1]);
   if (rstatus || wstatus) return xq_nxm_error(xq);
 
   /* is buffer valid? */
@@ -1460,8 +1460,8 @@ t_stat xq_process_bootrom (CTLR* xq)
 
   /* get receive bdl from memory */
   xq->var->rbdl_buf[0] = 0xFFFF;
-  wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0], NOMAP);
-  rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1], NOMAP);
+  wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0]);
+  rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1]);
   if (rstatus || wstatus) return xq_nxm_error(xq);
 
   /* invalid buffer? */
@@ -1471,7 +1471,7 @@ t_stat xq_process_bootrom (CTLR* xq)
   }
 
   /* get status words */
-  rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4], NOMAP);
+  rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
   if (rstatus) return xq_nxm_error(xq);
 
   /* get host memory address */
@@ -1487,7 +1487,7 @@ t_stat xq_process_bootrom (CTLR* xq)
   assert(b_length >= sizeof(xq_bootrom)/2);
 
   /* send data to host */
-  wstatus = Map_WriteB(address, sizeof(xq_bootrom)/2, bootrom, NOMAP);
+  wstatus = Map_WriteB(address, sizeof(xq_bootrom)/2, bootrom);
   if (wstatus) return xq_nxm_error(xq);
 
   /* update read status words */
@@ -1495,7 +1495,7 @@ t_stat xq_process_bootrom (CTLR* xq)
   xq->var->rbdl_buf[5] = 0;
 
   /* update read status words*/
-  wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4], NOMAP);
+  wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
   if (wstatus) return xq_nxm_error(xq);
 
   /* set to next bdl (implicit chain) */
@@ -1505,8 +1505,8 @@ t_stat xq_process_bootrom (CTLR* xq)
 
   /* get receive bdl from memory */
   xq->var->rbdl_buf[0] = 0xFFFF;
-  wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0], NOMAP);
-  rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1], NOMAP);
+  wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0]);
+  rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1]);
   if (rstatus || wstatus) return xq_nxm_error(xq);
 
   /* invalid buffer? */
@@ -1516,7 +1516,7 @@ t_stat xq_process_bootrom (CTLR* xq)
   }
 
   /* get status words */
-  rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4], NOMAP);
+  rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
   if (rstatus) return xq_nxm_error(xq);
 
   /* get host memory address */
@@ -1532,7 +1532,7 @@ t_stat xq_process_bootrom (CTLR* xq)
   assert(b_length >= sizeof(xq_bootrom)/2);
 
   /* send data to host */
-  wstatus = Map_WriteB(address, sizeof(xq_bootrom)/2, &bootrom[2048], NOMAP);
+  wstatus = Map_WriteB(address, sizeof(xq_bootrom)/2, &bootrom[2048]);
   if (wstatus) return xq_nxm_error(xq);
 
   /* update read status words */
@@ -1540,7 +1540,7 @@ t_stat xq_process_bootrom (CTLR* xq)
   xq->var->rbdl_buf[5] = 0;
 
   /* update read status words*/
-  wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4], NOMAP);
+  wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
   if (wstatus) return xq_nxm_error(xq);
 
   /* set to next bdl (implicit chain) */
@@ -1553,8 +1553,8 @@ t_stat xq_process_bootrom (CTLR* xq)
 
       /* get receive bdl from memory */
       xq->var->rbdl_buf[0] = 0xFFFF;
-      wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0], NOMAP);
-      rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1], NOMAP);
+      wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0]);
+      rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1]);
       if (rstatus || wstatus) return xq_nxm_error(xq);
 
       /* invalid buffer? */
@@ -1564,7 +1564,7 @@ t_stat xq_process_bootrom (CTLR* xq)
       }
 
       /* get status words */
-      rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4], NOMAP);
+      rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
       if (rstatus) return xq_nxm_error(xq);
 
       /* update read status words */
@@ -1572,7 +1572,7 @@ t_stat xq_process_bootrom (CTLR* xq)
       xq->var->rbdl_buf[5] = 0;
 
       /* update read status words*/
-      wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4], NOMAP);
+      wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
       if (wstatus) return xq_nxm_error(xq);
 
       /* set to next bdl (implicit chain) */

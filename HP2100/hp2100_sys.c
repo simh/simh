@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Sep-04	JDB	Added memory protect device
+			Fixed display of CCA/CCB/CCE instructions
    01-Jun-04	RMS	Added latent 13037 support
    19-Apr-04	RMS	Recognize SFS x,C and SFC x,C
    22-Mar-02	RMS	Revised for dynamically allocated memory
@@ -43,6 +45,7 @@
 
 extern DEVICE cpu_dev;
 extern UNIT cpu_unit;
+extern DEVICE mp_dev;
 extern DEVICE dma0_dev, dma1_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tty_dev, clk_dev;
@@ -78,6 +81,7 @@ int32 sim_emax = 3;
 
 DEVICE *sim_devices[] = {
 	&cpu_dev,
+	&mp_dev,
 	&dma0_dev,
 	&dma1_dev,
 	&ptr_dev,
@@ -283,8 +287,8 @@ static const char *stab[] = {
 static const int32 mtab[] = {
  0007700, 0007700, 0007700, 0007700, 0007700, 0007700, 0007700, 0007700,
  0007700, 0007700, 0007700, 0007700, 0007700, 0007700, 0007700, 0007700,
- 0006400, 0007000, 0007400, 0006400, 0007000, 0007400,
- 0002040, 0002040, 0002100, 0002200, 0002300,
+ 0007400, 0007400, 0007400, 0007400, 0007400, 0007400,
+ 0002040, 0002040, 0002300, 0002300, 0002300,
  0006020, 0006020, 0004010, 0004010,
  0006027, 0006027, 0006027, 0006027, 0006027, 0006027, 0006027, 0006027,
  0006027, 0006027, 0006027, 0006027, 0006027, 0006027, 0006027, 0006027,

@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Nov-04	RMS	Added support for SHOW opt=val
+   20-Oct-04	RMS	Converted all base types to typedefs
+   21-Sep-04	RMS	Added switch to flag stop message printout
    06-Feb-04	RMS	Moved device and unit user flags fields (V3.2)
 		RMS	Added REG_VMAD
    29-Dec-03	RMS	Added output stall status
@@ -102,38 +105,42 @@
 
 /* Length specific integer declarations */
 
-#define int8		char
-#define int16		short
-#define int32		int
+typedef signed char	int8;
+typedef signed short	int16;
+typedef signed int	int32;
+typedef unsigned char	uint8;
+typedef unsigned short	uint16;
+typedef unsigned int	uint32;		
 typedef int		t_stat;				/* status */
 typedef int		t_bool;				/* boolean */
-typedef unsigned int8	uint8;
-typedef unsigned int16	uint16;
-typedef unsigned int32	uint32;
 
 #if defined (USE_INT64)					/* 64b data */
 #if defined (_WIN32)					/* Windows */
-#define t_int64 __int64
+typedef signed __int64		t_int64;
+typedef unsigned __int64	t_uint64;
 #elif defined (__ALPHA) && defined (VMS)		/* Alpha VMS */
-#define t_int64 __int64
+typedef signed __int64		t_int64;
+typedef unsigned __int64	t_uint64;
 #elif defined (__ALPHA) && defined (__unix__)		/* Alpha UNIX */
-#define t_int64 long
+typedef signed long		t_int64;
+typedef unsigned long		t_uint64;
 #else							/* default GCC */
-#define t_int64 long long
+typedef signed long long	t_int64;
+typedef unsigned long long	t_uint64;
 #endif							/* end OS's */
-typedef unsigned t_int64	t_uint64, t_value;	/* value */
-typedef t_int64 		t_svalue;		/* signed value */
+typedef t_int64 	t_svalue;			/* signed value */
+typedef t_uint64	t_value;			/* value */
 #else							/* 32b data */
-typedef unsigned int32	t_value;
 typedef int32 		t_svalue;
+typedef uint32		t_value;
 #endif							/* end 64b data */
 
 #if defined (USE_INT64) && defined (USE_ADDR64)		/* 64b address */
-typedef unsigned t_int64	t_addr;
-#define T_ADDR_W		64
+typedef t_uint64	t_addr;
+#define T_ADDR_W	64
 #else							/* 32b address */
-typedef unsigned int32		t_addr;
-#define T_ADDR_W		32
+typedef uint32		t_addr;
+#define T_ADDR_W	32
 #endif							/* end 64b address */
 
 /* System independent definitions */
@@ -149,6 +156,7 @@ typedef unsigned int32		t_addr;
 #define SIM_SW_HIDE	(1u << 26)			/* enable hiding */
 #define SIM_SW_REST	(1u << 27)			/* attach/restore */
 #define SIM_SW_REG	(1u << 28)			/* register value */
+#define SIM_SW_STOP	(1u << 29)			/* stop message */
 
 /* Simulator status codes
 
@@ -255,7 +263,7 @@ struct sim_device {
 	t_stat		(*msize)(struct sim_unit *up, int32 v, char *cp, void *dp);
 							/* mem size routine */
 	char		*lname;				/* logical name */
-};
+	};
 
 /* Device flags */
 
@@ -308,7 +316,7 @@ struct sim_unit {
 	int32		u4;				/* device specific */
 	int32		u5;				/* device specific */
 	int32		u6;				/* device specific */
-};
+	};
 
 /* Unit flags */
 
@@ -345,7 +353,7 @@ struct sim_reg {
 	uint32		depth;				/* save depth */
 	uint32		flags;				/* flags */
 	uint32		qptr;				/* circ q ptr */
-};
+	};
 
 #define REG_FMT		0003				/* see PV_x */
 #define REG_RO		0004				/* read only */
@@ -365,7 +373,7 @@ struct sim_ctab {
 							/* action routine */
 	int32		arg;				/* argument */
 	char		*help;				/* help string */
-};
+	};
 
 struct sim_c1tab {
 	char		*name;				/* name */
@@ -373,7 +381,7 @@ struct sim_c1tab {
 			int32 flag, char *cptr);	/* action routine */
 	int32		arg;				/* argument */
 	char		*help;				/* help string */
-};
+	};
 
 struct sim_shtab {
 	char		*name;				/* name */
@@ -381,7 +389,7 @@ struct sim_shtab {
 			struct sim_unit *uptr, int32 flag, char *cptr);
 	int32		arg;				/* argument */
 	char		*help;				/* help string */
-};
+	};
 
 /* Modifier table - only extended entries have disp, reg, or flags */
 
@@ -397,7 +405,7 @@ struct sim_mtab {
 	void		*desc;				/* value descriptor */
 							/* REG * if MTAB_VAL */
 							/* int * if not */
-};
+	};
 
 #define	MTAB_XTD	(1u << UNIT_V_RSV)		/* ext entry flag */
 #define MTAB_VDV	001				/* valid for dev */
@@ -405,6 +413,7 @@ struct sim_mtab {
 #define MTAB_VAL	004				/* takes a value */
 #define MTAB_NMO	010				/* only if named */
 #define MTAB_NC		020				/* no UC conversion */
+#define MTAB_SHP	040				/* show takes parameter */
 
 /* Search table */
 
@@ -413,7 +422,7 @@ struct sim_schtab {
 	int32		bool;				/* boolean operator */
 	t_value		mask;				/* mask for logical */
 	t_value		comp;				/* comparison for boolean */
-};
+	};
 
 /* Breakpoint table */
 
@@ -422,14 +431,14 @@ struct sim_brktab {
 	int32		typ;				/* mask of types */
 	int32		cnt;				/* proceed count */	
 	char		*act;				/* action string */
-};
+	};
 
 /* Debug table */
 
 struct sim_debtab {
 	char		*name;				/* control name */
 	uint32		mask;				/* control bit */
-};
+	};
 
 #define DEBUG_PRS(d)	(sim_deb && d.dctrl)
 #define DEBUG_PRD(d)	(sim_deb && d->dctrl)

@@ -394,7 +394,7 @@ for (i = 0; dibp = dib_tab[i]; i++ ) {
 UBNXM_FAIL (pa, mode);
 }
 
-/* Mapped read and write routines - used by word-oriented Unibus devices */
+/* Mapped read and write routines - used by standard Unibus devices on Unibus 1 */
 
 a10 Map_Addr10 (a10 ba, int32 ub)
 {
@@ -407,23 +407,23 @@ pa10 = (ubmap[ub][vpn] + PAG_GETOFF (ba >> 2)) & PAMASK;
 return pa10;
 }
 
-int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf, t_bool ub)
+int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf)
 {
 uint32 lim;
 a10 pa10;
 
 lim = ba + bc;
 for ( ; ba < lim; ba++) {				/* by bytes */
-	pa10 = Map_Addr10 (ba, ub);			/* map addr */
+	pa10 = Map_Addr10 (ba, 1);			/* map addr */
 	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
-	    ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+	    ubcs[1] = ubcs[1] | UBCS_TMO;		/* UBA times out */
 	    return (lim - ba);  }			/* return bc */
 	*buf++ = (uint8) ((M[pa10] >> ubashf[ba & 3]) & 0377);
 	}
 return 0;
 }
 
-int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf, t_bool ub)
+int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf)
 {
 uint32 lim;
 a10 pa10;
@@ -431,16 +431,16 @@ a10 pa10;
 ba = ba & ~01;						/* align start */
 lim = ba + (bc & ~01);
 for ( ; ba < lim; ba = ba + 2) {			/* by words */
-	pa10 = Map_Addr10 (ba, ub);			/* map addr */
+	pa10 = Map_Addr10 (ba, 1);			/* map addr */
 	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
-	    ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+	    ubcs[1] = ubcs[1] | UBCS_TMO;		/* UBA times out */
 	    return (lim - ba);  }			/* return bc */
 	*buf++ = (uint16) ((M[pa10] >> ((ba & 2)? 0: 18)) & 0177777);
 	}
 return 0;
 }
 
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf, t_bool ub)
+int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf)
 {
 uint32 lim;
 a10 pa10;
@@ -448,16 +448,16 @@ static d10 mask = 0377;
 
 lim = ba + bc;
 for ( ; ba < lim; ba++) {				/* by bytes */
-	pa10 = Map_Addr10 (ba, ub);			/* map addr */
+	pa10 = Map_Addr10 (ba, 1);			/* map addr */
 	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
-	    ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+	    ubcs[1] = ubcs[1] | UBCS_TMO;		/* UBA times out */
 	    return (lim - ba);  }			/* return bc */
 	M[pa10] = (M[pa10] & ~(mask << ubashf[ba & 3])) |
 		(((d10) *buf++) << ubashf[ba & 3]);  }
 return 0;
 }
 
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf, t_bool ub)
+int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
 {
 uint32 lim;
 a10 pa10;
@@ -466,9 +466,9 @@ d10 val;
 ba = ba & ~01;						/* align start */
 lim = ba + (bc & ~01);
 for ( ; ba < lim; ba++) {				/* by bytes */
-	pa10 = Map_Addr10 (ba, ub);			/* map addr */
+	pa10 = Map_Addr10 (ba, 1);			/* map addr */
 	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
-	    ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+	    ubcs[1] = ubcs[1] | UBCS_TMO;		/* UBA times out */
 	    return (lim - ba);  }			/* return bc */
 	val = *buf++;					/* get data */
 	if (ba & 2) M[pa10] = (M[pa10] & 0777777600000) | val;

@@ -51,7 +51,7 @@
 #include "pdp11_defs.h"
 #include <ctype.h>
 
-extern DEVICE cpu_dev;
+extern DEVICE cpu_dev, sys_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
 extern DEVICE lpt_dev;
@@ -61,7 +61,8 @@ extern DEVICE vh_dev;
 extern DEVICE rk_dev, rl_dev;
 extern DEVICE hk_dev;
 extern DEVICE rx_dev, ry_dev;
-extern DEVICE rp_dev;
+extern DEVICE mba0_dev, mba1_dev;
+extern DEVICE rp_dev, tu_dev;
 extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE dt_dev;
 extern DEVICE tm_dev, ts_dev;
@@ -91,6 +92,9 @@ int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = {
 	&cpu_dev,
+	&sys_dev,
+	&mba0_dev,
+	&mba1_dev,
 	&ptr_dev,
 	&ptp_dev,
 	&tti_dev,
@@ -114,6 +118,7 @@ DEVICE *sim_devices[] = {
 	&tm_dev,
 	&ts_dev,
 	&tq_dev,
+	&tu_dev,
 	&xq_dev,
 	&xqb_dev,
 	&xu_dev,
@@ -335,7 +340,7 @@ static const char *opcode[] = {
 "MOV","CMP","BIT","BIC",
 "BIS","ADD",
 "MUL","DIV","ASH","ASHC",
-"XOR",
+"XOR", 
 "FADD","FSUB","FMUL","FDIV",
 "L2DR",
 "MOVC","MOVRC","MOVTC",

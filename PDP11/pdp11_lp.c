@@ -41,13 +41,9 @@
 
 #elif defined (VM_VAX)					/* VAX version */
 #include "vax_defs.h"
-extern int32 int_req[IPL_HLVL];
-extern int32 int_vec[IPL_HLVL][32];
 
 #else							/* PDP-11 version */
 #include "pdp11_defs.h"
-extern int32 int_req[IPL_HLVL];
-extern int32 int_vec[IPL_HLVL][32];
 #endif
 
 #define LPTCSR_IMP	(CSR_ERR + CSR_DONE + CSR_IE)	/* implemented */

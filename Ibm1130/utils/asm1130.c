@@ -9,10 +9,27 @@
  * Mail to sim@ibm1130.org
  */
 
+#define VERSION "ASM1130 CROSS ASSEMBLER V1.14"
+
 // ---------------------------------------------------------------------------------
 // ASM1130 - IBM 1130 Cross Assembler
 //
 // Version
+//		   1.14 - 2004Oct22 - Fixed problem with BSS complaining about negative
+//							  sizes. This may be a fundamental problem with my using
+//							  32-bit expressions, but for now, it appears that just
+//							  truncating the BSS size to 16 bits is sufficient to build DMS.
+//		   1.13 - 2004Jun05 - Fixed sign extension of constants in expressions. Statements
+//							  like LD /FFFF were being assembled incorrectly.
+//		   1.12 - 2004Jun04 - Made WAIT instruction take a displacement value.
+//							  Doesn't affect operation, but these are used as indicators
+//							  in the IBM one-card diagnostic programs.
+//							  Also -- should mention that the .IPL directive was
+//							  removed some time ago. To create bootable cards, 
+//							  use -b flag to create binary output, and post-process the
+//							  binary output with program "mkboot"
+//		   1.11 - 2004May22 - Added CMP, DCM, and DECS instructions for 1800,
+//							  thanks to Kevin Everets.
 //		   1.10 - 2003Dec08 - Fixed opcode value for XCH instruction, thanks to
 //							  Roger Simpson.
 //		   1.09 - 2003Aug03 - Added fxwrite so asm will write little-endian files
@@ -91,27 +108,13 @@
 // >>> Look for "bug here" though, for things to check out.
 //
 // Notes:
+// We assume that the computer on which the assembler runs uses ANSI floating point.
+// Also, the assembly of floating point values may be incorrect on non-Intel 
+// architectures, this needs to be investigated.
+//
 // org_advanced tells whether * in an expression refers to the address AFTER the
 // instruction (1 or 2 words, depending on length). This is the case for opcodes
 // but not all directives.
-//
-// Added special coldstart format directives:
-//
-//	 .IPL 1130,XXXXXXXX
-//   .IPL 1800,XXXXXXXX
-//
-// (these are not standard IBM)
-//
-// These directives cause the output file to be written in binary in either 1130 or
-// 1800 IPL format. In 1130 format, the index bits are lost and the displacement
-// is sign extended. In 1800 format, the data are punched 8 bits at a time into
-// two columns per word. If an identifier is not given, data are punched into
-// all 80 columns. If an identifier is given, data is punched in columns 0 through
-// 72, and the identification XXXXXXXX is punched in columns 73 through 80. (If
-// there are multiple output cards the last ident character is incremented). A
-// warning is issued if 1130 assembly results in lost bits. These directives
-// should be the first in the file as you don't want text and binary mixed in
-// the same output file.
 //
 // Revision History
 // 16Apr02	1.03	Added sector break, relocation flag output
@@ -133,7 +136,8 @@
 // DEFINITIONS
 // ---------------------------------------------------------------------------------
 
-// I have found some IBM source code where @ and ' seem interchangable.
+// I have found some IBM source code where @ and ' seem interchangable (likely due to the
+// use of 026 keypunches).
 // Comment out this define to make @ and ' different in symbol names, keep to make equivalent
 
 #if defined(VMS)
@@ -161,8 +165,6 @@
 #define BOOL  int
 #define TRUE  1
 #define FALSE 0
-
-#define VERSION "ASM1130 CROSS ASSEMBLER V1.08"
 
 #define ISTV	0x33			// magic number from DMS R2V12 monitorm symbol @ISTV
 
@@ -233,7 +235,7 @@ typedef enum {OUTMODE_LOAD, OUTMODE_1130, OUTMODE_1800, OUTMODE_BINARY} OUTMODE;
 
 // command line syntax
 char *usestr =
-"Usage: asm1130 [-bpsvwxy] [-o[file]] [-l[file]] [-rN.M] file...\n\n"
+"Usage: asm1130 [-bpsvwxy8] [-o[file]] [-l[file]] [-rN.M] file...\n\n"
 "-b  binary (relocatable format) output; default is simulator LOAD format\n"
 "-p  count passes required; no assembly output is created with this flag"
 "-s  add symbol table to listing\n"
@@ -244,10 +246,12 @@ char *usestr =
 "-y  preload system symbol table SYMBOLS.SYS\n"
 "-o  set output file; default is first input file + .out or .bin\n"
 "-l  create listing file; default is first input file + .lst\n"
-"-r  set dms version to VN RM for system SBRK cards";
+"-r  set dms version to VN RM for system SBRK cards\n"
+"-8  enable IBM 1800 instructions";				// (alternately, rename or link executable to asm1800.exe)
 
 BOOL verbose = FALSE;							// verbose mode flag
 BOOL tabformat = FALSE;							// TRUE if tabs were seen in the file
+BOOL enable_1800 = FALSE;						// TRUE if 1800 mode is enabled by flag or executable name
 int  pass;										// current assembler pass (1 or 2)
 char curfn[256];								// current input file name
 char progname[8];								// base name of primary input file
@@ -349,6 +353,7 @@ int ascii_to_1403_table[128] =
 // PROTOTYPES
 // ---------------------------------------------------------------------------------
 
+void init (int argc, char **argv);
 void bail (char *msg);
 void flag (char *arg);
 void proc (char *fname);
@@ -387,6 +392,7 @@ void bincard_endcard (void);
 void handle_sbrk (char *line);
 void bincard_typecard (void);
 void namecode (unsigned short *words, char *tok);
+int  signextend (int v);
 
 // ---------------------------------------------------------------------------------
 // main routine
@@ -396,9 +402,7 @@ int main (int argc, char **argv)
 {
 	int i, sawfile = FALSE;
 
-	for (i = 1; i < argc; i++)					// process command line switches
-		if (*argv[i] == '-')
-			flag(argv[i]+1);
+	init(argc, argv);							// initialize, process flags
 
 	startpass(1);								// first pass, process files 
 
@@ -461,6 +465,21 @@ int main (int argc, char **argv)
 }
 
 // ---------------------------------------------------------------------------------
+// init - initialize assembler, process command line flags
+// ---------------------------------------------------------------------------------
+
+void init (int argc, char **argv)
+{
+	int i;
+
+	enable_1800 = strstr(argv[0], "1800") != NULL;	// if "1800" appears in the executable name, enable 1800 extensions
+
+	for (i = 1; i < argc; i++)						// process command line switches
+		if (*argv[i] == '-')
+			flag(argv[i]+1);
+}
+
+// ---------------------------------------------------------------------------------
 // flag - process one command line switch
 // ---------------------------------------------------------------------------------
 
@@ -510,6 +529,10 @@ void flag (char *arg)
 
 			case 'b':
 				outmode = OUTMODE_BINARY;
+				break;
+
+			case '8':
+				enable_1800 = TRUE;
 				break;
 
 			case 'r':
@@ -1194,6 +1217,7 @@ void coltok (char *c, char *tok, int ifrom, int ito, BOOL condense, char *save)
 #define IS_ABS	0x0002			// always uses absolute addressing mode (implied X)
 #define NO_IDX	0x0004			// even with 1 or 2 modifier, this is not really indexed (for STX/LDX)
 #define NO_ARGS	0x0008			// statement takes no arguments
+#define IS_1800	0x0010			// 1800-only directive or instruction, flagged if 1800 mode is not enabled
 #define TRAP	0x1000			// debug this instruction
 
 struct tag_op {											// OPCODE TABLE
@@ -1230,6 +1254,7 @@ void x_bes  (struct tag_op *op, char *label, char *mods, char *arg);
 void x_bss  (struct tag_op *op, char *label, char *mods, char *arg);
 void x_dc   (struct tag_op *op, char *label, char *mods, char *arg);
 void x_dec  (struct tag_op *op, char *label, char *mods, char *arg);
+void x_decs (struct tag_op *op, char *label, char *mods, char *arg);
 void x_ebc  (struct tag_op *op, char *label, char *mods, char *arg);
 void x_end  (struct tag_op *op, char *label, char *mods, char *arg);
 void x_ent  (struct tag_op *op, char *label, char *mods, char *arg);
@@ -1262,6 +1287,7 @@ struct tag_op ops[] = {
 	"BSS",	0,		x_bss,	E, 	  		NONE,	0,
 	"DC",	0,		x_dc,	NONE, 		NONE,	0,
 	"DEC",  0,      x_dec,  E,          E, 		IS_DBL,
+	"DECS", 0,      x_decs, E,          E, 		IS_DBL,	// this is an IBM 1800 directive
 	"DMES",	0,		x_dmes,	ANY,		NONE,	0,
 	"DN",	0,		x_dn,	NONE,		NONE,	0,
 	"DSA",	0,		x_dsa,	NONE,		NONE,	0,
@@ -1293,6 +1319,8 @@ struct tag_op ops[] = {
 	"AND",	0xE000,	std_op, ALL, 		NONE,	0,
 	"BSI",	0x4000, bsi_op, ALL,		NONE,	0,
 	"CALL", 0x4000, x_call,	ALL,        L,		0,		// alias for BSI L, or external call
+	"CMP",	0xB000,	std_op, ALL, 		NONE,	IS_1800,	// this is an IBM 1800-only instruction
+	"DCM",	0xB800,	std_op, ALL, 		NONE,	IS_1800,	// this is an IBM 1800-only instruction
 	"D"	,	0xA800,	std_op, ALL, 		NONE,	0,
 	"EOR",	0xF000,	std_op, ALL, 		NONE,	0,
 	"LD",	0xC000,	std_op, ALL, 		NONE,	0,
@@ -1310,7 +1338,7 @@ struct tag_op ops[] = {
 	"STO",	0xD000,	std_op, ALL, 		NONE,	0,
 	"STS",	0x2800,	std_op, ALL, 		NONE,	0,
 	"STX",	0x6800,	std_op, ALL, 		NONE,	NO_IDX,
-	"WAIT",	0x3000, std_op, NONE,		NONE,	NO_ARGS,
+	"WAIT",	0x3000, std_op, NONE,		NONE,	IS_ABS,
 	"XCH",	0x18D0, std_op, NONE,		NONE,	0,		// same as RTE 16, 18C0 + 10
 	"XIO",  0x0800, std_op, ALL,		NONE,	IS_DBL,
 
@@ -1850,6 +1878,9 @@ void parse_line (char *line)
 
 	org_advanced = strchr(mods, 'L') ? 2 : 1;	// by default, * means address + 1 or 2. Sometimes it doesn't
 	(op->handler)(op, label, mods, arg);
+
+	if ((op->flags & IS_1800) && ! enable_1800)
+		asm_warning("%s is IBM 1800-specific; use the -8 command line option", op->mnem);
 }
 
 // ---------------------------------------------------------------------------------
@@ -2178,6 +2209,9 @@ void convert_double_to_extended (double d, unsigned short *wd)
 	wd[2] = (unsigned short) (mantissa & 0xFFFF);
 }
 
+// ---------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------
+
 void convert_double_to_standard (double d, unsigned short *wd)
 {
 	int neg, exp;
@@ -2222,6 +2256,9 @@ void convert_double_to_standard (double d, unsigned short *wd)
 // printf("       D %04x%04x\n", wd[0], wd[1]);
 }
 
+// ---------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------
+
 void convert_double_to_fixed (double d, unsigned short *wd, int bexp)
 {
 	int neg, exp, rshift;
@@ -2232,6 +2269,9 @@ void convert_double_to_fixed (double d, unsigned short *wd, int bexp)
 		wd[0] = wd[1] = 0;
 		return;
 	}
+
+	// note: we assume that this computer uses ANSI floating point
+
     //					  7         6         5         4             0
 	// d = ansi real*8    SXXX XXXX XXXX MMMM MMMM MMMM MMMM MMMM ... MMMM MMMM
 
@@ -2268,6 +2308,9 @@ void convert_double_to_fixed (double d, unsigned short *wd, int bexp)
 	wd[0] = (unsigned short) ((mantissa >> 16) & 0xFFFF);		// return all of the bits; no exponent here
 	wd[1] = (unsigned short) (mantissa & 0xFFFF);
 }
+
+// ---------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------
 
 void getDconstant (char *tok, unsigned short *wd)
 {
@@ -2312,14 +2355,15 @@ void getDconstant (char *tok, unsigned short *wd)
 		convert_double_to_standard(d, wd);
 }
 
+// ---------------------------------------------------------------------------------
 // If the input value is an integer with no decimal point and no B or E,
 // DEC generates a double INTEGER value.
 // IBM documentation ranges from ambiguous to wrong on this point, but
 // examination of the DMS microfiche supports this.
+// ---------------------------------------------------------------------------------
 
 void x_dec (struct tag_op *op, char *label, char *mods, char *arg)
 {	
-//	char *tok;
 	unsigned short wd[2];
 
 	org_advanced = 2;					// assume * means address after this location, since it's +1 for dc?
@@ -2342,6 +2386,28 @@ void x_dec (struct tag_op *op, char *label, char *mods, char *arg)
 //		writew(wd[0], FALSE);			// write hiword, then loword
 //		writew(wd[1], FALSE);
 }
+
+// ---------------------------------------------------------------------------------
+// DECS directive. Writes just the high word of a DEC value
+// ---------------------------------------------------------------------------------
+
+void x_decs (struct tag_op *op, char *label, char *mods, char *arg)
+{	
+	unsigned short wd[2];
+
+	org_advanced = 1;					// assume * means address after this location
+
+	setw(0, org, FALSE);				// display the origin
+
+	if (*label)							// define label
+		set_symbol(label, org, TRUE, relocate);
+
+	getDconstant(arg, wd);
+	writew(wd[0], FALSE);				// write hiword ONLY
+}
+
+// ---------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------
 
 void x_xflc (struct tag_op *op, char *label, char *mods, char *arg)
 {	
@@ -2843,28 +2909,29 @@ void x_bss (struct tag_op *op, char *label, char *mods, char *arg)
 	else if (getexpr(arg, FALSE, &expr) != S_DEFINED)
 		return;
 
-	if (strchr(mods, 'E') != NULL)	// force even address
+	if (strchr(mods, 'E') != NULL)		// force even address
 		org_even();
 
 	if (expr.relative)
 		asm_error("BSS size must be an absolute value");
 
-	setw(0, org, FALSE);			// display origin
+	setw(0, org, FALSE);				// display origin
 
-	if (*label)						// define label
+	if (*label)							// define label
 		set_symbol(label, org, TRUE, relocate);
 
-	if (expr.value < 0)
-		asm_warning("Negative BSS size");
+	expr.value &= 0xFFFF;				// truncate to 16 bits
 
+	if (expr.value & 0x8000)
+		asm_warning("Negative BSS size");
 	else if (expr.value > 0) {
 		if (outmode == OUTMODE_LOAD) {
-			org += expr.value;		// advance the origin by appropriate number of words
-			if (pass == 2)			// emit new load address in output file
+			org += expr.value;			// advance the origin by appropriate number of words
+			if (pass == 2)				// emit new load address in output file
 				fprintf(fout, "@%04x%s" ENDLINE, org & 0xFFFF, relocate ? "R" : "");
 		}
 		else {
-			org += expr.value;		// advance the origin by appropriate number of words
+			org += expr.value;			// advance the origin by appropriate number of words
 			if (pass == 2)
 				bincard_setorg(org);
 		}
@@ -3920,7 +3987,7 @@ void a1130_term (EXPR *ap)
     c = GETNEXT;
 
 	if (ctype[c] == DIGIT) {			/* number */
-		ap->value = c_number(c,10,-1);
+		ap->value = signextend(c_number(c,10,-1));
 		ap->relative = ABSOLUTE;
 	}
 	else if (c == '+') {				/* unary + */
@@ -3931,7 +3998,7 @@ void a1130_term (EXPR *ap)
 		ap->value = - ap->value;
 	}
 	else if (c == '/') {				/* / starts a hex constant */
-		ap->value = c_number(c,16,-1);
+		ap->value = signextend(c_number(c,16,-1));
 		ap->relative = ABSOLUTE;
 	}
 	else if (c == '*') {				/* asterisk alone = org */
@@ -3968,6 +4035,20 @@ void a1130_term (EXPR *ap)
 	}
 	else
 		exprerr(8);
+}
+
+// ---------------------------------------------------------------------------------
+// signextend - sign-extend a 16-bit constant value to whatever "int" is.
+// ---------------------------------------------------------------------------------
+
+int signextend (int v)
+{
+	v &= 0xFFFF;				// clip to 16 bits (this may not be necessary, but best to be safe?)
+
+	if (v & 0x8000)				// if sign bit is set
+		v |= ~0xFFFF;			// sign extend
+
+	return v;
 }
 
 // ---------------------------------------------------------------------------------
@@ -4168,15 +4249,15 @@ void c_term (EXPR *ap)
 		ap->value = c_esc(c);
 	}
 	else if (ctype[c] == DIGIT) {		/* number */
-		ap->value = c_number(c,10,-1);
+		ap->value = signextend(c_number(c,10,-1));
 	}
 	else if (c == '0') {				/* 0 starts a hex or octal constant */
 		if ((c = GETNEXT) == 'x') {
 			c = GETNEXT;
-			ap->value = c_number(c,16,-1);
+			ap->value = signextend(c_number(c,16,-1));
 		}
 		else {
-			ap->value = c_number(c,8,-1);
+			ap->value = signextend(c_number(c,8,-1));
 		}
 	}
 	else if (c == '*') {				/* asterisk alone = org */
@@ -4501,3 +4582,4 @@ int strcmpi (char *a, char *b)
 }
 
 #endif
+

@@ -619,9 +619,6 @@ typedef struct pdp_dib DIB;
 
 #define UNIBUS		TRUE				/* 18b only */
 
-#define FST		0				/* Unibus 1 */
-#define MAP		1				/* Unibus 3 */
-
 #define DEV_RDX		8				/* default device radix */
 
 /* I/O page layout */
@@ -739,10 +736,11 @@ typedef struct pdp_dib DIB;
 
 /* Function prototypes */
 
-int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf, t_bool ub);
-int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf, t_bool ub);
-int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf, t_bool ub);
-int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf, t_bool ub);
+int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
+int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);

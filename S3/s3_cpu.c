@@ -396,7 +396,7 @@ extern int32 dsk1 (int32 op, int32 m, int32 n, int32 data);
 extern int32 dsk2 (int32 op, int32 m, int32 n, int32 data);
 extern int32 cpu (int32 op, int32 m, int32 n, int32 data);
 extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern int32 fprint_sym (FILE *of, int32 addr, unsigned int32 *val,
+extern int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
 	UNIT *uptr, int32 sw);
 int32 nulldev (int32 opcode, int32 m, int32 n, int32 data);
 int add_zoned (int32 addr1, int32 len1, int32 addr2, int32 len2);

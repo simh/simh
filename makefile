@@ -10,7 +10,7 @@ OS_CCDEFS = -lsocket -lnsl -lpthread -D_GNU_SOURCE
 else
 OS_CCDEFS = -D_GNU_SOURCE
 endif
-CC = gcc -std=c99 -O2 -g -lm $(OS_CCDEFS) -I .
+CC = gcc -std=c99 -O2 -U__STRICT_ANSI__ -g -lm $(OS_CCDEFS) -I .
 ifeq ($(USE_NETWORK),)
 else
 NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a
@@ -81,20 +81,35 @@ PDP11 = ${PDP11D}pdp11_fp.c ${PDP11D}pdp11_cpu.c ${PDP11D}pdp11_dz.c \
 	${PDP11D}pdp11_tm.c ${PDP11D}pdp11_ts.c ${PDP11D}pdp11_io.c \
 	${PDP11D}pdp11_rq.c ${PDP11D}pdp11_tq.c ${PDP11D}pdp11_pclk.c \
 	${PDP11D}pdp11_ry.c ${PDP11D}pdp11_pt.c ${PDP11D}pdp11_hk.c \
-	${PDP11D}pdp11_xq.c ${PDP11D}pdp11_xu.c ${PDP11D}pdp11_vh.c
+	${PDP11D}pdp11_xq.c ${PDP11D}pdp11_xu.c ${PDP11D}pdp11_vh.c \
+	${PDP11D}pdp11_rh.c ${PDP11D}pdp11_tu.c ${PDP11D}pdp11_cpumod.c
 PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT}
 
 
 
 VAXD = VAX/
-VAX = ${VAXD}vax_cpu1.c ${VAXD}vax_cpu.c ${VAXD}vax_fpa.c ${VAXD}vax_io.c \
-	${VAXD}vax_mmu.c ${VAXD}vax_stddev.c ${VAXD}vax_sys.c \
-	${VAXD}vax_sysdev.c \
+VAX = ${VAXD}vax_cpu.c ${VAXD}vax_cpu1.c ${VAXD}vax_fpa.c ${VAXD}vax_io.c \
+	${VAXD}vax_cis.c ${VAXD}vax_octa.c  ${VAXD}vax_cmode.c \
+	${VAXD}vax_mmu.c ${VAXD}vax_stddev.c ${VAXD}vax_sysdev.c \
+	${VAXD}vax_sys.c  ${VAXD}vax_syscm.c ${VAXD}vax_syslist.c \
 	${PDP11D}pdp11_rl.c ${PDP11D}pdp11_rq.c ${PDP11D}pdp11_ts.c \
 	${PDP11D}pdp11_dz.c ${PDP11D}pdp11_lp.c ${PDP11D}pdp11_tq.c \
-	${PDP11D}pdp11_pt.c ${PDP11D}pdp11_xq.c ${PDP11D}pdp11_ry.c \
+	${PDP11D}pdp11_xq.c ${PDP11D}pdp11_ry.c \
 	${PDP11D}pdp11_vh.c
 VAX_OPT = -DVM_VAX -DUSE_INT64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+
+
+
+VAX780 = ${VAXD}vax_cpu.c ${VAXD}vax_cpu1.c ${VAXD}vax_fpa.c \
+	${VAXD}vax_cis.c ${VAXD}vax_octa.c  ${VAXD}vax_cmode.c \
+	${VAXD}vax_mmu.c ${VAXD}vax780_stddev.c ${VAXD}vax780_sbimem.c \
+	${VAXD}vax780_uba.c ${VAXD}vax780_mba.c \
+	${VAXD}vax_sys.c  ${VAXD}vax_syscm.c ${VAXD}vax780_syslist.c \
+	${PDP11D}pdp11_rl.c ${PDP11D}pdp11_rq.c ${PDP11D}pdp11_ts.c \
+	${PDP11D}pdp11_dz.c ${PDP11D}pdp11_lp.c ${PDP11D}pdp11_tq.c \
+	${PDP11D}pdp11_xu.c ${PDP11D}pdp11_ry.c \
+	${PDP11D}pdp11_rp.c ${PDP11D}pdp11_tu.c ${PDP11D}pdp11_hk.c
+VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
 
@@ -158,7 +173,7 @@ IBM1130 = ${IBM1130D}ibm1130_cpu.c ${IBM1130D}ibm1130_cr.c \
 	${IBM1130D}ibm1130_disk.c ${IBM1130D}ibm1130_stddev.c \
 	${IBM1130D}ibm1130_sys.c ${IBM1130D}ibm1130_gdu.c \
 	${IBM1130D}ibm1130_gui.c ${IBM1130D}ibm1130_prt.c \
-	${IBM1130D}ibm1130_fmt.c
+	${IBM1130D}ibm1130_fmt.c ${IBM1130D}ibm1130_ptrp.c
 IBM1130_OPT = -I ${IBM1130D}
 
 
@@ -288,6 +303,9 @@ ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
 ${BIN}vax${EXE} : ${VAX} ${SIM}
 	${CC} ${VAX} ${SIM} ${VAX_OPT} -o $@ ${LDFLAGS}
 
+
+${BIN}vax780${EXE} : ${VAX780} ${SIM}
+	${CC} ${VAX780} ${SIM} ${VAX780_OPT} -o $@ ${LDFLAGS}
 
 
 ${BIN}nova${EXE} : ${NOVA} ${SIM}

@@ -35,6 +35,7 @@
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
 
+   14-Nov-04	WVS	Added column binary support
    25-Apr-03	RMS	Revised for extended file support
    30-May-02	RMS	Widened POS to 32b
    30-Jan-02	RMS	New zero footprint card bootstrap from Van Snyder
@@ -49,8 +50,9 @@ extern uint8 M[];
 extern int32 ind[64], ssa, iochk;
 extern char bcd_to_ascii[64];
 extern char ascii_to_bcd[128];
+extern int16 colbin[64];
 int32 s1sel, s2sel, s4sel, s8sel;
-char rbuf[CBUFSIZE];					/* > CDR_WIDTH */
+char rbuf[2 * CBUFSIZE];				/* > CDR_WIDTH */
 t_stat cdr_svc (UNIT *uptr);
 t_stat cdr_boot (int32 unitno, DEVICE *dptr);
 t_stat cdr_attach (UNIT *uptr, char *cptr);
@@ -135,21 +137,24 @@ DEVICE stack_dev = {
 /* Card read routine
 
    Modifiers have been checked by the caller
-   No modifiers are recognized (column binary is not implemented)
+   C modifier is recognized (column binary is implemented)
 */
 
 t_stat read_card (int32 ilnt, int32 mod)
 {
-int32 i;
+int32 i, j;
+int16 c;
 t_stat r;
 
 if (sim_is_active (&cdr_unit)) {			/* busy? */
 	sim_cancel (&cdr_unit);				/* cancel */
-	if (r = cdr_svc (&cdr_unit)) return r;  }	/* process */
+	if (r = cdr_svc (&cdr_unit)) return r;		/* process */
+	}
 if ((cdr_unit.flags & UNIT_ATT) == 0) return SCPE_UNATT; /* attached? */
 ind[IN_READ] = ind[IN_LST] = s1sel = s2sel = 0;		/* default stacker */
-for (i = 0; i < CBUFSIZE; i++) rbuf[i] = 0;		/* clear buffer */
-fgets (rbuf, CBUFSIZE, cdr_unit.fileref);		/* read card */
+for (i = 0; i < 2 * CBUFSIZE; i++) rbuf[i] = 0;		/* clear extended buf */
+fgets (rbuf, (mod == BCD_C)? 2 * CBUFSIZE: CBUFSIZE,	/* rd bin/char card */
+	 cdr_unit.fileref);
 if (feof (cdr_unit.fileref)) return STOP_NOCD;		/* eof? */
 if (ferror (cdr_unit.fileref)) {			/* error? */
 	perror ("Card reader I/O error");
@@ -162,9 +167,28 @@ if (ssa) {						/* if last cd on */
 	getc (cdr_unit.fileref);			/* see if more */
 	if (feof (cdr_unit.fileref)) ind[IN_LST] = 1;	/* eof? set flag */
 	fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);  }
-for (i = 0; i < CDR_WIDTH; i++) {			/* cvt to BCD */
-	rbuf[i] = ascii_to_bcd[rbuf[i]];
-	M[CDR_BUF + i] = (M[CDR_BUF + i] & WM) | rbuf[i];  }
+if (mod == BCD_C) {					/* column binary */
+	for (i = 0; i < 2 * CDR_WIDTH; i++)		/* cvt to BCD */
+            rbuf[i] = ascii_to_bcd[rbuf[i]];
+	for (i = 0; i < CDR_WIDTH; i++) {
+	    M[CD_CBUF1 + i] = (M[CD_CBUF1 + i] & WM) | rbuf[i];
+	    M[CD_CBUF2 + i] = (M[CD_CBUF2 + i] & WM) | rbuf[CDR_WIDTH + i];
+	    c = (rbuf[i] << 6) | rbuf[CDR_WIDTH + i];
+	    M[CDR_BUF + i] = (M[CDR_BUF + i] & WM) | 077;
+	    for (j = 0; j < 64; j++) {			/* look for char */
+		if (c == colbin[j]) {
+		    M[CDR_BUF + i] = (M[CDR_BUF + i] & WM) | j;
+		    break;
+		    }					/* end if */
+		}					/* end for j */
+	    }						/* end for i */
+	}						/* end if col bin */
+else {							/* normal read */
+	for (i = 0; i < CDR_WIDTH; i++) {		/* cvt to BCD */
+	    rbuf[i] = ascii_to_bcd[rbuf[i]];
+	    M[CDR_BUF + i] = (M[CDR_BUF + i] & WM) | rbuf[i];
+	    }
+	}
 M[CDR_BUF - 1] = 060;					/* mem mark */
 sim_activate (&cdr_unit, cdr_unit.wait);		/* activate */
 return SCPE_OK;
@@ -199,13 +223,13 @@ return SCPE_OK;
 /* Card punch routine
 
    Modifiers have been checked by the caller
-   No modifiers are recognized (column binary is not implemented)
+   C modifier is recognized (column binary is implemented)
 */
 
 t_stat punch_card (int32 ilnt, int32 mod)
 {
 int32 i;
-static char pbuf[CDP_WIDTH + 1];			/* + null */
+static char pbuf[(2 * CDP_WIDTH) + 1];			/* + null */
 UNIT *uptr;
 
 if (s8sel) uptr = &stack_unit[2];			/* stack 8? */
@@ -215,9 +239,22 @@ if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* attached? */
 ind[IN_PNCH] = s4sel = s8sel = 0;			/* clear flags */
 
 M[CDP_BUF - 1] = 012;					/* set prev loc */
-for (i = 0; i < CDP_WIDTH; i++) pbuf[i] = bcd_to_ascii[M[CDP_BUF + i] & CHAR];
-for (i = CDP_WIDTH - 1; (i >= 0) && (pbuf[i] == ' '); i--) pbuf[i] = 0;
-pbuf[CDP_WIDTH] = 0;					/* trailing null */
+if (mod == BCD_C) {					/* column binary */
+	for (i = 0; i < CDP_WIDTH; i++) {
+	    pbuf[i] = bcd_to_ascii[M[CD_CBUF1 + i] & CHAR];
+	    pbuf[i + CDP_WIDTH] = bcd_to_ascii[M[CD_CBUF2 + i] & CHAR];
+	    }
+	for (i = 2 * CDP_WIDTH - 1; (i >= 0) && (pbuf[i] == ' '); i--)
+	     pbuf[i] = 0;
+	pbuf[2 * CDP_WIDTH] = 0;			/* trailing null */
+	}
+else {							/* normal */
+	for (i = 0; i < CDP_WIDTH; i++)
+	    pbuf[i] = bcd_to_ascii[M[CDP_BUF + i] & CHAR];
+	for (i = CDP_WIDTH - 1; (i >= 0) && (pbuf[i] == ' '); i--)
+	    pbuf[i] = 0;
+	pbuf[CDP_WIDTH] = 0;				/* trailing null */
+	}
 fputs (pbuf, uptr->fileref);				/* output card */
 fputc ('\n', uptr->fileref);				/* plus new line */
 if (ferror (uptr->fileref)) {				/* error? */

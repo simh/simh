@@ -25,6 +25,7 @@
 
    This module simulates the PDP-11 commercial instruction set (CIS).
 
+   16-Sep-04	RMS	Fixed bug in CMPP/N of negative strings
    17-Oct-02	RMS	Fixed compiler warning (found by Hans Pufal)
    08-Oct-02	RMS	Fixed macro definitions
 
@@ -154,8 +155,8 @@
 #define MAXDVAL		429496730			/* 2^32 / 10 */
 
 struct dstr {
-	unsigned int32	sign;
-	unsigned int32	val[DSTRLNT];  };
+	uint32		sign;
+	uint32		val[DSTRLNT];  };
 
 typedef struct dstr DSTR;
 
@@ -175,8 +176,8 @@ void SubDstr (DSTR *src1, DSTR *src2, DSTR *dst);
 int32 CmpDstr (DSTR *src1, DSTR *src2);
 int32 TestDstr (DSTR *dsrc);
 int32 LntDstr (DSTR *dsrc, int32 nz);
-unsigned int32 NibbleLshift (DSTR *dsrc, int32 sc, unsigned int32 cin);
-unsigned int32 NibbleRshift (DSTR *dsrc, int32 sc, unsigned int32 cin);
+uint32 NibbleLshift (DSTR *dsrc, int32 sc, uint32 cin);
+uint32 NibbleRshift (DSTR *dsrc, int32 sc, uint32 cin);
 int32 WordLshift (DSTR *dsrc, int32 sc);
 void WordRshift (DSTR *dsrc, int32 sc);
 void CreateTable (DSTR *dsrc, DSTR mtable[10]);
@@ -738,8 +739,9 @@ case 052: case 072: case 0152: case 0172:
 	if (src1.sign != src2.sign) N = src1.sign;
 	else {
 	    t = CmpDstr (&src1, &src2);			/* compare strings */
-	    if (t < 0) N = 1;
-	    else if (t == 0) Z = 1;  }
+	    if (t < 0) N = (src1.sign? 0: 1);
+	    else if (t > 0) N = (src1.sign? 1: 0);
+	    else Z = 1;  }
 	if ((op & INLINE) == 0)				/* if reg, clr reg */
 	    R[0] = R[1] = R[2] = R[3] = 0;
 	return;
@@ -1073,7 +1075,7 @@ return;
 int32 AddDstr (DSTR *s1, DSTR *s2, DSTR *ds, int32 cy)
 {
 int32 i;
-unsigned int32 sm1, sm2, tm1, tm2, tm3, tm4;
+uint32 sm1, sm2, tm1, tm2, tm3, tm4;
 
 for (i = 0; i < DSTRLNT; i++) {				/* loop low to high */
 	tm1 = s1->val[i] ^ (s2->val[i] + cy);		/* xor operands */
@@ -1226,7 +1228,7 @@ return c;
 	cin	=	carry in
 */
 
-unsigned int32 NibbleRshift (DSTR *dsrc, int32 sc, unsigned int32 cin)
+uint32 NibbleRshift (DSTR *dsrc, int32 sc, uint32 cin)
 {
 int32 i, s, rs, nc;
 
@@ -1249,7 +1251,7 @@ return 0;
 	cin	=	carry in
 */
 
-unsigned int32 NibbleLshift (DSTR *dsrc, int32 sc, unsigned int32 cin)
+uint32 NibbleLshift (DSTR *dsrc, int32 sc, uint32 cin)
 {
 int32 i, s, rs, nc;
 

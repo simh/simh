@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	IBM 1401 Simulator Usage
-Date:	15-Feb-2004
+Date:	15-Nov-2004
 
 			COPYRIGHT NOTICE
 
@@ -174,6 +174,17 @@ interrupt system.
 				most recent IS change first
 	WRU		8	interrupt character
 
+The CPU can maintain a history of the most recently executed instructions.
+This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
+
+	SET CPU HISTORY		clear history buffer
+	SET CPU HISTORY=0	disable history
+	SET CPU HISTORY=n	enable history, length = n
+	SHOW CPU HISTORY	print CPU history
+	SHOW CPU HISTORY=n	print first n entries of CPU history
+
+The maximum length for the history is 65536 entries.
+
 2.2 1402 Card Reader/Punch (CDR, CDP, STKR)
 
 The IBM 1402 card/reader punch is simulated as three independent devices:
@@ -314,7 +325,7 @@ pack options include the ability to enable address writing (formatting).
 	SET DPn ADDROFF		set unit n address enable off
 	SET DPn ADDRON		set unit n address enable on
 
-Units can also be set ONLINE or OFFLINE.
+Units can also be set ENABLED or DISABLED.
 
 Unlike most simulated disks, the 1311 includes explicit representation
 for sector addresses.  This is to support non-standard formats, such as
@@ -367,7 +378,7 @@ or write locked.
 	SET MTn LOCKED		set unit n write locked
 	SET MTn WRITEENABLED	set unit n write enabled
 
-Units can also be set ONLINE or OFFLINE.  The magnetic tape simulator
+Units can also be set ENABLED or DISABLED.  The magnetic tape simulator
 supports the BOOT command.  BOOT MT reads the first record off tape,
 starting at location 1, and then branches to it. 
 

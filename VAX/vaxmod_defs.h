@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Sep-04	RMS	Removed map_address prototype
    16-Jun-04	RMS	Added DHQ11 support
    21-Mar-04	RMS	Added RXV21 support
    25-Jan-04	RMS	Removed local debug logging support
@@ -57,6 +58,13 @@
 	3400 0000 - 3FFF FFFF		reserved
 */
 
+#ifdef FULL_VAX						/* subset VAX */
+#undef FULL_VAX
+#endif
+
+#ifndef _VAXMOD_DEFS_H_
+#define _VAXMOD_DEFS_H_	1
+
 /* Microcode constructs */
 
 #define CVAX_SID	(10 << 24)			/* system ID */
@@ -73,6 +81,14 @@
 #define MCHK_INTIPL	0x09				/* invalid ireq */
 #define MCHK_READ	0x80				/* read check */
 #define MCHK_WRITE	0x82				/* write check */
+
+/* Machine specific IPRs */
+
+#define MT_CADR		37
+#define MT_MSER		39
+#define MT_CONPC	42
+#define MT_CONPSL	43
+#define MT_IORESET	55
 
 /* Memory system error register */
 
@@ -409,19 +425,10 @@ typedef struct pdp_dib DIB;
 
 /* Function prototypes for I/O */
 
-t_bool map_addr (uint32 qa, uint32 *ma);
-int32 map_readB (uint32 ba, int32 bc, uint8 *buf);
-int32 map_readW (uint32 ba, int32 bc, uint16 *buf);
-int32 map_readL (uint32 ba, int32 bc, uint32 *buf);
-int32 map_writeB (uint32 ba, int32 bc, uint8 *buf);
-int32 map_writeW (uint32 ba, int32 bc, uint16 *buf);
-int32 map_writeL (uint32 ba, int32 bc, uint32 *buf);
-
-#define Map_Addr(a,b)		map_addr (a, b)
-#define Map_ReadB(a,b,c,d)	map_readB (a, b, c)
-#define Map_ReadW(a,b,c,d)	map_readW (a, b, c)
-#define Map_WriteB(a,b,c,d)	map_writeB (a, b, c)
-#define Map_WriteW(a,b,c,d)	map_writeW (a, b, c)
+int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
+int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
+int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
 
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -429,3 +436,5 @@ t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat auto_config (uint32 rank, uint32 num);
+
+#endif

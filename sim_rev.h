@@ -28,12 +28,183 @@
 #define _SIM_REV_H_	0
 
 #define	SIM_MAJOR	3
-#define SIM_MINOR	2
-#define SIM_PATCH	3
+#define SIM_MINOR	3
+#define SIM_PATCH	0
 
-/* V3.2 revision history 
+/* V3.3 revision history 
 
 patch	date		module(s) and fix(es)
+
+  0	tbd		scp.c:
+			- added reset_all_p (powerup)
+			- fixed comma-separated SET options (from Dave Bryan)
+			- changed ONLINE/OFFLINE to ENABLED/DISABLED (from Dave Bryan)
+			- modified to flush device buffers on stop (from Dave Bryan)
+			- changed HELP to suppress duplicate command displays
+
+			sim_console.c:
+			- moved SET/SHOW DEBUG under CONSOLE hierarchy
+
+			hp2100_cpu.c: (all fixes by Dave Bryan)
+			- moved MP into its own device; added MP option jumpers
+			- modified DMA to allow disabling
+			- modified SET CPU 2100/2116 to truncate memory > 32K
+			- added -F switch to SET CPU to force memory truncation
+			- fixed S-register behavior on 2116
+			- fixed LIx/MIx behavior for DMA on 2116 and 2100
+			- fixed LIx/MIx behavior for empty I/O card slots
+			- modified WRU to be REG_HRO
+			- added BRK and DEL to save console settings
+			- fixed use of "unsigned int16" in cpu_reset
+
+			hp2100_dp.c: (all fixes by Dave Bryan)
+			- fixed enable/disable from either device
+			- fixed ANY ERROR status for 12557A interface
+			- fixed unattached drive status for 12557A interface
+			- status cmd without prior STC DC now completes (12557A)
+			- OTA/OTB CC on 13210A interface also does CLC CC
+			- fixed RAR model
+			- fixed seek check on 13210 if sector out of range
+
+			hp2100_dq.c: (all fixes by Dave Bryan)
+			- fixed enable/disable from either device
+			- shortened xtime from 5 to 3 (drive avg 156KW/second)
+			- fixed not ready/any error status
+			- fixed RAR model
+
+			hp2100_dr.c: (all fixes by Dave Bryan)
+			- fixed enable/disable from either device
+			- fixed sector return in status word
+			- provided protected tracks and "Writing Enabled" status bit
+			- fixed DMA last word write, incomplete sector fill value
+			- added "parity error" status return on writes for 12606
+			- added track origin test for 12606
+			- added SCP test for 12606
+			- fixed 12610 SFC operation
+			- added "Sector Flag" status bit
+			- added "Read Inhibit" status bit for 12606
+			- fixed current-sector determination
+			- added TRACKPROT modifier
+
+			hp2100_ipl.c, hp2100_ms.c: (all fixes by Dave Bryan)
+			- fixed enable/disable from either device
+
+			hp2100_lps.c: (all fixes by Dave Bryan)
+			- added SET OFFLINE/ONLINE, POWEROFF/POWERON
+   			- fixed status returns for error conditions
+			- fixed handling of non-printing characters
+			- fixed handling of characters after column 80
+			- improved timing model accuracy for RTE
+			- added fast/realistic timing
+			- added debug printouts
+
+			hp2100_lpt.c: (all fixes by Dave Bryan)
+			- added SET OFFLINE/ONLINE, POWEROFF/POWERON
+   			- fixed status returns for error conditions
+			- fixed TOF handling so form remains on line 0
+
+			hp2100_stddev.c (all fixes by Dave Bryan)
+			- added paper tape loop mode, DIAG/READER modifiers to PTR
+			- added PV_LEFT to PTR TRLLIM register
+			- modified CLK to permit disable
+
+			hp2100_sys.c: (all fixes by Dave Bryan)
+			- added memory protect device
+			- fixed display of CCA/CCB/CCE instructions
+
+			i1401_cpu.c: added =n to SHOW HISTORY
+
+			id16_cpu.c: added instruction history
+
+			id32_cpu.c: added =n to SHOW HISTORY
+
+			pdp10_defs.h: revised Unibus DMA API's
+
+			pdp10_ksio.c: revised Unibus DMA API's
+
+			pdp10_lp20.c: revised Unibus DMA API's
+
+			pdp10_rp.c: replicated register state per drive
+
+			pdp10_tu.c:
+			- fixed to set FCE on short record
+			- fixed to return bit<15> in drive type
+			- fixed format specification, 1:0 are don't cares
+			- implemented write check
+			- TMK is cleared by new motion command, not DCLR
+			- DONE is set on data transfers, ATA on non data transfers
+
+			pdp11_defs.h: 
+			- revised Unibus/Qbus DMA API's
+			- added CPU type and options flags
+
+			pdp11_cpumod.h, pdp11_cpumod.c:
+			- new routines for setting CPU type and options
+
+			pdp11_io.c: revised Unibus/Qbus DMA API's
+
+			all PDP-11 DMA peripherals:
+			- revised Unibus/Qbus DMA API's
+
+			pdp11_hk.c: CS2 OR must be zero for M+
+
+			pdp11_rh.c, pdp11_rp.c, pdp11_tu.c:
+			- split Massbus adapter from controllers
+			- replicated RP register state per drive
+			- added TM02/TM03 with TE16/TU45/TU77 drives
+
+			pdp11_rq.c, pdp11_tq.c:
+			- provided different default timing for PDP-11, VAX
+			- revised to report CPU bus type in stage 1
+			- revised to report controller type reflecting bus type
+			- added -L switch (LBNs) to RAUSER size specification
+
+			pdp15_cpu.c: added =n to SHOW HISTORY
+
+			pdp15_fpp.c:
+			- fixed URFST to mask low 9b of fraction
+			- fixed exception PC setting
+
+			pdp8_cpu.c: added =n to SHOW HISTORY
+
+			vax_defs.h:
+			- added octaword, compatibility mode support
+
+			vax_moddefs.h: 
+			- revised Unibus/Qbus DMA API's
+
+			vax_cpu.c:
+			- moved processor-specific code to vax_sysdev.c
+			- added =n to SHOW HISTORY
+
+			vax_cpu1.c:
+			- moved processor-specific IPR's to vax_sysdev.c
+			- moved emulation trap to vax_cis.c
+			- added support for compatibility mode
+
+			vax_cis.c: new full VAX CIS instruction emulator
+
+			vax_octa.c: new full VAX octaword and h_floating instruction emulator
+
+			vax_cmode.c: new full VAX compatibility mode instruction emulator
+
+			vax_io.c:
+			- revised Unibus/Qbus DMA API's
+
+			vax_io.c, vax_stddev.c, vax_sysdev.c:
+			- integrated powerup into RESET (with -p)
+
+			vax_sys.c:
+			- fixed bugs in parsing indirect displacement modes
+			- fixed bugs in displaying and parsing character data
+
+			vax_syscm.c: added display and parse for compatibility mode
+
+			vax_syslist.c:
+			- split from vax_sys.c
+			- removed PTR, PTP
+
+/* V3.2 revision history 
 
   3	03-Sep-04	scp.c:
 			- added ECHO command (from Dave Bryan)

@@ -1,4 +1,4 @@
-/* vax_mm.c - VAX memory management simulator
+/* vax_mm.c - VAX memory management
 
    Copyright (c) 1998-2004, Robert M Supnik
 
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Sep-04	RMS	Comment and formating changes
    19-Sep-03	RMS	Fixed upper/lower case linkage problems on VMS
    01-Jun-03	RMS	Fixed compilation problem with USE_ADDR64
 

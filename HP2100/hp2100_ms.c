@@ -26,6 +26,7 @@
    ms		13181A 7970B 800bpi nine track magnetic tape
 		13183A 7970E 1600bpi nine track magnetic tape
 
+   07-Oct-04	JDB	Fixed enable/disable from either device
    14-Aug-04	JDB	Fixed many functional and timing problems (from Dave Bryan)
 			- fixed erroneous execution of rejected command
 			- fixed erroneous execution of select-only command
@@ -63,6 +64,12 @@
 
    If the byte count is odd, the record is padded with an extra byte
    of junk.  File marks are represented by a byte count of 0.
+
+   References:
+   - 13181B Digital Magnetic Tape Unit Interface Kit Operating and Service Manual
+            (13181-90901, Nov-1982)
+   - 13183B Digital Magnetic Tape Unit Interface Kit Operating and Service Manual
+            (13183-90901, Nov-1983)
 */
 
 #include "hp2100_defs.h"
@@ -233,7 +240,7 @@ DEVICE msd_dev = {
 	1, 10, DB_N_SIZE, 1, 8, 8,
 	NULL, NULL, &msc_reset,
 	NULL, NULL, NULL,
-	&msd_dib, 0 };
+	&msd_dib, DEV_DISABLE };
 
 /* MSC data structures
 
@@ -646,7 +653,8 @@ t_stat msc_reset (DEVICE *dptr)
 int32 i;
 UNIT *uptr;
 
-hp_enbdis_pair (&msc_dev, &msd_dev);			/* make pair cons */
+hp_enbdis_pair (dptr,					/* make pair cons */
+	(dptr == &msd_dev)? &msc_dev: &msd_dev);
 msc_buf = msd_buf = 0;
 msc_sta = msc_usl = 0;
 msc_1st = 0;

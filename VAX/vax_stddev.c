@@ -1,4 +1,4 @@
-/* vax_stddev.c: VAX standard I/O devices simulator
+/* vax_stddev.c: VAX 3900 standard I/O devices
 
    Copyright (c) 1998-2004, Robert M Supnik
 
@@ -27,6 +27,7 @@
    tto		terminal output
    clk		100Hz and TODR clock
 
+   09-Sep-04	RMS	Integrated powerup into RESET (with -p)
    28-May-04	RMS	Removed SET TTI CTRL-C
    29-Dec-03	RMS	Added console backpressure support
    25-Apr-03	RMS	Revised for extended file support
@@ -59,6 +60,7 @@
 
 extern int32 int_req[IPL_HLVL];
 extern int32 hlt_pin;
+extern int32 sim_switches;
 
 int32 tti_csr = 0;					/* control/status */
 int32 tto_csr = 0;					/* control/status */
@@ -341,19 +343,6 @@ if (!todr_blow) todr_reg = todr_reg + 1;		/* incr TODR */
 return SCPE_OK;
 }
 
-t_stat clk_reset (DEVICE *dptr)
-{
-int32 t;
-
-clk_csr = 0;
-CLR_INT (CLK);
-t = sim_rtcn_init (clk_unit.wait, TMR_CLK);		/* init timer */
-sim_activate (&clk_unit, t);				/* activate unit */
-tmr_poll = t;						/* set tmr poll */
-tmxr_poll = t * TMXR_MULT;				/* set mux poll */
-return SCPE_OK;
-}
-
 t_stat todr_powerup (void)
 {
 uint32 base;
@@ -372,3 +361,18 @@ todr_reg = (base * 100) + 0x10000000;			/* cvt to VAX form */
 todr_blow = 0;
 return SCPE_OK;
 }
+
+t_stat clk_reset (DEVICE *dptr)
+{
+int32 t;
+
+if (sim_switches & SWMASK ('P')) todr_powerup ();	/* powerup? */
+clk_csr = 0;
+CLR_INT (CLK);
+t = sim_rtcn_init (clk_unit.wait, TMR_CLK);		/* init timer */
+sim_activate (&clk_unit, t);				/* activate unit */
+tmr_poll = t;						/* set tmr poll */
+tmxr_poll = t * TMXR_MULT;				/* set mux poll */
+return SCPE_OK;
+}
+

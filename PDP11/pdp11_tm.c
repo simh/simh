@@ -25,6 +25,7 @@
 
    tm		TM11/TU10 magtape
 
+   30-Sep-04	RMS	Revised Unibus interface
    25-Jan-04	RMS	Revised for device debug support
    29-Dec-03	RMS	Added 18b Qbus support
    25-Apr-03	RMS	Revised for extended file support
@@ -398,7 +399,7 @@ case MTC_READ:						/* read */
 	    break;  }
 	if (tbc > cbc) tm_sta = tm_sta | STA_RLE;	/* wrong size? */
 	if (tbc < cbc) cbc = tbc;			/* use smaller */
-	if (t = Map_WriteB (xma, cbc, tmxb, MAP)) {	/* copy buf to mem */
+	if (t = Map_WriteB (xma, cbc, tmxb)) {		/* copy buf to mem */
 	    tm_sta = tm_sta | STA_NXM;			/* NXM, set err */
 	    cbc = cbc - t;  }				/* adj byte cnt */
 	xma = (xma + cbc) & 0777777;			/* inc bus addr */
@@ -407,7 +408,7 @@ case MTC_READ:						/* read */
 
 case MTC_WRITE:						/* write */
 case MTC_WREXT:						/* write ext gap */
-	if (t = Map_ReadB (xma, cbc, tmxb, MAP)) {	/* copy mem to buf */
+	if (t = Map_ReadB (xma, cbc, tmxb)) {		/* copy mem to buf */
 	    tm_sta = tm_sta | STA_NXM;			/* NXM, set err */
 	    cbc = cbc - t;				/* adj byte cnt */
 	    if (cbc == 0) break;  }			/* no xfr? done */
@@ -530,7 +531,7 @@ for (u = 0; u < TM_NUMDR; u++) {			/* loop thru units */
 		(sim_tape_bot (uptr)? STA_BOT: 0) |
 		(sim_tape_wrp (uptr)? STA_WLK: 0);
 	else uptr->USTAT = 0;  }
-if (tmxb == NULL) tmxb = calloc (MT_MAXFR, sizeof (unsigned int8));
+if (tmxb == NULL) tmxb = calloc (MT_MAXFR, sizeof (uint8));
 if (tmxb == NULL) return SCPE_MEM;
 return SCPE_OK;
 }

@@ -1,4 +1,4 @@
-/* hp2100_lpt.c: HP 2100 12845A line printer simulator
+/* hp2100_lpt.c: HP 2100 12845B line printer simulator
 
    Copyright (c) 1993-2004, Robert M. Supnik
 
@@ -23,13 +23,45 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   lpt		12845A line printer
+   lpt		12845B 2607 line printer
 
+   29-Sep-04	JDB	Added SET OFFLINE/ONLINE, POWEROFF/POWERON
+   			Fixed status returns for error conditions
+			Fixed TOF handling so form remains on line 0
    03-Jun-04	RMS	Fixed timing (found by Dave Bryan)
    26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
 			Implemented DMA SRQ (follows FLG)
    25-Apr-03	RMS	Revised for extended file support
    24-Oct-02	RMS	Cloned from 12653A
+
+   The 2607 provides three status bits via the interface:
+
+     bit 15 -- printer ready (online)
+     bit 14 -- paper out
+     bit  0 -- printer idle
+
+   The expected status returns are:
+
+     140001 -- power off or cable disconnected
+     100001 -- power on, paper loaded, printer ready
+     100000 -- power on, paper loaded, printer busy
+     040000 -- power on, paper out (at bottom-of-form)
+     000000 -- power on, paper out (not at BOF) / print button up / platen open
+
+   Manual Note: "2-33. PAPER OUT SIGNAL.  [...]  The signal is asserted only
+   when the format tape in the line printer has reached the bottom of form."
+
+   These simulator commands provide the listed printer states:
+
+     SET LPT POWEROFF --> power off or cable disconnected
+     SET LPT POWERON  --> power on
+     SET LPT OFFLINE  --> print button up
+     SET LPT ONLINE   --> print button down
+     ATT LPT <file>   --> paper loaded
+     DET LPT          --> paper out
+
+   Reference:
+   - 12845A Line Printer Operating and Service Manual (12845-90001, Aug-1972)
 */
 
 #include "hp2100_defs.h"
@@ -39,11 +71,17 @@
 #define LPT_NBSY 	0000001				/* not busy */
 #define LPT_PAPO	0040000				/* paper out */
 #define LPT_RDY		0100000				/* ready */
+#define LPT_PWROFF	LPT_RDY | LPT_PAPO | LPT_NBSY   /* power-off status */
 
 #define LPT_CTL		0100000				/* control output */
 #define LPT_CHAN	0000100				/* skip to chan */
 #define LPT_SKIPM	0000077				/* line count mask */
 #define LPT_CHANM	0000007				/* channel mask */
+
+#define UNIT_V_POWEROFF	(UNIT_V_UF + 0)			/* unit powered off */
+#define UNIT_V_OFFLINE	(UNIT_V_UF + 1)			/* unit offline */
+#define UNIT_POWEROFF	(1 << UNIT_V_POWEROFF)
+#define UNIT_OFFLINE	(1 << UNIT_V_OFFLINE)
 
 extern uint32 PC;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
@@ -71,7 +109,7 @@ t_stat lpt_attach (UNIT *uptr, char *cptr);
 DIB lpt_dib = { LPT, 0, 0, 0, 0, 0, &lptio };
 
 UNIT lpt_unit = {
-	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0) };
+	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_DISABLE, 0) };
 
 REG lpt_reg[] = {
 	{ ORDATA (BUF, lpt_unit.buf, 7) },
@@ -89,6 +127,10 @@ REG lpt_reg[] = {
 	{ NULL }  };
 
 MTAB lpt_mod[] = {
+	{ UNIT_POWEROFF, UNIT_POWEROFF, "power off", "POWEROFF", NULL },
+	{ UNIT_POWEROFF, 0, "power on", "POWERON", NULL },
+	{ UNIT_OFFLINE, UNIT_OFFLINE, "offline", "OFFLINE", NULL },
+	{ UNIT_OFFLINE, 0, "online", "ONLINE", NULL },
 	{ MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&hp_setdev, &hp_showdev, &lpt_dev },
 	{ 0 }  };
@@ -123,11 +165,15 @@ case ioOTX:						/* output */
 case ioLIX:						/* load */
 	dat = 0;					/* default sta = 0 */
 case ioMIX:						/* merge */
-	if (lpt_unit.flags & UNIT_ATT) {
-	    dat = dat | LPT_RDY;
-	    if (!sim_is_active (&lpt_unit))
-		dat = dat | LPT_NBSY;  }
-	else dat = dat | LPT_PAPO;
+	if (lpt_unit.flags & UNIT_POWEROFF)		/* power off? */
+	    dat = dat | LPT_PWROFF;
+	else if (!(lpt_unit.flags & UNIT_OFFLINE))	/* online? */
+	    if (lpt_unit.flags & UNIT_ATT) {		/* paper loaded? */
+		dat = dat | LPT_RDY;
+		if (!sim_is_active (&lpt_unit))		/* printer busy? */
+		    dat = dat | LPT_NBSY;  }
+	    else if (lpt_lcnt == LPT_PAGELNT - 1)	/* paper out, at BOF? */
+		dat = dat | LPT_PAPO;
 	break;
 case ioCTL:						/* control clear/set */
 	if (IR & I_CTL) {				/* CLC */
@@ -160,7 +206,7 @@ if (uptr->buf & LPT_CTL) {				/* control word? */
 	    if (chan == 0) {				/* top of form? */
 		fputc ('\f', uptr->fileref);		/* ffeed */
 		lpt_lcnt = 0;				/* reset line cnt */
-		skip = 1;  }
+		skip = 0;  }
 	    else if (chan == 1) skip = LPT_PAGELNT - lpt_lcnt - 1;
 	    else skip = lpt_cct[chan] - (lpt_lcnt % lpt_cct[chan]);
 	    }

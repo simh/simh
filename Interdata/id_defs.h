@@ -73,8 +73,8 @@
 /* Double precision floating point registers */
 
 struct dpr {
-	unsigned int32	h;				/* high 32b */
-	unsigned int32	l;				/* low 32b */
+	uint32		h;				/* high 32b */
+	uint32		l;				/* low 32b */
 };
 
 typedef struct dpr dpr_t;

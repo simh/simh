@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Interdata 16b/32b Simulator Usage
-Date:	15-Feb-2004
+Date:	15-Nov-2004
 
 			COPYRIGHT NOTICE
 
@@ -205,6 +205,17 @@ control registers for the interrupt system.
 				most recent PC change first
 	WRU		8	interrupt character
 
+The CPU can maintain a history of the most recently executed instructions.
+This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
+
+	SET CPU HISTORY		clear history buffer
+	SET CPU HISTORY=0	disable history
+	SET CPU HISTORY=n	enable history, length = n
+	SHOW CPU HISTORY	print CPU history
+	SHOW CPU HISTORY=n	print first n entries of CPU history
+
+The maximum length for the history is 65536 entries.
+
 2.2 CPU (32b)
 
 The CPU options include memory size and CPU type:
@@ -270,8 +281,9 @@ This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
 
 	SET CPU HISTORY		clear history buffer
 	SET CPU HISTORY=0	disable history
-	SET CPU HISTORY=n	enable history, display length = n
+	SET CPU HISTORY=n	enable history, length = n
 	SHOW CPU HISTORY	print CPU history
+	SHOW CPU HISTORY=n	print first n entries of CPU history
 
 The maximum length for the history is 65536 entries.
 
@@ -547,7 +559,7 @@ write locked.
 	SET FDn LOCKED		set unit n write locked
 	SET FDn WRITEENABLED	set unit n write enabled
 
-Units can also be set ONLINE or OFFLINE.
+Units can also be set ENABLED or DISABLED.
 
 The floppy disk supports the BOOT command.  BOOT FDn copies an autoload
 sequence into memory and starts it running.
@@ -658,7 +670,7 @@ write locked, and to select the type of drive:
 	SET DPn 2315		set unit n to 2315 (2.5MB)
 	SET DPn 5440		set unit n to 5440 (10MB)
 
-Units can also be set ONLINE or OFFLINE.
+Units can also be set ENABLED or DISABLED.
 
 The cartridge disk supports the BOOT command.  To boot OS16/32, the hex
 form of the operating system file's extension must be placed in locations
@@ -729,7 +741,7 @@ write enabled or write locked, and to select the type of drive:
 				(300MB formatted)
 
 Note that the disk bootstraps can ONLY boot the MSM80 and MSM300.
-Units can be set ONLINE or OFFLINE.
+Units can also be set ENABLED or DISABLED.
 
 The MSM/IDC controller supports the BOOT command.  To boot OS16/32, the hex
 form of the operating system file's extension must be placed in locations
@@ -791,7 +803,7 @@ or write locked.
 	SET MTn LOCKED		set unit n write locked
 	SET MTn WRITEENABLED	set unit n write enabled
 
-Units can also be set ONLINE or OFFLINE.
+Units can also be set ENABLED or DISABLED.
 
 The magnetic tape supports the BOOT command.  BOOT MTn copies an autoload
 sequence into memory and starts it running.

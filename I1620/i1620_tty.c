@@ -219,8 +219,8 @@ return STOP_RWRAP;
 
 t_stat tti_rnum (int8 *c)
 {
-int8 flg = 0;
-char *cp, raw;
+int8 raw, flg = 0;
+char *cp;
 t_stat r;
 
 *c = -1;						/* no char yet */
@@ -240,7 +240,7 @@ return SCPE_OK;
 
 t_stat tti_ralp (int8 *c)
 {
-char raw;
+int8 raw;
 t_stat r;
 
 *c = -1;						/* no char yet */

@@ -25,6 +25,8 @@
 
    fpp		PDP-15 floating point processor
 
+   31-Oct-04	RMS	Fixed URFST to mask low 9b of fraction
+			Fixed exception PC setting
    10-Apr-04	RMS	JEA is 15b not 18b
  
    The FP15 instruction format is:
@@ -205,7 +207,7 @@ DEVICE fpp_dev = {
 	1, 8, 1, 1, 8, 18,
 	NULL, NULL, &fp15_reset,
 	NULL, NULL, NULL,
-	NULL, DEV_DISABLE | DEV_DIS };
+	NULL, DEV_DISABLE };
 
 /* Instruction decode for FP15
 
@@ -390,11 +392,11 @@ t_stat sta;
 fguard = 0;						/* clear guard */
 if (ir & FI_FP) {					/* fp? */
 	if (sta = fp15_norm (ir, a, NULL, 0)) return sta;	/* normalize */
-	wd[1] = (a->sign << 17) | a->hi;		/* hi frac */
 	if (ir & FI_DP) {				/* dp? */
-	    numwd = 3;					/* 3 words */
 	    wd[0] = a->exp & DMASK;			/* exponent */
-	    wd[2] = a->lo;  }				/* low frac */
+	    wd[1] = (a->sign << 17) | a->hi;		/* hi frac */
+	    wd[2] = a->lo;				/* low frac */
+	    numwd = 3;  }				/* 3 words */
 	else {						/* single */
 	    if (!(ir & FI_NORND) && (a->lo & UFP_FL_SRND)) {	/* round? */
 		a->lo = (a->lo + UFP_FL_SRND) & UFP_FL_SMASK;
@@ -404,24 +406,25 @@ if (ir & FI_FP) {					/* fp? */
 		    a->exp = a->exp + 1;  }  }
 	    if (a->exp > 0377) return FP_OVF;		/* sp ovf? */
 	    if (a->exp < -0400) return FP_UNF;		/* sp unf? */
-	    numwd = 2;					/* 2 words */
-	    wd[0] = (a->exp & 0777) | a->lo;  }		/* low frac'exp */
+	    wd[0] = (a->exp & 0777) | (a->lo & UFP_FL_SMASK);	/* low frac'exp */
+	    wd[1] = (a->sign << 17) | a->hi;		/* hi frac */
+	    numwd = 2;  }				/* 2 words */
 	}
 else {	fmb.lo = (-a->lo) & UFP_FL_MASK;		/* 2's complement */
 	fmb.hi = (~a->hi + (fmb.lo == 0)) & UFP_FH_MASK;/* to FMB */
 	if (ir & FI_DP) {				/* dp? */
-	    numwd = 2;					/* 2 words */
 	    if (a->sign) {				/* negative? */
 		wd[0] = fmb.hi | SIGN;			/* store FMB */
 		wd[1] = fmb.lo;  }
 	    else {					/* pos, store FMA */
 		wd[0] = a->hi;
-		wd[1] = a->lo;  }  }
+		wd[1] = a->lo;  }
+	    numwd = 2;  }				/* 2 words */
 	else {						/* single */
 	    if (a->hi || (a->lo & SIGN)) return FP_OVF;	/* check int ovf */
-	    numwd = 1;					/* 1 word */
 	    if (a->sign) wd[0] = fmb.lo;		/* neg? store FMB */
-	    else wd[0] = a->lo;  }			/* pos, store FMA */
+	    else wd[0] = a->lo;				/* pos, store FMA */
+	    numwd = 1;  }				/* 1 word */
 	}
 for (i = 0; i < numwd; i++) {				/* store words */
 	if (Write (addr, wd[i], WR)) return FP_MM;
@@ -483,7 +486,7 @@ while (((a->hi & UFP_FH_NORM) == 0) &&			/* normalize divd */
 	dp_lsh_1 (a, NULL);				/* lsh divd, divr */
 	dp_lsh_1 (b, NULL);  }				/* can't carry out */
 if (!(a->hi & UFP_FH_NORM) && (b->hi & UFP_FH_NORM)) {	/* divr norm, divd not? */
-	a->hi = a->lo = 0;				/* result is 0 */
+	dp_swap (a, &fmq);				/* quo = 0 (fmq), rem = a */
 	return FP_OK;  }
 while ((b->hi & UFP_FH_NORM) == 0) {			/* normalize divr */
 	dp_lsh_1 (b, NULL);				/* can't carry out */
@@ -562,7 +565,7 @@ if (a->hi | a->lo) {					/* divd non-zero? */
 	for (i = 0; (fmq.hi & UFP_FH_NORM) == 0; i++) {	/* until quo */
 	    dp_lsh_1 (&fmq, NULL);			/* left shift quo */
 	    if (dp_cmp (a, b) >= 0) {			/* sub work? */
-	        dp_sub (a, b);				/* a -= b */
+	        dp_sub (a, b);				/* a = a - b */
 		if (i == 0) a->exp = a->exp + 1;
 		fmq.lo = fmq.lo | 1;  }			/* set quo bit */
 	    dp_lsh_1 (a, NULL);  }			/* left shift divd */
@@ -768,7 +771,7 @@ PCQ_ENTRY;						/* record branch */
 PC = Incr_addr (PC);					/* PC+1 for "JMS" */
 mb = Jms_word (usmd);					/* form JMS word */
 if (Write (ma, mb, WR)) return SCPE_OK;			/* store */
-PC = (jea + 1) & IAMASK;				/* new PC */
+PC = (ma + 1) & IAMASK;					/* new PC */
 return SCPE_OK;
 }
 	

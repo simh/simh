@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Nov-04	WVS	Added column binary support, debug support
+   06-Nov-04	RMS	Added instruction history
    12-Jul-03	RMS	Moved ASCII/BCD tables to included file
 			Revised fetch to model hardware
 			Removed length checking in fetch phase
@@ -123,6 +125,13 @@
 #define PCQ_MASK	(PCQ_SIZE - 1)
 #define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = saved_IS
 
+#define HIST_MIN	64
+#define HIST_MAX	65536
+struct InstHistory {
+	uint16		is;
+	uint16		ilnt;
+	uint8		inst[MAX_L]; };
+
 /* These macros validate addresses.  If an addresses error is detected,
    they return an error status to the caller.  These macros should only
    be used in a routine that returns a t_stat value.
@@ -162,13 +171,22 @@ int32 ind[64] = { 0 };					/* indicators */
 int32 ssa = 1;						/* sense switch A */
 int32 prchk = 0;					/* process check stop */
 int32 iochk = 0;					/* I/O check stop */
+int32 hst_p = 0;					/* history pointer */
+int32 hst_lnt = 0;					/* history length */
+struct InstHistory *hst = NULL;				/* instruction history */
+
 extern int32 sim_int_char;
+extern int32 sim_emax;
+extern t_value *sim_eval;
+extern FILE *sim_deb;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 int32 store_addr_h (int32 addr);
 int32 store_addr_t (int32 addr);
 int32 store_addr_u (int32 addr);
@@ -188,6 +206,7 @@ extern t_stat mt_io (int32 unit, int32 flag, int32 mod);
 extern t_stat dp_io (int32 fnc, int32 flag, int32 mod);
 extern t_stat mt_func (int32 unit, int32 mod);
 extern t_stat sim_activate (UNIT *uptr, int32 delay);
+extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 
 /* CPU data structures
 
@@ -246,13 +265,16 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 8000, NULL, "8K", &cpu_set_size },
 	{ UNIT_MSIZE, 12000, NULL, "12K", &cpu_set_size },
 	{ UNIT_MSIZE, 16000, NULL, "16K", &cpu_set_size },
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
+	  &cpu_set_hist, &cpu_show_hist },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
 	1, 10, 14, 1, 8, 7,
 	&cpu_ex, &cpu_dep, &cpu_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, DEV_DEBUG };
 
 /* Tables */
 
@@ -431,6 +453,8 @@ static const int32 cry_table[100] = {
 
 /* Legal modifier tables */
 
+static const int32 r_mod[] = { BCD_C, -1 };
+static const int32 p_mod[] = { BCD_C, -1 };
 static const int32 w_mod[] = { BCD_S, BCD_SQUARE, -1 };
 static const int32 ss_mod[] = { 1, 2, 4, 8, -1 };
 static const int32 mtf_mod[] = { BCD_B, BCD_E, BCD_M, BCD_R, BCD_U, -1 };
@@ -440,7 +464,7 @@ t_stat sim_instr (void)
 extern int32 sim_interval;
 int32 IS, ilnt, flags;
 int32 op, xa, t, wm, ioind, dev, unit;
-int32 a, b, i, asave, bsave;
+int32 a, b, i, k, asave, bsave;
 int32 carry, lowprd, sign, ps;
 int32 quo, ahigh, qs;
 int32 qzero, qawm, qbody, qsign, qdollar, qaster, qdecimal;
@@ -568,12 +592,30 @@ while (((t = M[IS]) & WM) == 0) {			/* I-8: repeats until WM */
 	PP (IS);  }
 
 CHECK_LENGTH:
+if ((flags & BREQ) && ADDR_ERR (BS)) {			/* valid B? */
+	reason = STOP_INVB;
+	break;  }
+if ((flags & AREQ) && ADDR_ERR (AS)) {			/* valid A? */
+	reason = STOP_INVA;
+	break;  }
 ilnt = IS - saved_IS;					/* get lnt */
-//if (((flags & len_table [(ilnt <= 8)? ilnt: 8]) == 0) &&	/* valid lnt? */
-//	((flags & HNOP) == 0)) reason = STOP_INVL;
-if ((flags & BREQ) && ADDR_ERR (BS)) reason = STOP_INVB;	/* valid A? */
-if ((flags & AREQ) && ADDR_ERR (AS)) reason = STOP_INVA;	/* valid B? */
-if (reason) break;					/* error in fetch? */
+if (hst_lnt) {						/* history enabled? */
+	hst_p = (hst_p + 1);				/* next entry */
+	if (hst_p >= hst_lnt) hst_p = 0;
+	hst[hst_p].is = saved_IS;			/* save IS */
+	hst[hst_p].ilnt = ilnt;
+	for (i = 0; (i < MAX_L) && (i < ilnt); i++)
+	    hst[hst_p].inst[i] = M[saved_IS + i];
+	}
+if (DEBUG_PRS (cpu_dev)) {
+	fprint_val (sim_deb, saved_IS, 10, 5, PV_RSPC);
+	fprintf (sim_deb, ": " );
+	for (i = 0; i < sim_emax; i++) sim_eval[i] = 0;
+	for (i = 0, k = saved_IS; i < sim_emax; i++, k++) {
+	    if (cpu_ex (&sim_eval[i], k, &cpu_unit, 0) != SCPE_OK) break;  }
+	fprint_sym (sim_deb, saved_IS, sim_eval, &cpu_unit, SWMASK('M'));
+	fprintf (sim_deb, "\n" );
+	}
 switch (op) {						/* case on opcode */	
 
 /* Move/load character instructions			A check	B check
@@ -858,7 +900,7 @@ case OP_C:						/* compare */
 */
 
 case OP_R:						/* read */
-	if (reason = iomod (ilnt, D, NULL)) break;	/* valid modifier? */
+	if (reason = iomod (ilnt, D, r_mod)) break;	/* valid modifier? */
 	reason = read_card (ilnt, D);			/* read card */
 	BS = CDR_BUF + CDR_WIDTH;
 	if ((ilnt == 4) || (ilnt == 5)) { BRANCH;  }	/* check for branch */
@@ -872,7 +914,7 @@ case OP_W:						/* write */
 	break;
 
 case OP_P:						/* punch */
-	if (reason = iomod (ilnt, D, NULL)) break;	/* valid modifier? */
+	if (reason = iomod (ilnt, D, p_mod)) break;	/* valid modifier? */
 	reason = punch_card (ilnt, D);			/* punch card */
 	BS = CDP_BUF + CDP_WIDTH;
 	if ((ilnt == 4) || (ilnt == 5)) { BRANCH;  }	/* check for branch */
@@ -1559,5 +1601,68 @@ MEMSIZE = val;
 for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
 if (MEMSIZE > 4000) cpu_unit.flags = cpu_unit.flags | MA;
 else cpu_unit.flags = cpu_unit.flags & ~MA;
+return SCPE_OK;
+}
+
+/* Set history */
+
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i, lnt;
+t_stat r;
+
+if (cptr == NULL) {
+	for (i = 0; i < hst_lnt; i++) hst[i].ilnt = 0;
+	hst_p = 0;
+	return SCPE_OK;  }
+lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+hst_p = 0;
+if (hst_lnt) {
+	free (hst);
+	hst_lnt = 0;
+	hst = NULL;  }
+if (lnt) {
+	hst = calloc (sizeof (struct InstHistory), lnt);
+	if (hst == NULL) return SCPE_MEM;
+	hst_lnt = lnt;  }
+return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 i, k, di, lnt;
+char *cptr = (char *) desc;
+t_value sim_eval[MAX_L + 1];
+t_stat r;
+struct InstHistory *h;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+	UNIT *uptr, int32 sw);
+
+if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+if (cptr) {
+	lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+	if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;  }
+else lnt = hst_lnt;
+di = hst_p - lnt;					/* work forward */
+if (di < 0) di = di + hst_lnt;
+fprintf (st, "IS     IR\n\n");
+for (k = 0; k < lnt; k++) {				/* print specified */
+	h = &hst[(++di) % hst_lnt];			/* entry pointer */
+	if (h->ilnt) {					/* instruction? */
+	    fprintf (st, "%05d  ", h->is);
+	    for (i = 0; i < h->ilnt; i++)
+		sim_eval[i] = h->inst[i];
+	    sim_eval[h->ilnt] = WM;
+	    if ((fprint_sym (st, h->is, sim_eval, &cpu_unit, SWMASK ('M'))) > 0) {
+		fprintf (st, "(undefined)");
+		for (i = 0; i < h->ilnt; i++)
+		    fprintf (st, "% 02o", h->inst[i]);
+		}
+	    fputc ('\n', st);				/* end line */
+	    }						/* end else instruction */
+	}						/* end for */
 return SCPE_OK;
 }

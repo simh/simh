@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   04-Oct-04	RMS	Added FIS instructions
    19-Jan-03	RMS	Changed mode definitions for Apple Dev Kit conflict
    08-Oct-02	RMS	Fixed macro definitions
    05-Jun-98	RMS	Fixed implementation specific shift bugs
@@ -194,10 +195,13 @@
 #define GET_SIGN_W(ir)	GET_BIT((ir), 15)
 
 extern jmp_buf save_env;
+extern int32 cpu_type;
 extern int32 FEC, FEA, FPS;
 extern int32 CPUERR, trap_req;
 extern int32 N, Z, V, C;
 extern int32 R[8];
+extern int32 STKLIM;
+extern int32 cm, isenable, dsenable, MMR0, MMR1;
 extern fpac_t FR[6];
 
 fpac_t zero_fac = { 0, 0 };
@@ -219,7 +223,7 @@ int32 backup_PC;
 int32 fpnotrap (int32 code);
 int32 GeteaFP (int32 spec, int32 len);
 
-unsigned int32 ReadI (int32 addr, int32 spec, int32 len);
+uint32 ReadI (int32 addr, int32 spec, int32 len);
 void ReadFP (fpac_t *fac, int32 addr, int32 spec, int32 len);
 void WriteI (int32 data, int32 addr, int32 spec, int32 len);
 void WriteFP (fpac_t *data, int32 addr, int32 spec, int32 len);
@@ -235,6 +239,7 @@ int32 round_and_pack (fpac_t *fac, int32 exp, fpac_t *frac, int r);
 extern int32 GeteaW (int32 spec);
 extern int32 ReadW (int32 addr);
 extern void WriteW (int32 data, int32 addr);
+extern void set_stack_trap (int32 adr);
 
 /* Set up for instruction decode and execution */
 
@@ -244,7 +249,7 @@ int32 dst, ea, ac, dstspec;
 int32 i, qdouble, lenf, leni;
 int32 newV, exp, sign;
 fpac_t fac, fsrc, modfrac;
-static const unsigned int32 i_limit[2][2] =
+static const uint32 i_limit[2][2] =
 	{ { 0x80000000, 0x80010000 }, { 0x80000000, 0x80000001 } };
 
 backup_PC = PC;						/* save PC for FEA */
@@ -471,6 +476,9 @@ case 6:							/* SUBf */
 case 011:						/* DIVf */
 	ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
 	F_LOAD (qdouble, FR[ac], fac);
+	if (GET_EXP (fsrc.h) == 0) {			/* divide by zero? */
+	    fpnotrap (FEC_DZRO);
+	    ABORT (TRAP_INT);  }
 	newV = divfp11 (&fac, &fsrc);
 	F_STORE (qdouble, fac, FR[ac]);
 	FPS = setfcc (FPS, fac.h, newV);
@@ -494,7 +502,6 @@ return;
 int32 GeteaFP (int32 spec, int32 len)
 {
 int32 adr, reg, ds;
-extern int32 cm, isenable, dsenable, MMR0, MMR1;
 
 reg = spec & 07;					/* reg number */
 ds = (reg == 7)? isenable: dsenable;			/* dspace if not PC */
@@ -517,16 +524,14 @@ case 3:							/* @(R)+ */
 case 4:							/* -(R) */
 	adr = R[reg] = (R[reg] - len) & 0177777;
 	if (update_MM) MMR1 = (((-len) & 037) << 3) | reg;
-	if ((adr < STKLIM) && (reg == 6) && (cm == MD_KER)) {
-	    setTRAP (TRAP_YEL);
-	    setCPUERR (CPUE_YEL);  }
+	if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
+	    set_stack_trap (adr);
 	return (adr | ds);
 case 5:							/* @-(R) */
 	adr = R[reg] = (R[reg] - 2) & 0177777;
 	if (update_MM) MMR1 = 0360 | reg;
-	if ((adr < STKLIM) && (reg == 6) && (cm == MD_KER)) {
-	    setTRAP (TRAP_YEL);
-	    setCPUERR (CPUE_YEL);  }
+	if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
+	    set_stack_trap (adr);
 	adr = ReadW (adr | ds);
 	return (adr | dsenable);
 case 6:							/* d(r) */
@@ -551,7 +556,7 @@ return 0;
 	data	=	data read from memory or I/O space
 */
 
-unsigned int32 ReadI (int32 VA, int32 spec, int32 len)
+uint32 ReadI (int32 VA, int32 spec, int32 len)
 {
 if ((len == WORD) || (spec == 027)) return (ReadW (VA) << 16);
 return ((ReadW (VA) << 16) | ReadW ((VA & ~0177777) | ((VA + 2) & 0177777)));
@@ -631,6 +636,66 @@ if (len == LONG) return;
 WriteW ((fptr->l >> FP_V_F2) & 0177777, exta | ((VA + 4) & 0177777));
 WriteW ((fptr->l >> FP_V_F3) & 0177777, exta | ((VA + 6) & 0177777));
 return;
+}
+
+/* FIS instructions */
+
+t_stat fis11 (int32 IR)
+{
+int32 reg, exta;
+fpac_t fac, fsrc;
+
+reg = IR & 07;						/* isolate reg */
+if (reg == 7) exta = isenable;				/* choose I,D */
+else exta = dsenable;
+if (IR & 000740) {					/* defined? */
+	if (CPUT (CPUT_03)) ReadW (exta | R[reg]);	/* 11/03 reads word */
+	ABORT (TRAP_ILL);  }
+FEC = 0;						/* no errors */
+FPS = FPS_IU|FPS_IV;					/* trap ovf,unf */
+
+fsrc.h = (ReadW (exta | R[reg]) << FP_V_F0) |
+	(ReadW (exta | ((R[reg] + 2) & 0177777)) << FP_V_F1);
+fsrc.l = 0;
+fac.h = (ReadW (exta | ((R[reg] + 4) & 0177777)) << FP_V_F0) |
+	(ReadW (exta | ((R[reg] + 6) & 0177777)) << FP_V_F1);
+fac.l = 0;
+if (GET_SIGN (fsrc.h) && (GET_EXP (fsrc.h) == 0))	/* clean 0's */
+	fsrc.h = fsrc.l = 0;
+if (GET_SIGN (fac.h) && (GET_EXP (fac.l) == 0))
+	fac.h = fac.l = 0;
+
+N = Z = V = C = 0;					/* clear cc's */
+switch ((IR >> 3) & 3) {				/* case IR<5:3> */
+
+case 0:							/* FAD */
+	addfp11 (&fac, &fsrc);
+	break;
+case 1:							/* FSUB */
+	if (fsrc.h != 0) fsrc.h = fsrc.h ^ FP_SIGN;	/* invert sign */
+	addfp11 (&fac, &fsrc);
+	break;
+case 2:							/* FMUL */
+	mulfp11 (&fac, &fsrc);
+	break;
+case 3:							/* FDIV */
+	if (fsrc.h == 0) {				/* div by 0? */
+	    V = N = C = 1;				/* set cc's */
+	    setTRAP (TRAP_FPE);				/* set trap */
+	    return SCPE_OK;  }
+	else divfp11 (&fac, &fsrc);
+	break;  }
+
+if (FEC == 0) {						/* no err? */
+	WriteW ((fac.h >> FP_V_F0) & 0177777, exta | ((R[reg] + 4) & 0177777));
+	WriteW ((fac.h >> FP_V_F1) & 0177777, exta | ((R[reg] + 6) & 0177777));
+	R[reg] = (R[reg] + 4) & 0177777;		/* pop stack */
+	N = (GET_SIGN (fac.h) != 0);			/* set N,Z */
+	Z = (fac.h == 0);  }
+else if (FEC == FEC_OVFLO) V = 1;			/* ovf? trap set */
+else if (FEC == FEC_UNFLO) V = N = 1;			/* unf? trap set */
+else return SCPE_IERR;					/* what??? */
+return SCPE_OK;
 }
 
 /* Floating point add
@@ -864,6 +929,8 @@ return;
 	fsrcp	=	pointer to divisor
    Outputs:
 	ovflo	=	overflow indicator
+
+   Source operand must be checked for zero by caller!
 */
 
 int32 divfp11 (fpac_t *facp, fpac_t *fsrcp)
@@ -872,9 +939,6 @@ int32 facexp, fsrcexp, i, count, qd;
 fpac_t facfrac, fsrcfrac, quo;
 
 fsrcexp = GET_EXP (fsrcp->h);				/* get divisor exp */
-if (fsrcexp == 0) {					/* divide by zero? */
-	fpnotrap (FEC_DZRO);
-	ABORT (TRAP_INT);  }
 facexp = GET_EXP (facp->h);				/* get dividend exp */
 if (facexp == 0) {					/* test for zero */
 	*facp = zero_fac;				/* result zero */

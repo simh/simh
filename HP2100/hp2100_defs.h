@@ -35,7 +35,8 @@
    14-Apr-99	RMS	Changed t_addr to unsigned
 
    The author gratefully acknowledges the help of Jeff Moffat in answering
-   questions about the HP2100.
+   questions about the HP2100; and of Dave Bryan in adding featurs and
+   correcting errors throughout the simulator.
 */
 
 #include "sim_defs.h"					/* simulator defns */
@@ -195,12 +196,12 @@ struct DMA {						/* DMA channel */
 
 /* I/O devices - variable assignment defaults */
 
-#define PTR		010				/* paper tape reader */
-#define TTY		011				/* console */
-#define PTP		012				/* paper tape punch */
-#define CLK		013				/* clock */
-#define LPS		014				/* 12653 line printer */
-#define LPT		015				/* 12845 line printer */
+#define PTR		010				/* 12597A-002 paper tape reader */
+#define TTY		011				/* 12531C teleprinter */
+#define PTP		012				/* 12597A-005 paper tape punch */
+#define CLK		013				/* 12539C time-base generator */
+#define LPS		014				/* 12653A line printer */
+#define LPT		015				/* 12845A line printer */
 #define MTD		020				/* 12559A data */
 #define MTC		021				/* 12559A control */
 #define DPD		022				/* 12557A data */
@@ -211,9 +212,9 @@ struct DMA {						/* DMA channel */
 #define DRC		027				/* 12610A control */
 #define MSD		030				/* 13181A data */
 #define MSC		031				/* 13181A control */
-#define IPLI		032				/* 12556B link in */
-#define IPLO		033				/* 12556B link out */
-#define DS		034				/* 13037 control */
+#define IPLI		032				/* 12566B link in */
+#define IPLO		033				/* 12566B link out */
+#define DS		034				/* 13037A control */
 #define MUXL		040				/* 12920A lower data */
 #define MUXU		041				/* 12920A upper data */
 #define MUXC		042				/* 12920A control */

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-10 Simulator Usage
-Date:	15-Jun-2004
+Date:	15-Nov-2004
 
 			COPYRIGHT NOTICE
 
@@ -173,6 +173,17 @@ control registers for the interrupt system.
 				most recent PC change first
 	WRU		8	interrupt character
 	REG[0:127]	36	fast memory blocks
+
+The CPU can maintain a history of the most recently executed instructions.
+This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
+
+	SET CPU HISTORY		clear history buffer
+	SET CPU HISTORY=0	disable history
+	SET CPU HISTORY=n	enable history, length = n
+	SHOW CPU HISTORY	print CPU history
+	SHOW CPU HISTORY=n	print first n entries of CPU history
+
+The maximum length for the history is 65536 entries.
 
 2.2 Pager
 
@@ -417,7 +428,7 @@ to set the drive type to one of six disk types, or autosize:
 The type options can be used only when a unit is not attached to a file.
 Note that TOPS-10 V7.03 supported only the RP06 and RM03; V7.04 added
 support for the RP07.  TOPS-20 V4.1 also supported only the RP06 and
-RM03.  Units can be set ONLINE or OFFLINE.
+RM03.  Units can be set ENABLED or DISABLED.
 
 The RP controller implements these registers:
 
@@ -467,7 +478,7 @@ the ability to make units write enabled or locked.
 	SET TUn LOCKED		set unit n write locked
 	SET TUn WRITEENABLED	set unit n write enabled
 
-Units can also be set ONLINE or OFFLINE.
+Units can also be set ENABLED or DISABLED.
 
 The magnetic tape controller implements these registers:
 

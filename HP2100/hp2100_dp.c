@@ -26,6 +26,13 @@
    dp		12557A 2871 disk subsystem
 		13210A 7900 disk subsystem
 
+   07-Oct-04	JDB	Fixed enable/disable from either device
+			Fixed ANY ERROR status for 12557A interface
+			Fixed unattached drive status for 12557A interface
+			Status cmd without prior STC DC now completes (12557A)
+			OTA/OTB CC on 13210A interface also does CLC CC
+			Fixed RAR model
+			Fixed seek check on 13210 if sector out of range
    20-Aug-04	JDB	Fixes from Dave Bryan
 			- Check status on unattached drive set busy and not ready
 			- Check status tests wrong unit for write protect status
@@ -73,6 +80,34 @@
 
    dpc_poll indicates whether seek completion polling can occur.  It is cleared
    by reset and CLC CC and set by issuance of a seek or completion of check status.
+
+   The controller's "Record Address Register" (RAR) contains the CHS address of
+   the last Seek or Address Record command executed.  The RAR is shared among
+   all drives on the controller.  In addition, each drive has an internal
+   position register that contains the last cylinder position transferred to the
+   drive during Seek command execution (data operations always start with the
+   RAR head and sector position).
+
+   In a real drive, the address field of the sector under the head is read and
+   compared to the RAR.  When they match, the target sector is under the head
+   and is ready for reading or writing.  If a match doesn't occur, an Address
+   Error is indicated.  In the simulator, the address field is obtained from the
+   drive's current position register during a read, i.e., the "on-disc" address
+   field is assumed to match the current position.
+
+   References:
+   - 7900A Disc Drive Operating and Service Manual (07900-90002, Feb-1975)
+   - 13210A Disc Drive Interface Kit Operating and Service Manual
+            (13210-90003, Nov-1974)
+   - 12557A Cartridge Disc Interface Kit Operating and Service Manual
+            (12557-90001, Sep-1970)
+
+   The following implemented behaviors have been inferred from secondary sources
+   (diagnostics, operating system drivers, etc.), due to absent or contradictory
+   authoritative information; future correction may be needed:
+
+     1. Status bit 15 (ATTENTION) does not set bit 0 (ANY ERROR) on the 12557A.
+     2. Omitting STC DC before Status Check does not set DC flag but does poll.
 */
 
 #include "hp2100_defs.h"
@@ -80,7 +115,7 @@
 #define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
 #define UNIT_WLK	(1 << UNIT_V_WLK)
 #define FNC		u3				/* saved function */
-#define CYL		u4				/* cylinder */
+#define DRV		u4				/* drive number (DC) */
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write prot */
 
 #define DP_N_NUMWD	7
@@ -109,9 +144,9 @@
 #define  FNC_AR		013				/* address */
 #define	 FNC_SEEK1	020				/* fake - seek1 */
 #define  FNC_SEEK2	021				/* fake - seek2 */
+#define  FNC_SEEK3	022				/* fake - seek3 */
 #define  FNC_CHK1	023				/* fake - check1 */
 #define  FNC_AR1	024				/* fake - arec1 */
-#define  FNC_STA1	025				/* fake - sta1 */
 #define CW_V_DRV	0				/* drive */
 #define CW_M_DRV	03
 #define CW_GETDRV(x)	(((x) >> CW_V_DRV) & CW_M_DRV)
@@ -152,10 +187,17 @@
 #define STA_BSY		0000004				/* seeking */
 #define STA_DTE		0000002				/* data error */
 #define STA_ERR		0000001				/* any error (d) */
-#define STA_ALLERR	(STA_ATN + STA_1ST + STA_OVR + STA_RWU + STA_ACU + \
-			 STA_SKI + STA_SKE + STA_NRDY + STA_EOC + STA_AER + \
-			 STA_FLG + STA_BSY + STA_DTE)
-#define STA_MBZ13	(STA_ATN + STA_RWU + STA_SKI)	/* zero in 13210 */
+
+#define STA_ERSET2	(STA_1ST | STA_OVR | STA_RWU | STA_ACU | \
+			 STA_SKI | STA_SKE | STA_NRDY | \
+			 STA_EOC | STA_AER | STA_DTE)	/* 12557A error set */
+#define STA_ERSET3	(STA_ATN | STA_1ST | STA_OVR | STA_RWU | STA_ACU | \
+			 STA_SKI | STA_SKE | STA_NRDY | STA_EOC | STA_AER | \
+			 STA_FLG | STA_BSY | STA_DTE)	/* 13210A error set */
+#define STA_ANYERR	(dp_ctype ? STA_ERSET3 : STA_ERSET2)
+
+#define STA_UNLOADED	(dp_ctype ? (STA_NRDY | STA_BSY) : STA_NRDY)
+#define STA_MBZ13	(STA_ATN | STA_RWU | STA_SKI)	/* zero in 13210 */
 
 extern uint16 *M;
 extern uint32 PC, SR;
@@ -177,9 +219,10 @@ int32 dpc_obuf = 0;					/* cch buffers */
 int32 dpd_xfer = 0;					/* xfer in prog */
 int32 dpd_wval = 0;					/* write data valid */
 int32 dp_ptr = 0;					/* buffer ptr */
-uint8 dpc_rarc[DP_NUMDRV] = { 0 };			/* cylinder */
-uint8 dpc_rarh[DP_NUMDRV] = { 0 };			/* head */
-uint8 dpc_rars[DP_NUMDRV] = { 0 };			/* sector */
+uint8 dpc_rarc = 0;					/* RAR cylinder */
+uint8 dpc_rarh = 0;					/* RAR head */
+uint8 dpc_rars = 0;					/* RAR sector */
+uint8 dpc_ucyl[DP_NUMDRV] = { 0 };			/* unit cylinder */
 uint16 dpc_sta[DP_NUMDRV] = { 0 };			/* status regs */
 uint16 dpxb[DP_NUMWD];					/* sector buffer */
 
@@ -216,6 +259,8 @@ UNIT dpd_unit = { UDATA (&dpd_svc, 0, 0) };
 REG dpd_reg[] = {
 	{ ORDATA (IBUF, dpd_ibuf, 16) },
 	{ ORDATA (OBUF, dpd_obuf, 16) },
+	{ BRDATA (DBUF, dpxb, 8, 16, DP_NUMWD) },
+	{ DRDATA (BPTR, dp_ptr, DP_N_NUMWD) },
 	{ FLDATA (CMD, dpd_dib.cmd, 0) },
 	{ FLDATA (CTL, dpd_dib.ctl, 0) },
 	{ FLDATA (FLG, dpd_dib.flg, 0) },
@@ -223,8 +268,6 @@ REG dpd_reg[] = {
 	{ FLDATA (SRQ, dpd_dib.srq, 0) },
 	{ FLDATA (XFER, dpd_xfer, 0) },
 	{ FLDATA (WVAL, dpd_wval, 0) },
-	{ BRDATA (DBUF, dpxb, 8, 16, DP_NUMWD) },
-	{ DRDATA (BPTR, dp_ptr, DP_N_NUMWD) },
 	{ ORDATA (DEVNO, dpd_dib.devno, 6), REG_HRO },
 	{ NULL }  };
 
@@ -238,7 +281,7 @@ DEVICE dpd_dev = {
 	1, 10, DP_N_NUMWD, 1, 8, 16,
 	NULL, NULL, &dpc_reset,
 	NULL, NULL, NULL,
-	&dpd_dib, 0 };
+	&dpd_dib, DEV_DISABLE };
 
 /* DPC data structures
 
@@ -269,17 +312,16 @@ REG dpc_reg[] = {
 	{ FLDATA (SRQ, dpc_dib.srq, 0) },
 	{ FLDATA (EOC, dpc_eoc, 0) },
 	{ FLDATA (POLL, dpc_poll, 0) },
-	{ BRDATA (RARC, dpc_rarc, 8, 8, DP_NUMDRV) },
-	{ BRDATA (RARH, dpc_rarh, 8, 2, DP_NUMDRV) },
-	{ BRDATA (RARS, dpc_rars, 8, 4, DP_NUMDRV) },
+	{ DRDATA (RARC, dpc_rarc, 8), PV_RZRO },
+	{ DRDATA (RARH, dpc_rarh, 2), PV_RZRO },
+	{ DRDATA (RARS, dpc_rars, 5), PV_RZRO },
+	{ BRDATA (CYL, dpc_ucyl, 10, 8, DP_NUMDRV), PV_RZRO },
 	{ BRDATA (STA, dpc_sta, 8, 16, DP_NUMDRV) },
 	{ DRDATA (CTIME, dpc_ctime, 24), PV_LEFT },
 	{ DRDATA (DTIME, dpc_dtime, 24), PV_LEFT },
 	{ DRDATA (STIME, dpc_stime, 24), PV_LEFT },
-	{ DRDATA (XTIME, dpc_xtime, 24), REG_NZ + PV_LEFT },
+	{ DRDATA (XTIME, dpc_xtime, 24), REG_NZ | PV_LEFT },
 	{ FLDATA (CTYPE, dp_ctype, 0), REG_HRO },
-	{ URDATA (UCYL, dpc_unit[0].CYL, 10, 8, 0,
-		  DP_NUMDRV, PV_LEFT | REG_HRO) },
 	{ URDATA (UFNC, dpc_unit[0].FNC, 8, 8, 0,
 		  DP_NUMDRV, REG_HRO) },
 	{ URDATA (CAPAC, dpc_unit[0].capac, 10, T_ADDR_W, 0,
@@ -367,15 +409,16 @@ case ioSFC:						/* skip flag clear */
 case ioSFS:						/* skip flag set */
 	if (FLG (devc) != 0) PC = (PC + 1) & VAMASK;
 	break;
-case ioOTX:						/* output */
-	dpc_obuf = dat;
-	break;
 case ioLIX:						/* load */
 	dat = 0;
 case ioMIX:						/* merge */
 	for (i = 0; i < DP_NUMDRV; i++)
 	    if (dpc_sta[i] & STA_ATN) dat = dat | (1 << i);
 	break;
+case ioOTX:						/* output */
+	dpc_obuf = dat;
+	if (!dp_ctype) break;
+	IR = IR | I_CTL;				/* 13210 OTx causes CLC */
 case ioCTL:						/* control clear/set */
 	if (IR & I_CTL) {				/* CLC? */
 	    clrCTL (devc);				/* clr cmd, ctl */
@@ -419,7 +462,7 @@ return dat;
 
 void dp_god (int32 fnc, int32 drv, int32 time)
 {
-dpd_unit.CYL = drv;					/* save unit */
+dpd_unit.DRV = drv;					/* save unit */
 dpd_unit.FNC = fnc;					/* save function */
 sim_activate (&dpd_unit, time);
 return;
@@ -450,7 +493,7 @@ return;
    This routine handles the data channel transfers.  It also handles
    data transfers that are blocked by seek in progress.
 
-   uptr->CYL	=	target drive
+   uptr->DRV	=	target drive
    uptr->FNC	=	target function
 
    Seek substates
@@ -468,59 +511,52 @@ t_stat dpd_svc (UNIT *uptr)
 {
 int32 i, drv, devc, devd, st;
 
-drv = uptr->CYL;					/* get drive no */
+drv = uptr->DRV;					/* get drive no */
 devc = dpc_dib.devno;					/* get cch devno */
 devd = dpd_dib.devno;					/* get dch devno */
 switch (uptr->FNC) {					/* case function */
 
+case FNC_AR:						/* arec, need cyl */
 case FNC_SEEK:						/* seek, need cyl */
 	if (CMD (devd)) {				/* dch active? */
-	    dpc_rarc[drv] = DA_GETCYL (dpd_obuf);	/* take cyl word */
+	    dpc_rarc = DA_GETCYL (dpd_obuf);		/* set RAR from cyl word */
 	    dpd_wval = 0;				/* clr data valid */
 	    setFSR (devd);				/* set dch flg */
 	    clrCMD (devd);				/* clr dch cmd */
-	    uptr->FNC = FNC_SEEK1;  }			/* advance state */
+	    if (uptr->FNC == FNC_AR) uptr->FNC = FNC_AR1;
+	    else uptr->FNC = FNC_SEEK1;  }		/* advance state */
 	sim_activate (uptr, dpc_xtime);			/* no, wait more */
 	break;
+
+case FNC_AR1:						/* arec, need hd/sec */
 case FNC_SEEK1:						/* seek, need hd/sec */
 	if (CMD (devd)) {				/* dch active? */
-	    dpc_rarh[drv] = DA_GETHD (dpd_obuf);	/* get head */
-	    dpc_rars[drv] = DA_GETSC (dpd_obuf);	/* get sector */
+	    dpc_rarh = DA_GETHD (dpd_obuf);		/* set RAR from head */
+	    dpc_rars = DA_GETSC (dpd_obuf);		/* set RAR from sector */
 	    dpd_wval = 0;				/* clr data valid */
 	    setFSR (devd);				/* set dch flg */
 	    clrCMD (devd);				/* clr dch cmd */
+	    if (uptr->FNC == FNC_AR1) {
+		setFSR (devc);				/* set cch flg */
+		clrCMD (devc);				/* clr cch cmd */
+		dpc_sta[drv] = dpc_sta[drv] | STA_ATN;	/* set drv attn */
+		break;  }				/* done if Address Record */
 	    if (sim_is_active (&dpc_unit[drv])) {	/* if busy, */
-		dpc_sta[drv] = dpc_sta[drv] | STA_SKE;
-		break;  }				/* error, ignore */
-	    st = abs (dpc_rarc[drv] - dpc_unit[drv].CYL) * dpc_stime;
+		dpc_sta[drv] = dpc_sta[drv] | STA_SKE;	/* seek check */
+		break;  }				/* allow prev seek to cmpl */
+	    if ((dpc_rarc >= DP_NUMCY) || 		/* invalid cyl? */
+	    	(dp_ctype && (dpc_rars >= DP_NUMSC3))) {  /* invalid sector? (13210A) */
+		dpc_sta[drv] = dpc_sta[drv] | STA_SKE;	/* seek check */
+	    	sim_activate (&dpc_unit[drv], 1);	/* schedule drive no-wait */
+		dpc_unit[drv].FNC = FNC_SEEK3;		/* do immed compl w/poll */
+		break;  }
+	    st = abs (dpc_rarc - dpc_ucyl[drv]) * dpc_stime;
 	    if (st == 0) st = dpc_stime;		/* min time */
+	    dpc_ucyl[drv] = dpc_rarc;			/* transfer RAR */
 	    sim_activate (&dpc_unit[drv], st);		/* schedule drive */
 	    dpc_sta[drv] = (dpc_sta[drv] | STA_BSY) &
 		~(STA_SKE | STA_SKI | STA_HUNT);
-	    dpc_unit[drv].CYL = dpc_rarc[drv];		/* on cylinder */
 	    dpc_unit[drv].FNC = FNC_SEEK2;  }		/* set operation */
-	else sim_activate (uptr, dpc_xtime);		/* no, wait more */
-	break;
-
-case FNC_AR:						/* arec, need cyl */
-	if (CMD (devd)) {				/* dch active? */
-	    dpc_rarc[drv] = DA_GETCYL (dpd_obuf);	/* take cyl word */
-	    dpd_wval = 0;				/* clr data valid */
-	    setFSR (devd);				/* set dch flg */
-	    clrCMD (devd);				/* clr dch cmd */
-	    uptr->FNC = FNC_AR1;  }			/* advance state */
-	sim_activate (uptr, dpc_xtime);			/* no, wait more */
-	break;
-case FNC_AR1:						/* arec, need hd/sec */
-	if (CMD (devd)) {				/* dch active? */
-	    dpc_rarh[drv] = DA_GETHD (dpd_obuf);	/* get head */
-	    dpc_rars[drv] = DA_GETSC (dpd_obuf);	/* get sector */
-	    dpd_wval = 0;				/* clr data valid */
-	    setFSR (devc);				/* set cch flg */
-	    clrCMD (devc);				/* clr cch cmd */
-	    setFSR (devd);				/* set dch flg */
-	    clrCMD (devd);				/* clr dch cmd */
-	    dpc_sta[drv] = dpc_sta[drv] | STA_ATN; }	/* set drv attn */
 	else sim_activate (uptr, dpc_xtime);		/* no, wait more */
 	break;
 
@@ -531,20 +567,16 @@ case FNC_STA:						/* read status */
 		if (dp_ctype) dpd_ibuf =		/* 13210? */
 		    (dpd_ibuf & ~(STA_MBZ13 | STA_PROT)) |
 		    (dpc_unit[drv].flags & UNIT_WPRT? STA_PROT: 0);  }
-	    else dpd_ibuf = STA_NRDY|STA_BSY;		/* not ready */
-	    if (dpd_ibuf & STA_ALLERR)			/* errors? set flg */
+	    else dpd_ibuf = STA_UNLOADED;		/* not ready */
+	    if (dpd_ibuf & STA_ANYERR)			/* errors? set flg */
 		dpd_ibuf = dpd_ibuf | STA_ERR;
 	    setFSR (devd);				/* set dch flg */
 	    clrCMD (devd);				/* clr dch cmd */
-	    clrCMD (devc);				/* clr cch cmd */
-	    dpc_sta[drv] = dpc_sta[drv] &		/* clr sta flags */
-		~(STA_ATN | STA_1ST | STA_OVR |
-		STA_RWU | STA_ACU | STA_EOC |
-		STA_AER | STA_FLG | STA_DTE);
-	    uptr->FNC = FNC_STA1;  }			/* advance state */
-	sim_activate (uptr, dpc_xtime);			/* no, wait more */
-	break;
-case FNC_STA1:						/* read sta, poll */
+	    clrCMD (devc);  }				/* clr cch cmd */
+	dpc_sta[drv] = dpc_sta[drv] &			/* clr sta flags */
+	    ~(STA_ATN | STA_1ST | STA_OVR |
+	    STA_RWU | STA_ACU | STA_EOC |
+	    STA_AER | STA_FLG | STA_DTE);
 	dpc_poll = 1;					/* enable polling */
 	for (i = 0; i < DP_NUMDRV; i++) {		/* loop thru drives */
 	    if (dpc_sta[i] & STA_ATN) {			/* any ATN set? */
@@ -556,8 +588,6 @@ case FNC_CHK:						/* check, need cnt */
 	if (CMD (devd)) {				/* dch active? */
 	    dpc_cnt = dpd_obuf & DA_CKMASK;		/* get count */
 	    dpd_wval = 0;				/* clr data valid */
-/*	    setFSR (devd);				/* set dch flg */
-/*	    clrCMD (devd);				/* clr dch cmd */
 	    dp_goc (FNC_CHK1, drv, dpc_xtime);  }	/* sched drv */
 	else sim_activate (uptr, dpc_xtime);		/* wait more */
 	break;
@@ -603,11 +633,10 @@ if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
 	return SCPE_OK;  }
 switch (uptr->FNC) {					/* case function */
 
-case FNC_SEEK2:						/* seek done */
-	dpc_sta[drv] = (dpc_sta[drv] | STA_ATN) & ~STA_BSY;
-	if (uptr->CYL >= DP_NUMCY) {			/* invalid cyl? */
-	    dpc_sta[drv] = dpc_sta[drv] | STA_SKE;
-	    uptr->CYL = DP_NUMCY - 1;  }
+case FNC_SEEK2:						/* positioning done */
+	dpc_sta[drv] = (dpc_sta[drv] | STA_ATN) & ~STA_BSY;  /* fall into cmpl */
+
+case FNC_SEEK3:						/* seek complete */
 	if (dpc_poll) {					/* polling enabled? */
 	    setFSR (devc);				/* set cch flg */
 	    clrCMD (devc);  }				/* clear cmd */
@@ -620,20 +649,19 @@ case FNC_RD:						/* read */
 case FNC_CHK1:						/* check */
 	if (dp_ptr == 0) {				/* new sector? */
 	    if (!CMD (devd) && (uptr->FNC != FNC_CHK1)) break;
-	    if (uptr->CYL != dpc_rarc[drv])		/* wrong cyl? */
+	    if (dpc_rarc != dpc_ucyl[drv])		/* RAR cyl miscompare? */
 		dpc_sta[drv] = dpc_sta[drv] | STA_AER;	/* set flag, read */
-	    if (dpc_rars[drv] >= DP_NUMSC) {		/* bad sector? */
+	    if (dpc_rars >= DP_NUMSC) {			/* bad sector? */
 		dpc_sta[drv] = dpc_sta[drv] | STA_AER;	/* set flag, stop */
 		break;  }
 	    if (dpc_eoc) {				/* end of cyl? */
 		dpc_sta[drv] = dpc_sta[drv] | STA_EOC;
 		break;  }
-	    da = GETDA (dpc_rarc[drv], dpc_rarh[drv], dpc_rars[drv]);
-	    dpc_rars[drv] = dpc_rars[drv] + 1;		/* incr address */
-	    if (dpc_rars[drv] >= DP_NUMSC) {		/* end of surf? */
-		dpc_rars[drv] = 0;			/* wrap to */
-		dpc_rarh[drv] = dpc_rarh[drv] ^ 1;	/* next head */
-		dpc_eoc = ((dpc_rarh[drv] & 1) == 0);  }/* calc eoc */
+	    da = GETDA (dpc_rarc, dpc_rarh, dpc_rars);	/* calc disk addr */
+	    dpc_rars = (dpc_rars + 1) % DP_NUMSC;	/* incr sector */
+	    if (dpc_rars == 0) {			/* wrap? */
+  		dpc_rarh = dpc_rarh ^ 1;		/* incr head */
+		dpc_eoc = ((dpc_rarh & 1) == 0);  }	/* calc eoc */
 	    if (err = fseek (uptr->fileref, da * sizeof (int16),
 		SEEK_SET)) break;
 	    fxread (dpxb, sizeof (int16), DP_NUMWD, uptr->fileref);
@@ -657,9 +685,9 @@ case FNC_WD:						/* write */
 	    if (uptr->flags & UNIT_WPRT) {		/* wr prot? */
 		dpc_sta[drv] = dpc_sta[drv] | STA_FLG;	/* set status */
 		break;  }				/* done */
-	    if ((uptr->CYL != dpc_rarc[drv]) ||		/* wrong cyl or */
-		(dpc_rars[drv] >= DP_NUMSC)) {		/* bad sector? */
-		dpc_sta[drv] = dpc_sta[drv] | STA_AER;	/* set flag, stop */
+	    if ((dpc_rarc != dpc_ucyl[drv]) ||		/* RAR cyl miscompare? */
+		(dpc_rars >= DP_NUMSC)) {		/* bad sector? */
+		dpc_sta[drv] = dpc_sta[drv] | STA_AER;	/* address error */
 		break;  }
 	    if (dpc_eoc) {				/* end of cyl? */
 	        dpc_sta[drv] = dpc_sta[drv] | STA_EOC;	/* set status */
@@ -667,12 +695,11 @@ case FNC_WD:						/* write */
 	dpxb[dp_ptr++] = dpd_wval? dpd_obuf: 0;		/* store word/fill */
 	dpd_wval = 0;					/* clr data valid */
 	if (dp_ptr >= DP_NUMWD) {			/* buffer full? */
-	    da = GETDA (dpc_rarc[drv], dpc_rarh[drv], dpc_rars[drv]);
-	    dpc_rars[drv] = dpc_rars[drv] + 1;		/* incr address */
-	    if (dpc_rars[drv] >= DP_NUMSC) {		/* end of surf? */
-		dpc_rars[drv] = 0;			/* wrap to */
-		dpc_rarh[drv] = dpc_rarh[drv] ^ 1;	/* next head */
-		dpc_eoc = ((dpc_rarh[drv] & 1) == 0);  }/* calc eoc */
+	    da = GETDA (dpc_rarc, dpc_rarh, dpc_rars);	/* calc disk addr */
+	    dpc_rars = (dpc_rars + 1) % DP_NUMSC;	/* incr sector */
+	    if (dpc_rars == 0) {			/* wrap? */
+		dpc_rarh = dpc_rarh ^ 1;		/* incr head */
+		dpc_eoc = ((dpc_rarh & 1) == 0);  }	/* calc eoc */
 	    if (err = fseek (uptr->fileref, da * sizeof (int16),
 		SEEK_SET)) break;
 	    fxwrite (dpxb, sizeof (int16), DP_NUMWD, uptr->fileref);
@@ -703,29 +730,30 @@ return SCPE_OK;
 
 t_stat dpc_reset (DEVICE *dptr)
 {
-int32 i;
+int32 drv;
 
-hp_enbdis_pair (&dpc_dev, &dpd_dev);			/* make pair cons */
+hp_enbdis_pair (dptr,					/* make pair cons */
+	(dptr == &dpd_dev)? &dpc_dev: &dpd_dev);
 dpd_ibuf = dpd_obuf = 0;				/* clear buffers */
 dpc_busy = dpc_obuf = 0;
 dpc_eoc = 0;
 dpc_poll = 0;
 dpd_xfer = dpd_wval = 0;
 dp_ptr = 0;
+dpc_rarc = dpc_rarh = dpc_rars = 0;			/* clear RAR */
 dpc_dib.cmd = dpd_dib.cmd = 0;				/* clear cmd */
 dpc_dib.ctl = dpd_dib.ctl = 0;				/* clear ctl */
 dpc_dib.fbf = dpd_dib.fbf = 1;				/* set fbf */
 dpc_dib.flg = dpd_dib.flg = 1;				/* set flg */
 dpc_dib.srq = dpd_dib.flg = 1;				/* srq follows flg */
 sim_cancel (&dpd_unit);					/* cancel dch */
-for (i = 0; i < DP_NUMDRV; i++) {			/* loop thru drives */
-	sim_cancel (&dpc_unit[i]);			/* cancel activity */
-	dpc_unit[i].FNC = 0;				/* clear function */
-	dpc_unit[i].CYL = 0;
-	dpc_rarc[i] = dpc_rarh[i] = dpc_rars[i] = 0;
-	if (dpc_unit[i].flags & UNIT_ATT)
-	    dpc_sta[i] = dpc_sta[i] & STA_1ST;
-	else dpc_sta[i] = 0;  }
+for (drv = 0; drv < DP_NUMDRV; drv++) {			/* loop thru drives */
+	sim_cancel (&dpc_unit[drv]);			/* cancel activity */
+	dpc_unit[drv].FNC = 0;				/* clear function */
+	dpc_ucyl[drv] = 0;				/* clear drive pos */
+	if (dpc_unit[drv].flags & UNIT_ATT)
+	    dpc_sta[drv] = dpc_sta[drv] & STA_1ST;	/* first seek status */
+	else dpc_sta[drv] = 0;  }			/* clear status */
 return SCPE_OK;
 }
 
@@ -847,4 +875,3 @@ SR = (SR & IBL_OPT) | IBL_DP | (dev << IBL_V_DEV);	/* set SR */
 if (sim_switches & SWMASK ('R')) SR = SR | IBL_DP_REM;	/* boot from removable? */
 return SCPE_OK;
 }
-

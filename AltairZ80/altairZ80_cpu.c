@@ -90,17 +90,36 @@ static uint16 IFF;
 #define SetPV2(x) ((cpu_unit.flags & UNIT_CHIP) ? (((temp == (x)) << 2)) : (parity(temp)))
 
 /* checkCPU8080 must be invoked whenever a Z80 only instruction is executed */
+/*
 #define checkCPU8080																													\
 	if (((cpu_unit.flags & UNIT_CHIP) == 0) && (cpu_unit.flags & UNIT_OPSTOP)) {\
 		reason = STOP_OPCODE;																											\
 		goto end_decode;																													\
 	}
+*/
+
+/* checkCPU8080 must be invoked whenever a Z80 only instruction is executed
+		In case a Z80 instruction is executed on an 8080 the following two cases exist:
+		1) Trapping is enabled: execution stops
+		2) Trapping is not enabled: decoding continues with the next byte
+*/ 
+#define checkCPU8080													\
+	if ((cpu_unit.flags & UNIT_CHIP) == 0) {		\
+		if (cpu_unit.flags & UNIT_OPSTOP) {				\
+			reason = STOP_OPCODE;										\
+			goto end_decode;												\
+		}																					\
+		else {																		\
+			sim_brk_pend = FALSE;										\
+			continue;																\
+		}																					\
+	}
 
 /* checkCPUZ80 must be invoked whenever a non Z80 instruction is executed */
-#define checkCPUZ80																														\
-	if (cpu_unit.flags & UNIT_OPSTOP) {																					\
-		reason = STOP_OPCODE;																											\
-		goto end_decode;																													\
+#define checkCPUZ80														\
+	if (cpu_unit.flags & UNIT_OPSTOP) {					\
+		reason = STOP_OPCODE;											\
+		goto end_decode;													\
 	}
 
 #define POP(x)	{															\

@@ -373,7 +373,7 @@ if ((fnc == FNC_PR) && (dvlnt == 0)) {
 	return SCPE_OK;  }
 
 for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
-	if (Map_ReadW (ba, 2, &wd10, MAP)) {		/* get word, err? */
+	if (Map_ReadW (ba, 2, &wd10)) {			/* get word, err? */
 	    lpcsb = lpcsb | CSB_MTE;			/* set NXM error */
 	    update_lpcs (CSA_ERR);			/* set done */
 	    break;  }

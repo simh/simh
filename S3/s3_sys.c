@@ -44,7 +44,7 @@ extern int32 saved_PC, IAR[];
 extern char ebcdic_to_ascii[256];
 char *parse_addr(char *cptr,  char *gbuf, int32 *addr, int32 *addrtype);
 
-int32 printf_sym (FILE *of, char *strg, int32 addr, unsigned int32 *val,
+int32 printf_sym (FILE *of, char *strg, int32 addr, uint32 *val,
 	UNIT *uptr, int32 sw);
 
 /* SCP data structures
@@ -246,7 +246,7 @@ return (SCPE_OK);
 	status	=	error code
 */
 
-int32 fprint_sym (FILE *of, int32 addr, unsigned int32 *val,
+int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
 	UNIT *uptr, int32 sw)
 {
 	int32 r;
@@ -261,7 +261,7 @@ int32 fprint_sym (FILE *of, int32 addr, unsigned int32 *val,
 	return (r);
 }
 
-int32 printf_sym (FILE *of, char *strg, int32 addr, unsigned int32 *val,
+int32 printf_sym (FILE *of, char *strg, int32 addr, uint32 *val,
 	UNIT *uptr, int32 sw)
 {
 int32 cflag, c1, c2, group, len1, len2, inst, aaddr, baddr;
@@ -496,7 +496,7 @@ return -(oplen - 1);
 	status	=	error status
 */
 
-int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, unsigned int32 *val, int32 sw)
+int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw)
 {
 int32 cflag, i = 0, j, r, oplen, addtyp, saveaddr, vptr;
 char gbuf[CBUFSIZE];

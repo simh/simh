@@ -50,9 +50,13 @@ extern int32 int_req;
 extern int32 int_vec[32];
 
 #elif defined (VM_VAX)            					/* VAX version */
-#error "DEUNA/DELUA not supported on VAX!"
+#include "vax_defs.h"
+#define XU_RDX		           8
+#define XU_WID		          16
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 
-#else                          							/* PDP-11 version */
+#else                          						/* PDP-11 version */
 #include "pdp11_defs.h"
 #define XU_RDX		           8
 #define XU_WID		          16

@@ -344,7 +344,7 @@
 #define UNIT_UP		(1 << UNIT_V_UP)
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
-unsigned int16 M[MAXMEMSIZE] = { 0 };			/* memory */
+uint16 M[MAXMEMSIZE] = { 0 };				/* memory */
 int32 AC[4] = { 0 };					/* accumulators */
 int32 C = 0;						/* carry flag */
 int32 saved_PC = 0;					/* program counter */
@@ -375,13 +375,13 @@ struct ndev dev_table[64];				/* dispatch table */
 int32 hnext = 0;					/* # of current entry */
 int32 hwrap = 0;					/* 1 if wrapped */
 int32 hmax = HISTMAX;					/* Maximum entries b4 wrap */
-unsigned int16 hpc[HISTMAX];
-unsigned int16 hinst[HISTMAX];
-unsigned int16 hinst2[HISTMAX];
-unsigned int16 hac0[HISTMAX];
-unsigned int16 hac1[HISTMAX];
-unsigned int16 hac2[HISTMAX];
-unsigned int16 hac3[HISTMAX];
+uint16 hpc[HISTMAX];
+uint16 hinst[HISTMAX];
+uint16 hinst2[HISTMAX];
+uint16 hac0[HISTMAX];
+uint16 hac1[HISTMAX];
+uint16 hac2[HISTMAX];
+uint16 hac3[HISTMAX];
 unsigned short hflags[HISTMAX];
 
 /* Flags:	0x01 - carry bit
@@ -689,7 +689,7 @@ t_stat sim_instr (void)
 {
 extern int32 sim_interval;
 register int32 PC, IR, i, t, MA, j, k, tac;
-register unsigned int32 mddata, uAC0, uAC1, uAC2, uAC3;
+register uint32 mddata, uAC0, uAC1, uAC2, uAC3;
 int16 sAC0, sAC1, sAC2;
 int32 sddata, mi1, mi2, fpnum32;
 t_int64 fpnum, expon;
@@ -1623,9 +1623,9 @@ if ((IR & 0100017) == 0100010) {		/* This pattern for all */
     /* Multiply / Divide */
     
     if (IR == 0143710) {			/* MUL: Unsigned Multiply */
-	uAC0 = (unsigned int32) AC[0];
-	uAC1 = (unsigned int32) AC[1];
-	uAC2 = (unsigned int32) AC[2];
+	uAC0 = (uint32) AC[0];
+	uAC1 = (uint32) AC[1];
+	uAC2 = (uint32) AC[2];
 
 	mddata = (uAC1 * uAC2) + uAC0;
 	AC[0] = (mddata >> 16) & 0177777;
@@ -1643,9 +1643,9 @@ if ((IR & 0100017) == 0100010) {		/* This pattern for all */
         continue;
     }
     if (IR == 0153710) {			/* DIV: Unsigned Divide */
-	uAC0 = (unsigned int32) AC[0];
-	uAC1 = (unsigned int32) AC[1];
-	uAC2 = (unsigned int32) AC[2];
+	uAC0 = (uint32) AC[0];
+	uAC1 = (uint32) AC[1];
+	uAC2 = (uint32) AC[2];
 
 	if (uAC0 >= uAC2) C = 0200000;
 	else {	C = 0;
@@ -5930,7 +5930,6 @@ int32 Dump_History (FILE *st, UNIT *uptr, int32 val, void *desc)
     char debmap[4], debion[4];
     t_value simeval[20];
     int debcar;
-    FILE *Dumpf;
     int start, end, ctr;
     int count = 0;
     
@@ -5939,7 +5938,6 @@ int32 Dump_History (FILE *st, UNIT *uptr, int32 val, void *desc)
          printf("in DEBUG with bit 0 being 1 to build history.\n");
          return SCPE_OK;
     }     
-    Dumpf = fopen("history.log", "w");
     if (!hwrap) {
     	start = 0;
     	end = hnext;
@@ -5957,7 +5955,7 @@ int32 Dump_History (FILE *st, UNIT *uptr, int32 val, void *desc)
         strcpy(debmap, " ");
         debcar = 0;
         if (hflags[ctr] & 0x80) {
-            fprintf(Dumpf, "--------- Interrupt %o (%o) to %6o ---------\n",
+            fprintf(st, "--------- Interrupt %o (%o) to %6o ---------\n",
             	 hinst[ctr], hac0[ctr], hac1[ctr]);
        } else {
             if (hflags[ctr] & 0x01) debcar = 1;
@@ -5966,20 +5964,18 @@ int32 Dump_History (FILE *st, UNIT *uptr, int32 val, void *desc)
             if (hflags[ctr] & 0x08) strcpy(debmap, "B");     
             if (hflags[ctr] & 0x10) strcpy(debmap, "C");     
             if (hflags[ctr] & 0x20) strcpy(debmap, "D");     
-            fprintf(Dumpf, "%s%s%06o acs: %06o %06o %06o %06o %01o ", 
+            fprintf(st, "%s%s%06o acs: %06o %06o %06o %06o %01o ", 
         	debion, debmap, hpc[ctr], hac0[ctr], hac1[ctr], hac2[ctr],
         	hac3[ctr], debcar);	
             simeval[0] = hinst[ctr];
             simeval[1] = hinst2[ctr];
-            fprint_sym (Dumpf, hpc[ctr], simeval, NULL, SWMASK('M'));
-            fprintf(Dumpf, "\n");
+            fprint_sym (st, hpc[ctr], simeval, NULL, SWMASK('M'));
+            fprintf(st, "\n");
         }    
         ctr++;
         if (ctr > hmax)
             ctr = 0;
     }
-    fclose(Dumpf);
-    printf("\n%d records dumped to history.log\n", count);
 	return SCPE_OK;
 }
 

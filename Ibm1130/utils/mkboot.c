@@ -30,9 +30,9 @@
 //			loads somefile.bin, writes object in 1130 IPL format to somefile.ipl
 //			Up to 80 columns will be written depending on what the object actually uses
 //
-//		mkboot somefile.bin somefile.ipl 1130 0 48 SOMEF
+//		mkboot somefile.bin somefile.ipl 1130 /0 /47 SOMEF
 //
-//			loads somefile.bin. Writes 72 columns (hex 48), with ident columns 73-80 = SOMEF001
+//			loads somefile.bin. Writes 72 columns (hex 0 to hex 47), with ident columns 73-80 = SOMEF001
 //
 //		mkboot somefile.bin somefile.dat core 0 0 SOMEF001
 //

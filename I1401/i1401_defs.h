@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Nov-04	RMS	Added column binary support
+   27-Oct-04	RMS	Added maximum instruction length
    16-Mar-03	RMS	Fixed mnemonic for MCS
    03-Jun-02	RMS	Added 1311 support
    14-Apr-99	RMS	Converted t_addr to unsigned
@@ -76,6 +78,8 @@
 #define CDR_WIDTH	80				/* card rdr width */
 #define CDP_BUF		101				/* card punch buffer */
 #define CDP_WIDTH	80				/* card punch width */
+#define CD_CBUF1	401				/* r/p col bin buf 12-3 */
+#define CD_CBUF2	501				/* r/p col bin buf 4-9 */
 #define LPT_BUF		201				/* line print buffer */
 #define LPT_WIDTH	132				/* line print width */
 #define CCT_LNT		132				/* car ctrl length */
@@ -110,6 +114,7 @@
 #define L5		0010				/* 5: op aaa d */
 #define L7		0020				/* 7: op aaa bbb */
 #define L8		0040				/* 8: op aaa bbb d */
+#define MAX_L		8				/* max length */
 
 /* CPU options, stored in cpu_unit.flags */
 

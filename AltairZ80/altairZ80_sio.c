@@ -64,6 +64,8 @@
 #define UNIT_BS							(1 << UNIT_V_BS)
 #define	UNIT_V_SIO_VERBOSE	(UNIT_V_UF + 3)				/* verbose mode, i.e. show error messages				*/
 #define UNIT_SIO_VERBOSE		(1 << UNIT_V_SIO_VERBOSE)
+#define	UNIT_V_MAP					(UNIT_V_UF + 4)				/* mapping mode on															*/
+#define UNIT_MAP						(1 << UNIT_V_MAP)
 
 #define	UNIT_V_SIMH_VERBOSE	(UNIT_V_UF + 0)				/* verbose mode for SIMH pseudo device					*/
 #define UNIT_SIMH_VERBOSE		(1 << UNIT_V_SIMH_VERBOSE)
@@ -187,7 +189,7 @@ static SIO_TERMINAL sio_terminals[Terminals] =
 static TMLN TerminalLines[Terminals] = { {0} };	/* four terminals				*/
 static TMXR altairTMXR = {Terminals, 0, 0, TerminalLines};		/* mux descriptor				*/
 
-static UNIT sio_unit = { UDATA (&sio_svc, UNIT_ATTABLE, 0), KBD_POLL_WAIT };
+static UNIT sio_unit = { UDATA (&sio_svc, UNIT_ATTABLE + UNIT_MAP, 0), KBD_POLL_WAIT };
 
 static REG sio_reg[] = {
 	{ HRDATA (DATA0,		sio_terminals[0].data,		8)	},
@@ -215,6 +217,8 @@ static MTAB sio_mod[] = {
 	{ UNIT_SIO_VERBOSE,	0,		"QUIET",		"QUIET",		NULL },	/* quiet, no error messages								*/
 	{ UNIT_SIO_VERBOSE,	UNIT_SIO_VERBOSE,	"VERBOSE",	"VERBOSE",	&sio_set_verbose },
 																														/* verbose, display warning messages			*/
+	{ UNIT_MAP,		0,					"NOMAP",		"NOMAP",		NULL },	/*  disable character mapping							*/
+	{ UNIT_MAP,		UNIT_MAP,		"MAP",			"MAP",			NULL },	/*  enable all character mapping					*/
 	{ 0 } };
 
 DEVICE sio_dev = {
@@ -491,17 +495,20 @@ int32 sio0d(const int32 port, const int32 io, const int32 data) {
 			sio_terminals[ti].data = tmxr_getc_ln(&TerminalLines[ti]) & 0xff;
 		}
 		sio_terminals[ti].status &= 0xfe;
-		if (sio_unit.flags & UNIT_BS) {
-			if (sio_terminals[ti].data == BACKSPACE_CHAR) {
-				sio_terminals[ti].data = DELETE_CHAR;
+		if (sio_unit.flags & UNIT_MAP) {
+			if (sio_unit.flags & UNIT_BS) {
+				if (sio_terminals[ti].data == BACKSPACE_CHAR) {
+					sio_terminals[ti].data = DELETE_CHAR;
+				}
+			}
+			else {
+				if (sio_terminals[ti].data == DELETE_CHAR) {
+					sio_terminals[ti].data = BACKSPACE_CHAR;
+				}
 			}
 		}
-		else {
-			if (sio_terminals[ti].data == DELETE_CHAR) {
-				sio_terminals[ti].data = BACKSPACE_CHAR;
-			}
-		}
-		return (sio_unit.flags & UNIT_UPPER) ? toupper(sio_terminals[ti].data) : sio_terminals[ti].data;
+		return ((sio_unit.flags & UNIT_UPPER) && (sio_unit.flags & UNIT_MAP)) ?
+			toupper(sio_terminals[ti].data) : sio_terminals[ti].data;
 	}
 	else { /* OUT */
 		int32 d = sio_unit.flags & UNIT_ANSI ? data & 0x7f : data;

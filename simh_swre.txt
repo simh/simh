@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Sample Software Packages
-Date:	06-Apr-2004
+Date:	15-Nov-2004
 
 This memorandum documents the sample software packages available to run
 with the SIMH simulators.  Many of these packages are available under
@@ -346,7 +346,8 @@ FOCAL15:
 
 The Advanced Software System Keyboard Monitor is the simplest mass
 storage monitor for the PDP-15.  It offers single-user program 
-development and execution capabilities.  To load and run ADSS/KM-15:
+development and execution capabilities.  My thanks to David Gesswein,
+who provided the DECtape images of ADSS/KM.  To load and run ADSS/KM-15:
 
 - On the PDP-9 (only), initialize extend mode to on:
 
@@ -402,9 +403,16 @@ development and execution capabilities.  To load and run ADSS/KM-15:
 
 6.3 Advanced Software System/Foreground Background
 
+The Advanced Software System/Foreground Background is a real-time
+monitor for the PDP-15.  It offers foreground and background execution
+of programs.  My thanks to David Gesswein, who provided the DECtape
+images of ADSS/FB.
+
 Note: your environment must have a functioning second Teletype; that is,
 you cannot at present run Foreground/Background if your host system
 does not support the SIMH sockets library.
+
+To load and run ADSS/FB:
 
 - Load the paper-tape bootstrap into upper memory:
 
@@ -460,7 +468,9 @@ does not support the SIMH sockets library.
 6.4 DOS-15
 
 DOS-15 is a more polished version of ADSS-15 using the RF15 or RP15
-as its system device.  To load and run DOS-15:
+as its system device.  My thanks to Hans Pufal, who recovered DOS-15
+from DECtape and deduced how to reconstruct disk images from DECtapes.
+To load and run DOS-15:
 
 - Load the DOS-15 paper tape bootstrap into upper memory:
 

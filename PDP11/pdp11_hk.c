@@ -25,6 +25,8 @@
 
    hk		RK611/RK06/RK07 disk
 
+   03-Oct-04	RMS	Revised Unibus interface
+		RMS	Fixed state of output ready for M+
    26-Mar-04	RMS	Fixed warnings with -std=c99
    25-Jan-04	RMS	Revised for device debug support
    04-Jan-04	RMS	Changed sim_fsize calling sequence
@@ -43,11 +45,16 @@
    This module includes ideas from a previous implementation by Fred Van Kempen.
 */
 
-#include "pdp11_defs.h"
+#if defined (VM_PDP10)					/* PDP10 version */
+#error "RK611 is not supported on the PDP-10!"
 
-#define HK_RDX		8
-#define HK_WID		16
-extern int32 cpu_18b, cpu_ubm;
+#elif defined (VM_VAX)					/* VAX version */
+#include "vax_defs.h"
+
+#else							/* PDP-11 version */
+#include "pdp11_defs.h"
+extern int32 cpu_opt;
+#endif
 
 extern uint16 *M;
 
@@ -379,37 +386,37 @@ UNIT hk_unit[] = {
 		UNIT_ROABLE+UNIT_RK06, RK06_SIZE) }  };
 
 REG hk_reg[] = {
-	{ GRDATA (HKCS1, hkcs1, HK_RDX, 16, 0) },
-	{ GRDATA (HKWC, hkwc, HK_RDX, 16, 0) },
-	{ GRDATA (HKBA, hkba, HK_RDX, 16, 0) },
-	{ GRDATA (HKDA, hkda, HK_RDX, 16, 0) },
-	{ GRDATA (HKCS2, hkcs2, HK_RDX, 16, 0) },
-	{ BRDATA (HKDS, hkds, HK_RDX, 16, HK_NUMDR) },
-	{ BRDATA (HKER, hker, HK_RDX, 16, HK_NUMDR) },
-	{ BRDATA (HKDB, hkdb, HK_RDX, 16, 3) },
-	{ GRDATA (HKDC, hkdc, HK_RDX, 16, 0) },
-	{ GRDATA (HKOF, hkof, HK_RDX, 8, 0) },
-	{ GRDATA (HKMR, hkmr, HK_RDX, 16, 0) },
-	{ GRDATA (HKMR2, hkmr2, HK_RDX, 16, 0), REG_RO },
-	{ GRDATA (HKMR3, hkmr3, HK_RDX, 16, 0), REG_RO },
-	{ GRDATA (HKSPR, hkspr, HK_RDX, 16, 0) },
+	{ GRDATA (HKCS1, hkcs1, DEV_RDX, 16, 0) },
+	{ GRDATA (HKWC, hkwc, DEV_RDX, 16, 0) },
+	{ GRDATA (HKBA, hkba, DEV_RDX, 16, 0) },
+	{ GRDATA (HKDA, hkda, DEV_RDX, 16, 0) },
+	{ GRDATA (HKCS2, hkcs2, DEV_RDX, 16, 0) },
+	{ BRDATA (HKDS, hkds, DEV_RDX, 16, HK_NUMDR) },
+	{ BRDATA (HKER, hker, DEV_RDX, 16, HK_NUMDR) },
+	{ BRDATA (HKDB, hkdb, DEV_RDX, 16, 3) },
+	{ GRDATA (HKDC, hkdc, DEV_RDX, 16, 0) },
+	{ GRDATA (HKOF, hkof, DEV_RDX, 8, 0) },
+	{ GRDATA (HKMR, hkmr, DEV_RDX, 16, 0) },
+	{ GRDATA (HKMR2, hkmr2, DEV_RDX, 16, 0), REG_RO },
+	{ GRDATA (HKMR3, hkmr3, DEV_RDX, 16, 0), REG_RO },
+	{ GRDATA (HKSPR, hkspr, DEV_RDX, 16, 0) },
 	{ FLDATA (INT, IREQ (HK), INT_V_HK) },
 	{ FLDATA (ERR, hkcs1, CSR_V_ERR) },
 	{ FLDATA (DONE, hkcs1, CSR_V_DONE) },
 	{ FLDATA (IE, hkcs1, CSR_V_IE) },
 	{ DRDATA (STIME, hk_swait, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (RTIME, hk_rwait, 24), REG_NZ + PV_LEFT },
-	{ URDATA (FNC, hk_unit[0].FNC, HK_RDX, 5, 0,
+	{ URDATA (FNC, hk_unit[0].FNC, DEV_RDX, 5, 0,
 		  HK_NUMDR, REG_HRO) },
-	{ URDATA (CYL, hk_unit[0].CYL, HK_RDX, 10, 0,
+	{ URDATA (CYL, hk_unit[0].CYL, DEV_RDX, 10, 0,
 		  HK_NUMDR, REG_HRO) },
-	{ BRDATA (OFFSET, hk_off, HK_RDX, 16, HK_NUMDR), REG_HRO },
-	{ BRDATA (CYLDIF, hk_dif, HK_RDX, 16, HK_NUMDR), REG_HRO },
+	{ BRDATA (OFFSET, hk_off, DEV_RDX, 16, HK_NUMDR), REG_HRO },
+	{ BRDATA (CYLDIF, hk_dif, DEV_RDX, 16, HK_NUMDR), REG_HRO },
 	{ URDATA (CAPAC, hk_unit[0].capac, 10, T_ADDR_W, 0,
 		  HK_NUMDR, PV_LEFT | REG_HRO) },
 	{ FLDATA (STOP_IOE, hk_stopioe, 0) },
-	{ GRDATA (DEVADDR, hk_dib.ba, HK_RDX, 32, 0), REG_HRO },
-	{ GRDATA (DEVVEC, hk_dib.vec, HK_RDX, 16, 0), REG_HRO },
+	{ GRDATA (DEVADDR, hk_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+	{ GRDATA (DEVVEC, hk_dib.vec, DEV_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB hk_mod[] = {
@@ -438,7 +445,7 @@ MTAB hk_mod[] = {
 
 DEVICE hk_dev = {
 	"HK", hk_unit, hk_reg, hk_mod,
-	HK_NUMDR, HK_RDX, 24, 1, HK_RDX, HK_WID,
+	HK_NUMDR, DEV_RDX, 24, 1, DEV_RDX, 16,
 	NULL, NULL, &hk_reset,
 	&hk_boot, &hk_attach, &hk_detach,
 	&hk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG };
@@ -472,7 +479,7 @@ case 003:						/* HKDA */
 	*data = hkda = hkda & ~DA_MBZ;
 	break;
 case 004:						/* HKCS2 */
-	*data = hkcs2 = (hkcs2 & ~CS2_MBZ) | CS2_IR | CS2_OR;
+	*data = hkcs2 = (hkcs2 & ~CS2_MBZ) | CS2_IR;
 	break;
 case 005:						/* HKDS */
 	*data = hkds[drv];
@@ -532,7 +539,7 @@ switch (j) {						/* decode PA<4:1> */
 case 000:						/* HKCS1 */
 	if (data & CS1_CCLR) {				/* controller reset? */
 	    hkcs1 = CS1_DONE;				/* CS1 = done */
-	    hkcs2 = CS2_IR | CS2_OR;			/* CS2 = ready */
+	    hkcs2 = CS2_IR;				/* CS2 = ready */
 	    hkmr = hkmr2 = hkmr3 = 0;			/* maint = 0 */
 	    hkda = hkdc = 0;
 	    hkba = hkwc = 0;
@@ -564,7 +571,7 @@ case 003:						/* HKDA */
 	break;
 case 004:						/* HKCS2 */
 	if (data & CS2_CLR) hk_reset (&hk_dev);		/* init? */
-	else hkcs2 = (hkcs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR | CS2_OR;
+	else hkcs2 = (hkcs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR;
 	drv = GET_UNIT (hkcs2);
 	break;
 case 007:						/* HKAS */
@@ -780,12 +787,12 @@ case FNC_READ:						/* read */
 	err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
 	if (uptr->FNC == FNC_WRITE) {			/* write? */
 	    if (hkcs2 & CS2_UAI) {			/* no addr inc? */
-		if (t = Map_ReadW (ba, 2, &comp, MAP)) {	/* get 1st wd */
+		if (t = Map_ReadW (ba, 2, &comp)) {	/* get 1st wd */
 		    wc = 0;				/* NXM, no xfr */
 		    hkcs2 = hkcs2 | CS2_NEM;  }		/* set nxm err */
 		for (i = 0; i < wc; i++) hkxb[i] = comp;  }
 	    else {					/* normal */
-		if (t = Map_ReadW (ba, wc << 1, hkxb, MAP)) {	/* get buf */
+		if (t = Map_ReadW (ba, wc << 1, hkxb)) { /* get buf */
 		    wc = wc - (t >> 1);			/* NXM, adj wc */
 		    hkcs2 = hkcs2 | CS2_NEM;  }		/* set nxm err */
 		ba = ba + (wc << 1);  }			/* adv ba */
@@ -800,11 +807,11 @@ case FNC_READ:						/* read */
 	    err = ferror (uptr->fileref);
 	    for ( ; i < wc; i++) hkxb[i] = 0;		/* fill buf */
 	    if (hkcs2 & CS2_UAI) {			/* no addr inc? */
-		if (t = Map_WriteW (ba, 2, &hkxb[wc - 1], MAP)) {
+		if (t = Map_WriteW (ba, 2, &hkxb[wc - 1])) {
 		    wc = 0;				/* NXM, no xfr */
 		    hkcs2 = hkcs2 | CS2_NEM;  }  }	/* set nxm err */
 	    else {					/* normal */
-		if (t = Map_WriteW (ba, wc << 1, hkxb, MAP)) {	/* put buf */
+		if (t = Map_WriteW (ba, wc << 1, hkxb)) {	/* put buf */
 		    wc = wc - (t >> 1);			/* NXM, adj wc */
 		    hkcs2 = hkcs2 | CS2_NEM;  }		/* set nxm err */
 		ba = ba + (wc << 1);  }			/* adv ba */
@@ -815,7 +822,7 @@ case FNC_READ:						/* read */
 	    for ( ; i < wc; i++) hkxb[i] = 0;		/* fill buf */
 	    awc = wc;
 	    for (wc = 0; wc < awc; wc++) {		/* loop thru buf */
-		if (Map_ReadW (ba, 2, &comp, MAP)) {	/* read word */
+		if (Map_ReadW (ba, 2, &comp)) {		/* read word */
 		    hkcs2 = hkcs2 | CS2_NEM;		/* set error */
 		    break;  }
 		if (comp != hkxb[wc]) {			/* compare wd */
@@ -999,7 +1006,7 @@ int32 i;
 UNIT *uptr;
 
 hkcs1 = CS1_DONE;					/* set done */
-hkcs2 = CS2_IR | CS2_OR;				/* clear state */
+hkcs2 = CS2_IR;						/* clear state */
 hkmr = hkmr2 = hkmr3 = 0;
 hkda = hkdc = 0;
 hkba = hkwc = 0;
@@ -1014,7 +1021,7 @@ for (i = 0; i < HK_NUMDR; i++) {			/* stop operations */
 	hk_dif[i] = 0;
 	hk_off[i] = 0;
 	hker[i] = 0;  }					/* clear errors */
-if (hkxb == NULL) hkxb = calloc (HK_MAXFR, sizeof (unsigned int16));
+if (hkxb == NULL) hkxb = calloc (HK_MAXFR, sizeof (uint16));
 if (hkxb == NULL) return SCPE_MEM;
 return SCPE_OK;
 }
@@ -1082,6 +1089,8 @@ t_stat hk_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc)
 return pdp11_bad_block (uptr, HK_NUMSC, HK_NUMWD);
 }
 
+#if defined (VM_PDP11)
+
 /* Device bootstrap - does not clear CSR when done */
 
 #define BOOT_START	02000				/* start */
@@ -1134,3 +1143,12 @@ M[BOOT_CSR >> 1] = hk_dib.ba & DMASK;
 saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 }
+
+#else
+
+t_stat hk_boot (int32 unitno, DEVICE *dptr)
+{
+return SCPE_NOFNC;
+}
+
+#endif
