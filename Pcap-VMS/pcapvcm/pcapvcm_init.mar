@@ -1,0 +1,18 @@
+	.TITLE	PCAPVCM_INIT
+	.IDENT	/X-1/
+
+	.LIBRARY /SYS$LIBRARY:LIB.MLB/
+
+	$SSDEF
+
+	.ENABLE	LOCAL_BLOCK
+;
+; Store the pointer to the context routine. This will become (hopefully)
+; the base address of the execlet when it is loaded.
+;
+.PSECT   $$$100_DATA noexe,quad
+	 .long pcap$vcm_get_context
+
+	.DISABLE LOCAL_BLOCK
+	.END
+

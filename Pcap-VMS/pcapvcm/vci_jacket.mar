@@ -1,0 +1,186 @@
+	.TITLE	VCI_JACKET
+	.IDENT	/X-1/
+
+;   Copyright (c) 2003, Anders "ankan" Ahgren
+;
+;   Permission is hereby granted, free of charge, to any person obtaining a
+;   copy of this software and associated documentation files (the "Software"),
+;   to deal in the Software without restriction, including without limitation
+;   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+;   and/or sell copies of the Software, and to permit persons to whom the
+;   Software is furnished to do so, subject to the following conditions:
+;
+;   The above copyright notice and this permission notice shall be included in
+;   all copies or substantial portions of the Software.
+;
+;   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+;   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+;   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+;   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+;   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+;++
+; FACILITY: PCAPVCM
+; 
+; FUNCTIONAL DESCRIPTION:
+; 
+;	 A set of jacket routines to allow C to easily use the VCI
+;	 JSB interface.
+; 
+; ENVIRONMENT: Kernel mode
+; 
+; AUTHOR: Ankan, CREATION-DATE: 30-Mar-2003
+; 
+; MODIFIED BY: 
+; 
+;	X-1	Ankan					30-Mar-2003
+;		Initial version
+;--
+
+
+	.library /sys$share:starlet.mlb/
+	.library /sys$share:lib.mlb/
+	.library /sys$share:lanudef.mlb/
+	.library /sys$share:lanidef.mlb/
+
+;	$LANIDEFS
+	$LANUDEF
+	$VCRPDEF
+	$VCRPLANDEF
+	$VCIBDEF
+	$VCIBDLLDEF
+	$SSDEF
+
+	.PSECT 	$CODE,SHR,EXE,NOWRT,PIC,LONG
+
+	.SBTTL	VCI JSR jacket routines
+
+; VCI_GET_DEVICE
+;	4(AP) Address of id
+;	8(ap) Address of LDC
+;
+	.entry	vci_get_device, ^m<r2,r3>
+	movl	g^net$ar_lan_vector, r3	; Get LAN vector
+	beql	20$			; No LAN vector, give up
+	cmpl	#1, lan$l_version(r3)	; Check version
+	blss	10$			; If less than zero, give up
+	movl	4(ap), r0		; Get address of id
+	movl	(r0), r0		; ...and id
+	jsb	@lan$a_get_device(r3)	; Go get device
+	cmpl	#0, r1			; No more devices?
+	beql	10$			; Nope, indicate that
+	movl	4(ap), r2		; Get address for id
+	movl	r0, (r2)		; Save id
+	movl	8(ap), r2		; Get address of LDC
+	movl	r1, (r2)		; Move in LDC
+	movl	#ss$_normal, r0		; Ok
+	ret
+10$:	movl	#ss$_nosuchdev, r0
+	ret
+20$:	movl	#ss$_accvio, r0
+	ret
+
+	.entry	vci_create_port, ^m<r2,r3, r4>
+	movl	g^net$ar_lan_vector, r3	; Get LAN vector
+	beql	20$			; No LAN vector, give up
+	cmpl	#1, lan$l_version(r3)	; Check version
+	blss	10$			; If less than zero, give up
+	movl	4(ap), r4		; Get address of vcib
+	jsb	@lan$a_create_port(r3)	; Go create the port
+	ret
+10$:	movl	#ss$_nosuchdev, r0
+	ret
+20$:	movl	#ss$_accvio, r0
+	ret
+
+	.entry	vci_delete_port, ^m<r2,r3, r4>
+	movl	g^net$ar_lan_vector, r3	; Get LAN vector
+	beql	20$			; No LAN vector, give up
+	cmpl	#1, lan$l_version(r3)	; Check version
+	blss	10$			; If less than zero, give up
+	movl	4(ap), r4		; Get address of vcib
+	jsb	@lan$a_delete_port(r3)	; Go delete the port
+	ret
+10$:	movl	#ss$_nosuchdev, r0
+	ret
+20$:	movl	#ss$_accvio, r0
+	ret
+
+
+;
+; 4(ap) VCRP
+; 8(ap) VCIB
+	.entry	vci_mgmt_port, ^m<r2,r3, r4>
+	movl	g^net$ar_lan_vector, r2	; Get LAN vector
+	beql	20$			; No LAN vector, give up
+	cmpl	#1, lan$l_version(r2)	; Check version
+	blss	10$			; If less than zero, give up
+	movl	4(ap), r3		; Get address of vcrp
+	movl	8(ap), r4		; Get address of vcib
+	jsb	@vcib$a_portmgmt_initiate(r4)	; Go enable the port
+	ret
+10$:	movl	#ss$_nosuchdev, r0
+	ret
+20$:	movl	#ss$_accvio, r0
+	ret
+
+;
+; 4(ap) VCRP
+	.entry	vci_delete_vcrp, ^m<r2,r3, r4>
+	movl	g^net$ar_lan_vector, r2	; Get LAN vector
+	beql	20$			; No LAN vector, give up
+	cmpl	#1, lan$l_version(r2)	; Check version
+	blss	10$			; If less than zero, give up
+	movl	4(ap), r3		; Get address of vcrp
+	jsb	@vcrp$a_dealloc_rtn(r3)	; Delete VCRP
+	ret
+10$:	movl	#ss$_nosuchdev, r0
+	ret
+20$:	movl	#ss$_accvio, r0
+	ret
+
+
+;
+; 4(ap) VCRP
+; 8(ap) VCIB
+	.entry	vci_transmit_frame, ^m<r2,r3, r4>
+	movl	g^net$ar_lan_vector, r2	; Get LAN vector
+	beql	20$			; No LAN vector, give up
+	cmpl	#1, lan$l_version(r2)	; Check version
+	blss	10$			; If less than zero, give up
+	movl	4(ap), r3		; Get address of vcrp
+	movl	8(ap), r4		; Get address of vcib
+	jsb	@vcib$a_lan_transmit_frame(r4)	; ...send off the packet
+	ret
+10$:	movl	#ss$_nosuchdev, r0
+	ret
+20$:	movl	#ss$_accvio, r0
+	ret
+
+;
+; 4(ap) - address of where to build header
+; 8(ap) - address of where to return header
+; 12(ap) - address of 802 transmit longword
+; 16(ap) - if 802 address of response byte
+; 20(ap) - address of vcrp
+	.entry	vci_build_header, ^m<r2,r3, r4>
+	movl	g^net$ar_lan_vector, r2	; Get LAN vector
+	beql	20$			; No LAN vector, give up
+	cmpl	#1, lan$l_version(r2)	; Check version
+	blss	10$			; If less than zero, give up
+	movl	4(ap), r0		; Get address header
+	movl	12(ap), r1		; 802 xmit longword
+	movl	16(ap), r2		; 802 response flag
+	movl	20(ap), r4		; vcrp address
+	jsb	@vcib$a_lan_build_hdr(r4) ; build us a header
+	movl	8(ap), r2		; Get return address
+	movl	r0, (r2)		; Save address	
+	movl	r3, r0			; Save final size
+	ret
+10$:	movl	#ss$_nosuchdev, r0
+	ret
+20$:	movl	#ss$_accvio, r0
+	ret
+
+	.END
