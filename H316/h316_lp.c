@@ -1,6 +1,6 @@
 /* h316_lp.c: Honeywell 316/516 line printer
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1999-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    lpt		line printer
+
+   30-May-02	RMS	Widened POS to 32b
 */
 
 #include "h316_defs.h"
@@ -101,7 +103,7 @@ REG lpt_reg[] = {
 	{ ORDATA (SVCST, lpt_svcst, 2) },
 	{ ORDATA (SVCCH, lpt_svcch, 2) },
 	{ BRDATA (BUF, lpt_buf, 8, 8, 120) },
-	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
 	{ DRDATA (XTIME, lpt_xtime, 24), PV_LEFT },
 	{ DRDATA (ETIME, lpt_etime, 24), PV_LEFT },
 	{ DRDATA (PTIME, lpt_ptime, 24), PV_LEFT },

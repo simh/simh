@@ -1,6 +1,6 @@
 /* i1401_cd.c: IBM 1402 card reader/punch
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,8 @@
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
 
+   30-May-02	RMS	Widened POS to 32b
+   30-Jan-02	RMS	New zero footprint card bootstrap from Van Snyder
    29-Nov-01	RMS	Added read only unit support
    13-Apr-01	RMS	Revised for register arrays
 */
@@ -68,7 +70,7 @@ REG cdr_reg[] = {
 	{ FLDATA (ERR, ind[IN_READ], 0) },
 	{ FLDATA (S1, s1sel, 0) },
 	{ FLDATA (S2, s2sel, 0) },
-	{ DRDATA (POS, cdr_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, cdr_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, cdr_unit.wait, 24), PV_LEFT },
 	{ BRDATA (BUF, rbuf, 8, 8, CDR_WIDTH) },
 	{ NULL }  };
@@ -93,7 +95,7 @@ REG cdp_reg[] = {
 	{ FLDATA (ERR, ind[IN_PNCH], 0) },
 	{ FLDATA (S4, s4sel, 0) },
 	{ FLDATA (S8, s8sel, 0) },
-	{ DRDATA (POS, cdp_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, cdp_unit.pos, 32), PV_LEFT },
 	{ NULL }  };
 
 DEVICE cdp_dev = {
@@ -117,10 +119,10 @@ UNIT stack_unit[] = {
 	{ UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) }  };
 
 REG stack_reg[] = {
-	{ DRDATA (POS0, stack_unit[0].pos, 31), PV_LEFT },
-	{ DRDATA (POS1, stack_unit[1].pos, 31), PV_LEFT },
-	{ DRDATA (POS28, stack_unit[2].pos, 31), PV_LEFT },
-	{ DRDATA (POS4, stack_unit[4].pos, 31), PV_LEFT },
+	{ DRDATA (POS0, stack_unit[0].pos, 32), PV_LEFT },
+	{ DRDATA (POS1, stack_unit[1].pos, 32), PV_LEFT },
+	{ DRDATA (POS28, stack_unit[2].pos, 32), PV_LEFT },
+	{ DRDATA (POS4, stack_unit[4].pos, 32), PV_LEFT },
 	{ NULL }  };
 
 DEVICE stack_dev = {
@@ -261,14 +263,11 @@ return attach_unit (uptr, cptr);
 
 /* Bootstrap routine */
 
-#define BOOT_START 100
+#define BOOT_START 0
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (unsigned char))
 
 static const unsigned char boot_rom[] = {
-	OP_R + WM,					/* R */
-	OP_SWM + WM, BCD_ZERO, BCD_ZERO, BCD_ONE,	/* SWM 001 */
-	OP_CS + WM, BCD_ZERO, BCD_ZERO, BCD_ONE,	/* CS 001 111 */
-		BCD_ONE, BCD_ONE, BCD_ONE  };
+	OP_R + WM, OP_NOP + WM };                       /* R, NOP */
 
 t_stat cdr_boot (int32 unitno)
 {

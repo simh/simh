@@ -1,6 +1,6 @@
 /* pdp11_io.c: PDP-11 I/O simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   26-Jan-02	RMS	Revised for multiple DZ's
+   06-Jan-02	RMS	Revised I/O access, enable/disable support
    11-Dec-01	RMS	Moved interrupt debug code
    08-Nov-01	RMS	Cloned from cpu sources
 */
@@ -39,83 +41,45 @@ extern int32 cpu_log;
 extern FILE *sim_log;
 int32 calc_ints (int32 nipl, int32 trq);
 
-extern t_stat CPU_rd (int32 *data, int32 addr, int32 access);
-extern t_stat CPU_wr (int32 data, int32 addr, int32 access);
-extern t_stat APR_rd (int32 *data, int32 addr, int32 access);
-extern t_stat APR_wr (int32 data, int32 addr, int32 access);
-extern t_stat SR_MMR012_rd (int32 *data, int32 addr, int32 access);
-extern t_stat SR_MMR012_wr (int32 data, int32 addr, int32 access);
-extern t_stat MMR3_rd (int32 *data, int32 addr, int32 access);
-extern t_stat MMR3_wr (int32 data, int32 addr, int32 access);
-extern t_stat ubm_rd (int32 *data, int32 addr, int32 access);
-extern t_stat ubm_wr (int32 data, int32 addr, int32 access);
-extern t_stat std_rd (int32 *data, int32 addr, int32 access);
-extern t_stat std_wr (int32 data, int32 addr, int32 access);
-extern t_stat lpt_rd (int32 *data, int32 addr, int32 access);
-extern t_stat lpt_wr (int32 data, int32 addr, int32 access);
-extern t_stat dz_rd (int32 *data, int32 addr, int32 access);
-extern t_stat dz_wr (int32 data, int32 addr, int32 access);
-extern t_stat rk_rd (int32 *data, int32 addr, int32 access);
-extern t_stat rk_wr (int32 data, int32 addr, int32 access);
+extern DIB cpu0_dib, cpu1_dib, cpu2_dib;
+extern DIB cpu3_dib, cpu4_dib, ubm_dib;
+extern DIB pt_dib, tt_dib, clk_dib;
+extern DIB lpt_dib, dz_dib;
+extern DIB rk_dib, rl_dib;
+extern DIB rp_dib, rq_dib;
+extern DIB rx_dib, dt_dib;
+extern DIB tm_dib, ts_dib;
 extern int32 rk_inta (void);
-extern int32 rk_enb;
-/* extern t_stat rk6_rd (int32 *data, int32 addr, int32 access);
-extern t_stat rk6_wr (int32 data, int32 addr, int32 access);
-extern int32 rk6_inta (void);
-extern int32 rk6_enb; */
-extern t_stat rl_rd (int32 *data, int32 addr, int32 access);
-extern t_stat rl_wr (int32 data, int32 addr, int32 access);
-extern int32 rl_enb;
-extern t_stat rp_rd (int32 *data, int32 addr, int32 access);
-extern t_stat rp_wr (int32 data, int32 addr, int32 access);
 extern int32 rp_inta (void);
-extern int32 rp_enb;
-extern t_stat rq_rd (int32 *data, int32 addr, int32 access);
-extern t_stat rq_wr (int32 data, int32 addr, int32 access);
 extern int32 rq_inta (void);
-extern int32 rq_enb;
-extern t_stat rx_rd (int32 *data, int32 addr, int32 access);
-extern t_stat rx_wr (int32 data, int32 addr, int32 access);
-extern int32 rx_enb;
-extern t_stat dt_rd (int32 *data, int32 addr, int32 access);
-extern t_stat dt_wr (int32 data, int32 addr, int32 access);
-extern int32 dt_enb;
-extern t_stat tm_rd (int32 *data, int32 addr, int32 access);
-extern t_stat tm_wr (int32 data, int32 addr, int32 access);
-extern int32 tm_enb;
-extern t_stat ts_rd (int32 *data, int32 addr, int32 access);
-extern t_stat ts_wr (int32 data, int32 addr, int32 access);
-extern int32 ts_enb;
+extern int32 dz_rxinta (void);
+extern int32 dz_txinta (void);
+
+t_bool dev_conflict (uint32 nba, DIB *curr);
 
 /* I/O data structures */
 
-struct iolink {						/* I/O page linkage */
-	int32	low;					/* low I/O addr */
-	int32	high;					/* high I/O addr */
-	int32	*enb;					/* enable flag */
-	t_stat	(*read)();				/* read routine */
-	t_stat	(*write)();  };				/* write routine */
-
-struct iolink iotable[] = {
-	{ IOBA_CPU, IOBA_CPU+IOLN_CPU, NULL, &CPU_rd, &CPU_wr },
-	{ IOBA_STD, IOBA_STD+IOLN_STD, NULL, &std_rd, &std_wr },
-	{ IOBA_LPT, IOBA_LPT+IOLN_LPT, NULL, &lpt_rd, &lpt_wr },
-	{ IOBA_DZ,  IOBA_DZ +IOLN_DZ,  NULL, &dz_rd, &dz_wr },
-	{ IOBA_RK,  IOBA_RK +IOLN_RK,  &rk_enb, &rk_rd, &rk_wr },
-	{ IOBA_RL,  IOBA_RL +IOLN_RL,  &rl_enb, &rl_rd, &rl_wr },
-	{ IOBA_RP,  IOBA_RP +IOLN_RP,  &rp_enb, &rp_rd, &rp_wr },
-	{ IOBA_RQ,  IOBA_RQ +IOLN_RQ,  &rq_enb, &rq_rd, &rq_wr },
-	{ IOBA_RX,  IOBA_RX +IOLN_RX,  &rx_enb, &rx_rd, &rx_wr },
-	{ IOBA_TC,  IOBA_TC +IOLN_TC,  &dt_enb, &dt_rd, &dt_wr },
-	{ IOBA_TM,  IOBA_TM +IOLN_TM,  &tm_enb, &tm_rd, &tm_wr },
-	{ IOBA_TS,  IOBA_TS +IOLN_TS,  &ts_enb, &ts_rd, &ts_wr },
-/*	{ IOBA_RK6, IOBA_RK6+IOLN_RK6, &rk6_enb, &rk6_rd, &rk6_wr }, */
-	{ IOBA_APR, IOBA_APR+IOLN_APR, NULL, &APR_rd, &APR_wr },
-	{ IOBA_APR1, IOBA_APR1+IOLN_APR1, NULL, &APR_rd, &APR_wr },
-	{ IOBA_SRMM, IOBA_SRMM+IOLN_SRMM, NULL, &SR_MMR012_rd, &SR_MMR012_wr },
-	{ IOBA_MMR3, IOBA_MMR3+IOLN_MMR3, NULL, &MMR3_rd, &MMR3_wr },
-	{ IOBA_UBM, IOBA_UBM+IOLN_UBM, NULL, &ubm_rd, &ubm_wr },
-	{ 0, 0, NULL, NULL, NULL }  };
+DIB *dib_tab[] = {
+	&cpu0_dib,
+	&cpu1_dib,
+	&cpu2_dib,
+	&cpu3_dib,
+	&cpu4_dib,
+	&ubm_dib,
+	&pt_dib,
+	&tt_dib,
+	&clk_dib,
+	&lpt_dib,
+	&dz_dib,
+	&rk_dib,
+	&rl_dib,
+	&rp_dib,
+	&rq_dib,
+	&rx_dib,
+	&dt_dib,
+	&tm_dib,
+	&ts_dib,
+	NULL };
 
 int32 int_vec[IPL_HLVL][32] = {				/* int req to vector */
 	{ 0 },						/* IPL 0 */
@@ -137,7 +101,8 @@ int32 (*int_ack[IPL_HLVL][32])() = {			/* int ack routines */
 	{ NULL },					/* IPL 3 */
 	{ NULL },					/* IPL 4 */
 	{ &rk_inta, NULL, NULL, NULL,			/* IPL 5 */
-	  &rp_inta, NULL, NULL, &rq_inta },
+	  &rp_inta, NULL, NULL, &rq_inta,
+	  &dz_rxinta, &dz_txinta, NULL },
 	{ NULL },					/* IPL 6 */
 	{ NULL }  };					/* IPL 7 */
 
@@ -152,29 +117,31 @@ int32 (*int_ack[IPL_HLVL][32])() = {			/* int ack routines */
 	status	=	SCPE_OK or SCPE_NXM
 */
 
-t_stat iopageR (int32 *data, int32 pa, int32 access)
+t_stat iopageR (int32 *data, uint32 pa, int32 access)
 {
+int32 i;
+DIB *dibp;
 t_stat stat;
-struct iolink *p;
 
-for (p = &iotable[0]; p -> low != 0; p++ ) {
-	if ((pa >= p -> low) && (pa < p -> high) &&
-	    ((p -> enb == NULL) || *p -> enb))  {
-		stat = p -> read (data, pa, access);
+for (i = 0; dibp = dib_tab[i]; i++ ) {
+	if (dibp -> enb && (pa >= dibp -> ba) &&
+	   (pa < (dibp -> ba + dibp -> lnt))) {
+		stat = dibp -> rd (data, pa, access);
 		trap_req = calc_ints (ipl, trap_req);
 		return stat;  }  }
 return SCPE_NXM;
 }
 
-t_stat iopageW (int32 data, int32 pa, int32 access)
+t_stat iopageW (int32 data, uint32 pa, int32 access)
 {
+int32 i;
+DIB *dibp;
 t_stat stat;
-struct iolink *p;
 
-for (p = &iotable[0]; p -> low != 0; p++ ) {
-	if ((pa >= p -> low) && (pa < p -> high) &&
-	    ((p -> enb == NULL) || *p -> enb))  {
-		stat = p -> write (data, pa, access);
+for (i = 0; dibp = dib_tab[i]; i++ ) {
+	if (dibp -> enb && (pa >= dibp -> ba) &&
+	   (pa < (dibp -> ba + dibp -> lnt))) {
+		stat = dibp -> wr (data, pa, access);
 		trap_req = calc_ints (ipl, trap_req);
 		return stat;  }  }
 return SCPE_NXM;
@@ -358,4 +325,87 @@ else {							/* physical */
     for ( ; ba < alim; ba = ba + 2) {			/* by words */
 	M[ba >> 1] = *buf++;  }
     return (lim - alim);  }
+}
+
+/* Change device number for a device */
+
+t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+DIB *dibp;
+uint32 newba;
+t_stat r;
+
+if (cptr == NULL) return SCPE_ARG;
+if ((val == 0) || (desc == NULL)) return SCPE_IERR;
+dibp = (DIB *) desc;
+newba = get_uint (cptr, 8, PAMASK, &r);			/* get new */
+if ((r != SCPE_OK) || (newba == dibp -> ba)) return r;
+if (newba <= IOPAGEBASE) return SCPE_ARG;		/* > IO page base? */
+if (newba % ((uint32) val)) return SCPE_ARG;		/* check modulus */
+if (dev_conflict (newba, dibp)) return SCPE_OK;
+dibp -> ba = newba;					/* store */
+return SCPE_OK;
+}
+
+/* Show device address */
+
+t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+DIB *dibp;
+
+if (desc == NULL) return SCPE_IERR;
+dibp = (DIB *) desc;
+if (dibp -> ba <= IOPAGEBASE) return SCPE_IERR;
+fprintf (st, "address=%08o", dibp -> ba);
+if (dibp -> lnt > 1)
+	fprintf (st, "-%08o", dibp -> ba + dibp -> lnt - 1);
+return SCPE_OK;
+}
+
+/* Enable or disable a device */
+
+t_stat set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i;
+DEVICE *dptr;
+DIB *dibp;
+UNIT *up;
+
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (desc == NULL)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);			/* find device */
+if (dptr == NULL) return SCPE_IERR;
+dibp = (DIB *) desc;
+if ((val ^ dibp -> enb) == 0) return SCPE_OK;		/* enable chg? */
+if (val) {						/* enable? */
+    if (dev_conflict (dibp -> ba, dibp)) return SCPE_OK;  }
+else {							/* disable */
+    for (i = 0; i < dptr -> numunits; i++) {		/* check units */
+	up = (dptr -> units) + i;
+	if ((up -> flags & UNIT_ATT) || sim_is_active (up))
+	    return SCPE_NOFNC;  }  }
+dibp -> enb = val;
+if (dptr -> reset) return dptr -> reset (dptr);
+else return SCPE_OK;
+}
+
+/* Test for conflict in device addresses */
+
+t_bool dev_conflict (uint32 nba, DIB *curr)
+{
+uint32 i, end;
+DIB *dibp;
+
+end = nba + curr -> lnt - 1;				/* get end */
+for (i = 0; dibp = dib_tab[i]; i++) {			/* loop thru dev */
+	if (!dibp -> enb || (dibp == curr)) continue;	/* skip disabled */
+	if (((nba >= dibp -> ba) &&			/* overlap start? */
+	    (nba < (dibp -> ba + dibp -> lnt))) ||
+	    ((end >= dibp -> ba) &&			/* overlap end? */
+	    (end < (dibp -> ba + dibp -> lnt)))) {
+		printf ("Device address conflict at %08o\n", dibp -> ba);
+		if (sim_log) fprintf (sim_log,
+			"Device number conflict at %08o\n", dibp -> ba);
+		return TRUE;  }  }
+return FALSE;
 }

@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,12 +25,210 @@
 */
 
 #define	SIM_MAJOR	2
-#define SIM_MINOR	8
-#define SIM_PATCH	5
+#define SIM_MINOR	9
+#define SIM_PATCH	11
 
-/* V2.8 revision history
+/* V2.9 revision history
 
 patch	date		module(s) and fix(es)
+
+  11	20-Jul-02	i1401_mt.c: on read, end of record stores group mark
+			without word mark (found by Van Snyder)
+
+			i1401_dp.c: reworked address generation and checking
+
+			vax_cpu.c: added infinite loop detection and halt to
+			boot ROM option (from Mark Pizzolato)
+
+			vax_fpa.c: changed function names to prevent conflict
+			with C math library
+
+			pdp11_cpu.c: fixed bug in MMR0 update logic (from
+			John Dundas)
+
+			pdp18b_stddev.c: added "ASCII mode" for reader and
+			punch (from Hans Pufal)
+
+			gri_*.c: added GRI-909 simulator
+
+			scp.c: added DO echo, DO exit (from Brian Knittel)
+
+			scp_tty.c: added Windows priority hacking (from
+			Mark Pizzolato)
+
+  10	15-Jun-02	scp.c: fixed error checking on calls to fxread/fxwrite
+			(found by Norm Lastovic)
+
+			scp_tty.c, sim_vt.h, sim_vt.c: added VTxxx emulation
+			support for Windows (from Fischer Franz)
+
+			sim_sock.c: added OS/2 support (from Holger Veit)
+
+			pdp11_cpu.c: fixed bugs (from John Dundas)
+			-- added special case for PS<15:12> = 1111 to MFPI
+			-- removed special case from MTPI
+			-- added masking of relocation adds 
+
+			i1401_cpu.c:
+			-- added multiply/divide
+			-- fixed bugs (found by Van Snyder)
+			   o 5 and 7 character H, 7 character doesn't branch
+			   o 8 character NOP
+			   o 1401-like memory dump
+
+			i1401_dp.c: added 1311 disk
+
+  9	04-May-02	pdp11_rq: fixed bug in polling routine
+
+  8	03-May-02	scp.c:
+			-- changed LOG/NOLOG to SET LOG/NOLOG
+			-- added SHOW LOG
+			-- added SET VT/NOVT and SHOW VT for VT emulation
+  
+			sim_sock.h: changed VMS stropt.h include to ioctl.h
+
+			vax_cpu.c
+			-- added TODR powerup routine to set date, time on boot
+			-- fixed exception flows to clear trap request
+			-- fixed register logging in autoincrement indexed
+
+			vax_stddev.c: added TODR powerup routine
+			
+			vax_cpu1.c: fixed exception flows to clear trap request
+
+  7	30-Apr-02	scp.c: fixed bug in clock calibration when (real) clock
+			jumps forward due too far (found by Jonathan Engdahl)
+  
+			pdp11_cpu.c: fixed bugs, added features (from John Dundas
+			and Wolfgang Helbig)
+			-- added HTRAP and BPOK to maintenance register
+			-- added trap on kernel HALT if MAINT<HTRAP> set
+			-- fixed red zone trap, clear odd address and nxm traps
+			-- fixed RTS SP, don't increment restored SP
+			-- fixed TSTSET, write dst | 1 rather than prev R0 | 1
+			-- fixed DIV, set N=0,Z=1 on div by zero (J11, 11/70)
+			-- fixed DIV, set set N=Z=0 on overfow (J11, 11/70)
+			-- fixed ASH, ASHC, count = -32 used implementation-
+			   dependent 32 bit right shift
+			-- fixed illegal instruction test to detect 000010
+			-- fixed write-only page test
+
+			pdp11_rp.c: fixed SHOW ADDRESS command
+
+			vaxmod_defs.h: fixed DZ vector base and number of lines
+
+			dec_dz.h:
+			-- fixed interrupt acknowledge routines
+			-- fixed SHOW ADDRESS command
+
+			all magtape routines: added test for badly formed
+			record length (suggested by Jonathan Engdahl)
+
+  6	18-Apr-02	vax_cpu.c: fixed CASEL condition codes
+
+			vax_cpu1.c: fixed vfield pos > 31 test to be unsigned
+
+			vax_fpu.c: fixed EDIV overflow test for 0 quotient
+
+  5	14-Apr-02	vax_cpu1.c:
+			-- fixed interrupt, prv_mode set to 0 (found by Tim Stark)
+			-- fixed PROBEx to mask mode to 2b (found by Kevin Handy)
+
+  4	1-Apr-02	pdp11_rq.c: fixed bug, reset cleared write protect status
+
+			pdp11_ts.c: fixed bug in residual frame count after space
+
+  3	15-Mar-02	pdp11_defs.h: changed default model to KDJ11A (11/73)
+
+			pdp11_rq.c: adjusted delays for M+ timing bugs
+
+			hp2100_cpu.c, pdp10_cpu.c, pdp11_cpu.c: tweaked abort
+			code for ANSI setjmp/longjmp compliance
+
+			hp2100_cpu.c, hp2100_fp.c, hp2100_stddev.c, hp2100_sys.c:
+			revised to allocate memory dynamically
+
+  2	01-Mar-02	pdp11_cpu.c:
+			-- fixed bugs in CPU registers
+			-- fixed double operand evaluation order for M+
+
+			pdp11_rq.c: added delays to initialization for
+			RSX11M+ prior to V4.5
+
+  1	20-Feb-02	scp.c: fixed bug in clock calibration when (real)
+			time runs backwards
+
+			pdp11_rq.c: fixed bug in host timeout logic
+
+			pdp11_ts.c: fixed bug in message header logic
+
+			pdp18b_defs.h, pdp18b_dt.c, pdp18b_sys.c: added
+			PDP-7 DECtape support
+
+			hp2100_cpu.c:
+			-- added floating point and DMS
+			-- fixed bugs in DIV, ASL, ASR, LBT, SBT, CBT, CMW
+
+			hp2100_sys.c: added floating point, DMS
+
+			hp2100_fp.c: added floating point
+
+			ibm1130: added Brian Knittel's IBM 1130 simulator
+
+  0	30-Jan-02	scp.c:
+			-- generalized timer package for multiple timers
+			-- added circular register arrays
+			-- fixed bugs, line spacing in modifier display
+			-- added -e switch to attach
+			-- moved device enable/disable to simulators
+
+			scp_tty.c: VAX specific fix (from Robert Alan Byer)
+
+			sim_tmxr.c, sim_tmxr.h:
+			-- added tmxr_fstats, tmxr_dscln
+			-- renamed tmxr_fstatus to tmxr_fconns
+
+			sim_sock.c, sim_sock.h: added VMS support (from
+			Robert Alan Byer)
+
+			pdp_dz.h, pdp18b_tt1.c, nova_tt1.c:
+			-- added SET DISCONNECT
+			-- added SHOW STATISTICS
+
+			pdp8_defs.h: fixed bug in interrupt enable initialization
+
+			pdp8_ttx.c: rewrote as unified multiplexor
+
+			pdp11_cpu.c: fixed calc_MMR1 macro (found by Robert Alan Byer)
+
+			pdp11_stddev.c: fixed bugs in KW11L (found by John Dundas)
+
+			pdp11_rp.c: fixed bug in 18b mode boot
+
+			pdp11 bootable I/O devices: fixed register setup at boot
+			exit (found by Doug Carman)
+
+			hp2100_cpu.c:
+			-- fixed DMA register tables (found by Bill McDermith)
+			-- fixed SZx,SLx,RSS bug (found by Bill McDermith)
+			-- fixed flop restore logic (found by Bill McDermith)
+
+			hp2100_mt.c: fixed bug on write of last character
+
+			hp2100_dq,dr,ms,mux.c: added new disk, magtape, and terminal
+			multiplexor controllers
+
+			i1401_cd.c, i1401_mt.c: new zero footprint bootstraps
+			(from Van Snyder)
+
+			i1401_sys.c: fixed symbolic display of H, NOP with no trailing
+			word mark (found by Van Snyder)
+
+			most CPUs:
+			-- replaced OLDPC with PC queue
+			-- implemented device enable/disable locally
+
+   V2.8 revision history
 
 5	25-Dec-01	scp.c: fixed bug in DO command (found by John Dundas)
 

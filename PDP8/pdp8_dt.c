@@ -1,6 +1,6 @@
 /* pdp8_dt.c: PDP-8 DECtape simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    dt		TC08/TU56 DECtape
 
+   30-May-02	RMS	Widened POS to 32b
+   06-Jan-02	RMS	Changed enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Changed POS, STATT, LASTT, FLG to arrays
    29-Aug-01	RMS	Added casts to PDP-18b packup routine
@@ -305,7 +307,7 @@ REG dt_reg[] = {
 	{ ORDATA (SUBSTATE, dt_substate, 2) },
 	{ ORDATA (LOG, dt_log, 4), REG_HIDDEN },
 	{ DRDATA (LBLK, dt_logblk, 12), REG_HIDDEN },
-	{ URDATA (POS, dt_unit[0].pos, 10, 31, 0,
+	{ URDATA (POS, dt_unit[0].pos, 10, 32, 0,
 		  DT_NUMDR, PV_LEFT | REG_RO) },
 	{ URDATA (STATT, dt_unit[0].STATE, 8, 18, 0,
 		  DT_NUMDR, REG_RO) },
@@ -317,10 +319,12 @@ REG dt_reg[] = {
 	{ NULL }  };
 
 MTAB dt_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
 	{ UNIT_8FMT, 0, "16b/18b", NULL, NULL },
 	{ UNIT_8FMT, UNIT_8FMT, "12b", NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, INT_DTA, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_DTA, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE dt_dev = {

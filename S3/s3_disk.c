@@ -38,6 +38,9 @@ extern int32 IAR[], level;
 extern FILE *trace;
 extern int32 debug_reg;
 char dbuf[DSK_SECTSIZE];		/* Disk buffer */
+int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data);
+int32 read_sector(UNIT *uptr, char *dbuf, int32 sect);
+int32 write_sector(UNIT *uptr, char *dbuf, int32 sect);
 t_stat r1_svc (UNIT *uptr);
 t_stat r1_boot (int32 unitno);
 t_stat r1_attach (UNIT *uptr, char *cptr);
@@ -54,6 +57,8 @@ t_stat f2_svc (UNIT *uptr);
 t_stat f2_boot (int32 unitno);
 t_stat f2_attach (UNIT *uptr, char *cptr);
 t_stat f2_reset (DEVICE *dptr);
+extern int32 GetMem(int32 addr);
+extern int32 PutMem(int32 addr, int32 data);
 
 char opstr[5][5] = { "SIO", "LIO", "TIO", "SNS", "APL" };
 
@@ -87,7 +92,7 @@ REG r1_reg[] = {
 	{ HRDATA (ERR, diskerr[0], 16) },
 	{ DRDATA (CYL, r1_unit.u3, 8) },
 	{ DRDATA (HEAD, seekhead[0], 8) },
-	{ DRDATA (POS, r1_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, r1_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, r1_unit.wait, 24), PV_LEFT },
 	{ BRDATA (BUF, dbuf, 8, 8, 256) },
 	{ NULL }  };
@@ -109,7 +114,7 @@ REG f1_reg[] = {
 	{ HRDATA (ERR, diskerr[0], 16) },
 	{ DRDATA (CYL, f1_unit.u3, 8) },
 	{ DRDATA (HEAD, seekhead[0], 8) },
-	{ DRDATA (POS, f1_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, f1_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, f1_unit.wait, 24), PV_LEFT },
 	{ BRDATA (BUF, dbuf, 8, 8, 256) },
 	{ NULL }  };
@@ -131,7 +136,7 @@ REG r2_reg[] = {
 	{ HRDATA (ERR, diskerr[1], 16) },
 	{ DRDATA (CYL, r2_unit.u3, 8) },
 	{ DRDATA (HEAD, seekhead[1], 8) },
-	{ DRDATA (POS, r2_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, r2_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, r2_unit.wait, 24), PV_LEFT },
 	{ BRDATA (BUF, dbuf, 8, 8, 256) },
 	{ NULL }  };
@@ -153,7 +158,7 @@ REG f2_reg[] = {
 	{ HRDATA (ERR, diskerr[1], 16) },
 	{ DRDATA (CYL, f2_unit.u3, 8) },
 	{ DRDATA (HEAD, seekhead[1], 8) },
-	{ DRDATA (POS, f2_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, f2_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, f2_unit.wait, 24), PV_LEFT },
 	{ BRDATA (BUF, dbuf, 8, 8, 256) },
 	{ NULL }  };

@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Dec-01	RMS	Revised for new TTX
    26-Nov-01	RMS	Added RL8A support
    17-Sep-01	RMS	Removed multiconsole support
    16-Sep-01	RMS	Added TSS/8 packed char support, added KL8A support
@@ -48,10 +49,7 @@ extern DEVICE rk_dev, rl_dev;
 extern DEVICE rx_dev;
 extern DEVICE df_dev, rf_dev;
 extern DEVICE dt_dev, mt_dev;
-extern DEVICE tti1_dev, tto1_dev;
-extern DEVICE tti2_dev, tto2_dev;
-extern DEVICE tti3_dev, tto3_dev;
-extern DEVICE tti4_dev, tto4_dev;
+extern DEVICE ttix_dev, ttox_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
 extern int32 sim_switches;
@@ -77,10 +75,7 @@ DEVICE *sim_devices[] = {
 	&cpu_dev,
 	&ptr_dev, &ptp_dev,
 	&tti_dev, &tto_dev,
-	&tti1_dev, &tto1_dev,
-	&tti2_dev, &tto2_dev,
-	&tti3_dev, &tto3_dev,
-	&tti4_dev, &tto4_dev,
+	&ttix_dev, &ttox_dev,
 	&clk_dev, &lpt_dev,
 	&rk_dev, &rl_dev,
 	&rx_dev,

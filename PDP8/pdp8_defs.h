@@ -1,6 +1,6 @@
 /* pdp8_defs.h: PDP-8 simulator definitions
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Jan-02	RMS	Fixed bug in TTx interrupt enable initialization
    25-Nov-01	RMS	Added RL8A support
    16-Sep-01	RMS	Added multiple KL support
    18-Mar-01	RMS	Added DF32 support
@@ -57,6 +58,11 @@
 #define IOT_SKP		(1 << IOT_V_SKP)
 #define IOT_REASON	(1 << IOT_V_REASON)
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* stop on error */
+
+/* Timers */
+
+#define TMR_CLK		0				/* timer 0 = clock */
+#define TMR_TTX		1				/* timer 1 = TTx */
 
 /* Interrupt flags
 
@@ -138,6 +144,13 @@
 #define INT_ION		(1 << INT_V_ION)
 #define INT_DEV_ENABLE	((1 << INT_V_DIRECT) - 1)	/* devices w/enables */
 #define INT_ALL		((1 << INT_V_OVHD) - 1)		/* all interrupts */
-#define INT_INIT_ENABLE	(INT_TTI+INT_TTO+INT_PTR+INT_PTP+INT_LPT)
+#define INT_INIT_ENABLE	(INT_TTI+INT_TTO+INT_PTR+INT_PTP+INT_LPT) | \
+			(INT_TTI1+INT_TTI2+INT_TTI3+INT_TTI4) | \
+			(INT_TTO1+INT_TTO2+INT_TTO3+INT_TTO4)
 #define INT_PENDING	(INT_ION+INT_NO_CIF_PENDING+INT_NO_ION_PENDING)
 #define INT_UPDATE	((int_req & ~INT_DEV_ENABLE) | (dev_done & int_enable))
+
+/* Function prototypes */
+
+t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc);

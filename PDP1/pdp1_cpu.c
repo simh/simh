@@ -1,6 +1,6 @@
 /* pdp1_cpu.c: PDP-1 CPU simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu		PDP-1 central processor
 
+   30-Dec-01	RMS	Added old PC queue
    07-Dec-01	RMS	Revised to use breakpoint package
    30-Nov-01	RMS	Added extended SET/SHOW support
    16-Dec-00	RMS	Fixed bug in XCT address calculation
@@ -214,6 +215,9 @@
 
 #include "pdp1_defs.h"
 
+#define PCQ_SIZE	64				/* must be 2**n */
+#define PCQ_MASK	(PCQ_SIZE - 1)
+#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
 #define UNIT_V_MDV	(UNIT_V_UF)			/* mul/div */
 #define UNIT_MDV	(1 << UNIT_V_MDV)
 #define UNIT_V_MSIZE	(UNIT_V_UF+1)			/* dummy mask */
@@ -237,7 +241,9 @@ int32 extm_init = 0;					/* ext mem startup */
 int32 stop_inst = 0;					/* stop on rsrv inst */
 int32 xct_max = 16;					/* nested XCT limit */
 int32 ind_max = 16;					/* nested ind limit */
-int32 old_PC = 0;					/* old PC */
+uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
+int32 pcq_p = 0;					/* PC queue ptr */
+REG *pcq_r = NULL;					/* PC queue reg ptr */
 extern UNIT *sim_clock_queue;
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
@@ -313,7 +319,8 @@ REG cpu_reg[] = {
 	{ FLDATA (SBIP, sbs, SB_V_IP) },
 	{ FLDATA (IOH, ioh, 0) },
 	{ FLDATA (IOC, ioc, 0) },
-	{ ORDATA (OLDPC, old_PC, ASIZE), REG_RO },
+	{ BRDATA (PCQ, pcq, 8, ASIZE, PCQ_SIZE), REG_RO+REG_CIRC },
+	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ FLDATA (SBS_INIT, sbs_init, SB_V_ON) },
 	{ FLDATA (EXTM_INIT, extm_init, 0) },
@@ -369,7 +376,7 @@ if (sim_interval <= 0) {				/* check clock queue */
 
 if (sbs == (SB_ON | SB_RQ)) {				/* interrupt? */
 	sbs = SB_ON | SB_IP;				/* set in prog flag */
-	old_PC = PC;					/* save old PC */
+	PCQ_ENTRY;					/* save old PC */
 	M[0] = AC;					/* save state */
 	M[1] = EPC_WORD;
 	M[2] = IO;
@@ -392,7 +399,7 @@ sim_interval = sim_interval - 1;
 xct_instr:						/* label for XCT */
 if ((IR == 0610001) && ((MA & EPCMASK) == 0) && (sbs & SB_ON)) {
 	sbs = sbs & ~SB_IP;				/* seq debreak */
-	old_PC = PC;					/* save old PC */
+	PCQ_ENTRY;					/* save old PC */
 	OV = (M[1] >> 17) & 1;				/* restore OV */
 	extm = (M[1] >> 16) & 1;			/* restore ext mode */
 	PC = M[1] & AMASK;				/* JMP I 1 */
@@ -433,7 +440,7 @@ case 004:						/* XCT */
 	goto xct_instr;					/* go execute */
 case 007:						/* CAL, JDA */
 	MA = (PC & EPCMASK) | ((IR & IA)? (IR & DAMASK): 0100);
-	old_PC = PC;
+	PCQ_ENTRY;
 	M[MA] = AC;
 	AC = EPC_WORD;
 	PC = INCR_ADDR (MA);
@@ -509,12 +516,12 @@ case 025:						/* SAS */
 	if (AC == M[MA]) PC = INCR_ADDR (PC);
 	break;
 case 030:						/* JMP */
-	old_PC = PC;
+	PCQ_ENTRY;
 	PC = MA;
 	break;
 case 031:						/* JSP */
 	AC = EPC_WORD;
-	old_PC = PC;
+	PCQ_ENTRY;
 	PC = MA;
 	break;
 case 034:						/* LAW */
@@ -724,6 +731,7 @@ default:						/* undefined */
 	reason = STOP_RSRV;				/* halt */
 	break;  }					/* end switch opcode */
 }							/* end while */
+pcq_r -> qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }
 
@@ -736,6 +744,9 @@ extm = extm_init;
 ioh = ioc = 0;
 OV = 0;
 PF = 0;
+pcq_r = find_reg ("PCQ", NULL, dptr);
+if (pcq_r) pcq_r -> qptr = 0;
+else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
 }

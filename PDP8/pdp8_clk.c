@@ -1,6 +1,6 @@
 /* pdp8_clk.c: PDP-8 real-time clock simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    clk		real time clock
 
+   30-Dec-01	RMS	Removed for generalized timers
    05-Sep-01	RMS	Added terminal multiplexor support
    17-Jul-01	RMS	Moved function prototype
    05-Mar-01	RMS	Added clock calibration support
@@ -109,7 +110,7 @@ int32 t;
 
 dev_done = dev_done | INT_CLK;				/* set done */
 int_req = INT_UPDATE;					/* update interrupts */
-t = sim_rtc_calb (clk_tps);				/* calibrate clock */
+t = sim_rtcn_calb (clk_tps, TMR_CLK);			/* calibrate clock */
 sim_activate (&clk_unit, t);				/* reactivate unit */
 tmxr_poll = t;						/* set mux poll */
 return SCPE_OK;
@@ -123,6 +124,5 @@ dev_done = dev_done & ~INT_CLK;				/* clear done, int */
 int_req = int_req & ~INT_CLK;
 int_enable = int_enable & ~INT_CLK;			/* clear enable */
 sim_activate (&clk_unit, clk_unit.wait);		/* activate unit */
-tmxr_poll = clk_unit.wait;				/* set mux poll */
 return SCPE_OK;
 }

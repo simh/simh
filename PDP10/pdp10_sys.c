@@ -1,6 +1,6 @@
 /* pdp10_sys.c: PDP-10 simulator interface
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Apr-02	RMS	Removed magtape record length error
    17-Sep-01	RMS	Removed multiconsole support
    25-Aug-01	RMS	Enabled DZ11
    27-May-01	RMS	Added multiconsole support
@@ -72,9 +73,9 @@ DEVICE *sim_devices[] = {
 	&ptr_dev,
 	&ptp_dev,
 	&lp20_dev,
-	&dz_dev,
 	&rp_dev,
 	&tu_dev,
+	&dz_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -89,7 +90,6 @@ const char *sim_stop_messages[] = {
 	"Nested indirect address limit exceeded",
 	"Nested XCT limit exceeded",
 	"Invalid I/O controller",
-	"Invalid magtape record length",
 	"Address stop",
 	"Panic stop"  };
 

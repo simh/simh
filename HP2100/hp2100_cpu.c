@@ -1,6 +1,6 @@
 /* hp2100_cpu.c: HP 2100 CPU simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,17 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Mar-02	RMS	Changed to allocate memory array dynamically
+   11-Mar-02	RMS	Cleaned up setjmp/auto variable interaction
+   17-Feb-02	RMS	Added DMS support
+			Fixed bugs in extended instructions
+   03-Feb-02	RMS	Added terminal multiplexor support
+			Changed PCQ macro to use unmodified PC
+			Fixed flop restore logic (found by Bill McDermith)
+			Fixed SZx,SLx,RSS bug (found by Bill McDermith)
+			Added floating point support
+   16-Jan-02	RMS	Added additional device support
+   07-Jan-02	RMS	Fixed DMA register tables (found by Bill McDermith)
    07-Dec-01	RMS	Revised to use breakpoint package
    03-Dec-01	RMS	Added extended SET/SHOW support
    10-Aug-01	RMS	Removed register in declarations
@@ -239,15 +250,30 @@
 */
 
 #include "hp2100_defs.h"
+#include <setjmp.h>
 
+#define PCQ_SIZE	64				/* must be 2**n */
+#define PCQ_MASK	(PCQ_SIZE - 1)
+#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = err_PC
 #define UNIT_V_MSIZE	(UNIT_V_UF)			/* dummy mask */
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 #define UNIT_V_2100	(UNIT_V_UF + 1)			/* 2100 vs 2116 */
 #define UNIT_2100	(1 << UNIT_V_2100)
 #define UNIT_V_21MX	(UNIT_V_UF + 2)			/* 21MX vs 2100 */
 #define UNIT_21MX	(1 << UNIT_V_21MX)
+#define ABORT(val)	longjmp (save_env, (val))
 
-uint16 M[MAXMEMSIZE] = { 0 };				/* memory */
+#define DMAR0		1
+#define DMAR1		2
+#define SEXT(x)		(((x) & SIGN)? (((int32) (x)) | ~DMASK): ((int32) (x)))
+
+/* Memory protection tests */
+
+#define MP_TEST(x)	(CTL (PRO) && ((x) > 1) && ((x) < mfence))
+
+#define MP_TESTJ(x)	(CTL (PRO) && ((x) < mfence))
+
+uint16 *M = NULL;					/* memory */
 int32 saved_AR = 0;					/* A register */
 int32 saved_BR = 0;					/* B register */
 int32 PC = 0;						/* P register */
@@ -266,23 +292,60 @@ int32 ion_defer = 0;					/* interrupt defer */
 int32 intaddr = 0;					/* interrupt addr */
 int32 mfence = 0;					/* mem prot fence */
 int32 maddr = 0;					/* mem prot err addr */
+int32 err_PC = 0;					/* error PC */
+int32 dms_enb = 0;					/* dms enable */
+int32 dms_ump = 0;					/* dms user map */
+int32 dms_sr = 0;					/* dms status register */
+int32 dms_fence = 0;					/* dms base page fence */
+int32 dms_vr = 0;					/* dms violation register */
+int32 dms_sma = 0;					/* dms saved ma */
+int32 dms_map[MAP_NUM * MAP_LNT] = { 0 };		/* dms maps */
 int32 ind_max = 16;					/* iadr nest limit */
 int32 stop_inst = 1;					/* stop on ill inst */
 int32 stop_dev = 2;					/* stop on ill dev */
-int32 old_PC = 0;					/* previous PC */
+uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
+int32 pcq_p = 0;					/* PC queue ptr */
+REG *pcq_r = NULL;					/* PC queue reg ptr */
+jmp_buf save_env;					/* abort handler */
+
+extern int32 sim_interval;
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
+extern FILE *sim_log;
 
+uint8 ReadB (int32 addr);
+uint8 ReadBA (int32 addr);
+uint16 ReadW (int32 addr);
+uint16 ReadWA (int32 addr);
+uint32 ReadF (int32 addr);
+uint16 ReadIO (int32 addr, int32 map);
+void WriteB (int32 addr, int32 dat);
+void WriteBA (int32 addr, int32 dat);
+void WriteW (int32 addr, int32 dat);
+void WriteWA (int32 addr, int32 dat);
+void WriteIO (int32 addr, int32 dat, int32 map);
+int32 dms (int32 va, int32 map, int32 prot);
+uint16 dms_rmap (int32 mapi);
+void dms_wmap (int32 mapi, int32 dat);
+void dms_viol (int32 va, int32 st, t_bool io);
+int32 dms_upd_sr (void);
 int32 shift (int32 inval, int32 flag, int32 oper);
 int32 calc_dma (void);
 int32 calc_int (void);
-void dma_cycle (int32 chan);
+void dma_cycle (int32 chan, int32 map);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat dma0_reset (DEVICE *dptr);
 t_stat dma1_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_bool dev_conflict (void);
+
+extern int32 f_as (uint32 op, t_bool sub);
+extern int32 f_mul (uint32 op);
+extern int32 f_div (uint32 op);
+extern int32 f_fix (void);
+extern void f_flt (void);
 
 /* CPU data structures
 
@@ -292,8 +355,7 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
    cpu_mod	CPU modifiers list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK,
-		MAXMEMSIZE) };
+UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, VASIZE) };
 
 REG cpu_reg[] = {
 	{ ORDATA (P, PC, 15) },
@@ -312,10 +374,17 @@ REG cpu_reg[] = {
 	{ FLDATA (MPFBF, dev_fbf[PRO/32], INT_V (PRO)) },
 	{ ORDATA (MFENCE, mfence, 15) },
 	{ ORDATA (MADDR, maddr, 16) },
+	{ FLDATA (DMSENB, dms_enb, 0) },
+	{ FLDATA (DMSCUR, dms_ump, VA_N_PAG) },
+	{ ORDATA (DMSSR, dms_sr, 16) },
+	{ ORDATA (DMSVR, dms_vr, 16) },
+	{ ORDATA (DMSSMA, dms_sma, 15), REG_HIDDEN },
+	{ BRDATA (DMSMAP, dms_map, 8, PA_N_SIZE, MAP_NUM * MAP_LNT) },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ FLDATA (STOP_DEV, stop_dev, 1) },
 	{ DRDATA (INDMAX, ind_max, 16), REG_NZ + PV_LEFT },
-	{ ORDATA (OLDP, old_PC, 15), REG_RO },
+	{ BRDATA (PCQ, pcq, 8, 15, PCQ_SIZE), REG_RO+REG_CIRC },
+	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ FLDATA (T2100, cpu_unit.flags, UNIT_V_2100), REG_HRO },
 	{ FLDATA (T21MX, cpu_unit.flags, UNIT_V_21MX), REG_HRO },
@@ -335,10 +404,13 @@ MTAB cpu_mod[] = {
 	{ UNIT_2100 + UNIT_21MX, UNIT_21MX, "21MX", "21MX", NULL },
 	{ UNIT_MSIZE, 4096, NULL, "4K", &cpu_set_size },
 	{ UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size },
-	{ UNIT_MSIZE, 12288, NULL, "12K", &cpu_set_size },
 	{ UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size },
-	{ UNIT_MSIZE, 24576, NULL, "24K", &cpu_set_size },
 	{ UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size },
+	{ UNIT_MSIZE, 65536, NULL, "64K", &cpu_set_size },
+	{ UNIT_MSIZE, 131072, NULL, "128K", &cpu_set_size },
+	{ UNIT_MSIZE, 262144, NULL, "256K", &cpu_set_size },
+	{ UNIT_MSIZE, 524288, NULL, "512K", &cpu_set_size },
+	{ UNIT_MSIZE, 1048576, NULL, "1024K", &cpu_set_size },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -362,7 +434,8 @@ REG dma0_reg[] = {
 	{ FLDATA (FBF, dev_fbf[DMA0/32], INT_V (DMA0)) },
 	{ ORDATA (CW1, dmac[0].cw1, 16) },
 	{ ORDATA (CW2, dmac[0].cw2, 16) },
-	{ ORDATA (CW3, dmac[0].cw3, 16) }  };
+	{ ORDATA (CW3, dmac[0].cw3, 16) },
+	{ NULL }  };
 
 DEVICE dma0_dev = {
 	"DMA0", &dma0_unit, dma0_reg, NULL,
@@ -379,7 +452,8 @@ REG dma1_reg[] = {
 	{ FLDATA (FBF, dev_fbf[DMA1/32], INT_V (DMA1)) },
 	{ ORDATA (CW1, dmac[1].cw1, 16) },
 	{ ORDATA (CW2, dmac[1].cw2, 16) },
-	{ ORDATA (CW3, dmac[1].cw3, 16) }  };
+	{ ORDATA (CW3, dmac[1].cw3, 16) },
+	{ NULL }  };
 
 DEVICE dma1_dev = {
 	"DMA1", &dma1_unit, dma1_reg, NULL,
@@ -389,23 +463,35 @@ DEVICE dma1_dev = {
 
 /* Extended instruction decode tables */
 
-static const t_bool ext_addr[192] = {			/* ext inst format */
- 0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
- 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
- 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
- 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
- 0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
- 1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+static const uint8 ext_addr[192] = {			/* ext inst format */
+ 0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,			/* 1: 2 word inst */
+ 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,
+ 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,
+ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
 
-static const t_bool exg_breq[16] = {			/* ext grp B only */
- 0,0,0,1,0,1,1,0,0,0,0,1,0,1,1,0 };
+static const uint8 exg_breq[64] = {			/* ext grp B only */
+ 1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,			/* 1: <11> must be 1 */
+ 1,1,0,1,0,0,0,0,0,0,1,1,1,1,1,1,
+ 0,0,0,1,0,1,1,0,0,0,0,1,0,1,1,0,
+ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 };
 
-static const t_bool exg_addr[32] = {			/* ext grp format */
- 1,0,1,1,0,1,1,0,1,0,1,1,0,1,1,0,0,0,1,0,0,2,2,0,0,0,1,3,3,3,2,2 };
+static const uint8 exg_addr[64] = {			/* ext grp format */
+ 0,0,0,0,0,0,0,0,0,0,0,0,1,3,0,0,			/* 1: 2 word inst */
+ 0,0,0,0,1,1,1,0,0,0,1,1,1,1,1,1,			/* 2: 3 word with count */
+ 1,0,1,1,0,1,1,0,1,0,1,1,0,1,1,0,			/* 3: 3 word inst */
+ 0,0,1,0,0,2,2,0,0,0,1,3,3,3,2,2 };
 
 /* Interrupt defer table */
 
-static const t_bool defer_tab[] = { 0, 1, 1, 1, 0, 0, 0, 1 };
+static const int32 defer_tab[] = { 0, 1, 1, 1, 0, 0, 0, 1 };
 
 /* Device dispatch table */
 
@@ -428,103 +514,123 @@ int32 (*dtab[64])() = {
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL  };
 
-/* Dynamic device information table */
+/* Device information blocks */
 
-extern int32 ptrio (int32 op, int32 IR, int32 outdat);
-extern int32 ptpio (int32 op, int32 IR, int32 outdat);
-extern int32 ttyio (int32 op, int32 IR, int32 outdat);
-extern int32 clkio (int32 op, int32 IR, int32 outdat);
-extern int32 lptio (int32 op, int32 IR, int32 outdat);
-extern int32 mtdio (int32 op, int32 IR, int32 outdat);
-extern int32 mtcio (int32 op, int32 IR, int32 outdat);
-extern int32 dpdio (int32 op, int32 IR, int32 outdat);
-extern int32 dpcio (int32 op, int32 IR, int32 outdat);
+extern DIB ptr_dib, ptp_dib;
+extern DIB tty_dib;
+extern DIB clk_dib;
+extern DIB lpt_dib;
+extern DIB dp_dib[];
+extern DIB dq_dib[];
+extern DIB dr_dib[];
+extern DIB mt_dib[];
+extern DIB ms_dib[];
+extern DIB mux_dib[];
+extern DIB muxc_dib;
 
-struct hpdev infotab[] = {
-	{ PTR, 0, 0, 0, 0, &ptrio },
-	{ PTP, 0, 0, 0, 0, &ptpio },
-	{ TTY, 0, 0, 0, 0, &ttyio },
-	{ CLK, 0, 0, 0, 0, &clkio },
-	{ LPT, 0, 0, 0, 0, &lptio },
-	{ MTD, 0, 0, 0, 0, &mtdio },
-	{ MTC, 0, 0, 0, 0, &mtcio },
-	{ DPD, 0, 0, 0, 0, &dpdio },
-	{ DPC, 0, 0, 0, 0, &dpcio },
-	{ 0 }  };
+DIB *dib_tab[] = {
+	&ptr_dib,
+	&ptp_dib,
+	&tty_dib,
+	&clk_dib,
+	&lpt_dib,
+	&dp_dib[0],
+	&dp_dib[1],
+	&dq_dib[0],
+	&dq_dib[1],
+	&dr_dib[0],
+	&dr_dib[1],
+	&mt_dib[0],
+	&mt_dib[1],
+	&ms_dib[0],
+	&ms_dib[1],
+	&mux_dib[0],
+	&mux_dib[1],
+	&muxc_dib,
+	NULL  };
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
-int32 IR, MA, absel, i, t, intrq, dmarq;
-int32 err_PC, M1, dev, iodata, op, sc, q, r, wc;
-t_stat reason;
-
-#define DMAR0	1
-#define DMAR1	2
-#define SEXT(x) (((x) & SIGN)? (((int32) (x)) | ~DMASK): ((int32) (x)))
-#define LDBY(a) ((M[(a) >> 1] >> (((a) & 1)? 0: 8)) & 0377)
-#define STBY(a,d) MA = (a) >> 1; \
-		MP_TEST (MA); \
-		if (!MEM_ADDR_OK (MA)) break; \
-		if ((a) & 1) M[MA] = (M[MA] & 0177400) | ((d) & 0377); \
-		else M[MA] = (M[MA] & 0377) | (((d) & 0377) << 8)
-
-/* Memory protection tests */
-
-#define MP_TEST(x) if (CTL (PRO) && ((x) > 1) && ((x) < mfence)) { \
-		maddr = err_PC | 0100000; \
-		setFLG (PRO); \
-		intrq = PRO; \
-		break;  }
-
-#define MP_TESTJ(x) if (CTL (PRO) && ((x) < mfence)) { \
-		maddr = err_PC | 0100000; \
-		setFLG (PRO); \
-		intrq = PRO; \
-		break;  }
+int32 intrq, dmarq;					/* set after setjmp */
+t_stat reason;						/* set after setjmp */
+int32 i, dev;						/* temp */
+DIB *dibp;						/* temp */
+int abortval;
 
 /* Restore register state */
 
+if (dev_conflict ()) return SCPE_STOP;			/* check consistency */
 AR = saved_AR & DMASK;					/* restore reg */
 BR = saved_BR & DMASK;
-err_PC = PC = PC & AMASK;				/* load local PC */
+dms_fence = dms_sr & MST_FENCE;				/* separate fence */
+err_PC = PC = PC & VAMASK;				/* load local PC */
 reason = 0;
 
 /* Restore I/O state */
 
-for (i = VARDEV; i <= DEVMASK; i++) dtab[i] = NULL;
-for (i = 0; infotab[i].devno != 0; i++) {		/* loop thru dev */
-	dev = infotab[i].devno;				/* get dev # */
-	if (infotab[i].ctl) { setCMD (dev); }		/* restore cmd */
-	else { clrCMD (dev); }
-	if (infotab[i].ctl) { setCTL (dev); }		/* restore ctl */
-	else { clrCTL (dev); }
-	if (infotab[i].flg) { setFLG (dev); }		/* restore flg */
-	else { clrFLG (dev); }
-	if (infotab[i].fbf) { setFBF (dev); }		/* restore fbf */
-	else { clrFBF (dev); }
-	dtab[dev] = infotab[i].iot;  }			/* set I/O dispatch */
+for (i = VARDEV; i <= DEVMASK; i++) dtab[i] = NULL;	/* clr disp table */
+dev_cmd[0] = dev_cmd[0] & M_FXDEV;			/* clear dynamic info */
+dev_ctl[0] = dev_ctl[0] & M_FXDEV;
+dev_flg[0] = dev_flg[0] & M_FXDEV;
+dev_fbf[0] = dev_fbf[0] & M_FXDEV;
+dev_cmd[1] = dev_ctl[1] = dev_flg[1] = dev_fbf[1] = 0;
+for (i = 0; dibp = dib_tab[i]; i++) {			/* loop thru dev */
+	if (dibp -> enb) {				/* enabled? */
+		dev = dibp -> devno;			/* get dev # */
+		if (dibp -> cmd) { setCMD (dev); }	/* restore cmd */
+		if (dibp -> ctl) { setCTL (dev); }	/* restore ctl */
+		if (dibp -> flg) { setFLG (dev); }	/* restore flg */
+		clrFBF (dev);				/* also sets fbf */
+		if (dibp -> fbf) { setFBF (dev); }	/* restore fbf */
+		dtab[dev] = dibp -> iot;  }  }		/* set I/O dispatch */
+
+/* Abort handling
+
+   If an abort occurs in memory protection, the relocation routine
+   executes a longjmp to this area OUTSIDE the main simulation loop.
+   Memory protection errors are the only sources of aborts in the
+   HP 2100.  All referenced variables must be globals, and all sim_instr
+   scoped automatics must be set after the setjmp.
+*/
+
+abortval = setjmp (save_env);				/* set abort hdlr */
+if (abortval != 0) {					/* mem mgt abort? */
+	if (abortval > 0) { setFLG (PRO); }		/* dms abort? */
+	else maddr = err_PC | 0100000;			/* mprot abort */
+	intrq = PRO;  }					/* protection intr */
 dmarq = calc_dma ();					/* recalc DMA masks */
 intrq = calc_int ();					/* recalc interrupts */
 
 /* Main instruction fetch/decode loop */
 
 while (reason == 0) {					/* loop until halted */
+int32 IR, MA, absel, i, dev, t, opnd;
+int32 M1, iodata, op, sc, q, r, wc;
+int32 mapi, mapj;
+uint32 fop;
+
 if (sim_interval <= 0) {				/* check clock queue */
 	if (reason = sim_process_event ()) break;  
 	dmarq = calc_dma ();				/* recalc DMA reqs */
 	intrq = calc_int ();  }				/* recalc interrupts */
 
 if (dmarq) {
-	if (dmarq & DMAR0) dma_cycle (0);		/* DMA1 cycle? */
-	if (dmarq & DMAR1) dma_cycle (1);		/* DMA2 cycle? */
+	if (dmarq & DMAR0) dma_cycle (0, PAMAP);	/* DMA1 cycle? */
+	if (dmarq & DMAR1) dma_cycle (1, PBMAP);	/* DMA2 cycle? */
 	dmarq = calc_dma ();				/* recalc DMA reqs */
 	intrq = calc_int ();  }				/* recalc interrupts */
 
 if (intrq && ((intrq <= PRO) || !ion_defer)) {		/* interrupt request? */
 	clrFBF (intrq);					/* clear flag buffer */
 	intaddr = intrq;				/* save int addr */
-	IR = M[intrq];					/* get dispatch instr */
+	err_PC = PC;					/* save PC for error */
+	if (dms_enb) dms_sr = dms_sr | MST_ENBI;	/* dms enabled? */
+	else dms_sr = dms_sr & ~MST_ENBI;
+	if (dms_ump) {					/* user map? */
+		dms_sr = dms_sr | MST_UMPI;
+		dms_ump = 0;  }				/* switch to system */
+	else dms_sr = dms_sr & ~MST_UMPI;
+	IR = ReadW (intrq);				/* get dispatch instr */
 	ion_defer = 1;					/* defer interrupts */
 	intrq = 0;					/* clear request */
 	clrCTL (PRO); }					/* protection off */
@@ -534,8 +640,8 @@ else {	if (sim_brk_summ &&
 		reason = STOP_IBKPT;			/* stop simulation */
 		break;  }
 	err_PC = PC;					/* save PC for error */
-	IR = M[PC];					/* fetch instr */
-	PC = (PC + 1) & AMASK;
+	IR = ReadW (PC);				/* fetch instr */
+	PC = (PC + 1) & VAMASK;
 	sim_interval = sim_interval - 1;
 	ion_defer = 0;  }
 absel = (IR & AB)? 1: 0;				/* get A/B select */
@@ -546,81 +652,79 @@ if (IR & MROP) {					/* mem ref? */
 	MA = IR & (IA | DISP);				/* ind + disp */
 	if (IR & CP) MA = ((PC - 1) & PAGENO) | MA;	/* current page? */
 	for (i = 0; (i < ind_max) && (MA & IA); i++)	/* resolve multi- */
-		MA = M[MA & AMASK];			/* level indirect */
+		MA = ReadW (MA & VAMASK);		/* level indirect */
 	if (i >= ind_max) {				/* indirect loop? */
 		reason = STOP_IND;
 		break;  }
 
 	switch ((IR >> 11) & 017) {			/* decode IR<14:11> */
 	case 002:					/* AND */
-		AR = AR & M[MA];
+		AR = AR & ReadW (MA);
 		break;
 	case 003:					/* JSB */
-		MP_TEST (MA);
-		if (MEM_ADDR_OK (MA)) M[MA] = PC;
-		old_PC = PC;
-		PC = (MA + 1) & AMASK;
+		WriteW (MA, PC);
+		PCQ_ENTRY;
+		PC = (MA + 1) & VAMASK;
 		if (IR & IA) ion_defer = 1;
 		break;
 	case 004:					/* XOR */
-		AR = AR ^ M[MA];
+		AR = AR ^ ReadW (MA);
 		break;
 	case 005:					/* JMP */
-		MP_TESTJ (MA);
-		old_PC = PC;
+		if (MP_TESTJ (MA)) ABORT (ABORT_FENCE);
+		PCQ_ENTRY;
 		PC = MA;
 		if (IR & IA) ion_defer = 1;
 		break;
 	case 006:					/* IOR */
-		AR = AR | M[MA];
+		AR = AR | ReadW (MA);
 		break;
 	case 007:					/* ISZ */
-		MP_TEST (MA);
-		t = (M[MA] + 1) & DMASK;
-		if (MEM_ADDR_OK (MA)) M[MA] = t;
-		if (t == 0) PC = (PC + 1) & AMASK;
+		t = (ReadW (MA) + 1) & DMASK;
+		WriteW (MA, t);
+		if (t == 0) PC = (PC + 1) & VAMASK;
 		break;
 
 /* Memory reference instructions, continued */
 
 	case 010:					/* ADA */
-		t = (int32) AR + (int32) M[MA];
+		opnd = (int32) ReadW (MA);
+		t = (int32) AR + opnd;
 		if (t > DMASK) E = 1;
-		if (((~AR ^ M[MA]) & (AR ^ t)) & SIGN) O = 1;
+		if (((~AR ^ opnd) & (AR ^ t)) & SIGN) O = 1;
 		AR = t & DMASK;
 		break;
 	case 011:					/* ADB */
-		t = (int32) BR + (int32) M[MA];
+		opnd = (int32) ReadW (MA);
+		t = (int32) BR + opnd;
 		if (t > DMASK) E = 1;
-		if (((~BR ^ M[MA]) & (BR ^ t)) & SIGN) O = 1;
+		if (((~BR ^ opnd) & (BR ^ t)) & SIGN) O = 1;
 		BR = t & DMASK;
 		break;
 	case 012:					/* CPA */
-		if (AR != M[MA]) PC = (PC + 1) & AMASK;
+		if (AR != ReadW (MA)) PC = (PC + 1) & VAMASK;
 		break;
 	case 013:					/* CPB */
-		if (BR != M[MA]) PC = (PC + 1) & AMASK;
+		if (BR != ReadW (MA)) PC = (PC + 1) & VAMASK;
 		break;
 	case 014:					/* LDA */
-		AR = M[MA];
+		AR = ReadW (MA);
 		break;
 	case 015:					/* LDB */
-		BR = M[MA];
+		BR = ReadW (MA);
 		break;
 	case 016:					/* STA */
-		MP_TEST (MA);
-		if (MEM_ADDR_OK (MA)) M[MA] = AR;
+		WriteW (MA, AR);
 		break;
 	case 017:					/* STB */
-		MP_TEST (MA);
-		if (MEM_ADDR_OK (MA)) M[MA] = BR;
+		WriteW (MA, BR);
 		break;  }				/* end case IR */
 	}						/* end if mem ref */
 
 /* Alter/skip instructions */
 
 else if ((IR & NMROP) == ASKP) {			/* alter/skip? */
-	int skip = 0;					/* no skip */
+	int32 skip = 0;					/* no skip */
 
 	if (IR & 000400) t = 0;				/* CLx */
 	else t = ABREG[absel];
@@ -630,7 +734,7 @@ else if ((IR & NMROP) == ASKP) {			/* alter/skip? */
 		if (IR & 000100) E = 0;			/* CLE */
 		if (IR & 000200) E = E ^ 1;		/* CME */
 		if (((IR & 000030) == 000030) &&	/* SSx,SLx,RSS */
-			(t == 0100001)) skip = 1;
+			((t & 0100001) == 0100001)) skip = 1;
 		if (((IR & 000030) == 000020) &&	/* SSx,RSS */
 			((t & SIGN) != 0)) skip = 1;
 		if (((IR & 000030) == 000010) &&	/* SLx,RSS */
@@ -656,7 +760,7 @@ else if ((IR & NMROP) == ASKP) {			/* alter/skip? */
 		if ((IR & 000002) && (t == 0)) skip = 1;/* SZx */
 		}					/* end if ~RSS */
 	ABREG[absel] = t;				/* store result */
-	PC = (PC + skip) & AMASK;			/* add in skip */
+	PC = (PC + skip) & VAMASK;			/* add in skip */
 	}						/* end if alter/skip */
 
 /* Shift instructions */
@@ -665,7 +769,7 @@ else if ((IR & NMROP) == SHFT) {			/* shift? */
 	t = shift (ABREG[absel], IR & 01000, IR >> 6);	/* do first shift */
 	if (IR & 000040) E = 0;				/* CLE */
 	if ((IR & 000010) && ((t & 1) == 0))		/* SLx */
-		PC = (PC + 1) & AMASK;
+		PC = (PC + 1) & VAMASK;
 	ABREG[absel] = shift (t, IR & 00020, IR);	/* do second shift */
 	}						/* end if shift */
 
@@ -675,12 +779,10 @@ else if ((IR & NMROP) == IOT) {				/* I/O? */
 	dev = IR & DEVMASK;				/* get device */
 	t = (IR >> 6) & 07;				/* get subopcode */
 	if (CTL (PRO) && ((t == ioHLT) || (dev != OVF))) {
-		maddr = err_PC | 0100000;
-		setFLG (PRO);
-		intrq = PRO;
-		break;  }
+		ABORT (ABORT_FENCE);  }
 	iodata = devdisp (dev, t, IR, ABREG[absel]);	/* process I/O */
-	if ((t == ioMIX) || (t == ioLIX)) ABREG[absel] = iodata & DMASK;
+	if ((t == ioMIX) || (t == ioLIX))		/* store ret data */
+		ABREG[absel] = iodata & DMASK;
 	if (t == ioHLT) reason = STOP_HALT;
 	else reason = iodata >> IOT_V_REASON;
 	ion_defer = defer_tab[t];			/* set defer */
@@ -695,10 +797,10 @@ else if (cpu_unit.flags & (UNIT_2100 | UNIT_21MX)) {	/* ext instr? */
 
 	op = (IR >> 4) & 0277;				/* get opcode */
 	if (ext_addr[op]) {				/* extended mem ref? */
-		MA = M[PC];				/* get next address */
-		PC = (PC + 1) & AMASK;
+		MA = ReadW (PC);			/* get next address */
+		PC = (PC + 1) & VAMASK;
 		for (i = 0; (i < ind_max) && (MA & IA); i++)
-			MA = M[MA & AMASK];
+			MA = ReadW (MA & VAMASK);
 		if (i >= ind_max) {
 			reason = STOP_IND;
 			break;  }  }
@@ -706,38 +808,36 @@ else if (cpu_unit.flags & (UNIT_2100 | UNIT_21MX)) {	/* ext instr? */
 	if (sc == 0) sc = 16;
 	switch (op) {					/* decode IR<11:4> */
 	case 0010:					/* MUL */
-		t = SEXT (AR) * SEXT (M[MA]);
+		t = SEXT (AR) * SEXT (ReadW (MA));
 		BR = (t >> 16) & DMASK;
 		AR = t & DMASK;
 		O = 0;
 		break;
 	case 0020:					/* DIV */
-		if ((M[MA] == 0) ||			/* divide by zero? */
-		   ((BR == SIGN) && (AR == 0) && (M[MA] == DMASK))) {
+		t = (SEXT (BR) << 16) | (int32) AR;	/* get divd */
+		opnd = SEXT (ReadW (MA));		/* get divisor */
+		if ((opnd == 0) ||			/* divide by zero? */
+		   ((t == SIGN32) && (opnd == -1)) ||	/* -2**32 / -1? */
+		   ((q = t / opnd) > 077777) ||		/* quo too big? */
+		    (q < -0100000)) {			/* quo too small? */
 			O = 1;				/* set overflow */
-			break;  }
-		t = (SEXT (BR) << 16) || (int32) AR;
-		q = t / SEXT (M[MA]);			/* quotient */
-		r = t % SEXT (M[MA]);			/* remainder */
-		if ((q >= 077777) || (q < -0100000)) {	/* quo too large? */
-			if (BR & SIGN) {		/* negative divd? */
-				AR = (-AR) & DMASK;	/* take abs value */
-				BR = ((BR ^ DMASK) + (AR == 0)) & DMASK;  }
-			O = 1;  }
+			if (BR & SIGN) {		/* divd negative? */
+				BR = (-BR) & DMASK;	/* make B'A pos */
+				AR = (~AR + (BR == 0)) & DMASK;  }
+			}				/* end if div fail */
 		else {	AR = q & DMASK;			/* set quo, rem */
-			BR = r & DMASK;
-			O = 0;  }
+			BR = (t % opnd) & DMASK;
+			O = 0;  }			/* end else ok */
 		break;
 	case 0210:					/* DLD */
-		AR = M[MA];
-		MA = (MA + 1) & AMASK;
-		BR = M[MA];
+		AR = ReadW (MA);
+		MA = (MA + 1) & VAMASK;
+		BR = ReadW (MA);
 		break;
 	case 0220:					/* DST */
-		MP_TEST (MA);
-		if (MEM_ADDR_OK (MA)) M[MA] = AR;
-		MA = (MA + 1) & AMASK;
-		if (MEM_ADDR_OK (MA)) M[MA] = BR;
+		WriteW (MA, AR);
+		MA = (MA + 1) & VAMASK;
+		WriteW (MA, BR);
 		break;
 
 /* Extended arithmetic instructions */
@@ -745,6 +845,7 @@ else if (cpu_unit.flags & (UNIT_2100 | UNIT_21MX)) {	/* ext instr? */
 	case 0001:					/* ASL */
 		t = (SEXT (BR) >> (16 - sc)) & DMASK;
 		if (t != ((BR & SIGN)? DMASK: 0)) O = 1;
+		else O = 0;
 		BR = (BR & SIGN) || ((BR << sc) & 077777) ||
 			(AR >> (16 - sc));
 		AR = (AR << sc) & DMASK;
@@ -761,6 +862,7 @@ else if (cpu_unit.flags & (UNIT_2100 | UNIT_21MX)) {	/* ext instr? */
 	case 0041:					/* ASR */
 		AR = ((BR << (16 - sc)) | (AR >> sc)) & DMASK;
 		BR = (SEXT (BR) >> sc) & DMASK;
+		O = 0;
 		break;
 	case 0042:					/* LSR */
 		AR = ((BR << (16 - sc)) | (AR >> sc)) & DMASK;
@@ -771,223 +873,453 @@ else if (cpu_unit.flags & (UNIT_2100 | UNIT_21MX)) {	/* ext instr? */
 		AR = ((AR >> sc) | (BR << (16 - sc))) & DMASK;
 		BR = ((BR >> sc) | (t << (16 - sc))) & DMASK;
 		break;
-
-/* Extended instruction group */
 
-	case 0076:					/* ext inst grp, A */
-		if (exg_breq[IR & 017]) {		/* must have B set? */
+/* Floating point instructions */
+
+	case 0240:					/* FAD */
+		fop = ReadF (MA);			/* get fop */
+		O = O | f_as (fop, 0);			/* add */
+		break;
+	case 0241:					/* FSB */
+		fop = ReadF (MA);			/* get fop */
+		O = O | f_as (fop, 1);			/* subtract */
+		break;
+	case 0242:					/* FMP */
+		fop = ReadF (MA);			/* get fop */
+		O = O | f_mul (fop);			/* multiply */
+		break;
+	case 0243:					/* FDV */
+		fop = ReadF (MA);			/* get fop */
+		O = O | f_div (fop);			/* divide */
+		break;
+	case 0244:					/* FIX */
+		O = O | f_fix ();			/* fix */
+		break;
+	case 0245:					/* FLT */
+		f_flt ();				/* float */
+		break;
+
+/* Extended instruction group, including DMS */
+
+	case 0074: case 0075:				/* DMS inst grp, A */
+	case 0076: case 0077:				/* ext inst grp, A */
+		if (exg_breq[IR & 077]) {		/* must have B set? */
 			reason = stop_inst;
 			break;  }
+	case 0274: case 0275:				/* DMS inst grp, B */
 	case 0276: case 0277:				/* ext inst grp, B */
 		if ((cpu_unit.flags & UNIT_21MX) == 0) {
 			reason = stop_inst;
 			break;  }
-		op = IR & 037;				/* get sub opcode */
+		op = IR & 077;				/* get sub opcode */
 		if (exg_addr[op]) {			/* mem addr? */
-			MA = M[PC];			/* get next address */
-			PC = (PC + 1) & AMASK;
+			MA = ReadW (PC);		/* get next address */
+			PC = (PC + 1) & VAMASK;
 			for (i = 0; (i < ind_max) && (MA & IA); i++) 
-				MA = M[MA & AMASK];
+				MA = ReadW (MA & VAMASK);
 			if (i >= ind_max) {
 				reason = STOP_IND;
 				break;  }  }
 		if (exg_addr[op] == 2) {		/* word of zero? */
-			wc = M[MA];			/* get count */
-			if (M[PC] == 0) M[PC] = wc;	/* save count */
+			wc = ReadW (MA);		/* get count */
+			if (ReadW (PC) == 0) WriteW (PC, wc);
 			awc = PC;			/* and addr */
-			PC = (PC + 1) & AMASK;  }
+			PC = (PC + 1) & VAMASK;  }
 		if (exg_addr[op] == 3) {		/* second address? */
-			M1 = M[PC];			/* get next address */
-			PC = (PC + 1) & AMASK;
+			M1 = ReadW (PC);		/* get next address */
+			PC = (PC + 1) & VAMASK;
 			for (i = 0; (i < ind_max) && (M1 & IA); i++)
-				M1 = M[M1 & AMASK];
+				M1 = ReadW (M1 & VAMASK);
 			if (i >= ind_max) {
 				reason = STOP_IND;
 				break;  }  }
 		switch (op) {				/* case on sub op */
-			t_bool cmpeql;
+
+/* Extended instruction group: DMS */
+
+		case 002:				/* MBI */
+			dms_viol (err_PC, MVI_PRV, 0);	/* priv if PRO */
+			if (XR == 0) break;		/* nop if X = 0 */
+			AR = AR & ~1;			/* force A, B even */
+			BR = BR & ~1;
+			for ( ; XR == 0; XR--) {	/* loop */
+			    t = ReadB (AR);		/* read curr */
+			    WriteBA (BR, t);		/* write alt */
+			    AR = (AR + 1) & DMASK;	/* inc ptrs */
+			    BR = (BR + 1) & DMASK;  }
+			break;
+		case 003:				/* MBF */
+			if (XR == 0) break;
+			AR = AR & ~1;			/* force A, B even */
+			BR = BR & ~1;
+			for ( ; XR == 0; XR--) {
+			    t = ReadBA (AR);
+			    WriteB (BR, t);
+			    AR = (AR + 1) & DMASK;
+			    BR = (BR + 1) & DMASK;  }
+			break;
+		case 004:				/* MBW */
+			dms_viol (err_PC, MVI_PRV, 0);
+			if (XR == 0) break;
+			AR = AR & ~1;			/* force A, B even */
+			BR = BR & ~1;
+			for ( ; XR == 0; XR--) {
+			    t = ReadBA (AR);
+			    WriteBA (BR, t);
+			    AR = (AR + 1) & DMASK;
+			    BR = (BR + 1) & DMASK;  }
+			break;
+		case 005:				/* MWI */
+			dms_viol (err_PC, MVI_PRV, 0);
+			if (XR == 0) break;
+			for ( ; XR == 0; XR--) {
+			    t = ReadW (AR & VAMASK);
+			    WriteWA (BR & VAMASK, t);
+			    AR = (AR + 1) & DMASK;
+			    BR = (BR + 1) & DMASK;  }
+			break;
+		case 006:				/* MWF */
+			if (XR == 0) break;
+			for ( ; XR == 0; XR--) {
+			    t = ReadWA (AR & VAMASK);
+			    WriteW (BR & VAMASK, t);
+			    AR = (AR + 1) & DMASK;
+			    BR = (BR + 1) & DMASK;  }
+			break;
+		case 007:				/* MWW */
+			dms_viol (err_PC, MVI_PRV, 0);
+			if (XR == 0) break;
+			for ( ; XR == 0; XR--) {
+			    t = ReadWA (AR & VAMASK);
+			    WriteWA (BR & VAMASK, t);
+			    AR = (AR + 1) & DMASK;
+			    BR = (BR + 1) & DMASK;  }
+			break;
+
+/* Extended instruction group: DMS, continued */
+
+		case 010:				/* SYA, SYB */
+		case 011:				/* USA, USB */
+		case 012:				/* PAA, PAB */
+		case 013:				/* PBA, PBB */
+			mapi = (op & 03) << VA_N_PAG;	/* map base */
+			if (ABREG[absel] & SIGN) {	/* store? */
+			    for (i = 0; i < MAP_LNT; i++) {
+				t = dms_rmap (mapi + i);
+				WriteW ((ABREG[absel] + i) & VAMASK, t);  }  }
+			else {				/* load */
+			    dms_viol (err_PC, MVI_PRV, 0);	/* priv if PRO */
+			    for (i = 0; i < MAP_LNT; i++) {
+				t = ReadW (ABREG[absel] + i & VAMASK);
+				dms_wmap (mapi + i, t);   }  }
+			ABREG[absel] = (ABREG[absel] + MAP_LNT) & DMASK;
+			break;
+		case 014:				/* SSM */
+			WriteW (MA, dms_upd_sr ());	/* store stat */
+			break;
+		case 015:				/* JRS */
+			if (dms_ump) dms_viol (err_PC, MVI_PRV, 0);
+			t = ReadW (MA);			/* get status */
+			if (t & 0100000) dms_enb = 1;	/* set/clr enb */
+			else dms_enb = 0;
+			if (t & 0040000) dms_ump = 1;	/* set/clr usr */
+			else dms_ump = 0;
+			PCQ_ENTRY;			/* save old PC */
+			PC = M1;			/* jump */
+			ion_defer = 1;			/* defer intr */
+			break;
+
+/* Extended instruction group: DMS, continued */
+
+		case 020:				/* XMM */
+			if (XR == 0) break;		/* nop? */
+			if (XR & SIGN) {		/* store? */
+			    for ( ; XR == 0; XR = (XR + 1) & DMASK) {
+				t = dms_rmap (AR & MAP_MASK);
+				WriteW (BR & VAMASK, t);
+				AR = (AR + 1) & DMASK;
+				BR = (BR + 1) & DMASK;  }  }
+			else {				/* load */
+			    for ( ; XR == 0; XR--) {
+				t = ReadW (BR & VAMASK);
+				dms_wmap (AR & MAP_MASK, t);
+				AR = (AR + 1) & DMASK;
+				BR = (BR + 1) & DMASK;  }  }
+			break;
+		case 021:				/* XMS */
+			if (XR & SIGN) break;		/* nop? */
+			for ( ; XR == 0; XR = (XR - 1) & DMASK) {
+			    dms_wmap (AR & MAP_MASK, BR);
+			    AR = (AR + 1) & DMASK;
+			    BR = (BR + 1) & DMASK;  }
+			break;
+		case 022:				/* XMA, XMB */
+			if (ABREG[absel] & 0100000) mapi = SMAP;
+			else mapi = UMAP;
+			if (ABREG[absel] & 0040000) mapj = PAMAP;
+			else mapj = PBMAP;
+			for (i = 0; i < MAP_LNT; i++) {
+			    t = dms_rmap (mapi + i);
+			    dms_wmap (mapj + i, t);  }
+			break;
+		case 024:				/* XLA, XLB */
+			ABREG[absel] = ReadWA (MA);	/* load alt */
+			break;
+		case 025:				/* XSA, XSB */
+			dms_viol (err_PC, MVI_PRV, 0);	/* priv if PRO */
+			WriteWA (MA, ABREG[absel]);	/* store alt */
+			break;
+		case 026:				/* XCA, XCB */
+			if (ABREG[absel] != ReadWA (MA))
+				PC = (PC + 1) & VAMASK;
+			break;
+		case 027:				/* LFA, LFB */
+			if (dms_ump) dms_viol (err_PC, MVI_PRV, 0);
+			dms_sr = (dms_sr & ~(MST_FLT | MST_FENCE)) |
+				(ABREG[absel] & (MST_FLT | MST_FENCE));
+			dms_fence = dms_sr & MST_FENCE;
+			break;
+
+/* Extended instruction group: DMS, continued */
+
+		case 030:				/* RSA, RSB */
+			ABREG[absel] = dms_upd_sr ();	/* save stat */
+			break;
+		case 031:				/* RVA, RVB */
+			ABREG[absel] = dms_vr;		/* save viol */
+			break;
+		case 032:				/* DJP */
+			if (dms_ump) dms_viol (err_PC, MVI_PRV, 0);
+			if (MP_TESTJ (MA)) ABORT (ABORT_FENCE);
+			dms_enb = 0;
+			PCQ_ENTRY;
+			PC = MA;
+			ion_defer = 1;
+			break;
+		case 033:				/* DJS */
+			if (dms_ump) dms_viol (err_PC, MVI_PRV, 0);
+			dms_enb = 0;
+			WriteW (MA, PC);
+			PCQ_ENTRY;
+			PC = (MA + 1) & VAMASK;
+			ion_defer = 1;
+			break;
+		case 034:				/* SJP */
+			if (dms_ump) dms_viol (err_PC, MVI_PRV, 0);
+			if (MP_TESTJ (MA)) ABORT (ABORT_FENCE);
+			dms_enb = 1;
+			dms_ump = 0;
+			PCQ_ENTRY;
+			PC = MA;
+			ion_defer = 1;
+			break;
+		case 035:				/* SJS */
+			if (dms_ump) dms_viol (err_PC, MVI_PRV, 0);
+			dms_enb = 1;
+			dms_ump = 0;
+			WriteW (MA, PC);
+			PCQ_ENTRY;
+			PC = (MA + 1) & VAMASK;
+			ion_defer = 1;
+			break;
+		case 036:				/* UJP */
+			if (dms_ump) dms_viol (err_PC, MVI_PRV, 0);
+			if (MP_TESTJ (MA)) ABORT (ABORT_FENCE);
+			dms_enb = 1;
+			dms_ump = 1;
+			PCQ_ENTRY;
+			PC = MA;
+			ion_defer = 1;
+			break;
+		case 037:				/* UJS */
+			if (dms_ump) dms_viol (err_PC, MVI_PRV, 0);
+			dms_enb = 1;
+			dms_ump = 1;
+			WriteW (MA, PC);
+			PCQ_ENTRY;
+			PC = (MA + 1) & VAMASK;
+			ion_defer = 1;
+			break;
 
 /* Extended instruction group: index register instructions */
 
-		case 000:				/* SAX, SBX */
-			MA = (MA + XR) & AMASK;
-			MP_TEST (MA);
-			if (MEM_ADDR_OK (MA)) M[MA] = ABREG[absel];
+		case 040:				/* SAX, SBX */
+			MA = (MA + XR) & VAMASK;
+			WriteW (MA, ABREG[absel]);
 			break;
-		case 001:				/* CAX, CBX */
+		case 041:				/* CAX, CBX */
 			XR = ABREG[absel];
 			break;
-		case 002:				/* LAX, LBX */
-			MA = (MA + XR) & AMASK;
-			ABREG[absel] = M[MA];
+		case 042:				/* LAX, LBX */
+			MA = (MA + XR) & VAMASK;
+			ABREG[absel] = ReadW (MA);
 			break;
-		case 003:				/* STX */
-			MP_TEST (MA);
-			if (MEM_ADDR_OK (MA)) M[MA] = XR;
+		case 043:				/* STX */
+			WriteW (MA, XR);
 			break;
-		case 004:				/* CXA, CXB */
+		case 044:				/* CXA, CXB */
 			ABREG[absel] = XR;
 			break;
-		case 005:				/* LDX */
-			XR = M[MA];
+		case 045:				/* LDX */
+			XR = ReadW (MA);
 			break;
-		case 006:				/* ADX */
-			t = XR + M[MA];
+		case 046:				/* ADX */
+			opnd = ReadW (MA);
+			t = XR + opnd;
 			if (t > DMASK) E = 1;
-			if (((~XR ^ M[MA]) & (XR ^ t)) & SIGN) O = 1;
+			if (((~XR ^ opnd) & (XR ^ t)) & SIGN) O = 1;
 			XR = t & DMASK;
 			break;
-		case 007:				/* XAX, XBX */
+		case 047:				/* XAX, XBX */
 			t = XR;
 			XR = ABREG[absel];
 			ABREG[absel] = t;
 			break;
-		case 010:				/* SAY, SBY */
-			MA = (MA + YR) & AMASK;
-			MP_TEST (MA);
-			if (MEM_ADDR_OK (MA)) M[MA] = ABREG[absel];
+		case 050:				/* SAY, SBY */
+			MA = (MA + YR) & VAMASK;
+			WriteW (MA, ABREG[absel]);
 			break;
-		case 011:				/* CAY, CBY */
+		case 051:				/* CAY, CBY */
 			YR = ABREG[absel];
 			break;
-		case 012:				/* LAY, LBY */
-			MA = (MA + YR) & AMASK;
-			ABREG[absel] = M[MA];
+		case 052:				/* LAY, LBY */
+			MA = (MA + YR) & VAMASK;
+			ABREG[absel] = ReadW (MA);
 			break;
-		case 013:				/* STY */
-			MP_TEST (MA);
-			if (MEM_ADDR_OK (MA)) M[MA] = YR;
+		case 053:				/* STY */
+			WriteW (MA, YR);
 			break;
-		case 014:				/* CYA, CYB */
+		case 054:				/* CYA, CYB */
 			ABREG[absel] = YR;
 			break;
-		case 015:				/* LDY */
-			YR = M[MA];
+		case 055:				/* LDY */
+			YR = ReadW (MA);
 			break;
-		case 016:				/* ADY */
-			t = YR + M[MA];
+		case 056:				/* ADY */
+			opnd = ReadW (MA);
+			t = YR + opnd;
 			if (t > DMASK) E = 1;
-			if (((~YR ^ M[MA]) & (YR ^ t)) & SIGN) O = 1;
+			if (((~YR ^ opnd) & (YR ^ t)) & SIGN) O = 1;
 			YR = t & DMASK;
 			break;
-		case 017:				/* XAY, XBY */
+		case 057:				/* XAY, XBY */
 			t = YR;
 			YR = ABREG[absel];
 			ABREG[absel] = t;
 			break;
-		case 020:				/* ISX */
+		case 060:				/* ISX */
 			XR = (XR + 1) & DMASK;
-			if (XR == 0) PC = (PC + 1) & AMASK;
+			if (XR == 0) PC = (PC + 1) & VAMASK;
 			break;
-		case 021:				/* DSX */
+		case 061:				/* DSX */
 			XR = (XR - 1) & DMASK;
-			if (XR == 0) PC = (PC + 1) & AMASK;
+			if (XR == 0) PC = (PC + 1) & VAMASK;
 			break;
-		case 022:				/* JLY */
-			MP_TESTJ (MA);
-			old_PC = PC;
+		case 062:				/* JLY */
+			if (MP_TESTJ (MA)) ABORT (ABORT_FENCE);
+			PCQ_ENTRY;
 			YR = PC;
 			PC = MA;
 			break;
-		case 030:				/* ISY */
+		case 070:				/* ISY */
 			YR = (YR + 1) & DMASK;
-			if (YR == 0) PC = (PC + 1) & AMASK;
+			if (YR == 0) PC = (PC + 1) & VAMASK;
 			break;
-		case 031:				/* DSY */
+		case 071:				/* DSY */
 			YR = (YR - 1) & DMASK;
-			if (YR == 0) PC = (PC + 1) & AMASK;
+			if (YR == 0) PC = (PC + 1) & VAMASK;
 			break;
-		case 032:				/* JPY */
-			MA = (M[PC] + YR) & AMASK;	/* no indirect */
-			PC = (PC + 1) & AMASK;
-			MP_TESTJ (MA);
-			old_PC = PC;
+		case 072:				/* JPY */
+			MA = (ReadW (PC) + YR) & VAMASK; /* no indirect */
+			PC = (PC + 1) & VAMASK;
+			if (MP_TESTJ (MA)) ABORT (ABORT_FENCE);
+			PCQ_ENTRY;
 			PC = MA;
 			break;
 
 /* Extended instruction group: byte */
 
-		case 023:				/* LBT */
-			AR = LDBY (BR);
+		case 063:				/* LBT */
+			AR = ReadB (BR);
+			BR = (BR + 1) & DMASK;
 			break;
-		case 024:				/* SBT */
-			STBY (BR, AR);
+		case 064:				/* SBT */
+			WriteB (BR, AR);
+			BR = (BR + 1) & DMASK;
 			break;
-		case 025:				/* MBT */
-			while (M[awc]) {		/* while count */
-				q = LDBY (AR);		/* load byte */
-				STBY (BR, q);		/* store byte */
-				AR = (AR + 1) & DMASK;	/* incr src */
-				BR = (BR + 1) & DMASK;	/* incr dst */
-				M[awc] = (M[awc] - 1) & DMASK;  }
+		case 065:				/* MBT */
+			t = ReadW (awc);		/* get wc */
+			while (t) {			/* while count */
+			    q = ReadB (AR);		/* move byte */
+			    WriteB (BR, q);
+			    AR = (AR + 1) & DMASK;	/* incr src */
+			    BR = (BR + 1) & DMASK;	/* incr dst */
+			    t = (t - 1) & DMASK;	/* decr cnt */
+			    WriteW (awc, t);  }
 			break;
-		case 026:				/* CBT */
-			cmpeql = TRUE;
-			while (M[awc]) {		/* while count */
-				q = LDBY (AR);		/* get src1 */
-				r = LDBY (BR);		/* get src2 */
-				if (cmpeql && (q != r)) {	/* compare */
-					PC = (PC + 1 + (q > r)) & AMASK;
-					cmpeql = FALSE;  }
-				AR = (AR + 1) & DMASK;
-				BR = (BR + 1) & DMASK;
-				M[awc] = (M[awc] - 1) & DMASK;  }
+		case 066:				/* CBT */
+			t = ReadW (awc);		/* get wc */
+			while (t) {			/* while count */
+			    q = ReadB (AR);		/* get src1 */
+			    r = ReadB (BR);		/* get src2 */
+			    if (q != r) {		/* compare */
+				PC = (PC + 1 + (q > r)) & VAMASK;
+				BR = (BR + t) & DMASK;	/* update BR */
+				WriteW (awc, 0);	/* clr awc */
+				break;  }
+			    AR = (AR + 1) & DMASK;	/* incr src1 */
+			    BR = (BR + 1) & DMASK;	/* incr src2 */
+			    t = (t - 1) & DMASK;	/* decr cnt */
+			    WriteW (awc, t);  }
 			break;
-		case 027:				/* SFB */
+		case 067:				/* SFB */
 			q = AR & 0377;			/* test byte */
 			r = (AR >> 8) & 0377;		/* term byte */
 			for (;;) {			/* scan */
-				t = LDBY (BR);		/* get byte */
-				if (t == q) break;	/* test match? */
-				BR = (BR + 1) & DMASK;
-				if (t == r) {		/* term match? */
-					PC = (PC + 1) & AMASK;
-					break;  }  }
+			    t = ReadB (BR);		/* get byte */
+			    if (t == q) break;		/* test match? */
+			    BR = (BR + 1) & DMASK;
+			    if (t == r) {		/* term match? */
+				PC = (PC + 1) & VAMASK;
+				break;  }  }
 			break;
 
 /* Extended instruction group: bit, word */
 
-		case 033:				/* SBS */
-			MP_TEST (M1);
-			if (MEM_ADDR_OK (M1)) M[M1] = M[M1] | M[MA];
+		case 073:				/* SBS */
+			WriteW (M1, M[M1] | M [MA]);
 			break;
-		case 034:				/* CBS */
-			MP_TEST (M1);
-			if (MEM_ADDR_OK (M1)) M[M1] = M[M1] & ~M[MA];
+		case 074:				/* CBS */
+			WriteW (M1, M[M1] & ~M[MA]);
 			break;
-		case 035:				/* TBS */
-			if ((M[M1] & M[MA]) != M[MA]) PC = (PC + 1) & AMASK;
+		case 075:				/* TBS */
+			if ((M[M1] & M[MA]) != M[MA]) PC = (PC + 1) & VAMASK;
 			break;
-		case 036:				/* CMW */
-			cmpeql = TRUE;
-			while (M[awc]) {		/* while count */
-				q = SEXT (M[AR & AMASK]);
-				r = SEXT (M[BR & AMASK]);
-				if (cmpeql && (q != r)) {	/* compare */
-					PC = (PC + 1 + (q > r)) & AMASK;
-					cmpeql = FALSE;  }
-				AR = (AR + 1) & DMASK;
-				BR = (BR + 1) & DMASK;
-				M[awc] = (M[awc] - 1) & DMASK;  }
+		case 076:				/* CMW */
+			t = ReadW (awc);		/* get wc */
+			while (t) {			/* while count */
+			    q = SEXT (M[AR & VAMASK]);
+			    r = SEXT (M[BR & VAMASK]);
+			    if (q != r) {		/* compare */
+				PC = (PC + 1 + (q > r)) & VAMASK;
+				BR = (BR + t) & DMASK;	/* update BR */
+				WriteW (awc, 0);	/* clr awc */
+				break;  }
+			    AR = (AR + 1) & DMASK;	/* incr src1 */
+			    BR = (BR + 1) & DMASK;	/* incr src2 */
+			    t = (t - 1) & DMASK;	/* decr cnt */
+			    WriteW (awc, t);  }
 			break;
-		case 037:				/* MVW */
-			while (M[awc]) {		/* while count */
-				MP_TEST (BR & AMASK);
-				if (MEM_ADDR_OK (BR & AMASK))
-					M[BR & AMASK] = M[AR & AMASK];
-				BR = (BR + 1) & DMASK;
-				AR = (AR + 1) & DMASK;
-				M[awc] = (M[awc] - 1) & DMASK;  }
+		case 077:				/* MVW */
+			t = ReadW (awc);		/* get wc */
+			while (t) {			/* while count */
+			    q = ReadW (AR & VAMASK);	/* move word */
+			    WriteW (BR & VAMASK, q);
+			    AR = (AR + 1) & DMASK;	/* incr src */
+			    BR = (BR + 1) & DMASK;	/* incr dst */
+			    t = (t - 1) & DMASK;	/* decr cnt */
+			    WriteW (awc, t);  }
 			break;	}			/* end ext group */
-
-/* Floating point instructions */
-
-	case 0240:					/* FAD */
-	case 0241:					/* FSB */
-	case 0242:					/* FMP */
-	case 0243:					/* FDV */
-	case 0244:					/* FIX */
-	case 0245:					/* FLT */
 	default:
 		reason = stop_inst;  }			/* end switch IR */
 	}						/* end if extended */
@@ -997,16 +1329,13 @@ else if (cpu_unit.flags & (UNIT_2100 | UNIT_21MX)) {	/* ext instr? */
 
 saved_AR = AR & DMASK;
 saved_BR = BR & DMASK;
-for (i = 0; infotab[i].devno != 0; i++) {		/* save dynamic info */
-	dev = infotab[i].devno;
-	infotab[i].ctl = CMD (dev);
-	infotab[i].ctl = CTL (dev);
-	infotab[i].flg = FLG (dev);
-	infotab[i].fbf = FBF (dev);  }
-dev_flg[0] = dev_flg[0] & M_FXDEV;			/* clear dynamic info */
-dev_fbf[0] = dev_fbf[0] & M_FXDEV;
-dev_ctl[0] = dev_ctl[0] & M_FXDEV;
-dev_flg[1] = dev_fbf[1] = dev_ctl[1] = 0;
+for (i = 0; dibp = dib_tab[i]; i++) {			/* loop thru dev */
+	dev = dibp -> devno;
+	dibp -> cmd = CMD (dev);
+	dibp -> ctl = CTL (dev);
+	dibp -> flg = FLG (dev);
+	dibp -> fbf = FBF (dev);  }
+pcq_r -> qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }
 
@@ -1070,16 +1399,16 @@ return r;
 /* Calculate interrupt requests
 
    This routine takes into account all the relevant state of the
-   interrupt system: ion, dev_flg, dev_buf, and dev_ctl.
+   interrupt system: ion, dev_flg, dev_fbf, and dev_ctl.
 
    1. dev_flg & dev_ctl determines the end of the priority grant.
       The break in the chain will occur at the first device for
-      which dev_flag & dev_ctl is true.  This is determined by
+      which dev_flg & dev_ctl is true.  This is determined by
       AND'ing the set bits with their 2's complement; only the low
       order (highest priority) bit will differ.  1 less than
       that, or'd with the single set bit itself, is the mask of
-	  possible interrupting devices.  If ION is clear, only devices
-	  4 and 5 are eligible to interrupt.
+      possible interrupting devices.  If ION is clear, only devices
+      4 and 5 are eligible to interrupt.
    2. dev_flg & dev_ctl & dev_fbf determines the outstanding
       interrupt requests.  All three bits must be on for a device
       to request an interrupt.  This is the masked under the
@@ -1109,10 +1438,197 @@ else {	req[0] = req[0] & (INT_M (PWR) | INT_M (PRO));
 if (req[0]) {						/* if low request */
 	for (j = 0; j < 32; j++) {			/* find dev # */
 		if (req[0] & INT_M (j)) return j;  }  }
-if (req[1]) {					/* if hi request */
+if (req[1]) {						/* if hi request */
 	for (j = 0; j < 32; j++) {			/* find dev # */
 		if (req[1] & INT_M (j)) return (32 + j);  }  }
 return 0;
+}
+
+/* Memory access routines */
+
+uint8 ReadB (int32 va)
+{
+int32 pa;
+
+if (dms_enb) pa = dms (va >> 1, dms_ump, RD);
+else pa = va >> 1;
+if (va & 1) return (M[pa] & 0377);
+else return ((M[pa] >> 8) & 0377);
+}
+
+uint8 ReadBA (int32 va)
+{
+int32 pa;
+
+if (dms_enb) pa = dms (va >> 1, dms_ump ^ MAP_LNT, RD);
+else pa = va >> 1;
+if (va & 1) return (M[pa] & 0377);
+else return ((M[pa] >> 8) & 0377);
+}
+
+uint16 ReadW (int32 va)
+{
+int32 pa;
+
+if (dms_enb) pa = dms (va, dms_ump, RD);
+else pa = va;
+return M[pa];
+}
+
+uint16 ReadWA (int32 va)
+{
+int32 pa;
+
+if (dms_enb) pa = dms (va, dms_ump ^ MAP_LNT, RD);
+else pa = va;
+return M[pa];
+}
+
+uint32 ReadF (int32 va)
+{
+uint32 t = ReadW (va);
+uint32 t1 = ReadW ((va + 1) & VAMASK);
+return (t << 16) | t1;
+}
+
+uint16 ReadIO (int32 va, int32 map)
+{
+int32 pa;
+
+if (dms_enb) pa = dms (va, map, RD);
+else pa = va;
+return M[pa];
+}
+
+void WriteB (int32 va, int32 dat)
+{
+int32 pa;
+
+if (MP_TEST (va)) ABORT (ABORT_FENCE);
+if (dms_enb) pa = dms (va >> 1, dms_ump ^ MAP_LNT, WR);
+else pa = va >> 1;
+if (MEM_ADDR_OK (pa)) {
+	if (va & 1) M[pa] = (M[pa] & 0177400) | (dat & 0377);
+	else M[pa] = (M[pa] & 0377) | ((dat & 0377) << 8); }
+return;
+}
+
+void WriteBA (int32 va, int32 dat)
+{
+int32 pa;
+
+if (MP_TEST (va)) ABORT (ABORT_FENCE);
+if (dms_enb) pa = dms (va >> 1, dms_ump ^ MAP_LNT, WR);
+else pa = va >> 1;
+if (MEM_ADDR_OK (pa)) {
+	if (va & 1) M[pa] = (M[pa] & 0177400) | (dat & 0377);
+	else M[pa] = (M[pa] & 0377) | ((dat & 0377) << 8); }
+return;
+}
+
+void WriteW (int32 va, int32 dat)
+{
+int32 pa;
+
+if (MP_TEST (va)) ABORT (ABORT_FENCE);
+if (dms_enb) pa = dms (va, dms_ump, WR);
+else pa = va;
+if (MEM_ADDR_OK (pa)) M[pa] = dat;
+return;
+}
+
+void WriteWA (int32 va, int32 dat)
+{
+int32 pa;
+
+if (MP_TEST (va)) ABORT (ABORT_FENCE);
+if (dms_enb) pa = dms (va, dms_ump ^ MAP_LNT, WR);
+else pa = va;
+if (MEM_ADDR_OK (pa)) M[pa] = dat;
+return;
+}
+
+void WriteIO (int32 va, int32 dat, int32 map)
+{
+int32 pa;
+
+if (dms_enb) pa = dms (va, map, WR);
+else pa = va;
+if (MEM_ADDR_OK (pa)) M[pa] = dat;
+return;
+}
+
+/* DMS relocation */
+
+int32 dms (int32 va, int32 map, int32 prot)
+{
+int32 pgn, mpr;
+
+if (va <= 1) return va;					/* A, B */
+pgn = VA_GETPAG (va);					/* get page num */
+if (pgn == 0) {						/* base page? */
+	if ((dms_sr & MST_FLT)?				/* check unmapped */
+	    (va >= dms_fence):				/* 1B10: >= fence */
+	    (va < dms_fence)) {				/* 0B10: < fence */
+		if (prot == WR) dms_viol (va, MVI_BPG, 0);	/* if W, viol */
+		return va;  }  }			/* no mapping */
+mpr = dms_map[map + pgn];				/* get map reg */
+if (mpr & prot) dms_viol (va, prot << (MVI_V_WPR - MAPA_V_WPR), 0);
+return (PA_GETPAG (mpr) | VA_GETOFF (va));
+}
+
+/* DMS read and write maps */
+
+uint16 dms_rmap (int32 mapi)
+{
+int32 t;
+mapi = mapi & MAP_MASK;
+t = (((dms_map[mapi] >> VA_N_OFF) & PA_M_PAG) |
+	((dms_map[mapi] & (RD | WR)) << (MAPM_V_WPR - MAPA_V_WPR)));
+return (uint16) t;
+}
+
+void dms_wmap (int32 mapi, int32 dat)
+{
+mapi = mapi & MAP_MASK;
+dms_map[mapi] = ((dat & PA_M_PAG) << VA_N_OFF) |
+	((dat >> (MAPM_V_WPR - MAPA_V_WPR)) & (RD | WR));
+return;
+}
+
+/* DMS violation
+
+   DMS violation processing occurs in two parts
+   - The violation register is set based on DMS status
+   - An interrupt (abort) occurs only if CTL (PRO) is set
+
+   Bit 7 (ME bus disabled/enabled) records whether relocation
+   actually occurred in the aborted cycle.  For read and write
+   violations, bit 7 will be set; for base page and privilege
+   violations, it will be clear
+
+   I/O map references set status bits but never abort
+*/
+
+void dms_viol (int32 va, int32 st, t_bool io)
+{
+dms_sr = st | VA_GETPAG (va) |
+	((st & (MVI_RPR | MVI_WPR))? MVI_MEB: 0) |	/* set MEB */	
+	(dms_enb? MVI_MEM: 0) |				/* set MEM */
+	(dms_ump? MVI_UMP: 0);				/* set UMAP */
+if (CTL (PRO) && !io) ABORT (ABORT_DMS);
+return;
+}
+
+/* DMS update status */
+
+int32 dms_upd_sr (void)
+{
+dms_sr = dms_sr & ~(MST_ENB | MST_UMP | MST_PRO);
+if (dms_enb) dms_sr = dms_sr | MST_ENB;
+if (dms_ump) dms_sr = dms_sr | MST_UMP;
+if (CTL (PRO)) dms_sr = dms_sr | MST_PRO;
+return dms_sr;
 }
 
 /* Device 0 (CPU) I/O routine */
@@ -1126,10 +1642,10 @@ case ioFLG:						/* flag */
 	ion = (IR & HC)? 0: 1;				/* interrupts off/on */
 	return dat;
 case ioSFC:						/* skip flag clear */
-	if (!ion) PC = (PC + 1) & AMASK;
+	if (!ion) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioSFS:						/* skip flag set */
-	if (ion) PC = (PC + 1) & AMASK;
+	if (ion) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioLIX:						/* load */
 	dat = 0;					/* returns 0 */
@@ -1153,10 +1669,10 @@ case ioFLG:						/* flag */
 	O = (IR & HC)? 0: 1;				/* clear/set overflow */
 	return dat;
 case ioSFC:						/* skip flag clear */
-	if (!O) PC = (PC + 1) & AMASK;
+	if (!O) PC = (PC + 1) & VAMASK;
 	break;						/* can clear flag */
 case ioSFS:						/* skip flag set */
-	if (O) PC = (PC + 1) & AMASK;
+	if (O) PC = (PC + 1) & VAMASK;
 	break;						/* can clear flag */
 case ioMIX:						/* merge */
 	dat = dat | SR;
@@ -1195,7 +1711,7 @@ int32 proio (int32 inst, int32 IR, int32 dat)
 {
 switch (inst) {						/* case on opcode */
 case ioSFC:						/* skip flag clear */
-	if (FLG (PRO)) PC = (PC + 1) & AMASK;
+	if (FLG (PRO)) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioSFS:						/* skip flag set */
 	return dat;
@@ -1206,7 +1722,7 @@ case ioLIX:						/* load */
 	dat = maddr;
 	break;
 case ioOTX:						/* output */
-	mfence = dat & AMASK;
+	mfence = dat & VAMASK;
 	break;
 case ioCTL:						/* control clear/set */
 	if ((IR & AB) == 0) {				/* STC */
@@ -1258,10 +1774,10 @@ case ioFLG:						/* flag */
 	if ((IR & HC) == 0) { clrCMD (DMA0 + ch); }	/* set -> abort */
 	break;
 case ioSFC:						/* skip flag clear */
-	if (FLG (DMA0 + ch) == 0) PC = (PC + 1) & AMASK;
+	if (FLG (DMA0 + ch) == 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioSFS:						/* skip flag set */
-	if (FLG (DMA0 + ch) != 0) PC = (PC + 1) & AMASK;
+	if (FLG (DMA0 + ch) != 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioMIX: case ioLIX:					/* load, merge */
 	dat = DMASK;
@@ -1282,17 +1798,17 @@ return dat;
 
 /* DMA cycle routine */
 
-void dma_cycle (int32 ch)
+void dma_cycle (int32 ch, int32 map)
 {
 int32 temp, dev, MA;
 
 dev = dmac[ch].cw1 & DEVMASK;				/* get device */
-MA = dmac[ch].cw2 & AMASK;				/* get mem addr */
+MA = dmac[ch].cw2 & VAMASK;				/* get mem addr */
 if (dmac[ch].cw2 & DMA2_OI) {				/* input? */
 	temp = devdisp (dev, ioLIX, HC + dev, 0);	/* do LIA dev,C */
-	if (MEM_ADDR_OK (MA)) M[MA] = temp & DMASK;  }	/* store data */
-else devdisp (dev, ioOTX, HC + dev, M[MA]);		/* do OTA dev,C */
-dmac[ch].cw2 = (dmac[ch].cw2 & DMA2_OI) | ((dmac[ch].cw2 + 1) & AMASK);
+	WriteIO (MA, temp & DMASK, map);  }		/* store data */
+else devdisp (dev, ioOTX, HC + dev, ReadIO (MA, map));	/* do OTA dev,C */
+dmac[ch].cw2 = (dmac[ch].cw2 & DMA2_OI) | ((dmac[ch].cw2 + 1) & VAMASK);
 dmac[ch].cw3 = (dmac[ch].cw3 + 1) & DMASK;		/* incr wcount */
 if (dmac[ch].cw3) {					/* more to do? */
 	if (dmac[ch].cw1 & DMA1_STC) devdisp (dev, ioCTL, dev, 0);  }
@@ -1310,7 +1826,7 @@ int32 nulio (int32 inst, int32 IR, int32 dat)
 {
 switch (inst) {						/* case on opcode */
 case ioSFC:						/* skip flag clear */
-	PC = (PC + 1) & AMASK;
+	PC = (PC + 1) & VAMASK;
 	return (stop_dev << IOT_V_REASON) | dat;
 case ioSFS:						/* skip flag set */
 	return (stop_dev << IOT_V_REASON) | dat;
@@ -1339,7 +1855,15 @@ clrFLG (PRO);
 clrFBF (PRO);
 mfence = 0;
 maddr = 0;
+dms_enb = dms_ump = 0;
+dms_sr = dms_fence = 0;
+dms_vr = dms_sma = 0;
+pcq_r = find_reg ("PCQ", NULL, dptr);
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
+if (M == NULL) M = calloc (PASIZE, sizeof (unsigned int16));
+if (M == NULL) return SCPE_MEM;
+if (pcq_r) pcq_r -> qptr = 0;
+else return SCPE_IERR;
 return SCPE_OK;
 }
 
@@ -1393,63 +1917,103 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 mc = 0;
 t_addr i;
 
-if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
+if ((val <= 0) || (val > PASIZE) || ((val & 07777) != 0) ||
+	(!(uptr -> flags & UNIT_21MX) && (val > 32768)))
 	return SCPE_ARG;
 for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
 	return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+for (i = MEMSIZE; i < PASIZE; i++) M[i] = 0;
 return SCPE_OK;
 }
 
 /* Set/show device number */
 
-t_stat hp_setdev (UNIT *uptr, int32 ord, char *cptr, void *desc)
+t_stat hp_setdev (UNIT *uptr, int32 num, char *cptr, void *desc)
 {
 int32 i, newdev;
+DIB *dibp = (DIB *) desc;
 t_stat r;
 
 if (cptr == NULL) return SCPE_ARG;
-newdev = get_uint (cptr, 8, DEVMASK, &r);
+if ((dibp == NULL) || (num > 1)) return SCPE_IERR;
+newdev = get_uint (cptr, 8, DEVMASK - num, &r);
 if (r != SCPE_OK) return r;
 if (newdev < VARDEV) return SCPE_ARG;
-for (i = 0; infotab[i].devno != 0; i++) {
-	if ((i != ord) && (newdev == infotab[i].devno))
-		return SCPE_ARG;  }
-infotab[ord].devno = newdev;
+for (i = 0; i <= num; i++, dibp++) dibp -> devno = newdev + i;
 return SCPE_OK;
 }
 
-t_stat hp_showdev (FILE *st, UNIT *uptr, int32 ord, void *desc)
+t_stat hp_showdev (FILE *st, UNIT *uptr, int32 num, void *desc)
 {
-fprintf (st, "devno=%o", infotab[ord].devno);
+int32 i;
+DIB *dibp = (DIB *) desc;
+
+if (dibp == NULL) return SCPE_IERR;
+fprintf (st, "devno=%o", dibp -> devno);
+for (i = 1; i <= num; i++) fprintf (st, "/%o", dibp -> devno + i);
 return SCPE_OK;
 }
 
-/* Set/show device number for data/control pair */
+/* Enable a device */
 
-t_stat hp_setdev2 (UNIT *uptr, int32 ord, char *cptr, void *desc)
+t_stat set_enb (UNIT *uptr, int32 num, char *cptr, void *desc)
 {
-int32 i, olddev, newdev;
-t_stat r;
+int32 i;
+DEVICE *dptr;
+DIB *dibp;
 
-olddev = infotab[ord].devno;
-if ((r = hp_setdev (uptr, ord, cptr, NULL)) != SCPE_OK) return r;
-newdev = infotab[ord].devno + 1;
-if (newdev > DEVMASK) {
-	infotab[ord].devno = olddev;
-	return SCPE_ARG;  }
-for (i = 0; infotab[i].devno != 0; i++) {
-	if ((i != (ord + 1)) && (newdev == infotab[i].devno)) {
-		infotab[ord].devno = olddev;
-		return SCPE_ARG;  }  }
-infotab[ord + 1].devno = infotab[ord].devno + 1;
-return SCPE_OK;
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (desc == NULL)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);			/* find device */
+if (dptr == NULL) return SCPE_IERR;
+dibp = (DIB *) desc;
+if (dibp -> enb) return SCPE_OK;			/* already enb? */
+for (i = 0; i <= num; i++, dibp++) dibp -> enb = 1;
+if (dptr -> reset) return dptr -> reset (dptr);
+else return SCPE_OK;
 }
 
-t_stat hp_showdev2 (FILE *st, UNIT *uptr, int32 ord, void *desc)
+/* Disable a device */
+
+t_stat set_dis (UNIT *uptr, int32 num, char *cptr, void *desc)
 {
-fprintf (st, "devno=%o/%o", infotab[ord].devno, infotab[ord + 1].devno);
-return SCPE_OK;
+int32 i;
+DEVICE *dptr;
+DIB *dibp;
+UNIT *up;
+
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (desc == NULL)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);			/* find device */
+if (dptr == NULL) return SCPE_IERR;
+dibp = (DIB *) desc;
+if (dibp -> enb == 0) return SCPE_OK;			/* already dis? */
+for (i = 0; i < dptr -> numunits; i++) {		/* check units */
+	up = (dptr -> units) + i;
+	if ((up -> flags & UNIT_ATT) || sim_is_active (up))
+	    return SCPE_NOFNC;  }
+for (i = 0; i <= num; i++, dibp++) dibp -> enb = 0;
+if (dptr -> reset) return dptr -> reset (dptr);
+else return SCPE_OK;
+}
+
+/* Test for device conflict */
+
+t_bool dev_conflict (void)
+{
+DIB *dibp, *chkp;
+int32 i, j, dno;
+
+for (i = 0; chkp = dib_tab[i]; i++) {
+    if (chkp -> enb) {
+	dno = chkp -> devno;
+	for (j = 0; dibp = dib_tab[j]; j++) {
+	    if (dibp -> enb && (chkp != dibp) && (dno == dibp -> devno)) {
+		printf ("Device number conflict, devno = %d\n", dno);
+		if (sim_log) fprintf (sim_log,
+		    "Device number conflict, devno = %d\n", dno);
+		return TRUE;  }  }  }  }
+return FALSE;
 }

@@ -1,6 +1,6 @@
 /* scp_tty.c: operating system-dependent I/O routines
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jul-02	RMS	Added Windows priority control from Mark Pizzolato
+   20-May-02	RMS	Added Windows VT support from Fischer Franz
+   01-Feb-02	RMS	Added VAX fix from Robert Alan Byer
    19-Sep-01	RMS	More Mac changes
    31-Aug-01	RMS	Changed int64 to t_int64 for Windoze
    20-Jul-01	RMS	Added Macintosh support (from Louis Chretien, Peter Schorn,
@@ -56,10 +59,15 @@
 int32 sim_int_char = 005;				/* interrupt character */
 extern FILE *sim_log;
 
-/* VMS routines, from Ben Thomas */
+/* VMS routines, from Ben Thomas, with fixes from Robert Alan Byer */
 
 #if defined (VMS)
 #define __TTYROUTINES 0
+#if defined(__VAX)
+#define sys$assign SYS$ASSIGN
+#define sys$qiow SYS$QIOW
+#define sys$gettim SYS$GETTIM
+#endif
 
 #include <descrip.h>
 #include <ttdef.h>
@@ -81,6 +89,7 @@ typedef struct {
 	unsigned int32 dev_status; } IOSB;
 SENSE_BUF cmd_mode = { 0 };
 SENSE_BUF run_mode = { 0 };
+int32 sim_vt = -1;
 
 t_stat ttinit (void)
 {
@@ -196,7 +205,9 @@ return quo;
 #include <conio.h>
 #include <windows.h>
 #include <signal.h>
+#include "sim_vt.h"
 static volatile int sim_win_ctlc = 0;
+int32 sim_vt = 0;
 
 void win_handler (int sig)
 {
@@ -206,18 +217,23 @@ return;
 
 t_stat ttinit (void)
 {
+vt_init ();
 return SCPE_OK;
 }
 
 t_stat ttrunstate (void)
 {
 sim_win_ctlc = 0;
+if (sim_vt > 0) vt_run ();
 if ((int) signal (SIGINT, win_handler) == -1) return SCPE_SIGERR;
+SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 return SCPE_OK;
 }
 
 t_stat ttcmdstate (void)
 {
+if (sim_vt > 0) vt_cmd ();
+SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 return SCPE_OK;
 }
 
@@ -234,8 +250,11 @@ if (sim_win_ctlc) {
 	sim_win_ctlc = 0;
 	signal (SIGINT, win_handler);
 	return 003 | SCPE_KFLAG;  }
-if (!kbhit ()) return SCPE_OK;
-c = _getch ();
+if (sim_vt > 0) {
+	c = vt_read ();
+	if (c == -1) return SCPE_OK;  }
+else {	if (!kbhit ()) return SCPE_OK;
+	c = _getch ();  }
 if ((c & 0177) == '\b') c = 0177;
 if ((c & 0177) == sim_int_char) return SCPE_STOP;
 return c | SCPE_KFLAG;
@@ -243,9 +262,9 @@ return c | SCPE_KFLAG;
 
 t_stat sim_putchar (int32 c)
 {
-if (c != 0177) {
-	_putch (c);
-	if (sim_log) fputc (c, sim_log);  }
+if (sim_vt > 0) vt_write ((char) c);
+else if (c != 0177) _putch (c);
+if (sim_log) fputc (c, sim_log);
 return SCPE_OK;
 }
 
@@ -263,6 +282,7 @@ return GetTickCount ();
 #if defined (__OS2__)
 #define __TTYROUTINES 0
 #include <conio.h>
+int32 sim_vt = -1;
 
 t_stat ttinit (void)
 {
@@ -329,6 +349,7 @@ return 0;
 #include <Traps.h>
 #include <LowMem.h>
 
+int32 sim_vt = -1;
 extern char sim_name[];
 extern pSIOUXWin SIOUXTextWindow;
 static CursHandle iBeamCursorH = NULL;			/* contains the iBeamCursor */
@@ -500,6 +521,7 @@ return (uint32) millis;
 #include <fcntl.h>
 #include <sys/time.h>
 
+int32 sim_vt = -1;
 struct sgttyb cmdtty,runtty;			/* V6/V7 stty data */
 struct tchars cmdtchars,runtchars;		/* V7 editing */
 struct ltchars cmdltchars,runltchars;		/* 4.2 BSD editing */
@@ -594,6 +616,7 @@ return msec;
 #include <termios.h>
 #include <sys/time.h>
 
+int32 sim_vt = -1;
 struct termios cmdtty, runtty;
 
 t_stat ttinit (void)

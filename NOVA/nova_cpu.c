@@ -1,6 +1,6 @@
 /* nova_cpu.c: NOVA CPU simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu		Nova central processor
 
+   30-Dec-01	RMS	Added old PC queue
    07-Dec-01	RMS	Revised to use breakpoint package
    30-Nov-01	RMS	Added extended SET/SHOW support
    10-Aug-01	RMS	Removed register in declarations
@@ -202,6 +203,10 @@
 
 #include "nova_defs.h"
 
+#define PCQ_SIZE	64				/* must be 2**n */
+#define PCQ_MASK	(PCQ_SIZE - 1)
+#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
+
 #define INCA(x)		(((x) + 1) & AMASK)
 #define DECA(x)		(((x) - 1) & AMASK)
 #define SEXT(x)		(((x) & SIGN)? ((x) | ~DMASK): (x))
@@ -241,7 +246,9 @@ int32 pimask = 0;					/* priority int mask */
 int32 pwr_low = 0;					/* power fail flag */
 int32 ind_max = 16;					/* iadr nest limit */
 int32 stop_dev = 0;					/* stop on ill dev */
-int32 old_PC = 0;					/* previous PC */
+uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
+int32 pcq_p = 0;					/* PC queue ptr */
+REG *pcq_r = NULL;					/* PC queue reg ptr */
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
 
@@ -336,14 +343,15 @@ REG cpu_reg[] = {
 	{ FLDATA (ISTK, cpu_unit.flags, UNIT_V_STK), REG_HRO },
 	{ FLDATA (IBYT, cpu_unit.flags, UNIT_V_BYT), REG_HRO },
 	{ DRDATA (INDMAX, ind_max, 16), REG_NZ + PV_LEFT },
-	{ ORDATA (OLDPC, old_PC, 15), REG_RO },
+	{ BRDATA (PCQ, pcq, 8, 16, PCQ_SIZE), REG_RO+REG_CIRC },
+	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ ORDATA (IOTENB, iot_enb, 32), REG_HRO },
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
-	{ UNIT_IOPT, UNIT_NOVA4, "NOVA4", "NOVA4", NULL },
 	{ UNIT_IOPT, UNIT_NOVA3, "NOVA3", "NOVA3", NULL },
+	{ UNIT_IOPT, UNIT_NOVA4, "NOVA4", "NOVA4", NULL },
 	{ UNIT_IOPT, UNIT_MDV, "MDV", "MDV", NULL },
 	{ UNIT_IOPT, 0, "none", "NONE", NULL },
 	{ UNIT_MSIZE, 4096, NULL, "4K", &cpu_set_size },
@@ -386,8 +394,9 @@ if (sim_interval <= 0) {				/* check clock queue */
 
 if (int_req > INT_PENDING) {				/* interrupt? */
 	int32 MA, indf;
-	int_req = int_req & ~INT_ION;
-	old_PC = M[INT_SAV] = PC;
+	int_req = int_req & ~INT_ION;			/* intr off */
+	PCQ_ENTRY;					/* save old PC */
+	M[INT_SAV] = PC;
 	if (int_req & INT_STK) {			/* stack overflow? */
 		int_req = int_req & ~INT_STK;		/* clear */
 		MA = STK_JMP;  }			/* jmp @3 */
@@ -470,8 +479,9 @@ if (IR & I_OPR) {					/* operate? */
 	switch (I_GETSKP (IR)) {			/* decode skip */
 	case 0:						/* nop */
 		if ((IR & I_NLD) && (cpu_unit.flags & UNIT_STK)) {
-			int32 indf, MA;		/* Nova 3 or 4 trap */
-			old_PC = M[TRP_SAV] = (PC - 1) & AMASK;
+			int32 indf, MA;			/* Nova 3 or 4 trap */
+			PCQ_ENTRY;			/* save old PC */
+			M[TRP_SAV] = (PC - 1) & AMASK;
 			MA = TRP_JMP;			/* jmp @47 */
 			for (i = 0, indf = 1; indf && (i < ind_max); i++) {
 				indf = IND_STEP (MA);  } /* resolve ind */
@@ -541,7 +551,7 @@ else if (IR < 060000) {					/* mem ref? */
 	case 001:					/* JSR */
 		AC[3] = PC;
 	case 000:					/* JMP */
-		old_PC = PC;
+		PCQ_ENTRY;
 		PC = MA;
 		break;
 	case 002:					/* ISZ */
@@ -675,7 +685,7 @@ else {							/* IOT */
 					AC[3] = FP = SP & AMASK;  
 					STK_CHECK (SP, 5);  }
 				if (pulse == iopC) {	/* retn */
-					old_PC = PC;
+					PCQ_ENTRY;
 					SP = FP & AMASK;
 					C = (M[SP] << 1) & CBIT;
 					PC = M[SP] & AMASK;
@@ -791,6 +801,7 @@ else {							/* IOT */
 /* Simulation halted */
 
 saved_PC = PC;
+pcq_r -> qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }
 
@@ -823,6 +834,9 @@ int_req = int_req & ~(INT_ION | INT_STK);
 pimask = 0;
 dev_disable = 0;
 pwr_low = 0;
+pcq_r = find_reg ("PCQ", NULL, dptr);
+if (pcq_r) pcq_r -> qptr = 0;
+else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
 }
@@ -911,4 +925,47 @@ extern int32 saved_PC;
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 saved_PC = BOOT_START;
 return SCPE_OK;
+}
+
+/* Device enable routine */
+
+t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+DEVICE *dptr;
+
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+iot_enb = iot_enb | val;
+if (dptr -> reset) dptr -> reset (dptr);
+return SCPE_OK;
+}
+
+/* Device disable routine */
+
+t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i;
+DEVICE *dptr;
+UNIT *up;
+
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+for (i = 0; i < dptr -> numunits; i++) {		/* check units */
+	up = (dptr -> units) + i;
+	if ((up -> flags & UNIT_ATT) || sim_is_active (up))
+		return SCPE_NOFNC;  }
+iot_enb = iot_enb & ~val;
+if (dptr -> reset) dptr -> reset (dptr);
+return SCPE_OK;
+}
+
+/* 1-to-1 map for I/O devices */
+
+int32 MapAddr (int32 map, int32 addr)
+{
+return addr;
 }

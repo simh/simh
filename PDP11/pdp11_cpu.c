@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,20 @@
 
    cpu		PDP-11 CPU (J-11 microprocessor)
 
+   14-Jul-02	RMS	Fixed bug in MMR0 error status load
+   03-Jun-02	RMS	Fixed relocation add overflow, added PS<15:12> = 1111
+			special case logic to MFPI and removed it from MTPI
+			(found by John Dundas)
+   29-Apr-02	RMS	More fixes to DIV and ASH/ASHC (found by John Dundas)
+   28-Apr-02	RMS	Fixed bugs in illegal instruction 000010 and in
+			write-only memory pages (found by Wolfgang Helbig)
+   21-Apr-02	RMS	Fixed bugs in DIV by zero, DIV overflow, TSTSET, RTS,
+			ASHC -32, and red zone trap (found by John Dundas)
+   04-Mar-02	RMS	Changed double operand evaluation order for M+
+   23-Feb-02	RMS	Fixed bug in MAINT, CPUERR, MEMERR read
+   28-Jan-02	RMS	Revised for multiple timers; fixed calc_MMR1 macros
+   06-Jan-02	RMS	Revised enable/disable support
+   30-Dec-01	RMS	Added old PC queue
    25-Dec-01	RMS	Cleaned up sim_inst declarations
    11-Dec-01	RMS	Moved interrupt debug code
    07-Dec-01	RMS	Revised to use new breakpoint package
@@ -173,7 +187,7 @@
    4. Adding I/O devices.  This requires modifications to three modules:
 
 	pdp11_defs.h		add interrupt request definitions
-	pdp11_io.c		add I/O page linkages
+	pdp11_io.c		add to dib_tab
 	pdp11_sys.c		add to sim_devices
 */
 
@@ -181,15 +195,18 @@
 
 #include "pdp11_defs.h"
 
+#define PCQ_SIZE	64				/* must be 2**n */
+#define PCQ_MASK	(PCQ_SIZE - 1)
+#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
 #define calc_is(md)	((md) << VA_V_MODE)
 #define calc_ds(md)	(calc_is((md)) | ((MMR3 & dsmask[(md)])? VA_DS: 0))
-#define calc_MMR1(val)	(MMR1 = MMR1? ((val) << 8) | MMR1: (val))
+#define calc_MMR1(val)	((MMR1)? (((val) << 8) | MMR1): (val))
 #define GET_SIGN_W(v)	((v) >> 15)
 #define GET_SIGN_B(v)	((v) >> 7)
 #define GET_Z(v)	((v) == 0)
-#define JMP_PC(x)	old_PC = PC; PC = (x)
-#define BRANCH_F(x)	old_PC = PC; PC = (PC + (((x) + (x)) & 0377)) & 0177777
-#define BRANCH_B(x)	old_PC = PC; PC = (PC + (((x) + (x)) | 0177400)) & 0177777
+#define JMP_PC(x)	PCQ_ENTRY; PC = (x)
+#define BRANCH_F(x)	PCQ_ENTRY; PC = (PC + (((x) + (x)) & 0377)) & 0177777
+#define BRANCH_B(x)	PCQ_ENTRY; PC = (PC + (((x) + (x)) | 0177400)) & 0177777
 #define last_pa		(cpu_unit.u4)			/* auto save/rest */
 #define UNIT_V_18B	(UNIT_V_UF)			/* force 18b addr */
 #define UNIT_V_UBM	(UNIT_V_UF + 1)			/* bus map present */
@@ -239,22 +256,28 @@ int32 cpu_bme = 0;					/* bus map enable */
 int32 cpu_18b = 0;					/* 18b CPU config'd */
 int32 cpu_ubm = 0;					/* bus map config'd */
 int32 cpu_rh11 = 0;					/* RH11 config'd */
+int32 cpu_astop = 0;					/* address stop */
 int32 isenable = 0, dsenable = 0;			/* i, d space flags */
 int32 CPUERR = 0;					/* CPU error reg */
 int32 MEMERR = 0;					/* memory error reg */
 int32 CCR = 0;						/* cache control reg */
 int32 HITMISS = 0;					/* hit/miss reg */
-int32 MAINT = MAINT_Q | MAINT_NOFPA | MAINT_KDJ;	/* maint reg */
+int32 MAINT = MAINT_Q | MAINT_NOFPA | MAINT_KDJ | MAINT_BPOK;	/* maint reg */
 int32 stop_trap = 1;					/* stop on trap */
 int32 stop_vecabort = 1;				/* stop on vec abort */
 int32 stop_spabort = 1;					/* stop on SP abort */
 int32 wait_enable = 0;					/* wait state enable */
 int32 cpu_log = 0;					/* logging */
-int32 old_PC = 0;					/* previous PC */
+uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
+int32 pcq_p = 0;					/* PC queue ptr */
+REG *pcq_r = NULL;					/* PC queue reg ptr */
 int32 dev_enb = (-1) & ~INT_TS;				/* dev enables */
 jmp_buf save_env;					/* abort handler */
 int32 dsmask[4] = { MMR3_KDS, MMR3_SDS, 0, MMR3_UDS };	/* dspace enables */
 
+extern int32 sim_interval;
+extern UNIT *sim_clock_queue;
+extern UNIT clk_unit;
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
 
@@ -276,10 +299,19 @@ void WriteW (int32 data, int32 addr);
 void WriteB (int32 data, int32 addr);
 void PWriteW (int32 data, int32 addr);
 void PWriteB (int32 data, int32 addr);
+t_stat CPU_rd (int32 *data, int32 addr, int32 access);
 t_stat CPU_wr (int32 data, int32 addr, int32 access);
+t_stat APR_rd (int32 *data, int32 addr, int32 access);
+t_stat APR_wr (int32 data, int32 addr, int32 access);
+t_stat SR_MMR012_rd (int32 *data, int32 addr, int32 access);
+t_stat SR_MMR012_wr (int32 data, int32 addr, int32 access);
+t_stat MMR3_rd (int32 *data, int32 addr, int32 access);
+t_stat MMR3_wr (int32 data, int32 addr, int32 access);
+t_stat ubm_rd (int32 *data, int32 addr, int32 access);
+t_stat ubm_wr (int32 data, int32 addr, int32 access);
 
-extern t_stat iopageR (int32 *data, int32 addr, int32 access);
-extern t_stat iopageW (int32 data, int32 addr, int32 access);
+extern t_stat iopageR (int32 *data, uint32 addr, int32 access);
+extern t_stat iopageW (int32 data, uint32 addr, int32 access);
 extern int32 calc_ints (int32 nipl, int32 trq);
 extern int32 get_vector (int32 nipl);
 
@@ -292,7 +324,7 @@ int32 trap_vec[TRAP_V_MAX] = {				/* trap req to vector */
 	VEC_YEL, VEC_PWRFL, VEC_FPE };
 
 int32 trap_clear[TRAP_V_MAX] = {			/* trap clears */
-	TRAP_RED+TRAP_PAR+TRAP_YEL+TRAP_TRC,
+	TRAP_RED+TRAP_PAR+TRAP_YEL+TRAP_TRC+TRAP_ODD+TRAP_NXM,
 	TRAP_ODD+TRAP_PAR+TRAP_YEL+TRAP_TRC,
 	TRAP_MME+TRAP_PAR+TRAP_YEL+TRAP_TRC,
 	TRAP_NXM+TRAP_PAR+TRAP_YEL+TRAP_TRC,
@@ -301,6 +333,15 @@ int32 trap_clear[TRAP_V_MAX] = {			/* trap clears */
 	TRAP_IOT+TRAP_TRC, TRAP_EMT+TRAP_TRC,
 	TRAP_TRAP+TRAP_TRC, TRAP_TRC,
 	TRAP_YEL, TRAP_PWRFL, TRAP_FPE };
+
+/* Fixed I/O address table entries */
+
+DIB cpu0_dib = { 1, IOBA_CPU, IOLN_CPU, &CPU_rd, &CPU_wr };
+DIB cpu1_dib = { 1, IOBA_APR, IOLN_APR, &APR_rd, &APR_wr };
+DIB cpu2_dib = { 1, IOBA_APR1, IOLN_APR1, &APR_rd, &APR_wr };
+DIB cpu3_dib = { 1, IOBA_SRMM, IOLN_SRMM, &SR_MMR012_rd, &SR_MMR012_wr };
+DIB cpu4_dib = { 1, IOBA_MMR3, IOLN_MMR3, &MMR3_rd, &MMR3_wr };
+DIB ubm_dib = { 0, IOBA_UBM, IOLN_UBM, &ubm_rd, &ubm_wr };
 
 /* CPU data structures
 
@@ -475,7 +516,8 @@ REG cpu_reg[] = {
 	{ FLDATA (UB_MAP, cpu_unit.flags, UNIT_V_UBM), REG_HRO },
 	{ FLDATA (RH11, cpu_unit.flags, UNIT_V_RH11), REG_HRO },
 	{ FLDATA (CIS, cpu_unit.flags, UNIT_V_CIS), REG_HRO },
-	{ ORDATA (OLDPC, old_PC, 16), REG_RO },
+	{ BRDATA (PCQ, pcq, 8, 16, PCQ_SIZE), REG_RO+REG_CIRC },
+	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ ORDATA (DEVENB, dev_enb, 32), REG_HRO },
 	{ NULL}  };
@@ -516,11 +558,8 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
-extern UNIT *sim_clock_queue;
-extern UNIT clk_unit;
 int abortval, i;
-volatile int32 trapea;					/* needed at longjmp */
+volatile int32 trapea;					/* used by setjmp */
 t_stat reason;
 void fp11 (int32 IR);
 void cis11 (int32 IR);
@@ -534,6 +573,8 @@ void cis11 (int32 IR);
 	5. Interrupt system
 */
 
+if (cpu_unit.flags & UNIT_UBM) ubm_dib.enb = 1;		/* enb/dis map */
+else ubm_dib.enb = 0;
 cm = (PSW >> PSW_V_CM) & 03;				/* call calc_is,ds */
 pm = (PSW >> PSW_V_PM) & 03;
 rs = (PSW >> PSW_V_RS) & 01;
@@ -559,7 +600,7 @@ cpu_rh11 = cpu_unit.flags & UNIT_RH11;
 trap_req = calc_ints (ipl, trap_req);			/* upd int req */
 trapea = 0;
 reason = 0;
-sim_rtc_init (clk_unit.wait);				/* init clock */
+sim_rtcn_init (clk_unit.wait, TMR_CLK);			/* init line clock */
 
 /* Abort handling
 
@@ -573,6 +614,9 @@ sim_rtc_init (clk_unit.wait);				/* init clock */
    special handling.  If the abort occured on the stack pushes, and
    the mode (encoded in trapea) is kernel, an "emergency" kernel
    stack is created at 4, and a red zone stack trap taken.
+
+   All variables used in setjmp processing, or assumed to be valid
+   after setjmp, must be volatile or global.
 */
 
 abortval = setjmp (save_env);				/* set abort hdlr */
@@ -595,8 +639,13 @@ if (abortval != 0) {
 while (reason == 0)  {
 
 int32 IR, srcspec, srcreg, dstspec, dstreg;
-int32 src, src2, dst;
+int32 src, src2, dst, ea;
 int32 i, t, sign, oldrs, trapnum;
+
+if (cpu_astop) {
+	cpu_astop = 0;
+	reason = SCPE_STOP;
+	break;  }
 
 if (sim_interval <= 0) {				/* intv cnt expired? */
 	reason = sim_process_event ();			/* process events */
@@ -703,12 +752,13 @@ switch ((IR >> 12) & 017) {				/* decode IR<15:12> */
 case 000:
 	switch ((IR >> 6) & 077) {			/* decode IR<11:6> */
 	case 000:					/* no operand */
-		if (IR > 000010) {			/* 000010 - 000077 */
+		if (IR >= 000010) {			/* 000010 - 000077 */
 			setTRAP (TRAP_ILL);		/* illegal */
 			break;  }
 		switch (IR) {				/* decode IR<2:0> */
 		case 0:					/* HALT */
-		    	if (cm == KERNEL) reason = STOP_HALT;
+		    	if ((cm == KERNEL) && ((MAINT & MAINT_HTRAP) == 0))
+				reason = STOP_HALT;
 			else {	setTRAP (TRAP_PRV);
 				setCPUERR (CPUE_HALT);  }
 			break;
@@ -781,7 +831,7 @@ case 000:
 			dstspec = dstspec & 07;
 			JMP_PC (R[dstspec]);
 			R[dstspec] = ReadW (SP | dsenable);
-			SP = (SP + 2) & 0177777;
+			if (dstspec != 6) SP = (SP + 2) & 0177777;
 			break;  } 			/* end if RTS */
 		if (IR < 000230) {
 			setTRAP (TRAP_ILL);
@@ -1003,7 +1053,9 @@ case 000:
 		if (dstreg) {
 			if ((dstspec == 6) && (cm != pm)) dst = STACKFILE[pm];
 			else dst = R[dstspec];  }
-		else dst = ReadW ((GeteaW (dstspec) & 0177777) | calc_is (pm));
+		else {	i = ((cm == pm) && (cm == USER))?
+				calc_ds (pm): calc_is (pm);
+			dst = ReadW ((GeteaW (dstspec) & 0177777) | i);  }
 		N = GET_SIGN_W (dst);
 		Z = GET_Z (dst);
 		V = 0;
@@ -1024,9 +1076,7 @@ case 000:
 		if (dstreg) {
 			if ((dstspec == 6) && (cm != pm)) STACKFILE[pm] = dst;
 			else R[dstspec] = dst;  }
-		else {	i = ((cm == pm) && (cm == USER))?
-				calc_ds (pm): calc_is (pm);
-			WriteW (dst, (GeteaW (dstspec) & 0177777) | i);  }
+		else WriteW (dst, (GeteaW (dstspec) & 0177777) | calc_is (pm));
 		break;
 	case 067:					/* SXT */
 		dst = N? 0177777: 0;
@@ -1064,8 +1114,8 @@ case 000:
 			Z = GET_Z (dst);
 			V = 0;
 			C = (dst & 1);
-			PWriteW (R[0] | 1, last_pa);
-			R[0] = dst;  }
+			R[0] = dst;			/* R[0] <- dst */
+			PWriteW (R[0] | 1, last_pa);  }	/* dst <- R[0] | 1 */
 		break;
 	case 073:					/* WRTLCK */
 		if (dstreg) setTRAP (TRAP_ILL);
@@ -1081,21 +1131,33 @@ case 000:
 
 /* Opcodes 01 - 06: double operand word instructions
 
+   J-11 (and F-11) optimize away register source operand decoding.
+   As a result, dop R,+/-(R) use the modified version of R as source.
+   Most (but not all) other PDP-11's fetch the source operand before
+   any destination operand decoding.
+
    Add: v = [sign (src) = sign (src2)] and [sign (src) != sign (result)]
    Cmp: v = [sign (src) != sign (src2)] and [sign (src2) = sign (result)]
 */
 
 case 001:						/* MOV */
-	dst = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		ea = GeteaW (dstspec);
+		dst = R[srcspec];  }
+	else {	dst = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
+		if (!dstreg) ea = GeteaW (dstspec);  }
 	N = GET_SIGN_W (dst);
 	Z = GET_Z (dst);
 	V = 0;
 	if (dstreg) R[dstspec] = dst;
-	else WriteW (dst, GeteaW (dstspec));
+	else WriteW (dst, ea);
 	break;
 case 002:						/* CMP */
-	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
-	src2 = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		src2 = ReadW (GeteaW (dstspec));
+		src = R[srcspec];  }
+	else {	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
+		src2 = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));  }
 	dst = (src - src2) & 0177777;
 	N = GET_SIGN_W (dst);
 	Z = GET_Z (dst);
@@ -1103,16 +1165,22 @@ case 002:						/* CMP */
 	C = (src < src2);
 	break;
 case 003:						/* BIT */
-	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
-	src2 = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		src2 = ReadW (GeteaW (dstspec));
+		src = R[srcspec];  }
+	else {	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
+		src2 = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));  }
 	dst = src2 & src;
 	N = GET_SIGN_W (dst);
 	Z = GET_Z (dst);
 	V = 0;
 	break;
 case 004:						/* BIC */
-	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
-	src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		src2 = ReadMW (GeteaW (dstspec));
+		src = R[srcspec];  }
+	else {	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
+		src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));  }
 	dst = src2 & ~src;
 	N = GET_SIGN_W (dst);
 	Z = GET_Z (dst);
@@ -1121,8 +1189,11 @@ case 004:						/* BIC */
 	else PWriteW (dst, last_pa);
 	break;
 case 005:						/* BIS */
-	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
-	src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		src2 = ReadMW (GeteaW (dstspec));
+		src = R[srcspec];  }
+	else {	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
+		src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));  }
 	dst = src2 | src;
 	N = GET_SIGN_W (dst);
 	Z = GET_Z (dst);
@@ -1131,8 +1202,11 @@ case 005:						/* BIS */
 	else PWriteW (dst, last_pa);
 	break;
 case 006:						/* ADD */
-	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
-	src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		src2 = ReadMW (GeteaW (dstspec));
+		src = R[srcspec];  }
+	else {	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
+		src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));  }
 	dst = (src2 + src) & 0177777;
 	N = GET_SIGN_W (dst);
 	Z = GET_Z (dst);
@@ -1177,24 +1251,25 @@ case 007:
 		break;
 	case 1:						/* DIV */
 		src2 = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));
-		src = (R[srcspec] << 16) | R[srcspec | 1];
+		src = (((uint32) R[srcspec]) << 16) | R[srcspec | 1];
 		if (src2 == 0) {
-			V = C = 1;
+			N = 0;				/* J11,11/70 compat */
+			Z = V = C = 1;			/* N = 0, Z = 1 */
 			break;  }
 		if ((src == 020000000000) && (src2 == 0177777)) {
-			V = 1;
-			C = 0;
+			V = 1;				/* J11,11/70 compat */
+			N = Z = C = 0;			/* N = Z = 0 */
 			break;  }
 		if (GET_SIGN_W (src2)) src2 = src2 | ~077777;
 		if (GET_SIGN_W (R[srcspec])) src = src | ~017777777777;
 		dst = src / src2;
+		N = (dst < 0);				/* N set on 32b result */
 		if ((dst > 077777) || (dst < -0100000)) {
-			V = 1;
-			C = 0;
+			V = 1;				/* J11,11/70 compat */
+			Z = C = 0;			/* Z = C = 0 */
 			break;  }
 		R[srcspec] = dst & 0177777;
 		R[srcspec | 1] = (src - (src2 * dst)) & 0177777;
-		N = (dst < 0);
 		Z = GET_Z (dst);
 		V = C = 0;
 		break;
@@ -1218,7 +1293,10 @@ case 007:
 			dst = 0;
 			V = (src != 0);
 			C = (src << (src2 - 16)) & 1;  }
-		else {					/* [-32,-1] */
+		else if (src2 == 32) {			/* [32] = -32 */
+			dst = -sign;
+			V = C = 0;  }
+		else {					/* [33,63] = -31,-1 */
 			dst = (src >> (64 - src2)) | (-sign << (src2 - 32));
 			V = 0;
 			C = ((src >> (63 - src2)) & 1);  }
@@ -1230,16 +1308,20 @@ case 007:
 		src2 = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));
 		src2 = src2 & 077;
 		sign = GET_SIGN_W (R[srcspec]);
-		src = (R[srcspec] << 16) | R[srcspec | 1];
+		src = (((uint32) R[srcspec]) << 16) | R[srcspec | 1];
 		if (src2 == 0) { 			/* [0] */
 			dst = src;
 			V = C = 0;  }
 		else if (src2 <= 31) {			/* [1,31] */
-			dst = src << src2;
+			dst = ((uint32) src) << src2;
 			i = (src >> (32 - src2)) | (-sign << src2);
 			V = (i != ((dst & 020000000000)? -1: 0));
 			C = (i & 1);  }
-		else {					/* [-32,-1] */
+		else if (src2 == 32) {			/* [32] = -32 */
+			dst = -sign;
+			V = 0;
+			C = (src >> 31) & 1;  }
+		else {					/* [33,63] = -31,-1 */
 			dst = (src >> (64 - src2)) | (-sign << (src2 - 32));
 			V = 0;
 			C = ((src >> (63 - src2)) & 1);  }
@@ -1516,16 +1598,23 @@ case 010:
 */
 
 case 011:						/* MOVB */
-	dst = srcreg? R[srcspec] & 0377: ReadB (GeteaB (srcspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		ea = GeteaB (dstspec);
+		dst = R[srcspec] & 0377;  }
+	else {	dst = srcreg? R[srcspec] & 0377: ReadB (GeteaB (srcspec));
+		if (!dstreg) ea = GeteaB (dstspec);  }
 	N = GET_SIGN_B (dst);
 	Z = GET_Z (dst);
 	V = 0;
 	if (dstreg) R[dstspec] = (dst & 0200)? 0177400 | dst: dst;
-	else WriteB (dst, GeteaB (dstspec));
+	else WriteB (dst, ea);
 	break;
 case 012:						/* CMPB */
-	src = srcreg? R[srcspec] & 0377: ReadB (GeteaB (srcspec));
-	src2 = dstreg? R[dstspec] & 0377: ReadB (GeteaB (dstspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		src2 = ReadB (GeteaB (dstspec));
+		src = R[srcspec] & 0377;  }
+	else {	src = srcreg? R[srcspec] & 0377: ReadB (GeteaB (srcspec));
+		src2 = dstreg? R[dstspec] & 0377: ReadB (GeteaB (dstspec));  }
 	dst = (src - src2) & 0377;
 	N = GET_SIGN_B (dst);
 	Z = GET_Z (dst);
@@ -1533,16 +1622,22 @@ case 012:						/* CMPB */
 	C = (src < src2);
 	break;
 case 013:						/* BITB */
-	src = srcreg? R[srcspec]: ReadB (GeteaB (srcspec));
-	src2 = dstreg? R[dstspec]: ReadB (GeteaB (dstspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		src2 = ReadB (GeteaB (dstspec));
+		src = R[srcspec] & 0377;  }
+	else {	src = srcreg? R[srcspec] & 0377: ReadB (GeteaB (srcspec));
+		src2 = dstreg? R[dstspec] & 0377: ReadB (GeteaB (dstspec));  }
 	dst = (src2 & src) & 0377;
 	N = GET_SIGN_B (dst);
 	Z = GET_Z (dst);
 	V = 0;
 	break;
 case 014:						/* BICB */
-	src = srcreg? R[srcspec]: ReadB (GeteaB (srcspec));
-	src2 = dstreg? R[dstspec]: ReadMB (GeteaB (dstspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		src2 = ReadMB (GeteaB (dstspec));
+		src = R[srcspec];  }
+	else {	src = srcreg? R[srcspec]: ReadB (GeteaB (srcspec));
+		src2 = dstreg? R[dstspec]: ReadMB (GeteaB (dstspec));  }
 	dst = (src2 & ~src) & 0377;
 	N = GET_SIGN_B (dst);
 	Z = GET_Z (dst);
@@ -1551,8 +1646,11 @@ case 014:						/* BICB */
 	else PWriteB (dst, last_pa);
 	break;
 case 015:						/* BISB */
-	src = srcreg? R[srcspec]: ReadB (GeteaB (srcspec));
-	src2 = dstreg? R[dstspec]: ReadMB (GeteaB (dstspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		src2 = ReadMB (GeteaB (dstspec));
+		src = R[srcspec];  }
+	else {	src = srcreg? R[srcspec]: ReadB (GeteaB (srcspec));
+		src2 = dstreg? R[dstspec]: ReadMB (GeteaB (dstspec));  }
 	dst = (src2 | src) & 0377;
 	N = GET_SIGN_B (dst);
 	Z = GET_Z (dst);
@@ -1561,8 +1659,11 @@ case 015:						/* BISB */
 	else PWriteB (dst, last_pa);
 	break;
 case 016:						/* SUB */
-	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
-	src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));
+	if (srcreg && !dstreg) {			/* R,not R */
+		src2 = ReadMW (GeteaW (dstspec));
+		src = R[srcspec];  }
+	else {	src = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
+		src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));  }
 	dst = (src2 - src) & 0177777;
 	N = GET_SIGN_W (dst);
 	Z = GET_Z (dst);
@@ -1588,6 +1689,7 @@ PSW = (cm << PSW_V_CM) | (pm << PSW_V_PM) | (rs << PSW_V_RS) |
 for (i = 0; i < 6; i++) REGFILE[i][rs] = R[i];
 STACKFILE[cm] = SP;
 saved_PC = PC & 0177777;
+pcq_r -> qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }
 
@@ -1910,15 +2012,17 @@ if (MMR0 & MMR0_MME) {					/* if mmgt */
 	apr = APRFILE[apridx];				/* with va<18:13> */
 	dbn = va & VA_BN;				/* extr block num */
 	plf = (apr & PDR_PLF) >> 2;			/* extr page length */
-	if ((apr & PDR_NR) == 0) {			/* if non-resident */
-		if (update_MM) MMR0 = MMR0 | (apridx << MMR0_V_PAGE);
-		MMR0 = MMR0 | MMR0_NR;
+	if ((apr & PDR_PRD) == 0) {			/* not readable? */
+		if (update_MM) MMR0 =			/* update MMR0 */
+		    (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
+		MMR0 = MMR0 | MMR0_NR;			/* err non-resident */
 		ABORT (TRAP_MME);  }			/* abort ref */
 	if ((apr & PDR_ED)? dbn < plf: dbn > plf) {	/* if pg lnt error */
-		if (update_MM) MMR0 = MMR0 | (apridx << MMR0_V_PAGE);
+		if (update_MM) MMR0 =			/* update MMR0 */
+		    (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
 		MMR0 = MMR0 | MMR0_PL;
 		ABORT (TRAP_MME);  }			/* abort ref */
-	pa = (va & VA_DF) + ((apr >> 10) & 017777700);
+	pa = ((va & VA_DF) + ((apr >> 10) & 017777700)) & PAMASK;
 	if ((MMR3 & MMR3_M22E) == 0) {
 		pa = pa & 0777777;
 		if (pa >= 0760000) pa = 017000000 | pa;  }  }
@@ -1950,20 +2054,23 @@ if (MMR0 & MMR0_MME) {					/* if mmgt */
 	apr = APRFILE[apridx];				/* with va<18:13> */
 	dbn = va & VA_BN;				/* extr block num */
 	plf = (apr & PDR_PLF) >> 2;			/* extr page length */
-	if ((apr & PDR_NR) == 0) {			/* if non-resident */
-		if (update_MM) MMR0 = MMR0 | (apridx << MMR0_V_PAGE);
-		MMR0 = MMR0 | MMR0_NR;
+	if ((apr & PDR_PRD) == 0) {			/* not readable? */
+		if (update_MM) MMR0 =			/* update MMR0 */
+		    (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
+		MMR0 = MMR0 | MMR0_NR;			/* err non-resident */
 		ABORT (TRAP_MME);  }			/* abort ref */
 	if ((apr & PDR_ED)? dbn < plf: dbn > plf) {	/* if pg lnt error */
-		if (update_MM) MMR0 = MMR0 | (apridx << MMR0_V_PAGE);
+		if (update_MM) MMR0 =			/* update MMR0 */
+		    (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
 		MMR0 = MMR0 | MMR0_PL;
 		ABORT (TRAP_MME);  }			/* abort ref */
-	if ((apr & PDR_RW) == 0) {			/* if rd only error */
-		if (update_MM) MMR0 = MMR0 | (apridx << MMR0_V_PAGE);
-		MMR0 = MMR0 | MMR0_RO;
+	if ((apr & PDR_PWR) == 0) {			/* not writeable? */
+		if (update_MM) MMR0 =			/* update MMR0 */
+		    (MMR0 & ~MMR0_PAGE) | (apridx << MMR0_V_PAGE);
+		MMR0 = MMR0 | MMR0_RO;			/* err read only */
 		ABORT (TRAP_MME);  }			/* abort ref */
 	APRFILE[apridx] = apr | PDR_W;			/* set W */
-	pa = (va & VA_DF) + ((apr >> 10) & 017777700);
+	pa = ((va & VA_DF) + ((apr >> 10) & 017777700)) & PAMASK;
 	if ((MMR3 & MMR3_M22E) == 0) {
 		pa = pa & 0777777;
 		if (pa >= 0760000) pa = 017000000 | pa;  }  }
@@ -1997,9 +2104,9 @@ if (MMR0 & MMR0_MME) {					/* if mmgt */
 	apr = APRFILE[apridx];				/* with va<18:13> */
 	dbn = va & VA_BN;				/* extr block num */
 	plf = (apr & PDR_PLF) >> 2;			/* extr page length */
-	if ((apr & PDR_NR) == 0) return -1;
+	if ((apr & PDR_PRD) == 0) return -1;		/* not readable? */
 	if ((apr & PDR_ED)? dbn < plf: dbn > plf) return -1;
-	pa = (va & VA_DF) + ((apr >> 10) & 017777700);
+	pa = ((va & VA_DF) + ((apr >> 10) & 017777700)) & PAMASK;
 	if ((MMR3 & MMR3_M22E) == 0) {
 		pa = pa & 0777777;
 		if (pa >= 0760000) pa = 017000000 | pa;  }  }
@@ -2111,7 +2218,7 @@ curr = left? (APRFILE[idx] >> 16) & 0177777: APRFILE[idx] & PDR_IMP;
 if (access == WRITEB) data = (pa & 1)?
 	(curr & 0377) | (data << 8): (curr & ~0377) | data;
 if (left) APRFILE[idx] =
-	((APRFILE[idx] & 0177777) | (data << 16)) & ~PDR_W;
+	((APRFILE[idx] & 0177777) | (((uint32) data) << 16)) & ~PDR_W;
 else APRFILE[idx] =
 	((APRFILE[idx] & ~PDR_RW) | (data & PDR_RW)) & ~PDR_W;
 return SCPE_OK;
@@ -2133,21 +2240,19 @@ t_stat CPU_rd (int32 *data, int32 pa, int32 access)
 switch ((pa >> 1) & 017) {				/* decode pa<4:1> */
 case 2: 						/* MEMERR */
 	*data = MEMERR;
-	MEMERR = 0;
 	return SCPE_OK;
 case 3:							/* CCR */
 	*data = CCR;
 	return SCPE_OK;
 case 4:							/* MAINT */
 	if (cpu_ubm) *data = MAINT | MAINT_U;
-	else *data = MAINT | MAINT_Q;
+	else *data = MAINT & ~MAINT_U;
 	return SCPE_OK;
 case 5:							/* Hit/miss */
 	*data = HITMISS;
 	return SCPE_OK;
 case 013:						/* CPUERR */
 	*data = CPUERR & CPUE_IMP;
-	CPUERR = 0;
 	return SCPE_OK;
 case 015:						/* PIRQ */
 	*data = PIRQ;
@@ -2258,6 +2363,9 @@ trap_req = 0;
 wait_state = 0;
 if (M == NULL) M = calloc (MEMSIZE >> 1, sizeof (unsigned int16));
 if (M == NULL) return SCPE_MEM;
+pcq_r = find_reg ("PCQ", NULL, dptr);
+if (pcq_r) pcq_r -> qptr = 0;
+else return SCPE_IERR;
 for (i = 0; i < UBM_LNT_LW; i++) ub_map[i] = 0;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;

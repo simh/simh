@@ -1,6 +1,6 @@
 /* pdp1_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

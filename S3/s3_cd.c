@@ -32,7 +32,6 @@
    This allows cards to be created and edited as normal files.  Set the EBCDIC
    flag on the card unit allows cards to be read or punched in EBCDIC format,
    suitable for binary data.
-  
 */
 
 #include "s3_defs.h"
@@ -47,6 +46,8 @@ t_stat cdr_svc (UNIT *uptr);
 t_stat cdr_boot (int32 unitno);
 t_stat cdr_attach (UNIT *uptr, char *cptr);
 t_stat cd_reset (DEVICE *dptr);
+t_stat read_card (int32 ilnt, int32 mod);
+t_stat punch_card (int32 ilnt, int32 mod);
 
 int32 DAR;		/* Data address register */						
 int32 LCR;		/* Length Count Register */
@@ -56,6 +57,9 @@ int32 pcherror = 0;	/* Punch error */
 int32 notready = 0;	/* Not ready error */
 int32 cdr_ebcdic = 0;	/* EBCDIC mode on reader */
 int32 cdp_ebcdic = 0;	/* EBCDIC mode on punch */
+
+extern int32 GetMem(int32 addr);
+extern int32 PutMem(int32 addr, int32 data);
 
 /* Card reader data structures
 
@@ -75,7 +79,7 @@ REG cdr_reg[] = {
 	{ HRDATA (LCR, LCR, 16) },
 	{ FLDATA (EBCDIC, cdr_ebcdic, 0) },
 	{ FLDATA (S2, s2sel, 0) },
-	{ DRDATA (POS, cdr_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, cdr_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, cdr_unit.wait, 24), PV_LEFT },
 	{ BRDATA (BUF, rbuf, 8, 8, CDR_WIDTH) },
 	{ NULL }  };
@@ -103,7 +107,7 @@ REG cdp_reg[] = {
 	{ FLDATA (NOTRDY, notready, 0) },
 	{ HRDATA (DAR, DAR, 16) },
 	{ HRDATA (LCR, LCR, 16) },
-	{ DRDATA (POS, cdp_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, cdp_unit.pos, 32), PV_LEFT },
 	{ NULL }  };
 
 DEVICE cdp_dev = {
@@ -123,7 +127,7 @@ UNIT stack_unit[] = {
 	{ UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) }  };
 
 REG stack_reg[] = {
-	{ DRDATA (POS0, stack_unit[0].pos, 31), PV_LEFT },
+	{ DRDATA (POS0, stack_unit[0].pos, 32), PV_LEFT },
 	{ NULL }  };
 
 DEVICE stack_dev = {
@@ -261,7 +265,7 @@ int32 crd (int32 op, int32 m, int32 n, int32 data)
 
 t_stat read_card (int32 ilnt, int32 mod)
 {
-int32 i, cnt;
+int32 i;
 t_stat r;
 
 if (sim_is_active (&cdr_unit)) {			/* busy? */

@@ -1,6 +1,6 @@
 /* pdp10_tim.c: PDP-10 tim subsystem simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tim		timer subsystem
 
+   06-Jan-02	RMS	Added enable/disable support
    02-Dec-01	RMS	Fixed bug in ITS PC sampling (found by Dave Conroy)
    31-Aug-01	RMS	Changed int64 to t_int64 for Windoze
    17-Jul-01	RMS	Moved function prototype
@@ -54,6 +55,8 @@ d10 quant = 0;						/* ITS quantum */
 int32 diagflg = 0;					/* diagnostics? */
 int32 tmxr_poll = TIM_DELAY * DZ_MULT;			/* term mux poll */
 
+t_stat tcu_rd (int32 *data, int32 PA, int32 access);
+extern t_stat wr_nop (int32 data, int32 PA, int32 access);
 t_stat tim_svc (UNIT *uptr);
 t_stat tim_reset (DEVICE *dptr);
 extern d10 Read (a10 ea, int32 prv);
@@ -68,6 +71,8 @@ extern int32 pi_eval (void);
    tim_unit	TIM unit descriptor
    tim_reg	TIM register list
 */
+
+DIB tcu_dib = { 1, IOBA_TCU, IOLN_TCU, &tcu_rd, &wr_nop };
 
 UNIT tim_unit = { UDATA (&tim_svc, 0, 0), TIM_DELAY };
 
@@ -84,6 +89,12 @@ REG tim_reg[] = {
 MTAB tim_mod[] = {
 	{ UNIT_Y2K, 0, "non Y2K OS", "NOY2K", NULL },
 	{ UNIT_Y2K, UNIT_Y2K, "Y2K OS", "Y2K", NULL },
+	{ MTAB_XTD|MTAB_VDV, 000, "ADDRESS", NULL,
+		NULL, &show_addr, &tcu_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &tcu_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &tcu_dib },
 	{ 0 }  };
 
 DEVICE tim_dev = {

@@ -26,7 +26,8 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
-   03-Dec-01	RMS	Changed tmxr_status for extended SET/SHOW
+   30-Dec-01	RMS	Added tmxr_fstats, tmxr_dscln, renamed tmxr_fstatus
+   03-Dec-01	RMS	Changed tmxr_fconns for extended SET/SHOW
    20-Oct-01	RMS	Fixed bugs in read logic (found by Thord Nilson).
 			added tmxr_rqln, tmxr_tqln
 */
@@ -349,7 +350,7 @@ for (i = 0; i < mp -> lines; i++) {			/* loop thru conn */
 	if (lp -> conn) {
 		tmxr_msg (lp -> conn, "\r\n");
 		tmxr_msg (lp -> conn, sim_name);
-		tmxr_msg (lp -> conn, " simulator shutting down... please come back later\r\n\n");
+		tmxr_msg (lp -> conn, " simulator shutting down\r\n\n");
 		tmxr_reset_ln (lp);  }			/* end if conn */
 	}						/* end for */
 sim_close_sock (mp -> master, 1);			/* close master socket */
@@ -380,12 +381,11 @@ if (sock) sim_write_sock (sock, msg, strlen (msg));
 return;
 }
 
-/* Print line status */
+/* Print connections - used only in named SHOW command */
 
-void tmxr_fstatus (FILE *st, TMLN *lp, int32 ln)
+void tmxr_fconns (FILE *st, TMLN *lp, int32 ln)
 {
-if (ln >= 0) fprintf (st, "\n  line %d: ", ln);
-else fprintf (st, "line status: ");
+if (ln >= 0) fprintf (st, "line %d: ", ln);
 if (lp -> conn) {
 	int32 o1, o2, o3, o4, hr, mn, sc;
 	uint32 ctime;
@@ -399,7 +399,47 @@ if (lp -> conn) {
 	mn = (ctime / 60) % 60;
 	sc = ctime % 3600;
 	fprintf (st, "IP address %d.%d.%d.%d", o1, o2, o3, o4);
-	if (ctime) fprintf (st, ", connected %02d:%02d:%02d", hr, mn, sc);  }
-else fprintf (st, "disconnected");
+	if (ctime) fprintf (st, ", connected %02d:%02d:%02d\n", hr, mn, sc);  }
+else fprintf (st, "line disconnected\n");
 return;
+}
+
+/* Print statistics - used only in named SHOW command */
+
+void tmxr_fstats (FILE *st, TMLN *lp, int32 ln)
+{
+static const char *enab = "on";
+static const char *dsab = "off";
+
+if (ln >= 0) fprintf (st, "line %d: ", ln);
+if (lp -> conn) {
+	fprintf (st, "input (%s) queued/total = %d/%d, ",
+		(lp -> rcve? enab: dsab),
+		lp -> rxbpi - lp -> rxbpr, lp -> rxcnt);
+	fprintf (st, "output (%s) queued/total = %d/%d\n",
+		(lp -> xmte? enab: dsab),
+		lp -> txbpi - lp -> txbpr, lp -> txcnt);  }
+else fprintf (st, "line disconnected\n");
+return;
+}
+
+/* Disconnect line */
+
+t_stat tmxr_dscln (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+TMXR *mp = (TMXR *) desc;
+TMLN *lp;
+int32 ln;
+t_stat r;
+
+if ((mp == NULL) || (val && (cptr == NULL))) return SCPE_ARG;
+if (cptr) {
+	ln = (int32) get_uint (cptr, 10, mp -> lines - 1, &r);
+	if (r != SCPE_OK) return SCPE_ARG;  }
+else ln = 0;
+lp = mp -> ldsc[ln];
+if (lp -> conn) {
+	tmxr_msg (lp -> conn, "\r\nOperator disconnected line\r\n\n");
+	tmxr_reset_ln (lp);  }
+return SCPE_OK;
 }

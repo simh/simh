@@ -1,6 +1,6 @@
 /* nova_defs.h: NOVA/Eclipse simulator definitions 
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -233,3 +233,9 @@ struct ndev {
 /* #define PI_DCM	0100000	*/
 /* #define PI_CAS	0000040	*/
 /* #define PI_ADCV	0000002	*/
+
+/* Function prototypes */
+
+int32 MapAddr (int32 map, int32 addr);
+t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc);

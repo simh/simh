@@ -1,6 +1,6 @@
 /* nova_mta.c: NOVA magnetic tape simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    mta		magnetic tape
 
+   30-May-02	RMS	Widened POS to 32b
+   22-Apr-02	RMS	Added maximum record length test
+   06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Changed POS, USTAT, FLG to an array
    26-Apr-01	RMS	Added device enable/disable support
@@ -60,6 +63,7 @@
 #define UNIT_W_UF	2				/* saved flags width */
 #define USTAT		u3				/* unit status */
 #define UNUM		u4				/* unit number */
+#define MTA_MAXFR	(1 << 16)			/* max record lnt */
 #define DTSIZE		(1 << 14)			/* max data xfer */
 #define DTMASK		(DTSIZE - 1)
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
@@ -153,11 +157,6 @@ t_stat mta_detach (UNIT *uptr);
 int32 mta_updcsta (UNIT *uptr);
 void mta_upddsta (UNIT *uptr, int32 newsta);
 t_stat mta_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
-#if defined (ECLIPSE)
-extern int32 MapAddr (int32 map, int32 addr);
-#else
-#define MapAddr(m,a)	(a)
-#endif
 
 static const int ctype[32] = {				/* c vs r timing */
  0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
@@ -195,7 +194,7 @@ REG mta_reg[] = {
 	{ DRDATA (CTIME, mta_cwait, 24), PV_LEFT },
 	{ DRDATA (RTIME, mta_rwait, 24), PV_LEFT },
 	{ URDATA (UST, mta_unit[0].USTAT, 8, 32, 0, MTA_NUMDR, 0) },
-	{ URDATA (POS, mta_unit[0].pos, 8, 31, 0,
+	{ URDATA (POS, mta_unit[0].pos, 8, 32, 0,
 		  MTA_NUMDR, REG_RO | PV_LEFT) },
 	{ URDATA (FLG, mta_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
 		  MTA_NUMDR, REG_HRO) },
@@ -203,8 +202,10 @@ REG mta_reg[] = {
 	{ NULL }  };
 
 MTAB mta_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", &mta_vlock },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", &mta_vlock },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", &mta_vlock },
+	{ MTAB_XTD|MTAB_VDV, INT_MTA, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_MTA, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE mta_dev = {
@@ -347,6 +348,7 @@ case CU_READNS:						/* read non-stop */
 		uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
 		break;  }
 	tbc = MTRL (tbc);				/* ignore error flag */
+	if (tbc > MTA_MAXFR) return SCPE_MTRLNT;	/* record too long? */
 	cbc = wc * 2;					/* expected bc */
 	if (tbc & 1) mta_sta = mta_sta | STA_ODD;	/* odd byte count? */
 	if (tbc > cbc) mta_sta = mta_sta | STA_WCO;	/* too big? */

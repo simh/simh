@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Jun-03	RMS	Added 1311 support
+   22-May-02	RMS	Added multiply and divide
+   30-Dec-01	RMS	Added old PC queue
    30-Nov-01	RMS	Added extended SET/SHOW support
    10-Aug-01	RMS	Removed register in declarations
    07-Dec-00	RMS	Fixed bugs found by Charles Owen
@@ -106,22 +109,33 @@
 
 #include "i1401_defs.h"
 
+#define PCQ_SIZE	64				/* must be 2**n */
+#define PCQ_MASK	(PCQ_SIZE - 1)
+#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = saved_IS
+
+/* These macros validate addresses.  If an addresses error is detected,
+   they return an error status to the caller.  These macros should only
+   be used in a routine that returns a t_stat value.
+*/
+
 #define MM(x)		x = x - 1; \
 			if (x < 0) { \
 				x = BA + MAXMEMSIZE - 1; \
 				reason = STOP_WRAP; \
-				break;  }			
+				break;  }
+			
 #define PP(x)		x = x + 1; \
 			if (ADDR_ERR (x)) { \
 				x = BA + (x % MAXMEMSIZE); \
 				reason = STOP_WRAP; \
 				break;  }
+
 #define BRANCH		if (ADDR_ERR (AS)) { \
 				reason = STOP_INVBR; \
 				break;  } \
 			if (cpu_unit.flags & XSA) BS = IS; \
 			else BS = BA + 0; \
-			oldIS = saved_IS; \
+			PCQ_ENTRY; \
 			IS = AS;
 
 uint8 M[MAXMEMSIZE] = { 0 };				/* main memory */
@@ -129,7 +143,9 @@ int32 saved_IS = 0;					/* saved IS */
 int32 AS = 0;						/* AS */
 int32 BS = 0;						/* BS */
 int32 as_err = 0, bs_err = 0;				/* error flags */
-int32 oldIS = 0;					/* previous IS */
+uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
+int32 pcq_p = 0;					/* PC queue ptr */
+REG *pcq_r = NULL;					/* PC queue reg ptr */
 int32 ind[64] = { 0 };					/* indicators */
 int32 ssa = 1;						/* sense switch A */
 int32 prchk = 0;					/* process check stop */
@@ -144,6 +160,9 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 store_addr_h (int32 addr);
 int32 store_addr_t (int32 addr);
 int32 store_addr_u (int32 addr);
+int32 div_add (int32 ap, int32 bp, int32 aend);
+int32 div_sub (int32 ap, int32 bp, int32 aend);
+void div_sign (int32 dvrc, int32 dvdc, int32 qp, int32 rp);
 t_stat iomod (int32 ilnt, int32 mod, const int32 *tptr);
 t_stat iodisp (int32 dev, int32 unit, int32 flag, int32 mod);
 
@@ -154,6 +173,7 @@ extern t_stat carriage_control (int32 mod);
 extern t_stat write_line (int32 ilnt, int32 mod);
 extern t_stat inq_io (int32 flag, int32 mod);
 extern t_stat mt_io (int32 unit, int32 flag, int32 mod);
+extern t_stat dp_io (int32 fnc, int32 flag, int32 mod);
 extern t_stat mt_func (int32 unit, int32 mod);
 extern t_stat sim_activate (UNIT *uptr, int32 delay);
 
@@ -188,7 +208,8 @@ REG cpu_reg[] = {
 	{ FLDATA (OVF, ind[IN_OVF], 0) },
 	{ FLDATA (IOCHK, iochk, 0) },
 	{ FLDATA (PRCHK, prchk, 0) },
-	{ DRDATA (OLDIS, oldIS, 14), REG_RO + PV_LEFT },
+	{ BRDATA (ISQ, pcq, 10, 14, PCQ_SIZE), REG_RO+REG_CIRC },
+	{ ORDATA (ISQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ NULL }  };
 
@@ -205,6 +226,8 @@ MTAB cpu_mod[] = {
 	{ MR, 0, "no MR", "NOMR", NULL },
 	{ EPE, EPE, "EPE", "EPE", NULL },
 	{ EPE, 0, "no EPE", "NOEPE", NULL },
+	{ MDV, MDV, "MDV", "MDV", NULL },
+	{ MDV, 0, "no MDV", "NOMDV", NULL },
 	{ UNIT_MSIZE, 4000, NULL, "4K", &cpu_set_size },
 	{ UNIT_MSIZE, 8000, NULL, "8K", &cpu_set_size },
 	{ UNIT_MSIZE, 12000, NULL, "12K", &cpu_set_size },
@@ -217,6 +240,8 @@ DEVICE cpu_dev = {
 	&cpu_ex, &cpu_dep, &cpu_reset,
 	NULL, NULL, NULL };
 
+/* Tables */
+
 /* Opcode table - length, dispatch, and option flags.  This table is also
    used by the symbolic input routine to validate instruction lengths  */
 
@@ -321,10 +346,10 @@ const int32 one_table[64] = {
 	BA+12000, 12001, 12002, 12003, 12004, 12005, 12006, 12007,
 	12008, 12009, 12000, BA+12003, BA+12004, BA+12005, BA+12006, BA+12007 };
 
-static const int32 bin_to_bcd[16] = {
+const int32 bin_to_bcd[16] = {
 	10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
 
-static const int32 bcd_to_bin[16] = {
+const int32 bcd_to_bin[16] = {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 3, 4, 5, 6, 7 };
 
 /* ASCII to BCD conversion */
@@ -358,15 +383,6 @@ char bcd_to_ascii[64] = {
 	'Q', 'R', '!', '$', '*', ']', ';', '_',
 	'&', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
 	'H', 'I', '?', '.', ')', '[', '<', '"' };
-
-t_stat sim_instr (void)
-{
-extern int32 sim_interval;
-int32 IS, D, ilnt, flags;
-int32 op, xa, t, wm, dev, unit;
-int32 a, b, i, bsave, carry;
-int32 qzero, qawm, qbody, qsign, qdollar, qaster, qdecimal;
-t_stat reason, r1, r2;
 
 /* Indicator resets - a 1 marks an indicator that resets when tested */
 
@@ -392,24 +408,71 @@ static const int32 col_table[64] = {
 	006, 032, 033, 034, 035, 036, 037, 040,
 	041, 042, 031, 001, 002, 003, 004, 005 };
 
-/* Summing table for two decimal digits, converted back to BCD */
+/* Summing table for two decimal digits, converted back to BCD
+   Also used for multiplying two decimal digits, converted back to BCD,
+   with carry forward
+*/
 	
-static const int32 sum_table[20] = {
-	10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+static const int32 sum_table[100] = {
+	BCD_ZERO, BCD_ONE, BCD_TWO, BCD_THREE, BCD_FOUR,
+	BCD_FIVE, BCD_SIX, BCD_SEVEN, BCD_EIGHT, BCD_NINE,
+	BCD_ZERO, BCD_ONE, BCD_TWO, BCD_THREE, BCD_FOUR,
+	BCD_FIVE, BCD_SIX, BCD_SEVEN, BCD_EIGHT, BCD_NINE,
+	BCD_ZERO, BCD_ONE, BCD_TWO, BCD_THREE, BCD_FOUR,
+	BCD_FIVE, BCD_SIX, BCD_SEVEN, BCD_EIGHT, BCD_NINE,
+	BCD_ZERO, BCD_ONE, BCD_TWO, BCD_THREE, BCD_FOUR,
+	BCD_FIVE, BCD_SIX, BCD_SEVEN, BCD_EIGHT, BCD_NINE,
+	BCD_ZERO, BCD_ONE, BCD_TWO, BCD_THREE, BCD_FOUR,
+	BCD_FIVE, BCD_SIX, BCD_SEVEN, BCD_EIGHT, BCD_NINE,
+	BCD_ZERO, BCD_ONE, BCD_TWO, BCD_THREE, BCD_FOUR,
+	BCD_FIVE, BCD_SIX, BCD_SEVEN, BCD_EIGHT, BCD_NINE,
+	BCD_ZERO, BCD_ONE, BCD_TWO, BCD_THREE, BCD_FOUR,
+	BCD_FIVE, BCD_SIX, BCD_SEVEN, BCD_EIGHT, BCD_NINE,
+	BCD_ZERO, BCD_ONE, BCD_TWO, BCD_THREE, BCD_FOUR,
+	BCD_FIVE, BCD_SIX, BCD_SEVEN, BCD_EIGHT, BCD_NINE,
+	BCD_ZERO, BCD_ONE, BCD_TWO, BCD_THREE, BCD_FOUR,
+	BCD_FIVE, BCD_SIX, BCD_SEVEN, BCD_EIGHT, BCD_NINE,
+	BCD_ZERO, BCD_ONE, BCD_TWO, BCD_THREE, BCD_FOUR,
+	BCD_FIVE, BCD_SIX, BCD_SEVEN, BCD_EIGHT, BCD_NINE };
+
+static const int32 cry_table[100] = {
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+	5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+	6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+	7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+	8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+	9, 9, 9, 9, 9, 9, 9, 9, 9, 9 };
 
 /* Legal modifier tables */
 
 static const int32 w_mod[] = { BCD_S, BCD_SQUARE, -1 };
 static const int32 ss_mod[] = { 1, 2, 4, 8, -1 };
 static const int32 mtf_mod[] = { BCD_B, BCD_E, BCD_M, BCD_R, BCD_U, -1 };
-
 
+t_stat sim_instr (void)
+{
+extern int32 sim_interval;
+int32 IS, D, ilnt, flags;
+int32 op, xa, t, wm, dev, unit;
+int32 a, b, i, asave, bsave;
+int32 carry, lowprd, sign, ps;
+int32 quo, ahigh, qs;
+int32 qzero, qawm, qbody, qsign, qdollar, qaster, qdecimal;
+t_stat reason, r1, r2;
+
 /* Restore saved state */
 
 IS = saved_IS;
+if (as_err) AS = AS | BA;				/* flag bad addresses */
+if (bs_err) BS = BS | BA;
+as_err = bs_err = 0;					/* reset error flags */
 D = 0;
 reason = 0;
-
+
 /* Main instruction fetch/decode loop */
 
 while (reason == 0) {					/* loop until halted */
@@ -551,6 +614,7 @@ case OP_MSZ:						/* move suppress zero */
 		wm = M[AS];
 		MM (AS); MM (BS);  }			/* decr pointers */
 	while ((wm & WM) == 0);				/* stop on A WM */
+	if (reason) break;				/* addr err? stop */
 	do {	PP (BS);				/* adv B */
 		t = M[BS];				/* get B, cant be WM */
 		if ((t == BCD_ZERO) || (t == BCD_COMMA)) {
@@ -681,6 +745,7 @@ case OP_A: case OP_S:					/* add/sub */
 		else M[BS] = (b & WM) + sum_table[t];	/* normal add */
 		MM (BS);  }
 	while ((b & WM) == 0);				/* stop on B WM */
+	if (reason) break;				/* address err? */
 	if (qsign && (carry == 0)) {			/* recompl, no carry? */
 		M[bsave] = M[bsave] ^ ABIT;		/* XOR sign */
 		for (carry = 1; bsave != BS; --bsave) {	/* rescan */
@@ -863,6 +928,7 @@ case OP_MCE:						/* edit */
 		MM (BS);  }				/* decr B pointer */
 	while ((b & WM) == 0);				/* stop on B WM */
 
+	if (reason) break;				/* address err? */
 	if (!qawm || !qzero) {				/* rescan? */
 		if (qdollar) reason = STOP_MCE3;	/* error if $ */
 		break;  }
@@ -912,6 +978,141 @@ case OP_MCE:						/* edit */
 			M[BS] = qaster? BCD_ASTER: BCD_BLANK;
 		BS--;  }				/* end for */
 	break;						/* done at last! */	
+
+/* Multiply.  Comments from the PDP-10 based simulator by Len Fehskens.
+
+   Multiply, with variable length operands, is necessarily done the same
+   way you do it with paper and pencil, except that partial products are
+   added into the incomplete final product as they are computed, rather
+   than at the end.  The 1401 multiplier format allows the product to
+   be developed in place, without scratch storage.
+
+   The A field contains the multiplicand, length LD.  The B field must be
+   LD + 1 + length of multiplier.  Locate the low order multiplier digit,
+   and at the same time zero out the product field.  Then compute the sign
+   of the result.
+*/
+
+case OP_MUL:
+	asave = AS; bsave = lowprd = BS;		/* save AS, BS */
+	do {	a = M[AS];				/* get mpcd char */
+		M[BS] = BCD_ZERO;			/* zero prod */
+		MM (AS); MM (BS);  }			/* decr pointers */
+	while ((a & WM) == 0);				/* until A WM */
+	if (reason) break;				/* address err? */
+	M[BS] = BCD_ZERO;				/* zero hi prod */
+	MM (BS);					/* addr low mpyr */
+	sign = ((M[asave] & ZONE) == BBIT) ^ ((M[BS] & ZONE) == BBIT);
+
+/* Outer loop on multiplier (BS) and product digits (ps),
+   inner loop on multiplicand digits (AS).
+   AS and ps cannot produce an address error.
+*/
+
+	do {	ps = bsave;				/* ptr to prod */
+		AS = asave;				/* ptr to mpcd */
+		carry = 0;				/* init carry */
+		b = M[BS];				/* get mpyr char */
+		do {	a = M[AS];			/* get mpcd char */
+			t = (bcd_to_bin[a & DIGIT] *	/* mpyr * mpcd */
+			     bcd_to_bin[b & DIGIT]) +	/* + c + partial prod */
+			     carry + bcd_to_bin[M[ps] & DIGIT];
+			carry = cry_table[t];
+			M[ps] = (M[ps] & WM) | sum_table[t];
+			MM (AS); ps--;  }
+		while ((a & WM) == 0);			/* until mpcd done */
+		M[BS] = (M[BS] & WM) | BCD_ZERO;	/* zero mpyr just used */
+		t = bcd_to_bin[M[ps] & DIGIT] + carry;	/* add carry to prod */
+		M[ps] = (M[ps] & WM) | sum_table[t];	/* store */
+		bsave--;				/* adv prod ptr */
+		MM (BS);  }				/* adv mpyr ptr */
+	while ((b & WM) == 0);				/* until mpyr done */
+	M[lowprd] = M[lowprd] | ZONE;			/* assume + */
+	if (sign) M[lowprd] = M[lowprd] & ~ABIT;	/* if minus, B only */
+	break;	
+
+/* Divide.  Comments from the PDP-10 based simulator by Len Fehskens.
+
+   Divide is done, like multiply, pretty muchy the same way you do it with
+   pencil and paper; successive subtraction of the divisor from a substring
+   of the dividend while counting up the corresponding quotient digit.
+
+   Let LS be the length of the divisor, LD the length of the dividend:
+   - AS points to the low order divisor digit.
+   - BS points to the high order dividend digit.
+   - The low order dividend digit is identified by sign (zone) bits.
+   - To the left of the dividend is a zero field of length LS + 1.
+   The low quotient is at low dividend - LS - 1.  As BS points to the
+   high dividend, the low dividend is at BS + LD - 1, so the low
+   quotient is at BS + LD - LS - 2.  The longest possible quotient is
+   LD - LS + 1, so the first possible non-zero quotient bit will be
+   found as BS - 2.
+
+   This pointer calculation assumes that the divisor has no leading zeroes.
+   For each leading zero, the start of the quotient will be one position
+   further left.
+
+   Start by locating the high order non-zero digit of the divisor.  This
+   also tests for a divide by zero.
+*/
+
+case OP_DIV:
+	asave = AS; ahigh = -1;
+	do {	a = M[AS];				/* get dvr char */
+		if ((a & CHAR) != BCD_ZERO) ahigh = AS;	/* mark non-zero */
+		MM (AS);  }
+	while ((a & WM) == 0);
+	if (reason) break;				/* address err? */
+	if (ahigh < 0) {				/* div? by zero */
+		ind[IN_OVF] = 1;			/* set ovf indic */
+		qs = bsave = BS;			/* quo, dividend */
+		do {	b = M[bsave];			/* find end divd */
+			PP (bsave);  }			/* marked by zone */
+		while ((b & ZONE) == 0);
+		if (reason) break;			/* address err? */
+		if (ADDR_ERR (qs)) {			/* address err? */
+			reason = STOP_WRAP;		/* address wrap? */
+			break;  }
+		div_sign (M[asave], b, qs - 1, bsave - 1);	/* set signs */
+		BS = (BS - 2) - (asave - (AS + 1));	/* final bs */
+		break;	}
+	bsave = BS + (asave - ahigh);			/* end subdivd */
+	qs = (BS - 2) - (ahigh - (AS + 1));		/* quo start */
+
+/* Divide loop - done with subroutines to keep the code clean.
+   In the loop,
+	
+   asave =	low order divisor
+   bsave =	low order subdividend
+   qs	=	current quotient digit
+*/
+
+	do {	quo = 0;				/* clear quo digit */
+		if (ADDR_ERR (qs) || ADDR_ERR (bsave)) {
+			reason = STOP_WRAP;		/* address wrap? */
+			break;  }
+		b = M[bsave];				/* save low divd */
+		do {	t = div_sub (asave, bsave, ahigh);	/* subtract */
+			quo++;  }			/* incr quo digit */
+		while (t == 0);				/* until borrow */
+		div_add (asave, bsave, ahigh); quo--;	/* restore */
+		M[qs] = (M[qs] & WM) | sum_table[quo];	/* store quo digit */
+		bsave++; qs++;  }			/* adv divd, quo */
+	while ((b & ZONE) == 0);			/* until B sign */
+	if (reason) break;				/* address err? */
+
+/* At this point,
+
+   AS	=	high order divisor - 1
+   asave =	unit position of divisor
+   b	=	unit character of dividend
+   bsave =	unit position of remainder + 1
+   qs	=	unit position of quotient + 1
+*/
+
+	div_sign (M[asave], b, qs - 1, bsave - 1);	/* set signs */
+	BS = qs - 2;					/* BS = quo 10's pos */
+	break;
 
 /* Miscellaneous instructions				A check	   B check
 
@@ -970,14 +1171,17 @@ default:
 	reason = STOP_NXI;				/* unimplemented */
 	break;  }					/* end switch */
 }							/* end while */
-
+
 /* Simulation halted */
 
-as_err = (AS > ADDRMASK);
-bs_err = (BS > ADDRMASK);
+as_err = ADDR_ERR (AS);					/* get addr err flags */
+bs_err = ADDR_ERR (BS);
+AS = AS & ADDRMASK;					/* clean addresses */
+BS = BS & ADDRMASK;
+pcq_r -> qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }							/* end sim_instr */
-
+
 /* store addr_x - convert address to BCD character in x position
 
    Inputs:
@@ -1005,6 +1209,59 @@ int32 thous;
 
 thous = (addr / 1000) & 014;
 return bin_to_bcd[addr % 10] | (thous << (V_ZONE - 2));
+}
+
+/* div_add - add string for divide */
+
+int32 div_add (int32 ap, int32 bp, int32 aend)
+{
+int32 a, b, c, r;
+
+c = 0;							/* init carry */
+do {	a = M[ap]; b = M[bp];				/* get operands */
+	r = bcd_to_bin[b & DIGIT] +			/* sum digits + c */
+	    bcd_to_bin[a & DIGIT] + c;
+	c = (r >= 10);					/* set carry out */
+	M[bp] = sum_table[r];				/* store result */
+	ap--; bp--;  }
+while (ap >= aend);
+return c;
+}
+
+/* div_sub - substract string for divide */
+
+int32 div_sub (int32 ap, int32 bp, int32 aend)
+{
+int32 a, b, c, r;
+
+c = 0;							/* init borrow */
+do {	a = M[ap]; b = M[bp];				/* get operands */
+	r = bcd_to_bin[b & DIGIT] -			/* a - b - borrow */
+	    bcd_to_bin[a & DIGIT] - c;
+	c = (r < 0);					/* set borrow out */
+	M[bp] = sum_table[r + 10];			/* store result */
+	ap--; bp--;  }
+while (ap >= aend);
+b = M[bp] & CHAR;					/* borrow position */
+if (b != BCD_ZERO) {					/* non-zero? */
+	r = bcd_to_bin[b & DIGIT] - c;			/* subtract borrow */
+	M[bp] = sum_table[r];				/* store result */
+	return 0;  }					/* subtract worked */
+return c;						/* return borrow */
+}
+
+/* div_sign - set signs for divide */
+
+void div_sign (int32 dvrc, int32 dvdc, int32 qp, int32 rp)
+{
+int32 sign = dvrc & ZONE;				/* divisor sign */
+
+M[rp] = M[rp] | ZONE;					/* assume rem pos */
+if (sign == BBIT) M[rp] = M[rp] & ~ABIT;		/* if dvr -, rem - */
+M[qp] = M[qp] | ZONE;					/* assume quo + */
+if (((dvdc & ZONE) == BBIT) ^ (sign == BBIT))		/* dvr,dvd diff? */
+	M[qp] = M[qp] & ~ABIT;				/* make quo - */
+return;
 }
 
 /* iomod - check on I/O modifiers
@@ -1038,6 +1295,7 @@ return STOP_INVM;
 t_stat iodisp (int32 dev, int32 unit, int32 flag, int32 mod)
 {
 if (dev == IO_INQ) return inq_io (flag, mod);		/* inq terminal? */
+if (dev == IO_DP) return dp_io (unit, flag, mod);	/* disk pack? */
 if (dev == IO_MT) return mt_io (unit, flag, mod);	/* magtape? */
 if (dev == IO_MTB) {					/* binary? */
 	if (flag == MD_WM) return STOP_INVM;		/* invalid */
@@ -1055,6 +1313,9 @@ for (i = 0; i < 64; i++) ind[i] = 0;
 ind[IN_UNC] = 1;
 AS = 0; as_err = 1;
 BS = 0; bs_err = 1;
+pcq_r = find_reg ("ISQ", NULL, dptr);
+if (pcq_r) pcq_r -> qptr = 0;
+else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
 }

@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	1-Dec-01
+Date:	15-Jun-2002
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2001, written by Robert M Supnik
-   Copyright (c) 1993-2001, Robert M Supnik
+   Original code published in 1993-2002, written by Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -79,7 +79,7 @@ PTR,PTP		PC11 paper tape reader/punch
 TTI,TTO		DL11 console terminal
 LPT		LP11 line printer
 CLK		line frequency clock
-DZ		DZ11 8-line terminal multiplexor
+DZ		DZ11 8-line terminal multiplexor (up to 4)
 RK		RK11/RK05 cartridge disk controller with eight drives
 RL		RLV12/RL01(2) cartridge disk controller with four drives
 RP		RM02/03/05/80, RP04/05/06/07 Massbus style controller
@@ -90,13 +90,16 @@ TC		TC11/TU56 DECtape controller with eight drives
 TM		TM11/TU10 magnetic tape controller with eight drives
 TS		TS11/TSV05 magnetic tape controller with one drive
 
-The DZ, RK, RL, RP, RQ, RX, TC, TM, and TS devices can be DISABLEd.  The
-PDP-11 can support either a TM11 or a TS11, but not both, since they use
-the same I/O addresses.  The simulator defaults to the TM11.  To change
-the magtape,
+The DZ, RK, RL, RP, RQ, RX, TC, TM, and TS devices can be set DISABLED.
+With default I/O page addressing, the PDP-11 can support either a TM11
+or a TS11, but not both, since they use the same I/O addresses.  The
+simulator defaults to the TM11.  To change the magtape from TM11 to TS11,
 
-	ENABLE TM11		enable TM11 and disable TS11
-	ENABLE TS11		enable TS11 and disable TM11
+	SET TM DISABLED		disable TM11
+	SET TS ENABLED		enable TS11
+
+Most devices support the SET ADDRESS command, which allows the I/O page
+address of the device to be changed.
 
 The PDP-11 simulator implements several unique stop conditions:
 
@@ -197,7 +200,8 @@ control registers for the interrupt system.
 	STOP_TRAPS	18	stop on trap flags
 	STOP_VECA	1	stop on read abort in trap or interrupt
 	STOP_SPA	1	stop on stack push abort in trap or interrupt
-	OLDPC		16	PC prior to last JMP, JMS, or interrupt
+	PCQ[0:63]	16	PC prior to last jump, branch, or interrupt;
+				most recent PC change first
 	WRU		8	interrupt character
 
 2.2 Programmed I/O Devices
@@ -219,7 +223,7 @@ The paper tape reader implements these registers:
 	BUSY		1	busy flag (CSR<11>)
 	DONE		1	device done flag (CSR<7>)
 	IE		1	interrupt enable flag (CSR<6>)
-	POS		31	position in the input file
+	POS		32	position in the input file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -251,7 +255,7 @@ The paper tape punch implements these registers:
 	ERR		1	error flag (CSR<15>)
 	DONE		1	device done flag (CSR<7>)
 	IE		1	interrupt enable flag (CSR<6>)
-	POS		31	position in the output file
+	POS		32	position in the output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -277,7 +281,7 @@ implements these registers:
 	ERR		1	error flag (CSR<15>)
 	DONE		1	device done flag (CSR<7>)
 	IE		1	interrupt enable flag (CSR<6>)
-	POS		31	number of characters input
+	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
 2.2.4 DL11 Terminal Output (TTO)
@@ -293,7 +297,7 @@ implements these registers:
 	ERR		1	error flag (CSR<15>)
 	DONE		1	device done flag (CSR<7>)
 	IE		1	interrupt enable flag (CSR<6>)
-	POS		31	number of characters input
+	POS		32	number of characters input
 	TIME		24	time from I/O initiation to interrupt
 
 2.2.5 LP11 Line Printer (LPT)
@@ -312,7 +316,7 @@ The line printer implements these registers:
 	ERR		1	error flag (CSR<15>)
 	DONE		1	device done flag (CSR<7>)
 	IE		1	interrupt enable flag (CSR<6>)
-	POS		31	position in the output file
+	POS		32	position in the output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -327,7 +331,7 @@ Error handling is as follows:
 
 2.2.6 Line-Time Clock (CLK)
 
-The clock (CLK) implements these registers:
+The line-time clock (CLK) implements these registers:
 
 	name		size	comments
 
@@ -338,16 +342,23 @@ The clock (CLK) implements these registers:
 	TIME		24	clock frequency
 	TPS		8	ticks per second (60 or 50)
 
-The real-time clock autocalibrates; the clock interval is adjusted up or
+The line-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
 
 2.2.7 DZ11 Terminal Multiplexor (DZ)
 
-The DZ11 is an 8-line terminal multiplexor.  The terminal lines perform
-input and output through Telnet sessions connected to a user-specified
-port.  The ATTACH command specifies the port to be used:
+The DZ11 is an 8-line terminal multiplexor.  Up to 4 DZ11's (32 lines)
+are supported.  The number of lines can be changed with the command
 
-	ATTACH {-am} DZ <port>(cr)	-- set up listening port
+	SET DZ LINES=n			set line count to n
+
+The line count must be a multiple of 8, with a maximum of 32.
+
+The terminal lines perform input and output through Telnet sessions
+connected to a user-specified port.  The ATTACH command specifies
+the port to be used:
+
+	ATTACH {-am} DZ <port>		set up listening port
 
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.  The optional switch -m turns on the DZ11's
@@ -357,25 +368,28 @@ modem controls; the optional switch -a turns on active disconnects
 Once the DZ is attached and the simulator is running, the DZ will listen
 for connections on the specified port.  It assumes that the incoming
 connections are Telnet connections.  The connection remains open until
-disconnected either by the simulated program or by the Telnet client.
+disconnected by the simulated program, the Telnet client, a SET DZ
+DISCONNECT command, or a DETACH DZ command.
 
-The SHOW DZ LINESTATUS command displays the current connections to the DZ. 
+The SHOW DZ CONNECTIONS command displays the current connections to the DZ.
+The SHOW DZ STATISTICS command displays statistics for active connections.
+The SET DZ DISCONNECT=linenumber disconnects the specified line.
 
 The DZ11 implements these registers:
 
 	name		size	comments
 
-	CSR		16	control/status register
-	RBUF		16	receive buffer
-	LPR		16	line parameter register
-	TCR		16	transmission control register
-	MSR		16	modem status register
-	TDR		16	transmit data register
-	SAENB		1	silo alarm enabled
+	CSR[0:3]	16	control/status register, boards 0..3
+	RBUF[0:3]	16	receive buffer, boards 0..3
+	LPR[0:3]	16	line parameter register, boards 0..3
+	TCR[0:3]	16	transmission control register, boards 0..3
+	MSR[0:3]	16	modem status register, boards 0..3
+	TDR[0:3]	16	transmit data register, boards 0..3
+	SAENB[0:3]	1	silo alarm enabled, boards 0..3
+	RXINT		4	receive interrupts, boards 3..0
+	TXINT		4	transmit interrupts, boards 3..0
 	MDMTCL		1	modem control enabled
 	AUTODS		1	autodisconnect enabled
-	RPOS0..7	32	count of characters received
-	TPOS0..7	32	count of characters transmitted
 
 The DZ11 does not support save and restore.  All open connections are
 lost when the simulator shuts down or the DZ is detached.
@@ -385,10 +399,9 @@ lost when the simulator shuts down or the DZ is detached.
 RK11 options include the ability to make units write enabled or write locked:
 
 	SET RKn LOCKED		set unit n write locked
-	SET RKn ENABLED		set unit n write enabled
+	SET RKn WRITEENABLED	set unit n write enabled
 
-Units can also be REMOVEd or ADDed to the configuration.  The RK11 supports
-the BOOT command.
+Units can also be set ONLINE or OFFLINE.  The RK11 supports the BOOT command.
 
 The RK11 implements these registers:
 
@@ -427,7 +440,7 @@ Error handling is as follows:
 RX11 options include the ability to make units write enabled or write locked:
 
 	SET RXn LOCKED		set unit n write locked
-	SET RXn ENABLED		set unit n write enabled
+	SET RXn WRITEENABLED	set unit n write enabled
 
 The RX11 supports the BOOT command.
 
@@ -471,7 +484,7 @@ to set the drive size to RL01, RL02, or autosize, and to write a DEC standard
 044 compliant bad block table on the last track:
 
 	SET RLn LOCKED		set unit n write locked
-	SET RLn ENABLED		set unit n write enabled
+	SET RLn WRITEENABLED	set unit n write enabled
 	SET RLn RL01		set size to RL01
 	SET RLn RL02		set size to RL02
 	SET RLn AUTOSIZE	set size based on file size at attach
@@ -479,8 +492,7 @@ to set the drive size to RL01, RL02, or autosize, and to write a DEC standard
 
 The size options can be used only when a unit is not attached to a file.  The
 bad block option can be used only when a unit is attached to a file.  Units
-can also be REMOVEd or ADDed to the configuration.  The RL11 supports the
-BOOT command.
+can also be set ONLINE or OFFLINE.  The RL11 supports the BOOT command.
 
 The RL11 implements these registers:
 
@@ -523,7 +535,7 @@ to set the drive type to one of six disk types, or autosize, and to write
 a DEC standard 044 compliant bad block table on the last track:
 
 	SET RPn LOCKED		set unit n write locked
-	SET RPn ENABLED		set unit n write enabled
+	SET RPn WRITEENABLED	set unit n write enabled
 	SET RPn RM03		set type to RM03
 	SET RPn RM05		set type to RM05
 	SET RPn RM80		set type to RM80
@@ -533,10 +545,10 @@ a DEC standard 044 compliant bad block table on the last track:
 	SET RPn AUTOSIZE	set type based on file size at attach
 	SET RPn BADBLOCK	write bad block table on last track
 
-The type options can be used only when a unit is not attached to a file.  The
-bad block option can be used only when a unit is attached to a file.  Units
-can also be REMOVEd or ADDed to the configuration.  The RP controller supports
-the BOOT command.
+The type options can be used only when a unit is not attached to a file.
+The bad block option can be used only when a unit is attached to a file.
+Units can also be set ONLINE or OFFLINE.  The RP controller supports the
+BOOT command.
 
 The RP controller implements these registers:
 
@@ -586,7 +598,7 @@ include the ability to set units write enabled or write locked, and to
 set the drive type to one of eleven disk types:
 
 	SET RQn LOCKED		set unit n write locked
-	SET RQn ENABLED		set unit n write enabled
+	SET RQn WRITEENABLED	set unit n write enabled
 	SET RQn RX50		set type to RX50
 	SET RQn RX33		set type to RX33
 	SET RQn RD51		set type to RD51
@@ -598,10 +610,11 @@ set the drive type to one of eleven disk types:
 	SET RQn RA72		set type to RA72
 	SET RQn RA90		set type to RA90
 	SET RQn RA92		set type to RA92
+	SET RQn RRD40		set type to RRD40 (CD ROM)
 
 The type options can be used only when a unit is not attached to a file.
-Units can also be REMOVEd or ADDed to the configuration.  The RQ controller
-supports the BOOT command.
+Units can also be set ONLINE or OFFLINE.  The RQ controller supports the
+BOOT command.
 
 The RQ controller implements the following special SHOW commands:
 
@@ -631,16 +644,22 @@ The RQ controller implements these registers:
 	CSTA		4	controller state
 	PERR		9	port error number
 	CRED		5	host credits
-	HAT		16	host available timer
+	HAT		17	host available timer
 	HTMO		17	host timeout value
 	CPKT[0:3]	5	current packet, units 0-3
 	PKTQ[0:3]	5	packet queue, units 0-3
 	UFLG[0:3]	16	unit flags, units 0-3
 	INT		1	interrupt request
+	ITIME		1	response time for initialization steps
+				(except for step 4)
 	QTIME		24	response time for 'immediate' packets
 	XTIME		24	response time for data transfers
 	PKTS[33*32]	16	packet buffers, 33W each,
 				32 entries
+
+Some DEC operating systems, notably RSX11M/M+, are very sensitive to
+the timing parameters.  Changing the default values may cause M/M+ to
+crash on boot or to hang during operation.
 
 Error handling is as follows:
 
@@ -659,17 +678,16 @@ DECtape options include the ability to make units write enabled or write
 locked.
 
 	SET DTn LOCKED		set unit n write locked
-	SET DTn ENABLED		set unit n write enabled
+	SET DTn WRITEENABLED	set unit n write enabled
 
-Units can also be REMOVEd or ADDed to the configuration.  The TC11 supports
-the BOOT command.
+Units can also be set ONLINE or OFFLINE.  The TC11 supports the BOOT command.
 
 The TC11 supports both PDP-8 format and PDP-9/11/15 format DECtape images.
 ATTACH tries to determine the tape format from the DECtape image; the user
 can force a particular format with switches:
 
-	-f				foreign (PDP-8) format
-	-n				native (PDP-9/11/15) format
+	-f			foreign (PDP-8) format
+	-n			native (PDP-9/11/15) format
 
 The DECtape controller is a data-only simulator; the timing and mark
 track, and block header and trailer, are not stored.  Thus, the WRITE
@@ -695,7 +713,7 @@ The DECtape controller implements these registers:
 	ACTIME		31	time to accelerate to full speed
 	DCTIME		31	time to decelerate to a full stop
 	SUBSTATE	2	read/write command substate
-	POS[0:7]	31	position, in lines, units 0-7
+	POS[0:7]	32	position, in lines, units 0-7
 	STATT[0-7]	31	unit state, units 0-7
 
 It is critically important to maintain certain timing relationships
@@ -711,9 +729,9 @@ operate correctly.
 TM options include the ability to make units write enabled or write locked.
 
 	SET TMn LOCKED		set unit n write locked
-	SET TMn ENABLED		set unit n write enabled
+	SET TMn WRITEENABLED	set unit n write enabled
 
-Units can also be REMOVEd or ADDed to the configuration.
+Units can also be set ONLINE or OFFLINE.
 
 The TM11 supports the BOOT command.  The bootstrap supports both original
 and DEC standard boot formats.  Originally, a tape bootstrap read and
@@ -737,7 +755,7 @@ The magnetic tape controller implements these registers:
 	STOP_IOE	1	stop on I/O error
 	TIME		24	delay
 	UST[0:7]	16	unit status, units 0-7
-	POS[0:7]	31	position, units 0-7
+	POS[0:7]	32	position, units 0-7
 
 Error handling is as follows:
 
@@ -757,7 +775,7 @@ work with TS11 drivers.  TS options include the ability to make the unit
 write enabled or write locked.
 
 	SET TS LOCKED		set unit write locked
-	SET TS ENABLED		set unit write enabled
+	SET TS WRITEENABLED	set unit write enabled
 
 The TS11 supports the BOOT command.  The bootstrap supports only DEC
 standard boot formats.  To allow for ANSI labels, the DEC standard bootstrap
@@ -791,7 +809,7 @@ The magnetic tape controller implements these registers:
 	OWNC		1	if set, tape owns command buffer
 	OWNM		1	if set, tape owns message buffer
 	TIME		24	delay
-	POS		31	position
+	POS		32	position
 
 Error handling is as follows:
 

@@ -1,6 +1,6 @@
 /* pdp1_lp.c: PDP-1 line printer simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt		Type 62 line printer for the PDP-1
 
+   30-May-02	RMS	Widened POS to 32b
    13-Apr-01	RMS	Revised for register arrays
 */
 
@@ -55,7 +56,7 @@ REG lpt_reg[] = {
 	{ FLDATA (RPLS, lpt_rpls, 0) },
 	{ DRDATA (BPTR, bptr, 6) },
 	{ ORDATA (LPT_STATE, lpt_iot, 6), REG_HRO },
-	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
 	{ BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },

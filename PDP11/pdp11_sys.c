@@ -1,6 +1,6 @@
 /* pdp11_sys.c: PDP-11 simulator interface
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -53,7 +53,6 @@ extern DEVICE rk_dev, rl_dev;
 extern DEVICE rp_dev, rq_dev;
 extern DEVICE rx_dev, dt_dev;
 extern DEVICE tm_dev, ts_dev;
-/* extern DEVICE hk_dev; */
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint16 *M;

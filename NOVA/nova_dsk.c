@@ -1,6 +1,6 @@
 /* nova_dsk.c: 4019 fixed head disk simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dsk	fixed head disk
 
+   06-Jan-02	RMS	Revised enable/disable support
    23-Aug-01	RMS	Fixed bug in write watermarking
    26-Apr-01	RMS	Added device enable/disable support
    10-Dec-00	RMS	Added Eclipse support
@@ -88,11 +89,6 @@ int32 dsk_time = 100;					/* time per sector */
 t_stat dsk_svc (UNIT *uptr);
 t_stat dsk_reset (DEVICE *dptr);
 t_stat dsk_boot (int32 unitno);
-#if defined (ECLIPSE)
-extern int32 MapAddr (int32 map, int32 addr);
-#else
-#define MapAddr(m,a)	(a)
-#endif
 
 /* DSK data structures
 
@@ -119,8 +115,13 @@ REG dsk_reg[] = {
 	{ FLDATA (*DEVENB, iot_enb, INT_V_DSK), REG_HRO },
 	{ NULL }  };
 
+MTAB dsk_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, INT_DSK, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_DSK, NULL, "DISABLED", &set_dsb },
+	{ 0 }  };
+
 DEVICE dsk_dev = {
-	"DK", &dsk_unit, dsk_reg, NULL,
+	"DK", &dsk_unit, dsk_reg, dsk_mod,
 	1, 8, 21, 1, 8, 16,
 	NULL, NULL, &dsk_reset,
 	&dsk_boot, NULL, NULL };

@@ -1,6 +1,6 @@
 /* pdp8_rk.c: RK8E cartridge disk simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rk		RK8E/RK05 cartridge disk
 
+   06-Jan-02	RMS	Changed enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Converted FLG to array, made register names consistent
    25-Apr-01	RMS	Added device enable/disable support
@@ -170,8 +171,10 @@ REG rk_reg[] = {
 	{ NULL }  };
 
 MTAB rk_mod[] = {
-	{ UNIT_HWLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_HWLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_HWLK, UNIT_HWLK, "write locked", "LOCKED", NULL },
+	{ MTAB_XTD|MTAB_VDV, INT_RK, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_RK, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE rk_dev = {

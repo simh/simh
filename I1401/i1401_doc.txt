@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	IBM 1401 Simulator Usage
-Date:	1-Dec-01
+Date:	15-Jun-2002
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2001, written by Robert M Supnik
-   Copyright (c) 1993-2001, Robert M Supnik
+   Original code published in 1993-2002, written by Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -43,8 +43,10 @@ sim/		sim_defs.h
 
 sim/i1401/	i1401_defs.h
 		i1401_cpu.c
+		i1401_cd.c
 		i1401_iq.c
 		i1401_lp.c
+		i1401_dp.c
 		i1401_mt.c
 		i1401_sys.c	
 
@@ -59,6 +61,7 @@ CPU		IBM 1401 CPU with 16K of memory
 CDR,CDP		IBM 1402 card reader/punch
 LPT		IBM 1403 line printer
 INQ		IBM 1407 inquiry terminal
+DP		IBM 1311 disk pack with five drives
 MT		IBM 729 7-track magnetic tape controller with six drives
 
 The IBM 1401 simulator implements many unique stop conditions.  On almost
@@ -83,8 +86,13 @@ any kind of error the simulator stops:
 	single character B field in MCE
 	hanging $ in MCE with EPE enabled
 	I/O check with I/O stop switch set
+	invalid disk drive
+	invalid disk sector address
+	invalid disk sector count
+	invalid disk address compare
 
-The LOAD and DUMP commands are not implemented.
+The LOAD command is used to load a line printer carriage-control tape.
+The DUMP command is not implemented.
 
 2.1 CPU
 
@@ -102,6 +110,8 @@ when memory size is greater than 4K.
 	SET CPU NOMR		disable move record
 	SET CPU EPE		enable extended print edit special feature
 	SET CPU NOEPE		disable extended print edit
+	SET CPU MDV		enable multiply/divide special feature
+	SET CPU NOMDV		disable multiply/divide
 	SET CPU 4K		set memory size = 4K
 	SET CPU 8K		set memory size = 8K
 	SET CPU 12K		set memory size = 12K
@@ -147,7 +157,8 @@ interrupt system.
 	OVF		1	overflow indicator
 	IOCHK		1	I/O check switch
 	PRCHK		1	process check switch
-	OLDIS		1	IS prior to last branch
+	ISQ		1	IS prior to last branch;
+				most recent IS change first
 	WRU		8	interrupt character
 
 2.2 1402 Card Reader/Punch (CDR, CDP, STKR)
@@ -177,7 +188,7 @@ The reader/punch registers are:
 		ERR		1	error indicator
 		S1		1	stacker 1 select flag
 		S2		1	stacker 2 select flag
-		POS		31	position
+		POS		32	position
 		TIME		24	delay window for stacker select
 		BUF[0:79]	8	reader buffer
 
@@ -185,10 +196,10 @@ The reader/punch registers are:
 		S4		1	stacker 4 select flag
 		S8		1	stacker 8 select flag
 
-	STKR	POS0		31	position, normal reader stack
-		POS1		31	position, reader stacker 1
-		POS2		31	position, shared stacker 2/8
-		POS4		31	position, punch stacker 4
+	STKR	POS0		32	position, normal reader stack
+		POS1		32	position, reader stacker 1
+		POS2		32	position, shared stacker 2/8
+		POS4		32	position, punch stacker 4
 
 Error handling is as follows:
 
@@ -245,7 +256,7 @@ The line printer registers are:
 	CCTP		8	carriage control tape pointer
 	CCTL		8	carriage control tape length (read only)
 	ERR		1	error indicator
-	POS		31	position
+	POS		32	position
 	CCT[0:131]	32	carriage control tape array	
 
 Error handling is as follows:
@@ -278,18 +289,68 @@ character is typed in.  The latter cancels the type-in and sets INC.
 
 The inquiry terminal has no errors.
 
-2.5 729 Magnetic Tape (MT)
+2.5 1311 Disk Pack (DP)
+
+The disk pack controller supports 5 drives, numbered 0 through 4.  Disk
+pack options include the ability to enable address writing (formatting).
+
+	SET DPn ADDROFF		set unit n address enable off
+	SET DPn ADDRON		set unit n address enable on
+
+Units can also be set ONLINE or OFFLINE.  Disk data is buffered in
+memory; IO errors cannot occur.
+
+Unlike most simulated disks, the 1311 includes explicit representation
+for sector addresses.  This is to support non-standard formats, such as
+the inclusion of the drive number in the sector address.  As a result,
+1311 sectors are 106 characters long: 6 address characters and 100
+data characters.  If the 1311 has not been formatted, the addresses
+are blanks and are synthesized, if needed, based on the sector number. 
+
+The 1311 also supports two modes of operation: move mode and load mode.
+In move mode, word marks are ignored on writes and left untouched on reads,
+and sectors hold 100 characters.  In load mode, word marks are included
+on writes and stored on reads, and sectors hold 90 characters.  No attempt
+is made to deal with sectors written in load mode and read in move mode,
+or vice versa; on a real 1401, this causes a fatal parity error.
+
+The disk pack controller implements these registers:
+
+	name		size	comments
+
+	ACC		1	access error indicator
+	PWC		1	parity or write check error indicator
+	WLR		1	wrong length record error indicator
+	UNA		1	unequal address compare error indicator
+	DSK		1	any disk error indicator
+	BSY		1	disk access busy indicator
+	LASTF		3	most recent function
+	TIME		24	seek time
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		set DSK indicator
+				if IOCHK set, report error and stop
+
+The 1311 has a primative overlapped seek capability.  If TIME is set
+non-zero, the 1311 will report itself busy for the specified amount
+of time following a seek.  This allows programs to utilize the seek
+time for processing.
+
+2.6 729 Magnetic Tape (MT)
 
 The magnetic tape controller supports six drives, numbered 1 through 6.
 Magnetic tape options include the ability to make units write enabled or
 or write locked.
 
 	SET MTn LOCKED		set unit n write locked
-	SET MTn ENABLED		set unit n write enabled
+	SET MTn WRITEENABLED	set unit n write enabled
 
-Units can also be REMOVEd or ADDed to the configuration.  The magnetic
-tape simulator supports the BOOT command.  BOOT MT reads the first
-record off tape, starting at location 1, and then branches to it. 
+Units can also be set ONLINE or OFFLINE.  The magnetic tape simulator
+supports the BOOT command.  BOOT MT reads the first record off tape,
+starting at location 1, and then branches to it. 
 
 The magnetic tape controller implements these registers:
 
@@ -298,7 +359,7 @@ The magnetic tape controller implements these registers:
 	END		1	end of file indicator
 	ERR		1	error indicator
 	PAR		1	parity error indicator
-	POS1..6		31	position, drives 1..6
+	POS1..6		32	position, drives 1..6
 
 Error handling is as follows:
 
@@ -313,7 +374,7 @@ Error handling is as follows:
 				if IOCHK set, report error and stop
 				otherwise, set ERR indicator
 
-2.6 Symbolic Display and Input
+2.7 Symbolic Display and Input
 
 The IBM 1401 simulator implements symbolic display and input.  Display is
 controlled by command line switches:
@@ -324,6 +385,8 @@ controlled by command line switches:
 				(CPU only)
 	-m			display instruction mnemonics
 				(CPU only)
+	-d			display 50 characters per line, with word
+				marks denoted by "1" on the line below
 
 In a CPU character display, word marks are denoted by ~.
 

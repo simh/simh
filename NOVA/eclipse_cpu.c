@@ -2,8 +2,8 @@
 
    Modified from the original NOVA simulator by Robert Supnik.
 
-   Copyright (c) 1998-2001, Charles E Owen
-   Portions Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1998-2002, Charles E Owen
+   Portions Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
 
    cpu		Eclipse central processor
 
+   28-Jan-02	RMS	Cleaned up compiler warnings
    30-Nov-01	RMS	Added extended SET/SHOW support
    01-Jun-01	RMS	Added second terminal, plotter support
    26-Apr-01	RMS	Added device enable/disable support
@@ -431,6 +432,7 @@ t_stat map_svc (UNIT *uptr);
 int32 GetMap(int32 addr);
 int32 PutMap(int32 addr, int32 data);
 int32 Debug_Entry(int32 PC, int32 inst, int32 inst2, int32 AC0, int32 AC1, int32 AC2, int32 AC3, int32 flags);
+
 extern int32 ptr (int32 pulse, int32 code, int32 AC);
 extern int32 ptp (int32 pulse, int32 code, int32 AC);
 extern int32 tti (int32 pulse, int32 code, int32 AC);
@@ -444,8 +446,7 @@ extern int32 dsk (int32 pulse, int32 code, int32 AC);
 extern int32 dkp (int32 pulse, int32 code, int32 AC);
 extern int32 mta (int32 pulse, int32 code, int32 AC);
 int32 nulldev (int32 pulse, int32 code, int32 AC);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
+extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 	UNIT *uptr, int32 sw);
 
 /* IOT dispatch table */
@@ -1640,7 +1641,7 @@ if ((IR & 0100017) == 0100010) {		/* This pattern for all */
         AC[3] = da;
         d = GetMap(GetMap(044) + op);
 	PC = indirect(d) & AMASK;
-	if ((GetMap(040) & AMASK) > GetMap(042) & AMASK) {
+	if ((GetMap(040) & AMASK) > (GetMap(042) & AMASK)) {
 	    pushrtn(PC);
 	    PC = indirect(GetMap(043));
 	    PutMap(040, (GetMap(040) & 077777));
@@ -3406,6 +3407,42 @@ int32 Debug_Dump(UNIT *uptr, int32 val, char *cptr, void *desc)
             ctr = 0;
     }
     fclose(Dumpf);
-    printf("\n%d records dumped to history.log\n");
+    printf("\n%d records dumped to history.log\n", count);
 	return SCPE_OK;
+}
+
+/* Device enable routine */
+
+t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+DEVICE *dptr;
+
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+iot_enb = iot_enb | val;
+if (dptr -> reset) dptr -> reset (dptr);
+return SCPE_OK;
+}
+
+/* Device disable routine */
+
+t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i;
+DEVICE *dptr;
+UNIT *up;
+
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+for (i = 0; i < dptr -> numunits; i++) {		/* check units */
+	up = (dptr -> units) + i;
+	if ((up -> flags & UNIT_ATT) || sim_is_active (up))
+		return SCPE_NOFNC;  }
+iot_enb = iot_enb & ~val;
+if (dptr -> reset) dptr -> reset (dptr);
+return SCPE_OK;
 }

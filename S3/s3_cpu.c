@@ -392,13 +392,19 @@ extern int32 dsk1 (int32 op, int32 m, int32 n, int32 data);
 extern int32 dsk2 (int32 op, int32 m, int32 n, int32 data);
 extern int32 cpu (int32 op, int32 m, int32 n, int32 data);
 extern t_stat sim_activate (UNIT *uptr, int32 delay);
+extern int32 fprint_sym (FILE *of, int32 addr, unsigned int32 *val,
+	UNIT *uptr, int32 sw);
 int32 nulldev (int32 opcode, int32 m, int32 n, int32 data);
 int add_zoned (int32 addr1, int32 len1, int32 addr2, int32 len2);
 int32 subtract_zoned (int32 addr1, int32 len1, int32 addr2, int32 len2);
+static int32 compare(int32 byte1, int32 byte2, int32 cond);
+static int32 condition(int32 qbyte);
 static void store_decimal (int32 addr, int32 len, uint8 *dec, int sign);
 static void load_decimal (int32 addr, int32 len, uint8 *result, int32 *count, int32 *sign);
 static void add_decimal (uint8 *dec1, uint8 *dec2, uint8 *result, int32 *count);
 static void subtract_decimal (uint8 *dec1, uint8 *dec2, uint8 *result, int *count, int *sign);
+int32 GetMem(int32 addr);
+int32 PutMem(int32 addr, int32 data);
 
 /* IOT dispatch table */
 
@@ -496,14 +502,12 @@ t_stat sim_instr (void)
 {
 extern int32 sim_interval;
 register int32 PC, IR;
-int32 i, j, carry, zero, gt, f, op1, op2;
+int32 i, j, carry, zero, op1, op2;
 int32 opcode = 0, qbyte = 0, rbyte = 0;
 int32 opaddr, addr1, addr2, dlen1, dlen2, r;
 int32 int_savelevel = 8, intpri, intlev, intdev, intmask;
 int32 devno, devm, devn;
 char display[3][9];
-char resp[2];
-char trstr[256];
 int32 val [32];
 register t_stat reason;
 
@@ -1679,7 +1683,6 @@ static void load_decimal (int32 addr, int32 len, uint8 *result, int32 *count, in
 int     h;                              /* Hexadecimal digit         */
 int     i, j;                           /* Array subscripts          */
 int     n;                              /* Significant digit counter */
-int 	s;
 
 	if ((GetMem(addr) & 0xf0) == 0xD0) 
 		*sign = -1;

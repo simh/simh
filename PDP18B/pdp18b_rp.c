@@ -1,6 +1,6 @@
 /* pdp18b_rp.c: RP15/RP02 disk pack simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp		RP15/RP02 disk pack
 
+   06-Jan-02	RMS	Revised enable/disable support
    29-Nov-01	RMS	Added read only unit support
    25-Nov-01	RMS	Revised interrupt structure
 			Changed FLG to array
@@ -176,12 +177,14 @@ REG rp_reg[] = {
 	{ DRDATA (RTIME, rp_rwait, 24), PV_LEFT },
 	{ URDATA (FLG, rp_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
 		  RP_NUMDR, REG_HRO) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_RP), REG_HRO },
+	{ FLDATA (*DEVENB, dev_enb, ENB_V_RP), REG_HRO },
 	{ NULL }  };
 
 MTAB rp_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+	{ MTAB_XTD|MTAB_VDV, ENB_RP, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, ENB_RP, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE rp_dev = {

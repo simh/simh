@@ -1,6 +1,6 @@
 /* pdp11_rx.c: RX11/RX01 floppy disk simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    rx		RX11/RX01 floppy disk
 
+   26-Jan-02	RMS	Revised bootstrap to conform to M9312
+   06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Converted FLG to array
    07-Sep-01	RMS	Revised device disable and interrupt mechanisms
@@ -107,6 +109,9 @@ int32 rx_xwait = 1;					/* tr set time */
 unsigned int8 rx_buf[RX_NUMBY] = { 0 };			/* sector buffer */
 int32 bptr = 0;						/* buffer pointer */
 int32 rx_enb = 1;					/* device enable */
+
+t_stat rx_rd (int32 *data, int32 PA, int32 access);
+t_stat rx_wr (int32 data, int32 PA, int32 access);
 t_stat rx_svc (UNIT *uptr);
 t_stat rx_reset (DEVICE *dptr);
 t_stat rx_boot (int32 unitno);
@@ -118,6 +123,8 @@ t_stat rx_boot (int32 unitno);
    rx_reg	RX register list
    rx_mod	RX modifier list
 */
+
+DIB rx_dib = { 1, IOBA_RX, IOLN_RX, &rx_rd, &rx_wr };
 
 UNIT rx_unit[] = {
 	{ UDATA (&rx_svc,
@@ -145,12 +152,19 @@ REG rx_reg[] = {
 	{ URDATA (FLG, rx_unit[0].flags, 2, 1, UNIT_V_WLK, RX_NUMDR, REG_HRO) },
 	{ FLDATA (STOP_IOE, rx_stopioe, 0) },
 	{ BRDATA (SBUF, rx_buf, 8, 8, RX_NUMBY) },
-	{ FLDATA (*DEVENB, rx_enb, 0), REG_HRO },
+	{ ORDATA (DEVADDR, rx_dib.ba, 32), REG_HRO },
+	{ FLDATA (*DEVENB, rx_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB rx_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+		&set_addr, &show_addr, &rx_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &rx_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &rx_dib },
 	{ 0 }  };
 
 DEVICE rx_dev = {
@@ -383,11 +397,13 @@ return SCPE_OK;
 
 /* Device bootstrap */
 
-#define BOOT_START 02000
-#define BOOT_UNIT 02006
+#define BOOT_START	02000				/* start */
+#define BOOT_ENTRY	02002				/* entry */
+#define BOOT_UNIT	02010				/* unit number */
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int32))
 
 static const int32 boot_rom[] = {
+	042130,				/* "XD" */
 	0012706, 0002000,		/* MOV #2000, SP */
 	0012700, 0000000,		/* MOV #unit, R0	; unit number */
 	0010003,			/* MOV R0, R3 */
@@ -417,8 +433,8 @@ static const int32 boot_rom[] = {
 	0000772,			/* BR .-012 */
 	0005002,			/* CLR R2 */
 	0005003,			/* CLR R3 */
-	0005004,			/* CLR R4 */
-	0012705, 0054104,		/* MOV #"DX, R5 */
+	0012704, BOOT_START+020,	/* MOV #START+20, R4 */
+	0005005,			/* CLR R5 */
 	0005007				/* CLR R7 */
 };
 
@@ -430,6 +446,6 @@ extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & RX_M_NUMDR;
-saved_PC = BOOT_START;
+saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* pdp10_defs.h: PDP-10 simulator definitions
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Apr-02	RMS	Removed magtape record length error
+   20-Jan-02	RMS	Added multiboard DZ11 support
    23-Oct-01	RMS	New IO page address constants
-   19-Oct-01	RMS	Added DZ definitions
+   19-Oct-01	RMS	Added DZ11 definitions
    07-Sep-01	RMS	Revised for PDP-11 multi-level interrupts
    31-Aug-01	RMS	Changed int64 to t_int64 for Windoze
    29-Aug-01	RMS	Corrected models and dates (found by Lars Brinkhoff)
@@ -93,9 +95,8 @@ typedef t_int64		d10;				/* PDP-10 data (36b) */
 #define STOP_IND	8				/* indirection loop */
 #define STOP_XCT	9				/* XCT loop */
 #define STOP_ILLIOC	10				/* invalid UBA num */
-#define STOP_MTRLNT	11				/* invalid mt rec lnt */
-#define STOP_ASTOP	12				/* address stop */
-#define STOP_UNKNOWN	13				/* unknown stop  */
+#define STOP_ASTOP	11				/* address stop */
+#define STOP_UNKNOWN	12				/* unknown stop  */
 #define PAGE_FAIL	-1				/* page fail */
 #define INTERRUPT	-2				/* interrupt */
 #define ABORT(x)	longjmp (save_env, (x))		/* abort */
@@ -573,30 +574,51 @@ typedef t_int64		d10;				/* PDP-10 data (36b) */
 #define IO_UBA3		(3 << IO_V_UBA)
 #define GET_IOUBA(x)	(((x) >> IO_V_UBA) & IO_M_UBA)
 
+/* Device information block */
+
+struct pdp_dib {
+	uint32		enb;				/* enabled */
+	uint32		ba;				/* base addr */
+	uint32		lnt;				/* length */
+	t_stat		(*rd)(int32 *dat, int32 ad, int32 md);
+	t_stat		(*wr)(int32 dat, int32 ad, int32 md);  };
+
+typedef struct pdp_dib DIB;
+
 /* DZ11 parameters */
 
-#define DZ_MUXES	1				/* # of muxes */
+#define DZ_MUXES	4				/* max # of muxes */
 #define DZ_LINES	8				/* lines per mux */
 
 /* I/O page layout */
 
-#define IOBA_DZ		0760010				/* DZ11 */
-#define IOLN_DZ		(010 * DZ_MUXES)
-#define IOBA_TCU	0760770				/* TCU150 */
-#define IOLN_TCU	006
-#define IOBA_UBMAP	0763000				/* Unibus map */
-#define IOLN_UBMAP	0100
-#define IOBA_UBCS	0763100				/* Unibus c/s reg */
-#define IOLN_UBCS	001
-#define IOBA_UBMNT	0763101				/* Unibus maint reg */
-#define IOLN_UBMNT	001
-#define IOBA_TU		0772440				/* RH11/tape */
-#define IOLN_TU		034
-#define IOBA_RP		0776700				/* RH11/disk */
+#define IOPAGEBASE	0760000				/* I/O page base */
+#define IOBA_UBMAP	0763000
+
+#define IOBA_UBMAP1	(IO_UBA1 + IOBA_UBMAP)		/* Unibus 1 map */
+#define IOLN_UBMAP1	0100
+#define IOBA_UBCS1	(IO_UBA1 + 0763100)		/* Unibus 1 c/s reg */
+#define IOLN_UBCS1	001
+#define IOBA_UBMNT1	(IO_UBA1 + 0763101)		/* Unibus 1 maint reg */
+#define IOLN_UBMNT1	001
+#define IOBA_RP		(IO_UBA1 + 0776700)		/* RH11/disk */
 #define IOLN_RP		050
-#define IOBA_LP20	0775400				/* LP20 */
+
+#define IOBA_DZ		(IO_UBA3 + 0760010)		/* DZ11 */
+#define IOLN_DZ		010
+#define IOBA_TCU	(IO_UBA3 + 0760770)		/* TCU150 */
+#define IOLN_TCU	006
+#define IOBA_UBMAP3	(IO_UBA3 + IOBA_UBMAP)		/* Unibus 3 map */
+#define IOLN_UBMAP3	0100
+#define IOBA_UBCS3	(IO_UBA3 + 0763100)		/* Unibus 3 c/s reg */
+#define IOLN_UBCS3	001
+#define IOBA_UBMNT3	(IO_UBA3 + 0763101)		/* Unibus 3 maint reg */
+#define IOLN_UBMNT3	001
+#define IOBA_TU		(IO_UBA3 + 0772440)		/* RH11/tape */
+#define IOLN_TU		034
+#define IOBA_LP20	(IO_UBA3 + 0775400)		/* LP20 */
 #define IOLN_LP20	020
-#define IOBA_PT		0777550				/* PC11 */
+#define IOBA_PT		(IO_UBA3 + 0777550)		/* PC11 */
 #define IOLN_PT		010
 
 /* Common Unibus CSR flags */
@@ -664,3 +686,10 @@ typedef t_int64		d10;				/* PDP-10 data (36b) */
 #define IREQ(dv)	int_req
 #define SET_INT(dv)	IREQ(dv) = IREQ(dv) | (INT_##dv)
 #define CLR_INT(dv)	IREQ(dv) = IREQ(dv) & ~(INT_##dv)
+
+/* Function prototypes */
+
+t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_bool dev_conflict (uint32 nba, DIB *curr);

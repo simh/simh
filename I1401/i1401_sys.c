@@ -1,6 +1,6 @@
 /* i1401_sys.c: IBM 1401 simulator interface
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Jun-02	RMS	Added 1311 support
+   18-May-02	RMS	Added -D feature from Van Snyder
+   26-Jan-02	RMS	Fixed H, NOP with no trailing wm (found by Van Snyder)
    17-Sep-01	RMS	Removed multiconsole support
    13-Jul-01	RMS	Fixed bug in symbolic output (found by Peter Schorn)
    27-May-01	RMS	Added multiconsole support
@@ -37,7 +40,7 @@
 #define LINE_LNT	80
 extern DEVICE cpu_dev, inq_dev, lpt_dev;
 extern DEVICE cdr_dev, cdp_dev, stack_dev;
-extern DEVICE mt_dev;
+extern DEVICE dp_dev, mt_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint8 M[];
@@ -63,9 +66,16 @@ REG *sim_PC = &cpu_reg[0];
 
 int32 sim_emax = LINE_LNT;
 
-DEVICE *sim_devices[] = { &cpu_dev, &inq_dev,
-	&cdr_dev, &cdp_dev, &stack_dev, &lpt_dev,
-	&mt_dev, NULL };
+DEVICE *sim_devices[] = {
+	&cpu_dev,
+	&inq_dev,
+	&cdr_dev,
+	&cdp_dev,
+	&stack_dev,
+	&lpt_dev,
+	&mt_dev,
+	&dp_dev,
+	NULL };
 
 const char *sim_stop_messages[] = {
 	"Unknown error",
@@ -89,7 +99,17 @@ const char *sim_stop_messages[] = {
 	"MCE data field too short",
 	"MCE control field too short",
 	"MCE EPE hanging $",
-	"I/O check"  };
+	"I/O check",
+	"Invalid disk sector address",
+	"Invalid disk sector count",
+	"Invalid disk unit",
+	"Invalid disk function",
+	"Invalid disk record length",
+	"Write track while disabled",
+	"Write check error",
+	"Disk address miscompare",
+	"Direct seek cylinder exceeds maximum"
+  };
 
 /* Binary loader -- load carriage control tape
 
@@ -187,6 +207,11 @@ if (sw & SWMASK ('C')) {				/* character? */
 	else fprintf (of, FMTASC (t & 0177));
 	return SCPE_OK;  }
 if ((uptr != NULL) && (uptr != &cpu_unit)) return SCPE_ARG;	/* CPU? */
+if (sw & SWMASK ('D')) {                                /* dump? */
+	for (i = 0; i < 50; i++) fprintf (of, "%c", bcd_to_ascii[val[i]&CHAR]) ;
+	fprintf (of, "\n\t");
+        for (i = 0; i < 50; i++) fprintf (of, (val[i]&WM)? "1": " ") ;
+	return -(i - 1);  }
 if (sw & SWMASK ('S')) {				/* string? */
 	i = 0;
 	do {	t = val[i++];
@@ -199,15 +224,15 @@ if ((val[0] & WM) == 0) return STOP_NOWM;		/* WM under op? */
 op = val[0]& CHAR;					/* isolate op */
 flags = op_table[op];					/* get flags */
 for (ilnt = 1; ilnt < sim_emax; ilnt++) if (val[ilnt] & WM) break;
-if (flags & HNOP) ilnt = 1;				/* halt, nop? */
-else if ((flags & NOWM) && (ilnt > 7)) ilnt = 7;	/* cs, swm? */
+if ((flags & (NOWM | HNOP)) && (ilnt > 7)) ilnt = 7;	/* cs, swm, h, nop? */
 else if ((op == OP_B) && (ilnt > 4) && (val[4] == BCD_BLANK)) ilnt = 4;
-else if (ilnt > 8) ilnt = 8;				/* cap length */
-if ((flags & len_table[ilnt]) == 0) return STOP_INVL;	/* legal length? */
+else if ((ilnt > 8) && (op != OP_NOP)) ilnt = 8;	/* cap length */
+if (((flags & len_table[ilnt]) == 0) &&			/* valid lnt, */
+	((op != OP_NOP) == 0)) return STOP_INVL;	/* nop? */
 fprintf (of, "%s",opcode[op]);				/* print opcode */
 if (ilnt > 2) {						/* A address? */
-	if ((flags & IO) && (val[1] == BCD_PERCNT)) fprintf (of, " %%%c%c",
-		bcd_to_ascii[val[2]], bcd_to_ascii[val[3]]);
+	if (((flags & IO) || (op == OP_NOP)) && (val[1] == BCD_PERCNT))
+       	 fprintf (of, " %%%c%c", bcd_to_ascii[val[2]], bcd_to_ascii[val[3]]);
 	else fprint_addr (of, &val[1]);  }
 if (ilnt > 5) fprint_addr (of, &val[4]);		/* B address? */
 if ((ilnt == 2) || (ilnt == 5) || (ilnt == 8))		/* d character? */
@@ -291,12 +316,12 @@ for (op = 0; op < 64; op++)				/* look it up */
 	if (opcode[op] && strcmp (gbuf, opcode[op]) == 0) break;
 if (op >= 64) return SCPE_ARG;				/* successful? */
 val[0] = op | WM;					/* store opcode */
-cptr = get_glyph (cptr, gbuf, ' ');			/* get addr or d */
+cptr = get_glyph (cptr, gbuf, 0);			/* get addr or d */
 if (((op_table[op] && IO) && (get_io (gbuf, &val[1]) == SCPE_OK)) ||
      (get_addr (gbuf, &val[1]) == SCPE_OK)) {
-	cptr = get_glyph (cptr, gbuf, ' ');		/* get addr or d */
+	cptr = get_glyph (cptr, gbuf, 0);		/* get addr or d */
 	if (get_addr (gbuf, &val[4]) == SCPE_OK) {
-		cptr = get_glyph (cptr, gbuf, ' ');	/* get d */
+		cptr = get_glyph (cptr, gbuf, ',');	/* get d */
 		ilnt = 7;  }				/* a and b addresses */
 	else ilnt = 4;  }				/* a address */
 else ilnt = 1;						/* no addresses */
@@ -306,6 +331,7 @@ if ((gbuf[0] == '\'') || (gbuf[0] == '"')) {		/* d character? */
 		return SCPE_ARG;			/* end and legal? */
 	val[ilnt] = ascii_to_bcd[t];			/* save D char */
 	ilnt = ilnt + 1;  }
+else if (gbuf[0] != 0) return SCPE_ARG;			/* not done? */
 if ((op_table[op] & len_table[ilnt]) == 0) return STOP_INVL;
 return -(ilnt - 1);
 }

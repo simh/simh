@@ -1,6 +1,6 @@
 /* pdp10_pt.c: PDP-10 Unibus paper tape reader/punch simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    ptr		paper tape reader
    ptp		paper tape punch
 
+   30-May-02	RMS	Widened POS to 32b
+   06-Jan-02	RMS	Revised enable/disable support
    29-Nov-01	RMS	Added read only unit support
    07-Sep-01	RMS	Revised disable mechanism
 */
@@ -42,7 +44,9 @@ int32 ptr_csr = 0;					/* control/status */
 int32 ptr_stopioe = 0;					/* stop on error */
 int32 ptp_csr = 0;					/* control/status */
 int32 ptp_stopioe = 0;					/* stop on error */
-int32 pt_enb = 0;					/* device enable */
+
+t_stat pt_rd (int32 *data, int32 PA, int32 access);
+t_stat pt_wr (int32 data, int32 PA, int32 access);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
@@ -59,6 +63,8 @@ t_stat ptp_detach (UNIT *uptr);
    ptr_reg	PTR register list
 */
 
+DIB pt_dib = { 0, IOBA_PT, IOLN_PT, &pt_rd, &pt_wr };
+
 UNIT ptr_unit = {
 	UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
 		SERIAL_IN_WAIT };
@@ -71,14 +77,23 @@ REG ptr_reg[] = {
 	{ FLDATA (BUSY, ptr_csr, CSR_V_BUSY) },
 	{ FLDATA (DONE, ptr_csr, CSR_V_DONE) },
 	{ FLDATA (IE, ptr_csr, CSR_V_IE) },
-	{ DRDATA (POS, ptr_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
-	{ FLDATA (*DEVENB, pt_enb, 0), REG_HRO },
+	{ FLDATA (*DEVENB, pt_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
+MTAB ptr_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
+		NULL, &show_addr, &pt_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &pt_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &pt_dib },
+	{ 0 }  };
+
 DEVICE ptr_dev = {
-	"PTR", &ptr_unit, ptr_reg, NULL,
+	"PTR", &ptr_unit, ptr_reg, ptr_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptr_reset,
 	NULL, &ptr_attach, &ptr_detach };
@@ -100,14 +115,23 @@ REG ptp_reg[] = {
 	{ FLDATA (ERR, ptp_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, ptp_csr, CSR_V_DONE) },
 	{ FLDATA (IE, ptp_csr, CSR_V_IE) },
-	{ DRDATA (POS, ptp_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
-	{ FLDATA (*DEVENB, pt_enb, 0), REG_HRO },
+	{ FLDATA (*DEVENB, pt_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
+MTAB ptp_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
+		NULL, &show_addr, &pt_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &pt_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &pt_dib },
+	{ 0 }  };
+
 DEVICE ptp_dev = {
-	"PTP", &ptp_unit, ptp_reg, NULL,
+	"PTP", &ptp_unit, ptp_reg, ptp_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptp_reset,
 	NULL, &ptp_attach, &ptp_detach };

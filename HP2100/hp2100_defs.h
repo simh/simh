@@ -1,6 +1,6 @@
 /* hp2100_defs.h: HP 2100 simulator definitions
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Feb-02	RMS	Added DMS definitions
+   01-Feb-02	RMS	Added terminal multiplexor support
+   16-Jan-02	RMS	Added additional device support
    30-Nov-01	RMS	Added extended SET/SHOW support
    15-Oct-00	RMS	Added dynamic device numbers
    14-Apr-99	RMS	Changed t_addr to unsigned
@@ -41,17 +44,25 @@
 #define STOP_IBKPT	4				/* breakpoint */
 #define STOP_IND	5				/* indirect loop */
 
+#define ABORT_DMS	1				/* DMS abort */
+#define ABORT_FENCE	-1				/* fence abort */
+
 /* Memory */
 
-#define MAXMEMSIZE	32768				/* max memory size */
 #define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
-#define AMASK		(MAXMEMSIZE - 1)		/* address mask */
 #define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
+#define VA_N_SIZE	15				/* virtual addr size */
+#define VASIZE		(1 << VA_N_SIZE)
+#define VAMASK		(VASIZE - 1)			/* virt addr mask */
+#define PA_N_SIZE	20				/* phys addr size */
+#define PASIZE		(1 << PA_N_SIZE)
+#define PAMASK		(PASIZE - 1)			/* phys addr mask */
 
 /* Architectural constants */
 
-#define SIGN		0100000				/* sign */
-#define DMASK		0177777				/* data mask */
+#define SIGN32		020000000000			/* 32b sign */
+#define SIGN		0100000				/* 16b sign */
+#define DMASK		0177777				/* 16b data mask */
 #define AR		M[0]				/* A = location 0 */
 #define BR		M[1]				/* B = location 1 */
 #define ABREG		M				/* register array */
@@ -87,6 +98,67 @@ struct DMA {						/* DMA channel */
 	int32	cw3;					/* word count */
 };
 
+/* Memory management */
+
+#define VA_N_OFF	10				/* offset width */
+#define VA_M_OFF	((1 << VA_N_OFF) - 1)		/* offset mask */
+#define VA_GETOFF(x)	((x) & VA_M_OFF)
+#define VA_N_PAG	(VA_N_SIZE - VA_N_OFF)		/* page width */
+#define VA_V_PAG	(VA_N_OFF)
+#define VA_M_PAG	((1 << VA_N_PAG) - 1)
+#define VA_GETPAG(x)	(((x) >> VA_V_PAG) & VA_M_PAG)
+
+/* Maps */
+
+#define MAP_NUM		4				/* num maps */
+#define MAP_LNT		(1 << VA_N_PAG)			/* map length */
+#define MAP_MASK	((MAP_NUM * MAP_LNT) - 1)
+#define SMAP		0				/* system map */
+#define UMAP		(SMAP + MAP_LNT)		/* user map */
+#define PAMAP		(UMAP + MAP_LNT)		/* port A map */
+#define PBMAP		(PAMAP + MAP_LNT)		/* port B map */
+
+/* Map entries are left shifted by VA_N_OFF, flags in lower 2b */
+
+#define PA_N_PAG	(PA_N_SIZE - VA_N_OFF)		/* page width */
+#define PA_V_PAG	(VA_N_OFF)
+#define PA_M_PAG	((1 << PA_N_PAG) - 1)
+#define MAPM_V_RPR	15				/* in mem: read prot */
+#define MAPM_V_WPR	14				/* write prot */
+#define MAPA_V_RPR	1				/* in array: */
+#define MAPA_V_WPR	0
+#define PA_GETPAG(x)	((x) & (PA_M_PAG << VA_V_PAG))
+#define RD		(1 << MAPA_V_RPR)
+#define WR		(1 << MAPA_V_WPR)
+
+/* Map status register */
+
+#define MST_ENBI	0100000				/* mem enb @ int */
+#define MST_UMPI	0040000				/* usr map @ int */
+#define MST_ENB		0020000				/* mem enb */
+#define MST_UMP		0010000				/* usr map */
+#define MST_PRO		0004000				/* protection */
+#define MST_FLT		0002000				/* fence comp */
+#define MST_FENCE	0001777				/* base page fence */
+
+/* Map violation register */
+
+#define MVI_V_RPR	15
+#define MVI_V_WPR	14
+#define MVI_RPR		(1 << MVI_V_RPR)		/* rd viol */
+#define MVI_WPR		(1 << MVI_V_WPR)		/* wr viol */
+#define MVI_BPG		0020000				/* base page viol */
+#define MVI_PRV		0010000				/* priv viol */
+#define MVI_MEB		0000200				/* me bus enb @ viol */
+#define MVI_MEM		0000100				/* mem enb @ viol */
+#define MVI_UMP		0000040				/* usr map @ viol */
+#define MVI_PAG		0000037				/* pag sel */
+
+/* Timers */
+
+#define TMR_CLK		0				/* clock */
+#define TMR_MUX		1				/* multiplexor */
+
 /* I/O sub-opcodes */
 
 #define ioHLT		0				/* halt */
@@ -121,17 +193,25 @@ struct DMA {						/* DMA channel */
 #define PTP		012				/* paper tape punch */
 #define CLK		013				/* clock */
 #define LPT		014				/* line printer */
-#define MTD		020				/* mag tape data */
-#define MTC		021				/* mag tape control */
-#define DPD		022				/* disk pack data */
-#define DPC		023				/* disk pack control */
-#define DPBD		024				/* second disk pack data */
-#define DPBC		025				/* second disk pack control */
+#define MTD		020				/* 12559A data */
+#define MTC		021				/* 12559A control */
+#define DPD		022				/* 12557A data */
+#define DPC		023				/* 12557A control */
+#define DQD		024				/* 12565A data */
+#define DQC		025				/* 12565A control */
+#define DRD		026				/* 12610A data */
+#define DRC		027				/* 12610A control */
+#define MSD		030				/* 13181A data */
+#define MSC		031				/* 13181A control */
+#define MUXL		040				/* 12920A lower data */
+#define MUXU		041				/* 12920A upper data */
+#define MUXC		042				/* 12920A control */
 
 /* Dynamic device information table */
 
-struct hpdev {
+struct hp_dib {
 	int32	devno;					/* device number */
+	int32	enb;					/* enabled */
 	int32	cmd;					/* saved command */
 	int32	ctl;					/* saved control */
 	int32	flg;					/* saved flag */
@@ -139,21 +219,7 @@ struct hpdev {
 	int32	(*iot)();				/* I/O routine */
 };
 
-/* Offsets in device information table */
-
-#define inPTR		0				/* infotab ordinals */
-#define inPTP		1
-#define inTTY		2
-#define inCLK		3
-#define inLPT		4
-#define inMTD		5
-#define inMTC		6
-#define inDPD		7
-#define inDPC		8
-#define inDPBD		9
-#define inDPBC		10
-
-#define UNIT_DEVNO	(1 << UNIT_V_UF)		/* dummy flag */
+typedef struct hp_dib DIB;
 
 /* I/O macros */
 
@@ -181,5 +247,5 @@ struct hpdev {
 
 t_stat hp_setdev (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat hp_setdev2 (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat hp_showdev2 (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_enb (UNIT *uptr, int32 num, char *cptr, void *desc);
+t_stat set_dis (UNIT *uptr, int32 num, char *cptr, void *desc);

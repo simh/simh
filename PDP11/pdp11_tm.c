@@ -1,6 +1,6 @@
 /* pdp11_tm.c: PDP-11 magnetic tape simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,11 @@
 
    tm		TM11/TU10 magtape
 
+   30-May-02	RMS	Widened POS to 32b
+   22-Apr-02	RMS	Fixed max record length, first block bootstrap
+			(found by Jonathan Engdahl)
+   26-Jan-02	RMS	Revised bootstrap to conform to M9312
+   06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Converted UST, POS, FLG to arrays
    09-Nov-01	RMS	Added bus map support
@@ -67,7 +72,6 @@
 #define UNIT_W_UF	2				/* saved user flags */
 #define USTAT		u3				/* unit status */
 #define UNUM		u4				/* unit number */
-#define TM_MAXFR	(1 << 16)			/* max transfer */
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
 
 /* Command - tm_cmd */
@@ -145,8 +149,9 @@ int32 tm_db = 0;					/* data buffer */
 int32 tm_rdl = 0;					/* read lines */
 int32 tm_time = 10;					/* record latency */
 int32 tm_stopioe = 1;					/* stop on error */
-int32 tm_enb = 1;					/* device enable */
 
+t_stat tm_rd (int32 *data, int32 PA, int32 access);
+t_stat tm_wr (int32 data, int32 PA, int32 access);
 t_stat tm_svc (UNIT *uptr);
 t_stat tm_reset (DEVICE *dptr);
 t_stat tm_attach (UNIT *uptr, char *cptr);
@@ -164,6 +169,8 @@ t_stat tm_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
    tm_reg	MT register list
    tm_mod	MT modifier list
 */
+
+DIB tm_dib = { 1, IOBA_TM, IOLN_TM, &tm_rd, &tm_wr };
 
 UNIT tm_unit[] = {
 	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
@@ -189,16 +196,23 @@ REG tm_reg[] = {
 	{ FLDATA (STOP_IOE, tm_stopioe, 0) },
 	{ DRDATA (TIME, tm_time, 24), PV_LEFT },
 	{ URDATA (UST, tm_unit[0].USTAT, 8, 16, 0, TM_NUMDR, 0) },
-	{ URDATA (POS, tm_unit[0].pos, 10, 31, 0,
+	{ URDATA (POS, tm_unit[0].pos, 10, 32, 0,
 		  TM_NUMDR, PV_LEFT | REG_RO) },
 	{ URDATA (FLG, tm_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
 		  TM_NUMDR, REG_HRO) },
-	{ FLDATA (*DEVENB, tm_enb, 0), REG_HRO },
+	{ ORDATA (DEVADDR, tm_dib.ba, 32), REG_HRO },
+	{ FLDATA (*DEVENB, tm_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB tm_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", &tm_vlock },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", &tm_vlock },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", &tm_vlock }, 
+	{ MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
+		&set_addr, &show_addr, &tm_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &tm_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &tm_dib },
 	{ 0 }  };
 
 DEVICE tm_dev = {
@@ -380,6 +394,7 @@ case MTC_READ:						/* read */
 		uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
 		break;  }
 	tbc = MTRL (tbc);				/* ignore error flag */
+	if (tbc > MT_MAXFR) return SCPE_MTRLNT;		/* record too long? */
 	if (tbc > cbc) tm_sta = tm_sta | STA_RLE;	/* wrong size? */
 	if (tbc < cbc) cbc = tbc;			/* use smaller */
 	i = fxread (tmxb, sizeof (int8), cbc, uptr -> fileref);
@@ -501,9 +516,7 @@ t_stat tm_reset (DEVICE *dptr)
 {
 int32 u;
 UNIT *uptr;
-extern int32 ts_enb;
 
-if (tm_enb) ts_enb = 0;					/* TM or TS */
 tm_cmd = MTC_DONE;					/* set done */
 tm_bc = tm_ca = tm_db = tm_sta = tm_rdl = 0;
 CLR_INT (TM);						/* clear interrupt */
@@ -515,7 +528,7 @@ for (u = 0; u < TM_NUMDR; u++) {			/* loop thru units */
 		((uptr -> pos)? 0: STA_BOT) |
 		((uptr -> flags & UNIT_WPRT)? STA_WLK: 0);
 	else uptr -> USTAT = 0;  }
-if (tmxb == NULL) tmxb = calloc (TM_MAXFR, sizeof (unsigned int8));
+if (tmxb == NULL) tmxb = calloc (MT_MAXFR, sizeof (unsigned int8));
 if (tmxb == NULL) return SCPE_MEM;
 return SCPE_OK;
 }
@@ -563,19 +576,21 @@ return SCPE_OK;
    use the second block scheme, so it is the default.
 
    To boot from the first block, use boot -o (old).
- */
+*/
 
-#define BOOT_START 040000
-#define BOOT_UNIT (BOOT_START + 6)
+#define BOOT_START	040000
+#define BOOT_ENTRY	(BOOT_START + 2)
+#define BOOT_UNIT	(BOOT_START + 010)
 #define BOOT1_LEN (sizeof (boot1_rom) / sizeof (int32))
 #define BOOT2_LEN (sizeof (boot2_rom) / sizeof (int32))
 
 static const int32 boot1_rom[] = {
+	0046524,			/* boot_start: "TM" */
 	0012706, 0040000,		/* mov #boot_start, sp */
 	0012700, 0000000,		/* mov #unit_num, r0 */
 	0012701, 0172526,		/* mov #172526, r1	; mtcma */
 	0005011,			/* clr (r1) */
-	0011041,			/* mov r1, -(r1)	; mtbrc */
+	0010141,			/* mov r1, -(r1)	; mtbrc */
 	0010002,			/* mov r0,r2 */
 	0000302,			/* swab r2 */
 	0062702, 0060003,		/* add #60003, r2 */
@@ -584,12 +599,13 @@ static const int32 boot1_rom[] = {
 	0100376,			/* bpl .-2 */
 	0005002,			/* clr r2 */
 	0005003,			/* clr r3 */
-	0005004,			/* clr r4 */
-	0012705, 0052115,	/* mov #MT, r5 */
+	0012704, BOOT_START+020,	/* mov #boot_start+20, r4 */
+	0005005,			/* clr r5 */
 	0005007				/* clr r7 */
 };
 
 static const int32 boot2_rom[] = {
+	0046524,			/* boot_start: "TM" */
 	0012706, 0040000,		/* mov #boot_start, sp */
 	0012700, 0000000,		/* mov #unit_num, r0 */
 	0012701, 0172526,		/* mov #172526, r1	; mtcma */
@@ -609,8 +625,8 @@ static const int32 boot2_rom[] = {
 	0100376,			/* bpl .-2 */
 	0005002,			/* clr r2 */
 	0005003,			/* clr r3 */
-	0005004,			/* clr r4 */
-	0012705, 0052115,	/* mov #MT, r5 */
+	0012704, BOOT_START+020,	/* mov #boot_start+20, r4 */
+	0005005,			/* clr r5 */
 	0005007				/* clr r7 */
 };
 
@@ -627,6 +643,6 @@ if (sim_switches & SWMASK ('O')) {
 else {	for (i = 0; i < BOOT2_LEN; i++)
 		M[(BOOT_START >> 1) + i] = boot2_rom[i];  }
 M[BOOT_UNIT >> 1] = unitno;
-saved_PC = BOOT_START;
+saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 } 

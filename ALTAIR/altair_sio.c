@@ -72,7 +72,7 @@ UNIT ptr_unit = { UDATA (&ptr_svc, UNIT_SEQ + UNIT_ATTABLE, 0),
 REG ptr_reg[] = {
 	{ ORDATA (DATA, ptr_unit.buf, 8) },
 	{ ORDATA (STAT, ptr_unit.u3, 8) },
-	{ ORDATA (POS, ptr_unit.pos, 31) },
+	{ ORDATA (POS, ptr_unit.pos, 32) },
 	{ NULL }  };
 
 DEVICE ptr_dev = {
@@ -87,7 +87,7 @@ UNIT ptp_unit = { UDATA (&ptp_svc, UNIT_SEQ + UNIT_ATTABLE, 0),
 REG ptp_reg[] = {
 	{ ORDATA (DATA, ptp_unit.buf, 8) },
 	{ ORDATA (STAT, ptp_unit.u3, 8) },
-	{ ORDATA (POS, ptp_unit.pos, 31) },
+	{ ORDATA (POS, ptp_unit.pos, 32) },
 	{ NULL }  };
 
 DEVICE ptp_dev = {

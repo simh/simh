@@ -1,6 +1,6 @@
 /* nova_tt.c: NOVA console terminal simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti		terminal input
    tto		terminal output
 
+   30-May-02	RMS	Widened POS to 32b
    30-Nov-01	RMS	Added extended SET/SHOW support
    17-Sep-01	RMS	Removed multiconsole support
    07-Sep-01	RMS	Moved function prototypes
@@ -59,7 +60,7 @@ REG tti_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTI) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_TTI) },
 	{ FLDATA (INT, int_req, INT_V_TTI) },
-	{ DRDATA (POS, tti_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (MODE, tti_unit.flags, UNIT_V_DASHER), REG_HRO },
 	{ NULL }  };
@@ -90,7 +91,7 @@ REG tto_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTO) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_TTO) },
 	{ FLDATA (INT, int_req, INT_V_TTO) },
-	{ DRDATA (POS, tto_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ FLDATA (MODE, tto_unit.flags, UNIT_V_DASHER), REG_HRO },
 	{ NULL }  };

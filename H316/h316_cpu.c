@@ -1,6 +1,6 @@
 /* h316_cpu.c: Honeywell 316/516 CPU simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1999-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu		H316/H516 CPU
 
+   30-Dec-01	RMS	Added old PC queue
    03-Nov-01	RMS	Fixed NOHSA modifier
    30-Nov-01	RMS	Added extended SET/SHOW support
 
@@ -189,6 +190,10 @@
 
 #include "h316_defs.h"
 
+#define PCQ_SIZE	64				/* must be 2**n */
+#define PCQ_MASK	(PCQ_SIZE - 1)
+#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
+#define PCQ_TOP		pcq[pcq_p]
 #define UNIT_V_MSIZE	(UNIT_V_UF)			/* dummy mask */
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 #define m7		0001000				/* for generics */
@@ -219,7 +224,9 @@ int32 dev_enable = 0;					/* dev enable */
 int32 ind_max = 8;					/* iadr nest limit */
 int32 stop_inst = 1;					/* stop on ill inst */
 int32 stop_dev = 2;					/* stop on ill dev */
-int32 old_PC = 0;					/* previous PC */
+uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
+int32 pcq_p = 0;					/* PC queue ptr */
+REG *pcq_r = NULL;					/* PC queue reg ptr */
 int32 dlog = 0;						/* debug log */
 int32 turnoff = 0;
 extern int32 sim_int_char;
@@ -269,9 +276,10 @@ REG cpu_reg[] = {
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ FLDATA (STOP_DEV, stop_dev, 1) },
 	{ DRDATA (INDMAX, ind_max, 8), REG_NZ + PV_LEFT },
-	{ ORDATA (OLDP, old_PC, 15), REG_RO },
+	{ BRDATA (PCQ, pcq, 8, 15, PCQ_SIZE), REG_RO+REG_CIRC },
+	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
-	{ FLDATA (DLOG, dlog, 0) },
+	{ FLDATA (DLOG, dlog, 0), REG_HIDDEN },
 	{ FLDATA (HEXT, cpu_unit.flags, UNIT_V_EXT), REG_HRO },
 	{ FLDATA (HSA, cpu_unit.flags, UNIT_V_HSA), REG_HRO },
 	{ NULL }  };
@@ -385,11 +393,11 @@ if (dlog && sim_log && !turnoff) {			/* cycle log? */
 switch (I_GETOP (MB)) {					/* case on <1:6> */
 case 001: case 021: case 041: case 061:			/* JMP */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
-	old_PC = PC;					/* save PC */
+	PCQ_ENTRY;					/* save PC */
 	PC = NEWA (PC, Y);				/* set new PC */
 	if (dlog && sim_log) {				/* logging? */
 		int32 op = I_GETOP (M[PC]) & 017;	/* get target */
-		if ((op == 014) && (PC == (old_PC - 2))) { /* jmp .-1 to IO? */
+		if ((op == 014) && (PC == (PCQ_TOP - 2))) { /* jmp .-1 to IO? */
 			turnoff = 1;			/* yes, stop */
 			fprintf (sim_log, "Idle loop detected\n");  }
 		else turnoff = 0;  }			/* no, log */
@@ -446,7 +454,7 @@ case 010: case 030: case 050: case 070:			/* JST */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	MB = NEWA (Read (Y), PC);			/* merge old PC */
 	Write (MB, Y);
-	old_PC = PC;
+	PCQ_ENTRY;
 	PC = NEWA (PC, Y + 1);				/* set new PC */
 	break;
 case 011: case 031: case 051: case 071:			/* CAS */
@@ -759,6 +767,7 @@ case 060:
 saved_AR = AR & DMASK;
 saved_BR = BR & DMASK;
 saved_XR = XR & DMASK;
+pcq_r -> qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }
 
@@ -985,6 +994,9 @@ dp = 0;
 ext = pme = extoff_pending = 0;
 dev_ready = dev_ready & ~INT_PENDING;
 dev_enable = 0;
+pcq_r = find_reg ("PCQ", NULL, dptr);
+if (pcq_r) pcq_r -> qptr = 0;
+else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
 }

@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	H316 Simulator Usage
-Date:	1-Dec-2001
+Date:	15-Jun-2002
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2001, written by Robert M Supnik
-   Copyright (c) 1993-2001, Robert M Supnik
+   Original code published in 1993-2002, written by Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -113,7 +113,8 @@ control registers for the interrupt system.
 	STOP_INST	1	stop on undefined instruction
 	STOP_DEV	1	stop on undefined device
 	INDMAX		1	indirect address limit
-	OLDP		15	PC prior to last JMP, JSB, or interrupt
+	PCQ[0:63]	15	PC prior to last JMP, JSB, or interrupt;
+				most recent PC change first
 	WRU		8	interrupt character
 
 2.2 Programmed I/O Devices
@@ -135,7 +136,7 @@ The paper tape reader implements these registers:
 	INTREQ		1	device interrupt request
 	READY		1	device ready
 	ENABLE		1	device interrupts enabled
-	POS		31	position in the input or output file
+	POS		32	position in the input or output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -166,7 +167,7 @@ The paper tape punch implements these registers:
 	READY		1	device ready
 	ENABLE		1	device interrupts enabled
 	POWER		1	device powered up
-	POS		31	position in the input or output file
+	POS		32	position in the input or output file
 	TIME		24	time from I/O initiation to interrupt
 	PWRTIME		24	time from I/O request to power up
 	STOP_IOE	1	stop on I/O error
@@ -187,7 +188,7 @@ simulator console window.  The terminal has one option, UC; when
 set, the terminal automatically converts lower case input to upper
 case.  This is on by default.
 
-The terminal these registers:
+The terminal implements these registers:
 
 	name		size	comments
 
@@ -196,9 +197,9 @@ The terminal these registers:
 	INTREQ		1	device interrupt request
 	READY		1	device ready
 	ENABLE		1	device interrupts enabled
-	KPOS		31	number of characters input
+	KPOS		32	number of characters input
 	KTIME		24	keyboard polling interval
-	TPOS		31	number of characters output
+	TPOS		32	number of characters output
 	TTIME		24	time from I/O initiation to interrupt
 
 2.2.4 316/516-12 Real Time Clock (CLK)
@@ -211,6 +212,9 @@ The real time clock (CLK) implements these registers:
 	READY		1	device ready
 	ENABLE		1	device interrupts enabled
 	TIME		24	clock interval
+
+The real-time clock autocalibrates; the clock interval is adjusted up or
+down so that the clock tracks actual elapsed time.
 
 2.2.5 316/5116 Line Printer (LPT)
 
@@ -227,12 +231,12 @@ The line printer implements these registers:
 	CRPOS		1	carriage position
 	XFER		1	transfer ready flag
 	PRDN		1	print done flag
-	INTREQ	1	device interrupt request
-	ENABLE	1	device interrupt enable
+	INTREQ		1	device interrupt request
+	ENABLE		1	device interrupt enable
 	SVCST		2	service state
 	SVCCH		2	service channel
 	BUF		8	buffer
-	POS		31	number of characters output
+	POS		32	number of characters output
 	XTIME		24	delay between transfers
 	ETIME		24	delay at end of scan
 	PTIME		24	delay for shuttle/line advance

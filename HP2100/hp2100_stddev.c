@@ -1,6 +1,6 @@
-/* hp2100_stddev.c: HP2100 standard devices
+/* hp2100_stddev.c: HP2100 standard devices simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,8 @@
    tty		12531C buffered teleprinter interface
    clk		12539A/B/C time base generator
 
+   30-May-02	RMS	Widened POS to 32b
+   22-Mar-02	RMS	Revised for dynamically allocated memory
    03-Nov-01	RMS	Changed DEVNO to use extended SET/SHOW
    29-Nov-01	RMS	Added read only unit support
    24-Nov-01	RMS	Changed TIME to an array
@@ -53,11 +55,10 @@
 #define CLK_V_ERROR	4				/* clock overrun */
 #define CLK_ERROR	(1 << CLK_V_ERROR)
 
-extern uint16 M[];
+extern uint16 *M;
 extern int32 PC;
 extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 extern UNIT cpu_unit;
-extern struct hpdev infotab[];
 int32 ptr_stopioe = 0, ptp_stopioe = 0;			/* stop on error */
 int32 ttp_stopioe = 0;
 int32 tty_buf = 0, tty_mode = 0;			/* tty buffer, mode */
@@ -65,14 +66,19 @@ int32 clk_select = 0;					/* clock time select */
 int32 clk_error = 0;					/* clock error */
 int32 clk_delay[8] =					/* clock intervals */
 	{ 50, 500, 5000, 50000, 500000, 5000000, 50000000, 50000000 };
+
+int32 ptrio (int32 inst, int32 IR, int32 dat);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno);
+int32 ptpio (int32 inst, int32 IR, int32 dat);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptp_reset (DEVICE *dptr);
+int32 ttyio (int32 inst, int32 IR, int32 dat);
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
+int32 clkio (int32 inst, int32 IR, int32 dat);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
 
@@ -84,25 +90,32 @@ t_stat clk_reset (DEVICE *dptr);
    ptr_reg	PTR register list
 */
 
+DIB ptr_dib = { PTR, 1, 0, 0, 0, 0, &ptrio };
+
 UNIT ptr_unit = {
 	UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
 		SERIAL_IN_WAIT };
 
 REG ptr_reg[] = {
 	{ ORDATA (BUF, ptr_unit.buf, 8) },
-	{ FLDATA (CMD, infotab[inPTR].cmd, 0) },
-	{ FLDATA (CTL, infotab[inPTR].ctl, 0) },
-	{ FLDATA (FLG, infotab[inPTR].flg, 0) },
-	{ FLDATA (FBF, infotab[inPTR].fbf, 0) },
-	{ DRDATA (POS, ptr_unit.pos, 31), PV_LEFT },
+	{ FLDATA (CMD, ptr_dib.cmd, 0) },
+	{ FLDATA (CTL, ptr_dib.ctl, 0) },
+	{ FLDATA (FLG, ptr_dib.flg, 0) },
+	{ FLDATA (FBF, ptr_dib.fbf, 0) },
+	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
-	{ ORDATA (DEVNO, infotab[inPTR].devno, 6), REG_RO },
+	{ ORDATA (DEVNO, ptr_dib.devno, 6), REG_HRO },
+	{ FLDATA (*DEVENB, ptr_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB ptr_mod[] = {
-	{ MTAB_XTD | MTAB_VDV, inPTR, "DEVNO", "DEVNO",
-		&hp_setdev, &hp_showdev, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, NULL, "ENABLED",
+		&set_enb, NULL, &ptr_dib },
+	{ MTAB_XTD | MTAB_VDV, 0, NULL, "DISABLED",
+		&set_dis, NULL, &ptr_dib },
+	{ MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
+		&hp_setdev, &hp_showdev, &ptr_dib },
 	{ 0 }  };
 
 DEVICE ptr_dev = {
@@ -119,24 +132,31 @@ DEVICE ptr_dev = {
    ptp_reg	PTP register list
 */
 
+DIB ptp_dib = { PTP, 1, 0, 0, 0, 0, &ptpio };
+
 UNIT ptp_unit = {
 	UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
 
 REG ptp_reg[] = {
 	{ ORDATA (BUF, ptp_unit.buf, 8) },
-	{ FLDATA (CMD, infotab[inPTP].cmd, 0) },
-	{ FLDATA (CTL, infotab[inPTP].ctl, 0) },
-	{ FLDATA (FLG, infotab[inPTP].flg, 0) },
-	{ FLDATA (FBF, infotab[inPTP].fbf, 0) },
-	{ DRDATA (POS, ptp_unit.pos, 31), PV_LEFT },
+	{ FLDATA (CMD, ptp_dib.cmd, 0) },
+	{ FLDATA (CTL, ptp_dib.ctl, 0) },
+	{ FLDATA (FLG, ptp_dib.flg, 0) },
+	{ FLDATA (FBF, ptp_dib.fbf, 0) },
+	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
-	{ ORDATA (DEVNO, infotab[inPTP].devno, 6), REG_RO },
+	{ ORDATA (DEVNO, ptp_dib.devno, 6), REG_HRO },
+	{ FLDATA (*DEVENB, ptr_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB ptp_mod[] = {
-	{ MTAB_XTD | MTAB_VDV, inPTP, "DEVNO", "DEVNO",
-		&hp_setdev, &hp_showdev, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, NULL, "ENABLED",
+		&set_enb, NULL, &ptp_dib },
+	{ MTAB_XTD | MTAB_VDV, 0, NULL, "DISABLED",
+		&set_dis, NULL, &ptp_dib },
+	{ MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
+		&hp_setdev, &hp_showdev, &ptp_dib },
 	{ 0 }  };
 
 DEVICE ptp_dev = {
@@ -157,6 +177,8 @@ DEVICE ptp_dev = {
 #define TTO	1
 #define TTP	2
 
+DIB tty_dib = { TTY, 1, 0, 0, 0, 0, &ttyio };
+
 UNIT tty_unit[] = {
 	{ UDATA (&tti_svc, UNIT_UC, 0), KBD_POLL_WAIT },
 	{ UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT },
@@ -165,25 +187,25 @@ UNIT tty_unit[] = {
 REG tty_reg[] = {
 	{ ORDATA (BUF, tty_buf, 8) },
 	{ ORDATA (MODE, tty_mode, 16) },
-	{ FLDATA (CMD, infotab[inTTY].cmd, 0), REG_HRO },
-	{ FLDATA (CTL, infotab[inTTY].ctl, 0) },
-	{ FLDATA (FLG, infotab[inTTY].flg, 0) },
-	{ FLDATA (FBF, infotab[inTTY].fbf, 0) },
-	{ DRDATA (KPOS, tty_unit[TTI].pos, 31), PV_LEFT },
+	{ FLDATA (CMD, tty_dib.cmd, 0), REG_HRO },
+	{ FLDATA (CTL, tty_dib.ctl, 0) },
+	{ FLDATA (FLG, tty_dib.flg, 0) },
+	{ FLDATA (FBF, tty_dib.fbf, 0) },
+	{ DRDATA (KPOS, tty_unit[TTI].pos, 32), PV_LEFT },
 	{ DRDATA (KTIME, tty_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPOS, tty_unit[TTO].pos, 31), PV_LEFT },
+	{ DRDATA (TPOS, tty_unit[TTO].pos, 32), PV_LEFT },
 	{ DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (PPOS, tty_unit[TTP].pos, 31), PV_LEFT },
+	{ DRDATA (PPOS, tty_unit[TTP].pos, 32), PV_LEFT },
 	{ FLDATA (STOP_IOE, ttp_stopioe, 0) },
-	{ ORDATA (DEVNO, infotab[inTTY].devno, 6), REG_RO },
+	{ ORDATA (DEVNO, tty_dib.devno, 6), REG_HRO },
 	{ FLDATA (UC, tty_unit[TTI].flags, UNIT_V_UC), REG_HRO },
 	{ NULL }  };
 
 MTAB tty_mod[] = {
 	{ UNIT_UC, 0, "lower case", "LC", NULL },
 	{ UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
-	{ MTAB_XTD | MTAB_VDV, inTTY, "DEVNO", "DEVNO",
-		&hp_setdev, &hp_showdev, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
+		&hp_setdev, &hp_showdev, &tty_dib },
 	{ 0 }  };
 
 DEVICE tty_dev = {
@@ -200,23 +222,25 @@ DEVICE tty_dev = {
    clk_reg	CLK register list
 */
 
+DIB clk_dib = { CLK, 1, 0, 0, 0, 0, &clkio };
+
 UNIT clk_unit = {
 	UDATA (&clk_svc, 0, 0) };
 
 REG clk_reg[] = {
 	{ ORDATA (SEL, clk_select, 3) },
-	{ FLDATA (CMD, infotab[inCLK].cmd, 0), REG_HRO },
-	{ FLDATA (CTL, infotab[inCLK].ctl, 0) },
-	{ FLDATA (FLG, infotab[inCLK].flg, 0) },
-	{ FLDATA (FBF, infotab[inCLK].fbf, 0) },
+	{ FLDATA (CMD, clk_dib.cmd, 0), REG_HRO },
+	{ FLDATA (CTL, clk_dib.ctl, 0) },
+	{ FLDATA (FLG, clk_dib.flg, 0) },
+	{ FLDATA (FBF, clk_dib.fbf, 0) },
 	{ FLDATA (ERR, clk_error, CLK_V_ERROR) },
 	{ BRDATA (TIME, clk_delay, 8, 31, 8) },
-	{ ORDATA (DEVNO, infotab[inCLK].devno, 6), REG_RO },
+	{ ORDATA (DEVNO, clk_dib.devno, 6), REG_HRO },
 	{ NULL }  };
 
 MTAB clk_mod[] = {
-	{ MTAB_XTD | MTAB_VDV, inCLK, "DEVNO", "DEVNO",
-		&hp_setdev, &hp_showdev, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
+		&hp_setdev, &hp_showdev, &clk_dib },
 	{ 0 }  };
 
 DEVICE clk_dev = {
@@ -237,10 +261,10 @@ case ioFLG:						/* flag clear/set */
 	if ((IR & HC) == 0) { setFLG (dev); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
-	if (FLG (dev) == 0) PC = (PC + 1) & AMASK;
+	if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioSFS:						/* skip flag set */
-	if (FLG (dev) != 0) PC = (PC + 1) & AMASK;
+	if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioMIX:						/* merge */
 	dat = dat | ptr_unit.buf;
@@ -268,7 +292,7 @@ t_stat ptr_svc (UNIT *uptr)
 {
 int32 dev, temp;
 
-dev = infotab[inPTR].devno;				/* get device no */
+dev = ptr_dib.devno;					/* get device no */
 clrCMD (dev);						/* clear cmd */
 if ((ptr_unit.flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (ptr_stopioe, SCPE_UNATT);
@@ -285,12 +309,12 @@ ptr_unit.pos = ftell (ptr_unit.fileref);
 return SCPE_OK;
 }
 
-/* Reset routine - called from SCP, flags in infotab */
+/* Reset routine - called from SCP, flags in DIB's */
 
 t_stat ptr_reset (DEVICE *dptr)
 {
-infotab[inPTR].cmd = infotab[inPTR].ctl = 0;		/* clear cmd, ctl */
-infotab[inPTR].flg = infotab[inPTR].fbf = 1;		/* set flg, fbf */
+ptr_dib.cmd = ptr_dib.ctl = 0;				/* clear cmd, ctl */
+ptr_dib.flg = ptr_dib.fbf = 1;				/* set flg, fbf */
 ptr_unit.buf = 0;
 sim_cancel (&ptr_unit);					/* deactivate unit */
 return SCPE_OK;
@@ -323,7 +347,7 @@ t_stat ptr_boot (int32 unit)
 {
 int32 i, dev;
 
-dev = infotab[inPTR].devno;				/* get device no */
+dev = ptr_dib.devno;					/* get device no */
 PC = (MEMSIZE - 1) & ~PBOOT_MASK;			/* start at mem top */
 for (i = 0; i < PBOOT_SIZE; i++)			/* copy bootstrap */
 	M[PC + i] = (pboot[i] & CHANGE_DEV)?		/* insert ptr dev no */
@@ -343,10 +367,10 @@ case ioFLG:						/* flag clear/set */
 	if ((IR & HC) == 0) { setFLG (dev); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
-	if (FLG (dev) == 0) PC = (PC + 1) & AMASK;
+	if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioSFS:						/* skip flag set */
-	if (FLG (dev) != 0) PC = (PC + 1) & AMASK;
+	if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioLIX:						/* load */
 	dat = 0;
@@ -377,7 +401,7 @@ t_stat ptp_svc (UNIT *uptr)
 {
 int32 dev;
 
-dev = infotab[inPTP].devno;				/* get device no */
+dev = ptp_dib.devno;					/* get device no */
 clrCMD (dev);						/* clear cmd */
 setFLG (dev);						/* set flag */
 if ((ptp_unit.flags & UNIT_ATT) == 0)			/* attached? */
@@ -394,8 +418,8 @@ return SCPE_OK;
 
 t_stat ptp_reset (DEVICE *dptr)
 {
-infotab[inPTP].cmd = infotab[inPTP].ctl = 0;		/* clear cmd, ctl */
-infotab[inPTP].flg = infotab[inPTP].fbf = 1;		/* set flg, fbf */
+ptp_dib.cmd = ptp_dib.ctl = 0;				/* clear cmd, ctl */
+ptp_dib.flg = ptp_dib.fbf = 1;				/* set flg, fbf */
 ptp_unit.buf = 0;
 sim_cancel (&ptp_unit);					/* deactivate unit */
 return SCPE_OK;
@@ -413,10 +437,10 @@ case ioFLG:						/* flag clear/set */
 	if ((IR & HC) == 0) { setFLG (dev); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
-	if (FLG (dev) == 0) PC = (PC + 1) & AMASK;
+	if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioSFS:						/* skip flag set */
-	if (FLG (dev) != 0) PC = (PC + 1) & AMASK;
+	if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioLIX:						/* load */
 	dat = 0;
@@ -448,6 +472,7 @@ t_stat tto_out (int32 ch)
 t_stat ret = SCPE_OK;
 
 if (tty_mode & TM_PRI) {				/* printing? */
+	ch = ch & 0177;
 	if ((tty_unit[TTI].flags & UNIT_UC) && islower (ch))	/* upper case? */
 		ch = toupper (ch);
 	ret = sim_putchar (ch & 0177);			/* output char */
@@ -467,7 +492,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 temp, dev;
 
-dev = infotab[inTTY].devno;				/* get device no */
+dev = tty_dib.devno;					/* get device no */
 sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* continue poll */
 if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
 temp = temp & 0177;
@@ -485,7 +510,7 @@ t_stat tto_svc (UNIT *uptr)
 {
 int32 ch, dev;
 
-dev = infotab[inTTY].devno;				/* get device no */
+dev = tty_dib.devno;					/* get device no */
 setFLG (dev);						/* set done flag */
 ch = tty_buf;
 tty_buf = 0377;						/* defang buf */
@@ -496,8 +521,8 @@ return tto_out (ch);					/* print and/or punch */
 
 t_stat tty_reset (DEVICE *dptr)
 {
-infotab[inTTY].cmd = infotab[inTTY].ctl = 0;		/* clear cmd, ctl */
-infotab[inTTY].flg = infotab[inTTY].fbf = 1;		/* set flg, fbf */
+tty_dib.cmd = tty_dib.ctl = 0;				/* clear cmd, ctl */
+tty_dib.flg = tty_dib.fbf = 1;				/* set flg, fbf */
 tty_mode = 0;
 tty_buf = 0;
 sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* activate poll */
@@ -517,10 +542,10 @@ case ioFLG:						/* flag clear/set */
 	if ((IR & HC) == 0) { setFLG (dev); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
-	if (FLG (dev) == 0) PC = (PC + 1) & AMASK;
+	if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioSFS:						/* skip flag set */
-	if (FLG (dev) != 0) PC = (PC + 1) & AMASK;
+	if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioMIX:						/* merge */
 	dat = dat | clk_error;
@@ -551,7 +576,7 @@ t_stat clk_svc (UNIT *uptr)
 {
 int32 dev;
 
-dev = infotab[inCLK].devno;				/* get device no */
+dev = clk_dib.devno;					/* get device no */
 if (FLG (dev)) clk_error = CLK_ERROR;			/* overrun? */
 setFLG (dev);						/* set device flag */
 return SCPE_OK;
@@ -561,8 +586,8 @@ return SCPE_OK;
 
 t_stat clk_reset (DEVICE *dptr)
 {
-infotab[inCLK].cmd = infotab[inCLK].ctl = 0;		/* clear cmd, ctl */
-infotab[inCLK].flg = infotab[inCLK].fbf = 1;		/* set flg, fbf */
+clk_dib.cmd = clk_dib.ctl = 0;				/* clear cmd, ctl */
+clk_dib.flg = clk_dib.fbf = 1;				/* set flg, fbf */
 clk_error = 0;						/* clear error */
 clk_select = 0;						/* clear select */
 sim_cancel (&clk_unit);					/* deactivate unit */

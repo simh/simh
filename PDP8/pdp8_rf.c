@@ -1,6 +1,6 @@
 /* pdp8_rf.c: RF08 fixed head disk simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rf		RF08 fixed head disk
 
+   06-Nov-02	RMS	Changed enable/disable support
    28-Nov-01	RMS	Added RL8A support
    25-Apr-01	RMS	Added device enable/disable support
    19-Mar-01	RMS	Added disk monitor bootstrap, fixed IOT decoding
@@ -131,8 +132,13 @@ REG rf_reg[] = {
 	{ FLDATA (*DEVENB, dev_enb, INT_V_RF), REG_HRO },
 	{ NULL }  };
 
+MTAB rf_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, INT_RF, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_RF, NULL, "DISABLED", &set_dsb },
+	{ 0 } };
+
 DEVICE rf_dev = {
-	"RF", &rf_unit, rf_reg, NULL,
+	"RF", &rf_unit, rf_reg, rf_mod,
 	1, 8, 20, 1, 8, 12,
 	NULL, NULL, &rf_reset,
 	&rf_boot, NULL, NULL };

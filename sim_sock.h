@@ -23,15 +23,16 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Apr-02	RMS	Changed VMS stropts include to ioctl
+   06-Feb-02	RMS	Added VMS support from Robert Alan Byer
    16-Sep-01	RMS	Added Macintosh support from Peter Schorn
 */
 
-#if defined (WIN32)
+#if defined (WIN32)					/* Windows */
 #undef INT_PTR						/* hack, hack */
 #include <winsock.h>
-#else
+#elif !defined (__OS2__)				/* other supported */
 #define WSAGetLastError()	errno
-#if !defined (VMS) && !defined (__OS2__)
 #include <sys/types.h>					/* for fcntl, getpid */
 #include <sys/socket.h>					/* for sockets */
 #include <fcntl.h>
@@ -39,6 +40,8 @@
 #include <netinet/in.h>					/* for sockaddr_in */
 #include <netdb.h>
 #endif
+#if defined (VMS)					/* VMS unique */
+#include <ioctl.h>					/* for ioctl */
 #endif
 
 /* Code uses Windows-specific defs that are undefined for most systems */

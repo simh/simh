@@ -1,6 +1,6 @@
 /* h316_stddev.c: Honeywell 316/516 standard devices
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1999-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tty		316/516-33 teleprinter
    clk/options	316/516-12 real time clocks/internal options
 
+   30-May-02	RMS	Widened POS to 32b
    03-Nov-01	RMS	Implemented upper case for console output
    29-Nov-01	RMS	Added read only unit support
    07-Sep-01	RMS	Moved function prototypes
@@ -75,7 +76,7 @@ REG ptr_reg[] = {
 	{ ORDATA (BUF, ptr_unit.buf, 8) },
 	{ FLDATA (READY, dev_ready, INT_V_PTR) },
 	{ FLDATA (ENABLE, dev_enable, INT_V_PTR) },
-	{ DRDATA (POS, ptr_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
 	{ NULL }  };
@@ -102,7 +103,7 @@ REG ptp_reg[] = {
 	{ FLDATA (READY, dev_ready, INT_V_PTP) },
 	{ FLDATA (ENABLE, dev_enable, INT_V_PTP) },
 	{ FLDATA (POWER, ptp_power, 0) },
-	{ DRDATA (POS, ptp_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ DRDATA (PWRTIME, ptp_ptime, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
@@ -135,9 +136,9 @@ REG tty_reg[] = {
 	{ FLDATA (MODE, tty_mode, 0) },
 	{ FLDATA (READY, dev_ready, INT_V_TTY) },
 	{ FLDATA (ENABLE, dev_enable, INT_V_TTY) },
-	{ DRDATA (KPOS, tty_unit[TTI].pos, 31), PV_LEFT },
+	{ DRDATA (KPOS, tty_unit[TTI].pos, 32), PV_LEFT },
 	{ DRDATA (KTIME, tty_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPOS, tty_unit[TTO].pos, 31), PV_LEFT },
+	{ DRDATA (TPOS, tty_unit[TTO].pos, 32), PV_LEFT },
 	{ DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (UC, tty_unit[TTI].flags, UNIT_V_UC), REG_HRO },
 	{ NULL }  };

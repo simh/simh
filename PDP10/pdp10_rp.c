@@ -1,6 +1,6 @@
 /* pdp10_rp.c - RH11/RP04/05/06/07 RM02/03/05/80 "Massbus" disk controller
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -339,14 +339,16 @@ int reg_in_drive[32] = {
  0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1,
  1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-void update_rpcs (int32 flags, int32 drv);
-void rp_go (int32 drv, int32 fnc);
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rp_rd (int32 *data, int32 PA, int32 access);
+t_stat rp_wr (int32 data, int32 PA, int32 access);
 t_stat rp_svc (UNIT *uptr);
 t_stat rp_reset (DEVICE *dptr);
 t_stat rp_boot (int32 unitno);
 t_stat rp_attach (UNIT *uptr, char *cptr);
 t_stat rp_detach (UNIT *uptr);
+void update_rpcs (int32 flags, int32 drv);
+void rp_go (int32 drv, int32 fnc);
+t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* RP data structures
 
@@ -355,6 +357,8 @@ t_stat rp_detach (UNIT *uptr);
    rp_reg	RP register list
    rp_mod	RP modifier list
 */
+
+DIB rp_dib = { 1, IOBA_RP, IOLN_RP, &rp_rd, &rp_wr };
 
 UNIT rp_unit[] = {
 	{ UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
@@ -406,7 +410,7 @@ REG rp_reg[] = {
 	{ NULL }  };
 
 MTAB rp_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
 	{ (UNIT_DTYPE+UNIT_ATT), (RM03_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
 		"RM03", NULL, NULL },
@@ -446,6 +450,8 @@ MTAB rp_mod[] = {
 		NULL, "RM05", &rp_set_size },
  	{ (UNIT_AUTO+UNIT_DTYPE), (RP07_DTYPE << UNIT_V_DTYPE),
 		NULL, "RP07", &rp_set_size },
+	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
+		NULL, &show_addr, &rp_dib },
 	{ 0 }  };
 
 DEVICE rp_dev = {

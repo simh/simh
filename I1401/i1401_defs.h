@@ -1,6 +1,6 @@
 /* i1401_defs.h: IBM 1401 simulator definitions
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Jun-03	RMS	Added 1311 support
    14-Apr-99	RMS	Converted t_addr to unsigned
 
    This simulator is based on the 1401 simulator written by Len Fehskens
@@ -56,6 +57,15 @@
 #define STOP_MCE2	19				/* MCE short B field */
 #define STOP_MCE3	20				/* MCE hanging $ */
 #define STOP_IOC	21				/* I/O check */
+#define STOP_INVDSC	22				/* invalid disk sector */
+#define STOP_INVDCN	23				/* invalid disk count */
+#define STOP_INVDSK	24				/* invalid disk unit */
+#define STOP_INVDFN	25				/* invalid disk func */
+#define STOP_INVDLN	26				/* invalid disk reclen */
+#define STOP_WRADIS	27				/* write address dis */
+#define STOP_WRCHKE	28				/* write check error */
+#define STOP_INVDAD	39				/* invalid disk addr */
+#define STOP_INVDCY	30				/* invalid direct seek */
 
 /* Memory and devices */
 
@@ -111,7 +121,7 @@
 #define HLE		(1 << (UNIT_V_UF + 6))		/* high/low/equal */
 #define UNIT_MSIZE	(1 << (UNIT_V_UF + 7))		/* fake flag */
 #define ALLOPT		(MDV + MR + XSA + EPE + MA + BBE + HLE)
-#define STDOPT		(MR + XSA + EPE + MA + BBE + HLE)
+#define STDOPT		(MDV + MR + XSA + EPE + MA + BBE + HLE)
 
 /* Fetch control */
 
@@ -238,13 +248,14 @@
 #define IN_EQU		022				/* equal */
 #define IN_LOW		023				/* low */
 #define IN_HGH		024				/* high */
-#define IN_PAR		025				/* parity check */
+#define IN_DPW		025				/* parity/compare check */
 #define IN_LNG		026				/* wrong lnt record */
 #define IN_UNA		027				/* unequal addr cmp */
 #define IN_DSK		030				/* disk error */
 #define IN_OVF		031				/* overflow */
 #define IN_LPT		032				/* printer error */
 #define IN_PRO		034				/* process check */
+#define IN_DBY		036				/* disk busy */
 #define IN_END		042				/* end indicator */
 #define IN_TAP		043				/* tape error */
 #define IN_ACC		045				/* access error */
@@ -261,3 +272,5 @@
 #define IN_SSF		066				/* sense switch F */
 #define IN_SSG		067				/* sense switch G */
 #define IN_READ		072				/* reader error */
+
+#define CRETIOE(f,c)	return ((f)? (c): SCPE_OK)

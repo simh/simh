@@ -1,6 +1,6 @@
 /* pdp8_df.c: DF32 fixed head disk simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -118,8 +118,13 @@ REG df_reg[] = {
 	{ FLDATA (*DEVENB, dev_enb, INT_V_DF), REG_HRO },
 	{ NULL }  };
 
+MTAB df_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, INT_DF, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_DF, NULL, "DISABLED", &set_dsb },
+	{ 0 } };
+
 DEVICE df_dev = {
-	"DF", &df_unit, df_reg, NULL,
+	"DF", &df_unit, df_reg, df_mod,
 	1, 8, 17, 1, 8, 12,
 	NULL, NULL, &df_reset,
 	&df_boot, NULL, NULL };

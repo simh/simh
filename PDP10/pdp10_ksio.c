@@ -1,6 +1,6 @@
 /* pdp10_ksio.c: PDP-10 KS10 I/O subsystem simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    uba		Unibus adapters
 
+   25-Jan-02	RMS	Revised for multiple DZ11's
+   06-Jan-02	RMS	Revised enable/disable support
    23-Sep-01	RMS	New IO page address constants
    07-Sep-01	RMS	Revised device disable mechanism
    25-Aug-01	RMS	Enabled DZ11
@@ -94,26 +96,17 @@ extern d10 *ac_cur;
 extern d10 pager_word;
 extern int32 flags, pi_l2bit[8];
 extern UNIT cpu_unit;
+extern FILE *sim_log;
 extern jmp_buf save_env;
 
 extern d10 Read (a10 ea);
 extern void pi_eval ();
-extern t_stat dz_rd (int32 *data, int32 addr, int32 access);
-extern t_stat dz_wr (int32 data, int32 addr, int32 access);
-extern int32 dz_enb;
-extern t_stat pt_rd (int32 *data, int32 addr, int32 access);
-extern t_stat pt_wr (int32 data, int32 addr, int32 access);
-extern int32 pt_enb;
-extern t_stat lp20_rd (int32 *data, int32 addr, int32 access);
-extern t_stat lp20_wr (int32 data, int32 addr, int32 access);
-extern int32 lp20_inta (void);
-extern t_stat rp_rd (int32 *data, int32 addr, int32 access);
-extern t_stat rp_wr (int32 data, int32 addr, int32 access);
+extern DIB dz_dib, pt_dib, lp20_dib, rp_dib, tu_dib, tcu_dib;
 extern int32 rp_inta (void);
-extern t_stat tu_rd (int32 *data, int32 addr, int32 access);
-extern t_stat tu_wr (int32 data, int32 addr, int32 access);
 extern int32 tu_inta (void);
-extern t_stat tcu_rd (int32 *data, int32 addr, int32 access);
+extern int32 lp20_inta (void);
+extern int32 dz_rxinta (void);
+extern int32 dz_txinta (void);
 t_stat ubmap_rd (int32 *data, int32 addr, int32 access);
 t_stat ubmap_wr (int32 data, int32 addr, int32 access);
 t_stat ubs_rd (int32 *data, int32 addr, int32 access);
@@ -125,6 +118,7 @@ t_stat uba_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat uba_reset (DEVICE *dptr);
 d10 ReadIO (a10 ea);
 void WriteIO (a10 ea, d10 val, int32 mode);
+t_bool dev_conflict (uint32 nba, DIB *curr);
 
 /* Unibus adapter data structures
 
@@ -132,6 +126,14 @@ void WriteIO (a10 ea, d10 val, int32 mode);
    uba_unit	UBA units
    uba_reg	UBA register list
 */
+
+DIB ubmp1_dib = { 1, IOBA_UBMAP1, IOLN_UBMAP1, &ubmap_rd, &ubmap_wr };
+DIB ubmp3_dib = { 1, IOBA_UBMAP3, IOLN_UBMAP3, &ubmap_rd, &ubmap_wr };
+DIB ubcs1_dib = { 1, IOBA_UBCS1, IOLN_UBCS1, &ubs_rd, &ubs_wr };
+DIB ubcs3_dib = { 1, IOBA_UBCS3, IOLN_UBCS3, &ubs_rd, &ubs_wr };
+DIB ubmn1_dib = { 1, IOBA_UBMNT1, IOLN_UBMNT1, &rd_zro, &wr_nop };
+DIB ubmn3_dib = { 1, IOBA_UBMNT3, IOLN_UBMNT3, &rd_zro, &wr_nop };
+DIB msys_dib = { 1, 00100000, 00100001, &rd_zro, &wr_nop };
 
 UNIT uba_unit[] = {
 	{ UDATA (NULL, UNIT_FIX, UMAP_MEMSIZE) },
@@ -151,50 +153,28 @@ DEVICE uba_dev = {
 
 /* PDP-11 I/O structures */
 
-struct iolink {						/* I/O page linkage */
-	int32	low;					/* low I/O addr */
-	int32	high;					/* high I/O addr */
-	int32	*enb;					/* enable flag */
-	t_stat	(*read)();				/* read routine */
-	t_stat	(*write)();  };				/* write routine */
-
-/* Table of I/O devices and corresponding read/write routines
-   The expected Unibus adapter number is included as the high 2 bits */
-
-struct iolink iotable[] = {
-	{ IO_UBA1+IOBA_RP, IO_UBA1+IOBA_RP+IOLN_RP,
-		NULL, &rp_rd, &rp_wr },			/* disk */
-	{ IO_UBA3+IOBA_TU, IO_UBA3+IOBA_TU+IOLN_TU,
-		NULL, &tu_rd, &tu_wr },			/* mag tape */
-	{ IO_UBA3+IOBA_DZ, IO_UBA3+IOBA_DZ+IOLN_DZ,
-		 &dz_enb, &dz_rd, &dz_wr },		/* terminal mux */
-	{ IO_UBA3+IOBA_LP20, IO_UBA3+IOBA_LP20+IOLN_LP20,
-		NULL, &lp20_rd, &lp20_wr },		/* line printer */
-	{ IO_UBA3+IOBA_PT, IO_UBA3+IOBA_PT+IOLN_PT,
-		&pt_enb, &pt_rd, &pt_wr },		/* paper tape */
-	{ IO_UBA1+IOBA_UBMAP, IO_UBA1+IOBA_UBMAP+IOLN_UBMAP,
-		NULL, &ubmap_rd, &ubmap_wr },		/* Unibus 1 map */
-	{ IO_UBA3+IOBA_UBMAP, IO_UBA3+IOBA_UBMAP+IOLN_UBMAP,
-		NULL, &ubmap_rd, &ubmap_wr },		/* Unibus 3 map */
-	{ IO_UBA1+IOBA_UBCS, IO_UBA1+IOBA_UBCS+IOLN_UBCS,
-		NULL, &ubs_rd, &ubs_wr },		/* Unibus 1 c/s */
-	{ IO_UBA3+IOBA_UBCS, IO_UBA3+IOBA_UBCS+IOLN_UBCS,
-		NULL, &ubs_rd, &ubs_wr },		/* Unibus 3 c/s */
-	{ IO_UBA1+IOBA_UBMNT, IO_UBA1+IOBA_UBMNT+IOLN_UBMNT,
-		NULL, &rd_zro, &wr_nop },		/* Unibus 1 maint */
-	{ IO_UBA3+IOBA_UBMNT, IO_UBA3+IOBA_UBMNT+IOLN_UBMNT,
-		NULL, &rd_zro, &wr_nop },		/* Unibus 3 maint */
-	{ IO_UBA3+IOBA_TCU, IO_UBA3+IOBA_TCU+IOLN_TCU,
-		NULL, &tcu_rd, &wr_nop },		/* TCU150 */
-	{ 00100000, 00100000, NULL, &rd_zro, &wr_nop },	/* Mem sys stat */
-	{ 0, 0, 0, NULL, NULL }  };
+DIB *dib_tab[] = {
+	&rp_dib,
+	&tu_dib,
+	&dz_dib,
+	&lp20_dib,
+	&pt_dib,
+	&tcu_dib,
+	&ubmp1_dib,
+	&ubmp3_dib,
+	&ubcs1_dib,
+	&ubcs3_dib,
+	&ubmn1_dib,
+	&ubmn3_dib,
+	&msys_dib,
+	NULL };
 
 /* Interrupt request to interrupt action map */
 
 int32 (*int_ack[32])() = {				/* int ack routines */
 	NULL, NULL, NULL, NULL, NULL, NULL, &rp_inta, &tu_inta,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	&dz_rxinta, &dz_txinta, NULL, NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, &lp20_inta, NULL, NULL, NULL, NULL, NULL  };
 
 /* Interrupt request to vector map */
@@ -393,14 +373,14 @@ return;
 
 d10 ReadIO (a10 ea)
 {
-int32 n, pa, val;
-struct iolink *p;
+uint32 pa = (uint32) ea;
+int32 i, n, val;
+DIB *dibp;
 
-pa = (int32) ea;					/* cvt addr to 32b */
-for (p = &iotable[0]; p -> low != 0; p++ ) {
-	if ((pa >= p -> low) && (pa < p -> high) &&
-	    ((p -> enb == NULL) || *p -> enb))  {
-		p -> read (&val, pa, READ);
+for (i = 0; dibp = dib_tab[i]; i++ ) {
+	if (dibp -> enb && (pa >= dibp -> ba) &&
+	   (pa < (dibp -> ba + dibp -> lnt))) {
+		dibp -> rd (&val, pa, READ);
 		pi_eval ();
 		return ((d10) val);  }  }
 UBNXM_FAIL (pa, READ);
@@ -408,14 +388,14 @@ UBNXM_FAIL (pa, READ);
 
 void WriteIO (a10 ea, d10 val, int32 mode)
 {
-int32 n, pa;
-struct iolink *p;
+uint32 pa = (uint32) ea;
+int32 i, n;
+DIB *dibp;
 
-pa = (int32) ea;					/* cvt addr to 32b */
-for (p = &iotable[0]; p -> low != 0; p++ ) {
-	if ((pa >= p -> low) && (pa < p -> high) &&
-	    ((p -> enb == NULL) || *p -> enb))  {
-		p -> write ((int32) val, pa, mode);
+for (i = 0; dibp = dib_tab[i]; i++ ) {
+	if (dibp -> enb && (pa >= dibp -> ba) &&
+	   (pa < (dibp -> ba + dibp -> lnt))) {
+		dibp -> wr ((int32) val, pa, mode);
 		pi_eval ();
 		return;  }  }
 UBNXM_FAIL (pa, mode);
@@ -548,4 +528,88 @@ for (uba = 0; uba < UBANUM; uba++) {
 	for (i = 0; i < UMAP_MEMSIZE; i++) ubmap[uba][i] = 0;  }
 pi_eval ();
 return SCPE_OK;
+}
+
+/* Change device number for a device */
+
+t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+DIB *dibp;
+uint32 newba;
+t_stat r;
+
+if (cptr == NULL) return SCPE_ARG;
+if ((val == 0) || (desc == NULL)) return SCPE_IERR;
+dibp = (DIB *) desc;
+newba = (uint32) get_uint (cptr, 8, PAMASK, &r);	/* get new */
+if ((r != SCPE_OK) || (newba == dibp -> ba)) return r;
+if ((newba & AMASK) <= IOPAGEBASE) return SCPE_ARG;	/* must be > 0 */
+if (newba % ((uint32) val)) return SCPE_ARG;		/* check modulus */
+if (GET_IOUBA (newba) != GET_IOUBA (dibp -> ba)) return SCPE_ARG;
+if (dev_conflict (newba, dibp)) return SCPE_OK;
+dibp -> ba = newba;					/* store */
+return SCPE_OK;
+}
+
+/* Show device address */
+
+t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+DIB *dibp;
+
+if (desc == NULL) return SCPE_IERR;
+dibp = (DIB *) desc;
+if (dibp -> ba <= IOPAGEBASE) return SCPE_IERR;
+fprintf (st, "address=%07o", dibp -> ba);
+if (dibp -> lnt > 1)
+	fprintf (st, "-%07o", dibp -> ba + dibp -> lnt - 1);
+return SCPE_OK;
+}
+
+/* Enable or disable a device */
+
+t_stat set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i;
+DEVICE *dptr;
+DIB *dibp;
+UNIT *up;
+
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (desc == NULL)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);			/* find device */
+if (dptr == NULL) return SCPE_IERR;
+dibp = (DIB *) desc;
+if ((val ^ dibp -> enb) == 0) return SCPE_OK;		/* enable chg? */
+if (val) {						/* enable? */
+    if (dev_conflict (dibp -> ba, dibp)) return SCPE_OK;  }
+else {							/* disable */
+    for (i = 0; i < dptr -> numunits; i++) {		/* check units */
+	up = (dptr -> units) + i;
+	if ((up -> flags & UNIT_ATT) || sim_is_active (up))
+	    return SCPE_NOFNC;  }  }
+dibp -> enb = val;
+if (dptr -> reset) return dptr -> reset (dptr);
+else return SCPE_OK;
+}
+
+/* Test for conflict in device addresses */
+
+t_bool dev_conflict (uint32 nba, DIB *curr)
+{
+uint32 i, end;
+DIB *dibp;
+
+end = nba + curr -> lnt - 1;				/* get end */
+for (i = 0; dibp = dib_tab[i]; i++) {			/* loop thru dev */
+	if (!dibp -> enb || (dibp == curr)) continue;	/* skip disabled */
+	if (((nba >= dibp -> ba) &&
+	    (nba < (dibp -> ba + dibp -> lnt))) ||
+	    ((end >= dibp -> ba) &&
+	    (end < (dibp -> ba + dibp -> lnt)))) {
+		printf ("Device address conflict at %07o\n", dibp -> ba);
+		if (sim_log) fprintf (sim_log,
+			"Device number conflict at %07o\n", dibp -> ba);
+		return TRUE;  }  }
+return FALSE;
 }

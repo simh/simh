@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-1 Simulator Usage
-Date:	1-Dec-01
+Date:	15-Jun-02
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2001, written by Robert M Supnik
-   Copyright (c) 1993-2001, Robert M Supnik
+   Original code published in 1993-2002, written by Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -114,7 +114,8 @@ control registers for the interrupt system.
 	SBIP		1	sequence break in progress
 	IOH		1	I/O halt in progress
 	IOC		1	I/O continue
-	OLDPC		16	PC prior to last transfer
+	PCQ[0:63]	16	PC prior to last jump or interrupt;
+				most recent PC change first
 	STOP_INST	1	stop on undefined instruction
 	SBS_INIT	1	initial state of sequence break enable
 	EXTM_INIT	1	initial state of extend mode
@@ -138,7 +139,7 @@ The paper tape reader implements these registers:
 	BUF		8	last data item processed
 	DONE		1	device done flag
 	RPLS		1	return restart pulse flag
-	POS		31	position in the input file
+	POS		32	position in the input file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -167,7 +168,7 @@ The paper tape punch implements these registers:
 	BUF		8	last data item processed
 	DONE		1	device done flag
 	RPLS		1	return restart pulse flag
-	POS		31	position in the output file
+	POS		32	position in the output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -189,7 +190,7 @@ implements these registers:
 
 	BUF		8	last data item processed
 	DONE		1	device done flag
-	POS		31	number of characters input
+	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
 2.2.4 Terminal Output (TTO)
@@ -202,7 +203,7 @@ It implements these registers:
 	BUF		8	last data item processed
 	DONE		1	device done flag
 	RPLS		1	return restart pulse flag
-	POS		31	number of characters output
+	POS		32	number of characters output
 	TIME		24	time from I/O initiation to interrupt
 
 2.2.5 Type 62 Line Printer (LPT)
@@ -220,7 +221,7 @@ The line printer implements these registers:
 	SPC		1	spacing done flag
 	RPLS		1	return restart pulse flag
 	BPTR		6	print buffer pointer
-	POS		31	position in the output file
+	POS		32	position in the output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 	LBUF[0:119]	8	line buffer

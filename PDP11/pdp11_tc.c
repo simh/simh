@@ -1,6 +1,6 @@
 /* pdp11_tc.c: PDP-11 DECtape simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    tc		TC11/TU56 DECtape
 
+   30-May-02	RMS	Widened POS to 32b
+   26-Jan-02	RMS	Revised bootstrap to conform to M9312
+   06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Converted POS, STATT, LASTT to arrays
    09-Nov-01	RMS	Added bus map support
@@ -258,8 +261,9 @@ int32 dt_actime = 54000;				/* accel time */
 int32 dt_dctime = 72000;				/* decel time */
 int32 dt_substate = 0;
 int32 dt_logblk = 0;
-int32 dt_enb = 1;					/* device enable */
 
+t_stat dt_rd (int32 *data, int32 PA, int32 access);
+t_stat dt_wr (int32 data, int32 PA, int32 access);
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_svcdone (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
@@ -285,6 +289,8 @@ extern int32 sim_is_running;
    dt_reg	DT register list
    dt_mod	DT modifier list
 */
+
+DIB dt_dib = { 1, IOBA_TC, IOLN_TC, &dt_rd, &dt_wr };
 
 UNIT dt_unit[] = {
 	{ UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, DT_CAPAC) },
@@ -315,7 +321,7 @@ REG dt_reg[] = {
 	{ DRDATA (DCTIME, dt_dctime, 31), REG_NZ },
 	{ ORDATA (SUBSTATE, dt_substate, 1) },
 	{ DRDATA (LBLK, dt_logblk, 12), REG_HIDDEN },
-	{ URDATA (POS, dt_unit[0].pos, 10, 31, 0,
+	{ URDATA (POS, dt_unit[0].pos, 10, 32, 0,
 		  DT_NUMDR, PV_LEFT | REG_RO) },
 	{ URDATA (STATT, dt_unit[0].STATE, 8, 18, 0,
 		  DT_NUMDR, REG_RO) },
@@ -323,14 +329,21 @@ REG dt_reg[] = {
 		  DT_NUMDR, REG_HRO) },
 	{ URDATA (FLG, dt_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
 		  DT_NUMDR, REG_HRO) },
-	{ FLDATA (*DEVENB, dt_enb, 0), REG_HRO },
+	{ ORDATA (DEVADDR, dt_dib.ba, 32), REG_HRO },
+	{ FLDATA (*DEVENB, dt_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB dt_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
 	{ UNIT_8FMT, 0, "16b/18b", NULL, NULL },
 	{ UNIT_8FMT, UNIT_8FMT, "12b", NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+		&set_addr, &show_addr, &dt_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &dt_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &dt_dib },
 	{ 0 }  };
 
 DEVICE dt_dev = {
@@ -960,11 +973,13 @@ return SCPE_OK;
 
 /* Device bootstrap */
 
-#define BOOT_START 02000				/* start */
-#define BOOT_UNIT 02006					/* unit number */
+#define BOOT_START	02000				/* start */
+#define BOOT_ENTRY	02002				/* entry */
+#define BOOT_UNIT	02010				/* unit number */
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int32))
 
 static const int32 boot_rom[] = {
+	0042124,			/* "TD" */
 	0012706, 0002000,		/* MOV #2000, SP */
 	0012700, 0000000,		/* MOV #unit, R0	; unit number */
 	0010003,			/* MOV R0, R3 */
@@ -993,8 +1008,8 @@ static const int32 boot_rom[] = {
 	0010211,			/* MOV R2, (R1)		; load csr */
 	0005002,			/* CLR R2 */
 	0005003,			/* CLR R3 */
-	0005004,			/* CLR R4 */
-	0012705, 0052104,		/* MOV #"DT, R5 */
+	0012704, BOOT_START+020,	/* MOV #START+20, R4 */
+	0005005,			/* CLR R5 */
 	0032711, 0100200,		/* BIT #100200, (R1)	; wait */
 	0001775,			/* BEQ .-4 */
 	0100401,			/* BMI ER		; err, die */
@@ -1011,7 +1026,7 @@ extern int32 saved_PC;
 dt_unit[unitno].pos = DT_EZLIN;
 for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & DT_M_NUMDR;
-saved_PC = BOOT_START;
+saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 }
 

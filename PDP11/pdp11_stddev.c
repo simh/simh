@@ -1,6 +1,6 @@
 /* pdp11_stddev.c: PDP-11 standard I/O devices simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,10 @@
    tti,tto	DL11 terminal input/output
    clk		KW11L line frequency clock
 
+   30-May-02	RMS	Widened POS to 32b
+   26-Jan-02	RMS	Revised for multiple timers
+   09-Jan-02	RMS	Fixed bugs in KW11L (found by John Dundas)
+   06-Jan-02	RMS	Split I/O address routines, revised enable/disable support
    29-Nov-01	RMS	Added read only unit support
    09-Nov-01	RMS	Added RQDX3 support
    07-Oct-01	RMS	Upgraded clock to full KW11L for RSTS/E autoconfigure
@@ -49,7 +53,7 @@
 #define TTOCSR_IMP	(CSR_DONE + CSR_IE)		/* terminal output */
 #define TTOCSR_RW	(CSR_IE)
 #define CLKCSR_IMP	(CSR_DONE + CSR_IE)		/* real-time clock */
-#define CLKCSR_RW	(CSR_DONE + CSR_IE)
+#define CLKCSR_RW	(CSR_IE)
 #define CLK_DELAY	8000
 
 extern int32 int_req[IPL_HLVL];
@@ -64,10 +68,16 @@ int32 clk_tps = 60;					/* ticks/second */
 int32 tmxr_poll = CLK_DELAY;				/* term mux poll */
 int32 tmr_poll = CLK_DELAY;				/* timer poll */
 
+t_stat pt_rd (int32 *data, int32 PA, int32 access);
+t_stat pt_wr (int32 data, int32 PA, int32 access);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
+t_stat tt_rd (int32 *data, int32 PA, int32 access);
+t_stat tt_wr (int32 data, int32 PA, int32 access);
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
+t_stat clk_rd (int32 *data, int32 PA, int32 access);
+t_stat clk_wr (int32 data, int32 PA, int32 access);
 t_stat clk_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
@@ -86,6 +96,8 @@ t_stat ptp_detach (UNIT *uptr);
    ptr_reg	PTR register list
 */
 
+DIB pt_dib = { 1, IOBA_PT, IOLN_PT, &pt_rd, &pt_wr };
+
 UNIT ptr_unit = {
 	UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
 		SERIAL_IN_WAIT };
@@ -98,13 +110,23 @@ REG ptr_reg[] = {
 	{ FLDATA (BUSY, ptr_csr, CSR_V_BUSY) },
 	{ FLDATA (DONE, ptr_csr, CSR_V_DONE) },
 	{ FLDATA (IE, ptr_csr, CSR_V_IE) },
-	{ DRDATA (POS, ptr_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
+	{ FLDATA (*DEVENB, pt_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
+MTAB ptr_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
+		NULL, &show_addr, &pt_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &pt_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &pt_dib },
+	{ 0 }  };
+
 DEVICE ptr_dev = {
-	"PTR", &ptr_unit, ptr_reg, NULL,
+	"PTR", &ptr_unit, ptr_reg, ptr_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptr_reset,
 	NULL, &ptr_attach, &ptr_detach };
@@ -126,13 +148,23 @@ REG ptp_reg[] = {
 	{ FLDATA (ERR, ptp_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, ptp_csr, CSR_V_DONE) },
 	{ FLDATA (IE, ptp_csr, CSR_V_IE) },
-	{ DRDATA (POS, ptp_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
+	{ FLDATA (*DEVENB, pt_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
+MTAB ptp_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
+		NULL, &show_addr, &pt_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &pt_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &pt_dib },
+	{ 0 }  };
+
 DEVICE ptp_dev = {
-	"PTP", &ptp_unit, ptp_reg, NULL,
+	"PTP", &ptp_unit, ptp_reg, ptp_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptp_reset,
 	NULL, &ptp_attach, &ptp_detach };
@@ -144,6 +176,8 @@ DEVICE ptp_dev = {
    tti_reg	TTI register list
 */
 
+DIB tt_dib = { 1, IOBA_TT, IOLN_TT, &tt_rd, &tt_wr };
+
 UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
@@ -153,12 +187,17 @@ REG tti_reg[] = {
 	{ FLDATA (ERR, tti_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, tti_csr, CSR_V_DONE) },
 	{ FLDATA (IE, tti_csr, CSR_V_IE) },
-	{ DRDATA (POS, tti_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
+MTAB tti_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
+		NULL, &show_addr, &tt_dib },
+	{ 0 }  };
+
 DEVICE tti_dev = {
-	"TTI", &tti_unit, tti_reg, NULL,
+	"TTI", &tti_unit, tti_reg, tti_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tti_reset,
 	NULL, NULL, NULL };
@@ -179,12 +218,17 @@ REG tto_reg[] = {
 	{ FLDATA (ERR, tto_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, tto_csr, CSR_V_DONE) },
 	{ FLDATA (IE, tto_csr, CSR_V_IE) },
-	{ DRDATA (POS, tto_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 
+MTAB tto_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
+		NULL, &show_addr, &tt_dib },
+	{ 0 }  };
+
 DEVICE tto_dev = {
-	"TTO", &tto_unit, tto_reg, NULL,
+	"TTO", &tto_unit, tto_reg, tto_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tto_reset,
 	NULL, NULL, NULL };
@@ -195,6 +239,8 @@ DEVICE tto_dev = {
    clk_unit	CLK unit descriptor
    clk_reg	CLK register list
 */
+
+DIB clk_dib = { 1, IOBA_CLK, IOLN_CLK, &clk_rd, &clk_wr };
 
 UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 8000 };
 
@@ -207,77 +253,43 @@ REG clk_reg[] = {
 	{ DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
+MTAB clk_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
+		NULL, &show_addr, &clk_dib },
+	{ 0 }  };
+
 DEVICE clk_dev = {
-	"CLK", &clk_unit, clk_reg, NULL,
+	"CLK", &clk_unit, clk_reg, clk_mod,
 	1, 0, 0, 0, 0, 0,
 	NULL, NULL, &clk_reset,
 	NULL, NULL, NULL };
 
-/* Standard I/O dispatch routine, I/O addresses 17777546-17777567
+/* Paper tape I/O address routines */
 
-   17777546		clock CSR
-   17777550		ptr CSR
-   17777552		ptr buffer
-   17777554		ptp CSR
-   17777556		ptp buffer
-   17777560		tti CSR
-   17777562		tti buffer
-   17777564		tto CSR
-   17777566		tto buffer
-
-   Note: Word access routines filter out odd addresses.  Thus,
-   an odd address implies an (odd) byte access.
-*/
-
-t_stat std_rd (int32 *data, int32 PA, int32 access)
+t_stat pt_rd (int32 *data, int32 PA, int32 access)
 {
-switch ((PA >> 1) & 017) {				/* decode PA<4:1> */
-case 03:						/* clk csr */
-	*data = clk_csr & CLKCSR_IMP;
-	return SCPE_OK;
-case 04:						/* ptr csr */
+switch ((PA >> 1) & 03) {				/* decode PA<2:1> */
+case 00:						/* ptr csr */
 	*data = ptr_csr & PTRCSR_IMP;
 	return SCPE_OK;
-case 05:						/* ptr buf */
+case 01:						/* ptr buf */
 	ptr_csr = ptr_csr & ~CSR_DONE;
 	CLR_INT (PTR);
 	*data = ptr_unit.buf & 0377;
 	return SCPE_OK;
-case 06:						/* ptp csr */
+case 02:						/* ptp csr */
 	*data = ptp_csr & PTPCSR_IMP;
 	return SCPE_OK;
-case 07:						/* ptp buf */
+case 03:						/* ptp buf */
 	*data = ptp_unit.buf;
-	return SCPE_OK;
-case 010:						/* tti csr */
-	*data = tti_csr & TTICSR_IMP;
-	return SCPE_OK;
-case 011:						/* tti buf */
-	tti_csr = tti_csr & ~CSR_DONE;
-	CLR_INT (TTI);
-	*data = tti_unit.buf & 0377;
-	return SCPE_OK;
-case 012:						/* tto csr */
-	*data = tto_csr & TTOCSR_IMP;
-	return SCPE_OK;
-case 013:						/* tto buf */
-	*data = tto_unit.buf;
 	return SCPE_OK;  }				/* end switch PA */
 return SCPE_NXM;
 }
-
-t_stat std_wr (int32 data, int32 PA, int32 access)
+
+t_stat pt_wr (int32 data, int32 PA, int32 access)
 {
-switch ((PA >> 1) & 017) {				/* decode PA<4:1> */
-case 03:						/* clk csr */
-	if (PA & 1) return SCPE_OK;
-	if (((data & CSR_IE) == 0) ||			/* clr IE, DONE? */
-	    ((data & CSR_DONE) == 0)) CLR_INT (CLK);	/* clr intr */
-	else if (((clk_csr & CSR_IE) == 0) ||		/* setting both */
-	    ((clk_csr & CSR_DONE) == 0)) SET_INT (CLK);	/* if prv clr, intr */
-	clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
-	return SCPE_OK;
-case 04:						/* ptr csr */
+switch ((PA >> 1) & 03) {				/* decode PA<2:1> */
+case 00:						/* ptr csr */
 	if (PA & 1) return SCPE_OK;
 	if ((data & CSR_IE) == 0) CLR_INT (PTR);
 	else if (((ptr_csr & CSR_IE) == 0) && (ptr_csr & (CSR_ERR | CSR_DONE)))
@@ -290,55 +302,27 @@ case 04:						/* ptr csr */
 		else sim_activate (&ptr_unit, 0);  }	/* error if not */
 	ptr_csr = (ptr_csr & ~PTRCSR_RW) | (data & PTRCSR_RW);
 	return SCPE_OK;
-case 05:						/* ptr buf */
+case 01:						/* ptr buf */
 	return SCPE_OK;
-case 06:						/* ptp csr */
+case 02:						/* ptp csr */
 	if (PA & 1) return SCPE_OK;
 	if ((data & CSR_IE) == 0) CLR_INT (PTP);
 	else if (((ptp_csr & CSR_IE) == 0) && (ptp_csr & (CSR_ERR | CSR_DONE)))
 		SET_INT (PTP);
 	ptp_csr = (ptp_csr & ~PTPCSR_RW) | (data & PTPCSR_RW);
 	return SCPE_OK;
-case 07:						/* ptp buf */
+case 03:						/* ptp buf */
 	if ((PA & 1) == 0) ptp_unit.buf = data & 0377;
 	ptp_csr = ptp_csr & ~CSR_DONE;
 	CLR_INT (PTP);
 	if (ptp_unit.flags & UNIT_ATT)			/* file to write? */
 		sim_activate (&ptp_unit, ptp_unit.wait);
 	else sim_activate (&ptp_unit, 0);		/* error if not */
-	return SCPE_OK;
-case 010:						/* tti csr */
-	if (PA & 1) return SCPE_OK;
-	if ((data & CSR_IE) == 0) CLR_INT (TTI);
-	else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-		SET_INT (TTI);
-	tti_csr = (tti_csr & ~TTICSR_RW) | (data & TTICSR_RW);
-	return SCPE_OK;
-case 011:						/* tti buf */
-	return SCPE_OK;
-case 012:						/* tto csr */
-	if (PA & 1) return SCPE_OK;
-	if ((data & CSR_IE) == 0) CLR_INT (TTO);
-	else if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-		SET_INT (TTO);
-	tto_csr = (tto_csr & ~TTOCSR_RW) | (data & TTOCSR_RW);
-	return SCPE_OK;
-case 013:						/* tto buf */
-	if ((PA & 1) == 0) tto_unit.buf = data & 0377;
-	tto_csr = tto_csr & ~CSR_DONE;
-	CLR_INT (TTO);
-	sim_activate (&tto_unit, tto_unit.wait);
 	return SCPE_OK;  }				/* end switch PA */
 return SCPE_NXM;
 }
 
-/* Paper tape reader routines
-
-   ptr_svc	process event (character ready)
-   ptr_reset	process reset
-   ptr_attach	process attach
-   ptr_detach	process detach
-*/
+/* Paper tape reader routines */
 
 t_stat ptr_svc (UNIT *uptr)
 {
@@ -387,13 +371,7 @@ ptr_csr = ptr_csr | CSR_ERR;
 return detach_unit (uptr);
 }
 
-/* Paper tape punch routines
-
-   ptp_svc	process event (character punched)
-   ptp_reset	process reset
-   ptp_attach	process attach
-   ptp_detach	process detach
-*/
+/* Paper tape punch routines */
 
 t_stat ptp_svc (UNIT *uptr)
 {
@@ -434,6 +412,56 @@ t_stat ptp_detach (UNIT *uptr)
 {
 ptp_csr = ptp_csr | CSR_ERR;
 return detach_unit (uptr);
+}
+
+/* Terminal I/O address routines */
+
+t_stat tt_rd (int32 *data, int32 PA, int32 access)
+{
+switch ((PA >> 1) & 03) {				/* decode PA<2:1> */
+case 00:						/* tti csr */
+	*data = tti_csr & TTICSR_IMP;
+	return SCPE_OK;
+case 01:						/* tti buf */
+	tti_csr = tti_csr & ~CSR_DONE;
+	CLR_INT (TTI);
+	*data = tti_unit.buf & 0377;
+	return SCPE_OK;
+case 02:						/* tto csr */
+	*data = tto_csr & TTOCSR_IMP;
+	return SCPE_OK;
+case 03:						/* tto buf */
+	*data = tto_unit.buf;
+	return SCPE_OK;  }				/* end switch PA */
+return SCPE_NXM;
+}
+
+t_stat tt_wr (int32 data, int32 PA, int32 access)
+{
+switch ((PA >> 1) & 03) {				/* decode PA<2:1> */
+case 00:						/* tti csr */
+	if (PA & 1) return SCPE_OK;
+	if ((data & CSR_IE) == 0) CLR_INT (TTI);
+	else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
+		SET_INT (TTI);
+	tti_csr = (tti_csr & ~TTICSR_RW) | (data & TTICSR_RW);
+	return SCPE_OK;
+case 01:						/* tti buf */
+	return SCPE_OK;
+case 02:						/* tto csr */
+	if (PA & 1) return SCPE_OK;
+	if ((data & CSR_IE) == 0) CLR_INT (TTO);
+	else if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
+		SET_INT (TTO);
+	tto_csr = (tto_csr & ~TTOCSR_RW) | (data & TTOCSR_RW);
+	return SCPE_OK;
+case 03:						/* tto buf */
+	if ((PA & 1) == 0) tto_unit.buf = data & 0377;
+	tto_csr = tto_csr & ~CSR_DONE;
+	CLR_INT (TTO);
+	sim_activate (&tto_unit, tto_unit.wait);
+	return SCPE_OK;  }				/* end switch PA */
+return SCPE_NXM;
 }
 
 /* Terminal input routines
@@ -490,11 +518,25 @@ sim_cancel (&tto_unit);					/* deactivate unit */
 return SCPE_OK;
 }
 
-/* Clock routines
+/* Clock I/O address routines */
 
-   clk_svc	process event (clock tick)
-   clk_reset	process reset
-*/
+t_stat clk_rd (int32 *data, int32 PA, int32 access)
+{
+*data = clk_csr & CLKCSR_IMP;
+return SCPE_OK;
+}
+
+t_stat clk_wr (int32 data, int32 PA, int32 access)
+{
+if (PA & 1) return SCPE_OK;
+clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
+if ((data & CSR_DONE) == 0) clk_csr = clk_csr & ~CSR_DONE;
+if (((clk_csr & CSR_IE) == 0) ||				/* unless IE+DONE */
+    ((clk_csr & CSR_DONE) == 0)) CLR_INT (CLK);		/* clr intr */
+return SCPE_OK;
+}
+
+/* Clock routines */
 
 t_stat clk_svc (UNIT *uptr)
 {
@@ -502,7 +544,7 @@ int32 t;
 
 clk_csr = clk_csr | CSR_DONE;				/* set done */
 if (clk_csr & CSR_IE) SET_INT (CLK);
-t = sim_rtc_calb (clk_tps);				/* calibrate clock */
+t = sim_rtcn_calb (clk_tps, TMR_CLK);			/* calibrate clock */
 sim_activate (&clk_unit, t);				/* reactivate unit */
 tmr_poll = t;						/* set timer poll */
 tmxr_poll = t;						/* set mux poll */
@@ -511,7 +553,7 @@ return SCPE_OK;
 
 t_stat clk_reset (DEVICE *dptr)
 {
-clk_csr = 0;
+clk_csr = CSR_DONE;					/* set done */
 CLR_INT (CLK);
 sim_activate (&clk_unit, clk_unit.wait);		/* activate unit */
 tmr_poll = clk_unit.wait;				/* set timer poll */

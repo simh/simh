@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Sample Software Packages
-Date:	30-Sep-01
+Date:	15-Apr-2002
 
 This memorandum documents the sample software packages available to run
 with the SIMH simulators.  Many of these packages are available under
@@ -10,8 +10,8 @@ software.
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2001, written by Robert M Supnik
-   Copyright (c) 1993-2001, Robert M Supnik
+   Original code published in 1993-2002, written by Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -100,7 +100,8 @@ Loading TSS/8
 -------------
 
 Note: your environment must have a functioning second Teletype; that is, you cannot
-at present run Foreground/Background if your host system is VMS or OS/2.
+at present run Foreground/Background if your host system does not support the SIMH
+sockets library.
 
 - Load the paper-tape bootstrap:
 
@@ -112,7 +113,7 @@ at present run Foreground/Background if your host system is VMS or OS/2.
 
 - Assign a TCP/IP port to the Telnet listener for the extra terminals:
 
-	sim> attach tti1 <port #>	-- 4000 typically works
+	sim> attach ttix <port #>	-- 4000 typically works
 
 - Run the bootstrap:
 
@@ -155,7 +156,7 @@ at present run Foreground/Background if your host system is VMS or OS/2.
 	.R CAT
 
 - Other users can log in by connecting, from a Telnet client, to localhost
-  on the port specified in the attach tti1 command.
+  on the port specified in the ATTACH TTIX command.
 
 2. PDP-11
 
@@ -164,12 +165,12 @@ at present run Foreground/Background if your host system is VMS or OS/2.
 UNIX was first developed on the PDP-7; its first widespread usage was on
 the PDP-11.  UNIX provides a program development and execution environment
 for assembler and C programs.  UNIX V5, V7, V7 for the PDP-11 is provided
-under license, as is, without fee, by Santa Cruz Organization (SCO), for
-non-commercial use only.  Please read the enclosed license agreement for
-full terms and conditions.  This license must be reproduced with any copy
-of the UNIX V5, V6, V7 disk images.  My thanks to PUPS, the PDP-11 UNIX
-Preservation Society of Australia, which provided the disk images, and to
-SCO, which provided the license.
+under license, as is, without fee, by Caldera Corportion, for non-commercial
+use only.  Please read the enclosed license agreement for full terms and
+conditions.  This license must be reproduced with any copy of the UNIX V5,
+V6, V7 disk images.  My thanks to PUPS, the PDP-11 UNIX Preservation Society
+of Australia, which provided the disk images, and to Caldera, which provided
+the license.
 
 2.1.1 UNIX V5
 
@@ -184,11 +185,12 @@ UNIX V5 is contained on a single RK05 disk image.  To boot UNIX:
 
 2.1.2 UNIX V6
 
-UNIX V6 is contained on three RK05 disk images.  To boot UNIX:
+UNIX V6 is contained on four RK05 disk images.  To boot UNIX:
 
 	sim> set cpu 18b
 	sim> att rk0 unix0_v6_rk.dsk
 	sim> att rk1 unix1_v6_rk.dsk
+	sim> att rk2 unix2_v6_rk.dsk
 	sim> att rk3 unix3_v6_rk.dsk
 	sim> boot rk0
 	@unix
@@ -196,9 +198,6 @@ UNIX V6 is contained on three RK05 disk images.  To boot UNIX:
 	# ls -l
 
 2.1.3 UNIX V7
-
-NOTE: The V7 disk images with V2.3c and later releases are new and
-replace the prior versions, which were corrupt.
 
 UNIX V7 is contained on a single RL02 disk image.  To boot UNIX:
 
@@ -260,7 +259,7 @@ distribution pack and generate a new system.  This requires mounting a
 blank pack on RL1.  When a blank pack is attached to the simulator, a
 bad block table must be created with the SET <unit> BADBLOCK command. 
 
-3. Nova RDOS
+3. Nova and Eclipse RDOS
 
 RDOS is the Nova's real-time mass storage operating system.  It provides a
 program development and execution environment for assembler, BASIC, and
@@ -271,9 +270,20 @@ agreement must be reproduced with any copy of the RDOS disk image.  My
 thanks to Carl Friend, a private collector, who provided the disk image,
 and to Data General Corporation, which provided the license.
 
-To boot and run RDOS:
+To boot and run RDOS for the Nova:
 
 	sim> att dp0 rdos_d31.dsk
+	sim> set tti dasher
+	sim> boot dp0
+	FILENAME? (cr)
+	DATE (mm/dd/yy)? xx/yy/zz
+	TIME (hh:mm:ss)? hh:mm:ss
+	R
+	list/e
+
+To boot and run RDOS for the Eclipse:
+
+	sim> att dp0 zrdos75.dsk
 	sim> set tti dasher
 	sim> boot dp0
 	FILENAME? (cr)
@@ -377,7 +387,8 @@ execution capabilities.  To load and run ADSS/KM-15:
 6.3 Advanced Software System/Foreground Background
 
 Note: your environment must have a functioning second Teletype; that is, you cannot
-at present run Foreground/Background if your host system is VMS or OS/2.
+at present run Foreground/Background if your host system does not support the SIMH
+sockets library.
 
 - Load the paper-tape bootstrap into upper memory:
 
@@ -390,7 +401,7 @@ at present run Foreground/Background if your host system is VMS or OS/2.
 	sim> ex pc
 	PC:	077646
 
-- Mount the Advanced Software System DECtape image on DECtape unit 0:
+- Mount the Foregorund/Background DECtape image on DECtape unit 0:
 
 	sim> attach dt fb15_32k.dtp
 
@@ -485,7 +496,7 @@ CPU diagnostics.
 
 The software and writeup were provided by Charles Owens.
 
-sps1.obj and sps2.obj are the object card decks are the "Symbolic
+sps1.obj and sps2.obj are the object card decks for the "Symbolic
 Programming System", a primitive assembler for the 1401 that predates
 the better known and more functional Autocoder.
 
@@ -591,11 +602,11 @@ To load and run BASIC:
 	 1.41421
 
 
-9. PDP-10 TOPS-10 7.03, TOPS-20 V4.1
+9. PDP-10 TOPS-10 7.03, TOPS-10 7.04, TOPS-20 V4.1
 
 TOPS-10 was the primary time-shared operating system for the PDP-10.
 TOPS-20 was a popular alternative derived from the BBN TENEX system.
-Installation and distribution tapes for TOPS-10 7.03 and TOPS-20 4.1
-are available at http://pdp-10.trailing-edge.com.
+Installation and distribution tapes for TOPS-10 7.03, TOPS-10 7.04,
+and TOPS-20 4.1 are available at http://pdp-10.trailing-edge.com.
 
 [end simh_swre.txt]

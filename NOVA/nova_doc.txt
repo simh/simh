@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Nova Simulator Usage
-Date:	1-Dec-01
+Date:	15-Jun-2002
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2001, written by Robert M Supnik
-   Copyright (c) 1993-2001, Robert M Supnik
+   Original code published in 1993-2002, written by Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -68,7 +68,7 @@ CPU		Nova CPU with 32KW of memory
 -		hardware multiply/divide
 PTR,PTP		paper tape reader/punch
 TTI,TTO		console terminal
-TTI1,TTO1		second terminal
+TTI1,TTO1	second terminal
 LPT		line printer
 PLT		plotter
 CLK		real-time clock
@@ -76,7 +76,7 @@ DK		head-per-track disk controller
 DP		moving head disk controller with four drives
 MT		magnetic tape controller with eight drives
 
-The TTI1/TTO1, PLT, DK, DP, and MT devices can be DISABLEd.
+The TTI1/TTO1, PLT, DK, DP, and MT devices can be set DISABLED.
 
 The Nova simulator implements these unique stop conditions:
 
@@ -134,7 +134,8 @@ control registers for the interrupt system.
 	DISABLE		15	device interrupt disable flags
 	STOP_DEV	1	stop on undefined IOT
 	INDMAX		15	maximum number of nested indirects
-	OLDPC		15	PC prior to last JMP, JMS, or interrupt
+	PCQ[0:63]	15	PC prior to last JMP, JMS, or interrupt;
+				most recent PC change first
 	WRU		8	interrupt character
 
 2.2 Programmed I/O Devices
@@ -154,7 +155,7 @@ The paper tape reader implements these registers:
 	DONE		1	device done flag
 	DISABLE		1	interrupt disable flag
 	INT		1	interrupt pending flag
-	POS		31	position in the input file
+	POS		32	position in the input file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -185,7 +186,7 @@ The paper tape punch implements these registers:
 	DONE		1	device done flag
 	DISABLE		1	interrupt disable flag
 	INT		1	interrupt pending flag
-	POS		31	position in the output file
+	POS		32	position in the output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -219,7 +220,7 @@ The terminal input implements these registers:
 	DONE		1	device done flag
 	DISABLE		1	interrupt disable flag
 	INT		1	interrupt pending flag
-	POS		31	number of characters input
+	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
 2.2.4 Terminal Output (TTO)
@@ -243,7 +244,7 @@ The terminal output implements these registers:
 	DONE		1	device done flag
 	DISABLE		1	interrupt disable flag
 	INT		1	interrupt pending flag
-	POS		31	number of characters output
+	POS		32	number of characters output
 	TIME		24	time from I/O initiation to interrupt
 
 2.2.5 Line Printer (LPT)
@@ -261,7 +262,7 @@ The line printer implements these registers:
 	DONE		1	device done flag
 	DISABLE		1	interrupt disable flag
 	INT		1	interrupt pending flag
-	POS		31	position in the output file
+	POS		32	position in the output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -308,7 +309,7 @@ The plotter implements these registers:
 	DONE		1	device done flag
 	DISABLE		1	interrupt disable flag
 	INT		1	interrupt pending flag
-	POS		31	position in the output file
+	POS		32	position in the output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -328,7 +329,7 @@ The additional terminal performs input and output through a Telnet session
 connecting into a user-specified port.  The ATTACH command specifies the
 port to be used:
 
-	ATTACH TTI1 <port>(cr)	-- set up listening port
+	ATTACH TTI1 <port>	set up listening port
 
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.
@@ -349,8 +350,9 @@ setting limited Dasher-compatibility mode or ANSI mode:
 Setting either TTI1 or TTO1 changes both devices.  In Dasher mode, carriage
 return is changed to newline on input, and ^X is changed to backspace.
 
-The SHOW TTI1 LINESTATUS command displays the current connection to the
-second terminal.
+The SHOW TTI1 CONNECTIONS command displays the current connection to TTI1.
+The SHOW TTI1 STATISTICS command displays statistics for the current connection.
+The SET TTI1 DISCONNECT{=0} disconnects the current connection.
 
 The second terminal input implements these registers:
 
@@ -361,7 +363,6 @@ The second terminal input implements these registers:
 	DONE		1	device done flag
 	DISABLE		1	interrupt disable flag
 	INT		1	interrupt pending flag
-	POS		31	number of characters input
 	TIME		24	keyboard polling interval
 
 The second terminal output implements these registers:
@@ -373,7 +374,6 @@ The second terminal output implements these registers:
 	DONE		1	device done flag
 	DISABLE		1	interrupt disable flag
 	INT		1	interrupt pending flag
-	POS		31	number of characters output
 	TIME		24	time from I/O initiation to interrupt
 
 2.3 Fixed Head Disk (DK)
@@ -411,7 +411,7 @@ Moving head disk options include the ability to make units write enabled or
 write locked, and to select the type of drive:
 
 	SET DPn LOCKED		set unit n write locked
-	SET DPn ENABLED		set unit n write enabled
+	SET DPn WRITEENABLED	set unit n write enabled
 	SET DPn FLOPPY		set unit n to floppy disk
 	SET DPn D31		set unit n to Diablo 31
 	SET DPn D44		set unit n to Diablo 44
@@ -424,8 +424,8 @@ write locked, and to select the type of drive:
 	SET DPn 6103		set unit n to 6103
 	SET DPn 4231		set unit n to 4231
 
-Units can also be REMOVEd or ADDed to the configuration.  The moving head
-disk controller supports the BOOT command.
+Units can also be set ONLINE or OFFLINE.  The moving head disk controller
+supports the BOOT command.
 
 All drives have 256 16b words per sector.  The other disk parameters are:
 
@@ -474,10 +474,10 @@ Magnetic tape options include the ability to make units write enabled or
 or write locked.
 
 	SET MTn LOCKED		set unit n write locked
-	SET MTn ENABLED		set unit n write enabled
+	SET MTn WRITEENABLED	set unit n write enabled
 
-Units can also be REMOVEd or ADDed to the configuration.  The magnetic
-tape controller supports the BOOT command.
+Units can also be set ONLINE or OFFLINE.  The magnetic tape controller
+supports the BOOT command.
 
 The magnetic tape controller implements these registers:
 

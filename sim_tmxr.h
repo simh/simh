@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   30-Dec-01	RMS	Renamed tmxr_fstatus, added tmxr_fstats
    20-Oct-01	RMS	Removed tmxr_getchar, formalized buffer guard,
 			added tmxr_rqln, tmxr_tqln
 */
@@ -75,7 +76,9 @@ t_stat tmxr_detach (TMXR *mp, UNIT *uptr);
 t_stat tmxr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void tmxr_msg (SOCKET sock, char *msg);
-void tmxr_fstatus (FILE *st, TMLN *lp, int32 ln);
+void tmxr_fconns (FILE *st, TMLN *lp, int32 ln);
+void tmxr_fstats (FILE *st, TMLN *lp, int32 ln);
+t_stat tmxr_dscln (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 tmxr_rqln (TMLN *lp);
 int32 tmxr_tqln (TMLN *lp);
 

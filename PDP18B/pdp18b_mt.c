@@ -1,6 +1,6 @@
 /* pdp18b_mt.c: 18b PDP magnetic tape simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
    mt		(PDP-9) TC59 magtape
 		(PDP-15) TC59D magtape
 
+   30-May-02	RMS	Widened POS to 32b
+   22-Apr-02	RMS	Added maximum record length test
+   06-Jan-02	RMS	Revised enabled/disable support
    29-Nov-01	RMS	Added read only unit support
    25-Nov-01	RMS	Revised interrupt structure
 			Changed UST, POS, FLG to arrays
@@ -58,7 +61,8 @@
 #define UNIT_W_UF	2				/* saved flag width */
 #define USTAT		u3				/* unit status */
 #define UNUM		u4				/* unit number */
-#define DBSIZE		(1 << 12)			/* max data record */
+#define MT_MAXFR	(1 << 16)			/* max record length */
+#define DBSIZE		(1 << 12)			/* max word count */
 #define DBMASK		(DBSIZE - 1)
 #define MT_WC		032				/* word count */
 #define MT_CA		033				/* current addr */
@@ -153,16 +157,18 @@ REG mt_reg[] = {
 	{ FLDATA (STOP_IOE, mt_stopioe, 0) },
 	{ DRDATA (TIME, mt_time, 24), PV_LEFT },
 	{ URDATA (UST, mt_unit[0].USTAT, 8, 16, 0, MT_NUMDR, 0) },
-	{ URDATA (POS, mt_unit[0].pos, 10, 31, 0,
+	{ URDATA (POS, mt_unit[0].pos, 10, 32, 0,
 		  MT_NUMDR, PV_LEFT | REG_RO) },
 	{ URDATA (FLG, mt_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
 		  MT_NUMDR, REG_HRO) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_MTA), REG_HRO },
+	{ FLDATA (*DEVENB, dev_enb, ENB_V_MTA), REG_HRO },
 	{ NULL }  };
 
 MTAB mt_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
+	{ MTAB_XTD|MTAB_VDV, ENB_MTA, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, ENB_MTA, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE mt_dev = {
@@ -262,6 +268,7 @@ case FN_CMPARE:						/* read/compare */
 		uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
 		break;  }
 	tbc = MTRL (tbc);				/* ignore error flag */
+	if (tbc > MT_MAXFR) return SCPE_MTRLNT;		/* record too long? */
 	wc = DBSIZE - (M[MT_WC] & DBMASK);		/* get word count */
 	cbc = PACKED (mt_cu)? wc * 3: wc * 2;		/* expected bc */
 	if (tbc != cbc) mt_sta = mt_sta | STA_RLE;	/* wrong size? */

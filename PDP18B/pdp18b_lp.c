@@ -1,6 +1,6 @@
 /* pdp18b_lp.c: 18b PDP's line printer simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,8 @@
 		(PDP-7,9) Type 647 line printer
 		(PDP-15) LP15 line printer
 
+   30-May-02	RMS	Widened POS to 32b
+   03-Feb-02	RMS	Fixed typo (found by Robert Alan Byer)
    25-Nov-01	RMS	Revised interrupt structure
    19-Sep-01	RMS	Fixed bug in 647
    13-Feb-01	RMS	Revised for register arrays
@@ -67,7 +69,7 @@ REG lpt_reg[] = {
 	{ FLDATA (SPC, int_hwre[API_LPTSPC], INT_V_LPTSPC) },
 	{ DRDATA (BPTR, bptr, 6) },
 	{ ORDATA (STATE, lpt_iot, 6), REG_HRO },
-	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
 	{ BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
@@ -91,27 +93,25 @@ static const char lpt_trans[64] = {
 	'o','J','K','L','M','N','O','P','Q','R','$','=','-',')','-','(',
 	'_','A','B','C','D','E','F','G','H','I','*','.','+',']','|','[' };
 
-if (pulse == 001) return (TST_INT (LPT))? IOT_SKP + AC: AC; /* LPSF */
-if (pulse == 002) CLR_INT (LPT);			/* LPCF */
-else if (pulse == 042) {				/* LPLD */
-	if (bptr < BPTR_MAX) {				/* limit test ptr */
-		i = bptr * 3;				/* cvt to chr ptr */
-		lpt_buf[i++] = lpt_trans[(AC >> 12) & 077];
-		lpt_buf[i++] = lpt_trans[(AC >> 6) & 077];
-		lpt_buf[i++] = lpt_trans[AC & 077];  }
+if ((pulse & 001) && TST_INT (LPT)) AC = IOT_SKP | AC;	/* LPSF */
+if ((pulse & 042) == 002) CLR_INT (LPT);		/* LPCF */
+if (((pulse & 042) == 042) && (bptr < BPTR_MAX)) {	/* LPLD */
+	i = bptr * 3;					/* cvt to chr ptr */
+	lpt_buf[i++] = lpt_trans[(AC >> 12) & 077];
+	lpt_buf[i++] = lpt_trans[(AC >> 6) & 077];
+	lpt_buf[i++] = lpt_trans[AC & 077];
 	bptr = (bptr + 1) & BPTR_MASK;  }
-else if (pulse == 006) {				/* LPSE */
-	CLR_INT (LPT);					/* clear flag */
+if (pulse & 004) {					/* LPSE */
 	sim_activate (&lpt_unit, lpt_unit.wait);  }	/* activate */
 return AC;
 }
 
 int32 lpt66 (int32 pulse, int32 AC)
 {
-if (pulse == 001) return (TST_INT (LPTSPC))? IOT_SKP + AC: AC; /* LSSF */
+if ((pulse & 001) && TST_INT (LPTSPC))			/* LSSF */
+	AC = IOT_SKP | AC;
 if (pulse & 002) CLR_INT (LPTSPC);			/* LSCF */
 if (pulse & 004) {					/* LSPR */
-	CLR_INT (LPTSPC);				/* clear flag */
 	lpt_iot = 020 | (AC & 07);			/* space, no print */
 	sim_activate (&lpt_unit, lpt_unit.wait);  }	/* activate */
 return AC;
@@ -219,7 +219,7 @@ REG lpt_reg[] = {
 	{ FLDATA (ERR, lpt_err, 0) },
 	{ DRDATA (BPTR, bptr, 7) },
 	{ ORDATA (SCMD, lpt_iot, 6), REG_HRO },
-	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
 	{ BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
@@ -235,51 +235,62 @@ DEVICE lpt_dev = {
 
 int32 lpt65 (int32 pulse, int32 AC)
 {
-int32 i;
+int32 i, subp;
 
-if (pulse == 001) return (lpt_done? IOT_SKP + AC: AC);	/* LPSF */
+subp = (pulse >> 4) & 03;				/* subcode */
+if ((pulse & 001) && lpt_done) AC = IOT_SKP | AC;	/* LPSF */
 if (pulse & 002) {					/* pulse 02 */
 	lpt_done = 0;					/* clear done */
-	CLR_INT (LPT);  }				/* clear int req */
-if (pulse == 002) {					/* LPCB */
-	for (i = 0; i < LPT_BSIZE; i++) lpt_buf[i] = 0;
-	bptr = 0;					/* reset buf ptr */
-	lpt_done = 1;					/* set done */
-	if (lpt_ie) SET_INT (LPT);  }			/* set int */
+	CLR_INT (LPT);					/* clear int req */
+	if (subp == 0) {				/* LPCB */
+		for (i = 0; i < LPT_BSIZE; i++) lpt_buf[i] = 0;
+		bptr = 0;				/* reset buf ptr */
+		lpt_done = 1;				/* set done */
+		if (lpt_ie) SET_INT (LPT);  }  }	/* set int */
+if (pulse & 004) {					/* LPDI */
+	switch (subp) {					/* case on subcode */
+	case 0:						/* LPDI */
 #if defined (PDP9)
-if (pulse == 004) {					/* LPDI */
-	lpt_ie = 0;					/* clear int enable */
-	CLR_INT (LPT);  }				/* clear int req */
+		lpt_ie = 0;				/* clear int enable */
+		CLR_INT (LPT);				/* clear int req */
 #endif
-if ((pulse == 046) && (bptr < LPT_BSIZE)) {		/* LPB3 */
-		lpt_buf[bptr] = lpt_buf[bptr] | ((AC >> 12) & 077);
-		bptr = bptr + 1;  }
-if (((pulse == 046) || (pulse == 026)) && (bptr < LPT_BSIZE)) {
-		lpt_buf[bptr] = lpt_buf[bptr] | ((AC >> 6) & 077);
-		bptr = bptr + 1;  }
-if ((pulse == 046) || (pulse == 026) || (pulse == 066)) {
-	if (bptr < LPT_BSIZE) {
-		lpt_buf[bptr] = lpt_buf[bptr] | (AC & 077);
-		bptr = bptr + 1;  }
-	lpt_done = 1;					/* set done */
-	if (lpt_ie) SET_INT (LPT);  }			/* set int */
+		break;
+	case 2:						/* LPB3 */
+		if (bptr < LPT_BSIZE) {
+			lpt_buf[bptr] = lpt_buf[bptr] | ((AC >> 12) & 077);
+			bptr = bptr + 1;  }
+	case 1:						/* LPB2 */
+		if (bptr < LPT_BSIZE) {
+			lpt_buf[bptr] = lpt_buf[bptr] | ((AC >> 6) & 077);
+			bptr = bptr + 1;  }
+	case 3:						/* LPB1 */
+		if (bptr < LPT_BSIZE) {
+			lpt_buf[bptr] = lpt_buf[bptr] | (AC & 077);
+			bptr = bptr + 1;  }
+		lpt_done = 1;				/* set done */
+		if (lpt_ie) SET_INT (LPT);		/* set int */
+		break;  }				/* end case */
+	}						/* end if pulse 4 */
 return AC;
 }
 
 int32 lpt66 (int32 pulse, int32 AC)
 {
-if (pulse == 001) return (lpt_err? IOT_SKP + AC: AC);	/* LPSE */
+if ((pulse & 001) && lpt_err) AC = IOT_SKP | AC;	/* LPSE */
 if (pulse & 002) {					/* LPCF */
 	lpt_done = 0;					/* clear done, int */
 	CLR_INT (LPT);  }
-if (((pulse & 060) < 060) && (pulse & 004)) {		/* LPLS, LPPB, LPPS */
-	lpt_iot = (pulse & 060) | (AC & 07);		/* save parameters */
-	sim_activate (&lpt_unit, lpt_unit.wait);  }	/* activate */
+if (pulse & 004) {
+	int32 subp = (pulse >> 4) & 03;			/* get subpulse */
+	if (subp < 3) {					/* LPLS, LPPB, LPPS */
+		lpt_iot = (pulse & 060) | (AC & 07);	/* save parameters */
+		sim_activate (&lpt_unit, lpt_unit.wait);  }	/* activate */
 #if defined (PDP9)
-if (pulse == 064) {					/* LPEI */
-	lpt_ie = 1;					/* set int enable */
-	if (lpt_done) SET_INT (LPT);  }
+	else {						/* LPEI */
+		lpt_ie = 1;				/* set int enable */
+		if (lpt_done) SET_INT (LPT);  }
 #endif
+	}						/* end if pulse 4 */
 return AC;
 }
 
@@ -420,7 +431,7 @@ REG lpt_reg[] = {
 	{ DRDATA (LCNT, lcnt, 9) },
 	{ DRDATA (BPTR, bptr, 8) },
 	{ FLDATA (MODE, mode, 0) },
-	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
 	{ BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
@@ -459,7 +470,7 @@ return AC;
 int32 lpt66 (int32 pulse, int32 AC)
 {
 if (pulse == 021) lpt_sta = lpt_sta & ~STA_DON;		/* LPCD */
-if (pulse == 041) lpt_sta = lpt_sta = 0;		/* LPCF */
+if (pulse == 041) lpt_sta = 0;				/* LPCF */
 lpt_updsta (0);						/* update status */
 return AC;
 }

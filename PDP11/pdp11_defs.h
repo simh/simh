@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,10 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   28-Apr-02	RMS	Clarified PDF ACF mnemonics
+   22-Apr-02	RMS	Added HTRAP, BPOK maint register flags, MT_MAXFR
+   06-Mar-02	RMS	Changed system type to KDJ11A
+   20-Jan-02	RMS	Added multiboard DZ11 support
    09-Nov-01	RMS	Added bus map support
    07-Nov-01	RMS	Added RQDX3 support
    26-Oct-01	RMS	Added symbolic definitions for IO page
@@ -114,6 +118,8 @@
 
 #define MMR0_MME	0000001				/* mem mgt enable */
 #define MMR0_V_PAGE	1				/* offset to pageno */
+#define MMR0_M_PAGE	077				/* mask for pageno */
+#define MMR0_PAGE	(MMR0_M_PAGE << MMR0_V_PAGE)
 #define MMR0_RO		0020000				/* read only error */
 #define MMR0_PL		0040000				/* page lnt error */
 #define MMR0_NR		0100000				/* no access error */
@@ -134,7 +140,8 @@
 
 /* PDR */
 
-#define PDR_NR		0000002				/* non-resident ACF */
+#define PDR_PRD		0000002				/* page readable */
+#define PDR_PWR		0000004				/* page writeable */
 #define PDR_ED		0000010				/* expansion dir */
 #define PDR_W		0000100				/* written flag */
 #define PDR_PLF		0077400				/* page lnt field */
@@ -179,7 +186,11 @@
 #define MAINT_NOFPA	(0 << MAINT_V_FPA)
 #define MAINT_FPA	(1 << MAINT_V_FPA)
 #define MAINT_V_TYP	4				/* system type */
-#define MAINT_KDJ	(4 << MAINT_V_TYP)
+#define MAINT_KDJ	(1 << MAINT_V_TYP)		/* KDJ11A */
+#define MAINT_V_HTRAP	3				/* trap 4 on HALT */
+#define MAINT_HTRAP	(1 << MAINT_V_HTRAP)
+#define MAINT_V_BPOK	0				/* power OK */
+#define MAINT_BPOK	(1 << MAINT_V_BPOK)
 
 /* Floating point accumulators */
 
@@ -266,15 +277,32 @@ typedef struct fpac fpac_t;
 #define STOP_RQ		(TRAP_V_MAX + 6)		/* RQDX3 panic */
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* cond error return */
 
-/* DZ11 parameters */
+/* Timers */
 
-#define DZ_MUXES	1				/* # of muxes */
+#define TMR_CLK		0				/* line clock */
+#define TMR_KWP		1				/* KW11P */
+
+/* IO parameters */
+
+#define DZ_MUXES	4				/* max # of muxes */
 #define DZ_LINES	8				/* lines per mux */
+#define MT_MAXFR	(1 << 16)			/* magtape max rec */
+
+/* Device information block */
+
+struct pdp_dib {
+	uint32		enb;				/* enabled */
+	uint32		ba;				/* base addr */
+	uint32		lnt;				/* length */
+	t_stat		(*rd)(int32 *dat, int32 ad, int32 md);
+	t_stat		(*wr)(int32 dat, int32 ad, int32 md);  };
+
+typedef struct pdp_dib DIB;
 
 /* I/O page layout */
 
 #define IOBA_DZ		(IOPAGEBASE + 000100)		/* DZ11 */
-#define IOLN_DZ		(010 * DZ_MUXES)
+#define IOLN_DZ		010
 #define IOBA_UBM	(IOPAGEBASE + 010200)		/* Unibus map */
 #define IOLN_UBM	(UBM_LNT_LW * sizeof (int32))
 #define IOBA_RQ		(IOPAGEBASE + 012150)		/* RQDX3 */
@@ -301,8 +329,12 @@ typedef struct fpac fpac_t;
 #define IOLN_RK6	040
 #define IOBA_LPT	(IOPAGEBASE + 017514)		/* LP11 */
 #define IOLN_LPT	004
-#define IOBA_STD	(IOPAGEBASE + 017546)		/* KW11L, DL11, PC11 */
-#define IOLN_STD	022
+#define IOBA_CLK	(IOPAGEBASE + 017546)		/* KW11L */
+#define IOLN_CLK	002
+#define IOBA_PT		(IOPAGEBASE + 017550)		/* PC11 */
+#define IOLN_PT		010
+#define IOBA_TT		(IOPAGEBASE + 017560)		/* DL11 */
+#define IOLN_TT		010
 #define IOBA_SRMM	(IOPAGEBASE + 017570)		/* SR, MMR0-2 */
 #define IOLN_SRMM	010
 #define IOBA_APR1	(IOPAGEBASE + 017600)		/* APRs */
@@ -452,3 +484,7 @@ int32 Map_ReadB (t_addr ba, int32 bc, uint8 *buf, t_bool ub);
 int32 Map_ReadW (t_addr ba, int32 bc, uint16 *buf, t_bool ub);
 int32 Map_WriteB (t_addr ba, int32 bc, uint8 *buf, t_bool ub);
 int32 Map_WriteW (t_addr ba, int32 bc, uint16 *buf, t_bool ub);
+t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_bool dev_conflict (uint32 nba, DIB *curr);

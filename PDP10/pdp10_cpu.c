@@ -1,6 +1,6 @@
 /* pdp10_cpu.c: PDP-10 CPU simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu		KS10 central processor
 
+   30-Dec-01	RMS	Added old PC queue
    25-Dec-01	RMS	Cleaned up sim_inst declarations
    07-Dec-01	RMS	Revised to use new breakpoint package
    21-Nov-01	RMS	Implemented ITS 1-proceed hack
@@ -128,6 +129,9 @@
 #include "pdp10_defs.h"
 #include <setjmp.h>
 
+#define PCQ_SIZE	64				/* must be 2**n */
+#define PCQ_MASK	(PCQ_SIZE - 1)
+#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
 #define UNIT_V_MSIZE	(UNIT_V_T20V41 + 1)		/* dummy mask */
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
@@ -169,7 +173,9 @@ int32 stop_op0 = 0;					/* stop on 0 */
 int32 rlog = 0;						/* extend fixup log */
 int32 ind_max = 32;					/* nested ind limit */
 int32 xct_max = 32;					/* nested XCT limit */
-a10 old_PC = 0;						/* old PC */
+a10 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
+int32 pcq_p = 0;					/* PC queue ptr */
+REG *pcq_r = NULL;					/* PC queue reg ptr */
 jmp_buf save_env;
 
 extern int32 sim_int_char;
@@ -351,7 +357,8 @@ REG cpu_reg[] = {
 	{ ORDATA (APRLVL, apr_lvl, 3) },
 	{ ORDATA (RLOG, rlog, 10) },
 	{ FLDATA (F1PR, its_1pr, 0) },
-	{ ORDATA (OLDPC, old_PC, VASIZE), REG_RO },
+	{ BRDATA (PCQ, pcq, 8, VASIZE, PCQ_SIZE), REG_RO+REG_CIRC },
+	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ DRDATA (INDMAX, ind_max, 8), PV_LEFT + REG_NZ },
 	{ DRDATA (XCTMAX, xct_max, 8), PV_LEFT + REG_NZ },
 	{ FLDATA (ITS, cpu_unit.flags, UNIT_V_ITS), REG_HRO },
@@ -434,7 +441,7 @@ static t_stat jrst_tab[16] = {
 
 #define IM		((d10) ea)
 #define IMS		(((d10) ea) << 18)
-#define JUMP(x)		old_PC = PC, PC = ((a10) (x)) & AMASK
+#define JUMP(x)		PCQ_ENTRY, PC = ((a10) (x)) & AMASK
 #define SUBJ(x)		CLRF (F_AFI | F_FPD | F_TR); JUMP (x)
 #define INCPC		PC = INCA (PC)
 
@@ -572,7 +579,7 @@ static t_stat jrst_tab[16] = {
 
 t_stat sim_instr (void)
 {
-a10 PC;
+a10 PC;							/* set by setjmp */
 int abortval = 0;					/* abort value */
 
 /* Restore register state */
@@ -598,6 +605,7 @@ if ((abortval > 0) || pager_pi) {			/* stop or pi err? */
 		abortval = STOP_PAGINT;			/* stop for pi err */
 	saved_PC = pager_PC & AMASK;			/* failing instr PC */
 	set_ac_display (ac_cur);			/* set up AC display */
+	pcq_r -> qptr = pcq_p;				/* update pc q ptr */
 	return abortval;  }				/* return to SCP */
 
 /* Page fail - checked against KS10 ucode
@@ -2035,6 +2043,9 @@ set_ac_display (ac_cur);
 pi_eval ();
 if (M == NULL) M = calloc (MAXMEMSIZE, sizeof (d10));
 if (M == NULL) return SCPE_MEM;
+pcq_r = find_reg ("PCQ", NULL, dptr);
+if (pcq_r) pcq_r -> qptr = 0;
+else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* pdp1_stddev.c: PDP-1 standard devices
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tti		keyboard
    tto		teleprinter
 
+   30-May-02	RMS	Widened POS to 32b
    29-Nov-01	RMS	Added read only unit support
    07-Sep-01	RMS	Moved function prototypes
    10-Jun-01	RMS	Fixed comment
@@ -112,7 +113,7 @@ REG ptr_reg[] = {
 	{ FLDATA (DONE, iosta, IOS_V_PTR) },
 	{ FLDATA (RPLS, ptr_rpls, 0) },
 	{ ORDATA (STATE, ptr_state, 5), REG_HRO },
-	{ DRDATA (POS, ptr_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
 	{ NULL }  };
@@ -137,7 +138,7 @@ REG ptp_reg[] = {
 	{ ORDATA (BUF, ptp_unit.buf, 8) },
 	{ FLDATA (DONE, iosta, IOS_V_PTP) },
 	{ FLDATA (RPLS, ptp_rpls, 0) },
-	{ DRDATA (POS, ptp_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
 	{ NULL }  };
@@ -161,7 +162,7 @@ REG tti_reg[] = {
 	{ ORDATA (BUF, tti_unit.buf, 6) },
 	{ FLDATA (DONE, iosta, IOS_V_TTI) },
 	{ ORDATA (STATE, tti_state, 10), REG_HRO },
-	{ DRDATA (POS, tti_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
@@ -185,7 +186,7 @@ REG tto_reg[] = {
 	{ FLDATA (DONE, iosta, IOS_V_TTO) },
 	{ FLDATA (RPLS, tto_rpls, 0) },
 	{ ORDATA (STATE, tto_state, 10), REG_HRO },
-	{ DRDATA (POS, tto_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 

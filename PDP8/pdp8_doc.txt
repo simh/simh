@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-8 Simulator Usage
-Date:	1-Dec-01
+Date:	15-Jun-2002
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2001, written by Robert M Supnik
-   Copyright (c) 1993-2001, Robert M Supnik
+   Original code published in 1993-2002, written by Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -67,12 +67,12 @@ The PDP-8 simulator is configured as follows:
 device		simulates
 name(s)
 
-CPU		PDP-8/E CPU with 32KW of memory
+CPU		PDP-8/E CPU with 4KW-32KW of memory
 -		KE8E extended arithmetic element (EAE)
 -		KM8E memory management and timeshare control
 PTR,PTP		PC8E paper tape reader/punch
 TTI,TTO		KL8E console terminal
-TTI1-4,TTO1-4	KL8JA additional terminals
+TTIX,TTOX	KL8JA additional terminals
 LPT		LE8E line printer
 CLK		DK8E line frequency clock (also PDP-8/A compatible)
 RK		RK8E/RK05 cartridge disk controller with four drives
@@ -83,14 +83,14 @@ RX		RX8E/RX01 floppy disk controller with two drives
 DT		TC08/TU56 DECtape controller with eight drives
 MT		TM8E/TU10 magnetic tape controller with eight drives
 
-The RK, RF, DF, RL, RX, DT, and MT devices can be DISABLEd.  The PDP-8
-can support only one of the set {DF32, RF08, RL8A},since they use the same
-IOT's.  The simulator defaults to the RF08.  To change the disk at device
-addresses 60-61:
+The RK, RF, DF, RL, RX, DT, MT, and TTIX/TTOX devices can be set DISABLEd.
+The PDP-8 can support only one of the set {DF32, RF08, RL8A}, since they
+use the same IOT's.  The simulator defaults to the RF08.  To change the
+disk at device addresses 60-61:
 
-	ENABLE DF	enable DF32, disable RF08 and RL8A
-	ENABLE RF	enable RF08, disable DF32 and RL8A
-	ENABLE RL	enable RL8A, disable DF32 and RF08
+	SET RF DISABLED		disable RF08
+	SET DF ENABLED, or	enable DF32
+	SET RL ENABLED		enable RL8A
 
 The PDP-8 simulator implements one unique stop condition: if an undefined
 instruction (unimplemented IOT or OPR) is decoded, and register STOP_INST
@@ -149,7 +149,8 @@ control registers for the interrupt system.
 	INT		15	interrupt pending flags
 	DONE		15	device done flags
 	ENABLE		15	device interrupt enable flags
-	OLDPC		15	PC prior to last JMP, JMS, or interrupt
+	PCQ[0:63]	15	PC prior to last JMP, JMS, or interrupt;
+				most recent PC change first
 	STOP_INST	1	stop on undefined instruction
 	WRU		8	interrupt character
 
@@ -172,7 +173,7 @@ The paper tape reader implements these registers:
 	DONE		1	device done flag
 	ENABLE		1	interrupt enable flag
 	INT		1	interrupt pending flag
-	POS		31	position in the input file
+	POS		32	position in the input file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -202,7 +203,7 @@ The paper tape punch implements these registers:
 	DONE		1	device done flag
 	ENABLE		1	interrupt enable flag
 	INT		1	interrupt pending flag
-	POS		31	position in the output file
+	POS		32	position in the output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -229,7 +230,7 @@ The terminal input implements these registers:
 	DONE		1	device done flag
 	ENABLE		1	interrupt enable flag
 	INT		1	interrupt pending flag
-	POS		31	number of characters input
+	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
 2.2.4 KL8E Terminal Output (TTO)
@@ -243,7 +244,7 @@ implements these registers:
 	DONE		1	device done flag
 	ENABLE		1	interrupt enable flag
 	INT		1	interrupt pending flag
-	POS		31	number of characters output
+	POS		32	number of characters output
 	TIME		24	time from I/O initiation to interrupt
 
 2.2.5 LE8E Line Printer (LPT)
@@ -261,7 +262,7 @@ The line printer implements these registers:
 	DONE		1	device done flag
 	ENABLE		1	interrupt enable flag
 	INT		1	interrupt pending flag
-	POS		31	position in the output file
+	POS		32	position in the output file
 	TIME		24	time from I/O initiation to interrupt
 
 Error handling is as follows:
@@ -288,51 +289,58 @@ The real-time clock (CLK) implements these registers:
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
 
-2.2.7 KL8JA Additional Terminals (TTI1-4, TTO1-4)
+2.2.7 KL8JA Additional Terminals (TTIX, TTOX)
 
-Each additional terminal consists of two independent devices, TTIn and
-TTOn.  The entire set is modelled as a terminal multiplexor, with TTI1
+The additional terminals consist of two independent devices, TTIX and
+TTOX.  The entire set is modelled as a terminal multiplexor, with TTIX
 as the master unit.  The additional terminals perform input and output
 through Telnet sessions connected to a user-specified port.  The ATTACH
 command specifies the port to be used:
 
-	ATTACH TTI1 <port>(cr)	-- set up listening port
+	ATTACH TTIX <port>	set up listening port
 
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.
 
-Once TTI1 is attached and the simulator is running, the terminals listen
+The additional terminals have one option, UC; when set, lower case input
+characters are automatically converted to upper case.  This is required
+by TSS/8 and is on by default for all lines.
+
+Once TTIX is attached and the simulator is running, the terminals listen
 for connections on the specified port.  They assume that the incoming
 connections are Telnet connections.  The connections remain open until
-disconnected either by the Telnet client, or by a DETACH TTI1 command.
+disconnected either by the Telnet client, a SET TTIX DISCONNECT command,
+or a DETACH TTIX command.
 
-The SHOW TTI1 LINESTATUS command displays the current connections to the
-additional terminals. 
+The SHOW TTIX CONNECTIONS command displays the current connections to the
+extra terminals.  The SHOW TTIX STATISTICS command displays statistics for
+active connections.  The SET TTIX DISCONNECT=linenumber disconnects the
+specified line.
 
-The input devices (TTI1-4) implement these registers:
-
-	name		size	comments
-
-	BUF		8	last data item processed
-	DONE		1	device done flag
-	ENABLE		1	interrupt enable flag
-	INT		1	interrupt pending flag
-	POS		31	number of characters input
-	TIME		24	keyboard polling interval
-
-The output devices (TTO1-4) implement these registers:
+The input device (TTIX) implements these registers:
 
 	name		size	comments
 
-	BUF		8	last data item processed
-	DONE		1	device done flag
-	ENABLE		1	interrupt enable flag
-	INT		1	interrupt pending flag
-	POS		31	number of characters output
-	TIME		24	time from I/O initiation to interrupt
+	BUF[0:3]	8	input buffer, lines 0-3
+	DONE		4	device done flags (line 0 rightmost)
+	ENABLE		4	interrupt enable flag
+	INT		4	interrupt pending flag
+	TIME		24	initial polling interval
+	TPS		10	polls per second after calibration
+
+The output device (TTOX) implements these registers:
+
+	name		size	comments
+
+	BUF[0:3]	8	last data item processed, lines 0-3
+	DONE		4	device done flag (line 0 rightmost)
+	ENABLE		4	interrupt enable flag
+	INT		4	interrupt pending flag
+	TIME[0:3]	24	time from I/O initiation to interrupt,
+				lines 0-3
 
 The additional terminals do not support save and restore.  All open
-connections are lost when the simulator shuts down or TTI1 is detached.
+connections are lost when the simulator shuts down or TTIX is detached.
 
 2.3 Moving Head Disks
 
@@ -341,10 +349,9 @@ connections are lost when the simulator shuts down or TTI1 is detached.
 RK8E options include the ability to make units write enabled or write locked:
 
 	SET RKn LOCKED		set unit n write locked
-	SET RKn ENABLED		set unit n write enabled
+	SET RKn WRITEENABLED	set unit n write enabled
 
-Units can also be REMOVEd or ADDed to the configuration.  The RK8E supports
-the BOOT command.
+Units can also be set ONLINE or OFFLINE.  The RK8E supports the BOOT command.
 
 The RK8E implements these registers:
 
@@ -375,11 +382,10 @@ Error handling is as follows:
 
 RL8A options include the ability to make units write enabled or write locked:
 
-	SET RKn LOCKED		set unit n write locked
-	SET RKn ENABLED		set unit n write enabled
+	SET RLn LOCKED		set unit n write locked
+	SET RLn WRITEENABLED	set unit n write enabled
 
-Units can also be REMOVEd or ADDed to the configuration.  The RK8E supports
-the BOOT command.
+Units can also be set ONLINE or OFFILE.  The RL8A supports the BOOT command.
 
 The RL8A implements these registers:
 
@@ -418,7 +424,7 @@ Error handling is as follows:
 RX8E options include the ability to set units write enabled or write locked:
 
 	SET RXn LOCKED		set unit n write locked
-	SET RXn ENABLED		set unit n write enabled
+	SET RXn WRITEENABLED	set unit n write enabled
 
 The RX8E supports the BOOT command.
 
@@ -534,17 +540,16 @@ DECtape options include the ability to make units write enabled or write
 locked.
 
 	SET DTn LOCKED		set unit n write locked
-	SET DTn ENABLED		set unit n write enabled
+	SET DTn WRITEENABLED	set unit n write enabled
 
-Units can also be REMOVEd or ADDed to the configuration.  The TC08 supports
-the BOOT command.
+Units can also be set ONLINE or OFFLINE.  The TC08 supports the BOOT command.
 
 The TC08 supports both PDP-8 format and PDP-9/11/15 format DECtape images.
 ATTACH tries to determine the tape format from the DECtape image; the user
 can force a particular format with switches:
 
-	-f				foreign (PDP-9/11/15) format
-	-n				native (PDP-8) format
+	-f			foreign (PDP-9/11/15) format
+	-n			native (PDP-8) format
 
 The DECtape controller is a data-only simulator; the timing and mark
 track, and block header and trailer, are not stored.  Thus, the WRITE
@@ -568,7 +573,7 @@ The DECtape controller implements these registers:
 	ACTIME		31	time to accelerate to full speed
 	DCTIME		31	time to decelerate to a full stop
 	SUBSTATE	2	read/write command substate
-	POS[0:7]	31	position, in lines, units 0-7
+	POS[0:7]	32	position, in lines, units 0-7
 	STATT[0:7]	31	unit state, units 0-7
 
 It is critically important to maintain certain timing relationships
@@ -585,9 +590,9 @@ Magnetic tape options include the ability to make units write enabled or
 or write locked.
 
 	SET MTn LOCKED		set unit n write locked
-	SET MTn ENABLED		set unit n write enabled
+	SET MTn WRITEENABLED	set unit n write enabled
 
-Units can also be REMOVEd or ADDed to the configuration.
+Units can also be set ONLINE or OFFLINE.
 
 The magnetic tape controller implements these registers:
 
@@ -605,7 +610,7 @@ The magnetic tape controller implements these registers:
 	STOP_IOE	1	stop on I/O error
 	TIME		24	record delay
 	UST[0:7]	24	unit status, units 0-7
-	POS[0:7]	31	position, units 0-7
+	POS[0:7]	32	position, units 0-7
 
 Error handling is as follows:
 

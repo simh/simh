@@ -1,6 +1,6 @@
-/* vax_rq.c: RQDX3 disk controller simulator
+/* pdp11_rq.c: RQDX3 disk controller simulator
 
-   Copyright (c) 2001, Robert M Supnik
+   Copyright (c) 2002, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,14 @@
 
    rq		RQDX3 disk controller
 
+   04-May-02	RMS	Fixed bug in polling loop for queued operations
+   26-Mar-02	RMS	Fixed bug, reset routine cleared UF_WPH
+   09-Mar-02	RMS	Adjusted delays for M+ timing bugs
+   04-Mar-02	RMS	Added delays to initialization for M+, RSTS/E
+   16-Feb-02	RMS	Fixed bugs in host timeout logic, boot
+   26-Jan-02	RMS	Revised bootstrap to conform to M9312
+   06-Jan-02	RMS	Revised enable/disable support
+   30-Dec-01	RMS	Revised show routines
    19-Dec-01	RMS	Added bigger drives
    17-Dec-01	RMS	Added queue process
 */
@@ -79,8 +87,12 @@
 #define GET_DTYPE(x)	(((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
 #define cpkt		u3				/* current packet */
 #define pktq		u4				/* packet queue */
-#define uf		buf				/* unit flags */
+#define uf		buf				/* settable unit flags */
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write prot */
+#define RQ_RMV(u)	((drv_tab[GET_DTYPE (u -> flags)].flgs & RQDF_RMV)? \
+			 UF_RMV: 0)
+#define RQ_WPH(u)	(((drv_tab[GET_DTYPE (u -> flags)].flgs & RQDF_RO) || \
+			  (u -> flags & UNIT_WPRT))? UF_WPH: 0)
 
 #define CST_S1		0				/* init stage 1 */
 #define CST_S1_WR	1				/* stage 1 wrap */
@@ -407,9 +419,13 @@ static struct drvtyp drv_tab[] = {
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
+extern int32 cpu_log;
 extern UNIT cpu_unit;
+extern FILE *sim_log;
+
 uint16 *rqxb = NULL;					/* xfer buffer */
 uint32 rq_sa = 0;					/* status, addr */
+uint32 rq_saw = 0;					/* written data */
 uint32 rq_s1dat = 0;					/* S1 data */
 uint32 rq_csta = 0;					/* ctrl state */
 uint32 rq_perr = 0;					/* last error */
@@ -425,10 +441,14 @@ uint32 rq_pbsy = 0;					/* #busy pkts */
 uint32 rq_credits = 0;					/* credits */
 uint32 rq_hat = 0;					/* host timer */
 uint32 rq_htmo = RQ_DHTMO;				/* host timeout */
-int32 rq_qtime = 100;					/* queue time */
+int32 rq_itime = 200;					/* init time, except */
+int32 rq_itime4 = 10;					/* stage 4 */
+int32 rq_qtime = 200;					/* queue time */
 int32 rq_xtime = 500;					/* transfer time */
 int32 rq_enb = 1;					/* device enable */
 
+t_stat rq_rd (int32 *data, int32 PA, int32 access);
+t_stat rq_wr (int32 data, int32 PA, int32 access);
 t_stat rq_svc (UNIT *uptr);
 t_stat rq_tmrsvc (UNIT *uptr);
 t_stat rq_quesvc (UNIT *uptr);
@@ -483,6 +503,8 @@ UNIT *rq_getucb (uint32 lu);
    rq_mod	RQ modifier list
 */
 
+DIB rq_dib = { 1, IOBA_RQ, IOLN_RQ, &rq_rd, &rq_wr };
+
 UNIT rq_unit[] = {
 	{ UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
 		(RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
@@ -500,6 +522,7 @@ UNIT rq_unit[] = {
 
 REG rq_reg[] = {
 	{ GRDATA (SA, rq_sa, RQ_RDX, 16, 0) },
+	{ GRDATA (SAW, rq_sa, RQ_RDX, 16, 0) },
 	{ GRDATA (S1DAT, rq_s1dat, RQ_RDX, 16, 0) },
 	{ GRDATA (CQBA, rq_cq.ba, RQ_RDX, 22, 0) },
 	{ GRDATA (CQLNT, rq_cq.lnt, RQ_RDX, 8, 2), REG_NZ },
@@ -507,31 +530,33 @@ REG rq_reg[] = {
 	{ GRDATA (RQBA, rq_rq.ba, RQ_RDX, 22, 0) },
 	{ GRDATA (RQLNT, rq_rq.lnt, RQ_RDX, 8, 2), REG_NZ },
 	{ GRDATA (RQIDX, rq_rq.idx, RQ_RDX, 8, 2) },
-	{ GRDATA (FREE, rq_freq, RQ_RDX, 5, 0) },
-	{ GRDATA (RESP, rq_rspq, RQ_RDX, 5, 0) },
-	{ GRDATA (PBSY, rq_pbsy, RQ_RDX, 5, 0) },
+	{ DRDATA (FREE, rq_freq, 5) },
+	{ DRDATA (RESP, rq_rspq, 5) },
+	{ DRDATA (PBSY, rq_pbsy, 5) },
 	{ GRDATA (CFLGS, rq_cflgs, RQ_RDX, 16, 0) },
 	{ GRDATA (CSTA, rq_csta, RQ_RDX, 4, 0) },
 	{ GRDATA (PERR, rq_perr, RQ_RDX, 9, 0) },
-	{ GRDATA (CRED, rq_credits, RQ_RDX, 5, 0) },
-	{ GRDATA (HAT, rq_hat, RQ_RDX, 16, 0) },
-	{ GRDATA (HTMO, rq_htmo, RQ_RDX, 17, 0) },
-	{ URDATA (CPKT, rq_unit[0].cpkt, RQ_RDX, 5, 0, RQ_NUMDR, 0) },
-	{ URDATA (PKTQ, rq_unit[0].pktq, RQ_RDX, 5, 0, RQ_NUMDR, 0) },
+	{ DRDATA (CRED, rq_credits, 5) },
+	{ DRDATA (HAT, rq_hat, 17) },
+	{ DRDATA (HTMO, rq_htmo, 17) },
+	{ URDATA (CPKT, rq_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
+	{ URDATA (PKTQ, rq_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
 	{ URDATA (UFLG, rq_unit[0].uf, RQ_RDX, 16, 0, RQ_NUMDR, 0) },
 	{ URDATA (SFLG, rq_unit[0].flags, RQ_RDX, UNIT_W_UF, UNIT_V_UF-1,
 		  RQ_NUMDR, REG_HRO) },
 	{ FLDATA (PRGI, rq_prgi, 0), REG_HIDDEN },
 	{ FLDATA (PIP, rq_pip, 0), REG_HIDDEN },
 	{ FLDATA (INT, IREQ (RQ), INT_V_RQ) },
+	{ DRDATA (ITIME, rq_itime, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (QTIME, rq_qtime, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (XTIME, rq_xtime, 24), PV_LEFT + REG_NZ },
 	{ BRDATA (PKTS, rq_pkt, RQ_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
-	{ FLDATA (*DEVENB, rq_enb, 0), REG_HRO },
+	{ GRDATA (DEVADDR, rq_dib.ba, RQ_RDX, 32, 0), REG_HRO },
+	{ FLDATA (*DEVENB, rq_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB rq_mod[] = {
-	{ UNIT_WLK, 0, NULL, "ENABLED", &rq_set_wlk },
+	{ UNIT_WLK, 0, NULL, "WRITEENABLED", &rq_set_wlk },
 	{ UNIT_WLK, UNIT_WLK, NULL, "LOCKED", &rq_set_wlk },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, RQ_SH_RI, "RINGS", NULL,
 		NULL, &rq_show_ctrl, NULL },
@@ -560,11 +585,17 @@ MTAB rq_mod[] = {
 	{ UNIT_DTYPE, (RA92_DTYPE << UNIT_V_DTYPE), "RA92", "RA92", &rq_set_size },
 	{ UNIT_DTYPE, (RRD40_DTYPE << UNIT_V_DTYPE), "RRD40", "RRD40", &rq_set_size },
 	{ UNIT_DTYPE, (RRD40_DTYPE << UNIT_V_DTYPE), NULL, "CDROM", &rq_set_size },
+	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+		&set_addr, &show_addr, &rq_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &rq_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &rq_dib },
 	{ 0 }  };
 
 DEVICE rq_dev = {
 	"RQ", rq_unit, rq_reg, rq_mod,
-	RQ_NUMDR + 1, RQ_RDX, 31, RQ_AINC, RQ_RDX, RQ_WID,
+	RQ_NUMDR + 2, RQ_RDX, 31, RQ_AINC, RQ_RDX, RQ_WID,
 	NULL, NULL, &rq_reset,
 	&rq_boot, &rq_attach, &rq_detach };
 
@@ -595,49 +626,14 @@ t_stat rq_wr (int32 data, int32 PA, int32 access)
 switch ((PA >> 1) & 01) {				/* decode PA<1> */
 case 0:							/* IP */
 	rq_reset (&rq_dev);				/* init device */
+	if (DBG_LOG (LOG_RQ)) fprintf (sim_log, ">>RQ: initialization started\n");
 	break;
 case 1:							/* SA */
-	switch (rq_csta) {				/* controller state? */
-	case CST_S1:					/* need S1 reply */
-		if (data & SA_S1H_VL) {			/* valid? */
-			if (data & SA_S1H_WR) {		/* wrap? */
-				rq_sa = data;		/* echo data */
-				rq_csta = CST_S1_WR;  }	/* endless loop */
-			else {	rq_s1dat = data;	/* save data */
-				rq_sa = SA_S2 | SA_S2C_PT | SA_S2C_EC (rq_s1dat);
-				rq_csta = CST_S2;	/* now in step 2 */
-				rq_init_int ();  }	/* intr if req */
-			}
-			break;
-	case CST_S1_WR:					/* wrap mode */
-		rq_sa = data;				/* echo data */
-		break;
-	case CST_S2:					/* need S2 reply */
-		rq_comm = data & SA_S2H_CLO;		/* get low addr */
-		rq_prgi = data & SA_S2H_PI;		/* get purge int */
-		rq_sa = SA_S3 | SA_S3C_EC (rq_s1dat);
-		rq_csta = CST_S3;			/* now in step 3 */
-		rq_init_int ();				/* intr if req */
-		break;
-	case CST_S3:					/* need S3 reply */
-		rq_comm = ((data & SA_S3H_CHI) << 16) | rq_comm;
-		if (data & SA_S3H_PP) {			/* purge/poll test? */
-			rq_sa = 0;			/* put 0 */
-			rq_csta = CST_S3_PPA;  }	/* wait for 0 write */
-		else rq_step4 ();			/* send step 4 */
-		break;
-	case CST_S3_PPA:				/* need purge test */
-		if (data) rq_fatal (PE_PPF);		/* data not zero? */
-		else rq_csta = CST_S3_PPB;		/* wait for poll */
-		break;
-	case CST_S4:					/* need S4 reply */
-		if (data & SA_S4H_GO) {			/* go set? */
-			rq_csta = CST_UP;		/* we're up */
-			rq_sa = 0;			/* clear SA */
-			sim_activate (&rq_unit[RQ_TIMER], tmr_poll * clk_tps);
-			if ((data & SA_S4H_LF) && rq_perr) rq_plf (rq_perr);
-			rq_perr = 0;  }
-		break;  }				
+	rq_saw = data;
+	if (rq_csta < CST_S4)				/* stages 1-3 */
+		sim_activate (&rq_unit[RQ_QUEUE], rq_itime);
+	else if (rq_csta == CST_S4)			/* stage 4 (fast) */
+		sim_activate (&rq_unit[RQ_QUEUE], rq_itime4);
 	break;  }
 return SCPE_OK;
 }
@@ -670,7 +666,8 @@ return OK;
 }
 
 /* Queue service - invoked when any of the queues (host queue, unit
-   queues, response queue) require servicing
+   queues, response queue) require servicing.  Also invoked during
+   initialization to provide some delay to the next step.
 
    Process at most one item off the host queue
    If the host queue is empty, process at most one item off
@@ -680,15 +677,68 @@ return OK;
    If all queues are idle, terminate thread
 */
 
-
 t_stat rq_quesvc (UNIT *uptr)
 {
 int32 i, cnid;
 int32 pkt = 0;
 
+if (rq_csta < CST_UP) {					/* still init? */
+    switch (rq_csta) {					/* controller state? */
+    case CST_S1:					/* need S1 reply */
+	if (rq_saw & SA_S1H_VL) {			/* valid? */
+	    if (rq_saw & SA_S1H_WR) {			/* wrap? */
+		rq_sa = rq_saw;				/* echo data */
+		rq_csta = CST_S1_WR;  }			/* endless loop */
+	else {
+	    rq_s1dat = rq_saw;				/* save data */
+	    rq_sa = SA_S2 | SA_S2C_PT | SA_S2C_EC (rq_s1dat);
+	    rq_csta = CST_S2;				/* now in step 2 */
+	    rq_init_int ();  }				/* intr if req */
+	    }						/* end if valid */
+	break;
+    case CST_S1_WR:					/* wrap mode */
+	rq_sa = rq_saw;					/* echo data */
+	break;
+    case CST_S2:					/* need S2 reply */
+	rq_comm = rq_saw & SA_S2H_CLO;			/* get low addr */
+	rq_prgi = rq_saw & SA_S2H_PI;			/* get purge int */
+	rq_sa = SA_S3 | SA_S3C_EC (rq_s1dat);
+	rq_csta = CST_S3;				/* now in step 3 */
+	rq_init_int ();					/* intr if req */
+	break;
+    case CST_S3:					/* need S3 reply */
+	rq_comm = ((rq_saw & SA_S3H_CHI) << 16) | rq_comm;
+	if (rq_saw & SA_S3H_PP) {			/* purge/poll test? */
+	    rq_sa = 0;					/* put 0 */
+	    rq_csta = CST_S3_PPA;  }			/* wait for 0 write */
+	else rq_step4 ();				/* send step 4 */
+	break;
+    case CST_S3_PPA:					/* need purge test */
+	if (rq_saw) rq_fatal (PE_PPF);			/* data not zero? */
+	else rq_csta = CST_S3_PPB;			/* wait for poll */
+	break;
+    case CST_S4:					/* need S4 reply */
+	if (rq_saw & SA_S4H_GO) {			/* go set? */
+	    if (DBG_LOG (LOG_RQ)) fprintf (sim_log,
+		">>RQ: initialization complete\n");
+	    rq_csta = CST_UP;				/* we're up */
+	    rq_sa = 0;					/* clear SA */
+	    sim_activate (&rq_unit[RQ_TIMER], tmr_poll * clk_tps);
+	    if ((rq_saw & SA_S4H_LF) && rq_perr) rq_plf (rq_perr);
+	    rq_perr = 0;  }
+	break;  }					/* end switch */			
+    return SCPE_OK;  }					/* end if */
+
 if (rq_pip) {						/* polling? */
     if (!rq_getpkt (&pkt)) return SCPE_OK;		/* get host pkt */
     if (pkt) {						/* got one? */
+        if (DBG_LOG (LOG_RQ)) {
+		fprintf (sim_log, ">>RQ: cmd=%04X, mod=%04X, unit=%d, ",
+		rq_pkt[pkt].d[CMD_OPC], rq_pkt[pkt].d[CMD_MOD], rq_pkt[pkt].d[CMD_UN]);
+	    fprintf (sim_log, "bc=%04X%04X, ma=%04X%04X, lbn=%04X%04X\n",
+		rq_pkt[pkt].d[RW_BCH], rq_pkt[pkt].d[RW_BCL],
+		rq_pkt[pkt].d[RW_BAH], rq_pkt[pkt].d[RW_BAL],
+		rq_pkt[pkt].d[RW_LBNH], rq_pkt[pkt].d[RW_LBNL]);  }
 	if (GETP (pkt, UQ_HCTC, TYP) != UQ_TYP_SEQ)	/* seq packet? */
 	    return rq_fatal (PE_PIE);			/* no, term thread */
 	cnid = GETP (pkt, UQ_HCTC, CID);		/* get conn ID */
@@ -703,15 +753,16 @@ if (rq_pip) {						/* polling? */
     }							/* end if pip */
 if (!rq_pip) {						/* not polling? */
     for (i = 0; i < RQ_NUMDR; i++) {			/* chk unit q's */
-	if (uptr -> cpkt || (uptr -> pktq == 0)) continue;
-	pkt = rq_deqh (&uptr -> pktq);			/* get top of q */
+	UNIT *nuptr = rq_dev.units + i;			/* ptr to unit */
+	if (nuptr -> cpkt || (nuptr -> pktq == 0)) continue;
+	pkt = rq_deqh (&nuptr -> pktq);			/* get top of q */
 	if (!rq_mscp (pkt, FALSE)) return SCPE_OK;  }	/* process */
     }							/* end if !pip */
 if (rq_rspq) {						/* resp q? */
     pkt = rq_deqh (&rq_rspq);				/* get top of q */
     if (!rq_putpkt (pkt, FALSE)) return SCPE_OK;	/* send to hst */
     }							/* end if resp q */
-if (pkt) sim_activate (&rq_unit[RQ_QUEUE], rq_qtime);	/* more to do? */ 
+if (pkt) sim_activate (&rq_unit[RQ_QUEUE], rq_qtime);	/* more to do? */
 return SCPE_OK;						/* done */
 }
 
@@ -794,7 +845,8 @@ if (uptr = rq_getucb (lu)) {				/* get unit */
 	    (GETP32 (uptr -> cpkt, CMD_REFL) == ref)) {	/* match ref? */
 		tpkt = uptr -> cpkt;			/* save match */
 		uptr -> cpkt = 0;			/* gonzo */
-		sim_cancel (uptr);  }			/* cancel unit */
+		sim_cancel (uptr);			/* cancel unit */
+		sim_activate (&rq_unit[RQ_QUEUE], rq_qtime);  }
 	else if (uptr -> pktq &&			/* head of q? */
 	    (GETP32 (uptr -> pktq, CMD_REFL) == ref)) {	/* match ref? */
 		tpkt = uptr -> pktq;			/* save match */
@@ -827,7 +879,7 @@ if (uptr = rq_getucb (lu)) {				/* unit exist? */
 		rq_enqt (&uptr -> pktq, pkt);		/* do later */
 		return OK;  }
 	uptr -> flags = uptr -> flags & ~UNIT_ONL;	/* not online */
-	uptr -> uf = uptr -> uf & (UF_WPH | UF_RPL | UF_RMV);
+	uptr -> uf = 0;					/* clr flags */
 	sts = ST_SUC;  }				/* success */
 else sts = ST_OFL;					/* offline */
 rq_putr (pkt, cmd | OP_END, 0, sts, AVL_LNT, UQ_TYP_SEQ);
@@ -923,7 +975,7 @@ return rq_putpkt (pkt, TRUE);
 
 t_bool rq_scc (int32 pkt, t_bool q)
 {
-int32 sts, cmd, tmo;
+int32 sts, cmd;
 
 if (rq_pkt[pkt].d[SCC_MSV]) {				/* MSCP ver = 0? */
 	sts = ST_CMD | I_VRSN;				/* no, lose */
@@ -932,8 +984,8 @@ else {	sts = ST_SUC;					/* success */
 	cmd = GETP (pkt, CMD_OPC, OPC);			/* get opcode */
 	rq_cflgs = (rq_cflgs & CF_RPL) |		/* hack ctrl flgs */
 		rq_pkt[pkt].d[SCC_CFL];
-	if (tmo = rq_pkt[pkt].d[SCC_TMO])		/* valid timeout? */
-		rq_htmo = tmo + 2;			/* set new val */
+	if (rq_htmo = rq_pkt[pkt].d[SCC_TMO])		/* set timeout */
+		rq_htmo = rq_htmo + 2;			/* if nz, round up */
 	rq_pkt[pkt].d[SCC_CFL] = rq_cflgs;		/* return flags */
 	rq_pkt[pkt].d[SCC_TMO] = RQ_DCTMO;		/* ctrl timeout */
 	rq_pkt[pkt].d[SCC_VER] = (RQ_HVER << SCC_VER_V_HVER) |
@@ -995,9 +1047,9 @@ if (uptr = rq_getucb (lu)) {				/* unit exist? */
 		sts = ST_OFL | SB_OFL_NV;		/* no vol */
 	else if (uptr -> flags & UNIT_ONL) {		/* online? */
 		uptr -> flags = uptr -> flags & ~UNIT_ONL;
-		uptr -> uf = uptr -> uf & (UF_WPH | UF_RPL | UF_RMV);
+		uptr -> uf = 0;				/* clear flags */
 		sts = ST_AVL | SB_AVL_INU;  }		/* avail, in use */
-	else if (uptr -> uf & UF_WPH)			/* write prot? */
+	else if (RQ_WPH (uptr))				/* write prot? */
 		sts = ST_WPR | SB_WPR_HW;		/* can't fmt */
 	else sts = ST_SUC;				/*** for now ***/
 	}
@@ -1066,7 +1118,7 @@ if ((cmd == OP_WR) || (cmd == OP_ERS)) {		/* write op? */
 		return (ST_CMD | I_LBN);		/* lbn err */
 	if (uptr -> uf & UF_WPS)			/* swre wlk? */
 		return (ST_WPR | SB_WPR_SW);
-	if (uptr -> uf & UF_WPH)			/* hwre wlk? */
+	if (RQ_WPH (uptr))				/* hwre wlk? */
 		return (ST_WPR | SB_WPR_HW);  }
 return 0;						/* success! */
 }
@@ -1093,17 +1145,22 @@ if (bc == 0) {						/* no xfer? */
 	rq_rw_end (uptr, 0, ST_SUC);			/* ok by me... */
 	return SCPE_OK;  }
 
+if ((cmd == OP_ERS) || (cmd == OP_WR)) {		/* write op? */
+	if (RQ_WPH (uptr)) {
+		rq_rw_end (uptr, 0, ST_WPR | SB_WPR_HW);
+		return SCPE_OK;  }
+	if (uptr -> uf & UF_WPS) {
+		rq_rw_end (uptr, 0, ST_WPR | SB_WPR_SW);
+		return SCPE_OK;  }  }
+
 if (cmd == OP_ERS) {					/* erase? */
-	if (uptr -> uf & (UF_WPH | UF_WPS)) rq_rw_end (uptr, 0,
-	    ST_WPR | ((uptr -> uf & UF_WPH)? SB_WPR_HW: SB_WPR_SW));
 	wwc = ((tbc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
 	for (i = 0; i < wwc; i++) rqxb[i] = 0;		/* clr buf */
 	err = fseek (uptr -> fileref, da, SEEK_SET);	/* set pos */
 	if (!err) fxwrite (rqxb, sizeof (int16), wwc, uptr -> fileref);
 	err = ferror (uptr -> fileref);  }		/* end if erase */
+
 else if (cmd == OP_WR) {				/* write? */
-	if (uptr -> uf & (UF_WPH | UF_WPS)) rq_rw_end (uptr, 0,
-	    ST_WPR | ((uptr -> uf & UF_WPH)? SB_WPR_HW: SB_WPR_SW));
 	t = Map_ReadW (ba, tbc, rqxb, QB);		/* fetch buffer */
 	if (abc = tbc - t) {				/* any xfer? */
 		wwc = ((abc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
@@ -1117,6 +1174,7 @@ else if (cmd == OP_WR) {				/* write? */
 		if (rq_hbe (uptr, ER_NXM))		/* post err log */
 		    rq_rw_end (uptr, EF_LOG, ST_HST | SB_HST_NXM);	
 		return SCPE_OK;  }  }			/* end else wr */
+
 else {	err = fseek (uptr -> fileref, da, SEEK_SET);	/* set pos */
 	if (!err) {
 		i = fxread (rqxb, sizeof (int16), tbc >> 1, uptr -> fileref);
@@ -1377,6 +1435,9 @@ uint32 desc, lnt, cr;
 t_addr addr;
 
 if (pkt == 0) return OK;				/* any packet? */
+if (DBG_LOG (LOG_RQ)) fprintf (sim_log,
+	">>RQ: rsp=%04X, sts=%04X\n",
+	rq_pkt[pkt].d[RSP_OPF], rq_pkt[pkt].d[RSP_STS]);
 if (!rq_getdesc (&rq_rq, &desc)) return ERR;		/* get rsp desc */
 if ((desc & UQ_DESC_OWN) == 0) {			/* not valid? */
 	if (qt) rq_enqt (&rq_rspq, pkt);		/* normal? q tail */
@@ -1456,8 +1517,7 @@ return uptr;
 
 void rq_setf_unit (int32 pkt, UNIT *uptr)
 {
-uptr -> uf = (uptr -> uf & (UF_WPH | UF_RPL | UF_RMV)) |
-	(rq_pkt[pkt].d[ONL_UFL] & UF_MSK);		/* settable flags */
+uptr -> uf = rq_pkt[pkt].d[ONL_UFL] & UF_MSK;		/* settable flags */
 if ((rq_pkt[pkt].d[CMD_MOD] & MD_SWP) &&		/* swre wrp enb? */
 	(rq_pkt[pkt].d[ONL_UFL] & UF_WPS))		/* swre wrp on? */
 	uptr -> uf = uptr -> uf | UF_WPS;		/* simon says... */
@@ -1471,7 +1531,7 @@ void rq_putr_unit (int32 pkt, UNIT *uptr, uint32 lu, t_bool all)
 uint32 dtyp = GET_DTYPE (uptr -> flags);		/* get drive type */
 
 rq_pkt[pkt].d[ONL_MLUN] = lu;				/* unit */
-rq_pkt[pkt].d[ONL_UFL] = uptr -> uf;			/* flags */
+rq_pkt[pkt].d[ONL_UFL] = uptr -> uf | UF_RPL | RQ_WPH (uptr) | RQ_RMV (uptr);
 rq_pkt[pkt].d[ONL_RSVL] = rq_pkt[pkt].d[ONL_RSVH] = 0;	/* reserved */
 rq_pkt[pkt].d[ONL_UIDA] = lu;				/* UID low */
 rq_pkt[pkt].d[ONL_UIDB] = 0;
@@ -1530,6 +1590,7 @@ return (VEC_Q + ((rq_s1dat & SA_S1H_VEC) << 2));	/* prog vector */
 
 t_bool rq_fatal (uint32 err)
 {
+if (DBG_LOG (LOG_RQ)) fprintf (sim_log, ">>RQ: fatal err=%X\n", err);
 rq_reset (&rq_dev);					/* reset device */
 rq_sa = SA_ER | err;					/* SA = dead code */
 rq_csta = CST_DEAD;					/* state = dead */
@@ -1544,9 +1605,6 @@ t_stat rq_set_wlk (UNIT *uptr, int32 val, char *cptr, void *desc)
 uint32 dtyp = GET_DTYPE (uptr -> flags);		/* get drive type */
 
 if (drv_tab[dtyp].flgs & RQDF_RO) return SCPE_NOFNC;	/* not on read only */
-if (val || (uptr -> flags & UNIT_RO))
-	uptr -> uf = uptr -> uf | UF_WPH;		/* copy to uf */
-else uptr -> uf = uptr -> uf & ~UF_WPH;
 return SCPE_OK;
 }
 
@@ -1557,7 +1615,7 @@ t_stat rq_show_wlk (FILE *st, UNIT *uptr, int32 val, void *desc)
 uint32 dtyp = GET_DTYPE (uptr -> flags);		/* get drive type */
 
 if (drv_tab[dtyp].flgs & RQDF_RO) fprintf (st, "read only");
-else if (uptr -> uf & UF_WPH) fprintf (st, "write locked");
+else if (uptr -> flags & UNIT_WPRT) fprintf (st, "write locked");
 else fprintf (st, "write enabled");
 return SCPE_OK;
 }
@@ -1566,12 +1624,10 @@ return SCPE_OK;
 
 t_stat rq_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
+uint32 dtyp = GET_DTYPE (val);
+
 if (uptr -> flags & UNIT_ATT) return SCPE_ALATT;
 uptr -> capac = drv_tab[GET_DTYPE (val)].lbn * RQ_NUMBY;
-if (drv_tab[GET_DTYPE (val)].flgs & RQDF_RMV)
-	uptr -> uf = uptr -> uf | UF_RMV;
-else uptr -> uf =  uptr -> uf & ~UF_RMV;
-if (val == RRD40_DTYPE) uptr -> uf = uptr -> uf | UF_WPH;
 return SCPE_OK;
 }
 
@@ -1586,8 +1642,6 @@ uptr -> capac = drv_tab[dtyp].lbn * RQ_NUMBY;
 r = attach_unit (uptr, cptr);
 if (r != SCPE_OK) return r;
 if (rq_csta == CST_UP) uptr -> flags = uptr -> flags | UNIT_ATP;
-if ((drv_tab[dtyp].flgs & RQDF_RO) || (uptr -> flags & UNIT_RO))
-    uptr -> uf = uptr -> uf | UF_WPH;
 return SCPE_OK;
 }
 
@@ -1600,7 +1654,7 @@ t_stat r;
 r = detach_unit (uptr);					/* detach unit */
 if (r != SCPE_OK) return r;
 uptr -> flags = uptr -> flags & ~(UNIT_ONL | UNIT_ATP);	/* clr onl, atn pend */
-uptr -> uf = uptr -> uf & (UF_WPH | UF_RPL | UF_RMV);	/* clr unit flgs */
+uptr -> uf = 0;						/* clr unit flgs */
 return SCPE_OK;
 } 
 
@@ -1630,11 +1684,10 @@ rq_pip = 0;						/* not polling */
 CLR_INT (RQ);						/* clr intr req */
 for (i = 0; i < RQ_NUMDR; i++) {			/* init units */
 	UNIT *uptr = rq_dev.units + i;
+	uint32 dtyp = GET_DTYPE (uptr -> flags);	/* get drive type */
 	sim_cancel (uptr);				/* clr activity */
 	uptr -> flags = uptr -> flags & ~UNIT_ONL;	/* not online */
-	if (drv_tab[GET_DTYPE (uptr -> flags)].flgs & RQDF_RMV)
-		uptr -> uf = UF_RPL | UF_RMV;		/* init flags */
-	else uptr -> uf = UF_RPL;
+	uptr -> uf = 0;					/* ctlr unit flags */
 	uptr -> cpkt = uptr -> pktq = 0;  }		/* clr pkt q's */
 sim_cancel (&rq_unit[RQ_TIMER]);			/* clr timer thrd */
 sim_cancel (&rq_unit[RQ_QUEUE]);			/* clr queue thrd */
@@ -1647,18 +1700,21 @@ return SCPE_OK;
 
 #if defined (VM_PDP11)
 
-#define BOOT_START 016000				/* start */
-#define BOOT_UNIT 016006				/* unit number */
+#define BOOT_START	016000				/* start */
+#define BOOT_ENTRY	016002				/* entry */
+#define BOOT_UNIT	016010				/* unit number */
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int16))
 
 static const uint16 boot_rom[] = {
 
+	0042125,			/* st: "UD" */
+
 	/* Four step init process */
 
-	0012706, 0016000,		/* st: mov #st,sp */
+	0012706, 0016000,		/*   mov  #st,sp */
 	0012700, 0000000,		/*   mov  #unit,r0 */
 	0012701, 0172150,		/*   mov  #172150, r1	; ip addr */
-	0012704, 0016160,		/*   mov  #it, r4 */
+	0012704, 0016162,		/*   mov  #it, r4 */
 	0012705, 0004000,		/*   mov  #4000,r5	; s1 mask */
 	0010102,			/*   mov  r1,r2 */
 	0005022,			/*   clr  (r2)+		; init */
@@ -1697,10 +1753,10 @@ static const uint16 boot_rom[] = {
 
 	/* Boot block read in, jump to 0 */
 
-	0005002,			/* done: clr r2 */
+	0005011,			/* done: clr (r1)	; for M+ */
 	0005003,			/*   clr  r3 */
-	0012705, 0052504,		/*   mov  #"DU,r5 */
-	0010704,			/*   mov  pc,r4 */
+	0012704, BOOT_START+020,	/*   mov  #st+020,r4 */
+	0005005,			/*   clr  r5 */
 	0005007,			/*   clr  pc */
 
 	/* Data */
@@ -1723,7 +1779,7 @@ extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & 3;
-saved_PC = BOOT_START;
+saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 }
 
@@ -1743,22 +1799,21 @@ uint32 i, desc;
 uint16 d[2];
 
 #if defined (VM_PDP11)
-fprintf (st, "ring, base = %o, index = %d, length = %d",
+fprintf (st, "ring, base = %o, index = %d, length = %d\n",
 	 rp -> ba, rp -> idx >> 2, rp -> lnt >> 2);
 #else
-fprintf (st, "ring, base = %x, index = %d, length = %d",
+fprintf (st, "ring, base = %x, index = %d, length = %d\n",
 	 rp -> ba, rp -> idx >> 2, rp -> lnt >> 2);
 #endif
-for (i = 0; i < rp -> lnt >> 2; i = i++) {
-	if ((i % RQ_SH_DPL) == 0) fprintf (st, "\n");
+for (i = 0; i < (rp -> lnt >> 2); i++) {
 	if (Map_ReadW (rp -> ba + (i << 2), 4, d, QB))	{
-		fprintf (st, " %3d: non-existent memory", i);
+		fprintf (st, " %3d: non-existent memory\n", i);
 		break;  }
 	desc = ((uint32) d[0]) | (((uint32) d[1]) << 16);
 #if defined (VM_PDP11)
-	fprintf (st, " %3d: %011o", i, desc);
+	fprintf (st, " %3d: %011o\n", i, desc);
 #else
-	fprintf (st, " %3d: %08x", i, desc);
+	fprintf (st, " %3d: %08x\n", i, desc);
 #endif
 	}
 return;
@@ -1771,16 +1826,17 @@ uint32 cr = GETP (pkt, UQ_HCTC, CR);
 uint32 typ = GETP (pkt, UQ_HCTC, TYP);
 uint32 cid = GETP (pkt, UQ_HCTC, CID);
 
-fprintf (st, "packet %d, credits = %d, type = %d, cid = %d",
+fprintf (st, "packet %d, credits = %d, type = %d, cid = %d\n",
 	pkt, cr, typ, cid);
 for (i = 0; i < RQ_SH_MAX; i = i + RQ_SH_PPL) {
-	fprintf (st, "\n %2d:", i);
-	for (j = i; (j < (i + RQ_SH_PPL)); j++)
+	fprintf (st, " %2d:", i);
+	for (j = i; j < (i + RQ_SH_PPL); j++)
 #if defined (VM_PDP11)
 		fprintf (st, " %06o", rq_pkt[pkt].d[j]);
 #else
 		fprintf (st, " %04x", rq_pkt[pkt].d[j]);
 #endif
+		fprintf (st, "\n");
 	}
 return;
 }
@@ -1790,21 +1846,21 @@ t_stat rq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc)
 int32 pkt, u = uptr - rq_dev.units;
 
 if (rq_csta != CST_UP) {
-	fprintf (st, "Controller is not initialized");
+	fprintf (st, "Controller is not initialized\n");
 	return SCPE_OK;  }
 if ((uptr -> flags & UNIT_ONL) == 0) {
 	if (uptr -> flags & UNIT_ATT)
-		fprintf (st, "Unit %d is available", u);
-	else fprintf (st, "Unit %d is offline", u);
+		fprintf (st, "Unit %d is available\n", u);
+	else fprintf (st, "Unit %d is offline\n", u);
 	return SCPE_OK;  }
 if (uptr -> cpkt) {
 	fprintf (st, "Unit %d current ", u);
 	rq_show_pkt (st, uptr -> cpkt);
 	if (pkt = uptr -> pktq) {
-		do {	fprintf (st, "\nUnit %d queued ", u);
+		do {	fprintf (st, "Unit %d queued ", u);
 			rq_show_pkt (st, pkt);  }
 		while (pkt = rq_pkt[pkt].link);  }  }
-else fprintf (st, "Unit %d queues are empty", u);
+else fprintf (st, "Unit %d queues are empty\n", u);
 return SCPE_OK;
 }
 
@@ -1813,37 +1869,35 @@ t_stat rq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc)
 int32 i, pkt;
 
 if (rq_csta != CST_UP) {
-    fprintf (st, "Controller is not initialized");
+    fprintf (st, "Controller is not initialized\n");
     return SCPE_OK;  }
 if (val & RQ_SH_RI) {
-    if (rq_pip) fprintf (st, "Polling in progress\n");
+    if (rq_pip) fprintf (st, "Polling in progress, host timer = %d\n", rq_hat);
+    else fprintf (st, "Host timer = %d\n", rq_hat);
     fprintf (st, "Command ");
     rq_show_ring (st, &rq_cq);
-    fprintf (st, "\nResponse ");
+    fprintf (st, "Response ");
     rq_show_ring (st, &rq_rq);
     }
 if (val & RQ_SH_FR) {
-    if (val & RQ_SH_RI) fprintf (st, "\n");
     if (pkt = rq_freq) {
 	for (i = 0; pkt != 0; i++, pkt = rq_pkt[pkt].link) {
 	    if (i == 0) fprintf (st, "Free queue = %d", pkt);
 	    else if ((i % 16) == 0) fprintf (st, ",\n %d", pkt);
-	    else fprintf (st, ", %d", pkt);  }  }
-    else fprintf (st, "Free queue is empty");
+	    else fprintf (st, ", %d", pkt);  }
+        fprintf (st, "\n");  }
+    else fprintf (st, "Free queue is empty\n");
     }
 if (val & RQ_SH_RS) {
-    if (val & (RQ_SH_RI | RQ_SH_FR)) fprintf (st, "\n");
     if (pkt = rq_rspq) {
 	do {	fprintf (st, "Response ");
 		rq_show_pkt (st, pkt);  }
 	while (pkt = rq_pkt[pkt].link);  }
-    else fprintf (st, "Response queue is empty");
+    else fprintf (st, "Response queue is empty\n");
     }
 if (val & RQ_SH_UN) {
-    for (i = 0; i < RQ_NUMDR; i++) {
-        if ((val & (RQ_SH_RI | RQ_SH_FR | RQ_SH_RS)) || i)
-	    fprintf (st, "\n");
-	rq_show_unitq (st, &rq_unit[i], 0, NULL); }
+    for (i = 0; i < RQ_NUMDR; i++)
+	rq_show_unitq (st, &rq_unit[i], 0, NULL);
     }
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   02-May-02	RMS	Removed log status codes
+   22-Apr-02	RMS	Added magtape record length error
+   30-Dec-01	RMS	Generalized timer package, added circular arrays
    07-Dec-01	RMS	Added breakpoint package
    01-Dec-01	RMS	Added read-only unit support, extended SET/SHOW features,
 			improved error messages
@@ -146,19 +149,18 @@ typedef int32		t_mtrlnt;			/* magtape rec lnt */
 #define SCPE_SUB	(SCPE_BASE + 24)		/* subscript err */
 #define SCPE_NOFNC	(SCPE_BASE + 25)		/* func not imp */
 #define SCPE_UDIS	(SCPE_BASE + 26)		/* unit disabled */
-#define SCPE_LOGON	(SCPE_BASE + 27)		/* logging enabled */
-#define SCPE_LOGOFF	(SCPE_BASE + 28)		/* logging disabled */
-#define SCPE_NORO	(SCPE_BASE + 29)		/* rd only not ok */
-#define SCPE_INVSW	(SCPE_BASE + 30)		/* invalid switch */
-#define SCPE_MISVAL	(SCPE_BASE + 31)		/* missing value */
-#define SCPE_2FARG	(SCPE_BASE + 32)		/* too few arguments */
-#define SCPE_2MARG	(SCPE_BASE + 33)		/* too many arguments */
-#define SCPE_NXDEV	(SCPE_BASE + 34)		/* nx device */
-#define SCPE_NXUN	(SCPE_BASE + 35)		/* nx unit */
-#define SCPE_NXREG	(SCPE_BASE + 36)		/* nx register */
-#define SCPE_NXPAR	(SCPE_BASE + 37)		/* nx parameter */
-#define SCPE_NEST	(SCPE_BASE + 40)		/* nested DO */
-#define SCPE_IERR	(SCPE_BASE + 41)		/* internal error */
+#define SCPE_NORO	(SCPE_BASE + 27)		/* rd only not ok */
+#define SCPE_INVSW	(SCPE_BASE + 28)		/* invalid switch */
+#define SCPE_MISVAL	(SCPE_BASE + 29)		/* missing value */
+#define SCPE_2FARG	(SCPE_BASE + 30)		/* too few arguments */
+#define SCPE_2MARG	(SCPE_BASE + 31)		/* too many arguments */
+#define SCPE_NXDEV	(SCPE_BASE + 32)		/* nx device */
+#define SCPE_NXUN	(SCPE_BASE + 33)		/* nx unit */
+#define SCPE_NXREG	(SCPE_BASE + 34)		/* nx register */
+#define SCPE_NXPAR	(SCPE_BASE + 35)		/* nx parameter */
+#define SCPE_NEST	(SCPE_BASE + 36)		/* nested DO */
+#define SCPE_IERR	(SCPE_BASE + 37)		/* internal error */
+#define SCPE_MTRLNT	(SCPE_BASE + 38)		/* tape rec lnt error */
 #define SCPE_KFLAG	01000				/* tti data flag */
 
 /* Print value format codes */
@@ -257,13 +259,15 @@ struct reg {
 	int32		offset;				/* starting bit */
 	int32		depth;				/* save depth */
 	int32		flags;				/* flags */
+	int32		qptr;				/* circ q ptr */
 };
 
-#define REG_FMT		003				/* see PV_x */
-#define REG_RO		004				/* read only */
-#define REG_HIDDEN	010				/* hidden */
-#define REG_NZ		020				/* must be non-zero */
-#define REG_UNIT	040				/* in unit struct */
+#define REG_FMT		0003				/* see PV_x */
+#define REG_RO		0004				/* read only */
+#define REG_HIDDEN	0010				/* hidden */
+#define REG_NZ		0020				/* must be non-zero */
+#define REG_UNIT	0040				/* in unit struct */
+#define REG_CIRC	0100				/* circular array */
 #define REG_HRO		(REG_RO | REG_HIDDEN)		/* hidden, read only */
 
 /* Command table */
@@ -293,7 +297,6 @@ struct mtab {
 #define MTAB_VUN	002				/* valid for unit */
 #define MTAB_VAL	004				/* takes a value */
 #define MTAB_NMO	010				/* only if named */
-#define MTAB_XTV	(MTAB_XTD | MTAB_XTD)		/* ext with value */
 
 /* Search table */
 
@@ -356,8 +359,12 @@ char *get_glyph (char *iptr, char *optr, char mchar);
 char *get_glyph_nc (char *iptr, char *optr, char mchar);
 t_value get_uint (char *cptr, int radix, t_value max, t_stat *status);
 t_value strtotv (char *cptr, char **endptr, int radix);
+DEVICE *find_dev_from_unit (UNIT *uptr);
+REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
 int32 sim_rtc_init (int32 time);
 int32 sim_rtc_calb (int32 ticksper);
+int32 sim_rtcn_init (int32 time, int32 tmr);
+int32 sim_rtcn_calb (int32 time, int32 tmr);
 t_stat sim_poll_kbd (void);
 t_stat sim_putchar (int32 out);
 t_bool sim_brk_test (t_addr bloc, int32 btyp);

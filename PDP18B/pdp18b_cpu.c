@@ -1,6 +1,6 @@
 /* pdp18b_cpu.c: 18b PDP CPU simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu		PDP-4/7/9/15 central processor
 
+   06-Jan-02	RMS	Revised enable/disable support
+   30-Dec-01	RMS	Added old PC queue
    30-Nov-01	RMS	Added extended SET/SHOW support
    25-Nov-01	RMS	Revised interrupt structure
    19-Sep-01	RMS	Fixed bug in EAE (found by Dave Conroy)
@@ -246,6 +248,9 @@
 
 #include "pdp18b_defs.h"
 
+#define PCQ_SIZE	64				/* must be 2**n */
+#define PCQ_MASK	(PCQ_SIZE - 1)
+#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
 #define UNIT_V_NOEAE	(UNIT_V_UF)			/* EAE absent */
 #define UNIT_NOEAE	(1 << UNIT_V_NOEAE)
 #define UNIT_V_NOAPI	(UNIT_V_UF+1)			/* API absent */
@@ -297,7 +302,13 @@ int32 XR = 0;						/* index register */
 int32 LR = 0;						/* limit register */
 int32 stop_inst = 0;					/* stop on rsrv inst */
 int32 xct_max = 16;					/* nested XCT limit */
-int32 old_PC = 0;					/* old PC */
+#if defined (PDP15)
+int32 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
+#else
+int16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
+#endif
+int32 pcq_p = 0;					/* PC queue ptr */
+REG *pcq_r = NULL;					/* PC queue reg ptr */
 int32 dev_enb = -1;					/* device enables */
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
@@ -398,7 +409,8 @@ REG cpu_reg[] = {
 	{ FLDATA (RESTP, rest_pending, 0) },
 	{ FLDATA (PWRFL, int_hwre[API_PWRFL], INT_V_PWRFL) },
 #endif
-	{ ORDATA (OLDPC, old_PC, ADDRSIZE), REG_RO },
+	{ BRDATA (PCQ, pcq, 8, ADDRSIZE, PCQ_SIZE), REG_RO+REG_CIRC },
+	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ FLDATA (NOEAE, cpu_unit.flags, UNIT_V_NOEAE), REG_HRO },
 	{ FLDATA (NOAPI, cpu_unit.flags, UNIT_V_NOAPI), REG_HRO },
@@ -631,7 +643,7 @@ if (sim_interval <= 0) {				/* check clock queue */
 
 #if defined (PDP7)
 if (trap_pending) {					/* trap pending? */
-	old_PC = PC;					/* save old PC */
+	PCQ_ENTRY;					/* save old PC */
 	M[0] = JMS_WORD (1);				/* save state */
 	PC = 2;						/* fetch next from 2 */
 	ion = 0;					/* interrupts off */
@@ -641,7 +653,7 @@ if (trap_pending) {					/* trap pending? */
 #endif
 #if defined (PDP9) || defined (PDP15)
 if (trap_pending) {					/* trap pending? */
-	old_PC = PC;					/* save old PC */
+	PCQ_ENTRY;					/* save old PC */
 	MA = ion? 0: 020;				/* save in 0 or 20 */
 	M[MA] = JMS_WORD (1);				/* save state */
 	PC = MA + 1;					/* fetch next */
@@ -677,7 +689,7 @@ if (!(api_enb && api_act) && ion && !ion_defer && int_pend) {
 #else
 if (ion && !ion_defer && int_pend) {			/* interrupt? */
 #endif
-	old_PC = PC;					/* save old PC */
+	PCQ_ENTRY;					/* save old PC */
 	M[0] = JMS_WORD (usmd);				/* save state */
 	PC = 1;						/* fetch next from 1 */
 	ion = 0;					/* interrupts off */
@@ -864,7 +876,7 @@ case 001: case 000:					/* CAL */
 #endif
 	if (IR & 0020000) { INDIRECT;  }		/* indirect? */
 	CHECK_ADDR_W (MA);
-	old_PC = PC;
+	PCQ_ENTRY;
 	M[MA] = JMS_WORD (t);				/* save state */
 	PC = INCR_ADDR (MA);
 	break;
@@ -877,7 +889,7 @@ case 005:						/* JMS, indir */
 case 004:						/* JMS, dir */
 	CHECK_INDEX;
 	CHECK_ADDR_W (MA);
-	old_PC = PC;
+	PCQ_ENTRY;
 	M[MA] = JMS_WORD (usmd);			/* save state */
 	PC = INCR_ADDR (MA);
 	break;
@@ -904,7 +916,7 @@ CHECK_AUTO_INC;					/* check auto inc */
 	emir_pending = rest_pending = 0;
 case 030:						/* JMP, dir */
 	CHECK_INDEX;
-	old_PC = PC;					/* save old PC */
+	PCQ_ENTRY;					/* save old PC */
 	PC = MA;
 	break;
 
@@ -1407,33 +1419,35 @@ case 034:						/* IOT */
 		break;
 #if defined (TTY1)
 	case 040:					/* TTO1 */
-		iot_data = tto1 (pulse, iot_data);
+		if (dev_enb & ENB_TTI1) iot_data = tto1 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 041:					/* TTI1 */
-		iot_data = tti1 (pulse, iot_data);
+		if (dev_enb & ENB_TTI1) iot_data = tti1 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 #endif
 #if defined (DRM)
 	case 060:					/* drum */
-		if (dev_enb & INT_DRM) iot_data = drm60 (pulse, iot_data);
+		if (dev_enb & ENB_DRM) iot_data = drm60 (pulse, iot_data);
 		else reason = stop_inst;
 		break;
 	case 061:
-		if (dev_enb & INT_DRM) iot_data = drm61 (pulse, iot_data);
+		if (dev_enb & ENB_DRM) iot_data = drm61 (pulse, iot_data);
 		else reason = stop_inst;
 		break;
 	case 062:
-		if (dev_enb & INT_DRM) iot_data = drm62 (pulse, iot_data);
+		if (dev_enb & ENB_DRM) iot_data = drm62 (pulse, iot_data);
 		else reason = stop_inst;
 		break;
 #endif
 #if defined (RP)
 	case 063:					/* RP15 */
-		if (dev_enb & INT_RP) iot_data = rp63 (pulse, iot_data);
+		if (dev_enb & ENB_RP) iot_data = rp63 (pulse, iot_data);
 		else reason = stop_inst;
 		break;
 	case 064:
-		if (dev_enb & INT_RP) iot_data = rp64 (pulse, iot_data);
+		if (dev_enb & ENB_RP) iot_data = rp64 (pulse, iot_data);
 		else reason = stop_inst;
 		break;
 #endif
@@ -1445,27 +1459,27 @@ case 034:						/* IOT */
 		break;
 #if defined (RF)
 	case 070:					/* RF09 */
-		if (dev_enb & INT_RF) iot_data = rf70 (pulse, iot_data);
+		if (dev_enb & ENB_RF) iot_data = rf70 (pulse, iot_data);
 		else reason = stop_inst;
 		break;
 	case 072:
-		if (dev_enb & INT_RF) iot_data = rf72 (pulse, iot_data);
+		if (dev_enb & ENB_RF) iot_data = rf72 (pulse, iot_data);
 		else reason = stop_inst;
 		break;
 #endif
 #if defined (MTA)
 	case 073:					/* TC59 */
-		if (dev_enb & INT_MTA) iot_data = mt (pulse, iot_data);
+		if (dev_enb & ENB_MTA) iot_data = mt (pulse, iot_data);
 		else reason = stop_inst;
 		break;
 #endif
 #if defined (DTA)
 	case 075:					/* TC02/TC15 */
-		if (dev_enb & INT_DTA) iot_data = dt75 (pulse, iot_data);
+		if (dev_enb & ENB_DTA) iot_data = dt75 (pulse, iot_data);
 		else reason = stop_inst;
 		break;
 	case 076:
-		if (dev_enb & INT_DTA) iot_data = dt76 (pulse, iot_data);
+		if (dev_enb & ENB_DTA) iot_data = dt76 (pulse, iot_data);
 		else reason = stop_inst;
 		break;
 #endif
@@ -1490,6 +1504,7 @@ saved_PC = PC & ADDRMASK;				/* save copies */
 saved_LAC = LAC & 01777777;
 saved_MQ = MQ & 0777777;
 iors = upd_iors ();					/* get IORS */
+pcq_r -> qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }
 
@@ -1560,6 +1575,9 @@ usmd = usmdbuf = 0;
 memm = memm_init;
 nexm = prvn = trap_pending = 0;
 emir_pending = rest_pending = 0;
+pcq_r = find_reg ("PCQ", NULL, dptr);
+if (pcq_r) pcq_r -> qptr = 0;
+else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
 }
@@ -1596,5 +1614,41 @@ if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
 	return SCPE_OK;
 MEMSIZE = val;
 for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+return SCPE_OK;
+}
+
+/* Device enable routine */
+
+t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+DEVICE *dptr;
+
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+dev_enb = dev_enb | val;
+if (dptr -> reset) dptr -> reset (dptr);
+return SCPE_OK;
+}
+
+/* Device disable routine */
+
+t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i;
+DEVICE *dptr;
+UNIT *up;
+
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+for (i = 0; i < dptr -> numunits; i++) {		/* check units */
+	up = (dptr -> units) + i;
+	if ((up -> flags & UNIT_ATT) || sim_is_active (up))
+		return SCPE_NOFNC;  }
+dev_enb = dev_enb & ~val;
+if (dptr -> reset) dptr -> reset (dptr);
 return SCPE_OK;
 }

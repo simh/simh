@@ -1,6 +1,6 @@
  /* pdp8_rl.c: RL8A cartridge disk simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rl		RL8A cartridge disk
 
+   06-Jan-02	RMS	Changed enable/disable support
    30-Nov-01	RMS	Cloned from RL11
 
    The RL8A is a four drive cartridge disk subsystem.  An RL01 drive
@@ -218,7 +219,7 @@ REG rl_reg[] = {
 	{ NULL }  };
 
 MTAB rl_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
 	{ UNIT_DUMMY, 0, NULL, "BADBLOCK", &rl_set_bad },
 	{ (UNIT_RL02+UNIT_ATT), UNIT_ATT, "RL01", NULL, NULL },
@@ -229,6 +230,8 @@ MTAB rl_mod[] = {
 	{ UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", NULL },
 	{ (UNIT_AUTO+UNIT_RL02), 0, NULL, "RL01", &rl_set_size },
 	{ (UNIT_AUTO+UNIT_RL02), UNIT_RL02, NULL, "RL02", &rl_set_size },
+	{ MTAB_XTD|MTAB_VDV, INT_RL, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_RL, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE rl_dev = {

@@ -1,6 +1,6 @@
 /* dec_dz.c: DZ11 terminal multiplexor simulator
 
-   Copyright (c) 2001, Robert M Supnik
+   Copyright (c) 2001-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,10 @@
 
    dz		DZ11 terminal multiplexor
 
+   28-Apr-02	RMS	Fixed interrupt acknowledge, fixed SHOW DZ ADDRESS
+   14-Jan-02	RMS	Added multiboard support
+   30-Dec-01	RMS	Added show statistics, set disconnect
+			Removed statistics registers
    03-Dec-01	RMS	Modified for extended SET/SHOW
    09-Nov-01	RMS	Added VAX support
    20-Oct-01	RMS	Moved getchar from sim_tmxr, changed interrupt
@@ -52,7 +56,14 @@
 #if !defined (DZ_RDX)
 #define DZ_RDX		8
 #endif
+#if !defined (DZ_MUXES)
+#define DZ_MUXES	1
+#endif
+#if !defined (DZ_LINES)
+#define DZ_LINES	8
+#endif
 
+#define DZ_MNOMASK	(DZ_MUXES - 1)			/* mask for mux no */
 #define DZ_LNOMASK	(DZ_LINES - 1)			/* mask for lineno */
 #define DZ_LMASK	((1 << DZ_LINES) - 1)		/* mask of lines */
 #define DZ_SILO_ALM	16				/* silo alarm level */
@@ -112,33 +123,38 @@ extern int32 IREQ (HLVL);
 extern int32 sim_switches;
 extern FILE *sim_log;
 extern int32 tmxr_poll;					/* calibrated delay */
-int32 dz_csr = 0;					/* csr */
-int32 dz_rbuf = 0;					/* rcv buffer */
-int32 dz_lpr = 0;					/* line param */
-int32 dz_tcr = 0;					/* xmit control */
-int32 dz_msr = 0;					/* modem status */
-int32 dz_tdr = 0;					/* xmit data */
+
+uint16 dz_csr[DZ_MUXES] = { 0 };			/* csr */
+uint16 dz_rbuf[DZ_MUXES] = { 0 };			/* rcv buffer */
+uint16 dz_lpr[DZ_MUXES] = { 0 };			/* line param */
+uint16 dz_tcr[DZ_MUXES] = { 0 };			/* xmit control */
+uint16 dz_msr[DZ_MUXES] = { 0 };			/* modem status */
+uint16 dz_tdr[DZ_MUXES] = { 0 };			/* xmit data */
+uint8 dz_sae[DZ_MUXES] = { 0 };				/* silo alarm enabled */
+uint32 dz_rxi = 0;					/* rcv interrupts */
+uint32 dz_txi = 0;					/* xmt interrupts */
 int32 dz_mctl = 0;					/* modem ctrl enabled */
 int32 dz_auto = 0;					/* autodiscon enabled */
-int32 dz_sa_enb = 1;					/* silo alarm enabled */
-int32 dz_enb = 1;					/* device enable */
-TMLN dz_ldsc[DZ_LINES] = {				/* line descriptors */
-	{ 0 }, { 0 }, { 0 }, { 0 },
-	{ 0 }, { 0 }, { 0 }, { 0 }  };
-TMXR dz_desc = {					/* mux descriptor */
-	DZ_LINES, 0,
-	&dz_ldsc[0], &dz_ldsc[1], &dz_ldsc[2], &dz_ldsc[3],
-	&dz_ldsc[4], &dz_ldsc[5], &dz_ldsc[6], &dz_ldsc[7] };
+TMLN dz_ldsc[DZ_MUXES * DZ_LINES] = { 0 };		/* line descriptors */
+TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, NULL };	/* mux descriptor */
 
+t_stat dz_rd (int32 *data, int32 PA, int32 access);
+t_stat dz_wr (int32 data, int32 PA, int32 access);
 t_stat dz_svc (UNIT *uptr);
 t_stat dz_reset (DEVICE *dptr);
 t_stat dz_attach (UNIT *uptr, char *cptr);
 t_stat dz_detach (UNIT *uptr);
-t_stat dz_clear (t_bool flag);
-int32 dz_getchar (TMXR *mp);
+t_stat dz_clear (int32 dz, t_bool flag);
+int32 dz_getc (int32 dz);
 void dz_update_rcvi (void);
 void dz_update_xmti (void);
-t_stat dz_status (FILE *st, UNIT *uptr, void *desc);
+void dz_clr_rxint (int32 dz);
+void dz_set_rxint (int32 dz);
+void dz_clr_txint (int32 dz);
+void dz_set_txint (int32 dz);
+t_stat dz_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dz_show (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* DZ data structures
 
@@ -147,141 +163,150 @@ t_stat dz_status (FILE *st, UNIT *uptr, void *desc);
    dz_reg	DZ register list
 */
 
+DIB dz_dib = { 1, IOBA_DZ, IOLN_DZ * DZ_MUXES, &dz_rd, &dz_wr };
+
 UNIT dz_unit = { UDATA (&dz_svc, UNIT_ATTABLE, 0) };
 
+REG dz_nlreg = { DRDATA (NLINES, dz_desc.lines, 6), PV_LEFT };
+
 REG dz_reg[] = {
-	{ GRDATA (CSR, dz_csr, DZ_RDX, 16, 0) },
-	{ GRDATA (RBUF, dz_rbuf, DZ_RDX, 16, 0) },
-	{ GRDATA (LPR, dz_lpr, DZ_RDX, 16, 0) },
-	{ GRDATA (TCR, dz_tcr, DZ_RDX, 16, 0) },
-	{ GRDATA (MSR, dz_msr, DZ_RDX, 16, 0) },
-	{ GRDATA (TDR, dz_tdr, DZ_RDX, 16, 0) },
-	{ FLDATA (SAENB, dz_sa_enb, 0) },
+	{ BRDATA (CSR, dz_csr, DZ_RDX, 16, DZ_MUXES) },
+	{ BRDATA (RBUF, dz_rbuf, DZ_RDX, 16, DZ_MUXES) },
+	{ BRDATA (LPR, dz_lpr, DZ_RDX, 16, DZ_MUXES) },
+	{ BRDATA (TCR, dz_tcr, DZ_RDX, 16, DZ_MUXES) },
+	{ BRDATA (MSR, dz_msr, DZ_RDX, 16, DZ_MUXES) },
+	{ BRDATA (TDR, dz_tdr, DZ_RDX, 16, DZ_MUXES) },
+	{ BRDATA (SAENB, dz_sae, DZ_RDX, 1, DZ_MUXES) },
+	{ GRDATA (RXINT, dz_rxi, DZ_RDX, DZ_MUXES, 0) },
+	{ GRDATA (TXINT, dz_txi, DZ_RDX, DZ_MUXES, 0) },
 	{ FLDATA (MDMCTL, dz_mctl, 0) },
 	{ FLDATA (AUTODS, dz_auto, 0) },
-	{ DRDATA (RPOS0, dz_ldsc[0].rxcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (TPOS0, dz_ldsc[0].txcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (RPOS1, dz_ldsc[1].rxcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (TPOS1, dz_ldsc[1].txcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (RPOS2, dz_ldsc[2].rxcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (TPOS2, dz_ldsc[2].txcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (RPOS3, dz_ldsc[3].rxcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (TPOS3, dz_ldsc[3].txcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (RPOS4, dz_ldsc[4].rxcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (TPOS4, dz_ldsc[4].txcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (RPOS5, dz_ldsc[5].rxcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (TPOS5, dz_ldsc[5].txcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (RPOS6, dz_ldsc[6].rxcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (TPOS6, dz_ldsc[6].txcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (RPOS7, dz_ldsc[7].rxcnt, 32), PV_LEFT+REG_RO },
-	{ DRDATA (TPOS7, dz_ldsc[7].txcnt, 32), PV_LEFT+REG_RO },
-	{ FLDATA (*DEVENB, dz_enb, 0) },
+	{ GRDATA (DEVADDR, dz_dib.ba, DZ_RDX, 32, 0), REG_HRO },
+	{ FLDATA (*DEVENB, dz_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB dz_mod[] = {
-	{ UNIT_ATT, UNIT_ATT, "line status", NULL, NULL, &dz_status },
-	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "LINESTATUS", NULL,
-		NULL, &dz_status, NULL },
+	{ UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &dz_summ },
+	{ MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
+		&tmxr_dscln, NULL, &dz_desc },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
+		NULL, &dz_show, NULL },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
+		NULL, &dz_show, NULL },
+	{ MTAB_XTD|MTAB_VDV, 010, "ADDRESS", "ADDRESS",
+		&set_addr, &show_addr, &dz_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &dz_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &dz_dib },
+	{ MTAB_XTD | MTAB_VDV | MTAB_VAL, 0, "lines", "LINES",
+		&dz_setnl, NULL, &dz_nlreg },
 	{ 0 }  };
 
 DEVICE dz_dev = {
 	"DZ", &dz_unit, dz_reg, dz_mod,
-	1, DZ_RDX, 13, 1, DZ_RDX, 8,
+	1, DZ_RDX, 8, 1, DZ_RDX, 8,
 	&tmxr_ex, &tmxr_dep, &dz_reset,
 	NULL, &dz_attach, &dz_detach };
 
-/* IO dispatch routines, I/O addresses 17760100 - 17760107 */
+/* IO dispatch routines, I/O addresses 177601x0 - 177601x7 */
 
 t_stat dz_rd (int32 *data, int32 PA, int32 access)
 {
+int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;	/* get mux num */
+
 switch ((PA >> 1) & 03) {				/* case on PA<2:1> */
 case 00:						/* CSR */
-	*data = dz_csr = dz_csr & ~CSR_MBZ;
+	*data = dz_csr[dz] = dz_csr[dz] & ~CSR_MBZ;
 	break;
 case 01:						/* RBUF */
-	dz_csr = dz_csr & ~CSR_SA;			/* clr silo alarm */
-	if (dz_csr & CSR_MSE) {				/* scanner on? */
-		dz_rbuf = dz_getchar (&dz_desc);	/* get top of silo */
-		if (!dz_rbuf) dz_sa_enb = 1;		/* empty? re-enable */
+	dz_csr[dz] = dz_csr[dz] & ~CSR_SA;		/* clr silo alarm */
+	if (dz_csr[dz] & CSR_MSE) {			/* scanner on? */
+		dz_rbuf[dz] = dz_getc (dz);		/* get top of silo */
+		if (!dz_rbuf[dz]) dz_sae[dz] = 1;	/* empty? re-enable */
 		tmxr_poll_rx (&dz_desc);		/* poll input */
 		dz_update_rcvi ();  }			/* update rx intr */
-	else {	dz_rbuf = 0;				/* no data */
+	else {	dz_rbuf[dz] = 0;			/* no data */
 		dz_update_rcvi ();  }			/* no rx intr */
-	*data = dz_rbuf;
+	*data = dz_rbuf[dz];
 	break;
 case 02:						/* TCR */
-	*data = dz_tcr;
+	*data = dz_tcr[dz];
 	break;
 case 03:						/* MSR */
-	*data = dz_msr;
+	*data = dz_msr[dz];
 	break;  }
 return SCPE_OK;
 }
 
 t_stat dz_wr (int32 data, int32 PA, int32 access)
 {
+int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;	/* get mux num */
 int32 i, line;
 TMLN *lp;
 
 switch ((PA >> 1) & 03) {				/* case on PA<2:1> */
 case 00:						/* CSR */
-	if (access == WRITEB) data = (PA & 1)?
-		(dz_csr & 0377) | (data << 8): (dz_csr & ~0377) | data;
-	if (data & CSR_CLR) dz_clear (FALSE);
+	if (access == WRITEB) data = (PA & 1)?		/* byte? merge */
+		(dz_csr[dz] & 0377) | (data << 8):
+		(dz_csr[dz] & ~0377) | data;
+	if (data & CSR_CLR) dz_clear (dz, FALSE);	/* clr? reset */
 	if (data & CSR_MSE) sim_activate (&dz_unit, tmxr_poll);
-	else {	sim_cancel (&dz_unit);
-		dz_csr = dz_csr & ~(CSR_SA | CSR_RDONE | CSR_TRDY);  }
-	if ((data & CSR_RIE) == 0) CLR_INT (DZRX);
-	else if (((dz_csr & CSR_IE) == 0) &&		/* RIE 0->1? */
-	         ((dz_csr & CSR_SAE)? (dz_csr & CSR_SA): (dz_csr & CSR_RDONE)))
-		SET_INT (DZRX);
-	if ((data & CSR_TIE) == 0) CLR_INT (DZTX);
-	else if (((dz_csr & CSR_TIE) == 0) && (dz_csr & CSR_TRDY))
-		SET_INT (DZTX);
-	dz_csr = (dz_csr & ~CSR_RW) | (data & CSR_RW);
+	else dz_csr[dz] &= ~(CSR_SA | CSR_RDONE | CSR_TRDY);
+	if ((data & CSR_RIE) == 0) dz_clr_rxint (dz);	/* RIE = 0? */
+	else if (((dz_csr[dz] & CSR_IE) == 0) &&	/* RIE 0->1? */
+	         ((dz_csr[dz] & CSR_SAE)?
+		  (dz_csr[dz] & CSR_SA): (dz_csr[dz] & CSR_RDONE)))
+		dz_set_rxint (dz);
+	if ((data & CSR_TIE) == 0) dz_clr_txint (dz);	/* TIE = 0? */
+	else if (((dz_csr[dz] & CSR_TIE) == 0) && (dz_csr[dz] & CSR_TRDY))
+		dz_set_txint (dz);
+	dz_csr[dz] = (dz_csr[dz] & ~CSR_RW) | (data & CSR_RW);
 	break;
 case 01:						/* LPR */
-	dz_lpr = data;
-	line = LPR_GETLN (dz_lpr);			/* get line */
-	lp = dz_desc.ldsc[line];			/* get line desc */
-	if (dz_lpr & LPR_RCVE) lp -> rcve = 1;		/* rcv enb? on */
+	dz_lpr[dz] = data;
+	line = (dz * DZ_LINES) + LPR_GETLN (data);	/* get line num */
+	lp = &dz_ldsc[line];				/* get line desc */
+	if (dz_lpr[dz] & LPR_RCVE) lp -> rcve = 1;	/* rcv enb? on */
 	else lp -> rcve = 0;				/* else line off */
 	tmxr_poll_rx (&dz_desc);			/* poll input */
 	dz_update_rcvi ();				/* update rx intr */
 	break;
 case 02:						/* TCR */
-	if (access == WRITEB) data = (PA & 1)?
-		(dz_tcr & 0377) | (data << 8): (dz_tcr & ~0377) | data;
+	if (access == WRITEB) data = (PA & 1)?		/* byte? merge */
+		(dz_tcr[dz] & 0377) | (data << 8):
+		(dz_tcr[dz] & ~0377) | data;
 	if (dz_mctl) {					/* modem ctl? */
-		dz_msr = dz_msr | ((data & 0177400) &	/* dcd |= dtr & ring */
-			((dz_msr & DZ_LMASK) << MSR_V_CD));
-		dz_msr = dz_msr & ~(data >> TCR_V_DTR);	/* ring = ring & ~dtr */
+		dz_msr[dz] |= ((data & 0177400) &	/* dcd |= dtr & ring */
+		    ((dz_msr[dz] & DZ_LMASK) << MSR_V_CD));
+		dz_msr[dz] &=  ~(data >> TCR_V_DTR);	/* ring &= ~dtr */
 		if (dz_auto) {				/* auto disconnect? */
 		    int32 drop;
-		    drop = (dz_tcr & ~data) >> TCR_V_DTR; /* drop = dtr & ~data */
+		    drop = (dz_tcr[dz] & ~data) >> TCR_V_DTR; /* drop = dtr & ~data */
 		    for (i = 0; i < DZ_LINES; i++) {	/* drop hangups */
-			lp = dz_desc.ldsc[i];		/* get line desc */
+			line = (dz * DZ_LINES) + i;	/* get line num */
+			lp = &dz_ldsc[line];		/* get line desc */
 			if (lp -> conn && (drop & (1 << i))) {
 			    tmxr_msg (lp -> conn, "\r\nLine hangup\r\n");
 			    tmxr_reset_ln (lp);		/* reset line, cdet */
-			    dz_msr = dz_msr & ~(1 << (i + MSR_V_CD));
+			    dz_msr[dz] &= ~(1 << (i + MSR_V_CD));
 			    }				/* end if drop */
 			}				/* end for */
 		    }					/* end if auto */
 		}					/* end if modem */
-	dz_tcr = data;
+	dz_tcr[dz] = data;
 	tmxr_poll_tx (&dz_desc);			/* poll output */
 	dz_update_xmti ();				/* update int */
 	break;
 case 03:						/* TDR */
 	if (PA & 1) {					/* odd byte? */
-		dz_tdr = (dz_tdr & 0377) | (data << 8);	/* just save */
+		dz_tdr[dz] = (dz_tdr[dz] & 0377) | (data << 8);	/* just save */
 		break;  }
-	dz_tdr = data;
-	if (dz_csr & CSR_MSE) {				/* enabled? */
-		line = CSR_GETTL (dz_csr);		/* get xmit line */
-		lp = dz_desc.ldsc[line];		/* get line desc */
-		tmxr_putc_ln (lp, dz_tdr & 0177);	/* store char */
+	dz_tdr[dz] = data;
+	if (dz_csr[dz] & CSR_MSE) {			/* enabled? */
+		line = (dz * DZ_LINES) + CSR_GETTL (dz_csr[dz]);
+		lp = &dz_ldsc[line];			/* get line desc */
+		tmxr_putc_ln (lp, dz_tdr[dz] & 0177);	/* store char */
 		tmxr_poll_tx (&dz_desc);		/* poll output */
 		dz_update_xmti ();  }			/* update int */
 	break;  }
@@ -294,18 +319,24 @@ return SCPE_OK;
    needs to be processed.  The polling interval is controlled by the clock
    simulator, so for most environments, it is calibrated to real time.
    Typical polling intervals are 50-60 times per second.
+
+   The simulator assumes that software enables all of the multiplexors,
+   or none of them.
 */
 
 t_stat dz_svc (UNIT *uptr)
 {
-int32 newln;
+int32 dz, t, newln;
 
-if (dz_csr & CSR_MSE) {					/* enabled? */
+for (dz = t = 0; dz < DZ_MUXES; dz++)			/* check enabled */
+	t = t | (dz_csr[dz] & CSR_MSE);
+if (t) {						/* any enabled? */
 	newln = tmxr_poll_conn (&dz_desc, uptr);	/* poll connect */
 	if ((newln >= 0) && dz_mctl) {			/* got a live one? */
-		if (dz_tcr & (1 << (newln + TCR_V_DTR)))	/* DTR set? */
-			dz_msr = dz_msr | (1 << (newln + MSR_V_CD));
-		else dz_msr = dz_msr | (1 << newln);  }	/* set ring */
+		dz = newln / DZ_LINES;			/* get mux num */
+		if (dz_tcr[dz] & (1 << (newln + TCR_V_DTR)))	/* DTR set? */
+		     dz_msr[dz] |= (1 << (newln + MSR_V_CD));	/* set cdet */
+		else dz_msr[dz] |= (1 << newln);  }		/* set ring */
 	tmxr_poll_rx (&dz_desc);			/* poll input */
 	dz_update_rcvi ();				/* upd rcv intr */
 	tmxr_poll_tx (&dz_desc);			/* poll output */
@@ -314,42 +345,50 @@ if (dz_csr & CSR_MSE) {					/* enabled? */
 return SCPE_OK;
 }
 
-/* Get first available character, if any */
+/* Get first available character for mux, if any */
 
-int32 dz_getchar (TMXR *mp)
+int32 dz_getc (int32 dz)
 {
-int32 i, val;
+uint32 i, line, c;
 
-for (i = val = 0; (i < mp -> lines) && (val == 0); i++) { /* loop thru lines */
-	val = tmxr_getc_ln (mp -> ldsc[i]);		/* test for input */
-	if (val) val = val | (i << RBUF_V_RLINE);	/* or in line # */
+for (i = c = 0; (i < DZ_LINES) && (c == 0); i++) { 	/* loop thru lines */
+	line = (dz * DZ_LINES) + i;			/* get line num */
+	c = tmxr_getc_ln (&dz_ldsc[line]);		/* test for input */
+	if (c) c = c | (i << RBUF_V_RLINE);		/* or in line # */
 	}						/* end for */
-return val;
+return c;
 }
 
 /* Update receive interrupts */
 
 void dz_update_rcvi (void)
 {
-int32 i, scnt;
+int32 i, dz, line, scnt[DZ_MUXES];
 TMLN *lp;
 
-for (i = scnt = 0; i < DZ_LINES; i++) {			/* poll lines */
-	lp = dz_desc.ldsc[i];				/* get line desc */
-	scnt = scnt + tmxr_rqln (lp);			/* sum buffers */
+for (dz = 0; dz < DZ_MUXES; dz++) {			/* loop thru muxes */
+    scnt[dz] = 0;					/* clr input count */
+    for (i = 0; i < DZ_LINES; i++) {			/* poll lines */
+	line = (dz * DZ_LINES) + i;			/* get line num */
+	lp = &dz_ldsc[line];				/* get line desc */
+	scnt[dz] = scnt[dz] + tmxr_rqln (lp);		/* sum buffers */
 	if (dz_mctl && !lp -> conn)			/* if disconn */
-		dz_msr = dz_msr & ~(1 << (i + MSR_V_CD)); /* reset car det */
+	    dz_msr[dz] &= ~(1 << (i + MSR_V_CD));	/* reset car det */
 	}
-if (scnt && (dz_csr & CSR_MSE)) {			/* input & enabled? */
-	dz_csr = dz_csr | CSR_RDONE;			/* set done */
-	if (dz_sa_enb && (scnt >= DZ_SILO_ALM)) {	/* alm enb & cnt hi? */
-		dz_csr = dz_csr | CSR_SA;		/* set status */
-		dz_sa_enb = 0;  }  }			/* disable alarm */
-else dz_csr = dz_csr & ~CSR_RDONE;			/* no, clear done */
-if ((dz_csr & CSR_RIE) &&				/* int enable */
-    ((dz_csr & CSR_SAE)? (dz_csr & CSR_SA): (dz_csr & CSR_RDONE)))
-	SET_INT (DZRX);					/* and alm/done? */
-else CLR_INT (DZRX);					/* no, clear int */
+    }
+for (dz = 0; dz < DZ_MUXES; dz++) {			/* loop thru muxes */
+    if (scnt[dz] && (dz_csr[dz] & CSR_MSE)) {		/* input & enabled? */
+	dz_csr[dz] |= CSR_RDONE;			/* set done */
+	if (dz_sae[dz] && (scnt[dz] >= DZ_SILO_ALM)) {	/* alm enb & cnt hi? */
+	    dz_csr[dz] |= CSR_SA;			/* set status */
+	    dz_sae[dz] = 0;  }  }			/* disable alarm */
+    else dz_csr[dz] &= ~CSR_RDONE;			/* no, clear done */
+    if ((dz_csr[dz] & CSR_RIE) &&			/* int enable */
+	((dz_csr[dz] & CSR_SAE)?
+	 (dz_csr[dz] & CSR_SA): (dz_csr[dz] & CSR_RDONE)))
+	dz_set_rxint (dz);				/* and alm/done? */
+    else dz_clr_rxint (dz);				/* no, clear int */
+    }
 return;
 }
 
@@ -357,47 +396,114 @@ return;
 
 void dz_update_xmti (void)
 {
-int32 linemask, i, j;
+int32 dz, linemask, i, j, line;
 
-linemask = dz_tcr & DZ_LMASK;				/* enabled lines */
-dz_csr = dz_csr & ~CSR_TRDY;				/* assume not rdy */
-for (i = 0, j = CSR_GETTL (dz_csr); i < DZ_LINES; i++) {
-	j = (j + 1) & DZ_LNOMASK;
-	if ((linemask & (1 << j)) && dz_desc.ldsc[j] -> xmte) {
-		CSR_PUTTL (dz_csr, j);			/* update CSR */
-		dz_csr = dz_csr | CSR_TRDY;		/* set xmt rdy */
+for (dz = 0; dz < DZ_MUXES; dz++) {			/* loop thru muxes */
+    linemask = dz_tcr[dz] & DZ_LMASK;			/* enabled lines */
+    dz_csr[dz] &= ~CSR_TRDY;				/* assume not rdy */
+    j = CSR_GETTL (dz_csr[dz]);				/* start at current */
+    for (i = 0; i < DZ_LINES; i++) {			/* loop thru lines */
+	j = (j + 1) & DZ_LNOMASK;			/* next line */
+	line = (dz * DZ_LINES) + j;			/* get line num */
+	if ((linemask & (1 << j)) && dz_ldsc[line].xmte) {
+		CSR_PUTTL (dz_csr[dz], j);		/* put ln in csr */
+		dz_csr[dz] |= CSR_TRDY;			/* set xmt rdy */
 		break;  }  }
-if ((dz_csr & CSR_TIE) && (dz_csr & CSR_TRDY))		/* ready plus int? */
-	 SET_INT (DZTX);
-else CLR_INT (DZTX);					/* no int req */
+    if ((dz_csr[dz] & CSR_TIE) && (dz_csr[dz] & CSR_TRDY)) /* ready plus int? */
+	 dz_set_txint (dz);
+    else dz_clr_txint (dz);				/* no int req */
+    }
 return;
+}
+
+/* Interrupt routines */
+
+void dz_clr_rxint (int32 dz)
+{
+dz_rxi = dz_rxi & ~(1 << dz);				/* clr mux rcv int */
+if (dz_rxi == 0) CLR_INT (DZRX);			/* all clr? */
+else SET_INT (DZRX);					/* no, set intr */
+return;
+}
+
+void dz_set_rxint (int32 dz)
+{
+dz_rxi = dz_rxi | (1 << dz);				/* set mux rcv int */
+SET_INT (DZRX);						/* set master intr */
+return;
+}
+
+int32 dz_rxinta (void)
+{
+int32 dz;
+
+for (dz = 0; dz < DZ_MUXES; dz++) {			/* find 1st mux */
+	if (dz_rxi & (1 << dz)) {
+		dz_clr_rxint (dz);			/* clear intr */
+		return (VEC_DZRX + (dz * 010));  }  }	/* return vector */
+return 0;
+}
+
+void dz_clr_txint (int32 dz)
+{
+dz_txi = dz_txi & ~(1 << dz);				/* clr mux xmt int */
+if (dz_txi == 0) CLR_INT (DZTX);			/* all clr? */
+else SET_INT (DZTX);					/* no, set intr */
+return;
+}
+
+void dz_set_txint (int32 dz)
+{
+dz_txi = dz_txi | (1 << dz);				/* set mux xmt int */
+SET_INT (DZTX);						/* set master intr */
+return;
+}
+
+int32 dz_txinta (void)
+{
+int32 dz;
+
+for (dz = 0; dz < DZ_MUXES; dz++) {			/* find 1st mux */
+	if (dz_txi & (1 << dz)) {
+		dz_clr_txint (dz);			/* clear intr */
+		return (VEC_DZTX + (dz * 010));  }  }	/* return vector */
+return 0;
 }
 
 /* Device reset */
 
-t_stat dz_clear (t_bool flag)
+t_stat dz_clear (int32 dz, t_bool flag)
 {
-int32 i;
+int32 i, line;
 
-dz_csr = 0;						/* clear CSR */
-dz_rbuf = 0;						/* silo empty */
-dz_lpr = 0;						/* no params */
-if (flag) dz_tcr = 0;					/* INIT? clr all */
-else dz_tcr = dz_tcr & ~0377;				/* else save dtr */
-dz_tdr = 0;
-dz_sa_enb = 1;
-CLR_INT (DZRX);
-CLR_INT (DZTX);
-sim_cancel (&dz_unit);					/* no polling */
-for (i = 0; i < DZ_LINES; i++) {
-	if (!dz_desc.ldsc[i] -> conn) dz_desc.ldsc[i] -> xmte = 1;
-	dz_desc.ldsc[i] -> rcve = 0;  }			/* clr rcv enb */
+dz_csr[dz] = 0;						/* clear CSR */
+dz_rbuf[dz] = 0;					/* silo empty */
+dz_lpr[dz] = 0;						/* no params */
+if (flag) dz_tcr[dz] = 0;				/* INIT? clr all */
+else dz_tcr[dz] &= ~0377;				/* else save dtr */
+dz_tdr[dz] = 0;
+dz_sae[dz] = 1;						/* alarm on */
+dz_clr_rxint (dz);					/* clear int */
+dz_clr_txint (dz);
+for (i = 0; i < DZ_LINES; i++) {			/* loop thru lines */
+	line = (dz * DZ_LINES) + i;
+	if (!dz_ldsc[line].conn) dz_ldsc[line].xmte = 1;/* set xmt enb */
+	dz_ldsc[line].rcve = 0;  }			/* clr rcv enb */
 return SCPE_OK;
 }
 
 t_stat dz_reset (DEVICE *dptr)
 {
-return dz_clear (TRUE);
+int32 i;
+
+for (i = 0; i < (DZ_MUXES * DZ_LINES); i++)		/* init mux desc */
+	dz_desc.ldsc[i] = &dz_ldsc[i];
+for (i = 0; i < DZ_MUXES; i++) dz_clear (i, TRUE);	/* init muxes */
+dz_rxi = dz_txi = 0;					/* clr master int */
+CLR_INT (DZRX);
+CLR_INT (DZTX);
+sim_cancel (&dz_unit);					/* stop poll */
+return SCPE_OK;
 }
 
 /* Attach */
@@ -429,19 +535,64 @@ t_stat dz_detach (UNIT *uptr)
 {
 return tmxr_detach (&dz_desc, uptr);
 }
+
+/* Show summary processor */
 
-/* Status */
-
-t_stat dz_status (FILE *st, UNIT *uptr, void *desc)
+t_stat dz_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-int32 i;
+int32 i, t;
 
-fprintf (st, "line status:");
-for (i = 0; (i < DZ_LINES) && (dz_desc.ldsc[i] -> conn == 0); i++) ;
-if (i < DZ_LINES) {
-	for (i = 0; i < DZ_LINES; i++) {
-		if (dz_desc.ldsc[i] -> conn) 
-			tmxr_fstatus (st, dz_desc.ldsc[i], i);  }  }
-else fprintf (st, " all disconnected");
+for (i = t = 0; i < dz_desc.lines; i++) {		/* get num conn */
+    if (dz_ldsc[i].conn) t = t + 1;  }
+if (t == 1) fprintf (st, "1 connection");
+else fprintf (st, "%d connections", t);
+return SCPE_OK;
+}
+
+/* SHOW CONN/STAT processor */
+
+t_stat dz_show (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 i, t;
+
+for (i = t = 0; i < dz_desc.lines; i++) {		/* loop thru conn */
+    if (dz_ldsc[i].conn) {
+	t = 1; 
+	if (val) tmxr_fconns (st, &dz_ldsc[i], i);
+	else tmxr_fstats (st, &dz_ldsc[i], i);  }  }
+if (t == 0) fprintf (st, "all disconnected\n");
+return SCPE_OK;
+}
+
+/* SET LINES processor */
+
+t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 newln, i, t;
+t_stat r;
+
+if (cptr == NULL) return SCPE_ARG;
+newln = (int32) get_uint (cptr, 10, (DZ_MUXES * DZ_LINES), &r);
+if ((r != SCPE_OK) || (newln == dz_desc.lines)) return r;
+if ((newln == 0) || (newln % DZ_LINES)) return SCPE_ARG;
+if (newln < dz_desc.lines) {
+    for (i = newln, t = 0; i < dz_desc.lines; i++) t = t | dz_ldsc[i].conn;
+    if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
+	return SCPE_OK;
+    for (i = newln; i < dz_desc.lines; i++) {
+	if (dz_ldsc[i].conn) {
+	    tmxr_msg (dz_ldsc[i].conn, "\r\nOperator disconnected line\r\n");
+	    tmxr_reset_ln (&dz_ldsc[i]);  }		/* reset line */
+	if ((i % DZ_LINES) == (DZ_LINES - 1))
+	    dz_clear (i / DZ_LINES, TRUE);  }		/* reset mux */
+    dz_dib.lnt = newln;
+    }
+else {
+    dz_dib.lnt = newln;					/* set length */
+    if (dev_conflict (dz_dib.ba, &dz_dib)) {		/* chk addr conflict */
+	dz_dib.lnt = dz_desc.lines;
+	return SCPE_OK;  }
+    }
+dz_desc.lines = newln;
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* pdp8_lp.c: PDP-8 line printer simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    lpt		LP8E line printer
+
+   30-May-02	RMS	Widened POS to 32b
 */
 
 #include "pdp8_defs.h"
@@ -52,7 +54,7 @@ REG lpt_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_LPT) },
 	{ FLDATA (ENABLE, int_enable, INT_V_LPT) },
 	{ FLDATA (INT, int_req, INT_V_LPT) },
-	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
 	{ NULL }  };

@@ -1,6 +1,6 @@
-/* hp2100_dp.c: HP 2100 disk pack simulator
+/* hp2100_dp.c: HP 2100 12557A/13210A disk pack simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   dp		12557A cartridge disk system
+   dp		12557A/13210A disk pack subsystem
 
+   15-Jan-02	RMS	Fixed INIT handling (found by Bill McDermith)
+   10-Jan-02	RMS	Fixed f(x)write call (found by Bill McDermith)
    03-Dec-01	RMS	Changed DEVNO to use extended SET/SHOW
    24-Nov-01	RMS	Changed STA to be an array
    07-Sep-01	RMS	Moved function prototypes
@@ -40,12 +42,15 @@
 #define FNC		u3				/* saved function */
 #define CYL		u4				/* cylinder */
 
-#define DP_W_NUMWD	7
-#define DP_NUMWD	(1 << DP_W_NUMWD)		/* words/sector */
-#define DP_NUMSC	12				/* sectors/track */
-#define DP_NUMTR	203				/* tracks/surface */
-#define DP_NUMSF	4				/* surfaces/track */
-#define DP_SIZE		(DP_NUMSF * DP_NUMTR * DP_NUMSC * DP_NUMWD)
+#define DP_N_NUMWD	7
+#define DP_NUMWD	(1 << DP_N_NUMWD)		/* words/sector */
+#define DP_NUMSC2	12				/* sectors/srf 12557 */
+#define DP_NUMSC3	24				/* sectors/srf 13210 */
+#define DP_NUMSC	(dp_ctype? DP_NUMSC3: DP_NUMSC2)
+#define DP_NUMSF	4				/* surfaces/cylinder */
+#define DP_NUMCY	203				/* cylinders/disk */
+#define DP_SIZE2	(DP_NUMSF * DP_NUMCY * DP_NUMSC2 * DP_NUMWD)
+#define DP_SIZE3	(DP_NUMSF * DP_NUMCY * DP_NUMSC3 * DP_NUMWD)
 #define DP_NUMDRV	4				/* # drives */
 
 /* Command word */
@@ -78,8 +83,13 @@
 #define DA_M_HD		03
 #define DA_GETHD(x)	(((x) >> DA_V_HD) & DA_M_HD)
 #define DA_V_SC		0				/* sector */
-#define DA_M_SC		017
+#define DA_M_SC2	017
+#define DA_M_SC3	037
+#define DA_M_SC		(dp_ctype? DA_M_SC3: DA_M_SC2)
 #define DA_GETSC(x)	(((x) >> DA_V_SC) & DA_M_SC)
+#define DA_CKMASK2	037				/* check mask */
+#define DA_CKMASK3	077
+#define DA_CKMASK	(dp_ctype? DA_CKMASK3: DA_CKMASK2)
 
 /* Status */
 
@@ -88,8 +98,8 @@
 #define STA_OVR		0020000				/* overrun */
 #define STA_RWU		0010000				/* rw unsafe */
 #define STA_ACU		0004000				/* access unsafe */
-#define STA_HUNT	0002000				/* hunting */
-#define STA_SKI		0001000				/* incomplete */
+#define STA_HUNT	0002000				/* hunting NI */
+#define STA_SKI		0001000				/* incomplete NI */
 #define STA_SKE		0000400				/* seek error */
 /*			0000200				/* unused */
 #define STA_NRDY	0000100				/* not ready */
@@ -102,11 +112,11 @@
 #define STA_ALLERR	(STA_ATN + STA_1ST + STA_OVR + STA_RWU + STA_ACU + \
 			 STA_HUNT + STA_SKI + STA_SKE + STA_NRDY + STA_EOC + \
 			 STA_FLG + STA_DTE)
+#define STA_MBZ13	(STA_ATN + STA_RWU + STA_SKI)	/* zero in 13210 */
 
-extern uint16 M[];
-extern struct hpdev infotab[];
 extern int32 PC;
 extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+int32 dp_ctype = 0;					/* ctrl type */
 int32 dpc_busy = 0;					/* cch busy */
 int32 dpc_cnt = 0;					/* check count */
 int32 dpc_eoc = 0;					/* end of cyl */
@@ -118,16 +128,18 @@ int32 dpc_rarc = 0, dpc_rarh = 0, dpc_rars = 0;		/* record addr */
 int32 dpd_obuf = 0, dpd_ibuf = 0;			/* dch buffers */
 int32 dpc_obuf = 0;					/* cch buffers */
 int32 dp_ptr = 0;					/* buffer ptr */
-uint16 dp_buf[DP_NUMWD];				/* sector buffer */
+uint16 dpxb[DP_NUMWD];					/* sector buffer */
 
+int32 dpdio (int32 inst, int32 IR, int32 dat);
+int32 dpcio (int32 inst, int32 IR, int32 dat);
 t_stat dpc_svc (UNIT *uptr);
 t_stat dpc_reset (DEVICE *dptr);
 t_stat dpc_vlock (UNIT *uptr, int32 val);
 t_stat dpc_attach (UNIT *uptr, char *cptr);
 t_stat dpc_detach (UNIT *uptr);
-t_stat dpd_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
-t_stat dpd_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void dp_go (int32 fnc, int32 drv, int32 time, int32 attdev);
+t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* DPD data structures
 
@@ -136,23 +148,37 @@ void dp_go (int32 fnc, int32 drv, int32 time, int32 attdev);
    dpd_reg	DPD register list
 */
 
-UNIT dpd_unit = { UDATA (NULL, UNIT_FIX, DP_NUMWD) };
+DIB dp_dib[] = {
+	{ DPD, 1, 0, 0, 0, 0, &dpdio },
+	{ DPC, 1, 0, 0, 0, 0, &dpcio }  };
+
+#define dpd_dib dp_dib[0]
+#define dpc_dib dp_dib[1]
+
+UNIT dpd_unit = { UDATA (NULL, 0, 0) };
 
 REG dpd_reg[] = {
 	{ ORDATA (IBUF, dpd_ibuf, 16) },
 	{ ORDATA (OBUF, dpd_obuf, 16) },
-	{ FLDATA (CMD, infotab[inDPD].cmd, 0) },
-	{ FLDATA (CTL, infotab[inDPD].ctl, 0) },
-	{ FLDATA (FLG, infotab[inDPD].flg, 0) },
-	{ FLDATA (FBF, infotab[inDPD].fbf, 0) },
-	{ DRDATA (BPTR, dp_ptr, DP_W_NUMWD) },
-	{ ORDATA (DEVNO, infotab[inDPD].devno, 6), REG_RO },
+	{ FLDATA (CMD, dpd_dib.cmd, 0) },
+	{ FLDATA (CTL, dpd_dib.ctl, 0) },
+	{ FLDATA (FLG, dpd_dib.flg, 0) },
+	{ FLDATA (FBF, dpd_dib.fbf, 0) },
+	{ BRDATA (DBUF, dpxb, 8, 16, DP_NUMWD) },
+	{ DRDATA (BPTR, dp_ptr, DP_N_NUMWD) },
+	{ ORDATA (DEVNO, dpd_dib.devno, 6), REG_HRO },
+	{ FLDATA (*DEVENB, dpd_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
+MTAB dpd_mod[] = {
+	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
+		&hp_setdev, &hp_showdev, &dpd_dib },
+	{ 0 }  };
+
 DEVICE dpd_dev = {
-	"DPD", &dpd_unit, dpd_reg, NULL,
-	1, 10, DP_W_NUMWD, 1, 8, 16,
-	&dpd_ex, &dpd_dep, &dpc_reset,
+	"DPD", &dpd_unit, dpd_reg, dpd_mod,
+	1, 10, DP_N_NUMWD, 1, 8, 16,
+	NULL, NULL, &dpc_reset,
 	NULL, NULL, NULL };
 
 /* DPC data structures
@@ -164,10 +190,10 @@ DEVICE dpd_dev = {
 */
 
 UNIT dpc_unit[] = {
-	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, DP_SIZE) },
-	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, DP_SIZE) },
-	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, DP_SIZE) },
-	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, DP_SIZE) }  };
+	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, DP_SIZE2) },
+	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, DP_SIZE2) },
+	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, DP_SIZE2) },
+	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, DP_SIZE2) }  };
 
 REG dpc_reg[] = {
 	{ ORDATA (OBUF, dpc_obuf, 16) },
@@ -176,31 +202,39 @@ REG dpc_reg[] = {
 	{ ORDATA (RARH, dpc_rarh, 2) },
 	{ ORDATA (RARS, dpc_rars, 4) },
 	{ ORDATA (CNT, dpc_cnt, 5) },
-	{ FLDATA (CMD, infotab[inDPC].cmd, 0) },
-	{ FLDATA (CTL, infotab[inDPC].ctl, 0) },
-	{ FLDATA (FLG, infotab[inDPC].flg, 0) },
-	{ FLDATA (FBF, infotab[inDPC].fbf, 0) },
+	{ FLDATA (CMD, dpc_dib.cmd, 0) },
+	{ FLDATA (CTL, dpc_dib.ctl, 0) },
+	{ FLDATA (FLG, dpc_dib.flg, 0) },
+	{ FLDATA (FBF, dpc_dib.fbf, 0) },
 	{ FLDATA (EOC, dpc_eoc, 0) },
 	{ DRDATA (CTIME, dpc_ctime, 24), PV_LEFT },
 	{ DRDATA (STIME, dpc_stime, 24), PV_LEFT },
 	{ DRDATA (XTIME, dpc_xtime, 24), REG_NZ + PV_LEFT },
 	{ BRDATA (STA, dpc_sta, 8, 16, DP_NUMDRV) },
-	{ GRDATA (UFLG0, dpc_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
-		  REG_HRO },
-	{ GRDATA (UFLG1, dpc_unit[1].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
-		  REG_HRO },
-	{ GRDATA (UFLG2, dpc_unit[2].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
-		  REG_HRO },
-	{ GRDATA (UFLG3, dpc_unit[3].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
-		  REG_HRO },
-	{ ORDATA (DEVNO, infotab[inDPC].devno, 6), REG_RO },
+	{ FLDATA (CTYPE, dp_ctype, 0), REG_HRO },
+	{ URDATA (CAPAC, dpc_unit[0].capac, 10, 31, 0,
+		  DP_NUMDRV, PV_LEFT | REG_HRO) },
+	{ URDATA (UFLG, dpc_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
+		  DP_NUMDRV, REG_HRO) },
+	{ ORDATA (DEVNO, dpc_dib.devno, 6), REG_HRO },
+	{ FLDATA (*DEVENB, dpc_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB dpc_mod[] = {
 /*	{ UNIT_WLK, 0, "write enabled", "ENABLED", &dpc_vlock }, */
 /*	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", &dpc_vlock }, */
-	{ MTAB_XTD | MTAB_VDV, inDPD, "DEVNO", "DEVNO",
-		&hp_setdev2, &hp_showdev2, NULL },
+	{ MTAB_XTD | MTAB_VDV, 1, NULL, "13210A",
+		&dp_settype, NULL, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, NULL, "12557A",
+		&dp_settype, NULL, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL,
+		NULL, &dp_showtype, NULL },
+	{ MTAB_XTD | MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enb, NULL, &dpd_dib },
+	{ MTAB_XTD | MTAB_VDV, 1, NULL, "DISABLED",
+		&set_dis, NULL, &dpd_dib },
+	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
+		&hp_setdev, &hp_showdev, &dpd_dib },
 	{ 0 }  };
 
 DEVICE dpc_dev = {
@@ -221,10 +255,10 @@ case ioFLG:						/* flag clear/set */
 	if ((IR & HC) == 0) { setFLG (devd); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
-	if (FLG (devd) == 0) PC = (PC + 1) & AMASK;
+	if (FLG (devd) == 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioSFS:						/* skip flag set */
-	if (FLG (devd) != 0) PC = (PC + 1) & AMASK;
+	if (FLG (devd) != 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioOTX:						/* output */
 	dpd_obuf = dat;
@@ -258,10 +292,10 @@ case ioFLG:						/* flag clear/set */
 	if ((IR & HC) == 0) { setFLG (devc); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
-	if (FLG (devc) == 0) PC = (PC + 1) & AMASK;
+	if (FLG (devc) == 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioSFS:						/* skip flag set */
-	if (FLG (devc) != 0) PC = (PC + 1) & AMASK;
+	if (FLG (devc) != 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioOTX:						/* output */
 	dpc_obuf = dat;
@@ -296,12 +330,8 @@ case ioCTL:						/* control clear/set */
 			dp_go (fnc, drv, dpc_xtime, devc);
 			break;
 		case FNC_REF: case FNC_RD: case FNC_WD:	/* ref, read, write */
-			dp_go (fnc, drv, dpc_ctime, devc);
-			break;
 		case FNC_INIT:				/* init */
-			dpc_sta[drv] = dpc_sta[drv] | STA_FLG;
-			setFLG (devc);			/* set cch flg */
-			clrCMD (devc);			/* clr cch cmd */
+			dp_go (fnc, drv, dpc_ctime, devc);
 			break;
 		}					/* end case */
 	}						/* end else */
@@ -341,8 +371,8 @@ int32 i, da, drv, devc, devd, err, st, maxsc;
 
 err = 0;						/* assume no err */
 drv = uptr - dpc_dev.units;				/* get drive no */
-devc = infotab[inDPC].devno;				/* get cch devno */
-devd = infotab[inDPD].devno;				/* get dch devno */
+devc = dpc_dib.devno;					/* get cch devno */
+devd = dpd_dib.devno;					/* get dch devno */
 switch (uptr -> FNC) {					/* case function */
 
 case FNC_SEEK:						/* seek, need cyl */
@@ -370,9 +400,11 @@ case FNC_SEEK1:						/* seek, need hd/sec */
 case FNC_SEEK2:						/* seek done */
 	if (dpc_busy) sim_activate (uptr, dpc_xtime);	/* ctrl busy? wait */
 	else {	dpc_sta[drv] = (dpc_sta[drv] | STA_ATN) & ~STA_BSY;
-		if (uptr -> CYL >= DP_NUMTR) {		/* error? */
+		if (uptr -> CYL >= DP_NUMCY) {		/* invalid cyl? */
 			dpc_sta[drv] = dpc_sta[drv] | STA_SKE;
 			uptr -> CYL = 0;  }
+		if (dpc_rars >= DP_NUMSC)		/* invalid sec? */
+			dpc_sta[drv] = dpc_sta[drv] | STA_SKE;
 		setFLG (devc);				/* set cch flg */
 		clrCMD (devc);  }			/* clr cch cmd */
 	return SCPE_OK;
@@ -397,10 +429,11 @@ case FNC_AR1:						/* arec, need hd/sec */
 
 case FNC_STA:						/* read status */
 	if (CMD (devd)) {				/* dch active? */
-		dpd_ibuf = dpc_sta[drv] | ((dpc_sta[drv] & STA_ALLERR)? STA_ERR: 0);
+		dpd_ibuf = dpc_sta[drv] & ~(dp_ctype? STA_MBZ13: 0);
+		if (dpc_sta[drv] & STA_ALLERR) dpd_ibuf = dpd_ibuf | STA_ERR;
 		setFLG (devd);				/* set dch flg */
 		clrCMD (devd);				/* clr dch cmd */
-		dpc_sta[drv] = dpc_sta[drv] & 	/* clr sta flags */
+		dpc_sta[drv] = dpc_sta[drv] &		/* clr sta flags */
 			~(STA_ATN | STA_DTE | STA_FLG | STA_AER | STA_EOC);
 		dpc_busy = 0;  }			/* ctlr is free */
 	else sim_activate (uptr, dpc_xtime);		/* wait more */
@@ -409,7 +442,7 @@ case FNC_STA:						/* read status */
 case FNC_REF:						/* refine sector */
 	if ((uptr -> CYL != dpc_rarc) || (dpc_rars >= DP_NUMSC))
 		dpc_sta[drv] = dpc_sta[drv] | STA_AER;
-	else {	for (i = 0; i < DP_NUMWD; i++) dp_buf[i] = 0;
+	else {	for (i = 0; i < DP_NUMWD; i++) dpxb[i] = 0;
 		da = GETDA (dpc_rarc, dpc_rarh, dpc_rars);	/* get addr */
 		dpc_rars = dpc_rars + 1;		/* incr sector */
 		if (dpc_rars >= DP_NUMSC) {		/* end of trk? */
@@ -417,13 +450,13 @@ case FNC_REF:						/* refine sector */
 			dpc_rarh = dpc_rarh ^ 1;  }	/* next surf */
 		if (err = fseek (uptr -> fileref, da * sizeof (int16),
 			SEEK_SET)) break;
-		fxwrite (dp_buf, sizeof (int16), DP_NUMWD, uptr -> fileref);
+		fxwrite (dpxb, sizeof (int16), DP_NUMWD, uptr -> fileref);
 		err = ferror (uptr -> fileref);  }
 	break;
 
 case FNC_CHK:						/* check, need cnt */
 	if (CMD (devd)) {				/* dch active? */
-		dpc_cnt = dpd_obuf & 037;		/* get count */
+		dpc_cnt = dpd_obuf & DA_CKMASK;		/* get count */
 		setFLG (devd);				/* set dch flg */
 		clrCMD (devd);				/* clr dch cmd */
 		sim_activate (uptr, dpc_ctime);		/* schedule op */
@@ -461,23 +494,24 @@ case FNC_RD:						/* read */
 			dpc_eoc = ((dpc_rarh & 1) == 0);  }	/* calc eoc */
 		if (err = fseek (uptr -> fileref, da * sizeof (int16),
 			SEEK_SET)) break;
-		fxread (dp_buf, sizeof (int16), DP_NUMWD, uptr -> fileref);
+		fxread (dpxb, sizeof (int16), DP_NUMWD, uptr -> fileref);
 		if (err = ferror (uptr -> fileref)) break;  }
-	dpd_ibuf = dp_buf[dp_ptr++];			/* get word */
+	dpd_ibuf = dpxb[dp_ptr++];			/* get word */
 	if (dp_ptr >= DP_NUMWD) dp_ptr = 0;		/* wrap if last */
 	setFLG (devd);					/* set dch flg */
 	clrCMD (devd);					/* clr dch cmd */
 	sim_activate (uptr, dpc_xtime);			/* sched next word */
 	return SCPE_OK;
 
+case FNC_INIT:						/* init */
 case FNC_WD:						/* write */
 	if (dpc_eoc) {					/* end of cyl? */
 		dpc_sta[drv] = dpc_sta[drv] | STA_EOC;	/* set status */
 		break;  }				/* done */
 	if (FLG (devd)) dpc_sta[drv] = dpc_sta[drv] | STA_OVR;
-	dp_buf[dp_ptr++] = dpd_obuf;			/* store word */
+	dpxb[dp_ptr++] = dpd_obuf;			/* store word */
 	if (!CMD (devd)) {				/* dch clr? done */
-		for ( ; dp_ptr < DP_NUMWD; dp_ptr++) dp_buf[dp_ptr] = 0;  }
+		for ( ; dp_ptr < DP_NUMWD; dp_ptr++) dpxb[dp_ptr] = 0;  }
 	if (dp_ptr >= DP_NUMWD) {			/* buffer full? */
 		if ((uptr -> CYL != dpc_rarc) || (dpc_rars >= DP_NUMSC)) {
 			dpc_sta[drv] = dpc_sta[drv] | STA_AER;
@@ -490,7 +524,7 @@ case FNC_WD:						/* write */
 			dpc_eoc = ((dpc_rarh & 1) == 0);  }	/* calc eoc */
 		if (err = fseek (uptr -> fileref, da * sizeof (int16),
 			SEEK_SET)) return TRUE;
-		fwrite (dp_buf, sizeof (int16), DP_NUMWD, uptr -> fileref);
+		fxwrite (dpxb, sizeof (int16), DP_NUMWD, uptr -> fileref);
 		if (err = ferror (uptr -> fileref)) break;
 		dp_ptr = 0;  }
 	if (CMD (devd)) {				/* dch active? */
@@ -538,10 +572,10 @@ dpc_busy = dpc_obuf = 0;
 dpc_eoc = 0;
 dp_ptr = 0;
 dpc_rarc = dpc_rarh = dpc_rars = 0;			/* clear rar */
-infotab[inDPC].cmd = infotab[inDPD].cmd = 0;		/* clear cmd */
-infotab[inDPC].ctl = infotab[inDPD].ctl = 0;		/* clear ctl */
-infotab[inDPC].fbf = infotab[inDPD].fbf = 1;		/* set fbf */
-infotab[inDPC].flg = infotab[inDPD].flg = 1;		/* set flg */
+dpc_dib.cmd = dpd_dib.cmd = 0;				/* clear cmd */
+dpc_dib.ctl = dpd_dib.ctl = 0;				/* clear ctl */
+dpc_dib.fbf = dpd_dib.fbf = 1;				/* set fbf */
+dpc_dib.flg = dpd_dib.flg = 1;				/* set flg */
 for (i = 0; i < DP_NUMDRV; i++) {			/* loop thru drives */
 	sim_cancel (&dpc_unit[i]);			/* cancel activity */
 	dpc_unit[i].FNC = 0;				/* clear function */
@@ -586,20 +620,28 @@ if (uptr -> flags & UNIT_ATT) return SCPE_ARG;
 return SCPE_OK;
 }
 
-/* Buffer examine */
+/* Set controller type */
 
-t_stat dpd_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
+t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (addr >= DP_NUMWD) return SCPE_NXM;
-if (vptr != NULL) *vptr = dp_buf[addr] & DMASK;
+int32 i;
+
+if ((val < 0) || (val > 1) || (cptr != NULL)) return SCPE_ARG;
+for (i = 0; i < DP_NUMDRV; i++) {
+	if (dpc_unit[i].flags & UNIT_ATT) return SCPE_ALATT;  }
+for (i = 0; i < DP_NUMDRV; i++)
+	dpc_unit[i].capac = (val? DP_SIZE3: DP_SIZE2);
+dp_ctype = val;
 return SCPE_OK;
 }
 
-/* Buffer deposit */
+/* Show controller type */
 
-t_stat dpd_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
+t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (addr >= DP_NUMWD) return SCPE_NXM;
-dp_buf[addr] = val & DMASK;
+if (dp_ctype) fprintf (st, "13210A");
+else fprintf (st, "12557A");
 return SCPE_OK;
 }
+
+

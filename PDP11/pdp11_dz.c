@@ -1,6 +1,6 @@
 /* pdp11_dz.c: DZ11 terminal multiplexor simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 2001-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

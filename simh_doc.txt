@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V2.8
-Date:	10-Dec-01
+Subj:	Simulator Usage, V2.11
+Date:	15-Jul-2002
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2001, written by Robert M Supnik
-   Copyright (c) 1993-2001, Robert M Supnik
+   Original code published in 1993-2002, written by Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -44,11 +44,17 @@ documented in separate, machine-specific memoranda.
 
 1. Compiling And Running A Simulator
 
-The simulators have been tested on VAX VMS, Alpha VMS, Alpha UNIX, Intel
-FreeBSD, Intel LINUX, Windows 9x/Me/NT/2000 (Visual C++ and MINGW gcc),
-Macintosh 9 and X (CodeWarrior), and OS/2.  Porting to other environments
-will require changes to the operating system dependent code in scp_tty.c
-and scp_sock.c.
+The simulators have been tested on VAX VMS, Alpha VMS, Alpha UNIX,
+Intel FreeBSD, Intel LINUX, Windows 9x/Me/NT/2000 (Visual C++ and
+MINGW gcc), Macintosh 9 and X (CodeWarrior), and OS/2.  Porting to
+other environments will require changes to the operating system
+dependent code in scp_tty.c and scp_sock.c.
+
+The simulator sources are provided in a zip archive.  The sources
+originate on a Windows system and have cr-lf at the end of every line.
+For use on UNIX or Mac, the sources must be converted to UNIX and MAC
+text conventions.  This can usually be done with the UNZIP utility
+(e.g., unzip -a on UNIX). 
 
 The simulator sources are organized hierarchically.  Source files for
 the simulator libraries are in the top level directory; source files
@@ -84,7 +90,8 @@ Compilation notes:
 
 - Simulators supporting multiple terminals require a sockets library.
   Under UNIX, this library is linked in automatically.  Under Visual
-  C++, wsock32.lib must be added to the library search list.
+  C++, wsock32.lib must be added to the library search list.  Under
+  OS/2, socket support requires the EMX compiler.
 
 Examples:
 
@@ -209,12 +216,13 @@ unstructured binary disk files in the host file system.  Before using a
 simulated unit the user must specify the file to be accessed by that
 unit.  The ATTACH (abbreviation AT) command associates a unit and a file:
 
-	sim> ATTACH <device><unit number> <filename>(cr)
+	sim> ATTACH <unit> <filename>(cr)
 
-If the file does not exist, it is created, and an appropriate message
-is printed.
+If the file does not exist, and the -e switch was not specified, a new
+file is created, and an appropriate message is printed.  If the -e switch
+was specified, a new file is not created, and an error message is printed.
 
-If the -r switch is given, or the file is write protected, ATTACH tries
+If the -r switch is specified, or the file is write protected, ATTACH tries
 to open the file read only.  If the file does not exist, or the unit
 does not support read only operation, an error occurs.  Input-only
 devices, such as paper-tape readers, and devices with write lock switches,
@@ -225,7 +233,7 @@ not modified.
 For Telnet-based terminal emulators, the ATTACH command associates the
 master unit with a TCP/IP port:
 
-	sim> ATTACH <device><unit number> <port>(cr)
+	sim> ATTACH <unit> <port>(cr)
 
 The port is a decimal number between 1 and 65535 and should not used
 by standard TCP/IP protocols.
@@ -234,7 +242,7 @@ The DETACH (abbreviation DET) command breaks the association between a
 unit and a file, or between a unit and a port:
 
 	sim> DETACH ALL(cr)			-- detach all units
-	sim> DETACH <device><unit number>(cr)	-- detach specified unit
+	sim> DETACH <unit>(cr)	-- detach specified unit
 
 The EXIT command performs an automatic DETACH ALL.
 
@@ -300,6 +308,8 @@ by commas:
 	address			the specified location
 	address1-address2	all locations starting at address1 up to
 				and including address2
+	address/length		all location starting at address up to
+				but not including address+length
 	STATE			all registers in the device
 	ALL			all locations in the unit
 
@@ -398,7 +408,7 @@ A breakpoint is set by the BREAK command:
 If no type is specified, the simulator-specific default breakpoint type
 (usually E for execution) is used.  As with EXAMINE and DEPOSIT, an address
 range may be a single address, a range of addresses low-high, or a relative
-range of address low/length.  Examples of SET BREAK
+range of address/length.  Examples of BREAK:
 
 	sim> break -e 200			-- set E break at 200
 	sim> break 2000/2[2]			-- set E breaks at 2000,2001
@@ -423,7 +433,7 @@ or a unit parameter:
 	sim> SET <unit> <parameter>{=<value>}
 
 Most parameters are simulator and device specific.  Disk drives, for
-example, can usually be set write ENABLED or write LOCKED; if a device
+example, can usually be set WRITEENABLED or write LOCKED; if a device
 supports multiple drive types, the SET command can be used to specify
 the drive type.
 
@@ -432,13 +442,6 @@ All devices recognize the following parameters:
 	OCT		sets the data radix = 8
 	DEC		sets the data radix = 10
 	HEX		sets the data radix = 16
-
-Most multi-unit devices allow units to be placed online or offline:
-
-	sim> SET <unit> ONLINE
-	sim> SET <unit> OFFLINE
-
-When a unit is offline, it will not be displayed by SHOW DEVICE.
 
 3.9 Displaying Parameters and Status
 
@@ -467,29 +470,48 @@ display a result.
 
 3.10 Altering the Simulated Configuration
 
-For most mass storage, the DISABLE <device> command removes the specified
-device from the configuration.  A DISABLEd device is invisible to running
+In most simulators, the SET <device> DISABLED command removes the specified
+device from the configuration.  A DISABLED device is invisible to running
 programs.  The device can still be RESET but it cannot be ATTAChed, DETACHed,
-or BOOTed.  ENABLE <device> restores a disabled device to a configuration.
+or BOOTed.  SET <device> ENABLED restores a disabled device to a configuration.
+
+Most multi-unit devices allow units to be placed online or offline:
+
+	sim> SET <unit> ONLINE
+	sim> SET <unit> OFFLINE
+
+When a unit is offline, it will not be displayed by SHOW DEVICE.
+
+If the host is VMS or UNIX, VT100 terminal emulation for the console window
+is built in to the Xterm program.  For Windows, VT100 emulation foir the
+console window can be enabled or disabled explicitly:
+
+	sim> SET VT				-- enable VT emulation
+	sim> SET NOVT				-- disable VT emulation
+
+VT100 emulation is not presently available on Mac or OS/2 hosts.
 
 3.11 Logging Console Output
 
 Output to the console can be logged simultaneously to a file.  Logging is
 enabled by the LOG command:
 
-	sim> LOG <filename>			-- log console output to file
+	sim> SET LOG <filename>			-- log console output to file
 
 Logging is disabled by the NOLOG command:
 
-	sim> NOLOG					-- disable logging
+	sim> SET NOLOG				-- disable logging
 
-LOG with no argument displays whether logging is enabled or disabled.
+SHOW LOG displays whether logging is enabled or disabled.
 
 3.12 Executing Command Files
 
 The simulator can execute command files with the DO command:
 
 	sim> DO <filename>			-- execute commands in file
+
+If the switch -V is specified, the commands in the file are echoed before
+they are executed.
 
 3.13 Exiting The Simulator
 
@@ -576,28 +598,47 @@ console		y	y	y	y	y
 paper tape	y	y	y	h	y
 card reader	-	-	-	-	-
 line printer	y	y	y	h	y
-clock		y	y	y	-	h
+clock		y	y	y	-	y
+extra terminal	y	y	y	-	y
 hard disk	y	y	y	-	h
-fixed disk	y/both	-	h	-	h
+fixed disk	y	-	h	-	h
 floppy disk	y	y	y	-	-
-DECtape		y	y	-	-	d
-mag tape	h	y/both	y	-	h
+DECtape		y	y	-	-	y
+mag tape	h	y	y	-	h
 
-	system	1401	2100	Id4	PDP-10	H316
+	system	1401	2100	PDP-10	H316	VAX
 device
-CPU		d	y	h	y	h
-FPU		-	-	h	y	-
-CIS		-	-	-	y	-
-console		h	y	h	y	h
-paper tape	-	h	h	h	h
-card reader	h	h	-	-	-
-line printer	h	-	-	y	h
-clock		-	h	-	y	h
-hard disk	-	h	-	y	-
+CPU		y	y	y	h	y
+FPU		-	-	y	-	y
+CIS		-	-	y	-	-
+console		h	y	y	h	y
+paper tape	-	h	h	h	y
+card reader	y	-	-	-	-
+line printer	y	h	y	h	y
+clock		-	h	y	h	y
+extra terminal	-	h	y	-	y
+hard disk	-	h	y	-	y
 fixed disk	-	h	-	-	-
 floppy disk	-	-	-	-	-
 DECtape		-	-	-	-	-
-mag tape	h	h	-	y	-
+mag tape	y	h	y	-	y
+
+	system	GRI-909
+device
+CPU		h
+FPU		-
+CIS		-
+console		h
+paper tape	h
+card reader	-
+line printer	-
+clock		h
+extra terminal	-
+hard disk	-
+fixed disk	-
+floppy disk	-
+DECtape		-
+mag tape	-
 
 legend:		y = runs operating system or sample program
 		d = runs diagnostics
@@ -605,10 +646,26 @@ legend:		y = runs operating system or sample program
 		n = untested
 		- = not applicable
 
-Revision History (covering Rev 1.1 to 2.7)
+Revision History (covering Rev 1.1 to 2.9)
 
 Starting with Rev 2.7, detailed revision histories can be found
 in file sim_rev.c.
+
+Rev 2.9, Jan, 02
+		Added circular register arrays
+		Replaced ENABLE/DISABLE with SET ENABLED/DISABLED
+		Replaced LOG/NOLOG with SET LOG/NOLOG
+		Generalized the timer calibration package
+		Added additional routines to the multiplexor library
+		Added SET DISCONNECT, SHOW STATISTICS commands to multiplexors
+		Reimplemented PDP-8 TTX as a unified multiplexor
+		Implemented a PC queue in most simulators
+		Added VAX simulator
+		Added GRI-909 simulator
+		Added Peter Schorn's MITS 8080/Z80 simulator
+		Added Brian Knittel's IBM 1130 simulator
+		Added HP2100 DQ, DR, MS, MUX devices
+		Added SET VT/NOVT commands
 
 Rev 2.8, Dec, 01
 		Added DO command
@@ -617,8 +674,6 @@ Rev 2.8, Dec, 01
 		Replaced ADD/REMOVE with SET ONLINE/OFFLINE
 		Added global register name recognition
 		Added unit-based register arrays
-		Added VAX simulator
-		Added SDS940 simulator
 		Added Charles Owen's System 3 simulator
 		Added PDP-11 I/O bus map
 		Added PDP-11/VAX RQDX3
@@ -870,12 +925,15 @@ Alan Bawden		ITS consulting
 Winfried Bergmann	Linux port testing
 Phil Budne		Solaris port testing
 Max Burnet		PDP information, documentation, and software
+Robert Alan Byer	VMS socket support and testing
 James Carpenter		LINUX port testing
 Chip Charlot		PDP-11 RT-11, RSTS/E, RSX-11M legal permissions
 Louis Chrétien		Macintosh porting
 Dave Conroy		HP 21xx documentation, PDP-10, PDP-18b debugging
 L Peter Deutsch		PDP-1 LISP software
 Ethan Dicks		PDP-11 2.9 BSD debugging
+John Dundas		PDP-11 CPU and clock debugging
+Jonathan Engdahl	PDP-11 device debugging
 Carl Friend		Nova and Interdata documentation, and RDOS software
 Megan Gentry		PDP-11 integer debugging, make file
 Dave Gesswein		PDP-8 and PDP-9.15 documentation, PDP-8 DECtape and
@@ -890,8 +948,10 @@ Ken Harrenstein		KLH PDP-10 simulator
 Bill Haygood		PDP-8 information, simulator, and software
 Wolfgang Helbig		DZ11 implementation
 Mark Hittinger		PDP-10 debugging
+Sellam Ismail		GRI-909 documentation
 Jay Jaeger		IBM 1401 information
 Doug Jones		PDP-8 information, simulator, and software
+Brian Knittel		IBM 1130 simulator
 Al Kossow		HP 21xx, Varian 620, TI 990, Interdata, DEC
 			 documentation and software
 Arthur Krewat		DZ11 update for the PDP-10
@@ -900,6 +960,7 @@ Don Lewine		Nova documentation and legal permissions
 Tim Litt		PDP-10 hardware documentation and schematics,
 			 tape images, and software sources
 Tim Markson		DZ11 debugging
+Bill McDermith		HP 2100 debugging, 12565A simulator
 Scott McGregor		PDP-11 UNIX legal permissions
 Jeff Moffatt		HP 2100 information, documentation, and software
 Alec Muffett		Solaris port testing
@@ -910,6 +971,7 @@ Charles Owen		Nova moving head disk debugging, Altair simulator,
 Sergio Pedraja		MINGW environment debugging
 Derek Peschel		PDP-10 debugging
 Paul Pierce		IBM 1401 diagnostics, media recovery
+Mark Pizzolato		VAX simulator improvements
 Hans Pufal		PDP-10 debugging, PDP-15 bootstrap
 Bruce Ray		Software, documentation, bug fixes, and new devices
 			 for the Nova, OS/2 porting
@@ -921,6 +983,7 @@ Olaf Seibert		NetBSD port testing
 Brian & Barry Silverman	PDP-1 simulator and software
 Tim Shoppa		Nova documentation, RDOS software, PDP-10 and PDP-11
 			 software archive, hosting for SIMH site
+Van Snyder		IBM 1401 bootstraps
 Michael Somos		PDP-1 debugging
 Hans-Michael Stahl	OS/2 port testing, TERMIOS implementation
 Tim Stark		TS10 PDP-10 simulator
@@ -933,6 +996,7 @@ Warren Toomey		PDP-11 UNIX software
 Deb Toivonen		DEC documentation
 Mike Umbricht		DEC documentation, H316 documentation and schematics
 Leendert Van Doorn	PDP-11 UNIX V6 debugging, TERMIOS implementation
+Holger Veit		OS/2 socket support
 David Waks		PDP-8 ESI-X and PDP-7 SIM8 software
 Tom West		Nova documentation
 Adrian Wise		H316 simulator, documentation, and software
@@ -947,3 +1011,5 @@ Digital Equipment Corporation
 Compaq Computer Corporation
 Mentec Corporation
 The Santa Cruz Operation
+Caldera Corporation
+

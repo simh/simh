@@ -1,6 +1,6 @@
 /* nova_plt.c: NOVA plotter simulator
 
-   Copyright (c) 2000-2001, Robert M. Supnik
+   Copyright (c) 2000-2002, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,8 @@
 
    plt		plotter
 
+   30-May-02	RMS	Widened POS to 32b
+   06-Jan-02	RMS	Revised enable/disable support
    26-Apr-01	RMS	Added device enable/disable support
 */
 
@@ -52,14 +54,19 @@ REG plt_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_PLT) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_PLT) },
 	{ FLDATA (INT, int_req, INT_V_PLT) },
-	{ DRDATA (POS, plt_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, plt_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, plt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, plt_stopioe, 0) },
 	{ FLDATA (*DEVENB, iot_enb, INT_V_PLT), REG_HRO },
 	{ NULL }  };
 
+MTAB plt_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, INT_PLT, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_PLT, NULL, "DISABLED", &set_dsb },
+	{ 0 } };
+
 DEVICE plt_dev = {
-	"PLT", &plt_unit, plt_reg, NULL,
+	"PLT", &plt_unit, plt_reg, plt_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &plt_reset,
 	NULL, NULL, NULL };

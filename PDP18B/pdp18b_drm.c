@@ -1,6 +1,6 @@
 /* pdp18b_drm.c: drum/fixed head disk simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    drm		(PDP-7) Type 24 serial drum
 		(PDP-9) RM09 serial drum
 
+   03-Feb-02	RMS	Fixed bug in reset routine (found by Robert Alan Byer)
+   06-Jan-02	RMS	Revised enable/disable support
    25-Nov-01	RMS	Revised interrupt structure
    10-Jun-01	RMS	Cleaned up IOT decoding to reflect hardware
    26-Apr-01	RMS	Added device enable/disable support
@@ -87,11 +89,16 @@ REG drm_reg[] = {
 	{ ORDATA (WLK, drm_wlk, 32) },
 	{ DRDATA (TIME, drm_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, drm_stopioe, 0) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_DRM), REG_HRO },
+	{ FLDATA (*DEVENB, dev_enb, ENB_V_DRM), REG_HRO },
 	{ NULL }  };
 
+MTAB drm_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, ENB_DRM, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, ENB_DRM, NULL, "DISABLED", &set_dsb },
+	{ 0 } };
+
 DEVICE drm_dev = {
-	"DRM", &drm_unit, drm_reg, NULL,
+	"DRM", &drm_unit, drm_reg, drm_mod,
 	1, 8, 20, 1, 8, 18,
 	NULL, NULL, &drm_reset,
 	&drm_boot, NULL, NULL };
@@ -172,7 +179,7 @@ return SCPE_OK;
 
 t_stat drm_reset (DEVICE *dptr)
 {
-drm_ma = drm_ma = drm_err = 0;
+drm_da = drm_ma = drm_err = 0;
 CLR_INT (DRM);						/* clear done */
 sim_cancel (&drm_unit);
 return SCPE_OK;

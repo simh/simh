@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tti,tto	KL8E terminal input/output
 
+   30-May-02	RMS	Widened POS to 32b
    07-Sep-01	RMS	Moved function prototypes
 */
 
@@ -54,7 +55,7 @@ REG tti_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTI) },
 	{ FLDATA (ENABLE, int_enable, INT_V_TTI) },
 	{ FLDATA (INT, int_req, INT_V_TTI) },
-	{ DRDATA (POS, tti_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (UC, tti_unit.flags, UNIT_V_UC), REG_HRO },
 	{ NULL }  };
@@ -84,7 +85,7 @@ REG tto_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTO) },
 	{ FLDATA (ENABLE, int_enable, INT_V_TTO) },
 	{ FLDATA (INT, int_req, INT_V_TTO) },
-	{ DRDATA (POS, tto_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 

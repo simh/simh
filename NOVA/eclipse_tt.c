@@ -1,27 +1,32 @@
 /* eclipse_tt.c: Eclipse console terminal simulator
 
-   Copyright (c) 1993-1997,
-   Robert M Supnik, Digital Equipment Corporation
+   Copyright (c) 1998-2002, Charles E Owen
+   Portions copyright (c) 1993-2002, Robert M Supnik
+   Written by Charles Owen, used by gracious permission
    Commercial use prohibited
 
    tti		terminal input
    tto		terminal output
+
+   30-May-02	RMS	Widened POS to 32b
+   28-Jan-02	RMS	Cleaned up compiler warnings
 */
 
 #include "nova_defs.h"
 
 #define	UNIT_V_DASHER	(UNIT_V_UF + 0)			/* Dasher mode */
 #define UNIT_DASHER	(1 << UNIT_V_DASHER)
+
 extern int32 int_req, dev_busy, dev_done, dev_disable;
+
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat ttx_setmod (UNIT *uptr, int32 value);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
+void translate_in();
+int32 translate_out(int32 c);
+int32 putseq(char *seq);
 
 /* TTI data structures
 
@@ -39,7 +44,7 @@ REG tti_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTI) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_TTI) },
 	{ FLDATA (INT, int_req, INT_V_TTI) },
-	{ DRDATA (POS, tti_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (MODE, tti_unit.flags, UNIT_V_DASHER), REG_HRO },
 	{ NULL }  };
@@ -70,7 +75,7 @@ REG tto_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTO) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_TTO) },
 	{ FLDATA (INT, int_req, INT_V_TTO) },
-	{ DRDATA (POS, tto_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ FLDATA (MODE, tto_unit.flags, UNIT_V_DASHER), REG_HRO },
 	{ NULL }  };
@@ -132,7 +137,7 @@ int spec200 = 0;	/* signals next char is 'special' */
 
 /* Translation: Vt100 input to D200 keycodes. */
 
-int32 translate_in()
+void translate_in()
 {
     char rev = 0;
     

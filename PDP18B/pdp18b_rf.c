@@ -1,6 +1,6 @@
 /* pdp18b_rf.c: fixed head disk simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    rf		(PDP-9) RF09/RF09
 		(PDP-15) RF15/RS09
 
+   06-Jan-02	RMS	Revised enable/disable support
    25-Nov-01	RMS	Revised interrupt structure
    24-Nov-01	RMS	Changed WLK to array
    26-Apr-01	RMS	Added device enable/disable support
@@ -122,11 +123,16 @@ REG rf_reg[] = {
 	{ DRDATA (TIME, rf_time, 24), PV_LEFT + REG_NZ },
 	{ FLDATA (BURST, rf_burst, 0) },
 	{ FLDATA (STOP_IOE, rf_stopioe, 0) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_RF), REG_HRO },
+	{ FLDATA (*DEVENB, dev_enb, ENB_V_RF), REG_HRO },
 	{ NULL }  };
 
+MTAB rf_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, ENB_RF, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, ENB_RF, NULL, "DISABLED", &set_dsb },
+	{ 0 }  };
+
 DEVICE rf_dev = {
-	"RF", &rf_unit, rf_reg, NULL,
+	"RF", &rf_unit, rf_reg, rf_mod,
 	1, 8, 21, 1, 8, 18,
 	NULL, NULL, &rf_reset,
 	NULL, NULL, NULL };

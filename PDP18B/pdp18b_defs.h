@@ -1,6 +1,6 @@
 /* pdp18b_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Feb-02	RMS	Added PDP-7 DECtape support
    25-Nov-01	RMS	Revised interrupt structure
    27-May-01	RMS	Added second Teletype support
    21-Jan-01	RMS	Added DECtape support
@@ -53,6 +54,7 @@
 					Type 75 paper tape punch
 					integral real time clock
 					Type 647B line printer (sixbit)
+					Type 550/555 DECtape
 					Type 24 serial drum
 
    PDP9	   32K	KE09A EAE		KSR-33 Teletype
@@ -99,6 +101,7 @@
 #elif defined (PDP7)
 #define ADDRSIZE	15
 #define TYPE647		0				/* sixbit printer */
+#define DTA		0				/* DECtape */
 #define DRM		0				/* drum */
 #elif defined (PDP9)
 #define ADDRSIZE	15
@@ -203,7 +206,7 @@
 
 #define ACH_PWRFL	052
 
-/*API level 1 */
+/* API level 1 */
 
 #define INT_V_DTA	0				/* DECtape */
 #define INT_V_MTA	1				/* magtape */
@@ -283,6 +286,22 @@
 #define SET_INT(dv)	int_hwre[API_##dv] = int_hwre[API_##dv] | INT_##dv
 #define CLR_INT(dv)	int_hwre[API_##dv] = int_hwre[API_##dv] & ~INT_##dv
 #define TST_INT(dv)	(int_hwre[API_##dv] & INT_##dv)
+
+/* Device enable flags are defined in a single 32b word */
+
+#define ENB_V_DTA	0				/* DECtape */
+#define ENB_V_MTA	1				/* magtape */
+#define ENB_V_DRM	2				/* drum */
+#define ENB_V_RF	3				/* fixed head disk */
+#define ENB_V_RP	4				/* disk pack */
+#define ENB_V_TTI1	5				/* 2nd teletype */
+
+#define ENB_DTA		(1u << ENB_V_DTA)
+#define ENB_MTA		(1u << ENB_V_MTA)
+#define ENB_DRM		(1u << ENB_V_DRM)
+#define ENB_RF		(1u << ENB_V_RF)
+#define ENB_RP		(1u << ENB_V_RP)
+#define ENB_TTI1	(1u << ENB_V_TTI1)
 
 /* I/O status flags for the IORS instruction
 
@@ -336,3 +355,8 @@
 #define IOS_MTA		0000100				/* magtape */
 #define IOS_LPT		0000010				/* line printer */
 #endif
+
+/* Function prototypes */
+
+t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc);

@@ -1,6 +1,6 @@
 /* i1401_mt.c: IBM 1401 magnetic tape simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,13 @@
 
    mt		7-track magtape
 
+   12-Jun-02	RMS	End-of-record on read sets GM without WM
+			(found by Van Snyder)
+   03-Jun-02	RMS	Modified for 1311 support
+   30-May-02	RMS	Widened POS to 32b
+   22-Apr-02	RMS	Added protection against bad record lengths
+   30-Jan-02	RMS	New zero footprint tape bootstrap from Van Snyder
+   20-Jan-02	RMS	Changed write enabled modifier
    29-Nov-01	RMS	Added read only unit support
    18-Apr-01	RMS	Changed to rewind tape before boot
    07-Dec-00	RMS	Widened display width from 6 to 8 bits to see record lnt
@@ -54,12 +61,13 @@
 #define UNIT_WLK	(1 << UNIT_V_WLK)
 #define UNIT_W_UF	2				/* #save flags */
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
+#define MT_MAXFR	(MAXMEMSIZE * 2)		/* max transfer */
 
 extern uint8 M[];					/* memory */
 extern int32 ind[64];
 extern int32 BS, iochk;
 extern UNIT cpu_unit;
-unsigned int8 dbuf[MAXMEMSIZE * 2];			/* tape buffer */
+uint8 dbuf[MT_MAXFR];					/* tape buffer */
 t_stat mt_reset (DEVICE *dptr);
 t_stat mt_boot (int32 unitno);
 UNIT *get_unit (int32 unit);
@@ -90,13 +98,12 @@ UNIT mt_unit[] = {
 REG mt_reg[] = {
 	{ FLDATA (END, ind[IN_END], 0) },
 	{ FLDATA (ERR, ind[IN_TAP], 0) },
-	{ FLDATA (PAR, ind[IN_PAR], 0) },
-	{ DRDATA (POS1, mt_unit[1].pos, 31), PV_LEFT + REG_RO },
-	{ DRDATA (POS2, mt_unit[2].pos, 31), PV_LEFT + REG_RO },
-	{ DRDATA (POS3, mt_unit[3].pos, 31), PV_LEFT + REG_RO },
-	{ DRDATA (POS4, mt_unit[4].pos, 31), PV_LEFT + REG_RO },
-	{ DRDATA (POS5, mt_unit[5].pos, 31), PV_LEFT + REG_RO },
-	{ DRDATA (POS6, mt_unit[6].pos, 31), PV_LEFT + REG_RO },
+	{ DRDATA (POS1, mt_unit[1].pos, 32), PV_LEFT + REG_RO },
+	{ DRDATA (POS2, mt_unit[2].pos, 32), PV_LEFT + REG_RO },
+	{ DRDATA (POS3, mt_unit[3].pos, 32), PV_LEFT + REG_RO },
+	{ DRDATA (POS4, mt_unit[4].pos, 32), PV_LEFT + REG_RO },
+	{ DRDATA (POS5, mt_unit[5].pos, 32), PV_LEFT + REG_RO },
+	{ DRDATA (POS6, mt_unit[6].pos, 32), PV_LEFT + REG_RO },
 	{ GRDATA (FLG1, mt_unit[1].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
 		  REG_HRO },
 	{ GRDATA (FLG2, mt_unit[2].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
@@ -112,7 +119,7 @@ REG mt_reg[] = {
 	{ NULL }  };
 
 MTAB mt_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
 	{ 0 }  };
 
@@ -211,13 +218,20 @@ case BCD_R:						/* read */
 		ind[IN_END] = 1;			/* set end mark */
 		uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
 		break;  }
-	tbc = MTRL (tbc);				/* ignore error flag */		
+	tbc = MTRL (tbc);				/* ignore error flag */
+	if (tbc > MT_MAXFR) return SCPE_MTRLNT;		/* record too long? */	
 	i = fxread (dbuf, sizeof (int8), tbc, uptr -> fileref);
 	for ( ; i < tbc; i++) dbuf[i] = 0;		/* fill with 0's */
-	err = ferror (uptr -> fileref);
+	if (err = ferror (uptr -> fileref)) break;	/* I/O error? */
 	uptr -> pos = uptr -> pos + ((tbc + 1) & ~1) +
 		(2 * sizeof (t_mtrlnt));
-	for (i = 0; (i < tbc) && (M[BS] != (BCD_GRPMRK + WM)); i++) {
+	for (i = 0; i < tbc; i++) {			/* loop thru buf */
+		if (M[BS] == (BCD_GRPMRK + WM)) {	/* GWM in memory? */
+			BS++;				/* incr BS */
+			if (ADDR_ERR (BS)) {		/* test for wrap */
+				BS = BA | (BS % MAXMEMSIZE);
+				return STOP_WRAP;  }
+			return SCPE_OK;  }		/* done */
 		t = dbuf[i];				/* get char */
 		if ((flag != MD_BIN) && (t == BCD_ALT)) t = BCD_BLANK;
 		if (flag == MD_WM) {			/* word mk mode? */
@@ -226,10 +240,11 @@ case BCD_R:						/* read */
 				wm_seen = 0;  }  }
 		else M[BS] = (M[BS] & WM) | (t & CHAR);
 		if (!wm_seen) BS++;
-		if (ADDR_ERR (BS)) {
+		if (ADDR_ERR (BS)) {			/* check next BS */
 			BS = BA | (BS % MAXMEMSIZE);
-			return STOP_NXM;  }  }
-	M[BS++] = BCD_GRPMRK + WM;			/* end of record */
+			return STOP_WRAP;  }  }
+	if (flag == MD_WM) M[BS] = BCD_GRPMRK;		/* load? clear WM */
+	else M[BS] = (M[BS] & WM) | BCD_GRPMRK;		/* move? save WM */
 	break;
 
 case BCD_W:
@@ -241,16 +256,19 @@ case BCD_W:
 		if (((t & CHAR) == BCD_BLANK) && (flag != MD_BIN))
 			dbuf[tbc++] = BCD_ALT;
 		else dbuf[tbc++] = t & CHAR;
-		if (ADDR_ERR (BS)) {
+		if (ADDR_ERR (BS)) {			/* check next BS */
 			BS = BA | (BS % MAXMEMSIZE);
-			return STOP_NXM;  }  }
+			return STOP_WRAP;  }  }
 	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
 	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
 	fxwrite (dbuf, sizeof (int8), (tbc + 1) & ~1, uptr -> fileref);
 	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	err = ferror (uptr -> fileref);
+	if (err = ferror (uptr -> fileref)) break;	/* I/O error? */
 	uptr -> pos = uptr -> pos + ((tbc + 1) & ~1) +
 		(2 * sizeof (t_mtrlnt));
+	if (ADDR_ERR (BS)) {				/* check final BS */
+		BS = BA | (BS % MAXMEMSIZE);
+		return STOP_WRAP;  }
 	break;
 default:
 	return STOP_INVM;  }
@@ -258,8 +276,8 @@ default:
 if (err != 0) {						/* I/O error */
 	perror ("MT I/O error");
 	clearerr (uptr -> fileref);
-	if (iochk) return SCPE_IOERR;
-	ind[IN_TAP] = 1;  }				/* flag error */
+	ind[IN_TAP] = 1;				/* flag error */
+	if (iochk) return SCPE_IOERR;  }
 return SCPE_OK;
 }
 
@@ -275,29 +293,19 @@ else return mt_dev.units + unit;
 
 t_stat mt_reset (DEVICE *dptr)
 {
-ind[IN_END] = ind[IN_PAR] = ind[IN_TAP] = 0;		/* clear indicators */
+ind[IN_END] = ind[IN_TAP] = 0;				/* clear indicators */
 return SCPE_OK;
 }
 
 /* Bootstrap routine */
 
-#define BOOT_START 3980
-#define BOOT_LEN (sizeof (boot_rom) / sizeof (unsigned char))
-
-static const unsigned char boot_rom[] = {
-	OP_LCA + WM, BCD_PERCNT, BCD_U, BCD_ONE,
-		BCD_ZERO, BCD_ZERO, BCD_ONE, BCD_R,	/* LDA %U1 001 R */
-	OP_B + WM, BCD_ZERO, BCD_ZERO, BCD_ONE,		/* B 001 */
-	OP_H + WM };					/* HALT */
-
 t_stat mt_boot (int32 unitno)
 {
-int32 i;
 extern int32 saved_IS;
 
-mt_unit[unitno].pos = 0;
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
-M[BOOT_START + 3] = unitno & 07;
-saved_IS = BOOT_START;
+mt_unit[unitno].pos = 0;				/* force rewind */
+BS = 1;							/* set BS = 001 */
+mt_io (unitno, MD_WM, BCD_R);				/* LDA %U1 001 R */
+saved_IS = 1;
 return SCPE_OK;
 }

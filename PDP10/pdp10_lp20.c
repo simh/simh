@@ -1,6 +1,6 @@
 /* pdp10_lp20.c: PDP-10 LP20 line printer simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    lp20		line printer
 
+   30-May-02	RMS	Widened POS to 32b
+   06-Jan-02	RMS	Added enable/disable support
    30-Nov-01	RMS	Added extended SET/SHOW support
 */
 
@@ -150,6 +152,9 @@ int32 lp20_irq = 0;					/* int request */
 int32 lp20_stopioe = 0;					/* stop on error */
 int16 txram[TX_SIZE] = { 0 };				/* translation RAM */
 int16 davfu[DV_SIZE] = { 0 };				/* DAVFU */
+
+t_stat lp20_rd (int32 *data, int32 pa, int32 access);
+t_stat lp20_wr (int32 data, int32 pa, int32 access);
 t_stat lp20_svc (UNIT *uptr);
 t_stat lp20_reset (DEVICE *dptr);
 t_stat lp20_attach (UNIT *uptr, char *ptr);
@@ -166,6 +171,8 @@ void update_lpcs (int32 flg);
    lp20_unit	LPT unit descriptor
    lp20_reg	LPT register list
 */
+
+DIB lp20_dib = { 1, IOBA_LP20, IOLN_LP20, &lp20_rd, &lp20_wr };
 
 UNIT lp20_unit = {
 	UDATA (&lp20_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
@@ -188,7 +195,7 @@ REG lp20_reg[] = {
 	{ FLDATA (ERR, lpcsa, CSR_V_ERR) },
 	{ FLDATA (DONE, lpcsa, CSR_V_DONE) },
 	{ FLDATA (IE, lpcsa, CSR_V_IE) },
-	{ DRDATA (POS, lp20_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, lp20_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, lp20_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lp20_stopioe, 0) },
 	{ BRDATA (TXRAM, txram, 8, 12, TX_SIZE) },
@@ -197,6 +204,12 @@ REG lp20_reg[] = {
 
 MTAB lp20_mod[] = {
 	{ UNIT_DUMMY, 0, NULL, "VFUCLEAR", &lp20_clear_vfu },
+	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+		&set_addr, &show_addr, &lp20_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &lp20_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &lp20_dib },
 	{ 0 }  };
 
 DEVICE lp20_dev = {

@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,17 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jul-02	RMS	Fixed exit bug in do, added -v switch (from Brian Knittel)
+   17-May-02	RMS	Fixed bug in fxread/fxwrite error usage (found by
+			Norm Lastovic)
+   02-May-02	RMS	Added VT emulation interface, changed {NO}LOG to SET {NO}LOG
+   22-Apr-02	RMS	Fixed laptop sleep problem in clock calibration, added
+			magtape record length error (found by Jonathan Engdahl)
+   26-Feb-02	RMS	Fixed initialization bugs in do_cmd, get_avail
+			(found by Brian Knittel)
+   10-Feb-02	RMS	Fixed problem in clock calibration
+   06-Jan-02	RMS	Moved device enable/disable to simulators
+   30-Dec-01	RMS	Generalized timer packaged, added circular arrays
    19-Dec-01	RMS	Fixed DO command bug (found by John Dundas)
    07-Dec-01	RMS	Implemented breakpoint package
    05-Dec-01	RMS	Fixed bug in universal register logic
@@ -100,8 +111,10 @@
 
 #define SWHIDE		(1u << 26)			/* enable hiding */
 #define SRBSIZ		1024				/* save/restore buffer */
-#define SIM_BRK_INILNT	1024
+#define SIM_BRK_INILNT	16384				/* bpt tbl length */
 #define SIM_BRK_ALLTYP	0xFFFFFFFF
+#define SIM_NTIMERS	8				/* # timers */
+#define SIM_TMAX	500				/* max timer makeup */
 #define UPDATE_SIM_TIME(x) sim_time = sim_time + (x - sim_interval); \
 	sim_rtime = sim_rtime + ((uint32) (x - sim_interval)); \
 	x = sim_interval
@@ -112,6 +125,7 @@ struct brktab {
 	int32	cnt;
 	char	*act;
 };
+
 typedef struct brktab BRKTAB;
 
 extern char sim_name[];
@@ -131,6 +145,7 @@ extern t_stat ttcmdstate (void);
 extern t_stat ttclose (void);
 extern t_stat sim_putchar (int32 out);
 extern uint32 sim_os_msec (void);
+extern int32 sim_vt;
 UNIT *sim_clock_queue = NULL;
 int32 sim_interval = 0;
 int32 sim_switches = 0;
@@ -198,10 +213,21 @@ void sim_brk_npc (void);
 	else if (sim_switches & SWMASK ('H')) val = 16; \
 	else val = dft;
 
-t_stat set_glob (CTAB *tab, char *gbuf, DEVICE *dptr, UNIT *uptr);
-t_stat ssh_break (FILE *st, char *cptr, int32 flg);
+CTAB *find_ctab (CTAB *tab, char *gbuf);
+t_stat set_vt (int32 flag, char *cptr);
+t_stat set_logon (int32 flag, char *cptr);
+t_stat set_logoff (int32 flag, char *cptr);
 t_stat set_radix (DEVICE *dptr, UNIT *uptr, int flag);
 t_stat set_onoff (DEVICE *dptr, UNIT *uptr, int32 flag);
+t_stat ssh_break (FILE *st, char *cptr, int32 flg);
+t_stat show_config (FILE *st, int32 flag);
+t_stat show_queue (FILE *st, int32 flag);
+t_stat show_time (FILE *st, int32 flag);
+t_stat show_mod_names (FILE *st, int32 flag);
+t_stat show_log (FILE *st, int32 flag);
+t_stat show_vt (FILE *st, int32 flag);
+t_stat show_device (FILE *st, DEVICE *dptr, int32 flag);
+t_stat show_unit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag);
 t_stat show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flg);
 t_stat show_one_mod (FILE *st, DEVICE *dptr, UNIT *uptr, MTAB *mptr, int32 flag);
 int32 get_switches (char *cptr);
@@ -214,8 +240,6 @@ void fprint_stopped (FILE *stream, t_stat r);
 char *read_line (char *ptr, int size, FILE *stream);
 DEVICE *find_dev (char *ptr);
 DEVICE *find_unit (char *ptr, UNIT **uptr);
-DEVICE *find_dev_from_unit (UNIT *uptr);
-REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
 REG *find_reg_glob (char *ptr, char **optr, DEVICE **gdptr);
 t_bool qdisable (DEVICE *dptr);
 t_stat attach_err (UNIT *uptr, t_stat stat);
@@ -263,8 +287,6 @@ const char *scp_error_messages[] = {
 	"Subscript out of range",
 	"Command not allowed",
 	"Unit disabled",
-	"Logging enabled",
-	"Logging disabled",
 	"Read only operation not allowed",
 	"Invalid switch",
 	"Missing value",
@@ -275,7 +297,8 @@ const char *scp_error_messages[] = {
 	"Non-existent register",
 	"Non-existent parameter",
 	"Nested DO commands",
-	"Internal error"
+	"Internal error",
+	"Invalid magtape record length"
 };
 
 const size_t size_map[] = { sizeof (int8),
@@ -319,10 +342,6 @@ t_stat restore_cmd (int flag, char *ptr);
 t_stat exit_cmd (int flag, char *ptr);
 t_stat set_cmd (int flag, char *ptr);
 t_stat show_cmd (int flag, char *ptr);
-t_stat enable_cmd (int flag, char *ptr);
-t_stat disable_cmd (int flag, char *ptr);
-t_stat log_cmd (int flag, char *ptr);
-t_stat nolog_cmd (int flag, char *ptr);
 t_stat brk_cmd (int flag, char *ptr);
 t_stat do_cmd (int flag, char *ptr);
 t_stat help_cmd (int flag, char *ptr);
@@ -350,10 +369,6 @@ static CTAB cmd_table[] = {
 	{ "BYE", &exit_cmd, 0 },
 	{ "SET", &set_cmd, 0 },
 	{ "SHOW", &show_cmd, 0 },
-	{ "ENABLE", &enable_cmd, 0 },
-	{ "DISABLE", &disable_cmd, 0 },
-	{ "LOG", &log_cmd, 0 },
-	{ "NOLOG", &nolog_cmd, 0 },
 	{ "BREAK", &brk_cmd, SSH_ST },
 	{ "NOBREAK", &brk_cmd, SSH_CL },
 	{ "DO", &do_cmd, 0 },
@@ -424,7 +439,7 @@ do {	printf ("sim> ");				/* prompt */
 } while (stat != SCPE_EXIT);
 
 detach_all (0, TRUE);					/* close files */
-nolog_cmd (0, NULL);					/* close log */
+set_logoff (0, NULL);					/* close log */
 ttclose ();						/* close console */
 return 0;
 }
@@ -459,18 +474,20 @@ fprintf (st, "det{ach} <unit>          detach file from simulated unit\n");
 fprintf (st, "sa{ve} <file>            save simulator to file\n");
 fprintf (st, "rest{ore}|ge{t} <file>   restore simulator from file\n");
 fprintf (st, "exi{t}|q{uit}|by{e}      exit from simulation\n");
+fprintf (st, "set log <file>           enable logging to file\n");
+fprintf (st, "set nolog                disable logging\n");
+fprintf (st, "set vt                   enable VT emulation (Windows only)\n");
+fprintf (st, "set novt                 disable VT emulation (Windows only)\n");
 fprintf (st, "set <dev>|<unit> <prm>   set device/unit parameter\n");
-fprintf (st, "sh{ow} <dev>|<unit>      show device parameters\n");
 fprintf (st, "sh{ow} c{onfiguration}   show configuration\n");
 fprintf (st, "sh{ow} d{evices}         show devices\n");
+fprintf (st, "sh{ow} l{og}             show log\n");
 fprintf (st, "sh{ow} m{odifiers}       show modifiers\n");
 fprintf (st, "sh{ow} q{ueue}           show event queue\n");
 fprintf (st, "sh{ow} t{ime}            show simulated time\n");
-fprintf (st, "sh{ow} v{ersion}         show simulator version\n");
-fprintf (st, "en{able} <device>        enable device\n");
-fprintf (st, "di{sable} <device>       disable device\n");
-fprintf (st, "log <file>               enable logging to file\n");
-fprintf (st, "nolog                    disable logging\n");
+fprintf (st, "sh{ow} ve{rsion}         show simulator version\n");
+fprintf (st, "sh{ow} vt                show VT emulation\n");
+fprintf (st, "sh{ow} <dev>|<unit>      show device parameters\n");
 fprintf (st, "do <file>                process command file\n");
 fprintf (st, "h{elp}                   type this message\n");
 return;
@@ -489,14 +506,17 @@ t_stat do_cmd (int flag, char *fcptr)
 {
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 FILE *fpin;
-int32 i;
-t_stat stat;
+int32 i, echo;
+t_stat stat = SCPE_OK;
 
+GET_SWITCHES (fcptr, gbuf);				/* get switches */
+echo = sim_switches & SWMASK ('V');			/* set echo flag */
 if ((fpin = fopen (fcptr, "r")) != NULL) {		/* cmd file open? */
     do {
 	cptr = read_line (cbuf, CBUFSIZE, fpin);	/* get cmd line */
 	if (cptr == NULL) break;			/* exit on eof */
 	if (*cptr == 0) continue;			/* ignore blank */
+	if (echo) printf ("do> %s\n", cptr);		/* echo cmd? */
 	if (sim_log) fprintf (sim_log, "do> %s\n", cptr);
 	cptr = get_glyph (cptr, gbuf, 0);		/* get command glyph */
 	if (strcmp (gbuf, "do") == 0) {			/* don't recurse */
@@ -508,9 +528,11 @@ if ((fpin = fopen (fcptr, "r")) != NULL) {		/* cmd file open? */
 		break;  }  }
 	if (stat >= SCPE_BASE)				/* error? */
 		printf ("%s\n", scp_error_messages[stat - SCPE_BASE]);
-    } while (stat != SCPE_EXIT);
+	}
+    while (stat != SCPE_EXIT);
     fclose (fpin);					/* close file */
-    return SCPE_OK;  }					/* end if cmd file */
+    return ((stat == SCPE_EXIT)? SCPE_EXIT: SCPE_OK);
+    }							/* end if cmd file */
 return SCPE_OPENERR;
 }
 
@@ -524,7 +546,13 @@ char gbuf[CBUFSIZE], *cvptr;
 DEVICE *dptr;
 UNIT *uptr;
 MTAB *mptr;
-CTAB *ctbr;
+CTAB *ctbr, *glbr;
+static CTAB set_glob_tab[] = {
+	{ "VT", &set_vt, 1 },
+	{ "NOVT", &set_vt, 0 },
+	{ "LOG", &set_logon, 0 },
+	{ "NOLOG", &set_logoff, 0 },
+	{ NULL, NULL, 0 }  };
 static CTAB set_dev_tab[] = {
 	{ "OCTAL", &set_radix, 8 },
 	{ "DECIMAL", &set_radix, 10 },
@@ -538,6 +566,8 @@ static CTAB set_unit_tab[] = {
 GET_SWITCHES (cptr, gbuf);				/* get switches */
 if (*cptr == 0) return SCPE_2FARG;			/* must be more */
 cptr = get_glyph (cptr, gbuf, 0);			/* get glob/dev/unit */
+if (glbr = find_ctab (set_glob_tab, gbuf))		/* global? */
+    return glbr -> action (glbr -> arg, cptr);		/* do the rest */
 if (*cptr == 0) return SCPE_2FARG;			/* must be more */
 
 if (dptr = find_dev (gbuf)) {				/* device match? */
@@ -554,8 +584,8 @@ if (dptr -> modifiers == NULL) return SCPE_NOPARAM;	/* any modifiers? */
 while (*cptr != 0) {					/* do all mods */
     cptr = get_glyph (cptr, gbuf, ',');			/* get modifier */
     if (cvptr = strchr (gbuf, '=')) *cvptr++ = 0;	/* = value? */
-    if (set_glob (ctbr, gbuf, dptr, uptr) == SCPE_OK)	/* global match? */
-	return SCPE_OK;
+    if (glbr = find_ctab (ctbr, gbuf))			/* global match? */
+	return glbr -> action (dptr, uptr, glbr -> arg);
     for (mptr = dptr -> modifiers; mptr -> mask != 0; mptr++) {
 	if ((mptr -> mstring) &&			/* match string */
 	    (MATCH_CMD (gbuf, mptr -> mstring) == 0)) {	/* matches option? */
@@ -591,13 +621,54 @@ while (*cptr != 0) {					/* do all mods */
     }							/* end while */
 return SCPE_OK;						/* done all */
 }
+
+/* Match CTAB name */
 
-t_stat set_glob (CTAB *tab, char *gbuf, DEVICE *dptr, UNIT *uptr)
+CTAB *find_ctab (CTAB *tab, char *gbuf)
 {
 for (; tab -> name != NULL; tab++) {
-    if (MATCH_CMD (gbuf, tab -> name) == 0)
-	return tab -> action (dptr, uptr, tab -> arg);  }
-return SCPE_NXPAR;
+    if (MATCH_CMD (gbuf, tab -> name) == 0) return tab;  }
+return NULL;
+}
+
+/* VT on/off routine */
+
+t_stat set_vt (int32 val, char *cptr)
+{
+if (sim_vt < 0) return SCPE_NOFNC;			/* not possible */
+if (*cptr) return SCPE_2MARG;				/* no more args */
+sim_vt = val;
+return SCPE_OK;
+}
+
+/* Log on routine */
+
+t_stat set_logon (int flag, char *cptr)
+{
+char gbuf[CBUFSIZE];
+
+if (*cptr == 0) SCPE_2FARG;				/* need arg */
+cptr = get_glyph_nc (cptr, gbuf, 0);			/* get file name */
+if (*cptr != 0) return SCPE_2MARG;			/* now eol? */
+set_logoff (0, NULL);					/* close cur log */
+sim_log = fopen (gbuf, "a");				/* open log */
+if (sim_log == NULL) return SCPE_OPENERR;		/* error? */
+printf ("Logging to file \"%s\"\n", gbuf);		/* start of log */
+fprintf (sim_log, "Logging to file \"%s\"\n", gbuf);
+return SCPE_OK;
+}
+
+/* Log off routine */
+
+t_stat set_logoff (int flag, char *cptr)
+{
+if (cptr && (*cptr != 0)) return SCPE_2MARG;		/* now eol? */
+if (sim_log == NULL) return SCPE_OK;			/* no log? */
+printf ("Log file closed\n");
+fprintf (sim_log, "Log file closed\n");			/* close log */
+fclose (sim_log);
+sim_log = NULL;
+return SCPE_OK;
 }
 
 /* Set radix routine */
@@ -632,13 +703,6 @@ DEVICE *dptr;
 UNIT *uptr;
 MTAB *mptr;
 
-t_stat show_config (FILE *st, int32 flag);
-t_stat show_queue (FILE *st, int32 flag);
-t_stat show_time (FILE *st, int32 flag);
-t_stat show_mod_names (FILE *st, int32 flag);
-t_stat show_device (FILE *st, DEVICE *dptr, int32 flag);
-t_stat show_unit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag);
-
 static CTAB show_table[] = {
 	{ "CONFIGURATION", &show_config, 0 },
 	{ "DEVICES", &show_config, 1 },
@@ -646,6 +710,8 @@ static CTAB show_table[] = {
 	{ "TIME", &show_time, 0 },
 	{ "MODIFIERS", &show_mod_names, 0 },
 	{ "VERSION", &show_version, 0 },
+	{ "LOG", &show_log, 0 },
+	{ "VT", &show_vt, 0 },
 	{ NULL, NULL, 0 }  };
 
 GET_SWITCHES (cptr, gbuf);				/* test for switches */
@@ -689,7 +755,7 @@ while (*cptr != 0) {					/* do all mods */
 	    (mptr -> mask & lvl): (MTAB_VUN & lvl)) && 
 	    ((mptr -> disp && mptr -> pstring &&	/* named disp? */
 		(MATCH_CMD (gbuf, mptr -> pstring) == 0)) ||
-	    (((mptr -> mask & MTAB_XTV) == MTAB_XTV) &&	/* named value? */
+	    ((mptr -> mask & MTAB_VAL) &&		/* named value? */
 		mptr -> mstring &&
 		(MATCH_CMD (gbuf, mptr -> mstring) == 0)))) {
 	    show_one_mod (stdout, dptr, uptr, mptr, 1);
@@ -697,6 +763,7 @@ while (*cptr != 0) {					/* do all mods */
 	    break;
 	    }						/* end if */
 	}						/* end for */
+    if (mptr -> mask == 0) return SCPE_ARG;		/* any match? */
     }							/* end while */
 return SCPE_OK;
 }
@@ -801,6 +868,21 @@ fprintf (st, "Time:	%-16.0f\n", sim_time);
 return SCPE_OK;
 }
 
+t_stat show_log (FILE *st, int32 flag)
+{
+if (sim_log) fprintf (st, "Logging enabled\n");
+else fprintf (st, "Logging disabled\n");
+return SCPE_OK;
+}
+
+t_stat show_vt (FILE *st, int32 flag)
+{
+if (sim_vt < 0) fprintf (st, "VT emulation not available\n");
+else if (sim_vt) fprintf (st, "VT emulation enabled\n");
+else fprintf (st, "VT emulation disabled\n");
+return SCPE_OK;
+}
+
 t_stat show_mod_names (FILE *st, int32 flag)
 {
 int i, any;
@@ -837,14 +919,15 @@ t_stat show_one_mod (FILE *st, DEVICE *dptr, UNIT *uptr, MTAB *mptr, int32 flag)
 t_value val;
 
 if (mptr -> disp) mptr -> disp (st, uptr, mptr -> match, mptr -> desc);
-else if ((mptr -> mask & MTAB_XTV) == MTAB_XTV) {
+else if ((mptr -> mask & MTAB_XTD) && (mptr -> mask & MTAB_VAL)) {
 	REG *rptr = (REG *) mptr -> desc;
 	fprintf (st, "%s=", mptr -> pstring);
 	val = get_rval (rptr, 0);
 	fprint_val (st, val, rptr -> radix, rptr -> width,
 		rptr -> flags & REG_FMT);  }
 else fputs (mptr -> pstring, st);
-if (flag) fputc ('\n', st);
+if (flag && !((mptr -> mask & MTAB_XTD) &&
+    (mptr -> mask & MTAB_NMO))) fputc ('\n', st);
 return SCPE_OK;
 }
 
@@ -896,104 +979,6 @@ while (*cptr) {
 	    }
 	}
     }
-return SCPE_OK;
-}
-
-/* Enable and disable commands and routines
-
-   en[able]		enable device
-   di[sable]		disable device
-*/
-
-t_stat enable_cmd (int flag, char *cptr)
-{
-char gbuf[CBUFSIZE];
-DEVICE *dptr;
-REG *rptr;
-
-GET_SWITCHES (cptr, gbuf);				/* test for switches */
-if (*cptr == 0) return SCPE_2FARG;			/* must be more */
-cptr = get_glyph (cptr, gbuf, 0);			/* get next glyph */
-dptr = find_dev (gbuf);					/* locate device */
-if (dptr == NULL) return SCPE_NXDEV;			/* found it? */
-if (*cptr != 0) return SCPE_2MARG;			/* now eol? */
-rptr = find_reg ("*DEVENB", NULL, dptr);		/* locate enable */
-if (rptr == NULL) return SCPE_NOFNC;			/* found it? */
-put_rval (rptr, 0, 1);					/* enable */
-if (dptr -> reset) dptr -> reset (dptr);		/* reset */
-return SCPE_OK;
-}
-
-t_stat disable_cmd (int flag, char *cptr)
-{
-int32 i;
-char gbuf[CBUFSIZE];
-DEVICE *dptr;
-UNIT *uptr;
-REG *rptr;
-
-GET_SWITCHES (cptr, gbuf);				/* test for switches */
-if (*cptr == 0) return SCPE_2FARG;			/* must be more */
-cptr = get_glyph (cptr, gbuf, 0);			/* get next glyph */
-dptr = find_dev (gbuf);					/* locate device */
-if (dptr == NULL) return SCPE_NXDEV;			/* found it? */
-if (*cptr != 0) return SCPE_2MARG;			/* now eol? */
-rptr = find_reg ("*DEVENB", NULL, dptr);		/* locate enable */
-if (rptr == NULL) return SCPE_NOFNC;			/* found it? */
-for (i = 0; i < dptr -> numunits; i++) {		/* check units */
-	uptr = (dptr -> units) + i;
-	if (uptr -> flags & UNIT_ATT || sim_is_active (uptr))
-		return SCPE_NOFNC;  }
-put_rval (rptr, 0, 0);					/* disable */
-if (dptr -> reset) dptr -> reset (dptr);		/* reset */
-return SCPE_OK;
-}
-
-/* Test for disabled device */
-
-t_bool qdisable (DEVICE *dptr)
-{
-REG *rptr;
-
-rptr = find_reg ("*DEVENB", NULL, dptr);		/* locate enable */
-if (rptr == NULL) return FALSE;				/* found it? */
-return (get_rval (rptr, 0)? FALSE: TRUE);		/* return flag */
-}
-
-/* Logging commands
-
-   log filename		open log file
-   nolog		close log file
-*/
-
-t_stat log_cmd (int flag, char *cptr)
-{
-char gbuf[CBUFSIZE];
-
-GET_SWITCHES (cptr, gbuf);				/* test for switches */
-if (*cptr == 0) return (sim_log? SCPE_LOGON: SCPE_LOGOFF);
-cptr = get_glyph_nc (cptr, gbuf, 0);			/* get file name */
-if (*cptr != 0) return SCPE_2MARG;			/* now eol? */
-nolog_cmd (0, NULL);					/* close cur log */
-sim_log = fopen (gbuf, "a");				/* open log */
-if (sim_log == NULL) return SCPE_OPENERR;		/* error? */
-printf ("Logging to file \"%s\"\n", gbuf);		/* start of log */
-fprintf (sim_log, "Logging to file \"%s\"\n", gbuf);
-return SCPE_OK;
-}
-
-t_stat nolog_cmd (int flag, char *cptr)
-{
-char gbuf[CBUFSIZE];
-
-if (cptr) {
-	GET_SWITCHES (cptr, gbuf);			/* test for switches */
-	if (*cptr != 0) return SCPE_2MARG;  }		/* now eol? */
-if (sim_log == NULL) return SCPE_OK;			/* no log? */
-printf ("Log file closed\n");
-fprintf (sim_log, "Log file closed\n");			/* close log */
-fclose (sim_log);
-sim_log = NULL;
 return SCPE_OK;
 }
 
@@ -1118,13 +1103,15 @@ else {							/* normal */
 		return attach_err (uptr, SCPE_NORO);	/* no error */
 	    uptr -> fileref = fopen (cptr, "rb");	/* open rd only */
 	    if (uptr -> fileref == NULL)		/* open fail? */
-		return SCPE_OPENERR;			/* yes, error */
+		return attach_err (uptr, SCPE_OPENERR);	/* yes, error */
 	    uptr -> flags = uptr -> flags | UNIT_RO;	/* set rd only */
 	    printf ("%s: unit is read only\n", dptr -> name);  }
 	else {						/* doesn't exist */
+	    if (sim_switches & SWMASK ('E'))		/* must exist? */
+		return attach_err (uptr, SCPE_OPENERR);	/* yes, error */
 	    uptr -> fileref = fopen (cptr, "wb+");	/* open new file */
 	    if (uptr -> fileref == NULL)		/* open fail? */
-		return SCPE_OPENERR;			/* yes, error */
+		return attach_err (uptr, SCPE_OPENERR);	/* yes, error */
 	    printf ("%s: creating new file\n", dptr -> name);  }
 	}						/* end if null */
     }							/* end else */
@@ -1134,7 +1121,8 @@ if (uptr -> flags & UNIT_BUFABLE) {			/* buffer? */
 	uptr -> hwmark = fxread (uptr -> filebuf, SZ_D (dptr),
 				uptr -> capac, uptr -> fileref);
 	uptr -> flags = uptr -> flags | UNIT_BUF;  }
-    else if (uptr -> flags & UNIT_MUSTBUF) return SCPE_MEM;  }
+    else if (uptr -> flags & UNIT_MUSTBUF)		/* must buf? */
+	return attach_err (uptr, SCPE_MEM);  }
 uptr -> flags = uptr -> flags | UNIT_ATT;
 uptr -> pos = 0;
 return SCPE_OK;
@@ -1332,7 +1320,7 @@ REG *rptr;
 
 #define READ_S(xx) if (read_line ((xx), CBUFSIZE, rfile) == NULL) \
 	{ fclose (rfile); return SCPE_IOERR;  }
-#define READ_I(xx) if (fxread (&xx, sizeof (xx), 1, rfile) <= 0) \
+#define READ_I(xx) if (fxread (&xx, sizeof (xx), 1, rfile) == 0) \
 	{ fclose (rfile); return SCPE_IOERR;  }
 
 GET_SWITCHES (cptr, buf);				/* test for switches */
@@ -1425,8 +1413,8 @@ for ( ;; ) {						/* device loop */
 		if (buf[0] == 0) break;			/* last? */
 		if ((rptr = find_reg (buf, NULL, dptr)) == NULL) {
 			printf ("Invalid register name: %s\n", buf);
-			fclose (rfile);
-			return SCPE_INCOMP;  }
+			READ_I (val);			/* assume depth=1 */
+			continue;  }			/* and pray! */
 		mask = width_mask[rptr -> width];
 		for (i = 0; i < rptr -> depth; i++) {	/* loop thru values */
 			READ_I (val);			/* read value */
@@ -1790,6 +1778,9 @@ t_value val;
 UNIT *uptr;
 
 sz = SZ_R (rptr);
+if ((rptr -> depth > 1) && (rptr -> flags & REG_CIRC)) {
+	idx = idx + rptr -> qptr;
+	if (idx >= rptr -> depth) idx = idx - rptr -> depth;  }
 if ((rptr -> depth > 1) && (rptr -> flags & REG_UNIT)) {
 	uptr = ((UNIT *) rptr -> loc) + idx;
 	val = *((uint32 *) uptr);  }
@@ -1867,6 +1858,9 @@ UNIT *uptr;
 if (rptr == sim_PC) sim_brk_npc ();
 sz = SZ_R (rptr);
 mask = width_mask[rptr -> width];
+if ((rptr -> depth > 1) && (rptr -> flags & REG_CIRC)) {
+	idx = idx + rptr -> qptr;
+	if (idx >= rptr -> depth) idx = idx - rptr -> depth;  }
 if ((rptr -> depth > 1) && (rptr -> flags & REG_UNIT)) {
 	uptr = ((UNIT *) rptr -> loc) + idx;
 	*((uint32 *) uptr) =
@@ -1933,8 +1927,8 @@ t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr)
 int32 i;
 t_value mask;
 t_addr j, loc;
-t_stat reason;
 size_t sz;
+t_stat reason = SCPE_OK;
 
 if ((dptr == NULL) || (uptr == NULL)) return SCPE_IERR;
 mask = width_mask[dptr -> dwidth];
@@ -2242,6 +2236,17 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
 	for (j = 0; j < dptr -> numunits; j++) {
 		if (uptr == (dptr -> units + j)) return dptr;  }  }
 return NULL;
+}
+
+/* Test for disabled device */
+
+t_bool qdisable (DEVICE *dptr)
+{
+REG *rptr;
+
+rptr = find_reg ("*DEVENB", NULL, dptr);		/* locate enable */
+if (rptr == NULL) return FALSE;				/* found it? */
+return (get_rval (rptr, 0)? FALSE: TRUE);		/* return flag */
 }
 
 /* find_reg_glob	find globally unique register
@@ -2569,7 +2574,7 @@ else  {	UPDATE_SIM_TIME (sim_clock_queue -> time);  }	/* update sim time */
 prvptr = NULL;
 accum = 0;
 for (cptr = sim_clock_queue; cptr != NULL; cptr = cptr -> next) {
-	if (event_time < accum + cptr -> time) break;
+	if (event_time < (accum + cptr -> time)) break;
 	accum = accum + cptr -> time;
 	prvptr = cptr;  }
 if (prvptr == NULL) {					/* insert at head */
@@ -2747,49 +2752,66 @@ return total;
    sim_rtc_calb	calibrate clock
 */
 
-static int32 rtc_ticks = 0;				/* ticks */
-static uint32 rtc_realtime = 0;				/* real time */
-static uint32 rtc_virttime = 0;				/* virtual time */
-static uint32 rtc_nextintv = 0;				/* next interval */
-static int32 rtc_basedelay = 0;				/* base delay */
-static int32 rtc_currdelay = 0;				/* current delay */
+static int32 rtc_ticks[SIM_NTIMERS] = { 0 };		/* ticks */
+static uint32 rtc_rtime[SIM_NTIMERS] = { 0 };		/* real time */
+static uint32 rtc_vtime[SIM_NTIMERS] = { 0 };		/* virtual time */
+static uint32 rtc_nxintv[SIM_NTIMERS] = { 0 };		/* next interval */
+static int32 rtc_based[SIM_NTIMERS] = { 0 };		/* base delay */
+static int32 rtc_currd[SIM_NTIMERS] = { 0 };		/* current delay */
 extern t_bool rtc_avail;
-#define TMAX	500					/* max makeup per sec */
+
+int32 sim_rtcn_init (int32 time, int32 tmr)
+{
+if ((tmr < 0) || (tmr >= SIM_NTIMERS)) return time;
+rtc_rtime[tmr] = sim_os_msec ();
+rtc_vtime[tmr] = rtc_rtime[tmr];
+rtc_nxintv[tmr] = 1000;
+rtc_ticks[tmr] = 0;
+rtc_based[tmr] = time;
+rtc_currd[tmr] = time;
+return time;
+}
+
+int32 sim_rtcn_calb (int32 ticksper, int32 tmr)
+{
+uint32 new_rtime, delta_rtime;
+int32 delta_vtime;
+
+if ((tmr < 0) || (tmr >= SIM_NTIMERS)) return 10000;
+rtc_ticks[tmr] = rtc_ticks[tmr] + 1;			/* count ticks */
+if (rtc_ticks[tmr] < ticksper) return rtc_currd[tmr];	/* 1 sec yet? */
+rtc_ticks[tmr] = 0;					/* reset ticks */
+if (!rtc_avail) return rtc_currd[tmr];			/* no timer? */
+new_rtime = sim_os_msec ();				/* wall time */
+if (new_rtime < rtc_rtime[tmr]) {			/* time running backwards? */
+	rtc_rtime[tmr] = new_rtime;			/* reset wall time */
+	return rtc_currd[tmr];  }			/* can't calibrate */
+delta_rtime = new_rtime - rtc_rtime[tmr];		/* elapsed wtime */
+rtc_rtime[tmr] = new_rtime;				/* adv wall time */
+if ((delta_rtime == 0) || (delta_rtime > 30000))	/* gap 0 or too big? */
+	return rtc_currd[tmr];				/* can't calibr */
+rtc_based[tmr] = (int32) (((double) rtc_based[tmr] * (double) rtc_nxintv[tmr]) /
+	((double) delta_rtime));			/* new base rate */
+rtc_vtime[tmr] = rtc_vtime[tmr] + 1000;			/* adv sim time */
+delta_vtime = rtc_vtime[tmr] - rtc_rtime[tmr];		/* gap */
+if (delta_vtime > SIM_TMAX) delta_vtime = SIM_TMAX;	/* limit gap */
+else if (delta_vtime < -SIM_TMAX) delta_vtime = -SIM_TMAX;
+rtc_nxintv[tmr] = 1000 + delta_vtime;			/* next wtime */
+rtc_currd[tmr] = (int32) (((double) rtc_based[tmr] * (double) rtc_nxintv[tmr]) /
+	1000.0);					/* next delay */
+return rtc_currd[tmr];
+}
+
+/* Prior interfaces - default to timer 0 */
 
 int32 sim_rtc_init (int32 time)
 {
-rtc_realtime = sim_os_msec ();
-rtc_virttime = rtc_realtime;
-rtc_nextintv = 1000;
-rtc_ticks = 0;
-rtc_basedelay = time;
-rtc_currdelay = time;
-return rtc_currdelay;
+return sim_rtcn_init (time, 0);
 }
 
 int32 sim_rtc_calb (int32 ticksper)
 {
-uint32 new_realtime, delta_realtime;
-int32 delta_virttime;
-
-rtc_ticks = rtc_ticks + 1;				/* count ticks */
-if (rtc_ticks < ticksper) return rtc_currdelay;		/* 1 sec yet? */
-rtc_ticks = 0;						/* reset ticks */
-if (!rtc_avail) return rtc_currdelay;			/* no timer? */
-new_realtime = sim_os_msec ();				/* wall time */
-delta_realtime = new_realtime - rtc_realtime;		/* elapsed wtime */
-if (delta_realtime == 0) return rtc_currdelay;		/* can't calibr */
-rtc_basedelay = (int32) (((double) rtc_basedelay * (double) rtc_nextintv) /
-	((double) delta_realtime));			/* new base rate */
-rtc_realtime = new_realtime;				/* adv wall time */
-rtc_virttime = rtc_virttime + 1000;			/* adv sim time */
-delta_virttime = rtc_virttime - rtc_realtime;		/* gap */
-if (delta_virttime > TMAX) delta_virttime = TMAX;	/* limit gap */
-else if (delta_virttime < -TMAX) delta_virttime = -TMAX;
-rtc_nextintv = 1000 + delta_virttime;			/* next wtime */
-rtc_currdelay = (int32) (((double) rtc_basedelay * (double) rtc_nextintv) /
-	1000.0);					/* next delay */
-return rtc_currdelay;
+return sim_rtcn_calb (ticksper, 0);
 }
 
 /* Breakpoint package.  This module replaces the VM-implemented one

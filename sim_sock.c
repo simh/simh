@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-May-02	RMS	Added OS2 EMX support from Holger Veit
+   06-Feb-02	RMS	Added VMS support from Robert Alan Byer
    16-Sep-01	RMS	Added Macintosh support from Peter Schorn
    02-Sep-01	RMS	Fixed UNIX bugs found by Mirian Lennox and Tom Markson
 */
@@ -44,7 +46,7 @@
 
 /* First, all the non-implemented versions */
 
-#if defined (VMS) || defined (__OS2__)
+#if defined (__OS2__) && !defined (__EMX__)
 
 SOCKET sim_master_sock (int32 port)
 {
@@ -78,7 +80,7 @@ return SOCKET_ERROR;
 
 #else							/* endif unimpl */
 
-/* UNIX, Win32, Macintosh (Berkeley socket) routines */
+/* UNIX, Win32, Macintosh, VMS, OS2 (Berkeley socket) routines */
 
 SOCKET sim_master_sock (int32 port)
 {
@@ -129,7 +131,9 @@ SOCKET sim_accept_conn (SOCKET master, UNIT *uptr, uint32 *ipaddr)
 {
 int32 sta;
 #if defined (macintosh) 
-socklen_t size; 
+socklen_t size;
+#elif defined (__EMX__)
+int size;
 #else 
 size_t size; 
 #endif
@@ -190,6 +194,13 @@ unsigned long non_block = 1;
 
 return ioctlsocket (sock, FIONBIO, &non_block);		/* set nonblocking */
 }
+#elif defined (VMS)
+SOCKET sim_setnonblock (SOCKET sock)
+{
+int non_block = 1;
+
+return ioctl (sock, FIONBIO, &non_block);		/* set nonblocking */
+}
 #else
 int32 sim_setnonblock (SOCKET sock)
 {
@@ -199,12 +210,12 @@ fl = fcntl (sock, F_GETFL,0);				/* get flags */
 if (fl == -1) return SOCKET_ERROR;
 sta = fcntl (sock, F_SETFL, fl | O_NONBLOCK);		/* set nonblock */
 if (sta == -1) return SOCKET_ERROR;
-#if !defined (macintosh)
+#if !defined (macintosh) && !defined (__EMX__)
 sta = fcntl (sock, F_SETOWN, getpid());			/* set ownership */
 if (sta == -1) return SOCKET_ERROR;
 #endif
 return 0;
 }
-#endif							/* endif Win32 */
+#endif							/* endif !Win32 */
 
-#endif							/* endif Win32/UNIX/Mac */
+#endif							/* endif Win32/UNIX/Mac/VMS */

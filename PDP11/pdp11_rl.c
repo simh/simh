@@ -1,6 +1,6 @@
  /* pdp11_rl.c: RL11 (RLV12) cartridge disk simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,9 @@
 
    rl		RL11(RLV12)/RL01/RL02 cartridge disk
 
-   30-Nov-01	MRS	Added read only, extended SET/SHOW support
+   26-Jan-02	RMS	Revised bootstrap to conform to M9312
+   06-Jan-02	RMS	Revised enable/disable support
+   30-Nov-01	RMS	Added read only, extended SET/SHOW support
    26-Nov-01	RMS	Fixed per-drive error handling
    24-Nov-01	RMS	Converted FLG, CAPAC to arrays
    19-Nov-01	RMS	Fixed signed/unsigned mismatch in write check
@@ -192,7 +194,9 @@ int32 rlmp = 0, rlmp1 = 0, rlmp2 = 0;			/* mp register queue */
 int32 rl_swait = 10;					/* seek wait */
 int32 rl_rwait = 10;					/* rotate wait */
 int32 rl_stopioe = 1;					/* stop on error */
-int32 rl_enb = 1;					/* device enable */
+
+t_stat rl_rd (int32 *data, int32 PA, int32 access);
+t_stat rl_wr (int32 data, int32 PA, int32 access);
 t_stat rl_svc (UNIT *uptr);
 t_stat rl_reset (DEVICE *dptr);
 void rl_set_done (int32 error);
@@ -209,6 +213,8 @@ extern t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds);
    rl_reg	RL register list
    rl_mod	RL modifier list
 */
+
+DIB rl_dib = { 1, IOBA_RL, IOLN_RL, &rl_rd, &rl_wr };
 
 UNIT rl_unit[] = {
 	{ UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
@@ -239,11 +245,12 @@ REG rl_reg[] = {
 	{ URDATA (CAPAC, rl_unit[0].capac, 10, 31, 0,
 		  RL_NUMDR, PV_LEFT + REG_HRO) },
 	{ FLDATA (STOP_IOE, rl_stopioe, 0) },
-	{ FLDATA (*DEVENB, rl_enb, 0), REG_HRO },
+	{ GRDATA (DEVADDR, rl_dib.ba, RL_RDX, 32, 0), REG_HRO },
+	{ FLDATA (*DEVENB, rl_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB rl_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
 	{ UNIT_DUMMY, 0, NULL, "BADBLOCK", &rl_set_bad },
 	{ (UNIT_RL02+UNIT_ATT), UNIT_ATT, "RL01", NULL, NULL },
@@ -254,6 +261,12 @@ MTAB rl_mod[] = {
 	{ UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", NULL },
 	{ (UNIT_AUTO+UNIT_RL02), 0, NULL, "RL01", &rl_set_size },
 	{ (UNIT_AUTO+UNIT_RL02), UNIT_RL02, NULL, "RL02", &rl_set_size },
+	{ MTAB_XTD|MTAB_VDV, 010, "ADDRESS", "ADDRESS",
+		&set_addr, &show_addr, &rl_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &rl_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &rl_dib },
 	{ 0 }  };
 
 DEVICE rl_dev = {
@@ -561,11 +574,13 @@ return pdp11_bad_block (uptr, RL_NUMSC, RL_NUMWD);
 
 #if defined (VM_PDP11)
 
-#define BOOT_START 02000				/* start */
-#define BOOT_UNIT 02006					/* unit number */
+#define BOOT_START	02000				/* start */
+#define BOOT_ENTRY	02002				/* entry */
+#define BOOT_UNIT	02010				/* unit number */
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int32))
 
 static const int32 boot_rom[] = {
+	0042114,			/* "LD" */
 	0012706, 0002000,		/* MOV #2000, SP */
 	0012700, 0000000,		/* MOV #UNIT, R0 */
 	0010003,			/* MOV R0, R3 */
@@ -601,8 +616,8 @@ static const int32 boot_rom[] = {
 	0042711, 0000377,		/* BIC #377, (R1) */
 	0005002,			/* CLR R2 */
 	0005003,			/* CLR R3 */
-	0005004,			/* CLR R4 */
-	0012705, 0046104,		/* MOV "DL, R5 */
+	0012704, BOOT_START+020,	/* MOV #START+20, R4 */
+	0005005,			/* CLR R5 */
 	0005007				/* CLR PC */
 };
 
@@ -614,7 +629,7 @@ extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & RLCS_M_DRIVE;
-saved_PC = BOOT_START;
+saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 }
 

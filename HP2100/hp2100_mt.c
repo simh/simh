@@ -1,6 +1,6 @@
-/* hp2100_mt.c: HP 2100 magnetic tape simulator
+/* hp2100_mt.c: HP 2100 12559A magnetic tape simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    mt		12559A nine track magnetic tape
 
+   30-May-02	RMS	Widened POS to 32b
+   22-Apr-02	RMS	Added maximum record length test
+   20-Jan-02	RMS	Fixed bug on last character write
    03-Dec-01	RMS	Added read only unit, extended SET/SHOW support
    07-Sep-01	RMS	Moved function prototypes
    30-Nov-00	RMS	Made variable names unique
@@ -81,8 +84,6 @@
 #define STA_PAR		0002				/* parity error */
 #define STA_BUSY	0001				/* busy */
 
-extern uint16 M[];
-extern struct hpdev infotab[];
 extern int32 PC;
 extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 int32 mtc_fnc = 0;					/* function */
@@ -92,18 +93,18 @@ int32 mtc_1st = 0;					/* first svc flop */
 int32 mtc_ctime = 1000;					/* command wait */
 int32 mtc_xtime = 10;					/* data xfer time */
 int32 mtc_stopioe = 1;					/* stop on error */
-uint8 mt_buf[DBSIZE] = { 0 };				/* data buffer */
+uint8 mtxb[DBSIZE] = { 0 };				/* data buffer */
 t_mtrlnt mt_ptr = 0, mt_max = 0;			/* buffer ptrs */
 static const int32 mtc_cmd[] = {
  FNC_WC, FNC_RC, FNC_GAP, FNC_FSR, FNC_BSR, FNC_REW, FNC_RWS, FNC_WFM };
 
+int32 mtdio (int32 inst, int32 IR, int32 dat);
+int32 mtcio (int32 inst, int32 IR, int32 dat);
 t_stat mtc_svc (UNIT *uptr);
 t_stat mtc_reset (DEVICE *dptr);
 t_stat mtc_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat mtc_attach (UNIT *uptr, char *cptr);
 t_stat mtc_detach (UNIT *uptr);
-t_stat mtd_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
-t_stat mtd_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 
 /* MTD data structures
 
@@ -112,22 +113,36 @@ t_stat mtd_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
    mtd_reg	MTD register list
 */
 
-UNIT mtd_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, DBSIZE) };
+DIB mt_dib[] = {
+	{ MTD, 1, 0, 0, 0, 0, &mtdio },
+	{ MTC, 1, 0, 0, 0, 0, &mtcio }  };
+
+#define mtd_dib mt_dib[0]
+#define mtc_dib mt_dib[1]
+
+UNIT mtd_unit = { UDATA (NULL, 0, 0) };
 
 REG mtd_reg[] = {
-	{ FLDATA (CMD, infotab[inMTD].cmd, 0), REG_HRO },
-	{ FLDATA (CTL, infotab[inMTD].ctl, 0), REG_HRO },
-	{ FLDATA (FLG, infotab[inMTD].flg, 0) },
-	{ FLDATA (FBF, infotab[inMTD].fbf, 0), REG_HRO },
+	{ FLDATA (CMD, mtd_dib.cmd, 0), REG_HRO },
+	{ FLDATA (CTL, mtd_dib.ctl, 0), REG_HRO },
+	{ FLDATA (FLG, mtd_dib.flg, 0) },
+	{ FLDATA (FBF, mtd_dib.fbf, 0), REG_HRO },
+	{ BRDATA (DBUF, mtxb, 8, 8, DBSIZE) },
 	{ DRDATA (BPTR, mt_ptr, DB_V_SIZE + 1) },
 	{ DRDATA (BMAX, mt_max, DB_V_SIZE + 1) },
-	{ ORDATA (DEVNO, infotab[inMTD].devno, 6), REG_RO },
+	{ ORDATA (DEVNO, mtd_dib.devno, 6), REG_HRO },
+	{ FLDATA (*DEVENB, mtd_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
+MTAB mtd_mod[] = {
+	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
+		&hp_setdev, &hp_showdev, &mtd_dib },
+	{ 0 }  };
+
 DEVICE mtd_dev = {
-	"MTD", &mtd_unit, mtd_reg, NULL,
+	"MTD", &mtd_unit, mtd_reg, mtd_mod,
 	1, 10, 16, 1, 8, 8,
-	&mtd_ex, &mtd_dep, &mtc_reset,
+	NULL, NULL, &mtc_reset,
 	NULL, NULL, NULL };
 
 /* MTC data structures
@@ -144,25 +159,30 @@ REG mtc_reg[] = {
 	{ ORDATA (FNC, mtc_fnc, 8) },
 	{ ORDATA (STA, mtc_sta, 9) },
 	{ ORDATA (BUF, mtc_unit.buf, 8) },
-	{ FLDATA (CMD, infotab[inMTC].cmd, 0), REG_HRO },
-	{ FLDATA (CTL, infotab[inMTC].ctl, 0) },
-	{ FLDATA (FLG, infotab[inMTC].flg, 0) },
-	{ FLDATA (FBF, infotab[inMTC].fbf, 0) },
+	{ FLDATA (CMD, mtc_dib.cmd, 0), REG_HRO },
+	{ FLDATA (CTL, mtc_dib.ctl, 0) },
+	{ FLDATA (FLG, mtc_dib.flg, 0) },
+	{ FLDATA (FBF, mtc_dib.fbf, 0) },
 	{ FLDATA (DTF, mtc_dtf, 0) },
 	{ FLDATA (FSVC, mtc_1st, 0) },
-	{ DRDATA (POS, mtc_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, mtc_unit.pos, 32), PV_LEFT },
 	{ DRDATA (CTIME, mtc_ctime, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (XTIME, mtc_xtime, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, mtc_stopioe, 0) },
 	{ FLDATA (WLK, mtc_unit.flags, UNIT_V_WLK), REG_HRO },
-	{ ORDATA (CDEVNO, infotab[inMTC].devno, 6), REG_RO },
+	{ ORDATA (DEVNO, mtc_dib.devno, 6), REG_HRO },
+	{ FLDATA (*DEVENB, mtc_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB mtc_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", &mtc_vlock },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", &mtc_vlock },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", &mtc_vlock }, 
-	{ MTAB_XTD | MTAB_VDV, inMTD, "DEVNO", "DEVNO",
-		&hp_setdev2, &hp_showdev2, NULL },
+	{ MTAB_XTD | MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enb, NULL, &mtd_dib },
+	{ MTAB_XTD | MTAB_VDV, 1, NULL, "DISABLED",
+		&set_dis, NULL, &mtd_dib },
+	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
+		&hp_setdev, &hp_showdev, &mtd_dib },
 	{ 0 }  };
 
 DEVICE mtc_dev = {
@@ -183,10 +203,10 @@ case ioFLG:						/* flag clear/set */
 	if ((IR & HC) == 0) { setFLG (devd); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
-	if (FLG (devd) == 0) PC = (PC + 1) & AMASK;
+	if (FLG (devd) == 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioSFS:						/* skip flag set */
-	if (FLG (devd) != 0) PC = (PC + 1) & AMASK;
+	if (FLG (devd) != 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioOTX:						/* output */
 	mtc_unit.buf = dat & 0377;			/* store data */
@@ -217,10 +237,10 @@ case ioFLG:						/* flag clear/set */
 	if ((IR & HC) == 0) { setFLG (devc); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
-	if (FLG (devc) == 0) PC = (PC + 1) & AMASK;
+	if (FLG (devc) == 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioSFS:						/* skip flag set */
-	if (FLG (devc) != 0) PC = (PC + 1) & AMASK;
+	if (FLG (devc) != 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioOTX:						/* output */
 	dat = dat & 0377;
@@ -287,15 +307,14 @@ static t_mtrlnt bceof = { 0 };
 if ((mtc_unit.flags & UNIT_ATT) == 0) {			/* offline? */
 	mtc_sta = STA_LOCAL | STA_BUSY | STA_REJ;
 	return IORETURN (mtc_stopioe, SCPE_UNATT);  }
-devc = infotab[inMTC].devno;				/* get device nos */
-devd = infotab[inMTD].devno;
+devc = mtc_dib.devno;				/* get device nos */
+devd = mtd_dib.devno;
 
 err = 0;						/* assume no errors */
 switch (mtc_fnc & 0377) {				/* case on function */
 case FNC_REW:						/* rewind */
 	mtc_unit.pos = 0;				/* BOT */
-	setFLG (devc);					/* set cch flg */
-	mtc_sta = (mtc_sta | STA_BOT) & ~STA_BUSY;	/* update status */
+	mtc_sta = mtc_sta | STA_BOT;			/* update status */
 	break;
 case FNC_RWS:						/* rewind and offline */
 	mtc_unit.pos = 0;				/* BOT */
@@ -308,15 +327,11 @@ case FNC_WFM:						/* write file mark */
 	mtc_unit.pos = mtc_unit.pos + sizeof (t_mtrlnt); /* update tape pos */
 	mtc_sta = mtc_sta | STA_EOF;			/* set EOF status */
 case FNC_GAP:						/* erase gap */
-	setFLG (devc);					/* set cch flg */
-	mtc_sta = mtc_sta & ~STA_BUSY;			/* update status */
 	break;
 
 /* Unit service, continued */
 
 case FNC_FSR:						/* space forward */
-	setFLG (devc);					/* set cch flg */
-	mtc_sta = mtc_sta & ~STA_BUSY;			/* update status */
 	fseek (mtc_unit.fileref, mtc_unit.pos, SEEK_SET);
 	fxread (&mt_max, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
 	if ((err = ferror (mtc_unit.fileref)) ||	/* error or eof? */
@@ -328,8 +343,6 @@ case FNC_FSR:						/* space forward */
 			(2 * sizeof (t_mtrlnt));	/* update position */
 	break;
 case FNC_BSR:						/* space reverse */
-	setFLG (devc);					/* set cch flg */
-	mtc_sta = mtc_sta & ~STA_BUSY;			/* update status */
 	if (mtc_unit.pos == 0) {			/* at BOT? */
 		mtc_sta = mtc_sta | STA_BOT;		/* update status */
 		break;  }
@@ -365,45 +378,44 @@ case FNC_RC:						/* read */
 		mt_max = MTRL (mt_max);			/* ignore errors */
 		mtc_unit.pos = mtc_unit.pos + ((mt_max + 1) & ~1) +
 			(2 * sizeof (t_mtrlnt));	/* update position */
-		if ((mt_max > DBSIZE) || (mt_max < 12)) {
+		if (mt_max > DBSIZE) return SCPE_MTRLNT;/* record too long? */
+		if (mt_max < 12) {			/* record too short? */
 			setFLG (devc);			/* set cch flg */
 			mtc_sta = (mtc_sta | STA_PAR) & ~STA_BUSY;
 			break;  }
-		i = fxread (mt_buf, sizeof (int8), mt_max, mtc_unit.fileref);
-		for ( ; i < mt_max; i++) mt_buf[i] = 0;	/* fill with 0's */
+		i = fxread (mtxb, sizeof (int8), mt_max, mtc_unit.fileref);
+		for ( ; i < mt_max; i++) mtxb[i] = 0;	/* fill with 0's */
 		err = ferror (mtc_unit.fileref);  }
 	if (mt_ptr < mt_max) {				/* more chars? */
 		if (FLG (devd)) mtc_sta = mtc_sta | STA_TIM;
-		mtc_unit.buf = mt_buf[mt_ptr++];		/* fetch next */
+		mtc_unit.buf = mtxb[mt_ptr++];		/* fetch next */
 		setFLG (devd);				/* set dch flg */
-		sim_activate (uptr, mtc_xtime);  }	/* re-activate */
-	else {	setFLG (devc);				/* set cch flg */
-		mtc_sta = mtc_sta & ~STA_BUSY;  }	/* update status */
+		sim_activate (uptr, mtc_xtime);		/* re-activate */
+		return SCPE_OK;  }
 	break;
 case FNC_WC:						/* write */
+	if (mtc_1st) mtc_1st = 0;			/* no xfr on first */
+	else {	if (mt_ptr < DBSIZE)			/* room in buffer? */
+			mtxb[mt_ptr++] = mtc_unit.buf;
+		else mtc_sta = mtc_sta | STA_PAR;  }
 	if (mtc_dtf) {					/* xfer flop set? */
-		if (!mtc_1st) {				/* not first? */
-			if (mt_ptr < DBSIZE)		/* room in buffer? */
-				mt_buf[mt_ptr++] = mtc_unit.buf;
-			else mtc_sta = mtc_sta | STA_PAR;  }
-		mtc_1st = 0;				/* clr 1st flop */
 		setFLG (devd);				/* set dch flag */
 		sim_activate (uptr, mtc_xtime);		/* re-activate */
-		break;  }
+		return SCPE_OK;  }
 	if (mt_ptr) {					/* write buffer */
 		fseek (mtc_unit.fileref, mtc_unit.pos, SEEK_SET);
 		fxwrite (&mt_ptr, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
-		fxwrite (mt_buf, sizeof (int8), mt_ptr, mtc_unit.fileref);
+		fxwrite (mtxb, sizeof (int8), mt_ptr, mtc_unit.fileref);
 		fxwrite (&mt_ptr, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
 		err = ferror (mtc_unit.fileref);
 		mtc_unit.pos = mtc_unit.pos + ((mt_ptr + 1) & ~1) +
 			(2 * sizeof (t_mtrlnt));  }
-	setFLG (devc);					/* set cch flg */
-	mtc_sta = mtc_sta & ~STA_BUSY;			/* update status */
 	break;  }
 
 /* Unit service, continued */
 
+setFLG (devc);						/* set cch flg */
+mtc_sta = mtc_sta & ~STA_BUSY;				/* not busy */
 if (err != 0) {						/* I/O error */
 	perror ("MT I/O error");
 	clearerr (mtc_unit.fileref);
@@ -416,10 +428,10 @@ return SCPE_OK;
 t_stat mtc_reset (DEVICE *dptr)
 {
 mtc_fnc = 0;
-infotab[inMTC].cmd = infotab[inMTD].cmd = 0;		/* clear cmd */
-infotab[inMTC].ctl = infotab[inMTD].ctl = 0;		/* clear ctl */
-infotab[inMTC].flg = infotab[inMTD].flg = 0;		/* clear flg */
-infotab[inMTC].fbf = infotab[inMTD].fbf = 0;		/* clear fbf */
+mtc_dib.cmd = mtd_dib.cmd = 0;				/* clear cmd */
+mtc_dib.ctl = mtd_dib.ctl = 0;				/* clear ctl */
+mtc_dib.flg = mtd_dib.flg = 0;				/* clear flg */
+mtc_dib.fbf = mtd_dib.fbf = 0;				/* clear fbf */
 sim_cancel (&mtc_unit);					/* cancel activity */
 if (mtc_unit.flags & UNIT_ATT) mtc_sta = ((mtc_unit.pos)? 0: STA_BOT) |
 	((mtc_unit.flags & UNIT_WPRT)? STA_WLK: 0);
@@ -452,23 +464,5 @@ return detach_unit (uptr);				/* detach unit */
 t_stat mtc_vlock (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if (val && (uptr -> flags & UNIT_ATT)) return SCPE_ARG;
-return SCPE_OK;
-}
-
-/* Buffer examine */
-
-t_stat mtd_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
-{
-if (addr >= DBSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = mt_buf[addr] & 0377;
-return SCPE_OK;
-}
-
-/* Buffer deposit */
-
-t_stat mtd_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
-{
-if (addr >= DBSIZE) return SCPE_NXM;
-mt_buf[addr] = val & 0377;
 return SCPE_OK;
 }

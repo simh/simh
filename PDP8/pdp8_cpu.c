@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu		central processor
 
+   06-Jan-02	RMS	Added device enable/disable routines
+   30-Dec-01	RMS	Added old PC queue
    16-Dec-01	RMS	Fixed bugs in EAE
    07-Dec-01	RMS	Revised to use new breakpoint package
    30-Nov-01	RMS	Added RL8A, extended SET/SHOW support
@@ -179,6 +181,9 @@
 
 #include "pdp8_defs.h"
 
+#define PCQ_SIZE	64				/* must be 2**n */
+#define PCQ_MASK	(PCQ_SIZE - 1)
+#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
 #define UNIT_V_NOEAE	(UNIT_V_UF)			/* EAE absent */
 #define UNIT_NOEAE	(1 << UNIT_V_NOEAE)
 #define UNIT_V_MSIZE	(UNIT_V_UF+1)			/* dummy mask */
@@ -197,19 +202,47 @@ int32 SC = 0;						/* EAE shift count */
 int32 UB = 0;						/* User mode Buffer */
 int32 UF = 0;						/* User mode Flag */
 int32 OSR = 0;						/* Switch Register */
-int32 old_PC = 0;					/* old PC */
+int16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
+int32 pcq_p = 0;					/* PC queue ptr */
+REG *pcq_r = NULL;					/* PC queue reg ptr */
 int32 dev_done = 0;					/* dev done flags */
 int32 int_enable = INT_INIT_ENABLE;			/* intr enables */
 int32 int_req = 0;					/* intr requests */
 int32 dev_enb = -1 & ~INT_DF & ~INT_RL;			/* device enables */
 int32 stop_inst = 0;					/* trap on ill inst */
+extern int32 sim_interval;
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
+extern UNIT clk_unit, ttix_unit;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern int32 tti (int32 pulse, int32 AC);
+extern int32 tto (int32 pulse, int32 AC);
+extern int32 ptr (int32 pulse, int32 AC);
+extern int32 ptp (int32 pulse, int32 AC);
+extern int32 clk (int32 pulse, int32 AC);
+extern int32 lpt (int32 pulse, int32 AC);
+extern int32 ttix (int32 inst, int32 AC);
+extern int32 ttox (int32 inst, int32 AC);
+extern int32 rk (int32 pulse, int32 AC);
+extern int32 rx (int32 pulse, int32 AC);
+extern int32 df60 (int32 pulse, int32 AC);
+extern int32 df61 (int32 pulse, int32 AC);
+extern int32 df62 (int32 pulse, int32 AC);
+extern int32 rf60 (int32 pulse, int32 AC);
+extern int32 rf61 (int32 pulse, int32 AC);
+extern int32 rf62 (int32 pulse, int32 AC);
+extern int32 rf64 (int32 pulse, int32 AC);
+extern int32 rl60 (int32 pulse, int32 AC);
+extern int32 rl61 (int32 pulse, int32 AC);
+extern int32 mt70 (int32 pulse, int32 AC);
+extern int32 mt71 (int32 pulse, int32 AC);
+extern int32 mt72 (int32 pulse, int32 AC);
+extern int32 dt76 (int32 pulse, int32 AC);
+extern int32 dt77 (int32 pulse, int32 AC);
 
 /* CPU data structures
 
@@ -245,7 +278,8 @@ REG cpu_reg[] = {
 	{ ORDATA (DONE, dev_done, INT_V_DIRECT), REG_RO },
 	{ ORDATA (ENABLE, int_enable, INT_V_DIRECT), REG_RO },
 	{ FLDATA (NOEAE, cpu_unit.flags, UNIT_V_NOEAE), REG_HRO },
-	{ ORDATA (OLDPC, old_PC, 15), REG_RO },
+	{ BRDATA (PCQ, pcq, 8, 15, PCQ_SIZE), REG_RO+REG_CIRC },
+	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ ORDATA (DEVENB, dev_enb, 32), REG_HRO },
@@ -272,36 +306,10 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 int32 IR, MB, IF, DF, LAC, MQ;
 t_addr PC, MA;
 int32 device, pulse, temp, iot_data;
 t_stat reason;
-extern UNIT clk_unit;
-extern int32 tti (int32 pulse, int32 AC);
-extern int32 tto (int32 pulse, int32 AC);
-extern int32 ptr (int32 pulse, int32 AC);
-extern int32 ptp (int32 pulse, int32 AC);
-extern int32 clk (int32 pulse, int32 AC);
-extern int32 lpt (int32 pulse, int32 AC);
-extern int32 ttix (int32 inst, int32 AC);
-extern int32 ttox (int32 inst, int32 AC);
-extern int32 rk (int32 pulse, int32 AC);
-extern int32 rx (int32 pulse, int32 AC);
-extern int32 df60 (int32 pulse, int32 AC);
-extern int32 df61 (int32 pulse, int32 AC);
-extern int32 df62 (int32 pulse, int32 AC);
-extern int32 rf60 (int32 pulse, int32 AC);
-extern int32 rf61 (int32 pulse, int32 AC);
-extern int32 rf62 (int32 pulse, int32 AC);
-extern int32 rf64 (int32 pulse, int32 AC);
-extern int32 rl60 (int32 pulse, int32 AC);
-extern int32 rl61 (int32 pulse, int32 AC);
-extern int32 mt70 (int32 pulse, int32 AC);
-extern int32 mt71 (int32 pulse, int32 AC);
-extern int32 mt72 (int32 pulse, int32 AC);
-extern int32 dt76 (int32 pulse, int32 AC);
-extern int32 dt77 (int32 pulse, int32 AC);
 
 /* Restore register state */
 
@@ -312,7 +320,8 @@ LAC = saved_LAC & 017777;
 MQ = saved_MQ & 07777;
 int_req = INT_UPDATE;
 reason = 0;
-sim_rtc_init (clk_unit.wait);				/* init calibration */
+sim_rtcn_init (clk_unit.wait, TMR_CLK);			/* init clk calib */
+sim_rtcn_init (ttix_unit.wait, TMR_TTX);		/* init ttx calib */
 
 /* Main instruction fetch/decode loop */
 
@@ -324,7 +333,8 @@ if (int_req > INT_PENDING) {				/* interrupt? */
 	int_req = int_req & ~INT_ION;			/* interrupts off */
 	SF = (UF << 6) | (IF >> 9) | (DF >> 12);	/* form save field */
 	IF = IB = DF = UF = UB = 0;			/* clear mem ext */
-	old_PC = M[0] = PC;				/* save PC in 0 */
+	PCQ_ENTRY;					/* save old PC */
+	M[0] = PC;					/* save PC in 0 */
 	PC = 1;  }					/* fetch next from 1 */
 
 MA = IF | PC;						/* form PC */
@@ -469,7 +479,7 @@ case 020:						/* JMS, dir, zero */
 	ZERO_PAGE_J;
 	CHANGE_FIELD;
 	MA = IF | MA;
-	old_PC = PC;
+	PCQ_ENTRY;
 	if (MEM_ADDR_OK (MA)) M[MA] = PC;
 	PC = (MA + 1) & 07777;
 	break;
@@ -477,7 +487,7 @@ case 021:						/* JMS, dir, curr */
 	CURR_PAGE_J;
 	CHANGE_FIELD;
 	MA = IF | MA;
-	old_PC = PC;
+	PCQ_ENTRY;
 	if (MEM_ADDR_OK (MA)) M[MA] = PC;
 	PC = (MA + 1) & 07777;
 	break;
@@ -486,7 +496,7 @@ case 022:						/* JMS, indir, zero */
 	INDIRECT_J;
 	CHANGE_FIELD;
 	MA = IF | MA;
-	old_PC = PC;
+	PCQ_ENTRY;
 	if (MEM_ADDR_OK (MA)) M[MA] = PC;
 	PC = (MA + 1) & 07777;
 	break;
@@ -495,7 +505,7 @@ case 023:						/* JMS, indir, curr */
 	INDIRECT_J;
 	CHANGE_FIELD;
 	MA = IF | MA;
-	old_PC = PC;
+	PCQ_ENTRY;
 	if (MEM_ADDR_OK (MA)) M[MA] = PC;
 	PC = (MA + 1) & 07777;
 	break;
@@ -505,27 +515,27 @@ case 023:						/* JMS, indir, curr */
 case 024:						/* JMP, dir, zero */
 	ZERO_PAGE_J;
 	CHANGE_FIELD;
-	old_PC = PC;
+	PCQ_ENTRY;
 	PC = MA;
 	break;
 case 025:						/* JMP, dir, curr */
 	CURR_PAGE_J;
 	CHANGE_FIELD;
-	old_PC = PC;
+	PCQ_ENTRY;
 	PC = MA;
 	break;
 case 026:						/* JMP, indir, zero */
 	ZERO_PAGE;
 	INDIRECT_J;
 	CHANGE_FIELD;
-	old_PC = PC;
+	PCQ_ENTRY;
 	PC = MA;
 	break;
 case 027:						/* JMP, indir, curr */
 	CURR_PAGE;
 	INDIRECT_J;
 	CHANGE_FIELD;
-	old_PC = PC;
+	PCQ_ENTRY;
 	PC = MA;
 	break;
 
@@ -1022,11 +1032,13 @@ case 030:case 031:case 032:case 033:			/* IOT */
 	case 013:					/* CLK */
 		iot_data = clk (pulse, iot_data);
 		break;
-	case 040: case 042: case 044: case 046:		/* KL8A in */
-		iot_data = ttix (IR, iot_data);
+	case 040: case 042: case 044: case 046:		/* KL8JA in */
+		if (dev_enb & INT_TTI1) iot_data = ttix (IR, iot_data);
+		else reason = stop_inst;
 		break;
-	case 041: case 043: case 045: case 047:		/* KL8A out */
-		iot_data = ttox (IR, iot_data);
+	case 041: case 043: case 045: case 047:		/* KL8JA out */
+		if (dev_enb & INT_TTI1) iot_data = ttox (IR, iot_data);
+		else reason = stop_inst;
 		break;
 	case 060:					/* DF32/RF08 */
 		if (dev_enb & INT_DF) iot_data = df60 (pulse, iot_data);
@@ -1091,6 +1103,7 @@ saved_PC = IF | (PC & 07777);				/* save copies */
 saved_DF = DF & 070000;
 saved_LAC = LAC & 017777;
 saved_MQ = MQ & 07777;
+pcq_r -> qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }							/* end sim_instr */
 
@@ -1101,6 +1114,9 @@ t_stat cpu_reset (DEVICE *dptr)
 int_req = (int_req & ~INT_ION) | INT_NO_CIF_PENDING;
 saved_DF = IB = saved_PC & 070000;
 UF = UB = gtf = emode = 0;
+pcq_r = find_reg ("PCQ", NULL, dptr);
+if (pcq_r) pcq_r -> qptr = 0;
+else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
 }
@@ -1137,5 +1153,41 @@ if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
 	return SCPE_OK;
 MEMSIZE = val;
 for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+return SCPE_OK;
+}
+
+/* Device enable routine */
+
+t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+DEVICE *dptr;
+
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+dev_enb = dev_enb | val;
+if (dptr -> reset) dptr -> reset (dptr);
+return SCPE_OK;
+}
+
+/* Device disable routine */
+
+t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i;
+DEVICE *dptr;
+UNIT *up;
+
+if (cptr != NULL) return SCPE_ARG;
+if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+for (i = 0; i < dptr -> numunits; i++) {		/* check units */
+	up = (dptr -> units) + i;
+	if ((up -> flags & UNIT_ATT) || sim_is_active (up))
+		return SCPE_NOFNC;  }
+dev_enb = dev_enb & ~val;
+if (dptr -> reset) dptr -> reset (dptr);
 return SCPE_OK;
 }

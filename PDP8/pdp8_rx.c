@@ -1,6 +1,6 @@
 /* pdp8_rx.c: RX8E/RX01 floppy disk simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rx		RX8E/RX01 floppy disk
 
+   06-Jan-02	RMS	Changed enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Converted FLG to array
    17-Jul-01	RMS	Fixed warning from VC++ 6
@@ -146,8 +147,10 @@ REG rx_reg[] = {
 	{ NULL }  };
 
 MTAB rx_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+	{ MTAB_XTD|MTAB_VDV, INT_RX, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_RX, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE rx_dev = {

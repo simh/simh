@@ -1,6 +1,6 @@
 /* dec_mscp.c: DEC MSCP definitions
 
-   Copyright (c) 2001, Robert M Supnik
+   Copyright (c) 2001-2002, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a

@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	HP2100 Simulator Usage
-Date:	1-Dec-01
+Date:	15-Jun-2002
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2001, written by Robert M Supnik
-   Copyright (c) 1993-2001, Robert M Supnik
+   Original code published in 1993-2002, written by Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -43,9 +43,14 @@ sim/		sim_defs.h
 
 sim/hp2100/	hp2100_defs.h
 		hp2100_cpu.c
+		hp2100_fp.c
 		hp2100_dp.c
+		hp2100_dq.c
+		hp2100_dr.c
 		hp2100_lp.c
 		hp2100_mt.c
+		hp2100_ms.c
+		hp2100_mux.c
 		hp2100_stddev.c
 		hp2100_sys.c
 
@@ -62,8 +67,12 @@ PTR,PTP		12597A paper tape reader/punch
 TTY		12631C buffered teleprinter
 LPT		12653A line printer
 CLK		12539A/B/C time base generator
-DP		12557A cartridge disk controller with four drives
+MUXL,MUXU,MUXC	12920A terminal multiplexor
+DP		12557A/13210A disk controller with four drives
+DQ		12565A disk controller with two drives
+DR		12606A/12610A fixed head disk/drum controller
 MT		12559C magnetic tape controller with one drives
+MS		13181A magnetic tape controller with four drives
 
 The HP2100 simulator implements several unique stop conditions:
 
@@ -116,7 +125,8 @@ control registers for the interrupt system.
 	STOP_INST	1	stop on undefined instruction
 	STOP_DEV	1	stop on undefined device
 	INDMAX		1	indirect address limit
-	OLDP		15	PC prior to last JMP, JSB, or interrupt
+	PCQ[0:63]	15	PC of last JMP, JSB, or interrupt;
+				most recent PC change first
 	WRU		8	interrupt character
 
 2.2 DMA Controllers
@@ -140,22 +150,34 @@ On the HP2100, I/O device take their device numbers from the backplane
 slot they are plugged into.  Thus, device number assignments vary
 considerably from system to system, and software package to software
 package.  The HP2100 simulator supports dynamic device number assignment.
-The current device device is shown with the command SHOW <dev> DEVNO:
+To show the current device number, use the SHOW <dev> DEVNO command:
 
 	sim> SHOW PTR DEV
 	device=10
 
-The user can change the device number with the SET <dev> DEVNO=<num>
-command:
+To change the device number, use the SET <dev> DEVNO=<num> command:
 
 	sim> SET PTR DEV=30
 	sim> SHOW PTR DEV
 	device=30
 
-The new device number must be in the range 010..077 (octal) and must 
-not be currently assigned to another device.  For devices with two
-device numbers, only the lower numbered device number can be changed;
-the higher is automatically set to the lower + 1.
+The new device number must be in the range 010..077 (octal).  For devices
+with two device numbers, only the lower numbered device number can be
+changed; the higher is automatically set to the lower + 1.  If a
+device number conflict occurs, the simulator will return an error
+message when started.
+
+In addition, most devices can be enabled or disabled.  To enable a
+device, use the SET <dev> ENABLED command:
+
+	sim> SET DP ENABLED
+
+To disable a device, use the SET <dev> DISABLED command:
+
+	sim> SET DP DISABLED
+
+For devices with two device numbers, disabling or enabling one device
+in the pair disables or enables the other.
 
 2.4 Programmed I/O Devices
 
@@ -177,10 +199,9 @@ The paper tape reader implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
-	POS		31	position in the input file
+	POS		32	position in the input file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
-	DEVNO		6	current device number (read only)
 
 Error handling is as follows:
 
@@ -209,10 +230,9 @@ The paper tape punch implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
-	POS		31	position in the output file
+	POS		32	position in the output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
-	DEVNO		6	current device number (read only)
 
 Error handling is as follows:
 
@@ -241,13 +261,12 @@ The terminal implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
-	KPOS		31	number of characters input
+	KPOS		32	number of characters input
 	KTIME		24	keyboard polling interval
-	TPOS		31	number of characters printed
+	TPOS		32	number of characters printed
 	TTIME		24	time from I/O initiation to interrupt
-	PPOS		31	position in the punch output file
+	PPOS		32	position in the punch output file
 	STOP_IOE	1	punch stop on I/O error
-	DEVNO		6	current device number (read only)
 
 Error handling for the punch is as follows:
 
@@ -273,11 +292,10 @@ The line printer implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
-	POS		31	position in the output file
+	POS		32	position in the output file
 	CTIME		24	time between characters
 	PTIME		24	time for a print operation
 	STOP_IOE	1	stop on I/O error
-	DEVNO		6	current device number (read only)
 
 Error handling is as follows:
 
@@ -302,12 +320,106 @@ The time base generator (CLK) implements these registers:
 	TIME[0:7]	31	clock intervals, select = 0..7
 	DEVNO		6	current device number (read only)
 
-2.5 12557A Cartridge Disk (DP)
+2.4.6 12920A Terminal Multiplexor (MUXL, MUXU, MUXC)
 
-The 12557A cartridge disk has two separate devices, a data channel and
+The 12920A is a 16-line terminal multiplexor, with five additional
+receive-only diagnostic lines.  It consists of three devices:
+
+	MUX		scanning logic (corresponding more or less
+			to the upper data card)
+	MUXL		individual lines (corresponding more or
+			less to the lower data card)
+	MUXC		modem control and status logic (corresponding
+			to the control card)
+
+The MUX performs input and output through Telnet sessions connected to a
+user-specified port.  The ATTACH command to the scanning logic specifies
+the port to be used:
+
+	ATTACH MUX <port>	set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.
+
+Each line (each unit of MUXL) supports two options.  UC, when set, causes
+lower case input characters to be automatically converted to upper case.
+DATASET, when set, enables modem control.  By default, UC is on, and
+DATASET is off.
+
+The modem controls model a simplified Bell 103A dataset with just four
+lines: data terminal ready and request to send from the computer to the
+data set, and carrier detect and data set ready from the data set to
+the computer.  There is no ring detection.  If data terminal ready is
+set when a Telnet connection starts up, then carrier detect and data
+set ready are also set.  The connection is established whether data
+terminal ready is set or not.
+
+Once MUX is attached and the simulator is running, the multiplexor listens
+for connections on the specified port.  It assumes that the incoming
+connections are Telnet connections.  The connections remain open until
+disconnected either by the Telnet client, a SET MUXL DISCONNECT command,
+or a DETACH MUX command.
+
+The SHOW MUX CONNECTIONS command displays the current connections to the
+extra terminals.  The SHOW MUX STATISTICS command displays statistics for
+active connections.  The SET MUX DISCONNECT=linenumber disconnects the
+specified line.
+
+The scanner (MUX) implements these registers:
+
+	name		size	comments
+
+	IBUF		16	input buffer, holds line status
+	OBUF		16	output buffer, holds channel select
+
+The lines (MUXL) implements these registers:
+
+	name		size	comments
+
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	STA[0:20]	16	line status, lines 0-20
+	RPAR[0:20]	16	receive parameters, lines 0-20
+	XPAR[0:15]	16	transmit parameters, lines 0-15
+	RBUF[0:20]	8	receive buffer, lines 0-20
+	XBUF[0:15]	8	transmit buffer, lines 0-15
+	RCHP[0:20]	1	receive character present, lines 0-20
+	XDON[0:15]	1	transmit done, lines 0-15
+	TIME[0:15]	24	transmit time, lines 0-15
+
+The modem control (MUXM) implements these registers:
+
+	name		size	comments
+
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	SCAN		1	scan enabled
+	CHAN		4	current line
+	DSO[0:15]	6	C2,C1,ES2,ES1,SS2,SS1, lines 0-15
+	DSI[0:15]	2	S2,S1, lines 0-15
+
+
+The terminal multiplexor does not support save and restore.  All open
+connections are lost when the simulator shuts down or MUXU is detached.
+
+2.5 12557A/13210A Disk Controller (DP)
+
+The 12557A/13210A disk controller can be configured as either a
+12557A, supporting 2.5MB drives, or a 13210A, supporting 5MB drives,
+with the commands:
+
+	SET DP 12557A		2.5MB drives
+	SET DP 13210A		5.0MB drives
+
+Drive types cannot be intermixed; the controller is configured for
+one type or the other.
+
+The simulated controller has two separate devices, a data channel and
 a device controller.  The data channel includes a 128-word (one sector)
 buffer for reads and writes.  The device controller includes the four
-disk drives.  Disk drives can be REMOVEd or ADDed to the configuration.
+disk drives.  Disk drives can be set ONLINE or OFFLINE.
 
 The data channel implements these registers:
 
@@ -315,12 +427,12 @@ The data channel implements these registers:
 
 	IBUF		16	input buffer
 	OBUF		16	output buffer
+	DBUF[0:127]	16	sector buffer
 	BPTR		7	sector buffer pointer
 	CMD		1	channel enable
 	CTL		1	interrupt enable
 	FLG		1	channel ready
 	FBF		1	channel ready buffer
-	DEVNO		6	current device number (read only)
 
 The device controller implements these registers:
 
@@ -341,7 +453,6 @@ The device controller implements these registers:
 	STIME		24	seek delay time, per cylinder
 	XTIME		24	interword transfer time
 	STA[0:3]	16	drive status, drives 0-3
-	DEVNO		6	current device number (read only)
 
 Error handling is as follows:
 
@@ -353,27 +464,125 @@ Error handling is as follows:
 
 	OS I/O error	report error and stop
 
-2.6 12559C Magnetic Tape (MT)
+2.6 12565A Disk Controller (DP)
+
+The 12565A disk controller has two separate devices, a data channel and
+a device controller.  The data channel includes a 128-word (one sector)
+buffer for reads and writes.  The device controller includes the two
+disk drives.  Disk drives can be set ONLINE or OFFLINE.
+
+The data channel implements these registers:
+
+	name		size	comments
+
+	IBUF		16	input buffer
+	OBUF		16	output buffer
+	DBUF[0:127]	16	sector buffer
+	BPTR		7	sector buffer pointer
+	CMD		1	channel enable
+	CTL		1	interrupt enable
+	FLG		1	channel ready
+	FBF		1	channel ready buffer
+
+The device controller implements these registers:
+
+	name		size	comments
+
+	OBUF		16	output buffer
+	BUSY		2	busy (unit #, + 1, of active unit)
+	RARC		8	record address register cylinder
+	RARH		5	record address register head
+	RARS		5	record address register sector
+	CNT		5	check record count
+	CMD		1	controller enable
+	CTL		1	interrupt enable
+	FLG		1	controller ready
+	FBF		1	controller ready buffer
+	EOC		1	end of cylinder pending
+	CTIME		24	command delay time
+	STIME		24	seek delay time, per cylinder
+	XTIME		24	interword transfer time
+	STA[0:3]	16	drive status, drives 0-3
+
+Error handling is as follows:
+
+	error	     	processed as
+
+	not attached	disk not ready
+
+	end of file	assume rest of disk is zero
+
+	OS I/O error	report error and stop
+
+2.7 12606A/12610A Fixed Head Disk/Drum Controller (DR)
+
+The 12606A/12610A fixed head disk/drum controller has two separate devices,
+a data channel and a device controller.  The device controller includes the
+actual drive.  Ten different models are supported:
+
+	SET DR 180K		12606A, 180K words
+	SET DR 360K		12606A, 360K words
+	SET DR 720K		12606A, 720K words
+	SET DR 384K		12610A, 384K words
+	SET DR 512K		12610A, 512K words
+	SET DR 640K		12610A, 640K words
+	SET DR 768K		12610A, 768K words
+	SET DR 896K		12610A, 896K words
+	SET DR 1024K		12610A, 1024K words
+	SET DR 1536K		12610A, 1536K words 
+
+The data channel implements these registers:
+
+	name		size	comments
+
+	IBUF		16	input buffer
+	OBUF		16	output buffer
+	CMD		1	channel enable
+	CTL		1	interrupt enable
+	FLG		1	channel ready
+	FBF		1	channel ready buffer
+	BPTR		6	sector buffer pointer
+
+The device controller implements these registers:
+
+	name		size	comments
+
+	CW		16	command word
+	STA		16	status
+	CMD		1	controller enable
+	CTL		1	interrupt enable
+	FLG		1	controller ready
+	FBF		1	controller ready buffer
+	TIME		24	interword transfer time
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     	processed as
+
+	not attached	disk not ready
+
+2.8 12559C Magnetic Tape (MT)
 
 Magnetic tape options include the ability to make the unit write enabled
 or write locked.
 
 	SET MT LOCKED		set unit write locked
-	SET MT ENABLED		set unit write enabled
+	SET MT WRITEENABLED	set unit write enabled
 
 The 12559C mag tape drive has two separate devices, a data channel and
 a device controller.  The data channel includes a maximum record sized
 buffer for reads and writes.  The device controller includes the tape
-unit
+unit.
 
 The data channel implements these registers:
 
 	name		size	comments
 
 	FLG		1	channel ready
+	DBUF[0:65535]	8	transfer buffer
 	BPTR		16	buffer pointer (reads and writes)
 	BMAX		16	buffer size (writes)
-	DEVNO		6	current device number (read only)
 
 The device controller implements these registers:
 
@@ -382,17 +591,15 @@ The device controller implements these registers:
 	FNC		8	current function
 	STA		9	tape status
 	BUF		8	buffer
-	BUSY		3	busy (unit #, + 1, of active unit)
 	CTL		1	interrupt enabled
 	FLG		1	controller ready
 	FBF		1	controller ready buffer
 	DTF		1	data transfer flop
 	FSVC		1	first service flop
-	POS		31	magtape position
+	POS		32	magtape position
 	CTIME		24	command delay time
 	XTIME		24	interword transfer delay time
 	STOP_IOE	1	stop on I/O error
-	DEVNO		6	current device number (read only)
 
 Error handling is as follows:
 
@@ -405,7 +612,59 @@ Error handling is as follows:
 
 	OS I/O error		report error and stop
 
-2.7 Symbolic Display and Input
+2.9 13181A Magnetic Tape (MS)
+
+Magnetic tape options include the ability to make the unit write enabled
+or write locked.
+
+	SET MT LOCKED		set unit write locked
+	SET MT WRITEENABLED	set unit write enabled
+
+The 13181A mag tape drive has two separate devices, a data channel and
+a device controller.  The data channel includes a maximum record sized
+buffer for reads and writes.  The device controller includes the tape
+units.
+
+The data channel implements these registers:
+
+	name		size	comments
+
+	BUF		16	data buffer
+	CTL		1	interrupt enabled
+	FLG		1	channel ready
+	FBF		1	channel ready buffer
+	DBUF[0:65535]	8	transfer buffer
+	BPTR		17	buffer pointer (reads and writes)
+	BMAX		17	buffer size (writes)
+
+The device controller implements these registers:
+
+	name		size	comments
+
+	STA		12	tape status
+	BUF		16	buffer
+	USEL		2	currently selected unit
+	FSVC		1	first service flop
+	CTL		1	interrupt enabled
+	FLG		1	controller ready
+	FBF		1	controller ready buffer
+	POS[0:3]	32	magtape position
+	CTIME		24	command delay time
+	XTIME		24	interword transfer delay time
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		tape not ready
+
+	end of file		(read or space) end of physical tape
+				(write) ignored
+
+	OS I/O error		report error and stop
+
+2.10 Symbolic Display and Input
 
 The HP2100 simulator implements symbolic display and input.  Display is
 controlled by command line switches:

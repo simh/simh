@@ -1,6 +1,6 @@
 /* pdp11_lp.c: PDP-11 line printer simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    lpt		LP11 line printer
 
+   30-May-02	RMS	Widened POS to 32b
+   06-Jan-02	RMS	Added enable/disable support
    09-Nov-01	RMS	Added VAX support
    07-Sep-01	RMS	Revised interrupt mechanism
    30-Oct-00	RMS	Standardized register naming
@@ -45,8 +47,12 @@
 #define LPTCSR_RW	(CSR_IE)			/* read/write */
 
 extern int32 int_req[IPL_HLVL];
+
 int32 lpt_csr = 0;					/* control/status */
 int32 lpt_stopioe = 0;					/* stop on error */
+
+t_stat lpt_rd (int32 *data, int32 PA, int32 access);
+t_stat lpt_wr (int32 data, int32 PA, int32 access);
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *ptr);
@@ -59,6 +65,8 @@ t_stat lpt_detach (UNIT *uptr);
    lpt_reg	LPT register list
 */
 
+DIB lpt_dib = { 1, IOBA_LPT, IOLN_LPT, &lpt_rd, &lpt_wr };
+
 UNIT lpt_unit = {
 	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
 
@@ -69,13 +77,24 @@ REG lpt_reg[] = {
 	{ FLDATA (ERR, lpt_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, lpt_csr, CSR_V_DONE) },
 	{ FLDATA (IE, lpt_csr, CSR_V_IE) },
-	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
+	{ GRDATA (DEVADDR, lpt_dib.ba, LPT_DRDX, 32, 0), REG_HRO },
+	{ FLDATA (*DEVENB, lpt_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
+MTAB lpt_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+		&set_addr, &show_addr, &lpt_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &lpt_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &lpt_dib },
+	{ 0 }  };
+
 DEVICE lpt_dev = {
-	"LPT", &lpt_unit, lpt_reg, NULL,
+	"LPT", &lpt_unit, lpt_reg, lpt_mod,
 	1, 10, 31, 1, LPT_DRDX, 8,
 	NULL, NULL, &lpt_reset,
 	NULL, &lpt_attach, &lpt_detach };

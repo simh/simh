@@ -25,10 +25,9 @@ extern REG cpu_reg[];
 extern unsigned char M[];
 extern int32 saved_PC, IAR[];
 extern char ebcdic_to_ascii[256];
-extern char *get_glyph (char *cptr, char *gbuf, char term);
-extern unsigned int32 get_uint (char *cptr, int32 radix, unsigned int32 max,
-	int32 *status);
 char *parse_addr(char *cptr,  char *gbuf, int32 *addr, int32 *addrtype);
+int32 printf_sym (FILE *of, char *strg, int32 addr, unsigned int32 *val,
+	UNIT *uptr, int32 sw);
 
 /* SCP data structures
 
@@ -247,9 +246,9 @@ int32 fprint_sym (FILE *of, int32 addr, unsigned int32 *val,
 int32 printf_sym (FILE *of, char *strg, int32 addr, unsigned int32 *val,
 	UNIT *uptr, int32 sw)
 {
-int32 cflag, c1, c2, group, len1, len2, inst, adr, aaddr, baddr;
+int32 cflag, c1, c2, group, len1, len2, inst, aaddr, baddr;
 int32 oplen, groupno, i, j, vpos, qbyte, da, m, n;
-char bld[128], bldaddr[32], boperand[32], aoperand[32], regoperand[32];
+char bld[128], bldaddr[32], boperand[32], aoperand[32];
 int32 blk[16], blt[16];
 int32 blkadd;
 
@@ -481,7 +480,7 @@ return -(oplen - 1);
 
 int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, unsigned int32 *val, int32 sw)
 {
-int32 cflag, i = 0, j, k, r, oplen, addtyp, saveaddr, vptr;
+int32 cflag, i = 0, j, r, oplen, addtyp, saveaddr, vptr;
 char gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);

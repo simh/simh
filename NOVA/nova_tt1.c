@@ -1,6 +1,6 @@
 /* nova_tt1.c: NOVA second terminal simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -27,6 +27,9 @@
    tti1		second terminal input
    tto1		second terminal output
 
+   30-May-02	RMS	Widened POS to 32b
+   06-Jan-02	RMS	Revised enable/disable support
+   30-Dec-01	RMS	Added show statistics, set disconnect
    30-Nov-01	RMS	Added extended SET/SHOW support
    17-Sep-01	RMS	Changed to use terminal multiplexor library
    07-Sep-01	RMS	Moved function prototypes
@@ -53,7 +56,8 @@ t_stat tto1_reset (DEVICE *dptr);
 t_stat ttx1_setmod (UNIT *uptr, int32 val, char *cptr);
 t_stat tti1_attach (UNIT *uptr, char *cptr);
 t_stat tti1_detach (UNIT *uptr);
-t_stat tti1_status (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tti1_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tti1_show (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* TTI1 data structures
 
@@ -71,22 +75,28 @@ REG tti1_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTI1) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_TTI1) },
 	{ FLDATA (INT, int_req, INT_V_TTI1) },
-	{ DRDATA (POS, tt1_ldsc.rxcnt, 31), PV_LEFT },
+	{ DRDATA (POS, tt1_ldsc.rxcnt, 32), PV_LEFT },
 	{ DRDATA (TIME, tti1_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (MODE, tti1_unit.flags, UNIT_V_DASHER), REG_HRO },
 	{ FLDATA (*DEVENB, iot_enb, INT_V_TTI1), REG_HRO },
 	{ NULL }  };
 
-MTAB ttx1_mod[] = {
+MTAB tti1_mod[] = {
 	{ UNIT_DASHER, 0, "ANSI", "ANSI", &ttx1_setmod },
 	{ UNIT_DASHER, UNIT_DASHER, "Dasher", "DASHER", &ttx1_setmod },
-	{ UNIT_ATT, UNIT_ATT, "line status", NULL, NULL, &tti1_status },
-	{ MTAB_XTD | MTAB_VDV | MTAB_VUN | MTAB_NMO, 0, "LINE", NULL,
-		NULL, &tti1_status, NULL },
+	{ UNIT_ATT, UNIT_ATT, "summary", NULL, NULL, &tti1_summ },
+	{ MTAB_XTD | MTAB_VDV, 0, NULL, "DISCONNECT",
+		&tmxr_dscln, NULL, &tt_desc },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
+		NULL, &tti1_show, NULL },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
+		NULL, &tti1_show, NULL },
+	{ MTAB_XTD|MTAB_VDV, INT_TTI1 | INT_TTO1, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_TTI1 | INT_TTO1, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE tti1_dev = {
-	"TTI1", &tti1_unit, tti1_reg, ttx1_mod,
+	"TTI1", &tti1_unit, tti1_reg, tti1_mod,
 	1, 10, 31, 1, 8, 8,
 	&tmxr_ex, &tmxr_dep, &tti1_reset,
 	NULL, &tti1_attach, &tti1_detach  };
@@ -106,14 +116,19 @@ REG tto1_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTO1) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_TTO1) },
 	{ FLDATA (INT, int_req, INT_V_TTO1) },
-	{ DRDATA (POS, tt1_ldsc.txcnt, 31), PV_LEFT },
+	{ DRDATA (POS, tt1_ldsc.txcnt, 32), PV_LEFT },
 	{ DRDATA (TIME, tto1_unit.wait, 24), PV_LEFT },
 	{ FLDATA (MODE, tto1_unit.flags, UNIT_V_DASHER), REG_HRO },
-	{ FLDATA (*DEVENB, iot_enb, INT_V_TTI1), REG_HRO },
+	{ FLDATA (*DEVENB, iot_enb, INT_V_TTO1), REG_HRO },
 	{ NULL }  };
 
+MTAB tto1_mod[] = {
+	{ UNIT_DASHER, 0, "ANSI", "ANSI", &ttx1_setmod },
+	{ UNIT_DASHER, UNIT_DASHER, "Dasher", "DASHER", &ttx1_setmod },
+	{ 0 }  };
+
 DEVICE tto1_dev = {
-	"TTO1", &tto1_unit, tto1_reg, ttx1_mod,
+	"TTO1", &tto1_unit, tto1_reg, tto1_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tto1_reset,
 	NULL, NULL, NULL };
@@ -267,10 +282,20 @@ sim_cancel (uptr);					/* stop poll */
 return r;
 }
 
-/* Status routine */
+/* Show summary processor */
 
-t_stat tti1_status (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tti1_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-tmxr_fstatus (st, &tt1_ldsc, -1);
+if (tt1_ldsc.conn) fprintf (st, "connected");
+else fprintf (st, "disconnected");
+return SCPE_OK;
+}
+
+/* SHOW CONN/STAT processor */
+
+t_stat tti1_show (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if (val) tmxr_fconns (st, &tt1_ldsc, -1);
+else tmxr_fstats (st, &tt1_ldsc, -1);
 return SCPE_OK;
 }

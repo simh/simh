@@ -1,0 +1,661 @@
+To:	Users
+From:	Bob Supnik
+Subj:	VAX Simulator Usage
+Date:	15-Jun-2002
+
+			COPYRIGHT NOTICE
+
+The following copyright notice applies to both the SIMH source and binary:
+
+   Original code published in 1993-2002, written by Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Robert M Supnik shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Robert M Supnik.
+
+This memorandum documents the VAX simulator.
+
+
+1. Simulator Files
+
+To compile the VAX, you must define USE_INT64 as part of the compilation
+command line.
+
+sim/		sim_defs.h
+		sim_sock.h
+		sim_tmxr.h
+		dec_dz.h
+		dec_mscp.h
+		dec_uqssp.h
+		scp.c
+		scp_tty.c
+		sim_rev.c
+		sim_sock.c
+		sim_tmxr.c
+
+sim/vax/	vax_defs.h
+		vaxmod_defs.h
+		vax_cpu.c
+		vax_cpu1.c
+		vax_fpa.c
+		vax_io.c
+		vax_mmu.c
+		vax_stddev.c
+		vax_sys.c
+
+sim/pdp11/	pdp11_dz.c
+		pdp11_lp.c
+		pdp11_rl.c
+		pdp11_rq.c
+		pdp11_ts.c
+
+2. VAX Features
+
+The VAX simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		KA655 CPU with 16MB-64MB of memory
+TLB		translation buffer
+ROM		read-only memory
+NVR		non-volatile memory
+SYSD		system devices
+QBA		Qbus adapter
+PTR,PTP		PCV11 paper tape reader/punch
+TTI,TTO		console terminal
+LPT		LPV11 line printer
+CLK		real-time clock
+DZ		DZV11 8-line terminal multiplexor (up to 4)
+RL		RLV12/RL01(2) cartridge disk controller with four drives
+RQ		RQDX3 MSCP controller with four drives
+TS		TSV11/TSV05 magnetic tape controller with one drive
+
+The PTR, PTP, LPT, DZ, RL, and TS devices can be set DISABLED.  In addition,
+most devices support the SET ADDRESS command, which allows the I/O page
+address of the device to be changed.
+
+The VAX simulator implements several unique stop conditions:
+
+	- change mode to interrupt stack
+	- illegal vector (bits<1:0> = 2 or 3)
+	- unexpected exception during interrupt or exception
+	- process PTE in P0 or P1 space instead of system space
+	- unknown IPL
+	- infinite loop (BRB/W to self at IPL 1F)
+
+The VAX supports a simple binary format consisting of a stream of
+binary bytes without origin or checksum, for loading memory, the boot
+ROM, or the non-volatile memory.
+
+2.1 CPU and System Devices
+
+2.2 CPU
+
+CPU options include the size of main memory and the treatment of the
+HALT instruction.
+
+	SET CPU 16M		set memory size = 16MB
+	SET CPU 32M		set memory size = 32MB
+	SET CPU 48M		set memory size = 48MB
+	SET CPU 64M		set memory size = 64MB
+	SET CPU SIMHALT		kernel HALT returns to simulator
+	SET CPU CONHALT		kernel HALT returns to boot ROM console
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 16MB.
+
+Memory can be loaded with a binary byte stream using the LOAD command.
+The LOAD command recognizes one switch:
+
+	-o			Origin argument follows file name
+
+The CPU supports the BOOT command and is the only VAX device to do so.
+
+These switches are recognized when examining or depositing in CPU memory:
+
+	-b			examine/deposit bytes
+	-w			examine/deposit words
+	-d			data radix is decimal
+	-o			data radix is octal
+	-h			data radix is hexadecimal
+	-v			interpret address as virtual, current mode
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	PC		32	program counter
+	R0..R14		32	R0..R14
+	AP		32	alias for R12
+	FP		32	alias for R13
+	SP		32	alias for R14
+	PSL		32	processor status longword
+	CC		4	condition codes, PSL<3:0>
+	KSP		32	kernel stack pointer
+	ESP		32	executive stack pointer
+	SSP		32	supervisor stack pointer
+	USP		32	user stack pointer
+	IS		32	interrupt stack pointer
+	SCBB		32	system control block base
+	PCBB		32	process controll block base
+	P0BR		32	P0 base register
+	P0LR		22	P0 length register
+	P1BR		32	P1 base register
+	P1LR		22	P1 length register
+	SBR		32	system base register
+	SLR		22	system length register
+	SISR		16	software interrupt summary register
+	ASTLVL		4	AST level register
+	CADR		8	cache disable register
+	MSER		8	memory system error register
+	MAPEN		1	memory management enable flag
+	TRPIRQ		8	trap/interrupt pending
+	CRDERR		1	correctible read data error flag
+	MEMERR		1	memory error flag
+	PCQ[0:63]	32	PC prior to last PC change or interrupt;
+				most recent PC change first
+	WRU		8	interrupt character
+
+2.1.2 Translation Buffer (TLB)
+
+The translation buffer consists of two units, representing the system
+and user translation buffers, respectively.  It has no registers.  Each
+translation buffer entry consists of two 32b words, as follows:
+
+	word n		tag
+	word n+1	cached PTE
+
+An invalid entry is indicated by a tag of FFFFFFFF.
+
+2.1.3 Read-only memory (ROM)
+
+The boot ROM consists of a single unit, representing the 128KB boot ROM.
+It has no registers.  The boot ROM is loaded with a binary byte stream
+using the LOAD -r command:
+
+	LOAD -r KA655.BIN	-- load boot ROM image KA655.BIN
+
+2.1.4 Non-volatile Memory (NVR)
+
+The NVR consists of a single unit, representing 1KB of battery-backed up
+memory.  When the simulator starts, NVR is cleared to 0, and the SSC
+battery-low indicator is set.  The NVR can be loaded with a binary byte
+stream using the LOAD -n command:
+
+	LOAD -n NVR.BIN		-- load NVR image NVR.BIN
+
+Successfully loading an NVR image clears the SSC battery-low indicator.
+
+2.1.5 System Devices (SYSD)
+
+The system devices are the facilities implemented in KA655 CPU board,
+the CMCTL memory controller, and the SSC system support chip.  Note that
+the simulation of these devices is incomplete and is intended strictly
+to allow the patched bootstrap code to run.  The SYSD registers are:
+
+	name		size	comments
+
+	CMCSR[0:17]	32	CMCTL control and status registers
+	CACR		8	second-level cache control register
+	BDR		8	front panel jumper register
+	BASE		29	SSC base address register
+	CNF		32	SSC configuration register
+	BTO		32	SSC bus timeout register
+	TCSR0		32	SSC timer 0 control/status register
+	TIR0		32	SSC timer 0 interval register
+	TNIR0		32	SSC timer 0 next interval register
+	TIVEC0		9	SSC timer 0 interrupt vector register
+	TCSR1		32	SSC timer 1 control/status register
+	TIR1		32	SSC timer 1 interval register
+	TNIR1		32	SSC timer 1 next interval register
+	TIVEC1		9	SSC timer 1 interrupt vector register
+	ADSM0		32	SSC address match 0 address
+	ADSK0		32	SSC address match 0 mask
+	ADSM1		32	SSC address match 1 address
+	ADSK1		32	SSC address match 1 mask
+	CDGDAT[0:16383]	32	cache diagnostic data store
+
+2.1.6 Qbus Adapter (QBA)
+
+The QBA represents the CQBIC Qbus adapter chip.  The QBA registers are:
+
+	name		size	comments
+
+	SCR		16	system configuration register
+	DSER		8	DMA system error register
+	MEAR		13	master error address register
+	SEAR		20	slave error address register
+	MBR		29	Qbus map base register
+	IPC		16	interprocessor communications register
+	IPL17		32	IPL 17 interrupt flags
+	IPL16		32	IPL 16 interrupt flags
+	IPL15		32	IPL 15 interrupt flags
+	IPL14		32	IPL 14 interrupt flags
+
+2.2 Programmed I/O Devices
+
+2.2.1 PC11 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.  Thus,
+by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	BUSY		1	busy flag (CSR<11>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		32	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+2.2.2 PC11 Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written. 
+Thus, by by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		32	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+2.2.3 Terminal Input (TTI)
+
+The terminal input (TTI) polls the console keyboard for input.  It
+implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		32	number of characters input
+	TIME		24	keyboard polling interval
+
+2.2.4 Terminal Output (TTO)
+
+The terminal output (TTO) writes to the simulator console window.  It
+implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		32	number of characters input
+	TIME		24	time from I/O initiation to interrupt
+
+2.2.5 Line Printer (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The line printer implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		32	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of paper
+
+	OS I/O error	x	report error and stop
+
+2.2.6 Real-Time Clock (CLK)
+
+The clock (CLK) implements these registers:
+
+	name		size	comments
+
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	IE		1	interrupt enable flag (CSR<6>)
+	TODR		32	time-of-day register
+	BLOW		1	TODR battery low indicator
+	TIME		24	clock frequency
+	TPS		8	ticks per second (100)
+
+The real-time clock autocalibrates; the clock interval is adjusted up or
+down so that the clock tracks actual elapsed time.
+
+2.2.7 DZ11 Terminal Multiplexor (DZ)
+
+The DZ11 is an 8-line terminal multiplexor.  Up to 4 DZ11's (32 lines)
+are supported.  The number of lines can be changed with the command
+
+	SET DZ LINES=n			set line count to n
+
+The line count must be a multiple of 8, with a maximum of 32.
+
+The terminal lines perform input and output through Telnet sessions
+connected to a user-specified port.  The ATTACH command specifies
+the port to be used:
+
+	ATTACH {-am} DZ <port>		set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.  The optional switch -m turns on the DZ11's
+modem controls; the optional switch -a turns on active disconnects
+(disconnect session if computer clears Data Terminal Ready).
+
+Once the DZ is attached and the simulator is running, the DZ will listen
+for connections on the specified port.  It assumes that the incoming
+connections are Telnet connections.  The connection remains open until
+disconnected by the simulated program, the Telnet client, a SET DZ
+DISCONNECT command, or a DETACH DZ command.
+
+The SHOW DZ CONNECTIONS command displays the current connections to the DZ.
+The SHOW DZ STATISTICS command displays statistics for active connections.
+The SET DZ DISCONNECT=linenumber disconnects the specified line.
+
+The DZ11 implements these registers:
+
+	name		size	comments
+
+	CSR[0:3]	16	control/status register, boards 0-3
+	RBUF[0:3]	16	receive buffer, boards 0-3
+	LPR[0:3]	16	line parameter register, boards 0-3
+	TCR[0:3]	16	transmission control register, boards 0-3
+	MSR[0:3]	16	modem status register, boards 0-3
+	TDR[0:3]	16	transmit data register, boards 0-3
+	SAENB[0:3]	1	silo alarm enabled, boards 0-3
+	RXINT		4	receive interrupts, boards 3..0
+	TXINT		4	transmit interrupts, boards 3..0
+	MDMTCL		1	modem control enabled
+	AUTODS		1	autodisconnect enabled
+
+The DZ11 does not support save and restore.  All open connections are
+lost when the simulator shuts down or the DZ is detached.
+
+2.3 RLV12/RL01,RL02 Cartridge Disk (RL)
+
+RLV12 options include the ability to set units write enabled or write locked,
+to set the drive size to RL01, RL02, or autosize, and to write a DEC standard
+044 compliant bad block table on the last track:
+
+	SET RLn LOCKED		set unit n write locked
+	SET RLn WRITEENABLED	set unit n write enabled
+	SET RLn RL01		set size to RL01
+	SET RLn RL02		set size to RL02
+	SET RLn AUTOSIZE	set size based on file size at attach
+	SET RLn BADBLOCK	write bad block table on last track
+
+The size options can be used only when a unit is not attached to a file.  The
+bad block option can be used only when a unit is attached to a file.  Units
+can also be set ONLINE or OFFLINE.
+
+The RL11 implements these registers:
+
+	name		size	comments
+
+	RLCS		16	control/status
+	RLDA		16	disk address
+	RLBA		16	memory address
+	RLBAE		6	memory address extension (RLV12)
+	RLMP..RLMP2	16	multipurpose register queue
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.4 RQDX3 MSCP Disk Controller (RQ)
+
+The RQ controller simulates the RQDX3 MSCP disk controller.  RQ options
+include the ability to set units write enabled or write locked, and to
+set the drive type to one of eleven disk types:
+
+	SET RQn LOCKED		set unit n write locked
+	SET RQn WRITEENABLED	set unit n write enabled
+	SET RQn RX50		set type to RX50
+	SET RQn RX33		set type to RX33
+	SET RQn RD51		set type to RD51
+	SET RQn RD52		set type to RD52
+	SET RQn RD53		set type to RD53
+	SET RQn RD54		set type to RD54
+	SET RQn RD31		set type to RD31
+	SET RQn RA82		set type to RA82
+	SET RQn RA72		set type to RA72
+	SET RQn RA90		set type to RA90
+	SET RQn RA92		set type to RA92
+
+The type options can be used only when a unit is not attached to a file.
+Units can also be set ONLINE or OFFLINE.
+
+The RQ controller implements the following special SHOW commands:
+
+	SHOW RQ RINGS		show command and response rings
+	SHOW RQ FREEQ		show packet free queue
+	SHOW RQ RESPQ		show packet response queue
+	SHOW RQ UNITQ		show unit queues
+	SHOW RQ ALL		show all ring and queue state
+	SHOW RQn UNITQ		show unit queues for unit n
+
+The RQ controller implements these registers:
+
+	name		size	comments
+
+	SA		16	status/address register
+	S1DAT		16	step 1 init host data
+	CQBA		22	command queue base address
+	CQLNT		8	command queue length
+	CQIDX		8	command queue index
+	RQBA		22	request queue base address
+	RQLNT		8	request queue length
+	RQIDX		8	request queue index
+	FREE		5	head of free packet list
+	RESP		5	head of response packet list
+	PBSY		5	number of busy packets
+	CFLGS		16	controller flags
+	CSTA		4	controller state
+	PERR		9	port error number
+	CRED		5	host credits
+	HAT		17	host available timer
+	HTMO		17	host timeout value
+	CPKT[0:3]	5	current packet, units 0-3
+	PKTQ[0:3]	5	packet queue, units 0-3
+	UFLG[0:3]	16	unit flags, units 0-3
+	INT		1	interrupt request
+	ITIME		1	response time for initialization steps
+				(except for step 4)
+	QTIME		24	response time for 'immediate' packets
+	XTIME		24	response time for data transfers
+	PKTS[33*32]	16	packet buffers, 33W each,
+				32 entries
+
+Error handling is as follows:
+
+	error	     	processed as
+
+	not attached	disk not ready
+
+	end of file	assume rest of disk is zero
+
+	OS I/O error	report error and stop
+
+2.5 TSV11/TSV05 Magnetic Tape (TS)
+
+TS options include the ability to make the unit write enabled or write locked.
+
+	SET TS LOCKED		set unit write locked
+	SET TS WRITEENABLED	set unit write enabled
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	TSSR		16	status register
+	TSBA		16	bus address register
+	TSDBX		16	data buffer extension register
+	CHDR		16	command packet header
+	CADL		16	command packet low address or count
+	CADH		16	command packet high address
+	CLNT		16	command packet length
+	MHDR		16	message packet header
+	MRFC		16	message packet residual frame count
+	MXS0		16	message packet extended status 0
+	MXS1		16	message packet extended status 1
+	MXS2		16	message packet extended status 2
+	MXS3		16	message packet extended status 3
+	MXS4		16	message packet extended status 4
+	WADL		16	write char packet low address
+	WADH		16	write char packet high address
+	WLNT		16	write char packet length
+	WOPT		16	write char packet options
+	WXOPT		16	write char packet extended options
+	ATTN		1	attention message pending
+	BOOT		1	boot request pending
+	OWNC		1	if set, tape owns command buffer
+	OWNM		1	if set, tape owns message buffer
+	TIME		24	delay
+	POS		32	position
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		tape not ready
+
+	end of file		(read or space) end of physical tape
+				(write) ignored
+
+	OS I/O error		fatal tape error
+
+2.6 Symbolic Display and Input
+
+The VAX simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as ASCII string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			ASCII string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard VAX assembler syntax.
+
+The syntax for specifiers is as follows:
+
+syntax		specifier	displacement	comments
+
+#s^n, #n	0n		-		short literal, integer only
+[Rn]		4n		-		indexed, second specifier
+						follows
+Rn		5n		-		PC illegal
+(Rn)		6n		-		PC illegal
+-(Rn)		7n              -		PC illegal
+(Rn)+		8n		-
+#i^n, #n	8F		n		immediate
+@(Rn)+		9n		-
+@#addr		9F		addr		absolute
+{+/-}b^d(Rn)	An		{+/-}d		byte displacement
+b^d		AF		d - PC		byte PC relative
+@{+/-}b^d(Rn)	Bn		{+/-}d		byte displacement deferred
+@b^d		BF		d - PC		byte PC relative deferred
+{+/-}w^d(Rn)	Cn		{+/-}d		word displacement
+w^d		CF		d - PC		word PC relative
+@{+/-}w^d(Rn)	Dn		{+/-}d		word displacement deferred
+@w^d		DF		d - PC		word PC relative deferred
+{+/-}l^d(Rn)	En		{+/-}d		long displacement
+l^d		EF		d - PC		long PC relative
+@{+/-}l^d(Rn)	Fn		{+/-}d		long displacement deferred
+@l^d		FF		d - PC		long PC relative deferred
+
+If no override is given for a literal (s^ or i^) or for a displacement or PC
+relative addres (b^, w^, or l^), the simulator chooses the mode automatically.

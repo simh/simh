@@ -1,6 +1,6 @@
 /* pdp10_tu.c - PDP-10 RH11/TM03/TU45 magnetic tape simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    tu		RH11/TM03/TU45 magtape
 
+   30-May-02	RMS	Widened POS to 32b
+   22-Apr-02	RMS	Changed record length error code
+   06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Changed POS, FLG, UST to arrays
    23-Oct-01	RMS	Fixed bug in error interrupts
@@ -296,6 +299,8 @@ int fmt_test[16] = {					/* fmt bytes/10 wd */
 int den_test[8] = {					/* valid densities */
  0, 0, 0, 1, 1, 0, 0, 0 };
 
+t_stat tu_rd (int32 *data, int32 PA, int32 access);
+t_stat tu_wr (int32 data, int32 PA, int32 access);
 t_stat tu_svc (UNIT *uptr);
 t_stat tu_reset (DEVICE *dptr);
 t_stat tu_attach (UNIT *uptr, char *cptr);
@@ -312,6 +317,8 @@ t_stat tu_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
    tu_reg	TU register list
    tu_mod	TU modifier list
 */
+
+DIB tu_dib = { 1, IOBA_TU, IOLN_TU, &tu_rd, &tu_wr };
 
 UNIT tu_unit[] = {
 	{ UDATA (&tu_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0) },
@@ -342,7 +349,7 @@ REG tu_reg[] = {
 	{ FLDATA (STOP_IOE, tu_stopioe, 0) },
 	{ DRDATA (TIME, tu_time, 24), PV_LEFT },
 	{ URDATA (UST, tu_unit[0].USTAT, 8, 17, 0, TU_NUMDR, 0) },
-	{ URDATA (POS, tu_unit[0].pos, 8, 31, 0,
+	{ URDATA (POS, tu_unit[0].pos, 8, 32, 0,
 		  TU_NUMDR, PV_LEFT | REG_RO) },
 	{ URDATA (FLG, tu_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
 		  TU_NUMDR, REG_HRO) },
@@ -350,8 +357,10 @@ REG tu_reg[] = {
 	{ NULL }  };
 
 MTAB tu_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", &tu_vlock },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", &tu_vlock },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", &tu_vlock }, 
+	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
+		NULL, &show_addr, &tu_dib },
 	{ 0 }  };
 
 DEVICE tu_dev = {
@@ -763,7 +772,7 @@ case FNC_WCHKF:						/* wcheck = read */
 		tufs = tufs | FS_TMK;
 		uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
 		break;  }
-	if (tbc > XBUFLNT) return STOP_MTRLNT;		/* bad rec length? */
+	if (tbc > XBUFLNT) return SCPE_MTRLNT;		/* bad rec length? */
 	i = fxread (xbuf, sizeof (int8), tbc, uptr -> fileref);
 	for ( ; i < tbc + 4; i++) xbuf[i] = 0;		/* fill/pad with 0's */
 	err = ferror (uptr -> fileref);
@@ -825,7 +834,7 @@ case FNC_WCHKR:						/* wcheck = read */
 		tufs = tufs | FS_TMK;
 		uptr -> pos = uptr -> pos - sizeof (t_mtrlnt);
 		break;  }
-	if (tbc > XBUFLNT) return STOP_MTRLNT;		/* bad rec length? */
+	if (tbc > XBUFLNT) return SCPE_MTRLNT;		/* bad rec length? */
 	fseek (uptr -> fileref, uptr -> pos - sizeof (t_mtrlnt)
 		 - ((tbc + 1) & ~1), SEEK_SET);
 	fxread (xbuf + 4, sizeof (int8), tbc, uptr -> fileref);

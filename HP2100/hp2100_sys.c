@@ -1,6 +1,6 @@
 /* hp2100_sys.c: HP 2100 simulator interface
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Mar-02	RMS	Revised for dynamically allocated memory
+   14-Feb-02	RMS	Added DMS instructions
+   04-Feb-02	RMS	Fixed bugs in alter/skip display and parsing
+   01-Feb-02	RMS	Added terminal multiplexor support
+   16-Jan-02	RMS	Added additional device support
    17-Sep-01	RMS	Removed multiconsole support
    27-May-01	RMS	Added multiconsole support
    14-Mar-01	RMS	Revised load/dump interface (again)
@@ -40,9 +45,13 @@ extern DEVICE dma0_dev, dma1_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tty_dev, clk_dev, lpt_dev;
 extern DEVICE mtd_dev, mtc_dev;
+extern DEVICE msd_dev, msc_dev;
 extern DEVICE dpd_dev, dpc_dev;
+extern DEVICE dqd_dev, dqc_dev;
+extern DEVICE drd_dev, drc_dev;
+extern DEVICE muxl_dev, muxu_dev, muxc_dev;
 extern REG cpu_reg[];
-extern uint16 M[];
+extern uint16 *M;
 
 /* SCP data structures and interface routines
 
@@ -65,8 +74,12 @@ DEVICE *sim_devices[] = { &cpu_dev,
 	&ptr_dev, &ptp_dev,
 	&tty_dev,
 	&clk_dev, &lpt_dev,
-	&mtd_dev, &mtc_dev,
 	&dpd_dev, &dpc_dev,
+	&dqd_dev, &dqc_dev,
+	&drd_dev, &drc_dev,
+	&mtd_dev, &mtc_dev,
+	&msd_dev, &msc_dev,
+	&muxu_dev, &muxl_dev, &muxc_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -129,24 +142,24 @@ return SCPE_OK;
 #define I_V_FL		16				/* flag start */
 #define I_M_FL		017				/* flag mask */
 #define I_V_NPN		0				/* no operand */
-#define I_V_NPNC	1				/* no operand + C */
+#define I_V_NPC		1				/* no operand + C */
 #define I_V_MRF		2				/* mem ref */
 #define I_V_ASH		3				/* alter/skip, shift */
-#define I_V_ESHF	4				/* extended shift */
-#define I_V_EMRF	5				/* extended mem ref */
-#define I_V_IOT1	6				/* I/O + HC */
-#define I_V_IOT2	7				/* I/O only */
-#define I_V_EG1Z	010				/* ext grp, 1 op + 0 */
+#define I_V_ESH		4				/* extended shift */
+#define I_V_EMR		5				/* extended mem ref */
+#define I_V_IO1		6				/* I/O + HC */
+#define I_V_IO2		7				/* I/O only */
+#define I_V_EGZ		010				/* ext grp, 1 op + 0 */
 #define I_V_EG2		011				/* ext grp, 2 op */
 #define I_NPN		(I_V_NPN << I_V_FL)
-#define I_NPNC		(I_V_NPNC << I_V_FL)
+#define I_NPC		(I_V_NPC << I_V_FL)
 #define I_MRF		(I_V_MRF << I_V_FL)
 #define I_ASH		(I_V_ASH << I_V_FL)
-#define I_ESHF		(I_V_ESHF << I_V_FL)
-#define I_EMRF		(I_V_EMRF << I_V_FL)
-#define I_IOT1		(I_V_IOT1 << I_V_FL)
-#define I_IOT2		(I_V_IOT2 << I_V_FL)
-#define I_EG1Z		(I_V_EG1Z << I_V_FL)
+#define I_ESH		(I_V_ESH << I_V_FL)
+#define I_EMR		(I_V_EMR << I_V_FL)
+#define I_IO1		(I_V_IO1 << I_V_FL)
+#define I_IO2		(I_V_IO2 << I_V_FL)
+#define I_EGZ		(I_V_EGZ << I_V_FL)
 #define I_EG2		(I_V_EG2 << I_V_FL)
 
 static const int32 masks[] = {
@@ -169,6 +182,18 @@ static const char *opcode[] = {
  "SFC", "SFS", "MIA", "MIB",
  "LIA", "LIB", "OTA", "OTB",
  "STC", "CLC",
+ "SYA", "USA", "PAA", "PBA",
+               "XMA",
+ "XLA", "XSA", "XCA", "LFA",
+ "RSA", "RVA",
+               "MBI", "MBF",
+ "MBW", "MWI", "MWF", "MWW",
+ "SYB", "USB", "PAB", "PBB",
+ "SSM", "JRS",
+ "XMM", "XMS", "XMB",
+ "XLB", "XSB", "XCB", "LFB",
+ "RSB", "RVB", "DJP", "DJS",
+ "SJP", "SJS", "UJP", "UJS",
  "SAX", "SBX", "CAX", "CBX",
  "LAX", "LBX", "STX",
  "CXA", "CXB", "LDX",
@@ -189,28 +214,40 @@ static const int32 opc_val[] = {
  0020000+I_MRF, 0024000+I_MRF, 0030000+I_MRF, 0034000+I_MRF,
  0040000+I_MRF, 0044000+I_MRF, 0050000+I_MRF, 0054000+I_MRF,
  0060000+I_MRF, 0064000+I_MRF, 0070000+I_MRF, 0074000+I_MRF,
- 0100020+I_ESHF, 0100040+I_ESHF, 0100100+I_ESHF,
- 0101020+I_ESHF, 0101040+I_ESHF, 0101100+I_ESHF,
- 0100200+I_EMRF, 0100400+I_EMRF, 0104200+I_EMRF, 0104400+I_EMRF,
- 0105000+I_EMRF, 0105020+I_EMRF, 0105040+I_EMRF, 0105060+I_EMRF,
+ 0100020+I_ESH, 0100040+I_ESH, 0100100+I_ESH,
+ 0101020+I_ESH, 0101040+I_ESH, 0101100+I_ESH,
+ 0100200+I_EMR, 0100400+I_EMR, 0104200+I_EMR, 0104400+I_EMR,
+ 0105000+I_EMR, 0105020+I_EMR, 0105040+I_EMR, 0105060+I_EMR,
  0105100+I_NPN, 0105120+I_NPN,
- 0102101+I_NPN, 0103101+I_NPN, 0102201+I_NPNC, 0102301+I_NPNC,
- 0102000+I_IOT1, 0102100+I_IOT2, 0103100+I_IOT2,
- 0102200+I_IOT2, 0102300+I_IOT2, 0102400+I_IOT1, 0106400+I_IOT1,
- 0102500+I_IOT1, 0106500+I_IOT1, 0102600+I_IOT1, 0106600+I_IOT1,
- 0102700+I_IOT1, 0106700+I_IOT1,
- 0101740+I_EMRF, 0105740+I_EMRF, 0101741+I_NPN, 0105741+I_NPN,
- 0101742+I_EMRF, 0105742+I_EMRF, 0105743+I_EMRF,
- 0101744+I_NPN, 0105744+I_NPN, 0105745+I_EMRF,
- 0105746+I_EMRF, 0101747+I_NPN, 0105747+I_NPN,
- 0101750+I_EMRF, 0105750+I_EMRF, 0101751+I_NPN, 0105751+I_NPN,
- 0101752+I_EMRF, 0105752+I_EMRF, 0105753+I_EMRF,
- 0101754+I_NPN, 0105754+I_NPN, 0105755+I_EMRF,
- 0105756+I_EMRF, 0101757+I_NPN, 0105757+I_NPN,
- 0105760+I_NPN, 0105761+I_NPN, 0105762+I_EMRF, 0105763+I_NPN,
- 0105764+I_NPN, 0105765+I_EG1Z, 0105766+I_EG1Z, 0105767+I_NPN,
- 0105770+I_NPN, 0105771+I_NPN, 0105772+I_EMRF, 0105773+I_EG2,
- 0105774+I_EG2, 0105775+I_EG2, 0105776+I_EG1Z, 0105777+I_EG1Z,
+ 0102101+I_NPN, 0103101+I_NPN, 0102201+I_NPC, 0102301+I_NPC,
+ 0102000+I_IO1, 0102100+I_IO2, 0103100+I_IO2,
+ 0102200+I_IO2, 0102300+I_IO2, 0102400+I_IO1, 0106400+I_IO1,
+ 0102500+I_IO1, 0106500+I_IO1, 0102600+I_IO1, 0106600+I_IO1,
+ 0102700+I_IO1, 0106700+I_IO1,
+ 0101710+I_NPN, 0101711+I_NPN, 0101712+I_NPN, 0101713+I_NPN,
+                               0101722+I_NPN,
+ 0101724+I_EMR, 0101725+I_EMR, 0101726+I_EMR, 0101727+I_NPN,
+ 0101730+I_NPN, 0101731+I_NPN,
+                               0105702+I_NPN, 0105703+I_NPN,
+ 0105704+I_NPN, 0105705+I_NPN, 0105706+I_NPN, 0105707+I_NPN,
+ 0105710+I_NPN, 0105711+I_NPN, 0105712+I_NPN, 0105713+I_NPN,
+ 0105714+I_EMR, 0105715+I_EG2,
+ 0105720+I_NPN, 0105721+I_NPN, 0105722+I_NPN,
+ 0105724+I_EMR, 0105725+I_EMR, 0105726+I_EMR, 0105727+I_NPN,
+ 0105730+I_NPN, 0105731+I_NPN, 0105732+I_EMR, 0105733+I_EMR,
+ 0105734+I_EMR, 0105735+I_EMR, 0105736+I_EMR, 0105737+I_EMR,
+ 0101740+I_EMR, 0105740+I_EMR, 0101741+I_NPN, 0105741+I_NPN,
+ 0101742+I_EMR, 0105742+I_EMR, 0105743+I_EMR,
+ 0101744+I_NPN, 0105744+I_NPN, 0105745+I_EMR,
+ 0105746+I_EMR, 0101747+I_NPN, 0105747+I_NPN,
+ 0101750+I_EMR, 0105750+I_EMR, 0101751+I_NPN, 0105751+I_NPN,
+ 0101752+I_EMR, 0105752+I_EMR, 0105753+I_EMR,
+ 0101754+I_NPN, 0105754+I_NPN, 0105755+I_EMR,
+ 0105756+I_EMR, 0101757+I_NPN, 0105757+I_NPN,
+ 0105760+I_NPN, 0105761+I_NPN, 0105762+I_EMR, 0105763+I_NPN,
+ 0105764+I_NPN, 0105765+I_EGZ, 0105766+I_EGZ, 0105767+I_NPN,
+ 0105770+I_NPN, 0105771+I_NPN, 0105772+I_EMR, 0105773+I_EG2,
+ 0105774+I_EG2, 0105775+I_EG2, 0105776+I_EGZ, 0105777+I_EGZ,
  0000000+I_ASH,						/* decode only */
  -1 };
 
@@ -230,8 +267,8 @@ static const char *stab[] = {
 static const int32 mtab[] = {
  0007700, 0007700, 0007700, 0007700, 0007700, 0007700, 0007700, 0007700,
  0007700, 0007700, 0007700, 0007700, 0007700, 0007700, 0007700, 0007700,
- 0007400, 0007400, 0007400, 0007400, 0007400, 0007400,
- 0002040, 0002040, 0002300, 0002300, 0002300,
+ 0006400, 0007000, 0007400, 0006400, 0007000, 0007400,
+ 0002040, 0002040, 0002100, 0002200, 0002300,
  0006020, 0006020, 0004010, 0004010,
  0006027, 0006027, 0006027, 0006027, 0006027, 0006027, 0006027, 0006027,
  0006027, 0006027, 0006027, 0006027, 0006027, 0006027, 0006027, 0006027,
@@ -288,15 +325,15 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 
 	switch (j) {					/* case on class */
 	case I_V_NPN:					/* no operands */
-		fprintf (of, "%s", opcode[i]);	/* opcode */
+		fprintf (of, "%s", opcode[i]);		/* opcode */
 		break;
-	case I_V_NPNC:					/* no operands + C */
+	case I_V_NPC:					/* no operands + C */
 		fprintf (of, "%s", opcode[i]);
 		if (inst & HC) fprintf (of, " C");
 		break;
 	case I_V_MRF:					/* mem ref */
 		disp = inst & DISP;			/* displacement */
-		fprintf (of, "%s ", opcode[i]);	/* opcode */
+		fprintf (of, "%s ", opcode[i]);		/* opcode */
 		if (inst & CP) {			/* current page? */
 			if (cflag) fprintf (of, "%-o", (addr & PAGENO) | disp);
 			else fprintf (of, "C %-o", disp);  }
@@ -306,36 +343,37 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	case I_V_ASH:					/* shift, alter-skip */
 		cm = FALSE;
 		for (i = 0; mtab[i] != 0; i++) {
-			if ((inst & mtab[i]) == vtab[i]) {
-				if (cm) fprintf (of, ",");
-				cm = TRUE;
-				fprintf (of, "%s", stab[i]);  }  }	
-		if (!cm) return SCPE_ARG;	/* nothing decoded? */
+		    if ((inst & mtab[i]) == vtab[i]) {
+			inst = inst & ~(vtab[i] & 01777);
+			if (cm) fprintf (of, ",");
+			cm = TRUE;
+			fprintf (of, "%s", stab[i]);  }  }	
+		if (!cm) return SCPE_ARG;		/* nothing decoded? */
 		break;
-	case I_V_ESHF:					/* extended shift */
+	case I_V_ESH:					/* extended shift */
 		disp = inst & 017;			/* shift count */
 		if (disp == 0) disp = 16;
 		fprintf (of, "%s %d", opcode[i], disp);
 		break;
-	case I_V_EMRF:					/* extended mem ref */
-		fprintf (of, "%s %-o", opcode[i], val[1] & AMASK);
+	case I_V_EMR:					/* extended mem ref */
+		fprintf (of, "%s %-o", opcode[i], val[1] & VAMASK);
 		if (val[1] & IA) fprintf (of, ",I");
 		return -1;				/* extra word */
-	case I_V_IOT1:					/* IOT with H/C */
+	case I_V_IO1:					/* IOT with H/C */
 		fprintf (of, "%s %-o", opcode[i], inst & DEVMASK);
 		if (inst & HC) fprintf (of, ",C");
 		break;
-	case I_V_IOT2:					/* IOT */
+	case I_V_IO2:					/* IOT */
 		fprintf (of, "%s %-o", opcode[i], inst & DEVMASK);
 		break;
-	case I_V_EG1Z:					/* ext grp 1 op + 0 */
-		fprintf (of, "%s %-o", opcode[i], val[1] & AMASK);
+	case I_V_EGZ:					/* ext grp 1 op + 0 */
+		fprintf (of, "%s %-o", opcode[i], val[1] & VAMASK);
 		if (val[1] & IA) fprintf (of, ",I");
 		return -2;				/* extra words */
 	case I_V_EG2:					/* ext grp 2 op */
-		fprintf (of, "%s %-o", opcode[i], val[1] & AMASK);
+		fprintf (of, "%s %-o", opcode[i], val[1] & VAMASK);
 		if (val[1] & IA) fprintf (of, ",I");
-		fprintf (of, " %-o", val[2] & AMASK);
+		fprintf (of, " %-o", val[2] & VAMASK);
 		if (val[2] & IA) fprintf (of, ",I");
 		return -2;  }				/* extra words */
 	return SCPE_OK;  }				/* end if */
@@ -359,7 +397,7 @@ t_stat r;
 char gbuf[CBUFSIZE];
 
 cptr = get_glyph (cptr, gbuf, ',');			/* get next field */
-d = get_uint (gbuf, 8, AMASK, &r);			/* construe as addr */
+d = get_uint (gbuf, 8, VAMASK, &r);			/* construe as addr */
 if (r != SCPE_OK) return -1;
 if (*cptr != 0) {					/* more? */
 	cptr = get_glyph (cptr, gbuf, 0);		/* look for indirect */
@@ -410,7 +448,7 @@ if (opcode[i]) {					/* found opcode? */
 	switch (j) {					/* case on class */
 	case I_V_NPN:					/* no operand */
 		break;
-	case I_V_NPNC:					/* no operand + C */
+	case I_V_NPC:					/* no operand + C */
 		if (*cptr != 0) {
 			cptr = get_glyph (cptr, gbuf, 0);
 			if (strcmp (gbuf, "C")) return SCPE_ARG;
@@ -424,24 +462,24 @@ if (opcode[i]) {					/* found opcode? */
 		else if (k = (strcmp (gbuf, "Z") == 0)) { /* Z specified? */
 			cptr = get_glyph (cptr, gbuf, ',');  }
 		if ((d = get_addr (gbuf)) < 0) return SCPE_ARG;
-		if ((d & AMASK) <= DISP) val[0] = val[0] | d;
+		if ((d & VAMASK) <= DISP) val[0] = val[0] | d;
 		else if (cflag && !k && (((addr ^ d) & PAGENO) == 0))
 				val[0] = val[0] | (d & (IA | DISP)) | CP;
 		else return SCPE_ARG;
 		break;
-	case I_V_ESHF:					/* extended shift */
+	case I_V_ESH:					/* extended shift */
 		cptr = get_glyph (cptr, gbuf, 0);
 		d = get_uint (gbuf, 10, 16, &r);
 		if ((r != SCPE_OK) || (d == 0)) return SCPE_ARG;
 		val[0] = val[0] | (d & 017);
 		break;
-	case I_V_EMRF:					/* extended mem ref */
+	case I_V_EMR:					/* extended mem ref */
 		cptr = get_glyph (cptr, gbuf, 0);	/* get next field */
 		if ((d = get_addr (gbuf)) < 0) return SCPE_ARG;
 		val[1] = d;
 		ret = -1;
 		break;
-	case I_V_IOT1:					/* IOT + optional C */
+	case I_V_IO1:					/* IOT + optional C */
 		cptr = get_glyph (cptr, gbuf, ',');	/* get device */
 		d = get_uint (gbuf, 8, DEVMASK, &r);
 		if (r != SCPE_OK) return SCPE_ARG;
@@ -451,13 +489,13 @@ if (opcode[i]) {					/* found opcode? */
 			if (strcmp (gbuf, "C")) return SCPE_ARG;
 			val[0] = val[0] | HC;  }
 		break;
-	case I_V_IOT2:					/* IOT */
+	case I_V_IO2:					/* IOT */
 		cptr = get_glyph (cptr, gbuf, 0);	/* get device */
 		d = get_uint (gbuf, 8, DEVMASK, &r);
 		if (r != SCPE_OK) return SCPE_ARG;
 		val[0] = val[0] | d;
 		break;
-	case I_V_EG1Z:					/* ext grp 1 op + 0 */
+	case I_V_EGZ:					/* ext grp 1 op + 0 */
 		cptr = get_glyph (cptr, gbuf, 0);	/* get next field */
 		if ((d = get_addr (gbuf)) < 0) return SCPE_ARG;
 		val[1] = d;
@@ -523,7 +561,7 @@ for (cptr = get_glyph (iptr, gbuf, ','); gbuf[0] != 0;
 	val[0] = val[0] | vtab[i];  }			/* fill value */
 if (clef) {						/* CLE seen? */
 	if (val[0] & ASKP) {				/* alter-skip? */
-		if (val[0] & 0300) return SCPE_ARG;	/* already filled in? */
+		if (tbits & 0100) return SCPE_ARG;	/* already filled in? */
 		else val[0] = val[0] | 0100;  }
 	else val[0] = val[0] | 040;  }			/* fill in shift */
 return ret;

@@ -1,6 +1,6 @@
 /* pdp18b_stddev.c: 18b PDP's standard devices
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,8 @@
    tto		teleprinter
    clk		clock
 
+   14-Jul-02	RMS	Added ASCII reader/punch support (from Hans Pufal)
+   30-May-02	RMS	Widened POS to 32b
    29-Nov-01	RMS	Added read only unit support
    25-Nov-01	RMS	Revised interrupt structure
    17-Sep-01	RMS	Removed multiconsole support
@@ -48,9 +50,16 @@
 #include "pdp18b_defs.h"
 #include <ctype.h>
 
+#define UNIT_V_RASCII	UNIT_V_UF			/* reader ASCII */
+#define UNIT_RASCII	(1 << UNIT_V_RASCII)
+#define UNIT_V_PASCII	UNIT_V_UF			/* punch ASCII */
+#define UNIT_PASCII	(1 << UNIT_V_PASCII)
+
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1], saved_PC;
+extern int32 sim_switches;
 extern UNIT cpu_unit;
+
 int32 clk_state = 0;
 int32 ptr_err = 0, ptr_stopioe = 0, ptr_state = 0;
 int32 ptp_err = 0, ptp_stopioe = 0;
@@ -117,9 +126,10 @@ REG ptr_reg[] = {
 	{ FLDATA (ERR, ptr_err, 0) },
 #endif
 	{ ORDATA (STATE, ptr_state, 5), REG_HRO },
-	{ DRDATA (POS, ptr_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
+	{ FLDATA (ASCII, ptr_unit.flags, UNIT_V_RASCII), REG_HRO },
 	{ NULL }  };
 
 DEVICE ptr_dev = {
@@ -145,9 +155,10 @@ REG ptp_reg[] = {
 #if defined (IOS_PTPERR)
 	{ FLDATA (ERR, ptp_err, 0) },
 #endif
-	{ DRDATA (POS, ptp_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
+	{ FLDATA (ASCII, ptp_unit.flags, UNIT_V_PASCII), REG_HRO },
 	{ NULL }  };
 
 DEVICE ptp_dev = {
@@ -216,7 +227,7 @@ REG tti_reg[] = {
 	{ FLDATA (UC, tti_unit.flags, UNIT_V_UC), REG_HRO },
 	{ FLDATA (HDX, tti_unit.flags, UNIT_V_HDX), REG_HRO },
 #endif
-	{ DRDATA (POS, tti_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
@@ -272,7 +283,7 @@ REG tto_reg[] = {
 #if defined (KSR28)
 	{ FLDATA (TTO_STATE, tto_state, 0), REG_HRO },
 #endif
-	{ DRDATA (POS, tto_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 
@@ -390,7 +401,8 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {		/* end of file? */
 	else perror ("PTR I/O error");
 	clearerr (ptr_unit.fileref);
 	return SCPE_IOERR;  }
-if (ptr_state == 0) ptr_unit.buf = temp & 0377;		/* alpha */
+if (ptr_state == 0) ptr_unit.buf = (temp |		/* alpha */
+	((ptr_unit.flags & UNIT_RASCII)? 0200: 0)) & 0377;
 else if (temp & 0200) {					/* binary */
 	ptr_state = ptr_state - 6;
 	ptr_unit.buf = ptr_unit.buf | ((temp & 077) << ptr_state);  }
@@ -420,6 +432,9 @@ t_stat reason;
 
 reason = attach_unit (uptr, cptr);
 ptr_err = (ptr_unit.flags & UNIT_ATT)? 0: 1;
+ptr_unit.flags = ptr_unit.flags & ~UNIT_RASCII;
+if (sim_switches & SWMASK ('A'))
+	ptr_unit.flags = ptr_unit.flags | UNIT_RASCII;
 return reason;
 }
 
@@ -626,6 +641,10 @@ SET_INT (PTP);						/* set done flag */
 if ((ptp_unit.flags & UNIT_ATT) == 0) {			/* not attached? */
 	ptp_err = 1;					/* set error */
 	return IORETURN (ptp_stopioe, SCPE_UNATT);  }
+if (ptp_unit.flags & UNIT_PASCII) {			/* ASCII mode? */
+	ptp_unit.buf = ptp_unit.buf & 0177;		/* force 7b */
+	if ((ptp_unit.buf == 0) || (ptp_unit.buf == 0177))
+		return SCPE_OK;  }			/* skip null, del */
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {	/* I/O error? */
 	ptp_err = 1;					/* set error */
 	perror ("PTP I/O error");
@@ -654,6 +673,9 @@ t_stat reason;
 
 reason = attach_unit (uptr, cptr);
 ptp_err = (ptp_unit.flags & UNIT_ATT)? 0: 1;
+ptp_unit.flags = ptp_unit.flags & ~UNIT_PASCII;
+if (sim_switches & SWMASK ('A'))
+	ptp_unit.flags = ptp_unit.flags | UNIT_PASCII;
 return reason;
 }
 

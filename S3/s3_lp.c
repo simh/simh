@@ -37,7 +37,9 @@ int32 cct[CCT_LNT] = { 03 };
 int32 cctlnt = 66, cctptr = 0, lines = 0, lflag = 0;
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *cptr);
+t_stat write_line (int32 ilnt, int32 mod);
 t_stat space (int32 lines, int32 lflag);
+t_stat carriage_control (int32 action, int32 mod);
 extern unsigned char ebcdic_to_ascii[256];
 
 #define	UNIT_V_PCHAIN	(UNIT_V_UF + 0)
@@ -78,7 +80,7 @@ REG lpt_reg[] = {
 	{ HRDATA (LPFLR, LPFLR, 8) },
 	{ HRDATA (LPIAR, LPIAR, 16) },
 	{ DRDATA (LINECT, linectr, 8) },
-	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
 	{ BRDATA (CCT, cct, 8, 32, CCT_LNT) },
 	{ DRDATA (LINES, lines, 8), PV_LEFT },
 	{ DRDATA (CCTP, cctptr, 8), PV_LEFT },
@@ -105,7 +107,7 @@ DEVICE lpt_dev = {
 
 int32 lpt (int32 op, int32 m, int32 n, int32 data)
 {
-	int32 iodata, c, ec, ac;
+	int32 iodata;
 	switch (op) {
 		case 0:		/* SIO 1403 */
 			iodata = 0;
@@ -209,7 +211,6 @@ int32 lpt (int32 op, int32 m, int32 n, int32 data)
 t_stat write_line (int32 ilnt, int32 mod)
 {
 int32 i, t, lc, sup;
-char *pch;
 static char lbuf[LPT_WIDTH + 1];			/* + null */
 
 if ((lpt_unit.flags & UNIT_ATT) == 0)

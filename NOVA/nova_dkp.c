@@ -1,6 +1,6 @@
 /* nova_dkp.c: NOVA moving head disk simulator
 
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 1993-2002, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dkp		moving head disk
 
+   06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Changed FLG, CAPAC to arrays
    26-Apr-01	RMS	Added device enable/disable support
@@ -286,11 +287,6 @@ t_stat dkp_boot (int32 unitno);
 t_stat dkp_attach (UNIT *uptr, char *cptr);
 t_stat dkp_go (void);
 t_stat dkp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-#if defined (ECLIPSE)
-extern int32 MapAddr (int32 map, int32 addr);
-#else
-#define MapAddr(m,a)	(a)
-#endif
 
 /* DKP data structures
 
@@ -329,7 +325,7 @@ REG dkp_reg[] = {
 	{ NULL }  };
 
 MTAB dkp_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
 	{ (UNIT_DTYPE+UNIT_ATT), (TYPE_FLP << UNIT_V_DTYPE) + UNIT_ATT,
 		"6030 (floppy)", NULL, NULL },
@@ -423,6 +419,8 @@ MTAB dkp_mod[] = {
 		NULL, "4231", &dkp_set_size },
  	{ (UNIT_AUTO+UNIT_DTYPE), (TYPE_4231 << UNIT_V_DTYPE),
 		NULL, "3330", &dkp_set_size },
+	{ MTAB_XTD|MTAB_VDV, INT_DKP, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_DKP, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE dkp_dev = {

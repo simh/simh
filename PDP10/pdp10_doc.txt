@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-10 Simulator Usage
-Date:	1-Dec-01
+Date:	15-Jun-2002
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2001, written by Robert M Supnik
-   Copyright (c) 1993-2001, Robert M Supnik
+   Original code published in 1993-2002, written by Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -76,13 +76,14 @@ UBA		Unibus adapters (translation maps)
 FE		console
 TIM		timer
 PTR,PTP		PC11 paper tape reader/punch
-DZ		DZ11 8-line terminal multiplexor
+DZ		DZ11 8-line terminal multiplexor (up to 4)
 LP20		LP20 line printer
 RP		RH11/RP04/RP05/RP06/RP07/RM03/RM05/RM80 controller with
 		eight drives
 TU		RH11/TM02/TU45 controller with eight drives
 
-The PTR/PTP are initially DISABLEd.  The DZ11 can also be DISABLEd.
+The PTR/PTP are initially set DISABLED.  The DZ11 and LP20 can also be
+set DISABLED.
 
 The PDP-10 simulator implements several unique stop condition:
 
@@ -99,7 +100,7 @@ The PDP-10 loader supports RIM10B format paper tapes, SAV binary files, and
 EXE binary files.  LOAD switches -r, -s, -e specify RIM10, SAV, EXE format,
 respectively.  If no switch is specified, the LOAD command checks the file
 extension; .RIM, .SAV, .EXE specify RIM10, SAV, EXE format, respectively.
-If no switch specified, and no extension matches, the LOAD command checks
+If no switch is specified, and no extension matches, the LOAD command checks
 the file format to try to determine the file type. 
 
 2.1 CPU
@@ -146,7 +147,8 @@ control registers for the interrupt system.
 	APRLVL		3	PI level for APR interrupt
 	IND_MAX		8	indirect address nesting limit
 	XCT_MAX		8	execute chaining limit
-	OLDPC		18	PC prior to last transfer instruction
+	PCQ[0:63]	18	PC prior to last jump or interrupt;
+				most recent PC change first
 	WRU		8	interrupt character
 	REG[0:127]	36	fast memory blocks
 
@@ -173,7 +175,7 @@ The Unibus adapters link the system I/O devices to the CPU.  Unibus
 adapter 1 (UBA1) is unit 0, and Unibus adapter 3 is unit 1.  The
 adapter's Unibus map is the memory space of the corresponding unit.
 
-The Unibus Adapter has the following registers:
+The Unibus adapter has the following registers:
 
 	name		size	comments
 
@@ -194,10 +196,10 @@ The front end has the following registers:
 	name		size	comments
 
 	IBUF		8	input buffer
-	ICOUNT		31	count of input characters
+	ICOUNT		32	count of input characters
 	ITIME		24	keyboard polling interval
 	OBUF		8	output buffer
-	OCOUNT		31	count of output characters
+	OCOUNT		32	count of output characters
 	OTIME		24	console output response time
 
 2.5 Timer (TIM)
@@ -205,7 +207,7 @@ The front end has the following registers:
 The timer (TIM) implements the system timer, the interval timer, and
 the time of day clock used to get the date and time at system startup.
 Because most PDP-10 software is not Y2K compliant, the timer implements
-one option
+one option:
 
 	SET TIM NOY2K		software not Y2K compliant, limit time
 				 of day clock to 1999 (default)
@@ -243,7 +245,7 @@ The paper tape reader implements these registers:
 	BUSY		1	busy flag (CSR<11>)
 	DONE		1	device done flag (CSR<7>)
 	IE		1	interrupt enable flag (CSR<6>)
-	POS		31	position in the input file
+	POS		32	position in the input file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -276,7 +278,7 @@ The paper tape punch implements these registers:
 	ERR		1	error flag (CSR<15>)
 	DONE		1	device done flag (CSR<7>)
 	IE		1	interrupt enable flag (CSR<6>)
-	POS		31	position in the input or output file
+	POS		32	position in the input or output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
 
@@ -291,11 +293,18 @@ Error handling is as follows:
 
 2.8 DZ11 Terminal Multiplexor (DZ)
 
-The DZ11 is an 8-line terminal multiplexor.  The terminal lines perform
-input and output through Telnet sessions connected to a user-specified
-port.  The ATTACH command specifies the port to be used:
+The DZ11 is an 8-line terminal multiplexor.  Up to 4 DZ11's (32 lines)
+are supported.  The number of lines can be changed with the command
 
-	ATTACH {-am} DZ <port>(cr)	-- set up listening port
+	SET DZ LINES=n			set line count to n
+
+The line count must be a multiple of 8, with a maximum of 32.
+
+The terminal lines perform input and output through Telnet sessions
+connected to a user-specified port.  The ATTACH command specifies
+the port to be used:
+
+	ATTACH {-am} DZ <port>		set up listening port
 
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.  The optional switch -m turns on the DZ11's
@@ -305,25 +314,28 @@ modem controls; the optional switch -a turns on active disconnects
 Once the DZ is attached and the simulator is running, the DZ will listen
 for connections on the specified port.  It assumes that the incoming
 connections are Telnet connections.  The connection remains open until
-disconnected either by the simulated program or by the Telnet client.
+disconnected by the simulated program, the Telnet client, a SET DZ
+DISCONNECT command, or a DETACH DZ command.
 
-The SHOW DZ LINESTATUS command displays the current connections to the DZ. 
+The SHOW DZ CONNECTIONS command displays the current connections to the DZ.
+The SHOW DZ STATISTICS command displays statistics for active connections.
+The SET DZ DISCONNECT=linenumber disconnects the specified line.
 
 The DZ11 implements these registers:
 
 	name		size	comments
 
-	CSR		16	control/status register
-	RBUF		16	receive buffer
-	LPR		16	line parameter register
-	TCR		16	transmission control register
-	MSR		16	modem status register
-	TDR		16	transmit data register
-	SAENB		1	silo alarm enabled
+	CSR[0:3]	16	control/status register, boards 0-3
+	RBUF[0:3]	16	receive buffer, boards 0-3
+	LPR[0:3]	16	line parameter register, boards 0-3
+	TCR[0:3]	16	transmission control register, boards 0-3
+	MSR[0:3]	16	modem status register, boards 0-3
+	TDR[0:3]	16	transmit data register, boards 0-3
+	SAENB[0:3]	1	silo alarm enabled, boards 0-3
+	RXINT		4	receive interrupts, boards 3..0
+	TXINT		4	transmit interrupts, boards 3..0
 	MDMTCL		1	modem control enabled
 	AUTODS		1	autodisconnect enabled
-	RPOS0..7	32	count of characters received
-	TPOS0..7	32	count of characters transmitted
 
 The DZ11 does not support save and restore.  All open connections are
 lost when the simulator shuts down or the DZ is detached.
@@ -340,7 +352,7 @@ RP options include the ability to set units write enabled or write locked,
 to set the drive type to one of six disk types, or autosize:
 
 	SET RPn LOCKED		set unit n write locked
-	SET RPn ENABLED		set unit n write enabled
+	SET RPn WRITEENABLED	set unit n write enabled
 	SET RPn RM03		set type to RM03
 	SET RPn RM05		set type to RM05
 	SET RPn RM80		set type to RM80
@@ -350,8 +362,9 @@ to set the drive type to one of six disk types, or autosize:
 	SET RPn AUTOSIZE	set type based on file size at attach
 
 The type options can be used only when a unit is not attached to a file.
-Note that TOPS-10 V7.03 only supported the RP06 and RM03; V7.04 added
-support for the RP07.  Units can be REMOVEd or ADDed to the configuration.
+Note that TOPS-10 V7.03 supported only the RP06 and RM03; V7.04 added
+support for the RP07.  TOPS-20 V4.1 also supported only the RP06 and
+RM03.  Units can be set ONLINE or OFFLINE.
 
 The RP controller implements these registers:
 
@@ -399,9 +412,9 @@ TM02 formatter and up to eight TU45 drives.  Magnetic tape options include
 the ability to make units write enabled or locked.
 
 	SET TUn LOCKED		set unit n write locked
-	SET TUn ENABLED		set unit n write enabled
+	SET TUn WRITEENABLED	set unit n write enabled
 
-Units can also be REMOVEd or ADDed to the configuration.
+Units can also be set ONLINE or OFFLINE.
 
 The magnetic tape controller implements these registers:
 
@@ -424,7 +437,7 @@ The magnetic tape controller implements these registers:
 	STOP_IOE	1	stop on I/O error
 	TIME		24	delay
 	UST[0:7]	16	unit status, units 0-7
-	POS[0:7]	31	position, units 0-7
+	POS[0:7]	32	position, units 0-7
 
 Error handling is as follows:
 
@@ -440,7 +453,7 @@ Error handling is as follows:
 2.11 LP20 DMA Line Printer (LP20)
 
 The LP20 is a DMA-based line printer controller.  There is one
-line printer option to clear the vertical forms unit (VFU).
+line printer option to clear the vertical forms unit (VFU):
 
 	SET LP20 VFUCLEAR	clear the vertical forms unit
 
@@ -464,7 +477,7 @@ The LP20 implements these registers:
 	ERR		1	error flag
 	DONE		1	done flag
 	IE		1	interrupt enable flag
-	POS		31	position in output file
+	POS		32	position in output file
 	TIME		24	response time
 	STOP_IOE	1	stop on I/O error
 	TXRAM[0:255]	12	translation RAM

@@ -1,6 +1,6 @@
 /* pdp18b_tt1.c: 18b PDP's second Teletype
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
    tti1		keyboard
    tto1		teleprinter
 
+   30-May-02	RMS	Widened POS to 32b
+   06-Jan-02	RMS	Added enable/disable support
+   30-Dec-01	RMS	Added show statistics, set disconnect
    30-Nov-01	RMS	Added extended SET/SHOW support
    25-Nov-01	RMS	Revised interrupt structure
    19-Sep-01	RMS	Fixed typo
@@ -42,7 +45,7 @@
 #define UNIT_V_UC	(UNIT_V_UF + 0)			/* UC only */
 #define UNIT_UC		(1 << UNIT_V_UC)
 
-extern int32 int_hwre[API_HLVL+1];
+extern int32 int_hwre[API_HLVL+1], dev_enb;
 extern int32 tmxr_poll;					/* calibrated poll */
 TMLN tt1_ldsc = { 0 };					/* line descriptors */
 TMXR tt_desc = { 1, 0, &tt1_ldsc };			/* mux descriptor */
@@ -53,7 +56,8 @@ t_stat tti1_reset (DEVICE *dptr);
 t_stat tto1_reset (DEVICE *dptr);
 t_stat tti1_attach (UNIT *uptr, char *cptr);
 t_stat tti1_detach (UNIT *uptr);
-t_stat tti1_status (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tti1_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tti1_show (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* TTI1 data structures
 
@@ -70,16 +74,23 @@ REG tti1_reg[] = {
 	{ FLDATA (INT, int_hwre[API_TTI1], INT_V_TTI1) },
 	{ FLDATA (DONE, int_hwre[API_TTI1], INT_V_TTI1) },
 	{ FLDATA (UC, tti1_unit.flags, UNIT_V_UC), REG_HRO },
-	{ DRDATA (POS, tt1_ldsc.rxcnt, 31), PV_LEFT },
+	{ DRDATA (POS, tt1_ldsc.rxcnt, 32), PV_LEFT },
 	{ DRDATA (TIME, tti1_unit.wait, 24), REG_NZ + PV_LEFT },
+	{ FLDATA (*DEVENB, dev_enb, ENB_V_TTI1), REG_HRO },
 	{ NULL }  };
 
 MTAB tti1_mod[] = {
 	{ UNIT_UC, 0, "lower case", "LC", NULL },
 	{ UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
-	{ UNIT_ATT, UNIT_ATT, "line status", NULL, NULL, &tti1_status },
-	{ MTAB_XTD | MTAB_VDV | MTAB_VUN | MTAB_NMO, 0, "LINE", NULL,
-		NULL, &tti1_status, NULL },
+	{ UNIT_ATT, UNIT_ATT, "summary", NULL, NULL, &tti1_summ },
+	{ MTAB_XTD | MTAB_VDV, 0, NULL, "DISCONNECT",
+		&tmxr_dscln, NULL, &tt_desc },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
+		NULL, &tti1_show, NULL },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
+		NULL, &tti1_show, NULL },
+	{ MTAB_XTD|MTAB_VDV, ENB_TTI1, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, ENB_TTI1, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE tti1_dev = {
@@ -102,8 +113,9 @@ REG tto1_reg[] = {
 	{ ORDATA (BUF, tto1_unit.buf, 8) },
 	{ FLDATA (INT, int_hwre[API_TTO1], INT_V_TTO1) },
 	{ FLDATA (DONE, int_hwre[API_TTO1], INT_V_TTO1) },
-	{ DRDATA (POS, tt1_ldsc.txcnt, 31), PV_LEFT },
+	{ DRDATA (POS, tt1_ldsc.txcnt, 32), PV_LEFT },
 	{ DRDATA (TIME, tto1_unit.wait, 24), PV_LEFT },
+	{ FLDATA (*DEVENB, dev_enb, ENB_V_TTI1), REG_HRO },
 	{ NULL }  };
 
 MTAB tto1_mod[] = {
@@ -235,10 +247,20 @@ sim_cancel (uptr);					/* stop poll */
 return r;
 }
 
-/* Status routine */
+/* Show summary processor */
 
-t_stat tti1_status (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tti1_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-tmxr_fstatus (st, &tt1_ldsc, -1);
+if (tt1_ldsc.conn) fprintf (st, "connected");
+else fprintf (st, "disconnected");
+return SCPE_OK;
+}
+
+/* SHOW CONN/STAT processor */
+
+t_stat tti1_show (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if (val) tmxr_fconns (st, &tt1_ldsc, -1);
+else tmxr_fstats (st, &tt1_ldsc, -1);
 return SCPE_OK;
 }

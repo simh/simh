@@ -1,6 +1,6 @@
 /* pdp11_rk.c: RK11 cartridge disk simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    rk		RK11/RK05 cartridge disk
 
+   26-Jan-02	RMS	Revised bootstrap to conform to M9312
+   06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Converted FLG to array
    09-Nov-01	RMS	Added bus map support
@@ -179,7 +181,9 @@ int32 last_drv = 0;					/* last r/w drive */
 int32 rk_stopioe = 1;					/* stop on error */
 int32 rk_swait = 10;					/* seek time */
 int32 rk_rwait = 10;					/* rotate time */
-int32 rk_enb = 1;					/* device enable */
+
+t_stat rk_rd (int32 *data, int32 PA, int32 access);
+t_stat rk_wr (int32 data, int32 PA, int32 access);
 t_stat rk_svc (UNIT *uptr);
 t_stat rk_reset (DEVICE *dptr);
 void rk_go (void);
@@ -194,6 +198,8 @@ t_stat rk_boot (int32 unitno);
    rk_reg	RK register list
    rk_mod	RK modifier list
 */
+
+DIB rk_dib = { 1, IOBA_RK, IOLN_RK, &rk_rd, &rk_wr };
 
 UNIT rk_unit[] = {
 	{ UDATA (&rk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
@@ -231,12 +237,19 @@ REG rk_reg[] = {
 	{ URDATA (FLG, rk_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
 		  RK_NUMDR, REG_HRO) },
 	{ FLDATA (STOP_IOE, rk_stopioe, 0) },
-	{ FLDATA (*DEVENB, rk_enb, 0), REG_HRO },
+	{ ORDATA (DEVADDR, rk_dib.ba, 32), REG_HRO },
+	{ FLDATA (*DEVENB, rk_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB rk_mod[] = {
-	{ UNIT_HWLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_HWLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_HWLK, UNIT_HWLK, "write locked", "LOCKED", NULL },
+	{ MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
+		&set_addr, &show_addr, &rk_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &rk_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &rk_dib },
 	{ 0 }  };
 
 DEVICE rk_dev = {
@@ -551,11 +564,13 @@ return SCPE_OK;
 
 /* Device bootstrap */
 
-#define BOOT_START 02000				/* start */
-#define BOOT_UNIT 02006					/* unit number */
+#define BOOT_START	02000				/* start */
+#define BOOT_ENTRY	02002				/* entry */
+#define BOOT_UNIT	02010				/* unit number */
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int32))
 
 static const int32 boot_rom[] = {
+	0042113,			/* "KD" */
 	0012706, 0002000,		/* MOV #2000, SP */
 	0012700, 0000000,		/* MOV #unit, R0	; unit number */
 	0010003,			/* MOV R0, R3 */
@@ -572,8 +587,8 @@ static const int32 boot_rom[] = {
 	0012741, 0000005,		/* MOV #READ+GO, -(R1)	; read & go */
 	0005002,			/* CLR R2 */
 	0005003,			/* CLR R3 */
-	0005004,			/* CLR R4 */
-	0012705, 0045504,		/* MOV #"DK, R5 */
+	0012704, BOOT_START+020,	/* MOV #START+20, R4 */
+	0005005,			/* CLR R5 */
 	0105711,			/* TSTB (R1) */
 	0100376,			/* BPL .-2 */
 	0105011,			/* CLRB (R1) */
@@ -587,6 +602,6 @@ extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & RK_M_NUMDR;
-saved_PC = BOOT_START;
+saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 }

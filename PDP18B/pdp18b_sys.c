@@ -1,6 +1,6 @@
 /* pdp18b_sys.c: 18b PDP's simulator interface
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Feb-02	RMS	Added PDP-7 DECtape IOT's
+   03-Feb-02	RMS	Fixed typo (found by Robert Alan Byer)
    17-Sep-01	RMS	Removed multiconsole support
    27-May-01	RMS	Added second Teletype support
    18-May-01	RMS	Added PDP-9,-15 API IOT's
@@ -328,7 +330,7 @@ static const char *opcode[] = {
  "LPL2", "LPLD", "LPL1",
  "LPEF", "LPCF", "LPCF", "LPCF", "LPCF",
  "LPPB", "LPLS", "LPPS",
-#elif defined (LP15)
+#elif defined (LP15)					/* PDP-15 LPT */
  "LPSF", "LPPM", "LPP1", "LPDI",
  "LPRS", "LPOS", "LPEI", "LPCD", "LPCF",
 #endif
@@ -359,9 +361,14 @@ static const char *opcode[] = {
  "MTTR", "MTCR", "MTSF", "MTRC", "MTAF",
  "MTRS", "MTGO", "MTCM", "MTLC",
 #endif
-#if defined (DTA)					/* TC02/TC15 */
+#if defined (DTA)					/* DECtape */
+#if defined (PDP7)					/* Type 550 */
+ "MMDF", "MMEF", "MMRD", "MMWR",
+ "MMBF", "MMRS", "MMLC", "MMSE",
+#elif defined (PDP9) || defined (PDP15)			/* TC02/TC15 */
  "DTCA", "DTRA", "DTXA", "DTLA",
  "DTEF", "DTRB", "DTDF",
+#endif
 #endif
 #if defined (TTY1)
  "KSF1", "KRB1",
@@ -511,8 +518,13 @@ static const int32 opc_val[] = {
  0707352+I_NPN, 0707304+I_NPI, 0707324+I_NPI, 0707326+I_NPI, 
 #endif
 #if defined (DTA)
+#if defined (PDP7)					/* Type 550 */
+ 0707501+I_NPI, 0707541+I_NPI, 0707512+I_NPN, 0707504+I_NPI,
+ 0707601+I_NPI, 0707612+I_NPN, 0707604+I_NPI, 0707644+I_NPI,
+#elif defined (PDP9) || defined (PDP15)			/* TC02/TC15 */
  0707541+I_NPI, 0707552+I_NPN, 0707544+I_NPI, 0707545+I_NPI,
  0707561+I_NPI, 0707572+I_NPN, 0707601+I_NPI,
+#endif
 #endif
 #if defined (TTY1)
  0704101+I_NPI, 0704112+I_NPN,
@@ -618,8 +630,8 @@ return sp;
 	return	=	status code
 */
 
-#define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
-#define SIXTOASC(x) (((x) >= 040)? (x): (x) + 0100)
+#define FMTASC(x) (((x) < 040)? "<%03o>": "%c", (x))
+#define SIXTOASC(x) (((x) >= 040)? (x): ((x) + 0100))
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 	UNIT *uptr, int32 sw)
@@ -631,7 +643,7 @@ i = val[1];
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 if (sw & SWMASK ('A')) {				/* ASCII? */
 	if (inst > 0377) return SCPE_ARG;
-	fprintf (of, FMTASC (inst & 0177));
+	fprintf (of, "%c", FMTASC (inst & 0177));
 	return SCPE_OK;  }
 if (sw & SWMASK ('C')) {				/* character? */
 	fprintf (of, "%c", SIXTOASC ((inst >> 12) & 077));

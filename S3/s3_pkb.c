@@ -23,6 +23,7 @@
 */
 
 #include "s3_defs.h"
+#include <ctype.h>
 
 extern int32 int_req, dev_busy, dev_done, dev_disable;
 t_stat pkb_svc (UNIT *uptr);
@@ -69,7 +70,7 @@ REG pkb_reg[] = {
 	{ HRDATA (RTNKEY, key_rtn, 8) },
 	{ HRDATA (CANKEY, key_can, 8) },
 	{ HRDATA (ENDKEY, key_end, 8) },
-	{ DRDATA (POS, pkb_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, pkb_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, pkb_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
@@ -133,7 +134,7 @@ unsigned char ascii_to_ebcdic[] = {
 
 int32 pkb (int32 op, int32 m, int32 n, int32 data)
 {
-	int32 iodata= 0, c, ec, ac;
+	int32 iodata= 0, ec, ac;
 	switch (op) {
 		case 0:		/* SIO 5471 */
 			if (n != 0)

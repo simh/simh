@@ -1,6 +1,6 @@
 /* pdp11_rp.c - RP04/05/06/07 RM02/03/05/80 "Massbus style" disk controller
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    rp		RH/RP/RM moving head disks
 
+   24-Apr-02	RMS	Fixed SHOW RP ADDRESS
+   26-Jan-02	RMS	Revised bootstrap to conform to M9312
+   06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Changed RPDS, RPER, FLG, CAPAC, RPFN to arrays
    09-Nov-01	RMS	Added bus map, VAX support
@@ -385,20 +388,21 @@ int32 rpiff = 0;					/* INTR flip/flop */
 int32 rp_stopioe = 1;					/* stop on error */
 int32 rp_swait = 10;					/* seek time */
 int32 rp_rwait = 10;					/* rotate time */
-int32 rp_enb = 1;					/* device enable */
 int reg_in_drive[32] = {
  0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1,
  1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-void update_rpcs (int32 flags, int32 drv);
-void rp_go (int32 drv, int32 fnc);
-t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rp_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rp_rd (int32 *data, int32 PA, int32 access);
+t_stat rp_wr (int32 data, int32 PA, int32 access);
 t_stat rp_svc (UNIT *uptr);
 t_stat rp_reset (DEVICE *dptr);
 t_stat rp_boot (int32 unitno);
 t_stat rp_attach (UNIT *uptr, char *cptr);
 t_stat rp_detach (UNIT *uptr);
+void update_rpcs (int32 flags, int32 drv);
+void rp_go (int32 drv, int32 fnc);
+t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rp_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds);
 
 /* RP data structures
@@ -408,6 +412,8 @@ extern t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds);
    rp_reg	RP register list
    rp_mod	RP modifier list
 */
+
+DIB rp_dib = { 1, IOBA_RP, IOLN_RP, &rp_rd, &rp_wr };
 
 UNIT rp_unit[] = {
 	{ UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
@@ -459,11 +465,12 @@ REG rp_reg[] = {
 	{ URDATA (CAPAC, rp_unit[0].capac, 10, 31, 0,
 		  RP_NUMDR, PV_LEFT | REG_HRO) },
 	{ FLDATA (STOP_IOE, rp_stopioe, 0) },
-	{ FLDATA (*DEVENB, rp_enb, 0), REG_HRO },
+	{ GRDATA (DEVADDR, rp_dib.ba, RP_RDX, 32, 0), REG_HRO },
+	{ FLDATA (*DEVENB, rp_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB rp_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
 	{ UNIT_DUMMY, 0, NULL, "BADBLOCK", &rp_set_bad },
 	{ (UNIT_DTYPE+UNIT_ATT), (RM03_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
@@ -504,6 +511,12 @@ MTAB rp_mod[] = {
 		NULL, "RM05", &rp_set_size },
  	{ (UNIT_AUTO+UNIT_DTYPE), (RP07_DTYPE << UNIT_V_DTYPE),
 		NULL, "RP07", &rp_set_size },
+	{ MTAB_XTD|MTAB_VDV, 0100, "ADDRESS", "ADDRESS",
+		&set_addr, &show_addr, &rp_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &rp_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &rp_dib },
 	{ 0 }  };
 
 DEVICE rp_dev = {
@@ -1106,11 +1119,13 @@ return pdp11_bad_block (uptr, drv_tab[GET_DTYPE (uptr -> flags)].sect, RP_NUMWD)
 
 #if defined (VM_PDP11)
 
-#define BOOT_START 02000				/* start */
-#define BOOT_UNIT 02006					/* unit number */
+#define BOOT_START	02000				/* start */
+#define BOOT_ENTRY	02002
+#define BOOT_UNIT	02010				/* unit number */
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int32))
 
 static const int32 boot_rom[] = {
+	0042102,			/* "DB" */
 	0012706, 0002000,		/* mov #2000, sp */
 	0012700, 0000000,		/* mov #unit, r0 */
 	0012701, 0176700,		/* mov #RPCS1, r1 */
@@ -1118,7 +1133,7 @@ static const int32 boot_rom[] = {
 	0010037, 0176710,		/* mov r0, RPCS2 */
 	0012711, 0000021,		/* mov #RIP+GO, (R1) */
 	0012737, 0010000, 0176732,	/* mov #FMT16B, RPOF */
-	0005037, 0176750,		/* clr RPBAE */
+/*	0005037, 0176750,		/* clr RPBAE */
 	0005037, 0176704,		/* clr RPBA */
 	0005037, 0176734,		/* clr RPDC */
 	0005037, 0176706,		/* clr RPDA */
@@ -1126,8 +1141,8 @@ static const int32 boot_rom[] = {
 	0012711, 0000071,		/* mov #READ+GO, (R1) */
 	0005002,			/* clr R2 */
 	0005003,			/* clr R3 */
-	0005004,			/* clr R4 */
-	0012705, 0050104,		/* mov #"DP, r5 */
+	0012704, BOOT_START+020,	/* mov #start+020, r4 */
+	0005005,			/* clr R5 */
 	0105711,			/* tstb (R1) */
 	0100376,			/* bpl .-2 */
 	0105011,			/* clrb (R1) */
@@ -1141,7 +1156,7 @@ extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & CS2_M_UNIT;
-saved_PC = BOOT_START;
+saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 }
 

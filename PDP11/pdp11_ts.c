@@ -1,6 +1,6 @@
 /* pdp11_ts.c: TS11/TSV05 magnetic tape simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,12 @@
 
    ts		TS11/TSV05 magtape
 
+   30-May-02	RMS	Widened POS to 32b
+   22-Apr-02	RMS	Added maximum record length protection
+   04-Apr-02	RMS	Fixed bug in residual frame count after space operation
+   16-Feb-02	RMS	Fixed bug in message header logic
+   26-Jan-02	RMS	Revised bootstrap to conform to M9312
+   06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    09-Nov-01	RMS	Added bus map, VAX support
    15-Oct-01	RMS	Integrated debug logging across simulator
@@ -91,7 +97,6 @@ extern int32 cpu_18b, cpu_ubm;
 
 #define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
 #define UNIT_WLK	(1 << UNIT_V_WLK)
-#define TS_MAXFR	(1 << 16)			/* max xfer */
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
 
 /* TSBA/TSDB - 17772520: base address/data buffer register
@@ -118,7 +123,8 @@ extern int32 cpu_18b, cpu_ubm;
 #define TSSR_SSR	0000200				/* subsystem ready */
 #define TSSR_OFL	0000100				/* offline */
 #define TSSR_V_TC	1				/* term class */
-#define TSSR_TC		(07 << TSSR_V_TC)
+#define TSSR_M_TC	07
+#define TSSR_TC		(TSSR_M_TC << TSSR_V_TC)
 #define  TC0		(0 << TSSR_V_TC)		/* ok */
 #define  TC1		(1 << TSSR_V_TC)		/* attention */
 #define  TC2		(2 << TSSR_V_TC)		/* status alert */
@@ -128,6 +134,7 @@ extern int32 cpu_18b, cpu_ubm;
 #define  TC6		(6 << TSSR_V_TC)		/* pos lost */
 #define  TC7		(7 << TSSR_V_TC)		/* fatal err */
 #define TSSR_MBZ	0060060
+#define GET_TC(x)	(((x) >> TSSR_V_TC) & TSSR_M_TC)	
 
 #define TSDBX_M_XA	017				/* ext addr */
 #define TSDBX_BOOT	0000200				/* boot */
@@ -254,6 +261,7 @@ extern int32 cpu_18b, cpu_ubm;
 
 extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
+extern int32 cpu_log;
 extern FILE *sim_log;
 uint8 *tsxb = NULL;					/* xfer buffer */
 int32 tssr = 0;						/* status register */
@@ -267,8 +275,9 @@ int32 ts_ownm = 0;					/* tape owns msg */
 int32 ts_qatn = 0;					/* queued attn */
 int32 ts_bcmd = 0;					/* boot cmd */
 int32 ts_time = 10;					/* record latency */
-int32 ts_enb = TS_DF_ENB;				/* device enable */
 
+t_stat ts_rd (int32 *data, int32 PA, int32 access);
+t_stat ts_wr (int32 data, int32 PA, int32 access);
 t_stat ts_svc (UNIT *uptr);
 t_stat ts_reset (DEVICE *dptr);
 t_stat ts_attach (UNIT *uptr, char *cptr);
@@ -286,6 +295,8 @@ void ts_endcmd (int32 ssf, int32 xs0f, int32 msg);
    ts_reg	TS register list
    ts_mod	TS modifier list
 */
+
+DIB ts_dib = { TS_DF_ENB, IOBA_TS, IOLN_TS, &ts_rd, &ts_wr };
 
 UNIT ts_unit = { UDATA (&ts_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) };
 
@@ -315,14 +326,21 @@ REG ts_reg[] = {
 	{ FLDATA (OWNC, ts_ownc, 0) },
 	{ FLDATA (OWNM, ts_ownm, 0) },
 	{ DRDATA (TIME, ts_time, 24), PV_LEFT + REG_NZ },
-	{ DRDATA (POS, ts_unit.pos, 31), PV_LEFT + REG_RO },
+	{ DRDATA (POS, ts_unit.pos, 32), PV_LEFT + REG_RO },
 	{ FLDATA (WLK, ts_unit.flags, UNIT_V_WLK), REG_HRO },
-	{ FLDATA (*DEVENB, ts_enb, 0), REG_HRO },
+	{ GRDATA (DEVADDR, ts_dib.ba, TS_RDX, 32, 0), REG_HRO },
+	{ FLDATA (*DEVENB, ts_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB ts_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", NULL },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
+	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+		&set_addr, &show_addr, &ts_dib },
+	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
+		&set_enbdis, NULL, &ts_dib },
+	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
+		&set_enbdis, NULL, &ts_dib },
 	{ 0 }  };
 
 DEVICE ts_dev = {
@@ -409,12 +427,13 @@ int32 ts_spacef (UNIT *uptr, int32 fc, t_bool upd)
 int32 st;
 t_mtrlnt tbc;
 
-do {	if (st = ts_rdlntf (uptr, &tbc)) return st;	/* read rec lnt */
+do {	fc = (fc - 1) & DMASK;				/* decr wc */
+	if (upd) msgrfc = fc;
+	if (st = ts_rdlntf (uptr, &tbc)) return st;	/* read rec lnt */
 	uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);	/* update pos */
 	if (tbc == 0) return (XTC (XS0_TMK | XS0_RLS, TC2));
 	uptr -> pos = uptr -> pos + ((MTRL (tbc) + 1) & ~1) + sizeof (t_mtrlnt);
-	fc = (fc - 1) & DMASK;				/* decr wc */
-	if (upd) msgrfc = fc;  }
+	}
 while (fc != 0);
 return 0;
 }
@@ -459,13 +478,15 @@ int32 ts_spacer (UNIT *uptr, int32 fc, t_bool upd)
 int32 st;
 t_mtrlnt tbc;
 
+if (upd) msgrfc = fc;
 do {	if (uptr -> pos == 0) break;			/* BOT? */
+	fc = (fc - 1) & DMASK;				/* decr wc */
+	if (upd) msgrfc = fc;
 	if (st = ts_rdlntr (uptr, &tbc)) return st;	/* read rec lnt */
 	uptr -> pos = uptr -> pos - sizeof (t_mtrlnt);	/* update pos */
 	if (tbc == 0) return (XTC (XS0_TMK | XS0_RLS, TC2));
 	uptr -> pos = uptr -> pos - ((MTRL (tbc) + 1) & ~1) - sizeof (t_mtrlnt);
-	fc = (fc - 1) & DMASK;				/* decr wc */
-	if (upd) msgrfc = fc;  }
+	}
 while (fc != 0);
 if (uptr -> pos == 0) {
 	msgxs3 = msgxs3 | XS3_RIB;
@@ -509,8 +530,8 @@ if (tbc == 0) {						/* tape mark? */
 if (fc == 0) fc = 0200000;				/* byte count */
 tsba = (cmdadh << 16) | cmdadl;				/* buf addr */
 tbc = MTRL (tbc);					/* ignore err flag */
-wbc = (tbc > TS_MAXFR)? TS_MAXFR: tbc;			/* cap rec size */
-wbc = (wbc > fc)? fc: wbc;				/* cap buf size */
+if (tbc > MT_MAXFR) return SCPE_MTRLNT;			/* record too long? */
+wbc = (tbc > fc)? fc: tbc;				/* cap buf size */
 i = fxread (tsxb, sizeof (uint8), wbc, uptr -> fileref); /* read record */
 if (ferror (uptr -> fileref)) return XTC (XS0_EOT | XS0_RLS, TC2);
 for ( ; i < wbc; i++) tsxb[i] = 0;			/* fill with 0's */
@@ -545,8 +566,8 @@ if (tbc == 0) {						/* tape mark? */
 if (fc == 0) fc = 0200000;				/* byte count */
 tsba = (cmdadh << 16) | cmdadl + fc;			/* buf addr */
 tbc = MTRL (tbc);					/* ignore err flag */
-wbc = (tbc > TS_MAXFR)? TS_MAXFR: tbc;			/* cap rec size */
-wbc = (wbc > fc)? fc: wbc;				/* cap buf size */
+if (tbc > MT_MAXFR) return SCPE_MTRLNT;			/* record too long? */
+wbc = (tbc > fc)? fc: tbc;				/* cap buf size */
 fseek (uptr -> fileref, uptr -> pos - sizeof (t_mtrlnt) - wbc, SEEK_SET);
 i = fxread (tsxb, sizeof (uint8), wbc, uptr -> fileref);
 for ( ; i < wbc; i++) tsxb[i] = 0;			/* fill with 0's */
@@ -787,6 +808,9 @@ case FNC_POS:
 		break;  }
 	ts_cmpendcmd (st0, 0);
 	break;  }
+if (DBG_LOG (LOG_TS))
+	fprintf (sim_log, ">>TS: cmd=%o, mod=%o, buf=%o, lnt=%d, sta=%o, tc=%o, pos=%d\n",
+	fnc, mod, cmdadl, cmdlnt, msgxs0, GET_TC (tssr), ts_unit.pos);
 return SCPE_OK;
 }
 
@@ -821,10 +845,12 @@ static const int32 msg[8] = {
  MSG_ACK | MSG_CERR, MSG_ACK | MSG_CERR,
  MSG_ACK | MSG_CERR, MSG_ACK | MSG_CERR };
 
-xs0 = GET_X (s0 | s1);					/* or XS0 errs */
-ssr = GET_T (s0 | s1) & ~TSSR_TC;			/* or SSR errs */
-tc = MAX (s0 & TSSR_TC, s1 & TSSR_TC);			/* max term code */
-ts_endcmd (ssr | tc, xs0, msg[tc]);			/* end cmd */
+xs0 = GET_X (s0) | GET_X (s1);				/* or XS0 errs */
+s0 = GET_T (s0);					/* get SSR errs */
+s1 = GET_T (s1);
+ssr = (s0 | s1) & ~TSSR_TC;				/* or SSR errs */
+tc = MAX (GET_TC (s0), GET_TC (s1));			/* max term code */
+ts_endcmd (ssr | (tc << TSSR_V_TC), xs0, msg[tc]);	/* end cmd */
 return;
 }
 
@@ -857,11 +883,7 @@ return;
 t_stat ts_reset (DEVICE *dptr)
 {
 int32 i;
-#if defined (VM_PDP11)
-extern int32 tm_enb;
 
-if (ts_enb) tm_enb = 0;					/* TM or TS */
-#endif
 ts_unit.pos = 0;
 tsba = tsdbx = 0;
 ts_ownc = ts_ownm = 0;
@@ -873,7 +895,7 @@ for (i = 0; i < WCH_PLNT; i++) tswchp[i] = 0;
 for (i = 0; i < MSG_PLNT; i++) tsmsgp[i] = 0;
 msgxs0 = ts_updxs0 (XS0_VCK);
 CLR_INT (TS);
-if (tsxb == NULL) tsxb = calloc (TS_MAXFR, sizeof (unsigned int8));
+if (tsxb == NULL) tsxb = calloc (MT_MAXFR, sizeof (unsigned int8));
 if (tsxb == NULL) return SCPE_MEM;
 return SCPE_OK;
 }
@@ -939,9 +961,9 @@ static const int32 boot_rom[] = {
 	0005711,			/* tst (r1)		; err? */
 	0100421,			/* bmi hlt */
 	0005000,			/* clr r0 */
-	0012705, 0051515,		/* mov #MS, r5 */
+	0012704, 0001066+020,		/* mov #sgnt+20, r4 */
 	0005007,			/* clr r7 */
-	0046523,			/* pad */
+	0046523,			/* sgnt: "SM" */
 	0140004,			/* pkt1: 140004, wcpk, 0, 8. */
 	0001100,
 	0000000,

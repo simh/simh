@@ -1,6 +1,6 @@
 /* pdp10_fe.c: PDP-10 front end (console terminal) simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fe		KS10 console front end
 
+   30-May-02	RMS	Widened COUNT to 32b
    30-Nov-01	RMS	Added extended SET/SHOW support
    23-Oct-01	RMS	New IO page address constants
    07-Sep-01	RMS	Moved function prototypes
@@ -57,10 +58,10 @@ UNIT fe_unit[] = {
 
 REG fe_reg[] = {
 	{ ORDATA (IBUF, fei_unit.buf, 8) },
-	{ DRDATA (ICOUNT, fei_unit.pos, 31), REG_RO + PV_LEFT },
+	{ DRDATA (ICOUNT, fei_unit.pos, 32), REG_RO + PV_LEFT },
 	{ DRDATA (ITIME, fei_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ ORDATA (OBUF, feo_unit.buf, 8) },
-	{ DRDATA (OCOUNT, feo_unit.pos, 31), REG_RO + PV_LEFT },
+	{ DRDATA (OCOUNT, feo_unit.pos, 32), REG_RO + PV_LEFT },
 	{ DRDATA (OTIME, feo_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 

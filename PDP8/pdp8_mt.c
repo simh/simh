@@ -1,6 +1,6 @@
 /* pdp8_mt.c: PDP-8 magnetic tape simulator
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    mt		TM8E/TU10 magtape
 
+   30-May-02	RMS	Widened POS to 32b
+   22-Apr-02	RMS	Added maximum record length test
+   06-Jan-02	RMS	Changed enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Changed UST, POS, FLG to arrays
    25-Apr-01	RMS	Added device enable/disable support
@@ -55,6 +58,7 @@
 #define UNIT_W_UF	2				/* saved user flags */
 #define USTAT		u3				/* unit status */
 #define UNUM		u4				/* unit number */
+#define MT_MAXFR	(1 << 16)			/* max record lnt */
 #define DBSIZE		(1 << 12)			/* max data cmd */
 #define DBMASK		(SBSIZE - 1)
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
@@ -173,7 +177,7 @@ REG mt_reg[] = {
 	{ FLDATA (STOP_IOE, mt_stopioe, 0) },
 	{ DRDATA (TIME, mt_time, 24), PV_LEFT },
 	{ URDATA (UST, mt_unit[0].USTAT, 8, 16, 0, MT_NUMDR, 0) },
-	{ URDATA (POS, mt_unit[0].pos, 10, 31, 0,
+	{ URDATA (POS, mt_unit[0].pos, 10, 32, 0,
 		  MT_NUMDR, PV_LEFT | REG_RO) },
 	{ URDATA (FLG, mt_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
 		  MT_NUMDR, REG_HRO) },
@@ -181,8 +185,10 @@ REG mt_reg[] = {
 	{ NULL }  };
 
 MTAB mt_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "ENABLED", &mt_vlock },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", &mt_vlock },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", &mt_vlock }, 
+	{ MTAB_XTD|MTAB_VDV, INT_MT, NULL, "ENABLED", &set_enb },
+	{ MTAB_XTD|MTAB_VDV, INT_MT, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE mt_dev = {
@@ -365,8 +371,9 @@ case FN_CMPARE:						/* read/compare */
 		uptr -> USTAT = uptr -> USTAT | STA_EOF | STA_RLE;
 		uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
 		break;  }
-	cbc = (mt_cu & CU_UNPAK)? wc: wc * 2;		/* expected bc */
 	tbc = MTRL (tbc);				/* ignore error flag */
+	if (tbc > MT_MAXFR) return SCPE_MTRLNT;		/* record too long? */
+	cbc = (mt_cu & CU_UNPAK)? wc: wc * 2;		/* expected bc */
 	if (tbc != cbc) mt_sta = mt_sta | STA_RLE;	/* wrong size? */
 	if (tbc < cbc) {				/* record small? */
 		cbc = tbc;				/* use smaller */
