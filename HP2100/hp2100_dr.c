@@ -1,6 +1,6 @@
 /* hp2100_dr.c: HP 2100 12606B/12610B fixed head disk/drum simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -284,7 +284,7 @@ da = ((trk * DR_NUMSC) + sec) * DR_NUMWD;
 if (drc_cw & CW_WR) {					/* write? */
 	if ((da < uptr->capac) && (sec < DR_NUMSC)) {
 	    *(((uint16 *) uptr->filebuf) + da + drd_ptr) = drd_obuf;
-	    if (((t_addr) (da + drd_ptr)) >= uptr->hwmark)
+	    if (((uint32) (da + drd_ptr)) >= uptr->hwmark)
 		uptr->hwmark = da + drd_ptr + 1;  }
 	drd_ptr = dr_incda (trk, sec, drd_ptr);		/* inc disk addr */
 	if (CMD (devd)) {				/* dch active? */

@@ -1,6 +1,6 @@
 /* vax_defs.h: VAX architecture definitions file
 
-   Copyright (c) 1998-2002, Robert M Supnik
+   Copyright (c) 1998-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,9 +26,17 @@
    The author gratefully acknowledges the help of Stephen Shirron, Antonio
    Carlini, and Kevin Peterson in providing specifications for the Qbus VAX's
 
+   19-May-03	RMS	Revised for new conditional compilation scheme
    14-Jul-02	RMS	Added infinite loop message
    30-Apr-02	RMS	Added CLR_TRAPS macro
 */
+
+#ifndef _VAX_DEFS_H
+#define _VAX_DEFS_H	0
+
+#ifndef VM_VAX
+#define VM_VAX		0
+#endif
 
 #include "sim_defs.h"
 #include <setjmp.h>
@@ -563,3 +571,5 @@ enum opcodes {
 /* Model dependent definitions */
 
 #include "vaxmod_defs.h"
+
+#endif							/* _VAX_DEFS_H */

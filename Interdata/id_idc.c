@@ -25,6 +25,7 @@
 
    idc		MSM/IDC disk controller
 
+   25-Apr-03	RMS	Revised for extended file support
    16-Feb-03	RMS	Fixed read to test transfer ok before selch operation
 
    Note: define flag ID_IDC to enable the extra functions of the intelligent
@@ -273,7 +274,7 @@ REG idc_reg[] = {
 		  ID_NUMDR, REG_HRO) },
 	{ URDATA (UST, idc_unit[0].STD, 16, 8, 0,
 		  ID_NUMDR, REG_RO) },
-	{ URDATA (CAPAC, idc_unit[0].capac, 10, 31, 0,
+	{ URDATA (CAPAC, idc_unit[0].capac, 10, T_ADDR_W, 0,
 		  ID_NUMDR, PV_LEFT | REG_HRO) },
 	{ HRDATA (DEVNO, idc_dib.dno, 8), REG_HRO },
 	{ HRDATA (SELCH, idc_dib.sch, 2), REG_HRO },
@@ -668,9 +669,10 @@ uint32 i, p;
 t_stat r;
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
-r = attach_unit (uptr, cptr);
+r = attach_unit (uptr, cptr);				/* attach unit */
+if (r != SCPE_OK) return r;				/* error? */
 uptr->CYL = 0;
-if ((r != SCPE_OK) || ((uptr->flags & UNIT_AUTO) == 0)) return r;
+if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */
 if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
 if ((p = ftell (uptr->fileref)) == 0) return SCPE_OK;
 for (i = 0; drv_tab[i].surf != 0; i++) {

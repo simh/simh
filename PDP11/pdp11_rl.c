@@ -1,6 +1,6 @@
 /* pdp11_rl.c: RL11 (RLV12) cartridge disk simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    rl		RL11(RLV12)/RL01/RL02 cartridge disk
 
+   19-May-03	RMS	Revised for new conditional compilation scheme
+   25-Apr-03	RMS	Revised for extended file support
    29-Sep-02	RMS	Added variable address support to bootstrap
 			Added vector change/display support
 			Revised mapping nomenclature
@@ -65,15 +67,18 @@
    - VAX Q22 systems - the RL11 must go through the I/O map
 */
 
-#if defined (USE_INT64)					/* VAX version */
-#include "vax_defs.h"
-#define VM_VAX		1
-#define RL_RDX		16
+#if defined (VM_PDP10)					/* PDP10 version */
+#error "RL11 is not supported on the PDP-10!"
 
-#else							/* PDP11 version */
+#elif defined (VM_VAX)					/* VAX version */
+#include "vax_defs.h"
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
+
+#else							/* PDP-11 version */
 #include "pdp11_defs.h"
-#define VM_PDP11	1
-#define RL_RDX		8
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 extern int32 cpu_18b, cpu_ubm;
 #endif
 
@@ -233,24 +238,24 @@ UNIT rl_unit[] = {
 		UNIT_ROABLE+UNIT_AUTO, RL01_SIZE) }  };
 
 REG rl_reg[] = {
-	{ GRDATA (RLCS, rlcs, RL_RDX, 16, 0) },
-	{ GRDATA (RLDA, rlda, RL_RDX, 16, 0) },
-	{ GRDATA (RLBA, rlba, RL_RDX, 16, 0) },
-	{ GRDATA (RLBAE, rlbae, RL_RDX, 6, 0) },
-	{ GRDATA (RLMP, rlmp, RL_RDX, 16, 0) },
-	{ GRDATA (RLMP1, rlmp1, RL_RDX, 16, 0) },
-	{ GRDATA (RLMP2, rlmp2, RL_RDX, 16, 0) },
+	{ GRDATA (RLCS, rlcs, DEV_RDX, 16, 0) },
+	{ GRDATA (RLDA, rlda, DEV_RDX, 16, 0) },
+	{ GRDATA (RLBA, rlba, DEV_RDX, 16, 0) },
+	{ GRDATA (RLBAE, rlbae, DEV_RDX, 6, 0) },
+	{ GRDATA (RLMP, rlmp, DEV_RDX, 16, 0) },
+	{ GRDATA (RLMP1, rlmp1, DEV_RDX, 16, 0) },
+	{ GRDATA (RLMP2, rlmp2, DEV_RDX, 16, 0) },
 	{ FLDATA (INT, IREQ (RL), INT_V_RL) },
 	{ FLDATA (ERR, rlcs, CSR_V_ERR) },
 	{ FLDATA (DONE, rlcs, CSR_V_DONE) },
 	{ FLDATA (IE, rlcs, CSR_V_IE) },
 	{ DRDATA (STIME, rl_swait, 24), PV_LEFT },
 	{ DRDATA (RTIME, rl_rwait, 24), PV_LEFT },
-	{ URDATA (CAPAC, rl_unit[0].capac, 10, 31, 0,
+	{ URDATA (CAPAC, rl_unit[0].capac, 10, T_ADDR_W, 0,
 		  RL_NUMDR, PV_LEFT + REG_HRO) },
 	{ FLDATA (STOP_IOE, rl_stopioe, 0) },
-	{ GRDATA (DEVADDR, rl_dib.ba, RL_RDX, 32, 0), REG_HRO },
-	{ GRDATA (DEVVEC, rl_dib.vec, RL_RDX, 16, 0), REG_HRO },
+	{ GRDATA (DEVADDR, rl_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+	{ GRDATA (DEVVEC, rl_dib.vec, DEV_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB rl_mod[] = {
@@ -273,7 +278,7 @@ MTAB rl_mod[] = {
 
 DEVICE rl_dev = {
 	"RL", rl_unit, rl_reg, rl_mod,
-	RL_NUMDR, RL_RDX, 24, 1, RL_RDX, 16,
+	RL_NUMDR, DEV_RDX, 24, 1, DEV_RDX, 16,
 	NULL, NULL, &rl_reset,
 	&rl_boot, &rl_attach, NULL,
 	&rl_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS };
@@ -404,7 +409,7 @@ t_stat rl_svc (UNIT *uptr)
 {
 int32 err, wc, maxwc, t;
 int32 i, func, da, awc;
-t_addr ma;
+uint32 ma;
 uint16 comp;
 
 func = GET_FUNC (rlcs);					/* get function */
@@ -538,18 +543,19 @@ return SCPE_OK;
 
 t_stat rl_attach (UNIT *uptr, char *cptr)
 {
-int32 p;
+uint32 p;
 t_stat r;
 
 uptr->capac = (uptr->flags & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
-r = attach_unit (uptr, cptr);
-if ((r != SCPE_OK) || ((uptr->flags & UNIT_AUTO) == 0)) return r;
+r = attach_unit (uptr, cptr);				/* attach unit */
+if (r != SCPE_OK) return r;				/* error? */
 uptr->TRK = 0;						/* cylinder 0 */
 uptr->STAT = RLDS_VCK;					/* new volume */
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
-if ((p = ftell (uptr->fileref)) == 0) {
-	if (uptr->flags & UNIT_RO) return SCPE_OK;
+if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;	/* seek to end */
+if ((p = ftell (uptr->fileref)) == 0) {			/* new disk image? */
+	if (uptr->flags & UNIT_RO) return SCPE_OK;	/* if ro, done */
 	return pdp11_bad_block (uptr, RL_NUMSC, RL_NUMWD);  }
+if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */
 if (p > (RL01_SIZE * sizeof (int16))) {
 	uptr->flags = uptr->flags | UNIT_RL02;
 	uptr->capac = RL02_SIZE;  }

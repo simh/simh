@@ -1,6 +1,6 @@
 /* altair_dsk.c: MITS Altair 88-DISK Simulator
 
-   Copyright (c) 1997, Charles E. Owen
+   Copyright (c) 1997-2003, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -124,8 +124,6 @@ t_stat dsk_svc (UNIT *uptr);
 t_stat dsk_reset (DEVICE *dptr);
 void writebuf();
 
-extern int32 sim_activate (UNIT *uptr, int32 interval);
-extern int32 sim_cancel (UNIT *uptr);
 extern int32 PCX;
 
 /* Global data on status */

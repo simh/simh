@@ -25,6 +25,7 @@
 
    tti,tto	KL8E terminal input/output
 
+   25-Apr-03	RMS	Revised for extended file support
    02-Mar-02	RMS	Added SET TTI CTRL-C
    22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7B/8B support
@@ -69,7 +70,7 @@ REG tti_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTI) },
 	{ FLDATA (ENABLE, int_enable, INT_V_TTI) },
 	{ FLDATA (INT, int_req, INT_V_TTI) },
-	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (UC, tti_unit.flags, UNIT_V_KSR), REG_HRO },
 	{ NULL }  };
@@ -105,7 +106,7 @@ REG tto_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTO) },
 	{ FLDATA (ENABLE, int_enable, INT_V_TTO) },
 	{ FLDATA (INT, int_req, INT_V_TTO) },
-	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 

@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	IBM 1620 Simulator Usage
-Date:	15-Nov-2002
+Date:	15-Apr-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -138,10 +138,10 @@ standard on the Model 2.
 
 If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
-portion of memory is lost.  Initially, memory size is 16K, and all special
-features are enabled.
+portion of memory is lost.  Initially, the CPU is a Model I, memory size is
+20K, and indirect addressing, editing instructions, and divide are enabled.
 
-Memory is implemented as 5 bit BCD characters, as follows:
+Memory is implemented as 5 bit BCD digits, as follows:
 
 	4	3	2	1	0
 
@@ -177,8 +177,8 @@ interrupt system.
 	IND[0:99]	1	indicator array
 	IAE		1	indirect address enable (Model 2 only)
 	IDXE		1	indexing enable (Model 2 only)
-	IDXB		1	indexinb band select (Model 2 only)
-	IR1Q		1	IR1 prior to last branch;
+	IDXB		1	indexing band select (Model 2 only)
+	IR1Q[0:63]	16	IR1 prior to last branch;
 				most recent IR1 change first
 	WRU		8	interrupt character
 
@@ -198,12 +198,12 @@ key is pressed.  The typewriter has no errors.
 
 2.3 1621 Paper Tape Reader (PTR)
 
-The paper tape reader (PTR) reads data from a disk file.  The POS
-register specifies the number of the next data item to be read.  Thus, 
-by changing POS, the user can backspace or advance the reader.
+The paper tape reader (PTR) reads data from a disk file.  The POS register
+specifies the number of the next data item to be read.  Thus, by changing
+POS, the user can backspace or advance the reader.
 
 The paper tape reader supports the BOOT command.  BOOT PTR starts the
-specified instruction sequence at location 0.
+standard paper tape boot sequence at location 0.
 
 The paper tape reader implements these registers:
 
@@ -227,7 +227,7 @@ Error handling is as follows:
 2.4 1624 Paper Tape Punch (PTP)
 
 The paper tape punch (PTP) writes data to a disk file.  The POS register
-specifies the number of the next data item to bewritten.  Thus, by
+specifies the number of the next data item to be written.  Thus, by
 changing POS, the user can backspace or advance the punch.
 
 The paper tape punch implements these registers:
@@ -252,8 +252,8 @@ Error handling is as follows:
 The IBM 1402 card/reader punch is simulated as two independent devices:
 the card reader (CDR) and the card punch (CDP).
 
-The card reader supports the BOOT command.  BOOT CDR starts the
-specified instruction sequence at location 0.
+The card reader supports the BOOT command.  BOOT CDR starts the standard
+card boot sequence at location 0.
 
 The card reader reads data from a disk file, while the punch writes data
 to a disk file.  Cards are simulated as ASCII text lines with terminating
@@ -436,11 +436,11 @@ marks the end of the immediate Q operand; and the flags over digits
 The IBM 1620 uses single digits to represent numbers, and pairs of
 digits to represent characters (alphameric coding).  Only a small
 number of the 256 possible alphameric codings have legitimate values.
-Further, the translation between alphameric and devices varied
-from device to device.  The simulator implements a code called
+Further, the translation between alphameric and devices varied from
+device to device.  The simulator implements a code called 1620 ASCII,
 which allows all 64 possible card codes to be represented by upper
-case ASCII characters.  In addition, lower case alphabetic
-characters are accepted on input as equivalent to upper case.
+case ASCII characters.  In addition, lower case alphabetic characters
+are accepted on input as equivalent to upper case.
 
 Card code	PT code	RA	RN	LPT WA	ASCII representation
 

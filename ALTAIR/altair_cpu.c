@@ -1,6 +1,6 @@
 /* altair_cpu.c: MITS Altair Intel 8080 CPU simulator
 
-   Copyright (c) 1997, Charles E. Owen
+   Copyright (c) 1997-2003, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -58,7 +58,7 @@
 
 	HALT instruction
 	I/O error in I/O simulator
-    Invalid OP code (If ITRAP is set on CPU)
+	Invalid OP code (if ITRAP is set on CPU)
 
    2. Interrupts.
       There are 8 possible levels of interrupt, and in effect they
@@ -82,14 +82,14 @@
 #include "altair_defs.h"
 
 #define UNIT_V_OPSTOP	(UNIT_V_UF)			/* Stop on Invalid OP? */
-#define UNIT_OPSTOP		(1 << UNIT_V_OPSTOP)
-#define UNIT_V_CHIP	 	(UNIT_V_UF+1)       /* 8080 or Z80 */
-#define UNIT_CHIP		(1 << UNIT_V_CHIP)
-#define UNIT_V_MSIZE	(UNIT_V_UF+2)		/* Memory Size */
-#define UNIT_MSIZE		(1 << UNIT_V_MSIZE)
+#define UNIT_OPSTOP	(1 << UNIT_V_OPSTOP)
+#define UNIT_V_CHIP	(UNIT_V_UF+1)			/* 8080 or Z80 */
+#define UNIT_CHIP	(1 << UNIT_V_CHIP)
+#define UNIT_V_MSIZE	(UNIT_V_UF+2)			/* Memory Size */
+#define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
-unsigned char M[MAXMEMSIZE];	/* memory */
-int32 A = 0;					    /* accumulator */
+unsigned char M[MAXMEMSIZE];				/* memory */
+int32 A = 0;						/* accumulator */
 int32 BC = 0;						/* BC register pair */
 int32 DE = 0;						/* DE register pair */
 int32 HL = 0;						/* HL register pair */
@@ -1168,7 +1168,7 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
 	return SCPE_ARG;

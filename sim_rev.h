@@ -27,15 +27,106 @@
 #ifndef _SIM_REV_H_
 #define _SIM_REV_H_	0
 
-#define	SIM_MAJOR	2
-#define SIM_MINOR	10
-#define SIM_PATCH	4
+#define	SIM_MAJOR	3
+#define SIM_MINOR	0
+#define SIM_PATCH	0
 
-/* V2.10 revision history 
+/* V3.0 revision history 
 
 patch	date		module(s) and fix(es)
 
-  4	22-Feb-03	scp.c
+  0	15-Jun-03	scp.c:
+			-- added ASSIGN/DEASSIGN
+			-- changed RESTORE to detach files
+			-- added u5, u6 unit fields
+			-- added USE_ADDR64 support
+			-- changed some structure fields to unsigned
+
+			scp_tty.c: added extended file seek
+
+			sim_sock.c: fixed calling sequence in stubs
+
+			sim_tape.c:
+			-- added E11 and TPC format support
+			-- added extended file support
+
+			sim_tmxr.c: fixed bug in SHOW CONNECTIONS
+
+			all magtapes:
+			-- added multiformat support
+			-- added extended file support
+
+			i1401_cpu.c:
+			-- fixed mnemonic, instruction lengths, and reverse
+			   scan length check bug for MCS
+			-- fixed MCE bug, BS off by 1 if zero suppress
+			-- fixed chaining bug, D lost if return to SCP
+			-- fixed H branch, branch occurs after continue
+			-- added check for invalid 8 character MCW, LCA
+
+			i1401_mt.c: fixed load-mode end of record response
+
+			nova_dsk.c: fixed variable size interaction with restore
+
+			pdp1_dt.c: fixed variable size interaction with restore
+
+			pdp10_rp.c: fixed ordering bug in attach
+
+			pdp11_cpu.c:
+			-- fixed bug in MMR1 update (found by Tim Stark)
+			-- fixed bug in memory size table
+
+			pdp11_lp.c, pdp11_rq.c: added extended file support
+
+			pdp11_rl.c, pdp11_rp.c, pdp11_ry.c: fixed ordering bug in attach
+
+			pdp11_tc.c: fixed variable size interaction with restore
+
+			pdp11_xq.c:
+			-- corrected interrupts on IE state transition (code by Tom Evans)
+			-- added interrupt clear on soft reset (first noted by Bob Supnik)
+			-- removed interrupt when setting XL or RL (multiple people)
+			-- added SET/SHOW XQ STATS
+			-- added SHOW XQ FILTERS
+			-- added ability to split received packet into multiple buffers
+			-- added explicit runt & giant packet processing
+
+			vax_fpa.c:
+			-- fixed integer overflow bug in CVTfi
+			-- fixed multiple bugs in EMODf
+
+			vax_io.c: optimized byte and word DMA routines
+
+			vax_sysdev.c:
+			-- added calibrated delay to ROM reads (from Mark Pizzolato)
+			-- fixed calibration problems in interval timer (from Mark Pizzolato)
+
+			pdp1_dt.c: fixed variable size interaction with restore
+
+			pdp18b_dt.c: fixed variable size interaction with restore
+
+			pdp18b_mt.c: fixed bug in MTTR
+
+			pdp18b_rf.c: fixed variable size interaction with restore
+
+			pdp8_df.c, pdp8_rf.c: fixed variable size interaction
+			with restore
+
+			pdp8_dt.c: fixed variable size interaction with restore
+
+			pdp8_mt.c: fixed bug in SKTR
+
+			hp2100_dp.c,hp2100_dq.c:
+			-- fixed bug in read status (13210A controller)
+			-- fixed bug in seek completion
+
+			id_pt.c: fixed type declaration (found by Mark Pizzolato)
+
+			gri_cpu.c: fixed bug in SC queue pointer management
+
+/* V2.10 revision history
+
+  4	03-Mar-03	scp.c
 			-- added .ini startup file capability
 			-- added multiple breakpoint actions
 			-- added multiple switch evaluation points
@@ -69,6 +160,8 @@ patch	date		module(s) and fix(es)
 
 			pdp10_tu.c: revised to use magtape library
 
+			pdp11_cpu.c: fixed bug in MMR1 update (found by Tim Stark)
+
 			pdp11_stddev.c
 			-- added set line frequency command
 			-- added set ctrl-c command
@@ -95,7 +188,9 @@ patch	date		module(s) and fix(es)
 			-- fixed bugs in BOT error handling, interrupt handling
 			-- revised to use magtape library
 
-			pdp18b_rf.c: removed 22nd bit from disk address
+			pdp18b_rf.c:
+			-- removed 22nd bit from disk address
+			-- fixed autosizing algorithm
 
 			pdp18b_stddev.c:
 			-- added set line frequency command

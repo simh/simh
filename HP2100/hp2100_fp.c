@@ -1,6 +1,6 @@
 /* hp2100_fp.c: HP 2100 floating point instructions
 
-   Copyright (c) 2002, Robert M. Supnik
+   Copyright (c) 2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

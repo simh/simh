@@ -1,6 +1,6 @@
 /* pdp1_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -54,7 +54,7 @@
 #define MAXMEMSIZE	(1u << ASIZE)			/* max mem size */
 #define AMASK		(MAXMEMSIZE - 1)		/* address mask */
 #define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
-#define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
+#define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
 
 /* Architectural constants */
 

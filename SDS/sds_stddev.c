@@ -1,6 +1,6 @@
 /* sds_stddev.c: SDS 940 standard devices
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,8 @@
    ptp		paper tape punch
    tti		keyboard
    tto		teleprinter
+
+   25-Apr-03	RMS	Revised for extended file support
 */
 
 #include "sds_defs.h"
@@ -81,7 +83,7 @@ REG ptr_reg[] = {
 	{ ORDATA (BUF, ptr_unit.buf, 7) },
 	{ FLDATA (XFR, xfr_req, XFR_V_PTR) },
 	{ FLDATA (SOR, ptr_sor, 0) },
-	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
 	{ NULL }  };
@@ -114,7 +116,7 @@ REG ptp_reg[] = {
 	{ ORDATA (BUF, ptp_unit.buf, 7) },
 	{ FLDATA (XFR, xfr_req, XFR_V_PTP) },
 	{ FLDATA (LDR, ptp_ldr, 0) },
-	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
 	{ NULL }  };
@@ -145,7 +147,7 @@ UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
 REG tti_reg[] = {
 	{ ORDATA (BUF, tti_unit.buf, 6) },
 	{ FLDATA (XFR, xfr_req, XFR_V_TTI) },
-	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
@@ -175,7 +177,7 @@ UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
 REG tto_reg[] = {
 	{ ORDATA (BUF, tto_unit.buf, 6) },
 	{ FLDATA (XFR, xfr_req, XFR_V_TTO) },
-	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 

@@ -1,6 +1,6 @@
 /* pdp11_io.c: PDP-11 I/O simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Mar-03	RMS	Added logical name support
    08-Oct-02	RMS	Trimmed I/O bus addresses
 			Added support for dynamic tables
 			Added show I/O space, autoconfigure routines
@@ -186,7 +187,7 @@ return SCPE_NXM;
 
 /* Map I/O address to memory address */
 
-t_bool Map_Addr (t_addr ba, t_addr *ma)
+t_bool Map_Addr (uint32 ba, uint32 *ma)
 {
 if (cpu_bme) {						/* bus map on? */
 	int32 pg = UBM_GETPN (ba);			/* map entry */
@@ -206,9 +207,9 @@ return TRUE;
    Map_WriteW 	-	store word buffer into memory
 */
 
-int32 Map_ReadB (t_addr ba, int32 bc, uint8 *buf, t_bool map)
+int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf, t_bool map)
 {
-t_addr alim, lim, ma;
+uint32 alim, lim, ma;
 
 ba = ba & BUSMASK (map);				/* trim address */
 lim = ba + bc;
@@ -229,9 +230,9 @@ else {							/* physical */
     return (lim - alim);  }
 }
 
-int32 Map_ReadW (t_addr ba, int32 bc, uint16 *buf, t_bool map)
+int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf, t_bool map)
 {
-t_addr alim, lim, ma;
+uint32 alim, lim, ma;
 
 ba = (ba & BUSMASK (map)) & ~01;			/* trim, align addr */
 lim = ba + (bc & ~01);
@@ -250,9 +251,9 @@ else {							/* physical */
     return (lim - alim);  }
 }
 
-int32 Map_WriteB (t_addr ba, int32 bc, uint8 *buf, t_bool map)
+int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf, t_bool map)
 {
-t_addr alim, lim, ma;
+uint32 alim, lim, ma;
 
 ba = ba & BUSMASK (map);				/* trim address */
 lim = ba + bc;
@@ -275,9 +276,9 @@ else {							/* physical */
     return (lim - alim);  }
 }
 
-int32 Map_WriteW (t_addr ba, int32 bc, uint16 *buf, t_bool map)
+int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf, t_bool map)
 {
-t_addr alim, lim, ma;
+uint32 alim, lim, ma;
 
 ba = (ba & BUSMASK (map)) & ~01;			/* trim, align addr */
 lim = ba + (bc & ~01);
@@ -415,9 +416,11 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
 	    (curr->ba < (dibp->ba + dibp->lnt))) ||
 	    ((end >= dibp->ba) &&			/* overlap end? */
 	    (end < (dibp->ba + dibp->lnt)))) {
-		printf ("Device %s address conflict at %08o\n", dptr->name, dibp->ba);
+		printf ("Device %s address conflict at %08o\n",
+		    sim_dname (dptr), dibp->ba);
 		if (sim_log) fprintf (sim_log,
-		    "Device %s address conflict at %08o\n", dptr->name, dibp->ba);
+		    "Device %s address conflict at %08o\n",
+		    sim_dname (dptr), dibp->ba);
 		return TRUE;  }	 }
 return FALSE;
 }
@@ -499,7 +502,7 @@ for (i = 0; dib_tab[i] != NULL; i++) {			/* print table */
 	fprintf (st, "%08o - %08o%c\t%s\n", dib_tab[i]->ba,
 		dib_tab[i]->ba + dib_tab[i]->lnt - 1,
 		(dptr && (dptr->flags & DEV_FLTA))? '*': ' ',
-		dptr? dptr->name: "CPU");
+		dptr? sim_dname (dptr): "CPU");
 	}
 return SCPE_OK;
 }

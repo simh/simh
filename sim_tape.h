@@ -27,24 +27,21 @@
 #ifndef _SIM_TAPE_H_
 #define _SIM_TAPE_H_	0
 
-/* Temporary for use with old sim_defs.h */
+/* SIMH/E11 tape format */
 
-#undef MTR_TMK
-#undef MTR_EOM
-#undef MTR_ERF
-#undef MT_SET_PNU
-#undef MT_CLR_PNU
-#undef MT_TST_PNU
-
-/* Default tape format */
-
-/* typedef uint32		t_mtrlnt;		/* magtape rec lnt */
+typedef uint32		t_mtrlnt;			/* magtape rec lnt */
 
 #define MTR_TMK		0x00000000			/* tape mark */
 #define MTR_EOM		0xFFFFFFFF			/* end of medium */
 #define MTR_ERF		0x80000000			/* error flag */
 #define MTR_F(x)	((x) & MTR_ERF)			/* record error flg */
 #define MTR_L(x)	((x) & ~MTR_ERF)		/* record length */
+
+/* TPC tape format */
+
+typedef uint16		t_tpclnt;			/* magtape rec lnt */
+
+#define TPC_TMK		0x0000				/* tape mark */
 
 /* Unit flags */
 
@@ -61,6 +58,7 @@
 #define MTUF_V_UF	(MTUF_V_FMT + MTUF_W_FMT)
 #define MTUF_PNU	(1u << MTUF_V_PNU)
 #define MTUF_WLK	(1u << MTUF_V_WLK)
+#define MTUF_FMT	(MTUF_M_FMT << MTUF_V_FMT)
 #define MTUF_WRP	(MTUF_WLK | UNIT_RO)
 
 #define MT_SET_PNU(u)	(u)->flags = (u)->flags | MTUF_PNU
@@ -97,5 +95,7 @@ t_stat sim_tape_reset (UNIT *uptr);
 t_bool sim_tape_bot (UNIT *uptr);
 t_bool sim_tape_wrp (UNIT *uptr);
 t_bool sim_tape_eot (UNIT *uptr, t_addr cap);
+t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #endif

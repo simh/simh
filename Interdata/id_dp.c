@@ -25,6 +25,7 @@
 
    dp		M46-421 2.5MB/10MB cartridge disk
 
+   25-Apr-03	RMS	Revised for extended file support
    16-Feb-03	RMS	Fixed read to test transfer ok before selch operation
 */
 
@@ -151,7 +152,7 @@ uint32 dpd_arm[DP_NUMDR] = { 0 };			/* drives armed */
 int32 dp_stime = 100;					/* seek latency */
 int32 dp_rtime = 100;					/* rotate latency */
 int32 dp_wtime = 1;					/* word time */
-int32 dp_log = 0;					/* debug log */
+uint32 dp_log = 0;					/* debug log */
 uint8 dp_tplte[(2 * DP_NUMDR) + 2];			/* fix/rmv + ctrl + end */
 
 DEVICE dp_dev;
@@ -210,7 +211,7 @@ REG dp_reg[] = {
 		  DP_NUMDR, REG_RO) },
 	{ URDATA (UST, dp_unit[0].STD, 16, 8, 0,
 		  DP_NUMDR, REG_RO) },
-	{ URDATA (CAPAC, dp_unit[0].capac, 10, 31, 0,
+	{ URDATA (CAPAC, dp_unit[0].capac, 10, T_ADDR_W, 0,
 		  DP_NUMDR, PV_LEFT | REG_HRO) },
 	{ FLDATA (LOG, dp_log, 0), REG_HIDDEN },
 	{ HRDATA (DEVNO, dp_dib.dno, 8), REG_HRO },
@@ -513,9 +514,10 @@ uint32 i, p;
 t_stat r;
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
-r = attach_unit (uptr, cptr);
+r = attach_unit (uptr, cptr);				/* attach unit */
+if (r != SCPE_OK) return r;				/* error? */
 uptr->CYL = 0;
-if ((r != SCPE_OK) || ((uptr->flags & UNIT_AUTO) == 0)) return r;
+if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */
 if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
 if ((p = ftell (uptr->fileref)) == 0) return SCPE_OK;
 for (i = 0; drv_tab[i].surf != 0; i++) {

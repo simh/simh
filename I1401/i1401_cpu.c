@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,12 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   16-Mar-03	RMS	Fixed mnemonic, instruction lengths, and reverse
+			scan length check bug for MCS
+			Fixed MCE bug, BS off by 1 if zero suppress
+			Fixed chaining bug, D lost if return to SCP
+			Fixed H branch, branch occurs after continue
+			Added check for invalid 8 character MCW, LCA
    03-Jun-03	RMS	Added 1311 support
    22-May-02	RMS	Added multiply and divide
    30-Dec-01	RMS	Added old PC queue
@@ -142,7 +148,9 @@ uint8 M[MAXMEMSIZE] = { 0 };				/* main memory */
 int32 saved_IS = 0;					/* saved IS */
 int32 AS = 0;						/* AS */
 int32 BS = 0;						/* BS */
+int32 D = 0;						/* modifier */
 int32 as_err = 0, bs_err = 0;				/* error flags */
+int32 hb_pend = 0;					/* halt br pending */
 uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
@@ -194,6 +202,7 @@ REG cpu_reg[] = {
 	{ DRDATA (BS, BS, 14), PV_LEFT },
 	{ FLDATA (ASERR, as_err, 0) },
 	{ FLDATA (BSERR, bs_err, 0) },
+	{ ORDATA (D, D, 7) },
 	{ FLDATA (SSA, ssa, 0) },
 	{ FLDATA (SSB, ind[IN_SSB], 0) },
 	{ FLDATA (SSC, ind[IN_SSC], 0) },
@@ -208,8 +217,9 @@ REG cpu_reg[] = {
 	{ FLDATA (OVF, ind[IN_OVF], 0) },
 	{ FLDATA (IOCHK, iochk, 0) },
 	{ FLDATA (PRCHK, prchk, 0) },
+	{ FLDATA (HBPEND, hb_pend, 0) },
 	{ BRDATA (ISQ, pcq, 10, 14, PCQ_SIZE), REG_RO+REG_CIRC },
-	{ ORDATA (ISQP, pcq_p, 6), REG_HRO },
+	{ DRDATA (ISQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ NULL }  };
 
@@ -271,7 +281,7 @@ const int32 op_table[64] = {
 	L1 | L8 | BREQ | BBE,				/* branch if bit eq */
 	0,						/* illegal */
 	L1 | L4 | L7 | AREQ | BREQ,			/* 30: move zones */
-	L7 | AREQ | BREQ,				/* move supress zero */
+	L1 | L4 | L7 | AREQ | BREQ,			/* move supress zero */
 	0,						/* illegal */
 	L1 | L4 | L7 | AREQ | BREQ | NOWM,		/* set word mark */
 	L7 | AREQ | BREQ | MDV,				/* divide */
@@ -305,7 +315,7 @@ const int32 op_table[64] = {
 	L1 | L4 | L7 | AREQ | MLS,			/* 70: store B addr */
 	0,						/* illegal */
 	L1 | L4 | L7 | AREQ | BREQ,			/* zero and add */
-	HNOP | L1 | L4,					/* halt */
+	HNOP | L1 | L4 | L7,				/* halt */
 	L1 | L4 | L7 | AREQ | BREQ,			/* clear word mark */
 	0,						/* illegal */
 	0,						/* illegal */
@@ -456,8 +466,8 @@ static const int32 mtf_mod[] = { BCD_B, BCD_E, BCD_M, BCD_R, BCD_U, -1 };
 t_stat sim_instr (void)
 {
 extern int32 sim_interval;
-int32 IS, D, ilnt, flags;
-int32 op, xa, t, wm, dev, unit;
+int32 IS, ilnt, flags;
+int32 op, xa, t, wm, ioind, dev, unit;
 int32 a, b, i, asave, bsave;
 int32 carry, lowprd, sign, ps;
 int32 quo, ahigh, qs;
@@ -466,16 +476,21 @@ t_stat reason, r1, r2;
 
 /* Restore saved state */
 
+
 IS = saved_IS;
 if (as_err) AS = AS | BA;				/* flag bad addresses */
 if (bs_err) BS = BS | BA;
 as_err = bs_err = 0;					/* reset error flags */
-D = 0;
 reason = 0;
 
 /* Main instruction fetch/decode loop */
 
 while (reason == 0) {					/* loop until halted */
+
+if (hb_pend) {						/* halt br pending? */
+	hb_pend = 0;					/* clear flag */
+	BRANCH;  }					/* execute branch */
+
 saved_IS = IS;						/* commit prev instr */
 if (sim_interval <= 0) {				/* check clock queue */
 	if (reason = sim_process_event ()) break;  }
@@ -500,7 +515,7 @@ if (op == OP_SAR) BS = AS;				/* SAR? save ASTAR */
 PP (IS);
 
 if ((t = M[IS]) & WM) goto CHECK_LENGTH;		/* WM? 1 char inst */
-D = t;							/* could be D char */
+D = ioind = t;						/* could be D char, % */
 AS = hun_table[t];					/* could be A addr */
 PP (IS);						/* if %xy, BA is set */
 
@@ -519,7 +534,7 @@ if ((t = M[IS]) & WM) {					/* WM? 3 char inst */
 AS = AS + one_table[t];					/* finish A addr */
 unit = (t == BCD_ZERO)? 0: t;				/* save char as unit */
 xa = (AS >> V_INDEX) & M_INDEX;				/* get index reg */
-if (xa && (D != BCD_PERCNT) && (cpu_unit.flags & XSA)) {	/* indexed? */
+if (xa && (ioind != BCD_PERCNT) && (cpu_unit.flags & XSA)) {	/* indexed? */
 	AS = AS + hun_table[M[xa] & CHAR] + ten_table[M[xa + 1] & CHAR] +
 	    one_table[M[xa + 2] & CHAR];
 	AS = (AS & INDEXMASK) % MAXMEMSIZE;  }
@@ -570,7 +585,7 @@ switch (op) {						/* case on opcode */
 	until A WM
    MCM: copy A to B, preserving B WM,			fetch	fetch
 	until record or group mark
-   MSZ: copy A to B, clearing B WM, until A WM;		fetch	fetch
+   MCS: copy A to B, clearing B WM, until A WM;		fetch	fetch
 	reverse scan and suppress leading zeroes
    MN:	copy A char digit to B char digit,		fetch	fetch
 	preserving B zone and WM
@@ -580,21 +595,23 @@ switch (op) {						/* case on opcode */
 
 case OP_MCW:						/* move char */
 	if (ilnt >= 8) {				/* I/O form? */
-	    reason = iodisp (dev, unit, MD_NORM, D);
+	    if (ioind != BCD_PERCNT) reason = STOP_INVL;
+	    else reason = iodisp (dev, unit, MD_NORM, D);
 	    break;  }
 	if (ADDR_ERR (AS)) {				/* check A addr */
 	    reason = STOP_INVA;
 	    break;  }
 	do {
-	    M[BS] = (M[BS] & WM) | (M[AS] & CHAR);	/* move char */
 	    wm = M[AS] | M[BS];
+	    M[BS] = (M[BS] & WM) | (M[AS] & CHAR);	/* move char */
 	    MM (AS); MM (BS);  }			/* decr pointers */
 	while ((wm & WM) == 0);				/* stop on A,B WM */
 	break;
 
 case OP_LCA:						/* load char */
 	if (ilnt >= 8) {				/* I/O form? */
-	    reason = iodisp (dev, unit, MD_WM, D);
+	    if (ioind != BCD_PERCNT) reason = STOP_INVL;
+	    else reason = iodisp (dev, unit, MD_WM, D);
 	    break;  }
 	if (ADDR_ERR (AS)) {				/* check A addr */
 	    reason = STOP_INVA;
@@ -607,18 +624,18 @@ case OP_LCA:						/* load char */
 
 case OP_MCM:						/* move to rec/group */
 	do {
-	    M[BS] = (M[BS] & WM) | (M[AS] & CHAR);	/* move char */
 	    t = M[AS];
+	    M[BS] = (M[BS] & WM) | (M[AS] & CHAR);	/* move char */
 	    PP (AS); PP (BS);  }			/* incr pointers */
 	while (((t & CHAR) != BCD_RECMRK) && (t != (BCD_GRPMRK + WM)));
 	break;
 
-case OP_MSZ:						/* move suppress zero */
+case OP_MCS:						/* move suppress zero */
 	bsave = BS;					/* save B start */
 	qzero = 1;					/* set suppress */
 	do {
-	    M[BS] = M[AS] & ((BS != bsave)? CHAR: DIGIT);	/* copy char */
 	    wm = M[AS];
+	    M[BS] = M[AS] & ((BS != bsave)? CHAR: DIGIT);	/* copy char */
 	    MM (AS); MM (BS);  }			/* decr pointers */
 	while ((wm & WM) == 0);				/* stop on A WM */
 	if (reason) break;				/* addr err? stop */
@@ -631,7 +648,8 @@ case OP_MSZ:						/* move suppress zero */
 	    else if (((t == BCD_DECIMAL) && (cpu_unit.flags & EPE)) ||
 		 (t <= BCD_NINE)) qzero = 0;
 	    else qzero = 1;  }
-	while (BS <= bsave);
+	while (BS < bsave);
+	PP (BS);					/* BS end is B+1 */
 	break;	
 
 case OP_MN:						/* move numeric */
@@ -644,10 +662,7 @@ case OP_MZ:						/* move zone */
 	MM (AS); MM (BS);				/* decr pointers */
 	break;
 
-/* Compare
-
-   A and B are checked in fetch
-*/
+/* Compare - A and B are checked in fetch */
 
 case OP_C:						/* compare */
 	if (ilnt != 1) {				/* if not chained */
@@ -993,7 +1008,9 @@ case OP_MCE:						/* edit */
 	while ((b & WM) == 0);
 
 	M[BS] = M[BS] & ~WM;				/* clear B WM */
-	if (!qdollar && !(qdecimal && qzero)) break;	/* rescan again? */
+	if (!qdollar && !(qdecimal && qzero)) {		/* rescan again? */
+	    BS++;					/* BS = addr WM + 1 */
+	    break;  }
 	if (qdecimal && qzero) qdollar = 0;		/* no digits? clr $ */
 
 /* Edit pass 3 (extended print only) - from right to left */
@@ -1111,7 +1128,7 @@ case OP_DIV:
 		reason = STOP_WRAP;			/* address wrap? */
 		break;  }
 	    div_sign (M[asave], b, qs - 1, bsave - 1);	/* set signs */
-	    BS = (BS - 2) - (asave - (AS + 1));	/* final bs */
+	    BS = (BS - 2) - (asave - (AS + 1));		/* final bs */
 	    break;	}
 	bsave = BS + (asave - ahigh);			/* end subdivd */
 	qs = (BS - 2) - (ahigh - (AS + 1));		/* quo start */
@@ -1208,7 +1225,7 @@ case OP_NOP:						/* nop */
 	break;
 
 case OP_H:						/* halt */
-	if (ilnt >= 4) { BRANCH;  }			/* branch if called */
+	if (ilnt == 4) hb_pend = 1;			/* set pending branch */
 	reason = STOP_HALT;				/* stop simulator */
 	saved_IS = IS;					/* commit instruction */
 	break;
@@ -1355,10 +1372,12 @@ t_stat cpu_reset (DEVICE *dptr)
 {
 int32 i;
 
-for (i = 0; i < 64; i++) ind[i] = 0;
-ind[IN_UNC] = 1;
-AS = 0; as_err = 1;
-BS = 0; bs_err = 1;
+for (i = 0; i < 64; i++) ind[i] = 0;			/* clr indicators */
+ind[IN_UNC] = 1;					/* ind[0] always on */
+AS = 0; as_err = 1;					/* clear AS */
+BS = 0; bs_err = 1;					/* clear BS */
+D = 0;							/* clear D */
+hb_pend = 0;						/* no halt br */
 pcq_r = find_reg ("ISQ", NULL, dptr);
 if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
@@ -1389,7 +1408,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val % 1000) != 0))
 	return SCPE_ARG;

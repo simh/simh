@@ -1,7 +1,7 @@
 /* pdp11_xq.h: DEQNA/DELQA ethernet controller information
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2002, David T. Hittner
+   Copyright (c) 2002-2003, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,10 +28,15 @@
 
   Modification history:
 
+  02-Jun-03  DTH  Added struct xq_stats
+  28-May-03  DTH  Made xq_msg_que.item dynamic
+  28-May-03  MP   Optimized structures, removed rtime variable
+  06-May-03  DTH  Changed 32-bit t_addr to uint32 for v3.0
+  28-Apr-03  DTH  Added callbacks for multicontroller identification
+  25-Mar-03  DTH  Removed bootrom field - no longer needed; Updated copyright
   15-Jan-03  DTH  Merged Mark Pizzolato's changes into main source
-  13-Jan-03  MP   Added xq_id to countdown the triggering of the System Id
-                  multicast packets
-  10-Jan-03  DTH  Added bootrom
+  13-Jan-03  MP   Added countdown for System Id multicast packets
+  10-Jan-03  DTH  Added bootrom field
   30-Dec-02  DTH  Added setup valid field
   21-Oct-02  DTH  Corrected copyright again
   15-Oct-02  DTH  Fixed copyright, added sanity timer support
@@ -46,19 +51,25 @@
 #ifndef _PDP11_XQ_H
 #define _PDP11_XQ_H
 
-#if defined (USE_INT64)
+#if defined (VM_PDP10)					/* PDP10 version */
+#error "DEQNA/DELQA not supported on PDP10!"
+
+#elif defined (VM_VAX)					/* VAX version */
 #include "vax_defs.h"
-#define VM_VAX		1
 #define XQ_RDX		16
 #define XQ_WID		32
+extern int32 PSL;           /* PSL */
+extern int32 fault_PC;      /* fault PC */
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 
-#else
+#else							/* PDP-11 version */
 #include "pdp11_defs.h"
-#define VM_PDP11	1
 #define XQ_RDX		8
 #define XQ_WID		16
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 #endif
-
 
 #include "sim_ether.h"
 
@@ -81,16 +92,17 @@ struct xq_id {
 
 struct xq_msg_itm {
   int       type;     /* receive (0=setup, 1=loopback, 2=normal) */
-  ETH_PACK  packet;   /* packet */
   int32     status;   /* message size */
+  ETH_PACK  packet;   /* packet */
 };
 
 struct xq_msg_que {
-  int               count;
-  int               head;
-  int               tail;
-  struct xq_msg_itm item[XQ_QUE_MAX];
-  int               loss;
+  int                 count;
+  int                 head;
+  int                 tail;
+  int                 loss;
+  int                 high;
+  struct xq_msg_itm*  item;
 };
 
 struct xq_setup {
@@ -104,6 +116,17 @@ struct xq_setup {
   ETH_MAC           macs[XQ_FILTER_MAX];  /* MAC addresses to respond to */
 };
 
+struct xq_stats {
+  int               recv;                 /* received packets */
+  int               filter;               /* filtered packets */
+  int               xmit;                 /* transmitted packets */
+  int               fail;                 /* transmit failed */
+  int               runt;                 /* runts */
+  int               giant;                /* oversize packets */
+  int               setup;                /* setup packets */
+  int               loop;                 /* loopback packets */
+};
+
 struct xq_meb {                           /* MEB block */
   uint8   type;
   uint8   add_lo;
@@ -115,7 +138,8 @@ struct xq_meb {                           /* MEB block */
 
 struct xq_device {
   /*+ initialized values - DO NOT MOVE */
-  int               rtime;                /* ethernet read timer */
+  ETH_PCALLBACK     rcallback;             /* read callback routine */
+  ETH_PCALLBACK     wcallback;            /* write callback routine */
   ETH_MAC           mac;                  /* MAC address */
   enum xq_type      type;                 /* controller type */
   struct xq_sanity  sanity;               /* sanity timer information */
@@ -131,19 +155,28 @@ struct xq_device {
 
   /* buffers, etc. */
   struct xq_setup   setup;
+  struct xq_stats   stats;
   uint8             mac_checksum[2];
   uint16            rbdl_buf[6];
   uint16            xbdl_buf[6];
-//  ETH_MAC           target_address[XQ_MAX_FILTERS];
-  t_addr            rbdl_ba;
-  t_addr            xbdl_ba;
+  uint32            rbdl_ba;
+  uint32            xbdl_ba;
   ETH_DEV*          etherface;
   int               receiving;
   ETH_PACK          read_buffer;
   ETH_PACK          write_buffer;
   struct xq_msg_que ReadQ;
-  uint8             bootrom[256];
 };
+
+struct xq_controller {
+  DEVICE*           dev;          /* device block */
+  UNIT*             unit;         /* unit block */
+  DIB*              dib;          /* device interface block */
+  struct xq_device* var;          /* controller-specific variables */
+};
+
+typedef struct xq_controller CTLR;
+
 
 #define XQ_CSR_RI 0x8000   /* Receive Interrupt Request     (RI) [RO/W1] */
 #define XQ_CSR_PE 0x4000   /* Parity Error in Host Memory   (PE) [RO] */

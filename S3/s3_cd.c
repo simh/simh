@@ -1,6 +1,6 @@
 /* s3_cd.c: IBM 1442 card reader/punch
 
-   Copyright (c) 2001, Charles E. Owen
+   Copyright (c) 2001-2003, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
    cdp		card punch
    cdp2		card punch stacker 2
 
+   25-Apr-03	RMS	Revised for extended file support
    08-Oct-02	RMS	Added impossible function catcher
 
    Normally, cards are represented as ASCII text streams terminated by newlines.
@@ -80,7 +81,7 @@ REG cdr_reg[] = {
 	{ HRDATA (LCR, LCR, 16) },
 	{ FLDATA (EBCDIC, cdr_ebcdic, 0) },
 	{ FLDATA (S2, s2sel, 0) },
-	{ DRDATA (POS, cdr_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, cdr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, cdr_unit.wait, 24), PV_LEFT },
 	{ BRDATA (BUF, rbuf, 8, 8, CDR_WIDTH) },
 	{ NULL }  };
@@ -108,7 +109,7 @@ REG cdp_reg[] = {
 	{ FLDATA (NOTRDY, notready, 0) },
 	{ HRDATA (DAR, DAR, 16) },
 	{ HRDATA (LCR, LCR, 16) },
-	{ DRDATA (POS, cdp_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, cdp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ NULL }  };
 
 DEVICE cdp_dev = {

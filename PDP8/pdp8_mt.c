@@ -25,6 +25,9 @@
 
    mt		TM8E/TU10 magtape
 
+   25-Apr-03	RMS	Revised for extended file support
+   29-Mar-03	RMS	Added multiformat support
+   04-Mar-03	RMS	Fixed bug in SKTR
    01-Mar-03	RMS	Fixed interrupt handling
 			Revised for magtape library
    30-Oct-02	RMS	Revised BOT handling, added error record handling
@@ -123,8 +126,6 @@
 #define STA_CLR		(FN_RMASK | 00020)		/* always clear */
 #define STA_DYN		(STA_REW | STA_BOT | STA_REM | STA_EOF | \
 			 STA_EOT | STA_WLK)		/* kept in USTAT */
-			 				/* set error */
-#define TUR(u)		(!sim_is_active (u))		/* tape unit ready */
 
 extern uint16 M[];
 extern int32 int_req, stop_inst;
@@ -189,7 +190,7 @@ REG mt_reg[] = {
 	{ FLDATA (STOP_IOE, mt_stopioe, 0) },
 	{ DRDATA (TIME, mt_time, 24), PV_LEFT },
 	{ URDATA (UST, mt_unit[0].USTAT, 8, 16, 0, MT_NUMDR, 0) },
-	{ URDATA (POS, mt_unit[0].pos, 10, 32, 0,
+	{ URDATA (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
 		  MT_NUMDR, PV_LEFT | REG_RO) },
 	{ FLDATA (DEVNUM, mt_dib.dev, 6), REG_HRO },
 	{ NULL }  };
@@ -197,6 +198,8 @@ REG mt_reg[] = {
 MTAB mt_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", &mt_vlock },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", &mt_vlock }, 
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&set_dev, &show_dev, NULL },
 	{ 0 }  };
@@ -241,7 +244,8 @@ case 6:							/* LFGR */
 	    mt_updcsta (uptr);				/* update status */
 	    return 0;  }
 	f = GET_FNC (mt_fn);				/* get function */
-	if (((uptr->flags & UNIT_ATT) == 0) || !TUR (uptr) ||
+	if (((uptr->flags & UNIT_ATT) == 0) ||
+	      sim_is_active (uptr) ||
 	   (((f == FN_WRITE) || (f == FN_WREOF)) && sim_tape_wrp (uptr))
 	   || (((f == FN_SPACER) || (f == FN_REWIND)) && sim_tape_bot (uptr))) {
 	    mt_sta = mt_sta | STA_ILL | STA_ERR;	/* illegal op error */
@@ -309,9 +313,10 @@ case 2:							/* SKCB */
 case 3:							/* SKJD */
 	return mt_done? IOT_SKP + AC: AC;
 case 4:							/* SKTR */
-	return (TUR (uptr))? IOT_SKP + AC: AC;
+	return (!sim_is_active (uptr) &&
+	    (uptr->flags & UNIT_ATT))? IOT_SKP + AC: AC;
 case 5:							/* CLF */
-	if (TUR (uptr)) mt_reset (&mt_dev);		/* if TUR, zap */
+	if (!sim_is_active (uptr)) mt_reset (&mt_dev);	/* if TUR, zap */
 	else {						/* just ctrl zap */
 	    mt_sta = 0;					/* clear status */
 	    mt_done = 0;				/* clear done */

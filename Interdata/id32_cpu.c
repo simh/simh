@@ -1993,7 +1993,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 uint32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE32) || ((val & 0xFFFF) != 0))
 	return SCPE_ARG;

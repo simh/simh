@@ -1,6 +1,6 @@
 /* hp2100_lpt.c: HP 2100 12845A line printer simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt		12845A line printer
 
+   25-Apr-03	RMS	Revised for extended file support
    24-Oct-02	RMS	Cloned from 12653A
 */
 
@@ -74,7 +75,7 @@ REG lpt_reg[] = {
 	{ FLDATA (FLG, lpt_dib.flg, 0) },
 	{ FLDATA (FBF, lpt_dib.fbf, 0) },
 	{ DRDATA (LCNT, lpt_lcnt, 7) },
-	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (CTIME, lpt_ctime, 31), PV_LEFT },
 	{ DRDATA (PTIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },

@@ -1,6 +1,6 @@
 /* vax_sysreg.c: VAX system registers simulator
 
-   Copyright (c) 1998-2002, Robert M Supnik
+   Copyright (c) 1998-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -33,6 +33,10 @@
    cso		console storage output
    sysd		system devices (SSC miscellany)
 
+   7-Jun-03	MP	Added calibrated delay to ROM reads (from Mark Pizzolato)
+			Fixed calibration problems interval timer (from Mark Pizzolato)
+   12-May-03	RMS	Fixed compilation warnings from VC.Net
+   23-Apr-03	RMS	Revised for 32b/64b t_addr
    19-Aug-02	RMS	Removed unused variables (found by David Hittner)
 			Allowed NVR to be attached to file
    30-May-02	RMS	Widened POS to 32b
@@ -40,6 +44,9 @@
 */
 
 #include "vax_defs.h"
+
+#define UNIT_V_NODELAY	(UNIT_V_UF + 0)			/* ROM access equal to RAM access */
+#define UNIT_NODELAY	(1u << UNIT_V_NODELAY)
 
 /* Console storage control/status */
 
@@ -156,6 +163,7 @@
 
 extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
+extern UNIT clk_unit;
 extern jmp_buf save_env;
 extern int32 p1;
 extern int32 sim_switches;
@@ -182,12 +190,13 @@ uint32 tmr_sav[2] = { 0 };				/* saved inst cnt */
 int32 ssc_adsm[2] = { 0 };				/* addr strobes */
 int32 ssc_adsk[2] = { 0 };
 int32 cdg_dat[CDASIZE >> 2];				/* cache data */
+static uint32 rom_delay = 0;
 
-t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
-t_stat rom_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
+t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
+t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_reset (DEVICE *dptr);
-t_stat nvr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
-t_stat nvr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
+t_stat nvr_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
+t_stat nvr_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_reset (DEVICE *dptr);
 t_stat nvr_attach (UNIT *uptr, char *cptr);
 t_stat nvr_detach (UNIT *uptr);
@@ -241,6 +250,7 @@ extern void rxcs_wr (int32 dat);
 extern void txcs_wr (int32 dat);
 extern void txdb_wr (int32 dat);
 extern void ioreset_wr (int32 dat);
+extern uint32 sim_os_msec();
 
 /* ROM data structures
 
@@ -254,8 +264,13 @@ UNIT rom_unit = { UDATA (NULL, UNIT_FIX+UNIT_BINK, ROMSIZE) };
 REG rom_reg[] = {
 	{ NULL }  };
 
+MTAB rom_mod[] = {
+	{ UNIT_NODELAY, UNIT_NODELAY, "fast access", "NODELAY", NULL },
+	{ UNIT_NODELAY, 0, "1usec calibrated access", "DELAY", NULL },
+	{ 0 }  };
+
 DEVICE rom_dev = {
-	"ROM", &rom_unit, rom_reg, NULL,
+	"ROM", &rom_unit, rom_reg, rom_mod,
 	1, 16, ROMAWIDTH, 4, 16, 32,
 	&rom_ex, &rom_dep, &rom_reset,
 	NULL, NULL, NULL,
@@ -395,13 +410,70 @@ DEVICE sysd_dev = {
 
 /* ROM: read only memory - stored in a buffered file
    Register space access routines see ROM twice
+
+   ROM access has been 'regulated' to about 1Mhz to avoid issues
+   with testing the interval timers in self-test.  Specifically,
+   the VAX boot ROM (ka655.bin) contains code which presumes that
+   the VAX runs at a particular slower speed when code is running
+   from ROM (which is not cached).  These assumptions are built
+   into instruction based timing loops. As the host platform gets
+   much faster than the original VAX, the assumptions embedded in
+   these code loops are no longer valid.
+   
+   Code has been added to the ROM implementation to limit CPU speed
+   to about 500K instructions per second.  This heads off any future
+   issues with the embedded timing loops.  
 */
+
+int32 rom_swapb(int32 val)
+{
+return ((val << 24) & 0xff000000) | (( val << 8) & 0xff0000) |
+	((val >> 8) & 0xff00) | ((val >> 24) & 0xff);
+}
+
+int32 rom_read_delay (int32 val)
+{
+uint32 i, l = rom_delay;
+int32 loopval = 0;
+
+if (rom_unit.flags & UNIT_NODELAY) return val;
+
+/* Calibrate the loop delay factor when first used.
+   Do this 4 times to and use the largest value computed. */
+
+if (rom_delay == 0) {
+	uint32 ts, te, c = 10000, samples = 0;
+	while (1) {
+           c = c * 2;
+           te = sim_os_msec();
+           while (te == (ts = sim_os_msec ()));		/* align on ms tick */
+
+/* This is merely a busy wait with some "work" that won't get optimized
+   away by a good compiler. loopval always is zero.  To avoid smart compilers,
+   the loopval variable is referenced in the function arguments so that the
+   function expression is not loop invariant.  It also must be referenced
+   by subsequent code or to avoid the whole computation being eliminated. */
+
+	    for (i = 0; i < c; i++)
+                loopval |= (loopval + ts) ^ rom_swapb (rom_swapb (loopval + ts));
+	    te = sim_os_msec (); 
+	    if ((te - ts) < 50) continue;		/* sample big enough? */
+	    if (rom_delay < (loopval + (c / (te - ts) / 1000) + 1))
+		rom_delay = loopval + (c / (te - ts) / 1000) + 1;
+	    if (++samples >= 4) break;
+	    c = c / 2;  }
+	if (rom_delay < 5) rom_delay = 5;  }
+
+for (i = 0; i < l; i++)
+	loopval |= (loopval + val) ^ rom_swapb (rom_swapb (loopval + val));
+return val + loopval;
+}
 
 int32 rom_rd (int32 pa)
 {
 int32 rg = ((pa - ROMBASE) & ROMAMASK) >> 2;
 
-return rom[rg];
+return rom_read_delay (rom[rg]);
 }
 
 void rom_wr (int32 pa, int32 val, int32 lnt)
@@ -418,8 +490,10 @@ return;
 
 /* ROM examine */
 
-t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
+t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw)
 {
+uint32 addr = (uint32) exta;
+
 if ((vptr == NULL) || (addr & 03)) return SCPE_ARG;
 if (addr >= ROMSIZE) return SCPE_NXM;
 *vptr = rom[addr >> 2];
@@ -428,8 +502,10 @@ return SCPE_OK;
 
 /* ROM deposit */
 
-t_stat rom_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
+t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw)
 {
+uint32 addr = (uint32) exta;
+
 if (addr & 03) return SCPE_ARG;
 if (addr >= ROMSIZE) return SCPE_NXM;
 rom[addr >> 2] = (uint32) val;
@@ -468,8 +544,10 @@ return;
 
 /* NVR examine */
 
-t_stat nvr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
+t_stat nvr_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw)
 {
+uint32 addr = (uint32) exta;
+
 if ((vptr == NULL) || (addr & 03)) return SCPE_ARG;
 if (addr >= NVRSIZE) return SCPE_NXM;
 *vptr = nvr[addr >> 2];
@@ -478,8 +556,10 @@ return SCPE_OK;
 
 /* NVR deposit */
 
-t_stat nvr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
+t_stat nvr_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw)
 {
+uint32 addr = (uint32) exta;
+
 if (addr & 03) return SCPE_ARG;
 if (addr >= NVRSIZE) return SCPE_NXM;
 nvr[addr >> 2] = (uint32) val;
@@ -711,8 +791,8 @@ return;
 struct reglink {					/* register linkage */
 	int32	low;					/* low addr */
 	int32	high;					/* high addr */
-	t_stat	(*read)();				/* read routine */
-	void	(*write)();  };				/* write routine */
+	t_stat	(*read)(int32 pa);			/* read routine */
+	void	(*write)(int32 pa, int32 val, int32 lnt);  };	/* write routine */
 
 struct reglink regtable[] = {
 	{ CQMAPBASE, CQMAPBASE+CQMAPSIZE, &cqmap_rd, &cqmap_wr },
@@ -1031,13 +1111,31 @@ return;
    clock events per second.  Instead, a gross hack is used.  When
    a timer is started, the clock interval is inspected.
 
-   if (int < 0 and small) then testing timer, count instructions
+   if (int < 0 and small) then testing timer, count instructions.
+        Small is determined by when the requested interval is less
+        than the size of a 100hz system clock tick.
    if (int >= 0 or large) then counting a real interval, schedule
 	clock events at 100Hz using calibrated line clock delay
+        and when the remaining time value gets small enough, behave
+        like the small case above.
 
    If the interval register is read, then its value between events
    is interpolated using the current instruction count versus the
-   count when the most recent event started.
+   count when the most recent event started, the result is scaled
+   to the calibrated system clock, unless the interval being timed
+   is less than a calibrated system clock tick (or the calibrated 
+   clock is running very slowly) at which time the result will be 
+   the elapsed instruction count.
+
+   The powerup TOY Test sometimes fails its tolerance test.  This was
+   due to varying system load causing varying calibration values to be
+   used at different times while referencing the TIR.  While timing long
+   intervals, we now synchronize the stepping (and calibration) of the
+   system tick with the opportunity to reference the value.  This gives
+   precise tolerance measurement values (when interval timers are used
+   to measure the system clock), regardless of other load issues on the
+   host system which might cause varying values of the system clock's
+   calibration factor.
 */
 
 int32 tmr_tir_rd (int32 tmr, t_bool interp)
@@ -1046,6 +1144,9 @@ uint32 delta;
 
 if (interp || (tmr_csr[tmr] & TMR_CSR_RUN)) {		/* interp, running? */
 	delta = sim_grtime () - tmr_sav[tmr];		/* delta inst */
+	if ((tmr_inc[tmr] == TMR_INC) &&		/* scale large int */
+	    (tmr_poll > TMR_INC))
+	    delta = (uint32) ((((double) delta) * TMR_INC) / tmr_poll);
 	if (delta >= tmr_inc[tmr]) delta = tmr_inc[tmr] - 1;
 	return tmr_tir[tmr] + delta;  }
 return tmr_tir[tmr];
@@ -1117,12 +1218,27 @@ return;
 
 void tmr_sched (int32 tmr)
 {
+int32 clk_time = sim_is_active (&clk_unit) - 1;
+int32 tmr_time;
+
 tmr_sav[tmr] = sim_grtime ();				/* save intvl base */
 if (tmr_tir[tmr] > (0xFFFFFFFFu - TMR_INC)) {		/* short interval? */
 	tmr_inc[tmr] = (~tmr_tir[tmr] + 1);		/* inc = interval */
-	sim_activate (&sysd_unit[tmr], tmr_inc[tmr]);  }
+	tmr_time = tmr_inc[tmr]; }
 else {	tmr_inc[tmr] = TMR_INC;				/* usec/interval */
-	sim_activate (&sysd_unit[tmr], tmr_poll);  }	/* use calib clock */
+        tmr_time = tmr_poll; }
+if (tmr_time == 0) tmr_time = 1;
+if ((tmr_inc[tmr] = TMR_INC) && (tmr_time > clk_time)) {
+
+/* Align scheduled event to be identical to the event for the next clock
+   tick.  This lets us always see a consistent calibrated value, both for
+   this scheduling, AND for any query of the current timer register that
+   may happen in tmr_tir_rd ().  This presumes that sim_activate will
+   queue the interval timer behind the event for the clock tick. */
+
+	tmr_inc[tmr] = (uint32) (((double) clk_time * TMR_INC) / tmr_poll);
+	tmr_time = clk_time; }
+sim_activate (&sysd_unit[tmr], tmr_time);
 return;
 }
 

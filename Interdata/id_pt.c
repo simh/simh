@@ -1,6 +1,6 @@
 /* id_pt.c: Interdata paper tape reader
 
-   Copyright (c) 2000-2001, Robert M. Supnik
+   Copyright (c) 2000-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,9 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    pt		paper tape reader and punch
+
+   25-Apr-03	RMS	Revised for extended file support
+   10-Apr-03	RMS	Fixed type problem in ptr service (from Mark Pizzolato)
 */
 
 #include "id_defs.h"
@@ -76,11 +79,11 @@ UNIT pt_unit[] = {
 REG pt_reg[] = {
 	{ HRDATA (STA, pt_sta, 8) },
 	{ HRDATA (RBUF, pt_unit[PTR].buf, 8) },
-	{ DRDATA (RPOS, pt_unit[PTR].pos, 32), PV_LEFT },
+	{ DRDATA (RPOS, pt_unit[PTR].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (RTIME, pt_unit[PTR].wait, 24), PV_LEFT },
 	{ FLDATA (RSTOP_IOE, ptr_stopioe, 0) },
 	{ HRDATA (PBUF, pt_unit[PTP].buf, 8) },
-	{ DRDATA (PPOS, pt_unit[PTP].pos, 32), PV_LEFT },
+	{ DRDATA (PPOS, pt_unit[PTP].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (PTIME, pt_unit[PTP].wait, 24), PV_LEFT },
 	{ FLDATA (PSTOP_IOE, ptp_stopioe, 0) },
 	{ FLDATA (IREQ, int_req[l_PT], i_PT) },
@@ -164,7 +167,7 @@ return 0;
 
 t_stat ptr_svc (UNIT *uptr)
 {
-uint32 temp;
+int32 temp;
 
 if ((uptr->flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (ptr_stopioe, SCPE_UNATT);
@@ -324,8 +327,7 @@ static uint8 load_rom[] = {
 
 t_stat pt_dump (FILE *of, char *cptr, char *fnam)
 {
-t_addr i, lo, hi;
-uint32 cs;
+uint32 i, lo, hi, cs;
 char *tptr;
 extern DEVICE cpu_dev;
 

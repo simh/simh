@@ -1,6 +1,6 @@
 /* pdp8_rk.c: RK8E cartridge disk simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rk		RK8E/RK05 cartridge disk
 
+   25-Apr-03	RMS	Revised for extended file support
    04-Oct-02	RMS	Added DIB, device number support
    06-Jan-02	RMS	Changed enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support

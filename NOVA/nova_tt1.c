@@ -27,6 +27,7 @@
    tti1		second terminal input
    tto1		second terminal output
 
+   09-May-03	RMS	Added network device flag
    05-Jan-03	RMS	Fixed calling sequence for setmod
    03-Oct-02	RMS	Added DIBs
    22-Aug-02	RMS	Updated for changes in sim_tmxr
@@ -105,7 +106,7 @@ DEVICE tti1_dev = {
 	1, 10, 31, 1, 8, 8,
 	&tmxr_ex, &tmxr_dep, &tti1_reset,
 	NULL, &tti1_attach, &tti1_detach,
-	&tti1_dib, DEV_DISABLE  };
+	&tti1_dib, DEV_NET | DEV_DISABLE  };
 
 /* TTO1 data structures
 

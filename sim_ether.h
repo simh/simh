@@ -1,7 +1,7 @@
 /* sim_ether.h: OS-dependent network information
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2002, David T. Hittner
+   Copyright (c) 2002-2003, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,8 @@
 
   Modification history:
 
+  05-Jun-03  DTH  Added used to struct eth_packet
+  01-Feb-03  MP   Changed some uint8 strings to char* to reflect usage 
   22-Oct-02  DTH  Added all_multicast and promiscuous support
   21-Oct-02  DTH  Corrected copyright again
   16-Oct-02  DTH  Fixed copyright
@@ -57,6 +59,7 @@
 struct eth_packet {
   uint8   msg[1518];
   int     len;
+  int     used;
 };
 
 struct eth_message {
@@ -75,8 +78,8 @@ struct eth_queue {
 
 struct eth_list {
   int     num;
-  uint8   name[ETH_DEV_NAME_MAX];
-  uint8   desc[ETH_DEV_DESC_MAX];
+  char    name[ETH_DEV_NAME_MAX];
+  char    desc[ETH_DEV_DESC_MAX];
 };
 
 typedef int ETH_BOOL;
@@ -86,7 +89,7 @@ typedef void (*ETH_PCALLBACK)(int status);
 typedef struct eth_list ETH_LIST;
 
 struct eth_device {
-  uint8*        name;                           /* name of ethernet device */
+  char*         name;                           /* name of ethernet device */
   void*         handle;                         /* handle of implementation-specific device */
   ETH_PCALLBACK read_callback;                  /* read callback function */
   ETH_PCALLBACK write_callback;                 /* write callback function */

@@ -26,6 +26,8 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   19-May-03	RMS	Revised for new conditional compilation
+   05-Apr-03	RMS	Fixed bug in MMR1 update (found by Tim Stark)
    28-Feb-03	RMS	Added TM logging support
    19-Jan-03	RMS	Changed mode definitions for Apple Dev Kit conflict
    11-Nov-02	RMS	Changed log definitions to be VAX compatible
@@ -52,6 +54,10 @@
 
 #ifndef _PDP11_DEFS_H
 #define _PDP11_DEFS_H	0
+
+#ifndef VM_PDP11
+#define VM_PDP11	0
+#endif
 
 #include "sim_defs.h"					/* simulator defns */
 #include <setjmp.h>
@@ -316,6 +322,8 @@ typedef struct fpac fpac_t;
 #define MAP		1				/* mapped */
 #define NOMAP		0				/* not mapped */
 
+#define DEV_RDX		8				/* default device radix */
+
 /* Device information block */
 
 #define VEC_DEVMAX	4				/* max device vec */
@@ -542,7 +550,7 @@ typedef struct pdp_dib DIB;
 
 /* CPU and FPU macros */
 
-#define update_MM	((MMR0 & (MMR0_FREEZE + MMR0_MME)) == MMR0_MME)
+#define update_MM	((MMR0 & MMR0_FREEZE) == 0)
 #define setTRAP(name)	trap_req = trap_req | (name)
 #define setCPUERR(name)	CPUERR = CPUERR | (name)
 #define ABORT(val)	longjmp (save_env, (val))
@@ -570,11 +578,11 @@ typedef struct pdp_dib DIB;
 
 /* Function prototypes */
 
-t_bool Map_Addr (t_addr qa, t_addr *ma);
-int32 Map_ReadB (t_addr ba, int32 bc, uint8 *buf, t_bool map);
-int32 Map_ReadW (t_addr ba, int32 bc, uint16 *buf, t_bool map);
-int32 Map_WriteB (t_addr ba, int32 bc, uint8 *buf, t_bool map);
-int32 Map_WriteW (t_addr ba, int32 bc, uint16 *buf, t_bool map);
+t_bool Map_Addr (uint32 qa, uint32 *ma);
+int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf, t_bool map);
+int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf, t_bool map);
+int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf, t_bool map);
+int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf, t_bool map);
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);

@@ -1,6 +1,6 @@
 /* id_io.c: Interdata CPU-independent I/O routines
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   21-Jun-03	RMS	Changed subroutine argument for ARM compiler conflict
 
    Interdata I/O devices are defined by a device information block:
 
@@ -391,7 +393,7 @@ return 0;
 
 /* Update device interrupt status */
 
-int32 int_chg (uint32 irq, int32 dat, int32 arm)
+int32 int_chg (uint32 irq, int32 dat, int32 armdis)
 {
 int32 t = CMD_GETINT (dat);				/* get int ctrl */
 	
@@ -405,7 +407,7 @@ if (t == CMD_IDSA) {					/* disarm? */
 	CLR_ENB (irq);
 	CLR_INT (irq);
 	return 0;  }
-return arm;
+return armdis;
 }
 
 /* Process a 2b field and return unchanged, set, clear, complement */

@@ -25,6 +25,7 @@
 
    dsk		fixed head disk
 
+   14-Mar-03	RMS	Fixed variable capacity interaction with save/restore
    03-Mar-03	RMS	Fixed variable capacity and autosizing
    03-Oct-02	RMS	Added DIB
    06-Jan-02	RMS	Revised enable/disable support
@@ -44,6 +45,7 @@
 #define UNIT_V_AUTO	(UNIT_V_UF + 0)			/* autosize */
 #define UNIT_V_PLAT	(UNIT_V_UF + 1)			/* #platters - 1 */
 #define UNIT_M_PLAT	07
+#define UNIT_PLAT	(UNIT_M_PLAT << UNIT_V_PLAT)
 #define UNIT_GETP(x)	((((x) >> UNIT_V_PLAT) & UNIT_M_PLAT) + 1)
 #define UNIT_AUTO	(1 << UNIT_V_AUTO)
 #define UNIT_PLAT	(UNIT_M_PLAT << UNIT_V_PLAT)
@@ -184,7 +186,7 @@ if ((pulse == iopP) && ((dsk_wlk >> GET_DISK (dsk_da)) & 1)) {	/* wrt lock? */
 	return rval;  }
 
 if (pulse & 1) {					/* read or write? */
-	if (((t_addr) (dsk_da * DSK_NUMWD)) >= dsk_unit.capac) { /* inv sev? */
+	if (((uint32) (dsk_da * DSK_NUMWD)) >= dsk_unit.capac) { /* inv sev? */
 	    dev_done = dev_done | INT_DSK;		/* set done */
 	    int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
 	    dsk_stat = DSKS_ERR + DSKS_NSD;		/* set status */
@@ -222,7 +224,7 @@ if (uptr->FUNC == iopP) {				/* write? */
 	for (i = 0; i < DSK_NUMWD; i++) {		/* copy sector */
 	    pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
 	    *(((int16 *) uptr->filebuf) + da + i) = M[pa];  }
-	if (((t_addr) (da + i)) >= uptr->hwmark)	/* past end? */
+	if (((uint32) (da + i)) >= uptr->hwmark)	/* past end? */
 	    uptr->hwmark = da + i + 1;			/* upd hwmark */
 	dsk_ma = (dsk_ma + DSK_NUMWD + 3) & AMASK;  }
 
@@ -271,15 +273,15 @@ return SCPE_OK;
 
 t_stat dsk_attach (UNIT *uptr, char *cptr)
 {
-t_addr sz, p;
-t_addr ds_bytes = DSK_DKSIZE * sizeof (int16);
+uint32 sz, p;
+uint32 ds_bytes = DSK_DKSIZE * sizeof (int16);
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
 	p = (sz + ds_bytes - 1) / ds_bytes;
-	if (p == 0) p = 1;
-	if (p > DSK_NUMDK) p = DSK_NUMDK;  }
-else p = UNIT_GETP (uptr->flags);			/* get # plat */
-uptr->capac = p * DSK_DKSIZE;				/* set capacity */
+	if (p >= DSK_NUMDK) p = DSK_NUMDK - 1;
+	uptr->flags = (uptr->flags & ~UNIT_PLAT) |
+	    (p << UNIT_V_PLAT);  }
+uptr->capac = UNIT_GETP (uptr->flags) * DSK_DKSIZE;	/* set capacity */
 return attach_unit (uptr, cptr);
 }
 

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Sample Software Packages
-Date:	15-Feb-2003
+Date:	15-Jun-2003
 
 This memorandum documents the sample software packages available to run
 with the SIMH simulators.  Many of these packages are available under
@@ -99,8 +99,8 @@ the disk image and the initialization tape source.
 Loading TSS/8
 -------------
 
-Note: your environment must have a functioning second Teletype; that is, you cannot
-at present run Foreground/Background if your host system does not support the SIMH
+Note: your environment must have a functioning second Teletype; that is, you
+cannot at present run TSS if your host system does not support the SIMH
 sockets library.
 
 - Load the paper-tape bootstrap:
@@ -427,7 +427,8 @@ does not support the SIMH sockets library.
 
 	sim> run
 
-- The DECtape will boot and print out
+- The DECtape will boot, and the Foreground/Background Monitor will print
+  on the second terminal
 
 	F9/15 V4A
 	$
@@ -449,11 +450,11 @@ does not support the SIMH sockets library.
 	B9/15 V4A
 	$
 
-   and is now ready for commands.
+  and is now ready for commands.
 
 6.4 DOS-15
 
-DOS-15 was a more polished version of ADSS-15 using the RF15 or RP15
+DOS-15 is a more polished version of ADSS-15 using the RF15 or RP15
 as its system device.  To load and run DOS-15:
 
 - Load the DOS-15 paper tape bootstrap into upper memory:
@@ -470,8 +471,8 @@ as its system device.  To load and run DOS-15:
 
 - The RF disk will boot and print out
 
-DOS-15 V2A
- ENTER DATE (MM/DD/YY) -
+	DOS-15 V2A
+ 	ENTER DATE (MM/DD/YY) -
 
   Enter the date (the year must be between 70 and 99).  DOS-15 will
   print its prompt and is now ready for commands.  Recognized commands

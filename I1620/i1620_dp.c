@@ -1,6 +1,6 @@
 /* i1620_dp.c: IBM 1311 disk simulator
 
-   Copyright (c) 2002, Robert M. Supnik
+   Copyright (c) 2002-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -83,7 +83,7 @@ extern uint8 ind[NUM_IND];
 extern UNIT cpu_unit;
 
 int32 dp_stop = 1;					/* disk err stop */
-t_addr dp_ba = 0;					/* buffer addr */
+uint32 dp_ba = 0;					/* buffer addr */
 
 t_stat dp_reset (DEVICE *dptr);
 t_stat dp_rdadr (UNIT *uptr, int32 sec, int32 qnr, int32 qwc);

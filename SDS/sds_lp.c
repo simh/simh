@@ -1,6 +1,6 @@
 /* sds_lp.c: SDS 940 line printer simulator
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-	lpt		line printer
+   lpt		line printer
+
+   25-Apr-03	RMS	Revised for extended file support
 */
 
 #include "sds_defs.h"
@@ -84,7 +86,7 @@ REG lpt_reg[] = {
 	{ DRDATA (CCTP, lpt_ccp, 8), PV_LEFT },
 	{ DRDATA (CCTL, lpt_ccl, 8), REG_RO + PV_LEFT },
 	{ ORDATA (SPCINST, lpt_spc, 24) },
-	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (CTIME, lpt_ctime, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (PTIME, lpt_ptime, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (STIME, lpt_stime, 24), REG_NZ + PV_LEFT },

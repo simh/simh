@@ -28,6 +28,7 @@
    tty		316/516-33 teleprinter
    clk/options	316/516-12 real time clocks/internal options
 
+   25-Apr-03	RMS	Revised for extended file support
    01-Mar-03	RMS	Added SET/SHOW CLK FREQ support
    22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7b/8b support to terminal
@@ -87,7 +88,7 @@ REG ptr_reg[] = {
 	{ ORDATA (BUF, ptr_unit.buf, 8) },
 	{ FLDATA (READY, dev_ready, INT_V_PTR) },
 	{ FLDATA (ENABLE, dev_enable, INT_V_PTR) },
-	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
 	{ NULL }  };
@@ -114,7 +115,7 @@ REG ptp_reg[] = {
 	{ FLDATA (READY, dev_ready, INT_V_PTP) },
 	{ FLDATA (ENABLE, dev_enable, INT_V_PTP) },
 	{ FLDATA (POWER, ptp_power, 0) },
-	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ DRDATA (PWRTIME, ptp_ptime, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
@@ -147,9 +148,9 @@ REG tty_reg[] = {
 	{ FLDATA (MODE, tty_mode, 0) },
 	{ FLDATA (READY, dev_ready, INT_V_TTY) },
 	{ FLDATA (ENABLE, dev_enable, INT_V_TTY) },
-	{ DRDATA (KPOS, tty_unit[TTI].pos, 32), PV_LEFT },
+	{ DRDATA (KPOS, tty_unit[TTI].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (KTIME, tty_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPOS, tty_unit[TTO].pos, 32), PV_LEFT },
+	{ DRDATA (TPOS, tty_unit[TTO].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
@@ -164,7 +165,7 @@ DEVICE tty_dev = {
 	2, 10, 31, 1, 8, 8,
 	NULL, NULL, &tty_reset,
 	NULL, NULL, NULL };
-
+
 /* CLK data structures
 
    clk_dev	CLK device descriptor

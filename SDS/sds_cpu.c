@@ -919,11 +919,10 @@ return SCPE_OK;
 
 /* Relocate addr for console access */
 
-t_addr RelocC (int32 va, int32 sw)
+uint32 RelocC (int32 va, int32 sw)
 {
 uint32 nml = nml_mode, usr = usr_mode;
-uint32 pgn, map;
-t_addr pa;
+uint32 pa, pgn, map;
 
 if (sw & SWMASK ('N')) nml = 1;				/* -n: normal */
 else if (sw & SWMASK ('X')) nml = usr = 0;		/* -x: mon */
@@ -1161,7 +1160,7 @@ return SCPE_OK;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
-t_addr pa;
+uint32 pa;
 
 pa = RelocC (addr, sw);
 if (pa > MAXMEMSIZE) return SCPE_REL;
@@ -1174,7 +1173,7 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-t_addr pa;
+uint32 pa;
 
 pa = RelocC (addr, sw);
 if (pa > MAXMEMSIZE) return SCPE_REL;
@@ -1188,7 +1187,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 037777) != 0))
 	return SCPE_ARG;
@@ -1209,7 +1208,7 @@ extern DEVICE drm_dev, mux_dev, muxl_dev;
 extern UNIT drm_unit, mux_unit;
 extern DIB mux_dib;
 
-if ((cpu_unit.flags & UNIT_GENIE) == val) return SCPE_OK;
+if ((cpu_unit.flags & UNIT_GENIE) == (uint32) val) return SCPE_OK;
 if ((drm_unit.flags & UNIT_ATT) ||			/* attached? */
     (mux_unit.flags & UNIT_ATT)) return SCPE_NOFNC;	/* can't do it */
 if (val) {						/* Genie? */

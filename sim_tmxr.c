@@ -1,6 +1,6 @@
 /* sim_tmxr.c: Telnet terminal multiplexor library
 
-   Copyright (c) 2001, Robert M Supnik
+   Copyright (c) 2001-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   09-Mar-03	RMS	Fixed bug in SHOW CONN
    22-Dec-02	RMS	Fixed bugs in IAC+IAC receive and transmit sequences
 			Added support for received break (all from by Mark Pizzolato)
 			Fixed bug in attach
@@ -40,6 +41,7 @@
 #include "sim_defs.h"
 #include "sim_sock.h"
 #include "sim_tmxr.h"
+#include <ctype.h>
 
 /* Telnet protocol constants - negatives are for init'ing signed char data */
 
@@ -446,7 +448,7 @@ if (lp->conn) {
 	ctime = (sim_os_msec () - lp->cnms) / 1000;
 	hr = ctime / 3600;
 	mn = (ctime / 60) % 60;
-	sc = ctime % 3600;
+	sc = ctime % 60;
 	fprintf (st, "IP address %d.%d.%d.%d", o1, o2, o3, o4);
 	if (ctime) fprintf (st, ", connected %02d:%02d:%02d\n", hr, mn, sc);  }
 else fprintf (st, "line disconnected\n");

@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Mar-03	RMS	Added missing timerclear definition for VMS (from
+			Robert Alan Byer)
    15-Feb-03	RMS	Added time.h for EMX (from Holger Veit)
    17-Dec-02	RMS	Added sim_connect_sock
    08-Oct-02	RMS	Revised for .NET compatibility
@@ -35,7 +37,7 @@
 #ifndef _SIM_SOCK_H_
 #define _SIM_SOCK_H_	0
 
-#if defined (WIN32)					/* Windows */
+#if defined (_WIN32)					/* Windows */
 #undef INT_PTR						/* hack, hack */
 #include <winsock.h>
 
@@ -56,6 +58,9 @@
 
 #if defined (VMS)					/* VMS unique */
 #include <ioctl.h>					/* for ioctl */
+#if !defined (timerclear)
+#define timerclear(tvp)         (tvp)->tv_sec = (tvp)->tv_usec = 0
+#endif
 #endif
 
 SOCKET sim_master_sock (int32 port);

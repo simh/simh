@@ -26,6 +26,7 @@
    tti,tto	DL11 terminal input/output
    clk		KW11L line frequency clock
 
+   25-Apr-03	RMS	Revised for extended file support
    01-Mar-03	RMS	Added SET/SHOW CLOCK FREQ, SET TTI CTRL-C
    22-Nov-02	RMS	Changed terminal default to 7B for UNIX
    01-Nov-02	RMS	Added 7B/8B support to terminal
@@ -106,7 +107,7 @@ REG tti_reg[] = {
 	{ FLDATA (ERR, tti_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, tti_csr, CSR_V_DONE) },
 	{ FLDATA (IE, tti_csr, CSR_V_IE) },
-	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
@@ -147,7 +148,7 @@ REG tto_reg[] = {
 	{ FLDATA (ERR, tto_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, tto_csr, CSR_V_DONE) },
 	{ FLDATA (IE, tto_csr, CSR_V_IE) },
-	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 

@@ -1,6 +1,6 @@
 /* nova_dkp.c: NOVA moving head disk simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dkp		moving head disk
 
+   25-Apr-03	RMS	Revised autosizing
    08-Oct-02	RMS	Added DIB
    06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
@@ -76,10 +77,10 @@
 #define USSC_M_UNIT	03
 #define USSC_UNIT	(USSC_M_UNIT << USSC_V_UNIT)
 #define GET_COUNT(x)	(((x) >> USSC_V_COUNT) & USSC_M_COUNT)
-#define GET_SECT(x,dt)	((drv_tab[dt].new)? \
+#define GET_SECT(x,dt)	((drv_tab[dt].newf)? \
 			(((x) >> USSC_V_NSECTOR) & USSC_M_NSECTOR): \
 			(((x) >> USSC_V_OSECTOR) & USSC_M_OSECTOR) )
-#define GET_SURF(x,dt)	((drv_tab[dt].new)? \
+#define GET_SURF(x,dt)	((drv_tab[dt].newf)? \
 			(((x) >> USSC_V_NSURFACE) & USSC_M_NSURFACE): \
 			(((x) >> USSC_V_OSURFACE) & USSC_M_OSURFACE) )
 #define GET_UNIT(x)	(((x) >> USSC_V_UNIT) & USSC_M_UNIT)
@@ -105,10 +106,10 @@
 #define  FCCY_SEEK	2
 #define  FCCY_RECAL	3
 #define FCCY_FLAGS	0174000				/* flags */
-#define GET_CMD(x,dt)	((drv_tab[dt].new)? \
+#define GET_CMD(x,dt)	((drv_tab[dt].newf)? \
 			(((x) >> FCCY_V_NCMD) & FCCY_M_NCMD): \
 			(((x) >> FCCY_V_OCMD) & FCCY_M_OCMD) )
-#define GET_CYL(x,dt)	((drv_tab[dt].new)? \
+#define GET_CYL(x,dt)	((drv_tab[dt].newf)? \
 			(((x) >> FCCY_V_NCYL) & FCCY_M_NCYL): \
 			((((x) >> FCCY_V_OCYL) & FCCY_M_OCYL) | \
 			((dt != TYPE_D44)? 0: \
@@ -254,7 +255,7 @@ struct drvtyp {
 	int32	surf;					/* surfaces */
 	int32	cyl;					/* cylinders */
 	int32	size;					/* #blocks */
-	int32 new;					/* new format flag */
+	int32	newf;					/* new format flag */
 };
 
 struct drvtyp drv_tab[] = {
@@ -323,7 +324,7 @@ REG dkp_reg[] = {
 	{ FLDATA (DISABLE, dev_disable, INT_V_DKP) },
 	{ DRDATA (STIME, dkp_swait, 24), PV_LEFT },
 	{ DRDATA (RTIME, dkp_rwait, 24), PV_LEFT },
-	{ URDATA (CAPAC, dkp_unit[0].capac, 10, 31, 0,
+	{ URDATA (CAPAC, dkp_unit[0].capac, 10, T_ADDR_W, 0,
 		  DKP_NUMDR, PV_LEFT | REG_HRO) },
 	{ NULL }  };
 
@@ -460,7 +461,7 @@ case ioDIB:						/* DIB */
 	break;
 case ioDOB:						/* DOB */
 	if ((dev_busy & INT_DKP) == 0) dkp_ma = 
-	    AC & (drv_tab[dtype].new? DMASK: AMASK);
+	    AC & (drv_tab[dtype].newf? DMASK: AMASK);
 	break;
 case ioDIC:						/* DIC */
 	rval = dkp_ussc;				/* return unit, sect */
@@ -576,7 +577,7 @@ else if ((uptr->CYL >= drv_tab[dtype].cyl) ||		/* bad cylinder */
          (GET_SECT (dkp_ussc, dtype) >= drv_tab[dtype].sect))	/* or bad sector? */
 	dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_UNS;
 
-else if (GET_CYL (dkp_fccy, dtype) != uptr->CYL)		/* address error? */
+else if (GET_CYL (dkp_fccy, dtype) != uptr->CYL)	/* address error? */
 	dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_UNS;
 
 else {	sc = 16 - GET_COUNT (dkp_ussc);			/* get sector count */
@@ -618,7 +619,7 @@ else {	sc = 16 - GET_COUNT (dkp_ussc);			/* get sector count */
 	newsect = sa % drv_tab[dtype].sect;
 	newsurf = (sa / drv_tab[dtype].sect) % drv_tab[dtype].surf;
 	dkp_ussc = (dkp_ussc & USSC_UNIT) | ((dkp_ussc + sc) & USSC_M_COUNT) |
-	    ((drv_tab[dtype].new)?
+	    ((drv_tab[dtype].newf)?
 	    ((newsurf << USSC_V_NSURFACE) | (newsect << USSC_V_NSECTOR)):
 	    ((newsurf << USSC_V_OSURFACE) | (newsect << USSC_V_OSECTOR)) );
 	dkp_sta = dkp_sta | STA_DONE;  }		/* set status */
@@ -716,7 +717,7 @@ for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 unitno = unitno & USSC_M_UNIT;
 dtype = GET_DTYPE (dkp_unit[unitno].flags);
 M[BOOT_UNIT] = M[BOOT_UNIT] | (unitno << USSC_V_UNIT);
-if (drv_tab[dtype].new) M[BOOT_SEEK] = 0176000;
+if (drv_tab[dtype].newf) M[BOOT_SEEK] = 0176000;
 saved_PC = BOOT_START;
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* hp2100_mux.c: HP 2100 12920A terminal multiplexor simulator
 
-   Copyright (c) 2002, Robert M Supnik
+   Copyright (c) 2002-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mux,muxl,muxc	12920A terminal multiplexor
 
+   09-May-03	RMS	Added network device flag
    01-Nov-02	RMS	Added 7B/8B support
    22-Aug-02	RMS	Updated for changes to sim_tmxr
 
@@ -231,7 +232,7 @@ DEVICE muxu_dev = {
 	1, 10, 31, 1, 8, 8,
 	&tmxr_ex, &tmxr_dep, &mux_reset,
 	NULL, &mux_attach, &mux_detach,
-	&muxu_dib, DEV_DISABLE };
+	&muxu_dib, DEV_NET | DEV_DISABLE };
 
 /* MUXL data structures
 

@@ -1,6 +1,6 @@
 /* pdp8_lp.c: PDP-8 line printer simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt		LP8E line printer
 
+   25-Apr-03	RMS	Revised for extended file support
    04-Oct-02	RMS	Added DIB, enable/disable, device number support
    30-May-02	RMS	Widened POS to 32b
 */
@@ -61,7 +62,7 @@ REG lpt_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_LPT) },
 	{ FLDATA (ENABLE, int_enable, INT_V_LPT) },
 	{ FLDATA (INT, int_req, INT_V_LPT) },
-	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
 	{ ORDATA (DEVNUM, lpt_dib.dev, 6), REG_HRO },
@@ -127,7 +128,7 @@ if (putc (lpt_unit.buf, lpt_unit.fileref) == EOF) {
 	perror ("LPT I/O error");
 	clearerr (lpt_unit.fileref);
 	return SCPE_IOERR;  }
-lpt_unit.pos = ftell (lpt_unit.fileref);
+lpt_unit.pos = lpt_unit.pos + 1;
 return SCPE_OK;
 }
 

@@ -25,6 +25,8 @@
 
    cpu		CVAX central processor
 
+   17-May-03	RMS	Fixed operand order in EMODx
+   23-Apr-03	RMS	Revised for 32b/64b t_addr
    05-Jan-02	RMS	Added memory size restore support
    25-Dec-02	RMS	Added instruction history (from Mark Pizzolato)
    29-Sep-02	RMS	Revised to build dib_tab dynamically
@@ -307,12 +309,12 @@ extern void op_polyd (int32 *opnd, int32 acc);
 extern void op_polyg (int32 *opnd, int32 acc);
 extern int32 op_emulate (int32 *opnd, int32 cc, int32 opc, int32 acc);
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
-extern int32 Read (t_addr va, int32 lnt, int32 acc);
-extern void Write (t_addr va, int32 val, int32 lnt, int32 acc);
-extern int32 ReadB (t_addr pa);
-extern int32 WriteB (t_addr pa, int32 val);
-extern int32 Test (t_addr va, int32 acc, int32 *status);
-extern int32 ReadLP (t_addr pa);
+extern int32 Read (uint32 va, int32 lnt, int32 acc);
+extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
+extern int32 ReadB (uint32 pa);
+extern int32 WriteB (uint32 pa, int32 val);
+extern int32 Test (uint32 va, int32 acc, int32 *status);
+extern int32 ReadLP (uint32 pa);
 extern int32 eval_int (void);
 extern int32 get_vector (int32 lvl);
 extern void set_map_reg (void);
@@ -322,8 +324,8 @@ extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
-t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
-t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
+t_stat cpu_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
+t_stat cpu_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_virt (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -512,7 +514,7 @@ for ( ;; ) {
 int32 spec, disp, rn, index, numspec;
 int32 vfldrp1, brdisp, flg, mstat;
 int32 i, j, r, rh, temp;
-t_addr va, iad;
+uint32 va, iad;
 int32 opnd[OPND_SIZE];					/* operand queue */
 
 if (cpu_astop) {
@@ -2120,8 +2122,8 @@ case ACBG:
 
 /* EMODF
 
-	op0	=	extension
-	op1	=	multiplier
+	op0	=	multiplier
+	op1	=	extension
 	op2	=	multiplicand
 	op3:op4 =	integer destination (int.wl)
 	op5:op6 =	floating destination (flt.wl)
@@ -2139,8 +2141,8 @@ case EMODF:
 
 /* EMODD, EMODG
 
-	op0	=	extension
-	op1:op2 =	multiplier
+	op0:op1 =	multiplier
+	op2	=	extension
 	op3:op4 =	multiplicand
 	op5:op6 =	integer destination (int.wl)
 	op7:op8 =	floating destination (flt.wq)
@@ -2315,7 +2317,7 @@ ASTLVL = 4;
 MSER = 0;
 CADR = 0;
 mapen = 0;
-if (M == NULL) M = calloc (MEMSIZE >> 2, sizeof (int32));
+if (M == NULL) M = calloc (((uint32) MEMSIZE) >> 2, sizeof (int32));
 if (M == NULL) return SCPE_MEM;
 pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r) pcq_r->qptr = 0;
@@ -2356,9 +2358,10 @@ return SCPE_OK;
 
 /* Memory examine */
 
-t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
+t_stat cpu_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw)
 {
 int32 st;
+uint32 addr = (uint32) exta;
 
 if (vptr == NULL) return SCPE_ARG;
 if (sw & SWMASK ('V')) addr = Test (addr, RD, &st);
@@ -2372,9 +2375,10 @@ return SCPE_NXM;
 
 /* Memory deposit */
 
-t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
+t_stat cpu_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw)
 {
 int32 st;
+uint32 addr = (uint32) exta;
 
 if (sw & SWMASK ('V')) addr = Test (addr, RD, &st);
 else addr = addr & PAMASK;
@@ -2393,7 +2397,7 @@ return SCPE_NXM;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i, clim;
+uint32 i, clim;
 uint32 *nM = NULL;
 
 if ((val <= 0) || (val > MAXMEMSIZE)) return SCPE_ARG;
@@ -2402,7 +2406,7 @@ if ((mc != 0) && !get_yn ("Really truncate memory [N]?", FALSE))
 	return SCPE_OK;
 nM = calloc (val >> 2, sizeof (uint32));
 if (nM == NULL) return SCPE_MEM;
-clim = (((t_addr) val) < MEMSIZE)? val: MEMSIZE;
+clim = (uint32) ((((uint32) val) < MEMSIZE)? val: MEMSIZE);
 for (i = 0; i < clim; i = i + 4) nM[i >> 2] = M[i >> 2];
 free (M);
 M = nM;
@@ -2414,7 +2418,7 @@ return SCPE_OK;  }
 t_stat cpu_show_virt (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 t_stat r;
-t_addr va, pa;
+uint32 va, pa;
 int32 st;
 static const char *mm_str[] = {
 	"Access control violation",
@@ -2426,7 +2430,7 @@ static const char *mm_str[] = {
 	"Process PTE translation not valid" };
 
 if (cptr == NULL) return SCPE_ARG;
-va = (t_addr) get_uint (cptr, 16, 0xFFFFFFFF, &r);
+va = (uint32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
 if (r != SCPE_OK) return SCPE_ARG;
 pa = Test (va, RD, &st);
 if (st == PR_OK) printf ("Virtual %-X = physical %-X\n", va, pa);

@@ -1,6 +1,6 @@
-/* ibms3_sys.c: IBM System/3 system interface
+/* s3_sys.c: IBM System/3 system interface
 
-   Copyright (c) 2001, Charles E. Owen
+   Copyright (c) 2001-2003, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

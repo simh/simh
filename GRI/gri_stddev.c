@@ -1,6 +1,6 @@
 /* gri_stddev.c: GRI-909 standard devices
 
-   Copyright (c) 2001-2002, Robert M Supnik
+   Copyright (c) 2001-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    hsp		S42-006 high speed punch
    rtc		real time clock
 
+   25-Apr-03	RMS	Revised for extended file support
    22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7b/8B support to terminal
 */
@@ -73,7 +74,7 @@ REG tti_reg[] = {
 	{ ORDATA (BUF, tti_unit.buf, 8) },
 	{ FLDATA (IRDY, dev_done, INT_V_TTI) },
 	{ FLDATA (IENB, ISR, INT_V_TTI) },
-	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (UC, tti_unit.flags, UNIT_V_KSR), REG_HRO },
 	{ NULL }  };
@@ -103,7 +104,7 @@ REG tto_reg[] = {
 	{ ORDATA (BUF, tto_unit.buf, 8) },
 	{ FLDATA (ORDY, dev_done, INT_V_TTO) },
 	{ FLDATA (IENB, ISR, INT_V_TTO) },
-	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 
@@ -134,7 +135,7 @@ REG hsr_reg[] = {
 	{ ORDATA (BUF, hsr_unit.buf, 8) },
 	{ FLDATA (IRDY, dev_done, INT_V_HSR) },
 	{ FLDATA (IENB, ISR, INT_V_HSR) },
-	{ DRDATA (POS, hsr_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, hsr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, hsr_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, hsr_stopioe, 0) },
 	{ NULL }  };
@@ -159,7 +160,7 @@ REG hsp_reg[] = {
 	{ ORDATA (BUF, hsp_unit.buf, 8) },
 	{ FLDATA (ORDY, dev_done, INT_V_HSP) },
 	{ FLDATA (IENB, ISR, INT_V_HSP) },
-	{ DRDATA (POS, hsp_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, hsp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, hsp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, hsp_stopioe, 0) },
 	{ NULL }  };
@@ -223,7 +224,7 @@ return 0;
 
 /* Service routines */
 
-t_stat tti_svc (UNIT *uhsr)
+t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
@@ -240,7 +241,7 @@ tti_unit.pos = tti_unit.pos + 1;
 return SCPE_OK;
 }
 
-t_stat tto_svc (UNIT *uhsr)
+t_stat tto_svc (UNIT *uptr)
 {
 int32 c;
 t_stat r;
@@ -257,7 +258,7 @@ return SCPE_OK;
 
 /* Reset routines */
 
-t_stat tti_reset (DEVICE *dhsr)
+t_stat tti_reset (DEVICE *dptr)
 {
 tti_unit.buf = 0;					/* clear buffer */
 dev_done = dev_done & ~INT_TTI;				/* clear ready */
@@ -265,7 +266,7 @@ sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
 return SCPE_OK;
 }
 
-t_stat tto_reset (DEVICE *dhsr)
+t_stat tto_reset (DEVICE *dptr)
 {
 tto_unit.buf = 0;					/* clear buffer */
 dev_done = dev_done | INT_TTO;				/* set ready */
@@ -310,7 +311,7 @@ if (((op & PT_IRDY) && (dev_done & INT_HSR)) ||
 return 0;
 }
 
-t_stat hsr_svc (UNIT *uhsr)
+t_stat hsr_svc (UNIT *uptr)
 {
 int32 temp;
 
@@ -329,7 +330,7 @@ hsr_unit.pos = hsr_unit.pos + 1;
 return SCPE_OK;
 }
 
-t_stat hsp_svc (UNIT *uhsr)
+t_stat hsp_svc (UNIT *uptr)
 {
 dev_done = dev_done | INT_HSP;				/* set ready */
 if ((hsp_unit.flags & UNIT_ATT) == 0)			/* attached? */
@@ -344,7 +345,7 @@ return SCPE_OK;
 
 /* Reset routines */
 
-t_stat hsr_reset (DEVICE *dhsr)
+t_stat hsr_reset (DEVICE *dptr)
 {
 hsr_unit.buf = 0;					/* clear buffer */
 dev_done = dev_done & ~INT_HSR;				/* clear ready */
@@ -352,7 +353,7 @@ sim_cancel (&hsr_unit);					/* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat hsp_reset (DEVICE *dhsr)
+t_stat hsp_reset (DEVICE *dptr)
 {
 hsp_unit.buf = 0;					/* clear buffer */
 dev_done = dev_done | INT_HSP;				/* set ready */
@@ -377,7 +378,7 @@ if ((op & RTC_OV) && (dev_done & INT_RTC)) return 1;
 return 0;
 }
 
-t_stat rtc_svc (UNIT *uhsr)
+t_stat rtc_svc (UNIT *uptr)
 {
 M[RTC_CTR] = (M[RTC_CTR] + 1) & DMASK;			/* incr counter */
 if (M[RTC_CTR] == 0) dev_done = dev_done | INT_RTC;	/* ovflo? set ready */
@@ -385,7 +386,7 @@ sim_activate (&rtc_unit, sim_rtc_calb (rtc_tps));	/* reactivate */
 return SCPE_OK;
 }
 
-t_stat rtc_reset (DEVICE *dhsr)
+t_stat rtc_reset (DEVICE *dptr)
 {
 dev_done = dev_done & ~INT_RTC;				/* clear ready */
 sim_cancel (&rtc_unit);					/* stop clock */

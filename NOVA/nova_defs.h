@@ -61,7 +61,7 @@
 #define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
 #define A_V_IND		15				/* ind: indirect */
 #define A_IND		(1 << A_V_IND)
-#define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
+#define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
 
 /* Architectural constants */
 

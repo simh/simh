@@ -25,6 +25,8 @@
 
    mt		12559A 3030 nine track magnetic tape
 
+   25-Apr-03	RMS	Revised for extended file support
+   28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised for magtape library
    30-Sep-02	RMS	Revamped error handling
    28-Aug-02	RMS	Added end of medium support
@@ -138,6 +140,8 @@ REG mtd_reg[] = {
 MTAB mtd_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
 		&hp_setdev, &hp_showdev, &mtd_dev },
 	{ 0 }  };
@@ -169,7 +173,7 @@ REG mtc_reg[] = {
 	{ FLDATA (FBF, mtc_dib.fbf, 0) },
 	{ FLDATA (DTF, mtc_dtf, 0) },
 	{ FLDATA (FSVC, mtc_1st, 0) },
-	{ DRDATA (POS, mtc_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, mtc_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (CTIME, mtc_ctime, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (GTIME, mtc_gtime, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (XTIME, mtc_xtime, 24), REG_NZ + PV_LEFT },

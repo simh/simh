@@ -1,6 +1,6 @@
 /* pdp8_ttx.c: PDP-8 additional terminals simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    ttix,ttox	PT08/KL8JA terminal input/output
 
+   09-May-03	RMS	Added network device flag
+   25-Apr-03	RMS	Revised for extended file support
    22-Dec-02	RMS	Added break support
    02-Nov-02	RMS	Added 7B/8B support
    04-Oct-02	RMS	Added DIB, device number support
@@ -116,7 +118,7 @@ DEVICE ttix_dev = {
 	1, 10, 31, 1, 8, 8,
 	&tmxr_ex, &tmxr_dep, &ttix_reset,
 	NULL, &ttx_attach, &ttx_detach,
-	&ttix_dib, DEV_DISABLE };
+	&ttix_dib, DEV_NET | DEV_DISABLE };
 
 /* TTOx data structures
 

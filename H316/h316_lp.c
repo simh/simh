@@ -1,6 +1,6 @@
 /* h316_lp.c: Honeywell 316/516 line printer
 
-   Copyright (c) 1999-2002, Robert M. Supnik
+   Copyright (c) 1999-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,34 +25,10 @@
 
    lpt		line printer
 
+   25-Apr-03	RMS	Revised for extended file support
    30-May-02	RMS	Widened POS to 32b
-*/
 
-#include "h316_defs.h"
-#define LPT_WIDTH	120				/* width */
-#define LPT_SCAN	(LPT_WIDTH / 2)			/* words/scan */
-#define LPT_DRUM	64				/* drum rows */
-#define LPT_SVCSH	01				/* shuttle */
-#define LPT_SVCPA	02				/* paper advance */
-
-extern int32 dev_ready, dev_enable;
-extern int32 stop_inst;
-int32 lpt_wdpos = 0;					/* word position */
-int32 lpt_drpos = 0;					/* drum position */
-int32 lpt_crpos = 0;					/* carriage position */
-int32 lpt_svcst = 0;					/* service state */
-int32 lpt_svcch = 0;					/* service channel */
-int32 lpt_xfer = 0;					/* transfer flag */
-int32 lpt_prdn = 1;					/* printing done */
-char lpt_buf[LPT_WIDTH + 1] = { 0 };			/* line buffer */
-int32 lpt_xtime = 5;					/* transfer time */
-int32 lpt_etime = 50;					/* end of scan time */
-int32 lpt_ptime = 5000;					/* paper adv time */
-int32 lpt_stopioe = 0;					/* stop on error */
-t_stat lpt_svc (UNIT *uptr);
-t_stat lpt_reset (DEVICE *dptr);
-
-/* The Series 16 line printer is an unbuffered Analex shuttle printer.
+   The Series 16 line printer is an unbuffered Analex shuttle printer.
    Because it was unbuffered, the CPU had to scan out an entire line's
    worth of characters (60 words) for every character on the print drum
    (64 characters).  Because it was a shuttle printer, the entire
@@ -81,8 +57,36 @@ t_stat lpt_reset (DEVICE *dptr);
 	lpt_svcch		channel for paper advance (0 = no adv)
 	lpt_xfer		transfer ready flag
 	lpt_prdn		printing done flag
+*/
 
-   LPT data structures
+#include "h316_defs.h"
+
+#define LPT_WIDTH	120				/* width */
+#define LPT_SCAN	(LPT_WIDTH / 2)			/* words/scan */
+#define LPT_DRUM	64				/* drum rows */
+#define LPT_SVCSH	01				/* shuttle */
+#define LPT_SVCPA	02				/* paper advance */
+
+extern int32 dev_ready, dev_enable;
+extern int32 stop_inst;
+
+int32 lpt_wdpos = 0;					/* word position */
+int32 lpt_drpos = 0;					/* drum position */
+int32 lpt_crpos = 0;					/* carriage position */
+int32 lpt_svcst = 0;					/* service state */
+int32 lpt_svcch = 0;					/* service channel */
+int32 lpt_xfer = 0;					/* transfer flag */
+int32 lpt_prdn = 1;					/* printing done */
+char lpt_buf[LPT_WIDTH + 1] = { 0 };			/* line buffer */
+int32 lpt_xtime = 5;					/* transfer time */
+int32 lpt_etime = 50;					/* end of scan time */
+int32 lpt_ptime = 5000;					/* paper adv time */
+int32 lpt_stopioe = 0;					/* stop on error */
+
+t_stat lpt_svc (UNIT *uptr);
+t_stat lpt_reset (DEVICE *dptr);
+
+/* LPT data structures
 
    lpt_dev	LPT device descriptor
    lpt_unit	LPT unit descriptor
@@ -103,7 +107,7 @@ REG lpt_reg[] = {
 	{ ORDATA (SVCST, lpt_svcst, 2) },
 	{ ORDATA (SVCCH, lpt_svcch, 2) },
 	{ BRDATA (BUF, lpt_buf, 8, 8, 120) },
-	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (XTIME, lpt_xtime, 24), PV_LEFT },
 	{ DRDATA (ETIME, lpt_etime, 24), PV_LEFT },
 	{ DRDATA (PTIME, lpt_ptime, 24), PV_LEFT },
@@ -115,7 +119,6 @@ DEVICE lpt_dev = {
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &lpt_reset,
 	NULL, NULL, NULL };
-
 
 /* IO routine */
 
@@ -127,7 +130,7 @@ switch (inst) {						/* case on opcode */
 case ioOCP:						/* OCP */
 	switch (fnc) {					/* case on fnc */
 	case 000: case 002: case 004:			/* paper adv */
-	    lpt_svcst = lpt_svcst | LPT_SVCPA;	/* set state */
+	    lpt_svcst = lpt_svcst | LPT_SVCPA;		/* set state */
 	    lpt_svcch = fnc >> 1;			/* save channel */
 	    sim_activate (&lpt_unit, lpt_ptime);
 	    CLR_READY (INT_LPT);			/* clear int */
@@ -141,6 +144,7 @@ case ioOCP:						/* OCP */
 	default:
 	    return IOBADFNC (dat);  }
 	break;
+
 case ioSKS:						/* SKS */
 	switch (fnc) {					/* case on fnc */
 	case 000:					/* if xfer rdy */
@@ -180,6 +184,7 @@ case ioSKS:						/* SKS */
 	default:
 	    return IOBADFNC (dat);  }
 	break;
+
 case ioOTA:						/* OTA */
 	if (fnc) return IOBADFNC (dat);			/* only fnc 0 */
 	if (lpt_xfer) {					/* xfer ready? */

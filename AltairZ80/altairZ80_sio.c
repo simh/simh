@@ -1,29 +1,29 @@
-/*	altairZ80_sio: MITS Altair serial I/O card
+/*	altairz80_sio: MITS Altair serial I/O card
 
-   Copyright (c) 2002, Peter Schorn
+		Copyright (c) 2002-2003, Peter Schorn
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+		Permission is hereby granted, free of charge, to any person obtaining a
+		copy of this software and associated documentation files (the "Software"),
+		to deal in the Software without restriction, including without limitation
+		the rights to use, copy, modify, merge, publish, distribute, sublicense,
+		and/or sell copies of the Software, and to permit persons to whom the
+		Software is furnished to do so, subject to the following conditions:
 
-   The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
+		The above copyright notice and this permission notice shall be included in
+		all copies or substantial portions of the Software.
 
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+		THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+		IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+		FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+		PETER SCHORN BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+		IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+		CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Peter Schorn shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Peter Schorn.
+		Except as contained in this notice, the name of Peter Schorn shall not
+		be used in advertising or otherwise to promote the sale, use or other dealings
+		in this Software without prior written authorization from Peter Schorn.
 
-   Based on work by Charles E Owen (c) 1997
+		Based on work by Charles E Owen (c) 1997
 
 		These functions support a simulated MITS 2SIO interface card.
 		The card had two physical I/O ports which could be connected
@@ -49,7 +49,6 @@
 		to the data port writes the character to the device.
 */
 
-#include <stdio.h>
 #include <ctype.h>
 
 #include "altairz80_defs.h"
@@ -77,35 +76,36 @@
 #define DELETE_CHAR			0x7f											/* delete character															*/
 #define CONTROLZ_CHAR		0x1a											/* control Z character													*/
 
-void resetSIOWarningFlags(void);
-t_stat sio_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc);
-t_stat sio_svc(UNIT *uptr);
-t_stat sio_reset(DEVICE *dptr);
-t_stat sio_attach(UNIT *uptr, char *cptr);
-t_stat sio_detach(UNIT *uptr);
-t_stat ptr_reset(DEVICE *dptr);
-t_stat ptp_reset(DEVICE *dptr);
-int32 nulldev	(int32 port, int32 io, int32 data);
-int32 sr_dev	(int32 port, int32 io, int32 data);
-int32 simh_dev(int32 port, int32 io, int32 data);
-int32 sio0d		(int32 port, int32 io, int32 data);
-int32 sio0s		(int32 port, int32 io, int32 data);
-int32 sio1d		(int32 port, int32 io, int32 data);
-int32 sio1s		(int32 port, int32 io, int32 data);
-void reset_sio_terminals(int32 useDefault);
-t_stat simh_dev_reset(DEVICE *dptr);
-t_stat simh_svc(UNIT *uptr);
-t_stat simh_dev_set_timeron(UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat simh_dev_set_timeroff(UNIT *uptr, int32 val, char *cptr, void *desc);
-int32 simh_in(void);
-int32 simh_out(int32 data);
-void attachCPM(UNIT *uptr);
-void setClockZSDOS(void);
-void setClockCPM3(void);
-time_t mkCPM3Origin(void);
-int32 toBCD(int32 x);
-int32 fromBCD(int32 x);
+static void resetSIOWarningFlags(void);
+static t_stat sio_set_verbose				(UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat simh_dev_set_timeron	(UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat simh_dev_set_timeroff	(UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat sio_svc(UNIT *uptr);
+static t_stat sio_reset(DEVICE *dptr);
+static t_stat sio_attach(UNIT *uptr, char *cptr);
+static t_stat sio_detach(UNIT *uptr);
+static t_stat ptr_reset(DEVICE *dptr);
+static t_stat ptp_reset(DEVICE *dptr);
+int32 nulldev	(const int32 port, const int32 io, const int32 data);
+int32 sr_dev	(const int32 port, const int32 io, const int32 data);
+int32 simh_dev(const int32 port, const int32 io, const int32 data);
+int32 sio0d		(const int32 port, const int32 io, const int32 data);
+int32 sio0s		(const int32 port, const int32 io, const int32 data);
+int32 sio1d		(const int32 port, const int32 io, const int32 data);
+int32 sio1s		(const int32 port, const int32 io, const int32 data);
+static void reset_sio_terminals(const int32 useDefault);
+static t_stat simh_dev_reset(DEVICE *dptr);
+static t_stat simh_svc(UNIT *uptr);
+static int32 simh_in(const int32 port);
+static int32 simh_out(const int32 port, const int32 data);
+static void attachCPM(UNIT *uptr);
+static void setClockZSDOS(void);
+static void setClockCPM3(void);
+static time_t mkCPM3Origin(void);
+static int32 toBCD(const int32 x);
+static int32 fromBCD(const int32 x);
 void printMessage(void);
+static void warnNoRealTimeClock(void);
 
 extern t_stat sim_activate(UNIT *uptr, int32 interval);
 extern t_stat sim_cancel(UNIT *uptr);
@@ -124,54 +124,50 @@ extern int32 common;
 extern uint8 GetBYTEWrapper(register uint32 Addr);
 extern UNIT cpu_unit;
 
-/* the following variables define state for the SIMH pseudo device */
-/* ZSDOS clock definitions */
-int32 ClockZSDOSDelta					= 0;			/* delta between real clock and Altair clock											*/
-int32 setClockZSDOSPos				= 0;			/* determines state for receiving address of parameter block			*/
-int32 setClockZSDOSAdr				= 0;			/* address in M of 6 byte parameter block for setting time				*/
-int32 getClockZSDOSPos				= 0;			/* determines state for sending clock information									*/
+/* SIMH pseudo device status registers																																					*/
+/* ZSDOS clock definitions																																											*/
+static int32 ClockZSDOSDelta				= 0;			/* delta between real clock and Altair clock											*/
+static int32 setClockZSDOSPos				= 0;			/* determines state for receiving address of parameter block			*/
+static int32 setClockZSDOSAdr				= 0;			/* address in M of 6 byte parameter block for setting time				*/
+static int32 getClockZSDOSPos				= 0;			/* determines state for sending clock information									*/
 
-/* CPM3 clock definitions */
-int32 ClockCPM3Delta					= 0;			/* delta between real clock and Altair clock											*/
-int32 setClockCPM3Pos					= 0;			/* determines state for receiving address of parameter block			*/
-int32 setClockCPM3Adr					= 0;			/* address in M of 5 byte parameter block for setting time				*/
-int32 getClockCPM3Pos					= 0;			/* determines state for sending clock information									*/
-int32 daysCPM3SinceOrg				= 0;			/* days since 1 Jan 1978																					*/
+/* CPM3 clock definitions																																												*/
+static int32 ClockCPM3Delta					= 0;			/* delta between real clock and Altair clock											*/
+static int32 setClockCPM3Pos				= 0;			/* determines state for receiving address of parameter block			*/
+static int32 setClockCPM3Adr				= 0;			/* address in M of 5 byte parameter block for setting time				*/
+static int32 getClockCPM3Pos				= 0;			/* determines state for sending clock information									*/
+static int32 daysCPM3SinceOrg				= 0;			/* days since 1 Jan 1978																					*/
 
-int32 timerDelta							= 100;		/* interrupt every 100 ms																					*/
-int32 tmpTimerDelta;
-uint32 timeOfNextInterrupt;
-int32 timerInterrupt					= FALSE;	/* timer interrupt pending																				*/
-int32 timerInterruptHandler		= 0x0fc00;/* default address of interrupt handling routine									*/
-int32 tmpTimerInterruptHandler;
-int32 setTimerDeltaPos				= 0;			/* determines state for receiving timerDelta											*/
-int32 setTimerInterruptAdrPos	= 0;			/* determines state for receiving timerInterruptHandler						*/
-int32 markTimeSP							= 0;			/* stack pointer for timer stack																	*/
-int32 versionPos							= 0;			/* determines state for sending device identifier									*/
-int32 lastCPMStatus						= 0;			/* result of last attachCPM command																*/
-int32 lastCommand							= 0;			/* most recent command processed on port 0xfeh										*/
-int32 getCommonPos						= 0;			/* determines state for sending the 'common' register							*/
-int32 warnLevelSIO						= 3;			/* display at most 'warnLevelSIO' times the same warning					*/
-int32 warnUnattachedPTP				= 0;			/* display a warning message if < warnLevel and SIO set to
-																					VERBOSE and output to PTP without an attached file							*/
-int32 warnUnattachedPTR				= 0;			/* display a warning message if < warnLevel and SIO set to
-																					VERBOSE and attempt to read from PTR without an attached file		*/
-int32 warnPTREOF							= 0;			/* display a warning message if < warnLevel and SIO set to
-																					VERBOSE and attempt to read from PTR past EOF										*/
-int32 warnUnassignedPort			= 0;			/* display a warning message if < warnLevel and SIO set to
-																					VERBOSE andattempt to perform IN or OUT on an unassigned PORT		*/
-char messageBuffer[256];
+/* interrupt related																																														*/
+static uint32 timeOfNextInterrupt;						/* time when next interrupt is scheduled													*/
+       int32 timerInterrupt					= FALSE;	/* timer interrupt pending																				*/
+       int32 timerInterruptHandler	= 0x0fc00;/* default address of interrupt handling routine									*/
+static int32 setTimerInterruptAdrPos= 0;			/* determines state for receiving timerInterruptHandler						*/
+static int32 timerDelta							= 100;		/* interrupt every 100 ms																					*/
+static int32 setTimerDeltaPos				= 0;			/* determines state for receiving timerDelta											*/
 
-void printMessage(void) {
-	printf(messageBuffer);
-	if (sim_log) {
-		fprintf(sim_log, messageBuffer);
-	}
-}
+/* stop watch and timer related																																									*/
+static uint32 stopWatchDelta				= 0;			/* stores elapsed time of stop watch															*/
+static int32 getStopWatchDeltaPos		= 0;			/* determines the state for receiving stopWatchDelta							*/
+static uint32 stopWatchNow					= 0;			/* stores starting time of stop watch															*/
+static int32 markTimeSP							= 0;			/* stack pointer for timer stack																	*/
 
+/* miscellaneous																																																*/
+static int32 versionPos							= 0;			/* determines state for sending device identifier									*/
+static int32 lastCPMStatus					= 0;			/* result of last attachCPM command																*/
+static int32 lastCommand						= 0;			/* most recent command processed on port 0xfeh										*/
+static int32 getCommonPos						= 0;			/* determines state for sending the 'common' register							*/
 
-
-/* 2SIO Standard I/O Data Structures */
+/* SIO status registers																																													*/
+static int32 warnLevelSIO						= 3;			/* display at most 'warnLevelSIO' times the same warning					*/
+static int32 warnUnattachedPTP			= 0;			/* display a warning message if < warnLevel and SIO set to
+																								VERBOSE and output to PTP without an attached file							*/
+static int32 warnUnattachedPTR			= 0;			/* display a warning message if < warnLevel and SIO set to
+																								VERBOSE and attempt to read from PTR without an attached file		*/
+static int32 warnPTREOF							= 0;			/* display a warning message if < warnLevel and SIO set to
+																								VERBOSE and attempt to read from PTR past EOF										*/
+static int32 warnUnassignedPort			= 0;			/* display a warning message if < warnLevel and SIO set to
+																								VERBOSE andattempt to perform IN or OUT on an unassigned PORT		*/
 struct sio_terminal {
 	int32 data;						/* data for this terminal									*/
 	int32 status;					/* status information for this terminal		*/
@@ -182,16 +178,17 @@ struct sio_terminal {
 
 typedef struct sio_terminal SIO_TERMINAL;
 
-SIO_TERMINAL sio_terminals[Terminals] = {	{0, 0, 0x10, 0x11, 0x02},
-																					{0, 0, 0x14, 0x15, 0x00},
-																					{0, 0, 0x16, 0x17, 0x00},
-																					{0, 0, 0x18, 0x19, 0x00} };
-TMLN TerminalLines[Terminals] = { {0} };	/* four terminals				*/
-TMXR altairTMXR = {Terminals, 0, 0 };	/* mux descriptor				*/
+static SIO_TERMINAL sio_terminals[Terminals] =
+	{	{0, 0, 0x10, 0x11, 0x02},
+		{0, 0, 0x14, 0x15, 0x00},
+		{0, 0, 0x16, 0x17, 0x00},
+		{0, 0, 0x18, 0x19, 0x00} };
+static TMLN TerminalLines[Terminals] = { {0} };	/* four terminals				*/
+static TMXR altairTMXR = {Terminals, 0, 0 };		/* mux descriptor				*/
 
-UNIT sio_unit = { UDATA (&sio_svc, UNIT_ATTABLE, 0), KBD_POLL_WAIT };
+static UNIT sio_unit = { UDATA (&sio_svc, UNIT_ATTABLE, 0), KBD_POLL_WAIT };
 
-REG sio_reg[] = {
+static REG sio_reg[] = {
 	{ HRDATA (DATA0,		sio_terminals[0].data,		8)	},
 	{ HRDATA (STAT0,		sio_terminals[0].status,	8)	},
 	{ HRDATA (DATA1,		sio_terminals[1].data,		8)	},
@@ -207,7 +204,7 @@ REG sio_reg[] = {
 	{ DRDATA (WUPORT,		warnUnassignedPort,				32)	},
 	{ NULL } };
 
-MTAB sio_mod[] = {
+static MTAB sio_mod[] = {
 	{ UNIT_ANSI,	0,					"TTY",			"TTY",			NULL },	/* keep bit 8 as is for output						*/
 	{ UNIT_ANSI,	UNIT_ANSI,	"ANSI",			"ANSI",			NULL },	/* set bit 8 to 0 before output						*/
 	{ UNIT_UPPER,	0,					"ALL",			"ALL",			NULL },	/* do not change case of input characters	*/
@@ -223,68 +220,80 @@ DEVICE sio_dev = {
 	"SIO", &sio_unit, sio_reg, sio_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &sio_reset,
-	NULL, &sio_attach, &sio_detach, NULL, 0 };
+	NULL, &sio_attach, &sio_detach, NULL, 0, NULL, NULL };
 
-UNIT ptr_unit = { UDATA (NULL, UNIT_SEQ + UNIT_ATTABLE + UNIT_ROABLE, 0),
+static UNIT ptr_unit = { UDATA (NULL, UNIT_SEQ + UNIT_ATTABLE + UNIT_ROABLE, 0),
 	KBD_POLL_WAIT };
 
-REG ptr_reg[] = {
+static REG ptr_reg[] = {
 	{ HRDATA (DATA,	ptr_unit.buf,	8)	},
 	{ HRDATA (STAT,	ptr_unit.u3,	8)	},
-	{ DRDATA (POS,	ptr_unit.pos,	31)	},
+	{ DRDATA (POS,	ptr_unit.pos,	32)	},
 	{ NULL } };
 
 DEVICE ptr_dev = {
 	"PTR", &ptr_unit, ptr_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptr_reset,
-	NULL, NULL, NULL, NULL, 0 };
+	NULL, NULL, NULL, NULL, 0, NULL, NULL };
 
-UNIT ptp_unit = { UDATA (NULL, UNIT_SEQ + UNIT_ATTABLE, 0),
+static UNIT ptp_unit = { UDATA (NULL, UNIT_SEQ + UNIT_ATTABLE, 0),
 	KBD_POLL_WAIT };
 
-REG ptp_reg[] = {
+static REG ptp_reg[] = {
 	{ HRDATA (DATA,	ptp_unit.buf,	8)	},
 	{ HRDATA (STAT,	ptp_unit.u3,	8)	},
-	{ DRDATA (POS,	ptp_unit.pos,	31)	},
+	{ DRDATA (POS,	ptp_unit.pos,	32)	},
 	{ NULL } };
 
 DEVICE ptp_dev = {
 	"PTP", &ptp_unit, ptp_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptp_reset,
-	NULL, NULL, NULL, NULL, 0 };
+	NULL, NULL, NULL, NULL, 0, NULL, NULL };
 
 /*	Synthetic device SIMH for communication
 		between Altair and SIMH environment using port 0xfe */
-UNIT simh_unit = { UDATA (&simh_svc, 0, 0), KBD_POLL_WAIT };
+static UNIT simh_unit = { UDATA (&simh_svc, 0, 0), KBD_POLL_WAIT };
 
-REG simh_reg[] = {
-	{ DRDATA (CZD,		ClockZSDOSDelta,				31)						},
+static REG simh_reg[] = {
+	{ DRDATA (CZD,		ClockZSDOSDelta,				32)						},
 	{ DRDATA (SCZP,		setClockZSDOSPos,				8),		REG_RO	},
+	{ HRDATA (SCZA,		setClockZSDOSAdr,				16),	REG_RO	},
 	{ DRDATA (GCZP,		getClockZSDOSPos,				8),		REG_RO	},
-	{ HRDATA (SCZA,		setClockZSDOSAdr,				17),	REG_RO	},
-	{ DRDATA (CC3D,		ClockCPM3Delta,					31)						},
-	{ DRDATA (TIMD,		timerDelta,							31)						},
+	
+	{ DRDATA (CC3D,		ClockCPM3Delta,					32)						},
+	{ DRDATA (SC3DP,	setClockCPM3Pos,				8),		REG_RO	},
+	{ HRDATA (SC3DA,	setClockCPM3Adr,				16),	REG_RO	},
+	{ DRDATA (GC3DP,	getClockCPM3Pos,				8),		REG_RO	},
+	{ DRDATA (D3DO,		daysCPM3SinceOrg,				32),	REG_RO	},
+	
+	{ DRDATA (TOFNI,	timeOfNextInterrupt,		32),	REG_RO	},
 	{ DRDATA (TIMI,		timerInterrupt,					3)						},
-	{ HRDATA (TIMH,		timerInterruptHandler,	17)						},
-	{ DRDATA (SCC3P,	setClockCPM3Pos,				8),		REG_RO	},
-	{ DRDATA (GCC3P,	getClockCPM3Pos,				8),		REG_RO	},
-	{ HRDATA (SCC3A,	setClockCPM3Adr,				17),	REG_RO	},
+	{ HRDATA (TIMH,		timerInterruptHandler,	16)						},
+	{ DRDATA (STIAP,	setTimerInterruptAdrPos,8),		REG_RO	},
+	{ DRDATA (TIMD,		timerDelta,							32)						},
+	{ DRDATA (STDP,		setTimerDeltaPos,				8),		REG_RO	},
+	
+	{ DRDATA (STPDT,	stopWatchDelta,					32),	REG_RO	},
+	{ DRDATA (STPOS,	getStopWatchDeltaPos,		8),		REG_RO	},
+	{ DRDATA (STPNW,	stopWatchNow,						32),	REG_RO	},
 	{ DRDATA (MTSP,		markTimeSP,							8),		REG_RO	},
-	{ DRDATA (VP,			versionPos,							8),		REG_RO	},
-	{ DRDATA (CP,			getCommonPos,						8),		REG_RO	},
-	{ DRDATA (LC,			lastCommand,						8),		REG_RO	},
+	
+	{ DRDATA (VPOS,		versionPos,							8),		REG_RO	},
+	{ DRDATA (LCPMS,	lastCPMStatus,					8),		REG_RO	},
+	{ DRDATA (LCMD,		lastCommand,						8),		REG_RO	},
+	{ DRDATA (CPOS,		getCommonPos,						8),		REG_RO	},
 	{ NULL } };
 
-MTAB simh_mod[] = {
+static MTAB simh_mod[] = {
 	/* quiet, no warning messages					*/
 	{ UNIT_SIMH_VERBOSE,	0,									"QUIET",		"QUIET",		NULL										},
 	/* verbose, display warning messages	*/
 	{ UNIT_SIMH_VERBOSE,	UNIT_SIMH_VERBOSE,	"VERBOSE",	"VERBOSE",	NULL										},
-	/* quiet, no warning messages					*/
+	/* timer generated interrupts are off	*/
 	{ UNIT_SIMH_TIMERON,	0,									"TIMEROFF",	"TIMEROFF",	&simh_dev_set_timeroff	},
-	/* verbose, display warning messages	*/
+	/* timer generated interrupts are on	*/
 	{ UNIT_SIMH_TIMERON,	UNIT_SIMH_TIMERON,	"TIMERON",	"TIMERON",	&simh_dev_set_timeron		},
 	{ 0 } };
 
@@ -292,22 +301,30 @@ DEVICE simh_device = {
 	"SIMH", &simh_unit, simh_reg, simh_mod,
 	1, 10, 31, 1, 16, 4,
 	NULL, NULL, &simh_dev_reset,
-	NULL, NULL, NULL, NULL, 0 };
+	NULL, NULL, NULL, NULL, 0, NULL, NULL };
 
+char messageBuffer[256];
 
-void resetSIOWarningFlags(void) {
+void printMessage(void) {
+	printf(messageBuffer);
+	if (sim_log) {
+		fprintf(sim_log, messageBuffer);
+	}
+}
+
+static void resetSIOWarningFlags(void) {
 	warnUnattachedPTP		= 0;
 	warnUnattachedPTR		= 0;
 	warnPTREOF					= 0;
 	warnUnassignedPort	= 0;
 }
 
-t_stat sio_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc) {
+static t_stat sio_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc) {
 	resetSIOWarningFlags();
 	return SCPE_OK;
 }
 
-t_stat sio_attach(UNIT *uptr, char *cptr) {
+static t_stat sio_attach(UNIT *uptr, char *cptr) {
 	int32 i;
 	for (i = 0; i < Terminals; i++) {
 		altairTMXR.ldsc[i] = &TerminalLines[i];
@@ -316,31 +333,31 @@ t_stat sio_attach(UNIT *uptr, char *cptr) {
 	return tmxr_attach(&altairTMXR, uptr, cptr);	/* attach mux */
 }
 
-void reset_sio_terminals(int32 useDefault) {
+static void reset_sio_terminals(const int32 useDefault) {
 	int32 i;
 	for (i = 0; i < Terminals; i++) {
-		sio_terminals[i].status = useDefault ? sio_terminals[i].defaultStatus : 0;	/* Status	*/
-		sio_terminals[i].data		= 0x00;																							/* Data		*/
+		sio_terminals[i].status = useDefault ? sio_terminals[i].defaultStatus : 0;	/* status	*/
+		sio_terminals[i].data		= 0x00;																							/* data		*/
 	}
 }
 
-/* Detach */
-t_stat sio_detach(UNIT *uptr) {
+/* detach */
+static t_stat sio_detach(UNIT *uptr) {
 	reset_sio_terminals(TRUE);
 	return tmxr_detach(&altairTMXR, uptr);
 }
 
-/* Service routines to handle simulator functions */
+/* service routines to handle simulator functions */
 
 /* service routine - actually gets char & places in buffer */
 
-t_stat sio_svc(UNIT *uptr) {
+static t_stat sio_svc(UNIT *uptr) {
 	int32 temp;
 
 	sim_activate(&sio_unit, sio_unit.wait);						/* continue poll			*/
 
 	if (sio_unit.flags & UNIT_ATT) {
-		if (sim_poll_kbd() == SCPE_STOP) {						/* listen for ^E			*/
+		if (sim_poll_kbd() == SCPE_STOP) {							/* listen for ^E			*/
 			return SCPE_STOP;
 		}
 		temp = tmxr_poll_conn(&altairTMXR);							/* poll connection		*/
@@ -354,16 +371,16 @@ t_stat sio_svc(UNIT *uptr) {
 		if ((temp = sim_poll_kbd()) < SCPE_KFLAG) {
 			return temp;																	/* no char or error?	*/
 		}
-		sio_terminals[0].data = temp & 0xff;						/* Save char					*/
-		sio_terminals[0].status |= 0x01;								/* Set status					*/
+		sio_terminals[0].data = temp & 0xff;						/* save character			*/
+		sio_terminals[0].status |= 0x01;								/* set status					*/
 	}
 	return SCPE_OK;
 }
 
 
-/* Reset routines */
+/* reset routines */
 
-t_stat sio_reset(DEVICE *dptr) {
+static t_stat sio_reset(DEVICE *dptr) {
 	int32 i;
 	resetSIOWarningFlags();
 	if (sio_unit.flags & UNIT_ATT) {
@@ -381,7 +398,7 @@ t_stat sio_reset(DEVICE *dptr) {
 	return SCPE_OK;
 }
 
-t_stat ptr_reset(DEVICE *dptr) {
+static t_stat ptr_reset(DEVICE *dptr) {
 	resetSIOWarningFlags();
 	ptr_unit.buf	= 0;
 	ptr_unit.u3		= 0;
@@ -393,10 +410,10 @@ t_stat ptr_reset(DEVICE *dptr) {
 	return SCPE_OK;
 }
 
-t_stat ptp_reset(DEVICE *dptr) {
+static t_stat ptp_reset(DEVICE *dptr) {
 	resetSIOWarningFlags();
-	ptp_unit.buf = 0;
-	ptp_unit.u3 = 0x02;
+	ptp_unit.buf	= 0;
+	ptp_unit.u3		= 0x02;
 	sim_cancel(&ptp_unit);	/* deactivate unit */
 	return SCPE_OK;
 }
@@ -415,7 +432,7 @@ t_stat ptp_reset(DEVICE *dptr) {
 		2) SIO not attached to a port (i.e. "regular" console I/O)
 */
 
-int32 sio0s(int32 port, int32 io, int32 data) {
+int32 sio0s(const int32 port, const int32 io, const int32 data) {
 	int32 ti;
 	for (ti = 0; ti < Terminals; ti++) {
 		if (sio_terminals[ti].statusPort == port) {
@@ -449,7 +466,7 @@ int32 sio0s(int32 port, int32 io, int32 data) {
 	}
 }
 
-int32 sio0d(int32 port, int32 io, int32 data) {
+int32 sio0d(const int32 port, const int32 io, const int32 data) {
 	int32 ti;
 	for (ti = 0; ti < Terminals; ti++) {
 		if (sio_terminals[ti].dataPort == port) {
@@ -474,22 +491,20 @@ int32 sio0d(int32 port, int32 io, int32 data) {
 		return (sio_unit.flags & UNIT_UPPER) ? toupper(sio_terminals[ti].data) : sio_terminals[ti].data;
 	}
 	else { /* OUT */
-		if (sio_unit.flags & UNIT_ANSI) {
-			data &= 0x7f;
-		}
+		int32 d = sio_unit.flags & UNIT_ANSI ? data & 0x7f : data;
 		if (sio_unit.flags & UNIT_ATT) {
-			tmxr_putc_ln(altairTMXR.ldsc[ti], data);
+			tmxr_putc_ln(altairTMXR.ldsc[ti], d);
 		}
 		else {
-			sim_putchar(data);
+			sim_putchar(d);
 		}
 		return 0;	/* ignored since OUT */
 	}
 }
 
-/* Port 2 controls the PTR/PTP devices */
+/* port 2 controls the PTR/PTP devices */
 
-int32 sio1s(int32 port, int32 io, int32 data) {
+int32 sio1s(const int32 port, const int32 io, const int32 data) {
 	if (io == 0) {
 		/* reset I bit iff PTR unit not attached or no more data available.	*/
 		/* O bit is always set since write always possible.									*/
@@ -500,7 +515,7 @@ int32 sio1s(int32 port, int32 io, int32 data) {
 			}
 			return 0x02;
 		}
-		return (ptr_unit.u3 != 0) ? 0x02 : 0x03;
+		return ptr_unit.u3 ? 0x02 : 0x03;
 	}
 	else { /* OUT */
 		if (data == 0x03) {
@@ -515,7 +530,7 @@ int32 sio1s(int32 port, int32 io, int32 data) {
 	}
 }
 
-int32 sio1d(int32 port, int32 io, int32 data) {
+int32 sio1d(const int32 port, const int32 io, const int32 data) {
 	int32 temp;
 	if (io == 0) {	/* IN */
 		if (ptr_unit.u3) { /* no more data available */
@@ -552,7 +567,7 @@ int32 sio1d(int32 port, int32 io, int32 data) {
 	}
 }
 
-int32 nulldev(int32 port, int32 io, int32 data) {
+int32 nulldev(const int32 port, const int32 io, const int32 data) {
 	if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnassignedPort < warnLevelSIO)) {
 		warnUnassignedPort++;
 		if (io == 0) {
@@ -565,83 +580,88 @@ int32 nulldev(int32 port, int32 io, int32 data) {
 	return io == 0 ? 0xff : 0;
 }
 
-int32 sr_dev(int32 port, int32 io, int32 data) {
+int32 sr_dev(const int32 port, const int32 io, const int32 data) {
 	return io == 0 ? SR : 0;
 }
 
-int32 toBCD(int32 x) {
+static int32 toBCD(const int32 x) {
 	return (x / 10) * 16 + (x % 10);
 }
 
-int32 fromBCD(int32 x) {
+static int32 fromBCD(const int32 x) {
 	return 10 * ((0xf0 & x) >> 4) + (0x0f & x);
 }
 
-/*	Z80 or 8080 programs communicate with the SIMH pseudo device via port 0xfe.
-		The principles are as follows:
+/*		Z80 or 8080 programs communicate with the SIMH pseudo device via port 0xfe.
+			The following principles apply:
 
-	1) For commands that do not require parameters and do not return results
-		ld	a,<cmd>
-		out	(0feh),a
-		Special case is the reset command which needs to be send 128 times to make
-		sure that the internal state is properly reset.
+	1)	For commands that do not require parameters and do not return results
+			ld	a,<cmd>
+			out	(0feh),a
+			Special case is the reset command which needs to be send 128 times to make
+			sure that the internal state is properly reset.
 
-	2) For commands that require parameters and do not return results
-		ld	a,<cmd>
-		out	(0feh),a
-		ld	a,<p1>
-		out	(0feh),a
-		ld	a,<p2>
-		out	(0feh),a
-		...
-		Note: The calling program must send all parameter bytes. Otherwise
-		the pseudo device is left in an unexpected state.
+	2)	For commands that require parameters and do not return results
+			ld	a,<cmd>
+			out	(0feh),a
+			ld	a,<p1>
+			out	(0feh),a
+			ld	a,<p2>
+			out	(0feh),a
+			...
+			Note: The calling program must send all parameter bytes. Otherwise
+			the pseudo device is left in an unexpected state.
 
-	3) For commands that do not require parameters and return results
-		ld	a,<cmd>
-		out	(0feh),a
-		in	a,(0feh)	; <A> contains first byte of result
-		in	a,(0feh)	; <A> contains second byte of result
-		...
-		Note: The calling program must request all bytes of the result. Otherwise
-		the pseudo device is left in an unexpected state.
+	3)	For commands that do not require parameters and return results
+			ld	a,<cmd>
+			out	(0feh),a
+			in	a,(0feh)	; <A> contains first byte of result
+			in	a,(0feh)	; <A> contains second byte of result
+			...
+			Note: The calling program must request all bytes of the result. Otherwise
+			the pseudo device is left in an unexpected state.
 
-	4) Commands requiring parameters and returning results do not exist currently.
+	4)	Commands requiring parameters and returning results do not exist currently.
 
 */
 
-#define splimit									10
-#define printTimeCmd						0		/* print the current time in milliseconds															*/
-#define startTimerCmd						1		/* start a new timer on the top of the timer stack										*/
-#define stopTimerCmd						2		/* stop timer on top of timer stack and show time difference					*/
-#define resetPTRCmd							3		/* reset the PTR device																								*/
-#define attachPTRCmd						4		/* attach the PTR device																							*/
-#define detachPTRCmd						5		/* detach the PTR device																							*/
-#define getSIMHVersionCMD				6		/* get the current version of the SIMH pseudo device									*/
-#define getClockZSDOSCmd				7		/* get the current time in ZSDOS format																*/
-#define setClockZSDOSCmd				8		/* set the current time in ZSDOS format																*/
-#define getClockCPM3Cmd					9		/* get the current time in CP/M 3 format															*/
-#define setClockCPM3Cmd					10	/* set the current time in CP/M 3 format															*/
-#define	getBankSelectCmd				11	/* get the selected bank																							*/
-#define	setBankSelectCmd				12	/* set the selected bank																							*/
-#define getCommonCmd						13	/* get the base address of the common memory segment									*/
-#define resetSIMHInterfaceCmd		14	/* reset the SIMH pseudo device																				*/
-#define showTimerCmd						15	/* show time difference to timer on top of stack											*/
-#define attachPTPCmd						16	/* attach PTP to the file with name at beginning of CP/M command line	*/
-#define detachPTPCmd						17	/* detach PTP																													*/
-#define hasBankedMemoryCmd			18	/* determines whether machine has banked memory												*/
-#define setZ80CPUCmd						19	/* set the CPU to a Z80																								*/
-#define set8080CPUCmd						20	/* set the CPU to an 8080																							*/
-#define startTimerInterruptsCmd	21	/* statr timer interrupts																							*/
-#define stopTimerInterruptsCmd	22	/* stop timer interrupts																							*/
-#define setTimerDeltaCmd				23	/* set the timer interval	in which interrupts occur										*/
-#define setTimerInterruptAdrCmd	24	/* set the address to call by timer interrupts												*/
-#define cpmCommandLineLength		128
-struct tm *currentTime = NULL;
-uint32 markTime[splimit];
-char version[] = "SIMH002";
+enum simhPseudoDeviceCommands { /* do not change order or remove commands, add only at the end		*/
+	printTimeCmd,						/*  0 print the current time in milliseconds														*/
+	startTimerCmd,					/*  1 start a new timer on the top of the timer stack										*/
+	stopTimerCmd,						/*  2 stop timer on top of timer stack and show time difference					*/
+	resetPTRCmd,						/*  3 reset the PTR device																							*/
+	attachPTRCmd,						/*  4 attach the PTR device																							*/
+	detachPTRCmd,						/*  5 detach the PTR device																							*/
+	getSIMHVersionCmd,			/*  6 get the current version of the SIMH pseudo device									*/
+	getClockZSDOSCmd,				/*  7 get the current time in ZSDOS format															*/
+	setClockZSDOSCmd,				/*  8 set the current time in ZSDOS format															*/
+	getClockCPM3Cmd,				/*  9 get the current time in CP/M 3 format															*/
+	setClockCPM3Cmd,				/* 10 set the current time in CP/M 3 format															*/
+	getBankSelectCmd,				/* 11 get the selected bank																							*/
+	setBankSelectCmd,				/* 12 set the selected bank																							*/
+	getCommonCmd,						/* 13 get the base address of the common memory segment									*/
+	resetSIMHInterfaceCmd,	/* 14 reset the SIMH pseudo device																			*/
+	showTimerCmd,						/* 15 show time difference to timer on top of stack											*/
+	attachPTPCmd,						/* 16 attach PTP to the file with name at beginning of CP/M command line*/
+	detachPTPCmd,						/* 17 detach PTP																												*/
+	hasBankedMemoryCmd,			/* 18 determines whether machine has banked memory											*/
+	setZ80CPUCmd,						/* 19 set the CPU to a Z80																							*/
+	set8080CPUCmd,					/* 20 set the CPU to an 8080																						*/
+	startTimerInterruptsCmd,/* 21 start timer interrupts																						*/
+	stopTimerInterruptsCmd,	/* 22 stop timer interrupts																							*/
+	setTimerDeltaCmd,				/* 23 set the timer interval	in which interrupts occur									*/
+	setTimerInterruptAdrCmd,/* 24 set the address to call by timer interrupts												*/
+	resetStopWatchCmd,			/* 25 reset the millisecond stop watch																	*/
+	readStopWatchCmd				/* 26 read the millisecond stop watch																		*/
+};
 
-t_stat simh_dev_reset(DEVICE *dptr) {
+#define cpmCommandLineLength	128
+#define splimit								10	/* stack depth of timer stack	*/
+static uint32 markTime[splimit];	/* timer stack								*/
+static struct tm *currentTime = NULL;
+static char version[] = "SIMH002";
+
+static t_stat simh_dev_reset(DEVICE *dptr) {
 	currentTime							= NULL;
 	ClockZSDOSDelta					= 0;
 	setClockZSDOSPos				= 0;
@@ -649,6 +669,7 @@ t_stat simh_dev_reset(DEVICE *dptr) {
 	ClockCPM3Delta					= 0;
 	setClockCPM3Pos					= 0;
 	getClockCPM3Pos					= 0;
+	getStopWatchDeltaPos		= 0;
 	getCommonPos						= 0;
 	setTimerDeltaPos				= 0;
 	setTimerInterruptAdrPos = 0;
@@ -663,24 +684,30 @@ t_stat simh_dev_reset(DEVICE *dptr) {
 	return SCPE_OK;
 }
 
-t_stat simh_dev_set_timeron(UNIT *uptr, int32 val, char *cptr, void *desc) {
+static void warnNoRealTimeClock(void) {
+	if (simh_unit.flags & UNIT_SIMH_VERBOSE) {
+		printf("Sorry - no real time clock available.\n");
+	}
+}
+
+static t_stat simh_dev_set_timeron(UNIT *uptr, int32 value, char *cptr, void *desc) {
 	if (rtc_avail) {
 		timeOfNextInterrupt = sim_os_msec() + timerDelta;
 		return sim_activate(&simh_unit, simh_unit.wait);	/* activate unit */
 	}
 	else {
-		printf("Sorry - no real time clock available.\n");
+		warnNoRealTimeClock();
 		return SCPE_ARG;
 	}
 }
 
-t_stat simh_dev_set_timeroff(UNIT *uptr, int32 val, char *cptr, void *desc) {
+static t_stat simh_dev_set_timeroff(UNIT *uptr, int32 value, char *cptr, void *desc) {
 	timerInterrupt = FALSE;
 	sim_cancel(&simh_unit);
 	return SCPE_OK;
 }
 
-t_stat simh_svc(UNIT *uptr) {
+static t_stat simh_svc(UNIT *uptr) {
 	uint32 n = sim_os_msec();
 	if (n >= timeOfNextInterrupt) {
 		timerInterrupt = TRUE;
@@ -695,8 +722,8 @@ t_stat simh_svc(UNIT *uptr) {
 	return SCPE_OK;
 }
 
-/* The CP/M commandline is used as the name of a file and UNIT* uptr is attached to it */
-void attachCPM(UNIT *uptr) {
+/* The CP/M commandline is used as the name of a file and UNIT* uptr is attached to it. */
+static void attachCPM(UNIT *uptr) {
 	char cpmCommandLine[cpmCommandLineLength];
 	uint32 i, len = (GetBYTEWrapper(0x80) & 0x7f) - 1; /* 0x80 contains length of commandline, discard first char */
 	for (i = 0; i < len; i++) {
@@ -716,7 +743,7 @@ void attachCPM(UNIT *uptr) {
 }
 
 /* setClockZSDOSAdr points to 6 byte block in M: YY MM DD HH MM SS in BCD notation */
-void setClockZSDOS(void) {
+static void setClockZSDOS(void) {
 	struct tm newTime;
 	int32 year = fromBCD(GetBYTEWrapper(setClockZSDOSAdr));
 	newTime.tm_year	= year < 50 ? year + 100 : year;
@@ -731,7 +758,7 @@ void setClockZSDOS(void) {
 #define secondsPerMinute	60
 #define secondsPerHour		(60 * secondsPerMinute)
 #define	secondsPerDay			(24 * secondsPerHour)
-time_t mkCPM3Origin(void) {
+static time_t mkCPM3Origin(void) {
 	struct tm date;
 	date.tm_year	= 77;
 	date.tm_mon		= 11;
@@ -747,7 +774,7 @@ time_t mkCPM3Origin(void) {
 			2 BCD byte:	HH
 			3 BCD byte:	MM
 			4 BCD byte:	SS																*/
-void setClockCPM3(void) {
+static void setClockCPM3(void) {
 	ClockCPM3Delta = mkCPM3Origin()																																	+
 		(GetBYTEWrapper(setClockCPM3Adr) + GetBYTEWrapper(setClockCPM3Adr + 1) * 256) * secondsPerDay	+
 		fromBCD(GetBYTEWrapper(setClockCPM3Adr + 2)) * secondsPerHour																	+
@@ -755,12 +782,13 @@ void setClockCPM3(void) {
 		fromBCD(GetBYTEWrapper(setClockCPM3Adr + 4)) - time(NULL);
 }
 
-int32 simh_in(void) {
+static int32 simh_in(const int32 port) {
 	int32 result;
 	switch(lastCommand) {
 		case attachPTRCmd:
 		case attachPTPCmd:
 			result = lastCPMStatus;
+			lastCommand = 0;
 			break;
 		case getClockZSDOSCmd:
 			if (currentTime) {
@@ -768,40 +796,67 @@ int32 simh_in(void) {
 					case 0:
 						result = toBCD(currentTime -> tm_year > 99 ?
 							currentTime -> tm_year - 100 : currentTime -> tm_year);
+						getClockZSDOSPos = 1;
 						break;
-					case 1:		result = toBCD(currentTime -> tm_mon + 1);	break;
-					case 2:		result = toBCD(currentTime -> tm_mday);			break;
-					case 3:		result = toBCD(currentTime -> tm_hour);			break;
-					case 4:		result = toBCD(currentTime -> tm_min);			break;
-					case 5:		result = toBCD(currentTime -> tm_sec);			break;
-					default:	result = 0;
+					case 1:
+						result = toBCD(currentTime -> tm_mon + 1);
+						getClockZSDOSPos = 2;
+						break;
+					case 2:
+						result = toBCD(currentTime -> tm_mday);
+						getClockZSDOSPos = 3;
+						break;
+					case 3:
+						result = toBCD(currentTime -> tm_hour);
+						getClockZSDOSPos = 4;
+						break;
+					case 4:
+						result = toBCD(currentTime -> tm_min);
+						getClockZSDOSPos = 5;
+						break;
+					case 5:
+						result = toBCD(currentTime -> tm_sec);
+						getClockZSDOSPos = lastCommand = 0;
+						break;
 				}
-				getClockZSDOSPos++;
 			}
 			else {
-				result = 0;
+				result = getClockZSDOSPos = lastCommand = 0;
 			}
 			break;
 		case getClockCPM3Cmd:
 			if (currentTime) {
 				switch(getClockCPM3Pos) {
-					case 0:		result = daysCPM3SinceOrg & 0xff;					break;
-					case 1:		result = (daysCPM3SinceOrg >> 8) & 0xff;	break;
-					case 2:		result = toBCD(currentTime -> tm_hour);		break;
-					case 3:		result = toBCD(currentTime -> tm_min);		break;
-					case 4:		result = toBCD(currentTime -> tm_sec);		break;
-					default:	result = 0;
+					case 0:
+						result = daysCPM3SinceOrg & 0xff;
+						getClockCPM3Pos = 1;
+						break;
+					case 1:
+						result = (daysCPM3SinceOrg >> 8) & 0xff;
+						getClockCPM3Pos = 2;
+						break;
+					case 2:
+						result = toBCD(currentTime -> tm_hour);
+						getClockCPM3Pos = 3;
+						break;
+					case 3:
+						result = toBCD(currentTime -> tm_min);
+						getClockCPM3Pos = 4;
+						break;
+					case 4:
+						result = toBCD(currentTime -> tm_sec);
+						getClockCPM3Pos = lastCommand = 0;
+						break;
 				}
-				getClockCPM3Pos++;
 			}
 			else {
-				result = 0;
+				result = getClockCPM3Pos = lastCommand = 0;
 			}
 			break;
-		case getSIMHVersionCMD:
+		case getSIMHVersionCmd:
 			result = version[versionPos++];
 			if (result == 0) {
-				versionPos = 0;
+				versionPos = lastCommand = 0;
 			}
 			break;
 		case getBankSelectCmd:
@@ -814,6 +869,7 @@ int32 simh_in(void) {
 					message1("Get selected bank ignored for non-banked memory.");
 				}
 			}
+			lastCommand = 0;
 			break;
 		case getCommonCmd:
 			if (getCommonPos == 0) {
@@ -822,48 +878,56 @@ int32 simh_in(void) {
 			}
 			else {
 				result = (common >> 8) & 0xff;
-				getCommonPos = 0;
+				getCommonPos = lastCommand = 0;
 			}
 			break;
 		case hasBankedMemoryCmd:
 			result = cpu_unit.flags & UNIT_BANKED ? MAXBANKS : 0;
+			lastCommand = 0;
+			break;
+		case readStopWatchCmd:
+			if (getStopWatchDeltaPos == 0) {
+				result = stopWatchDelta & 0xff;
+				getStopWatchDeltaPos = 1;
+			}
+			else {
+				result = (stopWatchDelta >> 8) & 0xff;
+				getStopWatchDeltaPos = lastCommand = 0;
+			}
 			break;
 		default:
-			result = 0;
+			if (simh_unit.flags & UNIT_SIMH_VERBOSE) {
+				message2("Unnecessary IN from SIMH pseudo device on port %03xh ignored.\n",
+					port);
+			}
+			result = lastCommand = 0;
 	}
 	return result;
 }
 
-int32 simh_out(int32 data) {
-	uint32 delta;
+static int32 simh_out(const int32 port, const int32 data) {
 	time_t now;
 	switch(lastCommand) {
 		case setClockZSDOSCmd:
-			switch(setClockZSDOSPos) {
-				case 0:
-					setClockZSDOSAdr = data;
-					setClockZSDOSPos++;
-					break;
-				case 1:
-					setClockZSDOSAdr += (data << 8);
-					setClockZSDOS();
-					lastCommand = 0;
-					break;
-				default:;
+			if (setClockZSDOSPos == 0) {
+				setClockZSDOSAdr = data;
+				setClockZSDOSPos = 1;
+			}
+			else {
+				setClockZSDOSAdr |= (data << 8);
+				setClockZSDOS();
+				setClockZSDOSPos = lastCommand = 0;
 			}
 			break;
 		case setClockCPM3Cmd:
-			switch(setClockCPM3Pos) {
-				case 0:
-					setClockCPM3Adr = data;
-					setClockCPM3Pos++;
-					break;
-				case 1:
-					setClockCPM3Adr += (data << 8);
-					setClockCPM3();
-					lastCommand = 0;
-					break;
-				default:;
+			if (setClockCPM3Pos == 0) {
+				setClockCPM3Adr = data;
+				setClockCPM3Pos = 1;
+			}
+			else {
+				setClockCPM3Adr |= (data << 8);
+				setClockCPM3();
+				setClockCPM3Pos = lastCommand = 0;
 			}
 			break;
 		case setBankSelectCmd:
@@ -876,29 +940,23 @@ int32 simh_out(int32 data) {
 			lastCommand = 0;
 			break;
 		case setTimerDeltaCmd:
-			switch(setTimerDeltaPos) {
-				case 0:
-					tmpTimerDelta = data;
-					setTimerDeltaPos++;
-					break;
-				case 1:
-					timerDelta = tmpTimerDelta + (data << 8);
-					lastCommand = 0;
-					break;
-				default:;
+			if (setTimerDeltaPos == 0) {
+				timerDelta				= data;
+				setTimerDeltaPos	= 1;
+			}
+			else {
+				timerDelta |= (data << 8);
+				setTimerDeltaPos = lastCommand = 0;
 			}
 			break;
 		case setTimerInterruptAdrCmd:
-			switch(setTimerInterruptAdrPos) {
-				case 0:
-					tmpTimerInterruptHandler = data;
-					setTimerInterruptAdrPos++;
-					break;
-				case 1:
-					timerInterruptHandler = tmpTimerInterruptHandler + (data << 8);
-					lastCommand = 0;
-					break;
-				default:;
+			if (setTimerInterruptAdrPos == 0) {
+				timerInterruptHandler			= data;
+				setTimerInterruptAdrPos		= 1;
+			}
+			else {
+				timerInterruptHandler |= (data << 8);
+				setTimerInterruptAdrPos = lastCommand = 0;
 			}
 			break;
 		default:
@@ -908,8 +966,11 @@ int32 simh_out(int32 data) {
 					if (rtc_avail) {
 						message2("Current time in milliseconds = %d.\n", sim_os_msec());
 					}
+					else {
+						warnNoRealTimeClock();
+					}
 					break;
-				case startTimerCmd:		/* create a new timer on top of stack */
+				case startTimerCmd:	/* create a new timer on top of stack */
 					if (rtc_avail) {
 						if (markTimeSP < splimit) {
 							markTime[markTimeSP++] = sim_os_msec();
@@ -918,16 +979,22 @@ int32 simh_out(int32 data) {
 							message1("Timer stack overflow.\n");
 						}
 					}
+					else {
+						warnNoRealTimeClock();
+					}
 					break;
-				case stopTimerCmd:		/* stop timer on top of stack and show time difference */
+				case stopTimerCmd:	/* stop timer on top of stack and show time difference */
 					if (rtc_avail) {
 						if (markTimeSP > 0) {
-							delta = sim_os_msec() - markTime[--markTimeSP];
+							uint32 delta = sim_os_msec() - markTime[--markTimeSP];
 							message2("Timer stopped. Elapsed time in milliseconds = %d.\n", delta);
 						}
 						else {
 							message1("No timer active.\n");
 						}
+					}
+					else {
+						warnNoRealTimeClock();
 					}
 					break;
 				case resetPTRCmd:		/* reset ptr device */
@@ -939,7 +1006,7 @@ int32 simh_out(int32 data) {
 				case detachPTRCmd:	/* detach ptr */
 					detach_unit(&ptr_unit);
 					break;
-				case getSIMHVersionCMD:
+				case getSIMHVersionCmd:
 					versionPos = 0;
 					break;
 				case getClockZSDOSCmd:
@@ -962,24 +1029,26 @@ int32 simh_out(int32 data) {
 					setClockCPM3Pos = 0;
 					break;
 				case getBankSelectCmd:
-					break;
 				case setBankSelectCmd:
-					break;
 				case getCommonCmd:
+				case hasBankedMemoryCmd:
 					break;
 				case resetSIMHInterfaceCmd:
 					markTimeSP	= 0;
 					lastCommand	= 0;
 					break;
-				case showTimerCmd:		/* show time difference to timer on top of stack */
+				case showTimerCmd:	/* show time difference to timer on top of stack */
 					if (rtc_avail) {
 						if (markTimeSP > 0) {
-							delta = sim_os_msec() - markTime[markTimeSP - 1];
+							uint32 delta = sim_os_msec() - markTime[markTimeSP - 1];
 							message2("Timer running. Elapsed in milliseconds = %d.\n", delta);
 						}
 						else {
 							message1("No timer active.\n");
 						}
+					}
+					else {
+						warnNoRealTimeClock();
 					}
 					break;
 				case attachPTPCmd:	/* attach ptp to the file with name at beginning of CP/M command line */
@@ -987,8 +1056,6 @@ int32 simh_out(int32 data) {
 					break;
 				case detachPTPCmd:	/* detach ptp */
 					detach_unit(&ptp_unit);
-					break;
-				case hasBankedMemoryCmd:
 					break;
 				case setZ80CPUCmd:
 					cpu_unit.flags |= UNIT_CHIP;
@@ -1012,9 +1079,17 @@ int32 simh_out(int32 data) {
 				case setTimerInterruptAdrCmd:
 					setTimerInterruptAdrPos = 0;
 					break;
+				case resetStopWatchCmd:
+					stopWatchNow = rtc_avail ? sim_os_msec() : 0;
+					break;
+				case readStopWatchCmd:
+					getStopWatchDeltaPos = 0;
+					stopWatchDelta = rtc_avail ? sim_os_msec() - stopWatchNow : 0;
+					break;
 				default:
 					if (simh_unit.flags & UNIT_SIMH_VERBOSE) {
-						message2("Unknown command (%i) to SIMH pseudo device ignored.\n", data);
+						message3("Unknown command (%i) to SIMH pseudo device on port %03xh ignored.\n",
+							data, port);
 					}
 			}
 	}
@@ -1022,6 +1097,6 @@ int32 simh_out(int32 data) {
 }
 
 /* port 0xfe is a device for communication SIMH <--> Altair machine */
-int32 simh_dev(int32 port, int32 io, int32 data) {
-	return io == 0 ? simh_in() : simh_out(data);
+int32 simh_dev(const int32 port, const int32 io, const int32 data) {
+	return io == 0 ? simh_in(port) : simh_out(port, data);
 }

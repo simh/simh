@@ -1,6 +1,6 @@
 /* pdp11_rp.c - RP04/05/06/07 RM02/03/05/80 "Massbus style" disk controller
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    rp		RH/RP/RM moving head disks
 
+   19-May-03	RMS	Revised for new conditional compilation scheme
+   25-Apr-03	RMS	Revised for extended file support
    29-Sep-02	RMS	Added variable address support to bootstrap
 			Added vector change/display support
 			Revised mapping mnemonics
@@ -89,23 +91,27 @@
    provides an internal mode flag for RH11 vs RH70
 */
 
-#if defined (USE_INT64)					/* VAX version */
+#if defined (VM_PDP10)					/* PDP10 version */
+#error "PDP-10 uses pdp10_rp.c!"
+
+#elif defined (VM_VAX)					/* VAX version */
 #include "vax_defs.h"
-#define VM_VAX		1
-#define RP_RDX		16
 #define RP_WID		32
 #define DMASK		0xFFFF
 #define RH11		0				/* always 22b */
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 
-#else							/* PDP11 version */
+#else							/* PDP-11 version */
 #include "pdp11_defs.h"
-#define VM_PDP11	1
-#define RP_RDX		8
+#define PT_DIS		0
 #define RP_WID		16
 #define RH		(cpu_18b || (cpu_ubm && cpu_rh11))
 #define RH11		(RH)
 extern uint16 *M;
 extern int32 cpu_18b, cpu_ubm, cpu_rh11;
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 #endif
 
 #include <math.h>
@@ -350,11 +356,11 @@ extern int32 cpu_18b, cpu_ubm, cpu_rh11;
 #define RP07_SIZE	(RP07_SECT * RP07_SURF * RP07_CYL * RP_NUMWD)
 
 struct drvtyp {
-	int	sect;					/* sectors */
-	int	surf;					/* surfaces */
-	int	cyl;					/* cylinders */
-	int	size;					/* #blocks */
-	int	devtype;				/* device type */
+	int32	sect;					/* sectors */
+	int32	surf;					/* surfaces */
+	int32	cyl;					/* cylinders */
+	int32	size;					/* #blocks */
+	int32	devtype;				/* device type */
 };
 
 static struct drvtyp drv_tab[] = {
@@ -442,23 +448,23 @@ UNIT rp_unit[] = {
 		UNIT_ROABLE+(RM03_DTYPE << UNIT_V_DTYPE), RM03_SIZE) }  };
 
 REG rp_reg[] = {
-	{ GRDATA (RPCS1, rpcs1, RP_RDX, 16, 0) },
-	{ GRDATA (RPWC, rpwc, RP_RDX, 16, 0) },
-	{ GRDATA (RPBA, rpba, RP_RDX, 16, 0) },
-	{ GRDATA (RPDA, rpda, RP_RDX, 16, 0) },
-	{ GRDATA (RPCS2, rpcs2, RP_RDX, 16, 0) },
-	{ BRDATA (RPDS, rpds, RP_RDX, 16, RP_NUMDR) },
-	{ BRDATA (RPER1, rper1, RP_RDX, 16, RP_NUMDR) },
-	{ GRDATA (RPOF, rpof, RP_RDX, 16, 0) },
-	{ GRDATA (RPDC, rpdc, RP_RDX, 16, 0) },
-	{ GRDATA (RPER2, rper2, RP_RDX, 16, 0) },
-	{ GRDATA (RPER3, rper3, RP_RDX, 16, 0) },
-	{ GRDATA (RPEC1, rpec1, RP_RDX, 16, 0) },
-	{ GRDATA (RPEC2, rpec2, RP_RDX, 16, 0) },
-	{ GRDATA (RPMR, rpmr, RP_RDX, 16, 0) },
-	{ GRDATA (RPDB, rpdb, RP_RDX, 16, 0) },
-	{ GRDATA (RPBAE, rpbae, RP_RDX, 6, 0) },
-	{ GRDATA (RPCS3, rpcs3, RP_RDX, 16, 0) },
+	{ GRDATA (RPCS1, rpcs1, DEV_RDX, 16, 0) },
+	{ GRDATA (RPWC, rpwc, DEV_RDX, 16, 0) },
+	{ GRDATA (RPBA, rpba, DEV_RDX, 16, 0) },
+	{ GRDATA (RPDA, rpda, DEV_RDX, 16, 0) },
+	{ GRDATA (RPCS2, rpcs2, DEV_RDX, 16, 0) },
+	{ BRDATA (RPDS, rpds, DEV_RDX, 16, RP_NUMDR) },
+	{ BRDATA (RPER1, rper1, DEV_RDX, 16, RP_NUMDR) },
+	{ GRDATA (RPOF, rpof, DEV_RDX, 16, 0) },
+	{ GRDATA (RPDC, rpdc, DEV_RDX, 16, 0) },
+	{ GRDATA (RPER2, rper2, DEV_RDX, 16, 0) },
+	{ GRDATA (RPER3, rper3, DEV_RDX, 16, 0) },
+	{ GRDATA (RPEC1, rpec1, DEV_RDX, 16, 0) },
+	{ GRDATA (RPEC2, rpec2, DEV_RDX, 16, 0) },
+	{ GRDATA (RPMR, rpmr, DEV_RDX, 16, 0) },
+	{ GRDATA (RPDB, rpdb, DEV_RDX, 16, 0) },
+	{ GRDATA (RPBAE, rpbae, DEV_RDX, 6, 0) },
+	{ GRDATA (RPCS3, rpcs3, DEV_RDX, 16, 0) },
 	{ FLDATA (IFF, rpiff, 0) },
 	{ FLDATA (INT, IREQ (RP), INT_V_RP) },
 	{ FLDATA (SC, rpcs1, CSR_V_ERR) },
@@ -466,13 +472,13 @@ REG rp_reg[] = {
 	{ FLDATA (IE, rpcs1, CSR_V_IE) },
 	{ DRDATA (STIME, rp_swait, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (RTIME, rp_rwait, 24), REG_NZ + PV_LEFT },
-	{ URDATA (FNC, rp_unit[0].FUNC, RP_RDX, 5, 0,
+	{ URDATA (FNC, rp_unit[0].FUNC, DEV_RDX, 5, 0,
 		  RP_NUMDR, REG_HRO) },
-	{ URDATA (CAPAC, rp_unit[0].capac, 10, 31, 0,
+	{ URDATA (CAPAC, rp_unit[0].capac, 10, T_ADDR_W, 0,
 		  RP_NUMDR, PV_LEFT | REG_HRO) },
 	{ FLDATA (STOP_IOE, rp_stopioe, 0) },
-	{ GRDATA (DEVADDR, rp_dib.ba, RP_RDX, 32, 0), REG_HRO },
-	{ GRDATA (DEVVEC, rp_dib.vec, RP_RDX, 16, 0), REG_HRO },
+	{ GRDATA (DEVADDR, rp_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+	{ GRDATA (DEVVEC, rp_dib.vec, DEV_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB rp_mod[] = {
@@ -525,7 +531,7 @@ MTAB rp_mod[] = {
 
 DEVICE rp_dev = {
 	"RP", rp_unit, rp_reg, rp_mod,
-	RP_NUMDR, RP_RDX, 30, 1, RP_RDX, RP_WID,
+	RP_NUMDR, DEV_RDX, 30, 1, DEV_RDX, RP_WID,
 	NULL, NULL, &rp_reset,
 	&rp_boot, &rp_attach, &rp_detach,
 	&rp_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS };
@@ -863,7 +869,7 @@ t_stat rp_svc (UNIT *uptr)
 {
 int32 i, t, dtype, drv, err;
 int32 wc, awc, da;
-t_addr ba;
+uint32 ba;
 uint16 comp;
 
 dtype = GET_DTYPE (uptr->flags);			/* get drive type */
@@ -1064,20 +1070,20 @@ int32 drv, i, p;
 t_stat r;
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
-r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
+r = attach_unit (uptr, cptr);				/* attach unit */
+if (r != SCPE_OK) return r;				/* error? */
 drv = uptr - rp_dev.units;				/* get drv number */
-rpds[drv] = DS_ATA | DS_MOL | DS_RDY | DS_DPR |
+rpds[drv] = DS_ATA | DS_MOL | DS_RDY | DS_DPR |		/* upd drv status */
 	((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
 rper1[drv] = 0;
-update_rpcs (CS1_SC, drv);
+update_rpcs (CS1_SC, drv);				/* upd ctlr status */
 
-if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
-if ((p = ftell (uptr->fileref)) == 0) {
+if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;	/* seek to end */
+if ((p = ftell (uptr->fileref)) == 0) {			/* new disk image? */
 	if (uptr->flags & UNIT_RO) return SCPE_OK;
 	return pdp11_bad_block (uptr,
 	    drv_tab[GET_DTYPE (uptr->flags)].sect, RP_NUMWD);  }
+if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */
 for (i = 0; drv_tab[i].sect != 0; i++) {
     if (p <= (drv_tab[i].size * (int) sizeof (int16))) {
 	uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);

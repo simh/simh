@@ -1,6 +1,6 @@
 /* h316_cpu.c: Honeywell 316/516 CPU simulator
 
-   Copyright (c) 1999-2002, Robert M. Supnik
+   Copyright (c) 1999-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -195,7 +195,7 @@
 #define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
 #define PCQ_TOP		pcq[pcq_p]
 #define UNIT_V_MSIZE	(UNIT_V_UF)			/* dummy mask */
-#define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+#define UNIT_MSIZE	(1u << UNIT_V_MSIZE)
 #define m7		0001000				/* for generics */
 #define m8		0000400
 #define m9		0000200
@@ -229,17 +229,20 @@ int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
 int32 dlog = 0;						/* debug log */
 int32 turnoff = 0;
+
 extern int32 sim_int_char;
+extern int32 sim_interval;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
 extern FILE *sim_log;
 
-extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
-	UNIT *uptr, int32 sw);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_noext (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+
+extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
+	UNIT *uptr, int32 sw);
 
 /* CPU data structures
 
@@ -276,7 +279,7 @@ REG cpu_reg[] = {
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ FLDATA (STOP_DEV, stop_dev, 1) },
 	{ DRDATA (INDMAX, ind_max, 8), REG_NZ + PV_LEFT },
-	{ BRDATA (PCQ, pcq, 8, 15, PCQ_SIZE), REG_RO+REG_CIRC },
+	{ BRDATA (PCQ, pcq, 8, 15, PCQ_SIZE), REG_RO + REG_CIRC },
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ FLDATA (DLOG, dlog, 0), REG_HIDDEN },
@@ -323,10 +326,9 @@ int32 (*iotab[64])() = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 extern UNIT clk_unit;
 int32 AR, BR, MB, Y, t1, t2, t3, skip;
-unsigned int32 ut;
+uint32 ut;
 t_stat reason;
 t_stat Ea (int32 inst, int32 *addr);
 void Write (int32 val, int32 addr);
@@ -377,6 +379,7 @@ else {	if (sim_brk_summ &&
 	MB = Read (Y);					/* fetch instr */
 	PC = NEWA (Y, Y + 1);				/* incr PC */
 	dev_ready = dev_ready | INT_NODEF;  }
+
 sim_interval = sim_interval - 1;
 if (dlog && sim_log && !turnoff) {			/* cycle log? */
 	int32 op = I_GETOP (MB) & 017;			/* core opcode */
@@ -389,6 +392,7 @@ if (dlog && sim_log && !turnoff) {			/* cycle log? */
 /* Memory reference instructions */
 
 switch (I_GETOP (MB)) {					/* case on <1:6> */
+
 case 001: case 021: case 041: case 061:			/* JMP */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	PCQ_ENTRY;					/* save PC */
@@ -401,6 +405,7 @@ case 001: case 021: case 041: case 061:			/* JMP */
 	    else turnoff = 0;  }			/* no, log */
 	if (extoff_pending) ext = extoff_pending = 0;	/* cond ext off */
 	break;
+
 case 002: case 022: case 042: case 062:			/* LDA */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	if (dp) {					/* double prec? */
@@ -409,10 +414,12 @@ case 002: case 022: case 042: case 062:			/* LDA */
 	    sc = 0;  }
 	else AR = Read (Y);				/* no, get word */
 	break;
+
 case 003: case 023: case 043: case 063:			/* ANA */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	AR = AR & Read (Y);
 	break;
+
 case 004: case 024: case 044: case 064:			/* STA */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	if (dp) {					/* double prec? */
@@ -421,10 +428,12 @@ case 004: case 024: case 044: case 064:			/* STA */
 	    sc = 0;  }
 	else Write (AR, Y);				/* no, store word */
 	break;
+
 case 005: case 025: case 045: case 065:			/* ERA */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	AR = AR ^ Read (Y);
 	break;
+
 case 006: case 026: case 046: case 066:			/* ADD */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	if (dp) {					/* double prec? */
@@ -435,6 +444,7 @@ case 006: case 026: case 046: case 066:			/* ADD */
 	    sc = 0;  }
 	else AR = Add16 (AR, Read (Y));			/* no, 16b add */
 	break;
+
 case 007: case 027: case 047: case 067:			/* SUB */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	if (dp) {					/* double prec? */
@@ -455,32 +465,38 @@ case 010: case 030: case 050: case 070:			/* JST */
 	PCQ_ENTRY;
 	PC = NEWA (PC, Y + 1);				/* set new PC */
 	break;
+
 case 011: case 031: case 051: case 071:			/* CAS */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	MB = Read (Y);
 	if (AR == MB) PC = NEWA (PC, PC + 1);
 	else if (SEXT (AR) < SEXT (MB)) PC = NEWA (PC, PC + 2);
 	break;
+
 case 012: case 032: case 052: case 072:			/* IRS */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	MB = (Read (Y) + 1) & DMASK;			/* incr, rewrite */
 	Write (MB, Y);
 	if (MB == 0) PC = NEWA (PC, PC + 1);		/* skip if zero */
 	break;
+
 case 013: case 033: case 053: case 073:			/* IMA */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	MB = Read (Y);
 	Write (AR, Y);					/* A to mem */
 	AR = MB;					/* mem to A */
 	break;
+
 case 015: case 055:					/* STX */
 	if (reason = Ea (MB & ~IDX, &Y)) break;		/* eff addr */
 	Write (XR, Y);					/* store XR */
 	break;
+
 case 035: case 075:					/* LDX */
 	if (reason = Ea (MB & ~IDX, &Y)) break;		/* eff addr */
 	XR = Read (Y);					/* load XR */
 	break;
+
 case 016: case 036: case 056: case 076:			/* MPY */
 	if (cpu_unit.flags & UNIT_HSA) {		/* installed? */
 	    if (reason = Ea (MB, &Y)) break;		/* eff addr */
@@ -489,6 +505,7 @@ case 016: case 036: case 056: case 076:			/* MPY */
 	    sc = 0;  }
 	else reason = stop_inst;
 	break;
+
 case 017: case 037: case 057: case 077:			/* DIV */
 	if (cpu_unit.flags & UNIT_HSA) {		/* installed? */
 	    if (reason = Ea (MB, &Y)) break;		/* eff addr */
@@ -512,6 +529,7 @@ case 014:						/* OCP */
 	reason = t2 >> IOT_V_REASON;
 	turnoff = 0;
 	break;
+
 case 034:						/* SKS */
 	t2 = iotab[MB & DEVMASK] (ioSKS, I_GETFNC (MB), AR);
 	reason = t2 >> IOT_V_REASON;
@@ -519,6 +537,7 @@ case 034:						/* SKS */
 	    PC = NEWA (PC, PC + 1);
 	    turnoff = 0;  }
 	break;
+
 case 054:						/* INA */
 	if (MB & INCLRA) AR = 0;
 	t2 = iotab[MB & DEVMASK] (ioINA, I_GETFNC (MB), AR);
@@ -528,6 +547,7 @@ case 054:						/* INA */
 	    turnoff = 0;  }
 	AR = t2 & DMASK;				/* data */
 	break;
+
 case 074:						/* OTA */
 	t2 = iotab[MB & DEVMASK] (ioOTA, I_GETFNC (MB), AR);
 	reason = t2 >> IOT_V_REASON;
@@ -606,6 +626,7 @@ case 020:
 	sc = 0;						/* clear sc */
 	if ((t1 = (-MB) & SHFMASK) == 0) break;		/* shift count */
 	switch (I_GETFNC (MB)) {			/* case shift fnc */
+
 	case 000:					/* LRL */
 	    if (t1 > 32) ut = 0;			/* >32? all 0 */
 	    else {
@@ -614,6 +635,7 @@ case 020:
 		ut = ut >> t1;  }			/* log right */
 	    PUTDBL_U (ut);				/* store A,B */
 	    break;
+
 	case 001:					/* LRS */
 	    if (t1 > 31) t1 = 31;			/* limit to 31 */
 	    t2 = GETDBL_S (SEXT (AR), BR);		/* get A'B signed */
@@ -621,6 +643,7 @@ case 020:
 	    t2 = t2 >> t1;				/* arith right */
 	    PUTDBL_S (t2);				/* store A,B */
 	    break;
+
 	case 002:					/* LRR */
 	    t2 = t1 % 32;				/* mod 32 */
 	    ut = GETDBL_U (AR, BR);			/* get A'B */
@@ -628,6 +651,7 @@ case 020:
 	    C = (ut >> 31) & 1;				/* C = A<1> */
 	    PUTDBL_U (ut);				/* store A,B */
 	    break;
+
 	case 003:					/* "long right arot" */
 	    if (reason = stop_inst) break;		/* stop on undef? */
 	    for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
@@ -636,22 +660,26 @@ case 020:
 		     ((BR & MMASK) >> 1);
 		AR = ((AR & SIGN) | (C << 15)) | (AR >> 1);  }
 	    break;
+
 	case 004:					/* LGR */
 	    if (t1 > 16) AR = 0;			/* > 16? all 0 */
 	    else {
 	    	C = (AR >> (t1 - 1)) & 1;		/* C = last out */
 		AR = (AR >> t1) & DMASK;  }		/* log right */
 	    break;
+
 	case 005:					/* ARS */
 	    if (t1 > 16) t1 = 16;			/* limit to 16 */
 	    C = ((SEXT (AR)) >> (t1 - 1)) & 1;		/* C = last out */
 	    AR = ((SEXT (AR)) >> t1) & DMASK;		/* arith right */
 	    break; 
+
 	case 006:					/* ARR */
 	    t2 = t1 % 16;				/* mod 16 */
 	    AR = ((AR >> t2) | (AR << (16 - t2))) & DMASK;
 	    C = (AR >> 15) & 1;				/* C = A<1> */
 	    break;
+
 	case 007:					/* "short right arot" */
 	    if (reason = stop_inst) break;		/* stop on undef? */
 	    for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
@@ -669,6 +697,7 @@ case 020:
 		ut = ut << t1;  }			/* log left */
 	    PUTDBL_U (ut);				/* store A,B */
 	    break;
+
 	case 011:					/* LLS */
 	    if (t1 > 31) t1 = 31;			/* limit to 31 */
 	    t2 = GETDBL_S (SEXT (AR), BR);		/* get A'B */
@@ -677,6 +706,7 @@ case 020:
 	    if ((t2 >> (31 - t1)) !=			/* shf out = sgn? */
 		((AR & SIGN)? -1: 0)) C = 1;
 	    break;
+
 	case 012:					/* LLR */
 	    t2 = t1 % 32;				/* mod 32 */
 	    ut = GETDBL_U (AR, BR);			/* get A'B */
@@ -684,6 +714,7 @@ case 020:
 	    C = ut & 1;					/* C = B<16> */
 	    PUTDBL_U (ut);				/* store A,B */
 	    break;
+
 	case 013:					/* "long left arot" */
 	    if (reason = stop_inst) break;		/* stop on undef? */
 	    for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
@@ -693,12 +724,14 @@ case 020:
 		if ((AR & SIGN) != ((AR >> 1) & SIGN)) C = 1;
 		AR = AR & DMASK;  }
 	    break;
+
 	case 014:					/* LGL */
 	    if (t1 > 16) AR = 0;			/* > 16? all 0 */
 	    else {
 	    	C = (AR >> (16 - t1)) & 1;		/* C = last out */
 		AR = (AR << t1) & DMASK;  }		/* log left */
 	    break;
+
 	case 015:					/* ALS */
 	    if (t1 > 16) t1 = 16;			/* limit to 16 */
 	    t2 = SEXT (AR);				/* save AR */
@@ -706,11 +739,13 @@ case 020:
 	    if ((t2 >> (16 - t1)) !=			/* shf out + sgn */
 		((AR & SIGN)? -1: 0)) C = 1;
 	    break;
+
 	case 016:					/* ALR */
 	    t2 = t1 % 16;				/* mod 16 */
 	    AR = ((AR << t2) | (AR >> (16 - t2))) & DMASK;
 	    C = AR & 1;					/* C = A<16> */
 	    break;
+
 	case 017:					/* "short left arot" */
 	    if (reason = stop_inst) break;		/* stop on undef? */
 	    for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
@@ -826,6 +861,7 @@ return;
 int32 Add16 (int32 v1, int32 v2)
 {
 int32 r = v1 + v2;
+
 C = 0;
 if (((v1 ^ ~v2) & (v1 ^ r)) & SIGN) C = 1;
 return (r & DMASK);
@@ -834,6 +870,7 @@ return (r & DMASK);
 int32 Add31 (int32 v1, int32 v2)
 {
 int32 r = v1 + v2;
+
 C = 0;
 if (((v1 ^ ~v2) & (v1 ^ r)) & (1u << 30)) C = 1;
 return r;
@@ -1037,7 +1074,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0) ||
     (((cpu_unit.flags & UNIT_EXT) == 0) && (val > (NX_AMASK + 1))))

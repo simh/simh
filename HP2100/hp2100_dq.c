@@ -1,6 +1,6 @@
 /* hp2100_dq.c: HP 2100 12565A disk simulator
 
-   Copyright (c) 1993-2002, Bill McDermith
+   Copyright (c) 1993-2003, Bill McDermith
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dq		12565A 2883 disk system
 
+   25-Apr-03	RMS	Fixed bug in status check
    10-Nov-02	RMS	Added boot command, rebuilt like 12559/13210
    09-Jan-02	WOM	Copied dp driver and mods for 2883
 
@@ -303,25 +304,26 @@ case ioCTL:						/* control clear/set */
 	    sim_cancel (&dqd_unit);			/* cancel dch */
 	    dqd_xfer = 0;				/* clr dch xfer */
 	    dqc_busy = 0;  }				/* clr busy */
-	else if (!CTL (devc)) {				/* set and was clr? */
-	    setCMD (devc);				/* set cmd, ctl */
-	    setCTL (devc);
-	    drv = CW_GETDRV (dqc_obuf);			/* get fnc, drv */
-	    fnc = CW_GETFNC (dqc_obuf);			/* from cmd word */
-	    switch (fnc) {				/* case on fnc */
-	    case FNC_SEEK: case FNC_RCL:		/* seek, recal */
-	    case FNC_CHK:				/* check */
-		dqc_sta[drv] = 0;			/* clear status */
-	    case FNC_STA: case FNC_LA:			/* rd sta, load addr */
-		dq_god (fnc, drv, dqc_dtime);		/* sched dch xfer */
-		break;
-	    case FNC_RD: case FNC_WD:			/* read, write */
-	    case FNC_RA: case FNC_WA:			/* rd addr, wr addr */
-	    case FNC_AS:				/* address skip */
-		dq_goc (fnc, drv, dqc_ctime);		/* sched drive */
-		break;
-	    }						/* end case */
-	}						/* end else */
+	else {						/* STC */
+	    setCTL (devc);				/* set ctl */
+	    if (!CMD (devc)) {				/* cmd clr? */
+		setCMD (devc);				/* set cmd, ctl */
+		drv = CW_GETDRV (dqc_obuf);			/* get fnc, drv */
+		fnc = CW_GETFNC (dqc_obuf);			/* from cmd word */
+		switch (fnc) {				/* case on fnc */
+		case FNC_SEEK: case FNC_RCL:		/* seek, recal */
+		case FNC_CHK:				/* check */
+		    dqc_sta[drv] = 0;			/* clear status */
+		case FNC_STA: case FNC_LA:		/* rd sta, load addr */
+		    dq_god (fnc, drv, dqc_dtime);	/* sched dch xfer */
+		    break;
+		case FNC_RD: case FNC_WD:		/* read, write */
+		case FNC_RA: case FNC_WA:		/* rd addr, wr addr */
+		case FNC_AS:				/* address skip */
+		    dq_goc (fnc, drv, dqc_ctime);	/* sched drive */
+		    break;  }				/* end case */
+		}					/* end if !CMD */
+	    }						/* end else */
 	break;
 default:
 	break;  }
@@ -451,6 +453,7 @@ case FNC_STA:						/* read status */
 	    if (drv) dqd_ibuf = dqd_ibuf | STA_DID;
 	    setFLG (devd);				/* set dch flg */
 	    clrCMD (devd);				/* clr dch cmd */
+	    clrCMD (devc);				/* clr cch cmd */
 	    dqc_sta[drv] = dqc_sta[drv] & 		/* clr sta flags */
 		~(STA_DTE | STA_FLG | STA_AER | STA_EOC | STA_ERR);
 	    }

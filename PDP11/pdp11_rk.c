@@ -1,6 +1,6 @@
 /* pdp11_rk.c: RK11 cartridge disk simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -428,7 +428,7 @@ t_stat rk_svc (UNIT *uptr)
 {
 int32 i, drv, err, awc, wc, t;
 int32 da, track, sect;
-t_addr ma;
+uint32 ma;
 uint16 comp;
 
 drv = uptr - rk_dev.units;				/* get drv number */

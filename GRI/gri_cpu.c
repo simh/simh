@@ -1,6 +1,6 @@
 /* gri_cpu.c: GRI-909 CPU simulator
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,10 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   cpu		GRI-909 CPU
+
+   14-Mar-03	RMS	Fixed bug in SC queue tracking
 
    The system state for the GRI-909 is:
 
@@ -167,6 +171,7 @@ uint32 stop_opr = 1;					/* stop ill operator */
 int16 scq[SCQ_SIZE] = { 0 };				/* PC queue */
 int32 scq_p = 0;					/* PC queue ptr */
 REG *scq_r = NULL;					/* PC queue reg ptr */
+
 extern int32 sim_interval;
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
@@ -340,7 +345,7 @@ REG cpu_reg[] = {
 	{ FLDATA (ION, dev_done, INT_V_ON) },
 	{ FLDATA (INODEF, dev_done, INT_V_NODEF) },
 	{ FLDATA (BKP, bkp, 0) },
-	{ BRDATA (SCQ, scq, 8, 15, SCQ_SIZE), REG_RO+REG_CIRC },
+	{ BRDATA (SCQ, scq, 8, 15, SCQ_SIZE), REG_RO + REG_CIRC },
 	{ ORDATA (SCQP, scq_p, 6), REG_HRO },
 	{ FLDATA (STOP_OPR, stop_opr, 0) },
 	{ ORDATA (WRU, sim_int_char, 8) },
@@ -475,7 +480,7 @@ else if ((src != U_MEM) && (dst != U_MEM)) {		/* reg-reg? */
 /* Memory reference.  The second SC increment occurs after the first
    execution cycle.  For direct, defer, and immediate defer, this is
    after the first memory read and before the bus transfer; but for
-   immediate, it is before the bus transfer.
+   immediate, it is after the bus transfer.
 */
 
 else {	SC = (SC + 1) & AMASK;				/* incr SC */
@@ -512,6 +517,7 @@ else {	SC = (SC + 1) & AMASK;				/* incr SC */
 /* Simulation halted */
 
 AO = ao_update ();					/* update AO */
+scq_r->qptr = scq_p;					/* update sc q ptr */
 return reason;
 }
 
@@ -871,7 +877,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
 	return SCPE_ARG;

@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	IBM 1401 Simulator Usage
-Date:	15-Nov-2002
+Date:	20-Apr-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -161,7 +161,7 @@ interrupt system.
 	OVF		1	overflow indicator
 	IOCHK		1	I/O check switch
 	PRCHK		1	process check switch
-	ISQ		1	IS prior to last branch;
+	ISQ[0:63]	14	IS prior to last branch;
 				most recent IS change first
 	WRU		8	interrupt character
 
@@ -184,26 +184,30 @@ the POS register specifies the number of the next data item to be read or
 written.  Thus, by changing POS, the user can backspace or advance these
 devices.
 
-The reader/punch registers are:
+The card reader registers are:
 
-	device	name		size	comments
+	name		size	comments
 
-	CDR	LAST		1	last card indicator
-		ERR		1	error indicator
-		S1		1	stacker 1 select flag
-		S2		1	stacker 2 select flag
-		POS		32	position
-		TIME		24	delay window for stacker select
-		BUF[0:79]	8	reader buffer
+	LAST		1	last card indicator
+	ERR		1	error indicator
+	S1		1	stacker 1 select flag
+	S2		1	stacker 2 select flag
+	POS		32	position
+	TIME		24	delay window for stacker select
+	BUF[0:79]	8	reader buffer
 
-	CDP	ERR		1	error indicator
-		S4		1	stacker 4 select flag
-		S8		1	stacker 8 select flag
+The card punch registers are:
 
-	STKR	POS0		32	position, normal reader stack
-		POS1		32	position, reader stacker 1
-		POS2		32	position, shared stacker 2/8
-		POS4		32	position, punch stacker 4
+	ERR		1	error indicator
+	S4		1	stacker 4 select flag
+	S8		1	stacker 8 select flag
+
+The stacker registers are:
+
+	POS0		32	position, normal reader stack
+	POS1		32	position, reader stacker 1
+	POS2		32	position, shared stacker 2/8
+	POS4		32	position, punch stacker 4
 
 Error handling is as follows:
 
@@ -423,7 +427,7 @@ devices can only accept single character input, without word marks.
 
 2.7 Character Sets
 
-The IBM 1401 used a 6b character code called BCD (binary coded decimal).
+The IBM 1401 uses a 6b character code called BCD (binary coded decimal).
 Some of the characters have no equivalent in ASCII and require different
 representations:
 

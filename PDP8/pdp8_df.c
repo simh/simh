@@ -25,6 +25,7 @@
 
    df		DF32 fixed head disk
 
+   14-Mar-03	RMS	Fixed variable platter interaction with save/restore
    03-Mar-03	RMS	Fixed autosizing
    02-Feb-03	RMS	Added variable platter and autosizing support
    04-Oct-02	RMS	Added DIBs, device number support
@@ -47,6 +48,7 @@
 #define UNIT_V_AUTO	(UNIT_V_UF + 0)			/* autosize */
 #define UNIT_V_PLAT	(UNIT_V_UF + 1)			/* #platters - 1 */
 #define UNIT_M_PLAT	03
+#define UNIT_PLAT	(UNIT_M_PLAT << UNIT_V_PLAT)
 #define UNIT_GETP(x)	((((x) >> UNIT_V_PLAT) & UNIT_M_PLAT) + 1)
 #define UNIT_AUTO	(1 << UNIT_V_AUTO)
 #define UNIT_PLAT	(UNIT_M_PLAT << UNIT_V_PLAT)
@@ -121,8 +123,8 @@ t_stat df_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 DIB df_dib = { DEV_DF, 3, { &df60, &df61, &df62 } };
 
 UNIT df_unit =
-	{ UDATA (&df_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-	  DF_DKSIZE) };
+	{ UDATA (&df_svc, UNIT_FIX+UNIT_ATTABLE+
+		 UNIT_BUFABLE+UNIT_MUSTBUF, DF_DKSIZE) };
 
 REG df_reg[] = {
 	{ ORDATA (STA, df_sta, 12) },
@@ -135,6 +137,7 @@ REG df_reg[] = {
 	{ DRDATA (TIME, df_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (BURST, df_burst, 0) },
 	{ FLDATA (STOP_IOE, df_stopioe, 0) },
+	{ DRDATA (CAPAC, df_unit.capac, 18), REG_HRO },
 	{ ORDATA (DEVNUM, df_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
@@ -226,7 +229,7 @@ return AC;
 t_stat df_svc (UNIT *uptr)
 {
 int32 pa, t, mex;
-t_addr da;
+uint32 da;
 
 UPDATE_PCELL;						/* update photocell */
 if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
@@ -315,18 +318,19 @@ else {	for (i = 0; i < OS8_LEN; i++)
 return SCPE_OK;
 }
 
+/* Attach routine */
 
 t_stat df_attach (UNIT *uptr, char *cptr)
 {
-t_addr p, sz;
-t_addr ds_bytes = DF_DKSIZE * sizeof (int16);
+uint32 p, sz;
+uint32 ds_bytes = DF_DKSIZE * sizeof (int16);
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
 	p = (sz + ds_bytes - 1) / ds_bytes;
-	if (p == 0) p = 1;
-	if (p > DF_NUMDK) p = DF_NUMDK;  }
-else p = UNIT_GETP (uptr->flags);
-uptr->capac = p * DF_DKSIZE;
+	if (p >= DF_NUMDK) p = DF_NUMDK - 1;
+	uptr->flags = (uptr->flags & ~UNIT_PLAT) |
+	     (p << UNIT_V_PLAT);  }
+uptr->capac = UNIT_GETP (uptr->flags) * DF_DKSIZE;
 return attach_unit (uptr, cptr);
 }
 

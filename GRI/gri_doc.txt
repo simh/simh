@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	GRI-909 Simulator Usage
-Date:	15-Nov-2002
+Date:	20-Apr-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -103,7 +103,7 @@ control registers for the interrupt system.
 
 	name		size	comments
 
-	SC		14	sequence counter
+	SC		15	sequence counter
 	AX		16	arithmetic operator input register 1
 	AY		16	arithmetic operator input register 2
 	AO		16	arithmetic operator output register
@@ -126,7 +126,7 @@ control registers for the interrupt system.
 	ION		1	interrupts enabled
 	INODEF		1	interrupts not deferred
 	BKP		1	breakpoint request
-	SCQ[0:63]	16	SC prior to last jump or interrupt;
+	SCQ[0:63]	15	SC prior to last jump or interrupt;
 				most recent SC change first
 	STOP_OPR	1	stop on undefined operator
 	WRU		8	interrupt character
@@ -136,8 +136,8 @@ control registers for the interrupt system.
 2.2.1 S42-004 High Speed Reader (HSR)
 
 The paper tape reader (HSR) reads data from or a disk file.  The POS
-register specifies the number of the next data item to be read.  Thus,
-by changing POS, the user can backspace or advance the reader.
+register specifies the number of the next data item to be read.
+Thus, by changing POS, the user can backspace or advance the reader.
 
 The paper tape reader implements these registers:
 

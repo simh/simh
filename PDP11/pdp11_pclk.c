@@ -1,6 +1,6 @@
 /* pdp11_pclk.c: KW11P programmable clock simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
    Written by John Dundas, used with his gracious permission
 
    Permission is hereby granted, free of charge, to any person obtaining a

@@ -25,6 +25,8 @@
 
    pas		Programmable asynchronous line adapter(s)
 
+   09-May-03	RMS	Added network device flag
+
    This module implements up to 32 individual serial interfaces, representing
    either individual PASLA modules or combinations of the 2-line and 8-line
    multiplexors, which are functionally very similar. These interfaces are mapped
@@ -160,7 +162,7 @@ DEVICE pas_dev = {
 	1, 10, 31, 1, 16, 8,
 	&tmxr_ex, &tmxr_dep, &pas_reset,
 	NULL, &pas_attach, &pas_detach,
-	&pas_dib, DEV_DISABLE };
+	&pas_dib, DEV_NET | DEV_DISABLE };
 
 /* PASL data structures
 

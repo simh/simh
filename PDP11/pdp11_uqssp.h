@@ -1,6 +1,6 @@
 /* pdp11_uqssp.h: Unibus/Qbus storage systems port definitions file
 
-   Copyright (c) 2001-2002, Robert M Supnik
+   Copyright (c) 2001-2003, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -134,8 +134,8 @@
 /* Command/response rings */
 
 struct uq_ring {
-	int32	ioff;					/* intr offset */
-	t_addr		ba;				/* base addr */
+	int32		ioff;				/* intr offset */
+	uint32		ba;				/* base addr */
 	uint32		lnt;				/* size in bytes */
 	uint32		idx;				/* current index */
 	};

@@ -25,6 +25,9 @@
 
    mt		7-track magtape
 
+   25-Apr-03	RMS	Revised for extended file support
+   28-Mar-03	RMS	Added multiformat support
+   15-Mar-03	RMS	Fixed end-of-record on load read yet again
    28-Feb-03	RMS	Modified for magtape library
    31-Oct-02	RMS	Added error record handling
    10-Oct-02	RMS	Fixed end-of-record on load read writes WM plus GM
@@ -101,17 +104,19 @@ UNIT mt_unit[] = {
 REG mt_reg[] = {
 	{ FLDATA (END, ind[IN_END], 0) },
 	{ FLDATA (ERR, ind[IN_TAP], 0) },
-	{ DRDATA (POS1, mt_unit[1].pos, 32), PV_LEFT + REG_RO },
-	{ DRDATA (POS2, mt_unit[2].pos, 32), PV_LEFT + REG_RO },
-	{ DRDATA (POS3, mt_unit[3].pos, 32), PV_LEFT + REG_RO },
-	{ DRDATA (POS4, mt_unit[4].pos, 32), PV_LEFT + REG_RO },
-	{ DRDATA (POS5, mt_unit[5].pos, 32), PV_LEFT + REG_RO },
-	{ DRDATA (POS6, mt_unit[6].pos, 32), PV_LEFT + REG_RO },
+	{ DRDATA (POS1, mt_unit[1].pos, T_ADDR_W), PV_LEFT + REG_RO },
+	{ DRDATA (POS2, mt_unit[2].pos, T_ADDR_W), PV_LEFT + REG_RO },
+	{ DRDATA (POS3, mt_unit[3].pos, T_ADDR_W), PV_LEFT + REG_RO },
+	{ DRDATA (POS4, mt_unit[4].pos, T_ADDR_W), PV_LEFT + REG_RO },
+	{ DRDATA (POS5, mt_unit[5].pos, T_ADDR_W), PV_LEFT + REG_RO },
+	{ DRDATA (POS6, mt_unit[6].pos, T_ADDR_W), PV_LEFT + REG_RO },
 	{ NULL }  };
 
 MTAB mt_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 	{ 0 }  };
 
 DEVICE mt_dev = {
@@ -173,6 +178,12 @@ return mt_map_status (st);
 	mod	=	modifier character
    Outputs:
 	status	=	status
+
+   Fine point: after a read, the system writes a group mark just
+   beyond the end of the record.  However, first it checks for a
+   GM + WM; if present, the GM + WM is not changed.  Otherwise,
+   an MCW read sets a GM, preserving the current WM; while an LCA
+   read sets a GM and clears the WM.
 */
 
 t_stat mt_io (int32 unit, int32 flag, int32 mod)
@@ -211,8 +222,9 @@ case BCD_R:						/* read */
 	    if (ADDR_ERR (BS)) {			/* check next BS */
 		BS = BA | (BS % MAXMEMSIZE);
 		return STOP_WRAP;  }  }
-	if (flag == MD_WM) M[BS] = WM | BCD_GRPMRK;	/* load? set WM */
-	else M[BS] = (M[BS] & WM) | BCD_GRPMRK;		/* move? save WM */
+	if (M[BS] != (BCD_GRPMRK + WM)) {		/* not GM+WM at end? */
+	    if (flag == MD_WM) M[BS] = BCD_GRPMRK;	/* LCA: clear WM */
+	    else M[BS] = (M[BS] & WM) | BCD_GRPMRK;  }	/* MCW: save WM */
 	BS++;						/* adv BS */
 	if (ADDR_ERR (BS)) {				/* check final BS */
 	    BS = BA | (BS % MAXMEMSIZE);

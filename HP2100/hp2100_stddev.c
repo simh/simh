@@ -1,6 +1,6 @@
 /* hp2100_stddev.c: HP2100 standard devices simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tty		12531C buffered teleprinter interface
    clk		12539C time base generator
 
+   25-Apr-03	RMS	Added extended file support
    22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Revised BOOT command for IBL ROMs
 			Fixed bug in TTY reset, TTY starts in input mode
@@ -133,7 +134,7 @@ REG ptr_reg[] = {
 	{ FLDATA (CTL, ptr_dib.ctl, 0) },
 	{ FLDATA (FLG, ptr_dib.flg, 0) },
 	{ FLDATA (FBF, ptr_dib.fbf, 0) },
-	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
 	{ ORDATA (DEVNO, ptr_dib.devno, 6), REG_HRO },
@@ -170,7 +171,7 @@ REG ptp_reg[] = {
 	{ FLDATA (CTL, ptp_dib.ctl, 0) },
 	{ FLDATA (FLG, ptp_dib.flg, 0) },
 	{ FLDATA (FBF, ptp_dib.fbf, 0) },
-	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
 	{ ORDATA (DEVNO, ptp_dib.devno, 6), REG_HRO },
@@ -214,11 +215,11 @@ REG tty_reg[] = {
 	{ FLDATA (CTL, tty_dib.ctl, 0) },
 	{ FLDATA (FLG, tty_dib.flg, 0) },
 	{ FLDATA (FBF, tty_dib.fbf, 0) },
-	{ DRDATA (KPOS, tty_unit[TTI].pos, 32), PV_LEFT },
+	{ DRDATA (KPOS, tty_unit[TTI].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (KTIME, tty_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPOS, tty_unit[TTO].pos, 32), PV_LEFT },
+	{ DRDATA (TPOS, tty_unit[TTO].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (PPOS, tty_unit[TTP].pos, 32), PV_LEFT },
+	{ DRDATA (PPOS, tty_unit[TTP].pos, T_ADDR_W), PV_LEFT },
 	{ FLDATA (STOP_IOE, ttp_stopioe, 0) },
 	{ ORDATA (DEVNO, tty_dib.devno, 6), REG_HRO },
 	{ NULL }  };

@@ -27,6 +27,7 @@
    tto		terminal output
    clk		100Hz and TODR clock
 
+   25-Apr-03	RMS	Revised for extended file support
    02-Mar-02	RMS	Added SET TTI CTRL-C
    22-Dec-02	RMS	Added console halt capability
    01-Nov-02	RMS	Added 7B/8B capability to terminal
@@ -93,7 +94,7 @@ REG tti_reg[] = {
 	{ FLDATA (INT, int_req[IPL_TTI], INT_V_TTI) },
 	{ FLDATA (DONE, tti_csr, CSR_V_DONE) },
 	{ FLDATA (IE, tti_csr, CSR_V_IE) },
-	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
@@ -130,7 +131,7 @@ REG tto_reg[] = {
 	{ FLDATA (INT, int_req[IPL_TTO], INT_V_TTO) },
 	{ FLDATA (DONE, tto_csr, CSR_V_DONE) },
 	{ FLDATA (IE, tto_csr, CSR_V_IE) },
-	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 

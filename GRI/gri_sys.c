@@ -1,6 +1,6 @@
 /* gri_sys.c: GRI-909 simulator interface
 
-   Copyright (c) 2001-2002, Robert M Supnik
+   Copyright (c) 2001-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -80,7 +80,8 @@ const char *sim_stop_messages[] = {
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
-int32 c, org;
+int32 c;
+uint32 org;
 t_stat r;
 char gbuf[CBUFSIZE];
 
@@ -114,7 +115,7 @@ return SCPE_OK;
 
 /* Symbol tables */
 
-#define F_V_FL	16
+#define F_V_FL	16					/* class flag */
 #define F_M_FL	017
 #define F_V_FO	000					/* function out */
 #define F_V_FOI	001					/* FO, impl reg */

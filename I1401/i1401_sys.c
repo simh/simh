@@ -1,6 +1,6 @@
 /* i1401_sys.c: IBM 1401 simulator interface
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   16-Mar-03	RMS	Fixed mnemonic for MCS
    03-Jun-02	RMS	Added 1311 support
    18-May-02	RMS	Added -D feature from Van Snyder
    26-Jan-02	RMS	Fixed H, NOP with no trailing wm (found by Van Snyder)
@@ -158,7 +159,7 @@ const char *opcode[64] = {
  NULL,  "R",   "W",  "WR",  "P",   "RP",  "WP",  "WRP",
  "RF",  "WF",  NULL, "MA",  "MUL", NULL,  NULL,  NULL,
  NULL,  "CS",  "S",  NULL,  "MTF", "BWZ", "BBE", NULL,
- "MZ",  "MSZ", NULL, "SWM", "DIV", NULL,  NULL,  NULL,
+ "MZ",  "MCS", NULL, "SWM", "DIV", NULL,  NULL,  NULL,
  NULL,  NULL,  "SS", "LCA", "MCW", "NOP", NULL,  "MCM",
  "SAR", NULL,  "ZS", NULL,  NULL,  NULL,  NULL,  NULL,
  NULL,  "A",   "B",  "C",   "MN",  "MCE", "CC",  NULL,

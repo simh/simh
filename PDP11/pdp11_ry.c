@@ -25,6 +25,9 @@
 
    ry		RY11/RX02 floppy disk
 
+   19-May-03	RMS	Revised for new conditional compilation scheme
+   25-Apr-03	RMS	Revised for extended file support
+   14-Mar-03	RMS	Fixed variable size interaction with save/restore
    03-Mar-03	RMS	Fixed autosizing
    12-Oct-02	RMS	Added autoconfigure support
 
@@ -32,14 +35,16 @@
    Tracks are numbered 0-76, sectors 1-26.
 */
 
-#if defined (USE_INT64)					/* PDP-10 !! */
+#if defined (VM_PDP10)					/* PDP10 version */
 #include "pdp10_defs.h"
-#define VM_PDP10	1
 extern int32 int_req;
 extern int32 int_vec[32];
-#else
-#include "pdp11_defs.h"					/* PDP-11 */
-#define VM_PDP11	1
+
+#elif defined (VM_VAX)					/* VAX version */
+#error "RX211 not supported on VAX!"
+
+#else							/* PDP-11 version */
+#include "pdp11_defs.h"
 extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
 #endif
@@ -51,7 +56,7 @@ extern int32 int_vec[IPL_HLVL][32];
 #define RX_NUMBY	128
 #define RX_SIZE		(RX_NUMTR * RX_NUMSC * RX_NUMBY)
 #define RY_NUMBY	256				/* bytes/sector */
-#define RY_SIZE	(RX_NUMTR * RX_NUMSC * RY_NUMBY)
+#define RY_SIZE		(RX_NUMTR * RX_NUMSC * RY_NUMBY)
 #define RX_NUMDR	2				/* drives/controller */
 #define RX_M_NUMDR	01
 #define UNIT_V_WLK	(UNIT_V_UF)			/* write locked */
@@ -190,6 +195,8 @@ REG ry_reg[] = {
 	{ DRDATA (XTIME, ry_xwait, 24), PV_LEFT },
 	{ BRDATA (SBUF, rx2xb, 8, 8, RY_NUMBY) },
 	{ FLDATA (STOP_IOE, ry_stopioe, 0) },
+	{ URDATA (CAPAC, ry_unit[0].capac, 10, T_ADDR_W, 0,
+		  RX_NUMDR, REG_HRO | PV_LEFT) },
 	{ ORDATA (DEVADDR, ry_dib.ba, 32), REG_HRO },
 	{ ORDATA (DEVVEC, ry_dib.vec, 16), REG_HRO },
 	{ NULL }  };
@@ -333,7 +340,7 @@ t_stat ry_svc (UNIT *uptr)
 {
 int32 i, t, func, bps;
 static uint8 estat[8];
-t_addr ba, da;
+uint32 ba, da;
 
 func = RYCS_GETFNC (ry_csr);				/* get function */
 bps = (ry_csr & RYCS_DEN)? RY_NUMBY: RX_NUMBY;		/* get sector size */
@@ -512,7 +519,7 @@ return auto_config (0, 0);				/* run autoconfig */
 
 t_stat ry_attach (UNIT *uptr, char *cptr)
 {
-t_addr sz;
+uint32 sz;
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
 	if (sz > RX_SIZE) uptr->flags = uptr->flags | UNIT_DEN;

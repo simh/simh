@@ -25,6 +25,8 @@
 
    cpu		PDP-11 CPU (J-11 microprocessor)
 
+   05-Jun-03	RMS	Fixed bugs in memory size table
+   12-Mar-03	RMS	Added logical name support
    01-Feb-03	RMS	Changed R display to follow PSW<rs>, added SP display
    19-Jan-03	RMS	Changed mode definitions for Apple Dev Kit conflict
    05-Jan-03	RMS	Added memory size restore support
@@ -549,7 +551,7 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 65536, NULL, "64K", &cpu_set_size},
 	{ UNIT_MSIZE, 98304, NULL, "96K", &cpu_set_size},
 	{ UNIT_MSIZE, 131072, NULL, "128K", &cpu_set_size},
-	{ UNIT_MSIZE, 229376, NULL, "192K", &cpu_set_size},
+	{ UNIT_MSIZE, 196608, NULL, "192K", &cpu_set_size},
 	{ UNIT_MSIZE, 262144, NULL, "256K", &cpu_set_size},
 	{ UNIT_MSIZE, 393216, NULL, "384K", &cpu_set_size},
 	{ UNIT_MSIZE, 524288, NULL, "512K", &cpu_set_size},
@@ -557,7 +559,7 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 1048576, NULL, "1024K", &cpu_set_size},
 	{ UNIT_MSIZE, 2097152, NULL, "2048K", &cpu_set_size},
 	{ UNIT_MSIZE, 3145728, NULL, "3072K", &cpu_set_size},
-	{ UNIT_MSIZE, 4194304, NULL, "4096K", &cpu_set_size},
+	{ UNIT_MSIZE, 4186112, NULL, "4096K", &cpu_set_size},
 	{ UNIT_MSIZE, 1048576, NULL, "1M", &cpu_set_size},
 	{ UNIT_MSIZE, 2097152, NULL, "2M", &cpu_set_size},
 	{ UNIT_MSIZE, 3145728, NULL, "3M", &cpu_set_size},
@@ -2450,7 +2452,7 @@ return iopageW ((int32) val, addr, WRITEC);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i, clim;
+uint32 i, clim;
 unsigned int16 *nM;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
@@ -2482,8 +2484,8 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
 	if ((dptr->flags & DEV_DISABLE) &&		/* disable-able? */
 	    !(dptr->flags & DEV_DIS) &&			/* enabled? */
 	    ((dptr->flags & (DEV_QBUS|DEV_UBUS)) == target)) {
-	    printf ("Disabling %s\n", dptr->name);
-	    if (sim_log) fprintf (sim_log, "Disabling %s\n", dptr->name);
+	    printf ("Disabling %s\n", sim_dname (dptr));
+	    if (sim_log) fprintf (sim_log, "Disabling %s\n", sim_dname (dptr));
 	    dptr->flags = dptr->flags | DEV_DIS;  }  }
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* pdp11_rx.c: RX11/RX01 floppy disk simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -301,7 +301,7 @@ return SCPE_OK;
 t_stat rx_svc (UNIT *uptr)
 {
 int32 i, func;
-t_addr da;
+uint32 da;
 
 func = RXCS_GETFNC (rx_csr);				/* get function */
 switch (rx_state) {					/* case on state */

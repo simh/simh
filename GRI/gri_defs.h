@@ -1,6 +1,6 @@
 /* gri_defs.h: GRI-909 simulator definitions 
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Apr-03	RMS	Revised for extended file support
    19-Sep-02	RMS	Fixed declarations in gdev structure
 
    There are several discrepancies between the original GRI-909 Reference
@@ -65,7 +66,7 @@
 #define MAXMEMSIZE	32768				/* max memory size */
 #define AMASK		077777				/* logical addr mask */
 #define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
-#define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
+#define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
 
 /* Architectural constants */
 

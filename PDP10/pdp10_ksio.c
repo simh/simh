@@ -1,6 +1,6 @@
 /* pdp10_ksio.c: PDP-10 KS10 I/O subsystem simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    uba		Unibus adapters
 
+   12-Mar-03	RMS	Added logical name support
    10-Oct-02	RMS	Revised for dynamic table generation
 			Added SHOW IOSPACE routine
    29-Sep-02	RMS	Added variable vector, central map support
@@ -405,9 +406,9 @@ pa10 = (ubmap[ub][vpn] + PAG_GETOFF (ba >> 2)) & PAMASK;
 return pa10;
 }
 
-int32 Map_ReadB (t_addr ba, int32 bc, uint8 *buf, t_bool ub)
+int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf, t_bool ub)
 {
-t_addr lim;
+uint32 lim;
 a10 pa10;
 
 lim = ba + bc;
@@ -421,9 +422,9 @@ for ( ; ba < lim; ba++) {				/* by bytes */
 return 0;
 }
 
-int32 Map_ReadW (t_addr ba, int32 bc, uint16 *buf, t_bool ub)
+int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf, t_bool ub)
 {
-t_addr lim;
+uint32 lim;
 a10 pa10;
 
 ba = ba & ~01;						/* align start */
@@ -438,9 +439,9 @@ for ( ; ba < lim; ba = ba + 2) {			/* by words */
 return 0;
 }
 
-int32 Map_WriteB (t_addr ba, int32 bc, uint8 *buf, t_bool ub)
+int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf, t_bool ub)
 {
-t_addr lim;
+uint32 lim;
 a10 pa10;
 static d10 mask = 0377;
 
@@ -455,9 +456,9 @@ for ( ; ba < lim; ba++) {				/* by bytes */
 return 0;
 }
 
-int32 Map_WriteW (t_addr ba, int32 bc, uint16 *buf, t_bool ub)
+int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf, t_bool ub)
 {
-t_addr lim;
+uint32 lim;
 a10 pa10;
 d10 val;
 
@@ -708,9 +709,11 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
 	    (curr->ba < (dibp->ba + dibp->lnt))) ||
 	    ((end >= dibp->ba) &&			/* overlap end? */
 	    (end < (dibp->ba + dibp->lnt)))) {
-		printf ("Device %s address conflict at %08o\n", dptr->name, dibp->ba);
+		printf ("Device %s address conflict at %08o\n",
+		    sim_dname (dptr), dibp->ba);
 		if (sim_log) fprintf (sim_log,
-			"Device %s address conflict at %08o\n", dptr->name, dibp->ba);
+		    "Device %s address conflict at %08o\n",
+		    sim_dname (dptr), dibp->ba);
 		return TRUE;  }  }
 return FALSE;
 }
@@ -781,7 +784,7 @@ for (i = 0; dib_tab[i] != NULL; i++) {			/* print table */
 		break;  }  }
 	fprintf (st, "%07o - %07o\t%s\n", dib_tab[i]->ba,
 		dib_tab[i]->ba + dib_tab[i]->lnt - 1,
-		dptr? dptr->name: "CPU");
+		dptr? sim_dname (dptr): "CPU");
 	}
 return SCPE_OK;
 }

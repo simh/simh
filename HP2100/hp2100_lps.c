@@ -1,6 +1,6 @@
 /* hp2100_lps.c: HP 2100 12653A line printer simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    lps		12653A 2767 line printer
 		(based on 12556B microcircuit interface)
 
+   25-Apr-03	RMS	Revised for extended file support
    24-Oct-02	RMS	Added microcircuit test features
    30-May-02	RMS	Widened POS to 32b
    03-Dec-01	RMS	Changed DEVNO to use extended SET/SHOW
@@ -72,7 +73,7 @@ REG lps_reg[] = {
 	{ FLDATA (CTL, lps_dib.ctl, 0) },
 	{ FLDATA (FLG, lps_dib.flg, 0) },
 	{ FLDATA (FBF, lps_dib.fbf, 0) },
-	{ DRDATA (POS, lps_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lps_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (CTIME, lps_ctime, 31), PV_LEFT },
 	{ DRDATA (PTIME, lps_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lps_stopioe, 0) },
@@ -159,7 +160,7 @@ if (fputc (c, lps_unit.fileref) == EOF) {
 	perror ("LPS I/O error");
 	clearerr (lps_unit.fileref);
 	return SCPE_IOERR;  }
-lps_unit.pos = ftell (lps_unit.fileref);		/* update pos */
+lps_unit.pos = lps_unit.pos + 1;			/* update pos */
 return SCPE_OK;
 }
 

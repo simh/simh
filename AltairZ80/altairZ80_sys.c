@@ -1,30 +1,30 @@
 /*	altairz80_sys.c: MITS Altair system interface
 
-   Copyright (c) 2002, Peter Schorn
+		Copyright (c) 2002-2003, Peter Schorn
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+		Permission is hereby granted, free of charge, to any person obtaining a
+		copy of this software and associated documentation files (the "Software"),
+		to deal in the Software without restriction, including without limitation
+		the rights to use, copy, modify, merge, publish, distribute, sublicense,
+		and/or sell copies of the Software, and to permit persons to whom the
+		Software is furnished to do so, subject to the following conditions:
 
-   The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
+		The above copyright notice and this permission notice shall be included in
+		all copies or substantial portions of the Software.
 
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+		THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+		IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+		FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+		PETER SCHORN BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+		IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+		CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Peter Schorn shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Peter Schorn.
+		Except as contained in this notice, the name of Peter Schorn shall not
+		be used in advertising or otherwise to promote the sale, use or other dealings
+		in this Software without prior written authorization from Peter Schorn.
 
-   Based on work by Charles E Owen (c) 1997
-   Disassembler from Marat Fayzullin ((c) 1995, 1996, 1997 - Commercial use prohibited)
+		Based on work by Charles E Owen (c) 1997
+		Disassembler from Marat Fayzullin ((c) 1995, 1996, 1997 - Commercial use prohibited)
 */
 
 #include <ctype.h>
@@ -40,27 +40,24 @@ extern DEVICE simh_device;
 extern DEVICE ptr_dev;
 extern DEVICE ptp_dev;
 extern int32 saved_PC;
-extern char *get_range(char *cptr, t_addr *lo, t_addr *hi, int rdx,
-	t_addr max, char term);
-extern t_value get_uint(char *cptr, int radix, t_value max, t_stat *status);
 extern void PutBYTEWrapper(register uint32 Addr, register uint32 Value);
 extern void PutBYTEForced(register uint32 Addr, register uint32 Value);
 extern uint8 GetBYTEWrapper(register uint32 Addr);
-extern int32 addressIsInROM(uint32 Addr);
-extern int32 addressExists(uint32 Addr);
-extern uint32 ROMLow;
-extern uint32 ROMHigh;
+extern int32 addressIsInROM(const uint32 Addr);
+extern int32 addressExists(const uint32 Addr);
+extern void printROMMessage(const uint32 cntROM);
 
 int32 sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag);
 int32 fprint_sym(FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw);
-int32 checkbase(char ch, char *numString);
-int32 numok(char ch, char **numString, int32 minvalue, int32 maxvalue, int32 requireSign, int32 *result);
-int32 match(char *pattern, char *input, char *xy, int32 *number, int32 *star, int32 *at,
+static int32 checkbase(char ch, const char *numString);
+static int32 numok(char ch, const char **numString, const int32 minvalue,
+	const int32 maxvalue, const int32 requireSign, int32 *result);
+static int32 match(const char *pattern, const char *input, char *xyFirst, char *xy, int32 *number, int32 *star, int32 *at,
 	int32 *hat, int32 *dollar);
-int32 parse_X80(char *cptr, int32 addr, uint32 *val, char *Mnemonics[]);
+static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *const Mnemonics[]);
 int32 parse_sym(char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw);
-int32 DAsm(char *S, uint32 *val, int32 useZ80Mnemonics, int32 addr);
-int32 checkXY(char xy);
+static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const int32 addr);
+static int32 checkXY(const char xy);
 
 /* SCP data structures
 	sim_name						simulator name string
@@ -78,14 +75,12 @@ DEVICE	*sim_devices[]	= { &cpu_dev, &sio_dev, &simh_device, &ptr_dev, &ptp_dev, 
 
 char memoryAccessMessage[80];
 const char *sim_stop_messages[] = {
-	"Unknown error",
-	"Unknown I/O Instruction",
 	"HALT instruction",
 	"Breakpoint",
 	memoryAccessMessage,
 	"Invalid Opcode" };
 
-static char *Mnemonics8080[] = {
+static char *const Mnemonics8080[] = {
 /*0/8							1/9								2/A						3/B							4/C							5/D							6/E							7/F													*/
 	"NOP",					"LXI B,#h",				"STAX B",			"INX B",				"INR B",				"DCR B",				"MVI B,*h",			"RLC",						/*	00-07	*/
 	"DB 09h",				"DAD B",					"LDAX B",			"DCX B",				"INR C",				"DCR C",				"MVI C,*h",			"RRC",						/*	08-0f	*/
@@ -121,7 +116,7 @@ static char *Mnemonics8080[] = {
 	"RM",						"SPHL",						"JM #h",			"EI",						"CM #h",				"DB FDh",				"CPI *h",				"RST 7"						/*	f8-ff */
  };
 
-static char *MnemonicsZ80[256] = {
+static char *const MnemonicsZ80[256] = {
 /*0/8							1/9								2/A						3/B							4/C							5/D							6/E							7/F													*/
 	"NOP",					"LD BC,#h",			"LD (BC),A",		"INC BC",				"INC B",				"DEC B",				"LD B,*h",			"RLCA",						/*	00-07	*/
 	"EX AF,AF'",		"ADD HL,BC",		"LD A,(BC)",		"DEC BC",				"INC C",				"DEC C",				"LD C,*h",			"RRCA",						/*	08-0f	*/
@@ -157,7 +152,7 @@ static char *MnemonicsZ80[256] = {
 	"RET M",				"LD SP,HL",			"JP M,#h",			"EI",						"CALL M,#h",		"PFX_FD",				"CP *h",				"RST 38h"					/*	f8-ff */
 };
 
-static char *MnemonicsCB[256] = {
+static char *const MnemonicsCB[256] = {
 /*0/8							1/9								2/A						3/B							4/C							5/D							6/E							7/F													*/
 	"RLC B",				"RLC C",				"RLC D",				"RLC E",				"RLC H",				"RLC L",				"RLC (HL)",				"RLC A",				/*	00-07	*/
 	"RRC B",				"RRC C",				"RRC D",				"RRC E",				"RRC H",				"RRC L",				"RRC (HL)",				"RRC A",				/*	08-0f	*/
@@ -193,7 +188,7 @@ static char *MnemonicsCB[256] = {
 	"SET 7,B",			"SET 7,C",			"SET 7,D",			"SET 7,E",			"SET 7,H",			"SET 7,L",			"SET 7,(HL)",			"SET 7,A"				/*	f8-ff */
 };
 
-static char *MnemonicsED[256] = {
+static char *const MnemonicsED[256] = {
 /*0/8							1/9								2/A						3/B							4/C							5/D							6/E							7/F													*/
 	"DB EDh,00h",		"DB EDh,01h",		"DB EDh,02h",		"DB EDh,03h",		"DB EDh,04h",		"DB EDh,05h",		"DB EDh,06h",			"DB EDh,07h",		/*	00-07	*/
 	"DB EDh,08h",		"DB EDh,09h",		"DB EDh,0Ah",		"DB EDh,0Bh",		"DB EDh,0Ch",		"DB EDh,0Dh",		"DB EDh,0Eh",			"DB EDh,0Fh",		/*	08-0f	*/
@@ -229,32 +224,32 @@ static char *MnemonicsED[256] = {
 	"DB EDh,F8h",		"DB EDh,F9h",		"DB EDh,FAh",		"DB EDh,FBh",		"DB EDh,FCh",		"DB EDh,FDh",		"DB EDh,FEh",			"DB EDh,FFh"		/*	f8-ff */
 };
 
-static char *MnemonicsXX[256] = {
+static char *const MnemonicsXX[256] = {
 /*0/8							1/9								2/A						3/B							4/C							5/D							6/E							7/F													*/
 	"NOP",					"LD BC,#h",			"LD (BC),A",		"INC BC",				"INC B",				"DEC B",				"LD B,*h",				"RLCA",					/*	00-07	*/
 	"EX AF,AF'",		"ADD I%,BC",		"LD A,(BC)",		"DEC BC",				"INC C",				"DEC C",				"LD C,*h",				"RRCA",					/*	08-0f	*/
 	"DJNZ $h",			"LD DE,#h",			"LD (DE),A",		"INC DE",				"INC D",				"DEC D",				"LD D,*h",				"RLA",					/*	10-17	*/
 	"JR $h",				"ADD I%,DE",		"LD A,(DE)",		"DEC DE",				"INC E",				"DEC E",				"LD E,*h",				"RRA",					/*	18-1f */
-	"JR NZ,$h",			"LD I%,#h",			"LD (#h),I%",		"INC I%",				"INC I%h",			"DEC I%h",			"LD I%h,*h",			"DAA",					/*	20-27 */
-	"JR Z,$h",			"ADD I%,I%",		"LD I%,(#h)",		"DEC I%",				"INC I%l",			"DEC I%l",			"LD I%l,*h",			"CPL",					/*	28-2f	*/
+	"JR NZ,$h",			"LD I%,#h",			"LD (#h),I%",		"INC I%",				"INC I%H",			"DEC I%H",			"LD I%H,*h",			"DAA",					/*	20-27 */
+	"JR Z,$h",			"ADD I%,I%",		"LD I%,(#h)",		"DEC I%",				"INC I%L",			"DEC I%L",			"LD I%L,*h",			"CPL",					/*	28-2f	*/
 	"JR NC,$h",			"LD SP,#h",			"LD (#h),A",		"INC SP",				"INC (I%+^h)",	"DEC (I%+^h)",	"LD (I%+^h),*h",	"SCF",					/*	30-37 */
 	"JR C,$h",			"ADD I%,SP",		"LD A,(#h)",		"DEC SP",				"INC A",				"DEC A",				"LD A,*h",				"CCF",					/*	38-3f */
-	"LD B,B",				"LD B,C",				"LD B,D",				"LD B,E",				"LD B,I%h",			"LD B,I%l",			"LD B,(I%+^h)",		"LD B,A",				/*	40-47 */
-	"LD C,B",				"LD C,C",				"LD C,D",				"LD C,E",				"LD C,I%h",			"LD C,I%l",			"LD C,(I%+^h)",		"LD C,A",				/*	48-4f */
-	"LD D,B",				"LD D,C",				"LD D,D",				"LD D,E",				"LD D,I%h",			"LD D,I%l",			"LD D,(I%+^h)",		"LD D,A",				/*	50-57 */
-	"LD E,B",				"LD E,C",				"LD E,D",				"LD E,E",				"LD E,I%h",			"LD E,I%l",			"LD E,(I%+^h)",		"LD E,A",				/*	58-5f */
-	"LD I%h,B",			"LD I%h,C",			"LD I%h,D",			"LD I%h,E",			"LD I%h,I%h",		"LD I%h,I%l",		"LD H,(I%+^h)",		"LD I%h,A",			/*	60-67 */
-	"LD I%l,B",			"LD I%l,C",			"LD I%l,D",			"LD I%l,E",			"LD I%l,I%h",		"LD I%l,I%l",		"LD L,(I%+^h)",		"LD I%l,A",			/*	68-6f */
+	"LD B,B",				"LD B,C",				"LD B,D",				"LD B,E",				"LD B,I%H",			"LD B,I%L",			"LD B,(I%+^h)",		"LD B,A",				/*	40-47 */
+	"LD C,B",				"LD C,C",				"LD C,D",				"LD C,E",				"LD C,I%H",			"LD C,I%L",			"LD C,(I%+^h)",		"LD C,A",				/*	48-4f */
+	"LD D,B",				"LD D,C",				"LD D,D",				"LD D,E",				"LD D,I%H",			"LD D,I%L",			"LD D,(I%+^h)",		"LD D,A",				/*	50-57 */
+	"LD E,B",				"LD E,C",				"LD E,D",				"LD E,E",				"LD E,I%H",			"LD E,I%L",			"LD E,(I%+^h)",		"LD E,A",				/*	58-5f */
+	"LD I%H,B",			"LD I%H,C",			"LD I%H,D",			"LD I%H,E",			"LD I%H,I%H",		"LD I%H,I%L",		"LD H,(I%+^h)",		"LD I%H,A",			/*	60-67 */
+	"LD I%L,B",			"LD I%L,C",			"LD I%L,D",			"LD I%L,E",			"LD I%L,I%H",		"LD I%L,I%L",		"LD L,(I%+^h)",		"LD I%L,A",			/*	68-6f */
 	"LD (I%+^h),B",	"LD (I%+^h),C",	"LD (I%+^h),D",	"LD (I%+^h),E",	"LD (I%+^h),H",	"LD (I%+^h),L",	"HALT",						"LD (I%+^h),A",	/*	70-77 */
-	"LD A,B",				"LD A,C",				"LD A,D",				"LD A,E",				"LD A,I%h",			"LD A,I%l",			"LD A,(I%+^h)",		"LD A,A",				/*	78-7f */
-	"ADD A,B",			"ADD A,C",			"ADD A,D",			"ADD A,E",			"ADD A,I%h",		"ADD A,I%l",		"ADD A,(I%+^h)",	"ADD A,A",			/*	80-87 */
-	"ADC A,B",			"ADC A,C",			"ADC A,D",			"ADC A,E",			"ADC A,I%h",		"ADC A,I%l",		"ADC A,(I%+^h)",	"ADC A,A",			/*	88-8f */
-	"SUB B",				"SUB C",				"SUB D",				"SUB E",				"SUB I%h",			"SUB I%l",			"SUB (I%+^h)",		"SUB A",				/*	90-97 */
-	"SBC A,B",			"SBC A,C",			"SBC A,D",			"SBC A,E",			"SBC A,I%h",		"SBC A,I%l",		"SBC A,(I%+^h)",	"SBC A,A",			/*	98-9f */
-	"AND B",				"AND C",				"AND D",				"AND E",				"AND I%h",			"AND I%l",			"AND (I%+^h)",		"AND A",				/*	a0-a7 */
-	"XOR B",				"XOR C",				"XOR D",				"XOR E",				"XOR I%h",			"XOR I%l",			"XOR (I%+^h)",		"XOR A",				/*	a8-af */
-	"OR B",					"OR C",					"OR D",					"OR E",					"OR I%h",				"OR I%l",				"OR (I%+^h)",			"OR A",					/*	b0-b7 */
-	"CP B",					"CP C",					"CP D",					"CP E",					"CP I%h",				"CP I%l",				"CP (I%+^h)",			"CP A",					/*	b8-bf */
+	"LD A,B",				"LD A,C",				"LD A,D",				"LD A,E",				"LD A,I%H",			"LD A,I%L",			"LD A,(I%+^h)",		"LD A,A",				/*	78-7f */
+	"ADD A,B",			"ADD A,C",			"ADD A,D",			"ADD A,E",			"ADD A,I%H",		"ADD A,I%L",		"ADD A,(I%+^h)",	"ADD A,A",			/*	80-87 */
+	"ADC A,B",			"ADC A,C",			"ADC A,D",			"ADC A,E",			"ADC A,I%H",		"ADC A,I%L",		"ADC A,(I%+^h)",	"ADC A,A",			/*	88-8f */
+	"SUB B",				"SUB C",				"SUB D",				"SUB E",				"SUB I%H",			"SUB I%L",			"SUB (I%+^h)",		"SUB A",				/*	90-97 */
+	"SBC A,B",			"SBC A,C",			"SBC A,D",			"SBC A,E",			"SBC A,I%H",		"SBC A,I%L",		"SBC A,(I%+^h)",	"SBC A,A",			/*	98-9f */
+	"AND B",				"AND C",				"AND D",				"AND E",				"AND I%H",			"AND I%L",			"AND (I%+^h)",		"AND A",				/*	a0-a7 */
+	"XOR B",				"XOR C",				"XOR D",				"XOR E",				"XOR I%H",			"XOR I%L",			"XOR (I%+^h)",		"XOR A",				/*	a8-af */
+	"OR B",					"OR C",					"OR D",					"OR E",					"OR I%H",				"OR I%L",				"OR (I%+^h)",			"OR A",					/*	b0-b7 */
+	"CP B",					"CP C",					"CP D",					"CP E",					"CP I%H",				"CP I%L",				"CP (I%+^h)",			"CP A",					/*	b8-bf */
 	"RET NZ",				"POP BC",				"JP NZ,#h",			"JP #h",				"CALL NZ,#h",		"PUSH BC",			"ADD A,*h",				"RST 00h",			/*	c8-cf */
 	"RET Z",				"RET",					"JP Z,#h",			"PFX_CB",				"CALL Z,#h",		"CALL #h",			"ADC A,*h",				"RST 08h",			/*	c8-cf */
 	"RET NC",				"POP DE",				"JP NC,#h",			"OUT (*h),A",		"CALL NC,#h",		"PUSH DE",			"SUB *h",					"RST 10h",			/*	d0-d7 */
@@ -265,7 +260,7 @@ static char *MnemonicsXX[256] = {
 	"RET M",				"LD SP,I%",			"JP M,#h",			"EI",						"CALL M,#h",		"PFX_FD",				"CP *h",					"RST 38h"				/*	f8-ff */
 };
 
-static char *MnemonicsXCB[256] = {
+static char *const MnemonicsXCB[256] = {
 /*0/8							1/9								2/A						3/B							4/C							5/D							6/E							7/F													*/
 	"RLC B",				"RLC C",				"RLC D",				"RLC E",				"RLC H",				"RLC L",				"RLC (I%@h)",			"RLC A",				/*	00-07	*/
 	"RRC B",				"RRC C",				"RRC D",				"RRC E",				"RRC H",				"RRC L",				"RRC (I%@h)",			"RRC A",				/*	08-0f	*/
@@ -301,7 +296,7 @@ static char *MnemonicsXCB[256] = {
 	"SET 7,B",			"SET 7,C",			"SET 7,D",			"SET 7,E",			"SET 7,H",			"SET 7,L",			"SET 7,(I%@h)",		"SET 7,A"				/*	f8-ff */
 };
 
-/* Symbolic disassembler
+/* symbolic disassembler
 
 	Inputs:
 		*val						=	instructions to disassemble
@@ -316,9 +311,9 @@ static char *MnemonicsXCB[256] = {
 
 */
 
-int32 DAsm(char *S, uint32 *val, int32 useZ80Mnemonics, int32 addr) {
-	char R[128], H[10], C= '\0', *T, *P;
-	uint8 J = 0, Offset;
+static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const int32 addr) {
+	char R[128], H[10], C = '\0', *T, *P;
+	uint8 J = 0, Offset = 0;
 	uint16 B = 0;
 
 	if (useZ80Mnemonics) {
@@ -333,8 +328,7 @@ int32 DAsm(char *S, uint32 *val, int32 useZ80Mnemonics, int32 addr) {
 				break;
 			case 0xdd:
 			case 0xfd:
-				C = (val[B] == 0xdd) ? 'X' : 'Y';
-				B++;
+				C = (val[B++] == 0xdd) ? 'X' : 'Y';
 				if (val[B] == 0xcb) {
 					B++;
 					Offset = val[B++];
@@ -411,7 +405,7 @@ int32 DAsm(char *S, uint32 *val, int32 useZ80Mnemonics, int32 addr) {
 	return(B);
 }
 
-/* Symbolic output
+/* symbolic output
 
 	Inputs:
 		*of		=	output stream
@@ -440,7 +434,7 @@ int32 fprint_sym(FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw) {
 
 /* numString checks determines the base of the number (ch, *numString)
 	and returns FALSE if the number is bad */
-int32 checkbase(char ch, char *numString) {
+static int32 checkbase(char ch, const char *numString) {
 	int32 decimal = (ch <= '9');
 	if (toupper(ch) == 'H') {
 		return FALSE;
@@ -453,7 +447,8 @@ int32 checkbase(char ch, char *numString) {
 	return toupper(ch) == 'H' ? 16 : (decimal ? 10 : FALSE);
 }
 
-int32 numok(char ch, char **numString, int32 minvalue, int32 maxvalue, int32 requireSign, int32 *result) {
+static int32 numok(char ch, const char **numString, const int32 minvalue,
+		const int32 maxvalue, const int32 requireSign, int32 *result) {
 	int32 sign = 1, value = 0, base;
 	if (requireSign) {
 		if (ch == '+') {
@@ -481,17 +476,19 @@ int32 numok(char ch, char **numString, int32 minvalue, int32 maxvalue, int32 req
 	return (minvalue <= value) && (value <= maxvalue);
 }
 
-int32 match(char *pattern, char *input, char *xy, int32 *number, int32 *star,
-	int32 *at, int32 *hat, int32 *dollar) {
+static int32 match(const char *pattern, const char *input, char *xyFirst, char *xy, int32 *number, int32 *star,
+		int32 *at, int32 *hat, int32 *dollar) {
 	char pat = *pattern++;
 	char inp = *input++;
 	while ((pat) && (inp)) {
 		switch(pat) {
+			case '_': /* patterns containting '_' should never match */
+				return FALSE;
 			case ',':
 				if (inp == ' ') {
 					inp = *input++;
 					continue;
-				}
+				}	/* otherwise fall through */
 			case ' ':
 				if (inp != pat) {
 					return FALSE;
@@ -502,11 +499,21 @@ int32 match(char *pattern, char *input, char *xy, int32 *number, int32 *star,
 					inp = *input++;
 				}
 				continue;
-				break;
 			case '%':
 				inp = toupper(inp);
 				if ((inp == 'X') || (inp == 'Y')) {
-					*xy = inp;
+					if (*xyFirst) { /* make sure that second '%' corresponds to first */
+						if (*xyFirst == inp) {
+							*xy = inp;
+						}
+						else {
+							return FALSE;
+						}
+					}
+					else { /* take note of first '%' for later */
+						*xyFirst = inp;
+						*xy = inp;
+					}
 				}
 				else {
 					return FALSE;
@@ -566,25 +573,16 @@ int32 match(char *pattern, char *input, char *xy, int32 *number, int32 *star,
 	return (pat == 0) && (inp == 0);
 }
 
-INLINE int32 checkXY(char xy) {
-	if (xy == 'X') {
-		return 0xdd;
-	}
-	else if (xy == 'Y') {
-		return 0xfd;
-	}
-	else {
-		printf("X or Y expected.\n");
-		return FALSE;
-	}
+static INLINE int32 checkXY(const char xy) {
+	return xy == 'X' ? 0xdd : 0xfd; /* else is 'Y' */
 }
 
-int32 parse_X80(char *cptr, int32 addr, uint32 *val, char *Mnemonics[]) {
-	char xy;
+static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *const Mnemonics[]) {
+	char xyFirst = 0, xy;
 	int32 op, number, star, at, hat, dollar;
 	for (op = 0; op < 256; op++) {
 		number = star = at = dollar = -129;
-		if (match(Mnemonics[op], cptr, &xy, &number, &star, &at, &hat, &dollar)) {
+		if (match(Mnemonics[op], cptr, &xyFirst, &xy, &number, &star, &at, &hat, &dollar)) {
 			val[0] = op;
 			if (number >= 0) {
 				val[1] = (0xff) & number;
@@ -598,7 +596,7 @@ int32 parse_X80(char *cptr, int32 addr, uint32 *val, char *Mnemonics[]) {
 			else if (at > -129) {
 				if ((-128 <= at) && (at <= 127)) {
 					val[1] = (int8)(at);
-					return -1;
+					return -1;				/* one additional byte returned			*/
 				}
 				else {
 					return SCPE_ARG;
@@ -624,7 +622,7 @@ int32 parse_X80(char *cptr, int32 addr, uint32 *val, char *Mnemonics[]) {
 	}
 
 	for (op = 0; op < 256; op++) {
-		if (match(MnemonicsCB[op], cptr, &xy, &number, &star, &at, &hat, &dollar)) {
+		if (match(MnemonicsCB[op], cptr, &xyFirst, &xy, &number, &star, &at, &hat, &dollar)) {
 			val[0] = 0xcb;
 			val[1] = op;
 			return -1;						/* one additional byte returned			*/
@@ -633,7 +631,7 @@ int32 parse_X80(char *cptr, int32 addr, uint32 *val, char *Mnemonics[]) {
 
 	for (op = 0; op < 256; op++) {
 		number = -1;
-		if (match(MnemonicsED[op], cptr, &xy, &number, &star, &at, &hat, &dollar)) {
+		if (match(MnemonicsED[op], cptr, &xyFirst, &xy, &number, &star, &at, &hat, &dollar)) {
 			val[0] = 0xed;
 			val[1] = op;
 			if (number >= 0) {
@@ -649,8 +647,9 @@ int32 parse_X80(char *cptr, int32 addr, uint32 *val, char *Mnemonics[]) {
 
 	for (op = 0; op < 256; op++) {
 		number = star = hat = -1;
-		xy = ' ';
-		if (match(MnemonicsXX[op], cptr, &xy, &number, &star, &at, &hat, &dollar)) {
+		xy = 0;
+		if (match(MnemonicsXX[op], cptr, &xyFirst, &xy, &number, &star, &at, &hat, &dollar)) {
+			/* all matches must have contained a '%' character */
 			if (!(val[0] = checkXY(xy))) {
 				return SCPE_ARG;
 			}
@@ -681,8 +680,9 @@ int32 parse_X80(char *cptr, int32 addr, uint32 *val, char *Mnemonics[]) {
 
 	for (op = 0; op < 256; op++) {
 		at = -129;
-		xy = ' ';
-		if (match(MnemonicsXCB[op], cptr, &xy, &number, &star, &at, &hat, &dollar)) {
+		xy = 0;
+		if (match(MnemonicsXCB[op], cptr, &xyFirst, &xy, &number, &star, &at, &hat, &dollar)) {
+			/* all matches must have contained a '%' character */
 			if (!(val[0] = checkXY(xy))) {
 				return SCPE_ARG;
 			}
@@ -702,7 +702,7 @@ int32 parse_X80(char *cptr, int32 addr, uint32 *val, char *Mnemonics[]) {
 }
 
 
-/* Symbolic input
+/* symbolic input
 
 	Inputs:
 		*cptr	=	pointer to input string
@@ -714,7 +714,7 @@ int32 parse_X80(char *cptr, int32 addr, uint32 *val, char *Mnemonics[]) {
 		status	=	error status
 */
 int32 parse_sym(char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw) {
-	while (isspace(*cptr)) cptr++;	/* absorb spaces		*/
+	while (isspace(*cptr)) cptr++;	/* absorb spaces			*/
 	if ((sw & (SWMASK('A') | SWMASK('C'))) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
 		if (cptr[0] == 0) {
 			return SCPE_ARG;						/* must have one char	*/
@@ -773,9 +773,7 @@ int32 sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
 		}						/* end while */
 		printf("%d bytes [%d page%s] loaded at %x.\n", cnt, (cnt + 255) >> 8,
 			((cnt + 255) >> 8) == 1 ? "" : "s", org);
-		if (cntROM) {
-			printf("Warning: %d bytes written to ROM [%04X - %04X].\n", cntROM, ROMLow, ROMHigh);
-		}
+		printROMMessage(cntROM);
 		if (cntNonExist) {
 			printf("Warning: %d bytes written to non-existing memory (for this configuration).\n", cntNonExist);
 		}

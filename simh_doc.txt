@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V2.10-3
-Date:	15-Feb-2003
+Subj:	Simulator Usage, V3.0
+Date:	15-May-2004
 
 			COPYRIGHT NOTICE
 
@@ -73,6 +73,11 @@ The simulators recognize or require a few compile-time #defines:
   default is GNU C (long long).  If your compiler uses a different
   convention, you will have to modify sim_defs.h.
 
+- The PDP-10, PDP-11, and VAX simulators share common peripherals.
+  To distinguish the target system, one of three variables must be
+  defined on the command line: VM_PDP10 for the PDP-10; VM_PDP11
+  for the PDP-11; or VM_VAX for the VAX.
+
 - The PDP-11 and VAX simulators optionally support Ethernet.  To
   include Ethernet emulation, USE_NETWORK must be defined as part
   of the compilation command line.  At present, Ethernet support is
@@ -134,7 +139,7 @@ Examples:
 
 - PDP-11 under TERMIOS UNIX:
 
-	% cc pdp11_*.c scp*.c sim_*.c -lm -o pdp11
+	% cc -DVM_PDP11 pdp11_*.c scp*.c sim_*.c -lm -o pdp11
 
 - PDP-9 under TERMIOS UNIX:
 
@@ -142,7 +147,7 @@ Examples:
 
 - PDP-10 under BSD terminal UNIX:
 
-	% cc -DUSE_INT64 -DBSDTTY pdp10_*.c scp*.c sim_*.c -lm -o pdp10
+	% cc -DVM_PDP10 -DUSE_INT64 -DBSDTTY pdp10_*.c scp*.c sim_*.c -lm -o pdp10
 
 1.2 Compiling Under Windows
 
@@ -328,6 +333,26 @@ only devices, such as paper-tape readers, and devices with write lock
 switches, such as disks and tapes, support read only operation; other
 devices do not.  If a file is ATTACHed read only, its contents can be
 examined but not modified. 
+
+For simulated magnetic tapes, the ATTACH command can specify the
+format of the attached tape image file:
+
+	sim> ATTACH -f <tape_unit> <format> <filename>(cr)
+
+The currently supported tape image file formats are:
+
+	SIMH		SIMH simulator format
+	E11		E11 simulator format
+	TPC		TPC format
+
+The tape format can also be set with the SET command prior to ATTACH:
+
+	sim> SET <tape_unit> FORMAT=<format>(cr)
+	sim> ATT <tape_unit> <filename>(cr)
+
+The format of an attached file can be displayed with the SHOW command:
+
+	sim> SHOW <tape_unit> FORMAT(cr)
 
 For Telnet-based terminal emulators, the ATTACH command associates the
 master unit with a TCP/IP port:
@@ -600,6 +625,21 @@ emulation of the Telnet client.
 	sim> SET NOTELNET		-- disable console Telnet
 	sim> SHOW TELNET		-- show console Telnet status
 
+The standard device names can be supplemented with logical names.
+Logical names must be unique within a simulator (that is, they cannot
+be the same as an existing device name).  To assign a logical name
+to a device:
+
+	sim> ASSIGN device log-name	-- assign log-name to device
+
+To remove a logical name:
+
+	sim> DEASSIGN device		-- remove logical name
+
+To show all logical names:
+
+	sim> SHOW NAMES
+
 3.11 Logging Console Output
 
 Output to the console can be logged simultaneously to a file.  Logging
@@ -690,6 +730,15 @@ Magnetic tapes are endian independent and consistent across simulator
 families.  A magtape produced by the Nova simulator will appear to
 have its 16b words byte swapped if read by the PDP-11 simulator.
 
+SIMH can read and write E11-format magtape images.  E11 format differs
+from SIMH format only for odd-length records; the data portion of E11
+records is not padded with an extra byte.
+
+SIMH can read TPC-format magtape images.  TPC format uses a 16b record
+header, with 0x0000 denoting file mark.  The record header is not
+repeated at the end of the record.  Odd-length records are padded with
+an extra byte.
+
 4. Line Printers
 
 Line printer output is represented by an ASCII file of lines separated
@@ -743,48 +792,48 @@ card reader	-	-	-	-	-
 line printer	y	y	y	h	y
 clock		y	y	y	-	y
 extra terminal	y	y	y	-	y
-hard disk	y	y	y	-	h
-fixed disk	y	-	h	-	h
+hard disk	y	y	y	-	y
+fixed disk	y	-	h	-	y
 floppy disk	y	y	y	-	-
-drum		-	-	-	-	h
+drum		-	-	-	h	h
 DECtape		y	y	-	h	y
-mag tape	h	y	y	-	h
+mag tape	y	y	y	-	h
 
 	system	1401	2100	PDP-10	H316	VAX
 device
 CPU		y	y	y	h	y
-FPU		-	d	y	-	y
-EIS/CIS		-	d	y	-	-
+FPU		-	y	y	-	y
+EIS/CIS		-	y	y	-	-
 console		h	y	y	h	y
-paper tape	-	d	h	h	y
+paper tape	-	y	h	h	y
 card reader	y	-	-	-	-
-line printer	y	d	y	h	y
-clock		-	d	y	h	y
-extra terminal	-	h	y	-	y
-hard disk	-	d	y	-	y
+line printer	y	y	y	h	y
+clock		-	y	y	h	y
+extra terminal	-	y	y	-	y
+hard disk	-	y	y	-	y
 fixed disk	-	n	-	-	-
 floppy disk	-	-	h	-	-
 drum		-	n	-	-	-
 DECtape		-	-	-	-	-
-mag tape	y	d	y	-	y
+mag tape	y	y	y	-	y
 
 	system	GRI-909	1620	i16	i32	SDS940
 device
-CPU		h	h	d	d	d
-FPU		-	-	d	d	-
+CPU		h	h	d	y	d
+FPU		-	-	d	y	-
 CIS		-	-	-	-	-
-console		h	h	d	d	h
-paper tape	h	h	d	d	h
+console		h	h	d	y	h
+paper tape	h	h	d	y	h
 card reader	-	h	-	-	-
-line printer	-	h	d	d	h
-clock		h	-	d	d	n
-extra terminal	-	-	h	h	h
-hard disk	-	h	d	d	h
+line printer	-	h	d	y	h
+clock		h	-	d	y	n
+extra terminal	-	-	h	y	h
+hard disk	-	h	d	y	h
 fixed disk	-	-	-	-	h
 floppy disk	-	-	d	d	-
 drum		-	-	-	-	h
 DECtape		-	-	-	-	-
-mag tape	-	-	d	d	h
+mag tape	-	-	d	y	h
 
 legend:		y = runs operating system or sample program
 		d = runs diagnostics
@@ -797,300 +846,308 @@ Revision History (covering Rev 2.0 to present)
 Starting with Rev 2.7, detailed revision histories can be found
 in file sim_rev.c.
 
+Rev 3.0, May, 03
+	Added logical name support
+	Added multiple tape format support
+	Added 64b address support
+
 Rev 2.10, Nov, 02
-		Added Telnet console capability, removed VT emulation
-		Added DO with substitutable arguments (from Brian Knittel)
-		Added quiet mode (from Brian Knittel)
-		Added ! command (from Mark Pizzolato)
-		Added Telnet BREAK support (from Mark Pizzolato)
-		Added device enable/disable support
-		Added optional simulator hooks for input, output, commands
-		Added PDP-11 KW11P programmable clock
-		Added PDP-11 RK611/RK06/RK07 disk
-		Added PDP-11/VAX TMSCP tape
-		Added PDP-11/VAX DELQA Ethernet support (from David Hittner)
-		Added PDP-11/PDP-10 RX211/RX02 floppy disk
-		Added PDP-11/VAX autoconfiguration support
-		Added PDP-10/PDP-11/VAX variable vector support
-		Added PDP-1 DECtape
-		Added PDP-1, PDP-4 Type 24 serial drum support
-		Added PDP-8 RX28 support
-		Added PDP-9 RB09 fixed head disk, LP09 line printer
-		Added HP2100 12845A line printer
-		Added HP2100 13183 magtape support
-		Added HP2100 boot ROM support
-		Added HP2100 interprocessor link support
-		Added IBM 1620
-		Added SDS 940
-		Added Interdata 16b and 32b systems
-		Added 16b DECtape file format support
-		Added support for statically buffered devices
-		Added magtape end of medium support
-		Added 7B/8B support to terminals and multiplexors
-		Added BREAK support to terminals and multiplexors
+	Added Telnet console capability, removed VT emulation
+	Added DO with substitutable arguments (from Brian Knittel)
+	Added .ini initialization file (from Hans Pufal)
+	Added quiet mode (from Brian Knittel)
+	Added ! command (from Mark Pizzolato)
+	Added Telnet BREAK support (from Mark Pizzolato)
+	Added device enable/disable support
+	Added optional simulator hooks for input, output, commands
+	Added breakpoint actions
+	Added magtape simulation library
+	Added PDP-11 KW11P programmable clock
+	Added PDP-11 RK611/RK06/RK07 disk
+	Added PDP-11/VAX TMSCP tape
+	Added PDP-11/VAX DELQA Ethernet support (from David Hittner)
+	Added PDP-11/PDP-10 RX211/RX02 floppy disk
+	Added PDP-11/VAX autoconfiguration support
+	Added PDP-10/PDP-11/VAX variable vector support
+	Added PDP-1 DECtape
+	Added PDP-1, PDP-4 Type 24 serial drum support
+	Added PDP-8 RX28 support
+	Added PDP-9 RB09 fixed head disk, LP09 line printer
+	Added HP2100 12845A line printer
+	Added HP2100 13183 magtape support
+	Added HP2100 boot ROM support
+	Added HP2100 interprocessor link support
+	Added IBM 1620
+	Added SDS 940
+	Added Interdata 16b and 32b systems
+	Added 16b DECtape file format support
+	Added support for statically buffered devices
+	Added magtape end of medium support
+	Added 50/60Hz support to line frequency clocks
+	Added 7B/8B support to terminals and multiplexors
+	Added BREAK support to terminals and multiplexors
 
 Rev 2.9, Jan, 02
-		Added circular register arrays
-		Replaced ENABLE/DISABLE with SET ENABLED/DISABLED
-		Replaced LOG/NOLOG with SET LOG/NOLOG
-		Generalized the timer calibration package
-		Added additional routines to the multiplexor library
-		Added SET DISCONNECT, SHOW STATISTICS commands to multiplexors
-		Reimplemented PDP-8 TTX as a unified multiplexor
-		Implemented a PC queue in most simulators
-		Added VAX simulator
-		Added GRI-909 simulator
-		Added Peter Schorn's MITS 8080/Z80 simulator
-		Added Brian Knittel's IBM 1130 simulator
-		Added HP2100 DQ, DR, MS, MUX devices
-		Added SET VT/NOVT commands
+	Added circular register arrays
+	Replaced ENABLE/DISABLE with SET ENABLED/DISABLED
+	Replaced LOG/NOLOG with SET LOG/NOLOG
+	Generalized the timer calibration package
+	Added additional routines to the multiplexor library
+	Added SET DISCONNECT, SHOW STATISTICS commands to multiplexors
+	Reimplemented PDP-8 TTX as a unified multiplexor
+	Implemented a PC queue in most simulators
+	Added VAX simulator
+	Added GRI-909 simulator
+	Added Peter Schorn's MITS 8080/Z80 simulator
+	Added Brian Knittel's IBM 1130 simulator
+	Added HP2100 DQ, DR, MS, MUX devices
+	Added SET VT/NOVT commands
 
 Rev 2.8, Dec, 01
-		Added DO command
-		Added general breakpoint facility
-		Added extended SET/SHOW capability
-		Replaced ADD/REMOVE with SET ONLINE/OFFLINE
-		Added global register name recognition
-		Added unit-based register arrays
-		Added Charles Owen's System 3 simulator
-		Added PDP-11 I/O bus map
-		Added PDP-11/VAX RQDX3
-		Added PDP-8 RL8A
-		Revised 18b PDP interrupt structure
-		Revised directory and documentation structure
-		Added support for MINGW environment
+	Added DO command
+	Added general breakpoint facility
+	Added extended SET/SHOW capability
+	Replaced ADD/REMOVE with SET ONLINE/OFFLINE
+	Added global register name recognition
+	Added unit-based register arrays
+	Added Charles Owen's System 3 simulator
+	Added PDP-11 I/O bus map
+	Added PDP-11/VAX RQDX3
+	Added PDP-8 RL8A
+	Revised 18b PDP interrupt structure
+	Revised directory and documentation structure
+	Added support for MINGW environment
 
 Rev 2.7, Sep, 01
-		Added DZ11 (from Thord Nilson and Art Krewat)
-			to PDP-11, PDP-10
-		Added additional terminals to PDP-8
-		Added TSS/8 packed character format to PDP-8
-		Added sim_sock and sim_tmxr libraries
-		Added sim_qcount and simulator exit detach all facilities
-		Added Macintosh sim_sock support (from Peter Schorn)
-		Added simulator revision level, SHOW version
-		Changed int64/uint64 to t_int64/t_uint64 for Windoze
-		Fixed bug in PDP-11 interrupt acknowledge
-		Fixed bugs in PDP-11 TS NXM check, boot code, error status;
-			added extended characteristics and status
-		Fixed bug in PDP-11 TC stop, stop all functions
-		Fixed receive interrupt while disconnected bug in DZ11
-		Fixed multi-unit operation bugs, interrupt bugs in
-			 PDP-11 RP, PDP-10 RP, PDP-10 TU
-		Fixed carrier detect bug in PDP-11, PDP-10 DZ
-		Fixed bug in PDP-8 reset routine
-		Fixed conditional in PDP-18b CPU
-		Fixed SC = 0 bug in PDP-18b EAE
-		Fixed bug in PDP-7 LPT
-		Upgraded Nova second terminal to use sim_tmxr
-		Upgraded PDP-18b second terminal to use sim_tmxr
-		Upgraded PDP-11 LTC to full KW11-L
-		Removed hack multiple console support
+	Added DZ11 (from Thord Nilson and Art Krewat) to PDP-11,
+	 PDP-10
+	Added additional terminals to PDP-8
+	Added TSS/8 packed character format to PDP-8
+	Added sim_sock and sim_tmxr libraries
+	Added sim_qcount and simulator exit detach all facilities
+	Added Macintosh sim_sock support (from Peter Schorn)
+	Added simulator revision level, SHOW version
+	Changed int64/uint64 to t_int64/t_uint64 for Windoze
+	Fixed bug in PDP-11 interrupt acknowledge
+	Fixed bugs in PDP-11 TS NXM check, boot code, error status;
+	 added extended characteristics and status
+	Fixed bug in PDP-11 TC stop, stop all functions
+	Fixed receive interrupt while disconnected bug in DZ11
+	Fixed multi-unit operation bugs, interrupt bugs in PDP-11
+	 RP, PDP-10 RP, PDP-10 TU
+	Fixed carrier detect bug in PDP-11, PDP-10 DZ
+	Fixed bug in PDP-8 reset routine
+	Fixed conditional in PDP-18b CPU
+	Fixed SC = 0 bug in PDP-18b EAE
+	Fixed bug in PDP-7 LPT
+	Upgraded Nova second terminal to use sim_tmxr
+	Upgraded PDP-18b second terminal to use sim_tmxr
+	Upgraded PDP-11 LTC to full KW11-L
+	Removed hack multiple console support
 
 Rev 2.6b, Aug, 01
-		Added H316/516 simulator
-		Added Macintosh support from Louis Chrétien, Peter Schorn,
-			and Ben Supnik
-		Added bad block table option to PDP-11 RL, RP
-		Removed register in declarations
-		Fixed bugs found by Peter Schorn
-		-- endian error in PDP-10, PDP-11 RP
-		-- space reverse error in PDP-11 TS
-		-- symbolic input in 1401
-		Fixed bug in PDP-1 RIM loader found by Derek Peschel
-		Fixed bug in Nova fixed head disk
+	Added H316/516 simulator
+	Added Macintosh support from Louis Chrétien, Peter Schorn,
+	 and Ben Supnik
+	Added bad block table option to PDP-11 RL, RP
+	Removed register in declarations
+	Fixed bugs found by Peter Schorn
+	-- endian error in PDP-10, PDP-11 RP
+	-- space reverse error in PDP-11 TS
+	-- symbolic input in 1401
+	Fixed bug in PDP-1 RIM loader found by Derek Peschel
+	Fixed bug in Nova fixed head disk
 
 Rev 2.6a, Jun, 01
-		Added PDP-9, PDP-15 API option
-		Added PDP-9, PDP-15 second terminal
-		Added PDP-10 option for TOPS-20 V4.1 bug fix
-		Added PDP-10 FE CTRL-C option for Windoze
-		Added console logging
-		Added multiple console support
-		Added comment recognition
-		Increased size of string buffers for long path names
-		Fixed bug in big-endian I/O found by Dave Conroy
-		Fixed DECtape reset in PDP-8, PDP-11, PDP-9/15
-		Fixed RIM loader PC handling in PDP-9/15
-		Fixed indirect pointers in PDP-10 paging
-		Fixed SSC handling in PDP-10 TM02/TU45
-		Fixed JMS to non-existent memory in PDP-8
-		Fixed error handling on command file
+	Added PDP-9, PDP-15 API option
+	Added PDP-9, PDP-15 second terminal
+	Added PDP-10 option for TOPS-20 V4.1 bug fix
+	Added PDP-10 FE CTRL-C option for Windoze
+	Added console logging
+	Added multiple console support
+	Added comment recognition
+	Increased size of string buffers for long path names
+	Fixed bug in big-endian I/O found by Dave Conroy
+	Fixed DECtape reset in PDP-8, PDP-11, PDP-9/15
+	Fixed RIM loader PC handling in PDP-9/15
+	Fixed indirect pointers in PDP-10 paging
+	Fixed SSC handling in PDP-10 TM02/TU45
+	Fixed JMS to non-existent memory in PDP-8
+	Fixed error handling on command file
 
 Rev 2.6, May, 01
-		Added ENABLE/DISABLE devices
-		Added SHOW DEVICES
-		Added examination/modification of register arrays
-		Added PDP-10 simulator
-		Added clock autocalibration to SCP, Nova, PDP-8, PDP-11,
-			PDP-18b
-		Added PDP-8, PDP-11, PDP-9/15 DECtape
-		Added PDP-8 DF32
-		Added 4k Disk Monitor boot to PDP-8 RF08 and DF32
-		Added PDP-4/7 funny format loader support
-		Added extension handling to the PDP-8 and -9/15 loaders
-		Added PDP-11 TS11/TSV05
-		Added integer interval timer to SCP
-		Added filename argument to LOAD/DUMP
-		Revised magtape and DECtape bootstraps to rewind
-			before first instruction
-		Fixed 3 cycle data break sequence in PDP-8 RF
-		Fixed 3 cycle data break sequence in 18b PDP LP, MT, RF
-		Fixed CS1.TRE write, CS2.MXF,UPE write, and CS2.UAI in
-			PDP-11 RP
-		Fixed 4M memory size definition in PDP-11
-		Fixed attach bug in RESTORE
-		Fixed detach bug for buffered devices
-		Updated copyright notices, fixed comments
+	Added ENABLE/DISABLE devices
+	Added SHOW DEVICES
+	Added examination/modification of register arrays
+	Added PDP-10 simulator
+	Added clock autocalibration to SCP, Nova, PDP-8, PDP-11,
+	 PDP-18b
+	Added PDP-8, PDP-11, PDP-9/15 DECtape
+	Added PDP-8 DF32
+	Added 4k Disk Monitor boot to PDP-8 RF08 and DF32
+	Added PDP-4/7 funny format loader support
+	Added extension handling to the PDP-8 and -9/15 loaders
+	Added PDP-11 TS11/TSV05
+	Added integer interval timer to SCP
+	Added filename argument to LOAD/DUMP
+	Revised magtape and DECtape bootstraps to rewind before
+	 first instruction
+	Fixed 3 cycle data break sequence in PDP-8 RF
+	Fixed 3 cycle data break sequence in 18b PDP LP, MT, RF
+	Fixed CS1.TRE write, CS2.MXF,UPE write, and CS2.UAI in
+	 PDP-11 RP
+	Fixed 4M memory size definition in PDP-11
+	Fixed attach bug in RESTORE
+	Fixed detach bug for buffered devices
+	Updated copyright notices, fixed comments
 
 Rev 2.5a, Dec, 00
-		Added CMD flop to HP paper tape and line printer
-		Added status input for HP paper tape punch and TTY
-		Added Dutch Owens' 1401 mag tape boot routine
-		Added Bruce Ray's Nova plotter and second terminal modules
-		Added Charles Owen's Eclipse CPU support
-		Added PDP-9/PDP-15 RIM/BIN loader support
-		Added PDP-9/PDP-15 extend/bank initial state registers
-		Added PDP-9/PDP-15 half/full duplex support
-		Moved software documentation to a separate file
-		Fixed SCP handling of devices without units
-		Fixed FLG, FBF initialization in many HP peripherals
-		Fixed 1401 bugs found by Dutch Owens
-		-- 4, 7 char NOPs are legal
-		-- 1 char B is chained BCE
-		-- MCE moves whole character, not digit, after first
-		Fixed Nova bugs found by Bruce Ray
-		-- traps implemented on Nova 3 as well as Nova 4
-		-- DIV and DIVS 0/0 set carry
-		-- RETN sets SP from FP at outset
-		-- IORST does not clear carry
-		-- Nova 4 implements two undocumented instructions
-		Fixed bugs in 18b PDP's
-		-- XCT indirect address calculation
-		-- missing index instructions in PDP-15
-		-- bank mode handling in PDP-15
+	Added CMD flop to HP paper tape and line printer
+	Added status input for HP paper tape punch and TTY
+	Added Charles Owen's 1401 mag tape boot routine
+	Added Bruce Ray's Nova plotter and second terminal modules
+	Added Charles Owen's Eclipse CPU support
+	Added PDP-9/PDP-15 RIM/BIN loader support
+	Added PDP-9/PDP-15 extend/bank initial state registers
+	Added PDP-9/PDP-15 half/full duplex support
+	Moved software documentation to a separate file
+	Fixed SCP handling of devices without units
+	Fixed FLG, FBF initialization in many HP peripherals
+	Fixed 1401 bugs found by Charles Owen
+	-- 4, 7 char NOPs are legal
+	-- 1 char B is chained BCE
+	-- MCE moves whole character, not digit, after first
+	Fixed Nova bugs found by Bruce Ray
+	-- traps implemented on Nova 3 as well as Nova 4
+	-- DIV and DIVS 0/0 set carry
+	-- RETN sets SP from FP at outset
+	-- IORST does not clear carry
+	-- Nova 4 implements two undocumented instructions
+	Fixed bugs in 18b PDP's
+	-- XCT indirect address calculation
+	-- missing index instructions in PDP-15
+	-- bank mode handling in PDP-15
 
 Rev 2.5, Nov, 00
-		Removed Digital and Compaq from copyrights, as
-			authorized by Compaq Sr VP Bill Strecker
-		Revised save/restore format for 64b simulators
-		Added examine to file
-		Added unsigned integer data types to sim_defs
-		Added Nova 3 and Nova 4 instructions to Nova CPU
-		Added HP2100
-		Added Interdata 4
-		Fixed indirect loop through autoinc/dec in Nova CPU
-		Fixed MDV enabled test in Nova CPU
+	Removed Digital and Compaq from copyrights, as authorized
+	 by Compaq Sr VP Bill Strecker
+	Revised save/restore format for 64b simulators
+	Added examine to file
+	Added unsigned integer data types to sim_defs
+	Added Nova 3 and Nova 4 instructions to Nova CPU
+	Added HP2100
+	Fixed indirect loop through autoinc/dec in Nova CPU
+	Fixed MDV enabled test in Nova CPU
 
 Rev 2.4, Jan, 99
-		Placed all sources under X11-like open source license
-		Added DUMP command, revised sim_load interface
-		Added SHOW MODIFIERS command
-		Revised magtape format to include record error flag   
-		Fixed 64b problems in SCP
-		Fixed big endian problem in PDP-11 bad block routine 
-		Fixed interrupt on error bug in PDP-11 RP/RM disks
-		Fixed ROL/ROR inversion in PDP-11 symbolic routines
+	Placed all sources under X11-like open source license
+	Added DUMP command, revised sim_load interface
+	Added SHOW MODIFIERS command
+	Revised magtape format to include record error flag   
+	Fixed 64b problems in SCP
+	Fixed big endian problem in PDP-11 bad block routine 
+	Fixed interrupt on error bug in PDP-11 RP/RM disks
+	Fixed ROL/ROR inversion in PDP-11 symbolic routines
 
 Rev 2.3d, Sep, 98
-		Added BeOS support
-		Added radix commands and switches
-		Added PDP-11 CIS support
-		Added RT11 V5.3 to distribution kits
-		Fixed "shift 32" bugs in SCP, PDP-11 floating point
-		Fixed bug in PDP-11 paper tape reader
-		Fixed bug in ^D handling
+	Added BeOS support
+	Added radix commands and switches
+	Added PDP-11 CIS support
+	Added RT11 V5.3 to distribution kits
+	Fixed "shift 32" bugs in SCP, PDP-11 floating point
+	Fixed bug in PDP-11 paper tape reader
+	Fixed bug in ^D handling
 
 Rev 2.3c, May, 98
-		Fixed bug in PDP-11 DIV overflow check
-		Fixed bugs in PDP-11 magtape bootstrap
-		Fixed bug in PDP-11 magtape unit select
-		Replaced UNIX V7 disk images
+	Fixed bug in PDP-11 DIV overflow check
+	Fixed bugs in PDP-11 magtape bootstrap
+	Fixed bug in PDP-11 magtape unit select
+	Replaced UNIX V7 disk images
 
 Rev 2.3b, May, 98
-		Added switch recognition to all simulator commands
-		Added RIM loader to PDP-8 paper tape reader and loader
-		Added second block bootstrap to PDP-11 magtape
-		Fixed bug in PDP-8 RF bootstrap
-		Fixed bug in PDP-11 symbolic display
-		Fixed bugs in PDP-11 floating point (LDEXP, STEXP,
-			MODf, STCfi, overflow handling)
+	Added switch recognition to all simulator commands
+	Added RIM loader to PDP-8 paper tape reader and loader
+	Added second block bootstrap to PDP-11 magtape
+	Fixed bug in PDP-8 RF bootstrap
+	Fixed bug in PDP-11 symbolic display
+	Fixed bugs in PDP-11 floating point (LDEXP, STEXP,
+	 MODf, STCfi, overflow handling)
 
 Rev 2.3a, Nov, 97
-		Added search capability
-		Added bad block table command to PDP-11 disks
-		Added bootstrap to PDP-11 magtape
-		Added additional Nova moving head disks
-		Added RT-11 sample software
-		Fixed bugs in PDP-11 RM/RP disks
-		Fixed bugs in Nova moving head disks
-		Fixed endian dependence in 18b PDP RIM loader
+	Added search capability
+	Added bad block table command to PDP-11 disks
+	Added bootstrap to PDP-11 magtape
+	Added additional Nova moving head disks
+	Added RT-11 sample software
+	Fixed bugs in PDP-11 RM/RP disks
+	Fixed bugs in Nova moving head disks
+	Fixed endian dependence in 18b PDP RIM loader
 
 Rev 2.3, Mar, 97
-		Added PDP-11 RP
-		Added PDP-1
-		Changed UNIX terminal I/O to TERMIOS
-		Changed magtape format to double ended
-		Changed PDP-8 current page mnemonic from T to C
-		Added endian independent I/O routines
-		Added precise integer data types 
-		Fixed bug in sim_poll_kbd
-		Fixed bug in PDP-8 binary loader
-		Fixed bugs in TM11 magtape
-		Fixed bug in RX11 bootstrap
-		Fixed bug in 18b PDP ADD
-		Fixed bug in 18b PDP paper tape reader
-		Fixed bug in PDP-4 console
-		Fixed bug in PDP-4,7 line printer
+	Added PDP-11 RP
+	Added PDP-1
+	Changed UNIX terminal I/O to TERMIOS
+	Changed magtape format to double ended
+	Changed PDP-8 current page mnemonic from T to C
+	Added endian independent I/O routines
+	Added precise integer data types 
+	Fixed bug in sim_poll_kbd
+	Fixed bug in PDP-8 binary loader
+	Fixed bugs in TM11 magtape
+	Fixed bug in RX11 bootstrap
+	Fixed bug in 18b PDP ADD
+	Fixed bug in 18b PDP paper tape reader
+	Fixed bug in PDP-4 console
+	Fixed bug in PDP-4,7 line printer
 
 Rev 2.2d, Dec, 96
-		Added ADD/REMOVE commands
-		Added unit enable/disable support to device simulators
-		Added features for IBM 1401 project
-		Added switch recognition for symbolic input
-		Fixed bug in variable length IEXAMINE
-		Fixed LCD bug in RX8E
-		Initial changes for Win32
-		Added IBM 1401
+	Added ADD/REMOVE commands
+	Added unit enable/disable support to device simulators
+	Added features for IBM 1401 project
+	Added switch recognition for symbolic input
+	Fixed bug in variable length IEXAMINE
+	Fixed LCD bug in RX8E
+	Initial changes for Win32
+	Added IBM 1401
 
 Rev 2.2b, Apr, 96
-		Added PDP-11 dynamic memory size support
+	Added PDP-11 dynamic memory size support
 
 Rev 2.2a, Feb, 96
-		New endian independent magtape format
+	New endian independent magtape format
 
 Rev 2.2 Jan, 96
-		Added register buffers for save/restore
-		Added 18b PDP's
-		Guaranteed TTI, CLK times are non-zero
-		Fixed breakpoint/RUN interaction bug
-		Fixed magnetic tape backspace to EOF bug
-		Fixed ISZ/DCA inversion in PDP-8 symbol table
-		Fixed sixbit conversion in PDP-8 examine/deposit
-		Fixed origin increment bug in PDP-11 binary loader
-		Fixed GCC longjmp optimization bug in PDP-11 CPU
-		Fixed unit number calculation bug in SCP and in
-			Nova, PDP-11, 18b PDP moving head disks
+	Added register buffers for save/restore
+	Added 18b PDP's
+	Guaranteed TTI, CLK times are non-zero
+	Fixed breakpoint/RUN interaction bug
+	Fixed magnetic tape backspace to EOF bug
+	Fixed ISZ/DCA inversion in PDP-8 symbol table
+	Fixed sixbit conversion in PDP-8 examine/deposit
+	Fixed origin increment bug in PDP-11 binary loader
+	Fixed GCC longjmp optimization bug in PDP-11 CPU
+	Fixed unit number calculation bug in SCP and in Nova,
+	 Nova, PDP-11, 18b PDP moving head disks
 
 Rev 2.1 Dec, 95
-		Fixed PTR bug (setting done on EOF) in PDP-8, Nova
-		Fixed RX bug (setting error on INIT if drive 1 is
-			not attached) in PDP-8, PDP-11
-		Fixed RF treatment of photocell flag in PDP-8
-		Fixed autosize bug (always chose smallest disk if new
-			file) in PDP-11, Nova
-		Fixed not attached bug (reported as not attachable) in
-			most mass storage devices
-		Fixed Nova boot ROMs
-		Fixed bug in RESTORE (didn't requeue if delay = 0)
-		Fixed bug in RESTORE (clobbered device position)
-		Declared static constant arrays as static const
-		Added PDP-8, Nova magnetic tape simulators
-		Added Dasher mode to Nova terminal simulator
-		Added LINUX support
+	Fixed PTR bug (setting done on EOF) in PDP-8, Nova
+	Fixed RX bug (setting error on INIT if drive 1 is
+	 not attached) in PDP-8, PDP-11
+	Fixed RF treatment of photocell flag in PDP-8
+	Fixed autosize bug (always chose smallest disk if new
+	 file) in PDP-11, Nova
+	Fixed not attached bug (reported as not attachable) in
+	 most mass storage devices
+	Fixed Nova boot ROMs
+	Fixed bug in RESTORE (didn't requeue if delay = 0)
+	Fixed bug in RESTORE (clobbered device position)
+	Declared static constant arrays as static const
+	Added PDP-8, Nova magnetic tape simulators
+	Added Dasher mode to Nova terminal simulator
+	Added LINUX support
 
 Rev 2.0	May, 95
-		Added symbolic assembly/disassembly
+	Added symbolic assembly/disassembly
 
 Acknowledgements
 
@@ -1110,12 +1167,12 @@ Louis Chrétien		Macintosh porting
 Dave Conroy		HP 21xx documentation, PDP-10, PDP-18b debugging
 L Peter Deutsch		PDP-1 LISP software
 Ethan Dicks		PDP-11 2.9 BSD debugging
-John Dundas		PDP-11 CPU and clock debugging
+John Dundas		PDP-11 CPU debugging, programmable clock simulator
 Jonathan Engdahl	PDP-11 device debugging
 Carl Friend		Nova and Interdata documentation, and RDOS software
-Megan Gentry		PDP-11 integer debugging, make file
-Dave Gesswein		PDP-8 and PDP-9.15 documentation, PDP-8 DECtape and
-			 paper tape images, PDP-9/15 DECtape images
+Megan Gentry		PDP-11 integer debugging
+Dave Gesswein		PDP-8 and PDP-9.15 documentation, PDP-8 DECtape, disk,
+			 and paper tape images, PDP-9/15 DECtape images
 Dick Greeley		PDP-8 OS/8 and PDP-10 TOPS-10/20 legal permissions
 Gordon Greene		PDP-1 LISP machine readable source
 Lynne Grettum		PDP-11 RT-11, RSTS/E, RSX-11M legal permissions
@@ -1126,14 +1183,14 @@ Ken Harrenstein		KLH PDP-10 simulator
 Bill Haygood		PDP-8 information, simulator, and software
 Wolfgang Helbig		DZ11 implementation
 Mark Hittinger		PDP-10 debugging
-Dave Hittner		SCP debugging, Ethernet emulation
+Dave Hittner		SCP debugging, DEQNA emulator and Ethernet library
 Sellam Ismail		GRI-909 documentation
-Jay Jaeger		IBM 1401 information
+Jay Jaeger		IBM 1401 consulting
 Doug Jones		PDP-8 information, simulator, and software
-Brian Knittel		IBM 1130 simulator
+Brian Knittel		IBM 1130 simulator, SCP extensions for GUI support
 Al Kossow		HP 21xx, Varian 620, TI 990, Interdata, DEC
 			 documentation and software
-Arthur Krewat		DZ11 update for the PDP-10
+Arthur Krewat		DZ11 changes for the PDP-10
 Mirian Crzig Lennox	ITS and DZ11 debugging
 Don Lewine		Nova documentation and legal permissions
 Tim Litt		PDP-10 hardware documentation and schematics,
@@ -1151,8 +1208,9 @@ Charles Owen		Nova moving head disk debugging, Altair simulator,
 Sergio Pedraja		MINGW environment debugging
 Derek Peschel		PDP-10 debugging
 Paul Pierce		IBM 1401 diagnostics, media recovery
-Mark Pizzolato		VAX simulator improvements
-Hans Pufal		PDP-10 debugging, PDP-15 bootstrap
+Mark Pizzolato		SCP, Ethernet, and VAX simulator improvements
+Hans Pufal		PDP-10 debugging, PDP-15 bootstrap, DOS-15 recovery,
+			DOS-15 documentation, PDP-9 restoration
 Bruce Ray		Software, documentation, bug fixes, and new devices
 			 for the Nova, OS/2 porting
 Craig St Clair		DEC documentation
@@ -1163,7 +1221,7 @@ Olaf Seibert		NetBSD port testing
 Brian & Barry Silverman	PDP-1 simulator and software
 Tim Shoppa		Nova documentation, RDOS software, PDP-10 and PDP-11
 			 software archive, hosting for SIMH site
-Van Snyder		IBM 1401 bootstraps
+Van Snyder		IBM 1401 zero footprint bootstraps
 Michael Somos		PDP-1 debugging
 Hans-Michael Stahl	OS/2 port testing, TERMIOS implementation
 Tim Stark		TS10 PDP-10 simulator
@@ -1171,11 +1229,14 @@ Larry Stewart		Initial suggestion for the project
 Bill Strecker		Permission to revert copyrights
 Chris Suddick		PDP-11 floating point debugging
 Ben Supnik		Macintosh timing routine
+Bob Supnik		SIMH simulators
 Ben Thomas		VMS character-by-character I/O routines
 Warren Toomey		PDP-11 UNIX software
 Deb Toivonen		DEC documentation
 Mike Umbricht		DEC documentation, H316 documentation and schematics
 Leendert Van Doorn	PDP-11 UNIX V6 debugging, TERMIOS implementation
+Fred Van Kempen		Ethernet code, RK611 emulator, PDP-11 debugging,
+			VAX/Ultrix debugging
 Holger Veit		OS/2 socket support
 David Waks		PDP-8 ESI-X and PDP-7 SIM8 software
 Tom West		Nova documentation
@@ -1192,4 +1253,6 @@ Compaq Computer Corporation
 Mentec Corporation
 The Santa Cruz Operation
 Caldera Corporation
+Hewlett-Packard Corporation
+
 

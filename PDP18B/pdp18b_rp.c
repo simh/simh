@@ -345,7 +345,7 @@ if (rp_sta & (STA_NXS | STA_NXF | STA_NXC)) {		/* or bad disk addr? */
 pa = rp_ma & ADDRMASK;					/* get mem addr */
 da = GET_DA (rp_da) * RP_NUMWD;				/* get disk addr */
 wc = 01000000 - rp_wc;					/* get true wc */
-if (((t_addr) (pa + wc)) > MEMSIZE) {			/* memory overrun? */
+if (((uint32) (pa + wc)) > MEMSIZE) {			/* memory overrun? */
 	nexm = 1;					/* set nexm flag */
 	wc = MEMSIZE - pa;  }				/* limit xfer */
 if ((da + wc) > RP_SIZE) {				/* disk overrun? */

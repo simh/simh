@@ -1,6 +1,6 @@
 /* nova_plt.c: NOVA plotter simulator
 
-   Copyright (c) 2000-2002, Robert M. Supnik
+   Copyright (c) 2000-2003, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    plt		plotter
 
+   25-Apr-03	RMS	Revised for extended file support
    03-Oct-02	RMS	Added DIB
    30-May-02	RMS	Widened POS to 32b
    06-Jan-02	RMS	Revised enable/disable support
@@ -61,7 +62,7 @@ REG plt_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_PLT) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_PLT) },
 	{ FLDATA (INT, int_req, INT_V_PLT) },
-	{ DRDATA (POS, plt_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, plt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, plt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, plt_stopioe, 0) },
 	{ NULL }  };

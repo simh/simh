@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	VAX Simulator Usage
-Date:	15-Nov-2002
+Date:	15-Jun-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -36,12 +36,10 @@ This memorandum documents the VAX simulator.
 
 1. Simulator Files
 
-To compile the VAX, you must define USE_INT64 as part of the compilation
+To compile the VAX, you must define VM_VAX and USE_INT64 as part of the compilation
 command line.
 
-sim/		dec_dz.h
-		dec_pt.h
-		sim_defs.h
+sim/		sim_defs.h
 		sim_ether.h
 		sim_rev.h
 		sim_sock.h
@@ -65,6 +63,7 @@ sim/vax/	vax_defs.h
 sim/pdp11/	pdp11_mscp.h
 		pdp11_uqssp.h
 		pdp11_xq.h
+		pdp11_xq_bootrom.h
 		pdp11_dz.c
 		pdp11_lp.c
 		pdp11_pt.c
@@ -100,9 +99,10 @@ RQD		fourth RQDX3 MSCP controller with four drives
 TS		TSV11/TSV05 magnetic tape controller with one drive
 TQ		TQK50 TMSCP magnetic tape controller with four drives
 XQ		DELQA/DEQNA Ethernet controller
+XQB		second DELQA/DEQNA Ethernet controller
 
-The PTR, PTP, LPT, DZ, RL, RQ, RQB, RQC, RQD, TS, TQ, and XQ devices can
-be set DISABLED.  RQB, RQC, and RQD are disabled by default.
+The PTR, PTP, LPT, DZ, RL, RQ, RQB, RQC, RQD, TS, TQ, XQ, and XQB devices
+can be set DISABLED.  RQB, RQC, RQD, and XQB are disabled by default.
 
 The VAX simulator implements several unique stop conditions:
 
@@ -227,6 +227,14 @@ using the LOAD -r command:
 
 	LOAD -r KA655.BIN	-- load boot ROM image KA655.BIN
 
+ROM accesses a use a calibrated delay that slows ROM-based execution to
+about 500K instructions per second.  This delay is required to make the
+power-up self-test routines run correctly on very fast hosts.  The delay
+is controlled with the commands:
+
+	SET ROM NODELAY			-- ROM runs like RAM
+	SET ROM DELAY			-- ROM runs slowly
+
 2.1.4 Non-volatile Memory (NVR)
 
 The NVR consists of a single unit, representing 1KB of battery-backed up
@@ -320,7 +328,7 @@ longer recognizes the explicitly configured device.  A device can be
 reset to autoconfigure with the SET <device> AUTOCONFIGURE command. 
 
 The current I/O map can be displayed with the SHOW CPU IOSPACE command.
-Address that have set by autoconfiguration are marked with an asterisk (*). 
+Addresses that have set by autoconfiguration are marked with an asterisk (*). 
 
 All devices support the SHOW ADDRESS and SHOW VECTOR commands, which display
 the device address and vector, respectively.
@@ -780,9 +788,10 @@ Error handling is as follows:
 
 	OS I/O error	report error and stop
 
-2.8 DELQA/DEQNA Ethernet Controller (XQ)
+2.8  DELQA/DEQNA Qbus Ethernet Controllers (XQ, XQB)
 
-XQ simulates the DELQA/DEQNA 10Mbps Ethernet controller.  Options allow
+The simulator implements two DELQA/DEQNA Qbus Ethernet controllers (XQ,
+XQB).  Initially, XQ is enabled, and XQB is disabled.  Options allow
 control of the MAC address, the controller mode, and the sanity timer.
 
 	SET  XQ MAC=<mac-address>	ex. 08-00-2B-AA-BB-CC

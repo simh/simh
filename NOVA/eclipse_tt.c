@@ -1,6 +1,6 @@
 /* eclipse_tt.c: Eclipse console terminal simulator
 
-   Copyright (c) 1998-2002, Charles E Owen
+   Copyright (c) 1998-2003, Charles E Owen
    Portions copyright (c) 1993-2002, Robert M Supnik
    Written by Charles Owen, used by gracious permission
    Commercial use prohibited
@@ -8,6 +8,7 @@
    tti		terminal input
    tto		terminal output
 
+   25-Apr-03	RMS	Revised for extended file support
    03-Oct-02	RMS	Added DIBs
    30-May-02	RMS	Widened POS to 32b
    28-Jan-02	RMS	Cleaned up compiler warnings
@@ -49,7 +50,7 @@ REG tti_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTI) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_TTI) },
 	{ FLDATA (INT, int_req, INT_V_TTI) },
-	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
@@ -82,7 +83,7 @@ REG tto_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTO) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_TTO) },
 	{ FLDATA (INT, int_req, INT_V_TTO) },
-	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 

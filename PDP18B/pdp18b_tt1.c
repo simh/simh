@@ -1,6 +1,6 @@
 /* pdp18b_tt1.c: 18b PDP's second Teletype
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti1		keyboard
    tto1		teleprinter
 
+   09-May-03	RMS	Added network device flag
    22-Dec-02	RMS	Added break support
    02-Nov-02	RMS	Added 7B/8B support
    05-Oct-02	RMS	Added DIB, device number support
@@ -110,7 +111,7 @@ DEVICE tti1_dev = {
 	1, 10, 31, 1, 8, 8,
 	&tmxr_ex, &tmxr_dep, &tti1_reset,
 	NULL, &tti1_attach, &tti1_detach,
-	&tti1_dib, DEV_DISABLE };
+	&tti1_dib, DEV_NET | DEV_DISABLE };
 
 /* TTO1 data structures
 

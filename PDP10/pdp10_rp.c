@@ -1,6 +1,6 @@
 /* pdp10_rp.c - RH11/RP04/05/06/07 RM02/03/05/80 "Massbus" disk controller
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp		RH/RP/RM moving head disks
 
+   25-Apr-03	RMS	Revised for extended file support
    21-Nov-02	RMS	Fixed bug in bootstrap (reported by Michael Thompson)
    29-Sep-02	RMS	Added variable vector support
 			New data structures
@@ -408,7 +409,7 @@ REG rp_reg[] = {
 	{ DRDATA (STIME, rp_swait, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (RTIME, rp_rwait, 24), REG_NZ + PV_LEFT },
 	{ URDATA (FNC, rp_unit[0].FUNC, 8, 5, 0, RP_NUMDR, REG_HRO) },
-	{ URDATA (CAPAC, rp_unit[0].capac, 10, 31, 0,
+	{ URDATA (CAPAC, rp_unit[0].capac, 10, T_ADDR_W, 0,
 		  RP_NUMDR, PV_LEFT | REG_HRO) },
 	{ FLDATA (STOP_IOE, rp_stopioe, 0) },
 	{ NULL }  };

@@ -1,6 +1,6 @@
 /* s3_lp.c: IBM 1403 line printer simulator
 
-   Copyright (c) 2001, Charles E. Owen
+   Copyright (c) 2001-2003, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Charles E. Owen.
 
-	lpt		1403 line printer
+   lpt		1403 line printer
 
+   25-Apr-03	RMS	Revised for extended file support
    08-Oct-02	RMS	Added impossible function catcher
 */
 
@@ -80,7 +81,7 @@ REG lpt_reg[] = {
 	{ HRDATA (LPFLR, LPFLR, 8) },
 	{ HRDATA (LPIAR, LPIAR, 16) },
 	{ DRDATA (LINECT, linectr, 8) },
-	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ BRDATA (CCT, cct, 8, 32, CCT_LNT) },
 	{ DRDATA (LINES, lines, 8), PV_LEFT },
 	{ DRDATA (CCTP, cctptr, 8), PV_LEFT },

@@ -1,6 +1,6 @@
-/* pdp11_rq.c: RQDX3 disk controller simulator
+/* pdp11_rq.c: MSCP disk controller simulator
 
-   Copyright (c) 2003, Robert M Supnik
+   Copyright (c) 2002-2003, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,9 @@
 
    rq		RQDX3 disk controller
 
+   19-May-03	RMS	Revised for new conditional compilation scheme
+   25-Apr-03	RMS	Revised for extended file support
+   14-Mar-03	RMS	Fixed variable size interaction with save/restore
    27-Feb-03	RMS	Added user-defined drive support
    26-Feb-03	RMS	Fixed bug in vector calculation for VAXen
    22-Feb-03	RMS	Fixed ordering bug in queue process
@@ -49,26 +52,29 @@
    17-Dec-01	RMS	Added queue process
 */
 
-#if defined (USE_INT64)
+#if defined (VM_PDP10)					/* PDP10 version */
+#error "RQDX3 not supported on PDP-10!"
+
+#elif defined (VM_VAX)					/* VAX version */
 #include "vax_defs.h"
-#define VM_VAX		1
-#define RQ_RDX		16
 #define RQ_AINC		4
 #define RQ_WID		32
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 
-#else
+#else							/* PDP-11 version */
 #include "pdp11_defs.h"
-#define VM_PDP11	1
-#define RQ_RDX		8
 #define RQ_AINC		2
 #define RQ_WID		16
 extern int32 cpu_18b, cpu_ubm;
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 #endif
 
 #if !defined (RQ_NUMCT)
 #define RQ_NUMCT	4
 #elif (RQ_NUMCT > 4)
-Assertion failure: RQ_NUMCT exceeds 4
+#error "Assertion failure: RQ_NUMCT exceeds 4"
 #endif
 
 #include "pdp11_uqssp.h"
@@ -418,8 +424,9 @@ struct rqpkt {
 #define RA8U_MOD	11				/* RA82 */
 #define RA8U_MED	0x25641052			/* RA82 */
 #define RA8U_FLGS	RQDF_SDI
-#define RA8U_MINC	((5 << 20) / RQ_NUMBY)
-#define RA8U_MAXC	((2047 << 20) / RQ_NUMBY)
+#define RA8U_MINC	5				/* min cap MB */
+#define RA8U_MAXC	2000				/* max cap MB */
+#define RA8U_EMAXC	1000000				/* ext max cap */
 
 struct drvtyp {
 	int32	sect;					/* sectors */
@@ -429,7 +436,7 @@ struct drvtyp {
 	int32	gpc;					/* grp/cyl */
 	int32	xbn;					/* XBN size */
 	int32	dbn;					/* DBN size */
-	int32	lbn;					/* LBN size */
+	uint32	lbn;					/* LBN size */
 	int32	rcts;					/* RCT size */
 	int32	rctc;					/* RCT copies */
 	int32	rbn;					/* RBNs */
@@ -460,6 +467,7 @@ extern int32 tmr_poll, clk_tps;
 extern int32 cpu_log;
 extern UNIT cpu_unit;
 extern FILE *sim_log;
+extern uint32 sim_taddr_64;
 
 uint16 *rqxb = NULL;					/* xfer buffer */
 int32 rq_itime = 200;					/* init time, except */
@@ -575,22 +583,22 @@ UNIT rq_unit[] = {
 	{ UDATA (&rq_quesvc, UNIT_DIS, 0) }  };
 
 REG rq_reg[] = {
-	{ GRDATA (SA, rq_ctx.sa, RQ_RDX, 16, 0) },
-	{ GRDATA (SAW, rq_ctx.saw, RQ_RDX, 16, 0) },
-	{ GRDATA (S1DAT, rq_ctx.s1dat, RQ_RDX, 16, 0) },
-	{ GRDATA (COMM, rq_ctx.comm, RQ_RDX, 22, 0) },
-	{ GRDATA (CQBA, rq_ctx.cq.ba, RQ_RDX, 22, 0) },
-	{ GRDATA (CQLNT, rq_ctx.cq.lnt, RQ_RDX, 8, 2), REG_NZ },
-	{ GRDATA (CQIDX, rq_ctx.cq.idx, RQ_RDX, 8, 2) },
-	{ GRDATA (RQBA, rq_ctx.rq.ba, RQ_RDX, 22, 0) },
-	{ GRDATA (RQLNT, rq_ctx.rq.lnt, RQ_RDX, 8, 2), REG_NZ },
-	{ GRDATA (RQIDX, rq_ctx.rq.idx, RQ_RDX, 8, 2) },
+	{ GRDATA (SA, rq_ctx.sa, DEV_RDX, 16, 0) },
+	{ GRDATA (SAW, rq_ctx.saw, DEV_RDX, 16, 0) },
+	{ GRDATA (S1DAT, rq_ctx.s1dat, DEV_RDX, 16, 0) },
+	{ GRDATA (COMM, rq_ctx.comm, DEV_RDX, 22, 0) },
+	{ GRDATA (CQBA, rq_ctx.cq.ba, DEV_RDX, 22, 0) },
+	{ GRDATA (CQLNT, rq_ctx.cq.lnt, DEV_RDX, 8, 2), REG_NZ },
+	{ GRDATA (CQIDX, rq_ctx.cq.idx, DEV_RDX, 8, 2) },
+	{ GRDATA (RQBA, rq_ctx.rq.ba, DEV_RDX, 22, 0) },
+	{ GRDATA (RQLNT, rq_ctx.rq.lnt, DEV_RDX, 8, 2), REG_NZ },
+	{ GRDATA (RQIDX, rq_ctx.rq.idx, DEV_RDX, 8, 2) },
 	{ DRDATA (FREE, rq_ctx.freq, 5) },
 	{ DRDATA (RESP, rq_ctx.rspq, 5) },
 	{ DRDATA (PBSY, rq_ctx.pbsy, 5) },
-	{ GRDATA (CFLGS, rq_ctx.cflgs, RQ_RDX, 16, 0) },
-	{ GRDATA (CSTA, rq_ctx.csta, RQ_RDX, 4, 0) },
-	{ GRDATA (PERR, rq_ctx.perr, RQ_RDX, 9, 0) },
+	{ GRDATA (CFLGS, rq_ctx.cflgs, DEV_RDX, 16, 0) },
+	{ GRDATA (CSTA, rq_ctx.csta, DEV_RDX, 4, 0) },
+	{ GRDATA (PERR, rq_ctx.perr, DEV_RDX, 9, 0) },
 	{ DRDATA (CRED, rq_ctx.credits, 5) },
 	{ DRDATA (HAT, rq_ctx.hat, 17) },
 	{ DRDATA (HTMO, rq_ctx.htmo, 17) },
@@ -601,12 +609,13 @@ REG rq_reg[] = {
 	{ DRDATA (I4TIME, rq_itime4, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (QTIME, rq_qtime, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (XTIME, rq_xtime, 24), PV_LEFT + REG_NZ },
-	{ BRDATA (PKTS, rq_ctx.pak, RQ_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
+	{ BRDATA (PKTS, rq_ctx.pak, DEV_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
 	{ URDATA (CPKT, rq_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
 	{ URDATA (PKTQ, rq_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
-	{ URDATA (UFLG, rq_unit[0].uf, RQ_RDX, 16, 0, RQ_NUMDR, 0) },
-	{ GRDATA (DEVADDR, rq_dib.ba, RQ_RDX, 32, 0), REG_HRO },
-	{ GRDATA (DEVVEC, rq_dib.vec, RQ_RDX, 16, 0), REG_HRO },
+	{ URDATA (UFLG, rq_unit[0].uf, DEV_RDX, 16, 0, RQ_NUMDR, 0) },
+	{ URDATA (CAPAC, rq_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
+	{ GRDATA (DEVADDR, rq_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+	{ GRDATA (DEVVEC, rq_dib.vec, DEV_RDX, 16, 0), REG_HRO },
 	{ DRDATA (DEVLBN, drv_tab[RA8U_DTYPE].lbn, 22), REG_HRO },
 	{ NULL }  };
 
@@ -672,7 +681,7 @@ MTAB rq_mod[] = {
 
 DEVICE rq_dev = {
 	"RQ", rq_unit, rq_reg, rq_mod,
-	RQ_NUMDR + 2, RQ_RDX, 31, RQ_AINC, RQ_RDX, RQ_WID,
+	RQ_NUMDR + 2, DEV_RDX, 31, RQ_AINC, DEV_RDX, RQ_WID,
 	NULL, NULL, &rq_reset,
 	&rq_boot, &rq_attach, &rq_detach,
 	&rq_dib, DEV_FLTA | DEV_DISABLE | DEV_UBUS | DEV_QBUS };
@@ -703,39 +712,40 @@ UNIT rqb_unit[] = {
 	{ UDATA (&rq_quesvc, UNIT_DIS, 0) }  };
 
 REG rqb_reg[] = {
-	{ GRDATA (SA, rqb_ctx.sa, RQ_RDX, 16, 0) },
-	{ GRDATA (SAW, rqb_ctx.saw, RQ_RDX, 16, 0) },
-	{ GRDATA (S1DAT, rqb_ctx.s1dat, RQ_RDX, 16, 0) },
-	{ GRDATA (COMM, rqb_ctx.comm, RQ_RDX, 22, 0) },
-	{ GRDATA (CQBA, rqb_ctx.cq.ba, RQ_RDX, 22, 0) },
-	{ GRDATA (CQLNT, rqb_ctx.cq.lnt, RQ_RDX, 8, 2), REG_NZ },
-	{ GRDATA (CQIDX, rqb_ctx.cq.idx, RQ_RDX, 8, 2) },
-	{ GRDATA (RQBA, rqb_ctx.rq.ba, RQ_RDX, 22, 0) },
-	{ GRDATA (RQLNT, rqb_ctx.rq.lnt, RQ_RDX, 8, 2), REG_NZ },
-	{ GRDATA (RQIDX, rqb_ctx.rq.idx, RQ_RDX, 8, 2) },
+	{ GRDATA (SA, rqb_ctx.sa, DEV_RDX, 16, 0) },
+	{ GRDATA (SAW, rqb_ctx.saw, DEV_RDX, 16, 0) },
+	{ GRDATA (S1DAT, rqb_ctx.s1dat, DEV_RDX, 16, 0) },
+	{ GRDATA (COMM, rqb_ctx.comm, DEV_RDX, 22, 0) },
+	{ GRDATA (CQBA, rqb_ctx.cq.ba, DEV_RDX, 22, 0) },
+	{ GRDATA (CQLNT, rqb_ctx.cq.lnt, DEV_RDX, 8, 2), REG_NZ },
+	{ GRDATA (CQIDX, rqb_ctx.cq.idx, DEV_RDX, 8, 2) },
+	{ GRDATA (RQBA, rqb_ctx.rq.ba, DEV_RDX, 22, 0) },
+	{ GRDATA (RQLNT, rqb_ctx.rq.lnt, DEV_RDX, 8, 2), REG_NZ },
+	{ GRDATA (RQIDX, rqb_ctx.rq.idx, DEV_RDX, 8, 2) },
 	{ DRDATA (FREE, rqb_ctx.freq, 5) },
 	{ DRDATA (RESP, rqb_ctx.rspq, 5) },
 	{ DRDATA (PBSY, rqb_ctx.pbsy, 5) },
-	{ GRDATA (CFLGS, rqb_ctx.cflgs, RQ_RDX, 16, 0) },
-	{ GRDATA (CSTA, rqb_ctx.csta, RQ_RDX, 4, 0) },
-	{ GRDATA (PERR, rqb_ctx.perr, RQ_RDX, 9, 0) },
+	{ GRDATA (CFLGS, rqb_ctx.cflgs, DEV_RDX, 16, 0) },
+	{ GRDATA (CSTA, rqb_ctx.csta, DEV_RDX, 4, 0) },
+	{ GRDATA (PERR, rqb_ctx.perr, DEV_RDX, 9, 0) },
 	{ DRDATA (CRED, rqb_ctx.credits, 5) },
 	{ DRDATA (HAT, rqb_ctx.hat, 17) },
 	{ DRDATA (HTMO, rqb_ctx.htmo, 17) },
 	{ FLDATA (PRGI, rqb_ctx.prgi, 0), REG_HIDDEN },
 	{ FLDATA (PIP, rqb_ctx.pip, 0), REG_HIDDEN },
 	{ FLDATA (INT, rqb_ctx.irq, 0) },
-	{ BRDATA (PKTS, rqb_ctx.pak, RQ_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
+	{ BRDATA (PKTS, rqb_ctx.pak, DEV_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
 	{ URDATA (CPKT, rqb_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
 	{ URDATA (PKTQ, rqb_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
-	{ URDATA (UFLG, rqb_unit[0].uf, RQ_RDX, 16, 0, RQ_NUMDR, 0) },
-	{ GRDATA (DEVADDR, rqb_dib.ba, RQ_RDX, 32, 0), REG_HRO },
-	{ GRDATA (DEVVEC, rqb_dib.vec, RQ_RDX, 16, 0), REG_HRO },
+	{ URDATA (UFLG, rqb_unit[0].uf, DEV_RDX, 16, 0, RQ_NUMDR, 0) },
+	{ URDATA (CAPAC, rqb_unit[0].capac, 10, 31, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
+	{ GRDATA (DEVADDR, rqb_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+	{ GRDATA (DEVVEC, rqb_dib.vec, DEV_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 DEVICE rqb_dev = {
 	"RQB", rqb_unit, rqb_reg, rq_mod,
-	RQ_NUMDR + 2, RQ_RDX, 31, RQ_AINC, RQ_RDX, RQ_WID,
+	RQ_NUMDR + 2, DEV_RDX, 31, RQ_AINC, DEV_RDX, RQ_WID,
 	NULL, NULL, &rq_reset,
 	&rq_boot, &rq_attach, &rq_detach,
 	&rqb_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS };
@@ -766,39 +776,40 @@ UNIT rqc_unit[] = {
 	{ UDATA (&rq_quesvc, UNIT_DIS, 0) }  };
 
 REG rqc_reg[] = {
-	{ GRDATA (SA, rqc_ctx.sa, RQ_RDX, 16, 0) },
-	{ GRDATA (SAW, rqc_ctx.saw, RQ_RDX, 16, 0) },
-	{ GRDATA (S1DAT, rqc_ctx.s1dat, RQ_RDX, 16, 0) },
-	{ GRDATA (COMM, rqc_ctx.comm, RQ_RDX, 22, 0) },
-	{ GRDATA (CQBA, rqc_ctx.cq.ba, RQ_RDX, 22, 0) },
-	{ GRDATA (CQLNT, rqc_ctx.cq.lnt, RQ_RDX, 8, 2), REG_NZ },
-	{ GRDATA (CQIDX, rqc_ctx.cq.idx, RQ_RDX, 8, 2) },
-	{ GRDATA (RQBA, rqc_ctx.rq.ba, RQ_RDX, 22, 0) },
-	{ GRDATA (RQLNT, rqc_ctx.rq.lnt, RQ_RDX, 8, 2), REG_NZ },
-	{ GRDATA (RQIDX, rqc_ctx.rq.idx, RQ_RDX, 8, 2) },
+	{ GRDATA (SA, rqc_ctx.sa, DEV_RDX, 16, 0) },
+	{ GRDATA (SAW, rqc_ctx.saw, DEV_RDX, 16, 0) },
+	{ GRDATA (S1DAT, rqc_ctx.s1dat, DEV_RDX, 16, 0) },
+	{ GRDATA (COMM, rqc_ctx.comm, DEV_RDX, 22, 0) },
+	{ GRDATA (CQBA, rqc_ctx.cq.ba, DEV_RDX, 22, 0) },
+	{ GRDATA (CQLNT, rqc_ctx.cq.lnt, DEV_RDX, 8, 2), REG_NZ },
+	{ GRDATA (CQIDX, rqc_ctx.cq.idx, DEV_RDX, 8, 2) },
+	{ GRDATA (RQBA, rqc_ctx.rq.ba, DEV_RDX, 22, 0) },
+	{ GRDATA (RQLNT, rqc_ctx.rq.lnt, DEV_RDX, 8, 2), REG_NZ },
+	{ GRDATA (RQIDX, rqc_ctx.rq.idx, DEV_RDX, 8, 2) },
 	{ DRDATA (FREE, rqc_ctx.freq, 5) },
 	{ DRDATA (RESP, rqc_ctx.rspq, 5) },
 	{ DRDATA (PBSY, rqc_ctx.pbsy, 5) },
-	{ GRDATA (CFLGS, rqc_ctx.cflgs, RQ_RDX, 16, 0) },
-	{ GRDATA (CSTA, rqc_ctx.csta, RQ_RDX, 4, 0) },
-	{ GRDATA (PERR, rqc_ctx.perr, RQ_RDX, 9, 0) },
+	{ GRDATA (CFLGS, rqc_ctx.cflgs, DEV_RDX, 16, 0) },
+	{ GRDATA (CSTA, rqc_ctx.csta, DEV_RDX, 4, 0) },
+	{ GRDATA (PERR, rqc_ctx.perr, DEV_RDX, 9, 0) },
 	{ DRDATA (CRED, rqc_ctx.credits, 5) },
 	{ DRDATA (HAT, rqc_ctx.hat, 17) },
 	{ DRDATA (HTMO, rqc_ctx.htmo, 17) },
 	{ FLDATA (PRGI, rqc_ctx.prgi, 0), REG_HIDDEN },
 	{ FLDATA (PIP, rqc_ctx.pip, 0), REG_HIDDEN },
 	{ FLDATA (INT, rqc_ctx.irq, 0) },
-	{ BRDATA (PKTS, rqc_ctx.pak, RQ_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
+	{ BRDATA (PKTS, rqc_ctx.pak, DEV_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
 	{ URDATA (CPKT, rqc_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
 	{ URDATA (PKTQ, rqc_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
-	{ URDATA (UFLG, rqc_unit[0].uf, RQ_RDX, 16, 0, RQ_NUMDR, 0) },
-	{ GRDATA (DEVADDR, rqc_dib.ba, RQ_RDX, 32, 0), REG_HRO },
-	{ GRDATA (DEVVEC, rqc_dib.vec, RQ_RDX, 16, 0), REG_HRO },
+	{ URDATA (UFLG, rqc_unit[0].uf, DEV_RDX, 16, 0, RQ_NUMDR, 0) },
+	{ URDATA (CAPAC, rqc_unit[0].capac, 10, 31, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
+	{ GRDATA (DEVADDR, rqc_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+	{ GRDATA (DEVVEC, rqc_dib.vec, DEV_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 DEVICE rqc_dev = {
 	"RQC", rqc_unit, rqc_reg, rq_mod,
-	RQ_NUMDR + 2, RQ_RDX, 31, RQ_AINC, RQ_RDX, RQ_WID,
+	RQ_NUMDR + 2, DEV_RDX, 31, RQ_AINC, DEV_RDX, RQ_WID,
 	NULL, NULL, &rq_reset,
 	&rq_boot, &rq_attach, &rq_detach,
 	&rqc_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS };
@@ -829,39 +840,40 @@ UNIT rqd_unit[] = {
 	{ UDATA (&rq_quesvc, UNIT_DIS, 0) }  };
 
 REG rqd_reg[] = {
-	{ GRDATA (SA, rqd_ctx.sa, RQ_RDX, 16, 0) },
-	{ GRDATA (SAW, rqd_ctx.saw, RQ_RDX, 16, 0) },
-	{ GRDATA (S1DAT, rqd_ctx.s1dat, RQ_RDX, 16, 0) },
-	{ GRDATA (COMM, rqd_ctx.comm, RQ_RDX, 22, 0) },
-	{ GRDATA (CQBA, rqd_ctx.cq.ba, RQ_RDX, 22, 0) },
-	{ GRDATA (CQLNT, rqd_ctx.cq.lnt, RQ_RDX, 8, 2), REG_NZ },
-	{ GRDATA (CQIDX, rqd_ctx.cq.idx, RQ_RDX, 8, 2) },
-	{ GRDATA (RQBA, rqd_ctx.rq.ba, RQ_RDX, 22, 0) },
-	{ GRDATA (RQLNT, rqd_ctx.rq.lnt, RQ_RDX, 8, 2), REG_NZ },
-	{ GRDATA (RQIDX, rqd_ctx.rq.idx, RQ_RDX, 8, 2) },
+	{ GRDATA (SA, rqd_ctx.sa, DEV_RDX, 16, 0) },
+	{ GRDATA (SAW, rqd_ctx.saw, DEV_RDX, 16, 0) },
+	{ GRDATA (S1DAT, rqd_ctx.s1dat, DEV_RDX, 16, 0) },
+	{ GRDATA (COMM, rqd_ctx.comm, DEV_RDX, 22, 0) },
+	{ GRDATA (CQBA, rqd_ctx.cq.ba, DEV_RDX, 22, 0) },
+	{ GRDATA (CQLNT, rqd_ctx.cq.lnt, DEV_RDX, 8, 2), REG_NZ },
+	{ GRDATA (CQIDX, rqd_ctx.cq.idx, DEV_RDX, 8, 2) },
+	{ GRDATA (RQBA, rqd_ctx.rq.ba, DEV_RDX, 22, 0) },
+	{ GRDATA (RQLNT, rqd_ctx.rq.lnt, DEV_RDX, 8, 2), REG_NZ },
+	{ GRDATA (RQIDX, rqd_ctx.rq.idx, DEV_RDX, 8, 2) },
 	{ DRDATA (FREE, rqd_ctx.freq, 5) },
 	{ DRDATA (RESP, rqd_ctx.rspq, 5) },
 	{ DRDATA (PBSY, rqd_ctx.pbsy, 5) },
-	{ GRDATA (CFLGS, rqd_ctx.cflgs, RQ_RDX, 16, 0) },
-	{ GRDATA (CSTA, rqd_ctx.csta, RQ_RDX, 4, 0) },
-	{ GRDATA (PERR, rqd_ctx.perr, RQ_RDX, 9, 0) },
+	{ GRDATA (CFLGS, rqd_ctx.cflgs, DEV_RDX, 16, 0) },
+	{ GRDATA (CSTA, rqd_ctx.csta, DEV_RDX, 4, 0) },
+	{ GRDATA (PERR, rqd_ctx.perr, DEV_RDX, 9, 0) },
 	{ DRDATA (CRED, rqd_ctx.credits, 5) },
 	{ DRDATA (HAT, rqd_ctx.hat, 17) },
 	{ DRDATA (HTMO, rqd_ctx.htmo, 17) },
 	{ FLDATA (PRGI, rqd_ctx.prgi, 0), REG_HIDDEN },
 	{ FLDATA (PIP, rqd_ctx.pip, 0), REG_HIDDEN },
 	{ FLDATA (INT, rqd_ctx.irq, 0) },
-	{ BRDATA (PKTS, rqd_ctx.pak, RQ_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
+	{ BRDATA (PKTS, rqd_ctx.pak, DEV_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
 	{ URDATA (CPKT, rqd_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
 	{ URDATA (PKTQ, rqd_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
-	{ URDATA (UFLG, rqd_unit[0].uf, RQ_RDX, 16, 0, RQ_NUMDR, 0) },
-	{ GRDATA (DEVADDR, rqd_dib.ba, RQ_RDX, 32, 0), REG_HRO },
-	{ GRDATA (DEVVEC, rqd_dib.vec, RQ_RDX, 16, 0), REG_HRO },
+	{ URDATA (UFLG, rqd_unit[0].uf, DEV_RDX, 16, 0, RQ_NUMDR, 0) },
+	{ URDATA (CAPAC, rqd_unit[0].capac, 10, 31, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
+	{ GRDATA (DEVADDR, rqd_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+	{ GRDATA (DEVVEC, rqd_dib.vec, DEV_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 DEVICE rqd_dev = {
 	"RQD", rqd_unit, rqd_reg, rq_mod,
-	RQ_NUMDR + 2, RQ_RDX, 31, RQ_AINC, RQ_RDX, RQ_WID,
+	RQ_NUMDR + 2, DEV_RDX, 31, RQ_AINC, DEV_RDX, RQ_WID,
 	NULL, NULL, &rq_reset,
 	&rq_boot, &rq_attach, &rq_detach,
 	&rqd_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS };
@@ -944,7 +956,7 @@ return -1;
 t_bool rq_step4 (MSC *cp)
 {
 int32 i, lnt;
-t_addr base;
+uint32 base;
 uint16 zero[SA_COMM_MAX >> 1];
 
 cp->rq.ioff = SA_COMM_RI;				/* set intr offset */
@@ -1420,7 +1432,7 @@ if ((cmd != OP_ACC) && (cmd != OP_ERS) &&		/* 'real' xfer */
 	return (ST_HST | SB_HST_OA);			/* host buf odd */
 if (bc & 1) return (ST_HST | SB_HST_OC);		/* odd byte cnt? */
 if (bc & 0xF0000000) return (ST_CMD | I_BCNT);		/* 'reasonable' bc? */
-if (lbn & 0xF0000000) return (ST_CMD | I_LBN);		/* 'reasonable' lbn? */
+/* if (lbn & 0xF0000000) return (ST_CMD | I_LBN);	/* 'reasonable' lbn? */
 if (lbn >= maxlbn) {					/* accessing RCT? */
 	if (lbn >= (maxlbn + drv_tab[dtyp].rcts))	/* beyond copy 1? */
 	    return (ST_CMD | I_LBN);			/* lbn err */
@@ -1449,7 +1461,7 @@ uint32 cmd = GETP (pkt, CMD_OPC, OPC);			/* get cmd */
 uint32 ba = GETP32 (pkt, RW_WBAL);			/* buf addr */
 uint32 bc = GETP32 (pkt, RW_WBCL);			/* byte count */
 uint32 bl = GETP32 (pkt, RW_WBLL);			/* block addr */
-uint32 da = bl * RQ_NUMBY;				/* disk addr */
+t_addr da = ((t_addr) bl) * RQ_NUMBY;			/* disk addr */
 
 if ((cp == NULL) || (pkt == 0)) return STOP_RQ;		/* what??? */
 tbc = (bc > RQ_MAXFR)? RQ_MAXFR: bc;			/* trim cnt to max */
@@ -1472,7 +1484,7 @@ if ((cmd == OP_ERS) || (cmd == OP_WR)) {		/* write op? */
 if (cmd == OP_ERS) {					/* erase? */
 	wwc = ((tbc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
 	for (i = 0; i < wwc; i++) rqxb[i] = 0;		/* clr buf */
-	err = fseek (uptr->fileref, da, SEEK_SET);	/* set pos */
+	err = fseek_ext (uptr->fileref, da, SEEK_SET);	/* set pos */
 	if (!err) fxwrite (rqxb, sizeof (int16), wwc, uptr->fileref);
 	err = ferror (uptr->fileref);  }		/* end if erase */
 
@@ -1481,7 +1493,7 @@ else if (cmd == OP_WR) {				/* write? */
 	if (abc = tbc - t) {				/* any xfer? */
 	    wwc = ((abc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
 	    for (i = (abc >> 1); i < wwc; i++) rqxb[i] = 0;
-	    err = fseek (uptr->fileref, da, SEEK_SET);
+	    err = fseek_ext (uptr->fileref, da, SEEK_SET);
 	    if (!err) fxwrite (rqxb, sizeof (int16), wwc, uptr->fileref);
 	    err = ferror (uptr->fileref);  }
 	if (t) {					/* nxm? */
@@ -1491,7 +1503,7 @@ else if (cmd == OP_WR) {				/* write? */
 		rq_rw_end (cp, uptr, EF_LOG, ST_HST | SB_HST_NXM);	
 	    return SCPE_OK;  }  }			/* end else wr */
 
-else {	err = fseek (uptr->fileref, da, SEEK_SET);	/* set pos */
+else {	err = fseek_ext (uptr->fileref, da, SEEK_SET);	/* set pos */
 	if (!err) {
 	    i = fxread (rqxb, sizeof (int16), tbc >> 1, uptr->fileref);
 	    for ( ; i < (tbc >> 1); i++) rqxb[i] = 0;	/* fill */
@@ -1733,8 +1745,7 @@ return;
 
 t_bool rq_getpkt (MSC *cp, int32 *pkt)
 {
-uint32 desc;
-t_addr addr;
+uint32 addr, desc;
 
 if (!rq_getdesc (cp, &cp->cq, &desc)) return ERR;	/* get cmd desc */
 if ((desc & UQ_DESC_OWN) == 0) {			/* none */
@@ -1755,8 +1766,7 @@ return rq_putdesc (cp, &cp->cq, desc);			/* release desc */
 
 t_bool rq_putpkt (MSC *cp, int32 pkt, t_bool qt)
 {
-uint32 desc, lnt, cr;
-t_addr addr;
+uint32 addr, desc, lnt, cr;
 DEVICE *dptr = rq_devmap[cp->cnum];
 
 if (pkt == 0) return OK;				/* any packet? */
@@ -1788,7 +1798,7 @@ return rq_putdesc (cp, &cp->rq, desc);			/* release desc */
 
 t_bool rq_getdesc (MSC *cp, struct uq_ring *ring, uint32 *desc)
 {
-t_addr addr = ring->ba + ring->idx;
+uint32 addr = ring->ba + ring->idx;
 uint16 d[2];
 
 if (Map_ReadW (addr, 4, d, MAP))			/* fetch desc */
@@ -1806,7 +1816,7 @@ return OK;
 t_bool rq_putdesc (MSC *cp, struct uq_ring *ring, uint32 desc)
 {
 uint32 prvd, newd = (desc & ~UQ_DESC_OWN) | UQ_DESC_F;
-t_addr prva, addr = ring->ba + ring->idx;
+uint32 prva, addr = ring->ba + ring->idx;
 uint16 d[2];
 
 d[0] = newd & 0xFFFF;					/* 32b to 16b */
@@ -1899,7 +1909,7 @@ return;
 
 void rq_ring_int (MSC *cp, struct uq_ring *ring)
 {
-t_addr iadr = cp->comm + ring->ioff;			/* addr intr wd */
+uint32 iadr = cp->comm + ring->ioff;			/* addr intr wd */
 uint16 flag = 1;
 
 Map_WriteW (iadr, 2, &flag, MAP);			/* write flag */
@@ -1991,7 +2001,8 @@ return SCPE_OK;
 
 t_stat rq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-int32 cap;
+uint32 cap;
+uint32 max = sim_taddr_64? RA8U_EMAXC: RA8U_MAXC;
 t_stat r;
 
 if ((val < 0) || (val > RA8U_DTYPE) || ((val != RA8U_DTYPE) && cptr))
@@ -2000,9 +2011,9 @@ if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
 if (cptr) {
 	cap = (int32) get_uint (cptr, 10, RA8U_MAXC, &r);
 	if ((r != SCPE_OK) || (cap < RA8U_MINC)) return SCPE_ARG;
-	drv_tab[val].lbn = cap;  }
+	drv_tab[val].lbn = cap << (20 - 9);  }
 uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
-uptr->capac = drv_tab[val].lbn * RQ_NUMBY;
+uptr->capac = ((t_addr) drv_tab[val].lbn) * RQ_NUMBY;
 return SCPE_OK;
 }
 

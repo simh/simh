@@ -1,6 +1,6 @@
 /* sds_defs.h: SDS 940 simulator definitions 
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   25-Apr-03	RMS	Revised for extended file support
 */
 
 #include "sim_defs.h"					/* simulator defns */
@@ -73,7 +75,7 @@
 #define MAXMEMSIZE	(1 << 16)			/* max memory size */
 #define PAMASK		(MAXMEMSIZE - 1)		/* physical addr mask */
 #define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
-#define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
+#define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
 #define ReadP(x)	M[x]
 #define WriteP(x,y)	if (MEM_ADDR_OK (x)) M[x] = y
 

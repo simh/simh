@@ -25,6 +25,7 @@
 
    rf		RF08 fixed head disk
 
+   14-Mar-03	RMS	Fixed variable platter interaction with save/restore
    03-Mar-03	RMS	Fixed autosizing
    02-Feb-03	RMS	Added variable platter and autosizing support
    04-Oct-02	RMS	Added DIB, device number support
@@ -132,8 +133,8 @@ t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 DIB rf_dib = { DEV_RF, 5, { &rf60, &rf61, &rf62, NULL, &rf64 } };
 
 UNIT rf_unit =
-	{ UDATA (&rf_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-	  RF_DKSIZE) };
+	{ UDATA (&rf_svc, UNIT_FIX+UNIT_ATTABLE+
+		 UNIT_BUFABLE+UNIT_MUSTBUF, RF_DKSIZE) };
 
 UNIT pcell_unit = { UDATA (&pcell_svc, 0, 0) };
 
@@ -148,6 +149,7 @@ REG rf_reg[] = {
 	{ DRDATA (TIME, rf_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (BURST, rf_burst, 0) },
 	{ FLDATA (STOP_IOE, rf_stopioe, 0) },
+	{ DRDATA (CAPAC, rf_unit.capac, 21), REG_HRO },
 	{ ORDATA (DEVNUM, rf_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
@@ -256,7 +258,7 @@ case 4:							/* DXAC w/o clear */
 default:
 	AC = (stop_inst << IOT_V_REASON) + AC;
 	break;  }					/* end switch */
-if ((t_addr) rf_da >= rf_unit.capac) rf_sta = rf_sta | RFS_NXD;
+if ((uint32) rf_da >= rf_unit.capac) rf_sta = rf_sta | RFS_NXD;
 else rf_sta = rf_sta & ~RFS_NXD;
 RF_INT_UPDATE;
 return AC;
@@ -280,7 +282,7 @@ if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	return IORETURN (rf_stopioe, SCPE_UNATT);  }
 
 mex = GET_MEX (rf_sta);
-do {	if ((t_addr) rf_da >= rf_unit.capac) {		/* disk overflow? */
+do {	if ((uint32) rf_da >= rf_unit.capac) {		/* disk overflow? */
 	    rf_sta = rf_sta | RFS_NXD;
 	    break;  }
 	M[RF_WC] = (M[RF_WC] + 1) & 07777;		/* incr word count */
@@ -294,7 +296,7 @@ do {	if ((t_addr) rf_da >= rf_unit.capac) {		/* disk overflow? */
 	    if ((rf_wlk >> t) & 1) rf_sta = rf_sta | RFS_WLS;
 	    else {
 	    	*(((int16 *) uptr->filebuf) + rf_da) = M[pa];
-		if (((t_addr) rf_da) >= uptr->hwmark) uptr->hwmark = rf_da + 1;  }  }
+		if (((uint32) rf_da) >= uptr->hwmark) uptr->hwmark = rf_da + 1;  }  }
 	rf_da = (rf_da + 1) & 03777777;  }		/* incr disk addr */
 while ((M[RF_WC] != 0) && (rf_burst != 0));		/* brk if wc, no brst */
 
@@ -373,15 +375,15 @@ return SCPE_OK;
 
 t_stat rf_attach (UNIT *uptr, char *cptr)
 {
-t_addr sz, p;
-t_addr ds_bytes = RF_DKSIZE * sizeof (int16);
+uint32 sz, p;
+uint32 ds_bytes = RF_DKSIZE * sizeof (int16);
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
 	p = (sz + ds_bytes - 1) / ds_bytes;
-	if (p == 0) p = 1;
-	if (p > RF_NUMDK) p = RF_NUMDK;  }
-else p = UNIT_GETP (uptr->flags);
-uptr->capac = p * RF_DKSIZE;
+	if (p >= RF_NUMDK) p = RF_NUMDK - 1;
+	uptr->flags = (uptr->flags & ~UNIT_PLAT) |
+	    (p << UNIT_V_PLAT);  }
+uptr->capac = UNIT_GETP (uptr->flags) * RF_DKSIZE;
 return attach_unit (uptr, cptr);
 }
 

@@ -1,6 +1,6 @@
 /* i1620_lp.c: IBM 1443 line printer simulator
 
-   Copyright (c) 2002, Robert M. Supnik
+   Copyright (c) 2002-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    lpt		1443 line printer
+
+   25-Apr-03	RMS	Revised for extended file support
 */
 
 #include "i1620_defs.h"
@@ -75,7 +77,7 @@ REG lpt_reg[] = {
 	{ FLDATA (PRCH9, ind[IN_PRCH9], 0) },
 	{ FLDATA (PRCH12, ind[IN_PRCH12], 0) },
 	{ FLDATA (PRBSY, ind[IN_PRBSY], 0) },
-	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ BRDATA (CCT, cct, 8, 32, CCT_LNT) },
 	{ DRDATA (CCTP, cct_ptr, 8), PV_LEFT },
 	{ DRDATA (CCTL, cct_lnt, 8), REG_RO + PV_LEFT },

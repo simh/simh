@@ -85,7 +85,7 @@
 #define MAXMEMMASK	(MAXMEMSIZE - 1)		/* max mem addr mask */
 #define INITMEMSIZE	(1 << 24)			/* initial memory size */
 #define MEMSIZE		(cpu_unit.capac)
-#define ADDR_IS_MEM(x)	(((t_addr) (x)) < MEMSIZE)
+#define ADDR_IS_MEM(x)	(((uint32) (x)) < MEMSIZE)
 
 /* Cache diagnostic space */
 
@@ -101,8 +101,8 @@
 #define CDG_GETTAG(x)	(((x) >> CDAAWIDTH) & CTGMASK)
 #define CTG_V		(1u << (CTGAWIDTH + 0))		/* tag valid */
 #define CTG_WP		(1u << (CTGAWIDTH + 1))		/* wrong parity */
-#define ADDR_IS_CDG(x)	((((t_addr) (x)) >= CDGBASE) && \
-			 (((t_addr) (x)) < (CDGBASE + CDGSIZE)))
+#define ADDR_IS_CDG(x)	((((uint32) (x)) >= CDGBASE) && \
+			 (((uint32) (x)) < (CDGBASE + CDGSIZE)))
 
 /* Qbus I/O registers */
 
@@ -110,8 +110,8 @@
 #define IOPAGESIZE	(1u << IOPAGEAWIDTH)		/* IO page length */
 #define IOPAGEMASK	(IOPAGESIZE - 1)		/* IO addr mask */
 #define IOPAGEBASE	0x20000000			/* IO page base */
-#define ADDR_IS_IO(x)	((((t_addr) (x)) >= IOPAGEBASE) && \
-			 (((t_addr) (x)) < (IOPAGEBASE + IOPAGESIZE)))
+#define ADDR_IS_IO(x)	((((uint32) (x)) >= IOPAGEBASE) && \
+			 (((uint32) (x)) < (IOPAGEBASE + IOPAGESIZE)))
 
 /* Read only memory - appears twice */
 
@@ -119,8 +119,8 @@
 #define ROMSIZE		(1u << ROMAWIDTH)		/* ROM length */
 #define ROMAMASK	(ROMSIZE - 1)			/* ROM addr mask */
 #define ROMBASE		0x20040000			/* ROM base */
-#define ADDR_IS_ROM(x)	((((t_addr) (x)) >= ROMBASE) && \
-			 (((t_addr) (x)) < (ROMBASE + ROMSIZE + ROMSIZE)))
+#define ADDR_IS_ROM(x)	((((uint32) (x)) >= ROMBASE) && \
+			 (((uint32) (x)) < (ROMBASE + ROMSIZE + ROMSIZE)))
 
 /* Local register space */
 
@@ -161,8 +161,8 @@
 #define NVRSIZE		(1u << NVRAWIDTH)		/* NVR length */
 #define NVRAMASK	(NVRSIZE - 1)			/* NVR addr mask */
 #define NVRBASE		0x20140400			/* NVR base */
-#define ADDR_IS_NVR(x)	((((t_addr) (x)) >= NVRBASE) && \
-			 (((t_addr) (x)) < (NVRBASE + NVRSIZE)))
+#define ADDR_IS_NVR(x)	((((uint32) (x)) >= NVRBASE) && \
+			 (((uint32) (x)) < (NVRBASE + NVRSIZE)))
 
 /* CQBIC Qbus memory space (seen from CVAX) */
 
@@ -211,6 +211,8 @@
 
 #define UNIBUS		FALSE				/* 22b only */
 
+#define DEV_RDX		16				/* default device radix */
+
 /* Device information block */
 
 #define VEC_DEVMAX	4				/* max device vec */
@@ -223,7 +225,7 @@ struct pdp_dib {
 	int32		vnum;				/* vectors: number */
 	int32		vloc;				/* locator */
 	int32		vec;				/* value */
-	int32		(*ack[VEC_DEVMAX])(void);	/* ack routines */
+	int32		(*ack[VEC_DEVMAX])(void);	/* ack routine */
 };
 
 typedef struct pdp_dib DIB;
@@ -386,13 +388,13 @@ typedef struct pdp_dib DIB;
 
 /* Function prototypes for I/O */
 
-t_bool map_addr (t_addr qa, t_addr *ma);
-int32 map_readB (t_addr ba, int32 bc, uint8 *buf);
-int32 map_readW (t_addr ba, int32 bc, uint16 *buf);
-int32 map_readL (t_addr ba, int32 bc, uint32 *buf);
-int32 map_writeB (t_addr ba, int32 bc, uint8 *buf);
-int32 map_writeW (t_addr ba, int32 bc, uint16 *buf);
-int32 map_writeL (t_addr ba, int32 bc, uint32 *buf);
+t_bool map_addr (uint32 qa, uint32 *ma);
+int32 map_readB (uint32 ba, int32 bc, uint8 *buf);
+int32 map_readW (uint32 ba, int32 bc, uint16 *buf);
+int32 map_readL (uint32 ba, int32 bc, uint32 *buf);
+int32 map_writeB (uint32 ba, int32 bc, uint8 *buf);
+int32 map_writeW (uint32 ba, int32 bc, uint16 *buf);
+int32 map_writeL (uint32 ba, int32 bc, uint32 *buf);
 
 #define Map_Addr(a,b)		map_addr (a, b)
 #define Map_ReadB(a,b,c,d)	map_readB (a, b, c)

@@ -1,6 +1,6 @@
 /* sds_rad.c: SDS 940 fixed head disk simulator
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -123,7 +123,7 @@ t_stat rad (uint32 fnc, uint32 inst, uint32 *dat)
 {
 int32 t, lun, new_ch;
 uint32 *wptr;
-t_addr p;
+uint32 p;
 
 switch (fnc) {						/* case function */
 case IO_CONN:						/* connect */
@@ -238,7 +238,7 @@ return SCPE_OK;
 
 t_stat rad_fill (int32 sba)
 {
-t_addr p = rad_da * RAD_NUMWD;
+uint32 p = rad_da * RAD_NUMWD;
 int32 wa = (sba + 1) >> 1;				/* whole words */
 
 if (sba && (p < rad_unit.capac)) {			/* fill needed? */

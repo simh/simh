@@ -1,6 +1,6 @@
 /* h316_defs.h: Honeywell 316/516 simulator definitions
 
-   Copyright (c) 1999-2002, Robert M. Supnik
+   Copyright (c) 1999-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   25-Apr-03	RMS	Revised for extended file support
 */
 
 #include "sim_defs.h"					/* simulator defns */
@@ -40,7 +42,7 @@
 #define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
 #define X_AMASK		(MAXMEMSIZE - 1)		/* ext address mask */
 #define NX_AMASK	((MAXMEMSIZE / 2) - 1)		/* nx address mask */
-#define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
+#define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
 
 /* Architectural constants */
 
@@ -56,8 +58,8 @@
 
 #define UNIT_V_EXT	(UNIT_V_UF + 1)			/* extended mem */
 #define UNIT_V_HSA	(UNIT_V_UF + 2)			/* high speed arith */
-#define UNIT_EXT	(1 << UNIT_V_EXT)
-#define UNIT_HSA	(1 << UNIT_V_HSA)
+#define UNIT_EXT	(1u << UNIT_V_EXT)
+#define UNIT_HSA	(1u << UNIT_V_HSA)
 
 /* Instruction format */
 

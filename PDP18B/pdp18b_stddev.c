@@ -29,6 +29,8 @@
    tto		teleprinter
    clk		clock
 
+   25-Apr-03	RMS	Revised for extended file support
+   14-Mar-03	RMS	Clean up flags on detach
    01-Mar-03	RMS	Added SET/SHOW CLK FREQ support, SET TTI CTRL-C support
    22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7B/8B support to terminal
@@ -160,7 +162,7 @@ REG ptr_reg[] = {
 	{ FLDATA (ERR, ptr_err, 0) },
 #endif
 	{ ORDATA (STATE, ptr_state, 5), REG_HRO },
-	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
 	{ NULL }  };
@@ -195,7 +197,7 @@ REG ptp_reg[] = {
 #if defined (IOS_PTPERR)
 	{ FLDATA (ERR, ptp_err, 0) },
 #endif
-	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
 	{ NULL }  };
@@ -272,7 +274,7 @@ REG tti_reg[] = {
 #if defined (KSR28)
 	{ ORDATA (TTI_STATE, tti_state, (TTI_WIDTH + 3)), REG_HRO },
 #endif
-	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
@@ -334,7 +336,7 @@ REG tto_reg[] = {
 #if defined (KSR28)
 	{ FLDATA (TTO_STATE, tto_state, 0), REG_HRO },
 #endif
-	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 
@@ -520,6 +522,7 @@ return reason;
 t_stat ptr_detach (UNIT *uptr)
 {
 ptr_err = 1;
+ptr_unit.flags = ptr_unit.flags & ~UNIT_RASCII;
 return detach_unit (uptr);
 }
 
@@ -773,6 +776,7 @@ return reason;
 t_stat ptp_detach (UNIT *uptr)
 {
 ptp_err = 1;
+ptp_unit.flags = ptp_unit.flags & ~UNIT_PASCII;
 return detach_unit (uptr);
 }
 

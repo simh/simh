@@ -25,6 +25,9 @@
 
    ts		TS11/TSV05 magtape
 
+   19-May-03	RMS	Revised for new conditional compilation scheme
+   25-Apr-03	RMS	Revised for extended file support
+   28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised to use magtape library
    30-Sep-02	RMS	Added variable address support to bootstrap
 			Added vector change/display support
@@ -72,22 +75,23 @@
    - VAX Q22 systems - the TS11 must go through the I/O map
 */
 
-#if defined (USE_INT64)					/* VAX version */
+#if defined (VM_PDP10)					/* PDP10 version */
+#error "TS11 not supported on PDP10!"
+
+#elif defined (VM_VAX)					/* VAX version */
 #include "vax_defs.h"
-#define VM_VAX		1
-#define TS_RDX		16
 #define TS_DIS		0				/* on by default */
 #define ADDRTEST	0177700
 #define DMASK		0xFFFF
-extern int32 ReadB (t_addr pa);
-extern void WriteB (t_addr pa, int32 val);
-extern int32 ReadW (t_addr pa);
-extern void WriteW (t_addr pa, int32 val);
+extern int32 ReadB (uint32 pa);
+extern void WriteB (uint32 pa, int32 val);
+extern int32 ReadW (uint32 pa);
+extern void WriteW (uint32 pa, int32 val);
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 
-#else							/* PDP11 version */
+#else							/* PDP-11 version */
 #include "pdp11_defs.h"
-#define VM_PDP11	1
-#define TS_RDX		8
 #define TS_DIS		DEV_DIS				/* off by default */
 #define ADDRTEST	(UNIBUS? 0177774: 0177700)
 extern uint16 *M;
@@ -311,39 +315,41 @@ DIB ts_dib = { IOBA_TS, IOLN_TS, &ts_rd, &ts_wr,
 UNIT ts_unit = { UDATA (&ts_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) };
 
 REG ts_reg[] = {
-	{ GRDATA (TSSR, tssr, TS_RDX, 16, 0) },
-	{ GRDATA (TSBA, tsba, TS_RDX, 22, 0) },
-	{ GRDATA (TSDBX, tsdbx, TS_RDX, 8, 0) },
-	{ GRDATA (CHDR, cmdhdr, TS_RDX, 16, 0) },
-	{ GRDATA (CADL, cmdadl, TS_RDX, 16, 0) },
-	{ GRDATA (CADH, cmdadh, TS_RDX, 16, 0) },
-	{ GRDATA (CLNT, cmdlnt, TS_RDX, 16, 0) },
-	{ GRDATA (MHDR, msghdr, TS_RDX, 16, 0) },
-	{ GRDATA (MRFC, msgrfc, TS_RDX, 16, 0) },
-	{ GRDATA (MXS0, msgxs0, TS_RDX, 16, 0) },
-	{ GRDATA (MXS1, msgxs1, TS_RDX, 16, 0) },
-	{ GRDATA (MXS2, msgxs2, TS_RDX, 16, 0) },
-	{ GRDATA (MXS3, msgxs3, TS_RDX, 16, 0) },
-	{ GRDATA (MSX4, msgxs4, TS_RDX, 16, 0) },
-	{ GRDATA (WADL, wchadl, TS_RDX, 16, 0) },
-	{ GRDATA (WADH, wchadh, TS_RDX, 16, 0) },
-	{ GRDATA (WLNT, wchlnt, TS_RDX, 16, 0) },
-	{ GRDATA (WOPT, wchopt, TS_RDX, 16, 0) },
-	{ GRDATA (WXOPT, wchxopt, TS_RDX, 16, 0) },
+	{ GRDATA (TSSR, tssr, DEV_RDX, 16, 0) },
+	{ GRDATA (TSBA, tsba, DEV_RDX, 22, 0) },
+	{ GRDATA (TSDBX, tsdbx, DEV_RDX, 8, 0) },
+	{ GRDATA (CHDR, cmdhdr, DEV_RDX, 16, 0) },
+	{ GRDATA (CADL, cmdadl, DEV_RDX, 16, 0) },
+	{ GRDATA (CADH, cmdadh, DEV_RDX, 16, 0) },
+	{ GRDATA (CLNT, cmdlnt, DEV_RDX, 16, 0) },
+	{ GRDATA (MHDR, msghdr, DEV_RDX, 16, 0) },
+	{ GRDATA (MRFC, msgrfc, DEV_RDX, 16, 0) },
+	{ GRDATA (MXS0, msgxs0, DEV_RDX, 16, 0) },
+	{ GRDATA (MXS1, msgxs1, DEV_RDX, 16, 0) },
+	{ GRDATA (MXS2, msgxs2, DEV_RDX, 16, 0) },
+	{ GRDATA (MXS3, msgxs3, DEV_RDX, 16, 0) },
+	{ GRDATA (MSX4, msgxs4, DEV_RDX, 16, 0) },
+	{ GRDATA (WADL, wchadl, DEV_RDX, 16, 0) },
+	{ GRDATA (WADH, wchadh, DEV_RDX, 16, 0) },
+	{ GRDATA (WLNT, wchlnt, DEV_RDX, 16, 0) },
+	{ GRDATA (WOPT, wchopt, DEV_RDX, 16, 0) },
+	{ GRDATA (WXOPT, wchxopt, DEV_RDX, 16, 0) },
 	{ FLDATA (INT, IREQ (TS), INT_V_TS) },
 	{ FLDATA (ATTN, ts_qatn, 0) },
 	{ FLDATA (BOOT, ts_bcmd, 0) },
 	{ FLDATA (OWNC, ts_ownc, 0) },
 	{ FLDATA (OWNM, ts_ownm, 0) },
 	{ DRDATA (TIME, ts_time, 24), PV_LEFT + REG_NZ },
-	{ DRDATA (POS, ts_unit.pos, 32), PV_LEFT + REG_RO },
-	{ GRDATA (DEVADDR, ts_dib.ba, TS_RDX, 32, 0), REG_HRO },
-	{ GRDATA (DEVVEC, ts_dib.vec, TS_RDX, 16, 0), REG_HRO },
+	{ DRDATA (POS, ts_unit.pos, T_ADDR_W), PV_LEFT + REG_RO },
+	{ GRDATA (DEVADDR, ts_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+	{ GRDATA (DEVVEC, ts_dib.vec, DEV_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB ts_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
 		&set_addr, &show_addr, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
@@ -352,7 +358,7 @@ MTAB ts_mod[] = {
 
 DEVICE ts_dev = {
 	"TS", &ts_unit, ts_reg, ts_mod,
-	1, 10, 31, 1, TS_RDX, 8,
+	1, 10, 31, 1, DEV_RDX, 8,
 	NULL, NULL, &ts_reset,
 	&ts_boot, &ts_attach, &ts_detach,
 	&ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS };
@@ -378,7 +384,7 @@ return SCPE_OK;
 t_stat ts_wr (int32 data, int32 PA, int32 access)
 {
 int32 i;
-t_addr pa;
+uint32 pa;
 
 switch ((PA >> 1) & 01) {				/* decode PA<1> */
 case 0:							/* TSDB */
@@ -531,7 +537,7 @@ int32 ts_readf (UNIT *uptr, uint32 fc)
 {
 t_stat st;
 t_mtrlnt i, tbc, wbc;
-t_addr wa, pa;
+uint32 wa, pa;
 
 msgrfc = fc;
 st = sim_tape_rdrecf (uptr, tsxb, &tbc, MT_MAXFR);	/* read rec fwd */
@@ -558,7 +564,7 @@ int32 ts_readr (UNIT *uptr, uint32 fc)
 {
 t_stat st;
 t_mtrlnt i, tbc, wbc;
-t_addr wa, pa;
+uint32 wa, pa;
 
 msgrfc = fc;
 st = sim_tape_rdrecr (uptr, tsxb, &tbc, MT_MAXFR);	/* read rec rev */
@@ -584,7 +590,7 @@ return 0;
 int32 ts_write (UNIT *uptr, int32 fc)
 {
 int32 i;
-t_addr wa, pa;
+uint32 wa, pa;
 t_stat st;
 
 msgrfc = fc;
@@ -620,7 +626,7 @@ return XTC (XS0_TMK, TC0);
 t_stat ts_svc (UNIT *uptr)
 {
 int32 i, fnc, mod, st0, st1;
-t_addr pa;
+uint32 pa;
 
 static const int32 fnc_mod[CMD_N_FNC] = {		/* max mod+1 0 ill */
  0, 4, 0, 0, 1, 2, 1, 0,				/* 00 - 07 */
@@ -854,7 +860,7 @@ return;
 void ts_endcmd (int32 tc, int32 xs0, int32 msg)
 {
 int32 i;
-t_addr pa;
+uint32 pa;
 
 msgxs0 = ts_updxs0 (msgxs0 | xs0);			/* update XS0 */
 if (wchxopt & WCHX_HDS) msgxs4 = msgxs4 | XS4_HDS;	/* update XS4 */

@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   06-May-03	RMS	Added support for second DEQNA/DELQA
    09-Jan-03	RMS	Added DELUA support
    17-Oct-02	RMS	Fixed bugs in branch, SOB address parsing
    09-Oct-02	RMS	Added DELQA support
@@ -62,7 +63,8 @@ extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE dt_dev;
 extern DEVICE tm_dev, ts_dev;
 extern DEVICE tq_dev;
-extern DEVICE xq_dev, xu_dev;
+extern DEVICE xq_dev, xqb_dev;
+extern DEVICE xu_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint16 *M;
@@ -109,6 +111,7 @@ DEVICE *sim_devices[] = {
 	&ts_dev,
 	&tq_dev,
 	&xq_dev,
+	&xqb_dev,
 	&xu_dev,
 	NULL };
 
@@ -161,7 +164,7 @@ const char *sim_stop_messages[] = {
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 csum, count, state, i;
-t_addr origin;
+uint32 origin;
 
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 state = csum = 0;

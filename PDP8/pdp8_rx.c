@@ -25,6 +25,8 @@
 
    rx		RX8E/RX01, RX28/RX02 floppy disk
 
+   25-Apr-03	RMS	Revised for extended file support
+   14-Mar-03	RMS	Fixed variable size interaction with save/restore
    03-Mar-03	RMS	Fixed autosizing
    08-Oct-02	RMS	Added DIB, device number support
 			Fixed reset to work with disabled device
@@ -177,6 +179,8 @@ REG rx_reg[] = {
 	{ FLDATA (STOP_IOE, rx_stopioe, 0) },
 	{ BRDATA (SBUF, rx_buf, 8, 8, RX2_NUMBY) },
 	{ FLDATA (RX28, rx_28, 0), REG_HRO },
+	{ URDATA (CAPAC, rx_unit[0].capac, 10, T_ADDR_W, 0,
+		  RX_NUMDR, REG_HRO | PV_LEFT) },
 	{ ORDATA (DEVNUM, rx_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
@@ -325,7 +329,7 @@ return;
 t_stat rx_svc (UNIT *uptr)
 {
 int32 i, func, byptr, bps, wps;
-t_addr da;
+uint32 da;
 #define PTR12(x) (((x) + (x) + (x)) >> 1)
 
 if (rx_28 && (uptr->flags & UNIT_DEN))
@@ -509,7 +513,7 @@ return SCPE_OK;
 
 t_stat rx_attach (UNIT *uptr, char *cptr)
 {
-t_addr sz;
+uint32 sz;
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
 	if (sz > RX_SIZE) uptr->flags = uptr->flags | UNIT_DEN;
@@ -581,8 +585,11 @@ static const uint16 boot_rom[] = {
 	07450,			/* 36, SNA		; more to do? */
 	07610,			/* 37, CLA SKP		; error */
 	05046,			/* 40, JMP 46		; go empty */
-	07402, 07402,		/* 41-45, HALT		; error */
-	07402, 07402, 07402,
+	07402,			/* 41-45, HALT		; error */
+	07402,
+	07402,
+	07402,
+	07402,
 	06751,			/* 46, LCD		; load empty */
 	04053,			/* 47, JMS LOAD		; get data */
 	03002,			/* 50, DCA 2		; store */

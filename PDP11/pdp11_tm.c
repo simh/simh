@@ -25,6 +25,8 @@
 
    tm		TM11/TU10 magtape
 
+   25-Apr-03	RMS	Revised for extended file support
+   28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised for magtape library, added logging
    30-Oct-02	RMS	Revised BOT handling, added error record handling
    30-Sep-02	RMS	Added variable address support to bootstrap
@@ -207,7 +209,7 @@ REG tm_reg[] = {
 	{ FLDATA (STOP_IOE, tm_stopioe, 0) },
 	{ DRDATA (TIME, tm_time, 24), PV_LEFT },
 	{ URDATA (UST, tm_unit[0].USTAT, 8, 16, 0, TM_NUMDR, 0) },
-	{ URDATA (POS, tm_unit[0].pos, 10, 32, 0,
+	{ URDATA (POS, tm_unit[0].pos, 10, T_ADDR_W, 0,
 		  TM_NUMDR, PV_LEFT | REG_RO) },
 	{ ORDATA (DEVADDR, tm_dib.ba, 32), REG_HRO },
 	{ ORDATA (DEVVEC, tm_dib.vec, 16), REG_HRO },
@@ -216,6 +218,8 @@ REG tm_reg[] = {
 MTAB tm_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", &tm_vlock },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", &tm_vlock }, 
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 	{ MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
 		&set_addr, &show_addr, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
@@ -352,7 +356,7 @@ return;
 t_stat tm_svc (UNIT *uptr)
 {
 int32 f, t, u;
-t_addr xma;
+uint32 xma;
 t_mtrlnt tbc, cbc;
 t_stat st, r = SCPE_OK;
 

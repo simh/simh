@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Apr-03	RMS	Revised for extended file support
    04-Feb-03	RMS	Added RB09, LP09 support
    22-Nov-02	RMS	Added PDP-4 drum support
    05-Oct-02	RMS	Added DIB structure
@@ -144,7 +145,7 @@
 #define BLKMASK		(ADDRMASK & (~IAMASK))		/* block mask */
 #define MAXMEMSIZE	(1 << ADDRSIZE)			/* max memory size */
 #define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
-#define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
+#define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
 
 /* Architectural constants */
 

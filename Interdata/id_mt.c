@@ -25,6 +25,8 @@
 
    mt		M46-494 dual density 9-track magtape controller
 
+   25-Apr-03	RMS	Revised for extended file support
+   28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised for magtape library
    20-Feb-03	RMS	Fixed read to stop selch on error
 
@@ -135,7 +137,7 @@ REG mt_reg[] = {
 	{ DRDATA (RTIME, mt_rtime, 24), PV_LEFT + REG_NZ },
 	{ URDATA (UST, mt_unit[0].UST, 16, 8, 0, MT_NUMDR, 0) },
 	{ URDATA (CMD, mt_unit[0].UCMD, 16, 8, 0, MT_NUMDR, 0) },
-	{ URDATA (POS, mt_unit[0].pos, 10, 32, 0,
+	{ URDATA (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
 		  MT_NUMDR, PV_LEFT | REG_RO) },
 	{ HRDATA (DEVNO, mt_dib.dno, 8), REG_HRO },
 	{ HRDATA (SELCH, mt_dib.sch, 1), REG_HRO },
@@ -144,6 +146,8 @@ REG mt_reg[] = {
 MTAB mt_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&set_dev, &show_dev, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "SELCH", "SELCH",

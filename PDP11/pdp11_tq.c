@@ -1,4 +1,4 @@
-/* pdp11_tq.c: TQK50 tape controller simulator
+/* pdp11_tq.c: TMSCP tape controller simulator
 
    Copyright (c) 2002-2003, Robert M Supnik
 
@@ -25,6 +25,9 @@
 
    tq		TQK50 tape controller
 
+   19-May-03	RMS	Revised for new conditional compilation scheme
+   25-Apr-03	RMS	Revised for extended file support
+   28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Added variable controller, user-defined drive support
    26-Feb-03	RMS	Fixed bug in vector calculation for VAXen
    22-Feb-03	RMS	Fixed ordering bug in queue process
@@ -33,15 +36,18 @@
    17-Oct-02	RMS	Fixed bug in read reverse (found by Hans Pufal)
 */
 
-#if defined (USE_INT64)
-#include "vax_defs.h"
-#define VM_VAX		1
-#define TQ_RDX		16
+#if defined (VM_PDP10)					/* PDP10 version */
+#error "TQK50 not supported on PDP-10!"
 
-#else
+#elif defined (VM_VAX)					/* VAX version */
+#include "vax_defs.h"
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
+
+#else							/* PDP-11 version */
 #include "pdp11_defs.h"
-#define VM_PDP11	1
-#define TQ_RDX		8
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 extern int32 cpu_18b, cpu_ubm;
 #endif
 
@@ -167,6 +173,7 @@ struct tqpkt {
 #define TQU_FMT		(TF_CTP|TF_CTP_LO)		/* menu */
 #define TQU_MINC	30				/* min cap MB */
 #define TQU_MAXC	2000				/* max cap MB */
+#define TQU_EMAXC	2000000000			/* ext max cap MB */
 
 #define TQ_DRV(d) \
 	d##_UQPM, \
@@ -180,7 +187,7 @@ struct drvtyp {
 	uint32	cmod;					/* ctrl model */
 	uint32	med;					/* MSCP media */
 	uint32	fmt;					/* flags */
-	uint32	cap;					/* capacity */
+	t_addr	cap;					/* capacity */
 	uint32	umod;					/* unit model */
 	uint32	cver;
 	uint32	fver;
@@ -202,6 +209,7 @@ extern int32 tmr_poll, clk_tps;
 extern int32 cpu_log;
 extern UNIT cpu_unit;
 extern FILE *sim_log;
+extern uint32 sim_taddr_64;
 
 uint8 *tqxb = NULL;					/* xfer buffer */
 uint32 tq_sa = 0;					/* status, addr */
@@ -353,28 +361,28 @@ UNIT tq_unit[] = {
 #define TQ_QUEUE	(TQ_TIMER + 1)
 
 REG tq_reg[] = {
-	{ GRDATA (SA, tq_sa, TQ_RDX, 16, 0) },
-	{ GRDATA (SAW, tq_saw, TQ_RDX, 16, 0) },
-	{ GRDATA (S1DAT, tq_s1dat, TQ_RDX, 16, 0) },
-	{ GRDATA (CQBA, tq_cq.ba, TQ_RDX, 22, 0) },
-	{ GRDATA (CQLNT, tq_cq.lnt, TQ_RDX, 8, 2), REG_NZ },
-	{ GRDATA (CQIDX, tq_cq.idx, TQ_RDX, 8, 2) },
-	{ GRDATA (TQBA, tq_rq.ba, TQ_RDX, 22, 0) },
-	{ GRDATA (TQLNT, tq_rq.lnt, TQ_RDX, 8, 2), REG_NZ },
-	{ GRDATA (TQIDX, tq_rq.idx, TQ_RDX, 8, 2) },
+	{ GRDATA (SA, tq_sa, DEV_RDX, 16, 0) },
+	{ GRDATA (SAW, tq_saw, DEV_RDX, 16, 0) },
+	{ GRDATA (S1DAT, tq_s1dat, DEV_RDX, 16, 0) },
+	{ GRDATA (CQBA, tq_cq.ba, DEV_RDX, 22, 0) },
+	{ GRDATA (CQLNT, tq_cq.lnt, DEV_RDX, 8, 2), REG_NZ },
+	{ GRDATA (CQIDX, tq_cq.idx, DEV_RDX, 8, 2) },
+	{ GRDATA (TQBA, tq_rq.ba, DEV_RDX, 22, 0) },
+	{ GRDATA (TQLNT, tq_rq.lnt, DEV_RDX, 8, 2), REG_NZ },
+	{ GRDATA (TQIDX, tq_rq.idx, DEV_RDX, 8, 2) },
 	{ DRDATA (FREE, tq_freq, 5) },
 	{ DRDATA (RESP, tq_rspq, 5) },
 	{ DRDATA (PBSY, tq_pbsy, 5) },
-	{ GRDATA (CFLGS, tq_cflgs, TQ_RDX, 16, 0) },
-	{ GRDATA (CSTA, tq_csta, TQ_RDX, 4, 0) },
-	{ GRDATA (PERR, tq_perr, TQ_RDX, 9, 0) },
+	{ GRDATA (CFLGS, tq_cflgs, DEV_RDX, 16, 0) },
+	{ GRDATA (CSTA, tq_csta, DEV_RDX, 4, 0) },
+	{ GRDATA (PERR, tq_perr, DEV_RDX, 9, 0) },
 	{ DRDATA (CRED, tq_credits, 5) },
 	{ DRDATA (HAT, tq_hat, 17) },
 	{ DRDATA (HTMO, tq_htmo, 17) },
 	{ URDATA (CPKT, tq_unit[0].cpkt, 10, 5, 0, TQ_NUMDR, 0) },
 	{ URDATA (PKTQ, tq_unit[0].pktq, 10, 5, 0, TQ_NUMDR, 0) },
-	{ URDATA (UFLG, tq_unit[0].uf, TQ_RDX, 16, 0, TQ_NUMDR, 0) },
-	{ URDATA (POS, tq_unit[0].pos, 10, 32, 0, TQ_NUMDR, 0) },
+	{ URDATA (UFLG, tq_unit[0].uf, DEV_RDX, 16, 0, TQ_NUMDR, 0) },
+	{ URDATA (POS, tq_unit[0].pos, 10, T_ADDR_W, 0, TQ_NUMDR, 0) },
 	{ URDATA (OBJP, tq_unit[0].objp, 10, 32, 0, TQ_NUMDR, 0) },
 	{ FLDATA (PRGI, tq_prgi, 0), REG_HIDDEN },
 	{ FLDATA (PIP, tq_pip, 0), REG_HIDDEN },
@@ -383,11 +391,11 @@ REG tq_reg[] = {
 	{ DRDATA (I4TIME, tq_itime4, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (QTIME, tq_qtime, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (XTIME, tq_xtime, 24), PV_LEFT + REG_NZ },
-	{ BRDATA (PKTS, tq_pkt, TQ_RDX, 16, TQ_NPKTS * (TQ_PKT_SIZE_W + 1)) },
+	{ BRDATA (PKTS, tq_pkt, DEV_RDX, 16, TQ_NPKTS * (TQ_PKT_SIZE_W + 1)) },
 	{ DRDATA (DEVTYPE, tq_typ, 2), REG_HRO },
-	{ DRDATA (DEVCAP, drv_tab[TQU_TYPE].cap, 31), REG_HRO },
-	{ GRDATA (DEVADDR, tq_dib.ba, TQ_RDX, 32, 0), REG_HRO },
-	{ GRDATA (DEVVEC, tq_dib.vec, TQ_RDX, 16, 0), REG_HRO },
+	{ DRDATA (DEVCAP, drv_tab[TQU_TYPE].cap, T_ADDR_W), PV_LEFT | REG_HRO },
+	{ GRDATA (DEVADDR, tq_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+	{ GRDATA (DEVVEC, tq_dib.vec, DEV_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB tq_mod[] = {
@@ -415,6 +423,8 @@ MTAB tq_mod[] = {
 		NULL, &tq_show_ctrl, NULL },
 	{ MTAB_XTD | MTAB_VUN | MTAB_NMO, 0, "UNITQ", NULL,
 		NULL, &tq_show_unitq, NULL },
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 #if defined (VM_PDP11)
 	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
 		&set_addr, &show_addr, NULL },
@@ -428,7 +438,7 @@ MTAB tq_mod[] = {
 
 DEVICE tq_dev = {
 	"TQ", tq_unit, tq_reg, tq_mod,
-	TQ_NUMDR + 2, 10, 31, 1, TQ_RDX, 8,
+	TQ_NUMDR + 2, 10, 31, 1, DEV_RDX, 8,
 	NULL, NULL, &tq_reset,
 	&tq_boot, &tq_attach, &tq_detach,
 	&tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS };
@@ -478,7 +488,7 @@ return SCPE_OK;
 t_bool tq_step4 (void)
 {
 int32 i, lnt;
-t_addr base;
+uint32 base;
 uint16 zero[SA_COMM_MAX >> 1];
 
 tq_rq.ioff = SA_COMM_RI;				/* set intr offset */
@@ -1246,7 +1256,7 @@ uint32 st, skrec;
 
 *skipped = 0;
 while (*skipped < cnt) {				/* loop */
-	st = tq_spacef (uptr, INT_MAX, &skrec, TRUE);	/* rec spc fwd */
+	st = tq_spacef (uptr, 0x7FFFFFFF, &skrec, TRUE);/* rec spc fwd */
 	if (st == ST_TMK) *skipped = *skipped + 1;	/* count files */
 	else if (st != ST_SUC) return st;  }
 return ST_SUC;
@@ -1274,7 +1284,7 @@ uint32 st, skrec;
 
 *skipped = 0;
 while (*skipped < cnt) {				/* loopo */
-	st = tq_spacer (uptr, INT_MAX, &skrec, TRUE);	/* rec spc rev */
+	st = tq_spacer (uptr, 0x7FFFFFFF, &skrec, TRUE);/* rec spc rev */
 	if (st == ST_TMK) *skipped = *skipped + 1;	/* tape mark? */
 	else if (st != 0) return st;  }			/* error? */
 return ST_SUC;
@@ -1459,8 +1469,7 @@ return;
 
 t_bool tq_getpkt (int32 *pkt)
 {
-uint32 desc;
-t_addr addr;
+uint32 addr, desc;
 
 if (!tq_getdesc (&tq_cq, &desc)) return ERR;		/* get cmd desc */
 if ((desc & UQ_DESC_OWN) == 0) {			/* none */
@@ -1481,8 +1490,7 @@ return tq_putdesc (&tq_cq, desc);			/* release desc */
 
 t_bool tq_putpkt (int32 pkt, t_bool qt)
 {
-uint32 desc, lnt, cr;
-t_addr addr;
+uint32 addr, desc, lnt, cr;
 
 if (pkt == 0) return OK;				/* any packet? */
 if (DBG_LOG (LOG_TQ)) {
@@ -1517,7 +1525,7 @@ return tq_putdesc (&tq_rq, desc);			/* release desc */
 
 t_bool tq_getdesc (struct uq_ring *ring, uint32 *desc)
 {
-t_addr addr = ring->ba + ring->idx;
+uint32 addr = ring->ba + ring->idx;
 uint16 d[2];
 
 if (Map_ReadW (addr, 4, d, MAP))				/* fetch desc */
@@ -1535,7 +1543,7 @@ return OK;
 t_bool tq_putdesc (struct uq_ring *ring, uint32 desc)
 {
 uint32 prvd, newd = (desc & ~UQ_DESC_OWN) | UQ_DESC_F;
-t_addr prva, addr = ring->ba + ring->idx;
+uint32 prva, addr = ring->ba + ring->idx;
 uint16 d[2];
 
 d[0] = newd & 0xFFFF;					/* 32b to 16b */
@@ -1638,7 +1646,7 @@ return;
 
 void tq_ring_int (struct uq_ring *ring)
 {
-t_addr iadr = tq_comm + ring->ioff;			/* addr intr wd */
+uint32 iadr = tq_comm + ring->ioff;			/* addr intr wd */
 uint16 flag = 1;
 
 Map_WriteW (iadr, 2, &flag, MAP);			/* write flag */
@@ -1976,7 +1984,8 @@ return SCPE_OK;
 
 tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-int32 i, cap;
+uint32 i, cap;
+uint32 max = sim_taddr_64? TQU_EMAXC: TQU_MAXC;
 t_stat r;
 
 if ((val < 0) || (val > TQU_TYPE) || ((val != TQU_TYPE) && cptr))
@@ -1984,9 +1993,9 @@ if ((val < 0) || (val > TQU_TYPE) || ((val != TQU_TYPE) && cptr))
 for (i = 0; i < TQ_NUMDR; i++) {
 	if (tq_unit[i].flags & UNIT_ATT) return SCPE_ALATT;  }
 if (cptr) {
-	cap = (int32) get_uint (cptr, 10, TQU_MAXC, &r);
+	cap = (uint32) get_uint (cptr, 10, max, &r);
 	if ((r != SCPE_OK) || (cap < TQU_MINC)) return SCPE_ARG;
-	drv_tab[TQU_TYPE].cap = cap << 20;  }
+	drv_tab[TQU_TYPE].cap = ((t_addr) cap) << 20;  }
 tq_typ = val;
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* altair_sys.c: MITS Altair system interface
 
-   Copyright (c) 1997, Charles E. Owen
+   Copyright (c) 1997-2003, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -37,9 +37,6 @@ extern DEVICE ptp_dev;
 extern DEVICE lpt_dev;
 extern unsigned char M[];
 extern int32 saved_PC;
-extern char *get_glyph (char *cptr, char *gbuf, char term);
-extern unsigned int32 get_uint (char *cptr, int32 radix, unsigned int32 max,
-	int32 *status);
 
 /* SCP data structures
 

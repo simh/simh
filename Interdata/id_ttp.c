@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    ttp		console (on PAS)
+
+   25-Apr-03	RMS	Revised for extended file support
 */
 
 #include "id_defs.h"
@@ -83,14 +85,14 @@ UNIT ttp_unit[] = {
 REG ttp_reg[] = {
 	{ HRDATA (CMD, ttp_cmd, 16) },
 	{ HRDATA (KBUF, ttp_unit[TTI].buf, 8) },
-	{ DRDATA (KPOS, ttp_unit[TTI].pos, 32), PV_LEFT },
+	{ DRDATA (KPOS, ttp_unit[TTI].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (KTIME, ttp_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (KIREQ, int_req[l_TTP], i_TTP) },
 	{ FLDATA (KIENB, int_enb[l_TTP], i_TTP) },
 	{ FLDATA (KARM, ttp_karm, 0) },
 	{ FLDATA (CHP, ttp_kchp, 0) },
 	{ HRDATA (TBUF, ttp_unit[TTO].buf, 8) },
-	{ DRDATA (TPOS, ttp_unit[TTO].pos, 32), PV_LEFT },
+	{ DRDATA (TPOS, ttp_unit[TTO].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TTIME, ttp_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (TIREQ, int_req[l_TTP], i_TTP + 1) },
 	{ FLDATA (TIENB, int_enb[l_TTP], i_TTP + 1) },

@@ -1,6 +1,6 @@
 /* hp2100_ms.c: HP 2100 13181A/13183A magnetic tape simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
    ms		13181A 7970B 800bpi nine track magnetic tape
 		13183A 7970E 1600bpi nine track magnetic tape
 
+   25-Apr-03	RMS	Revised for extended file support
+   28-Mar-03	RMS	Added multiformat support
+   28-Feb-03	RMS	Revised for magtape library
    18-Oct-02	RMS	Added BOOT command, added 13183A support
    30-Sep-02	RMS	Revamped error handling
    29-Aug-02	RMS	Added end of medium support
@@ -200,7 +203,7 @@ REG msc_reg[] = {
 	{ FLDATA (CTL, msc_dib.ctl, 0) },
 	{ FLDATA (FLG, msc_dib.flg, 0) },
 	{ FLDATA (FBF, msc_dib.fbf, 0) },
-	{ URDATA (POS, msc_unit[0].pos, 10, 32, 0, MS_NUMDR, PV_LEFT) },
+	{ URDATA (POS, msc_unit[0].pos, 10, T_ADDR_W, 0, MS_NUMDR, PV_LEFT) },
 	{ URDATA (FNC, msc_unit[0].FNC, 8, 8, 0, MS_NUMDR, REG_HRO) },
 	{ URDATA (UST, msc_unit[0].UST, 8, 12, 0, MS_NUMDR, REG_HRO) },
 	{ DRDATA (CTIME, msc_ctime, 24), REG_NZ + PV_LEFT },
@@ -215,6 +218,8 @@ REG msc_reg[] = {
 MTAB msc_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 	{ MTAB_XTD | MTAB_VDV, 0, NULL, "13181A",
 		&ms_settype, NULL, NULL },
 	{ MTAB_XTD | MTAB_VDV, 1, NULL, "13183A",

@@ -3,10 +3,13 @@
 # Written By:  Robert Alan Byer
 #              byer@mail.ourservers.net
 #
+# Modified By: Mark Pizzolato
+#              mark@infocomm.com
+#
 # This MMS/MMK build script is used to compile the various simulators in
 # the SIMH package for OpenVMS using DEC C v6.0-001.
 #
-# Notes:  On VAX, the PDP-10 and VAX simulator will not be built due to the 
+# Notes:  On VAX, the PDP-10 and VAX simulator will not be built due to the
 #         fact that INT64 is required for those simulators.
 #
 #         When using DEC's MMS on an Alpha you must use 
@@ -37,11 +40,14 @@
 #            S3              Just Build The IBM System 3.
 #            SDS             Just Build The SDS 940.
 #            VAX             Just Build The DEC VAX.
+#            CLEAN           Will Clean Files Back To Base Kit.
 #
 # To build with debugging enabled (which will also enable traceback 
 # information) use..
 #
 #        MMK/FORCE/MACRO=(DEBUG=1)
+#
+# This will produce an executable named {Simulator}-{VAX|AXP}-DBG.EXE
 #
 
 #
@@ -58,9 +64,16 @@ LIB_DIR = SYS$DISK:[.LIB]
 # Let's See If We Are Going To Build With DEBUG Enabled.
 #
 .IFDEF DEBUG
-CC_DEBUG = /DEBUG
+CC_DEBUG = /DEBUG=ALL
 LINK_DEBUG = /DEBUG/TRACEBACK
 CC_OPTIMIZE = /NOOPTIMIZE
+.IFDEF __ALPHA__
+CC_FLAGS = /PREFIX=ALL
+ARCH = AXP-DBG
+.ELSE
+ARCH = VAX-DBG
+CC_FLAGS = $(CC_FLAGS)
+.ENDIF
 .ELSE
 CC_DEBUG = /NODEBUG
 LINK_DEBUG = /NODEBUG/NOTRACEBACK
@@ -71,18 +84,19 @@ ARCH = AXP
 .ELSE
 CC_OPTIMIZE = /OPTIMIZE
 ARCH = VAX
+CC_FLAGS = $(CC_FLAGS)
 .ENDIF
 .ENDIF
 
 #
-# Define Our Compiler Flags.
+# Define Our Compiler Flags
 #
-CC_FLAGS = $(CC_FLAGS)$(CC_OPTIMIZE)/NEST=PRIMARY/NAME=(AS_IS,SHORTENED)
+CC_FLAGS = $(CC_FLAGS)$(CC_DEBUG)$(CC_OPTIMIZE)/NEST=PRIMARY/NAME=(AS_IS,SHORTENED)
 
 #
 # Define The Compile Command.
 #
-CC = CC $(CC_FLAGS)
+CC = CC/DECC$(CC_FLAGS)
 
 #
 # First, Let's Check To Make Sure We Have A SYS$DISK:[.BIN] And 
@@ -98,9 +112,11 @@ CC = CC $(CC_FLAGS)
 SIMH_DIR = SYS$DISK:[]
 SIMH_LIB = $(LIB_DIR)SIMH-$(ARCH).OLB
 SIMH_SOURCE = $(SIMH_DIR)SCP_TTY.C,$(SIMH_DIR)SIM_SOCK.C,\
-            $(SIMH_DIR)SIM_TMXR.C,$(SIMH_DIR)SIM_ETHER.C,$(SIMH_DIR)SIM_TAPE.C
+              $(SIMH_DIR)SIM_TMXR.C,$(SIMH_DIR)SIM_ETHER.C,\
+              $(SIMH_DIR)SIM_TAPE.C
 SIMH_OBJS = $(SIMH_DIR)SCP_TTY.OBJ,$(SIMH_DIR)SIM_SOCK.OBJ,\
-            $(SIMH_DIR)SIM_TMXR.OBJ,$(SIMH_DIR)SIM_ETHER.OBJ,$(SIMH_DIR)SIM_TAPE.OBJ
+            $(SIMH_DIR)SIM_TMXR.OBJ,$(SIMH_DIR)SIM_ETHER.OBJ,\
+            $(SIMH_DIR)SIM_TAPE.OBJ
 
 #
 # MITS Altair Simulator Definitions.
@@ -174,7 +190,7 @@ GRI_DIR = SYS$DISK:[.GRI]
 GRI_LIB = $(LIB_DIR)GRI-$(ARCH).OLB
 GRI_SOURCE = $(GRI_DIR)GRI_CPU.C,$(GRI_DIR)GRI_STDDEV.C,$(GRI_DIR)GRI_SYS.C
 GRI_OBJS = $(GRI_DIR)GRI_CPU.OBJ,$(GRI_DIR)GRI_STDDEV.OBJ,\
-          $(GRI_DIR)GRI_SYS.OBJ
+           $(GRI_DIR)GRI_SYS.OBJ
 GRI_OPTIONS = /INCLUDE=($(SIMH_DIR),$(GRI_DIR))
 
 #
@@ -219,11 +235,12 @@ ID16_SOURCE = $(ID16_DIR)ID16_CPU.C,$(ID16_DIR)ID16_SYS.C,$(ID16_DIR)ID_DP.C,\
               $(ID16_DIR)ID_IO.C,$(ID16_DIR)ID_LP.C,$(ID16_DIR)ID_MT.C,\
               $(ID16_DIR)ID_PAS.C,$(ID16_DIR)ID_PT.C,$(ID16_DIR)ID_TT.C,\
               $(ID16_DIR)ID_UVC.C,$(ID16_DIR)ID16_DBOOT.C,$(ID16_DIR)ID_TTP.C
-ID16_OBJS = $(ID16_DIR)ID16_CPU.OBJ,$(ID16_DIR)ID16_SYS.OBJ,$(ID16_DIR)ID_DP.OBJ,\
-            $(ID16_DIR)ID_FD.OBJ,$(ID16_DIR)ID_FP.OBJ,$(ID16_DIR)ID_IDC.OBJ,\
-            $(ID16_DIR)ID_IO.OBJ,$(ID16_DIR)ID_LP.OBJ,$(ID16_DIR)ID_MT.OBJ,\
-            $(ID16_DIR)ID_PAS.OBJ,$(ID16_DIR)ID_PT.OBJ,$(ID16_DIR)ID_TT.OBJ,\
-            $(ID16_DIR)ID_UVC.OBJ,$(ID16_DIR)ID16_DBOOT.OBJ,$(ID16)DIR)ID_TTP.OBJ
+ID16_OBJS = $(ID16_DIR)ID16_CPU.OBJ,$(ID16_DIR)ID16_SYS.OBJ,\
+            $(ID16_DIR)ID_DP.OBJ,$(ID16_DIR)ID_FD.OBJ,$(ID16_DIR)ID_FP.OBJ,\
+            $(ID16_DIR)ID_IDC.OBJ,$(ID16_DIR)ID_IO.OBJ,$(ID16_DIR)ID_LP.OBJ,\
+            $(ID16_DIR)ID_MT.OBJ,$(ID16_DIR)ID_PAS.OBJ,$(ID16_DIR)ID_PT.OBJ,\
+            $(ID16_DIR)ID_TT.OBJ,$(ID16_DIR)ID_UVC.OBJ,\
+            $(ID16_DIR)ID16_DBOOT.OBJ,$(ID16_DIR)ID_TTP.OBJ
 ID16_OPTIONS = /INCLUDE=($(SIMH_DIR),$(ID16_DIR))
 
 #
@@ -241,7 +258,8 @@ ID32_OBJS = $(ID32_DIR)ID32_CPU.OBJ,$(ID32_DIR)ID32_SYS.OBJ,\
             $(ID32_DIR)ID_FP.OBJ,$(ID32_DIR)ID_IDC.OBJ,\
             $(ID32_DIR)ID_IO.OBJ,$(ID32_DIR)ID_LP.OBJ,$(ID32_DIR)ID_MT.OBJ,\
             $(ID32_DIR)ID_PAS.OBJ,$(ID32_DIR)ID_PT.OBJ,$(ID32_DIR)ID_TT.OBJ,\
-            $(ID32_DIR)ID_UVC.OBJ,$(ID32_DIR)ID32_DBOOT.C,$(ID32_DIR)ID_TTP.OBJ
+            $(ID32_DIR)ID_UVC.OBJ,$(ID32_DIR)ID32_DBOOT.OBJ,\
+            $(ID32_DIR)ID_TTP.OBJ
 ID32_OPTIONS = /INCLUDE=($(SIMH_DIR),$(ID32_DIR))
 
 #
@@ -297,10 +315,10 @@ PDP1_DIR = SYS$DISK:[.PDP1]
 PDP1_LIB = $(LIB_DIR)PDP1-$(ARCH).OLB
 PDP1_SOURCE = $(PDP1_DIR)PDP1_LP.C,$(PDP1_DIR)PDP1_CPU.C,\
               $(PDP1_DIR)PDP1_STDDEV.C,$(PDP1_DIR)PDP1_SYS.C,\
-              $(PDP1_DIR)PDP1_DT.C,${PDP1_DIR}PDP1_DRM.C
+              $(PDP1_DIR)PDP1_DT.C,$(PDP1_DIR)PDP1_DRM.C
 PDP1_OBJS = $(PDP1_DIR)PDP1_LP.OBJ,$(PDP1_DIR)PDP1_CPU.OBJ,\
             $(PDP1_DIR)PDP1_STDDEV.OBJ,$(PDP1_DIR)PDP1_SYS.OBJ,\
-            $(PDP1_DIR)PDP1_DT.OBJ,{PDP1_DIR}PDP1_DRM.OBJ
+            $(PDP1_DIR)PDP1_DT.OBJ,$(PDP1_DIR)PDP1_DRM.OBJ
 PDP1_OPTIONS = /INCLUDE=($(SIMH_DIR),$(PDP1_DIR))
 
 #
@@ -378,30 +396,30 @@ PDP11_OBJS = $(PDP11_DIR)PDP11_FP.OBJ,$(PDP11_DIR)PDP11_CPU.OBJ,\
              $(PDP11_DIR)PDP11_RY.OBJ,$(PDP11_DIR)PDP11_PT.OBJ,\
              $(PDP11_DIR)PDP11_HK.OBJ,$(PDP11_DIR)PDP11_XQ.OBJ,\
              $(PDP11_DIR)PDP11_XU.OBJ
-PDP11_OPTIONS = /INCLUDE=($(SIMH_DIR),$(PDP11_DIR))
+PDP11_OPTIONS = /INCLUDE=($(SIMH_DIR),$(PDP11_DIR))/DEFINE=("VM_PDP11=1")
 
 #
 # Digital Equipment PDP-10 Simulator Definitions.
 #
 PDP10_DIR = SYS$DISK:[.PDP10]
 PDP10_LIB = $(LIB_DIR)PDP10-$(ARCH).OLB
-PDP10_SOURCE = $(PDP10_DIR)PDP10_FE.C,$(PDP10_DIR)PDP10_DZ.C,\
+PDP10_SOURCE = $(PDP10_DIR)PDP10_FE.C,\
                $(PDP10_DIR)PDP10_CPU.C,$(PDP10_DIR)PDP10_KSIO.C,\
                $(PDP10_DIR)PDP10_LP20.C,$(PDP10_DIR)PDP10_MDFP.C,\
-	       $(PDP10_DIR)PDP10_PAG.C,$(PDP10_DIR)PDP10_PT.C,\
+	         $(PDP10_DIR)PDP10_PAG.C,$(PDP10_DIR)PDP10_XTND.C,\
                $(PDP10_DIR)PDP10_RP.C,$(PDP10_DIR)PDP10_SYS.C,\
                $(PDP10_DIR)PDP10_TIM.C,$(PDP10_DIR)PDP10_TU.C,\
-	       $(PDP10_DIR)PDP10_XTND.C,$(PDP10_DIR)PDP10_PT.C,\
+	         $(PDP11_DIR)PDP11_PT.C,$(PDP11_DIR)PDP11_DZ.C,\
                $(PDP11_DIR)PDP11_RY.C,$(PDP11_DIR)PDP11_XU.C
-PDP10_OBJS = $(PDP10_DIR)PDP10_FE.OBJ,$(PDP10_DIR)PDP10_DZ.OBJ,\
+PDP10_OBJS = $(PDP10_DIR)PDP10_FE.OBJ,\
              $(PDP10_DIR)PDP10_CPU.OBJ,$(PDP10_DIR)PDP10_KSIO.OBJ,\
              $(PDP10_DIR)PDP10_LP20.OBJ,$(PDP10_DIR)PDP10_MDFP.OBJ,\
-             $(PDP10_DIR)PDP10_PAG.OBJ,$(PDP10_DIR)PDP10_PT.OBJ,\
+             $(PDP10_DIR)PDP10_PAG.OBJ,$(PDP10_DIR)PDP10_XTND.OBJ,\
              $(PDP10_DIR)PDP10_RP.OBJ,$(PDP10_DIR)PDP10_SYS.OBJ,\
              $(PDP10_DIR)PDP10_TIM.OBJ,$(PDP10_DIR)PDP10_TU.OBJ,\
-	     $(PDP10_DIR)PDP10_XTND.OBJ,$(PDP10_DIR)PDP10_PT.OBJ,\
-             $(PDP10_DIR)PDP11_RY.OBJ,(PDP10_DIR)PDP11_XU.OBJ
-PDP10_OPTIONS = /INCLUDE=($(SIMH_DIR),$(PDP10_DIR),$(PDP11_DIR))/DEFINE=("USE_INT64=1")
+	       $(PDP10_DIR)PDP11_PT.OBJ,$(PDP10_DIR)PDP11_DZ.OBJ,\
+             $(PDP10_DIR)PDP11_RY.OBJ,$(PDP10_DIR)PDP11_XU.OBJ
+PDP10_OPTIONS = /INCLUDE=($(SIMH_DIR),$(PDP10_DIR),$(PDP11_DIR))/DEFINE=("USE_INT64=1","VM_PDP10=1")
 
 #
 # IBM System 3 Simulator Definitions.
@@ -425,8 +443,8 @@ SDS_SOURCE = $(SDS_DIR)SDS_CPU.C,$(SDS_DIR)SDS_DRM.C,$(SDS_DIR)SDS_DSK.C,\
              $(SDS_DIR)SDS_SYS.C
 SDS_OBJS = $(SDS_DIR)SDS_CPU.OBJ,$(SDS_DIR)SDS_DRM.OBJ,$(SDS_DIR)SDS_DSK.OBJ,\ 
            $(SDS_DIR)SDS_IO.OBJ,$(SDS_DIR)SDS_LP.OBJ,$(SDS_DIR)SDS_MT.OBJ,\
-           $(SDS_DIR)SDS_MUX.OBJ,$(SDS_DIR)SDS_RAD.OBJ,$(SDS_DIR)SDS_STDDEV.OBJ,\
-           $(SDS_DIR)SDS_SYS.OBJ
+           $(SDS_DIR)SDS_MUX.OBJ,$(SDS_DIR)SDS_RAD.OBJ,\
+           $(SDS_DIR)SDS_STDDEV.OBJ,$(SDS_DIR)SDS_SYS.OBJ
 SDS_OPTIONS = /INCLUDE=($(SIMH_DIR),$(SDS_DIR))
 
 #
@@ -450,22 +468,44 @@ VAX_OBJS = $(VAX_DIR)VAX_CPU1.OBJ,$(VAX_DIR)VAX_CPU.OBJ,\
            $(VAX_DIR)PDP11_TS.OBJ,$(VAX_DIR)PDP11_DZ.OBJ,\
            $(VAX_DIR)PDP11_LP.OBJ,$(VAX_DIR)PDP11_TQ.OBJ,\
            $(VAX_DIR)PDP11_PT.OBJ,$(VAX_DIR)PDP11_XQ.OBJ
-VAX_OPTIONS = /INCLUDE=($(SIMH_DIR),$(VAX_DIR),$(PDP11_DIR))/DEFINE=("USE_INT64=1")
+#
+# If On Alpha, Define "USE_INT64" As We Have INT64.
+#
+.IFDEF __ALPHA__
+VAX_OPTIONS = /INCLUDE=($(SIMH_DIR),$(VAX_DIR),$(PDP11_DIR))/DEFINE=("USE_INT64=1","VM_VAX=1")
+.ELSE
+#
+# We Are On A VAX Platform So Don't Define "USE_INT64" As We Don't Have
+# INT64.
+#
+VAX_OPTIONS = /INCLUDE=($(SIMH_DIR),$(VAX_DIR),$(PDP11_DIR))/DEFINE=("VM_VAX=1")
+.ENDIF
 
 #
 # If On Alpha, Build Everything.
 #
 .IFDEF __ALPHA__
-ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI H316 HP2100 I1401 I1620 IBM1130 NOVA PDP1 \
-      PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 VAX
+ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
+      NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 VAX SDS
 .ELSE
 #
-# Else We Are On VAX And Build Everything EXCEPT PDP-10 And VAX Since VAX
+# Else We Are On VAX And Build Everything EXCEPT The PDP-10 Since VAX
 # Dosen't Have INT64
 #
-ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI H316 HP2100 I1401 I1620 IBM1130 NOVA PDP1 \ 
-      PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3
+ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
+      NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX SDS
 .ENDIF
+
+CLEAN : 
+	$!
+	$! Clean out all targets and building Remnants
+	$!
+	$ IF (F$SEARCH("$(BIN_DIR)*.EXE;*").NES."") THEN -
+	     DELETE/NOLOG/NOCONFIRM $(BIN_DIR)*.EXE;*
+	$ IF (F$SEARCH("$(LIB_DIR)*.EXE;*").NES."") THEN -
+	     DELETE/NOLOG/NOCONFIRM $(LIB_DIR)*.OLB;*
+	$ IF (F$SEARCH("SYS$DISK:[...]*.OBJ;*").NES."") THEN -
+	     DELETE/NOLOG/NOCONFIRM SYS$DISK:[...]*.OBJ;*
 
 #
 # Build The Libraries.
@@ -744,7 +784,6 @@ $(LIB_DIR)SDS-$(ARCH).OLB : $(SDS_SOURCE)
 #
 # If On Alpha, Build The VAX Library.
 #
-.IFDEF __ALPHA__
 $(LIB_DIR)VAX-$(ARCH).OLB : $(VAX_SOURCE)
                            $!
 			   $! Building The $(VAX_LIB) Library.
@@ -755,16 +794,6 @@ $(LIB_DIR)VAX-$(ARCH).OLB : $(VAX_SOURCE)
                                 LIBRARY/CREATE $(VAX_LIB)
                            $ LIBRARY/REPLACE $(VAX_LIB) $(VAX_OBJS)
                            $ DELETE/NOLOG/NOCONFIRM $(VAX_DIR)*.OBJ;*
-.ELSE
-#
-# We Are On VAX And Due To The Use of INT64 We Can't Build It.
-#
-$(LIB_DIR)VAX-$(ARCH).OLB : 
-                           $!
-			   $! Due To The Use Of INT64 We Can't Build The
-                           $! $(LIB_DIR)VAX-$(ARCH).OLB Library On VAX.
-                           $!
-.ENDIF
 
 #
 # Individual Simulator Builds.
@@ -982,10 +1011,6 @@ SDS : $(SIMH_LIB) $(SDS_LIB)
              SCP.OBJ,$(SDS_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
       $ DELETE/NOLOG/NOCONFIRM $(SIMH_DIR)*.OBJ;*
 
-#
-# If On Alpha, Build The VAX Simulator.
-#
-.IFDEF __ALPHA__
 VAX : $(SIMH_LIB) $(VAX_LIB)
       $!
       $! Building The $(BIN_DIR)VAX-$(ARCH).EXE Simulator.
@@ -994,15 +1019,3 @@ VAX : $(SIMH_LIB) $(VAX_LIB)
       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)VAX-$(ARCH).EXE -
              SCP.OBJ,$(VAX_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
       $ DELETE/NOLOG/NOCONFIRM $(SIMH_DIR)*.OBJ;*
-.ELSE
-#
-# Else We Are On VAX And Tell The User We Can't Build On VAX
-# Due To The Use Of INT64.
-#
-VAX : 
-      $!
-      $! Sorry, Can't Build $(BIN_DIR)VAX-$(ARCH).EXE Simulator
-      $! Because It Requires The Use Of INT64.
-      $!
-.ENDIF
-

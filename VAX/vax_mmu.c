@@ -1,6 +1,6 @@
 /* vax_mm.c - VAX memory management simulator
 
-   Copyright (c) 1998-2002, Robert M Supnik
+   Copyright (c) 1998-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   01-Jun-03	RMS	Fixed compilation problem with USE_ADDR64
 
    This module contains the instruction simulators for
 
@@ -95,19 +97,19 @@ t_stat tlb_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tlb_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tlb_reset (DEVICE *dptr);
 
-TLBENT fill (t_addr va, int32 lnt, int32 acc, int32 *stat);
-int32 ReadB (t_addr pa);
-void WriteB (t_addr pa, int32 val);
-int32 ReadW (t_addr pa);
-void WriteW (t_addr pa, int32 val);
-int32 ReadL (t_addr pa);
-void WriteL (t_addr pa, int32 val);
-int32 ReadLP (t_addr pa);
-void WriteLP (t_addr pa, int32 val);
-extern int32 ReadIO (t_addr pa, int32 lnt);
-extern void WriteIO (t_addr pa, int32 val, int32 lnt);
-extern int32 ReadReg (t_addr pa, int32 lnt);
-extern void WriteReg (t_addr pa, int32 val, int32 lnt);
+TLBENT fill (uint32 va, int32 lnt, int32 acc, int32 *stat);
+int32 ReadB (uint32 pa);
+void WriteB (uint32 pa, int32 val);
+int32 ReadW (uint32 pa);
+void WriteW (uint32 pa, int32 val);
+int32 ReadL (uint32 pa);
+void WriteL (uint32 pa, int32 val);
+int32 ReadLP (uint32 pa);
+void WriteLP (uint32 pa, int32 val);
+extern int32 ReadIO (uint32 pa, int32 lnt);
+extern void WriteIO (uint32 pa, int32 val, int32 lnt);
+extern int32 ReadReg (uint32 pa, int32 lnt);
+extern void WriteReg (uint32 pa, int32 val, int32 lnt);
 
 /* TLB data structures
 
@@ -156,7 +158,7 @@ DEVICE tlb_dev = {
 	returned data, right justified in 32b longword
 */
 
-int32 Read (t_addr va, int32 lnt, int32 acc)
+int32 Read (uint32 va, int32 lnt, int32 acc)
 {
 int32 vpn, off, tbi, pa;
 int32 pa1, bo, sc, wl, wh;
@@ -209,7 +211,7 @@ else {	wl = ReadL (pa);				/* word cross lw */
 	none
 */
 
-void Write (t_addr va, int32 val, int32 lnt, int32 acc)
+void Write (uint32 va, int32 val, int32 lnt, int32 acc)
 {
 int32 vpn, off, tbi, pa;
 int32 pa1, bo, sc, wl, wh;
@@ -289,7 +291,7 @@ return va & PAMASK;					/* ret phys addr */
 	returned data, right justified in 32b longword
 */
 
-int32 ReadB (t_addr pa)
+int32 ReadB (uint32 pa)
 {
 int32 dat;
 
@@ -300,7 +302,7 @@ else {	mchk_ref = REF_V;
 return ((dat >> ((pa & 3) << 3)) & BMASK);
 }
 
-int32 ReadW (t_addr pa)
+int32 ReadW (uint32 pa)
 {
 int32 dat;
 
@@ -311,7 +313,7 @@ else {	mchk_ref = REF_V;
 return ((dat >> ((pa & 2)? 16: 0)) & WMASK);
 }
 
-int32 ReadL (t_addr pa)
+int32 ReadL (uint32 pa)
 {
 if (ADDR_IS_MEM (pa)) return M[pa >> 2];
 mchk_ref = REF_V;
@@ -319,7 +321,7 @@ if (ADDR_IS_IO (pa)) return ReadIO (pa, L_LONG);
 return ReadReg (pa, L_LONG);
 }
 
-int32 ReadLP (t_addr pa)
+int32 ReadLP (uint32 pa)
 {
 if (ADDR_IS_MEM (pa)) return M[pa >> 2];
 mchk_va = pa;
@@ -337,7 +339,7 @@ return ReadReg (pa, L_LONG);
 	none
 */
 
-void WriteB (t_addr pa, int32 val)
+void WriteB (uint32 pa, int32 val)
 {
 if (ADDR_IS_MEM (pa)) {
 	int32 id = pa >> 2;
@@ -350,7 +352,7 @@ else {	mchk_ref = REF_V;
 return;
 }
 
-void WriteW (t_addr pa, int32 val)
+void WriteW (uint32 pa, int32 val)
 {
 if (ADDR_IS_MEM (pa)) {
 	int32 id = pa >> 2;
@@ -362,7 +364,7 @@ else {	mchk_ref = REF_V;
 return;
 }
 
-void WriteL (t_addr pa, int32 val)
+void WriteL (uint32 pa, int32 val)
 {
 if (ADDR_IS_MEM (pa)) M[pa >> 2] = val;
 else {	mchk_ref = REF_V;
@@ -371,7 +373,7 @@ else {	mchk_ref = REF_V;
 return;
 }
 
-void WriteLP (t_addr pa, int32 val)
+void WriteLP (uint32 pa, int32 val)
 {
 if (ADDR_IS_MEM (pa)) M[pa >> 2] = val;
 else {	mchk_va = pa;
@@ -398,7 +400,7 @@ return;
 	p2 = va; \
 	ABORT ((param & PR_TNV)? ABORT_TNV: ABORT_ACV); }
 
-TLBENT fill (t_addr va, int32 lnt, int32 acc, int32 *stat)
+TLBENT fill (uint32 va, int32 lnt, int32 acc, int32 *stat)
 {
 int32 ptidx = (((uint32) va) >> 7) & ~03;
 int32 tlbpte, ptead, pte, tbi, vpn;
@@ -500,7 +502,7 @@ return FALSE;
 t_stat tlb_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 int32 tlbn = uptr - tlb_unit;
-int32 idx = addr >> 1;
+int32 idx = (uint32) addr >> 1;
 
 if (idx >= VA_TBSIZE) return SCPE_NXM;
 if (addr & 1) *vptr = ((uint32) (tlbn? stlb[idx].pte: ptlb[idx].pte));
@@ -513,7 +515,7 @@ return SCPE_OK;
 t_stat tlb_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
 int32 tlbn = uptr - tlb_unit;
-int32 idx = addr >> 1;
+int32 idx = (uint32) addr >> 1;
 
 if (idx >= VA_TBSIZE) return SCPE_NXM;
 if (addr & 1) {

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	H316 Simulator Usage
-Date:	15-Mar-2003
+Date:	20-Apr-2003
 
 			COPYRIGHT NOTICE
 
@@ -152,7 +152,7 @@ Error handling is as follows:
 			0	out of tape
 
 	end of file	1	report error and stop
-				0	out of tape or paper
+			0	out of tape or paper
 
 	OS I/O error	x	report error and stop
 

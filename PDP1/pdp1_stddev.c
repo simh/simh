@@ -1,6 +1,6 @@
 /* pdp1_stddev.c: PDP-1 standard devices
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tti		keyboard
    tto		teleprinter
 
+   25-Apr-03	RMS	Revised for extended file support
    22-Dec-02	RMS	Added break support
    29-Nov-02	RMS	Fixed output flag initialization (found by Derek Peschel)
    21-Nov-02	RMS	Changed typewriter to half duplex (found by Derek Peschel)
@@ -124,7 +125,7 @@ REG ptr_reg[] = {
 	{ FLDATA (DONE, iosta, IOS_V_PTR) },
 	{ FLDATA (RPLS, ptr_rpls, 0) },
 	{ ORDATA (STATE, ptr_state, 5), REG_HRO },
-	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
 	{ NULL }  };
@@ -150,7 +151,7 @@ REG ptp_reg[] = {
 	{ ORDATA (BUF, ptp_unit.buf, 8) },
 	{ FLDATA (DONE, iosta, IOS_V_PTP) },
 	{ FLDATA (RPLS, ptp_rpls, 0) },
-	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
 	{ NULL }  };
@@ -179,11 +180,11 @@ REG tty_reg[] = {
 	{ FLDATA (RPLS, tto_rpls, 0) },
 	{ ORDATA (HOLD, tti_hold, 9), REG_HRO },
 	{ FLDATA (KDONE, iosta, IOS_V_TTI) },
+	{ DRDATA (KPOS, tty_unit[TTI].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (KTIME, tty_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (KPOS, tty_unit[TTI].pos, 32), PV_LEFT },
 	{ FLDATA (TDONE, iosta, IOS_V_TTO) },
+	{ DRDATA (TPOS, tty_unit[TTO].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TTIME, tty_unit[TTO].wait, 24), PV_LEFT },
-	{ DRDATA (TPOS, tty_unit[TTO].pos, 32), PV_LEFT },
 	{ NULL }  };
 
 DEVICE tty_dev = {

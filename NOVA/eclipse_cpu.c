@@ -2,7 +2,7 @@
 
    Modified from the original NOVA simulator by Robert Supnik.
 
-   Copyright (c) 1998-2002, Charles E Owen
+   Copyright (c) 1998-2003, Charles E Owen
    Portions Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -2953,7 +2953,7 @@ int32 pushrtn(int32 pc)
 int32 GetMap(int32 addr)
 {
      int32 page;
-	 t_addr paddr;
+	 uint32 paddr;
      
     switch (Usermap) {
         case 0:
@@ -3015,7 +3015,7 @@ int32 GetMap(int32 addr)
 int32 PutMap(int32 addr, int32 data)
 {
     int32 page;
-	t_addr paddr;
+	uint32 paddr;
     
     switch (Usermap) {
         case 0:
@@ -3060,7 +3060,7 @@ int32 PutMap(int32 addr, int32 data)
 #if 0
 int16 GetDCHMap(int32 map, int32 addr)
 {
-     t_addr paddr;
+     uint32 paddr;
      if (!(MapStat & 02)) return M[addr];
      paddr = ((Map[map][(addr >> 10) & 037] & PAGEMASK) << 10) | (addr & 001777);
      if (paddr < MEMSIZE)
@@ -3070,7 +3070,7 @@ int16 GetDCHMap(int32 map, int32 addr)
 
 int16 PutDCHMap(int32 map, int32 addr, int16 data)
 {
-     t_addr paddr;
+     uint32 paddr;
      if (!(MapStat & 02)) {
          M[addr] = data;      
          return (data);
@@ -3192,7 +3192,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
 	return SCPE_ARG;

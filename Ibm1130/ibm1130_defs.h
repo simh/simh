@@ -271,7 +271,7 @@ void   remark_cmd (char *remark);
 void   stuff_cmd (char *cmd);
 void   update_gui (t_bool force);
 void   sim_init (void);
-t_stat register_cmd (char *name, t_stat (*action)(), int arg, char *help);
+t_stat register_cmd (char *name, t_stat (*action)(int32, char *), int arg, char *help);
 
 /* GUI interface routines */
 t_bool keyboard_is_locked (void);

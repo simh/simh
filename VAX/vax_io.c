@@ -1,6 +1,6 @@
 /* vax_io.c: VAX Qbus IO simulator
 
-   Copyright (c) 1998-2002, Robert M Supnik
+   Copyright (c) 1998-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,9 @@
 
    qba		Qbus adapter
 
-   22-Dec-02	RMS	Addec console halt support
+   19-Apr-03	RMS	Added optimized byte and word DMA routines
+   12-Mar-03	RMS	Added logical name support
+   22-Dec-02	RMS	Added console halt support
    12-Oct-02	RMS	Added autoconfigure support
 			Added SHOW IO space routine
    29-Sep-02	RMS	Added dynamic table support
@@ -101,12 +103,12 @@ extern int32 ssc_bto;
 extern jmp_buf save_env;
 extern DEVICE *sim_devices[];
 
-extern int32 ReadB (t_addr pa);
-extern int32 ReadW (t_addr pa);
-extern int32 ReadL (t_addr pa);
-extern int32 WriteB (t_addr pa, int32 val);
-extern int32 WriteW (t_addr pa, int32 val);
-extern int32 WriteL (t_addr pa, int32 val);
+extern int32 ReadB (uint32 pa);
+extern int32 ReadW (uint32 pa);
+extern int32 ReadL (uint32 pa);
+extern int32 WriteB (uint32 pa, int32 val);
+extern int32 WriteW (uint32 pa, int32 val);
+extern int32 WriteL (uint32 pa, int32 val);
 extern FILE *sim_log;
 
 t_stat dbl_rd (int32 *data, int32 addr, int32 access);
@@ -409,7 +411,7 @@ return;
 int32 cqmem_rd (int32 pa)
 {
 int32 qa = pa & CQMAMASK;				/* Qbus addr */
-t_addr ma;
+uint32 ma;
 
 if (map_addr (qa, &ma)) return M[ma >> 2];		/* map addr */
 MACH_CHECK (MCHK_READ);					/* err? mcheck */
@@ -419,7 +421,7 @@ return 0;
 void cqmem_wr (int32 pa, int32 val, int32 lnt)
 {
 int32 qa = pa & CQMAMASK;				/* Qbus addr */
-t_addr ma;
+uint32 ma;
 
 if (map_addr (qa, &ma)) {				/* map addr */
 	if (lnt < L_LONG) {
@@ -434,7 +436,7 @@ return;
 
 /* Map an address via the translation map */
 
-t_bool map_addr (t_addr qa, t_addr *ma)
+t_bool map_addr (uint32 qa, uint32 *ma)
 {
 int32 qblk = (qa >> VA_V_VPN);				/* Qbus blk */
 int32 qmma = ((qblk << 2) & CQMAPAMASK) + cq_mbr;	/* map entry */
@@ -511,40 +513,64 @@ return qba_reset (&qba_dev);
    map_WriteL 	-	store longword buffer into memory
 */
 
-int32 map_readB (t_addr ba, int32 bc, uint8 *buf)
+int32 map_readB (uint32 ba, int32 bc, uint8 *buf)
 {
 int32 i;
-t_addr ma;
+uint32 ma, dat;
 
-for (i = ma = 0; i < bc; i++, buf++) {			/* by bytes */
-	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		!ADDR_IS_MEM (ma)) return (bc - i);  }
-	*buf = ReadB (ma);
-	ma = ma + 1;  }
+if ((ba | bc) & 03) {					/* check alignment */
+	for (i = ma = 0; i < bc; i++, buf++) {		/* by bytes */
+	    if ((ma & VA_M_OFF) == 0) {			/* need map? */
+		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+		*buf = ReadB (ma);
+		ma = ma + 1;  }
+	}
+else {	for (i = ma = 0; i < bc; i = i + 4, buf++) {	/* by longwords */
+	    if ((ma & VA_M_OFF) == 0) {			/* need map? */
+		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    dat = ReadL (ma);				/* get lw */
+	    *buf++ = dat & BMASK;			/* low 8b */
+	    *buf++ = (dat >> 8) & BMASK;		/* next 8b */
+	    *buf++ = (dat >> 16) & BMASK;		/* next 8b */
+	    *buf = (dat >> 24) & BMASK;
+	    ma = ma + 4;  }
+	}
 return 0;
 }
 
-int32 map_readW (t_addr ba, int32 bc, uint16 *buf)
+int32 map_readW (uint32 ba, int32 bc, uint16 *buf)
 {
 int32 i;
-t_addr ma;
+uint32 ma,dat;
 
 ba = ba & ~01;
 bc = bc & ~01;
-for (i = ma = 0; i < bc; i = i + 2, buf++) {		/* by words */
-	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		!ADDR_IS_MEM (ma)) return (bc - i);  }
-	*buf = ReadW (ma);
-	ma = ma + 2;  }
+if ((ba | bc) & 03) {					/* check alignment */
+	for (i = ma = 0; i < bc; i = i + 2, buf++) {	/* by words */
+	    if ((ma & VA_M_OFF) == 0) {			/* need map? */
+		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    *buf = ReadW (ma);
+	    ma = ma + 2;  }
+	}
+else {	for (i = ma = 0; i < bc; i = i + 4, buf++) {	/* by longwords */
+	    if ((ma & VA_M_OFF) == 0) {			/* need map? */
+		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    dat = ReadL (ma);				/* get lw */
+	    *buf++ = dat & WMASK;			/* low 16b */
+	    *buf = (dat >> 16) & WMASK;			/* high 16b */
+	    ma = ma + 4;  }
+	}
 return 0;
 }
 
-int32 map_readL (t_addr ba, int32 bc, uint32 *buf)
+int32 map_readL (uint32 ba, int32 bc, uint32 *buf)
 {
 int32 i;
-t_addr ma;
+uint32 ma;
 
 ba = ba & ~03;
 bc = bc & ~03;
@@ -557,40 +583,64 @@ for (i = ma = 0; i < bc; i = i + 4, buf++) {		/* by lw */
 return 0;
 }
 
-int32 map_writeB (t_addr ba, int32 bc, uint8 *buf)
+int32 map_writeB (uint32 ba, int32 bc, uint8 *buf)
 {
 int32 i;
-t_addr ma;
+uint32 ma, dat;
 
-for (i = ma = 0; i < bc; i++, buf++) {			/* by bytes */
-	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		!ADDR_IS_MEM (ma)) return (bc - i);  }
-	WriteB (ma, *buf);
-	ma = ma + 1;  }
+if ((ba | bc) & 03) {					/* check alignment */
+	for (i = ma = 0; i < bc; i++, buf++) {		/* by bytes */
+	    if ((ma & VA_M_OFF) == 0) {			/* need map? */
+		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    WriteB (ma, *buf);
+	    ma = ma + 1;  }
+	}
+else {	for (i = ma = 0; i < bc; i = i + 4, buf++) {	/* by longwords */
+	    if ((ma & VA_M_OFF) == 0) {			/* need map? */
+		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    dat = (uint32) *buf++;			/* get low 8b */
+	    dat = dat | (((uint32) *buf++) << 8);	/* merge next 8b */
+	    dat = dat | (((uint32) *buf++) << 16);	/* merge next 8b */
+	    dat = dat | (((uint32) *buf) << 24);	/* merge hi 8b */
+	    WriteL (ma, dat);				/* store lw */
+	    ma = ma + 4;  }
+	}
 return 0;
 }
 
-int32 map_writeW (t_addr ba, int32 bc, uint16 *buf)
+int32 map_writeW (uint32 ba, int32 bc, uint16 *buf)
 {
 int32 i;
-t_addr ma;
+uint32 ma, dat;
 
 ba = ba & ~01;
 bc = bc & ~01;
-for (i = ma = 0; i < bc; i = i + 2, buf++) {		/* by words */
-	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		!ADDR_IS_MEM (ma)) return (bc - i);  }
-	WriteW (ma, *buf);
-	ma = ma + 2;  }
+if ((ba | bc) & 03) {					/* check alignment */
+	for (i = ma = 0; i < bc; i = i + 2, buf++) {	/* by words */
+	    if ((ma & VA_M_OFF) == 0) {			/* need map? */
+		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    WriteW (ma, *buf);
+	    ma = ma + 2;  }
+	}
+else {	for (i = ma = 0; i < bc; i = i + 4, buf++) {	/* by longwords */
+	    if ((ma & VA_M_OFF) == 0) {			/* need map? */
+		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    dat = (uint32) *buf++;			/* get low 16b */
+	    dat = dat | (((uint32) *buf) << 16);	/* merge hi 16b */
+	    WriteL (ma, dat);				/* store lw */
+	    ma = ma + 4;  }
+	}
 return 0;
 }
 
-int32 map_writeL (t_addr ba, int32 bc, uint32 *buf)
+int32 map_writeL (uint32 ba, int32 bc, uint32 *buf)
 {
 int32 i;
-t_addr ma;
+uint32 ma;
 
 ba = ba & ~03;
 bc = bc & ~03;
@@ -722,9 +772,11 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
 	    (curr->ba < (dibp->ba + dibp->lnt))) ||
 	    ((end >= dibp->ba) &&			/* overlap end? */
 	    (end < (dibp->ba + dibp->lnt)))) {
-		printf ("Device %s address conflict at %08X\n", dptr->name, dibp->ba);
+		printf ("Device %s address conflict at %08X\n",
+		    sim_dname (dptr), dibp->ba);
 		if (sim_log) fprintf (sim_log,
-			"Device %s address conflict at %08X\n", dptr->name, dibp->ba);
+		    "Device %s address conflict at %08X\n",
+		    sim_dname (dptr), dibp->ba);
 		return TRUE;  }  }
 return FALSE;
 }
@@ -797,7 +849,7 @@ for (i = 0; dib_tab[i] != NULL; i++) {			/* print table */
 	fprintf (st, "%08X - %08X%c\t%s\n", dib_tab[i]->ba,
 		dib_tab[i]->ba + dib_tab[i]->lnt - 1,
 		(dptr && (dptr->flags & DEV_FLTA))? '*': ' ',
-		dptr? dptr->name: "CPU");
+		dptr? sim_dname (dptr): "CPU");
 	}
 return SCPE_OK;
 }

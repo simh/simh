@@ -1,6 +1,6 @@
 /* pdp11_lp.c: PDP-11 line printer simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    lpt		LP11 line printer
 
+   19-May-03	RMS	Revised for new conditional compilation scheme
+   25-Apr-03	RMS	Revised for extended file support
    29-Sep-02	RMS	Added vector change/display support
 			New data structures
    30-May-02	RMS	Widened POS to 32b
@@ -34,15 +36,18 @@
    30-Oct-00	RMS	Standardized register naming
 */
 
-#if defined (USE_INT64)
-#define VM_VAX		1
-#include "vax_defs.h"
-#define LPT_DRDX	16
+#if defined (VM_PDP10)					/* PDP10 version */
+#error "LP11 is not supported on the PDP-10!"
 
-#else
-#define VM_PDP11	1
+#elif defined (VM_VAX)					/* VAX version */
+#include "vax_defs.h"
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
+
+#else							/* PDP-11 version */
 #include "pdp11_defs.h"
-#define LPT_DRDX	8
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 #endif
 
 #define LPTCSR_IMP	(CSR_ERR + CSR_DONE + CSR_IE)	/* implemented */
@@ -76,17 +81,17 @@ UNIT lpt_unit = {
 	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
 
 REG lpt_reg[] = {
-	{ GRDATA (BUF, lpt_unit.buf, LPT_DRDX, 8, 0) },
-	{ GRDATA (CSR, lpt_csr, LPT_DRDX, 16, 0) },
+	{ GRDATA (BUF, lpt_unit.buf, DEV_RDX, 8, 0) },
+	{ GRDATA (CSR, lpt_csr, DEV_RDX, 16, 0) },
 	{ FLDATA (INT, IREQ (LPT), INT_V_LPT) },
 	{ FLDATA (ERR, lpt_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, lpt_csr, CSR_V_DONE) },
 	{ FLDATA (IE, lpt_csr, CSR_V_IE) },
-	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
-	{ GRDATA (DEVADDR, lpt_dib.ba, LPT_DRDX, 32, 0), REG_HRO },
-	{ GRDATA (DEVVEC, lpt_dib.vec, LPT_DRDX, 16, 0), REG_HRO },
+	{ GRDATA (DEVADDR, lpt_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+	{ GRDATA (DEVVEC, lpt_dib.vec, DEV_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB lpt_mod[] = {
@@ -98,7 +103,7 @@ MTAB lpt_mod[] = {
 
 DEVICE lpt_dev = {
 	"LPT", &lpt_unit, lpt_reg, lpt_mod,
-	1, 10, 31, 1, LPT_DRDX, 8,
+	1, 10, 31, 1, DEV_RDX, 8,
 	NULL, NULL, &lpt_reset,
 	NULL, &lpt_attach, &lpt_detach,
 	&lpt_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS };
@@ -148,7 +153,7 @@ if (putc (lpt_unit.buf & 0177, lpt_unit.fileref) == EOF) {
 	clearerr (lpt_unit.fileref);
 	return SCPE_IOERR;  }
 lpt_csr = lpt_csr & ~CSR_ERR;
-lpt_unit.pos = ftell (lpt_unit.fileref);
+lpt_unit.pos = lpt_unit.pos + 1;
 return SCPE_OK;
 }
 

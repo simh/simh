@@ -26,6 +26,7 @@
    rf		(PDP-9) RF09/RF09
 		(PDP-15) RF15/RS09
 
+   14-Mar-03	RMS	Fixed variable platter interaction with save/restore
    03-Mar-03	RMS	Fixed autosizing
    12-Feb-03	RMS	Removed 8 platter sizing hack
    05-Feb-03	RMS	Fixed decode bugs, added variable and autosizing
@@ -54,6 +55,7 @@
 #define UNIT_V_AUTO	(UNIT_V_UF + 0)			/* autosize */
 #define UNIT_V_PLAT	(UNIT_V_UF + 1)			/* #platters - 1 */
 #define UNIT_M_PLAT	07
+#define UNIT_PLAT	(UNIT_M_PLAT << UNIT_V_PLAT)
 #define UNIT_GETP(x)	((((x) >> UNIT_V_PLAT) & UNIT_M_PLAT) + 1)
 #define UNIT_AUTO	(1 << UNIT_V_AUTO)
 #define UNIT_PLAT	(UNIT_M_PLAT << UNIT_V_PLAT)
@@ -144,6 +146,7 @@ REG rf_reg[] = {
 	{ DRDATA (TIME, rf_time, 24), PV_LEFT + REG_NZ },
 	{ FLDATA (BURST, rf_burst, 0) },
 	{ FLDATA (STOP_IOE, rf_stopioe, 0) },
+	{ DRDATA (CAPAC, rf_unit.capac, 31), PV_LEFT + REG_HRO },
 	{ ORDATA (DEVNO, rf_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
@@ -205,7 +208,7 @@ if (pulse & 04) {
 		sim_activate (&rf_unit, t * rf_time);  }  }	/* schedule op */
 	else if (sb == 060) {				/* DLAH */
 	    rf_da = (rf_da & 0777777) | ((AC & 07) << 18);
-	    if ((t_addr) rf_da >= rf_unit.capac)	/* for sizing */
+	    if ((uint32) rf_da >= rf_unit.capac)	/* for sizing */
 		rf_updsta (RFS_NED);  }
 	}
 rf_updsta (0);						/* update status */
@@ -241,7 +244,7 @@ if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	return IORETURN (rf_stopioe, SCPE_UNATT);  }
 
 f = GET_FNC (rf_sta);					/* get function */
-do {	if ((t_addr) rf_da >= uptr->capac) {		/* disk overflow? */
+do {	if ((uint32) rf_da >= uptr->capac) {		/* disk overflow? */
 	    rf_updsta (RFS_NED);			/* nx disk error */
 	    break;  }
 	M[RF_WC] = (M[RF_WC] + 1) & 0777777;		/* incr word count */
@@ -260,7 +263,7 @@ do {	if ((t_addr) rf_da >= uptr->capac) {		/* disk overflow? */
 		break;  }
 	    else {
 	    	*(((int32 *) uptr->filebuf) + rf_da) = M[pa];
-		if (((t_addr) rf_da) >= uptr->hwmark) uptr->hwmark = rf_da + 1;  }  }
+		if (((uint32) rf_da) >= uptr->hwmark) uptr->hwmark = rf_da + 1;  }  }
 	rf_da = rf_da + 1;				/* incr disk addr */
 	}
 while ((M[RF_WC] != 0) && (rf_burst != 0));		/* brk if wc, no brst */
@@ -304,15 +307,15 @@ return ((rf_sta & (RFS_ERR | RFS_DON))? IOS_RF: 0);
 
 t_stat rf_attach (UNIT *uptr, char *cptr)
 {
-t_addr p, sz;
-t_addr ds_bytes = RF_DKSIZE * sizeof (int32);
+uint32 p, sz;
+uint32 ds_bytes = RF_DKSIZE * sizeof (int32);
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
 	p = (sz + ds_bytes - 1) / ds_bytes;
-	if (p == 0) p = 1;
-	if (p > RF_NUMDK) p = RF_NUMDK;  }
-else p = UNIT_GETP (uptr->flags);
-uptr->capac = p * RF_DKSIZE;
+	if (p >= RF_NUMDK) p = RF_NUMDK - 1;
+	uptr->flags = (uptr->flags & ~UNIT_PLAT) |
+	    (p << UNIT_V_PLAT);  }
+uptr->capac = UNIT_GETP (uptr->flags) * RF_DKSIZE;
 return attach_unit (uptr, cptr);
 }
 

@@ -26,6 +26,9 @@
    mt		(PDP-9) TC59 magtape
 		(PDP-15) TC59D magtape
 
+   25-Apr-03	RMS	Revised for extended file support
+   28-Mar-03	RMS	Added multiformat support
+   04-Mar-03	RMS	Fixed bug in MTTR
    01-Mar-03	RMS	Fixed bug in interrupt handling
 			Revised for magtape library
    02-Feb-03	RMS	Revised IOT decoding
@@ -124,6 +127,7 @@ int32 mt_cu = 0;					/* command/unit */
 int32 mt_sta = 0;					/* status register */
 int32 mt_time = 10;					/* record latency */
 int32 mt_stopioe = 1;					/* stop on error */
+int32 mt_log = 0;
 uint8 *mtxb = NULL;					/* transfer buffer */
 
 DEVICE mt_dev;
@@ -166,15 +170,19 @@ REG mt_reg[] = {
 	{ FLDATA (STOP_IOE, mt_stopioe, 0) },
 	{ DRDATA (TIME, mt_time, 24), PV_LEFT },
 	{ URDATA (UST, mt_unit[0].USTAT, 8, 16, 0, MT_NUMDR, 0) },
-	{ URDATA (POS, mt_unit[0].pos, 10, 32, 0,
+	{ URDATA (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
 		  MT_NUMDR, PV_LEFT | REG_RO) },
+	{ FLDATA (LOG, mt_log, 0), REG_HIDDEN },
 	{ ORDATA (DEVNO, mt_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
 MTAB mt_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
-	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
+		&set_devno, &show_devno, NULL },
 	{ 0 }  };
 
 DEVICE mt_dev = {
@@ -195,13 +203,17 @@ uptr = mt_dev.units + GET_UNIT (mt_cu);			/* get unit */
 mt_updcsta (uptr, 0);					/* update status */
 sb = pulse & 060;					/* subop */
 if (pulse & 01) {
-	if ((sb == 000) && !sim_is_active (uptr))	/* MTTR */
+	if ((sb == 000) && (uptr->flags & UNIT_ATT) &&	/* MTTR */
+	    !sim_is_active (uptr))
 	    AC = IOT_SKP | AC;
 	else if ((sb == 020) && !mt_busy ())		/* MTCR */
 	    AC = IOT_SKP | AC;
 	else if ((sb == 040) && (mt_sta & (STA_ERR | STA_DON))) /* MTSF */
 	    AC = IOT_SKP | AC;
 	}
+if ((pulse & 06) && mt_log)
+	printf ("[MT%d: IOT=%o, AC=%o, sta=%o]\n",
+	   GET_UNIT (mt_cu), 0707300 + pulse, AC, mt_sta);
 if (pulse & 02) {
 	if (sb == 000) AC = AC | (mt_cu & 0777700);	/* MTRC */
 	else if (sb == 020) {				/* MTAF, MTLC */
@@ -252,6 +264,7 @@ if (uptr->USTAT & STA_REW) {				/* rewind? */
 	if (uptr->flags & UNIT_ATT) uptr->USTAT = STA_BOT;
 	else uptr->USTAT = 0;
 	if (u == GET_UNIT (mt_cu)) mt_updcsta (uptr, STA_DON);
+	if (mt_log) printf ("[MT%d: rewind complete, sta=%o]\n", u, mt_sta);
 	return SCPE_OK;  }
 
 if ((uptr->flags & UNIT_ATT) == 0) {			/* if not attached */
@@ -345,6 +358,8 @@ case FN_SPACER:						/* space reverse */
 	break;  }					/* end case */
 
 mt_updcsta (uptr, STA_DON);				/* set done */
+if (mt_log) printf ("MT%d: fnc=%d done, ma=%o, wc=%o, sta=%o]\n",
+	u, f, M[MT_CA], M[MT_WC], mt_sta);
 return r;
 }
 
@@ -399,7 +414,7 @@ case MTSE_RECE:						/* record in error */
 	mt_sta = mt_sta | STA_PAR | STA_ERR;		/* set par err */
 	break;
 case MTSE_EOM:						/* end of medium */
-	mt_sta = mt_sta | STA_BAD | STA_ERR;		/* set bad tape */
+	mt_sta = mt_sta | STA_BAD | STA_ERR;		/* set end tape */
 	break;
 case MTSE_BOT:						/* reverse into BOT */
 	uptr->USTAT = uptr->USTAT | STA_BOT;		/* set status */

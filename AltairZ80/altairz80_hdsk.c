@@ -1,30 +1,29 @@
-/*	altairZ80_hdsk.c: simulated hard disk device to increase capacity
+/*	altairz80_hdsk.c: simulated hard disk device to increase capacity
 
-   Copyright (c) 2002, Peter Schorn
+		Copyright (c) 2002-2003, Peter Schorn
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+		Permission is hereby granted, free of charge, to any person obtaining a
+		copy of this software and associated documentation files (the "Software"),
+		to deal in the Software without restriction, including without limitation
+		the rights to use, copy, modify, merge, publish, distribute, sublicense,
+		and/or sell copies of the Software, and to permit persons to whom the
+		Software is furnished to do so, subject to the following conditions:
 
-   The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
+		The above copyright notice and this permission notice shall be included in
+		all copies or substantial portions of the Software.
 
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+		THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+		IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+		FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+		PETER SCHORN BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+		IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+		CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Peter Schorn shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Peter Schorn.
+		Except as contained in this notice, the name of Peter Schorn shall not
+		be used in advertising or otherwise to promote the sale, use or other dealings
+		in this Software without prior written authorization from Peter Schorn.
 */
 
-#include <stdio.h>
 #include "altairz80_defs.h"
 
 #define UNIT_V_HDSKWLK					(UNIT_V_UF + 0)			/* write locked														*/
@@ -54,32 +53,32 @@ extern int32 saved_PC;
 
 extern int32 install_bootrom(void);
 extern void printMessage(void);
+extern void PutBYTEBasic(const uint32 Addr, const uint32 Bank, const uint32 Value);
 extern void PutBYTEWrapper(register uint32 Addr, register uint32 Value);
-extern void protect(int32 l, int32 h);
+extern void protect(const int32 l, const int32 h);
 extern uint8 GetBYTEWrapper(register uint32 Addr);
 extern int32 bootrom[bootrom_size];
 
-t_stat hdsk_svc(UNIT *uptr);
-t_stat hdsk_boot(int32 unitno, DEVICE *dptr);
-int32 hdsk_hasVerbose(void);
-int32 hdsk_io(int32 port, int32 io, int32 data);
-int32 hdsk_in(void);
-int32 hdsk_out(int32 data);
-int32 checkParameters(void);
-int32 doSeek(void);
-int32 doRead(void);
-int32 doWrite(void);
+static t_stat hdsk_svc(UNIT *uptr);
+static t_stat hdsk_boot(int32 unitno, DEVICE *dptr);
+static int32 hdsk_hasVerbose(void);
+int32 hdsk_io(const int32 port, const int32 io, const int32 data);
+static int32 hdsk_in(const int32 port);
+static int32 hdsk_out(const int32 data);
+static int32 checkParameters(void);
+static int32 doSeek(void);
+static int32 doRead(void);
+static int32 doWrite(void);
 
-uint8 hdskbuf[HDSK_SECTOR_SIZE];	/* Data Buffer	*/
-int32 hdskLastCommand = hdsk_none;
-int32 hdskCommandPosition = 0;
-int32 selectedDisk;
-int32 selectedSector;
-int32 selectedTrack;
-int32 selectedDMA;
-int32 hdskTrace;
+static int32 hdskLastCommand = hdsk_none;
+static int32 hdskCommandPosition = 0;
+static int32 selectedDisk;
+static int32 selectedSector;
+static int32 selectedTrack;
+static int32 selectedDMA;
+static int32 hdskTrace;
 
-UNIT hdsk_unit[] = {
+static UNIT hdsk_unit[] = {
 	{ UDATA (&hdsk_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDSK_CAPACITY) },
 	{ UDATA (&hdsk_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDSK_CAPACITY) },
 	{ UDATA (&hdsk_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDSK_CAPACITY) },
@@ -89,7 +88,7 @@ UNIT hdsk_unit[] = {
 	{ UDATA (&hdsk_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDSK_CAPACITY) },
 	{ UDATA (&hdsk_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, HDSK_CAPACITY) } };
 
-REG hdsk_reg[] = {
+static REG hdsk_reg[] = {
 	{ DRDATA (HDCMD,		hdskLastCommand,			32),	REG_RO	},
 	{ DRDATA (HDPOS,		hdskCommandPosition,	32),	REG_RO	},
 	{ DRDATA (HDDSK,		selectedDisk,					32),	REG_RO	},
@@ -99,7 +98,7 @@ REG hdsk_reg[] = {
 	{ DRDATA (HDTRACE,	hdskTrace,						8),						},
 	{ NULL } };
 
-MTAB hdsk_mod[] = {
+static MTAB hdsk_mod[] = {
 	{ UNIT_HDSKWLK,				0,									"write enabled",	"WRITEENABLED",	NULL	},
 	{ UNIT_HDSKWLK,				UNIT_HDSKWLK,				"write locked",		"LOCKED",				NULL	},
 	/* quiet, no warning messages			*/
@@ -112,13 +111,13 @@ DEVICE hdsk_dev = {
 	"HDSK", hdsk_unit, hdsk_reg, hdsk_mod,
 	8, 10, 31, 1, 8, 8,
 	NULL, NULL, NULL,
-	&hdsk_boot, NULL, NULL, NULL, 0 };
+	&hdsk_boot, NULL, NULL, NULL, 0, NULL, NULL };
 
-t_stat hdsk_svc(UNIT *uptr) {
+static t_stat hdsk_svc(UNIT *uptr) {
 	return SCPE_OK;
 }
 
-int32 hdskBoot[bootrom_size] = {
+static const int32 hdskBoot[bootrom_size] = {
 	0xf3, 0x06, 0x80, 0x3e, 0x0e, 0xd3, 0xfe, 0x05, /* 5c00-5c07 */
 	0xc2, 0x05, 0x5c, 0x3e, 0x16, 0xd3, 0xfe, 0x3e, /* 5c08-5c0f */
 	0x12, 0xd3, 0xfe, 0xdb, 0xfe, 0xb7, 0xca, 0x20, /* 5c10-5c17 */
@@ -153,7 +152,7 @@ int32 hdskBoot[bootrom_size] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 5cf8-5cff */
 };
 
-t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
+static t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
 	int32 i;
 	if (MEMSIZE < 24*KB) {
 		printf("Need at least 24KB RAM to boot from hard disk.\n");
@@ -165,7 +164,7 @@ t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
 		}
 		/* check whether we are really modifying an LD A,<> instruction */
 		if (bootrom[unitNoOffset1 - 1] == LDAInstruction) {
-			bootrom[unitNoOffset1] = (unitno+NUM_OF_DSK) & 0xff;	/* LD A,<unitno> */
+			bootrom[unitNoOffset1] = (unitno + NUM_OF_DSK) & 0xff;	/* LD A,<unitno> */
 		}
 		else { /* Attempt to modify non LD A,<> instructions is refused. */
 			printf("Incorrect boot ROM offset detected.\n");
@@ -173,7 +172,7 @@ t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
 		}
 	}
 	for (i = 0; i < bootrom_size; i++) {
-		M[i + hdsk_boot_address][0] = hdskBoot[i] & 0xff;
+		PutBYTEBasic(i + hdsk_boot_address, 0, hdskBoot[i] & 0xff);
 	}
 	saved_PC = hdsk_boot_address;
 	protect(hdsk_boot_address, hdsk_boot_address + bootrom_size - 1);
@@ -181,7 +180,7 @@ t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
 }
 
 /* returns TRUE iff there exists a disk with VERBOSE */
-int32 hdsk_hasVerbose(void) {
+static int32 hdsk_hasVerbose(void) {
 	int32 i;
 	for (i = 0; i < HDSK_NUMBER; i++) {
 		if (((hdsk_dev.units + i) -> flags) & UNIT_HDSK_VERBOSE) {
@@ -221,7 +220,7 @@ l	ld	a,(hl)		; get byte of parameter block
 */
 
 /* check the parameters and return TRUE iff parameters are correct or have been repaired */
-int32 checkParameters(void) {
+static int32 checkParameters(void) {
 	int32 currentFlag;
 	if ((selectedDisk < 0) || (selectedDisk >= HDSK_NUMBER)) {
 		if (hdsk_hasVerbose()) {
@@ -259,7 +258,7 @@ int32 checkParameters(void) {
 	return TRUE;
 }
 
-int32 doSeek(void) {
+static int32 doSeek(void) {
 	UNIT *uptr = hdsk_dev.units + selectedDisk;
 	if (fseek(uptr -> fileref,
 		HDSK_TRACK_SIZE * selectedTrack + HDSK_SECTOR_SIZE * selectedSector, SEEK_SET)) {
@@ -274,8 +273,9 @@ int32 doSeek(void) {
 	}
 }
 
-int32 doRead(void) {
+static int32 doRead(void) {
 	int32 i;
+	uint8 hdskbuf[HDSK_SECTOR_SIZE];	/* data buffer	*/
 	UNIT *uptr = hdsk_dev.units + selectedDisk;
 	if (doSeek()) {
 		return CPM_ERROR;
@@ -296,8 +296,9 @@ int32 doRead(void) {
 	return CPM_OK;
 }
 
-int32 doWrite(void) {
+static int32 doWrite(void) {
 	int32 i;
+	uint8 hdskbuf[HDSK_SECTOR_SIZE];	/* data buffer	*/
 	UNIT *uptr = hdsk_dev.units + selectedDisk;
 	if (((uptr -> flags) & UNIT_HDSKWLK) == 0) { /* write enabled */
 		if (doSeek()) {
@@ -324,7 +325,7 @@ int32 doWrite(void) {
 	return CPM_OK;
 }
 
-int32 hdsk_in(void) {
+static int32 hdsk_in(const int32 port) {
 	int32 result;
 	if ((hdskCommandPosition == 6) && ((hdskLastCommand == hdsk_read) || (hdskLastCommand == hdsk_write))) {
 		result = checkParameters() ? ((hdskLastCommand == hdsk_read) ? doRead() : doWrite()) : CPM_ERROR;
@@ -333,12 +334,13 @@ int32 hdsk_in(void) {
 		return result;
 	}
 	else if (hdsk_hasVerbose()) {
-		message3("Illegal IN command detected (cmd=%d, pos=%d).\n", hdskLastCommand, hdskCommandPosition);
+		message4("Illegal IN command detected (port=%03xh, cmd=%d, pos=%d).\n",
+			port, hdskLastCommand, hdskCommandPosition);
 	}
 	return CPM_OK;
 }
 
-int32 hdsk_out(int32 data) {
+static int32 hdsk_out(const int32 data) {
 	switch(hdskLastCommand) {
 		case hdsk_read:
 		case hdsk_write:
@@ -379,6 +381,6 @@ int32 hdsk_out(int32 data) {
 	return 0; /* ignored, since OUT */
 }
 
-int32 hdsk_io(int32 port, int32 io, int32 data) {
-	return io == 0 ? hdsk_in() : hdsk_out(data);
+int32 hdsk_io(const int32 port, const int32 io, const int32 data) {
+	return io == 0 ? hdsk_in(port) : hdsk_out(data);
 }

@@ -25,6 +25,7 @@
 
    tt		console
 
+   25-Apr-03	RMS	Revised for extended file support
    11-Jan-03	RMS	Added TTP support
    22-Dec-02	RMS	Added break support
 */
@@ -83,10 +84,10 @@ UNIT tt_unit[] = {
 REG tt_reg[] = {
 	{ HRDATA (STA, tt_sta, 8) },
 	{ HRDATA (KBUF, tt_unit[TTI].buf, 8) },
-	{ DRDATA (KPOS, tt_unit[TTI].pos, 32), PV_LEFT },
+	{ DRDATA (KPOS, tt_unit[TTI].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (KTIME, tt_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
 	{ HRDATA (TBUF, tt_unit[TTO].buf, 8) },
-	{ DRDATA (TPOS, tt_unit[TTO].pos, 32), PV_LEFT },
+	{ DRDATA (TPOS, tt_unit[TTO].pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TTIME, tt_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (IREQ, int_req[l_TT], i_TT) },
 	{ FLDATA (IENB, int_enb[l_TT], i_TT) },

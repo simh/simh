@@ -1,6 +1,6 @@
-/* scp_sock.c: OS-dependent socket routines
+/* sim_sock.c: OS-dependent socket routines
 
-   Copyright (c) 2001, Robert M Supnik
+   Copyright (c) 2001-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Apr-03	RMS	Fixed non-implemented version of sim_close_sock
+			(found by Mark Pizzolato)
    17-Dec-02	RMS	Added sim_connect_socket, sim_create_socket
    08-Oct-02	RMS	Revised for .NET compatibility
    22-Aug-02	RMS	Changed calling sequence for sim_accept_conn
@@ -78,7 +80,7 @@ int32 sim_write_sock (SOCKET sock, char *msg, int32 nbytes)
 return 0;
 }
 
-void sim_close_sock (SOCKET sock)
+void sim_close_sock (SOCKET sock, t_bool master)
 {
 return;
 }
@@ -106,7 +108,7 @@ SOCKET sim_create_sock (void)
 SOCKET newsock;
 int32 err;
 
-#if defined (WIN32)
+#if defined (_WIN32)
 WORD wVersionRequested; 
 WSADATA wsaData; 
 wVersionRequested = MAKEWORD (1, 1); 
@@ -180,7 +182,7 @@ SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr)
 int32 sta, err;
 #if defined (macintosh) 
 socklen_t size;
-#elif defined (WIN32) || defined (__EMX__)
+#elif defined (_WIN32) || defined (__EMX__)
 int size;
 #else 
 size_t size; 
@@ -244,7 +246,7 @@ return send (sock, msg, nbytes, 0);
 
 void sim_close_sock (SOCKET sock, t_bool master)
 {
-#if defined (WIN32)
+#if defined (_WIN32)
 closesocket (sock);
 if (master) {
 	sim_sock_cnt = sim_sock_cnt - 1;
@@ -257,7 +259,7 @@ close (sock);
 return;
 }
 
-#if defined (WIN32)					/* Windows */
+#if defined (_WIN32)					/* Windows */
 SOCKET sim_setnonblock (SOCKET sock)
 {
 unsigned long non_block = 1;

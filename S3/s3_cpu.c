@@ -1,6 +1,6 @@
 /* s3_cpu.c: IBM System/3 CPU simulator
 
-   Copyright (c) 2001, Charles E. Owen
+   Copyright (c) 2001-2003, Charles E. Owen
    HPL & SLC instruction code Copyright (c) 2001 by Henk Stegeman
    Decimal Arithmetic Copyright (c) 2000 by Roger Bowler
 
@@ -1812,7 +1812,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
 	return SCPE_ARG;

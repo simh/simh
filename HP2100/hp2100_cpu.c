@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Mar-03	RMS	Added logical name support
    02-Feb-03	RMS	Fixed last cycle bug in DMA output (found by Mike Gemeny)
    22-Nov-02	RMS	Added 21MX IOP support
    24-Oct-02	RMS	Fixed bugs in IOP and extended instructions
@@ -2493,7 +2494,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > PASIZE) || ((val & 07777) != 0) ||
 	(!(uptr->flags & UNIT_21MX) && (val > 32768)))
@@ -2567,9 +2568,11 @@ for (i = 0; cdptr = sim_devices[i]; i++) {
 		dibp = (DIB *) dptr->ctxt;
 		if (dibp && !(dptr->flags & DEV_DIS) &&
 		    (chkp != dibp) && (dno == dibp->devno)) {
-		    printf ("%s device number conflict, devno = %d\n", dptr->name, dno);
+		    printf ("%s device number conflict, devno = %d\n",
+		        sim_dname (dptr), dno);
 		    if (sim_log) fprintf (sim_log,
-			"%s device number conflict, devno = %d\n", dptr->name, dno);
+			"%s device number conflict, devno = %d\n",
+			sim_dname (dptr), dno);
 		return TRUE;  }  }  }  }
 return FALSE;
 }

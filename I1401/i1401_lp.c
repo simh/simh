@@ -1,6 +1,6 @@
 /* i1401_lp.c: IBM 1403 line printer simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt		1403 line printer
 
+   25-Apr-03	RMS	Revised for extended file support
    30-May-02	RMS	Widened POS to 32b
    13-Apr-01	RMS	Revised for register arrays
 */
@@ -87,7 +88,7 @@ UNIT lpt_unit = {
 
 REG lpt_reg[] = {
 	{ FLDATA (ERR, ind[IN_LPT], 0) },
-	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ BRDATA (CCT, cct, 8, 32, CCT_LNT) },
 	{ DRDATA (LINES, lines, 8), PV_LEFT },
 	{ DRDATA (CCTP, cctptr, 8), PV_LEFT },

@@ -46,8 +46,8 @@ sim/		sim_defs.h
 		sim_tmxr.c
 
 sim/interdata/	id_defs.h
-		id16_cpu.c	[or id32_cpu.c]
-		id16_dboot.c	[or id32_dboot.c]
+		id16_cpu.c	[id32_cpu.c]
+		id16_dboot.c	[id32_dboot.c]
 		id_dp.c
 		id_fd.c
 		id_fp.c
@@ -60,7 +60,7 @@ sim/interdata/	id_defs.h
 		id_tt.c
 		id_ttp.c
 		id_uvc.c
-		id16_sys.c	[or id32_sys.c]
+		id16_sys.c	[id32_sys.c]
 
 2. Interdata Features
 
@@ -235,9 +235,6 @@ control registers for the interrupt system.
 	R0..R15		32	active general register set
 	GREG[32]	32	general register sets, 16 x 2
 	FR0..FR14	32	single precision floating point registers
-				if double precision floating point; for
-				microcoded floating point, floating point
-				registers are kept in memory locations 00 - 1F
 	D0H..D14H	32	double precision floating point registers,
 				high order
 	D0L..D14L	32	double precision floating point registers,
@@ -521,8 +518,8 @@ The programmable interval clock (PIC) implements these registers:
 	IENB		1	clock interrupt enable
 	IARM		1	clock interrupt armed
 
-If the interval requested is longer than 1 msec, and a multiple of
-1 msec, the programmable clock auto-calibrates; if not, it simply
+If the interval requested is an exact multiple of 1 msec, the
+programmable clock auto-calibrates; if not, it simply counts
 counts instructions.
 
 2.4.7 Floppy Disk Controller (FD)
@@ -587,7 +584,7 @@ or 8B.  In UC mode, lower case input and output characters are converted
 automatically to upper case.  In 7B mode, input and output characters are
 masked to 7 bits.  In 8B mode, characters are not modified.  The default
 mode is UC.  Each line (each unit of PASL) can also be set for modem
-control with the command SET PASLn DATASET.  The defaults are UC mode
+control with the command SET PASLn DATASET.  The defaults are 7b mode
 and DATASET disabled.
 
 Once PAS is attached and the simulator is running, the terminals listen

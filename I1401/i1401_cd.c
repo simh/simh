@@ -1,6 +1,6 @@
 /* i1401_cd.c: IBM 1402 card reader/punch
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,7 @@
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
 
+   25-Apr-03	RMS	Revised for extended file support
    30-May-02	RMS	Widened POS to 32b
    30-Jan-02	RMS	New zero footprint card bootstrap from Van Snyder
    29-Nov-01	RMS	Added read only unit support
@@ -70,7 +71,7 @@ REG cdr_reg[] = {
 	{ FLDATA (ERR, ind[IN_READ], 0) },
 	{ FLDATA (S1, s1sel, 0) },
 	{ FLDATA (S2, s2sel, 0) },
-	{ DRDATA (POS, cdr_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, cdr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, cdr_unit.wait, 24), PV_LEFT },
 	{ BRDATA (BUF, rbuf, 8, 8, CDR_WIDTH) },
 	{ NULL }  };
@@ -95,7 +96,7 @@ REG cdp_reg[] = {
 	{ FLDATA (ERR, ind[IN_PNCH], 0) },
 	{ FLDATA (S4, s4sel, 0) },
 	{ FLDATA (S8, s8sel, 0) },
-	{ DRDATA (POS, cdp_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, cdp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ NULL }  };
 
 DEVICE cdp_dev = {
@@ -119,10 +120,10 @@ UNIT stack_unit[] = {
 	{ UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) }  };
 
 REG stack_reg[] = {
-	{ DRDATA (POS0, stack_unit[0].pos, 32), PV_LEFT },
-	{ DRDATA (POS1, stack_unit[1].pos, 32), PV_LEFT },
-	{ DRDATA (POS28, stack_unit[2].pos, 32), PV_LEFT },
-	{ DRDATA (POS4, stack_unit[4].pos, 32), PV_LEFT },
+	{ DRDATA (POS0, stack_unit[0].pos, T_ADDR_W), PV_LEFT },
+	{ DRDATA (POS1, stack_unit[1].pos, T_ADDR_W), PV_LEFT },
+	{ DRDATA (POS28, stack_unit[2].pos, T_ADDR_W), PV_LEFT },
+	{ DRDATA (POS4, stack_unit[4].pos, T_ADDR_W), PV_LEFT },
 	{ NULL }  };
 
 DEVICE stack_dev = {

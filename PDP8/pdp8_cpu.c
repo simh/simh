@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu		central processor
 
+   12-Mar-03	RMS	Added logical name support
    04-Oct-02	RMS	Revamped device dispatching, added device number support
    06-Jan-02	RMS	Added device enable/disable routines
    30-Dec-01	RMS	Added old PC queue
@@ -286,7 +287,7 @@ DEVICE cpu_dev = {
 t_stat sim_instr (void)
 {
 int32 IR, MB, IF, DF, LAC, MQ;
-t_addr PC, MA;
+uint32 PC, MA;
 int32 device, pulse, temp, iot_data;
 t_stat reason;
 
@@ -739,7 +740,7 @@ case 036:case 037:					/* OPR, groups 2, 3 */
 	case 020:					/* mode A, B: SCA */
 	    LAC = LAC | SC;
 	    break;
-	case 0:						/* mode A, B: NOP */
+	case 000:					/* mode A, B: NOP */
 	    break;
 	case 021:					/* mode B: DAD */
 	    if (emode) {
@@ -752,13 +753,13 @@ case 036:case 037:					/* OPR, groups 2, 3 */
 		PC = (PC + 1) & 07777;
 		break;  }
 	    LAC = LAC | SC;				/* mode A: SCA then */
-	case 1:						/* mode B: ACS */
+	case 001:					/* mode B: ACS */
 	    if (emode) {
 		SC = LAC & 037;
-		LAC = LAC & 010000;
-		break;  }
-	    SC = (~M[IF | PC]) & 037;			/* mode A: SCL */
-	    PC = (PC + 1) & 07777;
+		LAC = LAC & 010000;  }
+	    else {					/* mode A: SCL */
+		SC = (~M[IF | PC]) & 037;
+		PC = (PC + 1) & 07777;  }
 	    break;
 	case 022:					/* mode B: DST */
 	    if (emode) {
@@ -770,7 +771,7 @@ case 036:case 037:					/* OPR, groups 2, 3 */
 		PC = (PC + 1) & 07777;
 		break;  }
 	    LAC = LAC | SC;				/* mode A: SCA then */
-	case 2:						/* MUY */
+	case 002:					/* MUY */
 	    MA = IF | PC;
 	    if (emode) { INDIRECT; }			/* mode B: defer */
 	    temp = (MQ * M[MA]) + (LAC & 07777);
@@ -785,7 +786,7 @@ case 036:case 037:					/* OPR, groups 2, 3 */
 	case 023:					/* mode B: SWBA */
 	    if (emode) break;
 	    LAC = LAC | SC;				/* mode A: SCA then */
-	case 3:						/* DVI */
+	case 003:					/* DVI */
 	    MA = IF | PC;
 	    if (emode) { INDIRECT; }			/* mode B: defer */
 	    if ((LAC & 07777) >= M[MA]) {		/* overflow? */
@@ -804,7 +805,7 @@ case 036:case 037:					/* OPR, groups 2, 3 */
 		if (((LAC | MQ) & 07777) == 0) PC = (PC + 1) & 07777;
 		break;  }
 	    LAC = LAC | SC;				/* mode A: SCA then */
-	case 4:						/* NMI */
+	case 004:					/* NMI */
 	    temp = (LAC << 12) | MQ;			/* preserve link */
 	    for (SC = 0; ((temp & 017777777) != 0) &&
 		(temp & 040000000) == ((temp << 1) & 040000000); SC++)
@@ -1053,7 +1054,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
 	return SCPE_ARG;
@@ -1099,7 +1100,7 @@ if (dptr == NULL) return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
 if (dibp == NULL) return SCPE_IERR;
 fprintf (st, "devno=%02o", dibp->dev);
-if (dibp-> num > 1) fprintf (st, "-%2o", dibp->dev + dibp->num - 1);
+if (dibp->num > 1) fprintf (st, "-%2o", dibp->dev + dibp->num - 1);
 return SCPE_OK;
 }
 
@@ -1130,10 +1131,10 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* add devices */
 		if (dibp->dsp[j]) {			/* any dispatch? */
 		    if (dev_tab[dibp->dev + j]) {	/* already filled? */
 			printf ("%s device number conflict at %02o\n",
-			    dptr->name, dibp->dev + j);
+			    sim_dname (dptr), dibp->dev + j);
 			if (sim_log) fprintf (sim_log,
 			    "%s device number conflict at %02o\n",
-			    dptr->name, dibp->dev + j);
+			    sim_dname (dptr), dibp->dev + j);
 			 return TRUE;  }
 		    dev_tab[dibp->dev + j] = dibp->dsp[j];	/* fill */
 		    }					/* end if dsp */

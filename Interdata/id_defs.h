@@ -1,6 +1,6 @@
 /* id_defs.h: Interdata 16b/32b simulator definitions
 
-   Copyright (c) 2000-2002, Robert M. Supnik
+   Copyright (c) 2000-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    The author gratefully acknowledges the help of Carl Friend and Al Kossow,
    who provided key documents about the Interdata product line.
 
+   21-Jun-03	RMS	Changed subroutine argument for ARM compiler conflict
+   25-Apr-03	RMS	Revised for extended file support
    28-Feb-03	RMS	Changed magtape device default to 0x85
 */
 
@@ -52,7 +54,7 @@
 #define PAMASK32	(MAXMEMSIZE32 - 1)
 
 #define MEMSIZE		(cpu_unit.capac)		/* act memory size */
-#define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
+#define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
 
 /* Single precision floating point registers */
 
@@ -171,8 +173,8 @@ typedef struct dpr dpr_t;
 
 struct BlockIO {
 	uint32		dfl;				/* devno, flags */
-	t_addr		cur;				/* current addr */
-	t_addr		end;				/* end addr */
+	uint32		cur;				/* current addr */
+	uint32		end;				/* end addr */
 	};
 
 #define BL_RD		0x8000				/* block read */
@@ -466,7 +468,7 @@ typedef struct interdib DIB;
 
 /* Function prototypes */
 
-int32 int_chg (uint32 irq, int32 dat, int32 arm);
+int32 int_chg (uint32 irq, int32 dat, int32 armdis);
 int32 io_2b (int32 val, int32 pos, int32 old);
 uint32 IOReadB (uint32 loc);
 void IOWriteB (uint32 loc, uint32 val);

@@ -1,6 +1,6 @@
 /* pdp10_lp20.c: PDP-10 LP20 line printer simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lp20		line printer
 
+   25-Apr-03	RMS	Revised for extended file support
    29-Sep-02	RMS	Added variable vector support
 			Modified to use common Unibus routines
 			New data structures
@@ -201,7 +202,7 @@ REG lp20_reg[] = {
 	{ FLDATA (ERR, lpcsa, CSR_V_ERR) },
 	{ FLDATA (DONE, lpcsa, CSR_V_DONE) },
 	{ FLDATA (IE, lpcsa, CSR_V_IE) },
-	{ DRDATA (POS, lp20_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lp20_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, lp20_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lp20_stopioe, 0) },
 	{ BRDATA (TXRAM, txram, 8, 12, TX_SIZE) },

@@ -1,3 +1,12 @@
+Version: 18 March 2003
+
+History (partial):
+
+2003-03-18	Fixed bug in asm1130 that produced an error message
+		with a (legal) offset of +127 in MDX instructions.
+
+		Fixed sign bug in 1130 emulator divide instruction.
+
 Interim 1130 distribution:
 --------------------------------------------
 

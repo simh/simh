@@ -674,9 +674,9 @@ else {							/* IOT */
 	    case ioDOC:
 		if ((dstAC == 2) && (cpu_unit.flags & UNIT_MDV)) {
 		    uint32 mddata, uAC0, uAC1, uAC2;
-		    uAC0 = (unsigned int32) AC[0];
-		    uAC1 = (unsigned int32) AC[1];
-		    uAC2 = (unsigned int32) AC[2];
+		    uAC0 = (uint32) AC[0];
+		    uAC1 = (uint32) AC[1];
+		    uAC2 = (uint32) AC[2];
 		    if (pulse == iopP) {		/* mul */
 			mddata = (uAC1 * uAC2) + uAC0;
 			AC[0] = (mddata >> 16) & DMASK;
@@ -704,8 +704,8 @@ else {							/* IOT */
 				C = CBIT;
 			    else C = 0;
 			    AC[0] = AC[0] & DMASK;  }  }  }
-		break;  }			/* end case code */
-	    }					/* end if mul/div */
+		break;  }				/* end case code */
+	    }						/* end if mul/div */
 
 /* IOT, continued */
 

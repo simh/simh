@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-May-03	RMS	Revised for new conditional compilation scheme
    09-Jan-03	RMS	Added DEUNA/DELUA support
    29-Sep-02	RMS	Added variable vector, RX211 support
    22-Apr-02	RMS	Removed magtape record length error
@@ -38,6 +39,10 @@
 
 #ifndef _PDP10_DEFS_H_
 #define _PDP10_DEFS_H_	0
+
+#ifndef	VM_PDP10
+#define VM_PDP10	0
+#endif
 
 #include "sim_defs.h"					/* simulator defns */
 
@@ -614,6 +619,8 @@ typedef struct pdp_dib DIB;
 #define FST		0				/* Unibus 1 */
 #define MAP		1				/* Unibus 3 */
 
+#define DEV_RDX		8				/* default device radix */
+
 /* I/O page layout */
 
 #define IOPAGEBASE	0760000				/* I/O page base */
@@ -729,10 +736,10 @@ typedef struct pdp_dib DIB;
 
 /* Function prototypes */
 
-int32 Map_ReadB (t_addr ba, int32 bc, uint8 *buf, t_bool ub);
-int32 Map_ReadW (t_addr ba, int32 bc, uint16 *buf, t_bool ub);
-int32 Map_WriteB (t_addr ba, int32 bc, uint8 *buf, t_bool ub);
-int32 Map_WriteW (t_addr ba, int32 bc, uint16 *buf, t_bool ub);
+int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf, t_bool ub);
+int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf, t_bool ub);
+int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf, t_bool ub);
+int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf, t_bool ub);
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);

@@ -188,7 +188,7 @@ static void Beep (void)			// notify user keyboard was locked or key was bad
 
 // tti_svc - keyboard polling (never stops)
 
-t_stat tti_svc (UNIT *uptr)
+static t_stat tti_svc (UNIT *uptr)
 {
 	int32 temp;
 
@@ -243,7 +243,7 @@ t_stat tti_svc (UNIT *uptr)
 	return SCPE_OK;
 }
 
-t_stat tti_reset (DEVICE *dptr)
+static t_stat tti_reset (DEVICE *dptr)
 {
 	tti_unit.buf = 0;
 	tti_dsw = 0;
@@ -262,7 +262,7 @@ t_bool keyboard_is_locked (void)					/* return TRUE if keyboard is not expecting
 	return (tti_dsw & TT_DSW_KEYBOARD_BUSY) == 0;
 }
 
-t_stat tto_svc (UNIT *uptr)
+static t_stat tto_svc (UNIT *uptr)
 {
 	int32 temp;
 	int ch;
@@ -300,7 +300,7 @@ t_stat tto_svc (UNIT *uptr)
 	return SCPE_OK;
 }
 
-t_stat tto_reset (DEVICE *dptr)
+static t_stat tto_reset (DEVICE *dptr)
 {
 	tto_unit.buf = 0;
 	tto_dsw = 0;

@@ -1,6 +1,6 @@
 /* i1620_cd.c: IBM 1622 card reader/punch
 
-   Copyright (c) 2002, Robert M. Supnik
+   Copyright (c) 2002-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cdr		1622 card reader
    cdp		1622 card punch
+
+   25-Apr-03	RMS	Revised for extended file support
 
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
@@ -62,7 +64,7 @@ UNIT cdr_unit = {
 
 REG cdr_reg[] = {
 	{ FLDATA (LAST, ind[IN_LAST], 0) },
-	{ DRDATA (POS, cdr_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, cdr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ NULL }  };
 
 DEVICE cdr_dev = {
@@ -82,7 +84,7 @@ UNIT cdp_unit = {
 	UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) };
 
 REG cdp_reg[] = {
-	{ DRDATA (POS, cdp_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, cdp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ NULL }  };
 
 DEVICE cdp_dev = {

@@ -1,6 +1,6 @@
 /* nova_sys.c: NOVA simulator interface
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -127,7 +127,7 @@ const char *sim_stop_messages[] = {
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 data, csum, count, state, i;
-t_addr origin;
+uint32 origin;
 
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 state = 0;

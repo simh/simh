@@ -1,6 +1,6 @@
 /* i1401_defs.h: IBM 1401 simulator definitions
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   03-Jun-03	RMS	Added 1311 support
+   16-Mar-03	RMS	Fixed mnemonic for MCS
+   03-Jun-02	RMS	Added 1311 support
    14-Apr-99	RMS	Converted t_addr to unsigned
 
    This simulator is based on the 1401 simulator written by Len Fehskens
@@ -79,7 +80,7 @@
 #define LPT_WIDTH	132				/* line print width */
 #define CCT_LNT		132				/* car ctrl length */
 #define INQ_WIDTH	80				/* inq term width */
-#define ADDR_ERR(x)	(((t_addr) (x)) >= MEMSIZE)
+#define ADDR_ERR(x)	(((uint32) (x)) >= MEMSIZE)
 
 /* Binary address format
 
@@ -205,7 +206,7 @@
 #define OP_BWZ		025				/* branch wm or zone */
 #define OP_BBE		026				/* branch bit equal */
 #define OP_MZ		030				/* move zone */
-#define OP_MSZ		031				/* move suppr zeroes */
+#define OP_MCS		031				/* move suppr zeroes */
 #define OP_SWM		033				/* set word mark */
 #define OP_DIV		034				/* divide */
 #define OP_SS		042				/* select stacker */

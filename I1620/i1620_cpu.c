@@ -1,6 +1,6 @@
 /* i1620_cpu.c: IBM 1620 CPU simulator
 
-   Copyright (c) 2002, Robert M. Supnik
+   Copyright (c) 2002-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   25-Apr-03	RMS	Changed t_addr to uint32 throughout
    18-Oct-02	RMS	Fixed bugs in invalid result testing (found by Hans Pufal)
 
    The simulated register state for the IBM 1620 is:
@@ -760,7 +761,7 @@ case OP_BCXM:
 	    break;  }
 	reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, &sta);
 	if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
-	if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {	/* ~z, ~c, ~schg? */
+	if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {	/* ~z, ~c, ~sign chg? */
 	    BRANCH (PAR);  }				/* branch */
 	break;
 
@@ -954,10 +955,10 @@ cnt = 0;						/* count depth */
 do {	indir = indir & M[alast];			/* get indirect */
 	if (cvt_addr (alast, lnt, FALSE, &addr))	/* cvt addr to bin */
 	    return STOP_INVPDG;				/* bad? */
-	idx = get_idx (ADDR_S (alast, 1));		/* get index addr */
+	idx = get_idx (ADDR_S (alast, 1));		/* get index reg num */
 	if (indexok && (idx > 0)) {			/* indexable? */
-	    idxa = GET_IDXADDR (idx);			/* get idx addr */
-	    if (cvt_addr (idxa, ADDR_LEN, TRUE, &idxv))	/* cvt idx */
+	    idxa = GET_IDXADDR (idx);			/* get idx reg addr */
+	    if (cvt_addr (idxa, ADDR_LEN, TRUE, &idxv))	/* cvt idx reg */
 		return STOP_INVPDG;
 	    addr = addr + idxv;				/* add in index */
 	    if (addr < 0) addr = addr + 100000;  }	/* -? 10's comp */
@@ -1009,10 +1010,10 @@ return SCPE_OK;
 
 t_stat get_idx (uint32 aidx)
 {
-int32 i, idx = 0;
+int32 i, idx;
 
 if (idxe == 0) return -1;				/* indexing off? */
-for (i = 0; i < 3; i++) {				/* 3 flags worth */
+for (i = idx = 0; i < 3; i++) {				/* 3 flags worth */
 	if (M[aidx] & FLAG) idx = idx | (1 << i);	/* test flag */
 	MM (aidx);  }					/* next digit */
 return idx;
@@ -1040,7 +1041,7 @@ return;
 
 t_stat xmt_field (uint32 d, uint32 s, uint32 skp)
 {
-t_addr cnt = 0;
+uint32 cnt = 0;
 uint8 t;
 
 do {	t = M[d] = M[s] & (FLAG | DIGIT);		/* copy src to dst */
@@ -1054,7 +1055,7 @@ return SCPE_OK;
 
 t_stat xmt_record (uint32 d, uint32 s, t_bool cpy)
 {
-t_addr cnt = 0;
+uint32 cnt = 0;
 
 while ((M[s] & REC_MARK) != REC_MARK) {			/* until rec mark */
 	M[d] = M[s] & (FLAG | DIGIT);			/* copy src to dst */
@@ -1083,7 +1084,7 @@ return SCPE_OK;
 
 t_stat xmt_divd (uint32 d, uint32 s)
 {
-t_addr cnt = 0;
+uint32 cnt = 0;
 
 M[d] = M[s] & DIGIT;					/* first w/o flag */
 do {	MM (d); MM (s);					/* decr mem addrs */
@@ -1097,7 +1098,7 @@ return SCPE_OK;
 
 t_stat xmt_tns (uint32 d, uint32 s)
 {
-t_addr cnt = 0;
+uint32 cnt = 0;
 uint8 t, z;
 
 t = M[s] & DIGIT;					/* get units */
@@ -1120,7 +1121,7 @@ return SCPE_OK;
 
 t_stat xmt_tnf (uint32 d, uint32 s)
 {
-t_addr cnt = 0;
+uint32 cnt = 0;
 uint8 t;
 
 t = M[s];						/* get 1st digit */
@@ -1242,7 +1243,7 @@ t_stat mul_field (uint32 mpc, uint32 mpy)
 int32 i;
 uint32 pro;						/* prod pointer */
 uint32 mpyd, mpyf;					/* mpy digit, flag */
-t_addr cnt = 0;						/* counter */
+uint32 cnt = 0;						/* counter */
 uint8 sign;						/* final sign */
 t_stat r;
 
@@ -1299,7 +1300,7 @@ uint32 mpcd, mpcf;					/* mpc digit, flag */
 uint32 prwp;						/* prod working ptr */
 uint32 prod;						/* product digit */
 uint32 cry;						/* carry */
-t_addr mpcc, cryc;					/* counters */
+uint32 mpcc, cryc;					/* counters */
 
 mptb = MUL_TABLE + ((mpyd <= 4)? (mpyd * 2):		/* set mpy table 100's, */
 	(((mpyd - 5) * 2) + 100));			/* 1's digits */
@@ -1535,7 +1536,7 @@ t_stat div_one_digit (uint32 dvd, uint32 dvr, uint32 max,
 uint32 dvrp, dvrd, dvrf;				/* dvr ptr, dig, flag */
 uint32 dvdp, dvdd;					/* dvd ptr, dig */
 uint32 qd, cry;						/* quo dig, carry */
-t_addr cnt;
+uint32 cnt;
 
 for (qd = 0; qd < max; qd++) {				/* devel quo dig */
 	dvrp = dvr;					/* divisor ptr */
@@ -1592,7 +1593,7 @@ return SCPE_OK;
 
 t_stat or_field (uint32 d, uint32 s)
 {
-t_addr cnt = 0;
+uint32 cnt = 0;
 int32 t;
 
 ind[IN_EZ] = 1;						/* assume result zero */
@@ -1607,7 +1608,7 @@ return SCPE_OK;
 
 t_stat and_field (uint32 d, uint32 s)
 {
-t_addr cnt = 0;
+uint32 cnt = 0;
 int32 t;
 
 ind[IN_EZ] = 1;						/* assume result zero */
@@ -1622,7 +1623,7 @@ return SCPE_OK;
 
 t_stat xor_field (uint32 d, uint32 s)
 {
-t_addr cnt = 0;
+uint32 cnt = 0;
 int32 t;
 
 ind[IN_EZ] = 1;						/* assume result zero */
@@ -1637,7 +1638,7 @@ return SCPE_OK;
 
 t_stat com_field (uint32 d, uint32 s)
 {
-t_addr cnt = 0;
+uint32 cnt = 0;
 int32 t;
 
 ind[IN_EZ] = 1;						/* assume result zero */
@@ -1667,7 +1668,7 @@ return SCPE_OK;
 
 t_stat oct_to_dec (uint32 tbl, uint32 s)
 {
-t_addr cnt = 0, tblc;
+uint32 cnt = 0, tblc;
 uint32 i, sd, sf, tf, sign;
 t_stat r;
 
@@ -1715,7 +1716,7 @@ t_stat dec_to_oct (uint32 d, uint32 tbl, int32 *ez)
 {
 uint32 sign, octd, t;
 t_bool first = TRUE;
-t_addr ctr = 0;
+uint32 ctr = 0;
 t_stat r;
 
 sign = M[PROD_AREA + PROD_AREA_LEN - 1] & FLAG;		/* input sign */
@@ -1794,7 +1795,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val % 1000) != 0))
 	return SCPE_ARG;

@@ -15,6 +15,7 @@
    10-May-02 BLK	Fixed bug in MDX instruction
    27-Mar-02 BLK	Made BOSC work even in short form
    16-Aug-02 BLK	Fixed bug in multiply instruction; didn't work with negative values
+   18-Mar-03 BLK	Fixed bug in divide instruction; didn't work with negative values
 
    The register state for the IBM 1130 CPU is:
 
@@ -883,7 +884,7 @@ t_stat sim_instr (void)
 				break;
 
 			case 0x11:						/* --- AD - Add Double --- */
-				src  = ((ACC << 16) + (EXT & 0xFFFF));
+				src  = ((ACC << 16) | (EXT & 0xFFFF));
 				src2 = (ReadW(eaddr) << 16) + ReadW(eaddr|1);
 				dst  = src + src2;
 				ACC  = (dst >> 16) & 0xFFFF;
@@ -905,7 +906,7 @@ t_stat sim_instr (void)
 				break;
 
 			case 0x13:						/* --- SD - Subtract Double	--- */
-				src  = ((ACC << 16) + (EXT & 0xFFFF));
+				src  = ((ACC << 16) | (EXT & 0xFFFF));
 				src2 = (ReadW(eaddr) << 16) + ReadW(eaddr|1);
 				dst  = src - src2;
 				ACC  = (dst >> 16) & 0xFFFF;
@@ -918,9 +919,9 @@ t_stat sim_instr (void)
 
 			case 0x14:						/* --- M - Multiply	--- */
 				if ((src = ACC & 0xFFFF)  & 0x8000)		/* sign extend the values */
-					src	 |= 0xFFFF0000;
+					src	 |= ~0xFFFF;
 				if ((src2 = ReadW(eaddr)) & 0x8000)
-					src2 |= 0xFFFF0000;
+					src2 |= ~0xFFFF;
 
 				dst = src * src2;
 				ACC = (dst >> 16) & 0xFFFF;				/* split the results */
@@ -928,8 +929,10 @@ t_stat sim_instr (void)
 				break;
 
 			case 0x15:						/* --- D - Divide --- */
-				src  = ((ACC << 16) + EXT);
-				src2 = ReadW(eaddr);
+				src  = ((ACC << 16) | (EXT & 0xFFFF));
+				if ((src2 = ReadW(eaddr)) & 0x8000)
+					src2 |= ~0xFFFF;		/* oops: sign extend was missing, fixed 18Mar03 */
+
 				if (src2 == 0)
 					V = 1;					/* divide by zero just sets overflow, ACC & EXT are undefined */
 				else {
@@ -1251,7 +1254,7 @@ void xio_error (char *msg)
  * register_cmd - add a command to the extensible command table
  * ------------------------------------------------------------------------ */
 
-t_stat register_cmd (char *name, t_stat (*action)(), int arg, char *help)
+t_stat register_cmd (char *name, t_stat (*action)(int32, char *), int arg, char *help)
 {
 	int i;
 

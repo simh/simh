@@ -1,6 +1,6 @@
 /* pdp8_dt.c: PDP-8 DECtape simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    dt		TC08/TU56 DECtape
 
+   25-Apr-03	RMS	Revised for extended file support
+   14-Mar-03	RMS	Fixed sizing interaction with save/restore
    17-Oct-02	RMS	Fixed bug in end of reel logic
    04-Oct-02	RMS	Added DIB, device number support
    12-Sep-02	RMS	Added support for 16b format
@@ -323,7 +325,7 @@ REG dt_reg[] = {
 	{ ORDATA (SUBSTATE, dt_substate, 2) },
 	{ ORDATA (LOG, dt_log, 4), REG_HIDDEN },
 	{ DRDATA (LBLK, dt_logblk, 12), REG_HIDDEN },
-	{ URDATA (POS, dt_unit[0].pos, 10, 32, 0,
+	{ URDATA (POS, dt_unit[0].pos, 10, T_ADDR_W, 0,
 		  DT_NUMDR, PV_LEFT | REG_RO) },
 	{ URDATA (STATT, dt_unit[0].STATE, 8, 18, 0,
 		  DT_NUMDR, REG_RO) },
@@ -614,7 +616,7 @@ if (((int32) uptr->pos < 0) ||
 	uptr->STATE = uptr->pos = 0;
 	unum = uptr - dt_dev.units;
 	if (unum == DTA_GETUNIT (dtsa))			/* if selected, */
-	    dt_seterr (uptr, DTB_SEL);		/* error */
+	    dt_seterr (uptr, DTB_SEL);			/* error */
 	return TRUE;  }
 return FALSE;
 }
@@ -632,7 +634,7 @@ int32 fnc = DTS_GETFNC (uptr->STATE);
 int16 *bptr = uptr->filebuf;
 int32 unum = uptr - dt_dev.units;
 int32 blk, wrd, ma, relpos, dat;
-t_addr ba;
+uint32 ba;
 
 /* Motion cases
 
@@ -1060,34 +1062,36 @@ t_stat dt_attach (UNIT *uptr, char *cptr)
 {
 uint32 pdp18b[D18_NBSIZE];
 uint16 pdp11b[D18_NBSIZE], *bptr;
-int32 i, k, p;
+int32 i, k;
+int32 u = uptr - dt_dev.units;
 t_stat r;
-t_addr ba;
+uint32 ba, sz;
 
 r = attach_unit (uptr, cptr);				/* attach */
 if (r != SCPE_OK) return r;				/* fail? */
-uptr->flags = (uptr->flags | UNIT_8FMT) & ~UNIT_11FMT;
-if (sim_switches & SWMASK ('T'))			/* att 18b? */
-	uptr->flags = uptr->flags & ~UNIT_8FMT;
-else if (sim_switches & SWMASK ('S'))			/* att 16b? */
-	uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT;
-else if (!(sim_switches & SWMASK ('R')) &&		/* autosize? */
-	 (fseek (uptr->fileref, 0, SEEK_END) == 0) &&
-	 ((p = ftell (uptr->fileref)) > 0)) {
-	 if (p == D11_FILSIZ)
-	     uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT;
-	 if (p > D8_FILSIZ) uptr->flags = uptr->flags & ~UNIT_8FMT;  }
+if ((sim_switches & SIM_SW_REST) == 0) {		/* not from rest? */
+	uptr->flags = (uptr->flags | UNIT_8FMT) & ~UNIT_11FMT;
+	if (sim_switches & SWMASK ('T'))		/* att 18b? */
+	    uptr->flags = uptr->flags & ~UNIT_8FMT;
+	else if (sim_switches & SWMASK ('S'))		/* att 16b? */
+	    uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT;
+	else if (!(sim_switches & SWMASK ('R')) &&	/* autosize? */
+	    (sz = sim_fsize (cptr))) {
+	    if (sz == D11_FILSIZ)
+		uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT;
+	    else if (sz > D8_FILSIZ)
+		uptr->flags = uptr->flags & ~UNIT_8FMT;  }  }
 uptr->capac = DTU_CAPAC (uptr);				/* set capacity */
 uptr->filebuf = calloc (uptr->capac, sizeof (int16));
 if (uptr->filebuf == NULL) {				/* can't alloc? */
 	detach_unit (uptr);
 	return SCPE_MEM;  }
 bptr = uptr->filebuf;					/* file buffer */
-if (uptr->flags & UNIT_8FMT) printf ("DT: 12b format");
-else if (uptr->flags & UNIT_11FMT) printf ("DT: 16b format");
-else printf ("DT: 18b/36b format");
+printf ("%s%d: ", sim_dname (&dt_dev), u);
+if (uptr->flags & UNIT_8FMT) printf ("12b format");
+else if (uptr->flags & UNIT_11FMT) printf ("16b format");
+else printf ("18b/36b format");
 printf (", buffering file in memory\n");
-rewind (uptr->fileref);					/* start of file */
 if (uptr->flags & UNIT_8FMT)				/* 12b? */
 	uptr->hwmark = fxread (uptr->filebuf, sizeof (int16),
 		uptr->capac, uptr->fileref);
@@ -1126,19 +1130,19 @@ t_stat dt_detach (UNIT* uptr)
 uint32 pdp18b[D18_NBSIZE];
 uint16 pdp11b[D18_NBSIZE], *bptr;
 int32 i, k;
-int32 unum = uptr - dt_dev.units;
-t_addr ba;
+int32 u = uptr - dt_dev.units;
+uint32 ba;
 
 if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;
 if (sim_is_active (uptr)) {
 	sim_cancel (uptr);
-	if ((unum == DTA_GETUNIT (dtsa)) && (dtsa & DTA_STSTP)) {
+	if ((u == DTA_GETUNIT (dtsa)) && (dtsa & DTA_STSTP)) {
 	    dtsb = dtsb | DTB_ERF | DTB_SEL | DTB_DTF;
 	    DT_UPDINT;  }
 	uptr->STATE = uptr->pos = 0;  }
 bptr = uptr->filebuf;					/* file buffer */
 if (uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {	/* any data? */
-	printf ("DT: writing buffer to file\n");
+	printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
 	rewind (uptr->fileref);				/* start of file */
 	if (uptr->flags & UNIT_8FMT)			/* PDP8? */
 	    fxwrite (uptr->filebuf, sizeof (int16),	/* write file */

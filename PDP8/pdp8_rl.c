@@ -1,6 +1,6 @@
  /* pdp8_rl.c: RL8A cartridge disk simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rl		RL8A cartridge disk
 
+   25-Apr-03	RMS	Revised for extended file support
    04-Oct-02	RMS	Added DIB, device number support
    06-Jan-02	RMS	Changed enable/disable support
    30-Nov-01	RMS	Cloned from RL11
@@ -217,7 +218,7 @@ REG rl_reg[] = {
 	{ FLDATA (ERR, rl_erf, 0) },
 	{ DRDATA (STIME, rl_swait, 24), PV_LEFT },
 	{ DRDATA (RTIME, rl_rwait, 24), PV_LEFT },
-	{ URDATA (CAPAC, rl_unit[0].capac, 10, 31, 0,
+	{ URDATA (CAPAC, rl_unit[0].capac, 10, T_ADDR_W, 0,
 		  RL_NUMDR, PV_LEFT + REG_HRO) },
 	{ FLDATA (STOP_IOE, rl_stopioe, 0) },
 	{ ORDATA (DEVNUM, rl_dib.dev, 6), REG_HRO },
@@ -370,7 +371,7 @@ t_stat rl_svc (UNIT *uptr)
 {
 int32 err, wc, maxc;
 int32 i, j, func, da, bc, wbc;
-t_addr ma;
+uint32 ma;
 
 func = GET_FUNC (rlcsb);				/* get function */
 if (func == RLCSB_GSTA) {				/* get status? */
@@ -514,19 +515,19 @@ return SCPE_OK;
 
 t_stat rl_attach (UNIT *uptr, char *cptr)
 {
-int32 p;
+uint32 p;
 t_stat r;
 
 uptr->capac = (uptr->flags & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
-
-r = attach_unit (uptr, cptr);
-if ((r != SCPE_OK) || ((uptr->flags & UNIT_AUTO) == 0)) return r;
+r = attach_unit (uptr, cptr);				/* attach unit */
+if (r != SCPE_OK) return r;				/* error? */
 uptr->TRK = 0;						/* cyl 0 */
 uptr->STAT = RLDS_VCK;					/* new volume */
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
-if ((p = ftell (uptr->fileref)) == 0) {
+if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;	/* seek to end */
+if ((p = ftell (uptr->fileref)) == 0) {			/* new disk image? */
 	if (uptr->flags & UNIT_RO) return SCPE_OK;
 	return rl_set_bad (uptr, 0, NULL, NULL);  }
+if ((uptr->flags & UNIT_AUTO) == 0) return r;		/* autosize? */
 if (p > (RL01_SIZE * sizeof (int16))) {
 	uptr->flags = uptr->flags | UNIT_RL02;
 	uptr->capac = RL02_SIZE;  }
@@ -619,7 +620,7 @@ t_stat rl_boot (int32 unitno, DEVICE *dptr)
 int32 i;
 extern int32 saved_PC;
 
-if (unitno) return SCPE_ARG;
+if (unitno) return SCPE_ARG;				/* only unit 0 */
 if (rl_dib.dev != DEV_RL) return STOP_NOTSTD;		/* only std devno */
 rl_unit[unitno].TRK = 0;
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];

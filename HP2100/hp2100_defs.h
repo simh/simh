@@ -1,6 +1,6 @@
 /* hp2100_defs.h: HP 2100 simulator definitions
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Apr-03	RMS	Revised for extended file support
    24-Oct-02	RMS	Added indirect address interrupt
    08-Feb-02	RMS	Added DMS definitions
    01-Feb-02	RMS	Added terminal multiplexor support
@@ -52,7 +53,7 @@
 /* Memory */
 
 #define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
-#define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
+#define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
 #define VA_N_SIZE	15				/* virtual addr size */
 #define VASIZE		(1 << VA_N_SIZE)
 #define VAMASK		(VASIZE - 1)			/* virt addr mask */

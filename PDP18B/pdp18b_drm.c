@@ -1,6 +1,6 @@
 /* pdp18b_drm.c: drum/fixed head disk simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -164,7 +164,7 @@ return AC;
 t_stat drm_svc (UNIT *uptr)
 {
 int32 i;
-t_addr da;
+uint32 da;
 
 if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	drm_err = 1;					/* set error */

@@ -78,7 +78,7 @@ PDP11 = ${PDP11D}pdp11_fp.c ${PDP11D}pdp11_cpu.c ${PDP11D}pdp11_dz.c \
 	${PDP11D}pdp11_rq.c ${PDP11D}pdp11_tq.c ${PDP11D}pdp11_pclk.c \
 	${PDP11D}pdp11_ry.c ${PDP11D}pdp11_pt.c ${PDP11D}pdp11_hk.c \
 	${PDP11D}pdp11_xq.c ${PDP11D}pdp11_xu.c
-PDP11_OPT = -I ${PDP11D} ${NETWORK_OPT}
+PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT}
 
 
 
@@ -89,17 +89,17 @@ VAX = ${VAXD}vax_cpu1.c ${VAXD}vax_cpu.c ${VAXD}vax_fpa.c ${VAXD}vax_io.c \
 	${PDP11D}pdp11_rl.c ${PDP11D}pdp11_rq.c ${PDP11D}pdp11_ts.c \
 	${PDP11D}pdp11_dz.c ${PDP11D}pdp11_lp.c ${PDP11D}pdp11_tq.c \
 	${PDP11D}pdp11_pt.c ${PDP11D}pdp11_xq.c
-VAX_OPT = -I ${VAXD} -I ${PDP11D} -DUSE_INT64 ${NETWORK_OPT}
+VAX_OPT = -DVM_VAX -DUSE_INT64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
 
 PDP10D = PDP10/
-PDP10 = ${PDP10D}pdp10_fe.c ${PDP10D}pdp10_dz.c ${PDP10D}pdp10_cpu.c \
+PDP10 = ${PDP10D}pdp10_fe.c ${PDP11D}pdp11_dz.c ${PDP10D}pdp10_cpu.c \
 	${PDP10D}pdp10_ksio.c ${PDP10D}pdp10_lp20.c ${PDP10D}pdp10_mdfp.c \
 	${PDP10D}pdp10_pag.c ${PDP10D}pdp10_rp.c ${PDP10D}pdp10_sys.c \
 	${PDP10D}pdp10_tim.c ${PDP10D}pdp10_tu.c ${PDP10D}pdp10_xtnd.c \
-	${PDP10D}pdp10_pt.c ${PDP11D}pdp11_ry.c ${PDP11D}pdp11_xu.c
-PDP10_OPT = -DUSE_INT64 -I ${PDP10D} -I ${PDP11D} -I ${VAXD}
+	${PDP11D}pdp11_pt.c ${PDP11D}pdp11_ry.c ${PDP11D}pdp11_xu.c
+PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D} -I ${VAXD}
 
 
 

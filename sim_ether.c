@@ -1,7 +1,7 @@
 /* sim_ether.c: OS-dependent network routines
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2002, David T. Hittner
+   Copyright (c) 2002-2003, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -53,6 +53,14 @@
 
   Modification history:
 
+  30-May-03  DTH  Changed WIN32 to _WIN32 for consistency
+  07-Mar-03  MP   Fixed Linux implementation of PacketGetAdapterNames to also
+                  work on Red Hat 6.2-sparc and Debian 3.0r1-sparc.
+  03-Mar-03  MP   Changed logging to be consistent on stdout and sim_log
+  01-Feb-03  MP   Changed type of local variables in eth_packet_trace to
+                  conform to the interface needs of eth_mac_fmt wich produces
+                  char data instead of unsigned char data.  Suggested by the
+                  DECC compiler.
   15-Jan-03  DTH  Corrected PacketGetAdapterNames parameter2 datatype
   26-Dec-02  DTH  Merged Mark Pizzolato's enhancements with main source
                   Added networking documentation
@@ -178,8 +186,8 @@ uint32 eth_crc32(uint32 crc, const void* vbuf, size_t len)
 
 void eth_packet_trace(ETH_PACK* packet, char* msg)
 {
-  unsigned char src[20];
-  unsigned char dst[20];
+  char src[20];
+  char dst[20];
   unsigned short* proto = (unsigned short*) &packet->msg[12];
   uint32 crc = eth_crc32(0, packet->msg, packet->len);
   eth_mac_fmt((ETH_MAC*)&packet->msg[0], dst);
@@ -209,7 +217,7 @@ void eth_zero(ETH_DEV* dev)
 /*                        Non-implemented versions                            */
 /*============================================================================*/
 
-#if !defined (WIN32) && !defined(linux) && !defined(__NetBSD__) && \
+#if !defined (_WIN32) && !defined(linux) && !defined(__NetBSD__) && \
     !defined (__OpenBSD__) || !defined (USE_NETWORK)
 t_stat eth_open (ETH_DEV* dev, char* name)
   {return SCPE_NOFNC;}
@@ -233,9 +241,9 @@ int eth_devices (int max, ETH_LIST* dev)
 
 #include <ctype.h>
 #include <pcap.h>
-#ifdef WIN32
+#ifdef _WIN32
 #include <packet32.h>
-#endif /* WIN32 */
+#endif /* _WIN32 */
 #if defined (__NetBSD__) || defined (__OpenBSD__)
 #include <sys/ioctl.h>
 #include <net/bpf.h>
@@ -270,9 +278,11 @@ t_stat eth_open(ETH_DEV* dev, char* name)
   memset(errbuf, 0, sizeof(errbuf));
   dev->handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, -1, errbuf);
   if (!dev->handle) { /* can't open device */
+    printf ("Eth: pcap_open_live error - %s\n", errbuf);
     if (sim_log) fprintf (sim_log, "Eth: pcap_open_live error - %s\n", errbuf);
     return SCPE_OPENERR;
   } else {
+    printf ("Eth: opened %s\n", savname);
     if (sim_log) fprintf (sim_log, "Eth: opened %s\n", savname);
   }
 
@@ -350,7 +360,7 @@ void eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* 
   int i;
   for (i = 0; i < ETH_FILTER_MAX; i++) {
     if (memcmp(data,     dev->filter_address[i], 6) == 0) to_me = 1;
-#ifdef WIN32
+#ifdef _WIN32
     /*
     WinPcap has a known bug/feature that whenever a packet is transmitted,
     it is looped back into the receive buffers. This is not consistant with the
@@ -363,7 +373,7 @@ void eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* 
     the network has the same DECNET address and refuses to start, giving an
     "Invalid media address" error.
 
-    This code section was ifdef'd for WIN32 only to allow other OS's a chance to
+    This code section was ifdef'd for _WIN32 only to allow other OS's a chance to
     properly implement the above behavior. If it breaks the ethernet simulator
     on other platforms, remove the ifdef so that it will affect your platform,
     and then notify the author so that he can fix the ifdef. :-)
@@ -497,7 +507,7 @@ int eth_devices(int max, ETH_LIST* list)
   return index; /* count of devices */
 }
 
-#endif /* (WIN32 || linux || __NetBSD__ || __OpenBSD__) && USE_NETWORK */
+#endif /* (_WIN32 || linux || __NetBSD__ || __OpenBSD__) && USE_NETWORK */
 
 /*============================================================================*/
 /*                          linux-specific code                               */
@@ -534,12 +544,26 @@ int PacketGetAdapterNames(char* buffer, unsigned long* size)
 
   while (ioctl(sock, SIOCGIFNAME, &ifr) == 0) {
 	  /* Only use ethernet interfaces */
-	  ioctl(sock, SIOCGIFHWADDR, &ifr);
-	  if (ifr.ifr_hwaddr.sa_family == ARPHRD_ETHER) {
+	  if ((0 == ioctl(sock, SIOCGIFHWADDR, &ifr)) &&
+	      (ifr.ifr_hwaddr.sa_family == ARPHRD_ETHER)) {
 	    strcpy(buffer+ptr, ifr.ifr_name);
-	    ptr += strlen(buffer)+1;
+	    ptr += strlen(buffer+ptr)+1;
   	}
 	  ifr.ifr_ifindex = ++iindex;
+  }
+  if (ptr == 0) { /* Found any Ethernet Interfaces? */
+    /* No, so try some good guesses since the SIOCGIFNAME ioctl
+       doesn't always return the ethernet interfaces, at least not
+	     Debian or Red Hat running on sparc boxes. */
+
+    for (iindex=0; iindex < 10; ++iindex) {
+      sprintf(ifr.ifr_name, "eth%d", iindex);
+	    if ((0 == ioctl(sock, SIOCGIFHWADDR, &ifr)) &&
+	       (ifr.ifr_hwaddr.sa_family == ARPHRD_ETHER)) {
+	      strcpy(buffer+ptr, ifr.ifr_name);
+	      ptr += strlen(buffer+ptr)+1;
+	    }
+	  }
   }
 
   close(sock);

@@ -1,6 +1,6 @@
 /* sds_mux.c: SDS 940 terminal multiplexor simulator
 
-   Copyright (c) 2001-2002, Robert M Supnik
+   Copyright (c) 2001-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    mux		terminal multiplexor
+
+   09-May-03	RMS	Added network device flag
 
    This module implements up to 32 individual serial interfaces, representing
    either the project Genie terminal multiplexor or the SDS 940 CTE option.
@@ -162,7 +164,7 @@ DEVICE mux_dev = {
 	1, 10, 31, 1, 8, 8,
 	&tmxr_ex, &tmxr_dep, &mux_reset,
 	NULL, &mux_attach, &mux_detach,
-	&mux_dib, DEV_DISABLE };
+	&mux_dib, DEV_NET | DEV_DISABLE };
 
 /* MUXL data structures
 

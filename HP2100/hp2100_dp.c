@@ -1,6 +1,6 @@
 /* hp2100_dp.c: HP 2100 12557A/13210A disk simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    dp		12557A 2871 disk subsystem
 		13210A 7900 disk subsystem
 
+   25-Apr-03	RMS	Revised for extended file support
+			Fixed bug(s) in boot (found by Terry Newton)
    10-Nov-02	RMS	Added BOOT command, fixed numerous bugs
    15-Jan-02	RMS	Fixed INIT handling (found by Bill McDermith)
    10-Jan-02	RMS	Fixed f(x)write call (found by Bill McDermith)
@@ -239,7 +241,7 @@ REG dpc_reg[] = {
 		  DP_NUMDRV, PV_LEFT | REG_HRO) },
 	{ URDATA (UFNC, dpc_unit[0].FNC, 8, 8, 0,
 		  DP_NUMDRV, REG_HRO) },
-	{ URDATA (CAPAC, dpc_unit[0].capac, 10, 31, 0,
+	{ URDATA (CAPAC, dpc_unit[0].capac, 10, T_ADDR_W, 0,
 		  DP_NUMDRV, PV_LEFT | REG_HRO) },
 	{ ORDATA (DEVNO, dpc_dib.devno, 6), REG_HRO },
 	{ NULL }  };
@@ -311,6 +313,7 @@ return dat;
 int32 dpcio (int32 inst, int32 IR, int32 dat)
 {
 int32 i, devc, fnc, drv;
+int32 devd = dpd_dib.devno;
 
 devc = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
@@ -340,22 +343,25 @@ case ioCTL:						/* control clear/set */
 	    sim_cancel (&dpd_unit);			/* cancel dch */
 	    dpd_xfer = 0;				/* clr dch xfer */
 	    dpc_busy = 0;  }				/* clr cch busy */
-	else if (!CTL (devc)) {				/* set and was clr? */
+	else {						/* STC */
 	    setCTL (devc);				/* set ctl */
-	    setCMD (devc);				/* set cmd */
-	    drv = CW_GETDRV (dpc_obuf);			/* get fnc, drv */
-	    fnc = CW_GETFNC (dpc_obuf);			/* from cmd word */
-	    switch (fnc) {				/* case on fnc */
-	    case FNC_SEEK: case FNC_CHK:		/* seek, check */
-	    case FNC_STA: case FNC_AR:			/* rd sta, addr rec */
-		dp_god (fnc, drv, dpc_dtime);		/* sched dch xfr */
-		break;
-	    case FNC_RD: case FNC_WD:			/* read, write */
-	    case FNC_REF: case FNC_INIT:		/* refine, init */
-		dp_goc (fnc, drv, dpc_ctime);		/* sched drive */
-		break;
-	    }						/* end case */
-	}						/* end else */
+	    if (!CMD (devc)) {				/* is cmd clr? */
+		setCMD (devc);				/* set cmd */
+		drv = CW_GETDRV (dpc_obuf);		/* get fnc, drv */
+		fnc = CW_GETFNC (dpc_obuf);		/* from cmd word */
+		switch (fnc) {				/* case on fnc */
+		case FNC_STA:				/* rd sta */
+		    if (dp_ctype) { clrFLG (devd); }	/* 13210? clr dch flag */
+		case FNC_SEEK: case FNC_CHK:		/* seek, check */
+		case FNC_AR:				/* addr rec */
+		    dp_god (fnc, drv, dpc_dtime);	/* sched dch xfr */
+		    break;
+		case FNC_RD: case FNC_WD:		/* read, write */
+		case FNC_REF: case FNC_INIT:		/* refine, init */
+		    dp_goc (fnc, drv, dpc_ctime);	/* sched drive */
+		    break;  }				/* end case */
+		}
+	    }						/* end else */
 	break;
 default:
 	break;  }
@@ -469,7 +475,7 @@ case FNC_AR1:						/* arec, need hd/sec */
 	break;
 
 case FNC_STA:						/* read status */
-	if (CMD (devd)) {				/* dch active? */
+	if (CMD (devd) || dp_ctype) {			/* dch act or 13210? */
 	    if (dpc_unit[drv].flags & UNIT_ATT) {	/* attached? */
 		dpd_ibuf = dpc_sta[drv] & ~STA_ERR;	/* clear err */
 		if (dp_ctype) dpd_ibuf =		/* 13210? */
@@ -480,6 +486,7 @@ case FNC_STA:						/* read status */
 		dpd_ibuf = dpd_ibuf | STA_ERR;
 	    setFLG (devd);				/* set dch flg */
 	    clrCMD (devd);				/* clr dch cmd */
+	    clrCMD (devc);				/* clr cch cmd */
 	    dpc_sta[drv] = dpc_sta[drv] &		/* clr sta flags */
 		~(STA_ATN | STA_1ST | STA_OVR |
 		STA_RWU | STA_ACU | STA_EOC |
@@ -545,7 +552,9 @@ case FNC_SEEK3:						/* waiting for flag */
 	if (dpc_busy || FLG (devc)) {			/* ctrl busy? wait */
 	    uptr->FNC = FNC_SEEK3;			/* next state */
 	    sim_activate (uptr, dpc_xtime);  }
-	else setFLG (devc);				/* set cch flg */
+	else {
+	    setFLG (devc);				/* set cch flg */
+	    clrCMD (devc);  }				/* clear cmd */
 	return SCPE_OK;
 
 case FNC_REF:						/* refine sector */

@@ -133,7 +133,7 @@ return IO;
 t_stat drm_svc (UNIT *uptr)
 {
 int32 i;
-t_addr da;
+uint32 da;
 
 if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	drm_err = 1;					/* set error */

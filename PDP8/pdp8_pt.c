@@ -1,6 +1,6 @@
 /* pdp8_pt.c: PDP-8 paper tape reader/punch simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ptr,ptp	PC8E paper tape reader/punch
 
+   25-Apr-03	RMS	Revised for extended file support
    04-Oct-02	RMS	Added DIBs
    30-May-02	RMS	Widened POS to 32b
    30-Nov-01	RMS	Added read only unit support
@@ -63,7 +64,7 @@ REG ptr_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_PTR) },
 	{ FLDATA (ENABLE, int_enable, INT_V_PTR) },
 	{ FLDATA (INT, int_req, INT_V_PTR) },
-	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
 	{ NULL }  };
@@ -96,7 +97,7 @@ REG ptp_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_PTP) },
 	{ FLDATA (ENABLE, int_enable, INT_V_PTP) },
 	{ FLDATA (INT, int_req, INT_V_PTP) },
-	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
 	{ NULL }  };

@@ -25,6 +25,8 @@
 
    tu		RH11/TM03/TU45 magtape
 
+   25-Apr-03	RMS	Revised for extended file support
+   28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised for magtape library
    27-Jan-03	RMS	Changed to dynamically allocate buffer
    21-Nov-02	RMS	Fixed bug in bootstrap (reported by Michael Thompson)
@@ -358,7 +360,7 @@ REG tu_reg[] = {
 	{ FLDATA (STOP_IOE, tu_stopioe, 0) },
 	{ DRDATA (TIME, tu_time, 24), PV_LEFT },
 	{ URDATA (UST, tu_unit[0].USTAT, 8, 17, 0, TU_NUMDR, 0) },
-	{ URDATA (POS, tu_unit[0].pos, 10, 32, 0,
+	{ URDATA (POS, tu_unit[0].pos, 10, T_ADDR_W, 0,
 		  TU_NUMDR, PV_LEFT | REG_RO) },
 	{ ORDATA (LOG, tu_log, 8), REG_HIDDEN },
 	{ NULL }  };
@@ -366,6 +368,8 @@ REG tu_reg[] = {
 MTAB tu_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
 		NULL, &show_addr, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,

@@ -25,6 +25,8 @@
 
    mta		magnetic tape
 
+   25-Apr-03	RMS	Revised for extended file support
+   28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised for magtape library
    30-Oct-02	RMS	Fixed BOT handling, added error record handling
    08-Oct-02	RMS	Added DIB
@@ -203,13 +205,15 @@ REG mta_reg[] = {
 	{ DRDATA (CTIME, mta_cwait, 24), PV_LEFT },
 	{ DRDATA (RTIME, mta_rwait, 24), PV_LEFT },
 	{ URDATA (UST, mta_unit[0].USTAT, 8, 32, 0, MTA_NUMDR, 0) },
-	{ URDATA (POS, mta_unit[0].pos, 8, 32, 0,
+	{ URDATA (POS, mta_unit[0].pos, 8, T_ADDR_W, 0,
 		  MTA_NUMDR, REG_RO | PV_LEFT) },
 	{ NULL }  };
 
 MTAB mta_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", &mta_vlock },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", &mta_vlock },
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 	{ 0 }  };
 
 DEVICE mta_dev = {

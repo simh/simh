@@ -1,6 +1,6 @@
 /* id_lp.c: Interdata line printer
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    lpt		M46-206 line printer
+
+   25-Apr-03	RMS	Revised for extended file support
 */
 
 #include "id_defs.h"
@@ -94,7 +96,7 @@ REG lpt_reg[] = {
 	{ FLDATA (IREQ, int_req[l_LPT], i_LPT) },
 	{ FLDATA (IENB, int_enb[l_LPT], i_LPT) },
 	{ FLDATA (IARM, lpt_arm, 0) },
-	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (CTIME, lpt_ctime, 24), PV_LEFT },
 	{ DRDATA (STIME, lpt_stime, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },

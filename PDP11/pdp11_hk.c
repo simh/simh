@@ -1,6 +1,6 @@
 /* pdp11_hk.c - RK611/RK06/RK07 disk controller
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    hk		RK611/RK06/RK07 disk
 
+   25-Apr-03	RMS	Revised for extended file support
+
    This is a somewhat abstracted implementation of the RK611, more closely
    modelled on third party clones than DEC's own implementation.  In particular,
    the drive-to-controller serial communications system is simulated only at
@@ -38,7 +40,7 @@
 */
 
 #include "pdp11_defs.h"
-#define VM_PDP11	1
+
 #define HK_RDX		8
 #define HK_WID		16
 extern int32 cpu_18b, cpu_ubm;
@@ -322,7 +324,7 @@ int32 hk_rwait = 10;					/* rotate time */
 int16 hkdb[3] = { 0 };					/* data buffer silo */
 int16 hk_off[HK_NUMDR] = { 0 };				/* saved offset */
 int16 hk_dif[HK_NUMDR] = { 0 };				/* cylinder diff */
-static int reg_in_drive[16] = {
+static int32 reg_in_drive[16] = {
  0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 DEVICE hk_dev;
@@ -400,7 +402,7 @@ REG hk_reg[] = {
 		  HK_NUMDR, REG_HRO) },
 	{ BRDATA (OFFSET, hk_off, HK_RDX, 16, HK_NUMDR), REG_HRO },
 	{ BRDATA (CYLDIF, hk_dif, HK_RDX, 16, HK_NUMDR), REG_HRO },
-	{ URDATA (CAPAC, hk_unit[0].capac, 10, 32, 0,
+	{ URDATA (CAPAC, hk_unit[0].capac, 10, T_ADDR_W, 0,
 		  HK_NUMDR, PV_LEFT | REG_HRO) },
 	{ FLDATA (STOP_IOE, hk_stopioe, 0) },
 	{ GRDATA (DEVADDR, hk_dib.ba, HK_RDX, 32, 0), REG_HRO },
@@ -591,13 +593,13 @@ void hk_go (int32 drv)
 
 int32 fnc, t;
 UNIT *uptr;
-static int fnc_nxf[16] = {
+static int32 fnc_nxf[16] = {
 	0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0 };
-static int fnc_att[16] = {
+static int32 fnc_att[16] = {
 	0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 };
-static int fnc_rdy[16] = {
+static int32 fnc_rdy[16] = {
 	0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 };
-static int fnc_cyl[16] = {
+static int32 fnc_cyl[16] = {
 	0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0 };
 
 fnc = GET_FNC (hkcs1);
@@ -686,7 +688,7 @@ t_stat hk_svc (UNIT *uptr)
 {
 int32 i, t, dc, drv, fnc, err;
 int32 wc, awc, da;
-t_addr ba;
+uint32 ba;
 uint16 comp;
 
 drv = uptr - hk_dev.units;				/* get drv number */
@@ -1018,25 +1020,25 @@ return SCPE_OK;
 
 t_stat hk_attach (UNIT *uptr, char *cptr)
 {
-int drv, p;
+uint32 drv, p;
 t_stat r;
 
 uptr->capac = HK_SIZE (uptr);
-r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
+r = attach_unit (uptr, cptr);				/* attach unit */
+if (r != SCPE_OK) return r;				/* error? */
 drv = uptr - hk_dev.units;				/* get drv number */
 hkds[drv] = DS_ATA | DS_RDY | ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
-hker[drv] = 0;
+hker[drv] = 0;						/* upd drv status */
 hk_off[drv] = 0;
 hk_dif[drv] = 0;
 uptr->CYL = 0;
-update_hkcs (CS1_DI, drv);
+update_hkcs (CS1_DI, drv);				/* upd ctlr status */
 
-if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
-if ((p = ftell (uptr->fileref)) == 0) {
+if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;	/* seek to end */
+if ((p = ftell (uptr->fileref)) == 0) {			/* new disk image? */
 	if (uptr->flags & UNIT_RO) return SCPE_OK;
 	return pdp11_bad_block (uptr, HK_NUMSC, HK_NUMWD);  }
+if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */
 if (p > (RK06_SIZE * sizeof (int16))) {
 	uptr->flags = uptr->flags | UNIT_RK07;
 	uptr->capac = RK07_SIZE;  }
@@ -1079,8 +1081,6 @@ return pdp11_bad_block (uptr, HK_NUMSC, HK_NUMWD);
 }
 
 /* Device bootstrap - does not clear CSR when done */
-
-#if defined (VM_PDP11)
 
 #define BOOT_START	02000				/* start */
 #define BOOT_ENTRY	(BOOT_START + 002)		/* entry */
@@ -1132,12 +1132,3 @@ M[BOOT_CSR >> 1] = hk_dib.ba & DMASK;
 saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 }
-
-#else
-
-t_stat hk_boot (int32 unitno, DEVICE *dptr)
-{
-return SCPE_NOFNC;
-}
-
-#endif

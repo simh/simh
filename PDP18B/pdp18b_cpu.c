@@ -25,6 +25,7 @@
 
    cpu		PDP-4/7/9/15 central processor
 
+   12-Mar-03	RMS	Added logical name support
    18-Feb-03	RMS	Fixed three EAE bugs (found by Hans Pufal)
    05-Oct-02	RMS	Added DIBs, device number support
    25-Jul-02	RMS	Added DECtape support for PDP-4
@@ -379,6 +380,7 @@ REG cpu_reg[] = {
 	{ ORDATA (SR, SR, 18) },
 	{ ORDATA (IORS, iors, 18), REG_RO },
 	{ BRDATA (INT, int_hwre, 8, 32, API_HLVL+1), REG_RO },
+	{ FLDATA (INT_PEND, int_pend, 0), REG_RO },
 	{ FLDATA (ION, ion, 0) },
 	{ ORDATA (ION_DELAY, ion_defer, 2) },
 #if defined (PDP7) 
@@ -475,7 +477,7 @@ extern UNIT clk_unit;
 #define JMS_WORD(t)	(((LAC & 01000000) >> 1) | ((memm & 1) << 16) | \
 			 (((t) & 1) << 15) | ((PC) & 077777))
 #define INCR_ADDR(x)	(((x) & epcmask) | (((x) + 1) & damask))
-#define SEXT(x)		((int) (((x) & 0400000)? (x) | ~0777777: (x) & 0777777))
+#define SEXT(x)		((int32) (((x) & 0400000)? (x) | ~0777777: (x) & 0777777))
 
 /* The following macros implement addressing.  They account for autoincrement
    addressing, extended addressing, and memory protection, if it exists.
@@ -881,7 +883,7 @@ case 004:						/* JMS, dir */
 */
 
 case 031:						/* JMP, indir */
-CHECK_AUTO_INC;					/* check auto inc */
+	CHECK_AUTO_INC;					/* check auto inc */
 #if defined (PDP7) || defined (PDP9)
 	if (emir_pending && (((M[MA] >> 16) & 1) == 0)) memm = 0;
 #endif
@@ -1496,7 +1498,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
 	return SCPE_ARG;
@@ -1542,7 +1544,7 @@ if (dptr == NULL) return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
 if (dibp == NULL) return SCPE_IERR;
 fprintf (st, "devno=%02o", dibp->dev);
-if (dibp-> num > 1) fprintf (st, "-%2o", dibp->dev + dibp->num - 1);
+if (dibp->num > 1) fprintf (st, "-%2o", dibp->dev + dibp->num - 1);
 return SCPE_OK;
 }
 
@@ -1582,10 +1584,10 @@ for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {	/* add devices */
 		if (dibp->dsp[j]) {			/* any dispatch? */
 		    if (dev_tab[dibp->dev + j]) {	/* already filled? */
 			printf ("%s device number conflict at %02o\n",
-			    dptr->name, dibp->dev + j);
+			    sim_dname (dptr), dibp->dev + j);
 			if (sim_log) fprintf (sim_log,
 			    "%s device number conflict at %02o\n",
-			    dptr->name, dibp->dev + j);
+			    sim_dname (dptr), dibp->dev + j);
 			 return TRUE;  }
 		    dev_tab[dibp->dev + j] = dibp->dsp[j];	/* fill */
 		    }					/* end if dsp */

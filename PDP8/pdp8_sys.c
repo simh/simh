@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Apr-03	RMS	Revised for extended file support
    30-Dec-01	RMS	Revised for new TTX
    26-Nov-01	RMS	Added RL8A support
    17-Sep-01	RMS	Removed multiconsole support
@@ -106,7 +107,7 @@ const char *sim_stop_messages[] = {
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 rubout, word, low, high, csum, newf, state, i;
-t_addr origin, field;
+uint32 origin, field;
 
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 rubout = state = field = newf = origin = csum = 0;

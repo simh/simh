@@ -16,7 +16,12 @@
 NOTE - there is a problem with this code. The Device Status Word (DSW) is
 computed from current conditions when requested by an XIO load status
 command; the value of DSW available to the simulator's examine & save
-commands may NOT be accurate. This should probably be fixed.
+commands may NOT be accurate. This should probably be fixed. (I think there's
+a way to have the expression evaluator call a routine? That would be one
+way to solve the problem, the other is to keep DSW up-to-date all the time).
+
+*  Update 2003-02-08: Fixed error in declaration of array list_save, pointed
+   out by Ray Comas.
 
 *  Update 2002-02-29: Added deck-list option. If you issue an attach
    command and specify the filename as "@filename", the named file is interpreted
@@ -436,8 +441,9 @@ static char tempfile[128];
 static int cardnum;
 static int any_punched = 0;
 
-#define MAXARG 80						/* saved arguments to attach command */
-static char list_save[MAXARG][10], *list_arg[MAXARG];
+#define MAXARGLEN 80					/* max length of a saved attach command argument */
+#define MAXARGS   10					/* max number of arguments to save */
+static char list_save[MAXARGS][MAXARGLEN], *list_arg[MAXARGLEN];
 static int list_nargs = 0;
 
 static int16 punchstation[80];
@@ -497,12 +503,12 @@ t_stat set_active_cr_code (int match)
 	return SCPE_OK;
 }
 
-t_stat cr_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
+static t_stat cr_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
 {
 	return set_active_cr_code(match);
 }
 
-t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
+static t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
 {
 	CPCODE *code;
 	int ncode;
@@ -964,7 +970,6 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 // no - don't cancel pending read?
 //	sim_cancel(uptr);								/* cancel pending operations */
 
-
 	CLRBIT(uptr->flags, UNIT_QUIET|UNIT_DEBUG);		/* set debug/quiet flags */
 	if (sim_switches & SWMASK('D')) SETBIT(uptr->flags, UNIT_DEBUG);
 	else if (sim_switches & SWMASK('Q')) SETBIT(uptr->flags, UNIT_QUIET);
@@ -972,15 +977,15 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 	cr_detach(uptr);								/* detach file and possibly deckfile */
 	CLRBIT(uptr->flags, UNIT_SCRATCH);
 
-	c = cptr;
-	for (list_nargs = 0; list_nargs < 10; ) {		/* extract arguments */
+	c = cptr;										/* extract arguments */
+	for (list_nargs = 0; list_nargs < MAXARGS; list_nargs++) {
 		while (*c && (*c <= ' '))					/* skip blanks */
 			c++;
+
 		if (! *c)
 			break;									/* all done */
 
 		arg = c;									/* save start */
-
 		while (*c && (*c > ' ')) {
 		    if (*c == '\'' || *c == '"') {			/* quoted string */
 				for (quote = *c++; *c;)
@@ -989,11 +994,12 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 			}
 			else c++;
 		}
+
 		if (*c)
 			*c++ = 0;								/* term arg at space */
 
 		list_arg[list_nargs] = list_save[list_nargs];	/* set pointer to permanent storage location */
-		strncpy(list_arg[list_nargs++], arg, MAXARG);	/* store copy */
+		strncpy(list_arg[list_nargs], arg, MAXARGLEN);	/* store copy */
 	}
 
 	if (list_nargs <= 0)							/* need at least 1 */

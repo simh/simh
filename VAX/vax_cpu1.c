@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2002, Robert M Supnik
+   Copyright (c) 1998-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -101,15 +101,15 @@ extern int32 ibcnt, ppc;
 extern int32 cpu_log;
 extern FILE *sim_log;
 
-extern int32 Read (t_addr va, int32 lnt, int32 acc);
-extern void Write (t_addr va, int32 val, int32 lnt, int32 acc);
-extern int32 Test (t_addr va, int32 acc, int32 *status);
-extern int32 ReadLP (t_addr pa);
-extern void WriteLP (t_addr pa, int32 val);
+extern int32 Read (uint32 va, int32 lnt, int32 acc);
+extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
+extern int32 Test (uint32 va, int32 acc, int32 *status);
+extern int32 ReadLP (uint32 pa);
+extern void WriteLP (uint32 pa, int32 val);
 extern void set_map_reg (void);
 extern void zap_tb (int stb);
-extern void zap_tb_ent (t_addr va);
-extern t_bool chk_tb_ent (t_addr va);
+extern void zap_tb_ent (uint32 va);
+extern t_bool chk_tb_ent (uint32 va);
 extern int32 ReadIPR (int32 rg);
 extern void WriteIPR (int32 rg, int32 val);
 extern jmp_buf save_env;

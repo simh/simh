@@ -1,6 +1,6 @@
-/* ibms3_defs.h: IBM System/3 simulator definitions 
+/* s3_defs.h: IBM System/3 simulator definitions 
 
-   Copyright (c) 2001, Charles E. Owen
+   Copyright (c) 2001-2003, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

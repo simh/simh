@@ -1,6 +1,6 @@
 /* s3_disk.c: IBM 5444 Disk Drives
 
-   Copyright (c) 2001, Charles E. Owen
+   Copyright (c) 2001-2003, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    r2	Removeable disk 2
    f2	Fixed disk 2
 
+   25-Apr-03	RMS	Revised for extended file support
    08-Oct-02	RMS	Added impossible function catcher
 */
 
@@ -93,7 +94,7 @@ REG r1_reg[] = {
 	{ HRDATA (ERR, diskerr[0], 16) },
 	{ DRDATA (CYL, r1_unit.u3, 8) },
 	{ DRDATA (HEAD, seekhead[0], 8) },
-	{ DRDATA (POS, r1_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, r1_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, r1_unit.wait, 24), PV_LEFT },
 	{ BRDATA (BUF, dbuf, 8, 8, 256) },
 	{ NULL }  };

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-10 Simulator Usage
-Date:	15-Jan-2003
+Date:	15-May-2003
 
 			COPYRIGHT NOTICE
 
@@ -36,12 +36,10 @@ This memorandum documents the PDP-10 simulator.
 
 1. Simulator Files
 
-To compile the PDP-10, you must define USE_INT64 as part of the compilation
-command line.
+To compile the PDP-10, you must define VM_PDP10 and USE_INT64 as part of the
+compilation command line.
 
-sim/		dec_dz.h
-		dec_pt.h
-		sim_defs.h
+sim/		sim_defs.h
 		sim_rev.h
 		sim_sock.h
 		sim_tmxr.h
@@ -54,19 +52,19 @@ sim/		dec_dz.h
 
 sim/pdp10/	pdp10_defs.h
 		pdp10_cpu.c
-		pdp10_dz.c
 		pdp10_fe.c
 		pdp10_ksio.c
 		pdp10_lp20.c
 		pdp10_mdfp.c
 		pdp10_pag.c
-		pdp10_pt.c
 		pdp10_rp.c
 		pdp10_sys.c
 		pdp10_tu.c
 		pdp10_xtnd.c
 
-sim/pdp11/	pdp11_ry.c
+sim/pdp11/	pdp11_dz.c
+		pdp11_pt.c
+		pdp11_ry.c
 		pdp11_xu.c
 
 2. PDP-10 Features

@@ -1,6 +1,6 @@
 /* altair_sio: MITS Altair serial I/O card
 
-   Copyright (c) 1997, Charles E. Owen
+   Copyright (c) 1997-2003, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -63,11 +63,6 @@ t_stat ptp_reset (DEVICE *dptr);
 
 int32 ptr_stopioe = 0, ptp_stopioe = 0;			/* stop on error */
 
-extern t_stat sim_activate (UNIT *uptr, int32 interval);
-extern t_stat sim_cancel (UNIT *uptr);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
-
 /* 2SIO Standard I/O Data Structures */
 
 UNIT sio_unit = { UDATA (&sio_svc, 0, 0),
@@ -95,7 +90,7 @@ UNIT ptr_unit = { UDATA (&ptr_svc, UNIT_SEQ + UNIT_ATTABLE, 0),
 REG ptr_reg[] = {
 	{ ORDATA (DATA, ptr_unit.buf, 8) },
 	{ ORDATA (STAT, ptr_unit.u3, 8) },
-	{ ORDATA (POS, ptr_unit.pos, 32) },
+	{ ORDATA (POS, ptr_unit.pos, T_ADDR_W) },
 	{ NULL }  };
 
 DEVICE ptr_dev = {
@@ -110,7 +105,7 @@ UNIT ptp_unit = { UDATA (&ptp_svc, UNIT_SEQ + UNIT_ATTABLE, 0),
 REG ptp_reg[] = {
 	{ ORDATA (DATA, ptp_unit.buf, 8) },
 	{ ORDATA (STAT, ptp_unit.u3, 8) },
-	{ ORDATA (POS, ptp_unit.pos, 32) },
+	{ ORDATA (POS, ptp_unit.pos, T_ADDR_W) },
 	{ NULL }  };
 
 DEVICE ptp_dev = {

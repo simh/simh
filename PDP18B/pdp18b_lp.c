@@ -28,6 +28,7 @@
    lp09		(PDP-9,15) LP09 line printer
    lp15		(PDP-15)   LP15 line printer
 
+   25-Apr-03	RMS	Revised for extended file support
    05-Feb-03	RMS	Added LP09, fixed conditionalization
    05-Oct-02	RMS	Added DIB, device number support
    30-May-02	RMS	Widened POS to 32b
@@ -97,7 +98,7 @@ REG lp62_reg[] = {
 	{ FLDATA (SPC, int_hwre[API_LPTSPC], INT_V_LPTSPC) },
 	{ DRDATA (BPTR, lp62_bp, 6) },
 	{ ORDATA (STATE, lp62_iot, 6), REG_HRO },
-	{ DRDATA (POS, lp62_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lp62_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, lp62_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lp62_stopioe, 0) },
 	{ BRDATA (LBUF, lp62_buf, 8, 8, LP62_BSIZE) },
@@ -264,7 +265,7 @@ REG lp647_reg[] = {
 	{ FLDATA (ERR, lp647_err, 0) },
 	{ DRDATA (BPTR, lp647_bp, 7) },
 	{ ORDATA (SCMD, lp647_iot, 6), REG_HRO },
-	{ DRDATA (POS, lp647_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lp647_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, lp647_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lp647_stopioe, 0) },
 	{ BRDATA (LBUF, lp647_buf, 8, 8, LP647_BSIZE) },
@@ -466,7 +467,7 @@ REG lp09_reg[] = {
 	{ FLDATA (DONE, lp09_don, 0) },
 	{ FLDATA (ENABLE, lp09_ie, 0) },
 	{ FLDATA (ERR, lp09_err, 0) },
-	{ DRDATA (POS, lp09_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lp09_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, lp09_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lp09_stopioe, 0) },
 	{ ORDATA (DEVNO, lp09_dib.dev, 6), REG_HRO },
@@ -635,7 +636,7 @@ REG lp15_reg[] = {
 	{ DRDATA (LCNT, lp15_lc, 9) },
 	{ DRDATA (BPTR, lp15_bp, 8) },
 	{ FLDATA (MODE, lp15_mode, 0) },
-	{ DRDATA (POS, lp15_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, lp15_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, lp15_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lp15_stopioe, 0) },
 	{ BRDATA (LBUF, lp15_buf, 8, 8, LP15_BSIZE) },

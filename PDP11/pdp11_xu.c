@@ -26,14 +26,16 @@
    xu		DEUNA/DELUNA Ethernet interface (stub)
 */
 
-#if defined (USE_INT64)					/* PDP-10 */
+#if defined (VM_PDP10)					/* PDP10 version */
 #include "pdp10_defs.h"
-#define VM_PDP10	1
 extern int32 int_req;
 extern int32 int_vec[32];
-#else
-#include "pdp11_defs.h"					/* PDP-11 */
-#define VM_PDP11	1
+
+#elif defined (VM_VAX)					/* VAX version */
+#error "DEUNA/DELUA not supported on VAX!"
+
+#else							/* PDP-11 version */
+#include "pdp11_defs.h"
 extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
 #endif

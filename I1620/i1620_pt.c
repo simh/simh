@@ -1,6 +1,6 @@
 /* i1620_pt.c: IBM 1621/1624 paper tape reader/punch simulator
 
-   Copyright (c) 2002, Robert M Supnik
+   Copyright (c) 2002-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    ptr		1621 paper tape reader
    ptp		1624 paper tape punch
+
+   25-Apr-03	RMS	Revised for extended file support
 */
 
 #include "i1620_defs.h"
@@ -58,7 +60,7 @@ UNIT ptr_unit = {
 	UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0) };
 
 REG ptr_reg[] = {
-	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ NULL }  };
 
 DEVICE ptr_dev = {
@@ -78,7 +80,7 @@ UNIT ptp_unit = {
 	UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) };
 
 REG ptp_reg[] = {
-	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ NULL }  };
 
 DEVICE ptp_dev = {
@@ -197,7 +199,7 @@ const int8 alp_to_ptp[256] = {
 
 t_stat ptr (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 {
-t_addr i;
+uint32 i;
 int8 mc;
 uint8 ptc;
 t_stat r, inv = SCPE_OK;
@@ -243,7 +245,7 @@ return STOP_RWRAP;
 
 t_stat btr (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 {
-t_addr i;
+uint32 i;
 uint8 ptc;
 t_stat r, inv = SCPE_OK;
 
@@ -333,7 +335,7 @@ return SCPE_OK;
 
 t_stat ptp (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 {
-t_addr i;
+uint32 i;
 int8 ptc;
 uint8 z, d;
 t_stat r;
@@ -366,7 +368,7 @@ return STOP_RWRAP;
 
 t_stat btp (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 {
-t_addr i;
+uint32 i;
 uint8 ptc, z, d;
 t_stat r;
 

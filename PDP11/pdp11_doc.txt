@@ -36,9 +36,7 @@ This memorandum documents the PDP-11 simulator.
 
 1. Simulator Files
 
-sim/		dec_dz.h
-		dec_pt.h
-		sim_defs.h
+sim/		sim_defs.h
 		sim_ether.h
 		sim_rev.h
 		sim_sock.h
@@ -53,6 +51,7 @@ sim/pdp11/	pdp11_defs.h
 		pdp11_mscp.h
 		pdp11_uqssp.h
 		pdp11_xq.h
+		pdp11_xq_bootrom.h
 		pdp11_cpu.c
 		pdp11_dz.c
 		pdp11_fp.c
@@ -108,11 +107,12 @@ TM		TM11/TU10 magnetic tape controller with eight drives
 TS		TS11/TSV05 magnetic tape controller with one drive
 TQ		TQK50 TMSCP magnetic tape controller with four drives
 XQ		DELQA/DEQNA Qbus Ethernet controller
+XQB		second DELQA/DEQNA Qbus Ethernet controller
 XU		DEUNA/DELUA Unibus Ethernet controller
 
-The DZ, RK, HK, RL, RP, RQ, RQB, RQC, RQD, RX, RY, TC, TM, TS, TQ, XQ, and XU
-devices can be set DISABLED.  RQB, RQC, RQD, RY, TS, and XU are disabled by
-default.
+The DZ, RK, HK, RL, RP, RQ, RQB, RQC, RQD, RX, RY, TC, TM, TS, TQ, XQ, XQB,
+and XU devices can be set DISABLED.  RQB, RQC, RQD, RY, TS, XQB, and XU are
+disabled by default.
 
 The PDP-11 simulator implements several unique stop conditions:
 
@@ -287,7 +287,7 @@ longer recognizes the explicitly configured device.  A device can be
 reset to autoconfigure with the SET <device> AUTOCONFIGURE command. 
 
 The current I/O map can be displayed with the SHOW CPU IOSPACE command.
-Address that have set by autoconfiguration are marked with an asterisk (*). 
+Addresses that have set by autoconfiguration are marked with an asterisk (*). 
 
 All devices support the SHOW ADDRESS and SHOW VECTOR commands, which display
 the device address and vector, respectively.
@@ -1175,9 +1175,10 @@ Error handling is as follows:
 
 	OS I/O error		fatal tape error
 
-2.10 DELQA/DEQNA Qbus Ethernet Controller (XQ)
+2.10 DELQA/DEQNA Qbus Ethernet Controllers (XQ, XQB)
 
-XQ simulates the DELQA/DEQNA Qbus Ethernet controller.  Options allow
+The simulator implements two DELQA/DEQNA Qbus Ethernet controllers (XQ,
+XQB).  Initially, XQ is enabled, and XQB is disabled.  Options allow
 control of the MAC address, the controller mode, and the sanity timer.
 
 	SET  XQ MAC=<mac-address>	ex. 08-00-2B-AA-BB-CC

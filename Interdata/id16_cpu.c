@@ -1,6 +1,6 @@
 /* id16_cpu.c: Interdata 16b CPU simulator
 
-   Copyright (c) 2000-2002, Robert M. Supnik
+   Copyright (c) 2000-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -1683,7 +1683,7 @@ return SCPE_OK;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-t_addr i;
+uint32 i;
 
 if ((val <= 0) || ((val & 0xFFF) != 0) ||
     (((uint32) val) > ((uptr->flags & UNIT_816E)? MAXMEMSIZE16E: MAXMEMSIZE16)))
@@ -1700,7 +1700,7 @@ return SCPE_OK;
 
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-t_addr i;
+uint32 i;
 
 if (!(val & UNIT_816E) && (MEMSIZE > MAXMEMSIZE16)) {
 	MEMSIZE = MAXMEMSIZE16;

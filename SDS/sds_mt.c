@@ -25,6 +25,8 @@
 
    mt		7 track magnetic tape
 
+   25-Apr-03	RMS	Revised for extended file support
+   28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised for magtape library
 
    Magnetic tapes are represented as a series of variable 8b records
@@ -132,7 +134,7 @@ REG mt_reg[] = {
 	{ FLDATA (SKIP, mt_skip, 0) },
 	{ DRDATA (CTIME, mt_ctime, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (GTIME, mt_gtime, 24), REG_NZ + PV_LEFT },
-	{ URDATA (POS, mt_unit[0].pos, 10, 32, 0,
+	{ URDATA (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
 		  MT_NUMDR, PV_LEFT | REG_RO) },
 	{ URDATA (BOT, mt_unit[0].botf, 10, 1, 0, MT_NUMDR, REG_RO) },
 	{ URDATA (EOT, mt_unit[0].eotf, 10, 1, 0, MT_NUMDR, REG_RO) },
@@ -142,6 +144,8 @@ REG mt_reg[] = {
 MTAB mt_mod[] = {
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "CHANNEL", "CHANNEL",
 		&set_chan, &show_chan, NULL },
 	{ 0 }  };

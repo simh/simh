@@ -25,6 +25,7 @@
 
    pkb		5471 printer/keyboard
 
+   25-Apr-03	RMS	Revised for extended file support
    08-Oct-02	RMS	Added impossible function catcher
 */
 
@@ -76,7 +77,7 @@ REG pkb_reg[] = {
 	{ HRDATA (RTNKEY, key_rtn, 8) },
 	{ HRDATA (CANKEY, key_can, 8) },
 	{ HRDATA (ENDKEY, key_end, 8) },
-	{ DRDATA (POS, pkb_unit.pos, 32), PV_LEFT },
+	{ DRDATA (POS, pkb_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, pkb_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 

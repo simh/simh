@@ -25,6 +25,7 @@
 
    ipli, iplo	12556B interprocessor link pair
 
+   09-May-03	RMS	Added network device flag
    31-Jan-03	RMS	Links are full duplex (found by Mike Gemeny)
 */
 
@@ -113,7 +114,7 @@ DEVICE ipli_dev = {
 	1, 10, 31, 1, 16, 16,
 	&tmxr_ex, &tmxr_dep, &ipl_reset,
 	&ipl_boot, &ipl_attach, &ipl_detach,
-	&ipli_dib, DEV_DISABLE | DEV_DIS  };
+	&ipli_dib, DEV_NET | DEV_DISABLE | DEV_DIS  };
 
 /* IPLO data structures
 
@@ -139,7 +140,7 @@ DEVICE iplo_dev = {
 	1, 10, 31, 1, 16, 16,
 	&tmxr_ex, &tmxr_dep, &ipl_reset,
 	&ipl_boot, &ipl_attach, &ipl_detach,
-	&iplo_dib, DEV_DISABLE | DEV_DIS  };
+	&iplo_dib, DEV_NET | DEV_DISABLE | DEV_DIS  };
 
 /* Interprocessor link I/O routines */
 

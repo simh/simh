@@ -23,6 +23,13 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Jun-03	RMS	Added register flag REG_VMIO
+   23-Apr-03	RMS	Revised for 32b/64b t_addr
+   14-Mar-03	RMS	Lengthened default serial output wait
+   31-Mar-03	RMS	Added u5, u6 fields
+   18-Mar-03	RMS	Added logical name support
+   			Moved magtape definitions to sim_tape.h
+			Moved breakpoint definitions from scp.c
    03-Mar-03	RMS	Added sim_fsize
    08-Feb-03	RMS	Changed sim_os_sleep to void, added match_ext
    05-Jan-03	RMS	Added hidden switch definitions, device dyn memory support,
@@ -98,9 +105,10 @@ typedef int		t_stat;				/* status */
 typedef int		t_bool;				/* boolean */
 typedef unsigned int8	uint8;
 typedef unsigned int16	uint16;
-typedef unsigned int32	uint32, t_addr;			/* address */
-#if defined (USE_INT64)					/* 64b */
-#if defined (WIN32)					/* Windows */
+typedef unsigned int32	uint32;
+
+#if defined (USE_INT64)					/* 64b data */
+#if defined (_WIN32)					/* Windows */
 #define t_int64 __int64
 #elif defined (__ALPHA) && defined (VMS)		/* Alpha VMS */
 #define t_int64 __int64
@@ -111,22 +119,20 @@ typedef unsigned int32	uint32, t_addr;			/* address */
 #endif							/* end OS's */
 typedef unsigned t_int64	t_uint64, t_value;	/* value */
 typedef t_int64 		t_svalue;		/* signed value */
-#else							/* 32b */
+#else							/* 32b data */
 typedef unsigned int32	t_value;
 typedef int32 		t_svalue;
-#endif							/* end else 64b */
+#endif							/* end 64b data */
+
+#if defined (USE_INT64) && defined (USE_ADDR64)		/* 64b address */
+typedef unsigned t_int64	t_addr;
+#define T_ADDR_W		64
+#else							/* 32b address */
+typedef unsigned int32		t_addr;
+#define T_ADDR_W		32
+#endif							/* end 64b address */
 
 /* System independent definitions */
-
-typedef uint32		t_mtrlnt;			/* magtape rec lnt */
-#define MTR_TMK		0x00000000			/* tape mark */
-#define MTR_EOM		0xFFFFFFFF			/* end of medium */
-#define MTR_ERF		0x80000000			/* error flag */
-#define MTRF(x)		((x) & MTR_ERF)			/* record error flg */
-#define MTRL(x)		((x) & ~MTR_ERF)		/* record length */
-#define MT_SET_PNU(u)	(u)->flags = (u)->flags | UNIT_PNU
-#define MT_CLR_PNU(u)	(u)->flags = (u)->flags & ~UNIT_PNU
-#define MT_TST_PNU(u)	((u)->flags & UNIT_PNU)
 
 #define FLIP_SIZE	(1 << 16)			/* flip buf size */
 #if !defined (PATH_MAX)					/* usually in limits */
@@ -138,6 +144,7 @@ typedef uint32		t_mtrlnt;			/* magtape rec lnt */
 
 #define SIM_SW_HIDE	(1u << 26)			/* enable hiding */
 #define SIM_SW_REST	(1u << 27)			/* attach/restore */
+#define SIM_SW_REG	(1u << 28)			/* register value */
 
 /* Simulator status codes
 
@@ -202,7 +209,7 @@ typedef uint32		t_mtrlnt;			/* magtape rec lnt */
 
 #define KBD_POLL_WAIT	5000				/* keyboard poll */
 #define SERIAL_IN_WAIT	100				/* serial in time */
-#define SERIAL_OUT_WAIT	10				/* serial output */
+#define SERIAL_OUT_WAIT	100				/* serial output */
 #define NOQUEUE_WAIT	10000				/* min check time */
 
 /* Convert switch letter to bit mask */
@@ -215,31 +222,32 @@ typedef uint32		t_mtrlnt;			/* magtape rec lnt */
 
 /* Device data structure */
 
-struct device {
+struct sim_device {
 	char		*name;				/* name */
-	struct unit 	*units;				/* units */
-	struct reg	*registers;			/* registers */
-	struct mtab	*modifiers;			/* modifiers */
-	int32		numunits;			/* #units */
-	int32		aradix;				/* address radix */
-	int32		awidth;				/* address width */
-	int32		aincr;				/* addr increment */
-	int32		dradix;				/* data radix */
-	int32		dwidth;				/* data width */
-	t_stat		(*examine)(t_value *v, t_addr a, struct unit *up,
+	struct sim_unit	*units;				/* units */
+	struct sim_reg	*registers;			/* registers */
+	struct sim_mtab	*modifiers;			/* modifiers */
+	uint32		numunits;			/* #units */
+	uint32		aradix;				/* address radix */
+	uint32		awidth;				/* address width */
+	uint32		aincr;				/* addr increment */
+	uint32		dradix;				/* data radix */
+	uint32		dwidth;				/* data width */
+	t_stat		(*examine)(t_value *v, t_addr a, struct sim_unit *up,
 				int32 sw);		/* examine routine */
-	t_stat		(*deposit)(t_value v, t_addr a, struct unit *up,
+	t_stat		(*deposit)(t_value v, t_addr a, struct sim_unit *up,
 				int32 sw);		/* deposit routine */
-	t_stat		(*reset)(struct device *dp);	/* reset routine */
-	t_stat		(*boot)(int32 u, struct device *dp);
+	t_stat		(*reset)(struct sim_device *dp);/* reset routine */
+	t_stat		(*boot)(int32 u, struct sim_device *dp);
 							/* boot routine */
-	t_stat		(*attach)(struct unit *up, char *cp);
+	t_stat		(*attach)(struct sim_unit *up, char *cp);
 							/* attach routine */
-	t_stat		(*detach)(struct unit *up);	/* detach routine */
+	t_stat		(*detach)(struct sim_unit *up);	/* detach routine */
 	void		*ctxt;				/* context */
-	int32		flags;				/* flags */
-	t_stat		(*msize)(struct unit *up, int32 v, char *cp, void *dp);
+	uint32		flags;				/* flags */
+	t_stat		(*msize)(struct sim_unit *up, int32 v, char *cp, void *dp);
 							/* mem size routine */
+	char		*lname;				/* logical name */
 };
 
 /* Device flags */
@@ -247,12 +255,14 @@ struct device {
 #define DEV_V_DIS	0				/* dev enabled */
 #define DEV_V_DISABLE	1				/* dev disable-able */
 #define DEV_V_DYNM	2				/* mem size dynamic */
+#define DEV_V_NET	3				/* network attach */
 #define	DEV_V_UF	12				/* user flags */
 #define DEV_V_RSV	31				/* reserved */
 
 #define DEV_DIS		(1 << DEV_V_DIS)
 #define DEV_DISABLE	(1 << DEV_V_DISABLE)
 #define DEV_DYNM	(1 << DEV_V_DYNM)
+#define DEV_NET		(1 << DEV_V_NET)
 
 #define DEV_UFMASK	(((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF) - 1))
 #define DEV_RFLAGS	(DEV_UFMASK|DEV_DIS)		/* restored flags */
@@ -266,21 +276,23 @@ struct device {
    are for a typical sequential device.
 */
 
-struct unit {
-	struct unit	*next;				/* next active */
-	t_stat		(*action)(struct unit *up);	/* action routine */
+struct sim_unit {
+	struct sim_unit	*next;				/* next active */
+	t_stat		(*action)(struct sim_unit *up);	/* action routine */
 	char		*filename;			/* open file name */
 	FILE		*fileref;			/* file reference */
 	void		*filebuf;			/* memory buffer */
-	t_addr		hwmark;				/* high water mark */
+	uint32		hwmark;				/* high water mark */
 	int32		time;				/* time out */
-	int32		flags;				/* flags */
+	uint32		flags;				/* flags */
 	t_addr		capac;				/* capacity */
 	t_addr		pos;				/* file position */
 	int32		buf;				/* buffer */
 	int32		wait;				/* wait */
 	int32		u3;				/* device specific */
 	int32		u4;				/* device specific */
+	int32		u5;				/* device specific */
+	int32		u6;				/* device specific */
 };
 
 /* Unit flags */
@@ -306,15 +318,15 @@ struct unit {
 
 /* Register data structure */
 
-struct reg {
+struct sim_reg {
 	char		*name;				/* name */
 	void		*loc;				/* location */
-	int32		radix;				/* radix */
-	int32		width;				/* width */
-	int32		offset;				/* starting bit */
-	int32		depth;				/* save depth */
-	int32		flags;				/* flags */
-	int32		qptr;				/* circ q ptr */
+	uint32		radix;				/* radix */
+	uint32		width;				/* width */
+	uint32		offset;				/* starting bit */
+	uint32		depth;				/* save depth */
+	uint32		flags;				/* flags */
+	uint32		qptr;				/* circ q ptr */
 };
 
 #define REG_FMT		0003				/* see PV_x */
@@ -323,27 +335,44 @@ struct reg {
 #define REG_NZ		0020				/* must be non-zero */
 #define REG_UNIT	0040				/* in unit struct */
 #define REG_CIRC	0100				/* circular array */
+#define REG_VMIO	0200				/* use VM print/parse */
 #define REG_HRO		(REG_RO | REG_HIDDEN)		/* hidden, read only */
 
-/* Command table */
+/* Command tables, base and alternate formats */
 
-struct ctab {
+struct sim_ctab {
 	char		*name;				/* name */
-	t_stat		(*action)();			/* action routine */
+	t_stat		(*action)(int32 flag, char *cptr);
+							/* action routine */
+	int32		arg;				/* argument */
+	char		*help;				/* help string */
+};
+
+struct sim_c1tab {
+	char		*name;				/* name */
+	t_stat		(*action)(struct sim_device *dptr, struct sim_unit *uptr,
+			int32 flag);			/* action routine */
+	int32		arg;				/* argument */
+	char		*help;				/* help string */
+};
+
+struct sim_shtab {
+	char		*name;				/* name */
+	t_stat		(*action)(FILE *st, int32 flag, char *cptr);
 	int32		arg;				/* argument */
 	char		*help;				/* help string */
 };
 
 /* Modifier table - only extended entries have disp, reg, or flags */
 
-struct mtab {
-	int32		mask;				/* mask or radix */
-	int32		match;				/* match or max */
+struct sim_mtab {
+	uint32		mask;				/* mask */
+	uint32		match;				/* match */
 	char		*pstring;			/* print string */
 	char		*mstring;			/* match string */
-	t_stat		(*valid)(struct unit *up, int32 v, char *cp, void *dp);
+	t_stat		(*valid)(struct sim_unit *up, int32 v, char *cp, void *dp);
 							/* validation routine */
-	t_stat		(*disp)(FILE *st, struct unit *up, int32 v, void *dp);
+	t_stat		(*disp)(FILE *st, struct sim_unit *up, int32 v, void *dp);
 							/* display routine */
 	void		*desc;				/* value descriptor */
 							/* REG * if MTAB_VAL */
@@ -359,11 +388,20 @@ struct mtab {
 
 /* Search table */
 
-struct schtab {
+struct sim_schtab {
 	int32		logic;				/* logical operator */
 	int32		bool;				/* boolean operator */
 	t_value		mask;				/* mask for logical */
 	t_value		comp;				/* comparison for boolean */
+};
+
+/* Breakpoint table */
+
+struct sim_brktab {
+	t_addr		addr;				/* address */
+	int32		typ;				/* mask of types */
+	int32		cnt;				/* proceed count */	
+	char		*act;				/* action string */
 };
 
 /* The following macros define structure contents */
@@ -392,12 +430,15 @@ struct schtab {
 
 /* Typedefs for principal structures */
 
-typedef struct device DEVICE;
-typedef struct unit UNIT;
-typedef struct reg REG;
-typedef struct ctab CTAB;
-typedef struct mtab MTAB;
-typedef struct schtab SCHTAB;
+typedef struct sim_device DEVICE;
+typedef struct sim_unit UNIT;
+typedef struct sim_reg REG;
+typedef struct sim_ctab CTAB;
+typedef struct sim_c1tab C1TAB;
+typedef struct sim_shtab SHTAB;
+typedef struct sim_mtab MTAB;
+typedef struct sim_schtab SCHTAB;
+typedef struct sim_brktab BRKTAB;
 
 /* Function prototypes */
 
@@ -410,19 +451,21 @@ uint32 sim_grtime (void);
 int32 sim_qcount (void);
 t_stat attach_unit (UNIT *uptr, char *cptr);
 t_stat detach_unit (UNIT *uptr);
-t_stat reset_all (int start_device);
+t_stat reset_all (uint32 start_device);
 size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
 size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
-t_addr sim_fsize (char *cptr);
+int fseek_ext (FILE *st, t_addr xpos, int origin);
+uint32 sim_fsize (char *cptr);
+char *sim_dname (DEVICE *dptr);
 t_stat get_yn (char *ques, t_stat deflt);
 char *get_glyph (char *iptr, char *optr, char mchar);
 char *get_glyph_nc (char *iptr, char *optr, char mchar);
-t_value get_uint (char *cptr, int radix, t_value max, t_stat *status);
-char *get_range (char *cptr, t_addr *lo, t_addr *hi, int32 rdx,
+t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status);
+char *get_range (char *cptr, t_addr *lo, t_addr *hi, uint32 rdx,
 	t_addr max, char term);
 t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp);
-t_value strtotv (char *cptr, char **endptr, int radix);
-t_stat fprint_val (FILE *stream, t_value val, int32 rdx, int32 wid, int32 fmt);
+t_value strtotv (char *cptr, char **endptr, uint32 radix);
+t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 DEVICE *find_dev_from_unit (UNIT *uptr);
 REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
 int32 sim_rtc_init (int32 time);
@@ -431,6 +474,7 @@ int32 sim_rtcn_init (int32 time, int32 tmr);
 int32 sim_rtcn_calb (int32 time, int32 tmr);
 t_stat sim_poll_kbd (void);
 t_stat sim_putchar (int32 out);
+BRKTAB *sim_brk_fnd (t_addr loc);
 t_bool sim_brk_test (t_addr bloc, int32 btyp);
 void sim_os_sleep (unsigned int sec);
 char *match_ext (char *fnam, char *ext);

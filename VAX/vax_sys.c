@@ -1,6 +1,6 @@
 /* vax_sys.c: VAX simulator interface
 
-   Copyright (c) 1998-2002, Robert M Supnik
+   Copyright (c) 1998-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   06-May-03	RMS	Added support for second DELQA
    12-Oct-02	RMS	Added multiple RQ controller support
    10-Oct-02	RMS	Added DELQA support
    21-Sep-02	RMS	Extended symbolic ex/mod to all byte devices
@@ -33,17 +34,23 @@
 #include "vax_defs.h"
 #include <ctype.h>
 
-extern DEVICE cpu_dev, tlb_dev;
-extern DEVICE rom_dev, nvr_dev;
-extern DEVICE sysd_dev, qba_dev;
+extern DEVICE cpu_dev;
+extern DEVICE tlb_dev;
+extern DEVICE rom_dev;
+extern DEVICE nvr_dev;
+extern DEVICE sysd_dev;
+extern DEVICE qba_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
 extern DEVICE csi_dev, cso_dev;
-extern DEVICE lpt_dev, clk_dev;
+extern DEVICE lpt_dev;
+extern DEVICE clk_dev;
 extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE rl_dev;
-extern DEVICE ts_dev, tq_dev;
-extern DEVICE dz_dev, xq_dev;
+extern DEVICE ts_dev;
+extern DEVICE tq_dev;
+extern DEVICE dz_dev;
+extern DEVICE xq_dev, xqb_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint32 *M;
@@ -52,12 +59,12 @@ extern int32 sim_switches;
 
 extern void WriteB (int32 pa, int32 val);
 extern void rom_wr (int32 pa, int32 val, int32 lnt);
-t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val);
+t_stat fprint_sym_m (FILE *of, uint32 addr, t_value *val);
 int32 fprint_sym_qoimm (FILE *of, t_value *val, int32 vp, int32 lnt);
-t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val);
-int32 parse_brdisp (char *cptr, t_addr addr, t_value *val,
+t_stat parse_sym_m (char *cptr, uint32 addr, t_value *val);
+int32 parse_brdisp (char *cptr, uint32 addr, t_value *val,
 	int32 vp, int32 lnt, t_stat *r);
-int32 parse_spec (char *cptr, t_addr addr, t_value *val,
+int32 parse_spec (char *cptr, uint32 addr, t_value *val,
 	int32 vp, int32 disp, t_stat *r);
 char *parse_rnum (char *cptr, int32 *rn);
 int32 parse_sym_qoimm (int32 *lit, t_value *val, int32 vp,
@@ -103,6 +110,7 @@ DEVICE *sim_devices[] = {
 	&ts_dev,
 	&tq_dev,
 	&xq_dev,
+	&xqb_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -135,7 +143,7 @@ t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 t_stat r;
 int32 i;
-t_addr origin, limit;
+uint32 origin, limit;
 extern int32 ssc_cnf;
 #define SSCCNF_BLO	0x80000000
 
@@ -148,7 +156,7 @@ else if (sim_switches & SWMASK ('N')) {			/* NVR? */
 	limit = NVRBASE + NVRSIZE;
 	ssc_cnf = ssc_cnf & ~SSCCNF_BLO;  }
 else {	origin = 0;					/* memory */
-	limit = cpu_unit.capac;
+	limit = (uint32) cpu_unit.capac;
 	if (sim_switches & SWMASK ('O')) {		/* origin? */
 	    origin = (int32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
 	    if (r != SCPE_OK) return SCPE_ARG;  }  }
@@ -189,7 +197,7 @@ int32 *buf;
 if ((sec < 2) || (wds < 16)) return SCPE_ARG;
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;
 if (!get_yn ("Overwrite last track? [N]", FALSE)) return SCPE_OK;
-da = (uptr->capac - (sec * wds)) * sizeof (int16);
+da = (int32) (uptr->capac - (sec * wds)) * sizeof (int16);
 if (fseek (uptr->fileref, da, SEEK_SET)) return SCPE_IOERR;
 if ((buf = malloc (wds * sizeof (int32))) == NULL) return SCPE_MEM;
 buf[0] = 0x12345678;
@@ -821,9 +829,10 @@ const char* regname[] = {
 			if < 0, number of extra bytes retired
 */
 
-t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
+t_stat fprint_sym (FILE *of, t_addr exta, t_value *val,
 	UNIT *uptr, int32 sw)
 {
+uint32 addr = (uint32) exta;
 int32 c, k, num, vp, lnt, rdx;
 t_stat r;
 DEVICE *dptr;
@@ -869,7 +878,7 @@ return -(vp - 1);
 			if < 0, number of extra bytes retired
 */
 
-t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val)
+t_stat fprint_sym_m (FILE *of, uint32 addr, t_value *val)
 {
 int32 i, k, vp, inst, numspec;
 int32 num, spec, rn, disp, index;
@@ -999,8 +1008,9 @@ return vp;
 			<= 0  -number of extra words
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (char *cptr, t_addr exta, UNIT *uptr, t_value *val, int32 sw)
 {
+uint32 addr = (uint32) exta;
 int32 k, rdx, lnt, num, vp;
 t_stat r;
 DEVICE *dptr;
@@ -1047,7 +1057,7 @@ return -(lnt - 1);
 			<= 0  -number of extra words
 */
 
-t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val)
+t_stat parse_sym_m (char *cptr, uint32 addr, t_value *val)
 {
 int32 i, numspec, disp, opc, vp;
 t_stat r;
@@ -1090,7 +1100,7 @@ return -(vp - 1);
 	vp	=	updated output pointer
 */
 
-int32 parse_brdisp (char *cptr, t_addr addr, t_value *val, int32 vp,
+int32 parse_brdisp (char *cptr, uint32 addr, t_value *val, int32 vp,
 	int32 lnt, t_stat *r)
 {
 int32 k, dest, num;
@@ -1133,7 +1143,7 @@ return vp;
 #define PARSE_LOSE	{ *r = SCPE_ARG; return vp; }
 #define SEL_LIM(p,m,u)	((fl & SP_PLUS)? (p): ((fl & SP_MINUS)? (m): (u)))
 
-int32 parse_spec (char *cptr, t_addr addr, t_value *val, int32 vp, int32 disp, t_stat *r)
+int32 parse_spec (char *cptr, uint32 addr, t_value *val, int32 vp, int32 disp, t_stat *r)
 {
 int32 i, k, litsize, rn, index;
 int32 num, dispsize, mode;

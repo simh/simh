@@ -1,6 +1,6 @@
 /* scp_tty.c: operating system-dependent I/O routines
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Apr-03	RMS	Added long seek support from Mark Pizzolato
+			Added Unix priority control from Mark Pizzolato
    24-Sep-02	RMS	Removed VT support, added Telnet console support
 			Added CGI support (from Brian Knittel)
 			Added MacOS sleep (from Peter Schorn)
@@ -66,7 +68,7 @@ extern FILE *sim_log;
 /* VMS routines, from Ben Thomas, with fixes from Robert Alan Byer */
 
 #if defined (VMS)
-#define __TTYROUTINES 0
+#define _SIM_IO_TTY_ 0
 #if defined(__VAX)
 #define sys$assign SYS$ASSIGN
 #define sys$qiow SYS$QIOW
@@ -211,8 +213,9 @@ return;
 /* Win32 routines */
 
 #if defined (_WIN32)
-#define __TTYROUTINES 0
+#define _SIM_IO_TTY_ 0
 #include <conio.h>
+#include <io.h>
 #include <windows.h>
 #include <signal.h>
 static volatile int sim_win_ctlc = 0;
@@ -287,7 +290,7 @@ return;
 /* OS/2 routines, from Bruce Ray */
 
 #if defined (__OS2__)
-#define __TTYROUTINES 0
+#define _SIM_IO_TTY_ 0
 #include <conio.h>
 
 t_stat ttinit (void)
@@ -344,7 +347,7 @@ return 0;
 */
 
 #if defined (__MWERKS__) && defined (macintosh)
-#define __TTYROUTINES 0
+#define _SIM_IO_TTY_ 0
 
 #include <Timer.h>
 #include <console.h>
@@ -357,6 +360,7 @@ return 0;
 #include <LowMem.h>
 
 /* function prototypes */
+
 Boolean SIOUXIsAppWindow(WindowPtr window);
 void SIOUXDoMenuChoice(long menuValue);
 void SIOUXUpdateMenuItems(void);
@@ -543,7 +547,7 @@ return;
 /* BSD UNIX routines */
 
 #if defined (BSDTTY)
-#define __TTYROUTINES 0
+#define _SIM_IO_TTY_ 0
 #include <sgtty.h>
 #include <fcntl.h>
 #include <sys/time.h>
@@ -585,11 +589,13 @@ fcntl (0, F_SETFL, runfl);			/* non-block mode */
 if (ioctl (0, TIOCSETP, &runtty) < 0) return SCPE_TTIERR;
 if (ioctl (0, TIOCSETC, &runtchars) < 0) return SCPE_TTIERR;
 if (ioctl (0, TIOCSLTC, &runltchars) < 0) return SCPE_TTIERR;
+nice (10);					/* lower priority */
 return SCPE_OK;
 }
 
 t_stat ttcmdstate (void)
 {
+nice (-10);					/* restore priority */
 fcntl (0, F_SETFL, cmdfl);			/* block mode */
 if (ioctl (0, TIOCSETP, &cmdtty) < 0) return SCPE_TTIERR;
 if (ioctl (0, TIOCSETC, &cmdtchars) < 0) return SCPE_TTIERR;
@@ -645,12 +651,13 @@ return;
 
 /* POSIX UNIX routines, from Leendert Van Doorn */
 
-#if !defined (__TTYROUTINES)
+#if !defined (_SIM_IO_TTY_)
 #include <termios.h>
 #include <sys/time.h>
 #include <unistd.h>
 
 struct termios cmdtty, runtty;
+static int prior_norm = 1;
 
 t_stat ttinit (void)
 {
@@ -697,12 +704,20 @@ t_stat ttrunstate (void)
 if (!isatty (fileno (stdin))) return SCPE_OK;		/* skip if !tty */
 runtty.c_cc[VINTR] = sim_int_char;			/* in case changed */
 if (tcsetattr (0, TCSAFLUSH, &runtty) < 0) return SCPE_TTIERR;
+if (prior_norm) {					/* at normal pri? */
+	errno =	0;
+	nice (10);					/* try to lower pri */
+	prior_norm = errno; }				/* if no error, done */
 return SCPE_OK;
 }
 
 t_stat ttcmdstate (void)
 {
 if (!isatty (fileno (stdin))) return SCPE_OK;		/* skip if !tty */
+if (!prior_norm) {					/* priority down? */
+	errno =	0;
+	nice (-10);					/* try to raise pri*/
+	prior_norm = (errno == 0); }			/* if no error, done */
 if (tcsetattr (0, TCSAFLUSH, &cmdtty) < 0) return SCPE_TTIERR;
 return SCPE_OK;
 }
@@ -750,4 +765,120 @@ sleep (sec);
 return;
 }
 
+#endif
+
+/* Long seek routines */
+
+#if defined (USE_INT64) && defined (USE_ADDR64)
+
+/* Alpha VMS */
+
+#if defined (__ALPHA) && defined (VMS)			/* Alpha VMS */
+#define _SIM_IO_FSEEK_EXT_	0
+
+static t_int64 fpos_t_to_int64 (fpos_t *pos)
+{
+unsigned short *w = (unsigned short *) pos;		/* endian dep! */
+t_int64 result;
+
+result = w[1];
+result <<= 16;
+result += w[0];
+result <<= 9;
+result += w[2];
+return result;
+}
+
+static void int64_to_fpos_t (t_int64 ipos, fpos_t *pos, size_t mbc)
+{
+unsigned short *w = (unsigned short *) pos;
+int bufsize = mbc << 9;
+
+w[3] = 0;
+w[2] = (unsigned short) (ipos % bufsize);
+ipos -= w[2];
+ipos >>= 9;
+w[0] = (unsigned short) ipos;
+ipos >>= 16;
+w[1] = (unsigned short) ipos;
+if ((w[2] == 0) && (w[0] || w[1])) {
+	w[2] = bufsize;
+	w[0] -= mbc;  }
+}
+
+int fseek_ext (FILE *st, t_addr offset, int whence)
+{
+t_addr fileaddr;
+fpos_t filepos;
+
+switch (whence) {
+	case SEEK_SET:
+	    fileaddr = offset;
+	    break;
+	case SEEK_CUR:
+	    if (fgetpos (st, &filepos)) return (-1);
+	    fileaddr = fpos_t_to_int64 (&filepos);
+	    fileaddr = fileaddr + offset;
+	    break;
+	default:
+	    errno = EINVAL;
+	    return (-1);  }
+int64_to_fpos_t (fileaddr, &filepos, 127);
+return fsetpos (st, &filepos);
+}
+
+#endif
+
+/* Alpha UNIX - natively 64b */
+
+#if defined (__ALPHA) && defined (__unix__)		/* Alpha UNIX */
+#define _SIM_IO_FSEEK_EXT_	0
+
+int fseek_ext (FILE *st, t_addr offset, int whence)
+{
+return fseek (st, offset, whence);
+}
+
+#endif
+
+/* Windows */
+
+#if defined (_WIN32)
+#define _SIM_IO_FSEEK_EXT_	0
+
+int fseek_ext (FILE *st, t_addr offset, int whence)
+{
+fpos_t fileaddr;
+
+switch (whence) {
+	case SEEK_SET:
+	    fileaddr = offset;
+	    break;
+	case SEEK_CUR:
+	    if (fgetpos (st, &fileaddr)) return (-1);
+	    fileaddr = fileaddr + offset;
+	    break;
+	default:
+	    errno = EINVAL;
+	    return (-1);  }
+return fsetpos (st, &fileaddr);
+}
+
+#endif							/* end Windows */
+
+#endif							/* end 64b seek defs */
+
+/* Default: no OS-specific routine has been defined */
+
+#if !defined (_SIM_IO_FSEEK_EXT_)
+#define _SIM_IO_FSEEK_EXT_	0
+
+int fseek_ext (FILE *st, t_addr xpos, int origin)
+{
+return fseek (st, (int32) xpos, origin);
+}
+
+uint32 sim_taddr_64 = 0;
+#else
+uint32 sim_taddr_64 = 1;
 #endif
