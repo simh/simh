@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   31-Jan-03	RMS	Added support for RB09
    05-Oct-02	RMS	Added variable device number support
    25-Jul-02	RMS	Added PDP-4 DECtape support
    10-Feb-02	RMS	Added PDP-7 DECtape IOT's
@@ -48,10 +49,24 @@ extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
 extern UNIT tti_unit, tto_unit;
 extern DEVICE clk_dev;
-extern DEVICE lpt_dev;
+#if defined (TYPE62)
+extern DEVICE lp62_dev;
+#endif
+#if defined (TYPE647)
+extern DEVICE lp647_dev;
+#endif
+#if defined (LP09)
+extern DEVICE lp09_dev;
+#endif
+#if defined (LP15)
+extern DEVICE lp15_dev;
+#endif
 extern DEVICE dt_dev;
 #if defined (DRM)
 extern DEVICE drm_dev;
+#endif
+#if defined (RB)
+extern DEVICE rb_dev;
 #endif
 #if defined (RF)
 extern DEVICE rf_dev;
@@ -97,11 +112,28 @@ REG *sim_PC = &cpu_reg[0];
 int32 sim_emax = 3;
 
 DEVICE *sim_devices[] = { &cpu_dev,
-	&ptr_dev, &ptp_dev,
-	&tti_dev, &tto_dev,
-	&clk_dev, &lpt_dev,
+	&ptr_dev,
+	&ptp_dev,
+	&tti_dev,
+	&tto_dev,
+	&clk_dev,
+#if defined (TYPE62)
+	&lp62_dev,
+#endif
+#if defined (TYPE647)
+	&lp647_dev,
+#endif
+#if defined (LP09)
+	&lp09_dev,
+#endif
+#if defined (LP15)
+	&lp15_dev,
+#endif
 #if defined (DRM)
 	&drm_dev,
+#endif
+#if defined (RB)
+	&rb_dev,
 #endif
 #if defined (RF)
 	&rf_dev,
@@ -321,15 +353,21 @@ static const char *opcode[] = {
  "PSF", "PCF", "PSA", "PSB", "PLS",
  "KSF", "KRB", "KCF", "IORS", "IOOS",
  "TSF", "TCF", "TPC", "TLS",
-#if defined (TYPE62)					/* PDP-4 LPT */
+#if defined (TYPE62)					/* Type 62 */
  "LPSF", "LPCF", "LPLD", "LPSE",
  "LSSF", "LSCF", "LSPR",
-#elif defined (TYPE647)					/* PDP-7, PDP-9 LPT */
+#endif
+#if defined (TYPE647)					/* Type 647 */
  "LPSF", "LPCB", "LPCD", "LPCD", "LPCD",
  "LPL2", "LPLD", "LPL1",
  "LPEF", "LPCF", "LPCF", "LPCF", "LPCF",
  "LPPB", "LPLS", "LPPS",
-#elif defined (LP15)					/* PDP-15 LPT */
+#endif
+#if defined (LP09)
+ "LSDF", "LSEF", "LSCF", "LPLD",
+ "LIOF", "LION",
+#endif
+#if defined (LP15)					/* LP15 */
  "LPSF", "LPPM", "LPP1", "LPDI",
  "LPRS", "LPOS", "LPEI", "LPCD", "LPCF",
 #endif
@@ -338,6 +376,11 @@ static const char *opcode[] = {
  "DRSF", "DRSN", "DRCF",
  "DRLCRD", "DRLCWR", "DRLBLK", "DRCONT",
  "DRSF", "DRSOK", "DRCF",
+#endif
+#if defined (RB)					/* RB09 */
+ "DBCF", "DBRD", "DBLD",
+ "DBSF", "DBRS", "DBLW",
+ "DBCS", "DBLM", "DBLS",
 #endif
 #if defined (RF)					/* RF09 */
  "DSSF", "DSCC", "DSCF",
@@ -478,12 +521,18 @@ static const int32 opc_val[] = {
 #if defined (TYPE62)
  0706501+I_NPI, 0706502+I_NPI, 0706542+I_NPI, 0706506+I_NPI,
  0706601+I_NPI, 0706602+I_NPI, 0706606+I_NPI,
-#elif defined (TYPE647)
+#endif
+#if defined (TYPE647)
  0706501+I_NPI, 0706502+I_NPI, 0706522+I_NPI, 0706542+I_NPI, 0706562+I_NPI,
  0706526+I_NPI, 0706546+I_NPI, 0706566+I_NPI,
  0706601+I_NPI, 0706602+I_NPI, 0706622+I_NPI, 0706642+I_NPI, 0706662+I_NPI, 
  0706606+I_NPI, 0706626+I_NPI, 0706646+I_NPI,
-#elif defined (LP15)
+#endif
+#if defined (LP09)
+ 0706601+I_NPI, 0706621+I_NPI, 0706602+I_NPI, 0706622+I_NPI,
+ 0706604+I_NPI, 0706644+I_NPI,
+#endif
+#if defined (LP15)
  0706501+I_NPI, 0706521+I_NPI, 0706541+I_NPI, 0706561+I_NPI,
  0706552+I_NPN, 0706542+I_NPI, 0706544+I_NPI, 0706621+I_NPI, 0706641+I_NPI,
 #endif
@@ -492,6 +541,11 @@ static const int32 opc_val[] = {
  0706101+I_NPI, 0706201+I_NPI, 0706102+I_NPI,
  0706006+I_NPI, 0706046+I_NPI, 0706106+I_NPI, 0706204+I_NPI,
  0706101+I_NPI, 0706201+I_NPI, 0706102+I_NPI,
+#endif
+#if defined (RB)
+ 0707101+I_NPI, 0707112+I_NPN, 0707104+I_NPI,
+ 0707121+I_NPI, 0707132+I_NPN, 0707124+I_NPI,
+ 0707141+I_NPI, 0707142+I_NPI, 0707144+I_NPI,
 #endif
 #if defined (RF)
  0707001+I_NPI, 0707021+I_NPI, 0707041+I_NPI,

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V2.10-2
-Date:	15-Jan-2003
+Subj:	Simulator Usage, V2.10-3
+Date:	15-Feb-2003
 
 			COPYRIGHT NOTICE
 
@@ -490,13 +490,15 @@ breakpoints of different types, identified by letter (for example, E
 for execution, R for read, W for write, etc).  At the moment, most
 simulators support only E (execution) breakpoints.
 
-Associated with a breakpoint is a count.  Each time the breakpoint
-is sprung, the associated count is decremented.  If the count is less
-than or equal to 0, the breakpoint occurs; otherwise, it is deferred.
+Associated with a breakpoint is a count and, optionally, an action.
+Each time the breakpoint is sprung, the associated count is decremented.
+If the count is less than or equal to 0, the breakpoint occurs; otherwise,
+it is deferred.  When the breakpoint occurs, the optional action is
+automatically executed
 
 A breakpoint is set by the BREAK command:
 
-	sim> BREAK {-types} <addr range>{[count]},{addr range...}
+	sim> BREAK {-types} <addr range>{[count]},{addr range...}{;action}
 
 If no type is specified, the simulator-specific default breakpoint
 type (usually E for execution) is used.  As with EXAMINE and DEPOSIT,
@@ -506,6 +508,9 @@ or a relative range of address/length.  Examples of BREAK:
 	sim> break -e 200		-- set E break at 200
 	sim> break 2000/2[2]		-- set E breaks at 2000,2001
 					   with count = 2
+	sim> break 100;ex ac		-- set E break at 100 with
+					   action EX AC
+	sim> break 100;			-- delete action on break at 100
 
 Currently set breakpoints can be displayed with the SHOW BREAK command:
 
@@ -800,7 +805,9 @@ Rev 2.10, Nov, 02
 		Added PDP-11/VAX autoconfiguration support
 		Added PDP-10/PDP-11/VAX variable vector support
 		Added PDP-1 DECtape
+		Added PDP-1, PDP-4 Type 24 serial drum support
 		Added PDP-8 RX28 support
+		Added PDP-9 RB09 fixed head disk, LP09 line printer
 		Added HP2100 12845A line printer
 		Added HP2100 13183 magtape support
 		Added HP2100 boot ROM support

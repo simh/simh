@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   19-Jan-03	RMS	Changed mode definitions for Apple Dev Kit conflict
    11-Nov-02	RMS	Changed log definitions to be VAX compatible
    10-Oct-02	RMS	Added vector information to DIB
 			Changed DZ11 vector to Unibus standard
@@ -71,10 +72,10 @@
 
 /* Protection modes */
 
-#define KERNEL		0
-#define SUPER		1
-#define UNUSED		2
-#define USER		3
+#define MD_KER		0
+#define MD_SUP		1
+#define MD_UND		2
+#define MD_USR		3
 
 /* I/O access modes */
 

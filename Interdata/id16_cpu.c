@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Feb-03	RMS	Fixed bug in SETM, SETMR (found by Mark Pizzolato)
+
    The register state for the Interdata 16b CPU is:
 
    R[0:F]<0:15>		general registers
@@ -1158,7 +1160,7 @@ case 0x53:						/* SETM - RXH */
 	    break;  }
 	t = (t & ~PSW_MAP) | (map << PSW_V_MAP);	/* insert map */
 	newPSW (t);					/* load new PSW */
-	CC_GL_16 (rslt);				/* set G,L */
+	CC_GL_16 (R[r1]);				/* set G,L */
 	break;
 
 /* I/O instructions */

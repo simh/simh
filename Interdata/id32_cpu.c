@@ -1987,6 +1987,8 @@ IOWriteB (addr, val & 0xFF);
 return SCPE_OK;
 }
 
+/* Change memory size */
+
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 uint32 mc = 0;

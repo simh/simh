@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Nova Simulator Usage
-Date:	15-Nov-2002
+Date:	1-Feb-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -382,6 +382,22 @@ The second terminal output implements these registers:
 	TIME		24	time from I/O initiation to interrupt
 
 2.3 Fixed Head Disk (DK)
+
+Fixed head disk options include the ability to set the number of platters
+to a fixed value between 1 and 8, or to autosize the number of platters
+from the attached file:
+
+	SET RF 1P		one platter (256K)
+	SET RF 2P		two platters (512K)
+	SET RF 3P		three platters (768K)
+	SET RF 4P		four platters (1024K)
+	SET RF 5P		five platters (1280K)
+	SET RF 6P		six platters (1536K)
+	SET RF 7P		seven platters (1792K)
+	SET RF 8P		eight platters (2048K)
+	SET RF AUTOSIZE		autosized on attach
+
+The default is 8P (maximum size).
 
 The fixed head disk controller implements these registers:
 

@@ -1,6 +1,6 @@
 /* hp2100_cpu.c: HP 2100 CPU simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   02-Feb-03	RMS	Fixed last cycle bug in DMA output (found by Mike Gemeny)
    22-Nov-02	RMS	Added 21MX IOP support
    24-Oct-02	RMS	Fixed bugs in IOP and extended instructions
 			Fixed bugs in memory protection and DMS
@@ -2349,7 +2350,17 @@ if (IR & I_HC) { clrFLG (DMA0 + ch); }			/* HC option */
 return dat;
 }
 
-/* DMA cycle routine */
+/* DMA cycle routine
+
+   The last cycle (word count reaches 0) logic is quite tricky.
+   Input cases:
+   - CLC requested: issue CLC
+   Output cases:
+   - neither STC nor CLC requested: issue CLF
+   - CLC requested but not STC: issue CLC,C
+   - STC requested but not CLC: issue STC,C
+   - STC and CLC both requested: issue STC,C and CLC,C
+*/
 
 void dma_cycle (uint32 ch, uint32 map)
 {
@@ -2369,11 +2380,17 @@ if (dmac[ch].cw3) {					/* more to do? */
 	if (dmac[ch].cw1 & DMA1_STC)			/* if STC flag, */
 	    devdisp (dev, ioCTL, I_HC + dev, 0);	/* do STC,C dev */
 	else devdisp (dev, ioFLG, I_HC + dev, 0);  }	/* else CLF dev */
-else {	if (!inp) devdisp (dev, ioFLG, I_HC + dev, 0);	/* output? clr flag */
-	if (dmac[ch].cw1 & DMA1_CLC)			/* CLC at end? */
-	    devdisp (dev, ioCTL, I_CTL + dev, 0);	/* yes */
-	else if (!inp && (dmac[ch].cw1 & DMA1_STC))	/* STC && output? */
-	    devdisp (dev, ioCTL, I_HC + dev, 0);	/* STC,C */
+else {	if (inp) {					/* last cycle, input? */
+	    if (dmac[ch].cw1 & DMA1_CLC)		/* CLC at end? */
+		devdisp (dev, ioCTL, I_CTL + dev, 0);	/* yes */
+	    }						/* end input */
+	else {						/* output */
+	    devdisp (dev, ioFLG, I_HC + dev, 0);	/* clear flag */
+	    if (dmac[ch].cw1 & DMA1_STC)		/* if STC flag, */
+		devdisp (dev, ioCTL, dev, 0);		/* do STC dev */
+	    if (dmac[ch].cw1 & DMA1_CLC)		/* CLC at end? */
+	        devdisp (dev, ioCTL, I_CTL + dev, 0);	/* yes */
+	    }						/* end output */
 	setFLG (DMA0 + ch);				/* set DMA flg */
 	clrCMD (DMA0 + ch);  }				/* clr DMA cmd */
 return;

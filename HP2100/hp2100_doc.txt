@@ -75,7 +75,7 @@ PTR,PTP		12597A paper tape reader/punch
 TTY		12631C buffered terminal controller
 LPS		12653A printer controller with 2767 printer
 		12566B microcircuit interface for diagnostics
-LPT		12845A printer controller
+LPT		12845A printer controller with 2607 printer
 CLK		12539A/B/C time base generator
 MUXL,MUXU,MUXC	12920A terminal multiplexor
 DP		12557A disk controller with four 2871 drives

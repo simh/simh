@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Sample Software Packages
-Date:	15-Nov-2002
+Date:	15-Feb-2003
 
 This memorandum documents the sample software packages available to run
 with the SIMH simulators.  Many of these packages are available under
@@ -10,8 +10,8 @@ software.
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -354,6 +354,12 @@ development and execution capabilities.  To load and run ADSS/KM-15:
 	sim> ex pc
 	PC:	077646
 
+- Change the default line printer to be the LP09 rather than the Type
+  647 (PDP-9) or LP15 (PDP-15):
+
+	sim> set lpt disa
+	sim> set lp9 ena
+
 - Mount the Advanced Software System DECtape image on DECtape unit 0:
 
 	sim> attach dt adss15_32k.dtp
@@ -444,6 +450,36 @@ does not support the SIMH sockets library.
 	$
 
    and is now ready for commands.
+
+6.4 DOS-15
+
+DOS-15 was a more polished version of ADSS-15 using the RF15 or RP15
+as its system device.  To load and run DOS-15:
+
+- Load the DOS-15 paper tape bootstrap into upper memory:
+
+	sim> load rfsboot.rim 77637
+
+- Mount the DOS-15 RF disk image on the RF15:
+
+	sim> att rf dosv2a_4p.rf
+
+- Run the bootstrap:
+
+	sim> run
+
+- The RF disk will boot and print out
+
+DOS-15 V2A
+ ENTER DATE (MM/DD/YY) -
+
+  Enter the date (the year must be between 70 and 99).  DOS-15 will
+  print its prompt and is now ready for commands.  Recognized commands
+  include:
+
+	I	system information
+	S	system configuration
+	R	system device assignments
 
 
 7. IBM 1401 

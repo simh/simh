@@ -1,6 +1,6 @@
 /* hp2100_ipl.c: HP 2000 interprocessor link simulator
 
-   Copyright (c) 2002, Robert M Supnik
+   Copyright (c) 2002-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    ipli, iplo	12556B interprocessor link pair
+
+   31-Jan-03	RMS	Links are full duplex (found by Mike Gemeny)
 */
 
 #include "hp2100_defs.h"
@@ -33,19 +35,22 @@
 #define UNIT_V_DIAG	(UNIT_V_UF + 0)			/* diagnostic mode */
 #define UNIT_V_ACTV	(UNIT_V_UF + 1)			/* making connection */
 #define UNIT_V_ESTB	(UNIT_V_UF + 2)			/* connection established */
+#define UNIT_V_HOLD	(UNIT_V_UF + 3)			/* character holding */
 #define UNIT_DIAG	(1 << UNIT_V_DIAG)
 #define UNIT_ACTV	(1 << UNIT_V_ACTV)
 #define UNIT_ESTB	(1 << UNIT_V_ESTB)
+#define UNIT_HOLD	(1 << UNIT_V_HOLD)
+#define IBUF		buf				/* input buffer */
+#define OBUF		wait				/* output buffer */
 #define DSOCKET		u3				/* data socket */
 #define LSOCKET		u4				/* listening socket */
-#define HOLD		wait				/* holding byte */
-#define IPL_HOLD	0100000
 
 extern uint32 PC;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 extern FILE *sim_log;
 int32 ipl_ptime = 400;					/* polling interval */
 int32 ipl_stopioe = 0;					/* stop on error */
+int32 ipl_hold[2] = { 0 };				/* holding character */
 
 DEVICE ipli_dev, iplo_dev;
 int32 ipliio (int32 inst, int32 IR, int32 dat);
@@ -82,12 +87,13 @@ UNIT ipl_unit[] = {
 #define iplo_unit ipl_unit[1]
 
 REG ipli_reg[] = {
-	{ ORDATA (BUF, ipli_unit.buf, 16) },
+	{ ORDATA (IBUF, ipli_unit.IBUF, 16) },
+	{ ORDATA (OBUF, ipli_unit.OBUF, 16) },
 	{ FLDATA (CMD, ipli_dib.cmd, 0) },
 	{ FLDATA (CTL, ipli_dib.ctl, 0) },
 	{ FLDATA (FLG, ipli_dib.flg, 0) },
 	{ FLDATA (FBF, ipli_dib.fbf, 0) },
-	{ ORDATA (HOLD, ipli_unit.HOLD, 16) },
+	{ ORDATA (HOLD, ipl_hold[0], 8) },
 	{ DRDATA (TIME, ipl_ptime, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ipl_stopioe, 0) },
 	{ ORDATA (DEVNO, ipli_dib.devno, 6), REG_HRO },
@@ -117,12 +123,13 @@ DEVICE ipli_dev = {
 */
 
 REG iplo_reg[] = {
-	{ ORDATA (BUF, iplo_unit.buf, 16) },
+	{ ORDATA (IBUF, iplo_unit.IBUF, 16) },
+	{ ORDATA (OBUF, iplo_unit.OBUF, 16) },
 	{ FLDATA (CMD, iplo_dib.cmd, 0) },
 	{ FLDATA (CTL, iplo_dib.ctl, 0) },
 	{ FLDATA (FLG, iplo_dib.flg, 0) },
 	{ FLDATA (FBF, iplo_dib.fbf, 0) },
-	{ ORDATA (HOLD, iplo_unit.HOLD, 16) },
+	{ ORDATA (HOLD, ipl_hold[1], 8) },
 	{ DRDATA (TIME, ipl_ptime, 24), PV_LEFT },
 	{ ORDATA (DEVNO, iplo_dib.devno, 6), REG_HRO },
 	{ NULL }  };
@@ -164,13 +171,13 @@ case ioSFS:						/* skip flag set */
 	if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
 	return dat;
 case ioOTX:						/* output */
-	uptr->buf = dat;
+	uptr->OBUF = dat;
 	break;
 case ioLIX:						/* load */
-	dat = uptr->buf;				/* return val */
+	dat = uptr->IBUF;				/* return val */
 	break;
 case ioMIX:						/* merge */
-	dat = dat | uptr->buf;				/* get return data */
+	dat = dat | uptr->IBUF;				/* get return data */
 	break;
 case ioCTL:						/* control clear/set */
 	if (IR & I_CTL) {				/* CLC */
@@ -184,8 +191,8 @@ case ioCTL:						/* control clear/set */
 		    if (!ipl_check_conn (uptr))		/* not established? */
 			return STOP_NOCONN;		/* lose */
 		    uptr->flags = uptr->flags | UNIT_ESTB;  }
-		msg[0] = (uptr->buf >> 8) & 0377;
-		msg[1] = uptr->buf & 0377;
+		msg[0] = (uptr->OBUF >> 8) & 0377;
+		msg[1] = uptr->OBUF & 0377;
 		sta = sim_write_sock (uptr->DSOCKET, msg, 2);
 		if (sta == SOCKET_ERROR) {
 		    printf ("IPL: socket write error\n");
@@ -193,7 +200,7 @@ case ioCTL:						/* control clear/set */
 		sim_os_sleep (0);  }
 	    else if (uptr->flags & UNIT_DIAG) {		/* diagnostic mode? */
 		u = (uptr - ipl_unit) ^ 1;		/* find other device */
-		ipl_unit[u].buf = uptr->buf;		/* output to other */
+		ipl_unit[u].IBUF = uptr->OBUF;		/* output to other */
 		odev = ipl_dib[u].devno;		/* other device no */
 		setFLG (odev);  }			/* set other flag */
 	    else return SCPE_UNATT;  }			/* lose */
@@ -211,23 +218,25 @@ t_stat ipl_svc (UNIT *uptr)
 int32 u, nb, dev;
 int8 msg[2];
 
+u = uptr - ipl_unit;					/* get link number */
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;	/* not attached? */
 sim_activate (uptr, ipl_ptime);				/* reactivate */
 if ((uptr->flags & UNIT_ESTB) == 0) {			/* not established? */
 	if (!ipl_check_conn (uptr)) return SCPE_OK;	/* check for conn */
 	uptr->flags = uptr->flags | UNIT_ESTB;  }
-nb = sim_read_sock (uptr->DSOCKET, msg, uptr->HOLD? 1: 2);
+nb = sim_read_sock (uptr->DSOCKET, msg, ((uptr->flags & UNIT_HOLD)? 1: 2));
 if (nb < 0) {						/* connection closed? */
 	printf ("IPL: socket read error\n");
 	return SCPE_IOERR;  }
 if (nb == 0) return SCPE_OK;				/* no data? */
-if (uptr->HOLD) {					/* holdover byte? */
-	uptr->buf = ((uptr->HOLD & 0377) << 8) | (((int32) msg[0]) & 0377);
-	uptr->HOLD = 0;  }
-else if (nb == 1) uptr->HOLD = (((int32) msg[0]) & 0377) | IPL_HOLD;
-else uptr->buf = ((((int32) msg[0]) & 0377) << 8) |
+if (uptr->flags & UNIT_HOLD) {				/* holdover byte? */
+	uptr->IBUF = (ipl_hold[u] << 8) | (((int32) msg[0]) & 0377);
+	uptr->flags = uptr->flags & ~UNIT_HOLD;  }
+else if (nb == 1) {
+	ipl_hold[u] = ((int32) msg[0]) & 0377;
+	uptr->flags = uptr->flags | UNIT_HOLD;  }
+else uptr->IBUF = ((((int32) msg[0]) & 0377) << 8) |
 	(((int32) msg[1]) & 0377);
-u = uptr - ipl_unit;					/* get link number */
 dev = ipl_dib[u].devno;					/* get device number */
 clrCMD (dev);						/* clr cmd, set flag */
 setFLG (dev);
@@ -258,9 +267,10 @@ UNIT *uptr = dptr->units;
 hp_enbdis_pair (&ipli_dev, &iplo_dev);			/* make pair cons */
 dibp->cmd = dibp->ctl = 0;				/* clear cmd, ctl */
 dibp->flg = dibp->fbf = 1;				/* set flg, fbf */
-uptr->buf = uptr->HOLD = 0;
+uptr->IBUF = uptr->OBUF = 0;				/* clr buffers */
 if (uptr->flags & UNIT_ATT) sim_activate (uptr, ipl_ptime);
 else sim_cancel (uptr);					/* deactivate unit */
+uptr->flags = uptr->flags & ~UNIT_HOLD;
 return SCPE_OK;
 }
 
@@ -305,8 +315,8 @@ else {	if (ipa != 0) return SCPE_ARG;
 	uptr->flags = uptr->flags & ~UNIT_ACTV;
 	uptr->LSOCKET = newsock;
 	uptr->DSOCKET = 0;  }
-uptr->buf = uptr->HOLD = 0;
-uptr->flags = (uptr->flags | UNIT_ATT) & ~UNIT_ESTB;	/* no more errors */
+uptr->IBUF = uptr->OBUF = 0;
+uptr->flags = (uptr->flags | UNIT_ATT) & ~(UNIT_ESTB | UNIT_HOLD);
 tptr = malloc (strlen (cptr) + 1);			/* get string buf */
 if (tptr == NULL) {					/* no memory? */
 	ipl_detach (uptr);				/* close sockets */

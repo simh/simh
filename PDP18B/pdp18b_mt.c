@@ -1,6 +1,6 @@
 /* pdp18b_mt.c: 18b PDP magnetic tape simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    mt		(PDP-9) TC59 magtape
 		(PDP-15) TC59D magtape
 
+   02-Feb-03	RMS	Revised IOT decoding
    30-Oct-02	RMS	Revised BOT handling, added error record handling
    05-Oct-02	RMS	Added DIB, device number support
 			Revamped error recovery
@@ -192,35 +193,44 @@ DEVICE mt_dev = {
 
 int32 mt (int32 pulse, int32 AC)
 {
-int32 f;
+int32 f, sb;
 UNIT *uptr;
 
 uptr = mt_dev.units + GET_UNIT (mt_cu);			/* get unit */
 mt_updcsta (uptr, 0);					/* update status */
-if (pulse == 001)					/* MTTR */
-	return (!sim_is_active (uptr))? IOT_SKP + AC: AC;
-if (pulse == 021)					/* MTCR */
-	return (!mt_busy ())? IOT_SKP + AC: AC;
-if (pulse == 041)					/* MTSF */
-	return (mt_sta & (STA_ERR | STA_DON))? IOT_SKP + AC: AC;
-if (pulse == 002) return (mt_cu & 0777700);		/* MTRC */
-if (pulse == 042) return mt_sta;			/* MTRS */
-if ((pulse & 062) == 022) {				/* MTAF, MTLC */
-	if (!mt_busy ()) mt_cu = mt_sta = 0;		/* if not busy, clr */
-	mt_sta = mt_sta & ~(STA_ERR | STA_DON);  }	/* clear flags */
-if ((pulse & 064) == 024)				/* MTCM, MTLC  */
-	mt_cu = (mt_cu & 0770700) | (AC & 0777700);	/* load status */
-if (pulse == 004) {					/* MTGO */
-	f = GET_CMD (mt_cu);				/* get function */
-	if (mt_busy () || (sim_is_active (uptr)) ||
-	   (((f == FN_SPACER) || (f == FN_REWIND)) & (uptr->USTAT & STA_BOT)) ||
-	   (((f == FN_WRITE) || (f == FN_WREOF)) && (uptr->flags & UNIT_WPRT))
-	   || ((uptr->flags & UNIT_ATT) == 0) || (f == FN_NOP))
-	    mt_sta = mt_sta | STA_ILL;			/* illegal op flag */
-	else {
-	    if (f == FN_REWIND) uptr->USTAT = STA_REW;	/* rewind? */
-	    else mt_sta = uptr->USTAT = 0;		/* no, clear status */
-	    sim_activate (uptr, mt_time);  }  }		/* start io */
+sb = pulse & 060;					/* subop */
+if (pulse & 01) {
+	if ((sb == 000) && !sim_is_active (uptr))	/* MTTR */
+	    AC = IOT_SKP | AC;
+	else if ((sb == 020) && !mt_busy ())		/* MTCR */
+	    AC = IOT_SKP | AC;
+	else if ((sb == 040) && (mt_sta & (STA_ERR | STA_DON))) /* MTSF */
+	    AC = IOT_SKP | AC;
+	}
+if (pulse & 02) {
+	if (sb == 000) AC = AC | (mt_cu & 0777700);	/* MTRC */
+	else if (sb == 020) {				/* MTAF, MTLC */
+	    if (!mt_busy ()) mt_cu = mt_sta = 0;	/* if not busy, clr */
+	    mt_sta = mt_sta & ~(STA_ERR | STA_DON);  }	/* clear flags */
+	else if (sb == 040) AC = AC | mt_sta;		/* MTRS */
+	}
+if (pulse & 04) {
+	if (sb == 000) {				/* MTGO */
+	    f = GET_CMD (mt_cu);			/* get function */
+	    if (mt_busy () ||
+	        sim_is_active (uptr) ||
+		(f == FN_NOP) ||
+		(((f == FN_SPACER) || (f == FN_REWIND)) && (uptr->USTAT & STA_BOT)) ||
+		(((f == FN_WRITE) || (f == FN_WREOF)) && (uptr->flags & UNIT_WPRT)) ||
+		((uptr->flags & UNIT_ATT) == 0))
+		mt_sta = mt_sta | STA_ILL;		/* illegal op flag */
+	    else {
+		if (f == FN_REWIND) uptr->USTAT = STA_REW;	/* rewind? */
+	        else mt_sta = uptr->USTAT = 0;		/* no, clear status */
+	        sim_activate (uptr, mt_time);  }  }	/* start io */
+	if (sb == 020)					/* MTCM, MTLC  */
+	    mt_cu = (mt_cu & 0770700) | (AC & 0777700);	/* load status */
+	}
 mt_updcsta (mt_dev.units + GET_UNIT (mt_cu), 0);	/* update status */
 return AC;
 }
@@ -340,20 +350,22 @@ case FN_WREOF:
 
 case FN_SPACEF:						/* space forward */
 	do {
+	    M[MT_WC] = (M[MT_WC] + 1) & 0777777;	/* inc WC */
 	    if (mt_rdlntf (uptr, &tbc, &err)) break;	/* read rec lnt, err? */
 	    uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
 		(2 * sizeof (t_mtrlnt));  }
-	while ((M[MT_WC] = (M[MT_WC] + 1) & 0777777) != 0);
+	while (M[MT_WC] != 0);
 	break;
 
 case FN_SPACER:						/* space reverse */
 	do {
+	    M[MT_WC] = (M[MT_WC] + 1) & 0777777;	/* inc WC */
 	    if (pnu) pnu = 0;				/* pos not upd? */
 	    else {
 	    	if (mt_rdlntf (uptr, &tbc, &err)) break;
 		uptr->pos = uptr->pos - ((tbc + 1) & ~1) -
 		    (2 * sizeof (t_mtrlnt));  }  }
-	while ((M[MT_WC] = (M[MT_WC] + 1) & 0777777) != 0);
+	while (M[MT_WC] != 0);
 	break;  }					/* end case */
 
 mt_updcsta (uptr, STA_DON | (err? STA_PAR: 0));		/* set done */

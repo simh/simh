@@ -1,6 +1,6 @@
 /* pdp18b_rp.c: RP15/RP02 disk pack simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp		RP15/RP02 disk pack
 
+   06-Feb-03	RMS	Revised IOT decoding, fixed bug in initiation
    05-Oct-02	RMS	Added DIB, device number support
    06-Jan-02	RMS	Revised enable/disable support
    29-Nov-01	RMS	Added read only unit support
@@ -203,33 +204,41 @@ DEVICE rp_dev = {
 
 int32 rp63 (int32 pulse, int32 AC)
 {
+int32 sb = pulse & 060;					/* subopcode */
+
 rp_updsta (0, 0);
-if (pulse == 001)					/* DPSF */
-	return ((rp_sta & (STA_DON | STA_ERR)) || (rp_stb & STB_ATTN))?
-		IOT_SKP + AC: AC;
-if (pulse == 021)					/* DPSA */
-	return (rp_stb & STB_ATTN)? IOT_SKP + AC: AC;
-if (pulse == 041)					/* DPSJ */
-	return (rp_sta & STA_DON)? IOT_SKP + AC: AC;
-if (pulse == 061)					/* DPSE */
-	return (rp_sta & STA_ERR)? IOT_SKP + AC: AC;
-if (pulse == 002) return rp_sta;			/* DPOSA */
-if (pulse == 022) return rp_stb;			/* DPOSB */
-if (((pulse & 007) == 004) && rp_busy) {		/* busy? */
-	rp_updsta (0, STB_PGE);
-	return AC;  }
-if (pulse == 004) {					/* DPLA */
-	rp_da = AC;
-	if (GET_SECT (rp_da) >= RP_NUMSC) rp_updsta (STA_NXS, 0);
-	if (GET_SURF (rp_da) >= RP_NUMSF) rp_updsta (STA_NXF, 0);
-	if (GET_CYL (rp_da) >= RP_NUMCY) rp_updsta (STA_NXC, 0);  }
-if (pulse == 024) {					/* DPCS */
-	rp_sta = rp_sta & ~(STA_HNF | STA_DON);
-	rp_stb = rp_stb & ~(STB_FME | STB_WPE | STB_LON | STB_WCE |
-	    STB_TME | STB_PGE | STB_EOP);
-	rp_updsta (0, 0);  }
-if (pulse == 044) rp_ma = AC;				/* DPCA */
-if (pulse == 064) rp_wc = AC;				/* DPWC */
+if (pulse & 01) {
+	if ((sb == 000) &&				/* DPSF */
+	    ((rp_sta & (STA_DON | STA_ERR)) || (rp_stb & STB_ATTN)))
+	    AC = IOT_SKP | AC;
+	else if ((sb == 020) && (rp_stb & STB_ATTN))	/* DPSA */
+	    AC = IOT_SKP | AC;
+	else if ((sb == 040) && (rp_sta & STA_DON))	/* DPSJ */
+	    AC = IOT_SKP | AC;
+	else if ((sb == 060) && (rp_sta & STA_ERR))	/* DPSE */
+	    AC = IOT_SKP | AC;
+	}
+if (pulse & 02) {
+	if (sb == 000) AC = AC | rp_sta;		/* DPOSA */
+	else if (sb == 020) AC = AC | rp_stb;		/* DPOSB */
+	}
+if (pulse & 04) {
+	if (rp_busy) {					/* busy? */
+	    rp_updsta (0, STB_PGE);
+	    return AC;  }
+	else if (sb == 000) {				/* DPLA */
+	    rp_da = AC & 0777777;
+	    if (GET_SECT (rp_da) >= RP_NUMSC) rp_updsta (STA_NXS, 0);
+	    if (GET_SURF (rp_da) >= RP_NUMSF) rp_updsta (STA_NXF, 0);
+	    if (GET_CYL (rp_da) >= RP_NUMCY) rp_updsta (STA_NXC, 0);  }
+	else if (sb == 020) {				/* DPCS */
+	    rp_sta = rp_sta & ~(STA_HNF | STA_DON);
+	    rp_stb = rp_stb & ~(STB_FME | STB_WPE | STB_LON | STB_WCE |
+		STB_TME | STB_PGE | STB_EOP);
+	    rp_updsta (0, 0);  }
+	else if (sb == 040) rp_ma = AC & 0777777;	/* DPCA */
+	else if (sb == 060) rp_wc = AC & 0777777;	/* DPWC */
+	}
 return AC;
 }
 
@@ -237,38 +246,45 @@ return AC;
 
 int32 rp64 (int32 pulse, int32 AC)
 {
-int32 u, f, c;
+int32 u, f, c, sb;
 UNIT *uptr;
 
-if (pulse == 021) return IOT_SKP + AC;			/* DPSN */
-if (pulse == 002) return rp_unit[GET_UNIT (rp_sta)].CYL; /* DPOU */
-if (pulse == 022) return rp_da;				/* DPOA */
-if (pulse == 042) return rp_ma;				/* DPOC */
-if (pulse == 062) return rp_wc;				/* DPOW */
-if ((pulse & 007) != 004) return AC;
-if (rp_busy) {						/* busy? */
-	rp_updsta (0, STB_PGE);
-	return AC;  }
-if (pulse == 004) rp_sta = rp_sta & ~STA_RW;		/* DPCF */
-if (pulse == 024) rp_sta = rp_sta & (AC | ~STA_RW);	/* DPLZ */
-if (pulse == 044) rp_sta = rp_sta | (AC & STA_RW);	/* DPLO */
-if (pulse == 064) rp_sta = (rp_sta & ~STA_RW) | (AC & STA_RW); /* DPLF */
-if (rp_sta & STA_GO) {
+sb = pulse & 060;
+if (pulse & 01) {
+	if (sb == 020) AC = IOT_SKP | AC;		/* DPSN */
+	}
+if (pulse & 02) {
+	if (sb == 000) AC = AC | rp_unit[GET_UNIT (rp_sta)].CYL; /* DPOU */
+	else if (sb == 020) AC = AC | rp_da;		/* DPOA */
+	else if (sb == 040) AC = AC | rp_ma;		/* DPOC */
+	else if (sb == 060) AC = AC | rp_wc;		/* DPOW */
+	}
+if (pulse & 04) {
+	if (rp_busy) {					/* busy? */
+	    rp_updsta (0, STB_PGE);
+	    return AC;  }
+	if (sb == 000) rp_sta = rp_sta & ~STA_RW;	/* DPCF */
+	else if (sb == 020) rp_sta = rp_sta & (AC | ~STA_RW);	/* DPLZ */
+	else if (sb == 040) rp_sta = rp_sta | (AC & STA_RW);	/* DPLO */
+	else if (sb == 060)				/* DPLF */
+	    rp_sta = (rp_sta & ~STA_RW) | (AC & STA_RW);
+	rp_sta = rp_sta & ~STA_DON;			/* clear done */
 	u = GET_UNIT (rp_sta);				/* get unit num */
 	uptr = rp_dev.units + u;			/* select unit */
-	if (sim_is_active (uptr)) return AC;		/* can't if busy */
-	f = uptr->FUNC = GET_FUNC (rp_sta);		/* get function */
-	rp_busy = 1;					/* set ctrl busy */
-	rp_sta = rp_sta & ~(STA_HNF | STA_DON);		/* clear flags */
-	rp_stb = rp_stb & ~(STB_FME | STB_WPE | STB_LON | STB_WCE |
-	    STB_TME | STB_PGE | STB_EOP | (1 << (STB_V_ATT0 - u)));
-	if (((uptr->flags & UNIT_ATT) == 0) || (f == FN_IDLE) ||
-	     (f == FN_SEEK) || (f == FN_RECAL))
-	    sim_activate (uptr, RP_MIN);		/* short delay */
-	else {
-	    c = GET_CYL (rp_da);
-	    c = abs (c - uptr->CYL) * rp_swait;		/* seek time */
-	    sim_activate (uptr, MAX (RP_MIN, c + rp_rwait));  }  }
+	if ((rp_sta & STA_GO) && !sim_is_active (uptr)) {
+	    f = uptr->FUNC = GET_FUNC (rp_sta);		/* get function */
+	    rp_busy = 1;				/* set ctrl busy */
+	    rp_sta = rp_sta & ~(STA_HNF | STA_DON);	/* clear flags */
+	    rp_stb = rp_stb & ~(STB_FME | STB_WPE | STB_LON | STB_WCE |
+		STB_TME | STB_PGE | STB_EOP | (1 << (STB_V_ATT0 - u)));
+	    if (((uptr->flags & UNIT_ATT) == 0) || (f == FN_IDLE) ||
+		(f == FN_SEEK) || (f == FN_RECAL))
+		sim_activate (uptr, RP_MIN);		/* short delay */
+	    else {
+		c = GET_CYL (rp_da);
+		c = abs (c - uptr->CYL) * rp_swait;	/* seek time */
+		sim_activate (uptr, MAX (RP_MIN, c + rp_rwait));  }  }
+	}
 rp_updsta (0, 0);
 return AC;
 }

@@ -1,6 +1,6 @@
 /* pdp8_df.c: DF32 fixed head disk simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    df		DF32 fixed head disk
 
+   02-Feb-03	RMS	Added variable platter and autosizing support
    04-Oct-02	RMS	Added DIBs, device number support
    28-Nov-01	RMS	Added RL8A support
    25-Apr-01	RMS	Added device enable/disable support
@@ -42,12 +43,17 @@
 #include "pdp8_defs.h"
 #include <math.h>
 
+#define UNIT_V_AUTO	(UNIT_V_UF + 0)			/* autosize */
+#define UNIT_V_MSIZE	(UNIT_V_UF + 1)			/* dummy mask */
+#define UNIT_AUTO	(1 << UNIT_V_AUTO)
+#define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+
 /* Constants */
 
 #define DF_NUMWD	2048				/* words/track */
 #define DF_NUMTR	16				/* tracks/disk */
+#define DF_DKSIZE	(DF_NUMTR * DF_NUMWD)		/* words/disk */
 #define DF_NUMDK	4				/* disks/controller */
-#define DF_SIZE		(DF_NUMDK * DF_NUMTR * DF_NUMWD) /* words/drive */
 #define DF_WC		07750				/* word count */
 #define DF_MA		07751				/* mem address */
 #define DF_WMASK	(DF_NUMWD - 1)			/* word mask */
@@ -65,8 +71,9 @@
 #define DFS_MEX		00070				/* mem addr extension */
 #define DFS_DRL		00004				/* data late error */
 #define DFS_WLS		00002				/* write lock error */
+#define DFS_NXD		00002				/* non-existent disk */
 #define DFS_PER		00001				/* parity error */
-#define DFS_ERR		(DFS_DRL + DFS_WLS + DFS_PER)
+#define DFS_ERR		(DFS_DRL | DFS_WLS | DFS_PER)
 #define DFS_V_DEX	6
 #define DFS_V_MEX	3
 
@@ -97,6 +104,8 @@ t_stat df_svc (UNIT *uptr);
 t_stat pcell_svc (UNIT *uptr);
 t_stat df_reset (DEVICE *dptr);
 t_stat df_boot (int32 unitno, DEVICE *dptr);
+t_stat df_attach (UNIT *uptr, char *cptr);
+t_stat df_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* DF32 data structures
 
@@ -110,7 +119,7 @@ DIB df_dib = { DEV_DF, 3, { &df60, &df61, &df62 } };
 
 UNIT df_unit =
 	{ UDATA (&df_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-	DF_SIZE) };
+	DF_NUMDK * DF_DKSIZE) };
 
 REG df_reg[] = {
 	{ ORDATA (STA, df_sta, 12) },
@@ -127,6 +136,10 @@ REG df_reg[] = {
 	{ NULL }  };
 
 MTAB df_mod[] = {
+	{ UNIT_MSIZE,  32768, NULL, "1P", &df_set_size },
+	{ UNIT_MSIZE,  65536, NULL, "2P", &df_set_size },
+	{ UNIT_MSIZE,  98304, NULL, "3P", &df_set_size },
+	{ UNIT_MSIZE, 131072, NULL, "4P", &df_set_size },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&set_dev, &show_dev, NULL },
 	{ 0 } };
@@ -135,7 +148,7 @@ DEVICE df_dev = {
 	"DF", &df_unit, df_reg, df_mod,
 	1, 8, 17, 1, 8, 12,
 	NULL, NULL, &df_reset,
-	&df_boot, NULL, NULL,
+	&df_boot, &df_attach, NULL,
 	&df_dib, DEV_DISABLE };
 
 /* IOT routines */
@@ -220,7 +233,10 @@ if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 
 mex = GET_MEX (df_sta);
 da = GET_DEX (df_sta) | df_da;				/* form disk addr */
-do {	M[DF_WC] = (M[DF_WC] + 1) & 07777;		/* incr word count */
+do {	if (da >= uptr->capac) {			/* nx disk addr? */
+	    df_sta = df_sta | DFS_NXD;
+	    break;  }
+	M[DF_WC] = (M[DF_WC] + 1) & 07777;		/* incr word count */
  	M[DF_MA] = (M[DF_MA] + 1) & 07777;		/* incr mem addr */
 	pa = mex | M[DF_MA]; 				/* add extension */
 	if (uptr->FUNC == DF_READ) {			/* read? */
@@ -235,7 +251,7 @@ do {	M[DF_WC] = (M[DF_WC] + 1) & 07777;		/* incr word count */
 	da = (da + 1) & 0377777;  }			/* incr disk addr */
 while ((M[DF_WC] != 0) && (df_burst != 0));		/* brk if wc, no brst */
 
-if (M[DF_WC] != 0)					/* more to do? */
+if ((M[DF_WC] != 0) && ((df_sta & DFS_ERR) == 0))	/* more to do? */
 	sim_activate (&df_unit, df_time);		/* sched next */
 else {	if (uptr->FUNC != DF_READ) da = (da - 1) & 0377777;
 	df_done = 1;					/* done */
@@ -293,5 +309,36 @@ if (sim_switches & SWMASK ('D')) {
 else {	for (i = 0; i < OS8_LEN; i++)
 	     M[OS8_START + i] = os8_rom[i];
 	saved_PC = OS8_START;  }
+return SCPE_OK;
+}
+
+
+t_stat df_attach (UNIT *uptr, char *cptr)
+{
+int32 p, d;
+int32 ds_bytes = DF_DKSIZE * sizeof (int16);
+
+if (uptr->flags & UNIT_AUTO) {
+	FILE *fp = fopen (cptr, "rb");
+	if (fp == NULL) return SCPE_OPENERR;
+	fseek (fp, 0, SEEK_END);
+	p = ftell (fp);
+	d = (p + ds_bytes - 1) / ds_bytes;
+	if (d == 0) d = 1;
+	if (d > DF_NUMDK) d = DF_NUMDK;
+	uptr->capac = d * DF_DKSIZE;
+	fclose (fp);  }
+return attach_unit (uptr, cptr);
+}
+
+/* Change disk size */
+
+t_stat df_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if ((val == 0) || (val > (DF_NUMDK * DF_DKSIZE)))
+	return SCPE_IERR;
+if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+uptr->capac = val;
+uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
 }

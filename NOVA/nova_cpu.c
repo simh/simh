@@ -1,6 +1,6 @@
 /* nova_cpu.c: NOVA CPU simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu		Nova central processor
 
+   19-Jan-03	RMS	Changed CMASK to CDMASK for Apple Dev Kit conflict
    03-Oct-02	RMS	Added DIB infrastructure
    30-Dec-01	RMS	Added old PC queue
    07-Dec-01	RMS	Revised to use breakpoint package
@@ -391,21 +392,21 @@ if (IR & I_OPR) {					/* operate? */
 	    src = src ^ DMASK;
 	    break;
 	case 1:						/* NEG */
-	    src = ((src ^ DMASK) + 1) & CMASK;
+	    src = ((src ^ DMASK) + 1) & CDMASK;
 	    break;
 	case 2:						/* MOV */
 	    break;
 	case 3:						/* INC */
-	    src = (src + 1) & CMASK;
+	    src = (src + 1) & CDMASK;
 	    break;
 	case 4:						/* ADC */
-	    src = ((src ^ DMASK) + AC[dstAC]) & CMASK;
+	    src = ((src ^ DMASK) + AC[dstAC]) & CDMASK;
 	    break;
 	case 5:						/* SUB */
-	    src = ((src ^ DMASK) + AC[dstAC] + 1) & CMASK;
+	    src = ((src ^ DMASK) + AC[dstAC] + 1) & CDMASK;
 	    break;
 	case 6:						/* ADD */
-	    src = (src + AC[dstAC]) & CMASK;
+	    src = (src + AC[dstAC]) & CDMASK;
 	    break;
 	case 7:						/* AND */
 	    src = src & (AC[dstAC] | CBIT);
@@ -417,10 +418,10 @@ if (IR & I_OPR) {					/* operate? */
 	case 0:						/* nop */
 	    break;
 	case 1:						/* L */
-	    src = ((src << 1) | (src >> 16)) & CMASK;
+	    src = ((src << 1) | (src >> 16)) & CDMASK;
 	    break;
 	case 2:						/* R */
-	    src = ((src >> 1) | (src << 16)) & CMASK;
+	    src = ((src >> 1) | (src << 16)) & CDMASK;
 	    break;
 	case 3:						/* S */
 	    src = ((src & 0377) << 8) | ((src >> 8) & 0377) |

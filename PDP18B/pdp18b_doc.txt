@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	18b PDP Simulator Usage
-Date:	15-Nov-2002
+Date:	01-Feb-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -61,6 +61,7 @@ sim/pdp18b/	pdp18b_defs.h
 		pdp18b_dt.c
 		pdp18b_lp.c
 		pdp18b_mt.c
+		pdp18b_rb.c
 		pdp18b_rf.c
 		pdp18b_rp.c
 		pdp18b_stddev.c
@@ -102,8 +103,10 @@ PDP-9	CPU		PDP-9 CPU with 32KW of memory
 	PTR,PTP		PC09A paper tape reader/punch
 	TTI,TTO		KSR 33 console terminal
 	TTI1,TTO1	LT09A second console terminal
+	LP9		LP09 line printer
 	LPT		Type 647E line printer
 	CLK		integral real-time clock
+	RB		RB09 fixed-head disk
 	RF		RF09/RS09 fixed-head disk
 	DT		TC02/TU55 DECtape
 	MT		TC59/TU10 magnetic tape
@@ -116,6 +119,7 @@ PDP-15	CPU		PDP-15 CPU with 32KW of memory
 	PTR,PTP		PC15 paper tape reader/punch
 	TTI,TTO		KSR 35 console terminal
 	TTI1,TTO1	LT15 second console terminal
+	LP9		LP09 line printer
 	LPT		LP15 line printer
 	CLK		integral real-time clock
 	RP		RP15/RP02 disk pack
@@ -239,9 +243,8 @@ BOOT -F PTR copies the funny format binary loader into memory and starts
 it running.
 
 The PTR ATTACH command recognizes one switch, -A for ASCII mode.  In
-ASCII mode, data returned by the read alphabetic command has the high
-order bit automatically set to 1.  This allows normal text files to be
-used as input to the paper tape reader.
+ASCII mode, data returned by the read alphabetic command has even parity.
+This allows normal text files to be used as input to the paper tape reader.
 
 The paper tape reader implements these registers:
 
@@ -337,13 +340,19 @@ implements these registers:
 	POS		32	number of chararacters output
 	TIME		24	time from I/O initiation to interrupt
 
-2.2.5 Line Printer (LPT)
+2.2.5 Line Printers (LPT, LP9)
 
-The line printer (LPT) writes data to a disk file.  The POS register
-specifies the number of the next data item to be written.  Thus,
-by changing POS, the user can backspace or advance the printer.
+The line printers (LPT, LP9) write data to a disk file.  The POS
+register specifies the number of the next data item to be written.
+Thus, by changing POS, the user can backspace or advance the printer.
 
-The PDP-4 uses a Type 62 printer controller, with these registers:
+LPT is the "default" line printer for a CPU: Type 62 for the PDP-4,
+Type 647 for the PDP-7 and PDP-9, and LP15 for the PDP-15.  LP9 is
+the LP09 line printer controller for the PDP-9.  It may be needed
+on the PDP-15 to run certain software packages.  LP9 is disabled by
+default.
+
+The Type 62 printer controller implements these registers:
 
 	name		size	comments
 
@@ -357,8 +366,7 @@ The PDP-4 uses a Type 62 printer controller, with these registers:
 	STOP_IOE	1	stop on I/O error
 	LBUF[0:119]	8	line buffer
 
-The PDP-7 and PDP-9 use a Type 647 printer controller, with these
-registers:
+The Type 647 printer controller implements these registers:
 
 	name		size	comments
 
@@ -373,7 +381,19 @@ registers:
 	STOP_IOE	1	stop on I/O error
 	LBUF[0:119]	8	line buffer
 
-The PDP-15 uses an LP15 printer controller, with these registers:
+The LP09 printer controller implements these registers:
+
+	name		size	comments
+
+	BUF		7	output character
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable
+	ERR		1	error flag
+	POS		32	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+
+The LP15 printer controller implements these registers:
 
 	name		size	comments
 
@@ -388,7 +408,7 @@ The PDP-15 uses an LP15 printer controller, with these registers:
 	STOP_IOE	1	stop on I/O error
 	LBUF[0:131]	8	line buffer
 
-For all three models, error handling is as follows:
+For all printers, error handling is as follows:
 
 	error	     STOP_IOE	processed as
 
@@ -519,7 +539,57 @@ Error handling is as follows:
 Drum data files are buffered in memory; therefore, end of file and OS
 I/O errors cannot occur.
 
+2.5 RB09 Fixed Head Disk (RB)
+
+The RB09 was an early fixed-head disk for the PDP-9.  It was superceded
+by the RF09/RS09.  It is disabled by default.
+
+The RB09 implements these registers:
+
+	name		size	comments
+
+	STA		18	status
+	DA		20	current disk address
+	WC		16	word count
+	MA		15	memory address
+	INT		1	interrupt pending flag
+	WLK		20	write lock switches for track groups,
+				10 tracks per group
+	TIME		24	rotational delay, per word
+	BURST		1	burst flag
+	STOP_IOE	1	stop on I/O error
+
+The RB09 is a data break device.  If BURST = 0, word transfers are
+scheduled individually; if BURST = 1, the entire transfer occurs in
+a single data break.
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RB09 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
 2.5 RF09/RF15/RS09 Fixed Head Disk (RF)
+
+RF09/RF15 options include the ability to set the number of platters
+to a fixed value between 1 and 8, or to autosize the number of platters
+from the attached file:
+
+	SET RF 1P		one platter (256K)
+	SET RF 2P		two platters (512K)
+	SET RF 3P		three platters (768K)
+	SET RF 4P		four platters (1024K)
+	SET RF 5P		five platters (1280K)
+	SET RF 6P		six platters (1536K)
+	SET RF 7P		seven platters (1792K)
+	SET RF 8P		eight platters (2048K)
+	SET RF AUTOSIZE		autosized on attach
+
+The default is AUTOSIZE.
 
 The RF09/RF15 implements these registers:
 
@@ -527,8 +597,8 @@ The RF09/RF15 implements these registers:
 
 	STA		18	status
 	DA		21	current disk address
-	MA		18	memory address (in memory)
 	WC		18	word count (in memory)
+	CA		18	memory address (in memory)
 	BUF		18	data buffer (diagnostic only)
 	INT		1	interrupt pending flag
 	WLK[0:7]	16	write lock switches for disks 0-7
@@ -627,7 +697,7 @@ The magnetic tape controller implements these registers:
 
 	CMD		18	command
 	STA		18	main status
-	MA		18	memory address (in memory)
+	CA		18	memory address (in memory)
 	WC		18	word count (in memory)
 	INT		1	interrupt pending flag
 	STOP_IOE	1	stop on I/O error

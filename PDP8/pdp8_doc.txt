@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-8 Simulator Usage
-Date:	15-Nov-2002
+Date:	1-Feb-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -76,8 +76,8 @@ TTIX,TTOX	KL8JA additional terminals
 LPT		LE8E line printer
 CLK		DK8E line frequency clock (also PDP-8/A compatible)
 RK		RK8E/RK05 cartridge disk controller with four drives
-RF		RF08/RS08 fixed head disk controller with four platters, or
-DF		DF32/DS32 fixed head disk controller with four platters
+RF		RF08/RS08 fixed head disk controller with 1-4 platters, or
+DF		DF32/DS32 fixed head disk controller with 1-4 platters
 RL		RL8A/RL01 cartridge disk controller with four drives
 RX		RX8E/RX01, RX28/RX02 floppy disk controller with two drives
 DT		TC08/TU56 DECtape controller with eight drives
@@ -506,6 +506,18 @@ not both, with default device addressing.
 
 2.5.1 RF08/RS08 Fixed Head Disk (RF)
 
+RF08 options include the ability to set the number of platters to a
+fixed value between 1 and 4, or to autosize the number of platters
+from the attached file:
+
+	SET RF 1P		one platter (256K)
+	SET RF 2P		two platters (512K)
+	SET RF 3P		three platters (768K)
+	SET RF 4P		four platters (1024K)
+	SET RF AUTOSIZE		autosized on attach
+
+The default is four platters.
+
 The RF08 implements these registers:
 
 	name		size	comments
@@ -539,6 +551,18 @@ RF08 data files are buffered in memory; therefore, end of file and OS
 I/O errors cannot occur.
 
 2.5.2 DF32/DS32 Fixed Head Disk (RF)
+
+DF32 options include the ability to set the number of platters to a
+fixed value between 1 and 4, or to autosize the number of platters
+from the attached file:
+
+	SET DF 1P		one platter (32K)
+	SET DF 2P		two platters (64K)
+	SET DF 3P		three platters (98K)
+	SET DF 4P		four platters (128K)
+	SET DF AUTOSIZE		autosized on attach
+
+The default is four platters.
 
 The DF32 implements these registers:
 

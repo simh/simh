@@ -1,6 +1,6 @@
 /* pdp11_fp.c: PDP-11 floating point simulator (32b version)
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Jan-03	RMS	Changed mode definitions for Apple Dev Kit conflict
    08-Oct-02	RMS	Fixed macro definitions
    05-Jun-98	RMS	Fixed implementation specific shift bugs
    20-Apr-98	RMS	Fixed bug in MODf integer truncation
@@ -516,14 +517,14 @@ case 3:							/* @(R)+ */
 case 4:							/* -(R) */
 	adr = R[reg] = (R[reg] - len) & 0177777;
 	if (update_MM) MMR1 = (((-len) & 037) << 3) | reg;
-	if ((adr < STKLIM) && (reg == 6) && (cm == KERNEL)) {
+	if ((adr < STKLIM) && (reg == 6) && (cm == MD_KER)) {
 	    setTRAP (TRAP_YEL);
 	    setCPUERR (CPUE_YEL);  }
 	return (adr | ds);
 case 5:							/* @-(R) */
 	adr = R[reg] = (R[reg] - 2) & 0177777;
 	if (update_MM) MMR1 = 0360 | reg;
-	if ((adr < STKLIM) && (reg == 6) && (cm == KERNEL)) {
+	if ((adr < STKLIM) && (reg == 6) && (cm == MD_KER)) {
 	    setTRAP (TRAP_YEL);
 	    setCPUERR (CPUE_YEL);  }
 	adr = ReadW (adr | ds);

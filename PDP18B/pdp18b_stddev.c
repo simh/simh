@@ -433,8 +433,13 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {		/* end of file? */
 	else perror ("PTR I/O error");
 	clearerr (ptr_unit.fileref);
 	return SCPE_IOERR;  }
-if (ptr_state == 0) ptr_unit.buf = (temp |		/* alpha */
-	((ptr_unit.flags & UNIT_RASCII)? 0200: 0)) & 0377;
+if (ptr_state == 0) {					/* ASCII */
+	if (ptr_unit.flags & UNIT_RASCII) {		/* want parity? */
+	    ptr_unit.buf = temp = temp & 0177;		/* parity off */
+	    while (temp = temp & (temp - 1))
+		ptr_unit.buf = ptr_unit.buf ^ 0200;	/* count bits */
+	    ptr_unit.buf = ptr_unit.buf ^ 0200;  }	/* set even parity */
+	else ptr_unit.buf = temp & 0377;  }
 else if (temp & 0200) {					/* binary */
 	ptr_state = ptr_state - 6;
 	ptr_unit.buf = ptr_unit.buf | ((temp & 077) << ptr_state);  }

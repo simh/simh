@@ -1,6 +1,6 @@
 /* nova_defs.h: NOVA/Eclipse simulator definitions 
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Jan-03	RMS	Changed CMASK to CDMASK for Apple Dev kit conflict
    03-Oct-02	RMS	Added device information structure
    22-Dec-00	RMS	Added Bruce Ray's second terminal support
    10-Dec-00	RMS	Added Charles Owen's Eclipse support
@@ -67,7 +68,7 @@
 #define SIGN		0100000				/* sign */
 #define DMASK		0177777				/* data mask */
 #define CBIT		(DMASK + 1)			/* carry bit */
-#define CMASK		(CBIT | DMASK)			/* carry + data */
+#define CDMASK		(CBIT | DMASK)			/* carry + data */
 
 /* Reserved memory locations */
 

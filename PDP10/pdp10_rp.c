@@ -339,7 +339,7 @@ int32 rpiff = 0;					/* INTR flip/flop */
 int32 rp_stopioe = 1;					/* stop on error */
 int32 rp_swait = 10;					/* seek time */
 int32 rp_rwait = 10;					/* rotate time */
-int reg_in_drive[32] = {
+static int32 reg_in_drive[32] = {
  0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1,
  1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -972,7 +972,7 @@ return SCPE_OK;
 
 t_stat rp_attach (UNIT *uptr, char *cptr)
 {
-int drv, i, p;
+int32 drv, i, p;
 t_stat r;
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;

@@ -1,6 +1,6 @@
 /* pdp18b_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   04-Feb-03	RMS	Added RB09, LP09 support
    22-Nov-02	RMS	Added PDP-4 drum support
    05-Oct-02	RMS	Added DIB structure
    25-Jul-02	RMS	Added PDP-4 DECtape support
@@ -66,7 +67,9 @@
 	   	KF09A auto pri intr	PC09A paper tape reader and punch
 		KG09B mem extension	integral real time clock
 		KP09A power detection	Type 647D/E line printer (sixbit)
-		KX09A mem protection	RF09/RS09 fixed head disk
+		KX09A mem protection	LP09 line printer (ASCII)
+					RF09/RS09 fixed head disk
+					RB09 fixed head disk
 					TC59 magnetic tape
 					TC02/TU55 DECtape
 					LT09A second Teletype
@@ -74,8 +77,9 @@
    PDP15  128K	KE15 EAE		KSR-35 Teletype
 		KA15 auto pri intr	PC15 paper tape reader and punch
 		KF15 power detection	KW15 real time clock
-		KM15 mem protection	LP15 line printer
-		??KT15 mem relocation	RP15 disk pack
+		KM15 mem protection	LP09 line printer
+		??KT15 mem relocation	LP15 line printer
+					RP15 disk pack
 					RF15/RF09 fixed head disk
 					TC59D magnetic tape
 					TC15/TU56 DECtape
@@ -114,6 +118,8 @@
 #elif defined (PDP9)
 #define ADDRSIZE	15
 #define TYPE647		0				/* sixbit printer */
+#define LP09		0				/* ASCII printer */
+#define RB		0				/* fixed head disk */
 #define RF		0				/* fixed head disk */
 #define MTA		0				/* magtape */
 #define TC02		0				/* DECtape */
@@ -121,7 +127,8 @@
 #define BRMASK		0076000				/* bounds mask */
 #elif defined (PDP15)
 #define ADDRSIZE	17
-#define LP15		0				/* ASCII printer */
+#define LP09		0				/* ASCII printer */
+#define LP15		0				/* DMA printer */
 #define RF		0				/* fixed head disk */
 #define RP		0				/* disk pack */
 #define MTA		0				/* magtape */
@@ -184,6 +191,7 @@ typedef struct pdp18b_dib DIB;
 #define DEV_RP		063				/* RP15 */
 #define DEV_LPT		065				/* line printer */
 #define DEV_RF		070				/* RF09 */
+#define DEV_RB		071				/* RB09 */
 #define DEV_MT		073				/* magtape */
 #define DEV_DTA		075				/* dectape */
 
@@ -203,7 +211,7 @@ typedef struct pdp18b_dib DIB;
 	04	TC02/TC15		1
 	05	TC59D			1
 	06	drum			1	PDP-9 only
-	07	disk			1	PDP-9 only
+	07	RB09			1	PDP-9 only
 	10	paper tape reader	2
 	11	real time clock		3
 	12	power fail		0
@@ -250,22 +258,26 @@ typedef struct pdp18b_dib DIB;
 #define INT_V_DRM	2				/* drum */
 #define INT_V_RF	3				/* fixed head disk */
 #define INT_V_RP	4				/* disk pack */
+#define INT_V_RB	5				/* RB disk */
 
 #define INT_DTA		(1 << INT_V_DTA)
 #define INT_MTA		(1 << INT_V_MTA)
 #define INT_DRM		(1 << INT_V_DRM)
 #define INT_RF		(1 << INT_V_RF)
 #define INT_RP		(1 << INT_V_RP)
+#define INT_RB		(1 << INT_V_RB)
 
 #define API_DTA		1
 #define API_MTA		1
 #define API_DRM		1
 #define API_RF		1
 #define API_RP		1
+#define API_RB		1
 
 #define ACH_DTA		044
 #define ACH_MTA		045
 #define ACH_DRM		046
+#define ACH_RB		047
 #define ACH_RF		063
 #define ACH_RP		064
 
@@ -375,6 +387,7 @@ typedef struct pdp18b_dib DIB;
 #define IOS_PTPERR	0000400				/* punch empty */
 #define IOS_MTA		0000100				/* magtape */
 #define IOS_LPT		0000010				/* line printer */
+#define IOS_LPT1	0000000				/* not used */
 #endif
 
 /* Function prototypes */

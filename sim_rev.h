@@ -29,11 +29,47 @@
 
 #define	SIM_MAJOR	2
 #define SIM_MINOR	10
-#define SIM_PATCH	2
+#define SIM_PATCH	3
 
 /* V2.10 revision history 
 
 patch	date		module(s) and fix(es)
+
+  3	tbd		scp.c:
+			-- added dynamic extension of the breakpoint table
+			-- added breakpoint actions
+
+			hp2100_cpu.c: fixed last cycle bug in DMA output (found by
+			Mike Gemeny)
+
+			hp2100_ipl.c: individual links are full duplex (found by
+			Mike Gemeny)
+
+			pdp11_cpu.c: changed R, SP to track PSW<rs,cm> respectively
+
+			pdp18b_defs.h, pdp18b_sys.c: added RB09 fixed head disk,
+			LP09 printer
+
+			pdp18b_rf.c:
+			-- fixed IOT decoding (found by Hans Pufal)
+			-- fixed address overrun logic
+			-- added variable number of platters and autosizing
+
+			pdp18b_rf.c:
+			-- fixed IOT decoding
+			-- fixed bug in command initiation
+
+			pdp18b_rb.c: new RB09 fixed head disk
+
+			pdp18b_lp.c: new LP09 line printer
+
+			pdp8_df.c: added variable number of platters and autosizing
+
+			pdp8_rf.c: added variable number of platters and autosizing
+
+			nova_dsk.c: added variable number of platters and autosizing
+
+			id16_cpu.c: fixed bug in SETM, SETMR (found by Mark Pizzolato)
 
   2     15-Jan-03	scp.c:
 			-- added dynamic memory size flag and RESTORE support

@@ -1,6 +1,6 @@
 /* pdp8_rf.c: RF08 fixed head disk simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rf		RF08 fixed head disk
 
+   02-Feb-03	RMS	Added variable platter and autosizing support
    04-Oct-02	RMS	Added DIB, device number support
    28-Nov-01	RMS	Added RL8A support
    25-Apr-01	RMS	Added device enable/disable support
@@ -46,12 +47,17 @@
 #include "pdp8_defs.h"
 #include <math.h>
 
+#define UNIT_V_AUTO	(UNIT_V_UF + 0)			/* autosize */
+#define UNIT_V_MSIZE	(UNIT_V_UF + 1)			/* dummy mask */
+#define UNIT_AUTO	(1 << UNIT_V_AUTO)
+#define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+
 /* Constants */
 
 #define RF_NUMWD	2048				/* words/track */
 #define RF_NUMTR	128				/* tracks/disk */
+#define RF_DKSIZE	(RF_NUMTR * RF_NUMWD)		/* words/disk */
 #define RF_NUMDK	4				/* disks/controller */
-#define RF_SIZE		(RF_NUMDK * RF_NUMTR * RF_NUMWD) /* words/drive */
 #define RF_WC		07750				/* word count */
 #define RF_MA		07751				/* mem address */
 #define RF_WMASK	(RF_NUMWD - 1)			/* word mask */
@@ -109,6 +115,8 @@ t_stat rf_svc (UNIT *uptr);
 t_stat pcell_svc (UNIT *uptr);
 t_stat rf_reset (DEVICE *dptr);
 t_stat rf_boot (int32 unitno, DEVICE *dptr);
+t_stat rf_attach (UNIT *uptr, char *cptr);
+t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* RF08 data structures
 
@@ -122,7 +130,7 @@ DIB rf_dib = { DEV_RF, 5, { &rf60, &rf61, &rf62, NULL, &rf64 } };
 
 UNIT rf_unit =
 	{ UDATA (&rf_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-	RF_SIZE) };
+	RF_NUMDK * RF_DKSIZE) };
 
 UNIT pcell_unit = { UDATA (&pcell_svc, 0, 0) };
 
@@ -141,6 +149,11 @@ REG rf_reg[] = {
 	{ NULL }  };
 
 MTAB rf_mod[] = {
+	{ UNIT_MSIZE,  262144, NULL, "1P", &rf_set_size },
+	{ UNIT_MSIZE,  524288, NULL, "2P", &rf_set_size },
+	{ UNIT_MSIZE,  786432, NULL, "3P", &rf_set_size },
+	{ UNIT_MSIZE, 1048576, NULL, "4P", &rf_set_size },
+	{ UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&set_dev, &show_dev, NULL },
 	{ 0 } };
@@ -149,7 +162,7 @@ DEVICE rf_dev = {
 	"RF", &rf_unit, rf_reg, rf_mod,
 	1, 8, 20, 1, 8, 12,
 	NULL, NULL, &rf_reset,
-	&rf_boot, NULL, NULL,
+	&rf_boot, &rf_attach, NULL,
 	&rf_dib, DEV_DISABLE | DEV_DIS };
 
 /* IOT routines */
@@ -187,7 +200,7 @@ case 1:							/* DCIM */
 	sim_cancel (&pcell_unit);			/* cancel photocell */
 	return AC;
 case 2:							/* DSAC */
-	return ((rf_da & RF_WMASK) == GET_POS (rf_time))? IOT_SKP + AC: AC;
+	return ((rf_da & RF_WMASK) == GET_POS (rf_time))? IOT_SKP: 0;
 case 5:							/* DIML */
 	rf_sta = (rf_sta & 07007) | (AC & 0770);	/* STA<3:8> <- AC */
 	if (rf_sta & RFS_PIE)				/* photocell int? */
@@ -225,14 +238,25 @@ UPDATE_PCELL;						/* update photocell */
 switch (pulse) {					/* decode IR<9:11> */
 case 1:							/* DCXA */
 	rf_da = rf_da & 07777;				/* clear DAR<0:7> */
-	return AC;
+	break;
 case 3:							/* DXAL */
-	rf_da = (rf_da & 07777) | ((AC & 0377) << 12);	/* DAR<0:7> <- AC */
-	return 0;					/* clear AC */
+	rf_da = rf_da & 07777;				/* clear DAR<0:7> */
+case 2:							/* DXAL w/o clear */
+	rf_da = rf_da | ((AC & 0377) << 12);		/* DAR<0:7> |= AC */
+	AC = AC & ~07777;				/* clear AC */
+	break;
 case 5:							/* DXAC */
-	return ((rf_da >> 12) & 0377);			/* AC <- DAR<0:7> */
+	AC = AC & ~07777;				/* clear AC */
+case 4:							/* DXAC w/o clear */
+	AC = AC | ((rf_da >> 12) & 0377);		/* AC |= DAR<0:7> */
+	break;
 default:
-	return (stop_inst << IOT_V_REASON) + AC;  }	/* end switch */
+	AC = (stop_inst << IOT_V_REASON) + AC;
+	break;  }					/* end switch */
+if ((t_addr) rf_da >= rf_unit.capac) rf_sta = rf_sta | RFS_NXD;
+else rf_sta = rf_sta & ~RFS_NXD;
+RF_INT_UPDATE;
+return AC;
 }
 
 /* Unit service
@@ -253,7 +277,10 @@ if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	return IORETURN (rf_stopioe, SCPE_UNATT);  }
 
 mex = GET_MEX (rf_sta);
-do {	M[RF_WC] = (M[RF_WC] + 1) & 07777;		/* incr word count */
+do {	if ((t_addr) rf_da >= rf_unit.capac) {		/* disk overflow? */
+	    rf_sta = rf_sta | RFS_NXD;
+	    break;  }
+	M[RF_WC] = (M[RF_WC] + 1) & 07777;		/* incr word count */
  	M[RF_MA] = (M[RF_MA] + 1) & 07777;		/* incr mem addr */
 	pa = mex | M[RF_MA]; 				/* add extension */
 	if (uptr->FUNC == RF_READ) {			/* read? */
@@ -268,7 +295,7 @@ do {	M[RF_WC] = (M[RF_WC] + 1) & 07777;		/* incr word count */
 	rf_da = (rf_da + 1) & 03777777;  }		/* incr disk addr */
 while ((M[RF_WC] != 0) && (rf_burst != 0));		/* brk if wc, no brst */
 
-if (M[RF_WC] != 0)					/* more to do? */
+if ((M[RF_WC] != 0) && ((rf_sta	& RFS_ERR) == 0))	/* more to do? */
 	sim_activate (&rf_unit, rf_time);		/* sched next */
 else {	rf_done = 1;					/* done */
 	RF_INT_UPDATE;  }				/* update int req */
@@ -336,5 +363,37 @@ if (sim_switches & SWMASK ('D')) {
 else {	for (i = 0; i < OS8_LEN; i++)
 	    M[OS8_START + i] = os8_rom[i];
 	saved_PC = OS8_START;  }
+return SCPE_OK;
+}
+
+/* Attach routine */
+
+t_stat rf_attach (UNIT *uptr, char *cptr)
+{
+int32 p, d;
+int32 ds_bytes = RF_DKSIZE * sizeof (int16);
+
+if (uptr->flags & UNIT_AUTO) {
+	FILE *fp = fopen (cptr, "rb");
+	if (fp == NULL) return SCPE_OPENERR;
+	fseek (fp, 0, SEEK_END);
+	p = ftell (fp);
+	d = (p + ds_bytes - 1) / ds_bytes;
+	if (d == 0) d = 1;
+	if (d > RF_NUMDK) d = RF_NUMDK;
+	uptr->capac = d * RF_DKSIZE;
+	fclose (fp);  }
+return attach_unit (uptr, cptr);
+}
+
+/* Change disk size */
+
+t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if ((val == 0) || (val > (RF_NUMDK * RF_DKSIZE)))
+	return SCPE_IERR;
+if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+uptr->capac = val;
+uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
 }

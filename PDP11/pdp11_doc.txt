@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	15-Jan-2003
+Date:	1-Feb-2003
 
 			COPYRIGHT NOTICE
 
@@ -203,8 +203,10 @@ control registers for the interrupt system.
 	name		size	comments
 
 	PC		16	program counter
-	R0..R5		16	R0..R5, first register set
-	R10..R15	16	R0..R5, second register set
+	R0..R5		16	R0..R5, current register set
+	SP		16	stack pointer, current mode
+	R00..R05	16	R0..R5, register set 0
+	R10..R15	16	R0..R5, register set 1
 	KSP		16	kernel stack pointer
 	SSP		16	supervisor stack pointer
 	USP		16	user stack pointer

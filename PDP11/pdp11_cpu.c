@@ -25,6 +25,8 @@
 
    cpu		PDP-11 CPU (J-11 microprocessor)
 
+   01-Feb-03	RMS	Changed R display to follow PSW<rs>, added SP display
+   19-Jan-03	RMS	Changed mode definitions for Apple Dev Kit conflict
    05-Jan-03	RMS	Added memory size restore support
    17-Oct-02	RMS	Fixed bug in examine/deposit (found by Hans Pufal)
    08-Oct-02	RMS	Revised to build dib_tab dynamically
@@ -315,6 +317,7 @@ t_stat MMR3_rd (int32 *data, int32 addr, int32 access);
 t_stat MMR3_wr (int32 data, int32 addr, int32 access);
 t_stat ubm_rd (int32 *data, int32 addr, int32 access);
 t_stat ubm_wr (int32 data, int32 addr, int32 access);
+void set_r_display (int32 rs, int32 cm);
 
 extern t_stat build_dib_tab (int32 ubm);
 extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -369,15 +372,22 @@ REG cpu_reg[] = {
 	{ ORDATA (R3, REGFILE[3][0], 16) },
 	{ ORDATA (R4, REGFILE[4][0], 16) },
 	{ ORDATA (R5, REGFILE[5][0], 16) },
+	{ ORDATA (SP, STACKFILE[MD_KER], 16) },
+	{ ORDATA (R00, REGFILE[0][0], 16) },
+	{ ORDATA (R01, REGFILE[1][0], 16) },
+	{ ORDATA (R02, REGFILE[2][0], 16) },
+	{ ORDATA (R03, REGFILE[3][0], 16) },
+	{ ORDATA (R04, REGFILE[4][0], 16) },
+	{ ORDATA (R05, REGFILE[5][0], 16) },
 	{ ORDATA (R10, REGFILE[0][1], 16) },
 	{ ORDATA (R11, REGFILE[1][1], 16) },
 	{ ORDATA (R12, REGFILE[2][1], 16) },
 	{ ORDATA (R13, REGFILE[3][1], 16) },
 	{ ORDATA (R14, REGFILE[4][1], 16) },
 	{ ORDATA (R15, REGFILE[5][1], 16) },
-	{ ORDATA (KSP, STACKFILE[KERNEL], 16) },
-	{ ORDATA (SSP, STACKFILE[SUPER], 16) },
-	{ ORDATA (USP, STACKFILE[USER], 16) },
+	{ ORDATA (KSP, STACKFILE[MD_KER], 16) },
+	{ ORDATA (SSP, STACKFILE[MD_SUP], 16) },
+	{ ORDATA (USP, STACKFILE[MD_USR], 16) },
 	{ ORDATA (PSW, PSW, 16) },
 	{ GRDATA (CM, PSW, 8, 2, PSW_V_CM) },
 	{ GRDATA (PM, PSW, 8, 2, PSW_V_PM) },
@@ -632,11 +642,11 @@ if (abortval != 0) {
 	trap_req = trap_req | abortval;			/* or in trap flag */
 	if ((trapea > 0) && (stop_vecabort)) reason = STOP_VECABORT;
 	if ((trapea < 0) && (stop_spabort)) reason = STOP_SPABORT;
-	if (trapea == ~KERNEL) {			/* kernel stk abort? */
+	if (trapea == ~MD_KER) {			/* kernel stk abort? */
 	    setTRAP (TRAP_RED);
 	    setCPUERR (CPUE_RED);
-	    STACKFILE[KERNEL] = 4;
-	    if (cm == KERNEL) SP = 4;  }  }
+	    STACKFILE[MD_KER] = 4;
+	    if (cm == MD_KER) SP = 4;  }  }
 
 /* Main instruction fetch/decode loop
 
@@ -701,8 +711,8 @@ if (trap_req) {						/* check traps, ints */
 		(N << PSW_V_N) | (Z << PSW_V_Z) |
 		(V << PSW_V_V) | (C << PSW_V_C);
 	oldrs = rs;
-	src = ReadW (trapea | calc_ds (KERNEL));
-	src2 = ReadW ((trapea + 2) | calc_ds (KERNEL));
+	src = ReadW (trapea | calc_ds (MD_KER));
+	src2 = ReadW ((trapea + 2) | calc_ds (MD_KER));
 	t = (src2 >> PSW_V_CM) & 03;
 	trapea = ~t;					/* flag pushes */
 	WriteW (PSW, ((STACKFILE[t] - 2) & 0177777) | calc_ds (t));
@@ -726,7 +736,7 @@ if (trap_req) {						/* check traps, ints */
 	isenable = calc_is (cm);
 	dsenable = calc_ds (cm);
 	trap_req = calc_ints (ipl, trap_req);
-	if ((SP < STKLIM) && (cm == KERNEL) &&
+	if ((SP < STKLIM) && (cm == MD_KER) &&
 	    (trapnum != TRAP_V_RED) && (trapnum != TRAP_V_YEL)) {
 	    setTRAP (TRAP_YEL);
 	    setCPUERR (CPUE_YEL);  }
@@ -766,14 +776,14 @@ case 000:
 		break;  }
 	    switch (IR) {				/* decode IR<2:0> */
 	    case 0:					/* HALT */
-	    	if ((cm == KERNEL) && ((MAINT & MAINT_HTRAP) == 0))
+	    	if ((cm == MD_KER) && ((MAINT & MAINT_HTRAP) == 0))
 		    reason = STOP_HALT;
 		else {
 		    setTRAP (TRAP_PRV);
 		    setCPUERR (CPUE_HALT);  }
 		break;
 	    case 1:					/* WAIT */
-		if (cm == KERNEL && wait_enable) wait_state = 1;
+		if (cm == MD_KER && wait_enable) wait_state = 1;
 		break;
 	    case 3:					/* BPT */
 		setTRAP (TRAP_BPT);
@@ -782,7 +792,7 @@ case 000:
 		setTRAP (TRAP_IOT);
 		break;
 	    case 5:					/* RESET */
-		if (cm == KERNEL) {
+		if (cm == MD_KER) {
 		    reset_all (1);
 		    PIRQ = 0;
 		    for (i = 0; i < IPL_HLVL; i++) int_req[i] = 0;
@@ -800,7 +810,7 @@ case 000:
 	    	src2 = ReadW (((SP + 2) & 0177777) | dsenable);
 		STACKFILE[cm] = SP = (SP + 4) & 0177777;
 		oldrs = rs;
-		if (cm == KERNEL) {
+		if (cm == MD_KER) {
 		    cm = (src2 >> PSW_V_CM) & 03;
 		    pm = (src2 >> PSW_V_PM) & 03;
 		    rs = (src2 >> PSW_V_RS) & 01;
@@ -848,7 +858,7 @@ case 000:
 		setTRAP (TRAP_ILL);
 		break;  }
 	    if (IR < 000240) {				/* SPL */
-		if (cm == KERNEL) ipl = IR & 07;
+		if (cm == MD_KER) ipl = IR & 07;
 		trap_req = calc_ints (ipl, trap_req);
 		break;  }				/* end if SPL */
 	    if (IR < 000260) {				/* clear CC */
@@ -925,7 +935,7 @@ case 000:
 		SP = (SP - 2) & 0177777;
 		if (update_MM) MMR1 = calc_MMR1 (0366);
 		WriteW (R[srcspec], SP | dsenable);
-		if ((SP < STKLIM) && (cm == KERNEL)) {
+		if ((SP < STKLIM) && (cm == MD_KER)) {
 		    setTRAP (TRAP_YEL);
 		    setCPUERR (CPUE_YEL);  }
 		R[srcspec] = PC;
@@ -1066,7 +1076,7 @@ case 000:
 		if ((dstspec == 6) && (cm != pm)) dst = STACKFILE[pm];
 		else dst = R[dstspec];  }
 	    else {
-	    	i = ((cm == pm) && (cm == USER))? calc_ds (pm): calc_is (pm);
+	    	i = ((cm == pm) && (cm == MD_USR))? calc_ds (pm): calc_is (pm);
 		dst = ReadW ((GeteaW (dstspec) & 0177777) | i);  }
 	    N = GET_SIGN_W (dst);
 	    Z = GET_Z (dst);
@@ -1074,7 +1084,7 @@ case 000:
 	    SP = (SP - 2) & 0177777;
 	    if (update_MM) MMR1 = calc_MMR1 (0366);
 	    WriteW (dst, SP | dsenable);
-	    if ((cm == KERNEL) && (SP < STKLIM)) {
+	    if ((cm == MD_KER) && (SP < STKLIM)) {
 		setTRAP (TRAP_YEL);
 		setCPUERR (CPUE_YEL);  }
 	    break;
@@ -1101,7 +1111,7 @@ case 000:
 /* Opcode 0: SOPs, continued */
 
 	case 070:					/* CSM */
-	    if (((MMR3 & MMR3_CSM) == 0) || (cm == KERNEL))
+	    if (((MMR3 & MMR3_CSM) == 0) || (cm == MD_KER))
 		setTRAP (TRAP_ILL);
 	    else {
 	    	dst = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));
@@ -1109,12 +1119,12 @@ case 000:
 			(rs << PSW_V_RS) | (ipl << PSW_V_IPL) | 
 			(tbit << PSW_V_TBIT);
 		STACKFILE[cm] = SP;
-		WriteW (PSW, ((SP - 2) & 0177777) | calc_ds (SUPER));
-		WriteW (PC, ((SP - 4) & 0177777) | calc_ds (SUPER));
-		WriteW (dst, ((SP - 6) & 0177777) | calc_ds (SUPER));
+		WriteW (PSW, ((SP - 2) & 0177777) | calc_ds (MD_SUP));
+		WriteW (PC, ((SP - 4) & 0177777) | calc_ds (MD_SUP));
+		WriteW (dst, ((SP - 6) & 0177777) | calc_ds (MD_SUP));
 		SP = (SP - 6) & 0177777;
 		pm = cm;
-		cm = SUPER;
+		cm = MD_SUP;
 		tbit = 0;
 		isenable = calc_is (cm);
 		dsenable = calc_ds (cm);
@@ -1562,7 +1572,7 @@ case 010:
 
 	case 064:					/* MTPS */
 	    dst = dstreg? R[dstspec]: ReadB (GeteaB (dstspec));
-	    if (cm == KERNEL) {
+	    if (cm == MD_KER) {
 		ipl = (dst >> PSW_V_IPL) & 07;
 		trap_req = calc_ints (ipl, trap_req);  }
 	    N = (dst >> PSW_V_N) & 01;
@@ -1581,7 +1591,7 @@ case 010:
 	    SP = (SP - 2) & 0177777;
 	    if (update_MM) MMR1 = calc_MMR1 (0366);
 	    WriteW (dst, SP | dsenable);
-	    if ((cm == KERNEL) && (SP < STKLIM)) {
+	    if ((cm == MD_KER) && (SP < STKLIM)) {
 		setTRAP (TRAP_YEL);
 		setCPUERR (CPUE_YEL);  }
 	    break;
@@ -1717,6 +1727,7 @@ for (i = 0; i < 6; i++) REGFILE[i][rs] = R[i];
 STACKFILE[cm] = SP;
 saved_PC = PC & 0177777;
 pcq_r->qptr = pcq_p;					/* update pc q ptr */
+set_r_display (rs, cm);
 return reason;
 }
 
@@ -1790,14 +1801,14 @@ case 3:							/* @(R)+ */
 case 4:							/* -(R) */
 	adr = R[reg] = (R[reg] - 2) & 0177777;
 	if (update_MM) MMR1 = calc_MMR1 (0360 | reg);
-	if ((adr < STKLIM) && (reg == 6) && (cm == KERNEL)) {
+	if ((adr < STKLIM) && (reg == 6) && (cm == MD_KER)) {
 	    setTRAP (TRAP_YEL);
 	    setCPUERR (CPUE_YEL);  }
 	return (adr | ds);
 case 5:							/* @-(R) */
 	adr = R[reg] = (R[reg] - 2) & 0177777;
 	if (update_MM) MMR1 = calc_MMR1 (0360 | reg);
-	if ((adr < STKLIM) && (reg == 6) && (cm == KERNEL)) {
+	if ((adr < STKLIM) && (reg == 6) && (cm == MD_KER)) {
 	    setTRAP (TRAP_YEL);
 	    setCPUERR (CPUE_YEL);  }
 	adr = ReadW (adr | ds);
@@ -1840,14 +1851,14 @@ case 4:							/* -(R) */
 	delta = 1 + (reg >= 6);				/* 2 if R6, PC */
 	adr = R[reg] = (R[reg] - delta) & 0177777;
 	if (update_MM) MMR1 = calc_MMR1 ((((-delta) & 037) << 3) | reg);
-	if ((adr < STKLIM) && (reg == 6) && (cm == KERNEL)) {
+	if ((adr < STKLIM) && (reg == 6) && (cm == MD_KER)) {
 	    setTRAP (TRAP_YEL);
 	    setCPUERR (CPUE_YEL);  }
 	return (adr | ds);
 case 5:							/* @-(R) */
 	adr = R[reg] = (R[reg] - 2) & 0177777;
 	if (update_MM) MMR1 = calc_MMR1 (0360 | reg);
-	if ((adr < STKLIM) && (reg == 6) && (cm == KERNEL)) {
+	if ((adr < STKLIM) && (reg == 6) && (cm == MD_KER)) {
 	    setTRAP (TRAP_YEL);
 	    setCPUERR (CPUE_YEL);  }
 	adr = ReadW (adr | ds);
@@ -2120,9 +2131,9 @@ int32 relocC (int32 va, int32 sw)
 int32 mode, dbn, plf, apridx, apr, pa;
 
 if (MMR0 & MMR0_MME) {					/* if mmgt */
-	if (sw & SWMASK ('K')) mode = KERNEL;
-	else if (sw & SWMASK ('S')) mode = SUPER;
-	else if (sw & SWMASK ('U')) mode = USER;
+	if (sw & SWMASK ('K')) mode = MD_KER;
+	else if (sw & SWMASK ('S')) mode = MD_SUP;
+	else if (sw & SWMASK ('U')) mode = MD_USR;
 	else if (sw & SWMASK ('P')) mode = (PSW >> PSW_V_PM) & 03;
 	else mode = (PSW >> PSW_V_CM) & 03;
 	va = va | ((sw & SWMASK ('D'))? calc_ds (mode): calc_is (mode));
@@ -2394,6 +2405,7 @@ if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 for (i = 0; i < UBM_LNT_LW; i++) ub_map[i] = 0;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
+set_r_display (0, MD_KER);
 return SCPE_OK;
 }
 
@@ -2476,3 +2488,17 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
 return SCPE_OK;
 }
 
+/* Set R, SP register display addresses */
+
+void set_r_display (int32 rs, int32 cm)
+{
+extern REG *find_reg (char *cptr, char **optr, DEVICE *dptr);
+REG *rptr;
+int32 i;
+
+rptr = find_reg ("R0", NULL, &cpu_dev);
+if (rptr == NULL) return;
+for (i = 0; i < 6; i++, rptr++) rptr->loc = (void *) &REGFILE[i][rs];
+rptr->loc = (void *) &STACKFILE[cm];
+return;
+}

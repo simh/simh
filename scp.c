@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Feb-03	RMS	Added VMS support for ! (from Mark Pizzolato)
+   01-Feb-03	RMS	Added breakpoint table extension, actions
    14-Jan-03	RMS	Added missing function prototypes
    10-Jan-03	RMS	Added attach/restore flag, dynamic memory size support,
 			case sensitive SET options
@@ -130,7 +132,7 @@
 #define RU_BOOT		4				/* boot */
 
 #define SRBSIZ		1024				/* save/restore buffer */
-#define SIM_BRK_INILNT	16384				/* bpt tbl length */
+#define SIM_BRK_INILNT	4096				/* bpt tbl length */
 #define SIM_BRK_ALLTYP	0xFFFFFFFF
 #define SIM_NTIMERS	8				/* # timers */
 #define SIM_TMAX	500				/* max timer makeup */
@@ -227,7 +229,7 @@ extern uint32 sim_os_msec (void);
 /* Prototypes */
 
 t_stat sim_brk_init (void);
-t_stat sim_brk_set (t_addr loc, int32 sw, int32 ncnt);
+t_stat sim_brk_set (t_addr loc, int32 sw, int32 ncnt, char *act);
 t_stat sim_brk_clr (t_addr loc, int32 sw);
 t_stat sim_brk_clrall (int32 sw);
 t_stat sim_brk_show (FILE *st, t_addr loc, int32 sw);
@@ -318,6 +320,7 @@ int32 sim_is_running = 0;
 uint32 sim_brk_summ = 0;
 uint32 sim_brk_types = 0;
 uint32 sim_brk_dflt = 0;
+char *sim_brk_act = NULL;
 BRKTAB *sim_brk_tab = NULL;
 int32 sim_brk_ent = 0;
 int32 sim_brk_lnt = 0;
@@ -567,12 +570,15 @@ else stat = SCPE_OK;
 
 while (stat != SCPE_EXIT) {				/* in case exit */
 	printf ("sim> ");				/* prompt */
-	if (sim_vm_read != NULL)			/* sim routine? */
+	if (cptr = sim_brk_act) {			/* pending action? */
+	    printf ("%s\n", sim_brk_act);
+	    sim_brk_act = NULL;  }
+	else if (sim_vm_read != NULL)			/* sim routine? */
 	    cptr = (*sim_vm_read) (cbuf, CBUFSIZE, stdin);
 	else cptr = read_line (cbuf, CBUFSIZE, stdin);	/* read command line */
 	if (cptr == NULL) continue;			/* ignore EOF */
 	if (*cptr == 0) continue;			/* ignore blank */
-	if (sim_log) fprintf (sim_log, "sim> %s\n", cbuf); /* log cmd */
+	if (sim_log) fprintf (sim_log, "sim> %s\n", cptr); /* log cmd */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get command glyph */
 	if (cmdp = find_cmd (gbuf))			/* lookup command */
 	    stat = cmdp->action (cmdp->arg, cptr);	/* if found, exec */
@@ -643,9 +649,16 @@ return SCPE_OK;
 
 t_stat spawn_cmd (int32 flag, char *cptr)
 {
-if ((cptr == NULL) || (strlen(cptr) == 0)) cptr = getenv("SHELL");
-if ((cptr == NULL) || (strlen(cptr) == 0)) cptr = getenv("ComSpec");
+if ((cptr == NULL) || (strlen (cptr) == 0)) cptr = getenv("SHELL");
+if ((cptr == NULL) || (strlen (cptr) == 0)) cptr = getenv("ComSpec");
+#if defined (VMS)
+if ((cptr == NULL) || (strlen (cptr) == 0)) cptr = "SPAWN/INPUT=SYS$COMMAND:";
+#endif
 system (cptr);
+#if defined (VMS)
+printf ("\n");
+#endif
+
 return SCPE_OK;
 }
 
@@ -1177,7 +1190,7 @@ return ssh_break (NULL, cptr, flg);			/* call common code */
 
 t_stat ssh_break (FILE *st, char *cptr, int32 flg)
 {
-char gbuf[CBUFSIZE], *tptr, *t1ptr;
+char gbuf[CBUFSIZE], *tptr, *t1ptr, *aptr;
 DEVICE *dptr = sim_devices[0];
 UNIT *uptr = dptr->units;
 t_stat r;
@@ -1187,6 +1200,9 @@ int32 cnt;
 if (*cptr == 0) return SCPE_2FARG;
 if (sim_brk_types == 0) return SCPE_NOFNC;
 if ((dptr == NULL) || (uptr == NULL)) return SCPE_IERR;
+if (aptr = strchr (cptr, ';')) {			/* ;action? */
+	if (flg != SSH_ST) return SCPE_ARG;		/* only on SET */
+	*aptr++ = 0;  }					/* separate strings */
 while (*cptr) {
     cptr = get_glyph (cptr, gbuf, ',');
     tptr = get_range (gbuf, &lo, &hi, dptr->aradix, max, 0);
@@ -1205,7 +1221,7 @@ while (*cptr) {
 	else return SCPE_ARG;  }
     else {	
 	for ( ; lo <= hi; lo = lo + dptr->aincr) {
-	    if (flg == SSH_ST) r = sim_brk_set (lo, sim_switches, cnt);
+	    if (flg == SSH_ST) r = sim_brk_set (lo, sim_switches, cnt, aptr);
 	    else if (flg == SSH_CL) r = sim_brk_clr (lo, sim_switches);
 	    else if (flg == SSH_SH) r = sim_brk_show (st, lo, sim_switches);
 	    else return SCPE_ARG;
@@ -1788,6 +1804,7 @@ if ((r = sim_check_console (30)) != SCPE_OK) {		/* check console, error? */
 	return r;  }
 if (step) sim_activate (&step_unit, step);		/* set step timer */
 sim_is_running = 1;					/* flag running */
+sim_brk_act = NULL;					/* defang actions */
 r = sim_instr();
 
 sim_is_running = 0;					/* flag idle */
@@ -3206,7 +3223,7 @@ return sim_rtcn_calb (ticksper, 0);
 	type			types of breakpoints set on the address
 				a bit mask representing letters A-Z
 	cnt			number of iterations before breakp is taken
-	action			pointer to list of commands to be executed
+	action			pointer command string to be executed
 				when break is taken
 
    sim_brk_summ is a summary of the types of breakpoints that are currently set (it
@@ -3216,7 +3233,6 @@ return sim_rtcn_calb (ticksper, 0);
    The package contains the following public routines:
 
 	sim_brk_init		initialize
-	sim_brk_pchg		PC change
 	sim_brk_set		set breakpoint
 	sim_brk_clr		clear breakpoint
 	sim_brk_clrall		clear all breakpoints
@@ -3225,17 +3241,17 @@ return sim_rtcn_calb (ticksper, 0);
 	sim_brk_test		test for breakpoint
 	sim_brk_npc		PC has been changed
 
-   Initialize breakpoint system.  If simulator has filled in sim_brk_types,
-   allocate an initial breakpoint table, otherwise, allocate a minimal table.
+   Initialize breakpoint system.
 */
 
 t_stat sim_brk_init (void)
 {
-if (sim_brk_types) sim_brk_lnt = SIM_BRK_INILNT;
-else sim_brk_lnt = 1;
+sim_brk_lnt = SIM_BRK_INILNT;
 sim_brk_tab = calloc (sim_brk_lnt, sizeof (BRKTAB));
 if (sim_brk_tab == NULL) return SCPE_MEM;
 sim_brk_ent = sim_brk_ins = 0;
+sim_brk_pend = FALSE;
+sim_brk_act = NULL;
 return SCPE_OK;
 }
 
@@ -3266,10 +3282,19 @@ return NULL;
 
 BRKTAB *sim_brk_new (t_addr loc)
 {
-BRKTAB *bp;
+int32 i, t;
+BRKTAB *bp, *newp;
 
 if (sim_brk_ins < 0) return NULL;
-if (sim_brk_ent >= sim_brk_lnt) return NULL;
+if (sim_brk_ent >= sim_brk_lnt) {			/* out of space? */
+	t = sim_brk_lnt + SIM_BRK_INILNT;		/* new size */
+	newp = calloc (t, sizeof (BRKTAB));		/* new table */
+	if (newp == NULL) return NULL;			/* can't extend */
+	for (i = 0; i < sim_brk_lnt; i++)		/* copy table */
+	    *(newp + i) = *(sim_brk_tab + i);
+	free (sim_brk_tab);				/* free old table */
+	sim_brk_tab = newp;				/* new base, lnt */
+	sim_brk_lnt = t;  }
 if (sim_brk_ins != sim_brk_ent) {			/* move needed? */
 	for (bp = sim_brk_tab + sim_brk_ent;
 	     bp > sim_brk_tab + sim_brk_ins; bp--)
@@ -3285,17 +3310,25 @@ return bp;
 
 /* Set a breakpoint of type sw */
 
-t_stat sim_brk_set (t_addr loc, int32 sw, int32 ncnt)
+t_stat sim_brk_set (t_addr loc, int32 sw, int32 ncnt, char *act)
 {
 BRKTAB *bp;
 
 if (sw == 0) sw = sim_brk_dflt;
 if ((sim_brk_types & sw) == 0) return SCPE_NOFNC;
-bp = sim_brk_fnd (loc);
-if (!bp) bp = sim_brk_new (loc);
-if (!bp) return SCPE_MEM;
-bp->typ = sw;
-bp->cnt = ncnt;
+bp = sim_brk_fnd (loc);					/* present? */
+if (!bp) bp = sim_brk_new (loc);			/* no, allocate */
+if (!bp) return SCPE_MEM;				/* still no? mem err */
+bp->typ = sw;						/* set type */
+bp->cnt = ncnt;						/* set count */
+if ((bp->act != NULL) && (act != NULL)) {		/* replace old action? */
+	free (bp->act);					/* deallocate */
+	bp->act = NULL;  }				/* now no action */
+if ((act != NULL) && (*act != 0)) {			/* new action? */
+	char *newp = calloc (CBUFSIZE, sizeof (char));	/* allocate buffer */
+	if (newp == NULL) return SCPE_MEM;		/* mem err? */
+	strncpy (newp, act, CBUFSIZE);			/* copy action */
+	bp->act = newp;  }				/* set pointer */
 sim_brk_summ = sim_brk_summ | sw;
 return SCPE_OK;
 }
@@ -3306,14 +3339,15 @@ t_stat sim_brk_clr (t_addr loc, int32 sw)
 {
 BRKTAB *bp = sim_brk_fnd (loc);
 
-if (!bp) return SCPE_OK;
+if (!bp) return SCPE_OK;				/* not there? ok */
 if (sw == 0) sw = SIM_BRK_ALLTYP;
 bp->typ = bp->typ & ~sw;
-if (bp->typ) return SCPE_OK;
-for ( ; bp < (sim_brk_tab + sim_brk_ent - 1); bp++)
+if (bp->typ) return SCPE_OK;				/* clear all types? */
+if (bp->act != NULL) free (bp->act);			/* deallocate action */
+for ( ; bp < (sim_brk_tab + sim_brk_ent - 1); bp++)	/* erase entry */
 	*bp = *(bp + 1);
-sim_brk_ent = sim_brk_ent - 1;
-sim_brk_summ = 0;
+sim_brk_ent = sim_brk_ent - 1;				/* decrement count */
+sim_brk_summ = 0;					/* recalc summary */
 for (bp = sim_brk_tab; bp < (sim_brk_tab + sim_brk_ent); bp++)
 	sim_brk_summ = sim_brk_summ | bp->typ;
 return SCPE_OK;
@@ -3326,9 +3360,9 @@ t_stat sim_brk_clrall (int32 sw)
 BRKTAB *bp;
 
 if (sw == 0) sw = SIM_BRK_ALLTYP;
-if ((sim_brk_summ & ~sw) == 0) sim_brk_ent = sim_brk_summ = 0;
-else {	for (bp = sim_brk_tab; bp < (sim_brk_tab + sim_brk_ent); bp++) {
-	if (bp->typ & sw) sim_brk_clr (bp->addr, sw);  }  }
+for (bp = sim_brk_tab; bp < (sim_brk_tab + sim_brk_ent); ) {
+	if (bp->typ & sw) sim_brk_clr (bp->addr, sw);
+	else bp++;  }
 return SCPE_OK;
 }
 
@@ -3352,6 +3386,7 @@ for (i = any = 0; i < 26; i++) {
 	    fputc (i + 'A', st);
 	    any = 1;  }  }
 if (bp->cnt > 0) fprintf (st, " [%d]", bp->cnt);
+if (bp->act != NULL) fprintf (st, "; %s", bp->act);
 fprintf (st, "\n");
 return SCPE_OK;
 }
@@ -3374,13 +3409,14 @@ t_bool sim_brk_test (t_addr loc, int32 btyp)
 {
 BRKTAB *bp;
 
-if ((bp = sim_brk_fnd (loc)) &&
-    (btyp & bp->typ) &&
-    (!sim_brk_pend || (loc != sim_brk_ploc)) &&
-    (--(bp->cnt) <= 0)) {
-	bp->cnt = 0;
-	sim_brk_ploc = loc;
-	sim_brk_pend = TRUE;
+if ((bp = sim_brk_fnd (loc)) &&				/* entry in table? */
+    (btyp & bp->typ) &&					/* type match? */
+    (!sim_brk_pend || (loc != sim_brk_ploc)) &&		/* new location? */
+    (--(bp->cnt) <= 0)) {				/* count reach 0? */
+	bp->cnt = 0;					/* reset count */
+	sim_brk_ploc = loc;				/* save location */
+	sim_brk_act = bp->act;				/* set up actions */
+	sim_brk_pend = TRUE;				/* don't do twice */
 	return TRUE;  }
 sim_brk_pend = FALSE;
 return FALSE;

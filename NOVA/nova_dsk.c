@@ -1,6 +1,6 @@
 /* nova_dsk.c: 4019 fixed head disk simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -40,15 +40,19 @@
 #include "nova_defs.h"
 #include <math.h>
 
+#define UNIT_V_AUTO	(UNIT_V_UF + 0)			/* autosize */
+#define UNIT_V_MSIZE	(UNIT_V_UF + 1)			/* dummy mask */
+#define UNIT_AUTO	(1 << UNIT_V_AUTO)
+#define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+
 /* Constants */
 
 #define DSK_NUMWD	256				/* words/sector */
 #define DSK_NUMSC	8				/* sectors/track */
 #define DSK_NUMTR	128				/* tracks/disk */
+#define DSK_DKSIZE	(DSK_NUMTR*DSK_NUMSC*DSK_NUMWD)	/* words/disk */
+#define DSK_AMASK	((DSK_NUMDK*DSK_NUMTR*DSK_NUMSC) - 1)	/* address mask */
 #define DSK_NUMDK	8				/* disks/controller */
-#define DSK_SCSIZE 	(DSK_NUMDK*DSK_NUMTR*DSK_NUMSC) /* sectors/drive */
-#define DSK_AMASK	(DSK_SCSIZE - 1)		/* address mask */
-#define DSK_SIZE	(DSK_SCSIZE * DSK_NUMWD)	/* words/drive */
 #define GET_DISK(x)	(((x) / (DSK_NUMSC * DSK_NUMTR)) & (DSK_NUMDK - 1))
 
 /* Parameters in the unit descriptor */
@@ -94,6 +98,8 @@ int32 dsk (int32 pulse, int32 code, int32 AC);
 t_stat dsk_svc (UNIT *uptr);
 t_stat dsk_reset (DEVICE *dptr);
 t_stat dsk_boot (int32 unitno, DEVICE *dptr);
+t_stat dsk_attach (UNIT *uptr, char *cptr);
+t_stat dsk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* DSK data structures
 
@@ -106,7 +112,7 @@ DIB dsk_dib = { DEV_DSK, INT_DSK, PI_DSK, &dsk };
 
 UNIT dsk_unit =
 	{ UDATA (&dsk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-		DSK_SIZE) };
+		DSK_NUMDK * DSK_DKSIZE) };
 
 REG dsk_reg[] = {
 	{ ORDATA (STAT, dsk_stat, 16) },
@@ -121,11 +127,23 @@ REG dsk_reg[] = {
 	{ FLDATA (STOP_IOE, dsk_stopioe, 0) },
 	{ NULL }  };
 
+MTAB dsk_mod[] = {
+	{ UNIT_MSIZE,  262144, NULL, "1P", &dsk_set_size },
+	{ UNIT_MSIZE,  524288, NULL, "2P", &dsk_set_size },
+	{ UNIT_MSIZE,  786432, NULL, "3P", &dsk_set_size },
+	{ UNIT_MSIZE, 1048576, NULL, "4P", &dsk_set_size },
+	{ UNIT_MSIZE, 1310720, NULL, "5P", &dsk_set_size },
+	{ UNIT_MSIZE, 1572864, NULL, "6P", &dsk_set_size },
+	{ UNIT_MSIZE, 1835008, NULL, "7P", &dsk_set_size },
+	{ UNIT_MSIZE, 2097152, NULL, "8P", &dsk_set_size },
+	{ UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", NULL },
+	{ 0 }  };
+
 DEVICE dsk_dev = {
-	"DK", &dsk_unit, dsk_reg, NULL,
+	"DK", &dsk_unit, dsk_reg, dsk_mod,
 	1, 8, 21, 1, 8, 16,
 	NULL, NULL, &dsk_reset,
-	&dsk_boot, NULL, NULL,
+	&dsk_boot, &dsk_attach, NULL,
 	&dsk_dib, DEV_DISABLE };
 
 /* IOT routine */
@@ -243,5 +261,37 @@ extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 saved_PC = BOOT_START;
+return SCPE_OK;
+}
+
+/* Attach routine */
+
+t_stat dsk_attach (UNIT *uptr, char *cptr)
+{
+int32 p, d;
+int32 ds_bytes = DSK_DKSIZE * sizeof (int16);
+
+if (uptr->flags & UNIT_AUTO) {
+	FILE *fp = fopen (cptr, "rb");
+	if (fp == NULL) return SCPE_OPENERR;
+	fseek (fp, 0, SEEK_END);
+	p = ftell (fp);
+	d = (p + ds_bytes - 1) / ds_bytes;
+	if (d == 0) d = 1;
+	if (d > DSK_NUMDK) d = DSK_NUMDK;
+	uptr->capac = d * DSK_DKSIZE;
+	fclose (fp);  }
+return attach_unit (uptr, cptr);
+}
+
+/* Change disk size */
+
+t_stat dsk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if ((val == 0) || (val > (DSK_NUMDK * DSK_DKSIZE)))
+	return SCPE_IERR;
+if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+uptr->capac = val;
+uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
 }

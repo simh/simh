@@ -1,92 +1,37 @@
-Notes For V2.10-2
+Notes For V2.10-3
 
-1. New Features in 2.10-2
-
-The build procedures have changed.  There is only one UNIX makefile.
-To compile without Ethernet support, simply type
-
-	gmake {target|all}
-
-To compile with Ethernet support, type
-
-	gmake USE_NETWORK=1 {target|all}
-
-The Mingw batch files require Mingw release 2 and invoke the Unix
-makefile.  There are still separate batch files for compilation
-with or without Ethernet support.
+1. New Features in 2.10-3
 
 1.1 SCP and Libraries
 
-- The EVAL command will evaluate a symbolic type-in and display
-  it in numeric form.
-- The ! command (with no arguments) will launch the host operating
-  system command shell.  The ! command (with an argument) executes
-  the argument as a host operating system command.  (Code from
-  Mark Pizzolato)
-- Telnet sessions now recognize BREAK.  How a BREAK is transmitted
-  dependent on the particular Telnet client.  (Code from Mark
-  Pizzolato)
-- The sockets library includes code for active connections as
-  well as listening connections.
-- The RESTORE command will restore saved memory size, if the
-  simulator supports dynamic memory resizing.
+- Added dynamic extension of the breakpoint table.
+- Added breakpoint actions.
+- Added VMS support for ! (from Mark Pizzolato).
 
-1.2 PDP-1
+1.2 18b PDP's
 
-- The PDP-1 supports the Type 24 serial drum (based on recently
-  discovered documents).
+- Added RB09 fixed head disk for the PDP-9.
+- Added LP09 line printer for the PDP-9 and PDP-15.
+- Added variable size support and autosizing to the RF15/RF09.
 
-1.3 18b PDP's
+1.3 PDP-8
 
-- The PDP-4 supports the Type 24 serial drum (based on recently
-  discovered documents).
+- Added variable size support and autosizing to the DF32 and RF08.
 
-1.4 PDP-11
+1.4 Nova
 
-- The PDP-11 implements a stub DEUNA/DELUA (XU).  The real XU
-  module will be included in a later release.
+- Added variable size support and autosizing to the Novadisk.
 
-1.5 PDP-10
+2. Bugs Fixed in 2.10-3
 
-- The PDP-10 implements a stub DEUNA/DELUA (XU).  The real XU
-  module will be included in a later release.
-
-1.6 HP 2100
-
-- The IOP microinstruction set is supported for the 21MX as well
-  as the 2100.
-- The HP2100 supports the Access Interprocessor Link (IPL).
-
-1.7 VAX
-
-- If the VAX console is attached to a Telnet session, BREAK is
-  interpreted as console halt.
-- The SET/SHOW HISTORY commands enable and display a history of
-  the most recently executed instructions.  (Code from Mark
-  Pizzolato)
-
-1.8 Terminals Multiplexors
-
-- BREAK detection was added to the HP, DEC, and Interdata terminal
-  multiplexors.
-
-1.9 Interdata 16b and 32b
-
-- First release.  UNIX is not yet working.
-
-1.10 SDS 940
-
-- First release.
-
-2. Bugs Fixed in 2.10-2
-
-- PDP-11 console must default to 7b for early UNIX compatibility.
-- PDP-11/VAX TMSCP emulator was using the wrong packet length for
-  read/write end packets.
-- Telnet IAC+IAC processing was fixed, both for input and output
-  (found by Mark Pizzolato).
-- PDP-11/VAX Ethernet setting flag bits wrong for chained
-  descriptors (found by Mark Pizzolato).
+- 18b PDP RF15/RF09: fixed IOT decoding and address wraparound
+  logic (found by Hans Pufal).
+- 18b PDP RP15: fixed IOT decoding and command initiation.
+- HP2100 IPL: changed to full duplex (found by Mike Gemeny).
+- HP2100 CPU: fixed last cycle bug in DMA outpout (found by Mike
+  Gemeny).
+- Interdata 16b CPU: fixed bug in SETM, SETMR (found by Mark
+  Pizzolato).
 
 3. New Features in 2.10 vs prior releases
 
@@ -117,6 +62,19 @@ with or without Ethernet support.
   to add an additional parameter.
 - SAVE now saves, and GET now restores, controller and unit flags.
 - Library sim_ether.c has been added for Ethernet support.
+- The EVAL command will evaluate a symbolic type-in and display
+  it in numeric form.
+- The ! command (with no arguments) will launch the host operating
+  system command shell.  The ! command (with an argument) executes
+  the argument as a host operating system command.  (Code from
+  Mark Pizzolato)
+- Telnet sessions now recognize BREAK.  How a BREAK is transmitted
+  dependent on the particular Telnet client.  (Code from Mark
+  Pizzolato)
+- The sockets library includes code for active connections as
+  well as listening connections.
+- The RESTORE command will restore saved memory size, if the
+  simulator supports dynamic memory resizing.
 
 3.2 VAX
 
@@ -137,6 +95,11 @@ with or without Ethernet support.
 - Examine and deposit switches now work on all devices, not just
   the CPU.
 - Device address conflicts are not detected until simulation starts.
+- If the VAX console is attached to a Telnet session, BREAK is
+  interpreted as console halt.
+- The SET/SHOW HISTORY commands enable and display a history of
+  the most recently executed instructions.  (Code from Mark
+  Pizzolato)
 
 3.3 PDP-11
 
@@ -159,6 +122,8 @@ with or without Ethernet support.
   configuration, causes all peripherals that are not compatible
   with the current bus configuration to be disabled.
 - Device address conflicts are not detected until simulation starts.
+- The PDP-11 implements a stub DEUNA/DELUA (XU).  The real XU
+  module will be included in a later release.
 
 3.4 PDP-10
 
@@ -171,13 +136,22 @@ with or without Ethernet support.
 - The paper tape now references a common implementation file,
   dec_pt.h.
 - Device address conflicts are not detected until simulation starts.
+- The PDP-10 implements a stub DEUNA/DELUA (XU).  The real XU
+  module will be included in a later release.
 
 3.5 PDP-1
 
 - DECtape (then known as MicroTape) support has been added.
 - The line printer and DECtape can be disabled and enabled.
+- The PDP-1 supports the Type 24 serial drum (based on recently
+  discovered documents).
 
-3.6 PDP-8
+3.6 18b PDP's
+
+- The PDP-4 supports the Type 24 serial drum (based on recently
+  discovered documents).
+
+3.7 PDP-8
 
 - The RX28 (double density floppy) has been added as an option to
   the existing RX8E controller.
@@ -185,10 +159,6 @@ with or without Ethernet support.
   devices allow the device number to be changed with SET <device>
   DEVNO=nnn.
 - Device number conflicts are not detected until simulation starts.
-
-3.7 IBM 1620
-
-- The IBM 1620 simulator has been released.
 
 3.8 AltairZ80
 
@@ -211,6 +181,9 @@ with or without Ethernet support.
 - New CPU options (DMS/NODMS) enable/disable the dynamic mapping
   instructions for the 21MX.
 - The 12539 timebase generator autocalibrates.
+- The IOP microinstruction set is supported for the 21MX as well
+  as the 2100.
+- The HP2100 supports the Access Interprocessor Link (IPL).
 
 3.10 Simulated Magtapes
 
@@ -223,6 +196,11 @@ with or without Ethernet support.
 3.11 Simulated DECtapes
 
 - Added support for RT11 image file format (256 x 16b) to DECtapes.
+
+3.12 Terminals Multiplexors
+
+- BREAK detection was added to the HP, DEC, and Interdata terminal
+  multiplexors.
 
 4. Bugs Fixed in 2.10 vs prior releases
 
@@ -242,8 +220,28 @@ with or without Ethernet support.
   Michael Thompson and Harris Newman, respectively)
 - PDP-1 typewriter is half duplex, with only one shift state for
   both input and output (found by Derek Peschel)
+- PDP-11 console must default to 7b for early UNIX compatibility.
+- PDP-11/VAX TMSCP emulator was using the wrong packet length for
+  read/write end packets.
+- Telnet IAC+IAC processing was fixed, both for input and output
+  (found by Mark Pizzolato).
+- PDP-11/VAX Ethernet setting flag bits wrong for chained
+  descriptors (found by Mark Pizzolato).
 
 5. General Notes
+
+WARNING: The build procedures have changed.  There is only one UNIX
+makefile.  To compile without Ethernet support, simply type
+
+	gmake {target|all}
+
+To compile with Ethernet support, type
+
+	gmake USE_NETWORK=1 {target|all}
+
+The Mingw batch files require Mingw release 2 and invoke the Unix
+makefile.  There are still separate batch files for compilation
+with or without Ethernet support.
 
 WARNING: V2.10 has reorganized and renamed some of the definition
 files for the PDP-10, PDP-11, and VAX.  Be sure to delete all

@@ -1,6 +1,6 @@
 /* pdp10_tu.c - PDP-10 RH11/TM03/TU45 magnetic tape simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tu		RH11/TM03/TU45 magtape
 
+   27-Jan-03	RMS	Changed to dynamically allocate buffer
    21-Nov-02	RMS	Fixed bug in bootstrap (reported by Michael Thompson)
 			Fixed bug in read (reported by Harris Newman)
    29-Sep-02	RMS	Added variable vector support
@@ -296,16 +297,17 @@ int32 tuiff = 0;					/* INTR flip/flop */
 int32 tu_time = 10;					/* record latency */
 int32 tu_stopioe = 1;					/* stop on error */
 int32 tu_log = 0;					/* debug */
-int reg_in_fmtr[32] = {					/* reg in formatter */
+int32 reg_in_fmtr[32] = {				/* reg in formatter */
  0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1,
  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
-int reg_in_fmtr1[32] = {				/* rmr if write + go */
+int32 reg_in_fmtr1[32] = {				/* rmr if write + go */
  0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1,
  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
-int fmt_test[16] = {					/* fmt bytes/10 wd */
+int32 fmt_test[16] = {					/* fmt bytes/10 wd */
  5, 0, 5, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-int den_test[8] = {					/* valid densities */
+int32 den_test[8] = {					/* valid densities */
  0, 0, 0, 1, 1, 0, 0, 0 };
+static uint8 *xbuf = NULL;				/* xfer buffer */
 
 t_stat tu_rd (int32 *data, int32 PA, int32 access);
 t_stat tu_wr (int32 data, int32 PA, int32 access);
@@ -682,7 +684,6 @@ int32 ba, fc, wc, drv, mpa10, vpn;
 d10 val, v[4];
 t_mtrlnt abc, tbc;
 static t_mtrlnt bceof = { MTR_TMK };
-static uint8 xbuf[XBUFLNT + 4];
 
 drv = uptr - tu_dev.units;				/* get drive # */
 pnu = MT_TST_PNU (uptr);				/* get pos not upd */
@@ -968,6 +969,8 @@ for (u = 0; u < TU_NUMDR; u++) {			/* loop thru units */
 	MT_CLR_PNU (uptr);				/* clear pos flag */
 	sim_cancel (uptr);				/* cancel activity */
 	uptr->USTAT = 0;  }
+if (xbuf == NULL) xbuf = calloc (XBUFLNT + 4, sizeof (uint8));
+if (xbuf == NULL) return SCPE_MEM;
 return SCPE_OK;
 }
 
