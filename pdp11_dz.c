@@ -1,4 +1,4 @@
-/* pdp10_dz.c: DZ11 terminal multiplexor simulator
+/* pdp11_dz.c: DZ11 terminal multiplexor simulator
 
    Copyright (c) 1993-2001, Robert M Supnik
 
@@ -26,5 +26,5 @@
    dz		DZ11 terminal multiplexor
 */
 
-#include "pdp10_defs.h"
+#include "pdp11_defs.h"
 #include "dec_dz.h"

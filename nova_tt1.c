@@ -27,23 +27,32 @@
    tti1		second terminal input
    tto1		second terminal output
 
+   17-Sep-01	RMS	Changed to use terminal multiplexor library
+   07-Sep-01	RMS	Moved function prototypes
    31-May-01	RMS	Added multiconsole support
    26-Apr-01	RMS	Added device enable/disable support
 */
 
 #include "nova_defs.h"
+#include "sim_sock.h"
+#include "sim_tmxr.h"
 
 #define	UNIT_V_DASHER	(UNIT_V_UF + 0)			/* Dasher mode */
 #define UNIT_DASHER	(1 << UNIT_V_DASHER)
 
 extern int32 int_req, dev_busy, dev_done, dev_disable, iot_enb;
+extern int32 tmxr_poll;					/* calibrated poll */
+TMLN tt1_ldsc = { 0 };					/* line descriptors */
+TMXR tt_desc = { 1, 0, &tt1_ldsc };			/* mux descriptor */
+
 t_stat tti1_svc (UNIT *uptr);
 t_stat tto1_svc (UNIT *uptr);
 t_stat tti1_reset (DEVICE *dptr);
 t_stat tto1_reset (DEVICE *dptr);
 t_stat ttx1_setmod (UNIT *uptr, int32 value);
-extern t_stat sim_poll_kbd (void);
-static uint8 tto1_consout[CONS_SIZE];
+t_stat tti1_attach (UNIT *uptr, char *cptr);
+t_stat tti1_detach (UNIT *uptr);
+t_stat tti1_status (UNIT *uptr, FILE *st);
 
 /* TTI1 data structures
 
@@ -53,7 +62,7 @@ static uint8 tto1_consout[CONS_SIZE];
    ttx1_mod	TTI1/TTO1 modifiers list
 */
 
-UNIT tti1_unit = { UDATA (&tti1_svc, 0, 0), KBD_POLL_WAIT };
+UNIT tti1_unit = { UDATA (&tti1_svc, UNIT_ATTABLE, 0), KBD_POLL_WAIT };
 
 REG tti1_reg[] = {
 	{ ORDATA (BUF, tti1_unit.buf, 8) },
@@ -61,16 +70,14 @@ REG tti1_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTI1) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_TTI1) },
 	{ FLDATA (INT, int_req, INT_V_TTI1) },
-	{ DRDATA (POS, tti1_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tt1_ldsc.rxcnt, 31), PV_LEFT },
 	{ DRDATA (TIME, tti1_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (MODE, tti1_unit.flags, UNIT_V_DASHER), REG_HRO },
-	{ FLDATA (CFLAG, tti1_unit.flags, UNIT_V_CONS), REG_HRO },
 	{ FLDATA (*DEVENB, iot_enb, INT_V_TTI1), REG_HRO },
 	{ NULL }  };
 
 MTAB ttx1_mod[] = {
-	{ UNIT_CONS, 0, "inactive", NULL, NULL },
-	{ UNIT_CONS, UNIT_CONS, "active console", "CONSOLE", &set_console },
+	{ UNIT_ATT, UNIT_ATT, "line status:", NULL, &tti1_status },
 	{ UNIT_DASHER, 0, "ANSI", "ANSI", &ttx1_setmod },
 	{ UNIT_DASHER, UNIT_DASHER, "Dasher", "DASHER", &ttx1_setmod },
 	{ 0 }  };
@@ -78,8 +85,8 @@ MTAB ttx1_mod[] = {
 DEVICE tti1_dev = {
 	"TTI1", &tti1_unit, tti1_reg, ttx1_mod,
 	1, 10, 31, 1, 8, 8,
-	NULL, NULL, &tti1_reset,
-	NULL, NULL, NULL };
+	&tmxr_ex, &tmxr_dep, &tti1_reset,
+	NULL, &tti1_attach, &tti1_detach  };
 
 /* TTO1 data structures
 
@@ -96,11 +103,9 @@ REG tto1_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_TTO1) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_TTO1) },
 	{ FLDATA (INT, int_req, INT_V_TTO1) },
-	{ DRDATA (POS, tto1_unit.pos, 31), PV_LEFT },
+	{ DRDATA (POS, tt1_ldsc.txcnt, 31), PV_LEFT },
 	{ DRDATA (TIME, tto1_unit.wait, 24), PV_LEFT },
 	{ FLDATA (MODE, tto1_unit.flags, UNIT_V_DASHER), REG_HRO },
-	{ BRDATA (CONSOUT, tto1_consout, 8, 8, CONS_SIZE), REG_HIDDEN },
-	{ FLDATA (CFLAG, tto1_unit.flags, UNIT_V_CONS), REG_HRO },
 	{ FLDATA (*DEVENB, iot_enb, INT_V_TTI1), REG_HRO },
 	{ NULL }  };
 
@@ -135,17 +140,25 @@ return iodata;
 
 t_stat tti1_svc (UNIT *uptr)
 {
-int32 temp;
+int32 temp, newln;
 
-sim_activate (&tti1_unit, tti1_unit.wait);		/* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
-tti1_unit.buf = temp & 0177;
-if ((tti1_unit.flags & UNIT_DASHER) && (tti1_unit.buf == '\r'))
-	tti1_unit.buf = '\n';				/* Dasher: cr -> nl */
-dev_busy = dev_busy & ~INT_TTI1;			/* clear busy */
-dev_done = dev_done | INT_TTI1;				/* set done */
-int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-tti1_unit.pos = tti1_unit.pos + 1;
+if (tt1_ldsc.conn) {					/* connected? */
+	tmxr_poll_rx (&tt_desc);			/* poll for input */
+	if (temp = tmxr_getc_ln (&tt1_ldsc)) {		/* get char */ 
+		uptr -> buf = temp & 0177;
+		if ((uptr -> flags & UNIT_DASHER) &&
+		    (uptr -> buf == '\r'))
+			uptr -> buf = '\n';		/* Dasher: cr -> nl */
+		dev_busy = dev_busy & ~INT_TTI1;	/* clear busy */
+		dev_done = dev_done | INT_TTI1;		/* set done */
+		int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);  }
+	sim_activate (uptr, uptr -> wait);  }		/* continue poll */
+if (uptr -> flags & UNIT_ATT) {				/* attached? */
+	newln = tmxr_poll_conn (&tt_desc, uptr);	/* poll connect */
+	if (newln >= 0) {				/* got one? */
+		sim_activate (&tti1_unit, tti1_unit.wait);
+		tt1_ldsc.rcve = 1;  }			/* rcv enabled */ 
+	sim_activate (uptr, tmxr_poll);  }		/* sched poll */
 return SCPE_OK;
 }
 
@@ -157,8 +170,12 @@ tti1_unit.buf = 0;
 dev_busy = dev_busy & ~INT_TTI1;			/* clear busy */
 dev_done = dev_done & ~INT_TTI1;			/* clear done, int */
 int_req = int_req & ~INT_TTI1;
-if (tti1_unit.flags & UNIT_CONS)				/* active console? */
-	sim_activate (&tti1_unit, tti1_unit.wait);
+if (tt1_ldsc.conn) {					/* if conn, */
+	sim_activate (&tti1_unit, tti1_unit.wait);	/* activate, */
+	tt1_ldsc.rcve = 1;  }				/* enable */
+else if (tti1_unit.flags & UNIT_ATT)			/* if attached, */
+	sim_activate (&tti1_unit, tmxr_poll);		/* activate */
+else sim_cancel (&tti1_unit);				/* else stop */
 return SCPE_OK;
 }
 
@@ -187,15 +204,20 @@ return 0;
 
 t_stat tto1_svc (UNIT *uptr)
 {
-int32 c, temp;
+int32 c;
 
 dev_busy = dev_busy & ~INT_TTO1;			/* clear busy */
 dev_done = dev_done | INT_TTO1;				/* set done */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
 c = tto1_unit.buf & 0177;
 if ((tto1_unit.flags & UNIT_DASHER) && (c == 031)) c = '\b';
-if ((temp = sim_putcons (c, uptr)) != SCPE_OK) return temp;
-tto1_unit.pos = tto1_unit.pos + 1;
+if (tt1_ldsc.conn) {					/* connected? */
+	if (tt1_ldsc.xmte) {				/* tx enabled? */
+		tmxr_putc_ln (&tt1_ldsc, c);		/* output char */
+		tmxr_poll_tx (&tt_desc);  }		/* poll xmt */
+	else {	tmxr_poll_tx (&tt_desc);		/* poll xmt */
+		sim_activate (&tto1_unit, tmxr_poll);	/* wait */
+		return SCPE_OK;  }  }
 return SCPE_OK;
 }
 
@@ -208,7 +230,6 @@ dev_busy = dev_busy & ~INT_TTO1;			/* clear busy */
 dev_done = dev_done & ~INT_TTO1;			/* clear done, int */
 int_req = int_req & ~INT_TTO1;
 sim_cancel (&tto1_unit);				/* deactivate unit */
-tto1_unit.filebuf = tto1_consout;			/* set buf pointer */
 return SCPE_OK;
 }
 
@@ -216,5 +237,37 @@ t_stat ttx1_setmod (UNIT *uptr, int32 value)
 {
 tti1_unit.flags = (tti1_unit.flags & ~UNIT_DASHER) | value;
 tto1_unit.flags = (tto1_unit.flags & ~UNIT_DASHER) | value;
+return SCPE_OK;
+}
+
+/* Attach routine */
+
+t_stat tti1_attach (UNIT *uptr, char *cptr)
+{
+t_stat r;
+
+r = tmxr_attach (&tt_desc, uptr, cptr);			/* attach */
+if (r != SCPE_OK) return r;				/* error */
+sim_activate (uptr, tmxr_poll);				/* start poll */
+return SCPE_OK;
+}
+
+/* Detach routine */
+
+t_stat tti1_detach (UNIT *uptr)
+{
+t_stat r;
+
+r = tmxr_detach (&tt_desc, uptr);			/* detach */
+tt1_ldsc.rcve = 0;					/* disable rcv */
+sim_cancel (uptr);					/* stop poll */
+return r;
+}
+
+/* Status routine */
+
+t_stat tti1_status (UNIT *uptr, FILE *st)
+{
+tmxr_fstatus (st, &tt1_ldsc, -1);
 return SCPE_OK;
 }

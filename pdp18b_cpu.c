@@ -25,6 +25,8 @@
 
    cpu		PDP-4/7/9/15 central processor
 
+   19-Sep-01	RMS	Fixed bug in EAE (found by Dave Conroy)
+   17-Sep-01	RMS	Fixed typo in conditional
    10-Aug-01	RMS	Removed register from declarations
    17-Jul-01	RMS	Moved function prototype
    27-May-01	RMS	Added second Teletype support, fixed bug in API
@@ -256,7 +258,7 @@
 #else
 #define EAE_DFLT	0
 #endif
-#if defined (PDP4) || (PDP7)
+#if defined (PDP4) || defined (PDP7)
 #define API_DFLT	UNIT_NOAPI
 #else
 #define API_DFLT	UNIT_NOAPI			/* for now */
@@ -612,7 +614,7 @@ api_cycle = 0;						/* not API cycle */
 /* Main instruction fetch/decode loop: check trap and interrupt */
 
 while (reason == 0) {					/* loop until halted */
-int32 IR, MA, t, xct_count;
+int32 IR, MA, esc, t, xct_count;
 int32 link_init, fill;
 
 if (sim_interval <= 0) {				/* check clock queue */
@@ -1086,6 +1088,7 @@ case 033: case 032:					/* EAE */
 	if (IR & 0001000) LAC = LAC & 01000000;		/* IR<8>? clear AC */
 	link_init = LAC & 01000000;			/* link temporary */
 	fill = link_init? 0777777: 0;			/* fill = link */
+	esc = (IR & 077)? IR & 077: 0100;		/* get eff SC */
 
 	switch ((IR >> 6) & 07) {			/* case on IR<9:11> */
 	case 0:						/* setup */
@@ -1100,7 +1103,7 @@ case 033: case 032:					/* EAE */
 		PC = INCR_ADDR (PC);			/* increment PC */
 		if (eae_ac_sign) MQ = MQ ^ 0777777;	/* EAE AC sign? ~MQ */
 		LAC = LAC & 0777777;			/* clear link */
-		for (SC = IR & 077; SC != 0; SC--) {	/* loop per step cnt */
+		for (SC = esc; SC != 0; SC--) {		/* loop per step cnt */
 			if (MQ & 1) LAC = LAC + MA;	/* MQ<17>? add */
 			MQ = (MQ >> 1) | ((LAC & 1) << 17);
 			LAC = LAC >> 1;  }		/* shift AC'MQ right */
@@ -1130,7 +1133,7 @@ case 033: case 032:					/* EAE */
 			break;  }
 		LAC = LAC & 0777777;			/* clear link */
 		t = 0;					/* init loop */
-		for (SC = IR & 077; SC != 0; SC--) {
+		for (SC = esc; SC != 0; SC--) {		/* loop per step cnt */
 			if (t) LAC = (LAC + MA) & 01777777;
 			else LAC = (LAC - MA) & 01777777;
 			t = (LAC >> 18) & 1;		/* quotient bit */
@@ -1153,40 +1156,38 @@ case 033: case 032:					/* EAE */
 #if defined (PDP15)
 		if (!usmd) ion_defer = 2;		/* free cycles */
 #endif
-		for (SC = IR & 077; ((LAC & 0400000) ==
-			((LAC << 1) & 0400000)) && (SC != 0); SC--) {
+		for (SC = esc; (SC != 0) && ((LAC & 0400000) ==
+			((LAC << 1) & 0400000)); SC--) {
 			LAC = (LAC << 1) | ((MQ >> 17) & 1);
 			MQ = (MQ << 1) | (link_init >> 18);  }
 		LAC = link_init | (LAC & 0777777);	/* trim AC, restore L */
 		MQ = MQ & 0777777;			/* trim MQ */
+		SC = SC & 077;				/* trim SC */
 		break;
 	case 5:						/* long right shift */
-		t = IR & 077;				/* get shift count */
-		if (t < 18) {
-			MQ = ((LAC << (18 - t)) | (MQ >> t)) & 0777777;
-			LAC = ((fill << (18 - t)) | (LAC >> t)) & 01777777;  }
-		else {	if (t < 36) MQ =
-			  ((fill << (36 - t)) | (LAC >> (t - 18))) & 0777777;
+		if (esc < 18) {
+			MQ = ((LAC << (18 - esc)) | (MQ >> esc)) & 0777777;
+			LAC = ((fill << (18 - esc)) | (LAC >> esc)) & 01777777;  }
+		else {	if (esc < 36) MQ =
+			  ((fill << (36 - esc)) | (LAC >> (esc - 18))) & 0777777;
 			else MQ = fill;
 			LAC = link_init | fill;  }
 		SC = 0;					/* clear step count */
 		break;
 	case 6:						/* long left shift */
-		t = IR & 077;				/* get shift count */
-		if (t < 18) {
+		if (esc < 18) {
 			LAC = link_init |
-			  (((LAC << t) | (MQ >> (18 - t))) & 0777777);
-			MQ = ((MQ << t) | (fill >> (18 - t))) & 0777777;  }
-		else {	if (t < 36) LAC = link_init | 
-			  (((MQ << (t - 18)) | (fill >> (36 - t))) & 0777777);
+			  (((LAC << esc) | (MQ >> (18 - esc))) & 0777777);
+			MQ = ((MQ << esc) | (fill >> (18 - esc))) & 0777777;  }
+		else {	if (esc < 36) LAC = link_init | 
+			  (((MQ << (esc - 18)) | (fill >> (36 - esc))) & 0777777);
 			else LAC = link_init | fill;
 			MQ = fill;  }
 		SC = 0;					/* clear step count */
 		break;
 	case 7:						/* AC left shift */
-		t = IR & 077;				/* get shift count */
-		if (t < 18) LAC = link_init |
-			(((LAC << t) | (fill >> (18 - t))) & 0777777);
+		if (esc < 18) LAC = link_init |
+			(((LAC << esc) | (fill >> (18 - esc))) & 0777777);
 		else LAC = link_init | fill;
 		SC = 0;					/* clear step count */
 		break;  }				/* end switch IR */

@@ -27,6 +27,8 @@
    ptp		316/516-52 paper tape punch
    tty		316/516-33 teleprinter
    clk/options	316/516-12 real time clocks/internal options
+
+   07-Sep-01	RMS	Moved function prototypes
 */
 
 #include "h316_defs.h"
@@ -54,9 +56,6 @@ t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
-extern t_bool hp_setdev (UNIT *uptr, int32 val);
 
 /* PTR data structures
 

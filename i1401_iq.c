@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Sep-01	RMS	Moved function prototypes
    14-Apr-99	RMS	Changed t_addr to unsigned
 */
 
@@ -38,8 +39,6 @@ int32 inq_char = 033;					/* request inq */
 t_stat inq_svc (UNIT *uptr);
 t_stat inq_reset (DEVICE *dptr);
 void puts_tty (char *cptr);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
 
 /* INQ data structures
 

@@ -25,6 +25,7 @@
 
    tim		timer subsystem
 
+   31-Aug-01	RMS	Changed int64 to t_int64 for Windoze
    17-Jul-01	RMS	Moved function prototype
    04-Jul-01	RMS	Added DZ11 support
 */
@@ -45,12 +46,12 @@ extern int32 apr_flg, pi_act;
 extern UNIT cpu_unit;
 extern d10 pcst;
 extern a10 pager_PC;
-int64 timebase = 0;					/* 71b timebase */
+t_int64 timebase = 0;					/* 71b timebase */
 d10 ttg = 0;						/* time to go */
 d10 period = 0;						/* period */
 d10 quant = 0;						/* ITS quantum */
 int32 diagflg = 0;					/* diagnostics? */
-int32 dz_poll = TIM_DELAY * DZ_MULT;			/* DZ11 poll */
+int32 tmxr_poll = TIM_DELAY * DZ_MULT;			/* term mux poll */
 
 t_stat tim_svc (UNIT *uptr);
 t_stat tim_reset (DEVICE *dptr);
@@ -132,7 +133,7 @@ int32 t;
 
 t = diagflg? tim_unit.wait: sim_rtc_calb (TIM_TPS);	/* calibrate clock */
 sim_activate (&tim_unit, t);				/* reactivate unit */
-dz_poll = t * DZ_MULT;					/* set DZ poll */
+tmxr_poll = t * DZ_MULT;				/* set mux poll */
 timebase = (timebase + 1) & TB_MASK;			/* increment timebase */
 ttg = ttg - TIM_HWRE;					/* decrement timer */
 if (ttg <= 0) {						/* timeout? */
@@ -152,7 +153,7 @@ t_stat tim_reset (DEVICE *dptr)
 period = ttg = 0;					/* clear timer */
 apr_flg = apr_flg & ~APRF_TIM;				/* clear interrupt */
 sim_activate (&tim_unit, tim_unit.wait);		/* activate unit */
-dz_poll = tim_unit.wait * DZ_MULT;			/* set DZ poll */
+tmxr_poll = tim_unit.wait * DZ_MULT;			/* set mux poll */
 return SCPE_OK;
 }
 

@@ -25,9 +25,13 @@
 
    cpu		PDP-11 CPU (J-11 microprocessor)
 
+   15-Oct-01	RMS	Added debug logging
+   08-Oct-01	RMS	Fixed bug in revised interrupt logic
+   07-Sep-01	RMS	Revised device disable and interrupt mechanisms
+   26-Aug-01	RMS	Added DZ11 support
    10-Aug-01	RMS	Removed register from declarations
    17-Jul-01	RMS	Fixed warning from VC++ 6.0
-   01-Jun-01	RMS	Added DZ11 support
+   01-Jun-01	RMS	Added DZ11 interrupts
    23-Apr-01	RMS	Added RK611 support
    05-Apr-01	RMS	Added TS11/TSV05 support
    05-Mar-01	RMS	Added clock calibration support
@@ -151,8 +155,8 @@
       lowest priority trap.  Traps are processed by trap_vec and trap_clear,
       which provide the vector and subordinate traps to clear, respectively.
 
-      Variable int_req bit encodes all possible interrupts.  It is masked
-      under the interrupt masks, int_mask[ipl].  If any interrupt request
+      Array int_req[0:7] bit encodes all possible interrupts.  It is masked
+      under the interrupt priority level, ipl.  If any interrupt request
       is not masked, the interrupt bit is set in trap_req.  While most
       interrupts are handled centrally, a device can supply an interrupt
       acknowledge routine.
@@ -176,8 +180,6 @@
 #define calc_is(md) ((md) << VA_V_MODE)
 #define calc_ds(md) (calc_is((md)) | ((MMR3 & dsmask[(md)])? VA_DS: 0))
 #define calc_MMR1(val) (MMR1 = MMR1? ((val) << 8) | MMR1: (val))
-#define calc_ints(lv,rq,tr) (((rq) & int_mask[(lv)])? \
-	((tr) | TRAP_INT) : ((tr) & ~TRAP_INT))
 #define GET_SIGN_W(v) ((v) >> 15)
 #define GET_SIGN_B(v) ((v) >> 7)
 #define GET_Z(v) ((v) == 0)
@@ -196,6 +198,8 @@
 
 /* Global state */
 
+extern FILE *sim_log;
+
 uint16 *M = NULL;					/* address of memory */
 int32 REGFILE[6][2] = { 0 };				/* R0-R5, two sets */
 int32 STACKFILE[4] = { 0 };				/* SP, four modes */
@@ -210,7 +214,7 @@ int32 PSW = 0;						/* PSW */
   int32 N = 0, Z = 0, V = 0, C = 0;			/*   condition codes */
 int32 wait_state = 0;					/* wait state */
 int32 trap_req = 0;					/* trap requests */
-int32 int_req = 0;					/* interrupt requests */
+int32 int_req[IPL_HLVL] = { 0 };			/* interrupt requests */
 int32 PIRQ = 0;						/* programmed int req */
 int32 SR = 0;						/* switch register */
 int32 DR = 0;						/* display register */
@@ -235,13 +239,13 @@ int32 stop_trap = 1;					/* stop on trap */
 int32 stop_vecabort = 1;				/* stop on vec abort */
 int32 stop_spabort = 1;					/* stop on SP abort */
 int32 wait_enable = 0;					/* wait state enable */
+int32 pdp11_log = 0;					/* logging */
 int32 ibkpt_addr = ILL_ADR_FLAG | VAMASK;		/* breakpoint addr */
 int32 old_PC = 0;					/* previous PC */
 int32 dev_enb = (-1) & ~INT_TS;				/* dev enables */
 jmp_buf save_env;					/* abort handler */
 int32 dsmask[4] = { MMR3_KDS, MMR3_SDS, 0, MMR3_UDS };	/* dspace enables */
-uint32 int_mask[8] = { INT_IPL0, INT_IPL1, INT_IPL2,	/* interrupt masks */
-	INT_IPL3, INT_IPL4, INT_IPL5, INT_IPL6, INT_IPL7 };
+
 extern int32 sim_int_char;
 
 /* Function declarations */
@@ -265,6 +269,7 @@ void PWriteW (int32 data, int32 addr);
 void PWriteB (int32 data, int32 addr);
 t_stat iopageR (int32 *data, int32 addr, int32 access);
 t_stat iopageW (int32 data, int32 addr, int32 access);
+int32 calc_ints (int32 nipl, int32 trq);
 
 t_stat CPU_rd (int32 *data, int32 addr, int32 access);
 t_stat CPU_wr (int32 data, int32 addr, int32 access);
@@ -278,64 +283,87 @@ extern t_stat std_rd (int32 *data, int32 addr, int32 access);
 extern t_stat std_wr (int32 data, int32 addr, int32 access);
 extern t_stat lpt_rd (int32 *data, int32 addr, int32 access);
 extern t_stat lpt_wr (int32 data, int32 addr, int32 access);
+extern t_stat dz_rd (int32 *data, int32 addr, int32 access);
+extern t_stat dz_wr (int32 data, int32 addr, int32 access);
 extern t_stat rk_rd (int32 *data, int32 addr, int32 access);
 extern t_stat rk_wr (int32 data, int32 addr, int32 access);
 extern int32 rk_inta (void);
+extern int32 rk_enb;
 /* extern t_stat hk_rd (int32 *data, int32 addr, int32 access);
 extern t_stat hk_wr (int32 data, int32 addr, int32 access);
-extern int32 hk_inta (void); */
+extern int32 hk_inta (void);
+extern int32 hk_enb; */
 extern t_stat rl_rd (int32 *data, int32 addr, int32 access);
 extern t_stat rl_wr (int32 data, int32 addr, int32 access);
+extern int32 rl_enb;
 extern t_stat rp_rd (int32 *data, int32 addr, int32 access);
 extern t_stat rp_wr (int32 data, int32 addr, int32 access);
 extern int32 rp_inta (void);
+extern int32 rp_enb;
 extern t_stat rx_rd (int32 *data, int32 addr, int32 access);
 extern t_stat rx_wr (int32 data, int32 addr, int32 access);
+extern int32 rx_enb;
 extern t_stat dt_rd (int32 *data, int32 addr, int32 access);
 extern t_stat dt_wr (int32 data, int32 addr, int32 access);
+extern int32 dt_enb;
 extern t_stat tm_rd (int32 *data, int32 addr, int32 access);
 extern t_stat tm_wr (int32 data, int32 addr, int32 access);
+extern int32 tm_enb;
 extern t_stat ts_rd (int32 *data, int32 addr, int32 access);
 extern t_stat ts_wr (int32 data, int32 addr, int32 access);
+extern int32 ts_enb;
 
 /* Auxiliary data structures */
 
 struct iolink {						/* I/O page linkage */
 	int32	low;					/* low I/O addr */
 	int32	high;					/* high I/O addr */
-	int32	enb;					/* enable mask */
+	int32	*enb;					/* enable flag */
 	t_stat	(*read)();				/* read routine */
 	t_stat	(*write)();  };				/* write routine */
 
 struct iolink iotable[] = {
-	{ 017777740, 017777777, 0, &CPU_rd, &CPU_wr },
-	{ 017777546, 017777567, 0, &std_rd, &std_wr },
-	{ 017777514, 017777517, 0, &lpt_rd, &lpt_wr },
-	{ 017777400, 017777417, INT_RK, &rk_rd, &rk_wr },
-/*	{ 017777440, 017777477, INT_HK, &hk_rd, &hk_wr }, */
-	{ 017774400, 017774411, INT_RL, &rl_rd, &rl_wr },
-	{ 017776700, 017776753, INT_RP, &rp_rd, &rp_wr },
-	{ 017777170, 017777173, INT_RX, &rx_rd, &rx_wr },
-	{ 017777340, 017777351, INT_DTA, &dt_rd, &dt_wr },
-	{ 017772520, 017772533, INT_TM, &tm_rd, &tm_wr },
-	{ 017772520, 017772523, INT_TS, &ts_rd, &ts_wr },
-	{ 017777600, 017777677, 0, &APR_rd, &APR_wr },
-	{ 017772200, 017772377, 0, &APR_rd, &APR_wr },
-	{ 017777570, 017777577, 0, &SR_MMR012_rd, &SR_MMR012_wr },
-	{ 017772516, 017772517, 0, &MMR3_rd, &MMR3_wr },
-	{ 0, 0, 0, NULL, NULL }  };
+	{ 017777740, 017777777, NULL, &CPU_rd, &CPU_wr },
+	{ 017777546, 017777567, NULL, &std_rd, &std_wr },
+	{ 017777514, 017777517, NULL, &lpt_rd, &lpt_wr },
+	{ 017760100, 017760107, NULL, &dz_rd, &dz_wr },
+	{ 017777400, 017777417, &rk_enb, &rk_rd, &rk_wr },
+/*	{ 017777440, 017777477, &hk_enb, &hk_rd, &hk_wr }, */
+	{ 017774400, 017774411, &rl_enb, &rl_rd, &rl_wr },
+	{ 017776700, 017776753, &rp_enb, &rp_rd, &rp_wr },
+	{ 017777170, 017777173, &rx_enb, &rx_rd, &rx_wr },
+	{ 017777340, 017777351, &dt_enb, &dt_rd, &dt_wr },
+	{ 017772520, 017772533, &tm_enb, &tm_rd, &tm_wr },
+	{ 017772520, 017772523, &ts_enb, &ts_rd, &ts_wr },
+	{ 017777600, 017777677, NULL, &APR_rd, &APR_wr },
+	{ 017772200, 017772377, NULL, &APR_rd, &APR_wr },
+	{ 017777570, 017777577, NULL, &SR_MMR012_rd, &SR_MMR012_wr },
+	{ 017772516, 017772517, NULL, &MMR3_rd, &MMR3_wr },
+	{ 0, 0, NULL, NULL, NULL }  };
 
-int32 int_vec[32] = {					/* int req to vector */
-	0, 0, 0, VEC_PIRQ, VEC_CLK, VEC_DTA, 0, VEC_PIRQ,
-	VEC_RK, VEC_RL, VEC_RX, VEC_TM, VEC_RP, VEC_TS, VEC_HK, 0,
-	VEC_DZ0RX, VEC_DZ0TX, 0, VEC_PIRQ, VEC_TTI, VEC_TTO, VEC_PTR, VEC_PTP,
-	VEC_LPT, 0, 0, 0, VEC_PIRQ, VEC_PIRQ, VEC_PIRQ, VEC_PIRQ  };
+int32 int_vec[IPL_HLVL][32] = {				/* int req to vector */
+	{ 0 },						/* IPL 0 */
+	{ VEC_PIRQ },					/* IPL 1 */
+	{ VEC_PIRQ },					/* IPL 2 */
+	{ VEC_PIRQ },					/* IPL 3 */
+	{ VEC_TTI, VEC_TTO, VEC_PTR, VEC_PTP,		/* IPL 4 */
+	  VEC_LPT, VEC_PIRQ },
+	{ VEC_RK, VEC_RL, VEC_RX, VEC_TM,		/* IPL 5 */
+	  VEC_RP, VEC_TS, VEC_HK, VEC_DZRX,
+	  VEC_DZTX, VEC_PIRQ }, 
+	{ VEC_CLK, VEC_DTA, VEC_PIRQ },			/* IPL 6 */
+	{ VEC_PIRQ }  };				/* IPL 7 */
 
-int32 (*int_ack[32])() = {				/* int ack routines */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	&rk_inta, NULL, NULL, NULL, &rp_inta, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL  };
+int32 (*int_ack[IPL_HLVL][32])() = {			/* int ack routines */
+	{ NULL },					/* IPL 0 */
+	{ NULL },					/* IPL 1 */
+	{ NULL },					/* IPL 2 */
+	{ NULL },					/* IPL 3 */
+	{ NULL },					/* IPL 4 */
+	{ &rk_inta, NULL, NULL, NULL,			/* IPL 5 */
+	  &rp_inta, NULL, NULL, NULL },
+	{ NULL },					/* IPL 6 */
+	{ NULL }  };					/* IPL 7 */
 
 int32 trap_vec[TRAP_V_MAX] = {				/* trap req to vector */
 	VEC_RED, VEC_ODD, VEC_MME, VEC_NXM,
@@ -398,7 +426,7 @@ REG cpu_reg[] = {
 	{ ORDATA (MAINT, MAINT, 16) },
 	{ ORDATA (HITMISS, HITMISS, 16) },
 	{ ORDATA (CPUERR, CPUERR, 16) },
-	{ ORDATA (INT, int_req, 32), REG_RO },
+	{ BRDATA (IREQ, int_req, 8, 32, IPL_HLVL), REG_RO },
 	{ ORDATA (TRAPS, trap_req, TRAP_V_MAX) },
 	{ ORDATA (PIRQ, PIRQ, 16) },
 	{ FLDATA (WAIT, wait_state, 0) },
@@ -406,6 +434,7 @@ REG cpu_reg[] = {
 	{ ORDATA (STOP_TRAPS, stop_trap, TRAP_V_MAX) },
 	{ FLDATA (STOP_VECA, stop_vecabort, 0) },
 	{ FLDATA (STOP_SPA, stop_spabort, 0) },
+	{ ORDATA (DBGLOG, pdp11_log, 16), REG_HIDDEN },
 	{ ORDATA (FAC0H, FR[0].h, 32) },
 	{ ORDATA (FAC0L, FR[0].l, 32) },
 	{ ORDATA (FAC1H, FR[1].h, 32) },
@@ -568,7 +597,7 @@ extern UNIT *sim_clock_queue;
 extern UNIT clk_unit;
 int32 IR, srcspec, srcreg, dstspec, dstreg;
 int32 src, src2, dst;
-int32 i, t, sign, oldrs, trapnum;
+int32 i, j, t, sign, oldrs, trapnum;
 int32 abortval;
 volatile int32 trapea;
 t_stat reason;
@@ -602,7 +631,7 @@ isenable = calc_is (cm);
 dsenable = calc_ds (cm);
 
 CPU_wr (PIRQ, 017777772, WRITE);			/* rewrite PIRQ */
-trap_req = calc_ints (ipl, int_req, trap_req);
+trap_req = calc_ints (ipl, trap_req);
 trapea = 0;
 reason = 0;
 sim_rtc_init (clk_unit.wait);				/* init clock */
@@ -641,28 +670,38 @@ if (abortval != 0) {
 while (reason == 0)  {
 if (sim_interval <= 0) {				/* check clock queue */
 	reason = sim_process_event ();
-	trap_req = calc_ints (ipl, int_req, trap_req);
+	trap_req = calc_ints (ipl, trap_req);
 	continue;  }
 if (trap_req) {						/* check traps, ints */
 	trapea = 0;					/* assume srch fails */
 	if (t = trap_req & TRAP_ALL) {			/* if a trap */
-		for (trapnum = 0; trapnum < TRAP_V_MAX; trapnum++) {
-			if ((t >> trapnum) & 1) {
-				trapea = trap_vec[trapnum];
-				trap_req = trap_req & ~trap_clear[trapnum];
-				if ((stop_trap >> trapnum) & 1)
-					reason = trapnum + 1;
-				break;  }  }  }
-	else if (t = int_req & int_mask[ipl]) {		/* if an interrupt */
-		for (i = 0; i < 32; i++) {
-			if ((t >> i) & 1) {
-				int_req = int_req & ~(1u << i);
-				if (int_ack[i]) trapea = int_ack[i]();
-				else trapea = int_vec[i];
-				trapnum = TRAP_V_MAX;
-				break;  }  }  }
+	    for (trapnum = 0; trapnum < TRAP_V_MAX; trapnum++) {
+		if ((t >> trapnum) & 1) {
+			trapea = trap_vec[trapnum];
+			trap_req = trap_req & ~trap_clear[trapnum];
+			if ((stop_trap >> trapnum) & 1)
+				reason = trapnum + 1;
+			break;  }			/* end if t & 1 */
+		}					/* end for */
+	    }						/* end if */
+	else {
+	    for (i = IPL_HLVL - 1; (trapea == 0) && (i > ipl); i--) {
+		t = int_req[i];				/* get level */
+		for (j = 0; t && (j < 32); j++) {	/* srch level */
+		    if ((t >> j) & 1) {			/* irq found? */
+			int_req[i] = int_req[i] & ~(1u << j);
+			if (int_ack[i][j]) trapea = int_ack[i][j]();
+			else trapea = int_vec[i][j];
+			trapnum = TRAP_V_MAX;
+			if (DBG_LOG (LOG_CPU_I)) fprintf (sim_log,
+			    ">>CPU, lvl=%d, flag=%d, vec=%o\n",
+			    i, j, trapea);
+			break;  }			/* end if t & 1 */
+		    }					/* end for j */
+	        }					/* end for i */
+	    }						/* end else */
 	if (trapea == 0) {				/* nothing to do? */
-		trap_req = calc_ints (ipl, int_req, 0);	/* recalculate */
+		trap_req = calc_ints (ipl, 0);		/* recalculate */
 		continue;  }				/* back to fetch */
 
 /* Process a trap or interrupt
@@ -707,7 +746,7 @@ if (trap_req) {						/* check traps, ints */
 	JMP_PC (src);
 	isenable = calc_is (cm);
 	dsenable = calc_ds (cm);
-	trap_req = calc_ints (ipl, int_req, trap_req);
+	trap_req = calc_ints (ipl, trap_req);
 	if ((SP < STKLIM) && (cm == KERNEL) &&
 	    (trapnum != TRAP_V_RED) && (trapnum != TRAP_V_YEL)) {
 		setTRAP (TRAP_YEL);
@@ -768,7 +807,8 @@ case 000:
 			if (cm == KERNEL) {
 				reset_all (1);
 				PIRQ = 0;
-				int_req = 0;
+				for (i = 0; i < IPL_HLVL; i++)
+					int_req[i] = 0;
 				MMR0 = MMR0 & ~(MMR0_MME | MMR0_FREEZE);
 				MMR3 = 0;
 				trap_req = trap_req & ~TRAP_INT;
@@ -796,7 +836,7 @@ case 000:
 			Z = (src2 >> PSW_V_Z) & 01;
 			V = (src2 >> PSW_V_V) & 01;
 			C = (src2 >> PSW_V_C) & 01;
-			trap_req = calc_ints (ipl, int_req, trap_req);
+			trap_req = calc_ints (ipl, trap_req);
 			isenable = calc_is (cm);
 			dsenable = calc_ds (cm);
 			if (rs != oldrs) {
@@ -830,7 +870,7 @@ case 000:
 			break;  }
 		if (IR < 000240) {			/* SPL */
 			if (cm == KERNEL) ipl = IR & 07;
-			trap_req = calc_ints (ipl, int_req, trap_req);
+			trap_req = calc_ints (ipl, trap_req);
 			break;  }			/* end if SPL */
 		if (IR < 000260) {			/* clear CC */
 			if (IR & 010) N = 0;
@@ -1503,7 +1543,7 @@ case 010:
 		dst = dstreg? R[dstspec]: ReadB (GeteaB (dstspec));
 		if (cm == KERNEL) {
 			ipl = (dst >> PSW_V_IPL) & 07;
-			trap_req = calc_ints (ipl, int_req, trap_req);  }
+			trap_req = calc_ints (ipl, trap_req);  }
 		N = (dst >> PSW_V_N) & 01;
 		Z = (dst >> PSW_V_Z) & 01;
 		V = (dst >> PSW_V_V) & 01;
@@ -2068,9 +2108,9 @@ struct iolink *p;
 
 for (p = &iotable[0]; p -> low != 0; p++ ) {
 	if ((pa >= p -> low) && (pa <= p -> high) &&
-	    ((p -> enb == 0) || (dev_enb & p -> enb)))  {
+	    ((p -> enb == NULL) || *p -> enb))  {
 		stat = p -> read (data, pa, access);
-		trap_req = calc_ints (ipl, int_req, trap_req);
+		trap_req = calc_ints (ipl, trap_req);
 		return stat;  }  }
 return SCPE_NXM;
 }
@@ -2082,11 +2122,22 @@ struct iolink *p;
 
 for (p = &iotable[0]; p -> low != 0; p++ ) {
 	if ((pa >= p -> low) && (pa <= p -> high) &&
-	    ((p -> enb == 0) || (dev_enb & p -> enb)))  {
+	    ((p -> enb == NULL) || *p -> enb))  {
 		stat = p -> write (data, pa, access);
-		trap_req = calc_ints (ipl, int_req, trap_req);
+		trap_req = calc_ints (ipl, trap_req);
 		return stat;  }  }
 return SCPE_NXM;
+}
+
+/* Calculate interrupt outstanding */
+
+int32 calc_ints (int32 nipl, int32 trq)
+{
+int32 i;
+
+for (i = IPL_HLVL - 1; i > nipl; i--) {
+	if (int_req[i]) return (trq | TRAP_INT);  }
+return (trq & ~TRAP_INT);
 }
 
 /* I/O page routines for CPU registers
@@ -2133,13 +2184,13 @@ default:						/* MMR1, MMR2 */
 	return SCPE_OK;  }				/* end switch pa */
 }
 
-t_stat MMR3_rd (int32 *data, int32 pa, int32 access)		/* MMR3 */
+t_stat MMR3_rd (int32 *data, int32 pa, int32 access)	/* MMR3 */
 {
 *data = MMR3 & MMR3_IMP;
 return SCPE_OK;
 }
 
-t_stat MMR3_wr (int32 data, int32 pa, int32 access)		/* MMR3 */
+t_stat MMR3_wr (int32 data, int32 pa, int32 access)	/* MMR3 */
 {
 if (pa & 1) return SCPE_OK;
 MMR3 = data & MMR3_RW;
@@ -2267,17 +2318,22 @@ case 015:						/* PIRQ */
 	if (access == WRITEB) {
 		if (pa & 1) data = data << 8;
 		else return SCPE_OK;  }
-	int_req = int_req & ~(INT_PIR7 + INT_PIR6 + INT_PIR5 + INT_PIR4 +
-		INT_PIR3 + INT_PIR2 + INT_PIR1);
 	PIRQ = data & PIRQ_RW;
 	pl = 0;
-	if (PIRQ & PIRQ_PIR1) { int_req = int_req | INT_PIR1; pl = 0042;  }
-	if (PIRQ & PIRQ_PIR2) { int_req = int_req | INT_PIR2; pl = 0104;  }
-	if (PIRQ & PIRQ_PIR3) { int_req = int_req | INT_PIR3; pl = 0146;  }
-	if (PIRQ & PIRQ_PIR4) { int_req = int_req | INT_PIR4; pl = 0210;  }
-	if (PIRQ & PIRQ_PIR5) { int_req = int_req | INT_PIR5; pl = 0252;  }
-	if (PIRQ & PIRQ_PIR6) { int_req = int_req | INT_PIR6; pl = 0314;  }
-	if (PIRQ & PIRQ_PIR7) { int_req = int_req | INT_PIR7; pl = 0356;  }
+	if (PIRQ & PIRQ_PIR1) { SET_INT (PIR1); pl = 0042;  }
+	else CLR_INT (PIR1);
+	if (PIRQ & PIRQ_PIR2) { SET_INT (PIR2); pl = 0104;  }
+	else CLR_INT (PIR2);
+	if (PIRQ & PIRQ_PIR3) { SET_INT (PIR3); pl = 0146;  }
+	else CLR_INT (PIR3);
+	if (PIRQ & PIRQ_PIR4) { SET_INT (PIR4); pl = 0210;  }
+	else CLR_INT (PIR4);
+	if (PIRQ & PIRQ_PIR5) { SET_INT (PIR5); pl = 0252;  }
+	else CLR_INT (PIR5);
+	if (PIRQ & PIRQ_PIR6) { SET_INT (PIR6); pl = 0314;  }
+	else CLR_INT (PIR6);
+	if (PIRQ & PIRQ_PIR7) { SET_INT (PIR7); pl = 0356;  }
+	else CLR_INT (PIR7);
 	PIRQ = PIRQ | pl;
 	return SCPE_OK;
 

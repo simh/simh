@@ -26,6 +26,9 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   19-Oct-01	RMS	Added DZ definitions
+   15-Oct-01	RMS	Added logging capabilities
+   07-Sep-01	RMS	Revised for multilevel interrupts
    01-Jun-01	RMS	Added DZ11 support
    23-Apr-01	RMS	Added RK611 support
    05-Apr-01	RMS	Added TS11/TSV05 support
@@ -237,40 +240,42 @@ typedef struct fpac fpac_t;
 #define STOP_SPABORT	TRAP_V_MAX + 5			/* abort trap push */
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* cond error return */
 
-/* Interrupt assignments, priority is right to left
+/* DZ11 parameters */
 
-   <3:0> =	BR7, <3> = PIR7
-   <7:4> =	BR6, <7> = PIR6
-   <19:8> =	BR5, <19> = PIR5
-   <28:20> =	BR4, <28> = PIR4
-   <29> =	PIR3
-   <30> =	PIR2
-   <31> =	PIR1
-*/
+#define DZ_MUXES	1				/* # of muxes */
+#define DZ_LINES	8				/* lines per mux */
 
-#define INT_V_PIR7	3
-#define INT_V_CLK	4
-#define INT_V_DTA	5
-#define INT_V_PIR6	7
-#define INT_V_RK	8
-#define INT_V_RL	9
-#define INT_V_RX	10
-#define INT_V_TM	11
-#define INT_V_RP	12
-#define INT_V_TS	13
-#define INT_V_HK	14
-#define INT_V_DZ0RX	16
-#define INT_V_DZ0TX	17
-#define INT_V_PIR5	19
-#define INT_V_TTI	20
-#define INT_V_TTO	21
-#define INT_V_PTR	22
-#define INT_V_PTP	23
-#define INT_V_LPT	24
-#define INT_V_PIR4	28
-#define INT_V_PIR3	29
-#define INT_V_PIR2	30
-#define INT_V_PIR1	31
+/* Interrupt assignments; within each level, priority is right to left */
+
+#define IPL_HLVL	8				/* # int levels */
+
+#define INT_V_PIR7	0				/* BR7 */
+
+#define INT_V_CLK	0				/* BR6 */
+#define INT_V_DTA	1
+#define INT_V_PIR6	2
+
+#define INT_V_RK	0				/* BR5 */
+#define INT_V_RL	1
+#define INT_V_RX	2
+#define INT_V_TM	3
+#define INT_V_RP	4
+#define INT_V_TS	5
+#define INT_V_HK	6
+#define INT_V_DZRX	7
+#define INT_V_DZTX	8
+#define INT_V_PIR5	9
+
+#define INT_V_TTI	0				/* BR4 */
+#define INT_V_TTO	1
+#define INT_V_PTR	2
+#define INT_V_PTP	3
+#define INT_V_LPT	4
+#define INT_V_PIR4	5
+
+#define INT_V_PIR3	0				/* BR3 */
+#define INT_V_PIR2	0				/* BR2 */
+#define INT_V_PIR1	0				/* BR1 */
 
 #define INT_PIR7	(1u << INT_V_PIR7)
 #define INT_CLK		(1u << INT_V_CLK)
@@ -283,8 +288,8 @@ typedef struct fpac fpac_t;
 #define INT_RP		(1u << INT_V_RP)
 #define INT_TS		(1u << INT_V_TS)
 #define INT_HK		(1u << INT_V_HK)
-#define INT_DZ0RX	(1u << INT_V_DZ0RX)
-#define INT_DZ0TX	(1u << INT_V_DZ0TX)
+#define INT_DZRX	(1u << INT_V_DZRX)
+#define INT_DZTX	(1u << INT_V_DZTX)
 #define INT_PIR5	(1u << INT_V_PIR5)
 #define INT_PTR		(1u << INT_V_PTR)
 #define INT_PTP		(1u << INT_V_PTP)
@@ -296,14 +301,30 @@ typedef struct fpac fpac_t;
 #define INT_PIR2	(1u << INT_V_PIR2)
 #define INT_PIR1	(1u << INT_V_PIR1)
 
-#define INT_IPL7	0x00000000			/* int level masks */
-#define INT_IPL6	0x0000000F
-#define INT_IPL5	0x000000FF
-#define INT_IPL4	0x000FFFFF
-#define INT_IPL3	0x1FFFFFFF
-#define INT_IPL2	0x3FFFFFFF
-#define INT_IPL1	0x7FFFFFFF
-#define INT_IPL0	0xFFFFFFFF
+#define IPL_CLK		6				/* int pri levels */
+#define IPL_DTA		6
+#define IPL_RK		5
+#define IPL_RL		5
+#define IPL_RX		5
+#define IPL_TM		5
+#define IPL_RP		5
+#define IPL_TS		5
+#define IPL_HK		5
+#define IPL_DZRX	5
+#define IPL_DZTX	5
+#define IPL_PTR		4
+#define IPL_PTP		4
+#define IPL_TTI		4
+#define IPL_TTO		4
+#define IPL_LPT		4
+
+#define IPL_PIR7	7
+#define IPL_PIR6	6
+#define IPL_PIR5	5
+#define IPL_PIR4	4
+#define IPL_PIR3	3
+#define IPL_PIR2	2
+#define IPL_PIR1	1
 
 #define VEC_PIRQ	0240				/* interrupt vectors */
 #define VEC_TTI		0060
@@ -320,8 +341,14 @@ typedef struct fpac fpac_t;
 #define VEC_TS		0224
 #define VEC_RP		0254
 #define VEC_RX		0264
-#define VEC_DZ0RX	0310
-#define VEC_DZ0TX	0314
+#define VEC_DZRX	0310
+#define VEC_DZTX	0314
+
+/* Interrupt macros */
+
+#define IREQ(dv)	int_req[IPL_##dv]
+#define SET_INT(dv)	IREQ(dv) = IREQ(dv) | (INT_##dv)
+#define CLR_INT(dv)	IREQ(dv) = IREQ(dv) & ~(INT_##dv)
 
 /* CPU and FPU macros */
 
@@ -331,3 +358,15 @@ typedef struct fpac fpac_t;
 #define ABORT(val) longjmp (save_env, (val))
 #define SP R[6]
 #define PC R[7]
+
+/* Logging */
+
+#define LOG_CPU_I	00000001
+#define LOG_RP		00000010
+#define LOG_TS		00000020
+#define LOG_TC_MS	00000100
+#define LOG_TC_RW	00000200
+#define LOG_TC_RA	00000400
+#define LOG_TC_BL	00001000
+
+#define DBG_LOG(x)	(sim_log && (pdp11_log & (x)))

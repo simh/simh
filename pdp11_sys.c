@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Sep-01	RMS	Removed multiconsole support
+   26-Aug-01	RMS	Added DZ11
    20-Aug-01	RMS	Updated bad block inquiry
    17-Jul-01	RMS	Fixed warning from VC++ 6.0
    27-May-01	RMS	Added multiconsole support
@@ -45,6 +47,7 @@ extern DEVICE cpu_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
 extern DEVICE lpt_dev, clk_dev;
+extern DEVICE dz_dev;
 extern DEVICE rk_dev, rx_dev;
 extern DEVICE rl_dev, rp_dev;
 extern DEVICE dt_dev, tm_dev;
@@ -61,7 +64,6 @@ extern int32 saved_PC;
    sim_PC		pointer to saved PC register descriptor
    sim_emax		number of words for examine
    sim_devices		array of pointers to simulated devices
-   sim_consoles		array of pointers to consoles (if more than one)
    sim_stop_messages	array of pointers to stop messages
    sim_load		binary loader
 */
@@ -77,13 +79,12 @@ DEVICE *sim_devices[] = {
 	&ptr_dev, &ptp_dev,
 	&tti_dev, &tto_dev,
 	&lpt_dev, &clk_dev,
+	&dz_dev,
 	&rk_dev, /* &hk_dev, */
 	&rl_dev, &rp_dev,
 	&rx_dev, &dt_dev,
 	&tm_dev, &ts_dev,
 	NULL };
-
-UNIT *sim_consoles = NULL;
 
 const char *sim_stop_messages[] = {
 	"Unknown error",
@@ -317,7 +318,7 @@ static const char *opcode[] = {
 "SOB",
 "BPL","BMI","BHI","BLOS",
 "BVC","BVS","BCC","BCS",
-"BHIS","BLO",							/* encode only */
+"BHIS","BLO",						/* encode only */
 "EMT","TRAP",
 "CLRB","COMB","INCB","DECB",
 "NEGB","ADCB","SBCB","TSTB",

@@ -25,6 +25,10 @@
 
    tc		TC11/TU56 DECtape
 
+   15-Sep-01	RMS 	Integrated debug logging
+   27-Sep-01	RMS	Fixed interrupt after stop for RSTS/E
+   07-Sep-01	RMS	Revised device disable and interrupt mechanisms
+   29-Aug-01	RMS	Added casts to PDP-8 unpack routine
    17-Jul-01	RMS	Moved function prototype
    11-May-01	RMS	Fixed bug in reset
    26-Apr-01	RMS	Added device enable/disable support
@@ -228,27 +232,30 @@
 #define LOG_BL		010				/* block # lblk */
 
 #define DT_SETDONE	tccm = tccm | CSR_DONE; \
-			if (tccm & CSR_IE) int_req = int_req | INT_DTA
+			if (tccm & CSR_IE) SET_INT (DTA)
 #define DT_CLRDONE	tccm = tccm & ~CSR_DONE; \
-			int_req = int_req & ~INT_DTA
+			CLR_INT (DTA)
 #define ABS(x)		(((x) < 0)? (-(x)): (x))
 
 extern uint16 *M;					/* memory */
-extern int32 int_req, dev_enb;
+extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
 extern int32 sim_switches;
+extern int32 pdp11_log;
+extern FILE *sim_log;
 int32 tcst = 0;						/* status */
 int32 tccm = 0;						/* command */
 int32 tcwc = 0;						/* word count */
 int32 tcba = 0;						/* bus address */
 int32 tcdt = 0;						/* data */
-int32 dt_ctime = 4;					/* fast cmd time */
+int32 dt_ctime = 100;					/* fast cmd time */
 int32 dt_ltime = 12;					/* interline time */
 int32 dt_actime = 54000;				/* accel time */
 int32 dt_dctime = 72000;				/* decel time */
 int32 dt_substate = 0;
-int32 dt_log = 0;
 int32 dt_logblk = 0;
+int32 dt_enb = 1;					/* device enable */
+
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_svcdone (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
@@ -294,7 +301,7 @@ REG dt_reg[] = {
 	{ ORDATA (TCWC, tcwc, 16) },
 	{ ORDATA (TCBA, tcba, 16) },
 	{ ORDATA (TCDT, tcdt, 16) },
-	{ FLDATA (INT, int_req, INT_V_DTA) },
+	{ FLDATA (INT, IREQ (DTA), INT_V_DTA) },
 	{ FLDATA (ERR, tccm, CSR_V_ERR) },
 	{ FLDATA (DONE, tccm, CSR_V_DONE) },
 	{ FLDATA (IE, tccm, CSR_V_DONE) },
@@ -303,7 +310,6 @@ REG dt_reg[] = {
 	{ DRDATA (ACTIME, dt_actime, 31), REG_NZ },
 	{ DRDATA (DCTIME, dt_dctime, 31), REG_NZ },
 	{ ORDATA (SUBSTATE, dt_substate, 1) },
-	{ ORDATA (LOG, dt_log, 4), REG_HIDDEN },
 	{ DRDATA (LBLK, dt_logblk, 12), REG_HIDDEN },
 	{ DRDATA (POS0, dt_unit[0].pos, 31), PV_LEFT + REG_RO },
 	{ DRDATA (POS1, dt_unit[1].pos, 31), PV_LEFT + REG_RO },
@@ -345,7 +351,7 @@ REG dt_reg[] = {
 		  REG_HRO },
 	{ GRDATA (FLG7, dt_unit[7].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
 		  REG_HRO },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_DTA), REG_HRO },
+	{ FLDATA (*DEVENB, dt_enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB dt_mod[] = {
@@ -411,14 +417,14 @@ case 001:						/* TCCM */
 	old_tccm = tccm;				/* save prior */
 	if (access == WRITEB) data = (PA & 1)?
 		(tccm & 0377) | (data << 8): (tccm & ~0377) | data;
-	if ((data & CSR_IE) == 0) int_req = int_req & ~INT_DTA;
+	if ((data & CSR_IE) == 0) CLR_INT (DTA);
 	else if ((((tccm & CSR_IE) == 0) && (tccm & CSR_DONE)) ||
-		(data & CSR_DONE)) int_req = int_req | INT_DTA;
+		(data & CSR_DONE)) SET_INT (DTA);
 	tccm = (tccm & ~CSR_RW) | (data & CSR_RW);
 	if ((data & CSR_GO) && (tccm & CSR_DONE)) {	/* new cmd? */
 		tcst = tcst & ~STA_ALLERR;		/* clear errors */
 		tccm = tccm & ~(CSR_ERR | CSR_DONE);	/* clear done, err */
-		int_req = int_req & ~INT_DTA;		/* clear int */
+		CLR_INT (DTA);				/* clear int */
 		if ((old_tccm ^ tccm) & CSR_UNIT) dt_deselect (old_tccm);
 		unum = CSR_GETUNIT (tccm);		/* get drive */
 		fnc = CSR_GETFNC (tccm);		/* get function */
@@ -581,8 +587,8 @@ case FNC_SRCH:						/* search */
 		DTU_TSIZE (uptr): blk), uptr) - DT_BLKLN - DT_WSIZE;
 	else newpos = DT_BLK2LN ((DT_QREZ (uptr)?
 		0: blk + 1), uptr) + DT_BLKLN + (DT_WSIZE - 1);
-	if (dt_log & LOG_MS) printf ("[DT%d: searching %s]\n", unum,
-		 (dir? "backward": "forward"));
+	if (DBG_LOG (LOG_TC_MS)) fprintf (sim_log, ">>DT%d: searching %s\n",
+		unum, (dir? "backward": "forward"));
 	break;
 case FNC_WRIT:						/* write */
 case FNC_READ:						/* read */
@@ -599,8 +605,8 @@ case FNC_READ:						/* read */
 		blk + 1: blk), uptr) - DT_HTLIN - DT_WSIZE;
 	else newpos = DT_BLK2LN (((relpos < DT_HTLIN)?
 		blk: blk + 1), uptr) + DT_HTLIN + (DT_WSIZE - 1);
-	if ((dt_log & LOG_RW) || ((dt_log & LOG_BL) && (blk == dt_logblk)))
-		printf ("[DT%d: %s block %d %s]\n",
+	if (DBG_LOG (LOG_TC_RW) || (DBG_LOG (LOG_TC_BL) && (blk == dt_logblk)))
+		fprintf (sim_log, ">>DT%d: %s block %d %s\n",
 			unum, ((fnc == FNC_READ)? "read": "write"),
 			blk, (dir? "backward": "forward"));
 	break;
@@ -618,8 +624,8 @@ case FNC_WALL:						/* write all */
 		else newpos = DT_BLK2LN (blk, uptr) + DT_CSMLN + (DT_WSIZE - 1);  }
 	if (fnc == FNC_WALL) sim_activate 		/* write all? */
 		(&dt_dev.units[DT_TIMER], dt_ctime);	/* sched done */
-	if ((dt_log & LOG_RA) || ((dt_log & LOG_BL) && (blk == dt_logblk)))
-		printf ("[DT%d: read all block %d %s]\n",
+	if (DBG_LOG (LOG_TC_RW) || (DBG_LOG (LOG_TC_BL) && (blk == dt_logblk)))
+		fprintf (sim_log, ">>DT%d: read all block %d %s\n",
 			unum, blk, (dir? "backward": "forward"));
 	break;
 default:
@@ -685,11 +691,11 @@ if ((uptr -> pos < 0) ||
 return FALSE;
 }
 
-/* Command timer service after stop - set done but not interrupt */
+/* Command timer service after stop - set done */
 
 t_stat dt_svcdone (UNIT *uptr)
 {
-tccm = tccm | CSR_DONE;
+DT_SETDONE;
 return SCPE_OK;
 }
 
@@ -932,7 +938,7 @@ int32 ba = blk * DTU_BSIZE (uptr);
 int32 i, csum, wrd;
 
 csum = 077;						/* init csum */
-for (i = 0; i < DTU_BSIZE (uptr); i++) {			/* loop thru buf */
+for (i = 0; i < DTU_BSIZE (uptr); i++) {		/* loop thru buf */
 	wrd = bptr[ba + i] ^ 0777777;			/* get ~word */
 	csum = csum ^ (wrd >> 12) ^ (wrd >> 6) ^ wrd;  }
 return (csum & 077);
@@ -974,14 +980,14 @@ for (i = 0; i < DT_NUMDR; i++) {			/* stop all activity */
 		uptr -> LASTT = sim_grtime ();  }  }
 tcst =  tcwc = tcba = tcdt = 0;				/* clear reg */
 tccm = CSR_DONE;
-int_req = int_req & ~INT_DTA;				/* clear int req */
+CLR_INT (DTA);						/* clear int req */
 return SCPE_OK;
 }
 
 /* Device bootstrap */
 
-#define BOOT_START 02000		/* start */
-#define BOOT_UNIT 02006			/* where to store unit number */
+#define BOOT_START 02000				/* start */
+#define BOOT_UNIT 02006					/* unit number */
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int32))
 
 static const int32 boot_rom[] = {
@@ -1064,7 +1070,7 @@ uptr -> filebuf = calloc (uptr -> capac, sizeof (int32));
 if (uptr -> filebuf == NULL) {				/* can't alloc? */
 	detach_unit (uptr);
 	return SCPE_MEM;  }
-printf ("%TC: buffering file in memory\n");
+printf ("TC: buffering file in memory\n");
 rewind (uptr -> fileref);				/* start of file */
 if (uptr -> flags & UNIT_8FMT) {			/* PDP-8? */
 	bptr = uptr -> filebuf;				/* file buffer */
@@ -1073,10 +1079,10 @@ if (uptr -> flags & UNIT_8FMT) {			/* PDP-8? */
 		if (k == 0) break;
 		for ( ; k < D8_NBSIZE; k++) pdp8b[k] = 0;
 		for (k = 0; k < D8_NBSIZE; k = k + 3) {	/* loop thru blk */
-			bptr[ba] = ((pdp8b[k] & 07777) << 6) |
-				((pdp8b[k + 1] >> 6) & 077);
+			bptr[ba] = ((uint32) (pdp8b[k] & 07777) << 6) |
+				((uint32) (pdp8b[k + 1] >> 6) & 077);
 			bptr[ba + 1] = ((pdp8b[k + 1] & 077) << 12) |
-				(pdp8b[k + 2] & 07777);
+				((uint32) (pdp8b[k + 2] & 07777));
 			ba = ba + 2;  }			/* end blk loop */
 		}					/* end file loop */
 	uptr -> hwmark = ba;  }				/* end if */
@@ -1109,7 +1115,7 @@ if (sim_is_active (uptr)) {				/* active? cancel op */
 	if ((unum == CSR_GETUNIT (tccm)) && ((tccm & CSR_DONE) == 0)) {
 		tcst = tcst | STA_SEL;
 		tccm = tccm | CSR_ERR | CSR_DONE;
-		if (tccm & CSR_IE) int_req = int_req | INT_DTA;  }
+		if (tccm & CSR_IE) SET_INT (DTA);  }
 	uptr -> STATE = uptr -> pos = 0;  }
 if (uptr -> hwmark) {					/* any data? */
 	printf ("TC: writing buffer to file\n");

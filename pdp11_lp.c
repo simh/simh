@@ -25,6 +25,7 @@
 
    lpt		LP11 line printer
 
+   07-Sep-01	RMS	Revised interrupt mechanism
    30-Oct-00	RMS	Standardized register naming
 */
 
@@ -33,7 +34,7 @@
 #define LPTCSR_IMP	(CSR_ERR + CSR_DONE + CSR_IE)	/* implemented */
 #define LPTCSR_RW	(CSR_IE)			/* read/write */
 
-extern int32 int_req;
+extern int32 int_req[IPL_HLVL];
 int32 lpt_csr = 0;					/* control/status */
 int32 lpt_stopioe = 0;					/* stop on error */
 t_stat lpt_svc (UNIT *uptr);
@@ -54,7 +55,7 @@ UNIT lpt_unit = {
 REG lpt_reg[] = {
 	{ ORDATA (BUF, lpt_unit.buf, 8) },
 	{ ORDATA (CSR, lpt_csr, 16) },
-	{ FLDATA (INT, int_req, INT_V_LPT) },
+	{ FLDATA (INT, IREQ (LPT), INT_V_LPT) },
 	{ FLDATA (ERR, lpt_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, lpt_csr, CSR_V_DONE) },
 	{ FLDATA (IE, lpt_csr, CSR_V_IE) },
@@ -90,13 +91,13 @@ t_stat lpt_wr (int32 data, int32 PA, int32 access)
 {
 if ((PA & 02) == 0) {					/* csr */
 	if (PA & 1) return SCPE_OK;
-	if ((data & CSR_IE) == 0) int_req = int_req & ~INT_LPT;
+	if ((data & CSR_IE) == 0) CLR_INT (LPT);
 	else if ((lpt_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-		int_req = int_req | INT_LPT;
+		SET_INT (LPT);
 	lpt_csr = (lpt_csr & ~LPTCSR_RW) | (data & LPTCSR_RW);  }
 else {	if ((PA & 1) == 0) lpt_unit.buf = data & 0177;	/* buffer */
 	lpt_csr = lpt_csr & ~CSR_DONE;
-	int_req = int_req & ~INT_LPT;
+	CLR_INT (LPT);
 	if ((lpt_unit.buf == 015) || (lpt_unit.buf == 014) ||
 	    (lpt_unit.buf == 012)) sim_activate (&lpt_unit, lpt_unit.wait);
 	else sim_activate (&lpt_unit, 0);  }
@@ -106,7 +107,7 @@ return SCPE_OK;
 t_stat lpt_svc (UNIT *uptr)
 {
 lpt_csr = lpt_csr | CSR_ERR | CSR_DONE;
-if (lpt_csr & CSR_IE) int_req = int_req | INT_LPT;
+if (lpt_csr & CSR_IE) SET_INT (LPT);
 if ((lpt_unit.flags & UNIT_ATT) == 0)
 	return IORETURN (lpt_stopioe, SCPE_UNATT);
 if (putc (lpt_unit.buf & 0177, lpt_unit.fileref) == EOF) {
@@ -123,7 +124,7 @@ t_stat lpt_reset (DEVICE *dptr)
 lpt_unit.buf = 0;
 lpt_csr = CSR_DONE;
 if ((lpt_unit.flags & UNIT_ATT) == 0) lpt_csr = lpt_csr | CSR_ERR;
-int_req = int_req & ~INT_LPT;
+CLR_INT (LPT);
 sim_cancel (&lpt_unit);					/* deactivate unit */
 return SCPE_OK;
 }

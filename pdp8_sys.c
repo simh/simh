@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Sep-01	RMS	Removed multiconsole support
+   16-Sep-01	RMS	Added TSS/8 packed char support, added KL8A support
    27-May-01	RMS	Added multiconsole support
    18-Mar-01	RMS	Added DF32 support
    14-Mar-01	RMS	Added extension detection of RIM binary tapes
@@ -44,6 +46,10 @@ extern DEVICE clk_dev, lpt_dev;
 extern DEVICE rk_dev, rx_dev;
 extern DEVICE df_dev, rf_dev;
 extern DEVICE dt_dev, mt_dev;
+extern DEVICE tti1_dev, tto1_dev;
+extern DEVICE tti2_dev, tto2_dev;
+extern DEVICE tti3_dev, tto3_dev;
+extern DEVICE tti4_dev, tto4_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
 extern int32 sim_switches;
@@ -69,13 +75,15 @@ DEVICE *sim_devices[] = {
 	&cpu_dev,
 	&ptr_dev, &ptp_dev,
 	&tti_dev, &tto_dev,
+	&tti1_dev, &tto1_dev,
+	&tti2_dev, &tto2_dev,
+	&tti3_dev, &tto3_dev,
+	&tti4_dev, &tto4_dev,
 	&clk_dev, &lpt_dev,
 	&rk_dev, &rx_dev,
 	&df_dev, &rf_dev,
 	&dt_dev, &mt_dev,
 	NULL };
-
-UNIT *sim_consoles = NULL;
 
 const char *sim_stop_messages[] = {
 	"Unknown error",
@@ -333,6 +341,7 @@ return sp;
 
 #define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
 #define SIXTOASC(x) (((x) >= 040)? (x): (x) + 0100)
+#define TSSTOASC(x) ((x) + 040)
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 	UNIT *uptr, int32 sw)
@@ -349,6 +358,10 @@ if (sw & SWMASK ('A')) {				/* ASCII? */
 if (sw & SWMASK ('C')) {				/* characters? */
 	fprintf (of, "%c", SIXTOASC ((inst >> 6) & 077));
 	fprintf (of, "%c", SIXTOASC (inst & 077));
+	return SCPE_OK;  }
+if (sw & SWMASK ('T')) {				/* TSS8 packed? */
+	fprintf (of, "%c", TSSTOASC ((inst >> 6) & 077));
+	fprintf (of, "%c", TSSTOASC (inst & 077));
 	return SCPE_OK;  }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
 
@@ -422,6 +435,11 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* sixbit string? */
 	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
 	val[0] = (((t_value) cptr[0] & 077) << 6) |
 		  ((t_value) cptr[1] & 077);
+	return SCPE_OK;  }
+if ((sw & SWMASK ('T')) || ((*cptr == '"') && cptr++)) { /* TSS8 string? */
+	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
+	val[0] = (((t_value) (cptr[0] - 040) & 077) << 6) |
+		  ((t_value) (cptr[1] - 040) & 077);
 	return SCPE_OK;  }
 
 /* Instruction parse */

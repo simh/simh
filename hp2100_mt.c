@@ -25,6 +25,7 @@
 
    mt		12559A nine track magnetic tape
 
+   07-Sep-01	RMS	Moved function prototypes
    30-Nov-00	RMS	Made variable names unique
    04-Oct-98	RMS	V2.4 magtape format
 
@@ -101,7 +102,6 @@ t_stat mtc_attach (UNIT *uptr, char *cptr);
 t_stat mtc_detach (UNIT *uptr);
 t_stat mtd_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat mtd_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
-extern t_bool hp_setdev2 (UNIT *uptr, int32 val);
 
 /* MTD data structures
 

@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    tti,tto	KL8E terminal input/output
+
+   07-Sep-01	RMS	Moved function prototypes
 */
 
 #include "pdp8_defs.h"
@@ -36,8 +38,6 @@ t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
 
 /* TTI data structures
 

@@ -25,6 +25,7 @@
 
    clk		real-time clock
 
+   17-Sep-01	RMS	Added terminal multiplexor support
    17-Mar-01	RMS	Moved function prototype
    05-Mar-01	RMS	Added clock calibration
    24-Sep-97	RMS	Fixed bug in unit service (found by Charles Owen)
@@ -36,6 +37,8 @@ extern int32 int_req, dev_busy, dev_done, dev_disable;
 int32 clk_sel = 0;					/* selected freq */
 int32 clk_time[4] = { 16000, 100000, 10000, 1000 };	/* freq table */
 int32 clk_tps[4] = { 60, 10, 100, 1000 };		/* ticks per sec */
+int32 clk_adj[4] = { 1, -5, 2, 20 };			/* tmxr adjust */
+int32 tmxr_poll = 16000;				/* tmxr poll */
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
 
@@ -95,11 +98,16 @@ return 0;
 
 t_stat clk_svc (UNIT *uptr)
 {
+int32 t;
+
 dev_done = dev_done | INT_CLK;				/* set done */
 dev_busy = dev_busy & ~INT_CLK;				/* clear busy */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-sim_activate (&clk_unit,				/* reactivate unit */
-	sim_rtc_calb (clk_tps[clk_sel]));		/* calibrate delay */
+t = sim_rtc_calb (clk_tps[clk_sel]);			/* calibrate delay */
+sim_activate (&clk_unit, t);				/* reactivate unit */
+if (clk_adj[clk_sel] > 0)				/* clk >= 60Hz? */
+	tmxr_poll = t * clk_adj[clk_sel];		/* poll is longer */
+else tmxr_poll = t / (-clk_adj[clk_sel]);		/* poll is shorter */
 return SCPE_OK;
 }
 
@@ -112,5 +120,6 @@ dev_busy = dev_busy & ~INT_CLK;				/* clear busy */
 dev_done = dev_done & ~INT_CLK;				/* clear done, int */
 int_req = int_req & ~INT_CLK;
 sim_cancel (&clk_unit);					/* deactivate unit */
+tmxr_poll = clk_time[0];				/* poll is default */
 return SCPE_OK;
 }

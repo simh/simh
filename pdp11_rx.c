@@ -25,6 +25,7 @@
 
    rx		RX11/RX01 floppy disk
 
+   07-Sep-01	RMS	Revised device disable and interrupt mechanisms
    17-Jul-01	RMS	Fixed warning from VC++ 6.0
    26-Apr-01	RMS	Added device enable/disable support
    13-Apr-01	RMS	Revised for register arrays
@@ -88,7 +89,7 @@
 #define TRACK u3					/* current track */
 #define CALC_DA(t,s) (((t) * RX_NUMSC) + ((s) - 1)) * RX_NUMBY
 
-extern int32 int_req, dev_enb;
+extern int32 int_req[IPL_HLVL];
 int32 rx_csr = 0;					/* control/status */
 int32 rx_dbr = 0;					/* data buffer */
 int32 rx_esr = 0;					/* error status */
@@ -102,6 +103,7 @@ int32 rx_swait = 10;					/* seek, per track */
 int32 rx_xwait = 1;					/* tr set time */
 unsigned int8 rx_buf[RX_NUMBY] = { 0 };			/* sector buffer */
 int32 bptr = 0;						/* buffer pointer */
+int32 rx_enb = 1;					/* device enable */
 t_stat rx_svc (UNIT *uptr);
 t_stat rx_reset (DEVICE *dptr);
 t_stat rx_boot (int32 unitno);
@@ -129,7 +131,7 @@ REG rx_reg[] = {
 	{ ORDATA (RXSA, rx_sector, 8) },
 	{ ORDATA (STAPTR, rx_state, 3), REG_RO },
 	{ ORDATA (BUFPTR, bptr, 7)  },
-	{ FLDATA (INT, int_req, INT_V_RX) },
+	{ FLDATA (INT, IREQ (RX), INT_V_RX) },
 	{ FLDATA (ERR, rx_csr, CSR_V_ERR) },
 	{ FLDATA (TR, rx_csr, RXCS_V_TR) },
 	{ FLDATA (IE, rx_csr, CSR_V_IE) },
@@ -141,7 +143,7 @@ REG rx_reg[] = {
 	{ FLDATA (FLG1, rx_unit[1].flags, UNIT_V_WLK), REG_HRO },
 	{ FLDATA (STOP_IOE, rx_stopioe, 0) },
 	{ BRDATA (SBUF, rx_buf, 8, 8, RX_NUMBY) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_RX), REG_HRO },
+	{ FLDATA (*DEVENB, rx_enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB rx_mod[] = {
@@ -222,9 +224,9 @@ case 0:							/* RXCS */
 			sim_activate (&rx_unit[drv], rx_cwait);
 			break;  }			/* end switch func */
 		return SCPE_OK;  }			/* end if GO */
-	if ((data & CSR_IE) == 0) int_req = int_req & ~INT_RX;
+	if ((data & CSR_IE) == 0) CLR_INT (RX);
 	else if ((rx_csr & (RXCS_DONE + CSR_IE)) == RXCS_DONE)
-		int_req = int_req | INT_RX;
+		SET_INT (RX);
 	rx_csr = (rx_csr & ~RXCS_RW) | (data & RXCS_RW);
 	break;						/* end case RXCS */
 
@@ -351,7 +353,7 @@ return IORETURN (rx_stopioe, rval);
 void rx_done (int32 new_dbr, int32 new_ecode)
 {
 rx_csr = rx_csr | RXCS_DONE;				/* set done */
-if (rx_csr & CSR_IE) int_req = int_req | INT_RX;	/* if ie, intr */
+if (rx_csr & CSR_IE) SET_INT (RX);			/* if ie, intr */
 rx_dbr = new_dbr;					/* update RXDB */
 if (new_ecode != 0) {					/* test for error */
 	rx_ecode = new_ecode;
@@ -368,7 +370,7 @@ t_stat rx_reset (DEVICE *dptr)
 {
 rx_csr = rx_dbr = 0;					/* clear regs */
 rx_esr = rx_ecode = 0;					/* clear error */
-int_req = int_req & ~INT_RX;				/* clear int req */
+CLR_INT (RX);						/* clear int req */
 sim_cancel (&rx_unit[1]);				/* cancel drive 1 */
 if (rx_unit[0].flags & UNIT_BUF)  {			/* attached? */
 	rx_state = INIT_COMPLETE;			/* yes, sched init */

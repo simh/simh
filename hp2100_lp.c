@@ -25,6 +25,7 @@
 
    lpt		12653A line printer
 
+   07-Sep-01	RMS	Moved function prototypes
    21-Nov-00	RMS	Fixed flag, fbf power up state
 			Added command flop
    15-Oct-00	RMS	Added variable device number support
@@ -42,7 +43,6 @@ int32 lpt_stopioe = 0;					/* stop on error */
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 extern struct hpdev infotab[];
-extern t_bool hp_setdev (UNIT *uptr, int32 val);
 
 /* LPT data structures
 

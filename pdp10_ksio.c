@@ -25,6 +25,8 @@
 
    uba		Unibus adapters
 
+   23-Sep-01	RMS	New IO page address constants
+   07-Sep-01	RMS	Revised device disable mechanism
    25-Aug-01	RMS	Enabled DZ11
    21-Aug-01	RMS	Updated DZ11 disable
    01-Jun-01	RMS	Updated DZ11 vectors
@@ -77,7 +79,6 @@
 int32 ubcs[UBANUM] = { 0 };				/* status registers */
 int32 ubmap[UBANUM][UMAP_MEMSIZE] = { 0 };		/* Unibus maps */
 int32 int_req = 0;					/* interrupt requests */
-int32 dev_enb = -1 & ~(INT_PTR | INT_PTP | INT_DZ0RX);	/* device enables */
 
 /* Map IO controller numbers to Unibus adapters: -1 = non-existent */
 
@@ -97,10 +98,12 @@ extern jmp_buf save_env;
 
 extern d10 Read (a10 ea);
 extern void pi_eval ();
-extern t_stat dz0_rd (int32 *data, int32 addr, int32 access);
-extern t_stat dz0_wr (int32 data, int32 addr, int32 access);
+extern t_stat dz_rd (int32 *data, int32 addr, int32 access);
+extern t_stat dz_wr (int32 data, int32 addr, int32 access);
+extern int32 dz_enb;
 extern t_stat pt_rd (int32 *data, int32 addr, int32 access);
 extern t_stat pt_wr (int32 data, int32 addr, int32 access);
+extern int32 pt_enb;
 extern t_stat lp20_rd (int32 *data, int32 addr, int32 access);
 extern t_stat lp20_wr (int32 data, int32 addr, int32 access);
 extern int32 lp20_inta (void);
@@ -138,7 +141,6 @@ REG uba_reg[] = {
 	{ ORDATA (INTREQ, int_req, 32), REG_RO },
 	{ ORDATA (UB1CS, ubcs[0], 18) },
 	{ ORDATA (UB3CS, ubcs[1], 18) },
-	{ ORDATA (DEVENB, dev_enb, 32), REG_HRO },
 	{ NULL }  };
 
 DEVICE uba_dev = {
@@ -152,7 +154,7 @@ DEVICE uba_dev = {
 struct iolink {						/* I/O page linkage */
 	int32	low;					/* low I/O addr */
 	int32	high;					/* high I/O addr */
-	int32	enb;					/* enable mask */
+	int32	*enb;					/* enable flag */
 	t_stat	(*read)();				/* read routine */
 	t_stat	(*write)();  };				/* write routine */
 
@@ -160,31 +162,31 @@ struct iolink {						/* I/O page linkage */
    The expected Unibus adapter number is included as the high 2 bits */
 
 struct iolink iotable[] = {
-	{ IO_UBA1+IO_RHBASE, IO_UBA1+IO_RHBASE+047, 0,
-			&rp_rd, &rp_wr },		/* disk */
-	{ IO_UBA3+IO_TMBASE, IO_UBA3+IO_TMBASE+033, 0,
-			&tu_rd, &tu_wr },		/* mag tape */
-	{ IO_UBA3+IO_DZBASE, IO_UBA3+IO_DZBASE+07, INT_DZ0RX,
-			&dz0_rd, &dz0_wr },		/* terminal mux */
-	{ IO_UBA3+IO_LPBASE, IO_UBA3+IO_LPBASE+017, 0,
-			&lp20_rd, &lp20_wr },		/* line printer */
-	{ IO_UBA3+IO_PTBASE, IO_UBA3+IO_PTBASE+07, INT_PTR,
-			&pt_rd, &pt_wr },		/* paper tape */
-	{ IO_UBA1+IO_UBMAP, IO_UBA1+IO_UBMAP+077, 0,
-			&ubmap_rd, &ubmap_wr },		/* Unibus 1 map */
-	{ IO_UBA3+IO_UBMAP, IO_UBA3+IO_UBMAP+077, 0,
-			&ubmap_rd, &ubmap_wr },		/* Unibus 3 map */
-	{ IO_UBA1+IO_UBCS, IO_UBA1+IO_UBCS, 0,
-			&ubs_rd, &ubs_wr },		/* Unibus 1 c/s */
-	{ IO_UBA3+IO_UBCS, IO_UBA3+IO_UBCS, 0,
-			&ubs_rd, &ubs_wr },		/* Unibus 3 c/s */
-	{ IO_UBA1+IO_UBMNT, IO_UBA1+IO_UBMNT, 0,
-			&rd_zro, &wr_nop },		/* Unibus 1 maint */
-	{ IO_UBA3+IO_UBMNT, IO_UBA3+IO_UBMNT, 0,
-			&rd_zro, &wr_nop },		/* Unibus 3 maint */
-	{ IO_UBA3+IO_TCUBASE, IO_UBA3+IO_TCUBASE+05, 0,
-			&tcu_rd, &wr_nop },		/* TCU150 */
-	{ 00100000, 00100000, 0, &rd_zro, &wr_nop },	/* Mem sys stat */
+	{ IO_UBA1+IOBA_RP, IO_UBA1+IOBA_RP+IOLN_RP,
+		NULL, &rp_rd, &rp_wr },			/* disk */
+	{ IO_UBA3+IOBA_TU, IO_UBA3+IOBA_TU+IOLN_TU,
+		NULL, &tu_rd, &tu_wr },			/* mag tape */
+	{ IO_UBA3+IOBA_DZ, IO_UBA3+IOBA_DZ+IOLN_DZ,
+		 &dz_enb, &dz_rd, &dz_wr },		/* terminal mux */
+	{ IO_UBA3+IOBA_LP20, IO_UBA3+IOBA_LP20+IOLN_LP20,
+		NULL, &lp20_rd, &lp20_wr },		/* line printer */
+	{ IO_UBA3+IOBA_PT, IO_UBA3+IOBA_PT+IOLN_PT,
+		&pt_enb, &pt_rd, &pt_wr },		/* paper tape */
+	{ IO_UBA1+IOBA_UBMAP, IO_UBA1+IOBA_UBMAP+IOLN_UBMAP,
+		NULL, &ubmap_rd, &ubmap_wr },		/* Unibus 1 map */
+	{ IO_UBA3+IOBA_UBMAP, IO_UBA3+IOBA_UBMAP+IOLN_UBMAP,
+		NULL, &ubmap_rd, &ubmap_wr },		/* Unibus 3 map */
+	{ IO_UBA1+IOBA_UBCS, IO_UBA1+IOBA_UBCS+IOLN_UBCS,
+		NULL, &ubs_rd, &ubs_wr },		/* Unibus 1 c/s */
+	{ IO_UBA3+IOBA_UBCS, IO_UBA3+IOBA_UBCS+IOLN_UBCS,
+		NULL, &ubs_rd, &ubs_wr },		/* Unibus 3 c/s */
+	{ IO_UBA1+IOBA_UBMNT, IO_UBA1+IOBA_UBMNT+IOLN_UBMNT,
+		NULL, &rd_zro, &wr_nop },		/* Unibus 1 maint */
+	{ IO_UBA3+IOBA_UBMNT, IO_UBA3+IOBA_UBMNT+IOLN_UBMNT,
+		NULL, &rd_zro, &wr_nop },		/* Unibus 3 maint */
+	{ IO_UBA3+IOBA_TCU, IO_UBA3+IOBA_TCU+IOLN_TCU,
+		NULL, &tcu_rd, &wr_nop },		/* TCU150 */
+	{ 00100000, 00100000, NULL, &rd_zro, &wr_nop },	/* Mem sys stat */
 	{ 0, 0, 0, NULL, NULL }  };
 
 /* Interrupt request to interrupt action map */
@@ -200,7 +202,7 @@ int32 (*int_ack[32])() = {				/* int ack routines */
 int32 int_vec[32] = {					/* int req to vector */
 	0, 0, 0, 0, 0, 0, VEC_RP, VEC_TU,
 	0, 0, 0, 0, 0, 0, 0, 0,
-	VEC_DZ0RX, VEC_DZ0TX, 0, 0, 0, 0, 0, 0, 
+	VEC_DZRX, VEC_DZTX, 0, 0, 0, 0, 0, 0, 
 	VEC_PTR, VEC_PTP, VEC_LP20, 0, 0, 0, 0, 0 };
 
 /* IO 710	(DEC) TIOE - test I/O word, skip if zero
@@ -396,8 +398,8 @@ struct iolink *p;
 
 pa = (int32) ea;					/* cvt addr to 32b */
 for (p = &iotable[0]; p -> low != 0; p++ ) {
-	if ((pa >= p -> low) && (pa <= p -> high) &&
-	    ((p -> enb == 0) || (dev_enb & p -> enb)))  {
+	if ((pa >= p -> low) && (pa < p -> high) &&
+	    ((p -> enb == NULL) || *p -> enb))  {
 		p -> read (&val, pa, READ);
 		pi_eval ();
 		return ((d10) val);  }  }
@@ -411,8 +413,8 @@ struct iolink *p;
 
 pa = (int32) ea;					/* cvt addr to 32b */
 for (p = &iotable[0]; p -> low != 0; p++ ) {
-	if ((pa >= p -> low) && (pa <= p -> high) &&
-	    ((p -> enb == 0) || (dev_enb & p -> enb)))  {
+	if ((pa >= p -> low) && (pa < p -> high) &&
+	    ((p -> enb == NULL) || *p -> enb))  {
 		p -> write ((int32) val, pa, mode);
 		pi_eval ();
 		return;  }  }

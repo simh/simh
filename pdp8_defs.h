@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   16-Sep-01	RMS	Added multiple KL support
    18-Mar-01	RMS	Added DF32 support
    15-Feb-01	RMS	Added DECtape support
    14-Apr-99	RMS	Changed t_addr to unsigned
@@ -73,6 +74,9 @@
 
    Because the PDP-8 does not have priority interrupts, the order
    of devices within groups does not matter.
+
+   Note: all extra KL input and output interrupts must be assigned
+   to contiguous bits.
 */
 
 #define INT_V_START	0				/* enable start */
@@ -82,7 +86,15 @@
 #define INT_V_TTO	(INT_V_START+3)			/* terminal */
 #define INT_V_TTI	(INT_V_START+4)			/* keyboard */
 #define INT_V_CLK	(INT_V_START+5)			/* clock */
-#define INT_V_DIRECT	(INT_V_START+6)			/* direct start */
+#define INT_V_TTO1	(INT_V_START+6)			/* tto1 */
+#define INT_V_TTO2	(INT_V_START+7)			/* tto2 */
+#define INT_V_TTO3	(INT_V_START+8)			/* tto3 */
+#define INT_V_TTO4	(INT_V_START+9)			/* tto4 */
+#define INT_V_TTI1	(INT_V_START+10)		/* tti1 */
+#define INT_V_TTI2	(INT_V_START+11)		/* tti2 */
+#define INT_V_TTI3	(INT_V_START+12)		/* tti3 */
+#define INT_V_TTI4	(INT_V_START+13)		/* tti4 */
+#define INT_V_DIRECT	(INT_V_START+14)		/* direct start */
 #define INT_V_RX	(INT_V_DIRECT+0)		/* RX8E */
 #define INT_V_RK	(INT_V_DIRECT+1)		/* RK8E */
 #define INT_V_RF	(INT_V_DIRECT+2)		/* RF08 */
@@ -102,6 +114,14 @@
 #define INT_TTO		(1 << INT_V_TTO)
 #define INT_TTI		(1 << INT_V_TTI)
 #define INT_CLK		(1 << INT_V_CLK)
+#define INT_TTO1	(1 << INT_V_TTO1)
+#define INT_TTO2	(1 << INT_V_TTO2)
+#define INT_TTO3	(1 << INT_V_TTO3)
+#define INT_TTO4	(1 << INT_V_TTO4)
+#define INT_TTI1	(1 << INT_V_TTI1)
+#define INT_TTI2	(1 << INT_V_TTI2)
+#define INT_TTI3	(1 << INT_V_TTI3)
+#define INT_TTI4	(1 << INT_V_TTI4)
 #define INT_RX		(1 << INT_V_RX)
 #define INT_RK		(1 << INT_V_RK)
 #define INT_RF		(1 << INT_V_RF)

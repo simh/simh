@@ -25,6 +25,12 @@
 
    ts		TS11/TSV05 magtape
 
+   15-Oct-01	RMS	Integrated debug logging across simulator
+   27-Sep-01	RMS	Implemented extended characteristics and status
+			Fixed bug in write characteristics status return
+   19-Sep-01	RMS	Fixed bug in bootstrap
+   15-Sep-01	RMS	Fixed bug in NXM test
+   07-Sep-01	RMS	Revised device disable and interrupt mechanism
    13-Jul-01	RMS	Fixed bug in space reverse (found by Peter Schorn)
 
    Magnetic tapes are represented as a series of variable 8b records
@@ -171,24 +177,28 @@
 
 /* Extended status register 1 - none of these errors are ever set */
 
-/* Extended status register 2 - none of these errors are ever set */
+/* Extended status register 2 */
+
+#define XS2_XTF		0000200				/* ext features */
 
 /* Extended status register 3 */
 
-#define XS3_XTF		0000200				/* ext features */
 #define XS3_OPI		0000100				/* op incomplete */
 #define XS3_REV		0000040				/* reverse */
 #define XS3_RIB		0000001				/* reverse to BOT */
 
-/* Extended status register 4 - none of these errors are ever set */
+/* Extended status register 4 */
+
+#define XS4_HDS		0100000				/* high density */
 
 /* Write characteristics packet offsets */
 
-#define WCH_PLNT	4				/* packet length */
+#define WCH_PLNT	5				/* packet length */
 #define wchadl		tswchp[0]			/* address low */
 #define wchadh		tswchp[1]			/* address high */
 #define wchlnt		tswchp[2]			/* length */
 #define wchopt		tswchp[3]			/* options */
+#define wchxopt		tswchp[4]			/* ext options */
 
 /* Write characteristics options */
 
@@ -197,6 +207,10 @@
 #define WCH_EAI		0000040				/* enb attn int */
 #define WCH_ERI		0000020				/* enb mrls int */
 
+/* Write characteristics extended options */
+
+#define WCHX_HDS	0000040				/* high density */
+
 #define MAX(a,b)	(((a) >= (b))? (a): (b))
 #define READ_BYTE(p)	((M[(p) >> 1] >> (((p) & 1)? 8: 0)) & 0377)
 #define WRITE_BYTE(d,p)	M[(p) >> 1] = (p & 1)? \
@@ -204,8 +218,10 @@
 			((M[(p) >> 1] & ~0377) | (d))
 
 extern uint16 *M;					/* memory */
-extern int32 int_req, dev_enb;
+extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
+extern FILE *sim_log;
+extern int32 pdp11_log;
 int32 tssr = 0;						/* status register */
 int32 tsba = 0;						/* mem addr */
 int32 tsdbx = 0;					/* data buf ext */
@@ -217,7 +233,7 @@ int32 ts_ownm = 0;					/* tape owns msg */
 int32 ts_qatn = 0;					/* queued attn */
 int32 ts_bcmd = 0;					/* boot cmd */
 int32 ts_time = 10;					/* record latency */
-int32 ts_log = 0;
+int32 ts_enb = 0;					/* device enable */
 static uint8 dbuf[DBSIZE];
 
 t_stat ts_svc (UNIT *uptr);
@@ -259,6 +275,8 @@ REG ts_reg[] = {
 	{ ORDATA (WADH, wchadh, 16) },
 	{ ORDATA (WLNT, wchlnt, 16) },
 	{ ORDATA (WOPT, wchopt, 16) },
+	{ ORDATA (WXOPT, wchxopt, 16) },
+	{ FLDATA (INT, IREQ (TS), INT_V_TS) },
 	{ FLDATA (ATTN, ts_qatn, 0) },
 	{ FLDATA (BOOT, ts_bcmd, 0) },
 	{ FLDATA (OWNC, ts_ownc, 0) },
@@ -266,8 +284,7 @@ REG ts_reg[] = {
 	{ DRDATA (TIME, ts_time, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (POS, ts_unit.pos, 31), PV_LEFT + REG_RO },
 	{ FLDATA (WLK, ts_unit.flags, UNIT_V_WLK), REG_HRO },
-	{ FLDATA (LOG, ts_log, 0), REG_HIDDEN },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_TS), REG_HRO },
+	{ FLDATA (*DEVENB, ts_enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB ts_mod[] = {
@@ -314,10 +331,10 @@ case 0:							/* TSDB */
 	tssr = ts_updtssr (tssr & TSSR_NBA);		/* clr ssr, err */
 	msgxs0 = ts_updxs0 (msgxs0 & ~XS0_ALLERR);	/* clr err, upd xs0 */
 	msgrfc = msgxs1 = msgxs2 = msgxs3 = msgxs4 = 0;	/* clr status */
-	int_req = int_req & ~INT_TS;			/* clr int req */
+	CLR_INT (TS);					/* clr int req */
 	for (i = 0; i < CMD_PLNT; i++) {		/* get cmd pkt */
 		if (ADDR_IS_MEM (tsba)) tscmdp[i] = M[(tsba >> 1)];
-		else {	ts_endcmd (TSSR_NXM + TC3, 0, MSG_ACK|MSG_MNEF|MSG_CFAIL);
+		else {	ts_endcmd (TSSR_NXM + TC5, 0, MSG_ACK|MSG_MNEF|MSG_CFAIL);
 			return SCPE_OK;  }
 		tsba = tsba + 2;  }			/* incr tsba */
 	ts_ownc = ts_ownm = 1;				/* tape owns all */
@@ -574,12 +591,12 @@ if (ts_bcmd) {						/* boot? */
 		ts_readf (uptr, 512);			/* read blk */
 		tssr = ts_updtssr (tssr | TSSR_SSR);  }
 	else tssr = ts_updtssr (tssr | TSSR_SSR | TC3);
-	if (cmdhdr & CMD_IE) int_req = int_req | INT_TS;
+	if (cmdhdr & CMD_IE) SET_INT (TS);
 	return SCPE_OK;  }
 
 if (!(cmdhdr & CMD_ACK)) {				/* no acknowledge? */
 	tssr = ts_updtssr (tssr | TSSR_SSR);		/* set rdy, int */
-	if (cmdhdr & CMD_IE) int_req = int_req | INT_TS;
+	if (cmdhdr & CMD_IE) SET_INT (TS);
 	ts_ownc = ts_ownm = 0;				/* CPU owns all */
 	return SCPE_OK;  }
 fnc = GET_FNC (cmdhdr);					/* get fnc+mode */
@@ -589,7 +606,7 @@ if ((fnc != FNC_WCHR) && (tssr & TSSR_NBA)) {		/* ~wr chr & nba? */
 	return SCPE_OK;  }
 if (ts_qatn && (wchopt & WCH_EAI)) {			/* attn pending? */
 	ts_endcmd (TC1, 0, MSG_MATN | MSG_CATN);	/* send attn msg */
-	int_req = int_req | INT_TS;			/* set interrupt */
+	SET_INT (TS);					/* set interrupt */
 	ts_qatn = 0;					/* not pending */
 	return SCPE_OK;  }
 if (cmdhdr & CMD_CVC)					/* cvc? clr vck */
@@ -628,13 +645,13 @@ case FNC_WCHR:						/* write char */
 		break;  }
 	tsba = (cmdadh << 16) | cmdadl;
 	for (i = 0; (i < WCH_PLNT) && (i < (cmdlnt / 2)); i++) {
-		if (ADDR_IS_MEM (cmdadl)) tswchp[i] = M[tsba >> 1];
-		else {	ts_endcmd (TSSR_NBA | TSSR_NXM | TC3, 0, 0);
+		if (ADDR_IS_MEM (tsba)) tswchp[i] = M[tsba >> 1];
+		else {	ts_endcmd (TSSR_NBA | TSSR_NXM | TC5, 0, 0);
 			return SCPE_OK;  }
 		tsba = tsba + 2;  }
 	if ((wchlnt < ((MSG_PLNT - 1) * 2)) || (wchadh & 0177700) ||
 	    (wchadl & 1)) ts_endcmd (TSSR_NBA | TC3, 0, 0);
-	else {	msgxs3 = msgxs3 | XS3_XTF | 1;
+	else {	msgxs2 = msgxs2 | XS2_XTF | 1;
 		tssr = ts_updtssr (tssr & ~TSSR_NBA);
 		ts_endcmd (TC0, 0, MSG_ACK | MSG_CEND);  }
 	return SCPE_OK;
@@ -642,7 +659,7 @@ case FNC_CTL:						/* control */
 	switch (mod) {					/* case mode */
 	case 00:					/* msg buf rls */
 		tssr = ts_updtssr (tssr | TSSR_SSR);	/* set SSR */
-		if (wchopt & WCH_ERI) int_req = int_req | INT_TS;
+		if (wchopt & WCH_ERI) SET_INT (TS);
 		ts_ownc = 0; ts_ownm = 1;		/* keep msg */
 		break;
 	case 01:					/* clean */
@@ -728,7 +745,8 @@ case FNC_POS:
 		break;  }
 	ts_cmpendcmd (st0, 0);
 	break;  }
-if (ts_log) printf ("Cmd=%o, mod=%o, buf=%o, lnt=%o, sta = %o, tc=%o, pos=%d\n",
+if (DBG_LOG (LOG_TS))
+	fprintf (sim_log, ">>TS: cmd=%o, mod=%o, buf=%o, lnt=%o, sta = %o, tc=%o, pos=%d\n",
 	fnc, mod, cmdadl, cmdlnt, msgxs0, (tssr & TSSR_TC) >> 1, ts_unit.pos);
 return SCPE_OK;
 }
@@ -776,6 +794,7 @@ void ts_endcmd (int32 tc, int32 xs0, int32 msg)
 int32 i;
 
 msgxs0 = ts_updxs0 (msgxs0 | xs0);			/* update XS0 */
+if (wchxopt & WCHX_HDS) msgxs4 = msgxs4 | XS4_HDS;	/* update XS4 */
 if (msg && !(tssr & TSSR_NBA)) {			/* send end pkt */
 	msghdr = msg;
 	msglnt = wchlnt - 4;				/* exclude hdr, bc */
@@ -787,7 +806,7 @@ if (msg && !(tssr & TSSR_NBA)) {			/* send end pkt */
 			break;  }  
 		tsba = tsba + 2;  }  }
 tssr = ts_updtssr (tssr | tc | TSSR_SSR | (tc? TSSR_SC: 0));
-if (cmdhdr & CMD_IE) int_req = int_req | INT_TS;
+if (cmdhdr & CMD_IE) SET_INT (TS);
 ts_ownm = 0; ts_ownc = 0;
 return;
 }
@@ -797,8 +816,9 @@ return;
 t_stat ts_reset (DEVICE *dptr)
 {
 int32 i;
+extern int32 tm_enb;
 
-if (dev_enb & INT_TS) dev_enb = dev_enb & ~INT_TM;	/* TM or TS */
+if (ts_enb) tm_enb = 0;					/* TM or TS */
 ts_unit.pos = 0;
 tsba = tsdbx = 0;
 ts_ownc = ts_ownm = 0;
@@ -809,7 +829,7 @@ for (i = 0; i < CMD_PLNT; i++) tscmdp[i] = 0;
 for (i = 0; i < WCH_PLNT; i++) tswchp[i] = 0;
 for (i = 0; i < MSG_PLNT; i++) tsmsgp[i] = 0;
 msgxs0 = ts_updxs0 (XS0_VCK);
-int_req = int_req & ~INT_TS;
+CLR_INT (TS);
 return SCPE_OK;
 }
 
@@ -825,7 +845,7 @@ tssr = tssr & ~TSSR_OFL;				/* clr offline */
 if ((tssr & TSSR_NBA) || !(wchopt & WCH_EAI)) return r;	/* attn msg? */
 if (ts_ownm) {						/* own msg buf? */
 	ts_endcmd (TC1, 0, MSG_MATN | MSG_CATN);	/* send attn */
-	int_req = int_req | INT_TS;			/* set interrupt */
+	SET_INT (TS);					/* set interrupt */
 	ts_qatn = 0;  }					/* don't queue */
 else ts_qatn = 1;					/* else queue */
 return r;
@@ -843,7 +863,7 @@ tssr = tssr | TSSR_OFL;					/* set offline */
 if ((tssr & TSSR_NBA) || !(wchopt & WCH_EAI)) return r;	/* attn msg? */
 if (ts_ownm) {						/* own msg buf? */
 	ts_endcmd (TC1, 0, MSG_MATN | MSG_CATN);	/* send attn */
-	int_req = int_req | INT_TS;			/* set interrupt */
+	SET_INT (TS);					/* set interrupt */
 	ts_qatn = 0;  }					/* don't queue */
 else ts_qatn = 1;					/* else queue */
 return r;
@@ -861,13 +881,13 @@ static const int32 boot_rom[] = {
 	0005011,			/* clr (r1)		; init, rew */
 	0105711,			/* tstb (r1)		; wait */
 	0100376,			/* bpl .-2 */
-	0012710, 0001064,		/* mov #pkt1, (r0)	; set char */
+	0012710, 0001070,		/* mov #pkt1, (r0)	; set char */
 	0105711,			/* tstb (r1)		; wait */
 	0100376,			/* bpl .-2 */
-	0012710, 0001104,		/* mov #pkt2, (r0)	; read, skip */
+	0012710, 0001110,		/* mov #pkt2, (r0)	; read, skip */
 	0105711,			/* tstb (r1)		; wait */
 	0100376,			/* bpl .-2 */
-	0012710, 0001104,		/* mov #pkt2, (r0)	; read */
+	0012710, 0001110,		/* mov #pkt2, (r0)	; read */
 	0105711,			/* tstb (r1)		; wait */
 	0100376,			/* bpl .-2 */
 	0005711,			/* tst (r1)		; err? */
@@ -877,10 +897,10 @@ static const int32 boot_rom[] = {
 	0005007,			/* clr r7 */
 	0046523,			/* pad */
 	0140004,			/* pkt1: 140004, wcpk, 0, 8. */
-	0001074,
+	0001100,
 	0000000,
 	0000010,
-	0001116,			/* wcpk: msg, 0, 14., 0 */
+	0001122,			/* wcpk: msg, 0, 14., 0 */
 	0000000,
 	0000016,
 	0000000,
@@ -889,6 +909,7 @@ static const int32 boot_rom[] = {
 	0000000,
 	0001000,
 	0000000				/* hlt:  halt */
+					/* msg:	.blk 4 */
 };
 
 t_stat ts_boot (int32 unitno)

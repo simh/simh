@@ -28,6 +28,7 @@
    tty		12531C buffered teleprinter interface
    clk		12539A/B/C time base generator
 
+   07-Sep-01	RMS	Moved function prototypes
    21-Nov-00	RMS	Fixed flag, buffer power up state
 			Added status input for ptp, tty
    15-Oct-00	RMS	Added dynamic device number support
@@ -71,9 +72,6 @@ t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
-extern t_bool hp_setdev (UNIT *uptr, int32 val);
 
 /* PTR data structures
 

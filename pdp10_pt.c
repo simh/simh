@@ -25,6 +25,8 @@
 
    ptr		paper tape reader
    ptp		paper tape punch
+
+   07-Sep-01	RMS	Revised disable mechanism
 */
 
 #include "pdp10_defs.h"
@@ -34,11 +36,12 @@
 #define PTPCSR_IMP	(CSR_ERR + CSR_DONE + CSR_IE)	/* paper tape punch */
 #define PTPCSR_RW	(CSR_IE)
 
-extern int32 int_req, dev_enb;
+extern int32 int_req;
 int32 ptr_csr = 0;					/* control/status */
 int32 ptr_stopioe = 0;					/* stop on error */
 int32 ptp_csr = 0;					/* control/status */
 int32 ptp_stopioe = 0;					/* stop on error */
+int32 pt_enb = 0;					/* device enable */
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
@@ -69,7 +72,7 @@ REG ptr_reg[] = {
 	{ DRDATA (POS, ptr_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_PTR), REG_HRO },
+	{ FLDATA (*DEVENB, pt_enb, 0), REG_HRO },
 	{ NULL }  };
 
 DEVICE ptr_dev = {
@@ -98,7 +101,7 @@ REG ptp_reg[] = {
 	{ DRDATA (POS, ptp_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_PTR), REG_HRO },
+	{ FLDATA (*DEVENB, pt_enb, 0), REG_HRO },
 	{ NULL }  };
 
 DEVICE ptp_dev = {

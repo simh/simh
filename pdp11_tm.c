@@ -25,6 +25,8 @@
 
    tm		TM11/TU10 magtape
 
+   18-Oct-01	RMS	Added stub diagnostic register (found by Thord Nilson)
+   07-Sep-01	RMS	Revised device disable and interrupt mechanisms
    26-Apr-01	RMS	Added device enable/disable support
    18-Apr-01	RMS	Changed to rewind tape before boot
    14-Apr-99	RMS	Changed t_addr to unsigned
@@ -124,17 +126,24 @@
 #define STA_EFLGS	(STA_ILL | STA_EOF | STA_CRC | STA_PAR | \
 			 STA_DLT | STA_EOT | STA_RLE | STA_BAD | STA_NXM)
 			 				/* set error */
+
+/* Read lines - tm_rdl */
+
+#define RDL_CLK		0100000				/* 10 Khz clock */
 
 extern uint16 *M;					/* memory */
-extern int32 int_req, dev_enb;
+extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
 int32 tm_sta = 0;					/* status register */
 int32 tm_cmd = 0;					/* command register */
 int32 tm_ca = 0;					/* current address */
 int32 tm_bc = 0;					/* byte count */
 int32 tm_db = 0;					/* data buffer */
+int32 tm_rdl = 0;					/* read lines */
 int32 tm_time = 10;					/* record latency */
 int32 tm_stopioe = 1;					/* stop on error */
+int32 tm_enb = 1;					/* device enable */
+
 t_stat tm_svc (UNIT *uptr);
 t_stat tm_reset (DEVICE *dptr);
 t_stat tm_attach (UNIT *uptr, char *cptr);
@@ -169,7 +178,8 @@ REG tm_reg[] = {
 	{ ORDATA (MTBRC, tm_bc, 16) },
 	{ ORDATA (MTCMA, tm_ca, 16) },
 	{ ORDATA (MTD, tm_db, 8) },
-	{ FLDATA (INT, int_req, INT_V_TM) },
+	{ ORDATA (MTRD, tm_rdl, 16) },
+	{ FLDATA (INT, IREQ (TM), INT_V_TM) },
 	{ FLDATA (ERR, tm_cmd, CSR_V_ERR) },
 	{ FLDATA (DONE, tm_cmd, CSR_V_DONE) },
 	{ FLDATA (IE, tm_cmd, CSR_V_IE) },
@@ -207,7 +217,7 @@ REG tm_reg[] = {
 		  REG_HRO },
 	{ GRDATA (FLG7, tm_unit[7].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
 		  REG_HRO },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_TM), REG_HRO },
+	{ FLDATA (*DEVENB, tm_enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB tm_mod[] = {
@@ -229,7 +239,7 @@ DEVICE tm_dev = {
    17772524	MTBRC	read/write
    17772526	MTCMA	read/write
    17772530	MTD	read/write
-   17772532	MTRD	unimplemented
+   17772532	MTRD	read only
 */
 
 t_stat tm_rd (int32 *data, int32 PA, int32 access)
@@ -240,23 +250,28 @@ uptr = tm_dev.units + GET_UNIT (tm_cmd);		/* get unit */
 switch ((PA >> 1) & 07) {				/* decode PA<3:1> */
 case 0:							/* MTS */
 	*data = tm_updcsta (uptr);			/* update status */
-	return SCPE_OK;
+	break;
 case 1:							/* MTC */
 	tm_updcsta (uptr);				/* update status */
 	*data = tm_cmd;					/* return command */
-	return SCPE_OK;
+	break;
 case 2:							/* MTBRC */
 	*data = tm_bc;					/* return byte count */
-	return SCPE_OK;
+	break;
 case 3:							/* MTCMA */
 	*data = tm_ca;					/* return mem addr */
-	return SCPE_OK;
+	break;
 case 4:							/* MTD */
 	*data = tm_db;					/* return data buffer */
-	return SCPE_OK;
+	break;
+case 5:							/* MTRD */
+	tm_rdl = tm_rdl ^ RDL_CLK;			/* "clock" ticks */
+	*data = tm_rdl;
+	break;
 default:						/* unimplemented */
 	*data = 0;
-	return SCPE_OK;  }
+	break;  }
+return SCPE_OK;
 }
 
 t_stat tm_wr (int32 data, int32 PA, int32 access)
@@ -265,7 +280,7 @@ UNIT *uptr;
 
 switch ((PA >> 1) & 07) {				/* decode PA<3:1> */
 case 0:							/* MTS: read only */
-	return SCPE_OK;
+	break;
 case 1:							/* MTC */
 	uptr = tm_dev.units + GET_UNIT (tm_cmd);	/* select unit */
 	if ((tm_cmd & MTC_DONE) == 0) tm_sta = tm_sta | STA_ILL;
@@ -276,30 +291,29 @@ case 1:							/* MTC */
 			tm_reset (&tm_dev);		/* reset device */
 			return SCPE_OK;  }
 		if ((data & MTC_IE) == 0)		/* int disable? */
-			int_req = int_req & ~INT_TM;	/* clr int request */
+			CLR_INT (TM);			/* clr int request */
 		else if ((tm_cmd & (MTC_ERR + MTC_DONE)) && !(tm_cmd & MTC_IE))
-			int_req = int_req | INT_TM;	/* set int request */
+			SET_INT (TM);			/* set int request */
 		tm_cmd = (tm_cmd & ~MTC_RW) | (data & MTC_RW);
 		uptr = tm_dev.units + GET_UNIT (tm_cmd);	/* new unit */
 		if (data & MTC_GO) tm_go (uptr);  }	/* new function? */
 	tm_updcsta (uptr);				/* update status */
-	return SCPE_OK;
+	break;
 case 2:							/* MTBRC */
 	if (access == WRITEB) data = (PA & 1)?
 		(tm_bc & 0377) | (data << 8): (tm_bc & ~0377) | data;
 	tm_bc = data;
-	return SCPE_OK;
+	break;
 case 3:							/* MTCMA */
 	if (access == WRITEB) data = (PA & 1)?
 		(tm_ca & 0377) | (data << 8): (tm_ca & ~0377) | data;
 	tm_ca = data;
-	return SCPE_OK;
+	break;
 case 4:							/* MTD */
 	if ((access == WRITEB) && (PA & 1)) return SCPE_OK;
 	tm_db = data & 0377;
-	return SCPE_OK;
-default:
-	return SCPE_OK;  }				/* end switch */
+	break;  }					/* end switch */
+return SCPE_OK;
 }
 
 /* New magtape command */
@@ -325,7 +339,7 @@ else if (f == MTC_REWIND)				/* rewind */
 	uptr -> USTAT = uptr -> USTAT | STA_REW; 	/* rewinding */
 /* else /* uncomment this else if rewind/unload don't set done */
 tm_cmd = tm_cmd & ~MTC_DONE;				/* clear done */
-int_req = int_req & ~INT_TM;				/* clear int */
+CLR_INT (TM);						/* clear int */
 sim_activate (uptr, tm_time);				/* start io */
 return;
 }
@@ -501,7 +515,7 @@ if (sim_is_active (uptr)) tm_sta = tm_sta & ~STA_TUR;
 else tm_sta = tm_sta | STA_TUR;
 if (tm_sta & STA_EFLGS) tm_cmd = tm_cmd | MTC_ERR;
 else tm_cmd = tm_cmd & ~MTC_ERR;
-if ((tm_cmd & MTC_IE) == 0) int_req = int_req & ~INT_TM;
+if ((tm_cmd & MTC_IE) == 0) CLR_INT (TM);
 return tm_sta;
 }
 
@@ -510,7 +524,7 @@ return tm_sta;
 void tm_set_done (void)
 {
 tm_cmd = tm_cmd | MTC_DONE;
-if (tm_cmd & MTC_IE) int_req = int_req | INT_TM;
+if (tm_cmd & MTC_IE) SET_INT (TM);
 return;
 }
 
@@ -520,11 +534,12 @@ t_stat tm_reset (DEVICE *dptr)
 {
 int32 u;
 UNIT *uptr;
+extern int32 ts_enb;
 
-if (dev_enb & INT_TM) dev_enb = dev_enb & ~INT_TS;	/* TM or TS */
+if (tm_enb) ts_enb = 0;					/* TM or TS */
 tm_cmd = MTC_DONE;					/* set done */
-tm_bc = tm_ca = tm_db = tm_sta = 0;
-int_req = int_req & ~INT_TM;				/* clear interrupt */
+tm_bc = tm_ca = tm_db = tm_sta = tm_rdl = 0;
+CLR_INT (TM);						/* clear interrupt */
 for (u = 0; u < TM_NUMDR; u++) {			/* loop thru units */
 	uptr = tm_dev.units + u;
 	uptr -> UNUM = u;				/* init drive number */

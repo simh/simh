@@ -25,6 +25,7 @@
 
    rl		RL11(RLV12)/RL01/RL02 cartridge disk
 
+   07-Sep-01	RMS	Revised device disable and interrupt mechanisms
    20-Aug-01	RMS	Added bad block option in attach
    17-Jul-01	RMS	Fixed warning from VC++ 6.0
    26-Apr-01	RMS	Added device enable/disable support
@@ -156,7 +157,7 @@
 #define RLBAE_IMP	0000077				/* implemented */
 
 extern uint16 *M;					/* memory */
-extern int32 int_req, dev_enb;
+extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
 int32 rlcs = 0;						/* control/status */
 int32 rlba = 0;						/* memory address */
@@ -166,6 +167,7 @@ int32 rlmp = 0, rlmp1 = 0, rlmp2 = 0;			/* mp register queue */
 int32 rl_swait = 10;					/* seek wait */
 int32 rl_rwait = 10;					/* rotate wait */
 int32 rl_stopioe = 1;					/* stop on error */
+int32 rl_enb = 1;					/* device enable */
 t_stat rl_svc (UNIT *uptr);
 t_stat rl_reset (DEVICE *dptr);
 void rl_set_done (int32 error);
@@ -201,7 +203,7 @@ REG rl_reg[] = {
 	{ ORDATA (RLMP, rlmp, 16) },
 	{ ORDATA (RLMP1, rlmp1, 16) },
 	{ ORDATA (RLMP2, rlmp2, 16) },
-	{ FLDATA (INT, int_req, INT_V_RL) },
+	{ FLDATA (INT, IREQ (RL), INT_V_RL) },
 	{ FLDATA (ERR, rlcs, CSR_V_ERR) },
 	{ FLDATA (DONE, rlcs, CSR_V_DONE) },
 	{ FLDATA (IE, rlcs, CSR_V_IE) },
@@ -220,7 +222,7 @@ REG rl_reg[] = {
 	{ DRDATA (CAPAC2, rl_unit[2].capac, 32), PV_LEFT + REG_HRO },
 	{ DRDATA (CAPAC3, rl_unit[3].capac, 32), PV_LEFT + REG_HRO },
 	{ FLDATA (STOP_IOE, rl_stopioe, 0) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_RL), REG_HRO },
+	{ FLDATA (*DEVENB, rl_enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB rl_mod[] = {
@@ -300,12 +302,12 @@ case 0:							/* RLCS */
 	rlcs = (rlcs & ~RLCS_RW) | (data & RLCS_RW);
 	rlbae = (rlbae & ~RLCS_M_MEX) | ((rlcs >> RLCS_V_MEX) & RLCS_M_MEX);
 	if (data & CSR_DONE) {				/* ready set? */
-		if ((data & CSR_IE) == 0) int_req = int_req & ~INT_RL;
+		if ((data & CSR_IE) == 0) CLR_INT (RL);
 		else if ((rlcs & (CSR_DONE + CSR_IE)) == CSR_DONE)
-			int_req = int_req | INT_RL;	
+			SET_INT (RL);	
 		return SCPE_OK;  }
 
-	int_req = int_req & ~INT_RL;			/* clear interrupt */
+	CLR_INT (RL);					/* clear interrupt */
 	rlcs = rlcs & ~RLCS_ALLERR;			/* clear errors */
 	switch (GET_FUNC (rlcs)) {			/* case on RLCS<3:1> */
 	case RLCS_NOP:					/* nop */
@@ -459,8 +461,8 @@ return SCPE_OK;
 void rl_set_done (int32 status)
 {
 	rlcs = rlcs | status | CSR_DONE;		/* set done */
-	if (rlcs & CSR_IE) int_req = int_req | INT_RL;
-	else int_req = int_req & ~INT_RL;
+	if (rlcs & CSR_IE) SET_INT (RL);
+	else CLR_INT (RL);
 	return;
 }
 
@@ -476,7 +478,7 @@ UNIT *uptr;
 
 rlcs = CSR_DONE;
 rlda = rlba = rlbae = rlmp = rlmp1 = rlmp2 = 0;
-int_req = int_req & ~INT_RL;
+CLR_INT (RL);
 for (i = 0; i < RL_NUMDR; i++) {
 	uptr = rl_dev.units + i;
 	sim_cancel (uptr);
@@ -523,8 +525,8 @@ return pdp11_bad_block (uptr, RL_NUMSC, RL_NUMWD);
 
 /* Device bootstrap */
 
-#define BOOT_START 02000		/* start */
-#define BOOT_UNIT 02006			/* where to store unit number */
+#define BOOT_START 02000				/* start */
+#define BOOT_UNIT 02006					/* unit number */
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int32))
 
 static const int32 boot_rom[] = {

@@ -23,6 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   23-Oct-01	RMS	New IO page address constants
+   19-Oct-01	RMS	Added DZ definitions
+   07-Sep-01	RMS	Revised for PDP-11 multi-level interrupts
+   31-Aug-01	RMS	Changed int64 to t_int64 for Windoze
+   29-Aug-01	RMS	Corrected models and dates (found by Lars Brinkhoff)
    01-Jun-01	RMS	Updated DZ11 vector definitions
    19-May-01	RMS	Added workaround for TOPS-20 V4.1 boot bug
 */
@@ -35,9 +40,9 @@
 
    PDP-6	0.25	Original 36b implementation, 1964
    KA10		0.38	First PDP-10, flip chips, 1967
-   KI10		0.72	First paging system, flip chip + MSI, 1969
-   KL10		1.8	First ECL system, ECL 10K, 1972
-   KL10X	1.8	Expanded addressing, ECL 10K, 1975
+   KI10		0.72	First paging system, flip chip + MSI, 1972
+   KL10		1.8	First ECL system, ECL 10K, 1975
+   KL10B	1.8	Expanded addressing, ECL 10K, 1978
    KS10		0.3	Last 36b system, 2901 based, 1979
 
    In addition, it ran four major (incompatible) operating systems:
@@ -69,8 +74,8 @@
 
 /* Data types */
 
-typedef int32 a10;					/* PDP-10 addr (30b) */
-typedef int64 d10;					/* PDP-10 data (36b) */
+typedef int32		a10;				/* PDP-10 addr (30b) */
+typedef t_int64		d10;				/* PDP-10 data (36b) */
 
 /* Abort codes, used to sort out longjmp's back to the main loop
    Codes > 0 are simulator stop codes
@@ -162,7 +167,7 @@ typedef int64 d10;					/* PDP-10 data (36b) */
 #define BP_S		0007700000000
 #define GET_P(x)	((int32) (((x) >> BP_V_P) & BP_M_P))
 #define GET_S(x)	((int32) (((x) >> BP_V_S) & BP_M_S))
-#define PUT_P(b,x)	(((b) & ~BP_P) | ((((int64) (x)) & BP_M_P) << BP_V_P))
+#define PUT_P(b,x)	(((b) & ~BP_P) | ((((t_int64) (x)) & BP_M_P) << BP_V_P))
 
 /* Flags (stored in their own halfword) */
 
@@ -567,17 +572,31 @@ typedef int64 d10;					/* PDP-10 data (36b) */
 #define IO_UBA3		(3 << IO_V_UBA)
 #define GET_IOUBA(x)	(((x) >> IO_V_UBA) & IO_M_UBA)
 
+/* DZ11 parameters */
+
+#define DZ_MUXES	1				/* # of muxes */
+#define DZ_LINES	8				/* lines per mux */
+
 /* I/O page layout */
 
-#define IO_DZBASE	0760010				/* DZ11 base */
-#define IO_TCUBASE	0760770				/* TCU150 base */
-#define IO_UBMAP	0763000				/* Unibus map base */
-#define IO_UBCS		0763100				/* Unibus c/s reg */
-#define IO_UBMNT	0763101				/* Unibus maint reg */
-#define IO_TMBASE	0772440				/* RH11/tape base */
-#define IO_RHBASE	0776700				/* RH11/disk base */
-#define IO_LPBASE	0775400				/* LP20 base */
-#define IO_PTBASE	0777550				/* PC11 base */
+#define IOBA_DZ		0760010				/* DZ11 */
+#define IOLN_DZ		(010 * DZ_MUXES)
+#define IOBA_TCU	0760770				/* TCU150 */
+#define IOLN_TCU	006
+#define IOBA_UBMAP	0763000				/* Unibus map */
+#define IOLN_UBMAP	0100
+#define IOBA_UBCS	0763100				/* Unibus c/s reg */
+#define IOLN_UBCS	001
+#define IOBA_UBMNT	0763101				/* Unibus maint reg */
+#define IOLN_UBMNT	001
+#define IOBA_TU		0772440				/* RH11/tape */
+#define IOLN_TU		034
+#define IOBA_RP		0776700				/* RH11/disk */
+#define IOLN_RP		050
+#define IOBA_LP20	0775400				/* LP20 */
+#define IOLN_LP20	020
+#define IOBA_PT		0777550				/* PC11 */
+#define IOLN_PT		010
 
 /* Common Unibus CSR flags */
 
@@ -603,19 +622,27 @@ typedef int64 d10;					/* PDP-10 data (36b) */
 
 #define INT_V_RP	6				/* RH11/RP,RM drives */
 #define INT_V_TU	7				/* RH11/TM03/TU45 */
-#define INT_V_DZ0RX	16				/* DZ11 */
-#define INT_V_DZ0TX	17
+#define INT_V_DZRX	16				/* DZ11 */
+#define INT_V_DZTX	17
 #define INT_V_PTR	24				/* PC11 */
 #define INT_V_PTP	25
 #define INT_V_LP20	26				/* LPT20 */
 
 #define INT_RP		(1u << INT_V_RP)
 #define INT_TU		(1u << INT_V_TU)
-#define INT_DZ0RX	(1u << INT_V_DZ0RX)
-#define INT_DZ0TX	(1u << INT_V_DZ0TX)
+#define INT_DZRX	(1u << INT_V_DZRX)
+#define INT_DZTX	(1u << INT_V_DZTX)
 #define INT_PTR		(1u << INT_V_PTR)
 #define INT_PTP		(1u << INT_V_PTP)
 #define INT_LP20	(1u << INT_V_LP20)
+
+#define IPL_RP		6				/* int levels */
+#define IPL_TU		6
+#define IPL_DZRX	5
+#define IPL_DZTX	5
+#define IPL_PTR		4
+#define IPL_PTP		4
+#define IPL_LP20	4
 
 #define INT_UB1		INT_RP				/* on Unibus 1 */
 #define INT_UB3		(0xFFFFFFFFu & ~INT_UB1)	/* on Unibus 3 */
@@ -629,6 +656,10 @@ typedef int64 d10;					/* PDP-10 data (36b) */
 #define VEC_PTP		0074
 #define VEC_TU		0224
 #define VEC_RP		0254
-#define VEC_DZ0RX	0340
-#define VEC_DZ0TX	0344
+#define VEC_DZRX	0340
+#define VEC_DZTX	0344
 #define VEC_LP20	0754
+
+#define IREQ(dv)	int_req
+#define SET_INT(dv)	IREQ(dv) = IREQ(dv) | (INT_##dv)
+#define CLR_INT(dv)	IREQ(dv) = IREQ(dv) & ~(INT_##dv)

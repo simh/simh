@@ -25,6 +25,7 @@
 
    cpu		KS10 central processor
 
+   31-Aug-01	RMS	Changed int64 to t_int64 for Windoze
    10-Aug-01	RMS	Removed register in declarations
    17-Jul-01	RMS	Moved function prototype
    19-May-01	RMS	Added workaround for TOPS-20 V4.1 boot bug
@@ -531,7 +532,7 @@ void ashc (int32 ac, a10 ea);
 void circ (int32 ac, a10 ea);
 void blt (int32 ac, a10 ea, int32 pflgs);
 void bltu (int32 ac, a10 ea, int32 pflgs, int dir);
-a10 calc_ea (int64 inst, int32 prv);
+a10 calc_ea (d10 inst, int32 prv);
 a10 calc_ioea (d10 inst, int32 prv);
 d10 calc_jrstfea (d10 inst, int32 pflgs);
 void pi_dismiss (void);

@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Sep-01	RMS	Removed multiconsole support
    27-May-01	RMS	Added second Teletype support
    18-May-01	RMS	Added PDP-9,-15 API IOT's
    12-May-01	RMS	Fixed bug in RIM loaders
@@ -116,15 +117,6 @@ DEVICE *sim_devices[] = { &cpu_dev,
 	&tti1_dev, &tto1_dev,
 #endif
 	NULL };
-
-#if defined (TTY1)
-UNIT *sim_consoles[] = {
-	&tti_unit, &tto_unit,
-	&tti1_unit, &tto1_unit,
-	NULL };
-#else
-UNIT *sim_consoles = NULL;
-#endif
 
 const char *sim_stop_messages[] = {
 	"Unknown error",

@@ -25,6 +25,7 @@
 
    dp		12557A cartridge disk system
 
+   07-Sep-01	RMS	Moved function prototypes
    29-Nov-00	RMS	Made variable names unique
    21-Nov-00	RMS	Fixed flag, buffer power up state
 */
@@ -125,7 +126,6 @@ t_stat dpc_detach (UNIT *uptr);
 t_stat dpd_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat dpd_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void dp_go (int32 fnc, int32 drv, int32 time, int32 attdev);
-extern t_bool hp_setdev2 (UNIT *uptr, int32 val);
 
 /* DPD data structures
 

@@ -30,7 +30,6 @@ extern unsigned int32 get_uint (char *cptr, int32 radix, unsigned int32 max,
    sim_PC		pointer to saved PC register descriptor
    sim_emax		number of words needed for examine
    sim_devices		array of pointers to simulated devices
-   sim_consoles		array of pointers to consoles (if more than one)
    sim_stop_messages	array of pointers to stop messages
    sim_load		binary loader
 */
@@ -43,8 +42,6 @@ int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = { &cpu_dev, &sio_dev, &ptr_dev,
 	&ptp_dev, &dsk_dev, NULL };
-
-UNIT *sim_consoles = NULL;
 
 const char *sim_stop_messages[] = {
 	"Unknown error",

@@ -29,6 +29,8 @@
    tto		teleprinter
    clk		clock
 
+   17-Sep-01	RMS	Removed multiconsole support
+   07-Sep-01	RMS	Added terminal multiplexor support
    17-Jul-01	RMS	Moved function prototype
    10-Jun-01	RMS	Cleaned up IOT decoding to reflect hardware
    27-May-01	RMS	Added multiconsole support
@@ -52,10 +54,8 @@ int32 ptr_err = 0, ptr_stopioe = 0, ptr_state = 0;
 int32 ptp_err = 0, ptp_stopioe = 0;
 int32 tti_state = 0;
 int32 tto_state = 0;
-int32 clk_tps = 60;
-#if defined (TTY1)
-static uint8 tto_consout[CONS_SIZE];
-#endif
+int32 clk_tps = 60;					/* ticks/second */
+int32 tmxr_poll = 16000;				/* term mux poll */
 
 t_stat clk_svc (UNIT *uptr);
 t_stat ptr_svc (UNIT *uptr);
@@ -72,8 +72,6 @@ t_stat ptp_attach (UNIT *uptr, char *cptr);
 t_stat ptr_detach (UNIT *uptr);
 t_stat ptp_detach (UNIT *uptr);
 t_stat ptr_boot (int32 unitno);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
 
 /* CLK data structures
 
@@ -200,9 +198,9 @@ static const int32 tti_trans[128] = {
 #define UNIT_HDX	(1 << UNIT_V_HDX)
 
 #if defined (PDP4) || defined (PDP7)
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC+UNIT_CONS, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC, 0), KBD_POLL_WAIT };
 #else
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC+UNIT_HDX+UNIT_CONS, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC+UNIT_HDX, 0), KBD_POLL_WAIT };
 #endif
 
 REG tti_reg[] = {
@@ -217,16 +215,9 @@ REG tti_reg[] = {
 #endif
 	{ DRDATA (POS, tti_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
-#if defined (TTY1)
-	{ FLDATA (CFLAG, tti_unit.flags, UNIT_V_CONS), REG_HRO },
-#endif
 	{ NULL }  };
 
 MTAB tti_mod[] = {
-#if defined (TTY1)
-	{ UNIT_CONS, 0, "inactive", NULL, NULL },
-	{ UNIT_CONS, UNIT_CONS, "active console", "CONSOLE", &set_console },
-#endif
 #if !defined (KSR28)
 	{ UNIT_UC, 0, "lower case", "LC", NULL },
 	{ UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
@@ -269,7 +260,7 @@ static const char tto_trans[64] = {
 
 #define TTO_MASK	((1 << TTO_WIDTH) - 1)
 
-UNIT tto_unit = { UDATA (&tto_svc, UNIT_UC+UNIT_CONS, 0), SERIAL_OUT_WAIT };
+UNIT tto_unit = { UDATA (&tto_svc, UNIT_UC, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
 	{ ORDATA (BUF, tto_unit.buf, TTO_WIDTH) },
@@ -280,17 +271,9 @@ REG tto_reg[] = {
 #endif
 	{ DRDATA (POS, tto_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
-#if defined (TTY1)
-	{ BRDATA (CONSOUT, tto_consout, 8, 8, CONS_SIZE), REG_HIDDEN },
-	{ FLDATA (CFLAG, tto_unit.flags, UNIT_V_CONS), REG_HRO },
-#endif
 	{ NULL }  };
 
 MTAB tto_mod[] = {
-#if defined (TTY1)
-	{ UNIT_CONS, 0, "inactive", NULL, NULL },
-	{ UNIT_CONS, UNIT_CONS, "active console", "CONSOLE", &set_console },
-#endif
 #if !defined (KSR28)
 	{ UNIT_UC, 0, "lower case", "LC", NULL },
 	{ UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
@@ -324,11 +307,14 @@ return AC;
 
 t_stat clk_svc (UNIT *uptr)
 {
+int32 t;
+
 if (clk_state) {					/* clock on? */
 	M[7] = (M[7] + 1) & 0777777;			/* incr counter */
 	if (M[7] == 0) int_req = int_req | INT_CLK;	/* ovrflo? set flag */
-	sim_activate (&clk_unit,			/* reactivate unit */
-		sim_rtc_calb (clk_tps));  }		/* calibr delay */
+	t = sim_rtc_calb (clk_tps);			/* calibrate clock */
+	sim_activate (&clk_unit, t);			/* reactivate unit */
+	tmxr_poll = t;  }				/* set mux poll */
 return SCPE_OK;
 }
 
@@ -339,6 +325,7 @@ t_stat clk_reset (DEVICE *dptr)
 int_req = int_req & ~INT_CLK;				/* clear flag */
 clk_state = 0;						/* clock off */
 sim_cancel (&clk_unit);					/* stop clock */
+tmxr_poll = clk_unit.wait;				/* set mux poll */
 return SCPE_OK;
 }
 
@@ -346,7 +333,7 @@ return SCPE_OK;
 
 int32 std_iors (void)
 {
-return	((int_req & INT_CLK)? IOS_CLK: 0) |
+return ((int_req & INT_CLK)? IOS_CLK: 0) |
 	((int_req & INT_PTR)? IOS_PTR: 0) |
 	((int_req & INT_PTP)? IOS_PTP: 0) |
 	((int_req & INT_TTI)? IOS_TTI: 0) |
@@ -714,7 +701,7 @@ if ((tti_unit.flags & UNIT_UC) && islower (temp)) temp = toupper (temp);
 if ((tti_unit.flags & UNIT_HDX) &&
     (!(tto_unit.flags & UNIT_UC) ||
 	  ((temp >= 007) && (temp <= 0137)))) {
-	sim_putcons (temp, uptr);
+	sim_putchar (temp);
 	tto_unit.pos = tto_unit.pos + 1;  }
 tti_unit.buf = temp | 0200;				/* got char */
 #endif
@@ -730,9 +717,6 @@ t_stat tti_reset (DEVICE *dptr)
 tti_unit.buf = 0;					/* clear buffer */
 tti_state = 0;						/* clear state */
 int_req = int_req & ~INT_TTI;				/* clear flag */
-#if defined (TTY1)
-if (tti_unit.flags & UNIT_CONS)				/* if active cons */
-#endif
 sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
 return SCPE_OK;
 }
@@ -770,7 +754,7 @@ out = tto_unit.buf & 0177;				/* ASCII... */
 #endif
 if (!(tto_unit.flags & UNIT_UC) ||
 	 ((out >= 007) && (out <= 0137))) {
-	temp = sim_putcons (out, uptr);
+	temp = sim_putchar (out);
 	if (temp != SCPE_OK) return temp;
 	tto_unit.pos = tto_unit.pos + 1;  }
 return SCPE_OK;
@@ -784,8 +768,5 @@ tto_unit.buf = 0;					/* clear buffer */
 tto_state = 0;						/* clear state */
 int_req = int_req & ~INT_TTO;				/* clear flag */
 sim_cancel (&tto_unit);					/* deactivate unit */
-#if defined (TTY1)
-tto_unit.filebuf = tto_consout;
-#endif
 return SCPE_OK;
 }

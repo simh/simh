@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   17-Sep-01	RMS	Removed multiconsole support
 */
 
 #include "h316_defs.h"
@@ -42,7 +44,6 @@ extern int32 sim_switches;
    sim_PC		pointer to saved PC register descriptor
    sim_emax		maximum number of words for examine/deposit
    sim_devices		array of pointers to simulated devices
-   sim_consoles		array of pointers to consoles (if more than one)
    sim_stop_messages	array of pointers to stop messages
    sim_load		binary loader
 */
@@ -58,8 +59,6 @@ DEVICE *sim_devices[] = { &cpu_dev,
 	&tty_dev, &lpt_dev,
 	&clk_dev,
 	NULL };
-
-UNIT *sim_consoles = NULL;
 
 const char *sim_stop_messages[] = {
 	"Unknown error",

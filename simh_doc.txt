@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V2.6b
-Date:	15-Sep-01
+Subj:	Simulator Usage, V2.7
+Date:	30-Sep-01
 
 			COPYRIGHT NOTICE
 
@@ -54,29 +54,32 @@ in scp_tty.c and scp_sock.c.
 To compile the simulators on VMS, use these commands (note that separate
 compilations are required for each of the 18b PDP's):
 
-	$ cc pdp8_*.c,scp.c,scp_tty.c		! PDP-8
-	$ link/exec=pdp8 pdp8_*.obj,scp.obj,scp_tty.obj
+	$ cc pdp8_*.c,scp.c,scp_tty.c,sim_*.c		! PDP-8
+	$ link/exec=pdp8 pdp8_*.obj,scp.obj,scp_tty.obj,sim_*.obj
 
-	$ cc pdp11_*.c,scp.c,scp_tty.c		! PDP-11
-	$ link/exec=pdp11 pdp11_*.obj,scp.obj,scp_tty.obj
+	$ cc pdp11_*.c,scp.c,scp_tty.c,sim_*.c		! PDP-11
+	$ link/exec=pdp11 pdp11_*.obj,scp.obj,scp_tty.obj,sim_*.obj
 
-	$ cc nova_*.c,scp.c,scp_tty.c		! Nova
-	$ link/exec=nova nova_*.obj,scp.obj,scp_tty.obj
+	$ cc nova_*.c,scp.c,scp_tty.c,sim_*.c		! Nova
+	$ link/exec=nova nova_*.obj,scp.obj,scp_tty.obj,sim_*.obj
 
-	$ cc pdp1_*.c,scp.c,scp_tty.c		! PDP-1
+	$ cc pdp1_*.c,scp.c,scp_tty.c			! PDP-1
 	$ link/exec=pdp1 pdp1_*.obj,scp.obj,scp_tty.obj
 
-	$ cc/define=PDP{4,7,9,15} pdp18b_*.c,scp.c,scp_tty.c
-	$ link/exec=pdp{4,7,9,15} pdp18b_*.obj,scp.obj,scp_tty.obj
+	$ cc/define=PDP{4,7,9,15} pdp18b_*.c,scp.c,scp_tty.c,sim_*.c
+	$ link/exec=pdp{4,7,9,15} pdp18b_*.obj,scp.obj,scp_tty.obj,sim_*.obj
 
-	$ cc i1401_*.c,scp.c,scp_tty.c		! IBM 1401
+	$ cc i1401_*.c,scp.c,scp_tty.c			! IBM 1401
 	$ link/exec=i1401 i1401_*.obj,scp.obj,scp_tty.obj
 
-	$ cc hp2100_*.c,scp.c,scp_tty.c		! HP 2100
+	$ cc hp2100_*.c,scp.c,scp_tty.c			! HP 2100
 	$ link/exec=hp2100 hp2100_*.obj,scp.obj,scp_tty.obj
 
-	$ cc id4_*.c,scp.c,scp_tty.c		! Interdata 4
+	$ cc id4_*.c,scp.c,scp_tty.c			! Interdata 4
 	$ link/exec=id4 id4_*.obj,scp.obj,scp_tty.obj
+
+	$ cc h316_*.c,scp.c,scp_tty.c			! Honeywell 316
+	$ link/exec=h316 h316_*.obj,scp.obj,scp_tty.obj
 
 On version of VMS prior to 6.2, the simulators must then be defined as
 foreign commands so that they can be started by name.
@@ -86,14 +89,15 @@ the POSIX compliant TERMIOS interface (including Linux and Mac OS X), use
 the following commands (note that separate compilations are required for
 each of the 18b PDP's):
 
-	% cc pdp8_*.c scp*.c -lm -o pdp8
-	% cc pdp11_*.c scp*.c -lm -o pdp11
-	% cc nova_*.c scp*.c -lm -o nova
+	% cc pdp8_*.c scp*.c sim_*.c -lm -o pdp8
+	% cc pdp11_*.c scp*.c sim_*.c -lm -o pdp11
+	% cc nova_*.c scp*.c sim_*.c -lm -o nova
 	% cc pdp1_*.c scp*.c -o pdp1
-	% cc -DPDP{4,7,9,15} pdp18b_*.c scp*.c -lm -o pdp{4,7,9,15}
+	% cc -DPDP{4,7,9,15} pdp18b_*.c scp*.c sim_*.c -lm -o pdp{4,7,9,15}
 	% cc i1401_*.c scp*.c -o i1401
 	% cc hp2100_*.c scp*.c -o hp2100
 	% cc id4_*.c scp*.c -o id4
+	% cc h316_*.c scp*.c -o h316
 
 These commands should work with most UNIX variants.  If your UNIX only
 supports the old BSD terminal interface, add -DBSDTTY to each command.
@@ -104,7 +108,7 @@ The PDP-10 simulator requires 64b support in the simulator and in the
 simulator control package (SCP).  To turn on 64b support, add the symbol
 USE_INT64 to the command line:
 
-	% cc -DUSE_INT64 pdp10_*.c,scp*.c -lm -o pdp10
+	% cc -DUSE_INT64 pdp10_*.c scp*.c sim_*.c -lm -o pdp10
 
 Since 64b integer declarations vary, sim_defs.h has conditional
 declarations for Windows (_int64) and Digital UNIX (long).  The default
@@ -115,12 +119,20 @@ To compile the simulators on Windows 9x/ME/NT/2000 and Visual C++,
 each simulator must be set up as a separate project.  Under the VC++
 file menu, select New, select Project Workspace, select Console
 Application, and type in the name of the simulator.  In the project
-files view, select Add Files To Project and add in all the files for
-that simulator (e.g., all files beginning nova_ for the Nova), plus
-sim_defs.h, scp.c, and scp_tty.c.  If the project requires the DZ11,
-also add in scp_sock.h and scp_sock.c.  If the project requires a
-command line switch, add the switches to the C/C++ tab of the
-Configuration dialog.  The simulator should then build properly.
+files view, select Add Files To Project and add in the required files:
+
+	- all simulators: sim_defs.h, sim_rev.h, scp.c, scp_tty
+	- all simulators: simulator specific files (e.g., all
+	  files beginning with nova_* for the Nova)
+	- PDP-10, PDP-11: dec_dz.h
+	- PDP-8, PDP-10, PDP-11, PDP-18b, Nova: sim_sock.h,
+	  sim_sock.c, sim_txmr.h, sim_txmr.c
+
+If the project requires 64b support, add the switch -DUSE_INT64 to
+the C/C++ tab of the Configuration dialog.  If the project includes
+Telnet-based terminals, add the appropriate Winsock library to the
+library search list (Wsock32.dll for VC++ V4.)  The simulator should
+then build properly.
 
 To start the simulator, simply type its name.  The simulator takes
 one optional argument, a startup command file.  If specified, this
@@ -136,6 +148,7 @@ for example, disk sizes.
 	% i1401 <startup file>(cr)		or
 	% hp2100 <startup file>(cr)		or
 	% id4 <startup file>(cr)		or
+	% h316 <startup file>(cr)		or
 	% pdp10 <startup file>(cr)
 
 The simulator types out its name and version, executes the commands
@@ -234,8 +247,16 @@ unit.  The ATTACH (abbreviation AT) command associates a unit and a file:
 If the file does not exist, it is created, and an appropriate message
 is printed.
 
+For Telnet-based terminal emulators, the ATTACH command associates the
+master unit with a TCP/IP port:
+
+	sim> ATTACH <device><unit number> <port>(cr)
+
+The port is a decimal number between 1 and 65535 and should not used
+by standard TCP/IP protocols.
+
 The DETACH (abbreviation DET) command breaks the association between a
-unit and a file and closes the file:
+unit and a file, or between a unit and a port:
 
 	sim> DETACH ALL(cr)			-- detach all units
 	sim> DETACH <device><unit number>(cr)	-- detach specified unit
@@ -463,6 +484,7 @@ CPU		PDP-8/E CPU with 32KW of memory
 -		KM8E memory management and timeshare control
 PTR,PTP		PC8E paper tape reader/punch
 TTI,TTO		KL8E console terminal
+TTI1-4,TTO1-4	KL8JA additional terminals
 LPT		LE8E line printer
 CLK		DK8E line frequency clock (also PDP-8/A compatible)
 RK		RK8E/RK05 cartridge disk controller with four drives
@@ -605,7 +627,7 @@ Error handling is as follows:
 
 4.2.3 KL8E Terminal Input (TTI)
 
-The terminal input (TTI) reads from the controling console port.  The
+The terminal input (TTI) polls the console keyboard for input.  The
 input side has one option, UC; when set, it automatically converts lower
 case input to upper case.  This is required by OS/8 and is on by default.
 
@@ -622,7 +644,7 @@ The terminal input implements these registers:
 
 4.2.4 KL8E Terminal Output (TTO)
 
-The terminal output (TTO) writes to the controling console port. It
+The terminal output (TTO) writes to the simulator console window. It
 implements these registers:
 
 	name		size	comments
@@ -675,6 +697,52 @@ The real-time clock (CLK) implements these registers:
 
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
+
+4.2.7 KL8JA Additional Terminals (TTI1-4, TTO1-4)
+
+Each additional terminal consists of two independent devices, TTIn and
+TTOn.  The entire set is modelled as a terminal multiplexor, with TTI1
+as the master unit.  The additional terminals perform input and output
+through Telnet sessions connected to a user-specified port.  The ATTACH
+command specifies the port to be used:
+
+	ATTACH TTI1 <port>(cr)	-- set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.
+
+Once TTI1 is attached and the simulator is running, the terminals listen
+for connections on the specified port.  They assume that the incoming
+connections are Telnet connections.  The connections remain open until
+disconnected either by the Telnet client, or by a DETACH TTI1 command.
+
+The SHOW TTI1 command displays the current connections to the additional
+terminals. 
+
+The input devices (TTI1-4) implement these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+The output devices (TTO1-4) implement these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters output
+	TIME		24	time from I/O initiation to interrupt
+
+The additional terminals do not support save and restore.  All open
+connections are lost when the simulator shuts down or TTI1 is detached.
 
 4.3 RK8E Cartridge Disk (RK)
 
@@ -923,6 +991,7 @@ controlled by command line switches:
 
 	-a			display as ASCII character
 	-c			display as (sixbit) character string
+	-t			display as (TSS/8 sixbit) character string
 	-m			display instruction mnemonics
 
 Input parsing is controlled by the first character typed in or by command
@@ -930,6 +999,7 @@ line switches:
 
 	' or -a			ASCII character
 	" or -c			two character sixbit string
+	# or -t			two character TSS/8 sixbit string
 	alphabetic		instruction mnemonic
 	numeric			octal number
 
@@ -985,6 +1055,7 @@ PTR,PTP		PC11 paper tape reader/punch
 TTI,TTO		DL11 console terminal
 LPT		LP11 line printer
 CLK		line frequency clock
+DZ		DZ11 8-line terminal multiplexor
 RK		RK11/RK05 cartridge disk controller with eight drives
 RL		RLV12/RL01(2) cartridge disk controller with four drives
 RP		RM02/03/05/80, RP04/05/06/07 Massbus style controller
@@ -994,9 +1065,9 @@ TC		TC11/TU56 DECtape controller with eight drives
 TM		TM11/TU10 magnetic tape controller with eight drives
 TS		TS11/TSV05 magnetic tape controller with one drive
 
-The RK, RL, RP, RX, TC, TM, and TS devices can be DISABLEd.  The PDP-11 can
-support either a TM11 or a TS11, but not both, since they use the same I/O
-addresses.  The simulator defaults to the TM11.  To change the magtape,
+The DZ, RK, RL, RP, RX, TC, TM, and TS devices can be DISABLEd.  The PDP-11
+can support either a TM11 or a TS11, but not both, since they use the same
+I/O addresses.  The simulator defaults to the TM11.  To change the magtape,
 
 	ENABLE TM11		enable TM11 and disable TS11
 	ENABLE TS11		enable TS11 and disable TM11
@@ -1164,7 +1235,7 @@ Error handling is as follows:
 
 5.2.3 KL11 Terminal Input (TTI)
 
-The terminal input (TTI) reads from the controling console port.  It
+The terminal input (TTI) polls the console keyboard for input.  It
 implements these registers:
 
 	name		size	comments
@@ -1180,7 +1251,7 @@ implements these registers:
 
 5.2.4 KL11 Terminal Output (TTO)
 
-The terminal output (TTO) writes to the controling console port.  It
+The terminal output (TTO) writes to the simulator console window.  It
 implements these registers:
 
 	name		size	comments
@@ -1238,6 +1309,45 @@ The clock (CLK) implements these registers:
 
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
+
+5.2.7 DZ11 Terminal Multiplexor (DZ)
+
+The DZ11 is an 8-line terminal multiplexor.  The terminal lines perform
+input and output through Telnet sessions connected to a user-specified
+port.  The ATTACH command specifies the port to be used:
+
+	ATTACH {-am} DZ <port>(cr)	-- set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.  The optional switch -m turns on the DZ11's
+modem controls; the optional switch -a turns on active disconnects
+(disconnect session if computer clears Data Terminal Ready).
+
+Once the DZ is attached and the simulator is running, the DZ will listen
+for connections on the specified port.  It assumes that the incoming
+connections are Telnet connections.  The connection remains open until
+disconnected either by the simulated program or by the Telnet client.
+
+The SHOW DZ command displays the current connections to the DZ. 
+
+The DZ11 implements these registers:
+
+	name		size	comments
+
+	CSR		16	control/status register
+	RBUF		16	receive buffer
+	LPR		16	line parameter register
+	TCR		16	transmission control register
+	MSR		16	modem status register
+	TDR		16	transmit data register
+	SAENB		1	silo alarm enabled
+	MDMTCL		1	modem control enabled
+	AUTODS		1	autodisconnect enabled
+	RPOS0..7	32	count of characters received
+	TPOS0..7	32	count of characters transmitted
+
+The DZ11 does not support save and restore.  All open connections are
+lost when the simulator shuts down or the DZ is detached.
 
 5.3 RK11/RK05 Cartridge Disk (RK)
 
@@ -1390,7 +1500,7 @@ a DEC standard 044 compliant bad block table on the last track:
 	SET RPn RP06		set size to RP06
 	SET RPn RP07		set size to RP07
 	SET RPn AUTOSIZE	set size based on file size at attach
-	SET RLn BADBLOCK	write bad block table on last track
+	SET RPn BADBLOCK	write bad block table on last track
 
 The size options can be used only when a unit is not attached to a file.  The
 bad block option can be used only when a unit is attached to a file.  Units
@@ -1402,26 +1512,29 @@ The RP controller implements these registers:
 	name		size	comments
 
 	RPCS1		16	control/status 1
-	RPCS2		16	control/status 2
-	RPCS3		16	control/status 3
 	RPWC		16	word count
 	RPBA		16	bus address
-	RPBAE		6	bus address extension
 	RPDA		16	desired surface, sector
-	RPDC		8	desired cylinder
+	RPCS2		16	control/status 2
 	RPOF		16	offset
-	RPDS0..7	16	drive status, drives 0-7
-	RPDE0..7	16	drive error, drives 0-7
+	RPDC		8	desired cylinder
 	RPER2		16	error status 2
 	RPER3		16	error status 3
-	RPDB		16	data buffer
+	RPEC1		16	ECC syndrome 1
+	RPEC2		16	ECC syndrome 2
 	RPMR		16	maintenance register
+	RPDB		16	data buffer
+	RPBAE		6	bus address extension
+	RPCS3		16	control/status 3
+	RPIFF		1	transfer complete interrupt request flop
 	INT		1	interrupt pending flag
 	SC		1	special condition (CSR1<15>)
 	DONE		1	device done flag (CSR1<7>)
 	IE		1	interrupt enable flag (CSR1<6>)
 	STIME		24	seek time, per cylinder
 	RTIME		24	rotational delay
+	RPDS0..7	16	drive status, drives 0-7
+	RPDE0..7	16	drive error, drives 0-7
 	STOP_IOE	1	stop on I/O error
 
 Error handling is as follows:
@@ -1568,6 +1681,7 @@ The magnetic tape controller implements these registers:
 	WADH		16	write char packet high address
 	WLNT		16	write char packet length
 	WOPT		16	write char packet options
+	WXOPT		16	write char packet extended options
 	ATTN		1	attention message pending
 	BOOT		1	boot request pending
 	OWNC		1	if set, tape owns command buffer
@@ -1732,22 +1846,6 @@ control registers for the interrupt system.
 
 6.2 Programmed I/O Devices
 
-The Nova can have two terminals (TTI/TTO, TTI1/TTO1).  At any moment
-only one terminal is active.  It can receive input from the keyboard;
-it can output to the simulator window.  The inactive console cannot
-receive input from the keyboard and outputs to an internal buffer
-(maximum 4K characters).
-
-Control is switched among terminals with a SET TTI{n} CONSOLE or SET
-TTO{n} CONSOLE command:
-
-					At startup, active console is TTI/TTO
-	SET TTI1 CONSOLE		Active console is now TTI1/TTO1
-	SET TTO CONSOLE		Active console is now TTI/TTO
-
-When control is switched to an inactive terminal, any buffered output
-is printed when simulation resumes.
-
 6.2.1 Paper Tape Reader (PTR)
 
 The paper tape reader (PTR) reads data from a disk file.  The POS
@@ -1807,23 +1905,19 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-6.2.3 Terminal Input (TTI, TTI1)
+6.2.3 Terminal Input (TTI)
 
-The active terminal input polls the console keyboard for input.  The
-inactive terminal input cannot receive characters.  Terminal input
-options include the ability to set limited Dasher compatibility mode
-or ANSI standard mode:
+The terminal input polls the console keyboard for input.  Terminal
+input options include the ability to set ANSI mode or limited Dasher
+compatibility mode:
 
 	SET TTI ANSI		normal mode
 	SET TTI DASHER		Dasher mode
-	SET TTO ANSI		normal mode
-	SET TTO DASHER		Dasher mode
 
-Setting either TTI (TTI1) or TTO (TTO1) changes both devices.  In Dasher
-mode, carriage return is changed to newline on input, and ^X is changed
-to backspace.
+Setting either TTI or TTO changes both devices.  In Dasher mode, carriage
+return is changed to newline on input, and ^X is changed to backspace.
 
-The terminal inputs implement these registers:
+The terminal input implements these registers:
 
 	name		size	comments
 
@@ -1835,22 +1929,19 @@ The terminal inputs implement these registers:
 	POS		31	number of characters input
 	TIME		24	keyboard polling interval
 
-6.2.4 Terminal Output (TTO, TTO1)
+6.2.4 Terminal Output (TTO)
 
-The active terminal output writes to the simulator window.  The inactive
-terminal output buffers characters.  Terminal output options include the
-the ability to set limited Dasher compatibility mode or ANSI mode:
+The terminal output writes to the simulator console window.  Terminal
+output options include the the ability to set ANSI mode or limited
+Dasher compatibility mode:
 
-	SET TTI ANSI		normal mode
-	SET TTI DASHER		Dasher mode
 	SET TTO ANSI		normal mode
 	SET TTO DASHER		Dasher mode
 
-Setting either TTI (TTI1) or TTO (TTO1) changes both devices.  In Dasher
-mode, carriage return is changed to newline on input, and ^X is changed
-to backspace.
+Setting either TTI or TTO changes both devices.  In Dasher mode, carriage
+return is changed to newline on input, and ^X is changed to backspace.
 
-The terminal outputs implement these registers:
+The terminal output implements these registers:
 
 	name		size	comments
 
@@ -1936,6 +2027,61 @@ Error handling is as follows:
 			0	out of tape or paper
 
 	OS I/O error	x	report error and stop
+
+6.2.8 Second Terminal (TTI1, TTO1)
+
+The second terminal consists of two independent devices, TTI1 and TTO1.
+The additional terminal performs input and output through a Telnet session
+connecting into a user-specified port.  The ATTACH command specifies the
+port to be used:
+
+	ATTACH TTI1 <port>(cr)	-- set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.
+
+Once TTI1 is attached and the simulator is running, the terminal listens
+for a connection on the specified port.  It assumes that the incoming
+connection is a Telnet connection.  The connection remain opens until
+disconnected by the Telnet client, or by a DETACH TTI1 command.
+
+The second terminal has two options, recognized on both devices, for
+setting limited Dasher-compatibility mode or ANSI mode:
+
+	SET TTI1 ANSI		normal mode
+	SET TTI1 DASHER		Dasher mode
+	SET TTO1 ANSI		normal mode
+	SET TTO1 DASHER		Dasher mode
+
+Setting either TTI1 or TTO1 changes both devices.  In Dasher mode, carriage
+return is changed to newline on input, and ^X is changed to backspace.
+
+The SHOW TTI1 command displays the current connection to the second
+terminal.
+
+The second terminal input implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+The second terminal output implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters output
+	TIME		24	time from I/O initiation to interrupt
 
 6.3 Fixed Head Disk (DK)
 
@@ -2261,8 +2407,8 @@ Error handling is as follows:
 
 7.2.3 Terminal Input (TTI)
 
-The terminal input (TTO) reads from the controling console port.
-It implements these registers:
+The terminal input (TTI) polls the console keyboard for input.  It
+implements these registers:
 
 	name		size	comments
 
@@ -2273,7 +2419,7 @@ It implements these registers:
 
 7.2.4 Terminal Output (TTO)
 
-The terminal output (TTO) writes to the controling console port.
+The terminal output (TTO) writes to the simulator console window.
 It implements these registers:
 
 	name		size	comments
@@ -2629,22 +2775,6 @@ the PDP-7 and PDP-9, 17b for the PDP-15).
 
 8.2 Programmed I/O Devices
 
-The PDP-9 and PDP-15 have two terminals (TTI/TTO, TTI1/TTO1).  At any
-moment, only one terminal is active.  It can receive input from the
-keyboard; it can output to the simulator window.  The inactive console
-cannot receive input from the keyboard and outputs to an internal buffer
-(maximum 4K characters).
-
-Control is switched among terminals with a SET TTI{n} CONSOLE or SET
-TTO{n} CONSOLE command:
-
-					At startup, active console is TTI/TTO
-	SET TTI1 CONSOLE		Active console is now TTI1/TTO1
-	SET TTO CONSOLE		Active console is now TTI/TTO
-
-When control is switched to an inactive terminal, any buffered output
-is printed when simulation resumes.
-
 8.2.1 Paper Tape Reader (PTR)
 
 The paper tape reader (PTR) reads data from a disk file.  The POS
@@ -2707,20 +2837,19 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-8.2.3 Terminal Input (TTI, TTI1)
+8.2.3 Terminal Input (TTI)
 
-The active terminal input polls the console keyboard for input.  The
-inactive terminal input cannot receive characters.  The terminal inputs
-have one option, UC; when set, it automatically converts lower case input
-to upper case.
+The terminal input (TTI) polls the console keyboard for input.  The
+input side has one option, UC; when set, it automatically converts lower
+case input to upper case.
 
-The PDP-9 and PDP-15 operated the primary terminal (TTI/TTO), by default,
-as half-duplex.  For backward compatibility, on the PDP-9 and PDP-15
+The PDP-9 and PDP-15 operate the console terminal (TTI/TTO), by default,
+as half duplex.  For backward compatibility, on the PDP-9 and PDP-15
 the first terminal input has a second option, FDX; when set, it operates
 the terminal input in full-duplex mode.  The second terminal is always
 full duplex.
 
-The terminal inputs implement these registers:
+The terminal input implements these registers:
 
 	name		size	comments
 
@@ -2730,14 +2859,13 @@ The terminal inputs implement these registers:
 	POS		31	number of characters input
 	TIME		24	keyboard polling interval
 
-8.2.4 Terminal Output (TTO, TTO1)
+8.2.4 Terminal Output (TTO)
 
-The active terminal output writes to the simulator window.  The inactive
-terminal output buffers characters.  The terminal outputs have one option,
-UC; when set, it suppresses lower case output (so that ALTMODE is not
-echoed as }).
+The terminal output (TTO) writes to the simulator console window.  The
+terminal output has one option, UC; when set, it suppresses lower case
+output (so that ALTMODE is not echoed as }).
 
-The terminal outputs implement these registers:
+The terminal output implements these registers:
 
 	name		size	comments
 
@@ -2821,6 +2949,51 @@ The real-time clock (CLK) implements these registers:
 
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
+
+8.2.7 Second Terminal (TTI1, TTO1)
+
+The second terminal consists of two independent devices, TTI1 and TTO1.
+The second terminal performs input and output through a Telnet session
+connected to a user-specified port.  The ATTACH command specifies the
+port to be used:
+
+	ATTACH TTI1 <port>(cr)	-- set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.
+
+Once TTI1 is attached and the simulator is running, the terminal listens
+for a connection on the specified port.  It assumes that the incoming
+connection is a Telnet connection.  The connection remain opens until
+disconnected by the Telnet client, or by a DETACH TTI1 command.
+
+The second terminal input has one option, UC;  when set, it automatically
+converts lower case input to upper case.  The second terminal output also
+has one option, UC; when set, it suppresses lower case output (so that
+ALTMODE is not echoed as }).
+
+The SHOW TTI1 command displays the current connection to the second
+terminal.
+
+The second terminal input implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+The second terminal output implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	POS		31	number of chararacters output
+	TIME		24	time from I/O initiation to interrupt
 
 8.3 RP15/RP02 Disk Pack (RP)
 
@@ -3384,8 +3557,8 @@ Error handling is as follows:
 9.4 1407 Inquiry Terminal (INQ)
 
 The IBM 1407 inquiry terminal (INQ) is a half-duplex console.  It polls
-the controling keyboard of the simulator periodically for inquiry requests.
-The inquiry terminal registers are:
+the console keyboard periodically for inquiry requests.  The inquiry
+terminal registers are:
 
 	name		size	comments
 
@@ -3725,11 +3898,11 @@ Error handling is as follows:
 10.4.3 12631C Buffered Teleprinter (TTY)
 
 The console teleprinter has three units: keyboard (unit 0), printer
-(unit 1), and punch (unit 2).  The keyboard reads from, and the
-printer writes to, the controlling console port.  The punch writes
-to a disk file.  The keyboard has one option, UC; when set, it
-automatically converts lower case input to upper case.  This is on
-by default.
+(unit 1), and punch (unit 2).  The keyboard reads from the console
+keyboard; the printer writes to the simulator console window.  The
+punch writes to a disk file.  The keyboard has one option, UC; when
+set, it automatically converts lower case input to upper case.  This
+is on by default.
 
 The terminal implements these registers:
 
@@ -4076,9 +4249,10 @@ Error handling is as follows:
 
 11.3 Teletype (TT)
 
-The teletype reads and writes to the controlling console port.  The
-keyboard has one option, UC; when set, it automatically converts lower
-case input to upper case.  This is on by default.
+The teletype keyboard reads from the console keyboard; the teletype
+printer writes to the simulator console window.  The keyboard has
+one option, UC; when set, it automatically converts lower case
+input to upper case.  This is on by default.
 
 	name		size	comments
 
@@ -4158,12 +4332,13 @@ UBA		Unibus adapters (translation maps)
 FE		console
 TIM		timer
 PTR,PTP		PC11 paper tape reader/punch
+DZ		DZ11 8-line terminal multiplexor
 LP20		LP20 line printer
 RP		RH11/RP04/RP05/RP06/RP07/RM03/RM05/RM80 controller with
 		eight drives
 TU		RH11/TM02/TU45 controller with eight drives
 
-The PTR/PTP are initially DISABLEd.  No other device can be DISABLEd.
+The PTR/PTP are initially DISABLEd.  The DZ11 can also be DISABLEd.
 
 The PDP-10 simulator implements several unique stop condition:
 
@@ -4371,7 +4546,54 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-12.8 RH11 Adapter, RM02/03/05/80, RP04/05/06/07 drives (RP)
+12.8 DZ11 Terminal Multiplexor (DZ)
+
+The DZ11 is an 8-line terminal multiplexor.  The terminal lines perform
+input and output through Telnet sessions connected to a user-specified
+port.  The ATTACH command specifies the port to be used:
+
+	ATTACH {-am} DZ <port>(cr)	-- set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.  The optional switch -m turns on the DZ11's
+modem controls; the optional switch -a turns on active disconnects
+(disconnect session if computer clears Data Terminal Ready).
+
+
+	ATTACH {-m} DZ <port>(cr)	-- set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.  The optional switch -m turns on the DZ11's
+modem controls; the optional switch -a turns on active disconnects
+(disconnect session if computer clears Data Terminal Ready).
+
+Once the DZ is attached and the simulator is running, the DZ will listen
+for connections on the specified port.  It assumes that the incoming
+connections are Telnet connections.  The connection remains open until
+disconnected either by the simulated program or by the Telnet client.
+
+The SHOW DZ command displays the current connections to the DZ. 
+
+The DZ11 implements these registers:
+
+	name		size	comments
+
+	CSR		16	control/status register
+	RBUF		16	receive buffer
+	LPR		16	line parameter register
+	TCR		16	transmission control register
+	MSR		16	modem status register
+	TDR		16	transmit data register
+	SAENB		1	silo alarm enabled
+	MDMTCL		1	modem control enabled
+	AUTODS		1	autodisconnect enabled
+	RPOS0..7	32	count of characters received
+	TPOS0..7	32	count of characters transmitted
+
+The DZ11 does not support save and restore.  All open connections are
+lost when the simulator shuts down or the DZ is detached.
+
+12.9 RH11 Adapter, RM02/03/05/80, RP04/05/06/07 drives (RP)
 
 The RP controller implements the Massbus 18b (RH11) direct interface for
 large disk drives.  It is more abstract than other device simulators, with
@@ -4401,26 +4623,27 @@ The RP controller implements these registers:
 	name		size	comments
 
 	RPCS1		16	control/status 1
-	RPCS2		16	control/status 2
-	RPCS3		16	control/status 3
 	RPWC		16	word count
 	RPBA		16	bus address
-	RPBAE		6	bus address extension
 	RPDA		16	desired surface, sector
-	RPDC		8	desired cylinder
+	RPCS2		16	control/status 2
 	RPOF		16	offset
-	RPDS0..7	16	drive status, drives 0-7
-	RPDE0..7	16	drive error, drives 0-7
+	RPDC		8	desired cylinder
 	RPER2		16	error status 2
 	RPER3		16	error status 3
-	RPDB		16	data buffer
+	RPEC1		16	ECC syndrome 1
+	RPEC2		16	ECC syndrome 2
 	RPMR		16	maintenance register
+	RPDB		16	data buffer
+	RPIFF		1	transfer complete interrupt request flop
 	INT		1	interrupt pending flag
 	SC		1	special condition (CSR1<15>)
 	DONE		1	device done flag (CSR1<7>)
 	IE		1	interrupt enable flag (CSR1<6>)
 	STIME		24	seek time, per cylinder
 	RTIME		24	rotational delay
+	RPDS0..7	16	drive status, drives 0-7
+	RPDE0..7	16	drive error, drives 0-7
 	STOP_IOE	1	stop on I/O error
 
 Error handling is as follows:
@@ -4434,11 +4657,11 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-12.9 RH11/TM02/TU45 Magnetic Tape (TU)
+12.10 RH11 Adapter, TM02 Formatter, TU45 Magnetic Tape (TU)
 
 The magnetic tape simulator simulates an RH11 Massbus adapter with one
-TM02 formatter and up to eight TU45.  Magnetic tape options include the
-ability to make units write enabled or locked.
+TM02 formatter and up to eight TU45 drives.  Magnetic tape options include
+the ability to make units write enabled or locked.
 
 	SET TUn LOCKED		set unit n write locked
 	SET TUn ENABLED		set unit n write enabled
@@ -4479,7 +4702,7 @@ Error handling is as follows:
 
 	OS I/O error	report error and stop
 
-12.10 LP20 DMA Line Printer (LP20)
+12.11 LP20 DMA Line Printer (LP20)
 
 The LP20 is a DMA-based line printer controller.  There is one
 line printer option to clear the vertical forms unit (VFU).
@@ -4521,7 +4744,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-12.11 Symbolic Display and Input
+12.12 Symbolic Display and Input
 
 The PDP-10 simulator implements symbolic display and input.  Display is
 controlled by command line switches:
@@ -4701,9 +4924,10 @@ Error handling is as follows:
 
 13.2.3 316/516-33 Console Teletype (TTY)
 
-The terminal reads and writes to the controlling console port.  It has
-one option, UC; when set, it automatically converts lower case input
-to upper case.  This is on by default.
+The terminal reads from the console keyboard and writes to the
+simulator console window.  The terminal has one option, UC; when
+set, the terminal automatically converts lower case input to upper
+case.  This is on by default.
 
 The terminal these registers:
 
@@ -4865,7 +5089,7 @@ use 578 blocks of 256 32b words.  Each 32b word contains 18b (6 lines)
 of data.  PDP-8 DECtapes use 1474 blocks of 129 16b words.  Each 16b
 word contains 12b (4 lines) of data.  Note that PDP-8 OS/8 does not use
 the 129th word of each block, and OS/8 DECtape dumps contain only 128
-words per block.  A utility, DSOS8CVT.C, is provided to convert OS/8
+words per block.  A utility, DTOS8CVT.C, is provided to convert OS/8
 DECtape dumps to simulator format.
 
 A known problem in DECtape format is that when a block is recorded in
@@ -4932,28 +5156,47 @@ legend:		y = runs operating system or sample program
 
 Revision History (since Rev 1.1)
 
-Rev 2.6b, Jul, 01
+Rev 2.7, Sep, 01
+		Added DZ11 (from Thord Nilson and Art Krewat)
+			to PDP-11, PDP-10
+		Added additional terminals to PDP-8
+		Added TSS/8 packed character format to PDP-8
+		Added sim_sock and sim_tmxr libraries
+		Added sim_qcount and simulator exit detach all facilities
+		Added Macintosh sim_sock support (from Peter Schorn)
+		Added simulator revision level, SHOW version
+		Changed int64/uint64 to t_int64/t_uint64 for Windoze
+		Fixed bug in PDP-11 interrupt acknowledge
+		Fixed bugs in PDP-11 TS NXM check, boot code, error status;
+			added extended characteristics and status
+		Fixed bug in PDP-11 TC stop, stop all functions
+		Fixed receive interrupt while disconnected bug in DZ11
+		Fixed multi-unit operation bugs, interrupt bugs in
+			 PDP-11 RP, PDP-10 RP, PDP-10 TU
+		Fixed carrier detect bug in PDP-11, PDP-10 DZ
+		Fixed bug in PDP-8 reset routine
+		Fixed conditional in PDP-18b CPU
+		Fixed SC = 0 bug in PDP-18b EAE
+		Fixed bug in PDP-7 LPT
+		Upgraded Nova second terminal to use sim_tmxr
+		Upgraded PDP-18b second terminal to use sim_tmxr
+		Upgraded PDP-11 LTC to full KW11-L
+		Removed hack multiple console support
+
+Rev 2.6b, Aug, 01
 		Added H316/516 simulator
 		Added Macintosh support from Louis Chrétien, Peter Schorn,
 			and Ben Supnik
 		Added bad block table option to PDP-11 RL, RP
+		Removed register in declarations
 		Fixed bugs found by Peter Schorn
-			Endian error in PDP-10, PDP-11 RP
-			Space reverse error in PDP-11 TS
-			Symbolic input in 1401
+		-- endian error in PDP-10, PDP-11 RP
+		-- space reverse error in PDP-11 TS
+		-- symbolic input in 1401
 		Fixed bug in PDP-1 RIM loader found by Derek Peschel
 		Fixed bug in Nova fixed head disk
-		Removed register in declarations
 
 Rev 2.6a, Jun, 01
-		Fixed bug (found by Dave Conroy) in big-endian I/O
-		Fixed DECtape reset in PDP-8, PDP-11, PDP-9/15
-		Fixed RIM loader PC handling in PDP-9/15
-		Fixed indirect pointers in PDP-10 paging
-		Fixed SSC handling in PDP-10 TM02/TU45
-		Fixed JMS to non-existent memory in PDP-8
-		Fixed error handling on command file
-		Increased size of string buffers for long path names
 		Added PDP-9, PDP-15 API option
 		Added PDP-9, PDP-15 second terminal
 		Added PDP-10 option for TOPS-20 V4.1 bug fix
@@ -4961,6 +5204,14 @@ Rev 2.6a, Jun, 01
 		Added console logging
 		Added multiple console support
 		Added comment recognition
+		Increased size of string buffers for long path names
+		Fixed bug in big-endian I/O found by Dave Conroy
+		Fixed DECtape reset in PDP-8, PDP-11, PDP-9/15
+		Fixed RIM loader PC handling in PDP-9/15
+		Fixed indirect pointers in PDP-10 paging
+		Fixed SSC handling in PDP-10 TM02/TU45
+		Fixed JMS to non-existent memory in PDP-8
+		Fixed error handling on command file
 
 Rev 2.6, May, 01
 		Added ENABLE/DISABLE devices
@@ -4989,31 +5240,31 @@ Rev 2.6, May, 01
 		Updated copyright notices, fixed comments
 
 Rev 2.5a, Dec, 00
-		Fixed SCP handling of devices without units
-		Fixed FLG, FBF initialization in many HP peripherals
 		Added CMD flop to HP paper tape and line printer
 		Added status input for HP paper tape punch and TTY
+		Added Dutch Owens' 1401 mag tape boot routine
+		Added Bruce Ray's Nova plotter and second terminal modules
+		Added Charles Owen's Eclipse CPU support
+		Added PDP-9/PDP-15 RIM/BIN loader support
+		Added PDP-9/PDP-15 extend/bank initial state registers
+		Added PDP-9/PDP-15 half/full duplex support
+		Moved software documentation to a separate file
+		Fixed SCP handling of devices without units
+		Fixed FLG, FBF initialization in many HP peripherals
 		Fixed 1401 bugs found by Dutch Owens
 		-- 4, 7 char NOPs are legal
 		-- 1 char B is chained BCE
 		-- MCE moves whole character, not digit, after first
-		Added Dutch Owens' 1401 mag tape boot routine
 		Fixed Nova bugs found by Bruce Ray
 		-- traps implemented on Nova 3 as well as Nova 4
 		-- DIV and DIVS 0/0 set carry
 		-- RETN sets SP from FP at outset
 		-- IORST does not clear carry
 		-- Nova 4 implements two undocumented instructions
-		Added Bruce Ray's Nova plotter and second terminal modules
-		Added Charles Owen's Eclipse CPU support
 		Fixed bugs in 18b PDP's
 		-- XCT indirect address calculation
 		-- missing index instructions in PDP-15
 		-- bank mode handling in PDP-15
-		Added PDP-9/PDP-15 RIM/BIN loader support
-		Added PDP-9/PDP-15 extend/bank initial state registers
-		Added PDP-9/PDP-15 half/full duplex support
-		Moved software documentation to a separate file
 
 Rev 2.5, Nov, 00
 		Removed Digital and Compaq from copyrights, as
@@ -5072,6 +5323,8 @@ Rev 2.3a, Nov, 97
 		Fixed endian dependence in 18b PDP RIM loader
 
 Rev 2.3, Mar, 97
+		Added PDP-11 RP
+		Added PDP-1
 		Changed UNIX terminal I/O to TERMIOS
 		Changed magtape format to double ended
 		Changed PDP-8 current page mnemonic from T to C
@@ -5085,8 +5338,6 @@ Rev 2.3, Mar, 97
 		Fixed bug in 18b PDP paper tape reader
 		Fixed bug in PDP-4 console
 		Fixed bug in PDP-4,7 line printer
-		Added PDP-11 RP
-		Added PDP-1
 
 Rev 2.2d, Dec, 96
 		Added ADD/REMOVE commands
@@ -5171,9 +5422,11 @@ Jay Jaeger		IBM 1401 information
 Doug Jones		PDP-8 information, simulator, and software
 Al Kossow		HP 21xx, Varian 620, TI 990, DEC documentation and software
 Arthur Krewat		DZ11 update for the PDP-10
+Mirian Crzig Lennox	ITS and DZ11 debugging
 Don Lewine		Nova documentation and legal permissions
 Tim Litt		PDP-10 hardware documentation and schematics,
 			 tape images, and software sources
+Tim Markson		DZ11 debugging
 Scott McGregor		PDP-11 UNIX legal permissions
 Jeff Moffatt		HP 2100 information, documentation, and software
 Alec Muffett		Solaris port testing
@@ -5209,6 +5462,7 @@ David Waks		PDP-8 ESI-X and PDP-7 SIM8 software
 Tom West		Nova documentation
 Adrian Wise		H316 simulator, documentation, and software
 John Wilson		PDP-11 simulator and software
+Joe Young		RP debugging on Ultrix-11 and BSD
 
 In addition, the following companies have graciously licensed their
 software at no cost for hobbyist use:

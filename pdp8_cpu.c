@@ -25,6 +25,7 @@
 
    cpu		central processor
 
+   16-Sep-01	RMS	Fixed bug in reset routine, added KL8A support
    10-Aug-01	RMS	Removed register from declarations
    17-Jul-01	RMS	Moved function prototype
    07-Jun-01	RMS	Fixed bug in JMS to non-existent memory
@@ -284,6 +285,8 @@ extern int32 ptr (int32 pulse, int32 AC);
 extern int32 ptp (int32 pulse, int32 AC);
 extern int32 clk (int32 pulse, int32 AC);
 extern int32 lpt (int32 pulse, int32 AC);
+extern int32 ttix (int32 inst, int32 AC);
+extern int32 ttox (int32 inst, int32 AC);
 extern int32 rk (int32 pulse, int32 AC);
 extern int32 rx (int32 pulse, int32 AC);
 extern int32 df60 (int32 pulse, int32 AC);
@@ -1018,6 +1021,12 @@ case 030:case 031:case 032:case 033:			/* IOT */
 	case 013:					/* CLK */
 		iot_data = clk (pulse, iot_data);
 		break;
+	case 040: case 042: case 044: case 046:		/* KL8A in */
+		iot_data = ttix (IR, iot_data);
+		break;
+	case 041: case 043: case 045: case 047:		/* KL8A out */
+		iot_data = ttox (IR, iot_data);
+		break;
 	case 060:					/* DF32/RF08 */
 		if (dev_enb & INT_DF) iot_data = df60 (pulse, iot_data);
 		else if (dev_enb & INT_RF) iot_data = rf60 (pulse, iot_data);
@@ -1087,7 +1096,7 @@ return reason;
 t_stat cpu_reset (DEVICE *dptr)
 {
 int_req = (int_req & ~INT_ION) | INT_NO_CIF_PENDING;
-saved_DF = IB = (saved_PC >> 12) & 03;
+saved_DF = IB = saved_PC & 070000;
 UF = UB = gtf = emode = 0;
 return cpu_svc (&cpu_unit);
 }

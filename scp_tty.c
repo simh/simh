@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Sep-01	RMS	More Mac changes
+   31-Aug-01	RMS	Changed int64 to t_int64 for Windoze
    20-Jul-01	RMS	Added Macintosh support (from Louis Chretien, Peter Schorn,
 				and Ben Supnik)
    15-May-01	RMS	Added logging support
@@ -50,7 +52,6 @@
    The POSIX UNIX version works with LINUX.
 */
 
-#undef USE_INT64					/* hack for Windows */
 #include "sim_defs.h"
 int32 sim_int_char = 005;				/* interrupt character */
 extern FILE *sim_log;
@@ -190,7 +191,7 @@ return quo;
 
 /* Win32 routines */
 
-#if defined (WIN32)
+#if defined (_WIN32)
 #define __TTYROUTINES 0
 #include <conio.h>
 #include <windows.h>
@@ -326,6 +327,7 @@ return 0;
 #include <sioux.h>
 #include <siouxglobals.h>
 #include <Traps.h>
+#include <LowMem.h>
 
 extern char sim_name[];
 extern pSIOUXWin SIOUXTextWindow;
@@ -339,7 +341,11 @@ static void updateCursor(void) {
 		Point localMouse;
 		GetPort(&savePort);
 		SetPort(window);
+#if !TARGET_API_MAC_CARBON
+		localMouse = LMGetMouseLocation();
+#else
 		GetGlobalMouse(&localMouse);
+#endif
 		GlobalToLocal(&localMouse);
 		if (PtInRect(localMouse, &(*SIOUXTextWindow->edit)->viewRect) && iBeamCursorH) {
 			SetCursor(*iBeamCursorH);

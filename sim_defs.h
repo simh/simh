@@ -23,6 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-Sep-01	RMS	Added queue count prototype
+   17-Sep-01	RMS	Removed multiple console support
+   07-Sep-01	RMS	Removed conditional externs on function prototypes
+   31-Aug-01	RMS	Changed int64 to t_int64 for Windoze
    17-Jul-01	RMS	Added additional function prototypes
    27-May-01	RMS	Added multiple console support
    15-May-01	RMS	Increased string buffer size
@@ -73,16 +77,18 @@ typedef int		t_bool;				/* boolean */
 typedef unsigned int8	uint8;
 typedef unsigned int16	uint16;
 typedef unsigned int32	uint32, t_addr;			/* address */
-#if defined (USE_INT64) && defined (WIN32)
-#define int64 __int64					/* for Windows */
-#elif defined (USE_INT64) && defined (__digital__) && defined (__unix__)
-#define int64 long					/* for DUNIX */
+#if defined (USE_INT64) && defined (_WIN32)
+#define t_int64 __int64					/* for Windows */
+#elif defined (USE_INT64) && defined (VMS) && defined (__ALPHA)
+#define t_int64 __int64					/* for AVMS */
+#elif defined (USE_INT64) && defined (__ALPHA) && defined (__unix__)
+#define t_int64 long					/* for DUNIX */
 #elif defined (USE_INT64)
-#define int64 long long					/* for GCC */
+#define t_int64 long long				/* for GCC */
 #endif
-#if defined (int64)
-typedef unsigned int64	uint64, t_value;		/* value */
-typedef int64 		t_svalue;			/* signed value */
+#if defined (t_int64)
+typedef unsigned t_int64	t_uint64, t_value;	/* value */
+typedef t_int64 		t_svalue;		/* signed value */
 #else
 typedef unsigned int32	t_value;
 typedef int32 		t_svalue;
@@ -221,8 +227,6 @@ struct unit {
 #define UNIT_BUF	000400				/* buffered */
 #define UNIT_DISABLE	001000				/* disable-able */
 #define UNIT_DIS	002000				/* disabled */
-#define UNIT_CONS	004000				/* active console */
-#define UNIT_V_CONS	11
 #define UNIT_V_UF	12				/* device specific */
 
 /* Register data structure */
@@ -254,8 +258,8 @@ struct ctab {
 /* Modifier table */
 
 struct mtab {
-	int32		mask;				/* mask */
-	int32		match;				/* match */
+	int32		mask;				/* mask or radix */
+	int32		match;				/* match or max */
 	char		*pstring;			/* print string */
 	char		*mstring;			/* match string */
 	t_stat		(*valid)();			/* validation routine */
@@ -301,30 +305,24 @@ typedef struct schtab SCHTAB;
 
 /* Function prototypes */
 
-#if defined (SCP)					/* defining routine? */
-#define EXTERN
-#else							/* referencing routine */
-#define EXTERN extern
-#endif
-
-EXTERN t_stat sim_process_event (void);
-EXTERN t_stat sim_activate (UNIT *uptr, int32 interval);
-EXTERN t_stat sim_cancel (UNIT *uptr);
-EXTERN int32 sim_is_active (UNIT *uptr);
-EXTERN double sim_gtime (void);
-EXTERN uint32 sim_grtime (void);
-EXTERN t_stat attach_unit (UNIT *uptr, char *cptr);
-EXTERN t_stat detach_unit (UNIT *uptr);
-EXTERN t_stat reset_all (int start_device);
-EXTERN size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-EXTERN size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
-EXTERN t_stat get_yn (char *ques, t_stat deflt);
-EXTERN char *get_glyph (char *iptr, char *optr, char mchar);
-EXTERN char *get_glyph_nc (char *iptr, char *optr, char mchar);
-EXTERN t_value get_uint (char *cptr, int radix, t_value max, t_stat *status);
-EXTERN t_value strtotv (char *cptr, char **endptr, int radix);
-EXTERN int32 sim_rtc_init (int32 time);
-EXTERN int32 sim_rtc_calb (int32 ticksper);
-EXTERN t_stat set_console (UNIT *uptr, int32 flag);
-EXTERN t_stat sim_putcons (int32 out, UNIT *uptr);
-
+t_stat sim_process_event (void);
+t_stat sim_activate (UNIT *uptr, int32 interval);
+t_stat sim_cancel (UNIT *uptr);
+int32 sim_is_active (UNIT *uptr);
+double sim_gtime (void);
+uint32 sim_grtime (void);
+int32 sim_qcount (void);
+t_stat attach_unit (UNIT *uptr, char *cptr);
+t_stat detach_unit (UNIT *uptr);
+t_stat reset_all (int start_device);
+size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
+size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
+t_stat get_yn (char *ques, t_stat deflt);
+char *get_glyph (char *iptr, char *optr, char mchar);
+char *get_glyph_nc (char *iptr, char *optr, char mchar);
+t_value get_uint (char *cptr, int radix, t_value max, t_stat *status);
+t_value strtotv (char *cptr, char **endptr, int radix);
+int32 sim_rtc_init (int32 time);
+int32 sim_rtc_calb (int32 ticksper);
+t_stat sim_poll_kbd (void);
+t_stat sim_putchar (int32 out);

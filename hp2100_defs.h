@@ -175,3 +175,8 @@ struct hpdev {
 
 #define IOT_V_REASON	16
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* stop on error */
+
+/* Function prototypes */
+
+t_bool hp_setdev (UNIT *uptr, int32 val);
+t_bool hp_setdev2 (UNIT *uptr, int32 val);

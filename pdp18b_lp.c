@@ -27,6 +27,7 @@
 		(PDP-7,9) Type 647 line printer
 		(PDP-15) LP15 line printer
 
+   19-Sep-01	RMS	Fixed bug in 647
    13-Feb-01	RMS	Revised for register arrays
    15-Feb-01	RMS	Fixed 3 cycle data break sequence
    30-Oct-00	RMS	Standardized register naming
@@ -234,7 +235,7 @@ int32 lpt65 (int32 pulse, int32 AC)
 {
 int32 i;
 
-if (pulse == 001) return (int_req & INT_LPT)? IOT_SKP + AC: AC;	/* LPSF */
+if (pulse == 001) return (lpt_done? IOT_SKP + AC: AC);	/* LPSF */
 if (pulse & 002) {					/* pulse 02 */
 	lpt_done = 0;					/* clear done */
 	int_req = int_req & ~INT_LPT;  }		/* clear int req */
@@ -265,7 +266,7 @@ return AC;
 
 int32 lpt66 (int32 pulse, int32 AC)
 {
-if (pulse == 001) return lpt_err? IOT_SKP + AC: AC;	/* LPSE */
+if (pulse == 001) return (lpt_err? IOT_SKP + AC: AC);	/* LPSE */
 if (pulse & 002) {					/* LPCF */
 	lpt_done = 0;					/* clear done, int */
 	int_req = int_req & ~INT_LPT;  }

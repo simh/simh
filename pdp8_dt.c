@@ -25,6 +25,7 @@
 
    dt		TC08/TU56 DECtape
 
+   29-Aug-01	RMS	Added casts to PDP-18b packup routine
    17-Jul-01	RMS	Moved function prototype
    11-May-01	RMS	Fixed bug in reset
    25-Apr-01	RMS	Added device enable/disable support
@@ -1130,10 +1131,10 @@ if (uptr -> hwmark) {					/* any data? */
 	else {						/* PDP9/11/15 */
 		for (ba = 0; ba < uptr -> hwmark; ) {	/* loop thru buf */
 			for (k = 0; k < D18_NBSIZE; k = k + 2) {
-				pdp18b[k] = ((bptr[ba] & 07777) << 6) |
-					((bptr[ba + 1] >> 6) & 077);
-				pdp18b[k + 1] = ((bptr[ba + 1] & 077) << 12) |
-					(bptr[ba + 2] & 07777);
+				pdp18b[k] = ((uint32) (bptr[ba] & 07777) << 6) |
+					((uint32) (bptr[ba + 1] >> 6) & 077);
+				pdp18b[k + 1] = ((uint32) (bptr[ba + 1] & 077) << 12) |
+					((uint32) (bptr[ba + 2] & 07777));
 				ba = ba + 3;  }		/* end loop blk */
 			fxwrite (pdp18b, sizeof (int32),
 				 D18_NBSIZE, uptr -> fileref);

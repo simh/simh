@@ -1,6 +1,6 @@
-/* pdp10_dz.c: DZ11 terminal multiplexor simulator
+/* scp_sock.h: OS-dependent socket routines header file
 
-   Copyright (c) 1993-2001, Robert M Supnik
+   Copyright (c) 2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,42 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   dz		DZ11 terminal multiplexor
+   16-Sep-01	RMS	Added Macintosh support from Peter Schorn
 */
 
-#include "pdp10_defs.h"
-#include "dec_dz.h"
+#if defined (WIN32)
+#undef INT_PTR						/* hack, hack */
+#include <winsock.h>
+#else
+#define WSAGetLastError()	errno
+#if !defined (VMS) && !defined (__OS2__)
+#include <sys/types.h>					/* for fcntl, getpid */
+#include <sys/socket.h>					/* for sockets */
+#include <fcntl.h>
+#include <unistd.h>
+#include <netinet/in.h>					/* for sockaddr_in */
+#include <netdb.h>
+#endif
+#endif
+
+/* Code uses Windows-specific defs that are undefined for most systems */
+
+#if !defined (SOCKET)
+#define SOCKET		int32
+#endif
+#if !defined (WSAEWOULDBLOCK)
+#define WSAEWOULDBLOCK	EWOULDBLOCK
+#endif
+#if !defined (INVALID_SOCKET)
+#define INVALID_SOCKET	-1 
+#endif
+#if !defined (SOCKET_ERROR)
+#define SOCKET_ERROR	-1
+#endif
+
+SOCKET sim_master_sock (int32 port);
+SOCKET sim_accept_conn (SOCKET master, UNIT *uptr, uint32 *ipaddr);
+int32 sim_read_sock (SOCKET sock, char *buf, int32 nbytes);
+int32 sim_write_sock (SOCKET sock, char *msg, int32 nbytes);
+void sim_close_sock (SOCKET sock, t_bool master);
+SOCKET sim_setnonblock (SOCKET sock);

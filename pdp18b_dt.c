@@ -26,6 +26,7 @@
    dt		(PDP-9) TC02/TU55 DECtape
 		(PDP-15) TC15/TU56 DECtape
 
+   29-Aug-01	RMS	Added casts to PDP-8 unpack routine
    17-Jul-01	RMS	Moved function prototype
    11-May-01	RMS	Fixed bug in reset
    26-Apr-01	RMS	Added device enable/disable support
@@ -1008,10 +1009,10 @@ if (uptr -> flags & UNIT_8FMT) {			/* PDP-8? */
 		if (k == 0) break;
 		for ( ; k < D8_NBSIZE; k++) pdp8b[k] = 0;
 		for (k = 0; k < D8_NBSIZE; k = k + 3) {	/* loop thru blk */
-			bptr[ba] = ((pdp8b[k] & 07777) << 6) |
-				((pdp8b[k + 1] >> 6) & 077);
+			bptr[ba] = ((uint32) (pdp8b[k] & 07777) << 6) |
+				((uint32) (pdp8b[k + 1] >> 6) & 077);
 			bptr[ba + 1] = ((pdp8b[k + 1] & 077) << 12) |
-				(pdp8b[k + 2] & 07777);
+				((uint32) (pdp8b[k + 2] & 07777));
 			ba = ba + 2;  }			/* end blk loop */
 		}					/* end file loop */
 	uptr -> hwmark = ba;  }				/* end if */

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Sample Software Packages
-Date:	31-May-01
+Date:	30-Sep-01
 
 This memorandum documents the sample software packages available to run
 with the SIMH simulators.  Many of these packages are available under
@@ -87,6 +87,75 @@ To boot and run OS/8:
 Note that OS/8 only recognizes upper case characters.  The first disk
 (drive 0) is the system disk; it also includes BASIC.  The second disk
 (drive 1) includes FORTRAN.
+
+1.4 PDP-8 TSS/8
+
+TSS/8 is the PDP-8's timesharing system.  It provides a program development
+and execution environment for assembler, BASIC, and FORTRAN programs.  TSS/8
+is provided as is, without fee, by Digital Equipment Corporation, for non-
+commercial use only.  My thanks to John Wilson of Dbit Inc, who provided
+the disk image and the initialization tape source.
+
+Loading TSS/8
+-------------
+
+Note: your environment must have a functioning second Teletype; that is, you cannot
+at present run Foreground/Background if your host system is VMS or OS/2.
+
+- Load the paper-tape bootstrap:
+
+	sim> load tss8_init.bin
+
+- Mount the TSS/8 disk image of the RF08:
+
+	sim> attach rf tss8_rf.dsk
+
+- Assign a TCP/IP port to the Telnet listener for the extra terminals:
+
+	sim> attach tti1 <port #>	-- 4000 typically works
+
+- Run the bootstrap:
+
+	sim> run 24200
+
+- TSS/8 will boot and go through its startup dialog
+
+	LOAD, DUMP, START, ETC? START
+	MONTH-DAY-YEAR: mm:dd:yy	-- numeric, yy in range [74:85]
+	HR:MIN - hh:mm			-- numeric, 24 hour format
+	(type cr to get attention)
+
+	.
+
+  and is now ready for login.  The list of accounts and passwords:
+
+	 PPN  Password
+	[0,1]   VH3M
+	[0,2]   LXHE
+	[0,3]   SHUG
+	[77,77]
+	[1,10]  WBCN
+	[20,1]  DT
+	[20,2]  PT
+	[20,3]  TSS8
+	[20,4]  EDIT
+	[20,5]  4TH
+	[1,50]  JERK
+
+- Login using one of the existing accounts.  The login command won't echo:
+
+	.LOGIN 2 LXHE			-- privileged library account
+
+	TSS/8.24  JOB 01  [00,02]  K00    23:23:06
+
+	SYSTEM IS DOWN, INC.
+
+- The system is now ready for commands.  To get a directory listing:
+
+	.R CAT
+
+- Other users can log in by connecting, from a Telnet client, to localhost
+  on the port specified in the attach tti1 command.
 
 2. PDP-11
 
@@ -300,6 +369,69 @@ execution capabilities.  To load and run ADSS/KM-15:
 	*TYPE 2+2,!
 	    4.0000
 	*
+
+6.3 Advanced Software System/Foreground Background
+
+Foreground/Background System
+----------------------------
+
+Note: your environment must have a functioning second Teletype; that is, you cannot
+at present run Foreground/Background if your host system is VMS or OS/2.
+
+- Load the paper-tape bootstrap into upper memory:
+
+	sim> load dec-15u.rim 77637
+
+  You <must> specify the load address.
+
+- Verify that the bootstrap loaded correctly:
+
+	sim> ex pc
+	PC:	077646
+
+- Mount the Advanced Software System DECtape image on DECtape unit 0:
+
+	sim> attach dt fb15_32k.dtp
+
+- Turn on the API option:
+
+	sim> set cpu api
+
+- Assign a TCP/IP port to the Telnet listener for the second terminal:
+
+	sim> assign tti1 <port #>	-- 4000 typically works
+
+- Start a Telnet client to act as the second terminal and connect to
+  localhost on the specified port.
+
+- Run the bootstrap:
+
+	sim> run
+
+- The DECtape will boot and print out
+
+	F9/15 V4A
+	$
+
+  and is now ready for commands.  Recognized commands include:
+
+	D 0	list system device directory
+	R	list device assignments
+
+- To activate the background, load IDLE into the foreground:
+
+	$A DTA0 -4
+	$GLOAD
+	FGLOAD V2A
+	>_IDLE<altmode = control-[>
+
+  Background terminal responds with
+
+	B9/15 V4A
+	$
+
+   and is now ready for commands.
+
 
 7. IBM 1401 
 

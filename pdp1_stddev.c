@@ -28,6 +28,7 @@
    tti		keyboard
    tto		teleprinter
 
+   07-Sep-01	RMS	Moved function prototypes
    10-Jun-01	RMS	Fixed comment
    30-Oct-00	RMS	Standardized device naming
 */
@@ -55,8 +56,6 @@ t_stat ptp_reset (DEVICE *dptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
 
 /* Character translation tables */
 

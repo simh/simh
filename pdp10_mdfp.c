@@ -91,6 +91,7 @@
    format (so-called G floating).  These instructions were not
    implemented in the KS10 and are treated as MUUO's.
 
+   31-Aug-01	RMS	Changed int64 to t_int64 for Windoze
    10-Aug-01	RMS	Removed register in declarations
 */
 
@@ -98,10 +99,10 @@
 #include <setjmp.h>
 
 struct ufp {						/* unpacked fp number */
-	int32	sign;					/* sign */
-	int32	exp;					/* exponent */
-	uint64	fhi;					/* fraction high */
-	uint64	flo;	};				/* for double prec */
+	int32		sign;				/* sign */
+	int32		exp;				/* exponent */
+	t_uint64	fhi;				/* fraction high */
+	t_uint64	flo;	};			/* for double prec */
 
 typedef struct ufp UFP;
 
@@ -154,7 +155,7 @@ extern d10 *ac_cur;					/* current AC block */
 extern int32 flags;					/* flags */
 void mul (d10 a, d10 b, d10 *rs);
 void funpack (d10 h, d10 l, UFP *r, t_bool sgn);
-void fnorm (UFP *r, int64 rnd);
+void fnorm (UFP *r, t_int64 rnd);
 d10 fpack (UFP *r, d10 *lo, t_bool fdvneg);
 
 /* Integer multiply - checked against KS-10 ucode */
@@ -197,9 +198,9 @@ return TRUE;
 
 void mul (d10 s1, d10 s2, d10 *rs)
 {
-uint64 a = ABS (s1);
-uint64 b = ABS (s2);
-uint64 t, u, r;
+t_uint64 a = ABS (s1);
+t_uint64 b = ABS (s2);
+t_uint64 t, u, r;
 
 if ((a == 0) || (b == 0)) {				/* operand = 0? */
 	rs[0] = rs[1] = 0;				/* result 0 */
@@ -232,7 +233,7 @@ t_bool divi (int32 ac, d10 b, d10 *rs)
 {
 int32 p1 = ADDAC (ac, 1);
 d10 dvr = ABS (b);				/* make divr positive */
-int64 t;
+t_int64 t;
 int32 i;
 d10 dvd[2];
 
@@ -373,7 +374,7 @@ else {	funpack (op1, 0, &a, SFRC);			/* unpack operands */
 		b = t;
 		ediff = -ediff;  }
 	if (ediff > 63) ediff = 63;			/* cap diff at 63 */
-	if (ediff) b.fhi = (int64) b.fhi >> ediff;	/* shift b (signed) */
+	if (ediff) b.fhi = (t_int64) b.fhi >> ediff;	/* shift b (signed) */
 	a.fhi = a.fhi + b.fhi;				/* add fractions */
 	if (a.sign ^ b.sign) {				/* add or subtract? */
 		if (a.fhi & FP_UCRY) {			/* subtract, frac -? */
@@ -420,7 +421,7 @@ return fpack (&a, NULL, FALSE);
 t_bool fdv (d10 op1, d10 op2, d10 *rs, t_bool rnd)
 {
 UFP a, b;
-uint64 savhi;
+t_uint64 savhi;
 t_bool rem = FALSE;
 
 funpack (op1, 0, &a, AFRC);				/* unpack operands */
@@ -479,7 +480,7 @@ return fpack (&a, NULL, FALSE);				/* pack result */
 void fix (int32 ac, d10 mb, t_bool rnd)
 {
 int32 sc;
-uint64 so;
+t_uint64 so;
 UFP a;
 
 funpack (mb, 0, &a, AFRC);				/* unpack operand */
@@ -521,11 +522,11 @@ else {
 		ediff = -ediff;  }
 	if (ediff > 127) ediff = 127;			/* cap diff at 127 */
 	if (ediff > 63) {				/* diff > 63? */
-		a.flo = (int64) b.fhi >> (ediff - 64);	/* b hi to a lo */
+		a.flo = (t_int64) b.fhi >> (ediff - 64); /* b hi to a lo */
 		b.fhi = b.sign? FP_ONES: 0;  }		/* hi = all sign */
 	else if (ediff) {				/* diff <= 63 */
 		a.flo = (b.flo >> ediff) | (b.fhi << (64 - ediff));
-		b.fhi = (int64) b.fhi >> ediff;  }	/* shift b (signed) */
+		b.fhi = (t_int64) b.fhi >> ediff;  }	/* shift b (signed) */
 	a.fhi = a.fhi + b.fhi;				/* do add */
 	if (a.sign ^ b.sign) {				/* add or subtract? */
 		if (a.fhi & FP_UCRY) {			/* subtract, frac -? */
@@ -552,7 +553,7 @@ return;
 void dfmp (int32 ac, d10 *rs)
 {
 int32 p1 = ADDAC (ac, 1);
-uint64 xh, xl, yh, yl, mid;
+t_uint64 xh, xl, yh, yl, mid;
 UFP a, b;
 
 funpack (AC(ac), AC(p1), &a, AFRC);			/* unpack operands */
@@ -587,7 +588,7 @@ void dfdv (int32 ac, d10 *rs)
 {
 int32 p1 = ADDAC (ac, 1);
 int32 i;
-uint64 qu = 0;
+t_uint64 qu = 0;
 UFP a, b;
 
 funpack (AC(ac), AC(p1), &a, AFRC);			/* unpack operands */
@@ -636,10 +637,10 @@ return;
 
 /* Normalize and optionally round floating point operand */
  
-void fnorm (UFP *a, int64 rnd)
+void fnorm (UFP *a, t_int64 rnd)
 {
 int32 i;
-static uint64 normmask[6] = {
+static t_uint64 normmask[6] = {
  0x6000000000000000, 0x7800000000000000, 0x7F80000000000000,
  0x7FFF800000000000, 0x7FFFFFFF80000000, 0x7FFFFFFFFFFFFFFF };
 static int32 normtab[7] = { 1, 2, 4, 8, 16, 32, 63 };

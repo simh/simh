@@ -25,6 +25,11 @@
 
    tu		RH11/TM03/TU45 magtape
 
+   23-Oct-01	RMS	Fixed bug in error interrupts
+			New IO page address constants
+   05-Oct-01	RMS	Rewrote interrupt handling from schematics
+   30-Sep-01	RMS	Fixed handling of non-existent formatters
+   28-Sep-01	RMS	Fixed interrupt handling for SC/ATA
    4-May-01	RMS	Fixed bug in odd address test
    3-May-01	RMS	Fixed drive reset to clear SSC
 
@@ -42,6 +47,20 @@
    If the byte count is odd, the record is padded with an extra byte
    of junk.  File marks are represented by a single record length of 0.
    End of tape is two consecutive end of file marks.
+
+   WARNING: The interupt logic of the RH11/RH70 is unusual and must be
+   simulated with great precision.  The RH11 has an internal interrupt
+   request flop, CSTB INTR, which is controlled as follows:
+   - Writing IE and DONE simultaneously sets CSTB INTR
+   - Controller clear, INIT, and interrupt acknowledge clear CSTB INTR
+     (and also clear IE)
+   - A transition of DONE from 0 to 1 sets CSTB from INTR
+   The output of INTR is OR'd with the AND of RPCS1<SC,DONE,IE> to
+   create the interrupt request signal.  Thus,
+   - The DONE interrupt is edge sensitive, but the SC interrupt is
+     level sensitive.
+   - The DONE interrupt, once set, is not disabled if IE is cleared,
+     but the SC interrupt is.
 */
 
 #include "pdp10_defs.h"
@@ -71,6 +90,7 @@
 #define  FNC_WREOF	013				/* write tape mark */
 #define  FNC_SPACEF	014				/* space forward */
 #define  FNC_SPACER	015				/* space reverse */
+#define FNC_XFER	024				/* >=? data xfr */
 #define  FNC_WCHKF	024				/* write check */
 #define  FNC_WCHKR	027				/* write check rev */
 #define  FNC_WRITE	030				/* write */
@@ -86,7 +106,7 @@
 #define CS1_TRE		0040000				/* transfer err */
 #define CS1_SC		0100000				/* special cond */
 #define CS1_MBZ		0012000
-#define CS1_RW		(CS1_FNC | CS1_IE | CS1_UAE | CS1_GO)
+#define CS1_DRV		(CS1_FNC | CS1_GO)
 #define GET_FNC(x)	(((x) >> CS1_V_FNC) & CS1_M_FNC)
 #define GET_UAE(x)	(((x) & CS1_UAE) << (16 - CS1_V_UAE))
 
@@ -224,6 +244,7 @@
 			   (((b) & XBA_ODD) != ((od) << 1))) { \
 				tucs2 = tucs2 | CS2_NEM; \
 				ubcs[1] = ubcs[1] | UBCS_TMO; \
+				tucs1 = tucs1 & ~CS1_GO; \
 				update_tucs (CS1_DONE, drv); \
 				return SCPE_OK;  }
 #define NEWPAGE(v,m)	(((v) & PAG_M_OFF) == (m))
@@ -257,6 +278,7 @@ int32 tucc = 0;						/* check character */
 int32 tudb = 0;						/* data buffer */
 int32 tumr = 0;						/* maint register */
 int32 tutc = 0;						/* tape control */
+int32 tuiff = 0;					/* INTR flip/flop */
 int32 tu_time = 10;					/* record latency */
 int32 tu_stopioe = 1;					/* stop on error */
 int32 tu_log = 0;					/* debug */
@@ -310,6 +332,7 @@ REG tu_reg[] = {
 	{ ORDATA (MTDB, tudb, 16) },
 	{ ORDATA (MTMR, tumr, 16) },
 	{ ORDATA (MTTC, tutc, 16) },
+	{ FLDATA (IFF, tuiff, 0) },
 	{ FLDATA (INT, int_req, INT_V_TU) },
 	{ FLDATA (DONE, tucs1, CSR_V_DONE) },
 	{ FLDATA (IE, tucs1, CSR_V_IE) },
@@ -379,7 +402,8 @@ if (reg_in_fmtr[j] && (fmtr != 0)) {			/* nx formatter */
 update_tucs (0, drv);					/* update status */
 switch (j) {						/* decode PA<4:1> */
 case 000:						/* MTCS1 */
-	*data = tucs1;
+	if (fmtr != 0) *data = tucs1 & ~CS1_DRV;
+	else *data = tucs1;
 	break;
 case 001:						/* MTWC */
 	*data = tuwc;
@@ -448,21 +472,24 @@ if (reg_in_fmtr1[j] && ((tucs1 & CS1_DONE) == 0)) {	/* formatter busy? */
 switch (j) {						/* decode PA<4:1> */
 case 000:						/* MTCS1 */
 	if ((access == WRITEB) && (PA & 1)) data = data << 8;
-	else {	if ((data & CS1_IE) == 0) int_req = int_req & ~INT_TU;
-		else if (data & CS1_DONE) int_req = int_req | INT_TU;  }
 	if (data & CS1_TRE) {				/* error clear? */
 		tucs1 = tucs1 & ~CS1_TRE;		/* clr CS1<TRE> */
 		tucs2 = tucs2 & ~CS2_ERR;  }		/* clr CS2<15:8> */
-	if (access == WRITEB) data = (tucs1 &		/* merge data */
-		((PA & 1)? 0377: 0177400)) | data;
-	tucs1 = (tucs1 & ~CS1_RW) | (data & CS1_RW);
-	if (data & CS1_GO) {				/* new command? */
+	if ((access == WRITE) || (PA & 1)) {		/* hi byte write? */
+		if (tucs1 & CS1_DONE)			/* done set? */
+			tucs1 = (tucs1 & ~CS1_UAE) | (data & CS1_UAE);  }
+	if ((access == WRITE) || !(PA & 1)) {		/* lo byte write? */
+		if ((data & CS1_DONE) && (data & CS1_IE))	/* to DONE+IE? */
+			tuiff = 1;			/* set CSTB INTR */
+		tucs1 = (tucs1 & ~CS1_IE) | (data & CS1_IE);
 		if (fmtr != 0) {			/* nx formatter? */
 			tucs2 = tucs2 | CS2_NEF;	/* set error flag */
-			update_tucs (CS1_SC, drv);	/* request intr */
-			return SCPE_OK;  }
-		if (tucs1 & CS1_DONE) tu_go (drv);	/* start if not busy */
-		else tucs2 = tucs2 | CS2_PGE;  }	/* else prog error */
+			cs1f = CS1_SC;  }		/* req interrupt */
+		else if (tucs1 & CS1_GO) {		/* busy? */
+			if (tucs1 & CS1_DONE) tuer = tuer | ER_RMR;
+			else tucs2 = tucs2 | CS2_PGE;  }
+		else {	tucs1 = (tucs1 & ~CS1_DRV) | (data & CS1_DRV);
+			if (tucs1 & CS1_GO) tu_go (drv);  }  }
 	break;	
 case 001:						/* MTWC */
 	if (access == WRITEB) data = (PA & 1)?
@@ -533,8 +560,10 @@ fnc = GET_FNC (tucs1);					/* get function */
 den = GET_DEN (tutc);					/* get density */
 uptr = tu_dev.units + drv;				/* get unit */
 if ((fnc != FNC_FCLR) && 				/* not clear & err */
-	((tufs & FS_ERR) || sim_is_active (uptr))) {	/* or in motion? */
-	tucs2 = tucs2 | CS2_PGE;			/* set error flag */
+    ((tufs & FS_ERR) || sim_is_active (uptr))) {	/* or in motion? */
+	tuer = tuer | ER_ILF;				/* set error flag */
+	tufs = tufs | FS_ATA;				/* exception */
+	tucs1 = tucs1 & ~CS1_GO;			/* clear go */
 	update_tucs (CS1_SC, drv);			/* request intr */
 	return;  }
 tufs = tufs & ~FS_ATA;					/* clear attention */
@@ -621,9 +650,10 @@ DATA_XFER:
 /*		tuer = tuer | ER_NXF;
 /*		break;  } */
 	uptr -> USTAT = 0;
+	tucs1 = tucs1 & ~CS1_DONE;			/* clear done */
 GO_XFER:
 	tucs2 = tucs2 & ~CS2_ERR;			/* clear errors */
-	tucs1 = tucs1 & ~(CS1_TRE | CS1_MCPE | CS1_DONE);
+	tucs1 = tucs1 & ~(CS1_TRE | CS1_MCPE);
 	tufs = tufs & ~(FS_TMK | FS_ID);		/* clear eof, id */
 	sim_activate (uptr, tu_time);
 	return;
@@ -631,7 +661,9 @@ GO_XFER:
 default:						/* all others */
 	tuer = tuer | ER_ILF;				/* not supported */
 	break;  }					/* end case function */
-update_tucs (CS1_SC, drv);				/* error, set intr */
+tucs1 = tucs1 & ~CS1_GO;				/* clear go */
+tufs = tufs | FS_ATA;					/* set attn */
+update_tucs (CS1_SC, drv);				/* set intr */
 return;
 }
 
@@ -851,15 +883,20 @@ update_tucs (CS1_DONE, drv);
 return SCPE_OK;
 }
 
-/* Controller status update  
-   First update formatter status, then update MTCS1
-   If optional argument, request interrupt
+/* Controller status update
+
+   Check for done transition
+   Update drive status
+   Update MTCS1
+   Update interrupt request
 */
 
 void update_tucs (int32 flag, int32 drv)
 {
 int32 act = sim_is_active (&tu_unit[drv]);
 
+if ((flag & ~tucs1) & CS1_DONE)				/* DONE 0 to 1? */
+	tuiff = (tucs1 & CS1_IE)? 1: 0;			/* CSTB INTR <- IE */
 if (GET_FMTR (tucs2) == 0) {				/* formatter present? */
 	tufs = (tufs & ~FS_DYN) | FS_FPR;
 	if (tu_unit[drv].flags & UNIT_ATT) {
@@ -871,10 +908,11 @@ if (GET_FMTR (tucs2) == 0) {				/* formatter present? */
 else tufs = 0;
 tucs1 = (tucs1 & ~(CS1_SC | CS1_MCPE | CS1_MBZ)) | CS1_DVA | flag;
 if (tucs2 & CS2_ERR) tucs1 = tucs1 | CS1_TRE | CS1_SC;
+else if (tucs1 & CS1_TRE) tucs1 = tucs1 | CS1_SC;
 if (tufs & FS_ATA) tucs1 = tucs1 | CS1_SC;
-if (((tucs1 & CS1_IE) == 0) || ((tucs1 & CS1_DONE) == 0))
-	int_req = int_req & ~INT_TU;
-else if (flag) int_req = int_req | INT_TU;
+if (tuiff || ((tucs1 & CS1_SC) && (tucs1 & CS1_DONE) && (tucs1 & CS1_IE)))
+	int_req = int_req | INT_TU;
+else int_req = int_req & ~INT_TU;
 if ((tucs1 & CS1_DONE) && tufs && !act) tufs = tufs | FS_RDY;
 return;
 }
@@ -884,6 +922,7 @@ return;
 int32 tu_inta (void)
 {
 tucs1 = tucs1 & ~CS1_IE;				/* clear int enable */
+tuiff = 0;						/* clear CSTB INTR */
 return VEC_TU;						/* acknowledge */
 }
 
@@ -899,6 +938,7 @@ tucs2 = CS2_IR | CS2_OR;
 tuba = tufc = 0;
 tutc = tuer = 0;
 tufs = FS_FPR | FS_RDY;
+tuiff = 0;						/* clear CSTB INTR */
 int_req = int_req & ~INT_TU;				/* clear interrupt */
 for (u = 0; u < TU_NUMDR; u++) {			/* loop thru units */
 	uptr = tu_dev.units + u;
@@ -958,8 +998,8 @@ return SCPE_OK;
 static const d10 boot_rom_dec[] = {
 	0515040000003,			/* boot:hrlzi 1,3	; uba # */
 	0201000040001,			/*	movei 0,40001	; vld,pg 1 */
-	0713001000000+IO_UBMAP+1,	/*	wrio 0,763001(1); set ubmap */
-	0435040000000+IO_TMBASE,	/*	iori 1,772440	; rh addr */
+	0713001000000+IOBA_UBMAP+1,	/*	wrio 0,763001(1); set ubmap */
+	0435040000000+IOBA_TU,		/*	iori 1,772440	; rh addr */
 	0202040000000+FE_RHBASE,	/*	movem 1,FE_RHBASE */
 	0201000000040,			/*	movei 0,40	; ctrl reset */
 	0713001000010,			/*	wrio 0,10(1)	; ->MTFS */
@@ -996,8 +1036,8 @@ static const d10 boot_rom_dec[] = {
 static const d10 boot_rom_its[] = {
 	0515040000003,			/* boot:hrlzi 1,3	; uba # - not used */
 	0201000040001,			/*	movei 0,40001	; vld,pg 1 */
-	0714000000000+IO_UBMAP+1,	/*	iowri 0,763001	; set ubmap */
-	0435040000000+IO_TMBASE,	/*	iori 1,772440	; rh addr */
+	0714000000000+IOBA_UBMAP+1,	/*	iowri 0,763001	; set ubmap */
+	0435040000000+IOBA_TU,		/*	iori 1,772440	; rh addr */
 	0202040000000+FE_RHBASE,	/*	movem 1,FE_RHBASE */
 	0201000000040,			/*	movei 0,40	; ctrl reset */
 	0714001000010,			/*	iowri 0,10(1)	; ->MTFS */

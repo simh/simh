@@ -27,6 +27,8 @@
    tti,tto	DL11 terminal input/output
    clk		KW11L line frequency clock
 
+   07-Oct-01	RMS	Upgraded clock to full KW11L for RSTS/E autoconfigure
+   07-Sep-01	RMS	Moved function prototypes, revised interrupt mechanism
    17-Jul-01	RMS	Moved function prototype
    04-Jul-01	RMS	Added DZ11 support
    05-Mar-01	RMS	Added clock calibration support
@@ -44,11 +46,11 @@
 #define TTICSR_RW	(CSR_IE)
 #define TTOCSR_IMP	(CSR_DONE + CSR_IE)		/* terminal output */
 #define TTOCSR_RW	(CSR_IE)
-#define CLKCSR_IMP	(CSR_IE)			/* real-time clock */
-#define CLKCSR_RW	(CSR_IE)
+#define CLKCSR_IMP	(CSR_DONE + CSR_IE)		/* real-time clock */
+#define CLKCSR_RW	(CSR_DONE + CSR_IE)
 #define CLK_DELAY	8000
 
-extern int32 int_req;
+extern int32 int_req[IPL_HLVL];
 int32 ptr_csr = 0;					/* control/status */
 int32 ptr_stopioe = 0;					/* stop on error */
 int32 ptp_csr = 0;					/* control/status */
@@ -57,7 +59,7 @@ int32 tti_csr = 0;					/* control/status */
 int32 tto_csr = 0;					/* control/status */
 int32 clk_csr = 0;					/* control/status */
 int32 clk_tps = 60;					/* ticks/second */
-int32 dz_poll = CLK_DELAY;				/* DZ poll inteval */
+int32 tmxr_poll = CLK_DELAY;				/* term mux poll */
 
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
@@ -73,8 +75,6 @@ t_stat ptr_attach (UNIT *uptr, char *ptr);
 t_stat ptr_detach (UNIT *uptr);
 t_stat ptp_attach (UNIT *uptr, char *ptr);
 t_stat ptp_detach (UNIT *uptr);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
 
 /* PTR data structures
 
@@ -89,7 +89,7 @@ UNIT ptr_unit = {
 REG ptr_reg[] = {
 	{ ORDATA (BUF, ptr_unit.buf, 8) },
 	{ ORDATA (CSR, ptr_csr, 16) },
-	{ FLDATA (INT, int_req, INT_V_PTR) },
+	{ FLDATA (INT, IREQ (PTR), INT_V_PTR) },
 	{ FLDATA (ERR, ptr_csr, CSR_V_ERR) },
 	{ FLDATA (BUSY, ptr_csr, CSR_V_BUSY) },
 	{ FLDATA (DONE, ptr_csr, CSR_V_DONE) },
@@ -118,7 +118,7 @@ UNIT ptp_unit = {
 REG ptp_reg[] = {
 	{ ORDATA (BUF, ptp_unit.buf, 8) },
 	{ ORDATA (CSR, ptp_csr, 16) },
-	{ FLDATA (INT, int_req, INT_V_PTP) },
+	{ FLDATA (INT, IREQ (PTP), INT_V_PTP) },
 	{ FLDATA (ERR, ptp_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, ptp_csr, CSR_V_DONE) },
 	{ FLDATA (IE, ptp_csr, CSR_V_IE) },
@@ -145,7 +145,7 @@ UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
 REG tti_reg[] = {
 	{ ORDATA (BUF, tti_unit.buf, 8) },
 	{ ORDATA (CSR, tti_csr, 16) },
-	{ FLDATA (INT, int_req, INT_V_TTI) },
+	{ FLDATA (INT, IREQ (TTI), INT_V_TTI) },
 	{ FLDATA (ERR, tti_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, tti_csr, CSR_V_DONE) },
 	{ FLDATA (IE, tti_csr, CSR_V_IE) },
@@ -171,7 +171,7 @@ UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
 REG tto_reg[] = {
 	{ ORDATA (BUF, tto_unit.buf, 8) },
 	{ ORDATA (CSR, tto_csr, 16) },
-	{ FLDATA (INT, int_req, INT_V_TTO) },
+	{ FLDATA (INT, IREQ (TTO), INT_V_TTO) },
 	{ FLDATA (ERR, tto_csr, CSR_V_ERR) },
 	{ FLDATA (DONE, tto_csr, CSR_V_DONE) },
 	{ FLDATA (IE, tto_csr, CSR_V_IE) },
@@ -196,7 +196,7 @@ UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 8000 };
 
 REG clk_reg[] = {
 	{ ORDATA (CSR, clk_csr, 16) },
-	{ FLDATA (INT, int_req, INT_V_CLK) },
+	{ FLDATA (INT, IREQ (CLK), INT_V_CLK) },
 	{ FLDATA (DONE, clk_csr, CSR_V_DONE) },
 	{ FLDATA (IE, clk_csr, CSR_V_IE) },
 	{ DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
@@ -236,7 +236,7 @@ case 04:						/* ptr csr */
 	return SCPE_OK;
 case 05:						/* ptr buf */
 	ptr_csr = ptr_csr & ~CSR_DONE;
-	int_req = int_req & ~INT_PTR;
+	CLR_INT (PTR);
 	*data = ptr_unit.buf & 0377;
 	return SCPE_OK;
 case 06:						/* ptp csr */
@@ -250,7 +250,7 @@ case 010:						/* tti csr */
 	return SCPE_OK;
 case 011:						/* tti buf */
 	tti_csr = tti_csr & ~CSR_DONE;
-	int_req = int_req & ~INT_TTI;
+	CLR_INT (TTI);
 	*data = tti_unit.buf & 0377;
 	return SCPE_OK;
 case 012:						/* tto csr */
@@ -267,17 +267,20 @@ t_stat std_wr (int32 data, int32 PA, int32 access)
 switch ((PA >> 1) & 017) {				/* decode PA<4:1> */
 case 03:						/* clk csr */
 	if (PA & 1) return SCPE_OK;
-	if ((data & CSR_IE) == 0) int_req = int_req & ~INT_CLK;
+	if (((data & CSR_IE) == 0) ||			/* clr IE, DONE? */
+	    ((data & CSR_DONE) == 0)) CLR_INT (CLK);	/* clr intr */
+	else if (((clk_csr & CSR_IE) == 0) ||		/* setting both */
+	    ((clk_csr & CSR_DONE) == 0)) SET_INT (CLK);	/* if prv clr, intr */
 	clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
 	return SCPE_OK;
 case 04:						/* ptr csr */
 	if (PA & 1) return SCPE_OK;
-	if ((data & CSR_IE) == 0) int_req = int_req & ~INT_PTR;
+	if ((data & CSR_IE) == 0) CLR_INT (PTR);
 	else if (((ptr_csr & CSR_IE) == 0) && (ptr_csr & (CSR_ERR | CSR_DONE)))
-		int_req = int_req | INT_PTR;
+		SET_INT (PTR);
 	if (data & CSR_GO) {
 		ptr_csr = (ptr_csr & ~CSR_DONE) | CSR_BUSY;
-		int_req = int_req & ~INT_PTR;
+		CLR_INT (PTR);
 		if (ptr_unit.flags & UNIT_ATT)		/* data to read? */
 			sim_activate (&ptr_unit, ptr_unit.wait);  
 		else sim_activate (&ptr_unit, 0);  }	/* error if not */
@@ -287,39 +290,39 @@ case 05:						/* ptr buf */
 	return SCPE_OK;
 case 06:						/* ptp csr */
 	if (PA & 1) return SCPE_OK;
-	if ((data & CSR_IE) == 0) int_req = int_req & ~INT_PTP;
+	if ((data & CSR_IE) == 0) CLR_INT (PTP);
 	else if (((ptp_csr & CSR_IE) == 0) && (ptp_csr & (CSR_ERR | CSR_DONE)))
-		int_req = int_req | INT_PTP;
+		SET_INT (PTP);
 	ptp_csr = (ptp_csr & ~PTPCSR_RW) | (data & PTPCSR_RW);
 	return SCPE_OK;
 case 07:						/* ptp buf */
 	if ((PA & 1) == 0) ptp_unit.buf = data & 0377;
 	ptp_csr = ptp_csr & ~CSR_DONE;
-	int_req = int_req & ~INT_PTP;
+	CLR_INT (PTP);
 	if (ptp_unit.flags & UNIT_ATT)			/* file to write? */
 		sim_activate (&ptp_unit, ptp_unit.wait);
 	else sim_activate (&ptp_unit, 0);		/* error if not */
 	return SCPE_OK;
 case 010:						/* tti csr */
 	if (PA & 1) return SCPE_OK;
-	if ((data & CSR_IE) == 0) int_req = int_req & ~INT_TTI;
+	if ((data & CSR_IE) == 0) CLR_INT (TTI);
 	else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-		int_req = int_req | INT_TTI;
+		SET_INT (TTI);
 	tti_csr = (tti_csr & ~TTICSR_RW) | (data & TTICSR_RW);
 	return SCPE_OK;
 case 011:						/* tti buf */
 	return SCPE_OK;
 case 012:						/* tto csr */
 	if (PA & 1) return SCPE_OK;
-	if ((data & CSR_IE) == 0) int_req = int_req & ~INT_TTO;
+	if ((data & CSR_IE) == 0) CLR_INT (TTO);
 	else if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-		int_req = int_req | INT_TTO;
+		SET_INT (TTO);
 	tto_csr = (tto_csr & ~TTOCSR_RW) | (data & TTOCSR_RW);
 	return SCPE_OK;
 case 013:						/* tto buf */
 	if ((PA & 1) == 0) tto_unit.buf = data & 0377;
 	tto_csr = tto_csr & ~CSR_DONE;
-	int_req = int_req & ~INT_TTO;
+	CLR_INT (TTO);
 	sim_activate (&tto_unit, tto_unit.wait);
 	return SCPE_OK;  }				/* end switch PA */
 return SCPE_NXM;
@@ -338,7 +341,7 @@ t_stat ptr_svc (UNIT *uptr)
 int32 temp;
 
 ptr_csr = (ptr_csr | CSR_ERR) & ~CSR_BUSY;
-if (ptr_csr & CSR_IE) int_req = int_req | INT_PTR;
+if (ptr_csr & CSR_IE) SET_INT (PTR);
 if ((ptr_unit.flags & UNIT_ATT) == 0)
 	return IORETURN (ptr_stopioe, SCPE_UNATT);
 if ((temp = getc (ptr_unit.fileref)) == EOF) {
@@ -359,7 +362,7 @@ t_stat ptr_reset (DEVICE *dptr)
 ptr_unit.buf = 0;
 ptr_csr = 0;
 if ((ptr_unit.flags & UNIT_ATT) == 0) ptr_csr = ptr_csr | CSR_ERR;
-int_req = int_req & ~INT_PTR;
+CLR_INT (PTR);
 sim_cancel (&ptr_unit);
 return SCPE_OK;
 }
@@ -391,7 +394,7 @@ return detach_unit (uptr);
 t_stat ptp_svc (UNIT *uptr)
 {
 ptp_csr = ptp_csr | CSR_ERR | CSR_DONE;
-if (ptp_csr & CSR_IE) int_req = int_req | INT_PTP;
+if (ptp_csr & CSR_IE) SET_INT (PTP);
 if ((ptp_unit.flags & UNIT_ATT) == 0)
 	return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {
@@ -408,7 +411,7 @@ t_stat ptp_reset (DEVICE *dptr)
 ptp_unit.buf = 0;
 ptp_csr = CSR_DONE;
 if ((ptp_unit.flags & UNIT_ATT) == 0) ptp_csr = ptp_csr | CSR_ERR;
-int_req = int_req & ~INT_PTP;
+CLR_INT (PTP);
 sim_cancel (&ptp_unit);					/* deactivate unit */
 return SCPE_OK;
 }
@@ -444,7 +447,7 @@ if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
 tti_unit.buf = temp & 0377;
 tti_unit.pos = tti_unit.pos + 1;
 tti_csr = tti_csr | CSR_DONE;
-if (tti_csr & CSR_IE) int_req = int_req | INT_TTI;
+if (tti_csr & CSR_IE) SET_INT (TTI);
 return SCPE_OK;
 }
 
@@ -452,7 +455,7 @@ t_stat tti_reset (DEVICE *dptr)
 {
 tti_unit.buf = 0;
 tti_csr = 0;
-int_req = int_req & ~INT_TTI;
+CLR_INT (TTI);
 sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
 return SCPE_OK;
 }
@@ -468,7 +471,7 @@ t_stat tto_svc (UNIT *uptr)
 int32 temp;
 
 tto_csr = tto_csr | CSR_DONE;
-if (tto_csr & CSR_IE) int_req = int_req | INT_TTO;
+if (tto_csr & CSR_IE) SET_INT (TTO);
 if ((temp = sim_putchar (tto_unit.buf & 0177)) != SCPE_OK) return temp;
 tto_unit.pos = tto_unit.pos + 1;
 return SCPE_OK;
@@ -478,7 +481,7 @@ t_stat tto_reset (DEVICE *dptr)
 {
 tto_unit.buf = 0;
 tto_csr = CSR_DONE;
-int_req = int_req & ~INT_TTO;
+CLR_INT (TTO);
 sim_cancel (&tto_unit);					/* deactivate unit */
 return SCPE_OK;
 }
@@ -493,18 +496,19 @@ t_stat clk_svc (UNIT *uptr)
 {
 int32 t;
 
-if (clk_csr & CSR_IE) int_req = int_req | INT_CLK;
+clk_csr = clk_csr | CSR_DONE;				/* set done */
+if (clk_csr & CSR_IE) SET_INT (CLK);
 t = sim_rtc_calb (clk_tps);				/* calibrate clock */
 sim_activate (&clk_unit, t);				/* reactivate unit */
-dz_poll = t;						/* set DZ poll */
+tmxr_poll = t;						/* set mux poll */
 return SCPE_OK;
 }
 
 t_stat clk_reset (DEVICE *dptr)
 {
 clk_csr = 0;
-int_req = int_req & ~INT_CLK;
+CLR_INT (CLK);
 sim_activate (&clk_unit, clk_unit.wait);		/* activate unit */
-dz_poll = clk_unit.wait;				/* set DZ poll */
+tmxr_poll = clk_unit.wait;				/* set mux poll */
 return SCPE_OK;
 }

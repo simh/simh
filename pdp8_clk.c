@@ -25,6 +25,7 @@
 
    clk		real time clock
 
+   05-Sep-01	RMS	Added terminal multiplexor support
    17-Jul-01	RMS	Moved function prototype
    05-Mar-01	RMS	Added clock calibration support
 
@@ -36,7 +37,8 @@
 extern int32 int_req, int_enable, dev_done, stop_inst;
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
-int32 clk_tps = 60;
+int32 clk_tps = 60;					/* ticks/second */
+int32 tmxr_poll = 16000;				/* term mux poll */
 
 /* CLK data structures
 
@@ -103,9 +105,13 @@ default:
 
 t_stat clk_svc (UNIT *uptr)
 {
+int32 t;
+
 dev_done = dev_done | INT_CLK;				/* set done */
 int_req = INT_UPDATE;					/* update interrupts */
-sim_activate (&clk_unit, sim_rtc_calb (clk_tps));	/* reactivate unit */
+t = sim_rtc_calb (clk_tps);				/* calibrate clock */
+sim_activate (&clk_unit, t);				/* reactivate unit */
+tmxr_poll = t;						/* set mux poll */
 return SCPE_OK;
 }
 
@@ -117,5 +123,6 @@ dev_done = dev_done & ~INT_CLK;				/* clear done, int */
 int_req = int_req & ~INT_CLK;
 int_enable = int_enable & ~INT_CLK;			/* clear enable */
 sim_activate (&clk_unit, clk_unit.wait);		/* activate unit */
+tmxr_poll = clk_unit.wait;				/* set mux poll */
 return SCPE_OK;
 }

@@ -24,6 +24,9 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    fe		KS10 console front end
+
+   23-Oct-01	RMS	New IO page address constants
+   07-Sep-01	RMS	Moved function prototypes
 */
 
 #include "pdp10_defs.h"
@@ -36,8 +39,6 @@ t_stat feo_svc (UNIT *uptr);
 t_stat fe_reset (DEVICE *dptr);
 t_stat fe_stop_os (UNIT *uptr, int32 val);
 t_stat fe_ctrl_c (UNIT *uptr, int32 val);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
 
 /* FE data structures
 
@@ -147,7 +148,7 @@ return SCPE_OK;
 
 t_stat fe_stop_os (UNIT *uptr, int32 val)
 {
-M[FE_SWITCH] = IO_RHBASE;				/* tell OS to stop */
+M[FE_SWITCH] = IOBA_RP;					/* tell OS to stop */
 return SCPE_OK;
 }
 
