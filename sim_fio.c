@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   26-May-04	RMS	Optimized sim_fread (suggested by John Dundas)
    02-Jan-04	RMS	Split out from SCP
 
    This library includes:
@@ -57,8 +58,8 @@ int32 sim_end = 1;					/* 1 = little */
    These routines are analogs of the standard C runtime routines
    fread and fwrite.  If the host is little endian, or the data items
    are size char, then the calls are passed directly to fread or
-   fwrite.  Otherwise, these routines perform the necessary byte swaps
-   using an intermediate buffer.
+   fwrite.  Otherwise, these routines perform the necessary byte swaps.
+   Sim_fread swaps in place, sim_fwrite uses an intermediate buffer.
 */
 
 int32 sim_finit (void)
@@ -72,28 +73,21 @@ return sim_end;
 
 size_t sim_fread (void *bptr, size_t size, size_t count, FILE *fptr)
 {
-size_t c, j, nelem, nbuf, lcnt, total;
-int32 i, k;
-unsigned char *sptr, *dptr;
+size_t c, j;
+int32 k;
+unsigned char by, *sptr, *dptr;
 
-if (sim_end || (size == sizeof (char)))
-	return fread (bptr, size, count, fptr);
-if ((size == 0) || (count == 0)) return 0;
-nelem = FLIP_SIZE / size;				/* elements in buffer */
-nbuf = count / nelem;					/* number buffers */
-lcnt = count % nelem;					/* count in last buf */
-if (lcnt) nbuf = nbuf + 1;
-else lcnt = nelem;
-total = 0;
-dptr = bptr;						/* init output ptr */
-for (i = nbuf; i > 0; i--) {
-	c = fread (sim_flip, size, (i == 1? lcnt: nelem), fptr);
-	if (c == 0) return total;
-	total = total + c;
-	for (j = 0, sptr = sim_flip; j < c; j++) {
-	    for (k = size - 1; k >= 0; k--) *(dptr + k) = *sptr++;
-	    dptr = dptr + size;  }  }
-return total;
+if ((size == 0) || (count == 0)) return 0;		/* check arguments */
+c = fread (bptr, size, count, fptr);			/* read buffer */
+if (sim_end || (size == sizeof (char)) || (c == 0))	/* le, byte, or err? */
+	return c;					/* done */
+for (j = 0, dptr = sptr = bptr; j < c; j++) {		/* loop on items */
+	for (k = size - 1; k >= 0; k--) {		/* loop on bytes/item */
+	    by = *sptr;					/* swap end-for-end */
+	    *sptr++ = *(dptr + k);
+	    *(dptr + k) = by;  }
+	    dptr = dptr + size;  }			/* next item */
+return c;
 }
 
 size_t sim_fwrite (void *bptr, size_t size, size_t count, FILE *fptr)
@@ -102,9 +96,9 @@ size_t c, j, nelem, nbuf, lcnt, total;
 int32 i, k;
 unsigned char *sptr, *dptr;
 
-if (sim_end || (size == sizeof (char)))
-	return fwrite (bptr, size, count, fptr);
-if ((size == 0) || (count == 0)) return 0;
+if ((size == 0) || (count == 0)) return 0;		/* check arguments */
+if (sim_end || (size == sizeof (char)))			/* le or byte? */
+	return fwrite (bptr, size, count, fptr);	/* done */
 nelem = FLIP_SIZE / size;				/* elements in buffer */
 nbuf = count / nelem;					/* number buffers */
 lcnt = count % nelem;					/* count in last buf */
@@ -112,9 +106,9 @@ if (lcnt) nbuf = nbuf + 1;
 else lcnt = nelem;
 total = 0;
 sptr = bptr;						/* init input ptr */
-for (i = nbuf; i > 0; i--) {
+for (i = nbuf; i > 0; i--) {				/* loop on buffers */
 	c = (i == 1)? lcnt: nelem;
-	for (j = 0, dptr = sim_flip; j < c; j++) {
+	for (j = 0, dptr = sim_flip; j < c; j++) {	/* loop on items */
 	    for (k = size - 1; k >= 0; k--) *(dptr + k) = *sptr++;
 	    dptr = dptr + size;  }
 	c = fwrite (sim_flip, size, c, fptr);
@@ -146,6 +140,8 @@ FILE *sim_fopen (char *file, char *mode)
 #if defined (VMS)
 return fopen (file, mode, "ALQ=32", "DEQ=4096",
          "MBF=6", "MBC=127", "FOP=cbt,tef", "ROP=rah,wbh", "CTX=stm");
+#elif defined (USE_INT64) && defined (USE_ADDR64) && defined (linux)
+return fopen64 (file, mode);
 #else
 return fopen (file, mode);
 #endif
@@ -249,6 +245,18 @@ return fsetpos (st, &fileaddr);
 }
 
 #endif							/* end Windows */
+
+/* Linux */
+
+#if defined (linux)
+#define _SIM_IO_FSEEK_EXT_	1
+
+int sim_fseek (FILE *st, t_addr xpos, int origin)
+{
+return fseeko64 (st, xpos, origin);
+}
+
+#endif							/* end Linux with LFS */
 
 #endif							/* end 64b seek defs */
 

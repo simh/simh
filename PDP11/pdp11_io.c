@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-May-04	RMS	Revised I/O dispatching (from John Dundas)
    25-Jan-04	RMS	Removed local debug logging support
    21-Dec-03	RMS	Fixed bug in autoconfigure vector assignment; added controls
    21-Nov-03	RMS	Added check for interrupt slot conflict (found by Dave Hittner)
@@ -42,13 +43,13 @@
 extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
 extern int32 ub_map[UBM_LNT_LW];
-extern UNIT cpu_unit;
 extern int32 cpu_bme, cpu_18b, cpu_ubm;
 extern int32 trap_req, ipl;
 extern int32 cpu_log;
 extern int32 autcon_enb;
 extern FILE *sim_log;
-extern DEVICE *sim_devices[];
+extern DEVICE *sim_devices[], cpu_dev;
+extern UNIT cpu_unit;
 
 int32 calc_ints (int32 nipl, int32 trq);
 
@@ -57,7 +58,9 @@ extern DIB cpu3_dib, cpu4_dib, ubm_dib;
 
 /* I/O data structures */
 
-DIB *dib_tab[DIB_MAX];					/* run time DIBs */
+static t_stat (*iodispR[IOPAGESIZE >> 1])(int32 *dat, int32 ad, int32 md);
+static t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
+static DIB *iodibp[IOPAGESIZE >> 1];
 
 int32 int_vec[IPL_HLVL][32];				/* int req to vector */
 
@@ -71,9 +74,9 @@ static DIB *std_dib[] = {				/* standard DIBs */
 	&cpu4_dib,
 	NULL };
 
-static int32 pirq_vloc[7] = {
-	IVCL (PIR7), IVCL (PIR6), IVCL (PIR5), IVCL (PIR4),
-	IVCL (PIR3), IVCL (PIR2), IVCL (PIR1) };
+static const int32 pirq_bit[7] = {
+	INT_V_PIR1, INT_V_PIR2, INT_V_PIR3, INT_V_PIR4,
+	INT_V_PIR5, INT_V_PIR6, INT_V_PIR7 };
 
 /* I/O page lookup and linkage routines
 
@@ -88,31 +91,27 @@ static int32 pirq_vloc[7] = {
 
 t_stat iopageR (int32 *data, uint32 pa, int32 access)
 {
-int32 i;
-DIB *dibp;
+int32 idx;
 t_stat stat;
 
-for (i = 0; dibp = dib_tab[i]; i++ ) {
-	if ((pa >= dibp->ba) &&
-	   (pa < (dibp->ba + dibp->lnt))) {
-	    stat = dibp->rd (data, pa, access);
-	    trap_req = calc_ints (ipl, trap_req);
-	    return stat;  }  }
+idx = (pa & IOPAGEMASK) >> 1;
+if (iodispR[idx]) {
+	stat = iodispR[idx] (data, pa, access);
+	trap_req = calc_ints (ipl, trap_req);
+	return stat;  }
 return SCPE_NXM;
 }
 
 t_stat iopageW (int32 data, uint32 pa, int32 access)
 {
-int32 i;
-DIB *dibp;
+int32 idx;
 t_stat stat;
 
-for (i = 0; dibp = dib_tab[i]; i++ ) {
-	if ((pa >= dibp->ba) &&
-	   (pa < (dibp->ba + dibp->lnt))) {
-	    stat = dibp->wr (data, pa, access);
-	    trap_req = calc_ints (ipl, trap_req);
-	    return stat;  }  }
+idx = (pa & IOPAGEMASK) >> 1;
+if (iodispW[idx]) {
+	stat = iodispW[idx] (data, pa, access);
+	trap_req = calc_ints (ipl, trap_req);
+	return stat;  }
 return SCPE_NXM;
 }
 
@@ -422,123 +421,126 @@ else {	fprintf (st, "vector=%o", vec);
 return SCPE_OK;
 }
 
-/* Test for conflict in device addresses */
+/* Build dispatch tables */
 
-t_bool dev_conflict (DIB *curr)
+t_stat build_dsp_tab (DEVICE *dptr, DIB *dibp)
 {
-uint32 i, end;
-DEVICE *dptr;
-DIB *dibp;
+uint32 i, idx;
 
-end = curr->ba + curr->lnt - 1;				/* get end */
-for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
-	dibp = (DIB *) dptr->ctxt;			/* get DIB */
-	if ((dibp == NULL) || (dibp == curr) ||
-	    (dptr->flags & DEV_DIS)) continue;
-	if (((curr->ba >= dibp->ba) &&			/* overlap start? */
-	    (curr->ba < (dibp->ba + dibp->lnt))) ||
-	    ((end >= dibp->ba) &&			/* overlap end? */
-	    (end < (dibp->ba + dibp->lnt)))) {
-		printf ("Device %s address conflict at %08o\n",
-		    sim_dname (dptr), dibp->ba);
-		if (sim_log) fprintf (sim_log,
-		    "Device %s address conflict at %08o\n",
-		    sim_dname (dptr), dibp->ba);
-		return TRUE;  }	 }
-return FALSE;
+if ((dptr == NULL) || (dibp == NULL)) return SCPE_IERR;	/* validate args */
+for (i = 0; i < dibp->lnt; i = i + 2) {			/* create entries */
+	idx = ((dibp->ba + i) & IOPAGEMASK) >> 1;	/* index into disp */
+	if ((iodispR[idx] && dibp->rd &&		/* conflict? */
+	    (iodispR[idx] != dibp->rd)) ||
+	    (iodispW[idx] && dibp->wr &&
+	    (iodispW[idx] != dibp->wr))) {
+	    printf ("Device %s address conflict at %08o\n",
+		sim_dname (dptr), dibp->ba);
+	    if (sim_log) fprintf (sim_log,
+		"Device %s address conflict at %08o\n",
+		sim_dname (dptr), dibp->ba);
+	    return SCPE_STOP;
+	    }
+	if (dibp->rd) iodispR[idx] = dibp->rd;		/* set rd dispatch */
+	if (dibp->wr) iodispW[idx] = dibp->wr;		/* set wr dispatch */
+	iodibp[idx] = dibp;				/* remember DIB */
+	}
+return SCPE_OK;
 }
 
 /* Build interrupt tables */
 
-t_bool build_int_vec (int32 vloc, int32 ivec, int32 (*iack)(void) )
+t_stat build_int_vec (DEVICE *dptr, DIB *dibp)
 {
-int32 ilvl = vloc / 32;
-int32 ibit = vloc % 32;
+int32 i, idx, vec, ilvl, ibit;
 
-if (iack != NULL) {
-	if (int_ack[ilvl][ibit] &&
-	   (int_ack[ilvl][ibit] != iack)) return TRUE;
-	 int_ack[ilvl][ibit] = iack;  }
-else if (ivec != 0) {
-	if (int_vec[ilvl][ibit] &&
-	    (int_vec[ilvl][ibit] != ivec)) return TRUE;
-	int_vec[ilvl][ibit] = ivec;  }
-return FALSE;
-}
-
-/* Build dib_tab from device list */
-
-t_stat build_dib_tab (int32 ubm)
-{
-int32 i, j, k;
-DEVICE *dptr;
-DIB *dibp;
-
-for (i = 0; i < IPL_HLVL; i++) {			/* clear int tables */
-	for (j = 0; j < 32; j++) {
-	    int_vec[i][j] = 0;
-	    int_ack[i][j] = NULL;  }  }
-for (i = j = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
-	dibp = (DIB *) dptr->ctxt;			/* get DIB */
-	if (dibp && !(dptr->flags & DEV_DIS)) {		/* defined, enabled? */
-	    if (dibp->vnum > VEC_DEVMAX) return SCPE_IERR;
-	    for (k = 0; k < dibp->vnum; k++) {		/* loop thru vec */
-	        if (build_int_vec (dibp->vloc + k,	/* add vector */
-		    dibp->vec + (k * 4), dibp->ack[k])) {
-		    printf ("Device %s interrupt slot conflict at %d\n",
-			sim_dname (dptr), dibp->vloc + k);
-		    if (sim_log) fprintf (sim_log,
-			"Device %s interrupt slot conflict at %d\n",
-			sim_dname (dptr), dibp->vloc + k);
-		    return SCPE_IERR;  }  }
-	    if (dibp->lnt != 0) {			/* I/O addresses? */
-		dib_tab[j++] = dibp;			/* add DIB to dib_tab */
-		if (j >= DIB_MAX) return SCPE_IERR;  }	/* too many? */	
-	    }						/* end if enabled */
-	}						/* end for */
-for (i = 0; (dibp = std_dib[i]) != NULL; i++) {		/* loop thru std */
-	dib_tab[j++] = dibp;				/* add to dib_tab */
-	if (j >= DIB_MAX) return SCPE_IERR;  }		/* too many? */
-if (ubm) {						/* Unibus map? */
-	dib_tab[j++] = &ubm_dib;			/* add to dib_tab */
-	if (j >= DIB_MAX) return SCPE_IERR;  }		/* too many? */
-dib_tab[j] = NULL;					/* end with NULL */
-for (i = 0; i < 7; i++)					/* add PIRQ intr */
-	build_int_vec (pirq_vloc[i], VEC_PIRQ, NULL);
-for (i = 0; (dibp = dib_tab[i]) != NULL; i++) {		/* test built dib_tab */
-	if (dev_conflict (dibp)) {
-	    return SCPE_STOP;  }  }			/* for conflicts */
+if ((dptr == NULL) || (dibp == NULL)) return SCPE_IERR;	/* validate args */
+if (dibp->vnum > VEC_DEVMAX) return SCPE_IERR;
+for (i = 0; i < dibp->vnum; i++) {			/* loop thru vec */
+	idx = dibp->vloc + i;				/* vector index */
+	vec = dibp->vec? (dibp->vec + (i * 4)): 0;	/* vector addr */
+	ilvl = idx / 32;
+	ibit = idx % 32;
+	if ((int_ack[ilvl][ibit] && dibp->ack[i] &&	/* conflict? */
+	    (int_ack[ilvl][ibit] != dibp->ack[i])) ||
+	    (int_vec[ilvl][ibit] && vec &&
+	    (int_vec[ilvl][ibit] != vec))) {
+	    printf ("Device %s interrupt slot conflict at %d\n",
+		sim_dname (dptr), idx);
+	    if (sim_log) fprintf (sim_log,
+	 	"Device %s interrupt slot conflict at %d\n",
+		sim_dname (dptr), idx);
+	    return SCPE_STOP;
+	    }
+	if (dibp->ack[i]) int_ack[ilvl][ibit] = dibp->ack[i];
+	else if (vec) int_vec[ilvl][ibit] = vec;
+	}
 return SCPE_OK;
 }
 
-/* Show dib_tab */
+/* Build tables from device list */
+
+t_stat build_dib_tab (int32 ubm)
+{
+int32 i, j;
+DEVICE *dptr;
+DIB *dibp;
+t_stat r;
+
+for (i = 0; i < IPL_HLVL; i++) {			/* clear intr tab */
+	for (j = 0; j < 32; j++) {
+	    int_vec[i][j] = 0;
+	    int_ack[i][j] = NULL;  }  }
+for (i = 0; i < (IOPAGESIZE >> 1); i++) {		/* clear dispatch tab */
+	iodispR[i] = NULL;
+	iodispW[i] = NULL;
+	iodibp[i] = NULL;  }
+for (i = 0; i < 7; i++)					/* seed PIRQ intr */
+	int_vec[i + 1][pirq_bit[i]] = VEC_PIRQ;
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
+	dibp = (DIB *) dptr->ctxt;			/* get DIB */
+	if (dibp && !(dptr->flags & DEV_DIS)) {		/* defined, enabled? */
+	    if (r = build_int_vec (dptr, dibp))		/* add to intr tab */
+		return r;
+	    if (r = build_dsp_tab (dptr, dibp))		/* add to dispatch tab */
+		return r;
+	    }						/* end if enabled */
+	}						/* end for */
+for (i = 0; std_dib[i] != NULL; i++) {			/* loop thru std */
+	if (r = build_dsp_tab (&cpu_dev, std_dib[i]))	/* add to dispatch tab */
+	    return r;
+	}
+if (ubm) {						/* Unibus map? */
+	if (r = build_dsp_tab (&cpu_dev, &ubm_dib))	/* add to dispatch tab */
+	    return r;
+	}
+return SCPE_OK;
+}
+
+/* Show IO space */
 
 t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-int32 i, j, done = 0;
+uint32 i, j;
 DEVICE *dptr;
-DIB *dibt;
+DIB *dibp;
 
-build_dib_tab (cpu_ubm);				/* build table */
-while (done == 0) {					/* sort ascending */
-	done = 1;					/* assume done */
-	for (i = 0; dib_tab[i + 1] != NULL; i++) {	/* check table */
-	    if (dib_tab[i]->ba > dib_tab[i + 1]->ba) {	/* out of order? */
-		dibt = dib_tab[i];			/* interchange */
-		dib_tab[i] = dib_tab[i + 1];
-		dib_tab[i + 1] = dibt;
-		done = 0;  }  }				/* not done */
-	}						/* end while */
-for (i = 0; dib_tab[i] != NULL; i++) {			/* print table */
-	for (j = 0, dptr = NULL; sim_devices[j] != NULL; j++) {
-	    if (((DIB*) sim_devices[j]->ctxt) == dib_tab[i]) {
-		dptr = sim_devices[j];
-		break;  }  }
-	fprintf (st, "%08o - %08o%c\t%s\n", dib_tab[i]->ba,
-		dib_tab[i]->ba + dib_tab[i]->lnt - 1,
+if (build_dib_tab (cpu_ubm)) return SCPE_OK;		/* build IO page */
+for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {	/* loop thru entries */
+	if (iodibp[i] && (iodibp[i] != dibp)) {		/* new block? */
+	    dibp = iodibp[i];				/* DIB for block */
+	    for (j = 0, dptr = NULL; sim_devices[j] != NULL; j++) {
+		if (((DIB*) sim_devices[j]->ctxt) == dibp) {
+		    dptr = sim_devices[j];		/* locate device */
+		    break;
+		    }					/* end if */
+		}					/* end for j */
+	    fprintf (st, "%08o - %08o%c\t%s\n",		/* print block entry */
+		dibp->ba, dibp->ba + dibp->lnt - 1,
 		(dptr && (dptr->flags & DEV_FLTA))? '*': ' ',
 		dptr? sim_dname (dptr): "CPU");
-	}
+	    }						/* end if */
+	}						/* end for i */
 return SCPE_OK;
 }
 
@@ -593,7 +595,7 @@ struct auto_con auto_tab[AUTO_LNT + 1] = {
 	{ 0xf, 0x3 },					/* VS100 */
 	{ 0x3, 0x3, AUTO_DYN|AUTO_VEC, 0, IOBA_TQ, { "TQ", "TQB" } },
 	{ 0xf, 0x7 },					/* KMV11 */
-	{ 0xf, 0x7 },					/* DHU11/DHQ11 */
+	{ 0x1f, 0x7, AUTO_VEC, VH_MUXES, 0, { "VH" } },	/* DHU11/DHQ11 */
 
 	{ 0x1f, 0x7 },					/* DMZ32 */
 	{ 0x1f, 0x7 },					/* CP132 */

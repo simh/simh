@@ -26,6 +26,7 @@
    tti,tto	DL11 terminal input/output
    clk		KW11L line frequency clock
 
+   28-May-04	RMS	Removed SET TTI CTRL-C
    29-Dec-03	RMS	Added console backpressure support
    25-Apr-03	RMS	Revised for extended file support
    01-Mar-03	RMS	Added SET/SHOW CLOCK FREQ, SET TTI CTRL-C
@@ -80,7 +81,6 @@ t_stat tto_rd (int32 *data, int32 PA, int32 access);
 t_stat tto_wr (int32 data, int32 PA, int32 access);
 t_stat tto_svc (UNIT *uptr);
 t_stat tto_reset (DEVICE *dptr);
-t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat clk_rd (int32 *data, int32 PA, int32 access);
 t_stat clk_wr (int32 data, int32 PA, int32 access);
@@ -115,8 +115,6 @@ REG tti_reg[] = {
 MTAB tti_mod[] = {
 	{ UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
 	{ UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
-	{ MTAB_XTD|MTAB_VDV|MTAB_VUN, 0, NULL, "CTRL-C",
-		&tti_set_ctrlc, NULL, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
 		NULL, &show_addr, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
@@ -265,18 +263,6 @@ tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);
 sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
-return SCPE_OK;
-}
-
-/* Set control-C */
-
-t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-if (cptr) return SCPE_ARG;
-uptr->buf = 003;
-uptr->pos = uptr->pos + 1;
-tti_csr = tti_csr | CSR_DONE;
-if (tti_csr & CSR_IE) SET_INT (TTI);
 return SCPE_OK;
 }
 

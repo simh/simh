@@ -194,7 +194,7 @@ if (lnt >= L_LONG) {					/* lw unaligned? */
 	sc = bo << 3;
 	wl = ReadL (pa);				/* read both lw */
 	wh = ReadL (pa1);				/* extract */
-	return (((wl >> sc) & align[bo]) | (wh << (32 - sc)));  }
+	return ((((wl >> sc) & align[bo]) | (wh << (32 - sc))) & LMASK);  }
 else if (bo == 1) return ((ReadL (pa) >> 8) & WMASK);
 else {	wl = ReadL (pa);				/* word cross lw */
 	wh = ReadL (pa1);				/* read, extract */
@@ -248,7 +248,7 @@ wl = ReadL (pa);
 if (lnt >= L_LONG) {
 	sc = bo << 3;
 	wh = ReadL (pa1);
-	wl = (wl & insert[bo]) | (val << sc);
+	wl = (wl & insert[bo]) | ((val << sc) & LMASK);
 	wh = (wh & ~insert[bo]) | ((val >> (32 - sc)) & insert[bo]);
 	WriteL (pa, wl);
 	WriteL (pa1, wh);  }
@@ -256,7 +256,7 @@ else if (bo == 1) {
 	wl = (wl & 0xFF0000FF) | (val << 8);
 	WriteL (pa, wl);  }
 else {	wh = ReadL (pa1);
-	wl = (wl & 0x00FFFFFF) | (val << 24);
+	wl = (wl & 0x00FFFFFF) | ((val & 0xFF) << 24);
 	wh = (wh & 0xFFFFFF00) | ((val >> 8) & 0xFF);
 	WriteL (pa, wl);
 	WriteL (pa1, wh);  }

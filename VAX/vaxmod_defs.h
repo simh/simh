@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   16-Jun-04	RMS	Added DHQ11 support
    21-Mar-04	RMS	Added RXV21 support
    25-Jan-04	RMS	Removed local debug logging support
 		RMS,MP	Added "KA655X" support
@@ -204,8 +205,9 @@
 
 /* I/O system definitions */
 
-#define DZ_MUXES	4				/* max # of muxes */
-#define DZ_LINES	4				/* (DZV) lines per mux */
+#define DZ_MUXES	4				/* max # of DZV muxes */
+#define DZ_LINES	4				/* lines per DZV mux */
+#define VH_MUXES        4				/* max # of DHQ muxes */
 #define MT_MAXFR	(1 << 16)			/* magtape max rec */
 #define AUTO_LNT	34				/* autoconfig ranks */
 #define DIB_MAX		100				/* max DIBs */
@@ -250,6 +252,8 @@ typedef struct pdp_dib DIB;
 #define IOLN_RQC	004
 #define IOBA_RQD	(IOPAGEBASE + IOBA_RQC + IOLN_RQC)
 #define IOLN_RQD	004
+#define IOBA_VH		(IOPAGEBASE + 000440)           /* DHQ11 */
+#define IOLN_VH		020
 #define IOBA_RQ		(IOPAGEBASE + 012150)		/* RQDX3 */
 #define IOLN_RQ		004
 #define IOBA_TS		(IOPAGEBASE + 012520)		/* TS11 */
@@ -297,6 +301,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_TS	5				/* TS11/TSV05 */
 #define INT_V_TQ	6				/* TMSCP */
 #define INT_V_XQ	7				/* DEQNA/DELQA */
+#define INT_V_RY	8				/* RXV21 */
 
 /* IPL 14 */
 
@@ -309,7 +314,8 @@ typedef struct pdp_dib DIB;
 #define INT_V_CSO	6
 #define INT_V_TMR0	7				/* SSC timers */
 #define INT_V_TMR1	8
-#define INT_V_RY	9				/* RXV21 */
+#define INT_V_VHRX	9				/* DHQ11 */
+#define INT_V_VHTX	10 
 
 #define INT_CLK		(1u << INT_V_CLK)
 #define INT_RQ		(1u << INT_V_RQ)
@@ -320,6 +326,7 @@ typedef struct pdp_dib DIB;
 #define INT_TS		(1u << INT_V_TS)
 #define INT_TQ		(1u << INT_V_TQ)
 #define INT_XQ		(1u << INT_V_XQ)
+#define INT_RY		(1u << INT_V_RY)
 #define INT_TTI		(1u << INT_V_TTI)
 #define INT_TTO		(1u << INT_V_TTO)
 #define INT_PTR		(1u << INT_V_PTR)
@@ -329,7 +336,8 @@ typedef struct pdp_dib DIB;
 #define INT_CSO		(1u << INT_V_CSO)
 #define INT_TMR0	(1u << INT_V_TMR0)
 #define INT_TMR1	(1u << INT_V_TMR1)
-#define INT_RY		(1u << INT_V_RY)
+#define INT_VHRX	(1u << INT_V_VHRX)
+#define INT_VHTX	(1u << INT_V_VHTX)
 
 #define IPL_CLK		(0x16 - IPL_HMIN)			/* relative IPL */
 #define IPL_RQ		(0x15 - IPL_HMIN)
@@ -350,6 +358,8 @@ typedef struct pdp_dib DIB;
 #define IPL_CSO		(0x14 - IPL_HMIN)
 #define IPL_TMR0	(0x14 - IPL_HMIN)
 #define IPL_TMR1	(0x14 - IPL_HMIN)
+#define IPL_VHRX	(0x14 - IPL_HMIN)
+#define IPL_VHTX	(0x14 - IPL_HMIN)
 
 #define IPL_HMAX	0x17				/* highest hwre level */
 #define IPL_HMIN	0x14				/* lowest hwre level */
@@ -371,6 +381,8 @@ typedef struct pdp_dib DIB;
 #define VEC_RY		(VEC_Q + 0264)
 #define VEC_DZRX	(VEC_Q + 0300)
 #define VEC_DZTX	(VEC_Q + 0304)
+#define VEC_VHRX	(VEC_Q + 0310)   
+#define VEC_VHTX	(VEC_Q + 0314)
 
 /* Autoconfigure ranks */
 
@@ -379,6 +391,7 @@ typedef struct pdp_dib DIB;
 #define RANK_RX		18
 #define RANK_RQ		26
 #define RANK_TQ		30
+#define RANK_VH		32
 
 /* Interrupt macros */
 

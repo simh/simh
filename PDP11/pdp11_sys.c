@@ -57,6 +57,7 @@ extern DEVICE tti_dev, tto_dev;
 extern DEVICE lpt_dev;
 extern DEVICE clk_dev, pclk_dev;
 extern DEVICE dz_dev;
+extern DEVICE vh_dev;
 extern DEVICE rk_dev, rl_dev;
 extern DEVICE hk_dev;
 extern DEVICE rx_dev, ry_dev;
@@ -98,6 +99,7 @@ DEVICE *sim_devices[] = {
 	&clk_dev,
 	&pclk_dev,
 	&dz_dev,
+	&vh_dev,
 	&rk_dev,
 	&rl_dev,
 	&hk_dev,

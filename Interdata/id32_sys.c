@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   02-Jul-04	RMS	Fixed missing type in declaration
    15-Jul-03	RMS	Fixed signed/unsigned bug in get_imm
    27-Feb-03	RMS	Added relative addressing support
    23-Dec-01	RMS	Cloned from ID4 sources
@@ -50,7 +51,7 @@ extern uint32 *M;
 t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val, t_bool cf);
 t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val, t_bool cf);
 extern t_stat lp_load (FILE *fileref, char *cptr, char *fnam);
-extern pt_dump (FILE *of, char *cptr, char *fnam);
+extern t_stat pt_dump (FILE *of, char *cptr, char *fnam);
 
 /* SCP data structures and interface routines
 

@@ -25,6 +25,7 @@
 
    fe		KS10 console front end
 
+   28-May-04	RMS	Removed SET FE CTRL-C
    29-Dec-03	RMS	Added console backpressure support
    25-Apr-03	RMS	Revised for extended file support
    22-Dec-02	RMS	Added break support
@@ -43,7 +44,6 @@ t_stat fei_svc (UNIT *uptr);
 t_stat feo_svc (UNIT *uptr);
 t_stat fe_reset (DEVICE *dptr);
 t_stat fe_stop_os (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat fe_ctrl_c (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* FE data structures
 
@@ -70,7 +70,6 @@ REG fe_reg[] = {
 
 MTAB fe_mod[] = {
 	{ UNIT_DUMMY, 0, NULL, "STOP", &fe_stop_os },
-	{ UNIT_DUMMY, 0, NULL, "CTRL-C", &fe_ctrl_c },
 	{ 0 }  };
 
 DEVICE fe_dev = {
@@ -159,15 +158,5 @@ return SCPE_OK;
 t_stat fe_stop_os (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 M[FE_SWITCH] = IOBA_RP;					/* tell OS to stop */
-return SCPE_OK;
-}
-
-/* Enter control-C for Windoze */
-
-t_stat fe_ctrl_c (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-fei_unit.buf = 003;					/* control-C */
-M[FE_CTYIN] = fei_unit.buf | FE_CVALID;			/* put char in mem */
-apr_flg = apr_flg | APRF_CON;				/* interrupt KS10 */
 return SCPE_OK;
 }

@@ -25,6 +25,8 @@
 
    mux,muxl,muxc	12920A terminal multiplexor
 
+   26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
+			Implemented DMA SRQ (follows FLG)
    05-Jan-04	RMS	Revised for tmxr library changes
    21-Dec-03	RMS	Added invalid character screening for TSB (from Mike Gemeny)
    09-May-03	RMS	Added network device flag
@@ -133,7 +135,7 @@
 			 << LIC_V_I)
 
 extern uint32 PC;
-extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
 
 uint16 mux_sta[MUX_LINES];				/* line status */
 uint16 mux_rpar[MUX_LINES + MUX_ILINES];		/* rcv param */
@@ -191,8 +193,8 @@ static uint8 odd_par[256] = {
 #define RCV_PAR(x)	(odd_par[(x) & 0377]? LIL_PAR: 0)
 
 DIB mux_dib[] = {
-	{ MUXL, 0, 0, 0, 0, &muxlio },
-	{ MUXU, 0, 0, 0, 0, &muxuio }  };
+	{ MUXL, 0, 0, 0, 0, 0, &muxlio },
+	{ MUXU, 0, 0, 0, 0, 0, &muxuio }  };
 
 #define muxl_dib mux_dib[0]
 #define muxu_dib mux_dib[1]
@@ -214,6 +216,7 @@ REG muxu_reg[] = {
 	{ FLDATA (CTL, muxu_dib.ctl, 0), REG_HRO },
 	{ FLDATA (FLG, muxu_dib.flg, 0), REG_HRO },
 	{ FLDATA (FBF, muxu_dib.fbf, 0), REG_HRO },
+	{ FLDATA (SRQ, muxu_dib.srq, 0), REG_HRO },
 	{ ORDATA (DEVNO, muxu_dib.devno, 6), REG_HRO },
 	{ NULL }  };
 
@@ -282,6 +285,7 @@ REG muxl_reg[] = {
 	{ FLDATA (CTL, muxl_dib.ctl, 0) },
 	{ FLDATA (FLG, muxl_dib.flg, 0) },
 	{ FLDATA (FBF, muxl_dib.fbf, 0) },
+	{ FLDATA (SRQ, muxl_dib.srq, 0) },
 	{ BRDATA (STA, mux_sta, 8, 16, MUX_LINES) },
 	{ BRDATA (RPAR, mux_rpar, 8, 16, MUX_LINES + MUX_ILINES) },
 	{ BRDATA (XPAR, mux_xpar, 8, 16, MUX_LINES) },
@@ -309,7 +313,7 @@ DEVICE muxl_dev = {
    muxc_mod	MUXM modifiers list
 */
 
-DIB muxc_dib = { MUXC, 0, 0, 0, 0, &muxcio };
+DIB muxc_dib = { MUXC, 0, 0, 0, 0, 0, &muxcio };
 
 UNIT muxc_unit = { UDATA (NULL, 0, 0) };
 
@@ -318,6 +322,7 @@ REG muxc_reg[] = {
 	{ FLDATA (CTL, muxc_dib.ctl, 0) },
 	{ FLDATA (FLG, muxc_dib.flg, 0) },
 	{ FLDATA (FBF, muxc_dib.fbf, 0) },
+	{ FLDATA (SRQ, muxc_dib.srq, 0) },
 	{ FLDATA (SCAN, muxc_scan, 0) },
 	{ ORDATA (CHAN, muxc_chan, 4) },
 	{ BRDATA (DSO, muxc_ota, 8, 6, MUX_LINES) },
@@ -346,14 +351,14 @@ int32 dev, ln;
 dev = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
 case ioFLG:						/* flag clear/set */
-	if ((IR & I_HC) == 0) { setFLG (dev); }		/* STF */
+	if ((IR & I_HC) == 0) { setFSR (dev); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
 	if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioSFS:						/* skip flag set */
 	if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioOTX:						/* output */
 	muxl_obuf = dat;				/* store data */
 	break;
@@ -385,7 +390,7 @@ case ioCTL:						/* control clear/set */
 default:
 	break;  }
 if (IR & I_HC) {					/* H/C option */
-	clrFLG (dev);					/* clear flag */
+	clrFSR (dev);					/* clear flag */
 	mux_data_int ();  }				/* look for new int */
 return dat;
 }
@@ -416,14 +421,14 @@ int32 dev, ln, t, old;
 dev = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
 case ioFLG:						/* flag clear/set */
-	if ((IR & I_HC) == 0) { setFLG (dev); }		/* STF */
+	if ((IR & I_HC) == 0) { setFSR (dev); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
 	if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioSFS:						/* skip flag set */
 	if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioOTX:						/* output */
 	if (dat & OTC_SCAN) muxc_scan = 1;		/* set scan flag */
 	else muxc_scan = 0;
@@ -460,7 +465,7 @@ case ioCTL:						/* ctrl clear/set */
 default:
 	break;  }
 if (IR & I_HC) {					/* H/C option */
-	clrFLG (dev);					/* clear flag */
+	clrFSR (dev);					/* clear flag */
 	mux_ctrl_int (); }				/* look for new int */
 return dat;
 }
@@ -558,14 +563,14 @@ for (i = 0; i < MUX_LINES; i++) {			/* rcv lines */
 	muxu_ibuf = PUT_CCH (i) | mux_sta[i];		/* hi buf = stat */
 	mux_rchp[i] = 0;				/* clr char, stat */
 	mux_sta[i] = 0;
-	setFLG (muxl_dib.devno);			/* interrupt */
+	setFSR (muxl_dib.devno);			/* interrupt */
 	return;  }  }
 for (i = 0; i < MUX_LINES; i++) {			/* xmt lines */
     if ((mux_xpar[i] & OTL_ENB) && mux_xdon[i]) {	/* enabled, done? */
 	muxu_ibuf = PUT_CCH (i) | mux_sta[i] | LIU_TR;	/* hi buf = stat */
 	mux_xdon[i] = 0;				/* clr done, stat */
 	mux_sta[i] = 0;
-	setFLG (muxl_dib.devno);			/* interrupt */
+	setFSR (muxl_dib.devno);			/* interrupt */
 	return;  }  }
 for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++) {	/* diag lines */
     if ((mux_rpar[i] & OTL_ENB) && mux_rchp[i]) {	/* enabled, char? */
@@ -574,7 +579,7 @@ for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++) {	/* diag lines */
 	muxu_ibuf = PUT_CCH (i) | mux_sta[i] | LIU_DG;	/* hi buf = stat */
 	mux_rchp[i] = 0;				/* clr char, stat */
 	mux_sta[i] = 0;
-	setFLG (muxl_dib.devno);
+	setFSR (muxl_dib.devno);
 	return;  }  }
 return;
 }
@@ -589,7 +594,7 @@ if (muxc_scan == 0) return;
 for (i = 0; i < MUX_LINES; i++) {
 	muxc_chan = (muxc_chan + 1) & LIC_M_CHAN;	/* step channel */
 	if (LIC_TSTI (muxc_chan)) {			/* status change? */
-	    setFLG (muxc_dib.devno);			/* set flag */
+	    setFSR (muxc_dib.devno);			/* set flag */
 	    break;  }  }
 return;
 }
@@ -639,11 +644,11 @@ if (muxu_dev.flags & DEV_DIS) {				/* enb/dis dev */
 else {	muxl_dev.flags = muxl_dev.flags & ~DEV_DIS;
 	muxc_dev.flags = muxc_dev.flags & ~DEV_DIS;  }
 muxl_dib.cmd = muxl_dib.ctl = 0;			/* init lower */
-muxl_dib.flg = muxl_dib.fbf = 1;
+muxl_dib.flg = muxl_dib.fbf = muxl_dib.srq = 1;
 muxu_dib.cmd = muxu_dib.ctl = 0;			/* upper not */
-muxu_dib.flg = muxu_dib.fbf = 0;			/* implemented */
+muxu_dib.flg = muxu_dib.fbf = muxu_dib.srq = 0;		/* implemented */
 muxc_dib.cmd = muxc_dib.ctl = 0;			/* init ctrl */
-muxc_dib.flg = muxc_dib.fbf = 1;
+muxc_dib.flg = muxc_dib.fbf = muxc_dib.srq = 1;
 muxc_chan = muxc_scan = 0;				/* init modem scan */
 if (muxu_unit.flags & UNIT_ATT) {			/* master att? */
 	if (!sim_is_active (&muxu_unit)) {

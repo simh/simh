@@ -25,6 +25,8 @@
 
    tq		TQK50 tape controller
 
+   12-Jun-04	RMS	Fixed bug in reporting write protect (reported by Lyle Bickley)
+   18-Apr-04	RMS	Fixed TQK70 media ID and model byte (found by Robert Schaffrath)
    26-Mar-04	RMS	Fixed warnings with -std=c99
    25-Jan-04	RMS	Revised for device debug support
    19-May-03	RMS	Revised for new conditional compilation scheme
@@ -87,7 +89,7 @@ extern int32 cpu_18b, cpu_ubm;
 #define pktq		u4				/* packet queue */
 #define uf		buf				/* settable unit flags */
 #define objp		wait				/* object position */
-#define TQ_WPH(u)	(sim_tape_wrp (u))
+#define TQ_WPH(u)	((sim_tape_wrp (u))? UF_WPH: 0)
 
 #define CST_S1		0				/* init stage 1 */
 #define CST_S1_WR	1				/* stage 1 wrap */
@@ -144,8 +146,8 @@ struct tqpkt {
 #define TQ7_TYPE	1				/* TK70 */
 #define TQ7_UQPM	14				/* UQ port ID */
 #define TQ7_CMOD	14				/* ctrl ID */
-#define TQ7_UMOD	11				/* unit ID */
-#define TQ7_MED		0x6A68B046			/* media ID */
+#define TQ7_UMOD	14				/* unit ID */
+#define TQ7_MED		0x6D68B046			/* media ID */
 #define TQ7_CREV	((1 << 8) | 5)			/* ctrl revs */	
 #define TQ7_FREV	0				/* formatter revs */
 #define TQ7_UREV	0				/* unit revs */

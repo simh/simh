@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-May-04	RMS	Added SET/SHOW CONSOLE
+		RMS	Added break, delete character maps
    02-Jan-04	RMS	Removed timer routines, added Telnet console routines
 		RMS	Moved console logging to OS-independent code
    25-Apr-03	RMS	Added long seek support from Mark Pizzolato
@@ -50,9 +52,8 @@
    sim_poll_kbd	-	poll for keyboard input
    sim_putchar	-	output character to console
    sim_putchar_s -	output character to console, stall if congested
-   sim_set_telnet -	set console to Telnet port
-   sim_set_notelnet -	close console Telnet port
-   sim_show_telnet -	show console status
+   sim_set_console -	set console parameters
+   sim_show_console -	show console parameters
 
    sim_ttinit	-	called once to get initial terminal state
    sim_ttrun	-	called to put terminal into run state
@@ -62,18 +63,63 @@
    sim_os_putchar -	output character to console
 
    The first group is OS-independent; the second group is OS-dependent.
+
+   The following routines are exposed but deprecated:
+
+   sim_set_telnet -	set console to Telnet port
+   sim_set_notelnet -	close console Telnet port
+   sim_show_telnet -	show console status
 */
 
 #include "sim_defs.h"
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 
+#define KMAP_WRU	0
+#define KMAP_BRK	1
+#define KMAP_DEL	2
+#define KMAP_MASK	0377
+#define KMAP_NZ		0400
+
 int32 sim_int_char = 005;				/* interrupt character */
+int32 sim_brk_char = 000;				/* break character */
+#if defined (_WIN32) || defined (__OS2__) || (defined (__MWERKS__) && defined (macintosh))
+int32 sim_del_char = '\b';				/* delete character */
+#else
+int32 sim_del_char = 0177;
+#endif
 TMLN sim_con_ldsc = { 0 };				/* console line descr */
 TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc };		/* console line mux */
 
 extern volatile int32 stop_cpu;
+extern int32 sim_quiet;
 extern FILE *sim_log;
+extern DEVICE *sim_devices[];
+
+/* Set/show data structures */
+
+static CTAB set_con_tab[] = {
+	{ "WRU", &sim_set_kmap, KMAP_WRU | KMAP_NZ },
+	{ "BRK", &sim_set_kmap, KMAP_BRK },
+	{ "DEL", &sim_set_kmap, KMAP_DEL |KMAP_NZ },
+	{ "TELNET", &sim_set_telnet, 0 },
+	{ "NOTELNET", &sim_set_notelnet, 0 },
+	{ "LOG", &sim_set_logon, 0 },
+	{ "NOLOG", &sim_set_logoff, 0 },
+	{ NULL, NULL, 0 }  };
+
+static SHTAB show_con_tab[] = {
+	{ "WRU", &sim_show_kmap, KMAP_WRU },
+	{ "BRK", &sim_show_kmap, KMAP_BRK },
+	{ "DEL", &sim_show_kmap, KMAP_DEL },
+	{ "LOG", &sim_show_log, 0 },
+	{ "TELNET", &sim_show_telnet, 0 },
+	{ NULL, NULL, 0 }  };
+
+static int32 *cons_kmap[] = {
+	&sim_int_char,
+	&sim_brk_char,
+	&sim_del_char };
 
 /* Console I/O package.
 
@@ -83,11 +129,126 @@ extern FILE *sim_log;
    sim_con_tmxr and internal terminal line description sim_con_ldsc.
 */
 
+/* SET CONSOLE command */
+
+t_stat sim_set_console (int32 flag, char *cptr)
+{
+char *cvptr, gbuf[CBUFSIZE];
+CTAB *ctptr;
+t_stat r;
+
+if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;
+while (*cptr != 0) {					/* do all mods */
+	cptr = get_glyph_nc (cptr, gbuf, 0);		/* get modifier */
+	if (cvptr = strchr (gbuf, '=')) *cvptr++ = 0;	/* = value? */
+	get_glyph (gbuf, gbuf, 0);			/* modifier to UC */
+	if (ctptr = find_ctab (set_con_tab, gbuf)) {	/* match? */
+	    r = ctptr->action (ctptr->arg, cvptr);	/* do the rest */
+	    if (r != SCPE_OK) return r;  }
+	else return SCPE_NOPARAM;
+	}
+return SCPE_OK;
+}
+
+/* SHOW CONSOLE command */
+
+t_stat sim_show_console (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char gbuf[CBUFSIZE];
+SHTAB *shptr;
+int32 i;
+
+if (*cptr == 0) {					/* show all */
+	for (i = 0; show_con_tab[i].name; i++)
+	    show_con_tab[i].action (st, dptr, uptr, show_con_tab[i].arg, cptr);
+	return SCPE_OK;
+	}
+while (*cptr != 0) {
+	cptr = get_glyph (cptr, gbuf, ',');		/* get modifier */
+	if (shptr = find_shtab (show_con_tab, gbuf))
+	    shptr->action (st, dptr, uptr, shptr->arg, cptr);
+	else return SCPE_NOPARAM;
+	}
+return SCPE_OK;
+}
+
+/* Set keyboard map */
+
+t_stat sim_set_kmap (int32 flag, char *cptr)
+{
+DEVICE *dptr = sim_devices[0];
+int32 val, rdx;
+t_stat r;
+
+if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;
+if (dptr->dradix == 16) rdx = 16;
+else rdx = 8;
+val = (int32) get_uint (cptr, rdx, 0177, &r);
+if ((r != SCPE_OK) ||
+	((val == 0) && (flag & KMAP_NZ))) return SCPE_ARG;
+*(cons_kmap[flag & KMAP_MASK]) = val;
+return SCPE_OK;
+}
+
+/* Show keyboard map */
+
+t_stat sim_show_kmap (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+int32 rdx = 8;
+
+dptr = sim_devices[0];
+if (dptr->dradix == 16) rdx = 16;
+fprintf (st, "%s = ", show_con_tab[flag].name);
+fprint_val (st, *(cons_kmap[flag & KMAP_MASK]), rdx, 7, 0);
+fprintf (st, "\n");
+return SCPE_OK;
+}
+
+/* Set log routine */
+
+t_stat sim_set_logon (int32 flag, char *cptr)
+{
+char gbuf[CBUFSIZE];
+
+if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;	/* need arg */
+cptr = get_glyph_nc (cptr, gbuf, 0);			/* get file name */
+if (*cptr != 0) return SCPE_2MARG;			/* now eol? */
+sim_set_logoff (0, NULL);				/* close cur log */
+sim_log = sim_fopen (gbuf, "a");			/* open log */
+if (sim_log == NULL) return SCPE_OPENERR;		/* error? */
+if (!sim_quiet) printf ("Logging to file \"%s\"\n", gbuf);
+fprintf (sim_log, "Logging to file \"%s\"\n", gbuf);	/* start of log */
+return SCPE_OK;
+}
+
+/* Set nolog routine */
+
+t_stat sim_set_logoff (int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0)) return SCPE_2MARG;		/* now eol? */
+if (sim_log == NULL) return SCPE_OK;			/* no log? */
+if (!sim_quiet) printf ("Log file closed\n");
+fprintf (sim_log, "Log file closed\n");			/* close log */
+fclose (sim_log);
+sim_log = NULL;
+return SCPE_OK;
+}
+
+/* Show log status */
+
+t_stat sim_show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0)) return SCPE_2MARG;
+if (sim_log) fputs ("Logging enabled\n", st);
+else fputs ("Logging disabled\n", st);
+return SCPE_OK;
+}
+
 /* Set console to Telnet port */
 
 t_stat sim_set_telnet (int32 flg, char *cptr)
 {
-if (*cptr == 0) return SCPE_2FARG;			/* too few arguments? */
+if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;	/* too few arguments? */
 if (sim_con_tmxr.master) return SCPE_ALATT;		/* already open? */
 return tmxr_open_master (&sim_con_tmxr, cptr);		/* open master socket */
 }
@@ -284,6 +445,7 @@ status = sys$qiow (EFN, tty_chan,
 	&iosb, 0, 0, buf, 1, 0, term, 0, 0);
 if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_OK;
 if (buf[0] == sim_int_char) return SCPE_STOP;
+if (sim_brk_char && (buf[0] == sim_brk_char)) return SCPE_BREAK;
 return (buf[0] | SCPE_KFLAG);
 }
 
@@ -349,8 +511,9 @@ if (sim_win_ctlc) {
 	return 003 | SCPE_KFLAG;  }
 if (!_kbhit ()) return SCPE_OK;
 c = _getch ();
-if ((c & 0177) == '\b') c = 0177;
+if ((c & 0177) == sim_del_char) c = 0177;
 if ((c & 0177) == sim_int_char) return SCPE_STOP;
+if (sim_brk_char && ((c & 0177) == sim_brk_char)) return SCPE_BREAK;
 return c | SCPE_KFLAG;
 }
 
@@ -392,8 +555,9 @@ int c;
 
 if (!kbhit ()) return SCPE_OK;
 c = getch();
-if ((c & 0177) == '\b') c = 0177;
+if ((c & 0177) == sim_del_char) c = 0177;
 if ((c & 0177) == sim_int_char) return SCPE_STOP;
+if (sim_brk_char && ((c & 0177) == sim_brk_char)) return SCPE_BREAK;
 return c | SCPE_KFLAG;
 }
 
@@ -561,8 +725,9 @@ int c;
 
 if (!ps_kbhit ()) return SCPE_OK;
 c = ps_getch();
-if ((c & 0177) == '\b') c = 0177;
+if ((c & 0177) == sim_del_char) c = 0177;
 if ((c & 0177) == sim_int_char) return SCPE_STOP;
+if (sim_brk_char && ((c & 0177) == sim_brk_char)) return SCPE_BREAK;
 return c | SCPE_KFLAG;
 }
 
@@ -644,6 +809,7 @@ unsigned char buf[1];
 
 status = read (0, buf, 1);
 if (status != 1) return SCPE_OK;
+if (sim_brk_char && (buf[0] == sim_brk_char)) return SCPE_BREAK;
 else return (buf[0] | SCPE_KFLAG);
 }
 
@@ -741,6 +907,7 @@ unsigned char buf[1];
 
 status = read (0, buf, 1);
 if (status != 1) return SCPE_OK;
+if (sim_brk_char && (buf[0] == sim_brk_char)) return SCPE_BREAK;
 else return (buf[0] | SCPE_KFLAG);
 }
 

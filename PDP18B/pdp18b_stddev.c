@@ -29,6 +29,7 @@
    tto		teleprinter
    clk		clock
 
+   28-May-04	RMS	Removed SET TTI CTRL-C
    16-Feb-04	RMS	Fixed bug in hardware read-in mode bootstrap
    14-Jan-04	RMS	Revised IO device call interface
 			CAF does not turn off the clock
@@ -37,7 +38,7 @@
 			Added hardware read-in mode support for PDP-7/9/15
    25-Apr-03	RMS	Revised for extended file support
    14-Mar-03	RMS	Clean up flags on detach
-   01-Mar-03	RMS	Added SET/SHOW CLK FREQ support, SET TTI CTRL-C support
+   01-Mar-03	RMS	Added SET/SHOW CLK freq, SET TTI CTRL-C
    22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7B/8B support to terminal
    05-Oct-02	RMS	Added DIBs, device number support, IORS call
@@ -106,7 +107,6 @@ t_stat ptr_detach (UNIT *uptr);
 t_stat ptp_detach (UNIT *uptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
 
@@ -292,7 +292,6 @@ MTAB tti_mod[] = {
 	{ UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
 	{ UNIT_HDX, 0       , "full duplex", "FDX", NULL },
 	{ UNIT_HDX, UNIT_HDX, "half duplex", "HDX", NULL },
-	{ MTAB_XTD|MTAB_VDV|MTAB_VUN, 0, NULL, "CTRL-C", &tti_set_ctrlc, NULL, NULL },
 #endif
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_devno, NULL },
 	{ 0 }  };

@@ -730,15 +730,6 @@ return 0;						/* q can't be empty */
 #define MVC_FILL	3				/* must be 3 */
 #define MVC_M_STATE	3
 #define MVC_V_CC	2
-#define STR_V_DPC	24
-#define STR_M_DPC	0xFF
-#define STR_V_CHR	16
-#define STR_M_CHR	0xFF
-#define STR_LNMASK	0xFFFF
-#define STR_GETDPC(x)	(((x) >> STR_V_DPC) & STR_M_DPC)
-#define STR_GETCHR(x)	(((x) >> STR_V_CHR) & STR_M_CHR)
-#define STR_PACK(m,x)	((((PC - fault_PC) & STR_M_DPC) << STR_V_DPC) | \
-			(((m) & STR_M_CHR) << STR_V_CHR) | ((x) & STR_LNMASK))
 
 /* MOVC3, MOVC5
 

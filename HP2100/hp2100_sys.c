@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   01-Jun-04	RMS	Added latent 13037 support
+   19-Apr-04	RMS	Recognize SFS x,C and SFC x,C
    22-Mar-02	RMS	Revised for dynamically allocated memory
    14-Feb-02	RMS	Added DMS instructions
    04-Feb-02	RMS	Fixed bugs in alter/skip display and parsing
@@ -50,6 +52,7 @@ extern DEVICE msd_dev, msc_dev;
 extern DEVICE dpd_dev, dpc_dev;
 extern DEVICE dqd_dev, dqc_dev;
 extern DEVICE drd_dev, drc_dev;
+extern DEVICE ds_dev;
 extern DEVICE muxl_dev, muxu_dev, muxc_dev;
 extern DEVICE ipli_dev, iplo_dev;
 extern REG cpu_reg[];
@@ -66,6 +69,8 @@ extern uint16 *M;
 */
 
 char sim_name[] = "HP 2100";
+
+char halt_msg[] = "HALT instruction xxxxxx";
 
 REG *sim_PC = &cpu_reg[0];
 
@@ -84,6 +89,7 @@ DEVICE *sim_devices[] = {
 	&dpd_dev, &dpc_dev,
 	&dqd_dev, &dqc_dev,
 	&drd_dev, &drc_dev,
+	&ds_dev,
 	&mtd_dev, &mtc_dev,
 	&msd_dev, &msc_dev,
 	&muxl_dev, &muxu_dev, &muxc_dev,
@@ -94,7 +100,7 @@ const char *sim_stop_messages[] = {
 	"Unknown error",
 	"Unimplemented instruction",
 	"Non-existent I/O device",
-	"HALT instruction",
+	halt_msg,
 	"Breakpoint",
 	"Indirect address loop",
 	"Indirect address interrupt (should not happen!)",
@@ -231,7 +237,7 @@ static const int32 opc_val[] = {
  0105100+I_NPN, 0105120+I_NPN,
  0102101+I_NPN, 0103101+I_NPN, 0102201+I_NPC, 0102301+I_NPC,
  0102000+I_IO1, 0102100+I_IO2, 0103100+I_IO2,
- 0102200+I_IO2, 0102300+I_IO2, 0102400+I_IO1, 0106400+I_IO1,
+ 0102200+I_IO1, 0102300+I_IO1, 0102400+I_IO1, 0106400+I_IO1,
  0102500+I_IO1, 0106500+I_IO1, 0102600+I_IO1, 0106600+I_IO1,
  0102700+I_IO1, 0106700+I_IO1,
  0101710+I_NPN, 0101711+I_NPN, 0101712+I_NPN, 0101713+I_NPN,

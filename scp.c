@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-May-04	RMS	Added SET/SHOW CONSOLE
    14-Feb-04	RMS	Updated SAVE/RESTORE (V3.2)
 		RMS	Added debug print routines (from Dave Hittner)
 		RMS	Added sim_vm_parse_addr and sim_vm_fprint_addr
@@ -247,8 +248,6 @@ t_stat spawn_cmd (int32 flag, char *ptr);
 
 /* Set and show command processors */
 
-t_stat set_logon (int32 flag, char *cptr);
-t_stat set_logoff (int32 flag, char *cptr);
 t_stat set_debon (int32 flag, char *cptr);
 t_stat set_deboff (int32 flag, char *cptr);
 t_stat set_dev_radix (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
@@ -261,7 +260,6 @@ t_stat show_queue (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_time (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_mod_names (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_log_names (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-t_stat show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_dev_radix (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
@@ -305,10 +303,7 @@ void fprint_help (FILE *st);
 void fprint_stopped (FILE *st, t_stat r);
 void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr);
 char *read_line (char *ptr, int32 size, FILE *stream);
-CTAB *find_ctab (CTAB *tab, char *gbuf);
-C1TAB *find_c1tab (C1TAB *tab, char *gbuf);
 CTAB *find_cmd (char *gbuf);
-SHTAB *find_shtab (SHTAB *tab, char *gbuf);
 DEVICE *find_dev (char *ptr);
 DEVICE *find_unit (char *ptr, UNIT **uptr);
 REG *find_reg_glob (char *ptr, char **optr, DEVICE **gdptr);
@@ -492,10 +487,7 @@ static CTAB cmd_table[] = {
 	{ "QUIT", &exit_cmd, 0, NULL },
 	{ "BYE", &exit_cmd, 0, NULL },
 	{ "SET", &set_cmd, 0,
-	  "set log <file>           enable logging to file\n"
-	  "set nolog                disable logging\n"
-	  "set telnet <port>        enable Telnet port for console\n"
-	  "set notelnet             disable Telnet for console\n"
+	  "set console arg{,arg...} set console options\n"
 	  "set debug <file>         enable debug output to file\n"
 	  "set nodebug              disable debug output\n"
 	  "set <dev> OCT|DEC|HEX    set device display radix\n"
@@ -510,14 +502,13 @@ static CTAB cmd_table[] = {
 	  },
 	{ "SHOW", &show_cmd, 0,
 	  "sh{ow} br{eak} <list>    show breakpoints on address list\n"
-	  "sh{ow} c{onfiguration}   show configuration\n"
+	  "sh{ow} con{figuration}   show configuration\n"
+	  "sh{ow} cons{ole} {arg}   show console options\n"
 	  "sh{ow} deb{ug}           show debugging output\n" 
 	  "sh{ow} dev{ices}         show devices\n"  
-	  "sh{ow} l{og}             show log\n"  
 	  "sh{ow} m{odifiers}       show modifiers\n" 
 	  "sh{ow} n{ames}           show logical names\n" 
 	  "sh{ow} q{ueue}           show event queue\n"  
-	  "sh{ow} te{lnet}          show console Telnet status\n"  
 	  "sh{ow} ti{me}            show simulated time\n"  
 	  "sh{ow} ve{rsion}         show simulator version\n" 
 	  "sh{ow} <dev> RADIX       show device display radix\n"
@@ -634,8 +625,8 @@ while (stat != SCPE_EXIT) {				/* in case exit */
 	}						/* end while */
 
 detach_all (0, TRUE);					/* close files */
-set_logoff (0, NULL);					/* close log */
 set_deboff (0, NULL);					/* close debug */
+sim_set_logoff (0, NULL);				/* close log */
 sim_set_notelnet (0, NULL);				/* close Telnet */
 sim_ttclose ();						/* close console */
 return 0;
@@ -802,10 +793,11 @@ CTAB *gcmdp;
 C1TAB *ctbr, *glbr;
 
 static CTAB set_glob_tab[] = {
-	{ "TELNET", &sim_set_telnet, 0 },
-	{ "NOTELNET", &sim_set_notelnet, 0 },
-	{ "LOG", &set_logon, 0 },
-	{ "NOLOG", &set_logoff, 0 },
+	{ "CONSOLE", &sim_set_console, 0 },
+	{ "TELNET", &sim_set_telnet, 0 },		/* deprecated */
+	{ "NOTELNET", &sim_set_notelnet, 0 },		/* deprecated */
+	{ "LOG", &sim_set_logon, 0 },			/* deprecated */
+	{ "NOLOG", &sim_set_logoff, 0 },		/* deprecated */
 	{ "BREAK", &brk_cmd, SSH_ST },
 	{ "DEBUG", &set_debon, 0 },
 	{ "NODEBUG", &set_deboff, 0 },
@@ -903,36 +895,6 @@ C1TAB *find_c1tab (C1TAB *tab, char *gbuf)
 for (; tab->name != NULL; tab++) {
     if (MATCH_CMD (gbuf, tab->name) == 0) return tab;  }
 return NULL;
-}
-
-/* Log on routine */
-
-t_stat set_logon (int32 flag, char *cptr)
-{
-char gbuf[CBUFSIZE];
-
-if (*cptr == 0) return SCPE_2FARG;			/* need arg */
-cptr = get_glyph_nc (cptr, gbuf, 0);			/* get file name */
-if (*cptr != 0) return SCPE_2MARG;			/* now eol? */
-set_logoff (0, NULL);					/* close cur log */
-sim_log = sim_fopen (gbuf, "a");			/* open log */
-if (sim_log == NULL) return SCPE_OPENERR;		/* error? */
-if (!sim_quiet) printf ("Logging to file \"%s\"\n", gbuf);
-fprintf (sim_log, "Logging to file \"%s\"\n", gbuf);	/* start of log */
-return SCPE_OK;
-}
-
-/* Log off routine */
-
-t_stat set_logoff (int32 flag, char *cptr)
-{
-if (cptr && (*cptr != 0)) return SCPE_2MARG;		/* now eol? */
-if (sim_log == NULL) return SCPE_OK;			/* no log? */
-if (!sim_quiet) printf ("Log file closed\n");
-fprintf (sim_log, "Log file closed\n");			/* close log */
-fclose (sim_log);
-sim_log = NULL;
-return SCPE_OK;
 }
 
 /* Set device data radix routine */
@@ -1064,8 +1026,9 @@ static SHTAB show_glob_tab[] = {
 	{ "MODIFIERS", &show_mod_names, 0 },
 	{ "NAMES", &show_log_names, 0 },
 	{ "VERSION", &show_version, 0 },
-	{ "LOG", &show_log, 0 },
-	{ "TELNET", &sim_show_telnet, 0 },
+	{ "CONSOLE", &sim_show_console, 0 },
+	{ "LOG", &sim_show_log, 0 },			/* deprecated */
+	{ "TELNET", &sim_show_telnet, 0 },		/* deprecated */
 	{ "BREAK", &show_break, 0 },
 	{ "DEBUG", &show_debug, 0 },
 	{ NULL, NULL, 0 }  };
@@ -1280,14 +1243,6 @@ t_stat show_time (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 if (cptr && (*cptr != 0)) return SCPE_2MARG;
 fprintf (st, "Time:	%.0f\n", sim_time);
-return SCPE_OK;
-}
-
-t_stat show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
-{
-if (cptr && (*cptr != 0)) return SCPE_2MARG;
-if (sim_log) fputs ("Logging enabled\n", st);
-else fputs ("Logging disabled\n", st);
 return SCPE_OK;
 }
 

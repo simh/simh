@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Sample Software Packages
-Date:	15-Jan-2004
+Date:	06-Apr-2004
 
 This memorandum documents the sample software packages available to run
 with the SIMH simulators.  Many of these packages are available under
@@ -176,7 +176,7 @@ the license.
 
 UNIX V5 is contained on a single RK05 disk image.  To boot UNIX:
 
-	sim> set cpu 18b
+	sim> set cpu u18
 	sim> att rk0 unix_v5_rk.dsk
 	sim> boot rk
 	@unix
@@ -187,7 +187,7 @@ UNIX V5 is contained on a single RK05 disk image.  To boot UNIX:
 
 UNIX V6 is contained on four RK05 disk images.  To boot UNIX:
 
-	sim> set cpu 18b
+	sim> set cpu u18
 	sim> att rk0 unix0_v6_rk.dsk
 	sim> att rk1 unix1_v6_rk.dsk
 	sim> att rk2 unix2_v6_rk.dsk
@@ -201,7 +201,7 @@ UNIX V6 is contained on four RK05 disk images.  To boot UNIX:
 
 UNIX V7 is contained on a single RL02 disk image.  To boot UNIX:
 
-	sim> set cpu 18b
+	sim> set cpu u18
 	sim> set rl0 RL02
 	sim> att rl0 unix_v7_rl.dsk
 	sim> boot rl0
@@ -212,7 +212,7 @@ UNIX V7 is contained on a single RL02 disk image.  To boot UNIX:
 
 A smaller image is contained on a single RK05 disk image.  To boot UNIX:
 
-	sim> set cpu 18b
+	sim> set cpu u18
 	sim> att rk0 unix_v7_rk.dsk
 	sim> boot rk0
 	@boot

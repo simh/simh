@@ -25,6 +25,7 @@
 
    tti,tto	KL8E terminal input/output
 
+   28-May-04	RMS	Removed SET TTI CTRL-C
    29-Dec-03	RMS	Added console output backpressure support
    25-Apr-03	RMS	Revised for extended file support
    02-Mar-02	RMS	Added SET TTI CTRL-C
@@ -51,7 +52,6 @@ t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
-t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* TTI data structures
@@ -80,7 +80,6 @@ MTAB tti_mod[] = {
 	{ UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", &tty_set_mode },
 	{ UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
 	{ UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
-	{ MTAB_XTD|MTAB_VDV|MTAB_VUN, 0, NULL, "CTRL-C", &tti_set_ctrlc, NULL, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_dev, NULL },
 	{ 0 }  };
 
@@ -184,18 +183,6 @@ dev_done = dev_done & ~INT_TTI;				/* clear done, int */
 int_req = int_req & ~INT_TTI;
 int_enable = int_enable | INT_TTI;			/* set enable */
 sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
-return SCPE_OK;
-}
-
-/* Set control-C */
-
-t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-if (cptr) return SCPE_ARG;
-uptr->buf = (uptr->flags & UNIT_KSR)? 0203: 0003;
-uptr->pos = uptr->pos + 1;
-dev_done = dev_done | INT_TTI;				/* set done */
-int_req = INT_UPDATE;					/* update interrupts */
 return SCPE_OK;
 }
 

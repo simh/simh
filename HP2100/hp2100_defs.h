@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Apr-04	RMS	Added additional IBL definitions
+			Added DMA EDT I/O pseudo-opcode
    25-Apr-03	RMS	Revised for extended file support
    24-Oct-02	RMS	Added indirect address interrupt
    08-Feb-02	RMS	Added DMS definitions
@@ -81,7 +83,7 @@
 
 /* Other instructions */
 
-#define I_NMRMASK	0102000				/* non-mrf opcode */
+#define I_NMRMASK	0172000				/* non-mrf opcode */
 #define I_SRG		0000000				/* shift */
 #define I_ASKP		0002000				/* alter/skip */
 #define I_EXTD		0100000				/* extend */
@@ -98,9 +100,9 @@
 #define DMA2_OI		0100000				/* DMA - output/input */
 
 struct DMA {						/* DMA channel */
-	int32	cw1;					/* device select */
-	int32	cw2;					/* direction, address */
-	int32	cw3;					/* word count */
+	uint32	cw1;					/* device select */
+	uint32	cw2;					/* direction, address */
+	uint32	cw3;					/* word count */
 };
 
 /* Memory management */
@@ -123,18 +125,17 @@ struct DMA {						/* DMA channel */
 #define PAMAP		(UMAP + MAP_LNT)		/* port A map */
 #define PBMAP		(PAMAP + MAP_LNT)		/* port B map */
 
-/* Map entries are left shifted by VA_N_OFF, flags in lower 2b */
+/* DMS map entries */
 
-#define PA_N_PAG	(PA_N_SIZE - VA_N_OFF)		/* page width */
-#define PA_V_PAG	(VA_N_OFF)
-#define PA_M_PAG	((1 << PA_N_PAG) - 1)
-#define MAPM_V_RPR	15				/* in mem: read prot */
-#define MAPM_V_WPR	14				/* write prot */
-#define MAPA_V_RPR	1				/* in array: */
-#define MAPA_V_WPR	0
-#define PA_GETPAG(x)	((x) & (PA_M_PAG << VA_V_PAG))
-#define RD		(1 << MAPA_V_RPR)
-#define WR		(1 << MAPA_V_WPR)
+#define MAP_V_RPR	15				/* read prot */
+#define MAP_V_WPR	14				/* write prot */
+#define RD		(1 << MAP_V_RPR)
+#define WR		(1 << MAP_V_WPR)
+#define MAP_MBZ		0036000				/* must be zero */
+#define MAP_N_PAG	(PA_N_SIZE - VA_N_OFF)		/* page width */
+#define MAP_V_PAG	(VA_N_OFF)
+#define MAP_M_PAG	((1 << MAP_N_PAG) - 1)
+#define MAP_GETPAG(x)	(((x) & MAP_M_PAG) << MAP_V_PAG)
 
 /* Map status register */
 
@@ -148,8 +149,8 @@ struct DMA {						/* DMA channel */
 
 /* Map violation register */
 
-#define MVI_V_RPR	15
-#define MVI_V_WPR	14
+#define MVI_V_RPR	15				/* must be same as */
+#define MVI_V_WPR	14				/* MAP_V_xPR */
 #define MVI_RPR		(1 << MVI_V_RPR)		/* rd viol */
 #define MVI_WPR		(1 << MVI_V_WPR)		/* wr viol */
 #define MVI_BPG		0020000				/* base page viol */
@@ -174,6 +175,7 @@ struct DMA {						/* DMA channel */
 #define ioLIX		5				/* load into A/B */
 #define ioOTX		6				/* output from A/B */
 #define ioCTL		7				/* set/clear control */
+#define ioEDT		8				/* DMA: end data transfer */
 
 /* I/O devices - fixed assignments */
 
@@ -211,31 +213,39 @@ struct DMA {						/* DMA channel */
 #define MSC		031				/* 13181A control */
 #define IPLI		032				/* 12556B link in */
 #define IPLO		033				/* 12556B link out */
+#define DS		034				/* 13037 control */
 #define MUXL		040				/* 12920A lower data */
 #define MUXU		041				/* 12920A upper data */
 #define MUXC		042				/* 12920A control */
 
 /* IBL assignments */
 
+#define IBL_V_SEL	14				/* ROM select */
+#define IBL_M_SEL	03
 #define IBL_PTR		0000000				/* PTR */
-#define IBL_DP		0040000				/* DP */
-#define IBL_DQ		0060000				/* DQ */
-#define IBL_MS		0100000				/* MS */
-#define IBL_TBD		0140000				/* tbd */
+#define IBL_DP		0040000				/* disk: DP */
+#define IBL_DQ		0060000				/* disk: DQ */
+#define IBL_MS		0100000				/* option 0: MS */
+#define IBL_DS		0140000				/* option 1: DS */
+#define IBL_MAN		0010000				/* RPL/man boot */
 #define IBL_V_DEV	6				/* dev in <11:6> */
-#define IBL_FIX		0000001				/* DP fixed */
+#define IBL_OPT		0000070				/* options in <5:3> */
+#define IBL_DP_REM	0000001				/* DP removable */
 #define IBL_LNT		64				/* boot length */
 #define IBL_MASK	(IBL_LNT - 1)			/* boot length mask */
+#define IBL_DPC		(IBL_LNT - 2)			/* DMA ctrl word */
+#define IBL_END		(IBL_LNT - 1)			/* last location */
 
 /* Dynamic device information table */
 
 struct hp_dib {
-	int32	devno;					/* device number */
-	int32	cmd;					/* saved command */
-	int32	ctl;					/* saved control */
-	int32	flg;					/* saved flag */
-	int32	fbf;					/* saved flag buf */
-	int32	(*iot)();				/* I/O routine */
+	uint32	devno;					/* device number */
+	uint32	cmd;					/* saved command */
+	uint32	ctl;					/* saved control */
+	uint32	flg;					/* saved flag */
+	uint32	fbf;					/* saved flag buf */
+	uint32	srq;					/* saved svc req */
+	int32	(*iot)(int32 op, int32 ir, int32 dat);	/* I/O routine */
 };
 
 typedef struct hp_dib DIB;
@@ -254,16 +264,24 @@ typedef struct hp_dib DIB;
 			setFBF(D)
 #define clrFLG(D)	dev_flg[(D)/32] = dev_flg[(D)/32] & ~INT_M (D); \
 			clrFBF(D)
+#define setFSR(D)	dev_flg[(D)/32] = dev_flg[(D)/32] | INT_M (D); \
+			setFBF(D); setSRQ(D)
+#define clrFSR(D)	dev_flg[(D)/32] = dev_flg[(D)/32] & ~INT_M (D); \
+			clrFBF(D); clrSRQ(D)
+#define setSRQ(D)	dev_srq[(D)/32] = dev_srq[(D)/32] | INT_M ((D))
+#define clrSRQ(D)	dev_srq[(D)/32] = dev_srq[(D)/32] & ~INT_M (D)
 #define CMD(D)		((dev_cmd[(D)/32] >> INT_V (D)) & 1)
 #define CTL(D)		((dev_ctl[(D)/32] >> INT_V (D)) & 1)
 #define FLG(D)		((dev_flg[(D)/32] >> INT_V (D)) & 1)
 #define FBF(D)		((dev_fbf[(D)/32] >> INT_V (D)) & 1)
+#define SRQ(D)		((dev_srq[(D)/32] >> INT_V (D)) & 1)
 
 #define IOT_V_REASON	16
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* stop on error */
 
 /* Function prototypes */
 
+t_stat ibl_copy (const uint16 pboot[IBL_LNT], int32 dev);
 t_stat hp_setdev (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
 void hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);

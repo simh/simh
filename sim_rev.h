@@ -29,38 +29,96 @@
 
 #define	SIM_MAJOR	3
 #define SIM_MINOR	2
-#define SIM_PATCH	0
+#define SIM_PATCH	1
 
 /* V3.2 revision history 
 
 patch	date		module(s) and fix(es)
 
-  0	tbd		scp.c:
-			-- added sim_vm_parse_addr and sim_vm_fprint_addr
-			-- added REG_VMAD
-			-- moved console logging to SCP
-			-- changed sim_fsize to use descriptor rather than name
-			-- added global device/unit show modifiers
-			-- added device debug support (Dave Hittner)
-			-- moved device and unit flags, updated save format
+  1	10-Jul-04	scp.c: added SET/SHOW CONSOLE subhierarchy
+
+			hp2100_cpu.c: fixed bugs and added features from Dave Bryan
+			- SBT increments B after store
+			- DMS console map must check dms_enb
+			- SFS x,C and SFC x,C work
+			- MP violation clears automatically on interrupt
+			- SFS/SFC 5 is not gated by protection enabled
+			- DMS enable does not disable mem prot checks
+			- DMS status inconsistent at simulator halt
+			- Examine/deposit are checking wrong addresses
+			- Physical addresses are 20b not 15b
+			- Revised DMS to use memory rather than internal format
+			- Added instruction printout to HALT message
+			- Added M and T internal registers
+			- Added N, S, and U breakpoints
+			Revised IBL facility to conform to microcode
+			Added DMA EDT I/O pseudo-opcode
+			Separated DMA SRQ (service request) from FLG
+
+			all HP2100 peripherals:
+			- revised to make SFS x,C and SFC x,C work
+			- revised to separate SRQ from FLG
+
+			all HP2100 IBL bootable peripherals:
+			- revised boot ROMs to use IBL facility
+			- revised SR values to preserve SR<5:3>
+
+			hp2100_lps.c, hp2100_lpt.c: fixed timing
+			
+			hp2100_dp.c: fixed interpretation of SR<0>
+
+			hp2100_dr.c: revised boot code to use IBL algorithm
+
+			hp2100_mt.c, hp2100_ms.c: fixed spurious timing error after CLC
+			 (found by Dave Bryan)
+
+			hp2100_stddev.c:
+			- fixed input behavior during typeout for RTE-IV
+			- suppressed nulls on TTY output for RTE-IV
+
+			hp2100_sys.c: added SFS x,C and SFC x,C to print/parse routines
+
+			pdp10_fe.c, pdp11_stddev.c, pdp18b_stddev.c, pdp8_tt.c, vax_stddev.c:
+			- removed SET TTI CTRL-C option
+
+			pdp11_tq.c:
+			- fixed bug in reporting write protect (reported by Lyle Bickley)
+			- fixed TK70 model number and media ID (found by Robert Schaffrath)
+
+			pdp11_vh.c: added DHQ11 support (from John Dundas)
+
+			pdp11_io.c, vax_io.c: fixed DHQ11 autoconfigure (from John Dundas)
+
+			pdp11_sys.c, vax_sys.c: added DHQ11 support (from John Dundas)
+
+			vax_cpu.c: fixed bug in DIVBx, DIVWx (reported by Peter Trimmel)
+
+  0	04-Apr-04	scp.c:
+			- added sim_vm_parse_addr and sim_vm_fprint_addr
+			- added REG_VMAD
+			- moved console logging to SCP
+			- changed sim_fsize to use descriptor rather than name
+			- added global device/unit show modifiers
+			- added device debug support (Dave Hittner)
+			- moved device and unit flags, updated save format
 
 			sim_ether.c:
-			-- further generalizations (Dave Hittner, Mark Pizzolato)
+			- further generalizations (Dave Hittner, Mark Pizzolato)
 
 			sim_tmxr.h, sim_tmxr.c:
-			-- added tmxr_linemsg
-			-- changed TMXR definition to support variable number of lines
+			- added tmxr_linemsg
+			- changed TMXR definition to support variable number of lines
 
 			sim_libraries:
-			-- new console library (sim_console.h, sim_console.c)
-			-- new file I/O library (sim_fio.h, sim_fio.c)
-			-- new timer library (sim_timer.h, sim_timer.c)
+			- new console library (sim_console.h, sim_console.c)
+			- new file I/O library (sim_fio.h, sim_fio.c)
+			- new timer library (sim_timer.h, sim_timer.c)
 
 			all terminal multiplexors: revised for tmxr library changes
 
 			all DECtapes:
-			-- added STOP_EOR to enable end-of-reel stop
-			-- revised for device debug support
+			- added STOP_EOR to enable end-of-reel stop
+			- revised for device debug support
 
 			all variable-sized devices: revised for sim_fsize change
 
@@ -68,7 +126,7 @@ patch	date		module(s) and fix(es)
 			   (found by Bruce Ray)
 
 			nova_defs.h, nova_sys.c, nova_qty.c:
-			-- added QTY and ALM support (Bruce Ray)
+			- added QTY and ALM support (Bruce Ray)
 
 			id32_cpu.c, id_dp.c: revised for device debug support
 
@@ -77,15 +135,15 @@ patch	date		module(s) and fix(es)
 			pdp1_sys.c: fixed bug in LOAD (found by Mark Crispin)
 
 			pdp10_mdfp.c:
-			-- fixed bug in floating unpack
-			-- fixed bug in FIXR (found by Philip Stone, fixed by Chris Smith)
+			- fixed bug in floating unpack
+			- fixed bug in FIXR (found by Philip Stone, fixed by Chris Smith)
 
 			pdp11_dz.c: added per-line logging
 
 			pdp11_rk.c:
-			-- added formatting support
-			-- added address increment inhibit support
-			-- added transfer overrun detection
+			- added formatting support
+			- added address increment inhibit support
+			- added transfer overrun detection
 
 			pdp11_hk.c, pdp11_rp.c: revised for device debug support
 
@@ -98,27 +156,27 @@ patch	date		module(s) and fix(es)
 			pdp11_xu.c: replaced stub with real implementation (Dave Hittner)
 
 			pdp18b_cpu.c:
-			-- fixed bug in XVM g_mode implementation
-			-- fixed bug in PDP-15 indexed address calculation
-			-- fixed bug in PDP-15 autoindexed address calculation
+			- fixed bug in XVM g_mode implementation
+			- fixed bug in PDP-15 indexed address calculation
+			- fixed bug in PDP-15 autoindexed address calculation
 
 			pdp18b_fpp.c: fixed bugs in instruction decode
 
 			pdp18b_stddev.c:
-			-- fixed clock response to CAF
-			-- fixed bug in hardware read-in mode bootstrap
+			- fixed clock response to CAF
+			- fixed bug in hardware read-in mode bootstrap
 
 			pdp18b_sys.c: fixed XVM instruction decoding errors
 
 			pdp18b_tt1.c: added support for 1-16 additional terminals
 
 			vax_moddef.h, vax_cpu.c, vax_sysdev.c:
-			-- added extended physical memory support (Mark Pizzolato)
-			-- added RXV21 support
+			- added extended physical memory support (Mark Pizzolato)
+			- added RXV21 support
 
 			vax_cpu1.c:
-			-- added PC read fault in EXTxV
-			-- fixed PC write fault in INSV
+			- added PC read fault in EXTxV
+			- fixed PC write fault in INSV
 
 /* V3.1 revision history
 
@@ -127,29 +185,29 @@ patch	date		module(s) and fix(es)
 			all console emulators: added output stall support
 
 			sim_ether.c (Dave Hittner, Mark Pizzolato, Anders Ahgren):
-			-- added Alpha/VMS support
-			-- added FreeBSD, Mac OS/X support
-			-- added TUN/TAP support
-			-- added DECnet duplicate address detection
+			- added Alpha/VMS support
+			- added FreeBSD, Mac OS/X support
+			- added TUN/TAP support
+			- added DECnet duplicate address detection
 
 			all memory buffered devices (fixed head disks, floppy disks):
-			-- cleaned up buffer copy code
+			- cleaned up buffer copy code
 
 			all DECtapes:
-			-- fixed reverse checksum in read all
-			-- added DECtape off reel message
-			-- simplified timing
+			- fixed reverse checksum in read all
+			- added DECtape off reel message
+			- simplified timing
 
 			eclipse_cpu.c (Charles Owen):
-			-- added floating point support
-			-- added programmable interval timer support
-			-- bug fixes
+			- added floating point support
+			- added programmable interval timer support
+			- bug fixes
 
 			h316_cpu.c:
-			-- added instruction history
-			-- added DMA/DMC support
-			-- added device ENABLE/DISABLE support
-			-- change default to HSA option included
+			- added instruction history
+			- added DMA/DMC support
+			- added device ENABLE/DISABLE support
+			- change default to HSA option included
 
 			h316_dp.c: added moving head disk support
 
@@ -160,115 +218,115 @@ patch	date		module(s) and fix(es)
 			h316_sys.c: added new device support
 
 			nova_dkp.c (Charles Owen):
-			-- fixed bug in flag clear sequence
-			-- added diagnostic mode support for disk sizing
+			- fixed bug in flag clear sequence
+			- added diagnostic mode support for disk sizing
 
 `			nova_mt.c (Charles Owen):
-			-- fixed bug, space operations return record count
-			-- fixed bug, reset doesn't cancel rewind
+			- fixed bug, space operations return record count
+			- fixed bug, reset doesn't cancel rewind
 
 			nova_sys.c: added floating point, timer support (from Charles Owen)
 
 			i1620_cpu.c: fixed bug in branch digit (found by Dave Babcock)
 
 			pdp1_drm.c:
-			-- added parallel drum support
-			-- fixed bug in serial drum instructin decoding
+			- added parallel drum support
+			- fixed bug in serial drum instructin decoding
 
 			pdp1_sys.c: added parallel drum support, mnemonics
 
 			pdp11_cpu.c:
-			-- added autoconfiguration controls
-			-- added support for 18b-only Qbus devices
-			-- cleaned up addressing/bus definitions
+			- added autoconfiguration controls
+			- added support for 18b-only Qbus devices
+			- cleaned up addressing/bus definitions
 
 			pdp11_rk.c, pdp11_ry.c, pdp11_tm.c, pdp11_hk.c:
-			-- added Q18 attribute
+			- added Q18 attribute
 
 			pdp11_io.c:
-			-- added autoconfiguration controls
-			-- fixed bug in I/O configuration (found by Dave Hittner)
+			- added autoconfiguration controls
+			- fixed bug in I/O configuration (found by Dave Hittner)
 
 			pdp11_rq.c:
-			-- revised MB->LBN conversion for greater accuracy
-			-- fixed bug with multiple RAUSER drives
+			- revised MB->LBN conversion for greater accuracy
+			- fixed bug with multiple RAUSER drives
 
 			pdp11_tc.c: changed to be off by default (base config is Qbus)
 
 			pdp11_xq.c (Dave Hittner, Mark Pizzolato):
-			-- fixed second controller interrupts
-			-- fixed bugs in multicast and promiscuous setup
+			- fixed second controller interrupts
+			- fixed bugs in multicast and promiscuous setup
   
 			pdp18b_cpu.c:
-			-- added instruction history
-			-- fixed PDP-4,-7,-9 autoincrement bug
-			-- change PDP-7,-9 default to API option included
+			- added instruction history
+			- fixed PDP-4,-7,-9 autoincrement bug
+			- change PDP-7,-9 default to API option included
 
 			pdp8_defs.h, pdp8_sys.c:
-			-- added DECtape off reel message
-			-- added support for TSC8-75 (ETOS) option
-			-- added support for TD8E controller
+			- added DECtape off reel message
+			- added support for TSC8-75 (ETOS) option
+			- added support for TD8E controller
 
 			pdp8_cpu.c: added instruction history
 
 			pdp8_rx.c:
-			-- fixed bug in RX28 read status (found by Charles Dickman)
-			-- fixed double density write
+			- fixed bug in RX28 read status (found by Charles Dickman)
+			- fixed double density write
 
 			pdp8_td.c: added TD8E controller
 
 			pdp8_tsc.c: added TSC8-75 option
 
 			vax_cpu.c:
-			-- revised instruction history for dynamic sizing
-			-- added autoconfiguration controls
+			- revised instruction history for dynamic sizing
+			- added autoconfiguration controls
 
 			vax_io.c:
-			-- added autoconfiguration controls
-			-- fixed bug in I/O configuration (found by Dave Hittner)
+			- added autoconfiguration controls
+			- fixed bug in I/O configuration (found by Dave Hittner)
 
 			id16_cpu.c: revised instruction decoding
 
 			id32_cpu.c:
-			-- revised instruction decoding
-			-- added instruction history
+			- revised instruction decoding
+			- added instruction history
 
 /* V3.0 revision history 
 
   2	15-Sep-03	scp.c:
-			-- fixed end-of-file problem in dep, idep
-			-- fixed error on trailing spaces in dep, idep
+			- fixed end-of-file problem in dep, idep
+			- fixed error on trailing spaces in dep, idep
 
 			pdp1_stddev.c
-			-- fixed system hang if continue after PTR error
-			-- added PTR start/stop functionality
-			-- added address switch functionality to PTR BOOT
+			- fixed system hang if continue after PTR error
+			- added PTR start/stop functionality
+			- added address switch functionality to PTR BOOT
 
 			pdp1_sys.c: added multibank capability to LOAD
   
 			pdp18b_cpu.c:
-			-- fixed priorities in PDP-15 API (PI between 3 and 4)
-			-- fixed sign handling in PDP-15 unsigned mul/div
-			-- fixed bug in CAF, must clear API subsystem
+			- fixed priorities in PDP-15 API (PI between 3 and 4)
+			- fixed sign handling in PDP-15 unsigned mul/div
+			- fixed bug in CAF, must clear API subsystem
 
 			i1401_mt.c:
-			-- fixed tape read end-of-record handling based on real 1401
-			-- added diagnostic read (space forward)
+			- fixed tape read end-of-record handling based on real 1401
+			- added diagnostic read (space forward)
 
 			i1620_cpu.c
-			-- fixed bug in immediate index add (found by Michael Short)
+			- fixed bug in immediate index add (found by Michael Short)
 
   1	27-Jul-03	pdp1_cpu.c: updated to detect indefinite I/O wait
 
 			pdp1_drm.c: fixed incorrect logical, missing activate, break
 
 			pdp1_lp.c:
-			-- fixed bugs in instruction decoding, overprinting
-			-- updated to detect indefinite I/O wait
+			- fixed bugs in instruction decoding, overprinting
+			- updated to detect indefinite I/O wait
 
 			pdp1_stddev.c:
-			-- changed RIM loader to be "hardware"
-			-- updated to detect indefinite I/O wait
+			- changed RIM loader to be "hardware"
+			- updated to detect indefinite I/O wait
 
 			pdp1_sys.c: added block loader format support to LOAD
 
@@ -277,12 +335,12 @@ patch	date		module(s) and fix(es)
 			pdp11_rq: fixed bug in user disk size (found by Chaskiel M Grundman)
 
 			pdp18b_cpu.c:
-			-- added FP15 support
-			-- added XVM support
-			-- added EAE support to the PDP-4
-			-- added PDP-15 "re-entrancy ECO"
-			-- fixed memory protect/skip interaction
-			-- fixed CAF to only reset peripherals
+			- added FP15 support
+			- added XVM support
+			- added EAE support to the PDP-4
+			- added PDP-15 "re-entrancy ECO"
+			- fixed memory protect/skip interaction
+			- fixed CAF to only reset peripherals
 
 			pdp18b_fpp.c: added FP15
 
@@ -291,16 +349,16 @@ patch	date		module(s) and fix(es)
 			pdp18b_rf.c: fixed bug in set size routine
 
 			pdp18b_stddev.c:
-			-- increased PTP TIME for PDP-15 operating systems
-			-- added hardware RIM loader for PDP-7, PDP-9, PDP-15
+			- increased PTP TIME for PDP-15 operating systems
+			- added hardware RIM loader for PDP-7, PDP-9, PDP-15
 
 			pdp18b_sys.c: added FP15, KT15, XVM instructions
 
 			pdp8b_df.c, pdp8_rf.c: fixed bug in set size routine
 
 			hp2100_dr.c:
-			-- fixed drum sizes
-			-- fixed variable capacity interaction with SAVE/RESTORE
+			- fixed drum sizes
+			- fixed variable capacity interaction with SAVE/RESTORE
 
 			i1401_cpu.c: revised fetch to model hardware more closely
 
@@ -311,33 +369,33 @@ patch	date		module(s) and fix(es)
 			altairz80: fixed bug in real-time clock on Windows host
 
   0	15-Jun-03	scp.c:
-			-- added ASSIGN/DEASSIGN
-			-- changed RESTORE to detach files
-			-- added u5, u6 unit fields
-			-- added USE_ADDR64 support
-			-- changed some structure fields to unsigned
+			- added ASSIGN/DEASSIGN
+			- changed RESTORE to detach files
+			- added u5, u6 unit fields
+			- added USE_ADDR64 support
+			- changed some structure fields to unsigned
 
 			scp_tty.c: added extended file seek
 
 			sim_sock.c: fixed calling sequence in stubs
 
 			sim_tape.c:
-			-- added E11 and TPC format support
-			-- added extended file support
+			- added E11 and TPC format support
+			- added extended file support
 
 			sim_tmxr.c: fixed bug in SHOW CONNECTIONS
 
 			all magtapes:
-			-- added multiformat support
-			-- added extended file support
+			- added multiformat support
+			- added extended file support
 
 			i1401_cpu.c:
-			-- fixed mnemonic, instruction lengths, and reverse
+			- fixed mnemonic, instruction lengths, and reverse
 			   scan length check bug for MCS
-			-- fixed MCE bug, BS off by 1 if zero suppress
-			-- fixed chaining bug, D lost if return to SCP
-			-- fixed H branch, branch occurs after continue
-			-- added check for invalid 8 character MCW, LCA
+			- fixed MCE bug, BS off by 1 if zero suppress
+			- fixed chaining bug, D lost if return to SCP
+			- fixed H branch, branch occurs after continue
+			- added check for invalid 8 character MCW, LCA
 
 			i1401_mt.c: fixed load-mode end of record response
 
@@ -348,8 +406,8 @@ patch	date		module(s) and fix(es)
 			pdp10_rp.c: fixed ordering bug in attach
 
 			pdp11_cpu.c:
-			-- fixed bug in MMR1 update (found by Tim Stark)
-			-- fixed bug in memory size table
+			- fixed bug in MMR1 update (found by Tim Stark)
+			- fixed bug in memory size table
 
 			pdp11_lp.c, pdp11_rq.c: added extended file support
 
@@ -358,23 +416,23 @@ patch	date		module(s) and fix(es)
 			pdp11_tc.c: fixed variable size interaction with restore
 
 			pdp11_xq.c:
-			-- corrected interrupts on IE state transition (code by Tom Evans)
-			-- added interrupt clear on soft reset (first noted by Bob Supnik)
-			-- removed interrupt when setting XL or RL (multiple people)
-			-- added SET/SHOW XQ STATS
-			-- added SHOW XQ FILTERS
-			-- added ability to split received packet into multiple buffers
-			-- added explicit runt & giant packet processing
+			- corrected interrupts on IE state transition (code by Tom Evans)
+			- added interrupt clear on soft reset (first noted by Bob Supnik)
+			- removed interrupt when setting XL or RL (multiple people)
+			- added SET/SHOW XQ STATS
+			- added SHOW XQ FILTERS
+			- added ability to split received packet into multiple buffers
+			- added explicit runt & giant packet processing
 
 			vax_fpa.c:
-			-- fixed integer overflow bug in CVTfi
-			-- fixed multiple bugs in EMODf
+			- fixed integer overflow bug in CVTfi
+			- fixed multiple bugs in EMODf
 
 			vax_io.c: optimized byte and word DMA routines
 
 			vax_sysdev.c:
-			-- added calibrated delay to ROM reads (from Mark Pizzolato)
-			-- fixed calibration problems in interval timer (from Mark Pizzolato)
+			- added calibrated delay to ROM reads (from Mark Pizzolato)
+			- fixed calibration problems in interval timer (from Mark Pizzolato)
 
 			pdp1_dt.c: fixed variable size interaction with restore
 
@@ -392,8 +450,8 @@ patch	date		module(s) and fix(es)
 			pdp8_mt.c: fixed bug in SKTR
 
 			hp2100_dp.c,hp2100_dq.c:
-			-- fixed bug in read status (13210A controller)
-			-- fixed bug in seek completion
+			- fixed bug in read status (13210A controller)
+			- fixed bug in seek completion
 
 			id_pt.c: fixed type declaration (found by Mark Pizzolato)
 
@@ -402,10 +460,10 @@ patch	date		module(s) and fix(es)
 /* V2.10 revision history
 
   4	03-Mar-03	scp.c
-			-- added .ini startup file capability
-			-- added multiple breakpoint actions
-			-- added multiple switch evaluation points
-			-- fixed bug in multiword deposits to file
+			- added .ini startup file capability
+			- added multiple breakpoint actions
+			- added multiple switch evaluation points
+			- fixed bug in multiword deposits to file
 
 			sim_tape.c: magtape simulation library
 
@@ -418,14 +476,14 @@ patch	date		module(s) and fix(es)
 			id_dp.c, id_idc.c: fixed cylinder overflow on writes
 
 			id_mt.c:
-			-- fixed error handling to stop selector channel
-			-- revised to use magtape library
+			- fixed error handling to stop selector channel
+			- revised to use magtape library
 
 			id16_sys.c, id32_sys.c: added relative addressing support
 
 			id_uvc.c:
-			-- added set frequency command to line frequency clock
-			-- improved calibration algorithm for precision clock
+			- added set frequency command to line frequency clock
+			- improved calibration algorithm for precision clock
 
 			nova_clk.c: added set line frequency command
 
@@ -438,38 +496,38 @@ patch	date		module(s) and fix(es)
 			pdp11_cpu.c: fixed bug in MMR1 update (found by Tim Stark)
 
 			pdp11_stddev.c
-			-- added set line frequency command
-			-- added set ctrl-c command
+			- added set line frequency command
+			- added set ctrl-c command
 
 			pdp11_rq.c:
-			-- fixed ordering problem in queue process
-			-- fixed bug in vector calculation for VAXen
-			-- added user defined drive support
+			- fixed ordering problem in queue process
+			- fixed bug in vector calculation for VAXen
+			- added user defined drive support
 
 			pdp11_ry.c: fixed autosizing algorithm
 
 			pdp11_tm.c, pdp11_ts.c: revised to use magtape library
 
 			pdp11_tq.c:
-			-- fixed ordering problem in queue process
-			-- fixed overly restrictive test for bad modifiers
-			-- fixed bug in vector calculation for VAXen
-			-- added variable controller, user defined drive support
-			-- revised to use magtape library
+			- fixed ordering problem in queue process
+			- fixed overly restrictive test for bad modifiers
+			- fixed bug in vector calculation for VAXen
+			- added variable controller, user defined drive support
+			- revised to use magtape library
 
 			pdp18b_cpu.c: fixed three EAE bugs (found by Hans Pufal)
 
 			pdp18b_mt.c:
-			-- fixed bugs in BOT error handling, interrupt handling
-			-- revised to use magtape library
+			- fixed bugs in BOT error handling, interrupt handling
+			- revised to use magtape library
 
 			pdp18b_rf.c:
-			-- removed 22nd bit from disk address
-			-- fixed autosizing algorithm
+			- removed 22nd bit from disk address
+			- fixed autosizing algorithm
 
 			pdp18b_stddev.c:
-			-- added set line frequency command
-			-- added set ctrl-c command
+			- added set line frequency command
+			- added set ctrl-c command
 
 			pdp18b_sys.c: fixed FMTASC printouts (found by Hans Pufal)
 
@@ -478,8 +536,8 @@ patch	date		module(s) and fix(es)
 			pdp8_df.c, pdp8_rf.c, pdp8_rx.c: fixed autosizing algorithm
 
 			pdp8_mt.c:
-			-- fixed bug in BOT error handling
-			-- revised to use magtape library
+			- fixed bug in BOT error handling
+			- revised to use magtape library
 
 			pdp8_tt.c: added set ctrl-c command
 
@@ -490,8 +548,8 @@ patch	date		module(s) and fix(es)
 			vax_stddev.c: added set ctrl-c command
 
   3	06-Feb-03	scp.c:
-			-- added dynamic extension of the breakpoint table
-			-- added breakpoint actions
+			- added dynamic extension of the breakpoint table
+			- added breakpoint actions
 
 			hp2100_cpu.c: fixed last cycle bug in DMA output (found by
 			Mike Gemeny)
@@ -505,13 +563,13 @@ patch	date		module(s) and fix(es)
 			LP09 printer
 
 			pdp18b_rf.c:
-			-- fixed IOT decoding (found by Hans Pufal)
-			-- fixed address overrun logic
-			-- added variable number of platters and autosizing
+			- fixed IOT decoding (found by Hans Pufal)
+			- fixed address overrun logic
+			- added variable number of platters and autosizing
 
 			pdp18b_rf.c:
-			-- fixed IOT decoding
-			-- fixed bug in command initiation
+			- fixed IOT decoding
+			- fixed bug in command initiation
 
 			pdp18b_rb.c: new RB09 fixed head disk
 
@@ -526,19 +584,19 @@ patch	date		module(s) and fix(es)
 			id16_cpu.c: fixed bug in SETM, SETMR (found by Mark Pizzolato)
 
   2     15-Jan-03	scp.c:
-			-- added dynamic memory size flag and RESTORE support
-			-- added EValuate command
-			-- added get_ipaddr routine
-			-- added ! (OS command) feature (from Mark Pizzolato)
-			-- added BREAK support to sim_poll_kbd (from Mark Pizzolato)
+			- added dynamic memory size flag and RESTORE support
+			- added EValuate command
+			- added get_ipaddr routine
+			- added ! (OS command) feature (from Mark Pizzolato)
+			- added BREAK support to sim_poll_kbd (from Mark Pizzolato)
 
 			sim_tmxr.c:
-			-- fixed bugs in IAC+IAC handling (from Mark Pizzolato)
-			-- added IAC+BRK handling (from Mark Pizzolato)
+			- fixed bugs in IAC+IAC handling (from Mark Pizzolato)
+			- added IAC+BRK handling (from Mark Pizzolato)
 
 			sim_sock.c:
-			-- added use count for Windows start/stop
-			-- added sim_connect_sock
+			- added use count for Windows start/stop
+			- added sim_connect_sock
 
 			pdp1_defs.h, pdp1_cpu.c, pdp1_sys.c, pdp1_drm.c:
 			added Type 24 serial drum
@@ -552,10 +610,10 @@ patch	date		module(s) and fix(es)
 			pdp11_tq.c: fixed bug in transfer end packet length
 
 			pdp11_xq.c:
-			-- added VMScluster support (thanks to Mark Pizzolato)
-			-- added major performance enhancements (thanks to Mark Pizzolato)
-			-- added local packet processing
-			-- added system id broadcast
+			- added VMScluster support (thanks to Mark Pizzolato)
+			- added major performance enhancements (thanks to Mark Pizzolato)
+			- added local packet processing
+			- added system id broadcast
 
 			pdp11_stddev.c: changed default to 7b (for early UNIX)
 
@@ -568,132 +626,132 @@ patch	date		module(s) and fix(es)
 			(found by Derek Peschel)
 
 			pdp10_tu.c:
-			-- fixed bug in bootstrap (reported by Michael Thompson)
-			-- fixed bug in read (reported by Harris Newman)
+			- fixed bug in bootstrap (reported by Michael Thompson)
+			- fixed bug in read (reported by Harris Newman)
 
   0	15-Nov-02	SCP and libraries
 			scp.c:
-			-- added Telnet console support
-			-- removed VT emulation support
-			-- added support for statically buffered devices
-			-- added HELP <command>
-			-- fixed bugs in set_logon, ssh_break (found by David Hittner)
-			-- added VMS file optimization (from Robert Alan Byer)
-			-- added quiet mode, DO with parameters, GUI interface,
+			- added Telnet console support
+			- removed VT emulation support
+			- added support for statically buffered devices
+			- added HELP <command>
+			- fixed bugs in set_logon, ssh_break (found by David Hittner)
+			- added VMS file optimization (from Robert Alan Byer)
+			- added quiet mode, DO with parameters, GUI interface,
 			   extensible commands (from Brian Knittel)
-			-- added DEVICE context and flags
-			-- added central device enable/disable support
-			-- modified SAVE/GET to save and restore flags
-			-- modified boot routine calling sequence
+			- added DEVICE context and flags
+			- added central device enable/disable support
+			- modified SAVE/GET to save and restore flags
+			- modified boot routine calling sequence
 			scp_tty.c:
-			-- removed VT emulation support
-			-- added sim_os_sleep, renamed sim_poll_kbd, sim_putchar
+			- removed VT emulation support
+			- added sim_os_sleep, renamed sim_poll_kbd, sim_putchar
 			sim_tmxr.c:
-			-- modified for Telnet console support
-			-- fixed bug in binary (8b) support
+			- modified for Telnet console support
+			- fixed bug in binary (8b) support
 			sim_sock.c: modified for Telnet console support
 			sim_ether.c: new library for Ethernet (from David Hittner)
 
 			all magtapes:
-			-- added support for end of medium
-			-- cleaned up BOT handling
+			- added support for end of medium
+			- cleaned up BOT handling
 
 			all DECtapes: added support for RT11 image file format
 
 			most terminals and multiplexors:
-			-- added support for 7b vs 8b character processing
+			- added support for 7b vs 8b character processing
 
 			PDP-1
 			pdp1_cpu.c, pdp1_sys.c, pdp1_dt.c: added PDP-1 DECtape support
 
 			PDP-8
 			pdp8_cpu.c, all peripherals:
-			-- added variable device number support
-			-- added new device enabled/disable support
+			- added variable device number support
+			- added new device enabled/disable support
 			pdp8_rx.c: added RX28/RX02 support
 
 			PDP-11
 			pdp11_defs.h, pdp11_io.c, pdp11_sys.c, all peripherals:
-			-- added variable vector support
-			-- added new device enable/disable support
-			-- added autoconfiguration support
+			- added variable vector support
+			- added new device enable/disable support
+			- added autoconfiguration support
 			all bootstraps: modified to support variable addresses
 			dec_mscp.h, pdp11_tq.c: added TK50 support
 			pdp11_rq.c:
-			-- added multicontroller support
-			-- fixed bug in HBE error log packet
-			-- fixed bug in ATP processing
+			- added multicontroller support
+			- fixed bug in HBE error log packet
+			- fixed bug in ATP processing
 			pdp11_ry.c: added RX211/RX02 support
 			pdp11_hk.c: added RK611/RK06/RK07 support
 			pdp11_tq.c: added TMSCP support
 			pdp11_xq.c: added DEQNA/DELQA support (from David Hittner)
 			pdp11_pclk.c: added KW11P support
 			pdp11_ts.c:
-			-- fixed bug in CTL decoding
-			-- fixed bug in extended status XS0_MOT
+			- fixed bug in CTL decoding
+			- fixed bug in extended status XS0_MOT
 			pdp11_stddev.c: removed paper tape to its own module
 
 			PDP-18b
 			pdp18b_cpu.c, all peripherals:
-			-- added variable device number support
-			-- added new device enabled/disabled support
+			- added variable device number support
+			- added new device enabled/disabled support
 
 			VAX
 			dec_dz.h: fixed bug in number of boards calculation
 			vax_moddefs.h, vax_io.c, vax_sys.c, all peripherals:
-			-- added variable vector support
-			-- added new device enable/disable support
-			-- added autoconfiguration support
+			- added variable vector support
+			- added new device enable/disable support
+			- added autoconfiguration support
 			vax_sys.c:
-			-- generalized examine/deposit
-			-- added TMSCP, multiple RQDX3, DEQNA/DELQA support
+			- generalized examine/deposit
+			- added TMSCP, multiple RQDX3, DEQNA/DELQA support
 			vax_stddev.c: removed paper tape, now uses PDP-11 version
 			vax_sysdev.c:
-			-- allowed NVR to be attached to file
-			-- removed unused variables (found by David Hittner)
+			- allowed NVR to be attached to file
+			- removed unused variables (found by David Hittner)
 
 			PDP-10
 			pdp10_defs.h, pdp10_ksio.c, all peripherals:
-			-- added variable vector support
-			-- added new device enable/disable support
+			- added variable vector support
+			- added new device enable/disable support
 			pdp10_defs.h, pdp10_ksio.c: added support for standard PDP-11
 			   peripherals, added RX211 support
 			pdp10_pt.c: rewritten to reference common implementation
 
 			Nova, Eclipse:
 			nova_cpu.c, eclipse_cpu.c, all peripherals:
-			-- added new device enable/disable support
+			- added new device enable/disable support
 
 			HP2100
 			hp2100_cpu:
-			-- fixed bugs in the EAU, 21MX, DMS, and IOP instructions
-			-- fixed bugs in the memory protect and DMS functions
-			-- created new options to enable/disable EAU, MPR, DMS
-			-- added new device enable/disable support
+			- fixed bugs in the EAU, 21MX, DMS, and IOP instructions
+			- fixed bugs in the memory protect and DMS functions
+			- created new options to enable/disable EAU, MPR, DMS
+			- added new device enable/disable support
 			hp2100_fp.c:
-			-- recoded to conform to 21MX microcode algorithms
+			- recoded to conform to 21MX microcode algorithms
 			hp2100_stddev.c:
-			-- fixed bugs in TTY reset, OTA, time base generator
-			-- revised BOOT support to conform to RBL loader
-			-- added clock calibration
+			- fixed bugs in TTY reset, OTA, time base generator
+			- revised BOOT support to conform to RBL loader
+			- added clock calibration
 			hp2100_dp.c:
-			-- changed default to 13210A
-			-- added BOOT support
+			- changed default to 13210A
+			- added BOOT support
 			hp2100_dq.c:
-			-- finished incomplete functions, fixed head switching
-			-- added BOOT support
+			- finished incomplete functions, fixed head switching
+			- added BOOT support
 			hp2100_ms.c:
-			-- fixed bugs found by diagnostics
-			-- added 13183 support
-			-- added BOOT support
+			- fixed bugs found by diagnostics
+			- added 13183 support
+			- added BOOT support
 			hp2100_mt.c:
-			-- fixed bugs found by diagnostics
-			-- disabled by default
+			- fixed bugs found by diagnostics
+			- disabled by default
 			hp2100_lpt.c: implemented 12845A controller
 			hp2100_lps.c:
-			-- renamed 12653A controller
-			-- added diagnostic mode for MPR, DCPC diagnostics
-			-- disabled by default
+			- renamed 12653A controller
+			- added diagnostic mode for MPR, DCPC diagnostics
+			- disabled by default
 
 			IBM 1620: first release
 
@@ -732,13 +790,13 @@ patch	date		module(s) and fix(es)
 			sim_sock.c: added OS/2 support (from Holger Veit)
 
 			pdp11_cpu.c: fixed bugs (from John Dundas)
-			-- added special case for PS<15:12> = 1111 to MFPI
-			-- removed special case from MTPI
-			-- added masking of relocation adds 
+			- added special case for PS<15:12> = 1111 to MFPI
+			- removed special case from MTPI
+			- added masking of relocation adds 
 
 			i1401_cpu.c:
-			-- added multiply/divide
-			-- fixed bugs (found by Van Snyder)
+			- added multiply/divide
+			- fixed bugs (found by Van Snyder)
 			   o 5 and 7 character H, 7 character doesn't branch
 			   o 8 character NOP
 			   o 1401-like memory dump
@@ -748,16 +806,16 @@ patch	date		module(s) and fix(es)
   9	04-May-02	pdp11_rq: fixed bug in polling routine
 
   8	03-May-02	scp.c:
-			-- changed LOG/NOLOG to SET LOG/NOLOG
-			-- added SHOW LOG
-			-- added SET VT/NOVT and SHOW VT for VT emulation
+			- changed LOG/NOLOG to SET LOG/NOLOG
+			- added SHOW LOG
+			- added SET VT/NOVT and SHOW VT for VT emulation
   
 			sim_sock.h: changed VMS stropt.h include to ioctl.h
 
 			vax_cpu.c
-			-- added TODR powerup routine to set date, time on boot
-			-- fixed exception flows to clear trap request
-			-- fixed register logging in autoincrement indexed
+			- added TODR powerup routine to set date, time on boot
+			- fixed exception flows to clear trap request
+			- fixed register logging in autoincrement indexed
 
 			vax_stddev.c: added TODR powerup routine
 			
@@ -768,25 +826,25 @@ patch	date		module(s) and fix(es)
   
 			pdp11_cpu.c: fixed bugs, added features (from John Dundas
 			   and Wolfgang Helbig)
-			-- added HTRAP and BPOK to maintenance register
-			-- added trap on kernel HALT if MAINT<HTRAP> set
-			-- fixed red zone trap, clear odd address and nxm traps
-			-- fixed RTS SP, don't increment restored SP
-			-- fixed TSTSET, write dst | 1 rather than prev R0 | 1
-			-- fixed DIV, set N=0,Z=1 on div by zero (J11, 11/70)
-			-- fixed DIV, set set N=Z=0 on overfow (J11, 11/70)
-			-- fixed ASH, ASHC, count = -32 used implementation-
+			- added HTRAP and BPOK to maintenance register
+			- added trap on kernel HALT if MAINT<HTRAP> set
+			- fixed red zone trap, clear odd address and nxm traps
+			- fixed RTS SP, don't increment restored SP
+			- fixed TSTSET, write dst | 1 rather than prev R0 | 1
+			- fixed DIV, set N=0,Z=1 on div by zero (J11, 11/70)
+			- fixed DIV, set set N=Z=0 on overfow (J11, 11/70)
+			- fixed ASH, ASHC, count = -32 used implementation-
 			   dependent 32 bit right shift
-			-- fixed illegal instruction test to detect 000010
-			-- fixed write-only page test
+			- fixed illegal instruction test to detect 000010
+			- fixed write-only page test
 
 			pdp11_rp.c: fixed SHOW ADDRESS command
 
 			vaxmod_defs.h: fixed DZ vector base and number of lines
 
 			dec_dz.h:
-			-- fixed interrupt acknowledge routines
-			-- fixed SHOW ADDRESS command
+			- fixed interrupt acknowledge routines
+			- fixed SHOW ADDRESS command
 
 			all magtape routines: added test for badly formed
 			   record length (suggested by Jonathan Engdahl)
@@ -798,8 +856,8 @@ patch	date		module(s) and fix(es)
 			vax_fpu.c: fixed EDIV overflow test for 0 quotient
 
   5	14-Apr-02	vax_cpu1.c:
-			-- fixed interrupt, prv_mode set to 0 (found by Tim Stark)
-			-- fixed PROBEx to mask mode to 2b (found by Kevin Handy)
+			- fixed interrupt, prv_mode set to 0 (found by Tim Stark)
+			- fixed PROBEx to mask mode to 2b (found by Kevin Handy)
 
   4	1-Apr-02	pdp11_rq.c: fixed bug, reset cleared write protect status
 
@@ -816,8 +874,8 @@ patch	date		module(s) and fix(es)
 			   revised to allocate memory dynamically
 
   2	01-Mar-02	pdp11_cpu.c:
-			-- fixed bugs in CPU registers
-			-- fixed double operand evaluation order for M+
+			- fixed bugs in CPU registers
+			- fixed double operand evaluation order for M+
 
 			pdp11_rq.c: added delays to initialization for
 			   RSX11M+ prior to V4.5
@@ -833,8 +891,8 @@ patch	date		module(s) and fix(es)
 			   PDP-7 DECtape support
 
 			hp2100_cpu.c:
-			-- added floating point and DMS
-			-- fixed bugs in DIV, ASL, ASR, LBT, SBT, CBT, CMW
+			- added floating point and DMS
+			- fixed bugs in DIV, ASL, ASR, LBT, SBT, CBT, CMW
 
 			hp2100_sys.c: added floating point, DMS
 
@@ -843,24 +901,24 @@ patch	date		module(s) and fix(es)
 			ibm1130: added Brian Knittel's IBM 1130 simulator
 
   0	30-Jan-02	scp.c:
-			-- generalized timer package for multiple timers
-			-- added circular register arrays
-			-- fixed bugs, line spacing in modifier display
-			-- added -e switch to attach
-			-- moved device enable/disable to simulators
+			- generalized timer package for multiple timers
+			- added circular register arrays
+			- fixed bugs, line spacing in modifier display
+			- added -e switch to attach
+			- moved device enable/disable to simulators
 
 			scp_tty.c: VAX specific fix (from Robert Alan Byer)
 
 			sim_tmxr.c, sim_tmxr.h:
-			-- added tmxr_fstats, tmxr_dscln
-			-- renamed tmxr_fstatus to tmxr_fconns
+			- added tmxr_fstats, tmxr_dscln
+			- renamed tmxr_fstatus to tmxr_fconns
 
 			sim_sock.c, sim_sock.h: added VMS support (from
 			Robert Alan Byer)
 
 			pdp_dz.h, pdp18b_tt1.c, nova_tt1.c:
-			-- added SET DISCONNECT
-			-- added SHOW STATISTICS
+			- added SET DISCONNECT
+			- added SHOW STATISTICS
 
 			pdp8_defs.h: fixed bug in interrupt enable initialization
 
@@ -876,9 +934,9 @@ patch	date		module(s) and fix(es)
 			   exit (found by Doug Carman)
 
 			hp2100_cpu.c:
-			-- fixed DMA register tables (found by Bill McDermith)
-			-- fixed SZx,SLx,RSS bug (found by Bill McDermith)
-			-- fixed flop restore logic (found by Bill McDermith)
+			- fixed DMA register tables (found by Bill McDermith)
+			- fixed SZx,SLx,RSS bug (found by Bill McDermith)
+			- fixed flop restore logic (found by Bill McDermith)
 
 			hp2100_mt.c: fixed bug on write of last character
 
@@ -892,17 +950,17 @@ patch	date		module(s) and fix(es)
 			   word mark (found by Van Snyder)
 
 			most CPUs:
-			-- replaced OLDPC with PC queue
-			-- implemented device enable/disable locally
+			- replaced OLDPC with PC queue
+			- implemented device enable/disable locally
 
    V2.8 revision history
 
 5	25-Dec-01	scp.c: fixed bug in DO command (found by John Dundas)
 
 			pdp10_cpu.c:
-			-- moved trap-in-progress to separate variable
-			-- cleaned up declarations
-			-- cleaned up volatile state for GNU C longjmp
+			- moved trap-in-progress to separate variable
+			- cleaned up declarations
+			- cleaned up volatile state for GNU C longjmp
 
 			pdp11_cpu.c: cleaned up declarations
   
@@ -911,9 +969,9 @@ patch	date		module(s) and fix(es)
 4	17-Dec-01	pdp11_rq.c: added delayed processing of packets
 
 3	16-Dec-01	pdp8_cpu.c:
-			-- mode A EAE instructions didn't clear GTF
-			-- ASR shift count > 24 mis-set GTF
-			-- effective shift count == 32 didn't work
+			- mode A EAE instructions didn't clear GTF
+			- ASR shift count > 24 mis-set GTF
+			- effective shift count == 32 didn't work
 
 2	07-Dec-01	scp.c: added breakpoint package
 
@@ -992,9 +1050,9 @@ patch	date		module(s) and fix(es)
 			   interrupting only if DON = 1 as well
 
 4	27-Sep-01	pdp11_ts.c:
-			-- NXM errors should return TC4 or TC5; were returning TC3
-			-- extended features is part of XS2; was returned in XS3
-			-- extended characteristics (fifth) word needed for RSTS/E
+			- NXM errors should return TC4 or TC5; were returning TC3
+			- extended features is part of XS2; was returned in XS3
+			- extended characteristics (fifth) word needed for RSTS/E
 
 			pdp11_tc.c: stop, stop all do cause an interrupt
 
@@ -1002,8 +1060,8 @@ patch	date		module(s) and fix(es)
 			   if there are no connections; needed for RSTS/E autoconfigure
 
 			scp.c:
-			-- added routine sim_qcount for 1130
-			-- added "simulator exit" detach routine for 1130
+			- added routine sim_qcount for 1130
+			- added "simulator exit" detach routine for 1130
 
 			sim_defs.h: added header for sim_qcount
 

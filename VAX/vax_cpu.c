@@ -25,6 +25,8 @@
 
    cpu		CVAX central processor
 
+   28-Jun-04	RMS	Fixed bug in DIVBx, DIVWx (reported by Peter Trimmel)
+   18-Apr-04	RMS	Added octaword macros
    25-Jan-04	RMS	Removed local debug logging support
 		RMS,MP	Added extended physical memory support
    31-Dec-03	RMS	Fixed bug in set_cpu_hist
@@ -155,7 +157,7 @@
 #define UNIT_MSIZE	(1u << UNIT_V_MSIZE)
 #define GET_CUR		acc = ACC_MASK (PSL_GETCUR (PSL))
 
-#define OPND_SIZE	10
+#define OPND_SIZE	20
 #define op0		opnd[0]
 #define op1		opnd[1]
 #define op2		opnd[2]
@@ -167,6 +169,7 @@
 #define op8		opnd[8]
 #define CHECK_FOR_PC	if (rn == nPC) RSVD_ADDR_FAULT
 #define CHECK_FOR_SP	if (rn >= nSP) RSVD_ADDR_FAULT
+#define CHECK_FOR_AP	if (rn >= nAP) RSVD_ADDR_FAULT
 #define RECW(l)		((l) << 4) | rn
 #define WRITE_B(r)	if (spec > (GRN | nPC)) Write (va, r, L_BYTE, WA); \
 			else R[rn] = (R[rn] & ~BMASK) | ((r) & BMASK)
@@ -174,11 +177,24 @@
 			else R[rn] = (R[rn] & ~WMASK) | ((r) & WMASK)
 #define WRITE_L(r)	if (spec > (GRN | nPC)) Write (va, r, L_LONG, WA); \
 			else R[rn] = (r)
-#define WRITE_Q(rl,rh)	if (spec > (GRN | nPC))  { \
-				if (Test (va + 7, WA, &mstat) >= 0) \
-					Write (va, rl, L_LONG, WA); \
-				Write (va + 4, rh, L_LONG, WA);  } \
-			else {	R[rn] = rl; R[rnplus1] = rh;  }
+#define WRITE_Q(rl,rh)	if (spec > (GRN | nPC)) { \
+			    if (Test (va + 7, WA, &mstat) >= 0) \
+				Write (va, rl, L_LONG, WA); \
+			    Write (va + 4, rh, L_LONG, WA);  } \
+			else { \
+			    R[rn] = rl; \
+			    R[rnplus1] = rh;  }
+#define WRITE_O(rl,rm2,rm1,rh)	if (spec > (GRN | nPC)) { \
+			    if (Test (va + 15, WA, &mstat) >= 0) \
+				Write (va, rl, L_LONG, WA); \
+			    Write (va + 4, rm2, L_LONG, WA); \
+			    Write (va + 8, rm1, L_LONG, WA); \
+			    Write (va + 12, rh, L_LONG, WA);  } \
+			else { \
+			    R[rn] = rl; \
+			    R[(rn + 1) & 0xF] = rm2; \
+			    R[(rn + 2) & 0xF] = rm1; \
+			    R[(rn + 3) & 0xF] = rh;  }
 
 #define HIST_MIN	128
 #define HIST_MAX	65536
@@ -1343,6 +1359,7 @@ case DIVB2: case DIVB3:
 	else {
 	    r = SXTB (op1) / SXTB (op0);		/* ok, divide */
 	    temp = 0;  }
+	r = r & BMASK;					/* mask to result */
 	WRITE_B (r);					/* write result */
 	CC_IIZZ_B (r);					/* set cc's */
 	cc = cc | temp;					/* error? set V */
@@ -1359,6 +1376,7 @@ case DIVW2: case DIVW3:
 	else {
 	    r = SXTW (op1) / SXTW (op0);		/* ok, divide */
 	    temp = 0;  }
+	r = r & WMASK;					/* mask to result */
 	WRITE_W (r);					/* write result */
 	CC_IIZZ_W (r);					/* set cc's */
 	cc = cc | temp;					/* error? set V */
@@ -1375,6 +1393,7 @@ case DIVL2: case DIVL3:
 	else {
 	    r = op1 / op0;				/* ok, divide */
 	    temp = 0;  }
+	r = r & LMASK;					/* mask to result */
 	WRITE_L (r);					/* write result */
 	CC_IIZZ_L (r);					/* set cc's */
 	cc = cc | temp;					/* error? set V */
@@ -1460,7 +1479,7 @@ case ROTL:
 case ASHL:
 	if (op0 & BSIGN) {				/* right shift? */
 	    temp = 0x100 - op0;				/* get |shift| */
-	    if (temp > 31) r = (op1 & LSIGN)? -1: 0;	/* sc > 31? */
+	    if (temp > 31) r = (op1 & LSIGN)? LMASK: 0;	/* sc > 31? */
 	    else r = op1 >> temp;			/* shift */
 	    WRITE_L (r);				/* store result */
 	    CC_IIZZ_L (r);				/* set cc's */
@@ -1468,7 +1487,7 @@ case ASHL:
 	else {
 	    if (op0 > 31) r = temp = 0;			/* sc > 31? */
 	    else {
-	    	r = ((uint32) op1) << op0;		/* shift */
+	    	r = (((uint32) op1) << op0) & LMASK;	/* shift */
 		temp = r >> op0;  }			/* shift back */
 	    WRITE_L (r);				/* store result */
 	    CC_IIZZ_L (r);				/* set cc's */

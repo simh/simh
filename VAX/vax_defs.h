@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Stephen Shirron, Antonio
    Carlini, and Kevin Peterson in providing specifications for the Qbus VAX's
 
+   18-Apr-04	RMS	Added octa, fp, string definitions
    19-May-03	RMS	Revised for new conditional compilation scheme
    14-Jul-02	RMS	Added infinite loop message
    30-Apr-02	RMS	Added CLR_TRAPS macro
@@ -95,6 +96,32 @@
 #define L_QUAD		8
 #define NUM_INST	512				/* one byte+two byte */
 #define MAX_SPEC	6				/* max spec/instr */
+
+/* Floating point formats */
+
+#define FD_V_EXP	7				/* f/d exponent */
+#define FD_M_EXP	0xFF
+#define FD_BIAS		0x80				/* f/d bias */
+#define FD_EXP		(FD_M_EXP << FD_V_EXP)
+#define FD_HB		(1 << FD_V_EXP)			/* f/d hidden bit */
+#define FD_GUARD	(15 - FD_V_EXP)			/* # guard bits */
+#define FD_GETEXP(x)	(((x) >> FD_V_EXP) & FD_M_EXP)
+
+#define G_V_EXP		4				/* g exponent */
+#define G_M_EXP		0x7FF
+#define G_BIAS		0x400				/* g bias */
+#define G_EXP		(G_M_EXP << G_V_EXP)
+#define G_HB		(1 << G_V_EXP)			/* g hidden bit */
+#define G_GUARD		(15 - G_V_EXP)			/* # guard bits */
+#define G_GETEXP(x)	(((x) >> G_V_EXP) & G_M_EXP)
+
+#define H_V_EXP		0				/* h exponent */
+#define H_M_EXP		0x7FFF
+#define H_BIAS		0x4000				/* h bias */
+#define H_EXP		(H_M_EXP << H_V_EXP)
+#define H_HB		(1 << H_V_EXP)			/* h hidden bit */
+#define H_GUARD		(15 - H_V_EXP)			/* # guard bits */
+#define H_GETEXP(x)	(((x) >> H_V_EXP) & H_M_EXP)
 
 /* Memory management modes */
 
@@ -458,6 +485,18 @@ enum opcodes {
 #define SETPC(d)	PC = (d), FLUSH_ISTR
 #define FLUSH_ISTR	ibcnt = 0, ppc = -1
 
+/* Character string instructions */
+
+#define STR_V_DPC	24				/* delta PC */
+#define STR_M_DPC	0xFF
+#define STR_V_CHR	16				/* char argument */
+#define STR_M_CHR	0xFF
+#define STR_LNMASK	0xFFFF				/* string length */
+#define STR_GETDPC(x)	(((x) >> STR_V_DPC) & STR_M_DPC)
+#define STR_GETCHR(x)	(((x) >> STR_V_CHR) & STR_M_CHR)
+#define STR_PACK(m,x)	((((PC - fault_PC) & STR_M_DPC) << STR_V_DPC) | \
+			(((m) & STR_M_CHR) << STR_V_CHR) | ((x) & STR_LNMASK))
+
 /* Read and write */
 
 #define RA		(acc)
@@ -488,6 +527,10 @@ enum opcodes {
 		if ((rh) & LSIGN) cc = CC_N; \
 		else if (((rl) | (rh)) == 0) cc = CC_Z; \
 		else cc = 0
+#define CC_IIZZ_O(rl,rm2,rm1,rh) \
+		if ((rh) & LSIGN) cc = CC_N; \
+		else if (((rl) | (rm2) | (rm1) | (rh)) == 0) cc = CC_Z; \
+		else cc = 0
 #define CC_IIZZ_FP	CC_IIZZ_W
 
 #define CC_IIZP_B(r) \
@@ -505,6 +548,10 @@ enum opcodes {
 #define CC_IIZP_Q(rl,rh) \
 		if ((rh) & LSIGN) cc = CC_N | (cc & CC_C); \
 		else if (((rl) | (rh)) == 0) cc = CC_Z | (cc & CC_C); \
+		else cc = cc & CC_C
+#define CC_IIZP_O(rl,rm2,rm1,rh) \
+		if ((rh) & LSIGN) cc = CC_N | (cc & CC_C); \
+		else if (((rl) | (rm2) | (rm1) | (rh)) == 0) cc = CC_Z | (cc & CC_C); \
 		else cc = cc & CC_C
 #define CC_IIZP_FP	CC_IIZP_W
 

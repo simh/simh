@@ -70,10 +70,12 @@ BSC32_SBRS= \
 	$(INTDIR)/ibm1130_gui.sbr \
 	$(INTDIR)/ibm1130_prt.sbr \
 	$(INTDIR)/scp.sbr \
-	$(INTDIR)/scp_tty.sbr \
 	$(INTDIR)/sim_tmxr.sbr \
 	$(INTDIR)/sim_sock.sbr \
-	$(INTDIR)/ibm1130_fmt.sbr
+	$(INTDIR)/ibm1130_fmt.sbr \
+	$(INTDIR)/sim_console.sbr \
+	$(INTDIR)/sim_fio.sbr \
+	$(INTDIR)/sim_timer.sbr
 
 $(OUTDIR)/ibm1130.bsc : $(OUTDIR)  $(BSC32_SBRS)
     $(BSC32) @<<
@@ -98,10 +100,12 @@ LINK32_OBJS= \
 	$(INTDIR)/ibm1130_gui.obj \
 	$(INTDIR)/ibm1130_prt.obj \
 	$(INTDIR)/scp.obj \
-	$(INTDIR)/scp_tty.obj \
 	$(INTDIR)/sim_tmxr.obj \
 	$(INTDIR)/sim_sock.obj \
-	$(INTDIR)/ibm1130_fmt.obj
+	$(INTDIR)/ibm1130_fmt.obj \
+	$(INTDIR)/sim_console.obj \
+	$(INTDIR)/sim_fio.obj \
+	$(INTDIR)/sim_timer.obj
 
 $(OUTDIR)/ibm1130.exe : $(OUTDIR)  $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
@@ -149,10 +153,12 @@ BSC32_SBRS= \
 	$(INTDIR)/ibm1130_gui.sbr \
 	$(INTDIR)/ibm1130_prt.sbr \
 	$(INTDIR)/scp.sbr \
-	$(INTDIR)/scp_tty.sbr \
 	$(INTDIR)/sim_tmxr.sbr \
 	$(INTDIR)/sim_sock.sbr \
-	$(INTDIR)/ibm1130_fmt.sbr
+	$(INTDIR)/ibm1130_fmt.sbr \
+	$(INTDIR)/sim_console.sbr \
+	$(INTDIR)/sim_fio.sbr \
+	$(INTDIR)/sim_timer.sbr
 
 $(OUTDIR)/ibm1130.bsc : $(OUTDIR)  $(BSC32_SBRS)
     $(BSC32) @<<
@@ -178,10 +184,12 @@ LINK32_OBJS= \
 	$(INTDIR)/ibm1130_gui.obj \
 	$(INTDIR)/ibm1130_prt.obj \
 	$(INTDIR)/scp.obj \
-	$(INTDIR)/scp_tty.obj \
 	$(INTDIR)/sim_tmxr.obj \
 	$(INTDIR)/sim_sock.obj \
-	$(INTDIR)/ibm1130_fmt.obj
+	$(INTDIR)/ibm1130_fmt.obj \
+	$(INTDIR)/sim_console.obj \
+	$(INTDIR)/sim_fio.obj \
+	$(INTDIR)/sim_timer.obj
 
 $(OUTDIR)/ibm1130.exe : $(OUTDIR)  $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
@@ -325,17 +333,6 @@ $(INTDIR)/scp.obj :  $(SOURCE)  $(DEP_SCP_C) $(INTDIR)
 ################################################################################
 # Begin Source File
 
-SOURCE=..\scp_tty.c
-DEP_SCP_T=\
-	..\sim_defs.h
-
-$(INTDIR)/scp_tty.obj :  $(SOURCE)  $(DEP_SCP_T) $(INTDIR)
-   $(CPP) $(CPP_PROJ)  $(SOURCE) 
-
-# End Source File
-################################################################################
-# Begin Source File
-
 SOURCE=\pdp11\supnik\sim_tmxr.c
 DEP_SIM_T=\
 	..\sim_defs.h\
@@ -366,6 +363,59 @@ $(INTDIR)/sim_sock.obj :  $(SOURCE)  $(DEP_SIM_S) $(INTDIR)
 SOURCE=.\ibm1130_fmt.c
 
 $(INTDIR)/ibm1130_fmt.obj :  $(SOURCE)  $(INTDIR)
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=\pdp11\supnik\sim_console.c
+DEP_SIM_C=\
+	..\sim_defs.h\
+	\pdp11\supnik\sim_sock.h\
+	\pdp11\supnik\sim_tmxr.h\
+	\pdp11\supnik\scp.h\
+	\pdp11\supnik\sim_console.h\
+	\pdp11\supnik\sim_timer.h\
+	\pdp11\supnik\sim_fio.h\
+	d:\progra~1\micros~1\include\winsock2.h\
+	\MSVC20\INCLUDE\sys\TYPES.H\
+	d:\progra~1\micros~1\include\qos.h\
+	d:\winddk\2600\inc\wxp\guiddef.h
+
+$(INTDIR)/sim_console.obj :  $(SOURCE)  $(DEP_SIM_C) $(INTDIR)
+   $(CPP) $(CPP_PROJ)  $(SOURCE) 
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=\pdp11\supnik\sim_fio.c
+DEP_SIM_F=\
+	..\sim_defs.h\
+	d:\progra~1\micros~1\include\BASETSD.H\
+	\pdp11\supnik\scp.h\
+	\pdp11\supnik\sim_console.h\
+	\pdp11\supnik\sim_timer.h\
+	\pdp11\supnik\sim_fio.h
+
+$(INTDIR)/sim_fio.obj :  $(SOURCE)  $(DEP_SIM_F) $(INTDIR)
+   $(CPP) $(CPP_PROJ)  $(SOURCE) 
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=\pdp11\supnik\sim_timer.c
+DEP_SIM_TI=\
+	..\sim_defs.h\
+	d:\progra~1\micros~1\include\BASETSD.H\
+	\pdp11\supnik\scp.h\
+	\pdp11\supnik\sim_console.h\
+	\pdp11\supnik\sim_timer.h\
+	\pdp11\supnik\sim_fio.h
+
+$(INTDIR)/sim_timer.obj :  $(SOURCE)  $(DEP_SIM_TI) $(INTDIR)
+   $(CPP) $(CPP_PROJ)  $(SOURCE) 
 
 # End Source File
 # End Group

@@ -25,6 +25,9 @@
 
    mt		12559A 3030 nine track magnetic tape
 
+   06-Jul-04	RMS	Fixed spurious timing error after CLC (found by Dave Bryan)
+   26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
+			Implemented DMA SRQ (follows FLG)
    21-Dec-03	RMS	Adjusted msc_ctime for TSB (from Mike Gemeny)
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
@@ -88,7 +91,8 @@
 #define STA_BUSY	0001				/* busy (d) */
 
 extern uint32 PC;
-extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
+
 int32 mtc_fnc = 0;					/* function */
 int32 mtc_sta = 0;					/* status register */
 int32 mtc_dtf = 0;					/* data xfer flop */
@@ -119,8 +123,8 @@ t_stat mt_map_err (UNIT *uptr, t_stat st);
 */
 
 DIB mt_dib[] = {
-	{ MTD, 0, 0, 0, 0, &mtdio },
-	{ MTC, 0, 0, 0, 0, &mtcio }  };
+	{ MTD, 0, 0, 0, 0, 0, &mtdio },
+	{ MTC, 0, 0, 0, 0, 0, &mtcio }  };
 
 #define mtd_dib mt_dib[0]
 #define mtc_dib mt_dib[1]
@@ -131,7 +135,8 @@ REG mtd_reg[] = {
 	{ FLDATA (CMD, mtd_dib.cmd, 0), REG_HRO },
 	{ FLDATA (CTL, mtd_dib.ctl, 0), REG_HRO },
 	{ FLDATA (FLG, mtd_dib.flg, 0) },
-	{ FLDATA (FBF, mtd_dib.fbf, 0), REG_HRO },
+	{ FLDATA (FBF, mtd_dib.fbf, 0) },
+	{ FLDATA (SRQ, mtd_dib.srq, 0) },
 	{ BRDATA (DBUF, mtxb, 8, 8, DBSIZE) },
 	{ DRDATA (BPTR, mt_ptr, DB_V_SIZE + 1) },
 	{ DRDATA (BMAX, mt_max, DB_V_SIZE + 1) },
@@ -172,6 +177,7 @@ REG mtc_reg[] = {
 	{ FLDATA (CTL, mtc_dib.ctl, 0) },
 	{ FLDATA (FLG, mtc_dib.flg, 0) },
 	{ FLDATA (FBF, mtc_dib.fbf, 0) },
+	{ FLDATA (SRQ, mtc_dib.srq, 0) },
 	{ FLDATA (DTF, mtc_dtf, 0) },
 	{ FLDATA (FSVC, mtc_1st, 0) },
 	{ DRDATA (POS, mtc_unit.pos, T_ADDR_W), PV_LEFT },
@@ -203,14 +209,14 @@ int32 devd;
 devd = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
 case ioFLG:						/* flag clear/set */
-	if ((IR & I_HC) == 0) { setFLG (devd); }	/* STF */
+	if ((IR & I_HC) == 0) { setFSR (devd); }	/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
 	if (FLG (devd) == 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioSFS:						/* skip flag set */
 	if (FLG (devd) != 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioOTX:						/* output */
 	mtc_unit.buf = dat & 0377;			/* store data */
 	break;
@@ -225,7 +231,7 @@ case ioCTL:						/* control clear/set */
 	break;
 default:
 	break;  }
-if (IR & I_HC) { clrFLG (devd); }			/* H/C option */
+if (IR & I_HC) { clrFSR (devd); }			/* H/C option */
 return dat;
 }
 
@@ -238,14 +244,14 @@ devc = IR & I_DEVMASK;					/* get device no */
 devd = devc - 1;
 switch (inst) {						/* case on opcode */
 case ioFLG:						/* flag clear/set */
-	if ((IR & I_HC) == 0) { setFLG (devc); }	/* STF */
+	if ((IR & I_HC) == 0) { setFSR (devc); }	/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
 	if (FLG (devc) == 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioSFS:						/* skip flag set */
 	if (FLG (devc) != 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioOTX:						/* output */
 	dat = dat & 0377;
 	mtc_sta = mtc_sta & ~STA_REJ;			/* clear reject */
@@ -259,9 +265,9 @@ case ioOTX:						/* output */
 	    mtc_1st = mtc_dtf = 0;
 	    mtc_sta = mtc_sta & STA_BOT;
 	    clrCTL (devc);				/* init device */
-	    clrFLG (devc);
+	    clrFSR (devc);
 	    clrCTL (devd);
-	    clrFLG (devd);
+	    clrFSR (devd);
 	    return SCPE_OK;  }
 	for (i = valid = 0; i < sizeof (mtc_cmd); i++)	/* is fnc valid? */
 	    if (dat == mtc_cmd[i]) valid = 1;
@@ -275,8 +281,8 @@ case ioOTX:						/* output */
 	    mtc_fnc = dat;				/* save function */
 	    mtc_sta = STA_BUSY;				/* unit busy */
 	    mt_ptr = 0;					/* init buffer ptr */
-	    clrFLG (devc);				/* clear flags */
-	    clrFLG (devd);
+	    clrFSR (devc);				/* clear flags */
+	    clrFSR (devd);
 	    mtc_1st = 1;				/* set 1st flop */
 	    mtc_dtf = 1;  }				/* set xfer flop */
 	break;
@@ -295,7 +301,7 @@ case ioCTL:						/* control clear/set */
 	break;
 default:
 	break;  }
-if (IR & I_HC) { clrFLG (devc); }			/* H/C option */
+if (IR & I_HC) { clrFSR (devc); }			/* H/C option */
 return dat;
 }
 
@@ -317,7 +323,7 @@ devc = mtc_dib.devno;					/* get device nos */
 devd = mtd_dib.devno;
 if ((mtc_unit.flags & UNIT_ATT) == 0) {			/* offline? */
 	mtc_sta = STA_LOCAL | STA_REJ;			/* rejected */
-	setFLG (devc);					/* set cch flg */
+	setFSR (devc);					/* set cch flg */
 	return IORETURN (mtc_stopioe, SCPE_UNATT);  }
 
 switch (mtc_fnc) {					/* case on function */
@@ -368,10 +374,10 @@ case FNC_RC:						/* read */
 		mtc_sta = mtc_sta | STA_PAR;		/* set flag */
 		break;  }
 	    }
-	if (mt_ptr < mt_max) {				/* more chars? */
+	if (mtc_dtf && (mt_ptr < mt_max)) {		/* more chars? */
 	    if (FLG (devd)) mtc_sta = mtc_sta | STA_TIM;
 	    mtc_unit.buf = mtxb[mt_ptr++];		/* fetch next */
-	    setFLG (devd);				/* set dch flg */
+	    setFSR (devd);				/* set dch flg */
 	    sim_activate (uptr, mtc_xtime);		/* re-activate */
 	    return SCPE_OK;  }
 	sim_activate (uptr, mtc_gtime);			/* schedule gap */
@@ -386,7 +392,7 @@ case FNC_WC:						/* write */
 		mtc_sta = mtc_sta & ~STA_BOT;  }	/* clear BOT */
 	    else mtc_sta = mtc_sta | STA_PAR;  }
 	if (mtc_dtf) {					/* xfer flop set? */
-	    setFLG (devd);				/* set dch flag */
+	    setFSR (devd);				/* set dch flag */
 	    sim_activate (uptr, mtc_xtime);		/* re-activate */
 	    return SCPE_OK;  }
 	if (mt_ptr) {					/* write buffer */
@@ -400,7 +406,7 @@ case FNC_WC:						/* write */
 default:						/* unknown */
 	break;  }
 
-setFLG (devc);						/* set cch flg */
+setFSR (devc);						/* set cch flg */
 mtc_sta = mtc_sta & ~STA_BUSY;				/* not busy */
 return SCPE_OK;
 }
@@ -449,6 +455,7 @@ mtc_dib.cmd = mtd_dib.cmd = 0;				/* clear cmd */
 mtc_dib.ctl = mtd_dib.ctl = 0;				/* clear ctl */
 mtc_dib.flg = mtd_dib.flg = 0;				/* clear flg */
 mtc_dib.fbf = mtd_dib.fbf = 0;				/* clear fbf */
+mtc_dib.srq = mtd_dib.srq = 0;				/* srq follows flg */
 sim_cancel (&mtc_unit);					/* cancel activity */
 sim_tape_reset (&mtc_unit);
 if (mtc_unit.flags & UNIT_ATT) mtc_sta =

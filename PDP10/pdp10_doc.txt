@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-10 Simulator Usage
-Date:	04-Apr-2004
+Date:	15-Jun-2004
 
 			COPYRIGHT NOTICE
 
@@ -208,10 +208,9 @@ The Unibus adapter has the following registers:
 2.4 Front End (FE)
 
 The front end is the system console.  The keyboard input is unit 0,
-the console output is unit 1.  It supports two options:
+the console output is unit 1.  It supports one option:
 
 	SET FE STOP		halts the PDP-10 operating system
-	SET FE CTLC		simulates typing ^C
 
 The front end has the following registers:
 

@@ -11,6 +11,8 @@
  * This is not a supported product, but I welcome bug reports and fixes.
  * Mail to simh@ibm1130.org
  *
+ * 09-Apr-04 BLK	Changed code to use stock windows cursor IDC_HAND if available
+ *
  * 02-Dec-02 BLK	Changed display, added printer and card reader icons
  *					Added drag and drop support for scripts and card decks
  *					Added support for physical card reader and printer (hides icons)
@@ -768,7 +770,13 @@ static DWORD WINAPI Pump (LPVOID arg)
 	hDkGreyPen = CreatePen(PS_SOLID, 1, RGB(64,64,64));
 
 	hcArrow    = LoadCursor(NULL,      IDC_ARROW);
-	hcHand     = LoadCursor(hInstance, MAKEINTRESOURCE(IDC_HAND));
+#ifdef IDC_HAND
+	hcHand     = LoadCursor(NULL, IDC_HAND);							// use stock object provided by Windows
+	if (hcHand == NULL)
+		hcHand = LoadCursor(hInstance, MAKEINTRESOURCE(IDC_MYHAND));
+#else
+	hcHand     = LoadCursor(hInstance, MAKEINTRESOURCE(IDC_MYHAND));
+#endif
 
 	if (hBitmap   == NULL)
 		hBitmap   = LoadBitmap(hInstance, MAKEINTRESOURCE(IDB_CONSOLE));

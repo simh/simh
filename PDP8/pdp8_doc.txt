@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-8 Simulator Usage
-Date:	15-Feb-2004
+Date:	15-Jun-2004
 
 			COPYRIGHT NOTICE
 
@@ -304,12 +304,6 @@ implements these registers:
 	INT		1	interrupt pending flag
 	POS		32	number of characters input
 	TIME		24	keyboard polling interval
-
-If the simulator is compiled under Windows Visual C++, typing ^C to the
-terminal input causes a fatal run-time error.  Use the following command
-to simulate typing ^C:
-
-	SET TTI CTRL-C
 
 2.3.4 KL8E Terminal Output (TTO)
 

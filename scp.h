@@ -1,4 +1,4 @@
-/* sim_timer.h: simulator timer library headers
+/* scp.h: simulator control program headers
 
    Copyright (c) 1993-2004, Robert M Supnik
 
@@ -52,6 +52,9 @@ t_value strtotv (char *cptr, char **endptr, uint32 radix);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 DEVICE *find_dev_from_unit (UNIT *uptr);
 REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
+CTAB *find_ctab (CTAB *tab, char *gbuf);
+C1TAB *find_c1tab (C1TAB *tab, char *gbuf);
+SHTAB *find_shtab (SHTAB *tab, char *gbuf);
 BRKTAB *sim_brk_fnd (t_addr loc);
 t_bool sim_brk_test (t_addr bloc, int32 btyp);
 char *match_ext (char *fnam, char *ext);

@@ -18,6 +18,9 @@
  * This is not a supported product, but I welcome bug reports and fixes.
  * Mail to simh@ibm1130.org
 
+ *  Update 2004-04-12: Changed ascii field of CPCODE to unsigned char, caught a couple
+ 					   other potential problems with signed characters used as subscript indexes.
+
  *  Update 2003-11-25: Physical card reader support working, may not be perfect.
  					   Changed magic filename for stdin to "(stdin)".
 
@@ -454,7 +457,7 @@ DEVICE cp_dev = {
 
 typedef struct {
 	uint16 hollerith;
-	char	ascii;
+	unsigned char ascii;
 } CPCODE;
 
 static CPCODE cardcode_029[] =
@@ -505,7 +508,7 @@ static CPCODE cardcode_029[] =
 	0x0120,		'\'',
 	0x00A0,		'=',
 	0x0060,		'"',
-	0x8820,		'\xA2',		// cent, in MS-DOS encoding (this is in guess_cr_code as well)
+	0x8820,		(unsigned char) '\xA2',		// cent, in MS-DOS encoding (this is in guess_cr_code as well)
 	0x8420,		'.',
 	0x8220,		'<',		// ) in 026 Fortran
 	0x8120,		'(',
@@ -516,7 +519,7 @@ static CPCODE cardcode_029[] =
 	0x4220,		'*',
 	0x4120,		')',
 	0x40A0,		';',
-	0x4060,		'\xAC',		// not, in MS-DOS encoding  (this is in guess_cr_code as well)
+	0x4060,		(unsigned char) '\xAC',		// not, in MS-DOS encoding  (this is in guess_cr_code as well)
 	0x2420,		',',
 	0x2220,		'%',		// ( in 026 Fortran
 	0x2120,		'_',
@@ -947,7 +950,7 @@ char card_to_ascii (uint16 hol)
 
 	for (i = 0; i < ncardcode; i++)
 		if (cardcode[i].hollerith == hol)
-			return cardcode[i].ascii;
+			return (char) cardcode[i].ascii;
 
 	return '?';
 }
@@ -960,7 +963,7 @@ char hollerith_to_ascii (uint16 hol)
 
 	for (i = 0; i < ncardcode; i++)
 		if (cardcode_029[i].hollerith == hol)
-			return cardcode[i].ascii;
+			return (char) cardcode[i].ascii;
 
 	return ' ';
 }
@@ -1074,7 +1077,7 @@ again:		/* jump here if we've loaded a new deck after emptying the previous one 
 				result = buf;
 
 			for (i = 0; i < nread; i++)					/* convert ascii to punch code */
-				readstation[i] = ascii_to_card[result[i]];
+				readstation[i] = ascii_to_card[(unsigned char) result[i]];
 
 			nread = 80;									/* even if line was blank consider it present */
 		}

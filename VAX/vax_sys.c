@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   16-Jun-04	RMS	Added DHQ11 support
    21-Mar-04	RMS	Added RXV21 support
    06-May-03	RMS	Added support for second DELQA
    12-Oct-02	RMS	Added multiple RQ controller support
@@ -52,6 +53,7 @@ extern DEVICE ry_dev;
 extern DEVICE ts_dev;
 extern DEVICE tq_dev;
 extern DEVICE dz_dev;
+extern DEVICE vh_dev;
 extern DEVICE xq_dev, xqb_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
@@ -104,6 +106,7 @@ DEVICE *sim_devices[] = {
 	&ptp_dev,
 	&lpt_dev,
 	&dz_dev,
+	&vh_dev,
 	&rl_dev,
 	&rq_dev,
 	&rqb_dev,

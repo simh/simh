@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    fpp		PDP-15 floating point processor
+
+   10-Apr-04	RMS	JEA is 15b not 18b
  
    The FP15 instruction format is:
 
@@ -168,7 +170,6 @@ void dp_swap (UFP *a, UFP *b);
 
 extern t_stat Read (int32 ma, int32 *dat, int32 cyc);
 extern t_stat Write (int32 ma, int32 dat, int32 cyc);
-extern t_stat Ia (int32 ma, int32 *ea, t_bool jmp);
 extern int32 Incr_addr (int32 addr);
 extern int32 Jms_word (int32 t);
 
@@ -195,7 +196,7 @@ REG fpp_reg[] = {
 	{ FLDATA (FGUARD, fguard, 0) },
 	{ ORDATA (FMQH, fmq.hi, 17) },
 	{ ORDATA (FMQL, fmq.lo, 18) },
-	{ ORDATA (JEA, jea, 18) },
+	{ ORDATA (JEA, jea, 15) },
 	{ FLDATA (STOP_FPP, stop_fpp, 0) },
 	{ NULL }  };
 
@@ -314,7 +315,7 @@ case FOP_JEA:						/* JEA */
 	else {						/* no, load */
 	    if (sta = Read (ar, &dat, RD)) break;
 	    fguard = (dat >> JEA_V_GUARD) & 1;
-	    jea = dat;  }
+	    jea = dat & JEA_EAMASK;  }
 	break;
 
 case FOP_ADD:						/* add */

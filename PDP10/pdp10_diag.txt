@@ -23,3 +23,4 @@ Bugs Found
 15. UBA initialization reset the UBA itself
 16. RHCS1: writing IE cannot trigger an interrupt
 17. Tape bootstrap was set to 800bpi instead of 1600bpi
+18. FIXR off by 1 in testing for lower limit to process

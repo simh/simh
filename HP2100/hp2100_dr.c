@@ -35,6 +35,9 @@
    
    The drum control channel does not have any of the traditional flip-flops.
 
+   26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
+			Revised boot rom to use IBL algorithm
+			Implemented DMA SRQ (follows FLG)
    27-Jul-03	RMS	Fixed drum sizes
 			Fixed variable capacity interaction with SAVE/RESTORE
    10-Nov-02	RMS	Added BOOT command
@@ -110,7 +113,7 @@
 extern UNIT cpu_unit;
 extern uint16 *M;
 extern uint32 PC;
-extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
 
 int32 drc_cw = 0;					/* fnc, addr */
 int32 drc_sta = 0;					/* status */
@@ -142,8 +145,8 @@ t_stat dr_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 */
 
 DIB dr_dib[] = {
-	{ DRD, 0, 0, 0, 0, &drdio },
-	{ DRC, 0, 0, 0, 0, &drcio }  };
+	{ DRD, 0, 0, 0, 0, 0, &drdio },
+	{ DRC, 0, 0, 0, 0, 0, &drcio }  };
 
 #define drd_dib dr_dib[0]
 #define drc_dib dr_dib[1]
@@ -157,6 +160,7 @@ REG drd_reg[] = {
 	{ FLDATA (CTL, drd_dib.ctl, 0) },
 	{ FLDATA (FLG, drd_dib.flg, 0) },
 	{ FLDATA (FBF, drd_dib.fbf, 0) },
+	{ FLDATA (SRQ, drd_dib.srq, 0) },
 	{ ORDATA (BPTR, drd_ptr, 6) },
 	{ ORDATA (DEVNO, drd_dib.devno, 6), REG_HRO },
 	{ NULL }  };
@@ -192,6 +196,7 @@ REG drc_reg[] = {
 	{ FLDATA (CTL, drc_dib.ctl, 0) },
 	{ FLDATA (FLG, drc_dib.flg, 0) },
 	{ FLDATA (FBF, drc_dib.fbf, 0) },
+	{ FLDATA (SRQ, drc_dib.srq, 0) },
 	{ DRDATA (TIME, dr_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, dr_stopioe, 0) },
 	{ ORDATA (DEVNO, drc_dib.devno, 6), REG_HRO },
@@ -242,11 +247,11 @@ case ioLIX:						/* load */
 case ioCTL:						/* control clear/set */
 	if (IR & I_AB) {				/* CLC */
 	    clrCMD (devd);				/* clr "ctl" */
-	    clrFLG (devd);				/* clr flg */
+	    clrFSR (devd);				/* clr flg */
 	    drc_sta = drc_sta & ~DRS_SAC;  }		/* clear SAC flag */
 	else if (!CMD (devd)) {				/* STC, not set? */
 	    setCMD (devd);				/* set "ctl" */
-	    if (drc_cw & CW_WR) { setFLG (devd); }	/* prime DMA */
+	    if (drc_cw & CW_WR) { setFSR (devd); }	/* prime DMA */
 	    drc_sta = 0;				/* clear errors */
 	    drd_ptr = 0;				/* clear sec ptr */
 	    sim_cancel (&drc_unit);			/* cancel curr op */
@@ -256,7 +261,7 @@ case ioCTL:						/* control clear/set */
 	break;
 default:
 	break;  }
-if (IR & I_HC) { clrFLG (devd); }			/* H/C option */
+if (IR & I_HC) { clrFSR (devd); }			/* H/C option */
 return dat;
 }
 
@@ -267,7 +272,7 @@ int32 st;
 switch (inst) {						/* case on opcode */
 case ioSFC:						/* skip flag clear */
 	PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioOTX:						/* output */
 	drc_cw = dat;
 	break;
@@ -310,7 +315,7 @@ if (drc_cw & CW_WR) {					/* write? */
 		uptr->hwmark = da + drd_ptr + 1;  }
 	drd_ptr = dr_incda (trk, sec, drd_ptr);		/* inc disk addr */
 	if (CMD (devd)) {				/* dch active? */
-	    setFLG (devd);				/* set dch flg */
+	    setFSR (devd);				/* set dch flg */
 	    sim_activate (uptr, dr_time);  }		/* sched next word */
 	else if (drd_ptr) {				/* done, need to fill? */
 	    for ( ; drd_ptr < DR_NUMWD; drd_ptr++)
@@ -321,7 +326,7 @@ else {							/* read */
 	    if ((da >= uptr->capac) || (sec >= DR_NUMSC)) drd_ibuf = 0;
 	    else drd_ibuf = bptr[da + drd_ptr];
 	    drd_ptr = dr_incda (trk, sec, drd_ptr);
-	    setFLG (devd);				/* set dch flg */
+	    setFSR (devd);				/* set dch flg */
 	    sim_activate (uptr, dr_time);  }		/* sched next word */
 	}
 return SCPE_OK;
@@ -354,6 +359,7 @@ drc_dib.cmd = drd_dib.cmd = 0;				/* clear cmd */
 drc_dib.ctl = drd_dib.ctl = 0;				/* clear ctl */
 drc_dib.fbf = drd_dib.fbf = 0;				/* clear fbf */
 drc_dib.flg = drd_dib.flg = 0;				/* clear flg */
+drc_dib.srq = drd_dib.srq = 0;				/* srq follows flg */
 sim_cancel (&drc_unit);
 return SCPE_OK;
 }
@@ -384,18 +390,17 @@ return SCPE_OK;
 
 /* Fixed head disk/drum bootstrap routine (disc subset of disc/paper tape loader) */
 
-#define CHANGE_DEV	(1 << 24)
 #define BOOT_BASE	056
 #define BOOT_START	060
 
-static const int32 dboot[IBL_LNT - BOOT_BASE] = {
-	0020000+CHANGE_DEV,	/*DMA 20000+DC */
+static const uint16 dr_rom[IBL_LNT - BOOT_BASE] = {
+	0020010,		/*DMA 20000+DC */
 	0000000,		/*    0 */
 	0107700,		/*    CLC 0,C */
 	0063756,		/*    LDA DMA		; DMA ctrl */
 	0102606,		/*    OTA 6 */
 	0002700,		/*    CLA,CCE */
-	0102601+CHANGE_DEV,	/*    OTA CC		; trk = sec = 0 */
+	0102611,		/*    OTA CC		; trk = sec = 0 */
 	0001500,		/*    ERA		; A = 100000 */
 	0102602,		/*    OTA 2		; DMA in, addr */
 	0063777,		/*    LDA M64 */
@@ -404,21 +409,25 @@ static const int32 dboot[IBL_LNT - BOOT_BASE] = {
 	0103706,		/*    STC 6,C		; start DMA */
 	0067776,		/*    LDB JSF		; get JMP . */
 	0074077,		/*    STB 77		; in base page */
-	0102700+CHANGE_DEV,	/*    STC DC		; start disc */
+	0102710,		/*    STC DC		; start disc */
 	0024077,		/*JSF JMP 77		; go wait */
 	0177700 };		/*M64 -100 */
 
 t_stat drc_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i, dev, ad;
+uint16 wd;
 
 if (unitno != 0) return SCPE_NOFNC;			/* only unit 0 */
 dev = drd_dib.devno;					/* get data chan dev */
 ad = ((MEMSIZE - 1) & ~IBL_MASK) & VAMASK;		/* start at mem top */
-for (i = 0; i < (IBL_LNT - BOOT_BASE); i++) {		/* copy bootstrap */
-	if (dboot[i] & CHANGE_DEV)			/* IO instr? */
-	    M[ad + BOOT_BASE + i] = (dboot[i] + dev) & DMASK;
-	else M[ad + BOOT_BASE + i] = dboot[i];  }
+for (i = BOOT_BASE; i < IBL_LNT; i++) {			/* copy bootstrap */
+	wd = dr_rom[i - BOOT_BASE];			/* get word */
+	if (((wd & I_NMRMASK) == I_IO) &&		/* IO instruction? */
+	    ((wd & I_DEVMASK) >= 010) &&		/* dev >= 10? */
+	    (I_GETIOOP (wd) != ioHLT))			/* not a HALT? */
+	    M[ad + i] = (wd + (dev - 010)) & DMASK;
+	else M[ad + i] = wd;  }
 PC = ad + BOOT_START;	
 return SCPE_OK;
 }

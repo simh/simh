@@ -81,7 +81,7 @@ PDP11 = ${PDP11D}pdp11_fp.c ${PDP11D}pdp11_cpu.c ${PDP11D}pdp11_dz.c \
 	${PDP11D}pdp11_tm.c ${PDP11D}pdp11_ts.c ${PDP11D}pdp11_io.c \
 	${PDP11D}pdp11_rq.c ${PDP11D}pdp11_tq.c ${PDP11D}pdp11_pclk.c \
 	${PDP11D}pdp11_ry.c ${PDP11D}pdp11_pt.c ${PDP11D}pdp11_hk.c \
-	${PDP11D}pdp11_xq.c ${PDP11D}pdp11_xu.c
+	${PDP11D}pdp11_xq.c ${PDP11D}pdp11_xu.c ${PDP11D}pdp11_vh.c
 PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -92,7 +92,8 @@ VAX = ${VAXD}vax_cpu1.c ${VAXD}vax_cpu.c ${VAXD}vax_fpa.c ${VAXD}vax_io.c \
 	${VAXD}vax_sysdev.c \
 	${PDP11D}pdp11_rl.c ${PDP11D}pdp11_rq.c ${PDP11D}pdp11_ts.c \
 	${PDP11D}pdp11_dz.c ${PDP11D}pdp11_lp.c ${PDP11D}pdp11_tq.c \
-	${PDP11D}pdp11_pt.c ${PDP11D}pdp11_xq.c ${PDP11D}pdp11_ry.c
+	${PDP11D}pdp11_pt.c ${PDP11D}pdp11_xq.c ${PDP11D}pdp11_ry.c \
+	${PDP11D}pdp11_vh.c
 VAX_OPT = -DVM_VAX -DUSE_INT64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -131,7 +132,7 @@ HP2100 = ${HP2100D}hp2100_stddev.c ${HP2100D}hp2100_dp.c ${HP2100D}hp2100_dq.c \
 	${HP2100D}hp2100_dr.c ${HP2100D}hp2100_lps.c ${HP2100D}hp2100_ms.c \
 	${HP2100D}hp2100_mt.c ${HP2100D}hp2100_mux.c ${HP2100D}hp2100_cpu.c \
 	${HP2100D}hp2100_fp.c ${HP2100D}hp2100_sys.c ${HP2100D}hp2100_lpt.c \
-	${HP2100D}hp2100_ipl.c 
+	${HP2100D}hp2100_ipl.c ${HP2100D}hp2100_ds.c
 HP2100_OPT = -I ${HP2100D}
 
 

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	18b PDP Simulator Usage
-Date:	4-Apr-2004
+Date:	15-Jun-2004
 
 			COPYRIGHT NOTICE
 
@@ -415,12 +415,6 @@ implements these registers:
 	DONE		1	device done flag
 	POS		32	number of characters input
 	TIME		24	keyboard polling interval
-
-If the simulator is debugged under Windows Visual C++, typing ^C to the
-terminal input causes a fatal run-time error.  Use the following command
-to simulate typing ^C:
-
-	SET TTI CTRL-C
 
 2.3.4 Terminal Output (TTO)
 

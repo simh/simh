@@ -1,103 +1,64 @@
-Notes For V3.2-0
+Notes For V3.2-1
 
 RESTRICTION: The PDP-15 FPP is only partially debugged.  Do NOT
 enable this feature for normal operations.
 
-WARNING: The core simulator files (scp.c, sim_*.c) have been
-reorganized.  Unzip V3.2-0 to an empty directory before attempting
-to compile the source.
-
-IMPORTANT: If you are compiling for UNIX, please read the notes
-for Ethernet very carefully.  You may need to download a new
-version of the pcap library, or make changes to the makefile,
-to get Ethernet support to work.
-
-1. New Features in 3.2-0
+1. New Features in 3.2-1
 
 1.1 SCP and libraries
 
-- Added SHOW <device> RADIX command.
-- Added SHOW <device> MODIFIERS command.
-- Added SHOW <device> NAMES command.
-- Added SET/SHOW <device> DEBUG command.
-- Added sim_vm_parse_addr and sim_vm_fprint_addr optional interfaces.
-- Added REG_VMAD flag.
-- Split SCP into separate libraries for easier modification.
-- Added more room to the device and unit flag fields.
-- Changed terminal multiplexor library to support unlimited.
-  number of async lines.
+- Added SET CONSOLE subhierarchy.
+- Added SHOW CONSOLE subhierarchy.
+- Added limited keyboard mapping capability.
 
-1.2 All DECtapes
+1.2 HP2100 (new features from Dave Bryan)
 
-- Added STOP_EOR flag to enable end-of-reel error stop
-- Added device debug support.
+- Added instruction printout to HALT message.
+- Added M and T internal registers.
+- Added N, S, and U breakpoints.
 
-1.3 Nova and Eclipse
+1.3 PDP-11 and VAX
 
-- Added QTY and ALM multiplexors (Bruce Ray).
+- Added DHQ11 support (from John Dundas)
 
-1.4 LGP-30
+2. Bugs Fixed in 3.2-1
 
-- Added LGP-30/LGP-21 simulator.
+2.1 HP2100 (most fixes from Dave Bryan)
 
-1.5 PDP-11
+- SBT increments B after store.
+- DMS console map must check dms_enb.
+- SFS x,C and SFC x,C work.
+- MP violation clears automatically on interrupt.
+- SFS/SFC 5 is not gated by protection enabled.
+- DMS enable does not disable mem prot checks.
+- DMS status inconsistent at simulator halt.
+- Examine/deposit are checking wrong addresses.
+- Physical addresses are 20b not 15b.
+- Revised DMS to use memory rather than internal format.
+- Revised IBL facility to conform to microcode.
+- Added DMA EDT I/O pseudo-opcode.
+- Separated DMA SRQ (service request) from FLG.
+- Revised peripherals to make SFS x,C and SFC x,C work.
+- Revised boot ROMs to use IBL facility.
+- Revised IBL treatment of SR to preserve SR<5:3>.
+- Fixed LPS, LPT timing.
+- Fixed DP boot interpretation of SR<0>.
+- Revised DR boot code to use IBL algorithm.
+- Fixed TTY input behavior during typeout for RTE-IV.
+- Suppressed nulls on TTY output for RTE-IV.
+- Added SFS x,C and SFC x,C to print/parse routines.
+- Fixed spurious timing error in magtape reads.
 
-- Added format, address increment inhibit, transfer overrun
-  detection to RK.
-- Added device debug support to HK, RP, TM, TQ, TS.
-- Added DEUNA/DELUA (XU) support (Dave Hittner).
-- Add DZ per-line logging.
+2.2 All DEC console devices
 
-1.6 18b PDP's
+- Removed SET TTI CTRL-C option.
 
-- Added support for 1-4 (PDP-9)/1-16 (PDP-15) additional
-  terminals.
+2.3 PDP-11/VAX peripherals
 
-1.7 PDP-10
+- Fixed bug in TQ reporting write protect status (reported by Lyle Bickley).
+- Fixed TK70 model number and media ID (found by Robert Schaffrath).
+- Fixed bug in autoconfigure (found by John Dundas).
 
-- Added DEUNA/DELUA (XU) support (Dave Hittner).
+2.4 VAX
 
-1.8 VAX
-
-- Added extended memory to 512MB (Mark Pizzolato).
-- Added RXV21 support.
-
-2. Bugs Fixed in 3.2-0
-
-2.1 SCP
-
-- Fixed double logging of SHOW BREAK (found by Mark Pizzolato).
-- Fixed implementation of REG_VMIO.
-
-2.2 Nova and Eclipse
-
-- Fixed device enable/disable support (found by Bruce Ray).
-
-2.3 PDP-1
-
-- Fixed bug in LOAD (found by Mark Crispin).
-
-2.4 PDP-10
-
-- Fixed bug in floating point unpack.
-- Fixed bug in FIXR (found by Phil Stone, fixed by Chris Smith).
-
-2.6 PDP-11
-
-- Fixed bug in RQ interrupt control (found by Tom Evans).
-
-2.6 PDP-18B
-
-- Fixed bug in PDP-15 XVM g_mode implementation.
-- Fixed bug in PDP-15 indexed address calculation.
-- Fixed bug in PDP-15 autoindexed address calculation.
-- Fixed bugs in FPP-15 instruction decode.
-- Fixed clock response to CAF.
-- Fixed bug in hardware read-in mode bootstrap.
-- Fixed PDP-15 XVM instruction decoding errors.
-
-2.7 VAX
-
-- Fixed PC read fault in EXTxV.
-- Fixed PC write fault in INSV.
-
+- Fixed bug in DIVBx and DIVWx (reported by Peter Trimmel).

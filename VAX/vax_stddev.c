@@ -27,6 +27,7 @@
    tto		terminal output
    clk		100Hz and TODR clock
 
+   28-May-04	RMS	Removed SET TTI CTRL-C
    29-Dec-03	RMS	Added console backpressure support
    25-Apr-03	RMS	Revised for extended file support
    02-Mar-02	RMS	Added SET TTI CTRL-C
@@ -74,7 +75,6 @@ t_stat clk_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
-t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 extern int32 sysd_hlt_enb (void);
 
@@ -102,8 +102,6 @@ REG tti_reg[] = {
 MTAB tti_mod[] = {
 	{ UNIT_8B, UNIT_8B, "8b", "8B", NULL },
 	{ UNIT_8B, 0      , "7b", "7B", NULL },
-	{ MTAB_XTD|MTAB_VDV|MTAB_VUN, 0, NULL, "CTRL-C",
-		&tti_set_ctrlc, NULL, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
 		NULL, &show_vec, NULL },
 	{ 0 }  };
@@ -290,18 +288,6 @@ tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);
 sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
-return SCPE_OK;
-}
-
-/* Set control-C */
-
-t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-if (cptr) return SCPE_ARG;
-uptr->buf = 003;
-uptr->pos = uptr->pos + 1;
-tti_csr = tti_csr | CSR_DONE;
-if (tti_csr & CSR_IE) SET_INT (TTI);
 return SCPE_OK;
 }
 

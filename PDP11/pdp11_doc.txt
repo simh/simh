@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	04-Apr-2004
+Date:	15-Jun-2004
 
 			COPYRIGHT NOTICE
 
@@ -84,6 +84,7 @@ sim/pdp11/	pdp11_defs.h
 		pdp11_tc.c
 		pdp11_tm.c
 		pdp11_ts.c
+		pdp11_vh.c
 		pdp11_xq.c
 		pdp11_xu.c
 
@@ -103,6 +104,7 @@ LPT		LP11 line printer
 CLK		line frequency clock
 PCLK		KW11P programmable clock
 DZ		DZ11 8-line terminal multiplexor (up to 4)
+VH		DHQ11 8-line terminal multiplexor (up to 4)
 RK		RK11/RK05 cartridge disk controller with eight drives
 HK		RK611/RK06(7) cartridge disk controller with eight drives
 RL		RLV12/RL01(2) cartridge disk controller with four drives
@@ -144,12 +146,12 @@ The CPU options include CPU mapping configuration (18b Unibus, 22b Unibus
 with RH70-style controllers, 22b Unibus with RH11 style controllers, and
 22b Qbus), the CIS instruction set, and the size of main memory.
 
-	SET CPU 18B		18b addressing, no I/O map
-	SET CPU URH11		22b addresssing, Unibus I/O map,
+	SET CPU U18		Unibus, no I/O map, 18b addressing
+	SET CPU URH11		Unibus, I/O map with 22b addressing,
 				18b mapped RH11 controller
-	SET CPU URH70		22b addressing, Unibus I/O map,
+	SET CPU URH70		Unibus, I/O map with 22b addressing,
 				22b unmapped RH70 controller
-	SET CPU 22B		22b addressing, no I/O map (Qbus)
+	SET CPU Q22		Qbus, no I/O map, 22b addressing
 	SET CPU NOCIS		disable CIS instructions (default)
 	SET CPU CIS		enable CIS instructions
 	SET CPU 16K		set memory size = 16KB
@@ -395,12 +397,6 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
-If the simulator is compiled under Windows Visual C++, typing ^C to the
-terminal input causes a fatal run-time error.  Use the following command
-to simulate typing ^C:
-
-	SET TTI CTRL-C
-
 2.3.4 DL11 Terminal Output (TTO)
 
 The terminal output (TTO) writes to the simulator console window.  It
@@ -498,81 +494,6 @@ The programmable clock autocalibrates; the clock interval is adjusted
 up or down so that the clock tracks actual elapsed time. Operation at
 the highest clock rate (100Khz) is not recommended.  The programmable
 clock is disabled by default.
-
-2.3.8 DZ11 Terminal Multiplexor (DZ)
-
-The DZ11 is an 8-line terminal multiplexor.  Up to 4 DZ11's (32 lines)
-are supported.  The number of lines can be changed with the command
-
-	SET DZ LINES=n		set line count to n
-
-The line count must be a multiple of 8, with a maximum of 32.
-
-The DZ11 supports 8-bit input and output of characters.  8-bit output
-may be incompatible with certain operating systems.  The command
-
-	SET DZ 7B
-
-forces output characters (only) to be masked to 7 bits.
-
-The DZ11 supports logging on a per-line basis.  The command
-
-	SET DZ LOG=line=filename
-
-enables logging for the specified line to the indicated file.  The
-command
-
-	SET DZ NOLOG=line
-
-disables logging for the specified line and closes any open log file.
-Finally, the command
-
-	SHOW DZ LOG
-
-displays logging information for all DZ lines.
-
-The terminal lines perform input and output through Telnet sessions
-connected to a user-specified port.  The ATTACH command specifies
-the port to be used:
-
-	ATTACH {-am} DZ <port>	set up listening port
-
-where port is a decimal number between 1 and 65535 that is not being used
-for other TCP/IP activities.  The optional switch -m turns on the DZ11's
-modem controls; the optional switch -a turns on active disconnects
-(disconnect session if computer clears Data Terminal Ready).  Without
-modem control, the DZ behaves as though terminals were directly connected;
-disconnecting the Telnet session does not cause any operating system-
-visible change in line status.
-
-Once the DZ is attached and the simulator is running, the DZ will listen
-for connections on the specified port.  It assumes that the incoming
-connections are Telnet connections.  The connection remains open until
-disconnected by the simulated program, the Telnet client, a SET DZ
-DISCONNECT command, or a DETACH DZ command.
-
-The SHOW DZ CONNECTIONS command displays the current connections to the DZ.
-The SHOW DZ STATISTICS command displays statistics for active connections.
-The SET DZ DISCONNECT=linenumber disconnects the specified line.
-
-The DZ11 implements these registers:
-
-	name		size	comments
-
-	CSR[0:3]	16	control/status register, boards 0..3
-	RBUF[0:3]	16	receive buffer, boards 0..3
-	LPR[0:3]	16	line parameter register, boards 0..3
-	TCR[0:3]	16	transmission control register, boards 0..3
-	MSR[0:3]	16	modem status register, boards 0..3
-	TDR[0:3]	16	transmit data register, boards 0..3
-	SAENB[0:3]	1	silo alarm enabled, boards 0..3
-	RXINT		4	receive interrupts, boards 3..0
-	TXINT		4	transmit interrupts, boards 3..0
-	MDMTCL		1	modem control enabled
-	AUTODS		1	autodisconnect enabled
-
-The DZ11 does not support save and restore.  All open connections are
-lost when the simulator shuts down or the DZ is detached.
 
 2.4 Floppy Disk Drives
 
@@ -1217,7 +1138,166 @@ Error handling is as follows:
 
 	OS I/O error		fatal tape error
 
-2.10 DELQA/DEQNA Qbus Ethernet Controllers (XQ, XQB)
+2.10 Communications Devices
+
+2.10.1 DZ11 Terminal Multiplexor (DZ)
+
+The DZ11 is an 8-line terminal multiplexor.  Up to 4 DZ11's (32 lines)
+are supported.  The number of lines can be changed with the command
+
+	SET DZ LINES=n		set line count to n
+
+The line count must be a multiple of 8, with a maximum of 32.
+
+The DZ11 supports 8-bit input and output of characters.  8-bit output
+may be incompatible with certain operating systems.  The command
+
+	SET DZ 7B
+
+forces output characters (only) to be masked to 7 bits.
+
+The DZ11 supports logging on a per-line basis.  The command
+
+	SET DZ LOG=line=filename
+
+enables logging for the specified line to the indicated file.  The
+command
+
+	SET DZ NOLOG=line
+
+disables logging for the specified line and closes any open log file.
+Finally, the command
+
+	SHOW DZ LOG
+
+displays logging information for all DZ lines.
+
+The terminal lines perform input and output through Telnet sessions
+connected to a user-specified port.  The ATTACH command specifies
+the port to be used:
+
+	ATTACH {-am} DZ <port>	set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.  The optional switch -m turns on the DZ11's
+modem controls; the optional switch -a turns on active disconnects
+(disconnect session if computer clears Data Terminal Ready).  Without
+modem control, the DZ behaves as though terminals were directly connected;
+disconnecting the Telnet session does not cause any operating system-
+visible change in line status.
+
+Once the DZ is attached and the simulator is running, the DZ will listen
+for connections on the specified port.  It assumes that the incoming
+connections are Telnet connections.  The connection remains open until
+disconnected by the simulated program, the Telnet client, a SET DZ
+DISCONNECT command, or a DETACH DZ command.
+
+The SHOW DZ CONNECTIONS command displays the current connections to the DZ.
+The SHOW DZ STATISTICS command displays statistics for active connections.
+The SET DZ DISCONNECT=linenumber disconnects the specified line.
+
+The DZ11 implements these registers:
+
+	name		size	comments
+
+	CSR[0:3]	16	control/status register, boards 0..3
+	RBUF[0:3]	16	receive buffer, boards 0..3
+	LPR[0:3]	16	line parameter register, boards 0..3
+	TCR[0:3]	16	transmission control register, boards 0..3
+	MSR[0:3]	16	modem status register, boards 0..3
+	TDR[0:3]	16	transmit data register, boards 0..3
+	SAENB[0:3]	1	silo alarm enabled, boards 0..3
+	RXINT		4	receive interrupts, boards 3..0
+	TXINT		4	transmit interrupts, boards 3..0
+	MDMTCL		1	modem control enabled
+	AUTODS		1	autodisconnect enabled
+
+The DZ11 does not support save and restore.  All open connections are
+lost when the simulator shuts down or the DZ is detached.
+
+2.10.2 DHQ11 Terminal Multiplexor (VH)
+
+The DHQ11 is an 8-line terminal multiplexor for Qbus systems.  Up
+to 4 DHQ11's are supported.
+
+The DHQ11 is a programmable asynchronous terminal multiplexor.  It
+has two programming modes: DHV11 and DHU11.  The register sets are
+compatible with these devices.  For transmission, the DHQ11 can be
+used in either DMA or programmed I/O mode.  For reception, there
+is a 256-entry FIFO for received characters, dataset status changes,
+and diagnostic information, and a programmable input interrupt
+timer (in DHU mode).  The device supports 16-, 18-, and 22-bit
+addressing.  The DHQ11 can be programmed to filter and/or handle
+XON/XOFF characters independently of the processor.  The DHQ11
+supports programmable bit width (between 5 and 8) for the input
+and output of characters.
+
+The DHQ11 has a rocker switch for determining the programming mode.
+By default, the DHV11 mode is selected, though DHU11 mode is
+recommended for applications that can support it.  The VH controller
+may be adjusted on a per controller basis as follows:
+
+	SET VHn DHU		use the DHU programming mode and registers
+	SET VHn DHV		use the DHV programming mode and registers
+
+DMA output is supported.  In a real DHQ11, DMA is not initiated
+immediately upon receipt of TX.DMA.START but is dependent upon some
+internal processes.  The VH controller mimics this behavior by default.
+It may be desirable to alter this and start immediately, though
+this may not be compatible with all operating systems and diagnostics.
+You can change the behavior of the VH controller as follows:
+
+	SET VHn NORMAL		use normal DMA procedures
+	SET VHn FASTDMA		set DMA to initiate immediately
+
+The terminal lines perform input and output through Telnet sessions
+connected to a user-specified port.  The ATTACH command specifies
+the port to be used:
+
+        ATTACH VH <port>	set up listening port
+	DETACH VH
+
+where port is a decimal number between 1 and 65535 that is not
+being used for other TCP/IP activities.  This port is the point of
+entry for al lines on all VH controllers.
+
+Modem and auto-disconnect support may be set on an individual
+controller basis.  The SET MODEM command directs the controller to
+report modem status changes to the computer.  The SET HANGUP command
+turns on active disconnects (disconnect session if computer clears
+Data Terminal Ready).
+
+	SET VHn [NO]MODEM	disable/enable modem control
+	SET VHn [NO]HANGUP	disable/enable disconnect on DTR drop
+
+Once the VH is attached and the simulator is running, the VH will
+listen for connections on the specified port.  It assumes that the
+incoming connections are Telnet connections.  The connection remains
+open until disconnected by the simulated program, the Telnet client,
+a SET VH DISCONNECT command, or a DETACH VH command.
+
+The SHOW VH CONNECTIONS command displays the current connections to the VH.
+The SHOW VH STATISTICS command displays statistics for active connections.
+The SET VH DISCONNECT=linenumber disconnects the specified line.
+
+The DHQ11 implements these registers, though not all can be examined
+from SCP:
+
+        name            size    comments
+
+        CSR[0:3]        16      control/status register, boards 0..3
+        RBUF[0:3]       16      receive buffer, boards 0..3
+        LPR[0:3]        16      line parameter register, boards 0..3
+        RXINT           4       receive interrupts, boards 3..0
+        TXINT           4       transmit interrupts, boards 3..0
+[more to be described...]
+
+The DHQ11 does not support save and restore.  All open connections
+are lost when the simulator shuts down or the VH is detached.
+
+2.11 Ethernet Controllers
+
+2.11.1 DELQA/DEQNA Qbus Ethernet Controllers (XQ, XQB)
 
 The simulator implements two DELQA/DEQNA Qbus Ethernet controllers (XQ,
 XQB).  Initially, XQ is enabled, and XQB is disabled.  Options allow
@@ -1301,10 +1381,10 @@ not limited to the ~1.5Mbit/sec of the real DEQNA/DELQA controllers,
 nor the 10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet
 (100 Mbit/sec) card, and "Feel the Power!" :-)
 
-2.11 DEUNA/DELUA Unibus Ethernet Controller (XU)
+2.11.2 DEUNA/DELUA Unibus Ethernet Controller (XU)
 
-XU simulates the DEUNA/DELUA Unibus Ethernet controller.  THe current
-implementation is a stub and is permanently disabled.
+XU simulates the DEUNA/DELUA Unibus Ethernet controller.  Its operation
+is analagous to the DELQA/DEQNA controller.
 
 2.12 Symbolic Display and Input
 

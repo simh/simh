@@ -23,6 +23,23 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-May-04	RMS	Fixed bugs and added features from Dave Bryan
+			- SBT increments B after store
+			- DMS console map must check dms_enb
+			- SFS x,C and SFC x,C work
+			- MP violation clears automatically on interrupt
+			- SFS/SFC 5 is not gated by protection enabled
+			- DMS enable does not disable mem prot checks
+			- DMS status inconsistent at simulator halt
+			- Examine/deposit are checking wrong addresses
+			- Physical addresses are 20b not 15b
+			- Revised DMS to use memory rather than internal format
+			- Added instruction printout to HALT message
+			- Added M and T internal registers
+			- Added N, S, and U breakpoints
+			Revised IBL facility to conform to microcode
+			Added DMA EDT I/O pseudo-opcode
+			Separated DMA SRQ (service request) from FLG
    12-Mar-03	RMS	Added logical name support
    02-Feb-03	RMS	Fixed last cycle bug in DMA output (found by Mike Gemeny)
    22-Nov-02	RMS	Added 21MX IOP support
@@ -55,6 +72,8 @@
    BR<15:0>		B register - addressable as location 1
    PC<14:0>		P register (program counter)
    SR<15:0>		S register
+   MR<14:0>		M register - memory address
+   TR<15:0>		T register - memory data
    E			extend flag (carry out)
    O			overflow flag
 
@@ -232,12 +251,13 @@
 	unknown I/O device and stop_dev flag set
 	I/O error in I/O simulator
 
-   2. Interrupts.  I/O devices are modelled as four parallel arrays:
+   2. Interrupts.  I/O devices are modelled as five parallel arrays:
 
 	device commands as bit array dev_cmd[2][31..0]
 	device flags as bit array dev_flg[2][31..0]
 	device flag buffers as bit array dev_fbf[2][31..0]
 	device controls as bit array dev_ctl[2][31..0]
+	device service requests as bit array dev_srq[3][31..0]
 
       The HP 2100 interrupt structure is based on flag, flag buffer,.
       and control.  If a device flag is set, the flag buffer is set,
@@ -251,6 +271,8 @@
       tells whether a device is active.  It is set by STC and cleared
       by CLC; it is also cleared when the device flag is set.  Simple
       devices don't need to track command separately from control.
+
+      Service requests are used to trigger the DMA service logic.
  
    3. Non-existent memory.  On the HP 2100, reads to non-existent memory
       return zero, and writes are ignored.  In the simulator, the
@@ -308,11 +330,15 @@
 #define DMAR0		1
 #define DMAR1		2
 
+#define ALL_BKPTS	(SWMASK('E')|SWMASK('N')|SWMASK('S')|SWMASK('U'))
+
 uint16 *M = NULL;					/* memory */
 uint32 saved_AR = 0;					/* A register */
 uint32 saved_BR = 0;					/* B register */
 uint32 PC = 0;						/* P register */
 uint32 SR = 0;						/* S register */
+uint32 MR = 0;						/* M register */
+uint32 TR = 0;						/* T register */
 uint32 XR = 0;						/* X register */
 uint32 YR = 0;						/* Y register */
 uint32 E = 0;						/* E register */
@@ -321,6 +347,7 @@ uint32 dev_cmd[2] = { 0 };				/* device command */
 uint32 dev_ctl[2] = { 0 };				/* device control */
 uint32 dev_flg[2] = { 0 };				/* device flags */
 uint32 dev_fbf[2] = { 0 };				/* device flag bufs */
+uint32 dev_srq[2] = { 0 };				/* device svc reqs */
 struct DMA dmac[2] = { { 0 }, { 0 } };			/* DMA channels */
 uint32 ion = 0;						/* interrupt enable */
 uint32 ion_defer = 0;					/* interrupt defer */
@@ -334,7 +361,7 @@ uint32 dms_enb = 0;					/* dms enable */
 uint32 dms_ump = 0;					/* dms user map */
 uint32 dms_sr = 0;					/* dms status reg */
 uint32 dms_vr = 0;					/* dms violation reg */
-uint32 dms_map[MAP_NUM * MAP_LNT] = { 0 };		/* dms maps */
+uint16 dms_map[MAP_NUM * MAP_LNT] = { 0 };		/* dms maps */
 uint32 iop_sp = 0;					/* iop stack */
 uint32 ind_max = 16;					/* iadr nest limit */
 uint32 stop_inst = 1;					/* stop on ill inst */
@@ -361,6 +388,7 @@ extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
 extern FILE *sim_log;
 extern DEVICE *sim_devices[];
+extern char halt_msg[];
 
 t_stat Ea (uint32 IR, uint32 *addr, uint32 irq);
 t_stat Ea1 (uint32 *addr, uint32 irq);
@@ -390,6 +418,7 @@ void dma_cycle (uint32 chan, uint32 map);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
+t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 t_stat dma0_reset (DEVICE *dptr);
 t_stat dma1_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -417,18 +446,20 @@ REG cpu_reg[] = {
 	{ ORDATA (P, PC, 15) },
 	{ ORDATA (A, saved_AR, 16) },
 	{ ORDATA (B, saved_BR, 16) },
+	{ ORDATA (M, MR, 15) },
+	{ ORDATA (T, TR, 16), REG_RO },
 	{ ORDATA (X, XR, 16) },
 	{ ORDATA (Y, YR, 16) },
 	{ ORDATA (S, SR, 16) },
-	{ ORDATA (F, mp_fence, 15) },
 	{ FLDATA (E, E, 0) },
 	{ FLDATA (O, O, 0) },
 	{ FLDATA (ION, ion, 0) },
 	{ FLDATA (ION_DEFER, ion_defer, 0) },
-	{ ORDATA (IADDR, intaddr, 6) },
+	{ ORDATA (CIR, intaddr, 6) },
 	{ FLDATA (MPCTL, dev_ctl[PRO/32], INT_V (PRO)) },
 	{ FLDATA (MPFLG, dev_flg[PRO/32], INT_V (PRO)) },
 	{ FLDATA (MPFBF, dev_fbf[PRO/32], INT_V (PRO)) },
+	{ ORDATA (MPFR, mp_fence, 15) },
 	{ ORDATA (MPVR, mp_viol, 16) },
 	{ FLDATA (MPMEV, mp_mevff, 0) },
 	{ FLDATA (MPEVR, mp_evrff, 0) },
@@ -436,7 +467,7 @@ REG cpu_reg[] = {
 	{ FLDATA (DMSCUR, dms_ump, VA_N_PAG) },
 	{ ORDATA (DMSSR, dms_sr, 16) },
 	{ ORDATA (DMSVR, dms_vr, 16) },
-	{ BRDATA (DMSMAP, dms_map, 8, PA_N_SIZE, MAP_NUM * MAP_LNT) },
+	{ BRDATA (DMSMAP, dms_map, 8, 16, MAP_NUM * MAP_LNT) },
 	{ ORDATA (IOPSP, iop_sp, 16) },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ FLDATA (STOP_DEV, stop_dev, 1) },
@@ -452,6 +483,8 @@ REG cpu_reg[] = {
 	{ ORDATA (LFLG, dev_flg[1], 32), REG_HRO },
 	{ ORDATA (HFBF, dev_fbf[0], 32), REG_HRO },
 	{ ORDATA (LFBF, dev_fbf[1], 32), REG_HRO },
+	{ ORDATA (HSRQ, dev_srq[0], 32), REG_HRO },
+	{ ORDATA (LSRQ, dev_srq[1], 32), REG_HRO },
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
@@ -499,9 +532,9 @@ MTAB cpu_mod[] = {
 
 DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
-	1, 8, 15, 1, 8, 16,
+	1, 8, PA_N_SIZE, 1, 8, 16,
 	&cpu_ex, &cpu_dep, &cpu_reset,
-	NULL, NULL, NULL };
+	&cpu_boot, NULL, NULL };
 
 /* DMA controller data structures
 
@@ -663,6 +696,7 @@ int32 (*dtab[64])() = {
 t_stat sim_instr (void)
 {
 uint32 intrq, dmarq;					/* set after setjmp */
+uint32 iotrap = 0;					/* set after setjmp */
 t_stat reason;						/* set after setjmp */
 int32 i, dev;						/* temp */
 DEVICE *dptr;						/* temp */
@@ -684,6 +718,7 @@ dev_cmd[0] = dev_cmd[0] & M_FXDEV;			/* clear dynamic info */
 dev_ctl[0] = dev_ctl[0] & M_FXDEV;
 dev_flg[0] = dev_flg[0] & M_FXDEV;
 dev_fbf[0] = dev_fbf[0] & M_FXDEV;
+dev_srq[0] = dev_srq[1] = 0;				/* init svc requests */
 dev_cmd[1] = dev_ctl[1] = dev_flg[1] = dev_fbf[1] = 0;
 for (i = 0; dptr = sim_devices[i]; i++) {		/* loop thru dev */
 	dibp = (DIB *) dptr->ctxt;			/* get DIB */
@@ -694,6 +729,7 @@ for (i = 0; dptr = sim_devices[i]; i++) {		/* loop thru dev */
 	    if (dibp->flg) { setFLG (dev); }		/* restore flg */
 	    clrFBF (dev);				/* also sets fbf */
 	    if (dibp->fbf) { setFBF (dev); }		/* restore fbf */
+	    if (dibp->srq) { setSRQ (dev); }		/* restore srq */
 	    dtab[dev] = dibp->iot;  }  }		/* set I/O dispatch */
 sim_rtc_init (clk_delay (0));				/* recalibrate clock */
 
@@ -719,7 +755,7 @@ while (reason == 0) {					/* loop until halted */
 uint32 IR, MA, M1, absel, v1, v2, t;
 uint32 fop, eop, etype, eflag;
 uint32 skip, mapi, mapj, qs, rs;
-uint32 awc, sc, wc, hp, tp, iotrap;
+uint32 awc, sc, wc, hp, tp;
 int32 sop1, sop2;
 
 if (sim_interval <= 0) {				/* check clock queue */
@@ -733,9 +769,21 @@ if (dmarq) {
 	dmarq = calc_dma ();				/* recalc DMA reqs */
 	intrq = calc_int ();  }				/* recalc interrupts */
 
+/*  (From Dave Bryan)
+    Unlike most other I/O devices, the MP flag flip-flop is cleared
+    automatically when the interrupt is acknowledged and not by a programmed
+    instruction (CLF and STF affect the parity error enable FF instead).
+    Section 4.4.3 "Memory Protect and I/O Interrupt Generation" of the "HP 1000
+    M/E/F-Series Computers Engineering and Reference Documentation" (HP
+    92851-90001) says:
+
+      "When IAK occurs and IRQ5 is asserted, the FLAGBFF is cleared, FLAGFF
+       clocked off at next T2, and IRQ5 will no longer occur." */
+
 if (intrq && ((intrq <= PRO) || !ion_defer)) {		/* interrupt request? */
 	iotrap = 1;					/* I/O trap cell instr */
 	clrFBF (intrq);					/* clear flag buffer */
+	if (intrq == PRO) clrFLG (PRO);			/* MP flag follows flag buffer */
 	intaddr = intrq;				/* save int addr */
 	if (dms_enb) dms_sr = dms_sr | MST_ENBI;	/* dms enabled? */
 	else dms_sr = dms_sr & ~MST_ENBI;
@@ -752,8 +800,12 @@ if (intrq && ((intrq <= PRO) || !ion_defer)) {		/* interrupt request? */
 
 else {	iotrap = 0;					/* normal instruction */
 	err_PC = PC;					/* save PC for error */
-	if (sim_brk_summ &&
-	    sim_brk_test (PC, SWMASK ('E'))) {		/* breakpoint? */
+	if (sim_brk_summ &&				/* any breakpoints? */
+	    sim_brk_test (PC, ALL_BKPTS) &&		/* at this location? */
+	    (sim_brk_test (PC, SWMASK ('E')) ||		/* unconditional? */
+	     sim_brk_test (PC, dms_enb?			/* or right type for DMS? */
+			(dms_ump? SWMASK ('U'): SWMASK ('S')):
+			SWMASK ('N')))) {
 	    reason = STOP_IBKPT;			/* stop simulation */
 	    break;  }
 	if (mp_evrff) mp_viol = PC;			/* if ok, upd mp_viol */
@@ -1200,19 +1252,23 @@ case 0203:case 0213:					/* MAC1 ext */
 	    break;
 	case 0221:					/* IOP PRFIO (I_NO) */
 	case 0473:					/* IOPX PFRIO (I_NO) */
-	    IR = ReadW (PC);				/* get IO instr */
+	    t = ReadW (PC);				/* get IO instr */
 	    PC = (PC + 1) & VAMASK;
 	    WriteW (PC, 1);				/* set flag */
 	    PC = (PC + 1) & VAMASK;
-	    reason = iogrp (IR, 0);			/* execute instr */
+	    reason = iogrp (t, 0);			/* execute instr */
+	    dmarq = calc_dma ();			/* recalc DMA */
+	    intrq = calc_int ();			/* recalc interrupts */
 	    break;
 	case 0222:					/* IOP PRFEI (I_NO) */
 	case 0471:					/* IOPX PFREI (I_NO) */
-	    IR = ReadW (PC);				/* get IO instr */
+	    t = ReadW (PC);				/* get IO instr */
 	    PC = (PC + 1) & VAMASK;
 	    WriteW (PC, 1);				/* set flag */
 	    PC = (PC + 1) & VAMASK;
-	    reason = iogrp (IR, 0);			/* execute instr */
+	    reason = iogrp (t, 0);			/* execute instr */
+	    dmarq = calc_dma ();			/* recalc DMA */
+	    intrq = calc_int ();			/* recalc interrupts */
 							/* fall through */
 	case 0223:					/* IOP PRFEX (I_NO) */
 	case 0472:					/* IOPX PFREX (I_NO) */
@@ -1655,6 +1711,7 @@ case 0203:case 0213:					/* MAC1 ext */
 	    break;
 	case 0764:					/* SBT (E_NO) */
 	    WriteB (BR, AR);				/* store byte */
+	    BR = (BR + 1) & DMASK;			/* incr ptr */
 	    break;
 	IOP_MBYTE:					/* IOP MBYTE (I_AZ) */
 	    if (wc & SIGN) break;			/* must be positive */
@@ -1763,8 +1820,12 @@ if (reason == STOP_INDINT) {				/* indirect intr? */
 
 /* Simulation halted */
 
+if (iotrap && (reason == STOP_HALT)) MR = intaddr;	/* HLT in trap cell? */
+else MR = (PC - 1) & VAMASK;				/* no, M = P - 1 */
+TR = ReadIO (MR, dms_ump);				/* last word fetched */
 saved_AR = AR & DMASK;
 saved_BR = BR & DMASK;
+dms_upd_sr ();						/* update dms_sr */
 for (i = 0; dptr = sim_devices[i]; i++) {		/* loop thru dev */
 	dibp = (DIB *) dptr->ctxt;			/* get DIB */
 	if (dibp) {					/* exist? */
@@ -1772,7 +1833,8 @@ for (i = 0; dptr = sim_devices[i]; i++) {		/* loop thru dev */
 	    dibp->cmd = CMD (dev);
 	    dibp->ctl = CTL (dev);
 	    dibp->flg = FLG (dev);
-	    dibp->fbf = FBF (dev);  }  }
+	    dibp->fbf = FBF (dev);
+	    dibp->srq = SRQ (dev);  }  }
 pcq_r->qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }
@@ -1865,7 +1927,10 @@ iodata = devdisp (dev, sop, ir, ABREG[ab]);		/* process I/O */
 ion_defer = defer_tab[sop];				/* set defer */
 if ((sop == ioMIX) || (sop == ioLIX))			/* store ret data */
 	ABREG[ab] = iodata & DMASK;
-if (sop == ioHLT) return STOP_HALT;			/* halt? */
+if (sop == ioHLT) {					/* halt? */
+	int32 len = strlen (halt_msg);			/* find end msg */
+	sprintf (&halt_msg[len - 6], "%06o", ir);	/* add the halt */
+	return STOP_HALT;  }
 return (iodata >> IOT_V_REASON);			/* return status */
 }
 
@@ -1883,9 +1948,9 @@ uint32 calc_dma (void)
 {
 uint32 r = 0;
 
-if (CMD (DMA0) && FLG (dmac[0].cw1 & I_DEVMASK))	/* check DMA0 cycle */
+if (CMD (DMA0) && SRQ (dmac[0].cw1 & I_DEVMASK))	/* check DMA0 cycle */
 	r = r | DMAR0;
-if (CMD (DMA1) && FLG (dmac[1].cw1 & I_DEVMASK))	/* check DMA1 cycle */
+if (CMD (DMA1) && SRQ (dmac[1].cw1 & I_DEVMASK))	/* check DMA1 cycle */
 	r = r | DMAR1;
 return r;
 }
@@ -1994,7 +2059,14 @@ else pa = va;
 return M[pa];
 }
 
-/* Memory protection test for writes */
+/* Memory protection test for writes
+
+   From Dave Bryan: The problem is that memory writes aren't being checked for
+   an MP violation if DMS is enabled, i.e., if DMS is enabled, and the page is
+   writable, then whether the target is below the MP fence is not checked. [The
+   simulator must] do MP check on all writes after DMS translation and violation
+   checks are done (so, to pass, the page must be writable AND the target must
+   be above the MP fence). */
 
 #define MP_TEST(x)	(CTL (PRO) && ((x) > 1) && ((x) < mp_fence))
 
@@ -2003,8 +2075,8 @@ void WriteB (uint32 va, uint32 dat)
 uint32 pa;
 
 if (dms_enb) pa = dms (va >> 1, dms_ump, WR);
-else {	if (MP_TEST (va >> 1)) ABORT (ABORT_PRO);
-	pa = va >> 1;  }
+else pa = va >> 1;
+if (MP_TEST (va >> 1)) ABORT (ABORT_PRO);
 if (MEM_ADDR_OK (pa)) {
 	if (va & 1) M[pa] = (M[pa] & 0177400) | (dat & 0377);
 	else M[pa] = (M[pa] & 0377) | ((dat & 0377) << 8); }
@@ -2018,8 +2090,8 @@ uint32 pa;
 if (dms_enb) {
 	dms_viol (va >> 1, MVI_WPR);			/* viol if prot */
 	pa = dms (va >> 1, dms_ump ^ MAP_LNT, WR);  }
-else {	if (MP_TEST (va >> 1)) ABORT (ABORT_PRO);
-	pa = va >> 1;  }
+else pa = va >> 1;
+if (MP_TEST (va >> 1)) ABORT (ABORT_PRO);
 if (MEM_ADDR_OK (pa)) {
 	if (va & 1) M[pa] = (M[pa] & 0177400) | (dat & 0377);
 	else M[pa] = (M[pa] & 0377) | ((dat & 0377) << 8); }
@@ -2031,8 +2103,8 @@ void WriteW (uint32 va, uint32 dat)
 uint32 pa;
 
 if (dms_enb) pa = dms (va, dms_ump, WR);
-else {	if (MP_TEST (va)) ABORT (ABORT_PRO);
-	pa = va;  }
+else pa = va;
+if (MP_TEST (va)) ABORT (ABORT_PRO);
 if (MEM_ADDR_OK (pa)) M[pa] = dat;
 return;
 }
@@ -2044,8 +2116,8 @@ int32 pa;
 if (dms_enb) {
 	dms_viol (va, MVI_WPR);				/* viol if prot */
 	pa = dms (va, dms_ump ^ MAP_LNT, WR);  }
-else {	if (MP_TEST (va)) ABORT (ABORT_PRO);
-	pa = va;  }
+else pa = va;
+if (MP_TEST (va)) ABORT (ABORT_PRO);
 if (MEM_ADDR_OK (pa)) M[pa] = dat;
 return;
 }
@@ -2076,8 +2148,8 @@ if (pgn == 0) {						/* base page? */
 	    if (prot == WR) dms_viol (va, MVI_BPG);	/* if W, viol */
 	    return va;  }  }				/* no mapping */
 mpr = dms_map[map + pgn];				/* get map reg */
-if (mpr & prot) dms_viol (va, prot << (MVI_V_WPR - MAPA_V_WPR));
-return (PA_GETPAG (mpr) | VA_GETOFF (va));
+if (mpr & prot) dms_viol (va, prot);			/* prot violation? */
+return (MAP_GETPAG (mpr) | VA_GETOFF (va));
 }
 
 /* DMS relocation for IO access */
@@ -2095,19 +2167,24 @@ if (pgn == 0) {						/* base page? */
 	    (va < dms_fence)) {				/* 0B10: < fence */
 	    return va;  }  }				/* no mapping */
 mpr = dms_map[map + pgn];				/* get map reg */
-return (PA_GETPAG (mpr) | VA_GETOFF (va));
+return (MAP_GETPAG (mpr) | VA_GETOFF (va));
 }
 
 /* DMS relocation for console access */
 
 uint32 dms_cons (uint32 va, int32 sw)
 {
-if (sw & SWMASK ("V")) return dms_io (va, dms_ump);
-if (sw & SWMASK ("S")) return dms_io (va, SMAP);
-if (sw & SWMASK ("U")) return dms_io (va, UMAP);
-if (sw & SWMASK ("P")) return dms_io (va, PAMAP);
-if (sw & SWMASK ("Q")) return dms_io (va, PBMAP);
-return va;
+uint32 map_sel;
+
+if (sw & SWMASK ('V')) map_sel = dms_ump;		/* switch? select map */
+else if (sw & SWMASK ('S')) map_sel = SMAP;
+else if (sw & SWMASK ('U')) map_sel = UMAP;
+else if (sw & SWMASK ('P')) map_sel = PAMAP;
+else if (sw & SWMASK ('Q')) map_sel = PBMAP;
+else return va;						/* no switch, physical */
+if (va >= VASIZE) return MEMSIZE;			/* virtual, must be 15b */
+else if (dms_enb) return dms_io (va, map_sel);		/* DMS on? go thru map */
+else return va;						/* else return virtual */
 }
 
 /* Mem protect and DMS validation for jumps */
@@ -2131,19 +2208,14 @@ return;
 
 uint16 dms_rmap (uint32 mapi)
 {
-int32 t;
-
 mapi = mapi & MAP_MASK;
-t = (((dms_map[mapi] >> VA_N_OFF) & PA_M_PAG) |
-	((dms_map[mapi] & (RD | WR)) << (MAPM_V_WPR - MAPA_V_WPR)));
-return (uint16) t;
+return (dms_map[mapi] & ~MAP_MBZ);
 }
 
 void dms_wmap (uint32 mapi, uint32 dat)
 {
 mapi = mapi & MAP_MASK;
-dms_map[mapi] = ((dat & PA_M_PAG) << VA_N_OFF) |
-	((dat >> (MAPM_V_WPR - MAPA_V_WPR)) & (RD | WR));
+dms_map[mapi] = (uint16) (dat & ~MAP_MBZ);
 return;
 }
 
@@ -2172,7 +2244,24 @@ if (CTL (PRO)) dms_sr = dms_sr | MST_PRO;
 return dms_sr;
 }
 
-/* Device 0 (CPU) I/O routine */
+/* Device 0 (CPU) I/O routine
+
+   From Dave Bryan: RTE uses the undocumented instruction "SFS 0,C" to both test
+   and turn off the interrupt system.  This is confirmed in the "RTE-6/VM
+   Technical Specifications" manual (HP 92084-90015), section 2.3.1 "Process
+   the Interrupt", subsection "A.1 $CIC":
+
+   "Test to see if the interrupt system is on or off. This is done with the
+    SFS 0,C instruction.  In either case, turn it off (the ,C does it)."
+
+   ...and in section 5.8, "Parity Error Detection":
+
+   "Because parity error interrupts can occur even when the interrupt system
+    is off, the code at $CIC must be able to save the complete system status.
+    The major hole in being able to save the complete state is in saving the
+    interrupt system state. In order to do this in both the 21MX and the 21XE
+    the instruction 103300 was used to both test the interrupt system and
+    turn it off." */
 
 int32 cpuio (int32 inst, int32 IR, int32 dat)
 {
@@ -2184,10 +2273,10 @@ case ioFLG:						/* flag */
 	return dat;
 case ioSFC:						/* skip flag clear */
 	if (!ion) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioSFS:						/* skip flag set */
 	if (ion) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioLIX:						/* load */
 	dat = 0;					/* returns 0 */
 	break;
@@ -2249,7 +2338,11 @@ default:
 return dat;
 }
 
-/* Device 5 (memory protect) I/O routine */
+/* Device 5 (memory protect) I/O routine
+
+   From Dave Bryan: Examination of the schematics for the MP card in the
+   engineering documentation shows that the SFS and SFC I/O backplane signals
+   gate the output of the MEVFF onto the SKF line unconditionally. */
 
 int32 proio (int32 inst, int32 IR, int32 dat)
 {
@@ -2257,13 +2350,11 @@ if ((cpu_unit.flags & UNIT_MPR) == 0)			/* not installed? */
 	return nulio (inst, IR, dat);			/* non-existent dev */
 switch (inst) {						/* case on opcode */
 case ioSFC:						/* skip flag clear */
-	if (FLG (PRO) && !mp_mevff)			/* skip if mem prot */
-	    PC = (PC + 1) & VAMASK;
-	return dat;
+	if (!mp_mevff) PC = (PC + 1) & VAMASK;		/* skip if mem prot */
+	break;
 case ioSFS:						/* skip flag set */
-	if (FLG (PRO) && mp_mevff)			/* skip if DMS */
-	    PC = (PC + 1) & VAMASK;
-	return dat;
+	if (mp_mevff) PC = (PC + 1) & VAMASK;		/* skip if DMS */
+	break;
 case ioMIX:						/* merge */
 	dat = dat | mp_viol;
 	break;
@@ -2329,10 +2420,10 @@ case ioFLG:						/* flag */
 	break;
 case ioSFC:						/* skip flag clear */
 	if (FLG (DMA0 + ch) == 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioSFS:						/* skip flag set */
 	if (FLG (DMA0 + ch) != 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioMIX: case ioLIX:					/* load, merge */
 	dat = DMASK;
 	break;
@@ -2358,9 +2449,10 @@ return dat;
    - CLC requested: issue CLC
    Output cases:
    - neither STC nor CLC requested: issue CLF
-   - CLC requested but not STC: issue CLC,C
    - STC requested but not CLC: issue STC,C
-   - STC and CLC both requested: issue STC,C and CLC,C
+   - CLC requested but not STC: issue CLC,C
+   - STC and CLC both requested: issue STC,C and CLC,C, in that order
+   Either: issue EDT
 */
 
 void dma_cycle (uint32 ch, uint32 map)
@@ -2380,20 +2472,24 @@ dmac[ch].cw3 = (dmac[ch].cw3 + 1) & DMASK;		/* incr wcount */
 if (dmac[ch].cw3) {					/* more to do? */
 	if (dmac[ch].cw1 & DMA1_STC)			/* if STC flag, */
 	    devdisp (dev, ioCTL, I_HC + dev, 0);	/* do STC,C dev */
-	else devdisp (dev, ioFLG, I_HC + dev, 0);  }	/* else CLF dev */
+	else devdisp (dev, ioFLG, I_HC + dev, 0);	/* else CLF dev */
+	}
 else {	if (inp) {					/* last cycle, input? */
 	    if (dmac[ch].cw1 & DMA1_CLC)		/* CLC at end? */
 		devdisp (dev, ioCTL, I_CTL + dev, 0);	/* yes */
 	    }						/* end input */
 	else {						/* output */
-	    devdisp (dev, ioFLG, I_HC + dev, 0);	/* clear flag */
+	    if ((dmac[ch].cw1 & (DMA1_STC | DMA1_CLC)) == 0)
+		devdisp (dev, ioFLG, I_HC + dev, 0);	/* clear flag */
 	    if (dmac[ch].cw1 & DMA1_STC)		/* if STC flag, */
-		devdisp (dev, ioCTL, dev, 0);		/* do STC dev */
+		devdisp (dev, ioCTL, I_HC + dev, 0);	/* do STC,C dev */
 	    if (dmac[ch].cw1 & DMA1_CLC)		/* CLC at end? */
-	        devdisp (dev, ioCTL, I_CTL + dev, 0);	/* yes */
+	        devdisp (dev, ioCTL, I_HC + I_CTL + dev, 0);	/* yes */
 	    }						/* end output */
 	setFLG (DMA0 + ch);				/* set DMA flg */
-	clrCMD (DMA0 + ch);  }				/* clr DMA cmd */
+	clrCMD (DMA0 + ch);				/* clr DMA cmd */
+	devdisp (dev, ioEDT, dev, 0);			/* do EDT */
+	}
 return;
 }
 
@@ -2428,6 +2524,7 @@ clrCMD (PRO);
 clrCTL (PRO);
 clrFLG (PRO);
 clrFBF (PRO);
+dev_srq[0] = dev_srq[0] & ~M_FXDEV;
 mp_fence = 0;						/* init mprot */
 mp_viol = 0;
 mp_mevff = 0;
@@ -2436,7 +2533,8 @@ dms_enb = dms_ump = 0;					/* init DMS */
 dms_sr = 0;
 dms_vr = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-sim_brk_types = sim_brk_dflt = SWMASK ('E');
+sim_brk_types = ALL_BKPTS;
+sim_brk_dflt = SWMASK ('E');
 if (M == NULL) M = calloc (PASIZE, sizeof (unsigned int16));
 if (M == NULL) return SCPE_MEM;
 if (pcq_r) pcq_r->qptr = 0;
@@ -2449,6 +2547,7 @@ t_stat dma0_reset (DEVICE *tptr)
 clrCMD (DMA0);
 clrCTL (DMA0);
 setFLG (DMA0);
+clrSRQ (DMA0);
 dmac[0].cw1 = dmac[0].cw2 = dmac[0].cw3 = 0;
 return SCPE_OK;
 }
@@ -2458,6 +2557,7 @@ t_stat dma1_reset (DEVICE *tptr)
 clrCMD (DMA1);
 clrCTL (DMA1);
 setFLG (DMA1);
+clrSRQ (DMA1);
 dmac[1].cw1 = dmac[1].cw2 = dmac[1].cw3 = 0;
 return SCPE_OK;
 }
@@ -2468,8 +2568,8 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 int32 d;
 
-if (addr >= MEMSIZE) return SCPE_NXM;
 addr = dms_cons (addr, sw);
+if (addr >= MEMSIZE) return SCPE_NXM;
 if (addr == 0) d = saved_AR;
 else if (addr == 1) d = saved_BR;
 else d = M[addr];
@@ -2481,8 +2581,8 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
 addr = dms_cons (addr, sw);
+if (addr >= MEMSIZE) return SCPE_NXM;
 if (addr == 0) saved_AR = val & DMASK;
 else if (addr == 1) saved_BR = val & DMASK;
 else M[addr] = val & DMASK;
@@ -2558,7 +2658,7 @@ t_bool dev_conflict (void)
 {
 DEVICE *dptr, *cdptr;
 DIB *dibp, *chkp;
-int32 i, j, dno;
+uint32 i, j, dno;
 
 for (i = 0; cdptr = sim_devices[i]; i++) {
 	chkp = (DIB *) cdptr->ctxt;
@@ -2598,5 +2698,60 @@ for (i = 0; opt_val[i].optf != 0; i++) {
 	    if (val == UNIT_DMS) uptr->flags |= UNIT_MPR;
 	    return SCPE_OK;  }  }
 return SCPE_NOFNC;
+}
+
+/* IBL routine (CPU boot) */
+
+t_stat cpu_boot (int32 unitno, DEVICE *dptr)
+{
+extern const uint16 ptr_rom[IBL_LNT], dq_rom[IBL_LNT], ms_rom[IBL_LNT];
+int32 dev = (SR >> IBL_V_DEV) & I_DEVMASK;
+int32 sel = (SR >> IBL_V_SEL) & IBL_M_SEL;
+
+if (dev < 010) return SCPE_NOFNC;
+switch (sel) {
+case 0:							/* PTR boot */
+	ibl_copy (ptr_rom, dev);
+	break;
+case 1:							/* DP/DQ boot */
+	ibl_copy (dq_rom, dev);
+	break;
+case 2:							/* MS boot */
+	ibl_copy (ms_rom, dev);
+	break;
+default:
+	return SCPE_NOFNC;  }
+return SCPE_OK;
+}
+
+/* IBL boot ROM copy
+
+   - Use memory size to set the initial PC and base of the boot area
+   - Copy boot ROM to memory, updating I/O instructions
+   - Place 2's complement of boot base in last location
+
+   Notes:
+   - SR settings are done by the caller
+   - Boot ROM's must be assembled with a device code of 10 (10 and 11 for
+     devices requiring two codes)
+*/
+
+t_stat ibl_copy (const uint16 pboot[IBL_LNT], int32 dev)
+{
+int32 i;
+uint16 wd;
+
+if (dev < 010) return SCPE_ARG;				/* valid device? */
+PC = ((MEMSIZE - 1) & ~IBL_MASK) & VAMASK;		/* start at mem top */
+for (i = 0; i < IBL_LNT; i++) {				/* copy bootstrap */
+	wd = pboot[i];					/* get word */
+	if (((wd & I_NMRMASK) == I_IO) &&		/* IO instruction? */
+	    ((wd & I_DEVMASK) >= 010) &&		/* dev >= 10? */
+	    (I_GETIOOP (wd) != ioHLT))			/* not a HALT? */
+	    M[PC + i] = (wd + (dev - 010)) & DMASK;	/* change dev code */
+	else M[PC + i] = wd;  }				/* leave unchanged */
+M[PC + IBL_DPC] = (M[PC + IBL_DPC] + (dev - 010)) & DMASK;	/* patch DMA ctrl */
+M[PC + IBL_END] = (~PC + 1) & DMASK;			/* fill in start of boot */
+return SCPE_OK;
 }
 

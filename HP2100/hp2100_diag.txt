@@ -169,3 +169,12 @@ Peripherals
 	- test 19 uses non-supported read rev
 13183	7970E magtape				not run		in 21MX CE	no
 12920	multiplexor				not run		in 21MX CE	no
+
+Bug List (post-release)
+
+1. SFS x,C and SFC x,C work for all devices, not just device 1.
+2. DMS protection does not disable conventional memory protection.
+3. Memory protect violation clears automatically when the interrupt is acknowledged.
+4. SFS/SFC 5 is not gated by protection enabled.
+
+3. SBT increments B after the byte store.

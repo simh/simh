@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   28-May-04	RMS	Added DHQ support
    25-Jan-04	RMS	Removed local debug logging support
    22-Dec-03	RMS	Added second DEUNA/DELUA support
    18-Oct-03	RMS	Added DECtape off reel message
@@ -74,6 +75,8 @@
 #define UNIMEMSIZE	001000000			/* 2**18 */
 #define UNIMASK		(UNIMEMSIZE - 1)		/* 2**18 - 1 */
 #define IOPAGEBASE	017760000			/* 2**22 - 2**13 */
+#define IOPAGESIZE	000020000			/* 2**13 */
+#define IOPAGEMASK	(IOPAGESIZE - 1)		/* 2**13 - 1 */
 #define MAXMEMSIZE	020000000			/* 2**22 */
 #define PAMASK		(MAXMEMSIZE - 1)		/* 2**22 - 1 */
 #define MEMSIZE		(cpu_unit.capac)
@@ -308,8 +311,9 @@ typedef struct fpac fpac_t;
 
 /* IO parameters */
 
-#define DZ_MUXES	4				/* max # of muxes */
-#define DZ_LINES	8				/* lines per mux */
+#define DZ_MUXES	4				/* max # of DZ muxes */
+#define DZ_LINES	8				/* lines per DZ mux */
+#define VH_MUXES	4				/* max # of VH muxes */
 #define MT_MAXFR	(1 << 16)			/* magtape max rec */
 #define AUTO_LNT	34				/* autoconfig ranks */
 #define DIB_MAX		100				/* max DIBs */
@@ -359,6 +363,8 @@ typedef struct pdp_dib DIB;
 #define IOLN_RQC	004
 #define IOBA_RQD	(IOPAGEBASE + IOBA_RQC + IOLN_RQC)
 #define IOLN_RQD	004
+#define IOBA_VH		(IOPAGEBASE + 000440)		/* DHQ11 */
+#define IOLN_VH		020
 #define IOBA_UBM	(IOPAGEBASE + 010200)		/* Unibus map */
 #define IOLN_UBM	(UBM_LNT_LW * sizeof (int32))
 #define IOBA_RQ		(IOPAGEBASE + 012150)		/* RQDX3 */
@@ -446,7 +452,9 @@ typedef struct pdp_dib DIB;
 #define INT_V_PTR	2
 #define INT_V_PTP	3
 #define INT_V_LPT	4
-#define INT_V_PIR4	5
+#define INT_V_VHRX	5
+#define INT_V_VHTX	6  
+#define INT_V_PIR4	7
 
 #define INT_V_PIR3	0				/* BR3 */
 #define INT_V_PIR2	0				/* BR2 */
@@ -477,6 +485,8 @@ typedef struct pdp_dib DIB;
 #define INT_TTI		(1u << INT_V_TTI)
 #define INT_TTO		(1u << INT_V_TTO)
 #define INT_LPT		(1u << INT_V_LPT)
+#define INT_VHRX	(1u << INT_V_VHRX)
+#define INT_VHTX	(1u << INT_V_VHTX)
 #define INT_PIR4	(1u << INT_V_PIR4)
 #define INT_PIR3	(1u << INT_V_PIR3)
 #define INT_PIR2	(1u << INT_V_PIR2)
@@ -504,6 +514,8 @@ typedef struct pdp_dib DIB;
 #define IPL_TTI		4
 #define IPL_TTO		4
 #define IPL_LPT		4
+#define IPL_VHRX	4
+#define IPL_VHTX	4
 
 #define IPL_PIR7	7
 #define IPL_PIR6	6
@@ -539,6 +551,8 @@ typedef struct pdp_dib DIB;
 #define VEC_RY		0264
 #define VEC_DZRX	0300
 #define VEC_DZTX	0304
+#define VEC_VHRX	0310
+#define VEC_VHTX	0314
 
 /* Autoconfigure ranks */
 
@@ -548,6 +562,7 @@ typedef struct pdp_dib DIB;
 #define RANK_XU		25
 #define RANK_RQ		26
 #define RANK_TQ		30
+#define RANK_VH		32
 
 /* Interrupt macros */
 

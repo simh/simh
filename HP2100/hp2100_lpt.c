@@ -25,6 +25,9 @@
 
    lpt		12845A line printer
 
+   03-Jun-04	RMS	Fixed timing (found by Dave Bryan)
+   26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
+			Implemented DMA SRQ (follows FLG)
    25-Apr-03	RMS	Revised for extended file support
    24-Oct-02	RMS	Cloned from 12653A
 */
@@ -43,8 +46,10 @@
 #define LPT_CHANM	0000007				/* channel mask */
 
 extern uint32 PC;
-extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
-int32 lpt_ctime = 1000;					/* char time */
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
+
+int32 lpt_ctime = 4;					/* char time */
+int32 lpt_ptime = 10000;				/* print time */
 int32 lpt_stopioe = 0;					/* stop on error */
 int32 lpt_lcnt = 0;					/* line count */
 static int32 lpt_cct[8] = {
@@ -63,10 +68,10 @@ t_stat lpt_attach (UNIT *uptr, char *cptr);
    lpt_reg	LPT register list
 */
 
-DIB lpt_dib = { LPT, 0, 0, 0, 0, &lptio };
+DIB lpt_dib = { LPT, 0, 0, 0, 0, 0, &lptio };
 
 UNIT lpt_unit = {
-	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
+	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0) };
 
 REG lpt_reg[] = {
 	{ ORDATA (BUF, lpt_unit.buf, 7) },
@@ -74,10 +79,11 @@ REG lpt_reg[] = {
 	{ FLDATA (CTL, lpt_dib.ctl, 0) },
 	{ FLDATA (FLG, lpt_dib.flg, 0) },
 	{ FLDATA (FBF, lpt_dib.fbf, 0) },
+	{ FLDATA (SRQ, lpt_dib.srq, 0) },
 	{ DRDATA (LCNT, lpt_lcnt, 7) },
 	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (CTIME, lpt_ctime, 31), PV_LEFT },
-	{ DRDATA (PTIME, lpt_unit.wait, 24), PV_LEFT },
+	{ DRDATA (PTIME, lpt_ptime, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
 	{ ORDATA (DEVNO, lpt_dib.devno, 6), REG_HRO },
 	{ NULL }  };
@@ -103,14 +109,14 @@ int32 dev;
 dev = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
 case ioFLG:						/* flag clear/set */
-	if ((IR & I_HC) == 0) { setFLG (dev); }		/* STF */
+	if ((IR & I_HC) == 0) { setFSR (dev); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
 	if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioSFS:						/* skip flag set */
 	if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioOTX:						/* output */
 	lpt_unit.buf = dat & (LPT_CTL | 0177);
 	break;
@@ -131,11 +137,11 @@ case ioCTL:						/* control clear/set */
 	    setCMD (dev);				/* set ctl, cmd */
 	    setCTL (dev);
 	    sim_activate (&lpt_unit,			/* schedule op */
-		(lpt_unit.buf & LPT_CTL)? lpt_unit.wait: lpt_ctime);  }
+		(lpt_unit.buf & LPT_CTL)? lpt_ptime: lpt_ctime);  }
 	break;
 default:
 	break;  }
-if (IR & I_HC) { clrFLG (dev); }			/* H/C option */
+if (IR & I_HC) { clrFSR (dev); }			/* H/C option */
 return dat;
 }
 
@@ -147,7 +153,7 @@ dev = lpt_dib.devno;					/* get dev no */
 clrCMD (dev);						/* clear cmd */
 if ((uptr->flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (lpt_stopioe, SCPE_UNATT);
-setFLG (dev);						/* set flag, fbf */
+setFSR (dev);						/* set flag, fbf */
 if (uptr->buf & LPT_CTL) {				/* control word? */
 	if (uptr->buf & LPT_CHAN) {
 	    chan = uptr->buf & LPT_CHANM;
@@ -179,7 +185,7 @@ return SCPE_OK;
 t_stat lpt_reset (DEVICE *dptr)
 {
 lpt_dib.cmd = lpt_dib.ctl = 0;				/* clear cmd, ctl */
-lpt_dib.flg = lpt_dib.fbf = 1;				/* set flg, fbf */
+lpt_dib.flg = lpt_dib.fbf = lpt_dib.srq = 1;		/* set flg, fbf, srq */
 lpt_unit.buf = 0;
 sim_cancel (&lpt_unit);					/* deactivate unit */
 return SCPE_OK;

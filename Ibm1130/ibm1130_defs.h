@@ -13,6 +13,8 @@
  */
 
 #include "sim_defs.h"						/* main SIMH defns (include path should include .., or make a copy) */
+#include "sim_console.h"					/* more SIMH defns (include path should include .., or make a copy) */
+
 #include <setjmp.h>
 #include <assert.h>
 #include <stdlib.h>

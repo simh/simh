@@ -19,7 +19,7 @@
 // TEXTINCLUDE
 //
 
-1 TEXTINCLUDE DISCARDABLE
+1 TEXTINCLUDE DISCARDABLE 
 BEGIN
     "ibm1130res.h\0"
 END
@@ -45,21 +45,20 @@ END
 // Bitmap
 //
 
-IDB_CONSOLE             BITMAP  "1130consoleblank.bmp"
-FULL_1442               BITMAP  "1442full.bmp"
-EOF_1442		BITMAP  "1442eof.bmp"
-EMPTY_1442              BITMAP  "1442empty.bmp"
-MIDDLE_1442		BITMAP	"1442middle.bmp"
-FULL_1132               BITMAP  "1132full.bmp"
-EMPTY_1132              BITMAP  "1132empty.bmp"
-
+IDB_CONSOLE             BITMAP  MOVEABLE PURE   "1130consoleblank.bmp"
+FULL_1442               BITMAP  MOVEABLE PURE   "1442full.bmp"
+EOF_1442                BITMAP  MOVEABLE PURE   "1442eof.bmp"
+EMPTY_1442              BITMAP  MOVEABLE PURE   "1442empty.bmp"
+MIDDLE_1442             BITMAP  MOVEABLE PURE   "1442middle.bmp"
+FULL_1132               BITMAP  MOVEABLE PURE   "1132full.bmp"
+EMPTY_1132              BITMAP  MOVEABLE PURE   "1132empty.bmp"
 
 /////////////////////////////////////////////////////////////////////////////
 //
 // Cursor
 //
 
-IDC_HAND                CURSOR  "HAND.CUR"
+IDC_MYHAND              CURSOR  DISCARDABLE     "HAND.CUR"
 
 #ifndef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////

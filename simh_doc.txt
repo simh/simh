@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V3.2
-Date:	4-Apr-2004
+Subj:	Simulator Usage, V3.2-1
+Date:	15-Jun-2004
 
 			COPYRIGHT NOTICE
 
@@ -527,8 +527,8 @@ These simulator-detected conditions stop simulation:
 3.7.2 User Specified Stop Conditions
 
 Typing the interrupt character stops simulation.  The interrupt character
-is defined by the WRU (where are you) register and is initially set to
-005 (^E).
+is defined by the WRU (where are you) console option and is initially set
+to 005 (^E).
 
 3.7.3 Breakpoints
 
@@ -632,16 +632,6 @@ Most multi-unit devices allow units to be placed online or offline:
 
 When a unit is offline, it will not be displayed by SHOW DEVICE.
 
-The console terminal normally runs in the controlling window.
-Optionally,  the console terminal can be connected to a Telnet port.
-This allows systems to emulate a VT100 using the built-in terminal
-emulation of the Telnet client.
-
-	sim> SET TELNET <port>		-- listen for console
-					   Telnet connection on port
-	sim> SET NOTELNET		-- disable console Telnet
-	sim> SHOW TELNET		-- show console Telnet status
-
 The standard device names can be supplemented with logical names.
 Logical names must be unique within a simulator (that is, they cannot
 be the same as an existing device name).  To assign a logical name
@@ -661,18 +651,43 @@ To show all logical names:
 
 	sim> SHOW NAMES
 
-3.11 Logging Console Output
+3.11 Console Options
 
-Output to the console can be logged simultaneously to a file.  Logging
-is enabled by the LOG command:
+Console options are controlled by the SET CONSOLE command.
 
-	sim> SET LOG <filename>		-- log console output to file
+The console terminal normally runs in the controlling window.
+Optionally,  the console terminal can be connected to a Telnet port.
+This allows systems to emulate a VT100 using the built-in terminal
+emulation of the Telnet client.
 
-Logging is disabled by the NOLOG command:
+	sim> SET CONSOLE TELNET=<port>	-- connect console terminal
+					   to Telnet session on port
+	sim> SET CONSOLE NOTELNET	-- disable console Telnet
 
-	sim> SET NOLOG			-- disable logging
+Output to the console can be logged simultaneously to a file:
 
-SHOW LOG displays whether logging is enabled or disabled.
+	sim> SET CONSOLE LOG=<filename>	-- log console output to file
+	sim> SET CONSOLE NOLOG		-- disable logging
+
+The console provides a limited key remapping capability:
+
+	sim> SET CONSOLE WRU=<value>	-- interpret ASCII code
+					   value as WRU
+	sim> SET CONSOLE BRK=<value>	-- interpret ASCII code
+					   value as BREAK (0 disables)
+	sim> SET CONSOLE DEL=<value>	-- interpret ASCII code
+					   value as DELETE
+
+Values are hexadecimal on hex CPU's, octal on all others.
+
+The SHOW CONSOLE command displays the current state of console options:
+
+	sim> SHOW CONSOLE		-- show all console options
+	sim> SHOW CONSOLE TELNET	-- show console Telnet state
+	sim> SHOW CONSOLE LOG		-- show console logging state
+	sim> SHOW CONSOLE WRU		-- show value assigned to WRU
+	sim> SHOW CONSOLE BRK		-- show value assigned to BREAK
+	sim> SHOW CONSOLE DEL		-- show value assigned to DELETE
 
 3.12 Executing Command Files
 
@@ -859,9 +874,9 @@ line printer	y	y	y	h	y
 clock		-	y	y	h	y
 extra terminal	-	y	y	-	y
 hard disk	h	y	y	-	y
-fixed disk	-	n	-	h	-
+fixed disk	-	h	-	h	-
 floppy disk	-	-	h	-	-
-drum		-	n	-	-	-
+drum		-	h	-	-	-
 DECtape		-	-	-	-	-
 mag tape	y	y	y	h	y
 

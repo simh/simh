@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Apr-04	RMS	Moved format definitions to vax_defs.h
    19-Jun-03	RMS	Simplified add algorithm
    16-May-03	RMS	Fixed bug in floating to integer convert overflow
 			Fixed multiple bugs in EMODx
@@ -42,22 +43,6 @@
 
 #define M32		0xFFFFFFFF			/* 32b */
 #define M16		0x0000FFFF
-
-#define FD_V_EXP	7				/* f/d exponent */
-#define FD_M_EXP	0xFF
-#define FD_BIAS		0x80				/* f/d bias */
-#define FD_EXP		(FD_M_EXP << FD_V_EXP)
-#define FD_HB		(1 << FD_V_EXP)			/* f/d hidden bit */
-#define FD_GUARD	(15 - FD_V_EXP)			/* # guard bits */
-#define FD_GETEXP(x)	(((x) >> FD_V_EXP) & FD_M_EXP)
-
-#define G_V_EXP		4				/* g exponent */
-#define G_M_EXP		0x7FF
-#define G_BIAS		0x400				/* g bias */
-#define G_EXP		(G_M_EXP << G_V_EXP)
-#define G_HB		(1 << G_V_EXP)			/* g hidden bit */
-#define G_GUARD		(15 - G_V_EXP)			/* # guard bits */
-#define G_GETEXP(x)	(((x) >> G_V_EXP) & G_M_EXP)
 
 extern int32 R[16];
 extern int32 PSL;

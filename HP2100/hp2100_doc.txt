@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	HP2100 Simulator Usage
-Date:	15-Feb-2004
+Date:	30-Jun-2004
 
 			COPYRIGHT NOTICE
 
@@ -80,7 +80,7 @@ CPU		2116 CPU with 32KW memory
 		21MX CPU with 1024KW memory, FP or DMS instructions
 DMA0, DMA1	dual channel DMA controller
 PTR,PTP		12597A paper tape reader/punch
-TTY		12631C buffered terminal controller
+TTY		12531C buffered terminal controller
 LPS		12653A printer controller with 2767 printer
 		12566B microcircuit interface for diagnostics
 LPT		12845A printer controller with 2607 printer
@@ -99,7 +99,7 @@ IPLO		12556B interprocessor link, output side
 
 The HP2100 simulator implements several unique stop conditions:
 
-	- decode of an undefined instruction, and STOP_INST is et
+	- decode of an undefined instruction, and STOP_INST is set
 	- reference to an undefined I/O device, and STOP_DEV is set
 	- more than INDMAX indirect references are detected during
 	  memory reference address decoding
@@ -149,6 +149,13 @@ These switches are recognized when examining or depositing in CPU memory:
 	-p			if DMS enabled, force port A map
 	-q			if DMS enabled, force port B map
 
+The CPU implements four different kinds of instruction breakpoints:
+
+	-e			break unconditionally
+	-n			break if DMS is disabled
+	-s			break if DMS enabled and system map
+	-u			break if DMS enabled and user map
+
 CPU registers include the visible state of the processor as well as the
 control registers for the interrupt system.
 
@@ -157,18 +164,20 @@ control registers for the interrupt system.
 	P		all		15	program counter
 	A		all		16	A register
 	B		all		16	B register
+	M		all		15	M (memory address) register
+	T		all		16	T (memory data) register
 	X		21MX		16	X index register
 	Y		21MX		16	Y index register
 	S		all		16	switch/display register
-	F		2100,21MX	15	memory protection fence
 	E		all		1	extend flag
 	O		all		1	overflow flag
 	ION		all		1	interrupt enable flag
 	ION_DEFER	all		1	interrupt defer flag
-	IADDR		all		6	most recent interrupting device
+	CIR		all		6	current interrupt register
 	MPCTL		2100,21MX	1	memory protection enable
 	MPFLG		2100,21MX	1	memory protection flag
 	MPFBF		2100,21MX	1	memory protection flag buffer
+	MPFR		2100,21MX	15	memory protection fence
 	MPVR		2100,21MX	16	memory protection violation reg
 	MPEVR		2100,21MX	1	memory protection freeze flag
 	MPMEV		2100,21MX	1	memory protection DMS error flag
@@ -176,13 +185,31 @@ control registers for the interrupt system.
 	DMSCUR		21MX		1	DMS current mode
 	DMSSR		21MX		16	DMS status register
 	DMSVR		21MX		16	DMS violation register
-	DMSMAP[4][32]	21MX		20	DMS maps
+	DMSMAP[4][16]	21MX		16	DMS maps
 	STOP_INST	all		1	stop on undefined instruction
 	STOP_DEV	all		1	stop on undefined device
 	INDMAX		all		16	indirect address limit
 	PCQ[0:63]	all		15	P of last JMP, JSB, or interrupt;
 						most recent P change first
 	WRU		all		8	interrupt character
+
+BOOT CPU implements the 21MX IBL facility.  IBL is controlled by the switch
+register S.  S<15:14> selects the device to boot:
+
+	00		paper-tape reader (12992K ROM)
+	01		7900A/2883 disk (12992A ROM)
+	10		7970B/E tape (12992D ROM)
+	11		undefined
+
+For the 7900A/2883 only, S<13:12> specify the type of disk:
+
+	00		7900A
+	10		2883
+
+S<11:6> contains the device address.  If the device has two addresses, S<11:6>
+specifies the lower address.  S<5:3> are passed to the bootstrap program.
+S<2:0> specify options for the boot loader.  IBL will not report an error if
+the device address in S<11:6> is incorrect.
 
 2.2 DMA Controllers
 
@@ -243,7 +270,13 @@ register specifies the number of the next data item to be read.
 Thus, by changing POS, the user can backspace or advance the reader.
 
 The paper tape reader supports the BOOT command.  BOOT PTR copies the
-absolute binary loader into memory and starts it running.
+IBL into memory and starts it running.  The switch register (S) is
+set automatically to the value expected by the IBL loader:
+
+	<15:12>	=	0000
+	<11:6>	=	device code
+	<5:3> = 	unchanged
+	<2:0> =		000
 
 The paper tape reader implements these registers:
 
@@ -254,6 +287,9 @@ The paper tape reader implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
+	SRQ		1	device DMA service request
+	TRLLIM		8	number of trailing nulls to append
+				after end-of-file is detected
 	POS		32	position in the input file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
@@ -285,6 +321,7 @@ The paper tape punch implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
+	SRQ		1	device DMA service request
 	POS		32	position in the output file
 	TIME		24	time from I/O initiation to interrupt
 	STOP_IOE	1	stop on I/O error
@@ -298,7 +335,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.4.3 12631C Buffered Terminal (TTY)
+2.4.3 12531C Buffered Terminal (TTY)
 
 The console terminal has three units: keyboard (unit 0), printer
 (unit 1), and punch (unit 2).  The keyboard reads from the console
@@ -307,8 +344,20 @@ punch writes to a disk file.  The keyboard and printer units (TTY0,
 TTY1) can be set to one of three modes: UC, 7B, or 8B.  In UC mode,
 lower case input and output characters are automatically converted to
 upper case.  In 7B mode, input and output characters are masked to 7
-bits.  In 8B mode, characters are not modified.  Changing the mode
-of either unit changes both.  The default mode is UC.
+bits.  In 8B mode, characters are not modified.  In UC and 7B mode,
+output of null characters is suppressed; in 8B mode, output of null
+characters is permitted.  Changing the mode of either the keyboard
+or the printer changes both.  The default mode is UC.
+
+Some HP software systems expect the console terminal to transmit
+line-feed automatically following carriage-return.  This feature is
+enabled with:
+
+	SET TTY AUTOLF
+
+and disabled with:
+
+	SET TTY NOAUTOLF
 
 The console teleprinter implements these registers:
 
@@ -319,6 +368,7 @@ The console teleprinter implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
+	SRQ		1	device DMA service request
 	KPOS		32	number of characters input
 	KTIME		24	keyboard polling interval
 	TPOS		32	number of characters printed
@@ -363,6 +413,7 @@ The 12653A implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
+	SRQ		1	device DMA service request
 	POS		32	position in the output file
 	CTIME		24	time between characters
 	PTIME		24	time for a print operation
@@ -395,6 +446,7 @@ The line printer implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
+	SRQ		1	device DMA service request
 	LCNT		7	line count within page
 	POS		32	position in the output file
 	CTIME		24	time between characters
@@ -497,6 +549,7 @@ The lines (MUXL) implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
+	SRQ		1	device DMA service request
 	STA[0:20]	16	line status, lines 0-20
 	RPAR[0:20]	16	receive parameters, lines 0-20
 	XPAR[0:15]	16	transmit parameters, lines 0-15
@@ -513,6 +566,7 @@ The modem control (MUXM) implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
+	SRQ		1	device DMA service request
 	SCAN		1	scan enabled
 	CHAN		4	current line
 	DSO[0:15]	6	C2,C1,ES2,ES1,SS2,SS1, lines 0-15
@@ -574,6 +628,7 @@ Both IPLI and IPLO implement these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
+	SRQ		1	device DMA service request
 	TIME		24	polling interval for input
 	STOP_IOE	1	stop on I/O error
 
@@ -596,16 +651,17 @@ a device controller.  The data channel includes a 128-word (one sector)
 buffer for reads and writes.  The device controller includes the four
 disk drives.  Disk drives can be set ONLINE or OFFLINE.
 
-The 12557A/13210A supports the BOOT command.  BOOT DP loads the IBL
-for 7900 class disks into memory and starts it running.  BOOT -F DP
-boots from the fixed platter (head 2).  The switch register (S) is
+The 12557A/13210A supports the BOOT command.  BOOT DPC copies the IBL
+for 7900 class disks into memory and starts it running.  BOOT -R DP
+boots from the removable platter (head 2).  The switch register (S) is
 set automatically to the value expected by the IBL loader:
 
 	<15:14>	=	01
 	<13:12>	=	00
 	<11:6>	=	data channel device code
-	<5:1> = 	00000
-	<0> =		1 if booting from the fixed platter
+	<5:3> = 	unchanged
+	<2:1> =		00
+	<0> =		1 if booting from the removable platter
 
 The data channel implements these registers:
 
@@ -619,6 +675,7 @@ The data channel implements these registers:
 	CTL		1	interrupt enable
 	FLG		1	channel ready
 	FBF		1	channel ready buffer
+	SRQ		1	channel DMA service request
 	XFER		1	transfer in progress flag
 	WVAL		1	write data valid flag
 
@@ -633,6 +690,7 @@ The device controller implements these registers:
 	CTL		1	interrupt enable
 	FLG		1	controller ready
 	FBF		1	controller ready buffer
+	SRQ		1	controller DMA service request
 	EOC		1	end of cylinder pending
 	RARC[0:3]	8	record address register cylinder, drives 0-3
 	RARH[0:3]	2	record address register head, drives 0-3
@@ -660,14 +718,14 @@ a device controller.  The data channel includes a 128-word (one sector)
 buffer for reads and writes.  The device controller includes the two
 disk drives.  Disk drives can be set ONLINE or OFFLINE.
 
-The 12565A supports the BOOT command.  BOOT DQ loads the IBL for 2883
+The 12565A supports the BOOT command.  BOOT DQC copies the IBL for 2883
 class disks into memory and starts it running.  The switch register (S)
 is set automatically to the value expected by the IBL loader:
 
-	<15:14>	=	01
-	<13:12>	=	10
+	<15:12>	=	0110
 	<11:6>	=	data channel device code
-	<5:0> = 	00000
+	<5:3> = 	unchanged
+	<2:0> =		000
 
 The data channel implements these registers:
 
@@ -681,6 +739,7 @@ The data channel implements these registers:
 	CTL		1	interrupt enable
 	FLG		1	channel ready
 	FBF		1	channel ready buffer
+	SRQ		1	channel DMA service request
 	XFER		1	transfer in progress flag
 	WVAL		1	write data valid flag
 
@@ -695,6 +754,7 @@ The device controller implements these registers:
 	CTL		1	interrupt enable
 	FLG		1	controller ready
 	FBF		1	controller ready buffer
+	SRQ		1	controller DMA service request
 	RARC[0:1]	8	record address register cylinder, drives 0-1
 	RARH[0:1]	5	record address register head, drives 0-1
 	RARS[0:1]	5	record address register sector, drives 0-1
@@ -747,6 +807,7 @@ The data channel implements these registers:
 	CTL		1	interrupt enable
 	FLG		1	channel ready
 	FBF		1	channel ready buffer
+	SRQ		1	channel DMA service request
 	BPTR		6	sector buffer pointer
 
 The device controller implements these registers:
@@ -759,6 +820,7 @@ The device controller implements these registers:
 	CTL		1	interrupt enable
 	FLG		1	controller ready
 	FBF		1	controller ready buffer
+	SRQ		1	controller DMA service request
 	TIME		24	interword transfer time
 	STOP_IOE	1	stop on I/O error
 
@@ -793,6 +855,7 @@ The data channel implements these registers:
 	name		size	comments
 
 	FLG		1	channel ready
+	SRQ		1	channel DMA service request
 	DBUF[0:65535]	8	transfer buffer
 	BPTR		16	buffer pointer (reads and writes)
 	BMAX		16	buffer size (writes)
@@ -807,6 +870,7 @@ The device controller implements these registers:
 	CTL		1	interrupt enabled
 	FLG		1	controller ready
 	FBF		1	controller ready buffer
+	SRQ		1	controller DMA service request
 	DTF		1	data transfer flop
 	FSVC		1	first service flop
 	POS		32	magtape position
@@ -847,10 +911,10 @@ MS causes the loader to space forward the number of files specified in
 the A register before starting to load data.  The switch register (S) is
 set automatically to the value expected by the IBL loader:
 
-	<15:14>	=	10
-	<13:12>	=	00
+	<15:12>	=	1000
 	<11:6>	=	data channel device code
-	<5:1> = 	00000
+	<5:3> = 	unchanged
+	<2:0> =		00
 	<0> =		1 if space forward before loading
 
 The data channel implements these registers:
@@ -861,6 +925,7 @@ The data channel implements these registers:
 	CTL		1	interrupt enabled
 	FLG		1	channel ready
 	FBF		1	channel ready buffer
+	SRQ		1	channel DMA service request
 	DBUF[0:65535]	8	transfer buffer
 	BPTR		17	buffer pointer (reads and writes)
 	BMAX		17	buffer size (writes)
@@ -876,6 +941,7 @@ The device controller implements these registers:
 	CTL		1	interrupt enabled
 	FLG		1	controller ready
 	FBF		1	controller ready buffer
+	SRQ		1	controller DMA service request
 	POS[0:3]	32	magtape position
 	CTIME		24	command delay time
 	XTIME		24	interword transfer delay time

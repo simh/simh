@@ -25,6 +25,8 @@
 
    ipli, iplo	12556B interprocessor link pair
 
+   26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
+			Implemented DMA SRQ (follows FLG)
    21-Dec-03	RMS	Adjusted ipl_ptime for TSB (from Mike Gemeny)
    09-May-03	RMS	Added network device flag
    31-Jan-03	RMS	Links are full duplex (found by Mike Gemeny)
@@ -48,7 +50,7 @@
 #define LSOCKET		u4				/* listening socket */
 
 extern uint32 PC;
-extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
 extern FILE *sim_log;
 int32 ipl_ptime = 31;					/* polling interval */
 int32 ipl_stopioe = 0;					/* stop on error */
@@ -75,8 +77,8 @@ t_bool ipl_check_conn (UNIT *uptr);
 */
 
 DIB ipl_dib[] = {
-	{ IPLI, 0, 0, 0, 0, &ipliio },
-	{ IPLO, 0, 0, 0, 0, &iploio }  };
+	{ IPLI, 0, 0, 0, 0, 0, &ipliio },
+	{ IPLO, 0, 0, 0, 0, 0, &iploio }  };
 
 #define ipli_dib ipl_dib[0]
 #define iplo_dib ipl_dib[1]
@@ -95,6 +97,7 @@ REG ipli_reg[] = {
 	{ FLDATA (CTL, ipli_dib.ctl, 0) },
 	{ FLDATA (FLG, ipli_dib.flg, 0) },
 	{ FLDATA (FBF, ipli_dib.fbf, 0) },
+	{ FLDATA (SRQ, ipli_dib.srq, 0) },
 	{ ORDATA (HOLD, ipl_hold[0], 8) },
 	{ DRDATA (TIME, ipl_ptime, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ipl_stopioe, 0) },
@@ -131,6 +134,7 @@ REG iplo_reg[] = {
 	{ FLDATA (CTL, iplo_dib.ctl, 0) },
 	{ FLDATA (FLG, iplo_dib.flg, 0) },
 	{ FLDATA (FBF, iplo_dib.fbf, 0) },
+	{ FLDATA (SRQ, iplo_dib.srq, 0) },
 	{ ORDATA (HOLD, ipl_hold[1], 8) },
 	{ DRDATA (TIME, ipl_ptime, 24), PV_LEFT },
 	{ ORDATA (DEVNO, iplo_dib.devno, 6), REG_HRO },
@@ -164,14 +168,14 @@ int8 msg[2];
 dev = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
 case ioFLG:						/* flag clear/set */
-	if ((IR & I_HC) == 0) { setFLG (dev); }		/* STF */
+	if ((IR & I_HC) == 0) { setFSR (dev); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
 	if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioSFS:						/* skip flag set */
 	if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
-	return dat;
+	break;
 case ioOTX:						/* output */
 	uptr->OBUF = dat;
 	break;
@@ -204,12 +208,12 @@ case ioCTL:						/* control clear/set */
 		u = (uptr - ipl_unit) ^ 1;		/* find other device */
 		ipl_unit[u].IBUF = uptr->OBUF;		/* output to other */
 		odev = ipl_dib[u].devno;		/* other device no */
-		setFLG (odev);  }			/* set other flag */
+		setFSR (odev);  }			/* set other flag */
 	    else return SCPE_UNATT;  }			/* lose */
 	break;
 default:
 	break;  }
-if (IR & I_HC) { clrFLG (dev); }			/* H/C option */
+if (IR & I_HC) { clrFSR (dev); }			/* H/C option */
 return dat;
 }
 
@@ -241,7 +245,7 @@ else uptr->IBUF = ((((int32) msg[0]) & 0377) << 8) |
 	(((int32) msg[1]) & 0377);
 dev = ipl_dib[u].devno;					/* get device number */
 clrCMD (dev);						/* clr cmd, set flag */
-setFLG (dev);
+setFSR (dev);
 return SCPE_OK;
 }
 
@@ -268,7 +272,7 @@ UNIT *uptr = dptr->units;
 
 hp_enbdis_pair (&ipli_dev, &iplo_dev);			/* make pair cons */
 dibp->cmd = dibp->ctl = 0;				/* clear cmd, ctl */
-dibp->flg = dibp->fbf = 1;				/* set flg, fbf */
+dibp->flg = dibp->fbf = dibp->srq = 1;			/* set flg, fbf, srq */
 uptr->IBUF = uptr->OBUF = 0;				/* clr buffers */
 if (uptr->flags & UNIT_ATT) sim_activate (uptr, ipl_ptime);
 else sim_cancel (uptr);					/* deactivate unit */
@@ -381,13 +385,13 @@ return SCPE_OK;
 
 /* Interprocessor link bootstrap routine (HP Access Manual) */
 
-#define LDR_BASE	073
+#define MAX_BASE	073
 #define IPL_PNTR	074
 #define PTR_PNTR	075
 #define IPL_DEVA	076
 #define PTR_DEVA	077
 
-static const int32 pboot[IBL_LNT] = {
+static const uint32 pboot[IBL_LNT] = {
 	0163774,		/*BBL LDA ICK,I		; IPL sel code */
 	0027751,		/*    JMP CFG		; go configure */
 	0107700,		/*ST  CLC 0,C		; intr off */
@@ -467,7 +471,7 @@ devp = ptr_dib.devno;
 PC = ((MEMSIZE - 1) & ~IBL_MASK) & VAMASK;		/* start at mem top */
 SR = (devi << IBL_V_DEV) | devp;			/* set SR */
 for (i = 0; i < IBL_LNT; i++) M[PC + i] = pboot[i];	/* copy bootstrap */
-M[PC + LDR_BASE] = (~PC + 1) & DMASK;			/* fix ups */
+M[PC + MAX_BASE] = (~PC + 1) & DMASK;			/* fix ups */
 M[PC + IPL_PNTR] = M[PC + IPL_PNTR] | PC;
 M[PC + PTR_PNTR] = M[PC + PTR_PNTR] | PC;
 M[PC + IPL_DEVA] = devi;
