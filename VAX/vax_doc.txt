@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	VAX Simulator Usage
-Date:	15-Dec-2003
+Date:	04-Apr-2004
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2003, written by Robert M Supnik
-   Copyright (c) 1993-2003, Robert M Supnik
+   Original code published in 1993-2004, written by Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -40,17 +40,23 @@ To compile the VAX, you must define VM_VAX and USE_INT64 as part of the compilat
 command line.  To enable extended file support (files greater than 2GB), you must
 define USE_ADDR64 as part of the command line as well.
 
-sim/		sim_defs.h
+sim/		scp.h
+		sim_console.h
+		sim_defs.h
 		sim_ether.h
+		sim_fio.h
 		sim_rev.h
 		sim_sock.h
 		sim_tape.h
+		sim_timer.h
 		sim_tmxr.h
 		scp.c
-		scp_tty.c
+		sim_console.c
 		sim_ether.c
+		sim_fio.c
 		sim_sock.c
 		sim_tape.c
+		sim_timer.c
 		sim_tmxr.c
 
 sim/vax/	vax_defs.h
@@ -72,10 +78,16 @@ sim/pdp11/	pdp11_mscp.h
 		pdp11_lp.c
 		pdp11_pt.c
 		pdp11_rl.c
+		pdp11_ry.c
 		pdp11_rq.c
 		pdp11_tq.c
 		pdp11_ts.c
 		pdp11_xp.c
+
+Additional files are:
+
+sim/vax/	ka655.bin		standard boot ROM code
+		ka655x.bin		extended memory boot ROM code
 
 2. VAX Features
 
@@ -84,7 +96,8 @@ The VAX simulator is configured as follows:
 device		simulates
 name(s)
 
-CPU		KA655 CPU with 16MB-64MB of memory
+CPU		KA655 CPU with 16MB-64MB of memory, or
+		"KA655X" CPU with 16MB-512MB of memory
 TLB		translation buffer
 ROM		read-only memory
 NVR		non-volatile memory
@@ -100,13 +113,15 @@ RQ		RQDX3 MSCP controller with four drives
 RQB		second RQDX3 MSCP controller with four drives
 RQC		third RQDX3 MSCP controller with four drives
 RQD		fourth RQDX3 MSCP controller with four drives
+RY		RXV21 floppy disk controller with two drives
 TS		TSV11/TSV05 magnetic tape controller with one drive
 TQ		TQK50 TMSCP magnetic tape controller with four drives
 XQ		DELQA/DEQNA Ethernet controller
 XQB		second DELQA/DEQNA Ethernet controller
 
-The PTR, PTP, LPT, DZ, RL, RQ, RQB, RQC, RQD, TS, TQ, XQ, and XQB devices
-can be set DISABLED.  RQB, RQC, RQD, and XQB are disabled by default.
+The PTR, PTP, LPT, DZ, RL, RQ, RQB, RQC, RQD, RY, TS, TQ, XQ, and XQB
+devices can be set DISABLED.  RQB, RQC, RQD, and XQB are disabled by
+default.
 
 The VAX simulator implements several unique stop conditions:
 
@@ -128,10 +143,15 @@ ROM, or the non-volatile memory.
 CPU options include the size of main memory and the treatment of the
 HALT instruction.
 
+	SET CPU EXTEND		enable extended memory support
+	SET CPU NOEXTEND	disable extended memory support
 	SET CPU 16M		set memory size = 16MB
 	SET CPU 32M		set memory size = 32MB
 	SET CPU 48M		set memory size = 48MB
 	SET CPU 64M		set memory size = 64MB
+	SET CPU 128M		set memory size = 128MB
+	SET CPU 256M		set memory size = 256MB
+	SET CPU 512M		set memory size = 512MB
 	SET CPU SIMHALT		kernel HALT returns to simulator
 	SET CPU CONHALT		kernel HALT returns to boot ROM console
 
@@ -139,16 +159,39 @@ The CPU implements a show command to display the I/O address map:
 
 	SHOW CPU IOSPACE	show I/O space address map
 
-If memory size is being reduced, and the memory being truncated contains
-non-zero data, the simulator asks for confirmation.  Data in the truncated
-portion of memory is lost.  Initial memory size is 16MB.  If the simulator
-is running VMS, the operating system will not recognize memory size changes
-until AUTOGEN is run.
+Notes of the memory size:
+
+- The real KA655 CPU only supported 16MB to 64MB of memory.  The simulator
+  provides a KA655"X" mode, which increases supported memory to 512MB.
+  Extended memory is enabled by default.  If extended memory is enabled,
+  and memory size exceeds 64MB, the CPU will boot using special firmware
+  ka655x.bin.  This firmware contains code to determine the size of extended
+  memory and set up the PFN bit map accordingly.  Other than setting up
+  the PFN bootmap, the firmware does not recognize extended memory and
+  will behave as though memory size was 64MB. 
+- If memory size is being reduced, and the memory being truncated contains
+  non-zero data, the simulator asks for confirmation.  Data in the truncated
+  portion of memory is lost.
+- If the simulator is running VMS, the operating system may have a SYSGEN 
+  parameter set called PHYSICXAL PAGES (viewable from "MCR SYSGEN SHOW
+  PHYSICALPAGES").  PHYSICALPAGES limits the maximum number of physical pages
+  of memory the OS will recognize.  If it is set to a lower value than the
+  new extended memory size of the machine, then only the first PHYSICALPAGES
+  of memory will be recognized, otherwise the actual size of the extended
+  memory will be realized by VMS upon each boot.  Some users and/or sites
+  may specify the PHYSICALPAGES parameter in the input file to AUTOGEN
+  (SYS$SYSTEM:MODPARAMS.DAT).  If PHYSICALPAGES is specified there, it will
+  have to be adjusted before running AUTOGEN to recognize more memory.  The
+  default value for PHYSICALPAGES is 1048576, which describes 512MB of RAM.
+
+Initial memory size is 16MB.
 
 Memory can be loaded with a binary byte stream using the LOAD command.
-The LOAD command recognizes one switch:
+The LOAD command recognizes three switch:
 
-	-o			Origin argument follows file name
+	-o			origin argument follows file name
+	-r			load the boot ROM
+	-n			load the non-volatile RAM
 
 The CPU supports the BOOT command and is the only VAX device to do so.
 Note that the behavior of the bootstrap depends on the capabilities of
@@ -315,6 +358,7 @@ presense of other devices in the configuration:
 
 	DZ11		all instances have floating addresses
 	RL11		first instance has fixed address, rest floating
+	RX11/RX211	first instance has fixed address, second floating
 	MSCP disk	first instance has fixed address, rest floating
 	TMSCP tape	first instance has fixed address, rest floating
 
@@ -516,6 +560,22 @@ may be incompatible with certain operating systems.  The command
 
 forces output characters to be masked to 7 bits.
 
+The DZ11 supports logging on a per-line basis.  The command
+
+	SET DZ LOG=line=filename
+
+enables logging for the specified line to the indicated file.  The
+command
+
+	SET DZ NOLOG=line
+
+disables logging for the specified line and closes any open log file.
+Finally, the command
+
+	SHOW DZ LOG
+
+displays logging information for all DZ lines.
+
 The terminal lines perform input and output through Telnet sessions
 connected to a user-specified port.  The ATTACH command specifies
 the port to be used:
@@ -687,7 +747,54 @@ Error handling is as follows:
 
 	OS I/O error		report error and stop
 
-2.6 TSV11/TSV05 Magnetic Tape (TS)
+2.6 RXV21/RX02 Floppy Disk (RY)
+
+RXV21 options include the ability to set units write enabled or write
+locked, single or double density, or autosized:
+
+	SET RYn LOCKED		set unit n write locked
+	SET RYn WRITEENABLED	set unit n write enabled
+	SET RYn SINGLE		set unit n single density
+	SET RYn DOUBLE		set unit n double density (default)
+	SET RYn AUTOSIZE	set unit n autosized
+
+The RXV21 does not support the boot command.
+
+The RXV21 implements these registers:
+
+	name		size	comments
+
+	RYCS		16	status
+	RYBA		16	buffer address
+	RYWC		8	word count
+	RYDB		16	data buffer
+	RYES		12	error status
+	RYERR		8	error code
+	RYTA		8	current track
+	RYSA		8	current sector
+	STAPTR		4	controller state
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	TR		1	transfer ready flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	DONE		1	device done flag (CSR<5>)
+	CTIME		24	command completion time
+	STIME		24	seek time, per track
+	XTIME		24	transfer ready delay
+	STOP_IOE	1	stop on I/O error
+	SBUF[0:255]	8	sector buffer array
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RX02 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.7 TSV11/TSV05 Magnetic Tape (TS)
 
 TS options include the ability to make the unit write enabled or write locked.
 
@@ -735,7 +842,7 @@ Error handling is as follows:
 
 	OS I/O error		fatal tape error
 
-2.7 TQK50 TMSCP Disk Controller (TQ)
+2.8 TQK50 TMSCP Disk Controller (TQ)
 
 The TQ controller simulates the TQK50 TMSCP disk controller.  TQ options
 include the ability to set units write enabled or write locked, and to
@@ -805,7 +912,7 @@ Error handling is as follows:
 
 	OS I/O error		report error and stop
 
-2.8  DELQA/DEQNA Qbus Ethernet Controllers (XQ, XQB)
+2.9  DELQA/DEQNA Qbus Ethernet Controllers (XQ, XQB)
 
 The simulator implements two DELQA/DEQNA Qbus Ethernet controllers (XQ,
 XQB).  Initially, XQ is enabled, and XQB is disabled.  Options allow
@@ -841,6 +948,18 @@ state of this switch.  Note that only the DEQNA (or the DELQA in DEQNA-
 LOCK mode (=DEQNA)) supports the sanity timer - it is ignored by a DELQA
 in Normal mode, which uses switch S4 for a different purpose.
 
+	SET  XQ POLL={DEFAULT|4..2500}
+	SHOW XQ POLL
+
+These commands change or display the service polling timer.  The polling
+timer is calibrated to run the service thread 200 times per second.  This
+value can be changed to accomodate particular system requirements for
+more (or less) frequent polling.
+
+	SHOW XQ STATS
+
+This command will display the accumulated statistics for the simulated
+Ethernet controller.
 To access the network, the simulated Ethernet controller must be attached
 to a real Ethernet interface:
 
@@ -855,7 +974,7 @@ The device list can be quite cryptic, depending on the host system, but
 is probably better than guessing. If you do not attach the device, the
 controller will behave as though the ethernet cable were unplugged.
 
-XQ has the following registers:
+XQ and XQB have the following registers:
 
 	name		size	comments
 
@@ -865,17 +984,18 @@ XQ has the following registers:
 	SA3		16	station address word 3
 	SA4		16	station address word 4
 	SA5		16	station address word 5
+	RBDL		32	receive buffer descriptor list
+	XBDL		32	trans(X)mit buffer descriptor list
 	CSR		16	control status register
 	VAR		16	vector address register
-	RBDL		32	receive buffer descriptor list
-	XBDL		32	trans(X)mit buffer descriptorlList
+	INT		1	interrupt request flag
 
 One final note: because of it's asynchronous nature, the XQ controller is
 not limited to the ~1.5Mbit/sec of the real DEQNA/DELQA controllers,
 nor the 10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet
 (100 Mbit/sec) card, and "Feel the Power!" :-)
 
-2.9 Symbolic Display and Input
+2.10 Symbolic Display and Input
 
 The VAX simulator implements symbolic display and input.  Display is
 controlled by command line switches:
@@ -923,3 +1043,21 @@ l^d		EF		d - PC		long PC relative
 
 If no override is given for a literal (s^ or i^) or for a displacement or PC
 relative addres (b^, w^, or l^), the simulator chooses the mode automatically.
+
+Appendix - The KA655"X"
+
+The real KA655 is limited to 64MB of memory, and the KA655 firmware is coded
+to this limit.  However, the VAX operating systems (VMS, Ultrix, NetBSD)
+know very little about the hardware details.  Instead, they take their memory
+size information from the Restart Parameter Block (RPB).  If the firmware
+sets up an RPB for more than 64MB, the operating systems use the extra
+memory without requiring source changes.
+
+In extended memory mode, the simulator implements an 18th CMCTL register.
+This read-only register gives the size of main memory in MB.  The extended
+memory firmware (ka655x.bin) bootstrap code uses this to set up the RPB.
+No other parts of the firmware are aware of extended memory; thus, all the
+diagnostic and display commands operate only on the first 64MB of memory.
+
+If extended memory mode is disabled, the 18th CMCTL register is invisible,
+and the simulator operates like a real KA655.

@@ -1,6 +1,6 @@
 /* sds_mux.c: SDS 940 terminal multiplexor simulator
 
-   Copyright (c) 2001-2003, Robert M Supnik
+   Copyright (c) 2001-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mux		terminal multiplexor
 
+   05-Jan-04	RMS	Revised for tmxr library changes
    09-May-03	RMS	Added network device flag
 
    This module implements up to 32 individual serial interfaces, representing
@@ -109,7 +110,7 @@ uint32 mux_scan = 0;					/* scanner */
 uint32 mux_slck = 0;					/* scanner locked */
 
 TMLN mux_ldsc[MUX_LINES] = { 0 };			/* line descriptors */
-TMXR mux_desc = { MUX_LINES, 0, 0, NULL };		/* mux descriptor */
+TMXR mux_desc = { MUX_LINES, 0, 0, mux_ldsc };		/* mux descriptor */
 
 t_stat mux (uint32 fnc, uint32 inst, uint32 *dat);
 t_stat muxi_svc (UNIT *uptr);
@@ -211,6 +212,10 @@ UNIT muxl_unit[] = {
 MTAB muxl_mod[] = {
 	{ UNIT_UC, 0, "lower case", "LC", NULL },
 	{ UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
+	{ MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
+	    &tmxr_set_log, &tmxr_show_log, &mux_desc },
+	{ MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
+	    &tmxr_set_nolog, NULL, &mux_desc },
 	{ 0 }  };
 
 REG muxl_reg[] = {
@@ -285,7 +290,7 @@ if (PROJ_GENIE && ((*dat & POT_GLNE) == 0)) {		/* Genie disable? */
     mux_ldsc[ln].rcve = 0;  }
 else if (!PROJ_GENIE && (*dat & POT_SCDT)) {		/* SDS disable? */
     if (mux_ldsc[ln].conn) {				/* connected? */
-	tmxr_msg (mux_ldsc[ln].conn, "\r\nLine hangup\r\n");
+	tmxr_linemsg (&mux_ldsc[ln], "\r\nLine hangup\r\n");
 	tmxr_reset_ln (&mux_ldsc[ln]);			/* reset line */
 	mux_reset_ln (ln);				/* reset state */
 	MUX_SETFLG (ln, MUX_FCRF);			/* set carrier off */
@@ -396,9 +401,7 @@ if (mux_unit.flags & UNIT_ATT) {			/* master att? */
 	t = sim_rtcn_init (mux_unit.wait, TMR_MUX);
 	sim_activate (&mux_unit, t);  }  }		/* activate */
 else sim_cancel (&mux_unit);				/* else stop */
-for (i = 0; i < MUX_LINES; i++) {
-	mux_desc.ldsc[i] = &mux_ldsc[i];
-	mux_reset_ln (i);  }
+for (i = 0; i < MUX_LINES; i++) mux_reset_ln (i);
 for (i = 0; i < MUX_FLAGS; i++) MUX_CLRINT (i);		/* clear all ints */
 return SCPE_OK;
 }
@@ -475,7 +478,7 @@ if (newln < MUX_NUMLIN) {
 	    return SCPE_OK;
     for (i = newln; i < MUX_NUMLIN; i++) {
 	if (mux_ldsc[i].conn) {
-	    tmxr_msg (mux_ldsc[i].conn, "\r\nOperator disconnected line\r\n");
+	    tmxr_linemsg (&mux_ldsc[i], "\r\nOperator disconnected line\r\n");
 	    tmxr_reset_ln (&mux_ldsc[i]);  }		/* reset line */
 	muxl_unit[i].flags = muxl_unit[i].flags | UNIT_DIS;
 	mux_reset_ln (i);  }

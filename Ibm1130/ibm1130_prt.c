@@ -264,7 +264,7 @@ static void flush_prt_line (FILE *fd, int spacemode, t_bool phys_flush)
 
 	if (spacemode && ! maxnp) {								// spacing only
 		if (prt_row == 0 && prt_nnl) {
-#ifdef WIN32
+#ifdef _WIN32
 			if (! cgi)
 				putc('\r', fd);								// DOS/Windows: end with cr/lf
 #endif
@@ -283,7 +283,7 @@ static void flush_prt_line (FILE *fd, int spacemode, t_bool phys_flush)
 	if (prt_nnl) {											// there are queued newlines
 // if we spaced to top of form, don't emit formfeed. We'd only ever emit the formfeed if we skipped	via control tape channels
 //		if (prt_row == 0 && prt_nnl) {						// we spaced to top of form
-//#ifdef WIN32
+//#ifdef _WIN32
 //			if (! cgi)
 //				putc('\r', fd);								// DOS/Windows: end with cr/lf
 //#endif
@@ -293,7 +293,7 @@ static void flush_prt_line (FILE *fd, int spacemode, t_bool phys_flush)
 //		}
 //		else {
 			while (prt_nnl > 0) {							// spit out queued newlines
-#ifdef WIN32
+#ifdef _WIN32
 				if (! cgi)
 					putc('\r', fd);							// DOS/Windows: end with cr/lf
 #endif
@@ -347,7 +347,7 @@ void xio_1132_printer (int32 iocc_addr, int32 func, int32 modify)
 
 	switch (func) {
 		case XIO_READ:
-			M[iocc_addr & mem_mask] = codewheel1132[prt_nchar].ebcdic << 8;
+			M[iocc_addr & mem_mask] = (uint16) (codewheel1132[prt_nchar].ebcdic << 8);
 
 			if ((uptr->flags & UNIT_PRINTING) == 0)				/* if we're not printing, advance this after every test */
 				prt_nchar = (prt_nchar + 1) % WHEELCHARS_1132;
@@ -631,7 +631,7 @@ static t_stat delete_cmd (int flag, char *cptr)
 	if (*gbuf == 0) return SCPE_2FARG;
 	if (*cptr != 0) return SCPE_2MARG;			/* now eol? */
 
-	status = unlink(gbuf);						/* delete the file */
+	status = remove(gbuf);						/* delete the file */
 
 	if (status != 0 && errno != ENOENT)			/* print message if failed and file exists */
 		perror(gbuf);
@@ -745,7 +745,7 @@ static t_stat prt_attach (UNIT *uptr, char *cptr)
 	reset_prt_line();
 
 	if (IS_1132(uptr)) {
-		PRT_DSW = (PRT_DSW & ~PRT1132_DSW_CHANNEL_MASK) | cc_format_1132(cctape[prt_row]);
+		PRT_DSW = (uint16) ((PRT_DSW & ~PRT1132_DSW_CHANNEL_MASK) | cc_format_1132(cctape[prt_row]));
 
 		if (IS_ONLINE(uptr))
 			CLRBIT(PRT_DSW, PRT1132_DSW_NOT_READY);

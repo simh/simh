@@ -25,6 +25,8 @@
 
    cpu		CVAX central processor
 
+   25-Jan-04	RMS	Removed local debug logging support
+		RMS,MP	Added extended physical memory support
    31-Dec-03	RMS	Fixed bug in set_cpu_hist
    21-Dec-03	RMS	Added autoconfiguration controls
    29-Oct-03	RMS	Fixed WriteB declaration (found by Mark Pizzolato)
@@ -146,8 +148,10 @@
 
 #define OP_MEM		-1
 #define UNIT_V_CONH	(UNIT_V_UF + 0)			/* halt to console */
-#define UNIT_V_MSIZE	(UNIT_V_UF + 1)			/* dummy */
+#define UNIT_V_EXTM	(UNIT_V_UF + 1)			/* ext memory enable */
+#define UNIT_V_MSIZE	(UNIT_V_UF + 2)			/* dummy */
 #define UNIT_CONH	(1u << UNIT_V_CONH)
+#define UNIT_EXTM	(1u << UNIT_V_EXTM)
 #define UNIT_MSIZE	(1u << UNIT_V_MSIZE)
 #define GET_CUR		acc = ACC_MASK (PSL_GETCUR (PSL))
 
@@ -221,8 +225,8 @@ int32 dbg_stop = 0;
 int32 mchk_va, mchk_ref;				/* mem ref param */
 int32 ibufl, ibufh;					/* prefetch buf */
 int32 ibcnt, ppc;					/* prefetch ctl */
-int32 cpu_log = 0;					/* logging */
 int32 autcon_enb = 1;					/* autoconfig enable */
+int32 cpu_extmem = 0;					/* extended memory */
 jmp_buf save_env;
 REG *pcq_r = NULL;					/* PC queue reg ptr */
 int32 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
@@ -335,6 +339,7 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 t_stat cpu_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_extm (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_virt (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -349,7 +354,7 @@ int32 con_halt (int32 code, int32 cc);
    cpu_mod	CPU modifier list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, INITMEMSIZE) };
+UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK + UNIT_EXTM, INITMEMSIZE) };
 
 REG cpu_reg[] = {
 	{ HRDATA (PC, R[nPC], 32) },
@@ -395,7 +400,6 @@ REG cpu_reg[] = {
 	{ FLDATA (CRDERR, crd_err, 0) },
 	{ FLDATA (MEMERR, mem_err, 0) },
 	{ FLDATA (HLTPIN, hlt_pin, 0) },
-	{ HRDATA (DBGLOG, cpu_log, 16), REG_HIDDEN },
 	{ FLDATA (DBGSTOP, dbg_stop, 0), REG_HIDDEN },
 	{ BRDATA (PCQ, pcq, 16, 32, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ HRDATA (PCQP, pcq_p, 6), REG_HRO },
@@ -405,10 +409,15 @@ REG cpu_reg[] = {
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
-	{ UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size },
+	{ UNIT_EXTM, UNIT_EXTM, NULL, "EXTENDEDMEMORY", &cpu_set_extm },
+	{ UNIT_EXTM, 0, NULL, "NOEXTENDEDMEMORY", &cpu_set_extm },
 	{ UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size },
 	{ UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size },
+	{ UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size },
 	{ UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size },
+	{ UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size },
+	{ UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size },
+	{ UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size },
 	{ UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL },
 	{ UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
 	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
@@ -422,12 +431,19 @@ MTAB cpu_mod[] = {
 	{ MTAB_XTD|MTAB_VDV, 0, NULL, "VIRTUAL", &cpu_show_virt },
 	{ 0 }  };
 
+DEBTAB cpu_deb[] = {
+	{ "INTEXC", LOG_CPU_I },
+	{ "REI", LOG_CPU_R },
+	{ "CONTEXT", LOG_CPU_P },
+	{ NULL, 0 }  };
+
 DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
 	1, 16, 32, 1, 16, 8,
 	&cpu_ex, &cpu_dep, &cpu_reset,
 	&cpu_boot, NULL, NULL,
-	NULL, DEV_DYNM, &cpu_set_size };
+	NULL, DEV_DYNM | DEV_DEBUG, 0,
+	cpu_deb, &cpu_set_size, NULL };
 
 t_stat sim_instr (void)
 {
@@ -437,6 +453,7 @@ int abortval;
 t_stat r;
 
 if ((r = build_dib_tab ()) != SCPE_OK) return r;	/* build, chk dib_tab */
+cpu_extmem = cpu_unit.flags & UNIT_EXTM;		/* external flag */
 cc = PSL & CC_MASK;					/* split PSL */
 PSL = PSL & ~CC_MASK;
 in_ie = 0;						/* not in exc */
@@ -2311,10 +2328,6 @@ JUMP (ROMBASE);						/* PC = 20040000 */
 return 0;						/* new cc = 0 */
 }
 
-/* To do list:
-	Examine/deposit I/O
-*/
-
 /* Reset */
 
 t_stat cpu_reset (DEVICE *dptr)
@@ -2359,10 +2372,16 @@ conpc = 0;
 conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
 if (rom == NULL) return SCPE_IERR;
 if (*rom == 0) {					/* no boot? */
-	printf ("Loading boot code from ka655.bin\n");
-	if (sim_log) fprintf (sim_log,
-	    "Loading boot code from ka655.bin\n");
-	r = load_cmd (0, "-R ka655.bin");
+	if (cpu_unit.flags & UNIT_EXTM) {		/* KA655X? */
+	    printf ("Loading boot code from ka655x.bin\n");
+	    if (sim_log) fprintf (sim_log, 
+		"Loading boot code from ka655x.bin\n");
+	    r = load_cmd (0, "-R ka655x.bin");  }
+	else {						/* KA655 */
+	    printf ("Loading boot code from ka655.bin\n");
+	     if (sim_log) fprintf (sim_log,
+		"Loading boot code from ka655.bin\n");
+	    r = load_cmd (0, "-R ka655.bin");  }
 	if (r != SCPE_OK) return r;  }
 return SCPE_OK;
 }
@@ -2403,6 +2422,14 @@ if (ADDR_IS_ROM (addr)) {
 return SCPE_NXM;
 }
 
+/* Enable/disable extended physical memory */
+
+t_stat cpu_set_extm (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if ((val == 0) && (MEMSIZE > MAXMEMSIZE)) return SCPE_ARG;
+return SCPE_OK;
+}
+
 /* Memory allocation */
 
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
@@ -2411,7 +2438,8 @@ int32 mc = 0;
 uint32 i, clim;
 uint32 *nM = NULL;
 
-if ((val <= 0) || (val > MAXMEMSIZE)) return SCPE_ARG;
+if ((val <= 0) ||
+    (val > ((uptr->flags & UNIT_EXTM)? MAXMEMSIZE_X: MAXMEMSIZE))) return SCPE_ARG;
 for (i = val; i < MEMSIZE; i = i + 4) mc = mc | M[i >> 2];
 if ((mc != 0) && !get_yn ("Really truncate memory [N]?", FALSE))
 	return SCPE_OK;

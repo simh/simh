@@ -1,6 +1,6 @@
 /* pdp18b_dt.c: 18b DECtape simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,9 @@
 		(PDP-9) TC02/TU55 DECtape
 		(PDP-15) TC15/TU56 DECtape
 
+   25-Jan-04	RMS	Revised for device debug support
+   14-Jan-04	RMS	Revised IO device call interface
+			Changed sim_fsize calling sequence, added STOP_OFFR
    26-Oct-03	RMS	Cleaned up buffer copy code
    18-Oct-03	RMS	Fixed reverse checksum in read all
 			Added DECtape off reel message
@@ -317,10 +320,11 @@
 #define ABS(x)		(((x) < 0)? (-(x)): (x))
 
 extern int32 M[];
-extern int32 int_hwre[API_HLVL+1], dev_enb;
+extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
 extern int32 sim_switches;
 extern int32 sim_is_running;
+extern FILE *sim_deb;
 
 int32 dtsa = 0;						/* status A */
 int32 dtsb = 0;						/* status B */
@@ -328,15 +332,15 @@ int32 dtdb = 0;						/* data buffer */
 int32 dt_ltime = 12;					/* interline time */
 int32 dt_dctime = 40000;				/* decel time */
 int32 dt_substate = 0;
-int32 dt_log = 0;
 int32 dt_logblk = 0;
+int32 dt_stopoffr = 0;					/* stop on off reel */
 static const int32 map_unit[16] = {			/* Type 550 unit map */
  -1,  1,  2,  3,  4,  5,  6,  7,
   0, -1, -1, -1, -1, -1, -1, -1 };
 
 DEVICE dt_dev;
-int32 dt75 (int32 pulse, int32 dat);
-int32 dt76 (int32 pulse, int32 dat);
+int32 dt75 (int32 dev, int32 pulse, int32 dat);
+int32 dt76 (int32 dev, int32 pulse, int32 dat);
 int32 dt_iors (void);
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
@@ -400,7 +404,6 @@ REG dt_reg[] = {
 	{ DRDATA (LTIME, dt_ltime, 31), REG_NZ },
 	{ DRDATA (DCTIME, dt_dctime, 31), REG_NZ },
 	{ ORDATA (SUBSTATE, dt_substate, 2) },
-	{ ORDATA (LOG, dt_log, 4), REG_HIDDEN },
 	{ DRDATA (LBLK, dt_logblk, 12), REG_HIDDEN },
 	{ URDATA (POS, dt_unit[0].pos, 10, T_ADDR_W, 0,
 		  DT_NUMDR, PV_LEFT | REG_RO) },
@@ -409,6 +412,7 @@ REG dt_reg[] = {
 	{ URDATA (LASTT, dt_unit[0].LASTT, 10, T_ADDR_W, 0,
 		  DT_NUMDR, REG_HRO) },
 	{ ORDATA (DEVNO, dt_dib.dev, 6), REG_HRO },
+	{ FLDATA (STOP_OFFR, dt_stopoffr, 0) },
 	{ NULL }  };
 
 MTAB dt_mod[] = {
@@ -420,17 +424,25 @@ MTAB dt_mod[] = {
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
 	{ 0 }  };
 
+DEBTAB dt_deb[] = {
+	{ "MOTION", LOG_MS },
+	{ "DATA", LOG_RW },
+	{ "READALL", LOG_RA },
+	{ "BLOCK", LOG_BL },
+	{ NULL, 0 }  };
+
 DEVICE dt_dev = {
 	"DT", dt_unit, dt_reg, dt_mod,
 	DT_NUMDR, 8, 24, 1, 8, 18,
 	NULL, NULL, &dt_reset,
 	NULL, &dt_attach, &dt_detach,
-	&dt_dib, DEV_DISABLE };
+	&dt_dib, DEV_DISABLE | DEV_DEBUG, 0,
+	dt_deb, NULL, NULL };
 
 /* IOT routines */
 
 #if defined (TC02)					/* TC02/TC15 */
-int32 dt75 (int32 pulse, int32 dat)
+int32 dt75 (int32 dev, int32 pulse, int32 dat)
 {
 int32 old_dtsa = dtsa, fnc;
 UNIT *uptr;
@@ -462,7 +474,7 @@ if ((pulse & 067) == 063)				/* DTEF!DTRB */
 return dat;
 }
 
-int32 dt76 (int32 pulse, int32 dat)
+int32 dt76 (int32 dev, int32 pulse, int32 dat)
 {
 if ((pulse & 01) && (dtsb & DTB_DTF))			/* DTDF */
 	return IOT_SKP + dat;
@@ -470,7 +482,7 @@ return dat;
 }
 
 #else							/* Type 550 */
-int32 dt75 (int32 pulse, int32 dat)
+int32 dt75 (int32 dev, int32 pulse, int32 dat)
 {
 if (((pulse & 041) == 001) && (dtsb & DTB_DTF))		/* MMDF */
 	dat = dat | IOT_SKP;
@@ -486,7 +498,7 @@ DT_UPDINT;
 return dat;
 }
 
-int32 dt76 (int32 pulse, int32 dat)
+int32 dt76 (int32 dev, int32 pulse, int32 dat)
 {
 int32 fnc, mot, unum;
 UNIT *uptr = NULL;
@@ -664,16 +676,16 @@ case DTS_OFR:						/* off reel */
 	break;
 case FNC_MOVE:						/* move */
 	dt_schedez (uptr, dir);				/* sched end zone */
-	if (dt_log & LOG_MS) printf ("[DT%d: moving %s]\n", unum, (dir?
-	    "backward": "forward"));
+	if (DEBUG_PRI (dt_dev, LOG_MS)) fprintf (sim_deb, ">>DT%d: moving %s\n",
+	    unum, (dir? "backward": "forward"));
 	return;						/* done */
 case FNC_SRCH:						/* search */
 	if (dir) newpos = DT_BLK2LN ((DT_QFEZ (uptr)?
 	    DTU_TSIZE (uptr): blk), uptr) - DT_BLKLN - DT_WSIZE;
 	else newpos = DT_BLK2LN ((DT_QREZ (uptr)?
 	    0: blk + 1), uptr) + DT_BLKLN + (DT_WSIZE - 1);
-	if (dt_log & LOG_MS) printf ("[DT%d: searching %s]\n", unum,
-	    (dir? "backward": "forward"));
+	if (DEBUG_PRI (dt_dev, LOG_MS)) fprintf (sim_deb, ">>DT%d: searching %s\n",
+	    unum, (dir? "backward": "forward"));
 	break;
 case FNC_WRIT:						/* write */
 case FNC_READ:						/* read */
@@ -701,10 +713,11 @@ case FNC_WALL:						/* write all */
 	else {
 	    newpos = ((uptr->pos) / DT_WSIZE) * DT_WSIZE;
 	    if (!dir) newpos = newpos + (DT_WSIZE - 1);  }
-	if ((dt_log & LOG_RA) || ((dt_log & LOG_BL) && (blk == dt_logblk)))
-	    printf ("[DT%d: read all block %d %s%s\n",
+	if (DEBUG_PRI (dt_dev, LOG_RA) ||
+	   (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
+	    fprintf (sim_deb, ">>DT%d: read all block %d %s%s\n",
 		unum, blk, (dir? "backward": "forward"),
-		((dtsa & DTA_MODE)? " continuous]": "]"));
+		((dtsa & DTA_MODE)? " continuous]": " "));
 	break;
 default:
 	dt_seterr (uptr, DTB_SEL);			/* bad state */
@@ -800,7 +813,8 @@ uint32 ba;
 
 switch (mot) {
 case DTS_DECF: case DTS_DECR:				/* decelerating */
-	if (dt_setpos (uptr)) return STOP_DTOFF;	/* update pos */
+	if (dt_setpos (uptr))				/* upd pos; off reel? */
+	    return IORETURN (dt_stopoffr, STOP_DTOFF);
 	uptr->STATE = DTS_NXTSTA (uptr->STATE);		/* advance state */
 	if (uptr->STATE)				/* not stopped? */
 	    sim_activate (uptr, dt_dctime - (dt_dctime >> 2));	/* reversing */
@@ -821,7 +835,8 @@ default:						/* other */
    Off reel - detach unit (it must be deselected)
 */
 
-if (dt_setpos (uptr)) return STOP_DTOFF;		/* update pos */
+if (dt_setpos (uptr))					/* upd pos; off reel? */
+	return IORETURN (dt_stopoffr, STOP_DTOFF);
 if (DT_QEZ (uptr)) {					/* in end zone? */
 	dt_seterr (uptr, DTB_END);			/* end zone error */
 	return SCPE_OK;  }
@@ -871,10 +886,11 @@ case FNC_READ:						/* read */
 	    if (dtsb & DTB_DTF) {			/* DTF set? */
 		dt_seterr (uptr, DTB_TIM);		/* timing error */
 		return SCPE_OK;  }
-	    if ((dt_log & LOG_RW) || ((dt_log & LOG_BL) && (blk == dt_logblk)))
-		printf ("[DT%d: reading block %d %s%s\n",
+	    if (DEBUG_PRI (dt_dev, LOG_RW) ||
+	       (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
+		fprintf (sim_deb, ">>DT%d: reading block %d %s%s\n",
 		    unum, blk, (dir? "backward": "forward"),
-		    ((dtsa & DTA_MODE)? " continuous]": "]"));
+		    ((dtsa & DTA_MODE)? " continuous": " "));
 	    dt_substate = 0;				/* fall through */
 	case 0:						/* normal read */
 	    M[DT_WC] = (M[DT_WC] + 1) & DMASK;		/* incr WC, CA */
@@ -920,10 +936,11 @@ case FNC_WRIT:						/* write */
 	    if (dtsb & DTB_DTF) {			/* DTF set? */
 		dt_seterr (uptr, DTB_TIM);		/* timing error */
 		return SCPE_OK;  }
-	    if ((dt_log & LOG_RW) || ((dt_log & LOG_BL) && (blk == dt_logblk)))
-		printf ("[DT%d: writing block %d %s%s\n", unum, blk,
+	    if (DEBUG_PRI (dt_dev, LOG_RW) ||
+	       (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
+		fprintf (sim_deb, ">>DT%d: writing block %d %s%s\n", unum, blk,
 		    (dir? "backward": "forward"),
-		    ((dtsa & DTA_MODE)? " continuous]": "]"));
+		    ((dtsa & DTA_MODE)? " continuous": " "));
 	    dt_substate = 0;				/* fall through */
 	case 0:						/* normal write */
 	    M[DT_WC] = (M[DT_WC] + 1) & DMASK;		/* incr WC, CA */
@@ -1245,7 +1262,7 @@ if ((sim_switches & SIM_SW_REST) == 0) {		/* not from rest? */
 	else if (sim_switches & SWMASK ('S'))		/* att 16b? */
 	    uptr->flags = uptr->flags | UNIT_11FMT;
 	else if (!(sim_switches & SWMASK ('T')) &&	/* autosize? */
-	    (sz = sim_fsize (cptr))) {
+	    (sz = sim_fsize (uptr->fileref))) {
 	    if (sz == D8_FILSIZ)
 		uptr->flags = uptr->flags | UNIT_8FMT;
 	    else if (sz == D11_FILSIZ)

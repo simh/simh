@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V3.1
-Date:	15-Dec-2003
+Subj:	Simulator Usage, V3.2
+Date:	4-Apr-2004
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2003, written by Robert M Supnik
-   Copyright (c) 1993-2003, Robert M Supnik
+   Original code published in 1993-2004, written by Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -35,7 +35,7 @@ This memorandum documents SIMH simulators.  These simulators are freeware;
 refer to the license terms above for conditions of use.  Support is not
 available.  The best way to fix problems or add features is to read and
 modify the sources yourself.  Alternately, you can send Internet mail to
-bsupnik@us.inter.net, but a response is not guaranteed.
+bob AT supnik DOT org, but a response is not guaranteed.
 
 The simulators use a common command interface.  This memorandum describes
 the features of the command interface.  The details of each simulator are
@@ -47,8 +47,8 @@ documented in separate, machine-specific memoranda.
 The simulators have been tested on VAX VMS, Alpha VMS, Alpha UNIX,
 NetBSD, FreeBSD, OpenBSD, Linux, Solaris, Windows 9x/Me/NT/2000, MacOS
 9 and X, and OS/2.  Porting to other environments will require changes
-to the operating system dependent code in scp_tty.c, scp_sock.c, and
-sim_ether.c.
+to the operating system dependent code in the SIMH libraries (sim_fio.c,
+sim_timer.c, sim_console.c, sim_ether.c, sim_sock.c).
 
 The simulator sources are provided in a zip archive and are organized
 hierarchically.  Source files for the simulator libraries are in the
@@ -78,10 +78,12 @@ The simulators recognize or require a few compile-time #defines:
   defined on the command line: VM_PDP10 for the PDP-10; VM_PDP11
   for the PDP-11; or VM_VAX for the VAX.
 
-- The PDP-11 and VAX simulators optionally support Ethernet.  To
-  include Ethernet emulation, USE_NETWORK must be defined as part
-  of the compilation command line.  At present, Ethernet support is
-  available only on Windows, Linux, NetBSD, OpenBSD, and Alpha VMS.
+- The PDP-11, PDP-11, and VAX simulators optionally support Ethernet.
+  To include Ethernet emulation, USE_NETWORK must be defined as part
+  of the compilation command line.  At present, Ethernet support has
+  been tested only on Windows, Linux, NetBSD, OpenBSD, FreeBSD,
+  Solaris, and Alpha VMS, but it should work in any host environment
+  that supports the Pcap library (see the Ethernet readme file).
 
 - The PDP-11 and VAX simulators optionally support disks and serial
   devices files greater than 2GB.  To include large device support,
@@ -102,7 +104,7 @@ If no file is specified on the command line, the simulator looks for
 an startup file consisting of the simulator name (including its path
 components) plus the extension .ini.  If a startup file is specified,
 either on the command line or implicitly via the .ini capability, it
-ishould contain a series of non-interactive simulator command, one
+should contain a series of non-interactive simulator command, one
 per line.  These command can be used to set up standard parameters,
 for example, disk sizes.
 
@@ -144,15 +146,15 @@ Examples:
 
 - PDP-11 under TERMIOS UNIX:
 
-	% cc -DVM_PDP11 pdp11_*.c scp*.c sim_*.c -lm -o pdp11
+	% cc -DVM_PDP11 pdp11_*.c scp.c sim_*.c -lm -o pdp11
 
 - PDP-9 under TERMIOS UNIX:
 
-	% cc -DPDP9 pdp18b_*.c scp*.c sim_*.c -lm -o pdp9
+	% cc -DPDP9 pdp18b_*.c scp.c sim_*.c -lm -o pdp9
 
 - PDP-10 under BSD terminal UNIX:
 
-	% cc -DVM_PDP10 -DUSE_INT64 -DBSDTTY pdp10_*.c scp*.c sim_*.c -lm -o pdp10
+	% cc -DVM_PDP10 -DUSE_INT64 -DBSDTTY pdp10_*.c scp.c sim_*.c -lm -o pdp10
 
 1.2 Compiling Under Windows
 
@@ -223,8 +225,8 @@ build all the simulators from source.  An example of hand compilation:
 
 - PDP-8 under VMS:
 
-	$ cc scp*.c,sim_*.c,[.pdp8]pdp8*.c
-	$ link/exec=pdp8 scp*.obj,sim_*.obj,[.pdp8]pdp8*.obj
+	$ cc scp.c,sim_*.c,[.pdp8]pdp8*.c
+	$ link/exec=pdp8 scp.obj,sim_*.obj,[.pdp8]pdp8*.obj
 
 1.4 Compiling Under MacOS
 
@@ -291,7 +293,8 @@ The types of formats supported are implementation specific.  Options
 
 The SAVE command (abbreviation SA) save the complete state of the
 simulator to a file.  This includes the contents of main memory and
-all registers, and the I/O connections of devices:
+all registers, and the I/O connections of devices except network
+devices (such as Ethernet controllers and terminal multiplexors):
 
 	sim> save <filename>(cr)
 
@@ -317,8 +320,8 @@ does not clear main memory or affect I/O connections.
 
 3.4 Connecting and Disconnecting Devices
 
-Except for main memory, simulated unit address spaces are simulated
-as unstructured binary disk files in the host file system.  Before
+Except for main memory and network devices, units are simulated as
+unstructured binary disk files in the host file system.  Before
 using a simulated unit, the user must specify the file to be accessed
 by that unit.  The ATTACH (abbreviation AT) command associates a unit
 and a file:
@@ -366,8 +369,13 @@ master unit with a TCP/IP port:
 The port is a decimal number between 1 and 65535 and should not used
 by standard TCP/IP protocols.
 
+For Ethernet emulators, the ATTACH command associates the simulated
+Ethernet with a physical Ethernet device:
+
+	sim> ATTACH <unit> <physical device name>(cr)
+
 The DETACH (abbreviation DET) command breaks the association between
-a unit and a file, or between a unit and a port:
+a unit and a file, port, or network device:
 
 	sim> DETACH ALL(cr)		-- detach all units
 	sim> DETACH <unit>(cr)		-- detach specified unit
@@ -492,7 +500,7 @@ is supplied, one instruction is executed.
 
 The BOOT command (abbreviated BO) bootstraps the device and unit given
 by its argument.  If no unit is supplied, unit 0 is bootstrapped.  The
-specified unit must be attached to a file.
+specified unit must be attached.
 
 3.7 Stopping Programs
 
@@ -530,7 +538,7 @@ for execution, R for read, W for write, etc).  At the moment, most
 simulators support only E (execution) breakpoints.
 
 Associated with a breakpoint is a count and, optionally, one or more
-actions.  Each time the breakpoint is sprung, the associated count is
+actions.  Each time the breakpoint is taken, the associated count is
 decremented.  If the count is less than or equal to 0, the breakpoint
 occurs; otherwise, it is deferred.  When the breakpoint occurs, the
 optional actions are automatically executed.
@@ -601,7 +609,9 @@ the last RUN command.
 
 The SHOW <device> command shows the status of the named simulated
 device. SHOW <device> <parameter> shows the value of the named
-parameter, if it can display a value.
+parameter, if it can display a value.  All devices implement parameters
+RADIX (the display radix), MODIFIERS (list of valid modifiers), and
+NAMES (logical name).
 
 The SHOW <unit> command shows the status of the named simulated unit.
 SHOW <unit> <parameter> shows the value of the named parameter, if
@@ -637,11 +647,15 @@ Logical names must be unique within a simulator (that is, they cannot
 be the same as an existing device name).  To assign a logical name
 to a device:
 
-	sim> ASSIGN device log-name	-- assign log-name to device
+	sim> ASSIGN <device> <log-name>	-- assign log-name to device
 
 To remove a logical name:
 
-	sim> DEASSIGN device		-- remove logical name
+	sim> DEASSIGN <device>		-- remove logical name
+
+To show the current logical name assignment:
+
+	sim> SHOW <device> NAMES	-- show logical name, if any
 
 To show all logical names:
 
@@ -694,7 +708,34 @@ commands:
 	sim> HELP			-- print all HELP messages
 	sim> HELP <command>		-- print HELP for command
 
-3.15 Exiting The Simulator
+3.15 Controlling Debugging
+
+Some simulated devices may provide debug printouts to help in diagnosing
+complicated problems.  Debug output may be sent to a variety of places,
+or disabled entirely:
+
+	sim> SET DEBUG STDOUT		-- direct debug output to stdout
+	sim> SET DEBUG STDERR		-- direct debug output to stderr
+	sim> SET DEBUG LOG		-- direct debug output to log file
+	sim> SET DEBUG <filename>	-- direct debug output to file
+	sim> SET NODEBUG		-- disable debug output
+
+If debug output is enabled, individual devices can be controlled with the
+SET command.  If a device has only a single debug flag:
+
+	sim> SET <device> DEBUG		-- enable device debug output
+	sim> SET <device> NODEBUG	-- disable device debug output
+
+If the device has individual, named debug flags:
+
+	sim> SET <device> DEBUG=n1,n2,...   -- enable device debug flags n1, n2, ...
+	sim> SET <device> NODEBUG=n1,n2,... -- disable device debug flags n1, n2, ...
+	sim> SET <device> NODEBUG	    -- disable all device debug flags
+
+If debug output is directed to stdout, it will be intermixed with normal
+simulator output.
+
+3.16 Exiting The Simulator
 
 EXIT (synonyms QUIT and BYE) returns control to the operating system.
 
@@ -720,7 +761,7 @@ written.
 3. Magnetic Tapes
 
 Magnetic tapes are represented as unstructured binary files of 8b data
-items.  Each record consists of a 32b record header, in little endian
+items.  Each record starts with a 32b record header, in little endian
 format.  If the record header is not a special header, it is followed
 by n 8b bytes of data, followed by a repeat of the 32b record header.
 A 1 in the high order bit of the record header indicates an error in
@@ -730,8 +771,8 @@ length; the pad byte is undefined.
 Special record headers occur only once and have no data.  The currently
 defined special headers are:
 
-	0x00000000		file mark (not repeated)
-	0xFFFFFFFF		end of medium (not repeated)
+	0x00000000		file mark
+	0xFFFFFFFF		end of medium
 
 Magnetic tapes are endian independent and consistent across simulator
 families.  A magtape produced by the Nova simulator will appear to
@@ -764,7 +805,7 @@ DECtapes use 1474 blocks of 129 16b words.  Each 16b word contains 12b
 and OS/8 DECtape dumps contain only 128 words per block.  A utility,
 DTOS8CVT.C, is provided to convert OS/8 DECtape dumps to simulator format.
 
-A known problem in DECtape format is that when a block is recorded in
+A known issue in DECtape format is that when a block is recorded in
 one direction and read in the other, the bits in a word are scrambled
 (to the complement obverse).  The PDP-11 deals with this problem by
 performing an automatic complement obverse on reverse writes and reads.
@@ -842,6 +883,24 @@ drum		-	-	-	-	h
 DECtape		-	-	-	-	-
 mag tape	-	-	d	y	h
 
+	system	LGP-30	1130
+device
+CPU		h	y
+FPU		-	-
+CIS		-	-
+console		h	y
+paper tape	h	-
+card reader	-	y
+line printer	-	y
+clock		-	-
+extra terminal	-	-
+hard disk	-	y
+fixed disk	-	-
+floppy disk	-	-
+drum		-	-
+DECtape		-	-
+mag tape	-	-
+
 legend:		y = runs operating system or sample program
 		d = runs diagnostics
 		h = runs hand-generated test cases
@@ -852,6 +911,17 @@ Revision History (covering Rev 2.0 to present)
 
 Starting with Rev 2.7, detailed revision histories can be found
 in file sim_rev.c.
+
+Rev 3.2, Feb, 04
+	Added LGP-30/LGP-21 simulator
+	Added global SHOW modifier capability
+	Added global SET DEBUG modifier
+	Added global SHOW DEBUG,RADIX,MODIFIERS,NAME modifiers
+	Added VAX extended physical memory support (Mark Pizzolato)
+	Added VAX RXV21 support
+	Revised terminal multiplexor library to support variable
+	 number of lines per multiplexor
+	Added PDP-15 LT19 support (1-16 terminals)
 
 Rev 3.1, Dec, 03
 	Added Alpha/VMS, FreeBSD, Mac OS/X Ethernet library support

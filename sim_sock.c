@@ -1,6 +1,6 @@
 /* sim_sock.c: OS-dependent socket routines
 
-   Copyright (c) 2001-2003, Robert M Supnik
+   Copyright (c) 2001-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Jan-04	RMS	Fixed typing problem in Alpha Unix (found by Tim Chapman)
    17-Apr-03	RMS	Fixed non-implemented version of sim_close_sock
 			(found by Mark Pizzolato)
    17-Dec-02	RMS	Added sim_connect_socket, sim_create_socket
@@ -182,7 +183,8 @@ SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr)
 int32 sta, err;
 #if defined (macintosh) 
 socklen_t size;
-#elif defined (_WIN32) || defined (__EMX__) || defined (__APPLE__)
+#elif defined (_WIN32) || defined (__EMX__) || defined (__APPLE__) ||\
+     (defined (__ALPHA) && defined (__unix__))
 int size;
 #else 
 size_t size; 

@@ -6,19 +6,19 @@
 ifeq ($(WIN32),)
 #Unix Environments
 ifeq ($(OSTYPE),solaris)
-OS_CCDEFS = -lsocket -lnsl -I /usr/local/include
-CC = gcc -O2 -g -lm $(OS_CCDEFS) -L /usr/local/lib -I . -D_GNU_SOURCE
+OS_CCDEFS = -lsocket -lnsl -lpthread -D_GNU_SOURCE
 else
-CC = gcc -O2 -lm -I . 
+OS_CCDEFS = -D_GNU_SOURCE
 endif
+CC = gcc -std=c99 -O2 -g -lm $(OS_CCDEFS) -I .
 ifeq ($(USE_NETWORK),)
 else
-NETWORK_OPT = -DUSE_NETWORK -lpcap
+NETWORK_OPT = -DUSE_NETWORK -lpcap  -isystem /usr/local/include -L /usr/local/lib
 endif
 else
 #Win32 Environments
 LDFLAGS = -lm -lwsock32
-CC = gcc -O0 -I.
+CC = gcc -std=c99 -U__STRICT_ANSI__ -O0 -I.
 EXE = .exe
 ifeq ($(USE_NETWORK),)
 else
@@ -31,8 +31,8 @@ endif
 # Common Libraries
 #
 BIN = BIN/
-SIM = scp.c scp_tty.c sim_sock.c sim_tmxr.c sim_ether.c sim_tape.c
-
+SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
+	sim_tmxr.c sim_ether.c sim_tape.c
 
 
 #
@@ -48,7 +48,7 @@ NOVAD = NOVA/
 NOVA = ${NOVAD}nova_sys.c ${NOVAD}nova_cpu.c ${NOVAD}nova_dkp.c \
 	${NOVAD}nova_dsk.c ${NOVAD}nova_lp.c ${NOVAD}nova_mta.c \
 	${NOVAD}nova_plt.c ${NOVAD}nova_pt.c ${NOVAD}nova_clk.c \
-	${NOVAD}nova_tt.c ${NOVAD}nova_tt1.c
+	${NOVAD}nova_tt.c ${NOVAD}nova_tt1.c ${NOVAD}nova_qty.c
 NOVA_OPT = -I ${NOVAD}
 
 
@@ -56,7 +56,7 @@ NOVA_OPT = -I ${NOVAD}
 ECLIPSE = ${NOVAD}eclipse_cpu.c ${NOVAD}eclipse_tt.c ${NOVAD}nova_sys.c \
 	${NOVAD}nova_dkp.c ${NOVAD}nova_dsk.c ${NOVAD}nova_lp.c \
 	${NOVAD}nova_mta.c ${NOVAD}nova_plt.c ${NOVAD}nova_pt.c \
-	${NOVAD}nova_clk.c ${NOVAD}nova_tt1.c
+	${NOVAD}nova_clk.c ${NOVAD}nova_tt1.c ${NOVAD}nova_qty.c
 ECLIPSE_OPT = -I ${NOVAD} -DECLIPSE -DUSE_INT64 
 
 
@@ -92,7 +92,7 @@ VAX = ${VAXD}vax_cpu1.c ${VAXD}vax_cpu.c ${VAXD}vax_fpa.c ${VAXD}vax_io.c \
 	${VAXD}vax_sysdev.c \
 	${PDP11D}pdp11_rl.c ${PDP11D}pdp11_rq.c ${PDP11D}pdp11_ts.c \
 	${PDP11D}pdp11_dz.c ${PDP11D}pdp11_lp.c ${PDP11D}pdp11_tq.c \
-	${PDP11D}pdp11_pt.c ${PDP11D}pdp11_xq.c
+	${PDP11D}pdp11_pt.c ${PDP11D}pdp11_xq.c ${PDP11D}pdp11_ry.c
 VAX_OPT = -DVM_VAX -DUSE_INT64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -103,7 +103,7 @@ PDP10 = ${PDP10D}pdp10_fe.c ${PDP11D}pdp11_dz.c ${PDP10D}pdp10_cpu.c \
 	${PDP10D}pdp10_pag.c ${PDP10D}pdp10_rp.c ${PDP10D}pdp10_sys.c \
 	${PDP10D}pdp10_tim.c ${PDP10D}pdp10_tu.c ${PDP10D}pdp10_xtnd.c \
 	${PDP11D}pdp11_pt.c ${PDP11D}pdp11_ry.c ${PDP11D}pdp11_xu.c
-PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D} -I ${VAXD}
+PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D} -I ${VAXD} ${NETWORK_OPT}
 
 
 
@@ -208,6 +208,12 @@ GRI_OPT = -I ${GRID}
 
 
 
+LGPD = LGP/
+LGP = ${LGPD}lgp_cpu.c ${LGPD}lgp_stddev.c ${LGPD}lgp_sys.c
+LGP_OPT = -I ${LGPD}
+
+
+
 SDSD = SDS/
 SDS = ${SDSD}sds_cpu.c ${SDSD}sds_drm.c ${SDSD}sds_dsk.c ${SDSD}sds_io.c \
 	${SDSD}sds_lp.c ${SDSD}sds_mt.c ${SDSD}sds_mux.c ${SDSD}sds_rad.c \
@@ -225,7 +231,7 @@ ALL = ${BIN}pdp1${EXE} ${BIN}pdp4${EXE} ${BIN}pdp7${EXE} ${BIN}pdp8${EXE} \
 	${BIN}hp2100${EXE} ${BIN}i1401${EXE} ${BIN}i1620${EXE} ${BIN}s3${EXE} \
 	${BIN}altair${EXE} ${BIN}altairz80${EXE} ${BIN}gri${EXE} \
 	${BIN}i1620${EXE} ${BIN}ibm1130${EXE} ${BIN}id16${EXE} \
-	${BIN}id32${EXE} ${BIN}sds${EXE}
+	${BIN}id32${EXE} ${BIN}sds${EXE} ${BIN}lgp${EXE}
 
 all : ${ALL}
 
@@ -332,6 +338,10 @@ ${BIN}gri${EXE} : ${GRI} ${SIM}
 	${CC} ${GRI} ${SIM} ${GRI_OPT} -o $@ ${LDFLAGS}
 
 
+${BIN}lgp${EXE} : ${LGP} ${SIM}
+	${CC} ${LGP} ${SIM} ${LGP_OPT} -o $@ ${LDFLAGS}
+
+
 ${BIN}id16${EXE} : ${ID16} ${SIM}
 	${CC} ${ID16} ${SIM} ${ID16_OPT} -o $@ ${LDFLAGS}
 
@@ -342,5 +352,3 @@ ${BIN}id32${EXE} : ${ID32} ${SIM}
 
 ${BIN}sds${EXE} : ${SDS} ${SIM}
 	${CC} ${SDS} ${SIM} ${SDS_OPT} -o $@ ${LDFLAGS}
-
-

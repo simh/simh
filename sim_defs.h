@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   06-Feb-04	RMS	Moved device and unit user flags fields (V3.2)
+		RMS	Added REG_VMAD
    29-Dec-03	RMS	Added output stall status
    15-Jun-03	RMS	Added register flag REG_VMIO
    23-Apr-03	RMS	Revised for 32b/64b t_addr
@@ -88,6 +90,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
@@ -247,6 +250,8 @@ struct sim_device {
 	t_stat		(*detach)(struct sim_unit *up);	/* detach routine */
 	void		*ctxt;				/* context */
 	uint32		flags;				/* flags */
+	uint32		dctrl;				/* debug control */
+	struct sim_debtab *debflags;			/* debug flags */
 	t_stat		(*msize)(struct sim_unit *up, int32 v, char *cp, void *dp);
 							/* mem size routine */
 	char		*lname;				/* logical name */
@@ -258,14 +263,22 @@ struct sim_device {
 #define DEV_V_DISABLE	1				/* dev disable-able */
 #define DEV_V_DYNM	2				/* mem size dynamic */
 #define DEV_V_NET	3				/* network attach */
-#define	DEV_V_UF	12				/* user flags */
+#define DEV_V_DEBUG	4				/* debug capability */
+#define DEV_V_RAW	5				/* raw supported */
+#define DEV_V_RAWONLY	6				/* only raw supported */
+#define DEV_V_UF_31	12				/* user flags, V3.1 */
+#define	DEV_V_UF	16				/* user flags */
 #define DEV_V_RSV	31				/* reserved */
 
 #define DEV_DIS		(1 << DEV_V_DIS)
 #define DEV_DISABLE	(1 << DEV_V_DISABLE)
 #define DEV_DYNM	(1 << DEV_V_DYNM)
 #define DEV_NET		(1 << DEV_V_NET)
+#define DEV_DEBUG	(1 << DEV_V_DEBUG)
+#define DEV_RAW		(1 << DEV_V_RAW)
+#define DEV_RAWONLY	(1 << DEV_V_RAWONLY)
 
+#define DEV_UFMASK_31	(((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF_31) - 1))
 #define DEV_UFMASK	(((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF) - 1))
 #define DEV_RFLAGS	(DEV_UFMASK|DEV_DIS)		/* restored flags */
 
@@ -299,7 +312,8 @@ struct sim_unit {
 
 /* Unit flags */
 
-#define UNIT_V_UF	12				/* device specific */
+#define UNIT_V_UF_31	12				/* dev spec, V3.1 */
+#define UNIT_V_UF	16				/* device specific */
 #define UNIT_V_RSV	31				/* reserved!! */
 
 #define UNIT_ATTABLE	000001				/* attachable */
@@ -314,7 +328,9 @@ struct sim_unit {
 #define UNIT_ROABLE	001000				/* read only ok */
 #define UNIT_DISABLE	002000				/* disable-able */
 #define UNIT_DIS	004000				/* disabled */
+#define UNIT_RAW	010000				/* raw mode */
 
+#define UNIT_UFMASK_31	(((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF_31) - 1))
 #define UNIT_UFMASK	(((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF) - 1))
 #define UNIT_RFLAGS	(UNIT_UFMASK|UNIT_DIS)		/* restored flags */
 
@@ -337,7 +353,8 @@ struct sim_reg {
 #define REG_NZ		0020				/* must be non-zero */
 #define REG_UNIT	0040				/* in unit struct */
 #define REG_CIRC	0100				/* circular array */
-#define REG_VMIO	0200				/* use VM print/parse */
+#define REG_VMIO	0200				/* use VM data print/parse */
+#define REG_VMAD	0400				/* use VM addr print/parse */
 #define REG_HRO		(REG_RO | REG_HIDDEN)		/* hidden, read only */
 
 /* Command tables, base and alternate formats */
@@ -353,14 +370,15 @@ struct sim_ctab {
 struct sim_c1tab {
 	char		*name;				/* name */
 	t_stat		(*action)(struct sim_device *dptr, struct sim_unit *uptr,
-			int32 flag);			/* action routine */
+			int32 flag, char *cptr);	/* action routine */
 	int32		arg;				/* argument */
 	char		*help;				/* help string */
 };
 
 struct sim_shtab {
 	char		*name;				/* name */
-	t_stat		(*action)(FILE *st, int32 flag, char *cptr);
+	t_stat		(*action)(FILE *st, struct sim_device *dptr,
+			struct sim_unit *uptr, int32 flag, char *cptr);
 	int32		arg;				/* argument */
 	char		*help;				/* help string */
 };
@@ -405,6 +423,17 @@ struct sim_brktab {
 	int32		cnt;				/* proceed count */	
 	char		*act;				/* action string */
 };
+
+/* Debug table */
+
+struct sim_debtab {
+	char		*name;				/* control name */
+	uint32		mask;				/* control bit */
+};
+
+#define DEBUG_PRS(d)	(sim_deb && d.dctrl)
+#define DEBUG_PRD(d)	(sim_deb && d->dctrl)
+#define DEBUG_PRI(d,m)	(sim_deb && (d.dctrl & (m)))
 
 /* The following macros define structure contents */
 
@@ -441,45 +470,13 @@ typedef struct sim_shtab SHTAB;
 typedef struct sim_mtab MTAB;
 typedef struct sim_schtab SCHTAB;
 typedef struct sim_brktab BRKTAB;
+typedef struct sim_debtab DEBTAB;
 
 /* Function prototypes */
 
-t_stat sim_process_event (void);
-t_stat sim_activate (UNIT *uptr, int32 interval);
-t_stat sim_cancel (UNIT *uptr);
-int32 sim_is_active (UNIT *uptr);
-double sim_gtime (void);
-uint32 sim_grtime (void);
-int32 sim_qcount (void);
-t_stat attach_unit (UNIT *uptr, char *cptr);
-t_stat detach_unit (UNIT *uptr);
-t_stat reset_all (uint32 start_device);
-size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
-int fseek_ext (FILE *st, t_addr xpos, int origin);
-uint32 sim_fsize (char *cptr);
-char *sim_dname (DEVICE *dptr);
-t_stat get_yn (char *ques, t_stat deflt);
-char *get_glyph (char *iptr, char *optr, char mchar);
-char *get_glyph_nc (char *iptr, char *optr, char mchar);
-t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status);
-char *get_range (char *cptr, t_addr *lo, t_addr *hi, uint32 rdx,
-	t_addr max, char term);
-t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp);
-t_value strtotv (char *cptr, char **endptr, uint32 radix);
-t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
-DEVICE *find_dev_from_unit (UNIT *uptr);
-REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
-int32 sim_rtc_init (int32 time);
-int32 sim_rtc_calb (int32 ticksper);
-int32 sim_rtcn_init (int32 time, int32 tmr);
-int32 sim_rtcn_calb (int32 time, int32 tmr);
-t_stat sim_poll_kbd (void);
-t_stat sim_putchar (int32 out);
-t_stat sim_putchar_s (int32 out);
-BRKTAB *sim_brk_fnd (t_addr loc);
-t_bool sim_brk_test (t_addr bloc, int32 btyp);
-void sim_os_sleep (unsigned int sec);
-char *match_ext (char *fnam, char *ext);
+#include "scp.h"
+#include "sim_console.h"
+#include "sim_timer.h"
+#include "sim_fio.h"
 
 #endif

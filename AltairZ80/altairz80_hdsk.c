@@ -1,6 +1,6 @@
 /*	altairz80_hdsk.c: simulated hard disk device to increase capacity
 
-		Copyright (c) 2002-2003, Peter Schorn
+		Copyright (c) 2002-2004, Peter Schorn
 
 		Permission is hereby granted, free of charge, to any person obtaining a
 		copy of this software and associated documentation files (the "Software"),
@@ -111,7 +111,9 @@ DEVICE hdsk_dev = {
 	"HDSK", hdsk_unit, hdsk_reg, hdsk_mod,
 	8, 10, 31, 1, 8, 8,
 	NULL, NULL, NULL,
-	&hdsk_boot, NULL, NULL, NULL, 0, NULL, NULL };
+	&hdsk_boot, NULL, NULL,
+	NULL, 0, 0,
+	NULL, NULL, NULL };
 
 static t_stat hdsk_svc(UNIT *uptr) {
 	return SCPE_OK;
@@ -224,34 +226,34 @@ static int32 checkParameters(void) {
 	int32 currentFlag;
 	if ((selectedDisk < 0) || (selectedDisk >= HDSK_NUMBER)) {
 		if (hdsk_hasVerbose()) {
-			message2("HDSK%d does not exist, will use HDSK0 instead.\n", selectedDisk);
+			message2("HDSK%d does not exist, will use HDSK0 instead.", selectedDisk);
 		}
 		selectedDisk = 0;
 	}
 	currentFlag = (hdsk_dev.units + selectedDisk) -> flags;
 	if ((currentFlag & UNIT_ATT) == 0) {
 		if (currentFlag & UNIT_HDSK_VERBOSE) {
-			message2("HDSK%d is not attached.\n", selectedDisk);
+			message2("HDSK%d is not attached.", selectedDisk);
 		}
 		return FALSE; /* cannot read or write */
 	}
 	if ((selectedSector < 0) || (selectedSector >= HDSK_SECTORS_PER_TRACK)) {
 		if (currentFlag & UNIT_HDSK_VERBOSE) {
-			message4("HDSK%d: 0 <= Sector=%02d < %d violated, will use 0 instead.\n",
+			message4("HDSK%d: 0 <= Sector=%02d < %d violated, will use 0 instead.",
 				selectedDisk, selectedSector, HDSK_SECTORS_PER_TRACK);
 		}
 		selectedSector = 0;
 	}
 	if ((selectedTrack < 0) || (selectedTrack >= HDS_MAX_TRACKS)) {
 		if (currentFlag & UNIT_HDSK_VERBOSE) {
-			message4("HDSK%d: 0 <= Track=%04d < %04d violated, will use 0 instead.\n",
+			message4("HDSK%d: 0 <= Track=%04d < %04d violated, will use 0 instead.",
 				selectedDisk, selectedTrack, HDS_MAX_TRACKS);
 		}
 		selectedTrack = 0;
 	}
 	selectedDMA &= ADDRMASK;
 	if (hdskTrace) {
-		message6("%s HDSK%d Sector=%02d Track=%04d DMA=%04x\n",
+		message6("%s HDSK%d Sector=%02d Track=%04d DMA=%04x",
 			(hdskLastCommand == hdsk_read) ? "Read" : "Write",
 			selectedDisk, selectedSector, selectedTrack, selectedDMA);
 	}
@@ -263,7 +265,7 @@ static int32 doSeek(void) {
 	if (fseek(uptr -> fileref,
 		HDSK_TRACK_SIZE * selectedTrack + HDSK_SECTOR_SIZE * selectedSector, SEEK_SET)) {
 		if ((uptr -> flags) & UNIT_HDSK_VERBOSE) {
-			message4("Could not access HDSK%d Sector=%02d Track=%04d.\n",
+			message4("Could not access HDSK%d Sector=%02d Track=%04d.",
 				selectedDisk, selectedSector, selectedTrack);
 		}
 		return CPM_ERROR;
@@ -285,7 +287,7 @@ static int32 doRead(void) {
 			hdskbuf[i] = CPM_EMPTY;
 		}
 		if ((uptr -> flags) & UNIT_HDSK_VERBOSE) {
-			message4("Could not read HDSK%d Sector=%02d Track=%04d.\n",
+			message4("Could not read HDSK%d Sector=%02d Track=%04d.",
 				selectedDisk, selectedSector, selectedTrack);
 		}
 		return CPM_OK; /* allows the creation of empty hard disks */
@@ -309,7 +311,7 @@ static int32 doWrite(void) {
 		}
 		if (fwrite(hdskbuf, HDSK_SECTOR_SIZE, 1, uptr -> fileref) != 1) {
 			if ((uptr -> flags) & UNIT_HDSK_VERBOSE) {
-				message4("Could not write HDSK%d Sector=%02d Track=%04d.\n",
+				message4("Could not write HDSK%d Sector=%02d Track=%04d.",
 					selectedDisk, selectedSector, selectedTrack);
 			}
 			return CPM_ERROR;
@@ -317,7 +319,7 @@ static int32 doWrite(void) {
 	}
 	else {
 		if ((uptr -> flags) & UNIT_HDSK_VERBOSE) {
-			message4("Could not write to locked HDSK%d Sector=%02d Track=%04d.\n",
+			message4("Could not write to locked HDSK%d Sector=%02d Track=%04d.",
 				selectedDisk, selectedSector, selectedTrack);
 		}
 		return CPM_ERROR;
@@ -334,7 +336,7 @@ static int32 hdsk_in(const int32 port) {
 		return result;
 	}
 	else if (hdsk_hasVerbose()) {
-		message4("Illegal IN command detected (port=%03xh, cmd=%d, pos=%d).\n",
+		message4("Illegal IN command detected (port=%03xh, cmd=%d, pos=%d).",
 			port, hdskLastCommand, hdskCommandPosition);
 	}
 	return CPM_OK;

@@ -26,6 +26,8 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   04-Jan-04	RMS	Changed TMXR ldsc to be pointer to linedesc array
+			Added tmxr_linemsg, logging (from Mark Pizzolato)
    29-Dec-03	RMS	Added output stall support, increased buffer size
    22-Dec-02	RMS	Added break support (from Mark Pizzolato)
    20-Aug-02	RMS	Added tmxr_open_master, tmxr_close_master, tmxr.port
@@ -41,7 +43,6 @@
 #define TMXR_VALID	(1 << TMXR_V_VALID)
 #define TMXR_MAXBUF	256				/* buffer size */
 #define TMXR_GUARD	12				/* buffer guard */
-#define TMXR_MAXLIN	64				/* max lines */
 
 struct tmln {
 	SOCKET		conn;				/* line conn */
@@ -57,6 +58,8 @@ struct tmln {
 	int32		txbpr;				/* xmt buf remove */
 	int32		txbpi;				/* xmt buf insert */
 	int32		txcnt;				/* xmt count */
+	FILE		*txlog;				/* xmt log file */
+	char		*txlogname;			/* xmt log file name */
 	char		rxb[TMXR_MAXBUF];		/* rcv buffer */
 	char		rbr[TMXR_MAXBUF];		/* rcv break */
 	char		txb[TMXR_MAXBUF];		/* xmt buffer */
@@ -68,7 +71,7 @@ struct tmxr {
 	int32		lines;				/* # lines */
 	int32		port;				/* listening port */
 	SOCKET		master;				/* master socket */
-	TMLN		*ldsc[TMXR_MAXLIN];		/* line descriptors */
+	TMLN		*ldsc;				/* line descriptors */
 	};
 
 typedef struct tmxr TMXR;
@@ -86,8 +89,12 @@ t_stat tmxr_detach (TMXR *mp, UNIT *uptr);
 t_stat tmxr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void tmxr_msg (SOCKET sock, char *msg);
+void tmxr_linemsg (TMLN *lp, char *msg);
 void tmxr_fconns (FILE *st, TMLN *lp, int32 ln);
 void tmxr_fstats (FILE *st, TMLN *lp, int32 ln);
+t_stat tmxr_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tmxr_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tmxr_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_dscln (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 tmxr_rqln (TMLN *lp);
 int32 tmxr_tqln (TMLN *lp);

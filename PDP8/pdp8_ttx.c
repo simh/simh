@@ -1,6 +1,6 @@
 /* pdp8_ttx.c: PDP-8 additional terminals simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox	PT08/KL8JA terminal input/output
 
+   05-Jan-04	RMS	Revised for tmxr library changes
    09-May-03	RMS	Added network device flag
    25-Apr-03	RMS	Revised for extended file support
    22-Dec-02	RMS	Added break support
@@ -62,8 +63,7 @@ uint8 ttix_buf[TTX_LINES] = { 0 };			/* input buffers */
 uint8 ttox_buf[TTX_LINES] = { 0 };			/* output buffers */
 int32 ttx_tps = 100;					/* polls per second */
 TMLN ttx_ldsc[TTX_LINES] = { 0 };			/* line descriptors */
-TMXR ttx_desc = {					/* mux descriptor */
-	TTX_LINES, 0, 0, &ttx_ldsc[0], &ttx_ldsc[1], &ttx_ldsc[2], &ttx_ldsc[3] };
+TMXR ttx_desc = { TTX_LINES, 0, 0, ttx_ldsc };		/* mux descriptor */
 
 DEVICE ttix_dev, ttox_dev;
 int32 ttix (int32 IR, int32 AC);
@@ -111,6 +111,10 @@ MTAB ttix_mod[] = {
 		NULL, &ttx_show, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&set_dev, &show_dev, NULL },
+	{ MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
+	    &tmxr_set_log, &tmxr_show_log, &ttx_desc },
+	{ MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
+	    &tmxr_set_nolog, NULL, &ttx_desc },
 	{ 0 }  };
 
 DEVICE ttix_dev = {
@@ -279,9 +283,9 @@ t_stat ttox_svc (UNIT *uptr)
 {
 int32 c, ln = uptr - ttox_unit;				/* line # */
 
-if (ttx_desc.ldsc[ln]->conn) {				/* connected? */
-	if (ttx_desc.ldsc[ln]->xmte) {			/* tx enabled? */
-	    TMLN *lp = ttx_desc.ldsc[ln];		/* get line */
+if (ttx_ldsc[ln].conn) {				/* connected? */
+	if (ttx_ldsc[ln].xmte) {			/* tx enabled? */
+	    TMLN *lp = &ttx_ldsc[ln];			/* get line */
 	    if (ttox_unit[ln].flags & UNIT_UC) {	/* UC mode? */
 		c = ttox_buf[ln] & 0177;		/* get char */
 		if (islower (c)) c = toupper (c);  }
@@ -337,7 +341,7 @@ t_stat r;
 
 r = tmxr_detach (&ttx_desc, uptr);			/* detach */
 for (i = 0; i < TTX_LINES; i++) {			/* all lines, */
-	ttx_desc.ldsc[i]->rcve = 0;			/* disable rcv */
+	ttx_ldsc[i].rcve = 0;				/* disable rcv */
 	sim_cancel (&ttox_unit[i]);  }			/* stop poll */
 return r;
 }

@@ -744,6 +744,7 @@ int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf, t_bool ub);
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf, t_bool ub);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf, t_bool ub);
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);

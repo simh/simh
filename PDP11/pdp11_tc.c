@@ -25,6 +25,8 @@
 
    tc		TC11/TU56 DECtape
 
+   25-Jan-04	RMS	Revised for device debug support
+   09-Jan-04	RMS	Changed sim_fsize calling sequence, added STOP_OFFR
    29-Dec-03	RMS	Changed initial status to disabled (in Qbus system)
    18-Oct-03	RMS	Fixed reverse checksum in read all
 			Added DECtape off reel message
@@ -253,10 +255,9 @@
 
 /* Logging */
 
-#define LOG_MS		001				/* move, search */
-#define LOG_RW		002				/* read, write */
-#define LOG_RA		004				/* read all */
-#define LOG_BL		010				/* block # lblk */
+#define LOG_MS		0x1
+#define LOG_RW		0x2
+#define LOG_BL		0x4
 
 #define DT_SETDONE	tccm = tccm | CSR_DONE; \
 			if (tccm & CSR_IE) SET_INT (DTA)
@@ -269,8 +270,7 @@ extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
 extern UNIT cpu_unit;
 extern int32 sim_switches;
-extern int32 cpu_log;
-extern FILE *sim_log;
+extern FILE *sim_deb;
 
 int32 tcst = 0;						/* status */
 int32 tccm = 0;						/* command */
@@ -282,6 +282,7 @@ int32 dt_ltime = 12;					/* interline time */
 int32 dt_dctime = 40000;				/* decel time */
 int32 dt_substate = 0;
 int32 dt_logblk = 0;
+int32 dt_stopoffr = 0;
 
 DEVICE dt_dev;
 t_stat dt_rd (int32 *data, int32 PA, int32 access);
@@ -357,6 +358,7 @@ REG dt_reg[] = {
 		  DT_NUMDR, REG_RO) },
 	{ URDATA (LASTT, dt_unit[0].LASTT, 10, 32, 0,
 		  DT_NUMDR, REG_HRO) },
+	{ FLDATA (STOP_OFFR, dt_stopoffr, 0) },
 	{ ORDATA (DEVADDR, dt_dib.ba, 32), REG_HRO },
 	{ ORDATA (DEVVEC, dt_dib.vec, 16), REG_HRO },
 	{ NULL }  };
@@ -373,12 +375,19 @@ MTAB dt_mod[] = {
 		&set_vec, &show_vec, NULL },
 	{ 0 }  };
 
+DEBTAB dt_deb[] = {
+	{ "MOTION", LOG_MS },
+	{ "DATA", LOG_RW },
+	{ "BLOCK", LOG_BL },
+	{ NULL, 0 }  };
+
 DEVICE dt_dev = {
 	"TC", dt_unit, dt_reg, dt_mod,
 	DT_NUMDR + 1, 8, 24, 1, 8, 18,
 	NULL, NULL, &dt_reset,
 	&dt_boot, &dt_attach, &dt_detach,
-	&dt_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS };
+	&dt_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0,
+	dt_deb, NULL, NULL };
 
 /* IO dispatch routines, I/O addresses 17777340 - 17777350 */
 
@@ -599,7 +608,7 @@ case FNC_SRCH:						/* search */
 	    DTU_TSIZE (uptr): blk), uptr) - DT_BLKLN - DT_WSIZE;
 	else newpos = DT_BLK2LN ((DT_QREZ (uptr)?
 	    0: blk + 1), uptr) + DT_BLKLN + (DT_WSIZE - 1);
-	if (DBG_LOG (LOG_TC_MS)) fprintf (sim_log, ">>DT%d: searching %s\n",
+	if (DEBUG_PRI (dt_dev, LOG_MS)) fprintf (sim_deb, ">>DT%d: searching %s\n",
 	    unum, (dir? "backward": "forward"));
 	break;
 case FNC_WRIT:						/* write */
@@ -617,8 +626,9 @@ case FNC_READ:						/* read */
 	    blk + 1: blk), uptr) - DT_HTLIN - DT_WSIZE;
 	else newpos = DT_BLK2LN (((relpos < DT_HTLIN)?
 	    blk: blk + 1), uptr) + DT_HTLIN + (DT_WSIZE - 1);
-	if (DBG_LOG (LOG_TC_RW) || (DBG_LOG (LOG_TC_BL) && (blk == dt_logblk)))
-	    fprintf (sim_log, ">>DT%d: %s block %d %s\n",
+	if (DEBUG_PRI (dt_dev, LOG_RW) ||
+	   (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
+	    fprintf (sim_deb, ">>DT%d: %s block %d %s\n",
 		unum, ((fnc == FNC_READ)? "read": "write"),
 		blk, (dir? "backward": "forward"));
 	break;
@@ -637,8 +647,9 @@ case FNC_WALL:						/* write all */
 	    else newpos = DT_BLK2LN (blk, uptr) + DT_CSMLN + (DT_WSIZE - 1);  }
 	if (fnc == FNC_WALL) sim_activate 		/* write all? */
 	    (&dt_dev.units[DT_TIMER], dt_ctime);	/* sched done */
-	if (DBG_LOG (LOG_TC_RW) || (DBG_LOG (LOG_TC_BL) && (blk == dt_logblk)))
-	    fprintf (sim_log, ">>DT%d: read all block %d %s\n",
+	if (DEBUG_PRI (dt_dev, LOG_RW) ||
+	   (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
+	    fprintf (sim_deb, ">>DT%d: read all block %d %s\n",
 		unum, blk, (dir? "backward": "forward"));
 	break;
 default:
@@ -737,7 +748,8 @@ uint32 ba, ma, mma;
 
 switch (mot) {
 case DTS_DECF: case DTS_DECR:				/* decelerating */
-	if (dt_setpos (uptr)) return STOP_DTOFF;	/* update pos */
+	if (dt_setpos (uptr))				/* upd pos; off reel? */
+	    return IORETURN (dt_stopoffr, STOP_DTOFF);
 	uptr->STATE = DTS_NXTSTA (uptr->STATE);		/* advance state */
 	if (uptr->STATE)				/* not stopped? */
 	    sim_activate (uptr, dt_dctime - (dt_dctime >> 2));	/* reversing */
@@ -757,7 +769,8 @@ default:						/* other */
    Off reel - detach unit (it must be deselected)
 */
 
-if (dt_setpos (uptr)) return STOP_DTOFF;		/* update pos */
+if (dt_setpos (uptr))					/* upd pos; off reel? */
+	return IORETURN (dt_stopoffr, STOP_DTOFF);
 if (DT_QEZ (uptr)) {					/* in end zone? */
 	dt_seterr (uptr, STA_END);			/* end zone error */
 	return SCPE_OK;  }
@@ -1090,7 +1103,7 @@ if ((sim_switches & SIM_SW_REST) == 0) {		/* not from rest? */
 	else if (sim_switches & SWMASK ('T'))		/* att 18b? */
 	    uptr->flags = uptr->flags & ~(UNIT_8FMT | UNIT_11FMT);
 	else if (!(sim_switches & SWMASK ('S')) &&	/* autosize? */
-	    ((sz = sim_fsize (cptr)) > D16_FILSIZ)) {
+	    ((sz = sim_fsize (uptr->fileref)) > D16_FILSIZ)) {
 	    if (sz <= D8_FILSIZ)
 	    uptr->flags = (uptr->flags | UNIT_8FMT) & ~UNIT_11FMT;
 	    else uptr->flags = uptr->flags & ~(UNIT_8FMT | UNIT_11FMT);  }  }

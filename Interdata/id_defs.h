@@ -1,6 +1,6 @@
 /* id_defs.h: Interdata 16b/32b simulator definitions
 
-   Copyright (c) 2000-2003, Robert M. Supnik
+   Copyright (c) 2000-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Carl Friend and Al Kossow,
    who provided key documents about the Interdata product line.
 
+   25-Jan-04	RMS	Removed local logging support
    22-Sep-03	RMS	Added additional instruction decode types
    21-Jun-03	RMS	Changed subroutine argument for ARM compiler conflict
    25-Apr-03	RMS	Revised for extended file support
@@ -456,17 +457,6 @@ typedef struct interdib DIB;
 #define VFU_LNT		132
 #define MIN(x,y)	(((x) < (y))? (x): (y))
 #define MAX(x,y)	(((x) > (y))? (x): (y))
-
-/* Logging */
-
-#define LOG_CPU_I	0x0001				/* instructions */
-#define LOG_CPU_C	0x0002				/* context change */
-#define LOG_DP		0x0010
-#define LOG_IDC		0x0020
-#define LOG_MT		0x0040
-#define LOG_FD		0x0080
-
-#define DBG_LOG(x)	(sim_log && (cpu_log & (x)))
 
 /* Function prototypes */
 

@@ -1,6 +1,6 @@
 /* pdp11_hk.c - RK611/RK06/RK07 disk controller
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    hk		RK611/RK06/RK07 disk
 
+   26-Mar-04	RMS	Fixed warnings with -std=c99
+   25-Jan-04	RMS	Revised for device debug support
+   04-Jan-04	RMS	Changed sim_fsize calling sequence
    29-Dec-03	RMS	Added 18b Qbus support
    25-Apr-03	RMS	Revised for extended file support
 
@@ -301,8 +304,7 @@ extern uint16 *M;
 
 extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
-extern int32 cpu_log;
-extern FILE *sim_log;
+extern FILE *sim_deb;
 
 uint16 *hkxb = NULL;					/* xfer buffer */
 int32 hkcs1 = 0;					/* control/status 1 */
@@ -439,7 +441,7 @@ DEVICE hk_dev = {
 	HK_NUMDR, HK_RDX, 24, 1, HK_RDX, HK_WID,
 	NULL, NULL, &hk_reset,
 	&hk_boot, &hk_attach, &hk_detach,
-	&hk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 };
+	&hk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG };
 
 /* I/O dispatch routines, I/O addresses 17777440 - 17777476 */
 
@@ -591,9 +593,9 @@ return SCPE_OK;
 
 void hk_go (int32 drv)
 {
-
 int32 fnc, t;
 UNIT *uptr;
+
 static int32 fnc_nxf[16] = {
 	0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0 };
 static int32 fnc_att[16] = {
@@ -604,7 +606,7 @@ static int32 fnc_cyl[16] = {
 	0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0 };
 
 fnc = GET_FNC (hkcs1);
-if (DBG_LOG (LOG_HK)) fprintf (sim_log,
+if (DEBUG_PRS (hk_dev)) fprintf (sim_deb,
 	">>HK%d: fnc=%o, ds=%o, cyl=%o, da=%o, ba=%o, wc=%o\n",
 	drv, fnc, hkds[drv], hkdc, hkda, hkba, hkwc);
 uptr = hk_dev.units + drv;				/* get unit */
@@ -875,7 +877,7 @@ return;
 
 /* Drive status update */
 
-void update_hkds (drv)
+void update_hkds (int32 drv)
 {
 if (hk_unit[drv].flags & UNIT_DIS) {			/* disabled? */
 	hkds[drv] = hker[drv] = 0;			/* all clear */
@@ -1035,8 +1037,7 @@ hk_dif[drv] = 0;
 uptr->CYL = 0;
 update_hkcs (CS1_DI, drv);				/* upd ctlr status */
 
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;	/* seek to end */
-if ((p = ftell (uptr->fileref)) == 0) {			/* new disk image? */
+if ((p = sim_fsize (uptr->fileref)) == 0) {		/* new disk image? */
 	if (uptr->flags & UNIT_RO) return SCPE_OK;
 	return pdp11_bad_block (uptr, HK_NUMSC, HK_NUMWD);  }
 if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */

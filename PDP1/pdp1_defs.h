@@ -1,6 +1,6 @@
 /* pdp1_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-2003, Robert M. Supnik
+   Copyright (c) 1993-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,10 +19,11 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Feb-04	PLB	Added support for display
    08-Dec-03	RMS	Added support for parallel drum
    18-Oct-03	RMS	Added DECtape off reel message
    22-Jul-03	RMS	Updated for "hardware" RIM loader
@@ -40,6 +41,7 @@
    Memory extension control	Type 15
    Parallel drum		Type 23
    Serial drum			Type 24
+   Graphic display		Type 30
    Line printer control		Type 62
    Microtape (DECtape) control	Type 550
 */
@@ -115,10 +117,12 @@
 #define CPLS_V_PTP	4
 #define CPLS_V_TTO	3
 #define CPLS_V_LPT	2
+#define CPLS_V_DPY	1
 #define CPLS_PTR	(1 << CPLS_V_PTR)
 #define CPLS_PTP	(1 << CPLS_V_PTP)
 #define CPLS_TTO	(1 << CPLS_V_TTO)
 #define CPLS_LPT	(1 << CPLS_V_LPT)
+#define CPLS_DPY	(1 << CPLS_V_TTY)
 
 /* Sequence break flags */
 

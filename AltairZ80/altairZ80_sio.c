@@ -1,6 +1,6 @@
 /*	altairz80_sio: MITS Altair serial I/O card
 
-		Copyright (c) 2002-2003, Peter Schorn
+		Copyright (c) 2002-2004, Peter Schorn
 
 		Permission is hereby granted, free of charge, to any person obtaining a
 		copy of this software and associated documentation files (the "Software"),
@@ -112,6 +112,9 @@ extern t_stat sim_cancel(UNIT *uptr);
 extern t_stat sim_poll_kbd(void);
 extern t_stat sim_putchar(int32 out);
 extern t_stat attach_unit(UNIT *uptr, char *cptr);
+extern int32 getBankSelect(void);
+extern void setBankSelect(int32 b);
+extern uint32 getCommon(void);
 extern t_bool rtc_avail;
 extern FILE *sim_log;
 extern int32 PCX;
@@ -119,8 +122,6 @@ extern int32 sim_switches;
 extern uint32 sim_os_msec(void);
 extern const char *scp_error_messages[];
 extern int32 SR;
-extern int32 bankSelect;
-extern int32 common;
 extern uint8 GetBYTEWrapper(register uint32 Addr);
 extern UNIT cpu_unit;
 
@@ -184,7 +185,7 @@ static SIO_TERMINAL sio_terminals[Terminals] =
 		{0, 0, 0x16, 0x17, 0x00},
 		{0, 0, 0x18, 0x19, 0x00} };
 static TMLN TerminalLines[Terminals] = { {0} };	/* four terminals				*/
-static TMXR altairTMXR = {Terminals, 0, 0 };		/* mux descriptor				*/
+static TMXR altairTMXR = {Terminals, 0, 0, TerminalLines};		/* mux descriptor				*/
 
 static UNIT sio_unit = { UDATA (&sio_svc, UNIT_ATTABLE, 0), KBD_POLL_WAIT };
 
@@ -220,7 +221,9 @@ DEVICE sio_dev = {
 	"SIO", &sio_unit, sio_reg, sio_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &sio_reset,
-	NULL, &sio_attach, &sio_detach, NULL, 0, NULL, NULL };
+	NULL, &sio_attach, &sio_detach,
+	NULL, 0, 0,
+	NULL, NULL, NULL };
 
 static UNIT ptr_unit = { UDATA (NULL, UNIT_SEQ + UNIT_ATTABLE + UNIT_ROABLE, 0),
 	KBD_POLL_WAIT };
@@ -235,7 +238,9 @@ DEVICE ptr_dev = {
 	"PTR", &ptr_unit, ptr_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptr_reset,
-	NULL, NULL, NULL, NULL, 0, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, 0, 0,
+	NULL, NULL, NULL };
 
 static UNIT ptp_unit = { UDATA (NULL, UNIT_SEQ + UNIT_ATTABLE, 0),
 	KBD_POLL_WAIT };
@@ -250,7 +255,9 @@ DEVICE ptp_dev = {
 	"PTP", &ptp_unit, ptp_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptp_reset,
-	NULL, NULL, NULL, NULL, 0, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, 0, 0,
+	NULL, NULL, NULL };
 
 /*	Synthetic device SIMH for communication
 		between Altair and SIMH environment using port 0xfe */
@@ -301,14 +308,24 @@ DEVICE simh_device = {
 	"SIMH", &simh_unit, simh_reg, simh_mod,
 	1, 10, 31, 1, 16, 4,
 	NULL, NULL, &simh_dev_reset,
-	NULL, NULL, NULL, NULL, 0, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, 0, 0,
+	NULL, NULL, NULL };
 
 char messageBuffer[256];
 
 void printMessage(void) {
 	printf(messageBuffer);
+#if defined(__NetBSD__) || defined (__OpenBSD__) || defined (__FreeBSD__) || defined (__APPLE__)
+/* need to make sure that carriage return is executed - ttrunstate() of scp_tty.c
+	has disabled \n translation */
+	printf("\r\n");
+#else
+	printf("\n");
+#endif
 	if (sim_log) {
 		fprintf(sim_log, messageBuffer);
+		fprintf(sim_log,"\n");
 	}
 }
 
@@ -325,10 +342,6 @@ static t_stat sio_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc) {
 }
 
 static t_stat sio_attach(UNIT *uptr, char *cptr) {
-	int32 i;
-	for (i = 0; i < Terminals; i++) {
-		altairTMXR.ldsc[i] = &TerminalLines[i];
-	}
 	reset_sio_terminals(FALSE);
 	return tmxr_attach(&altairTMXR, uptr, cptr);	/* attach mux */
 }
@@ -362,7 +375,7 @@ static t_stat sio_svc(UNIT *uptr) {
 		}
 		temp = tmxr_poll_conn(&altairTMXR);							/* poll connection		*/
 		if (temp >= 0) {
-			altairTMXR.ldsc[temp] -> rcve = 1;						/* enable receive			*/
+			TerminalLines[temp].rcve = 1;									/* enable receive			*/
 		}
 		tmxr_poll_rx(&altairTMXR);											/* poll input					*/
 		tmxr_poll_tx(&altairTMXR);											/* poll output				*/
@@ -385,8 +398,8 @@ static t_stat sio_reset(DEVICE *dptr) {
 	resetSIOWarningFlags();
 	if (sio_unit.flags & UNIT_ATT) {
 		for (i = 0; i < Terminals; i++) {
-			if (altairTMXR.ldsc[i] -> conn > 0) {
-				tmxr_reset_ln(altairTMXR.ldsc[i]);
+			if (TerminalLines[i].conn > 0) {
+				tmxr_reset_ln(&TerminalLines[i]);
 			}
 		}
 		reset_sio_terminals(FALSE);
@@ -442,9 +455,9 @@ int32 sio0s(const int32 port, const int32 io, const int32 data) {
 	if (io == 0) { /* IN */
 		if (sio_unit.flags & UNIT_ATT) {
 			sio_terminals[ti].status =
-				(((tmxr_rqln(altairTMXR.ldsc[ti]) > 0	? 0x01 : 0) |
+				(((tmxr_rqln(&TerminalLines[ti]) > 0	? 0x01 : 0) |
 				/* read possible if character available							*/
-				((altairTMXR.ldsc[ti] -> conn) && (altairTMXR.ldsc[ti] -> xmte) ? 0x02 : 0x00)));
+				((TerminalLines[ti].conn) && (TerminalLines[ti].xmte) ? 0x02 : 0x00)));
 				/* write possible if connected and transmit enabled	*/
 		}
 		return sio_terminals[ti].status;
@@ -475,7 +488,7 @@ int32 sio0d(const int32 port, const int32 io, const int32 data) {
 	}
 	if (io == 0) { /* IN */
 		if (sio_unit.flags & UNIT_ATT) {
-			sio_terminals[ti].data = tmxr_getc_ln(altairTMXR.ldsc[ti]) & 0xff;
+			sio_terminals[ti].data = tmxr_getc_ln(&TerminalLines[ti]) & 0xff;
 		}
 		sio_terminals[ti].status &= 0xfe;
 		if (sio_unit.flags & UNIT_BS) {
@@ -493,7 +506,7 @@ int32 sio0d(const int32 port, const int32 io, const int32 data) {
 	else { /* OUT */
 		int32 d = sio_unit.flags & UNIT_ANSI ? data & 0x7f : data;
 		if (sio_unit.flags & UNIT_ATT) {
-			tmxr_putc_ln(altairTMXR.ldsc[ti], d);
+			tmxr_putc_ln(&TerminalLines[ti], d); /* status ignored */
 		}
 		else {
 			sim_putchar(d);
@@ -511,7 +524,7 @@ int32 sio1s(const int32 port, const int32 io, const int32 data) {
 		if ((ptr_unit.flags & UNIT_ATT) == 0) {
 			if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnattachedPTR < warnLevelSIO)) {
 				warnUnattachedPTR++;
-/*06*/	message1("Attempt to test status of unattached PTR. 0x02 returned.\n");
+/*06*/	message1("Attempt to test status of unattached PTR. 0x02 returned.");
 			}
 			return 0x02;
 		}
@@ -536,14 +549,14 @@ int32 sio1d(const int32 port, const int32 io, const int32 data) {
 		if (ptr_unit.u3) { /* no more data available */
 			if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnPTREOF < warnLevelSIO)) {
 				warnPTREOF++;
-/*07*/	message1("PTR attempted to read past EOF. 0x00 returned.\n");
+/*07*/	message1("PTR attempted to read past EOF. 0x00 returned.");
 			}
 			return 0;
 		}
 		if ((ptr_unit.flags & UNIT_ATT) == 0) { /* not attached */
 			if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnattachedPTR < warnLevelSIO)) {
 				warnUnattachedPTR++;
-/*08*/	message1("Attempt to read from unattached PTR. 0x00 returned.\n");
+/*08*/	message1("Attempt to read from unattached PTR. 0x00 returned.");
 			}
 			return 0;
 		}
@@ -560,7 +573,7 @@ int32 sio1d(const int32 port, const int32 io, const int32 data) {
 		}																	/* else ignore data				*/
 		else if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnattachedPTP < warnLevelSIO)) {
 			warnUnattachedPTP++;
-/*09*/message2("Attempt to output '0x%02x' to unattached PTP - ignored.\n", data);
+/*09*/message2("Attempt to output '0x%02x' to unattached PTP - ignored.", data);
 		}
 		ptp_unit.pos++;
 		return 0;	/* ignored since OUT */
@@ -571,10 +584,10 @@ int32 nulldev(const int32 port, const int32 io, const int32 data) {
 	if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnassignedPort < warnLevelSIO)) {
 		warnUnassignedPort++;
 		if (io == 0) {
-			message2("Unassigned IN(%2xh) - ignored.\n", port);
+			message2("Unassigned IN(%2xh) - ignored.", port);
 		}
 		else {
-			message3("Unassigned OUT(%2xh) -> %2xh - ignored.\n", port, data);
+			message3("Unassigned OUT(%2xh) -> %2xh - ignored.", port, data);
 		}
 	}
 	return io == 0 ? 0xff : 0;
@@ -739,7 +752,7 @@ static void attachCPM(UNIT *uptr) {
 	}
 	lastCPMStatus = attach_unit(uptr, cpmCommandLine);
 	if ((lastCPMStatus != SCPE_OK) && (simh_unit.flags & UNIT_SIMH_VERBOSE)) {
-		message3("Cannot open '%s' (%s).\n", cpmCommandLine, scp_error_messages[lastCPMStatus - SCPE_BASE]);
+		message3("Cannot open '%s' (%s).", cpmCommandLine, scp_error_messages[lastCPMStatus - SCPE_BASE]);
 	}
 }
 
@@ -862,7 +875,7 @@ static int32 simh_in(const int32 port) {
 			break;
 		case getBankSelectCmd:
 			if (cpu_unit.flags & UNIT_BANKED) {
-				result = bankSelect;
+				result = getBankSelect();
 			}
 			else {
 				result = 0;
@@ -874,11 +887,11 @@ static int32 simh_in(const int32 port) {
 			break;
 		case getCommonCmd:
 			if (getCommonPos == 0) {
-				result = common & 0xff;
+				result = getCommon() & 0xff;
 				getCommonPos = 1;
 			}
 			else {
-				result = (common >> 8) & 0xff;
+				result = (getCommon() >> 8) & 0xff;
 				getCommonPos = lastCommand = 0;
 			}
 			break;
@@ -898,7 +911,7 @@ static int32 simh_in(const int32 port) {
 			break;
 		default:
 			if (simh_unit.flags & UNIT_SIMH_VERBOSE) {
-				message2("Unnecessary IN from SIMH pseudo device on port %03xh ignored.\n",
+				message2("Unnecessary IN from SIMH pseudo device on port %03xh ignored.",
 					port);
 			}
 			result = lastCommand = 0;
@@ -933,7 +946,7 @@ static int32 simh_out(const int32 port, const int32 data) {
 			break;
 		case setBankSelectCmd:
 			if (cpu_unit.flags & UNIT_BANKED) {
-				bankSelect = data & BANKMASK;
+				setBankSelect(data & BANKMASK);
 			}
 			else if (simh_unit.flags & UNIT_SIMH_VERBOSE) {
 				message2("Set selected bank to %i ignored for non-banked memory.", data & 3);
@@ -965,7 +978,7 @@ static int32 simh_out(const int32 port, const int32 data) {
 			switch(data) {
 				case printTimeCmd:	/* print time */
 					if (rtc_avail) {
-						message2("Current time in milliseconds = %d.\n", sim_os_msec());
+						message2("Current time in milliseconds = %d.", sim_os_msec());
 					}
 					else {
 						warnNoRealTimeClock();
@@ -977,7 +990,7 @@ static int32 simh_out(const int32 port, const int32 data) {
 							markTime[markTimeSP++] = sim_os_msec();
 						}
 						else {
-							message1("Timer stack overflow.\n");
+							message1("Timer stack overflow.");
 						}
 					}
 					else {
@@ -988,10 +1001,10 @@ static int32 simh_out(const int32 port, const int32 data) {
 					if (rtc_avail) {
 						if (markTimeSP > 0) {
 							uint32 delta = sim_os_msec() - markTime[--markTimeSP];
-							message2("Timer stopped. Elapsed time in milliseconds = %d.\n", delta);
+							message2("Timer stopped. Elapsed time in milliseconds = %d.", delta);
 						}
 						else {
-							message1("No timer active.\n");
+							message1("No timer active.");
 						}
 					}
 					else {
@@ -1044,10 +1057,10 @@ static int32 simh_out(const int32 port, const int32 data) {
 					if (rtc_avail) {
 						if (markTimeSP > 0) {
 							uint32 delta = sim_os_msec() - markTime[markTimeSP - 1];
-							message2("Timer running. Elapsed in milliseconds = %d.\n", delta);
+							message2("Timer running. Elapsed in milliseconds = %d.", delta);
 						}
 						else {
-							message1("No timer active.\n");
+							message1("No timer active.");
 						}
 					}
 					else {
@@ -1091,7 +1104,7 @@ static int32 simh_out(const int32 port, const int32 data) {
 					break;
 				default:
 					if (simh_unit.flags & UNIT_SIMH_VERBOSE) {
-						message3("Unknown command (%i) to SIMH pseudo device on port %03xh ignored.\n",
+						message3("Unknown command (%i) to SIMH pseudo device on port %03xh ignored.",
 							data, port);
 					}
 			}

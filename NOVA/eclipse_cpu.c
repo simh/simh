@@ -3915,7 +3915,7 @@ if ((IR & 0100017) == 0100010) {		/* This pattern for all */
 	j = (IR >> 11) & 3;
 	i = (AC[0] >> 8) & 0x007F;
 	FPAC[j] &= 0x80FFFFFFFFFFFFFF;		/* clear exponent */
-	FPAC[j] |= (t_int64)(i << 56);
+	FPAC[j] |= ((t_int64) i << 56);
 	if ((FPAC[j] & 0x00ffffffffffffff) == 0)
 		FPAC[j] = 0;
 	if (FPAC[j] == 0)
@@ -5996,7 +5996,8 @@ for (i = 0; i < 64; i++) {				/* clr dev_table */
 	dev_table[i].pi = 0;
 	dev_table[i].routine = NULL;  }
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
-	if (dibp = (DIB *) dptr->ctxt) {		/* get DIB */
+	if (!(dptr->flags & DEV_DIS) &&			/* enabled and */
+	    (dibp = (DIB *) dptr->ctxt)) {		/* defined DIB? */
 	    dn = dibp->dnum;				/* get dev num */
 	    dev_table[dn].mask = dibp->mask;		/* copy entries */
 	    dev_table[dn].pi = dibp->pi;

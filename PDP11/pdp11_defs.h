@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   25-Jan-04	RMS	Removed local debug logging support
    22-Dec-03	RMS	Added second DEUNA/DELUA support
    18-Oct-03	RMS	Added DECtape off reel message
    19-May-03	RMS	Revised for new conditional compilation
@@ -563,25 +564,6 @@ typedef struct pdp_dib DIB;
 #define ABORT(val)	longjmp (save_env, (val))
 #define SP R[6]
 #define PC R[7]
-
-/* Logging */
-
-#define LOG_CPU_I	0x0001
-#define LOG_TM		0x0008
-#define LOG_RP		0x0010
-#define LOG_TS		0x0020
-#define LOG_RQ		0x0040
-#define LOG_TQ		0x0080
-#define LOG_XQ0		0x0100
-#define LOG_XQ1		0x0200
-#define LOG_XQ2		0x0400
-#define LOG_XQ3		0x0800
-#define LOG_TC_MS	0x1000
-#define LOG_TC_RW	0x2000
-#define LOG_TC_BL	0x4000
-#define LOG_HK		0x8000
-
-#define DBG_LOG(x)	(sim_log && (cpu_log & (x)))
 
 /* Function prototypes */
 

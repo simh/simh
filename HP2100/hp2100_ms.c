@@ -1,6 +1,6 @@
 /* hp2100_ms.c: HP 2100 13181A/13183A magnetic tape simulator
 
-   Copyright (c) 1993-2003, Robert M. Supnik
+   Copyright (c) 1993-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

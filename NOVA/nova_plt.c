@@ -1,6 +1,6 @@
 /* nova_plt.c: NOVA plotter simulator
 
-   Copyright (c) 2000-2003, Robert M. Supnik
+   Copyright (c) 2000-2004, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a

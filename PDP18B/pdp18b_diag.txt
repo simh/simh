@@ -1,0 +1,58 @@
+Operating Instructions, PDP-15 diagnostics
+
+MAINDEC-15-D0A1-PH		Instruction test 1
+
+Read in:	200
+Start:		200
+Breakpoint:	7274 for one pass
+
+MAINDEC-15-D0A2-PH		Instruction test 1A
+
+Read in:	200
+Start:		200
+Breakpoint:	4437 for one pass
+
+MAINDEC-15-D0AA-PB		Index register test
+
+Read in:	17700		(binary tape, doesn't matter)
+Start:		200
+Halts:		at 214, set BANKM = 0
+Runs to:	prints END at end of pass
+
+MAINDEC-15-D0BB-PH		Instruction test 2
+
+Read in:	200
+Start:		200
+SR:		1 to run clock test
+Breakpoint:	6403 for one pass
+
+MAINDEC-15-D0CA-PH		Memory address test
+
+Read in:	7200
+Start:		7200
+Breakpoint:	7577 for one pass
+
+MAINDEC-15-D0EA-PH		JMP-Y interrupt test
+
+Read in:	7400
+Start:		7400
+Breakpoint:	7551 for one pass
+
+MAINDEC-15-D0FA-PH		JMS-Y interrupt test
+
+Read in:	7400
+Start:		7400
+Breakpoint:	7577 for one pass
+
+MAINDEC-15-D0KA-PH		ISZ test
+
+Read in:	200
+Start:		200
+Breakpoint:	7704 for one pass
+
+MAINDEC-15-D1CD-PB		Extended memory test
+
+Read in:	200		(ignored, binary tape)
+Start:		200
+Halts after printout, set SR = 30000
+Breakpoint:	563 for one pass

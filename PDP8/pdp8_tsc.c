@@ -1,6 +1,6 @@
 /* pdp8_tsc.c: PDP-8 ETOS timesharing option board (TSC8-75)
 
-   Copyright (c) 2003, Robert M Supnik
+   Copyright (c) 2003-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

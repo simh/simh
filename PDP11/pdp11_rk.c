@@ -25,6 +25,7 @@
 
    rk		RK11/RKV11/RK05 cartridge disk
 
+   24-Jan-04	RMS	Added increment inhibit, overrun detection, formatting
    29-Dec-03	RMS	Added RKV11 support
    29-Sep-02	RMS	Added variable address support to bootstrap
 			Added vector change/display support
@@ -384,7 +385,8 @@ if (uptr->flags & UNIT_DIS) {				/* not present? */
 if (((uptr->flags & UNIT_ATT) == 0) || sim_is_active (uptr)) {
 	rk_set_done (RKER_DRE);				/* not att or busy */
 	return;  }
-if (rkcs & (RKCS_INH + RKCS_FMT)) {			/* format? */
+if ((rkcs & RKCS_FMT) &&				/* format and */
+    (func != RKCS_READ) && (func != RKCS_WRITE)) {	/* not read or write? */
 	rk_set_done (RKER_PGE);
 	return;  }
 if ((func == RKCS_WRITE) && (uptr->flags & UNIT_WPRT)) {
@@ -427,8 +429,8 @@ return;
 
 t_stat rk_svc (UNIT *uptr)
 {
-int32 i, drv, err, awc, wc, t;
-int32 da, track, sect;
+int32 i, drv, err, awc, wc, cma, cda, t;
+int32 da, cyl, track, sect;
 uint32 ma;
 uint16 comp;
 
@@ -446,51 +448,103 @@ if (uptr->FUNC == RKCS_SEEK) {				/* seek */
 if ((uptr->flags & UNIT_ATT) == 0) {			/* attached? */
 	rk_set_done (RKER_DRE);
 	return IORETURN (rk_stopioe, SCPE_UNATT);  }
+sect = GET_SECT (rkda);					/* get sector, cyl */
+cyl = GET_CYL (rkda);
+if (sect >= RK_NUMSC) {					/* bad sector? */
+	rk_set_done (RKER_NXS);
+	return SCPE_OK;  }
+if (cyl >= RK_NUMCY) {					/* bad cyl? */
+	rk_set_done (RKER_NXC);
+	return SCPE_OK;  }
 ma = ((rkcs & RKCS_MEX) << (16 - RKCS_V_MEX)) | rkba;	/* get mem addr */
 da = GET_DA (rkda) * RK_NUMWD;				/* get disk addr */
 wc = 0200000 - rkwc;					/* get wd cnt */
+if ((da + wc) > (int32) uptr->capac) {			/* overrun? */
+	wc = uptr->capac - da;				/* trim transfer */
+	rker = rker | RKER_OVR;  }			/* set overrun err */
 
 err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
+if (wc && (err == 0)) {					/* seek ok? */
+    switch (uptr->FUNC) {				/* case on function */
 
-if ((uptr->FUNC == RKCS_READ) && (err == 0)) {		/* read? */
-	i = fxread (rkxb, sizeof (int16), wc, uptr->fileref);
-	err = ferror (uptr->fileref);
-	for ( ; i < wc; i++) rkxb[i] = 0;		/* fill buf */
-	if (t = Map_WriteW (ma, wc << 1, rkxb, MAP)) {	/* store buf */
-	    rker = rker | RKER_NXM;			/* NXM? set flg */
-	    wc = wc - t;  }				/* adj wd cnt */
-	}						/* end read */
+    case RKCS_READ:					/* read */
+	if (rkcs & RKCS_FMT) {				/* format? */
+	    for (i = 0, cda = da; i < wc; i++) {	/* fill buffer with cyl #s */
+		if (cda >= (int32) uptr->capac) {	/* overrun? */
+		    rker = rker | RKER_OVR;		/* set overrun err */
+		    wc = i;				/* trim transfer */
+		    break;  }
+		rkxb[i] = (cda / RK_NUMWD) / (RK_NUMSF * RK_NUMSC);
+		cda = cda + RK_NUMWD;			/* next sector */
+		}					/* end for wc */
+	    }						/* end if format */
+	else {						/* normal read */
+	    i = fxread (rkxb, sizeof (int16), wc, uptr->fileref);
+	    err = ferror (uptr->fileref);		/* read file */
+	    for ( ; i < wc; i++) rkxb[i] = 0;		/* fill buf */
+	    }
+	if (rkcs & RKCS_INH) {				/* incr inhibit? */
+	    if (t = Map_WriteW (ma, 2, &rkxb[wc - 1], MAP)) {	/* store last */
+		rker = rker | RKER_NXM;			/* NXM? set flag */
+		wc = 0;  }				/* no transfer */
+	    }
+	else {						/* normal store */
+	    if (t = Map_WriteW (ma, wc << 1, rkxb, MAP)) {	/* store buf */
+		rker = rker | RKER_NXM;			/* NXM? set flag */
+		wc = wc - t;  }				/* adj wd cnt */
+	    }
+	break;						/* end read */
 
-if ((uptr->FUNC == RKCS_WRITE) && (err == 0)) {		/* write? */
-	if (t = Map_ReadW (ma, wc << 1, rkxb, MAP)) {	/* get buf */
-	    rker = rker | RKER_NXM;			/* NXM? set flg */
-	    wc = wc - t;  }				/* adj wd cnt */
+    case RKCS_WRITE:					/* write */
+	if (rkcs & RKCS_INH) {				/* incr inhibit? */
+	    if (t = Map_ReadW (ma, 2, &comp, MAP)) {	/* get 1st word */
+		rker = rker | RKER_NXM;			/* NXM? set flag */
+		wc = 0;  }				/* no transfer */
+	    for (i = 0; i < wc; i++) rkxb[i] = comp;	/* all words same */
+	    }
+	else {						/* normal fetch */
+	    if (t = Map_ReadW (ma, wc << 1, rkxb, MAP)) {	/* get buf */
+		rker = rker | RKER_NXM;			/* NXM? set flg */
+		wc = wc - t;  }				/* adj wd cnt */
+	    }
 	if (wc) {					/* any xfer? */
 	    awc = (wc + (RK_NUMWD - 1)) & ~(RK_NUMWD - 1);	/* clr to */
 	    for (i = wc; i < awc; i++) rkxb[i] = 0;	/* end of blk */
 	    fxwrite (rkxb, sizeof (int16), awc, uptr->fileref);
-	    err = ferror (uptr->fileref);  }
-	}						/* end write */
+	    err = ferror (uptr->fileref);
+	    }
+	break;						/* end write */
 
-if ((uptr->FUNC == RKCS_WCHK) && (err == 0)) {		/* write check? */
+    case RKCS_WCHK:					/* write check */
 	i = fxread (rkxb, sizeof (int16), wc, uptr->fileref);
-	err = ferror (uptr->fileref);
+	if (err = ferror (uptr->fileref)) {		/* read error? */
+	   wc = 0;					/* no transfer */
+	   break;  }
 	for ( ; i < wc; i++) rkxb[i] = 0;		/* fill buf */
 	awc = wc;					/* save wc */
-	for (wc = 0; (err == 0) && (wc < awc); wc++)  {	/* loop thru buf */
-	    if (Map_ReadW (ma + (wc << 1), 2, &comp, MAP)) {	/* mem wd */
+	for (wc = 0, cma = ma; wc < awc; wc++)  {	/* loop thru buf */
+	    if (Map_ReadW (cma, 2, &comp, MAP)) {	/* mem wd */
 		rker = rker | RKER_NXM;			/* NXM? set flg */
 		break;  }
 	    if (comp != rkxb[wc])  {			/* match to disk? */
 		rker = rker | RKER_WCE;			/* no, err */
-		if (rkcs & RKCS_SSE) break;  }  }
-	}						/* end wcheck */
+		if (rkcs & RKCS_SSE) break;  }
+	    if (!(rkcs & RKCS_INH)) cma = cma + 2;	/* next mem addr */
+	    }						/* end for */
+	break;						/* end wcheck */
+
+    default:						/* read check */
+	break;
+	}						/* end switch */
+    }							/* end else */
 
 rkwc = (rkwc + wc) & 0177777;				/* final word count */
-ma = ma + (wc << 1);					/* final byte addr */
+if (!(rkcs & RKCS_INH)) ma = ma + (wc << 1);		/* final byte addr */
 rkba = ma & RKBA_IMP;					/* lower 16b */
 rkcs = (rkcs & ~RKCS_MEX) | ((ma >> (16 - RKCS_V_MEX)) & RKCS_MEX);
-da = da + wc + (RK_NUMWD - 1);
+if ((uptr->FUNC == RKCS_READ) && (rkcs & RKCS_FMT))	/* read format? */
+	da = da + (wc * RK_NUMWD);			/* count by sectors */
+else da = da + wc + (RK_NUMWD - 1);			/* count by words */
 track = (da / RK_NUMWD) / RK_NUMSC;
 sect = (da / RK_NUMWD) % RK_NUMSC;
 rkda = (rkda & RKDA_DRIVE) | (track << RKDA_V_TRACK) | (sect << RKDA_V_SECT);

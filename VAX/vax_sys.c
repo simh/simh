@@ -1,6 +1,6 @@
 /* vax_sys.c: VAX simulator interface
 
-   Copyright (c) 1998-2003, Robert M Supnik
+   Copyright (c) 1998-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Mar-04	RMS	Added RXV21 support
    06-May-03	RMS	Added support for second DELQA
    12-Oct-02	RMS	Added multiple RQ controller support
    10-Oct-02	RMS	Added DELQA support
@@ -47,6 +48,7 @@ extern DEVICE lpt_dev;
 extern DEVICE clk_dev;
 extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE rl_dev;
+extern DEVICE ry_dev;
 extern DEVICE ts_dev;
 extern DEVICE tq_dev;
 extern DEVICE dz_dev;
@@ -107,6 +109,7 @@ DEVICE *sim_devices[] = {
 	&rqb_dev,
 	&rqc_dev,
 	&rqd_dev,
+	&ry_dev,
 	&ts_dev,
 	&tq_dev,
 	&xq_dev,

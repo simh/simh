@@ -1,6 +1,6 @@
 /* id_dp.c: Interdata 2.5MB/10MB cartridge disk simulator
 
-   Copyright (c) 2001-2003, Robert M. Supnik
+   Copyright (c) 2001-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dp		M46-421 2.5MB/10MB cartridge disk
 
+   25-Jan-04	RMS	Revised for device debug support
    25-Apr-03	RMS	Revised for extended file support
    16-Feb-03	RMS	Fixed read to test transfer ok before selch operation
 */
@@ -136,7 +137,7 @@ static struct drvtyp drv_tab[] = {
 	{ 0 }  };
 
 extern uint32 int_req[INTSZ], int_enb[INTSZ];
-extern FILE *sim_log;
+extern FILE *sim_deb;
 
 uint8 dpxb[DP_NUMBY];					/* xfer buffer */
 uint32 dp_bptr = 0;					/* buffer ptr */
@@ -152,7 +153,6 @@ uint32 dpd_arm[DP_NUMDR] = { 0 };			/* drives armed */
 int32 dp_stime = 100;					/* seek latency */
 int32 dp_rtime = 100;					/* rotate latency */
 int32 dp_wtime = 1;					/* word time */
-uint32 dp_log = 0;					/* debug log */
 uint8 dp_tplte[(2 * DP_NUMDR) + 2];			/* fix/rmv + ctrl + end */
 
 DEVICE dp_dev;
@@ -213,7 +213,6 @@ REG dp_reg[] = {
 		  DP_NUMDR, REG_RO) },
 	{ URDATA (CAPAC, dp_unit[0].capac, 10, T_ADDR_W, 0,
 		  DP_NUMDR, PV_LEFT | REG_HRO) },
-	{ FLDATA (LOG, dp_log, 0), REG_HIDDEN },
 	{ HRDATA (DEVNO, dp_dib.dno, 8), REG_HRO },
 	{ HRDATA (SELCH, dp_dib.sch, 2), REG_HRO },
 	{ NULL }  };
@@ -246,7 +245,7 @@ DEVICE dp_dev = {
 	DP_NUMDR, 16, 24, 1, 16, 8,
 	NULL, NULL, &dp_reset,
 	&id_dboot, &dp_attach, &dp_detach,
-	&dp_dib, DEV_DISABLE };
+	&dp_dib, DEV_DISABLE | DEV_DEBUG };
 
 /* Controller: IO routine */
 
@@ -266,7 +265,7 @@ case IO_RD:						/* read data */
 	else dp_sta = dp_sta | STA_BSY;			/* xfr? set busy */
 	return dp_db;					/* return data */
 case IO_WD:						/* write data */
-	if (sim_log && dp_log) fprintf (sim_log,
+	if (DEBUG_PRS (dp_dev)) fprintf (sim_deb,
 	    ">>DPC WD = %02X, STA = %02X\n", dat, dp_sta);
 	if (dp_sta & STC_IDL) dp_hdsc = dat & HS_MASK;	/* idle? hdsc */
 	else {						/* data xfer */
@@ -278,7 +277,7 @@ case IO_SS:						/* status */
 	if (t & SETC_EX) t = t | STA_EX;		/* test for EX */
 	return t;
 case IO_OC:						/* command */
-	if (sim_log && dp_log) fprintf (sim_log,
+	if (DEBUG_PRS (dp_dev)) fprintf (sim_deb,
 	    ">>DPC OC = %02X, STA = %02X\n", dat, dp_sta);
 	f = dat & CMC_MASK;				/* get cmd */
 	if (f & CMC_CLR) {				/* clear? */
@@ -315,7 +314,7 @@ case IO_ADR:						/* select */
 	if (dp_sta & STC_IDL) dp_svun = dev;		/* idle? save unit */
 	return BY;					/* byte only */
 case IO_WD:						/* write data */
-	if (sim_log && dp_log) fprintf (sim_log,
+	if (DEBUG_PRS (dp_dev)) fprintf (sim_deb,
 	    ">>DP%d WD = %02X, STA = %02X\n", u, dat, dp_sta);
 	if (GET_DTYPE (uptr->flags) == TYPE_2315)	/* 2.5MB drive? */
 	    dp_cyl = dat & 0xFF;			/* cyl is 8b */
@@ -330,7 +329,7 @@ case IO_SS:						/* status */
 	if (t & SETD_EX) t = t | STA_EX;		/* test for ex */
 	return t;
 case IO_OC:						/* command */
-	if (sim_log && dp_log) fprintf (sim_log,
+	if (DEBUG_PRS (dp_dev)) fprintf (sim_deb,
 	    ">>DP%d OC = %02X, STA = %02X\n", u, dat, dp_sta);
 	dpd_arm[u] = int_chg (v_DPC + u + 1, dat, dpd_arm[u]);
 	if (dat & CMD_SK) t = dp_cyl;			/* seek? get cyl */

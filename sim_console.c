@@ -1,6 +1,6 @@
-/* scp_tty.c: operating system-dependent I/O routines
+/* sim_console.c: simulator console I/O library
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   02-Jan-04	RMS	Removed timer routines, added Telnet console routines
+		RMS	Moved console logging to OS-independent code
    25-Apr-03	RMS	Added long seek support from Mark Pizzolato
 			Added Unix priority control from Mark Pizzolato
    24-Sep-02	RMS	Removed VT support, added Telnet console support
@@ -45,34 +47,153 @@
 
    This module implements the following routines to support terminal I/O:
 
-   ttinit	-	called once to get initial terminal state
-   ttrunstate	-	called to put terminal into run state
-   ttcmdstate	-	called to return terminal to command state
-   ttclose	-	called once before the simulator exits
+   sim_poll_kbd	-	poll for keyboard input
+   sim_putchar	-	output character to console
+   sim_putchar_s -	output character to console, stall if congested
+   sim_set_telnet -	set console to Telnet port
+   sim_set_notelnet -	close console Telnet port
+   sim_show_telnet -	show console status
+
+   sim_ttinit	-	called once to get initial terminal state
+   sim_ttrun	-	called to put terminal into run state
+   sim_ttcmd	-	called to return terminal to command state
+   sim_ttclose	-	called once before the simulator exits
    sim_os_poll_kbd -	poll for keyboard input
-   sim_os_putchar -	output character to terminal
+   sim_os_putchar -	output character to console
 
-   This module implements the following routines to support clock calibration:
-
-   sim_os_msec	-	return elapsed time in msec
-   sim_os_sleep	-	sleep specified number of seconds
-
-   Versions are included for VMS, Windows, OS/2, Macintosh, BSD UNIX, and POSIX UNIX.
-   The POSIX UNIX version works with LINUX.
+   The first group is OS-independent; the second group is OS-dependent.
 */
 
 #include "sim_defs.h"
+#include "sim_sock.h"
+#include "sim_tmxr.h"
+
 int32 sim_int_char = 005;				/* interrupt character */
+TMLN sim_con_ldsc = { 0 };				/* console line descr */
+TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc };		/* console line mux */
+
+extern volatile int32 stop_cpu;
 extern FILE *sim_log;
+
+/* Console I/O package.
+
+   The console terminal can be attached to the controlling window
+   or to a Telnet connection.  If attached to a Telnet connection,
+   the console is described by internal terminal multiplexor
+   sim_con_tmxr and internal terminal line description sim_con_ldsc.
+*/
+
+/* Set console to Telnet port */
+
+t_stat sim_set_telnet (int32 flg, char *cptr)
+{
+if (*cptr == 0) return SCPE_2FARG;			/* too few arguments? */
+if (sim_con_tmxr.master) return SCPE_ALATT;		/* already open? */
+return tmxr_open_master (&sim_con_tmxr, cptr);		/* open master socket */
+}
+
+/* Close console Telnet port */
+
+t_stat sim_set_notelnet (int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0)) return SCPE_2MARG;		/* too many arguments? */
+if (sim_con_tmxr.master == 0) return SCPE_OK;		/* ignore if already closed */
+return tmxr_close_master (&sim_con_tmxr);		/* close master socket */
+}
+
+/* Show console Telnet status */
+
+t_stat sim_show_telnet (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0)) return SCPE_2MARG;
+if (sim_con_tmxr.master == 0)
+	fprintf (st, "Connected to console window\n");
+else if (sim_con_ldsc.conn == 0)
+	fprintf (st, "Listening on port %d\n", sim_con_tmxr.port);
+else {	fprintf (st, "Listening on port %d, connected to socket %d\n",
+	    sim_con_tmxr.port, sim_con_ldsc.conn);
+	tmxr_fconns (st, &sim_con_ldsc, -1);
+	tmxr_fstats (st, &sim_con_ldsc, -1);  }
+return SCPE_OK;
+}
+
+/* Check connection before executing */
+
+t_stat sim_check_console (int32 sec)
+{
+int32 c, i;
+
+if (sim_con_tmxr.master == 0) return SCPE_OK;		/* not Telnet? done */
+if (sim_con_ldsc.conn) {				/* connected? */
+	tmxr_poll_rx (&sim_con_tmxr);			/* poll (check disconn) */
+	if (sim_con_ldsc.conn) return SCPE_OK;  }	/* still connected? */
+for (i = 0; i < sec; i++) {				/* loop */
+	if (tmxr_poll_conn (&sim_con_tmxr) >= 0) {	/* poll connect */
+	    sim_con_ldsc.rcve = 1;			/* rcv enabled */
+	    if (i) {					/* if delayed */
+		printf ("Running\n");			/* print transition */
+		fflush (stdout);  }
+	    return SCPE_OK;  }				/* ready to proceed */
+	c = sim_os_poll_kbd ();				/* check for stop char */
+	if ((c == SCPE_STOP) || stop_cpu) return SCPE_STOP;
+	if ((i % 10) == 0) {				/* Status every 10 sec */
+	    printf ("Waiting for console Telnet connection\n");
+	    fflush (stdout);  }
+	sim_os_sleep (1);				/* wait 1 second */
+	}
+return SCPE_TTMO;					/* timed out */
+}
+
+/* Poll for character */
+
+t_stat sim_poll_kbd (void)
+{
+int32 c;
+
+c = sim_os_poll_kbd ();					/* get character */
+if ((c == SCPE_STOP) || (sim_con_tmxr.master == 0))	/* ^E or not Telnet? */
+	return c;					/* in-window */
+if (sim_con_ldsc.conn == 0) return SCPE_LOST;		/* no Telnet conn? */
+tmxr_poll_rx (&sim_con_tmxr);				/* poll for input */
+if (c = tmxr_getc_ln (&sim_con_ldsc))			/* any char? */ 
+	return (c & (SCPE_BREAK | 0377)) | SCPE_KFLAG;
+return SCPE_OK;
+}
+
+/* Output character */
+
+t_stat sim_putchar (int32 c)
+{
+if (sim_log) fputc (c, sim_log);			/* log file? */
+if (sim_con_tmxr.master == 0)				/* not Telnet? */
+	return sim_os_putchar (c);			/* in-window version */
+if (sim_con_ldsc.conn == 0) return SCPE_LOST;		/* no Telnet conn? */
+tmxr_putc_ln (&sim_con_ldsc, c);			/* output char */
+tmxr_poll_tx (&sim_con_tmxr);				/* poll xmt */
+return SCPE_OK;
+}
+
+t_stat sim_putchar_s (int32 c)
+{
+t_stat r;
+
+if (sim_log) fputc (c, sim_log);			/* log file? */
+if (sim_con_tmxr.master == 0)				/* not Telnet? */
+	return sim_os_putchar (c);			/* in-window version */
+if (sim_con_ldsc.conn == 0) return SCPE_LOST;		/* no Telnet conn? */
+if (sim_con_ldsc.xmte == 0) r = SCPE_STALL;		/* xmt disabled? */
+else r = tmxr_putc_ln (&sim_con_ldsc, c);		/* no, Telnet output */
+tmxr_poll_tx (&sim_con_tmxr);				/* poll xmt */
+return r;						/* return status */
+}
 
 /* VMS routines, from Ben Thomas, with fixes from Robert Alan Byer */
 
 #if defined (VMS)
-#define _SIM_IO_TTY_ 0
+
 #if defined(__VAX)
 #define sys$assign SYS$ASSIGN
 #define sys$qiow SYS$QIOW
-#define sys$gettim SYS$GETTIM
 #endif
 
 #include <descrip.h>
@@ -82,22 +203,26 @@ extern FILE *sim_log;
 #include <ssdef.h>
 #include <starlet.h>
 #include <unistd.h>
+
 #define EFN 0
 unsigned int32 tty_chan = 0;
+
 typedef struct {
 	unsigned short sense_count;
 	unsigned char sense_first_char;
 	unsigned char sense_reserved;
 	unsigned int32 stat;
 	unsigned int32 stat2; } SENSE_BUF;
+
 typedef struct {
 	unsigned int16 status;
 	unsigned int16 count;
 	unsigned int32 dev_status; } IOSB;
+
 SENSE_BUF cmd_mode = { 0 };
 SENSE_BUF run_mode = { 0 };
 
-t_stat ttinit (void)
+t_stat sim_ttinit (void)
 {
 unsigned int32 status;
 IOSB iosb;
@@ -114,7 +239,7 @@ run_mode.stat2 = cmd_mode.stat2 | TT2$M_PASTHRU;
 return SCPE_OK;
 }
 
-t_stat ttrunstate (void)
+t_stat sim_ttrun (void)
 {
 unsigned int status;
 IOSB iosb;
@@ -125,7 +250,7 @@ if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTIERR;
 return SCPE_OK;
 }
 
-t_stat ttcmdstate (void)
+t_stat sim_ttcmd (void)
 {
 unsigned int status;
 IOSB iosb;
@@ -136,9 +261,9 @@ if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTIERR;
 return SCPE_OK;
 }
 
-t_stat ttclose (void)
+t_stat sim_ttclose (void)
 {
-return ttcmdstate ();
+return sim_ttcmd ();
 }
 
 t_stat sim_os_poll_kbd (void)
@@ -171,49 +296,14 @@ IOSB iosb;
 c = out;
 status = sys$qiow (EFN, tty_chan, IO$_WRITELBLK | IO$M_NOFORMAT,
 	&iosb, 0, 0, &c, 1, 0, 0, 0, 0);
-if (sim_log) fputc (c, sim_log);
 if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTOERR;
 return SCPE_OK;
 }
-
-const t_bool rtc_avail = TRUE;
-
-uint32 sim_os_msec ()
-{
-uint32 quo, htod, tod[2];
-int32 i;
-
-sys$gettim (tod);					/* time 0.1usec */
-
-/* To convert to msec, must divide a 64b quantity by 10000.  This is actually done
-   by dividing the 96b quantity 0'time by 10000, producing 64b of quotient, the
-   high 32b of which are discarded.  This can probably be done by a clever multiply...
-*/
-
-quo = htod = 0;
-for (i = 0; i < 64; i++) {				/* 64b quo */
-	htod = (htod << 1) | ((tod[1] >> 31) & 1);	/* shift divd */
-	tod[1] = (tod[1] << 1) | ((tod[0] >> 31) & 1);
-	tod[0] = tod[0] << 1;
-	quo = quo << 1;					/* shift quo */
-	if (htod >= 10000) {				/* divd work? */
-	    htod = htod - 10000;			/* subtract */
-	    quo = quo | 1;  }  }			/* set quo bit */
-return quo;
-}
-
-void sim_os_sleep (unsigned int sec)
-{
-sleep (sec);
-return;
-}
-
-#endif
 
 /* Win32 routines */
 
-#if defined (_WIN32)
-#define _SIM_IO_TTY_ 0
+#elif defined (_WIN32)
+
 #include <conio.h>
 #include <io.h>
 #include <windows.h>
@@ -226,25 +316,25 @@ sim_win_ctlc = 1;
 return;
 }
 
-t_stat ttinit (void)
+t_stat sim_ttinit (void)
 {
 return SCPE_OK;
 }
 
-t_stat ttrunstate (void)
+t_stat sim_ttrun (void)
 {
 if (signal (SIGINT, win_handler) == SIG_ERR) return SCPE_SIGERR;
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 return SCPE_OK;
 }
 
-t_stat ttcmdstate (void)
+t_stat sim_ttcmd (void)
 {
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 return SCPE_OK;
 }
 
-t_stat ttclose (void)
+t_stat sim_ttclose (void)
 {
 return SCPE_OK;
 }
@@ -257,7 +347,7 @@ if (sim_win_ctlc) {
 	sim_win_ctlc = 0;
 	signal (SIGINT, win_handler);
 	return 003 | SCPE_KFLAG;  }
-if (!kbhit ()) return SCPE_OK;
+if (!_kbhit ()) return SCPE_OK;
 c = _getch ();
 if ((c & 0177) == '\b') c = 0177;
 if ((c & 0177) == sim_int_char) return SCPE_STOP;
@@ -266,49 +356,32 @@ return c | SCPE_KFLAG;
 
 t_stat sim_os_putchar (int32 c)
 {
-if (c != 0177) {
-	_putch (c);
-	if (sim_log) fputc (c, sim_log);  }
+if (c != 0177) _putch (c);
 return SCPE_OK;
 }
-
-const t_bool rtc_avail = TRUE;
-
-uint32 sim_os_msec ()
-{
-return GetTickCount ();
-}
-
-void sim_os_sleep (unsigned int sec)
-{
-Sleep (sec * 1000);
-return;
-}
-
-#endif
 
 /* OS/2 routines, from Bruce Ray */
 
-#if defined (__OS2__)
-#define _SIM_IO_TTY_ 0
+#elif defined (__OS2__)
+
 #include <conio.h>
 
-t_stat ttinit (void)
+t_stat sim_ttinit (void)
 {
 return SCPE_OK;
 }
 
-t_stat ttrunstate (void)
+t_stat sim_ttrun (void)
 {
 return SCPE_OK;
 }
 
-t_stat ttcmdstate (void)
+t_stat sim_ttcmd (void)
 {
 return SCPE_OK;
 }
 
-t_stat ttclose (void)
+t_stat sim_ttclose (void)
 {
 return SCPE_OK;
 }
@@ -328,28 +401,15 @@ t_stat sim_os_putchar (int32 c)
 {
 if (c != 0177) {
 	putch (c);
-	fflush (stdout) ;
-	if (sim_log) fputc (c, sim_log);  }
+	fflush (stdout);  }
 return SCPE_OK;
 }
-
-const t_bool rtc_avail = FALSE;
-
-uint32 sim_os_msec ()
-{
-return 0;
-}
-
-#endif
 
-/* Metrowerks CodeWarrior Macintosh routines, from Louis Chretien,
-   Peter Schorn, and Ben Supnik
-*/
+/* Metrowerks CodeWarrior Macintosh routines, from Louis Chretien and
+   Peter Schorn */
 
-#if defined (__MWERKS__) && defined (macintosh)
-#define _SIM_IO_TTY_ 0
+#elif defined (__MWERKS__) && defined (macintosh)
 
-#include <Timer.h>
 #include <console.h>
 #include <Mactypes.h>
 #include <string.h>
@@ -367,13 +427,6 @@ void SIOUXUpdateMenuItems(void);
 void SIOUXUpdateScrollbar(void);
 int ps_kbhit(void);
 int ps_getch(void);
-t_stat ttinit (void);
-t_stat ttrunstate (void);
-t_stat ttcmdstate (void);
-t_stat ttclose (void);
-uint32 sim_os_msec (void);
-t_stat sim_os_poll_kbd (void);
-t_stat sim_os_putchar (int32 c);
 
 extern char sim_name[];
 extern pSIOUXWin SIOUXTextWindow;
@@ -464,8 +517,8 @@ int ps_getch(void) {
    return c;
 }
 
-t_stat ttinit (void) {
-/* Note that this only works if the call to ttinit comes before any output to the console */
+t_stat sim_ttinit (void) {
+/* Note that this only works if the call to sim_ttinit comes before any output to the console */
 	int i;
 	char title[50] = " "; /* this blank will later be replaced by the number of characters */
 	unsigned char ptitle[50];
@@ -487,17 +540,17 @@ t_stat ttinit (void) {
 	return SCPE_OK;
 }
 
-t_stat ttrunstate (void)
+t_stat sim_ttrun (void)
 {
 return SCPE_OK;
 }
 
-t_stat ttcmdstate (void)
+t_stat sim_ttcmd (void)
 {
 return SCPE_OK;
 }
 
-t_stat ttclose (void)
+t_stat sim_ttclose (void)
 {
 return SCPE_OK;
 }
@@ -517,40 +570,16 @@ t_stat sim_os_putchar (int32 c)
 {
 if (c != 0177) {
 	putchar (c);
-	fflush (stdout) ;
-	if (sim_log) fputc (c, sim_log);  }
+	fflush (stdout);  }
 return SCPE_OK;
 }
-
-const t_bool rtc_avail = TRUE;
-
-uint32 sim_os_msec (void)
-{
-unsigned long long micros;
-UnsignedWide macMicros;
-unsigned long millis;
-
-Microseconds (&macMicros);
-micros = *((unsigned long long *) &macMicros);
-millis = micros / 1000LL;
-return (uint32) millis;
-}
-
-void sim_os_sleep (unsigned int sec)
-{
-sleep (sec);
-return;
-}
-
-#endif
 
 /* BSD UNIX routines */
 
-#if defined (BSDTTY)
-#define _SIM_IO_TTY_ 0
+#elif defined (BSDTTY)
+
 #include <sgtty.h>
 #include <fcntl.h>
-#include <sys/time.h>
 #include <unistd.h>
 
 struct sgttyb cmdtty,runtty;			/* V6/V7 stty data */
@@ -558,7 +587,7 @@ struct tchars cmdtchars,runtchars;		/* V7 editing */
 struct ltchars cmdltchars,runltchars;		/* 4.2 BSD editing */
 int cmdfl,runfl;				/* TTY flags */
 
-t_stat ttinit (void)
+t_stat sim_ttinit (void)
 {
 cmdfl = fcntl (0, F_GETFL, 0);			/* get old flags  and status */
 runfl = cmdfl | FNDELAY;
@@ -582,7 +611,7 @@ runltchars.t_lnextc = 0xFF;
 return SCPE_OK;					/* return success */
 }
 
-t_stat ttrunstate (void)
+t_stat sim_ttrun (void)
 {
 runtchars.t_intrc = sim_int_char;		/* in case changed */
 fcntl (0, F_SETFL, runfl);			/* non-block mode */
@@ -593,7 +622,7 @@ nice (10);					/* lower priority */
 return SCPE_OK;
 }
 
-t_stat ttcmdstate (void)
+t_stat sim_ttcmd (void)
 {
 nice (-10);					/* restore priority */
 fcntl (0, F_SETFL, cmdfl);			/* block mode */
@@ -603,9 +632,9 @@ if (ioctl (0, TIOCSLTC, &cmdltchars) < 0) return SCPE_TTIERR;
 return SCPE_OK;
 }
 
-t_stat ttclose (void)
+t_stat sim_ttclose (void)
 {
-return ttcmdstate ();
+return sim_ttcmd ();
 }
 
 t_stat sim_os_poll_kbd (void)
@@ -624,42 +653,20 @@ char c;
 
 c = out;
 write (1, &c, 1);
-if (sim_log) fputc (c, sim_log);
 return SCPE_OK;
 }
-
-const t_bool rtc_avail = TRUE;
-
-uint32 sim_os_msec ()
-{
-struct timeval cur;
-struct timezone foo;
-uint32 msec;
-
-gettimeofday (&cur, &foo);
-msec = (((uint32) cur.tv_sec) * 1000) + (((uint32) cur.tv_usec) / 1000);
-return msec;
-}
-
-void sim_os_sleep (unsigned int sec)
-{
-sleep (sec);
-return;
-}
-
-#endif
 
 /* POSIX UNIX routines, from Leendert Van Doorn */
 
-#if !defined (_SIM_IO_TTY_)
+#else
+
 #include <termios.h>
-#include <sys/time.h>
 #include <unistd.h>
 
 struct termios cmdtty, runtty;
 static int prior_norm = 1;
 
-t_stat ttinit (void)
+t_stat sim_ttinit (void)
 {
 if (!isatty (fileno (stdin))) return SCPE_OK;		/* skip if !tty */
 if (tcgetattr (0, &cmdtty) < 0) return SCPE_TTIERR;	/* get old flags */
@@ -699,7 +706,7 @@ runtty.c_cc[VSTATUS] = 0;
 return SCPE_OK;
 }
 
-t_stat ttrunstate (void)
+t_stat sim_ttrun (void)
 {
 if (!isatty (fileno (stdin))) return SCPE_OK;		/* skip if !tty */
 runtty.c_cc[VINTR] = sim_int_char;			/* in case changed */
@@ -711,7 +718,7 @@ if (prior_norm) {					/* at normal pri? */
 return SCPE_OK;
 }
 
-t_stat ttcmdstate (void)
+t_stat sim_ttcmd (void)
 {
 if (!isatty (fileno (stdin))) return SCPE_OK;		/* skip if !tty */
 if (!prior_norm) {					/* priority down? */
@@ -722,9 +729,9 @@ if (tcsetattr (0, TCSAFLUSH, &cmdtty) < 0) return SCPE_TTIERR;
 return SCPE_OK;
 }
 
-t_stat ttclose (void)
+t_stat sim_ttclose (void)
 {
-return ttcmdstate ();
+return sim_ttcmd ();
 }
 
 t_stat sim_os_poll_kbd (void)
@@ -743,142 +750,7 @@ char c;
 
 c = out;
 write (1, &c, 1);
-if (sim_log) fputc (c, sim_log);
 return SCPE_OK;
 }
 
-const t_bool rtc_avail = TRUE;
-
-uint32 sim_os_msec ()
-{
-struct timeval cur;
-uint32 msec;
-
-gettimeofday (&cur, NULL);
-msec = (((uint32) cur.tv_sec) * 1000) + (((uint32) cur.tv_usec) / 1000);
-return msec;
-}
-
-void sim_os_sleep (unsigned int sec)
-{
-sleep (sec);
-return;
-}
-
-#endif
-
-/* Long seek routines */
-
-#if defined (USE_INT64) && defined (USE_ADDR64)
-
-/* Alpha VMS */
-
-#if defined (__ALPHA) && defined (VMS)			/* Alpha VMS */
-#define _SIM_IO_FSEEK_EXT_	0
-
-static t_int64 fpos_t_to_int64 (fpos_t *pos)
-{
-unsigned short *w = (unsigned short *) pos;		/* endian dep! */
-t_int64 result;
-
-result = w[1];
-result <<= 16;
-result += w[0];
-result <<= 9;
-result += w[2];
-return result;
-}
-
-static void int64_to_fpos_t (t_int64 ipos, fpos_t *pos, size_t mbc)
-{
-unsigned short *w = (unsigned short *) pos;
-int bufsize = mbc << 9;
-
-w[3] = 0;
-w[2] = (unsigned short) (ipos % bufsize);
-ipos -= w[2];
-ipos >>= 9;
-w[0] = (unsigned short) ipos;
-ipos >>= 16;
-w[1] = (unsigned short) ipos;
-if ((w[2] == 0) && (w[0] || w[1])) {
-	w[2] = bufsize;
-	w[0] -= mbc;  }
-}
-
-int fseek_ext (FILE *st, t_addr offset, int whence)
-{
-t_addr fileaddr;
-fpos_t filepos;
-
-switch (whence) {
-	case SEEK_SET:
-	    fileaddr = offset;
-	    break;
-	case SEEK_CUR:
-	    if (fgetpos (st, &filepos)) return (-1);
-	    fileaddr = fpos_t_to_int64 (&filepos);
-	    fileaddr = fileaddr + offset;
-	    break;
-	default:
-	    errno = EINVAL;
-	    return (-1);  }
-int64_to_fpos_t (fileaddr, &filepos, 127);
-return fsetpos (st, &filepos);
-}
-
-#endif
-
-/* Alpha UNIX - natively 64b */
-
-#if defined (__ALPHA) && defined (__unix__)		/* Alpha UNIX */
-#define _SIM_IO_FSEEK_EXT_	0
-
-int fseek_ext (FILE *st, t_addr offset, int whence)
-{
-return fseek (st, offset, whence);
-}
-
-#endif
-
-/* Windows */
-
-#if defined (_WIN32)
-#define _SIM_IO_FSEEK_EXT_	0
-
-int fseek_ext (FILE *st, t_addr offset, int whence)
-{
-fpos_t fileaddr;
-
-switch (whence) {
-	case SEEK_SET:
-	    fileaddr = offset;
-	    break;
-	case SEEK_CUR:
-	    if (fgetpos (st, &fileaddr)) return (-1);
-	    fileaddr = fileaddr + offset;
-	    break;
-	default:
-	    errno = EINVAL;
-	    return (-1);  }
-return fsetpos (st, &fileaddr);
-}
-
-#endif							/* end Windows */
-
-#endif							/* end 64b seek defs */
-
-/* Default: no OS-specific routine has been defined */
-
-#if !defined (_SIM_IO_FSEEK_EXT_)
-#define _SIM_IO_FSEEK_EXT_	0
-
-int fseek_ext (FILE *st, t_addr xpos, int origin)
-{
-return fseek (st, (int32) xpos, origin);
-}
-
-uint32 sim_taddr_64 = 0;
-#else
-uint32 sim_taddr_64 = 1;
 #endif

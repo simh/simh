@@ -1,6 +1,6 @@
 /* pdp8_rx.c: RX8E/RX01, RX28/RX02 floppy disk simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rx		RX8E/RX01, RX28/RX02 floppy disk
 
+   04-Jan-04	RMS	Changed sim_fsize calling sequence
    05-Nov-03	RMS	Fixed bug in RX28 read status (found by Charles Dickman)
    26-Oct-03	RMS	Cleaned up buffer copy code, fixed double density write
    25-Apr-03	RMS	Revised for extended file support
@@ -523,12 +524,15 @@ return SCPE_OK;
 t_stat rx_attach (UNIT *uptr, char *cptr)
 {
 uint32 sz;
+t_stat r;
 
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
+r = attach_unit (uptr, cptr);
+if (r != SCPE_OK) return r;
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (uptr->fileref))) {
 	if (sz > RX_SIZE) uptr->flags = uptr->flags | UNIT_DEN;
 	else uptr->flags = uptr->flags & ~UNIT_DEN;  }
 uptr->capac = (uptr->flags & UNIT_DEN)? RX2_SIZE: RX_SIZE;
-return attach_unit (uptr, cptr);
+return SCPE_OK;
 }
 
 /* Set size routine */

@@ -1,6 +1,6 @@
 /* id_pas.c: Interdata programmable async line adapter simulator
 
-   Copyright (c) 2001-2003, Robert M Supnik
+   Copyright (c) 2001-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    pas		Programmable asynchronous line adapter(s)
 
+   05-Jan-04	RMS	Revised for tmxr library changes
    09-May-03	RMS	Added network device flag
 
    This module implements up to 32 individual serial interfaces, representing
@@ -100,7 +101,7 @@ uint32 pas_tps = 50;					/* polls/second */
 uint8 pas_tplte[PAS_LINES * 2 + 1];			/* template */
 
 TMLN pas_ldsc[PAS_LINES] = { 0 };			/* line descriptors */
-TMXR pas_desc = { 8, 0, 0, &pas_ldsc[0], NULL };	/* mux descriptor */
+TMXR pas_desc = { 8, 0, 0, pas_ldsc };			/* mux descriptor */
 #define PAS_ENAB	pas_desc.lines
 
 uint32 pas (uint32 dev, uint32 op, uint32 dat);
@@ -145,16 +146,16 @@ REG pas_reg[] = {
 
 MTAB pas_mod[] = {
 	{ MTAB_XTD | MTAB_VDV | MTAB_VAL, 0, "lines", "LINES",
-		&pas_vlines, NULL, &pas_nlreg },
+	    &pas_vlines, NULL, &pas_nlreg },
 	{ MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-		&tmxr_dscln, NULL, &pas_desc },
+	    &tmxr_dscln, NULL, &pas_desc },
 	{ UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &pas_summ },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-		NULL, &pas_show, NULL },
+	    NULL, &pas_show, NULL },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-		NULL, &pas_show, NULL },
+	    NULL, &pas_show, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
-		&set_dev, &show_dev, NULL },
+	    &set_dev, &show_dev, NULL },
 	{ 0 }  };
 
 DEVICE pas_dev = {
@@ -212,6 +213,10 @@ MTAB pasl_mod[] = {
 	{ UNIT_UC+UNIT_8B, UNIT_8B, "8b", "8B", NULL },
 	{ UNIT_MDM, 0, "no dataset", "NODATASET", NULL },
 	{ UNIT_MDM, UNIT_MDM, "dataset", "DATASET", NULL },
+	{ MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
+	    &tmxr_set_log, &tmxr_show_log, &pas_desc },
+	{ MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
+	    &tmxr_set_nolog, NULL, &pas_desc },
 	{ 0 }  };
 
 REG pasl_reg[] = {
@@ -270,7 +275,7 @@ case IO_OC:						/* command */
 	    if ((pas_cmd[ln] & CMD_DTR) && (pas_sta[ln] & STA_RING))
 		pas_sta[ln] = pas_sta[ln] & ~(STA_CROF | STA_RING);
 	    if (old_cmd & ~pas_cmd[ln] & CMD_DTR) {
-	    	tmxr_msg (pas_ldsc[ln].conn, "\r\nLine hangup\r\n");
+	    	tmxr_linemsg (&pas_ldsc[ln], "\r\nLine hangup\r\n");
 		tmxr_reset_ln (&pas_ldsc[ln]);		/* reset line */
 		pas_sta[ln] = pas_sta[ln] | STA_CROF;	/* no carrier */
 		if (pas_rarm[ln]) SET_INT (v_PAS + ln + ln);  }  }
@@ -424,9 +429,7 @@ if (pas_unit.flags & UNIT_ATT) {			/* master att? */
 	    t = sim_rtcn_init (pas_unit.wait, TMR_PAS);
 	    sim_activate (&pas_unit, t);  }  }		/* activate */
 else sim_cancel (&pas_unit);				/* else stop */
-for (i = 0; i < PAS_LINES; i++) {
-	pas_desc.ldsc[i] = &pas_ldsc[i];
-	pas_reset_ln (i);  }
+for (i = 0; i < PAS_LINES; i++) pas_reset_ln (i);
 return SCPE_OK;
 }
 
@@ -501,7 +504,7 @@ if (newln < PAS_ENAB) {
 	    return SCPE_OK;
 	for (i = newln; i < PAS_ENAB; i++) {
 	    if (pas_ldsc[i].conn) {
-		tmxr_msg (pas_ldsc[i].conn, "\r\nOperator disconnected line\r\n");
+		tmxr_linemsg (&pas_ldsc[i], "\r\nOperator disconnected line\r\n");
 		tmxr_reset_ln (&pas_ldsc[i]);  }		/* reset line */
 	    pasl_unit[i].flags = pasl_unit[i].flags | UNIT_DIS;
 	    pas_reset_ln (i);  }

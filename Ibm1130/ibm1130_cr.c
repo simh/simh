@@ -1,6 +1,10 @@
 #include "ibm1130_defs.h"
 #include "ibm1130_fmt.h"
 
+#ifdef _WIN32
+#  include <io.h>		// Microsoft puts definition of mktemp into io.h rather than stdlib.h
+#endif
+
 /* ibm1130_cr.c: IBM 1130 1442 Card Reader simulator
 
    Based on the SIMH package written by Robert M Supnik
@@ -1187,7 +1191,7 @@ static void checkdeck (void)
 
 static t_bool nextdeck (void)
 {
-	char buf[200], tmpbuf[200], *fname, *tn, *c, quote, *mode;
+	char buf[200], tmpbuf[200], *fname, *c, quote, *mode;
 	int code;
 	long fpos;
 
@@ -1204,7 +1208,7 @@ static t_bool nextdeck (void)
 		cr_unit.fileref = NULL;
 
 		if (cr_unit.flags & UNIT_SCRATCH) {
-			unlink(tempfile);
+			remove(tempfile);
 			CLRBIT(cr_unit.flags, UNIT_SCRATCH);
 		}
 	}
@@ -1229,8 +1233,39 @@ static t_bool nextdeck (void)
 		}
 
 		if (buf[0] == '!') {				/* literal text line, make a temporary file */
-			if (*tempfile == '\0') {
-				if ((tn = tempnam(".", "1130")) == NULL) {
+
+#if defined  (__GNUC__) && !defined (_WIN32)			// GCC complains about mktemp & always provides mkstemp
+
+			if (*tempfile == '\0') {						// first time, open guaranteed-unique file
+				int fh;					
+
+				strcpy(tempfile, "tempXXXXXX");				// get modifiable copy of name template
+
+				if ((fh = mkstemp(tempfile)) == -1) {		// open file. Actual name is set by side effect
+					printf("Cannot create temporary deck file\n");
+					break_simulation(STOP_DECK_BREAK);
+					return 0;
+				}
+															// get FILE * from the file handle
+				if ((cr_unit.fileref = fdopen(fh, "w+b")) == NULL) {
+					printf("Cannot use temporary deck file %s\n", tempfile);
+					break_simulation(STOP_DECK_BREAK);
+					return 0;
+				}
+			}
+			else {											// on later opens, just reuse the old name
+				if ((cr_unit.fileref = fopen(tempfile, "w+b")) == NULL) {
+					printf("Cannot create temporary file %s\n", tempfile);
+					break_simulation(STOP_DECK_BREAK);
+					return 0;
+				}
+			}
+#else					// ANSI standard C always provides mktemp
+
+			if (*tempfile == '\0') {						// first time, construct unique name
+				char *tn;
+
+				if ((tn = mktemp("crXXXXXX")) == NULL) {
 					printf("Cannot create temporary card file name\n");
 					break_simulation(STOP_DECK_BREAK);
 					return 0;
@@ -1238,12 +1273,13 @@ static t_bool nextdeck (void)
 				strcpy(tempfile, tn);
 				strcat(tempfile, ".tmp");
 			}
-
-			if ((cr_unit.fileref = fopen(tempfile, "wb+")) == NULL) {
+															// (re)create file
+			if ((cr_unit.fileref = fopen(tempfile, "w+b")) == NULL) {
 				printf("Cannot create temporary file %s\n", tempfile);
 				break_simulation(STOP_DECK_BREAK);
 				return 0;
 			}
+#endif
 
 			SETBIT(cr_unit.flags, UNIT_SCRATCH);
 
@@ -1560,7 +1596,7 @@ t_stat cr_detach (UNIT *uptr)
 			fclose(cr_unit.fileref);
 
 		if (cr_unit.flags & UNIT_SCRATCH) {
-			unlink(tempfile);
+			remove(tempfile);
 			CLRBIT(cr_unit.flags, UNIT_SCRATCH);
 		}
 
@@ -1677,7 +1713,7 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 {
 	char msg[80];
 	int ch;
-	int16 wd;
+	uint16 wd;
 	t_bool lastcard;
 
 	switch (func) {
@@ -1763,7 +1799,7 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 					cp_unit.COLUMN = 81;
 				}
 				else if (cp_unit.COLUMN < 80) {
-					wd = ReadW(addr);			/* store one word to punch buffer */
+					wd = (uint16) ReadW(addr);			/* store one word to punch buffer */
 					punchstation[cp_unit.COLUMN] = wd & 0xFFF0;
 					if (wd & 0x0008)			/* mark this as last column to be punched */
 						SETBIT(cp_unit.flags, UNIT_LASTPUNCH);
@@ -2052,8 +2088,7 @@ char response_byte;
 
 static DWORD CALLBACK pcr_thread (LPVOID arg)
 {
-	DWORD event;
-	long nrcvd, nread;
+	DWORD event, nrcvd, nread;
 	HANDLE objs[4];
 	BOOL pick_queued = FALSE, reset_queued = FALSE;
 		
@@ -2172,10 +2207,10 @@ static DWORD CALLBACK pcr_thread (LPVOID arg)
 					printf((nrcvd <= 0) ? "PCR: NO RESP!\n" : "PCR: GOT %d BYTES\n", nrcvd);
 
 				if (nrcvd > 0) {
-					pcr_nleft -= nrcvd;
+					pcr_nleft -= (int) nrcvd;
 
 					begin_pcr_critical_section();
-					pcr_nready += nrcvd;
+					pcr_nready += (int) nrcvd;
 					end_pcr_critical_section();
 				}
 
@@ -2210,7 +2245,7 @@ static char lastcmd = '?';
 
 static void pcr_cmd (char cmd)
 {
-	long nwrite, nrcvd;
+	DWORD nwrite, nrcvd;
 
 	if (cmd != '\0') {
 		if (cr_unit.flags & UNIT_DEBUG && (cmd != 'S' || cmd != lastcmd))
@@ -2231,7 +2266,7 @@ static void pcr_cmd (char cmd)
 
 static BOOL pcr_handle_status_byte (char byte)
 {
-	long nrcvd;
+	DWORD nrcvd;
 	static char prev_status = '?';
 	BOOL show;
 
@@ -2276,7 +2311,7 @@ static void pcr_set_dsw_from_status (BOOL post_pick)
 
 static BOOL pcr_handle_byte (char byte)
 {
-	long nrcvd;
+	DWORD nrcvd;
 
 	GetOverlappedResult(hpcr, &ovRd, &nrcvd, TRUE);
 

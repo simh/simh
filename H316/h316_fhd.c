@@ -1,6 +1,6 @@
 /* h316_fhd.c: H316/516 fixed head simulator
 
-   Copyright (c) 2003, Robert M. Supnik
+   Copyright (c) 2003-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    fhd		516-4400 fixed head disk
+
+   04-Jan-04	RMS	Changed sim_fsize calling sequence
 
    These head-per-track devices are buffered in memory, to minimize overhead.
 */
@@ -402,14 +404,17 @@ t_stat fhd_attach (UNIT *uptr, char *cptr)
 {
 uint32 sz, sf;
 uint32 ds_bytes = FH_WDPSF * sizeof (int16);
+t_stat r;
 
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
+r = attach_unit (uptr, cptr);
+if (r != SCPE_OK) return r;
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (uptr->fileref))) {
 	sf = (sz + ds_bytes - 1) / ds_bytes;
 	if (sf >= FH_NUMSF) sf = FH_NUMSF - 1;
 	uptr->flags = (uptr->flags & ~UNIT_SF) |
 	    (sf << UNIT_V_SF);  }
 uptr->capac = UNIT_GETSF (uptr->flags) * FH_WDPSF;
-return attach_unit (uptr, cptr);
+return SCPE_OK;
 }
 
 /* Set size routine */

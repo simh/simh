@@ -1,6 +1,6 @@
 /* pdp11_rl.c: RL11 (RLV12) cartridge disk simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rl		RL11(RLV12)/RL01/RL02 cartridge disk
 
+   04-Jan-04	RMS	Changed sim_fsize calling sequence
    19-May-03	RMS	Revised for new conditional compilation scheme
    25-Apr-03	RMS	Revised for extended file support
    29-Sep-02	RMS	Added variable address support to bootstrap
@@ -551,8 +552,7 @@ r = attach_unit (uptr, cptr);				/* attach unit */
 if (r != SCPE_OK) return r;				/* error? */
 uptr->TRK = 0;						/* cylinder 0 */
 uptr->STAT = RLDS_VCK;					/* new volume */
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;	/* seek to end */
-if ((p = ftell (uptr->fileref)) == 0) {			/* new disk image? */
+if ((p = sim_fsize (uptr->fileref)) == 0) {		/* new disk image? */
 	if (uptr->flags & UNIT_RO) return SCPE_OK;	/* if ro, done */
 	return pdp11_bad_block (uptr, RL_NUMSC, RL_NUMWD);  }
 if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */

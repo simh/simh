@@ -1,6 +1,6 @@
 /* pdp8_rk.c: RK8E cartridge disk simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -85,7 +85,7 @@
 #define  RKC_WALL	5
 #define RKC_V_FUNC	9
 #define RKC_IE		00400				/* interrupt enable */
-#define RKC_SKDN	00200				/* int on seek done */
+#define RKC_SKDN	00200				/* set done on seek done */
 #define RKC_HALF	00100				/* 128W sector */
 #define RKC_MEX		00070				/* memory extension */
 #define RKC_V_MEX	3

@@ -1,6 +1,6 @@
 /* pdp1_sys.c: PDP-1 simulator interface
 
-   Copyright (c) 1993-2003, Robert M. Supnik
+   Copyright (c) 1993-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,10 +19,12 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   06-Apr-04	RMS	Fixed bug in binary loader (found by Mark Crispin)
+   08-Feb-04	PLB	Merged display support
    08-Dec-03	RMS	Added parallel drum support, drum mnemonics
    18-Oct-03	RMS	Added DECtape off reel message
    01-Sep-03	RMS	Added support for loading in multiple fields
@@ -51,6 +53,7 @@ extern DEVICE lpt_dev;
 extern DEVICE dt_dev;
 extern DEVICE drm_dev;
 extern DEVICE drp_dev;
+extern DEVICE dpy_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern int32 M[];
@@ -84,6 +87,7 @@ DEVICE *sim_devices[] = {
 	&dt_dev,
 	&drm_dev,
 	&drp_dev,
+//	&dpy_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -167,7 +171,7 @@ t_stat sta;
 int32 fld;
 
 if (flag != 0) return SCPE_ARG;
-if (cptr) {
+if (cptr && (*cptr != 0)) {
 	fld = get_uint (cptr, 8, AMASK, &sta);
 	if (sta != SCPE_OK) return sta;
 	fld = fld & EPCMASK;  }
@@ -215,6 +219,7 @@ static const char *opcode[] = {
 
  "IOH", "RPA", "RPB", "RRB",				/* I/O instructions */
  "PPA", "PPB", "TYO", "TYI",
+ "DPY",
  "LSM", "ESM", "CBS",
  "LEM", "EEM", "CKS",
  "MSE", "MLC", "MRD", "MWR", "MRS",
@@ -270,6 +275,7 @@ static const int32 opc_val[] = {
 
  0730000+I_NPN, 0720001+I_IOT, 0720002+I_IOT, 0720030+I_IOT,
  0720005+I_IOT, 0720006+I_IOT, 0720003+I_IOT, 0720004+I_IOT,
+ 0720007+I_IOT,
  0720054+I_NPN, 0720055+I_NPN, 0720056+I_NPN,
  0720074+I_NPN, 0724074+I_NPN, 0720033+I_NPN,
  0720301+I_NPN, 0720401+I_NPN, 0720501+I_NPN, 0720601+I_NPN, 0720701+I_NPN, 

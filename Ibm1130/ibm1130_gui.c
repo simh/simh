@@ -126,8 +126,8 @@ void scp_panic (char *msg)
 	exit(1);
 }
 
-#ifdef WIN32
-	/* only WIN32 is defined right now */
+#ifdef _WIN32
+	/* only _WIN32 is defined right now */
 
 #include <windows.h>
 
@@ -1463,7 +1463,7 @@ static void tear_printer (void)
 //	if (! stuff_and_wait("detach cr", 1000, 0))			// detach the card reader so they can edit the deck file
 //		return;
 
-	unlink(filename);									// delete the file
+	remove(filename);									// delete the file
 
 	sprintf(cmd, "attach prt \"%s\"", filename);		// reattach
 	stuff_cmd(cmd);
@@ -1634,5 +1634,5 @@ void remark_cmd (char *remark)
 	}
 }
 
-#endif 		// WIN32 defined
+#endif 		// _WIN32 defined
 #endif		// GUI_SUPPORT defined

@@ -1,6 +1,6 @@
 /* sim_tape.c: simulator tape support library
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    Ultimately, this will be a place to hide processing of various tape formats,
    as well as OS-specific direct hardware access.
 
+   05-Jan-04	RMS	Revised for file I/O library
    25-Apr-03	RMS	Added extended file support
    28-Mar-03	RMS	Added E11 and TPC format support
 
@@ -146,7 +147,7 @@ return SCPE_OK;
    read error		unchanged, PNU set
    end of file/medium	unchanged, PNU set
    tape mark		updated
-   data record		updated, fxread will read record forward
+   data record		updated, sim_fread will read record forward
 */
 
 t_stat sim_tape_rdlntf (UNIT *uptr, t_mtrlnt *bc)
@@ -157,11 +158,11 @@ t_tpclnt tpcbc;
 
 MT_CLR_PNU (uptr);
 if ((uptr->flags & UNIT_ATT) == 0) return MTSE_UNATT;	/* not attached? */
-fseek_ext (uptr->fileref, uptr->pos, SEEK_SET);		/* set tape pos */
+sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* set tape pos */
 
 switch (f) {						/* switch on fmt */
 case MTUF_F_STD: case MTUF_F_E11:
-	fxread (bc, sizeof (t_mtrlnt), 1, uptr->fileref); /* read rec lnt */
+	sim_fread (bc, sizeof (t_mtrlnt), 1, uptr->fileref); /* read rec lnt */
 	sbc = MTR_L (*bc);				/* save rec lnt */
 	if (ferror (uptr->fileref)) {			/* error? */
 	    MT_SET_PNU (uptr);				/* pos not upd */
@@ -176,7 +177,7 @@ case MTUF_F_STD: case MTUF_F_E11:
 	break;
 
 case MTUF_F_TPC:
-	fxread (&tpcbc, sizeof (t_tpclnt), 1, uptr->fileref);
+	sim_fread (&tpcbc, sizeof (t_tpclnt), 1, uptr->fileref);
 	*bc = tpcbc;					/* save rec lnt */
 	if (ferror (uptr->fileref)) {			/* error? */
 	    MT_SET_PNU (uptr);				/* pos not upd */
@@ -211,7 +212,7 @@ return MTSE_OK;
    end of file		unchanged
    end of medium	updated
    tape mark		updated
-   data record		updated, fxread will read record forward
+   data record		updated, sim_fread will read record forward
 */
 
 t_stat sim_tape_rdlntr (UNIT *uptr, t_mtrlnt *bc)
@@ -227,8 +228,8 @@ if (sim_tape_bot (uptr)) return MTSE_BOT;		/* at BOT? */
 
 switch (f) {						/* switch on fmt */
 case MTUF_F_STD: case MTUF_F_E11:
-	fseek_ext (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET);
-	fxread (bc, sizeof (t_mtrlnt), 1, uptr->fileref); /* read rec lnt */
+	sim_fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET);
+	sim_fread (bc, sizeof (t_mtrlnt), 1, uptr->fileref); /* read rec lnt */
 	sbc = MTR_L (*bc);
 	if (ferror (uptr->fileref))			/* error? */
 	    return sim_tape_ioerr (uptr);
@@ -238,20 +239,20 @@ case MTUF_F_STD: case MTUF_F_E11:
 	if (*bc == MTR_TMK) return MTSE_TMK;		/* tape mark? */
 	uptr->pos = uptr->pos - sizeof (t_mtrlnt) -	/* spc over record */
 	    ((f == MTUF_F_STD)? ((sbc + 1) & ~1): sbc);
-	fseek_ext (uptr->fileref, uptr->pos + sizeof (t_mtrlnt), SEEK_SET);
+	sim_fseek (uptr->fileref, uptr->pos + sizeof (t_mtrlnt), SEEK_SET);
 	break;
 
 case MTUF_F_TPC:
 	ppos = sim_tape_tpc_fnd (uptr, uptr->filebuf);	/* find prev rec */
-	fseek_ext (uptr->fileref, ppos, SEEK_SET);	/* position */
-	fxread (&tpcbc, sizeof (t_tpclnt), 1, uptr->fileref);
+	sim_fseek (uptr->fileref, ppos, SEEK_SET);	/* position */
+	sim_fread (&tpcbc, sizeof (t_tpclnt), 1, uptr->fileref);
 	*bc = tpcbc;					/* save rec lnt */
 	if (ferror (uptr->fileref))			/* error? */
 	    return sim_tape_ioerr (uptr);
 	if (feof (uptr->fileref)) return MTSE_EOM;	/* eof? */
 	uptr->pos = ppos;				/* spc over record */
 	if (*bc == MTR_TMK) return MTSE_TMK;		/* tape mark? */
-	fseek_ext (uptr->fileref, uptr->pos + sizeof (t_tpclnt), SEEK_SET);
+	sim_fseek (uptr->fileref, uptr->pos + sizeof (t_tpclnt), SEEK_SET);
 	break;
 default:
 	return MTSE_FMT;  }
@@ -292,7 +293,7 @@ if (rbc > max) {					/* rec out of range? */
 	MT_SET_PNU (uptr);
 	uptr->pos = opos;
 	return MTSE_INVRL;  }
-i = fxread (buf, sizeof (uint8), rbc, uptr->fileref);	/* read record */
+i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);	/* read record */
 if (ferror (uptr->fileref)) {				/* error? */
 	MT_SET_PNU (uptr);
 	uptr->pos = opos;
@@ -331,7 +332,7 @@ t_stat st;
 if (st = sim_tape_rdlntr (uptr, &tbc)) return st;	/* read rec lnt */
 *bc = rbc = MTR_L (tbc);				/* strip error flag */
 if (rbc > max) return MTSE_INVRL;			/* rec out of range? */
-i = fxread (buf, sizeof (uint8), rbc, uptr->fileref);	/* read record */
+i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);	/* read record */
 if (ferror (uptr->fileref))				/* error? */
 	return sim_tape_ioerr (uptr);
 for ( ; i < rbc; i++) buf[i] = 0;			/* fill with 0's */
@@ -361,14 +362,14 @@ uint32 f = MT_GET_FMT (uptr);
 t_mtrlnt sbc;
 
 MT_CLR_PNU (uptr);
+if ((uptr->flags & UNIT_ATT) == 0) return MTSE_UNATT;	/* not attached? */
+if (sim_tape_wrp (uptr)) return MTSE_WRP;		/* write prot? */
 if (f == MTUF_F_STD) sbc = (bc + 1) & ~1;
 else sbc = bc;
-if ((uptr->flags & UNIT_ATT) == 0) return MTSE_UNATT;	/* not attached? */
-if (uptr->flags & MTUF_WRP) return MTSE_WRP;		/* write prot? */
-fseek_ext (uptr->fileref, uptr->pos, SEEK_SET);		/* set pos */
-fxwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
-fxwrite (buf, sizeof (uint8), sbc, uptr->fileref);
-fxwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
+sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* set pos */
+sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
+sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
+sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
 if (ferror (uptr->fileref)) {				/* error? */
 	MT_SET_PNU (uptr);
 	return sim_tape_ioerr (uptr);  }
@@ -382,9 +383,9 @@ t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat)
 {
 MT_CLR_PNU (uptr);
 if ((uptr->flags & UNIT_ATT) == 0) return MTSE_UNATT;	/* not attached? */
-if (uptr-> flags & MTUF_WRP) return MTSE_WRP;		/* write prot? */
-fseek_ext (uptr->fileref, uptr->pos, SEEK_SET);		/* set pos */
-fxwrite (&dat, sizeof (t_mtrlnt), 1, uptr->fileref);
+if (sim_tape_wrp (uptr)) return MTSE_WRP;		/* write prot? */
+sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* set pos */
+sim_fwrite (&dat, sizeof (t_mtrlnt), 1, uptr->fileref);
 if (ferror (uptr->fileref)) {				/* error? */
 	MT_SET_PNU (uptr);
 	return sim_tape_ioerr (uptr);  }
@@ -518,8 +519,8 @@ uint32 i, objc;
 
 if ((uptr == NULL) || (uptr->fileref == NULL)) return 0;
 for (objc = 0, tpos = 0;; ) {
-	fseek_ext (uptr->fileref, tpos, SEEK_SET);
-	i = fxread (&bc, sizeof (t_tpclnt), 1, uptr->fileref);
+	sim_fseek (uptr->fileref, tpos, SEEK_SET);
+	i = sim_fread (&bc, sizeof (t_tpclnt), 1, uptr->fileref);
 	if (i == 0) break;
 	if (map) map[objc] = tpos;
 	objc++;

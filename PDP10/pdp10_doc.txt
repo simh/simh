@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-10 Simulator Usage
-Date:	15-May-2003
+Date:	04-Apr-2004
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2003, written by Robert M Supnik
-   Copyright (c) 1993-2003, Robert M Supnik
+   Original code published in 1993-2004, written by Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -39,17 +39,23 @@ This memorandum documents the PDP-10 simulator.
 To compile the PDP-10, you must define VM_PDP10 and USE_INT64 as part of the
 compilation command line.
 
-sim/		sim_defs.h
+sim/		scp.h
+		sim_console.h
+		sim_defs.h
 		sim_ether.h
+		sim_fio.h
 		sim_rev.h
 		sim_sock.h
 		sim_tape.h
+		sim_timer.h
 		sim_tmxr.h
 		scp.c
-		scp_tty.c
+		sim_console.c
 		sim_ether.c
+		sim_fio.c
 		sim_sock.c
 		sim_tape.c
+		sim_timer.c
 		sim_tmxr.c
 
 sim/pdp10/	pdp10_defs.h
@@ -328,6 +334,22 @@ output is incompatible with TOPS-20 and is off by default.  The command
 	SET DZ 8B
 
 allows output characters to be 8 bits.
+
+The DZ11 supports logging on a per-line basis.  The command
+
+	SET DZ LOG=line=filename
+
+enables logging for the specified line to the indicated file.  The
+command
+
+	SET DZ NOLOG=line
+
+disables logging for the specified line and closes any open log file.
+Finally, the command
+
+	SHOW DZ LOG
+
+displays logging information for all DZ lines.
 
 The terminal lines perform input and output through Telnet sessions
 connected to a user-specified port.  The ATTACH command specifies

@@ -1,6 +1,6 @@
 /* nova_dkp.c: NOVA moving head disk simulator
 
-   Copyright (c) 1993-2003, Robert M. Supnik
+   Copyright (c) 1993-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dkp		moving head disk
 
+   04-Jan-04	RMS	Changed attach routine to use sim_fsize
    28-Nov-03	CEO	Boot from DP now puts device address in SR
    24-Nov-03	CEO	Added support for disk sizing on 6099/6103
    19-Nov-03	CEO	Corrected major DMA Mapping bug
@@ -688,13 +689,12 @@ t_stat dkp_attach (UNIT *uptr, char *cptr)
 int32 i, p;
 t_stat r;
 
-uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
-r = attach_unit (uptr, cptr);
-if ((r != SCPE_OK) || ((uptr->flags & UNIT_AUTO) == 0)) return r;
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
-if ((p = ftell (uptr->fileref)) == 0) return SCPE_OK;
+uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;	/* restore capac */
+r = attach_unit (uptr, cptr);				/* attach */
+if ((r != SCPE_OK) || !(uptr->flags & UNIT_AUTO)) return r;
+if ((p = sim_fsize (uptr->fileref)) == 0) return SCPE_OK; /* get file size */
 for (i = 0; drv_tab[i].sect != 0; i++) {
-	if (p <= (drv_tab[i].size * (int) sizeof (short))) {
+	if (p <= (drv_tab[i].size * (int32) sizeof (uint16))) {
 	    uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
 	    uptr->capac = drv_tab[i].size;
 	    return SCPE_OK;  }  }

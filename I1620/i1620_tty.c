@@ -1,6 +1,6 @@
 /* i1620_tty.c: IBM 1620 typewriter
 
-   Copyright (c) 2002-2003, Robert M. Supnik
+   Copyright (c) 2002-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

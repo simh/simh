@@ -1,6 +1,6 @@
 /* pdp10_mdfp.c: PDP-10 multiply/divide and floating point simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,10 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   2-Apr-04	RMS	Fixed bug in floating point unpack
+			Fixed bug in FIXR (found by Phil Stone, fixed by
+			Chris Smith)
 
    Instructions handled in this module:
 	imul		integer multiply
@@ -346,7 +350,7 @@ AC(ADDAC(ac, 3)) = dvd[1];
 return;
 }
 
-/* Single precision floating add - checked against KS10 ucode
+/* Single precision floating add/subtract - checked against KS10 ucode
    The KS10 shifts the smaller operand regardless of the exponent diff.
    This code will not shift more than 63 places; shifts beyond that
    cannot change the value of the smaller operand.
@@ -486,7 +490,7 @@ UFP a;
 
 funpack (mb, 0, &a, AFRC);				/* unpack operand */
 if (a.exp > (FP_BIAS + FP_N_FHI + FP_N_EXP)) SETF (F_AOV | F_T1);
-else if (a.exp < (FP_BIAS - 1)) AC(ac) = 0;
+else if (a.exp < FP_BIAS) AC(ac) = 0;			/* < 1/2? */
 else {	sc = FP_V_UNORM - (a.exp - FP_BIAS) + 1;
 	AC(ac) = a.fhi >> sc;
 	if (rnd) {
@@ -629,9 +633,13 @@ fplo = GET_FPLO (l);
 r->fhi = (fphi << FP_V_UFHI) | (fplo << FP_V_UFLO);
 r->flo = 0;
 if (r->sign) {
-	r->exp = r->exp ^ FP_M_EXP;
-	if (sgn) r->fhi = r->fhi | FP_UCRY;		/* ext sign */ 
-	else {
+	r->exp = r->exp ^ FP_M_EXP;			/* 1s comp exp */
+	if (sgn) {					/* signed frac? */
+	    if (r->fhi) r->fhi = r->fhi | FP_UCRY;	/* extend sign */ 
+	    else {
+		r->exp = r->exp + 1;
+		r->fhi = FP_UCRY | FP_UNORM;  }  }
+	else {						/* abs frac */
 	    if (r->fhi) r->fhi = UNEG (r->fhi) & FP_UFRAC;
 	    else {
 	    	r->exp = r->exp + 1;
@@ -648,7 +656,13 @@ static t_uint64 normmask[6] = {
  0x6000000000000000, 0x7800000000000000, 0x7F80000000000000,
  0x7FFF800000000000, 0x7FFFFFFF80000000, 0x7FFFFFFFFFFFFFFF };
 static int32 normtab[7] = { 1, 2, 4, 8, 16, 32, 63 };
+extern a10 pager_PC;
 
+if (a->fhi & FP_UCRY) {					/* carry set? */
+	printf ("%%PDP-10 FP: carry bit set at normalization, PC = %o\n", pager_PC);
+	a->flo = (a->flo >> 1) | ((a->fhi & 1) << 63);	/* try to recover */
+	a->fhi = a->fhi >> 1;				/* but root cause */
+	a->exp = a->exp + 1;  }				/* should be fixed! */
 if ((a->fhi | a->flo) == 0) {				/* if fraction = 0 */
 	a->sign = a->exp = 0;				/* result is 0 */
 	return;  }

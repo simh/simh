@@ -1,6 +1,6 @@
 /* pdp11_rq.c: MSCP disk controller simulator
 
-   Copyright (c) 2002-2003, Robert M Supnik
+   Copyright (c) 2002-2004, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,9 @@
 
    rq		RQDX3 disk controller
 
+   05-Feb-04	RMS	Revised for file I/O library
+   25-Jan-04	RMS	Revised for device debug support
+   12-Jan-04	RMS	Fixed bug in interrupt control (found by Tom Evans)
    07-Oct-03	RMS	Fixed problem with multiple RAUSER drives
    17-Sep-03	RMS	Fixed MB to LBN conversion to be more accurate
    11-Jul-03	RMS	Fixed bug in user disk size (found by Chaskiel M Grundman)
@@ -467,9 +470,8 @@ static struct drvtyp drv_tab[] = {
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
-extern int32 cpu_log;
 extern UNIT cpu_unit;
-extern FILE *sim_log;
+extern FILE *sim_deb;
 extern uint32 sim_taddr_64;
 
 uint16 *rqxb = NULL;					/* xfer buffer */
@@ -687,7 +689,7 @@ DEVICE rq_dev = {
 	RQ_NUMDR + 2, DEV_RDX, 31, RQ_AINC, DEV_RDX, RQ_WID,
 	NULL, NULL, &rq_reset,
 	&rq_boot, &rq_attach, &rq_detach,
-	&rq_dib, DEV_FLTA | DEV_DISABLE | DEV_UBUS | DEV_QBUS };
+	&rq_dib, DEV_FLTA | DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG };
 
 /* RQB data structures
 
@@ -751,7 +753,7 @@ DEVICE rqb_dev = {
 	RQ_NUMDR + 2, DEV_RDX, 31, RQ_AINC, DEV_RDX, RQ_WID,
 	NULL, NULL, &rq_reset,
 	&rq_boot, &rq_attach, &rq_detach,
-	&rqb_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS };
+	&rqb_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG };
 
 /* RQC data structures
 
@@ -815,7 +817,7 @@ DEVICE rqc_dev = {
 	RQ_NUMDR + 2, DEV_RDX, 31, RQ_AINC, DEV_RDX, RQ_WID,
 	NULL, NULL, &rq_reset,
 	&rq_boot, &rq_attach, &rq_detach,
-	&rqc_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS };
+	&rqc_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG };
 
 /* RQD data structures
 
@@ -879,7 +881,7 @@ DEVICE rqd_dev = {
 	RQ_NUMDR + 2, DEV_RDX, 31, RQ_AINC, DEV_RDX, RQ_WID,
 	NULL, NULL, &rq_reset,
 	&rq_boot, &rq_attach, &rq_detach,
-	&rqd_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS };
+	&rqd_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG };
 
 static DEVICE *rq_devmap[RQ_NUMCT] = {
 	&rq_dev, &rqb_dev, &rqc_dev, &rqd_dev  };
@@ -924,7 +926,7 @@ if (cidx < 0) return SCPE_IERR;
 switch ((PA >> 1) & 01) {				/* decode PA<1> */
 case 0:							/* IP */
 	rq_reset (rq_devmap[cidx]);			/* init device */
-	if (DBG_LOG (LOG_RQ)) fprintf (sim_log,
+	if (DEBUG_PRD (dptr)) fprintf (sim_deb,
 	    ">>RQ%c: initialization started\n", 'A' + cp->cnum);
 	break;
 case 1:							/* SA */
@@ -1042,7 +1044,7 @@ if (cp->csta < CST_UP) {				/* still init? */
 	break;
     case CST_S4:					/* need S4 reply */
 	if (cp->saw & SA_S4H_GO) {			/* go set? */
-	    if (DBG_LOG (LOG_RQ)) fprintf (sim_log,
+	    if (DEBUG_PRD (dptr)) fprintf (sim_deb,
 		">>RQ%c: initialization complete\n", 'A' + cp->cnum);
 	    cp->csta = CST_UP;				/* we're up */
 	    cp->sa = 0;					/* clear SA */
@@ -1060,11 +1062,11 @@ for (i = 0; i < RQ_NUMDR; i++) {			/* chk unit q's */
 if ((pkt == 0) && cp->pip) {				/* polling? */
     if (!rq_getpkt (cp, &pkt)) return SCPE_OK;		/* get host pkt */
     if (pkt) {						/* got one? */
-        if (DBG_LOG (LOG_RQ)) {
-		fprintf (sim_log, ">>RQ%c: cmd=%04X, mod=%04X, unit=%d, ",
+        if (DEBUG_PRD (dptr)) {
+		fprintf (sim_deb, ">>RQ%c: cmd=%04X, mod=%04X, unit=%d, ",
 		'A' + cp->cnum, cp->pak[pkt].d[CMD_OPC],
 		cp->pak[pkt].d[CMD_MOD], cp->pak[pkt].d[CMD_UN]);
-	    fprintf (sim_log, "bc=%04X%04X, ma=%04X%04X, lbn=%04X%04X\n",
+	    fprintf (sim_deb, "bc=%04X%04X, ma=%04X%04X, lbn=%04X%04X\n",
 		cp->pak[pkt].d[RW_BCH], cp->pak[pkt].d[RW_BCL],
 		cp->pak[pkt].d[RW_BAH], cp->pak[pkt].d[RW_BAL],
 		cp->pak[pkt].d[RW_LBNH], cp->pak[pkt].d[RW_LBNL]);  }
@@ -1459,7 +1461,8 @@ t_stat rq_svc (UNIT *uptr)
 {
 MSC *cp = rq_ctxmap[uptr->cnum];
 
-uint32 i, t, err, tbc, abc, wwc;
+uint32 i, t, tbc, abc, wwc;
+uint32 err = 0;
 int32 pkt = uptr->cpkt;					/* get packet */
 uint32 cmd = GETP (pkt, CMD_OPC, OPC);			/* get cmd */
 uint32 ba = GETP32 (pkt, RW_WBAL);			/* buf addr */
@@ -1488,8 +1491,8 @@ if ((cmd == OP_ERS) || (cmd == OP_WR)) {		/* write op? */
 if (cmd == OP_ERS) {					/* erase? */
 	wwc = ((tbc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
 	for (i = 0; i < wwc; i++) rqxb[i] = 0;		/* clr buf */
-	err = fseek_ext (uptr->fileref, da, SEEK_SET);	/* set pos */
-	if (!err) fxwrite (rqxb, sizeof (int16), wwc, uptr->fileref);
+	err = sim_fseek (uptr->fileref, da, SEEK_SET);	/* set pos */
+	if (!err) sim_fwrite (rqxb, sizeof (int16), wwc, uptr->fileref);
 	err = ferror (uptr->fileref);  }		/* end if erase */
 
 else if (cmd == OP_WR) {				/* write? */
@@ -1497,8 +1500,8 @@ else if (cmd == OP_WR) {				/* write? */
 	if (abc = tbc - t) {				/* any xfer? */
 	    wwc = ((abc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
 	    for (i = (abc >> 1); i < wwc; i++) rqxb[i] = 0;
-	    err = fseek_ext (uptr->fileref, da, SEEK_SET);
-	    if (!err) fxwrite (rqxb, sizeof (int16), wwc, uptr->fileref);
+	    err = sim_fseek (uptr->fileref, da, SEEK_SET);
+	    if (!err) sim_fwrite (rqxb, sizeof (int16), wwc, uptr->fileref);
 	    err = ferror (uptr->fileref);  }
 	if (t) {					/* nxm? */
 	    PUTP32 (pkt, RW_WBCL, bc - abc);		/* adj bc */
@@ -1507,9 +1510,9 @@ else if (cmd == OP_WR) {				/* write? */
 		rq_rw_end (cp, uptr, EF_LOG, ST_HST | SB_HST_NXM);	
 	    return SCPE_OK;  }  }			/* end else wr */
 
-else {	err = fseek_ext (uptr->fileref, da, SEEK_SET);	/* set pos */
+else {	err = sim_fseek (uptr->fileref, da, SEEK_SET);	/* set pos */
 	if (!err) {
-	    i = fxread (rqxb, sizeof (int16), tbc >> 1, uptr->fileref);
+	    i = sim_fread (rqxb, sizeof (int16), tbc >> 1, uptr->fileref);
 	    for ( ; i < (tbc >> 1); i++) rqxb[i] = 0;	/* fill */
 	    err = ferror (uptr->fileref);  }
 	if ((cmd == OP_RD) && !err) {			/* read? */
@@ -1774,7 +1777,7 @@ uint32 addr, desc, lnt, cr;
 DEVICE *dptr = rq_devmap[cp->cnum];
 
 if (pkt == 0) return OK;				/* any packet? */
-if (DBG_LOG (LOG_RQ)) fprintf (sim_log,
+if (DEBUG_PRD (dptr)) fprintf (sim_deb,
 	">>RQ%c: rsp=%04X, sts=%04X\n", 'A' + cp->cnum,
 	cp->pak[pkt].d[RSP_OPF], cp->pak[pkt].d[RSP_STS]);
 if (!rq_getdesc (cp, &cp->rq, &desc)) return ERR;	/* get rsp desc */
@@ -1906,7 +1909,8 @@ return;
 
 void rq_init_int (MSC *cp)
 {
-if (cp->s1dat & (SA_S1H_IE | SA_S1H_VEC)) rq_setint (cp);
+if ((cp->s1dat & SA_S1H_IE) &&				/* int enab & */
+    (cp->s1dat & SA_S1H_VEC)) rq_setint (cp);		/* ved set? int */
 return;
 }
 
@@ -1971,8 +1975,10 @@ return 0;						/* no intr req */
 
 t_bool rq_fatal (MSC *cp, uint32 err)
 {
-if (DBG_LOG (LOG_RQ))
-	fprintf (sim_log, ">>RQ%c: fatal err=%X\n", 'A' + cp->cnum, err);
+DEVICE *dptr = rq_devmap[cp->cnum];
+
+if (DEBUG_PRD (dptr))
+	fprintf (sim_deb, ">>RQ%c: fatal err=%X\n", 'A' + cp->cnum, err);
 rq_reset (rq_devmap[cp->cnum]);				/* reset device */
 cp->sa = SA_ER | err;					/* SA = dead code */
 cp->csta = CST_DEAD;					/* state = dead */

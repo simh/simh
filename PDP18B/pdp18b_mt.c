@@ -1,6 +1,6 @@
 /* pdp18b_mt.c: 18b PDP magnetic tape simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    mt		(PDP-9) TC59 magtape
 		(PDP-15) TC59D magtape
 
+   14-Jan-04	RMS	Revised IO device call interface
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
    04-Mar-03	RMS	Fixed bug in MTTR
@@ -131,7 +132,7 @@ int32 mt_log = 0;
 uint8 *mtxb = NULL;					/* transfer buffer */
 
 DEVICE mt_dev;
-int32 mt (int32 pulse, int32 dat);
+int32 mt (int32 dev, int32 pulse, int32 dat);
 int32 mt_iors (void);
 t_stat mt_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
@@ -194,7 +195,7 @@ DEVICE mt_dev = {
 
 /* IOT routine */
 
-int32 mt (int32 pulse, int32 dat)
+int32 mt (int32 dev, int32 pulse, int32 dat)
 {
 int32 f, sb;
 UNIT *uptr;

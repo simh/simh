@@ -1,6 +1,6 @@
 /* pdp18b_stddev.c: 18b PDP's standard devices
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,9 @@
    tto		teleprinter
    clk		clock
 
+   16-Feb-04	RMS	Fixed bug in hardware read-in mode bootstrap
+   14-Jan-04	RMS	Revised IO device call interface
+			CAF does not turn off the clock
    29-Dec-03	RMS	Added console backpressure support
    26-Jul-03	RMS	Increased PTP, TTO timeouts for PDP-15 operating systems
 			Added hardware read-in mode support for PDP-7/9/15
@@ -67,6 +70,7 @@
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1], PC, ASW;
 extern int32 sim_switches;
+extern int32 sim_is_running;
 extern UNIT cpu_unit;
 
 int32 clk_state = 0;
@@ -77,10 +81,10 @@ int32 tto_state = 0;
 int32 clk_tps = 60;					/* ticks/second */
 int32 tmxr_poll = 16000;				/* term mux poll */
 
-int32 ptr (int32 pulse, int32 dat);
-int32 ptp (int32 pulse, int32 dat);
-int32 tti (int32 pulse, int32 dat);
-int32 tto (int32 pulse, int32 dat);
+int32 ptr (int32 dev, int32 pulse, int32 dat);
+int32 ptp (int32 dev, int32 pulse, int32 dat);
+int32 tti (int32 dev, int32 pulse, int32 dat);
+int32 tto (int32 dev, int32 pulse, int32 dat);
 int32 clk_iors (void);
 int32 ptr_iors (void);
 int32 ptp_iors (void);
@@ -361,7 +365,7 @@ DEVICE tto_dev = {
 
 /* Clock: IOT routine */
 
-int32 clk (int32 pulse, int32 dat)
+int32 clk (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* CLSF */
 	if (TST_INT (CLK)) dat = dat | IOT_SKP;  }
@@ -403,9 +407,10 @@ return (TST_INT (CLK)? IOS_CLK: 0);
 t_stat clk_reset (DEVICE *dptr)
 {
 CLR_INT (CLK);						/* clear flag */
-clk_state = 0;						/* clock off */
-sim_cancel (&clk_unit);					/* stop clock */
 tmxr_poll = clk_unit.wait;				/* set mux poll */
+if (!sim_is_running) {					/* RESET? */
+	clk_state = 0;					/* clock off */
+	sim_cancel (&clk_unit);  }			/* stop clock */
 return SCPE_OK;
 }
 
@@ -429,7 +434,7 @@ return SCPE_OK;
 
 /* Paper tape reader: IOT routine */
 
-int32 ptr (int32 pulse, int32 dat)
+int32 ptr (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* RSF */
 	if (TST_INT (PTR)) dat = dat | IOT_SKP;  }
@@ -531,12 +536,13 @@ return detach_unit (uptr);
 
 /* Hardware RIM loader routines, PDP-7/9/15 */
 
-int32 ptr_getw (FILE *fileref, int32 *hi)
+int32 ptr_getw (UNIT *uptr, int32 *hi)
 {
 int32 word, bits, st, ch;
 
 word = st = bits = 0;
-do {	if ((ch = getc (fileref)) == EOF) return -1;
+do {	if ((ch = getc (uptr->fileref)) == EOF) return -1;
+	uptr->pos = uptr->pos + 1;
 	if (ch & 0200) {
 	    word = (word << 6) | (ch & 077);
 	    bits = (bits << 1) | ((ch >> 6) & 1);
@@ -546,12 +552,12 @@ if (hi != NULL) *hi = bits;
 return word;
 }
 
-t_stat ptr_rim_load (FILE *fileref, int32 origin)
+t_stat ptr_rim_load (UNIT *uptr, int32 origin)
 {
 int32 bits, val;
 
 for (;;) {						/* word loop */
-	if ((val = ptr_getw (fileref, &bits)) < 0) return SCPE_FMT;
+	if ((val = ptr_getw (uptr, &bits)) < 0) return SCPE_FMT;
 	if (bits & 1) {					/* end of tape? */
 	    if ((val & 0760000) == OP_JMP) {
 		PC = ((origin - 1) & 060000) | (val & 017777);
@@ -714,7 +720,7 @@ extern int32 sim_switches;
 
 #if defined (PDP7)
 if (sim_switches & SWMASK ('H'))			/* hardware RIM load? */
-	return ptr_rim_load (ptr_unit.fileref, ASW);
+	return ptr_rim_load (&ptr_unit, ASW);
 #endif
 if (ptr_dib.dev != DEV_PTR) return STOP_NONSTD;		/* non-std addr? */
 if (MEMSIZE < 8192) mask = 0767777;			/* 4k? */
@@ -733,14 +739,14 @@ return SCPE_OK;
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-return ptr_rim_load (ptr_unit.fileref, ASW);
+return ptr_rim_load (&ptr_unit, ASW);
 }
 
 #endif
 
 /* Paper tape punch: IOT routine */
 
-int32 ptp (int32 pulse, int32 dat)
+int32 ptp (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* PSF */
 	if (TST_INT (PTP)) dat = dat | IOT_SKP;  }
@@ -821,7 +827,7 @@ return detach_unit (uptr);
 
 /* Terminal input: IOT routine */
 
-int32 tti (int32 pulse, int32 dat)
+int32 tti (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* KSF */
 	if (TST_INT (TTI)) dat = dat | IOT_SKP;  }
@@ -909,7 +915,7 @@ return SCPE_OK;
 
 /* Terminal output: IOT routine */
 
-int32 tto (int32 pulse, int32 dat)
+int32 tto (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* TSF */
 	if (TST_INT (TTO)) dat = dat | IOT_SKP;  }

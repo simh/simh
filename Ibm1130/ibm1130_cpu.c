@@ -141,7 +141,7 @@ extern CTAB *sim_vm_cmd;
 #define MAX_EXTRA_COMMANDS 10
 CTAB x_cmds[MAX_EXTRA_COMMANDS];
 
-#ifdef WIN32
+#ifdef _WIN32
 #   define CRLF "\r\n"
 #else
 #   define CRLF "\n"
@@ -1160,7 +1160,7 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
 	if (addr < MEMSIZE) {
-		M[addr] = val & 0xFFFF;
+		M[addr] = (uint16) (val & 0xFFFF);
 		return SCPE_OK;
 	}
 	return SCPE_NXM;
@@ -1476,7 +1476,7 @@ static t_stat cpu_attach (UNIT *uptr, char *cptr)
 	PSYMENTRY n, prv, s;
 	FILE *fd;
 
-	unlink(cptr);							// delete old log file, if present
+	remove(cptr);							// delete old log file, if present
 	new_log = TRUE;
 	log_fac = sim_switches & SWMASK ('F');	// display the FAC and the ACC/EXT as fixed point.
 
@@ -1565,16 +1565,16 @@ static void trace_instruction (void)
 			fac = 1.f;
 		}
 		else {
-			if ((sign = mant & 0x80000000))
+			if ((sign = mant & 0x80000000) != 0)
 				mant = -mant;
 			fac = (float) mant * ((float) 1./ (float) (unsigned long) 0x80000000);
 		}
 		sprintf(fltstr, "%c%.5f ", sign ? '-' : ' ', fac);
 
 		if (BETWEEN(M[3], 0x300, MEMSIZE-128)) {
-			exp  = (M[M[3]+125] & 0xFF) - 128;
+			exp  = (short) ((M[M[3]+125] & 0xFF) - 128);
 			mant = (M[M[3]+126] << 8) | ((M[M[3]+127] >> 8) & 0xFF);
-			if ((sign = (mant & 0x00800000)))
+			if ((sign = (mant & 0x00800000)) != 0)
 				mant = (-mant) & 0x00FFFFFF;
 
 			fac = (float) mant * ((float) 1. / (float) 0x00800000);
@@ -1660,7 +1660,7 @@ void debug_print (char *fmt, ...)
 	}
 }
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <windows.h>
 #endif
 
@@ -1668,7 +1668,7 @@ void debug_print (char *fmt, ...)
 
 static t_stat view_cmd (int flag, char *cptr)
 {
-#ifdef WIN32
+#ifdef _WIN32
 	char cmdline[256];
 
 	sprintf(cmdline, "notepad %s", cptr);
@@ -1713,7 +1713,7 @@ static void cgi_clockfail (void)
 // cgi_start_timer - OS dependent routine to set things up so that
 // cgi_timeout() will be called after cgi_maxsec seconds.
 
-#if defined(WIN32)
+#if defined(_WIN32)
 	static DWORD WINAPI cgi_timer_thread (LPVOID arg)
 	{
 		Sleep(cgi_maxsec*1000);					// timer thread -- wait, then call timeout routine

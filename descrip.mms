@@ -21,6 +21,7 @@
 #            ALTAIRZ80       Just Build The MITS Altair Z80.
 #            ECLIPSE         Just Build The Data General Eclipse.
 #            GRI             Just Build The GRI Corporation GRI-909.
+#            LGP             Just Build The Royal-McBee LGP-30.
 #            H316            Just Build The Honewell 316/516.
 #            HP2100          Just Build The Hewlett-Packard HP-2100. 
 #            I1401           Just Build The IBM 1401.
@@ -117,15 +118,17 @@ CC = CC/DECC$(OUR_CC_FLAGS)
   @ IF (F$SEARCH("SYS$DISK:[]LIB.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
   @ IF (F$SEARCH("SYS$DISK:[.LIB]BLD-$(ARCH).DIR").EQS."") THEN CREATE/DIRECTORY $(BLD_DIR)
   @ IF (F$SEARCH("$(BLD_DIR)*.*").NES."") THEN DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.*;*
+  @ IF "".NES."''CC'" THEN DELETE/SYMBOL/GLOBAL CC
 
 #
 # Core SIMH File Definitions.
 #
 SIMH_DIR = SYS$DISK:[]
 SIMH_LIB = $(LIB_DIR)SIMH-$(ARCH).OLB
-SIMH_SOURCE = $(SIMH_DIR)SCP_TTY.C,$(SIMH_DIR)SIM_SOCK.C,\
+SIMH_SOURCE = $(SIMH_DIR)SIM_CONSOLE.C,$(SIMH_DIR)SIM_SOCK.C,\
               $(SIMH_DIR)SIM_TMXR.C,$(SIMH_DIR)SIM_ETHER.C,\
-              $(SIMH_DIR)SIM_TAPE.C
+              $(SIMH_DIR)SIM_TAPE.C,$(SIMH_DIR)SIM_FIO.C,\
+              $(SIMH_DIR)SIM_TIMER.C
 
 #
 # VMS PCAP File Definitions.
@@ -189,7 +192,7 @@ NOVA_SOURCE = $(NOVA_DIR)NOVA_SYS.C,$(NOVA_DIR)NOVA_CPU.C,\
               $(NOVA_DIR)NOVA_LP.C,$(NOVA_DIR)NOVA_MTA.C,\
               $(NOVA_DIR)NOVA_PLT.C,$(NOVA_DIR)NOVA_PT.C,\
               $(NOVA_DIR)NOVA_CLK.C,$(NOVA_DIR)NOVA_TT.C,\
-              $(NOVA_DIR)NOVA_TT1.C
+              $(NOVA_DIR)NOVA_TT1.C,$(NOVA_DIR)NOVA_QTY.C
 NOVA_OPTIONS = /INCLUDE=($(SIMH_DIR),$(NOVA_DIR))/DEFINE=($(CC_DEFS))
 
 #
@@ -201,7 +204,7 @@ ECLIPSE_SOURCE = $(NOVA_DIR)ECLIPSE_CPU.C,$(NOVA_DIR)ECLIPSE_TT.C,\
                  $(NOVA_DIR)NOVA_DSK.C,$(NOVA_DIR)NOVA_LP.C,\
                  $(NOVA_DIR)NOVA_MTA.C,$(NOVA_DIR)NOVA_PLT.C,\
                  $(NOVA_DIR)NOVA_PT.C,$(NOVA_DIR)NOVA_CLK.C,\
-                 $(NOVA_DIR)NOVA_TT1.C
+                 $(NOVA_DIR)NOVA_TT1.C,$(NOVA_DIR)NOVA_QTY.C
 ECLIPSE_OPTIONS = /INCLUDE=($(SIMH_DIR),$(NOVA_DIR))\
     		/DEFINE=($(CC_DEFS),"USE_INT64=1","ECLIPSE=1")
 
@@ -212,6 +215,14 @@ GRI_DIR = SYS$DISK:[.GRI]
 GRI_LIB = $(LIB_DIR)GRI-$(ARCH).OLB
 GRI_SOURCE = $(GRI_DIR)GRI_CPU.C,$(GRI_DIR)GRI_STDDEV.C,$(GRI_DIR)GRI_SYS.C
 GRI_OPTIONS = /INCLUDE=($(SIMH_DIR),$(GRI_DIR))/DEFINE=($(CC_DEFS))
+
+#
+# Royal-McBee LGP-30 Simulator Definitions.
+#
+LGP_DIR = SYS$DISK:[.LGP]
+LGP_LIB = $(LIB_DIR)LGP-$(ARCH).OLB
+LGP_SOURCE = $(LGP_DIR)LGP_CPU.C,$(LGP_DIR)LGP_STDDEV.C,$(LGP_DIR)LGP_SYS.C
+LGP_OPTIONS = /INCLUDE=($(SIMH_DIR),$(LGP_DIR))/DEFINE=($(CC_DEFS))
 
 #
 # Honeywell 316/516 Simulator Definitions.
@@ -349,7 +360,7 @@ PDP11_LIB1 = $(LIB_DIR)PDP11L1-$(ARCH).OLB
 PDP11_SOURCE1 = $(PDP11_DIR)PDP11_FP.C,$(PDP11_DIR)PDP11_CPU.C,\
                $(PDP11_DIR)PDP11_DZ.C,$(PDP11_DIR)PDP11_CIS.C,\
                $(PDP11_DIR)PDP11_LP.C,$(PDP11_DIR)PDP11_RK.C,\
-	       $(PDP11_DIR)PDP11_RL.C,$(PDP11_DIR)PDP11_RP.C,\
+	         $(PDP11_DIR)PDP11_RL.C,$(PDP11_DIR)PDP11_RP.C,\
                $(PDP11_DIR)PDP11_RX.C,$(PDP11_DIR)PDP11_STDDEV.C,\
                $(PDP11_DIR)PDP11_SYS.C,$(PDP11_DIR)PDP11_TC.C
 PDP11_LIB2 = $(LIB_DIR)PDP11L2-$(ARCH).OLB
@@ -376,7 +387,7 @@ PDP10_SOURCE = $(PDP10_DIR)PDP10_FE.C,\
 	       $(PDP11_DIR)PDP11_PT.C,$(PDP11_DIR)PDP11_DZ.C,\
                $(PDP11_DIR)PDP11_RY.C,$(PDP11_DIR)PDP11_XU.C
 PDP10_OPTIONS = /INCLUDE=($(SIMH_DIR),$(PDP10_DIR),$(PDP11_DIR))\
-		/DEFINE=($(CC_DEFS),"USE_INT64=1","VM_PDP10=1")
+		/DEFINE=($(CC_DEFS),"USE_INT64=1","VM_PDP10=1"$(PCAP_DEFS))
 
 #
 # IBM System 3 Simulator Definitions.
@@ -407,10 +418,11 @@ VAX_SOURCE = $(VAX_DIR)VAX_CPU1.C,$(VAX_DIR)VAX_CPU.C,\
              $(VAX_DIR)VAX_FPA.C,$(VAX_DIR)VAX_IO.C,\
              $(VAX_DIR)VAX_MMU.C,$(VAX_DIR)VAX_STDDEV.C,\
              $(VAX_DIR)VAX_SYS.C,$(VAX_DIR)VAX_SYSDEV.C,\
-	     $(PDP11_DIR)PDP11_RL.C,$(PDP11_DIR)PDP11_RQ.C,\
+             $(PDP11_DIR)PDP11_RL.C,$(PDP11_DIR)PDP11_RQ.C,\
              $(PDP11_DIR)PDP11_TS.C,$(PDP11_DIR)PDP11_DZ.C,\
              $(PDP11_DIR)PDP11_LP.C,$(PDP11_DIR)PDP11_TQ.C,\
-             $(PDP11_DIR)PDP11_PT.C,$(PDP11_DIR)PDP11_XQ.C
+             $(PDP11_DIR)PDP11_PT.C,$(PDP11_DIR)PDP11_XQ.C,\
+             $(PDP11_DIR)PDP11_RY.C
 VAX_OPTIONS = /INCLUDE=($(SIMH_DIR),$(VAX_DIR),$(PDP11_DIR)$(PCAP_INC))\
 		/DEFINE=($(CC_DEFS),"VM_VAX=1"$(PCAP_DEFS))
 
@@ -418,12 +430,12 @@ VAX_OPTIONS = /INCLUDE=($(SIMH_DIR),$(VAX_DIR),$(PDP11_DIR)$(PCAP_INC))\
 # If we're not a VAX, Build Everything
 #
 .IFDEF MMSALPHA
-ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
+ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
       NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 VAX SDS
 .ELSE
 #
-# Else We Are On VAX And Build Everything EXCEPT The PDP-10 Since VAX
-# Dosen't Have INT64
+# Else We Are On VAX And Build Everything EXCEPT The PDP-10 and the ECLIPSE
+# Since VAX Dosen't Have INT64
 #
 ALL : ALTAIR ALTAIRZ80 GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
       NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX SDS
@@ -510,6 +522,17 @@ $(GRI_LIB) : $(GRI_SOURCE)
 		$! Building The $(GRI_LIB) Library.
 		$!
 		$ $(CC)$(GRI_OPTIONS) -
+			/OBJECT=$(BLD_DIR) $(MMS$CHANGED_LIST)
+		$ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+			LIBRARY/CREATE $(MMS$TARGET)
+		$ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+		$ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+$(LGP_LIB) : $(LGP_SOURCE)
+		$!
+		$! Building The $(LGP_LIB) Library.
+		$!
+		$ $(CC)$(LGP_OPTIONS) -
 			/OBJECT=$(BLD_DIR) $(MMS$CHANGED_LIST)
 		$ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
 			LIBRARY/CREATE $(MMS$TARGET)
@@ -783,6 +806,10 @@ ALTAIRZ80 : $(SIMH_LIB) $(ALTAIRZ80_LIB)
                    $(BLD_DIR)SCP.OBJ,$(ALTAIRZ80_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
             $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
+#
+# If Not On VAX, Build The PDP-10 Simulator.
+#
+.IFDEF MMSALPHA
 ECLIPSE : $(SIMH_LIB) $(ECLIPSE_LIB)
           $!
           $! Building The $(BIN_DIR)ECLIPSE-$(ARCH).EXE Simulator.
@@ -791,6 +818,17 @@ ECLIPSE : $(SIMH_LIB) $(ECLIPSE_LIB)
           $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ECLIPSE-$(ARCH).EXE -
                  $(BLD_DIR)SCP.OBJ,$(ECLIPSE_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
           $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+.ELSE
+#
+# Else We Are On VAX And Tell The User We Can't Build On VAX
+# Due To The Use Of INT64.
+#
+ECLIPSE : 
+        $!
+        $! Sorry, Can't Build $(BIN_DIR)ECLIPSE-$(ARCH).EXE Simulator
+        $! Because It Requires The Use Of INT64.
+        $!
+.ENDIF
 
 GRI : $(SIMH_LIB) $(GRI_LIB)
       $!
@@ -799,6 +837,15 @@ GRI : $(SIMH_LIB) $(GRI_LIB)
       $ $(CC)$(GRI_OPTIONS)/OBJECT=$(BLD_DIR) SCP.C
       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)GRI-$(ARCH).EXE -
              $(BLD_DIR)SCP.OBJ,$(GRI_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+      $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+LGP : $(SIMH_LIB) $(LGP_LIB)
+      $!
+      $! Building The $(BIN_DIR)LGP-$(ARCH).EXE Simulator.
+      $!
+      $ $(CC)$(LGP_OPTIONS)/OBJECT=$(BLD_DIR) SCP.C
+      $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)LGP-$(ARCH).EXE -
+             $(BLD_DIR)SCP.OBJ,$(LGP_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 H316 : $(SIMH_LIB) $(H316_LIB)
@@ -922,13 +969,13 @@ PDP9 : $(SIMH_LIB) $(PDP9_LIB)
 # If Not On VAX, Build The PDP-10 Simulator.
 #
 .IFDEF MMSALPHA
-PDP10 : $(SIMH_LIB) $(PDP10_LIB)
+PDP10 : $(SIMH_LIB) $(PCAP_LIBD) $(PDP10_LIB) $(PCAP_EXECLET)
         $!
         $! Building The $(BIN_DIR)PDP10-$(ARCH).EXE Simulator.
         $!
         $ $(CC)$(PDP10_OPTIONS)/OBJECT=$(BLD_DIR) SCP.C
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP10-$(ARCH).EXE -
-               $(BLD_DIR)SCP.OBJ,$(PDP10_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+               $(BLD_DIR)SCP.OBJ,$(PDP10_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY$(PCAP_LIBR)
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 .ELSE
 #
@@ -1003,4 +1050,4 @@ $(PCAP_VCMDIR)PCAPVCM.EXE : $(PCAP_VCM_SOURCES)
                             $!
                             $ @SYS$DISK:[.PCAP-VMS.PCAPVCM]BUILD_PCAPVCM
                             $ DELETE/NOLOG/NOCONFIRM $(PCAP_VCMDIR)*.OBJ;*,$(PCAP_VCMDIR)*.MAP;*
-			 
+			

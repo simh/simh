@@ -1,6 +1,6 @@
 /* pdp10_rp.c - RH11/RP04/05/06/07 RM02/03/05/80 "Massbus" disk controller
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp		RH/RP/RM moving head disks
 
+   04-Jan-04	RMS	Changed sim_fsize calling sequence
    23-Jul-03	RMS	Fixed bug in read header stub
    25-Apr-03	RMS	Revised for extended file support
    21-Nov-02	RMS	Fixed bug in bootstrap (reported by Michael Thompson)
@@ -989,8 +990,7 @@ rper1[drv] = 0;
 update_rpcs (CS1_SC, drv);
 
 if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
-if ((p = ftell (uptr->fileref)) == 0) return SCPE_OK;
+if ((p = sim_fsize (uptr->fileref)) == 0) return SCPE_OK;
 for (i = 0; drv_tab[i].sect != 0; i++) {
     if (p <= (drv_tab[i].size * (int) sizeof (d10))) {
 	uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);

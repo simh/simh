@@ -1,6 +1,6 @@
 /* sds_stddev.c: SDS 940 standard devices
 
-   Copyright (c) 2001-2003, Robert M. Supnik
+   Copyright (c) 2001-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

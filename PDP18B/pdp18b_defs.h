@@ -1,6 +1,6 @@
 /* pdp18b_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jan-04	RMS	Revised IO device call interface
    18-Oct-03	RMS	Added DECtape off reel message
    18-Jul-03	RMS	Added FP15 support
 			Added XVM support
@@ -80,7 +81,7 @@
 					RB09 fixed head disk
 					TC59 magnetic tape
 					TC02/TU55 DECtape
-					LT09A second Teletype
+					LT09A additional Teletypes
 
    PDP15  128K	KE15 EAE		KSR-35 Teletype
 		KA15 auto pri intr	PC15 paper tape reader and punch
@@ -91,7 +92,7 @@
 		XVM option		RF15/RF09 fixed head disk
 					TC59D magnetic tape
 					TC15/TU56 DECtape
-					LT15 second Teletype
+					LT15/LT19 additional Teletypes
 
    ??Indicates not implemented.  The PDP-4 manual refers to a memory
    ??extension control; there is no documentation on it.
@@ -134,7 +135,7 @@
 #define RF		0				/* fixed head disk */
 #define MTA		0				/* magtape */
 #define TC02		0				/* DECtape */
-#define TTY1		0				/* second Teletype */
+#define TTY1		4				/* second Teletype(s) */
 #define BRMASK		0076000				/* bounds mask */
 #elif defined (PDP15)
 #define ADDRSIZE	17
@@ -144,7 +145,7 @@
 #define RP		0				/* disk pack */
 #define MTA		0				/* magtape */
 #define TC02		0				/* DECtape */
-#define TTY1		0				/* second Teletype */
+#define TTY1		16				/* second Teletype(s) */
 #define BRMASK		0377400				/* bounds mask */
 #define BRMASK_XVM	0777400				/* bounds mask, XVM */
 #endif
@@ -250,7 +251,7 @@ struct pdp18b_dib {
 	uint32		dev;				/* base dev number */
 	uint32		num;				/* number of slots */
 	int32		(*iors)(void);			/* IORS responder */
-	int32		(*dsp[DEV_MAXBLK])(int32 pulse, int32 dat);
+	int32		(*dsp[DEV_MAXBLK])(int32 dev, int32 pulse, int32 dat);
 };
 
 typedef struct pdp18b_dib DIB;
@@ -312,7 +313,10 @@ typedef struct pdp18b_dib DIB;
 	35	LT15 TTI		3	PDP-15 only
 	36	-
 	37	-
-*/
+
+   On the PDP-9, any API level active masks PI, and PI does not mask API.
+   On the PDP-15, only the hardware API levels active mask PI, and PI masks
+   the API software levels. */
 
 #define API_ML0		0200				/* API masks: level 0 */
 #define API_ML1		0100

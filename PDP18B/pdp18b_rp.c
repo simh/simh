@@ -1,6 +1,6 @@
 /* pdp18b_rp.c: RP15/RP02 disk pack simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp		RP15/RP02 disk pack
 
+   14-Jan-04	RMS	Revised IO device call interface
    06-Feb-03	RMS	Revised IOT decoding, fixed bug in initiation
    05-Oct-02	RMS	Added DIB, device number support
    06-Jan-02	RMS	Revised enable/disable support
@@ -144,8 +145,8 @@ int32 rp_swait = 10;					/* seek time */
 int32 rp_rwait = 10;					/* rotate time */
 
 DEVICE rp_dev;
-int32 rp63 (int32 pulse, int32 dat);
-int32 rp64 (int32 pulse, int32 dat);
+int32 rp63 (int32 dev, int32 pulse, int32 dat);
+int32 rp64 (int32 dev, int32 pulse, int32 dat);
 int32 rp_iors (void);
 t_stat rp_svc (UNIT *uptr);
 void rp_updsta (int32 newa, int32 newb);
@@ -202,7 +203,7 @@ DEVICE rp_dev = {
 
 /* IOT routines */
 
-int32 rp63 (int32 pulse, int32 dat)
+int32 rp63 (int32 dev, int32 pulse, int32 dat)
 {
 int32 sb = pulse & 060;					/* subopcode */
 
@@ -244,7 +245,7 @@ return dat;
 
 /* IOT 64 */
 
-int32 rp64 (int32 pulse, int32 dat)
+int32 rp64 (int32 dev, int32 pulse, int32 dat)
 {
 int32 u, f, c, sb;
 UNIT *uptr;

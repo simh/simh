@@ -1,6 +1,6 @@
 /* pdp10_ksio.c: PDP-10 KS10 I/O subsystem simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    uba		Unibus adapters
 
+   25-Jan-04	RMS	Added stub floating address routine
    12-Mar-03	RMS	Added logical name support
    10-Oct-02	RMS	Revised for dynamic table generation
 			Added SHOW IOSPACE routine
@@ -663,7 +664,7 @@ if (dptr == NULL) return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
 if (dibp == NULL) return SCPE_IERR;
 newvec = (uint32) get_uint (cptr, 8, VEC_Q + 01000, &r);
-if ((r != SCPE_OK) || (newvec <= VEC_Q) ||
+if ((r != SCPE_OK) || (newvec == VEC_Q) ||
     ((newvec + (dibp->vnum * 4)) >= (VEC_Q + 01000)) ||
     (newvec & ((dibp->vnum > 1)? 07: 03))) return SCPE_ARG;
 dibp->vec = newvec;
@@ -792,6 +793,13 @@ return SCPE_OK;
 /* Stub auto-configure */
 
 t_stat auto_config (uint32 rank, uint32 num)
+{
+return SCPE_OK;
+}
+
+/* Stub floating address */
+
+t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 return SCPE_OK;
 }

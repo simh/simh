@@ -1,6 +1,6 @@
 /*	altairz80_dsk.c: MITS Altair 88-DISK Simulator
 
-		Copyright (c) 2002-2003, Peter Schorn
+		Copyright (c) 2002-2004, Peter Schorn
 
 		Permission is hereby granted, free of charge, to any person obtaining a
 		copy of this software and associated documentation files (the "Software"),
@@ -142,7 +142,6 @@ static char* selectInOut(const int32 io);
 extern int32 PCX;
 extern int32 saved_PC;
 extern FILE *sim_log;
-extern void PutBYTEWrapper(register uint32 Addr, register uint32 Value);
 extern void printMessage(void);
 extern char messageBuffer[];
 extern int32 install_bootrom(void);
@@ -251,7 +250,9 @@ DEVICE dsk_dev = {
 	"DSK", dsk_unit, dsk_reg, dsk_mod,
 	8, 10, 31, 1, 8, 8,
 	NULL, NULL, &dsk_reset,
-	&dsk_boot, NULL, NULL, NULL, 0, NULL, NULL };
+	&dsk_boot, NULL, NULL,
+	NULL, 0, 0,
+	NULL, NULL, NULL };
 
 static void resetDSKWarningFlags(void) {
 	int32 i;
@@ -351,7 +352,7 @@ int32 dsk10(const int32 port, const int32 io, const int32 data) {
 		if (current_disk >= NUM_OF_DSK) {
 			if (hasVerbose() && (warnDSK10 < warnLevelDSK)) {
 				warnDSK10++;
-/*01*/	message1("Attempt of IN 0x08 on unattached disk - ignored.\n");
+/*01*/	message1("Attempt of IN 0x08 on unattached disk - ignored.");
 			}
 			return 0xff;				/* no drive selected - can do nothing */
 		}
@@ -363,14 +364,14 @@ int32 dsk10(const int32 port, const int32 io, const int32 data) {
 		writebuf();
 	}
 	if (trace_flag & TRACE_IN_OUT) {
-		message2("OUT 0x08: %x\n", data);
+		message2("OUT 0x08: %x", data);
 	}
 	current_disk = data & NUM_OF_DSK_MASK; /* 0 <= current_disk < NUM_OF_DSK */
 	current_disk_flags = (dsk_dev.units + current_disk) -> flags;
 	if ((current_disk_flags & UNIT_ATT) == 0) { /* nothing attached? */
 		if ( (current_disk_flags & UNIT_DSK_VERBOSE) && (warnAttached[current_disk] < warnLevelDSK) ) {
 			warnAttached[current_disk]++;
-/*02*/message2("Attempt to select unattached DSK%d - ignored.\n", current_disk);
+/*02*/message2("Attempt to select unattached DSK%d - ignored.", current_disk);
 		}
 		current_disk = NUM_OF_DSK;
 	}
@@ -390,7 +391,7 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
 	if (current_disk >= NUM_OF_DSK) {
 		if (hasVerbose() && (warnDSK11 < warnLevelDSK)) {
 			warnDSK11++;
-/*03*/message2("Attempt of %s 0x09 on unattached disk - ignored.\n", selectInOut(io));
+/*03*/message2("Attempt of %s 0x09 on unattached disk - ignored.", selectInOut(io));
 		}
 		return 0;				/* no drive selected - can do nothing */
 	}
@@ -400,10 +401,10 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
 		in9_count++;
 		if ((trace_flag & TRACE_SECTOR_STUCK) && (in9_count > 2 * DSK_SECT) && (!in9_message)) {
 			in9_message = TRUE;
-			message2("Looping on sector find %d.\n", current_disk);
+			message2("Looping on sector find %d.", current_disk);
 		}
 		if (trace_flag & TRACE_IN_OUT) {
-			message1("IN 0x09\n");
+			message1("IN 0x09");
 		}
 		if (dirty) {/* implies that current_disk < NUM_OF_DSK */
 			writebuf();
@@ -425,12 +426,12 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
 	/* drive functions */
 
 	if (trace_flag & TRACE_IN_OUT) {
-		message2("OUT 0x09: %x\n", data);
+		message2("OUT 0x09: %x", data);
 	}
 	if (data & 0x01) {						/* step head in												*/
 		if (trace_flag & TRACE_TRACK_STUCK) {
 			if (current_track[current_disk] == (tracks[current_disk] - 1)) {
-				message2("Unnecessary step in for disk %d\n", current_disk);
+				message2("Unnecessary step in for disk %d", current_disk);
 			}
 		}
 		current_track[current_disk]++;
@@ -447,7 +448,7 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
 	if (data & 0x02) {						/* step head out											*/
 		if (trace_flag & TRACE_TRACK_STUCK) {
 			if (current_track[current_disk] == 0) {
-				message2("Unnecessary step out for disk %d\n", current_disk);
+				message2("Unnecessary step out for disk %d", current_disk);
 			}
 		}
 		current_track[current_disk]--;
@@ -501,7 +502,7 @@ int32 dsk12(const int32 port, const int32 io, const int32 data) {
 	if (current_disk >= NUM_OF_DSK) {
 		if (hasVerbose() && (warnDSK12 < warnLevelDSK)) {
 			warnDSK12++;
-/*04*/message2("Attempt of %s 0x0a on unattached disk - ignored.\n", selectInOut(io));
+/*04*/message2("Attempt of %s 0x0a on unattached disk - ignored.", selectInOut(io));
 		}
 		return 0;
 	}
@@ -513,7 +514,7 @@ int32 dsk12(const int32 port, const int32 io, const int32 data) {
 		if (current_byte[current_disk] >= DSK_SECTSIZE) {
 			/* physically read the sector */
 			if (trace_flag & TRACE_READ_WRITE) {
-				message4("IN 0x0a (READ) D%d T%d S%d\n", current_disk, current_track[current_disk], current_sector[current_disk]);
+				message4("IN 0x0a (READ) D%d T%d S%d", current_disk, current_track[current_disk], current_sector[current_disk]);
 			}
 			for (i = 0; i < DSK_SECTSIZE; i++) {
 				dskbuf[i] = 0;
@@ -547,21 +548,21 @@ static void writebuf(void) {
 	uptr = dsk_dev.units + current_disk;
 	if (((uptr -> flags) & UNIT_DSKWLK) == 0) { /* write enabled */
 		if (trace_flag & TRACE_READ_WRITE) {
-			message4("OUT 0x0a (WRITE) D%d T%d S%d\n", current_disk, current_track[current_disk], current_sector[current_disk]);
+			message4("OUT 0x0a (WRITE) D%d T%d S%d", current_disk, current_track[current_disk], current_sector[current_disk]);
 		}
 		if (dskseek(uptr)) {
-			message4("fseek failed D%d T%d S%d\n", current_disk, current_track[current_disk], current_sector[current_disk]);
+			message4("fseek failed D%d T%d S%d", current_disk, current_track[current_disk], current_sector[current_disk]);
 		}
 		rtn = fwrite(dskbuf, DSK_SECTSIZE, 1, uptr -> fileref);
 		if (rtn != 1) {
-			message4("fwrite failed T%d S%d Return=%d\n", current_track[current_disk], current_sector[current_disk], rtn);
+			message4("fwrite failed T%d S%d Return=%d", current_track[current_disk], current_sector[current_disk], rtn);
 		}
 	}
 	else if ( ((uptr -> flags) & UNIT_DSK_VERBOSE) && (warnLock[current_disk] < warnLevelDSK) ) {
 		/* write locked - print warning message if required */
 		warnLock[current_disk]++;
 /*05*/
-		message2("Attempt to write to locked DSK%d - ignored.\n", current_disk);
+		message2("Attempt to write to locked DSK%d - ignored.", current_disk);
 	}
 	current_flag[current_disk]	&= 0xfe;	/* ENWD off */
 	current_byte[current_disk]	= 0xff;

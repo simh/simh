@@ -25,6 +25,7 @@
 
    ry		RX211/RXV21/RX02 floppy disk
 
+   21-Mar-04	RMS	Added VAX support
    29-Dec-03	RMS	Added RXV21 support
    19-May-03	RMS	Revised for new conditional compilation scheme
    25-Apr-03	RMS	Revised for extended file support
@@ -40,14 +41,19 @@
 #include "pdp10_defs.h"
 extern int32 int_req;
 extern int32 int_vec[32];
+#define DEV_DISI	DEV_DIS
 
 #elif defined (VM_VAX)					/* VAX version */
-#error "RX211 not supported on VAX!"
+#include "vax_defs.h"
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
+#define DEV_DISI	0
 
 #else							/* PDP-11 version */
 #include "pdp11_defs.h"
 extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
+#define DEV_DISI	DEV_DIS
 #endif
 
 #define RX_NUMTR	77				/* tracks/disk */
@@ -176,14 +182,14 @@ UNIT ry_unit[] = {
 	  UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF, RY_SIZE) } };
 
 REG ry_reg[] = {
-	{ ORDATA (RYCS, ry_csr, 16) },
-	{ ORDATA (RYBA, ry_ba, 16) },
-	{ ORDATA (RYWC, ry_wc, 8) },
-	{ ORDATA (RYDB, ry_dbr, 16) },
-	{ ORDATA (RYES, ry_esr, 12) },
-	{ ORDATA (RYERR, ry_ecode, 8) },
-	{ ORDATA (RYTA, ry_track, 8) },
-	{ ORDATA (RYSA, ry_sector, 8) },
+	{ GRDATA (RYCS, ry_csr, DEV_RDX, 16, 0) },
+	{ GRDATA (RYBA, ry_ba, DEV_RDX, 16, 0) },
+	{ GRDATA (RYWC, ry_wc, DEV_RDX, 8, 0) },
+	{ GRDATA (RYDB, ry_dbr, DEV_RDX, 16, 0) },
+	{ GRDATA (RYES, ry_esr, DEV_RDX, 12, 0) },
+	{ GRDATA (RYERR, ry_ecode, DEV_RDX, 8, 0) },
+	{ GRDATA (RYTA, ry_track, DEV_RDX, 8, 0) },
+	{ GRDATA (RYSA, ry_sector, DEV_RDX, 8, 0) },
 	{ DRDATA (STAPTR, ry_state, 4), REG_RO },
 	{ FLDATA (INT, IREQ (RY), INT_V_RY) },
 	{ FLDATA (ERR, ry_csr, RYCS_V_ERR) },
@@ -197,8 +203,8 @@ REG ry_reg[] = {
 	{ FLDATA (STOP_IOE, ry_stopioe, 0) },
 	{ URDATA (CAPAC, ry_unit[0].capac, 10, T_ADDR_W, 0,
 		  RX_NUMDR, REG_HRO | PV_LEFT) },
-	{ ORDATA (DEVADDR, ry_dib.ba, 32), REG_HRO },
-	{ ORDATA (DEVVEC, ry_dib.vec, 16), REG_HRO },
+	{ GRDATA (DEVADDR, ry_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+	{ GRDATA (DEVVEC, ry_dib.vec, DEV_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB ry_mod[] = {
@@ -224,10 +230,10 @@ MTAB ry_mod[] = {
 
 DEVICE ry_dev = {
 	"RY", ry_unit, ry_reg, ry_mod,
-	RX_NUMDR, 8, 20, 1, 8, 8,
+	RX_NUMDR, DEV_RDX, 20, 1, DEV_RDX, 8,
 	NULL, NULL, &ry_reset,
 	&ry_boot, &ry_attach, NULL,
-	&ry_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_Q18 };
+	&ry_dib, DEV_FLTA | DEV_DISABLE | DEV_DISI | DEV_UBUS | DEV_Q18 };
 
 /* I/O dispatch routine, I/O addresses 17777170 - 17777172
 
@@ -520,12 +526,15 @@ return auto_config (0, 0);				/* run autoconfig */
 t_stat ry_attach (UNIT *uptr, char *cptr)
 {
 uint32 sz;
+t_stat r;
 
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
+r = attach_unit (uptr, cptr);
+if (r != SCPE_OK) return r;
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (uptr->fileref))) {
 	if (sz > RX_SIZE) uptr->flags = uptr->flags | UNIT_DEN;
 	else uptr->flags = uptr->flags & ~UNIT_DEN;  }
 uptr->capac = (uptr->flags & UNIT_DEN)? RY_SIZE: RX_SIZE;
-return attach_unit (uptr, cptr);
+return SCPE_OK;
 }
 
 /* Set size routine */

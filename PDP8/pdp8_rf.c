@@ -1,6 +1,6 @@
 /* pdp8_rf.c: RF08 fixed head disk simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rf		RF08 fixed head disk
 
+   04-Jan-04	RMS	Changed sim_fsize calling sequence
    26-Oct-03	RMS	Cleaned up buffer copy code
    26-Jul-03	RMS	Fixed bug in set size routine
    14-Mar-03	RMS	Fixed variable platter interaction with save/restore
@@ -381,14 +382,17 @@ t_stat rf_attach (UNIT *uptr, char *cptr)
 {
 uint32 sz, p;
 uint32 ds_bytes = RF_DKSIZE * sizeof (int16);
+t_stat r;
 
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
+r = attach_unit (uptr, cptr);
+if (r != SCPE_OK) return r;
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (uptr->fileref))) {
 	p = (sz + ds_bytes - 1) / ds_bytes;
 	if (p >= RF_NUMDK) p = RF_NUMDK - 1;
 	uptr->flags = (uptr->flags & ~UNIT_PLAT) |
 	    (p << UNIT_V_PLAT);  }
 uptr->capac = UNIT_GETP (uptr->flags) * RF_DKSIZE;
-return attach_unit (uptr, cptr);
+return SCPE_OK;
 }
 
 /* Change disk size */

@@ -1,6 +1,6 @@
 /* vax_io.c: VAX Qbus IO simulator
 
-   Copyright (c) 1998-2003, Robert M Supnik
+   Copyright (c) 1998-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    qba		Qbus adapter
 
+   21-Mar-04	RMS	Added RXV21 support
    21-Dec-03	RMS	Fixed bug in autoconfigure vector assignment; added controls
    21-Nov-03	RMS	Added check for interrupt slot conflict (found by Dave Hittner)
    29-Oct-03	RMS	Fixed WriteX declaration (found by Mark Pizzolato)
@@ -927,7 +928,7 @@ struct auto_con auto_tab[AUTO_LNT + 1] = {
 	{ 0x7, 0x7 },					/* KW11C */
 
 	{ 0x7, 0 },					/* reserved */
-	{ 0x7, 0x3 },					/* RX11/RX211 */
+	{ 0x7, 0x3, AUTO_DYN|AUTO_VEC, 0, IOBA_RX, { "RX", "RY" } },
 	{ 0x7, 0x3 },					/* DR11W */
 	{ 0x7, 0x3 },					/* DR11B */
 	{ 0x7, 0x7 },					/* DMP11 */

@@ -1,6 +1,6 @@
 /* pdp1_dt.c: 18b DECtape simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    dt		Type 550/555 DECtape
 
+   25-Jan-04	RMS	Revised for device debug support
+   09-Jan-04	RMS	Changed sim_fsize calling sequence, added STOP_OFFR
    26-Oct-03	RMS	Cleaned up buffer copy code
    18-Oct-03	RMS	Added DECtape off reel message, simplified timing
    25-Apr-03	RMS	Revised for extended file support
@@ -239,9 +241,8 @@
 /* Logging */
 
 #define LOG_MS		001				/* move, search */
-#define LOG_RW		002				/* read, write */
-#define LOG_RA		004				/* read all */
-#define LOG_BL		010				/* block # lblk */
+#define LOG_RW		002				/* read write */
+#define LOG_BL		004				/* block # lblk */
 
 #define ABS(x)		(((x) < 0)? (-(x)): (x))
 
@@ -251,6 +252,7 @@ extern int32 stop_inst;
 extern UNIT cpu_unit;
 extern int32 sim_switches;
 extern int32 sim_is_running;
+extern FILE *sim_deb;
 
 int32 dtsa = 0;						/* status A */
 int32 dtsb = 0;						/* status B */
@@ -258,8 +260,8 @@ int32 dtdb = 0;						/* data buffer */
 int32 dt_ltime = 12;					/* interline time */
 int32 dt_dctime = 40000;				/* decel time */
 int32 dt_substate = 0;
-int32 dt_log = 0;
 int32 dt_logblk = 0;
+int32 dt_stopoffr = 0;
 static const int32 map_unit[16] = {			/* Type 550 unit map */
  -1,  1,  2,  3,  4,  5,  6,  7,
   0, -1, -1, -1, -1, -1, -1, -1 };
@@ -314,7 +316,6 @@ REG dt_reg[] = {
 	{ DRDATA (LTIME, dt_ltime, 31), REG_NZ },
 	{ DRDATA (DCTIME, dt_dctime, 31), REG_NZ },
 	{ ORDATA (SUBSTATE, dt_substate, 2) },
-	{ ORDATA (LOG, dt_log, 4), REG_HIDDEN },
 	{ DRDATA (LBLK, dt_logblk, 12), REG_HIDDEN },
 	{ URDATA (POS, dt_unit[0].pos, 10, T_ADDR_W, 0,
 		  DT_NUMDR, PV_LEFT | REG_RO) },
@@ -322,6 +323,7 @@ REG dt_reg[] = {
 		  DT_NUMDR, REG_RO) },
 	{ URDATA (LASTT, dt_unit[0].LASTT, 10, 32, 0,
 		  DT_NUMDR, REG_HRO) },
+	{ FLDATA (STOP_OFFR, dt_stopoffr, 0) },
 	{ NULL }  };
 
 MTAB dt_mod[] = {
@@ -332,12 +334,19 @@ MTAB dt_mod[] = {
 	{ UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL, NULL },
 	{ 0 }  };
 
+DEBTAB dt_deb[] = {
+	{ "MOTION", LOG_MS },
+	{ "DATA", LOG_RW },
+	{ "BLOCK", LOG_BL },
+	{ NULL, 0 }  };
+
 DEVICE dt_dev = {
 	"DT", dt_unit, dt_reg, dt_mod,
 	DT_NUMDR, 8, 24, 1, 8, 18,
 	NULL, NULL, &dt_reset,
 	NULL, &dt_attach, &dt_detach,
-	NULL, DEV_DISABLE };
+	NULL, DEV_DISABLE | DEV_DEBUG, 0,
+	dt_deb, NULL, NULL };
 
 int32 dt (int32 IR, int32 dev, int32 dat)
 {
@@ -524,7 +533,7 @@ case DTS_OFR:						/* off reel */
 	break;
 case FNC_MOVE:						/* move */
 	dt_schedez (uptr, dir);				/* sched end zone */
-	if (dt_log & LOG_MS) printf ("[DT%d: moving %s]\n", unum, (dir?
+	if (DEBUG_PRI (dt_dev, LOG_MS)) fprintf (sim_deb, ">>DT%d: moving %s\n", unum, (dir?
 		"backward": "forward"));
 	return;						/* done */
 case FNC_SRCH:						/* search */
@@ -532,7 +541,7 @@ case FNC_SRCH:						/* search */
 	    DTU_TSIZE (uptr): blk), uptr) - DT_BLKLN - DT_WSIZE;
 	else newpos = DT_BLK2LN ((DT_QREZ (uptr)?
 	    0: blk + 1), uptr) + DT_BLKLN + (DT_WSIZE - 1);
-	if (dt_log & LOG_MS) printf ("[DT%d: searching %s]\n", unum,
+	if (DEBUG_PRI (dt_dev, LOG_MS)) fprintf (sim_deb, ">>DT%d: searching %s\n", unum,
 	    (dir? "backward": "forward"));
 	break;
 case FNC_WRIT:						/* write */
@@ -545,10 +554,11 @@ case FNC_WALL:						/* write all */
 	else {
 	    newpos = ((uptr->pos) / DT_WSIZE) * DT_WSIZE;
 	    if (!dir) newpos = newpos + (DT_WSIZE - 1);  }
-	if ((dt_log & LOG_RA) || ((dt_log & LOG_BL) && (blk == dt_logblk)))
-	    printf ("[DT%d: read all block %d %s%s\n",
+	if (DEBUG_PRI (dt_dev, LOG_RW) ||
+	   (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
+	    fprintf (sim_deb, ">>DT%d: read all block %d %s%s\n",
 		unum, blk, (dir? "backward": "forward"),
-		((dtsa & DTA_MODE)? " continuous]": "]"));
+		((dtsa & DTA_MODE)? " continuous": " "));
 	break;
 default:
 	dt_seterr (uptr, DTB_SEL);			/* bad state */
@@ -642,7 +652,8 @@ uint32 ba;
 
 switch (mot) {
 case DTS_DECF: case DTS_DECR:				/* decelerating */
-	if (dt_setpos (uptr)) return STOP_DTOFF;	/* update pos */
+	if (dt_setpos (uptr))				/* upd pos; off reel? */
+	    return IORETURN (dt_stopoffr, STOP_DTOFF);
 	uptr->STATE = DTS_NXTSTA (uptr->STATE);		/* advance state */
 	if (uptr->STATE)				/* not stopped? */
 	    sim_activate (uptr, dt_dctime - (dt_dctime >> 2));	/* reversing */
@@ -663,7 +674,8 @@ default:						/* other */
    Off reel - detach unit (it must be deselected)
 */
 
-if (dt_setpos (uptr)) return STOP_DTOFF;		/* update pos */
+if (dt_setpos (uptr))					/* upd pos; off reel? */
+	return IORETURN (dt_stopoffr, STOP_DTOFF);
 if (DT_QEZ (uptr)) {					/* in end zone? */
 	dt_seterr (uptr, DTB_END);			/* end zone error */
 	return SCPE_OK;  }
@@ -888,7 +900,7 @@ if ((sim_switches & SIM_SW_REST) == 0) {		/* not from rest? */
 	else if (sim_switches & SWMASK ('S'))			/* att 16b? */
 	    uptr->flags = uptr->flags | UNIT_11FMT;
 	else if (!(sim_switches & SWMASK ('T')) &&		/* autosize? */
-	    (sz = sim_fsize (cptr))) {
+	    (sz = sim_fsize (uptr->fileref))) {
 	    if (sz == D8_FILSIZ)
 		uptr->flags = uptr->flags | UNIT_8FMT;
 	    else if (sz == D11_FILSIZ)

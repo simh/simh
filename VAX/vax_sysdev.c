@@ -1,6 +1,6 @@
 /* vax_sysreg.c: VAX system registers simulator
 
-   Copyright (c) 1998-2003, Robert M Supnik
+   Copyright (c) 1998-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -33,8 +33,9 @@
    cso		console storage output
    sysd		system devices (SSC miscellany)
 
-   7-Jun-03	MP	Added calibrated delay to ROM reads (from Mark Pizzolato)
-			Fixed calibration problems interval timer (from Mark Pizzolato)
+   23-Jan-04	MP	Added extended physical memory support (Mark Pizzolato)
+   07-Jun-03	MP	Added calibrated delay to ROM reads (Mark Pizzolato)
+			Fixed calibration problems interval timer (Mark Pizzolato)
    12-May-03	RMS	Fixed compilation warnings from VC.Net
    23-Apr-03	RMS	Revised for 32b/64b t_addr
    19-Aug-02	RMS	Removed unused variables (found by David Hittner)
@@ -65,7 +66,7 @@
 #define CMCNF_RW	(CMCNF_VLD | CMCNF_BA)		/* read/write */
 #define CMCNF_MASK	(CMCNF_RW | CMCNF_SIG)
 #define MEM_BANK	(1 << 22)			/* bank size 4MB */
-#define MEM_SIG		0x17;				/* ECC, 4 x 4MB */
+#define MEM_SIG		(0x17)				/* ECC, 4 x 4MB */
 
 /* CMCTL error register */
 
@@ -169,6 +170,7 @@ extern int32 p1;
 extern int32 sim_switches;
 extern int32 MSER;
 extern int32 tmr_poll;
+extern int32 cpu_extmem;
 
 uint32 *rom = NULL;					/* boot ROM */
 uint32 *nvr = NULL;					/* non-volatile mem */
@@ -874,7 +876,10 @@ default:						/* config reg */
 case 16:						/* err status */
 	return cmctl_reg[rg];
 case 17:						/* csr */
-	return cmctl_reg[rg] & CMCSR_MASK;  }
+	return cmctl_reg[rg] & CMCSR_MASK;
+case 18:						/* KA655X ext mem */
+	if (cpu_extmem) return MEMSIZE;
+	MACH_CHECK (MCHK_READ);  }
 return 0;
 }
 
@@ -888,7 +893,8 @@ if (lnt < L_LONG) {					/* LW write only */
 switch (rg) {
 default:						/* config reg */
 	if (val & CMCNF_SRQ) {				/* sig request? */
-	    for (i = rg; i < (rg + 4); i++) {
+	    int32 rg_g = rg & ~3;			/* group of 4 */
+	    for (i = rg_g; i < (rg_g + 4); i++) {
 		cmctl_reg[i] = cmctl_reg[i] & ~CMCNF_SIG;
 		if (ADDR_IS_MEM (i * MEM_BANK))
 		    cmctl_reg[i] = cmctl_reg[i] | MEM_SIG;  }  }
@@ -899,7 +905,9 @@ case 16:						/* err status */
 	break;
 case 17:						/* csr */
 	cmctl_reg[rg] = val & CMCSR_MASK;
-	break;  }
+	break;
+case 18:
+	MACH_CHECK (MCHK_WRITE);  }
 return;
 }
 

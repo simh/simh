@@ -1,16 +1,19 @@
-This file contains information about the XQ/SIM_ETHER package.
+This file contains information about the SIMH Ethernet package.
 
 -------------------------------------------------------------------------------
 
 The XQ emulator is a host-independant software emulation of Digital's
 DELQA (M7516) and DEQNA (M7504) Q-bus ethernet cards for the SIMH emulator.
 
-The XQ emulator uses the Sim_Ether module to execute host-specific ethernet
-packet reads and writes, since all operating systems talk to real ethernet
-cards/controllers differently. The host-dependant Sim_Ether module currently
-supports Windows, Linux, NetBSD, OpenBSD, FreeBSD, OS/X, and Alpha VMS.
+The XU emulator is a host-independant software emulation of Digital's DEUNA
+(M7792/M7793) and DELUA (M7521) Unibus ethernet cards for the SIMH emulator.
 
-Currently, the Sim_Ether module sets the selected ethernet card into
+The XQ and XU simulators use the Sim_Ether module to execute host-specific
+packet reads and writes, since all operating systems talk to real ethernet
+cards/controllers differently. See the comments at the top of sim_ether.c
+for the list of currently supported host platforms.
+
+The Sim_Ether module sets the selected ethernet card into
 promiscuous mode to gather all packets, then filters out the packets that it
 doesn't want. In Windows, packets having the same source MAC address as the
 controller are ignored for WinPCAP compatibility (see Windows notes below).
@@ -67,26 +70,58 @@ Building on Windows:
  4. If you're using Borland C++, use COFF2OMF to convert the .lib files into
     a format that can be used by the compiler.
 
- 5. Define USE_NETWORK if you want the network functionality.
+ 5. Define USE_NETWORK.
 
  6. Build it!
 
 -------------------------------------------------------------------------------
 
 Linux, {Free|Net|Open}BSD, OS/X, and Un*x notes:
- 1. You must run SIMH(scp) as root so that the ethernet card can be set into
-    promiscuous mode by the driver. Alternative methods for avoiding the
-    'run as root' requirement will be welcomed.
+
+----- WARNING ----- WARNING ----- WARNING ----- WARNING ----- WARNING -----
+
+Sim_Ether has been reworked to be more universal; because of this, you will
+need to get a version of libpcap that is 0.9 or greater. This can be
+downloaded from www.tcpdump.org - see the comments at the top of Sim_ether.c
+for details.
+
+At the time of this release, the "Current Version" available at:
+http://www.tcpdump.org/daily/libpcap-current.tar.gz is the 
+latest checked-in source code that is actually higher than the released
+0.8.3 version number. Specifically, for all platforms, it contains code that 
+opens the ethernet device in Read/Write mode instead of the Read-Only mode 
+that previous libpcap versions for platforms which use one of pcap-bpf.c, 
+pcap-pf.c, or pcap-snit.c.  This capabiligy now exists to support a newly 
+provided generic packet sending capability.
+
+----- WARNING ----- WARNING ----- WARNING ----- WARNING ----- WARNING -----
+
+ 1. For all platforms, you must run SIMH(scp) with sufficient privilege to
+    allow the ethernet card can be set into promiscuous mode and to write
+    packets through the driver. For most Unix/Unix-like platforms this will 
+    mean running as root.  For systems which use bpf devices (NetBSD, 
+    OpenBSD, FreeBSD and OS/X) it is possible to set permissions on the bpf 
+    devices to allow read and write access to users other than root (For
+    example: chmod 666 /dev/bpf*).  Doing this, has its own security issues.
+    Additional alternative methods for avoiding the 'run as root' requirement 
+    will be welcomed.
 
  2. If you want to use TAP devices, they must be created before running SIMH.
 
-Linux, {Free|Net|Open}BSD, OS/X, Un*x notes:
+Building on Linux, {Free|Net|Open}BSD, OS/X, Un*x:
+
  1. Get/make/install the libpcap package for your operating system. Sources:
+      All    : http://www.tcpdump.org/
+      Older versions of libpcap can be found, for various systems, at:
       Linux  : search for your variant on http://rpmfind.net
       OS/X   : Apple Developer's site?
-      Others : http://sourceforge.net/projects/libpcap/
 
- 2. Use 'make USE_NETWORK=1' if you want the network functionality.
+	    NOTE: These repositories will not likely contain a version
+	          of libpcap greater than 0.8.1 for several years since 
+	          other packages in these repositories don't depend on a 
+	          later version than they currently have.
+
+ 2. Use 'make USE_NETWORK=1'
 
  3. Build it!
 
@@ -114,7 +149,8 @@ OpenVMS Alpha notes:
          no network devices are available
 
   2. You must place the PCAPVCM.EXE execlet in SYS$LOADABLE_IMAGES before
-     running a simulator with ethernet support.
+     running a simulator with ethernet support.  Note: This is done by the
+     build commands in descrip.mms.
 
   3. You must have CMKRNL privilege to SHOW or ATTACH an ethernet device;
      alternatively, you can INSTALL the simulator with CMKRNL privilege.
@@ -125,25 +161,16 @@ OpenVMS Alpha notes:
      The execlet is not written to create an I/O structure for the device.
 
 Building on OpenVMS Alpha:
-  1. Build the PCAP library and execlet. They are in the [.PCAP-VMS]
-     directory in the simh source distribution. The following builds
-     both the pcap library and the pcap execlet:
-	$ set def [.pcap-vms]
-	$ @build_all 
-        Building VCI version of pcap...
-        Building the PCAP VCM execlet...
-        In order to use it, place PCAPVCM.EXE in the
-        SYS$LOADABLE_IMAGES directory.
-        %DCL-I-SUPERSEDE, previous value of PCAPVCM$OBJ has been superseded
-
-        To use the PCAPVCM.EXE execlet you must copy it to
-        the SYS$LOADABLE_IMAGES directory.
-
-        Build done...
-
-   2. To build the simulators with ethernet support, you
-      need to build them with MMS or MMK as follows:
-         $ MMx/MACRO=("__ALPHA__=1", "__PCAP__=1")
+  The current descrip.mms file will build simulators capable of using
+  ethernet support with them automatically.  These currently are: VAX, 
+  PDP11, and PDP10.  The descrip.mms driven builds will also build the
+  pcap library and build and install the VCI execlet.
+  
+  1. Fetch the VMS-PCAP zip file from:  
+	    http://simh.trailing-edge.com/sources/vms-pcap.zip
+  2. Unzip it into the base of the simh distribution directory.
+  3. Build the simulator(s) with MMS or MMK:
+         $ MMx {VAX,PDP11,PDP10, etc...}
 
 -------------------------------------------------------------------------------
 
@@ -160,7 +187,28 @@ An RT-11 v5.3 system with a freeware TCP/IP stack has been successfully run.
 Other testers have reported that RSX with DECNET and the NetBSD operating
 systems also work. RSTS/E v10.1 has preliminary support - RSTS/E boots and
 enables the XH (XQ) device - DECNET and LAT software have not been tested.
- 
+
+The XU module has been tested by a third party for basic packet functionality 
+under a modified RSX11M environment. I am unable to test it in-house until
+someone can arrange to send me a disk image containing a stock RSTS/E or
+RSX11M+ system image that also contains DECNET, LAT, and/or TCP/IP software.
+
+-------------------------------------------------------------------------------
+
+How to debug problems with the ethernet subsystems:
+
+PLEASE read the host-specific notes in sim_ether.c!
+
+While running SCP, the following commands can be used to enable debug messages:
+
+  scp> SET DEBUG STDERR
+  scp> SET XQ DEBUG={ETH|TRC|REG|WRN|CSR|VAR|SAN|SET|PCK}
+  scp> SET XU DEBUG={ETH|TRC|REG|WRN}
+
+Documentation of the functionality of these debug modifiers can be found in
+pdp11_xq.h and pdp11_xu.h. Inline debugging has replaced the previous #ifdef
+style of debugging, which required recompilation before debugging.
+
 -------------------------------------------------------------------------------
 
 Things planned for future releases:
@@ -168,7 +216,6 @@ Things planned for future releases:
  2. Full MOP implementation
  3. DESQA support (if someone can get me the user manuals)
  4. DETQA support [DELQA-Turbo] (I have the manual)
- 5. DEUNA/DELUA support
 
 -------------------------------------------------------------------------------
 
@@ -190,12 +237,21 @@ Dave
                                Change Log
 ===============================================================================
 
+19-Mar-04 Release:
+ 1. Genericized Sim_Ether code, reduced #ifdefs                (David Hittner)
+ 2. Further refinement of sim_ether, qualified more platforms (Mark Pizzolato)
+ 3. Added XU module                                            (David Hittner)
+ 4. Corrected XQ interrupt signalling for PDP11s               (David Hittner)
+ 5. Added inline debugging support                             (David Hittner)
+
+-------------------------------------------------------------------------------
+
 26-Nov-03 Release:
  1. Added VMS support to Sim_Ether; created pcap-vms port      (Anders Ahgren)
  2. Added DECNET duplicate detection for Windows              (Mark Pizzolato)
  3. Added BPF filtering to increase efficiency                (Mark Pizzolato)
  4. Corrected XQ Runt processing                              (Mark Pizzolato)
- 5. Corrected XQ Software Reset                               (Mark Pizzolato)
+ 5. Corrected XQ Sofware Reset                               (Mark Pizzolato)
  6. Corrected XQ Multicast/Promiscuous mode setting/resetting (Mark Pizzolato)
  7. Added Universal TUN/TAP support                           (Mark Pizzolato)
  8. Added FreeBSD support                                  (Edward Brocklesby)

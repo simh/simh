@@ -1,6 +1,6 @@
 /* pdp18b_lp.c: 18b PDP's line printer simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    lp09		(PDP-9,15) LP09 line printer
    lp15		(PDP-15)   LP15 line printer
 
+   14-Jan-04	RMS	Revised IO device call interface
    23-Jul-03	RMS	Fixed overprint bug in Type 62
    25-Apr-03	RMS	Revised for extended file support
    05-Feb-03	RMS	Added LP09, fixed conditionalization
@@ -75,8 +76,8 @@ static const char *lp62_cc[] = {
 	"\f" };
 
 DEVICE lp62_dev;
-int32 lp62_65 (int32 pulse, int32 dat);
-int32 lp62_66 (int32 pulse, int32 dat);
+int32 lp62_65 (int32 dev, int32 pulse, int32 dat);
+int32 lp62_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp62_iors (void);
 t_stat lp62_svc (UNIT *uptr);
 t_stat lp62_reset (DEVICE *dptr);
@@ -121,7 +122,7 @@ DEVICE lp62_dev = {
 
 /* IOT routines */
 
-int32 lp62_65 (int32 pulse, int32 dat)
+int32 lp62_65 (int32 dev, int32 pulse, int32 dat)
 {
 int32 i;
 
@@ -142,7 +143,7 @@ if (pulse & 04) {					/* LPSE */
 return dat;
 }
 
-int32 lp62_66 (int32 pulse, int32 dat)
+int32 lp62_66 (int32 dev, int32 pulse, int32 dat)
 {
 if ((pulse & 01) && TST_INT (LPTSPC))			/* LSSF */
 	dat = IOT_SKP | dat;
@@ -239,8 +240,8 @@ static const char *lp647_cc[] = {
 	"\f" };
 
 DEVICE lp647_dev;
-int32 lp647_65 (int32 pulse, int32 dat);
-int32 lp647_66 (int32 pulse, int32 dat);
+int32 lp647_65 (int32 dev, int32 pulse, int32 dat);
+int32 lp647_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp647_iors (void);
 t_stat lp647_svc (UNIT *uptr);
 t_stat lp647_reset (DEVICE *dptr);
@@ -289,7 +290,7 @@ DEVICE lp647_dev = {
 
 /* IOT routines */
 
-int32 lp647_65 (int32 pulse, int32 dat)
+int32 lp647_65 (int32 dev, int32 pulse, int32 dat)
 {
 int32 i, sb;
 
@@ -331,7 +332,7 @@ if (pulse & 004) {					/* LPDI */
 return dat;
 }
 
-int32 lp647_66 (int32 pulse, int32 dat)
+int32 lp647_66 (int32 dev, int32 pulse, int32 dat)
 {
 if ((pulse & 01) && lp647_err) dat = IOT_SKP | dat;	/* LPSE */
 if (pulse & 02) {					/* LPCF */
@@ -446,7 +447,7 @@ int32 lp09_ie = 1;					/* int enable */
 int32 lp09_stopioe = 0;
 DEVICE lp09_dev;
 
-int32 lp09_66 (int32 pulse, int32 dat);
+int32 lp09_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp09_iors (void);
 t_stat lp09_svc (UNIT *uptr);
 t_stat lp09_reset (DEVICE *dptr);
@@ -490,7 +491,7 @@ DEVICE lp09_dev = {
 
 /* IOT routines */
 
-int32 lp09_66 (int32 pulse, int32 dat)
+int32 lp09_66 (int32 dev, int32 pulse, int32 dat)
 {
 int32 sb = pulse & 060;					/* subopcode */
 
@@ -612,8 +613,8 @@ int32 lp15_bp = 0;
 char lp15_buf[LP15_BSIZE] = { 0 };
 
 DEVICE lp15_dev;
-int32 lp15_65 (int32 pulse, int32 dat);
-int32 lp15_66 (int32 pulse, int32 dat);
+int32 lp15_65 (int32 dev, int32 pulse, int32 dat);
+int32 lp15_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp15_iors (void);
 t_stat lp15_svc (UNIT *uptr);
 t_stat lp15_reset (DEVICE *dptr);
@@ -660,7 +661,7 @@ DEVICE lp15_dev = {
 
 /* IOT routines */
 
-int32 lp15_65 (int32 pulse, int32 dat)
+int32 lp15_65 (int32 dev, int32 pulse, int32 dat)
 {
 int32 header, sb;
 
@@ -685,7 +686,7 @@ lp15_updsta (0);					/* update status */
 return dat;
 }
 
-int32 lp15_66 (int32 pulse, int32 dat)
+int32 lp15_66 (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse == 021) lp15_sta = lp15_sta & ~STA_DON;	/* LPCD */
 if (pulse == 041) lp15_sta = 0;				/* LPCF */

@@ -347,7 +347,7 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 				uptr->CYL = 0;
 			}
 
-			dsk_sec[drv] = (dsk_sec[drv] + 1) % 4;				/* advance the "next sector" count every time */
+			dsk_sec[drv] = (int16) ((dsk_sec[drv] + 1) % 4);		/* advance the "next sector" count every time */
 			ACC = dsk_dsw[drv] | dsk_sec[drv];
 
 			if (modify & 0x01) {						/* reset interrupts */
@@ -474,7 +474,7 @@ t_stat dsk_reset (DEVICE *dptr)
 
 		uptr->CYL    = 0;
 		uptr->FUNC   = DSK_FUNC_IDLE;
-		dsk_dsw[drv] = (uptr->flags & UNIT_ATT) ? DSK_DSW_CARRIAGE_HOME : 0;
+		dsk_dsw[drv] = (int16) ((uptr->flags & UNIT_ATT) ? DSK_DSW_CARRIAGE_HOME : 0);
 	}
 
 	calc_ints();

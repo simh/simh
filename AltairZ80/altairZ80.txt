@@ -3,6 +3,7 @@ Altair 8800 Simulator with Z80 support
 
 0. Revision History
 
+- 26-Jan-2004, Peter Schorn (added support for t-state stepping)
 - 25-Feb-2003, Peter Schorn (added support for real time simulation)
 -  9-Oct-2002, Peter Schorn (added support for simulated hard disk)
 - 28-Sep-2002, Peter Schorn (number of tracks per disk can be configured)
@@ -842,6 +843,9 @@ following commands:
 
 4. Special simulator features
 
+
+4.1 Memory access breakpoints
+
   In addition to the regular SIMH features such as PC queue, breakpoints
 etc., this simulator supports memory access breakpoints. A memory access
 breakpoint is triggered when a pre-defined memory location is accessed
@@ -853,6 +857,21 @@ sim> break -m <location>
 a memory access breakpoint is not triggered by fetching code from memory
 (this is the job of regular breakpoints). This feature has been implemented
 by using the typing facility of the SIMH breakpoints.
+
+
+4.2 T-state stepping
+
+  The SIMH step command supports the "-t" modifier to allow steppping for
+a predefined number of t-states. For example
+
+sim> step -t 1000
+
+will cause the simulated CPU to execute 1000 t-states (note that the shortest
+instruction will have 4 t-states). On the other hand, the command
+
+sim> step 1000
+
+will cause the simulated CPU to execute 1000 instructions.
 
 
 5. Brief summary of all major changes to the original Altair simulator

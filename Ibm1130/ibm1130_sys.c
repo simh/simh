@@ -442,7 +442,7 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 	return SCPE_ARG;
 }
 
-#ifndef WIN32
+#ifndef _WIN32
 
 int strnicmp (char *a, char *b, int n)
 {

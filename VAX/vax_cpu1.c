@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2003, Robert M Supnik
+   Copyright (c) 1998-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-Jan-04	RMS	Added device logging support
+			Fixed EXTxV, INSV double register PC reference fault
    30-Apr-02	RMS	Fixed interrupt/exception handler to clear traps
    17-Apr-02	RMS	Fixed pos > 31 test in bit fields (should be unsigned)
    14-Apr-02	RMS	Fixed prv_mode handling for interrupts (found by Tim Stark)
@@ -98,8 +100,8 @@ extern int32 in_ie;
 extern int32 mchk_va;
 extern int32 sim_interval;
 extern int32 ibcnt, ppc;
-extern int32 cpu_log;
-extern FILE *sim_log;
+extern FILE *sim_deb;
+extern DEVICE cpu_dev;
 
 extern int32 Read (uint32 va, int32 lnt, int32 acc);
 extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
@@ -180,6 +182,8 @@ if (size == 0) return 0;				/* size 0? field = 0 */
 if (size > 32) RSVD_OPND_FAULT;				/* size > 32? fault */
 if (rn >= 0) {						/* register? */
 	if (((uint32) pos) > 31) RSVD_OPND_FAULT;	/* pos > 31? fault */
+	if (((pos + size) > 32) && (rn >= nSP))		/* span 2 reg, PC? */
+	    RSVD_ADDR_FAULT;				/* fault */
 	if (pos) wd = (wd >> pos) | (((uint32) vfldrp1) << (32 - pos));  }
 else {	ba = wd + (pos >> 3);				/* base byte addr */
 	pos = (pos & 07) | ((ba & 03) << 3);		/* bit offset */
@@ -214,7 +218,7 @@ if (size > 32) RSVD_OPND_FAULT;				/* size > 32? fault */
 if (rn >= 0) {						/* in registers? */
 	if (((uint32) pos) > 31) RSVD_OPND_FAULT;	/* pos > 31? fault */
 	if ((pos + size) > 32) {			/* span two reg? */
-	    if (rn >= nSP) RSVD_OPND_FAULT;		/* if PC, fault */
+	    if (rn >= nSP) RSVD_ADDR_FAULT;		/* if PC, fault */
 	    mask = byte_mask[pos + size - 32];		/* insert fragment */
 	    val = ins >> (32 - pos);
 	    R[rnplus1] = (vfldrp1 & ~mask) | (val & mask);  }
@@ -1032,7 +1036,7 @@ else {	STK[oldcur] = SP;				/* no, save cur stk */
 if (ei > 0) PSL = newpsl | (ipl << PSL_V_IPL);		/* if int, new IPL */
 else PSL = newpsl | ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) |
 	(oldcur << PSL_V_PRV);
-if (DBG_LOG (LOG_CPU_I)) fprintf (sim_log,
+if (DEBUG_PRI (cpu_dev, LOG_CPU_I)) fprintf (sim_deb,
 	">>IEX: PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
 	PC, oldpsl, oldsp, vec, PSL, SP);
 acc = ACC_MASK (KERN);					/* new mode is kernel */
@@ -1122,14 +1126,14 @@ else {							/* to k, skip 3,5,6 */
 SP = SP + 8;						/* pop stack */
 if (PSL & PSL_IS) IS = SP;				/* save stack */
 else STK[oldcur] = SP;
-if (DBG_LOG (LOG_CPU_R)) fprintf (sim_log,
+if (DEBUG_PRI (cpu_dev, LOG_CPU_R)) fprintf (sim_deb,
 	">>REI: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
 	PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]));
 PSL = (PSL & PSL_TP) | (newpsl & ~CC_MASK);		/* set new PSL */
 if (PSL & PSL_IS) SP = IS;				/* set new stack */
 else {	SP = STK[newcur];				/* if ~IS, chk AST */
 	if (newcur >= ASTLVL) {
-	    if (DBG_LOG (LOG_CPU_R)) fprintf (sim_log,
+	    if (DEBUG_PRI (cpu_dev, LOG_CPU_R)) fprintf (sim_deb,
 		">>REI: AST delivered\n");
 	    SISR = SISR | SISR_2;  }  }
 JUMP (newpc);						/* set new PC */
@@ -1175,7 +1179,7 @@ P1BR = P1BR & BR_MASK;
 P1LR = P1LR & LR_MASK;
 zap_tb (0);						/* clear process TB */
 set_map_reg ();
-if (DBG_LOG (LOG_CPU_P)) fprintf (sim_log,
+if (DEBUG_PRI (cpu_dev, LOG_CPU_P)) fprintf (sim_deb,
 	">>LDP: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
 	PC, PSL, SP, newpc, newpsl, KSP);
 if (PSL & PSL_IS) IS = SP;				/* if istk, */
@@ -1195,7 +1199,7 @@ int32 savpc, savpsl, pcbpa;
 if (PSL & PSL_CUR) RSVD_INST_FAULT;			/* must be kernel */
 savpc = Read (SP, L_LONG, RA);				/* pop PC, PSL */
 savpsl = Read (SP + 4, L_LONG, RA);
-if (DBG_LOG (LOG_CPU_P)) fprintf (sim_log,
+if (DEBUG_PRI (cpu_dev, LOG_CPU_P)) fprintf (sim_deb,
 	">>SVP: PC=%08x, PSL=%08x, SP=%08x, oPC=%08x, oPSL=%08x\n",
 	PC, PSL, SP, savpc, savpsl);
 if (PSL & PSL_IS) SP = SP + 8;				/* int stack? */

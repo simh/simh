@@ -25,6 +25,7 @@
 
    cpu		H316/H516 CPU
 
+   04-Jan-04	RMS	Removed unnecessary compare
    31-Dec-03	RMS	Fixed bug in cpu_set_hist
    24-Oct-03	RMS	Added DMA/DMC support, instruction history
    30-Dec-01	RMS	Added old PC queue
@@ -1317,7 +1318,7 @@ for (i = 0; dptr = sim_devices[i]; i++) {		/* loop thru devices */
 	    }						/* end for */
 	if (dibp->chan) {				/* DMA/DMC? */
 	    chan = dibp->chan - 1;
-	    if ((chan >= 0) && (chan < DMC_V_DMC1) && (chan >= dma_nch)) {
+	    if ((chan < DMC_V_DMC1) && (chan >= dma_nch)) {
 	        printf ("%s configured for DMA channel %d\n", sim_dname (dptr), chan + 1);
 		if (sim_log) fprintf (sim_log,
 		    "%s configured for DMA channel %d\n", sim_dname (dptr), chan + 1);

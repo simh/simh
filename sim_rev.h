@@ -28,12 +28,99 @@
 #define _SIM_REV_H_	0
 
 #define	SIM_MAJOR	3
-#define SIM_MINOR	1
+#define SIM_MINOR	2
 #define SIM_PATCH	0
 
-/* V3.1 revision history 
+/* V3.2 revision history 
 
 patch	date		module(s) and fix(es)
+
+  0	tbd		scp.c:
+			-- added sim_vm_parse_addr and sim_vm_fprint_addr
+			-- added REG_VMAD
+			-- moved console logging to SCP
+			-- changed sim_fsize to use descriptor rather than name
+			-- added global device/unit show modifiers
+			-- added device debug support (Dave Hittner)
+			-- moved device and unit flags, updated save format
+
+			sim_ether.c:
+			-- further generalizations (Dave Hittner, Mark Pizzolato)
+
+			sim_tmxr.h, sim_tmxr.c:
+			-- added tmxr_linemsg
+			-- changed TMXR definition to support variable number of lines
+
+			sim_libraries:
+			-- new console library (sim_console.h, sim_console.c)
+			-- new file I/O library (sim_fio.h, sim_fio.c)
+			-- new timer library (sim_timer.h, sim_timer.c)
+
+			all terminal multiplexors: revised for tmxr library changes
+
+			all DECtapes:
+			-- added STOP_EOR to enable end-of-reel stop
+			-- revised for device debug support
+
+			all variable-sized devices: revised for sim_fsize change
+
+			eclipse_cpu.c, nova_cpu.c: fixed device enable/disable support
+			   (found by Bruce Ray)
+
+			nova_defs.h, nova_sys.c, nova_qty.c:
+			-- added QTY and ALM support (Bruce Ray)
+
+			id32_cpu.c, id_dp.c: revised for device debug support
+
+			lgp: added LGP-30 [LGP-21] simulator
+
+			pdp1_sys.c: fixed bug in LOAD (found by Mark Crispin)
+
+			pdp10_mdfp.c:
+			-- fixed bug in floating unpack
+			-- fixed bug in FIXR (found by Philip Stone, fixed by Chris Smith)
+
+			pdp11_dz.c: added per-line logging
+
+			pdp11_rk.c:
+			-- added formatting support
+			-- added address increment inhibit support
+			-- added transfer overrun detection
+
+			pdp11_hk.c, pdp11_rp.c: revised for device debug support
+
+			pdp11_rq.c: fixed bug in interrupt control (found by Tom Evans)
+
+			pdp11_ry.c: added VAX support
+
+			pdp11_tm.c, pdp11_tq.c, pdp11_ts.c: revised for device debug support
+
+			pdp11_xu.c: replaced stub with real implementation (Dave Hittner)
+
+			pdp18b_cpu.c:
+			-- fixed bug in XVM g_mode implementation
+			-- fixed bug in PDP-15 indexed address calculation
+			-- fixed bug in PDP-15 autoindexed address calculation
+
+			pdp18b_fpp.c: fixed bugs in instruction decode
+
+			pdp18b_stddev.c:
+			-- fixed clock response to CAF
+			-- fixed bug in hardware read-in mode bootstrap
+
+			pdp18b_sys.c: fixed XVM instruction decoding errors
+
+			pdp18b_tt1.c: added support for 1-16 additional terminals
+
+			vax_moddef.h, vax_cpu.c, vax_sysdev.c:
+			-- added extended physical memory support (Mark Pizzolato)
+			-- added RXV21 support
+
+			vax_cpu1.c:
+			-- added PC read fault in EXTxV
+			-- fixed PC write fault in INSV
+
+/* V3.1 revision history
 
   0	29-Dec-03	sim_defs.h, scp.c: added output stall status
 

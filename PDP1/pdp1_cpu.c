@@ -1,6 +1,6 @@
 /* pdp1_cpu.c: PDP-1 CPU simulator
 
-   Copyright (c) 1993-2003, Robert M. Supnik
+   Copyright (c) 1993-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -331,6 +331,7 @@ REG cpu_reg[] = {
 	{ FLDATA (SBIP, sbs, SB_V_IP) },
 	{ FLDATA (IOH, ioh, 0) },
 	{ FLDATA (IOS, ios, 0) },
+	{ ORDATA (CPLS, cpls, 6) },
 	{ BRDATA (PCQ, pcq, 8, ASIZE, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ FLDATA (STOP_INST, stop_inst, 0) },

@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	18b PDP Simulator Usage
-Date:	25-Aug-2003
+Date:	4-Apr-2004
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2003, written by Robert M Supnik
-   Copyright (c) 1993-2003, Robert M Supnik
+   Original code published in 1993-2004, written by Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -107,7 +107,7 @@ PDP-9	CPU		PDP-9 CPU with 32KW of memory
 	-		KX09A memory protection
 	PTR,PTP		PC09A paper tape reader/punch
 	TTI,TTO		KSR 33 console terminal
-	TTI1,TTO1	LT09A second console terminal
+	TTIX,TTOX	1-4 LT09A additional terminals
 	LP9		LP09 line printer
 	LPT		Type 647E line printer
 	CLK		integral real-time clock
@@ -126,7 +126,7 @@ PDP-15	CPU		PDP-15 CPU with 32KW of memory
 	FPP		FP15 floating point processor
 	PTR,PTP		PC15 paper tape reader/punch
 	TTI,TTO		KSR 35 console terminal
-	TTI1,TTO1	LT15 second console terminal
+	TTIX,TTOX	1-16 LT15/LT19 additional terminals
 	LP9		LP09 line printer
 	LPT		LP15 line printer
 	CLK		integral real-time clock
@@ -154,7 +154,8 @@ The 18b PDP simulators implement several unique stop conditions:
 	  instruction execution
 	- an FP15 instruction is decoded, the FP15 is disabled,
 	  and register STOP_FPP is set
-	- a simulated DECtape runs off the end of its real
+	- a simulated DECtape runs off the end of its real, and
+	  register STOP_EOR is set
 
 The PDP-4 and PDP-7 LOAD command supports only "second stage" RIM format
 files (alternating DAC address instructions and data):
@@ -532,52 +533,67 @@ The clock implements these registers:
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
 
-2.3.7 Second Terminal (TTI1, TTO1)
+2.3.7 Additional Terminals (TTIX, TTOX)
 
-The second terminal consists of two independent devices, TTI1 and TTO1.
-The second terminal performs input and output through a Telnet session
-connected to a user-specified port.  The ATTACH command specifies the
-port to be used:
+The additional terminals consist of two independent devices, TTIX and
+TTOX.  The entire set is modelled as a terminal multiplexor, with TTIX
+as the master unit.  The additional terminals perform input and output
+through Telnet sessions connected to a user-specified port.  The ATTACH
+command specifies the port to be used:
 
-	ATTACH TTI1 <port>	set up listening port
+	ATTACH TTIX <port>	set up listening port
 
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.
 
-Once TTI1 is attached and the simulator is running, the terminal listens
-for a connection on the specified port.  It assumes that the incoming
-connection is a Telnet connection.  The connection remain opens until
-disconnected by the Telnet client, or by a DETACH TTI1 command.
+The PDP-9 supports 1-4 additional terminals.  The PDP-15 supports 1-16
+additional terminals.  The number of additional terminals can be changed
+with the command:
 
-The second terminal (TTI1,TTO1) can be set to one of three modes: KSR, 7B,
-or 8B.  In KSR mode, lower case input and output characters are converted
-automatically to upper case, the high order bit is forced to one on input,
-and printing of ALTmode characters is supressed.  In 7B mode, input and
-output characters are masked to 7 bits.  In 8B mode, characters are not
-modified.  Changing the mode of either device changes both.  The default
-mode is KSR.
+	SET TTIX LINES=n	set number of lines to n
 
-The SHOW TTI1 CONNECTIONS command displays the current connection to TTI1.
-The SHOW TTI1 STATISTICS command displays statistics for the current connection.
-The SET TTI1 DISCONNECT{=0} disconnects the current connection.
+The default is one additional terminal.
 
-The second terminal input implements these registers:
+The additional terminals can be set to one of three modes: UC, 7B, or
+8B.  In KSR mode, lower case input and output characters are converted
+automatically to upper case.  In 7B mode, input and output characters
+are masked to 7 bits.  In 8B mode, characters are not modified.  The
+default mode is KSR.  Finally, each line supports output logging.
+The SET TTOXn LOG command enables logging on a line:
+
+	SET TTOXn LOG=filename	log output of line n to filename
+
+The SET TTOXn NOLOG command disables logging and closes the open log
+file, if any.
+
+Once TTIX is attached and the simulator is running, the terminals listen
+for connections on the specified port.  They assume that the incoming
+connections are Telnet connections.  The connections remain open until
+disconnected either by the Telnet client, a SET TTIX DISCONNECT command,
+or a DETACH TTIX command.
+
+The SHOW TTIX CONNECTIONS command displays the current connections to the
+extra terminals.  The SHOW TTIX STATISTICS command displays statistics for
+active connections.  The SET TTIX DISCONNECT=linenumber disconnects the
+specified line.
+
+The input device (TTIX) implements these registers:
 
 	name		size	comments
 
-	BUF		8	last data item processed
+	BUF[0..3/15]	8	last character received
+	DONE		16	input ready flags, line 0 on right
 	INT		1	interrupt pending flag
-	DONE		1	device done flag
 	TIME		24	keyboard polling interval
 
-The second terminal output implements these registers:
+The output device (TTOX) implements these registers:
 
 	name		size	comments
 
-	BUF		8	last data item processed
+	BUF[0..3/15]	8	last character transmitted
+	DONE		16	output ready flags, line 0 on right
 	INT		1	interrupt pending flag
-	DONE		1	device done flag
-	TIME		24	time from I/O initiation to interrupt
+	TIME[0..3/15]	24	time from I/O initiation to interrupt
 
 2.4 RP15/RP02 Disk Pack (RP)
 
@@ -771,6 +787,7 @@ The DECtape controller implements these registers:
 	all	SUBSTATE	2	read/write command substate
 	all	POS[0:7]	32	position, in lines, units 0-7
 	all	STATT[0:7]	18	unit state, units 0-7
+	all	STOP_OFFR	1	stop on off-reel error
 
 It is critically important to maintain certain timing relationships
 among the DECtape parameters, or the DECtape simulator will fail to

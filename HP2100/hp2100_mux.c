@@ -1,6 +1,6 @@
 /* hp2100_mux.c: HP 2100 12920A terminal multiplexor simulator
 
-   Copyright (c) 2002-2003, Robert M Supnik
+   Copyright (c) 2002-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mux,muxl,muxc	12920A terminal multiplexor
 
+   05-Jan-04	RMS	Revised for tmxr library changes
    21-Dec-03	RMS	Added invalid character screening for TSB (from Mike Gemeny)
    09-May-03	RMS	Added network device flag
    01-Nov-02	RMS	Added 7B/8B support
@@ -152,7 +153,7 @@ uint32 muxc_chan = 0;					/* ctrl chan */
 uint32 muxc_scan = 0;					/* ctrl scan */
 
 TMLN mux_ldsc[MUX_LINES] = { 0 };			/* line descriptors */
-TMXR mux_desc = { MUX_LINES, 0, 0, NULL };		/* mux descriptor */
+TMXR mux_desc = { MUX_LINES, 0, 0, mux_ldsc };		/* mux descriptor */
 
 DEVICE muxl_dev, muxu_dev, muxc_dev;
 int32 muxlio (int32 inst, int32 IR, int32 dat);
@@ -268,6 +269,10 @@ MTAB muxl_mod[] = {
 	{ UNIT_UC+UNIT_8B, UNIT_8B, "8b", "8B", NULL },
 	{ UNIT_MDM, 0, "no dataset", "NODATASET", NULL },
 	{ UNIT_MDM, UNIT_MDM, "dataset", "DATASET", NULL },
+	{ MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
+	    &tmxr_set_log, &tmxr_show_log, &mux_desc },
+	{ MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
+	    &tmxr_set_nolog, NULL, &mux_desc },
 	{ MTAB_XTD|MTAB_VDV, 1, "DEVNO", "DEVNO",
 		&hp_setdev, &hp_showdev, &muxl_dev },
 	{ 0 }  };
@@ -433,7 +438,7 @@ case ioOTX:						/* output */
 		(muxc_ota[ln] & ~OTC_C1) | (dat & OTC_C1);
 	    if ((muxl_unit[ln].flags & UNIT_MDM) &&	/* modem ctrl? */
 		(old & DTR) && !(muxc_ota[ln] & DTR)) {	/* DTR drop? */
-	    	tmxr_msg (mux_ldsc[ln].conn, "\r\nLine hangup\r\n");
+	    	tmxr_linemsg (&mux_ldsc[ln], "\r\nLine hangup\r\n");
 		tmxr_reset_ln (&mux_ldsc[ln]);		/* reset line */
 		muxc_lia[ln] = 0;  }			/* dataset off */
 	    }						/* end update */
@@ -645,9 +650,7 @@ if (muxu_unit.flags & UNIT_ATT) {			/* master att? */
 	    t = sim_rtcn_init (muxu_unit.wait, TMR_MUX);
 	    sim_activate (&muxu_unit, t);  }  }		/* activate */
 else sim_cancel (&muxu_unit);				/* else stop */
-for (i = 0; i < MUX_LINES; i++) {
-	mux_desc.ldsc[i] = &mux_ldsc[i];
-	mux_reset_ln (i);  }
+for (i = 0; i < MUX_LINES; i++) mux_reset_ln (i);
 return SCPE_OK;
 }
 

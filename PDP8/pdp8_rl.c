@@ -1,6 +1,6 @@
  /* pdp8_rl.c: RL8A cartridge disk simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rl		RL8A cartridge disk
 
+   04-Jan-04	RMS	Changed attach routine to use sim_fsize
    25-Apr-03	RMS	Revised for extended file support
    04-Oct-02	RMS	Added DIB, device number support
    06-Jan-02	RMS	Changed enable/disable support
@@ -523,8 +524,7 @@ r = attach_unit (uptr, cptr);				/* attach unit */
 if (r != SCPE_OK) return r;				/* error? */
 uptr->TRK = 0;						/* cyl 0 */
 uptr->STAT = RLDS_VCK;					/* new volume */
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;	/* seek to end */
-if ((p = ftell (uptr->fileref)) == 0) {			/* new disk image? */
+if ((p = sim_fsize (uptr->fileref)) == 0) {		/* new disk image? */
 	if (uptr->flags & UNIT_RO) return SCPE_OK;
 	return rl_set_bad (uptr, 0, NULL, NULL);  }
 if ((uptr->flags & UNIT_AUTO) == 0) return r;		/* autosize? */

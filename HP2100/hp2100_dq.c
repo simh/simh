@@ -1,6 +1,6 @@
 /* hp2100_dq.c: HP 2100 12565A disk simulator
 
-   Copyright (c) 1993-2003, Bill McDermith
+   Copyright (c) 1993-2004, Bill McDermith
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

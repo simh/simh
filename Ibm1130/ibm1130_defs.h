@@ -15,6 +15,7 @@
 #include "sim_defs.h"						/* main SIMH defns (include path should include .., or make a copy) */
 #include <setjmp.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #if defined(VMS)
 	#  include <unistd.h>  					/* to pick up 'unlink' */
@@ -23,7 +24,7 @@
 #define MIN(a,b)  (((a) <= (b)) ? (a) : (b))
 #define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
 
-#ifndef WIN32
+#ifndef _WIN32
    int strnicmp (char *a, char *b, int n);
    int strcmpi  (char *a, char *b);
 #endif

@@ -1,6 +1,6 @@
 /* pdp18b_rf.c: fixed head disk simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    rf		(PDP-9) RF09/RF09
 		(PDP-15) RF15/RS09
 
+   14-Jan-04	RMS	Revised IO device call interface
+			Changed sim_fsize calling sequence
    26-Oct-03	RMS	Cleaned up buffer copy code
    26-Jul-03	RMS	Fixed bug in set size routine
    14-Mar-03	RMS	Fixed variable platter interaction with save/restore
@@ -115,8 +117,8 @@ int32 rf_burst = 1;					/* burst mode flag */
 int32 rf_stopioe = 1;					/* stop on error */
 
 DEVICE rf_dev;
-int32 rf70 (int32 pulse, int32 dat);
-int32 rf72 (int32 pulse, int32 dat);
+int32 rf70 (int32 dev, int32 pulse, int32 dat);
+int32 rf72 (int32 dev, int32 pulse, int32 dat);
 int32 rf_iors (void);
 t_stat rf_svc (UNIT *uptr);
 t_stat rf_reset (DEVICE *dptr);
@@ -174,7 +176,7 @@ DEVICE rf_dev = {
 
 /* IOT routines */
 
-int32 rf70 (int32 pulse, int32 dat)
+int32 rf70 (int32 dev, int32 pulse, int32 dat)
 {
 int32 t, sb;
 
@@ -217,7 +219,7 @@ rf_updsta (0);						/* update status */
 return dat;
 }
 
-int32 rf72 (int32 pulse, int32 dat)
+int32 rf72 (int32 dev, int32 pulse, int32 dat)
 {
 int32 sb = pulse & 060;
 
@@ -311,14 +313,17 @@ t_stat rf_attach (UNIT *uptr, char *cptr)
 {
 uint32 p, sz;
 uint32 ds_bytes = RF_DKSIZE * sizeof (int32);
+t_stat r;
 
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
+r = attach_unit (uptr, cptr);
+if (r != SCPE_OK) return r;
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (uptr->fileref))) {
 	p = (sz + ds_bytes - 1) / ds_bytes;
 	if (p >= RF_NUMDK) p = RF_NUMDK - 1;
 	uptr->flags = (uptr->flags & ~UNIT_PLAT) |
 	    (p << UNIT_V_PLAT);  }
 uptr->capac = UNIT_GETP (uptr->flags) * RF_DKSIZE;
-return attach_unit (uptr, cptr);
+return SCPE_OK;
 }
 
 /* Change disk size */

@@ -1,6 +1,6 @@
 /* pdp11_tq.c: TMSCP tape controller simulator
 
-   Copyright (c) 2002-2003, Robert M Supnik
+   Copyright (c) 2002-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    tq		TQK50 tape controller
 
+   26-Mar-04	RMS	Fixed warnings with -std=c99
+   25-Jan-04	RMS	Revised for device debug support
    19-May-03	RMS	Revised for new conditional compilation scheme
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
@@ -206,9 +208,8 @@ static struct drvtyp drv_tab[] = {
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
-extern int32 cpu_log;
 extern UNIT cpu_unit;
-extern FILE *sim_log;
+extern FILE *sim_deb;
 extern uint32 sim_taddr_64;
 
 uint8 *tqxb = NULL;					/* xfer buffer */
@@ -441,7 +442,7 @@ DEVICE tq_dev = {
 	TQ_NUMDR + 2, 10, 31, 1, DEV_RDX, 8,
 	NULL, NULL, &tq_reset,
 	&tq_boot, &tq_attach, &tq_detach,
-	&tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS };
+	&tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG };
 
 /* I/O dispatch routine, I/O addresses 17772150 - 17772152
 
@@ -470,7 +471,7 @@ t_stat tq_wr (int32 data, int32 PA, int32 access)
 switch ((PA >> 1) & 01) {				/* decode PA<1> */
 case 0:							/* IP */
 	tq_reset (&tq_dev);				/* init device */
-	if (DBG_LOG (LOG_TQ)) fprintf (sim_log,
+	if (DEBUG_PRS (tq_dev)) fprintf (sim_deb,
 	    ">>TQ: initialization started, time=%.0f\n", sim_gtime ());
 	break;
 case 1:							/* SA */
@@ -568,7 +569,7 @@ if (tq_csta < CST_UP) {					/* still init? */
 	break;
     case CST_S4:					/* need S4 reply */
 	if (tq_saw & SA_S4H_GO) {			/* go set? */
-	    if (DBG_LOG (LOG_TQ)) fprintf (sim_log,
+	    if (DEBUG_PRS (tq_dev)) fprintf (sim_deb,
 		">>TQ: initialization complete\n");
 	    tq_csta = CST_UP;				/* we're up */
 	    tq_sa = 0;					/* clear SA */
@@ -586,16 +587,16 @@ for (i = 0; i < TQ_NUMDR; i++) {			/* chk unit q's */
 if ((pkt == 0) && tq_pip) {				/* polling? */
     if (!tq_getpkt (&pkt)) return SCPE_OK;		/* get host pkt */
     if (pkt) {						/* got one? */
-        if (DBG_LOG (LOG_TQ)) {
+        if (DEBUG_PRS (tq_dev)) {
             UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
-	    fprintf (sim_log, ">>TQ: cmd=%04X, mod=%04X, unit=%d, ",
+	    fprintf (sim_deb, ">>TQ: cmd=%04X, mod=%04X, unit=%d, ",
 		tq_pkt[pkt].d[CMD_OPC], tq_pkt[pkt].d[CMD_MOD], tq_pkt[pkt].d[CMD_UN]);
-	    fprintf (sim_log, "bc=%04X%04X, ma=%04X%04X",
+	    fprintf (sim_deb, "bc=%04X%04X, ma=%04X%04X",
 		tq_pkt[pkt].d[RW_BCH], tq_pkt[pkt].d[RW_BCL],
 		tq_pkt[pkt].d[RW_BAH], tq_pkt[pkt].d[RW_BAL]);
-	    if (up) fprintf (sim_log, ", pos=%d, obj=%d\n", up->pos, up->objp);
-	    else fprintf (sim_log, "\n");
-	    fflush (sim_log);  }
+	    if (up) fprintf (sim_deb, ", pos=%d, obj=%d\n", up->pos, up->objp);
+	    else fprintf (sim_deb, "\n");
+	    fflush (sim_deb);  }
 	if (GETP (pkt, UQ_HCTC, TYP) != UQ_TYP_SEQ)	/* seq packet? */
 	    return tq_fatal (PE_PIE);			/* no, term thread */
 	cnid = GETP (pkt, UQ_HCTC, CID);		/* get conn ID */
@@ -1493,13 +1494,13 @@ t_bool tq_putpkt (int32 pkt, t_bool qt)
 uint32 addr, desc, lnt, cr;
 
 if (pkt == 0) return OK;				/* any packet? */
-if (DBG_LOG (LOG_TQ)) {
+if (DEBUG_PRS (tq_dev)) {
         UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
-	fprintf (sim_log, ">>TQ: rsp=%04X, sts=%04X",
+	fprintf (sim_deb, ">>TQ: rsp=%04X, sts=%04X",
 	    tq_pkt[pkt].d[RSP_OPF], tq_pkt[pkt].d[RSP_STS]);
-	if (up) fprintf (sim_log, ", pos=%d, obj=%d\n", up->pos, up->objp);
-	else fprintf (sim_log, "\n");
-	fflush (sim_log);  }
+	if (up) fprintf (sim_deb, ", pos=%d, obj=%d\n", up->pos, up->objp);
+	else fprintf (sim_deb, "\n");
+	fflush (sim_deb);  }
 if (!tq_getdesc (&tq_rq, &desc)) return ERR;		/* get rsp desc */
 if ((desc & UQ_DESC_OWN) == 0) {			/* not valid? */
 	if (qt) tq_enqt (&tq_rspq, pkt);		/* normal? q tail */
@@ -1665,7 +1666,7 @@ return tq_dib.vec;					/* prog vector */
 
 t_bool tq_fatal (uint32 err)
 {
-if (DBG_LOG (LOG_TQ)) fprintf (sim_log, ">>TQ: fatal err=%X\n", err);
+if (DEBUG_PRS (tq_dev)) fprintf (sim_deb, ">>TQ: fatal err=%X\n", err);
 tq_reset (&tq_dev);					/* reset device */
 tq_sa = SA_ER | err;					/* SA = dead code */
 tq_csta = CST_DEAD;					/* state = dead */
@@ -1982,7 +1983,7 @@ return SCPE_OK;
 
 /* Set controller type (and capacity for user-defined type) */
 
-tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 uint32 i, cap;
 uint32 max = sim_taddr_64? TQU_EMAXC: TQU_MAXC;
@@ -2002,7 +2003,7 @@ return SCPE_OK;
 
 /* Show controller type (and capacity for user-defined type) */
 
-tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 fprintf (st, "%s", drv_tab[tq_typ].name);
 if (tq_typ == TQU_TYPE) fprintf (st, " (%dMB)", drv_tab[tq_typ].cap >> 20);

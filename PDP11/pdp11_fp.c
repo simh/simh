@@ -1,6 +1,6 @@
 /* pdp11_fp.c: PDP-11 floating point simulator (32b version)
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -712,7 +712,7 @@ if ((facexp == 0) || (fsrcexp == 0)) {			/* test for zero */
 F_GET_FRAC_P (facp, facfrac);				/* get fractions */
 F_GET_FRAC_P (fsrcp, fsrcfrac);
 facexp = facexp + fsrcexp - FP_BIAS;			/* calculate exp */
-facp->h = facp->h  ^ fsrcp->h;			/* calculate sign */
+facp->h = facp->h  ^ fsrcp->h;				/* calculate sign */
 frac_mulfp11 (&facfrac, &fsrcfrac);			/* multiply fracs */
 
 /* Multiplying two numbers in the range [.5,1) produces a result in the

@@ -1,6 +1,6 @@
 /* sim_tmxr.c: Telnet terminal multiplexor library
 
-   Copyright (c) 2001-2003, Robert M Supnik
+   Copyright (c) 2001-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,10 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   04-Jan-04	RMS	Changed TMXR ldsc to be pointer to linedesc array
+			Added tmxr_linemsg, circular output pointers, logging
+			(from Mark Pizzolato)
+   29-Dec-03	RMS	Added output stall support
    01-Nov-03	RMS	Cleaned up attach routine
    09-Mar-03	RMS	Fixed bug in SHOW CONN
    22-Dec-02	RMS	Fixed bugs in IAC+IAC receive and transmit sequences
@@ -37,6 +41,30 @@
    03-Dec-01	RMS	Changed tmxr_fconns for extended SET/SHOW
    20-Oct-01	RMS	Fixed bugs in read logic (found by Thord Nilson).
 			Added tmxr_rqln, tmxr_tqln
+
+   This library includes:
+
+   tmxr_poll_conn -	poll for connection
+   tmxr_reset_ln -	reset line
+   tmxr_getc_ln	-	get character for line
+   tmxr_poll_rx	-	poll receive
+   tmxr_putc_ln	-	put character for line
+   tmxr_poll_tx -	poll transmit
+   tmxr_open_master -	open master connection
+   tmxr_close_master -	close master connection
+   tmxr_attach	-	attach terminal multiplexor
+   tmxr_detach	-	detach terminal multiplexor
+   tmxr_ex	-	(null) examine
+   tmxr_dep	-	(null) deposit
+   tmxr_msg	-	send message to socket
+   tmxr_linemsg	-	send message to line
+   tmxr_fconns	-	output connection status
+   tmxr_fstats	-	output connection statistics
+   tmxr_dscln	-	disconnect line (SET routine)
+   tmxr_rqln	-	number of available characters for line
+   tmxr_tqln	-	number of buffered characters for line
+
+   All routines are OS-independent.
 */
 
 #include "sim_defs.h"
@@ -67,6 +95,9 @@
 #define TNS_SKIP	004				/* skip next */
 
 void tmxr_rmvrc (TMLN *lp, int32 p);
+int32 tmxr_send_buffered_data (TMLN *lp);
+TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp);
+
 extern int32 sim_switches;
 extern char sim_name[];
 extern FILE *sim_log;
@@ -98,13 +129,13 @@ static char mantra[] = {
 newsock = sim_accept_conn (mp->master, &ipaddr);	/* poll connect */
 if (newsock != INVALID_SOCKET) {			/* got a live one? */
 	for (i = 0; i < mp->lines; i++) {		/* find avail line */
-	    lp = mp->ldsc[i];				/* ptr to ln desc */
+	    lp = mp->ldsc + i;				/* ptr to ln desc */
 	    if (lp->conn == 0) break;  }		/* available? */
 	if (i >= mp->lines) {				/* all busy? */
 	    tmxr_msg (newsock, "All connections busy\r\n");
 	    sim_close_sock (newsock, 0);  }
 	else {
-	    lp = mp->ldsc[i];				/* get line desc */
+	    lp = mp->ldsc + i;				/* get line desc */
 	    lp->conn = newsock;				/* record connection */
 	    lp->ipad = ipaddr;				/* ip address */
 	    lp->cnms = sim_os_msec ();			/* time of conn */
@@ -115,9 +146,10 @@ if (newsock != INVALID_SOCKET) {			/* got a live one? */
 	    lp->xmte = 1; 				/* enable transmit */
 	    lp->dstb = 0;				/* default bin mode */
 	    sim_write_sock (newsock, mantra, 15);
-	    tmxr_msg (newsock, "\n\r\nConnected to the ");
-	    tmxr_msg (newsock, sim_name);
-	    tmxr_msg (newsock, " simulator\r\n\n");
+	    tmxr_linemsg (lp, "\n\r\nConnected to the ");
+	    tmxr_linemsg (lp, sim_name);
+	    tmxr_linemsg (lp, " simulator\r\n\n");
+	    tmxr_poll_tx (mp);				/* flush output */
 	    return i;  }
 	}						/* end if newsock */
 return -1;
@@ -127,6 +159,8 @@ return -1;
 
 void tmxr_reset_ln (TMLN *lp)
 {
+if (lp->txlog) fflush (lp->txlog);			/* dump log */
+tmxr_send_buffered_data (lp);				/* send buffered data */
 sim_close_sock (lp->conn, 0);				/* reset conn */
 lp->conn = lp->tsta = 0;				/* reset state */
 lp->rxbpr = lp->rxbpi = 0;
@@ -175,7 +209,7 @@ int32 i, nbytes, j;
 TMLN *lp;
 
 for (i = 0; i < mp->lines; i++) {			/* loop thru lines */
-	lp = mp->ldsc[i];				/* get line desc */
+	lp = mp->ldsc + i;				/* get line desc */
 	if (!lp->conn || !lp->rcve) continue;		/* skip if !conn */
 
 	nbytes = 0;
@@ -238,7 +272,7 @@ for (i = 0; i < mp->lines; i++) {			/* loop thru lines */
 	    }						/* end else nbytes */
 	}						/* end for lines */
 for (i = 0; i < mp->lines; i++) {			/* loop thru lines */
-	lp = mp->ldsc[i];				/* get line desc */
+	lp = mp->ldsc + i;				/* get line desc */
 	if (lp->rxbpi == lp->rxbpr)			/* if buf empty, */
 	    lp->rxbpi = lp->rxbpr = 0;			/* reset pointers */
 	}						/* end for */
@@ -274,14 +308,17 @@ return;
 
 t_stat tmxr_putc_ln (TMLN *lp, int32 chr)
 {
+if (lp->txlog) fputc (chr, lp->txlog);			/* log if available */
 if (lp->conn == 0) return SCPE_LOST;			/* no conn? lost */
-if (lp->txbpi < (TMXR_MAXBUF - 1)) {			/* room for char (+ IAC)? */
+if (tmxr_tqln (lp) < (TMXR_MAXBUF - 1)) {		/* room for char (+ IAC)? */
 	lp->txb[lp->txbpi] = (char) chr;		/* buffer char */
 	lp->txbpi = lp->txbpi + 1;			/* adv pointer */
+	if (lp->txbpi >= TMXR_MAXBUF) lp->txbpi = 0;	/* wrap? */
 	if ((char) chr == TN_IAC) {			/* IAC? */
 	    lp->txb[lp->txbpi] = (char) chr;		/* IAC + IAC */
-	    lp->txbpi = lp->txbpi + 1;  }		/* adv pointer */	
-	if (lp->txbpi > (TMXR_MAXBUF - TMXR_GUARD))	/* near full? */
+	    lp->txbpi = lp->txbpi + 1;			/* adv pointer */	
+	    if (lp->txbpi >= TMXR_MAXBUF) lp->txbpi = 0;  }	/* wrap? */
+	if (tmxr_tqln (lp) > (TMXR_MAXBUF - TMXR_GUARD))/* near full? */
 	    lp->xmte = 0;				/* disable line */
 	return SCPE_OK;  }				/* char sent */
 lp->xmte = 0;						/* no room, dsbl line */
@@ -298,33 +335,58 @@ return SCPE_STALL;					/* char not sent */
 
 void tmxr_poll_tx (TMXR *mp)
 {
-int32 i, nbytes, sbytes;
+int32 i, nbytes;
 TMLN *lp;
 
 for (i = 0; i < mp->lines; i++) {			/* loop thru lines */
-	lp = mp->ldsc[i];				/* get line desc */
+	lp = mp->ldsc + i;				/* get line desc */
 	if (lp->conn == 0) continue;			/* skip if !conn */
-	nbytes = lp->txbpi - lp->txbpr;			/* avail bytes */
-	if (nbytes) {					/* >0? write */
-	    sbytes = sim_write_sock (lp->conn,
-		 &(lp->txb[lp->txbpr]), nbytes);
-	    if (sbytes != SOCKET_ERROR) {		/* update ptrs */
-		lp->txbpr = lp->txbpr + sbytes;
-		lp->txcnt = lp->txcnt + sbytes;
-		nbytes = nbytes - sbytes;  }
-	    }
-	if (nbytes == 0) {				/* buf empty? */
-    	    lp->xmte = 1;				/* enable this line */
-	    lp->txbpr = lp->txbpi = 0;  }
+        nbytes = tmxr_send_buffered_data (lp);		/* buffered bytes */
+	if (nbytes == 0) lp->xmte = 1;			/* buf empty? enab line */
 	}						/* end for */
 return;
+}
+
+/* Send buffered data across network
+
+   Inputs:
+	*lp	=	pointer to line descriptor
+   Outputs:
+	returns number of bytes still buffered
+*/
+
+int32 tmxr_send_buffered_data (TMLN *lp)
+{
+int32 nbytes, sbytes;
+
+nbytes = tmxr_tqln(lp);					/* avail bytes */
+if (nbytes) {						/* >0? write */
+	if (lp->txbpr < lp->txbpi)			/* no wrap? */
+	    sbytes = sim_write_sock (lp->conn,		/* write all data */
+		&(lp->txb[lp->txbpr]), nbytes);
+	else sbytes = sim_write_sock (lp->conn,		/* write to end buf */
+		&(lp->txb[lp->txbpr]), TMXR_MAXBUF - lp->txbpr);
+	if (sbytes != SOCKET_ERROR) {			/* ok? */
+	    lp->txbpr = (lp->txbpr + sbytes);		/* update remove ptr */
+	    if (lp->txbpr >= TMXR_MAXBUF) lp->txbpr = 0;/* wrap? */
+	    lp->txcnt = lp->txcnt + sbytes;		/* update counts */
+	    nbytes = nbytes - sbytes;  }
+	if (nbytes && (lp->txbpr == 0))	{		/* more data and wrap? */
+	    sbytes = sim_write_sock (lp->conn, lp->txb, nbytes);
+	    if (sbytes != SOCKET_ERROR) {		/* ok */
+		lp->txbpr = (lp->txbpr + sbytes);	/* update remove ptr */
+		if (lp->txbpr >= TMXR_MAXBUF) lp->txbpr = 0;/* wrap? */
+		lp->txcnt = lp->txcnt + sbytes;		/* update counts */
+		nbytes = nbytes - sbytes;  }  }
+	}						/* end if nbytes */
+return nbytes;
 }
 
 /* Return count of buffered characters for line */
 
 int32 tmxr_tqln (TMLN *lp)
 {
-return (lp->txbpi - lp->txbpr);
+return (lp->txbpi - lp->txbpr + ((lp->txbpi < lp->txbpr)? TMXR_MAXBUF: 0));
 }
 
 /* Open master socket */
@@ -346,7 +408,7 @@ if (sim_log) fprintf (sim_log,
 mp->port = port;					/* save port */
 mp->master = sock;					/* save master socket */
 for (i = 0; i < mp->lines; i++) {			/* initialize lines */
-	lp = mp->ldsc[i];
+	lp = mp->ldsc + i;
 	lp->conn = lp->tsta = 0;
 	lp->rxbpi = lp->rxbpr = 0;
 	lp->txbpi = lp->txbpr = 0;
@@ -383,11 +445,11 @@ int32 i;
 TMLN *lp;
 
 for (i = 0; i < mp->lines; i++) {			/* loop thru conn */
-	lp = mp->ldsc[i];
+	lp = mp->ldsc + i;
 	if (lp->conn) {
-	    tmxr_msg (lp->conn, "\r\nDisconnected from the ");
-	    tmxr_msg (lp->conn, sim_name);
-	    tmxr_msg (lp->conn, " simulator\r\n\n");
+	    tmxr_linemsg (lp, "\r\nDisconnected from the ");
+	    tmxr_linemsg (lp, sim_name);
+	    tmxr_linemsg (lp, " simulator\r\n\n");
 	    tmxr_reset_ln (lp);  }			/* end if conn */
 	}						/* end for */
 sim_close_sock (mp->master, 1);				/* close master socket */
@@ -419,11 +481,20 @@ t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 return SCPE_NOFNC;
 }
 
-/* Output message */
+/* Output message to socket or line descriptor */
 
 void tmxr_msg (SOCKET sock, char *msg)
 {
 if (sock) sim_write_sock (sock, msg, strlen (msg));
+return;
+}
+
+void tmxr_linemsg (TMLN *lp, char *msg)
+{
+int32 len;
+
+for (len = strlen (msg); len > 0; --len)
+	tmxr_putc_ln (lp, *msg++);
 return;
 }
 
@@ -447,6 +518,7 @@ if (lp->conn) {
 	fprintf (st, "IP address %d.%d.%d.%d", o1, o2, o3, o4);
 	if (ctime) fprintf (st, ", connected %02d:%02d:%02d\n", hr, mn, sc);  }
 else fprintf (st, "line disconnected\n");
+if (lp->txlog) fprintf (st, "Logging to %s\n", lp->txlogname);
 return;
 }
 
@@ -483,9 +555,74 @@ if (cptr) {
 	ln = (int32) get_uint (cptr, 10, mp->lines - 1, &r);
 	if (r != SCPE_OK) return SCPE_ARG;  }
 else ln = 0;
-lp = mp->ldsc[ln];
+lp = mp->ldsc + ln;
 if (lp->conn) {
-	tmxr_msg (lp->conn, "\r\nOperator disconnected line\r\n\n");
+	tmxr_linemsg (lp, "\r\nOperator disconnected line\r\n\n");
 	tmxr_reset_ln (lp);  }
 return SCPE_OK;
+}
+
+/* Enable logging for line */
+
+t_stat tmxr_set_log (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+TMXR *mp = (TMXR *) desc;
+TMLN *lp;
+
+if (cptr == NULL) return SCPE_2FARG;			/* no file name? */
+lp = tmxr_find_ldsc (uptr, val, mp);			/* find line desc */
+if (lp == NULL) return SCPE_IERR;
+if (lp->txlog) tmxr_set_nolog (NULL, val, NULL, desc);	/* close existing log */
+lp->txlogname = calloc (CBUFSIZE, sizeof (char));	/* alloc namebuf */
+if (lp->txlogname == NULL) return SCPE_MEM;		/* can't? */
+strncpy (lp->txlogname, cptr, CBUFSIZE);		/* save file name */
+lp->txlog = fopen (cptr, "ab");				/* open log */
+if (lp->txlog == NULL) {				/* error? */
+	free (lp->txlogname);				/* free buffer */
+	return SCPE_OPENERR;  }
+return SCPE_OK;
+}
+
+/* Disable logging for line */
+
+t_stat tmxr_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+TMXR *mp = (TMXR *) desc;
+TMLN *lp;
+
+if (cptr) return SCPE_2MARG;				/* no arguments */
+lp = tmxr_find_ldsc (uptr, val, mp);			/* find line desc */
+if (lp == NULL) return SCPE_IERR;
+if (lp->txlog) {					/* logging? */
+	fclose (lp->txlog);				/* close log */
+	free (lp->txlogname);				/* free namebuf */
+	lp->txlog = NULL;
+	lp->txlogname = NULL;  }
+return SCPE_OK;
+}
+
+/* Show logging status for line */
+
+t_stat tmxr_show_log (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+TMXR *mp = (TMXR *) desc;
+TMLN *lp;
+
+lp = tmxr_find_ldsc (uptr, val, mp);			/* find line desc */
+if (lp == NULL) return SCPE_IERR;
+if (lp->txlog) fprintf (st, "logging to %s", lp->txlogname);
+else fprintf (st, "no logging");
+return SCPE_OK;
+}
+
+/* Find line descriptor */
+
+TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp)
+{
+if (uptr) {						/* called from SET? */
+	DEVICE *dptr = find_dev_from_unit (uptr);	/* find device */
+	if (dptr == NULL) return NULL;			/* what?? */
+	val = uptr - dptr->units;  }			/* implicit line # */
+if ((val < 0) || (val >= mp->lines)) return NULL;	/* invalid line? */
+return mp->ldsc + val;					/* line descriptor */
 }

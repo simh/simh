@@ -1,6 +1,6 @@
 /*	altairz80_defs.h: MITS Altair simulator definitions
 
-		Copyright (c) 2002-2003, Peter Schorn
+		Copyright (c) 2002-2004, Peter Schorn
 
 		Permission is hereby granted, free of charge, to any person obtaining a
 		copy of this software and associated documentation files (the "Software"),
@@ -74,13 +74,9 @@
 #define message6(p1,p2,p3,p4,p5,p6)	\
 	sprintf(messageBuffer,PCformat p1,PCX,p2,p3,p4,p5,p6);	printMessage()
 
-/*	The Default is to use "inline". In this case the wrapper functions for
-		GetBYTE and PutBYTE need to be created. Otherwise they are not needed
-		and the calls map to the original functions.																			*/
-#ifdef NO_INLINE
+/*	The Default is to use "inline".	*/
+#if defined(NO_INLINE)
 #define INLINE
-#define GetBYTEWrapper GetBYTE
-#define PutBYTEWrapper PutBYTE
 #else
 #if defined(__DECC) && defined(VMS)
 #define INLINE __inline

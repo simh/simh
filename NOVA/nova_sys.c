@@ -1,6 +1,6 @@
 /* nova_sys.c: NOVA simulator interface
 
-   Copyright (c) 1993-2003, Robert M. Supnik
+   Copyright (c) 1993-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   26-Mar-04	RMS	Fixed warning with -std=c99
+   14-Jan-04	BKR	Added support for QTY and ALM
+   04-Jan-04	RMS	Fixed 64b issues found by VMS 8.1
    24-Nov-03	CEO	Added symbolic support for LEF instruction
    17-Sep-01	RMS	Removed multiconsole support
    31-May-01	RMS	Added multiconsole support
@@ -61,6 +64,8 @@ extern DEVICE lpt_dev;
 extern DEVICE dkp_dev;
 extern DEVICE dsk_dev;
 extern DEVICE mta_dev;
+extern DEVICE qty_dev;
+extern DEVICE alm_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
 extern int32 saved_PC;
@@ -104,6 +109,8 @@ DEVICE *sim_devices[] = {
 	&dsk_dev,
 	&dkp_dev,
 	&mta_dev,
+	&qty_dev,
+	&alm_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -387,7 +394,7 @@ static const char *opcode[] = {
 #endif
  NULL };
 
-static const opc_val[] = {
+static const int32 opc_val[] = {
  0000000+I_M, 0004000+I_M, 0010000+I_M, 0014000+I_M,
  0020000+I_RM, 0040000+I_RM,
 #if defined (ECLIPSE)
@@ -596,7 +603,7 @@ return SCPE_OK;
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 	UNIT *uptr, int32 sw)
 {
-int32 cflag, i, j, c1, c2, inst, dv, src, dst, skp;
+int32 cflag, i, j, c1, c2, inst, inst1, dv, src, dst, skp;
 int32 ind, mode, disp, dev;
 int32 byac, extind, extdisp, xop;
 
@@ -615,6 +622,7 @@ if (!(sw & SWMASK ('M'))) return SCPE_ARG;		/* mnemonic? */
 /* Instruction decode */
 
 inst = (int32) val[0];
+inst1 = (int32) val[1];
 for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
     if ((opc_val[i] & 0177777) == (inst & masks[j])) {	/* match? */
@@ -627,8 +635,8 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	dev = I_GETDEV (inst);				/* IOT fields */
 	byac = I_GETPULSE (inst);			/* byte fields */
 	xop = I_GETXOP (inst);				/* XOP fields */
-	extind = (int32) val[1] & A_IND;		/* extended fields */
-	extdisp = (int32) val[1] & AMASK;
+	extind = inst1 & A_IND;			/* extended fields */
+	extdisp = inst1 & AMASK;
 	for (dv = 0; (dev_val[dv] >= 0) && (dev_val[dv] != dev); dv++) ;
 
 	switch (j) {					/* switch on class */
@@ -677,10 +685,10 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	    fprintf (of, "%s %-o,%-o", opcode[i], src + 1, dst);
 	    break;
 	case I_V_LI:					/* long imm */
-	    fprintf (of, "%s %-o", opcode[i], val[1]);
+	    fprintf (of, "%s %-o", opcode[i], inst1);
 	    return -1;
 	case I_V_RLI:					/* reg, long imm */
-	    fprintf (of, "%s %-o,%-o", opcode[i], val[1], dst);
+	    fprintf (of, "%s %-o,%-o", opcode[i], inst1, dst);
 	    return -1;
 	case I_V_LM:					/* long addr */
 	    fprintf (of, "%s ", opcode[i]);

@@ -104,7 +104,7 @@ char	cX;													// character to test
 	iO = 0;													// init output position
 	iT = 0;													// init tab stop
 	
-	while (cX = *(p_szInbuf + iI))							// while there are characters
+	while ((cX = *(p_szInbuf + iI))	!= 0)					// while there are characters
 	{
 		if (cX == '\t')										// q. tab character?
 		{													// a. yes ..
@@ -227,7 +227,7 @@ char *EditToFortran(char* p_pszEdit)					// convert line to 1130 assembler
 char	pszLine[MAXLINE];									// source line
 char*	pszWork;											// work pointer
 size_t	iI;													// work integer
-char	bContinue;											// true if continue
+int		bContinue;											// true if continue
 
 	if (p_pszEdit == NULL)									// q. null request?
 		return FMSG;										// a. yes .. return display message

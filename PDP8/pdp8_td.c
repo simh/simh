@@ -1,6 +1,6 @@
 /* pdp8_td.c: PDP-8 simple DECtape controller (TD8E) simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,8 @@
    PDP8 simulator but tracks the hardware implementation more closely.
 
    td		TD8E/TU56 DECtape
+
+   09-Jan-04	RMS	Changed sim_fsize calling sequence, added STOP_OFFR
 
    PDP-8 DECtapes are represented in memory by fixed length buffer of 12b words.
    Three file formats are supported:
@@ -183,6 +185,7 @@ int32 td_csum = 0;					/* save check sum */
 int32 td_qlctr = 0;					/* quad line ctr */
 int32 td_ltime = 20;					/* interline time */
 int32 td_dctime = 40000;				/* decel time */
+int32 td_stopoffr = 0;
 static uint8 tdb_mtk[DT_NUMDR][D18_LPERB];		/* mark track bits */
 
 DEVICE td_dev;
@@ -238,6 +241,7 @@ REG td_reg[] = {
 		  DT_NUMDR, REG_RO) },
 	{ URDATA (LASTT, td_unit[0].LASTT, 10, 32, 0,
 		  DT_NUMDR, REG_HRO) },
+	{ FLDATA (STOP_OFFR, td_stopoffr, 0) },
 	{ ORDATA (DEVNUM, td_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
@@ -283,7 +287,7 @@ case 04:						/* SDLC */
 	td_cmd = AC & TDC_MASK;				/* update cmd */
 	if ((diff != 0) && (diff != TDC_RW)) {		/* signif change? */
 	    if (td_newsa (td_cmd))			/* new command */
-		return AC | (STOP_DTOFF << IOT_V_REASON);  }
+		return AC | (IORETURN (td_stopoffr, STOP_DTOFF) << IOT_V_REASON);  }
 	break;
 case 05:						/* SDLD */
 	td_slf = 0;					/* clear flags */
@@ -433,7 +437,8 @@ if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
 
 switch (mot) {						/* case on motion */
 case STA_DEC:						/* deceleration */
-	if (td_setpos (uptr)) return STOP_DTOFF;	/* update pos */
+	if (td_setpos (uptr))				/* upd pos; off reel? */
+	    return IORETURN (td_stopoffr, STOP_DTOFF);
 	if ((unum != su) || !(td_cmd & TDC_STPGO))	/* not sel or stop? */
 	    uptr->STATE = 0;				/* stop */
 	else {						/* selected and go */
@@ -442,7 +447,8 @@ case STA_DEC:						/* deceleration */
 	    sim_activate (uptr, td_dctime - (td_dctime >> 2));  }
 	return SCPE_OK;
 case STA_ACC:						/* accelerating */
-	if (td_setpos (uptr)) return STOP_DTOFF;	/* update pos */
+	if (td_setpos (uptr))				/* upd pos; off reel? */
+	    return IORETURN (td_stopoffr, STOP_DTOFF);
 	uptr->STATE = STA_UTS | dir;			/* set up to speed */
 	break;
 case STA_UTS:						/* up to speed */
@@ -452,7 +458,7 @@ case STA_UTS:						/* up to speed */
 	if (((int32) uptr->pos < 0) ||			/* off reel? */
 	   (uptr->pos >= (((uint32) DTU_FWDEZ (uptr)) + DT_EZLIN))) {
 	    detach_unit (uptr);
-	    return STOP_DTOFF;  }
+	    return IORETURN (td_stopoffr, STOP_DTOFF);  }
 	break;  }					/* check function */
 
 /* At speed - process the current line
@@ -707,7 +713,7 @@ if ((sim_switches & SIM_SW_REST) == 0) {		/* not from rest? */
 	else if (sim_switches & SWMASK ('S'))		/* att 16b? */
 	    uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT;
 	else if (!(sim_switches & SWMASK ('R')) &&	/* autosize? */
-	    (sz = sim_fsize (cptr))) {
+	    (sz = sim_fsize (uptr->fileref))) {
 	    if (sz == D11_FILSIZ)
 		uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT;
 	    else if (sz > D8_FILSIZ)

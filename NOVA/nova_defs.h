@@ -1,6 +1,6 @@
 /* nova_defs.h: NOVA/Eclipse simulator definitions 
 
-   Copyright (c) 1993-2003, Robert M. Supnik
+   Copyright (c) 1993-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jan-04	BKR	Added support for QTY and ALM
    22-Nov-03	CEO	Added support for PIT device
    19-Jan-03	RMS	Changed CMASK to CDMASK for Apple Dev kit conflict
    03-Oct-02	RMS	Added device information structure
@@ -173,8 +174,10 @@
 #define DEV_MTA		022				/* magtape */
 #define DEV_DCM		024				/* data comm mux */
 #define DEV_ADCV	030				/* A/D converter */
+#define	DEV_QTY		030				/* 4060 multiplexor */
 #define DEV_DKP		033				/* disk pack */
 #define DEV_CAS		034				/* cassette */
+#define	DEV_ALM		034				/* ALM/ULM multiplexor */
 #define DEV_PIT		043				/* programmable interval timer */
 #define DEV_TTI1	050				/* second console input */
 #define DEV_TTO1	051				/* second console output */
@@ -226,9 +229,11 @@ typedef struct nova_dib DIB;
 #define INT_V_TTO	12				/* terminal */
 #define INT_V_TTI1	13				/* second keyboard */
 #define INT_V_TTO1	14				/* second terminal */
-#define INT_V_STK	15				/* stack overflow */
-#define INT_V_NO_ION_PENDING 16				/* ion delay */
-#define INT_V_ION 	17				/* interrupts on */
+#define	INT_V_QTY	15				/* QTY multiplexor */
+#define	INT_V_ALM	16				/* ALM multiplexor */
+#define INT_V_STK	17				/* stack overflow */
+#define INT_V_NO_ION_PENDING 18				/* ion delay */
+#define INT_V_ION 	19				/* interrupts on */
 
 #define INT_PIT		(1 << INT_V_PIT)
 #define INT_DKP		(1 << INT_V_DKP)
@@ -243,6 +248,8 @@ typedef struct nova_dib DIB;
 #define INT_TTO		(1 << INT_V_TTO)
 #define	INT_TTI1	(1 << INT_V_TTI1)
 #define	INT_TTO1	(1 << INT_V_TTO1)
+#define	INT_QTY		(1 << INT_V_QTY)
+#define	INT_ALM		(1 << INT_V_ALM)
 #define INT_STK		(1 << INT_V_STK)
 #define INT_NO_ION_PENDING (1 << INT_V_NO_ION_PENDING)
 #define INT_ION		(1 << INT_V_ION)
@@ -260,6 +267,8 @@ typedef struct nova_dib DIB;
 #define PI_PTR		0000020
 #define PI_PTP		0000004
 #define PI_PLT		0000010
+#define	PI_QTY		0000002
+#define	PI_ALM		0000002
 #define PI_TTI		0000002
 #define PI_TTO		0000001
 #define	PI_TTI1		PI_TTI

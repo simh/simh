@@ -25,6 +25,10 @@
 
    cpu		PDP-4/7/9/15 central processor
 
+   26-Mar-04	RMS	Fixed warning from -std=c99
+   14-Jan-04	RMS	Fixed g_mode in XVM implementation
+			PDP-15 index, autoincrement generate 18b addresses
+			Revised IO device call interface
    31-Dec-03	RMS	Fixed bug in cpu_set_hist
    02-Nov-03	RMS	Changed PDP-9,-15 default to API
    26-Oct-03	RMS	Fixed bug in PDP-4,-7,-9 autoincrement addressing
@@ -386,7 +390,7 @@ t_stat Ia (int32 ma, int32 *ea, t_bool jmp);
 int32 Incr_addr (int32 addr);
 int32 Jms_word (int32 t);
 #if defined (PDP15)
-#define INDEX(i,x)	if (!memm && ((i) & I_IDX)) x = ((x) + XR) & AMASK
+#define INDEX(i,x)	if (!memm && ((i) & I_IDX)) x = ((x) + XR) & DMASK
 int32 Prot15 (int32 ma, t_bool bndchk);
 int32 Reloc15 (int32 ma, int32 acc);
 int32 RelocXVM (int32 ma, int32 acc);
@@ -395,9 +399,9 @@ extern t_stat fp15 (int32 ir);
 #define INDEX(i,x)
 #endif
 
-extern clk (int32 pulse, int32 AC);
+extern int32 clk (int32 dev, int32 pulse, int32 AC);
 
-int32 (*dev_tab[DEV_MAX])(int32 pulse, int32 AC);	/* device dispatch */
+int32 (*dev_tab[DEV_MAX])(int32 dev, int32 pulse, int32 AC);	/* device dispatch */
 
 int32 (*dev_iors[DEV_MAX])(void);			/* IORS dispatch */
 
@@ -851,7 +855,7 @@ case 004:						/* JMS, dir */
 #endif
 	MB = Jms_word (api_usmd | usmd);		/* save state */
 	if (Write (MA, MB, WR)) break;
-	PC = Incr_addr (MA);
+	PC = Incr_addr (MA) & AMASK;
 	break;
 
 /* JMP: opcode 60 */
@@ -861,7 +865,7 @@ case 031:						/* JMP, indir */
 case 030:						/* JMP, dir */
 	INDEX (IR, MA);
 	PCQ_ENTRY;					/* save old PC */
-	PC = MA;
+	PC = MA & AMASK;
 	break;
 
 /* OPR: opcode 74 */
@@ -1276,7 +1280,7 @@ case 034:						/* IOT */
 	case 0:						/* CPU and clock */
 	    if (pulse == 002) ion = 0;			/* IOF */
 	    else if (pulse == 042) ion = ion_defer = 1;	/* ION */
-	    else iot_data = clk (pulse, iot_data);
+	    else iot_data = clk (device, pulse, iot_data);
 	    break;
 #endif
 
@@ -1289,7 +1293,7 @@ case 034:						/* IOT */
 	    else if (pulse == 042) ion = ion_defer = 1;	/* ION */
 	    else if (pulse == 062)			/* ITON */
 		usmd = usmd_buf = ion = ion_defer = 1;
-	    else iot_data = clk (pulse, iot_data);
+	    else iot_data = clk (device, pulse, iot_data);
 	    break;
 	case 033:					/* CPU control */
 	    if ((pulse == 001) || (pulse == 041)) PC = Incr_addr (PC);
@@ -1313,7 +1317,7 @@ case 034:						/* IOT */
 	case 000:					/* CPU and clock */
 	    if (pulse == 002) ion = 0;			/* IOF */
 	    else if (pulse == 042) ion = 1;		/* ION */
-	    else iot_data = clk (pulse, iot_data);
+	    else iot_data = clk (device, pulse, iot_data);
 	    break;
 	case 017:					/* mem protection */
 	    if (PROT) {					/* enabled? */
@@ -1375,7 +1379,7 @@ case 034:						/* IOT */
 		iot_data = MMR;
 	    else if (XVM && (pulse == 024))		/* LDMM */
 	        MMR = iot_data;
-	    else iot_data = clk (pulse, iot_data);
+	    else iot_data = clk (device, pulse, iot_data);
 	    break;
 	case 017:					/* mem protection */
 	    if (PROT) {					/* enabled? */
@@ -1432,7 +1436,7 @@ case 034:						/* IOT */
 
 	default:					/* devices */
 	    if (dev_tab[device])			/* defined? */
-		iot_data = dev_tab[device] (pulse, iot_data);
+		iot_data = dev_tab[device] (device, pulse, iot_data);
 	    else reason = stop_inst;			/* stop on flag */
 	    break;  }					/* end switch device */
 	LAC = LAC | (iot_data & DMASK);
@@ -1634,7 +1638,8 @@ return (((LAC & LINK) >> 1) | ((memm & 1) << 16) |
 		will access absolute locations 00010-00017.
 	Indirect addressing range is determined by autoincrementing.
 	Any indirect can trigger a restore.
-	Memory protection is implemented for foreground/background operation. */
+	Memory protection is implemented for foreground/background operation.
+	Read and write mask addresses to 17b except for XVM systems */
 
 t_stat Read (int32 ma, int32 *dat, int32 cyc)
 {
@@ -1643,7 +1648,7 @@ int32 pa;
 if (usmd) {						/* user mode? */
 	if (XVM) pa = RelocXVM (ma, REL_R);		/* XVM relocation? */
 	else if (RELOC) pa = Reloc15 (ma, REL_R);	/* PDP-15 relocation? */
-	else pa = Prot15 (ma, cyc == FE);		/* just protection */
+	else pa = Prot15 (ma, cyc == FE);		/* PDP-15 prot, fetch only */
 	if (pa < 0) {					/* error? */
 	    *dat = 0;
 	    return MM_ERR;  }  }
@@ -1661,7 +1666,7 @@ int32 pa;
 if (usmd) {						/* user mode? */
 	if (XVM) pa = RelocXVM (ma, REL_W);		/* XVM relocation? */
 	else if (RELOC) pa = Reloc15 (ma, REL_W);	/* PDP-15 relocation? */
-	else pa = Prot15 (ma, cyc != DF);		/* just protection */
+	else pa = Prot15 (ma, cyc != DF);		/* PDP-15 prot, !defer */
 	if (pa < 0) return MM_ERR;  }			/* error? */
 else pa = ma & AMASK;					/* no prot or reloc */
 if (MEM_ADDR_OK (pa)) M[pa] = dat & DMASK;		/* valid mem? ok */
@@ -1673,8 +1678,9 @@ return MM_OK;
 
 t_stat Ia (int32 ma, int32 *ea, t_bool jmp)
 {
-int32 t;
+int32 gmode, t;
 int32 damask = memm? B_DAMASK: P_DAMASK;
+static const int32 g_mask[4] = { MM_G_W0, MM_G_W1, MM_G_W2, MM_G_W3 };
 t_stat sta = MM_OK;
 
 if ((ma & damask & ~07) == 010) {			/* autoincrement? */
@@ -1688,8 +1694,10 @@ if (rest_pending) {					/* restore pending? */
 	memm = (t >> 16) & 1;				/* restore bank */
 	usmd = usmd_buf = (t >> 15) & 1;		/* restore user */
 	emir_pending = rest_pending = 0; }
-if (usmd && XVM && (MMR & MM_GM)) *ea = t;		/* XVM G_mode? */
-else if ((ma & damask & ~07) == 010) *ea = t & AMASK;	/* autoindex? */
+gmode = MM_GETGM (MMR);					/* get G_mode */
+if (usmd && XVM && gmode) {				/* XVM user mode? */
+	*ea = t & g_mask[gmode];  }			/* mask ia to size */
+else if ((ma & damask & ~07) == 010) *ea = t & DMASK;	/* autoindex? */
 else *ea = (PC & BLKMASK) | (t & IAMASK);		/* within 32K */
 return sta;
 }
@@ -1745,13 +1753,11 @@ return pa;
 int32 RelocXVM (int32 ma, int32 rc)
 {
 int32 pa, gmode, slr;
-static const int32 g_mask[4] = { MM_G_W0, MM_G_W1, MM_G_W2, MM_G_W3 };
 static const int32 g_base[4] = { MM_G_B0, MM_G_B1, MM_G_B2, MM_G_B3 };
 static const int32 slr_lnt[4] = { MM_SLR_L0, MM_SLR_L1, MM_SLR_L2, MM_SLR_L3 };
 
 gmode = MM_GETGM (MMR);					/* get G_mode */
 slr = MM_GETSLR (MMR);					/* get segment length */
-ma = ma & g_mask[gmode];				/* mask address */
 if (MMR & MM_RDIS) pa = ma;				/* reloc disabled? */
 else if ((MMR & MM_SH) &&				/* shared enabled and */
 	(ma >= g_base[gmode]) &&			/* >= shared base and */
@@ -1884,7 +1890,7 @@ return SCPE_OK;
 
 /* CPU device handler - should never get here! */
 
-int32 bad_dev (int32 pulse, int32 AC)
+int32 bad_dev (int32 dev, int32 pulse, int32 AC)
 {
 return (SCPE_IERR << IOT_V_REASON) | AC;		/* broken! */
 }

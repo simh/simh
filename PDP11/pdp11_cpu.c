@@ -25,6 +25,7 @@
 
    cpu		PDP-11 CPU (J-11 microprocessor)
 
+   25-Jan-04	RMS	Removed local debug logging support
    29-Dec-03	RMS	Formalized 18b Qbus support
    21-Dec-03	RMS	Added autoconfiguration controls
    05-Jun-03	RMS	Fixed bugs in memory size table
@@ -277,7 +278,6 @@ int32 stop_trap = 1;					/* stop on trap */
 int32 stop_vecabort = 1;				/* stop on vec abort */
 int32 stop_spabort = 1;					/* stop on SP abort */
 int32 wait_enable = 0;					/* wait state enable */
-int32 cpu_log = 0;					/* logging */
 int32 autcon_enb = 1;					/* autoconfig enable */
 uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
@@ -420,7 +420,6 @@ REG cpu_reg[] = {
 	{ ORDATA (STOP_TRAPS, stop_trap, TRAP_V_MAX) },
 	{ FLDATA (STOP_VECA, stop_vecabort, 0) },
 	{ FLDATA (STOP_SPA, stop_spabort, 0) },
-	{ HRDATA (DBGLOG, cpu_log, 16), REG_HIDDEN },
 	{ ORDATA (FAC0H, FR[0].h, 32) },
 	{ ORDATA (FAC0L, FR[0].l, 32) },
 	{ ORDATA (FAC1H, FR[1].h, 32) },
@@ -583,7 +582,8 @@ DEVICE cpu_dev = {
 	1, 8, 22, 2, 8, 16,
 	&cpu_ex, &cpu_dep, &cpu_reset,
 	NULL, NULL, NULL,
-	NULL, DEV_DYNM, &cpu_set_size };
+	NULL, DEV_DYNM | DEV_DEBUG, 0,
+	NULL, &cpu_set_size, NULL };
 
 t_stat sim_instr (void)
 {

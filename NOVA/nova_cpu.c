@@ -1,6 +1,6 @@
 /* nova_cpu.c: NOVA CPU simulator
 
-   Copyright (c) 1993-2003, Robert M. Supnik
+   Copyright (c) 1993-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu		Nova central processor
 
+   14-Jan-04	RMS	Fixed device enable/disable support (found by Bruce Ray)
    19-Jan-03	RMS	Changed CMASK to CDMASK for Apple Dev Kit conflict
    03-Oct-02	RMS	Added DIB infrastructure
    30-Dec-01	RMS	Added old PC queue
@@ -831,7 +832,8 @@ for (i = 0; i < 64; i++) {				/* clr dev_table */
 	dev_table[i].pi = 0;
 	dev_table[i].routine = NULL;  }
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
-	if (dibp = (DIB *) dptr->ctxt) {		/* get DIB */
+	if (!(dptr->flags & DEV_DIS) &&			/* enabled and */
+	    (dibp = (DIB *) dptr->ctxt)) {		/* defined DIB? */
 	    dn = dibp->dnum;				/* get dev num */
 	    dev_table[dn].mask = dibp->mask;		/* copy entries */
 	    dev_table[dn].pi = dibp->pi;

@@ -1,6 +1,6 @@
 /*	altairz80_sys.c: MITS Altair system interface
 
-		Copyright (c) 2002-2003, Peter Schorn
+		Copyright (c) 2002-2004, Peter Schorn
 
 		Permission is hereby granted, free of charge, to any person obtaining a
 		copy of this software and associated documentation files (the "Software"),
@@ -40,14 +40,7 @@ extern DEVICE simh_device;
 extern DEVICE ptr_dev;
 extern DEVICE ptp_dev;
 extern int32 saved_PC;
-extern void PutBYTEWrapper(register uint32 Addr, register uint32 Value);
-extern void PutBYTEForced(register uint32 Addr, register uint32 Value);
-extern uint8 GetBYTEWrapper(register uint32 Addr);
-extern int32 addressIsInROM(const uint32 Addr);
-extern int32 addressExists(const uint32 Addr);
-extern void printROMMessage(const uint32 cntROM);
 
-int32 sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag);
 int32 fprint_sym(FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw);
 static int32 checkbase(char ch, const char *numString);
 static int32 numok(char ch, const char **numString, const int32 minvalue,
@@ -347,7 +340,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
 		T = Mnemonics8080[val[B++]];
 	}
 
-	if (P = strchr(T, '^')) {
+	if ( (P = strchr(T, '^')) ) {
 		strncpy(R, T, P - T);
 		R[P - T] = '\0';
 		sprintf(H, "%02X", val[B++]);
@@ -357,21 +350,21 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
 	else {
 		strcpy(R, T);
 	}
-	if (P = strchr(R, '%')) {
+	if ( (P = strchr(R, '%')) ) {
 		*P = C;
-		if (P = strchr(P + 1, '%')) {
+		if ( (P = strchr(P + 1, '%')) ) {
 			*P = C;
 		}
 	}
 
-	if(P = strchr(R, '*')) {
+	if( (P = strchr(R, '*')) ) {
 		strncpy(S, R, P - R);
 		S[P - R] = '\0';
 		sprintf(H, "%02X", val[B++]);
 		strcat(S, H);
 		strcat(S, P + 1);
 	}
-	else if (P = strchr(R, '@')) {
+	else if ( (P = strchr(R, '@')) ) {
 		strncpy(S, R, P - R);
 		S[P - R] = '\0';
 		if(!J) {
@@ -383,7 +376,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
 		strcat(S, H);
 		strcat(S, P + 1);
 	}
-	else if (P = strchr(R, '$')) {
+	else if ( (P = strchr(R, '$')) ) {
 		strncpy(S, R, P - R);
 		S[P - R] = '\0';
 		Offset = val[B++];
@@ -391,7 +384,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
 		strcat(S, H);
 		strcat(S, P + 1);
 	}
-	else if (P = strchr(R, '#')) {
+	else if ( (P = strchr(R, '#')) ) {
 		strncpy(S, R, P - R);
 		S[P - R] = '\0';
 		sprintf(H, "%04X", val[B] + 256 * val[B + 1]);
@@ -723,60 +716,4 @@ int32 parse_sym(char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw) {
 		return SCPE_OK;
 	}
 	return parse_X80(cptr, addr, val, cpu_unit.flags & UNIT_CHIP ? MnemonicsZ80 : Mnemonics8080);
-}
-
-
-/*	This is the binary loader. The input file is considered to be
-		a string of literal bytes with no format special format. The
-		load starts at the current value of the PC. ROM/NOROM and
-		ALTAIRROM/NOALTAIRROM settings are ignored.
-*/
-
-int32 sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
-	int32 i, addr = 0, cnt = 0, org, cntROM = 0, cntNonExist = 0;
-	t_addr j, lo, hi;
-	char *result;
-	t_stat status;
-	if (flag) {
-		result = get_range(cptr, &lo, &hi, 16, ADDRMASK, 0);
-		if (result == NULL) {
-			return SCPE_ARG;
-		}
-		for (j = lo; j <= hi; j++) {
-			if (putc(GetBYTEWrapper(j), fileref) == EOF) {
-				return SCPE_IOERR;
-			}
-		}
-		printf("%d bytes dumped [%x - %x].\n", hi + 1 - lo, lo, hi);
-	}
-	else {
-		if (*cptr == 0) {
-			addr = saved_PC;
-		}
-		else {
-			addr = get_uint(cptr, 16, ADDRMASK, &status);
-			if (status != SCPE_OK) {
-				return status;
-			}
-		}
-		org = addr;
-		while ((addr < MAXMEMSIZE) && ((i = getc(fileref)) != EOF)) {
-			PutBYTEForced(addr, i);
-			if (addressIsInROM(addr)) {
-				cntROM++;
-			}
-			if (!addressExists(addr)) {
-				cntNonExist++;
-			}
-			addr++;
-			cnt++;
-		}						/* end while */
-		printf("%d bytes [%d page%s] loaded at %x.\n", cnt, (cnt + 255) >> 8,
-			((cnt + 255) >> 8) == 1 ? "" : "s", org);
-		printROMMessage(cntROM);
-		if (cntNonExist) {
-			printf("Warning: %d bytes written to non-existing memory (for this configuration).\n", cntNonExist);
-		}
-	}
-	return SCPE_OK;
 }

@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Mar-04	RMS	Added RXV21 support
+   25-Jan-04	RMS	Removed local debug logging support
+		RMS,MP	Added "KA655X" support
    29-Dec-03	RMS	Added Q18 definition for PDP11 compatibility
    22-Dec-02	RMS	Added BDR halt enable definition
    11-Nov-02	RMS	Added log bits for XQ
@@ -33,13 +36,15 @@
    28-Apr-02	RMS	Fixed DZV vector base and number of lines
 
    This file covers the KA65x ("Mayfair") series of CVAX-based Qbus systems.
+   The simulator defines an extended physical memory variant of the KA655,
+   called the KA655X.  It has a maximum memory size of 512MB instead of 64MB.
 
    System memory map
 
-	0000 0000 - 03FF FFFF		main memory
-	0400 0000 - 0FFF FFFF		reserved
-	1000 0000 - 13FF FFFF		secondary cache diagnostic space
-	1400 0000 - 1FFF FFFF		reserved
+	0000 0000 - 03FF FFFF		main memory (KA655)
+	0400 0000 - 0FFF FFFF		reserved (KA655), main memory (KA655X)
+	1000 0000 - 13FF FFFF		cache diagnostic space (KA655), main memory (KA655X)
+	1400 0000 - 1FFF FFFF		reserved (KA655), main memory (KA655X)
 
 	2000 0000 - 2000 1FFF		Qbus I/O page
 	2000 2000 - 2003 FFFF		reserved
@@ -81,9 +86,10 @@
 
 /* Memory */
 
-#define MAXMEMWIDTH	26				/* max mem addr width */
+#define MAXMEMWIDTH	26				/* max mem, std KA655 */
 #define MAXMEMSIZE	(1 << MAXMEMWIDTH)		/* max mem size */
-#define MAXMEMMASK	(MAXMEMSIZE - 1)		/* max mem addr mask */
+#define MAXMEMWIDTH_X	29				/* max mem, KA655X */
+#define MAXMEMSIZE_X	(1 << MAXMEMWIDTH_X)
 #define INITMEMSIZE	(1 << 24)			/* initial memory size */
 #define MEMSIZE		(cpu_unit.capac)
 #define ADDR_IS_MEM(x)	(((uint32) (x)) < MEMSIZE)
@@ -148,7 +154,8 @@
 
 /* CMCTL registers */
 
-#define CMCTLSIZE	(18 << 2)			/* 18 registers */
+/* #define CMCTLSIZE	(18 << 2)			/* 18 registers */
+#define CMCTLSIZE	(19 << 2)			/* KA655X extra reg */
 #define CMCTLBASE	(REGBASE + 0x100)		/* CMCTL addr base */
 
 /* SSC registers */
@@ -257,6 +264,10 @@ typedef struct pdp_dib DIB;
 #define IOLN_TQ		004
 #define IOBA_RP		(IOPAGEBASE + 016700)		/* RP/RM */
 #define IOLN_RP		054
+#define IOBA_RX		(IOPAGEBASE + 017170)		/* RXV11 */
+#define IOLN_RX		004
+#define IOBA_RY		(IOPAGEBASE + 017170)		/* RXV21 */
+#define IOLN_RY		004
 #define IOBA_DBL	(IOPAGEBASE + 017500)		/* doorbell */
 #define IOLN_DBL	002
 #define IOBA_LPT	(IOPAGEBASE + 017514)		/* LP11 */
@@ -298,6 +309,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_CSO	6
 #define INT_V_TMR0	7				/* SSC timers */
 #define INT_V_TMR1	8
+#define INT_V_RY	9				/* RXV21 */
 
 #define INT_CLK		(1u << INT_V_CLK)
 #define INT_RQ		(1u << INT_V_RQ)
@@ -317,6 +329,7 @@ typedef struct pdp_dib DIB;
 #define INT_CSO		(1u << INT_V_CSO)
 #define INT_TMR0	(1u << INT_V_TMR0)
 #define INT_TMR1	(1u << INT_V_TMR1)
+#define INT_RY		(1u << INT_V_RY)
 
 #define IPL_CLK		(0x16 - IPL_HMIN)			/* relative IPL */
 #define IPL_RQ		(0x15 - IPL_HMIN)
@@ -327,6 +340,7 @@ typedef struct pdp_dib DIB;
 #define IPL_TS		(0x15 - IPL_HMIN)
 #define IPL_TQ		(0x15 - IPL_HMIN)
 #define IPL_XQ		(0x15 - IPL_HMIN)
+#define IPL_RY		(0x15 - IPL_HMIN)
 #define IPL_TTI		(0x14 - IPL_HMIN)
 #define IPL_TTO		(0x14 - IPL_HMIN)
 #define IPL_PTR		(0x14 - IPL_HMIN)
@@ -354,6 +368,7 @@ typedef struct pdp_dib DIB;
 #define VEC_TS		(VEC_Q + 0224)
 #define VEC_RP		(VEC_Q + 0254)
 #define VEC_TQ		(VEC_Q + 0260)
+#define VEC_RY		(VEC_Q + 0264)
 #define VEC_DZRX	(VEC_Q + 0300)
 #define VEC_DZTX	(VEC_Q + 0304)
 
@@ -361,6 +376,7 @@ typedef struct pdp_dib DIB;
 
 #define RANK_DZ		8
 #define RANK_RL		14
+#define RANK_RX		18
 #define RANK_RQ		26
 #define RANK_TQ		30
 
@@ -374,20 +390,9 @@ typedef struct pdp_dib DIB;
 
 /* Logging */
 
-#define LOG_CPU_I	0x0001				/* intexc */
-#define LOG_CPU_R	0x0002				/* REI */
-#define LOG_CPU_P	0x0004				/* context */
-#define LOG_CPU_H	0x0008				/* history */
-#define LOG_RP		0x0010
-#define LOG_TS		0x0020
-#define LOG_RQ		0x0040
-#define LOG_TQ		0x0080
-#define LOG_XQ0		0x0100
-#define LOG_XQ1		0x0200
-#define LOG_XQ2		0x0400
-#define LOG_XQ3		0x0800
-
-#define DBG_LOG(x)	(sim_log && (cpu_log & (x)))
+#define LOG_CPU_I	0x1				/* intexc */
+#define LOG_CPU_R	0x2				/* REI */
+#define LOG_CPU_P	0x4				/* context */
 
 /* Function prototypes for I/O */
 

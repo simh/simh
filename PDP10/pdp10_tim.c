@@ -1,6 +1,6 @@
 /* pdp10_tim.c: PDP-10 tim subsystem simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tim		timer subsystem
 
+   02-Feb-04	RMS	Exported variables needed by Ethernet simulator
    29-Jan-02	RMS	New data structures
    06-Jan-02	RMS	Added enable/disable support
    02-Dec-01	RMS	Fixed bug in ITS PC sampling (found by Dave Conroy)
@@ -55,6 +56,11 @@ d10 period = 0;						/* period */
 d10 quant = 0;						/* ITS quantum */
 int32 diagflg = 0;					/* diagnostics? */
 int32 tmxr_poll = TIM_DELAY * DZ_MULT;			/* term mux poll */
+
+/* Exported variables */
+
+int32 clk_tps = TIM_TPS;				/* clock ticks/sec */
+int32 tmr_poll = TIM_DELAY;				/* clock poll */
 
 DEVICE tim_dev;
 t_stat tcu_rd (int32 *data, int32 PA, int32 access);
@@ -144,6 +150,7 @@ int32 t;
 
 t = diagflg? tim_unit.wait: sim_rtc_calb (TIM_TPS);	/* calibrate clock */
 sim_activate (&tim_unit, t);				/* reactivate unit */
+tmr_poll = t;						/* set timer poll */
 tmxr_poll = t * DZ_MULT;				/* set mux poll */
 timebase = (timebase + 1) & TB_MASK;			/* increment timebase */
 ttg = ttg - TIM_HWRE;					/* decrement timer */
@@ -161,10 +168,14 @@ return SCPE_OK;
 
 t_stat tim_reset (DEVICE *dptr)
 {
+int32 t;
+
 period = ttg = 0;					/* clear timer */
 apr_flg = apr_flg & ~APRF_TIM;				/* clear interrupt */
-sim_activate (&tim_unit, tim_unit.wait);		/* activate unit */
-tmxr_poll = tim_unit.wait * DZ_MULT;			/* set mux poll */
+t = sim_rtc_init (tim_unit.wait);			/* init timer */
+sim_activate (&tim_unit, t);				/* activate unit */
+tmr_poll = t;						/* set timer poll */
+tmxr_poll = t * DZ_MULT;				/* set mux poll */
 return SCPE_OK;
 }
 

@@ -1,7 +1,7 @@
 /* pdp11_xq.h: DEQNA/DELQA ethernet controller information
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2002-2003, David T. Hittner
+   Copyright (c) 2002-2004, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,10 @@
 
   Modification history:
 
+  20-Jan-04  DTH  Added new sanity timer and system id timer
+  19-Jan-04  DTH  Added XQ_SERVICE_INTERVAL, poll
+  09-Jan-04  DTH  Added Boot PDP diagnostic definition, XI/RI combination
+  26-Dec-03  DTH  Moved ethernet queue definitions to sim_ether
   25-Nov-03  DTH  Added interrupt request flag
   02-Jun-03  DTH  Added struct xq_stats
   28-May-03  DTH  Made xq_msg_que.item dynamic
@@ -74,36 +78,20 @@ extern int32 int_vec[IPL_HLVL][32];
 
 #include "sim_ether.h"
 
-/* message queue arrays */
-#define XQ_QUE_MAX      500
-#define XQ_FILTER_MAX    14
+#define XQ_QUE_MAX           500          /* read queue size in packets */
+#define XQ_FILTER_MAX         14          /* number of filters allowed */
+#define XQ_SERVICE_INTERVAL  100          /* polling interval - X per second */
+#define XQ_SYSTEM_ID_SECS    540          /* seconds before system ID timer expires */
+#define XQ_HW_SANITY_SECS    240          /* seconds before HW sanity timer expires */
+#define XQ_MAX_CONTROLLERS     2          /* maximum controllers allowed */
 
 enum xq_type {XQ_T_DEQNA, XQ_T_DELQA};
 
 struct xq_sanity {
-  int       enabled;        /* sanity timer enabled ? */
-  int       quarter_secs;   /* sanity timer value in 1/4 seconds */
-  int       countdown;      /* sanity timer countdown in 1/4 seconds */
-};
-
-struct xq_id {
-  int       enabled;        /* System ID timer enabled ? */
-  int       countdown;      /* System ID timer countdown in seconds */
-};
-
-struct xq_msg_itm {
-  int       type;     /* receive (0=setup, 1=loopback, 2=normal) */
-  int32     status;   /* message size */
-  ETH_PACK  packet;   /* packet */
-};
-
-struct xq_msg_que {
-  int                 count;
-  int                 head;
-  int                 tail;
-  int                 loss;
-  int                 high;
-  struct xq_msg_itm*  item;
+  int       enabled;                    /* sanity timer enabled? 2=HW, 1=SW, 0=off */
+  int       quarter_secs;               /* sanity timer value in 1/4 seconds */
+  int       max;                        /* maximum timeout (based on poll) */
+  int       timer;                      /* countdown timer */
 };
 
 struct xq_setup {
@@ -139,12 +127,12 @@ struct xq_meb {                           /* MEB block */
 
 struct xq_device {
   /*+ initialized values - DO NOT MOVE */
-  ETH_PCALLBACK     rcallback;             /* read callback routine */
+  ETH_PCALLBACK     rcallback;            /* read callback routine */
   ETH_PCALLBACK     wcallback;            /* write callback routine */
   ETH_MAC           mac;                  /* MAC address */
   enum xq_type      type;                 /* controller type */
+  int               poll;                 /* poll ethernet times/sec */
   struct xq_sanity  sanity;               /* sanity timer information */
-  struct xq_id      id;                   /* System ID timer information */
   /*- initialized values - DO NOT MOVE */
 
   /* I/O register storage */
@@ -167,7 +155,8 @@ struct xq_device {
   int               receiving;
   ETH_PACK          read_buffer;
   ETH_PACK          write_buffer;
-  struct xq_msg_que ReadQ;
+  ETH_QUE           ReadQ;
+  int               idtmr;                /* countdown for ID Timer */
 };
 
 struct xq_controller {
@@ -198,9 +187,11 @@ typedef struct xq_controller CTLR;
 #define XQ_CSR_RE 0x0001   /* Receiver Enable               (RE) [RW] */
 
 /* special access bitmaps */
-#define XQ_CSR_RO 0xF8B4   /* Read-Only bits */
-#define XQ_CSR_RW 0x074B   /* Read/Write bits */
-#define XQ_CSR_W1 0x8080   /* Write-one-to-clear bits */
+#define XQ_CSR_RO   0xF8B4   /* Read-Only bits */
+#define XQ_CSR_RW   0x074B   /* Read/Write bits */
+#define XQ_CSR_W1   0x8080   /* Write-one-to-clear bits */
+#define XQ_CSR_BP   0x0208   /* Boot PDP diagnostic ROM */
+#define XQ_CSR_XIRI 0X8080   /* Transmit & Receive Interrupts */
 
 #define XQ_VEC_MS 0x8000   /* Mode Select                   (MO) [RW]  */
 #define XQ_VEC_OS 0x4000   /* Option Switch Setting         (OS) [RO]  */
@@ -228,5 +219,16 @@ typedef struct xq_controller CTLR;
 #define XQ_SETUP_PM 0x0002  /* promiscuous bit */
 #define XQ_SETUP_LD 0x000C  /* led bits */
 #define XQ_SETUP_ST 0x0070  /* sanity timer bits */
+
+/* debugging bitmaps */
+#define DBG_TRC  0x0001       /* trace routine calls */
+#define DBG_REG  0x0002       /* trace read/write registers */
+#define DBG_CSR  0x0004       /* watch CSR */
+#define DBG_VAR  0x0008       /* watch VAR */
+#define DBG_WRN  0x0010       /* display warnings */
+#define DBG_SAN  0x0020       /* display sanity timer info */
+#define DBG_SET  0x0040       /* display setup info */
+#define DBG_PCK  0x0080       /* display packets */
+#define DBG_ETH  0x8000       /* debug ethernet device */
 
 #endif /* _PDP11_XQ_H */

@@ -1,6 +1,6 @@
 /* i1620_lp.c: IBM 1443 line printer simulator
 
-   Copyright (c) 2002-2003, Robert M. Supnik
+   Copyright (c) 2002-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

@@ -25,6 +25,7 @@
 
    cpu			Interdata 32b CPU
 
+   25-Jan-04	RMS	Revised for device debug support
    31-Dec-03	RMS	Fixed bug in cpu_set_hist
    22-Sep-03	RMS	Added additional instruction decode types
 			Added instruction history
@@ -191,6 +192,11 @@ struct InstHistory {
 #define ABS(x)		(((x) & SIGN32)? NEG (x): (x))
 #define DNEG(x,y)	y = NEG (y); \
 			x = (~(x) + (y == 0)) & DMASK32
+
+/* Logging */
+
+#define LOG_CPU_I	0x0001				/* intr/exception */
+#define LOG_CPU_C	0x0002				/* context change */
 
 uint32 GREG[16 * NRSETS] = { 0 };			/* general registers */
 uint32 *M = NULL;					/* memory */
@@ -219,7 +225,6 @@ REG *pcq_r = NULL;					/* PC queue reg ptr */
 uint32 dec_flgs = 0;					/* decode flags */
 uint32 fp_in_hwre = 0;					/* ucode vs hwre fp */
 uint32 pawidth = PAWIDTH32;				/* addr mask */
-uint32 cpu_log = 0;					/* debug logging */
 uint32 hst_p = 0;					/* history pointer */
 uint32 hst_lnt = 0;					/* history length */
 struct InstHistory *hst = NULL;				/* instruction history */
@@ -231,7 +236,7 @@ extern int32 sim_interval;
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
 extern UNIT pic_unit, lfc_unit, pas_unit;		/* timers */
-extern FILE *sim_log;
+extern FILE *sim_deb;
 
 uint32 ReadB (uint32 loc, uint32 rel);
 uint32 ReadH (uint32 loc, uint32 rel);
@@ -538,7 +543,6 @@ REG cpu_reg[] = {
 	{ BRDATA (PCQ, pcq, 16, 20, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ HRDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ HRDATA (WRU, sim_int_char, 8) },
-	{ HRDATA (DBGLOG, cpu_log, 16), REG_HIDDEN },
 	{ HRDATA (BLKIOD, blk_io.dfl, 16), REG_HRO },
 	{ HRDATA (BLKIOC, blk_io.cur, 20), REG_HRO },
 	{ HRDATA (BLKIOE, blk_io.end, 20), REG_HRO },
@@ -561,12 +565,18 @@ MTAB cpu_mod[] = {
 	  &cpu_set_hist, &cpu_show_hist },
 	{ 0 }  };
 
+DEBTAB cpu_deb[] = {
+	{ "INTEXC", LOG_CPU_I },
+	{ "CONTEXT", LOG_CPU_C },
+	{ NULL, 0 }  };
+
 DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
 	1, 16, 20, 1, 16, 8,
 	&cpu_ex, &cpu_dep, &cpu_reset,
 	NULL, NULL, NULL,
-	&cpu_dib, 0 };
+	&cpu_dib, DEV_DEBUG, 0,
+	cpu_deb, NULL, NULL };
 
 t_stat sim_instr (void)
 {
@@ -1307,7 +1317,7 @@ case 0xE1:						/* SVC - RX */
 	R[14] = t;					/* old PSW */
 	R[15] = PC;					/* old PC */
 	PC = ReadH (SVNPC + r1 + r1, P);		/* new PC */
-	if (DBG_LOG (LOG_CPU_C)) fprintf (sim_log,
+	if (DEBUG_PRI (cpu_dev, LOG_CPU_C)) fprintf (sim_deb,
 	    ">>SVC: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
 	    pcq[pcq_p], t, PC, PSW);
 	break;
@@ -1341,7 +1351,7 @@ case 0xE3:						/* SCP - RXH */
 case 0x18:						/* LPSWR - RR */
 	PCQ_ENTRY;					/* effective branch */
 	PC = R[(r2 + 1) & 0xF] & VAMASK;		/* new PC (old reg set) */
-	if (DBG_LOG (LOG_CPU_C)) fprintf (sim_log,
+	if (DEBUG_PRI (cpu_dev, LOG_CPU_C)) fprintf (sim_deb,
 	    ">>LPSWR: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
 	    pcq[pcq_p], BUILD_PSW (cc), PC, opnd);
 	cc = newPSW (opnd);				/* new PSW */
@@ -1351,7 +1361,7 @@ case 0x18:						/* LPSWR - RR */
 case 0xC2:						/* LPSW - RXF */
 	PCQ_ENTRY;					/* effective branch */
 	PC = ReadF ((ea + 4) & VAMASK, VR) & VAMASK;	/* new PC */
-	if (DBG_LOG (LOG_CPU_C)) fprintf (sim_log,
+	if (DEBUG_PRI (cpu_dev, LOG_CPU_C)) fprintf (sim_deb,
 	    ">>LPSW: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
 	    pcq[pcq_p], BUILD_PSW (cc), PC, opnd);
 	cc = newPSW (opnd);				/* new PSW */
@@ -1587,7 +1597,7 @@ if (cpu_unit.flags & UNIT_832) {			/* 8/32? */
 	R[15] = oldPC;  }				/* PC to new 15 */
 else {	GREG[14] = oldPSW;				/* 7/32, PSW to set 0 14 */
 	GREG[15] = oldPC;  }				/* PC to set 0 15 */
-if (DBG_LOG (LOG_CPU_C)) fprintf (sim_log,
+if (DEBUG_PRI (cpu_dev, LOG_CPU_I)) fprintf (sim_deb,
 	">>Exc %X: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
 	loc, oldPC, oldPSW, PC, PSW | cc | flg);
 return cc | flg;					/* return CC */
@@ -1672,7 +1682,7 @@ newPSW (0x2800);					/* new PSW */
 R[0] = oldPSW;						/* save old PSW */
 R[1] = PC;						/* save PC */
 R[2] = dev;						/* set dev # */
-if (DBG_LOG (LOG_CPU_C)) fprintf (sim_log,
+if (DEBUG_PRI (cpu_dev, LOG_CPU_I)) fprintf (sim_deb,
 	">>Int %X: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
 	dev, PC, oldPSW, vec, 0x2800);
 if (DEV_ACC (dev)) {					/* dev exist? */

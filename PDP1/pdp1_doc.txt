@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-1 Simulator Usage
-Date:	15-Dec-2003
+Date:	15-Feb-2004
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2003, written by Robert M Supnik
-   Copyright (c) 1993-2003, Robert M Supnik
+   Original code published in 1993-2004, written by Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -36,13 +36,19 @@ This memorandum documents the PDP-1 simulator.
 
 1. Simulator Files
 
-sim/		sim_defs.h
+sim/		scp.h
+		sim_console.h
+		sim_defs.h
+		sim_fio.h
 		sim_rev.h
 		sim_sock.h
+		sim_timer.h
 		sim_tmxr.h
 		scp.c
-		scp_tty.c
+		sim_console.c
+		sim_fio.c
 		sim_sock.c
+		sim_timer.c
 		sim_tmxr.c
 
 sim/pdp1/	pdp1_defs.h
@@ -308,6 +314,7 @@ The DECtape controller implements these registers:
 	SUBSTATE	2	read/write command substate
 	POS[0:7]	32	position, in lines, units 0-7
 	STATT[0:7]	18	unit state, units 0-7
+	STOP_OFFR	1	stop on off-reel error
 
 It is critically important to maintain certain timing relationships
 among the DECtape parameters, or the DECtape simulator will fail to

@@ -1,6 +1,6 @@
 /* pdp11_rp.c - RP04/05/06/07 RM02/03/05/80 "Massbus style" disk controller
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    rp		RH/RP/RM moving head disks
 
+   25-Jan-04	RMS	Revised for device debug support
+   04-Jan-04	RMS	Changed sim_fsize calling sequence
    19-May-03	RMS	Revised for new conditional compilation scheme
    25-Apr-03	RMS	Revised for extended file support
    29-Sep-02	RMS	Added variable address support to bootstrap
@@ -374,8 +376,7 @@ static struct drvtyp drv_tab[] = {
 
 extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
-extern int32 cpu_log;
-extern FILE *sim_log;
+extern FILE *sim_deb;
 
 uint16 *rpxb = NULL;					/* xfer buffer */
 int32 rpcs1 = 0;					/* control/status 1 */
@@ -534,7 +535,7 @@ DEVICE rp_dev = {
 	RP_NUMDR, DEV_RDX, 30, 1, DEV_RDX, RP_WID,
 	NULL, NULL, &rp_reset,
 	&rp_boot, &rp_attach, &rp_detach,
-	&rp_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS };
+	&rp_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG };
 
 /* I/O dispatch routines, I/O addresses 17776700 - 17776776 */
 
@@ -767,7 +768,7 @@ void rp_go (int32 drv, int32 fnc)
 int32 dc, dtype, t;
 UNIT *uptr;
 
-if (DBG_LOG (LOG_RP)) fprintf (sim_log,
+if (DEBUG_PRS (rp_dev)) fprintf (sim_deb,
 	">>RP%d: fnc=%o, ds=%o, cyl=%o, da=%o, ba=%o, wc=%o\n",
 	drv, fnc, rpds[drv], rpdc, rpda, (rpbae << 16) | rpba, rpwc);
 uptr = rp_dev.units + drv;				/* get unit */
@@ -1078,8 +1079,7 @@ rpds[drv] = DS_ATA | DS_MOL | DS_RDY | DS_DPR |		/* upd drv status */
 rper1[drv] = 0;
 update_rpcs (CS1_SC, drv);				/* upd ctlr status */
 
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;	/* seek to end */
-if ((p = ftell (uptr->fileref)) == 0) {			/* new disk image? */
+if ((p = sim_fsize (uptr->fileref)) == 0) {		/* new disk image? */
 	if (uptr->flags & UNIT_RO) return SCPE_OK;
 	return pdp11_bad_block (uptr,
 	    drv_tab[GET_DTYPE (uptr->flags)].sect, RP_NUMWD);  }

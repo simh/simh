@@ -125,8 +125,8 @@ static unsigned char conout_map[256];		/* 1130 console code to ASCII translation
 static unsigned char conin_map[256];		/* input mapping */
 static int  curcol = 0;						/* current typewriter element column, leftmost = 0 */
 static int  maxcol = 0;						/* highest curcol seen in this output line         */
-static char black_ribbon[30];				/* output escape sequence for black ribbon shift   */
-static char red_ribbon[30];					/* output escape sequence for red ribbon shift     */
+static unsigned char black_ribbon[30];		/* output escape sequence for black ribbon shift   */
+static unsigned char red_ribbon[30];		/* output escape sequence for red ribbon shift     */
 
 static OS_MAP os_buf[MAX_OUTPUT_COLUMNS];			/* current typewriter output line, holds character struck in each column */
 static OS_MAP os_map[MAX_OS_MAPPINGS];				/* overstrike mapping entries */
@@ -800,8 +800,8 @@ static void set_default_mapping (int32 flags)
 
 	reset_mapping();
 
-	strcpy(black_ribbon, "\033[30m");
-	strcpy(red_ribbon,	 "\033[31m");
+	strcpy((char *) black_ribbon, "\033[30m");
+	strcpy((char *) red_ribbon,	 "\033[31m");
 
 	switch (flags & CSET_MASK) {
 		case CSET_1130:
@@ -850,10 +850,10 @@ static t_stat map_conout_character (int ch)
 	int i, cmp;
 
 	if (ch == (COUT_IS_CTRL|COUT_CTRL_BLACK))
-		return (tto_unit.flags & ENABLE_ANSI) ? sim_putstr(black_ribbon) : SCPE_OK;
+		return (tto_unit.flags & ENABLE_ANSI) ? sim_putstr((char *) black_ribbon) : SCPE_OK;
 
 	if (ch == (COUT_IS_CTRL|COUT_CTRL_RED))
-		return (tto_unit.flags & ENABLE_ANSI) ? sim_putstr(red_ribbon)   : SCPE_OK;
+		return (tto_unit.flags & ENABLE_ANSI) ? sim_putstr((char *) red_ribbon)   : SCPE_OK;
 
 	if ((ch = conout_map[ch & 0xFF]) == 0)
 		ch = '?';						// unknown character? print ?
@@ -1088,7 +1088,7 @@ static void read_map_file (FILE *fd)
 
 static char * get_num_char (char **pc, unsigned char *out, int ndigits, int base, char *errmsg)
 {
-	unsigned char ch = 0, digit;
+	int ch = 0, digit;
 	char *c = *pc;
 
 	while (--ndigits >= 0) {			/* collect specified number of digits */
@@ -1108,7 +1108,7 @@ static char * get_num_char (char **pc, unsigned char *out, int ndigits, int base
 		c++;
 	}
 
-	*out = ch;							/* return parsed character */
+	*out = (unsigned char) ch;			/* return parsed character */
 	*pc  = c-1;							/* make input pointer point to last character seen */
 	return NULL;						/* no error */
 }
@@ -1119,9 +1119,10 @@ static char * get_num_char (char **pc, unsigned char *out, int ndigits, int base
  * error encountered. *pc is advanced to next whitespace or whatever followed input.
  */
 
-static char * get_characters (char **pc, char *outstr, int nmax, int *nout)
+static char * get_characters (char **pc, unsigned char *outstr, int nmax, int *nout)
 {
-	char *c = *pc, *out = outstr, *errstr;
+	char *c = *pc, *errstr;
+	unsigned char *out = outstr;
 
 	while (*c && *c <= ' ')					/* skip leading whitespace */
 		c++;
@@ -1181,7 +1182,7 @@ static char * get_characters (char **pc, char *outstr, int nmax, int *nout)
 					else if (BETWEEN(*c, 'A', 'Z') || BETWEEN(*c, 'a', 'z'))
 						return "invalid \\ escape";	/* other \x letters are bad */
 					else {
-						*out++ = *c;				/* otherwise, accept \x as literal character x */
+						*out++ = (unsigned char) *c;/* otherwise, accept \x as literal character x */
 					}
 					break;
 			}
@@ -1189,18 +1190,18 @@ static char * get_characters (char **pc, char *outstr, int nmax, int *nout)
 		else if (*c == '^') {				/* control character */
 			c++;
 			if (BETWEEN(*c, 'A', 'Z'))		/* convert alpha, e.g. A -> 1 */
-				*out++ = *c - 'A' + 1;
+				*out++ = (unsigned char) (*c - 'A' + 1);
 			else if (BETWEEN(*c, 'a', 'z'))
-				*out++ = *c - 'z' + 1;
+				*out++ = (unsigned char) (*c - 'z' + 1);
 			else							/* non alpha is bad */
 				return "invalid control letter";
 		}
 		else if (str_match(c, "IGNORE")) {	/* magic word: a character that will never be output */
-			*out++ = IGNR_;
+			*out++ = (unsigned char) IGNR_;
 			c += 6;
 		}
 		else {
-			*out++ = *c;					/* save literal character */
+			*out++ = (unsigned char) *c;	/* save literal character */
 		}
 
 		c++;
@@ -1219,7 +1220,8 @@ static char * get_characters (char **pc, char *outstr, int nmax, int *nout)
 
 static char * handle_map_ansi_definition (char **pc)
 {
-	char *outstr, *errmsg;
+	unsigned char *outstr;
+	char *errmsg;
 	int n;
 
 	if (str_match(*pc, "black")) {							/* find which string we're setting */

@@ -169,7 +169,7 @@ void xio_2250_display (int32 addr, int32 func, int32 modify)
 			WriteW(addr+3, gdu_y & 0x7FF);
 			WriteW(addr+4, gdu_fkey);
 			WriteW(addr+5, gdu_akey);
-			gdu_ar = addr+6;						/* this alters the channel address register? */
+			gdu_ar = (int16) (addr+6);				/* this alters the channel address register? */
 
 			clear_interrupts();						/* read status clears the interrupts */
 			break;
@@ -182,7 +182,7 @@ void xio_2250_display (int32 addr, int32 func, int32 modify)
 				set_indicators((ReadW(addr) << 16) | ReadW(addr+1));
 			}
 			else {
-				gdu_ar   = addr;
+				gdu_ar   = (int16) addr;
 				gdu_fkey = 0;
 				gdu_akey = 0;
 				clear_interrupts();
@@ -273,7 +273,7 @@ static int32 read_gduword (void)
 	int32 w;
 
 	w = M[gdu_ar++ & mem_mask];
-	gdu_dsw = (gdu_dsw & ~GDU_DSW_ADDR_DISP) | ((gdu_ar - gdu_instaddr) & GDU_DSW_ADDR_DISP);
+	gdu_dsw = (int16) ((gdu_dsw & ~GDU_DSW_ADDR_DISP) | ((gdu_ar - gdu_instaddr) & GDU_DSW_ADDR_DISP));
 
 	return w;
 }
@@ -387,8 +387,8 @@ static void draw (int32 newx, int32 newy, t_bool beam)
 #endif
 	}
 
-	gdu_x = newx;
-	gdu_y = newy;
+	gdu_x = (int16) newx;
+	gdu_y = (int16) newy;
 }
 
 static void generate_image (void)
@@ -419,7 +419,7 @@ static void generate_image (void)
 			case 0:									// short branch
 			case 1:
 				gdu_revert = gdu_ar;				// save revert address & get new address
-				gdu_ar = read_gduword() & 0x1FFF;
+				gdu_ar = (int16) (read_gduword() & 0x1FFF);
 				if (gdu_dsw & GDU_DSW_CHARACTER_MODE) {
 					draw_characters();				// in character mode this means we are at character data
 					gdu_ar = gdu_revert;
@@ -443,7 +443,7 @@ static void generate_image (void)
 						if (instr & 0x0080)			// indirect
 							new_addr = M[new_addr & mem_mask];
 
-						gdu_ar = new_addr;
+						gdu_ar = (int16) new_addr;
 
 						if (gdu_dsw & GDU_DSW_CHARACTER_MODE) {
 							draw_characters();
@@ -600,9 +600,9 @@ static void draw_characters (void)
 
 				case 7:							// new line
 					gdu_x = 0;
-					gdu_y -= ci->dy;
+					gdu_y -= (int16) ci->dy;
 					if (gdu_y < 0 && last_abs)
-						gdu_y = 1024 - ci->dy;	// this is a guess
+						gdu_y = (int16) (1024 - ci->dy);	// this is a guess
 					break;
 			}
 		}
@@ -631,7 +631,7 @@ static void draw_characters (void)
 			gdu_x += ci->dx;
 			if (gdu_x > 1023 && last_abs) {		// line wrap
 				gdu_x = 0;
-				gdu_y -= ci->dy;
+				gdu_y -= (int16) ci->dy;
 			}
 		}
 	} while ((w & 0x0080) == 0);				// repeat until we hit revert bit
@@ -645,7 +645,7 @@ static void draw_characters (void)
 
 /******* PLATFORM SPECIFIC CODE ***********************************************************/
 
-#ifdef WIN32
+#ifdef _WIN32
 
 #include <windows.h>
 #include <windowsx.h>
@@ -1114,5 +1114,5 @@ static void ShowPenHit (int x, int y)
 }
 #endif
 
-#endif		// WIN32 defined
+#endif		// _WIN32 defined
 #endif		// GUI_SUPPORT defined

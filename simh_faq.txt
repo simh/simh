@@ -1,4 +1,4 @@
-SIMH FAQ, 31-Dec-2003
+SIMH FAQ, 31-Mar-2004
 
 1 General
 
@@ -148,6 +148,7 @@ SIMH simulates the following computer systems:
 	Interdata Corporation		16b systems, 7/32, 8/32
 	Scientific Data Systems		SDS-940
 	MITS				Altair 8080, Altair Z80
+	Royal-Mcbee			LGP-30, LGP-21
 
 The documentation contains more details on supported models and peripherals.
 
@@ -169,7 +170,7 @@ The documentation contains more details on supported models and peripherals.
 	Linux		gcc		requires libpcap for Ethernet support
 	Tru64 UNIX	DEC C		no Ethernet support
 	AIX				no Ethernet support
-	Solaris				no Ethernet support
+	Solaris				requires libpcap for Ethernet support
 	HP/UX				no Ethernet support
 	NetBSD		gcc		requires libpcap for Ethernet support
 	OpenBSD		gcc		requires libpcap for Ethernet support
@@ -199,8 +200,8 @@ The simplest way is to download the pre-compiled binaries.  Unzip these into the
 directory where you want to run SIMH. You can then run whichever binary that you
 want.
 
-If you want to run the VAX emulator, you will also need the KA655.bin file from
-the source kit.
+If you want to run the VAX emulator, you will also need files ka655.bin and
+ka655x.bin from the source kit.
 
 --------------------------------------------------------------------------------
 
@@ -363,7 +364,7 @@ use the various network copy programs (FTP, DECNET) to transfer files.
 
 2.9 Can I connect real devices on the host computer to SIMH?
 
-Not yet.
+At the moment, Ethernet is the only supported real device.
 
 --------------------------------------------------------------------------------
 
@@ -429,9 +430,8 @@ completing the current instruction.
 
 SIMH is released whenever a significant number of new features, or
 important bug fixes, has accumulated.  This has averaged every 4-8
-weeks.  The major version number has not been changed since the
-addition of symbolic debugging and won't be changed unless the
-internals of SCP change dramatically.  The minor version number
+weeks.  The major version number only changes when there is a major
+restructuring of SIMH's internal structures.  The minor version number
 is changed when the format of the save/restore file must be updated.
 
 ================================================================================

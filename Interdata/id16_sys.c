@@ -1,6 +1,6 @@
 /* id16_sys.c: Interdata 16b simulator interface
 
-   Copyright (c) 2000-2003, Robert M. Supnik
+   Copyright (c) 2000-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   26-Mar-04	RMS	Fixed warning with -std=c99
    27-Feb-03	RMS	Added relative addressing support
 */
 
@@ -47,7 +48,7 @@ extern uint16 *M;
 t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val, t_bool cf);
 t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val, t_bool cf);
 extern t_stat lp_load (FILE *fileref, char *cptr, char *fnam);
-extern pt_dump (FILE *of, char *cptr, char *fnam);
+extern t_stat pt_dump (FILE *of, char *cptr, char *fnam);
 
 /* SCP data structures and interface routines
 

@@ -1,6 +1,6 @@
 /* pdp11_ts.c: TS11/TSV05 magnetic tape simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ts		TS11/TSV05 magtape
 
+   25-Jan-04	RMS	Revised for device debug support
    19-May-03	RMS	Revised for new conditional compilation scheme
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
@@ -270,10 +271,9 @@ extern int32 cpu_18b, cpu_ubm;
 
 extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
-
 extern UNIT cpu_unit;
-extern int32 cpu_log;
-extern FILE *sim_log;
+extern FILE *sim_deb;
+
 uint8 *tsxb = NULL;					/* xfer buffer */
 int32 tssr = 0;						/* status register */
 int32 tsba = 0;						/* mem addr */
@@ -361,7 +361,7 @@ DEVICE ts_dev = {
 	1, 10, 31, 1, DEV_RDX, 8,
 	NULL, NULL, &ts_reset,
 	&ts_boot, &ts_attach, &ts_detach,
-	&ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS };
+	&ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG };
 
 /* I/O dispatch routine, I/O addresses 17772520 - 17772522
 
@@ -658,8 +658,8 @@ if (!(cmdhdr & CMD_ACK)) {				/* no acknowledge? */
 	return SCPE_OK;  }
 fnc = GET_FNC (cmdhdr);					/* get fnc+mode */
 mod = GET_MOD (cmdhdr);
-if (DBG_LOG (LOG_TS))
-	fprintf (sim_log, ">>TS: cmd=%o, mod=%o, buf=%o, lnt=%d, pos=%d\n",
+if (DEBUG_PRS (ts_dev))
+	fprintf (sim_deb, ">>TS: cmd=%o, mod=%o, buf=%o, lnt=%d, pos=%d\n",
 	    fnc, mod, cmdadl, cmdlnt, ts_unit.pos);
 if ((fnc != FNC_WCHR) && (tssr & TSSR_NBA)) {		/* ~wr chr & nba? */
 	ts_endcmd (TC3, 0, 0);				/* error */
@@ -879,8 +879,8 @@ if (msg && !(tssr & TSSR_NBA)) {			/* send end pkt */
 tssr = ts_updtssr (tssr | tc | TSSR_SSR | (tc? TSSR_SC: 0));
 if (cmdhdr & CMD_IE) SET_INT (TS);
 ts_ownm = 0; ts_ownc = 0;
-if (DBG_LOG (LOG_TS))
-	fprintf (sim_log, ">>TS: sta=%o, tc=%o, rfc=%d, pos=%d\n",
+if (DEBUG_PRS (ts_dev))
+	fprintf (sim_deb, ">>TS: sta=%o, tc=%o, rfc=%d, pos=%d\n",
 	    msgxs0, GET_TC (tssr), msgrfc, ts_unit.pos);
 return;
 }

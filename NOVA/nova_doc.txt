@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Nova Simulator Usage
-Date:	15-Mar-2003
+Date:	15-Mar-2004
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2003, written by Robert M Supnik
-   Copyright (c) 1993-2003, Robert M Supnik
+   Original code published in 1993-2004, written by Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -36,15 +36,21 @@ This memorandum documents the Nova simulator.
 
 1. Simulator Files
 
-sim/		sim_defs.h
+sim/		scp.h
+		sim_console.h
+		sim_defs.h
+		sim_fio.h
 		sim_rev.h
 		sim_sock.h
 		sim_tape.h
+		sim_timer.h
 		sim_tmxr.h
 		scp.c
-		scp_tty.c
+		sim_console.c
+		sim_fio.c
 		sim_sock.c
 		sim_tape.c
+		sim_timer.c
 		sim_tmxr.c
 
 sim/nova/	nova_defs.h
@@ -55,6 +61,7 @@ sim/nova/	nova_defs.h
 		nova_lp.c
 		nova_mta.c
 		nova_plt.c
+		nova_qty.c
 		nova_sys.c
 		nova_tt.c
 		nova_tt1.c
@@ -66,7 +73,7 @@ The Nova simulator is configured as follows:
 device		simulates
 name(s)
 
-CPU		Nova CPU with 32KW of memory
+CPU		Nova, Nova 3, or Nova 4 CPU with 32KW of memory
 -		hardware multiply/divide
 PTR,PTP		paper tape reader/punch
 TTI,TTO		console terminal
@@ -77,6 +84,8 @@ CLK		real-time clock
 DK		head-per-track disk controller
 DP		moving head disk controller with four drives
 MT		magnetic tape controller with eight drives
+QTY		4060 multiplexor with up to 64 lines
+ALM		4255 multiplexor with up to 64 lines
 
 The Nova simulator implements these unique stop conditions:
 
@@ -85,6 +94,11 @@ The Nova simulator implements these unique stop conditions:
 	  an interrupt
 	- more than INDMAX indirect addresses are detected during
 	  memory reference address decoding
+
+Note that indirect address loop detection does not exist on unmapped
+Novas.  Some DG diagnostics test thousands of levels of indirect
+addressing.  INDMAX may have to be set to 32,000 to get diagnostics
+to run properly.
 
 The Nova loader supports standard binary format tapes.  The DUMP command
 is not implemented.
@@ -121,6 +135,11 @@ and the size of main memory.
 If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
 portion of memory is lost.  Initial memory size is 32K.
+
+The CPU supports the boot command.  BOOT CPU simulates the Nova hardware
+APL (automatic program load) feature.  The switch register (SR) bits 12:17
+must contain the device code of the device to be booted.  If the device is
+a "high-speed" (channel) device, SR bit 0 should also be set.  
 
 CPU registers include the visible state of the processor as well as the
 control registers for the interrupt system.
@@ -363,6 +382,12 @@ setting limited Dasher-compatibility mode or ANSI mode:
 
 Setting either TTI1 or TTO1 changes both devices.  In Dasher mode, carriage
 return is changed to newline on input, and ^X is changed to backspace.
+TTO1 supports output logging.  The SET TTO1 LOG command enables logging:
+
+	SET TTO1 LOG=filename	log output to filename
+
+The SET TTO1 NOLOG command disables logging and closes the open log
+file, if any.
 
 The SHOW TTI1 CONNECTIONS command displays the current connection to TTI1.
 The SHOW TTI1 STATISTICS command displays statistics for the current connection.
@@ -389,6 +414,67 @@ The second terminal output implements these registers:
 	DISABLE		1	interrupt disable flag
 	INT		1	interrupt pending flag
 	TIME		24	time from I/O initiation to interrupt
+
+2.2.8 Asynchronous Multiplexors (QTY, ALM)
+
+The QTY and ALM are terminal multiplexors with up to 64 lines.  Either
+the QTY or ALM can be enabled, but not both; the ALM is enabled by
+default.  The number of lines can be changed with the command
+
+	SET {QTY|ALM} LINES=n	set line count to n
+
+The line count maximum is 64.
+
+The QTY and ALM support 8-bit input and output of characters.  8-bit I/O
+may be incompatible with certain operating systems; 7-bit is the default.
+The command
+
+	SET {QTY|ALM} 8B
+
+enables 8-bit input and output.
+
+The terminal lines perform input and output through Telnet sessions
+connected to a user-specified port.  The ATTACH command specifies
+the port to be used:
+
+	ATTACH {-am} {QTY|ALM} <port>	set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.  For the ALM multiplexor, the optional switch
+-m turns on the multiplexor modem controls; the optional switch -a turns on
+active disconnects (disconnect session if computer clears Data Terminal Ready).
+The QTY multiplexor does not support modem control.  Without modem control,
+the multiplexor behaves as though terminals were directly connected;
+disconnecting the Telnet session does not cause any operating system-
+visible change in line status.
+
+Once the multiplexor is attached and the simulator is running, it will listen
+for connections on the specified port.  It assumes that the incoming
+connections are Telnet connections.  The connection remains open until
+disconnected by the simulated program, the Telnet client, a SET {QTY|ALM}
+DISCONNECT command, or a DETACH {QTY|ALM} command.
+
+The SHOW {QTY|ALM} CONNECTIONS command displays the current connections to
+the multiplexor.  The SHOW {QTY|ALM} STATISTICS command displays statistics
+for active connections.  The SET {QTY|ALM| DISCONNECT=linenumber disconnects
+the specified line.
+
+The QTY/ALM implement these registers:
+
+	name		size	comments
+
+	BUF		8	character buffer
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	device disable flag
+	INT		1	interrupt pending flag
+	MDMCTL		1	modem control flag
+	AUTODS		1	autodisconnect flag
+	POLLS		32	number of service polls
+	STOP_IOE	1	stop on I/O error
+
+The multiplexors do not support save and restore.  All open connections are
+lost when the simulator shuts down or the multiplexor is detached.
 
 2.3 Fixed Head Disk (DK)
 

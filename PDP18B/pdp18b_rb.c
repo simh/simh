@@ -1,6 +1,6 @@
 /* pdp18b_rb.c: RB09 fixed head disk simulator
 
-   Copyright (c) 2003, Robert M Supnik
+   Copyright (c) 2003-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rb		RB09 fixed head disk
 
+   14-Jan-04	RMS	Revised IO device call interface
    26-Oct-03	RMS	Cleaned up buffer copy code
 
    The RB09 is a head-per-track disk.  It uses the single cycle data break
@@ -89,7 +90,7 @@ int32 rb_burst = 1;					/* burst mode flag */
 int32 rb_stopioe = 1;					/* stop on error */
 
 DEVICE rb_dev;
-int32 rb71 (int32 pulse, int32 AC);
+int32 rb71 (int32 dev, int32 pulse, int32 AC);
 t_stat rb_svc (UNIT *uptr);
 t_stat rb_reset (DEVICE *dptr);
 int32 rb_updsta (int32 new);
@@ -137,7 +138,7 @@ DEVICE rb_dev = {
 
 /* IOT routines */
 
-int32 rb71 (int32 pulse, int32 AC)
+int32 rb71 (int32 dev, int32 pulse, int32 AC)
 {
 int32 tow, t, sb = pulse & 060;
 

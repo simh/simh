@@ -1,6 +1,6 @@
 /* id_pt.c: Interdata paper tape reader
 
-   Copyright (c) 2000-2003, Robert M. Supnik
+   Copyright (c) 2000-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -332,7 +332,7 @@ char *tptr;
 extern DEVICE cpu_dev;
 
 if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;
-tptr = get_range (cptr, &lo, &hi, cpu_dev.aradix, 0xFFFF, 0);
+tptr = get_range (NULL, cptr, &lo, &hi, cpu_dev.aradix, 0xFFFF, 0);
 if ((tptr == NULL) || (lo < INTSVT)) return SCPE_ARG;
 if (*tptr != 0) return SCPE_2MARG;
 for (i = lo, cs = 0; i <= hi; i++) cs = cs ^ IOReadB (i);

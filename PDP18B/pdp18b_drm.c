@@ -1,6 +1,6 @@
 /* pdp18b_drm.c: drum/fixed head disk simulator
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    drm		(PDP-4,PDP-7) Type 24 serial drum
 
+   14-Jan-04	RMS	Revised IO device call interface
    26-Oct-03	RMS	Cleaned up buffer copy code
    05-Dec-02	RMS	Updated from Type 24 documentation
    22-Nov-02	RMS	Added PDP-4 support
@@ -71,9 +72,9 @@ int32 drm_time = 10;					/* inter-word time */
 int32 drm_stopioe = 1;					/* stop on error */
 
 DEVICE drm_dev;
-int32 drm60 (int32 pulse, int32 AC);
-int32 drm61 (int32 pulse, int32 AC);
-int32 drm62 (int32 pulse, int32 AC);
+int32 drm60 (int32 dev, int32 pulse, int32 AC);
+int32 drm61 (int32 dev, int32 pulse, int32 AC);
+int32 drm62 (int32 dev, int32 pulse, int32 AC);
 int32 drm_iors (void);
 t_stat drm_svc (UNIT *uptr);
 t_stat drm_reset (DEVICE *dptr);
@@ -117,7 +118,7 @@ DEVICE drm_dev = {
 
 /* IOT routines */
 
-int32 drm60 (int32 pulse, int32 AC)
+int32 drm60 (int32 dev, int32 pulse, int32 AC)
 {
 if ((pulse & 027) == 06) {				/* DRLR, DRLW */
 	drm_ma = AC & 0177777;				/* load mem addr */
@@ -125,7 +126,7 @@ if ((pulse & 027) == 06) {				/* DRLR, DRLW */
 return AC;
 }
 
-int32 drm61 (int32 pulse, int32 AC)
+int32 drm61 (int32 dev, int32 pulse, int32 AC)
 {
 int32 t;
 
@@ -142,7 +143,7 @@ if (pulse & 004) {					/* DRSS */
 return AC;
 }
 
-int32 drm62 (int32 pulse, int32 AC)
+int32 drm62 (int32 dev, int32 pulse, int32 AC)
 {
 int32 t;
 

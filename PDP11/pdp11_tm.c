@@ -25,6 +25,7 @@
 
    tm		TM11/TU10 magtape
 
+   25-Jan-04	RMS	Revised for device debug support
    29-Dec-03	RMS	Added 18b Qbus support
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
@@ -148,8 +149,7 @@
 extern uint16 *M;					/* memory */
 extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
-extern int32 cpu_log;
-extern FILE *sim_log;
+extern FILE *sim_deb;
 
 uint8 *tmxb = NULL;					/* xfer buffer */
 int32 tm_sta = 0;					/* status register */
@@ -232,7 +232,7 @@ DEVICE tm_dev = {
 	TM_NUMDR, 10, 31, 1, 8, 8,
 	NULL, NULL, &tm_reset,
 	&tm_boot, &tm_attach, &tm_detach,
-	&tm_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 };
+	&tm_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG };
 
 /* I/O dispatch routine, I/O addresses 17772520 - 17772532
 
@@ -384,7 +384,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {			/* if not attached */
 	tm_updcsta (uptr);				/* update status */
 	return IORETURN (tm_stopioe, SCPE_UNATT);  }
 
-if (DBG_LOG (LOG_TM)) fprintf (sim_log,
+if (DEBUG_PRS (tm_dev)) fprintf (sim_deb,
 	">>TM: op=%o, ma=%o, bc=%o, pos=%d\n", f, xma, cbc, uptr->pos);
 switch (f) {						/* case on function */
 
@@ -449,7 +449,7 @@ tm_cmd = (tm_cmd & ~MTC_EMA) | ((xma >> (16 - MTC_V_EMA)) & MTC_EMA);
 tm_ca = xma & 0177777;					/* update mem addr */
 tm_set_done ();						/* set done */
 tm_updcsta (uptr);					/* update status */
-if (DBG_LOG (LOG_TM)) fprintf (sim_log,
+if (DEBUG_PRS (tm_dev)) fprintf (sim_deb,
 	">>TM: sta=%o, ma=%o, wc=%o, pos=%d\n",
 	tm_sta, tm_ca, tm_bc, uptr->pos);
 return r;

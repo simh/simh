@@ -1,6 +1,6 @@
 /* pdp11_dz.c: DZ11 terminal multiplexor simulator
 
-   Copyright (c) 2001-2003, Robert M Supnik
+   Copyright (c) 2001-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    dz		DZ11 terminal multiplexor
 
+   4-Apr-04	RMS	Added per-line logging
+   05-Jan-04	RMS	Revised for tmxr library changes
    19-May-03	RMS	Revised for new conditional compilation scheme
    09-May-03	RMS	Added network device flag
    22-Dec-02	RMS	Added break (framing error) support
@@ -155,7 +157,7 @@ uint32 dz_txi = 0;					/* xmt interrupts */
 int32 dz_mctl = 0;					/* modem ctrl enabled */
 int32 dz_auto = 0;					/* autodiscon enabled */
 TMLN dz_ldsc[DZ_MUXES * DZ_LINES] = { 0 };		/* line descriptors */
-TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, NULL };	/* mux descriptor */
+TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, dz_ldsc };	/* mux descriptor */
 
 DEVICE dz_dev;
 t_stat dz_rd (int32 *data, int32 PA, int32 access);
@@ -178,6 +180,9 @@ t_stat dz_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dz_show (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dz_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dz_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dz_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dz_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* DZ data structures
 
@@ -229,6 +234,12 @@ MTAB dz_mod[] = {
 #endif
 	{ MTAB_XTD | MTAB_VDV | MTAB_VAL, 0, "lines", "LINES",
 		&dz_setnl, NULL, &dz_nlreg },
+	{ MTAB_XTD | MTAB_VDV, 0, NULL, "LOG",
+		&dz_set_log, NULL, &dz_desc },
+	{ MTAB_XTD | MTAB_VDV, 0, NULL, "NOLOG",
+		&dz_set_nolog, NULL, &dz_desc },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "LOG", NULL,
+		NULL, &dz_show_log, &dz_desc },
 	{ 0 }  };
 
 DEVICE dz_dev = {
@@ -317,7 +328,7 @@ case 02:						/* TCR */
 		    line = (dz * DZ_LINES) + i;		/* get line num */
 		    lp = &dz_ldsc[line];		/* get line desc */
 		    if (lp->conn && (drop & (1 << i))) {
-			tmxr_msg (lp->conn, "\r\nLine hangup\r\n");
+			tmxr_linemsg (lp, "\r\nLine hangup\r\n");
 			tmxr_reset_ln (lp);		/* reset line, cdet */
 			dz_msr[dz] &= ~(1 << (i + MSR_V_CD));
 			}				/* end if drop */
@@ -528,8 +539,6 @@ t_stat dz_reset (DEVICE *dptr)
 {
 int32 i, ndev;
 
-for (i = 0; i < (DZ_MUXES * DZ_LINES); i++)		/* init mux desc */
-	dz_desc.ldsc[i] = &dz_ldsc[i];
 for (i = 0; i < DZ_MUXES; i++) dz_clear (i, TRUE);	/* init muxes */
 dz_rxi = dz_txi = 0;					/* clr master int */
 CLR_INT (DZRX);
@@ -614,7 +623,7 @@ if (newln < dz_desc.lines) {
 	return SCPE_OK;
     for (i = newln; i < dz_desc.lines; i++) {
 	if (dz_ldsc[i].conn) {
-	    tmxr_msg (dz_ldsc[i].conn, "\r\nOperator disconnected line\r\n");
+	    tmxr_linemsg (&dz_ldsc[i], "\r\nOperator disconnected line\r\n");
 	    tmxr_reset_ln (&dz_ldsc[i]);  }		/* reset line */
 	if ((i % DZ_LINES) == (DZ_LINES - 1))
 	    dz_clear (i / DZ_LINES, TRUE);  }		/* reset mux */
@@ -631,3 +640,50 @@ t_stat dz_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 return show_vec (st, uptr, ((dz_desc.lines * 2) / DZ_LINES), desc);
 }
+
+/* SET LOG processor */
+
+t_stat dz_set_log (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+char *tptr;
+t_stat r;
+int32 ln;
+
+if (cptr == NULL) return SCPE_ARG;
+tptr = strchr (cptr, '=');
+if ((tptr == NULL) || (*tptr == 0)) return SCPE_ARG;
+*tptr++ = 0;
+ln = (int32) get_uint (cptr, 10, (DZ_MUXES * DZ_LINES), &r);
+if ((r != SCPE_OK) || (ln >= dz_desc.lines)) return SCPE_ARG;
+return tmxr_set_log (NULL, ln, tptr, desc);
+}
+
+/* SET NOLOG processor */
+
+t_stat dz_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+t_stat r;
+int32 ln;
+
+if (cptr == NULL) return SCPE_ARG;
+ln = (int32) get_uint (cptr, 10, (DZ_MUXES * DZ_LINES), &r);
+if ((r != SCPE_OK) || (ln >= dz_desc.lines)) return SCPE_ARG;
+return tmxr_set_nolog (NULL, ln, NULL, desc);
+}
+
+/* SHOW LOG processor */
+
+t_stat dz_show_log (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 i;
+
+for (i = 0; i < dz_desc.lines; i++) {
+	fprintf (st, "line %d: ", i);
+	tmxr_show_log (st, NULL, i, desc);
+	fprintf (st, "\n");
+	}
+return SCPE_OK;
+}
+
+
+

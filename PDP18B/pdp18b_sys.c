@@ -1,6 +1,6 @@
 /* pdp18b_sys.c: 18b PDP's simulator interface
 
-   Copyright (c) 1993-2003, Robert M Supnik
+   Copyright (c) 1993-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Jan-04	RMS	Fixed instruction table errors
    18-Oct-03	RMS	Added DECtape off reel message
    30-Jul-03	RMS	Fixed FPM class mask
    18-Jul-03	RMS	Added FP15 support
@@ -366,6 +367,9 @@ static const int32 masks[] = {
  0740700, 0760700, 0777700, 0777777,
  0777777, 0777777 };
 
+/* If both NPN (clear AC) and NPI versions of an IOT are defined,
+   the NPN version must come first */
+
 static const char *opcode[] = {
  "CAL", "DAC", "JMS", "DZM",				/* mem refs */
  "LAC", "XOR", "ADD", "TAD",
@@ -472,7 +476,7 @@ static const char *opcode[] = {
 #if defined (PDP15)
  "SPCO", "SKP15", "RES",
  "SBA", "DBA", "EBA",
- "ORMM", "RDMM", "LDMM", "MPLR",
+ "RDMM", "ORMM", "LDMM", "MPLR",
  "ENB", "INH", "MPRC", "IPFH",
  "AAS", "PAX", "PAL", "AAC",
  "PXA", "AXS", "PXL", "PLA",
@@ -670,7 +674,7 @@ static const int32 opc_val[] = {
 #if defined (RP)
  0706301+I_NPI, 0706321+I_NPI, 0706341+I_NPI, 0706361+I_NPI,
  0706312+I_NPN, 0706302+I_NPI, 0706332+I_NPN, 0706322+I_NPI, 
- 0706342+I_NPN, 0706352+I_NPI,
+ 0706352+I_NPN, 0706342+I_NPI,
  0706304+I_NPI, 0706324+I_NPI, 0706344+I_NPI, 0706364+I_NPI,
  0706411+I_NPN, 0706401+I_NPI, 0706421+I_NPI,
  0706412+I_NPN, 0706402+I_NPI, 0706432+I_NPN, 0706422+I_NPI, 
@@ -703,7 +707,7 @@ static const int32 opc_val[] = {
 #if defined (PDP15)
  0703341+I_NPI, 0707741+I_NPI, 0707742+I_NPI,
  0707761+I_NPI, 0707762+I_NPI, 0707764+I_NPI,
- 0700022+I_NPI, 0700032+I_NPN, 0700024+I_NPI, 0701724+I_NPI,
+ 0700032+I_NPN, 0700022+I_NPI, 0700024+I_NPI, 0701724+I_NPI,
  0705521+I_NPI, 0705522+I_NPI, 0701722+I_NPI, 0701764+I_NPI,
  0720000+I_XR9, 0721000+I_XR, 0722000+I_XR, 0723000+I_XR9,
  0724000+I_XR, 0725000+I_XR9, 0726000+I_XR, 0730000+I_XR,

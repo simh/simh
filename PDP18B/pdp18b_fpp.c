@@ -1,6 +1,6 @@
 /* pdp18b_fpp.c: FP15 floating point processor simulator
 
-   Copyright (c) 2003, Robert M Supnik
+   Copyright (c) 2003-2004, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -263,7 +263,7 @@ case FOP_MUL:						/* multiply */
 case FOP_DIV:						/* divide */
 	if (sta = fp15_opnd (fir, ar, &fmb)) break;	/* fetch op to FMB */
 	if (fir & FI_FP)				/* fp? */
-	    sta = fp15_fadd (fir, &fma, &fmb, 1);	/* yes, fp sub */
+	    sta = fp15_fdiv (fir, &fma, &fmb);		/* yes, fp div */
 	else sta = fp15_idiv (fir, &fma, &fmb);		/* no, int div */
 	break;
 
@@ -271,7 +271,7 @@ case FOP_RDIV:						/* reverse divide */
 	fmb = fma;					/* FMB <- FMA */
 	if (sta = fp15_opnd (fir, ar, &fma)) break;	/* fetch op to FMA */
 	if (fir & FI_FP)				/* fp? */
-	    sta = fp15_fadd (fir, &fma, &fmb, 1);	/* yes, fp sub */
+	    sta = fp15_fdiv (fir, &fma, &fmb);		/* yes, fp div */
 	else sta = fp15_idiv (fir, &fma, &fmb);		/* no, int div */
 	break;
 
@@ -529,8 +529,7 @@ else if (((b->hi | b->lo) != 0) && (ediff <= 35)) {	/* b!=0 && ~"small"? */
 		dp_rsh_1 (a, NULL);			/* right shift */
 		a->exp = a->exp + 1;			/* incr exponent */
 		if (!(ir & FI_NORND) && fguard)		/* rounding? */
-		    dp_inc (a);
-		if (a->exp > 0377777) return FP_OVF;  }  }
+		    dp_inc (a);  }  }
 	}						/* end if b != 0 */
 fp15_asign (ir, a);					/* adjust A sign */
 return fp15_norm (ir, a, NULL, 0);			/* norm, no round */
@@ -733,6 +732,11 @@ return;
 
 t_stat fp15_norm (int32 ir, UFP *a, UFP *b, t_bool rnd)
 {
+a->hi = a->hi & UFP_FH_MASK;				/* mask a */
+a->lo = a->lo & UFP_FL_MASK;
+if (b) {						/* if b, mask */
+	b->hi = b->hi & UFP_FH_MASK;
+	b->lo = b->lo & UFP_FL_MASK;  }
 if (!(ir & FI_NONORM)) {				/* norm enabled? */
 	if ((a->hi | a->lo) || (b && (b->hi | b->lo))) { /* frac != 0? */
 	    while ((a->hi & UFP_FH_NORM) == 0) {	/* until norm */

@@ -1,6 +1,6 @@
 /* i1620_cpu.c: IBM 1620 CPU simulator
 
-   Copyright (c) 2002-2003, Robert M. Supnik
+   Copyright (c) 2002-2004, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   26-Mar-04	RMS	Fixed warnings with -std=c99
    02-Nov-03	RMS	Fixed bug in branch digit (found by Dave Babcock)
    21-Aug-03	RMS	Fixed bug in immediate index add (found by Michael Short)
    25-Apr-03	RMS	Changed t_addr to uint32 throughout
@@ -153,15 +154,15 @@ t_stat xor_field (uint32 d, uint32 s);
 t_stat com_field (uint32 d, uint32 s);
 void upd_ind (void);
 
-extern tty (uint32 op, uint32 pa, uint32 f0, uint32 f1);
-extern ptp (uint32 op, uint32 pa, uint32 f0, uint32 f1);
-extern ptr (uint32 op, uint32 pa, uint32 f0, uint32 f1);
-extern cdp (uint32 op, uint32 pa, uint32 f0, uint32 f1);
-extern cdr (uint32 op, uint32 pa, uint32 f0, uint32 f1);
-extern dp (uint32 op, uint32 pa, uint32 f0, uint32 f1);
-extern lpt (uint32 op, uint32 pa, uint32 f0, uint32 f1);
-extern btp (uint32 op, uint32 pa, uint32 f0, uint32 f1);
-extern btr (uint32 op, uint32 pa, uint32 f0, uint32 f1);
+extern t_stat tty (uint32 op, uint32 pa, uint32 f0, uint32 f1);
+extern t_stat ptp (uint32 op, uint32 pa, uint32 f0, uint32 f1);
+extern t_stat ptr (uint32 op, uint32 pa, uint32 f0, uint32 f1);
+extern t_stat cdp (uint32 op, uint32 pa, uint32 f0, uint32 f1);
+extern t_stat cdr (uint32 op, uint32 pa, uint32 f0, uint32 f1);
+extern t_stat dp (uint32 op, uint32 pa, uint32 f0, uint32 f1);
+extern t_stat lpt (uint32 op, uint32 pa, uint32 f0, uint32 f1);
+extern t_stat btp (uint32 op, uint32 pa, uint32 f0, uint32 f1);
+extern t_stat btr (uint32 op, uint32 pa, uint32 f0, uint32 f1);
 
 extern t_stat fp_add (uint32 d, uint32 s, t_bool sub);
 extern t_stat fp_mul (uint32 d, uint32 s);
