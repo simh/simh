@@ -1,0 +1,4181 @@
+To:	Users
+From:	Bob Supnik
+Subj:	Simulator Usage, V2.5
+Date:	1-Jan-01
+
+			COPYRIGHT NOTICE
+
+The following copyright notice applies to both the SIMH source and binary:
+
+   Original code published in 1993-2000, written by Robert M Supnik
+   Copyright (c) 1993-2000, Robert M Supnik
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Robert M Supnik shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Robert M Supnik.
+
+This memorandum documents the PDP-8, PDP-11, PDP-1, other 18b PDP, Nova,
+IBM 1401, HP 2100, and Interdata 4 simulators.  These simulators are freeware;
+refer to the license terms above for conditions of use.  Support is not available.
+The best way to fix problems or add features is to read and modify the sources
+yourself.  Alternately, you can send Internet mail to mps@tiac.net, but
+a response is not guaranteed.
+
+The simulators use a common command interface.  The memorandum first
+describes the common features of the command interface and then provides
+information on each of the individual simulators.
+
+
+1. Compiling And Running A Simulator
+
+The simulators have been tested on VAX VMS, Alpha VMS, Alpha UNIX, Intel
+FreeBSD, Intel LINUX, and Windows 95/Windows NT (Visual C++ environment).
+Porting to other environments will require changes to the operating system
+dependent code in scp_tty.c.
+
+To compile the simulators on VMS, use these commands (note that separate
+compilations are required for each of the 18b PDP's):
+
+	$ cc pdp8_*.c,scp.c,scp_tty.c		! PDP-8
+	$ link/exec=pdp8 pdp8_*.obj,scp.obj,scp_tty.obj
+
+	$ cc pdp11_*.c,scp.c,scp_tty.c		! PDP-11
+	$ link/exec=pdp11 pdp11_*.obj,scp.obj,scp_tty.obj
+
+	$ cc nova_*.c,scp.c,scp_tty.c		! Nova
+	$ link/exec=nova nova_*.obj,scp.obj,scp_tty.obj
+
+	$ cc pdp1_*.c,scp.c,scp_tty.c		! PDP-1
+	$ link/exec=pdp1 pdp1_*.obj,scp.obj,scp_tty.obj
+
+	$ cc/define=PDP{4,7,9,15} pdp18b_*.c,scp.c,scp_tty.c
+	$ link/exec=pdp{4,7,9,15} pdp18b_*.obj,scp.obj,scp_tty.obj
+
+	$ cc i1401_*.c,scp.c,scp_tty.c		! IBM 1401
+	$ link/exec=i1401 i1401_*.obj,scp.obj,scp_tty.obj
+
+	$ cc hp2100_*.c,scp.c,scp_tty.c		! HP 2100
+	$ link/exec=hp2100 hp2100_*.obj,scp.obj,scp_tty.obj
+
+	$ cc id4_*.c,scp.c,scp_tty.c		! Interdata 4
+	$ link/exec=id4 id4_*.obj,scp.obj,scp_tty.obj
+
+On version of VMS prior to 6.2, the simulators must then be defined as
+foreign commands so that they can be started by name.
+
+To compile the simulators on Alpha UNIX or any UNIX variant which supports
+the POSIX compliant TERMIOS interface, use the following commands (note
+that separate compilations are required for each of the 18b PDP's):
+
+	% cc pdp8_*.c scp*.c -lm -o pdp8
+	% cc pdp11_*.c scp*.c -lm -o pdp11
+	% cc nova_*.c scp*.c -lm -o nova
+	% cc pdp1_*.c scp*.c -o pdp1
+	% cc -DPDP{4,7,9,15} pdp18b_*.c scp*.c -lm -o pdp{4,7,9,15}
+	% cc i1401_*.c scp*.c -o i1401
+	% cc hp2100_*.c scp*.c -o hp2100
+	% cc id4_*.c scp*.c -o id4
+
+These commands should work with most UNIX variants.  If your UNIX only
+supports the old BSD terminal interface, add -DBSDTTY to each command.
+If your UNIX automatically includes the math library, omit -lm from
+the command line.
+
+To start the simulator, simply type its name.  The simulator takes
+one optional argument, a startup command file.  If specified, this
+file should contain a series of non-interactive simulator commands,
+one per line.  These command can be used to set up standard parameters,
+for example, disk sizes.
+
+	% pdp8 <startup file>(cr)		or
+	% pdp11 <startup file>(cr)		or
+	% nova <startup file>(cr)		or
+	% pdp1 <startup file>(cr)		or
+	% pdp{4,7,9,15} <startup file>(cr)	or
+	% i1401 <startup file>(cr)		or
+	% hp2100 <startup file>(cr)		or
+	% id4 <startup file>(cr)
+
+The simulator types out its name and version, executes the commands
+in the startup file, if any, and then prompts for input with
+
+	sim>
+
+2. Simulator Conventions
+
+A simulator consists of a series of devices, the first of which is always
+the CPU.  A device consists of named registers and one or more numbered
+units.  Registers correspond to device state, units to device address
+spaces.  Thus, the CPU device might have registers like PC, ION, etc,
+and a unit corresponding to main memory; a disk device might have
+registers like BUSY, DONE, etc, and units corresponding to individual
+disk drives.  Except for main memory, device address spaces are simulated
+as unstructured binary disk files in the host file system.  The SHOW CONFIG
+command displays the simulator configuration.
+
+A simulator keeps time in terms of arbitrary units, usually one time unit
+per instruction executed.  Simulated events (such as completion of I/O)
+are scheduled at some number of time units in the future.  The simulator
+executes synchronously, invoking event processors when simulated events
+are scheduled to occur.  Even asynchronous events, like keyboard input,
+are handled by polling at synchronous intervals.  The SHOW QUEUE command
+displays the simulator event queue.
+
+3. Commands
+
+Simulator commands consist of a command verb, optional switches, and optional
+arguments.  Switches take the form:
+
+	-<letter>{<letter>...}
+
+Multiple switches may be specified separately or together: -abcd or
+-a -b -c -d are treated identically.  Verbs, switches, and other
+input (except for file names) are case insensitive.
+
+3.1 Loading and Saving Programs
+
+The LOAD command (abbreviation LO) loads a file in binary paper-tape
+loader format:
+
+	sim> load <filename> {implementation options}(cr)
+
+The number of formats supported is implementation specific.  Options
+(such as load within range) are also implementation specific.
+
+The DUMP command (abbreviation DU) dumps memory in binary paper-
+tape loader format:
+
+	sim> dump <filename> {implementation options}(cr)
+
+The number of formats supported is implementation specific.  Options
+(such as dump within range) are also implementation specific.
+
+3.2 Saving and Restoring State
+
+The SAVE command (abbreviation SA) save the complete state of the
+simulator to a file.  This includes the contents of main memory and
+all registers, and the I/O connections of devices:
+
+	sim> save <filename>(cr)
+
+The RESTORE command (abbreviation REST, alternately GET) restores a
+previously saved simulator state:
+
+	sim> restore <filename>(cr)
+
+Note: SAVE file format compresses zeroes to minimize file size.
+
+3.3 Resetting Devices
+
+The RESET command (abbreviation RE) resets a device or the entire
+simulator to a predefined condition:
+
+	sim> RESET(cr)			-- reset all devices
+	sim> RESET ALL(cr)		-- reset all devices
+	sim> RESET <device>(cr)		-- reset specified device
+
+Typically, RESET stops any in-progress I/O operation, clears any
+interrupt request, and returns the device to a quiescent state.  It
+does not clear main memory or affect I/O connections.
+
+3.4 Connecting and Disconnecting Devices
+
+Except for main memory, simulated unit address spaces are simulated as
+unstructured binary disk files in the host file system.  Before using a
+simulated unit the user must specify the file to be accessed by that
+unit.  The ATTACH (abbreviation AT) command associates a unit and a file:
+
+	sim> ATTACH <device><unit number> <filename>(cr)
+
+If the file does not exist, it is created, and an appropriate message
+is printed.
+
+The DETACH (abbreviation DET) command breaks the association between a
+unit and a file and closes the file:
+
+	sim> DETACH ALL(cr)			-- detach all units
+	sim> DETACH <device><unit number>(cr)	-- detach specified unit
+
+The EXIT command performs an automatic DETACH ALL.
+
+3.5 Examining and Changing State
+
+There are four commands to examine and change state:
+
+	EXAMINE (abbreviated E) examines state
+	DEPOSIT (abbreviated D) changes state
+	IEXAMINE (interactive examine, abbreviated IE) examines state
+		and allows the user to interactively change it
+	IDEPOSIT (interactive deposit, abbreviated ID) allows the user
+		to interactively change state
+
+All four commands take the form
+
+	command {modifiers} <state list>
+
+Deposit must also include a deposit value at the end of the command.
+
+There are four kinds of modifiers: switches, device/unit name, search
+specifiers, and for EXAMINE, output file.  Switches have been described
+previously.  A device/unit name identifies the device and unit whose
+address space is to be examined or modified.  If no device is specified,
+the CPU (main memory)is selected; if a device but no unit is specified,
+unit 0 of the device is selected.
+
+Search specifiers provide criteria for testing addresses or registers
+to see if they should be processed.  A specifier consists of a logical
+operator, a relational operator, or both, optionally separated by spaces.
+
+	{<logical op> <value>} <relational op> <value>
+
+where the logical operator is & (and), | (or), or ^ (xor), and the
+relational operator is = or == (equal), ! or != (not equal), >=
+(greater than or equal), > (greater than), <= (less than or equal), or
+< (less than).  If a logical operator is specified without a relational
+operator, it is ignored.  If a relational operator is specified without
+a logical operator, no logical operation is performed.  All comparisons
+are unsigned.
+
+The output file modifier redirects command output to a file instead of
+the console.  An output file modifier consists of @ followed by a
+valid file name.
+
+Modifiers may be specified in any order.  If multiple modifiers of the
+same time are specified, later modifiers override earlier modifiers.
+Note that if the device/unit name comes after the search specifier,
+the values will interpreted in the radix of the CPU, rather than of the
+device/unit.
+
+The "state list" consists of one or more of the following, separated
+by commas:
+
+	register		the specified register
+	register1-register2	all the registers starting at register1
+				up to and including register2
+	address			the specified location
+	address1-address2	all locations starting at address1 up to
+				and including address2
+	STATE			all registers in the device
+	ALL			all locations in the unit
+
+Switches can be used to control the format of display information:
+
+	-a			display as ASCII
+	-c			display as character string
+	-m			display as instruction mnemonics
+	-o			display as octal
+	-d			display as decimal
+	-h			display as hexidecimal
+
+The simulators typically accept symbolic input (see simulator sections).
+
+Examples:
+
+	sim> ex 1000-1100	-- examine 1100:1100
+	sim> de PC 1040		-- set PC to 1040
+	sim> ie 40-50		-- interactively examine 40:50
+	sim> ie >1000 40-50	-- interactively examine the subset
+				   of locations 40:50 that are >1000
+	sim> ex rx0 50060	-- examine 50060, RX unit 0
+	sim> de all 0		-- set main memory to 0
+	sim> de &77 >0 0	-- set all addresses whose low order
+				   bits are non-zero to 0
+	sim> ex -m @memdump.txt 0-7777	-- dump memory to file
+
+Note: to terminate an interactive command, simply type a bad value (eg,
+XYZ) when input is requested.
+
+3.6 Running Programs
+
+The RUN command (abbreviated RU) resets all devices, deposits its argument
+(if given) in the PC, and starts execution.  If no argument is given,
+execution starts at the current PC.
+
+The GO command does NOT reset devices, deposits its argument (if given) in
+the PC, and starts execution.  If no argument is given, execution starts at
+the current PC.
+
+The CONT command (abbreviated CO) does NOT reset devices and resumes
+execution at the current PC.
+
+The STEP command (abbreviated S) resumes execution at the current PC for
+the number of instructions given by its argument.  If no argument is
+supplied, one instruction is executed.
+
+The BOOT command (abbreviated BO) bootstraps the device and unit given
+by its argument.  If no unit is supplied, unit 0 is bootstrapped.  The
+specified unit must be attached to a file.
+
+3.7 Stopping Programs
+
+Programs run until the simulator detects an error or stop condition, or
+until the user forces a stop condition.
+
+3.7.1 Simulator Detected Stop Conditions
+
+These simulator-detected conditions stop simulation:
+
+	- HALT instruction.  If a HALT instruction is decoded,
+	  simulation stops.
+
+	- Breakpoint.  The IBKPT register provides a single virtual
+	  address breakpoint.  If the PC matches the contents of the
+	  IBKPT register, simulation stops.  The breakpoint is
+	  automatically disabled for the next instruction execution.
+
+	- I/O error.  If an I/O error occurs during simulation of an
+	  I/O operation, and the device stop-on-I/O-error flag is set,
+	  simulation usually stops.
+
+	- Processor condition.  Certain processor conditions can stop
+	  simulation; these are described with the individual simulators.
+
+3.7.2 User Specified Stop Conditions
+
+Typing the interrupt character stops simulation.  The interrupt character
+is defined by the WRU (where are you) register and is initially set to
+005 (^E).
+
+3.8 Setting Device Parameters
+
+The SET command (abbreviated SE) changes the status of a device parameter:
+
+	sim> SET <unit> <parameter>
+
+Most parameters are simulator and device specific.  Disk drives, for
+example, can usually be set write ENABLED or write LOCKED; if a device
+supports multiple drive types, the SET command can be used to specify
+the drive type.
+
+All devices recognize the following parameters:
+
+	OCT		sets the data radix = 8
+	DEC		sets the data radix = 10
+	HEX		sets the data radix = 16
+
+3.9 Displaying Parameters and Status
+
+The SHOW CONFIGURATION command shows the simulator configuration and the
+status of all simulated devices.
+
+The SHOW MODIFIERS command shows the modifiers available on all simulated
+devices.
+
+The SHOW <device> command shows the status of the named simulated device.
+
+The SHOW QUEUE command shows the state of the simulator event queue.  Times
+are in "simulation units", typically one unit per instruction execution,
+relative to the current simulation time.
+
+The SHOW TIME command shows the number of time units elapsed since
+the last RUN command.
+
+3.10 Altering the Simulated Configuration
+
+In devices with multiple units, the REMOVE <unit> command removes the
+specified unit from the configuration.  Once removed, a unit cannot be
+manipulated in any way until it is added back to the configuration.
+
+ADD <unit> adds back a unit that had been removed from the configuration.
+
+3.11 Exiting The Simulator
+
+EXIT (synonyms QUIT and BYE) returns control to the operating system.
+
+4. PDP-8 Features
+
+The PDP-8 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		PDP-8/E CPU with 32KW of memory
+-		KE8E extended arithmetic element (EAE)
+-		KM8E memory management and timeshare control
+PTR,PTP		PC8E paper tape reader/punch
+TTI,TTO		KL8E console terminal
+LPT		LE8E line printer
+CLK		DK8E line frequency clock (also PDP-8/A compatible)
+RK		RK8E/RK05 cartridge disk controller with four drives
+RF		RF08/RS08 fixed head disk controller with four platters
+RX		RX8E/RX01 floppy disk controller with two drives
+MT		TM8E/TU10 magnetic tape controller with eight drives
+
+The PDP-8 simulator implements one unique stop condition: if an undefined
+instruction (unimplemented IOT or OPR) is decoded, and register STOP_INST
+is set, the simulator halts.
+
+The PDP-8 loader supports both RIM format and BIN format tapes.  BIN is
+the default; to load a RIM format tape, use the -r switch with LOAD.  The
+DUMP command is not implemented.
+
+4.1 CPU
+
+The only CPU options are the presence of the EAE and the size of main
+memory; the memory extension and time-share control is always included,
+even if memory size is 4K.
+
+	SET CPU EAE		enable EAE
+	SET CPU NOEAE		disable EAE
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 12K		set memory size = 12K
+	SET CPU 16K		set memory size = 16K
+	SET CPU 20K		set memory size = 20K
+	SET CPU 24K		set memory size = 24K
+	SET CPU 28K		set memory size = 28K
+	SET CPU 32K		set memory size = 32K
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 32K.
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	PC		15	program counter, including IF as high 3 bits
+	AC		12	accumulator
+	MQ		12	multiplier-quotient
+	L		1	link
+	SR		12	front panel switches
+	IF		3	instruction field
+	DF		3	data field
+	IB		3	instruction field buffer
+	SF		7	save field
+	UF		1	user mode flag
+	UB		1	user mode buffer
+	SC		5	EAE shift counter
+	GTF		1	EAE greater than flag
+	EMODE		1	EAE mode (0 = A, 1 = B)
+	ION		1	interrupt enable
+	ION_DELAY	1	interrupt enable delay for ION
+	CIF_DELAY	1	interrupt enable delay for CIF
+	PWR_INT		1	power fail interrupt
+	UF_INT		1	user mode violation interrupt
+	INT		15	interrupt pending flags
+	DONE		15	device done flags
+	ENABLE		15	device interrupt enable flags
+	OLDPC		15	PC prior to last JMP, JMS, or interrupt
+	STOP_INST	1	stop on undefined instruction
+	BREAK		16	breakpoint address (177777 to disable)
+	WRU		8	interrupt character
+
+4.2 Programmed I/O Devices
+
+4.2.1 PC8E Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.  Thus, 
+by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader supports the BOOT command.  BOOT PTR copies the
+RIM loader into memory and starts it running.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+4.2.2 PC8E Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS register
+specifies the number of the next data item to bewritten.  Thus, by
+changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+4.2.3 KL8E Terminal Input (TTI)
+
+The terminal input (TTI) reads from the controling console port.  The
+input side has one option, UC; when set, it automatically converts lower
+case input to upper case.  This is required by OS/8 and is on by default.
+
+The terminal input implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+4.2.4 KL8E Terminal Output (TTO)
+
+The terminal output (TTO) writes to the controling console port. It
+implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters output
+	TIME		24	time from I/O initiation to interrupt
+
+4.2.5 LE8E Line Printer (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be read or written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The line printer implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	ERR		1	error status flag
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	set error flag
+
+	OS I/O error	x	report error and stop
+
+4.2.6 DK8E Line-Frequency Clock (CLK)
+
+The real-time clock (CLK) implements these registers:
+
+	name		size	comments
+
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	TIME		24	clock interval
+
+4.3 RK8E Cartridge Disk (RK)
+
+RK8E options include the ability to make units write enabled or write locked:
+
+	SET RKn LOCKED		set unit n write locked
+	SET RKn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The RK8E implements these registers:
+
+	name		size	comments
+
+	STA		12	status
+	DA		12	disk address
+	MA		12	current memory address
+	CMD		12	disk command
+	BUSY		1	control busy flag
+	INT		1	interrupt pending flag
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+4.4 RX8E/RX01 Floppy Disk (RX)
+
+RX8E options include the ability to set units write enabled or write locked:
+
+	SET RXn LOCKED		set unit n write locked
+	SET RXn ENABLED		set unit n write enabled
+
+The RX8E implements these registers:
+
+	name		size	comments
+
+	RXCS		12	status
+	RXDB		12	data buffer
+	RXES		8	error status
+	RXTA		8	current track
+	RXSA		8	current sector
+	STAPTR		3	controller state
+	BUFPTR		3	buffer pointer
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	TR		1	transfer ready flag
+	ERR		1	error flag
+	CTIME		24	command completion time
+	STIME		24	seek time, per track
+	XTIME		24	transfer ready delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RX01 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+4.5 RF08/RS08 Fixed Head Disk (RF)
+
+The RF08 implements these registers:
+
+	name		size	comments
+
+	STA		12	status
+	DA		20	current disk address
+	MA		12	memory address (in memory)
+	WC		12	word count (in memory)
+	WLK		32	write lock switches
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	TIME		24	rotational delay, per word
+	BURST		1	burst flag
+	STOP_IOE	1	stop on I/O error
+
+The RF08 is a three-cycle data break device.  If BURST = 0, word transfers
+are scheduled individually; if BURST = 1, the entire transfer occurs in
+a single data break.
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RF08 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+4.6 TM8E Magnetic Tape (MT)
+
+Magnetic tape options include the ability to make units write enabled or
+or write locked.
+
+	SET MTn LOCKED		set unit n write locked
+	SET MTn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	CMD		12	command
+	FNC		12	function
+	CA		12	memory address
+	WC		12	word count
+	DB		12	data buffer
+	STA		12	main status
+	STA2		6	secondary status
+	DONE		1	device done flag
+	INT		1	interrupt pending flag
+	STOP_IOE	1	stop on I/O error
+	TIME		24	record delay
+	UST0..7		24	unit status, units 0..n
+	POS0..7		31	position, units 0..n
+
+Error handling is as follows:
+
+	error		processed as
+
+	not attached	tape not ready
+
+	end of file	(read or space) end of physical tape
+			(write) ignored
+
+	OS I/O error	report error and stop
+
+4.7 Symbolic Display and Input
+
+The PDP-8 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as (sixbit) character string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			two character sixbit string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard PDP-8 assembler syntax.  There are four
+instruction classes: memory reference, IOT, field change, and operate.
+
+Memory reference instructions have the format
+
+	memref {I} {C/Z} address
+
+where I signifies indirect, C a current page reference, and Z a zero page
+reference.  The address is an octal number in the range 0 - 07777; if C or
+Z is specified, the address is a page offset in the range 0 - 177.  Normally,
+C is not needed; the simulator figures out from the address what mode to use.
+However, when referencing memory outside the CPU (eg, disks), there is no
+valid PC, and C must be used to specify current page addressing.
+
+IOT instructions consist of single mnemonics, eg, KRB, TLS.  IOT instructions
+may be or'd together
+
+	iot iot iot...
+
+The simulator does not check the legality of the proposed combination.  IOT's
+for which there is no opcode may be specified as IOT n, where n is an octal
+number in the range 0 - 0777.
+
+Field change instructions (CIF, CDF) have the format
+
+	fldchg field
+
+where field is an octal number in the range 0 - 7.  Field change instructions
+may be or'd together.
+
+Operate instructions have the format
+
+	opr opr opr...
+
+The simulator does not check the legality of the proposed combination.  EAE
+mode A and B mnemonics may be specified regardless of the EAE mode.  The
+operands for MUY and DVI must be deposited explicitly.
+
+5. PDP-11 Features
+
+The PDP-11 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		J-11 CPU with 256KB of memory
+-		FP11 floating point unit (FPA)
+-		CIS11 commercial instruction set (CIS, off by default)
+PTR,PTP		PC11 paper tape reader/punch
+TTI,TTO		DL11 console terminal
+LPT		LP11 line printer
+CLK		line frequency clock
+RK		RK11/RK05 cartridge disk controller with eight drives
+RL		RLV12/RL01(2) cartridge disk controller with four drives
+RP		RM02/03/05/80, RP04/05/06/07 Massbus style controller
+		with eight drives
+RX		RX11/RX01 floppy disk controller with two drives
+TM		TM11/TU10 magnetic tape controller with eight drives
+
+The PDP-11 simulator implements several unique stop conditions:
+
+	- abort during exception vector fetch, and register STOP_VEC is set
+	- abort during exception stack push, and register STOP_SPA is set
+	- trap condition 'n' occurs, and register STOP_TRAP<n> is set
+	- wait state entered, and no I/O operations outstanding
+	  (ie, no interrupt can ever occur)
+
+The PDP-11 loader supports standard binary format tapes.  The DUMP command
+is not implemented.
+
+5.1 CPU
+
+The only CPU options are disabling of 22b addressing, the CIS instruction
+set, and the size of main memory.
+
+	SET CPU 18B		disable 22b addressing
+	SET CPU 22B		enable 22b addressing (default)
+	SET CPU NOCIS		disable CIS instructions (default)
+	SET CPU CIS		enable CIS instructions
+	SET CPU 16K		set memory size = 16KB
+	SET CPU 32K		set memory size = 32KB
+	SET CPU 48K		set memory size = 48KB
+	SET CPU 64K		set memory size = 64KB
+	SET CPU 96K		set memory size = 96KB
+	SET CPU 128K		set memory size = 128KB
+	SET CPU 192K		set memory size = 192KB
+	SET CPU 256K		set memory size = 256KB
+	SET CPU 384K		set memory size = 384KB
+	SET CPU 512K		set memory size = 512KB
+	SET CPU 768K		set memory size = 768KB
+	SET CPU 1024K (or 1M)	set memory size = 1024KB
+	SET CPU 2048K (or 2M)	set memory size = 2048KB
+	SET CPU 3072K (or 3M)	set memory size = 3072KB
+	SET CPU 4096K (or 4M)	set memory size = 4096KB
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 256KB.
+
+These switches are recognized when examining or depositing in CPU memory:
+
+	-v			interpret address as virtual
+	-d			if mem mgt enabled, force data space
+	-k			if mem mgt enabled, force kernel mode
+	-s			if mem mgt enabled, force supervisor mode
+	-u			if mem mgt enabled, force user mode
+	-p			if mem mgt enabled, force previous mode
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	PC		16	program counter
+	R0..R5		16	R0..R5, first register set
+	R10..R15	16	R0..R5, second register set
+	KSP		16	kernel stack pointer
+	SSP		16	supervisor stack pointer
+	USP		16	user stack pointer
+	PSW		16	processor status word
+	  CM		2	  current mode, PSW<15:14>
+	  PM		2	  previous mode, PSW<13:12>
+	  RS		2	  register set, PSW<11>
+	  IPL		3	  interrupt priority level, PSW<7:5>
+	  T		1	  trace bit, PSW<4>
+	  N		1	  negative flag, PSW<3>
+	  Z		1	  zero flag, PSW<2>
+	  V		1	  overflow flag, PSW<1>
+	  C		1	  carry flag, PSW<0>
+	SR		16	front panel switches
+	DR		16	front panel display
+	MEMERR		16	memory error register
+	CCR		16	cache control register
+	MAINT		16	maintenance register
+	HITMISS		16	hit/miss register
+	CPUERR		16	CPU error register
+	PIRQ		16	programmed interrupt requests
+	FAC0H..FAC5H	32	FAC0..FAC5, high 32 bits
+	FAC0L..FAC5L	32	FAC0..FAC5, low 32 bits
+	FPS		16	floating point status
+	FEA		16	floating exception address
+	FEC		4	floating exception code
+	MMR0..3		16	memory management registers 0..3
+	{K/S/U}{I/D}{PAR/PDR}{0..7}
+			16	memory management registers
+	INT		32	interrupt pending flags
+	TRAP		18	trap pending flags
+	WAIT		0	wait state flag
+	WAIT_ENABLE	0	wait state enable flag
+	STOP_TRAPS	18	stop on trap flags
+	STOP_VECA	1	stop on read abort in trap or interrupt
+	STOP_SPA	1	stop on stack push abort in trap or interrupt
+	OLDPC		16	PC prior to last JMP, JMS, or interrupt
+	BREAK		16	breakpoint address (1 to disable)
+	WRU		8	interrupt character
+
+5.2 Programmed I/O Devices
+
+5.2.1 PC11 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.  Thus,
+by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	BUSY		1	busy flag (CSR<11>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+5.2.2 PC11 Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written. 
+Thus, by by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+5.2.3 KL11 Terminal Input (TTI)
+
+The terminal input (TTI) reads from the controling console port.  It
+implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+5.2.4 KL11 Terminal Output (TTO)
+
+The terminal output (TTO) writes to the controling console port.  It
+implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	number of characters input
+	TIME		24	time from I/O initiation to interrupt
+
+5.2.5 LP11 Line Printer (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The line printer implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of paper
+
+	OS I/O error	x	report error and stop
+
+5.2.6 Line-Time Clock (CLK)
+
+The clock (CLK) implements these registers:
+
+	name		size	comments
+
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	TIME		24	clock frequency
+
+5.3 RK11/RK05 Cartridge Disk (RK)
+
+RK11 options include the ability to make units write enabled or write locked:
+
+	SET RKn LOCKED		set unit n write locked
+	SET RKn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The RK11 implements these registers:
+
+	name		size	comments
+
+	RKCS		16	control/status
+	RKDA		16	disk address
+	RKBA		16	memory address
+	RKWC		16	word count
+	RKDS		16	drive status
+	RKER		16	error status
+	INTQ		9	interrupt queue
+	DRVN		3	number of last selected drive
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	INT		1	interrupt pending flag
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+5.4 RX11/RX01 Floppy Disk (RX)
+
+RX11 options include the ability to make units write enabled or write locked:
+
+	SET RXn LOCKED		set unit n write locked
+	SET RXn ENABLED		set unit n write enabled
+
+The RX11 implements these registers:
+
+	name		size	comments
+
+	RXCS		12	status
+	RXDB		8	data buffer
+	RXES		8	error status
+	RXERR		8	error code
+	RXTA		8	current track
+	RXSA		8	current sector
+	STAPTR		3	controller state
+	BUFPTR		3	buffer pointer
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	TR		1	transfer ready flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	DONE		1	device done flag (CSR<5>)
+	CTIME		24	command completion time
+	STIME		24	seek time, per track
+	XTIME		24	transfer ready delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RX01 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+5.5 RL11(V12)/RL01,RL02 Cartridge Disk (RL)
+
+RL11 options include the ability to set units write enabled or write locked,
+to set the drive size to RL01, RL02, or autosize, and to write a DEC standard
+044 compliant bad block table on the last track:
+
+	SET RLn LOCKED		set unit n write locked
+	SET RLn ENABLED		set unit n write enabled
+	SET RLn RL01		set size to RL01
+	SET RLn RL02		set size to RL02
+	SET RLn AUTOSIZE	set size based on file size at attach
+	SET RLn BADBLOCK	write bad block table on last track
+
+The size options can be used only when a unit is not attached to a file.  The
+bad block option can be used only when a unit is attached to a file.  Units
+can also be REMOVEd or ADDed to the configuration.
+
+The RL11 implements these registers:
+
+	name		size	comments
+
+	RLCS		16	control/status
+	RLDA		16	disk address
+	RLBA		16	memory address
+	RLBAE		6	memory address extension (RLV12)
+	RLMP..RLMP2	16	multipurpose register queue
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+5.6 RM02/03/05/80, RP04/05/06/07 Disk Pack Drives (RP)
+
+The RP controller implements a "Massbus style" 22b direct interface for
+large disk drives.  It is more abstract than other device simulators, with
+just enough detail to run operating system drivers.  In addition, the RP
+controller conflates the details of the RM series controllers with the RP
+series controllers, although there were detailed differences.
+
+RP options include the ability to set units write enabled or write locked,
+to set the drive size to one of seven disk types, or autosize, and to write
+a DEC standard 044 compliant bad block table on the last track:
+
+	SET RPn LOCKED		set unit n write locked
+	SET RPn ENABLED		set unit n write enabled
+	SET RPn RM03		set size to RM03
+	SET RPn RM05		set size to RM05
+	SET RPn RM80		set size to RM80
+	SET RPn RP04		set size to RP04
+	SET RPn RP06		set size to RP06
+	SET RPn RP07		set size to RP07
+	SET RPn AUTOSIZE	set size based on file size at attach
+	SET RLn BADBLOCK	write bad block table on last track
+
+The size options can be used only when a unit is not attached to a file.  The
+bad block option can be used only when a unit is attached to a file.  Units
+can also be REMOVEd or ADDed to the configuration.
+
+The RP controller implements these registers:
+
+	name		size	comments
+
+	RPCS1		16	control/status 1
+	RPCS2		16	control/status 2
+	RPCS3		16	control/status 3
+	RPWC		16	word count
+	RPBA		16	bus address
+	RPBAE		6	bus address extension
+	RPDA		16	desired surface, sector
+	RPDC		8	desired cylinder
+	RPOF		16	offset
+	RPDS0..7	16	drive status, drives 0-7
+	RPDE0..7	16	drive error, drives 0-7
+	RPER2		16	error status 2
+	RPER3		16	error status 3
+	RPDB		16	data buffer
+	RPMR		16	maintenance register
+	INT		1	interrupt pending flag
+	SC		1	special condition (CSR1<15>)
+	DONE		1	device done flag (CSR1<7>)
+	IE		1	interrupt enable flag (CSR1<6>)
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+5.7 TM11 Magnetic Tape (TM)
+
+Magnetic tape options include the ability to make units write enabled or
+or write locked.
+
+	SET TMn LOCKED		set unit n write locked
+	SET TMn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The magnetic tape bootstrap supports both original and DEC standard boot
+formats.  Originally, a tape bootstrap read and executed the first record
+on tape.  To allow for ANSI labels, the DEC standard bootstrap skipped the
+first record and read and executed the second.  The DEC standard is the
+default; to bootstrap an original format tape, use the -o switch with the
+BOOT command.
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	MTS		16	status
+	MTC		16	command
+	MTCMA		16	memory address
+	MTBRC		16	byte/record count
+	INT		1	interrupt pending flag
+	ERR		1	error flag
+	DONE		1	device done flag
+	IE		1	interrupt enable flag
+	STOP_IOE	1	stop on I/O error
+	TIME		24	delay
+	UST0..7		16	unit status, units 0..n
+	POS0..7		31	position, units 0..n
+
+Error handling is as follows:
+
+	error		processed as
+
+	not attached	tape not ready
+
+	end of file	(read or space) end of physical tape
+			(write) ignored
+
+	OS I/O error	report error and stop
+
+5.8 Symbolic Display and Input
+
+The PDP-11 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as two character ASCII string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			two character ASCII string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard PDP-11 assembler syntax.  There are sixteen
+instruction classes:
+
+class		operands		examples		comments
+
+no operands	none			HALT, RESET
+3b literal	literal, 0 - 7		SPL
+6b literal	literal, 0 - 077	MARK
+8b literal	literal, 0 - 0377	EMT, TRAP
+register	register		RTS
+sop		specifier		SWAB, CLR, ASL
+reg-sop		register, specifier	JSR, XOR, MUL
+fop		flt specifier		ABSf, NEGf
+ac-fop		flt reg, flt specifier	LDf, MULf
+ac-sop		flt reg, specifier	LDEXP, STEXP
+ac-moded sop	flt reg, specifier	LDCif, STCfi
+dop		specifier, specifier	MOV, ADD, BIC
+cond branch	address			BR, BCC, BNE
+sob		register, address	SOB
+cc clear	cc clear instructions	CLC, CLV, CLZ, CLN	combinable
+cc set		cc set instructions	SEC, SEV, SEZ, SEN	combinable
+
+For floating point opcodes, F and D variants, and I and L variants, may be
+specified regardless of the state of FPS.
+
+The syntax for specifiers is as follows:
+
+syntax		specifier	displacement	comments
+
+Rn		0n		-
+Fn		0n		-		only in flt reg classes
+(Rn)		1n		-
+@(Rn)		7n		0		equivalent to @0(Rn)
+(Rn)+		2n		-
+@(Rn)+		3n              -
+-(Rn)		4n              -
+@-(Rn)		5n              -
+{+/-}d(Rn)	6n		{+/-}d
+@{+/-}d(Rn)	7n		{+/-}d
+#n		27		n
+@#n		37		n
+.+/-n		67		+/-n - 4
+@.+/-n		77		+/-n - 4
+{+/-}n		67		{+/-}n - PC - 4	if on disk, 37 and n
+@{+/-}n		77		{+/-}n - PC - 4	if on disk, invalid
+
+6. Nova Features
+
+The Nova simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		Nova CPU with 32KW of memory
+-		hardware multiply/divide
+PTR,PTP		paper tape reader/punch
+TTI,TTO		console terminal
+LPT		line printer
+CLK		real-time clock
+DK		head-per-track disk controller
+DP		moving head disk controller with four drives
+MT		magnetic tape controller with eight drives
+
+The Nova simulator implements these unique stop conditions:
+
+	- reference to undefined I/O device, and STOP_DEV is set
+	- more than INDMAX indirect addresses are detected during
+	  an interrupt
+	- more than INDMAX indirect addresses are detected during
+	  memory reference address decoding
+
+The Nova loader supports standard binary format tapes.  The DUMP command
+is not implemented.
+
+6.1 CPU
+
+The only CPU options are the presence of the optional instructions
+and the size of main memory.
+
+	SET CPU NOVA4		enable Nova4 instructions
+	SET CPU NOVA3		enable Nova3 instructions
+	SET CPU MDV		enable multiply/divide
+	SET CPU NONE		disable all optional instructions
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 12K		set memory size = 12K
+	SET CPU 16K		set memory size = 16K
+	SET CPU 20K		set memory size = 20K
+	SET CPU 24K		set memory size = 24K
+	SET CPU 28K		set memory size = 28K
+	SET CPU 32K		set memory size = 32K
+
+(Nova 4 = optional multiply/divide, stack, byte, trap instructions)
+(Nova 3 = optional multiply/divide, stack instructions)
+(MDV = multiply/divide instructions)
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 32K.
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	PC		15	program counter
+	AC0..AC3	16	accumulators 0..3
+	C		1	carry
+	SR		16	front panel switches
+	PI		16	priority interrupt mask
+	ION		1	interrupt enable
+	ION_DELAY	1	interrupt enable delay for ION
+	PWR		1	power fail interrupt
+	INT		15	interrupt pending flags
+	BUSY		15	device busy flags
+	DONE		15	device done flags
+	DISABLE		15	device interrupt disable flags
+	STOP_DEV	1	stop on undefined IOT
+	INDMAX		15	maximum number of nested indirects
+	OLDPC		15	PC prior to last JMP, JMS, or interrupt
+	BREAK		16	breakpoint address (177777 to disable)
+	WRU		8	interrupt character
+
+6.2 Programmed I/O Devices
+
+6.2.1 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.  Thus,
+by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	errpr   STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	end of file	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+6.2.2 Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written.
+Thus, by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+6.2.3 Terminal Input (TTI)
+
+The terminal input reads from the controling console port.  Terminal
+options include the ability to set limited Dasher compatibility mode or
+normal mode:
+
+	SET TTI ANSI		normal mode
+	SET TTI DASHER		Dasher mode
+	SET TTO ANSI		normal mode
+	SET TTO DASHER		Dasher mode
+
+Setting either TTI or TTO changes both devices.  In Dasher mode, carriage
+return is changed to newline on input, and ^X is changed to backspace.
+
+The terminal input implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+6.2.4 Terminal Output (TTO)
+
+The terminal output writes to the controling console port.  Terminal
+options include the ability to set limited Dasher compatibility mode or
+normal mode:
+
+	SET TTI ANSI		normal mode
+	SET TTI DASHER		Dasher mode
+	SET TTO ANSI		normal mode
+	SET TTO DASHER		Dasher mode
+
+Setting either TTI or TTO changes both devices.  In Dasher mode, carriage
+return is changed to newline on input, and ^X is changed to backspace.
+
+The terminal output implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters output
+	TIME		24	time from I/O initiation to interrupt
+
+6.2.5 Programmed I/O Devices (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The line printer implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of paper
+
+	OS I/O error	x	report error and stop
+
+6.2.6 Real-Time Clock (CLK)
+
+The real-time clock (CLK) implements these registers:
+
+	name		size	comments
+
+	SELECT	2	selected clock interval
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	TIME0		24	clock frequency, select = 0
+	TIME1		24	clock frequency, select = 1
+	TIME2		24	clock frequency, select = 2
+	TIME3		24	clock frequency, select = 3
+
+6.3 Fixed Head Disk (DK)
+
+The fixed head disk controller implements these registers:
+
+	name		size	comments
+
+	STAT		16	status
+	DA		16	disk address
+	MA		16	memory address
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	device disable flag
+	INT		1	interrupt pending flag
+	WLK		8	write lock switches
+	TIME		24	rotational delay, per sector
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+Fixed head disk data files are buffered in memory; therefore, end of file
+and OS I/O errors cannot occur.
+
+6.4 Moving Head Disk (DP)
+
+Moving head disk options include the ability to make units write enabled or
+write locked, and to select the type of drive:
+
+	SET DPn LOCKED		set unit n write locked
+	SET DPn ENABLED		set unit n write enabled
+	SET DPn FLOPPY		set unit n to floppy disk
+	SET DPn D31		set unit n to Diablo 31
+	SET DPn D44		set unit n to Diablo 44
+	SET DPn C111		set unit n to Century 111
+	SET DPn C114		set unit n to Century 114
+	SET DPn 6225		set unit n to 6225
+	SET DPn 6099		set unit n to 6099
+	SET DPn 6227		set unit n to 6227
+	SET DPn 6070		set unit n to 6070
+	SET DPn 6103		set unit n to 6103
+	SET DPn 4231		set unit n to 4231
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+All drives have 256 16b words per sector.  The other disk parameters are:
+
+	drive cylinders surfaces sectors size (MW) 	DG models
+
+	floppy	77	1	8	  .158		6038
+	D31	203	2	12	 1.247		4047, 4237, 4238
+	D44	408	4	12	 5.014		4234, 6045
+	C111	203	10	6	 3.118		4048
+	C114	203	20	12	12.472		4057, 2314
+	6225	20	2	245	 2.508
+	6099	32	4	192	 6.291
+	6227	20	6	245	 7.526
+	6070	24	4	408	10.027
+	6103	32	8	192	12.583
+	4231	23	19	411	45.979
+
+The moving head disk controller implements these registers:
+
+	name		size	comments
+
+	FCCY		16	flags, command, cylinder
+	USSC		16	unit, surface, sector, count
+	STAT		16	status
+	MA		16	memory address
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+
+Error handling is as follows:
+
+	error		processed as
+
+	not attached	disk not ready
+
+	end of file	assume rest of disk is zero
+
+	OS I/O error	report error and stop
+
+6.5 Magnetic Tape (MT)
+
+Magnetic tape options include the ability to make units write enabled or
+or write locked.
+
+	SET MTn LOCKED		set unit n write locked
+	SET MTn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	CU		16	command, unit
+	MA		16	memory address
+	WC		16	word count
+	STA1		16	status word 1
+	STA2		16	status word 2
+	EP		1	extended polling mode (not supported)
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	STOP_IOE	1	stop on I/O error
+	CTIME		24	controller delay
+	RTIME		24	record delay
+	UST0..7		32	unit status, units 0..n
+	POS0..7		31	position, units 0..n
+
+Error handling is as follows:
+
+	error		processed as
+
+	not attached	tape not ready
+
+	end of file	(read or space) end of physical tape
+			(write) ignored
+
+	OS I/O error	report error and stop
+
+6.6 Symbolic Display and Input
+
+The Nova simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as two character ASCII string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			two character ASCII string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard Nova assembler syntax.  There are three
+instruction classes: memory reference, IOT, and operate.
+
+Memory reference instructions have the format
+
+	memref {ac,}{@}address{,index}
+
+LDA and STA require an initial register; ISZ, DSZ, JSR, and JMP do not.
+The syntax for addresses and indices is as follows:
+
+syntax		mode	displacement	comments
+
+0 <= n < 0400	0	n
+{+/-}n >= 0400	1	{+/-}n - PC	must be in range [-200, 177]
+					invalid on disk
+.+/-n		1	{+/-}n		must be in range [-200, 177]
+{+/-}n,2	2	{+/-}n		must be in range [-200, 177]
+{+/-}n,3	3	{+/-}n		must be in range [-200, 177]
+
+IOT instructions have one of four formats
+
+	syntax			example
+
+	iot			HALT
+	iot reg			INTA
+	iot device		SKPDN
+	iot reg,device		DOAS
+
+Devices may be specified as mnemonics or as numbers in the range 0 - 077.
+
+Operate instructions have the format
+
+	opcode{#} reg,reg{,skip}
+
+In all Nova instructions, blanks may be substituted for commas as field
+delimiters.
+
+7. PDP-1 Features
+
+The PDP-1 is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		PDP-1 CPU with up to 64KW of memory
+PTR,PTP		integral paper tape reader/punch
+TTI,TTO		Flexowriter typewriter input/output
+LPT		Type 62 line printer
+
+The PDP-1 simulator implements the following unique stop conditions:
+
+	- an unimplemented instruction is decoded, and register
+	  STOP_INST is set
+	- more than INDMAX indirect addresses are detected during
+	  memory reference address decoding
+	- more than XCTMAX nested executes are detected during
+	  instruction execution
+	- wait state entered, and no I/O operations outstanding
+	  (ie, no interrupt can ever occur)
+
+The PDP-1 loader supports RIM format tapes.  The DUMP command is not
+implemented.
+
+7.1 CPU
+
+The only CPU options are the presence of hardware multiply/divide and the
+size of main memory.
+
+	SET CPU MDV		enable multiply/divide
+	SET CPU NOMDV		disable multiply/divide
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 12K		set memory size = 12K
+	SET CPU 16K		set memory size = 16K
+	SET CPU 20K		set memory size = 20K
+	SET CPU 24K		set memory size = 24K
+	SET CPU 28K		set memory size = 28K
+	SET CPU 32K		set memory size = 32K
+	SET CPU 48K		set memory size = 48K
+	SET CPU 64K		set memory size = 64K
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 64K.
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	PC		16	program counter
+	AC		18	accumulator
+	IO		18	IO register
+	OV		1	overflow flag
+	PF		6	program flags<1:6>
+	SS		6	sense switches<1:6>
+	TW		18	test word (front panel switches)
+	EXTM		1	extend mode
+	IOSTA		18	IO status register
+	SBON		1	sequence break enable
+	SBRQ		1	sequence break request
+	SBIP		1	sequence break in progress
+	IOH		1	I/O halt in progress
+	IOC		1	I/O continue
+	OLDPC		16	PC prior to last transfer
+	STOP_INST	1	stop on undefined instruction
+	SBS_INIT	1	initial state of sequence break enable
+	EXTM_INIT	1	initial state of extend mode
+	BREAK		17	breakpoint address (377777 to disable)
+	WRU		8	interrupt character
+
+7.2 Programmed I/O Devices
+
+7.2.1 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from or a disk file.  The POS
+register specifies the number of the next data item to be read.  Thus,
+by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	RPLS		1	return restart pulse flag
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+7.2.2 Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written.
+Thus, by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	RPLS		1	return restart pulse flag
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+7.2.3 Terminal Input (TTI)
+
+The terminal input (TTO) reads from the controling console port.
+It implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+7.2.4 Terminal Output (TTO)
+
+The terminal output (TTO) writes to the controling console port.
+It implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	RPLS		1	return restart pulse flag
+	POS		31	number of characters output
+	TIME		24	time from I/O initiation to interrupt
+
+7.2.5 Type 62 Line Printer (LPT)
+
+The paper line printer (LPT) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written.
+Thus, by changing POS, the user can backspace or advance the printer.
+
+The line printer implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	PNT		1	printing done flag
+	SPC		1	spacing done flag
+	RPLS		1	return restart pulse flag
+	BPTR		6	print buffer pointer
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+7.3 Symbolic Display and Input
+
+The PDP-1 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as FIODEC character string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			three character FIODEC string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses modified PDP-1 assembler syntax.  There are six
+instruction classes: memory reference, shift, skip, operate, IOT, and
+LAW.
+
+Memory reference instructions have the format
+
+	memref {I} address
+
+where I signifies indirect reference.  The address is an octal number in
+the range 0 - 0177777.
+
+Shift instructions have the format
+
+	shift shift_count
+
+The shift count is an octal number in the range 0-9.
+
+Skip instructions consist of single mnemonics, eg, SZA, SZS4.  Skip
+instructions may be or'd together
+
+	skip skip skip...
+
+The sense of a skip can be inverted by including the mnemonic I.
+
+Operate instructions consist of single mnemonics, eg, CLA, CLI.  Operate
+instructions may be or'd together
+
+	opr opr opr...
+
+IOT instructions consist of single mnemonics, eg, TYI, TYO.  IOT
+instructions may include an octal numeric modifier or the modifier I:
+
+	iot modifier
+
+The simulator does not check the legality of skip, operate, or IOT
+combinations.
+
+Finally, the LAW instruction has the format
+
+	LAW {I} immediate
+
+where immediate is in the range 0 to 07777.
+
+7.4 Character Sets
+
+The PDP-1's console was a Frieden Flexowriter; its character encoding
+was known as FIODEC.  The PDP-1's line printer used a modified Hollerith
+character set.  The following table provides equivalences between ASCII
+characters and the PDP-1's I/O devices.  In the console table, UC stands
+for upper case.
+
+		 PDP-1			   PDP-1
+ASCII		console	 		line printer
+
+000 - 007	none			none
+bs		075			none
+tab		036			none
+012 - 014	none			none
+cr		077			none
+016 - 037	none			none
+space		000	       		000
+!		{OR} UC+005		none
+"		UC+001			none
+#		{IMPLIES} UC+004	none
+$		none			none
+%		none			none
+&		{AND} UC+006		none
+'		UC+002			none
+(		057			057
+)		055			055
+*		{TIMES} UC+073		072
++		UC+054			074
+,		033			033
+-		054			054
+.		073			073
+/		021			021
+0		020			020
+1		001			001
+2		002			002
+3		003			003
+4		004			004
+5		005			005
+6		006			006
+7		007			007
+8		010			010
+9		011			011
+:		none			none
+;		none			none
+<		UC+007			034
+=		UC+033			053
+>		UC+010			034
+?		UC+021			037
+@		{MID DOT} 040		{MID DOT} 040
+A		UC+061			061
+B		UC+062			062
+C		UC+063			063
+D		UC+064			064
+E		UC+065			065
+F		UC+066			066
+G		UC+067			067
+H		UC+070			070
+I		UC+071			071
+J		UC+041			041
+K		UC+042			042
+L		UC+043			043
+M		UC+044			044
+N		UC+045			045
+O		UC+046			046
+P		UC+047			047
+Q		UC+050			050
+R		UC+051			051
+S		UC+022			022
+T		UC+023			023
+U		UC+024			024
+V		UC+025			025
+W		UC+026			026
+X		UC+027			027
+Y		UC+030			030
+Z		UC+031			031
+[		UC+057			none
+\		{OVERLINE} 056		{OVERLINE} 056
+]		UC+055			none
+^		{UP ARROW} UC+011	{UP ARROW} 035
+_		UC+040			UC+040
+`		{RT ARROW} UC+020	036
+a		061			none
+b		062			none
+c		063			none
+d		064			none
+e		065			none
+f		066			none
+g		067			none
+h		070			none
+i		071			none
+j		041			none
+k		042			none
+l		043			none
+m		044			none
+n		045			none
+o		046			none
+p		047			none
+q		050			none
+r		051			none
+s		022			none
+t		023			none
+u		024			none
+v		025			none
+w		026			none
+x		027			none
+y		030			none
+z		031			none
+{		none			none
+|		UC+056			076
+}		none			none
+~		UC+003			013
+del		075			none
+
+8. 18b PDP Features
+
+The other four 18b PDP's (PDP-4, PDP-7, PDP-9, PDP-15) are very similar
+and are configured as follows:
+
+system	device		simulates
+	name(s)
+
+PDP-4	CPU		PDP-4 CPU with 8KW of memory
+	PTR,PTP		integral paper tape/Type 75 punch
+	TTI,TTO		KSR28 console terminal (Baudot code)
+	LPT		Type 62 line printer (Hollerith code)
+	CLK		integral real-time clock
+
+PDP-7	CPU		PDP-7 CPU with 32KW of memory
+	-		Type 177 extended arithmetic element (EAE)
+	-		Type 148 memory extension
+	PTR,PTP		Type 444 paper tape reader/Type 75 punch
+	TTI,TTO		KSR 33 console terminal
+	LPT		Type 647 line printer
+	CLK		integral real-time clock
+	DRM		Type 24 serial drum
+
+PDP-9	CPU		PDP-9 CPU with 32KW of memory
+	-		KE09A extended arithmetic element (EAE)
+	-		KG09B memory extension
+	-		KP09A power detection
+	-		KX09A memory protection
+	PTR,PTP		PC09A paper tape reader/punch
+	TTI,TTO		KSR 33 console terminal
+	LPT		Type 647E line printer
+	CLK		integral real-time clock
+	RF		RF09/RS09 fixed-head disk
+	MT		TC59/TU10 magnetic tape
+
+PDP-15	CPU		PDP-15 CPU with 32KW of memory
+	-		KE15 extended arithmetic element (EAE)
+	-		KF15 power detection
+	-		KM15 memory protection
+	PTR,PTP		PC15 paper tape reader/punch
+	TTI,TTO		KSR 35 console terminal
+	LPT		LP15 line printer
+	CLK		integral real-time clock
+	RP		RP15/RP02 disk pack
+	RF		RF15/RS09 fixed-head disk
+	MT		TC59/TU10 magnetic tape
+
+The 18b PDP simulators implement several unique stop conditions:
+
+	- an unimplemented instruction is decoded, and register
+	  STOP_INST is set
+	- more than XCTMAX nested executes are detected during
+	  instruction execution
+
+The 18b PDP loader supports RIM format tapes.  The DUMP command is not
+implemented.
+
+8.1 CPU
+
+The only CPU options are the presence of the EAE and the size of main memory.
+
+	SET CPU EAE		enable EAE
+	SET CPU NOEAE		disable EAE
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 12K		set memory size = 12K
+	SET CPU 16K		set memory size = 16K
+	SET CPU 20K		set memory size = 20K
+	SET CPU 24K		set memory size = 24K
+	SET CPU 28K		set memory size = 28K
+	SET CPU 32K		set memory size = 32K
+	SET CPU 48K		set memory size = 48K
+	SET CPU 64K		set memory size = 64K
+	SET CPU 80K		set memory size = 80K
+	SET CPU 96K		set memory size = 96K
+	SET CPU 112K		set memory size = 112K
+	SET CPU 128K		set memory size = 128K
+
+Memory sizes greater than 8K are only available on the PDP-7, PDP-9, and
+PDP-15; memory sizes greater than 32KW are only available on the PDP-15.
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 8K for the PDP-4, 32K
+for the PDP-7 and PDP-9, and 128K for the PDP-15.
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	system	name		size	comments
+
+	all	PC		addr	program counter
+	7,9	PC		15	program counter
+	15	PC		17	program counter
+	all	AC		18	accumulator
+	7,9,15	MQ		18	multiplier-quotient
+	7,9,15	SC		6	shift counter
+	7,9,15	EAE_AC_SIGN	1	EAE AC sign
+	all	L		1	link
+	7,9	EXTM		1	extend mode
+	15	BANKM		1	bank mode
+	7	TRAPM		1	trap mode
+	9,15	USMD		1	user mode
+	9,15	USMDBUF		1	user mode buffer
+	9,15	BR		addr	memory protection bounds
+	7,9,15	TRAPP		1	trap pending
+	9,15	NEXM		1	non-existent memory violation
+	9,15	PRVN		1	privilege violation
+	7,9	EMIRP		1	EMIR instruction pending
+	9,15	RESTP		1	DBR or RES instruction pending
+	15	XR		18	index register
+	15	LR		18	limit register
+	all	SR		18	front panel switches
+	all	INT		32	interrupt requests
+	all	IORS		18	IORS register
+	all	ION		1	interrupt enable
+	all	ION_DELAY	2	interrupt enable delay
+	all	OLDPC		addr	PC prior to last transfer
+	all	STOP_INST	1	stop on undefined instruction
+	all	BREAK		18	breakpoint address (777777 to disable)
+	all	WRU		8	interrupt character
+
+"addr" signifies the address width of the system (13b for the PDP-4, 15b for
+the PDP-7 and PDP-9, 17b for the PDP-15).
+
+8.2 Programmed I/O Devices
+
+8.2.1 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.  Thus,
+by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ERR		1	error flag (PDP-9, PDP-15 only)
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+8.2.2 Paper Tape Punch (PTP)
+
+The ppaper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written.
+Thus, by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ERR		1	error flag (PDP-9, PDP-15 only)
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+8.2.3 Terminal Input (TTI)
+
+The terminal input (TTI) reads from the controling console port.  The
+input has one option, UC; when set, it automatically converts lower
+case input to upper case.
+
+The terminal input implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+8.2.4 Terminal Output (TTO)n backspace or advance these devices.
+
+The terminal output (TTO) writes to the controling console port.  It
+implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	POS		31	number of chararacters output
+	TIME		24	time from I/O initiation to interrupt
+
+8.2.5 Line Printer (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The PDP-4 used a Type 62 printer controller, with these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	SPC		1	spacing done flag
+	BPTR		6	print buffer pointer
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+The PDP-7 and PDP-7 used a Type 647 printer controller, with these
+registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ENABLE	1	interrupt enable (PDP-9 only)
+	ERR		1	error flag
+	BPTR		7	print buffer pointer
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+The PDP-15 used an LP15 printer controller, with these registers:
+
+	name		size	comments
+
+	STA		18	status register
+	MA		18	DMA memory address
+	INT		1	interrupt pending flag
+	ENABLE	1	interrupt enable
+	LCNT		8	line counter
+	BPTR		7	print buffer pointer
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+For all three models, error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+8.2.6 Real-Time Clock (CLK)
+
+The real-time clock (CLK) implements these registers:
+
+	name		size	comments
+
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ENABLE	1	clock enable
+	TIME		24	clock frequency
+
+8.3 RP15/RP02 Disk Pack (RP)
+
+RP15 options include the ability to make units write enabled or write locked:
+
+	SET RPn LOCKED		set unit n write locked
+	SET RPn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The RP15 implements these registers:
+
+	name		size	comments
+
+	STA		18	status A
+	STB		18	status B
+	DA		18	disk address
+	MA		18	current memory address
+	WC		18	word count
+	INT		1	interrupt pending flag
+	BUSY		1	control busy flag
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+8.4 Type 24 Serial Drum (DRM)
+
+The serial drum (DRM) implements these registers:
+
+	name		size	comments
+
+	DA		9	drum address (sector number)
+	MA		15	current memory address
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ERR		1	error flag
+	WLK		32	write lock switches
+	TIME		24	rotational latency, per word
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+Drum data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+8.5 RF09/RF15/RS09 Fixed Head Disk (RF)
+
+The RF09/RF15 implements these registers:
+
+	name		size	comments
+
+	STA		18	status
+	DA		21	current disk address
+	MA		18	memory address (in memory)
+	WC		18	word count (in memory)
+	BUF		18	data buffer (diagnostic only)
+	INT		1	interrupt pending flag
+	WLK0..7		16	write lock switches for disks 0..7
+	TIME		24	rotational delay, per word
+	BURST		1	burst flag
+	STOP_IOE	1	stop on I/O error
+
+The RF09/RF15 is a three-cycle data break device.  If BURST = 0, word
+transfers are scheduled individually; if BURST = 1, the entire transfer
+occurs in a single data break.
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RF15/RF09 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+8.6 TC59/TU10 Magnetic Tape (MT)
+
+Magnetic tape options include the ability to make units write enabled or
+or write locked.
+
+	SET MTn LOCKED		set unit n write locked
+	SET MTn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	CMD		18	command
+	STA		18	main status
+	MA		18	memory address (in memory)
+	WC		18	word count (in memory)
+	INT		1	interrupt pending flag
+	STOP_IOE	1	stop on I/O error
+	TIME		24	record delay
+	UST0..7		24	unit status, units 0..n
+	POS0..7		31	position, units 0..n
+
+Error handling is as follows:
+
+	error		processed as
+
+	not attached	tape not ready
+
+	end of file	(read or space) end of physical tape
+			(write) ignored
+
+	OS I/O error	report error and stop
+
+8.7 Symbolic Display and Input
+
+The 18b PDP simulators implement symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as (sixbit) character string
+	-m			display instruction mnemonics
+
+The PDP-15 also recognizes an additional switch:
+
+	-p			display as packed ASCII (five 7b ASCII
+				characters in two 18b words)
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			three character sixbit string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+The PDP-15 also recognizes an additional input mode:
+
+	# or -p			five character packed ASCII string in
+				two 18b words
+
+Instruction input uses standard 18b PDP assembler syntax.  There are six
+instruction classes: memory reference, EAE, index (PDP-15 only), IOT,
+operate, and LAW.
+
+Memory reference instructions have the format
+
+	memref {I/@} address{,X}
+
+where I (PDP-4, PDP-7, PDP-9) /@ (PDP-15) signifies indirect reference,
+and X signifies indexing (PDP-15 in page mode only).  The address is an
+octal number in the range 0 - 017777 (PDP-4, PDP-7, PDP-9, and PDP-15 in
+bank mode) or 0 - 07777 (PDP-15 in page mode).
+
+IOT instructions consist of single mnemonics, eg, KRB, TLS.  IOT instructions
+may be or'd together
+
+	iot iot iot...
+
+IOT's may also include the number 10, signifying clear the accumulator
+
+	iot 10
+
+The simulator does not check the legality of IOT combinations.  IOT's for
+which there is no opcode may be specified as IOT n, where n is an octal
+number in the range 0 - 07777.
+
+EAE instructions have the format
+
+	eae {+/- shift count}
+
+EAE instructions may be or'd together
+
+	eae eae eae...
+
+The simulator does not check the legality of EAE combinations.  EAE's for
+which there is no opcode may be specified as EAE n, where n is an octal
+number in the range 0 - 037777.
+
+Index instructions (PDP-15 only) have the format
+
+	index {immediate}
+
+The immediate, if allowed, must be in the range of -0400 to +0377.
+
+Operate instructions have the format
+
+	opr opr opr...
+
+The simulator does not check the legality of the proposed combination.  The
+operands for MUY and DVI must be deposited explicitly.
+
+Finally, the LAW instruction has the format
+
+	LAW immediate
+
+where immediate is in the range of 0 to 017777.
+
+8.8 Character Sets
+
+The PDP-4's console was an ASR-28 Teletype; its character encoding was
+Baudot.  The PDP-4's line printer used a modified Hollerith character
+set.  The PDP-7's and PDP-9's consoles were KSR-33 Teletypes; their
+character sets were basically ASCII.  The PDP-7's and PDP-9's line
+printers used sixbit encoding (ASCII codes 040 - 0137 masked to six
+bits).  The PDP-15's I/O devices were all ASCII.  The following table
+provides equivalences between ASCII characters and the PDP-4's I/O devices.
+In the console table, FG stands for figures (upper case).
+
+		 PDP-4			   PDP-4
+ASCII		console	 		line printer
+
+000 - 006	none			none
+bell		FG+024			none
+010 - 011	none			none
+lf		010			none
+013 - 014	none			none
+cr		002			none
+016 - 037	none			none
+space		004	     		000
+!		FG+026			none
+"		FG+021			none
+#		FG+005			none
+$		FG+062			none
+%		none			none
+&		FG+013			none
+'		FG+032			none
+(		FG+036			057
+)		FG+011			055
+*		none			072
++		none			074
+,		FG+006			033
+-		FG+030			054
+.		FG+007			073
+/		FG+027			021
+0		FG+015			020
+1		FG+035			001
+2		FG+031			002
+3		FG+020			003
+4		FG+012			004
+5		FG+001			005
+6		FG+025			006
+7		FG+034			007
+8		FG+014			010
+9		FG+003			011
+:		FG+016			none
+;		FG+017			none
+<		none			034
+=		none			053
+>		none			034
+?		FG+023			037
+@		none			{MID DOT} 040
+A		030			061
+B		023			062
+C		016			063
+D		022			064
+E		020			065
+F		026			066
+G		013			067
+H		005			070
+I		014			071
+J		032			041
+K		036			042
+L		011			043
+M		007			044
+N		006			045
+O		003			046
+P		015			047
+Q		035			050
+R		012			051
+S		024			022
+T		001			023
+U		034			024
+V		017			025
+W		031			026
+X		027			027
+Y		025			030
+Z		021			031
+[		none			none
+\		none			{OVERLINE} 056
+]		none			none
+^		none			{UP ARROW} 035
+_		none			UC+040
+0140 - 0177	none			none
+
+9. IBM 1401 Features
+
+The IBM 1401 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		IBM 1401 CPU with 16K of memory
+CDR,CDP		IBM 1402 card reader/punch
+LPT		IBM 1403 line printer
+INQ		IBM 1407 inquiry terminal
+MT		IBM 729 7-track magnetic tape controller with six drives
+
+The IBM 1401 simulator implements many unique stop conditions.  On almost
+any kind of error the simulator stops:
+
+	unimplemented opcode
+	reference to non-existent memory
+	reference to non-existent device
+	no word mark under opcode
+	invalid A address
+	invalid B address
+	invalid instruction length
+	invalid modifier character
+	invalid branch address
+	invalid magtape unit number
+	invalid magtape record length
+	write to locked magtape drive
+	skip to unpunched carriage control tape channel
+	card reader hopper empty
+	address register wrap-around
+	single character A field in MCE
+	single character B field in MCE
+	hanging $ in MCE with EPE enabled
+	I/O check with I/O stop switch set
+
+The LOAD and DUMP commands are not implemented.
+
+9.1 CPU
+
+The CPU options include a number of special features and the size of main
+memory.  Note that the Modify Address special feature is always included
+when memory size is greater than 4K.
+
+	SET CPU XSA		enable advanced programming special feature
+	SET CPU NOXSA		disable advanced programming
+	SET CPU HLE		enable high/low/equal special feature
+	SET CPU NOHLE		disable high/low/equal
+	SET CPU BBE		enable branch on bit equal special feature
+	SET CPU NOBBE		disable branch on bit equal
+	SET CPU MR		enable move record special feature
+	SET CPU NOMR		disable move record
+	SET CPU EPE		enable extended print edit special feature
+	SET CPU NOEPE		disable extended print edit
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 12K		set memory size = 12K
+	SET CPU 16K		set memory size = 16K
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initially, memory size is 16K, and all special
+features are enabled.
+
+Memory is implemented as 7 bit BCD characters, as follows:
+
+	6	5 	4	3	2	1	0
+
+	word	B bit	A bit	8	4	2	1
+	mark	<-- zone -->	<-------- digit -------->
+
+In BCD, the decimal digits 0-9 are (octal) values 012, 001, 002, 003, 004,
+005, 006, 007, 010, 011, respectively.  Signs are encoded in the zone bits,
+with 00, 01, and 11 being positive, and 10 being negative.
+
+CPU registers include the visible state of the processor.  The 1401 has no
+interrupt system.
+
+	name		size	comments
+
+	IS		14	instruction storage address register (PC)
+	AS		14	A storage address register
+	BS		14	B storage address register
+	ASERR		1	AS invalid flag
+	BSERR		1	BS invalid flag
+	SSA		1	sense switch A
+	SSB		1	sense switch B
+	SSC		1	sense switch C
+	SSD		1	sense switch D
+	SSE		1	sense switch E
+	SSF		1	sense switch F
+	SSG		1	sense switch G
+	EQU		1	equal compare indicator
+	UNEQ		1	unequal compare indicator
+	HIGH		1	high compare indicator
+	LOW		1	low compare indicator
+	OVF		1	overflow indicator
+	IOCHK		1	I/O check switch
+	PRCHK		1	process check switch
+	OLDIS		1	IS prior to last branch
+	BREAK		17	breakpoint address (1000000 to disable)
+	WRU		8	interrupt character
+
+9.2 1402 Card Reader/Punch (CDR, CDP, STKR)
+
+The IBM 1402 card/reader punch is simulated as three independent devices:
+the card reader (CDR), the card punch (CDP), and the reader and punch
+stackers (STKR).  STRK units 0, 1, 2, and 4 correspond to the reader
+normal stacker, reader stacker 1, shared stacker 2/8, and punch stacker
+4, respectively.
+
+The card reader reads data from disk files, while the punch and stackers
+write data to disk files.  Cards are simulated as ASCII text lines with
+terminating newlines; column binary is not supported.  For each unit,
+the POS register specifies the number of the next data item to be read or
+written.  Thus, by changing POS, the user can backspace or advance these
+devices.
+
+The reader/punch registers are:
+
+	device	name		size	comments
+
+	CDR	LAST		1	last card indicator
+		ERR		1	error indicator
+		S1		1	stacker 1 select flag
+		S2		1	stacker 2 select flag
+		POS		31	position
+		TIME		24	delay window for stacker select
+
+	CDP	ERR		1	error indicator
+		S4		1	stacker 4 select flag
+		S8		1	stacker 8 select flag
+
+	STKR	POS0		31	position, normal reader stack
+		POS1		31	position, reader stacker 1
+		POS2		31	position, shared stacker 2/8
+		POS4		31	position, punch stacker 4
+
+Error handling is as follows:
+
+	device		error		processed as
+
+	reader		end of file	if SSA set, set LAST indicator
+					on next Read, report error and stop
+
+	reader,punch	not attached	report error and stop
+			OS I/O error	print error message
+					if IOCHK set, report error and stop
+					otherwise, set ERR indicator
+
+	stacker		not attached	ignored
+			OS I/O error	print error message
+					if IOCHK set, report error and stop
+
+9.3 1403 Line Printer (LPT)
+
+The IBM 1403 line printer (LPT) writes its data, converted to ASCII, to
+a disk file.  The line printer supports three different print character
+sets or "chains":
+
+	SET LPT PCF			full 64 character chain
+	SET LPT PCA			48 character business chain
+	SET LPT PCH			48 character FORTRAN chain
+
+In addition, the line printer can be programmed with a carriage control
+tape.  The LOAD command loads a new carriage control tape:
+
+	LOAD <file>			load carriage control tape file
+
+The format of a carriage control tape consists of multiple lines.  Each
+line contains an optional repeat count, enclosed in parentheses, optionally
+followed by a series of column numbers separated by commas.  Column numbers
+must be between 1 and 12; a column number of zero denotes top of form.  The
+following are all legal carriage control specifications:
+
+	<blank line>			no punch
+	(5)				5 lines with no punches
+	1,5,7,8				columns 1, 5, 7, 8 punched
+	(10)2				10 lines with column 2 punched
+	1,0				column 1 punched; top of form
+
+The default form is 66 lines long, with column 1 and the top of form mark
+on line 1, and the rest blank.
+
+The line printer registers are:
+
+	name		size	comments
+
+	LINES		8	number of newlines after next print
+	LFLAG		1	carriage control flag (1 = skip, 0 = space)
+	CCTP		8	carriage control tape pointer
+	CCTL		8	carriage control tape length (read only)
+	ERR		1	error indicator
+	POS		31	position
+
+Error handling is as follows:
+
+	error		processed as
+
+	not attached	report error and stop
+
+	OS I/O error	print error message
+			if IOCHK set, report error and stop
+			otherwise, set ERR indicator
+
+9.4 1407 Inquiry Terminal (INQ)
+
+The IBM 1407 inquiry terminal (INQ) is a half-duplex console.  It polls
+the controling keyboard of the simulator periodically for inquiry requests.
+The inquiry terminal registers are:
+
+	name		size	comments
+
+	INQC		7	inquiry request character (initially ESC)
+	INR		1	inquiry request indicator
+	INC		1	inquiry cleared indicator
+	TIME		24	polling interval
+
+When the 1401 CPU requests input from the keyboard, the message [Enter]
+is printed out, followed by a new line.  The CPU hangs waiting for input
+until either the return/enter key is pressed, or the inquiry request
+character is typed in.  The latter cancels the type-in and sets INC.
+
+The inquiry terminal has no errors.
+
+9.5 729 Magnetic Tape (MT)
+
+The magnetic tape controller supports six drives, numbered 1 through 6.
+Magnetic tape options include the ability to make units write enabled or
+or write locked.
+
+	SET MTn LOCKED		set unit n write locked
+	SET MTn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	END		1	end of file indicator
+	ERR		1	error indicator
+	PAR		1	parity error indicator
+	POS1..6		31	position, drives 1..6
+
+Error handling is as follows:
+
+	error		processed as
+
+	not attached	report error and stop
+
+	end of file	(read or space) end of physical tape
+			(write) ignored
+
+	OS I/O error	print error message
+			if IOCHK set, report error and stop
+			otherwise, set ERR indicator
+
+9.6 Symbolic Display and Input
+
+The IBM 1401 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-c			display as single character
+				(BCD for CPU and MT, ASCII for others)
+	-s			display as wordmark terminated BCD string
+				(CPU only)
+	-m			display instruction mnemonics
+				(CPU only)
+
+In a CPU character display, word marks are denoted by ~.
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or " or -c or -s	characters (BCD for CPU and MT, ASCII
+				for others)
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input is free format, with spaces separating fields.  There
+are six instruction formats: 1, 2, 4, 5, 7, and 8 characters:
+
+	1 character		opcode
+	2 character		opcode 'modifier
+	4 character		opcode address
+	5 character		opcode address 'modifier
+	7 character		opcode address address
+	8 character		opcode address address 'modifier
+
+Addresses are always decimal, except for special I/O addresses in the A
+field, which may be specified as %xy, where x denotes the device and y
+the unit number.
+
+For the CPU, string input may encompass multiple characters.  A word mark
+is denoted by ~ and must precede the character to be marked.  All other
+devices can only accept single character input, without word marks.
+
+9.7 Character Sets
+
+The IBM 1401 used a 6b character code called BCD (binary coded decimal).
+Some of the characters have no equivalent in ASCII and require different
+representations:
+
+BCD	    ASCII	IBM 1401		print
+code	representation	character		chains
+
+00	space
+01	1
+02	2
+03	3
+04	4
+05	5
+06	6
+07	7
+10	8
+11	9
+12	0
+13	#					= in H chain
+14	@					' in H chain
+15	:					blank in A, H chains
+16	>					blank in A, H chains
+17	(		tape mark		blank in A, H chains
+20	^		alternate blank		blank in A, H chains
+21	/
+22	S
+23	T
+24	U
+25	V
+26	W
+27	X
+30	Y
+31	Z
+32	'		record mark
+33	,
+34	%					( in H chain
+35	=		word mark		blank in A, H chains
+36	\					blank in A, H chains
+37	+					blank in A, H chains
+40	-
+41	J
+42	K
+43	L
+44	M
+45	N
+46	O
+47	P
+50	Q
+51	R
+52	!
+53	$
+54	*
+55	]					blank in A, H chains
+56	;					blank in A, H chains
+57	_		delta			blank in A, H chains
+60	&
+61	A
+62	B
+63	C
+64	D
+65	E
+66	F
+67	G
+70	H
+71	I
+72	?
+73	.
+74	)		lozenge
+75	[					blank in A, H chains
+76	<					blank in A, H chains
+77	"		group mark		blank in A, H chains
+
+10. HP2100 Features
+
+The HP2100 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		2116, 2100, or 21MX CPU with 32KW memory
+DMA0, DMA1	dual channel DMA controller
+PTR,PTP		paper tape reader/punch
+TTY		console terminal
+LPT		LE8E line printer
+CLK		12639C time base generator
+DP		12557A cartridge disk controller with four drives
+MT		12559 magnetic tape controller with one drives
+
+The HP2100 simulator implements several unique stop conditions:
+
+	- decode of an undefined instruction, and STOP_INST is et
+	- reference to an undefined I/O device, and STOP_DEV is set
+	- more than INDMAX indirect references are detected during
+	  memory reference address decoding
+
+The HP2100 loader supports standard absolute binary format.  The DUMP
+command is not implemented.
+
+10.1 CPU
+
+CPU options include choice of instruction set and memory size.
+
+	SET CPU 2116		2116 instructions
+	SET CPU 2100		2100 instructions
+	SET CPU 21MX		21MX instructions
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 16K		set memory size = 16K
+	SET CPU 24K		set memory size = 24K
+	SET CPU 32K		set memory size = 32K
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 32K.
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	P		15	program counter
+	A		16	A register
+	B		16	B register
+	X		16	X index register (21MX)
+	Y		16	Y index register (21MX)
+	S		16	switch/display register
+	E		1	extend flag
+	O		1	overflow flag
+	ION		1	interrupt enable flag
+	ION_DEFER	1	interrupt defer flag
+	IADDR		6	most recent interrupting device
+	MPCTL		1	memory protection enable (2100, 21MX)
+	MPFLG		1	memory protection flag (2100, 21MX)
+	MPFBF		1	memory protection flag buffer (2100, 21MX)
+	MFENCE		15	memory protection fence (2100, 21MX)
+	MADDR		16	memory protection error address (2100, 21MX)
+	STOP_INST	1	stop on undefined instruction
+	STOP_DEV	1	stop on undefined device
+	INDMAX		1	indirect address limit
+	OLDP		15	PC prior to last JMP, JSB, or interrupt
+	BREAK		16	breakpoint address (177777 to disable)
+	WRU		8	interrupt character
+
+10.2 DMA Controllers
+
+The HP2100 includes two DMA channel controllers (DMA0 and DMA1).  Each
+DMA channel has the following visible state:
+
+	name		size	comments
+
+	CMD		1	channel enabled
+	CTL		1	interrupt enabled
+	FLG		1	channel ready
+	FBF		1	channel ready buffer
+	CW1		1	command word 1
+	CW2		1	command word 2
+	CW3		1	command word 3
+
+10.3 Variable Device Assignments
+
+On the HP2100, I/O device take their device numbers from the backplane
+slot they are plugged into.  Thus, device number assignments vary
+considerably from system to system, and software package to software
+package.  The HP2100 simulator supports dynamic device reassignment
+with the command:
+
+	SET <controller> DEVNO
+
+This initiates a dialog that displays the current device number and
+allows the user to assign a new one:
+
+	Device number:	old	<new>(cr)
+
+The new device number must be in the range 010..077 (octal) and must 
+not be currently assigned to another device.  For devices with two
+device numbers, only the lower numbered device number can be changed;
+the higher is automatically set to the lower + 1.
+
+10.4 Programmed I/O Devices
+
+10.4.1 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.
+Thus, by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader supports the BOOT command.  BOOT PTR copies the
+absolute binary loader into memory and starts it running.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+	DEVNO		6	current device number (read only)
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+10.4.2 Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written.
+Thus, by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+	DEVNO		6	current device number (read only)
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+10.4.3 Console Terminal (TTY)
+
+The console terminal has three units: keyboard (unit 0), printer
+(unit 1), and punch (unit 2).  The keyboard reads from, and the
+printer writes to, the controlling console port.  The punch writes
+to a disk file.  The keyboard has one option, UC; when set, it
+automatically converts lower case input to upper case.  This is on
+by default.
+
+The terminal implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	MODE		16	mode
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	KPOS		31	number of characters input
+	KTIME		24	keyboard polling interval
+	TPOS		31	number of characters printed
+	TTIME		24	time from I/O initiation to interrupt
+	PPOS		31	position in the punch output file
+	STOP_IOE	1	punch stop on I/O error
+	DEVNO		6	current device number (read only)
+
+Error handling for the punch is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+10.4.4 12653A Line Printer (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The line printer implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	POS		31	position in the output file
+	CTIME		24	time between characters
+	PTIME		24	time for a print operation
+	STOP_IOE	1	stop on I/O error
+	DEVNO		6	current device number (read only)
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+10.4.5 12639C Time Base Generator (CLK)
+
+The time base generator (CLK) implements these registers:
+
+	name		size	comments
+
+	SEL		3	time base select
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	ERR		1	error flag
+	TIME0..TIME7	31	clock intervals, select = 0..7
+	DEVNO		6	current device number (read only)
+
+10.5 12559C Cartridge Disk (DP)
+
+The 12559C cartridge disk has two separate devices, a data channel and
+a device controller.  The data channel includes a 128-word (one sector)
+buffer for reads and writes.  The device controller includes the four
+disk drives.  Disk drives can be REMOVEd or ADDed to the configuration.
+
+The data channel implements these registers:
+
+	name		size	comments
+
+	IBUF		16	input buffer
+	OBUF		16	output buffer
+	BPTR		7	sector buffer pointer
+	CMD		1	channel enabled
+	CTL		1	interrupt enabled
+	FLG		1	channel ready
+	FBF		1	channel ready buffer
+	DEVNO		6	current device number (read only)
+
+The device controller implements these registers:
+
+	name		size	comments
+
+	OBUF		16	output buffer
+	BUSY		3	busy (unit #, + 1, of active unit)
+	RARC		8	record address register cylinder
+	RARH		2	record address register head
+	RARS		4	record address register sector
+	CNT		5	check record count
+	CMD		1	controller enabled
+	CTL		1	interrupt enabled
+	FLG		1	controller ready
+	FBF		1	controller ready buffer
+	EOC		1	end of cylinder pending
+	CTIME		24	command delay time
+	STIME		24	seek delay time, per cylinder
+	XTIME		24	interword transfer time
+	STA0		16	drive 0 status
+	STA1		16	drive 1 status
+	STA2		16	drive 2 status
+	STA3		16	drive 3 status
+	DEVNO		6	current device number (read only)
+
+Error handling is as follows:
+
+	error	     	processed as
+
+	not attached	disk not ready
+
+	end of file	assume rest of disk is zero
+
+	OS I/O error	report error and stop
+
+10.6 12557 Magnetic Tape (MT)
+
+Magnetic tape options include the ability to make the unit write enabled
+or write locked.
+
+	SET MT LOCKED		set unit write locked
+	SET MT ENABLED		set unit write enabled
+
+The 12557 mag tape drive has two separate devices, a data channel and
+a device controller.  The data channel includes a maximum record sized
+buffer for reads and writes.  The device controller includes the tape
+unit
+
+The data channel implements these registers:
+
+	name		size	comments
+
+	FLG		1	channel ready
+	BPTR		16	buffer pointer (reads and writes)
+	BMAX		16	buffer size (writes)
+	DEVNO		6	current device number (read only)
+
+The device controller implements these registers:
+
+	name		size	comments
+
+	FNC		8	current function
+	STA		9	tape status
+	BUF		8	buffer
+	BUSY		3	busy (unit #, + 1, of active unit)
+	CTL		1	interrupt enabled
+	FLG		1	controller ready
+	FBF		1	controller ready buffer
+	DTF		1	data transfer flop
+	FSVC		1	first service flop
+	POS		31	magtape position
+	CTIME		24	command delay time
+	XTIME		24	interword transfer delay time
+	STOP_IOE	1	stop on I/O error
+	DEVNO		6	current device number (read only)
+
+Error handling is as follows:
+
+	error		processed as
+
+	not attached	tape not ready
+
+	end of file	(read or space) end of physical tape
+			(write) ignored
+
+	OS I/O error	report error and stop
+
+10.7 Symbolic Display and Input
+
+The HP2100 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as two character string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			two character sixbit string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard HP2100 assembler syntax.  There are seven
+instruction classes: memory reference, I/O, shift, alter skip, extended
+shift, extended memory reference, extended two address reference.
+
+Memory reference instructions have the format
+
+	memref {C/Z} address{,I}
+
+where I signifies indirect, C a current page reference, and Z a zero page
+reference.  The address is an octal number in the range 0 - 077777; if C or
+Z is specified, the address is a page offset in the range 0 - 01777.  Normally,
+C is not needed; the simulator figures out from the address what mode to use.
+However, when referencing memory outside the CPU (eg, disks), there is no
+valid PC, and C must be used to specify current page addressing.
+
+IOT instructions have the format
+
+	io device{,C}
+
+where C signifies that the device flag is to be cleared.  The device is an
+octal number in the range 0 - 77.
+
+Shift and alter/skip instructions have the format
+
+	sub-op sub-op sub-op...
+
+The simulator checks that the combination of sub-opcodes is legal.
+
+Extended shift instructions have the format
+
+	extshift count
+
+where count is an octal number in the range 1 - 020.
+
+Extended memory reference instructions have the format
+
+	extmemref address{,I}
+
+where I signifies indirect addressing.  The address is an octal number in
+the range 0 - 077777.
+
+Extended two address instructions have the format
+
+	ext2addr addr1{,I},addr2{,I}
+
+where I signifies indirect addressing.  Both address 1 and address 2 are
+octal numbers in the range 0 - 077777.
+
+11. Interdata 4 Features
+
+The Interdata 4 simulator is not fully debugged.  Lack of documentation
+and software makes checkout very difficult.  The simulator is included in
+the hopes that a fellow enthusiast may be able to provide software or
+additional documentation to facilitate further debug.
+
+The Interdata 4 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		Interdata 4 CPU with 64KB memory
+PT		paper tape reader/punch
+TT		console terminal
+
+The Interdata 4 simulator implements one unique stop condition:
+
+	- decode of an undefined instruction, and STOP_INST is set
+
+The LOAD and DUMP command are not implemented.
+
+11.1 CPU
+
+The only CPU options are memory size:
+
+	SET CPU 8K		set memory size = 8KB
+	SET CPU 16K		set memory size = 16KB
+	SET CPU 24K		set memory size = 24KB
+	SET CPU 32K		set memory size = 32KB
+	SET CPU 48K		set memory size = 48KB
+	SET CPU 64K		set memory size = 64KB
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 64KB.
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	PC		16	program counter
+	R0..RF		16	general registers
+	F0, F2..FE	32	floating point registers
+	PSW		16	processor status word
+	CC		4	condition codes, PSW<12:15>
+	SR		16	switch register
+	DR		16	display register low 16 bits
+	DR1		16	display register high 16 bits
+	DRMOD		1	display mode
+	DRPOS		2	display pointer position
+	SRPOS		1	switch pointer position
+	IRQ0..IRQ7	32	interrupt requests
+	IEN0..IEN7	32	interrupt enables
+	STOP_INST	1	stop on undefined instruction
+	OLDPC		16	PC prior to last branch or interrupt
+	BREAK		17	breakpoint address (377777 to disable)
+	WRU		8	interrupt character
+
+11.2 Paper Tape Reader/Punch (PT)
+
+The paper tape reader and punch (PT units 0 and 1) read data from or
+write data to disk files.  The RPOS and PPOS registers specify the
+number of the next data item to be read and written, respectively.
+Thus, by changing RPOS or PPOS, the user can backspace or advance
+these devices.
+
+The paper tape reader supports the BOOT command.  BOOT PTR copies the
+so-called '50 loader' into memory and starts it running.
+
+The paper tape controller implements these registers:
+
+	name		size	comments
+
+	RBUF		8	reader buffer
+	RPOS		31	reader position in the input file
+	RTIME		24	time from reader start to interrupt
+	RSTOP_IOE	1	reader stop on I/O error
+	PBUF		8	punch buffer
+	PPOS		31	punch position in the output file
+	PTIME		24	time from punch start to interrupt
+	PSTOP_IOE	1	punch stop on I/O error
+	IREQ		1	paper tape interrupt request
+	IENB		1	paper tape interrupt enable
+	RUN		1	paper tape running
+	SLEW		1	paper tape reader slew mode
+	BUSY		1	paper tape busy
+	RW		1	paper tape read/write mode
+
+Error handling is as follows:
+
+	type	error	     STOP_IOE	processed as
+
+	in,out	not attached	1	report error and stop
+				0	out of tape
+
+	in	end of file	1	report error and stop
+				0	out of tape
+
+	in,out	OS I/O error	x	report error and stop
+
+11.3 Teletype (TT)
+
+The teletype reads and writes to the controlling console port.  The
+keyboard has one option, UC; when set, it automatically converts lower
+case input to upper case.  This is on by default.
+
+	name		size	comments
+
+	KBUF		8	keyboard buffer
+	KPOS		31	number of characters output
+	KTIME		24	keyboard polling interval
+	TBUF		8	output buffer
+	TPOS		31	number of characters output
+	TTIME		24	time from output start to interrupt
+	IREQ		1	teletype interrupt request
+	IENB		1	teletype interrupt enable
+	HDPX		1	teletype half-duplex
+	BUSY		1	teletype busy
+	RW		1	teletype read/write mode
+
+11.4 Symbolic Display and Input
+
+The Interdata 4 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as two character string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			two character sixbit string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard Interdata 4 assembler syntax.  There are
+four instruction classes: register, memory, register-register, register-
+memory.
+
+Register instructions have the format
+
+	rop regnum
+
+where the register number is a hex digit, optionally preceded by R,
+between 0 and F.
+
+Memory instructions have the format
+
+	mop address{(index)}
+
+where address is a hex number between 0 and 0xFFFF, and the index register
+is a hex digit, optinally preceded by R, between 0 and F.
+
+Register-register instructions have the format
+
+	rrop regnum,regnum
+
+where the register numbers are hex digits, optionally preceded by R,
+between 1 and F.
+
+Register-memory instructions have the format
+
+	rmop regnum,address{(index)}
+
+where the register number is a hex digit, optionally preceded by R,
+between 0 and F, the address is a hex number between 0 and 0xFFFF, and
+the index register is a hex digit, optionally preceded by R, between
+1 and F.
+
+Appendix 1: File Representations
+
+All file representations are little endian.  On big endian hosts, the
+simulator automatically performs any required byte swapping.
+
+1. Hard Disks
+
+Hard disks are represented as unstructured binary files of 16b data items for
+the 12b and 16b simulators, of 32b data items for the 18b and 32b simulators,
+and 64b for the 36b simulators.
+
+2. Floppy Disks
+
+PDP-8 and PDP-11 floppy disks are represented as unstructured binary files
+of 8b data items.  They are nearly identical to the floppy disk images for
+Doug Jones' PDP-8 simulator but lack the initial 256 byte header.  A utility
+for converting between the two formats is easily written.
+
+3. Magnetic Tapes
+
+Magnetic tapes are represented as unstructured binary files of 8b data
+items.  Each record consists of a 32b record header, in little endian
+format, followed by n 8b bytes of data, followed by a repeat of the 32b
+record header.  The high order bit of the record header is used as an
+error flag; the remaining 31b are the byte count of the record.  If
+the byte count is odd, the record is padded to even length; the pad
+byte is undefined.
+
+Magnetic tapes are endian independent and consistent across simulator
+families.  A magtape produced by the Nova simulator will appear to
+have its 16b words byte swapped if read by the PDP-11 simulator.
+
+4. Line Printers
+
+Line printer output is represented by an ASCII file of lines separated by
+the newline character.  Overprinting is represented by a line ending in
+return rather than newline.
+
+Appendix 2: Sample Software
+
+1. PDP-8
+
+1.1 ESI-X
+
+ESI-X is an interactive program for technical computation.  It can
+execute both immediate commands and stored programs (like BASIC).  ESI-X
+is provided as both source and as a binary loader format paper-tape
+image.  For more information see the documentation included with the
+program.  My thanks to Dave Waks, who wrote the program, and to Paul
+Pierce and Tim Litt, who recovered the source from its archival medium.
+
+To load and run ESI-X:
+
+	sim> load esix.bin
+	sim> run 5400
+	_TYPE 2+2.
+	       2+2 =     4
+
+1.2 FOCAL69
+
+FOCAL69 is an interactive program for technical computations.  It can
+execute both immediate commands and stored programs (like BASIC).  FOCAL69
+is provided as a binary loader format paper-tape image.  To load and
+run FOCAL69:
+
+	sim> load focal69.bin
+	sim> run 200
+	*TYPE 2+2
+	=    4.000*
+
+1.3 PDP-8 OS/8
+
+OS/8 is the PDP-8's mass storage-based operating system.  It provides a
+program development and execution environment for assembler, BASIC, and
+FORTRAN programs.  OS/8 is provided under license, as is, without fee, by
+Digital Equipment Corporation, for non-commercial use only.  Please read
+the enclosed license agreement for full terms and conditions.  This license
+agreement must be reproduced with any copy of the OS/8 disk images.  My
+thanks to Doug Jones of the University of Iowa, who provided the disk
+images, and to Digital Equipment Corporation, which provided the license.
+
+To boot and run OS/8:
+
+	sim> att rx0 os8sys_rx.dsk
+	sim> att rx1 os8f4_rx.dsk
+	sim> boot rx0
+	
+	.DA dd-mmm-yy
+	.
+
+Note that OS/8 only recognizes upper case characters.  The first disk
+(drive 0) is the system disk; it also includes BASIC.  The second disk
+(drive 1) includes FORTRAN.
+
+2. PDP-11
+
+2.1 UNIX V5, V6, V7
+
+UNIX was first developed on the PDP-7; its first widespread usage was on
+the PDP-11.  UNIX provides a program development and execution environment
+for assembler and C programs.  UNIX V5, V7, V7 for the PDP-11 is provided
+under license, as is, without fee, by Santa Cruz Organization (SCO), for
+non-commercial use only.  Please read the enclosed license agreement for
+full terms and conditions.  This license must be reproduced with any copy
+of the UNIX V5, V6, V7 disk images.  My thanks to PUPS, the PDP-11 UNIX
+Preservation Society of Australia, which provided the disk images, and to
+SCO, which provided the license.
+
+2.1.1 UNIX V5
+
+UNIX V5 is contained on a single RK05 disk image.  To boot UNIX:
+
+	sim> set cpu 18b
+	sim> att rk0 unix_v5_rk.dsk
+	sim> boot rk
+	@unix
+	login: root
+	#ls -l
+
+2.1.2 UNIX V6
+
+UNIX V6 is contained on three RK05 disk images.  To boot UNIX:
+
+	sim> set cpu 18b
+	sim> att rk0 unix0_v6_rk.dsk
+	sim> att rk1 unix1_v6_rk.dsk
+	sim> att rk3 unix3_v6_rk.dsk
+	sim> boot rk0
+	@unix
+	login: root
+	# ls -l
+
+2.1.3 UNIX V7
+
+NOTE: The V7 disk images with V2.3c and later releases are new and
+replace the prior versions, which were corrupt.
+
+UNIX V7 is contained on a single RL02 disk image.  To boot UNIX:
+
+	sim> set cpu 18b
+	sim> set rl0 RL02
+	sim> att rl0 unix_v7_rl.dsk
+	sim> boot rl0
+	@boot
+	New Boot, known devices are hp ht rk rl rp tm vt
+	: rl(0,0)rl2unix
+	# 
+
+A smaller image is contained on a single RK05 disk image.  To boot UNIX:
+
+	sim> set cpu 18b
+	sim> att rk0 unix_v7_rk.dsk
+	sim> boot rk0
+	@boot
+	New Boot, known devices are hp ht rk rl rp tm vt
+	: rk(0,0)rkunix
+	# STTY -LCASE
+	#
+
+2.2 RT-11
+
+RT-11 is the PDP-11's single user operating system.  It provides a program
+development and execution environment for assembler, BASIC, and FORTRAN
+programs.  RT-11 is provided under license, as is, without fee, by Mentec
+Corporation, for non-commercial use ONLY ON THIS SIMULATOR.  Please read
+the enclosed license agreement for full terms and conditions.  This license
+agreement must be reproduced with any copy of the RT-11 disk image.  My
+thanks to John Wilson, a private collector, who provided the disk image
+for RT-11 V4; to Megan Gentry, of Digital Equipment Corporation, who
+provided the disk image for RT-11 V5.3; and to Mentec Corporation, which
+provided the license.
+
+2.2.1 RT-11 V4
+
+RT-11 is contained in a single RK05 disk image.  To boot and run RT-11:
+
+	sim> att rk0 rtv4_rk.dsk
+	sim> boot rk0
+
+For RL, RM, and RP series disks, RT-11 expects to find a manufacturer's bad
+block table in the last track of the disk.  Therefore, INITialization of a
+new (all zero's) disk fails, because there is no valid bad block table.  To
+create a minimal bad block table, use the SET <unit> BADBLOCK command.
+
+2.2.2 RT-11 V5.3
+
+RT-11 is contained in a single RL02 disk image.  To boot and run RT-11:
+
+	sim> set rl0 rl02
+	sim> att rl0 rtv53_rl.dsk
+	sim> boot rl0
+
+This is a full RT-11 distribution kit.  It expects the user to copy the
+distribution pack and generate a new system.  This requires mounting
+blank packs on RL1.  When a blank pack is attached to the simulator,
+a bad block table must be created with the SET <unit> BADBLOCK command. 
+
+3. Nova RDOS
+
+RDOS is the Nova's real-time mass storage operating system.  It provides a
+program development and execution environment for assembler, BASIC, and
+FORTRAN programs.  RDOS is provided under license, as is, without fee, by
+Data General Corporation, for non-commercial use only.  Please read the
+enclosed license agreement for full terms and conditions.  This license
+agreement must be reproduced with any copy of the RDOS disk image.  My
+thanks to Carl Friend, a private collector, who provided the disk image,
+and to Data General Corporation, which provided the license.
+
+To boot and run RDOS:
+
+	sim> att dp0 rdos_d31.dsk
+	sim> set tti dasher
+	sim> boot dp0
+	FILENAME? (cr)
+	DATE (mm/dd/yy)? xx/yy/zz
+	TIME (hh:mm:ss)? hh:mm:ss
+	R
+	list/e
+
+4. PDP-1 LISP
+
+PDP-1 LISP is an interactive interpreter for the Lisp language.  It can
+execute both interactive commands and stored programs.  The startup
+instructions for LISP are complicated; see the documentation included
+with the program for details.  My thanks to Peter Deutsch, who wrote the
+program, to Gordon Greene, who typed it in from a printed listing, and
+to Paul McJones, who helped with the final debug process.
+
+5. PDP-7 SIM8
+
+PDP-7 SIM8 is a PDP-8 simulator for the PDP-7.  It implements an 8K
+PDP-8/I with keyboard, teleprinter, reader, punch, and line printer.
+It provides an interactive console environment for control and debug
+of the simulated PDP-8.  For more information see the documentation
+included with the program.  My thanks to Dave Waks, who wrote the
+program, and to Paul Pierce and Tim Litt, who recovered the source
+from its archival medium.
+
+To load and run SIM8:
+
+	sim> load sim8.rim
+	sim> run
+	AC/ 0000
+
+6. 1401 Single Card "Koans"
+
+One of the art forms for the IBM 1401 was packing useful programs into a
+single punched card.  Three samples are included:
+
+i1401_ctolp.cd		prints a card deck on the line printer
+i1401_ctopu.cd		copies a card deck to the card punch
+i1401_hello.cd		prints "HELLO WORLD" on the line printer and stops
+
+To use the reproduction cards, simply insert them at the beginning of a
+text file, terminated by newline.  Attach the modified file to the card
+reader, attach a blank file to the output device, and boot the card reader.
+
+7.  HP2116 16K BASIC
+
+HP BASIC is a paper-tape centric implementation of BASIC for a 16KW
+HP2116.  Device numbers correspond to the default simulator settings:
+
+	PTR	=	10
+	TTY	=	11
+	PTP	=	12
+
+The program is a complete but early BASIC and has one unsual requirement:
+all programs must include a valid END statement to run correctly.  My
+thanks to Jeff Moffatt for providing the program.
+
+To load and run BASIC:
+
+	sim> load basic1.abs
+	sim> run 100
+	READY
+	10 PRINT SQR(2)
+	20 END
+	RUN
+	 1.41421
+
+Appendix 3: Debug Status
+
+The debug status of each simulated CPU and device is as follows:
+
+	system	PDP-8	PDP-11	Nova	PDP-1	18b PDP
+device
+CPU		y	y	y	y	y
+FPU		-	y	-	-	-
+CIS		-	h	-	-	-
+console		y	y	y	y	y
+paper tape	y	y	y	h	y
+card reader	-	-	-	-	-
+line printer	y	y	y	h	y
+clock		y	y	y	-	h
+hard disk	y	y	y	-	h
+fixed disk	h	-	h	-	h
+floppy disk	y	y	y	-	-
+mag tape	h	y	y	-	h
+
+	system	1401	2100	Id4
+device
+CPU		h	y	h
+FPU		-	-	h
+CIS		-	-	-
+console		h	y	h
+paper tape	-	h	h
+card reader	h	h	-
+line printer	h	-	-
+clock		-	h	-
+hard disk	-	h	-
+fixed disk	-	h	-
+floppy disk	-	-	-
+mag tape	h	h	-
+
+legend:		y = runs operating system or sample program
+		d = runs diagnostics
+		h = runs hand-generated test cases
+		n = untested
+		- = not applicable
+
+Revision History (since Rev 1.1)
+
+Rev 2.5, Jan, 01
+		Removed Digital and Compaq from copyrights, as
+			authorized by Compaq Sr VP Bill Strecker
+		Revised save/restore format for 64b simulators
+		Added examine to file
+		Added unsigned integer data types to sim_defs
+		Added Nova 3 and Nova 4 instructions to Nova CPU
+		Added HP2100
+		Added Interdata 4
+		Fixed indirect loop through autoinc/dec in Nova CPU
+		Fixed MDV enabled test in Nova CPU
+
+Rev 2.4, Jan, 99
+		Placed all sources under X11-like open source license
+		Added DUMP command, revised sim_load interface
+		Added SHOW MODIFIERS command
+		Revised magtape format to include record error flag   
+		Fixed 64b problems in SCP
+		Fixed big endian problem in PDP-11 bad block routine 
+		Fixed interrupt on error bug in PDP-11 RP/RM disks
+		Fixed ROL/ROR inversion in PDP-11 symbolic routines
+
+Rev 2.3d, Sep, 98
+		Added BeOS support
+		Added radix commands and switches
+		Added PDP-11 CIS support
+		Added RT11 V5.3 to distribution kits
+		Fixed "shift 32" bugs in SCP, PDP-11 floating point
+		Fixed bug in PDP-11 paper tape reader
+		Fixed bug in ^D handling
+
+Rev 2.3c, May, 98
+		Fixed bug in PDP-11 DIV overflow check
+		Fixed bugs in PDP-11 magtape bootstrap
+		Fixed bug in PDP-11 magtape unit select
+		Replaced UNIX V7 disk images
+
+Rev 2.3b, May, 98
+		Added switch recognition to all simulator commands
+		Added RIM loader to PDP-8 paper tape reader and loader
+		Added second block bootstrap to PDP-11 magtape
+		Fixed bug in PDP-8 RF bootstrap
+		Fixed bug in PDP-11 symbolic display
+		Fixed bugs in PDP-11 floating point (LDEXP, STEXP,
+			MODf, STCfi, overflow handling)
+
+Rev 2.3a, Nov, 97
+		Added search capability
+		Added bad block table command to PDP-11 disks
+		Added bootstrap to PDP-11 magtape
+		Added additional Nova moving head disks
+		Added RT-11 sample software
+		Fixed bugs in PDP-11 RM/RP disks
+		Fixed bugs in Nova moving head disks
+		Fixed endian dependence in 18b PDP RIM loader
+
+Rev 2.3, Mar, 97
+		Changed UNIX terminal I/O to TERMIOS
+		Changed magtape format to double ended
+		Changed PDP-8 current page mnemonic from T to C
+		Added endian independent I/O routines
+		Added precise integer data types 
+		Fixed bug in sim_poll_kbd
+		Fixed bug in PDP-8 binary loader
+		Fixed bugs in TM11 magtape
+		Fixed bug in RX11 bootstrap
+		Fixed bug in 18b PDP ADD
+		Fixed bug in 18b PDP paper tape reader
+		Fixed bug in PDP-4 console
+		Fixed bug in PDP-4,7 line printer
+		Added PDP-11 RP
+		Added PDP-1
+
+Rev 2.2d, Dec, 96
+		Added ADD/REMOVE commands
+		Added unit enable/disable support to device simulators
+		Added features for IBM 1401 project
+		Added switch recognition for symbolic input
+		Fixed bug in variable length IEXAMINE
+		Fixed LCD bug in RX8E
+		Initial changes for Win32
+		Added IBM 1401
+
+Rev 2.2b, Apr, 96
+		Added PDP-11 dynamic memory size support
+
+Rev 2.2a, Feb, 96
+		New endian independent magtape format
+
+Rev 2.2 Jan, 96
+		Added register buffers for save/restore
+		Added 18b PDP's
+		Guaranteed TTI, CLK times are non-zero
+		Fixed breakpoint/RUN interaction bug
+		Fixed magnetic tape backspace to EOF bug
+		Fixed ISZ/DCA inversion in PDP-8 symbol table
+		Fixed sixbit conversion in PDP-8 examine/deposit
+		Fixed origin increment bug in PDP-11 binary loader
+		Fixed GCC longjmp optimization bug in PDP-11 CPU
+		Fixed unit number calculation bug in SCP and in
+			Nova, PDP-11, 18b PDP moving head disks
+
+Rev 2.1 Dec, 95
+		Fixed PTR bug (setting done on EOF) in PDP-8, Nova
+		Fixed RX bug (setting error on INIT if drive 1 is
+			not attached) in PDP-8, PDP-11
+		Fixed RF treatment of photocell flag in PDP-8
+		Fixed autosize bug (always chose smallest disk if new
+			file) in PDP-11, Nova
+		Fixed not attached bug (reported as not attachable) in
+			most mass storage devices
+		Fixed Nova boot ROMs
+		Fixed bug in RESTORE (didn't requeue if delay = 0)
+		Fixed bug in RESTORE (clobbered device position)
+		Declared static constant arrays as static const
+		Added PDP-8, Nova magnetic tape simulators
+		Added Dasher mode to Nova terminal simulator
+		Added LINUX support
+
+Rev 2.0	May, 95
+		Added symbolic assembly/disassembly
+
+Acknowledgements
+
+SIMH would not have been possible without help from around the world.  I
+would like to acknowledge the help of the following people, all of whom
+donated their time and talent to this "computer archaeology" project:
+
+Bill Ackerman		PDP-1 consulting
+Winfried Bergmann	Linux port testing
+Phil Budne		Solaris port testing
+Max Burnet		PDP information, documentation, and software
+James Carpenter		LINUX port testing
+Chip Charlot		PDP-11 RT-11, RSTS/E, RSX-11M legal permissions
+Dave Conroy		HP 21xx documentation
+L Peter Deutsch		PDP-1 LISP software
+Ethan Dicks		PDP-11 2.9 BSD debugging
+Carl Friend		Nova and Interdata documentation, and RDOS software
+Megan Gentry		PDP-11 integer debugging, make file
+Dick Greeley		PDP-8 OS/8 and PDP-10 TOPS-10/20 legal permissions
+Gordon Greene		PDP-1 LISP machine readable source
+Lynne Grettum		PDP-11 RT-11, RSTS/E, RSX-11M legal permissions
+Franc Grootjen		PDP-11 2.11 BSD debugging
+Ken Harrenstein		PDP-10 simulator
+Bill Haygood		PDP-8 information, simulator, and software
+Jim Jaeger		IBM 1401 information
+Doug Jones		PDP-8 information, simulator, and software
+Don Lewine		Nova documentation and legal permissions
+Scott McGregor		PDP-11 UNIX legal permissions
+Jeff Moffatt		HP 2100 information, documentation, and software
+Alec Muffett		Solaris port testing
+Dutch Owen		Nova moving head disk debugging, Altair simulator
+Paul Pierce		IBM 1401 diagnostics, media recovery
+Craig St Clair		PDP documentation
+Richard Schedler	Public repository maintenance
+Stephen Schultz		PDP-11 2.11 BSD debugging
+Olaf Seibert		NetBSD port testing
+Brian & Barry Silverman	PDP-1 simulator and software
+Tim Shoppa		Nova documentation and RDOS software
+Michael Somos		PDP-1 debugging
+Hans-Michael Stahl	OS/2 port testing, TERMIOS implementation
+Larry Stewart		Initial suggestion for the project
+Bill Strecker	Permission to revert copyrights
+Chris Suddick		PDP-11 floating point debugging
+Ben Thomas		VMS character-by-character I/O routines
+Warren Toomey		PDP-11 UNIX software
+Deb Toivonen		PDP documentation
+Leendert Van Doorn	PDP-11 UNIX V6 debugging, TERMIOS implementation
+David Waks		PDP-8 ESI-X and PDP-7 SIM8 software
+Tom West		Nova documentation
+John Wilson		PDP-11 simulator and software
+
+In addition, the following companies have graciously licensed their
+software at no cost for hobbyist use:
+
+Data General Corporation
+Digital Equipment Corporation
+Compaq Computer Corporation
+Mentec Corporation
+The Santa Cruz Operation

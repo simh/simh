@@ -1,0 +1,5 @@
+*.jpg binary
+*.sln binary
+*.vcproj binary
+*.exe binary
+*.bin binary
