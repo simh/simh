@@ -185,7 +185,11 @@ control registers for the interrupt system.
 	DMSCUR		21MX		1	DMS current mode
 	DMSSR		21MX		16	DMS status register
 	DMSVR		21MX		16	DMS violation register
-	DMSMAP[4][16]	21MX		16	DMS maps
+	DMSMAP[128]	21MX		16	DMS maps
+						[0:31] system map
+						[32:63] user map
+						[64:95] port A map
+						[96:127] port B map
 	STOP_INST	all		1	stop on undefined instruction
 	STOP_DEV	all		1	stop on undefined device
 	INDMAX		all		16	indirect address limit
@@ -652,7 +656,7 @@ buffer for reads and writes.  The device controller includes the four
 disk drives.  Disk drives can be set ONLINE or OFFLINE.
 
 The 12557A/13210A supports the BOOT command.  BOOT DPC copies the IBL
-for 7900 class disks into memory and starts it running.  BOOT -R DP
+for 7900 class disks into memory and starts it running.  BOOT -R DPC
 boots from the removable platter (head 2).  The switch register (S) is
 set automatically to the value expected by the IBL loader:
 

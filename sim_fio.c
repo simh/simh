@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Jul-04	RMS	Fixed bug in optimized sim_fread (reported by Scott Bailey)
    26-May-04	RMS	Optimized sim_fread (suggested by John Dundas)
    02-Jan-04	RMS	Split out from SCP
 
@@ -82,11 +83,11 @@ c = fread (bptr, size, count, fptr);			/* read buffer */
 if (sim_end || (size == sizeof (char)) || (c == 0))	/* le, byte, or err? */
 	return c;					/* done */
 for (j = 0, dptr = sptr = bptr; j < c; j++) {		/* loop on items */
-	for (k = size - 1; k >= 0; k--) {		/* loop on bytes/item */
+	for (k = size - 1; k >= (((int32) size + 1) / 2); k--) {
 	    by = *sptr;					/* swap end-for-end */
 	    *sptr++ = *(dptr + k);
 	    *(dptr + k) = by;  }
-	    dptr = dptr + size;  }			/* next item */
+	sptr = dptr = dptr + size;  }			/* next item */
 return c;
 }
 

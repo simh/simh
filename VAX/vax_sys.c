@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Jul-04	RMS	Fixed bad block routine
    16-Jun-04	RMS	Added DHQ11 support
    21-Mar-04	RMS	Added RXV21 support
    06-May-03	RMS	Added support for second DELQA
@@ -197,20 +198,22 @@ return SCPE_OK;
 
 t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds)
 {
-int32 i, da;
-int32 *buf;
+int32 i;
+t_addr da;
+uint16 *buf;
 
 if ((sec < 2) || (wds < 16)) return SCPE_ARG;
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;
 if (!get_yn ("Overwrite last track? [N]", FALSE)) return SCPE_OK;
-da = (int32) (uptr->capac - (sec * wds)) * sizeof (int16);
-if (fseek (uptr->fileref, da, SEEK_SET)) return SCPE_IOERR;
-if ((buf = malloc (wds * sizeof (int32))) == NULL) return SCPE_MEM;
-buf[0] = 0x12345678;
-buf[1] = 0;
-for (i = 2; i < wds; i++) buf[i] = 0xFFFFFFFF;
+da = (uptr->capac - (sec * wds)) * sizeof (uint16);
+if (sim_fseek (uptr->fileref, da, SEEK_SET)) return SCPE_IOERR;
+if ((buf = malloc (wds * sizeof (uint16))) == NULL) return SCPE_MEM;
+buf[0] = 0x1234;
+buf[1] = 0x5678;
+buf[2] = buf[3] = 0;
+for (i = 4; i < wds; i++) buf[i] = 0xFFFF;
 for (i = 0; (i < sec) && (i < 10); i++)
-	fxwrite (buf, sizeof (int32), wds, uptr->fileref);
+	sim_fwrite (buf, sizeof (uint16), wds, uptr->fileref);
 free (buf);
 if (ferror (uptr->fileref)) return SCPE_IOERR;
 return SCPE_OK;

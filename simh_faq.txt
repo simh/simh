@@ -27,6 +27,7 @@ SIMH FAQ, 31-Mar-2004
 2.8 How can I get binary files in and out of SIMH?
 2.9 Can I connect real devices on the host computer to SIMH?
 2.10 My Windows host can't communicate with the PDP-11 or VAX over Ethernet; why?
+2.11 How can I use my wireless Ethernet card with SIMH?
 
 --------------------------------------------------------------------------------
 
@@ -375,6 +376,58 @@ with the host on the primary interface.  To establish communications between SIM
 and a PC host, add a second Ethernet controller, attach both controllers to the
 same hub, and attach SIMH to the second controller.  The host and SIMH will now
 be able to communicate across the physical network connection.
+
+--------------------------------------------------------------------------------
+
+2.11 How can I use my wireless Ethernet card with SIMH?
+
+Wireless Ethernet is something of a misnomer - it "works like" Ethernet.
+Wireless cards behave differently than real Ethernet cards in promiscuous mode
+but can be successfully used with existing SIMH code.
+
+The caveat is that the simulated machine cannot run any software which changes
+the simulated MAC address, or the network connection will stop working.  For
+example, DECNET Phase IV (or Phase V in compatibility mode) tries to change the
+MAC of the network card to AA-00-04-xx-xx-xx.  Nor can you preset the wireless
+MAC address to the anticipated target DECNET address using something like SMAC
+to get DECNET to work - DECNET will see the MAC already preset to the required
+DECNET address and generate an invalid media (duplicate address) fault.
+
+Otherwise, TCP/IP, LAT, VMS Clustering, and DECNET Phase V in non-compatibility
+mode work fine.
+
+To get wireless cards to work with SIMH, set the simulated MAC to be the same
+as the MAC of the wireless card.  An example:
+
+c:\> IPCONFIG/ALL
+
+Windows 2000 IP Configuration
+
+  Host Name . . . . . . . . . . . . : LLOH3-EXP29189
+  Primary DNS Suffix  . . . . . . . : ad.tasc.com
+  Node Type . . . . . . . . . . . . : Hybrid
+  IP Routing Enabled. . . . . . . . : No
+  WINS Proxy Enabled. . . . . . . . : No
+  DNS Suffix Search List. . . . . . : ad.tasc.com
+
+Ethernet adapter Local Area Connection:
+
+  Connection-specific DNS Suffix  . :
+  Description . . . . . . . . . . . : D-Link DWL-650+ Wireless Cardbus Adapter
+  Physical Address. . . . . . . . . : 00-80-C8-08-CE-DB   <-- MAC address
+  DHCP Enabled. . . . . . . . . . . : No
+  IP Address. . . . . . . . . . . . : 192.168.0.5
+  Subnet Mask . . . . . . . . . . . : 255.255.255.0
+  Default Gateway . . . . . . . . . :
+  DNS Servers . . . . . . . . . . . :
+  Primary WINS Server . . . . . . . : 132.228.188.100
+  Secondary WINS Server . . . . . . : 132.228.196.98
+
+c:\> VAX
+VAX simulator V3.2-1
+sim> DO VAX_CONFIG.DO               <-- setup VAX as normal
+sim> SET XQ MAC=00-80-C8-08-CE-DB   <-- set XQ MAC to wireless MAC address
+sim> B CPU                          <-- and continue...
 
 ================================================================================
 3 Writing and Debugging New Code

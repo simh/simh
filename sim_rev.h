@@ -29,11 +29,26 @@
 
 #define	SIM_MAJOR	3
 #define SIM_MINOR	2
-#define SIM_PATCH	1
+#define SIM_PATCH	2
 
 /* V3.2 revision history 
 
 patch	date		module(s) and fix(es)
+
+  2	17-Jul-04	scp.c: fixed problem ATTACHing to read only files
+			(found by John Dundas)
+
+			sim_console.c: revised Windows console code (from Dave Bryan)
+
+			sim_fio.c: fixed problem in big-endian read
+			(reported by Scott Bailey)
+
+			gri_cpu.c: updated MSR, EAO functions
+
+			hp_stddev.c: generalized handling of control char echoing
+			(from Dave Bryan)
+
+			vax_sys.c: fixed bad block initialization routine
 
   1	10-Jul-04	scp.c: added SET/SHOW CONSOLE subhierarchy
 

@@ -25,6 +25,7 @@
 
    cpu		GRI-909 CPU
 
+   17-Jul-04	RMS	Revised MSR, EAO based on additional documentation
    14-Mar-03	RMS	Fixed bug in SC queue tracking
 
    The system state for the GRI-909 is:
@@ -731,6 +732,9 @@ case AO_IOR:
 	break;  }
 if ((AX + AY) & CBIT) MSR = MSR | MSR_AOV;		/* always calc AOV */
 else MSR = MSR & ~MSR_AOV;
+if (SIGN & ((AX ^ (AX + AY)) & (~AX ^ AY)))		/* always calc SOV */
+	MSR = MSR | MSR_SOV;
+else MSR = MSR & ~MSR_SOV;
 return t;
 }
 
@@ -778,21 +782,41 @@ if (cpu_unit.flags & UNIT_NOEAO) return stop_opr;	/* EAO installed? */
 if (op == EAO_MUL) {					/* mul? */
 	t = AX * AY;					/* AX * AY */
 	AX = (t >> 16) & DMASK;				/* to AX'GR1 */
-	GR[0] = t & DMASK;  }
-if (op == EAO_DIV) {					/* div? */
+	GR[0] = t & DMASK;
+	}
+else if (op == EAO_DIV) {				/* div? */
 	if (AY && (AX < AY)) {
 	    t = (AX << 16) | GR[0];			/* AX'GR1 / AY */
 	    GR[0] = t / AY;				/* quo to GR1 */
-	    AX = t % AY;  }				/* rem to AX */
+	    AX = t % AY;				/* rem to AX */
+	    MSR = MSR & ~MSR_L;  }			/* clear link */
+	else MSR = MSR | MSR_L;				/* set link */
 	}
+else if (op == EAO_ARS) {				/* arith right? */
+	t = 0;						/* shift limiter */
+	if (AX & SIGN) MSR = MSR | MSR_L;		/* L = sign */
+	else MSR = MSR & ~MSR_L;
+	do {						/* shift one bit */
+	    AY = ((AY >> 1) | (AX << 15)) & DMASK;
+	    AX = (AX & SIGN) | (AX >> 1);
+	    GR[0] = (GR[0] + 1) & DMASK;  }
+	while (GR[0] && (++t < 32));			/* until cnt or limit */
+	}	    
+else if (op == EAO_NORM) {				/* norm? */
+	if ((AX | AY) != 0) {				/* can normalize? */
+	    while ((AX & SIGN) != ((AX << 1) & SIGN)) {	/* until AX15 != AX14 */
+		AX = ((AX << 1) | (AY >> 15)) & DMASK;
+		AY = (AY << 1) & DMASK;
+		GR[0] = (GR[0] + 1) & DMASK;  }  }
+	}
+ao_update ();
 return SCPE_OK;
 }
 
 uint32 ao_sf (uint32 op)
 {
 if (((op & 2) && (MSR & MSR_AOV)) ||			/* arith carry? */
-    ((op & 4) && (SIGN &				/* arith overflow? */
-	((AX ^ (AX + AY)) & (~AX ^ AY))))) return 1;
+    ((op & 4) && (MSR & MSR_SOV))) return 1;		/* arith overflow? */
 return 0;
 }
 

@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Jul-04	RMS	Fixed problem ATTACHing to read only files
+			(found by John Dundas)
    28-May-04	RMS	Added SET/SHOW CONSOLE
    14-Feb-04	RMS	Updated SAVE/RESTORE (V3.2)
 		RMS	Added debug print routines (from Dave Hittner)
@@ -1543,7 +1545,7 @@ if (sim_switches & SWMASK ('R')) {			/* read only? */
 else {							/* normal */
     uptr->fileref = sim_fopen (cptr, "rb+");		/* open r/w */
     if (uptr->fileref == NULL) {			/* open fail? */
-	if (errno == EROFS) {				/* read only? */
+	if ((errno == EROFS) || (errno == EACCES)) {	/* read only? */
 	    if ((uptr->flags & UNIT_ROABLE) == 0)	/* allowed? */
 		return attach_err (uptr, SCPE_NORO);	/* no error */
 	    uptr->fileref = sim_fopen (cptr, "rb");	/* open rd only */

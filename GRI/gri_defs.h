@@ -28,28 +28,29 @@
 
    There are several discrepancies between the original GRI-909 Reference
    Manual of 1969 and the only surviving code sample, the MIT Crystal Growing
-   System of 1972:
+   System of 1972.  These discrepancies were clarified by later documentation:
 
    1. Ref Manual documents two GR's at codes 26-27; MITCS documents six GR's
-      at 30-35.
+      at 30-35.  Answer: 6 GR's, 26-27 were used for character compares.
    2. Ref Manual documents only unsigned overflow (carry) for arithmetic
       operator; MITCS uses both unsigned overflow (AOV) and signed overflow
-      (SOV).
+      (SOV).  Answer: signed and unsigned.
    3. Ref Manual documents a ROM-subroutine multiply operator and mentions
       but does not document a "fast multiply"; MITCS uses an extended
-      arithmetic operator with multiply, divide, and shifts.  The behavior
+      arithmetic operator with multiply, divide, and shift.  The behavior
       of the extended arithmetic operator can only be inferred partially;
-      the shifts are never used, and there is no indication of how divide
-      overflow is handled.
-
-   The simulator follows the code in these instances.
+      the shift is never used, and there is no indication of how divide
+      overflow is handled.  Answer: EAO is a package of ROM subroutines
+      with just four functions: multiply, divide, arithmetic right shift,
+      and normalize.
 
    Outstanding issues:
 
    1. Is there any interaction between the byte swapper and the byte packer?
    2. Is SOV testable even if the FOA is not ADD?
-   3. How does the EAO handle divide overflow?
+   3. How does the EAO handle divide overflow?  Answer: set link.
    4. What are the other EAO functions beside multiply and divide?
+      Answer: arithmetic right shift, normalize.
 */
 
 #include "sim_defs.h"					/* simulator defns */
@@ -109,7 +110,6 @@
 #define U_MSR		017				/* machine status */
 #define U_BSW		024				/* byte swap */
 #define U_BPK		025				/* byte pack */
-/* #define U_GR		026				/* dual general regs */
 #define U_GR		030				/* hex general regs */
 #define U_RTC		075				/* clock */
 #define U_HS		076				/* paper tape */
@@ -159,17 +159,20 @@ struct gdev {
 #define AO_IOR		03				/* or */
 #define EAO_MUL		01				/* multiply */
 #define EAO_DIV		02				/* divide */
-#define EAO_ASR		03				/* arith rshft */
+#define EAO_ARS		03				/* arith rshft */
+#define EAO_NORM	04				/* normalize */
 
 /* Machine status */
 
 #define MSR_V_BOV	15				/* bus carry */
-#define MSR_BOV		(1u << MSR_V_BOV)
 #define MSR_V_L		14				/* bus link */
-#define MSR_L		(1u << MSR_V_L)			/* bus link */
 #define MSR_V_FOA	8				/* arith func */
 #define MSR_M_FOA	03
+#define MSR_V_SOV	1				/* arith ovflo */
 #define MSR_V_AOV	0				/* arith carry */
+#define MSR_BOV		(1u << MSR_V_BOV)
+#define MSR_L		(1u << MSR_V_L)
+#define MSR_SOV		(1u << MSR_V_SOV)
 #define MSR_AOV		(1u << MSR_V_AOV)
 #define MSR_GET_FOA(x)	(((x) >> MSR_V_FOA) & MSR_M_FOA)
 #define MSR_PUT_FOA(x,n)	(((x) & ~(MSR_M_FOA << MSR_V_FOA)) | \

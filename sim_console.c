@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jul-04	RMS	Revised Windows console code (from Dave Bryan)
    28-May-04	RMS	Added SET/SHOW CONSOLE
 		RMS	Added break, delete character maps
    02-Jan-04	RMS	Removed timer routines, added Telnet console routines
@@ -467,32 +468,40 @@ return SCPE_OK;
 #elif defined (_WIN32)
 
 #include <conio.h>
+#include <fcntl.h>
 #include <io.h>
 #include <windows.h>
 #include <signal.h>
-static volatile int sim_win_ctlc = 0;
-
-void win_handler (int sig)
-{
-sim_win_ctlc = 1;
-return;
-}
-
+#define RAW_MODE 0
+static HANDLE std_input;
+static DWORD saved_mode;
+ 
 t_stat sim_ttinit (void)
 {
+std_input = GetStdHandle (STD_INPUT_HANDLE);
+if ((std_input == INVALID_HANDLE_VALUE) ||
+	!GetConsoleMode (std_input, &saved_mode)) return SCPE_TTYERR;
 return SCPE_OK;
 }
-
+ 
 t_stat sim_ttrun (void)
 {
-if (signal (SIGINT, win_handler) == SIG_ERR) return SCPE_SIGERR;
+if (!GetConsoleMode(std_input, &saved_mode) ||
+	!SetConsoleMode(std_input, RAW_MODE)) return SCPE_TTYERR;
+if (sim_log) {
+	fflush (sim_log);
+	setmode (_fileno (sim_log), _O_BINARY);  }
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 return SCPE_OK;
 }
 
 t_stat sim_ttcmd (void)
 {
+if (sim_log) {
+	fflush (sim_log);
+	_setmode (_fileno (sim_log), _O_TEXT);  }
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_NORMAL);
+if (!SetConsoleMode(std_input, saved_mode)) return SCPE_TTYERR;
 return SCPE_OK;
 }
 
@@ -505,10 +514,6 @@ t_stat sim_os_poll_kbd (void)
 {
 int c;
 
-if (sim_win_ctlc) {
-	sim_win_ctlc = 0;
-	signal (SIGINT, win_handler);
-	return 003 | SCPE_KFLAG;  }
 if (!_kbhit ()) return SCPE_OK;
 c = _getch ();
 if ((c & 0177) == sim_del_char) c = 0177;

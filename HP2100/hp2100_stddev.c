@@ -28,6 +28,8 @@
    tty		12531C buffered teleprinter interface
    clk		12539C time base generator
 
+   14-Jul-04	RMS	Generalized handling of control char echoing
+			(from Dave Bryan)
    26-Apr-04	RMS	Fixed SFS x,C and SFC x,C
 			Fixed SR setting in IBL
 			Fixed input behavior during typeout for RTE-IV
@@ -68,6 +70,16 @@
 #include "hp2100_defs.h"
 #include <ctype.h>
 
+#define CHAR_FLAG(c)	(1u << (c))
+
+#define BEL_FLAG	CHAR_FLAG('\a')
+#define BS_FLAG		CHAR_FLAG('\b')
+#define LF_FLAG		CHAR_FLAG('\n')
+#define CR_FLAG		CHAR_FLAG('\r')
+
+#define FULL_SET	0xFFFFFFFF
+#define CNTL_SET	(BEL_FLAG | BS_FLAG | LF_FLAG | CR_FLAG)
+
 #define UNIT_V_8B	(UNIT_V_UF + 0)			/* 8B */
 #define UNIT_V_UC	(UNIT_V_UF + 1)			/* UC only */
 #define UNIT_V_DIAG	(UNIT_V_UF + 2)			/* diag mode */
@@ -101,6 +113,8 @@ int32 tty_buf = 0;					/* tty buffer */
 int32 tty_mode = 0;					/* tty mode */
 int32 tty_shin = 0377;					/* tty shift in */
 int32 tty_lf = 0;					/* lf flag */
+uint32 tty_cntlprt = CNTL_SET;				/* tty print flags */
+uint32 tty_cntlset = CNTL_SET;				/* tty cntl set */
 int32 clk_select = 0;					/* clock time select */
 int32 clk_error = 0;					/* clock error */
 int32 clk_ctr = 0;					/* clock counter */
@@ -246,6 +260,8 @@ REG tty_reg[] = {
 	{ DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (PPOS, tty_unit[TTP].pos, T_ADDR_W), PV_LEFT },
 	{ FLDATA (STOP_IOE, ttp_stopioe, 0) },
+	{ ORDATA (CNTLPRT, tty_cntlprt, 32), REG_HRO },
+	{ ORDATA (CNTLSET, tty_cntlset, 32), REG_HIDDEN },
 	{ ORDATA (DEVNO, tty_dib.devno, 6), REG_HRO },
 	{ NULL }  };
 
@@ -653,7 +669,7 @@ if (tty_mode & TM_PRI) {				/* printing? */
 	    c = c & 0177;
 	    if (islower (c)) c = toupper (c);  }
 	else c = c & ((tty_unit[TTO].flags & UNIT_8B)? 0377: 0177);
-	if (c || (tty_unit[TTO].flags & UNIT_8B)) {	/* !null or 8b? */
+	if ((c > 31) || (CHAR_FLAG (c) & tty_cntlprt)) {/* normal, ctrl? */
 	    if (r = sim_putchar_s (c)) return r;	/* output char */
 	    tty_unit[TTO].pos = tty_unit[TTO].pos + 1;  }
 	}
@@ -696,6 +712,8 @@ int32 mask = (int32) desc;
 if (u > 1) return SCPE_NOFNC;
 tty_unit[TTI].flags = (tty_unit[TTI].flags & ~mask) | val;
 tty_unit[TTO].flags = (tty_unit[TTO].flags & ~mask) | val;
+if (val == UNIT_8B) tty_cntlprt = FULL_SET;
+else tty_cntlprt = tty_cntlset;
 return SCPE_OK;
 }
 
