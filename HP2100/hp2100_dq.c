@@ -136,7 +136,6 @@
 #define STA_ERR		0000001				/* any error */
 #define STA_ANYERR	(STA_NRDY | STA_EOC | STA_AER | STA_FLG | STA_DTE)
 
-extern uint16 *M;
 extern uint32 PC, SR;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
 extern int32 sim_switches;

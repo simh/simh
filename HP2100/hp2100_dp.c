@@ -199,7 +199,6 @@
 #define STA_UNLOADED	(dp_ctype ? (STA_NRDY | STA_BSY) : STA_NRDY)
 #define STA_MBZ13	(STA_ATN | STA_RWU | STA_SKI)	/* zero in 13210 */
 
-extern uint16 *M;
 extern uint32 PC, SR;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
 extern int32 sim_switches;

@@ -25,6 +25,7 @@
 
    cpu		PDP-11 CPU
 
+   22-Dec-04	RMS	Fixed WAIT to work in all modes (from John Dundas)
    02-Oct-04	RMS	Added model emulation
    25-Jan-04	RMS	Removed local debug logging support
    29-Dec-03	RMS	Formalized 18b Qbus support
@@ -785,7 +786,7 @@ case 000:
 		else setTRAP (TRAP_ILL);		/* no, ill inst */
 		break;
 	    case 1:					/* WAIT */
-		if ((cm == MD_KER) && wait_enable) wait_state = 1;
+		if (wait_enable) wait_state = 1;
 		break;
 	    case 3:					/* BPT */
 		setTRAP (TRAP_BPT);

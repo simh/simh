@@ -25,6 +25,7 @@
 
    mt		7 track magnetic tape
 
+   07-Dec-04	RMS	Added read-only file support
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised for magtape library
@@ -114,14 +115,14 @@ static const char bcd_to_sds[64] = {
 DIB mt_dib = { CHAN_W, DEV_MT, XFR_MT0, mt_tplt, &mt };
 
 UNIT mt_unit[] = {
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) }  };
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) }  };
 
 REG mt_reg[] = {
 	{ BRDATA (BUF, mtxb, 8, 8, MT_MAXFR) },

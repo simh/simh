@@ -25,6 +25,8 @@
 
    mt		516-4100 seven track magnetic tape
 
+   01-Dec-04	RMS	Fixed bug in DMA/DMC support
+
    Magnetic tapes are represented as a series of variable records
    of the form:
 
@@ -183,7 +185,8 @@ case ioOCP:
 	case FNC_DMANM:					/* set DMA/DMC */
 	case FNC_DMAAU:
 	    mt_usel = u;				/* save unit select */
-	    if (mt_dib.chan) mt_dma = 1;		/* if configured */
+	    if (mt_dib.chan) mt_dma = 1;		/* set DMA if configured */
+	    else mt_dma = 0;
 	    break;
 	case FNC_IOBUS:					/* set IOBUS */
 	    mt_usel = u;				/* save unit select */
@@ -382,7 +385,7 @@ case FNC_WBCD2: case FNC_WBIN2: case FNC_WBIN3:		/* write first */
 case FNC_WBCD2 | FNC_2ND:				/* write, word */
 case FNC_WBIN2 | FNC_2ND:
 case FNC_WBIN3 | FNC_2ND:
-	if (mt_eor || mt_rdy) {			/* done or no data? */
+	if (mt_eor || mt_rdy) {				/* done or no data? */
 	    if (!mt_rdy) mt_wrwd (uptr, mt_buf);	/* write last word */
 	    if (mt_ptr) {				/* any data? */
 		if (st = sim_tape_wrrecf (uptr, mtxb, mt_ptr))	/* write, err? */

@@ -1,6 +1,6 @@
 /* lgp_cpu.c: LGP CPU simulator
 
-   Copyright (c) 2004, Robert M. Supnik
+   Copyright (c) 2004-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    cpu		LGP-30 [LGP-21] CPU
+
+   04-Jan-05	RMS	Modified VM pointer setup
 
    The system state for the LGP-30 [LGP-21] is:
 
@@ -167,6 +169,7 @@ uint32 shift_in (uint32 a, uint32 dat, uint32 sh4);
 
 extern t_stat op_p (uint32 dev, uint32 ch);
 extern t_stat op_i (uint32 dev, uint32 ch, uint32 sh4);
+extern void lgp_vm_init (void);
 
 /* CPU data structures
 
@@ -578,6 +581,7 @@ out_strt = 0;
 out_done = 0;
 lgp21_sov = 0;
 delay = 0;
+lgp_vm_init ();
 pcq_r = find_reg ("CQ", NULL, dptr);
 if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;

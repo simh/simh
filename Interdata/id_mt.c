@@ -25,6 +25,7 @@
 
    mt		M46-494 dual density 9-track magtape controller
 
+   07-Dec-04	RMS	Added read-only file support
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
    28-Feb-03	RMS	Revised for magtape library
@@ -117,10 +118,10 @@ t_stat mt_map_err (UNIT *uptr, t_stat st);
 DIB mt_dib = { d_MT, 0, v_MT, mt_tplte, &mt, NULL };
 
 UNIT mt_unit[] = {
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) }  };
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) },
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) },
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) },
+	{ UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) }  };
 
 REG mt_reg[] = {
 	{ HRDATA (STA, mt_sta, 8) },

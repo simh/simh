@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   26-Dec-04	RMS	Qualified SAVE examine, RESTORE deposit with SIM_SW_REST
+   10-Nov-04	JDB	Fixed logging of errors from cmds in "do" file
    05-Nov-04	RMS	Moved SET/SHOW DEBUG under CONSOLE hierarchy
 			Renamed unit OFFLINE/ONLINE to DISABLED/ENABLED (from Dave Bryan)
 			Revised to flush output files after simulation stop (from Dave Bryan)
@@ -734,8 +736,10 @@ do {	cptr = read_line (cbuf, CBUFSIZE, fpin);	/* get cmd line */
 	if (cmdp = find_cmd (gbuf))			/* lookup command */
 	    stat = cmdp->action (cmdp->arg, cptr);	/* if found, exec */
 	else stat = SCPE_UNK;
-	if (stat >= SCPE_BASE)				/* error? */
+	if (stat >= SCPE_BASE) {			/* error? */
 	    printf ("%s\n", scp_error_messages[stat - SCPE_BASE]);
+	    if (sim_log) fprintf (sim_log, "%s\n",
+		scp_error_messages[stat - SCPE_BASE]);  }
 	if (sim_vm_post != NULL) (*sim_vm_post) (TRUE);
 } while (stat != SCPE_EXIT);
 
@@ -1798,7 +1802,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru devices */
 		    zeroflg = TRUE;
 		    for (l = 0; (l < SRBSIZ) && (k < high); l++,
 			 k = k + (dptr->aincr)) {	/* check for 0 block */
-			r = dptr->examine (&val, k, uptr, 0);
+			r = dptr->examine (&val, k, uptr, SIM_SW_REST);
 			if (r != SCPE_OK) return r;
 			if (val) zeroflg = FALSE;
 			SZ_STORE (sz, val, mbuf, l);
@@ -1963,7 +1967,7 @@ for ( ;; ) {						/* device loop */
 		    for (j = 0; j < limit; j++, k = k + (dptr->aincr)) {
 			if (blkcnt < 0) val = 0;	/* compressed? */
 			else SZ_LOAD (sz, val, mbuf, j);/* saved value */
-			r = dptr->deposit (val, k, uptr, 0);
+			r = dptr->deposit (val, k, uptr, SIM_SW_REST);
 			if (r != SCPE_OK) return r;
 			}				/* end for j */
 		    }					/* end for k */

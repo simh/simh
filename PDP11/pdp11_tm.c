@@ -25,6 +25,7 @@
 
    tm		TM11/TU10 magtape
 
+   07-Dec-04	RMS	Added read-only file support
    30-Sep-04	RMS	Revised Unibus interface
    25-Jan-04	RMS	Revised for device debug support
    29-Dec-03	RMS	Added 18b Qbus support
@@ -188,14 +189,14 @@ DIB tm_dib = { IOBA_TM, IOLN_TM, &tm_rd, &tm_wr,
 		1, IVCL (TM), VEC_TM, { NULL } };
 
 UNIT tm_unit[] = {
-	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) }  };
+	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) },
+	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_ROABLE +UNIT_DISABLE, 0) }  };
 
 REG tm_reg[] = {
 	{ ORDATA (MTS, tm_sta, 16) },

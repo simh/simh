@@ -115,7 +115,6 @@
 #define CLK_V_ERROR	4				/* clock overrun */
 #define CLK_ERROR	(1 << CLK_V_ERROR)
 
-extern uint16 *M;
 extern uint32 PC, SR;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
 extern UNIT cpu_unit;

@@ -31,8 +31,8 @@
 
    08-Sep-04	RMS	Cloned from vax_stddev.c, vax_sysdev.c, and pdp11_rx.c
 
-   The console floppy protocol is a guess, because VMS only uses read and write.
-   Based on triangulation of the boot and full drivers:
+   The console floppy protocol is based on the description in the 1982 VAX
+   Architecture Reference Manual:
 
    TXDB<11:8> =	0	->	normal console output
    TXDB<11:8> = 1	->	data output to floppy
@@ -122,6 +122,11 @@
 #define  FL_STADDA	0x040
 #define  FL_STAERR	0x080
 #define FL_CPROT	0x905				/* protocol error */
+#define FL_MISC		0xF00				/* misc communications */
+#define  FL_SWDN	0x1				/* software done */
+#define  FL_BOOT	0x2				/* reboot */
+#define  FL_CLWS	0x3				/* clear warm start */
+#define  FL_CLCS	0x4				/* clear cold start */
 #define FL_GETFNC(x)	(((x) >> FL_V_FNC) & FL_M_FNC)
 
 #define TRACK u3					/* current track */
@@ -340,7 +345,7 @@ int32 rxdb_rd (void)
 int32 t = tti_buf;					/* char + error */
 
 tti_csr = tti_csr & ~CSR_DONE;				/* clr done */
-tti_buf = tti_buf & 0xFF;				/* clr errors */
+tti_buf = tti_buf & BMASK;				/* clr errors */
 tti_int = 0;
 return t;
 }
@@ -635,7 +640,7 @@ todr_reg = (base * 100) + 0x10000000;			/* cvt to VAX form */
 return SCPE_OK;
 }
 
-/* Console write, txdb<11:8> != 1 (console unit) */
+/* Console write, txdb<11:8> != 0 (console unit) */
 
 t_stat fl_wr_txdb (int32 data)
 {

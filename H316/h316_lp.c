@@ -25,6 +25,7 @@
 
    lpt		line printer
 
+   01-Dec-04	RMS	Fixed bug in DMA/DMC support
    24-Oct-03	RMS	Added DMA/DMC support
    25-Apr-03	RMS	Revised for extended file support
    30-May-02	RMS	Widened POS to 32b
@@ -153,13 +154,13 @@ case ioOCP:						/* OCP */
 	    lpt_wdpos = 0;				/* init scan pos */
 	    lpt_eor = 0;
 	    if (ch >= 0) lpt_dma = 1;			/* try for DMA/DMC */
-	    lpt_dma = 0;
+	    else lpt_dma = 0;
 	    if (!sim_is_active (&lpt_unit)) {
 		lpt_rdy = 1;
 		if (lpt_dma) SET_CH_REQ (ch);  }
 	    CLR_INT (INT_LPT);				/* clear int */
 	    break;
-	case 007:					/* init scan IO bus*/
+	case 007:					/* init scan IO bus */
 	    lpt_prdn = 0;				/* clear pr done */
 	    lpt_wdpos = 0;				/* init scan pos */
 	    lpt_eor = 0;

@@ -25,6 +25,7 @@
 
    lpt		12845B 2607 line printer
 
+   19-Nov-04	JDB	Added restart when set online, etc.
    29-Sep-04	JDB	Added SET OFFLINE/ONLINE, POWEROFF/POWERON
    			Fixed status returns for error conditions
 			Fixed TOF handling so form remains on line 0
@@ -97,6 +98,7 @@ DEVICE lpt_dev;
 int32 lptio (int32 inst, int32 IR, int32 dat);
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
+t_stat lpt_restart (UNIT *uptr, int32 value, char *cptr, void *desc);
 t_stat lpt_attach (UNIT *uptr, char *cptr);
 
 /* LPT data structures
@@ -128,9 +130,9 @@ REG lpt_reg[] = {
 
 MTAB lpt_mod[] = {
 	{ UNIT_POWEROFF, UNIT_POWEROFF, "power off", "POWEROFF", NULL },
-	{ UNIT_POWEROFF, 0, "power on", "POWERON", NULL },
+	{ UNIT_POWEROFF, 0, "power on", "POWERON", lpt_restart },
 	{ UNIT_OFFLINE, UNIT_OFFLINE, "offline", "OFFLINE", NULL },
-	{ UNIT_OFFLINE, 0, "online", "ONLINE", NULL },
+	{ UNIT_OFFLINE, 0, "online", "ONLINE", lpt_restart },
 	{ MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&hp_setdev, &hp_showdev, &lpt_dev },
 	{ 0 }  };
@@ -196,9 +198,13 @@ t_stat lpt_svc (UNIT *uptr)
 int32 i, skip, chan, dev;
 
 dev = lpt_dib.devno;					/* get dev no */
-clrCMD (dev);						/* clear cmd */
 if ((uptr->flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (lpt_stopioe, SCPE_UNATT);
+else if (uptr->flags & UNIT_OFFLINE)			/* offline? */
+	return IORETURN (lpt_stopioe, STOP_OFFLINE);
+else if (uptr->flags & UNIT_POWEROFF)			/* powered off? */
+	return IORETURN (lpt_stopioe, STOP_PWROFF);
+clrCMD (dev);						/* clear cmd */
 setFSR (dev);						/* set flag, fbf */
 if (uptr->buf & LPT_CTL) {				/* control word? */
 	if (uptr->buf & LPT_CHAN) {
@@ -237,10 +243,32 @@ sim_cancel (&lpt_unit);					/* deactivate unit */
 return SCPE_OK;
 }
 
+/* Restart I/O routine
+
+   If I/O is started via STC, and the printer is powered off, offline,
+   or out of paper, the CTL and CMD flip-flops will set, a service event
+   will be scheduled, and the service routine will be entered.  If
+   STOP_IOE is not set, the I/O operation will "hang" at that point
+   until the printer is powered on, set online, or paper is supplied
+   (attached).
+
+   If a pending operation is "hung" when this routine is called, it is
+   restarted, which clears CTL and sets FBF and FLG, completing the
+   original I/O request.
+ */
+
+t_stat lpt_restart (UNIT *uptr, int32 value, char *cptr, void *desc)
+{
+if (lpt_dib.cmd && lpt_dib.ctl && !sim_is_active (uptr))
+	sim_activate (uptr, 0);				/* reschedule I/O */
+return SCPE_OK;
+}
+
 /* Attach routine */
 
 t_stat lpt_attach (UNIT *uptr, char *cptr)
 {
 lpt_lcnt = 0;						/* top of form */
+lpt_restart (uptr, 0, NULL, NULL);			/* restart I/O if hung */
 return attach_unit (uptr, cptr);
 }

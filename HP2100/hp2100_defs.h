@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Dec-04	JDB	Added IBL_DS_HEAD head number mask
+   19-Nov-04	JDB	Added STOP_OFFLINE, STOP_PWROFF stop codes
    25-Apr-04	RMS	Added additional IBL definitions
 			Added DMA EDT I/O pseudo-opcode
    25-Apr-03	RMS	Revised for extended file support
@@ -35,7 +37,7 @@
    14-Apr-99	RMS	Changed t_addr to unsigned
 
    The author gratefully acknowledges the help of Jeff Moffat in answering
-   questions about the HP2100; and of Dave Bryan in adding featurs and
+   questions about the HP2100; and of Dave Bryan in adding features and
    correcting errors throughout the simulator.
 */
 
@@ -50,6 +52,8 @@
 #define STOP_IND	5				/* indirect loop */
 #define STOP_INDINT	6				/* indirect intr */
 #define STOP_NOCONN	7				/* no connection */
+#define STOP_OFFLINE	8				/* device offline */
+#define STOP_PWROFF	9				/* device powered off */
 
 #define ABORT_PRO	1				/* protection abort */
 
@@ -69,9 +73,8 @@
 #define SIGN32		020000000000			/* 32b sign */
 #define SIGN		0100000				/* 16b sign */
 #define DMASK		0177777				/* 16b data mask */
-#define AR		M[0]				/* A = location 0 */
-#define BR		M[1]				/* B = location 1 */
-#define ABREG		M				/* register array */
+#define AR		ABREG[0]			/* A = reg 0 */
+#define BR		ABREG[1]			/* B = reg 1 */
 #define SEXT(x)		((int32) (((x) & SIGN)? ((x) | ~DMASK): ((x) & DMASK)))
 
 /* Memory reference instructions */
@@ -232,6 +235,7 @@ struct DMA {						/* DMA channel */
 #define IBL_V_DEV	6				/* dev in <11:6> */
 #define IBL_OPT		0000070				/* options in <5:3> */
 #define IBL_DP_REM	0000001				/* DP removable */
+#define IBL_DS_HEAD	0000003				/* DS head number */
 #define IBL_LNT		64				/* boot length */
 #define IBL_MASK	(IBL_LNT - 1)			/* boot length mask */
 #define IBL_DPC		(IBL_LNT - 2)			/* DMA ctrl word */

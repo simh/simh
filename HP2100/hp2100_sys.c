@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Nov-04	JDB	Added STOP_OFFLINE, STOP_PWROFF messages
    25-Sep-04	JDB	Added memory protect device
 			Fixed display of CCA/CCB/CCE instructions
    01-Jun-04	RMS	Added latent 13037 support
@@ -108,7 +109,9 @@ const char *sim_stop_messages[] = {
 	"Breakpoint",
 	"Indirect address loop",
 	"Indirect address interrupt (should not happen!)",
-	"No connection on interprocessor link"  };
+	"No connection on interprocessor link",
+	"Device/unit offline",
+	"Device/unit powered off"  };
 
 /* Binary loader
 

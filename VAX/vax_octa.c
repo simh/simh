@@ -68,8 +68,7 @@ typedef struct ufph UFPH;
 #define UH_HRND		0x00004000			/* H round */
 #define UH_V_NM		127
 
-int32 op_movh (int32 val);
-int32 op_mnegh (int32 val);
+int32 op_tsth (int32 val);
 int32 op_cmph (int32 *hf1, int32 *hf2);
 int32 op_cvtih (int32 val, int32 *hf);
 int32 op_cvthi (int32 *hf, int32 *flg, int32 opc);
@@ -82,7 +81,7 @@ int32 op_mulh (int32 *opnd, int32 *hf);
 int32 op_divh (int32 *opnd, int32 *hf);
 int32 op_emodh (int32 *opnd, int32 *hflt, int32 *intgr, int32 *flg);
 void op_polyh (int32 *opnd, int32 acc);
-void h_write_bwl (int32 spec, int32 va, int32 val, int32 lnt, int32 acc);
+void h_write_l (int32 spec, int32 va, int32 val, int32 acc);
 void h_write_q (int32 spec, int32 va, int32 vl, int32 vh, int32 acc);
 void h_write_o (int32 spec, int32 va, int32 *val, int32 acc);
 void vax_hadd (UFPH *a, UFPH *b);
@@ -104,14 +103,15 @@ void h_normh (UFPH *a);
 int32 h_rpackfd (UFPH *a, int32 *rl);
 int32 h_rpackg (UFPH *a, int32 *rl);
 int32 h_rpackh (UFPH *a, int32 *hflt);
+
+static int32 z_octa[4] = { 0, 0, 0, 0 };
 
 /* Octaword instructions */
 
 int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, int32 va)
 {
-int32 r, rh, temp, flg;
-int32 z_octa[4] = { 0, 0, 0, 0 };
-int32 r_octa[4] = { 0, 0, 0, 0 };
+int32 r, rh, temp, flg, rn;
+int32 r_octa[4];
 
 switch (opc) {
 
@@ -135,7 +135,7 @@ case PUSHAO:
 */
 
 case MOVAO:
-	h_write_bwl (spec, va, opnd[0], L_LONG, acc);	/* write operand */
+	h_write_l (spec, va, opnd[0], acc);		/* write operand */
 	CC_IIZP_L (opnd[0]);				/* set cc's */
 	break;
 
@@ -157,7 +157,7 @@ case CLRO:
 */
 
 case TSTH:
-	r = op_movh (opnd[0]);				/* test for -0 */
+	r = op_tsth (opnd[0]);				/* test for 0 */
 	CC_IIZZ_FP (r);					/* set cc's */
 	break;
 
@@ -174,16 +174,18 @@ case MOVO:
 	CC_IIZP_O (opnd[0], opnd[1], opnd[2], opnd[3]);	/* set cc's */
 	break;
 case MOVH:
-	if ((opnd[0] = op_movh (opnd[0])) == 0)		/* test for -0 */
-	    opnd[1] = opnd[2] = opnd[3] = 0;		/* result is 0 */
-	h_write_o (spec, va, opnd, acc);		/* write result */
-	CC_IIZP_FP (opnd[0]);				/* set cc's */
+	if (r = op_tsth (opnd[0]))			/* test for 0 */
+	    h_write_o (spec, va, opnd, acc);		/* nz, write result */
+	else h_write_o (spec, va, z_octa, acc);		/* zero, write 0 */
+	CC_IIZP_FP (r);					/* set cc's */
 	break;
 case MNEGH:
-	if ((opnd[0] = op_mnegh (opnd[0])) == 0)	/* test for -0 */
-	    opnd[1] = opnd[2] = opnd[3] = 0;		/* result is 0 */
-	h_write_o (spec, va, opnd, acc);		/* write result */
-	CC_IIZZ_FP (opnd[0]);				/* set cc's */
+	if (r = op_tsth (opnd[0])) {			/* test for 0 */
+	    opnd[0] = opnd[0] ^ FPSIGN;			/* nz, invert sign */
+	    h_write_o (spec, va, opnd, acc);		/* write result */
+	    }
+	else h_write_o (spec, va, z_octa, acc);		/* zero, write 0 */
+	CC_IIZZ_FP (r);					/* set cc's */
 	break;
 
 /* CMPH
@@ -230,19 +232,25 @@ case CVTLH:
 
 case CVTHB:
 	r = op_cvthi (opnd, &temp, opc) & BMASK;	/* convert */
-	h_write_bwl (spec, va, r, L_BYTE, acc);		/* write result */
+	if (spec > (GRN | nPC)) Write (va, r, L_BYTE, WA);
+	else {
+	    rn = spec & 0xF;
+	    R[rn] = (R[rn] & ~BMASK) | r;  }
 	CC_IIZZ_B (r);					/* set cc's */
 	cc = cc | temp;					/* or in V */
 	break;
 case CVTHW:
 	r = op_cvthi (opnd, &temp, opc) & WMASK;	/* convert */
-	h_write_bwl (spec, va, r, L_WORD, acc);		/* write result */
+	if (spec > (GRN | nPC)) Write (va, r, L_WORD, WA);
+	else {
+	    rn = spec & 0xF;
+	    R[rn] = (R[rn] & ~WMASK) | r;  }
 	CC_IIZZ_W (r);					/* set cc's */
 	cc = cc | temp;					/* or in V */
 	break;
 case CVTHL: case CVTRHL:
 	r = op_cvthi (opnd, &temp, opc) & LMASK;	/* convert */
-	h_write_bwl (spec, va, r, L_LONG, acc);		/* write result */
+	h_write_l (spec, va, r, acc);			/* write result */
 	CC_IIZZ_L (r);					/* set cc's */
 	cc = cc | temp;					/* or in V */
 	break;
@@ -290,7 +298,7 @@ case CVTGH:
 
 case CVTHF:
 	r = op_cvthfd (opnd, NULL);			/* convert */
-	h_write_bwl (spec, va, r, L_LONG, acc);		/* write result */
+	h_write_l (spec, va, r, acc);			/* write result */
 	CC_IIZZ_FP (r);					/* set cc's */
 	break;
 case CVTHD:
@@ -402,21 +410,14 @@ default:
 return cc;
 }
 
-/* Move/test/move negated h_floating
+/* Test h_floating
 
    Note that only the high 32b is processed.
    If the high 32b is not zero, the rest of the fraction is unchanged. */
 
-int32 op_movh (int32 val)
+int32 op_tsth (int32 val)
 {
 if (val & H_EXP) return val;				/* non-zero? */
-if (val & FPSIGN) RSVD_OPND_FAULT;			/* reserved? */
-return 0;						/* clean 0 */
-}
-
-int32 op_mnegh (int32 val)
-{
-if (val & H_EXP) return (val ^ FPSIGN);			/* non-zero? */
 if (val & FPSIGN) RSVD_OPND_FAULT;			/* reserved? */
 return 0;						/* clean 0 */
 }
@@ -454,7 +455,7 @@ if (val < 0) {						/* negative? */
 	}
 else a.sign = 0;					/* else sign = + */
 a.exp = 32 + H_BIAS;					/* initial exp */
-a.frac.f3 = val & LMASK;					/* fraction hi */
+a.frac.f3 = val & LMASK;				/* fraction hi */
 a.frac.f2 = a.frac.f1 = a.frac.f0 = 0;
 h_normh (&a);						/* normalize */
 return h_rpackh (&a, hf);				/* round and pack */
@@ -620,7 +621,7 @@ UFPH a, b;
 
 h_unpackh (&opnd[0], &a);				/* unpack operands */
 h_unpackh (&opnd[5], &b);
-a.frac.f3 = a.frac.f3 | opnd[4];			/* extend src1 */
+a.frac.f0 = a.frac.f0 | opnd[4];			/* extend src1 */
 vax_hmul (&a, &b);					/* multiply */
 vax_hmod (&a, intgr, flg);				/* sep int & frac */
 return h_rpackh (&a, hflt);				/* round and pack frac */
@@ -984,8 +985,8 @@ int32 h_rpackfd (UFPH *r, int32 *rh)
 static UQP f_round = { 0, 0, 0, UH_FRND };
 static UQP d_round = { 0, 0, UH_DRND, 0 };
 
-if ((r->frac.f0 == 0) && (r->frac.f1 == 0) &&		/* if fraction = 0 */
-    (r->frac.f2 == 0) && (r->frac.f3 == 0)) return 0;
+if (rh) *rh = 0;					/* assume 0 */
+if (r->exp == 0) return 0;				/* exp = 0? done */
 qp_add (&r->frac, rh? &d_round: &f_round);
 if ((r->frac.f3 & UH_NM_H) == 0) {			/* carry out? */
 	qp_rsh (&r->frac, 1);				/* renormalize */
@@ -999,7 +1000,7 @@ if (r->exp <= 0) {					/* underflow? */
 qp_rsh (&r->frac, FD_GUARD);				/* remove guard */
 if (rh) *rh = WORDSWAP (r->frac.f2);
 return r->sign | (r->exp << FD_V_EXP) |
-	(WORDSWAP (r->frac.f0) & ~(FD_HB | FPSIGN | FD_EXP));
+	(WORDSWAP (r->frac.f3) & ~(FD_HB | FPSIGN | FD_EXP));
 }
 
 int32 h_rpackg (UFPH *r, int32 *rh)
@@ -1007,8 +1008,7 @@ int32 h_rpackg (UFPH *r, int32 *rh)
 static UQP g_round = { 0, 0, UH_GRND, 0 };
 
 *rh = 0;						/* assume 0 */
-if ((r->frac.f0 == 0) && (r->frac.f1 == 0) &&		/* if fraction = 0 */
-    (r->frac.f2 == 0) && (r->frac.f3 == 0)) return 0;
+if (r->exp == 0) return 0;				/* exp = 0? done */
 qp_add (&r->frac, &g_round);				/* round */
 if ((r->frac.f3 & UH_NM_H) == 0) {			/* carry out? */
 	qp_rsh (&r->frac, 1);				/* renormalize */
@@ -1030,8 +1030,7 @@ int32 h_rpackh (UFPH *r, int32 *hflt)
 static UQP h_round = { UH_HRND, 0, 0, 0 };
 
 hflt[0] = hflt[1] = hflt[2] = hflt[3] = 0;		/* assume 0 */
-if ((r->frac.f0 == 0) && (r->frac.f1 == 0) &&		/* if fraction = 0 */
-    (r->frac.f2 == 0) && (r->frac.f3 == 0)) return 0;
+if (r->exp == 0) return 0;				/* exp = 0? done */
 qp_add (&r->frac, &h_round);				/* round */
 if ((r->frac.f3 & UH_NM_H) == 0) {			/* carry out? */
 	qp_rsh (&r->frac, 1);				/* renormalize */
@@ -1051,15 +1050,10 @@ hflt[3] = WORDSWAP (r->frac.f0);
 return hflt[0];
 }
 
-void h_write_bwl (int32 spec, int32 va, int32 val, int32 lnt, int32 acc)
+void h_write_l (int32 spec, int32 va, int32 val, int32 acc)
 {
-int32 rn;
-
-if (spec >= (GRN | nPC)) Write (va, val, lnt, WA);
-else {	rn = spec & 0xF;
-	if (lnt == L_BYTE) R[rn] = (R[rn] & ~BMASK) | val;
-	else if (lnt == L_WORD) R[rn] = (R[rn] & ~WMASK) | val;
-	else R[rn] = val;  }
+if (spec > (GRN | nPC)) Write (va, val, L_LONG, WA);
+else R[spec & 0xF] = val;
 return;
 }
 

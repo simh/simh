@@ -226,7 +226,6 @@
 #define VH_MUXES        4				/* max # of DHQ muxes */
 #define MT_MAXFR	(1 << 16)			/* magtape max rec */
 #define AUTO_LNT	34				/* autoconfig ranks */
-#define DIB_MAX		100				/* max DIBs */
 
 #define DEV_V_UBUS	(DEV_V_UF + 0)			/* Unibus */
 #define DEV_V_QBUS	(DEV_V_UF + 1)			/* Qbus */

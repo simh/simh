@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	HP2100 Simulator Usage
-Date:	26-Oct-2004
+Date:	22-Dec-2004
 
 			COPYRIGHT NOTICE
 
@@ -59,6 +59,7 @@ sim/hp2100/	hp2100_defs.h
 		hp2100_dp.c
 		hp2100_dq.c
 		hp2100_dr.c
+		hp2100_ds.c
 		hp2100_ipl.c
 		hp2100_lps.c
 		hp2100_lpt.c
@@ -77,7 +78,7 @@ name(s)
 
 CPU		2116 CPU with 32KW memory
 		2100 CPU with 32KW memory, FP or IOP instructions
-		21MX CPU with 1024KW memory, FP, DMS, and/or IOP instructions
+		21MX-M/E CPU with 1024KW memory, FP, DMS, and/or IOP instructions
 MP		12892B memory protect
 DMA0, DMA1	12895A/12897B direct memory access/dual channel port controller
 PTR		12597A duplex register interface with 2748 paper tape reader
@@ -93,6 +94,7 @@ DP		12557A disk controller with four 2871 drives
 DQ		12565A disk controller with two 2883 drives
 DR		12606B fixed head disk controller with 2770/2771 disk
 		12610B drum controller with 2773/2774/2775 drum
+DS		13037 disk controller with eight 7905/7906/7920/7925 drives
 MT		12559C magnetic tape controller with one 3030 drive
 MS		13181A magnetic tape controller with four 7970B drives
 		13183A magnetic tape controller with four 7970E drives
@@ -120,7 +122,8 @@ Options that may be specified are:
 
 	SET CPU 2116		2116 CPU
 	SET CPU 2100		2100 CPU
-	SET CPU 21MX		21MX CPU
+	SET CPU 21MX-M		21MX M-series CPU
+	SET CPU 21MX-E		21MX E-series CPU
 	SET CPU EAU		EAU instructions (2116 only)
 	SET CPU NOEAU		no EAU instructions (2116 only)
 	SET CPU FP		FP instructions (2100 only)
@@ -141,7 +144,9 @@ Options that may be specified are:
 
 On the 2100, EAU is standard, and the FP and IOP options are mutually
 exclusive.  On the 21MX, EAU and FP are standard.  The 21MX optionally
-includes DMS (dynamic mapping system) and IOP instructions.
+includes DMS (dynamic mapping system) and IOP instructions.  The 21MX-E
+supports the TIMER instruction; on the 21MX-M, this instruction decodes
+as MPY.
 
 Setting the CPU type to 2116, 2100, or 21MX establishes a consistent set
 of common options.  Additional SET CPU commands may follow to fine-tune
@@ -274,6 +279,7 @@ DMA1).  Each DMA channel has the following visible state:
 	CTL		1	interrupt enabled
 	FLG		1	channel ready
 	FBF		1	channel ready buffer
+	CTLALT		1	command word 2/3 selector
 	CW1		16	command word 1
 	CW2		16	command word 2
 	CW3		16	command word 3
@@ -532,7 +538,17 @@ In printer mode, error handling is as follows:
 	not attached	1	report error and stop
 			0	out of paper
 
+	SET POWEROFF	1	report error and stop
+			0	powered off
+
+	SET OFFLINE	1	report error and stop
+			0	offline
+
 	OS I/O error	x	report error and stop
+
+With STOP_IOE set to 0, output performed when the device is powered off
+or offline will initiate but then hang, waiting for the device to be
+returned online.  When it is, the output operation will complete.
 
 In diagnostic mode, there are no errors; data sent to the output
 buffer is looped back to the status register with a fixed delay of 1.
@@ -573,7 +589,17 @@ Error handling is as follows:
 	not attached	1	report error and stop
 			0	out of paper
 
+	SET POWEROFF	1	report error and stop
+			0	powered off
+
+	SET OFFLINE	1	report error and stop
+			0	offline
+
 	OS I/O error	x	report error and stop
+
+With STOP_IOE set to 0, output performed when the device is powered off
+or offline will initiate but then hang, waiting for the device to be
+returned online.  When it is, the output operation will complete.
 
 2.5.6 12539C Time Base Generator (CLK)
 
@@ -754,8 +780,10 @@ Both IPLI and IPLO implement these registers:
 	TIME		24	polling interval for input
 	STOP_IOE	1	stop on I/O error
 
-2.6 12557A Disk Controller (DPC, DPD) with Four 2781 Drives
-    13210A Disk Controller (DPC, DPD) with Four 7900 Drives
+2.6 Disk Controllers
+
+2.6.1 12557A Disk Controller (DPC, DPD) with Four 2781 Drives
+      13210A Disk Controller (DPC, DPD) with Four 7900 Drives
 
 The 12557A/13210A disk controller can be configured as either a
 12557A, supporting 2.5MB drives, or a 13210A, supporting 5MB drives,
@@ -773,9 +801,19 @@ a command channel.  The data channel includes a 128-word (one sector)
 buffer for reads and writes.  The command channel includes the four
 disk drives.  Disk drives can be set DISABLED or ENABLED.
 
+Individual drives may be protected against writing.  These commands
+simulate the Upper/Lower Disc Protect switches on the drives:
+
+	SET DPCn LOCKED		set unit n write locked
+	SET DPCn WRITEENABLED	set unit n write enabled
+
+Separate protection for the upper and lower platters of the 7900 drive
+is not supported.  Also, the drive Protect/Override switch is not
+supported; drive protection is permanently overridden.
+
 The 12557A/13210A supports the BOOT command.  BOOT DPC copies the IBL
 for 7900 class disks into memory and starts it running.  BOOT -R DPC
-boots from the removable platter (head 2).  The switch register (S) is
+boots from the removable platter (head 0).  The switch register (S) is
 set automatically to the value expected by the IBL loader:
 
 	<15:14>	=	01
@@ -827,20 +865,25 @@ The command channel implements these registers:
 
 Error handling is as follows:
 
-	error	     	processed as
+	error	     		processed as
 
-	not attached	disk not ready
+	not attached		disk not ready (drive unloaded)
 
-	end of file	assume rest of disk is zero
+	end of file		assume rest of disk is zero
 
-	OS I/O error	report error and stop
+	OS I/O error		report error and stop
 
-2.7 12565A Disk Controller (DQC, DQD) with Two 2883 Drives
+2.6.2 12565A Disk Controller (DQC, DQD) with Two 2883 Drives
 
 The 12565A disk controller has two separate devices, a data channel and
 a command channel.  The data channel includes a 128-word (one sector)
 buffer for reads and writes.  The command channel includes the two
 disk drives.  Disk drives can be set DISABLED or ENABLED.
+
+Individual drives may be protected against writing:
+
+	SET DQCn LOCKED		set unit n write locked
+	SET DQCn WRITEENABLED	set unit n write enabled
 
 The 12565A supports the BOOT command.  BOOT DQC copies the IBL for 2883
 class disks into memory and starts it running.  The switch register (S)
@@ -892,16 +935,16 @@ The command channel implements these registers:
 
 Error handling is as follows:
 
-	error	     	processed as
+	error	     		processed as
 
-	not attached	disk not ready
+	not attached		disk not ready
 
-	end of file	assume rest of disk is zero
+	end of file		assume rest of disk is zero
 
-	OS I/O error	report error and stop
+	OS I/O error		report error and stop
 
-2.8 12606B Fixed Head Disk Controller (DRC, DRD) with 2770/2771 Disk
-    12610B Drum Controller (DRC, DRD) with 2773/2774/2775 Drum
+2.6.3 12606B Fixed Head Disk Controller (DRC, DRD) with 2770/2771 Disk
+      12610B Drum Controller (DRC, DRD) with 2773/2774/2775 Drum
 
 The 12606B/12610B fixed head disk/drum controller has two separate devices,
 a data channel and a command channel.
@@ -982,7 +1025,93 @@ Error handling is as follows:
 12606B/12610B data files are buffered in memory; therefore, end of file
 and OS I/O errors cannot occur.
 
-2.9 12559C Magnetic Tape Controller (MTC, MTD) with One 3030 Drive
+2.6.4 13037 Disk Controller (DS) with Eight 7905/7906/7920/7925 Drives
+
+The 13037 disk controller supports 7905 (15MB), 7906 (20MB), 7920 (50MB),
+or 7925 (120MB) disk drives, as well as autosizing, based on the size
+of the disk image file:
+
+	SET DSn 7905		drive n is a 15MB drive
+	SET DSn 7906		drive n is a 20MB drive
+	SET DSn 7920		drive n is a 50MB drive
+	SET DSn 7925		drive n is a 120MB drive
+	SET DSn AUTOSIZE	drive n type based on file size at attach
+
+Drive types can be intermixed.  The 7905 is selected by default.  Drives
+can be set DISABLED or ENABLED.
+
+Individual drives may be protected against writing.  These commands
+simulate the Disc Protect/Read Only switches on the drives:
+
+	SET DSn LOCKED		set unit n write locked
+	SET DSn WRITEENABLED	set unit n write enabled
+
+Separate protection for the upper and lower platters of the 7905 and
+7906 drives is not supported.  Protecting a 7905 or 7906 drive behaves
+as though both of the Disc Protect switches were on.
+
+The setting of the drive Format switch may be changed with:
+
+	SET DSn FORMAT		set format enabled
+	SET DSn NOFORMAT	set format disabled
+
+The 13037 supports the BOOT command.  BOOT DS copies the IBL loader for
+the 13037 controller into memory and starts it running.  The switch register
+(S) is set automatically to the value expected by the IBL loader:
+
+	<15:14>	=	11
+	<13:12>	=	01
+	<11:6>	=	data channel device code
+	<5:3> = 	unchanged
+	<2> =		0
+	<1:0> =		unchanged (head number)
+
+The DS controller implements these registers:
+
+	name		size	comments
+
+	CMD		16	command register
+	FIFO[0:15]	16	data FIFO
+	SR1		16	status register 1
+	VCTR		16	verify counter
+	FMASK		8	file mask
+	CYL		16	cylinder address register
+	HS		16	head/sector address register
+	STATE		2	controller state
+	LASTA		3	last unit polled for attention flag
+	FIP		4	FIFO insertion pointer
+	FRP		4	FIFO removal pointer
+	FCNT		5	FIFO counter
+	CTL		1	interrupt enable
+	FLG		1	ready flag
+	FBF		1	ready flag buffer
+	SRQ		1	DMA service request
+	BUSY		1	visible busy status
+	CMDF		1	command follows flag
+	CMDP		1	command pending flag
+	EOC		1	end of cylinder flag
+	EOD		1	end of data flag
+	DBUF[0:127]	16	sector buffer
+	DPTR		8	sector buffer pointer
+	CTIME		24	command response time
+	DTIME		24	data transfer response time
+	STIME		24	seek time (per cylinder)
+	RTIME		24	rotation time
+	TIMEOUT		31	controller timeout
+
+Error handling is as follows:
+
+	error	     		processed as
+
+	not attached		disk not ready
+
+	end of file		assume rest of disk is zero
+
+	OS I/O error		report error and stop
+
+2.7 Magnetic Tape
+
+2.7.1 12559C Magnetic Tape Controller (MTC, MTD) with One 3030 Drive
 
 Magnetic tape options include the ability to make the unit write enabled
 or write locked.
@@ -1037,8 +1166,8 @@ Error handling is as follows:
 
 	OS I/O error		parity error; if STOP_IOE, stop
 
-2.10 13181A Magnetic Tape Controller (MSC, MSD) with Four 7970B Drives
-     18183A Magnetic Tape Controller (MSC, MSD) with Four 7970E Drives
+2.7.2 13181A Magnetic Tape Controller (MSC, MSD) with Four 7970B Drives
+      18183A Magnetic Tape Controller (MSC, MSD) with Four 7970E Drives
 
 Magnetic tape options include the ability to make the unit write enabled
 or write locked, and the ability to select the 13181A (800 bpi) controller
@@ -1126,7 +1255,7 @@ Error handling is as follows:
 
 	OS I/O error		parity error; if STOP_IOE, stop
 
-2.11 Symbolic Display and Input
+2.8 Symbolic Display and Input
 
 The HP2100 simulator implements symbolic display and input.  Display is
 controlled by command line switches:

@@ -183,7 +183,7 @@ Notes on memory size:
   non-zero data, the simulator asks for confirmation.  Data in the truncated
   portion of memory is lost.
 - If the simulator is running VMS, the operating system may have a SYSGEN 
-  parameter set called PHYSICXAL PAGES (viewable from "MCR SYSGEN SHOW
+  parameter set called PHYSICAL PAGES (viewable from "MCR SYSGEN SHOW
   PHYSICALPAGES").  PHYSICALPAGES limits the maximum number of physical pages
   of memory the OS will recognize.  If it is set to a lower value than the
   new memory size of the machine, then only the first PHYSICALPAGES of

@@ -1,6 +1,6 @@
 /* i1401_sys.c: IBM 1401 simulator interface
 
-   Copyright (c) 1993-2004, Robert M. Supnik
+   Copyright (c) 1993-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   04-Jan-05	WVS	Added address argument support
    14-Nov-04	WVS	Added data printout support
    16-Mar-03	RMS	Fixed mnemonic for MCS
    03-Jun-02	RMS	Added 1311 support
@@ -173,7 +174,7 @@ void fprint_addr (FILE *of, t_value *dig)
 int32 addr, xa;
 extern int32 hun_table[64], ten_table[64], one_table[64];
 
-addr = hun_table[dig[0]] + ten_table[dig[1]] + one_table[dig[2]];
+addr = hun_table[dig[0] & CHAR] + ten_table[dig[1]] + one_table[dig[2]];
 xa = (addr >> V_INDEX) & M_INDEX;
 if (xa) fprintf (of, " %d,%d", addr & ADDRMASK, ((xa - (X1 >> V_INDEX)) / 5) + 1);
 else if (addr >= MAXMEMSIZE) fprintf (of, " %d*", addr & ADDRMASK);
@@ -246,12 +247,17 @@ for (ilnt = 1; ilnt < sim_emax; ilnt++) if (val[ilnt] & WM) break;
 if ((flags & (NOWM | HNOP)) && (ilnt > 7)) ilnt = 7;	/* cs, swm, h, nop? */
 else if ((op == OP_B) && (ilnt > 4) && (val[4] == BCD_BLANK)) ilnt = 4;
 else if ((ilnt > 8) && (op != OP_NOP)) ilnt = 8;	/* cap length */
-if (((flags & len_table[ilnt]) == 0) &&			/* invalid lnt, */
-	(op != OP_NOP)) return dcw (of, op, val);	/* not nop? */
+if (ilnt == 3) {					/* lnt = 3? */
+	fprintf (of, "DSA");				/* assume DSA */
+	fprint_addr (of, val);				/* print addr */
+	return -(ilnt - 1);  }
+if ((((flags & len_table[ilnt]) == 0) &&		/* invalid lnt, */
+	(op != OP_NOP)) ||				/* not nop? */
+	(opcode[op] == NULL)) return dcw (of, op, val);	/* or undef? */
 fprintf (of, "%s",opcode[op]);				/* print opcode */
 if (ilnt > 2) {						/* A address? */
 	if (((flags & IO) || (op == OP_NOP)) && (val[1] == BCD_PERCNT))
-       	 fprintf (of, " %%%c%c", bcd_to_ascii[val[2]], bcd_to_ascii[val[3]]);
+       	    fprintf (of, " %%%c%c", bcd_to_ascii[val[2]], bcd_to_ascii[val[3]]);
 	else fprint_addr (of, &val[1]);  }
 if (ilnt > 5) fprint_addr (of, &val[4]);		/* B address? */
 if ((ilnt == 2) || (ilnt == 5) || (ilnt == 8))		/* d character? */

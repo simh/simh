@@ -25,6 +25,7 @@
 
    cpu		H316/H516 CPU
 
+   01-Dec-04	RMS	Fixed bug in DIV
    06-Nov-04	RMS	Added =n to SHOW HISTORY
    04-Jan-04	RMS	Removed unnecessary compare
    31-Dec-03	RMS	Fixed bug in cpu_set_hist
@@ -496,11 +497,10 @@ case 003: case 023: case 043: case 063:			/* ANA */
 
 case 004: case 024: case 044: case 064:			/* STA */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	Write (Y, AR);					/* store A */
 	if (dp) {					/* double prec? */
-	    if ((Y & 1) == 0) Write (Y, AR);		/* if even, store A */
 	    Write (Y | 1, BR);				/* store B */
 	    sc = 0;  }
-	else Write (Y, AR);				/* no, store word */
 	break;
 
 case 005: case 025: case 045: case 065:			/* ERA */
@@ -585,7 +585,7 @@ case 017: case 037: case 057: case 077:			/* DIV */
 	    if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	    t2 = SEXT (Read (Y));			/* divr */
 	    if (t2) {					/* divr != 0? */
-		t1 = GETDBL_S (AR, BR);			/* get A'B */
+		t1 = GETDBL_S (SEXT (AR), BR);		/* get A'B signed */
 		BR = (t1 % t2) & DMASK;			/* remainder */
 		t1 = t1 / t2;				/* quotient */
 		AR = t1 & DMASK;
@@ -934,8 +934,8 @@ int32 Add16 (int32 v1, int32 v2)
 {
 int32 r = v1 + v2;
 
-C = 0;
 if (((v1 ^ ~v2) & (v1 ^ r)) & SIGN) C = 1;
+else C = 0;
 return (r & DMASK);
 }
 
@@ -943,8 +943,8 @@ int32 Add31 (int32 v1, int32 v2)
 {
 int32 r = v1 + v2;
 
-C = 0;
-if (((v1 ^ ~v2) & (v1 ^ r)) & (1u << 30)) C = 1;
+if (((v1 ^ ~v2) & (v1 ^ r)) & DP_SIGN) C = 1;
+else C = 0;
 return r;
 }
 
@@ -1196,7 +1196,7 @@ if (cptr == NULL) return SCPE_ARG;
 newmax = get_uint (cptr, 10, DMA_MAX, &r);		/* get new max */
 if ((r != SCPE_OK) || (newmax == dma_nch)) return r;	/* err or no chg? */
 dma_nch = newmax;					/* set new max */
-for (i = newmax; i <DMA_MAX; i++) {			/* reset chan */
+for (i = newmax; i < DMA_MAX; i++) {			/* reset chan */
 	dma_ad[i] = dma_wc[i] = dma_eor[i] = 0;
 	chan_req = chan_req & ~(1 << i);  }
 return SCPE_OK;

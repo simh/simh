@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   01-Dec-04	RMS	Fixed fprint_opr calling sequence
    24-Oct-03	RMS	Added DMA/DMC support
    17-Sep-01	RMS	Removed multiconsole support
 */
@@ -196,17 +197,17 @@ static const int32 opc_val[] = {
 	status	=	space needed
 */
 
-int32 fprint_opr (FILE *of, int32 inst, int32 class, int32 sp)
+void fprint_opr (FILE *of, int32 inst, int32 class)
 {
-int32 i, j;
+int32 i, j, sp;
 
-for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
+for (i = sp = 0; opc_val[i] >= 0; i++) {		/* loop thru ops */
 	j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
 	if ((j == class) && (opc_val[i] & inst)) {	/* same class? */
 	    inst = inst & ~opc_val[i];			/* mask bit set? */
 	    fprintf (of, (sp? " %s": "%s"), opcode[i]);
 	    sp = 1;  }  }
-return sp;
+return;
 }
 
 /* Symbolic decode
@@ -268,8 +269,8 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	    fprintf (of, "%s %o", opcode[i], disp);
 	    break;
 	case I_V_SK0: case I_V_SK1:			/* skips */
-	    fprint_opr (of, inst & 0777, j, 0);	/* print skips */	
-	    break;  }				/* end case */
+	    fprint_opr (of, inst & 0777, j);		/* print skips */	
+	    break;  }					/* end case */
 	return SCPE_OK;  }				/* end if */
 	}						/* end for */
 return SCPE_ARG;

@@ -52,7 +52,6 @@
 #define VAX780_PLANT	(0 << 12)			/* plant (Salem NH) */
 #define VAX780_SN	(1234)
 #define CON_HLTPIN	0x0200				/* external CPU halt */
-#define CON_PWRUP	0x0300				/* powerup code */
 #define CON_HLTINS	0x0600				/* HALT instruction */
 #define MCHK_RD_F	0x00				/* read fault */
 #define MCHK_RD_A	0xF4				/* read abort */
@@ -77,7 +76,7 @@
 #define TR_MBA1		9
 #define NEXUS_HLVL	(IPL_HMAX - IPL_HMIN + 1)
 #define SCB_NEXUS	0x100				/* nexus intr base */
-#define SBI_FAULTS	0xFC000000			/* SBI fault flags - ni */
+#define SBI_FAULTS	0xFC000000			/* SBI fault flags */
 
 /* Internal I/O interrupts - relative except for clock and console */
 
@@ -195,7 +194,6 @@
 #define VH_MUXES	4				/* max # of DHQ muxes */
 #define MT_MAXFR	(1 << 16)			/* magtape max rec */
 #define AUTO_LNT	34				/* autoconfig ranks */
-#define DIB_MAX		100				/* max DIBs */
 
 #define DEV_V_UBUS	(DEV_V_UF + 0)			/* Unibus */
 #define DEV_V_MBUS	(DEV_V_UF + 1)			/* Massbus */

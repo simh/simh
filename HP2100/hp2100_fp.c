@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   26-Dec-04	RMS	Separated A/B from M[0/1] for DMA IO (from Dave Bryan)
    15-Jul-03	RMS	Fixed signed/unsigned warning
    21-Oct-02	RMS	Recoded for compatibility with 21MX microcode algorithms
 
@@ -102,7 +103,7 @@ struct ufp {						/* unpacked fp */
 
 #define FR_NEG(v)	((~(v) + 1) & DMASK32)
 
-extern uint16 *M;
+extern uint16 ABREG[2];
 uint32 UnpackFP (struct ufp *fop, uint32 opnd);
 void NegFP (struct ufp *fop);
 void NormFP (struct ufp *fop);

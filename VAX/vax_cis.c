@@ -349,7 +349,7 @@ case MATCHC:
    Registers if PSL<fpd> = 1:
 	R[0]		=	result
 	R[1]		=	table address
-	R[2]		=	source string length
+	R[2]		=	delta-PC/0/source string length
 	R[3]		=	source string address
 
    Condition codes:
@@ -578,7 +578,6 @@ case DIVP:
 		NibbleLshift (&src2, 1, 0);		/* shift dividend */
 		NibbleLshift (&dst, 1, 0);		/* shift quotient */
 		}					/* end divide loop */
-	    dst.sign = src1.sign ^ src2.sign;		/* calculate sign */
 	    }						/* end if */
 	cc = WriteDstr (op[4], op[5], &dst, 0, acc);	/* store result */
 	R[0] = 0;
@@ -982,7 +981,7 @@ case EDITPC:
 		sign = C_SPACE;
 		}
 	    fill = C_SPACE;
-	    R[0] = R[4] = op[0] & WMASK;		/* src len */
+	    R[0] = R[4] = op[0];			/* src len */
 	    R[1] = op[1];				/* src addr */
 	    R[2] = STR_PACK (0, (sign << ED_V_SIGN) | (fill << ED_V_FILL));
 							/* delta PC, sign, fill */
@@ -990,7 +989,7 @@ case EDITPC:
 	    R[5] = op[3];				/* dst addr */
 	    PSL = PSL | PSL_FPD;			/* set FPD */
 	    }
-	for (;; ) {					/* loop thru pattern */
+	for ( ;; ) {					/* loop thru pattern */
 	    pop = Read (R[3], L_BYTE, RA);		/* rd pattern op */
 	    if (pop == EO_END) break;			/* end? */
 	    if (pop & EO_RPT_FLAG) {			/* repeat class? */

@@ -39,6 +39,11 @@
    - Busy.  The controller is processing a command.  The controller does not
      respond to new commands or to drive attention interrupts.
 
+   The controller busy state is loosely related to the testable (visible) busy
+   flop.  If the visible busy flop is set, the controller is in the busy state;
+   but the controller can also be busy (processing an invalid opcode or invalid
+   unit) while visible busy is clear.
+
    Omissions: the following features are not implemented:
 
    - Drive hold.  Since this is a single CPU implementation, the drives are
@@ -46,6 +51,9 @@
    - Spare, defective, protected.  The disk files carry only data.
    - Formatting.  The disk files carry only data.
    - ECC.  Data errors are always uncorrectable.
+
+   Reference:
+   - 13037 Disc Controller Technical Information Package (13037-90902, Aug-1980)
 */
 
 #include "hp2100_defs.h"
@@ -60,10 +68,9 @@
 #define DS_FHS		2
 #define DS_FDATA	3
 #define DS_FIFO_SIZE	16				/* fifo size */
+#define DS_FIFO_EMPTY	(ds_fifo_cnt == 0)
 #define ds_ctrl		ds_unit[DS_NUMDR]		/* ctrl thread */
 #define ds_timer	ds_unit[DS_NUMDR + 1]		/* timeout thread */
-#define GET_DA(x,y,z,t) \
-	((((((x) * drv_tab[t].hd) + (y)) * drv_tab[t].sc) + (z)) * DS_NUMWD)
 #define GET_CURSEC(x,d)	((int32) fmod (sim_gtime() / ((double) (x)), \
 			((double) (drv_tab[d].sc))))
 
@@ -112,9 +119,9 @@
 #define  DSC_RFULL	006				/* read full */
 #define  DSC_VFY	007				/* verify */
 #define  DSC_WRITE	010				/* write */
-#define  DSC_WFULL	011				/* write full - na */
+#define  DSC_WFULL	011				/* write full */
 #define  DSC_CLEAR	012				/* clear */
-#define  DSC_INIT	013				/* initialize - na */
+#define  DSC_INIT	013				/* initialize */
 #define  DSC_AREC	014				/* address record */
 #define  DSC_RSYN	015				/* request syndrome */
 #define  DSC_ROFF	016				/* read with offset */
@@ -124,7 +131,7 @@
 #define  DSC_RDA	024				/* request disk addr */
 #define  DSC_END	025				/* end */
 #define  DSC_WAKE	026				/* wakeup */
-#define  DSC_ATTN	035				/* pseudo: ATTN */
+#define  DSC_ATN	035				/* pseudo: ATN */
 #define  DSC_BADU	036				/* pseudo: bad unit */
 #define  DSC_BADF	037				/* pseudo: bad opcode */
 #define  DSC_NEXT	0040				/* state increment */
@@ -138,24 +145,30 @@
 #define DSC_V_RTY	4				/* retry count */
 #define DSC_M_RTY	017
 #define DSC_V_DECR	3				/* seek decrement */
-#define DSC_V_SPAR	2				/* enable sparing */
+#define DSC_V_SPEN	2				/* enable sparing */
 #define DSC_V_CYLM	1				/* cylinder mode */
 #define DSC_V_AUTO	0				/* auto seek */
 #define DSC_V_HOLD	7				/* hold flag */
 #define DSC_V_UNIT	0				/* unit */
 #define DSC_M_UNIT	017
+#define DSC_V_SPAR	15				/* INIT spare */
+#define DSC_V_PROT	14				/* INIT protected */
+#define DSC_V_DFCT	13				/* INIT defective */
 
 #define DSC_HOLD	(1u << DSC_V_HOLD)
 #define DSC_DECR	(1u << DSC_V_DECR)
-#define DSC_SPAR	(1u << DSC_V_SPAR)
+#define DSC_SPEN	(1u << DSC_V_SPEN)
 #define DSC_CYLM	(1u << DSC_V_CYLM)
 #define DSC_AUTO	(1u << DSC_V_AUTO)
 #define DSC_FMASK	((DSC_M_RTY << DSC_V_RTY)|DSC_DECR|\
-			  DSC_SPAR|DSC_CYLM|DSC_AUTO)
+			  DSC_SPEN|DSC_CYLM|DSC_AUTO)
 #define DSC_GETOP(x)	(((x) >> DSC_V_OP) & DSC_M_OP)
 #define DSC_GETUNIT(x)	(((x) >> DSC_V_UNIT) & DSC_M_UNIT)
 #define DSC_GETCHD(x)	(((x) >> DSC_V_CHD) & DSC_M_CHD)
 #define DSC_GETCSC(x)	(((x) >> DSC_V_CSC) & DSC_M_CSC)
+#define DSC_SPAR	(1u << DSC_V_SPAR)
+#define DSC_PROT	(1u << DSC_V_PROT)
+#define DSC_DFCT	(1u << DSC_V_DFCT)
 
 /* Command flags */
 
@@ -199,15 +212,19 @@
 #define  DS1_S2ERR	(023 << DS1_V_STAT)		/* status 2 error */
 #define  DS1_TKPER	(026 << DS1_V_STAT)		/* protected trk - na */
 #define  DS1_UNAVL	(027 << DS1_V_STAT)		/* illegal unit */
-#define  DS1_ATTN	(037 << DS1_V_STAT)		/* attention */
+#define  DS1_ATN	(037 << DS1_V_STAT)		/* attention */
 #define DS1_V_UNIT	0
+#define DS1_SPAR	(1u << DS1_V_SPAR)
+#define DS1_PROT	(1u << DS1_V_PROT)
+#define DS1_DFCT	(1u << DS1_V_DFCT)
 
 /* Status 2, ^ = kept in unit status, * = dynamic */
 
 #define DS2_ERR		0100000				/* *error */
+#define DS2_V_ID	9				/* drive type */
 #define DS2_ATN		0000200				/* ^attention */
 #define DS2_RO		0000100				/* *read only */
-#define DS2_FRM		0000040				/* format - na */
+#define DS2_FRM		0000040				/* *format */
 #define DS2_FLT		0000020				/* fault - na */
 #define DS2_FS		0000010				/* ^first status */
 #define DS2_SC		0000004				/* ^seek error */
@@ -234,34 +251,69 @@
    In theory, each drive can be a different type.  The size field in
    each unit selects the drive capacity for each drive and thus the
    drive type.  DISKS MUST BE DECLARED IN ASCENDING SIZE.
+
+   The 7905 and 7906 have fixed and removable platters.  Consequently,
+   they are almost always accessed with cylinders limited to each
+   platter.  The 7920 and 7925 have multiple-platter packs, and so are
+   almost always accessed with cylinders that span all surfaces.
+
+   Disk image files are arranged as a linear set of tracks.  To improve
+   locality, tracks on the 7905 and 7906 images are grouped per-platter,
+   i.e., all tracks on heads 0 and 1, followed by all tracks on head 2
+   (and, for the 7906, head 3), whereas tracks on the 7920 and 7925 are
+   sequential by cylinder and head number.
+
+   This variable-access geometry is accomplished by defining a "heads
+   per cylinder" value for the fixed and removable sections of each
+   drive that indicates the number of heads that should be grouped for
+   locality.  The removable values are set to 2 on the 7905 and 7906,
+   indicating that those drives typically use cylinders of two surfaces.
+   They are set to the number of surfaces per drive for the 7920 and
+   7925, as those typically use cylinders encompassing the entire
+   spindle.
 */
+
+#define GET_DA(x,y,z,t) \
+	(((((y) < drv_tab[t].rh)? \
+	    (x) * drv_tab[t].rh + (y): \
+	    drv_tab[t].cyl * drv_tab[t].rh + \
+		((x) * drv_tab[t].fh + (y) - drv_tab[t].rh)) * \
+	drv_tab[t].sc + (z)) * DS_NUMWD)
 
 #define D7905_DTYPE	0
 #define D7905_SECT	48
 #define D7905_SURF	3
+#define D7905_RH	2
+#define D7905_FH	(D7905_SURF - D7905_RH)
 #define D7905_CYL	411
-#define D7905_ID	2
+#define D7905_ID	(2 << DS2_V_ID)
 #define D7905_SIZE	(D7905_SECT * D7905_SURF * D7905_CYL * DS_NUMWD)
 
 #define D7906_DTYPE	1
 #define D7906_SECT	48
 #define D7906_SURF	4
+#define D7906_RH	2
+#define D7906_FH	(D7906_SURF - D7906_RH)
 #define D7906_CYL	411
-#define D7906_ID	0
+#define D7906_ID	(0 << DS2_V_ID)
 #define D7906_SIZE	(D7906_SECT * D7906_SURF * D7906_CYL * DS_NUMWD)
 
 #define D7920_DTYPE	2
 #define D7920_SECT	48
 #define D7920_SURF	5
+#define D7920_RH	D7920_SURF
+#define D7920_FH	(D7920_SURF - D7920_RH)
 #define D7920_CYL	823
-#define D7920_ID	1
+#define D7920_ID	(1 << DS2_V_ID)
 #define D7920_SIZE	(D7920_SECT * D7920_SURF * D7920_CYL * DS_NUMWD)
 
 #define D7925_DTYPE	3
 #define D7925_SECT	64
 #define D7925_SURF	9
+#define D7925_RH	D7925_SURF
+#define D7925_FH	(D7925_SURF - D7925_RH)
 #define D7925_CYL	823
-#define D7925_ID	3
+#define D7925_ID	(3 << DS2_V_ID)
 #define D7925_SIZE	(D7925_SECT * D7925_SURF * D7925_CYL * DS_NUMWD)
 
 struct drvtyp {
@@ -270,16 +322,17 @@ struct drvtyp {
 	uint32	cyl;					/* cylinders */
 	uint32	size;					/* #blocks */
 	uint32	id;					/* device type */
+	uint32  rh;					/* removable surfaces */
+	uint32  fh;					/* fixed surfaces */
 };
 
 static struct drvtyp drv_tab[] = {
-	{ D7905_SECT, D7905_SURF, D7905_CYL, D7905_SIZE, D7905_ID },
-	{ D7906_SECT, D7906_SURF, D7906_CYL, D7906_SIZE, D7906_ID },
-	{ D7920_SECT, D7920_SURF, D7920_CYL, D7920_SIZE, D7920_ID },
-	{ D7925_SECT, D7925_SURF, D7925_CYL, D7925_SIZE, D7925_ID },
+	{ D7905_SECT, D7905_SURF, D7905_CYL, D7905_SIZE, D7905_ID, D7905_RH, D7905_FH },
+	{ D7906_SECT, D7906_SURF, D7906_CYL, D7906_SIZE, D7906_ID, D7906_RH, D7906_FH },
+	{ D7920_SECT, D7920_SURF, D7920_CYL, D7920_SIZE, D7920_ID, D7920_RH, D7920_FH },
+	{ D7925_SECT, D7925_SURF, D7925_CYL, D7925_SIZE, D7925_ID, D7925_RH, D7925_FH },
 	{ 0 }  };
 
-extern uint16 *M;
 extern uint32 PC, SR;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
 extern int32 sim_switches;
@@ -291,7 +344,6 @@ uint32 ds_fifo_rp = 0;					/* removal ptr */
 uint32 ds_fifo_cnt = 0;					/* count */
 uint32 ds_cmd = 0;					/* command word */
 uint32 ds_sr1 = 0;					/* status word 1 */
-uint32 ds_u = 0;					/* saved unit */
 uint32 ds_busy = 0;					/* busy flag */
 uint32 ds_eoc = 0;					/* end of cylinder */
 uint32 ds_eod = 0;					/* end of data */
@@ -302,12 +354,12 @@ uint32 ds_cyl = 0;					/* disk address: cyl */
 uint32 ds_hs = 0;					/* disk address: hs */
 uint32 ds_vctr = 0;					/* verify counter */
 uint32 ds_state = 0;					/* controller state */
-uint32 ds_lastatn = 0;					/* last attn intr */
+uint32 ds_lastatn = 0;					/* last atn intr */
 int32 ds_stime = 100;					/* seek time */
 int32 ds_rtime = 100;					/* inter-sector time */
 int32 ds_ctime = 3;					/* command time */
 int32 ds_dtime = 1;					/* dch time */
-int32 ds_tmo = 1000000;					/* timeout */
+int32 ds_tmo = 2749200;					/* timeout = 1.74 sec */
 uint32 ds_ptr = 0;					/* buffer ptr */
 uint16 dsxb[DS_NUMWDF];					/* sector buffer */
 
@@ -351,7 +403,6 @@ t_stat ds_svc_c (UNIT *uptr);
 t_stat ds_svc_u (UNIT *uptr);
 t_stat ds_svc_t (UNIT *uptr);
 t_stat ds_reset (DEVICE *dptr);
-t_stat ds_vlock (UNIT *uptr, int32 val);
 t_stat ds_attach (UNIT *uptr, char *cptr);
 t_stat ds_detach (UNIT *uptr);
 t_stat ds_boot (int32 unitno, DEVICE *dptr);
@@ -359,7 +410,7 @@ t_stat ds_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 void ds_poll (void);
 void ds_docmd (uint32 cmd);
 void ds_doatn (void);
-uint32 ds_updds2 (UNIT *uptr, uint32 clear);
+uint32 ds_updds2 (UNIT *uptr);
 void ds_cmd_done (t_bool sf, uint32 sr1);
 void ds_wait_for_cpu (UNIT *uptr, uint32 newst);
 void ds_set_idle (void);
@@ -376,7 +427,7 @@ t_stat ds_cont_wr (UNIT *uptr, uint32 off, uint32 bsize);
 void ds_end_rw (UNIT *uptr, uint32 newst);
 t_stat ds_set_uncorr (UNIT *uptr);
 t_stat ds_reset_cmn (DEVICE *dptr);
-void ds_sched_attn (UNIT *uptr);
+void ds_sched_atn (UNIT *uptr);
 uint32 ds_fifo_read (void);
 void ds_fifo_write (uint32 dat);
 void ds_fifo_reset (void);
@@ -416,7 +467,6 @@ REG ds_reg[] = {
 	{ BRDATA (FIFO, ds_fifo, 8, 16, DS_FIFO_SIZE) },
 	{ ORDATA (SR1, ds_sr1, 16) },
 	{ ORDATA (VCTR, ds_vctr, 16) },
-	{ ORDATA (UNIT, ds_u, 4) },
 	{ ORDATA (FMASK, ds_fmask, 8) },
 	{ ORDATA (CYL, ds_cyl, 16) },
 	{ ORDATA (HS, ds_hs, 16) },
@@ -440,9 +490,9 @@ REG ds_reg[] = {
 	{ DRDATA (CTIME, ds_ctime, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (DTIME, ds_dtime, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (STIME, ds_stime, 24), PV_LEFT + REG_NZ },
-	{ DRDATA (TTIME, ds_rtime, 24), PV_LEFT + REG_NZ },
+	{ DRDATA (RTIME, ds_rtime, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (TIMEOUT, ds_tmo, 31), PV_LEFT + REG_NZ },
-	{ URDATA (UCYL, ds_unit[0].CYL, 10, 8, 0,
+	{ URDATA (UCYL, ds_unit[0].CYL, 10, 10, 0,
 		  DS_NUMDR + 1, PV_LEFT | REG_HRO) },
 	{ URDATA (UFNC, ds_unit[0].FNC, 8, 8, 0,
 		  DS_NUMDR + 1, REG_HRO) },
@@ -493,15 +543,14 @@ DEVICE ds_dev = {
 	DS_NUMDR + 2, 8, 27, 1, 8, 16,
 	NULL, NULL, &ds_reset,
 	&ds_boot, &ds_attach, &ds_detach,
-	&ds_dib, DEV_DISABLE | DEV_DIS };
+	&ds_dib, DEV_DISABLE };
 
 /* IO instructions */
 
 int32 dsio (int32 inst, int32 IR, int32 dat)
 {
-int32 dev;
+uint32 dev = IR & I_DEVMASK;
 
-dev = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
 case ioFLG:						/* flag clear/set */
 	if ((IR & I_HC) == 0) { setFLG (dev); }		/* STF */
@@ -516,7 +565,8 @@ case ioOTX:						/* output */
 	if (ds_cmdf) {					/* expecting command? */
 	    ds_cmd = dat;				/* save command */
 	    ds_cmdf = 0;
-	    ds_cmdp = 1;  }				/* command present */
+	    ds_cmdp = 1;				/* command present */
+	    }
 	else ds_fifo_write (dat);			/* put in fifo */
 	break;
 case ioMIX:						/* merge */
@@ -530,9 +580,11 @@ case ioCTL:						/* control clear/set */
 	    clrCTL (dev);				/* clear control */
 	    ds_cmdf = 1;				/* expecting command */
 	    ds_cmdp = 0;				/* none pending */
-	    ds_fifo_reset ();  }			/* clear fifo */
+	    ds_fifo_reset ();				/* clear fifo */
+	    }
 	else {						/* STC */
-	    setCTL (dev);  }				/* set ctl */
+	    setCTL (dev);				/* set ctl */
+	    }
 	break;
 case ioEDT:						/* end of transfer */
 	ds_eod = 1;					/* flag end transfer */
@@ -546,7 +598,7 @@ return dat;
 
 /* Run the controller polling loop, based on ds_state:
 
-	IDLE	commands and ATTN interrupts
+	IDLE	commands and ATN interrupts
 	WAIT	commands only
 	BUSY	nothing
 */
@@ -556,7 +608,7 @@ void ds_poll (void)
 int32 dev = ds_dib.devno;
 
 if ((ds_state != DS_BUSY) && ds_cmdp) ds_docmd (ds_cmd);/* cmd pending? */
-if ((ds_state == DS_IDLE) && CTL (dev)) ds_doatn ();	/* idle? chk atn */
+if ((ds_state == DS_IDLE) && CTL (dev)) ds_doatn ();	/* idle? check ATN */
 return;
 }
 
@@ -571,29 +623,31 @@ return;
 
 void ds_docmd (uint32 cmd)
 {
-uint32 op, f, dtyp;
+uint32 op, f, dtyp, unum;
 
 op = DSC_GETOP (cmd);					/* operation */
 f = ds_opflags[op];					/* flags */
-if (op == DSC_COLD) ds_u = 0;				/* boot force unit 0 */
-else ds_u = DSC_GETUNIT (cmd);				/* get unit */
-if ((f & CMF_UIDLE) && (ds_u < DS_NUMDR) &&		/* idle required */
-     sim_is_active (&ds_unit[ds_u])) {			/* but unit busy? */
+if (op == DSC_COLD) unum = 0;				/* boot force unit 0 */
+else unum = DSC_GETUNIT (cmd);				/* get unit */
+if ((f & CMF_UIDLE) && (unum < DS_NUMDR) &&		/* idle required */
+     sim_is_active (&ds_unit[unum])) {			/* but unit busy? */
 	ds_state = DS_WAIT;				/* wait */
-	return;  }
+	return;
+	}
 ds_cmdp = 0;						/* flush command */
 ds_state = DS_BUSY;					/* ctrl is busy */
 if (f & CMF_CLRS) ds_sr1 = 0;				/* clear status */
 if (f & CMF_CLREC) ds_eoc = 0;				/* clear end cyl */
 if (f & CMF_UNDF) {					/* illegal op? */
-	ds_sched_ctrl_op (DSC_BADF, 0, CLR_BUSY);	/* sched, not busy */
-	return;  }
+	ds_sched_ctrl_op (DSC_BADF, 0, CLR_BUSY);	/* sched, clr busy */
+	return;
+	}
 switch (op) {
 
 /* Drive commands */
 
 case DSC_COLD:						/* cold load read */
-	ds_fmask = DSC_SPAR;				/* sparing enabled */
+	ds_fmask = DSC_SPEN;				/* sparing enabled */
 	ds_cyl = 0;					/* cylinder 0 */
 	ds_hs = (DSC_GETCHD (ds_cmd) << DSHS_V_HD) |	/* reformat hd/sec */
 	    (DSC_GETCSC (ds_cmd) << DSHS_V_SC);
@@ -607,13 +661,19 @@ case DSC_VFY:						/* verify */
 case DSC_WRITE:						/* write */
 case DSC_WFULL:						/* write full */
 case DSC_INIT:						/* init */
-	ds_sr1 = ds_u;					/* init status */
-	if (ds_u >= DS_NUMDR) {				/* invalid unit? */
-	    ds_sched_ctrl_op (DSC_BADU, ds_u, CLR_BUSY);/* sched, not busy */
-	    return;  }
-	ds_unit[ds_u].FNC = op;				/* save op */
-	ds_unit[ds_u].STA &= ~DS2_ATN;			/* clear ATTN */
-	sim_activate (&ds_unit[ds_u], ds_ctime);	/* schedule unit */
+	ds_sr1 = unum;					/* init status */
+	if (unum >= DS_NUMDR) {				/* invalid unit? */
+	    ds_sched_ctrl_op (DSC_BADU, unum, CLR_BUSY);/* sched, not busy */
+	    return;
+	    }
+	if (op == DSC_INIT) ds_sr1 |=			/* init? */
+	    ((cmd & DSC_SPAR)? DS1_SPAR: 0) |		/* copy SPD to stat1 */
+	    ((cmd & DSC_PROT)? DS1_PROT: 0) |
+	    ((cmd & DSC_DFCT)? DS1_DFCT: 0);
+	ds_unit[unum].FNC = op;				/* save op */
+	ds_unit[unum].STA &= ~DS2_ATN;			/* clear ATN */
+	sim_cancel (&ds_unit[unum]);			/* cancel current */
+	sim_activate (&ds_unit[unum], ds_ctime);	/* schedule unit */
 	ds_busy = 1;					/* set visible busy */
 	break;
 
@@ -621,12 +681,15 @@ case DSC_INIT:						/* init */
 
 case DSC_RSTA:						/* read status */
 	dsxb[1] = ds_sr1;				/* return SR1 */
-	if (ds_u >= DS_NUMDR) dsxb[0] = DS2_ERR|DS2_NR|ds_u;	/* SR2 */
-	else dsxb[0] = ds_updds2 (&ds_unit[ds_u], DS2_FS);
+	if (unum < DS_NUMDR) {				/* and SR2 */
+	    dsxb[0] = ds_updds2 (&ds_unit[unum]);
+	    ds_unit[unum].STA &= ~DS2_FS;		/* clear 1st */
+	    }
+	else dsxb[0] = DS2_ERR|DS2_NR;
 	ds_sched_ctrl_op (DSC_RSTA, 2, SET_BUSY);	/* sched 2 wds, busy */
 	break;
 case DSC_RSA:						/* read sector address */
-	dtyp = GET_DTYPE (ds_unit[ds_u].flags);		/* get unit type */
+	dtyp = GET_DTYPE (ds_unit[unum].flags);		/* get unit type */
 	dsxb[0] = GET_CURSEC (ds_dtime * DS_NUMWD, dtyp);	/* rot position */
 	ds_sched_ctrl_op (DSC_RSTA, 1, SET_BUSY);	/* sched 1 wd, busy */
 	break;
@@ -653,7 +716,8 @@ case DSC_WTIO:						/* write TIO */
 
 case DSC_END:						/* end */
 	ds_set_idle ();					/* idle ctrl */
-	break;  }
+	break;
+	}
 return;
 }
 
@@ -669,9 +733,11 @@ for (i = 0; i < DS_NUMDR; i++) {			/* intr disabled? */
 	if (ds_unit[ds_lastatn].STA & DS2_ATN) {	/* ATN set? */
 	    ds_unit[ds_lastatn].STA &= ~DS2_ATN;	/* clear ATN */
 	    setFLG (dev);				/* request interrupt */
-	    ds_sr1 = DS1_ATTN | ds_lastatn;		/* set up status 1 */
-	    ds_state = DS_WAIT;				/* block attn intrs */
-	    return;  }  }
+	    ds_sr1 = DS1_ATN | ds_lastatn;		/* set up status 1 */
+	    ds_state = DS_WAIT;				/* block atn intrs */
+	    return;
+	    }
+	}
 return;
 }
 
@@ -691,28 +757,31 @@ case DSC_AREC:						/* address record */
 	ds_wait_for_cpu (uptr, DSC_AREC|DSC_2ND);	/* set flag, new state */
 	break;
 case DSC_AREC | DSC_2ND:				/* poll done */
-	if (!FLG (dev)) {				/* OTA x,C? */
+	if (!DS_FIFO_EMPTY) {				/* OTA ds? */
 	    ds_cyl = ds_fifo_read ();			/* save cylinder */
-	    ds_wait_for_cpu (uptr, DSC_AREC|DSC_3RD);  }/* set flag, new state */
+	    ds_wait_for_cpu (uptr, DSC_AREC|DSC_3RD);	/* set flag, new state */
+	    }
 	else sim_activate (uptr, ds_ctime);		/* no, continue poll */
 	break;
 case DSC_AREC | DSC_3RD:				/* poll done */
-	if (!FLG (dev)) {				/* OTA x,C? */
+	if (!DS_FIFO_EMPTY) {				/* OTA ds? */
 	    ds_hs = ds_fifo_read ();			/* save head/sector */
-	    ds_cmd_done (0, DS1_OK);  }			/* op done, no flag */
+	    ds_cmd_done (0, DS1_OK);			/* op done, no flag */
+	    }
 	else sim_activate (uptr, ds_ctime);		/* no, continue poll */
 	break;
 
 case DSC_RSTA:						/* rd stat (all forms) */
-	if (!FLG (dev)) {				/* buffer clear? */
+	if (DS_FIFO_EMPTY) {				/* fifo empty? */
 	    uptr->CYL--;
 	    ds_fifo_write (dsxb[uptr->CYL]);		/* store next status */
 	    ds_wait_for_cpu (uptr, DSC_RSTA |
-		(uptr->CYL? 0: DSC_2ND));  }		/* set flag, new state */
+		(uptr->CYL? 0: DSC_2ND));		/* set flag, new state */
+	    }
 	else sim_activate (uptr, ds_ctime);		/* no, continue poll */
 	break;
 case DSC_RSTA | DSC_2ND:				/* poll done */
-	if (!FLG (dev)) ds_cmd_done (0, DS1_OK);	/* op done? no flag */
+	if (DS_FIFO_EMPTY) ds_cmd_done (0, DS1_OK);	/* op done? no flag */
 	else sim_activate (uptr, ds_ctime);		/* no, continue poll */
 	break;
 
@@ -758,7 +827,7 @@ t_stat ds_svc_t (UNIT *uptr)
 {
 int32 i;
 
-for (i = 0; i < DS_NUMDR; i++)				/* cancel all ops */
+for (i = 0; i < (DS_NUMDR + 1); i++)			/* cancel all ops */
 	sim_cancel (&ds_unit[i]);
 ds_set_idle ();						/* idle the controller */
 ds_fmask = 0;						/* clear file mask */
@@ -783,7 +852,8 @@ switch (op) {						/* case on function */
 case DSC_RECAL:						/* recalibrate */
 	if (uptr->flags & UNIT_ATT) {			/* attached? */
 	    ds_start_seek (uptr, 0, DSC_RECAL|DSC_2ND);	/* set up seek */
-	    ds_set_idle ();  }				/* ctrl is idle */
+	    ds_set_idle ();				/* ctrl is idle */
+	    }
 	else ds_cmd_done (1, DS1_S2ERR);		/* not ready error */
 	break;
 case DSC_RECAL | DSC_2ND:				/* recal complete */
@@ -794,18 +864,21 @@ case DSC_SEEK:						/* seek */
 	ds_wait_for_cpu (uptr, DSC_SEEK|DSC_2ND);	/* set flag, new state */
 	break;
 case DSC_SEEK | DSC_2ND:				/* waiting for word 1 */
-	if (!FLG (dev)) {				/* OTA x,C? */
+	if (!DS_FIFO_EMPTY) {				/* OTA ds? */
 	    ds_cyl = ds_fifo_read ();			/* save cylinder */
-	    ds_wait_for_cpu (uptr, DSC_SEEK|DSC_3RD);  }/* set flag, new state */
+	    ds_wait_for_cpu (uptr, DSC_SEEK|DSC_3RD);	/* set flag, new state */
+	    }
 	else sim_activate (uptr, ds_ctime);		/* no, continue poll */
 	break;
 case DSC_SEEK | DSC_3RD:				/* waiting for word 2 */
-	if (!FLG (dev)) {				/* OTA x,C? */
+	if (!DS_FIFO_EMPTY) {				/* OTA ds? */
 	    ds_hs = ds_fifo_read ();			/* save head/sector */
 	    if (uptr->flags & UNIT_ATT) {		/* attached? */
 		ds_start_seek (uptr, ds_cyl, DSC_SEEK|DSC_4TH); /* set up seek */
-		ds_set_idle ();  }			/* ctrl is idle */
-	     else ds_cmd_done (1, DS1_S2ERR);  }	/* else not ready error */
+		ds_set_idle ();				/* ctrl is idle */
+		}
+	    else ds_cmd_done (1, DS1_S2ERR);		/* else not ready error */
+	    }
 	else sim_activate (uptr, ds_ctime);		/* continue poll */
 	break;
 case DSC_SEEK | DSC_4TH:				/* seek complete */
@@ -818,7 +891,11 @@ case DSC_ROFF:						/* read with offset */
 	ds_wait_for_cpu (uptr, DSC_ROFF|DSC_2ND);	/* set flag, new state */
 	break;
 case DSC_ROFF | DSC_2ND:				/* poll done */
-	if (!FLG (dev)) uptr->FNC = DSC_READ;		/* OTA x,C? new state */
+	if (!DS_FIFO_EMPTY) {				/* OTA ds? new state */
+	    ds_fifo_read ();				/* drain fifo */
+	    uptr->FNC = DSC_READ;
+	    setFLG (dev);				/* handshake */
+	    }
 	sim_activate (uptr, ds_ctime);			/* schedule unit */
 	break;
 
@@ -829,8 +906,7 @@ case DSC_COLD:						/* cold load read */
 	break;
 
 case DSC_READ:						/* read */
-	if (r = ds_start_rd (uptr, 0, 1))		/* new sector; error? */
-	    return r;
+	if (r = ds_start_rd (uptr, 0, 1)) return r;	/* new sector; error? */
 	break;
 case DSC_READ | DSC_2ND:				/* word transfer */
 	ds_cont_rd (uptr, DS_NUMWD);			/* xfr wd, check end */
@@ -840,8 +916,7 @@ case DSC_READ | DSC_3RD:				/* end of sector */
 	break;
 
 case DSC_RNOVFY:					/* read, no verify */
-	if (r = ds_start_rd (uptr, 0, 0))		/* new sector; error? */
-	    return r;
+	if (r = ds_start_rd (uptr, 0, 0)) return r;	/* new sector; error? */
 	break;
 case DSC_RNOVFY | DSC_2ND:				/* word transfer */
 	ds_cont_rd (uptr, DS_NUMWD);			/* xfr wd, check end */
@@ -868,10 +943,11 @@ case DSC_VFY:						/* verify */
 	ds_wait_for_cpu (uptr, DSC_VFY|DSC_2ND);	/* set flag, new state */
 	break;
 case DSC_VFY | DSC_2ND:					/* poll done */
-	if (!FLG (dev)) {				/* OTA x,C? */
+	if (!DS_FIFO_EMPTY) {				/* OTA ds? */
 	    ds_vctr = ds_fifo_read ();			/* save count */
 	    uptr->FNC = DSC_VFY | DSC_3RD;		/* next state */
-	    sim_activate (uptr, ds_rtime);  }		/* delay for transfer */
+	    sim_activate (uptr, ds_rtime);		/* delay for transfer */
+	    }
 	else sim_activate (uptr, ds_ctime);		/* no, continue poll */
 	break;
 case DSC_VFY | DSC_3RD:					/* start sector */
@@ -978,9 +1054,9 @@ sim_activate (&ds_timer, ds_tmo);
 return;
 }
 
-/* Return drive status (status word 2), clear specified flags */
+/* Return drive status (status word 2) */
 
-uint32 ds_updds2 (UNIT *uptr, uint32 clear)
+uint32 ds_updds2 (UNIT *uptr)
 {
 uint32 sta;
 uint32 dtyp = GET_DTYPE (uptr->flags);
@@ -988,10 +1064,10 @@ uint32 dtyp = GET_DTYPE (uptr->flags);
 sta = drv_tab[dtyp].id |				/* form status */
 	uptr->STA |					/* static bits */
 	((uptr->flags & UNIT_WPR)? DS2_RO: 0) |		/* dynamic bits */
-	((uptr->flags & UNIT_ATT)? 0: DS2_NR) |
+	((uptr->flags & UNIT_FMT)? DS2_FRM: 0) |
+	((uptr->flags & UNIT_ATT)? 0: DS2_NR | DS2_BS) |
 	(sim_is_active (uptr)? DS2_BS: 0);
 if (sta & DS2_ALLERR) sta = sta | DS2_ERR;		/* set error */
-uptr->STA = uptr->STA & ~clear;				/* clear static */
 return sta;
 }
 
@@ -1022,16 +1098,23 @@ return;
 void ds_start_seek (UNIT *uptr, uint32 cyl, uint32 newst)
 {
 int32 t;
+uint32 hd, sc;
 uint32 dtyp = GET_DTYPE (uptr->flags);
 
 uptr->FNC = newst;					/* set new state */
 if (cyl >= drv_tab[dtyp].cyl) {				/* out of bounds? */
-	uptr->CYL = t = drv_tab[dtyp].cyl;		/* put off edge */
-	uptr->STA = uptr->STA | DS2_SC;  }		/* set seek check */
-else {							/* seek in range */
-	t = abs (uptr->CYL - cyl);			/* delta cylinders */
+	t = 0;						/* don't change cyl */
+	uptr->STA = uptr->STA | DS2_SC;			/* set seek check */
+	}
+else {	t = abs (uptr->CYL - cyl);			/* delta cylinders */
 	uptr->CYL = cyl;				/* put on cylinder */
-	uptr->STA = uptr->STA & ~DS2_SC;  }		/* clear seek check */
+	hd = DSHS_GETHD (ds_hs);			/* invalid head or sec? */
+	sc = DSHS_GETSC (ds_hs);
+	if ((hd >= drv_tab[dtyp].hd) ||
+	    (sc >= drv_tab[dtyp].sc))
+	    uptr->STA = uptr->STA | DS2_SC;		/* set seek check */
+	else uptr->STA = uptr->STA & ~DS2_SC;		/* clear seek check */
+	}
 sim_activate (uptr, ds_stime * (t + 1));		/* schedule */
 return;
 }
@@ -1048,29 +1131,36 @@ t_bool ds_start_rw (UNIT *uptr, int32 tm, t_bool vfy)
 uint32 da, hd, sc;
 uint32 dtyp = GET_DTYPE (uptr->flags);
 
-ds_eod = 0;						/* clear eod */
+ds_eod = 0;						/* init eod */
+ds_ptr = 0;						/* init buffer ptr */
 if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
 	ds_cmd_done (1, DS1_S2ERR);
-	return TRUE;  }
+	return TRUE;
+	}
 if (ds_eoc) {						/* at end of cylinder? */
 	ds_next_cyl (uptr);				/* auto seek to next */
-	return TRUE;  }					/* or error */	
-if (vfy && ((uint32) uptr->CYL != ds_cyl)) {		/* on proper cylinder? */
-	ds_cmd_done (1, DS1_CYLCE);			/* no, error */
-	return TRUE;  }
+	return TRUE;					/* or error */	
+	}
+if (vfy && ((uint32) uptr->CYL != ds_cyl)) {		/* on wrong cylinder? */
+	if (ds_cyl >= drv_tab[dtyp].cyl)		/* seeking to bad? */
+	    ds_cmd_done (1, DS1_CYLCE);			/* lose */
+	else ds_start_seek (uptr, ds_cyl, uptr->FNC);	/* seek right cyl */
+	return TRUE;
+	}
 hd = DSHS_GETHD (ds_hs);
 sc = DSHS_GETSC (ds_hs);
 if ((uint32) uptr->CYL >= drv_tab[dtyp].cyl) {		/* valid cylinder? */
 	uptr->STA = uptr->STA | DS2_SC;			/* set seek check */
 	ds_cmd_done (1, DS1_S2ERR);			/* error */
-	return TRUE;  }
+	return TRUE;
+	}
 if ((hd >= drv_tab[dtyp].hd) ||				/* valid head, sector? */
 	(sc >= drv_tab[dtyp].sc)) {
 	ds_cmd_done (1, DS1_HSCE);			/* no, error */
-	return TRUE;  }
+	return TRUE;
+	}
 da = GET_DA (uptr->CYL, hd, sc, dtyp);			/* position in file */
 sim_fseek (uptr->fileref, da * sizeof (uint16), SEEK_SET); /* set file pos */
-ds_ptr = 0;						/* init buffer ptr */
 uptr->FNC += DSC_NEXT;					/* next state */
 sim_activate (uptr, tm);				/* activate unit */
 return FALSE;
@@ -1080,7 +1170,8 @@ return FALSE;
 
    - Do common start for read and write
    - If error, return, command has been terminated, nothing scheduled
-   - If no error, state has been advanced and unit scheduled
+   - If implicit seek, return, seek scheduled
+   - If no error or seek, state has been advanced and unit scheduled
    - Read sector
    - If read error, terminate command and return, nothing scheduled
    - If no error, advance head/sector, next state scheduled */
@@ -1089,8 +1180,7 @@ t_stat ds_start_rd (UNIT *uptr, uint32 off, t_bool vfy)
 {
 uint32 t;
 
-if (ds_start_rw (uptr, ds_rtime, vfy))			/* new sector; error? */
-	return SCPE_OK;					/* nothing scheduled */
+if (ds_start_rw (uptr, ds_rtime, vfy)) return SCPE_OK;	/* new sec; err or seek? */
 t = sim_fread (dsxb + off, sizeof (uint16), DS_NUMWD, uptr->fileref);
 for (t = t + off ; t < DS_NUMWDF; t++) dsxb[t] = 0;	/* fill sector */
 if (ferror (uptr->fileref))				/* error? */
@@ -1103,20 +1193,22 @@ return SCPE_OK;
 
    - Do common start for read and write
    - If error, return, command has been terminated, nothing scheduled
-   - If no error, state has been advanced and unit scheduled
+   - If implicit seek, return, seek scheduled
+   - If no error or seek, state has been advanced and unit scheduled
    - Clear buffer
    - Set service request */
 
 void ds_start_wr (UNIT *uptr, t_bool vfy)
 {
-uint32 i, dev;
+uint32 i;
+uint32 dev = ds_dib.devno;
 
-dev = ds_dib.devno;
 if ((uptr->flags & UNIT_WPR) ||				/* write protected? */
     (!vfy && ((uptr->flags & UNIT_FMT) == 0))) {	/* format, not enbl? */
 	ds_cmd_done (1, DS1_S2ERR);			/* error */
-	return;  }
-if (ds_start_rw (uptr, ds_rtime, vfy)) return;		/* new sector; error? */
+	return;
+	}
+if (ds_start_rw (uptr, ds_rtime, vfy)) return;		/* new sec; err or seek? */
 for (i = 0; i < DS_NUMWDF; i++) dsxb[i] = 0;		/* clear buffer */
 setSRQ (dev);						/* request word */
 return;
@@ -1134,7 +1226,8 @@ ds_hs = ds_hs & ~DSHS_SC;				/* yes, wrap sector */
 if (ds_fmask & DSC_CYLM) {				/* cylinder mode? */
 	ds_hs = ds_hs + (1 << DSHS_V_HD);		/* increment head */
 	if (DSHS_GETHD (ds_hs) < drv_tab[dtyp].hd) return; /* end of cyl? */
-	ds_hs = ds_hs & ~DSHS_HD;  }			/* 0 head */
+	ds_hs = ds_hs & ~DSHS_HD;			/* 0 head */
+	}
 ds_eoc = 1;						/* flag end cylinder */
 return;
 }
@@ -1146,13 +1239,12 @@ return;
 
 void ds_next_cyl (UNIT *uptr)
 {
-uint32 dtyp = GET_DTYPE (uptr->flags);
-
 if (ds_fmask & DSC_AUTO) {				/* auto seek allowed? */
 	if (ds_fmask & DSC_DECR) ds_cyl = (ds_cyl - 1) & DMASK;
 	else ds_cyl = (ds_cyl + 1) & DMASK;
 	ds_eoc = 0;					/* clear end cylinder */
-	ds_start_seek (uptr, ds_cyl, uptr->FNC);  }	/* seek, same state */
+	ds_start_seek (uptr, ds_cyl, uptr->FNC);	/* seek, same state */
+	}
 else ds_cmd_done (1, DS1_EOCYL);			/* no, end of cyl err */
 return;
 }
@@ -1167,10 +1259,15 @@ void ds_cont_rd (UNIT *uptr, uint32 bsize)
 uint32 dev = ds_dib.devno;
 
 if (ds_eod) ds_cmd_done (1, DS1_OK);			/* DMA end? done */
+else if (SRQ (dev)) {					/* overrun? */
+	ds_cmd_done (1, DS1_OVRUN);			/* set done */
+	return;
+	}
 else {  ds_fifo_write (dsxb[ds_ptr++]);			/* next word */
 	setSRQ (dev);					/* request service */
 	if (ds_ptr >= bsize) uptr->FNC += DSC_NEXT;	/* sec done? next state */
-	sim_activate (uptr, ds_dtime);  }		/* schedule */
+	sim_activate (uptr, ds_dtime);			/* schedule */
+	}
 return;
 }
 
@@ -1183,18 +1280,26 @@ return;
 
 t_stat ds_cont_wr (UNIT *uptr, uint32 off, uint32 bsize)
 {
+uint32 i, dat;
 uint32 dev = ds_dib.devno;
 
-dsxb[ds_ptr++] = ds_fifo_read ();			/* next word */
+if (SRQ (dev)) {					/* overrun? */
+	ds_cmd_done (1, DS1_OVRUN);			/* set done */
+	return SCPE_OK;
+	}
+dsxb[ds_ptr++] = dat = ds_fifo_read ();			/* next word */
 if (ds_eod || (ds_ptr >= bsize)) {			/* xfr or sector done? */
+	for (i = ds_ptr; i < bsize; i++) dsxb[i] = dat;	/* fill sector */
 	sim_fwrite (dsxb + off, sizeof (uint16), DS_NUMWD, uptr->fileref);
 	if (ferror (uptr->fileref))			/* error on write? */
 	    return ds_set_uncorr (uptr);		/* uncorrectable */
 	ds_next_sec (uptr);				/* increment hd, sc */
 	if (ds_eod) {					/* end data? */
 	    ds_cmd_done (1, DS1_OK);			/* set done */
-	    return SCPE_OK;  }
-	else uptr->FNC += DSC_NEXT;  }			/* no, next state */
+	    return SCPE_OK;
+	    }
+	else uptr->FNC += DSC_NEXT;			/* no, next state */
+	}
 else { setSRQ (dev); }					/* request next word */
 sim_activate (uptr, ds_dtime);				/* schedule */
 return SCPE_OK;
@@ -1278,7 +1383,8 @@ for (i = 0; i < DS_NUMDR; i++) {			/* loop thru drives */
 	sim_cancel (&ds_unit[i]);			/* cancel activity */
 	ds_unit[i].FNC = 0;				/* clear function */
 	ds_unit[i].CYL = 0;
-	ds_unit[i].STA = 0;  }
+	ds_unit[i].STA = 0;
+	}
 sim_cancel (&ds_ctrl);
 sim_cancel (&ds_timer);
 return SCPE_OK;
@@ -1305,14 +1411,16 @@ uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = attach_unit (uptr, cptr);				/* attach unit */
 if (r != SCPE_OK) return r;				/* error? */
 uptr->STA = DS2_ATN | DS2_FS;				/* update drive status */
-ds_sched_attn (uptr);					/* schedule attention */
+ds_sched_atn (uptr);					/* schedule attention */
 if (((uptr->flags & UNIT_AUTO) == 0) ||			/* static size? */
     ((p = sim_fsize (uptr->fileref)) == 0)) return SCPE_OK;	/* new file? */
 for (i = 0; drv_tab[i].sc != 0; i++) {			/* find best fit */
-    if (p <= (drv_tab[i].size * sizeof (uint16))) {
-	uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
-	uptr->capac = drv_tab[i].size;
-	return SCPE_OK;  }  }
+	if (p <= (drv_tab[i].size * sizeof (uint16))) {
+	    uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
+	    uptr->capac = drv_tab[i].size;
+	    return SCPE_OK;
+	    }
+	}
 return SCPE_OK;
 }
 
@@ -1321,20 +1429,21 @@ return SCPE_OK;
 t_stat ds_detach (UNIT *uptr)
 {
 uptr->STA = DS2_ATN;					/* update drive status */
-ds_sched_attn (uptr);					/* schedule attention */
+ds_sched_atn (uptr);					/* schedule attention */
 return detach_unit (uptr);
 }
 
 /* Schedule attention interrupt if CTL set, not restore, and controller idle */
 
-void ds_sched_attn (UNIT *uptr)
+void ds_sched_atn (UNIT *uptr)
 {
 int32 i;
 
 if (!ds_dib.ctl || (sim_switches & SIM_SW_REST)) return;
 for (i = 0; i < (DS_NUMDR + 1); i++) {			/* check units, ctrl */
-	if (sim_is_active (ds_dev.units + i)) return;  }
-uptr->FNC = DSC_ATTN;					/* pseudo operation */
+	if (sim_is_active (ds_dev.units + i)) return;
+	}
+uptr->FNC = DSC_ATN;					/* pseudo operation */
 sim_activate (uptr, 1);					/* do immediately */
 return;
 }
@@ -1424,6 +1533,6 @@ int32 dev;
 if (unitno != 0) return SCPE_NOFNC;			/* only unit 0 */
 dev = ds_dib.devno;					/* get data chan dev */
 if (ibl_copy (ds_rom, dev)) return SCPE_IERR;		/* copy boot to memory */
-SR = (SR & IBL_OPT) | IBL_DS | IBL_MAN | (dev << IBL_V_DEV);	/* set SR */
+SR = (SR & (IBL_OPT | IBL_DS_HEAD)) | IBL_DS | IBL_MAN | (dev << IBL_V_DEV);
 return SCPE_OK;
 }

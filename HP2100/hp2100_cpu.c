@@ -23,10 +23,19 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   CPU		2116A/2100A/21MXE central processing unit
+   CPU		2116A/2100A/21MX-M/21MX-E central processing unit
    MP		12892B memory protect
    DMA0,DMA1	12895A/12897B direct memory access/dual channel port controller
 
+   26-Dec-04	RMS	DMA reset doesn't clear alternate CTL flop (from Dave Bryan)
+			DMA reset shouldn't clear control words (from Dave Bryan)
+			Alternate CTL flop not visible as register (from Dave Bryan)
+			Fixed CBS, SBS, TBS to perform virtual reads
+			Separated A/B from M[0/1] for DMA IO (from Dave Bryan)
+			Fixed bug in JPY (from Dave Bryan)
+   25-Dec-04	JDB	Added SET CPU 21MX-M, 21MX-E (21MX defaults to MX-E)
+			TIMER/EXECUTE/DIAG instructions disabled for 21MX-M
+			T-register reflects changes in M-register when halted
    25-Sep-04	JDB	Moved MP into its own device; added MP option jumpers
 			Modified DMA to allow disabling
 			Modified SET CPU 2100/2116 to truncate memory > 32K
@@ -327,13 +336,14 @@
 #define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = err_PC
 
 #define UNIT_V_2100	(UNIT_V_UF + 0)			/* 2100 */
-#define UNIT_V_21MX	(UNIT_V_UF + 1)			/* 21MX */
+#define UNIT_V_21MX	(UNIT_V_UF + 1)			/* 21MX-E or 21MX-M */
 #define UNIT_V_EAU	(UNIT_V_UF + 2)			/* EAU */
 #define UNIT_V_FP	(UNIT_V_UF + 3)			/* FP */
 #define UNIT_V_DMS	(UNIT_V_UF + 4)			/* DMS */
 #define UNIT_V_IOP	(UNIT_V_UF + 5)			/* 2100 IOP */
 #define UNIT_V_IOPX	(UNIT_V_UF + 6)			/* 21MX IOP */
 #define UNIT_V_MSIZE	(UNIT_V_UF + 7)			/* dummy mask */
+#define UNIT_V_MXM  	(UNIT_V_UF + 8)			/* 21MX is M-series */
 #define UNIT_2116	(0)
 #define UNIT_2100	(1 << UNIT_V_2100)
 #define UNIT_21MX	(1 << UNIT_V_21MX)
@@ -343,6 +353,7 @@
 #define UNIT_IOP	(1 << UNIT_V_IOP)
 #define UNIT_IOPX	(1 << UNIT_V_IOPX)
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+#define UNIT_MXM	(1 << UNIT_V_MXM)
 
 #define UNIT_V_MP_JSB	(UNIT_V_UF + 0)			/* MP jumper W5 out */
 #define UNIT_V_MP_INT	(UNIT_V_UF + 1)			/* MP jumper W6 out */
@@ -365,6 +376,7 @@
 uint16 *M = NULL;					/* memory */
 uint32 saved_AR = 0;					/* A register */
 uint32 saved_BR = 0;					/* B register */
+uint16 ABREG[2];					/* during execution */
 uint32 PC = 0;						/* P register */
 uint32 SR = 0;						/* S register */
 uint32 MR = 0;						/* M register */
@@ -433,11 +445,14 @@ uint16 ReadW (uint32 addr);
 uint16 ReadWA (uint32 addr);
 uint32 ReadF (uint32 addr);
 uint16 ReadIO (uint32 addr, uint32 map);
+uint16 ReadPW (uint32 addr);
+uint16 ReadTAB (uint32 addr);
 void WriteB (uint32 addr, uint32 dat);
 void WriteBA (uint32 addr, uint32 dat);
 void WriteW (uint32 addr, uint32 dat);
 void WriteWA (uint32 addr, uint32 dat);
 void WriteIO (uint32 addr, uint32 dat, uint32 map);
+void WritePW (uint32 addr, uint32 dat);
 t_stat iogrp (uint32 ir, uint32 iotrap);
 uint32 dms (uint32 va, uint32 map, uint32 prot);
 uint32 dms_io (uint32 va, uint32 map);
@@ -460,6 +475,7 @@ t_stat dma1_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_bool dev_conflict (void);
+void hp_post_cmd (t_bool from_scp);
 
 extern uint32 f_as (uint32 op, t_bool sub);
 extern uint32 f_mul (uint32 op);
@@ -467,6 +483,7 @@ extern uint32 f_div (uint32 op);
 extern uint32 f_fix (void);
 extern uint32 f_flt (void);
 extern int32 clk_delay (int32 flg);
+extern void (*sim_vm_post) (t_bool from_scp);
 
 /* CPU data structures
 
@@ -525,12 +542,16 @@ MTAB cpu_mod[] = {
 	{ UNIT_2116+UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
 	  UNIT_2100+UNIT_EAU, NULL, "2100", &cpu_set_opt,
 	  NULL, (void *) UNIT_2100 },
-	{ UNIT_2116+UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
-	  UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_DMS, NULL, "21MX", &cpu_set_opt,
+	{ UNIT_2116+UNIT_2100+UNIT_21MX+UNIT_MXM+UNIT_EAU+UNIT_FP+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
+	  UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_DMS, NULL, "21MX-E", &cpu_set_opt,
+	  NULL, (void *) UNIT_21MX },
+	{ UNIT_2116+UNIT_2100+UNIT_21MX+UNIT_MXM+UNIT_EAU+UNIT_FP+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
+	  UNIT_21MX+UNIT_MXM+UNIT_EAU+UNIT_FP+UNIT_DMS, NULL, "21MX-M", &cpu_set_opt,
 	  NULL, (void *) UNIT_21MX },
 	{ UNIT_2116+UNIT_2100+UNIT_21MX, UNIT_2116, "2116", NULL, NULL },
 	{ UNIT_2116+UNIT_2100+UNIT_21MX, UNIT_2100, "2100", NULL, NULL },
-	{ UNIT_2116+UNIT_2100+UNIT_21MX, UNIT_21MX, "21MX", NULL, NULL },
+	{ UNIT_2116+UNIT_2100+UNIT_21MX+UNIT_MXM, UNIT_21MX, "21MX-E", NULL, NULL },
+	{ UNIT_2116+UNIT_2100+UNIT_21MX+UNIT_MXM, UNIT_21MX+UNIT_MXM, "21MX-M", NULL, NULL },
 	{ UNIT_EAU, UNIT_EAU, "EAU",   "EAU",   &cpu_set_opt,
 	  NULL, (void *) UNIT_EAU },
 	{ UNIT_EAU, 0,        "no EAU", "NOEAU", &cpu_set_opt,
@@ -616,6 +637,7 @@ REG dma0_reg[] = {
 	{ FLDATA (CTL, dev_ctl[DMA0/32], INT_V (DMA0)) },
 	{ FLDATA (FLG, dev_flg[DMA0/32], INT_V (DMA0)) },
 	{ FLDATA (FBF, dev_fbf[DMA0/32], INT_V (DMA0)) },
+	{ FLDATA (CTLALT, dev_ctl[DMALT0/32], INT_V (DMALT0)) },
 	{ ORDATA (CW1, dmac[0].cw1, 16) },
 	{ ORDATA (CW2, dmac[0].cw2, 16) },
 	{ ORDATA (CW3, dmac[0].cw3, 16) },
@@ -635,6 +657,7 @@ REG dma1_reg[] = {
 	{ FLDATA (CTL, dev_ctl[DMA1/32], INT_V (DMA1)) },
 	{ FLDATA (FLG, dev_flg[DMA1/32], INT_V (DMA1)) },
 	{ FLDATA (FBF, dev_fbf[DMA1/32], INT_V (DMA1)) },
+	{ FLDATA (CTLALT, dev_ctl[DMALT1/32], INT_V (DMALT1)) },
 	{ ORDATA (CW1, dmac[1].cw1, 16) },
 	{ ORDATA (CW2, dmac[1].cw2, 16) },
 	{ ORDATA (CW3, dmac[1].cw3, 16) },
@@ -735,7 +758,7 @@ static const uint32 e_inst[512] = {
  X_MR,X_NO,X_MR,X_MR,X_NO,X_MR,X_MR,X_NO,		/* S*X,C*X,L*X,STX,CX*,LDX,ADX,X*X */
  X_MR,X_NO,X_MR,X_MR,X_NO,X_MR,X_MR,X_NO,		/* S*Y,C*Y,L*Y,STY,CY*,LDY,ADY,X*Y */
  X_NO,X_NO,X_MR,X_NO,X_NO,X_AZ,X_AZ,X_NO,		/* ISX,DSX,JLY,LBT,SBT,MBT,CBT,SFB */
- X_NO,X_NO,X_MR,X_AA,X_AA,X_AA,X_AZ,X_AZ };		/* ISY,DSY,JPY,SBS,CBS,TBS,CMW,MVW */
+ X_NO,X_NO,X_NO,X_AA,X_AA,X_AA,X_AZ,X_AZ };		/* ISY,DSY,JPY,SBS,CBS,TBS,CMW,MVW */
 
 /* Interrupt defer table */
 
@@ -1095,16 +1118,31 @@ case 0214:case 0215:case 0216:case 0217:
 	intrq = calc_int ();				/* recalc interrupts */
 	break;						/* end if I/O */
 
-/* Extended arithmetic */
+/* Extended arithmetic
+
+   The 21MX-E adds three "special instructions" that do not exist in earlier
+   CPUs, including the 21MX-M.  They are: TIMER (100060), EXECUTE (100120), and
+   DIAG (100000).  On the 21MX-M, these instruction codes map to the
+   microroutines for MPY, ASL, and RRL, respectively.
+
+   Under simulation, these cause undefined instruction stops if the CPU is set
+   to 2100 or 2116.  They do not cause stops on the 21MX-M, as TIMER in
+   particular is used by several HP programs to differentiate between M- and
+   E-series machines. */
 
 case 0200:						/* EAU group 0 */
 	if ((cpu_unit.flags & UNIT_EAU) == 0) {		/* implemented? */
 	     reason = stop_inst;
 	     break;  }
 	switch ((IR >> 4) & 017) {			/* decode IR<7:4> */
-	case 000:					/* diagnostic */
-	    break;
-	case 001:					/* ASL */
+	case 005:					/* EXECUTE */
+	    if (!(cpu_unit.flags & UNIT_21MX)) {	/* must be 21MX */
+		reason = stop_inst;			/* trap if not */
+		break;  }
+	    else if (!(cpu_unit.flags & UNIT_MXM)) {	/* E-series? */
+		PC = (PC + 1) & VAMASK;			/* not simulated */
+		break;  }
+	case 001:					/* ASL (+ EXECUTE on 21MX-M) */
 	    sc = (IR & 017)? (IR & 017): 16;		/* get sc */
 	    O = 0;					/* clear ovflo */
 	    while (sc-- != 0) {				/* bit by bit */
@@ -1118,17 +1156,27 @@ case 0200:						/* EAU group 0 */
 	    BR = ((BR << sc) | (AR >> (16 - sc))) & DMASK;
 	    AR = (AR << sc) & DMASK;			/* BR'AR lsh left */
 	    break;
-	case 003:					/* TIMER */
-	    BR = (BR + 1) & DMASK;			/* increment B */
-	    if (BR) PC = err_PC;			/* if !=0, repeat */
-	    break;
-	case 004:					/* RRL */
+	case 000:					/* DIAG */
+	    if (!(cpu_unit.flags & UNIT_21MX)) {	/* must be 21MX */
+		reason = stop_inst;			/* trap if not */
+		break;  }
+	    else if (!(cpu_unit.flags & UNIT_MXM))	/* E-series? */
+		break;					/* is NOP unless halted */
+	case 004:					/* RRL (+ DIAG on 21MX-M) */
 	    sc = (IR & 017)? (IR & 017): 16;		/* get sc */
 	    t = BR;					/* BR'AR rot left */
 	    BR = ((BR << sc) | (AR >> (16 - sc))) & DMASK;
 	    AR = ((AR << sc) | (t >> (16 - sc))) & DMASK;
 	    break;
-	case 010:					/* MPY */
+	case 003:					/* TIMER */
+	    if (!(cpu_unit.flags & UNIT_21MX)) {	/* must be 21MX */
+		reason = stop_inst;			/* trap if not */
+		break;  }
+	    else if (!(cpu_unit.flags & UNIT_MXM)) {	/* E-series? */
+		BR = (BR + 1) & DMASK;  		/* increment B */
+		if (BR) PC = err_PC;			/* if !=0, repeat */
+		break;  }
+	case 010:					/* MPY (+ TIMER on 21MX-M) */
 	    if (reason = Ea1 (&MA, intrq)) break;	/* get opnd addr */
 	    sop1 = SEXT (AR);				/* sext AR */
 	    sop2 = SEXT (ReadW (MA));			/* sext mem */
@@ -1844,13 +1892,19 @@ case 0203:case 0213:					/* MAC1 ext */
 /* Bit, word instructions */
 
 	case 0773:					/* SBS (E_AA) */
-	    WriteW (M1, M[M1] | M [MA]);		/* set bit */
+	    v1 = ReadW (MA);
+	    v2 = ReadW (M1);
+	    WriteW (M1, v2 | v1);			/* set bit */
 	    break;
 	case 0774:					/* CBS (E_AA) */
-	    WriteW (M1, M[M1] & ~M[MA]);		/* clear bit */
+	    v1 = ReadW (MA);
+	    v2 = ReadW (M1);
+	    WriteW (M1, v2 & ~v1);			/* clear bit */
 	    break;
 	case 0775:					/* TBS (E_AA) */
-	    if ((M[MA] & M[M1]) != M[MA])		/* test bit */
+	    v1 = ReadW (MA);
+	    v2 = ReadW (M1);
+	    if ((v2 & v1) != v1)			/* test bits */
 	        PC = (PC + 1) & VAMASK;
 	    break;
 	case 0776:					/* CMW (E_AZ) */
@@ -1900,13 +1954,13 @@ if (reason == STOP_INDINT) {				/* indirect intr? */
 
 /* Simulation halted */
 
-if (iotrap && (reason == STOP_HALT)) MR = intaddr;	/* HLT in trap cell? */
-else MR = (PC - 1) & VAMASK;				/* no, M = P - 1 */
-TR = ReadIO (MR, dms_ump);				/* last word fetched */
-if ((reason == STOP_RSRV) || (reason == STOP_IODV) ||	/* instr error? */
-    (reason == STOP_IND)) PC = err_PC;			/* back up PC */
 saved_AR = AR & DMASK;
 saved_BR = BR & DMASK;
+if (iotrap && (reason == STOP_HALT)) MR = intaddr;	/* HLT in trap cell? */
+else MR = (PC - 1) & VAMASK;				/* no, M = P - 1 */
+TR = ReadTAB (MR);					/* last word fetched */
+if ((reason == STOP_RSRV) || (reason == STOP_IODV) ||	/* instr error? */
+    (reason == STOP_IND)) PC = err_PC;			/* back up PC */
 dms_upd_sr ();						/* update dms_sr */
 for (i = 0; dptr = sim_devices[i]; i++) {		/* loop thru dev */
 	dibp = (DIB *) dptr->ctxt;			/* get DIB */
@@ -2096,8 +2150,8 @@ int32 pa;
 
 if (dms_enb) pa = dms (va >> 1, dms_ump, RD);
 else pa = va >> 1;
-if (va & 1) return (M[pa] & 0377);
-else return ((M[pa] >> 8) & 0377);
+if (va & 1) return (ReadPW (pa) & 0377);
+else return ((ReadPW (pa) >> 8) & 0377);
 }
 
 uint8 ReadBA (uint32 va)
@@ -2106,8 +2160,8 @@ uint32 pa;
 
 if (dms_enb) pa = dms (va >> 1, dms_ump ^ MAP_LNT, RD);
 else pa = va >> 1;
-if (va & 1) return (M[pa] & 0377);
-else return ((M[pa] >> 8) & 0377);
+if (va & 1) return (ReadPW (pa) & 0377);
+else return ((ReadPW (pa) >> 8) & 0377);
 }
 
 uint16 ReadW (uint32 va)
@@ -2116,7 +2170,7 @@ uint32 pa;
 
 if (dms_enb) pa = dms (va, dms_ump, RD);
 else pa = va;
-return M[pa];
+return ReadPW (pa);
 }
 
 uint16 ReadWA (uint32 va)
@@ -2125,7 +2179,7 @@ uint32 pa;
 
 if (dms_enb) pa = dms (va, dms_ump ^ MAP_LNT, RD);
 else pa = va;
-return M[pa];
+return ReadPW (pa);
 }
 
 uint32 ReadF (uint32 va)
@@ -2144,6 +2198,19 @@ else pa = va;
 return M[pa];
 }
 
+uint16 ReadPW (uint32 pa)
+{
+if (pa <= 1) return ABREG[pa];
+return M[pa];
+}
+
+uint16 ReadTAB (uint32 addr)
+{
+if (addr == 0) return saved_AR;
+else if (addr == 1) return saved_BR;
+else return ReadIO (addr, dms_ump);
+}
+
 /* Memory protection test for writes
 
    From Dave Bryan: The problem is that memory writes aren't being checked for
@@ -2157,20 +2224,22 @@ return M[pa];
 
 void WriteB (uint32 va, uint32 dat)
 {
-uint32 pa;
+uint32 pa, t;
 
 if (dms_enb) pa = dms (va >> 1, dms_ump, WR);
 else pa = va >> 1;
 if (MP_TEST (va >> 1)) ABORT (ABORT_PRO);
 if (MEM_ADDR_OK (pa)) {
-	if (va & 1) M[pa] = (M[pa] & 0177400) | (dat & 0377);
-	else M[pa] = (M[pa] & 0377) | ((dat & 0377) << 8); }
+	t = ReadPW (pa);
+	if (va & 1) t = (t & 0177400) | (dat & 0377);
+	else t = (t & 0377) | ((dat & 0377) << 8);
+	WritePW (pa, t);  }
 return;
 }
 
 void WriteBA (uint32 va, uint32 dat)
 {
-uint32 pa;
+uint32 pa, t;
 
 if (dms_enb) {
 	dms_viol (va >> 1, MVI_WPR);			/* viol if prot */
@@ -2178,8 +2247,10 @@ if (dms_enb) {
 else pa = va >> 1;
 if (MP_TEST (va >> 1)) ABORT (ABORT_PRO);
 if (MEM_ADDR_OK (pa)) {
-	if (va & 1) M[pa] = (M[pa] & 0177400) | (dat & 0377);
-	else M[pa] = (M[pa] & 0377) | ((dat & 0377) << 8); }
+	t = ReadPW (pa);
+	if (va & 1) t = (t & 0177400) | (dat & 0377);
+	else t = (t & 0377) | ((dat & 0377) << 8);
+	WritePW (pa, t);  }
 return;
 }
 
@@ -2190,7 +2261,7 @@ uint32 pa;
 if (dms_enb) pa = dms (va, dms_ump, WR);
 else pa = va;
 if (MP_TEST (va)) ABORT (ABORT_PRO);
-if (MEM_ADDR_OK (pa)) M[pa] = dat;
+if (MEM_ADDR_OK (pa)) WritePW (pa, dat);
 return;
 }
 
@@ -2203,7 +2274,7 @@ if (dms_enb) {
 	pa = dms (va, dms_ump ^ MAP_LNT, WR);  }
 else pa = va;
 if (MP_TEST (va)) ABORT (ABORT_PRO);
-if (MEM_ADDR_OK (pa)) M[pa] = dat;
+if (MEM_ADDR_OK (pa)) WritePW (pa, dat);
 return;
 }
 
@@ -2213,7 +2284,14 @@ uint32 pa;
 
 if (dms_enb) pa = dms_io (va, map);
 else pa = va;
-if (MEM_ADDR_OK (pa)) M[pa] = dat;
+if (MEM_ADDR_OK (pa)) M[pa] = dat & DMASK;
+return;
+}
+
+void WritePW (uint32 pa, uint32 dat)
+{
+if (pa <= 1) ABREG[pa] = dat & DMASK;
+else M[pa] = dat & DMASK;
 return;
 }
 
@@ -2630,6 +2708,7 @@ if (M == NULL) M = calloc (PASIZE, sizeof (uint16));
 if (M == NULL) return SCPE_MEM;
 if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
+sim_vm_post = &hp_post_cmd;				/* set cmd post proc */
 return SCPE_OK;
 }
 
@@ -2652,7 +2731,9 @@ clrCMD (DMA0);
 clrCTL (DMA0);
 setFLG (DMA0);
 clrSRQ (DMA0);
-dmac[0].cw1 = dmac[0].cw2 = dmac[0].cw3 = 0;
+clrCTL (DMALT0);
+if (sim_switches & SWMASK ('P'))			/* power up? */
+	dmac[0].cw1 = dmac[0].cw2 = dmac[0].cw3 = 0;
 return SCPE_OK;
 }
 
@@ -2663,7 +2744,9 @@ clrCMD (DMA1);
 clrCTL (DMA1);
 setFLG (DMA1);
 clrSRQ (DMA1);
-dmac[1].cw1 = dmac[1].cw2 = dmac[1].cw3 = 0;
+clrCTL (DMALT1);
+if (sim_switches & SWMASK ('P'))			/* power up? */
+	dmac[1].cw1 = dmac[1].cw2 = dmac[1].cw3 = 0;
 return SCPE_OK;
 }
 
@@ -2675,8 +2758,8 @@ int32 d;
 
 addr = dms_cons (addr, sw);
 if (addr >= MEMSIZE) return SCPE_NXM;
-if (addr == 0) d = saved_AR;
-else if (addr == 1) d = saved_BR;
+if (!(sw & SIM_SW_REST) && (addr == 0)) d = saved_AR;
+else if (!(sw & SIM_SW_REST) && (addr == 1)) d = saved_BR;
 else d = M[addr];
 if (vptr != NULL) *vptr = d & DMASK;
 return SCPE_OK;
@@ -2688,8 +2771,8 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
 addr = dms_cons (addr, sw);
 if (addr >= MEMSIZE) return SCPE_NXM;
-if (addr == 0) saved_AR = val & DMASK;
-else if (addr == 1) saved_BR = val & DMASK;
+if (!(sw & SIM_SW_REST) && (addr == 0)) saved_AR = val & DMASK;
+else if (!(sw & SIM_SW_REST) && (addr == 1)) saved_BR = val & DMASK;
 else M[addr] = val & DMASK;
 return SCPE_OK;
 }
@@ -2755,6 +2838,16 @@ void hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp)
 {
 if (ccp->flags & DEV_DIS) dcp->flags = dcp->flags | DEV_DIS;
 else dcp->flags = dcp->flags & ~DEV_DIS;
+return;
+}
+
+/* Command post-processor
+
+   Update T register to contents of memory addressed by M register. */
+
+void hp_post_cmd (t_bool from_scp)
+{
+TR = ReadTAB (MR);					/* sync T with M */
 return;
 }
 

@@ -27,6 +27,8 @@
 		4651 disk subsystem
 		4720 disk subsystem
 
+   01-Dec-04	RMS	Fixed bug in skip on !seeking
+
    The Honeywell disks have the unique characteristic of supporting variable
    formatting, on a per track basis.  To accomodate this, each track is
    simulated as 2048 words, divided into records.  (2048 words accomodates
@@ -433,7 +435,8 @@ case ioSKS:						/* SKS */
 	    u = fnc - 011;
 	case 007:					/* !not seeking 7 */
 	    if (!sim_is_active (&dp_unit[u]) ||		/* quiescent? */
-		(dp_unit[u].FNC & 017) != FNC_SEEK) return IOSKIP (dat);
+		(dp_unit[u].FNC != (FNC_SEEK | FNC_2ND)))
+		return IOSKIP (dat);			/* seeking sets late */
 	    break;  }
 	break;
 case ioEND:						/* end of range */
@@ -816,6 +819,8 @@ for (i = 0; i < DP_NUMDRV; i++) {			/* loop thru drives */
 	sim_cancel (&dp_unit[i]);			/* cancel activity */
 	dp_unit[i].FNC = 0;				/* clear function */
 	dp_unit[i].CYL = 0;  }
+CLR_INT (INT_DP);					/* clear int, enb */
+CLR_ENB (INT_DP);
 return SCPE_OK;
 }
 

@@ -25,6 +25,7 @@
 
    ts		TS11/TSV05 magtape
 
+   07-Dec-04	RMS	Added read-only file support
    30-Sep-04	RMS	Revised Unibus interface
    25-Jan-04	RMS	Revised for device debug support
    19-May-03	RMS	Revised for new conditional compilation scheme
@@ -301,7 +302,7 @@ int32 ts_map_status (t_stat st);
 DIB ts_dib = { IOBA_TS, IOLN_TS, &ts_rd, &ts_wr,
 		1, IVCL (TS), VEC_TS, { NULL } };
 
-UNIT ts_unit = { UDATA (&ts_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) };
+UNIT ts_unit = { UDATA (&ts_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) };
 
 REG ts_reg[] = {
 	{ GRDATA (TSSR, tssr, DEV_RDX, 16, 0) },

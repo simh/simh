@@ -174,6 +174,23 @@ The paper tape reader (PTR) reads data from a disk file.  The POS
 register specifies the number of the next data item to be read.
 Thus, by changing POS, the user can backspace or advance the reader.
 
+The paper tape reader can bet set to operate in binary, ASCII, or
+Unix ASCII mode:
+
+	sim> set ptr binary		-- binary mode
+	sim> set ptr ascii		-- ASCII mode
+	sim> set ptr uascii		-- Unix ASCII mode
+
+The mode can also be set by a switch setting in the attach command:
+
+	sim> att -b ptr <file>		-- binary mode
+	sim> att -a ptr <file>		-- ASCII mode
+	sim> att -u ptr <file>		-- Unix ASCII mode
+
+In ASCII or Unix ASCII mode, all non-zero characters have the high
+order bit forced on.  In Unix ASCII mode, newline is converted to
+CR, and LF in inserted as the following character.
+
 The paper tape reader supports the BOOT command.  BOOT PTR copies the
 absolute binary loader into memory and starts it running.
 
@@ -207,6 +224,23 @@ The paper tape punch (PTP) writes data to a disk file.  The POS
 register specifies the number of the next data item to be written.
 Thus, by changing POS, the user can backspace or advance the punch.
 
+The paper tape punch can bet set to operate in binary, ASCII, or
+Unix ASCII mode:
+
+	sim> set ptp binary		-- binary mode
+	sim> set ptp ascii		-- ASCII mode
+	sim> set ptp uascii		-- Unix ASCII mode
+
+The mode can also be set by a switch setting in the attach command:
+
+	sim> att -b ptp <file>		-- binary mode
+	sim> att -a ptp <file>		-- ASCII mode
+	sim> att -u ptp <file>		-- Unix ASCII mode
+
+In ASCII or Unix ASCII mode, all characters are masked to 7b
+before being written to the output file.  In Unix ASCII mode, LF
+is converted to newline, and CR is discarded.
+
 The paper tape punch implements these registers:
 
 	name		size	comments
@@ -232,15 +266,65 @@ Error handling is as follows:
 
 2.2.3 316/516-33 Console Teletype (TTY)
 
-The Teletype units (TTY0, TTY1) can be set to one of three modes:
+The console Teletype (TTY) consists of four separate units:
+
+	TTY0			keyboard
+	TTY1			printer
+	TTY2			paper tape reader
+	TTY3			paper tape punch
+
+The keyboard and printer (TTY0, TTY1) can be set to one of three modes:
 KSR, 7B, or 8B.  In KSR mode, lower case input and output characters
 are automatically converted to upper case, and the high order bit is
 forced to one on input.  In 7B mode, input and output characters are
 masked to 7 bits.  In 8B mode, characters are not modified.  Changing
-the mode of either unit changes both.  The default mode is KSR.
+the mode of either unit changes both.  The default mode is KSR.  The
+Teletype keyboard reads from the console keyboard, and the printer
+prites to the simulator console window.  
 
-The Teletype reads from the console keyboard and writes to the
-simulator console window.  It implements these registers:
+The paper tape reader (TTY2) can bet set to operate in binary, ASCII, or
+Unix ASCII mode:
+
+	sim> set tty2 binary		-- binary mode
+	sim> set tty2 ascii		-- ASCII mode
+	sim> set tty2 uascii		-- Unix ASCII mode
+
+The mode can also be set by a switch setting in the attach command:
+
+	sim> att -b tty2 <file>		-- binary mode
+	sim> att -a tty2 <file>		-- ASCII mode
+	sim> att -u tty2 <file>		-- Unix ASCII mode
+
+In ASCII or Unix ASCII mode, all non-zero characters have the high
+order bit forced on.  In Unix ASCII mode, newline is converted to
+CR, and LF in inserted as the following character.
+
+The paper tape reader is started by program output of XON or by
+the command SET TTY2 START.  The paper tape reader is stopped by
+reader input of XOFF or by the command SET TTY2 STOP.
+
+The paper tape punch (TTY3) can bet set to operate in binary, ASCII, or
+Unix ASCII mode:
+
+	sim> set tty3 binary		-- binary mode
+	sim> set tty3 ascii		-- ASCII mode
+	sim> set tty3 uascii		-- Unix ASCII mode
+
+The mode can also be set by a switch setting in the attach command:
+
+	sim> att -b tty3 <file>		-- binary mode
+	sim> att -a tty3 <file>		-- ASCII mode
+	sim> att -u tty3 <file>		-- Unix ASCII mode
+
+In ASCII or Unix ASCII mode, all characters are masked to 7b
+before being written to the output file.  In Unix ASCII mode, LF
+is converted to newline, and CR is discarded.
+
+The paper tape punch is started by program output of TAPE or by
+the command SET TTY3 START.  The paper tape punch is stopped by
+program output of XOFF or by the command SET TTY3 STOP.
+
+It implements these registers:
 
 	name		size	comments
 
@@ -249,10 +333,12 @@ simulator console window.  It implements these registers:
 	INTREQ		1	device interrupt request
 	READY		1	device ready
 	ENABLE		1	device interrupts enabled
-	KPOS		32	number of characters input
+	KPOS		32	number of keyboard characters input
 	KTIME		24	keyboard polling interval
-	TPOS		32	number of characters output
+	TPOS		32	number of printer characters output
 	TTIME		24	time from I/O initiation to interrupt
+	RPOS		32	current reader character position
+	PPOS		32	current punch character position
 
 2.2.4 316/516-12 Real Time Clock (CLK)
 

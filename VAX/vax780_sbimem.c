@@ -53,7 +53,6 @@
 #define SBISC_RD	0xFFFF0000			/* SBI silo comp */
 #define SBISC_WR	0x7FFF0000
 #define SBISC_LOCK	0x80000000			/* lock */
-#define SBISC_CNT	0x000F0000			/* count */
 
 #define SBIMT_RD	0xFFFFFF00			/* SBI maint */
 #define SBIMT_WR	0xFFFFF900
@@ -498,8 +497,7 @@ case MT_SBIFS:						/* SBIFS */
 	sbi_fs = sbi_fs & ~(val & SBIFS_W1C);
 	break;
 case MT_SBISC:						/* SBISC */
-	sbi_sc = (sbi_sc & ~SBISC_WR) | (val & SBISC_WR);
-	if ((val & SBISC_CNT) != SBISC_CNT) sbi_sc = sbi_sc & ~SBISC_LOCK;
+	sbi_sc = (sbi_sc & ~(SBISC_LOCK|SBISC_WR)) | (val & SBISC_WR);
 	break;
 case MT_SBIMT:						/* SBIMT */
 	sbi_mt = (sbi_mt & ~SBIMT_WR) | (val & SBIMT_WR);

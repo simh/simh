@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   01-Dec-04	RMS	Added double precision constants
    24-Oct-03	RMS	Added DMA/DMC support
    25-Apr-03	RMS	Revised for extended file support
 */
@@ -55,6 +56,7 @@
 /* Architectural constants */
 
 #define SIGN		0100000				/* sign */
+#define DP_SIGN		010000000000
 #define DMASK		0177777				/* data mask */
 #define MMASK		(DMASK & ~SIGN)			/* magnitude mask */
 #define XR		M[0]

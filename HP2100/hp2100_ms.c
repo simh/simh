@@ -133,7 +133,6 @@
 #define STA_LOCAL	0000001				/* local (d) */
 #define STA_DYN		(STA_PE|STA_SEL|STA_TBSY|STA_WLK|STA_LOCAL)
 
-extern uint16 *M;
 extern uint32 PC, SR;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
 extern int32 sim_switches;
@@ -854,12 +853,13 @@ const uint16 ms_rom[IBL_LNT] = {
 t_stat msc_boot (int32 unitno, DEVICE *dptr)
 {
 int32 dev;
+extern uint32 saved_AR;
 
 if (unitno != 0) return SCPE_NOFNC;			/* only unit 0 */
 dev = msd_dib.devno;					/* get data chan dev */
 if (ibl_copy (ms_rom, dev)) return SCPE_IERR;		/* copy boot to memory */
 SR = (SR & IBL_OPT) | IBL_MS | (dev << IBL_V_DEV);	/* set SR */
-if ((sim_switches & SWMASK ('S')) && AR) SR = SR | 1;	/* skip? */
+if ((sim_switches & SWMASK ('S')) && saved_AR) SR = SR | 1;	/* skip? */
 return SCPE_OK;
 }
 

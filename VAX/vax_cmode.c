@@ -140,7 +140,7 @@ case 000:						/* 00xxxx */
 	case 002:					/* 0002xx */
 	    if (IR < 000210) {				/* RTS */
 		dstspec = dstspec & 07;
-		if (dstspec != 7) {			 /* PC <- r */
+		if (dstspec != 7) {			/* PC <- r */
 		   CMODE_JUMP (RdRegW (dstspec));
 		   }
 		dst = RdMemW (R[6]);			/* t <- (sp)+ */
@@ -157,7 +157,7 @@ case 000:						/* 00xxxx */
 	case 003:					/* SWAB */
 	    if (dstreg) src = RdRegW (dstspec);
 	    else src = RdMemMW (ea = GeteaW (dstspec));
-	    dst = ((src & 0xFF) << 8) | ((src >> 8) & 0xFF);
+	    dst = ((src & BMASK) << 8) | ((src >> 8) & BMASK);
 	    if (dstreg) WrRegW (dst, dstspec);
 	    else WrMemW (dst, ea);
 	    CC_IIZZ_B ((dst & BMASK));
@@ -216,7 +216,7 @@ case 000:						/* 00xxxx */
 		src = RdRegW (srcspec);			/* get src reg */
 		WrMemW (src, (R[6] - 2) & WMASK);	/* -(sp) <- r */
 		R[6] = (R[6] - 2) & WMASK;
-		if (srcspec != 7) R[srcspec] = PC;	/* r <- PC */
+		if (srcspec != 7) WrRegW (PC, srcspec);	/* r <- PC */
 		CMODE_JUMP (dst);			/* PC <- dst */
 		}
 	    break;					/* end JSR */
@@ -562,7 +562,8 @@ case 007:						/* EIS */
 	    break;
 
 	default:
-	    CMODE_FAULT (CMODE_RSVI);  }		/* end switch EIS */
+	    CMODE_FAULT (CMODE_RSVI);			/* end switch EIS */
+	    }
 	break;						/* end case 007 */
 
 /* Opcode 10: branches, traps, SOPs */
@@ -627,7 +628,7 @@ case 010:
 /* Opcode 10, continued: SOPs */
 
 	case 050:					/* CLRB */
-	    if (dstreg) R[dstspec] = R[dstspec] & ~BMASK;
+	    if (dstreg) WrRegB (0, dstspec);
 	    else WrMemB (0, GeteaB (dstspec));
 	    cc = CC_Z;
 	    break;

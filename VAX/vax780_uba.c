@@ -64,7 +64,8 @@
 #define UBA_USEFIE_SR	(UBASR_RDTO|UBASR_RDS|UBASR_CRD|UBASR_CXTER| \
 			 UBASR_CXTO|UBASR_DPPE|UBASR_IVMR|UBASR_MRPF)
 #define UBA_SUEFIE_SR	(UBASR_UBSTO|UBASR_UBTMO)
-#define UBA_CNFIE_CR	(UBACNF_ADPDN|UBACNF_ADPUP|UBACNF_UBINIT|UBACNF_UBPDN|UBACNF_UBIC)
+#define UBA_CNFIE_CR	(UBACNF_ADPDN|UBACNF_ADPUP|UBACNF_UBINIT|\
+			 UBACNF_UBPDN|UBACNF_UBIC)
 
 /* Status register */
 
@@ -128,8 +129,6 @@
 #define UBADPR_UA	0x0000FFFF			/* last UB addr */
 #define UBADPR_RD	0xC0FFFFFF
 #define UBADPR_W1C	0xC0000000
-
-#define UBAMAX_OF	0x020
 
 /* Map registers */
 
@@ -285,7 +284,6 @@ if (ofs >= UBAMAP_OF) {					/* map range */
 	idx = ofs - UBAMAP_OF;
 	*val = uba_map[idx] & UBAMAP_RD;
 	return SCPE_OK;  }
-if (ofs >= UBAMAX_OF) return SCPE_NXM;			/* check range */
 
 switch (ofs) {						/* case on offset */
 
@@ -358,8 +356,8 @@ if (ofs >= UBAMAP_OF) {					/* map? */
 	idx = ofs - UBAMAP_OF;
 	uba_map[idx] = val & UBAMAP_WR;
 	return SCPE_OK;  }
-if (ofs >= UBAMAX_OF) return SCPE_NXM;			/* check range */
-switch (ofs) {					/* case on offset */
+
+switch (ofs) {						/* case on offset */
 
 case UBACNF_OF:						/* CNF */
 	uba_cnf = uba_cnf & ~(val & UBACNF_W1C);	/* W1C bits */

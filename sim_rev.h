@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,13 +29,60 @@
 
 #define	SIM_MAJOR	3
 #define SIM_MINOR	3
-#define SIM_PATCH	0
+#define SIM_PATCH	1
 
 /* V3.3 revision history 
 
 patch	date		module(s) and fix(es)
 
-  0	tbd		scp.c:
+  1	05-Jan-05	h316_cpu.c: fixed bug in DIV
+
+			h316_stddev.c:
+			- fixed bug in SKS '104 (reported by Philipp Hachtmann)
+			- fixed bug in SKS '504
+			- adder reader/punch ASCII file support
+			- added Teletype reader/punch support
+
+			h316_dp.c: fixed bug in skip on !seeking
+
+			h316_mt.c: fixed bug in DMA/DMC support
+
+			h316_lp.c: fixed bug in DMA/DMC support
+
+			hp2100_cpu.c:
+			- fixed DMA reset to clear alternate CTL flop (from Dave Bryan)
+			- fixed DMA reset to not clear control words (from Dave Bryan)
+			- fixed SBS, CBS, TBS to do virtual reads
+			- separated A/B from M[0/1], for DMA IO (from Dave Bryan)
+			- added SET CPU 21MX-M, 21MX-E (from Dave Brian)
+			- disabled TIMER/EXECUTE/DIAG instructions for 21MX-M (from Dave Bryan)
+			- added post-processor to maintain T/M consistency (from Dave Bryan)
+
+			hp2100_ds.c: first release
+
+			hp2100_lps.c (all changes from Dave Bryan)
+			- added restart when set online, etc.
+			- fixed col count for non-printing chars
+
+			hp2100_lpt.c (all changes from Dave Bryan)
+			- added restart when set online, etc.
+
+			hp2100_sys.c (all changes from Dave Bryan):
+			- added STOP_OFFLINE, STOP_PWROFF messages
+
+			i1401_sys.c: added address argument support (from Van Snyder)
+
+			id_mt.c: added read-only file support
+
+			lgp_cpu.c, lgp_sys.c: modified VM pointer setup
+
+			pdp11_cpu.c: fixed WAIT to work in all modes (from John Dundas)
+
+			pdp11_tm.c, pdp11_ts.c: added read-only file support
+
+			sds_mt.c: added read-only file support
+
+  0	23-Nov-04	scp.c:
 			- added reset_all_p (powerup)
 			- fixed comma-separated SET options (from Dave Bryan)
 			- changed ONLINE/OFFLINE to ENABLED/DISABLED (from Dave Bryan)

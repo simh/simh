@@ -1,6 +1,6 @@
                       SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2004-11-02
+                             Last update: 2004-12-29
 
 
 The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
@@ -28,7 +28,7 @@ The results of the diagnostic runs are summarized below:
 101100  Memory Reference Instruction Group       1624  3.2-3  Passed
 101001  Alter-Skip Instruction Group             1431  3.2-3  Passed
 101002  Shift-Rotate Instruction Group           1431  3.2-3  Passed
-102200  Core Memory (2100/16/15/14)              1624    -    No simulation
+102200  Core Memory (2100/16/15/14)              1624  3.3-0  Passed
 102104  Semiconductor Memory (21MX)              1644  3.2-3  Passed
 
 101004  EAU Instruction Group                    1431  3.2-3  Passed
@@ -75,7 +75,7 @@ The results of the diagnostic runs are summarized below:
 
 111104  12732 Flexible Disc Subsystem            1708    -    No simulation
 151302  7900/01 Cartridge Disc                   1805  3.2-3  Partial
-151403  7905/06/20/25 Disc                       1805    -    No simulation
+151403  7905/06/20/25 Disc                       1805  3.3-1  Partial
 104117  92900 Terminal Subsystem                 1814    -    No simulation
 
 112200  9-Track Magnetic Tape (7970, 13181/3)    2040  3.2-3  Partial
@@ -216,6 +216,24 @@ DSN 101002 - Shift-Rotate Instructions
 TESTED DEVICE:  CPU (hp2100_cpu.c)
 
 CONFIGURATION:  sim> deposit S 000000
+                sim> reset
+                sim> go 100
+
+TEST REPORT:    HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+----------------------------------------
+DSN 102200 - Core Memory (2100/16/15/14)
+----------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu.c)
+
+CONFIGURATION:  sim> set CPU 2100
+                sim> set CPU 32K
+                sim> deposit S 000000
                 sim> reset
                 sim> go 100
 
@@ -953,17 +971,381 @@ TEST NOTES:     Steps 4, 7, 8, and 9 test the defective and protected cylinder
 
 
 
--------------------------------
-DSN 151403 - 7905/06/20/25 Disc
--------------------------------
+-----------------------------------------------
+DSN 151403 - 7905/06/20/25 Disc (multiple unit)
+-----------------------------------------------
 
 TESTED DEVICE:  DS (hp2100_ds.c)
 
-CONFIGURATION:
+CONFIGURATION:  sim> set DS0 7905
+                sim> set DS1 7906
+                sim> set DS2 7920
+                sim> set DS3 7925
+                sim> set DS4 7905
+                sim> set DS5 7906
+                sim> set DS6 7920
+                sim> set DS7 7925
+                sim> attach DS0 scratch.U0.7905.disc
+                sim> attach DS1 scratch.U1.7906.disc
+                sim> attach DS2 scratch.U2.7920.disc
+                sim> attach DS3 scratch.U3.7925.disc
+                sim> attach DS4 scratch.U4.7905.disc
+                sim> attach DS5 scratch.U5.7906.disc
+                sim> attach DS6 scratch.U6.7920.disc
+                sim> attach DS7 scratch.U7.7925.disc
+                sim> deposit S 000034
+                sim> reset
+                sim> go 100
 
-TEST REPORT:
+                HALT instruction 102074
 
-TEST RESULT:    Not tested.
+                sim> deposit S 000004
+                sim> reset
+                sim> go
+
+                H0 79XX/13037 DISC MEMORY DIAGNOSTIC
+                H37 UNIT TABLE: 01 DRIVE(S); 0
+                H25 WISH TO CHANGE?
+                YES
+
+                H34 ENTER UNIT NUMBERS(0-7)SEPARATED BY COMMAS
+                0,1,2,3,4,5,6,7
+
+                H37 UNIT TABLE: 08 DRIVE(S); 0 1 2 3 4 5 6 7
+                H25 WISH TO CHANGE?
+                NO
+
+                ENTER:(U)NIT,(?) ERRS,(H)EAD,(O)UTPUT,(P)ATT,(S)OFT,(C)YL,(M)CPU,(E)XIT
+                H
+
+                H62 HEAD TABLE;  UNIT  0  7905A , 02 HEAD(S) 0 1                
+                H62 HEAD TABLE;  UNIT  1  7906A , 02 HEAD(S) 0 1                
+                H62 HEAD TABLE;  UNIT  2  7920A , 05 HEAD(S) 0 1 2 3 4          
+                H62 HEAD TABLE;  UNIT  3  7925A , 09 HEAD(S) 0 1 2 3 4 5 6 7 8  
+                H62 HEAD TABLE;  UNIT  4  7905A , 02 HEAD(S) 0 1                
+                H62 HEAD TABLE;  UNIT  5  7906A , 02 HEAD(S) 0 1                
+                H62 HEAD TABLE;  UNIT  6  7920A , 05 HEAD(S) 0 1 2 3 4          
+                H62 HEAD TABLE;  UNIT  7  7925A , 09 HEAD(S) 0 1 2 3 4 5 6 7 8  
+                H25 WISH TO CHANGE?
+                YES
+
+                H132 TYPE UNITS YOU WISH TO CHANGE SEPERATED BY COMMAS
+                0,1,4,5
+
+                H62 HEAD TABLE;  UNIT  0  7905A , 02 HEAD(S) 0 1                
+                H106 ENTER HEADS SEPARATED BY COMMAS
+                0,1,2
+
+                H62 HEAD TABLE;  UNIT  0  7905A , 03 HEAD(S) 0 1 2              
+                H25 WISH TO CHANGE?
+                NO
+
+                H62 HEAD TABLE;  UNIT  1  7906A , 02 HEAD(S) 0 1                
+                H106 ENTER HEADS SEPARATED BY COMMAS
+                0,1,2,3
+
+                H62 HEAD TABLE;  UNIT  1  7906A , 04 HEAD(S) 0 1 2 3            
+                H25 WISH TO CHANGE?
+                NO
+
+                H62 HEAD TABLE;  UNIT  4  7905A , 02 HEAD(S) 0 1                
+                H106 ENTER HEADS SEPARATED BY COMMAS
+                0,1,2
+
+                H62 HEAD TABLE;  UNIT  4  7905A , 03 HEAD(S) 0 1 2              
+                H25 WISH TO CHANGE?
+                NO
+
+                H62 HEAD TABLE;  UNIT  5  7906A , 02 HEAD(S) 0 1                
+                H106 ENTER HEADS SEPARATED BY COMMAS
+                0,1,2,3
+
+                H62 HEAD TABLE;  UNIT  5  7906A , 04 HEAD(S) 0 1 2 3            
+                H25 WISH TO CHANGE?
+                NO
+
+                ENTER:(U)NIT,(?) ERRS,(H)EAD,(O)UTPUT,(P)ATT,(S)OFT,(C)YL,(M)CPU,(E)XIT
+                E
+
+TEST REPORT:    H121 WARNING-FORMAT SWITCH OFF
+                H65 LONG  PASS 0001,HEAD 012      ,UNIT 0,0000 ERRORS-0000 SOFT
+                H65 LONG  PASS 0002,HEAD 0123     ,UNIT 1,0000 ERRORS-0000 SOFT
+                H65 LONG  PASS 0003,HEAD 01234    ,UNIT 2,0000 ERRORS-0000 SOFT
+                H65 LONG  PASS 0004,HEAD 012345678,UNIT 3,0000 ERRORS-0000 SOFT
+                H65 LONG  PASS 0005,HEAD 012      ,UNIT 4,0000 ERRORS-0000 SOFT
+                H65 LONG  PASS 0006,HEAD 0123     ,UNIT 5,0000 ERRORS-0000 SOFT
+                H65 LONG  PASS 0007,HEAD 01234    ,UNIT 6,0000 ERRORS-0000 SOFT
+                H65 LONG  PASS 0008,HEAD 012345678,UNIT 7,0000 ERRORS-0000 SOFT,MULTI-UNIT
+
+                [CTRL+E]
+                Simulation stopped
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     Eight passes are required to test all head/unit combinations.
+
+
+
+--------------------------------------------------
+DSN 151403 - 7905/06/20/25 Disc (user interaction)
+--------------------------------------------------
+
+TESTED DEVICE:  DS (hp2100_ds.c)
+
+CONFIGURATION:  sim> set DS0 7905
+                sim> attach DS0 scratch.U0.7905.disc
+                sim> deposit S 000034
+                sim> reset
+                sim> go 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000120
+                sim> reset
+                sim> go
+
+                H0 79XX/13037 DISC MEMORY DIAGNOSTIC
+                H37 UNIT TABLE: 01 DRIVE(S); 0
+                H25 WISH TO CHANGE?
+                NO
+
+TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> set DS0 FORMAT
+                sim> go
+
+                H46 READ IN STEP  04
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 0 1 0 00000 XXXX XXXX / 0 000010 0 0 0 1  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                START 0000/00/00-LAST 0000/00/01 WORD COUNT  00128,OLD CYL  0000,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H22 VERIFY IN STEP  04
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 0 1 0 00000 XXXX XXXX / 0 000010 0 0 0 1  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                START 0000/00/00-LAST 0001/00/00 WORD COUNT  00048,OLD CYL  0000,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H67 CLEAR FORMAT SWITCH ON UNIT  0,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> set DS0 NOFORMAT
+                sim> go
+
+                H46 READ IN STEP  07
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 0  0  0  0  0 0
+                    SHOULD BE 0 0 1 10001 XXXX XXXX / 0 000010 0 0 0 0  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "DEFECTIVE TRK "
+                START 0001/00/00-LAST 0001/00/01 WORD COUNT  00128,OLD CYL  0000,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H45 WRITE  IN STEP  08
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 0  0  0  0  0 0
+                    SHOULD BE 0 1 0 10110 XXXX XXXX / 0 000010 0 0 0 0  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "WRT PROTEC TRK"
+                START 0000/00/00-LAST 0000/00/01 WORD COUNT  00128,OLD CYL  0001,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> set DS0 FORMAT
+                sim> go
+
+                H45 WRITE  IN STEP  10
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 0 1 0 00000 XXXX XXXX / 0 000010 0 0 0 1  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                START 0000/00/00-LAST 0000/00/08 WORD COUNT  01024,OLD CYL  0000,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H70 UNLOAD UNIT  0,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> detach DS0
+                sim> go
+
+                H107 READY UNIT  0
+
+                [CTRL+E]
+                Simulation stopped
+
+                sim> attach DS0 scratch.U0.7905.disc
+                sim> go
+
+                H142 PROTECT  U/D,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> set DS0 LOCKED
+                sim> go
+
+                H143 CLEAR  U/D PROTECT,PUSH RUN
+
+                HALT instruction 102002
+
+                sim> set DS0 WRITEENABLED
+                sim> go
+
+                H110 PRESS PRESET(S),PRESS RUN
+
+                HALT instruction 102002
+
+                sim> reset
+                sim> go
+
+                H46 READ IN STEP  38
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 0 0 0 00111 0000 0000 / 0 000010 0 0 0 X  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "CYL CMP ERROR "
+                START 0000/00/01-LAST 0000/00/03 WORD COUNT  00138,OLD CYL  0000,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H46 READ IN STEP  39
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 0 0 0 01001 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "HD/SEC CMP ERR"
+                START 0000/00/01-LAST 0000/00/03 WORD COUNT  00138,OLD CYL  0000,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H46 READ IN STEP  40
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 0 0 0 01001 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "HD/SEC CMP ERR"
+                START 0000/00/01-LAST 0000/00/03 WORD COUNT  00138,OLD CYL  0000,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H46 READ IN STEP  41
+                E47 DATA WORD 0065 IS 075126 SHOULD BE  030400
+                E47 DATA WORD 0066 IS 000762 SHOULD BE  030400
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 0 0 0 01111 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "POSS CORR DATA"
+                START 0000/00/00-LAST 0000/00/03 WORD COUNT  00128,OLD CYL  0000,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H46 READ IN STEP  42
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 0 0 0 01000 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "UNCOR DATA ERR"
+                START 0000/00/00-LAST 0000/00/03 WORD COUNT  00276,OLD CYL  0000,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H22 VERIFY IN STEP  43
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 0 0 1 10001 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "DEFECTIVE TRK "
+                START 0016/00/00-LAST 0017/00/00 WORD COUNT  00048,OLD CYL  0128,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H22 VERIFY IN STEP  43
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 1 0 0 10000 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "SPR TRK ACCESS"
+                START 0128/01/00-LAST 0129/01/00 WORD COUNT  00048,OLD CYL  0016,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H45 WRITE  IN STEP  43
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 1 0 0 00000 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                START 0016/00/33-LAST 0016/00/34 WORD COUNT  00128,OLD CYL  0128,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H46 READ IN STEP  43
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 1 0 0 00000 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                START 0016/00/33-LAST 0016/00/34 WORD COUNT  00128,OLD CYL  0016,UNIT 00
+                  
+                HALT instruction 102001
+
+                sim> go
+
+                H46 READ IN STEP  43
+                H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
+                E64 STATUS IS 0 0 0 00111 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                    SHOULD BE 1 0 0 00000 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
+                H137 TERMINATION STATUS IS "CYL CMP ERROR "  SHOULD BE "NORMAL COMPLET"
+                E13 0000 WORDS TRANSFERRED  0128 EXPECTED
+                START 0016/00/33-LAST 0016/00/33 WORD COUNT  00128,OLD CYL  0016,UNIT 00
+
+                HALT instruction 102001
+
+                sim> go
+
+                H65 SHORT PASS 0001,HEAD 01       ,UNIT 0,0015 ERRORS-0015 SOFT
+
+                [CTRL+E]
+                Simulation stopped
+
+TEST RESULT:    Partially passed.
+
+TEST NOTES:     Steps 4, 8, and 10 test the protected cylinder bit.  Step 7
+                tests the defective cylinder bit.  Steps 38, 39, and 40 test the
+                Write Full Sector command.  Steps 41 and 42 test error
+                correction.  Step 43 tests the spare cylinder bit and track
+                sparing.  These features are not simulated.
 
 
 

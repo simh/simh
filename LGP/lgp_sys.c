@@ -1,6 +1,6 @@
 /* lgp_sys.c: LGP-30 simulator interface
 
-   Copyright (c) 2004, Robert M Supnik
+   Copyright (c) 2004-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   04-Jan-05	RMS	Modified VM pointer setup
 */
 
 #include "lgp_defs.h"
@@ -41,7 +43,6 @@ extern uint32 ts_flag;
 extern int32 sim_switches;
 extern int32 flex_to_ascii[128], ascii_to_flex[128];
 
-void (*sim_vm_init) (void) = &lgp_init;
 extern void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr);
 extern t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr);
 
@@ -221,7 +222,7 @@ else ea = (t_addr) strtotv (cptr, tptr, dptr->aradix);
 return ea;
 }
 
-void lgp_init (void)
+void lgp_vm_init (void)
 {
 sim_vm_fprint_addr = &lgp_fprint_addr;
 sim_vm_parse_addr = &lgp_parse_addr;
@@ -304,7 +305,7 @@ if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) {
 
 if (uptr && (uptr != &cpu_unit)) return SCPE_ARG;	/* must be CPU */
 if (!parse_sym_m (cptr, val, sw)) return SCPE_OK;	/* symbolic parse? */
-if ((sw & SWMASK ('L')) ||				  /* LGP hex? */
+if ((sw & SWMASK ('L')) ||				/* LGP hex? */
     ((cpu_unit.flags & UNIT_LGPH_D) && !(sw & SWMASK ('H')))) {
 	val[0] = 0;
 	while (isspace (*cptr)) cptr++;			/* absorb spaces */

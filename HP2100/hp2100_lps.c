@@ -26,6 +26,8 @@
    lps		12653A 2767 line printer
 		(based on 12566B microcircuit interface)
 
+   19-Nov-04	JDB	Added restart when set online, etc.
+			Fixed col count for non-printing chars
    01-Oct-04	JDB	Added SET OFFLINE/ONLINE, POWEROFF/POWERON
    			Fixed status returns for error conditions
 			Fixed handling of non-printing characters
@@ -164,6 +166,9 @@ DEVICE lps_dev;
 int32 lpsio (int32 inst, int32 IR, int32 dat);
 t_stat lps_svc (UNIT *uptr);
 t_stat lps_reset (DEVICE *dptr);
+t_stat lps_restart (UNIT *uptr, int32 value, char *cptr, void *desc);
+t_stat lps_poweroff (UNIT *uptr, int32 value, char *cptr, void *desc);
+t_stat lps_poweron (UNIT *uptr, int32 value, char *cptr, void *desc);
 t_stat lps_attach (UNIT *uptr, char *cptr);
 t_stat lps_set_timing (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -204,10 +209,10 @@ REG lps_reg[] = {
 MTAB lps_mod[] = {
 	{ UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", NULL },
 	{ UNIT_DIAG, 0, "printer mode", "PRINTER", NULL },
-	{ UNIT_POWEROFF, UNIT_POWEROFF, "power off", "POWEROFF", NULL },
-	{ UNIT_POWEROFF, 0, "power on", "POWERON", NULL },
+	{ UNIT_POWEROFF, UNIT_POWEROFF, "power off", "POWEROFF", lps_poweroff },
+	{ UNIT_POWEROFF, 0, "power on", "POWERON", lps_poweron },
 	{ UNIT_OFFLINE, UNIT_OFFLINE, "offline", "OFFLINE", NULL },
-	{ UNIT_OFFLINE, 0, "online", "ONLINE", NULL },
+	{ UNIT_OFFLINE, 0, "online", "ONLINE", lps_restart },
 	{ MTAB_XTD | MTAB_VDV, 0, NULL, "REALTIME",
 		&lps_set_timing, NULL, NULL },
 	{ MTAB_XTD | MTAB_VDV, 1, NULL, "FASTTIME",
@@ -250,27 +255,13 @@ case ioOTX:						/* output */
 case ioLIX:						/* load */
 	dat = 0;					/* default sta = 0 */
 case ioMIX:						/* merge */
-	if ((lps_unit.flags & UNIT_DIAG) == 0) {	/* real lpt? */
-	    if (lps_power == LPS_ON) {			/* power on? */
-		if (lps_unit.flags & UNIT_POWEROFF) {	/* power just turned off? */
-		    lps_power = LPS_OFF;		/* change state */
-		    lps_sta = LPS_PWROFF;
-		    if (DEBUG_PRS (lps_dev))
-			fputs (">>LPS LIx: Power state is OFF\n", sim_deb);  }
-		else if (((lps_unit.flags & UNIT_ATT) == 0) ||
-			 (lps_unit.flags & UNIT_OFFLINE) ||
-			 sim_is_active (&lps_unit)) lps_sta = LPS_BUSY;
-		else lps_sta = 0;  }
-	    else if (lps_power == LPS_TURNING_ON)	/* printer warming up? */
-		lps_sta = LPS_PWROFF;
-	    else if (!(lps_unit.flags & UNIT_POWEROFF)) {  /* power just turned on? */
-		lps_power = LPS_TURNING_ON;		/* change state */
-		lps_unit.flags |= UNIT_OFFLINE; 	/* set offline */
-		sim_activate (&lps_unit, lps_rtime);	/* schedule printer ready */
-		lps_sta = LPS_PWROFF;
-		if (DEBUG_PRS (lps_dev)) fprintf (sim_deb,
-		    ">>LPS LIx: Power state is TURNING ON, scheduled time = %d\n",
-		    lps_rtime );  } }
+	if ((lps_unit.flags & UNIT_DIAG) == 0)		/* real lpt? */
+	    if (lps_power == LPS_ON)			/* power on? */
+		if (((lps_unit.flags & UNIT_ATT) == 0) ||   /* paper out? */
+		    (lps_unit.flags & UNIT_OFFLINE) ||	    /* offline? */
+		    sim_is_active (&lps_unit)) lps_sta = LPS_BUSY;
+		else lps_sta = 0;
+	    else lps_sta = LPS_PWROFF;
 	dat = dat | lps_sta;				/* diag, rtn status */
 	if (DEBUG_PRS (lps_dev))
 	    fprintf (sim_deb, ">>LPS LIx: Status %06o returned\n", dat);
@@ -291,13 +282,10 @@ case ioCTL:						/* control clear/set */
 		if ((lps_unit.buf != '\f') &&
 		    (lps_unit.buf != '\n') &&
 		    (lps_unit.buf != '\r')) {		/* normal char */
-		    if ((lps_unit.buf < ' ') || (lps_unit.buf > '_'))
-			sched = lps_ctime;		/* non-printing char */
-		    else {				/* printing char */
-			lps_ccnt = lps_ccnt + 1;	/* incr char counter */
-			if (lps_ccnt % LPS_ZONECNT == 0)/* end of zone? */
-			    sched = lps_ptime;		/* print zone */
-			else sched = lps_ctime;  } }	/* xfer char */
+		    lps_ccnt = lps_ccnt + 1;		/* incr char counter */
+		    if (lps_ccnt % LPS_ZONECNT == 0)	/* end of zone? */
+		        sched = lps_ptime;		/* print zone */
+		    else sched = lps_ctime;  }		/* xfer char */
 		else {					/* print cmd */
 		    if (lps_ccnt % LPS_ZONECNT == 0)	/* last zone printed? */
 			sched = lps_ctime;		/* yes, so just char time */
@@ -328,22 +316,29 @@ int32 c = uptr->buf & 0177;
 
 if (lps_power == LPS_TURNING_ON) {			/* printer warmed up? */
 	lps_power = LPS_ON;				/* change state */
+	lps_restart (uptr, 0, NULL, NULL);		/* restart I/O if hung */
 	if (DEBUG_PRS (lps_dev))
 	    fputs (">>LPS svc: Power state is ON\n", sim_deb);
 	return SCPE_OK;  }				/* done */
 dev = lps_dib.devno;					/* get dev no */
-clrCMD (dev);						/* clear cmd */
-setFSR (dev);						/* set flag, fbf */
 if (uptr->flags & UNIT_DIAG) {				/* diagnostic? */
 	lps_sta = uptr->buf;				/* loop back */
+	clrCMD (dev);					/* clear cmd */
+	setFSR (dev);					/* set flag, fbf */
 	return SCPE_OK;  }				/* done */
-if ((uptr->flags & UNIT_ATT) == 0)			/* real lpt, att? */
+if ((uptr->flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (lps_stopioe, SCPE_UNATT);
+else if (uptr->flags & UNIT_OFFLINE)			/* offline? */
+	return IORETURN (lps_stopioe, STOP_OFFLINE);
+else if (uptr->flags & UNIT_POWEROFF)			/* powered off? */
+	return IORETURN (lps_stopioe, STOP_PWROFF);
+clrCMD (dev);						/* clear cmd */
+setFSR (dev);						/* set flag, fbf */
 if (((c < ' ') || (c > '_')) &&				/* non-printing char? */
     (c != '\f') && (c != '\n') && (c != '\r')) {
-	c = ' ';					/* replace with blank */
 	if (DEBUG_PRS (lps_dev))
-	    fprintf (sim_deb, ">>LPS svc: Character %06o erased\n", c);  }
+	    fprintf (sim_deb, ">>LPS svc: Character %06o erased\n", c);
+	c = ' ';  }					/* replace with blank */
 if (lps_ccnt > LPS_PAGECNT) {				/* 81st character? */
 	fputc ('\r', uptr->fileref);			/* return to line start */
 	uptr->pos = uptr->pos + 1;			/* update pos */
@@ -379,11 +374,60 @@ lps_set_timing (NULL, lps_timing, NULL, NULL);		/* init timing set */
 return SCPE_OK;
 }
 
+/* Restart I/O routine
+
+   If I/O is started via STC, and the printer is powered off, offline,
+   or out of paper, the CTL and CMD flip-flops will set, a service event
+   will be scheduled, and the service routine will be entered.  If
+   STOP_IOE is not set, the I/O operation will "hang" at that point
+   until the printer is powered on, set online, or paper is supplied
+   (attached).
+
+   If a pending operation is "hung" when this routine is called, it is
+   restarted, which clears CTL and sets FBF and FLG, completing the
+   original I/O request.
+ */
+
+t_stat lps_restart (UNIT *uptr, int32 value, char *cptr, void *desc)
+{
+if (lps_dib.cmd && lps_dib.ctl && !sim_is_active (uptr))
+	sim_activate (uptr, 0);				/* reschedule I/O */
+return SCPE_OK;
+}
+
+/* Printer power off */
+
+t_stat lps_poweroff (UNIT *uptr, int32 value, char *cptr, void *desc)
+{
+lps_power = LPS_OFF;					/* change state */
+if (DEBUG_PRS (lps_dev)) fputs (">>LPS set: Power state is OFF\n", sim_deb);
+return SCPE_OK;
+}
+
+/* Printer power on */
+
+t_stat lps_poweron (UNIT *uptr, int32 value, char *cptr, void *desc)
+{
+if (lps_unit.flags & UNIT_DIAG) {			/* diag mode? */
+	lps_power = LPS_ON;				/* no delay */
+	if (DEBUG_PRS (lps_dev))
+	    fputs (">>LPS set: Power state is ON\n", sim_deb);  }
+else {
+	lps_power = LPS_TURNING_ON;			/* change state */
+	lps_unit.flags |= UNIT_OFFLINE; 		/* set offline */
+	sim_activate (&lps_unit, lps_rtime);		/* schedule ready */
+	if (DEBUG_PRS (lps_dev)) fprintf (sim_deb,
+	    ">>LPS set: Power state is TURNING ON, scheduled time = %d\n",
+	    lps_rtime );  }
+return SCPE_OK;
+}
+
 /* Attach routine */
 
 t_stat lps_attach (UNIT *uptr, char *cptr)
 {
 lps_ccnt = lps_lcnt = 0;				/* top of form */
+lps_restart (uptr, 0, NULL, NULL);			/* restart I/O if hung */
 return attach_unit (uptr, cptr);
 }
 

@@ -77,7 +77,7 @@
 #define MBASR_NFD	0x00040000			/* nx drive - W1C int */
 #define MBASR_MCPE	0x00020000			/* ctl perr - ni W1C int */
 #define MBASR_ATA	0x00010000			/* attn - W1C int */
-#define MBASR_SPE	0x00004000			/* silo par err - ni W1C int */
+#define MBASR_SPE	0x00004000			/* silo perr - ni W1C int */
 #define MBASR_DTCMP	0x00002000			/* xfr done - W1C int */
 #define MBASR_DTABT	0x00001000			/* abort - W1C int */
 #define MBASR_DLT	0x00000800			/* dat late - ni W1C abt */
@@ -124,8 +124,6 @@
 /* Command register (SBI) - read only */
 
 #define MBACMD_OF	0x7
-
-#define MBAMAX_OF	0x8
 
 /* External registers */
 
@@ -180,7 +178,6 @@ extern void WriteL (uint32 pa, int32 val);
 
 static MBACTX *ctxmap[MBA_NUM] = { &massbus[0], &massbus[1] };
 static DEVICE *devmap[MBA_NUM] = { &mba0_dev, &mba1_dev };
-static DIB *dibmap[MBA_NUM] = { &mba0_dib, &mba1_dib };
 
 /* Massbus register dispatches */
 
@@ -268,7 +265,6 @@ switch (rtype) {					/* case on type */
 
 case MBART_INT:						/* internal */
 	ofs = MBA_INTOFS (pa);				/* check range */
-	if (ofs >= MBAMAX_OF) return SCPE_NXM;
 	switch (ofs) {
 	case MBACNF_OF:					/* CNF */
 	    *val = (mbp->cnf & MBACNF_RD) | MBACNF_CODE;
@@ -337,7 +333,6 @@ switch (rtype) {					/* case on type */
 
 case MBART_INT:						/* internal */
 	ofs = MBA_INTOFS (pa);				/* check range */
-	if (ofs >= MBAMAX_OF) return SCPE_NXM;
 	switch (ofs) {
 	case MBACNF_OF:					/* CNF */
 	    mbp->cnf = mbp->cnf & ~(val & MBACNF_W1C);
@@ -391,7 +386,7 @@ case MBART_EXT:						/* external */
 	r = mbregW[mb] (val, ofs, drv);			/* write dev reg */
 	if (r == MBE_NXD) mba_upd_sr (MBASR_NFD, 0, mb);/* nx drive? */
 	else if (r == MBE_NXR) return SCPE_NXM;		/* nx reg? */
-	if (cs1dt && (r == SCPE_OK))			/* did dt start? */		
+	if (cs1dt && (r == SCPE_OK))			/* did dt start? */	
 	    mbp->sr = (mbp->sr | MBASR_DTBUSY) & ~MBASR_W1C;
 	break; 
 
@@ -498,7 +493,7 @@ for (i = 0; i < bc; i = i + pbc) {			/* loop by pages */
 		}
 	    }
 	}
-return 0;
+return i;
 }
 
 int32 mba_chbufW (uint32 mb, int32 bc, uint16 *buf)
@@ -575,7 +570,7 @@ MBACTX *mbp;
 
 if (mb >= MBA_NUM) return 0;
 mbp = ctxmap[mb];
-return ((0x10000 - (mbp->bc >> MBABC_V_CNT)) & MBABC_WR);
+return (((MBABC_WR + 1) - (mbp->bc >> MBABC_V_CNT)) & MBABC_WR);
 }
 
 void mba_set_int (uint32 mb)
@@ -621,12 +616,14 @@ return;
 t_stat mba_reset (DEVICE *dptr)
 {
 int32 i, mb;
+DIB *dibp;
 MBACTX *mbp;
 
-for (mb = 0; mb < MBA_NUM; mb++) {
-	mbp = ctxmap[mb];
-	if (dptr == devmap[mb]) break;
-	}
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+mb = dibp->ba - TR_MBA0;
+if ((mb < 0) || (mb >= MBA_NUM)) return SCPE_IERR;
+mbp = ctxmap[mb];
 mbp->cnf = 0;
 mbp->cr = mbp->cr & MBACR_MNT;
 mbp->sr = 0;
