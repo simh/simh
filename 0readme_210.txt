@@ -1,37 +1,59 @@
-Notes For V2.10-3
+Notes For V2.10-4
 
-1. New Features in 2.10-3
+1. New Features in 2.10-4
 
 1.1 SCP and Libraries
 
-- Added dynamic extension of the breakpoint table.
-- Added breakpoint actions.
-- Added VMS support for ! (from Mark Pizzolato).
+- Added .ini startup file capability (suggested by Hans Pufal).
+- Added multiple switch evaluation points (suggested by Hans Pufal).
+- Added multiple command per action.
+- Added new library, sim_tape.c, for magtape emulation.
 
-1.2 18b PDP's
+1.2 PDP-11
 
-- Added RB09 fixed head disk for the PDP-9.
-- Added LP09 line printer for the PDP-9 and PDP-15.
-- Added variable size support and autosizing to the RF15/RF09.
+- Added user-defined disk capacity to RQ.
+- Addec choice of controllers to TQ.
+- Added user-defined tape capacity to TQ.
 
-1.3 PDP-8
+1.3 Interdata
 
-- Added variable size support and autosizing to the DF32 and RF08.
+- Added SHOW SELCH n command to display selector channel state.
 
-1.4 Nova
+1.4 Line Frequency Clocks (H316, Interdata, Nova, PDP-8, PDP-11,
+    PDP-18B, SDS)
 
-- Added variable size support and autosizing to the Novadisk.
+- Added SET <device> {50HZ/60HZ}, to set the line frequency.
 
-2. Bugs Fixed in 2.10-3
+1.5 DEC Console Input (PDP-8, PDP-11, PDP-18B, VAX)
 
-- 18b PDP RF15/RF09: fixed IOT decoding and address wraparound
-  logic (found by Hans Pufal).
-- 18b PDP RP15: fixed IOT decoding and command initiation.
-- HP2100 IPL: changed to full duplex (found by Mike Gemeny).
-- HP2100 CPU: fixed last cycle bug in DMA outpout (found by Mike
-  Gemeny).
-- Interdata 16b CPU: fixed bug in SETM, SETMR (found by Mark
-  Pizzolato).
+- Added SET TTI CTRL-C, to generate ^C from SIMH prompt (^C
+  crashes simulators compiled with Windows Visual C++).
+
+1.6 Magtapes
+
+- Revised to use magtape library for consistency.
+
+2. Bugs Fixed in 2.10-4
+
+- SCP: fixed bug in multiword deposits to files
+- Interdata disks: fixed bug in cylinder overflow on writes
+- Interdata tape: fixed bug, read error did not stop selector
+  channel
+- Interdata precision clock: improved autocalibrate algorithm
+  for UNIX V7.
+- Nova fixed head disk: fixed autosize algorithm.
+- PDP-11 RQ and TQ: fixed bugs in queue process and in vector
+  calculation for VAXen.
+- PDP-11 TQ: fixed overly strict implementation of illegal
+  modifiers check.
+- PDP-11 RY: fixed autosize algorithm.
+- PDP-18B CPU: fixed three EAE bugs (found by Hans Pufal).
+- PDP-18B MT: fixed bugs in interrupt handling, BOT error handling.
+- PDP-18B RF: removed extra bit from disk address, fixed autosize
+  algorithm.
+- PDP-18B SYS: fixed bug in FMTASC usage (found by Hans Pufal).
+- PDP-8 MT: fixed bug in BOT error handling.
+- PDP-8 DF, RF, RX: fixed autosize algorithm.
 
 3. New Features in 2.10 vs prior releases
 
@@ -75,6 +97,9 @@ Notes For V2.10-3
   well as listening connections.
 - The RESTORE command will restore saved memory size, if the
   simulator supports dynamic memory resizing.
+- Added dynamic extension of the breakpoint table.
+- Added breakpoint actions.
+- Added VMS support for ! (from Mark Pizzolato).
 
 3.2 VAX
 
@@ -150,6 +175,9 @@ Notes For V2.10-3
 
 - The PDP-4 supports the Type 24 serial drum (based on recently
   discovered documents).
+- Added RB09 fixed head disk for the PDP-9.
+- Added LP09 line printer for the PDP-9 and PDP-15.
+- Added variable size support and autosizing to the RF15/RF09.
 
 3.7 PDP-8
 
@@ -159,13 +187,18 @@ Notes For V2.10-3
   devices allow the device number to be changed with SET <device>
   DEVNO=nnn.
 - Device number conflicts are not detected until simulation starts.
+- Added variable size support and autosizing to the DF32 and RF08.
 
-3.8 AltairZ80
+3.8 Nova
+
+- Added variable size support and autosizing to the Novadisk.
+
+3.9 AltairZ80
 
 - A hard drive has been added for increased storage.
 - Several bugs have been fixed.
 
-3.9 HP 2100
+3.10 HP 2100
 
 - The 12845A has been added and made the default line printer (LPT).
   The 12653A has been renamed LPS and is off by default.  It also
@@ -185,7 +218,7 @@ Notes For V2.10-3
   as the 2100.
 - The HP2100 supports the Access Interprocessor Link (IPL).
 
-3.10 Simulated Magtapes
+3.11 Simulated Magtapes
 
 - Simulated magtapes recognize end of file and the marker
   0xFFFFFFFF as end of medium.  Only the TMSCP tape simulator
@@ -193,11 +226,11 @@ Notes For V2.10-3
 - The error handling in simulated magtapes was overhauled to be
   consistent through all simulators.
 
-3.11 Simulated DECtapes
+3.12 Simulated DECtapes
 
 - Added support for RT11 image file format (256 x 16b) to DECtapes.
 
-3.12 Terminals Multiplexors
+3.13 Terminals Multiplexors
 
 - BREAK detection was added to the HP, DEC, and Interdata terminal
   multiplexors.
@@ -227,6 +260,15 @@ Notes For V2.10-3
   (found by Mark Pizzolato).
 - PDP-11/VAX Ethernet setting flag bits wrong for chained
   descriptors (found by Mark Pizzolato).
+- 18b PDP RF15/RF09: fixed IOT decoding and address wraparound
+  logic (found by Hans Pufal).
+- 18b PDP RP15: fixed IOT decoding and command initiation.
+- HP2100 IPL: changed to full duplex (found by Mike Gemeny).
+- HP2100 CPU: fixed last cycle bug in DMA outpout (found by Mike
+  Gemeny).
+- Interdata 16b CPU: fixed bug in SETM, SETMR (found by Mark
+  Pizzolato).
+
 
 5. General Notes
 

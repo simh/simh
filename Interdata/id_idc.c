@@ -1,6 +1,6 @@
 /* id_idc.c: Interdata MSM/IDC disk controller simulator
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    idc		MSM/IDC disk controller
+
+   16-Feb-03	RMS	Fixed read to test transfer ok before selch operation
 
    Note: define flag ID_IDC to enable the extra functions of the intelligent
    disk controller
@@ -490,8 +492,7 @@ case CMC_RUNC:						/* read uncorr */
 #endif
 case CMC_RD:						/* read */
 	if (sch_actv (idc_dib.sch, idc_dib.dno)) {	/* sch transfer? */
-	    if (idc_dter (uptr, idc_1st)) return SCPE_OK;	/* dte? done */
-							/* fseek done */
+	    if (idc_dter (uptr, idc_1st)) return SCPE_OK; /* dte? done */
 	    if (r = idc_rds (uptr)) return r;		/* read sec, err? */
 	    idc_1st = 0;
 	    t = sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY);	/* write mem */
@@ -504,9 +505,9 @@ case CMC_RD:						/* read */
 
 case CMC_WR:						/* write */
 	if (sch_actv (idc_dib.sch, idc_dib.dno)) {	/* sch transfer? */
+	    if (idc_dter (uptr, idc_1st)) return SCPE_OK; /* dte? done */
 	    idc_bptr = sch_rdmem (idc_dib.sch, idcxb, IDC_NUMBY); /* read mem */
 	    idc_db = idcxb[idc_bptr - 1];		/* last byte */
-	    if (idc_dter (uptr, idc_1st)) return SCPE_OK;	/* dte? done */
 	    if (r = idc_wds (uptr)) return r;		/* write sec, err? */
 	    idc_1st = 0;
 	    if (sch_actv (idc_dib.sch, idc_dib.dno)) {	/* more to do? */	

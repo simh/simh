@@ -23,7 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ttp			console (on PAS)
+   ttp		console (on PAS)
 */
 
 #include "id_defs.h"
@@ -76,8 +76,8 @@ extern int32 pas_par (int32 cmd, int32 c);
 DIB ttp_dib = { d_TTP, -1, v_TTP, ttp_tplte, &ttp, NULL };
 
 UNIT ttp_unit[] = {
-	{ UDATA (&ttpi_svc, UNIT_UC, 0), KBD_POLL_WAIT },
-	{ UDATA (&ttpo_svc, UNIT_UC, 0), SERIAL_OUT_WAIT }
+	{ UDATA (&ttpi_svc, 0, 0), KBD_POLL_WAIT },
+	{ UDATA (&ttpo_svc, 0, 0), SERIAL_OUT_WAIT }
 };
 
 REG ttp_reg[] = {

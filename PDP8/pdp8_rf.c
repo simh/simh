@@ -25,6 +25,7 @@
 
    rf		RF08 fixed head disk
 
+   03-Mar-03	RMS	Fixed autosizing
    02-Feb-03	RMS	Added variable platter and autosizing support
    04-Oct-02	RMS	Added DIB, device number support
    28-Nov-01	RMS	Added RL8A support
@@ -48,9 +49,11 @@
 #include <math.h>
 
 #define UNIT_V_AUTO	(UNIT_V_UF + 0)			/* autosize */
-#define UNIT_V_MSIZE	(UNIT_V_UF + 1)			/* dummy mask */
+#define UNIT_V_PLAT	(UNIT_V_UF + 1)			/* #platters - 1 */
+#define UNIT_M_PLAT	03
+#define UNIT_GETP(x)	((((x) >> UNIT_V_PLAT) & UNIT_M_PLAT) + 1)
 #define UNIT_AUTO	(1 << UNIT_V_AUTO)
-#define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+#define UNIT_PLAT	(UNIT_M_PLAT << UNIT_V_PLAT)
 
 /* Constants */
 
@@ -130,7 +133,7 @@ DIB rf_dib = { DEV_RF, 5, { &rf60, &rf61, &rf62, NULL, &rf64 } };
 
 UNIT rf_unit =
 	{ UDATA (&rf_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-	RF_NUMDK * RF_DKSIZE) };
+	  RF_DKSIZE) };
 
 UNIT pcell_unit = { UDATA (&pcell_svc, 0, 0) };
 
@@ -149,10 +152,10 @@ REG rf_reg[] = {
 	{ NULL }  };
 
 MTAB rf_mod[] = {
-	{ UNIT_MSIZE,  262144, NULL, "1P", &rf_set_size },
-	{ UNIT_MSIZE,  524288, NULL, "2P", &rf_set_size },
-	{ UNIT_MSIZE,  786432, NULL, "3P", &rf_set_size },
-	{ UNIT_MSIZE, 1048576, NULL, "4P", &rf_set_size },
+	{ UNIT_PLAT, 0, NULL, "1P", &rf_set_size },
+	{ UNIT_PLAT, 1, NULL, "2P", &rf_set_size },
+	{ UNIT_PLAT, 2, NULL, "3P", &rf_set_size },
+	{ UNIT_PLAT, 3, NULL, "4P", &rf_set_size },
 	{ UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&set_dev, &show_dev, NULL },
@@ -370,19 +373,15 @@ return SCPE_OK;
 
 t_stat rf_attach (UNIT *uptr, char *cptr)
 {
-int32 p, d;
-int32 ds_bytes = RF_DKSIZE * sizeof (int16);
+t_addr sz, p;
+t_addr ds_bytes = RF_DKSIZE * sizeof (int16);
 
-if (uptr->flags & UNIT_AUTO) {
-	FILE *fp = fopen (cptr, "rb");
-	if (fp == NULL) return SCPE_OPENERR;
-	fseek (fp, 0, SEEK_END);
-	p = ftell (fp);
-	d = (p + ds_bytes - 1) / ds_bytes;
-	if (d == 0) d = 1;
-	if (d > RF_NUMDK) d = RF_NUMDK;
-	uptr->capac = d * RF_DKSIZE;
-	fclose (fp);  }
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
+	p = (sz + ds_bytes - 1) / ds_bytes;
+	if (p == 0) p = 1;
+	if (p > RF_NUMDK) p = RF_NUMDK;  }
+else p = UNIT_GETP (uptr->flags);
+uptr->capac = p * RF_DKSIZE;
 return attach_unit (uptr, cptr);
 }
 
@@ -390,10 +389,9 @@ return attach_unit (uptr, cptr);
 
 t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if ((val == 0) || (val > (RF_NUMDK * RF_DKSIZE)))
-	return SCPE_IERR;
+if ((val < 0) || (val >= RF_NUMDK)) return SCPE_IERR;
 if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-uptr->capac = val;
+uptr->capac = (val + 1) * RF_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
 }

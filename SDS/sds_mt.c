@@ -1,6 +1,6 @@
 /* sds_mt.c: SDS 940 magnetic tape simulator
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-	mt		7 track magnetic tape
+   mt		7 track magnetic tape
+
+   28-Feb-03	RMS	Revised for magtape library
 
    Magnetic tapes are represented as a series of variable 8b records
    of the form:
@@ -42,16 +44,13 @@
 */
 
 #include "sds_defs.h"
+#include "sim_tape.h"
+
 #define MT_MAXFR	(32768 * 4)
 #define MT_NUMDR	8				/* number drives */
 #define MT_UNIT		07
-#define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
-#define UNIT_WLK	(1 << UNIT_V_WLK)
 #define botf		u3				/* bot tape flag */
 #define eotf		u4				/* eot tape flag */
-#define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
-
-#define MTR_BOT		0xFFFFFFFE			/* BOT pseudo mark */
 
 extern uint32 xfr_req;
 extern int32 stop_invins, stop_invdev, stop_inviop;
@@ -141,8 +140,8 @@ REG mt_reg[] = {
 	{ NULL }  };
 
 MTAB mt_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
+	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
+	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
 	{ MTAB_XTD|MTAB_VDV, 0, "CHANNEL", "CHANNEL",
 		&set_chan, &show_chan, NULL },
 	{ 0 }  };
@@ -199,7 +198,8 @@ case IO_EOM1:						/* EOM mode 1 */
     if (new_ch != mt_dib.chan) CRETIOP;			/* wrong chan? */
     t = inst & 07670;					/* get command */
     if ((t == 04010) && !sim_is_active (uptr)) {	/* rewind? */
-	uptr->pos = uptr->eotf = 0;			/* clr pos, eot */
+	sim_tape_rewind (uptr);				/* rewind unit */
+	uptr->eotf = 0;					/* clr eot */
 	uptr->botf = 1;  }				/* set bot */
     else if ((t == 03610) && sim_is_active (uptr) &&	/* skip rec? */
 	((mt_inst & DEV_OUT) == 0)) mt_skip = 1;	/* set flag */
@@ -245,7 +245,7 @@ case IO_SKS:						/* SKS */
 	    if (!mt_eof) *dat = 1;			/* not EOF */
 	    break;
 	case 020:					/* sks 1401n */
-	    if (!(uptr->flags & UNIT_WPRT)) *dat = 1;	/* not wrp */
+	    if (!sim_tape_wrp (uptr)) *dat = 1;		/* not wrp */
 	    break;
 	case 031:					/* sks 1621n */
 	case 033:					/* sks 1661n */
@@ -301,60 +301,28 @@ return SCPE_OK;
 
 t_stat mt_readrec (UNIT *uptr)
 {
-t_mtrlnt abc, tbc;
+t_mtrlnt tbc;
+t_stat st, r = SCPE_OK;
 
 if ((uptr->flags & UNIT_ATT) == 0) {			/* attached? */
     mt_set_err (uptr);					/* no, err, disc */
     return SCPE_UNATT;  }
-tbc = mt_readbc (uptr);					/* get bc */
-if (tbc == MTR_EOM) {					/* end of med? */
-    uptr->eotf = 1;					/* end of tape */
-    mt_set_err (uptr);					/* err, disc */
-    return SCPE_OK;  }
-if (tbc == MTR_BOT) {					/* BOT? */
-    mt_set_err (uptr);					/* err, disc */
-    return SCPE_OK;  }
-if (tbc == MTR_TMK) {					/* tape mark? */
+if (mt_inst & CHC_REV)					/* reverse? */
+    st = sim_tape_rdrecr (uptr, mtxb, &tbc, MT_MAXFR);	/* read rec rev */
+else st = sim_tape_rdrecf (uptr, mtxb, &tbc, MT_MAXFR);	/* no, fwd */
+if (st == MTSE_TMK) {					/* tape mark? */
     mt_eof = 1;						/* set eof flag */
     mtxb[0] = mtxb[1] = 017;				/* EOR char */
     mt_blnt = 2;					/* store 2 */
-    uptr->pos += sizeof (t_mtrlnt);			/* update position */
+    return SCPE_OK;  }
+if (st != MTSE_OK) {					/* other error? */
+    mt_set_err (uptr);					/* err, disc */
+    if (st == MTSE_IOERR) return SCPE_IOERR;		/* IO error? */
+    if (st == MTSE_INVRL) return SCPE_MTRLNT;		/* inv rec lnt? */
+    if (st == MTSE_EOM) uptr->eotf = 1;			/* eom? set eot */
     return SCPE_OK;  }
 mt_blnt = tbc;						/* set buf lnt */
-if (tbc > MT_MAXFR) return SCPE_MTRLNT;			/* record too long? */
-if (mt_inst & CHC_REV) {				/* reverse? */
-    fseek (uptr->fileref, uptr->pos - ((tbc + 1) & ~1) - sizeof (t_mtrlnt), SEEK_SET);
-    mt_bptr = mt_blnt;  }
-abc = fxread (mtxb, sizeof (uint8), tbc, uptr->fileref);/* read record */
-for (; abc < tbc; abc++) mtxb[abc] = 0;			/* zero fill */
-if (ferror (uptr->fileref)) {				/* I/O error */
-    mt_set_err (uptr);					/* no, err, disc */
-    perror ("MT I/O error");
-    clearerr (uptr->fileref);
-    return SCPE_IOERR;  }
-if (mt_inst & CHC_REV)					/* update pos */
-    uptr->pos -= (((tbc + 1) & ~1) + (2 * sizeof (t_mtrlnt)));
-else uptr->pos += (((tbc + 1) & ~1) + (2 * sizeof (t_mtrlnt)));		
 return SCPE_OK;
-}
-
-/* Read record byte count */
-
-t_mtrlnt mt_readbc (UNIT *uptr)
-{
-t_mtrlnt tbc;
-
-if (mt_inst & CHC_REV) {
-    if (uptr->pos < sizeof (t_mtrlnt)) {
-	uptr->botf = 1;
-	return MTR_BOT;  }
-    fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET);  }
-else fseek (uptr->fileref, uptr->pos, SEEK_SET);
-fxread (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
-if (ferror (uptr->fileref) || feof (uptr->fileref) ||	/* err, eof, eom? */
-   (tbc == MTR_EOM)) return MTR_EOM;			/* return EOM */
-if (MTRF (tbc)) chan_set_flag (mt_dib.chan, CHF_ERR);	/* rec err? set flag */
-return MTRL (tbc);
 }
 
 /* Read done (eof, end of record) */
@@ -375,51 +343,32 @@ return;
 
 t_stat mt_wrend (uint32 dev)
 {
-static t_mtrlnt bceom = MTR_EOM;
-static t_mtrlnt bceof = MTR_TMK;
 UNIT *uptr = mt_dev.units + (dev & MT_UNIT);
-t_addr old_pos = uptr->pos;
 t_mtrlnt tbc;
+t_stat st;
 
 sim_cancel (uptr);					/* no more xfr's */
 if (mt_bptr == 0) return SCPE_OK;			/* buf empty? */
 if (!(uptr->flags & UNIT_ATT)) {			/* attached? */
     mt_set_err (uptr);					/* no, err, disc */
     return SCPE_UNATT;  }
-if (uptr->flags & UNIT_WPRT) {				/* write lock? */
+if (sim_tape_wrp (uptr)) {				/* write lock? */
     mt_set_err (uptr);					/* yes, err, disc */
     return SCPE_OK;  }
 if (dev & DEV_MTS) {					/* erase? */
-    if (mt_inst & CHC_REV) {				/* reverse? */
-	tbc = mt_readbc (uptr);				/* get bc */
-	if ((tbc == MTR_TMK) || (tbc == MTR_EOM))	/* tmk, eom? */
-	    fseek (uptr->fileref, uptr->pos -= sizeof (t_mtrlnt), SEEK_SET);
-	else if (tbc != MTR_BOT) {			/* not BOT? */
-	    tbc = MTRL (tbc);				/* clear error */
-	    fseek (uptr->fileref, uptr->pos -= 
-		(((tbc + 1) & ~1) - sizeof (t_mtrlnt)), SEEK_SET);  }  }
-    fxwrite (&bceom, sizeof (t_mtrlnt), 1, uptr->fileref);
-	}
+    if (mt_inst & CHC_REV)				/* reverse? */
+	sim_tape_sprecr (uptr, &tbc);			/* backspace */
+    st = sim_tape_wreom (uptr);				/* write eom */
+    }
 else {
-    fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* set position */
     if ((mt_bptr == 1) && (mtxb[0] == 017) &&		/* wr eof? */
-	 ((mt_inst & 01670) == 00050)) {
-	fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr->fileref);
-	uptr->pos += sizeof (t_mtrlnt);  }
-    else {						/* normal wr */
-	fxwrite (&mt_bptr, sizeof (t_mtrlnt), 1, uptr->fileref);
-	fxwrite (mtxb, sizeof (uint8), (mt_bptr + 1) & ~1, uptr->fileref);
-	fxwrite (&mt_bptr, sizeof (t_mtrlnt), 1, uptr->fileref);
-	uptr->pos += ((mt_bptr + 1) & ~1) + (2 * sizeof (t_mtrlnt));
-	}
+	 ((mt_inst & 01670) == 00050))
+	st = sim_tape_wrtmk (uptr);			/* write tape mark */
+    else st = sim_tape_wrrecf (uptr, mtxb, mt_bptr);	/* write record */
     }
 mt_bptr = 0;
-if (ferror (uptr->fileref)) {				/* I/O error */
-    uptr->pos = old_pos;				/* restore pos */
-    mt_set_err (uptr);					/* no, err, disc */
-    perror ("MT I/O error");
-    clearerr (uptr->fileref);
-    return SCPE_IOERR;  }
+if (st != MTSE_OK) mt_set_err (uptr);			/* error? */
+if (st == MTSE_IOERR) return SCPE_IOERR;
 return SCPE_OK;
 }
 
@@ -449,6 +398,7 @@ mt_bptr = mt_blnt = 0;
 xfr_req = xfr_req & ~XFR_MT0;				/* clr xfr flag */
 for (i = 0; i < MT_NUMDR; i++) {			/* deactivate */
     sim_cancel (&mt_unit[i]);
+    sim_tape_reset (&mt_unit[i]);
     mt_unit[i].eotf = 0;  }
 return SCPE_OK;
 }
@@ -459,7 +409,7 @@ t_stat mt_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
 
-r = attach_unit (uptr, cptr);
+r = sim_tape_attach (uptr, cptr);
 if (r != SCPE_OK) return r;
 uptr->botf = 1;
 uptr->eotf = 0;
@@ -469,7 +419,7 @@ return SCPE_OK;
 t_stat mt_detach (UNIT *uptr)
 {
 uptr->botf = uptr->eotf = 0;
-return detach_unit (uptr);
+return sim_tape_detach (uptr);
 }
 
 /* Boot routine - simulate FILL console command */

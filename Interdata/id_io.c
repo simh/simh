@@ -35,8 +35,7 @@
    Interdata I/O uses the following interconnected tables:
 
 	dev_tab[dev]	Indexed by device number, points to the I/O instruction
-			processing routine for the device.  Initialized in the
-			device reset routine.
+			processing routine for the device.
 
 	sch_tab[dev]	Indexed by device number, if non-zero, the number + 1
 			of the selector channel used by the device.
@@ -81,7 +80,8 @@ uint8 sch_tplte[SCH_NUMCH + 1];				/* dnum template */
 uint32 sch (uint32 dev, uint32 op, uint32 dat);
 void sch_ini (t_bool dtpl);
 t_stat sch_reset (DEVICE *dptr);
-t_stat sch_vchan (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat sch_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat sch_show_reg (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* Selector channel data structures
 
@@ -110,7 +110,15 @@ REG sch_reg[] = {
 
 MTAB sch_mod[] = {
 	{ MTAB_XTD|MTAB_VDV|MTAB_VAL, 0, "channels", "CHANNELS",
-		&sch_vchan, NULL, &sch_reg[0] },
+		&sch_set_nchan, NULL, &sch_reg[0] },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "0", NULL,
+		NULL, &sch_show_reg, NULL },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "1", NULL,
+		NULL, &sch_show_reg, NULL },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 2, "2", NULL,
+		NULL, &sch_show_reg, NULL },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 3, "3", NULL,
+		NULL, &sch_show_reg, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&set_dev, &show_dev, &sch_dib },
 	{ 0 }  };
@@ -298,7 +306,7 @@ return SCPE_OK;
 
 /* Set number of channels */
 
-t_stat sch_vchan (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sch_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 DEVICE *dptr;
 DIB *dibp;
@@ -320,6 +328,21 @@ if (newmax < sch_max) {					/* reducing? */
 		return SCPE_OK;  }  }  }
 sch_max = newmax;					/* set new max */
 sch_reset_ch (sch_max);					/* reset chan */
+return SCPE_OK;
+}
+
+/* Show channel registers */
+
+t_stat sch_show_reg (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if (val < 0) return SCPE_IERR;
+if (val >= (int32) sch_max) fprintf (st, "Channel %d disabled\n", val);
+else {	fprintf (st, "SA:	%05X\n", sch_sa[val]);
+	fprintf (st, "EA:	%05X\n", sch_ea[val]);
+	fprintf (st, "CMD:	%02X\n", sch_cmd[val]);
+	fprintf (st, "DEV:	%02X\n", sch_sdv[val]);
+	fprintf (st, "RDP:	%X\n", sch_rdp[val]);
+	fprintf (st, "WDC:	%X\n", sch_wdc[val]);  }
 return SCPE_OK;
 }
 

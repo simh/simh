@@ -209,8 +209,9 @@ int32 sim_check_conn (SOCKET sock, t_bool rd)
 fd_set rw_set, er_set;
 fd_set *rw_p = &rw_set;
 fd_set *er_p = &er_set;
-struct timeval tz = { 0, 0};
+struct timeval tz;
 
+timerclear (&tz);
 FD_ZERO (rw_p);
 FD_ZERO (er_p);
 FD_SET (sock, rw_p);

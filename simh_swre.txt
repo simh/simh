@@ -164,7 +164,7 @@ sockets library.
 
 UNIX was first developed on the PDP-7; its first widespread usage was on
 the PDP-11.  UNIX provides a program development and execution environment
-for assembler and C programs.  UNIX V5, V7, V7 for the PDP-11 is provided
+for assembler and C programs.  UNIX V5, V6, V7 for the PDP-11 is provided
 under license, as is, without fee, by Caldera Corportion, for non-commercial
 use only.  Please read the enclosed license agreement for full terms and
 conditions.  This license must be reproduced with any copy of the UNIX V5,
@@ -645,5 +645,49 @@ TOPS-10 was the primary time-shared operating system for the PDP-10.
 TOPS-20 was a popular alternative derived from the BBN TENEX system.
 Installation and distribution tapes for TOPS-10 7.03, TOPS-10 7.04,
 and TOPS-20 4.1 are available at http://pdp-10.trailing-edge.com.
+
+10. Interdata 32b Systems
+
+10.1 Interdata 7/32 UNIX
+
+Interdata UNIX V6 was the first port of UNIX from its native environment
+on the PDP-11.  The port was done by Richard Miller and his colleagues
+at the University of Wollongong, Australia, in 1976-77.  UNIX V6 and V7
+for the Interdata 7/32 is provided under license, as is, without fee, by
+Caldera Corportion, for non-commercial use only.  Please read the enclosed
+license agreement for full terms and conditions.  This license must be
+reproduced with any copy of the UNIX V6 and V7 disk images.  My thanks to
+Richard Miller, without whose guidance, knowledge, and patience the
+recreation of Interdata UNIX would not have been possible, and to Caldera,
+which provided the license.
+
+10.1.1 UNIX V6
+
+UNIX V6 is contained on a single 10MB disk image.  To boot UNIX V6:
+
+	sim> set ttp ena
+	sim> set pas dev=12
+	sim> set mt dev=85
+	sim> att -e dp0 iu6_dp0.dsk
+	sim> boot dp0
+	?unix
+	login: root
+	# ls -l
+
+10.1.2 UNIX V7
+
+UNIX V7 is contained on two 10MB disk images.  To boot UNIX V7:
+
+	sim> set ttp ena
+	sim> set pas dev=12
+	sim> set mt dev=85
+	sim> att -e dp0 iu6_dp0.dsk
+	sim> att -e dp1 iu6_dp1.dsk
+	sim> boot dp0
+	Boot
+	: dsk(1,0)unix
+	#
+
+Type ^D to enable multiuser mode.  The root password is root.
 
 [end simh_swre.txt]

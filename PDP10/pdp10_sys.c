@@ -297,7 +297,6 @@ t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 d10 data;
 int32 wc, fmt;
 extern int32 sim_switches;
-extern t_bool match_ext (char *fnam, char *ext);
 
 fmt = 0;						/* no fmt */
 if (sim_switches & SWMASK ('R')) fmt = FMT_R;		/* -r? */

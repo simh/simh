@@ -1,6 +1,6 @@
 /* id32_cpu.c: Interdata 32b CPU simulator
 
-   Copyright (c) 2000-2002, Robert M. Supnik
+   Copyright (c) 2000-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -740,7 +740,7 @@ case 0x63:						/* LRA - RX */
 	break;
 
 case 0x40:						/* STH - RX */
-	WriteH (ea, R[r1] & DMASK16, VW);		/* store register */
+	WriteH (ea, R[r1], VW);				/* store register */
 	break;
 
 case 0x50:						/* ST - RX */
@@ -775,7 +775,7 @@ case 0x92:						/* STBR - NO */
 	R[r2] = (R[r2] & ~DMASK8) | (R[r1] & DMASK8);	/* store byte */
 	break;
 case 0xD2:						/* STB - RX */
-	WriteB (ea, R[r1] & DMASK8, VW);		/* store byte */
+	WriteB (ea, R[r1], VW);				/* store byte */
 	break;
 
 case 0x34:						/* EXHR - NO */
@@ -1291,7 +1291,7 @@ case 0xE3:						/* SCP - RX */
 	    else WriteB ((bufa + sr) & VAMASK, R[r1], VW); /* read, R1 to mem */
 	    sr = sr + 1;				/* inc count */
 	    CC_GL_32 (sr & DMASK32);			/* set cc's */
-	    WriteH (t & VAMASK, sr & DMASK16, VW);	/* rewrite */
+	    WriteH (t & VAMASK, sr, VW);		/* rewrite */
 	    if ((sr > 0) && !(opnd & CCW32_FST))	/* buf switch? */
 		WriteH (ea, opnd ^ CCW32_B1, VW);	/* flip CCW bit */
 	    }						/* end if */
@@ -1603,7 +1603,7 @@ slt = (t >> 16) & DMASK16;				/* # slots */
 usd = t & DMASK16;					/* # used */
 if (usd == 0) return CC_V;				/* empty? */
 usd = usd - 1;						/* dec used */
-WriteH (ea + Q32_USD, usd & DMASK16, VW);		/* rewrite */
+WriteH (ea + Q32_USD, usd, VW);				/* rewrite */
 if (flg) {						/* RBL? */
 	rda = ReadH ((ea + Q32_BOT) & VAMASK, VR);	/* get bottom */
 	if (rda == 0) rda = (slt - 1) & DMASK16;	/* wrap if necc */
@@ -1673,7 +1673,7 @@ if (ccw & CCW32_FST) {					/* fast mode? */
 		    t = dev_tab[dev] (dev, IO_RD, 0);	/* get byte */
 		    WriteB (addr, t, VW);  }		/* write to mem */
 		bufc = bufc + 1;  }			/* adv buf cnt */
-	    WriteH (ccwa + CCB32_B0C, bufc & DMASK16, VW);/* rewrite cnt */
+	    WriteH (ccwa + CCB32_B0C, bufc, VW);	/* rewrite cnt */
 	    if (bufc > 0) {
 		PC = ReadH (ccwa + CCB32_SUB, VR);	/* get subr */
 		return CC_G;  }				/* CC = G */
@@ -1709,7 +1709,7 @@ else {							/* slow mode */
 			PC = t << 1;			/* change PC */
 			R[3] = by;			/* untrans char */
 			return 0;  }			/* CC = 0 */
-		    WriteB (addr, t & DMASK8, VW);  }	/* wr trans */
+		    WriteB (addr, t, VW);  }		/* wr trans */
 		else WriteB (addr, by, VW);  }		/* wr orig */
 	    t = ReadH (ccwa + CCB32_CHK, VR);		/* get check wd */
 	    t = t ^ by;					/* start LRC */
@@ -1719,7 +1719,7 @@ else {							/* slow mode */
 		    else t = t >> 1;  }  }
 	    WriteH (ccwa + CCB32_CHK, t, VW);		/* rewrite chk wd */
 	    bufc = bufc + 1;				/* adv buf cnt */
-	    WriteH (ccwb, bufc & DMASK16, VW);		/* rewrite cnt */
+	    WriteH (ccwb, bufc, VW);			/* rewrite cnt */
 	    if (bufc > 0) {				/* cnt pos? */
 		ccw = ccw ^ CCW32_B1;			/* flip buf */
 		WriteH (ccwa, ccw, VW);			/* rewrite */
@@ -1826,10 +1826,10 @@ uint32 val;
 uint32 sc = (3 - (loc & 3)) << 3;
 
 if ((PSW & PSW_REL) == 0) {				/* reloc off? */
-	val = M[loc >> 2];				/* get mem word */
 	if ((loc & ~03) == MAC_STA) {			/* MAC status? */
 	    val = mac_sta;				/* read it */
-	    qevent = qevent & ~EV_MAC;  }  }		/* clr MAC intr */
+	    qevent = qevent & ~EV_MAC;  }		/* clr MAC intr */
+	else val = M[loc >> 2];  }			/* get mem word */
 else if (rel == 0) val = M[loc >> 2];			/* phys ref? */
 else {	uint32 pa = Reloc (loc, rel);			/* relocate */
 	val = M[pa >> 2];  }
@@ -1841,10 +1841,10 @@ uint32 ReadH (uint32 loc, uint32 rel)
 uint32 val;
 
 if ((PSW & PSW_REL) == 0) {				/* reloc off? */
-	val = M[loc >> 2];				/* get mem word */
 	if ((loc & ~03) == MAC_STA) {			/* MAC status? */
 	    val = mac_sta;				/* read it */
-	    qevent = qevent & ~EV_MAC;  }  }		/* clr MAC intr */
+	    qevent = qevent & ~EV_MAC;  }		/* clr MAC intr */
+	else val = M[loc >> 2];  }			/* get mem word */
 else if (rel == 0) val = M[loc >> 2];			/* phys ref? */
 else {	uint32 pa = Reloc (loc, rel);			/* relocate */
 	val = M[pa >> 2];  }
@@ -1856,10 +1856,10 @@ uint32 ReadF (uint32 loc, uint32 rel)
 uint32 val;
 
 if ((PSW & PSW_REL) == 0) {				/* reloc off? */
-	val = M[loc >> 2];				/* get mem word */
 	if ((loc & ~03) == MAC_STA) {			/* MAC status? */
 	    val = mac_sta;				/* read it */
-	    qevent = qevent & ~EV_MAC;  }  }		/* clr MAC intr */
+	    qevent = qevent & ~EV_MAC;  }		/* clr MAC intr */
+	else val = M[loc >> 2];  }			/* get mem word */
 else if (rel == 0) val = M[loc >> 2];			/* phys ref? */
 else {	uint32 pa = Reloc (loc, rel);			/* relocate */
 	val = M[pa >> 2];  }
@@ -1894,9 +1894,9 @@ val = val & DMASK16;
 if ((PSW & PSW_REL) == 0) {				/* reloc off? */
 	uint32 idx = (pa - MAC_BASE) >> 2;		/* check for MAC */
 	if (idx <= MAC_LNT) {
-	if (idx < MAC_LNT) mac_reg[idx] = ((loc & 2)?
-	    ((mac_reg[idx] & ~DMASK16) | val):
-	    ((mac_reg[idx] & DMASK16) | (val << 16))) & SR_MASK;
+	    if (idx < MAC_LNT) mac_reg[idx] = ((loc & 2)?
+		((mac_reg[idx] & ~DMASK16) | val):
+		((mac_reg[idx] & DMASK16) | (val << 16))) & SR_MASK;
 	    else {
 		mac_sta = 0;
 		qevent = qevent & ~EV_MAC;  }  }  }
@@ -1911,6 +1911,7 @@ void WriteF (uint32 loc, uint32 val, uint32 rel)
 {
 uint32 pa = loc;
 
+val = val & DMASK32;
 if (loc & 2) {
 	WriteH (loc & VAMASK, (val >> 16) & DMASK16, rel);
 	WriteH ((loc + 2) & VAMASK, val & DMASK16, rel);
@@ -1918,7 +1919,7 @@ if (loc & 2) {
 if ((PSW & PSW_REL) == 0) {				/* reloc off? */
 	uint32 idx = (pa - MAC_BASE) >> 2;		/* check for MAC */
 	if (idx <= MAC_LNT) {
-	if (idx < MAC_LNT) mac_reg[idx] = val & SR_MASK;
+	    if (idx < MAC_LNT) mac_reg[idx] = val & SR_MASK;
 	    else {
 		mac_sta = 0;
 		qevent = qevent & ~EV_MAC;  }  }  }

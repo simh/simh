@@ -82,16 +82,23 @@ To start the simulator, simply type its name.  (On version of VMS
 prior to 6.2, the simulators must then be defined as foreign commands
 in order to be be started by name.)  The simulator recognizes one
 switch, -Q; if specified, certain informational messages are suppressed.
+
 The simulator interprets the arguments on the command line, if any,
-as the file name and arguments for a DO command.  If a startup file
-is specified, it should contain a series of non-interactive simulator
-commands, one per line.  These command can be used to set up standard
-parameters, for example, disk sizes:
+as the file name and arguments for a DO command:
 
 	% pdp10 {<startup file> {arg,arg,...}}(cr)
 
-The simulator types out its name and version, executes the commands
-in the startup file, if any, and then prompts for input with
+If no file is specified on the command line, the simulator looks for
+an startup file consisting of the simulator name (including its path
+components) plus the extension .ini.  If a startup file is specified,
+either on the command line or implicitly via the .ini capability, it
+ishould contain a series of non-interactive simulator command, one
+per line.  These command can be used to set up standard parameters,
+for example, disk sizes.
+
+After initializing its internal structures and processing the startup
+file (if any), the simulator types out its name and version and then
+prompts for input with:
 
 	sim>
 
@@ -106,11 +113,11 @@ The supplied makefile will compile the simulators for UNIX systems
 which support the POSIX TERMIOS.  The VAX and PDP-11 can be compiled
 with or without Ethernet support.  To compile without Ethernet support:
 
-	gmake {target|ALL}
+	gmake {target|ALL|clean}
 
 To compile with Ethernet support:
 
-	gmake USE_NETWORK=1 {target|ALL}
+	gmake USE_NETWORK=1 {target|ALL|clean}
 
 Notes for hand compilation:
 
@@ -490,15 +497,16 @@ breakpoints of different types, identified by letter (for example, E
 for execution, R for read, W for write, etc).  At the moment, most
 simulators support only E (execution) breakpoints.
 
-Associated with a breakpoint is a count and, optionally, an action.
-Each time the breakpoint is sprung, the associated count is decremented.
-If the count is less than or equal to 0, the breakpoint occurs; otherwise,
-it is deferred.  When the breakpoint occurs, the optional action is
-automatically executed
+Associated with a breakpoint is a count and, optionally, one or more
+actions.  Each time the breakpoint is sprung, the associated count is
+decremented.  If the count is less than or equal to 0, the breakpoint
+occurs; otherwise, it is deferred.  When the breakpoint occurs, the
+optional actions are automatically executed.
 
 A breakpoint is set by the BREAK command:
 
-	sim> BREAK {-types} <addr range>{[count]},{addr range...}{;action}
+	sim> BREAK {-types} <addr range>{[count]},{addr range...}
+	     {;action;action...}
 
 If no type is specified, the simulator-specific default breakpoint
 type (usually E for execution) is used.  As with EXAMINE and DEPOSIT,
@@ -508,8 +516,8 @@ or a relative range of address/length.  Examples of BREAK:
 	sim> break -e 200		-- set E break at 200
 	sim> break 2000/2[2]		-- set E breaks at 2000,2001
 					   with count = 2
-	sim> break 100;ex ac		-- set E break at 100 with
-					   action EX AC
+	sim> break 100;ex ac;d mq 0	-- set E break at 100 with
+					   actions EX AC and D MQ 0
 	sim> break 100;			-- delete action on break at 100
 
 Currently set breakpoints can be displayed with the SHOW BREAK command:

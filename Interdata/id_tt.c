@@ -23,7 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   tt			console
+   tt		console
 
    11-Jan-03	RMS	Added TTP support
    22-Dec-02	RMS	Added break support

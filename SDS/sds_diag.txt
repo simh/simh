@@ -60,7 +60,6 @@ sim> c
 Breakpoint, P: 00112 (BRU 3)
 
 ---
-
 930 P&S Register Test
 
 sim> att mt diag.tap

@@ -561,8 +561,8 @@ END OF TEST
 ---
 Common magtape diagnostic
 
-sim> set mt dev=85			; 800 bpi default
 sim> att -e pt0 diag.bin
+sim> att mt foo.tap
 sim> br c4
 sim> boot pt0
 
@@ -575,9 +575,6 @@ COMMON MAGNETIC TAPE TEST PROGRAM 06-172R02
 
 *TEST 0,1,2,3,4,5
 *MODE 0					; prog i/o and selch
-*RUN
-
-*MODE 0
 *RUN
 
 TEST  00
@@ -880,7 +877,7 @@ Bugs found
 65. PIC, LFC: ric reloaded from output buffer on count overflow
 66. PIC, LFC: added diagnostic mode, revised use of count vs timer
 67. DP: track increment algorithm incorrect
-68. DP,IDC: incorrectly setting overrun for less than full sector reads
+68. DP, IDC: incorrectly setting overrun for less than full sector reads
 69. DP: should interrupt on detach (offline)
 70. FD: high water mark not updated on write
 71. FD: deleted data not implemented, required for diagnostic
@@ -905,4 +902,6 @@ Bugs found
 90. IDC: drive command 0x30 is an instant NOP
 91. IDC: set cylinder with invalid cylinder sets SKI
 92. IDC: read with invalid head sets ACF, not DTE
+93. DP, IDC: write with cylinder overflow advanced selch pointer
+94. MT: read error must stop selector channel (if active)
 

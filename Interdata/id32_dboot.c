@@ -1,6 +1,6 @@
 /* id32_dboot.c: Interdata 32b simulator disk bootstrap
 
-   Copyright (c) 2000-2002, Robert M. Supnik
+   Copyright (c) 2000-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   17-Feb-03	RMS	Fixed for UNIX bootstrap, upper platter bootstrap
 */
 
 #include "id_defs.h"
@@ -140,7 +142,7 @@ static uint8 dboot_rom[] = {
  0x11, 0xa5,
  0x06, 0xba,
  0x98, 0x49,
- 0xde, 0x4d, 0x03, 0x28,
+ 0xde, 0x4d, 0x03, 0x2b,
  0x9d, 0x3f,
  0x22, 0x21,
  0x9d, 0x4f,
@@ -265,23 +267,27 @@ static uint8 dboot_rom[] = {
 
 struct dboot_id {
 	char	*name;
+	uint32	sw;
 	uint32	cap;
 	uint32	dtype;
 	uint32	offset;
+	uint32	adder;
 };
 
 static struct dboot_id dboot_tab[] = {
-	{ "DP", 2, 0x31, o_DP0 },
-	{ "DP", 9, 0x33, o_DP0 },
-	{ "DM", 64, 0x35, o_ID0 },
-	{ "DM", 244, 0x36, o_ID0 },
+	{ "DP", 0,            2, 0x31, o_DP0, 0 },
+	{ "DP", SWMASK ('F'), 9, 0x32, o_DP0, o_DPF },
+	{ "DP", 0,            9, 0x33, o_DP0, 0 },
+	{ "DM", 0,           64, 0x35, o_ID0, 0 },
+	{ "DM", 0,          244, 0x36, o_ID0, 0 },
 	{ NULL }  };
 
 t_stat id_dboot (int32 u, DEVICE *dptr)
 {
-extern DIB pt_dib, sch_dib;
+extern DIB ttp_dib, sch_dib;
 extern uint32 PC;
-uint32 i, typ, ctlno, off, cap, sch_dev;
+extern int32 sim_switches;
+uint32 i, typ, ctlno, off, add, cap, sch_dev;
 UNIT *uptr;
 
 DIB *ddib = (DIB *) dptr->ctxt;				/* get disk DIB */
@@ -291,17 +297,20 @@ uptr = dptr->units + u;					/* get capacity */
 cap = uptr->capac >> 20;
 for (i = typ = 0; dboot_tab[i].name != NULL; i++) {
 	if ((strcmp (dboot_tab[i].name, dptr->name) == 0) &&
+	    ((dboot_tab[i].sw == 0) || (dboot_tab[i].sw & sim_switches)) &&
 	    (dboot_tab[i].cap == cap)) {
 		typ = dboot_tab[i].dtype;
-		off = dboot_tab[i].offset;  }  }
+		off = dboot_tab[i].offset;
+		add = dboot_tab[i].adder;
+		break;  }  }
 if (typ == 0) return SCPE_NOFNC;
 
 IOWriteBlk (DBOOT_BEG, DBOOT_LEN, dboot_rom);		/* copy boot */
-IOWriteB (AL_DEV, pt_dib.dno);				/* bin input dev */
-IOWriteB (AL_IOC, 0x99);
-IOWriteB (AL_DSKU, ctlno + ((u + 1) * off));		/* disk param */
-IOWriteB (AL_DSKT, typ);
-IOWriteB (AL_DSKC, ctlno);
+IOWriteB (AL_DEV, ttp_dib.dno);				/* bin input dev */
+IOWriteB (AL_IOC, 0xa3);
+IOWriteB (AL_DSKU, ctlno + ((u + 1) * off) + add);	/* disk dev addr */
+IOWriteB (AL_DSKT, typ);				/* disk type */
+IOWriteB (AL_DSKC, ctlno);				/* disk ctl addr */
 IOWriteB (AL_SCH, sch_dev);
 PC = DBOOT_START;
 return SCPE_OK;

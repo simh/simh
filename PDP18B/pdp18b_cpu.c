@@ -1,6 +1,6 @@
 /* pdp18b_cpu.c: 18b PDP CPU simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu		PDP-4/7/9/15 central processor
 
+   18-Feb-03	RMS	Fixed three EAE bugs (found by Hans Pufal)
    05-Oct-02	RMS	Added DIBs, device number support
    25-Jul-02	RMS	Added DECtape support for PDP-4
    06-Jan-02	RMS	Revised enable/disable support
@@ -1076,11 +1077,11 @@ case 033: case 032:					/* EAE */
 	if (IR & 0001000) LAC = LAC & 01000000;		/* IR<8>? clear AC */
 	link_init = LAC & 01000000;			/* link temporary */
 	fill = link_init? 0777777: 0;			/* fill = link */
-	esc = (IR & 077)? IR & 077: 0100;		/* get eff SC */
+	esc = IR & 077;					/* get eff SC */
 
 	switch ((IR >> 6) & 07) {			/* case on IR<9:11> */
 	case 0:						/* setup */
-	    if (IR & 04) LAC = LAC ^ 0777777;		/* IR<15>? ~AC */
+	    if (IR & 04) MQ = MQ ^ 0777777;		/* IR<15>? ~MQ */
 	    if (IR & 02) LAC = LAC | MQ;		/* IR<16>? or MQ */
 	    if (IR & 01) LAC = LAC | ((-SC) & 077);	/* IR<17>? or SC */
 	    break;
@@ -1091,10 +1092,13 @@ case 033: case 032:					/* EAE */
 	    PC = INCR_ADDR (PC);			/* increment PC */
 	    if (eae_ac_sign) MQ = MQ ^ 0777777;		/* EAE AC sign? ~MQ */
 	    LAC = LAC & 0777777;			/* clear link */
-	    for (SC = esc; SC != 0; SC--) {		/* loop per step cnt */
+	    SC = esc;					/* init SC */
+	    do {					/* loop */
 		if (MQ & 1) LAC = LAC + MA;		/* MQ<17>? add */
 		MQ = (MQ >> 1) | ((LAC & 1) << 17);
-		LAC = LAC >> 1;  }			/* shift AC'MQ right */
+		LAC = LAC >> 1;				/* shift AC'MQ right */
+		SC = (SC - 1) & 077;  }			/* decrement SC */
+	    while (SC != 0);				/* until SC = 0 */
 	    if (eae_ac_sign ^ link_init) {		/* result negative? */
 		LAC = LAC ^ 0777777;
 		MQ = MQ ^ 0777777;  }
@@ -1121,16 +1125,19 @@ case 033: case 032:					/* EAE */
 		break;  }
 	    LAC = LAC & 0777777;			/* clear link */
 	    t = 0;					/* init loop */
-	    for (SC = esc; SC != 0; SC--) {		/* loop per step cnt */
+	    SC = esc;					/* init SC */
+	    do {					/* loop */
 		if (t) LAC = (LAC + MA) & 01777777;
 		else LAC = (LAC - MA) & 01777777;
 		t = (LAC >> 18) & 1;			/* quotient bit */
 		if (SC > 1) LAC =			/* skip if last */
 		    ((LAC << 1) | (MQ >> 17)) & 01777777;
-		MQ = ((MQ << 1) | t) & 0777777;  }
+		MQ = ((MQ << 1) | t) & 0777777;		/* shift in quo bit */
+		SC = (SC - 1) & 077;  }			/* decrement SC */
+	    while (SC != 0);				/* until SC = 0 */
 	    if (t) LAC = (LAC + MA) & 01777777;
 	    if (eae_ac_sign) LAC = LAC ^ 0777777;	/* sgn rem = sgn divd */
-	    if (eae_ac_sign ^ link_init ^ 1) MQ = MQ ^ 0777777;
+	    if ((eae_ac_sign ^ link_init) == 0) MQ = MQ ^ 0777777;
 	    break;
 
 /* EAE, continued
@@ -1144,14 +1151,16 @@ case 033: case 032:					/* EAE */
 #if defined (PDP15)
 	    if (!usmd) ion_defer = 2;			/* free cycles */
 #endif
-	    for (SC = esc; (SC != 0) && ((LAC & 0400000) ==
-		((LAC << 1) & 0400000)); SC--) {
+	    for (SC = esc; ((LAC & 0400000) == ((LAC << 1) & 0400000)); ) {
 		LAC = (LAC << 1) | ((MQ >> 17) & 1);
-		MQ = (MQ << 1) | (link_init >> 18);  }
+		MQ = (MQ << 1) | (link_init >> 18);
+		SC = (SC - 1) & 077;
+		if (SC == 0) break;  }
 	    LAC = link_init | (LAC & 0777777);		/* trim AC, restore L */
 	    MQ = MQ & 0777777;				/* trim MQ */
 	    SC = SC & 077;				/* trim SC */
 	    break;
+
 	case 5:						/* long right shift */
 	    if (esc < 18) {
 		MQ = ((LAC << (18 - esc)) | (MQ >> esc)) & 0777777;
@@ -1163,6 +1172,7 @@ case 033: case 032:					/* EAE */
 		LAC = link_init | fill;  }
 	    SC = 0;					/* clear step count */
 	    break;
+
 	case 6:						/* long left shift */
 	    if (esc < 18) {
 		LAC = link_init |
@@ -1175,6 +1185,7 @@ case 033: case 032:					/* EAE */
 		MQ = fill;  }
 	    SC = 0;					/* clear step count */
 	    break;
+
 	case 7:						/* AC left shift */
 	    if (esc < 18) LAC = link_init |
 		(((LAC << esc) | (fill >> (18 - esc))) & 0777777);

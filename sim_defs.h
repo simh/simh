@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Mar-03	RMS	Added sim_fsize
+   08-Feb-03	RMS	Changed sim_os_sleep to void, added match_ext
    05-Jan-03	RMS	Added hidden switch definitions, device dyn memory support,
 			parameters for function pointers, case sensitive SET support
    22-Dec-02	RMS	Added break flag
@@ -411,6 +413,7 @@ t_stat detach_unit (UNIT *uptr);
 t_stat reset_all (int start_device);
 size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
 size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
+t_addr sim_fsize (char *cptr);
 t_stat get_yn (char *ques, t_stat deflt);
 char *get_glyph (char *iptr, char *optr, char mchar);
 char *get_glyph_nc (char *iptr, char *optr, char mchar);
@@ -429,6 +432,7 @@ int32 sim_rtcn_calb (int32 time, int32 tmr);
 t_stat sim_poll_kbd (void);
 t_stat sim_putchar (int32 out);
 t_bool sim_brk_test (t_addr bloc, int32 btyp);
-int sim_os_sleep (unsigned int sec);
+void sim_os_sleep (unsigned int sec);
+char *match_ext (char *fnam, char *ext);
 
 #endif

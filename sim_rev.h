@@ -29,13 +29,97 @@
 
 #define	SIM_MAJOR	2
 #define SIM_MINOR	10
-#define SIM_PATCH	3
+#define SIM_PATCH	4
 
 /* V2.10 revision history 
 
 patch	date		module(s) and fix(es)
 
-  3	tbd		scp.c:
+  4	22-Feb-03	scp.c
+			-- added .ini startup file capability
+			-- added multiple breakpoint actions
+			-- added multiple switch evaluation points
+			-- fixed bug in multiword deposits to file
+
+			sim_tape.c: magtape simulation library
+
+			h316_stddev.c: added set line frequency command
+
+			hp2100_mt.c, hp2100_ms.c: revised to use magtape library
+
+			i1401_mt.c: revised to use magtape library
+
+			id_dp.c, id_idc.c: fixed cylinder overflow on writes
+
+			id_mt.c:
+			-- fixed error handling to stop selector channel
+			-- revised to use magtape library
+
+			id16_sys.c, id32_sys.c: added relative addressing support
+
+			id_uvc.c:
+			-- added set frequency command to line frequency clock
+			-- improved calibration algorithm for precision clock
+
+			nova_clk.c: added set line frequency command
+
+			nova_dsk.c: fixed autosizing algorithm
+
+			nova_mt.c: revised to use magtape library
+
+			pdp10_tu.c: revised to use magtape library
+
+			pdp11_stddev.c
+			-- added set line frequency command
+			-- added set ctrl-c command
+
+			pdp11_rq.c:
+			-- fixed ordering problem in queue process
+			-- fixed bug in vector calculation for VAXen
+			-- added user defined drive support
+
+			pdp11_ry.c: fixed autosizing algorithm
+
+			pdp11_tm.c, pdp11_ts.c: revised to use magtape library
+
+			pdp11_tq.c:
+			-- fixed ordering problem in queue process
+			-- fixed overly restrictive test for bad modifiers
+			-- fixed bug in vector calculation for VAXen
+			-- added variable controller, user defined drive support
+			-- revised to use magtape library
+
+			pdp18b_cpu.c: fixed three EAE bugs (found by Hans Pufal)
+
+			pdp18b_mt.c:
+			-- fixed bugs in BOT error handling, interrupt handling
+			-- revised to use magtape library
+
+			pdp18b_rf.c: removed 22nd bit from disk address
+
+			pdp18b_stddev.c:
+			-- added set line frequency command
+			-- added set ctrl-c command
+
+			pdp18b_sys.c: fixed FMTASC printouts (found by Hans Pufal)
+
+			pdp8_clk.c: added set line frequency command
+
+			pdp8_df.c, pdp8_rf.c, pdp8_rx.c: fixed autosizing algorithm
+
+			pdp8_mt.c:
+			-- fixed bug in BOT error handling
+			-- revised to use magtape library
+
+			pdp8_tt.c: added set ctrl-c command
+
+			sds_cpu.c: added set line frequency command
+
+			sds_mt.c: revised to use magtape library
+
+			vax_stddev.c: added set ctrl-c command
+
+  3	06-Feb-03	scp.c:
 			-- added dynamic extension of the breakpoint table
 			-- added breakpoint actions
 

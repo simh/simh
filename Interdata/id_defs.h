@@ -25,6 +25,8 @@
 
    The author gratefully acknowledges the help of Carl Friend and Al Kossow,
    who provided key documents about the Interdata product line.
+
+   28-Feb-03	RMS	Changed magtape device default to 0x85
 */
 
 #include "sim_defs.h"					/* simulator defns */
@@ -260,12 +262,12 @@ typedef struct interdib DIB;
 #define d_LPT		0x62				/* line printer */
 #define d_PIC		0x6C				/* interval timer */
 #define d_LFC		0x6D				/* line freq clk */
+#define d_MT		0x85				/* magtape */
+#define o_MT0		0x10
 #define d_DPC		0xB6				/* disk controller */
 #define o_DP0		0x10
 #define o_DPF		0x01				/* offset to fixed */
 #define d_FD		0xC1				/* floppy disk */
-#define d_MT		0xC5				/* magtape */
-#define o_MT0		0x10
 #define d_SCH		0xF0				/* selector chan */
 #define d_IDC		0xFB				/* MSM disk ctrl */
 #define o_ID0		0x01

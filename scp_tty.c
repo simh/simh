@@ -200,9 +200,10 @@ for (i = 0; i < 64; i++) {				/* 64b quo */
 return quo;
 }
 
-int sim_os_sleep (unsigned int sec)
+void sim_os_sleep (unsigned int sec)
 {
-return sleep (sec);
+sleep (sec);
+return;
 }
 
 #endif
@@ -275,10 +276,10 @@ uint32 sim_os_msec ()
 return GetTickCount ();
 }
 
-int sim_os_sleep (unsigned int sec)
+void sim_os_sleep (unsigned int sec)
 {
 Sleep (sec * 1000);
-return 0;
+return;
 }
 
 #endif
@@ -369,7 +370,6 @@ t_stat ttclose (void);
 uint32 sim_os_msec (void);
 t_stat sim_os_poll_kbd (void);
 t_stat sim_os_putchar (int32 c);
-int sim_os_sleep (unsigned int sec);
 
 extern char sim_name[];
 extern pSIOUXWin SIOUXTextWindow;
@@ -532,9 +532,10 @@ millis = micros / 1000LL;
 return (uint32) millis;
 }
 
-int sim_os_sleep (unsigned int sec)
+void sim_os_sleep (unsigned int sec)
 {
-return sleep (sec);
+sleep (sec);
+return;
 }
 
 #endif
@@ -634,9 +635,10 @@ msec = (((uint32) cur.tv_sec) * 1000) + (((uint32) cur.tv_usec) / 1000);
 return msec;
 }
 
-int sim_os_sleep (unsigned int sec)
+void sim_os_sleep (unsigned int sec)
 {
-return sleep (sec);
+sleep (sec);
+return;
 }
 
 #endif
@@ -742,9 +744,10 @@ msec = (((uint32) cur.tv_sec) * 1000) + (((uint32) cur.tv_usec) / 1000);
 return msec;
 }
 
-int sim_os_sleep (unsigned int sec)
+void sim_os_sleep (unsigned int sec)
 {
-return sleep (sec);
+sleep (sec);
+return;
 }
 
 #endif

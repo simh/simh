@@ -25,6 +25,10 @@
 
    tq		TQK50 tape controller
 
+   28-Feb-03	RMS	Added variable controller, user-defined drive support
+   26-Feb-03	RMS	Fixed bug in vector calculation for VAXen
+   22-Feb-03	RMS	Fixed ordering bug in queue process
+			Fixed flags table to allow MD_CSE everywhere
    09-Jan-03	RMS	Fixed bug in transfer end packet status
    17-Oct-02	RMS	Fixed bug in read reverse (found by Hans Pufal)
 */
@@ -43,6 +47,7 @@ extern int32 cpu_18b, cpu_ubm;
 
 #include "pdp11_uqssp.h"
 #include "pdp11_mscp.h"
+#include "sim_tape.h"
 
 #define	UF_MSK		(UF_SCH|UF_VSS|UF_CMR|UF_CMW)	/* settable flags */
 
@@ -60,14 +65,12 @@ extern int32 cpu_18b, cpu_ubm;
 #define TQ_NUMDR	4				/* # drives */
 #define TQ_MAXFR	(1 << 16)			/* max xfer */
 
-#define UNIT_V_ONL	(UNIT_V_UF + 0)			/* online */
-#define UNIT_V_WLK	(UNIT_V_UF + 1)			/* hwre write lock */
-#define UNIT_V_ATP	(UNIT_V_UF + 2)			/* attn pending */
-#define UNIT_V_SXC	(UNIT_V_UF + 3)			/* serious exc */
-#define UNIT_V_POL	(UNIT_V_UF + 4)			/* position lost */
-#define UNIT_V_TMK	(UNIT_V_UF + 5)			/* tape mark seen */
+#define UNIT_V_ONL	(MTUF_V_UF + 0)			/* online */
+#define UNIT_V_ATP	(MTUF_V_UF + 1)			/* attn pending */
+#define UNIT_V_SXC	(MTUF_V_UF + 2)			/* serious exc */
+#define UNIT_V_POL	(MTUF_V_UF + 3)			/* position lost */
+#define UNIT_V_TMK	(MTUF_V_UF + 4)			/* tape mark seen */
 #define UNIT_ONL	(1 << UNIT_V_ONL)
-#define UNIT_WLK	(1 << UNIT_V_WLK)
 #define UNIT_ATP	(1 << UNIT_V_ATP)
 #define UNIT_SXC	(1 << UNIT_V_SXC)
 #define UNIT_POL	(1 << UNIT_V_POL)
@@ -76,8 +79,7 @@ extern int32 cpu_18b, cpu_ubm;
 #define pktq		u4				/* packet queue */
 #define uf		buf				/* settable unit flags */
 #define objp		wait				/* object position */
-#define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write prot */
-#define TQ_WPH(u)	((u->flags & UNIT_WPRT)? UF_WPH: 0)
+#define TQ_WPH(u)	(sim_tape_wrp (u))
 
 #define CST_S1		0				/* init stage 1 */
 #define CST_S1_WR	1				/* stage 1 wrap */
@@ -153,12 +155,25 @@ struct tqpkt {
 #define TQ8_CAP		(180 * (1 << 20))		/* capacity */
 #define TQ8_FMT		(TF_9TK|TF_9TK_GRP)		/* menu */
 
+#define TQU_TYPE	3				/* TKuser defined */
+#define TQU_UQPM	3				/* UQ port ID */
+#define TQU_CMOD	9				/* ctrl ID */
+#define TQU_UMOD	3				/* unit ID */
+#define TQU_MED		0x6D68B032			/* media ID */
+#define TQU_CREV	((1 << 8) | 5)			/* ctrl revs */	
+#define TQU_FREV	0				/* formatter revs */
+#define TQU_UREV	0				/* unit revs */
+#define TQU_CAP		(94 * (1 << 20))		/* capacity */
+#define TQU_FMT		(TF_CTP|TF_CTP_LO)		/* menu */
+#define TQU_MINC	30				/* min cap MB */
+#define TQU_MAXC	2000				/* max cap MB */
+
 #define TQ_DRV(d) \
 	d##_UQPM, \
 	d##_CMOD, d##_MED,  d##_FMT,  d##_CAP, \
 	d##_UMOD, d##_CREV, d##_FREV, d##_UREV
 
-#define TEST_EOT(u)	(uptr->pos > drv_tab[tq_typ].cap)
+#define TEST_EOT(u)	(sim_tape_eot (u, drv_tab[tq_typ].cap))
 
 struct drvtyp {
 	uint32	uqpm;					/* UQ port model */
@@ -170,12 +185,14 @@ struct drvtyp {
 	uint32	cver;
 	uint32	fver;
 	uint32	uver;
+	char	*name;
 };
 
 static struct drvtyp drv_tab[] = {
-	{ TQ_DRV (TQ5) },
-	{ TQ_DRV (TQ7) },
-	{ TQ_DRV (TQ8) }
+	{ TQ_DRV (TQ5), "TK50" },
+	{ TQ_DRV (TQ7), "TK70" },
+	{ TQ_DRV (TQ8), "TU81" },
+	{ TQ_DRV (TQU), "TKUSER" },
 };
 
 /* Data */
@@ -208,16 +225,16 @@ int32 tq_itime = 200;					/* init time, except */
 int32 tq_itime4 = 10;					/* stage 4 */
 int32 tq_qtime = 200;					/* queue time */
 int32 tq_xtime = 500;					/* transfer time */
-int32 tq_typ = 0;					/* device type */
+int32 tq_typ = TQ5_TYPE;				/* device type */
 
 /* Command table - legal modifiers (low 16b) and flags (high 16b) */
 
 static uint32 tq_cmf[64] = {
 	0,						/* 0 */
 	CMF_IMM,					/* abort */
-	CMF_IMM,					/* get cmd status */
-	CMF_IMM|MD_NXU,					/* get unit status */
-	CMF_IMM,					/* set ctrl char */
+	CMF_IMM|MD_CSE,					/* get cmd status */
+	CMF_IMM|MD_CSE|MD_NXU,				/* get unit status */
+	CMF_IMM|MD_CSE,					/* set ctrl char */
 	0, 0, 0,					/* 5-7 */
 	CMF_SEQ|MD_ACL|MD_CDL|MD_CSE|MD_EXA|MD_UNL,	/* available */
 	CMF_SEQ|MD_CDL|MD_CSE|MD_SWP|MD_EXA,		/* online */
@@ -265,6 +282,8 @@ t_stat tq_set_wlk (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tq_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 t_bool tq_step4 (void);
 t_bool tq_mscp (int32 pkt, t_bool q);
@@ -284,11 +303,10 @@ t_bool tq_plf (uint32 err);
 t_bool tq_dte (UNIT *uptr, uint32 err);
 t_bool tq_hbe (UNIT *uptr, uint32 ba);
 t_bool tq_una (UNIT *uptr);
-uint32 tq_rdlntf (UNIT *uptr, t_mtrlnt *tbc);
+uint32 tq_map_status (UNIT *uptr, t_stat st);
 uint32 tq_spacef (UNIT *uptr, uint32 cnt, uint32 *skipped, t_bool qrec);
 uint32 tq_skipff (UNIT *uptr, uint32 cnt, uint32 *skipped);
 uint32 tq_rdbuff (UNIT *uptr, t_mtrlnt *tbc);
-uint32 tq_rdlntr (UNIT *uptr, t_mtrlnt *tbc);
 uint32 tq_spacer (UNIT *uptr, uint32 cnt, uint32 *skipped, t_bool qrec);
 uint32 tq_skipfr (UNIT *uptr, uint32 cnt, uint32 *skipped);
 uint32 tq_rdbufr (UNIT *uptr, t_mtrlnt *tbc);
@@ -366,14 +384,25 @@ REG tq_reg[] = {
 	{ DRDATA (QTIME, tq_qtime, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (XTIME, tq_xtime, 24), PV_LEFT + REG_NZ },
 	{ BRDATA (PKTS, tq_pkt, TQ_RDX, 16, TQ_NPKTS * (TQ_PKT_SIZE_W + 1)) },
-	{ FLDATA (DEVTYPE, tq_typ, 0), REG_HRO },
+	{ DRDATA (DEVTYPE, tq_typ, 2), REG_HRO },
+	{ DRDATA (DEVCAP, drv_tab[TQU_TYPE].cap, 31), REG_HRO },
 	{ GRDATA (DEVADDR, tq_dib.ba, TQ_RDX, 32, 0), REG_HRO },
 	{ GRDATA (DEVVEC, tq_dib.vec, TQ_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB tq_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
+	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
+	{ MTAB_XTD | MTAB_VDV, TQ5_TYPE, NULL, "TK50",
+		&tq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VDV, TQ7_TYPE, NULL, "TK70",
+		&tq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VDV, TQ8_TYPE, NULL, "TU81",
+		&tq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VDV, TQU_TYPE, NULL, "TKUSER",
+		&tq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL,
+		NULL, &tq_show_type, NULL },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, TQ_SH_RI, "RINGS", NULL,
 		NULL, &tq_show_ctrl, NULL },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, TQ_SH_FR, "FREEQ", NULL,
@@ -417,8 +446,8 @@ case 0:							/* IP */
 	*data = 0;					/* reads zero */
 	if (tq_csta == CST_S3_PPB) tq_step4 ();		/* waiting for poll? */
 	else if (tq_csta == CST_UP) {			/* if up */
-		tq_pip = 1;				/* poll host */
-		sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);  }
+	    tq_pip = 1;					/* poll host */
+	    sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);  }
 	break;
 case 1:							/* SA */
 	*data = tq_sa;
@@ -431,7 +460,8 @@ t_stat tq_wr (int32 data, int32 PA, int32 access)
 switch ((PA >> 1) & 01) {				/* decode PA<1> */
 case 0:							/* IP */
 	tq_reset (&tq_dev);				/* init device */
-	if (DBG_LOG (LOG_TQ)) fprintf (sim_log, ">>TQ: initialization started\n");
+	if (DBG_LOG (LOG_TQ)) fprintf (sim_log,
+	    ">>TQ: initialization started, time=%.0f\n", sim_gtime ());
 	break;
 case 1:							/* SA */
 	tq_saw = data;
@@ -476,9 +506,8 @@ return OK;
    queues, response queue) require servicing.  Also invoked during
    initialization to provide some delay to the next step.
 
-   Process at most one item off the host queue
-   If the host queue is empty, process at most one item off
-	each unit queue
+   Process at most one item off each unit queue
+   If the unit queues were empty, process at most one item off the host queue
    Process at most one item off the response queue
 
    If all queues are idle, terminate thread
@@ -499,7 +528,8 @@ if (tq_csta < CST_UP) {					/* still init? */
 		tq_csta = CST_S1_WR;  }			/* endless loop */
 	else {
 	    tq_s1dat = tq_saw;				/* save data */
-	    tq_dib.vec = VEC_Q + ((tq_s1dat & SA_S1H_VEC) << 2);
+	    tq_dib.vec = (tq_s1dat & SA_S1H_VEC) << 2;	/* get vector */
+	    if (tq_dib.vec) tq_dib.vec = tq_dib.vec + VEC_Q; /* if nz, bias */
 	    tq_sa = SA_S2 | SA_S2C_PT | SA_S2C_EC (tq_s1dat);
 	    tq_csta = CST_S2;				/* now in step 2 */
 	    tq_init_int ();  }				/* intr if req */
@@ -538,7 +568,12 @@ if (tq_csta < CST_UP) {					/* still init? */
 	break;  }					/* end switch */			
     return SCPE_OK;  }					/* end if */
 
-if (tq_pip) {						/* polling? */
+for (i = 0; i < TQ_NUMDR; i++) {			/* chk unit q's */
+	nuptr = tq_dev.units + i;			/* ptr to unit */
+	if (nuptr->cpkt || (nuptr->pktq == 0)) continue;
+	pkt = tq_deqh (&nuptr->pktq);			/* get top of q */
+	if (!tq_mscp (pkt, FALSE)) return SCPE_OK;  }	/* process */
+if ((pkt == 0) && tq_pip) {				/* polling? */
     if (!tq_getpkt (&pkt)) return SCPE_OK;		/* get host pkt */
     if (pkt) {						/* got one? */
         if (DBG_LOG (LOG_TQ)) {
@@ -563,13 +598,6 @@ if (tq_pip) {						/* polling? */
 	}						/* end if pkt */
     else tq_pip = 0;					/* discontinue poll */
     }							/* end if pip */
-if (!tq_pip) {						/* not polling? */
-    for (i = 0; i < TQ_NUMDR; i++) {			/* chk unit q's */
-	nuptr = tq_dev.units + i;			/* ptr to unit */
-	if (nuptr->cpkt || (nuptr->pktq == 0)) continue;
-	pkt = tq_deqh (&nuptr->pktq);			/* get top of q */
-	if (!tq_mscp (pkt, FALSE)) return SCPE_OK;  }	/* process */
-    }							/* end if !pip */
 if (tq_rspq) {						/* resp q? */
     pkt = tq_deqh (&tq_rspq);				/* get top of q */
     if (!tq_putpkt (pkt, FALSE)) return SCPE_OK;	/* send to hst */
@@ -620,7 +648,8 @@ else if (mdf & ~tq_cmf[cmd]) {				/* invalid mod? */
 	sts = ST_CMD | I_MODF;  }			/* ill mods */
 else {							/* valid cmd */
     if (uptr = tq_getucb (lu)) {			/* valid unit? */
-	if (q && uptr->cpkt && (tq_cmf[cmd] & CMF_SEQ)) {
+	if (q && (tq_cmf[cmd] & CMF_SEQ) &&		/* queueing, seq, */
+	    (uptr->cpkt || uptr->pktq)) {		/* and active? */
 		tq_enqt (&uptr->pktq, pkt);		/* do later */
 		return OK;  }
 /*	if (tq_cmf[cmd] & MD_CDL)			/* clr cch lost? */
@@ -719,7 +748,8 @@ if (uptr = tq_getucb (lu)) {				/* unit exist? */
    if (uptr->flags & UNIT_SXC) sts = ST_SXC;		/* ser exc pending? */
    else {
 	uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_TMK | UNIT_POL);
-	uptr->uf = uptr->pos = uptr->objp = 0;		/* clr flags, rewind */
+	sim_tape_rewind (uptr);				/* rewind */
+	uptr->uf = uptr->objp = 0;			/* clr flags */
 	if (uptr->flags & UNIT_ATT) {			/* attached? */
 	    sts = ST_SUC;				/* success */
 	    if (mdf & MD_UNL) tq_detach (uptr);  }	/* unload? */
@@ -791,7 +821,8 @@ if (uptr = tq_getucb (lu)) {				/* unit exist? */
 	else if (uptr->flags & UNIT_ONL)		/* already online? */
 		sts = ST_SUC | SB_SUC_ON;
 	else {	sts = ST_SUC;				/* mark online */
-		uptr->pos = uptr->objp = 0;		/* rewind */
+		sim_tape_rewind (uptr);			/* rewind */
+		uptr->objp = 0;				/* clear flags */
 		uptr->flags = (uptr->flags | UNIT_ONL) &
 			~(UNIT_TMK | UNIT_POL);		/* onl, pos ok */
 		tq_setf_unit (pkt, uptr);  }		/* hack flags */
@@ -976,7 +1007,7 @@ return ST_SUC;						/* success! */
 t_stat tq_svc (UNIT *uptr)
 {
 uint32 t, sts, sktmk, skrec;
-t_mtrlnt i, ebc, tbc, wbc;
+t_mtrlnt i, tbc, wbc;
 int32 pkt = uptr->cpkt;					/* get packet */
 uint32 cmd = GETP (pkt, CMD_OPC, OPC);			/* get cmd */
 uint32 mdf = tq_pkt[pkt].d[CMD_MOD];			/* modifier */
@@ -984,8 +1015,6 @@ uint32 ba = GETP32 (pkt, RW_BAL);			/* buf addr */
 t_mtrlnt bc = GETP32 (pkt, RW_BCL);			/* byte count */
 uint32 nrec = GETP32 (pkt, POS_RCL);			/* #rec to skip */
 uint32 ntmk = GETP32 (pkt, POS_TMCL);			/* #tmk to skp */
-static t_mtrlnt bceof = MTR_TMK;
-static t_mtrlnt bceom = MTR_EOM;
 
 if (pkt == 0) return SCPE_IERR;				/* what??? */
 if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
@@ -1052,19 +1081,13 @@ case OP_RD:case OP_ACC:case OP_CMP:			/* read-like op */
 	break;
 
 case OP_WR:						/* write */
-	if (t = Map_ReadB (ba, bc, tqxb, MAP)) {		/* fetch buf, nxm? */
+	if (t = Map_ReadB (ba, bc, tqxb, MAP)) {	/* fetch buf, nxm? */
 	    PUTP32 (pkt, RW_BCL, 0);			/* no bytes xfer'd */
 	    if (tq_hbe (uptr, ba + bc - t))		/* post err log */
 		tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, bc);	
 	    return SCPE_OK;  }				/* end else wr */
-	ebc = (bc + 1) & ~1;				/* force even */
-	fseek (uptr->fileref, uptr->pos, SEEK_SET);	/* set pos */
-	fxwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
-	fxwrite (tqxb, sizeof (uint8), ebc, uptr->fileref);
-	fxwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
-	if (ferror (uptr->fileref))			/* error? */
+	if (sim_tape_wrrecf (uptr, tqxb, bc))		/* write rec fwd, err? */
 	    return tq_mot_err (uptr, bc);		/* log, end */
-	uptr->pos = uptr->pos + ebc + (2 * sizeof (t_mtrlnt));
 	uptr->objp = uptr->objp + 1;			/* upd obj pos */
 	if (TEST_EOT (uptr))				/* EOT on write? */
 	    uptr->flags = uptr->flags | UNIT_SXC;
@@ -1073,11 +1096,8 @@ case OP_WR:						/* write */
 	break;
 
 case OP_WTM:						/* write tape mark */
-	fseek (uptr->fileref, uptr->pos, SEEK_SET);	/* set pos */
-	fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr->fileref);
-	if (ferror (uptr->fileref))			/* error? */
+	if (sim_tape_wrtmk (uptr))			/* write tmk, err? */
 	    return tq_mot_err (uptr, 0);		/* log, end */
-	uptr->pos = uptr->pos + sizeof (t_mtrlnt);	/* update pos */
 	uptr->objp = uptr->objp + 1;			/* incr obj cnt */
 case OP_ERG:						/* erase gap */
 	if (TEST_EOT (uptr))				/* EOT on write? */
@@ -1086,18 +1106,18 @@ case OP_ERG:						/* erase gap */
 	break;
 
 case OP_ERS:						/* erase */
-	fseek (uptr->fileref, uptr->pos, SEEK_SET);	/* set pos */
-	fxwrite (&bceom, sizeof (t_mtrlnt), 1, uptr->fileref);
-	if (ferror (uptr->fileref))			/* error? */
-	    return tq_mot_err (uptr, 0);
-	uptr->pos = uptr->objp = 0;			/* rewind */
+	if (sim_tape_wreom (uptr))			/* write eom, err? */
+	    return tq_mot_err (uptr, 0);		/* log, end */
+	sim_tape_rewind (uptr);				/* rewind */
+	uptr->objp = 0;
 	uptr->flags = uptr->flags & ~(UNIT_TMK | UNIT_POL);
 	break;
 
 case OP_POS:						/* position */
 	sktmk = skrec = 0;				/* clr skipped */
 	if (mdf & MD_RWD) {				/* rewind? */
-	    uptr->pos = uptr->objp = 0;			/* clr flags */
+	    sim_tape_rewind (uptr);
+	    uptr->objp = 0;				/* clr flags */
 	    uptr->flags = uptr->flags & ~(UNIT_TMK | UNIT_POL);  }
 	if (mdf & MD_OBC) {				/* skip obj? */
 	    if (mdf & MD_REV)				/* reverse? */
@@ -1161,43 +1181,63 @@ return OK;
 
 /* Tape motion routines */
 
-uint32 tq_rdlntf (UNIT *uptr, t_mtrlnt *tbc)
+uint32 tq_map_status (UNIT *uptr, t_stat st)
 {
-fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* set pos */
-fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);	/* read rec lnt */
-if (ferror (uptr->fileref)) {				/* error? */
-    uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;	/* ser exc, pos lost */
-    return ST_DRV;  }
-if (feof (uptr->fileref) || (*tbc == MTR_EOM)) {	/* end of medium? */
-    uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;	/* ser exc, pos lost */
-    return ST_DAT;  }
-return 0;
+switch (st)
+{
+case MTSE_OK:
+	break;
+case MTSE_UNATT:
+	uptr->flags = uptr->flags | UNIT_SXC;
+	return (ST_OFL | SB_OFL_NV);
+case MTSE_FMT:
+	uptr->flags = uptr->flags | UNIT_SXC;
+	return ST_MFE;
+case MTSE_TMK:
+	uptr->flags = uptr->flags | UNIT_SXC;
+	return ST_TMK;
+case MTSE_INVRL:
+	uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
+	return ST_FMT;
+case MTSE_RECE:
+case MTSE_IOERR:
+	uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
+	return ST_DRV;
+case MTSE_EOM:
+	uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
+	return ST_DAT;
+case MTSE_BOT:
+	uptr->flags = (uptr->flags | UNIT_SXC) & ~UNIT_POL;
+	return ST_BOT;
+case MTSE_WRP:
+	uptr->flags = uptr->flags | UNIT_SXC;
+	return ST_WPR;  }
+return ST_SUC;
 }
 
 uint32 tq_spacef (UNIT *uptr, uint32 cnt, uint32 *skipped, t_bool qrec)
 {
-uint32 st;
+t_stat st;
 t_mtrlnt tbc;
 
 *skipped = 0;
 while (*skipped < cnt) {				/* loop */
-    if (st = tq_rdlntf (uptr, &tbc)) return st;		/* read rec lnt */
-    uptr->objp = uptr->objp + 1;			/* upd obj cnt */
-    if (tbc == MTR_TMK) {				/* tape mark? */
-	int32 pkt = uptr->cpkt;				/* get pkt */
-	if ((tq_pkt[pkt].d[CMD_MOD] & MD_DLE) &&	/* LEOT? */
-	    (uptr->flags & UNIT_TMK)) {
-	    uptr->flags = uptr->flags | UNIT_SXC;	/* serious exc */	    
-	    return ST_LED;  }				/* dont upd pos */
-	uptr->pos = uptr->pos + sizeof (t_mtrlnt);	/* update pos */
-	uptr->flags = uptr->flags | UNIT_TMK;		/* set TM seen */
-	if (qrec) return ST_TMK;  }			/* rec spc? stop */
-    else {
-    	uptr->pos = uptr->pos + ((MTRL (tbc) + 1) & ~1) +
-	    (2 * sizeof (t_mtrlnt));			/* update pos */
-	uptr->flags = uptr->flags & ~UNIT_TMK;  }	/* clr TM seen */
-    *skipped = *skipped + 1;  }				/* # rec skipped */
-return 0;
+	st = sim_tape_sprecf (uptr, &tbc);		/* space rec fwd */
+	if ((st != MTSE_OK) && (st != MTSE_TMK))	/* real error? */
+	    return tq_map_status (uptr, st);		/* map status */
+	uptr->objp = uptr->objp + 1;			/* upd obj cnt */
+	if (st == MTSE_TMK) {				/* tape mark? */
+	    int32 pkt = uptr->cpkt;			/* get pkt */
+	    if ((tq_pkt[pkt].d[CMD_MOD] & MD_DLE) &&	/* LEOT? */
+		(uptr->flags & UNIT_TMK)) {
+		sim_tape_sprecr (uptr, &tbc);		/* rev over tmk */
+		uptr->flags = uptr->flags | UNIT_SXC;	/* serious exc */	    
+		return ST_LED;  }
+	    uptr->flags = uptr->flags | UNIT_TMK;	/* set TM seen */
+	    if (qrec) return ST_TMK;  }			/* rec spc? stop */
+	else uptr->flags = uptr->flags & ~UNIT_TMK;	/* clr TM seen */
+	*skipped = *skipped + 1;  }			/* # obj skipped */
+return ST_SUC;
 }
 
 uint32 tq_skipff (UNIT *uptr, uint32 cnt, uint32 *skipped)
@@ -1206,49 +1246,26 @@ uint32 st, skrec;
 
 *skipped = 0;
 while (*skipped < cnt) {				/* loop */
-    st = tq_spacef (uptr, 0xFFFFFFFF, &skrec, TRUE);	/* rec spc fwd */
-    if (st == ST_TMK) *skipped = *skipped + 1;		/* count files */
-    else if (st != 0) return st;  }
-return 0;
-}
-
-uint32 tq_rdlntr (UNIT *uptr, t_mtrlnt *tbc)
-{
-uptr->flags = uptr->flags & ~UNIT_TMK;			/* rev clrs tmk */
-if (uptr->pos < sizeof (t_mtrlnt)) {			/* at BOT? */
-    uptr->flags = (uptr->flags | UNIT_SXC) & ~UNIT_POL;
-    return ST_BOT;  }
-fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET);
-fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);	/* read rec lnt */
-if (ferror (uptr->fileref)) {				/* error? */
-    uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;	/* ser exc, pos lost */
-    return ST_DRV;  }
-if (feof (uptr->fileref)) {				/* end of file? */
-    uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;	/* ser exc, pos lost */
-    return ST_DAT;  }
-if (*tbc == MTR_EOM) {					/* end of medium? */
-    uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;	/* ser exc, pos lost */
-    uptr->pos = uptr->pos - sizeof (t_mtrlnt);		/* spc over eom */
-    return ST_DAT;  }
-return 0;
+	st = tq_spacef (uptr, INT_MAX, &skrec, TRUE);	/* rec spc fwd */
+	if (st == ST_TMK) *skipped = *skipped + 1;	/* count files */
+	else if (st != ST_SUC) return st;  }
+return ST_SUC;
 }
 
 uint32 tq_spacer (UNIT *uptr, uint32 cnt, uint32 *skipped, t_bool qrec)
 {
-uint32 st;
+t_stat st;
 t_mtrlnt tbc;
 
 *skipped = 0;
 while (*skipped < cnt) {				/* loop */
-    if (st = tq_rdlntr (uptr, &tbc)) return st;		/* read rec lnt */
-    uptr->objp = uptr->objp - 1;			/* upd obj cnt */
-    if (tbc == MTR_TMK) {				/* tape mark? */
-	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* update pos */
-	if (qrec) return ST_TMK;  }			/* recd spc? stop */
-    else uptr->pos = uptr->pos - ((MTRL (tbc) + 1) & ~1) -
-	(2 * sizeof (t_mtrlnt));			/* update pos */ 
-    *skipped = *skipped + 1;  }				/* # rec skipped */
-return 0;
+	st = sim_tape_sprecr (uptr, &tbc);		/* spc rec rev */
+	if ((st != MTSE_OK) && (st != MTSE_TMK))	/* real error? */
+	    return tq_map_status (uptr, st);		/* map status */
+	uptr->objp = uptr->objp - 1;			/* upd obj cnt */
+	if ((st == MTSE_TMK) && qrec) return ST_TMK;	/* tape mark, stop? */
+	*skipped = *skipped + 1;  }			/* # obj skipped */
+return ST_SUC;
 }
 
 uint32 tq_skipfr (UNIT *uptr, uint32 cnt, uint32 *skipped)
@@ -1257,64 +1274,41 @@ uint32 st, skrec;
 
 *skipped = 0;
 while (*skipped < cnt) {				/* loopo */
-    st = tq_spacer (uptr, 0xFFFFFFFF, &skrec, TRUE);	/* rec spc rev */
-    if (st == ST_TMK) *skipped = *skipped + 1;		/* tape mark? */
-    else if (st != 0) return st;  }			/* error? */
-return 0;
+	st = tq_spacer (uptr, INT_MAX, &skrec, TRUE);	/* rec spc rev */
+	if (st == ST_TMK) *skipped = *skipped + 1;	/* tape mark? */
+	else if (st != 0) return st;  }			/* error? */
+return ST_SUC;
 }
 
 /* Read buffer - can return ST_TMK, ST_FMT, or ST_DRV */
 
 uint32 tq_rdbuff (UNIT *uptr, t_mtrlnt *tbc)
 {
-t_mtrlnt i;
-uint32 st;
+t_stat st;
 
-if (st = tq_rdlntf (uptr, tbc)) return st;		/* read rec lnt */
-if (*tbc == MTR_TMK) {					/* tape mark? */
-    uptr->flags = uptr->flags | UNIT_SXC | UNIT_TMK;	/* serious exc */
-    uptr->pos = uptr->pos + sizeof (t_mtrlnt);		/* update pos */
-    uptr->objp = uptr->objp + 1;			/* update obj cnt */
-    return ST_TMK;  }
+st = sim_tape_rdrecf (uptr, tqxb, tbc, MT_MAXFR);	/* read rec fwd */
+if (st == MTSE_TMK) {					/* tape mark? */
+	uptr->flags = uptr->flags | UNIT_SXC | UNIT_TMK;/* serious exc */
+	uptr->objp = uptr->objp + 1;			/* update obj cnt */
+	return ST_TMK;  }
+if (st != MTSE_OK) return tq_map_status (uptr, st);	/* other error? */
 uptr->flags = uptr->flags & ~UNIT_TMK;			/* clr tape mark */
-*tbc = MTRL (*tbc);					/* ignore err flag */
-if (*tbc > MT_MAXFR) {					/* rec out of range? */
-    uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
-    return ST_FMT;  }
-i = fxread (tqxb, sizeof (uint8), *tbc, uptr->fileref);	/* read record */
-if (ferror (uptr->fileref)) {				/* error? */
-    uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
-    return ST_DRV;  }
-for ( ; i < *tbc; i++) tqxb[i] = 0;			/* fill with 0's */
-uptr->pos = uptr->pos + ((*tbc + 1) & ~1) + (2 * sizeof (t_mtrlnt));
 uptr->objp = uptr->objp + 1;				/* upd obj cnt */
-return 0;
+return ST_SUC;
 }
 
 uint32 tq_rdbufr (UNIT *uptr, t_mtrlnt *tbc)
 {
-t_mtrlnt i;
-uint32 st;
+t_stat st;
 
-if (st = tq_rdlntr (uptr, tbc)) return st;		/* read rec lnt */
-if (*tbc == MTR_TMK) {					/* tape mark? */
-    uptr->flags = uptr->flags | UNIT_SXC;		/* serious exc */
-    uptr->pos = uptr->pos - sizeof (t_mtrlnt);		/* update pos */
-    uptr->objp = uptr->objp - 1;			/* update obj cnt */
-    return ST_TMK;  }
-*tbc = MTRL (*tbc);					/* ignore err flag */
-if (*tbc > MT_MAXFR) {					/* rec out of range? */
-    uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
-    return ST_FMT;  }
-fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt) - *tbc, SEEK_SET);
-i = fxread (tqxb, sizeof (uint8), *tbc, uptr->fileref);	/* read record */
-if (ferror (uptr->fileref)) {				/* error? */
-    uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
-    return ST_DRV;  }
-for ( ; i < *tbc; i++) tqxb[i] = 0;			/* fill with 0's */
-uptr->pos = uptr->pos - ((*tbc + 1) & ~1) - (2 * sizeof (t_mtrlnt));
+st = sim_tape_rdrecr (uptr, tqxb, tbc, MT_MAXFR);	/* read rec rev */
+if (st == MTSE_TMK) {					/* tape mark? */
+	uptr->flags = uptr->flags | UNIT_SXC;		/* serious exc */
+	uptr->objp = uptr->objp - 1;			/* update obj cnt */
+	return ST_TMK;  }
+if (st != MTSE_OK) return tq_map_status (uptr, st);	/* other error? */
 uptr->objp = uptr->objp - 1;				/* upd obj cnt */
-return 0;
+return ST_SUC;
 }
 
 /* Data transfer error log packet */
@@ -1671,21 +1665,13 @@ tq_perr = err;						/* save error */
 return ERR;
 }
 
-/* Change controller type */
-
-t_stat tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-tq_typ = val;
-return SCPE_OK;
-}
-
 /* Device attach */
 
 t_stat tq_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
 
-r = attach_unit (uptr, cptr);
+r = sim_tape_attach (uptr, cptr);
 if (r != SCPE_OK) return r;
 if (tq_csta == CST_UP) uptr->flags = (uptr->flags | UNIT_ATP) &
 	~(UNIT_SXC | UNIT_POL | UNIT_TMK);
@@ -1698,7 +1684,7 @@ t_stat tq_detach (UNIT *uptr)
 {
 t_stat r;
 
-r = detach_unit (uptr);					/* detach unit */
+r = sim_tape_detach (uptr);				/* detach unit */
 if (r != SCPE_OK) return r;
 uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_ATP | UNIT_SXC | UNIT_POL | UNIT_TMK);
 uptr->uf = 0;						/* clr unit flgs */
@@ -1734,6 +1720,7 @@ CLR_INT (TQ);						/* clr intr req */
 for (i = 0; i < TQ_NUMDR + 2; i++) {			/* init units */
 	uptr = tq_dev.units + i;
 	sim_cancel (uptr);				/* clr activity */
+	sim_tape_reset (uptr);
 	uptr->flags = uptr->flags &			/* not online */
 		~(UNIT_ONL|UNIT_ATP|UNIT_SXC|UNIT_POL|UNIT_TMK);
 	uptr->uf = 0;					/* clr unit flags */
@@ -1982,5 +1969,33 @@ if (val & TQ_SH_UN) {
     for (i = 0; i < TQ_NUMDR; i++)
 	tq_show_unitq (st, &tq_unit[i], 0, NULL);
     }
+return SCPE_OK;
+}
+
+/* Set controller type (and capacity for user-defined type) */
+
+tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i, cap;
+t_stat r;
+
+if ((val < 0) || (val > TQU_TYPE) || ((val != TQU_TYPE) && cptr))
+	return SCPE_ARG;
+for (i = 0; i < TQ_NUMDR; i++) {
+	if (tq_unit[i].flags & UNIT_ATT) return SCPE_ALATT;  }
+if (cptr) {
+	cap = (int32) get_uint (cptr, 10, TQU_MAXC, &r);
+	if ((r != SCPE_OK) || (cap < TQU_MINC)) return SCPE_ARG;
+	drv_tab[TQU_TYPE].cap = cap << 20;  }
+tq_typ = val;
+return SCPE_OK;
+}
+
+/* Show controller type (and capacity for user-defined type) */
+
+tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "%s", drv_tab[tq_typ].name);
+if (tq_typ == TQU_TYPE) fprintf (st, " (%dMB)", drv_tab[tq_typ].cap >> 20);
 return SCPE_OK;
 }

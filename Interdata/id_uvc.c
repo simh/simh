@@ -23,8 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   pic			precision incremental clock
-   lfc			line frequency clock
+   pic		precision incremental clock
+   lfc		line frequency clock
+
+   01-Mar-03	RMS	Added SET/SHOW LFC FREQ support
+			Changed precision clock algorithm for V7 UNIX
 */
 
 #include "id_defs.h"
@@ -56,7 +59,9 @@ uint32 pic_rdp = 0;
 uint32 pic_wdp = 0;
 uint32 pic_cnti = 0;					/* instr/timer */
 uint32 pic_arm = 0;					/* int arm */
+uint32 pic_decr = 1;					/* decrement */
 uint16 pic_time[4] = { 1, 10, 100, 1000 };		/* delays */
+uint16 pic_usec[4] = { 1, 10, 100, 1000 };		/* usec per tick */
 static int32 pic_map[16] = {				/* map rate to delay */
  0, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0 };
 
@@ -74,6 +79,8 @@ DEVICE lfc_dev;
 uint32 lfc (uint32 dev, uint32 op, uint32 dat);
 t_stat lfc_svc (UNIT *uptr);
 t_stat lfc_reset (DEVICE *dptr);
+t_stat lfc_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat lfc_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* PIC data structures
 
@@ -90,7 +97,6 @@ REG pic_reg[] = {
 	{ HRDATA (BUF, pic_db, 16) },
 	{ HRDATA (RIC, pic_ric, 16) },
 	{ HRDATA (CIC, pic_cic, 12) },
-	{ DRDATA (SAVE, pic_save, 32), REG_HRO + PV_LEFT },
 	{ FLDATA (RDP, pic_rdp, 0) },
 	{ FLDATA (WDP, pic_wdp, 0) },
 	{ FLDATA (OVF, pic_ovf, 0) },
@@ -98,6 +104,9 @@ REG pic_reg[] = {
 	{ FLDATA (IENB, int_enb[l_PIC], i_PIC) },
 	{ FLDATA (IARM, pic_arm, 0) },
 	{ BRDATA (TIME, pic_time, 10, 16, 4), REG_NZ + PV_LEFT },
+	{ DRDATA (SAVE, pic_save, 32), REG_HRO + PV_LEFT },
+	{ DRDATA (DECR, pic_decr, 16), REG_HRO + PV_LEFT },
+	{ FLDATA (MODE, pic_cnti, 0), REG_HRO },
 	{ HRDATA (DEVNO, pic_dib.dno, 8), REG_HRO },
 	{ NULL }  };
 
@@ -131,11 +140,17 @@ REG lfc_reg[] = {
 	{ FLDATA (IENB, int_enb[l_LFC], i_LFC) },
 	{ FLDATA (IARM, lfc_arm, 0) },
 	{ DRDATA (TIME, lfc_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPS, lfc_tps, 8), REG_NZ + PV_LEFT },
+	{ DRDATA (TPS, lfc_tps, 8), PV_LEFT + REG_HRO },
 	{ HRDATA (DEVNO, lfc_dib.dno, 8), REG_HRO },
 	{ NULL }  };
 
 MTAB lfc_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 100, NULL, "50HZ",
+		&lfc_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 120, NULL, "60HZ",
+		&lfc_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "FREQUENCY", NULL,
+		NULL, &lfc_show_freq, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&set_dev, &show_dev, NULL },
 	{ 0 }  };
@@ -200,9 +215,9 @@ t_stat pic_svc (UNIT *uptr)
 {
 t_bool rate_chg = FALSE;
 
-if (pic_cnti) pic_cic = -1;				/* one shot? */
-pic_cic = pic_cic - 1;					/* decrement */
-if (pic_cic < 0) {					/* overflow? */
+if (pic_cnti) pic_cic = 0;				/* one shot? */
+pic_cic = pic_cic - pic_decr;				/* decrement */
+if (pic_cic <= 0) {					/* overflow? */
 	if (pic_wdp) pic_ovf = 1;			/* broken wr? set flag */
 	if (pic_arm) SET_INT (v_PIC);			/* if armed, intr */
 	if (GET_RATE (pic_ric) != GET_RATE (pic_db))	/* rate change? */
@@ -216,23 +231,27 @@ return SCPE_OK;
 
 /* Schedule next interval
 
-   If rate < 1ms, or diagnostic mode, count instructions
-   If rate = 1ms, and not diagnostic mode, use timer
+   If eff rate < 1ms, or diagnostic mode, count instructions
+   If eff rate = 1ms, and not diagnostic mode, use timer
 */
 
 void pic_sched (t_bool strt)
 {
-int32 r, t;
+int32 r, t, intv, intv_usec;
 
 pic_save = sim_grtime ();				/* save start */
 r = pic_map[GET_RATE (pic_ric)];			/* get mapped rate */
-t = pic_time[r];					/* get delay */
-if ((r == 3) && !(pic_unit.flags & UNIT_DIAG)) {	/* timer? */
+intv = pic_cic? pic_cic: 1;				/* get cntr */
+intv_usec = intv * pic_usec[r];				/* cvt to usec */
+if (!(pic_unit.flags & UNIT_DIAG) &&			/* not diag? */
+    ((intv_usec % 1000) == 0)) {			/* 1ms multiple? */
 	pic_cnti = 0;					/* clr mode */
-	if (strt) t = sim_rtcn_init (t, TMR_PIC);	/* init or */
+	pic_decr = pic_usec[3 - r];			/* set decrement */
+	if (strt) t = sim_rtcn_init (pic_time[3], TMR_PIC);	/* init or */
 	else t = sim_rtcn_calb (PIC_TPS, TMR_PIC);  }	/* calibrate */
 else {	pic_cnti = 1;					/* set mode */
-	t = t * (pic_cic + 1);				/* interval */
+	pic_decr = 1;					/* decr = 1 */
+	t = pic_time[r] * intv;				/* interval */
 	if (t == 1) t++;  }				/* for diagn */
 sim_activate (&pic_unit, t);				/* activate */
 return;
@@ -260,6 +279,7 @@ pic_ric = pic_cic = 0;
 pic_db = 0;
 pic_ovf = 0;						/* clear state */
 pic_cnti = 0;
+pic_decr = 1;
 pic_rdp = pic_wdp = 0;
 CLR_INT (v_PIC);					/* clear int */
 CLR_ENB (v_PIC);					/* disable int */
@@ -309,3 +329,22 @@ CLR_ENB (v_LFC);					/* disable int */
 lfc_arm = 0;						/* disarm int */
 return SCPE_OK;
 }
+
+/* Set frequency */
+
+t_stat lfc_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr) return SCPE_ARG;
+if ((val != 100) && (val != 120)) return SCPE_IERR;
+lfc_tps = val;
+return SCPE_OK;
+}
+
+/* Show frequency */
+
+t_stat lfc_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, (lfc_tps == 100)? "50Hz": "60Hz");
+return SCPE_OK;
+}
+

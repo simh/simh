@@ -25,6 +25,7 @@
 
    df		DF32 fixed head disk
 
+   03-Mar-03	RMS	Fixed autosizing
    02-Feb-03	RMS	Added variable platter and autosizing support
    04-Oct-02	RMS	Added DIBs, device number support
    28-Nov-01	RMS	Added RL8A support
@@ -44,9 +45,11 @@
 #include <math.h>
 
 #define UNIT_V_AUTO	(UNIT_V_UF + 0)			/* autosize */
-#define UNIT_V_MSIZE	(UNIT_V_UF + 1)			/* dummy mask */
+#define UNIT_V_PLAT	(UNIT_V_UF + 1)			/* #platters - 1 */
+#define UNIT_M_PLAT	03
+#define UNIT_GETP(x)	((((x) >> UNIT_V_PLAT) & UNIT_M_PLAT) + 1)
 #define UNIT_AUTO	(1 << UNIT_V_AUTO)
-#define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+#define UNIT_PLAT	(UNIT_M_PLAT << UNIT_V_PLAT)
 
 /* Constants */
 
@@ -119,7 +122,7 @@ DIB df_dib = { DEV_DF, 3, { &df60, &df61, &df62 } };
 
 UNIT df_unit =
 	{ UDATA (&df_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-	DF_NUMDK * DF_DKSIZE) };
+	  DF_DKSIZE) };
 
 REG df_reg[] = {
 	{ ORDATA (STA, df_sta, 12) },
@@ -136,10 +139,10 @@ REG df_reg[] = {
 	{ NULL }  };
 
 MTAB df_mod[] = {
-	{ UNIT_MSIZE,  32768, NULL, "1P", &df_set_size },
-	{ UNIT_MSIZE,  65536, NULL, "2P", &df_set_size },
-	{ UNIT_MSIZE,  98304, NULL, "3P", &df_set_size },
-	{ UNIT_MSIZE, 131072, NULL, "4P", &df_set_size },
+	{ UNIT_PLAT, 0, NULL, "1P", &df_set_size },
+	{ UNIT_PLAT, 1, NULL, "2P", &df_set_size },
+	{ UNIT_PLAT, 2, NULL, "3P", &df_set_size },
+	{ UNIT_PLAT, 3, NULL, "4P", &df_set_size },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&set_dev, &show_dev, NULL },
 	{ 0 } };
@@ -315,19 +318,15 @@ return SCPE_OK;
 
 t_stat df_attach (UNIT *uptr, char *cptr)
 {
-int32 p, d;
-int32 ds_bytes = DF_DKSIZE * sizeof (int16);
+t_addr p, sz;
+t_addr ds_bytes = DF_DKSIZE * sizeof (int16);
 
-if (uptr->flags & UNIT_AUTO) {
-	FILE *fp = fopen (cptr, "rb");
-	if (fp == NULL) return SCPE_OPENERR;
-	fseek (fp, 0, SEEK_END);
-	p = ftell (fp);
-	d = (p + ds_bytes - 1) / ds_bytes;
-	if (d == 0) d = 1;
-	if (d > DF_NUMDK) d = DF_NUMDK;
-	uptr->capac = d * DF_DKSIZE;
-	fclose (fp);  }
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
+	p = (sz + ds_bytes - 1) / ds_bytes;
+	if (p == 0) p = 1;
+	if (p > DF_NUMDK) p = DF_NUMDK;  }
+else p = UNIT_GETP (uptr->flags);
+uptr->capac = p * DF_DKSIZE;
 return attach_unit (uptr, cptr);
 }
 
@@ -335,10 +334,9 @@ return attach_unit (uptr, cptr);
 
 t_stat df_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if ((val == 0) || (val > (DF_NUMDK * DF_DKSIZE)))
-	return SCPE_IERR;
+if ((val < 0) || (val >= DF_NUMDK)) return SCPE_IERR;
 if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-uptr->capac = val;
+uptr->capac = (val + 1) * DF_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
 }

@@ -1,0 +1,25 @@
+Bugs Found
+----------
+
+1. pushj cleared T2 after setting it
+2. if timer autoadjust is enabled, timer diagnostic may fail,
+   depending on host CPU speed
+3. DFAD/DFSB should use FP_ONES instead of ONES
+4. TLB physical address max = 1MW, tested in diagnostic
+5. DPB does read/write, not read-modify/write
+6. Fetch error takes priority over traps, due to prefetching
+   of next instruction
+7. HSB is 36b, was 32b
+8. CPU and PAG devices had mismatched types
+9. non-zero sections in Tops-20 paging section indirect may
+   cause non-existent memory error, due to microcode "error"
+10. PXCT test for user mode was backward
+11. Timer interrupts were not implemented in Tops-20 indirect
+   chains
+12. epta/upta hit known bug in VC++ implementation of 64b
+   data types
+13. final W calculation in Tops-20 paging was incorrect
+14. Timer representation lost sub msec values
+15. UBA initialization reset the UBA itself
+16. RHCS1: writing IE cannot trigger an interrupt
+17. Tape bootstrap was set to 800bpi instead of 1600bpi

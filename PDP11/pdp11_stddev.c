@@ -1,6 +1,6 @@
 /* pdp11_stddev.c: PDP-11 standard I/O devices simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti,tto	DL11 terminal input/output
    clk		KW11L line frequency clock
 
+   01-Mar-03	RMS	Added SET/SHOW CLOCK FREQ, SET TTI CTRL-C
    22-Nov-02	RMS	Changed terminal default to 7B for UNIX
    01-Nov-02	RMS	Added 7B/8B support to terminal
    29-Sep-02	RMS	Added vector display support
@@ -58,7 +59,6 @@
 
 #define UNIT_V_8B	(UNIT_V_UF + 0)			/* 8B */
 #define UNIT_8B		(1 << UNIT_V_8B)
-#define UNIT_KSR	(1 << UNIT_V_KSR)
 
 extern int32 int_req[IPL_HLVL];
 extern int32 int_vec[IPL_HLVL][32];
@@ -78,11 +78,14 @@ t_stat tto_rd (int32 *data, int32 PA, int32 access);
 t_stat tto_wr (int32 data, int32 PA, int32 access);
 t_stat tto_svc (UNIT *uptr);
 t_stat tto_reset (DEVICE *dptr);
+t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat clk_rd (int32 *data, int32 PA, int32 access);
 t_stat clk_wr (int32 data, int32 PA, int32 access);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
+t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* TTI data structures
 
@@ -110,6 +113,8 @@ REG tti_reg[] = {
 MTAB tti_mod[] = {
 	{ UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
 	{ UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
+	{ MTAB_XTD|MTAB_VDV|MTAB_VUN, 0, NULL, "CTRL-C",
+		&tti_set_ctrlc, NULL, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
 		NULL, &show_addr, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
@@ -180,10 +185,16 @@ REG clk_reg[] = {
 	{ FLDATA (DONE, clk_csr, CSR_V_DONE) },
 	{ FLDATA (IE, clk_csr, CSR_V_IE) },
 	{ DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
+	{ DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
 	{ NULL }  };
 
 MTAB clk_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 50, NULL, "50HZ",
+		&clk_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 60, NULL, "60HZ",
+		&clk_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "FREQUENCY", NULL,
+		NULL, &clk_show_freq, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
 		NULL, &show_addr, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
@@ -252,6 +263,18 @@ tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);
 sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
+return SCPE_OK;
+}
+
+/* Set control-C */
+
+t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr) return SCPE_ARG;
+uptr->buf = 003;
+uptr->pos = uptr->pos + 1;
+tti_csr = tti_csr | CSR_DONE;
+if (tti_csr & CSR_IE) SET_INT (TTI);
 return SCPE_OK;
 }
 
@@ -363,5 +386,23 @@ CLR_INT (CLK);
 sim_activate (&clk_unit, clk_unit.wait);		/* activate unit */
 tmr_poll = clk_unit.wait;				/* set timer poll */
 tmxr_poll = clk_unit.wait;				/* set mux poll */
+return SCPE_OK;
+}
+
+/* Set frequency */
+
+t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr) return SCPE_ARG;
+if ((val != 50) && (val != 60)) return SCPE_IERR;
+clk_tps = val;
+return SCPE_OK;
+}
+
+/* Show frequency */
+
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;
 }

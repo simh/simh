@@ -27,7 +27,7 @@ endif
 # Common Libraries
 #
 BIN = BIN/
-SIM = scp.c scp_tty.c sim_sock.c sim_tmxr.c sim_ether.c
+SIM = scp.c scp_tty.c sim_sock.c sim_tmxr.c sim_ether.c sim_tape.c
 
 
 
@@ -212,7 +212,7 @@ SDS_OPT = -I ${SDSD}
 #
 # Build everything
 #
-all : ${BIN}pdp1${EXE} ${BIN}pdp4${EXE} ${BIN}pdp7${EXE} ${BIN}pdp8${EXE} \
+ALL = ${BIN}pdp1${EXE} ${BIN}pdp4${EXE} ${BIN}pdp7${EXE} ${BIN}pdp8${EXE} \
 	${BIN}pdp9${EXE} ${BIN}pdp15${EXE} ${BIN}pdp11${EXE} ${BIN}pdp10${EXE} \
 	${BIN}vax${EXE} ${BIN}nova${EXE} ${BIN}eclipse${EXE} ${BIN}h316${EXE} \
 	${BIN}hp2100${EXE} ${BIN}i1401${EXE} ${BIN}i1620${EXE} ${BIN}s3${EXE} \
@@ -220,7 +220,14 @@ all : ${BIN}pdp1${EXE} ${BIN}pdp4${EXE} ${BIN}pdp7${EXE} ${BIN}pdp8${EXE} \
 	${BIN}i1620${EXE} ${BIN}ibm1130${EXE} ${BIN}id16${EXE} \
 	${BIN}id32${EXE} ${BIN}sds${EXE}
 
+all : ${ALL}
 
+clean :
+ifeq ($(WIN32),)
+	${RM} ${ALL}
+else
+	if exist BIN\*.exe del /q BIN\*.exe
+endif
 #
 # Individual builds
 #

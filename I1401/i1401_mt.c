@@ -1,6 +1,6 @@
 /* i1401_mt.c: IBM 1401 magnetic tape simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt		7-track magtape
 
+   28-Feb-03	RMS	Modified for magtape library
    31-Oct-02	RMS	Added error record handling
    10-Oct-02	RMS	Fixed end-of-record on load read writes WM plus GM
    30-Sep-02	RMS	Revamped error handling
@@ -59,13 +60,9 @@
 */
 
 #include "i1401_defs.h"
+#include "sim_tape.h"
 
 #define MT_NUMDR	7				/* #drives */
-#define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
-#define UNIT_V_PNU	(UNIT_V_UF + 1)			/* pos not upd */
-#define UNIT_WLK	(1 << UNIT_V_WLK)
-#define UNIT_PNU	(1 << UNIT_V_PNU)
-#define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
 #define MT_MAXFR	(MAXMEMSIZE * 2)		/* max transfer */
 
 extern uint8 M[];					/* memory */
@@ -75,7 +72,7 @@ extern UNIT cpu_unit;
 uint8 dbuf[MT_MAXFR];					/* tape buffer */
 t_stat mt_reset (DEVICE *dptr);
 t_stat mt_boot (int32 unitno, DEVICE *dptr);
-t_stat mt_attach (UNIT *uptr, char *cptr);
+t_stat mt_map_status (t_stat st);
 UNIT *get_unit (int32 unit);
 
 /* MT data structures
@@ -113,15 +110,15 @@ REG mt_reg[] = {
 	{ NULL }  };
 
 MTAB mt_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
+	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
+	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
 	{ 0 }  };
 
 DEVICE mt_dev = {
 	"MT", mt_unit, mt_reg, mt_mod,
 	MT_NUMDR, 10, 31, 1, 8, 8,
 	NULL, NULL, &mt_reset,
-	&mt_boot, &mt_attach, NULL };
+	&mt_boot, &sim_tape_attach, &sim_tape_detach };
 
 /* Function routine
 
@@ -134,59 +131,38 @@ DEVICE mt_dev = {
 
 t_stat mt_func (int32 unit, int32 mod)
 {
-int32 err, pnu;
 t_mtrlnt tbc;
 UNIT *uptr;
-static t_mtrlnt bceof = { MTR_TMK };
+t_stat st;
 
 if ((uptr = get_unit (unit)) == NULL) return STOP_INVMTU; /* valid unit? */
-pnu = MT_TST_PNU (uptr);				/* get pos not upd */
-MT_CLR_PNU (uptr);					/* and clear */
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* attached? */
 switch (mod) {						/* case on modifier */
 case BCD_B:						/* backspace */
-	ind[IN_END] = 0;				/* clear end of reel */
-	if (pnu || (uptr->pos < sizeof (t_mtrlnt)))	/* bot or pnu? */
-	    return SCPE_OK;
-	fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET);
-	fxread (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
-	if ((err = ferror (uptr->fileref)) ||		/* err or eof? */
-	    feof (uptr->fileref)) break;
-	if ((tbc == MTR_TMK) || (tbc == MTR_EOM))	/* tmk or eom? */
-	    uptr->pos = uptr->pos - sizeof (t_mtrlnt);
-	else uptr->pos = uptr->pos - ((MTRL (tbc) + 1) & ~1) -
-	    (2 * sizeof (t_mtrlnt));
+	ind[IN_END] = 0;				/* clear end of file */
+	st = sim_tape_sprecr (uptr, &tbc);		/* space rev */
 	break;  					/* end case */
 
 case BCD_E:						/* erase = nop */
-	if (uptr->flags & UNIT_WPRT) return STOP_MTL;
+	if (sim_tape_wrp (uptr)) return STOP_MTL;
 	return SCPE_OK;
 
 case BCD_M:						/* write tapemark */
-	if (uptr->flags & UNIT_WPRT) return STOP_MTL;
-	fseek (uptr->fileref, uptr->pos, SEEK_SET);
-	fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr->fileref);
-	if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr); /* error */
-	else uptr->pos = uptr->pos + sizeof (t_mtrlnt);
+	st = sim_tape_wrtmk (uptr);			/* write tmk */
 	break;
 
 case BCD_R:						/* rewind */
-	uptr->pos = 0;					/* update position */
+	sim_tape_rewind (uptr);				/* update position */
 	return SCPE_OK;
 
 case BCD_U:						/* unload */
-	uptr->pos = 0;					/* update position */
+	sim_tape_rewind (uptr);				/* update position */
 	return detach_unit (uptr);			/* detach */
 
 default:
 	return STOP_INVM;  }
 
-if (err != 0) {						/* I/O error */
-	perror ("MT I/O error");
-	clearerr (uptr->fileref);
-	ind[IN_TAP] = 1;				/* set indicator */
-	if (iochk) return SCPE_IOERR;  }
-return SCPE_OK;
+return mt_map_status (st);
 }
 
 /* Read and write routines
@@ -201,37 +177,21 @@ return SCPE_OK;
 
 t_stat mt_io (int32 unit, int32 flag, int32 mod)
 {
-int32 err, t, wm_seen;
-t_mtrlnt i, tbc, ebc;
+int32 t, wm_seen;
+t_mtrlnt i, tbc;
+t_stat st;
 UNIT *uptr;
 
 if ((uptr = get_unit (unit)) == NULL) return STOP_INVMTU; /* valid unit? */
-uptr->flags = uptr->flags & ~UNIT_PNU;			/* clr pos not upd */
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* attached? */
 
 switch (mod) {
 case BCD_R:						/* read */
 	ind[IN_TAP] = ind[IN_END] = 0;			/* clear error */
 	wm_seen = 0;					/* no word mk seen */
-	fseek (uptr->fileref, uptr->pos, SEEK_SET);
-	fxread (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
-	if (err = ferror (uptr->fileref)) break;	/* error? */
-	if (feof (uptr->fileref) || (tbc == MTR_EOM)) {	/* eom or eof? */
-	    ind[IN_TAP] = 1;				/* pretend error */
-	    MT_SET_PNU (uptr);				/* pos not upd */
-	    break;  }
-	if (tbc == MTR_TMK) {				/* tape mark? */
-	    ind[IN_END] = 1;				/* set end mark */
-	    uptr->pos = uptr->pos + sizeof (t_mtrlnt);
-	    break;  }
-	if (MTRF (tbc)) ind[IN_TAP] = 1;		/* error? set flag */
-	tbc = MTRL (tbc);				/* clear error flag */
-	if (tbc > MT_MAXFR) return SCPE_MTRLNT;		/* record too long? */	
-	i = fxread (dbuf, sizeof (int8), tbc, uptr->fileref);
-	if (err = ferror (uptr->fileref)) break;	/* I/O error? */
-	for ( ; i < tbc; i++) dbuf[i] = 0;		/* fill with 0's */
-	uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
-	    (2 * sizeof (t_mtrlnt));
+	st = sim_tape_rdrecf (uptr, dbuf, &tbc, MT_MAXFR);	/* read rec */
+	if (st == MTSE_RECE) ind[IN_TAP] = 1;		/* rec in error? */
+	else if (st != MTSE_OK) break;			/* stop on error */
 	for (i = 0; i < tbc; i++) {			/* loop thru buf */
 	    if (M[BS] == (BCD_GRPMRK + WM)) {		/* GWM in memory? */
 		BS++;					/* incr BS */
@@ -260,7 +220,7 @@ case BCD_R:						/* read */
 	break;
 
 case BCD_W:
-	if (uptr->flags & UNIT_WPRT) return STOP_MTL;	/* locked? */
+	if (uptr->flags & MTUF_WRP) return STOP_MTL;	/* locked? */
 	if (M[BS] == (BCD_GRPMRK + WM)) return STOP_MTZ;	/* eor? */
 	ind[IN_TAP] = ind[IN_END] = 0;			/* clear error */
 	for (tbc = 0; (t = M[BS++]) != (BCD_GRPMRK + WM); ) {
@@ -271,13 +231,7 @@ case BCD_W:
 	    if (ADDR_ERR (BS)) {			/* check next BS */
 		BS = BA | (BS % MAXMEMSIZE);
 		return STOP_WRAP;  }  }
-	ebc = (tbc + 1) & ~1;				/* force even */
-	fseek (uptr->fileref, uptr->pos, SEEK_SET);
-	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
-	fxwrite (dbuf, sizeof (int8), ebc, uptr->fileref);
-	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
-	if (err = ferror (uptr->fileref)) break;	/* I/O error? */
-	uptr->pos = uptr->pos + ebc + (2 * sizeof (t_mtrlnt));
+	st = sim_tape_wrrecf (uptr, dbuf, tbc);		/* write record */
 	if (ADDR_ERR (BS)) {				/* check final BS */
 	    BS = BA | (BS % MAXMEMSIZE);
 	    return STOP_WRAP;  }
@@ -285,13 +239,7 @@ case BCD_W:
 default:
 	return STOP_INVM;  }
 
-if (err != 0) {						/* I/O error? */
-	perror ("MT I/O error");
-	clearerr (uptr->fileref);
-	MT_SET_PNU (uptr);				/* pos not upd */
-	ind[IN_TAP] = 1;				/* flag error */
-	if (iochk) return SCPE_IOERR;  }
-return SCPE_OK;
+return mt_map_status (st);
 }
 
 /* Get unit pointer from unit number */
@@ -299,7 +247,37 @@ return SCPE_OK;
 UNIT *get_unit (int32 unit)
 {
 if ((unit <= 0) || (unit >= MT_NUMDR)) return NULL;
-else return mt_dev.units + unit;
+return mt_dev.units + unit;
+}
+
+/* Map tape status */
+
+t_stat mt_map_status (t_stat st)
+{
+switch (st) {
+case MTSE_OK:						/* no error */
+case MTSE_BOT:						/* reverse into BOT */
+	break;
+case MTSE_FMT:						/* illegal fmt */
+	return SCPE_IERR;
+case MTSE_UNATT:					/* not attached */
+	return SCPE_UNATT;
+case MTSE_INVRL:					/* invalid rec lnt */
+	return SCPE_MTRLNT;
+case MTSE_TMK:						/* end of file */
+	ind[IN_END] = 1;				/* set end mark */
+	break;
+case MTSE_IOERR:					/* IO error */
+	ind[IN_TAP] = 1;				/* set error */
+	if (iochk) return SCPE_IOERR;
+	break;
+case MTSE_RECE:						/* record in error */
+case MTSE_EOM:						/* end of medium */
+	ind[IN_TAP] = 1;				/* set error */
+	break;
+case MTSE_WRP:						/* write protect */
+	return STOP_MTL;  }
+return SCPE_OK;
 }
 
 /* Reset routine */
@@ -315,21 +293,13 @@ ind[IN_END] = ind[IN_TAP] = 0;				/* clear indicators */
 return SCPE_OK;
 }
 
-/* Attach routine */
-
-t_stat mt_attach (UNIT *uptr, char *cptr)
-{
-MT_CLR_PNU (uptr);
-return attach_unit (uptr, cptr);
-}
-
 /* Bootstrap routine */
 
 t_stat mt_boot (int32 unitno, DEVICE *dptr)
 {
 extern int32 saved_IS;
 
-mt_unit[unitno].pos = 0;				/* force rewind */
+sim_tape_rewind (&mt_unit[unitno]);			/* force rewind */
 BS = 1;							/* set BS = 001 */
 mt_io (unitno, MD_WM, BCD_R);				/* LDA %U1 001 R */
 saved_IS = 1;

@@ -107,7 +107,6 @@ t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 rubout, word, low, high, csum, newf, state, i;
 t_addr origin, field;
-extern t_bool match_ext (char *fnam, char *ext);
 
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 rubout = state = field = newf = origin = csum = 0;

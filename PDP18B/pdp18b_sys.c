@@ -1,6 +1,6 @@
 /* pdp18b_sys.c: 18b PDP's simulator interface
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   02-Mar-03	RMS	Split loaders apart for greater flexibility
+   09-Feb-03	RMS	Fixed bug in FMTASC (found by Hans Pufal)
    31-Jan-03	RMS	Added support for RB09
    05-Oct-02	RMS	Added variable device number support
    25-Jul-02	RMS	Added PDP-4 DECtape support
@@ -159,7 +161,7 @@ const char *sim_stop_messages[] = {
 	"Invalid API interrupt",
 	"Non-standard device number"  };
 
-/* Binary loader */
+/* Binary loaders */
 
 int32 getword (FILE *fileref, int32 *hi)
 {
@@ -176,9 +178,7 @@ if (hi != NULL) *hi = bits;
 return word;
 }
 
-#if defined (PDP4) || defined (PDP7)
-
-/* PDP-4/PDP-7: RIM format only
+/* PDP-4/PDP-7 RIM format loader
 
    Tape format
 	dac addr
@@ -189,11 +189,12 @@ return word;
 	jmp addr or hlt
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat rim_load_47 (FILE *fileref, char *cptr)
 {
 int32 origin, val;
 
-if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
+if (*cptr != 0) return SCPE_2MARG;
+origin = 0200;
 for (;;) {
 	if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
 	if ((val & 0760000) == 0040000) {		/* DAC? */
@@ -208,60 +209,58 @@ for (;;) {
 return SCPE_FMT;					/* error */
 }
 
-#else
+/* PDP-9/15 RIM format loader
 
-/* PDP-9/PDP-15: RIM format and BIN format
-
-   RIM format (read in address specified externally)
+   Tape format (read in address specified externally)
 	data
 	:
 	data
 	word to execute (bit 1 of last character set)
-
-   BIN format (starts after RIM bootstrap)
-    block/	origin (>= 0)
-		count
-		checksum
-		data
-		:
-		data
-    block/
-    :
-    endblock/	origin (< 0)
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat rim_load_915 (FILE *fileref, char *cptr)
 {
-extern int32 sim_switches;
-int32 i, bits, origin, count, cksum, val;
-t_stat r;
+int32 bits, origin, val;
 char gbuf[CBUFSIZE];
-extern t_bool match_ext (char *fnm, char *ext);
+t_stat r;
 
-/* RIM loader */
+if (*cptr != 0) {					/* more input? */
+	cptr = get_glyph (cptr, gbuf, 0);		/* get origin */
+	origin = get_uint (gbuf, 8, ADDRMASK, &r);
+	if (r != SCPE_OK) return r;
+	if (*cptr != 0) return SCPE_ARG;  }		/* no more */
+else origin = 0200;					/* default 200 */
 
-if ((sim_switches & SWMASK ('R')) ||			/* RIM format? */
-    (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B')))) {
-	if (*cptr != 0) {				/* more input? */
-	    cptr = get_glyph (cptr, gbuf, 0);		/* get origin */
-	    origin = get_uint (gbuf, 8, ADDRMASK, &r);
-	    if (r != SCPE_OK) return r;
-	    if (*cptr != 0) return SCPE_ARG;  }		/* no more */
-	else origin = 0200;				/* default 200 */
+for (;;) {						/* word loop */
+	if ((val = getword (fileref, &bits)) < 0) return SCPE_FMT;
+	if (bits & 1) {					/* end of tape? */
+	    if ((val & 0760000) == OP_JMP) saved_PC = 
+		((origin - 1) & 060000) | (val & 017777);
+	    else if (val != OP_HLT) return SCPE_FMT;
+	    break;  }
+	else if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
+return SCPE_OK;
+}
 
-	for (;;) {					/* word loop */
-	    if ((val = getword (fileref, &bits)) < 0) return SCPE_FMT;
-	    if (bits & 1) {				/* end of tape? */
-		if ((val & 0760000) == OP_JMP) saved_PC = 
-		     ((origin - 1) & 060000) | (val & 017777);
-		else if (val != OP_HLT) return SCPE_FMT;
-		break;  }
-	    else if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
-	return SCPE_OK;  }
+/* PDP-9/15 BIN format loader
 
-/* Binary loader */
+   BIN format (starts after RIM bootstrap)
+	block/		origin (>= 0)
+			count
+			checksum
+			data
+		:
+			data
+	block/
+	:
+	endblock/	origin (< 0)
+*/
 
-if (*cptr != 0) return SCPE_ARG;			/* no arguments */
+t_stat bin_load_915 (FILE *fileref, char *cptr)
+{
+int32 i, val, origin, count, cksum;
+
+if (*cptr != 0) return SCPE_2MARG;			/* no arguments */
 do {	val = getc (fileref);  }			/* find end RIM */
 while (((val & 0100) == 0) && (val != EOF));
 if (val == EOF) rewind (fileref);			/* no RIM? rewind */ 
@@ -283,6 +282,34 @@ for (;;) {						/* block loop */
 	if ((cksum & DMASK) != 0) return SCPE_CSUM;  }
 return SCPE_OK;
 }
+
+#if defined (PDP4) || defined (PDP7)
+
+/* PDP-4/PDP-7: RIM format only */
+
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+{
+if (flag != 0) return SCPE_NOFNC;
+return rim_load_47 (fileref, cptr);
+}
+
+#else
+
+/* PDP-9/PDP-15: all formats */
+
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+{
+extern int32 sim_switches;
+
+if (flag != 0) return SCPE_NOFNC;
+if (sim_switches & SWMASK ('S'))			/* PDP-4/7 format? */
+	return rim_load_47 (fileref, cptr);
+if ((sim_switches & SWMASK ('R')) ||			/* RIM format? */
+    (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B'))))
+	return rim_load_915 (fileref, cptr);
+return bin_load_915 (fileref, cptr);			/* must be BIN */
+}
+
 #endif
 
 /* Symbol tables */
@@ -679,7 +706,7 @@ return sp;
 	return	=	status code
 */
 
-#define FMTASC(x) (((x) < 040)? "<%03o>": "%c", (x))
+#define FMTASC(x) (((x) < 040)? "<%03o>": "%c"), (x)
 #define SIXTOASC(x) (((x) >= 040)? (x): ((x) + 0100))
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
@@ -691,7 +718,7 @@ inst = val[0];
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 if (sw & SWMASK ('A')) {				/* ASCII? */
 	if (inst > 0377) return SCPE_ARG;
-	fprintf (of, "%c", FMTASC (inst & 0177));
+	fprintf (of, FMTASC (inst & 0177));
 	return SCPE_OK;  }
 if (sw & SWMASK ('C')) {				/* character? */
 	fprintf (of, "%c", SIXTOASC ((inst >> 12) & 077));
@@ -701,11 +728,11 @@ if (sw & SWMASK ('C')) {				/* character? */
 #if defined (PDP15)
 if (sw & SWMASK ('P')) {				/* packed ASCII? */
 	i = val[1];
-	fprintf (of, "%c", FMTASC ((inst >> 11) & 0177));
-	fprintf (of, "%c", FMTASC ((inst >> 4) & 0177));
-	fprintf (of, "%c", FMTASC (((inst << 3) | (i >> 15)) & 0177));
-	fprintf (of, "%c", FMTASC ((i >> 8) & 0177));
-	fprintf (of, "%c", FMTASC ((i >> 1) & 0177));
+	fprintf (of, FMTASC ((inst >> 11) & 0177));
+	fprintf (of, FMTASC ((inst >> 4) & 0177));
+	fprintf (of, FMTASC (((inst << 3) | (i >> 15)) & 0177));
+	fprintf (of, FMTASC ((i >> 8) & 0177));
+	fprintf (of, FMTASC ((i >> 1) & 0177));
 	return -1;  }
 #endif
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;

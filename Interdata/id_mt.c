@@ -1,6 +1,6 @@
 /* id_mt.c: Interdata magnetic tape simulator
 
-   Copyright (c) 2001-2002, Robert M Supnik
+   Copyright (c) 2001-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    mt		M46-494 dual density 9-track magtape controller
 
+   28-Feb-03	RMS	Revised for magtape library
+   20-Feb-03	RMS	Fixed read to stop selch on error
+
    Magnetic tapes are represented as a series of variable 8b records
    of the form:
 
@@ -42,15 +45,11 @@
 */
 
 #include "id_defs.h"
+#include "sim_tape.h"
 
-#define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
-#define UNIT_V_PNU	(UNIT_V_UF + 1)			/* pos not updated */
-#define UNIT_WLK	(1 << UNIT_V_WLK)
-#define UNIT_PNU	(1 << UNIT_V_PNU)
 #define UST		u3				/* unit status */
 #define UCMD		u4				/* unit command */
 #define MT_MAXFR	(1 << 16)			/* max transfer */
-#define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
 
 /* Command - in UCMD */
 
@@ -98,15 +97,12 @@ static const uint8 bad_cmd[64] = {
 
 DEVICE mt_dev;
 uint32 mt (uint32 dev, uint32 op, uint32 dat);
-t_bool mt_rdlntf (UNIT *uptr, t_mtrlnt *tbc, int32 *err);
-t_bool mt_rdlntr (UNIT *uptr, t_mtrlnt *tbc, int32 *err);
-t_bool mt_forwsp (UNIT *uptr, int32 *err);
-t_bool mt_backsp (UNIT *uptr, int32 *err);
 t_stat mt_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
 t_stat mt_attach (UNIT *uptr, char *cptr);
 t_stat mt_detach (UNIT *uptr);
 t_stat mt_boot (int32 unitno, DEVICE *dptr);
+t_stat mt_map_err (UNIT *uptr, t_stat st);
 
 /* MT data structures
 
@@ -146,8 +142,8 @@ REG mt_reg[] = {
 	{ NULL }  };
 
 MTAB mt_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
+	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&set_dev, &show_dev, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "SELCH", "SELCH",
@@ -200,7 +196,7 @@ case IO_OC:						/* command */
 	if (((uptr->flags & UNIT_ATT) == 0) ||		/* ignore if unatt */
 	    bad_cmd[f] ||				/* or bad cmd */
 	   (((f == MTC_WR) || (f == MTC_WEOF)) &&	/* or write */
-	    (uptr->flags & UNIT_WPRT))) break;		/* and protected */
+	    sim_tape_wrp (uptr))) break;		/* and protected */
 	for (i = 0; i < MT_NUMDR; i++) {		/* check other drvs */
 	    if (sim_is_active (&mt_unit[i]) &&		/* active? */
 		(mt_unit[i].UCMD != MTC_REW)) {		/* not rewind? */
@@ -238,16 +234,11 @@ return 0;
 
 t_stat mt_svc (UNIT *uptr)
 {
-uint32 i, pnu;
-int32 err;
+uint32 i;
 int32 u = uptr - mt_dev.units;
 uint32 dev = mt_dib.dno + (u * o_MT0);
 t_mtrlnt tbc;
-static t_mtrlnt bceof = { 0 };
-
-err = 0;
-pnu = MT_TST_PNU (uptr);				/* get pos not upd */
-MT_CLR_PNU (uptr);					/* and clear */
+t_stat st, r = SCPE_OK;
 
 if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
 	uptr->UCMD = 0;					/* clr cmd */
@@ -274,8 +265,8 @@ if (uptr->UCMD & MTC_STOP1) {				/* stop, gen EOM? */
 switch (uptr->UCMD) {					/* case on function */
 
 case MTC_REW:						/* rewind */
+	sim_tape_rewind (uptr);				/* reposition */
 	uptr->UCMD = 0;					/* clr cmd */
-	uptr->pos = 0;					/* update position */
 	uptr->UST = STA_NMTN | STA_EOT;			/* update status */
 	mt_sta = mt_sta & ~STA_BSY;			/* don't set EOM */
 	if (mt_arm[u]) SET_INT (v_MT + u);		/* interrupt */
@@ -293,16 +284,15 @@ case MTC_REW:						/* rewind */
 
 case MTC_RD:						/* read */
 	if (mt_blnt == 0) {				/* first time? */
-	    if (mt_rdlntf (uptr, &tbc, &err)) break;	/* read rec lnt, err? */
-	    mt_blnt = tbc;				/* set buf lnt */
-	    if (tbc > MT_MAXFR) return SCPE_MTRLNT;	/* record too long? */
-	    i = fxread (mtxb, sizeof (uint8), mt_blnt, uptr->fileref);
-	    if (err = ferror (uptr->fileref)) {		/* error? */
-		MT_SET_PNU (uptr);			/* pos not upd */
+	    st = sim_tape_rdrecf (uptr, mtxb, &tbc, MT_MAXFR);	/* read rec */
+	    if (st == MTSE_RECE) mt_sta = mt_sta | STA_ERR;	/* rec in err? */
+	    else if (st != SCPE_OK) {			/* other error? */
+		r = mt_map_err (uptr, st);		/* map error */
+		if (sch_actv (mt_dib.sch, dev))		/* if sch, stop */
+		    sch_stop (mt_dib.sch);
 		break;  }
-	    for ( ; i < mt_blnt; i++) mtxb[i] = 0;	/* fill with 0's */
-	    uptr->pos = uptr->pos + ((tbc + 1) & ~1)	/* upd pos */
-		+ (2 * sizeof (t_mtrlnt));  }
+	    mt_blnt = tbc;				/* set buf lnt */
+	    }
 
 	if (sch_actv (mt_dib.sch, dev)) {		/* sch active? */
 	    i = sch_wrmem (mt_dib.sch, mtxb, mt_blnt);	/* store rec in mem */
@@ -334,114 +324,77 @@ case MTC_WR:						/* write */
 	    return SCPE_OK;  }
 
 	if (mt_bptr) {					/* any chars? */
-	    int32 ebc = (mt_bptr + 1) & ~1;		/* force even */
-	    fseek (uptr->fileref, uptr->pos, SEEK_SET);
-	    fxwrite (&mt_bptr, sizeof (t_mtrlnt), 1, uptr->fileref);
-	    fxwrite (mtxb, sizeof (uint8), ebc, uptr->fileref);
-	    fxwrite (&mt_bptr, sizeof (t_mtrlnt), 1, uptr->fileref);
-	    if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr);
-	    else uptr->pos = uptr->pos + ebc + (2 * sizeof (t_mtrlnt));  }
+	    if (st = sim_tape_wrrecf (uptr, mtxb, mt_bptr))	/* write, err? */
+		r = mt_map_err (uptr, st);  }		/* map error */
 	break;						/* record done */
 
 /* Unit service, continued */
 
 case MTC_WEOF:						/* write eof */
-	fseek (uptr->fileref, uptr->pos, SEEK_SET);	/* set pos */
-	fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr->fileref);
-	if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr);
-	else uptr->pos = uptr->pos + sizeof (t_mtrlnt);	/* update pos */
+	if (st = sim_tape_wrtmk (uptr))			/* write tmk, err? */
+	    r = mt_map_err (uptr, st);			/* map error */
 	mt_sta = mt_sta | STA_EOF;			/* set eof */
 	if (mt_arm[u]) SET_INT (v_MT + u);		/* interrupt */
 	break;
 
 case MTC_SKFF:						/* skip file fwd */
-	while (mt_forwsp (uptr, &err)) ;		/* spc until EOF/EOT */
+	while ((st = sim_tape_sprecf (uptr, &tbc)) == MTSE_OK) ;
+	if (st == MTSE_TMK) {				/* stopped by tmk? */
+	    mt_sta = mt_sta | STA_EOF;			/* set eof */
+	    if (mt_arm[u]) SET_INT (v_MT + u);  }	/* set intr */
+	else r = mt_map_err (uptr, st);			/* map error */
 	break;
 
 case MTC_SKFR:						/* skip file rev */
-	while (mt_backsp (uptr, &err)) ;		/* spc until EOF/BOT */
+	while ((st = sim_tape_sprecr (uptr, &tbc)) == MTSE_OK) ;
+	if (st == MTSE_TMK) {				/* stopped by tmk? */
+	    mt_sta = mt_sta | STA_EOF;			/* set eof */
+	    if (mt_arm[u]) SET_INT (v_MT + u);  }	/* set intr */
+	else r = mt_map_err (uptr, st);			/* map error */
 	break;
 
 case MTC_SPCR:						/* backspace */
-	if (!pnu) mt_backsp (uptr, &err);		/* if pos not upd */
+	if (st = sim_tape_sprecr (uptr, &tbc))		/* skip rec rev, err? */
+	    r = mt_map_err (uptr, st);			/* map error */
 	break;  }					/* end case */
 
-if (err != 0) {						/* I/O error */
-	mt_sta = mt_sta | STA_ERR;
-	perror ("MT I/O error");
-	clearerr (uptr->fileref);
-	if (mt_stopioe) return SCPE_IOERR;  }
 uptr->UCMD = uptr->UCMD | MTC_STOP1;			/* set stop stage 1 */
 sim_activate (uptr, mt_rtime);				/* schedule */
-return SCPE_OK;
+return r;
 }
 
-/* Tape motion routines */
+/* Map tape error status */
 
-t_bool mt_rdlntf (UNIT *uptr, t_mtrlnt *tbc, int32 *err)
+t_stat mt_map_err (UNIT *uptr, t_stat st)
 {
 int32 u = uptr - mt_dev.units;
 
-fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* position */
-fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);	/* get bc */
-if ((*err = ferror (uptr->fileref)) ||			/* err or eom? */
-    feof (uptr->fileref) || (*tbc == MTR_EOM)) {
-	mt_sta = mt_sta | STA_ERR;			/* set err */
-	MT_SET_PNU (uptr);				/* pos not upd */
-	return TRUE;  }
-if (*tbc == MTR_TMK) {					/* tape mark? */
+switch (st) {
+case MTSE_FMT:						/* illegal fmt */
+case MTSE_UNATT:					/* not attached */
+	mt_sta = mt_sta | STA_ERR;
+case MTSE_OK:						/* no error */
+	return SCPE_IERR;
+case MTSE_TMK:						/* end of file */
 	mt_sta = mt_sta | STA_EOF;			/* set eof */
 	if (mt_arm[u]) SET_INT (v_MT + u);		/* set intr */
-	uptr->pos = uptr->pos + sizeof (t_mtrlnt);	/* update pos */
-	return TRUE;  }
-*tbc = MTRL (*tbc);
-return FALSE;
-}
-
-t_bool mt_rdlntr (UNIT *uptr, t_mtrlnt *tbc, int32 *err)
-{
-int32 u = uptr - mt_dev.units;
-
-if (uptr->pos < sizeof (t_mtrlnt)) {			/* at bot? */
+	break;
+case MTSE_IOERR:					/* IO error */
+	mt_sta = mt_sta | STA_ERR;			/* set err */
+	if (mt_stopioe) return SCPE_IOERR;
+	break;
+case MTSE_INVRL:					/* invalid rec lnt */
+	mt_sta = mt_sta | STA_ERR;
+	return SCPE_MTRLNT;
+case MTSE_WRP:						/* write protect */
+case MTSE_RECE:						/* record in error */
+case MTSE_EOM:						/* end of medium */
+	mt_sta = mt_sta | STA_ERR;			/* set err */
+	break;
+case MTSE_BOT:						/* reverse into BOT */
 	uptr->UST = uptr->UST | STA_EOT;		/* set err */
-	return TRUE;  }
-fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET);
-fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);	/* get bc */
-if ((*err = ferror (uptr->fileref)) ||			/* err or eof? */
-    feof (uptr->fileref)) {
-	mt_sta = mt_sta | STA_ERR;			/* set err */
-	return TRUE;  }
-if (*tbc == MTR_EOM) {					/* eom? */
-	mt_sta = mt_sta | STA_ERR;			/* set err */
-	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* update pos */
-	return TRUE;  }
-if (*tbc == MTR_TMK) {					/* tape mark? */
-	mt_sta = mt_sta | STA_EOF;			/* set eof */
-	if (mt_arm[u]) SET_INT (v_MT + u);		/* set intr */
-	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* update pos */
-	return TRUE;  }
-*tbc = MTRL (*tbc);
-return FALSE;
-}
-
-t_bool mt_forwsp (UNIT *uptr, int32 *err)
-{
-t_mtrlnt tbc;
-
-if (mt_rdlntf (uptr, &tbc, err)) return FALSE;		/* read rec lnt, err? */
-uptr->pos = uptr->pos + ((tbc + 1) & ~1) +		/* space to next rec */
-	(2 * sizeof (t_mtrlnt));
-return TRUE;
-}
-
-t_bool mt_backsp (UNIT *uptr, int32 *err)
-{
-t_mtrlnt tbc;
-
-if (mt_rdlntr (uptr, &tbc, err)) return FALSE;		/* read rec lnt, err? */
-uptr->pos = uptr->pos - ((tbc + 1) & ~1) -		/* space to prv rec */
-	(2 * sizeof (t_mtrlnt));
-return TRUE;
+	break;  }					/* end switch */
+return SCPE_OK;
 }
 
 /* Reset routine */
@@ -459,7 +412,7 @@ for (u = 0; u < MT_NUMDR; u++) {			/* loop thru units */
 	CLR_ENB (v_MT + u);				/* disable int */
 	mt_arm[u] = 0;					/* disarm int */
 	uptr = mt_dev.units + u;
-	MT_CLR_PNU (uptr);				/* clear pos flag */
+	sim_tape_reset (uptr);				/* clear pos flag */
 	sim_cancel (uptr);				/* cancel activity */
 	uptr->UST = (uptr->UST & STA_UFLGS) | STA_NMTN;	/* init status */
 	uptr->UCMD = 0;  }				/* init cmd */
@@ -473,10 +426,8 @@ t_stat mt_attach (UNIT *uptr, char *cptr)
 int32 u = uptr - mt_dev.units;
 t_stat r;
 
-r = attach_unit (uptr, cptr);
+r = sim_tape_attach (uptr, cptr);
 if (r != SCPE_OK) return r;
-uptr->pos = 0;
-MT_CLR_PNU (uptr);
 uptr->UST = STA_EOT;
 if (mt_arm[u]) SET_INT (v_MT + u);
 return r;
@@ -489,11 +440,9 @@ t_stat mt_detach (UNIT* uptr)
 int32 u = uptr - mt_dev.units;
 t_stat r;
 
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;
-r = detach_unit (uptr);
+r = sim_tape_detach (uptr);
 if (r != SCPE_OK) return r;
 if (mt_arm[u]) SET_INT (v_MT + u);
-MT_CLR_PNU (uptr);
 uptr->UST = 0;
 return SCPE_OK;
 }
@@ -518,7 +467,7 @@ extern DIB sch_dib;
 uint32 sch_dev;
 
 if (decrom[0xD5] & dec_flgs) return SCPE_NOFNC;		/* AL defined? */
-mt_unit[unitno].pos = 0;				/* rewind */
+sim_tape_rewind (&mt_unit[unitno]);			/* rewind */
 sch_dev = sch_dib.dno + mt_dib.sch;			/* sch dev # */
 IOWriteBlk (BOOT_START, BOOT_LEN, boot_rom);		/* copy boot */
 IOWriteB (AL_DEV, mt_dib.dno + (unitno * o_MT0));	/* set dev no for unit */

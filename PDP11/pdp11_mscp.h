@@ -1,4 +1,4 @@
-/* pdp11_mscp.h: DEC MSCP and TMSCP definitions
+/* pdp11_mscp.h: DEC MSCP and TMSCP definitionsn
 
    Copyright (c) 2001-2003, Robert M Supnik
    Derived from work by Stephen F. Shirron

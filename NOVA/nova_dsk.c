@@ -25,6 +25,7 @@
 
    dsk		fixed head disk
 
+   03-Mar-03	RMS	Fixed variable capacity and autosizing
    03-Oct-02	RMS	Added DIB
    06-Jan-02	RMS	Revised enable/disable support
    23-Aug-01	RMS	Fixed bug in write watermarking
@@ -41,9 +42,11 @@
 #include <math.h>
 
 #define UNIT_V_AUTO	(UNIT_V_UF + 0)			/* autosize */
-#define UNIT_V_MSIZE	(UNIT_V_UF + 1)			/* dummy mask */
+#define UNIT_V_PLAT	(UNIT_V_UF + 1)			/* #platters - 1 */
+#define UNIT_M_PLAT	07
+#define UNIT_GETP(x)	((((x) >> UNIT_V_PLAT) & UNIT_M_PLAT) + 1)
 #define UNIT_AUTO	(1 << UNIT_V_AUTO)
-#define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+#define UNIT_PLAT	(UNIT_M_PLAT << UNIT_V_PLAT)
 
 /* Constants */
 
@@ -112,7 +115,7 @@ DIB dsk_dib = { DEV_DSK, INT_DSK, PI_DSK, &dsk };
 
 UNIT dsk_unit =
 	{ UDATA (&dsk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-		DSK_NUMDK * DSK_DKSIZE) };
+		DSK_DKSIZE) };
 
 REG dsk_reg[] = {
 	{ ORDATA (STAT, dsk_stat, 16) },
@@ -128,14 +131,14 @@ REG dsk_reg[] = {
 	{ NULL }  };
 
 MTAB dsk_mod[] = {
-	{ UNIT_MSIZE,  262144, NULL, "1P", &dsk_set_size },
-	{ UNIT_MSIZE,  524288, NULL, "2P", &dsk_set_size },
-	{ UNIT_MSIZE,  786432, NULL, "3P", &dsk_set_size },
-	{ UNIT_MSIZE, 1048576, NULL, "4P", &dsk_set_size },
-	{ UNIT_MSIZE, 1310720, NULL, "5P", &dsk_set_size },
-	{ UNIT_MSIZE, 1572864, NULL, "6P", &dsk_set_size },
-	{ UNIT_MSIZE, 1835008, NULL, "7P", &dsk_set_size },
-	{ UNIT_MSIZE, 2097152, NULL, "8P", &dsk_set_size },
+	{ UNIT_PLAT, 0, NULL, "1P", &dsk_set_size },
+	{ UNIT_PLAT, 1, NULL, "2P", &dsk_set_size },
+	{ UNIT_PLAT, 2, NULL, "3P", &dsk_set_size },
+	{ UNIT_PLAT, 3, NULL, "4P", &dsk_set_size },
+	{ UNIT_PLAT, 4, NULL, "5P", &dsk_set_size },
+	{ UNIT_PLAT, 5, NULL, "6P", &dsk_set_size },
+	{ UNIT_PLAT, 6, NULL, "7P", &dsk_set_size },
+	{ UNIT_PLAT, 7, NULL, "8P", &dsk_set_size },
 	{ UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", NULL },
 	{ 0 }  };
 
@@ -268,19 +271,15 @@ return SCPE_OK;
 
 t_stat dsk_attach (UNIT *uptr, char *cptr)
 {
-int32 p, d;
-int32 ds_bytes = DSK_DKSIZE * sizeof (int16);
+t_addr sz, p;
+t_addr ds_bytes = DSK_DKSIZE * sizeof (int16);
 
-if (uptr->flags & UNIT_AUTO) {
-	FILE *fp = fopen (cptr, "rb");
-	if (fp == NULL) return SCPE_OPENERR;
-	fseek (fp, 0, SEEK_END);
-	p = ftell (fp);
-	d = (p + ds_bytes - 1) / ds_bytes;
-	if (d == 0) d = 1;
-	if (d > DSK_NUMDK) d = DSK_NUMDK;
-	uptr->capac = d * DSK_DKSIZE;
-	fclose (fp);  }
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
+	p = (sz + ds_bytes - 1) / ds_bytes;
+	if (p == 0) p = 1;
+	if (p > DSK_NUMDK) p = DSK_NUMDK;  }
+else p = UNIT_GETP (uptr->flags);			/* get # plat */
+uptr->capac = p * DSK_DKSIZE;				/* set capacity */
 return attach_unit (uptr, cptr);
 }
 
@@ -288,10 +287,9 @@ return attach_unit (uptr, cptr);
 
 t_stat dsk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if ((val == 0) || (val > (DSK_NUMDK * DSK_DKSIZE)))
-	return SCPE_IERR;
+if ((val < 0) || (val >= DSK_NUMDK)) return SCPE_IERR;
 if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-uptr->capac = val;
+uptr->capac = (val + 1) * DSK_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
 }

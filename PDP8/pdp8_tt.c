@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tti,tto	KL8E terminal input/output
 
+   02-Mar-02	RMS	Added SET TTI CTRL-C
    22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7B/8B support
    04-Oct-02	RMS	Added DIBs, device number support
@@ -48,6 +49,7 @@ t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
+t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* TTI data structures
@@ -76,7 +78,8 @@ MTAB tti_mod[] = {
 	{ UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", &tty_set_mode },
 	{ UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
 	{ UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
-	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_dev },
+	{ MTAB_XTD|MTAB_VDV|MTAB_VUN, 0, NULL, "CTRL-C", &tti_set_ctrlc, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_dev, NULL },
 	{ 0 }  };
 
 DEVICE tti_dev = {
@@ -159,14 +162,14 @@ int32 c;
 sim_activate (&tti_unit, tti_unit.wait);		/* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
 if (c & SCPE_BREAK) tti_unit.buf = 0;			/* break? */
-else if (tti_unit.flags & UNIT_KSR) {			/* UC only? */
+else if (tti_unit.flags & UNIT_KSR) {			/* KSR? */
 	c = c & 0177;
 	if (islower (c)) c = toupper (c);
 	tti_unit.buf = c | 0200;  }			/* add TTY bit */
 else tti_unit.buf = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);
+tti_unit.pos = tti_unit.pos + 1;
 dev_done = dev_done | INT_TTI;				/* set done */
 int_req = INT_UPDATE;					/* update interrupts */
-tti_unit.pos = tti_unit.pos + 1;
 return SCPE_OK;
 }
 
@@ -179,6 +182,18 @@ dev_done = dev_done & ~INT_TTI;				/* clear done, int */
 int_req = int_req & ~INT_TTI;
 int_enable = int_enable | INT_TTI;			/* set enable */
 sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
+return SCPE_OK;
+}
+
+/* Set control-C */
+
+t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr) return SCPE_ARG;
+uptr->buf = (uptr->flags & UNIT_KSR)? 0203: 0003;
+uptr->pos = uptr->pos + 1;
+dev_done = dev_done | INT_TTI;				/* set done */
+int_req = INT_UPDATE;					/* update interrupts */
 return SCPE_OK;
 }
 

@@ -1,6 +1,6 @@
 /* id_dp.c: Interdata 2.5MB/10MB cartridge disk simulator
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    dp		M46-421 2.5MB/10MB cartridge disk
+
+   16-Feb-03	RMS	Fixed read to test transfer ok before selch operation
 */
 
 #include "id_defs.h"
@@ -133,6 +135,7 @@ static struct drvtyp drv_tab[] = {
 	{ 0 }  };
 
 extern uint32 int_req[INTSZ], int_enb[INTSZ];
+extern FILE *sim_log;
 
 uint8 dpxb[DP_NUMBY];					/* xfer buffer */
 uint32 dp_bptr = 0;					/* buffer ptr */
@@ -148,6 +151,7 @@ uint32 dpd_arm[DP_NUMDR] = { 0 };			/* drives armed */
 int32 dp_stime = 100;					/* seek latency */
 int32 dp_rtime = 100;					/* rotate latency */
 int32 dp_wtime = 1;					/* word time */
+int32 dp_log = 0;					/* debug log */
 uint8 dp_tplte[(2 * DP_NUMDR) + 2];			/* fix/rmv + ctrl + end */
 
 DEVICE dp_dev;
@@ -208,6 +212,7 @@ REG dp_reg[] = {
 		  DP_NUMDR, REG_RO) },
 	{ URDATA (CAPAC, dp_unit[0].capac, 10, 31, 0,
 		  DP_NUMDR, PV_LEFT | REG_HRO) },
+	{ FLDATA (LOG, dp_log, 0), REG_HIDDEN },
 	{ HRDATA (DEVNO, dp_dib.dno, 8), REG_HRO },
 	{ HRDATA (SELCH, dp_dib.sch, 2), REG_HRO },
 	{ NULL }  };
@@ -260,6 +265,8 @@ case IO_RD:						/* read data */
 	else dp_sta = dp_sta | STA_BSY;			/* xfr? set busy */
 	return dp_db;					/* return data */
 case IO_WD:						/* write data */
+	if (sim_log && dp_log) fprintf (sim_log,
+	    ">>DPC WD = %02X, STA = %02X\n", dat, dp_sta);
 	if (dp_sta & STC_IDL) dp_hdsc = dat & HS_MASK;	/* idle? hdsc */
 	else {						/* data xfer */
 	    dp_sta = dp_sta | STA_BSY;			/* set busy */
@@ -270,6 +277,8 @@ case IO_SS:						/* status */
 	if (t & SETC_EX) t = t | STA_EX;		/* test for EX */
 	return t;
 case IO_OC:						/* command */
+	if (sim_log && dp_log) fprintf (sim_log,
+	    ">>DPC OC = %02X, STA = %02X\n", dat, dp_sta);
 	f = dat & CMC_MASK;				/* get cmd */
 	if (f & CMC_CLR) {				/* clear? */
 	    dp_reset (&dp_dev);				/* reset world */
@@ -305,6 +314,8 @@ case IO_ADR:						/* select */
 	if (dp_sta & STC_IDL) dp_svun = dev;		/* idle? save unit */
 	return BY;					/* byte only */
 case IO_WD:						/* write data */
+	if (sim_log && dp_log) fprintf (sim_log,
+	    ">>DP%d WD = %02X, STA = %02X\n", u, dat, dp_sta);
 	if (GET_DTYPE (uptr->flags) == TYPE_2315)	/* 2.5MB drive? */
 	    dp_cyl = dat & 0xFF;			/* cyl is 8b */
 	else dp_cyl = ((dp_cyl << 8) | dat) & DMASK16;	/* insert byte */
@@ -318,6 +329,8 @@ case IO_SS:						/* status */
 	if (t & SETD_EX) t = t | STA_EX;		/* test for ex */
 	return t;
 case IO_OC:						/* command */
+	if (sim_log && dp_log) fprintf (sim_log,
+	    ">>DP%d OC = %02X, STA = %02X\n", u, dat, dp_sta);
 	dpd_arm[u] = int_chg (v_DPC + u + 1, dat, dpd_arm[u]);
 	if (dat & CMD_SK) t = dp_cyl;			/* seek? get cyl */
 	else if (dat & CMD_RST) t = 0;			/* rest? cyl 0 */
@@ -378,9 +391,9 @@ case CMC_RD:						/* read */
 
 case CMC_WR:						/* write */
 	if (sch_actv (dp_dib.sch, dp_dib.dno)) {	/* sch transfer? */
+	    if (dp_dter (uptr, dp_1st)) return SCPE_OK;	/* check xfr err */
 	    dp_bptr = sch_rdmem (dp_dib.sch, dpxb, DP_NUMBY); /* read from mem */
 	    dp_db = dpxb[dp_bptr - 1];			/* last byte */
-	    if (dp_dter (uptr, dp_1st)) return SCPE_OK;	/* check xfr err */
 	    if (r = dp_wds (uptr)) return r;		/* write sec, err? */
 	    dp_1st = 0;
 	    if (sch_actv (dp_dib.sch, dp_dib.dno)) {	/* more to do? */	
@@ -440,8 +453,10 @@ if (((uptr->flags & UNIT_ATT) == 0) ||			/* not attached? */
 hd = GET_SRF (dp_hdsc);					/* get head */
 sc = GET_SEC (dp_hdsc);					/* get sector */
 if (dp_cyl != (uint32) uptr->CYL) {			/* wrong cylinder? */
-	dp_done (STC_ACF);				/* error, done */
-	return TRUE;  }
+	if (dp_cyl == 0) uptr->CYL = 0;
+	else {
+	    dp_done (STC_ACF);				/* error, done */
+	    return TRUE;  }  }
 if (sc >= DP_NUMSC) {					/* bad sector? */
 	dp_done (STC_OVR);				/* error, done */
 	return TRUE;  }

@@ -23,7 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   pt			paper tape reader and punch
+   pt		paper tape reader and punch
 */
 
 #include "id_defs.h"

@@ -55,7 +55,7 @@
 #define RL01_SIZE	(RL_NUMCY*RL_NUMSF*RL_NUMSC*RL_NUMBY)  /* words/drive */
 #define RL02_SIZE	(RL01_SIZE * 2)			/* words/drive */
 #define RL_BBMAP	014				/* sector for bblk map */
-#define RL_BBID	0123				/* ID for bblk map */
+#define RL_BBID		0123				/* ID for bblk map */
 
 /* Flags in the unit flags word */
 

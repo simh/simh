@@ -1,6 +1,6 @@
 /* hp2100_mt.c: HP 2100 12559A magnetic tape simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt		12559A 3030 nine track magnetic tape
 
+   28-Feb-03	RMS	Revised for magtape library
    30-Sep-02	RMS	Revamped error handling
    28-Aug-02	RMS	Added end of medium support
    30-May-02	RMS	Widened POS to 32b
@@ -54,15 +55,10 @@
 */
 
 #include "hp2100_defs.h"
+#include "sim_tape.h"
 
-#define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
-#define UNIT_V_PNU	(UNIT_V_UF + 1)			/* pos not updated */
-#define UNIT_WLK	(1 << UNIT_V_WLK)
-#define UNIT_PNU	(1 << UNIT_V_PNU)
 #define DB_V_SIZE	16				/* max data buf */
 #define DBSIZE		(1 << DB_V_SIZE)		/* max data cmd */
-#define DBMASK		(DBSIZE - 1)
-#define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
 
 /* Command - mtc_fnc */
 
@@ -108,12 +104,9 @@ int32 mtdio (int32 inst, int32 IR, int32 dat);
 int32 mtcio (int32 inst, int32 IR, int32 dat);
 t_stat mtc_svc (UNIT *uptr);
 t_stat mtc_reset (DEVICE *dptr);
-t_stat mtc_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat mtc_attach (UNIT *uptr, char *cptr);
 t_stat mtc_detach (UNIT *uptr);
-t_bool mt_rdlntf (UNIT *uptr, t_mtrlnt *tbc, int32 *err);
-t_bool mt_rdlntr (UNIT *uptr, t_mtrlnt *tbc, int32 *err);
-int32 mt_wrtrec (UNIT *uptr, t_mtrlnt lnt);
+t_stat mt_map_err (UNIT *uptr, t_stat st);
 
 /* MTD data structures
 
@@ -143,6 +136,8 @@ REG mtd_reg[] = {
 	{ NULL }  };
 
 MTAB mtd_mod[] = {
+	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
+	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
 	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
 		&hp_setdev, &hp_showdev, &mtd_dev },
 	{ 0 }  };
@@ -183,8 +178,6 @@ REG mtc_reg[] = {
 	{ NULL }  };
 
 MTAB mtc_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", &mtc_vlock },
-	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", &mtc_vlock }, 
 	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
 		&hp_setdev, &hp_showdev, &mtd_dev },
 	{ 0 }  };
@@ -234,6 +227,7 @@ return dat;
 int32 mtcio (int32 inst, int32 IR, int32 dat)
 {
 int32 i, devc, devd, valid;
+t_stat st;
 
 devc = IR & I_DEVMASK;					/* get device no */
 devd = devc - 1;
@@ -252,8 +246,9 @@ case ioOTX:						/* output */
 	mtc_sta = mtc_sta & ~STA_REJ;			/* clear reject */
 	if (dat == FNC_CLR) {				/* clear? */
 	    if (sim_is_active (&mtc_unit) &&		/* write in prog? */
-		(mtc_fnc == FNC_WC) && (mt_ptr > 0))	/* yes, bad rec */
-		mt_wrtrec (&mtc_unit, mt_ptr | MTR_ERF);
+		(mtc_fnc == FNC_WC) && (mt_ptr > 0)) {	/* yes, bad rec */
+		    if (st = sim_tape_wrrecf (&mtc_unit, mtxb, mt_ptr | MTR_ERF))
+			mt_map_err (&mtc_unit, st);  }
 	    if (((mtc_fnc == FNC_REW) || (mtc_fnc == FNC_RWS)) &&
 		sim_is_active (&mtc_unit)) sim_cancel (&mtc_unit);
 	    mtc_1st = mtc_dtf = 0;
@@ -267,7 +262,7 @@ case ioOTX:						/* output */
 	    if (dat == mtc_cmd[i]) valid = 1;
 	if (!valid || sim_is_active (&mtc_unit) ||	/* is cmd valid? */
 	   ((mtc_sta & STA_BOT) && (dat == FNC_BSR)) ||
-	   ((mtc_unit.flags & UNIT_WPRT) && 
+	   (sim_tape_wrp (&mtc_unit) && 
 	     ((dat == FNC_WC) || (dat == FNC_GAP) || (dat == FNC_WFM))))
 	    mtc_sta = mtc_sta | STA_REJ;
 	else {
@@ -286,7 +281,7 @@ case ioMIX:						/* merge */
 	dat = dat | (mtc_sta & ~(STA_LOCAL | STA_WLK | STA_BUSY));
 	if (mtc_unit.flags & UNIT_ATT) {		/* construct status */
 	    if (sim_is_active (&mtc_unit)) dat = dat | STA_BUSY;
-	    if (mtc_unit.flags & UNIT_WPRT) dat = dat | STA_WLK;  }
+	    if (sim_tape_wrp (&mtc_unit)) dat = dat | STA_WLK;  }
 	else dat = dat | STA_BUSY | STA_LOCAL;	
 	break;
 case ioCTL:						/* control clear/set */
@@ -309,10 +304,10 @@ return dat;
 
 t_stat mtc_svc (UNIT *uptr)
 {
-int32 devc, devd, err, pnu;
-static t_mtrlnt i, bceof = { MTR_TMK };
+int32 devc, devd;
+t_mtrlnt tbc;
+t_stat st, r = SCPE_OK;
 
-err = 0;						/* assume no errors */
 devc = mtc_dib.devno;					/* get device nos */
 devd = mtd_dib.devno;
 if ((mtc_unit.flags & UNIT_ATT) == 0) {			/* offline? */
@@ -320,66 +315,54 @@ if ((mtc_unit.flags & UNIT_ATT) == 0) {			/* offline? */
 	setFLG (devc);					/* set cch flg */
 	return IORETURN (mtc_stopioe, SCPE_UNATT);  }
 
-pnu = MT_TST_PNU (uptr);				/* get pos not upd */
-MT_CLR_PNU (uptr);					/* and clear */
 switch (mtc_fnc) {					/* case on function */
 
 case FNC_REW:						/* rewind */
-	mtc_unit.pos = 0;				/* BOT */
+	sim_tape_rewind (uptr);				/* BOT */
 	mtc_sta = STA_BOT;				/* update status */
 	break;
 
 case FNC_RWS:						/* rewind and offline */
-	mtc_unit.pos = 0;				/* clear position */
-	return detach_unit (uptr);			/* don't set cch flg */
+	sim_tape_rewind (uptr);				/* clear position */
+	return sim_tape_detach (uptr);			/* don't set cch flg */
 
 case FNC_WFM:						/* write file mark */
-	fseek (mtc_unit.fileref, mtc_unit.pos, SEEK_SET);
-	fxwrite (&bceof, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
+	if (st = sim_tape_wrtmk (uptr))			/* write tmk, err? */
+	    r = mt_map_err (uptr, st);			/* map error */
 	mtc_sta = STA_EOF;				/* set EOF status */
-	if (err = ferror (mtc_unit.fileref)) MT_SET_PNU (uptr);
-	else mtc_unit.pos = mtc_unit.pos + sizeof (t_mtrlnt); /* update tape pos */
 	break;
 
 case FNC_GAP:						/* erase gap */
 	break;
 
 case FNC_FSR:						/* space forward */
-	if (mt_rdlntf (uptr, &mt_max, &err)) break;	/* read rec lnt, err? */
-	mtc_unit.pos = mtc_unit.pos + ((mt_max + 1) & ~1) +
-		(2 * sizeof (t_mtrlnt));		/* update position */
+	if (st = sim_tape_sprecf (uptr, &tbc))		/* space rec fwd, err? */
+	    r = mt_map_err (uptr, st);			/* map error */
 	break;
 
 case FNC_BSR:						/* space reverse */
-	if (pnu) break;					/* pnu? do nothing */
-	if (mt_rdlntr (uptr, &mt_max, &err)) break;	/* read rec lnt, err? */
-	mtc_unit.pos = mtc_unit.pos - ((mt_max + 1) & ~1) -
-	    (2 * sizeof (t_mtrlnt));			/* update position */
+	if (st = sim_tape_sprecr (uptr, &tbc))		/* space rec rev, err? */
+	    r = mt_map_err (uptr, st);			/* map error */
 	break;
 
 /* Unit service, continued */
 
 case FNC_RC:						/* read */
 	if (mtc_1st) {					/* first svc? */
-	    mtc_1st = 0;				/* clr 1st flop */
-	    if (mt_rdlntf (uptr, &mt_max, &err)) {	/* read rec lnt */
-		if (!err) {				/* tmk or eom? */
+	    mtc_1st = mt_ptr = 0;			/* clr 1st flop */
+	    st = sim_tape_rdrecf (uptr, mtxb, &mt_max, DBSIZE);	/* read rec */
+	    if (st == MTSE_RECE) mtc_sta = mtc_sta | STA_PAR;	/* rec in err? */
+	    else if (st != MTSE_OK) {			/* other error? */
+		r = mt_map_err (uptr, st);		/* map error */
+		if (r == SCPE_OK) {			/* recoverable? */
 		    sim_activate (uptr, mtc_gtime);	/* sched IRG */
 		    mtc_fnc = 0;			/* NOP func */
 		    return SCPE_OK;  }
-		break;  }				/* error, done */
-	    if (mt_max > DBSIZE) return SCPE_MTRLNT;	/* record too long? */
+		break;  }				/* non-recov, done */
 	    if (mt_max < 12) {				/* record too short? */
 		mtc_sta = mtc_sta | STA_PAR;		/* set flag */
 		break;  }
-	    i = fxread (mtxb, sizeof (int8), mt_max, mtc_unit.fileref);
-	    for ( ; i < mt_max; i++) mtxb[i] = 0;	/* fill with 0's */
-	    if (err = ferror (mtc_unit.fileref)) {	/* error? */
-		mtc_sta = mtc_sta | STA_PAR;		/* set flag */
-		MT_SET_PNU (uptr);			/* pos not upd */
-		break;  }
-	    mtc_unit.pos = mtc_unit.pos + ((mt_max + 1) & ~1) +
-		(2 * sizeof (t_mtrlnt));  }		/* update position */
+	    }
 	if (mt_ptr < mt_max) {				/* more chars? */
 	    if (FLG (devd)) mtc_sta = mtc_sta | STA_TIM;
 	    mtc_unit.buf = mtxb[mt_ptr++];		/* fetch next */
@@ -402,7 +385,9 @@ case FNC_WC:						/* write */
 	    sim_activate (uptr, mtc_xtime);		/* re-activate */
 	    return SCPE_OK;  }
 	if (mt_ptr) {					/* write buffer */
-	    if (err = mt_wrtrec (uptr, mt_ptr)) break;  }
+	    if (st = sim_tape_wrrecf (uptr, mtxb, mt_ptr)) {	/* write, err? */
+		r = mt_map_err (uptr, st);		/* map error */
+		break;  }  }				/* done */
 	sim_activate (uptr, mtc_gtime);			/* schedule gap */
 	mtc_fnc = 0;					/* nop */
 	return SCPE_OK;
@@ -412,70 +397,40 @@ default:						/* unknown */
 
 setFLG (devc);						/* set cch flg */
 mtc_sta = mtc_sta & ~STA_BUSY;				/* not busy */
-if (err != 0) {						/* I/O error */
-	perror ("MT I/O error");
-	clearerr (mtc_unit.fileref);
-	if (mtc_stopioe) return SCPE_IOERR;  }
 return SCPE_OK;
 }
 
-/* Tape motion routines */
+/* Map tape error status */
 
-t_bool mt_rdlntf (UNIT *uptr, t_mtrlnt *tbc, int32 *err)
+t_stat mt_map_err (UNIT *uptr, t_stat st)
 {
-fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* position */
-fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);	/* get bc */
-if ((*err = ferror (uptr->fileref)) ||			/* error or eom? */ 
-     feof (uptr->fileref) || (*tbc == MTR_EOM)) {
-	mtc_sta = mtc_sta | STA_PAR;			/* error */
-	MT_SET_PNU (uptr);				/* pos not upd */
-	return TRUE;  }
-if (*tbc == MTR_TMK) {					/* tape mark? */
+switch (st) {
+case MTSE_FMT:						/* illegal fmt */
+case MTSE_UNATT:					/* unattached */
+	mtc_sta = mtc_sta | STA_REJ;			/* reject */
+case MTSE_OK:						/* no error */
+	return SCPE_IERR;				/* never get here! */
+case MTSE_TMK:						/* end of file */
 	mtc_sta = mtc_sta | STA_EOF;			/* eof */
-	uptr->pos = uptr->pos + sizeof (t_mtrlnt);	/* spc over tmk */
-	return TRUE;  }
-if (MTRF (*tbc)) mtc_sta = mtc_sta | STA_PAR;		/* error in rec? */
-*tbc = MTRL (*tbc);					/* clear err flag */
-return FALSE;
-}
-
-t_bool mt_rdlntr (UNIT *uptr, t_mtrlnt *tbc, int32 *err)
-{
-if (uptr->pos < sizeof (t_mtrlnt)) {			/* no data to read? */
-	mtc_sta = mtc_sta | STA_BOT;			/* update status */
-	return TRUE;  }
-fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET);
-fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);	/* get bc */
-if ((*err = ferror (uptr->fileref)) ||			/* error or eof? */ 
-     feof (uptr->fileref)) {
+	break;
+case MTSE_IOERR:					/* IO error */
 	mtc_sta = mtc_sta | STA_PAR;			/* error */
-	return TRUE;  }
-if (*tbc == MTR_EOM) {					/* eom? */
+	if (mtc_stopioe) return SCPE_IOERR;
+	break;
+case MTSE_INVRL:					/* invalid rec lnt */
+	mtc_sta = mtc_sta | STA_PAR;
+	return SCPE_MTRLNT;
+case MTSE_RECE:						/* record in error */
+case MTSE_EOM:						/* end of medium */
 	mtc_sta = mtc_sta | STA_PAR;			/* error */
-	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* spc over eom */
-	return TRUE;  }
-if (*tbc == MTR_TMK) {					/* tape mark? */
-	mtc_sta = mtc_sta | STA_EOF;			/* eof */
-	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* spc over tmk */
-	return TRUE;  }
-if (MTRF (*tbc)) mtc_sta = mtc_sta | STA_PAR;		/* error in rec? */
-*tbc = MTRL (*tbc);					/* clear err flag */
-return FALSE;
-}
-
-int32 mt_wrtrec (UNIT *uptr, t_mtrlnt lnt)
-{
-int32 elnt = MTRL ((lnt + 1) & ~1);			/* even lnt, no err */
-
-fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* seek to record */
-fxwrite (&lnt, sizeof (t_mtrlnt), 1, uptr->fileref);	/* write rec lnt */
-fxwrite (mtxb, sizeof (int8), elnt, uptr->fileref);	/* write data */
-fxwrite (&lnt, sizeof (t_mtrlnt), 1, uptr->fileref);	/* write rec lnt */
-if (ferror (uptr->fileref)) {				/* error? */
-	MT_SET_PNU (uptr);				/* pos not updated */
-	return 1;  }
-else uptr->pos = uptr->pos + elnt + (2 * sizeof (t_mtrlnt)); /* no, upd pos */
-return 0;
+	break;
+case MTSE_BOT:						/* reverse into BOT */
+	mtc_sta = mtc_sta | STA_BOT;			/* set status */
+	break;
+case MTSE_WRP:						/* write protect */
+	mtc_sta = mtc_sta | STA_REJ;			/* reject */
+	break;  }
+return SCPE_OK;
 }
 
 /* Reset routine */
@@ -490,9 +445,10 @@ mtc_dib.ctl = mtd_dib.ctl = 0;				/* clear ctl */
 mtc_dib.flg = mtd_dib.flg = 0;				/* clear flg */
 mtc_dib.fbf = mtd_dib.fbf = 0;				/* clear fbf */
 sim_cancel (&mtc_unit);					/* cancel activity */
-mtc_unit.flags = mtc_unit.flags & ~UNIT_PNU;		/* clear pos flag */
-if (mtc_unit.flags & UNIT_ATT) mtc_sta = ((mtc_unit.pos)? 0: STA_BOT) |
-	((mtc_unit.flags & UNIT_WPRT)? STA_WLK: 0);
+sim_tape_reset (&mtc_unit);
+if (mtc_unit.flags & UNIT_ATT) mtc_sta =
+	(sim_tape_bot (&mtc_unit)? STA_BOT: 0) |
+	(sim_tape_wrp (&mtc_unit)? STA_WLK: 0);
 else mtc_sta = STA_LOCAL | STA_BUSY;
 return SCPE_OK;
 }
@@ -503,9 +459,8 @@ t_stat mtc_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
 
-r = attach_unit (uptr, cptr);				/* attach unit */
+r = sim_tape_attach (uptr, cptr);			/* attach unit */
 if (r != SCPE_OK) return r;				/* update status */
-MT_CLR_PNU (uptr);
 mtc_sta = STA_BOT;
 return r;
 }
@@ -515,14 +470,5 @@ return r;
 t_stat mtc_detach (UNIT* uptr)
 {
 mtc_sta = 0;						/* update status */
-MT_CLR_PNU (uptr);
-return detach_unit (uptr);				/* detach unit */
-}
-
-/* Write lock/enable routine */
-
-t_stat mtc_vlock (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-if (val && (uptr->flags & UNIT_ATT)) return SCPE_ARG;
-return SCPE_OK;
+return sim_tape_detach (uptr);				/* detach unit */
 }

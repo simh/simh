@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   27-Feb-03	RMS	Added relative addressing support
 */
 
 #include "id_defs.h"
@@ -42,8 +44,8 @@ extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint16 *M;
 
-t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val);
-t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val);
+t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val, t_bool cf);
+t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val, t_bool cf);
 extern t_stat lp_load (FILE *fileref, char *cptr, char *fnam);
 extern pt_dump (FILE *of, char *cptr, char *fnam);
 
@@ -297,7 +299,7 @@ if ((sw & SWMASK ('A')) || (sw & SWMASK ('C'))) {	/* char format? */
 	return -(vp - 1);  }				/* return # chars */
 
 if (sw & SWMASK ('M')) {				/* inst format? */
-	r = fprint_sym_m (of, addr, val);		/* decode inst */
+	r = fprint_sym_m (of, addr, val, uptr == &cpu_unit); /* decode inst */
 	if (r <= 0) return r;  }
 
 GETNUM (num, lnt);					/* get number */
@@ -311,14 +313,15 @@ return -(vp - 1);
 	of	=	output stream
 	addr	=	current PC
 	*val	=	values to decode
+	cf	=	true if decoding for CPU
    Outputs:
 	return	=	if >= 0, error code
 			if < 0, number of extra bytes retired
 */
 
-t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val)
+t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val, t_bool cf)
 {
-uint32 i, j, k, inst, r1, r2, ea, tgt, vp;
+uint32 i, j, k, inst, r1, r2, ea, vp;
 
 vp = 0;
 GETNUM (inst, 2);					/* first 16b */
@@ -328,40 +331,39 @@ for (i = 0; opcode[i] != NULL; i++) {			/* loop thru ops */
     if ((opc_val[i] & 0xFFFF) == (inst & masks[j])) {	/* match? */
 	r1 = (inst >> 4) & 0xF;
 	r2 = inst & 0xF;
+	fprintf (of, "%s ", opcode[i]);			/* print opcode */
 	switch (j) {					/* case on class */
 	case I_V_MR:					/* mask-register */
-		fprintf (of, "%s %-X,R%d", opcode[i], r1, r2);
-		return -1;
+	    fprintf (of, "%-X,R%d", r1, r2);
+	    return -1;
 	case I_V_RR:					/* register-register */
 	case I_V_FF:					/* floating-floating */
-		fprintf (of, "%s R%d,R%d", opcode[i], r1, r2);
-		return -1;
+	    fprintf (of, "R%d,R%d", r1, r2);
+	    return -1;
 	case I_V_SI:					/* short immediate */
-		fprintf (of, "%s R%d,%-X", opcode[i], r1, r2);
-		return -1;
+	    fprintf (of, "R%d,%-X", r1, r2);
+	    return -1;
 	case I_V_SB:					/* short branch */
-		if (inst & MSK_SBF) tgt = addr + r2 + r2;
-		else tgt = addr - r2 - r2;
-		fprintf (of, "%s %-X,%-X", opcode[i], r1, tgt);
-		return -1;
+	    fprintf (of, "%-X,", r1);
 	case I_V_SX:					/* ext short branch */
-		if (inst & MSK_SBF) tgt = addr + r2 + r2;
-		else tgt = addr - r2 - r2;
-		fprintf (of, "%s %-X", opcode[i], tgt);
-		return -1;
+	    if (cf) fprintf (of, "%-X", ((inst & MSK_SBF)?
+	        (addr + r2 + r2): (addr - r2 - r2)));
+	    else fprintf (of, ((inst & MSK_SBF)?
+	        ".+%-X": ".-%X"), r2 + r2);
+	    return -1;
 	case I_V_R:					/* register */
-		fprintf (of, "%s R%d", opcode[i], r2);
-		return -1;
+	    fprintf (of, "R%d", r2);
+	    return -1;
 	case I_V_MX:					/* mask-memory */
-		fprintf (of, "%s %-X,%-X", opcode[i], r1, ea);
-		break;
+	    fprintf (of, "%-X,%-X", r1, ea);
+	    break;
 	case I_V_RX:					/* register-memory */
 	case I_V_FX:					/* floating-memory */
-		fprintf (of, "%s R%d,%-X", opcode[i], r1, ea);
-		break;
+	    fprintf (of, "R%d,%-X", r1, ea);
+	    break;
 	case I_V_X:					/* memory */
-		fprintf (of, "%s %-X", opcode[i], ea);
-		break;  }				/* end case */
+	    fprintf (of, "%-X", ea);
+	    break;  }					/* end case */
 	if (r2) fprintf (of, "(R%d)", r2);  
 	return -3;  }					/* end if */
 	}						/* end for */
@@ -398,6 +400,41 @@ if ((rtype == R_F) && (reg & 1)) return -1;
 *optr = cptr + 1;
 return reg;
 }
+
+/* Address
+
+   Inputs:
+	*cptr	=	pointer to input string
+	**tptr	=	pointer to moved pointer
+	*ea	=	effective address
+	*rel	=	relative flag
+	addr	=	base address
+	cf	=	true if parsing for CPU
+   Outputs:
+	status	=	SCPE_OK if ok, else error code
+*/
+
+t_stat get_addr (char *cptr, char **tptr, t_addr *ea, t_bool *rel,
+	t_addr addr, t_bool cf)
+{
+int32 sign = 1;
+
+*ea = 0;
+if (*cptr == '.') {					/* relative? */
+	*rel = TRUE;
+	cptr++;
+	if (cf) *ea = addr;
+	if (*cptr == '+') cptr++;			/* .+? */
+	else if (*cptr == '-') {			/* .-? */
+	    sign = -1;
+	    cptr++;  }
+	else return SCPE_OK;  }
+else *rel = FALSE;
+errno = 0;
+*ea = *ea + (sign * ((int32) strtoul (cptr, tptr, 16)));
+if (errno || (cptr == *tptr)) return SCPE_ARG;
+return SCPE_OK;
+}
 
 #define PUTNUM(d,n)	for (k = n; k > 0; k--) \
 			val[vp++] = (d >> ((k - 1) * 8)) & 0xFF
@@ -431,9 +468,8 @@ if ((sw & SWMASK ('A')) || (sw & SWMASK ('C'))) {	/* char format? */
 		val[vp++] = *cptr++;  }
 	return -(vp - 1);  }				/* return # chars */
 
-if (uptr == &cpu_unit) {				/* cpu only */
-	r = parse_sym_m (cptr, addr, val);		/* try to parse inst */
-	if (r <= 0) return r;  }
+r = parse_sym_m (cptr, addr, val, uptr == &cpu_unit);	/* try to parse inst */
+if (r <= 0) return r;
 
 num = (int32) get_uint (cptr, rdx, maxv[lnt], &r);	/* get number */
 if (r != SCPE_OK) return r;
@@ -447,15 +483,17 @@ return -(lnt - 1);
 	*cptr	=	pointer to input string
 	addr	=	current PC
 	*val	=	pointer to output values
+	cf	=	true if parsing for CPU
    Outputs:
 	status	=	> 0   error code
 			<= 0  -number of extra words
 */
 
-t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val)
+t_stat parse_sym_m (char *cptr, t_addr addr, t_value *val, t_bool cf)
 {
-uint32 i, j, k, t, df, db, inst, ea, vp;
-int32 r1, r2;
+uint32 i, j, k, t, df, db, inst, vp;
+int32 st, r1, r2;
+t_bool rel;
 t_stat r;
 char *tptr, gbuf[CBUFSIZE];
 
@@ -488,9 +526,9 @@ case I_V_R:						/* register */
 case I_V_FX:						/* float-memory */
 case I_V_MX: case I_V_RX:				/* mask/reg-mem */
 case I_V_X:						/* memory */
-	errno = 0;
-	ea = strtoul (gbuf, &tptr, 16);			/* get address */
-	if (errno || (gbuf == tptr)) return SCPE_ARG;	/* error? */
+	r = get_addr (gbuf, &tptr, &t, &rel, addr, cf);	/* get addr */
+	if ((r != SCPE_OK) || (t > PAMASK16) ||
+	    (!cf && rel)) return SCPE_ARG;
 	if (*tptr == '(') {				/* index? */
 		if ((r2 = get_reg (tptr + 1, &tptr, R_R)) < 0)
 			return SCPE_ARG;
@@ -498,23 +536,34 @@ case I_V_X:						/* memory */
 		inst = inst | r2;  }			/* or in R2 */
 	if (*tptr != 0) return SCPE_ARG;
 	PUTNUM (inst, 2);
-	PUTNUM (ea, 2);
+	PUTNUM (t, 2);
 	return -3;
 
 case I_V_SB: case I_V_SX:				/* short branches */
-	t = get_uint (gbuf, 16, DMASK16, &r);		/* get addr */
-	if ((r != SCPE_OK) || (t & 1)) return r;	/* error if odd */
-	db = (addr - t) & 0x1F;				/* back displ */
-	df = (t - addr) & 0x1F;				/* fwd displ */
-	if ((t == ((addr - db) & VAMASK16)) &&		/* back work and */
-	    ((j == I_V_SX) || !(inst & MSK_SBF))) {	/* ext or back br? */
-	    inst = inst | (db >> 1);			/* or in back displ */
-	    break;  }
-	if ((t == ((addr + df) & VAMASK16)) &&		/* fwd work and */
-	    ((j == I_V_SX) || (inst & MSK_SBF))) {	/* ext or fwd br? */
-	    inst = inst | (df >> 1) | MSK_SBF;		/* or in fwd displ */
-	    break;  }
-	return SCPE_ARG;  }				/* end case */
+	r = get_addr (gbuf, &tptr, &t, &rel, addr, cf);	/* get addr */
+	if ((r != SCPE_OK) || (t & 1) || *tptr)		/* error if odd */
+	    return SCPE_ARG;
+	st = t;						/* signed version */
+	if (cf) {					/* for CPU? */
+	    db = (addr - t) & 0x1F;			/* back displ */
+	    df = (t - addr) & 0x1F;			/* fwd displ */
+	    if ((t == ((addr - db) & VAMASK16)) &&	/* back work and */
+		((j == I_V_SX) || !(inst & MSK_SBF)))	/* ext or back br? */
+		inst = inst | (db >> 1);		/* or in back displ */
+	    else if ((t == ((addr + df) & VAMASK16)) &&	/* fwd work and */
+		((j == I_V_SX) || (inst & MSK_SBF)))	/* ext or fwd br? */
+		inst = inst | (df >> 1) | MSK_SBF;	/* or in fwd displ */
+	    else return SCPE_ARG;  }
+	else if (rel) {					/* periph, must be rel */
+	    if ((st <= 0) && (st >= -0x1F) &&		/* relative back? */
+		((j == I_V_SX) || !(inst & MSK_SBF)))
+		inst = inst | ((-st & 0x1F) >> 1);
+	    else if ((st >= 0) && (st < 0x1F) &&	/* relative fwd? */
+		((j == I_V_SX) || (inst & MSK_SBF)))
+		inst = inst | ((t & 0x1F) >> 1);
+	    else return SCPE_ARG;  }
+	else return SCPE_ARG;				/* periph & ~rel, err */
+	}						/* end case */
 
 PUTNUM (inst, 2);
 return -1;

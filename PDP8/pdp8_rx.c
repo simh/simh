@@ -1,6 +1,6 @@
 /* pdp8_rx.c: RX8E/RX01, RX28/RX02 floppy disk simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rx		RX8E/RX01, RX28/RX02 floppy disk
 
+   03-Mar-03	RMS	Fixed autosizing
    08-Oct-02	RMS	Added DIB, device number support
 			Fixed reset to work with disabled device
    15-Sep-02	RMS	Added RX28/RX02 support
@@ -508,21 +509,13 @@ return SCPE_OK;
 
 t_stat rx_attach (UNIT *uptr, char *cptr)
 {
-int32 p;
-t_stat r;
+t_addr sz;
 
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (cptr))) {
+	if (sz > RX_SIZE) uptr->flags = uptr->flags | UNIT_DEN;
+	else uptr->flags = uptr->flags & ~UNIT_DEN;  }
 uptr->capac = (uptr->flags & UNIT_DEN)? RX2_SIZE: RX_SIZE;
-r = attach_unit (uptr, cptr);
-if ((r != SCPE_OK) || ((uptr->flags & UNIT_AUTO) == 0) ||
-	(rx_28 == 0)) return r;
-if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
-if ((p = ftell (uptr->fileref)) == 0) return SCPE_OK;
-if (p > RX_SIZE) {
-	uptr->flags = uptr->flags | UNIT_DEN;
-	uptr->capac = RX2_SIZE;  }
-else {	uptr->flags = uptr->flags & ~UNIT_DEN;
-	uptr->capac = RX_SIZE;  }
-return SCPE_OK;
+return attach_unit (uptr, cptr);
 }
 
 /* Set size routine */

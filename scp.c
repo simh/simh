@@ -23,6 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Mar-03	RMS	Added sim_fsize
+   27-Feb-03	RMS	Fixed bug in multiword deposits to files
+   08-Feb-03	RMS	Changed sim_os_sleep to void, match_ext to char*
+			Added multiple actions, .ini file support
+			Added multiple switch evaluations per line
    07-Feb-03	RMS	Added VMS support for ! (from Mark Pizzolato)
    01-Feb-03	RMS	Added breakpoint table extension, actions
    14-Jan-03	RMS	Added missing function prototypes
@@ -165,13 +170,8 @@
 	else if (sz == sizeof (uint16)) *(((uint16 *) mb) + j) = (uint16) v; \
 	else *(((uint32 *) mb) + j) = v;
 #endif
-#define GET_SWITCHES(cp,gb) \
-	sim_switches = 0; \
-	while (*cp == '-') { \
-		int32 lsw; \
-		cp = get_glyph (cp, gb, 0); \
-		if ((lsw = get_switches (gb)) <= 0) return SCPE_INVSW; \
-		sim_switches = sim_switches | lsw;  }
+#define GET_SWITCHES(cp) \
+	if ((cp = get_sim_sw (cp)) == NULL) return SCPE_INVSW
 #define GET_RADIX(val,dft) \
 	if (sim_switches & SWMASK ('O')) val = 8; \
 	else if (sim_switches & SWMASK ('D')) val = 10; \
@@ -234,6 +234,8 @@ t_stat sim_brk_clr (t_addr loc, int32 sw);
 t_stat sim_brk_clrall (int32 sw);
 t_stat sim_brk_show (FILE *st, t_addr loc, int32 sw);
 t_stat sim_brk_showall (FILE *st, int32 sw);
+char *sim_brk_getact (char *buf, int32 size);
+void sim_brk_clract (void);
 void sim_brk_npc (void);
 t_stat set_telnet (int32 flg, char *cptr);
 t_stat set_notelnet (int32 flg, char *cptr);
@@ -257,8 +259,8 @@ t_stat show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flg);
 t_stat show_one_mod (FILE *st, DEVICE *dptr, UNIT *uptr, MTAB *mptr, int32 flag);
 t_stat sim_check_console (int32 sec);
 char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc);
-t_bool match_ext (char *fnam, char *ext);
 int32 get_switches (char *cptr);
+char *get_sim_sw (char *cptr);
 t_value get_rval (REG *rptr, int32 idx);
 void put_rval (REG *rptr, int32 idx, t_value val);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
@@ -285,8 +287,6 @@ t_stat dep_reg (int32 flag, char *cptr, REG *rptr, t_addr idx);
 t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_stat dep_addr (int32 flag, char *cptr, t_addr addr, DEVICE *dptr,
 	UNIT *uptr, int32 dfltinc);
-char *get_range (char *cptr, t_addr *lo, t_addr *hi, int32 rdx,
-	t_addr max, char term);
 SCHTAB *get_search (char *cptr, DEVICE *dptr, SCHTAB *schptr);
 int32 test_search (t_value val, SCHTAB *schptr);
 t_stat step_svc (UNIT *ptr);
@@ -519,11 +519,11 @@ for (i = 1; i < argc; i++) {				/* loop thru args */
 	if (argv[i] == NULL) continue;			/* paranoia */
 	if ((*argv[i] == '-') && lookswitch) {		/* switch? */
 		if ((sw = get_switches (argv[i])) < 0) {
-		    printf ("Invalid switch %s\n", argv[i]);
+		    fprintf (stderr, "Invalid switch %s\n", argv[i]);
 		    return 0;  }
 		sim_switches = sim_switches | sw;  }
 	else {	if ((strlen (argv[i]) + strlen (cbuf) + 1) >= CBUFSIZE) {
-		    printf ("Argument string too long\n");
+		    fprintf (stderr, "Argument string too long\n");
 		    return 0;  }
 		if (*cbuf) strcat (cbuf, " ");		/* concat args */
 		strcat (cbuf, argv[i]);
@@ -544,18 +544,18 @@ sim_log = NULL;
 if (sim_emax <= 0) sim_emax = 1;
 
 if ((stat = ttinit ()) != SCPE_OK) {
-	printf ("Fatal terminal initialization error\n%s\n",
+	fprintf (stderr, "Fatal terminal initialization error\n%s\n",
 	    scp_error_messages[stat - SCPE_BASE]);
 	return 0;  }
 if ((sim_eval = calloc (sim_emax, sizeof (t_value))) == NULL) {
-	printf ("Unable to allocate examine buffer\n");
+	fprintf (stderr, "Unable to allocate examine buffer\n");
 	return 0;  };
 if ((stat = reset_all (0)) != SCPE_OK) {
-	printf ("Fatal simulator initialization error\n%s\n",
+	fprintf (stderr, "Fatal simulator initialization error\n%s\n",
 	    scp_error_messages[stat - SCPE_BASE]);
 	return 0;  }
 if ((stat = sim_brk_init ()) != SCPE_OK) {
-	printf ("Fatal breakpoint table initialization error\n%s\n",
+	fprintf (stderr, "Fatal breakpoint table initialization error\n%s\n",
 	    scp_error_messages[stat - SCPE_BASE]);
 	return 0;  }
 if (!sim_quiet) {
@@ -566,13 +566,18 @@ if (*cbuf) {						/* cmd file arg? */
 	stat = do_cmd (1, cbuf);			/* proc cmd file */
 	if (stat == SCPE_OPENERR)			/* error? */
 	     fprintf (stderr, "Can't open file %s\n", cbuf);  }
-else stat = SCPE_OK;
+else if (*argv[0]) {					/* sim name arg? */
+	char nbuf[PATH_MAX + 7], *np;			/* "path.ini" */
+	nbuf[0] = '"';					/* starting " */
+	strncpy (nbuf + 1, argv[0], PATH_MAX + 1);	/* copy sim name */
+	if (np = match_ext (nbuf, "EXE")) *np = 0;	/* remove .exe */
+	strcat (nbuf, ".ini\"");			/* add .ini" */
+	stat = do_cmd (1, nbuf);  }			/* proc cmd file */
 
 while (stat != SCPE_EXIT) {				/* in case exit */
 	printf ("sim> ");				/* prompt */
-	if (cptr = sim_brk_act) {			/* pending action? */
-	    printf ("%s\n", sim_brk_act);
-	    sim_brk_act = NULL;  }
+	if (cptr = sim_brk_getact (cbuf, CBUFSIZE))	/* pending action? */
+	    printf ("%s\n", cptr);			/* echo */
 	else if (sim_vm_read != NULL)			/* sim routine? */
 	    cptr = (*sim_vm_read) (cbuf, CBUFSIZE, stdin);
 	else cptr = read_line (cbuf, CBUFSIZE, stdin);	/* read command line */
@@ -580,6 +585,7 @@ while (stat != SCPE_EXIT) {				/* in case exit */
 	if (*cptr == 0) continue;			/* ignore blank */
 	if (sim_log) fprintf (sim_log, "sim> %s\n", cptr); /* log cmd */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get command glyph */
+	sim_switches = 0;				/* init switches */
 	if (cmdp = find_cmd (gbuf))			/* lookup command */
 	    stat = cmdp->action (cmdp->arg, cptr);	/* if found, exec */
 	else stat = SCPE_UNK;
@@ -633,6 +639,7 @@ t_stat help_cmd (int32 flag, char *cptr)
 char gbuf[CBUFSIZE];
 CTAB *cmdp;
 
+GET_SWITCHES (cptr);
 if (*cptr) {
 	cptr = get_glyph (cptr, gbuf, 0);
 	if (*cptr) return SCPE_2MARG;
@@ -665,6 +672,54 @@ return SCPE_OK;
 
 /* Do command */
 
+t_stat do_cmd (int flag, char *fcptr)
+{
+char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
+FILE *fpin;
+CTAB *cmdp;
+int32 echo, nargs;
+t_stat stat = SCPE_OK;
+
+if (flag == 0) { GET_SWITCHES (fcptr); }		/* get switches */
+echo = sim_switches & SWMASK ('V');			/* -v means echo */
+
+c = fcptr;
+for (nargs = 0; nargs < 10; ) {				/* extract arguments */
+	while (isspace (*c)) c++;			/* skip blanks */
+	if (*c == 0) break;				/* all done */
+	if (*c == '\'' || *c == '"') quote = *c++;	/* quoted string? */
+	else quote = 0;
+	do_arg[nargs++] = c;				/* save start */
+	while (*c && (quote? (*c != quote): !isspace (*c))) c++;
+	if (*c) *c++ = 0;				/* term at quote/spc */
+	}						/* end for */
+if (nargs <= 0) return SCPE_2FARG;			/* need at least 1 */
+if ((fpin = FOPEN (do_arg[0], "r")) == NULL)		/* cmd file failed to open? */
+	return SCPE_OPENERR;
+
+do {	cptr = read_line (cbuf, CBUFSIZE, fpin);	/* get cmd line */
+	sub_args (cbuf, gbuf, CBUFSIZE, nargs, do_arg);
+	if (cptr == NULL) break;			/* exit on eof */
+	if (*cptr == 0) continue;			/* ignore blank */
+	if (echo) printf("do> %s\n", cptr);		/* echo if -v */
+	if (sim_log) fprintf (sim_log, "do> %s\n", cptr);
+	cptr = get_glyph (cptr, gbuf, 0);		/* get command glyph */
+	sim_switches = 0;				/* init switches */
+	if (strcmp (gbuf, "do") == 0) {			/* don't recurse */
+	    fclose (fpin);
+	    return SCPE_NEST;  }
+	if (cmdp = find_cmd (gbuf))			/* lookup command */
+	    stat = cmdp->action (cmdp->arg, cptr);	/* if found, exec */
+	else stat = SCPE_UNK;
+	if (stat >= SCPE_BASE)				/* error? */
+	    printf ("%s\n", scp_error_messages[stat - SCPE_BASE]);
+	if (sim_vm_post != NULL) (*sim_vm_post) (TRUE);
+} while (stat != SCPE_EXIT);
+
+fclose (fpin);						/* close file */
+return (stat == SCPE_EXIT)? SCPE_EXIT: SCPE_OK;
+}
+
 /* Substitute_args - replace %n tokens in 'instr' with the do command's arguments
 
    Calling sequence
@@ -692,55 +747,6 @@ for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
 *op = 0;						/* term buffer */
 strcpy (instr, tmpbuf);
 return;
-}
-
-t_stat do_cmd (int flag, char *fcptr)
-{
-char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
-FILE *fpin;
-CTAB *cmdp;
-int32 echo, nargs;
-t_stat stat = SCPE_OK;
-
-if (flag == 0) { GET_SWITCHES (fcptr, gbuf); }		/* get switches */
-echo = sim_switches & SWMASK ('V');			/* -v means echo */
-
-c = fcptr;
-for (nargs = 0; nargs < 10; ) {				/* extract arguments */
-	while (*c && (*c <= ' ')) c++;			/* skip blanks */
-	if (! *c) break;				/* all done */
-	do_arg[nargs++] = c;				/* save start */
-	while (*c && (*c > ' ')) {
-	    if (*c == '\'' || *c == '"') {		/* quoted string */
-		for (quote = *c++; *c; )
-		   if (*c++ == quote) break;  }
-	     else c++;  }
-	if (*c) *c++ = 0;				/* term arg at spc */
-	}						/* end for */
-if (nargs <= 0) return SCPE_2FARG;			/* need at least 1 */
-if ((fpin = FOPEN (do_arg[0], "r")) == NULL)		/* cmd file failed to open? */
-	return SCPE_OPENERR;
-
-do {	cptr = read_line (cbuf, CBUFSIZE, fpin);	/* get cmd line */
-	sub_args (cbuf, gbuf, CBUFSIZE, nargs, do_arg);
-	if (cptr == NULL) break;			/* exit on eof */
-	if (*cptr == 0) continue;			/* ignore blank */
-	if (echo) printf("do> %s\n", cptr);		/* echo if -v */
-	if (sim_log) fprintf (sim_log, "do> %s\n", cptr);
-	cptr = get_glyph (cptr, gbuf, 0);		/* get command glyph */
-	if (strcmp (gbuf, "do") == 0) {			/* don't recurse */
-	    fclose (fpin);
-	    return SCPE_NEST;  }
-	if (cmdp = find_cmd (gbuf))			/* lookup command */
-	    stat = cmdp->action (cmdp->arg, cptr);	/* if found, exec */
-	else stat = SCPE_UNK;
-	if (stat >= SCPE_BASE)				/* error? */
-	    printf ("%s\n", scp_error_messages[stat - SCPE_BASE]);
-	if (sim_vm_post != NULL) (*sim_vm_post) (TRUE);
-} while (stat != SCPE_EXIT);
-
-fclose (fpin);						/* close file */
-return (stat == SCPE_EXIT)? SCPE_EXIT: SCPE_OK;
 }
 
 /* Set command */
@@ -773,7 +779,7 @@ static CTAB set_unit_tab[] = {
 	{ "OFFLINE", &set_onoff, 0 },
 	{ NULL, NULL, 0 }  };
 
-GET_SWITCHES (cptr, gbuf);				/* get switches */
+GET_SWITCHES (cptr);					/* get switches */
 if (*cptr == 0) return SCPE_2FARG;			/* must be more */
 cptr = get_glyph (cptr, gbuf, 0);			/* get glob/dev/unit */
 
@@ -941,7 +947,7 @@ static CTAB show_table[] = {
 	{ "BREAK", &show_break, 0 },
 	{ NULL, NULL, 0 }  };
 
-GET_SWITCHES (cptr, gbuf);				/* test for switches */
+GET_SWITCHES (cptr);					/* get switches */
 if (*cptr == 0) return SCPE_2FARG;			/* must be more */
 cptr = get_glyph (cptr, gbuf, 0);			/* get next glyph */
 for (i = 0; show_table[i].name != NULL; i++) {		/* find command */
@@ -1078,10 +1084,10 @@ int32 accum;
 
 if (cptr && (*cptr != 0)) return SCPE_2MARG;
 if (sim_clock_queue == NULL) {
-	fprintf (st, "%s event queue empty, time = %-16.0f\n",
+	fprintf (st, "%s event queue empty, time = %.0f\n",
 	    sim_name, sim_time);
 	return SCPE_OK;  }
-fprintf (st, "%s event queue status, time = %-16.0f\n",
+fprintf (st, "%s event queue status, time = %.0f\n",
 	 sim_name, sim_time);
 accum = 0;
 for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
@@ -1099,7 +1105,7 @@ return SCPE_OK;
 t_stat show_time (FILE *st, int32 flag, char *cptr)
 {
 if (cptr && (*cptr != 0)) return SCPE_2MARG;
-fprintf (st, "Time:	%-16.0f\n", sim_time);
+fprintf (st, "Time:	%.0f\n", sim_time);
 return SCPE_OK;
 }
 
@@ -1182,9 +1188,7 @@ return SCPE_OK;
 
 t_stat brk_cmd (int32 flg, char *cptr)
 {
-char gbuf[CBUFSIZE];
-
-GET_SWITCHES (cptr, gbuf);				/* test for switches */
+GET_SWITCHES (cptr);					/* get switches */
 return ssh_break (NULL, cptr, flg);			/* call common code */
 }
 
@@ -1244,7 +1248,7 @@ t_stat reset_cmd (int32 flag, char *cptr)
 char gbuf[CBUFSIZE];
 DEVICE *dptr;
 
-GET_SWITCHES (cptr, gbuf);				/* test for switches */
+GET_SWITCHES (cptr);					/* get switches */
 if (*cptr == 0) return (reset_all (0));			/* reset(cr) */
 cptr = get_glyph (cptr, gbuf, 0);			/* get next glyph */
 if (*cptr != 0) return SCPE_2MARG;			/* now eol? */
@@ -1291,11 +1295,12 @@ char gbuf[CBUFSIZE];
 FILE *loadfile;
 t_stat reason;
 
-GET_SWITCHES (cptr, gbuf);				/* test for switches */
+GET_SWITCHES (cptr);					/* get switches */
 if (*cptr == 0) return SCPE_2FARG;			/* must be more */
 cptr = get_glyph_nc (cptr, gbuf, 0);			/* get file name */
 loadfile = FOPEN (gbuf, flag? "wb": "rb");		/* open for wr/rd */
 if (loadfile == NULL) return SCPE_OPENERR;
+GET_SWITCHES (cptr);					/* get switches */
 reason = sim_load (loadfile, cptr, gbuf, flag);		/* load or dump */
 fclose (loadfile);
 return reason;
@@ -1312,9 +1317,10 @@ char gbuf[CBUFSIZE];
 DEVICE *dptr;
 UNIT *uptr;
 
-GET_SWITCHES (cptr, gbuf);				/* test for switches */
+GET_SWITCHES (cptr);					/* get switches */
 if (*cptr == 0) return SCPE_2FARG;			/* must be more */
 cptr = get_glyph (cptr, gbuf, 0);			/* get next glyph */
+GET_SWITCHES (cptr);					/* get switches */
 if (*cptr == 0) return SCPE_2FARG;			/* now eol? */
 dptr = find_unit (gbuf, &uptr);				/* locate unit */
 if (dptr == NULL) return SCPE_NXDEV;			/* found dev? */
@@ -1399,7 +1405,7 @@ char gbuf[CBUFSIZE];
 DEVICE *dptr;
 UNIT *uptr;
 
-GET_SWITCHES (cptr, gbuf);				/* test for switches */
+GET_SWITCHES (cptr);					/* get switches */
 if (*cptr == 0) return SCPE_2FARG;			/* must be more */
 cptr = get_glyph (cptr, gbuf, 0);			/* get next glyph */
 if (*cptr != 0) return SCPE_2MARG;			/* now eol? */
@@ -1470,7 +1476,6 @@ return (fclose (uptr->fileref) == EOF)? SCPE_IOERR: SCPE_OK;
 
 t_stat save_cmd (int32 flag, char *cptr)
 {
-char gbuf[CBUFSIZE];
 void *mbuf;
 FILE *sfile;
 int32 i, j, l, t;
@@ -1485,7 +1490,7 @@ REG *rptr;
 
 #define WRITE_I(xx) fxwrite (&(xx), sizeof (xx), 1, sfile)
 
-GET_SWITCHES (cptr, gbuf);				/* test for switches */
+GET_SWITCHES (cptr);					/* get switches */
 if (*cptr == 0) return SCPE_2FARG;			/* must be more */
 if ((sfile = FOPEN (cptr, "wb")) == NULL) return SCPE_OPENERR;
 fputs (save_vercur, sfile);				/* [V2.5] save format */
@@ -1582,7 +1587,7 @@ REG *rptr;
 #define READ_I(xx) if (fxread (&xx, sizeof (xx), 1, rfile) == 0) \
 	{ fclose (rfile); return SCPE_IOERR;  }
 
-GET_SWITCHES (cptr, buf);				/* test for switches */
+GET_SWITCHES (cptr);					/* get switches */
 if (*cptr == 0) return SCPE_2FARG;			/* must be more */
 if ((rfile = FOPEN (cptr, "rb")) == NULL) return SCPE_OPENERR;
 READ_S (buf);						/* [V2.5+] read version */
@@ -1753,7 +1758,7 @@ DEVICE *dptr;
 UNIT *uptr;
 void int_handler (int signal);
 
-GET_SWITCHES (cptr, gbuf);				/* test for switches */
+GET_SWITCHES (cptr);					/* get switches */
 step = 0;
 if (((flag == RU_RUN) || (flag == RU_GO)) && (*cptr != 0)) {	/* run or go */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get next glyph */
@@ -1804,7 +1809,7 @@ if ((r = sim_check_console (30)) != SCPE_OK) {		/* check console, error? */
 	return r;  }
 if (step) sim_activate (&step_unit, step);		/* set step timer */
 sim_is_running = 1;					/* flag running */
-sim_brk_act = NULL;					/* defang actions */
+sim_brk_clract ();					/* defang actions */
 r = sim_instr();
 
 sim_is_running = 0;					/* flag idle */
@@ -2331,7 +2336,7 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
 		if (loc >= uptr->hwmark) uptr->hwmark = loc + 1;  }
 	    else {
 	    	fseek (uptr->fileref, sz * loc, SEEK_SET);
-		fxwrite (sim_eval, sz, 1, uptr->fileref);
+		fxwrite (&sim_eval[i], sz, 1, uptr->fileref);
 		if (ferror (uptr->fileref)) {
 		    clearerr (uptr->fileref);
 		    return SCPE_IOERR;  }  }  }  }
@@ -2342,12 +2347,11 @@ return reason;
 
 t_stat eval_cmd (int32 flg, char *cptr)
 {
-char gbuf[CBUFSIZE];
 DEVICE *dptr = sim_devices[0];
 int32 i, count, rdx;
 t_stat r;
 
-GET_SWITCHES (cptr, gbuf);
+GET_SWITCHES (cptr);
 GET_RADIX (rdx, dptr->dradix);
 for (i = 0; i < sim_emax; i++) sim_eval[i] = 0;
 if (*cptr == 0) return SCPE_2FARG;
@@ -2598,11 +2602,10 @@ t_stat r;
 DEVICE *dptr;
 
 if (uptr == NULL) return NULL;				/* arg error? */
-for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* exact match? */
-	if (strcmp (cptr, dptr->name) == 0) {
-	    if (qdisable (dptr)) return NULL;		/* disabled? */
-	    *uptr = dptr->units;			/* unit 0 */
-	    return dptr;  }  }
+if (dptr = find_dev (cptr)) {				/* exact match? */
+	if (qdisable (dptr)) return NULL;		/* disabled? */
+	*uptr = dptr->units;				/* unit 0 */
+	return dptr;  }
 
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* base + unit#? */
 	if ((dptr->numunits == 0) ||			/* no units? */
@@ -2718,21 +2721,52 @@ if (*cptr != '-') return 0;
 sw = 0;
 for (cptr++; (isspace (*cptr) == 0) && (*cptr != 0); cptr++) {
 	if (isalpha (*cptr) == 0) return -1;
-	sw = sw | SWMASK (*cptr);  }
+	sw = sw | SWMASK (toupper (*cptr));  }
 return sw;
 }
 
-t_bool match_ext (char *fnam, char *ext)
-{
-char *fptr, *eptr;
+/* get_sim_sw		accumulate sim_switches
 
-if ((fnam == NULL) || (ext == NULL)) return FALSE;
-fptr = strrchr (fnam, '.');
-if (fptr == NULL) return FALSE;
-for (fptr++, eptr = ext; *fptr; fptr++, eptr++) {
-	if (toupper (*fptr) != toupper (*eptr)) return FALSE;  }
-if (*eptr) return FALSE;
-return TRUE;
+   Inputs:
+	cptr	=	pointer to input string
+   Outputs:
+	ptr	=	pointer to first non-string glyph
+			NULL if error
+*/
+
+char *get_sim_sw (char *cptr)
+{
+int32 lsw;
+char gbuf[CBUFSIZE];
+
+while (*cptr == '-') {					/* while switches */
+	cptr = get_glyph (cptr, gbuf, 0);		/* get switch glyph */
+	lsw = get_switches (gbuf);			/* parse */
+	if (lsw <= 0) return NULL;			/* invalid? */
+	sim_switches = sim_switches | lsw;  }		/* accumulate */
+return cptr;
+}
+
+/* Match file extension
+
+   Inputs:
+	fnam	=	file name
+	ext	=	extension, without period
+   Outputs:
+	cp	=	pointer to final '.' if match, NULL if not
+*/
+
+char *match_ext (char *fnam, char *ext)
+{
+char *pptr, *fptr, *eptr;
+
+if ((fnam == NULL) || (ext == NULL)) return NULL;
+pptr = strrchr (fnam, '.');
+if (pptr) {
+	for (fptr = pptr + 1, eptr = ext; *fptr; fptr++, eptr++) {
+	    if (toupper (*fptr) != toupper (*eptr)) return NULL;  }
+	if (*eptr) return NULL;  }
+return pptr;
 }
 
 /* Get search specification
@@ -3143,6 +3177,21 @@ for (i = nbuf; i > 0; i--) {
 	total = total + c;  }
 return total;
 }
+
+/* Get file size */
+
+t_addr sim_fsize (char *cptr)
+{
+FILE *fp;
+t_addr sz;
+
+fp = fopen (cptr, "rb");
+if (fp == NULL) return 0;
+fseek (fp, 0, SEEK_END);
+sz = ftell (fp);
+fclose (fp);
+return sz;
+}
 
 /* OS independent clock calibration package
 
@@ -3240,6 +3289,8 @@ return sim_rtcn_calb (ticksper, 0);
 	sim_brk_showall		show all breakpoints
 	sim_brk_test		test for breakpoint
 	sim_brk_npc		PC has been changed
+	sim_brk_getact		get next action
+	sim_brk_clract		clear pending actions
 
    Initialize breakpoint system.
 */
@@ -3420,6 +3471,33 @@ if ((bp = sim_brk_fnd (loc)) &&				/* entry in table? */
 	return TRUE;  }
 sim_brk_pend = FALSE;
 return FALSE;
+}
+
+/* Get next pending action, if any */
+
+char *sim_brk_getact (char *buf, int32 size)
+{
+char *ep;
+size_t lnt;
+
+if (sim_brk_act == NULL) return NULL;			/* any action? */
+while (isspace (*sim_brk_act)) sim_brk_act++;		/* skip spaces */
+if (*sim_brk_act == 0) return (sim_brk_act = NULL);	/* now empty? */
+if (ep = strchr (sim_brk_act, ';')) {			/* cmd delimiter? */
+	lnt = ep - sim_brk_act;				/* cmd length */
+	memcpy (buf, sim_brk_act, lnt + 1);		/* copy with ; */
+	buf[lnt] = 0;					/* erase ; */
+	sim_brk_act = sim_brk_act + lnt + 1;  }		/* adv ptr */
+else {	strncpy (buf, sim_brk_act, size);		/* copy action */
+	sim_brk_act = NULL;  }				/* no more */
+return buf;
+}
+
+/* Clear pending actions */
+
+void sim_brk_clract (void)
+{
+sim_brk_act = NULL;
 }
 
 /* New PC */

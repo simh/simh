@@ -1,6 +1,6 @@
 /* pdp18b_stddev.c: 18b PDP's standard devices
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    tto		teleprinter
    clk		clock
 
+   01-Mar-03	RMS	Added SET/SHOW CLK FREQ support, SET TTI CTRL-C support
    22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7B/8B support to terminal
    05-Oct-02	RMS	Added DIBs, device number support, IORS call
@@ -96,6 +97,9 @@ t_stat ptr_detach (UNIT *uptr);
 t_stat ptp_detach (UNIT *uptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 extern int32 upd_iors (void);
 
@@ -115,10 +119,16 @@ REG clk_reg[] = {
 	{ FLDATA (DONE, int_hwre[API_CLK], INT_V_CLK) },
 	{ FLDATA (ENABLE, clk_state, 0) },
 	{ DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
+	{ DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
 	{ NULL }  };
 
 MTAB clk_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 50, NULL, "50HZ",
+		&clk_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 60, NULL, "60HZ",
+		&clk_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "FREQUENCY", NULL,
+		NULL, &clk_show_freq, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_devno },
 	{ 0 }  };
 
@@ -273,8 +283,9 @@ MTAB tti_mod[] = {
 	{ UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
 	{ UNIT_HDX, 0       , "full duplex", "FDX", NULL },
 	{ UNIT_HDX, UNIT_HDX, "half duplex", "HDX", NULL },
+	{ MTAB_XTD|MTAB_VDV|MTAB_VUN, 0, NULL, "CTRL-C", &tti_set_ctrlc, NULL, NULL },
 #endif
-	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_devno },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_devno, NULL },
 	{ 0 }  };
 
 DEVICE tti_dev = {
@@ -390,6 +401,24 @@ CLR_INT (CLK);						/* clear flag */
 clk_state = 0;						/* clock off */
 sim_cancel (&clk_unit);					/* stop clock */
 tmxr_poll = clk_unit.wait;				/* set mux poll */
+return SCPE_OK;
+}
+
+/* Set frequency */
+
+t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr) return SCPE_ARG;
+if ((val != 50) && (val != 60)) return SCPE_IERR;
+clk_tps = val;
+return SCPE_OK;
+}
+
+/* Show frequency */
+
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;
 }
 
@@ -801,8 +830,8 @@ if ((tti_unit.flags & UNIT_HDX) && out && 		/* half duplex and */
 tti_unit.buf = c;					/* got char */
 
 #endif
-SET_INT (TTI);						/* set flag */
 tti_unit.pos = tti_unit.pos + 1;
+SET_INT (TTI);						/* set flag */
 return SCPE_OK;
 }
 
@@ -821,6 +850,17 @@ tti_unit.buf = 0;					/* clear buffer */
 tti_state = 0;						/* clear state */
 CLR_INT (TTI);						/* clear flag */
 sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
+return SCPE_OK;
+}
+
+/* Set control-C */
+
+t_stat tti_set_ctrlc (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr) return SCPE_ARG;
+uptr->buf = (uptr->flags & UNIT_KSR)? 0203: 0003;
+uptr->pos = uptr->pos + 1;
+SET_INT (TTI);
 return SCPE_OK;
 }
 
@@ -882,6 +922,8 @@ CLR_INT (TTO);						/* clear flag */
 sim_cancel (&tto_unit);					/* deactivate unit */
 return SCPE_OK;
 }
+
+/* Set mode */
 
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {

@@ -415,6 +415,12 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
+If the simulator is compiled under Windows Visual C++, typing ^C to the
+terminal input causes a fatal run-time error.  Use the following command
+to simulate typing ^C:
+
+	SET TTI CTRL-C
+
 2.3.4 Terminal Output (TTO)
 
 The terminal output (TTO) writes to the simulator console window.  It
@@ -584,7 +590,7 @@ The simulator implements four MSCP disk controllers, RQ, RQB, RQC, RQD.
 Initially, RQB, RQC, and RQD are disabled.  Each RQ controller simulates
 an RQDX3 MSCP disk controller.  RQ options include the ability to set
 units write enabled or write locked, and to set the drive type to one
-of eleven disk types:
+of many disk types:
 
 	SET RQn LOCKED		set unit n write locked
 	SET RQn WRITEENABLED	set unit n write enabled
@@ -599,12 +605,14 @@ of eleven disk types:
 	SET RQn RA72		set type to RA72
 	SET RQn RA90		set type to RA90
 	SET RQn RA92		set type to RA92
+	SET RQn RA81		set type to RA81 with n LBN's.
 
 The type options can be used only when a unit is not attached to a file.
 Units can also be set ONLINE or OFFLINE.
 
 Each RQ controller implements the following special SHOW commands:
 
+	SHOW RQn TYPE		show drive type
 	SHOW RQ RINGS		show command and response rings
 	SHOW RQ FREEQ		show packet free queue
 	SHOW RQ RESPQ		show packet response queue
@@ -705,13 +713,22 @@ Error handling is as follows:
 2.7 TQK50 TMSCP Disk Controller (TQ)
 
 The TQ controller simulates the TQK50 TMSCP disk controller.  TQ options
-include the ability to set units write enabled or write locked:
+include the ability to set units write enabled or write locked, and to
+specify the controller type and tape length:
 
 	SET TQn LOCKED		set unit n write locked
 	SET TQn WRITEENABLED	set unit n write enabled
+	SET TQ TK50		set controller type to TK50
+	SET TQ TK70		set controller type to TK70
+	SET TQ TU81		set controller type to TU81
+	SET TQ TKUSER{=n}	set controller type to TK50 with
+				tape capacity of n MB
+
+User-specified capacity must be between 50 and 2000 MB.
 
 The TQ controller implements the following special SHOW commands:
 
+	SHOW TQ TYPE		show controller type
 	SHOW TQ RINGS		show command and response rings
 	SHOW TQ FREEQ		show packet free queue
 	SHOW TQ RESPQ		show packet response queue

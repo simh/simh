@@ -159,11 +159,12 @@ Peripherals
 12965	2883/2884 disk				passed		12965 manual	no
 12559	3030 magtape				not run		no documentation
 13181	7970B magtape				partial		in 21MX CE	no
+	- initial s = 102030
 	- set MSC CTIME to 180000
 	- do not change MSC XTIME
 	- attach scratch tapes to units 0,1
-	- set s = 2000 (suppress CRC/LRC)
-	- run with test select a = 37737, b = 7767
+	- set s = 1201 (suppress CRC/LRC)
+	- run with test select a = 37757, b = 7767
 	- tests 4, 14, 15 are timing dependent
 	- test 19 uses non-supported read rev
 13183	7970E magtape				not run		in 21MX CE	no

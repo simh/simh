@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	1-Feb-2003
+Date:	15-Mar-2003
 
 			COPYRIGHT NOTICE
 
@@ -377,6 +377,12 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
+If the simulator is compiled under Windows Visual C++, typing ^C to the
+terminal input causes a fatal run-time error.  Use the following command
+to simulate typing ^C:
+
+	SET TTI CTRL-C
+
 2.3.4 DL11 Terminal Output (TTO)
 
 The terminal output (TTO) writes to the simulator console window.  It
@@ -424,7 +430,14 @@ Error handling is as follows:
 
 2.3.6 Line-Time Clock (CLK)
 
-The line-time clock (CLK) implements these registers:
+The line-time clock (CLK) frequency can be adjusted as follows:
+
+	SET CLK 60HZ		set frequency to 60Hz
+	SET CLK 50HZ		set frequency to 50Hz
+
+The default is 60Hz.
+
+The line-time clock implements these registers:
 
 	name		size	comments
 
@@ -433,14 +446,20 @@ The line-time clock (CLK) implements these registers:
 	DONE		1	device done flag (CSR<7>)
 	IE		1	interrupt enable flag (CSR<6>)
 	TIME		24	clock interval
-	TPS		8	ticks per second (60 or 50)
 
 The line-time clock autocalibrates; the clock interval is adjusted up
 or down so that the clock tracks actual elapsed time.
 
 2.3.7 Programmable Clock (PCLK)
 
-The programmable clock (PCLK) implements these registers:
+The programmable clock (PCLK) line frequency can be adjusted as follows:
+
+	SET PCLK 60HZ		set frequency to 60Hz
+	SET PCLK 50HZ		set frequency to 50Hz
+
+The default is 60Hz.
+
+The programmable clock implements these registers:
 
 	name		size	comments
 
@@ -838,7 +857,7 @@ The simulator implements four MSCP disk controllers, RQ, RQB, RQC, RQD.
 Initially, RQB, RQC, and RQD are disabled.  Each RQ controller simulates
 an RQDX3 MSCP disk controller.  RQ options include the ability to set
 units write enabled or write locked, and to set the drive type to one
-of eleven disk types:
+of many disk types:
 
 	SET RQn LOCKED		set unit n write locked
 	SET RQn WRITEENABLED	set unit n write enabled
@@ -854,6 +873,7 @@ of eleven disk types:
 	SET RQn RA90		set type to RA90
 	SET RQn RA92		set type to RA92
 	SET RQn RRD40		set type to RRD40 (CD ROM)
+	SET RQn RAUSER{=n}	set type to RA81 with n LBNs
 
 The type options can be used only when a unit is not attached to a file.
 Units can also be set ONLINE or OFFLINE.  Each RQ controller supports the
@@ -862,6 +882,7 @@ a Qbus (22B) system, an RQ supports 22b addressing.
 
 Each RQ controller implements the following special SHOW commands:
 
+	SHOW RQn TYPE		show drive type
 	SHOW RQ RINGS		show command and response rings
 	SHOW RQ FREEQ		show packet free queue
 	SHOW RQ RESPQ		show packet response queue
@@ -1079,10 +1100,18 @@ Error handling is as follows:
 2.9.3 TQK50 TMSCP Disk Controller (TQ)
 
 The TQ controller simulates the TQK50 TMSCP disk controller.  TQ options
-include the ability to set units write enabled or write locked:
+include the ability to set units write enabled or write locked, and to
+specify the controller type and tape length:
 
 	SET TQn LOCKED		set unit n write locked
 	SET TQn WRITEENABLED	set unit n write enabled
+	SET TQ TK50		set controller type to TK50
+	SET TQ TK70		set controller type to TK70
+	SET TQ TU81		set controller type to TU81
+	SET TQ TKUSER{=n}	set controller type to TK50 with
+				tape capacity of n MB
+
+User-specified capacity must be between 50 and 2000 MB.
 
 The TQ controller supports the BOOT command.   In a Unibus system, the
 TQ supports 18b addressing.  In a Qbus (22B) system, the TQ supports
@@ -1090,6 +1119,7 @@ TQ supports 18b addressing.  In a Qbus (22B) system, the TQ supports
 
 The TQ controller implements the following special SHOW commands:
 
+	SHOW TQ TYPE		show controller type
 	SHOW TQ RINGS		show command and response rings
 	SHOW TQ FREEQ		show packet free queue
 	SHOW TQ RESPQ		show packet response queue

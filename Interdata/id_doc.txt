@@ -1,13 +1,13 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Interdata 16b/32b Simulator Usage
-Date:	15-Jan-2003
+Date:	15-Mar-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
    Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -91,7 +91,7 @@ DP		2.5MB/10MB cartridge disk
 DM		mass storage module (MSM)/intelligent (IDC) disk controller
 MT		magnetic tape
 PAS		programmable asynchronous line controller
-PASL		programmable asyhchronous lines, up to 32
+PASL		programmable asynchronous lines, up to 32
 
 The Interdata simulator implements two unique stop conditions:
 
@@ -268,6 +268,10 @@ channels can be changed with the command:
 
 	SET SELCH CHANNELS=num
 
+All the state for a selector channel can be displayed with the command:
+
+	SHOW SELCH num
+
 The selector channels implement these registers:
 
 	name		size	comments
@@ -398,7 +402,7 @@ UC, 7B, or 8B.  In UC mode, lower case input and output characters
 are automatically converted to upper case.  In 7B mode, input and
 output characters are masked to 7 bits.  In 8B mode, characters
 are not modified.  Changing the mode of either unit changes both.
-The default mode is UC.
+The default mode is 7B.
 
 To simulate pressing the break key, stop the simulator and use
 the command:
@@ -412,6 +416,8 @@ The PASLA console interface implements these registers:
 
 	name		size	comments
 
+	CMD		16	command register
+	STA		8	status register
 	KBUF		8	input buffer
 	KPOS		32	number of characters input
 	KTIME		24	input polling interval
@@ -480,7 +486,14 @@ Error handling is as follows:
 
 2.4.5 Line Frequency Clock (LFC)
 
-The line frequency clock (LFC) implements these registers:
+The line frequency clock (LFC) frequency can be adjusted as follows:
+
+	SET LFC 60HZ		set frequency to 60Hz
+	SET LFC 50HZ		set frequency to 50Hz
+
+The default is 60Hz.
+
+The line frequency clock implements these registers:
 
 	name		size	comments
 
@@ -488,10 +501,9 @@ The line frequency clock (LFC) implements these registers:
 	IENB		1	clock interrupt enable
 	IARM		1	clock interrupt armed
 	TIME		24	clock frequency
-	TPS		8	ticks per second (120 or 100)
 
-The real-time clock autocalibrates; the clock interval is adjusted up or
-down so that the clock tracks actual elapsed time.
+The line frequency clock autocalibrates; the clock interval is adjusted
+up or down so that the clock tracks actual elapsed time.
 
 2.4.6 Programmable Interval Clock (PIC)
 
@@ -509,8 +521,9 @@ The programmable interval clock (PIC) implements these registers:
 	IENB		1	clock interrupt enable
 	IARM		1	clock interrupt armed
 
-If the interval requested is longer than 1 msec, the programmable clock
-auto-calibrates; if not, it simply counts instructions.
+If the interval requested is longer than 1 msec, and a multiple of
+1 msec, the programmable clock auto-calibrates; if not, it simply
+counts instructions.
 
 2.4.7 Floppy Disk Controller (FD)
 
@@ -634,7 +647,8 @@ block 0, and uses that to locate the volume directory.  It then searches
 the directory for a filename of the form OS16xxxx.hhh or OS32xxxx.hhh,
 where the xxxx is ignored and hhh is the ASCII form of the extension from
 locations 7E:7F.  The 32b bootstrap can also boot Wollongong UNIX; locations
-7E:7F must be 0.
+7E:7F must be 0.  The bootstrap normally boots from the first (removable)
+platter in a 5440; to boot from the second (fixed) platter, use BOOT -F.
 
 All drives have 256 8b bytes per sector.  The other disk parameters are:
 
@@ -877,7 +891,9 @@ number, optionally preceded by R, between 1 and F (15).
 Instruction input uses standard Interdata assembler syntax.  There are
 nine instruction classes: short branch, extended short branch, short
 immediate, 16b immediate, 32b immediate, register, register-register,
-memory, and register-memory.
+memory, and register-memory.  Addresses, where required, can be
+specified as either absolute numbers or relative to the current
+location (.+n or .-n).
 
 Short branch instructions have the format
 

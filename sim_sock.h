@@ -1,6 +1,6 @@
 /* sim_sock.h: OS-dependent socket routines header file
 
-   Copyright (c) 2001, Robert M Supnik
+   Copyright (c) 2001-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Feb-03	RMS	Added time.h for EMX (from Holger Veit)
    17-Dec-02	RMS	Added sim_connect_sock
    08-Oct-02	RMS	Revised for .NET compatibility
    20-Aug-02	RMS	Changed calling sequence for sim_accept_conn
@@ -50,6 +51,7 @@
 #include <unistd.h>
 #include <netinet/in.h>					/* for sockaddr_in */
 #include <netdb.h>
+#include <sys/time.h>					/* for EMX */
 #endif
 
 #if defined (VMS)					/* VMS unique */

@@ -1,6 +1,6 @@
 /* nova_clk.c: NOVA real-time clock simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    clk		real-time clock
 
+   01-Mar-03	RMS	Added SET/SHOW CLK FREQ support
    03-Oct-02	RMS	Added DIB
    17-Sep-01	RMS	Added terminal multiplexor support
    17-Mar-01	RMS	Moved function prototype
@@ -45,6 +46,8 @@ int32 tmxr_poll = 16000;				/* tmxr poll */
 int32 clk (int32 pulse, int32 code, int32 AC);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
+t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* CLK data structures
 
@@ -67,10 +70,20 @@ REG clk_reg[] = {
 	{ DRDATA (TIME1, clk_time[1], 24), REG_NZ + PV_LEFT },
 	{ DRDATA (TIME2, clk_time[2], 24), REG_NZ + PV_LEFT },
 	{ DRDATA (TIME3, clk_time[3], 24), REG_NZ + PV_LEFT },
+	{ DRDATA (TPS0, clk_tps[0], 6), PV_LEFT + REG_HRO },
 	{ NULL }  };
 
+MTAB clk_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 50, NULL, "50HZ",
+		&clk_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 60, NULL, "60HZ",
+		&clk_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "LINE", NULL,
+		NULL, &clk_show_freq, NULL },
+	{ 0 } };
+
 DEVICE clk_dev = {
-	"CLK", &clk_unit, clk_reg, NULL,
+	"CLK", &clk_unit, clk_reg, clk_mod,
 	1, 0, 0, 0, 0, 0,
 	NULL, NULL, &clk_reset,
 	NULL, NULL, NULL,
@@ -128,5 +141,23 @@ dev_done = dev_done & ~INT_CLK;				/* clear done, int */
 int_req = int_req & ~INT_CLK;
 sim_cancel (&clk_unit);					/* deactivate unit */
 tmxr_poll = clk_time[0];				/* poll is default */
+return SCPE_OK;
+}
+
+/* Set line frequency */
+
+t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr) return SCPE_ARG;
+if ((val != 50) && (val != 60)) return SCPE_IERR;
+clk_tps[0] = val;
+return SCPE_OK;
+}
+
+/* Show line frequency */
+
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, (clk_tps[0] == 50)? "50Hz": "60Hz");
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* pdp8_clk.c: PDP-8 real-time clock simulator
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    clk		real time clock
 
+   01-Mar-03	RMS	Aded SET/SHOW CLK FREQ support
    04-Oct-02	RMS	Added DIB, device number support
    30-Dec-01	RMS	Removed for generalized timers
    05-Sep-01	RMS	Added terminal multiplexor support
@@ -44,6 +45,8 @@ int32 tmxr_poll = 16000;				/* term mux poll */
 int32 clk (int32 IR, int32 AC);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
+t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* CLK data structures
 
@@ -61,10 +64,16 @@ REG clk_reg[] = {
 	{ FLDATA (ENABLE, int_enable, INT_V_CLK) },
 	{ FLDATA (INT, int_req, INT_V_CLK) },
 	{ DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
+	{ DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
 	{ NULL }  };
 
 MTAB clk_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 50, NULL, "50HZ",
+		&clk_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 60, NULL, "60HZ",
+		&clk_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "FREQUENCY", NULL,
+		NULL, &clk_show_freq, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_dev },
 	{ 0 } };
 
@@ -135,5 +144,23 @@ dev_done = dev_done & ~INT_CLK;				/* clear done, int */
 int_req = int_req & ~INT_CLK;
 int_enable = int_enable & ~INT_CLK;			/* clear enable */
 sim_activate (&clk_unit, clk_unit.wait);		/* activate unit */
+return SCPE_OK;
+}
+
+/* Set frequency */
+
+t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr) return SCPE_ARG;
+if ((val != 50) && (val != 60)) return SCPE_IERR;
+clk_tps = val;
+return SCPE_OK;
+}
+
+/* Show frequency */
+
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;
 }

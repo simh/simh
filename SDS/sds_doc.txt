@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	SDS 940 Simulator Usage
-Date:	15-Nov-2002
+Date:	15-Mar-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -39,10 +39,12 @@ This memorandum documents the SDS 940 simulator.
 sim/		sim_defs.h
 		sim_rev.h
 		sim_sock.h
+		sim_tape.h
 		sim_tmxr.h
 		scp.c
 		scp_tty.c
 		sim_sock.c
+		sim_tape.c
 		sim_tmxr.c
 
 sim/sds/	sds_defs.h
@@ -296,15 +298,21 @@ Error handling is as follows:
 
 By default, the line printer is assigned to channel W.
 
-2.8 Real Time Clock (RTC)
+2.8 Real-Time Clock (RTC)
 
-The real time clock (RTC) implements these registers:
+The real-time clock (RTC) frequency can be adjusted as follows:
+
+	SET RTC 60HZ		set frequency to 60Hz
+	SET RTC 50HZ		set frequency to 50Hz
+
+The default is 60Hz.
+
+The clock implements these registers:
 
 	name		size	comments
 
 	PIE		1	interrupt enable
 	TIME		24	tick interval
-	TPS		8	ticks per second
 
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.

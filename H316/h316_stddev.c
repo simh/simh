@@ -1,6 +1,6 @@
 /* h316_stddev.c: Honeywell 316/516 standard devices
 
-   Copyright (c) 1999-2002, Robert M. Supnik
+   Copyright (c) 1999-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tty		316/516-33 teleprinter
    clk/options	316/516-12 real time clocks/internal options
 
+   01-Mar-03	RMS	Added SET/SHOW CLK FREQ support
    22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7b/8b support to terminal
    30-May-02	RMS	Widened POS to 32b
@@ -54,7 +55,7 @@ extern UNIT cpu_unit;
 int32 ptr_stopioe = 0, ptp_stopioe = 0;			/* stop on error */
 int32 ptp_power = 0, ptp_ptime;				/* punch power, time */
 int32 tty_mode = 0, tty_buf = 0;			/* tty mode, buf */
-int32 clk_tps = 60;				/* ticks per second */
+int32 clk_tps = 60;					/* ticks per second */
 
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
@@ -67,6 +68,8 @@ t_stat tty_reset (DEVICE *dptr);
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
+t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* PTR data structures
 
@@ -177,11 +180,20 @@ REG clk_reg[] = {
 	{ FLDATA (READY, dev_ready, INT_V_CLK) },
 	{ FLDATA (ENABLE, dev_enable, INT_V_CLK) },
 	{ DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
+	{ DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
 	{ NULL }  };
 
+MTAB clk_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 50, NULL, "50HZ",
+		&clk_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 60, NULL, "60HZ",
+		&clk_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "FREQUENCY", NULL,
+		NULL, &clk_show_freq, NULL },
+	{ 0 } };
+
 DEVICE clk_dev = {
-	"CLK", &clk_unit, clk_reg, NULL,
+	"CLK", &clk_unit, clk_reg, clk_mod,
 	1, 0, 0, 0, 0, 0,
 	NULL, NULL, &clk_reset,
 	NULL, NULL, NULL };
@@ -504,5 +516,23 @@ t_stat clk_reset (DEVICE *dptr)
 CLR_READY (INT_CLK);					/* clear ready, enb */
 CLR_ENABLE (INT_CLK);
 sim_cancel (&clk_unit);					/* deactivate unit */
+return SCPE_OK;
+}
+
+/* Set frequency */
+
+t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr) return SCPE_ARG;
+if ((val != 50) && (val != 60)) return SCPE_IERR;
+clk_tps = val;
+return SCPE_OK;
+}
+
+/* Show frequency */
+
+t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;
 }

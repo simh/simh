@@ -1,6 +1,6 @@
 /* sds_cpu.c: SDS 940 CPU simulator
 
-   Copyright (c) 2001-2002, Robert M. Supnik
+   Copyright (c) 2001-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -41,6 +41,8 @@
 
    cpu		central processor
    rtc		real time clock
+
+   01-Mar-03	RMS	Added SET/SHOW RTC FREQ support
 */
 
 /* The SDS 940 has three instruction format -- memory reference, register change,
@@ -196,6 +198,9 @@ t_stat one_inst (uint32 inst, uint32 pc, uint32 mode);
 t_stat rtc_inst (uint32 inst);
 t_stat rtc_svc (UNIT *uptr);
 t_stat rtc_reset (DEVICE *dptr);
+t_stat rtc_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rtc_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
+
 extern t_bool io_init (void);
 extern t_stat op_wyim (uint32 inst, uint32 *dat);
 extern t_stat op_miwy (uint32 inst, uint32 dat);
@@ -278,11 +283,20 @@ UNIT rtc_unit = { UDATA (&rtc_svc, 0, 0), 16000 };
 REG rtc_reg[] = {
 	{ FLDATA (PIE, rtc_pie, 0) },
 	{ DRDATA (TIME, rtc_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPS, rtc_tps, 8), REG_NZ + PV_LEFT },
+	{ DRDATA (TPS, rtc_tps, 8), PV_LEFT + REG_HRO },
 	{ NULL }  };
 
+MTAB rtc_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 50, NULL, "50HZ",
+		&rtc_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 60, NULL, "60HZ",
+		&rtc_set_freq, NULL, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "FREQUENCY", NULL,
+		NULL, &rtc_show_freq, NULL },
+	{ 0 } };
+
 DEVICE rtc_dev = {
-	"RTC", &rtc_unit, rtc_reg, NULL,
+	"RTC", &rtc_unit, rtc_reg, rtc_mod,
 	1, 8, 8, 1, 8, 8,
 	NULL, NULL, &rtc_reset,
 	NULL, NULL, NULL };
@@ -1222,6 +1236,8 @@ sim_activate (&rtc_unit, sim_rtcn_calb (rtc_tps, TMR_RTC));	/* reactivate unit *
 return SCPE_OK;
 }
 
+/* Clock interrupt instruction */
+
 t_stat rtc_inst (uint32 inst)
 {
 uint32 op, dat, val, va;
@@ -1239,9 +1255,29 @@ if (dat == 0) int_req = int_req | INT_RTCS;		/* set clk sync int */
 return SCPE_OK;
 }
 
+/* Clock reset */
+
 t_stat rtc_reset (DEVICE *dptr)
 {
 rtc_pie = 0;						/* disable pulse */
 sim_activate (&rtc_unit, rtc_unit.wait);		/* activate unit */
+return SCPE_OK;
+}
+
+/* Set frequency */
+
+t_stat rtc_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr) return SCPE_ARG;
+if ((val != 50) && (val != 60)) return SCPE_IERR;
+rtc_tps = val;
+return SCPE_OK;
+}
+
+/* Show frequency */
+
+t_stat rtc_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, (rtc_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;
 }

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Nova Simulator Usage
-Date:	1-Feb-2003
+Date:	15-Mar-2003
 
 			COPYRIGHT NOTICE
 
@@ -39,10 +39,12 @@ This memorandum documents the Nova simulator.
 sim/		sim_defs.h
 		sim_rev.h
 		sim_sock.h
+		sim_tape.h
 		sim_tmxr.h
 		scp.c
 		scp_tty.c
 		sim_sock.c
+		sim_tape.c
 		sim_tmxr.c
 
 sim/nova/	nova_defs.h
@@ -282,7 +284,14 @@ Error handling is as follows:
 
 2.2.6 Real-Time Clock (CLK)
 
-The real-time clock (CLK) implements these registers:
+The real-time clock (CLK) line frequency can be adjusted as follows:
+
+	SET CLK 60HZ		set line frequency to 60Hz
+	SET CLK 50HZ		set line frequency to 50Hz
+
+The default is 60Hz.
+
+The clock implements these registers:
 
 	name		size	comments
 
@@ -397,7 +406,7 @@ from the attached file:
 	SET RF 8P		eight platters (2048K)
 	SET RF AUTOSIZE		autosized on attach
 
-The default is 8P (maximum size).
+The default is 1P (minimum size).
 
 The fixed head disk controller implements these registers:
 

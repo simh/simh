@@ -303,23 +303,27 @@ static uint8 dboot_rom[] = {
 
 struct dboot_id {
 	char	*name;
+	uint32	sw;
 	uint32	cap;
 	uint32	dtype;
 	uint32	offset;
+	uint32	adder;
 };
 
 static struct dboot_id dboot_tab[] = {
-	{ "DP", 2, 0x31, o_DP0 },
-	{ "DP", 9, 0x33, o_DP0 },
-	{ "DM", 64, 0x35, o_ID0 },
-	{ "DM", 244, 0x36, o_ID0 },
+	{ "DP", 0,            2, 0x31, o_DP0, 0 },
+	{ "DP", SWMASK ('F'), 9, 0x32, o_DP0, o_DPF },
+	{ "DP", 0,            9, 0x33, o_DP0, 0 },
+	{ "DM", 0,           64, 0x35, o_ID0, 0 },
+	{ "DM", 0,          244, 0x36, o_ID0, 0 },
 	{ NULL }  };
 
 t_stat id_dboot (int32 u, DEVICE *dptr)
 {
 extern DIB pt_dib, sch_dib;
 extern uint32 PC;
-uint32 i, typ, ctlno, off, cap, sch_dev;
+extern int32 sim_switches;
+uint32 i, typ, ctlno, off, add, cap, sch_dev;
 UNIT *uptr;
 
 DIB *ddib = (DIB *) dptr->ctxt;				/* get disk DIB */
@@ -331,13 +335,15 @@ for (i = typ = 0; dboot_tab[i].name != NULL; i++) {
 	if ((strcmp (dboot_tab[i].name, dptr->name) == 0) &&
 	    (dboot_tab[i].cap == cap)) {
 		typ = dboot_tab[i].dtype;
-		off = dboot_tab[i].offset;  }  }
+		off = dboot_tab[i].offset;
+		add = dboot_tab[i].adder;
+		break;  }  }
 if (typ == 0) return SCPE_NOFNC;
 
 IOWriteBlk (DBOOT_BEG, DBOOT_LEN, dboot_rom);		/* copy boot */
 IOWriteB (AL_DEV, pt_dib.dno);				/* bin input dev */
 IOWriteB (AL_IOC, 0x99);
-IOWriteB (AL_DSKU, ctlno + ((u + 1) * off));		/* disk param */
+IOWriteB (AL_DSKU, ctlno + ((u + 1) * off) + add);	/* disk param */
 IOWriteB (AL_DSKT, typ);
 IOWriteB (AL_DSKC, ctlno);
 IOWriteB (AL_SCH, sch_dev);

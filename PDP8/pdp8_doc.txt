@@ -39,10 +39,12 @@ This memorandum documents the PDP-8 simulator.
 sim/		sim_defs.h
 		sim_rev.h
 		sim_sock.h
+		sim_tape.h
 		sim_tmxr.h
 		scp.c
 		scp_tty.c
 		sim_sock.c
+		sim_tape.c
 		sim_tmxr.c
 
 sim/pdp8/	pdp8_defs.h
@@ -253,6 +255,12 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
+If the simulator is compiled under Windows Visual C++, typing ^C to the
+terminal input causes a fatal run-time error.  Use the following command
+to simulate typing ^C:
+
+	SET TTI CTRL-C
+
 2.2.4 KL8E Terminal Output (TTO)
 
 The terminal output (TTO) writes to the simulator console window.  It
@@ -296,7 +304,14 @@ Error handling is as follows:
 
 2.2.6 DK8E Line-Frequency Clock (CLK)
 
-The real-time clock (CLK) implements these registers:
+The real-time clock (CLK) frequency can be adjusted as follows:
+
+	SET CLK 60HZ		set frequency to 60Hz
+	SET CLK 50HZ		set frequency to 50Hz
+
+The default is 60Hz.
+
+The clock implements these registers:
 
 	name		size	comments
 
@@ -304,7 +319,6 @@ The real-time clock (CLK) implements these registers:
 	ENABLE		1	interrupt enable flag
 	INT		1	interrupt pending flag
 	TIME		24	clock interval
-	TPS		8	ticks per second (60 or 50)
 
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
@@ -516,7 +530,7 @@ from the attached file:
 	SET RF 4P		four platters (1024K)
 	SET RF AUTOSIZE		autosized on attach
 
-The default is four platters.
+The default is one platter.
 
 The RF08 implements these registers:
 
@@ -562,7 +576,7 @@ from the attached file:
 	SET DF 4P		four platters (128K)
 	SET DF AUTOSIZE		autosized on attach
 
-The default is four platters.
+The default is one platter.
 
 The DF32 implements these registers:
 

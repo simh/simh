@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   28-Feb-03	RMS	Added TM logging support
    19-Jan-03	RMS	Changed mode definitions for Apple Dev Kit conflict
    11-Nov-02	RMS	Changed log definitions to be VAX compatible
    10-Oct-02	RMS	Added vector information to DIB
@@ -551,6 +552,7 @@ typedef struct pdp_dib DIB;
 /* Logging */
 
 #define LOG_CPU_I	0x0001
+#define LOG_TM		0x0008
 #define LOG_RP		0x0010
 #define LOG_TS		0x0020
 #define LOG_RQ		0x0040

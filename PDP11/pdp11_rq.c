@@ -1,6 +1,6 @@
 /* pdp11_rq.c: RQDX3 disk controller simulator
 
-   Copyright (c) 2002, Robert M Supnik
+   Copyright (c) 2003, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,9 @@
 
    rq		RQDX3 disk controller
 
+   27-Feb-03	RMS	Added user-defined drive support
+   26-Feb-03	RMS	Fixed bug in vector calculation for VAXen
+   22-Feb-03	RMS	Fixed ordering bug in queue process
    12-Oct-02	RMS	Added multicontroller support
    29-Sep-02	RMS	Changed addressing to 18b in Unibus mode
 			Added variable address support to bootstrap
@@ -201,7 +204,7 @@ struct rqpkt {
 
    Each drive can be a different type.  The drive field in the
    unit flags specified the drive type and thus, indirectly,
-   the drive size.  DISKS MUST BE DECLARED IN ASCENDING SIZE.
+   the drive size.
 */
 
 #define RQDF_RMV	01				/* removable */
@@ -400,6 +403,24 @@ struct rqpkt {
 #define RA92_MED	0x2564105C
 #define RA92_FLGS	RQDF_SDI
 
+#define RA8U_DTYPE	12				/* user defined */
+#define RA8U_SECT	57				/* +1 spare/track */
+#define RA8U_SURF	15
+#define RA8U_CYL	1435				/* 0-1422 user */
+#define RA8U_TPG	RA8U_SURF
+#define RA8U_GPC	1
+#define RA8U_XBN	3420				/* cyl 1427-1430 */
+#define RA8U_DBN	3420				/* cyl 1431-1434 */
+#define RA8U_LBN	1216665				/* 57*15*1423 */
+#define RA8U_RCTS	400				/* cyl 1423-1426 */
+#define RA8U_RCTC	8
+#define RA8U_RBN	21345				/* 1 *15*1423 */
+#define RA8U_MOD	11				/* RA82 */
+#define RA8U_MED	0x25641052			/* RA82 */
+#define RA8U_FLGS	RQDF_SDI
+#define RA8U_MINC	((5 << 20) / RQ_NUMBY)
+#define RA8U_MAXC	((2047 << 20) / RQ_NUMBY)
+
 struct drvtyp {
 	int32	sect;					/* sectors */
 	int32	surf;					/* surfaces */
@@ -415,6 +436,7 @@ struct drvtyp {
 	int32	mod;					/* MSCP model */
 	int32	med;					/* MSCP media */
 	int32	flgs;					/* flags */
+	char	*name;					/* name */
 };
 
 #define RQ_DRV(d) \
@@ -425,13 +447,13 @@ struct drvtyp {
 #define RQ_SIZE(d)	(d##_LBN * RQ_NUMBY)
 
 static struct drvtyp drv_tab[] = {
-	{ RQ_DRV (RX50) }, { RQ_DRV (RX33) },
-	{ RQ_DRV (RD51) }, { RQ_DRV (RD31) },
-	{ RQ_DRV (RD52) }, { RQ_DRV (RD53) },
-	{ RQ_DRV (RD54) }, { RQ_DRV (RA82) },
-	{ RQ_DRV (RRD40) }, { RQ_DRV (RA72) },
-	{ RQ_DRV (RA90) }, { RQ_DRV (RA92) },
-	{ 0 }  };
+	{ RQ_DRV (RX50), "RX50" }, { RQ_DRV (RX33), "RX33" },
+	{ RQ_DRV (RD51), "RD51" }, { RQ_DRV (RD31), "RD31" },
+	{ RQ_DRV (RD52), "RD52" }, { RQ_DRV (RD53), "RD53" },
+	{ RQ_DRV (RD54), "RD54" }, { RQ_DRV (RA82), "RA82" },
+	{ RQ_DRV (RRD40), "RRD40" }, { RQ_DRV (RA72), "RA72" },
+	{ RQ_DRV (RA90), "RA90" }, { RQ_DRV (RA92), "RA92" },
+	{ RQ_DRV (RA8U), "RAUSER" }, { 0 }  };
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
@@ -483,7 +505,8 @@ t_stat rq_attach (UNIT *uptr, char *cptr);
 t_stat rq_detach (UNIT *uptr);
 t_stat rq_boot (int32 unitno, DEVICE *dptr);
 t_stat rq_set_wlk (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rq_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_wlk (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -584,6 +607,7 @@ REG rq_reg[] = {
 	{ URDATA (UFLG, rq_unit[0].uf, RQ_RDX, 16, 0, RQ_NUMDR, 0) },
 	{ GRDATA (DEVADDR, rq_dib.ba, RQ_RDX, 32, 0), REG_HRO },
 	{ GRDATA (DEVVEC, rq_dib.vec, RQ_RDX, 16, 0), REG_HRO },
+	{ DRDATA (DEVLBN, drv_tab[RA8U_DTYPE].lbn, 22), REG_HRO },
 	{ NULL }  };
 
 MTAB rq_mod[] = {
@@ -603,19 +627,36 @@ MTAB rq_mod[] = {
 		NULL, &rq_show_unitq, 0 },
 	{ MTAB_XTD | MTAB_VUN, 0, "WRITE", NULL,
 		NULL, &rq_show_wlk, NULL },
- 	{ UNIT_DTYPE, (RX50_DTYPE << UNIT_V_DTYPE), "RX50", "RX50", &rq_set_size },
-	{ UNIT_DTYPE, (RX33_DTYPE << UNIT_V_DTYPE), "RX33", "RX33", &rq_set_size }, 
- 	{ UNIT_DTYPE, (RD31_DTYPE << UNIT_V_DTYPE), "RD31", "RD31", &rq_set_size },
- 	{ UNIT_DTYPE, (RD51_DTYPE << UNIT_V_DTYPE), "RD51", "RD51", &rq_set_size },
- 	{ UNIT_DTYPE, (RD52_DTYPE << UNIT_V_DTYPE), "RD52", "RD52", &rq_set_size },
- 	{ UNIT_DTYPE, (RD53_DTYPE << UNIT_V_DTYPE), "RD53", "RD53", &rq_set_size },
- 	{ UNIT_DTYPE, (RD54_DTYPE << UNIT_V_DTYPE), "RD54", "RD54", &rq_set_size },
-	{ UNIT_DTYPE, (RA82_DTYPE << UNIT_V_DTYPE), "RA82", "RA82", &rq_set_size },
-	{ UNIT_DTYPE, (RA72_DTYPE << UNIT_V_DTYPE), "RA72", "RA72", &rq_set_size },
-	{ UNIT_DTYPE, (RA90_DTYPE << UNIT_V_DTYPE), "RA90", "RA90", &rq_set_size },
-	{ UNIT_DTYPE, (RA92_DTYPE << UNIT_V_DTYPE), "RA92", "RA92", &rq_set_size },
-	{ UNIT_DTYPE, (RRD40_DTYPE << UNIT_V_DTYPE), "RRD40", "RRD40", &rq_set_size },
-	{ UNIT_DTYPE, (RRD40_DTYPE << UNIT_V_DTYPE), NULL, "CDROM", &rq_set_size },
+	{ MTAB_XTD | MTAB_VUN, RX50_DTYPE, NULL, "RX50",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RX33_DTYPE, NULL, "RX33",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RD31_DTYPE, NULL, "RD31",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RD51_DTYPE, NULL, "RD51",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RD52_DTYPE, NULL, "RD52",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RD53_DTYPE, NULL, "RD53",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RD54_DTYPE, NULL, "RD54",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RA82_DTYPE, NULL, "RA82",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RRD40_DTYPE, NULL, "RRD40",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RRD40_DTYPE, NULL, "CDROM",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RA72_DTYPE, NULL, "RA72",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RA90_DTYPE, NULL, "RA90",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RA92_DTYPE, NULL, "RA92",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RA8U_DTYPE, NULL, "RAUSER",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, 0, "TYPE", NULL,
+		NULL, &rq_show_type, NULL },
 #if defined (VM_PDP11)
 	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
 		&set_addr, &show_addr, NULL },
@@ -931,9 +972,8 @@ return OK;
    queues, response queue) require servicing.  Also invoked during
    initialization to provide some delay to the next step.
 
-   Process at most one item off the host queue
-   If the host queue is empty, process at most one item off
-	each unit queue
+   Process at most one item off each unit queue
+   If the unit queues were empty, process at most one item off the host queue
    Process at most one item off the response queue
 
    If all queues are idle, terminate thread
@@ -957,7 +997,8 @@ if (cp->csta < CST_UP) {				/* still init? */
 		cp->csta = CST_S1_WR;  }		/* endless loop */
 	else {
 	    cp->s1dat = cp->saw;			/* save data */
-	    dibp->vec = VEC_Q + ((cp->s1dat & SA_S1H_VEC) << 2);
+	    dibp->vec = (cp->s1dat & SA_S1H_VEC) << 2;	/* get vector */
+	    if (dibp->vec) dibp->vec = dibp->vec + VEC_Q; /* if nz, bias */
 	    cp->sa = SA_S2 | SA_S2C_PT | SA_S2C_EC (cp->s1dat);
 	    cp->csta = CST_S2;				/* now in step 2 */
 	    rq_init_int (cp);  }			/* intr if req */
@@ -996,7 +1037,12 @@ if (cp->csta < CST_UP) {				/* still init? */
 	break;  }					/* end switch */			
     return SCPE_OK;  }					/* end if */
 
-if (cp->pip) {						/* polling? */
+for (i = 0; i < RQ_NUMDR; i++) {			/* chk unit q's */
+	nuptr = dptr->units + i;			/* ptr to unit */
+	if (nuptr->cpkt || (nuptr->pktq == 0)) continue;
+	pkt = rq_deqh (cp, &nuptr->pktq);		/* get top of q */
+	if (!rq_mscp (cp, pkt, FALSE)) return SCPE_OK;  }	/* process */
+if ((pkt == 0) && cp->pip) {				/* polling? */
     if (!rq_getpkt (cp, &pkt)) return SCPE_OK;		/* get host pkt */
     if (pkt) {						/* got one? */
         if (DBG_LOG (LOG_RQ)) {
@@ -1019,13 +1065,6 @@ if (cp->pip) {						/* polling? */
 	}						/* end if pkt */
     else cp->pip = 0;					/* discontinue poll */
     }							/* end if pip */
-if (!cp->pip) {						/* not polling? */
-    for (i = 0; i < RQ_NUMDR; i++) {			/* chk unit q's */
-	nuptr = dptr->units + i;			/* ptr to unit */
-	if (nuptr->cpkt || (nuptr->pktq == 0)) continue;
-	pkt = rq_deqh (cp, &nuptr->pktq);		/* get top of q */
-	if (!rq_mscp (cp, pkt, FALSE)) return SCPE_OK;  }	/* process */
-    }							/* end if !pip */
 if (cp->rspq) {						/* resp q? */
     pkt = rq_deqh (cp, &cp->rspq);			/* get top of q */
     if (!rq_putpkt (cp, pkt, FALSE)) return SCPE_OK;	/* send to hst */
@@ -1948,14 +1987,30 @@ else fprintf (st, "write enabled");
 return SCPE_OK;
 }
 
-/* Change unit size */
+/* Set unit type (and capacity if user defined) */
 
-t_stat rq_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-uint32 dtyp = GET_DTYPE (val);
+int32 cap;
+t_stat r;
 
+if ((val < 0) || (val > RA8U_DTYPE) || ((val != RA8U_DTYPE) && cptr))
+	return SCPE_ARG;
 if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-uptr->capac = drv_tab[dtyp].lbn * RQ_NUMBY;
+if (cptr) {
+	cap = (int32) get_uint (cptr, 10, RA8U_MAXC, &r);
+	if ((r != SCPE_OK) || (cap < RA8U_MINC)) return SCPE_ARG;
+	drv_tab[val].lbn = cap;  }
+uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
+uptr->capac = drv_tab[val].lbn * RQ_NUMBY;
+return SCPE_OK;
+}
+
+/* Show unit type (and capacity if user defined) */
+
+t_stat rq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "%s", drv_tab[GET_DTYPE (uptr->flags)].name);
 return SCPE_OK;
 }
 
