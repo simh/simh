@@ -256,9 +256,9 @@ RT-11 is contained in a single RL02 disk image.  To boot and run RT-11:
 	sim> boot rl0
 
 This is a full RT-11 distribution kit.  It expects the user to copy the
-distribution pack and generate a new system.  This requires mounting
-blank packs on RL1.  When a blank pack is attached to the simulator,
-a bad block table must be created with the SET <unit> BADBLOCK command. 
+distribution pack and generate a new system.  This requires mounting a
+blank pack on RL1.  When a blank pack is attached to the simulator, a
+bad block table must be created with the SET <unit> BADBLOCK command. 
 
 3. Nova RDOS
 
@@ -307,7 +307,7 @@ To load and run SIM8:
 	sim> run
 	AC/ 0000
 
-6. PDP-15
+6. PDP-9/PDP-15
 
 6.1 FOCAL
 
@@ -327,6 +327,10 @@ Kossow, who provided the binary image.  To load and run FOCAL15:
 The Advanced Software System Keyboard Monitor is the simplest mass storage
 monitor for the PDP-15.  It offers single-user program development and
 execution capabilities.  To load and run ADSS/KM-15:
+
+- On the PDP-9 (only), initialize extend mode to on:
+
+	sim> d extm_init 1
 
 - Load the paper-tape bootstrap into upper memory:
 
@@ -371,9 +375,6 @@ execution capabilities.  To load and run ADSS/KM-15:
 	*
 
 6.3 Advanced Software System/Foreground Background
-
-Foreground/Background System
-----------------------------
 
 Note: your environment must have a functioning second Teletype; that is, you cannot
 at present run Foreground/Background if your host system is VMS or OS/2.
@@ -589,58 +590,8 @@ To load and run BASIC:
 	RUN
 	 1.41421
 
-9. PDP-9/PDP-15 Advanced Software System/Keyboard Monitor
 
-The Advanced Software System was a family of operating systems for the
-PDP-9 and PDP-15, ranging from a paper-tape basic system, through the
-DECtape or disk based Keyboard Monitor, through the Foreground/Background
-Monitor, to DOS-15.  To run ADSS/KM from simulated DECtape:
-
-- On the PDP-9 (only), initialize extend mode to on:
-
-	sim> d extm_init 1
-
-- Load the paper-tape bootstrap into upper memory:
-
-	sim> load dec-15u.rim 77637
-
-- Verify that the bootstrap loaded correctly:
-
-	sim> ex pc
-	PC:	077646
-
-- Mount the Advanced Software System DECtape image on DECtape unit 0:
-
-	sim> attach dt adss15_32k.dtp
-
-- Run the bootstrap:
-
-	sim> run
-
-- The DECtape will boot and print out
-
-	KMS9-15 V5B000
-	$
-
-   and is now ready for commands.  Recognized commands include:
-
-	D	list system device directory
-	I	list available commands
-	R	list device assignments
-	SCOM	list systems communication region
-
-- To run Focal, assign unused DAT slot 10 and then load Focal
-
-	$A LPA0 10
-	$GLOAD
-	LOADER V5B000
-	>_FOCAL<altmode = control-[>
-	FOCAL V9A
-	*TYPE 2+2,!
-	    4.0000
-	*
-
-10. PDP-10 TOPS-10 7.03, TOPS-20 V4.1
+9. PDP-10 TOPS-10 7.03, TOPS-20 V4.1
 
 TOPS-10 was the primary time-shared operating system for the PDP-10.
 TOPS-20 was a popular alternative derived from the BBN TENEX system.

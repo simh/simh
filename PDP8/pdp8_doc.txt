@@ -1,0 +1,676 @@
+To:	Users
+From:	Bob Supnik
+Subj:	PDP-8 Simulator Usage
+Date:	1-Dec-01
+
+			COPYRIGHT NOTICE
+
+The following copyright notice applies to both the SIMH source and binary:
+
+   Original code published in 1993-2001, written by Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Robert M Supnik shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Robert M Supnik.
+
+This memorandum documents the PDP-8 simulator.
+
+
+1. Simulator Files
+
+sim/		sim_defs.h
+		sim_sock.h
+		sim_tmxr.h
+		scp.c
+		scp_tty.c
+		sim_rev.c
+		sim_sock.c
+		sim_tmxr.c
+
+sim/pdp8/	pdp8_defs.h
+		pdp8_cpu.c
+		pdp8_df.c
+		pdp8_dt.c
+		pdp8_lp.c
+		pdp8_mt.c
+		pdp8_pt.c
+		pdp8_rf.c
+		pdp8_rk.c
+		pdp8_rl.c
+		pdp8_rx.c
+		pdp8_sys.c
+		pdp8_tt.c
+		pdp8_ttx.c
+
+2. PDP-8 Features
+
+The PDP-8 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		PDP-8/E CPU with 32KW of memory
+-		KE8E extended arithmetic element (EAE)
+-		KM8E memory management and timeshare control
+PTR,PTP		PC8E paper tape reader/punch
+TTI,TTO		KL8E console terminal
+TTI1-4,TTO1-4	KL8JA additional terminals
+LPT		LE8E line printer
+CLK		DK8E line frequency clock (also PDP-8/A compatible)
+RK		RK8E/RK05 cartridge disk controller with four drives
+RF		RF08/RS08 fixed head disk controller with four platters, or
+DF		DF32/DS32 fixed head disk controller with four platters
+RL		RL8A/RL01 cartridge disk controller with four drives
+RX		RX8E/RX01 floppy disk controller with two drives
+DT		TC08/TU56 DECtape controller with eight drives
+MT		TM8E/TU10 magnetic tape controller with eight drives
+
+The RK, RF, DF, RL, RX, DT, and MT devices can be DISABLEd.  The PDP-8
+can support only one of the set {DF32, RF08, RL8A},since they use the same
+IOT's.  The simulator defaults to the RF08.  To change the disk at device
+addresses 60-61:
+
+	ENABLE DF	enable DF32, disable RF08 and RL8A
+	ENABLE RF	enable RF08, disable DF32 and RL8A
+	ENABLE RL	enable RL8A, disable DF32 and RF08
+
+The PDP-8 simulator implements one unique stop condition: if an undefined
+instruction (unimplemented IOT or OPR) is decoded, and register STOP_INST
+is set, the simulator halts.
+
+The PDP-8 loader supports both RIM format and BIN format tapes.  If the file
+extension is .RIM, or the -r switch is specified with LOAD, the file is
+assumed to be RIM format; if the file extension is not .RIM, or if the -b
+switch is specified, the file is assumed to be BIN format.
+
+2.1 CPU
+
+The only CPU options are the presence of the EAE and the size of main
+memory; the memory extension and time-share control is always included,
+even if memory size is 4K.
+
+	SET CPU EAE		enable EAE
+	SET CPU NOEAE		disable EAE
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 12K		set memory size = 12K
+	SET CPU 16K		set memory size = 16K
+	SET CPU 20K		set memory size = 20K
+	SET CPU 24K		set memory size = 24K
+	SET CPU 28K		set memory size = 28K
+	SET CPU 32K		set memory size = 32K
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 32K.
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	PC		15	program counter, including IF as high 3 bits
+	AC		12	accumulator
+	MQ		12	multiplier-quotient
+	L		1	link
+	SR		12	front panel switches
+	IF		3	instruction field
+	DF		3	data field
+	IB		3	instruction field buffer
+	SF		7	save field
+	UF		1	user mode flag
+	UB		1	user mode buffer
+	SC		5	EAE shift counter
+	GTF		1	EAE greater than flag
+	EMODE		1	EAE mode (0 = A, 1 = B)
+	ION		1	interrupt enable
+	ION_DELAY	1	interrupt enable delay for ION
+	CIF_DELAY	1	interrupt enable delay for CIF
+	PWR_INT		1	power fail interrupt
+	UF_INT		1	user mode violation interrupt
+	INT		15	interrupt pending flags
+	DONE		15	device done flags
+	ENABLE		15	device interrupt enable flags
+	OLDPC		15	PC prior to last JMP, JMS, or interrupt
+	STOP_INST	1	stop on undefined instruction
+	WRU		8	interrupt character
+
+2.2 Programmed I/O Devices
+
+2.2.1 PC8E Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.  Thus, 
+by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader supports the BOOT command.  BOOT PTR copies the
+RIM loader into memory and starts it running.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+2.2.2 PC8E Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS register
+specifies the number of the next data item to bewritten.  Thus, by
+changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+2.2.3 KL8E Terminal Input (TTI)
+
+The terminal input (TTI) polls the console keyboard for input.  The
+input side has one option, UC; when set, it automatically converts lower
+case input to upper case.  This is required by OS/8 and is on by default.
+
+The terminal input implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+2.2.4 KL8E Terminal Output (TTO)
+
+The terminal output (TTO) writes to the simulator console window. It
+implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters output
+	TIME		24	time from I/O initiation to interrupt
+
+2.2.5 LE8E Line Printer (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be read or written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The line printer implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	ERR		1	error status flag
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	set error flag
+
+	OS I/O error	x	report error and stop
+
+2.2.6 DK8E Line-Frequency Clock (CLK)
+
+The real-time clock (CLK) implements these registers:
+
+	name		size	comments
+
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	TIME		24	clock interval
+	TPS		8	ticks per second (60 or 50)
+
+The real-time clock autocalibrates; the clock interval is adjusted up or
+down so that the clock tracks actual elapsed time.
+
+2.2.7 KL8JA Additional Terminals (TTI1-4, TTO1-4)
+
+Each additional terminal consists of two independent devices, TTIn and
+TTOn.  The entire set is modelled as a terminal multiplexor, with TTI1
+as the master unit.  The additional terminals perform input and output
+through Telnet sessions connected to a user-specified port.  The ATTACH
+command specifies the port to be used:
+
+	ATTACH TTI1 <port>(cr)	-- set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.
+
+Once TTI1 is attached and the simulator is running, the terminals listen
+for connections on the specified port.  They assume that the incoming
+connections are Telnet connections.  The connections remain open until
+disconnected either by the Telnet client, or by a DETACH TTI1 command.
+
+The SHOW TTI1 LINESTATUS command displays the current connections to the
+additional terminals. 
+
+The input devices (TTI1-4) implement these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+The output devices (TTO1-4) implement these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	INT		1	interrupt pending flag
+	POS		31	number of characters output
+	TIME		24	time from I/O initiation to interrupt
+
+The additional terminals do not support save and restore.  All open
+connections are lost when the simulator shuts down or TTI1 is detached.
+
+2.3 Moving Head Disks
+
+2.3.1 RK8E Cartridge Disk (RK)
+
+RK8E options include the ability to make units write enabled or write locked:
+
+	SET RKn LOCKED		set unit n write locked
+	SET RKn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.  The RK8E supports
+the BOOT command.
+
+The RK8E implements these registers:
+
+	name		size	comments
+
+	RKSTA		12	status
+	RKCMD		12	disk command
+	RKDA		12	disk address
+	RKMA		12	current memory address
+	BUSY		1	control busy flag
+	INT		1	interrupt pending flag
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.3.2 RL8A Cartridge Disk (RL)
+
+RL8A options include the ability to make units write enabled or write locked:
+
+	SET RKn LOCKED		set unit n write locked
+	SET RKn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.  The RK8E supports
+the BOOT command.
+
+The RL8A implements these registers:
+
+	name		size	comments
+
+	RLCSA		12	control/status A
+	RLCSB		12	control/status B
+	RLMA		12	memory address
+	RLWC		12	word count
+	RLSA		6	sector address
+	RLER		12	error flags
+	RLSI		16	silo top word
+	RLSI1		16	silo second word
+	RLSI2		16	silo third word
+	RLSIL		1	silo read left/right flag
+	INT		1	interrupt request
+	DONE		1	done flag
+	ERR		1	composite error flag
+	STIME		1	seek time, per cylinder
+	RTIME		1	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.4 RX8E/RX01 Floppy Disk (RX)
+
+RX8E options include the ability to set units write enabled or write locked:
+
+	SET RXn LOCKED		set unit n write locked
+	SET RXn ENABLED		set unit n write enabled
+
+The RX8E supports the BOOT command.
+
+The RX8E implements these registers:
+
+	name		size	comments
+
+	RXCS		12	status
+	RXDB		12	data buffer
+	RXES		8	error status
+	RXTA		8	current track
+	RXSA		8	current sector
+	STAPTR		3	controller state
+	BUFPTR		3	buffer pointer
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ENABLE		1	interrupt enable flag
+	TR		1	transfer ready flag
+	ERR		1	error flag
+	CTIME		24	command completion time
+	STIME		24	seek time, per track
+	XTIME		24	transfer ready delay
+	STOP_IOE	1	stop on I/O error
+	SBUF[0:127]	8	sector buffer array
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RX01 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.5 Fixed Head Disks
+
+Either the RF08 or the DF32 can be present in a configuration, but
+not both.
+
+2.5.1 RF08/RS08 Fixed Head Disk (RF)
+
+The RF08 implements these registers:
+
+	name		size	comments
+
+	STA		12	status
+	DA		20	current disk address
+	MA		12	memory address (in memory)
+	WC		12	word count (in memory)
+	WLK		32	write lock switches
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	TIME		24	rotational delay, per word
+	BURST		1	burst flag
+	STOP_IOE	1	stop on I/O error
+
+The RF08 supports the BOOT command.  The default bootstrap is for OS/8.  To
+bootstrap the 4K Disk Monitor, use the BOOT -D command.
+
+The RF08 is a three-cycle data break device.  If BURST = 0, word transfers
+are scheduled individually; if BURST = 1, the entire transfer occurs in
+a single data break.
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RF08 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.5.2 DF32/DS32 Fixed Head Disk (RF)
+
+The DF32 implements these registers:
+
+	name		size	comments
+
+	STA		12	status, disk and memory address extension
+	DA		12	low order disk address
+	MA		12	memory address (in memory)
+	WC		12	word count (in memory)
+	WLK		16	write lock switches
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	TIME		24	rotational delay, per word
+	BURST		1	burst flag
+	STOP_IOE	1	stop on I/O error
+
+The DF32 supports the BOOT command.  The default bootstrap is for OS/8.  To
+bootstrap the 4K Disk Monitor, use the BOOT -D command.
+
+The DF32 is a three-cycle data break device.  If BURST = 0, word transfers
+are scheduled individually; if BURST = 1, the entire transfer occurs in
+a single data break.
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+DF32 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.6 TC08/TU56 DECtape (DT)
+
+DECtapes drives are numbered 1-8; in the simulator, drive 8 is unit 0.
+DECtape options include the ability to make units write enabled or write
+locked.
+
+	SET DTn LOCKED		set unit n write locked
+	SET DTn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.  The TC08 supports
+the BOOT command.
+
+The TC08 supports both PDP-8 format and PDP-9/11/15 format DECtape images.
+ATTACH tries to determine the tape format from the DECtape image; the user
+can force a particular format with switches:
+
+	-f				foreign (PDP-9/11/15) format
+	-n				native (PDP-8) format
+
+The DECtape controller is a data-only simulator; the timing and mark
+track, and block header and trailer, are not stored.  Thus, the WRITE
+TIMING AND MARK TRACK function is not supported; the READ ALL function
+always returns the hardware standard block header and trailer; and the
+WRITE ALL function dumps non-data words into the bit bucket.
+
+The DECtape controller implements these registers:
+
+	name		size	comments
+
+	DTSA		12	status register A
+	DTSB		12	status register B
+	INT		1	interrupt pending flag
+	ENB		1	interrupt enable flag
+	DTF		1	DECtape flag
+	ERF		1	error flag
+	CA		12	current address (memory location 7754)
+	WC		12	word count (memory location 7755)
+	LTIME		31	time between lines
+	ACTIME		31	time to accelerate to full speed
+	DCTIME		31	time to decelerate to a full stop
+	SUBSTATE	2	read/write command substate
+	POS[0:7]	31	position, in lines, units 0-7
+	STATT[0:7]	31	unit state, units 0-7
+
+It is critically important to maintain certain timing relationships
+among the DECtape parameters, or the DECtape simulator will fail to
+operate correctly.
+
+	- LTIME must be at least 6
+	- ACTIME must be less than DCTIME, and both need to be at
+	  least 100 times LTIME
+
+2.7 TM8E Magnetic Tape (MT)
+
+Magnetic tape options include the ability to make units write enabled or
+or write locked.
+
+	SET MTn LOCKED		set unit n write locked
+	SET MTn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	CMD		12	command
+	FNC		12	function
+	CA		12	memory address
+	WC		12	word count
+	DB		12	data buffer
+	STA		12	main status
+	STA2		6	secondary status
+	DONE		1	device done flag
+	INT		1	interrupt pending flag
+	STOP_IOE	1	stop on I/O error
+	TIME		24	record delay
+	UST[0:7]	24	unit status, units 0-7
+	POS[0:7]	31	position, units 0-7
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		tape not ready
+
+	end of file		(read or space) end of physical tape
+				(write) ignored
+
+	OS I/O error		report error and stop
+
+2.8 Symbolic Display and Input
+
+The PDP-8 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as (sixbit) character string
+	-t			display as (TSS/8 sixbit) character string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			two character sixbit string
+	# or -t			two character TSS/8 sixbit string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard PDP-8 assembler syntax.  There are four
+instruction classes: memory reference, IOT, field change, and operate.
+
+Memory reference instructions have the format
+
+	memref {I} {C/Z} address
+
+where I signifies indirect, C a current page reference, and Z a zero page
+reference.  The address is an octal number in the range 0 - 07777; if C or
+Z is specified, the address is a page offset in the range 0 - 177.  Normally,
+C is not needed; the simulator figures out from the address what mode to use.
+However, when referencing memory outside the CPU (eg, disks), there is no
+valid PC, and C must be used to specify current page addressing.
+
+IOT instructions consist of single mnemonics, eg, KRB, TLS.  IOT instructions
+may be or'd together
+
+	iot iot iot...
+
+The simulator does not check the legality of the proposed combination.  IOT's
+for which there is no opcode may be specified as IOT n, where n is an octal
+number in the range 0 - 0777.
+
+Field change instructions (CIF, CDF) have the format
+
+	fldchg field
+
+where field is an octal number in the range 0 - 7.  Field change instructions
+may be or'd together.
+
+Operate instructions have the format
+
+	opr opr opr...
+
+The simulator does not check the legality of the proposed combination.  EAE
+mode A and B mnemonics may be specified regardless of the EAE mode.  The
+operands for MUY and DVI must be deposited explicitly.

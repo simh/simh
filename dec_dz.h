@@ -28,6 +28,8 @@
 
    dz		DZ11 terminal multiplexor
 
+   03-Dec-01	RMS	Modified for extended SET/SHOW
+   09-Nov-01	RMS	Added VAX support
    20-Oct-01	RMS	Moved getchar from sim_tmxr, changed interrupt
 			logic to use tmxr_rqln
    06-Oct-01	RMS	Fixed bug in carrier detect logic
@@ -46,6 +48,10 @@
 
 #include "sim_sock.h"
 #include "sim_tmxr.h"
+
+#if !defined (DZ_RDX)
+#define DZ_RDX		8
+#endif
 
 #define DZ_LNOMASK	(DZ_LINES - 1)			/* mask for lineno */
 #define DZ_LMASK	((1 << DZ_LINES) - 1)		/* mask of lines */
@@ -132,7 +138,7 @@ t_stat dz_clear (t_bool flag);
 int32 dz_getchar (TMXR *mp);
 void dz_update_rcvi (void);
 void dz_update_xmti (void);
-t_stat dz_status (UNIT *uptr, FILE *st);
+t_stat dz_status (FILE *st, UNIT *uptr, void *desc);
 
 /* DZ data structures
 
@@ -144,12 +150,12 @@ t_stat dz_status (UNIT *uptr, FILE *st);
 UNIT dz_unit = { UDATA (&dz_svc, UNIT_ATTABLE, 0) };
 
 REG dz_reg[] = {
-	{ ORDATA (CSR, dz_csr, 16) },
-	{ ORDATA (RBUF, dz_rbuf, 16) },
-	{ ORDATA (LPR, dz_lpr, 16) },
-	{ ORDATA (TCR, dz_tcr, 16) },
-	{ ORDATA (MSR, dz_msr, 16) },
-	{ ORDATA (TDR, dz_tdr, 16) },
+	{ GRDATA (CSR, dz_csr, DZ_RDX, 16, 0) },
+	{ GRDATA (RBUF, dz_rbuf, DZ_RDX, 16, 0) },
+	{ GRDATA (LPR, dz_lpr, DZ_RDX, 16, 0) },
+	{ GRDATA (TCR, dz_tcr, DZ_RDX, 16, 0) },
+	{ GRDATA (MSR, dz_msr, DZ_RDX, 16, 0) },
+	{ GRDATA (TDR, dz_tdr, DZ_RDX, 16, 0) },
 	{ FLDATA (SAENB, dz_sa_enb, 0) },
 	{ FLDATA (MDMCTL, dz_mctl, 0) },
 	{ FLDATA (AUTODS, dz_auto, 0) },
@@ -173,12 +179,14 @@ REG dz_reg[] = {
 	{ NULL }  };
 
 MTAB dz_mod[] = {
-	{ UNIT_ATT, UNIT_ATT, "line status:", NULL, &dz_status },
+	{ UNIT_ATT, UNIT_ATT, "line status", NULL, NULL, &dz_status },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "LINESTATUS", NULL,
+		NULL, &dz_status, NULL },
 	{ 0 }  };
 
 DEVICE dz_dev = {
 	"DZ", &dz_unit, dz_reg, dz_mod,
-	1, 8, 13, 1, 8, 8,
+	1, DZ_RDX, 13, 1, DZ_RDX, 8,
 	&tmxr_ex, &tmxr_dep, &dz_reset,
 	NULL, &dz_attach, &dz_detach };
 
@@ -424,10 +432,11 @@ return tmxr_detach (&dz_desc, uptr);
 
 /* Status */
 
-t_stat dz_status (UNIT *uptr, FILE *st)
+t_stat dz_status (FILE *st, UNIT *uptr, void *desc)
 {
 int32 i;
 
+fprintf (st, "line status:");
 for (i = 0; (i < DZ_LINES) && (dz_desc.ldsc[i] -> conn == 0); i++) ;
 if (i < DZ_LINES) {
 	for (i = 0; i < DZ_LINES; i++) {

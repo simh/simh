@@ -1,0 +1,24 @@
+Charles Owen's Eclipse Modules
+
+1. Eclipse CPU simulator
+
+The Eclipse CPU simulator can be used with the  Nova definitions and peripheral
+modules to produce an Eclipse simulator that will run Eclipse mapped RDOS V7.5.
+The compilation procedure is the same as for the Nova simulator, except:
+
+	- the symbol ECLIPSE must be defined
+	- the module eclipse_cpu.c must be substituted for nova_cpu.c
+	- the output should be named eclipse rather than nova
+
+For example, to compile under UNIX, move nova_cpu.c out of the source directory
+and then give this command:
+
+	% cc -DECLIPSE eclipse_cpu.c nova_*.c -o eclipse
+
+2. Alternate terminal emulator
+
+The module eclipse_tt.c can be used with either an Eclipse or Nova CPU simulator
+in place of nova_tt.c.  It provides a full emulation of the cursor controls on
+the Dasher video terminal but requires that the underlying operating system
+interpret VT100 cursor controls.  Thus, it works under VMS or UNIX but not under
+Windows or OS/2.

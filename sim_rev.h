@@ -25,10 +25,52 @@
 */
 
 #define	SIM_MAJOR	2
-#define SIM_MINOR	7
-#define SIM_PATCH	15
+#define SIM_MINOR	8
+#define SIM_PATCH	5
 
-/* SIMH detailed revision list, starting with V2.7
+/* V2.8 revision history
+
+patch	date		module(s) and fix(es)
+
+5	25-Dec-01	scp.c: fixed bug in DO command (found by John Dundas)
+
+			pdp10_cpu.c:
+			-- moved trap-in-progress to separate variable
+			-- cleaned up declarations
+			-- cleaned up volatile state for GNU C longjmp
+
+			pdp11_cpu.c: cleaned up declarations
+  
+			pdp11_rq.c: added RA-class disks
+
+4	17-Dec-01	pdp11_rq.c: added delayed processing of packets
+
+3	16-Dec-01	pdp8_cpu.c:
+			-- mode A EAE instructions didn't clear GTF
+			-- ASR shift count > 24 mis-set GTF
+			-- effective shift count == 32 didn't work
+
+2	07-Dec-01	scp.c: added breakpoint package
+
+			all CPU's: revised to use new breakpoint package
+
+1	05-Dec-01	scp.c: fixed bug in universal register name logic
+
+0	30-Nov-01	Reorganized simh source and documentation tree
+
+			scp: Added DO command, universal registers, extended
+			SET/SHOW logic
+
+			pdp11: overhauled PDP-11 for DMA map support, shared
+			sources with VAX, dynamic buffer allocation
+
+			18b pdp: overhauled interrupt structure
+
+			pdp8: added RL8A
+
+			pdp10: fixed two ITS-related bugs (found by Dave Conroy)
+
+   V2.7 revision history
 
 patch	date		module(s) and fix(es)
 

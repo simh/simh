@@ -23,6 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Dec-01	RMS	Added breakpoint package
+   01-Dec-01	RMS	Added read-only unit support, extended SET/SHOW features,
+			improved error messages
+   24-Nov-01	RMS	Added unit-based registers
    27-Sep-01	RMS	Added queue count prototype
    17-Sep-01	RMS	Removed multiple console support
    07-Sep-01	RMS	Removed conditional externs on function prototypes
@@ -144,6 +148,17 @@ typedef int32		t_mtrlnt;			/* magtape rec lnt */
 #define SCPE_UDIS	(SCPE_BASE + 26)		/* unit disabled */
 #define SCPE_LOGON	(SCPE_BASE + 27)		/* logging enabled */
 #define SCPE_LOGOFF	(SCPE_BASE + 28)		/* logging disabled */
+#define SCPE_NORO	(SCPE_BASE + 29)		/* rd only not ok */
+#define SCPE_INVSW	(SCPE_BASE + 30)		/* invalid switch */
+#define SCPE_MISVAL	(SCPE_BASE + 31)		/* missing value */
+#define SCPE_2FARG	(SCPE_BASE + 32)		/* too few arguments */
+#define SCPE_2MARG	(SCPE_BASE + 33)		/* too many arguments */
+#define SCPE_NXDEV	(SCPE_BASE + 34)		/* nx device */
+#define SCPE_NXUN	(SCPE_BASE + 35)		/* nx unit */
+#define SCPE_NXREG	(SCPE_BASE + 36)		/* nx register */
+#define SCPE_NXPAR	(SCPE_BASE + 37)		/* nx parameter */
+#define SCPE_NEST	(SCPE_BASE + 40)		/* nested DO */
+#define SCPE_IERR	(SCPE_BASE + 41)		/* internal error */
 #define SCPE_KFLAG	01000				/* tti data flag */
 
 /* Print value format codes */
@@ -174,12 +189,12 @@ struct device {
 	struct unit 	*units;				/* units */
 	struct reg	*registers;			/* registers */
 	struct mtab	*modifiers;			/* modifiers */
-	int		numunits;			/* #units */
-	int		aradix;				/* address radix */
-	int		awidth;				/* address width */
-	int		aincr;				/* addr increment */
-	int		dradix;				/* data radix */
-	int		dwidth;				/* data width */
+	int32		numunits;			/* #units */
+	int32		aradix;				/* address radix */
+	int32		awidth;				/* address width */
+	int32		aincr;				/* addr increment */
+	int32		dradix;				/* data radix */
+	int32		dwidth;				/* data width */
 	t_stat		(*examine)();			/* examine routine */
 	t_stat		(*deposit)();			/* deposit routine */
 	t_stat		(*reset)();			/* reset routine */
@@ -225,19 +240,22 @@ struct unit {
 #define UNIT_BUFABLE	000100				/* bufferable */
 #define UNIT_MUSTBUF	000200				/* must buffer */
 #define UNIT_BUF	000400				/* buffered */
-#define UNIT_DISABLE	001000				/* disable-able */
-#define UNIT_DIS	002000				/* disabled */
+#define UNIT_ROABLE	001000				/* read only ok */
+#define UNIT_DISABLE	002000				/* disable-able */
+#define UNIT_DIS	004000				/* disabled */
 #define UNIT_V_UF	12				/* device specific */
+							/* must be DIS+1!! */
+#define UNIT_V_RSV	31				/* reserved!! */
 
 /* Register data structure */
 
 struct reg {
 	char		*name;				/* name */
 	void		*loc;				/* location */
-	int		radix;				/* radix */
-	int		width;				/* width */
-	int		offset;				/* starting bit */
-	int		depth;				/* save depth */
+	int32		radix;				/* radix */
+	int32		width;				/* width */
+	int32		offset;				/* starting bit */
+	int32		depth;				/* save depth */
 	int32		flags;				/* flags */
 };
 
@@ -245,17 +263,18 @@ struct reg {
 #define REG_RO		004				/* read only */
 #define REG_HIDDEN	010				/* hidden */
 #define REG_NZ		020				/* must be non-zero */
-#define REG_HRO		(REG_RO + REG_HIDDEN)		/* hidden, read only */
+#define REG_UNIT	040				/* in unit struct */
+#define REG_HRO		(REG_RO | REG_HIDDEN)		/* hidden, read only */
 
 /* Command table */
 
 struct ctab {
 	char		*name;				/* name */
 	t_stat		(*action)();			/* action routine */
-	int		arg;				/* argument */
+	int32		arg;				/* argument */
 };
 
-/* Modifier table */
+/* Modifier table - only extended entries have disp, reg, or flags */
 
 struct mtab {
 	int32		mask;				/* mask or radix */
@@ -263,7 +282,18 @@ struct mtab {
 	char		*pstring;			/* print string */
 	char		*mstring;			/* match string */
 	t_stat		(*valid)();			/* validation routine */
+	t_stat		(*disp)();			/* display routine */
+	void		*desc;				/* value descriptor */
+							/* REG * if MTAB_VAL */
+							/* int * if not */
 };
+
+#define	MTAB_XTD	(1u << UNIT_V_RSV)		/* ext entry flag */
+#define MTAB_VDV	001				/* valid for dev */
+#define MTAB_VUN	002				/* valid for unit */
+#define MTAB_VAL	004				/* takes a value */
+#define MTAB_NMO	010				/* only if named */
+#define MTAB_XTV	(MTAB_XTD | MTAB_XTD)		/* ext with value */
 
 /* Search table */
 
@@ -285,6 +315,8 @@ struct schtab {
 #define FLDATA(nm,loc,pos) #nm, &(loc), 2, 1, (pos), 1
 #define GRDATA(nm,loc,rdx,wd,pos) #nm, &(loc), (rdx), (wd), (pos), 1
 #define BRDATA(nm,loc,rdx,wd,dep) #nm, (loc), (rdx), (wd), 0, (dep)
+#define URDATA(nm,loc,rdx,wd,off,dep,fl) \
+	#nm, &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
 #else
 #define ORDATA(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1
 #define DRDATA(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1
@@ -292,6 +324,8 @@ struct schtab {
 #define FLDATA(nm,loc,pos) "nm", &(loc), 2, 1, (pos), 1
 #define GRDATA(nm,loc,rdx,wd,pos) "nm", &(loc), (rdx), (wd), (pos), 1
 #define BRDATA(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
+#define URDATA(nm,loc,rdx,wd,off,dep,fl) \
+	"nm", &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
 #endif
 
 /* Typedefs for principal structures */
@@ -326,3 +360,4 @@ int32 sim_rtc_init (int32 time);
 int32 sim_rtc_calb (int32 ticksper);
 t_stat sim_poll_kbd (void);
 t_stat sim_putchar (int32 out);
+t_bool sim_brk_test (t_addr bloc, int32 btyp);

@@ -1,0 +1,428 @@
+To:	Users
+From:	Bob Supnik
+Subj:	IBM 1401 Simulator Usage
+Date:	1-Dec-01
+
+			COPYRIGHT NOTICE
+
+The following copyright notice applies to both the SIMH source and binary:
+
+   Original code published in 1993-2001, written by Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Robert M Supnik shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Robert M Supnik.
+
+This memorandum documents the IBM 1401 simulator.
+
+
+1. Simulator Files
+
+sim/		sim_defs.h
+		scp.c
+		scp_tty.c
+		sim_rev.c
+
+sim/i1401/	i1401_defs.h
+		i1401_cpu.c
+		i1401_iq.c
+		i1401_lp.c
+		i1401_mt.c
+		i1401_sys.c	
+
+2. IBM 1401 Features
+
+The IBM 1401 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		IBM 1401 CPU with 16K of memory
+CDR,CDP		IBM 1402 card reader/punch
+LPT		IBM 1403 line printer
+INQ		IBM 1407 inquiry terminal
+MT		IBM 729 7-track magnetic tape controller with six drives
+
+The IBM 1401 simulator implements many unique stop conditions.  On almost
+any kind of error the simulator stops:
+
+	unimplemented opcode
+	reference to non-existent memory
+	reference to non-existent device
+	no word mark under opcode
+	invalid A address
+	invalid B address
+	invalid instruction length
+	invalid modifier character
+	invalid branch address
+	invalid magtape unit number
+	invalid magtape record length
+	write to locked magtape drive
+	skip to unpunched carriage control tape channel
+	card reader hopper empty
+	address register wrap-around
+	single character A field in MCE
+	single character B field in MCE
+	hanging $ in MCE with EPE enabled
+	I/O check with I/O stop switch set
+
+The LOAD and DUMP commands are not implemented.
+
+2.1 CPU
+
+The CPU options include a number of special features and the size of main
+memory.  Note that the Modify Address special feature is always included
+when memory size is greater than 4K.
+
+	SET CPU XSA		enable advanced programming special feature
+	SET CPU NOXSA		disable advanced programming
+	SET CPU HLE		enable high/low/equal special feature
+	SET CPU NOHLE		disable high/low/equal
+	SET CPU BBE		enable branch on bit equal special feature
+	SET CPU NOBBE		disable branch on bit equal
+	SET CPU MR		enable move record special feature
+	SET CPU NOMR		disable move record
+	SET CPU EPE		enable extended print edit special feature
+	SET CPU NOEPE		disable extended print edit
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 12K		set memory size = 12K
+	SET CPU 16K		set memory size = 16K
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initially, memory size is 16K, and all special
+features are enabled.
+
+Memory is implemented as 7 bit BCD characters, as follows:
+
+	6	5 	4	3	2	1	0
+
+	word	B bit	A bit	8	4	2	1
+	mark	<-- zone -->	<-------- digit -------->
+
+In BCD, the decimal digits 0-9 are (octal) values 012, 001, 002, 003, 004,
+005, 006, 007, 010, 011, respectively.  Signs are encoded in the zone bits,
+with 00, 01, and 11 being positive, and 10 being negative.
+
+CPU registers include the visible state of the processor.  The 1401 has no
+interrupt system.
+
+	name		size	comments
+
+	IS		14	instruction storage address register (PC)
+	AS		14	A storage address register
+	BS		14	B storage address register
+	ASERR		1	AS invalid flag
+	BSERR		1	BS invalid flag
+	SSA		1	sense switch A
+	SSB		1	sense switch B
+	SSC		1	sense switch C
+	SSD		1	sense switch D
+	SSE		1	sense switch E
+	SSF		1	sense switch F
+	SSG		1	sense switch G
+	EQU		1	equal compare indicator
+	UNEQ		1	unequal compare indicator
+	HIGH		1	high compare indicator
+	LOW		1	low compare indicator
+	OVF		1	overflow indicator
+	IOCHK		1	I/O check switch
+	PRCHK		1	process check switch
+	OLDIS		1	IS prior to last branch
+	WRU		8	interrupt character
+
+2.2 1402 Card Reader/Punch (CDR, CDP, STKR)
+
+The IBM 1402 card/reader punch is simulated as three independent devices:
+the card reader (CDR), the card punch (CDP), and the reader and punch
+stackers (STKR).  STRK units 0, 1, 2, and 4 correspond to the reader
+normal stacker, reader stacker 1, shared stacker 2/8, and punch stacker
+4, respectively.
+
+The card reader supports the BOOT command.  BOOT CDR reads a card image
+into locations 1-80, sets a word mark under location 1, clears storage,
+and then transfers control to location 1.
+
+The card reader reads data from disk files, while the punch and stackers
+write data to disk files.  Cards are simulated as ASCII text lines with
+terminating newlines; column binary is not supported.  For each unit,
+the POS register specifies the number of the next data item to be read or
+written.  Thus, by changing POS, the user can backspace or advance these
+devices.
+
+The reader/punch registers are:
+
+	device	name		size	comments
+
+	CDR	LAST		1	last card indicator
+		ERR		1	error indicator
+		S1		1	stacker 1 select flag
+		S2		1	stacker 2 select flag
+		POS		31	position
+		TIME		24	delay window for stacker select
+		BUF[0:79]	8	reader buffer
+
+	CDP	ERR		1	error indicator
+		S4		1	stacker 4 select flag
+		S8		1	stacker 8 select flag
+
+	STKR	POS0		31	position, normal reader stack
+		POS1		31	position, reader stacker 1
+		POS2		31	position, shared stacker 2/8
+		POS4		31	position, punch stacker 4
+
+Error handling is as follows:
+
+	device		error		processed as
+
+	reader		end of file	if SSA set, set LAST indicator
+					on next Read, report error and stop
+
+	reader,punch	not attached	report error and stop
+			OS I/O error	print error message
+					if IOCHK set, report error and stop
+					otherwise, set ERR indicator
+
+	stacker		not attached	ignored
+			OS I/O error	print error message
+					if IOCHK set, report error and stop
+
+2.3 1403 Line Printer (LPT)
+
+The IBM 1403 line printer (LPT) writes its data, converted to ASCII, to
+a disk file.  The line printer supports three different print character
+sets or "chains":
+
+	SET LPT PCF			full 64 character chain
+	SET LPT PCA			48 character business chain
+	SET LPT PCH			48 character FORTRAN chain
+
+In addition, the line printer can be programmed with a carriage control
+tape.  The LOAD command loads a new carriage control tape:
+
+	LOAD <file>			load carriage control tape file
+
+The format of a carriage control tape consists of multiple lines.  Each
+line contains an optional repeat count, enclosed in parentheses, optionally
+followed by a series of column numbers separated by commas.  Column numbers
+must be between 1 and 12; a column number of zero denotes top of form.  The
+following are all legal carriage control specifications:
+
+	<blank line>			no punch
+	(5)				5 lines with no punches
+	1,5,7,8				columns 1, 5, 7, 8 punched
+	(10)2				10 lines with column 2 punched
+	1,0				column 1 punched; top of form
+
+The default form is 66 lines long, with column 1 and the top of form mark
+on line 1, and the rest blank.
+
+The line printer registers are:
+
+	name		size	comments
+
+	LINES		8	number of newlines after next print
+	LFLAG		1	carriage control flag (1 = skip, 0 = space)
+	CCTP		8	carriage control tape pointer
+	CCTL		8	carriage control tape length (read only)
+	ERR		1	error indicator
+	POS		31	position
+	CCT[0:131]	32	carriage control tape array	
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		report error and stop
+
+	OS I/O error		print error message
+				if IOCHK set, report error and stop
+				otherwise, set ERR indicator
+
+2.4 1407 Inquiry Terminal (INQ)
+
+The IBM 1407 inquiry terminal (INQ) is a half-duplex console.  It polls
+the console keyboard periodically for inquiry requests.  The inquiry
+terminal registers are:
+
+	name		size	comments
+
+	INQC		7	inquiry request character (initially ESC)
+	INR		1	inquiry request indicator
+	INC		1	inquiry cleared indicator
+	TIME		24	polling interval
+
+When the 1401 CPU requests input from the keyboard, the message [Enter]
+is printed out, followed by a new line.  The CPU hangs waiting for input
+until either the return/enter key is pressed, or the inquiry request
+character is typed in.  The latter cancels the type-in and sets INC.
+
+The inquiry terminal has no errors.
+
+2.5 729 Magnetic Tape (MT)
+
+The magnetic tape controller supports six drives, numbered 1 through 6.
+Magnetic tape options include the ability to make units write enabled or
+or write locked.
+
+	SET MTn LOCKED		set unit n write locked
+	SET MTn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.  The magnetic
+tape simulator supports the BOOT command.  BOOT MT reads the first
+record off tape, starting at location 1, and then branches to it. 
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	END		1	end of file indicator
+	ERR		1	error indicator
+	PAR		1	parity error indicator
+	POS1..6		31	position, drives 1..6
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		report error and stop
+
+	end of file		(read or space) end of physical tape
+				(write) ignored
+
+	OS I/O error		print error message
+				if IOCHK set, report error and stop
+				otherwise, set ERR indicator
+
+2.6 Symbolic Display and Input
+
+The IBM 1401 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-c			display as single character
+				(BCD for CPU and MT, ASCII for others)
+	-s			display as wordmark terminated BCD string
+				(CPU only)
+	-m			display instruction mnemonics
+				(CPU only)
+
+In a CPU character display, word marks are denoted by ~.
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or " or -c or -s	characters (BCD for CPU and MT, ASCII
+				for others)
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input is free format, with spaces separating fields.  There
+are six instruction formats: 1, 2, 4, 5, 7, and 8 characters:
+
+	1 character		opcode
+	2 character		opcode 'modifier
+	4 character		opcode address
+	5 character		opcode address 'modifier
+	7 character		opcode address address
+	8 character		opcode address address 'modifier
+
+Addresses are always decimal, except for special I/O addresses in the A
+field, which may be specified as %xy, where x denotes the device and y
+the unit number.
+
+For the CPU, string input may encompass multiple characters.  A word mark
+is denoted by ~ and must precede the character to be marked.  All other
+devices can only accept single character input, without word marks.
+
+2.7 Character Sets
+
+The IBM 1401 used a 6b character code called BCD (binary coded decimal).
+Some of the characters have no equivalent in ASCII and require different
+representations:
+
+BCD	    ASCII	IBM 1401		print
+code	representation	character		chains
+
+00	space
+01	1
+02	2
+03	3
+04	4
+05	5
+06	6
+07	7
+10	8
+11	9
+12	0
+13	#					= in H chain
+14	@					' in H chain
+15	:					blank in A, H chains
+16	>					blank in A, H chains
+17	(		tape mark		blank in A, H chains
+20	^		alternate blank		blank in A, H chains
+21	/
+22	S
+23	T
+24	U
+25	V
+26	W
+27	X
+30	Y
+31	Z
+32	'		record mark
+33	,
+34	%					( in H chain
+35	=		word mark		blank in A, H chains
+36	\					blank in A, H chains
+37	+					blank in A, H chains
+40	-
+41	J
+42	K
+43	L
+44	M
+45	N
+46	O
+47	P
+50	Q
+51	R
+52	!
+53	$
+54	*
+55	]					blank in A, H chains
+56	;					blank in A, H chains
+57	_		delta			blank in A, H chains
+60	&
+61	A
+62	B
+63	C
+64	D
+65	E
+66	F
+67	G
+70	H
+71	I
+72	?
+73	.
+74	)		lozenge
+75	[					blank in A, H chains
+76	<					blank in A, H chains
+77	"		group mark		blank in A, H chains

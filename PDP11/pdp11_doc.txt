@@ -1,0 +1,868 @@
+To:	Users
+From:	Bob Supnik
+Subj:	PDP-11 Simulator Usage
+Date:	1-Dec-01
+
+			COPYRIGHT NOTICE
+
+The following copyright notice applies to both the SIMH source and binary:
+
+   Original code published in 1993-2001, written by Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Robert M Supnik shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Robert M Supnik.
+
+This memorandum documents the PDP-11 simulator.
+
+
+1. Simulator Files
+
+sim/		sim_defs.h
+		sim_sock.h
+		sim_tmxr.h
+		dec_dz.h
+		dec_mscp.h
+		dec_uqssp.h
+		scp.c
+		scp_tty.c
+		sim_rev.c
+		sim_sock.c
+		sim_tmxr.c
+
+sim/pdp11/	pdp11_defs.h
+		pdp11_cpu.c
+		pdp11_dz.c
+		pdp11_fp.c
+		pdp11_io.c
+		pdp11_lp.c
+		pdp11_rk.c
+		pdp11_rl.c
+		pdp11_rp.c
+		pdp11_rq.c
+		pdp11_rx.c
+		pdp11_stddev.c
+		pdp11_sys.c
+		pdp11_tc.c
+		pdp11_tm.c
+		pdp11_ts.c
+
+2. PDP-11 Features
+
+The PDP-11 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		J-11 CPU with 256KB of memory
+-		FP11 floating point unit (FPA)
+-		CIS11 commercial instruction set (CIS, off by default)
+PTR,PTP		PC11 paper tape reader/punch
+TTI,TTO		DL11 console terminal
+LPT		LP11 line printer
+CLK		line frequency clock
+DZ		DZ11 8-line terminal multiplexor
+RK		RK11/RK05 cartridge disk controller with eight drives
+RL		RLV12/RL01(2) cartridge disk controller with four drives
+RP		RM02/03/05/80, RP04/05/06/07 Massbus style controller
+		with eight drives
+RQ		RQDX3 MSCP controller with four drives
+RX		RX11/RX01 floppy disk controller with two drives
+TC		TC11/TU56 DECtape controller with eight drives
+TM		TM11/TU10 magnetic tape controller with eight drives
+TS		TS11/TSV05 magnetic tape controller with one drive
+
+The DZ, RK, RL, RP, RQ, RX, TC, TM, and TS devices can be DISABLEd.  The
+PDP-11 can support either a TM11 or a TS11, but not both, since they use
+the same I/O addresses.  The simulator defaults to the TM11.  To change
+the magtape,
+
+	ENABLE TM11		enable TM11 and disable TS11
+	ENABLE TS11		enable TS11 and disable TM11
+
+The PDP-11 simulator implements several unique stop conditions:
+
+	- abort during exception vector fetch, and register STOP_VEC is set
+	- abort during exception stack push, and register STOP_SPA is set
+	- trap condition 'n' occurs, and register STOP_TRAP<n> is set
+	- wait state entered, and no I/O operations outstanding
+	  (ie, no interrupt can ever occur)
+
+The PDP-11 loader supports standard binary format tapes.  The DUMP command
+is not implemented.
+
+2.1 CPU
+
+The CPU options include CPU mapping configuration (18b Unibus, 22b Unibus
+with RH70-style controllers, 22b Unibus with RH11 style controllers, and
+22b Qbus), the CIS instruction set, and the size of main memory.
+
+	SET CPU 18B		18b addressing, no I/O map
+	SET CPU URH11		22b addresssing, Unibus I/O map,
+				18b mapped RH11 controller
+	SET CPU URH70		22b addressing, Unibus I/O map,
+				22b unmapped RH70 controller
+	SET CPU 22B		22b addressing, no I/O map (Qbus)
+	SET CPU NOCIS		disable CIS instructions (default)
+	SET CPU CIS		enable CIS instructions
+	SET CPU 16K		set memory size = 16KB
+	SET CPU 32K		set memory size = 32KB
+	SET CPU 48K		set memory size = 48KB
+	SET CPU 64K		set memory size = 64KB
+	SET CPU 96K		set memory size = 96KB
+	SET CPU 128K		set memory size = 128KB
+	SET CPU 192K		set memory size = 192KB
+	SET CPU 256K		set memory size = 256KB
+	SET CPU 384K		set memory size = 384KB
+	SET CPU 512K		set memory size = 512KB
+	SET CPU 768K		set memory size = 768KB
+	SET CPU 1024K (or 1M)	set memory size = 1024KB
+	SET CPU 2048K (or 2M)	set memory size = 2048KB
+	SET CPU 3072K (or 3M)	set memory size = 3072KB
+	SET CPU 4096K (or 4M)	set memory size = 4096KB
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 256KB.
+
+These switches are recognized when examining or depositing in CPU memory:
+
+	-v			interpret address as virtual
+	-d			if mem mgt enabled, force data space
+	-k			if mem mgt enabled, force kernel mode
+	-s			if mem mgt enabled, force supervisor mode
+	-u			if mem mgt enabled, force user mode
+	-p			if mem mgt enabled, force previous mode
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	PC		16	program counter
+	R0..R5		16	R0..R5, first register set
+	R10..R15	16	R0..R5, second register set
+	KSP		16	kernel stack pointer
+	SSP		16	supervisor stack pointer
+	USP		16	user stack pointer
+	PSW		16	processor status word
+	  CM		2	  current mode, PSW<15:14>
+	  PM		2	  previous mode, PSW<13:12>
+	  RS		2	  register set, PSW<11>
+	  IPL		3	  interrupt priority level, PSW<7:5>
+	  T		1	  trace bit, PSW<4>
+	  N		1	  negative flag, PSW<3>
+	  Z		1	  zero flag, PSW<2>
+	  V		1	  overflow flag, PSW<1>
+	  C		1	  carry flag, PSW<0>
+	SR		16	front panel switches
+	DR		16	front panel display
+	MEMERR		16	memory error register
+	CCR		16	cache control register
+	MAINT		16	maintenance register
+	HITMISS		16	hit/miss register
+	CPUERR		16	CPU error register
+	PIRQ		16	programmed interrupt requests
+	FAC0H..FAC5H	32	FAC0..FAC5, high 32 bits
+	FAC0L..FAC5L	32	FAC0..FAC5, low 32 bits
+	FPS		16	floating point status
+	FEA		16	floating exception address
+	FEC		4	floating exception code
+	MMR0..3		16	memory management registers 0..3
+	{K/S/U}{I/D}{PAR/PDR}{0..7}
+			16	memory management registers
+	UBMAP[0:63]	16	Unibus map registers
+	INT		32	interrupt pending flags
+	TRAP		18	trap pending flags
+	WAIT		0	wait state flag
+	WAIT_ENABLE	0	wait state enable flag
+	STOP_TRAPS	18	stop on trap flags
+	STOP_VECA	1	stop on read abort in trap or interrupt
+	STOP_SPA	1	stop on stack push abort in trap or interrupt
+	OLDPC		16	PC prior to last JMP, JMS, or interrupt
+	WRU		8	interrupt character
+
+2.2 Programmed I/O Devices
+
+2.2.1 PC11 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.  Thus,
+by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	BUSY		1	busy flag (CSR<11>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+2.2.2 PC11 Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written. 
+Thus, by by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+2.2.3 DL11 Terminal Input (TTI)
+
+The terminal input (TTI) polls the console keyboard for input.  It
+implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+2.2.4 DL11 Terminal Output (TTO)
+
+The terminal output (TTO) writes to the simulator console window.  It
+implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	number of characters input
+	TIME		24	time from I/O initiation to interrupt
+
+2.2.5 LP11 Line Printer (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The line printer implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of paper
+
+	OS I/O error	x	report error and stop
+
+2.2.6 Line-Time Clock (CLK)
+
+The clock (CLK) implements these registers:
+
+	name		size	comments
+
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	TIME		24	clock frequency
+	TPS		8	ticks per second (60 or 50)
+
+The real-time clock autocalibrates; the clock interval is adjusted up or
+down so that the clock tracks actual elapsed time.
+
+2.2.7 DZ11 Terminal Multiplexor (DZ)
+
+The DZ11 is an 8-line terminal multiplexor.  The terminal lines perform
+input and output through Telnet sessions connected to a user-specified
+port.  The ATTACH command specifies the port to be used:
+
+	ATTACH {-am} DZ <port>(cr)	-- set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.  The optional switch -m turns on the DZ11's
+modem controls; the optional switch -a turns on active disconnects
+(disconnect session if computer clears Data Terminal Ready).
+
+Once the DZ is attached and the simulator is running, the DZ will listen
+for connections on the specified port.  It assumes that the incoming
+connections are Telnet connections.  The connection remains open until
+disconnected either by the simulated program or by the Telnet client.
+
+The SHOW DZ LINESTATUS command displays the current connections to the DZ. 
+
+The DZ11 implements these registers:
+
+	name		size	comments
+
+	CSR		16	control/status register
+	RBUF		16	receive buffer
+	LPR		16	line parameter register
+	TCR		16	transmission control register
+	MSR		16	modem status register
+	TDR		16	transmit data register
+	SAENB		1	silo alarm enabled
+	MDMTCL		1	modem control enabled
+	AUTODS		1	autodisconnect enabled
+	RPOS0..7	32	count of characters received
+	TPOS0..7	32	count of characters transmitted
+
+The DZ11 does not support save and restore.  All open connections are
+lost when the simulator shuts down or the DZ is detached.
+
+2.3 RK11/RK05 Cartridge Disk (RK)
+
+RK11 options include the ability to make units write enabled or write locked:
+
+	SET RKn LOCKED		set unit n write locked
+	SET RKn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.  The RK11 supports
+the BOOT command.
+
+The RK11 implements these registers:
+
+	name		size	comments
+
+	RKCS		16	control/status
+	RKDA		16	disk address
+	RKBA		16	memory address
+	RKWC		16	word count
+	RKDS		16	drive status
+	RKER		16	error status
+	INTQ		9	interrupt queue
+	DRVN		3	number of last selected drive
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	INT		1	interrupt pending flag
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.4 RX11/RX01 Floppy Disk (RX)
+
+RX11 options include the ability to make units write enabled or write locked:
+
+	SET RXn LOCKED		set unit n write locked
+	SET RXn ENABLED		set unit n write enabled
+
+The RX11 supports the BOOT command.
+
+The RX11 implements these registers:
+
+	name		size	comments
+
+	RXCS		12	status
+	RXDB		8	data buffer
+	RXES		8	error status
+	RXERR		8	error code
+	RXTA		8	current track
+	RXSA		8	current sector
+	STAPTR		3	controller state
+	BUFPTR		3	buffer pointer
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	TR		1	transfer ready flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	DONE		1	device done flag (CSR<5>)
+	CTIME		24	command completion time
+	STIME		24	seek time, per track
+	XTIME		24	transfer ready delay
+	STOP_IOE	1	stop on I/O error
+	SBUF[0:127]	8	sector buffer array
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RX01 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.5 RL11(V12)/RL01,RL02 Cartridge Disk (RL)
+
+RL11 options include the ability to set units write enabled or write locked,
+to set the drive size to RL01, RL02, or autosize, and to write a DEC standard
+044 compliant bad block table on the last track:
+
+	SET RLn LOCKED		set unit n write locked
+	SET RLn ENABLED		set unit n write enabled
+	SET RLn RL01		set size to RL01
+	SET RLn RL02		set size to RL02
+	SET RLn AUTOSIZE	set size based on file size at attach
+	SET RLn BADBLOCK	write bad block table on last track
+
+The size options can be used only when a unit is not attached to a file.  The
+bad block option can be used only when a unit is attached to a file.  Units
+can also be REMOVEd or ADDed to the configuration.  The RL11 supports the
+BOOT command.
+
+The RL11 implements these registers:
+
+	name		size	comments
+
+	RLCS		16	control/status
+	RLDA		16	disk address
+	RLBA		16	memory address
+	RLBAE		6	memory address extension (RLV12)
+	RLMP..RLMP2	16	multipurpose register queue
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.6 RM02/03/05/80, RP04/05/06/07 Disk Pack Drives (RP)
+
+The RP controller implements a "Massbus style" 22b direct interface for
+large disk drives.  It is more abstract than other device simulators, with
+just enough detail to run operating system drivers.  In addition, the RP
+controller conflates the details of the RM series controllers with the RP
+series controllers, although there were detailed differences.
+
+RP options include the ability to set units write enabled or write locked,
+to set the drive type to one of six disk types, or autosize, and to write
+a DEC standard 044 compliant bad block table on the last track:
+
+	SET RPn LOCKED		set unit n write locked
+	SET RPn ENABLED		set unit n write enabled
+	SET RPn RM03		set type to RM03
+	SET RPn RM05		set type to RM05
+	SET RPn RM80		set type to RM80
+	SET RPn RP04		set type to RP04
+	SET RPn RP06		set type to RP06
+	SET RPn RP07		set type to RP07
+	SET RPn AUTOSIZE	set type based on file size at attach
+	SET RPn BADBLOCK	write bad block table on last track
+
+The type options can be used only when a unit is not attached to a file.  The
+bad block option can be used only when a unit is attached to a file.  Units
+can also be REMOVEd or ADDed to the configuration.  The RP controller supports
+the BOOT command.
+
+The RP controller implements these registers:
+
+	name		size	comments
+
+	RPCS1		16	control/status 1
+	RPWC		16	word count
+	RPBA		16	bus address
+	RPDA		16	desired surface, sector
+	RPCS2		16	control/status 2
+	RPDS[0:7]	16	drive status, drives 0-7
+	RPER1[0:7]	16	drive errors, drives 0-7
+	RPOF		16	offset
+	RPDC		8	desired cylinder
+	RPER2		16	error status 2
+	RPER3		16	error status 3
+	RPEC1		16	ECC syndrome 1
+	RPEC2		16	ECC syndrome 2
+	RPMR		16	maintenance register
+	RPDB		16	data buffer
+	RPBAE		6	bus address extension
+	RPCS3		16	control/status 3
+	IFF		1	transfer complete interrupt request flop
+	INT		1	interrupt pending flag
+	SC		1	special condition (CSR1<15>)
+	DONE		1	device done flag (CSR1<7>)
+	IE		1	interrupt enable flag (CSR1<6>)
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.7 RQDX3 MSCP Disk Controller (RQ)
+
+The RQ controller simulates the RQDX3 MSCP disk controller.  RQ options
+include the ability to set units write enabled or write locked, and to
+set the drive type to one of eleven disk types:
+
+	SET RQn LOCKED		set unit n write locked
+	SET RQn ENABLED		set unit n write enabled
+	SET RQn RX50		set type to RX50
+	SET RQn RX33		set type to RX33
+	SET RQn RD51		set type to RD51
+	SET RQn RD52		set type to RD52
+	SET RQn RD53		set type to RD53
+	SET RQn RD54		set type to RD54
+	SET RQn RD31		set type to RD31
+	SET RQn RA82		set type to RA82
+	SET RQn RA72		set type to RA72
+	SET RQn RA90		set type to RA90
+	SET RQn RA92		set type to RA92
+
+The type options can be used only when a unit is not attached to a file.
+Units can also be REMOVEd or ADDed to the configuration.  The RQ controller
+supports the BOOT command.
+
+The RQ controller implements the following special SHOW commands:
+
+	SHOW RQ RINGS		show command and response rings
+	SHOW RQ FREEQ		show packet free queue
+	SHOW RQ RESPQ		show packet response queue
+	SHOW RQ UNITQ		show unit queues
+	SHOW RQ ALL		show all ring and queue state
+	SHOW RQn UNITQ		show unit queues for unit n
+
+The RQ controller implements these registers:
+
+	name		size	comments
+
+	SA		16	status/address register
+	S1DAT		16	step 1 init host data
+	CQBA		22	command queue base address
+	CQLNT		8	command queue length
+	CQIDX		8	command queue index
+	RQBA		22	request queue base address
+	RQLNT		8	request queue length
+	RQIDX		8	request queue index
+	FREE		5	head of free packet list
+	RESP		5	head of response packet list
+	PBSY		5	number of busy packets
+	CFLGS		16	controller flags
+	CSTA		4	controller state
+	PERR		9	port error number
+	CRED		5	host credits
+	HAT		16	host available timer
+	HTMO		17	host timeout value
+	CPKT[0:3]	5	current packet, units 0-3
+	PKTQ[0:3]	5	packet queue, units 0-3
+	UFLG[0:3]	16	unit flags, units 0-3
+	INT		1	interrupt request
+	QTIME		24	response time for 'immediate' packets
+	XTIME		24	response time for data transfers
+	PKTS[33*32]	16	packet buffers, 33W each,
+				32 entries
+
+Error handling is as follows:
+
+	error	     	processed as
+
+	not attached	disk not ready
+
+	end of file	assume rest of disk is zero
+
+	OS I/O error	report error and stop
+
+2.8 TC11/TU56 DECtape (DT)
+
+DECtapes drives are numbered 1-8; in the simulator, drive 8 is unit 0.
+DECtape options include the ability to make units write enabled or write
+locked.
+
+	SET DTn LOCKED		set unit n write locked
+	SET DTn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.  The TC11 supports
+the BOOT command.
+
+The TC11 supports both PDP-8 format and PDP-9/11/15 format DECtape images.
+ATTACH tries to determine the tape format from the DECtape image; the user
+can force a particular format with switches:
+
+	-f				foreign (PDP-8) format
+	-n				native (PDP-9/11/15) format
+
+The DECtape controller is a data-only simulator; the timing and mark
+track, and block header and trailer, are not stored.  Thus, the WRITE
+TIMING AND MARK TRACK function is not supported; the READ ALL function
+always returns the hardware standard block header and trailer; and the
+WRITE ALL function dumps non-data words into the bit bucket.
+
+The DECtape controller implements these registers:
+
+	name		size	comments
+
+	TCST		16	status register
+	TCCM		16	command register
+	TCWC		16	word count register
+	TCBA		16	bus address register
+	TCDT		16	data register
+	INT		1	interrupt pending flag
+	ERR		1	error flag
+	DONE		1	done flag
+	IE		1	interrupt enable flag
+	CTIME		31	time to complete transport stop
+	LTIME		31	time between lines
+	ACTIME		31	time to accelerate to full speed
+	DCTIME		31	time to decelerate to a full stop
+	SUBSTATE	2	read/write command substate
+	POS[0:7]	31	position, in lines, units 0-7
+	STATT[0-7]	31	unit state, units 0-7
+
+It is critically important to maintain certain timing relationships
+among the DECtape parameters, or the DECtape simulator will fail to
+operate correctly.
+
+	- LTIME must be at least 6
+	- ACTIME must be less than DCTIME, and both need to be at
+	  least 100 times LTIME
+	
+2.9 TM11 Magnetic Tape (TM)
+
+TM options include the ability to make units write enabled or write locked.
+
+	SET TMn LOCKED		set unit n write locked
+	SET TMn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The TM11 supports the BOOT command.  The bootstrap supports both original
+and DEC standard boot formats.  Originally, a tape bootstrap read and
+executed the first record on tape.  To allow for ANSI labels, the DEC
+standard bootstrap skipped the first record and read and executed the second.
+The DEC standard is the default; to bootstrap an original format tape, use
+the -o switch.
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	MTS		16	status
+	MTC		16	command
+	MTCMA		16	memory address
+	MTBRC		16	byte/record count
+	INT		1	interrupt pending flag
+	ERR		1	error flag
+	DONE		1	device done flag
+	IE		1	interrupt enable flag
+	STOP_IOE	1	stop on I/O error
+	TIME		24	delay
+	UST[0:7]	16	unit status, units 0-7
+	POS[0:7]	31	position, units 0-7
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		tape not ready
+
+	end of file		(read or space) end of physical tape
+				(write) ignored
+
+	OS I/O error		report error and stop
+
+2.10 TS11/TSV05 Magnetic Tape (TS)
+
+The TS actually implements the TSV05, with 22-bit addressing, but will
+work with TS11 drivers.  TS options include the ability to make the unit
+write enabled or write locked.
+
+	SET TS LOCKED		set unit write locked
+	SET TS ENABLED		set unit write enabled
+
+The TS11 supports the BOOT command.  The bootstrap supports only DEC
+standard boot formats.  To allow for ANSI labels, the DEC standard bootstrap
+skipped the first record and read and executed the second.
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	TSSR		16	status register
+	TSBA		16	bus address register
+	TSDBX		16	data buffer extension register
+	CHDR		16	command packet header
+	CADL		16	command packet low address or count
+	CADH		16	command packet high address
+	CLNT		16	command packet length
+	MHDR		16	message packet header
+	MRFC		16	message packet residual frame count
+	MXS0		16	message packet extended status 0
+	MXS1		16	message packet extended status 1
+	MXS2		16	message packet extended status 2
+	MXS3		16	message packet extended status 3
+	MXS4		16	message packet extended status 4
+	WADL		16	write char packet low address
+	WADH		16	write char packet high address
+	WLNT		16	write char packet length
+	WOPT		16	write char packet options
+	WXOPT		16	write char packet extended options
+	ATTN		1	attention message pending
+	BOOT		1	boot request pending
+	OWNC		1	if set, tape owns command buffer
+	OWNM		1	if set, tape owns message buffer
+	TIME		24	delay
+	POS		31	position
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		tape not ready
+
+	end of file		(read or space) end of physical tape
+				(write) ignored
+
+	OS I/O error		fatal tape error
+
+2.11 Symbolic Display and Input
+
+The PDP-11 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as two character ASCII string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			two character ASCII string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard PDP-11 assembler syntax.  There are sixteen
+instruction classes:
+
+class		operands		examples		comments
+
+no operands	none			HALT, RESET
+3b literal	literal, 0 - 7		SPL
+6b literal	literal, 0 - 077	MARK
+8b literal	literal, 0 - 0377	EMT, TRAP
+register	register		RTS
+sop		specifier		SWAB, CLR, ASL
+reg-sop		register, specifier	JSR, XOR, MUL
+fop		flt specifier		ABSf, NEGf
+ac-fop		flt reg, flt specifier	LDf, MULf
+ac-sop		flt reg, specifier	LDEXP, STEXP
+ac-moded sop	flt reg, specifier	LDCif, STCfi
+dop		specifier, specifier	MOV, ADD, BIC
+cond branch	address			BR, BCC, BNE
+sob		register, address	SOB
+cc clear	cc clear instructions	CLC, CLV, CLZ, CLN	combinable
+cc set		cc set instructions	SEC, SEV, SEZ, SEN	combinable
+
+For floating point opcodes, F and D variants, and I and L variants, may be
+specified regardless of the state of FPS.
+
+The syntax for specifiers is as follows:
+
+syntax		specifier	displacement	comments
+
+Rn		0n		-
+Fn		0n		-		only in flt reg classes
+(Rn)		1n		-
+@(Rn)		7n		0		equivalent to @0(Rn)
+(Rn)+		2n		-
+@(Rn)+		3n              -
+-(Rn)		4n              -
+@-(Rn)		5n              -
+{+/-}d(Rn)	6n		{+/-}d
+@{+/-}d(Rn)	7n		{+/-}d
+#n		27		n
+@#n		37		n
+.+/-n		67		+/-n - 4
+@.+/-n		77		+/-n - 4
+{+/-}n		67		{+/-}n - PC - 4	if on disk, 37 and n
+@{+/-}n		77		{+/-}n - PC - 4	if on disk, invalid

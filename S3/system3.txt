@@ -1,0 +1,472 @@
+    The IBM System/3 simulator is configured as follows:
+
+	CPU	5410 (Model 10) CPU with 64KB of memory.
+	PKB	5471 Printer/Keyboard console.
+	CDR	1442 Card Reader
+	CDP	1442 Card Punch	
+	CDP2	1442 2nd stacker	
+	LPT	1403 Line Printer
+	R1	5444 Top Drive (removeable)
+	F1	5444 Top Drive (fixed)
+	R2	5444 Bottom Drive (removeable)
+	F2	5444 Bottom Drive (fixed
+ 
+    The only CPU options are to set Model 15 mode (not implemented), DPF
+(Dual Programming Facility, not implemented), and the memory size 8K, 16K,
+32K, 48K, or 64K.
+
+    CPU registers are the standard System/3 set:
+
+	name		size	Description
+
+	IAR-P1		16	Instruction Address Register for Program Level 1
+	ARR-P2		16	Address Recall Register for Program Level 1
+	IAR-P2		16	IAR for Program Level 2 (not implemented)
+	ARR-P2		16	ARR for Program Level 2 (not implemented)
+	AAR		16	A-Address Register
+	BAR		16	B-Address Register
+	PSR		16	Program Status Register
+	XR1		16	Index Register 1
+	XR2		16	Index Register 2
+	IAR<0:7>	16	IAR for interrupt level 0 thru 7
+	ARR<0:7>	16	ARR for interrupt level 0 thru 7
+
+	Plus these simulator registers:
+
+	IAR		16	Value of last IAR used.
+	LEVEL		 8	Current operating level (8=P1, 9=P2,
+					0 thru 7 = Interrupt level)
+	SR		16	Front Panel switches
+	INT		16	Interrupt Request Flags
+	WRU		8	Simulator Interrupt Character
+	BREAK		17	Breakpoint Address
+	DEBUG		16	Debugging bits:
+				0x01: Write all instructions executed to
+					file trace.log.
+				0x02: Write details of all Disk I/O 
+					requests to trace.log.
+				0x80: Breakpoint on first character
+					written to 5471 printer.
+
+1	5471 Printer/Keyboard
+
+	This is the operator console.  It has the following registers:
+
+	FLAG	5471 Flag Bytes
+	IBUF:	Input character from keyboard
+	OBUF:	Output character to printer
+	POS:	Number of characters printed
+	TIME:	Delay for device operation
+	REQKEY:	ASCII value of key mapped to 5471 REQUEST key
+	RTNKEY:	ASCII value of key mapped to 5471 RETURN key
+	ENDKEY:	ASCII value of key mapped to 5471 END key
+	CANKEY:	ASCII value of key mapped to 5471 CANCEL key
+	
+
+2	1442 Card Reader.  This reader reads 80-column cards; the input
+	is usually an ASCII file which is translated to EBCDIC when read,
+	but optionally can be a binary file in EBCDIC format (such as an
+	object program).
+
+	LAST	Last card switch
+	ERR	Card Reader Error
+	NOTRDY	1442 reader not ready (not attached or past EOF)
+	DAR	Data Address Register (shared with punch)
+	LCR	Length Count Register (shared with punch)
+	EBCDIC	EBCDIC mode flag: if 1, input is 80-col EBCDIC binary.
+		(IPL from 1442 automatically sets this to 1).
+	S2	Stacker 2 is selected when this is 1
+	POS	Number of cards read
+	TIME	Device Delay
+
+	The real hardware 1442 had only 1 hopper for cards, whether
+	these were used for blank cards for punching, or cards to be
+	read.  Cards could be read without a feed cycle, then
+	punched.  When punching cards, the SCP does a read of a card,
+	makes sure it is blank, and then punches it.  To simulate
+	this without requiring that a stack of blank lines be attached
+	to the card reader device, a special feature of the simulator
+	is this:  if no file is attached to the cdr device, but a file
+	is attached to the cdp or the cdp2 devices, any read from the
+	reader will return a blank card -- i.e. when punching, an
+	unattached cdr device is assumed to be loaded with an unlimited
+	supply of blank cards.
+
+
+3	1442 Card Punch.  Normally cards are written to the attached
+	disk file as ASCII with newline/cr delimiters.  But an optional
+	flag allows writing as 80-column binary EBCDIC.
+
+	ERR	Card Punch Error
+	EBCDIC	When this is 1, output will be 80-col EBCDIC.
+	S2	When this is 1, output is placed in stacker 2
+	NOTRDY	1442 punch not ready (not attached)
+	DAR	Data Address Register (shared with reader)
+	LCR	Length Count Register (shared with reader)
+	POS	Number of cards punched
+	TIME	Device Delay
+
+4 	1442 Stacker 2.  When cards are to be punched in stacker 2,
+	attach a disk file to this device (cdp2) to hold that output.
+	Note: When SCP punches cards, the default is to punch in
+	stacker 2.
+
+	POS0	Number of cards punched.
+
+5	1403 Printer.  This is a 132-column output device, emulating
+	the famous IBM 1403, models 2, 6, and N1.  Output is always
+	translated to ASCII with newline/CR delimiters.  Page advance
+	is output as a form feed.
+
+	ERR	1403 error flags
+	LPDAR	Data Address Register
+	LPFLR	Forms Length Register
+	LPIAR	Image Address Register
+	LINECT	Current Line on form
+	POS	Number of lines printed
+
+6 	5444 Disk Drives (R1, R2, F1, F2)
+
+	The 5444 came as a set of two drives, each with two disks.  The
+	top disk in a drive was removable, the bottom fixed.  The first
+	drive consists of disks R1 and F1, the second drive R2 and F2.
+	Each disk holds 2,467,600 bytes of user data, plus 3 alternate
+	tracks and a CE track.  Flagging of alternate tracks is not
+	supported in this version of the simulator.
+
+	NOTRDY	Drive not ready (not attached)
+	SEEK	Drive is busy with a seek operation
+	DAR	Data Address Register
+	CAR	Control Address Register
+	ERR	Error Flags (16 bits)
+	CYL	Current Cylinder (0 thru 203)
+	HEAD	Current head (0 or 1)
+	POS	Current position in attached disk file
+	TIME	Device Delay
+
+7  	Symbolic Display and Input
+
+	The System/3 Simulator supports symbolic display and input.
+	Display is controlled by command line switches:
+
+	(none)	display as hex EBCDIC
+	-c	display bytes as characters
+	-m	display instruction mnemonics.
+	-a	display a 256-byte block of memory in both hex and ASCII.
+
+   	The symbolic  format contains the same elements as the machine
+	language operation, but not always in the same order.  The
+	operation code frequently specifies both the opcode and the Q byte,
+	and the top nybble of the opcode is determined by the format of the
+	addresses.
+
+	Addresses take two forms:  the direct address in hex, or a relative
+	address specified thusly: (byte,XRx) where 'byte' is a 1-byte
+	offset, and XRx is either XR1 or XR2 for the two index registers. 
+	Use these formats when 'address' is indicated below:
+
+   	When 'reg' is mentioned, a mnemonic may be used for the register,
+   	thusly:
+	
+	IAR	Instruction Address Register for the current program level
+	ARR	Address Recall Register for the current program level
+	P1IAR	IAR for Program Level 1
+	P2IAR	IAR for Program Level 2
+	PSR	Program Status Register
+	XR1	Index Register 1
+	XR2 	Index Register 2
+	IARx	IAR for the interrupt level x (x = 0 thru 7)
+	   
+   	All other operands mentioned below are single-byte hex, except for
+	the length (len) operand of the two-address instructions, which is a
+	decimal length in the range 1-256.
+
+        In operations where there is a source and a destination, the 
+	destination is always operand 1, the source is operand 2.
+   
+   	No-address formats:
+   	------------------
+   
+   	HPL hex,hex		Halt Program Level, the operands are the
+				Q and R bytes.
+   
+   
+   	One-address formats:
+  	-------------------
+   
+	A reg,address        	Add to register
+   	CLI address,byte	Compare Logical Immediate
+   	MVI address,byte	Move Immediate
+   	TBF address,mask	Test Bits Off
+   	TBN address,mask	Test Bits On
+  	SBF address,mask	Set Bits Off
+   	SBN address,mask	Set Bits On
+   	ST reg,address		Store Register
+   	L reg,address		Load Register
+   	LA reg,address		Load Address (reg can only be XR1 or XR2)
+   	JC address,cond		Jump on Condition
+   	BC address,cond		Branch on Condition
+   
+   	These operations do not specify a qbyte, it is implicit in the
+   	opcode:
+   
+   	B address		Unconditional branch to address
+   	BE address		Branch Equal
+   	BNE address		Branch Not Equal
+   	BH address		Branch High
+   	BNH address		Branch Not High
+   	BL address		Branch Low
+   	BNL address		Branch Not Low
+   	BT address		Branch True
+   	BF address		Branch False
+   	BP address		Branch Plus
+   	BM address		Branch Minus
+   	BNP address		Branch Not Plus
+   	BNM address		Branch Not Minus
+   	BZ address		Branch Zero
+   	BNZ address		Branch Not Zero
+   	BOZ address		Branch Overflow Zoned
+   	BOL address		Branch Overflow Logical
+   	BNOZ address		Branch No Overflow Zoned
+   	BNOL address		Branch No Overflow Logical
+   	NOPB address		No - never branch
+   
+   	(substitute J for B above for a set of Jumps -- 1-byte operand (not
+    	2), always jumps forward up to 255 bytes from the address following
+    	the Jump instruction. In this case, 'address' cannot be less than
+    	the current address, nor greater than the current address + 255)
+   
+   	Two-address formats (first address is destination, len is decimal 1-256):
+   	-------------------
+   
+   	MVC address,address,len		Move Characters
+   	CLC address,address,len		Compare Logical Characters
+   	ALC address,address,len		Add Logical Characters
+   	SLC address,address,len		Subtract Logical Characters
+   	ED address,address,len		Edit
+   	ITC address,address,len		Insert and Test Characters
+   	AZ address,address,len		Add Zoned Decimal
+   	SZ address,address,len		Subtract Zoned Decimal
+   
+   	MNN address,address		Move Numeric to Numeric
+   	MNZ address,address		Move Numeric to Zone
+   	MZZ address,address		Move Zone to Zone
+   	MZN address,address		Move Zone to Numeric
+   
+   	I/O Format
+  	----------
+   
+   	In the I/O format, there are always 3 fields:
+   
+   	da - Device Address 0-15 (decimal)
+   	m - Modifier 0-1
+   	n - Function 0-7
+   	
+   	The meaning of these is entirely defined by the device addressed.	
+   	
+   	There may be an optional control byte, or an optional address (based
+	on the type of instruction).
+
+	SNS da,m,n,address		Sense I/O
+	LIO da,m,n,address		Load I/O
+	TIO da,m,n,address		Test I/O
+	
+	SIO da,m,n,cc			Start I/O -- cc is a control byte
+	
+	APL da,m,n			Advance Program Level 
+
+
+8	Device Programming.
+
+	Note: On a model 15, interrupts are used for all devices.  On
+	other models, interrupts are only used for the printer/keyboard.
+
+	This is a summary of the DA, M, N, and CC codes for all supported
+	devices:
+
+	5471 Printer Keyboard
+	---------------------
+
+		The PKB has 2 visible indicators: Proceed and Request
+		Pending.  It has a normal keyboard and 4 special keys:
+		Request, Return, End, and Cancel.
+
+		SIO 1,0,0,XX	Start Keyboard Operation, bit masks for XX are:
+				X'20': Request Pending Indicator On
+				X'10': Proceed Indicator On
+				X'04': Request Key Interrupts Enable (1) Disable (0)
+				X'02': Other Key Interrupts Enable (1) Disable (0)
+				X'01': Reset request key and other key interrupts
+
+		SIO 1,1,0,XX	Start Printer Operation, bit masks for XX are:
+				X'80': Start Printing
+				X'40': Start Carrier Return
+				X'04': Printer Interrupt Enable(1) or Disable (0)
+				X'01': Reset Printer Interrupt
+
+		LIO 1,1,0,addr	Load Printer Output Character
+				addr is address of low-order (highest numbered)
+				byte of two-byte field, and high-order byte
+				(that is, addr - 1) is loaded into output
+				register to print.  Printing is done one character
+				at a time.
+
+		SNS 1,0,1,addr	Sense Status Bytes 0 and 1:
+				Byte 0 (leftmost) is the character typed in
+					in EBCDIC.
+				Byte 1 is status:
+				X'80': Request key interrupt pending
+				X'40': End or Cancel key interrupt pending
+				X'20': Cancel key pressed
+				X'10': End Key Pressed
+				X'08': Return or data key interrupt pending
+				X'04': Return key pressed
+
+		SNS 1,0,3,addr	Sense Status Bytes 2 and 3: returns 0000 in
+					this sim.
+
+	1442 Reader/Punch
+	-----------------
+
+		SIO 5,0,0,XX	Feed Card without reading/punching
+				XX is stacker select for all functions: 0 = stacker
+				1 (normal), 1 = stacker 2.
+
+		SIO 5,0,1,XX	Read Card
+		SIO 5,0,2,XX	Punch and Feed
+		SIO 5,0,3,XX	Read Column Binary
+		SIO 5,0,4,XX	Punch with no feed
+
+		TIO 5,0,0,addr	Branch to addr if not ready or busy
+		TIO 5,0,2,addr	Branch to addr if busy
+		TIO 5,0,5,addr	(mod 15 only) branch if interrupt pending
+
+		APL 5,0,0	Loop (or switch prog levels) if not ready/busy
+		APL 5,0,2	Loop (or switch) if busy
+		APL 5,0,5	Loop (or switch) if interrupt pending (mod 15 only)
+
+		LIO 5,0,0,addr	Load 2-byte field to Length Count Register
+		LIO 5,0,4,addr	Load 2-byte field to Data Address Register
+				(DAR is incremented by a read/punch operation and must
+				be reset every card)
+
+		SNS 5,0,1,addr	Sense CE indicators (0000 returned in this sim)
+		SNS 5,0,2,addr	Sense CE indicators (0000 returned in this sim)
+		SNS 5,0,3,addr	Sense Status Indicators: (only simulated bits shown)
+				X'8000': Read Check
+				X'4000': Last Card
+				X'2000': Punch Check
+				X'1000': Data Overrun
+				X'0800': Not Ready
+
+
+	1403 Printer
+	------------
+
+		SIO 14,0,0,XX	Line space XX lines (0-3 valid in XX)
+		SIO 14,0,2,XX	Print a line space (0-3 valid in XX)
+		SIO 14,0,4,XX	Skip Only (line number 1-112 in XX)
+
+		SIO 14,0,6,XX	Print and Skip (line number 0-112 in XX)
+
+		TIO 14,0,0,addr	Branch to addr if not ready
+		TIO 14,0,2,addr	Branch to addr if buffer busy
+		TIO 14,0,3,addr	Branch to addr if interrupt pending (mod 15 only)
+		TIO 14,0,4,addr	Branch if carriage busy
+		TIO 14,0,6,addr	Branch if printer busy
+
+		APL 14,0,0	Loop (or switch prog levels) if not ready/check
+		APL 14,0,2	Loop (or switch) if buffer busy
+		APL 14,0,3	Loop (or switch) if interrupt pending (mod 15 only)
+		APL 14,0,4	Loop (or switch) if carriage busy
+		APL 14,0,6	Loop (or switch) if printer busy
+
+		LIO 14,0,0,addr	Load 1 byte to Forms Length Reg at addr-1
+		LIO 14,0,4,addr	Load 2 bytes to Chain Image Address Register
+		LIO 14,0,6,addr	Load 2 bytes to Data Address Register
+
+		SNS 14,0,0,addr	Sense Character Count
+		SNS 14,0,4,addr	Sense LPIAR (Image Address Register)
+		SNS 14,0,6,addr	Sense LPDAR (data addres register)
+
+
+	5444 Disk Drives
+	----------------
+
+		Each drive has two disks (upper and lower), each disk
+		has two surfaces (upper and lower), each surface has
+		24 256-byte sectors, sectors are number 0 thru 23 on
+		upper surface, 32 thru 55 on lower.
+
+		d = drive, 0 is R1/F1, 1 is R2/F2
+		s = surface, 0 = upper (removable), 1 = lower (fixed)
+
+		The Control register points to the leftmost byte of a 4-byte
+		control field in memory with these bytes:
+
+			F - Flag byte (not supported in this sim)
+			C - Cylinder Address (0-203)
+			S - Sector Number (0-23, or 32-55) in top 6 bits
+			N - Number of sectors minus 1
+
+		These have meaning for all operations except seek, seek uses
+		the fields differently.
+
+		SIO 1d,s,0,XX	Seek, XX not used, control field is used:
+
+			F - not used
+			C - not used
+			S - high bit is head to be used 0-upper 1-lower
+			    low bit is direction to move 0-back 1-forward
+			N - number of cylinders to move
+
+		SIO 1d,s,1,XX	Read, values of XX are as follows:
+			X'00':	Read Data
+			X'01':	Read Identifier (updates control field, no
+					data is read)
+			X'02':	Read Data Diagnostic
+			X'03':	Verify (does not read, but checks)
+
+		SIO 1d,s,2,XX	Write, values of XX are as follows:
+			X'00':	Write Data
+			X'01':	Write Identifier (24 sectors with byte at
+					data address register)
+		
+		SIO 1d,s,3,XX	Scan. All 256 bytes in memory at data
+				address register are compared to disk
+				sectors on current track, except those
+				bytes of X'FF' are not compared.  Values of
+				XX are:
+
+				X'00': Scan Equal
+				X'01': Scan Low or Equal
+				X'02': Scan High or Equal
+
+		LIO 1d,0,4,addr	Load Data Address Register
+		LIO 1d,0,6,addr	Load Disk Control Address Register
+
+		TIO 1d,0,0,addr	Branch if not ready/unit check
+		TIO 1d,0,2,addr	Branch if busy
+		TIO 1d,0,4,addr	Branch if Scan Found
+
+		APL 1d,0,0	Loop if not ready/unit check
+		APL 1d,0,2	Loop if busy
+		APL 1d,0,4	Loop if scan found
+
+		SNS 1d,0,2,addr	Sense Status Bytes 0 and 1: (simulated 
+				bits only are shown, otehrs are 0):
+				X'1000': equipment check
+				X'0800': data check
+				X'0400': No record found
+				X'0100': Seek Check (past cyl 203)
+				X'0080': Scan equal Hit
+				X'0040': Cylinder 0
+				X'0020': End of Cylinder 
+				X'0010': Seek Busy
+		SNS 1d,0,3,addr	Sense bytes 2 and 3 (0000 in this sim)
+		SNS 1d,0,4,addr	Sense Data Address Register
+		SNS 1d,0,6,addr	Sense Control Address Register
+
+
+ 
+

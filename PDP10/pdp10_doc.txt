@@ -1,0 +1,526 @@
+To:	Users
+From:	Bob Supnik
+Subj:	PDP-10 Simulator Usage
+Date:	1-Dec-01
+
+			COPYRIGHT NOTICE
+
+The following copyright notice applies to both the SIMH source and binary:
+
+   Original code published in 1993-2001, written by Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Robert M Supnik shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Robert M Supnik.
+
+This memorandum documents the PDP-10 simulator.
+
+
+1. Simulator Files
+
+To compile the PDP-10, you must define USE_INT64 as part of the compilation
+command line.
+
+sim/		sim_defs.h
+		sim_sock.h
+		sim_tmxr.h
+		dec_dz.h
+		scp.c
+		scp_tty.c
+		sim_rev.c
+		sim_sock.c
+		sim_tmxr.c
+
+sim/pdp10/	pdp10_defs.h
+		pdp10_cpu.c
+		pdp10_dz.c
+		pdp10_fe.c
+		pdp10_ksio.c
+		pdp10_lp20.c
+		pdp10_mdfp.c
+		pdp10_pag.c
+		pdp10_pt.c
+		pdp10_rp.c
+		pdp10_sys.c
+		pdp10_tu.c
+		pdp10_xtnd.c
+
+2. PDP-10 Features
+
+The PDP-10 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		KS10 CPU with 1MW of memory
+PAG		paging unit (translation maps)
+UBA		Unibus adapters (translation maps)
+FE		console
+TIM		timer
+PTR,PTP		PC11 paper tape reader/punch
+DZ		DZ11 8-line terminal multiplexor
+LP20		LP20 line printer
+RP		RH11/RP04/RP05/RP06/RP07/RM03/RM05/RM80 controller with
+		eight drives
+TU		RH11/TM02/TU45 controller with eight drives
+
+The PTR/PTP are initially DISABLEd.  The DZ11 can also be DISABLEd.
+
+The PDP-10 simulator implements several unique stop condition:
+
+	- illegal instruction (000) in kernel mode
+	- indirect addressing nesting exceeds limit
+	- execute chaining exceeds limit
+	- page fail or other error in interrupt sequence
+	- illegal instruction in interrupt sequence
+	- invalid vector pointer in interrupt sequence
+	- invalid Unibus adapter number
+	- non-existent exec or user page table address
+
+The PDP-10 loader supports RIM10B format paper tapes, SAV binary files, and
+EXE binary files.  LOAD switches -r, -s, -e specify RIM10, SAV, EXE format,
+respectively.  If no switch is specified, the LOAD command checks the file
+extension; .RIM, .SAV, .EXE specify RIM10, SAV, EXE format, respectively.
+If no switch specified, and no extension matches, the LOAD command checks
+the file format to try to determine the file type. 
+
+2.1 CPU
+
+The CPU options allow the user to specify standard microcode, standard
+microcode with a bug fix for a boostrap problem in TOPS-20 V4.1, or ITS
+microcode
+
+	SET CPU STANDARD	Standard microcode
+	SET CPU TOPS20V41	Standard microcode with TOPS-20 V4.1 bug fix
+	SET CPU ITS		ITS compatible microcode
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	PC		18	program counter
+	FLAGS		18	processor flags (<13:17> unused)
+	AC0..AC17	36	accumulators
+	IR		36	instruction register
+	EBR		18	executive base register
+	PGON		1	paging enabled flag
+	T20P		1	TOPS-20 paging
+	UBR		18	user base register
+	CURAC		3	current AC block
+	PRVAC		3	previous AC block
+	SPT		36	shared pointer table
+	CST		36	core status table
+	PUR		36	process update register
+	CSTM		36	CST mask
+	HSB		18	halt status block address
+	DBR1		18	descriptor base register 1 (ITS)
+	DBR2		18	descriptor base register 2 (ITS)
+	DBR3		18	descriptor base register 3 (ITS)
+	DBR4		18	descriptor base register 4 (ITS)
+	PIENB		7	PI levels enabled
+	PIACT		7	PI levels active
+	PIPRQ		7	PI levels with program requests
+	PIIOQ		7	PI levels with IO requests
+	PIAPR		7	PI levels with APR requests
+	APRENB		8	APR flags enabled
+	APRFLG		8	APR flags active
+	APRLVL		3	PI level for APR interrupt
+	IND_MAX		8	indirect address nesting limit
+	XCT_MAX		8	execute chaining limit
+	OLDPC		18	PC prior to last transfer instruction
+	WRU		8	interrupt character
+	REG[0:127]	36	fast memory blocks
+
+2.2 Pager
+
+The pager contains the page maps for executive and user mode.  The
+executive page map is the memory space for unit 0, the user page map the
+memory space for unit 1.  A page map entry is 32 bits wide and has the
+following format:
+
+	bit		content
+	---		-------
+	31		page is writeable
+	30		entry is valid
+	29:19		mbz
+	18:9		physical page base address
+	8:0		mbz
+
+The pager has no registers.
+
+2.3 Unibus Adapters
+
+The Unibus adapters link the system I/O devices to the CPU.  Unibus
+adapter 1 (UBA1) is unit 0, and Unibus adapter 3 is unit 1.  The
+adapter's Unibus map is the memory space of the corresponding unit.
+
+The Unibus Adapter has the following registers:
+
+	name		size	comments
+
+	INTREQ		32	interrupt requests
+	UB1CS		16	Unibus adapter 1 control/status
+	UB3CS		16	Unibus adapter 3 control/status
+
+2.4 Front End (FE)
+
+The front end is the system console.  The keyboard input is unit 0,
+the console output is unit 1.  It supports two options:
+
+	SET FE STOP		halts the PDP-10 operating system
+	SET FE CTLC		simulates typing ^C (for Windoze)
+
+The front end has the following registers:
+
+	name		size	comments
+
+	IBUF		8	input buffer
+	ICOUNT		31	count of input characters
+	ITIME		24	keyboard polling interval
+	OBUF		8	output buffer
+	OCOUNT		31	count of output characters
+	OTIME		24	console output response time
+
+2.5 Timer (TIM)
+
+The timer (TIM) implements the system timer, the interval timer, and
+the time of day clock used to get the date and time at system startup.
+Because most PDP-10 software is not Y2K compliant, the timer implements
+one option
+
+	SET TIM NOY2K		software not Y2K compliant, limit time
+				 of day clock to 1999 (default)
+	SET TIM Y2K		software is Y2K compliant
+
+The timer has the following registers:
+
+	name		size	comments
+
+	TIMBASE		59	time base (double precision)
+	TTG		36	time to go (remaining time) for interval
+	PERIOD		36	reset value for interval
+	QUANT		36	quantum timer (ITS only)
+	TIME		24	tick delay
+	DIAG		1	use fixed tick delay instead of autocalibration
+
+Unless the DIAG flag is set, the timer autocalibrates; the tick delay
+is adjusted up or down so that the time base tracks actual elapsed time.
+This may cause time-dependent diagnostics to report errors.
+
+2.6 PC11 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.  Thus,
+by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	BUSY		1	busy flag (CSR<11>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+
+2.7 PC11 Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written. 
+Thus, by by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CSR		16	control/status register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	POS		31	position in the input or output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+				0	out of tape
+
+	OS I/O error	x	report error and stop
+
+2.8 DZ11 Terminal Multiplexor (DZ)
+
+The DZ11 is an 8-line terminal multiplexor.  The terminal lines perform
+input and output through Telnet sessions connected to a user-specified
+port.  The ATTACH command specifies the port to be used:
+
+	ATTACH {-am} DZ <port>(cr)	-- set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.  The optional switch -m turns on the DZ11's
+modem controls; the optional switch -a turns on active disconnects
+(disconnect session if computer clears Data Terminal Ready).
+
+Once the DZ is attached and the simulator is running, the DZ will listen
+for connections on the specified port.  It assumes that the incoming
+connections are Telnet connections.  The connection remains open until
+disconnected either by the simulated program or by the Telnet client.
+
+The SHOW DZ LINESTATUS command displays the current connections to the DZ. 
+
+The DZ11 implements these registers:
+
+	name		size	comments
+
+	CSR		16	control/status register
+	RBUF		16	receive buffer
+	LPR		16	line parameter register
+	TCR		16	transmission control register
+	MSR		16	modem status register
+	TDR		16	transmit data register
+	SAENB		1	silo alarm enabled
+	MDMTCL		1	modem control enabled
+	AUTODS		1	autodisconnect enabled
+	RPOS0..7	32	count of characters received
+	TPOS0..7	32	count of characters transmitted
+
+The DZ11 does not support save and restore.  All open connections are
+lost when the simulator shuts down or the DZ is detached.
+
+2.9 RH11 Adapter, RM02/03/05/80, RP04/05/06/07 drives (RP)
+
+The RP controller implements the Massbus 18b (RH11) direct interface for
+large disk drives.  It is more abstract than other device simulators, with
+just enough detail to run operating system drivers.  In addition, the RP
+controller conflates the details of the RM series controllers with the RP
+series controllers, although there were detailed differences.
+
+RP options include the ability to set units write enabled or write locked,
+to set the drive type to one of six disk types, or autosize:
+
+	SET RPn LOCKED		set unit n write locked
+	SET RPn ENABLED		set unit n write enabled
+	SET RPn RM03		set type to RM03
+	SET RPn RM05		set type to RM05
+	SET RPn RM80		set type to RM80
+	SET RPn RP04		set type to RP04
+	SET RPn RP06		set type to RP06
+	SET RPn RP07		set type to RP07
+	SET RPn AUTOSIZE	set type based on file size at attach
+
+The type options can be used only when a unit is not attached to a file.
+Note that TOPS-10 V7.03 only supported the RP06 and RM03; V7.04 added
+support for the RP07.  Units can be REMOVEd or ADDed to the configuration.
+
+The RP controller implements these registers:
+
+	name		size	comments
+
+	RPCS1		16	control/status 1
+	RPWC		16	word count
+	RPBA		16	bus address
+	RPDA		16	desired surface, sector
+	RPCS2		16	control/status 2
+	RPDS[0:7]	16	drive status, drives 0-7
+	RPER1[0:7]	16	drive errors, drives 0-7
+	RPOF		16	offset
+	RPDC		8	desired cylinder
+	RPER2		16	error status 2
+	RPER3		16	error status 3
+	RPEC1		16	ECC syndrome 1
+	RPEC2		16	ECC syndrome 2
+	RPMR		16	maintenance register
+	RPDB		16	data buffer
+	IFF		1	transfer complete interrupt request flop
+	INT		1	interrupt pending flag
+	SC		1	special condition (CSR1<15>)
+	DONE		1	device done flag (CSR1<7>)
+	IE		1	interrupt enable flag (CSR1<6>)
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.10 RH11 Adapter, TM02 Formatter, TU45 Magnetic Tape (TU)
+
+The magnetic tape simulator simulates an RH11 Massbus adapter with one
+TM02 formatter and up to eight TU45 drives.  Magnetic tape options include
+the ability to make units write enabled or locked.
+
+	SET TUn LOCKED		set unit n write locked
+	SET TUn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	MTCS1		16	control/status 1
+	MTBA		16	memory address
+	MTWC		16	word count
+	MTFC		16	frame count
+	MTCS2		16	control/status 2
+	MTFS		16	formatter status
+	MTER		16	error status
+	MTCC		16	check character
+	MTDB		16	data buffer
+	MTMR		16	maintenance register
+	MTTC		16	tape control register
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	IE		1	interrupt enable flag
+	STOP_IOE	1	stop on I/O error
+	TIME		24	delay
+	UST[0:7]	16	unit status, units 0-7
+	POS[0:7]	31	position, units 0-7
+
+Error handling is as follows:
+
+	error		processed as
+
+	not attached	tape not ready
+
+	end of file	(read or space) end of physical tape
+			(write) ignored
+
+	OS I/O error	report error and stop
+
+2.11 LP20 DMA Line Printer (LP20)
+
+The LP20 is a DMA-based line printer controller.  There is one
+line printer option to clear the vertical forms unit (VFU).
+
+	SET LP20 VFUCLEAR	clear the vertical forms unit
+
+The LP20 implements these registers:
+
+	name		size	comments
+
+	LPCSA		16	control/status register A
+	LPCSB		16	control/status register B
+	LPBA		16	bus address register
+	LPBC		12	byte count register
+	LPPAGC		12	page count register
+	LPRDAT		12	RAM data register
+	LPCBUF		8	character buffer register
+	LPCOLC		8	column counter register
+	LPPDAT		8	printer data register
+	LPCSUM		8	checksum register
+	DVPTR		7	vertical forms unit pointer
+	DVLNT		7	vertical forms unit length
+	INT		1	interrupt request
+	ERR		1	error flag
+	DONE		1	done flag
+	IE		1	interrupt enable flag
+	POS		31	position in output file
+	TIME		24	response time
+	STOP_IOE	1	stop on I/O error
+	TXRAM[0:255]	12	translation RAM
+	DAVFU[0:142]	12	vertical forms unit array	
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of paper
+
+	OS I/O error	x	report error and stop
+
+2.12 Symbolic Display and Input
+
+The PDP-10 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as (sixbit) character string
+	-p			display as packed (seven bit) string
+	-m			display instruction mnemonics
+	-v			interpret address as virtual
+	-e			force executive mode
+	-u			force user mode
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			sixbit string
+	# or -p			packed seven bit string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard PDP-10 assembler syntax.  There are three
+instruction classes: memory reference, memory reference with AC, and I/O.
+
+Memory reference instructions have the format
+
+	memref {@}address{(index)}
+
+memory reference with AC instructions have the format
+
+	memac ac,{@}address{(index)}
+
+and I/O instructions have the format
+
+	io device,{@}address{(index)}
+
+where @ signifies indirect.  The address is a signed octal number in the
+range 0 - 0777777.  The ac and index are unsigned octal numbers in the
+range 0-17.  The device is either a recognized device mnemonic (APR, PI,
+TIM) or an octal number in the range 0 - 0177.
+
+The simulator recognizes the standard MACRO alternate mnemonics (CLEAR
+for SETZ, OR for IORI), the individual definitions for JRST and JFCL
+variants, and the extended instruction mnemonics.

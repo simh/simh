@@ -1,0 +1,375 @@
+Altair 8800 Simulator
+=====================
+
+1. Background.
+
+  The MITS (Micro Instrumentation and Telemetry Systems) Altair 8800
+was announced on the January 1975 cover of Popular Electronics, which
+boasted you could buy and build this powerful computer kit for only $397.
+The kit consisted at that time of only the parts to build a case, power
+supply, card cage (18 slots), CPU card, and memory card with 256 *bytes* of
+memory.  Still, thousands were ordered within the first few months after the
+announcement, starting the personal computer revolution as we know it today.
+
+  Many laugh at the small size of the that first kit, noting there
+were no peripherals and the 256 byte memory size.  But the computer was an
+open system, and by 1977 MITS and many other small startups had added many
+expansion cards to make the Altair quite a respectable little computer. The
+"Altair Bus" that made this possible was soon called the S-100 Bus, later
+adopted as an industry standard, and eventually became the IEE-696 Bus.
+
+2. Hardware
+
+  We are simulating a fairly "loaded" Altair 8800 from about 1977,
+with the following configuration:
+
+  device    simulates
+  name(s)
+
+  CPU       Altair 8800 with Intel 8080 CPU board, 62KB
+            of RAM, 2K of EPROM with start boot ROM.
+  SIO       MITS 88-2SIO Dual Serial Interface Board. Port 1
+            is assumed to be connected to a serial "glass
+            TTY" that is your terminal running the Simulator.
+  PTR       Paper Tape Reader attached to port 2 of the 2SIO board.
+  PTP       Paper Tape Punch attached to port 2 of the
+            2SIO board.  This also doubles as a printer port.
+  DSK       MITS 88-DISK Floppy Disk controller with up
+            to eight drives.
+
+2.1 CPU
+
+  We have 2 CPU options that were not present on the original
+machine but are useful in the simulator.  We also allow you to select
+memory sizes, but be aware that some sample software requires the full
+64K (i.e. CP/M) and the MITS Disk Basic and Altair DOS require about
+a minimum of 24K.
+
+  SET CPU 8080  Simulates the 8080 CPU (normal)
+  SET CPU Z80   Simulates the Z80 CPU. Note that some software (e.g. most
+      original Altair software such as 4K Basic) requires an 8080 CPU and
+      will not or not properly run on a Z80. This is mainly due to the use
+      of the parity flag on the 8080 which has not always the same
+      semantics on the Z80.
+  SET CPU ITRAP  Causes the simulator to halt if an invalid opcode
+      is detected (depending on the chosen CPU).
+  SET CPU NOITRAP  Does not stop on an invalid Opcode.  This is
+      how the real 8080 works.
+  SET CPU 4K
+  SET CPU 8K
+  SET CPU 12K
+  SET CPU 16K
+    ......
+  SET CPU 64K  All these set various CPU memory configurations.
+      The 2K EPROM at the high end of memory is always
+      present and will always boot.
+
+The BOOT EPROM card starts at address FF00.  Jumping to this address
+will always boot drive 0 of the floppy controller.  If no valid bootable
+software is present there the machine crashes.  This is historically
+accurate behavior.
+
+The real 8080, on receiving a HLT (Halt) instruction, freezes the processor
+and only an interrupt or CPU hardware reset will restore it.  The simulator
+is alot nicer, it will halt but send you back to the simulator command line.
+
+CPU Registers include the following:
+
+  name  size  comments
+
+  PC      16  The Program Counter
+  AF      16  The accumulator and the flag register
+              F = S Z - AC - P/V N C
+                S    = Sign flag.
+                Z    = Zero Flag.
+                AC   = Auxillary Carry flag.
+                P/V  = Parity flag on 8080
+                       Parity / Overflow flag on Z80
+                -    = not used (undefined)
+                N    = Internal sign flag
+                C    = Carry flag.
+  BC      16  The BC register pair.  Register B is the high 8 bits,
+              C is the lower 8 bits
+  DE      16  The DE register pair.  Register D is the high 8 bits,
+              E is the lower 8 bits.
+  HL      16  The HL register pair.  Register H is the high 8 bits,
+              L is the lower 8 bits.
+  AF1     16  The alternate AF register (only on Z80)
+  BC1     16  The alternate BC register (only on Z80)
+  DE1     16  The alternate DE register (only on Z80)
+  HL1     16  The alternate HL register (only on Z80)
+  IX      16  The IX index register (only on Z80)
+  IY      16  The IY index register (only on Z80)
+  IFF      8  Interrupt flag (only on Z80, no effect)
+  INT      8  Interrupt register (only on Z80, no effect)
+
+  SR      16  The front panel switches (use D SR 8 for 4k Basic).
+  WRU      8  The interrupt character.  This starts as 5
+              (ctrl-E) but some Altair software uses this
+              keystroke so best to change this to something
+              exotic such as 035 (which is Ctl-]).
+
+
+2.2 The Serial I/O Card (2SIO)
+
+  This simple programmed I/O device provides 2 serial ports to the
+outside world, which could be hardware jumpered to support RS-232 plugs or a
+TTY current loop interface.  The standard I/O addresses assigned by MITS
+was 10-11 (hex) for the first port, and 12-13 (hex) for the second.
+We follow this standard in the Simulator.
+
+  The simulator directs I/O to/from the first port to the screen. The
+second port reads from an attachable "tape reader" file on input, and writes
+to an attachable "punch file" on output.  These files are considered a
+simple stream of 8-bit bytes.
+
+  The SIO can be configured in SIMH with the following commands:
+
+  SET SIO TTY      Bit 8 is set to zero on console output
+  SET SIO ANSI     Bit 8 is not touched on console output
+
+  SET SIO ALL      Console input support lower- and upper case
+  SET SIO UPPER    Console input is transformed to upper case characters only
+                   (This feature is useful for most Altair software)
+
+  SET SIO BS       Map the delete character to backspace
+  SET SIO DEL      Map the backspace character to delete
+  
+  You can also attach the SIO to a port:
+  
+  ATTACH SIO 23    Console IO goes via a Telnet connection on port 23
+  DETACH SIO       Console IO goes via the regular SIMH console
+
+2.3 The 88-DISK controller.
+
+  The MITS 88-DISK is a simple programmed I/O interface to the MITS
+8-inch floppy drive, which was basically a Pertec FD-400 with a power
+supply and buffer board builtin.  The controller supports neither interrupts
+nor DMA, so floppy access required the sustained attention of the CPU.
+The standard I/O addresses were 8, 9, and 0A (hex), and we follow the
+standard.  Details on controlling this hardware are in the altair_dsk.c
+source file.
+
+  The only difference is that the simulated disks may be larger than the
+original ones: The original disk had 77 tracks while the simulated disks
+support up to 254 tracks (only relevant for CP/M).
+
+  For debugging purposes you can set the trace level of some disk I/O
+functions. To do so the following bits in TRACE (a register of the disk)
+have been defined with the following meaning:
+
+  1 Trace all IN and OUT instructions on the disk ports 8 and 9
+  2 Trace all read and writes to full sectors on the disk
+  4 Print a message whenever an unnecessary step-in or step out of the
+    disk head occurs (often an indication of an infinite loop)
+  8 Print a message whenever the disk head appears to be waiting for a
+    sector which does not show up (often an indication of an infinite
+    loop)
+  
+For example the command "D TRACE 10" will trace options 2+8 from above.  
+  
+
+3. Sample Software
+
+  Running an Altair in 1977 you would be running either MITS Disk
+Extended BASIC, or the brand new and sexy CP/M Operating System from Digital
+Research.  Or possibly, you ordered Altair DOS back when it was promised in
+1975, and are still waiting for it to be delivered in early 1977.
+
+  We have samples of all three for you to check out.  We can't go into
+the details of how they work, but we'll give you a few hints.
+
+
+3.1 CP/M Version 2.2
+
+  This version is my own port of the standard CP/M to the Altair.
+There were some "official" versions but I don't have them.  None were
+endorsed or sold by MITS to my knowledge, however.
+  To boot CP/M:
+
+  sim> attach dsk altcpm.dsk
+  sim> go ff00
+  62K CP/M VERSION 2.2 (ALTAIR 8800)
+  A>DIR
+
+  CP/M feels like DOS, sort of.  DIR will work.  I have included all
+the standard CP/M utilities, plus a few common public-domain ones.  I also
+include the sources to the customized BIOS and some other small programs.
+TYPE will print an ASCII file.  DUMP will dump a binary one.  LS is a better
+DIR than DIR.  ASM will assemble .ASM files to Hex, LOAD will "load" them to
+binary format (.COM).  ED is a simple editor, #A command will bring the
+source file to the buffer, T command will "type" lines, L will move lines,
+E exits the editor.  20L20T will move down 20 lines, and type 20.  Very
+DECish.  DDT is the debugger, SUBMIT is a batch-type command processor.
+A sample batch file that will assemble and write out the bootable CP/M
+image (on drive A) is "SYSGEN.SUB".  To run it, type "SUBMIT SYSGEN".
+
+  In order to efficiently transfer files into the CP/M environment use the
+included program READ <filename.ext>. If you have a file named foo.ext in
+the current directory (i.e. the directory where SIMH is), executing
+READ FOO.EXT under CP/M will transfer the file onto the CP/M disk. READ will
+only run with Z80 CPU so remember to "SET CPU Z80".
+
+The disk "altcpm.dsk" contains the following files:
+Name    Ext  Size Comment
+ABOOT62 ASM    1K Moves CP/M image from MOVCPM location to real location
+                  in memory
+ASM     COM    8K Standard CP/M assembler
+CALC    PRO    3K Prolog sample file "Calculator"
+CBIOS   ASM    8K BIOS for the Altair (used for sysgen)
+COPY    COM    1K ALTAIR diskette backup program
+CPM62   COM    9K CP/M binary (used for sysgen)
+DDT     COM    5K Dynamic Debugging Tool (Standard CP/M)
+DDTZ    COM   10K Dynamic Debugging Tool for Z80
+DUMP    ASM    5K Assembler source for DUMP utility
+DUMP    COM    1K Dumps the contents of a file in hex (Standard CP/M)
+ED      COM    7K Line oriented editor (Standard CP/M)
+FAMILY  PRO    2K Prolog sample file "Family relations"
+FORMAT  COM    2K Formats a disk
+INTEGER PRO    1K Prolog sample file "Integer arithmetic"
+KNAKE   PRO    2K Prolog sample file "Logic puzzle"
+LOAD    COM    2K Loads a hex file and produces an executable
+                  (Standard CP/M)
+LS      COM    3K Directory utility
+MOVCPM  COM   12K Regenerates the CP/M system for a particular
+                  memory size (Standard CP/M)
+PINST   COM    4K Terminal installer for PROLOGZ.COM
+PIP     COM    8K Peripheral Interchange Program for copying files
+                  (Standard CP/M)
+PROLOGZ COM   17K Prolog development environment
+PROLOGZ TXT   40K PROLOGZ documentation in German
+PTD     ASM    2K Writes Altair-format memory image to disk
+                  (used for sysgen)
+QUEEN   PRO    2K Prolog sample file "N Queens problem"
+READ    COM    2K Reads a file from the SIMH filesystem to CP/M
+README  TXT    3K This file
+STAT    COM    6K Provides information about drives, disks and
+                  files (Standard CP/M)
+SUBMIT  COM    2K Submits a file of commands for batch processing
+                  (Standard CP/M)
+SURVEY  COM    2K Provides information about memory and IO ports
+SYSCOPY COM    2K Copies the reserved tracks between disks
+SYSGEN  SUB    2K Submit file for generating the CP/M system
+XSUB    COM    2K Addition to SUBMIT such that all input is read
+                  from the submit file (Standard CP/M)
+
+3.2 MITS Disk Extended BASIC Version 4.1
+
+  This was the commonly used software for serious users of the Altair
+computer.  It is a powerful (but slow) BASIC with some extended commands to
+allow it to access and manage the disk.  There was no operating system it
+ran under.  To boot:
+
+  sim> set cpu 8080          ;Z80 will not work
+  sim> attach dsk mbasic.dsk
+  sim> set sio upper
+  sim> go ff00
+
+  MEMORY SIZE? [return]
+  LINEPRINTER? C [return]
+  HIGHEST DISK NUMBER? 0 [return]  (3 here = 4 drive system)
+  NUMBER OF FILES? 3 [return]
+  NUMBER OF RANDOM FILES? 2 [return]
+
+  44041 BYTES FREE
+  ALTAIR BASIC REV. 4.1
+  [DISK EXTENDED VERSION]
+  COPYRIGHT 1977 BY MITS INC.
+  OK
+  MOUNT 0
+  OK
+  FILES
+
+
+3.3 Altair DOS Version 1.0
+
+  This was long promised but not delivered until it was almost
+irrelevant.  A short attempted tour will reveal it to be a dog, far inferior
+to CP/M. To boot:
+
+  sim> attach dsk altdos.dsk
+  sim> set sio upper
+  sim> go ff00
+
+  MEMORY SIZE? [return]
+  INTERRUPTS? N [return]
+  HIGHEST DISK NUMBER? 0 [return]  (3 here = 4 drive system)
+  HOW MANY DISK FILES? 3 [return]
+  HOW MANY RANDOM FILES? 2 [return]
+
+  056449 BYTES AVAILABLE
+  DOS MONITOR VER 1.0
+  COPYRIGHT 1977 BY MITS INC
+  .MNT 0
+
+  .DIR 0
+
+3.4 Altair 4k Basic
+  In order to run the famous 4k Basic, use the following commands (the trick
+is to get the Switch Register right).
+
+  sim> set cpu 8080    ;note 4k Basic will not run on a Z80 CPU
+  sim> set sio upper   ;4k Basic does not like lower case letters as input
+  sim> set sio ansi    ;4k Basic produces 8-bit output, strip to seven bits
+  sim> d sr 8          ;good setting for the Switch Register
+  sim> load 4kbas.bin  ;load it
+  sim> go              ;and go
+  MEMORY SIZE? [return]
+  TERMINAL WIDTH? [return]
+  WANT SIN? [Y]
+
+  61911 BYTES FREE
+
+  BASIC VERSION 3.2
+  [4K VERSION]
+
+  OK
+
+3.5 Altair 8k Basic
+  Running 8k Basic follows the procedure for 4k Basic.
+
+  sim> set cpu 8080    ;note 8k Basic will not run on a Z80 CPU
+  sim> set sio upper   ;8k Basic does not like lower case letters as input
+  sim> set sio ansi    ;8k Basic produces 8-bit output, strip to seven bits
+  sim> d sr 8          ;good setting for the Switch Register
+  sim> load 8kbas.bin  ;load it
+  sim> go              ;and go
+  MEMORY SIZE? [A]
+  
+  WRITTEN FOR ROYALTIES BY MICRO-SOFT
+  
+  MEMORY SIZE? [return]
+  TERMINAL WIDTH? [return]
+  WANT SIN-COS-TAN-ATN?  [Y]
+
+  58756 BYTES FREE
+  ALTAIR BASIC REV. 4.0
+  [EIGHT-K VERSION]
+  COPYRIGHT 1976 BY MITS INC.
+  OK
+
+4. Brief summary of all major changes to the original Altair simulator
+- Full support for Z80. CP/M software requiring a Z80 CPU now runs
+  properly. DDTZ and PROLOGZ are included for demonstration purposes.
+- Full assembler and dis-assembler support for Z80 and 8080 mnemonics.
+  Depending on the current setting of the CPU, the appropriate mnemonics
+  are used.
+- The BOOT ROM was changed to fully load the software from disk. The
+  original code basically loaded a copy of itself from the disk and
+  executed it.
+- ROM and memory size settings are now fully honored. This means that you
+  cannot write into the ROM or outside the defined RAM (e.g. when the RAM size
+  was truncated with the SET CPU commands). This feature allows programs which
+  check for the size of available RAM to run properly (e.g. 4k Basic).
+- The console can also be used via Telnet. This is useful when a terminal is
+  needed which supports cursor control such as a VT100. PROLOGZ for example
+  has a built-in screen editor which works under Telnet.
+- Simplified file exchange for CP/M. Using the READ program under CP/M one
+  can easily import files into CP/M from the regular file system. Note that PIP
+  does not work properly on non-text files on PTR.
+- The last character read from PTR is always Control-Z (the EOF character for
+  CP/M). This makes sure that PIP (Peripheral Interchange Program on CP/M) will
+  terminate properly.
+- Fixed a bug in the BIOS warm boot routine which caused CP/M to crash.
+- Modified the BIOS for CP/M to support 8 disks.
+- Changed from octal to hex which is more concise.

@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   03-Dec-01	RMS	Changed tmxr_status for extended SET/SHOW
    20-Oct-01	RMS	Fixed bugs in read logic (found by Thord Nilson).
 			added tmxr_rqln, tmxr_tqln
 */
@@ -383,7 +384,8 @@ return;
 
 void tmxr_fstatus (FILE *st, TMLN *lp, int32 ln)
 {
-if (ln >= 0) fprintf (st, "\n  line %d", ln);
+if (ln >= 0) fprintf (st, "\n  line %d: ", ln);
+else fprintf (st, "line status: ");
 if (lp -> conn) {
 	int32 o1, o2, o3, o4, hr, mn, sc;
 	uint32 ctime;
@@ -396,8 +398,8 @@ if (lp -> conn) {
 	hr = ctime / 3600;
 	mn = (ctime / 60) % 60;
 	sc = ctime % 3600;
-	fprintf (st, ": IP address %d.%d.%d.%d", o1, o2, o3, o4);
+	fprintf (st, "IP address %d.%d.%d.%d", o1, o2, o3, o4);
 	if (ctime) fprintf (st, ", connected %02d:%02d:%02d", hr, mn, sc);  }
-else fprintf (st, ": disconnected");
+else fprintf (st, "disconnected");
 return;
 }

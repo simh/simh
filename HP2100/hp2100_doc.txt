@@ -1,0 +1,471 @@
+To:	Users
+From:	Bob Supnik
+Subj:	HP2100 Simulator Usage
+Date:	1-Dec-01
+
+			COPYRIGHT NOTICE
+
+The following copyright notice applies to both the SIMH source and binary:
+
+   Original code published in 1993-2001, written by Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Robert M Supnik shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Robert M Supnik.
+
+This memorandum documents the HP 2100 simulator.
+
+
+1. Simulator Files
+
+sim/		sim_defs.h
+		scp.c
+		scp_tty.c
+		sim_rev.c
+
+sim/hp2100/	hp2100_defs.h
+		hp2100_cpu.c
+		hp2100_dp.c
+		hp2100_lp.c
+		hp2100_mt.c
+		hp2100_stddev.c
+		hp2100_sys.c
+
+2. HP2100 Features
+
+The HP2100 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		2116, 2100, or 21MX CPU with 32KW memory
+DMA0, DMA1	dual channel DMA controller
+PTR,PTP		12597A paper tape reader/punch
+TTY		12631C buffered teleprinter
+LPT		12653A line printer
+CLK		12539A/B/C time base generator
+DP		12557A cartridge disk controller with four drives
+MT		12559C magnetic tape controller with one drives
+
+The HP2100 simulator implements several unique stop conditions:
+
+	- decode of an undefined instruction, and STOP_INST is et
+	- reference to an undefined I/O device, and STOP_DEV is set
+	- more than INDMAX indirect references are detected during
+	  memory reference address decoding
+
+The HP2100 loader supports standard absolute binary format.  The DUMP
+command is not implemented.
+
+2.1 CPU
+
+CPU options include choice of instruction set and memory size.
+
+	SET CPU 2116		2116 instructions
+	SET CPU 2100		2100 instructions
+	SET CPU 21MX		21MX instructions
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 16K		set memory size = 16K
+	SET CPU 24K		set memory size = 24K
+	SET CPU 32K		set memory size = 32K
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 32K.
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	P		15	program counter
+	A		16	A register
+	B		16	B register
+	X		16	X index register (21MX)
+	Y		16	Y index register (21MX)
+	S		16	switch/display register
+	E		1	extend flag
+	O		1	overflow flag
+	ION		1	interrupt enable flag
+	ION_DEFER	1	interrupt defer flag
+	IADDR		6	most recent interrupting device
+	MPCTL		1	memory protection enable (2100, 21MX)
+	MPFLG		1	memory protection flag (2100, 21MX)
+	MPFBF		1	memory protection flag buffer (2100, 21MX)
+	MFENCE		15	memory protection fence (2100, 21MX)
+	MADDR		16	memory protection error address (2100, 21MX)
+	STOP_INST	1	stop on undefined instruction
+	STOP_DEV	1	stop on undefined device
+	INDMAX		1	indirect address limit
+	OLDP		15	PC prior to last JMP, JSB, or interrupt
+	WRU		8	interrupt character
+
+2.2 DMA Controllers
+
+The HP2100 includes two DMA channel controllers (DMA0 and DMA1).  Each
+DMA channel has the following visible state:
+
+	name		size	comments
+
+	CMD		1	channel enabled
+	CTL		1	interrupt enabled
+	FLG		1	channel ready
+	FBF		1	channel ready buffer
+	CW1		1	command word 1
+	CW2		1	command word 2
+	CW3		1	command word 3
+
+2.3 Variable Device Assignments
+
+On the HP2100, I/O device take their device numbers from the backplane
+slot they are plugged into.  Thus, device number assignments vary
+considerably from system to system, and software package to software
+package.  The HP2100 simulator supports dynamic device number assignment.
+The current device device is shown with the command SHOW <dev> DEVNO:
+
+	sim> SHOW PTR DEV
+	device=10
+
+The user can change the device number with the SET <dev> DEVNO=<num>
+command:
+
+	sim> SET PTR DEV=30
+	sim> SHOW PTR DEV
+	device=30
+
+The new device number must be in the range 010..077 (octal) and must 
+not be currently assigned to another device.  For devices with two
+device numbers, only the lower numbered device number can be changed;
+the higher is automatically set to the lower + 1.
+
+2.4 Programmed I/O Devices
+
+2.4.1 12597A-002 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.
+Thus, by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader supports the BOOT command.  BOOT PTR copies the
+absolute binary loader into memory and starts it running.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CMD		1	reader enable
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+	DEVNO		6	current device number (read only)
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+2.4.2 12597A-005 Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written.
+Thus, by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CMD		1	punch enable
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+	DEVNO		6	current device number (read only)
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+2.4.3 12631C Buffered Teleprinter (TTY)
+
+The console teleprinter has three units: keyboard (unit 0), printer
+(unit 1), and punch (unit 2).  The keyboard reads from the console
+keyboard; the printer writes to the simulator console window.  The
+punch writes to a disk file.  The keyboard has one option, UC; when
+set, it automatically converts lower case input to upper case.  This
+is on by default.
+
+The terminal implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	MODE		16	mode
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	KPOS		31	number of characters input
+	KTIME		24	keyboard polling interval
+	TPOS		31	number of characters printed
+	TTIME		24	time from I/O initiation to interrupt
+	PPOS		31	position in the punch output file
+	STOP_IOE	1	punch stop on I/O error
+	DEVNO		6	current device number (read only)
+
+Error handling for the punch is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+2.4.4 12653A Line Printer (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The line printer implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	CMD		1	printer enable
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	POS		31	position in the output file
+	CTIME		24	time between characters
+	PTIME		24	time for a print operation
+	STOP_IOE	1	stop on I/O error
+	DEVNO		6	current device number (read only)
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+2.4.5 12539A/B/C Time Base Generator (CLK)
+
+The time base generator (CLK) implements these registers:
+
+	name		size	comments
+
+	SEL		3	time base select
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	ERR		1	error flag
+	TIME[0:7]	31	clock intervals, select = 0..7
+	DEVNO		6	current device number (read only)
+
+2.5 12557A Cartridge Disk (DP)
+
+The 12557A cartridge disk has two separate devices, a data channel and
+a device controller.  The data channel includes a 128-word (one sector)
+buffer for reads and writes.  The device controller includes the four
+disk drives.  Disk drives can be REMOVEd or ADDed to the configuration.
+
+The data channel implements these registers:
+
+	name		size	comments
+
+	IBUF		16	input buffer
+	OBUF		16	output buffer
+	BPTR		7	sector buffer pointer
+	CMD		1	channel enable
+	CTL		1	interrupt enable
+	FLG		1	channel ready
+	FBF		1	channel ready buffer
+	DEVNO		6	current device number (read only)
+
+The device controller implements these registers:
+
+	name		size	comments
+
+	OBUF		16	output buffer
+	BUSY		3	busy (unit #, + 1, of active unit)
+	RARC		8	record address register cylinder
+	RARH		2	record address register head
+	RARS		4	record address register sector
+	CNT		5	check record count
+	CMD		1	controller enable
+	CTL		1	interrupt enable
+	FLG		1	controller ready
+	FBF		1	controller ready buffer
+	EOC		1	end of cylinder pending
+	CTIME		24	command delay time
+	STIME		24	seek delay time, per cylinder
+	XTIME		24	interword transfer time
+	STA[0:3]	16	drive status, drives 0-3
+	DEVNO		6	current device number (read only)
+
+Error handling is as follows:
+
+	error	     	processed as
+
+	not attached	disk not ready
+
+	end of file	assume rest of disk is zero
+
+	OS I/O error	report error and stop
+
+2.6 12559C Magnetic Tape (MT)
+
+Magnetic tape options include the ability to make the unit write enabled
+or write locked.
+
+	SET MT LOCKED		set unit write locked
+	SET MT ENABLED		set unit write enabled
+
+The 12559C mag tape drive has two separate devices, a data channel and
+a device controller.  The data channel includes a maximum record sized
+buffer for reads and writes.  The device controller includes the tape
+unit
+
+The data channel implements these registers:
+
+	name		size	comments
+
+	FLG		1	channel ready
+	BPTR		16	buffer pointer (reads and writes)
+	BMAX		16	buffer size (writes)
+	DEVNO		6	current device number (read only)
+
+The device controller implements these registers:
+
+	name		size	comments
+
+	FNC		8	current function
+	STA		9	tape status
+	BUF		8	buffer
+	BUSY		3	busy (unit #, + 1, of active unit)
+	CTL		1	interrupt enabled
+	FLG		1	controller ready
+	FBF		1	controller ready buffer
+	DTF		1	data transfer flop
+	FSVC		1	first service flop
+	POS		31	magtape position
+	CTIME		24	command delay time
+	XTIME		24	interword transfer delay time
+	STOP_IOE	1	stop on I/O error
+	DEVNO		6	current device number (read only)
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		tape not ready
+
+	end of file		(read or space) end of physical tape
+				(write) ignored
+
+	OS I/O error		report error and stop
+
+2.7 Symbolic Display and Input
+
+The HP2100 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as two character string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			two character sixbit string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard HP2100 assembler syntax.  There are seven
+instruction classes: memory reference, I/O, shift, alter skip, extended
+shift, extended memory reference, extended two address reference.
+
+Memory reference instructions have the format
+
+	memref {C/Z} address{,I}
+
+where I signifies indirect, C a current page reference, and Z a zero page
+reference.  The address is an octal number in the range 0 - 077777; if C or
+Z is specified, the address is a page offset in the range 0 - 01777.  Normally,
+C is not needed; the simulator figures out from the address what mode to use.
+However, when referencing memory outside the CPU (eg, disks), there is no
+valid PC, and C must be used to specify current page addressing.
+
+IOT instructions have the format
+
+	io device{,C}
+
+where C signifies that the device flag is to be cleared.  The device is an
+octal number in the range 0 - 77.
+
+Shift and alter/skip instructions have the format
+
+	sub-op sub-op sub-op...
+
+The simulator checks that the combination of sub-opcodes is legal.
+
+Extended shift instructions have the format
+
+	extshift count
+
+where count is an octal number in the range 1 - 020.
+
+Extended memory reference instructions have the format
+
+	extmemref address{,I}
+
+where I signifies indirect addressing.  The address is an octal number in
+the range 0 - 077777.
+
+Extended two address instructions have the format
+
+	ext2addr addr1{,I},addr2{,I}
+
+where I signifies indirect addressing.  Both address 1 and address 2 are
+octal numbers in the range 0 - 077777.

@@ -1,0 +1,303 @@
+To:	Users
+From:	Bob Supnik
+Subj:	H316 Simulator Usage
+Date:	1-Dec-2001
+
+			COPYRIGHT NOTICE
+
+The following copyright notice applies to both the SIMH source and binary:
+
+   Original code published in 1993-2001, written by Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Robert M Supnik shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Robert M Supnik.
+
+This memorandum documents Honeywell 316/516 simulator.
+
+
+1. Simulator Files
+
+The H316 requires the following files:
+
+sim/		sim_defs.h
+		scp.c
+		scp_tty.c
+		sim_rev.c
+
+sim/h316/	h316_defs.h
+		h316_cpu.c
+		h316_lp.c
+		h316_stddev.c
+		h316_cpu.c
+
+2. H316/H516 Features
+
+The Honeywell 316/516 simulator is configured as follows:
+
+device		simulates
+name(s)
+
+CPU		H316/H516 CPU with 16/32KW memory
+PTR		316/516-50 paper tape reader
+PTP		316/516-52 paper tape punch
+TTY		316/516-33 console terminal
+CLK		316/516-12 real time clock
+LPT		316/516 line printer
+
+The H316/H516 simulator implements several unique stop conditions:
+
+	- decode of an undefined instruction, and STOP_INST is et
+	- reference to an undefined I/O device, and STOP_DEV is set
+	- more than INDMAX indirect references are detected during
+	  memory reference address decoding
+
+The H316/H516 loader is not implemented.
+
+2.1 CPU
+
+CPU options include choice of instruction set and memory size.
+
+	SET CPU HSA		high speed arithmetic instructions
+	SET CPU NOHSA		no high speed arithmetic instructions
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 12K		set memory size = 12K
+	SET CPU 16K		set memory size = 16K
+	SET CPU 24K		set memory size = 24K
+	SET CPU 32K		set memory size = 32K
+
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 32K.
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	name		size	comments
+
+	P		15	program counter
+	A		16	A register
+	B		16	B register
+	X		16	index register
+	SC		16	shift count
+	C		1	carry flag
+	EXT		1	extend flag
+	PME		1	previous mode extend flag
+	EXT_OFF		1	extend off pending flag
+	DP		1	double precision flag
+	SS1..4		1	sense switches 1..4
+	ION		1	interrupts enabled
+	INODEF		1	interrupts not deferred
+	INTREQ		16	interrupt requests
+	DEVRDY		16	device ready flags (read only)
+	DEVENB		16	device interrupt enable flags (read only)
+	STOP_INST	1	stop on undefined instruction
+	STOP_DEV	1	stop on undefined device
+	INDMAX		1	indirect address limit
+	OLDP		15	PC prior to last JMP, JSB, or interrupt
+	WRU		8	interrupt character
+
+2.2 Programmed I/O Devices
+
+2.2.1 316/516-50 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.
+Thus, by changing POS, the user can backspace or advance the reader.
+
+The paper tape reader supports the BOOT command.  BOOT PTR copies the
+absolute binary loader into memory and starts it running.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INTREQ		1	device interrupt request
+	READY		1	device ready
+	ENABLE		1	device interrupts enabled
+	POS		31	position in the input or output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+				0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+2.2.2 316/516-52 Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written.
+Thus, by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INTREQ		1	device interrupt request
+	READY		1	device ready
+	ENABLE		1	device interrupts enabled
+	POWER		1	device powered up
+	POS		31	position in the input or output file
+	TIME		24	time from I/O initiation to interrupt
+	PWRTIME		24	time from I/O request to power up
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+2.2.3 316/516-33 Console Teletype (TTY)
+
+The terminal reads from the console keyboard and writes to the
+simulator console window.  The terminal has one option, UC; when
+set, the terminal automatically converts lower case input to upper
+case.  This is on by default.
+
+The terminal these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	MODE		1	read/write mode
+	INTREQ		1	device interrupt request
+	READY		1	device ready
+	ENABLE		1	device interrupts enabled
+	KPOS		31	number of characters input
+	KTIME		24	keyboard polling interval
+	TPOS		31	number of characters output
+	TTIME		24	time from I/O initiation to interrupt
+
+2.2.4 316/516-12 Real Time Clock (CLK)
+
+The real time clock (CLK) implements these registers:
+
+	name		size	comments
+
+	INTREQ		1	device interrupt request
+	READY		1	device ready
+	ENABLE		1	device interrupts enabled
+	TIME		24	clock interval
+
+2.2.5 316/5116 Line Printer (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The line printer implements these registers:
+
+	name		size	comments
+
+	WDPOS		6	word position in current scan
+	DRPOS		6	drum position
+	CRPOS		1	carriage position
+	XFER		1	transfer ready flag
+	PRDN		1	print done flag
+	INTREQ	1	device interrupt request
+	ENABLE	1	device interrupt enable
+	SVCST		2	service state
+	SVCCH		2	service channel
+	BUF		8	buffer
+	POS		31	number of characters output
+	XTIME		24	delay between transfers
+	ETIME		24	delay at end of scan
+	PTIME		24	delay for shuttle/line advance
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of paper
+
+	OS I/O error	x	report error and stop
+
+2.3 Symbolic Display and Input
+
+The H316/H516 simulator implements symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as two character string
+	-m			display instruction mnemonics
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			two character sixbit string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+Instruction input uses standard H316/H516 assembler syntax.  There are six
+instruction classes: memory reference, I/O, control, shift, skip, and
+operate.
+
+Memory reference instructions have the format
+
+	memref{*} {C/Z} address{,1}
+
+where * signifies indirect, C a current sector reference, Z a sector zero
+reference, and 1 indexed.  The address is an octal number in the range 0 -
+077777; if C or Z is specified, the address is a page offset in the range
+0 - 0777.  Normally, C is not needed; the simulator figures out from the
+address what mode to use.  However, when referencing memory outside the CPU
+(eg, disks), there is no valid PC, and C must be used to specify current
+sector addressing.
+
+I/O instructions have the format
+
+	io pulse+device
+
+The pulse+device is an octal number in the range 0 - 01777.
+
+Control and operate instructions consist of a single opcode
+
+	opcode
+
+Shift instructions have the format
+
+	shift n
+
+where n is an octal number in the range 0-77.
+
+Skip instructions have the format
+
+	sub-op sub-op sub-op...
+
+The simulator checks that the combination of sub-opcodes is legal.

@@ -1,0 +1,782 @@
+To:	Users
+From:	Bob Supnik
+Subj:	18b PDP Simulator Usage
+Date:	1-Dec-01
+
+			COPYRIGHT NOTICE
+
+The following copyright notice applies to both the SIMH source and binary:
+
+   Original code published in 1993-2001, written by Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Robert M Supnik shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Robert M Supnik.
+
+This memorandum documents the PDP-4, PDP-7, PDP-9, and PDP-15 simulators.
+
+
+1. Simulator Files
+
+To compile a particular model in the 18b family, you must include the appropriate
+switch in the compilation command line:
+
+PDP-4/		PDP4
+PDP-7/		PDP7
+PDP-9/		PDP9
+PDP-15/		PDP15
+
+If no model is specified, the default is the PDP-9.
+
+sim/		sim_defs.h
+		sim_sock.h
+		sim_tmxr.h
+		scp.c
+		scp_tty.c
+		sim_rev.c
+		sim_sock.c
+		sim_tmxr.c
+
+sim/pdp18b/	pdp18b_defs.h
+		pdp18b_cpu.c
+		pdp18b_drm.c
+		pdp18b_dt.c
+		pdp18b_lp.c
+		pdp18b_mt.c
+		pdp18b_rf.c
+		pdp18b_rp.c
+		pdp18b_stddev.c
+		pdp18b_sys.c
+		pdp18b_tt1.c
+
+2. 18b PDP Features
+
+The other four 18b PDP's (PDP-4, PDP-7, PDP-9, PDP-15) are very similar
+and are configured as follows:
+
+system	device		simulates
+	name(s)
+
+PDP-4	CPU		PDP-4 CPU with 8KW of memory
+	PTR,PTP		integral paper tape/Type 75 punch
+	TTI,TTO		KSR28 console terminal (Baudot code)
+	LPT		Type 62 line printer (Hollerith code)
+	CLK		integral real-time clock
+
+PDP-7	CPU		PDP-7 CPU with 32KW of memory
+	-		Type 177 extended arithmetic element (EAE)
+	-		Type 148 memory extension
+	PTR,PTP		Type 444 paper tape reader/Type 75 punch
+	TTI,TTO		KSR 33 console terminal
+	LPT		Type 647 line printer
+	CLK		integral real-time clock
+	DRM		Type 24 serial drum
+
+PDP-9	CPU		PDP-9 CPU with 32KW of memory
+	-		KE09A extended arithmetic element (EAE)
+	-		KF09A automatic priority interrupt (API)
+	-		KG09B memory extension
+	-		KP09A power detection
+	-		KX09A memory protection
+	PTR,PTP		PC09A paper tape reader/punch
+	TTI,TTO		KSR 33 console terminal
+	TTI1,TTO1	LT09A second console terminal
+	LPT		Type 647E line printer
+	CLK		integral real-time clock
+	RF		RF09/RS09 fixed-head disk
+	DT		TC02/TU55 DECtape
+	MT		TC59/TU10 magnetic tape
+
+PDP-15	CPU		PDP-15 CPU with 32KW of memory
+	-		KE15 extended arithmetic element (EAE)
+	-		KA15 automatic priority interrupt (API)
+	-		KF15 power detection
+	-		KM15 memory protection
+	PTR,PTP		PC15 paper tape reader/punch
+	TTI,TTO		KSR 35 console terminal
+	TTI1,TTO1	LT15 second console terminal
+	LPT		LP15 line printer
+	CLK		integral real-time clock
+	RP		RP15/RP02 disk pack
+	RF		RF15/RS09 fixed-head disk
+	DT		TC15/TU56 DECtape
+	MT		TC59/TU10 magnetic tape
+
+The DRM, RF, RP, DT, and MT devices can be DISABLEd.
+
+The 18b PDP simulators implement several unique stop conditions:
+
+	- an unimplemented instruction is decoded, and register
+	  STOP_INST is set
+	- more than XCTMAX nested executes are detected during
+	  instruction execution
+
+The PDP-4 and PDP-7 loaders support only RIM format tapes.  The PDP-9
+and PDP-15 support both RIM and BIN format tapes.  If the file extension
+is .RIM, or the -r switch is specified with LOAD, the file is assumed to
+be RIM format; if the file extension is not .RIM, or if the -b switch is
+specified, the file is assumed to be BIN format.
+
+2.1 CPU
+
+The CPU options are the presence of the EAE, the presense of the API (for
+the PDP-9 and PDP-15), and the size of main memory.
+
+	SET CPU EAE		enable EAE
+	SET CPU NOEAE		disable EAE
+	SET CPU API		enable API
+	SET CPU NOAPI		disable API
+	SET CPU 4K		set memory size = 4K
+	SET CPU 8K		set memory size = 8K
+	SET CPU 12K		set memory size = 12K
+	SET CPU 16K		set memory size = 16K
+	SET CPU 20K		set memory size = 20K
+	SET CPU 24K		set memory size = 24K
+	SET CPU 28K		set memory size = 28K
+	SET CPU 32K		set memory size = 32K
+	SET CPU 48K		set memory size = 48K
+	SET CPU 64K		set memory size = 64K
+	SET CPU 80K		set memory size = 80K
+	SET CPU 96K		set memory size = 96K
+	SET CPU 112K		set memory size = 112K
+	SET CPU 128K		set memory size = 128K
+
+Memory sizes greater than 8K are only available on the PDP-7, PDP-9, and
+PDP-15; memory sizes greater than 32KW are only available on the PDP-15.
+If memory size is being reduced, and the memory being truncated contains
+non-zero data, the simulator asks for confirmation.  Data in the truncated
+portion of memory is lost.  Initial memory size is 8K for the PDP-4, 32K
+for the PDP-7 and PDP-9, and 128K for the PDP-15.
+
+CPU registers include the visible state of the processor as well as the
+control registers for the interrupt system.
+
+	system	name		size	comments
+
+	all	PC		addr	program counter
+	all	AC		18	accumulator
+	all	L		1	link
+	7,9,15	MQ		18	multiplier-quotient
+	7,9,15	SC		6	shift counter
+	7,9,15	EAE_AC_SIGN	1	EAE AC sign
+	all	SR		18	front panel switches
+	all	INT[0:4]	32	interrupt requests,
+					0:3 = API levels 0-3
+					4 = PI level
+	all	IORS		18	IORS register
+	all	ION		1	interrupt enable
+	all	ION_DELAY	2	interrupt enable delay
+	9,15	APIENB		1	API enable
+	9,15	APIREQ		8	API requesting levels
+	9,15	APIACT		8	API active levels
+	9,15	BR		addr	memory protection bounds
+	15	XR		18	index register
+	15	LR		18	limit register
+	15	BR		17	memory protection bounds
+	9,15	USMD		1	user mode
+	9,15	USMDBUF		1	user mode buffer
+	9,15	NEXM		1	non-existent memory violation
+	9,15	PRVN		1	privilege violation
+	7,9	EXTM		1	extend mode
+	7,9	EXTM_INIT	1	extend mode value after reset
+	15	BANKM		1	bank mode
+	15	BANKM_INIT	1	bank mode value after reset
+	7	TRAPM		1	trap mode
+	7,9,15	TRAPP		1	trap pending
+	7,9	EMIRP		1	EMIR instruction pending
+	9,15	RESTP		1	DBR or RES instruction pending
+	9,15	PWRFL		1	power fail flag
+	all	OLDPC		addr	PC prior to last transfer
+	all	STOP_INST	1	stop on undefined instruction
+	all	WRU		8	interrupt character
+
+"addr" signifies the address width of the system (13b for the PDP-4, 15b for
+the PDP-7 and PDP-9, 17b for the PDP-15).
+
+2.2 Programmed I/O Devices
+
+2.2.1 Paper Tape Reader (PTR)
+
+The paper tape reader (PTR) reads data from a disk file.  The POS
+register specifies the number of the next data item to be read.  Thus,
+by changing POS, the user can backspace or advance the reader.
+
+On the PDP-4 and PDP-7, the paper tape reader supports the BOOT command.
+BOOT PTR copies the RIM loader into memory and starts it running, while
+BOOT -F PTR copies the funny format binary loader into memory and starts
+it running.
+
+The paper tape reader implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ERR		1	error flag (PDP-9, PDP-15 only)
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape
+
+	end of file	1	report error and stop
+			0	out of tape
+
+	OS I/O error	x	report error and stop
+
+2.2.2 Paper Tape Punch (PTP)
+
+The paper tape punch (PTP) writes data to a disk file.  The POS
+register specifies the number of the next data item to be written.
+Thus, by changing POS, the user can backspace or advance the punch.
+
+The paper tape punch implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ERR		1	error flag (PDP-9, PDP-15 only)
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+2.2.3 Terminal Input (TTI)
+
+The terminal input (TTI) polls the console keyboard for input.  The
+input side has one option, UC; when set, it automatically converts lower
+case input to upper case.
+
+The PDP-9 and PDP-15 operate the console terminal (TTI/TTO), by default,
+as half duplex.  For backward compatibility, on the PDP-9 and PDP-15
+the first terminal input has a second option, FDX; when set, it operates
+the terminal input in full-duplex mode.  The second terminal is always
+full duplex.
+
+The terminal input implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+2.2.4 Terminal Output (TTO)
+
+The terminal output (TTO) writes to the simulator console window.  The
+terminal output has one option, UC; when set, it suppresses lower case
+output (so that ALTMODE is not echoed as }).
+
+The terminal output implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	POS		31	number of chararacters output
+	TIME		24	time from I/O initiation to interrupt
+
+2.2.5 Line Printer (LPT)
+
+The line printer (LPT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be written.  Thus,
+by changing POS, the user can backspace or advance the printer.
+
+The PDP-4 used a Type 62 printer controller, with these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	SPC		1	spacing done flag
+	BPTR		6	print buffer pointer
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+	LBUF[0:119]	8	line buffer
+
+The PDP-7 and PDP-7 used a Type 647 printer controller, with these
+registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ENABLE	1	interrupt enable (PDP-9 only)
+	ERR		1	error flag
+	BPTR		7	print buffer pointer
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+	LBUF[0:119]	8	line buffer
+
+The PDP-15 used an LP15 printer controller, with these registers:
+
+	name		size	comments
+
+	STA		18	status register
+	MA		18	DMA memory address
+	INT		1	interrupt pending flag
+	ENABLE	1	interrupt enable
+	LCNT		8	line counter
+	BPTR		7	print buffer pointer
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+	LBUF[0:131]	8	line buffer
+
+For all three models, error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+2.2.6 Real-Time Clock (CLK)
+
+The real-time clock (CLK) implements these registers:
+
+	name		size	comments
+
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ENABLE	1	clock enable
+	TIME		24	clock frequency
+	TPS		8	ticks per second (60 or 50)
+
+The real-time clock autocalibrates; the clock interval is adjusted up or
+down so that the clock tracks actual elapsed time.
+
+2.2.7 Second Terminal (TTI1, TTO1)
+
+The second terminal consists of two independent devices, TTI1 and TTO1.
+The second terminal performs input and output through a Telnet session
+connected to a user-specified port.  The ATTACH command specifies the
+port to be used:
+
+	ATTACH TTI1 <port>(cr)	-- set up listening port
+
+where port is a decimal number between 1 and 65535 that is not being used
+for other TCP/IP activities.
+
+Once TTI1 is attached and the simulator is running, the terminal listens
+for a connection on the specified port.  It assumes that the incoming
+connection is a Telnet connection.  The connection remain opens until
+disconnected by the Telnet client, or by a DETACH TTI1 command.
+
+The second terminal input has one option, UC;  when set, it automatically
+converts lower case input to upper case.  The second terminal output also
+has one option, UC; when set, it suppresses lower case output (so that
+ALTMODE is not echoed as }).
+
+The SHOW TTI1 LINESTATUS command displays the current connection to the
+second terminal.
+
+The second terminal input implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	POS		31	number of characters input
+	TIME		24	keyboard polling interval
+
+The second terminal output implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	POS		31	number of chararacters output
+	TIME		24	time from I/O initiation to interrupt
+
+2.3 RP15/RP02 Disk Pack (RP)
+
+RP15 options include the ability to make units write enabled or write locked:
+
+	SET RPn LOCKED		set unit n write locked
+	SET RPn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The RP15 implements these registers:
+
+	name		size	comments
+
+	STA		18	status A
+	STB		18	status B
+	DA		18	disk address
+	MA		18	current memory address
+	WC		18	word count
+	INT		1	interrupt pending flag
+	BUSY		1	control busy flag
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.4 Type 24 Serial Drum (DRM)
+
+The serial drum (DRM) implements these registers:
+
+	name		size	comments
+
+	DA		9	drum address (sector number)
+	MA		15	current memory address
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ERR		1	error flag
+	WLK		32	write lock switches
+	TIME		24	rotational latency, per word
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+Drum data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.5 RF09/RF15/RS09 Fixed Head Disk (RF)
+
+The RF09/RF15 implements these registers:
+
+	name		size	comments
+
+	STA		18	status
+	DA		21	current disk address
+	MA		18	memory address (in memory)
+	WC		18	word count (in memory)
+	BUF		18	data buffer (diagnostic only)
+	INT		1	interrupt pending flag
+	WLK[0:7]	16	write lock switches for disks 0-7
+	TIME		24	rotational delay, per word
+	BURST		1	burst flag
+	STOP_IOE	1	stop on I/O error
+
+The RF09/RF15 is a three-cycle data break device.  If BURST = 0, word
+transfers are scheduled individually; if BURST = 1, the entire transfer
+occurs in a single data break.
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RF15/RF09 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.6 TC02/TU55 and TC15/TU56 DECtape (DT)
+
+DECtapes drives are numbered 1-8; in the simulator, drive 8 is unit 0.
+DECtape options include the ability to make units write enabled or write
+locked.
+
+	SET DTn LOCKED		set unit n write locked
+	SET DTn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The TC02/TC15 supports both PDP-8 format and PDP-9/11/15 format DECtape
+images.  ATTACH tries to determine the tape format from the DECtape image;
+the user can force a particular format with switches:
+
+	-f				foreign (PDP-8) format
+	-n				native (PDP-9/11/15) format
+
+The DECtape controller is a data-only simulator; the timing and mark
+track, and block header and trailer, are not stored.  Thus, the WRITE
+TIMING AND MARK TRACK function is not supported; the READ ALL function
+always returns the hardware standard block header and trailer; and the
+WRITE ALL function dumps non-data words into the bit bucket.
+
+The DECtape controller implements these registers:
+
+	name		size	comments
+
+	DTSA		12	status register A
+	DTSB		12	status register B
+	INT		1	interrupt pending flag
+	ENB		1	interrupt enable flag
+	DTF		1	DECtape flag
+	ERF		1	error flag
+	CA		18	current address (memory location 30)
+	WC		18	word count (memory location 31)
+	LTIME		31	time between lines
+	ACTIME		31	time to accelerate to full speed
+	DCTIME		31	time to decelerate to a full stop
+	SUBSTATE	2	read/write command substate
+	POS[0:7]	31	position, in lines, units 0-7
+	STATT[0:7]	31	unit state, units 0-7
+
+It is critically important to maintain certain timing relationships
+among the DECtape parameters, or the DECtape simulator will fail to
+operate correctly.
+
+	- LTIME must be at least 6
+	- ACTIME must be less than DCTIME, and both need to be at
+	  least 100 times LTIME
+
+2.7 TC59/TU10 Magnetic Tape (MT)
+
+Magnetic tape options include the ability to make units write enabled or
+or write locked.
+
+	SET MTn LOCKED		set unit n write locked
+	SET MTn ENABLED		set unit n write enabled
+
+Units can also be REMOVEd or ADDed to the configuration.
+
+The magnetic tape controller implements these registers:
+
+	name		size	comments
+
+	CMD		18	command
+	STA		18	main status
+	MA		18	memory address (in memory)
+	WC		18	word count (in memory)
+	INT		1	interrupt pending flag
+	STOP_IOE	1	stop on I/O error
+	TIME		24	record delay
+	UST[0:7]	24	unit status, units 0-7
+	POS[0:7]	31	position, units 0-7
+
+Error handling is as follows:
+
+	error			processed as
+
+	not attached		tape not ready
+
+	end of file		(read or space) end of physical tape
+				(write) ignored
+
+	OS I/O error		report error and stop
+
+2.8 Symbolic Display and Input
+
+The 18b PDP simulators implement symbolic display and input.  Display is
+controlled by command line switches:
+
+	-a			display as ASCII character
+	-c			display as (sixbit) character string
+	-m			display instruction mnemonics
+
+The PDP-15 also recognizes an additional switch:
+
+	-p			display as packed ASCII (five 7b ASCII
+				characters in two 18b words)
+
+Input parsing is controlled by the first character typed in or by command
+line switches:
+
+	' or -a			ASCII character
+	" or -c			three character sixbit string
+	alphabetic		instruction mnemonic
+	numeric			octal number
+
+The PDP-15 also recognizes an additional input mode:
+
+	# or -p			five character packed ASCII string in
+				two 18b words
+
+Instruction input uses standard 18b PDP assembler syntax.  There are six
+instruction classes: memory reference, EAE, index (PDP-15 only), IOT,
+operate, and LAW.
+
+Memory reference instructions have the format
+
+	memref {I/@} address{,X}
+
+where I (PDP-4, PDP-7, PDP-9) /@ (PDP-15) signifies indirect reference,
+and X signifies indexing (PDP-15 in page mode only).  The address is an
+octal number in the range 0 - 017777 (PDP-4, PDP-7, PDP-9, and PDP-15 in
+bank mode) or 0 - 07777 (PDP-15 in page mode).
+
+IOT instructions consist of single mnemonics, eg, KRB, TLS.  IOT instructions
+may be or'd together
+
+	iot iot iot...
+
+IOT's may also include the number 10, signifying clear the accumulator
+
+	iot 10
+
+The simulator does not check the legality of IOT combinations.  IOT's for
+which there is no opcode may be specified as IOT n, where n is an octal
+number in the range 0 - 07777.
+
+EAE instructions have the format
+
+	eae {+/- shift count}
+
+EAE instructions may be or'd together
+
+	eae eae eae...
+
+The simulator does not check the legality of EAE combinations.  EAE's for
+which there is no opcode may be specified as EAE n, where n is an octal
+number in the range 0 - 037777.
+
+Index instructions (PDP-15 only) have the format
+
+	index {immediate}
+
+The immediate, if allowed, must be in the range of -0400 to +0377.
+
+Operate instructions have the format
+
+	opr opr opr...
+
+The simulator does not check the legality of the proposed combination.  The
+operands for MUY and DVI must be deposited explicitly.
+
+Finally, the LAW instruction has the format
+
+	LAW immediate
+
+where immediate is in the range of 0 to 017777.
+
+2.9 Character Sets
+
+The PDP-4's console was an ASR-28 Teletype; its character encoding was
+Baudot.  The PDP-4's line printer used a modified Hollerith character
+set.  The PDP-7's and PDP-9's consoles were KSR-33 Teletypes; their
+character sets were basically ASCII.  The PDP-7's and PDP-9's line
+printers used sixbit encoding (ASCII codes 040 - 0137 masked to six
+bits).  The PDP-15's I/O devices were all ASCII.  The following table
+provides equivalences between ASCII characters and the PDP-4's I/O devices.
+In the console table, FG stands for figures (upper case).
+
+		 PDP-4			   PDP-4
+ASCII		console	 		line printer
+
+000 - 006	none			none
+bell		FG+024			none
+010 - 011	none			none
+lf		010			none
+013 - 014	none			none
+cr		002			none
+016 - 037	none			none
+space		004	     		000
+!		FG+026			none
+"		FG+021			none
+#		FG+005			none
+$		FG+062			none
+%		none			none
+&		FG+013			none
+'		FG+032			none
+(		FG+036			057
+)		FG+011			055
+*		none			072
++		none			074
+,		FG+006			033
+-		FG+030			054
+.		FG+007			073
+/		FG+027			021
+0		FG+015			020
+1		FG+035			001
+2		FG+031			002
+3		FG+020			003
+4		FG+012			004
+5		FG+001			005
+6		FG+025			006
+7		FG+034			007
+8		FG+014			010
+9		FG+003			011
+:		FG+016			none
+;		FG+017			none
+<		none			034
+=		none			053
+>		none			034
+?		FG+023			037
+@		none			{MID DOT} 040
+A		030			061
+B		023			062
+C		016			063
+D		022			064
+E		020			065
+F		026			066
+G		013			067
+H		005			070
+I		014			071
+J		032			041
+K		036			042
+L		011			043
+M		007			044
+N		006			045
+O		003			046
+P		015			047
+Q		035			050
+R		012			051
+S		024			022
+T		001			023
+U		034			024
+V		017			025
+W		031			026
+X		027			027
+Y		025			030
+Z		021			031
+[		none			none
+\		none			{OVERLINE} 056
+]		none			none
+^		none			{UP ARROW} 035
+_		none			UC+040
+0140 - 0177	none			none
