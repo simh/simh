@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	15-Jul-2003
+Date:	15-Sep-2003
 
 			COPYRIGHT NOTICE
 
@@ -35,6 +35,10 @@ This memorandum documents the PDP-11 simulator.
 
 
 1. Simulator Files
+
+To compile the PDP-11, you must define VM_PDP11 as part of the compilation
+command line.  If you want expanded file support, you must also define USE_INT64
+and USE_ADDR64 as part of the compilation command line.
 
 sim/		sim_defs.h
 		sim_ether.h
@@ -277,7 +281,7 @@ disabled and then RY is enabled, RY is assigned the fixed "first instance"
 I/O address for floppy disks.
 
 Autoconfiguration cannot solve address conflicts between devices with
-overlapping fixed address.  For example, with default I/O page addressing,
+overlapping fixed addresses.  For example, with default I/O page addressing,
 the PDP-11 can support either a TM11 or a TS11, but not both, since they use
 the same I/O addresses.
 
@@ -683,7 +687,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.5.2 RK611/RK06,RK07 Cartridge Disk (RL)
+2.5.2 RK611/RK06,RK07 Cartridge Disk (HK)
 
 RK611 options include the ability to set units write enabled or write
 locked, to set the drive size to RK06, RK07, or autosize, and to write

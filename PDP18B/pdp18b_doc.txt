@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	18b PDP Simulator Usage
-Date:	25-Jul-2003
+Date:	25-Aug-2003
 
 			COPYRIGHT NOTICE
 
@@ -150,15 +150,17 @@ The 18b PDP simulators implement several unique stop conditions:
 
 	- an unimplemented instruction is decoded, and register
 	  STOP_INST is set
-	- more than XCTMAX nested executes are detected during
+	- more than XCT_MAX nested executes are detected during
 	  instruction execution
+	- an FP15 instruction is decoded, the FP15 is disabled,
+	  and register STOP_FPP is set
 
 The PDP-4 and PDP-7 LOAD command supports only "second stage" RIM format
 files (alternating DAC address instructions and data):
 
 	LOAD file			load PDP-4/PDP-7 RIM format file
 
-The PDP-9 and PDP-15 LOAD commands upports hardware RIM format (data only),
+The PDP-9 and PDP-15 LOAD commands support hardware RIM format (data only),
 PDP-4/PDP-7 RIM loader format (for compatability with Macro7), and BIN
 loader format:
 
@@ -238,6 +240,7 @@ control registers for the interrupt system.
 	all	IORS		18	IORS register
 	all	ION		1	interrupt enable
 	all	ION_DELAY	2	interrupt enable delay
+	15	ION_INH		1	interrupt inhibit
 	9,15	APIENB		1	API enable
 	9,15	APIREQ		8	API requesting levels
 	9,15	APIACT		8	API active levels
@@ -264,6 +267,7 @@ control registers for the interrupt system.
 	all	PCQ[0:63]	addr	PC prior to last JMP, JMS, CAL, or
 					interrupt; most recent PC change first
 	all	STOP_INST	1	stop on undefined instruction
+	all	XCT_MAX		8	maximum number of chained XCT's allowed
 	all	WRU		8	interrupt character
 
 "addr" signifies the address width of the system (13b for the PDP-4, 15b for
@@ -291,6 +295,8 @@ The FPP implements these registers:
 	FMQH		17	FMQ<1:17>
 	FMQL		18	FMQ<18:35>
 	JEA		18	exception address register
+	STOP_FPP	1	stop if FP15 instruction decoded
+				while FP15 is disabled
 
 2.3 Programmed I/O Devices
 
@@ -308,7 +314,7 @@ recognized vary from system to system:
 			  it running
 	BOOT -H PTR	PDP-7: start hardware RIM load at address given
 			  by address switches (ASW)
-	BOOT {-H} PTR	PDP-9, PDP-15: start hardware RIM load at addrss
+	BOOT {-H} PTR	PDP-9, PDP-15: start hardware RIM load at address
 			  given by address switches (ASW)
 
 The PDP-4 did not have a hardware read-in mode load capability.
@@ -398,7 +404,7 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
-If the simulator is compiled under Windows Visual C++, typing ^C to the
+If the simulator is debugged under Windows Visual C++, typing ^C to the
 terminal input causes a fatal run-time error.  Use the following command
 to simulate typing ^C:
 
@@ -670,7 +676,7 @@ from the attached file:
 	SET RF 6P		six platters (1536K)
 	SET RF 7P		seven platters (1792K)
 	SET RF 8P		eight platters (2048K)
-	SET RF AUTOSIZE		autosized on attach
+	SET RF AUTOSIZE		autosize on attach
 
 The default is AUTOSIZE.
 
@@ -720,10 +726,10 @@ locked.
 
 Units can also be set ONLINE or OFFLINE.
 
-The Type 550, TC02, and TC15 support supports PDP-8 format, PDP-11 format,
-and 18b format DECtape images.  ATTACH tries to determine the tape
-format from the DECtape image; the user can force a particular format
-with switches:
+The Type 550, TC02, and TC15 support PDP-8 format, PDP-11 format, and
+18b format DECtape images.  ATTACH tries to determine the tape format
+from the DECtape image; the user can force a particular format with
+switches:
 
 	-r			PDP-8 format
 	-s			PDP-11 format

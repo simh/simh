@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-1 Simulator Usage
-Date:	15-Jul-2003
+Date:	15-Sep-2003
 
 			COPYRIGHT NOTICE
 
@@ -71,15 +71,25 @@ The PDP-1 simulator implements the following unique stop conditions:
 
 	- an unimplemented instruction is decoded, and register
 	  STOP_INST is set
-	- more than INDMAX indirect addresses are detected during
+	- more than IND_MAX indirect addresses are detected during
 	  memory reference address decoding
-	- more than XCTMAX nested executes are detected during
+	- more than XCT_MAX nested executes are detected during
 	  instruction execution
 	- I/O wait, and no I/O operations outstanding (i.e, no I/O
 	  completion will ever occur)
 
-The PDP-1 loader supports RIM format tapes.  The DUMP command is not
-implemented.
+The PDP-1 loader supports RIM format tapes and BLK format tapes.  If
+the file to be loaded has an extension of .BIN, or switch -B is specified,
+the file is assumed to be BLK format; otherwise, it defaults to RIM
+format.  LOAD takes an optional argument which specifies the starting
+address of the field to be loaded:
+
+	LOAD lisp.rim		-- load RIM format file lisp.rim
+	LOAD ddt.rim 70000	-- load RIM format file ddt.rim into
+				   the field starting at 70000
+	LOAD -B macro.blk	-- load BLK format file macro.blk
+
+The DUMP command is not implemented.
 
 2.1 CPU
 
@@ -114,6 +124,7 @@ control registers for the interrupt system.
 	OV		1	overflow flag
 	PF		6	program flags<1:6>
 	SS		6	sense switches<1:6>
+	TA		16	address switches
 	TW		18	test word (front panel switches)
 	EXTM		1	extend mode
 	IOSTA		18	IO status register
@@ -121,12 +132,14 @@ control registers for the interrupt system.
 	SBRQ		1	sequence break request
 	SBIP		1	sequence break in progress
 	IOH		1	I/O halt in progress
-	IOC		1	I/O continue
+	IOS		1	I/O synchronizer (completion)
 	PCQ[0:63]	16	PC prior to last jump or interrupt;
 				most recent PC change first
 	STOP_INST	1	stop on undefined instruction
 	SBS_INIT	1	initial state of sequence break enable
 	EXTM_INIT	1	initial state of extend mode
+	XCT_MAX		8	maximum XCT chain
+	IND_MAX		8	maximum nested indirect addresses
 	WRU		8	interrupt character
 
 2.2 Programmed I/O Devices
@@ -138,7 +151,9 @@ register specifies the number of the next data item to be read.  Thus,
 by changing POS, the user can backspace or advance the reader.
 
 The paper tape reader supports the BOOT command.  BOOT PTR copies the
-RIM loader into memory and starts it running.
+RIM loader into memory and starts it running.  BOOT PTR loads into the
+field selected by TA<0:3> (the high order four bits of the address
+switches).
 
 The paper tape reader implements these registers:
 
@@ -192,11 +207,11 @@ Error handling is as follows:
 2.2.3 Console Typewriter (TTY)
 
 The Typewriter is a half-duplex electric typewriter (originally a
-Friden Flexowriter, later an IBM Sorobon B).  It has only a single
-buffer and a single carriage state but distinct input and output
-done and interrupt flags.  The typewriter input (TTY unit 0) polls
-the console keyboard for input.  The typewriter output (TTY unit 1)
-writes to the simulator console window.
+Friden Flexowriter, later a Sorobon-modified IBM B).  It has only a
+single buffer and a single carriage state but distinct input and
+output done and interrupt flags.  The typewriter input (TTY unit 0)
+polls the console keyboard for input.  The typewriter output (TTY
+unit 1) writes to the simulator console window.
 
 The typewriter implements these registers:
 
@@ -246,8 +261,8 @@ Error handling is as follows:
 
 2.3 Type 550/555 Microtape (DECtape) (DT)
 
-The PDP-1 used the Type 550 Microtape (later renamed DECtape), a programmed
-I/O controller.  PDP-1 DECtape format had 4 18b words in its block headers
+The PDP-1 uses the Type 550 Microtape (later renamed DECtape), a programmed
+I/O controller.  PDP-1 DECtape format has 4 18b words in its block headers
 and trailers.
 
 DECtapes drives are numbered 1-8; in the simulator, drive 8 is unit 0.
@@ -388,7 +403,7 @@ where immediate is in the range 0 to 07777.
 
 2.6 Character Sets
 
-The PDP-1's console was a Frieden Flexowriter; its character encoding
+The PDP-1's first console was a Frieden Flexowriter; its character encoding
 was known as FIODEC.  The PDP-1's line printer used a modified Hollerith
 character set.  The following table provides equivalences between ASCII
 characters and the PDP-1's I/O devices.  In the console table, UC stands

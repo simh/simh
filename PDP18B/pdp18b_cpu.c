@@ -25,6 +25,9 @@
 
    cpu		PDP-4/7/9/15 central processor
 
+   31-Aug-03	RMS	Added instruction history
+			Fixed PDP-15-specific implementation of API priorities
+   16-Aug-03	RMS	Fixed PDP-15-specific handling of EAE unsigned mul/div
    27-Jul-03	RMS	Added FP15 support
 			Added XVM support
 			Added EAE option to PDP-4
@@ -274,6 +277,18 @@
 #define UNIT_XVM	(1 << UNIT_V_XVM)
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
+#define HIST_SIZE	4096
+#define HIST_API	0x40000000
+#define HIST_PI		0x20000000
+#define HIST_M_LVL	0x3F
+#define HIST_V_LVL	6
+struct InstHistory {
+	int32		pc;
+	int32		ir;
+	int32		ir1;
+	int32		lac;
+	int32		mq; };
+
 #define XVM		(cpu_unit.flags & UNIT_XVM)
 #define RELOC		(cpu_unit.flags & UNIT_RELOC)
 #define PROT		(cpu_unit.flags & UNIT_PROT)
@@ -338,6 +353,9 @@ int16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 #endif
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
+int32 hst_p = 0;					/* history pointer */
+int32 hst_lnt = 0;					/* history length */
+static struct InstHistory hst[HIST_SIZE] = { { 0 } };	/* instruction history */
 
 extern int32 sim_int_char;
 extern int32 sim_interval;
@@ -350,6 +368,10 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+void cpu_inst_hist (int32 addr, int32 inst);
+void cpu_intr_hist (int32 flag, int32 lvl);
 int32 upd_iors (void);
 int32 api_eval (int32 *pend);
 t_stat Read (int32 ma, int32 *dat, int32 cyc);
@@ -511,6 +533,8 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 114688, NULL, "112K", &cpu_set_size },
 	{ UNIT_MSIZE, 131072, NULL, "128K", &cpu_set_size },
 #endif
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "HISTORY", "HISTORY",
+	  &cpu_set_hist, &cpu_show_hist },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -564,7 +588,7 @@ if (trap_pending) {					/* trap pending? */
 	Write (0, MB, WR);				/* save in 0 */
 	PC = 2;  }					/* fetch next from 2 */
 #endif
-if (ion && !ion_defer && int_pend) {			/* interrupt? */
+if (int_pend && ion && !ion_defer) {			/* interrupt? */
 	PCQ_ENTRY;					/* save old PC */
 	MB = Jms_word (usmd);				/* save state */
 	ion = 0;					/* interrupts off */
@@ -599,6 +623,7 @@ if (trap_pending) {					/* trap pending? */
 
 if (api_int && !ion_defer) {				/* API intr? */
 	int32 i, lvl = api_int - 1;			/* get req level */
+	if (hst_lnt) cpu_intr_hist (HIST_API, lvl);	/* record */
 	api_act = api_act | (API_ML0 >> lvl);		/* set level active */
 	if (lvl >= API_HLVL) {				/* software req? */
 	    MA = ACH_SWRE + lvl - API_HLVL;		/* vec = 40:43 */
@@ -619,13 +644,16 @@ if (api_int && !ion_defer) {				/* API intr? */
 	xct_count = 0;
 	goto xct_instr;  }
 
-if (!(api_enb && api_act) && ion && !ion_defer && int_pend) {
+if (int_pend && ion && !ion_defer &&			/* int pending, enabled? */
+	!(api_enb && (api_act & API_MASKPI))) {		/* API off or not masking PI? */
 	PCQ_ENTRY;					/* save old PC */
+	if (hst_lnt) cpu_intr_hist (HIST_PI, 0);	/* record */
 	MB = Jms_word (usmd);				/* save state */
 	ion = 0;					/* interrupts off */
 #if defined (PDP9)					/* PDP-9, */
 	memm = 0;					/* extend off */
 #else							/* PDP-15 */
+	ion_defer = 2;					/* free instruction */
 	if (!(cpu_unit.flags & UNIT_NOAPI)) {		/* API? */
 	    api_act = api_act | API_ML3;		/* set lev 3 active */
 	    api_int = api_eval (&int_pend);  }		/* re-evaluate */
@@ -651,6 +679,7 @@ PC = Incr_addr (PC);					/* increment PC */
 
 xct_instr:						/* label for XCT */
 if (Read (MA, &IR, FE)) continue;			/* fetch instruction */
+if (hst_lnt) cpu_inst_hist (MA, IR);			/* history? */
 if (ion_defer) ion_defer = ion_defer - 1;		/* count down defer */
 if (sim_interval) sim_interval = sim_interval - 1;
 
@@ -971,7 +1000,7 @@ case 036:						/* OPR, dir */
 	case 7:						/* RTL RTR */
 #if defined (PDP15)					/* PDP-15 */
 	    LAC = ((LAC >> 9) & 0777) | ((LAC & 0777) << 9) |
-		(LAC & LINK);			/* BSW */
+		(LAC & LINK);				/* BSW */
 #else							/* PDP-4,-7,-9 */
 	    reason = stop_inst;				/* undefined */
 #endif
@@ -1014,6 +1043,12 @@ case 033: case 032:					/* EAE */
 	    if (IR & 02) LAC = LAC | MQ;		/* IR<16>? or MQ */
 	    if (IR & 01) LAC = LAC | ((-SC) & 077);	/* IR<17>? or SC */
 	    break;
+
+/* EAE, continued
+
+   Multiply uses a shift and add algorithm.  The PDP-15, unlike prior
+   implementations, factors IR<6> (signed multiply) into the calculation
+   of the result sign. */
 
 	case 1:						/* multiply */
 	    if (Read (PC, &MB, FE)) break;		/* get next word */
@@ -1027,20 +1062,19 @@ case 033: case 032:					/* EAE */
 		LAC = LAC >> 1;				/* shift AC'MQ right */
 		SC = (SC - 1) & 077;  }			/* decrement SC */
 	    while (SC != 0);				/* until SC = 0 */
+#if defined (PDP15)
+	    if ((IR & 0004000) && (eae_ac_sign ^ link_init)) {
+#else
 	    if (eae_ac_sign ^ link_init) {		/* result negative? */
+#endif
 		LAC = LAC ^ DMASK;
 		MQ = MQ ^ DMASK;  }
 	    break;
-
-/* EAE, continued
 
-   Divide uses a non-restoring divide.  This code duplicates the PDP-7
-   algorithm, except for its use of two's complement arithmetic instead
-   of 1's complement.
-
-   The quotient is generated in one's complement form; therefore, the
-   quotient is complemented if the input operands had the same sign
-   (that is, if the quotient is positive). */
+/* Divide uses a non-restoring divide.  Divide uses a subtract and shift
+   algorithm.  The quotient is generated in true form.  The PDP-15, unlike
+   prior implementations, factors IR<6> (signed multiply) into the calculation
+   of the result sign.*/
 
 	case 3:						/* divide */
 	    if (Read (PC, &MB, FE)) break;		/* get next word */
@@ -1058,12 +1092,17 @@ case 033: case 032:					/* EAE */
 		t = (LAC >> 18) & 1;			/* quotient bit */
 		if (SC > 1) LAC =			/* skip if last */
 		    ((LAC << 1) | (MQ >> 17)) & LACMASK;
-		MQ = ((MQ << 1) | t) & DMASK;		/* shift in quo bit */
+		MQ = ((MQ << 1) | (t ^ 1)) & DMASK;	/* shift in quo bit */
 		SC = (SC - 1) & 077;  }			/* decrement SC */
 	    while (SC != 0);				/* until SC = 0 */
 	    if (t) LAC = (LAC + MB) & LACMASK;
-	    if (eae_ac_sign) LAC = LAC ^ DMASK;	/* sgn rem = sgn divd */
-	    if ((eae_ac_sign ^ link_init) == 0) MQ = MQ ^ DMASK;
+	    if (eae_ac_sign) LAC = LAC ^ DMASK;		/* sgn rem = sgn divd */
+#if defined (PDP15)
+	    if ((IR & 0004000) && (eae_ac_sign ^ link_init))
+#else
+	    if (eae_ac_sign ^ link_init)		/* result negative? */
+#endif
+	        MQ = MQ ^ DMASK;
 	    break;
 
 /* EAE, continued
@@ -1212,7 +1251,7 @@ case 035:						/* index operates */
 case 034:						/* IOT */
 #if defined (PDP15)
 	if (IR & 0010000) {				/* floating point? */
-	    fp15 (IR);					/* process */
+	    reason = fp15 (IR);				/* process */
 	    break;  }
 #endif
 	if ((api_usmd | usmd) &&			/* user, not XVM UIOT? */
@@ -1286,7 +1325,9 @@ case 034:						/* IOT */
 	    break;
 	case 033:					/* CPU control */
 	    if ((pulse == 001) || (pulse == 041)) PC = Incr_addr (PC);
-	    else if (pulse == 002) reset_all (1);	/* CAF - skip CPU */
+	    else if (pulse == 002) {			/* CAF */
+		reset_all (1);				/* reset all exc CPU */
+		api_enb = api_req = api_act = 0;  }	/* reset API system */
 	    else if (pulse == 044) rest_pending = 1;	/* DBR */
 	    if (((cpu_unit.flags & UNIT_NOAPI) == 0) && (pulse & 004)) {
 		int32 t = api_ffo[api_act & 0377];
@@ -1348,7 +1389,9 @@ case 034:						/* IOT */
 	    break;
 	case 033:					/* CPU control */
 	    if ((pulse == 001) || (pulse == 041)) PC = Incr_addr (PC);
-	    else if (pulse == 002) reset_all (2);	/* CAF - skip CPU, FP15 */
+	    else if (pulse == 002) {			/* CAF */
+		reset_all (2);				/* reset all exc CPU, FP15 */
+		api_enb = api_req = api_act = 0;  }	/* reset API system */
 	    else if (pulse == 044) rest_pending = 1;	/* DBR */
 	    if (((cpu_unit.flags & UNIT_NOAPI) == 0) && (pulse & 004)) {
 		int32 t = api_ffo[api_act & 0377];
@@ -1880,4 +1923,84 @@ for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {	/* add devices */
 	    }						/* end if enb */
 	}						/* end for i */
 return FALSE;
+}
+
+/* Set history */
+
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i, lnt;
+t_stat r;
+
+if (cptr == NULL) {
+	for (i = 0; i < HIST_SIZE; i++) hst[i].pc = 0;
+	return SCPE_OK;  }
+lnt = (int32) get_uint (cptr, 10, HIST_SIZE, &r);
+if (r != SCPE_OK) return SCPE_ARG;
+hst_lnt = lnt;
+return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 l, j, k, di;
+t_value sim_eval[2];
+struct InstHistory *h;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+	UNIT *uptr, int32 sw);
+
+if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+di = hst_p + HIST_SIZE - hst_lnt;			/* work forward */
+for (k = 0; k < hst_lnt; k++) {				/* print specified */
+	h = &hst[(di++) % HIST_SIZE];			/* entry pointer */
+	if (h->pc == 0) continue;			/* filled in? */
+	if (h->pc & (HIST_API | HIST_PI)) {		/* interrupt event? */
+	    if (h->pc & HIST_PI)			/* PI? */
+		fprintf (st, "%06o PI LVL 0-4 =", h->pc & AMASK);
+		else fprintf (st, "%06o API %d LVL 0-4 =", h->pc & AMASK, h->mq);
+	    for (j = API_HLVL; j >= 0; j--)
+		fprintf (st, " %02o", (h->ir >> (j * HIST_V_LVL)) & HIST_M_LVL);
+	    }
+	else {						/* instruction */
+	    l = (h->lac >> 18) & 1;			/* link */
+	    fprintf (st, "%06o %o %06o %06o ", h->pc, l, h->lac & DMASK, h->mq);
+	    sim_eval[0] = h->ir;
+	    sim_eval[1] = h->ir1;
+	    if ((fprint_sym (st, h->pc, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+		fprintf (st, "(undefined) %06o", h->ir);
+	    }						/* end else instruction */
+	fputc ('\n', st);				/* end line */
+	}						/* end for */
+return SCPE_OK;
+}
+
+/* Record events in history table */
+
+void cpu_inst_hist (int32 addr, int32 inst)
+{
+hst[hst_p].pc = addr;
+hst[hst_p].ir = inst;
+if (cpu_ex (&hst[hst_p].ir1, (addr + 1) & AMASK, &cpu_unit, SWMASK ('V')))
+	hst[hst_p].ir1 = 0;
+hst[hst_p].lac = LAC;
+hst[hst_p].mq = MQ;
+hst_p = (hst_p + 1) % HIST_SIZE;
+return;
+}
+
+void cpu_intr_hist (int32 flag, int32 lvl)
+{
+int32 j;
+
+hst[hst_p].pc = PC | flag;
+hst[hst_p].ir = 0;
+for (j = 0; j < API_HLVL+1; j++) hst[hst_p].ir = 
+	(hst[hst_p].ir << HIST_V_LVL) | (int_hwre[j] & HIST_M_LVL);
+hst[hst_p].ir1 = 0;
+hst[hst_p].lac = 0;
+hst[hst_p].mq = lvl;
+hst_p = (hst_p + 1) % HIST_SIZE;
+return;
 }

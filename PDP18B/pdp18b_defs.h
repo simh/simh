@@ -45,6 +45,9 @@
    Al Kossow and Max Burnet in making documentation and software available.
 */
 
+#ifndef _PDP18B_DEFS_H_
+#define _PDP18B_DEFS_H_	0
+
 #include "sim_defs.h"					/* simulator defns */
 
 /* Models: only one should be defined
@@ -52,7 +55,7 @@
    model memory	CPU options		I/O options
 
    PDP4	   8K	Type 18 EAE		Type 65 KSR-28 Teletype (Baudot)
-					integral paper tape reader
+		??Type 16 mem extension	integral paper tape reader
 					Type 75 paper tape punch
 					integral real time clock
 					Type 62 line printer (Hollerith)
@@ -61,7 +64,7 @@
 
    PDP7	   32K	Type 177 EAE		Type 649 KSR-33 Teletype
 		Type 148 mem extension	Type 444 paper tape reader
-		??KA70A bounds control	Type 75 paper tape punch
+					Type 75 paper tape punch
 					integral real time clock
 					Type 647B line printer (sixbit)
 					Type 550/555 DECtape
@@ -106,6 +109,7 @@
 #define STOP_API	5				/* invalid API int */
 #define STOP_NONSTD	6				/* non-std dev num */
 #define STOP_MME	7				/* mem mgt error */
+#define STOP_FPDIS	8				/* fp inst, fpp disabled */
 
 /* Peripheral configuration */
 
@@ -244,7 +248,7 @@ struct pdp18b_dib {
 	uint32		dev;				/* base dev number */
 	uint32		num;				/* number of slots */
 	int32		(*iors)(void);			/* IORS responder */
-	int32		(*dsp[DEV_MAXBLK])(int32 IR, int32 dat);
+	int32		(*dsp[DEV_MAXBLK])(int32 pulse, int32 dat);
 };
 
 typedef struct pdp18b_dib DIB;
@@ -316,6 +320,12 @@ typedef struct pdp18b_dib DIB;
 #define API_ML5		0004
 #define API_ML6		0002
 #define API_ML7		0001				/* level 7 */
+
+#if defined (PDP9)					/* levels which mask PI */
+#define API_MASKPI	(API_ML0|API_ML1|API_ML2|API_ML3|API_ML4|API_ML5|API_ML6|API_ML7)
+#else
+#define API_MASKPI	(API_ML0|API_ML1|API_ML2|API_ML3)
+#endif
 
 #define API_HLVL	4				/* hwre levels */
 #define ACH_SWRE	040				/* swre int vec */
@@ -436,7 +446,7 @@ typedef struct pdp18b_dib DIB;
    14	card pun error					lpt flag*
    15	lpt flag*	lpt flag*	lpt flag*
    16	lpt space flag*	lpt error flag	lpt error flag
-   17			drum flag*	drum flag*
+   17	drum flag*	drum flag*
 */
 
 #define IOS_ION		0400000				/* interrupts on */
@@ -473,3 +483,6 @@ typedef struct pdp18b_dib DIB;
 
 t_stat set_devno (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_devno (FILE *st, UNIT *uptr, int32 val, void *desc);
+
+#endif
+

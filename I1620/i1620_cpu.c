@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   21-Aug-03	RMS	Fixed bug in immediate index add (found by Michael Short)
    25-Apr-03	RMS	Changed t_addr to uint32 throughout
    18-Oct-02	RMS	Fixed bugs in invalid result testing (found by Hans Pufal)
 
@@ -137,7 +138,7 @@ t_stat xmt_index (uint32 d, uint32 s);
 t_stat xmt_divd (uint32 d, uint32 s);
 t_stat xmt_tns (uint32 d, uint32 s);
 t_stat xmt_tnf (uint32 d, uint32 s);
-t_stat add_field (uint32 d, uint32 s, t_bool sub, t_bool sto, int32 *sta);
+t_stat add_field (uint32 d, uint32 s, t_bool sub, t_bool sto, uint32 skp, int32 *sta);
 uint32 add_one_digit (uint32 dst, uint32 src, uint32 *cry);
 t_stat mul_field (uint32 mpc, uint32 mpy);
 t_stat mul_one_digit (uint32 mpyd, uint32 mpcp, uint32 prop, uint32 last);
@@ -612,21 +613,21 @@ case OP_BNI:
 
 case OP_A:
 case OP_AM:
-	reason = add_field (PAR, QAR, FALSE, TRUE, &sta); /* add, store */
+	reason = add_field (PAR, QAR, FALSE, TRUE, 0, &sta); /* add, store */
 	if (sta == ADD_CARRY) ind[IN_OVF] = 1;		/* cout => ovflo */
 	if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
 	break;
 
 case OP_S:
 case OP_SM:
-	reason = add_field (PAR, QAR, TRUE, TRUE, &sta); /* sub, store */
+	reason = add_field (PAR, QAR, TRUE, TRUE, 0, &sta); /* sub, store */
 	if (sta == ADD_CARRY) ind[IN_OVF] = 1;		/* cout => ovflo */
 	if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
 	break;
 
 case OP_C:
 case OP_CM:
-	reason = add_field (PAR, QAR, TRUE, FALSE, &sta); /* sub, nostore */
+	reason = add_field (PAR, QAR, TRUE, FALSE, 0, &sta); /* sub, nostore */
 	if (sta == ADD_CARRY) ind[IN_OVF] = 1;		/* cout => ovflo */
 	if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
 	break;
@@ -720,8 +721,8 @@ case OP_MA:
 case OP_BLX:
 case OP_BLXM:
 	idx = get_idx (ADDR_A (saved_PC, I_QL - 1));	/* get index */
-	if (idx < 0) {					/* invalid? */
-	    reason = STOP_INVIDX;			/* stop for now */
+	if (idx < 0) {					/* disabled? */
+	    reason = STOP_INVIDX;			/* stop */
 	    break;  }
 	xmt_index (GET_IDXADDR (idx), QAR);		/* copy Q to idx */
 	BRANCH (PAR);					/* branch to P */
@@ -731,8 +732,8 @@ case OP_BLXM:
 
 case OP_BSX:
 	idx = get_idx (ADDR_A (saved_PC, I_QL - 1));	/* get index */
-	if (idx < 0) {					/* invalid? */
-	    reason = STOP_INVIDX;			/* stop for now */
+	if (idx < 0) {					/* disabled? */
+	    reason = STOP_INVIDX;			/* stop */
 	    break;  }
 	xmt_index (QAR, GET_IDXADDR (idx));		/* copy idx to Q */
 	BRANCH (PAR);					/* branch to P */
@@ -741,12 +742,21 @@ case OP_BSX:
 /* Branch and modify index - P,Q are valid, Q not indexed */
 
 case OP_BX:
+	idx = get_idx (ADDR_A (saved_PC, I_QL - 1));	/* get index */
+	if (idx < 0) {					/* disabled? */
+	    reason = STOP_INVIDX;			/* stop */
+	    break;  }
+	reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 0, &sta);
+	if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
+	BRANCH (PAR);					/* branch to P */
+	break;
+
 case OP_BXM:
 	idx = get_idx (ADDR_A (saved_PC, I_QL - 1));	/* get index */
-	if (idx < 0) {					/* invalid? */
-	    reason = STOP_INVIDX;			/* stop for now */
+	if (idx < 0) {					/* disabled? */
+	    reason = STOP_INVIDX;			/* stop */
 	    break;  }
-	reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, &sta);
+	reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 3, &sta);
 	if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
 	BRANCH (PAR);					/* branch to P */
 	break;
@@ -754,12 +764,22 @@ case OP_BXM:
 /* Branch conditionally and modify index - P,Q are valid, Q not indexed */
 
 case OP_BCX:
+	idx = get_idx (ADDR_A (saved_PC, I_QL - 1));	/* get index */
+	if (idx < 0) {					/* disabled? */
+	    reason = STOP_INVIDX;			/* stop */
+	    break;  }
+	reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 0, &sta);
+	if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
+	if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {	/* ~z, ~c, ~sign chg? */
+	    BRANCH (PAR);  }				/* branch */
+	break;
+
 case OP_BCXM:
 	idx = get_idx (ADDR_A (saved_PC, I_QL - 1));	/* get index */
-	if (idx < 0) {					/* invalid? */
-	    reason = STOP_INVIDX;			/* stop for now */
+	if (idx < 0) {					/* disabled? */
+	    reason = STOP_INVIDX;			/* stop */
 	    break;  }
-	reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, &sta);
+	reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 3, &sta);
 	if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
 	if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {	/* ~z, ~c, ~sign chg? */
 	    BRANCH (PAR);  }				/* branch */
@@ -1145,6 +1165,7 @@ return SCPE_OK;
 	s	=	source field low (Q)
 	sub	=	TRUE if subtracting
 	sto	=	TRUE if storing
+	skp	=	number of source field flags, beyond sign, to ignore
    Output:
 	return	=	status
 	sta	=	ADD_NOCRY: no carry out, no sign change
@@ -1155,7 +1176,7 @@ return SCPE_OK;
    is retained."
 */
 
-t_stat add_field (uint32 d, uint32 s, t_bool sub, t_bool sto, int32 *sta)
+t_stat add_field (uint32 d, uint32 s, t_bool sub, t_bool sto, uint32 skp, int32 *sta)
 {
 uint32 cry, src, dst, res, comp, dp, dsv;
 uint32 src_f = 0, cnt = 0, dst_f;
@@ -1180,7 +1201,7 @@ do {	dst = M[d] & DIGIT;				/* get dst digit */
 	if (src_f) src = 0;				/* src done? src = 0 */
 	else {
 	    src = M[s] & DIGIT;				/* get src digit */
-	    src_f = M[s] & FLAG;			/* get src flag */
+	    if (cnt >= skp) src_f = M[s] & FLAG;	/* get src flag */
 	    MM (s);  } 					/* decr src addr */
 	if (BAD_DIGIT (dst) || BAD_DIGIT (src))		/* bad digit? */
 	    return STOP_INVDIG;

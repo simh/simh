@@ -28,6 +28,9 @@
    tti		keyboard
    tto		teleprinter
 
+   07-Sep-03	RMS	Changed ioc to ios
+   30-Aug-03	RMS	Revised PTR to conform to Maintenance Manual;
+			added deadlock prevention on errors
    23-Jul-03	RMS	Revised to detect I/O wait hang
    25-Apr-03	RMS	Revised for extended file support
    22-Dec-02	RMS	Added break support
@@ -54,13 +57,15 @@
 #define TTO		1
 
 int32 ptr_state = 0;
+int32 ptr_wait = 0;
 int32 ptr_stopioe = 0;
 int32 ptp_stopioe = 0;
 int32 tti_hold = 0;					/* tti hold buf */
 int32 tty_buf = 0;					/* tty buffer */
 int32 tty_uc = 0;					/* tty uc/lc */
 
-extern int32 sbs, ioc, cpls, iosta, PF, IO, PC;
+extern int32 sbs, ios, ioh, cpls, iosta;
+extern int32 PF, IO, PC, TA;
 extern int32 M[];
 
 t_stat ptr_svc (UNIT *uptr);
@@ -126,6 +131,7 @@ REG ptr_reg[] = {
 	{ FLDATA (DONE, iosta, IOS_V_PTR) },
 	{ FLDATA (RPLS, cpls, CPLS_V_PTR) },
 	{ ORDATA (STATE, ptr_state, 5), REG_HRO },
+	{ FLDATA (WAIT, ptr_wait, 0), REG_HRO },
 	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
@@ -195,19 +201,36 @@ DEVICE tty_dev = {
 	NULL, NULL, NULL,
 	NULL, 0 };
 
-/* Paper tape reader: IOT routine */
+/* Paper tape reader: IOT routine.  Points to note:
+
+   - RPA (but not RPB) complements the reader clutch control.  Thus,
+     if the reader is running, RPA will stop it.
+   - The status bit indicates data in the reader buffer that has not
+     been transfered to IO.  It is cleared by any RB->IO operation,
+     including RRB and the completion pulse.
+   - A reader error on a wait mode operation could hang the simulator.
+     IOH is set; any retry (without RESET) will be NOP'd.  Accordingly,
+     the PTR service routine clears IOH on any error during a rpa/rpb i.
+*/
 
 int32 ptr (int32 inst, int32 dev, int32 dat)
 {
-iosta = iosta & ~IOS_PTR;				/* clear flag */
-if (dev == 0030) return ptr_unit.buf;			/* RRB */
-ptr_state = (dev == 0002)? 18: 0;			/* mode = bin/alp */
+if (dev == 0030) {					/* RRB */
+	iosta = iosta & ~IOS_PTR;			/* clear status */
+	return ptr_unit.buf;  }				/* return data */
+if (dev == 0002) ptr_state = 18;			/* RPB, mode = binary */
+else if (sim_is_active (&ptr_unit)) {			/* RPA, running? */
+	sim_cancel (&ptr_unit);				/* stop reader */
+	return dat;  }
+else ptr_state = 0;					/* mode = alpha */
 ptr_unit.buf = 0;					/* clear buffer */
+if (inst & IO_WAIT) ptr_wait = 1;			/* set ptr wait */
+else ptr_wait = 0;					/* from IR<5> */
 if (GEN_CPLS (inst)) {					/* comp pulse? */
-	ioc = 0;
+	ios = 0;
 	cpls = cpls | CPLS_PTR;  }
 else cpls = cpls & ~CPLS_PTR;
-sim_activate (&ptr_unit, ptr_unit.wait);
+sim_activate (&ptr_unit, ptr_unit.wait);		/* start reader */
 return dat;
 }
 
@@ -217,11 +240,14 @@ t_stat ptr_svc (UNIT *uptr)
 {
 int32 temp;
 
-if ((ptr_unit.flags & UNIT_ATT) == 0)			/* attached? */
-	return IORETURN (ptr_stopioe, SCPE_UNATT);
+if ((ptr_unit.flags & UNIT_ATT) == 0) {			/* attached? */
+	if (ptr_wait) ptr_wait = ioh = 0;		/* if wait, clr ioh */
+	if ((cpls & CPLS_PTR) || ptr_stopioe) return SCPE_UNATT;
+	return SCPE_OK;  }
 if ((temp = getc (ptr_unit.fileref)) == EOF) {		/* end of file? */
+	if (ptr_wait) ptr_wait = ioh = 0;		/* if wait, clr ioh */
 	if (feof (ptr_unit.fileref)) {
-	    if (ptr_stopioe) printf ("PTR end of file\n");
+	    if ((cpls & CPLS_PTR) || ptr_stopioe) printf ("PTR end of file\n");
 	    else return SCPE_OK;  }
 	else perror ("PTR I/O error");
 	clearerr (ptr_unit.fileref);
@@ -233,11 +259,13 @@ else if (temp & 0200) {					/* binary */
 	ptr_unit.buf = ptr_unit.buf | ((temp & 077) << ptr_state);  }
 if (ptr_state == 0) {					/* done? */
 	if (cpls & CPLS_PTR) {				/* completion pulse? */
+	    iosta = iosta & ~IOS_PTR;			/* clear flag */
 	    IO = ptr_unit.buf;				/* fill IO */
-	    ioc = 1;					/* restart */
+	    ios = 1;					/* restart */
 	    cpls = cpls & ~CPLS_PTR;  }
-	iosta = iosta | IOS_PTR;			/* set flag */
-	sbs = sbs | SB_RQ;  }				/* req seq break */
+	else {						/* no, interrupt */
+	    iosta = iosta | IOS_PTR;			/* set flag */
+	    sbs = sbs | SB_RQ;  }  }			/* req seq break */
 else sim_activate (&ptr_unit, ptr_unit.wait);		/* get next char */
 return SCPE_OK;
 }
@@ -247,6 +275,7 @@ return SCPE_OK;
 t_stat ptr_reset (DEVICE *dptr)
 {
 ptr_state = 0;						/* clear state */
+ptr_wait = 0;
 ptr_unit.buf = 0;
 cpls = cpls & ~CPLS_PTR;
 iosta = iosta & ~IOS_PTR;				/* clear flag */
@@ -272,16 +301,17 @@ return word;
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
 int32 origin, val;
+int32 fld = TA & EPCMASK;
 
 for (;;) {
 	if ((val = ptr_getw (&ptr_unit)) < 0) return SCPE_FMT;
 	if (((val & 0760000) == OP_DIO) ||		/* DIO? */
 	    ((val & 0760000) == OP_DAC)) {		/* hack - Macro1 err */
-	    origin = val & 07777;
+	    origin = val & DAMASK;
 	    if ((val = ptr_getw (&ptr_unit)) < 0) return SCPE_FMT;
-	    M[origin] = val;  }
+	    M[fld | origin] = val;  }
 	else if ((val & 0760000) == OP_JMP) {		/* JMP? */
-	    PC = val & 007777;
+	    PC = fld | (val & DAMASK);
 	    break;  }
 	else return SCPE_FMT;				/* bad instr */
 	}
@@ -295,7 +325,7 @@ int32 ptp (int32 inst, int32 dev, int32 dat)
 iosta = iosta & ~IOS_PTP;				/* clear flag */
 ptp_unit.buf = (dev == 0006)? ((dat >> 12) | 0200): (dat & 0377);
 if (GEN_CPLS (inst)) {					/* comp pulse? */
-	ioc = 0;
+	ios = 0;
 	cpls = cpls | CPLS_PTP;  }
 else cpls = cpls & ~CPLS_PTP;
 sim_activate (&ptp_unit, ptp_unit.wait);		/* start unit */
@@ -307,7 +337,7 @@ return dat;
 t_stat ptp_svc (UNIT *uptr)
 {
 if (cpls & CPLS_PTP) {					/* completion pulse? */
-	ioc = 1;					/* restart */
+	ios = 1;					/* restart */
 	cpls = cpls & ~CPLS_PTP;  }
 iosta = iosta | IOS_PTP;				/* set flag */
 sbs = sbs | SB_RQ;					/* req seq break */
@@ -347,7 +377,7 @@ int32 tto (int32 inst, int32 dev, int32 dat)
 iosta = iosta & ~IOS_TTO;				/* clear flag */
 tty_buf = dat & TT_WIDTH;				/* load buffer */
 if (GEN_CPLS (inst)) {					/* comp pulse? */
-	ioc = 0;
+	ios = 0;
 	cpls = cpls | CPLS_TTO;  }
 else cpls = cpls & ~CPLS_TTO;
 sim_activate (&tty_unit[TTO], tty_unit[TTO].wait);	/* activate unit */
@@ -390,7 +420,7 @@ t_stat tto_svc (UNIT *uptr)
 int32 out;
 
 if (cpls & CPLS_TTO) {					/* completion pulse? */
-	ioc = 1;					/* restart */
+	ios = 1;					/* restart */
 	cpls = cpls & ~CPLS_TTO;  }
 iosta = iosta | IOS_TTO;				/* set flag */
 sbs = sbs | SB_RQ;					/* req seq break */

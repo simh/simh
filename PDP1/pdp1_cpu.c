@@ -25,6 +25,8 @@
 
    cpu		PDP-1 central processor
 
+   07-Sep-03	RMS	Added additional explanation on I/O simulation
+   01-Sep-03	RMS	Added address switches for hardware readin
    23-Jul-03	RMS	Revised to detect I/O wait hang
    05-Dec-02	RMS	Added drum support
    06-Oct-02	RMS	Revised for V2.10
@@ -49,7 +51,7 @@
    	IOSTA		I/O status register
 	SBS<0:2>	sequence break flip flops
 	IOH		I/O halt flip flop
-	IOC		I/O completion flip flop
+	IOS		I/O syncronizer (completion) flip flop
    	EXTM		extend mode
 	PF<1:6>		program flags
 	SS<1:6>		sense switches
@@ -234,12 +236,13 @@ int32 PC = 0;						/* PC */
 int32 OV = 0;						/* overflow */
 int32 SS = 0;						/* sense switches */
 int32 PF = 0;						/* program flags */
+int32 TA = 0;						/* address switches */
 int32 TW = 0;						/* test word */
 int32 iosta = 0;					/* status reg */
 int32 sbs = 0;						/* sequence break */
 int32 sbs_init = 0;					/* seq break startup */
 int32 ioh = 0;						/* I/O halt */
-int32 ioc = 0;						/* I/O completion */
+int32 ios = 0;						/* I/O syncronizer */
 int32 cpls = 0;						/* pending completions */
 int32 extm = 0;						/* ext mem mode */
 int32 extm_init = 0;					/* ext mem startup */
@@ -319,6 +322,7 @@ REG cpu_reg[] = {
 	{ FLDATA (OV, OV, 0) },
 	{ ORDATA (PF, PF, 6) },
 	{ ORDATA (SS, SS, 6) },
+	{ ORDATA (TA, TA, ASIZE) },
 	{ ORDATA (TW, TW, 18) },
 	{ FLDATA (EXTM, extm, 0) },
 	{ ORDATA (IOSTA, iosta, 18), REG_RO },
@@ -326,7 +330,7 @@ REG cpu_reg[] = {
 	{ FLDATA (SBRQ, sbs, SB_V_RQ) },
 	{ FLDATA (SBIP, sbs, SB_V_IP) },
 	{ FLDATA (IOH, ioh, 0) },
-	{ FLDATA (IOC, ioc, 0) },
+	{ FLDATA (IOS, ios, 0) },
 	{ BRDATA (PCQ, pcq, 8, ASIZE, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
@@ -705,12 +709,31 @@ case 033:
 	    break;  }					/* end switch shifts */
 	break;
 
-/* IOT */
+/* IOT - The simulator behaves functionally like a real PDP-1 but does not
+   use the same mechanisms or state bits.  In particular,
+
+   - If an IOT does not specify IO_WAIT, the IOT will be executed, and the
+     I/O halt flag (IOH) will not be disturbed.  On the real PDP-1, IOH is
+     stored in IHS, IOH is cleared, the IOT is executed, and then IOH is
+     restored from IHS.  Because IHS is not otherwise used, it is not
+     explicitly simulated.
+   - If an IOT does specify IO_WAIT, then IOH specifies whether an I/O halt
+     (wait) is already in progress.
+	> If already set, I/O wait is in progress.  The simulator looks for
+	  a completion pulse (IOS).  If there is a pulse, IOH is cleared.  If
+	  not, the IOT is fetched again.  In either case, execution of the
+	  IOT is skipped.
+	> If not set, I/O wait must start.  IOH is set, the PC is backed up,
+	  and the IOT is executed.
+     On a real PDP-1, IOC is the I/O command enable and enables the IOT
+     pulses.  In the simulator, the enabling of IOT pulses is done through
+     code flow, and IOC is not explicitly simulated.
+*/
 
 case 035:
 	if (IR & IO_WAIT) {				/* wait? */
 	    if (ioh) {					/* I/O halt? */
-		if (ioc) ioh = 0;			/* comp pulse? done */
+		if (ios) ioh = 0;			/* comp pulse? done */
 		else {					/* wait more */
 		    PC = DECR_ADDR (PC);		/* re-execute */
 		    if (cpls == 0) {			/* any pending pulses? */
@@ -784,7 +807,7 @@ t_stat cpu_reset (DEVICE *dptr)
 {
 sbs = sbs_init;
 extm = extm_init;
-ioh = ioc = cpls = 0;
+ioh = ios = cpls = 0;
 OV = 0;
 PF = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);

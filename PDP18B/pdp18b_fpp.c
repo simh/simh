@@ -132,6 +132,7 @@ typedef struct ufp UFP;
 static int32 fir;					/* instruction */
 static int32 jea;					/* exc address */
 static int32 fguard;					/* guard bit */
+static int32 stop_fpp = STOP_RSRV;			/* stop if fp dis */
 static UFP fma;						/* FMA */
 static UFP fmb;						/* FMB */
 static UFP fmq;						/* FMQ - hi,lo only */
@@ -195,6 +196,7 @@ REG fpp_reg[] = {
 	{ ORDATA (FMQH, fmq.hi, 17) },
 	{ ORDATA (FMQL, fmq.lo, 18) },
 	{ ORDATA (JEA, jea, 18) },
+	{ FLDATA (STOP_FPP, stop_fpp, 0) },
 	{ NULL }  };
 
 DEVICE fpp_dev = {
@@ -218,7 +220,8 @@ t_stat fp15 (int32 ir)
 int32 ar, ma, fop, dat;
 t_stat sta = FP_OK;
 
-if (fpp_dev.flags & DEV_DIS) return MM_OK;		/* disabled? */
+if (fpp_dev.flags & DEV_DIS)				/* disabled? */
+	return (stop_fpp? STOP_FPDIS: SCPE_OK);
 fir = ir & 07777;					/* save subop + mods */
 ma = PC;						/* fetch next word */
 PC = Incr_addr (PC);
@@ -237,33 +240,38 @@ case FOP_TST:						/* NOP */
 
 case FOP_SUB:						/* subtract */
 	if (sta = fp15_opnd (fir, ar, &fmb)) break;	/* fetch op to FMB */
-	if (fir & FI_FP) sta = fp15_fadd (fir, &fma, &fmb, 1);	/* fp? */
+	if (fir & FI_FP)				/* fp? */
+	    sta = fp15_fadd (fir, &fma, &fmb, 1);	/* yes, fp sub */
 	else sta = fp15_iadd (fir, &fma, &fmb, 1);	/* no, int sub */
 	break;
 
 case FOP_RSUB:						/* reverse sub */
 	fmb = fma;					/* FMB <- FMA */
 	if (sta = fp15_opnd (fir, ar, &fma)) break;	/* fetch op to FMA */
-	if (fir & FI_FP) sta = fp15_fadd (fir, &fma, &fmb, 1);	/* fp? */
+	if (fir & FI_FP)				/* fp? */
+	    sta = fp15_fadd (fir, &fma, &fmb, 1);	/* yes, fp sub */
 	else sta = fp15_iadd (fir, &fma, &fmb, 1);	/* no, int sub */
 	break;
 
 case FOP_MUL:						/* multiply */
 	if (sta = fp15_opnd (fir, ar, &fmb)) break;	/* fetch op to FMB */
-	if (fir & FI_FP) sta = fp15_fmul (fir, &fma, &fmb);	/* fp? */
+	if (fir & FI_FP)				/* fp? */
+	    sta = fp15_fmul (fir, &fma, &fmb);		/* yes, fp mul */
 	else sta = fp15_imul (fir, &fma, &fmb);		/* no, int mul */
 	break;
 
 case FOP_DIV:						/* divide */
 	if (sta = fp15_opnd (fir, ar, &fmb)) break;	/* fetch op to FMB */
-	if (fir & FI_FP) sta = fp15_fdiv (fir, &fma, &fmb);	/* fp? */
+	if (fir & FI_FP)				/* fp? */
+	    sta = fp15_fadd (fir, &fma, &fmb, 1);	/* yes, fp sub */
 	else sta = fp15_idiv (fir, &fma, &fmb);		/* no, int div */
 	break;
 
 case FOP_RDIV:						/* reverse divide */
 	fmb = fma;					/* FMB <- FMA */
 	if (sta = fp15_opnd (fir, ar, &fma)) break;	/* fetch op to FMA */
-	if (fir & FI_FP) sta = fp15_fdiv (fir, &fma, &fmb);	/* fp? */
+	if (fir & FI_FP)				/* fp? */
+	    sta = fp15_fadd (fir, &fma, &fmb, 1);	/* yes, fp sub */
 	else sta = fp15_idiv (fir, &fma, &fmb);		/* no, int div */
 	break;
 
@@ -271,7 +279,7 @@ case FOP_LD:						/* load */
 	if (sta = fp15_opnd (fir, ar, &fma)) break;	/* fetch op to FMA */
 	fp15_asign (fir, &fma);				/* modify A sign */
 	if (fir & FI_FP)				/* fp? */
-	    sta = fp15_norm (ir, &fma, NULL, 0);	/* normalize */
+	    sta = fp15_norm (ir, &fma, NULL, 0);	/* norm, no round */
 	break;
 
 case FOP_ST:						/* store */
@@ -283,7 +291,7 @@ case FOP_FLT:						/* float */
 	if (sta = fp15_opnd (fir, ar, &fma)) break;	/* fetch op to FMA */
 	fma.exp = 35;
 	fp15_asign (fir, &fma);				/* adjust A sign */
-	sta = fp15_norm (ir, &fma, NULL, 0);		/* normalize */
+	sta = fp15_norm (ir, &fma, NULL, 0);		/* norm, no found */
 	break;
 
 case FOP_FIX:						/* fix */
@@ -295,8 +303,8 @@ case FOP_LFMQ:						/* load FMQ */
 	if (sta = fp15_opnd (fir, ar, &fma)) break;	/* fetch op to FMA */
 	dp_swap (&fma, &fmq);				/* swap FMA, FMQ */
 	fp15_asign (fir, &fma);				/* adjust A sign */
-	if (fir & FI_FP)				/* fp? norm, no rnd */
-	    sta = fp15_norm (ir | FI_NORND, &fma, &fmq, 0);
+	if (fir & FI_FP)				/* fp? */
+	    sta = fp15_norm (ir, &fma, &fmq, 0);	/* yes, norm, no rnd */
 	break;
 
 case FOP_JEA:						/* JEA */
@@ -311,7 +319,8 @@ case FOP_JEA:						/* JEA */
 
 case FOP_ADD:						/* add */
 	if (sta = fp15_opnd (fir, ar, &fmb)) break;	/* fetch op to FMB */
-	if (fir & FI_FP) sta = fp15_fadd (fir, &fma, &fmb, 0);	/* fp? */
+	if (fir & FI_FP)				/* fp? */
+	    sta = fp15_fadd (fir, &fma, &fmb, 0);	/* yes, fp add */
 	else sta = fp15_iadd (fir, &fma, &fmb, 0);	/* no, int add */
 	break;
 
@@ -331,7 +340,7 @@ default:
 fma.exp = fma.exp & DMASK;				/* mask exp to 18b */
 fmb.exp = fmb.exp & DMASK;
 if (sta != FP_OK) return fp15_exc (sta);		/* error? */
-return MM_OK;
+return SCPE_OK;
 }
 
 /* Operand load and store */
@@ -524,7 +533,7 @@ else if (((b->hi | b->lo) != 0) && (ediff <= 35)) {	/* b!=0 && ~"small"? */
 		if (a->exp > 0377777) return FP_OVF;  }  }
 	}						/* end if b != 0 */
 fp15_asign (ir, a);					/* adjust A sign */
-return fp15_norm (ir, a, NULL, 0);			/* normalize */
+return fp15_norm (ir, a, NULL, 0);			/* norm, no round */
 }
 
 /* Floating multiply - overflow/underflow detected in normalize */
@@ -587,8 +596,6 @@ return FP_OK;
 
 void dp_add (UFP *a, UFP *b)
 {
-int32 a_hi_orig = a->hi;
-
 a->lo = (a->lo + b->lo) & UFP_FL_MASK;			/* add low */
 a->hi = a->hi + b->hi + (a->lo < b->lo);		/* add hi + carry */
 return;
@@ -755,9 +762,9 @@ ma = (jea & JEA_EAMASK) + sta - 1;			/* JEA address */
 PCQ_ENTRY;						/* record branch */
 PC = Incr_addr (PC);					/* PC+1 for "JMS" */
 mb = Jms_word (usmd);					/* form JMS word */
-if (Write (ma, mb, WR)) return MM_ERR;			/* store */
+if (Write (ma, mb, WR)) return SCPE_OK;			/* store */
 PC = (jea + 1) & IAMASK;				/* new PC */
-return MM_OK;
+return SCPE_OK;
 }
 	
 /* Reset routine */

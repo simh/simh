@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   01-Sep-03	RMS	Added support for loading in multiple fields
    22-Jul-03	RMS	Updated for "hardware" RIM loader
    05-Dec-02	RMS	Added drum support
    21-Nov-02	RMS	Changed typewriter to half duplex
@@ -105,7 +106,7 @@ for (i = 0; i < 3;) {
 return word;
 }
 
-t_stat rim_load (FILE *inf)
+t_stat rim_load (FILE *inf, int32 fld)
 {
 int32 origin, val;
 
@@ -113,18 +114,18 @@ for (;;) {
 	if ((val = getw (inf)) < 0) return SCPE_FMT;
 	if (((val & 0760000) == OP_DIO) ||		/* DIO? */
 	    ((val & 0760000) == OP_DAC)) {		/* hack - Macro1 err */
-	    origin = val & 07777;
+	    origin = val & DAMASK;
 	    if ((val = getw (inf)) < 0) return SCPE_FMT;
-	    M[origin] = val;  }
+	    M[fld | origin] = val;  }
 	else if ((val & 0760000) == OP_JMP) {		/* JMP? */
-	    PC = val & 007777;
+	    PC = fld | (val & DAMASK);
 	    break;  }
 	else return SCPE_FMT;				/* bad instr */
 	}
 return SCPE_OK;						/* done */
 }
 
-t_stat blk_load (FILE *inf)
+t_stat blk_load (FILE *inf, int32 fld)
 {
 int32 val, start, count, csum;
 
@@ -132,22 +133,23 @@ for (;;) {
 	if ((val = getw (inf)) < 0) return SCPE_FMT;	/* get word, EOF? */
 	if ((val & 0760000) == OP_DIO) {		/* DIO? */
 	    csum = val;					/* init checksum */
-	    start = val & 07777;			/* starting addr */
+	    start = val & DAMASK;			/* starting addr */
 	    if ((val = getw (inf)) < 0) return SCPE_FMT;
 	    if ((val & 0760000) != OP_DIO) return SCPE_FMT;
 	    csum = csum + val;
 	    if (csum > 0777777) csum = (csum + 1) & 0777777;
-	    count = (val & 07777) - start + 1;		/* block count */
+	    count = (val & DAMASK) - start + 1;		/* block count */
 	    if (count <= 0) return SCPE_FMT;
 	    while (count--) {				/* loop on data */
 		if ((val = getw (inf)) < 0) return SCPE_FMT;
 		csum = csum + val;
 		if (csum > 0777777) csum = (csum + 1) & 0777777;
-		M[start++] = val;  }
+		M[fld | start] = val;
+		start = (start + 1) & DAMASK;  }
 	    if ((val = getw (inf)) < 0) return SCPE_FMT;
 	    if (val != csum) return SCPE_CSUM;  }
 	else if ((val & 0760000) == OP_JMP) {		/* JMP? */
-	    PC = val & 007777;
+	    PC = fld | (val & DAMASK);
 	    break;  }
 	else return SCPE_FMT;				/* bad instr */
 	}
@@ -157,12 +159,18 @@ return SCPE_OK;						/* done */
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 t_stat sta;
+int32 fld;
 
-if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
-sta = rim_load (fileref);
+if (flag != 0) return SCPE_ARG;
+if (cptr) {
+	fld = get_uint (cptr, 8, AMASK, &sta);
+	if (sta != SCPE_OK) return sta;
+	fld = fld & EPCMASK;  }
+else fld = 0;
+sta = rim_load (fileref, fld);
 if (sta != SCPE_OK) return sta;
 if ((sim_switches & SWMASK ('B')) || match_ext (fnam, "BIN"))
-	return blk_load (fileref);
+	return blk_load (fileref, fld);
 return SCPE_OK;
 }
 

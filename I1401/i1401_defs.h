@@ -180,6 +180,7 @@
 #define BCD_DOLLAR	053
 #define BCD_ASTER	054
 #define BCD_AMPER	060
+#define BCD_A		061
 #define BCD_B		062
 #define BCD_C		063
 #define BCD_E		065

@@ -25,6 +25,7 @@
 
    lpt		Type 62 line printer for the PDP-1
 
+   07-Sep-03	RMS	Changed ioc to ios
    23-Jul-03	RMS	Fixed bugs in instruction decoding, overprinting
 			Revised to detect I/O wait hang
    25-Apr-03	RMS	Revised for extended file support
@@ -49,7 +50,7 @@ static const unsigned char lpt_trans[64] = {
 	'@','J','K','L','M','N','O','P','Q','R','$','=','-',')','-','(',
 	'_','A','B','C','D','E','F','G','H','I','*','.','+',']','|','[' };
 
-extern int32 ioc, cpls, sbs, iosta;
+extern int32 ios, cpls, sbs, iosta;
 extern int32 stop_inst;
 
 t_stat lpt_svc (UNIT *uptr);
@@ -110,7 +111,7 @@ else if ((inst & 07000) == 00000) {			/* print */
 	lpt_spc = 0;  }					/* state = print */
 else return (stop_inst << IOT_V_REASON) | dat;		/* not implemented */
 if (GEN_CPLS (inst)) {					/* comp pulse? */
-	ioc = 0;					/* clear flop */
+	ios = 0;					/* clear flop */
 	cpls = cpls | CPLS_LPT;  }			/* request completion */
 else cpls = cpls & ~CPLS_LPT;
 sim_activate (&lpt_unit, lpt_unit.wait);		/* activate */
@@ -137,7 +138,7 @@ static const char *lpt_cc[] = {
 	"\f" };
 
 if (cpls & CPLS_LPT) {					/* completion pulse? */
-	ioc = 1;					/* restart */
+	ios = 1;					/* restart */
 	cpls = cpls & ~CPLS_LPT;  }			/* clr pulse pending */
 sbs = sbs | SB_RQ;					/* req seq break */
 if (lpt_spc) {						/* space? */

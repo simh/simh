@@ -169,7 +169,8 @@ const char *sim_stop_messages[] = {
 	"Nested XCT's",
 	"Invalid API interrupt",
 	"Non-standard device number",
-	"Memory management error"  };
+	"Memory management error",
+	"FP15 instruction disabled"  };
 
 /* Binary loaders */
 

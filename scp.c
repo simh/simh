@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   01-Sep-03	RMS	Fixed end-of-file problem in dep, idep
+			Fixed error on trailing spaces in dep, idep
    15-Jul-03	RMS	Removed unnecessary test in reset_all
    15-Jun-03	RMS	Added register flag REG_VMIO
    25-Apr-03	RMS	Added extended address support (V3.0)
@@ -58,7 +60,7 @@
    02-May-02	RMS	Added VT emulation interface, changed {NO}LOG to SET {NO}LOG
    22-Apr-02	RMS	Fixed laptop sleep problem in clock calibration, added
 			magtape record length error (found by Jonathan Engdahl)
-   26-Feb-02	RMS	Fixed initialization bugs in do_cmd, get_avail
+   26-Feb-02	RMS	Fixed initialization bugs in do_cmd, get_aval
 			(found by Brian Knittel)
    10-Feb-02	RMS	Fixed problem in clock calibration
    06-Jan-02	RMS	Moved device enable/disable to simulators
@@ -2177,9 +2179,10 @@ if (uptr->flags & UNIT_DIS) return SCPE_UDIS;		/* disabled? */
 mask = (t_addr) width_mask[dptr->awidth];
 if ((low > mask) || (high > mask) || (low > high)) return SCPE_ARG;
 for (i = low; i <= high; i = i + (dptr->aincr)) {
-	reason = get_aval (i, dptr, uptr);		/* get data */
-	if (reason != SCPE_OK) return reason;		/* return if error */
-	if (schptr && !test_search (sim_eval[0], schptr)) continue;
+	if ((flag & EX_E) || schptr) {			/* examine or search? */
+	    reason = get_aval (i, dptr, uptr);		/* get data */
+	    if (reason != SCPE_OK) return reason;	/* return if error */
+	    if (schptr && !test_search (sim_eval[0], schptr)) continue;  }
 	if (flag != EX_D) {
 	    reason = ex_addr (ofile, flag, i, dptr, uptr);
 	    if (reason > SCPE_OK) return reason;
@@ -2630,9 +2633,11 @@ t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status)
 t_value val;
 char *tptr;
 
+*status = SCPE_OK;
 val = strtotv (cptr, &tptr, radix);
-if ((cptr == tptr) || (val > max) || (*tptr != 0)) *status = SCPE_ARG;
-else *status = SCPE_OK;
+if ((cptr == tptr) || (val > max)) *status = SCPE_ARG;
+else {	while (isspace (*tptr)) tptr++;
+	if (*tptr != 0) *status = SCPE_ARG;  }
 return val;
 }
 
@@ -2654,20 +2659,23 @@ char *get_range (char *cptr, t_addr *lo, t_addr *hi, uint32 rdx,
 	t_addr max, char term)
 {
 char *tptr;
-t_addr hb;
 
-*lo = *hi = hb = 0;
 if (max && strncmp (cptr, "ALL", strlen ("ALL")) == 0) { /* ALL? */
 	tptr = cptr + strlen ("ALL");
+	*lo = 0;
 	*hi = max;  }
 else {	*lo = (t_addr) strtotv (cptr, &tptr, rdx);	/* get low */
 	if (cptr == tptr) return NULL;			/* error? */
-	if ((*tptr == '-') || (*tptr == ':') || (*tptr == '/')) {
-	    if (*tptr == '/') hb = *lo;			/* relative? */
+	if ((*tptr == '-') || (*tptr == ':')) {		/* range? */
 	    cptr = tptr + 1;
-	    *hi = hb + (t_addr) strtotv (cptr, &tptr, rdx);	/* get high */
+	    *hi = (t_addr) strtotv (cptr, &tptr, rdx);	/* get high */
 	    if (cptr == tptr) return NULL;
 	    if (*lo > *hi) return NULL;  }
+	else if (*tptr == '/') {			/* relative? */
+	    cptr = tptr + 1;
+	    *hi = (t_addr) strtotv (cptr, &tptr, rdx);	/* get high */
+	    if ((cptr == tptr) || (*hi == 0)) return NULL;
+	    *hi = *lo + *hi - 1;  }
 	else *hi = *lo;  }
 if (term && (*tptr++ != term)) return NULL;
 return tptr;

@@ -1,4 +1,4 @@
-SIMH FAQ, 15-Apr-2003
+SIMH FAQ, 15-Sep-2003
 
 1 General
 
@@ -51,6 +51,13 @@ SIMH FAQ, 15-Apr-2003
 4.7 Is there an example of the simulator running VMS?
 4.8 How can I import files into a simulated VMS environment?
 4.9 How can I export files from a simulated VMS environment?
+
+--------------------------------------------------------------------------------
+
+5 PDP-11
+
+5.1 When installing RSTS/E from simulated magtape, the installation process
+    hangs with no error message; why?
 
 ================================================================================
 1. General Questions
@@ -199,7 +206,7 @@ the source kit.
 
 2.2 How do I install SIMH with Ethernet support on Windows?
 
-The pre-compiled binaries contain Ethernet support.  Before running these
+Separate pre-compiled binaries contain Ethernet support.  Before running these
 binaries, you must download download and install the WinPCAP AutoInstaller from
 
   http://winpcap.polito.it
@@ -244,10 +251,10 @@ UNZIP can be found on the VMS freeware CDs, or from www.info-zip.org
 MMK   can be found on the VMS freeware CDs, or from www.madgoat.com
 MMS   can be licensed from HP/Compaq/Digital.
 
-Note that the VAX and PDP-10 emulators cannot be built and used on VAX/VMS,
-since the DEC C compiler for that operating system does not support 64-bit
-integers. DEC C on Alpha VMS has the required 64-bit capability to build
-and run all of the emulators.
+Note that the PDP-10 emulator cannot be built and used on VAX/VMS, because
+the DEC C compiler for VAX/VMS does not support 64-bit integers.  DEC C on
+on Alpha VMS has the required 64-bit capability to build and run all of the
+emulators.
 
 --------------------------------------------------------------------------------
 
@@ -263,10 +270,10 @@ and run all of the emulators.
 	sim> set rq1 cdrom
 	sim> att rq1 /dev/cdrom_drive
 
-- On Windows, there a quite a few products that can do this. The two most
+- On Windows, there are quite a few products that can do this. The two most
   common products are detailed below.  Make sure to disable any antivirus
   software before proceeding. Antivirus software tends to interfere with
-  the smooth flow of data from the CD, and will occasionally transform the
+  the smooth flow of data from the CD and will occasionally transform the
   data in strange and unexpected ways to 'protect' you.
 
   1) Roxio EZ-CD Creator 5.x
@@ -589,3 +596,11 @@ Ethernet Adapter 0 (774440)
   from that image to the host file system.
 - Text files can be printed to the simulated line printer, as described above.
 
+================================================================================
+5 PDP-11
+================================================================================
+
+5.1 When installing RSTS/E from simulated magtape, the installation process
+    hangs with no error message; why?
+
+- RSTS/E installation from magnetic tape requires that the tape be write locked.

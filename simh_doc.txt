@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V3.1
-Date:	15-Jul-2003
+Subj:	Simulator Usage, V3.0-2
+Date:	15-Sep-2003
 
 			COPYRIGHT NOTICE
 
@@ -66,8 +66,8 @@ The simulators recognize or require a few compile-time #defines:
   of the compilation command line (i.e., PDP4 for the PDP-4, PDP7
   for the PDP-7, PDP9 for the PDP-9, PDP15 for the PDP-15).
 
-- The PDP-10 and VAX simulators use 64b integer variables, requiring
-  that USE_INT64 be defined as part of the compilation command line.
+- The PDP-10 simulator uses 64b integer variables, requiring that
+  USE_INT64 be defined as part of the compilation command line.
   Since 64b integer declarations vary, sim_defs.h has conditional
   declarations for Windows (_int64) and Digital UNIX (long).  The
   default is GNU C (long long).  If your compiler uses a different
@@ -82,6 +82,11 @@ The simulators recognize or require a few compile-time #defines:
   include Ethernet emulation, USE_NETWORK must be defined as part
   of the compilation command line.  At present, Ethernet support is
   available only on Windows, Linux, NetBSD, and OpenBSD.
+
+- The PDP-11 and VAX simulators optionally support disks and serial
+  devices files greater than 2GB.  To include large device support,
+  both USE_INT64 and USE_ADDR64 must be defined as part of the
+  compilation command line.
 
 To start the simulator, simply type its name.  (On version of VMS
 prior to 6.2, the simulators must then be defined as foreign commands
@@ -271,7 +276,7 @@ loader format:
 
 	sim> load <filename> {implementation options}(cr)
 
-The number of formats supported is implementation specific.  Options
+The types of formats supported are implementation specific.  Options
 (such as load within range) are also implementation specific.
 
 The DUMP command (abbreviation DU) dumps memory in binary paper-
@@ -279,7 +284,7 @@ tape loader format:
 
 	sim> dump <filename> {implementation options}(cr)
 
-The number of formats supported is implementation specific.  Options
+The types of formats supported are implementation specific.  Options
 (such as dump within range) are also implementation specific.
 
 3.2 Saving and Restoring State
@@ -422,8 +427,11 @@ by commas:
 
 	register		the specified register
 	register[sub1-sub2]	the specified register array locations,
-				start at location sub1 up to and including
-				location sub2
+				starting at location sub1 up to and
+				including location sub2
+	register[sub1/length]	the specified register array locations,
+				starting at location sub1 up to but
+				not including sub1+length
 	register[ALL]		all locations in the specified register
 				array
 	register1-register2	all the registers starting at register1
@@ -599,7 +607,7 @@ The SHOW <unit> command shows the status of the named simulated unit.
 SHOW <unit> <parameter> shows the value of the named parameter, if
 it can display a value.
 
-3.10 Altering the Simulated Configuration
+3.10 Altering The Simulated Configuration
 
 In most simulators, the SET <device> DISABLED command removes the
 specified device from the configuration.  A DISABLED device is
@@ -783,7 +791,7 @@ The debug status of each simulated CPU and device is as follows:
 	system	PDP-8	PDP-11	Nova	PDP-1	18b PDP
 device
 CPU		y	y	y	y	y
-FPU		-	y	-	-	-
+FPU		-	y	-	-	h
 EIS/CIS		-	h	-	-	-
 console		y	y	y	y	y
 paper tape	y	y	y	h	y
@@ -849,6 +857,8 @@ Rev 3.0, May, 03
 	Added logical name support
 	Added multiple tape format support
 	Added 64b address support
+	Added PDP-4 EAE support
+	Added PDP-15 FP15 and XVM support
 
 Rev 2.10, Nov, 02
 	Added Telnet console capability, removed VT emulation

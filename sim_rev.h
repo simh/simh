@@ -29,11 +29,34 @@
 
 #define	SIM_MAJOR	3
 #define SIM_MINOR	0
-#define SIM_PATCH	1
+#define SIM_PATCH	2
 
 /* V3.0 revision history 
 
 patch	date		module(s) and fix(es)
+
+  2	tbd		scp.c:
+			-- fixed end-of-file problem in dep, idep
+			-- fixed error on trailing spaces in dep, idep
+
+			pdp1_stddev.c
+			-- fixed system hang if continue after PTR error
+			-- added PTR start/stop functionality
+			-- added address switch functionality to PTR BOOT
+
+			pdp1_sys.c: added multibank capability to LOAD
+  
+			pdp18b_cpu.c:
+			-- fixed priorities in PDP-15 API (PI between 3 and 4)
+			-- fixed sign handling in PDP-15 unsigned mul/div
+			-- fixed bug in CAF, must clear API subsystem
+
+			i1401_mt.c:
+			-- fixed tape read end-of-record handling based on real 1401
+			-- added diagnostic read (space forward)
+
+			i1620_cpu.c
+			-- fixed bug in immediate index add (found by Michael Short)
 
   1	27-Jul-03	pdp1_cpu.c: updated to detect indefinite I/O wait
 

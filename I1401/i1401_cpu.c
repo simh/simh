@@ -256,7 +256,7 @@ DEVICE cpu_dev = {
 
 /* Tables */
 
-/* Opcode table - length, dispatch, and option flags.  This table is also
+/* Opcode table - length, dispatch, and option flags.  This table is
    used by the symbolic input routine to validate instruction lengths  */
 
 const int32 op_table[64] = {
@@ -372,7 +372,7 @@ static const int32 ind_table[64] = {
 	0, 0, 0, 0, 0, 0, 0, 0,				/* 00 - 07 */
 	0, 0, 0, 0, 0, 0, 0, 0,				/* 10 - 17 */
 	0, 0, 0, 0, 0, 0, 0, 0,				/* 20 - 27 */
-	0, 1, 1, 0, 1, 0, 0, 0,				/* 30 - 37 */
+	0, 1, 1  , 0, 1, 0, 0, 0,				/* 30 - 37 */
 	0, 0, 1, 0, 0, 0, 0, 0,				/* 40 - 47 */
 	0, 0, 1, 0, 1, 0, 0, 0,				/* 50 - 57 */
 	0, 0, 0, 0, 0, 0, 0, 0,				/* 60 - 67 */
@@ -561,10 +561,9 @@ if (xa && (cpu_unit.flags & XSA)) {			/* indexed? */
 PP (IS);
 
 if (flags & NOWM) goto CHECK_LENGTH;			/* I-7: SWM? done */
-if ((t = M[IS]) & WM) goto CHECK_LENGTH;			/* WM? 7 char inst */
+if ((t = M[IS]) & WM) goto CHECK_LENGTH;		/* WM? 7 char inst */
 D = t;							/* last char is D */
-for (;;) {						/* I-8: repeats until WM */
-	if ((t = M[IS]) & WM) break;			/* WM? done */
+while (((t = M[IS]) & WM) == 0) {			/* I-8: repeats until WM */
 	D = t;						/* last char is D */
 	PP (IS);  }
 
@@ -711,9 +710,9 @@ case OP_B:						/* branch */
 
 /* Other branch instructions				A check     B check
 
-   BWZ		branch if (d<0>: B char WM)		if branch   here
+   BWZ		branch if (d<0>: B char WM)		if branch   fetch
 		(d<1>: B char zone = d zone)
-   BBE		branch if B char & d non-zero		if branch   here
+   BBE		branch if B char & d non-zero		if branch   fetch
 
    Instruction lengths:
    1	chained

@@ -25,6 +25,9 @@
 
    mt		7-track magtape
 
+   16-Aug-03	RMS	End-of-record on load read works like move read
+			(verified on real 1401)
+			Added diagnostic read (space forward)
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
    15-Mar-03	RMS	Fixed end-of-record on load read yet again
@@ -143,6 +146,12 @@ t_stat st;
 if ((uptr = get_unit (unit)) == NULL) return STOP_INVMTU; /* valid unit? */
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* attached? */
 switch (mod) {						/* case on modifier */
+
+case BCD_A:						/* diagnostic read */
+	ind[IN_END] = 0;				/* clear end of file */
+	st = sim_tape_sprecf (uptr, &tbc);		/* space fwd */
+	break;
+
 case BCD_B:						/* backspace */
 	ind[IN_END] = 0;				/* clear end of file */
 	st = sim_tape_sprecr (uptr, &tbc);		/* space rev */
@@ -222,9 +231,10 @@ case BCD_R:						/* read */
 	    if (ADDR_ERR (BS)) {			/* check next BS */
 		BS = BA | (BS % MAXMEMSIZE);
 		return STOP_WRAP;  }  }
-	if (M[BS] != (BCD_GRPMRK + WM)) {		/* not GM+WM at end? */
-	    if (flag == MD_WM) M[BS] = BCD_GRPMRK;	/* LCA: clear WM */
-	    else M[BS] = (M[BS] & WM) | BCD_GRPMRK;  }	/* MCW: save WM */
+/*	if (M[BS] != (BCD_GRPMRK + WM)) {		/* not GM+WM at end? */
+/*	    if (flag == MD_WM) M[BS] = BCD_GRPMRK;	/* LCA: clear WM */
+/*	    else M[BS] = (M[BS] & WM) | BCD_GRPMRK;  }	/* MCW: save WM */
+	M[BS] = (M[BS] & WM) | BCD_GRPMRK;		/* write GM, save WM */
 	BS++;						/* adv BS */
 	if (ADDR_ERR (BS)) {				/* check final BS */
 	    BS = BA | (BS % MAXMEMSIZE);

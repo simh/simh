@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Sample Software Packages
-Date:	15-Jun-2003
+Date:	15-Sep-2003
 
 This memorandum documents the sample software packages available to run
 with the SIMH simulators.  Many of these packages are available under
@@ -292,7 +292,9 @@ To boot and run RDOS for the Eclipse:
 	R
 	list/e
 
-4. PDP-1 LISP
+4. PDP-1
+
+4.1 PDP-1 LISP
 
 PDP-1 LISP is an interactive interpreter for the Lisp language.  It can
 execute both interactive commands and stored programs.  The startup
@@ -300,6 +302,13 @@ instructions for LISP are complicated; see the documentation included
 with the program for details.  My thanks to Peter Deutsch, who wrote the
 program, to Gordon Greene, who typed it in from a printed listing, and
 to Paul McJones, who helped with the final debug process.
+
+4.2 PDP-1 DDT
+
+PDP-1 DDT is an interactive debugging tool for the PDP-1.  It provides
+symbolic debugging capabilities for PDP-1 programs.  The documentation
+included with the program provides information on loading and operating
+DDT.  My thanks to Derek Peschel, who transcribed and debugged DDT.
 
 5. PDP-7 SIM8
 
