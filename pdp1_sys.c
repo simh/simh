@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-May-01	RMS	Added multiconsole support
    14-Mar-01	RMS	Revised load/dump interface (again)
    30-Oct-00	RMS	Added support for examine to file
    27-Oct-98	RMS	V2.4 load interface
@@ -50,6 +51,7 @@ extern int32 sc_map[];
    sim_PC		pointer to saved PC register descriptor
    sim_emax		number of words for examine
    sim_devices		array of pointers to simulated devices
+   sim_consoles		array of pointers to consoles (if more than one)
    sim_stop_messages	array of pointers to stop messages
    sim_load		binary loader
 */
@@ -63,6 +65,8 @@ int32 sim_emax = 1;
 DEVICE *sim_devices[] = { &cpu_dev,
 	&ptr_dev, &ptp_dev, &tti_dev, &tto_dev,
 	&lpt_dev, NULL };
+
+UNIT *sim_consoles = NULL;
 
 const char *sim_stop_messages[] = {
 	"Unknown error",
@@ -98,11 +102,11 @@ int32 origin, val;
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 for (;;) {
 	if ((val = getword (fileref)) < 0) return SCPE_FMT;
-	if ((val & 0770000) == 0240000) {	/* DAC? */
+	if ((val & 0770000) == 0240000) {		/* DAC? */
 		origin = val & 07777;
 		if ((val = getword (fileref)) < 0) return SCPE_FMT;
 		if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
-	else if ((val & 0770000) == 0600000) {
+	else if ((val & 0770000) == 0600000) {		/* JMP? */
 		PC = val & 007777;
 		return SCPE_OK;  }  }
 return SCPE_FMT;					/* error */

@@ -187,7 +187,7 @@ if (pulse == 042) {					/* DSCD */
 	if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;		/* busy inhibits */
 	else rf_sta = 0;
 	rf_updsta (0);  }
-if (pulse == 0062) {					/* DSRS */
+if (pulse == 062) {					/* DSRS */
 	if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;		/* busy sets PGE */
 	return rf_updsta (0);  }
 return AC;

@@ -25,6 +25,7 @@
 
    cpu		central processor
 
+   07-Jun-01	RMS	Fixed bug in JMS to non-existent memory
    25-Apr-01	RMS	Added device enable/disable support
    18-Mar-01	RMS	Added DF32 support
    05-Mar-01	RMS	Added clock calibration support
@@ -345,6 +346,10 @@ sim_interval = sim_interval - 1;
    jump calculations.  Data calculations return a full 15b extended
    address, jump calculations a 12b field-relative address.
 
+   Autoindex calculations always occur within the same field as the
+   instruction fetch.  The field must exist; otherwise, the instruction
+   fetched would be 0000, and indirect addressing could not occur.
+
    Note that MA contains IF'PC.
 */
 
@@ -408,12 +413,12 @@ case 007:						/* TAD, indir, curr */
 
 case 010:						/* ISZ, dir, zero */
 	ZERO_PAGE;
-	M[MA] = MB = (M[MA] + 1) & 07777;
+	M[MA] = MB = (M[MA] + 1) & 07777;		/* field must exist */
 	if (MB == 0) PC = (PC + 1) & 07777;
 	break;
 case 011:						/* ISZ, dir, curr */
        	CURR_PAGE;
-	M[MA] = MB = (M[MA] + 1) & 07777;
+	M[MA] = MB = (M[MA] + 1) & 07777;		/* field must exist */
 	if (MB == 0) PC = (PC + 1) & 07777;
 	break;
 case 012:						/* ISZ, indir, zero */
@@ -461,13 +466,17 @@ case 017:						/* DCA, indir, curr */
 case 020:						/* JMS, dir, zero */
 	ZERO_PAGE_J;
 	CHANGE_FIELD;
-	M[IF | MA] = old_PC = PC;
+	MA = IF | MA;
+	old_PC = PC;
+	if (MEM_ADDR_OK (MA)) M[MA] = PC;
 	PC = (MA + 1) & 07777;
 	break;
 case 021:						/* JMS, dir, curr */
 	CURR_PAGE_J;
 	CHANGE_FIELD;
-	M[IF | MA] = old_PC = PC;
+	MA = IF | MA;
+	old_PC = PC;
+	if (MEM_ADDR_OK (MA)) M[MA] = PC;
 	PC = (MA + 1) & 07777;
 	break;
 case 022:						/* JMS, indir, zero */

@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   01-Jun-01	RMS	Added DZ11 support
    23-Apr-01	RMS	Added RK611 support
    05-Apr-01	RMS	Added TS11/TSV05 support
    10-Feb-01	RMS	Added DECtape support
@@ -240,7 +241,7 @@ typedef struct fpac fpac_t;
 
    <3:0> =	BR7, <3> = PIR7
    <7:4> =	BR6, <7> = PIR6
-   <19:8> =	BR5, <15> = PIR5
+   <19:8> =	BR5, <19> = PIR5
    <28:20> =	BR4, <28> = PIR4
    <29> =	PIR3
    <30> =	PIR2
@@ -258,6 +259,8 @@ typedef struct fpac fpac_t;
 #define INT_V_RP	12
 #define INT_V_TS	13
 #define INT_V_HK	14
+#define INT_V_DZ0RX	16
+#define INT_V_DZ0TX	17
 #define INT_V_PIR5	19
 #define INT_V_TTI	20
 #define INT_V_TTO	21
@@ -280,6 +283,8 @@ typedef struct fpac fpac_t;
 #define INT_RP		(1u << INT_V_RP)
 #define INT_TS		(1u << INT_V_TS)
 #define INT_HK		(1u << INT_V_HK)
+#define INT_DZ0RX	(1u << INT_V_DZ0RX)
+#define INT_DZ0TX	(1u << INT_V_DZ0TX)
 #define INT_PIR5	(1u << INT_V_PIR5)
 #define INT_PTR		(1u << INT_V_PTR)
 #define INT_PTP		(1u << INT_V_PTP)
@@ -315,6 +320,8 @@ typedef struct fpac fpac_t;
 #define VEC_TS		0224
 #define VEC_RP		0254
 #define VEC_RX		0264
+#define VEC_DZ0RX	0310
+#define VEC_DZ0TX	0314
 
 /* CPU and FPU macros */
 

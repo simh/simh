@@ -28,7 +28,7 @@
    26-Apr-01	RMS	Added device enable/disable support
    25-Mar-01	RMS	Fixed block fill calculation
    15-Feb-01	RMS	Corrected bootstrap string
-   29-Jun-96	RMS	Added unit disable support.
+   29-Jun-96	RMS	Added unit disable support
 
    The RK11 is an eight drive cartridge disk subsystem.  An RK05 drive
    consists of 203 cylinders, each with 2 surfaces containing 12 sectors

@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   31-May-01	RMS	Added multiconsole support
    14-Mar-01	RMS	Revised load/dump interface (again)
    22-Dec-00	RMS	Added second terminal support
    10-Dec-00	RMS	Added Eclipse support
@@ -31,7 +32,7 @@
    15-Oct-00	RMS	Added stack, byte, trap instructions
    14-Apr-99	RMS	Changed t_addr to unsigned
    27-Oct-98	RMS	V2.4 load interface
-   24-Sep-97	RMS	Fixed bug in device name table (found by Dutch Owen)
+   24-Sep-97	RMS	Fixed bug in device name table (found by Charles Owen)
 */
 
 #include "nova_defs.h"
@@ -49,6 +50,8 @@ extern DEVICE tti1_dev, tto1_dev;
 extern DEVICE clk_dev, lpt_dev;
 extern DEVICE dkp_dev, dsk_dev;
 extern DEVICE mta_dev;
+extern UNIT tti_unit, tto_unit;
+extern UNIT tti1_unit, tto1_unit;
 extern REG cpu_reg[];
 extern uint16 M[];
 extern int32 saved_PC;
@@ -59,6 +62,7 @@ extern int32 saved_PC;
    sim_PC		pointer to saved PC register descriptor
    sim_emax		number of words needed for examine
    sim_devices		array of pointers to simulated devices
+   sim_consoles		array of pointers to consoles (if more than one)
    sim_stop_messages	array of pointers to stop messages
    sim_load		binary loader
 */
@@ -84,6 +88,11 @@ DEVICE *sim_devices[] = {
 	&clk_dev, &plt_dev,
 	&lpt_dev, &dsk_dev,
 	&dkp_dev, &mta_dev,
+	NULL };
+
+UNIT *sim_consoles[] = {
+	&tti_unit, &tto_unit,
+	&tti1_unit, &tto1_unit,
 	NULL };
 
 const char *sim_stop_messages[] = {

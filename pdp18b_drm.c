@@ -26,6 +26,7 @@
    drm		(PDP-7) Type 24 serial drum
 		(PDP-9) RM09 serial drum
 
+   10-Jun-01	RMS	Cleaned up IOT decoding to reflect hardware
    26-Apr-01	RMS	Added device enable/disable support
    14-Apr-99	RMS	Changed t_addr to unsigned
 */
@@ -108,14 +109,13 @@ int32 drm61 (int32 pulse, int32 AC)
 {
 int32 t;
 
-if (pulse == 001) return (int_req & INT_DRM)? IOT_SKP + AC: AC; /* DRSF */
-if (pulse == 002) {					/* DRCF */
+if (pulse & 001) {					/* DRSF */
+	if (int_req & INT_DRM) AC = AC | IOT_SKP;  }
+if (pulse & 002) {					/* DRCF */
 	int_req = int_req & ~INT_DRM;			/* clear done */
 	drm_err = 0;  }					/* clear error */
-if (pulse == 006) {					/* DRSS */
+if (pulse & 004) {					/* DRSS */
 	drm_da = AC & DRM_SMASK;			/* load sector # */
-	int_req = int_req & ~INT_DRM;			/* clear done */
-	drm_err = 0;					/* clear error */
 	t = ((drm_da % DRM_NUMSC) * DRM_NUMWDS) - GET_POS (drm_time);
 	if (t < 0) t = t + DRM_NUMWDT;			/* wrap around? */
 	sim_activate (&drm_unit, t * drm_time);  }	/* schedule op */
@@ -126,8 +126,9 @@ int32 drm62 (int32 pulse, int32 AC)
 {
 int32 t;
 
-if (pulse == 001) return (drm_err)? AC: IOT_SKP + AC;	/* DRSN */
-if (pulse == 004) {					/* DRCS */
+if (pulse & 001) {					/* DRSN */
+	if (drm_err == 0) AC = AC | IOT_SKP;  }
+if (pulse & 004) {					/* DRCS */
 	int_req = int_req & ~INT_DRM;			/* clear done */
 	drm_err = 0;					/* clear error */
 	t = ((drm_da % DRM_NUMSC) * DRM_NUMWDS) - GET_POS (drm_time);

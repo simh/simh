@@ -27,6 +27,7 @@
    tti1		second terminal input
    tto1		second terminal output
 
+   31-May-01	RMS	Added multiconsole support
    26-Apr-01	RMS	Added device enable/disable support
 */
 
@@ -36,14 +37,13 @@
 #define UNIT_DASHER	(1 << UNIT_V_DASHER)
 
 extern int32 int_req, dev_busy, dev_done, dev_disable, iot_enb;
-int32 tti1_stopioe = 0, tto1_stopioe = 0;		/* stop on error */
 t_stat tti1_svc (UNIT *uptr);
 t_stat tto1_svc (UNIT *uptr);
 t_stat tti1_reset (DEVICE *dptr);
 t_stat tto1_reset (DEVICE *dptr);
-t_stat tti1_attach (UNIT *uptr, char *ptr);
-t_stat tti1_detach (UNIT *uptr);
 t_stat ttx1_setmod (UNIT *uptr, int32 value);
+extern t_stat sim_poll_kbd (void);
+static uint8 tto1_consout[CONS_SIZE];
 
 /* TTI1 data structures
 
@@ -53,7 +53,7 @@ t_stat ttx1_setmod (UNIT *uptr, int32 value);
    ttx1_mod	TTI1/TTO1 modifiers list
 */
 
-UNIT tti1_unit = { UDATA (&tti1_svc, UNIT_SEQ+UNIT_ATTABLE, 0), KBD_POLL_WAIT };
+UNIT tti1_unit = { UDATA (&tti1_svc, 0, 0), KBD_POLL_WAIT };
 
 REG tti1_reg[] = {
 	{ ORDATA (BUF, tti1_unit.buf, 8) },
@@ -63,12 +63,14 @@ REG tti1_reg[] = {
 	{ FLDATA (INT, int_req, INT_V_TTI1) },
 	{ DRDATA (POS, tti1_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, tti1_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ FLDATA (STOP_IOE, tti1_stopioe, 0) },
 	{ FLDATA (MODE, tti1_unit.flags, UNIT_V_DASHER), REG_HRO },
+	{ FLDATA (CFLAG, tti1_unit.flags, UNIT_V_CONS), REG_HRO },
 	{ FLDATA (*DEVENB, iot_enb, INT_V_TTI1), REG_HRO },
 	{ NULL }  };
 
 MTAB ttx1_mod[] = {
+	{ UNIT_CONS, 0, "inactive", NULL, NULL },
+	{ UNIT_CONS, UNIT_CONS, "active console", "CONSOLE", &set_console },
 	{ UNIT_DASHER, 0, "ANSI", "ANSI", &ttx1_setmod },
 	{ UNIT_DASHER, UNIT_DASHER, "Dasher", "DASHER", &ttx1_setmod },
 	{ 0 }  };
@@ -77,7 +79,7 @@ DEVICE tti1_dev = {
 	"TTI1", &tti1_unit, tti1_reg, ttx1_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tti1_reset,
-	NULL, &tti1_attach, &tti1_detach };
+	NULL, NULL, NULL };
 
 /* TTO1 data structures
 
@@ -86,7 +88,7 @@ DEVICE tti1_dev = {
    tto1_reg	TTO1 register list
 */
 
-UNIT tto1_unit = { UDATA (&tto1_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
+UNIT tto1_unit = { UDATA (&tto1_svc, 0, 0), SERIAL_OUT_WAIT };
 
 REG tto1_reg[] = {
 	{ ORDATA (BUF, tto1_unit.buf, 8) },
@@ -96,8 +98,9 @@ REG tto1_reg[] = {
 	{ FLDATA (INT, int_req, INT_V_TTO1) },
 	{ DRDATA (POS, tto1_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, tto1_unit.wait, 24), PV_LEFT },
-	{ FLDATA (STOP_IOE, tto1_stopioe, 0) },
 	{ FLDATA (MODE, tto1_unit.flags, UNIT_V_DASHER), REG_HRO },
+	{ BRDATA (CONSOUT, tto1_consout, 8, 8, CONS_SIZE), REG_HIDDEN },
+	{ FLDATA (CFLAG, tto1_unit.flags, UNIT_V_CONS), REG_HRO },
 	{ FLDATA (*DEVENB, iot_enb, INT_V_TTI1), REG_HRO },
 	{ NULL }  };
 
@@ -134,16 +137,8 @@ t_stat tti1_svc (UNIT *uptr)
 {
 int32 temp;
 
-if ((tti1_unit.flags & UNIT_ATT) == 0)			/* attached? */
-	return IORETURN (tti1_stopioe, SCPE_UNATT);
 sim_activate (&tti1_unit, tti1_unit.wait);		/* continue poll */
-if ((temp = getc (tti1_unit.fileref)) == EOF) {		/* end of file? */
-	if (feof (tti1_unit.fileref)) {
-		if (tti1_stopioe) printf ("TTI1 end of file\n");
-		else return SCPE_OK;  }
-	else perror ("TTI1 input error");
-	clearerr (tti1_unit.fileref);
-	return SCPE_IOERR;  }
+if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
 tti1_unit.buf = temp & 0177;
 if ((tti1_unit.flags & UNIT_DASHER) && (tti1_unit.buf == '\r'))
 	tti1_unit.buf = '\n';				/* Dasher: cr -> nl */
@@ -162,29 +157,9 @@ tti1_unit.buf = 0;
 dev_busy = dev_busy & ~INT_TTI1;			/* clear busy */
 dev_done = dev_done & ~INT_TTI1;			/* clear done, int */
 int_req = int_req & ~INT_TTI1;
-if (tti1_unit.flags & UNIT_ATT)				/* attached? */
+if (tti1_unit.flags & UNIT_CONS)				/* active console? */
 	sim_activate (&tti1_unit, tti1_unit.wait);
-else sim_cancel (&tti1_unit);
 return SCPE_OK;
-}
-
-/* Attach routine */
-
-t_stat tti1_attach (UNIT *uptr, char *cptr)
-{
-t_stat reason;
-
-reason = attach_unit (uptr, cptr);
-if (reason == SCPE_OK) sim_activate (uptr, uptr -> wait);
-return reason;
-}
-
-/* Detach routine */
-
-t_stat tti1_detach (UNIT *uptr)
-{
-sim_cancel (uptr);
-return detach_unit (uptr);
 }
 
 /* Terminal output: IOT routine */
@@ -212,19 +187,14 @@ return 0;
 
 t_stat tto1_svc (UNIT *uptr)
 {
-int32 c ;
+int32 c, temp;
 
 dev_busy = dev_busy & ~INT_TTO1;			/* clear busy */
 dev_done = dev_done | INT_TTO1;				/* set done */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-if ((tto1_unit.flags & UNIT_ATT) == 0)			/* attached? */
-	return IORETURN (tto1_stopioe, SCPE_UNATT);
 c = tto1_unit.buf & 0177;
 if ((tto1_unit.flags & UNIT_DASHER) && (c == 031)) c = '\b';
-if (putc (c, tto1_unit.fileref) == EOF) {
-	perror ("TTO1 output error");
-	clearerr (tto1_unit.fileref);
-	return SCPE_IOERR;  }
+if ((temp = sim_putcons (c, uptr)) != SCPE_OK) return temp;
 tto1_unit.pos = tto1_unit.pos + 1;
 return SCPE_OK;
 }
@@ -238,6 +208,7 @@ dev_busy = dev_busy & ~INT_TTO1;			/* clear busy */
 dev_done = dev_done & ~INT_TTO1;			/* clear done, int */
 int_req = int_req & ~INT_TTO1;
 sim_cancel (&tto1_unit);				/* deactivate unit */
+tto1_unit.filebuf = tto1_consout;			/* set buf pointer */
 return SCPE_OK;
 }
 

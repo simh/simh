@@ -25,6 +25,8 @@
 
    tti		terminal input
    tto		terminal output
+
+   31-May-01	RMS	Added multiconsole support
 */
 
 #include "nova_defs.h"
@@ -39,6 +41,7 @@ t_stat tto_reset (DEVICE *dptr);
 t_stat ttx_setmod (UNIT *uptr, int32 value);
 extern t_stat sim_poll_kbd (void);
 extern t_stat sim_putchar (int32 out);
+static uint8 tto_consout[CONS_SIZE];
 
 /* TTI data structures
 
@@ -48,7 +51,7 @@ extern t_stat sim_putchar (int32 out);
    ttx_mod	TTI/TTO modifiers list
 */
 
-UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_CONS, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
 	{ ORDATA (BUF, tti_unit.buf, 8) },
@@ -59,9 +62,12 @@ REG tti_reg[] = {
 	{ DRDATA (POS, tti_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (MODE, tti_unit.flags, UNIT_V_DASHER), REG_HRO },
+	{ FLDATA (CFLAG, tti_unit.flags, UNIT_V_CONS), REG_HRO },
 	{ NULL }  };
 
 MTAB ttx_mod[] = {
+	{ UNIT_CONS, 0, "inactive", NULL, NULL },
+	{ UNIT_CONS, UNIT_CONS, "active console", "CONSOLE", &set_console },
 	{ UNIT_DASHER, 0, "ANSI", "ANSI", &ttx_setmod },
 	{ UNIT_DASHER, UNIT_DASHER, "Dasher", "DASHER", &ttx_setmod },
 	{ 0 }  };
@@ -79,7 +85,7 @@ DEVICE tti_dev = {
    tto_reg	TTO register list
 */
 
-UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
+UNIT tto_unit = { UDATA (&tto_svc, UNIT_CONS, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
 	{ ORDATA (BUF, tto_unit.buf, 8) },
@@ -90,6 +96,8 @@ REG tto_reg[] = {
 	{ DRDATA (POS, tto_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ FLDATA (MODE, tto_unit.flags, UNIT_V_DASHER), REG_HRO },
+	{ BRDATA (CONSOUT, tto_consout, 8, 8, CONS_SIZE), REG_HIDDEN },
+	{ FLDATA (CFLAG, tto_unit.flags, UNIT_V_CONS), REG_HRO },
 	{ NULL }  };
 
 DEVICE tto_dev = {
@@ -145,7 +153,8 @@ tti_unit.buf = 0;
 dev_busy = dev_busy & ~INT_TTI;				/* clear busy */
 dev_done = dev_done & ~INT_TTI;				/* clear done, int */
 int_req = int_req & ~INT_TTI;
-sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
+if (tti_unit.flags & UNIT_CONS)				/* if active console, */
+	sim_activate (&tti_unit, tti_unit.wait);	/* activate unit */
 return SCPE_OK;
 }
 
@@ -181,7 +190,7 @@ dev_done = dev_done | INT_TTO;				/* set done */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
 c = tto_unit.buf & 0177;
 if ((tto_unit.flags & UNIT_DASHER) && (c == 031)) c = '\b';
-if ((temp = sim_putchar (c)) != SCPE_OK) return temp;
+if ((temp = sim_putcons (c, uptr)) != SCPE_OK) return temp;
 tto_unit.pos = tto_unit.pos + 1;
 return SCPE_OK;
 }
@@ -195,6 +204,7 @@ dev_busy = dev_busy & ~INT_TTO;				/* clear busy */
 dev_done = dev_done & ~INT_TTO;				/* clear done, int */
 int_req = int_req & ~INT_TTO;
 sim_cancel (&tto_unit);					/* deactivate unit */
+tto_unit.filebuf = tto_consout;			/* set buf pointer */
 return SCPE_OK;
 }
 

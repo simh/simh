@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-May-01	RMS	Added second Teletype support
+   18-May-01	RMS	Added PDP-9,-15 API IOT's
    12-May-01	RMS	Fixed bug in RIM loaders
    14-Mar-01	RMS	Added extension detection of RIM format tapes
    21-Jan-01	RMS	Added DECtape support
@@ -39,6 +41,7 @@
 extern DEVICE cpu_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
+extern UNIT tti_unit, tto_unit;
 extern DEVICE clk_dev;
 extern DEVICE lpt_dev;
 #if defined (DRM)
@@ -55,6 +58,10 @@ extern DEVICE mt_dev;
 #endif
 #if defined (DTA)
 extern DEVICE dt_dev;
+#endif
+#if defined (TTY1)
+extern DEVICE tti1_dev, tto1_dev;
+extern UNIT tti1_unit, tto1_unit;
 #endif
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
@@ -87,7 +94,8 @@ REG *sim_PC = &cpu_reg[0];
 int32 sim_emax = 3;
 
 DEVICE *sim_devices[] = { &cpu_dev,
-	&ptr_dev, &ptp_dev, &tti_dev, &tto_dev,
+	&ptr_dev, &ptp_dev,
+	&tti_dev, &tto_dev,
 	&clk_dev, &lpt_dev,
 #if defined (DRM)
 	&drm_dev,
@@ -104,14 +112,27 @@ DEVICE *sim_devices[] = { &cpu_dev,
 #if defined (MTA)
 	&mt_dev,
 #endif
+#if defined (TTY1)
+	&tti1_dev, &tto1_dev,
+#endif
 	NULL };
+
+#if defined (TTY1)
+UNIT *sim_consoles[] = {
+	&tti_unit, &tto_unit,
+	&tti1_unit, &tto1_unit,
+	NULL };
+#else
+UNIT *sim_consoles = NULL;
+#endif
 
 const char *sim_stop_messages[] = {
 	"Unknown error",
 	"Undefined instruction",
 	"HALT instruction",
 	"Breakpoint",
-	"Nested XCT's"  };
+	"Nested XCT's",
+	"Invalid API interrupt"  };
 
 /* Binary loader */
 
@@ -279,7 +300,7 @@ static const char *opcode[] = {
  "XCT", "ISZ", "AND", "SAD",
  "JMP",
 
-#if defined (PDP15)					/* mem ref ind */
+#if defined (PDP9) || defined (PDP15)			/* mem ref ind */
  "CAL*", "DAC*", "JMS*", "DZM*",			/* normal */
  "LAC*", "XOR*", "ADD*", "TAD*",
  "XCT*", "ISZ*", "AND*", "SAD*",
@@ -346,26 +367,34 @@ static const char *opcode[] = {
  "MTTR", "MTCR", "MTSF", "MTRC", "MTAF",
  "MTRS", "MTGO", "MTCM", "MTLC",
 #endif
-#if defined (DTA)
+#if defined (DTA)					/* TC02/TC15 */
  "DTCA", "DTRA", "DTXA", "DTLA",
  "DTEF", "DTRB", "DTDF",
+#endif
+#if defined (TTY1)
+ "KSF1", "KRB1",
+ "TSF1", "TCF1", "TLS1", "TCF1!TLS1",
 #endif
 #if defined (PDP7)
  "ITON", "TTS", "SKP7", "CAF",
  "SEM", "EEM", "EMIR", "LEM",
-#elif defined (PDP9)
- "PFSF", "TTS", "SKP7", "CAF",
- "DBR", "SEM", "EEM", "LEM",
- "MPSK", "MPSNE", "MPCV", "MPEU",
- "MPLD", "MPCNE",
+#endif
+#if defined (PDP9)
+ "SKP7", "SEM", "EEM", "LEM",
  "LPDI", "LPEI",
-#elif defined (PDP15)
- "PFSF", "TTS", "SPCO", "CAF",
- "DBR", "SKP15", "RES",
+#endif
+#if defined (PDP15)
+ "SPCO", "SKP15", "RES",
  "SBA", "DBA", "EBA",
  "AAS", "PAX", "PAL", "AAC",
  "PXA", "AXS", "PXL", "PLA",
  "PLX", "CLAC","CLX", "CLLR", "AXR",
+#endif
+#if defined (PDP9) || defined (PDP15)
+ "MPSK", "MPSNE", "MPCV", "MPEU",
+ "MPLD", "MPCNE", "PFSF",
+ "TTS", "CAF", "DBK", "DBR",
+ "SPI", "RPL", "ISA",
 #endif
  "IOT",							/* general */
 
@@ -493,22 +522,30 @@ static const int32 opc_val[] = {
  0707541+I_NPI, 0707552+I_NPN, 0707544+I_NPI, 0707545+I_NPI,
  0707561+I_NPI, 0707572+I_NPN, 0707601+I_NPI,
 #endif
+#if defined (TTY1)
+ 0704101+I_NPI, 0704112+I_NPN,
+ 0704001+I_NPI, 0704002+I_NPI, 0704004+I_NPI, 0704006+I_NPI,
+#endif
 #if defined (PDP7)
  0703201+I_NPI, 0703301+I_NPI, 0703341+I_NPI, 0703302+I_NPI,
  0707701+I_NPI, 0707702+I_NPI, 0707742+I_NPI, 0707704+I_NPI,
-#elif defined (PDP9)
- 0700062+I_NPI, 0703301+I_NPI, 0703341+I_NPI, 0703302+I_NPI,
- 0703344+I_NPI, 0707701+I_NPI, 0707702+I_NPI, 0707704+I_NPI,
- 0701701+I_NPI, 0701741+I_NPI, 0701702+I_NPI, 0701742+I_NPI,
- 0701704+I_NPI, 0701644+I_NPI,
+#endif
+#if defined (PDP9)
+ 0703341+I_NPI, 0707701+I_NPI, 0707702+I_NPI, 0707704+I_NPI,
  0706504+I_NPI, 0706604+I_NPI,
-#elif defined (PDP15)
- 0700062+I_NPI, 0703301+I_NPI, 0703341+I_NPI, 0703302+I_NPI,
- 0703344+I_NPI, 0707741+I_NPI, 0707742+I_NPI,
+#endif
+#if defined (PDP15)
+ 0703341+I_NPI, 0707741+I_NPI, 0707742+I_NPI,
  0707761+I_NPI, 0707762+I_NPI, 0707764+I_NPI,
  0720000+I_XR9, 0721000+I_XR, 0722000+I_XR, 0723000+I_XR9,
  0724000+I_XR, 0725000+I_XR9, 0726000+I_XR, 0730000+I_XR,
  0731000+I_XR, 0734000+I_XR, 0735000+I_XR, 0736000+I_XR, 0737000+I_XR9,
+#endif
+#if defined (PDP9) || defined (PDP15)
+ 0701701+I_NPI, 0701741+I_NPI, 0701702+I_NPI, 0701742+I_NPI,
+ 0701704+I_NPI, 0701744+I_NPI, 0703201+I_NPI,
+ 0703301+I_NPI, 0703302+I_NPI, 0703304+I_NPI, 0703344+I_NPI,
+ 0705501+I_NPI, 0705512+I_NPN, 0705504+I_NPI,
 #endif
  0700000+I_IOT,
 
@@ -785,6 +822,8 @@ case I_V_MRF:						/* mem ref */
 #else
 	dmask = 017777;
 	cptr = get_glyph (cptr, gbuf, 0);		/* get next field */
+#endif
+#if defined (PDP4) || defined (PDP7)
 	if (strcmp (gbuf, "I") == 0) {			/* indirect? */
 		val[0] = val[0] | 020000;
 		cptr = get_glyph (cptr, gbuf, 0);  }

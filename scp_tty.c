@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-May-01	RMS	Added logging support
    05-Mar-01	RMS	Added clock calibration support
    08-Dec-00	BKR	Added OS/2 support
    18-Aug-98	RMS	Added BeOS support
@@ -50,6 +51,7 @@
 #undef USE_INT64					/* hack for Windows */
 #include "sim_defs.h"
 int32 sim_int_char = 005;				/* interrupt character */
+extern FILE *sim_log;
 
 /* VMS routines */
 
@@ -151,6 +153,7 @@ IOSB iosb;
 c = out;
 status = sys$qiow (EFN, tty_chan, IO$_WRITELBLK | IO$M_NOFORMAT,
 	&iosb, 0, 0, &c, 1, 0, 0, 0, 0);
+if (sim_log) fputc (c, sim_log);
 if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTOERR;
 return SCPE_OK;
 }
@@ -237,7 +240,9 @@ return c | SCPE_KFLAG;
 
 t_stat sim_putchar (int32 c)
 {
-if (c != 0177) _putch (c);
+if (c != 0177) {
+	_putch (c);
+	if (sim_log) fputc (c, sim_log);  }
 return SCPE_OK;
 }
 
@@ -291,7 +296,8 @@ t_stat sim_putchar (int32 c)
 {
 if (c != 0177) {
 	putch (c);
-	fflush (stdout) ;  }
+	fflush (stdout) ;
+	if (sim_log) fputc (c, sim_log);  }
 return SCPE_OK;
 }
 
@@ -381,6 +387,7 @@ char c;
 
 c = out;
 write (1, &c, 1);
+if (sim_log) fputc (c, sim_log);
 return SCPE_OK;
 }
 
@@ -480,6 +487,7 @@ char c;
 
 c = out;
 write (1, &c, 1);
+if (sim_log) fputc (c, sim_log);
 return SCPE_OK;
 }
 

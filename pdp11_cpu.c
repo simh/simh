@@ -25,6 +25,7 @@
 
    cpu		PDP-11 CPU (J-11 microprocessor)
 
+   01-Jun-01	RMS	Added DZ11 support
    23-Apr-01	RMS	Added RK611 support
    05-Apr-01	RMS	Added TS11/TSV05 support
    05-Mar-01	RMS	Added clock calibration support
@@ -325,7 +326,7 @@ struct iolink iotable[] = {
 int32 int_vec[32] = {					/* int req to vector */
 	0, 0, 0, VEC_PIRQ, VEC_CLK, VEC_DTA, 0, VEC_PIRQ,
 	VEC_RK, VEC_RL, VEC_RX, VEC_TM, VEC_RP, VEC_TS, VEC_HK, 0,
-	0, 0, 0, VEC_PIRQ, VEC_TTI, VEC_TTO, VEC_PTR, VEC_PTP,
+	VEC_DZ0RX, VEC_DZ0TX, 0, VEC_PIRQ, VEC_TTI, VEC_TTO, VEC_PTR, VEC_PTP,
 	VEC_LPT, 0, 0, 0, VEC_PIRQ, VEC_PIRQ, VEC_PIRQ, VEC_PIRQ  };
 
 int32 (*int_ack[32])() = {				/* int ack routines */

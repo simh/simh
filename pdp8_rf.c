@@ -29,7 +29,7 @@
    19-Mar-01	RMS	Added disk monitor bootstrap, fixed IOT decoding
    15-Feb-01	RMS	Fixed 3 cycle data break sequence
    14-Apr-99	RMS	Changed t_addr to unsigned
-   30-Mar-98	RMS	Fixed bug in RF bootstrap.
+   30-Mar-98	RMS	Fixed bug in RF bootstrap
 
    The RF08 is a head-per-track disk.  It uses the three cycle data break
    facility.  To minimize overhead, the entire RF08 is buffered in memory.

@@ -25,6 +25,7 @@
 
    cpu		KS10 central processor
 
+   19-May-01	RMS	Added workaround for TOPS-20 V4.1 boot bug
    29-Apr-01	RMS	Fixed modifier naming conflict
 			Fixed XCTR/XCTRI, UMOVE/UMOVEM, BLTUB/BLTBU for ITS
 			Added CLRCSH for ITS
@@ -115,7 +116,7 @@
 
 #define ILL_ADR_FLAG	(1 << VASIZE)
 #define save_ibkpt	(cpu_unit.u3)
-#define UNIT_V_MSIZE	(UNIT_V_ITS + 1)		/* dummy mask */
+#define UNIT_V_MSIZE	(UNIT_V_T20V41 + 1)		/* dummy mask */
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
 d10 *M = NULL;						/* memory */
@@ -241,6 +242,7 @@ REG cpu_reg[] = {
 	{ DRDATA (INDMAX, ind_max, 8), PV_LEFT + REG_NZ },
 	{ DRDATA (XCTMAX, xct_max, 8), PV_LEFT + REG_NZ },
 	{ FLDATA (ITS, cpu_unit.flags, UNIT_V_ITS), REG_HRO },
+	{ FLDATA (T20V41, cpu_unit.flags, UNIT_V_T20V41), REG_HRO },
 	{ ORDATA (BREAK, ibkpt_addr, VASIZE + 1) },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ FLDATA (STOP_ILL, stop_op0, 0) },
@@ -248,8 +250,9 @@ REG cpu_reg[] = {
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
-	{ UNIT_ITS, 0, "Standard microcode", "STANDARD", NULL },
-	{ UNIT_ITS, UNIT_ITS, "ITS microcode", "ITS", NULL },
+	{ UNIT_ITS+UNIT_T20V41, 0, "Standard microcode", "STANDARD", NULL },
+	{ UNIT_ITS+UNIT_T20V41, UNIT_T20V41, "TOPS-20 V4.1", "TOPS20V41", NULL },
+	{ UNIT_ITS+UNIT_T20V41, UNIT_ITS, "ITS microcode", "ITS", NULL },
 	{ 0 }  };
 
 DEVICE cpu_dev = {

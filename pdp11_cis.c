@@ -138,11 +138,11 @@
 
 /* Condition code macros */
 
-#define GET_BIT(ir,n) (((ir) >> n) & 1)
-#define GET_SIGN_L(ir) GET_BIT((ir), 31)
-#define GET_SIGN_W(ir) GET_BIT((ir), 15)
-#define GET_SIGN_B(ir) GET_BIT((ir), 7)
-#define GET_Z(ir) (ir == 0)
+#define GET_BIT(ir,n)	(((ir) >> n) & 1)
+#define GET_SIGN_L(ir)	GET_BIT((ir), 31)
+#define GET_SIGN_W(ir)	GET_BIT((ir), 15)
+#define GET_SIGN_B(ir)	GET_BIT((ir), 7)
+#define GET_Z(ir)	(ir == 0)
 
 /* Decimal string structure */
 
@@ -416,7 +416,7 @@ case 030: case 032: case 0130: case 0132:
    Condition codes:
 	NZVC		=	set from src.lnt - dst.lnt
 
-   Registers (MOVC, MOVTC only)
+   Registers (MOVRC only)
 	R0		=	max (0, src.len - dst.len)
 	R1:R3		=	0
 	R4:R5		=	unchanged
@@ -432,7 +432,7 @@ case 031: case 0131:
 	addr = A2ADR + A2LNT - mvlnt;
 	for (i = 0; i < mvlnt; i++) {
 		WriteB (movbuf[i], ((addr + i) & 0177777) | dsenable);  }
-	fill = A3LNT & 0377;			/* do fill, if any */
+	fill = A3LNT & 0377;				/* do fill, if any */
 	for (i = mvlnt, j = 0; i < A2LNT; i++, j++) {
 		WriteB (fill, ((A2ADR + j) & 0177777) | dsenable);  }
 	t = A1LNT - A2LNT;				/* src.lnt - dst.lnt */
@@ -509,7 +509,7 @@ case 042: case 043: case 0142: case 0143:
 	for (; R[0] != 0; R[0]--) {			/* loop */
 		t = ReadB (R[1] | dsenable);		/* get char as index */
 		c = ReadB (((A1ADR + t) & 0177777) | dsenable);
-		if (((c & mask) != 0) ^ (op & 1)) break;	/* != + SCN, = + SPN? */
+		if (((c & mask) != 0) ^ (op & 1)) break; /* != + SCN, = + SPN? */
 		R[1] = (R[1] + 1) & 0177777;  }
 	N = GET_SIGN_W (R[0]);
 	Z = GET_Z (R[0]);
@@ -735,8 +735,7 @@ case 052: case 072: case 0152: case 0172:
 	ReadDstr (A2, &src2, op);			/* get source2 */
 	N = Z = V = C = 0;
 	if (src1.sign != src2.sign) N = src1.sign;
-	else {
-		t = CmpDstr (&src1, &src2);		/* compare strings */
+	else {	t = CmpDstr (&src1, &src2);		/* compare strings */
 		if (t < 0) N = 1;
 		else if (t == 0) Z = 1;  }
 	if ((op & INLINE) == 0)				/* if reg, clr reg */

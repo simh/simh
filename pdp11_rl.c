@@ -28,9 +28,9 @@
    26-Apr-01	RMS	Added device enable/disable support
    25-Mar-01	RMS	Fixed block fill calculation
    15-Feb-01	RMS	Corrected bootstrap string
-   12-Nov-97	RMS	Added bad block table command.
-   25-Nov-96	RMS	Default units to autosize.
-   29-Jun-96	RMS	Added unit disable support.
+   12-Nov-97	RMS	Added bad block table command
+   25-Nov-96	RMS	Default units to autosize
+   29-Jun-96	RMS	Added unit disable support
 
    The RL11 is a four drive cartridge disk subsystem.  An RL01 drive
    consists of 256 cylinders, each with 2 surfaces containing 40 sectors

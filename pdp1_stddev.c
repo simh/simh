@@ -28,6 +28,7 @@
    tti		keyboard
    tto		teleprinter
 
+   10-Jun-01	RMS	Fixed comment
    30-Oct-00	RMS	Standardized device naming
 */
 
@@ -260,7 +261,7 @@ static const int32 boot_rom[] = {
 	0327776,					/* dio x */
 	0107776,					/* xct x */
 	0730002,					/* rpb + wait */
-	0760400,					/* x, halt /
+	0760400,					/* x, halt */
 	0607772						/* jmp r */
 };
 

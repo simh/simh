@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-May-01	RMS	Added multiple console support
+   15-May-01	RMS	Increased string buffer size
    25-Feb-01	RMS	Revisions for V2.6
    15-Oct-00	RMS	Editorial revisions for V2.5
    11-Jul-99	RMS	Added unsigned int data types
@@ -53,6 +55,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 
 #ifndef TRUE
 #define TRUE		1
@@ -90,7 +93,11 @@ typedef int32		t_mtrlnt;			/* magtape rec lnt */
 #define MTRF(x)		((x) & (1u << 31))		/* record error flg */
 #define MTRL(x)		((x) & ((1u << 31) - 1))	/* record length */
 #define FLIP_SIZE	(1 << 16)			/* flip buf size */
-#define CBUFSIZE	128				/* string buf size */
+#if !defined (PATH_MAX)					/* usually in limits */
+#define PATH_MAX	512
+#endif
+#define CBUFSIZE	(128 + PATH_MAX)		/* string buf size */
+#define CONS_SIZE	4096				/* console buffer */
 
 /* Simulator status codes
 
@@ -128,6 +135,8 @@ typedef int32		t_mtrlnt;			/* magtape rec lnt */
 #define SCPE_SUB	(SCPE_BASE + 24)		/* subscript err */
 #define SCPE_NOFNC	(SCPE_BASE + 25)		/* func not imp */
 #define SCPE_UDIS	(SCPE_BASE + 26)		/* unit disabled */
+#define SCPE_LOGON	(SCPE_BASE + 27)		/* logging enabled */
+#define SCPE_LOGOFF	(SCPE_BASE + 28)		/* logging disabled */
 #define SCPE_KFLAG	01000				/* tti data flag */
 
 /* Print value format codes */
@@ -211,7 +220,9 @@ struct unit {
 #define UNIT_BUF	000400				/* buffered */
 #define UNIT_DISABLE	001000				/* disable-able */
 #define UNIT_DIS	002000				/* disabled */
-#define UNIT_V_UF	11				/* device specific */
+#define UNIT_CONS	004000				/* active console */
+#define UNIT_V_CONS	11
+#define UNIT_V_UF	12				/* device specific */
 
 /* Register data structure */
 
@@ -310,3 +321,5 @@ EXTERN char *get_glyph (char *iptr, char *optr, char mchar);
 EXTERN char *get_glyph_nc (char *iptr, char *optr, char mchar);
 EXTERN t_value get_uint (char *cptr, int radix, t_value max, t_stat *status);
 EXTERN t_value strtotv (char *cptr, char **endptr, int radix);
+EXTERN t_stat set_console (UNIT *uptr, int32 flag);
+EXTERN t_stat sim_putcons (int32 out, UNIT *uptr);

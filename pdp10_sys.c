@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-May-01	RMS	Added multiconsole support
    29-Apr-01	RMS	Fixed format for RDPCST, WRPCST
 			Added CLRCSH for ITS
    03-Apr-01	RMS	Added support for loading EXE files
@@ -50,6 +51,7 @@ extern a10 saved_PC;
    sim_PC		pointer to saved PC register descriptor
    sim_emax		number of words for examine
    sim_devices		array of pointers to simulated devices
+   sim_consoles		array of pointers to consoles (if more than one)
    sim_stop_messages	array of pointers to stop messages
    sim_load		binary loader
 */
@@ -68,6 +70,8 @@ DEVICE *sim_devices[] = {
 	&lp20_dev, /* &dz_dev, */
 	&rp_dev, &tu_dev,
 	NULL };
+
+UNIT *sim_consoles = NULL;
 
 const char *sim_stop_messages[] = {
 	"Unknown error",

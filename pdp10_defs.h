@@ -22,6 +22,9 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   01-Jun-01	RMS	Updated DZ11 vector definitions
+   19-May-01	RMS	Added workaround for TOPS-20 V4.1 boot bug
 */
 
 #include "sim_defs.h"					/* simulator defns */
@@ -103,6 +106,8 @@ typedef int64 d10;					/* PDP-10 data (36b) */
 
 #define UNIT_V_ITS	(UNIT_V_UF)			/* ITS */
 #define UNIT_ITS	(1 << UNIT_V_ITS)
+#define UNIT_V_T20V41	(UNIT_V_UF + 1)			/* TOPS-20 V4.1 */
+#define UNIT_T20V41	(1 << UNIT_V_T20V41)
 #define ITS		(cpu_unit.flags & UNIT_ITS)
 
 /* Architectural constants */
@@ -590,22 +595,24 @@ typedef int64 d10;					/* PDP-10 data (36b) */
 /* I/O system definitions, lifted from the PDP-11 simulator
    Interrupt assignments, priority is right to left
 
-   <7:0> =	BR7
-   <15:8> =	BR6
-   <23:16> =	BR5
-   <30:24> =	BR4
+   <3:0> =	BR7
+   <7:4> =	BR6
+   <19:8> =	BR5
+   <30:20> =	BR4
 */
 
-#define INT_V_RP	8				/* RH11/RP,RM drives */
-#define INT_V_TU	9				/* RH11/TM03/TU45 */
-#define INT_V_DZ	16				/* DZ11 */
+#define INT_V_RP	6				/* RH11/RP,RM drives */
+#define INT_V_TU	7				/* RH11/TM03/TU45 */
+#define INT_V_DZ0RX	16				/* DZ11 */
+#define INT_V_DZ0TX	17
 #define INT_V_PTR	24				/* PC11 */
 #define INT_V_PTP	25
 #define INT_V_LP20	26				/* LPT20 */
 
 #define INT_RP		(1u << INT_V_RP)
 #define INT_TU		(1u << INT_V_TU)
-#define INT_DZ		(1u << INT_V_DZ)
+#define INT_DZ0RX	(1u << INT_V_DZ0RX)
+#define INT_DZ0TX	(1u << INT_V_DZ0TX)
 #define INT_PTR		(1u << INT_V_PTR)
 #define INT_PTP		(1u << INT_V_PTP)
 #define INT_LP20	(1u << INT_V_LP20)
@@ -613,14 +620,15 @@ typedef int64 d10;					/* PDP-10 data (36b) */
 #define INT_UB1		INT_RP				/* on Unibus 1 */
 #define INT_UB3		(0xFFFFFFFFu & ~INT_UB1)	/* on Unibus 3 */
 
-#define INT_IPL7	0x000000FF			/* int level masks */
-#define INT_IPL6	0x0000FF00
-#define INT_IPL5	0x00FF0000
-#define INT_IPL4	0x3F000000
+#define INT_IPL7	0x0000000F			/* int level masks */
+#define INT_IPL6	0x000000F0
+#define INT_IPL5	0x000FFF00
+#define INT_IPL4	0x3FF00000
 
 #define VEC_PTR		0070				/* interrupt vectors */
 #define VEC_PTP		0074
 #define VEC_TU		0224
 #define VEC_RP		0254
-#define VEC_DZ		0340
+#define VEC_DZ0RX	0340
+#define VEC_DZ0TX	0344
 #define VEC_LP20	0754

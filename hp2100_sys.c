@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-May-01	RMS	Added multiconsole support
    14-Mar-01	RMS	Revised load/dump interface (again)
    30-Oct-00	RMS	Added examine to file support
    15-Oct-00	RMS	Added dynamic device number support
@@ -48,6 +49,7 @@ extern uint16 M[];
    sim_PC		pointer to saved PC register descriptor
    sim_emax		maximum number of words for examine/deposit
    sim_devices		array of pointers to simulated devices
+   sim_consoles		array of pointers to consoles (if more than one)
    sim_stop_messages	array of pointers to stop messages
    sim_load		binary loader
 */
@@ -66,6 +68,8 @@ DEVICE *sim_devices[] = { &cpu_dev,
 	&mtd_dev, &mtc_dev,
 	&dpd_dev, &dpc_dev,
 	NULL };
+
+UNIT *sim_consoles = NULL;
 
 const char *sim_stop_messages[] = {
 	"Unknown error",

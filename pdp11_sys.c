@@ -23,16 +23,17 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-May-01	RMS	Added multiconsole support
    05-Apr-01	RMS	Added support for TS11/TSV05
    14-Mar-01	RMS	Revised load/dump interface (again)
    11-Feb-01	RMS	Added DECtape support
    30-Oct-00	RMS	Added support for examine to file
    14-Apr-99	RMS	Changed t_addr to unsigned
-   09-Nov-98	RMS	Fixed assignments of ROR/ROL (John Wilson).
-   27-Oct-98	RMS	V2.4 load interface.
-   08-Oct-98	RMS	Fixed bug in bad block routine.
-   30-Mar-98	RMS	Fixed bug in floating point display.
-   12-Nov-97	RMS	Added bad block table routine.
+   09-Nov-98	RMS	Fixed assignments of ROR/ROL (John Wilson)
+   27-Oct-98	RMS	V2.4 load interface
+   08-Oct-98	RMS	Fixed bug in bad block routine
+   30-Mar-98	RMS	Fixed bug in floating point display
+   12-Nov-97	RMS	Added bad block table routine
 */
 
 #include "pdp11_defs.h"
@@ -58,6 +59,7 @@ extern int32 saved_PC;
    sim_PC		pointer to saved PC register descriptor
    sim_emax		number of words for examine
    sim_devices		array of pointers to simulated devices
+   sim_consoles		array of pointers to consoles (if more than one)
    sim_stop_messages	array of pointers to stop messages
    sim_load		binary loader
 */
@@ -78,6 +80,8 @@ DEVICE *sim_devices[] = {
 	&rx_dev, &dt_dev,
 	&tm_dev, &ts_dev,
 	NULL };
+
+UNIT *sim_consoles = NULL;
 
 const char *sim_stop_messages[] = {
 	"Unknown error",

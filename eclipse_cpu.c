@@ -28,6 +28,7 @@
 
    cpu		Eclipse central processor
 
+   01-Jun-01	RMS	Added second terminal, plotter support
    26-Apr-01	RMS	Added device enable/disable support
 
    The register state for the Eclipse CPU is basically the same as
@@ -436,7 +437,10 @@ extern int32 ptr (int32 pulse, int32 code, int32 AC);
 extern int32 ptp (int32 pulse, int32 code, int32 AC);
 extern int32 tti (int32 pulse, int32 code, int32 AC);
 extern int32 tto (int32 pulse, int32 code, int32 AC);
+extern int32 tti1 (int32 pulse, int32 code, int32 AC);
+extern int32 tto1 (int32 pulse, int32 code, int32 AC);
 extern int32 clk (int32 pulse, int32 code, int32 AC);
+extern int32 plt (int32 pulse, int32 code, int32 AC);
 extern int32 lpt (int32 pulse, int32 code, int32 AC);
 extern int32 dsk (int32 pulse, int32 code, int32 AC);
 extern int32 dkp (int32 pulse, int32 code, int32 AC);
@@ -455,7 +459,7 @@ struct ndev dev_table[64] = {
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
 	{ INT_TTI, PI_TTI, &tti }, { INT_TTO, PI_TTO, &tto },	/* 10 - 17 */
 	{ INT_PTR, PI_PTR, &ptr }, { INT_PTP, PI_PTP, &ptp }, 
-	{ INT_CLK, PI_CLK, &clk }, { 0, 0, &nulldev },
+	{ INT_CLK, PI_CLK, &clk }, { INT_PLT, PI_PLT, &plt },
 	{ 0, 0, &nulldev }, { INT_LPT, PI_LPT, &lpt },
 	{ INT_DSK, PI_DSK, &dsk }, { 0, 0, &nulldev },		/* 20 - 27 */
 	{ INT_MTA, PI_MTA, &mta }, { 0, 0, &nulldev }, 
@@ -469,7 +473,7 @@ struct ndev dev_table[64] = {
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev },			/* 50 - 57 */
+	{ INT_TTI1, PI_TTI1, &tti1 }, { INT_TTO1, PI_TTO1, &tto1 }, /* 50 - 57 */
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 

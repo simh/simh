@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-May-01	RMS	Added second Teletype support
    21-Jan-01	RMS	Added DECtape support
    14-Apr-99	RMS	Changed t_addr to unsigned
    02-Jan-96	RMS	Added fixed head and moving head disks
@@ -54,21 +55,23 @@
 					Type 24 serial drum
 
    PDP9	   32K	KE09A EAE		KSR-33 Teletype
-	   	KG09B mem extension	PC09A paper tape reader and punch
-		KP09A power detection	integral real time clock
-		KX09A mem protection	Type 647D/E line printer (sixbit)
-					RF09/RS09 fixed head disk
+	   	KF09A auto pri intr	PC09A paper tape reader and punch
+		KG09B mem extension	integral real time clock
+		KP09A power detection	Type 647D/E line printer (sixbit)
+		KX09A mem protection	RF09/RS09 fixed head disk
 					TC59 magnetic tape
 					TC02/TU55 DECtape
+					LT09A second Teletype
 
    PDP15  128K	KE15 EAE		KSR-35 Teletype
-		KF15 power detection	PC15 paper tape reader and punch
-		KM15 mem protection	KW15 real time clock
-		??KT15 mem relocation	LP15 line printer
-					RP15 disk pack
+		KA15 auto pri intr	PC15 paper tape reader and punch
+		KF15 power detection	KW15 real time clock
+		KM15 mem protection	LP15 line printer
+		??KT15 mem relocation	RP15 disk pack
 					RF15/RF09 fixed head disk
 					TC59D magnetic tape
 					TC15/TU56 DECtape
+					LT15 second Teletype
 
    ??Indicates not implemented.  The PDP-4 manual refers to both an EAE
    ??and a memory extension control; there is no documentation on either.
@@ -84,6 +87,7 @@
 #define STOP_HALT	2				/* HALT */
 #define STOP_IBKPT	3				/* breakpoint */
 #define STOP_XCT	4				/* nested XCT's */
+#define STOP_API	5				/* invalid API int */
 
 /* Peripheral configuration */
 
@@ -101,6 +105,8 @@
 #define RF		0				/* fixed head disk */
 #define MTA		0				/* magtape */
 #define DTA		0				/* DECtape */
+#define TTY1		0				/* second Teletype */
+#define BRMASK		0076000				/* bounds mask */
 #elif defined (PDP15)
 #define ADDRSIZE	17
 #define LP15		0				/* ASCII printer */
@@ -108,6 +114,8 @@
 #define RP		0				/* disk pack */
 #define MTA		0				/* magtape */
 #define DTA		0				/* DECtape */
+#define TTY1		0				/* second Teletype */
+#define BRMASK		0377400				/* bounds mask */
 #endif
 
 /* Memory */
@@ -125,6 +133,7 @@
 #define LINK		(DMASK + 1)			/* link */
 #define LACMASK		(LINK | DMASK)			/* link + data */
 #define SIGN		0400000				/* sign bit */
+#define OP_JMS		0100000				/* JMS */
 #define OP_JMP		0600000				/* JMP */
 #define OP_HLT		0740040				/* HLT */
 
@@ -144,18 +153,54 @@
    If flag based, API is hard to implement; if API based, IORS requires
    extra code for implementation.  I've chosen an API based model.
 
+   API channel	Device	  	API priority	Notes
+
+	00	software 4		4
+	01	software 5		5
+	02	software 6		6
+	03	software 7		7
+	04	TC02/TC15		1
+	05	TC59D			1
+	06	drum			1	PDP-9 only
+	07	disk			1	PDP-9 only
+	10	paper tape reader	2
+	11	real time clock		3
+	12	power fail		0
+	13	memory parity		0
+	14	display			2
+	15	card reader		2
+	16	line printer		2
+	17	A/D converter		0
+	20	interprocessor buffer	3
+	21	360 link		3	PDP-9 only
+	22	data phone		2	PDP-15 only
+	23	RF09/RF15		1
+	24	RP15			1	PDP-15 only
+	25	plotter			1	PDP-15 only
+	26	-
+	27	-
+	30	-
+	31	-
+	32	-
+	33	-
+	34	LT15 TTO		3	PDP-15 only
+	35	LT15 TTI		3	PDP-15 only
+	36	-
+	37	-
+
    Interrupt system, priority is left to right.
 
    <30:28> =	priority 0
    <27:20> =	priority 1
-   <19:14> =	priority 2
-   <13:10> =	priority 3
-   <9:4> =	PI only
-   <3> =	priority 4 (software)
-   <2> =	priority 5 (software)
-   <1> =	priority 6 (software)
-   <0> =	priority 7 (software)
+   <19:12> =	priority 2
+   <11:8> =	priority 3
+   <7:0> =	PI only
 */
+
+#define API_L0		0xF0000000
+#define API_L1		0x0FF00000
+#define API_L2		0x000FF000
+#define API_L3		0x00000F00
 
 #define INT_V_PWRFL	30				/* powerfail */
 #define INT_V_DTA	27				/* DECtape */
@@ -166,14 +211,12 @@
 #define INT_V_PTR	19				/* paper tape reader */
 #define INT_V_LPT	18				/* line printer */
 #define INT_V_LPTSPC	17				/* line printer spc */
-#define INT_V_CLK	13				/* clock */
-#define INT_V_TTI	9				/* keyboard */
-#define INT_V_TTO	8				/* terminal */
-#define INT_V_PTP	7				/* paper tape punch */
-#define INT_V_SW4	3				/* software 4 */
-#define INT_V_SW5	2				/* software 5 */
-#define INT_V_SW6	1				/* software 6 */
-#define INT_V_SW7	0				/* software 7 */
+#define INT_V_CLK	11				/* clock */
+#define INT_V_TTI1	10				/* LT15 keyboard */
+#define INT_V_TTO1	9				/* LT15 output */
+#define INT_V_TTI	7				/* console keyboard */
+#define INT_V_TTO	6				/* console output */
+#define INT_V_PTP	5				/* paper tape punch */
 
 #define INT_PWRFL	(1 << INT_V_PWRFL)
 #define INT_DTA		(1 << INT_V_DTA)
@@ -185,13 +228,24 @@
 #define INT_LPT		(1 << INT_V_LPT)
 #define INT_LPTSPC	(1 << INT_V_LPTSPC)
 #define INT_CLK		(1 << INT_V_CLK)
+#define INT_TTI1	(1 << INT_V_TTI1)
+#define INT_TTO1	(1 << INT_V_TTO1)
 #define INT_TTI		(1 << INT_V_TTI)
 #define INT_TTO		(1 << INT_V_TTO)
 #define INT_PTP		(1 << INT_V_PTP)
-#define INT_SW4		(1 << INT_V_SW4)
-#define INT_SW5		(1 << INT_V_SW5)
-#define INT_SW6		(1 << INT_V_SW6)
-#define INT_SW7		(1 << INT_V_SW7)
+
+#define ACH_SWRE	040				/* API channels */
+#define ACH_PWRFL	052
+#define ACH_DTA		044
+#define ACH_MTA		045
+#define ACH_DRM		046
+#define ACH_RF		063
+#define ACH_RP		064
+#define ACH_PTR		050
+#define ACH_LPT		056
+#define ACH_CLK		051
+#define ACH_TTI1	075
+#define ACH_TTO1	074
 
 /* I/O status flags for the IORS instruction
 

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V2.6
-Date:	3-May-01
+Subj:	Simulator Usage, V2.6a
+Date:	15-Jun-01
 
 			COPYRIGHT NOTICE
 
@@ -160,6 +160,8 @@ arguments.  Switches take the form:
 Multiple switches may be specified separately or together: -abcd or
 -a -b -c -d are treated identically.  Verbs, switches, and other
 input (except for file names) are case insensitive.
+
+Any command beginning with semicolon (;) is considered a comment and ignored.
 
 3.1 Loading and Saving Programs
 
@@ -419,7 +421,20 @@ specified unit from the configuration.  Once removed, a unit cannot be
 manipulated in any way until it is added back to the configuration.
 ADD <unit> adds back a unit that had been removed from the configuration.
 
-3.11 Exiting The Simulator
+3.11 Logging Console Output
+
+Output to the console can be logged simultaneously to a file.  Logging is
+enabled by the LOG command:
+
+	sim> LOG <filename>			-- log console output to file
+
+Logging is disabled by the NOLOG command:
+
+	sim> NOLOG					-- disable logging
+
+LOG with no argument displays whether logging is enabled or disabled.
+
+3.12 Exiting The Simulator
 
 EXIT (synonyms QUIT and BYE) returns control to the operating system.
 
@@ -1704,6 +1719,22 @@ control registers for the interrupt system.
 
 6.2 Programmed I/O Devices
 
+The Nova can have two terminals (TTI/TTO, TTI1/TTO1).  At any moment
+only one terminal is active.  It can receive input from the keyboard;
+it can output to the simulator window.  The inactive console cannot
+receive input from the keyboard and outputs to an internal buffer
+(maximum 4K characters).
+
+Control is switched among terminals with a SET TTI{n} CONSOLE or SET
+TTO{n} CONSOLE command:
+
+					At startup, active console is TTI/TTO
+	SET TTI1 CONSOLE		Active console is now TTI1/TTO1
+	SET TTO CONSOLE		Active console is now TTI/TTO
+
+When control is switched to an inactive terminal, any buffered output
+is printed when simulation resumes.
+
 6.2.1 Paper Tape Reader (PTR)
 
 The paper tape reader (PTR) reads data from a disk file.  The POS
@@ -1763,21 +1794,23 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-6.2.3 Terminal Input (TTI)
+6.2.3 Terminal Input (TTI, TTI1)
 
-The terminal input reads from the controling console port.  Terminal
-options include the ability to set limited Dasher compatibility mode or
-normal mode:
+The active terminal input polls the console keyboard for input.  The
+inactive terminal input cannot receive characters.  Terminal input
+options include the ability to set limited Dasher compatibility mode
+or ANSI standard mode:
 
 	SET TTI ANSI		normal mode
 	SET TTI DASHER		Dasher mode
 	SET TTO ANSI		normal mode
 	SET TTO DASHER		Dasher mode
 
-Setting either TTI or TTO changes both devices.  In Dasher mode, carriage
-return is changed to newline on input, and ^X is changed to backspace.
+Setting either TTI (TTI1) or TTO (TTO1) changes both devices.  In Dasher
+mode, carriage return is changed to newline on input, and ^X is changed
+to backspace.
 
-The terminal input implements these registers:
+The terminal inputs implement these registers:
 
 	name		size	comments
 
@@ -1789,21 +1822,22 @@ The terminal input implements these registers:
 	POS		31	number of characters input
 	TIME		24	keyboard polling interval
 
-6.2.4 Terminal Output (TTO)
+6.2.4 Terminal Output (TTO, TTO1)
 
-The terminal output writes to the controling console port.  Terminal
-options include the ability to set limited Dasher compatibility mode or
-normal mode:
+The active terminal output writes to the simulator window.  The inactive
+terminal output buffers characters.  Terminal output options include the
+the ability to set limited Dasher compatibility mode or ANSI mode:
 
 	SET TTI ANSI		normal mode
 	SET TTI DASHER		Dasher mode
 	SET TTO ANSI		normal mode
 	SET TTO DASHER		Dasher mode
 
-Setting either TTI or TTO changes both devices.  In Dasher mode, carriage
-return is changed to newline on input, and ^X is changed to backspace.
+Setting either TTI (TTI1) or TTO (TTO1) changes both devices.  In Dasher
+mode, carriage return is changed to newline on input, and ^X is changed
+to backspace.
 
-The terminal output implements these registers:
+The terminal outputs implement these registers:
 
 	name		size	comments
 
@@ -1869,69 +1903,6 @@ specifies the number of the next data item to be written. Thus,
 by changing POS, the user can backspace or advance the plotter.
 
 The plotter implements these registers:
-
-	name		size	comments
-
-	BUF		8	last data item processed
-	BUSY		1	device busy flag
-	DONE		1	device done flag
-	DISABLE		1	interrupt disable flag
-	INT		1	interrupt pending flag
-	POS		31	position in the output file
-	TIME		24	time from I/O initiation to interrupt
-	STOP_IOE	1	stop on I/O error
-
-Error handling is as follows:
-
-	error	     STOP_IOE	processed as
-
-	not attached	1	report error and stop
-			0	out of tape or paper
-
-	OS I/O error	x	report error and stop
-
-6.2.8 Second Terminal Input (TTI1)
-
-The second terminal input (TTI1) reads data from a disk file.  When a
-file is attached, the second terminal input will read characters at
-the interval specified by the TIME register.  Detaching the file, or
-reaching end of file, stops input.  The POS register specifies the
-number of the next data item to be read.  Thus, by changing POS, the
-user can backspace or advance the input stream.
-
-The second terminal input implements these registers:
-
-	name		size	comments
-
-	BUF		8	last data item processed
-	BUSY		1	device busy flag
-	DONE		1	device done flag
-	DISABLE		1	interrupt disable flag
-	INT		1	interrupt pending flag
-	POS		31	position in the input file
-	TIME		24	time from I/O initiation to interrupt
-	STOP_IOE	1	stop on I/O error
-
-Error handling is as follows:
-
-	error   STOP_IOE	processed as
-
-	not attached	1	report error and stop
-			0	out of tape or paper
-
-	end of file	1	report error and stop
-			0	out of tape or paper
-
-	OS I/O error	x	report error and stop
-
-6.2.9 Second Terminal Output (TTO1)
-
-The second terminal output (TTO1) writes data to a disk file.  The
-POS register specifies the number of the next data item to be written.
-Thus, by changing POS, the user can backspace or advance the output
-stream.
-
-The second terminal outpout implements these registers:
 
 	name		size	comments
 
@@ -2528,11 +2499,13 @@ PDP-7	CPU		PDP-7 CPU with 32KW of memory
 
 PDP-9	CPU		PDP-9 CPU with 32KW of memory
 	-		KE09A extended arithmetic element (EAE)
+	-		KF09A automatic priority interrupt (API)
 	-		KG09B memory extension
 	-		KP09A power detection
 	-		KX09A memory protection
 	PTR,PTP		PC09A paper tape reader/punch
 	TTI,TTO		KSR 33 console terminal
+	TTI1,TTO1	LT09A second console terminal
 	LPT		Type 647E line printer
 	CLK		integral real-time clock
 	RF		RF09/RS09 fixed-head disk
@@ -2541,10 +2514,12 @@ PDP-9	CPU		PDP-9 CPU with 32KW of memory
 
 PDP-15	CPU		PDP-15 CPU with 32KW of memory
 	-		KE15 extended arithmetic element (EAE)
+	-		KA15 automatic priority interrupt (API)
 	-		KF15 power detection
 	-		KM15 memory protection
 	PTR,PTP		PC15 paper tape reader/punch
 	TTI,TTO		KSR 35 console terminal
+	TTI1,TTO1	LT15 second console terminal
 	LPT		LP15 line printer
 	CLK		integral real-time clock
 	RP		RP15/RP02 disk pack
@@ -2569,10 +2544,13 @@ specified, the file is assumed to be BIN format.
 
 8.1 CPU
 
-The only CPU options are the presence of the EAE and the size of main memory.
+The CPU options are the presence of the EAE, the presense of the API (for
+the PDP-9 and PDP-15), and the size of main memory.
 
 	SET CPU EAE		enable EAE
 	SET CPU NOEAE		disable EAE
+	SET CPU API		enable API
+	SET CPU NOAPI	disable API
 	SET CPU 4K		set memory size = 4K
 	SET CPU 8K		set memory size = 8K
 	SET CPU 12K		set memory size = 12K
@@ -2638,6 +2616,22 @@ the PDP-7 and PDP-9, 17b for the PDP-15).
 
 8.2 Programmed I/O Devices
 
+The PDP-9 and PDP-15 have two terminals (TTI/TTO, TTI1/TTO1).  At any
+moment, only one terminal is active.  It can receive input from the
+keyboard; it can output to the simulator window.  The inactive console
+cannot receive input from the keyboard and outputs to an internal buffer
+(maximum 4K characters).
+
+Control is switched among terminals with a SET TTI{n} CONSOLE or SET
+TTO{n} CONSOLE command:
+
+					At startup, active console is TTI/TTO
+	SET TTI1 CONSOLE		Active console is now TTI1/TTO1
+	SET TTO CONSOLE		Active console is now TTI/TTO
+
+When control is switched to an inactive terminal, any buffered output
+is printed when simulation resumes.
+
 8.2.1 Paper Tape Reader (PTR)
 
 The paper tape reader (PTR) reads data from a disk file.  The POS
@@ -2700,18 +2694,20 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-8.2.3 Terminal Input (TTI)
+8.2.3 Terminal Input (TTI, TTI1)
 
-The terminal input (TTI) reads from the controling console port.  The
-terminal input has one option, UC; when set, it automatically converts
-lower case input to upper case.
+The active terminal input polls the console keyboard for input.  The
+inactive terminal input cannot receive characters.  The terminal inputs
+have one option, UC; when set, it automatically converts lower case input
+to upper case.
 
-The PDP-9 and PDP-15 operated the terminal, by default, as half-duplex.
-For backward compatibility, on the PDP-9 and PDP-15 the terminal input
-has a second option, FDX; when set, it operates the terminal input in
-full-duplex mode.
+The PDP-9 and PDP-15 operated the primary terminal (TTI/TTO), by default,
+as half-duplex.  For backward compatibility, on the PDP-9 and PDP-15
+the first terminal input has a second option, FDX; when set, it operates
+the terminal input in full-duplex mode.  The second terminal is always
+full duplex.
 
-The terminal input implements these registers:
+The terminal inputs implement these registers:
 
 	name		size	comments
 
@@ -2721,10 +2717,14 @@ The terminal input implements these registers:
 	POS		31	number of characters input
 	TIME		24	keyboard polling interval
 
-8.2.4 Terminal Output (TTO)n backspace or advance these devices.
+8.2.4 Terminal Output (TTO, TTO1)
 
-The terminal output (TTO) writes to the controling console port.  It
-implements these registers:
+The active terminal output writes to the simulator window.  The inactive
+terminal output buffers characters.  The terminal outputs have one option,
+UC; when set, it suppresses lower case output (so that ALTMODE is not
+echoed as }).
+
+The terminal outputs implement these registers:
 
 	name		size	comments
 
@@ -4172,9 +4172,12 @@ the file format to try to determine the file type.
 
 12.1 CPU
 
-The only CPU option is the choice of standard or ITS compatible microcode.
+The CPU options allow the user to specify standard microcode, standard
+microcode with a bug fix for a boostrap problem in TOPS-20 V4.1, or ITS
+microcode
 
 	SET CPU STANDARD	Standard microcode
+	SET CPU TOPS20V41	Standard microcode with TOPS-20 V4.1 bug fix
 	SET CPU ITS		ITS compatible microcode
 
 CPU registers include the visible state of the processor as well as the
@@ -4663,12 +4666,22 @@ legend:		y = runs operating system or sample program
 
 Revision History (since Rev 1.1)
 
-Rev 2.6a, Jul, 01
+Rev 2.6a, Jun, 01
+		Fixed bug (found by Dave Conroy) in big-endian I/O
 		Fixed DECtape reset in PDP-8, PDP-11, PDP-9/15
 		Fixed RIM loader PC handling in PDP-9/15
 		Fixed indirect pointers in PDP-10 paging
 		Fixed SSC handling in PDP-10 TM02/TU45
-		Added FE CTRL-C option for Windoze
+		Fixed JMS to non-existent memory in PDP-8
+		Fixed error handling on command file
+		Increased size of string buffers for long path names
+		Added PDP-9, PDP-15 API option
+		Added PDP-9, PDP-15 second terminal
+		Added PDP-10 option for TOPS-20 V4.1 bug fix
+		Added PDP-10 FE CTRL-C option for Windoze
+		Added console logging
+		Added multiple console support
+		Added comment recognition
 
 Rev 2.6, May, 01
 		Added ENABLE/DISABLE devices

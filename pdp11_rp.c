@@ -34,8 +34,8 @@
    14-Apr-99	RMS	Changed t_addr to unsigned
    05-Oct-98	RMS	Fixed bug, failing to interrupt on go error
    04-Oct-98	RMS	Changed names to allow coexistence with RH/TU77
-   12-Nov-97	RMS	Added bad block table command.
-   10-Aug-97	RMS	Fixed bugs in interrupt handling.
+   12-Nov-97	RMS	Added bad block table command
+   10-Aug-97	RMS	Fixed bugs in interrupt handling
 
    The "Massbus style" disks consisted of several different large
    capacity drives interfaced through a reasonably common (but not

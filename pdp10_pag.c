@@ -25,6 +25,7 @@
 
    pag		KS10 pager
 
+   19-May-01	RMS	Added workaround for TOPS-20 V4.1 boot bug
    03-May-01	RMS	Fixed bug in indirect page table pointer processing
    29-Apr-01	RMS	Added CLRCSH for ITS, fixed LPMR
 
@@ -659,6 +660,8 @@ return FALSE;
 t_bool wrcstm (a10 ea, int32 prv)
 {
 cstm = Read (ea, prv);
+if ((cpu_unit.flags & UNIT_T20V41) && (ea == 040127))
+	cstm = 0770000000000;
 return FALSE;
 }
 

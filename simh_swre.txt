@@ -457,9 +457,62 @@ To load and run BASIC:
 	RUN
 	 1.41421
 
-9. PDP-10 TOPS-10 7.03
+9. PDP-9/PDP-15 Advanced Software System/Keyboard Monitor
+
+The Advanced Software System was a family of operating systems for the
+PDP-9 and PDP-15, ranging from a paper-tape basic system, through the
+DECtape or disk based Keyboard Monitor, through the Foreground/Background
+Monitor, to DOS-15.  To run ADSS/KM from simulated DECtape:
+
+- On the PDP-9 (only), initialize extend mode to on:
+
+	sim> d extm_init 1
+
+- Load the paper-tape bootstrap into upper memory:
+
+	sim> load dec-15u.rim 77637
+
+- Verify that the bootstrap loaded correctly:
+
+	sim> ex pc
+	PC:	077646
+
+- Mount the Advanced Software System DECtape image on DECtape unit 0:
+
+	sim> attach dt adss15_32k.dtp
+
+- Run the bootstrap:
+
+	sim> run
+
+- The DECtape will boot and print out
+
+	KMS9-15 V5B000
+	$
+
+   and is now ready for commands.  Recognized commands include:
+
+	D	list system device directory
+	I	list available commands
+	R	list device assignments
+	SCOM	list systems communication region
+
+- To run Focal, assign unused DAT slot 10 and then load Focal
+
+	$A LPA0 10
+	$GLOAD
+	LOADER V5B000
+	>_FOCAL<altmode = control-[>
+	FOCAL V9A
+	*TYPE 2+2,!
+	    4.0000
+	*
+
+10. PDP-10 TOPS-10 7.03, TOPS-20 V4.1
 
 TOPS-10 was the primary time-shared operating system for the PDP-10.
-Installation and distribution tapes for TOPS-10 7.03 are available at
-http://pdp-10.trailing-edge.com.
+TOPS-20 was a popular alternative derived from the BBN TENEX system.
+Installation and distribution tapes for TOPS-10 7.03 and TOPS-20 4.1
+are available at http://pdp-10.trailing-edge.com.
+
 [end simh_swre.txt]

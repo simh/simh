@@ -25,6 +25,7 @@
 
    uba		Unibus adapters
 
+   1-Jun-01	RMS	Updated DZ11 vectors
    12-May-01	RMS	Fixed typo
 
    The KS10 uses the PDP-11 Unibus for its I/O, via adapters.  While
@@ -94,8 +95,8 @@ extern jmp_buf save_env;
 
 extern d10 Read (a10 ea);
 extern void pi_eval ();
-extern t_stat dz_rd (int32 *data, int32 addr, int32 access);
-extern t_stat dz_wr (int32 data, int32 addr, int32 access);
+extern t_stat dz0_rd (int32 *data, int32 addr, int32 access);
+extern t_stat dz0_wr (int32 data, int32 addr, int32 access);
 extern t_stat pt_rd (int32 *data, int32 addr, int32 access);
 extern t_stat pt_wr (int32 data, int32 addr, int32 access);
 extern t_stat lp20_rd (int32 *data, int32 addr, int32 access);
@@ -162,7 +163,7 @@ struct iolink iotable[] = {
 	{ IO_UBA3+IO_TMBASE, IO_UBA3+IO_TMBASE+033, 0,
 			&tu_rd, &tu_wr },		/* mag tape */
 /*	{ IO_UBA3+IO_DZBASE, IO_UBA3+IO_DZBASE+07, INT_DZ,
-			&dz_rd, &dz_wr },		/* terminal mux */
+			&dz0_rd, &dz0_wr },		/* terminal mux */
 	{ IO_UBA3+IO_LPBASE, IO_UBA3+IO_LPBASE+017, 0,
 			&lp20_rd, &lp20_wr },		/* line printer */
 	{ IO_UBA3+IO_PTBASE, IO_UBA3+IO_PTBASE+07, INT_PTR,
@@ -187,17 +188,17 @@ struct iolink iotable[] = {
 /* Interrupt request to interrupt action map */
 
 int32 (*int_ack[32])() = {				/* int ack routines */
+	NULL, NULL, NULL, NULL, NULL, NULL, &rp_inta, &tu_inta,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	&rp_inta, &tu_inta, NULL, NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, &lp20_inta, NULL, NULL, NULL, NULL, NULL  };
 
 /* Interrupt request to vector map */
 
 int32 int_vec[32] = {					/* int req to vector */
+	0, 0, 0, 0, 0, 0, VEC_RP, VEC_TU,
 	0, 0, 0, 0, 0, 0, 0, 0,
-	VEC_RP, VEC_TU, 0, 0, 0, 0, 0, 0,
-	VEC_DZ, 0, 0, 0, 0, 0, 0, 0, 
+	VEC_DZ0RX, VEC_DZ0TX, 0, 0, 0, 0, 0, 0, 
 	VEC_PTR, VEC_PTP, VEC_LP20, 0, 0, 0, 0, 0 };
 
 /* IO 710	(DEC) TIOE - test I/O word, skip if zero

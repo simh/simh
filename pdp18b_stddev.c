@@ -29,6 +29,8 @@
    tto		teleprinter
    clk		clock
 
+   10-Jun-01	RMS	Cleaned up IOT decoding to reflect hardware
+   27-May-01	RMS	Added multiconsole support
    10-Mar-01	RMS	Added funny format loader support
    05-Mar-01	RMS	Added clock calibration support
    22-Dec-00	RMS	Added PDP-9/15 half duplex support
@@ -50,6 +52,10 @@ int32 ptp_err = 0, ptp_stopioe = 0;
 int32 tti_state = 0;
 int32 tto_state = 0;
 int32 clk_tps = 60;
+#if defined (TTY1)
+static uint8 tto_consout[CONS_SIZE];
+#endif
+
 t_stat clk_svc (UNIT *uptr);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
@@ -195,9 +201,9 @@ static const int32 tti_trans[128] = {
 #define UNIT_HDX	(1 << UNIT_V_HDX)
 
 #if defined (PDP4) || defined (PDP7)
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC+UNIT_CONS, 0), KBD_POLL_WAIT };
 #else
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC + UNIT_HDX, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC+UNIT_HDX+UNIT_CONS, 0), KBD_POLL_WAIT };
 #endif
 
 REG tti_reg[] = {
@@ -212,9 +218,16 @@ REG tti_reg[] = {
 #endif
 	{ DRDATA (POS, tti_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
+#if defined (TTY1)
+	{ FLDATA (CFLAG, tti_unit.flags, UNIT_V_CONS), REG_HRO },
+#endif
 	{ NULL }  };
 
 MTAB tti_mod[] = {
+#if defined (TTY1)
+	{ UNIT_CONS, 0, "inactive", NULL, NULL },
+	{ UNIT_CONS, UNIT_CONS, "active console", "CONSOLE", &set_console },
+#endif
 #if !defined (KSR28)
 	{ UNIT_UC, 0, "lower case", "LC", NULL },
 	{ UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
@@ -257,7 +270,7 @@ static const char tto_trans[64] = {
 
 #define TTO_MASK	((1 << TTO_WIDTH) - 1)
 
-UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
+UNIT tto_unit = { UDATA (&tto_svc, UNIT_UC+UNIT_CONS, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
 	{ ORDATA (BUF, tto_unit.buf, TTO_WIDTH) },
@@ -268,10 +281,25 @@ REG tto_reg[] = {
 #endif
 	{ DRDATA (POS, tto_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
+#if defined (TTY1)
+	{ BRDATA (CONSOUT, tto_consout, 8, 8, CONS_SIZE), REG_HIDDEN },
+	{ FLDATA (CFLAG, tto_unit.flags, UNIT_V_CONS), REG_HRO },
+#endif
 	{ NULL }  };
 
+MTAB tto_mod[] = {
+#if defined (TTY1)
+	{ UNIT_CONS, 0, "inactive", NULL, NULL },
+	{ UNIT_CONS, UNIT_CONS, "active console", "CONSOLE", &set_console },
+#endif
+#if !defined (KSR28)
+	{ UNIT_UC, 0, "lower case", "LC", NULL },
+	{ UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
+#endif
+	{ 0 }  };
+
 DEVICE tto_dev = {
-	"TTO", &tto_unit, tto_reg, NULL,
+	"TTO", &tto_unit, tto_reg, tto_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tto_reset,
 	NULL, NULL, NULL };
@@ -280,14 +308,16 @@ DEVICE tto_dev = {
 
 int32 clk (int32 pulse, int32 AC)
 {
-if (pulse == 001) return (int_req & INT_CLK)? IOT_SKP + AC: AC;	/* CLSF */
-if (pulse == 004) clk_reset (&clk_dev);			/* CLOF */
-else if (pulse == 044) {				/* CLON */
-	int_req = int_req & ~INT_CLK;			/* clear flag */
-	clk_state = 1;					/* clock on */
-	if (!sim_is_active (&clk_unit))			/* already on? */
-		sim_activate (&clk_unit,		/* start */
-		    sim_rtc_init (clk_unit.wait));  }	/* init calibr */
+if (pulse & 001) {					/* CLSF */
+	if (int_req & INT_CLK) AC = AC | IOT_SKP;  }
+if (pulse & 004) {					/* CLON/CLOF */
+	if (pulse & 040) {				/* CLON */
+		int_req = int_req & ~INT_CLK;		/* clear flag */
+		clk_state = 1;				/* clock on */
+		if (!sim_is_active (&clk_unit))		/* already on? */
+			sim_activate (&clk_unit,	/* start, calibr */
+			    sim_rtc_init (clk_unit.wait));  }
+	else clk_reset (&clk_dev);  }			/* CLOF */
 return AC;
 }
 
@@ -335,10 +365,11 @@ return	((int_req & INT_CLK)? IOS_CLK: 0) |
 
 int32 ptr (int32 pulse, int32 AC)
 {
-if (pulse == 001) return (int_req & INT_PTR)? IOT_SKP + AC: AC;	/* RSF */
+if (pulse & 001) {					/* RSF */
+	if (int_req & INT_PTR) AC = AC | IOT_SKP;  }
 if (pulse & 002) {					/* RRB, RCF */
 	int_req = int_req & ~INT_PTR;			/* clear done */
-	AC = ptr_unit.buf;  }				/* return buffer */
+	AC = AC | ptr_unit.buf;  }			/* return buffer */
 if (pulse & 004) {					/* RSA, RSB */
 	ptr_state = (pulse & 040)? 18: 0;		/* set mode */
 	int_req = int_req & ~INT_PTR;			/* clear done */
@@ -587,7 +618,8 @@ return SCPE_ARG;
 
 int32 ptp (int32 pulse, int32 AC)
 {
-if (pulse == 001) return (int_req & INT_PTP)? IOT_SKP + AC: AC;	/* PSF */
+if (pulse & 001) {					/* PSF */
+	if (int_req & INT_PTP) AC = AC | IOT_SKP;  }
 if (pulse & 002) int_req = int_req & ~INT_PTP;		/* PCF */
 if (pulse & 004) {					/* PSA, PSB, PLS */
 	int_req = int_req & ~INT_PTP;			/* clear flag */
@@ -648,10 +680,11 @@ return detach_unit (uptr);
 
 int32 tti (int32 pulse, int32 AC)
 {
-if (pulse == 001) return (int_req & INT_TTI)? IOT_SKP + AC: AC;	/* KSF */
-if (pulse == 002) {					/* KRB */
+if (pulse & 001) {					/* KSF */
+	if (int_req & INT_TTI) AC = AC | IOT_SKP;  }
+if (pulse & 002) {					/* KRB */
 	int_req = int_req & ~INT_TTI;			/* clear flag */
-	return tti_unit.buf & TTI_MASK;  }		/* return buffer */
+	AC = AC | tti_unit.buf & TTI_MASK;  }		/* return buffer */
 return AC;
 }
 
@@ -679,7 +712,11 @@ else {	if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;
 if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
 temp = temp & 0177;
 if ((tti_unit.flags & UNIT_UC) && islower (temp)) temp = toupper (temp);
-if (tti_unit.flags & UNIT_HDX) sim_putchar (temp);
+if ((tti_unit.flags & UNIT_HDX) &&
+    (!(tto_unit.flags & UNIT_UC) ||
+	  ((temp >= 007) && (temp <= 0137)))) {
+	sim_putcons (temp, uptr);
+	tto_unit.pos = tto_unit.pos + 1;  }
 tti_unit.buf = temp | 0200;				/* got char */
 #endif
 int_req = int_req | INT_TTI;				/* set flag */
@@ -694,6 +731,9 @@ t_stat tti_reset (DEVICE *dptr)
 tti_unit.buf = 0;					/* clear buffer */
 tti_state = 0;						/* clear state */
 int_req = int_req & ~INT_TTI;				/* clear flag */
+#if defined (TTY1)
+if (tti_unit.flags & UNIT_CONS)				/* if active cons */
+#endif
 sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
 return SCPE_OK;
 }
@@ -702,7 +742,8 @@ return SCPE_OK;
 
 int32 tto (int32 pulse, int32 AC)
 {
-if (pulse == 001) return (int_req & INT_TTO)? IOT_SKP + AC: AC;	/* TSF */
+if (pulse & 001) {					/* TSF */
+	if (int_req & INT_TTO) AC = AC | IOT_SKP;  }
 if (pulse & 002) int_req = int_req & ~INT_TTO;		/* clear flag */
 if (pulse & 004) {					/* load buffer */
 	sim_activate (&tto_unit, tto_unit.wait);	/* activate unit */
@@ -728,8 +769,11 @@ out = tto_trans[tto_unit.buf + tto_state];		/* translate */
 #else
 out = tto_unit.buf & 0177;				/* ASCII... */
 #endif
-if ((temp = sim_putchar (out)) != SCPE_OK) return temp;
-tto_unit.pos = tto_unit.pos + 1;
+if (!(tto_unit.flags & UNIT_UC) ||
+	 ((out >= 007) && (out <= 0137))) {
+	temp = sim_putcons (out, uptr);
+	if (temp != SCPE_OK) return temp;
+	tto_unit.pos = tto_unit.pos + 1;  }
 return SCPE_OK;
 }
 
@@ -741,5 +785,8 @@ tto_unit.buf = 0;					/* clear buffer */
 tto_state = 0;						/* clear state */
 int_req = int_req & ~INT_TTO;				/* clear flag */
 sim_cancel (&tto_unit);					/* deactivate unit */
+#if defined (TTY1)
+tto_unit.filebuf = tto_consout;
+#endif
 return SCPE_OK;
 }

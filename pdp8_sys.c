@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-May-01	RMS	Added multiconsole support
    18-Mar-01	RMS	Added DF32 support
    14-Mar-01	RMS	Added extension detection of RIM binary tapes
    15-Feb-01	RMS	Added DECtape support
@@ -53,6 +54,7 @@ extern int32 sim_switches;
    sim_PC		pointer to saved PC register descriptor
    sim_emax		maximum number of words for examine/deposit
    sim_devices		array of pointers to simulated devices
+   sim_consoles		array of pointers to consoles (if more than one)
    sim_stop_messages	array of pointers to stop messages
    sim_load		binary loader
 */
@@ -72,6 +74,8 @@ DEVICE *sim_devices[] = {
 	&df_dev, &rf_dev,
 	&dt_dev, &mt_dev,
 	NULL };
+
+UNIT *sim_consoles = NULL;
 
 const char *sim_stop_messages[] = {
 	"Unknown error",
