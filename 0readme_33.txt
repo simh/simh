@@ -1,63 +1,47 @@
-Notes For V3.3-1
+Notes For V3.3-2
 
-1. New Features in 3.3-1
+1. New Features in 3.3-2
 
-1.1 H316
+1.1 SCP and Libraries
 
-TTY	- implemented paper-tape reader and punch
-	- added ASCII file support
+- Added ASSERT command (from Dave Bryan)
 
-PTR,PTP	- added ASCII file support
+1.2 PDP-11, VAX
 
-1.2 HP2100
+- Added RA60, RA71, RA81 disks
 
-CPU	- added SET CPU 21MX-M, 21MX-E (from Dave Brian)
-	- disabled TIMER/EXECUTE/DIAG instructions for 21MX-M (from Dave Bryan)
-	- added post-processor to maintain T/M consistency (from Dave Bryan)
-
-DS	- released 13037 disk controller
-
-1.3 Interdata
-
-MT	- added read-only file support
-
-1.4 SDS
-
-MT	- added read-only file support
-
-1.5 PDP-11
-
-TM,TS	- added read-only file support
-
-2. Bugs Fixed in 3.3
+2. Bugs Fixed in 3.3-2
 
 2.1 H316
 
-CPU	- fixed bug in divide
+- Fixed IORETURN macro
+- PT: fixed bug in OCP '0001 (found by Philipp Hachtmann)
+- MT: fixed error reporting from OCP (found by Philipp Hachtmann)
 
-LPT	- fixed bug in DMA/DMC support
+2.2 Interdata 32b
 
-MT	- fixed bug in DMA/DMC support
-
-DP	- fixed bug in skip on not seeking
-
-TTY	- fixed bugs in SKS '104, '504
-
-2.2 HP2100
-
-CPU	- fixed DMA reset to clear alternate CTL flop (from Dave Bryan)
-	- fixed bug in JPY (from Dave Bryan)
-	- fixed bugs in CBS, SBS, TBS
-	- separate A/B from M[0/1] for DMA (found by Dave Bryan)
-
-
-LPS	- added restart when set online, etc. (from Dave Bryan)
-	- fixed col count for non-printing chars (from Dave Bryan)
-
-LPT	- added restart when set online, etc. (from Dave Bryan)
-
+- Fixed branches to mask new PC (from Greg Johnson)
 
 2.3 PDP-11
 
-CPU	- fixed WAIT to work in all modes (from John Dundas)
+- Fixed bugs in RESET for 11/70 (reported by Tim Chapman)
+- Fixed bug in SHOW MODEL (from Sergey Okhapkin)
+- Made SYSID variable for 11/70 (from Tim Chapman)
+- Fixed MBRK write case for 11/70 (from Tim Chapman)
+- RY: fixed bug in boot code (reported by Graham Toal)
+
+2.4 VAX
+
+- Fixed initial state of cpu_extmem
+
+2.5 HP2100 (from Dave Bryan)
+
+- Fixed missing MPCK on JRS target
+- Removed EXECUTE instruction (is NOP in actual microcode)
+- Fixed missing negative overflow renorm in StoreFP
+
+2.6 I1401
+
+- Fixed bug in line printer write line (reported by Van Snyder)
+
 

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	VAX780 Simulator Usage
-Date:	24-Oct-2004
+Date:	20-Jan-2005
 
 			COPYRIGHT NOTICE
 
@@ -714,7 +714,9 @@ of many disk types:
 	SET RQn RD53		set type to RD53
 	SET RQn RD54		set type to RD54
 	SET RQn RD31		set type to RD31
+	SET RQn RA81		set type to RA81
 	SET RQn RA82		set type to RA82
+	set RQn RA71		set type to RA71
 	SET RQn RA72		set type to RA72
 	SET RQn RA90		set type to RA90
 	SET RQn RA92		set type to RA92

@@ -1,6 +1,6 @@
 /* h316_mt.c: H316/516 magnetic tape simulator
 
-   Copyright (c) 2003-2004, Robert M. Supnik
+   Copyright (c) 2003-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt		516-4100 seven track magnetic tape
 
+   08-Feb-05	RMS	Fixed error reporting from OCP (found by Philipp Hachtmann)
    01-Dec-04	RMS	Fixed bug in DMA/DMC support
 
    Magnetic tapes are represented as a series of variable records
@@ -203,11 +204,11 @@ case ioOCP:
 	    mt_eor = 0;					/* clr transfer done */
 	    mt_err = 0;					/* clr error */
 	    mt_usel = u;				/* save unit select */
-	    if (((uptr->flags & UNIT_ATT) == 0) ||	/* nop if not att */
-		sim_is_active (uptr))			/* or busy */
-		(IORETURN (mt_stopioe, SCPE_UNATT) | dat);
+	    if ((uptr->flags & UNIT_ATT) == 0)		/* not attached? */
+		return (((mt_stopioe? SCPE_UNATT: SCPE_OK) << IOT_V_REASON) | dat);
+	    if (sim_is_active (uptr)) return dat;	/* nop if busy */
 	    if (wrt_fnc[fnc] && (uptr->flags & UNIT_WPRT))
-		return (STOP_MTWRP << IOT_V_REASON);
+		return ((STOP_MTWRP << IOT_V_REASON) | dat);
 	    uptr->FNC = fnc;
 	    uptr->UST = 0;
 	    mt_busy = 1;

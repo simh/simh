@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu		PDP-11 CPU
 
+   19-Jan-05	RMS	Fixed bug(s) in RESET for 11/70 (reported by Tim Chapman)
    22-Dec-04	RMS	Fixed WAIT to work in all modes (from John Dundas)
    02-Oct-04	RMS	Added model emulation
    25-Jan-04	RMS	Removed local debug logging support
@@ -796,11 +797,12 @@ case 000:
 		break;
 	    case 5:					/* RESET */
 		if (cm == MD_KER) {
-		    reset_all (1);
-		    PIRQ = 0;
+		    reset_all (2);			/* skip CPU, sys reg */
+		    PIRQ = 0;				/* clear PIRQ, STKLIM, */
+		    STKLIM = 0;				/* MMR0<15:12,0>, */
 		    for (i = 0; i < IPL_HLVL; i++) int_req[i] = 0;
 		    MMR0 = MMR0 & ~(MMR0_MME | MMR0_FREEZE);
-		    MMR3 = 0;
+		    MMR3 = 0;				/* MMR3 */
 		    trap_req = trap_req & ~TRAP_INT;
 		    dsenable = calc_ds (cm);  }
 		break;

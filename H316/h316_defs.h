@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Feb-05	RMS	Added start button interrupt
    01-Dec-04	RMS	Added double precision constants
    24-Oct-03	RMS	Added DMA/DMC support
    25-Apr-03	RMS	Revised for extended file support
@@ -159,8 +160,9 @@ typedef struct h316_dib DIB;
 #define INT_V_FHD	8				/* fixed head disk */
 #define INT_V_DP	12				/* moving head disk */
 #define INT_V_MT	15				/* mag tape */
-#define INT_V_NODEF	16				/* int not deferred */
-#define INT_V_ON	17				/* int on */
+#define INT_V_START	16				/* start button */
+#define INT_V_NODEF	17				/* int not deferred */
+#define INT_V_ON	18				/* int on */
 
 /* I/O macros */
 
@@ -181,9 +183,11 @@ typedef struct h316_dib DIB;
 #define INT_FHD		(1u << INT_V_FHD)
 #define INT_DP		(1u << INT_V_DP)
 #define INT_MT		(1u << INT_V_MT)
+#define INT_START	(1u << INT_V_START)
 #define INT_NODEF	(1u << INT_V_NODEF)
 #define INT_ON		(1u << INT_V_ON)
-#define INT_PENDING	(INT_ON | INT_NODEF)
+#define INT_NMI		(INT_START)
+#define INT_PEND	(INT_ON | INT_NODEF)
 
 #define SET_INT(x)	dev_int = dev_int | (x)
 #define CLR_INT(x)	dev_int = dev_int & ~(x)

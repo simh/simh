@@ -1,6 +1,6 @@
 /* scp.h: simulator control program headers
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Feb-05	RMS	Added ASSERT command
    09-Sep-04	RMS	Added reset_all_p
    14-Feb-04	RMS	Added debug prototypes (from Dave Hittner)
    02-Jan-04	RMS	Split out from SCP
@@ -64,6 +65,7 @@ t_stat set_cmd (int32 flag, char *ptr);
 t_stat show_cmd (int32 flag, char *ptr);
 t_stat brk_cmd (int32 flag, char *ptr);
 t_stat do_cmd (int32 flag, char *ptr);
+t_stat assert_cmd (int32 flag, char *ptr);
 t_stat help_cmd (int32 flag, char *ptr);
 t_stat spawn_cmd (int32 flag, char *ptr);
 t_stat echo_cmd (int32 flag, char *ptr);

@@ -7,8 +7,8 @@ Date:	15-Nov-2004
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2004, written by Robert M Supnik
-   Copyright (c) 1993-2004, Robert M Supnik
+   Original code published in 1993-2005, written by Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

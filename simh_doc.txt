@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Simulator Usage, V3.3
-Date:	15-Nov-2004
+Date:	25-Jan-2005
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2004, written by Robert M Supnik
-   Copyright (c) 1993-2004, Robert M Supnik
+   Original code published in 1993-2005, written by Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -426,7 +426,7 @@ the console.  An output file modifier consists of @ followed by a
 valid file name.
 
 Modifiers may be specified in any order.  If multiple modifiers of the
-same time are specified, later modifiers override earlier modifiers.
+same type are specified, later modifiers override earlier modifiers.
 Note that if the device/unit name comes after the search specifier,
 the values will interpreted in the radix of the CPU, rather than of the
 device/unit.

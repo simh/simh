@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	15-Nov-2004
+Date:	20-Jan-2005
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2004, written by Robert M Supnik
-   Copyright (c) 1993-2004, Robert M Supnik
+   Original code published in 1993-2005, written by Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -328,6 +328,7 @@ The SYSTEM device implements registers that vary from system to system:
 		11/83, 11/84, 11/93,
 		11/94
 	MBRK	11/45, 11/70		16	microbreak register
+	SYSID	11/70			16	system ID (default = 1234 hex)
 	JCSR	11/53, 11/73B, 11/83,	16	board control/status
 		11/84, 11/93, 11/94
 	JPCR	11/23+, 11/53, 11/73B,	16	page control register
@@ -983,13 +984,15 @@ of many disk types:
 	SET RQn RD53		set type to RD53
 	SET RQn RD54		set type to RD54
 	SET RQn RD31		set type to RD31
+	SET RQn RA81		set type to RA81
 	SET RQn RA82		set type to RA82
+	set RQn RA71		set type to RA71
 	SET RQn RA72		set type to RA72
 	SET RQn RA90		set type to RA90
 	SET RQn RA92		set type to RA92
 	SET RQn RRD40		set type to RRD40 (CD ROM)
-	SET RQn RAUSER{=n}	set type to RA81 with n MB's
-	SET -L RQn RAUSER{=n}	set type to RA81 with n LBN's
+	SET RQn RAUSER{=n}	set type to RA82 with n MB's
+	SET -L RQn RAUSER{=n}	set type to RA82 with n LBN's
 
 The type options can be used only when a unit is not attached to a file.
 RAUSER is a "user specified" disk; the user can specify the size of the

@@ -1,6 +1,6 @@
 /* h316_stddev.c: Honeywell 316/516 standard devices
 
-   Copyright (c) 1999-2004, Robert M. Supnik
+   Copyright (c) 1999-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,8 @@
    tty		316/516-33 teleprinter
    clk/options	316/516-12 real time clocks/internal options
 
+   05-Feb-05	RMS	Fixed bug in OCP '0001 (found by Philipp Hachtmann)
+   31-Jan-05	RMS	Fixed bug in TTY print (found by Philipp Hachtmann)
    01-Dec-04	RMS	Fixed problem in SKS '104 (reported by Philipp Hachtmann)
 			Fixed bug in SKS '504
 			Added PTR detach routine, stops motion
@@ -98,6 +100,7 @@ extern int32 dev_int, dev_enb;
 extern int32 sim_switches;
 extern UNIT cpu_unit;
 
+uint32 ptr_motion = 0;					/* read motion */
 uint32 ptr_stopioe = 0;					/* stop on error */
 uint32 ptp_stopioe = 0;
 uint32 ptp_power = 0;					/* punch power, time */
@@ -152,6 +155,7 @@ REG ptr_reg[] = {
 	{ ORDATA (BUF, ptr_unit.buf, 8) },
 	{ FLDATA (READY, dev_int, INT_V_PTR) },
 	{ FLDATA (ENABLE, dev_enb, INT_V_PTR) },
+	{ FLDATA (MOTION, ptr_motion, 0) },
 	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
 	{ ORDATA (RSTATE, ptr_unit.STA, 2), REG_HIDDEN },
@@ -306,6 +310,7 @@ int32 ptrio (int32 inst, int32 fnc, int32 dat, int32 dev)
 switch (inst) {						/* case on opcode */
 case ioOCP:						/* OCP */
 	if (fnc & 016) return IOBADFNC (dat);		/* only fnc 0,1 */
+	ptr_motion = fnc ^ 1;
 	if (fnc) sim_cancel (&ptr_unit);		/* fnc 1? stop */
 	else sim_activate (&ptr_unit, ptr_unit.wait);	/* fnc 0? start */
 	break;
@@ -319,6 +324,8 @@ case ioINA:						/* INA */
 	if (fnc) return IOBADFNC (dat);			/* only fnc 0 */
 	if (TST_INT (INT_PTR)) {			/* ready? */
 	    CLR_INT (INT_PTR);				/* clear ready */
+	    if (ptr_motion)				/* if motion, restart */
+		sim_activate (&ptr_unit, ptr_unit.wait);
 	    return IOSKIP (ptr_unit.buf | dat);  }	/* ret buf, skip */
 	break;  }					/* end case op */
 return dat;
@@ -352,7 +359,6 @@ else {	if ((c = getc (uptr->fileref)) == EOF) {	/* read byte */
 	}
 SET_INT (INT_PTR);					/* set ready flag */
 uptr->buf = c & 0377;					/* get byte */
-sim_activate (uptr, uptr->wait);			/* reactivate */
 return SCPE_OK;
 }
 
@@ -391,6 +397,7 @@ CLR_INT (INT_PTR);					/* clear ready, enb */
 CLR_ENB (INT_PTR);
 ptr_unit.buf = 0;					/* clear buffer */
 ptr_unit.STA = 0;
+ptr_motion = 0;						/* unit stopped */
 sim_cancel (&ptr_unit);					/* deactivate unit */
 return SCPE_OK;
 }
@@ -637,17 +644,17 @@ return SCPE_OK;
 
 t_stat tto_write (int32 c)
 {
-uint32 c7b;
 UNIT *tuptr = &tty_unit[TTO];
 
-c7b = c & 0177;
-if (!(tuptr->flags & UNIT_8B)) {			/* 7b or KSR? */
-	if (c7b == 0) return SCPE_OK;			/* supress NUL */
+if (tuptr->flags & UNIT_8B) c = c & 0377;		/* 8b? */
+else {	c = c & 0177;					/* 7b, KSR: mask */
+	if (c) return SCPE_OK;				/* supress NUL */
 	if (tuptr->flags & UNIT_KSR) {			/* KSR? */
-	    if ((c7b < 040) &&				/* not in ctrl set? */
-		!(CNTL_SET & CHAR_FLAG (c7b))) return SCPE_OK;
-	    if (islower (c7b)) c = toupper (c7b);  }	/* cvt to UC */
-	else c = c7b;  }				/* full 7b */
+	    if ((c < 040) &&				/* not in ctrl set? */
+		!(CNTL_SET & CHAR_FLAG (c))) return SCPE_OK;
+	    if (islower (c)) c = toupper (c);		/* cvt to UC */
+	    }
+	}
 tuptr->pos = tuptr->pos + 1;
 return sim_putchar_s (c);
 }

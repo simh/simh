@@ -29,11 +29,45 @@
 
 #define	SIM_MAJOR	3
 #define SIM_MINOR	3
-#define SIM_PATCH	1
+#define SIM_PATCH	2
 
 /* V3.3 revision history 
 
 patch	date		module(s) and fix(es)
+
+  2	08-Mar-05	scp.c: added ASSERT command (from Dave Bryan)
+
+			h316_defs.h: fixed IORETURN macro
+
+			h316_mt.c: fixed error reporting from OCP (found by Philipp Hachtmann)
+
+			h316_stddev.c: fixed bug in OCP '0001 (found by Philipp Hachtmann)
+
+			hp2100_cpu.c: split out EAU and MAC instructions
+
+			hp2100_cpu1.c: (from Dave Bryan)
+			- fixed missing MPCK on JRS target
+			- removed EXECUTE instruction (is NOP in actual microcode)
+
+			hp2100_fp: (from Dave Bryan)
+			- fixed missing negative overflow renorm in StoreFP
+
+			i1401_lp.c: fixed bug in write_line (reported by Van Snyder)
+
+			id32_cpu.c: fixed branches to mask new PC (from Greg Johnson)
+
+			pdp11_cpu.c: fixed bugs in RESET for 11/70 (reported by Tim Chapman)
+
+			pdp11_cpumod.c:
+			- fixed bug in SHOW MODEL (from Sergey Okhapkin)
+			- made SYSID variable for 11/70 (from Tim Chapman)
+			- added MBRK write case for 11/70 (from Tim Chapman)
+
+			pdp11_rq: added RA60, RA71, RA81 disks
+
+			pdp11_ry: fixed bug in boot code (reported by Graham Toal)
+
+			vax_cpu.c: fixed initial state of cpu_extmem
 
   1	05-Jan-05	h316_cpu.c: fixed bug in DIV
 

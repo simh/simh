@@ -1,6 +1,6 @@
 /* pdp11_cpumod.c: PDP-11 CPU model-specific features
 
-   Copyright (c) 2004, Robert M Supnik
+   Copyright (c) 2004-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,9 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    system	PDP-11 model-specific registers
+
+   15-Feb-05	RMS	Fixed bug in SHOW MODEL (from Sergey Okhapkin)
+   19-Jan-05	RMS	Added variable SYSID, MBRK write (from Tim Chapman)
 
    This module includes CPU- and system-specific registers, such as the Unibus
    map and control registers on 22b Unibus systems, the board registers for the
@@ -51,6 +54,7 @@
 int32 SR = 0;						/* switch register */
 int32 DR = 0;						/* display register */
 int32 MBRK = 0;						/* 11/70 microbreak */
+int32 SYSID = 0x1234;					/* 11/70 system ID */
 int32 CPUERR = 0;					/* CPU error reg */
 int32 MEMERR = 0;					/* memory error reg */
 int32 CCR = 0;						/* cache control reg */
@@ -249,6 +253,7 @@ REG sys_reg[] = {
 	{ ORDATA (HITMISS, HITMISS, 16) },
 	{ ORDATA (CPUERR, CPUERR, 16) },
 	{ ORDATA (MBRK, MBRK, 16) },
+	{ ORDATA (SYSID, SYSID, 16) },
 	{ ORDATA (JCSR, JCSR, 16) },
 	{ ORDATA (JPCR, JPCR, 16) },
 	{ ORDATA (JASR, JASR, 16) },
@@ -477,7 +482,7 @@ case 010:						/* lower size */
 	*data = (MEMSIZE >> 6) - 1;
 	return SCPE_OK;
 case 012:						/* system ID */
-	*data = 0x1234;
+	*data = SYSID;
 	return SCPE_OK;
 case 013:						/* CPUERR */
 	*data = CPUERR & CPUE_IMP;
@@ -512,6 +517,9 @@ case 5:							/* Hit/miss */
 	return SCPE_OK;
 case 013:						/* CPUERR */
 	CPUERR = 0;
+	return SCPE_OK;
+case 014:				                /* MBRK */
+	MBRK = data;
 	return SCPE_OK;
 case 015:						/* PIRQ */
 	ODD_WO (data);
@@ -876,12 +884,12 @@ return SCPE_OK;
 
 t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-uint32 i, std;
+uint32 i, all_opt;
 
 fprintf (st, "%s", cpu_tab[cpu_model].name);
-std = cpu_tab[cpu_model].opt;
-for (i = 0; std && opt_name[i]; i = i++) {
-	if ((std >> i) & 1) fprintf (st, ", %s",
+all_opt = cpu_tab[cpu_model].opt;
+for (i = 0; opt_name[2 * i] != NULL; i++) {
+	if ((all_opt >> i) & 1) fprintf (st, ", %s",
 	    ((cpu_opt >> i) & 1)? opt_name[2 * i]: opt_name[(2 * i) + 1]);
 	}	
 return SCPE_OK;

@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Feb-05	RMS	Added assertion fail stop
    05-Nov-04	RMS	Added support for SHOW opt=val
    20-Oct-04	RMS	Converted all base types to typedefs
    21-Sep-04	RMS	Added switch to flag stop message printout
@@ -209,6 +210,7 @@ typedef uint32		t_addr;
 #define SCPE_LOST	(SCPE_BASE + 39)		/* Telnet conn lost */
 #define SCPE_TTMO	(SCPE_BASE + 40)		/* Telnet conn timeout */
 #define SCPE_STALL	(SCPE_BASE + 41)		/* Telnet conn stall */
+#define SCPE_AFAIL	(SCPE_BASE + 42)		/* assert failed */
 #define SCPE_KFLAG	0010000				/* tti data flag */
 #define SCPE_BREAK	0020000				/* tti break flag */
 
@@ -267,7 +269,7 @@ struct sim_device {
 
 /* Device flags */
 
-#define DEV_V_DIS	0				/* dev enabled */
+#define DEV_V_DIS	0				/* dev disabled */
 #define DEV_V_DISABLE	1				/* dev disable-able */
 #define DEV_V_DYNM	2				/* mem size dynamic */
 #define DEV_V_NET	3				/* network attach */

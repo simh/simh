@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-8 Simulator Usage
-Date:	15-Nov-2004
+Date:	15-Feb-2005
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2004, written by Robert M Supnik
-   Copyright (c) 1993-2004, Robert M Supnik
+   Original code published in 1993-2005, written by Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -443,7 +443,8 @@ locked.
 	SET DTn LOCKED		set unit n write locked
 	SET DTn WRITEENABLED	set unit n write enabled
 
-Units can also be set ENABLED or DISABLED.  The TD8E supports the BOOT command.
+Units can also be set ENABLED or DISABLED.  The TD8E supports the BOOT
+command, but only for unit 0.
 
 The TD8E supports supports PDP-8 format, PDP-11 format, and 18b format
 DECtape images.  ATTACH tries to determine the tape format from the DECtape
@@ -522,7 +523,8 @@ RL8A options include the ability to make units write enabled or write locked:
 	SET RLn LOCKED		set unit n write locked
 	SET RLn WRITEENABLED	set unit n write enabled
 
-Units can also be set ONLINE or OFFILE.  The RL8A supports the BOOT command.
+Units can also be set ENABLED or DISABLED.  The RL8A supports the BOOT command,
+but only for unit 0.
 
 The RL8A implements these registers:
 
@@ -720,7 +722,8 @@ locked.
 	SET DTn LOCKED		set unit n write locked
 	SET DTn WRITEENABLED	set unit n write enabled
 
-Units can also be set ENABLED or DISABLED.  The TC08 supports the BOOT command.
+Units can also be set ENABLED or DISABLED.  The TC08 supports the BOOT
+command, but only for unit 0.
 
 The TC08 supports supports PDP-8 format, PDP-11 format, and 18b format
 DECtape images.  ATTACH tries to determine the tape format from the DECtape

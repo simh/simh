@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Feb-05	RMS	Added ASSERT command (from Dave Bryan)
+   02-Feb-05	RMS	Fixed bug in global register search
    26-Dec-04	RMS	Qualified SAVE examine, RESTORE deposit with SIM_SW_REST
    10-Nov-04	JDB	Fixed logging of errors from cmds in "do" file
    05-Nov-04	RMS	Moved SET/SHOW DEBUG under CONSOLE hierarchy
@@ -274,7 +276,7 @@ BRKTAB *sim_brk_new (t_addr loc);
 
 /* Commands support routines */
 
-SCHTAB *get_search (char *cptr, DEVICE *dptr, SCHTAB *schptr);
+SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr);
 int32 test_search (t_value val, SCHTAB *schptr);
 char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc);
 int32 get_switches (char *cptr);
@@ -391,8 +393,9 @@ const char *scp_error_messages[] = {
 	"Invalid magtape record length",
 	"Console Telnet connection lost",
 	"Console Telnet connection timed out",
-	"Console Telnet output stall"
-};
+	"Console Telnet output stall",
+	""						/* printed by assert */
+	};
 
 const size_t size_map[] = { sizeof (int8),
 	sizeof (int8), sizeof (int16), sizeof (int32), sizeof (int32)
@@ -422,7 +425,7 @@ const t_value width_mask[] = { 0,
 	0x1FFFFFFFFFFFFFFF, 0x3FFFFFFFFFFFFFFF,
 		 0x7FFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF
 #endif
-};
+	};
 
 static CTAB cmd_table[] = {
 	{ "RESET", &reset_cmd, 0,
@@ -504,6 +507,8 @@ static CTAB cmd_table[] = {
 	  "do <file> {arg,arg...}   process command file\n" },
 	{ "ECHO", &echo_cmd, 0,
 	  "echo <string>            display <string>\n" },
+	{ "ASSERT", &assert_cmd, 0,
+	  "assert {<dev>} <cond>    test simulator state against condition\n" },
 	{ "HELP", &help_cmd, 0,
 	  "h{elp}                   type this message\n"
 	  "h{elp} <command>         type help for command\n" },
@@ -741,7 +746,7 @@ do {	cptr = read_line (cbuf, CBUFSIZE, fpin);	/* get cmd line */
 	    if (sim_log) fprintf (sim_log, "%s\n",
 		scp_error_messages[stat - SCPE_BASE]);  }
 	if (sim_vm_post != NULL) (*sim_vm_post) (TRUE);
-} while (stat != SCPE_EXIT);
+} while ((stat != SCPE_EXIT) && (stat != SCPE_AFAIL));
 
 fclose (fpin);						/* close file */
 return (stat == SCPE_EXIT)? SCPE_EXIT: SCPE_OK;
@@ -774,6 +779,47 @@ for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
 *op = 0;						/* term buffer */
 strcpy (instr, tmpbuf);
 return;
+}
+
+/* Assert command
+   
+   Syntax: ASSERT {<dev>} <reg>{<logical-op><value>}<conditional-op><value>
+
+   If <dev> is not specified, CPU is assumed.  <value> is expressed in the radix
+   specified for <reg>.  <logical-op> and <conditional-op> are the same as that
+   allowed for examine and deposit search specifications. */
+
+t_stat assert_cmd (int32 flag, char *cptr)
+{
+char gbuf[CBUFSIZE], *gptr, *aptr;
+REG *rptr;
+uint32 idx;
+t_value val;
+t_stat r;
+
+aptr = cptr;						/* save assertion */
+cptr = get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, cptr, &r);	/* get sw, default */
+if (*cptr == 0) return SCPE_2FARG;			/* must be more */
+cptr = get_glyph (cptr, gbuf, 0);			/* get register */
+rptr = find_reg (gbuf, &gptr, sim_dfdev);		/* parse register */
+if (!rptr) return SCPE_NXREG;				/* not there */
+if (*gptr == '[') {					/* subscript? */
+	if (rptr->depth <= 1) return SCPE_ARG;		/* array register? */
+	idx = (uint32) strtotv (++gptr, &cptr, 10);	/* convert index */
+	if ((gptr == cptr) || (*cptr++ != ']')) return SCPE_ARG;
+	}
+else idx = 0;						/* not array */
+if (idx >= rptr->depth) return SCPE_SUB;		/* validate subscript */
+if (*cptr == 0) return SCPE_2FARG;			/* must be more */
+cptr = get_glyph (cptr, gbuf, 0);			/* get search cond */
+if (*cptr != 0) return SCPE_2MARG;			/* must be done */
+if (!get_search (gbuf, rptr->radix, &sim_stab))		/* parse condition */
+	return SCPE_MISVAL;
+val = get_rval (rptr, idx);				/* get register value */
+if (test_search (val, &sim_stab)) return SCPE_OK;	/* test condition */
+printf ("Assertion failed (%s)", aptr);			/* report failing assertion */
+if (sim_log) fprintf (sim_log, "Assertion failed (%s)", aptr);
+return SCPE_AFAIL;					/* condition fails */
 }
 
 /* Set command */
@@ -2950,6 +2996,7 @@ DEVICE *dptr;
 REG *rptr, *srptr = NULL;
 
 for (i = 0; (dptr = sim_devices[i]) != 0; i++) {	/* all dev */
+	if (dptr->flags & DEV_DIS) continue;		/* skip disabled */
 	if (rptr = find_reg (cptr, optr, dptr)) {	/* found? */
 	    if (srptr) return NULL;			/* ambig? err */
 	    srptr = rptr;				/* save reg */
@@ -3077,7 +3124,7 @@ while (*cptr) {						/* loop through modifiers */
 		return NULL;  }
 	    sim_switches = sim_switches | t;  }		/* or in new switches */
 	else if ((opt & CMD_OPT_SCH) &&			/* if allowed, */
-	    get_search (gbuf, sim_dfdev, &sim_stab))	/* try for search */
+	    get_search (gbuf, sim_dfdev->dradix, &sim_stab))	/* try for search */
 	    sim_schptr = &sim_stab;			/* set search */
 	else if ((opt & CMD_OPT_DFT) &&			/* if allowed, */
 	    (tdptr = find_unit (gbuf, &tuptr)) &&	/* try for default */
@@ -3115,14 +3162,14 @@ return pptr;
 
    Inputs:
 	cptr	=	pointer to input string
-	dptr	=	pointer to device
+	radix	=	radix for numbers
 	schptr =	pointer to search table
    Outputs:
 	return =	NULL if error
 			schptr if valid search specification
 */
 
-SCHTAB *get_search (char *cptr, DEVICE *dptr, SCHTAB *schptr)
+SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr)
 {
 int32 c, logop, cmpop;
 t_value logval, cmpval;
@@ -3133,7 +3180,7 @@ if (*cptr == 0) return NULL;				/* check for clause */
 for (logop = cmpop = -1; c = *cptr++; ) {		/* loop thru clauses */
 	if (sptr = strchr (logstr, c)) {		/* check for mask */
 	    logop = sptr - logstr;
-	    logval = strtotv (cptr, &tptr, dptr->dradix);
+	    logval = strtotv (cptr, &tptr, radix);
 	    if (cptr == tptr) return NULL;
 	    cptr = tptr;  }
 	else if (sptr = strchr (cmpstr, c)) {		/* check for bool */
@@ -3141,7 +3188,7 @@ for (logop = cmpop = -1; c = *cptr++; ) {		/* loop thru clauses */
 	    if (*cptr == '=') {
 		cmpop = cmpop + strlen (cmpstr);
 		cptr++;  }
-	    cmpval = strtotv (cptr, &tptr, dptr->dradix);
+	    cmpval = strtotv (cptr, &tptr, radix);
 	    if (cptr == tptr) return NULL;
 	    cptr = tptr;  }
 	else return NULL;  }				/* end while */

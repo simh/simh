@@ -1,6 +1,6 @@
 /* pdp11_ry.c: RX211/RXV21/RX02 floppy disk simulator
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ry		RX211/RXV21/RX02 floppy disk
 
+   18-Feb-05	RMS	Fixed bug in boot code (reported by Graham Toal)
    30-Sep-04	RMS	Revised Unibus interface
    21-Mar-04	RMS	Added VAX support
    29-Dec-03	RMS	Added RXV21 support
@@ -575,6 +576,7 @@ static const uint16 boot_rom[] = {
 	0032711, 0000040,		/* RD: BIT #40, (R1)	; ready? */
 	0001775,			/*  BEQ .-4 */
 	0012746, 0000007,		/*  MOV #READ+GO, -(SP) */
+	0050316,			/*  BIS R3, (SP)	; or unit */
 	0050416,			/*  BIS R4, (SP)	; or density */
 	0012611,			/*  MOV (SP)+, (R1)	; read & go */
 	0105711,			/*  TSTB (R1)		; xfr ready? */
@@ -588,7 +590,7 @@ static const uint16 boot_rom[] = {
 	0005711,			/*  TST (R1)		; error? */
 	0100003,			/*  BEQ OK */
 	0005704,			/*  TST R4		; single? */
-	0001346,			/*  BNE DN		; no, try again */
+	0001345,			/*  BNE DN		; no, try again */
 	0000000,			/*  HALT		; dead */
 	0012746, 0000003,		/* OK: MOV #EMPTY+GO, -(SP); empty & go */
 	0050416,			/*  BIS R4, (SP)	; or density */
@@ -609,7 +611,7 @@ static const uint16 boot_rom[] = {
 	0062602,			/*  ADD (SP)+, R2	; adv buf addr */
 	0122525,			/*  CMPB (R5)+, (R5)+	; sect += 2 */
 	0020527, 0000007,		/*  CMP R5, #7		; end? */
-	0101716,			/*  BLOS RD		; read next */
+	0101715,			/*  BLOS RD		; read next */
 	0005002,			/*  CLR R2 */
 	0005003,			/*  CLR R3 */
 	0012704, BOOT_START+020,	/*  MOV #START+20, R4 */

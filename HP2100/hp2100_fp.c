@@ -1,6 +1,6 @@
 /* hp2100_fp.c: HP 2100 floating point instructions
 
-   Copyright (c) 2002-2004, Robert M. Supnik
+   Copyright (c) 2002-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   11-Feb-05	JDB	Fixed missing negative overflow renorm in StoreFP
    26-Dec-04	RMS	Separated A/B from M[0/1] for DMA IO (from Dave Bryan)
    15-Jul-03	RMS	Fixed signed/unsigned warning
    21-Oct-02	RMS	Recoded for compatibility with 21MX microcode algorithms
@@ -295,8 +296,9 @@ svfr = fop->fr;						/* save fraction */
 sign = FP_GETSIGN (fop->fr);				/* save sign */
 fop->fr = (fop->fr + (sign? FP_RNDM: FP_RNDP)) & FP_FR;	/* round */
 if ((fop->fr ^ svfr) & FP_SIGN) {			/* sign change? */
-	fop->fr = (fop->fr >> 1) | (sign? FP_SIGN: 0);	/* renormalize */
+	fop->fr = fop->fr >> 1;				/* renormalize */
 	fop->exp = fop->exp + 1;  }
+else NormFP (fop);					/* check for norm */
 if (fop->fr == 0) hi = 0;				/* result 0? */
 else if (fop->exp < -(FP_M_EXP + 1)) {			/* underflow? */
 	hi = 0;						/* store clean 0 */

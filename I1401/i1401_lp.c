@@ -1,6 +1,6 @@
 /* i1401_lp.c: IBM 1403 line printer simulator
 
-   Copyright (c) 1993-2004, Robert M. Supnik
+   Copyright (c) 1993-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt		1403 line printer
 
+   07-Mar-05	RMS	Fixed bug in write_line (reported by Van Snyder)
    25-Apr-03	RMS	Revised for extended file support
    30-May-02	RMS	Widened POS to 32b
    13-Apr-01	RMS	Revised for register arrays
@@ -129,7 +130,7 @@ for (i = 0; i < LPT_WIDTH; i++) {			/* convert print buf */
 	t = M[LPT_BUF + i];
 	if (wm) lbuf[i] = (t & WM)? '1': ' ';		/* wmarks -> 1 or sp */
 	else lbuf[i] = pch[t & CHAR];  }		/* normal */
-M[LPT_BUF + 1] = 0;					/* trailing null */
+lbuf[LPT_WIDTH] = 0;					/* trailing null */
 for (i = LPT_WIDTH - 1; (i >= 0) && (lbuf[i] == ' '); i--) lbuf[i] = 0;
 fputs (lbuf, lpt_unit.fileref);				/* write line */
 if (lines) space (lines, lflag);			/* cc action? do it */

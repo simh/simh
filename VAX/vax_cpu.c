@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2004, Robert M Supnik
+   Copyright (c) 1998-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu		VAX central processor
 
+   13-Jan-05	RMS	Fixed initial state of cpu_extmem
    06-Nov-04	RMS	Added =n to SHOW HISTORY
    30-Sep-04	RMS	Added octaword specifier decodes and instructions
 			Moved model-specific routines to system module
@@ -226,7 +227,7 @@ int32 cpu_astop = 0;
 int32 mchk_va, mchk_ref;				/* mem ref param */
 int32 ibufl, ibufh;					/* prefetch buf */
 int32 ibcnt, ppc;					/* prefetch ctl */
-int32 cpu_extmem = 0;					/* extended memory */
+int32 cpu_extmem = 1;					/* extended memory */
 jmp_buf save_env;
 REG *pcq_r = NULL;					/* PC queue reg ptr */
 int32 pcq[PCQ_SIZE] = { 0 };				/* PC queue */

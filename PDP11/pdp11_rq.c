@@ -1,6 +1,6 @@
 /* pdp11_rq.c: MSCP disk controller simulator
 
-   Copyright (c) 2002-2004, Robert M Supnik
+   Copyright (c) 2002-2005, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    rq		RQDX3 disk controller
 
+   17-Jan-05	RMS	Added more RA and RD disks
    31-Oct-04	RMS	Added -L switch (LBNs) to RAUSER size specification
    01-Oct-04	RMS	Revised Unibus interface
 			Changed to identify as UDA50 in Unibus configurations
@@ -203,7 +204,7 @@ struct rqpkt {
 #define RCT_ENTB	128				/* entries/blk */
 #define RCT_END		0x80000000			/* marks RCT end */
 
-/* The RQDX3 supports multiple disk drive types:
+/* The RQDX3 supports multiple disk drive types (x = not implemented):
 
    type	sec	surf	cyl	tpg	gpc	RCT	LBNs
 	
@@ -212,17 +213,23 @@ struct rqpkt {
    RD51	18	4	306	4	1	36*4	21600
    RD31	17	4	615	4	1	3*8	41560
    RD52	17	8	512	8	1	4*8	60480
+x  RD32	17	6	820	?	?	?	83236
+x  RD33	17	7	1170	?	?	?	138565
    RD53	17	7	1024	7	1	5*8	138672
    RD54	17	15	1225	15	1	7*8	311200
 
    The simulator also supports larger drives that only existed
-   on SDI controllers.  XBN, DBN, RCTS and RCTC are not known
-   for the SDI drives and are not used by the simulator:
+   on SDI controllers.
 
-   RA82	57	15	1435	15	1	?*8	1216665
-   RA72	51	20	1921?	20	1	?*8	1953300
-   RA90	69	13	2656	13	1	?*8	2376153
-   RA92	73	13	3101	13	1	?*8	2940951
+   RA60	42(+1)	6	1600	6	1	1008	400176
+x  RA70	33(+1)	11	1507+	11	1	?	547041
+   RA81	51(+1)	14	1258	14	1	2856	891072
+   RA82	57(+1)	15	1435	15	1	3420	1216665
+   RA71 51(+1)	14	1921	14	1	1428	1367310		
+   RA72	51(+1)	20	1921	20	1	2040	1953300
+   RA90	69(+1)	13	2656	13	1	1794	2376153
+   RA92	73(+1)	13	3101	13	1	949	2940951
+x  RA73 70(+1)	21	2667+	21	1	?	3920490
 
    Each drive can be a different type.  The drive field in the
    unit flags specified the drive type and thus, indirectly,
@@ -351,11 +358,11 @@ struct rqpkt {
 #define RA82_CYL	1435				/* 0-1422 user */
 #define RA82_TPG	RA82_SURF
 #define RA82_GPC	1
-#define RA82_XBN	3420				/* cyl 1427-1430 */
-#define RA82_DBN	3420				/* cyl 1431-1434 */
+#define RA82_XBN	3480				/* cyl 1427-1430 */
+#define RA82_DBN	3480				/* cyl 1431-1434 */
 #define RA82_LBN	1216665				/* 57*15*1423 */
-#define RA82_RCTS	400				/* cyl 1423-1426 */
-#define RA82_RCTC	8
+#define RA82_RCTS	3420				/* cyl 1423-1426 */
+#define RA82_RCTC	1
 #define RA82_RBN	21345				/* 1 *15*1423 */
 #define RA82_MOD	11
 #define RA82_MED	0x25641052
@@ -383,11 +390,11 @@ struct rqpkt {
 #define RA72_CYL	1921				/* 0-1914 user */
 #define RA72_TPG	RA72_SURF
 #define RA72_GPC	1
-#define RA72_XBN	2040				/* cyl 1917-1918? */
-#define RA72_DBN	2040				/* cyl 1920-1921? */
+#define RA72_XBN	2080				/* cyl 1917-1918? */
+#define RA72_DBN	2080				/* cyl 1920-1921? */
 #define RA72_LBN	1953300				/* 51*20*1915 */
-#define RA72_RCTS	400				/* cyl 1915-1916? */
-#define RA72_RCTC	5				/* ? */
+#define RA72_RCTS	2040				/* cyl 1915-1916? */
+#define RA72_RCTC	1
 #define RA72_RBN	38300				/* 1 *20*1915 */
 #define RA72_MOD	37
 #define RA72_MED	0x25641048
@@ -399,11 +406,11 @@ struct rqpkt {
 #define RA90_CYL	2656				/* 0-2648 user */
 #define RA90_TPG	RA90_SURF
 #define RA90_GPC	1
-#define RA90_XBN	1794				/* cyl 2651-2652? */
-#define RA90_DBN	1794				/* cyl 2653-2654? */
+#define RA90_XBN	1820				/* cyl 2651-2652? */
+#define RA90_DBN	1820				/* cyl 2653-2654? */
 #define RA90_LBN	2376153				/* 69*13*2649 */
-#define RA90_RCTS	400				/* cyl 2649-2650? */
-#define RA90_RCTC	6				/* ? */
+#define RA90_RCTS	1794				/* cyl 2649-2650? */
+#define RA90_RCTC	1
 #define RA90_RBN	34437				/* 1 *13*2649 */
 #define RA90_MOD	19
 #define RA90_MED	0x2564105A
@@ -416,10 +423,10 @@ struct rqpkt {
 #define RA92_TPG	RA92_SURF
 #define RA92_GPC	1
 #define RA92_XBN	174				/* cyl 3100? */
-#define RA92_DBN	775
+#define RA92_DBN	788
 #define RA92_LBN	2940951				/* 73*13*3099 */
-#define RA92_RCTS	316				/* cyl 3099? */
-#define RA92_RCTC	3				/* ? */
+#define RA92_RCTS	949				/* cyl 3099? */
+#define RA92_RCTC	1
 #define RA92_RBN	40287				/* 1 *13*3099 */
 #define RA92_MOD	29
 #define RA92_MED	0x2564105C
@@ -443,6 +450,54 @@ struct rqpkt {
 #define RA8U_MINC	10000				/* min cap LBNs */
 #define RA8U_MAXC	4000000				/* max cap LBNs */
 #define RA8U_EMAXC	2000000000			/* ext max cap */
+
+#define RA60_DTYPE	13				/* SDI drive */
+#define RA60_SECT	42				/* +1 spare/track */
+#define RA60_SURF	6
+#define RA60_CYL	1600				/* 0-1587 user */
+#define RA60_TPG	RA60_SURF
+#define RA60_GPC	1
+#define RA60_XBN	1032				/* cyl 1592-1595 */
+#define RA60_DBN	1032				/* cyl 1596-1599 */
+#define RA60_LBN	400176				/* 42*6*1588 */
+#define RA60_RCTS	1008				/* cyl 1588-1591 */
+#define RA60_RCTC	1
+#define RA60_RBN	9528				/* 1 *6*1588 */
+#define RA60_MOD	4
+#define RA60_MED	0x22A4103C
+#define RA60_FLGS	(RQDF_RMV | RQDF_SDI)
+
+#define RA81_DTYPE	14				/* SDI drive */
+#define RA81_SECT	51				/* +1 spare/track */
+#define RA81_SURF	14
+#define RA81_CYL	1258				/* 0-1247 user */
+#define RA81_TPG	RA81_SURF
+#define RA81_GPC	1
+#define RA81_XBN	2436				/* cyl 1252-1254? */
+#define RA81_DBN	2436				/* cyl 1255-1256? */
+#define RA81_LBN	891072				/* 51*14*1248 */
+#define RA81_RCTS	2856				/* cyl 1248-1251? */
+#define RA81_RCTC	1
+#define RA81_RBN	17472				/* 1 *14*1248 */
+#define RA81_MOD	5
+#define RA81_MED	0x25641051
+#define RA81_FLGS	RQDF_SDI
+
+#define RA71_DTYPE	15				/* SDI drive */
+#define RA71_SECT	51				/* +1 spare/track */
+#define RA71_SURF	14
+#define RA71_CYL	1921				/* 0-1914 user */
+#define RA71_TPG	RA71_SURF
+#define RA71_GPC	1
+#define RA71_XBN	1456				/* cyl 1917-1918? */
+#define RA71_DBN	1456				/* cyl 1919-1920? */
+#define RA71_LBN	1367310				/* 51*14*1915 */
+#define RA71_RCTS	1428				/* cyl 1915-1916? */
+#define RA71_RCTC	1
+#define RA71_RBN	26810				/* 1 *14*1915 */
+#define RA71_MOD	40
+#define RA71_MED	0x25641047
+#define RA71_FLGS	RQDF_SDI
 
 struct drvtyp {
 	int32	sect;					/* sectors */
@@ -476,7 +531,9 @@ static struct drvtyp drv_tab[] = {
 	{ RQ_DRV (RD54), "RD54" }, { RQ_DRV (RA82), "RA82" },
 	{ RQ_DRV (RRD40), "RRD40" }, { RQ_DRV (RA72), "RA72" },
 	{ RQ_DRV (RA90), "RA90" }, { RQ_DRV (RA92), "RA92" },
-	{ RQ_DRV (RA8U), "RAUSER" }, { 0 }  };
+	{ RQ_DRV (RA8U), "RAUSER" }, { RQ_DRV (RA60), "RA60" },
+	{ RQ_DRV (RA81), "RA81" }, { RQ_DRV (RA71), "RA71" },
+	{ 0 }  };
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
@@ -666,11 +723,17 @@ MTAB rq_mod[] = {
 		&rq_set_type, NULL, NULL },
 	{ MTAB_XTD | MTAB_VUN, RD54_DTYPE, NULL, "RD54",
 		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RA60_DTYPE, NULL, "RA60",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RA81_DTYPE, NULL, "RA81",
+		&rq_set_type, NULL, NULL },
 	{ MTAB_XTD | MTAB_VUN, RA82_DTYPE, NULL, "RA82",
 		&rq_set_type, NULL, NULL },
 	{ MTAB_XTD | MTAB_VUN, RRD40_DTYPE, NULL, "RRD40",
 		&rq_set_type, NULL, NULL },
 	{ MTAB_XTD | MTAB_VUN, RRD40_DTYPE, NULL, "CDROM",
+		&rq_set_type, NULL, NULL },
+	{ MTAB_XTD | MTAB_VUN, RA71_DTYPE, NULL, "RA71",
 		&rq_set_type, NULL, NULL },
 	{ MTAB_XTD | MTAB_VUN, RA72_DTYPE, NULL, "RA72",
 		&rq_set_type, NULL, NULL },
@@ -2028,7 +2091,7 @@ uint32 cap;
 uint32 max = sim_taddr_64? RA8U_EMAXC: RA8U_MAXC;
 t_stat r;
 
-if ((val < 0) || (val > RA8U_DTYPE) || ((val != RA8U_DTYPE) && cptr))
+if ((val < 0) || ((val != RA8U_DTYPE) && cptr))
 	return SCPE_ARG;
 if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
 if (cptr) {

@@ -1,6 +1,6 @@
 /* id32_cpu.c: Interdata 32b CPU simulator
 
-   Copyright (c) 2000-2004, Robert M. Supnik
+   Copyright (c) 2000-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu			Interdata 32b CPU
 
+   18-Feb-05	RMS	Fixed branches to mask new PC (from Greg Johnson)
    06-Nov-04	RMS	Added =n to SHOW HISTORY
    25-Jan-04	RMS	Revised for device debug support
    31-Dec-03	RMS	Fixed bug in cpu_set_hist
@@ -845,14 +846,14 @@ case 0x01:						/* BALR - RR */
 case 0x41:						/* BAL - RX */
 	PCQ_ENTRY;					/* save old PC */
 	R[r1] = PC;					/* save cur PC */
-	PC = opnd;					/* branch */
+	PC = opnd & VAMASK;				/* branch */
 	break;
 
 case 0x02:						/* BTCR - RR */
 case 0x42:						/* BTC - RX */
 	if (cc & r1) {					/* test CC's */
 	    PCQ_ENTRY;					/* branch if true */
-	    PC = opnd;  }
+	    PC = opnd & VAMASK;  }
 	break;
 
 case 0x20:						/* BTBS - NO */
@@ -871,7 +872,7 @@ case 0x03:						/* BFCR - RR */
 case 0x43:						/* BFC - RX */
 	if ((cc & r1) == 0) {				/* test CC's */
 	    PCQ_ENTRY;					/* branch if false */
-	    PC = opnd;  }
+	    PC = opnd & VAMASK;  }
 	break;
 
 case 0x22:						/* BFBS - NO */
@@ -892,7 +893,7 @@ case 0xC0:						/* BXH - RX */
 	R[r1] = (R[r1] + inc) & DMASK32;		/* R1 = R1 + inc */
 	if (R[r1] > lim) {				/* if R1 > lim */
 	    PCQ_ENTRY;					/* branch */
-	    PC = opnd;  }
+	    PC = opnd & VAMASK;  }
 	break;
 
 case 0xC1:						/* BXLE - RX */
@@ -901,7 +902,7 @@ case 0xC1:						/* BXLE - RX */
 	R[r1] = (R[r1] + inc) & DMASK32;		/* R1 = R1 + inc */
 	if (R[r1] <= lim) {				/* if R1 <= lim */
 	    PCQ_ENTRY;					/* branch */
-	    PC = opnd;  }
+	    PC = opnd & VAMASK;  }
 	break;
 
 /* Logical instructions */

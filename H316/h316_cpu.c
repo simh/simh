@@ -1,6 +1,6 @@
 /* h316_cpu.c: Honeywell 316/516 CPU simulator
 
-   Copyright (c) 1999-2004, Robert M. Supnik
+   Copyright (c) 1999-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu		H316/H516 CPU
 
+   15-Feb-05	RMS	Added start button interrupt
    01-Dec-04	RMS	Fixed bug in DIV
    06-Nov-04	RMS	Added =n to SHOW HISTORY
    04-Jan-04	RMS	Removed unnecessary compare
@@ -308,6 +309,7 @@ REG cpu_reg[] = {
 	{ FLDATA (SS4, ss[3], 0) },
 	{ FLDATA (ION, dev_int, INT_V_ON) },
 	{ FLDATA (INODEF, dev_int, INT_V_NODEF) },
+	{ FLDATA (START, dev_int, INT_V_START) },
 	{ ORDATA (DEVINT, dev_int, 16), REG_RO },
 	{ ORDATA (DEVENB, dev_enb, 16), REG_RO },
 	{ ORDATA (CHREQ, chan_req, DMA_MAX + DMC_MAX) },
@@ -443,7 +445,7 @@ if (chan_req) {						/* channel request? */
 
 /* Interrupts */
 
-if ((dev_int & (INT_PENDING | dev_enb)) > INT_PENDING) {	/* int req? */
+if ((dev_int & (INT_PEND|INT_NMI|dev_enb)) > INT_PEND) {/* int req? */
 	pme = ext;					/* save extend */
 	if (cpu_unit.flags & UNIT_EXT) ext = 1;		/* ext opt? extend on */
 	dev_int = dev_int & ~INT_ON;			/* intr off */
@@ -460,6 +462,7 @@ else {	if (sim_brk_summ &&
 	PC = NEWA (Y, Y + 1);				/* incr PC */
 	dev_int = dev_int | INT_NODEF;  }
 
+dev_int = dev_int & ~INT_START;				/* clr start button int */
 sim_interval = sim_interval - 1;
 if (hst_lnt) {						/* instr hist? */
 	hst_p = (hst_p + 1);				/* next entry */
@@ -1129,7 +1132,7 @@ saved_AR = saved_BR = saved_XR = 0;
 C = 0;
 dp = 0;
 ext = pme = extoff_pending = 0;
-dev_int = dev_int & ~INT_PENDING;
+dev_int = dev_int & ~(INT_PEND|INT_NMI);
 dev_enb = 0;
 for (i = 0; i < DMA_MAX; i++) dma_ad[i] = dma_wc[i] = dma_eor[i] = 0;
 chan_req = 0;
