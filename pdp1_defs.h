@@ -1,6 +1,6 @@
 /* pdp1_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-1999, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,7 @@
 
    The PDP-1 was Digital's first computer.  The system design evolved during
    its life, and as a result, specifications are sketchy or contradictory.
-   This simulator is based on the 1963 maintenance manual.
+   This simulator is based on the 1962 maintenance manual.
 
    This simulator implements the following options:
 
@@ -61,7 +61,7 @@
 #define EPCMASK		(AMASK & ~DAMASK)		/* extended addr */
 #define IA		010000				/* indirect flag */
 #define IO_WAIT		010000				/* I/O sync wait */
-#define IO_CPLS		004000				/* cmopletion pulse */
+#define IO_CPLS		004000				/* completion pulse */
 #define GEN_CPLS(x)	(((x) ^ ((x) << 1)) & IO_WAIT)	/* completion pulse? */
 
 /* IOT subroutine return codes */

@@ -1,6 +1,6 @@
 /* nova_dsk.c: 4019 fixed head disk simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dsk	fixed head disk
 
+   26-Apr-01	RMS	Added device enable/disable support
    10-Dec-00	RMS	Added Eclipse support
    15-Oct-00	RMS	Editorial changes
    14-Apr-99	RMS	Changed t_addr to unsigned
@@ -74,9 +75,9 @@ static const int32 sector_map[] = {
 #define GET_SECTOR(x)	((int) fmod (sim_gtime() / ((double) (x)), \
 			((double) DSK_NUMSC)))
 
-extern unsigned int16 M[];
+extern uint16 M[];
 extern UNIT cpu_unit;
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 int_req, dev_busy, dev_done, dev_disable, iot_enb;
 int32 dsk_stat = 0;					/* status register */
 int32 dsk_da = 0;					/* disk address */
 int32 dsk_ma = 0;					/* memory address */
@@ -114,6 +115,7 @@ REG dsk_reg[] = {
 	{ ORDATA (WLK, dsk_wlk, 8) },
 	{ DRDATA (TIME, dsk_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, dsk_stopioe, 0) },
+	{ FLDATA (*DEVENB, iot_enb, INT_V_DSK), REG_HRO },
 	{ NULL }  };
 
 DEVICE dsk_dev = {

@@ -1,6 +1,6 @@
 /* pdp18b_cpu.c: 18b PDP CPU simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   cpu		PDP-4/7/9/15 central processor
+
+   26-Apr-01	RMS	Added device enable/disable support
+   25-Jan-01	RMS	Added DECtape support
    18-Dec-00	RMS	Added PDP-9,-15 memm init register
    30-Nov-00	RMS	Fixed numerous PDP-15 bugs
    14-Apr-99	RMS	Changed t_addr to unsigned
@@ -276,6 +280,7 @@ int32 stop_inst = 0;					/* stop on rsrv inst */
 int32 xct_max = 16;					/* nested XCT limit */
 int32 old_PC = 0;					/* old PC */
 int32 ibkpt_addr = ILL_ADR_FLAG | ADDRMASK;		/* breakpoint addr */
+int32 dev_enb = -1;					/* device enables */
 extern int32 sim_int_char;
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -347,6 +352,7 @@ REG cpu_reg[] = {
 	{ DRDATA (XCT_MAX, xct_max, 8), PV_LEFT + REG_NZ },
 	{ ORDATA (BREAK, ibkpt_addr, ADDRSIZE + 1) },
 	{ ORDATA (WRU, sim_int_char, 8) },
+	{ ORDATA (DEVENB, dev_enb, 32), REG_HRO },
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
@@ -387,6 +393,8 @@ extern int32 sim_interval;
 register int32 PC, LAC, MQ;
 int32 iot_data, device, pulse;
 t_stat reason;
+extern UNIT clk_unit;
+extern int32 sim_rtc_init (int32 time);
 extern int32 tti (int32 pulse, int32 AC);
 extern int32 tto (int32 pulse, int32 AC);
 extern int32 ptr (int32 pulse, int32 AC);
@@ -409,6 +417,10 @@ extern int32 rp64 (int32 pulse, int32 AC);
 #endif
 #if defined (MTA)
 extern int32 mt (int32 pulse, int32 AC);
+#endif
+#if defined (DTA)
+extern int32 dt75 (int32 pulse, int32 AC);
+extern int32 dt76 (int32 pulse, int32 AC);
 #endif
 
 #define JMS_WORD(t)	(((LAC & 01000000) >> 1) | ((memm & 1) << 16) | \
@@ -433,6 +445,7 @@ PC = saved_PC & ADDRMASK;				/* load local copies */
 LAC = saved_LAC & 01777777;
 MQ = saved_MQ & 0777777;
 reason = 0;
+sim_rtc_init (clk_unit.wait);			/* init calibration */
 
 /* Main instruction fetch/decode loop: check trap and interrupt */
 
@@ -795,7 +808,7 @@ case 031:						/* JMP, indir */
 	if (rest_pending) {				/* restore pending? */
 		LAC = ((M[MA] << 1) & 01000000) | (LAC & 0777777);
 		memm = (M[MA] >> 16) & 1;
-		usmd = (M[MA] >> 15) & 1);  }
+		usmd = (M[MA] >> 15) & 1;  }
 #endif
 	INDIRECT;					/* complete indirect */
 	emir_pending = rest_pending = 0;
@@ -1304,21 +1317,26 @@ case 034:						/* IOT */
 		break;
 #if defined (DRM)
 	case 060:					/* drum */
-		iot_data = drm60 (pulse, iot_data);
+		if (dev_enb & INT_DRM) iot_data = drm60 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 061:
-		iot_data = drm61 (pulse, iot_data);
+		if (dev_enb & INT_DRM) iot_data = drm61 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 062:
-		iot_data = drm62 (pulse, iot_data);
+		if (dev_enb & INT_DRM) iot_data = drm62 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 #endif
 #if defined (RP)
 	case 063:					/* RP15 */
-		iot_data = rp63 (pulse, iot_data);
+		if (dev_enb & INT_RP) iot_data = rp63 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 064:
-		iot_data = rp64 (pulse, iot_data);
+		if (dev_enb & INT_RP) iot_data = rp64 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 #endif
 	case 065:					/* LPT */
@@ -1329,15 +1347,28 @@ case 034:						/* IOT */
 		break;
 #if defined (RF)
 	case 070:					/* RF09 */
-		iot_data = rf70 (pulse, iot_data);
+		if (dev_enb & INT_RF) iot_data = rf70 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 072:
-		iot_data = rf72 (pulse, iot_data);
+		if (dev_enb & INT_RF) iot_data = rf72 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 #endif
 #if defined (MTA)
 	case 073:					/* TC59 */
-		iot_data = mt (pulse, iot_data);
+		if (dev_enb & INT_MTA) iot_data = mt (pulse, iot_data);
+		else reason = stop_inst;
+		break;
+#endif
+#if defined (DTA)
+	case 075:					/* TC02/TC15 */
+		if (dev_enb & INT_DTA) iot_data = dt75 (pulse, iot_data);
+		else reason = stop_inst;
+		break;
+	case 076:
+		if (dev_enb & INT_DTA) iot_data = dt76 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 #endif
 	default:					/* unknown device */

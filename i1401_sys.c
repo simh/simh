@@ -1,6 +1,6 @@
 /* i1401_sys.c: IBM 1401 simulator interface
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Mar-01	RMS	Revised load/dump interface (again)
    30-Oct-00	RMS	Added support for examine to file
    27-Oct-98	RMS	V2.4 load interface
 */
@@ -36,7 +37,7 @@ extern DEVICE cdr_dev, cdp_dev, stack_dev;
 extern DEVICE mt_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
-extern unsigned char M[];
+extern uint8 M[];
 extern char bcd_to_ascii[64], ascii_to_bcd[128];
 extern char *get_glyph (char *cptr, char *gbuf, char term);
 extern int32 store_addr_h (int32 addr);
@@ -97,7 +98,7 @@ const char *sim_stop_messages[] = {
    number of entries
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 col, rpt, ptr, mask, cctbuf[CCT_LNT];
 t_stat r;

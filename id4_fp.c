@@ -1,6 +1,6 @@
 /* id4_fp.c: Interdata 4 floating point instructions
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -69,16 +69,21 @@ struct ufp {						/* unpacked fp */
 #define FP_ROUND	0x80000000
 #define FP_DMASK	0xFFFFFFFF
 
-#define FP_SHFR(v,s)	if ((s) < 32) { \
+/* Variable and constant shifts; for constants, 0 < k < 32 */
+
+#define FP_SHFR_V(v,s)	if ((s) < 32) { \
 				v.frl = ((v.frl >> (s)) | \
 					(v.frh << (32 - (s)))) & FP_DMASK; \
 				v.frh = (v.frh >> (s)) & FP_DMASK; } \
 			else {	v.frl = v.frh >> ((s) - 32); \
-				v.frh = 0; }			
+				v.frh = 0; }
+#define FP_SHFR_K(v,s)	v.frl = ((v.frl >> (s)) | \
+				(v.frh << (32 - (s)))) & FP_DMASK; \
+			v.frh = (v.frh >> (s)) & FP_DMASK
 
 extern int32 R[16];
-extern unsigned int32 F[8];
-extern unsigned int16 M[];
+extern uint32 F[8];
+extern uint16 M[];
 void ReadFP2 (struct ufp *fop, int32 op, int32 r2, int32 ea);
 void UnpackFP (struct ufp *fop, unsigned int32 val);
 void NormFP (struct ufp *fop);
@@ -130,7 +135,7 @@ else if (fop2.frh != 0) {				/* if op2 = 0, no add */
 		fop1 = t;  }
 	if (ediff = fop1.exp - fop2.exp) {		/* exp differ? */
 		if (ediff > 14) fop2.frh = 0;		/* limit shift */
-		else {	FP_SHFR (fop2, ediff * 4);  }  }
+		else {	FP_SHFR_V (fop2, ediff * 4);  }  }
 	if (fop1.sign ^ fop2.sign) {			/* eff subtract */
 		fop1.frl = 0 - fop2.frl;		/* sub fractions */
 		fop1.frh = fop1.frh - fop2.frh - (fop1.frl != 0);
@@ -138,7 +143,7 @@ else if (fop2.frh != 0) {				/* if op2 = 0, no add */
 	else {	fop1.frl = fop2.frl;			/* add fractions */	
 		fop1.frh = fop1.frh + fop2.frh;		
 		if (fop1.frh & FP_CARRY) {		/* carry out? */
-			FP_SHFR (fop1, 4);		/* renormalize */
+			FP_SHFR_K (fop1, 4);		/* renormalize */
 			fop1.exp = fop1.exp + 1;  }  }	/* incr exp */
 	}						/* end if fop2 */
 return StoreFP (&fop1, r1);				/* store result */

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Sample Software Packages
-Date:	1-Jan-01
+Date:	31-May-01
 
 This memorandum documents the sample software packages available to run
 with the SIMH simulators.  Many of these packages are available under
@@ -10,8 +10,8 @@ software.
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2000, written by Robert M Supnik
-   Copyright (c) 1993-2000, Robert M Supnik
+   Original code published in 1993-2001, written by Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -238,7 +238,9 @@ To load and run SIM8:
 	sim> run
 	AC/ 0000
 
-6. PDP-15 FOCAL
+6. PDP-15
+
+6.1 FOCAL
 
 FOCAL15 is an interactive program for technical computations.  It can
 execute both immediate commands and stored programs (like BASIC).  FOCAL15
@@ -249,6 +251,54 @@ Kossow, who provided the binary image.  To load and run FOCAL15:
 	sim> run
 	*TYPE FSQT(2),!
 	=    1.4142
+	*
+
+6.2 Advanced Software System/Keyboard Monitor
+
+The Advanced Software System Keyboard Monitor is the simplest mass storage
+monitor for the PDP-15.  It offers single-user program development and
+execution capabilities.  To load and run ADSS/KM-15:
+
+- Load the paper-tape bootstrap into upper memory:
+
+	sim> load dec-15u.rim 77637
+
+  You <must> specify the load address.
+
+- Verify that the bootstrap loaded correctly:
+
+	sim> ex pc
+	PC:	077646
+
+- Mount the Advanced Software System DECtape image on DECtape unit 0:
+
+	sim> attach dt adss15_32k.dtp
+
+- Run the bootstrap:
+
+	sim> run
+
+- The DECtape will boot and print out
+
+	KMS9-15 V5B000
+	$
+
+  and is now ready for commands.  Recognized commands include:
+
+	D	list system device directory
+	I	list available commands
+	R	list device assignments
+	SCOM	list systems communication region
+
+- To run Focal, assign unused DAT slot 10 and then load Focal
+
+	$A LPA0 10
+	$GLOAD
+	LOADER V5B000
+	>_FOCAL<altmode = control-[>
+	FOCAL V9A
+	*TYPE 2+2,!
+	    4.0000
 	*
 
 7. IBM 1401 
@@ -407,4 +457,9 @@ To load and run BASIC:
 	RUN
 	 1.41421
 
+9. PDP-10 TOPS-10 7.03
+
+TOPS-10 was the primary time-shared operating system for the PDP-10.
+Installation and distribution tapes for TOPS-10 7.03 are available at
+http://pdp-10.trailing-edge.com.
 [end simh_swre.txt]

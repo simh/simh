@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   tti		terminal input
-   tto		terminal output
+   tti,tto	KL8E terminal input/output
 */
 
 #include "pdp8_defs.h"
@@ -32,13 +31,11 @@
 
 #define UNIT_V_UC	(UNIT_V_UF + 0)			/* UC only */
 #define UNIT_UC		(1 << UNIT_V_UC)
-extern int32 int_req, dev_done, dev_enable, stop_inst;
+extern int32 int_req, int_enable, dev_done, stop_inst;
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 extern t_stat sim_poll_kbd (void);
 extern t_stat sim_putchar (int32 out);
 
@@ -55,7 +52,7 @@ UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC, 0), KBD_POLL_WAIT };
 REG tti_reg[] = {
 	{ ORDATA (BUF, tti_unit.buf, 8) },
 	{ FLDATA (DONE, dev_done, INT_V_TTI) },
-	{ FLDATA (ENABLE, dev_enable, INT_V_TTI) },
+	{ FLDATA (ENABLE, int_enable, INT_V_TTI) },
 	{ FLDATA (INT, int_req, INT_V_TTI) },
 	{ DRDATA (POS, tti_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
@@ -85,7 +82,7 @@ UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
 REG tto_reg[] = {
 	{ ORDATA (BUF, tto_unit.buf, 8) },
 	{ FLDATA (DONE, dev_done, INT_V_TTO) },
-	{ FLDATA (ENABLE, dev_enable, INT_V_TTO) },
+	{ FLDATA (ENABLE, int_enable, INT_V_TTO) },
 	{ FLDATA (INT, int_req, INT_V_TTO) },
 	{ DRDATA (POS, tto_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
@@ -115,8 +112,8 @@ case 2:							/* KCC */
 case 4:							/* KRS */
 	return (AC | tti_unit.buf);			/* return buffer */
 case 5:							/* KIE */
-	if (AC & 1) dev_enable = dev_enable | (INT_TTI+INT_TTO);
-	else dev_enable = dev_enable & ~(INT_TTI+INT_TTO);
+	if (AC & 1) int_enable = int_enable | (INT_TTI+INT_TTO);
+	else int_enable = int_enable & ~(INT_TTI+INT_TTO);
 	int_req = INT_UPDATE;				/* update interrupts */
 	return AC;
 case 6:							/* KRB */
@@ -152,7 +149,7 @@ t_stat tti_reset (DEVICE *dptr)
 tti_unit.buf = 0;
 dev_done = dev_done & ~INT_TTI;				/* clear done, int */
 int_req = int_req & ~INT_TTI;
-dev_enable = dev_enable | INT_TTI;			/* set enable */
+int_enable = int_enable | INT_TTI;			/* set enable */
 sim_activate (&tti_unit, tti_unit.wait);		/* activate unit */
 return SCPE_OK;
 }
@@ -205,7 +202,7 @@ t_stat tto_reset (DEVICE *dptr)
 tto_unit.buf = 0;
 dev_done = dev_done & ~INT_TTO;				/* clear done, int */
 int_req = int_req & ~INT_TTO;
-dev_enable = dev_enable | INT_TTO;			/* set enable */
+int_enable = int_enable | INT_TTO;			/* set enable */
 sim_cancel (&tto_unit);					/* deactivate unit */
 return SCPE_OK;
 }

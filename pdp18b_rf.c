@@ -1,6 +1,6 @@
 /* pdp18b_rf.c: fixed head disk simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,9 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   rf		RF09/RF09 for PDP-9
-		RF15/RS09 for PDP-15
+   rf		(PDP-9) RF09/RF09
+		(PDP-15) RF15/RS09
 
+   26-Apr-01	RMS	Added device enable/disable support
+   15-Feb-01	RMS	Fixed 3 cycle data break sequencing
    30-Nov-99	RMS	Added non-zero requirement to rf_time
    14-Apr-99	RMS	Changed t_addr to unsigned
 
@@ -50,7 +52,7 @@
 #define RF_SIZE		(RF_NUMDK * RF_NUMTR * RF_NUMWD) /* words/drive */
 #define RF_WMASK	(RF_NUMWD - 1)			/* word mask */
 #define RF_WC		036				/* word count */
-#define RF_MA		037				/* mem address */
+#define RF_CA		037				/* current addr */
 
 /* Function/status register */
 
@@ -83,7 +85,7 @@
 #define RF_BUSY		(sim_is_active (&rf_unit))
 
 extern int32 M[];
-extern int32 int_req;
+extern int32 int_req, dev_enb;
 extern UNIT cpu_unit;
 int32 rf_sta = 0;					/* status register */
 int32 rf_da = 0;					/* disk address */
@@ -95,9 +97,6 @@ int32 rf_stopioe = 1;					/* stop on error */
 t_stat rf_svc (UNIT *uptr);
 t_stat rf_reset (DEVICE *dptr);
 int32 rf_updsta (int32 new);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
 
 /* RF data structures
 
@@ -113,8 +112,8 @@ UNIT rf_unit =
 REG rf_reg[] = {
 	{ ORDATA (STA, rf_sta, 18) },
 	{ ORDATA (DA, rf_da, 21) },
-	{ ORDATA (MA, M[RF_MA], 18) },
 	{ ORDATA (WC, M[RF_WC], 18) },
+	{ ORDATA (CA, M[RF_CA], 18) },
 	{ ORDATA (BUF, rf_dbuf, 18) },
 	{ FLDATA (INT, int_req, INT_V_RF) },
 	{ ORDATA (WLK0, rf_wlk[0], 16) },
@@ -128,6 +127,7 @@ REG rf_reg[] = {
 	{ DRDATA (TIME, rf_time, 24), PV_LEFT + REG_NZ },
 	{ FLDATA (BURST, rf_burst, 0) },
 	{ FLDATA (STOP_IOE, rf_stopioe, 0) },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_RF), REG_HRO },
 	{ NULL }  };
 
 DEVICE rf_dev = {
@@ -207,7 +207,8 @@ if ((uptr -> flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	return IORETURN (rf_stopioe, SCPE_UNATT);  }
 
 f = GET_FNC (rf_sta);					/* get function */
-do { 	pa = M[RF_MA] = (M[RF_MA] + 1) & ADDRMASK;	/* incr mem addr */
+do {	M[RF_WC] = (M[RF_WC] + 1) & 0777777;		/* incr word count */
+ 	pa = M[RF_CA] = (M[RF_CA] + 1) & ADDRMASK;	/* incr mem addr */
 	if ((f == FN_READ) && MEM_ADDR_OK (pa))		/* read? */
 		M[pa] = *(((int32 *) uptr -> filebuf) + rf_da);
 	if ((f == FN_WCHK) &&				/* write check? */
@@ -227,8 +228,7 @@ do { 	pa = M[RF_MA] = (M[RF_MA] + 1) & ADDRMASK;	/* incr mem addr */
 	if (rf_da > RF_SIZE) {				/* disk overflow? */
 		rf_da = 0;
 		rf_updsta (RFS_NED);			/* nx disk error */
-		break;  }
-	M[RF_WC] = (M[RF_WC] + 1) & 0777777;  }		/* incr word count */
+		break;  }  }
 while ((M[RF_WC] != 0) && (rf_burst != 0));		/* brk if wc, no brst */
 
 if ((M[RF_WC] != 0) && ((rf_sta & RFS_ERR) == 0))	/* more to do? */

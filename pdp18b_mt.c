@@ -1,6 +1,6 @@
-/* 18b PDP magnetic tape simulator
+/* pdp18b_mt.c: 18b PDP magnetic tape simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,12 +23,14 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   mt		TC59 magnetic tape for PDP-9
-		TC59D magnetic tape for PDP-15
+   mt		(PDP-9) TC59 magtape
+		(PDP-15) TC59D magtape
 
+   26-Apr-01	RMS	Added device enable/disable support
+   15-Feb-01	RMS	Fixed 3-cycle data break sequence
    04-Oct-98	RMS	V2.4 magtape format
    22-Jan-97	RMS	V2.3 magtape format
-   29-Jun-96	RMS	Added unit disable support
+   29-Jun-96	RMS	Added unit enable/disable support
 
    Magnetic tapes are represented as a series of variable records
    of the form:
@@ -55,8 +57,8 @@
 #define UNUM		u4				/* unit number */
 #define DBSIZE		(1 << 12)			/* max data record */
 #define DBMASK		(DBSIZE - 1)
-#define MT_WC		032				/* in core reg */
-#define MT_MA		033
+#define MT_WC		032				/* word count */
+#define MT_CA		033				/* current addr */
 
 /* Command/unit - mt_cu */
 
@@ -107,7 +109,7 @@
 							/* error flags */
 
 extern int32 M[];
-extern int32 int_req;
+extern int32 int_req, dev_enb;
 extern UNIT cpu_unit;
 int32 mt_cu = 0;					/* command/unit */
 int32 mt_sta = 0;					/* status register */
@@ -119,11 +121,6 @@ t_stat mt_attach (UNIT *uptr, char *cptr);
 t_stat mt_detach (UNIT *uptr);
 int32 mt_updcsta (UNIT *uptr, int32 val);
 UNIT *mt_busy (void);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
-extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 
 /* MT data structures
 
@@ -146,8 +143,8 @@ UNIT mt_unit[] = {
 REG mt_reg[] = {
 	{ ORDATA (STA, mt_sta, 18) },
 	{ ORDATA (CMD, mt_cu, 18) },
-	{ ORDATA (MA, M[MT_MA], 18) },
 	{ ORDATA (WC, M[MT_WC], 18) },
+	{ ORDATA (CA, M[MT_CA], 18) },
 	{ FLDATA (INT, int_req, INT_V_MTA) },
 	{ FLDATA (STOP_IOE, mt_stopioe, 0) },
 	{ DRDATA (TIME, mt_time, 24), PV_LEFT },
@@ -183,6 +180,7 @@ REG mt_reg[] = {
 		  REG_HRO },
 	{ GRDATA (FLG7, mt_unit[7].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
 		  REG_HRO },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_MTA), REG_HRO },
 	{ NULL }  };
 
 MTAB mt_mod[] = {
@@ -244,7 +242,7 @@ int32 c, c1, c2, c3, f, i, p, u, err;
 int32 wc, xma;
 t_stat rval;
 t_mtrlnt tbc, cbc;
-unsigned int8 dbuf[(3 * DBSIZE)];
+static uint8 dbuf[(3 * DBSIZE)];
 static t_mtrlnt bceof = { 0 };
 
 u = uptr -> UNUM;					/* get unit number */
@@ -297,8 +295,9 @@ case FN_CMPARE:						/* read/compare */
 	for ( ; i < cbc; i++) dbuf[i] = 0;		/* fill with 0's */
 	err = ferror (uptr -> fileref);
 	for (i = p = 0; i < wc; i++) {			/* copy buffer */
-		M[MT_MA] = (M[MT_MA] + 1) & 0777777;
-		xma = M[MT_MA] & ADDRMASK;
+		M[MT_WC] = (M[MT_WC] + 1) & 0777777;	/* inc WC, CA */
+		M[MT_CA] = (M[MT_CA] + 1) & 0777777;
+		xma = M[MT_CA] & ADDRMASK;
 		if (PACKED (mt_cu)) {			/* packed? */
 			c1 = dbuf[p++] & 077;
 			c2 = dbuf[p++] & 077;
@@ -311,8 +310,7 @@ case FN_CMPARE:						/* read/compare */
 		else if ((f == FN_CMPARE) && (c != (M[xma] &
 			(PACKED (mt_cu)? 0777777: 0177777)))) {
 			mt_updcsta (uptr, STA_CPE);
-			break;  }
-		M[MT_WC] = (M[MT_WC] + 1) & 0777777;  }
+			break;  }  }
 	uptr -> pos = uptr -> pos + ((tbc + 1) & ~1) +
 		(2 * sizeof (t_mtrlnt));
 	break;
@@ -321,16 +319,16 @@ case FN_WRITE:						/* write */
 	wc = DBSIZE - (M[MT_WC] & DBMASK);		/* get word count */
 	tbc = PACKED (mt_cu)? wc * 3: wc * 2;
 	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	for (i = p = 0; i < wc; i++) {		/* copy buf to tape */
-		M[MT_MA] = (M[MT_MA] + 1) & 0777777;
-		xma = M[MT_MA] & ADDRMASK;
+	for (i = p = 0; i < wc; i++) {			/* copy buf to tape */
+		M[MT_WC] = (M[MT_WC] + 1) & 0777777;	/* inc WC, CA */
+		M[MT_CA] = (M[MT_CA] + 1) & 0777777;
+		xma = M[MT_CA] & ADDRMASK;
 		if (PACKED (mt_cu)) {			/* packed? */
 			dbuf[p++] = (M[xma] >> 12) & 077;
 			dbuf[p++] = (M[xma] >> 6) & 077;
 			dbuf[p++] = M[xma] & 077;  }
 		else {	dbuf[p++] = (M[xma] >> 8) & 0377;
-			dbuf[p++] = M[xma] & 0377;  }
-		M[MT_WC] = (M[MT_WC] + 1) & 0777777;  }
+			dbuf[p++] = M[xma] & 0377;  }  }
 	fxwrite (dbuf, sizeof (char), (tbc + 1) & ~1, uptr -> fileref);
 	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
 	err = ferror (uptr -> fileref);
@@ -348,7 +346,6 @@ case FN_WREOF:
 	uptr -> USTAT = STA_EOF;
 	break;
 case FN_SPACEF:						/* space forward */
-	wc = 01000000 - M[MT_WC];			/* get word count */
 	do {	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
 		fxread (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref); /* read bc */
 		if ((err = ferror (uptr -> fileref)) ||	/* error or eof? */
@@ -364,7 +361,6 @@ case FN_SPACEF:						/* space forward */
 	while ((M[MT_WC] = (M[MT_WC] + 1) & 0777777) != 0);
 	break;
 case FN_SPACER:						/* space reverse */
-	wc = 01000000 - M[MT_WC];			/* get word count */
 	if (uptr -> pos == 0) {				/* at BOT? */
 		uptr -> USTAT = STA_BOT;
 		break;  }

@@ -1,6 +1,6 @@
 /* pdp18b_sys.c: 18b PDP's simulator interface
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-May-01	RMS	Fixed bug in RIM loaders
+   14-Mar-01	RMS	Added extension detection of RIM format tapes
+   21-Jan-01	RMS	Added DECtape support
    30-Nov-00	RMS	Added PDP-9,-15 RIM/BIN loader format
    30-Oct-00	RMS	Added support for examine to file
    27-Oct-98	RMS	V2.4 load interface
@@ -49,6 +52,9 @@ extern DEVICE rp_dev;
 #endif
 #if defined (MTA)
 extern DEVICE mt_dev;
+#endif
+#if defined (DTA)
+extern DEVICE dt_dev;
 #endif
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
@@ -92,6 +98,9 @@ DEVICE *sim_devices[] = { &cpu_dev,
 #if defined (RP)
 	&rp_dev,
 #endif
+#if defined (DTA)
+	&dt_dev,
+#endif
 #if defined (MTA)
 	&mt_dev,
 #endif
@@ -134,7 +143,7 @@ return word;
 	jmp addr or hlt
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 origin, val;
 
@@ -145,10 +154,10 @@ for (;;) {
 		origin = val & 017777;
 		if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
 		if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
-	else if ((val & 0760000) == 0600000) {		/* JMP? */
-		saved_PC = val & 017777;
+	else if ((val & 0760000) == OP_JMP) {		/* JMP? */
+		saved_PC = ((origin - 1) & 060000) | (val & 017777);
 		return SCPE_OK;  }
-	else if (val == 0740040) return SCPE_OK;	/* HLT? */
+	else if (val == OP_HLT) return SCPE_OK;		/* HLT? */
 	else return SCPE_FMT;  }			/* error */
 return SCPE_FMT;					/* error */
 }
@@ -175,16 +184,18 @@ return SCPE_FMT;					/* error */
     endblock/	origin (< 0)
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 extern int32 sim_switches;
 int32 i, bits, origin, count, cksum, val;
 t_stat r;
 char gbuf[CBUFSIZE];
+extern t_bool match_ext (char *fnm, char *ext);
 
 /* RIM loader */
 
-if (sim_switches & SWMASK ('R')) {			/* RIM load? */
+if ((sim_switches & SWMASK ('R')) ||			/* RIM format? */
+    (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B')))) {
 	if (*cptr != 0) {				/* more input? */
 		cptr = get_glyph (cptr, gbuf, 0);	/* get origin */
 		origin = get_uint (gbuf, 8, ADDRMASK, &r);
@@ -192,11 +203,15 @@ if (sim_switches & SWMASK ('R')) {			/* RIM load? */
 		if (*cptr != 0) return SCPE_ARG;  }	/* no more */
 	else origin = 0200;				/* default 200 */
 
-	for (bits = 0; (bits & 1) == 0; ) {		/* word loop */
+	for (;;) {					/* word loop */
 		if ((val = getword (fileref, &bits)) < 0) return SCPE_FMT;
-		saved_PC = origin & ADDRMASK;		/* save start */
-		if (MEM_ADDR_OK (origin)) M[origin++] = val;  }	/* store word */
-	return SCPE_OK;  }				/* found word
+		if (bits & 1) {				/* end of tape? */
+			if ((val & 0760000) == OP_JMP) saved_PC = 
+				((origin - 1) & 060000) | (val & 017777);
+			else if (val != OP_HLT) return SCPE_FMT;
+			break;  }
+		else if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
+	return SCPE_OK;  }
 
 /* Binary loader */
 
@@ -330,6 +345,10 @@ static const char *opcode[] = {
 #if defined (MTA)					/* TC59 */
  "MTTR", "MTCR", "MTSF", "MTRC", "MTAF",
  "MTRS", "MTGO", "MTCM", "MTLC",
+#endif
+#if defined (DTA)
+ "DTCA", "DTRA", "DTXA", "DTLA",
+ "DTEF", "DTRB", "DTDF",
 #endif
 #if defined (PDP7)
  "ITON", "TTS", "SKP7", "CAF",
@@ -469,6 +488,10 @@ static const int32 opc_val[] = {
 #if defined (MTA)
  0707301+I_NPI, 0707321+I_NPI, 0707341+I_NPI, 0707312+I_NPN, 0707322+I_NPI,
  0707352+I_NPN, 0707304+I_NPI, 0707324+I_NPI, 0707326+I_NPI, 
+#endif
+#if defined (DTA)
+ 0707541+I_NPI, 0707552+I_NPN, 0707544+I_NPI, 0707545+I_NPI,
+ 0707561+I_NPI, 0707572+I_NPN, 0707601+I_NPI,
 #endif
 #if defined (PDP7)
  0703201+I_NPI, 0703301+I_NPI, 0703341+I_NPI, 0703302+I_NPI,

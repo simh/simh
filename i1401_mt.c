@@ -1,6 +1,6 @@
 /* IBM 1401 magnetic tape simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Apr-01	RMS	Changed to rewind tape before boot
    07-Dec-00	RMS	Widened display width from 6 to 8 bits to see record lnt
 		CEO	Added tape bootstrap
    14-Apr-99	RMS	Changed t_addr to unsigned
@@ -50,7 +51,7 @@
 #define UNIT_WLK	(1 << UNIT_V_WLK)
 #define UNIT_W_UF	2				/* #save flags */
 
-extern unsigned char M[];				/* memory */
+extern uint8 M[];					/* memory */
 extern int32 ind[64];
 extern int32 BS, iochk;
 extern UNIT cpu_unit;
@@ -58,8 +59,6 @@ unsigned int8 dbuf[MAXMEMSIZE * 2];			/* tape buffer */
 t_stat mt_reset (DEVICE *dptr);
 t_stat mt_boot (int32 unitno);
 UNIT *get_unit (int32 unit);
-extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 
 /* MT data structures
 
@@ -286,6 +285,7 @@ t_stat mt_boot (int32 unitno)
 int32 i;
 extern int32 saved_IS;
 
+mt_unit[unitno].pos = 0;
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 M[BOOT_START + 3] = unitno & 07;
 saved_IS = BOOT_START;

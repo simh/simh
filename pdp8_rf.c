@@ -1,6 +1,6 @@
 /* pdp8_rf.c: RF08 fixed head disk simulator
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   rf		RF08 fixed head disk
+
+   25-Apr-01	RMS	Added device enable/disable support
+   19-Mar-01	RMS	Added disk monitor bootstrap, fixed IOT decoding
+   15-Feb-01	RMS	Fixed 3 cycle data break sequence
    14-Apr-99	RMS	Changed t_addr to unsigned
    30-Mar-98	RMS	Fixed bug in RF bootstrap.
 
@@ -52,8 +57,8 @@
 /* Parameters in the unit descriptor */
 
 #define FUNC		u4				/* function */
-#define RF_READ		3				/* read */
-#define RF_WRITE	5				/* write */
+#define RF_READ		2				/* read */
+#define RF_WRITE	4				/* write */
 
 /* Status register */
 
@@ -81,9 +86,10 @@
 				int_req = int_req | INT_RF; \
 			else int_req = int_req & ~INT_RF
 
-extern int32 int_req, stop_inst;
-extern unsigned int16 M[];
+extern uint16 M[];
+extern int32 int_req, dev_enb, stop_inst;
 extern UNIT cpu_unit;
+extern int32 df_devenb;
 int32 rf_sta = 0;					/* status register */
 int32 rf_da = 0;					/* disk address */
 int32 rf_done = 0;					/* done flag */
@@ -95,8 +101,6 @@ t_stat rf_svc (UNIT *uptr);
 t_stat pcell_svc (UNIT *uptr);
 t_stat rf_reset (DEVICE *dptr);
 t_stat rf_boot (int32 unitno);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 
 /* RF08 data structures
 
@@ -115,14 +119,15 @@ UNIT pcell_unit = { UDATA (&pcell_svc, 0, 0) };
 REG rf_reg[] = {
 	{ ORDATA (STA, rf_sta, 12) },
 	{ ORDATA (DA, rf_da, 20) },
-	{ ORDATA (MA, M[RF_MA], 12) },
 	{ ORDATA (WC, M[RF_WC], 12) },
+	{ ORDATA (MA, M[RF_MA], 12) },
 	{ FLDATA (DONE, rf_done, 0) },
 	{ FLDATA (INT, int_req, INT_V_RF) },
 	{ ORDATA (WLK, rf_wlk, 32) },
 	{ DRDATA (TIME, rf_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (BURST, rf_burst, 0) },
 	{ FLDATA (STOP_IOE, rf_stopioe, 0) },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_RF), REG_HRO },
 	{ NULL }  };
 
 DEVICE rf_dev = {
@@ -138,22 +143,19 @@ int32 rf60 (int32 pulse, int32 AC)
 int32 t;
 
 UPDATE_PCELL;						/* update photocell */
-switch (pulse) {					/* decode IR<9:11> */
-case 1:							/* DCMA */
+if (pulse & 1) {					/* DCMA */
 	rf_da = rf_da & ~07777;				/* clear DAR<8:19> */
-	return AC;
-case 3:case 5:						/* DMAR, DMAW */
-	rf_da = (rf_da & ~07777) | AC;			/* DAR<8:19> <- AC */
 	rf_done = 0;					/* clear done */
 	rf_sta = rf_sta & ~RFS_ERR;			/* clear errors */
-	RF_INT_UPDATE;					/* update int req */
-	rf_unit.FUNC = pulse;				/* save function */
+	RF_INT_UPDATE;  }				/* update int req */
+if (pulse & 6) {					/* DMAR, DMAW */
+	rf_da = rf_da | AC;				/* DAR<8:19> |= AC */
+	rf_unit.FUNC = pulse & ~1;			/* save function */
 	t = (rf_da & RF_WMASK) - GET_POS (rf_time);	/* delta to new loc */
 	if (t < 0) t = t + RF_NUMWD;			/* wrap around? */
 	sim_activate (&rf_unit, t * rf_time);		/* schedule op */
-	return 0;					/* clear AC */
-default:
-	return (stop_inst << IOT_V_REASON) + AC;  }	/* end switch */
+	AC = 0;  }					/* clear AC */
+return AC;
 }
 
 int32 rf61 (int32 pulse, int32 AC)
@@ -176,9 +178,8 @@ case 5:							/* DIML */
 	RF_INT_UPDATE;					/* update int req */
 	return 0;					/* clear AC */
 case 6:							/* DIMA */
-	return rf_sta;					/* AC <- STA<0:11> */
-default:
-	return (stop_inst << IOT_V_REASON) + AC;  }	/* end switch */
+	return rf_sta;  }				/* AC <- STA<0:11> */
+return AC;
 }
 
 /* IOT's, continued */
@@ -186,17 +187,13 @@ default:
 int32 rf62 (int32 pulse, int32 AC)
 {
 UPDATE_PCELL;						/* update photocell */
-switch (pulse) {					/* decode IR<9:11> */
-case 1:							/* DFSE */
-	return (rf_sta & RFS_ERR)? IOT_SKP + AC: AC;
-case 2:							/* DFSC */
-	return (rf_done)? IOT_SKP + AC: AC;
-case 3:							/* DISK */
-	return (rf_done || (rf_sta & RFS_ERR))? IOT_SKP + AC: AC;
-case 6:							/* DMAC */
-	return rf_da & 07777;				/* AC <- DAR<0:11> */
-default:
-	return (stop_inst << IOT_V_REASON) + AC;  }	/* end switch */
+if (pulse & 1) {					/* DFSE */
+	if (rf_sta & RFS_ERR) AC = AC | IOT_SKP;  }
+if (pulse & 2) {					/* DFSC */
+	if (pulse & 4) AC = AC & ~07777;		/* for DMAC */
+	else if (rf_done) AC = AC | IOT_SKP;  }
+if (pulse & 4) AC = AC | (rf_da & 07777);		/* DMAC */
+return AC;
 }
 
 int32 rf64 (int32 pulse, int32 AC)
@@ -233,7 +230,8 @@ if ((uptr -> flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	return IORETURN (rf_stopioe, SCPE_UNATT);  }
 
 mex = GET_MEX (rf_sta);
-do { 	M[RF_MA] = (M[RF_MA] + 1) & 07777;		/* incr mem addr */
+do {	M[RF_WC] = (M[RF_WC] + 1) & 07777;		/* incr word count */
+ 	M[RF_MA] = (M[RF_MA] + 1) & 07777;		/* incr mem addr */
 	pa = mex | M[RF_MA]; 				/* add extension */
 	if (uptr -> FUNC == RF_READ) {
 		if (MEM_ADDR_OK (pa))			/* read, check nxm */
@@ -243,8 +241,7 @@ do { 	M[RF_MA] = (M[RF_MA] + 1) & 07777;		/* incr mem addr */
 		else {	*(((int16 *) uptr -> filebuf) + rf_da) = M[pa];
 			if (((t_addr) rf_da) >= uptr -> hwmark)
 				uptr -> hwmark = rf_da + 1;  }  }
-	rf_da = (rf_da + 1) & 03777777;			/* incr disk addr */
-	M[RF_WC] = (M[RF_WC] + 1) & 07777;  }		/* incr word count */
+	rf_da = (rf_da + 1) & 03777777;  }		/* incr disk addr */
 while ((M[RF_WC] != 0) && (rf_burst != 0));		/* brk if wc, no brst */
 
 if (M[RF_WC] != 0)					/* more to do? */
@@ -269,6 +266,7 @@ return SCPE_OK;
 
 t_stat rf_reset (DEVICE *dptr)
 {
+if (dev_enb & INT_RF) dev_enb = dev_enb & ~INT_DF;	/* either DF or RF */
 rf_sta = rf_da = 0;
 rf_done = 1;
 int_req = int_req & ~INT_RF;				/* clear interrupt */
@@ -279,10 +277,12 @@ return SCPE_OK;
 
 /* Bootstrap routine */
 
-#define BOOT_START 07750
-#define BOOT_LEN (sizeof (boot_rom) / sizeof (int))
+#define OS8_START	07750
+#define OS8_LEN		(sizeof (os8_rom) / sizeof (int32))
+#define DM4_START	00200
+#define DM4_LEN		(sizeof (dm4_rom) / sizeof (int32))
 
-static const int32 boot_rom[] = {
+static const int32 os8_rom[] = {
 	07600,			/* 7750, CLA CLL	; also word count */
 	06603,			/* 7751, DMAR		; also address */
 	06622,			/* 7752, DFSC		; done? */
@@ -290,12 +290,27 @@ static const int32 boot_rom[] = {
 	05752			/* 7754, JMP @.-2	; enter boot */
 };
 
+static const int32 dm4_rom[] = {
+	00200, 07600,		/* 0200, CLA CLL */
+	00201, 06603,		/* 0201, DMAR		; read */
+	00202, 06622,		/* 0202, DFSC		; done? */
+	00203, 05202,		/* 0203, JMP .-1	; no */
+	00204, 05600,		/* 0204, JMP @.-4	; enter boot */
+	07750, 07576,		/* 7750, 7576		; word count */
+	07751, 07576		/* 7751, 7576		; address */
+};
+
 t_stat rf_boot (int32 unitno)
 {
 int32 i;
-extern int32 saved_PC;
+extern int32 sim_switches, saved_PC;
 
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
-saved_PC = BOOT_START;
+if (sim_switches & SWMASK ('D')) {
+	for (i = 0; i < DM4_LEN; i = i + 2)
+		M[dm4_rom[i]] = dm4_rom[i + 1];
+	saved_PC = DM4_START;  }
+else {	for (i = 0; i < OS8_LEN; i++)
+		M[OS8_START + i] = os8_rom[i];
+	saved_PC = OS8_START;  }
 return SCPE_OK;
 }

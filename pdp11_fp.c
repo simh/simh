@@ -1,6 +1,6 @@
 /* pdp11_fp.c: PDP-11 floating point simulator (32b version)
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -206,7 +206,7 @@ fpac_t fround_fac = { (1u << (FP_V_FROUND + 32)), 0 };
 fpac_t fround_guard_fac = { 0, (1u << (FP_V_FROUND + FP_GUARD)) };
 fpac_t dround_guard_fac = { (1u << (FP_V_DROUND + FP_GUARD)), 0 };
 fpac_t fmask_fac = { 0xFFFFFFFF, (1u << (FP_V_HB + FP_GUARD + 1)) - 1 };
-static const unsigned int32 and_mask[33] = { 0,
+static const uint32 and_mask[33] = { 0,
 	0x1, 0x3, 0x7, 0xF,
 	0x1F, 0x3F, 0x7F, 0xFF,
 	0x1FF, 0x3FF, 0x7FF, 0xFFF,

@@ -1,6 +1,6 @@
-/* RL11 (RLV12) cartridge disk simulator
+/* pdp11_rl.c: RL11 (RLV12) cartridge disk simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   rl		RL11(RLV12)/RL01/RL02 cartridge disk
+
+   26-Apr-01	RMS	Added device enable/disable support
+   25-Mar-01	RMS	Fixed block fill calculation
+   15-Feb-01	RMS	Corrected bootstrap string
    12-Nov-97	RMS	Added bad block table command.
    25-Nov-96	RMS	Default units to autosize.
    29-Jun-96	RMS	Added unit disable support.
@@ -148,8 +153,8 @@
 
 #define RLBAE_IMP	0000077				/* implemented */
 
-extern int32 int_req;
-extern unsigned int16 *M;				/* memory */
+extern uint16 *M;					/* memory */
+extern int32 int_req, dev_enb;
 extern UNIT cpu_unit;
 int32 rlcs = 0;						/* control/status */
 int32 rlba = 0;						/* memory address */
@@ -166,11 +171,6 @@ t_stat rl_boot (int32 unitno);
 t_stat rl_attach (UNIT *uptr, char *cptr);
 t_stat rl_set_size (UNIT *uptr, int32 value);
 t_stat rl_set_bad (UNIT *uptr, int32 value);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
-extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 extern t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds);
 
 /* RL11 data structures
@@ -218,6 +218,7 @@ REG rl_reg[] = {
 	{ DRDATA (CAPAC2, rl_unit[2].capac, 32), PV_LEFT + REG_HRO },
 	{ DRDATA (CAPAC3, rl_unit[3].capac, 32), PV_LEFT + REG_HRO },
 	{ FLDATA (STOP_IOE, rl_stopioe, 0) },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_RL), REG_HRO },
 	{ NULL }  };
 
 MTAB rl_mod[] = {
@@ -306,7 +307,7 @@ case 0:							/* RLCS */
 	switch (GET_FUNC (rlcs)) {			/* case on RLCS<3:1> */
 	case RLCS_NOP:					/* nop */
 		rl_set_done (0);
-		return SCPE_OK;
+		break;
 	case RLCS_SEEK:					/* seek */
 		curr = GET_CYL (uptr -> TRK);		/* current cylinder */
 		offs = GET_CYL (rlda);			/* offset */
@@ -320,10 +321,10 @@ case 0:							/* RLCS */
 		uptr -> TRK = (newc << RLDA_V_CYL) |	/* put on track */
 			((rlda & RLDA_SK_HD)? RLDA_HD1: RLDA_HD0);
 		sim_activate (uptr, rl_swait * abs (newc - curr));
-		return SCPE_OK;
+		break;
 	default:					/* data transfer */
 		sim_activate (uptr, rl_swait);		/* activate unit */
-		return SCPE_OK;  }			/* end switch func */
+		break;  }			/* end switch func */
 	return SCPE_OK;					/* end case RLCS */
 
 case 1:							/* RLBA */
@@ -357,11 +358,11 @@ case 4:							/* RLBAE */
    the current command.
 */
 
-static unsigned int16 fill[RL_NUMWD] = { 0 };
 t_stat rl_svc (UNIT *uptr)
 {
 int32 comp, err, awc, wc, maxwc;
-int32 func, pa, da, fillc;
+int32 func, pa, da, remc;
+static uint16 fill[RL_NUMWD] = { 0 };
 
 func = GET_FUNC (rlcs);					/* get function */
 if (func == RLCS_GSTA) {				/* get status */
@@ -421,13 +422,13 @@ if ((func >= RLCS_READ) && (err == 0)) {		/* read (no hdr)? */
 if ((func == RLCS_WRITE) && (err == 0)) {		/* write? */
 	fxwrite (&M[pa], sizeof (int16), wc, uptr -> fileref);
 	err = ferror (uptr -> fileref);
-	if ((err == 0) && (fillc = (wc & (RL_NUMWD - 1)))) {
-		fxwrite (fill, sizeof (int16), fillc, uptr -> fileref);
+	if ((err == 0) && (remc = (wc & (RL_NUMWD - 1)))) {
+		fxwrite (fill, sizeof (int16), RL_NUMWD - remc, uptr -> fileref);
 		err = ferror (uptr -> fileref);  }  }
 
 if ((func == RLCS_WCHK) && (err == 0)) {		/* write check? */
-	fillc = wc;					/* xfer length */
-	for (wc = 0; (err == 0) && (wc < fillc); wc++)  {
+	remc = wc;					/* xfer length */
+	for (wc = 0; (err == 0) && (wc < remc); wc++)  {
 		awc = fxread (&comp, sizeof (int16), 1, uptr -> fileref);
 		if (awc == 0) comp = 0;
 		if (comp != M[pa + wc]) rlcs = rlcs | RLCS_ERR | RLCS_CRC;  }
@@ -558,7 +559,7 @@ static const int32 boot_rom[] = {
 	0005002,			/* CLR R2 */
 	0005003,			/* CLR R3 */
 	0005004,			/* CLR R4 */
-	0012705, 0062154,		/* MOV "DL, R5 */
+	0012705, 0046104,		/* MOV "DL, R5 */
 	0005007				/* CLR PC */
 };
 

@@ -1,6 +1,6 @@
 /* nova_plt.c: NOVA plotter simulator
 
-   Copyright (c) 2000, Robert M. Supnik
+   Copyright (c) 2000-2001, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -23,11 +23,15 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   plt		plotter
+
+   26-Apr-01	RMS	Added device enable/disable support
 */
 
 #include "nova_defs.h"
 
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 int_req, dev_busy, dev_done, dev_disable, iot_enb;
 int32 plt_stopioe = 0;					/* stop on error */
 t_stat plt_svc (UNIT *uptr);
 t_stat plt_reset (DEVICE *dptr);
@@ -51,6 +55,7 @@ REG plt_reg[] = {
 	{ DRDATA (POS, plt_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, plt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, plt_stopioe, 0) },
+	{ FLDATA (*DEVENB, iot_enb, INT_V_PLT), REG_HRO },
 	{ NULL }  };
 
 DEVICE plt_dev = {

@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,13 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   cpu		PDP-11 CPU (J-11 microprocessor)
+
+   23-Apr-01	RMS	Added RK611 support
+   05-Apr-01	RMS	Added TS11/TSV05 support
+   05-Mar-01	RMS	Added clock calibration support
+   11-Feb-01	RMS	Added DECtape support
+   25-Jan-01	RMS	Fixed 4M memory definition (found by Eric Smith)
    14-Apr-99	RMS	Changed t_addr to unsigned
    18-Aug-98	RMS	Added CIS support
    09-May-98	RMS	Fixed bug in DIV overflow test
@@ -179,14 +186,14 @@
 #define last_pa		(cpu_unit.u4)			/* and RESTOREd */
 #define UNIT_V_18B	(UNIT_V_UF)			/* force 18b addr */
 #define UNIT_18B	(1u << UNIT_V_18B)
-#define UNIT_V_CIS	(UNIT_V_UF + 1)		/* CIS present */
+#define UNIT_V_CIS	(UNIT_V_UF + 1)			/* CIS present */
 #define UNIT_CIS	(1u << UNIT_V_CIS)
 #define UNIT_V_MSIZE	(UNIT_V_UF + 2)			/* dummy */
 #define UNIT_MSIZE	(1u << UNIT_V_MSIZE)
 
 /* Global state */
 
-unsigned int16 *M = NULL;				/* address of memory */
+uint16 *M = NULL;					/* address of memory */
 int32 REGFILE[6][2] = { 0 };				/* R0-R5, two sets */
 int32 STACKFILE[4] = { 0 };				/* SP, four modes */
 int32 saved_PC = 0;					/* program counter */
@@ -195,8 +202,8 @@ int32 PSW = 0;						/* PSW */
   int32 cm = 0;						/*   current mode */
   int32 pm = 0;						/*   previous mode */
   int32 rs = 0;						/*   register set */
-  int32 ipl = 0;						/*   int pri level */
-  int32 tbit = 0;						/*   trace flag */
+  int32 ipl = 0;					/*   int pri level */
+  int32 tbit = 0;					/*   trace flag */
   int32 N = 0, Z = 0, V = 0, C = 0;			/*   condition codes */
 int32 wait_state = 0;					/* wait state */
 int32 trap_req = 0;					/* trap requests */
@@ -213,23 +220,24 @@ int32 MMR0 = 0;						/* MMR0 - status */
 int32 MMR1 = 0;						/* MMR1 - R+/-R */
 int32 MMR2 = 0;						/* MMR2 - saved PC */
 int32 MMR3 = 0;						/* MMR3 - 22b status */
-int32 isenable = 0, dsenable = 0;				/* i, d space flags */
-int32 CPUERR = 0;						/* CPU error reg */
-int32 MEMERR = 0;						/* memory error reg */
+int32 isenable = 0, dsenable = 0;			/* i, d space flags */
+int32 CPUERR = 0;					/* CPU error reg */
+int32 MEMERR = 0;					/* memory error reg */
 int32 CCR = 0;						/* cache control reg */
 int32 HITMISS = 0;					/* hit/miss reg */
 int32 MAINT = (0 << 9) + (0 << 8) + (4 << 4);		/* maint bit<9> = Q/U */
 							/*  <8> = hwre FP */
 							/*  <6:4> = sys type */
 int32 stop_trap = 1;					/* stop on trap */
-int32 stop_vecabort = 1;					/* stop on vec abort */
+int32 stop_vecabort = 1;				/* stop on vec abort */
 int32 stop_spabort = 1;					/* stop on SP abort */
 int32 wait_enable = 0;					/* wait state enable */
-int32 ibkpt_addr = ILL_ADR_FLAG | VAMASK;			/* breakpoint addr */
-int32 old_PC = 0;						/* previous PC */
+int32 ibkpt_addr = ILL_ADR_FLAG | VAMASK;		/* breakpoint addr */
+int32 old_PC = 0;					/* previous PC */
+int32 dev_enb = (-1) & ~INT_TS;				/* dev enables */
 jmp_buf save_env;					/* abort handler */
 int32 dsmask[4] = { MMR3_KDS, MMR3_SDS, 0, MMR3_UDS };	/* dspace enables */
-int32 int_mask[8] = { INT_IPL0, INT_IPL1, INT_IPL2,	/* interrupt masks */
+uint32 int_mask[8] = { INT_IPL0, INT_IPL1, INT_IPL2,	/* interrupt masks */
 	INT_IPL3, INT_IPL4, INT_IPL5, INT_IPL6, INT_IPL7 };
 extern int32 sim_int_char;
 
@@ -270,6 +278,9 @@ extern t_stat lpt_wr (int32 data, int32 addr, int32 access);
 extern t_stat rk_rd (int32 *data, int32 addr, int32 access);
 extern t_stat rk_wr (int32 data, int32 addr, int32 access);
 extern int32 rk_inta (void);
+/* extern t_stat hk_rd (int32 *data, int32 addr, int32 access);
+extern t_stat hk_wr (int32 data, int32 addr, int32 access);
+extern int32 hk_inta (void); */
 extern t_stat rl_rd (int32 *data, int32 addr, int32 access);
 extern t_stat rl_wr (int32 data, int32 addr, int32 access);
 extern t_stat rp_rd (int32 *data, int32 addr, int32 access);
@@ -277,38 +288,45 @@ extern t_stat rp_wr (int32 data, int32 addr, int32 access);
 extern int32 rp_inta (void);
 extern t_stat rx_rd (int32 *data, int32 addr, int32 access);
 extern t_stat rx_wr (int32 data, int32 addr, int32 access);
+extern t_stat dt_rd (int32 *data, int32 addr, int32 access);
+extern t_stat dt_wr (int32 data, int32 addr, int32 access);
 extern t_stat tm_rd (int32 *data, int32 addr, int32 access);
 extern t_stat tm_wr (int32 data, int32 addr, int32 access);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
+extern t_stat ts_rd (int32 *data, int32 addr, int32 access);
+extern t_stat ts_wr (int32 data, int32 addr, int32 access);
 
 /* Auxiliary data structures */
 
 struct iolink {						/* I/O page linkage */
 	int32	low;					/* low I/O addr */
 	int32	high;					/* high I/O addr */
+	int32	enb;					/* enable mask */
 	t_stat	(*read)();				/* read routine */
 	t_stat	(*write)();  };				/* write routine */
 
 struct iolink iotable[] = {
-	{ 017777740, 017777777, &CPU_rd, &CPU_wr },
-	{ 017777546, 017777567, &std_rd, &std_wr },
-	{ 017777514, 017777517, &lpt_rd, &lpt_wr },
-	{ 017777400, 017777417, &rk_rd, &rk_wr },
-	{ 017774400, 017774411, &rl_rd, &rl_wr },
-	{ 017776700, 017776753, &rp_rd, &rp_wr },
-	{ 017777170, 017777173, &rx_rd, &rx_wr },
-	{ 017772520, 017772533, &tm_rd, &tm_wr },
-	{ 017777600, 017777677, &APR_rd, &APR_wr },
-	{ 017772200, 017772377, &APR_rd, &APR_wr },
-	{ 017777570, 017777577, &SR_MMR012_rd, &SR_MMR012_wr },
-	{ 017772516, 017772517, &MMR3_rd, &MMR3_wr },
-	{ 0, 0, NULL }  };
+	{ 017777740, 017777777, 0, &CPU_rd, &CPU_wr },
+	{ 017777546, 017777567, 0, &std_rd, &std_wr },
+	{ 017777514, 017777517, 0, &lpt_rd, &lpt_wr },
+	{ 017777400, 017777417, INT_RK, &rk_rd, &rk_wr },
+/*	{ 017777440, 017777477, INT_HK, &hk_rd, &hk_wr }, */
+	{ 017774400, 017774411, INT_RL, &rl_rd, &rl_wr },
+	{ 017776700, 017776753, INT_RP, &rp_rd, &rp_wr },
+	{ 017777170, 017777173, INT_RX, &rx_rd, &rx_wr },
+	{ 017777340, 017777351, INT_DTA, &dt_rd, &dt_wr },
+	{ 017772520, 017772533, INT_TM, &tm_rd, &tm_wr },
+	{ 017772520, 017772523, INT_TS, &ts_rd, &ts_wr },
+	{ 017777600, 017777677, 0, &APR_rd, &APR_wr },
+	{ 017772200, 017772377, 0, &APR_rd, &APR_wr },
+	{ 017777570, 017777577, 0, &SR_MMR012_rd, &SR_MMR012_wr },
+	{ 017772516, 017772517, 0, &MMR3_rd, &MMR3_wr },
+	{ 0, 0, 0, NULL, NULL }  };
 
 int32 int_vec[32] = {					/* int req to vector */
-	0, 0, 0, VEC_PIRQ, VEC_CLK, 0, 0, VEC_PIRQ,
-	VEC_RK, VEC_RL, VEC_RX, VEC_TM, VEC_RP, 0, 0, VEC_PIRQ,
-	VEC_TTI, VEC_TTO, VEC_PTR, VEC_PTP, VEC_LPT, 0, 0, 0,
-	0, 0, 0, 0, VEC_PIRQ, VEC_PIRQ, VEC_PIRQ, VEC_PIRQ  };
+	0, 0, 0, VEC_PIRQ, VEC_CLK, VEC_DTA, 0, VEC_PIRQ,
+	VEC_RK, VEC_RL, VEC_RX, VEC_TM, VEC_RP, VEC_TS, VEC_HK, 0,
+	0, 0, 0, VEC_PIRQ, VEC_TTI, VEC_TTO, VEC_PTR, VEC_PTP,
+	VEC_LPT, 0, 0, 0, VEC_PIRQ, VEC_PIRQ, VEC_PIRQ, VEC_PIRQ  };
 
 int32 (*int_ack[32])() = {				/* int ack routines */
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -322,7 +340,7 @@ int32 trap_vec[TRAP_V_MAX] = {				/* trap req to vector */
 	VEC_IOT, VEC_EMT, VEC_TRAP, VEC_TRC,
 	VEC_YEL, VEC_PWRFL, VEC_FPE };
 
-int32 trap_clear[TRAP_V_MAX] = {				/* trap clears */
+int32 trap_clear[TRAP_V_MAX] = {			/* trap clears */
 	TRAP_RED+TRAP_PAR+TRAP_YEL+TRAP_TRC,
 	TRAP_ODD+TRAP_PAR+TRAP_YEL+TRAP_TRC,
 	TRAP_MME+TRAP_PAR+TRAP_YEL+TRAP_TRC,
@@ -505,6 +523,7 @@ REG cpu_reg[] = {
 	{ ORDATA (OLDPC, old_PC, 16), REG_RO },
 	{ ORDATA (BREAK, ibkpt_addr, 17) },
 	{ ORDATA (WRU, sim_int_char, 8) },
+	{ ORDATA (DEVENB, dev_enb, 32), REG_HRO },
 	{ NULL}  };
 
 MTAB cpu_mod[] = {
@@ -530,7 +549,7 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 1048576, NULL, "1M", &cpu_set_size},
 	{ UNIT_MSIZE, 2097152, NULL, "2M", &cpu_set_size},
 	{ UNIT_MSIZE, 3145728, NULL, "3M", &cpu_set_size},
-	{ UNIT_MSIZE, 4194304, NULL, "4M", &cpu_set_size},
+	{ UNIT_MSIZE, 4186112, NULL, "4M", &cpu_set_size},
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -543,6 +562,8 @@ t_stat sim_instr (void)
 {
 extern int32 sim_interval;
 extern UNIT *sim_clock_queue;
+extern UNIT clk_unit;
+extern int32 sim_rtc_init (int32 time);
 register int32 IR, srcspec, srcreg, dstspec, dstreg;
 register int32 src, src2, dst;
 register int32 i, t, sign, oldrs, trapnum;
@@ -582,6 +603,7 @@ CPU_wr (PIRQ, 017777772, WRITE);			/* rewrite PIRQ */
 trap_req = calc_ints (ipl, int_req, trap_req);
 trapea = 0;
 reason = 0;
+sim_rtc_init (clk_unit.wait);				/* init clock */
 
 /* Abort handling
 
@@ -2043,7 +2065,8 @@ t_stat stat;
 struct iolink *p;
 
 for (p = &iotable[0]; p -> low != 0; p++ ) {
-	if ((pa >= p -> low) && (pa <= p -> high))  {
+	if ((pa >= p -> low) && (pa <= p -> high) &&
+	    ((p -> enb == 0) || (dev_enb & p -> enb)))  {
 		stat = p -> read (data, pa, access);
 		trap_req = calc_ints (ipl, int_req, trap_req);
 		return stat;  }  }
@@ -2056,7 +2079,8 @@ t_stat stat;
 struct iolink *p;
 
 for (p = &iotable[0]; p -> low != 0; p++ ) {
-	if ((pa >= p -> low) && (pa <= p -> high))  {
+	if ((pa >= p -> low) && (pa <= p -> high) &&
+	    ((p -> enb == 0) || (dev_enb & p -> enb)))  {
 		stat = p -> write (data, pa, access);
 		trap_req = calc_ints (ipl, int_req, trap_req);
 		return stat;  }  }

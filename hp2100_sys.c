@@ -1,6 +1,6 @@
 /* hp2100_sys.c: HP 2100 simulator interface
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Mar-01	RMS	Revised load/dump interface (again)
    30-Oct-00	RMS	Added examine to file support
    15-Oct-00	RMS	Added dynamic device number support
    27-Oct-98	RMS	V2.4 load interface
@@ -39,7 +40,7 @@ extern DEVICE tty_dev, clk_dev, lpt_dev;
 extern DEVICE mtd_dev, mtc_dev;
 extern DEVICE dpd_dev, dpc_dev;
 extern REG cpu_reg[];
-extern unsigned int16 M[];
+extern uint16 M[];
 
 /* SCP data structures and interface routines
 
@@ -98,7 +99,7 @@ if ((c2 = fgetc (fileref)) == EOF) return -1;
 return ((c1 & 0377) << 8) | (c2 & 0377);
 }
 
-t_stat sim_load (FILE *fileref, char *cptr, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 origin, csum, zerocnt, count, word, i;
 

@@ -1,6 +1,6 @@
 /* pdp11_rp.c - RP04/05/06/07 RM02/03/05/80 "Massbus style" disk controller
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,14 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   rp		RH/RP/RM moving head disks
+
+   14-May-01	RMS	Added check for unattached drive
+   25-Apr-01	RMS	Added device enable/disable support
+   21-Apr-01	RMS	Implemented UAI function
+   02-Apr-01	RMS	Fixed CS1.TRE error clear function, CS2.MXF/PE writes
+   25-Mar-01	RMS	Corrected block fill calculation, IE write processing
+   15-Feb-01	RMS	Corrected bootstrap string
    14-Apr-99	RMS	Changed t_addr to unsigned
    05-Oct-98	RMS	Fixed bug, failing to interrupt on go error
    04-Oct-98	RMS	Changed names to allow coexistence with RH/TU77
@@ -50,6 +58,7 @@
 
 #define RP_NUMDR	8				/* #drives */
 #define RP_NUMWD	256				/* words/sector */
+#define RP_MAXFR	65536				/* max transfer */
 #define GET_SECTOR(x,d)	((int) fmod (sim_gtime() / ((double) (x)), \
 			((double) drv_tab[d].sect)))
 
@@ -126,7 +135,7 @@
 #define CS2_V_UNIT	0				/* unit pos */
 #define CS2_M_UNIT	07				/* unit mask */
 #define CS2_UNIT	(CS2_M_UNIT << CS2_V_UNIT)
-#define CS2_UAI		0000010				/* addr inhibit NI */
+#define CS2_UAI		0000010				/* addr inhibit */
 #define CS2_PAT		0000020				/* parity test NI */
 #define CS2_CLR		0000040				/* controller clear */
 #define CS2_IR		0000100				/* input ready */
@@ -140,7 +149,7 @@
 #define CS2_WCE		0040000				/* write check err */
 #define CS2_DLT		0100000				/* data late NI */
 #define CS2_MBZ		(CS2_CLR)
-#define CS2_RW		(CS2_UNIT | CS2_UAI | CS2_PAT)
+#define CS2_RW		(CS2_UNIT | CS2_UAI | CS2_PAT | CS2_MXF | CS2_PE)
 #define CS2_ERR		(CS2_MDPE | CS2_MXF | CS2_PGE | CS2_NEM | \
 			 CS2_NED | CS2_PE | CS2_WCE | CS2_DLT )
 #define GET_UNIT(x)	(((x) >> CS2_V_UNIT) & CS2_M_UNIT)
@@ -300,8 +309,8 @@ struct drvtyp drv_tab[] = {
 	{ RP07_SECT, RP07_SURF, RP07_CYL, RP07_SIZE, RP07_DEV },
 	{ 0 }  };
 
-extern int32 int_req;
-extern unsigned int16 *M;				/* memory */
+extern uint16 *M;					/* memory */
+extern int32 int_req, dev_enb;
 extern UNIT cpu_unit;
 int32 rpcs1 = 0;					/* control/status 1 */
 int32 rpwc = 0;						/* word count */
@@ -336,11 +345,6 @@ t_stat rp_reset (DEVICE *dptr);
 t_stat rp_boot (int32 unitno);
 t_stat rp_attach (UNIT *uptr, char *cptr);
 t_stat rp_detach (UNIT *uptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
-extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 extern t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds);
 
 /* RP data structures
@@ -424,6 +428,7 @@ REG rp_reg[] = {
 	{ GRDATA (FLG7, rp_unit[7].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
 		  REG_HRO },
 	{ FLDATA (STOP_IOE, rp_stopioe, 0) },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_RP), REG_HRO },
 	{ NULL }  };
 
 MTAB rp_mod[] = {
@@ -570,8 +575,9 @@ return SCPE_OK;
 
 t_stat rp_wr (int32 data, int32 PA, int32 access)
 {
-int32 drv, i, j;
+int32 cs1f, drv, i, j;
 
+cs1f = 0;						/* no int on cs1 upd */
 drv = GET_UNIT (rpcs2);					/* get current unit */
 j = (PA >> 1) & 037;					/* get reg offset */
 if (reg_in_drive[j] && (rp_unit[drv].flags & UNIT_DIS)) {	/* nx disk */
@@ -585,11 +591,14 @@ if (reg_in_drive[j] && sim_is_active (&rp_unit[drv])) {	/* unit busy? */
 
 switch (j) {						/* decode PA<5:1> */
 case 000:						/* RPCS1 */
-	if (access == WRITEB) data = (PA & 1)?
-		(rpcs1 & 0377) | (data << 8): (rpcs1 & ~0377) | data;
-	if ((data & CS1_IE) == 0) int_req = int_req & ~INT_RP;
-	else if ((((rpcs1 & CS1_IE) == 0) && (rpcs1 & CS1_DONE)) ||
-		(data & CS1_DONE)) int_req = int_req | INT_RP;
+	if ((access == WRITEB) && (PA & 1)) data = data << 8;
+	else {	if ((data & CS1_IE) == 0) int_req = int_req & ~INT_RP;
+		else if (data & CS1_DONE) int_req = int_req | INT_RP;  }
+	if (data & CS1_TRE) {				/* error clear? */
+		rpcs1 = rpcs1 & ~CS1_TRE;		/* clr CS1<TRE> */
+		rpcs2 = rpcs2 & ~CS2_ERR;  }		/* clr CS2<15:8> */
+	if (access == WRITEB) data = (rpcs1 &		/* merge data */
+		((PA & 1)? 0377: 0177400)) | data;
 	rpcs1 = (rpcs1 & ~CS1_RW) | (data & CS1_RW);
 	rpbae = (rpbae & ~CS1_M_UAE) | ((rpcs1 >> CS1_V_UAE) & CS1_M_UAE);
 	rpcs3 = (rpcs3 & ~CS1_IE) | (rpcs1 & CS1_IE);
@@ -613,10 +622,13 @@ case 003:						/* RPDA */
 	rpda = data & ~DA_MBZ;
 	break;
 case 004:						/* RPCS2 */
-	if (access == WRITEB) data = (PA & 1)?
-		(rpcs2 & 0377) | (data << 8): (rpcs2 & ~0377) | data;
-	if (data & CS2_CLR) rp_reset (&rp_dev);
-	else rpcs2 = (rpcs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR | CS2_OR;
+	if ((access == WRITEB) && (PA & 1)) data = data << 8;
+	if (data & CS2_CLR) rp_reset (&rp_dev);		/* init? */
+	else {	if ((data & ~rpcs2) & (CS2_PE | CS2_MXF))
+			cs1f = CS1_SC;			/* diagn intr */
+		if (access == WRITEB) data = (rpcs2 &	/* merge data */
+			((PA & 1)? 0377: 0177400)) | data;
+		rpcs2 = (rpcs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR | CS2_OR;  }
 	drv = GET_UNIT (rpcs2);
 	break;
 case 006:						/* RPER1 */
@@ -624,7 +636,7 @@ case 006:						/* RPER1 */
 	rper1[drv] = rper1[drv] & data;
 	break;
 case 007:						/* RPAS */
-	if (PA & 1) break;
+	if ((access == WRITEB) && (PA & 1)) break;
 	for (i = 0; i < RP_NUMDR; i++)
 		if (data & (AS_U0 << i)) rpds[i] = rpds[i] & ~DS_ATA;
 	break;
@@ -649,12 +661,12 @@ case 016:						/* RPDC */
 	rpdc = data & ~DC_MBZ;
 	break;
 case 024:						/* RPBAE */
-	if (PA & 1) break;
+	if ((access == WRITEB) && (PA & 1)) break;
 	rpbae = data & ~AE_MBZ;
 	rpcs1 = (rpcs1 & ~CS1_UAE) | ((rpbae << CS1_V_UAE) & CS1_UAE);
 	break;
 case 025:						/* RPCS3 */
-	if (PA & 1) break;
+	if ((access == WRITEB) && (PA & 1)) break;
 	rpcs3 = data & ~CS3_MBZ;
 	if ((data & CS1_IE) == 0) int_req = int_req & ~INT_RP;
 	else if (((rpcs1 & CS1_IE) == 0) && (rpcs1 & CS1_DONE))
@@ -674,7 +686,7 @@ case 023:						/* RPEC2 */
 default:						/* all others */
 	rper1[drv] = rper1[drv] | ER1_ILR;
 	break;  }					/* end switch */
-update_rpcs (0, drv);					/* update status */
+update_rpcs (cs1f, drv);				/* update status */
 return SCPE_OK;
 }
 
@@ -692,11 +704,16 @@ if (uptr -> flags & UNIT_DIS) {				/* nx unit? */
 	rpcs2 = rpcs2 | CS2_NED;			/* set error flag */
 	update_rpcs (CS1_SC, drv);			/* request intr */
 	return;  }
-if (((fnc != FNC_DCLR) && (rpds[drv] & DS_ERR)) ||	/* not clear & err? */
-	((rpds[drv] & DS_RDY) == 0)) {			/* not ready? */
-	rpcs2 = rpcs2 | CS2_PGE;			/* set error flag */
-	update_rpcs (CS1_SC, drv);			/* request intr */
-	return;  }
+if (fnc != FNC_DCLR) {				 	/* not clear? */
+	if ((rpds[drv] & DS_ERR) ||			/* error or */
+	   ((rpds[drv] & DS_RDY) == 0)) {		/* not ready? */
+		rpcs2 = rpcs2 | CS2_PGE;		/* set error flag */
+		update_rpcs (CS1_SC, drv);		/* request intr */
+		return;  }
+	if ((uptr -> flags & UNIT_ATT) == 0) {		/* not attached? */
+		rper1[drv] = rper1[drv] | ER1_UNS;	/* unsafe */
+		update_rpcs (CS1_SC, drv);		/* request intr */
+		return;  }  }
 dtype = GET_DTYPE (uptr -> flags);			/* get drive type */
 rpds[drv] = rpds[drv] & ~DS_ATA;			/* clear attention */
 dc = rpdc;						/* assume seek, sch */
@@ -771,11 +788,11 @@ return;
    Unit must be attached - detach cancels in progress operations
 */
 
-static unsigned int16 fill[RP_NUMWD] = { 0 };
 t_stat rp_svc (UNIT *uptr)
 {
-int32 dtype, drv, err;
-int32 pa, wc, awc, twc, da, fillc;
+int32 i, dtype, drv, err;
+int32 ba, wc, awc, twc, da, fc;
+static uint16 dbuf[RP_MAXFR];
 
 dtype = GET_DTYPE (uptr -> flags);			/* get drive type */
 drv = uptr - rp_dev.units;				/* get drv number */
@@ -785,73 +802,71 @@ switch (uptr -> FUNC) {					/* case on function */
 case FNC_OFFSET:					/* offset */
 	rpds[drv] = rpds[drv] | DS_OF | DS_ATA;		/* set offset, attention */
 	update_rpcs (CS1_SC, drv);
-	return SCPE_OK;
+	break;
 case FNC_RETURN:					/* return to centerline */
 	rpds[drv] = (rpds[drv] & ~DS_OF) | DS_ATA;	/* clear offset, set attn */
 	update_rpcs (CS1_SC, drv);
-	return SCPE_OK;	
+	break;	
 case FNC_UNLOAD:					/* unload */
 	rp_detach (uptr);				/* detach unit */
-	return SCPE_OK;
+	break;
 case FNC_RECAL:						/* recalibrate */
 case FNC_SEARCH:					/* search */
 case FNC_SEEK:						/* seek */
 	rpds[drv] = rpds[drv] | DS_ATA;			/* set attention */
 	update_rpcs (CS1_SC, drv);
-	return SCPE_OK;
+	break;
 
 case FNC_WRITE:						/* write */
 	if (uptr -> flags & UNIT_WLK) {			/* write locked? */
 		rper1[drv] = rper1[drv] | ER1_WLE;	/* set drive error */
 		update_rpcs (CS1_DONE | CS1_TRE, drv);	/* set done, err */
-		return SCPE_OK;  }
+		break;  }
 case FNC_WCHK:						/* write check */
 case FNC_READ:						/* read */
-	pa = ((rpbae << 16) | rpba) >> 1;		/* get mem addr */
+	ba = (rpbae << 16) | rpba;			/* get byte addr */
 	da = GET_DA (rpdc, rpda, dtype) * RP_NUMWD;	/* get disk addr */
-	twc = 0200000 - rpwc;				/* get true wc */
-	if (((t_addr) (pa + twc)) > (MEMSIZE / 2)) {	/* mem overrun? */
-		rpcs2 = rpcs2 | CS2_NEM;
-		wc = ((MEMSIZE / 2) - pa);	
-		if (wc < 0) {				/* abort transfer? */
-			update_rpcs (CS1_DONE, drv);	/* set done */
-			return SCPE_OK;  }  }
-	else wc = twc;
-	if ((da + twc) > drv_tab[dtype].size) {		/* disk overrun? */
+	wc = 0200000 - rpwc;				/* get true wc */
+
+	if ((da + wc) > drv_tab[dtype].size) {		/* disk overrun? */
 		rper1[drv] = rper1[drv] | ER1_AOE;
 		if (wc > (drv_tab[dtype].size - da))
 			wc = drv_tab[dtype].size - da;  }
 
 	err = fseek (uptr -> fileref, da * sizeof (int16), SEEK_SET);
+	if (uptr -> FUNC == FNC_WRITE) {		/* write? */
+	    for (twc = 0; twc < wc; twc++) {
+		if (!ADDR_IS_MEM (ba)) {		/* nx memory? */
+			rpcs2 = rpcs2 | CS2_NEM;	/* set error */
+			break;  }
+		dbuf[twc] = M[ba >> 1];			/* write to disk */
+		if ((rpcs2 & CS2_UAI) == 0) ba = ba + 2;  }
+	    if (fc = twc & (RP_NUMWD - 1)) {		/* fill? */
+		fc = RP_NUMWD - fc;
+		for (i = 0; i < fc; i++) dbuf[twc + i] = 0;  }
+	    fxwrite (dbuf, sizeof (uint16), twc + fc, uptr -> fileref);
+	    err = ferror (uptr -> fileref);
+	    }						/* end if */
+	else {						/* read, wchk */
+	    awc = fread (dbuf, sizeof (uint16), wc, uptr -> fileref);
+	    err = ferror (uptr -> fileref);
+	    for ( ; awc < wc; awc++) dbuf[awc] = 0;
+	    for (twc = 0; twc < wc; twc++) {
+		if (!ADDR_IS_MEM (ba)) {		/* nx memory? */
+			rpcs2 = rpcs2 | CS2_NEM;	/* set error */
+			break;  }
+		if (uptr -> FUNC == FNC_READ) M[ba >> 1] = dbuf[twc];
+		else if (M[ba >> 1] != dbuf[twc]) {
+			rpcs2 = rpcs2 | CS2_WCE;	/* set error */
+			break;  }
+		if ((rpcs2 & CS2_UAI) == 0) ba = ba + 2;  }
+	    }						/* end else */
 
-	if ((uptr -> FUNC == FNC_READ) && (err == 0)) {	/* read? */
-		awc = fxread (&M[pa], sizeof (int16), wc, uptr -> fileref);
-		for ( ; awc < wc; awc++) M[pa + awc] = 0;
-		err = ferror (uptr -> fileref);  }
-
-	if ((uptr -> FUNC == FNC_WRITE) && (err == 0)) {	/* write? */
-		fxwrite (&M[pa], sizeof (int16), wc, uptr -> fileref);
-		err = ferror (uptr -> fileref);
-		if ((err == 0) && (fillc = (wc & (RP_NUMWD - 1)))) {
-			fxwrite (fill, sizeof (int16), fillc, uptr -> fileref);
-			err = ferror (uptr -> fileref);  }  }
-
-	if ((uptr -> FUNC == FNC_WCHK) && (err == 0)) {	/* wcheck? */
-		twc = wc;				/* xfer length */
-		for (wc = 0; (err == 0) && (wc < twc); wc++)  {
-			awc = fxread (&rpdb, sizeof (int16), 1, uptr -> fileref);
-			if (awc == 0) rpdb = 0;
-			if (rpdb != M[pa + wc])  {
-				rpcs2 = rpcs2 | CS2_WCE;
-				break;  }  }
-		err = ferror (uptr -> fileref);  }
-
-	rpwc = (rpwc + wc) & 0177777;			/* final word count */
-	pa = (pa + wc) << 1;				/* final byte addr */
-	rpba = (pa & 0177777) & ~BA_MBZ;		/* lower 16b */
-	rpbae = (pa >> 16) & ~AE_MBZ;			/* upper 6b */
+	rpwc = (rpwc + twc) & 0177777;			/* final word count */
+	rpba = (ba & 0177777) & ~BA_MBZ;		/* lower 16b */
+	rpbae = (ba >> 16) & ~AE_MBZ;			/* upper 6b */
 	rpcs1 = (rpcs1 & ~ CS1_UAE) | ((rpbae << CS1_V_UAE) & CS1_UAE);
-	da = da + wc + (RP_NUMWD - 1);
+	da = da + twc + (RP_NUMWD - 1);
 	if (da >= drv_tab[dtype].size) rpds[drv] = rpds[drv] | DS_LST;
 	da = da / RP_NUMWD;
 	rpda = da % drv_tab[dtype].sect;
@@ -866,7 +881,7 @@ case FNC_READ:						/* read */
 		clearerr (uptr -> fileref);
 		return SCPE_IOERR;  }
 	update_rpcs (CS1_DONE, drv);			/* set done */
-	return SCPE_OK;  }				/* end case function */
+	break;  }				/* end case function */
 return SCPE_OK;
 }
 
@@ -883,7 +898,7 @@ if (rp_unit[drv].flags & UNIT_DIS) rpds[drv] = rper1[drv] = 0;
 else rpds[drv] = (rpds[drv] | DS_DPR) & ~DS_PGM;
 if (rp_unit[drv].flags & UNIT_ATT) rpds[drv] = rpds[drv] | DS_MOL;
 else rpds[drv] = rpds[drv] & ~(DS_MOL | DS_VV | DS_RDY);
-if (rper1[drv] | rper2 | rper3) rpds[drv] = rpds[drv] | DS_ERR;
+if (rper1[drv] | rper2 | rper3) rpds[drv] = rpds[drv] | DS_ERR | DS_ATA;
 else rpds[drv] = rpds[drv] & ~DS_ERR;
 
 rpcs1 = (rpcs1 & ~(CS1_SC | CS1_MCPE | CS1_MBZ)) | CS1_DVA | flag;
@@ -1016,7 +1031,7 @@ static const int32 boot_rom[] = {
 	0005002,			/* clr R2 */
 	0005003,			/* clr R3 */
 	0005004,			/* clr R4 */
-	0012705, 0042120,		/* mov #"DP, r5 */
+	0012705, 0050104,		/* mov #"DP, r5 */
 	0105711,			/* tstb (R1) */
 	0100376,			/* bpl .-2 */
 	0105011,			/* clrb (R1) */

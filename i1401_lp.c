@@ -1,6 +1,6 @@
 /* i1401_lp.c: IBM 1403 line printer simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,11 +22,15 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+	lpt		1403 line printer
+
+   13-Apr-01	RMS	Revised for register arrays
 */
 
 #include "i1401_defs.h"
 
-extern unsigned char M[];
+extern uint8 M[];
 extern char bcd_to_ascii[64];
 extern int32 iochk, ind[64];
 int32 cct[CCT_LNT] = { 03 };
@@ -80,7 +84,7 @@ UNIT lpt_unit = {
 REG lpt_reg[] = {
 	{ FLDATA (ERR, ind[IN_LPT], 0) },
 	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
-	{ BRDATA (*CCT, cct, 8, 32, CCT_LNT), REG_HRO },
+	{ BRDATA (CCT, cct, 8, 32, CCT_LNT) },
 	{ DRDATA (LINES, lines, 8), PV_LEFT },
 	{ DRDATA (CCTP, cctptr, 8), PV_LEFT },
 	{ DRDATA (CCTL, cctlnt, 8), REG_RO + PV_LEFT },

@@ -1,6 +1,6 @@
-/* PDP-11 magnetic tape simulator
+/* pdp11_tm.c: PDP-11 magnetic tape simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    tm		TM11/TU10 magtape
 
+   26-Apr-01	RMS	Added device enable/disable support
+   18-Apr-01	RMS	Changed to rewind tape before boot
    14-Apr-99	RMS	Changed t_addr to unsigned
    04-Oct-98	RMS	V2.4 magtape format
    10-May-98	RMS	Fixed bug with non-zero unit operation (from Steven Schultz)
@@ -123,8 +125,8 @@
 			 STA_DLT | STA_EOT | STA_RLE | STA_BAD | STA_NXM)
 			 				/* set error */
 
-extern unsigned int16 *M;				/* memory */
-extern int32 int_req;
+extern uint16 *M;					/* memory */
+extern int32 int_req, dev_enb;
 extern UNIT cpu_unit;
 int32 tm_sta = 0;					/* status register */
 int32 tm_cmd = 0;					/* command register */
@@ -142,11 +144,6 @@ void tm_go (UNIT *uptr);
 int32 tm_updcsta (UNIT *uptr);
 void tm_set_done (void);
 t_stat tm_vlock (UNIT *uptr, int32 val);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
-extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 
 /* MT data structures
 
@@ -210,6 +207,7 @@ REG tm_reg[] = {
 		  REG_HRO },
 	{ GRDATA (FLG7, tm_unit[7].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
 		  REG_HRO },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_TM), REG_HRO },
 	{ NULL }  };
 
 MTAB tm_mod[] = {
@@ -340,12 +338,12 @@ return;
 
 t_stat tm_svc (UNIT *uptr)
 {
-int f, i, p, err;
+int32 f, i, p, err;
 t_addr xma;
 t_stat rval;
 t_mtrlnt tbc, cbc;
-unsigned int16 c;
-unsigned int8 dbuf[DBSIZE];
+uint16 c;
+static uint8 dbuf[DBSIZE];
 static t_mtrlnt bceof = { 0 };
 
 if (uptr -> USTAT & STA_REW) {				/* rewind? */
@@ -523,6 +521,7 @@ t_stat tm_reset (DEVICE *dptr)
 int32 u;
 UNIT *uptr;
 
+if (dev_enb & INT_TM) dev_enb = dev_enb & ~INT_TS;	/* TM or TS */
 tm_cmd = MTC_DONE;					/* set done */
 tm_bc = tm_ca = tm_db = tm_sta = 0;
 int_req = int_req & ~INT_TM;				/* clear interrupt */
@@ -635,6 +634,7 @@ int32 i;
 extern int32 saved_PC;
 extern int32 sim_switches;
 
+tm_unit[unitno].pos = 0;
 if (sim_switches & SWMASK ('O')) {
 	for (i = 0; i < BOOT1_LEN; i++)
 		M[(BOOT_START >> 1) + i] = boot1_rom[i];  }

@@ -1,6 +1,6 @@
 /* i1401_cd.c: IBM 1402 card reader/punch
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -34,12 +34,14 @@
 
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
+
+   13-Apr-01	RMS	Revised for register arrays
 */
 
 #include "i1401_defs.h"
 #include <ctype.h>
 
-extern unsigned char M[];
+extern uint8 M[];
 extern int32 ind[64], ssa, iochk;
 extern char bcd_to_ascii[64];
 extern char ascii_to_bcd[128];
@@ -49,9 +51,6 @@ t_stat cdr_svc (UNIT *uptr);
 t_stat cdr_boot (int32 unitno);
 t_stat cdr_attach (UNIT *uptr, char *cptr);
 t_stat cd_reset (DEVICE *dptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
 
 /* Card reader data structures
 
@@ -70,7 +69,7 @@ REG cdr_reg[] = {
 	{ FLDATA (S2, s2sel, 0) },
 	{ DRDATA (POS, cdr_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, cdr_unit.wait, 24), PV_LEFT },
-	{ BRDATA (*BUF, rbuf, 8, 8, CDR_WIDTH), REG_HRO },
+	{ BRDATA (BUF, rbuf, 8, 8, CDR_WIDTH) },
 	{ NULL }  };
 
 DEVICE cdr_dev = {

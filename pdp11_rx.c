@@ -1,6 +1,6 @@
 /* pdp11_rx.c: RX11/RX01 floppy disk simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   rx		RX11 disk controller
+   rx		RX11/RX01 floppy disk
 
+   26-Apr-01	RMS	Added device enable/disable support
+   13-Apr-01	RMS	Revised for register arrays
+   15-Feb-01	RMS	Corrected bootstrap string
    14-Apr-99	RMS	Changed t_addr to unsigned
 
    An RX01 diskette consists of 77 tracks, each with 26 sectors of 128B.
@@ -84,7 +87,7 @@
 #define TRACK u3					/* current track */
 #define CALC_DA(t,s) (((t) * RX_NUMSC) + ((s) - 1)) * RX_NUMBY
 
-extern int32 int_req;
+extern int32 int_req, dev_enb;
 int32 rx_csr = 0;					/* control/status */
 int32 rx_dbr = 0;					/* data buffer */
 int32 rx_esr = 0;					/* error status */
@@ -96,13 +99,11 @@ int32 rx_stopioe = 1;					/* stop on error */
 int32 rx_cwait = 100;					/* command time */
 int32 rx_swait = 10;					/* seek, per track */
 int32 rx_xwait = 1;					/* tr set time */
-unsigned int8 buf[RX_NUMBY] = { 0 };			/* sector buffer */
+unsigned int8 rx_buf[RX_NUMBY] = { 0 };			/* sector buffer */
 int32 bptr = 0;						/* buffer pointer */
 t_stat rx_svc (UNIT *uptr);
 t_stat rx_reset (DEVICE *dptr);
 t_stat rx_boot (int32 unitno);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 
 /* RX11 data structures
 
@@ -138,7 +139,8 @@ REG rx_reg[] = {
 	{ FLDATA (FLG0, rx_unit[0].flags, UNIT_V_WLK), REG_HRO },
 	{ FLDATA (FLG1, rx_unit[1].flags, UNIT_V_WLK), REG_HRO },
 	{ FLDATA (STOP_IOE, rx_stopioe, 0) },
-	{ BRDATA (**BUF, buf, 8, 8, RX_NUMBY), REG_HRO },
+	{ BRDATA (SBUF, rx_buf, 8, 8, RX_NUMBY) },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_RX), REG_HRO },
 	{ NULL }  };
 
 MTAB rx_mod[] = {
@@ -250,10 +252,10 @@ case 1:							/* RXDB */
    IDLE		Should never get here, treat as unknown command
    RWDS		Just transferred sector, wait for track, set tr
    RWDT		Just transferred track, do read or write, finish command
-   FILL		copy ir to buf[bptr], advance ptr
+   FILL		copy ir to rx_buf[bptr], advance ptr
 		if bptr > max, finish command, else set tr
    EMPTY	if bptr > max, finish command, else
-		copy buf[bptr] to ir, advance ptr, set tr
+		copy rx_buf[bptr] to ir, advance ptr, set tr
    CMD_COMPLETE	copy requested data to ir, finish command
    INIT_COMPLETE read drive 0, track 1, sector 1 to buffer, finish command
 
@@ -276,12 +278,12 @@ case IDLE:						/* idle */
 	break;
 case EMPTY:						/* empty buffer */
 	if (bptr >= RX_NUMBY) rx_done (rx_esr, 0);	/* done all? */
-	else {	rx_dbr = buf[bptr];			/* get next */
+	else {	rx_dbr = rx_buf[bptr];			/* get next */
 		bptr = bptr + 1;
 		rx_csr = rx_csr | RXCS_TR;  }		/* set xfer */
 	break;
 case FILL:						/* fill buffer */
-	buf[bptr] = rx_dbr;				/* write next */
+	rx_buf[bptr] = rx_dbr;				/* write next */
 	bptr = bptr + 1;
 	if (bptr < RX_NUMBY) rx_csr = rx_csr | RXCS_TR;	/* if more, set xfer */
 	else rx_done (rx_esr, 0);			/* else done */
@@ -308,13 +310,13 @@ case RWDT:						/* wait for track */
 	if (func == RXCS_WRDEL) rx_esr = rx_esr | RXES_DD;	/* del data? */
 	if (func == RXCS_READ) {			/* read? */
 		for (i = 0; i < RX_NUMBY; i++)
-			buf[i] = *(((int8 *) uptr -> filebuf) + da + i);  }
+			rx_buf[i] = *(((int8 *) uptr -> filebuf) + da + i);  }
 	else {	if (uptr -> flags & UNIT_WLK) {		/* write and locked? */
 			rx_esr = rx_esr | RXES_WLK;	/* flag error */
 			rx_done (rx_esr, 0100);		/* done, error */
 			break;  }
 		for (i = 0; i < RX_NUMBY; i++)		/* write */
-			*(((int8 *) uptr -> filebuf) + da + i) = buf[i];
+			*(((int8 *) uptr -> filebuf) + da + i) = rx_buf[i];
 		da = da + RX_NUMBY;
 		if (da > uptr -> hwmark) uptr -> hwmark = da;  }
 	rx_done (rx_esr, 0);				/* done */
@@ -332,7 +334,7 @@ case INIT_COMPLETE:					/* init complete */
 		break;	}
 	da = CALC_DA (1, 1);				/* track 1, sector 1 */
 	for (i = 0; i < RX_NUMBY; i++)			/* read sector */
-		buf[i] = *(((int8 *) uptr -> filebuf) + da + i);
+		rx_buf[i] = *(((int8 *) uptr -> filebuf) + da + i);
 	rx_done (rx_esr | RXES_ID | RXES_DRDY, 0);	/* set done */
 	if ((rx_unit[1].flags & UNIT_ATT) == 0) rx_ecode = 0020;
 	break;  }					/* end case state */
@@ -363,11 +365,12 @@ t_stat rx_reset (DEVICE *dptr)
 {
 rx_csr = rx_dbr = 0;					/* clear regs */
 rx_esr = rx_ecode = 0;					/* clear error */
-rx_state = INIT_COMPLETE;				/* set state */
 int_req = int_req & ~INT_RX;				/* clear int req */
 sim_cancel (&rx_unit[1]);				/* cancel drive 1 */
-sim_activate (&rx_unit[0],				/* start drive 0 */
-	rx_swait * abs (1 - rx_unit[0].TRACK));
+if (rx_unit[0].flags & UNIT_BUF)  {			/* attached? */
+	rx_state = INIT_COMPLETE;			/* yes, sched init */
+	sim_activate (&rx_unit[0], rx_swait * abs (1 - rx_unit[0].TRACK));  }
+else rx_done (rx_esr | RXES_ID, 0010);			/* no, error */
 return SCPE_OK;
 }
 
@@ -408,7 +411,7 @@ static const int32 boot_rom[] = {
 	0005002,			/* CLR R2 */
 	0005003,			/* CLR R3 */
 	0005004,			/* CLR R4 */
-	0012705, 0062170,		/* MOV #"DX, R5 */
+	0012705, 0054104,		/* MOV #"DX, R5 */
 	0005007				/* CLR R7 */
 };
 
@@ -416,7 +419,7 @@ t_stat rx_boot (int32 unitno)
 {
 int32 i;
 extern int32 saved_PC;
-extern unsigned short *M;
+extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & RX_M_NUMDR;

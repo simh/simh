@@ -1,6 +1,6 @@
 /* nova_mta.c: NOVA magnetic tape simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,12 +25,14 @@
 
    mta		magnetic tape
 
+   26-Apr-01	RMS	Added device enable/disable support
+   18-Apr-01	RMS	Changed to rewind tape before boot
    10-Dec-00	RMS	Added Eclipse support from Charles Owen
    15-Oct-00	RMS	Editorial changes
    11-Nov-98	CEO	Removed clear of mta_ma on iopC 
    04-Oct-98	RMS	V2.4 magtape format
    18-Jan-97	RMS	V2.3 magtape format
-   29-Jun-96	RMS	Added unit disable support
+   29-Jun-96	RMS	Added unit enable/disable support
 
    Magnetic tapes are represented as a series of variable records
    of the form:
@@ -130,9 +132,9 @@
 #define STA_MON		(STA_REW | STA_BOT | STA_WLK | STA_RDY | \
 			 STA_PEM)			/* set status chg */
 
-extern unsigned int16 M[];
+extern uint16 M[];
 extern UNIT cpu_unit;
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 int_req, dev_busy, dev_done, dev_disable, iot_enb;
 int32 mta_ma = 0;					/* memory address */
 int32 mta_wc = 0;					/* word count */
 int32 mta_cu = 0;					/* command/unit */
@@ -221,6 +223,7 @@ REG mta_reg[] = {
 		  REG_HRO },
 	{ GRDATA (FLG7, mta_unit[7].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
 		  REG_HRO },
+	{ FLDATA (*DEVENB, iot_enb, INT_V_MTA), REG_HRO },
 	{ NULL }  };
 
 MTAB mta_mod[] = {
@@ -318,8 +321,8 @@ t_stat mta_svc (UNIT *uptr)
 int32 c, i, p, u, pa, err;
 t_stat rval;
 t_mtrlnt cbc, tbc, wc;
-unsigned int16 c1, c2;
-unsigned int8 dbuf[2 * DTSIZE];
+uint16 c1, c2;
+static uint8 dbuf[2 * DTSIZE];
 static t_mtrlnt bceof = { 0 };
 
 rval = SCPE_OK;
@@ -593,6 +596,7 @@ t_stat mta_boot (int32 unitno)
 int32 i;
 extern int32 saved_PC;
 
+mta_unit[unitno].pos = 0;
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 M[BOOT_UNIT] = (unitno & CU_M_UNIT) << CU_V_UNIT;
 saved_PC = BOOT_START;

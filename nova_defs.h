@@ -1,6 +1,6 @@
 /* nova_defs.h: NOVA/Eclipse simulator definitions 
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -171,9 +171,9 @@
 */
 
 struct ndev {
-	int	mask;					/* done/busy mask */
-	int	pi;					/* assigned pi bit */
-	int	(*routine)();				/* dispatch routine */
+	int32	mask;					/* done/busy mask */
+	int32	pi;					/* assigned pi bit */
+	int32	(*routine)();				/* dispatch routine */
 	};
 
 /* Device flags (simulator representation)

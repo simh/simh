@@ -1,6 +1,6 @@
-/* PDP-8 magnetic tape simulator
+/* pdp8_mt.c: PDP-8 magnetic tape simulator
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   mt		TM8E/TU10 magtape
+
+   25-Apr-01	RMS	Added device enable/disable support
    04-Oct-98	RMS	V2.4 magtape format
    22-Jan-97	RMS	V2.3 magtape format
    01-Jan-96	RMS	Rewritten from TM8-E Maintenance Manual
@@ -114,8 +117,8 @@
 			 				/* set error */
 #define TUR(u)		(!sim_is_active (u))		/* tape unit ready */
 
-extern unsigned int16 M[];
-extern int32 int_req, stop_inst;
+extern uint16 M[];
+extern int32 int_req, dev_enb, stop_inst;
 extern UNIT cpu_unit;
 int32 mt_cu = 0;					/* command/unit */
 int32 mt_fn = 0;					/* function */
@@ -135,11 +138,6 @@ int32 mt_ixma (int32 xma);
 t_stat mt_vlock (UNIT *uptr, int32 val);
 UNIT *mt_busy (void);
 void mt_set_done (void);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
-extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 
 /* MT data structures
 
@@ -203,6 +201,7 @@ REG mt_reg[] = {
 		  REG_HRO },
 	{ GRDATA (FLG7, mt_unit[7].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
 		  REG_HRO },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_MT), REG_HRO },
 	{ NULL }  };
 
 MTAB mt_mod[] = {
@@ -276,10 +275,8 @@ case 7:							/* LDBR */
 	mt_db = AC;					/* load buffer */
 	mt_set_done ();					/* set done */
 	mt_updcsta (uptr);				/* update status */
-	return 0;
-default:
-	return (stop_inst << IOT_V_REASON) + AC;  }	/* end switch */
-return AC;
+	return 0;  }				/* end switch */
+return (stop_inst << IOT_V_REASON) + AC;		/* ill inst */
 }
 
 /* IOTs, continued */
@@ -305,10 +302,8 @@ case 6:							/* RFSR */
 	return (((mt_fn & FN_RMASK) | (mt_updcsta (uptr) & ~FN_RMASK))
 		 & 07777);				/* read function */
 case 7:							/* RDBR */
-	return mt_db;					/* read data buffer */
-default:
-	return (stop_inst << IOT_V_REASON) + AC;  }	/* end switch */
-return AC;
+	return mt_db;  }					/* read data buffer */
+return (stop_inst << IOT_V_REASON) + AC;	/* ill inst */
 }
 
 int32 mt72 (int32 pulse, int32 AC)
@@ -330,10 +325,8 @@ case 5:							/* CLF */
 	else {	mt_sta = 0;				/* clear status */
 		mt_done = 0;				/* clear done */
 		mt_updcsta (uptr);  }			/* update status */
-	return AC;
-default:
-	return (stop_inst << IOT_V_REASON) + AC;  }	/* end switch */
-return AC;
+	return AC;  }					/* end switch */
+return (stop_inst << IOT_V_REASON) + AC;	/* ill inst */
 }
 
 /* Unit service
@@ -347,8 +340,8 @@ t_stat mt_svc (UNIT *uptr)
 int32 f, i, p, u, err, wc, xma;
 t_stat rval;
 t_mtrlnt tbc, cbc;
-unsigned int16 c, c1, c2;
-unsigned int8 dbuf[(2 * DBSIZE)];
+uint16 c, c1, c2;
+uint8 dbuf[(2 * DBSIZE)];
 static t_mtrlnt bceof = { 0 };
 
 u = uptr -> UNUM;					/* get unit number */

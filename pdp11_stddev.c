@@ -1,6 +1,6 @@
 /* pdp11_stddev.c: PDP-11 standard I/O devices simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,12 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ptr		paper tape reader
-   ptp		paper tape punch
-   tti		terminal input
-   tto		terminal output
-   clk		line frequency clock
+   ptr,ptp	PC11 paper tape reader/punch
+   tti,tto	DL11 terminal input/output
+   clk		KW11L line frequency clock
 
+   05-Mar-01	RMS	Added clock calibration support
    30-Oct-00	RMS	Standardized register order
    25-Jun-98	RMS	Fixed bugs in paper tape error handling
 */
@@ -54,6 +53,7 @@ int32 ptp_stopioe = 0;					/* stop on error */
 int32 tti_csr = 0;					/* control/status */
 int32 tto_csr = 0;					/* control/status */
 int32 clk_csr = 0;					/* control/status */
+int32 clk_tps = 60;					/* ticks/second */
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat tti_svc (UNIT *uptr);
@@ -68,10 +68,9 @@ t_stat ptr_attach (UNIT *uptr, char *ptr);
 t_stat ptr_detach (UNIT *uptr);
 t_stat ptp_attach (UNIT *uptr, char *ptr);
 t_stat ptp_detach (UNIT *uptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 extern t_stat sim_poll_kbd (void);
 extern t_stat sim_putchar (int32 out);
+extern int32 sim_rtc_calb (int32 ticksper);
 
 /* PTR data structures
 
@@ -197,6 +196,7 @@ REG clk_reg[] = {
 	{ FLDATA (DONE, clk_csr, CSR_V_DONE) },
 	{ FLDATA (IE, clk_csr, CSR_V_IE) },
 	{ DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
+	{ DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
 DEVICE clk_dev = {
@@ -255,7 +255,7 @@ case 012:						/* tto csr */
 case 013:						/* tto buf */
 	*data = tto_unit.buf;
 	return SCPE_OK;  }				/* end switch PA */
-return SCPE_NXM;					/* can't get here */
+return SCPE_NXM;
 }
 
 t_stat std_wr (int32 data, int32 PA, int32 access)
@@ -265,7 +265,6 @@ case 03:						/* clk csr */
 	if (PA & 1) return SCPE_OK;
 	if ((data & CSR_IE) == 0) int_req = int_req & ~INT_CLK;
 	clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
-	sim_activate (&clk_unit, clk_unit.wait);
 	return SCPE_OK;
 case 04:						/* ptr csr */
 	if (PA & 1) return SCPE_OK;
@@ -319,7 +318,7 @@ case 013:						/* tto buf */
 	int_req = int_req & ~INT_TTO;
 	sim_activate (&tto_unit, tto_unit.wait);
 	return SCPE_OK;  }				/* end switch PA */
-return SCPE_NXM;					/* can't get here */
+return SCPE_NXM;
 }
 
 /* Paper tape reader routines
@@ -489,7 +488,7 @@ return SCPE_OK;
 t_stat clk_svc (UNIT *uptr)
 {
 if (clk_csr & CSR_IE) int_req = int_req | INT_CLK;
-sim_activate (&clk_unit, clk_unit.wait);		/* reactivate unit */
+sim_activate (&clk_unit, sim_rtc_calb (clk_tps));	/* reactivate unit */
 return SCPE_OK;
 }
 

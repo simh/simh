@@ -1,6 +1,6 @@
 /* hp2100_stddev.c: HP2100 standard devices
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -49,7 +49,7 @@
 #define CLK_V_ERROR	4				/* clock overrun */
 #define CLK_ERROR	(1 << CLK_V_ERROR)
 
-extern unsigned int16 M[];
+extern uint16 M[];
 extern int32 PC;
 extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 extern UNIT cpu_unit;

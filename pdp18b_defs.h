@@ -1,6 +1,6 @@
 /* pdp18b_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Jan-01	RMS	Added DECtape support
    14-Apr-99	RMS	Changed t_addr to unsigned
    02-Jan-96	RMS	Added fixed head and moving head disks
    31-Dec-95	RMS	Added memory management
@@ -39,7 +40,7 @@
 
    model memory	CPU options		I/O options
 
-   PDP4	   8K	none			Type 65 KSR-28 Teletype (Baudot)
+   PDP4	   8K	??Type 18 EAE		Type 65 KSR-28 Teletype (Baudot)
 					integral paper tape reader
 					Type 75 paper tape punch
 					integral real time clock
@@ -58,6 +59,7 @@
 		KX09A mem protection	Type 647D/E line printer (sixbit)
 					RF09/RS09 fixed head disk
 					TC59 magnetic tape
+					TC02/TU55 DECtape
 
    PDP15  128K	KE15 EAE		KSR-35 Teletype
 		KF15 power detection	PC15 paper tape reader and punch
@@ -66,6 +68,7 @@
 					RP15 disk pack
 					RF15/RF09 fixed head disk
 					TC59D magnetic tape
+					TC15/TU56 DECtape
 
    ??Indicates not implemented.  The PDP-4 manual refers to both an EAE
    ??and a memory extension control; there is no documentation on either.
@@ -97,12 +100,14 @@
 #define TYPE647		0				/* sixbit printer */
 #define RF		0				/* fixed head disk */
 #define MTA		0				/* magtape */
+#define DTA		0				/* DECtape */
 #elif defined (PDP15)
 #define ADDRSIZE	17
 #define LP15		0				/* ASCII printer */
 #define RF		0				/* fixed head disk */
 #define RP		0				/* disk pack */
 #define MTA		0				/* magtape */
+#define DTA		0				/* DECtape */
 #endif
 
 /* Memory */
@@ -120,6 +125,8 @@
 #define LINK		(DMASK + 1)			/* link */
 #define LACMASK		(LINK | DMASK)			/* link + data */
 #define SIGN		0400000				/* sign bit */
+#define OP_JMP		0600000				/* JMP */
+#define OP_HLT		0740040				/* HLT */
 
 /* IOT subroutine return codes */
 

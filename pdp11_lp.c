@@ -1,6 +1,6 @@
 /* pdp11_lp.c: PDP-11 line printer simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   lpt		line printer
+   lpt		LP11 line printer
 
    30-Oct-00	RMS	Standardized register naming
 */
@@ -40,8 +40,6 @@ t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *ptr);
 t_stat lpt_detach (UNIT *uptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 
 /* LPT data structures
 

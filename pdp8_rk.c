@@ -1,6 +1,6 @@
 /* pdp8_rk.c: RK8E cartridge disk simulator
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   29-Jun-96	RMS	Added unit disable feature
+   rk		RK8E/RK05 cartridge disk
+
+   25-Apr-01	RMS	Added device enable/disable support
+   29-Jun-96	RMS	Added unit enable/disable support
 */
 
 #include "pdp8_defs.h"
@@ -115,8 +118,8 @@
 #define RK_MIN 10
 #define MAX(x,y) (((x) > (y))? (x): (y))
 
-extern int32 int_req, stop_inst;
-extern unsigned int16 M[];
+extern uint16 M[];
+extern int32 int_req, dev_enb, stop_inst;
 extern UNIT cpu_unit;
 int32 rk_busy = 0;					/* controller busy */
 int32 rk_sta = 0;					/* status register */
@@ -129,11 +132,6 @@ t_stat rk_svc (UNIT *uptr);
 t_stat rk_reset (DEVICE *dptr);
 t_stat rk_boot (int32 unitno);
 void rk_go (int32 function, int32 cylinder);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
-extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 
 /* RK-8E data structures
 
@@ -167,6 +165,7 @@ REG rk_reg[] = {
 	{ GRDATA (FLG3, rk_unit[3].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
 		  REG_HRO },
 	{ FLDATA (STOP_IOE, rk_stopioe, 0) },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_RK), REG_HRO },
 	{ NULL }  };
 
 MTAB rk_mod[] = {
@@ -291,7 +290,7 @@ return;
    Note that memory addresses wrap around in the current field.
 */
 
-static unsigned int16 fill[RK_NUMWD/2] = { 0 };
+static uint16 fill[RK_NUMWD/2] = { 0 };
 t_stat rk_svc (UNIT *uptr)
 {
 int32 err, wc, wc1, awc, swc, pa, da;

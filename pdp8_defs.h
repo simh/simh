@@ -1,6 +1,6 @@
 /* pdp8_defs.h: PDP-8 simulator definitions
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,9 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Mar-01	RMS	Added DF32 support
+   15-Feb-01	RMS	Added DECtape support
    14-Apr-99	RMS	Changed t_addr to unsigned
-   19-Mar-95	RMS	Added dynamic memory size.
-   02-May-94	RMS	Added non-existent memory handling.
+   19-Mar-95	RMS	Added dynamic memory size
+   02-May-94	RMS	Added non-existent memory handling
 
    The author gratefully acknowledges the help of Max Burnet, Richie Lary,
    and Bill Haygood in resolving questions about the PDP-8
@@ -84,10 +86,12 @@
 #define INT_V_RX	(INT_V_DIRECT+0)		/* RX8E */
 #define INT_V_RK	(INT_V_DIRECT+1)		/* RK8E */
 #define INT_V_RF	(INT_V_DIRECT+2)		/* RF08 */
-#define INT_V_MT	(INT_V_DIRECT+3)		/* TM8E */
-#define INT_V_PWR	(INT_V_DIRECT+4)		/* power int */
-#define INT_V_UF	(INT_V_DIRECT+5)		/* user int */
-#define INT_V_OVHD	(INT_V_DIRECT+6)		/* overhead start */
+#define INT_V_DF	(INT_V_DIRECT+3)		/* DF32 */
+#define INT_V_MT	(INT_V_DIRECT+4)		/* TM8E */
+#define INT_V_DTA	(INT_V_DIRECT+5)		/* TC08 */
+#define INT_V_PWR	(INT_V_DIRECT+6)		/* power int */
+#define INT_V_UF	(INT_V_DIRECT+7)		/* user int */
+#define INT_V_OVHD	(INT_V_DIRECT+8)		/* overhead start */
 #define INT_V_NO_ION_PENDING (INT_V_OVHD+0)		/* ion pending */
 #define INT_V_NO_CIF_PENDING (INT_V_OVHD+1)		/* cif pending */
 #define INT_V_ION	(INT_V_OVHD+2)			/* interrupts on */
@@ -101,7 +105,9 @@
 #define INT_RX		(1 << INT_V_RX)
 #define INT_RK		(1 << INT_V_RK)
 #define INT_RF		(1 << INT_V_RF)
+#define INT_DF		(1 << INT_V_DF)
 #define INT_MT		(1 << INT_V_MT)
+#define INT_DTA		(1 << INT_V_DTA)
 #define INT_PWR		(1 << INT_V_PWR)
 #define INT_UF		(1 << INT_V_UF)
 #define INT_NO_ION_PENDING (1 << INT_V_NO_ION_PENDING)
@@ -111,4 +117,4 @@
 #define INT_ALL		((1 << INT_V_OVHD) - 1)		/* all interrupts */
 #define INT_INIT_ENABLE	(INT_TTI+INT_TTO+INT_PTR+INT_PTP+INT_LPT)
 #define INT_PENDING	(INT_ION+INT_NO_CIF_PENDING+INT_NO_ION_PENDING)
-#define INT_UPDATE	((int_req & ~INT_DEV_ENABLE) | (dev_done & dev_enable))
+#define INT_UPDATE	((int_req & ~INT_DEV_ENABLE) | (dev_done & int_enable))

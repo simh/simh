@@ -1,6 +1,6 @@
 /* pdp18b_lp.c: 18b PDP's line printer simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,13 +23,15 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   lpt		(PDP-4) Type 62 line printer
+		(PDP-7,9) Type 647 line printer
+		(PDP-15) LP15 line printer
+
+   13-Feb-01	RMS	Revised for register arrays
+   15-Feb-01	RMS	Fixed 3 cycle data break sequence
    30-Oct-00	RMS	Standardized register naming
    20-Aug-98	RMS	Fixed compilation problem in BeOS
    03-Jan-97	RMS	Fixed bug in Type 62 state handling
-
-   lpt		Type 62 line printer for the PDP-4
-		Type 647 line printer for the PDP-7 and PDP-9
-		LP15 line printer for the PDP-15
 */
 
 #include "pdp18b_defs.h"
@@ -45,8 +47,6 @@ char lpt_buf[LPT_BSIZE + 1] = { 0 };
 
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 
 /* Type 62 LPT data structures
 
@@ -68,7 +68,7 @@ REG lpt_reg[] = {
 	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
-	{ BRDATA (**BUF, lpt_buf, 8, 8, LPT_BSIZE), REG_HRO },
+	{ BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
 	{ NULL }  };
 
 DEVICE lpt_dev = {
@@ -195,8 +195,6 @@ t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *cptr);
 t_stat lpt_detach (UNIT *uptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 
 /* Type 647 LPT data structures
 
@@ -221,7 +219,7 @@ REG lpt_reg[] = {
 	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
-	{ BRDATA (**BUF, lpt_buf, 8, 8, LPT_BSIZE), REG_HRO },
+	{ BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
 	{ NULL }  };
 
 DEVICE lpt_dev = {
@@ -377,7 +375,7 @@ return detach_unit (uptr);
 
 #define LPT_BSIZE	132				/* line size */
 #define LPT_WC		034				/* word count */
-#define LPT_MA		035				/* mem address */
+#define LPT_CA		035				/* current addr */
 
 /* Status register */
 
@@ -400,9 +398,6 @@ char lpt_buf[LPT_BSIZE] = { 0 };
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 int32 lpt_updsta (int32 new);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
 
 /* LP15 LPT data structures
 
@@ -416,7 +411,7 @@ UNIT lpt_unit = {
 
 REG lpt_reg[] = {
 	{ ORDATA (STA, lpt_sta, 18) },
-	{ ORDATA (MA, M[LPT_MA], 18) },
+	{ ORDATA (CA, M[LPT_CA], 18) },
 	{ FLDATA (INT, int_req, INT_V_LPT) },
 	{ FLDATA (ENABLE, lpt_ie, 0) },
 	{ DRDATA (LCNT, lcnt, 9) },
@@ -425,7 +420,7 @@ REG lpt_reg[] = {
 	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
-	{ BRDATA (**BUF, lpt_buf, 8, 8, LPT_BSIZE), REG_HRO },
+	{ BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
 	{ NULL }  };
 
 DEVICE lpt_dev = {
@@ -443,8 +438,8 @@ int32 header;
 if (pulse == 001)					/* LPSF */
 	return (lpt_sta & (STA_ERR | STA_DON))? IOT_SKP + AC: AC;
 if ((pulse == 021) || (pulse == 041)) {			/* LPP1, LPPM */
-	header = M[(M[LPT_MA] + 1) & ADDRMASK];		/* get first word */
-	M[LPT_MA] = (M[LPT_MA] + 2) & 0777777;
+	header = M[(M[LPT_CA] + 1) & ADDRMASK];		/* get first word */
+	M[LPT_CA] = (M[LPT_CA] + 2) & 0777777;
 	mode = header & 1;				/* mode */
 	if (pulse == 041) lcnt = 1;			/* line count */
 	else lcnt = (header >> 9) & 0377;
@@ -486,9 +481,9 @@ if ((lpt_unit.flags & UNIT_ATT) == 0) {			/* not attached? */
 	return IORETURN (lpt_stopioe, SCPE_UNATT);  }
 
 for (more = 1; more != 0; ) {				/* loop until ctrl */
-	w0 = M[(M[LPT_MA] + 1) & ADDRMASK];		/* get first word */
-	w1 = M[(M[LPT_MA] + 2) & ADDRMASK];		/* get second word */
-	M[LPT_MA] = (M[LPT_MA] + 2) & 0777777;		/* advance mem addr */
+	w0 = M[(M[LPT_CA] + 1) & ADDRMASK];		/* get first word */
+	w1 = M[(M[LPT_CA] + 2) & ADDRMASK];		/* get second word */
+	M[LPT_CA] = (M[LPT_CA] + 2) & 0777777;		/* advance mem addr */
 	if (mode) {					/* unpacked? */
 		c[0] = w0 & 0177;
 		c[1] = w1 & 0177;

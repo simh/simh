@@ -1,6 +1,6 @@
 /* pdp11_sys.c: PDP-11 simulator interface
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Apr-01	RMS	Added support for TS11/TSV05
+   14-Mar-01	RMS	Revised load/dump interface (again)
+   11-Feb-01	RMS	Added DECtape support
    30-Oct-00	RMS	Added support for examine to file
    14-Apr-99	RMS	Changed t_addr to unsigned
    09-Nov-98	RMS	Fixed assignments of ROR/ROL (John Wilson).
@@ -41,10 +44,12 @@ extern DEVICE tti_dev, tto_dev;
 extern DEVICE lpt_dev, clk_dev;
 extern DEVICE rk_dev, rx_dev;
 extern DEVICE rl_dev, rp_dev;
-extern DEVICE tm_dev;
+extern DEVICE dt_dev, tm_dev;
+extern DEVICE ts_dev;
+/* extern DEVICE hk_dev; */
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
-extern unsigned int16 *M;
+extern uint16 *M;
 extern int32 saved_PC;
 
 /* SCP data structures and interface routines
@@ -63,10 +68,16 @@ REG *sim_PC = &cpu_reg[0];
 
 int32 sim_emax = 4;
 
-DEVICE *sim_devices[] = { &cpu_dev,
-	&ptr_dev, &ptp_dev, &tti_dev, &tto_dev,
-	&lpt_dev, &clk_dev, &rk_dev, &rl_dev,
-	&rp_dev, &rx_dev, &tm_dev, NULL };
+DEVICE *sim_devices[] = {
+	&cpu_dev,
+	&ptr_dev, &ptp_dev,
+	&tti_dev, &tto_dev,
+	&lpt_dev, &clk_dev,
+	&rk_dev, /* &hk_dev, */
+	&rl_dev, &rp_dev,
+	&rx_dev, &dt_dev,
+	&tm_dev, &ts_dev,
+	NULL };
 
 const char *sim_stop_messages[] = {
 	"Unknown error",
@@ -112,7 +123,7 @@ const char *sim_stop_messages[] = {
    the PC at which to start the program.
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 csum, count, state, i;
 t_addr origin;

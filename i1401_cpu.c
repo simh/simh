@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -124,7 +124,7 @@
 			oldIS = saved_IS; \
 			IS = AS;
 
-unsigned char M[MAXMEMSIZE] = { 0 };			/* main memory */
+uint8 M[MAXMEMSIZE] = { 0 };				/* main memory */
 int32 saved_IS = 0;					/* saved IS */
 int32 AS = 0;						/* AS */
 int32 BS = 0;						/* BS */

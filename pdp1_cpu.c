@@ -1,6 +1,6 @@
 /* pdp1_cpu.c: PDP-1 CPU simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   cpu		PDP-1 central processor
 
    16-Dec-00	RMS	Fixed bug in XCT address calculation
    14-Apr-99	RMS	Changed t_addr to unsigned
@@ -46,11 +48,13 @@
 	SS<1:6>		sense switches
 	TW<0:17>	test word (switch register)
 
-   Unresolved questions:
+   Questions:
 
-   1. cks: is there a status flag for sequence break enabled?
-   2. cks: which bits are line printer print done and space done?
-   3. sbs: do sequence breaks accumulate when the break system is off?
+	cks: which bits are line printer print done and space done?
+	cks: is there a bit for sequence break enabled (yes, according
+		to the 1963 Handbook)
+	sbs: do sequence breaks accumulate while the system is disabled
+		(yes, according to the Maintenance Manual)
 */
 
 /* The PDP-1 has six instruction formats: memory reference, skips,
@@ -188,9 +192,10 @@
 	I/O error in I/O simulator
 
    2. Interrupts.  With a single channel sequence break system, the
-      PDP-1 had a single break request flop, b2, here sbs<SB_V_RQ>.
-      If sequence breaks are enabled, and one is not already in
-      progress, a sequence break occurs.
+      PDP-1 has a single break request (flop b2, here sbs<SB_V_RQ>).
+      If sequence breaks are enabled (flop sbm, here sbs<SB_V_ON>),
+      and one is not already in progress (flop b4, here sbs<SB_V_IP>),
+      a sequence break occurs.
 
    3. Arithmetic.  The PDP-1 is a 1's complement system.  In 1's
       complement arithmetic, a negative number is represented by the

@@ -1,6 +1,6 @@
 /* pdp1_stddev.c: PDP-1 standard devices
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -54,8 +54,6 @@ t_stat ptp_reset (DEVICE *dptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 extern t_stat sim_poll_kbd (void);
 extern t_stat sim_putchar (int32 out);
 

@@ -1,6 +1,6 @@
-/* scp_tty.c: Operating system-dependent terminal I/O routines.
+/* scp_tty.c: operating system-dependent I/O routines
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,30 +23,39 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Mar-01	RMS	Added clock calibration support
    08-Dec-00	BKR	Added OS/2 support
    18-Aug-98	RMS	Added BeOS support
    13-Oct-97	RMS	Added NetBSD terminal support
    25-Jan-97	RMS	Added POSIX terminal I/O support
    02-Jan-97	RMS	Fixed bug in sim_poll_kbd
 
+   This module implements the following routines to support terminal I/O:
+
    ttinit	-	called once to get initial terminal state
    ttrunstate	-	called to put terminal into run state
    ttcmdstate	-	called to return terminal to command state
    ttclose	-	called once before the simulator exits
    sim_poll_kbd	-	poll for keyboard input
-   sim_putchar -	output character to terminal
+   sim_putchar	-	output character to terminal
 
-   Versions are included for generic (BSD) UNIX and for VMS.
-   The generic UNIX version works with LINUX.
+   This module implements the following routines to support clock calibration:
+
+   sim_os_msec	-	return elapsed time in msec
+
+   Versions are included for VMS, Windows, OS/2, BSD UNIX, and POSIX UNIX.
+   The POSIX UNIX version works with LINUX.
 */
 
+#undef USE_INT64					/* hack for Windows */
 #include "sim_defs.h"
 int32 sim_int_char = 005;				/* interrupt character */
 
 /* VMS routines */
 
-#ifdef VMS
+#if defined (VMS)
 #define __TTYROUTINES 0
+
 #include <descrip.h>
 #include <ttdef.h>
 #include <tt2def.h>
@@ -145,13 +154,49 @@ status = sys$qiow (EFN, tty_chan, IO$_WRITELBLK | IO$M_NOFORMAT,
 if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTOERR;
 return SCPE_OK;
 }
+
+const t_bool rtc_avail = TRUE;
+
+uint32 sim_os_msec ()
+{
+uint32 quo, htod, tod[2];
+int32 i;
+
+sys$gettim (tod);					/* time 0.1usec */
+
+/* To convert to msec, must divide 64b quantity by 10000.  This is actually done
+   by dividing the 96b quantity 0'time by 10000, producing 64b of quotient, the
+   high 32b of which are discared.  This can probably be done by a clever multiply...
+*/
+
+quo = htod = 0;
+for (i = 0; i < 64; i++) {				/* 64b quo */
+	htod = (htod << 1) | ((tod[1] >> 31) & 1);	/* shift divd */
+	tod[1] = (tod[1] << 1) | ((tod[0] >> 31) & 1);
+	tod[0] = tod[0] << 1;
+	quo = quo << 1;					/* shift quo */
+	if (htod >= 10000) {				/* divd work? */
+		htod = htod - 10000;			/* subtract */
+		quo = quo | 1;  }  }			/* set quo bit */
+return quo;
+}
+
 #endif
 
 /* Win32 routines */
 
-#ifdef _WIN32
+#if defined (WIN32)
 #define __TTYROUTINES 0
 #include <conio.h>
+#include <windows.h>
+#include <signal.h>
+static volatile int sim_win_ctlc = 0;
+
+void win_handler (int sig)
+{
+sim_win_ctlc = 1;
+return;
+}
 
 t_stat ttinit (void)
 {
@@ -160,6 +205,8 @@ return SCPE_OK;
 
 t_stat ttrunstate (void)
 {
+sim_win_ctlc = 0;
+if ((int) signal (SIGINT, win_handler) == -1) return SCPE_SIGERR;
 return SCPE_OK;
 }
 
@@ -177,6 +224,10 @@ t_stat sim_poll_kbd (void)
 {
 int c;
 
+if (sim_win_ctlc) {
+	sim_win_ctlc = 0;
+	signal (SIGINT, win_handler);
+	return 003 | SCPE_KFLAG;  }
 if (!kbhit ()) return SCPE_OK;
 c = _getch ();
 if ((c & 0177) == '\b') c = 0177;
@@ -186,8 +237,15 @@ return c | SCPE_KFLAG;
 
 t_stat sim_putchar (int32 c)
 {
-_putch (c);
+if (c != 0177) _putch (c);
 return SCPE_OK;
+}
+
+const t_bool rtc_avail = TRUE;
+
+uint32 sim_os_msec ()
+{
+return GetTickCount ();
 }
 
 #endif
@@ -231,19 +289,28 @@ return c | SCPE_KFLAG;
 
 t_stat sim_putchar (int32 c)
 {
-putch (c);
-fflush (stdout) ;
+if (c != 0177) {
+	putch (c);
+	fflush (stdout) ;  }
 return SCPE_OK;
+}
+
+const t_bool rtc_avail = FALSE;
+
+uint32 sim_os_msec ()
+{
+return 0;
 }
 
 #endif
 
 /* BSD UNIX routines */
 
-#ifdef BSDTTY
+#if defined (BSDTTY)
 #define __TTYROUTINES 0
 #include <sgtty.h>
 #include <fcntl.h>
+#include <sys/time.h>
 
 struct sgttyb cmdtty,runtty;			/* V6/V7 stty data */
 struct tchars cmdtchars,runtchars;		/* V7 editing */
@@ -316,12 +383,27 @@ c = out;
 write (1, &c, 1);
 return SCPE_OK;
 }
+
+const t_bool rtc_avail = TRUE;
+
+uint32 sim_os_msec ()
+{
+struct timeval cur;
+struct timezone foo;
+uint32 msec;
+
+gettimeofday (&cur, &foo);
+msec = (((uint32) cur.tv_sec) * 1000) + (((uint32) cur.tv_usec) / 1000);
+return msec;
+}
+
 #endif
 
 /* POSIX UNIX routines */
 
-#ifndef __TTYROUTINES
+#if !defined (__TTYROUTINES)
 #include <termios.h>
+#include <sys/time.h>
 
 struct termios cmdtty, runtty;
 
@@ -400,5 +482,17 @@ c = out;
 write (1, &c, 1);
 return SCPE_OK;
 }
-#endif
 
+const t_bool rtc_avail = TRUE;
+
+uint32 sim_os_msec ()
+{
+struct timeval cur;
+uint32 msec;
+
+gettimeofday (&cur, NULL);
+msec = (((uint32) cur.tv_sec) * 1000) + (((uint32) cur.tv_usec) / 1000);
+return msec;
+}
+
+#endif

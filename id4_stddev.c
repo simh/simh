@@ -1,6 +1,6 @@
 /* id4_stddev.c: Interdata 4 standard devices
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -33,7 +33,7 @@
 #define UNIT_V_UC	(UNIT_V_UF + 0)			/* UC only */
 #define UNIT_UC		(1 << UNIT_V_UC)
 
-extern unsigned int16 M[];
+extern uint16 M[];
 extern int32 int_req[INTSZ], int_enb[INTSZ];
 int32 pt_run = 0, pt_slew = 0;				/* ptr modes */
 int pt_rw = 0, pt_busy = 0;				/* pt state */

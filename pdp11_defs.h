@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,10 @@
 
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
+
+   23-Apr-01	RMS	Added RK611 support
+   05-Apr-01	RMS	Added TS11/TSV05 support
+   10-Feb-01	RMS	Added DECtape support
 */
 
 #include "sim_defs.h"					/* simulator defns */
@@ -40,6 +44,7 @@
 #define MAXMEMSIZE	020000000			/* 2**22 */
 #define MEMSIZE		(cpu_unit.capac)
 #define ADDR_IS_MEM(x)	(((t_addr) (x)) < MEMSIZE)
+#define DMASK		0177777
 
 /* Protection modes */
 
@@ -235,8 +240,8 @@ typedef struct fpac fpac_t;
 
    <3:0> =	BR7, <3> = PIR7
    <7:4> =	BR6, <7> = PIR6
-   <15:8> =	BR5, <15> = PIR5
-   <28:16> =	BR4, <28> = PIR4
+   <19:8> =	BR5, <15> = PIR5
+   <28:20> =	BR4, <28> = PIR4
    <29> =	PIR3
    <30> =	PIR2
    <31> =	PIR1
@@ -244,18 +249,21 @@ typedef struct fpac fpac_t;
 
 #define INT_V_PIR7	3
 #define INT_V_CLK	4
+#define INT_V_DTA	5
 #define INT_V_PIR6	7
 #define INT_V_RK	8
 #define INT_V_RL	9
 #define INT_V_RX	10
 #define INT_V_TM	11
 #define INT_V_RP	12
-#define INT_V_PIR5	15
-#define INT_V_TTI	16
-#define INT_V_TTO	17
-#define INT_V_PTR	18
-#define INT_V_PTP	19
-#define INT_V_LPT	20
+#define INT_V_TS	13
+#define INT_V_HK	14
+#define INT_V_PIR5	19
+#define INT_V_TTI	20
+#define INT_V_TTO	21
+#define INT_V_PTR	22
+#define INT_V_PTP	23
+#define INT_V_LPT	24
 #define INT_V_PIR4	28
 #define INT_V_PIR3	29
 #define INT_V_PIR2	30
@@ -263,12 +271,15 @@ typedef struct fpac fpac_t;
 
 #define INT_PIR7	(1u << INT_V_PIR7)
 #define INT_CLK		(1u << INT_V_CLK)
+#define INT_DTA		(1u << INT_V_DTA)
 #define INT_PIR6	(1u << INT_V_PIR6)
 #define INT_RK		(1u << INT_V_RK)
 #define INT_RL		(1u << INT_V_RL)
 #define INT_RX		(1u << INT_V_RX)
 #define INT_TM		(1u << INT_V_TM)
 #define INT_RP		(1u << INT_V_RP)
+#define INT_TS		(1u << INT_V_TS)
+#define INT_HK		(1u << INT_V_HK)
 #define INT_PIR5	(1u << INT_V_PIR5)
 #define INT_PTR		(1u << INT_V_PTR)
 #define INT_PTP		(1u << INT_V_PTP)
@@ -283,7 +294,7 @@ typedef struct fpac fpac_t;
 #define INT_IPL7	0x00000000			/* int level masks */
 #define INT_IPL6	0x0000000F
 #define INT_IPL5	0x000000FF
-#define INT_IPL4	0x0000FFFF
+#define INT_IPL4	0x000FFFFF
 #define INT_IPL3	0x1FFFFFFF
 #define INT_IPL2	0x3FFFFFFF
 #define INT_IPL1	0x7FFFFFFF
@@ -296,11 +307,14 @@ typedef struct fpac fpac_t;
 #define VEC_PTP		0074
 #define VEC_CLK		0100
 #define VEC_LPT		0200
+#define VEC_HK		0210
 #define VEC_RK		0220
 #define VEC_RL		0160
-#define VEC_RX		0264
+#define VEC_DTA		0214
 #define VEC_TM		0224
+#define VEC_TS		0224
 #define VEC_RP		0254
+#define VEC_RX		0264
 
 /* CPU and FPU macros */
 

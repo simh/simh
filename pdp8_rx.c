@@ -1,6 +1,6 @@
 /* pdp8_rx.c: RX8E/RX01 floppy disk simulator
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,12 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   rx		RX8E disk controller
+   rx		RX8E/RX01 floppy disk
+
+   26-Apr-01	RMS	Added device enable/disable support
+   13-Apr-01	RMS	Revised for register arrays
+   14-Apr-99	RMS	Changed t_addr to unsigned
+   15-Aug-96	RMS	Fixed bug in LCD
 
    An RX01 diskette consists of 77 tracks, each with 26 sectors of 128B.
    Tracks are numbered 0-76, sectors 1-26.  The RX8E can store data in
@@ -31,9 +36,6 @@
    128 bytes per sector.  In 12b mode, the reads or writes 64 12b words
    per sector.  The 12b words are bit packed into the first 96 bytes
    of the sector; the last 32 bytes are zeroed on writes.
-
-   14-Apr-99	RMS	Changed t_addr to unsigned
-   15-Aug-96	RMS	Fixed bug in LCD
 */
 
 #include "pdp8_defs.h"
@@ -82,7 +84,7 @@
 #define READ_RXDBR ((rx_csr & RXCS_MODE)? AC | (rx_dbr & 0377): rx_dbr)
 #define CALC_DA(t,s) (((t) * RX_NUMSC) + ((s) - 1)) * RX_NUMBY
 
-extern int32 int_req, dev_done, dev_enable;
+extern int32 int_req, int_enable, dev_done, dev_enb;
 int32 rx_tr = 0;					/* xfer ready flag */
 int32 rx_err = 0;					/* error flag */
 int32 rx_csr = 0;					/* control/status */
@@ -96,13 +98,11 @@ int32 rx_cwait = 100;					/* command time */
 int32 rx_swait = 10;					/* seek, per track */
 int32 rx_xwait = 1;					/* tr set time */
 int32 rx_stopioe = 1;					/* stop on error */
-unsigned int8 buf[RX_NUMBY] = { 0 };			/* sector buffer */
+uint8 rx_buf[RX_NUMBY] = { 0 };				/* sector buffer */
 int32 bufptr = 0;					/* buffer pointer */
 t_stat rx_svc (UNIT *uptr);
 t_stat rx_reset (DEVICE *dptr);
 t_stat rx_boot (int32 unitno);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 
 /* RX8E data structures
 
@@ -130,7 +130,7 @@ REG rx_reg[] = {
 	{ FLDATA (TR, rx_tr, 0) },
 	{ FLDATA (ERR, rx_err, 0) },
 	{ FLDATA (DONE, dev_done, INT_V_RX) },
-	{ FLDATA (ENABLE, dev_enable, INT_V_RX) },
+	{ FLDATA (ENABLE, int_enable, INT_V_RX) },
 	{ FLDATA (INT, int_req, INT_V_RX) },
 	{ DRDATA (CTIME, rx_cwait, 24), PV_LEFT },
 	{ DRDATA (STIME, rx_swait, 24), PV_LEFT },
@@ -138,7 +138,8 @@ REG rx_reg[] = {
 	{ FLDATA (FLG0, rx_unit[0].flags, UNIT_V_WLK), REG_HRO },
 	{ FLDATA (FLG1, rx_unit[1].flags, UNIT_V_WLK), REG_HRO },
 	{ FLDATA (STOP_IOE, rx_stopioe, 0) },
-	{ BRDATA (*BUF, buf, 8, 8, RX_NUMBY), REG_HRO },
+	{ BRDATA (SBUF, rx_buf, 8, 8, RX_NUMBY) },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_RX), REG_HRO },
 	{ NULL }  };
 
 MTAB rx_mod[] = {
@@ -226,8 +227,8 @@ case 5:							/* SDN */
 		return IOT_SKP + AC;  }
 	return AC;
 case 6:							/* INTR */
-	if (AC & 1) dev_enable = dev_enable | INT_RX;
-	else dev_enable = dev_enable & ~INT_RX;
+	if (AC & 1) int_enable = int_enable | INT_RX;
+	else int_enable = int_enable & ~INT_RX;
 	int_req = INT_UPDATE;
 	return AC;
 case 7:							/* INIT */
@@ -240,10 +241,10 @@ case 7:							/* INIT */
    IDLE		Should never get here, treat as unknown command
    RWDS		Just transferred sector, wait for track, set tr
    RWDT		Just transferred track, do read or write, finish command
-   FILL		copy dbr to buf[bufptr], advance ptr
+   FILL		copy dbr to rx_buf[bufptr], advance ptr
    		if bufptr > max, finish command, else set tr
    EMPTY	if bufptr > max, finish command, else
-		copy buf[bufptr] to dbr, advance ptr, set tr
+		copy rx_buf[bufptr] to dbr, advance ptr, set tr
    CMD_COMPLETE	copy requested data to dbr, finish command
    INIT_COMPLETE read drive 0, track 1, sector 1 to buffer, finish command
 
@@ -270,34 +271,34 @@ case EMPTY:						/* empty buffer */
 		if (bufptr >= RX_NUMBY) {		/* done? */
 			rx_done (rx_esr, 0);		/* set done */
 			break;  }			/* and exit */
-		rx_dbr = buf[bufptr];  }		/* else get data */
+		rx_dbr = rx_buf[bufptr];  }		/* else get data */
 	else {	byptr = PTR12 (bufptr);			/* 12b xfer */
 		if (bufptr >= RX_NUMWD) {		/* done? */
 			rx_done (rx_esr, 0);		/* set done */
 			break;  }			/* and exit */
 		rx_dbr = (bufptr & 1)?			/* get data */
-			((buf[byptr] & 017) << 8) | buf[byptr + 1]:
-			(buf[byptr] << 4) | ((buf[byptr + 1] >> 4) & 017);  }
+			((rx_buf[byptr] & 017) << 8) | rx_buf[byptr + 1]:
+			(rx_buf[byptr] << 4) | ((rx_buf[byptr + 1] >> 4) & 017);  }
 	bufptr = bufptr + 1;
 	rx_tr = 1;
 	break;
 case FILL:						/* fill buffer */
 	if (rx_csr & RXCS_MODE) {			/* 8b xfer? */
-		buf[bufptr] = rx_dbr;			/* fill buffer */
+		rx_buf[bufptr] = rx_dbr;		/* fill buffer */
 		bufptr = bufptr + 1;
 		if (bufptr < RX_NUMBY) rx_tr = 1;	/* if more, set xfer */
 		else rx_done (rx_esr, 0);  }		/* else done */
 	else { 	byptr = PTR12 (bufptr);			/* 12b xfer */
 		if (bufptr & 1) {			/* odd or even? */
-		  buf[byptr] = (buf[byptr] & 0360) | ((rx_dbr >> 8) & 017);
-		  buf[byptr + 1] = rx_dbr & 0377;  }
+		  rx_buf[byptr] = (rx_buf[byptr] & 0360) | ((rx_dbr >> 8) & 017);
+		  rx_buf[byptr + 1] = rx_dbr & 0377;  }
 		else {
-		  buf[byptr] = (rx_dbr >> 4) & 0377;
-		  buf[byptr + 1] = (rx_dbr & 017) << 4;  }
+		  rx_buf[byptr] = (rx_dbr >> 4) & 0377;
+		  rx_buf[byptr + 1] = (rx_dbr & 017) << 4;  }
 		bufptr = bufptr + 1;
 		if (bufptr < RX_NUMWD) rx_tr = 1;	/* if more, set xfer */
 		else {	for (i = PTR12 (RX_NUMWD); i < RX_NUMBY; i++)
-				buf[i] = 0;		/* else fill sector */
+				rx_buf[i] = 0;		/* else fill sector */
 			rx_done (rx_esr, 0);  }  }	/* set done */
 	break;
 case RWDS:						/* wait for sector */
@@ -320,13 +321,13 @@ case RWDT:						/* wait for track */
 	if (func == RXCS_WRDEL) rx_esr = rx_esr | RXES_DD;	/* del data? */
 	if (func == RXCS_READ) {			/* read? */
 		for (i = 0; i < RX_NUMBY; i++)
-			buf[i] = *(((int8 *) uptr -> filebuf) + da + i);  }
+			rx_buf[i] = *(((int8 *) uptr -> filebuf) + da + i);  }
 	else {	if (uptr -> flags & UNIT_WLK) {		/* write and locked? */
 			rx_esr = rx_esr | RXES_WLK;	/* flag error */
 			rx_done (rx_esr, 0100);		/* done, error */
 			break;  }
 		for (i = 0; i < RX_NUMBY; i++)		/* write */
-			*(((int8 *) uptr -> filebuf) + da + i) = buf[i];
+			*(((int8 *) uptr -> filebuf) + da + i) = rx_buf[i];
 		da = da + RX_NUMBY;
 		if (da > uptr -> hwmark) uptr -> hwmark = da;  }
 	rx_done (rx_esr, 0);				/* done */
@@ -344,7 +345,7 @@ case INIT_COMPLETE:					/* init complete */
 		break;	}
 	da = CALC_DA (1, 1);				/* track 1, sector 1 */
 	for (i = 0; i < RX_NUMBY; i++)			/* read sector */
-		buf[i] = *(((int8 *) uptr -> filebuf) + da + i);
+		rx_buf[i] = *(((int8 *) uptr -> filebuf) + da + i);
 	rx_done (rx_esr | RXES_ID | RXES_DRDY, 0);	/* set done */
 	if ((rx_unit[1].flags & UNIT_ATT) == 0) rx_ecode = 0020;
 	break;  }					/* end case state */
@@ -377,11 +378,13 @@ rx_esr = rx_ecode = 0;					/* clear error */
 rx_tr = rx_err = 0;					/* clear flags */
 dev_done = dev_done & ~INT_RX;				/* clear done, int */
 int_req = int_req & ~INT_RX;
+int_enable = int_enable & ~INT_RX;
 rx_dbr = rx_csr = 0;					/* 12b mode, drive 0 */
-rx_state = INIT_COMPLETE;				/* set state */
 sim_cancel (&rx_unit[1]);				/* cancel drive 1 */
-sim_activate (&rx_unit[0],				/* start drive 0 */
-	rx_swait * abs (1 - rx_unit[0].TRACK));
+if (rx_unit[0].flags & UNIT_BUF)  {			/* attached? */
+	rx_state = INIT_COMPLETE;			/* yes, sched init */
+	sim_activate (&rx_unit[0], rx_swait * abs (1 - rx_unit[0].TRACK));  }
+else rx_done (rx_esr | RXES_ID, 0010);			/* no, error */
 return SCPE_OK;
 }
 
@@ -427,7 +430,7 @@ t_stat rx_boot (int32 unitno)
 {
 int32 i;
 extern int32 saved_PC;
-extern unsigned int16 M[];
+extern uint16 M[];
 
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 M[BOOT_INST] = unitno? 07024: 07004;

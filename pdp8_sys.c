@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Mar-01	RMS	Added DF32 support
+   14-Mar-01	RMS	Added extension detection of RIM binary tapes
+   15-Feb-01	RMS	Added DECtape support
    30-Oct-00	RMS	Added support for examine to file
    27-Oct-98	RMS	V2.4 load interface
    10-Apr-98	RMS	Added RIM loader support
@@ -38,10 +41,10 @@ extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
 extern DEVICE clk_dev, lpt_dev;
 extern DEVICE rk_dev, rx_dev;
-extern DEVICE rf_dev;
-extern DEVICE mt_dev;
+extern DEVICE df_dev, rf_dev;
+extern DEVICE dt_dev, mt_dev;
 extern REG cpu_reg[];
-extern unsigned int16 M[];
+extern uint16 M[];
 extern int32 sim_switches;
 
 /* SCP data structures and interface routines
@@ -60,11 +63,14 @@ REG *sim_PC = &cpu_reg[0];
 
 int32 sim_emax = 4;
 
-DEVICE *sim_devices[] = { &cpu_dev,
-	&ptr_dev, &ptp_dev, &tti_dev, &tto_dev,
+DEVICE *sim_devices[] = {
+	&cpu_dev,
+	&ptr_dev, &ptp_dev,
+	&tti_dev, &tto_dev,
 	&clk_dev, &lpt_dev,
-	&rk_dev, &rx_dev, &rf_dev,
-	&mt_dev,
+	&rk_dev, &rx_dev,
+	&df_dev, &rf_dev,
+	&dt_dev, &mt_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -75,9 +81,9 @@ const char *sim_stop_messages[] = {
 
 /* Binary loader
 
-   Two loader formats are supported: RIM loader (-r) and BIN loader.
+   Two loader formats are supported: RIM loader (-r) and BIN (-b) loader.
 
-   RIM loader format cosists of alternating pairs of addresses and 12-bit
+   RIM loader format consists of alternating pairs of addresses and 12-bit
    words.  It can only operate in field 0 and is not checksummed.
 
    BIN loader format consists of a string of 12-bit words (made up from
@@ -86,14 +92,16 @@ const char *sim_stop_messages[] = {
    a character > 0200 indicates a change of field.
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 rubout, word, low, high, csum, newf, state, i;
 t_addr origin, field;
+extern t_bool match_ext (char *fnam, char *ext);
 
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 rubout = state = field = newf = origin = csum = 0;
-if (sim_switches & SWMASK ('R')) {			/* RIM format? */
+if ((sim_switches & SWMASK ('R')) ||			/* RIM format? */
+    (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B')))) {
 	while ((i = getc (fileref)) != EOF) {
 		switch (state) {
 		case 0:					/* leader */
@@ -190,6 +198,7 @@ static const char *opcode[] = {
  "ADSK", "ADSE", "ADLE", "ADRS",
  "DCMA", "DMAR", "DMAW",
  "DCIM", "DSAC", "DIML", "DIMA",
+ "DCEA",         "DEAL", "DEAC",
  "DFSE", "DFSC", "DISK", "DMAC",
  "DCXA", "DXAL", "DXAC",
  "PSKF", "PCLF", "PSKE",
@@ -241,6 +250,7 @@ static const int32 opc_val[] = {
  06534+I_NPN, 06535+I_NPN, 06536+I_NPN, 06537+I_NPN,
  06601+I_NPN, 06603+I_NPN, 06605+I_NPN,
  06611+I_NPN, 06612+I_NPN, 06615+I_NPN, 06616+I_NPN,
+ 06611+I_NPN,              06615+I_NPN, 06616+I_NPN,
  06621+I_NPN, 06622+I_NPN, 06623+I_NPN, 06626+I_NPN,
  06641+I_NPN, 06643+I_NPN, 06645+I_NPN,
  06661+I_NPN, 06662+I_NPN, 06663+I_NPN,

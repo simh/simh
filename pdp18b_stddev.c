@@ -1,6 +1,6 @@
 /* pdp18b_stddev.c: 18b PDP's standard devices
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,30 +23,33 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   22-Dec-00	RMS	Added PDP-9/15 half duplex support
-   30-Nov-00	RMS	Fixed PDP-4/7 bootstrap loader for 4K systems
-   30-Oct-00	RMS	Standardized register naming
-   06-Jan-97	RMS	Fixed PDP-4 console input
-   16-Dec-96	RMS	Fixed bug in binary ptr service
-
    ptr		paper tape reader
    ptp		paper tape punch
    tti		keyboard
    tto		teleprinter
    clk		clock
+
+   10-Mar-01	RMS	Added funny format loader support
+   05-Mar-01	RMS	Added clock calibration support
+   22-Dec-00	RMS	Added PDP-9/15 half duplex support
+   30-Nov-00	RMS	Fixed PDP-4/7 bootstrap loader for 4K systems
+   30-Oct-00	RMS	Standardized register naming
+   06-Jan-97	RMS	Fixed PDP-4 console input
+   16-Dec-96	RMS	Fixed bug in binary ptr service
 */
 
 #include "pdp18b_defs.h"
 #include <ctype.h>
 
-extern int32 int_req, saved_PC;
 extern int32 M[];
+extern int32 int_req, saved_PC;
 extern UNIT cpu_unit;
 int32 clk_state = 0;
 int32 ptr_err = 0, ptr_stopioe = 0, ptr_state = 0;
 int32 ptp_err = 0, ptp_stopioe = 0;
 int32 tti_state = 0;
 int32 tto_state = 0;
+int32 clk_tps = 60;
 t_stat clk_svc (UNIT *uptr);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
@@ -62,8 +65,8 @@ t_stat ptp_attach (UNIT *uptr, char *cptr);
 t_stat ptr_detach (UNIT *uptr);
 t_stat ptp_detach (UNIT *uptr);
 t_stat ptr_boot (int32 unitno);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
+extern int32 sim_rtc_init (int32 time);
+extern int32 sim_rtc_calb (int32 tps);
 extern t_stat sim_poll_kbd (void);
 extern t_stat sim_putchar (int32 out);
 
@@ -74,13 +77,14 @@ extern t_stat sim_putchar (int32 out);
    clk_reg	CLK register list
 */
 
-UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 5000 };
+UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 16000 };
 
 REG clk_reg[] = {
 	{ FLDATA (INT, int_req, INT_V_CLK) },
 	{ FLDATA (DONE, int_req, INT_V_CLK) },
 	{ FLDATA (ENABLE, clk_state, 0) },
 	{ DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
+	{ DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
 DEVICE clk_dev = {
@@ -281,7 +285,9 @@ if (pulse == 004) clk_reset (&clk_dev);			/* CLOF */
 else if (pulse == 044) {				/* CLON */
 	int_req = int_req & ~INT_CLK;			/* clear flag */
 	clk_state = 1;					/* clock on */
-	sim_activate (&clk_unit, clk_unit.wait);  }	/* start clock */
+	if (!sim_is_active (&clk_unit))			/* already on? */
+		sim_activate (&clk_unit,		/* start */
+		    sim_rtc_init (clk_unit.wait));  }	/* init calibr */
 return AC;
 }
 
@@ -292,7 +298,8 @@ t_stat clk_svc (UNIT *uptr)
 if (clk_state) {					/* clock on? */
 	M[7] = (M[7] + 1) & 0777777;			/* incr counter */
 	if (M[7] == 0) int_req = int_req | INT_CLK;	/* ovrflo? set flag */
-	sim_activate (&clk_unit, clk_unit.wait);  }	/* reactivate unit */
+	sim_activate (&clk_unit,			/* reactivate unit */
+		sim_rtc_calb (clk_tps));  }		/* calibr delay */
 return SCPE_OK;
 }
 
@@ -414,35 +421,154 @@ return detach_unit (uptr);
    used to remove addr<5> for a 4K system.
  */
 
-#define BOOT_START 017762
-#define BOOT_PC 017770
+#define BOOT_START	017577
+#define BOOT_FPC	017577
+#define BOOT_RPC	017770
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int))
 
 static const int32 boot_rom[] = {
-	0000000,					/* r, 0 */
-	0700101,					/* rsf */
-	0617763,					/* jmp .-1 */
-	0700112,					/* rrb */
 	0700144,					/* rsb */
-	0637762,					/* jmp i r */
-	0700144,					/* go, rsb */
-	0117762,					/* g, jms r */
-	0057775,					/* dac out */
-	0417775,					/* xct out */
-	0117762,					/* jms r */
-	0000000,					/* out, 0 */
-	0617771						/* jmp g */
+	0117762,					/* ff,	jsb r1b */
+	0057666,					/*	dac done 1 */
+	0117762,					/*	jms r1b */
+	0057667,					/*	dac done 2 */
+	0117762,					/*	jms r1b */
+	0040007,					/*	dac conend */
+	0057731,					/*	dac conbeg */
+	0440007,					/*	isz conend */
+	0117762,					/* blk,	jms r1b */
+	0057673,					/*	dac cai */
+	0741100,					/*	spa */
+	0617665,					/*	jmp done */
+	0117762,					/*	jms r1b */
+	0057777,					/*	dac tem1 */
+	0317673,					/*	add cai */
+	0057775,					/*	dac cks */
+	0117713,					/*	jms r1a */
+	0140010,					/*	dzm word */
+	0457777,					/* cont, isz tem1 */
+	0617632,					/*	jmp cont1 */
+	0217775,					/*	lac cks */
+	0740001,					/*	cma */
+	0740200,					/*	sza */
+	0740040,					/*	hlt */
+	0700144,					/*	rsb */
+	0617610,					/*	jmp blk */
+	0117713,					/* cont1, jms r1a */
+	0057762,					/*	dac tem2 */
+	0117713,					/*	jms r1a */
+	0742010,					/*	rtl */
+	0742010,					/*	rtl */
+	0742010,					/*	rtl */
+	0742010,					/*	rtl */
+	0317762,					/*	add tem2 */
+	0057762,					/*	dac tem2 */
+	0117713,					/*	jms r1a */
+        0742020,					/*	rtr */
+        0317726,					/*	add cdsp */
+        0057713,					/*	dac r1a */
+        0517701,					/*	and ccma */
+        0740020,					/*	rar */
+        0317762,					/*	add tem2 */
+        0437713,					/*	xct i r1a */
+        0617622,					/*	jmp cont */
+        0617672,					/* dsptch, jmp code0 */
+        0617670,					/*	jmp code1 */
+        0617700,					/*	jmp code2 */
+        0617706,					/*	jmp code3 */
+        0417711,					/*	xct code4 */
+        0617732,					/*	jmp const */
+        0740000,					/*	nop */
+        0740000,					/*	nop */
+        0740000,					/*	nop */
+        0200007,					/* done, lac conend */
+        0740040,					/*	xx */
+        0740040,					/*	xx */
+        0517727,					/* code1, and imsk */
+        0337762,					/*	add i tem2 */
+        0300010,					/* code0, add word */
+        0740040,					/* cai,	xx */
+        0750001,					/*	clc */
+        0357673,					/*	tad cai */
+        0057673,					/*	dac cai */
+        0617621,					/*	jmp cont-1 */
+        0711101,					/* code2, spa cla */
+        0740001,					/* ccma, cma */
+        0277762,					/*	xor i tem2 */
+        0300010,					/*	add word */
+        0040010,					/* code2a, dac word */
+        0617622,					/* jmp cont */
+        0057711,					/* code3, dac code4 */
+        0217673,					/*	lac cai */
+        0357701,					/*	tad ccma */
+        0740040,					/* code4, xx */
+        0617622,					/*	jmp cont */
+        0000000,					/* r1a,	0 */
+        0700101,					/*	rsf */
+        0617714,					/*	jmp .-1 */
+        0700112,					/*	rrb */
+        0700104,					/*	rsa */
+        0057730,					/*	dac tem */
+        0317775,					/*	add cks */
+        0057775,					/*	dac cks */
+        0217730,					/*	lac tem */
+        0744000,					/*	cll */
+        0637713,					/*	jmp i r1a */
+        0017654,					/* cdsp, dsptch */
+        0760000,					/* imsk, 760000 */
+        0000000,					/* tem,	0 */
+        0000000,					/* conbeg, 0 */
+        0300010,					/* const, add word */
+        0060007,					/*	dac i conend */
+        0217731,					/*	lac conbeg */
+        0040010,					/*	dac index */
+        0220007,					/*	lac i conend */
+        0560010,					/* con1, sad i index */
+        0617752,					/*	jmp find */
+        0560010,					/*	sad i index */
+        0617752,					/*	jmp find */
+        0560010,					/*	sad i index */
+        0617752,					/*	jmp find */
+        0560010,					/*	sad i index */
+        0617752,					/*	jmp find */
+        0560010,					/*	sad i index */
+        0617752,					/*	jmp find */
+	0617737,					/*	jmp con1 */
+        0200010,					/* find, lac index */
+        0540007,					/*	sad conend */
+        0440007,					/*	isz conend */
+        0617704,					/*	jmp code2a */
+	0000000,
+	0000000,
+	0000000,
+	0000000,
+	0000000,					/* r1b,	0 */
+	0700101,					/*	rsf */
+	0617763,					/*	jmp .-1 */
+	0700112,					/*	rrb */
+	0700144,					/*	rsb */
+	0637762,					/*	jmp i r1b */
+	0700144,					/* go,	rsb */
+	0117762,					/* g,	jms r1b */
+	0057775,					/*	dac cks */
+	0417775,					/*	xct cks */
+	0117762,					/*	jms r1b */
+	0000000,					/* cks,	0 */
+	0617771						/*	jmp g */
 };
 
 t_stat ptr_boot (int32 unitno)
 {
-int32 i, mask;
+int32 i, mask, wd;
+extern int32 sim_switches;
 
 if (MEMSIZE < 8192) mask = 0767777;			/* 4k? */
 else mask = 0777777;
-for (i = 0; i < BOOT_LEN; i++)
-	M[(BOOT_START & mask) + i] = boot_rom[i] & mask;
-saved_PC = BOOT_PC & mask;
+for (i = 0; i < BOOT_LEN; i++) {
+	wd = boot_rom[i];
+	if ((wd >= 0040000) && (wd < 0640000)) wd = wd & mask;
+	M[(BOOT_START & mask) + i] = wd;  }
+saved_PC = ((sim_switches & SWMASK ('F'))? BOOT_FPC: BOOT_RPC) & mask;
 return SCPE_OK;
 }
 

@@ -1,6 +1,6 @@
 /* hp2100_cpu.c: HP 2100 CPU simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -246,7 +246,7 @@
 #define UNIT_V_21MX	(UNIT_V_UF + 2)			/* 21MX vs 2100 */
 #define UNIT_21MX	(1 << UNIT_V_21MX)
 
-unsigned int16 M[MAXMEMSIZE] = { 0 };			/* memory */
+uint16 M[MAXMEMSIZE] = { 0 };				/* memory */
 int32 saved_AR = 0;					/* A register */
 int32 saved_BR = 0;					/* B register */
 int32 PC = 0;						/* P register */

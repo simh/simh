@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,12 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   cpu		central processor
+
+   25-Apr-01	RMS	Added device enable/disable support
+   18-Mar-01	RMS	Added DF32 support
+   05-Mar-01	RMS	Added clock calibration support
+   15-Feb-01	RMS	Added DECtape support
    14-Apr-99	RMS	Changed t_addr to unsigned
 
    The register state for the PDP-8 is:
@@ -143,7 +149,7 @@
    2. Interrupts.  Interrupts are maintained by three parallel variables:
 
 	dev_done 	device done flags
-	dev_enable	device interrupt enable flags
+	int_enable	interrupt enable flags
 	int_req		interrupt requests
 
       In addition, int_req contains the interrupt enable flag, the
@@ -173,7 +179,7 @@
 #define UNIT_V_MSIZE	(UNIT_V_UF+1)			/* dummy mask */
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
-unsigned int16 M[MAXMEMSIZE] = { 0 };			/* main memory */
+uint16 M[MAXMEMSIZE] = { 0 };				/* main memory */
 int32 saved_LAC = 0;					/* saved L'AC */
 int32 saved_MQ = 0;					/* saved MQ */
 int32 saved_PC = 0;					/* saved IF'PC */
@@ -187,9 +193,10 @@ int32 UB = 0;						/* User mode Buffer */
 int32 UF = 0;						/* User mode Flag */
 int32 OSR = 0;						/* Switch Register */
 int32 old_PC = 0;					/* old PC */
-int32 dev_enable = INT_INIT_ENABLE;			/* dev intr enables */
 int32 dev_done = 0;					/* dev done flags */
+int32 int_enable = INT_INIT_ENABLE;			/* intr enables */
 int32 int_req = 0;					/* intr requests */
+int32 dev_enb = -1 & ~INT_DF;				/* device enables */
 int32 ibkpt_addr = ILL_ADR_FLAG | ADDRMASK;		/* breakpoint addr */
 int32 stop_inst = 0;					/* trap on ill inst */
 extern int32 sim_int_char;
@@ -199,7 +206,6 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_svc (UNIT *uptr);
 t_stat cpu_set_size (UNIT *uptr, int32 value);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
 
 /* CPU data structures
 
@@ -233,12 +239,13 @@ REG cpu_reg[] = {
 	{ FLDATA (UF_INT, int_req, INT_V_UF) },
 	{ ORDATA (INT, int_req, INT_V_ION+1), REG_RO },
 	{ ORDATA (DONE, dev_done, INT_V_DIRECT), REG_RO },
-	{ ORDATA (ENABLE, dev_enable, INT_V_DIRECT), REG_RO },
+	{ ORDATA (ENABLE, int_enable, INT_V_DIRECT), REG_RO },
 	{ FLDATA (NOEAE, cpu_unit.flags, UNIT_V_NOEAE), REG_HRO },
 	{ ORDATA (OLDPC, old_PC, 15), REG_RO },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ ORDATA (BREAK, ibkpt_addr, 16) },
 	{ ORDATA (WRU, sim_int_char, 8) },
+	{ ORDATA (DEVENB, dev_enb, 32), REG_HRO },
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
@@ -267,6 +274,8 @@ register int32 IR, MB, IF, DF, LAC, MQ;
 register t_addr PC, MA;
 int32 device, pulse, temp, iot_data;
 t_stat reason;
+extern UNIT clk_unit;
+extern int32 sim_rtc_init (int32 time);
 extern int32 tti (int32 pulse, int32 AC);
 extern int32 tto (int32 pulse, int32 AC);
 extern int32 ptr (int32 pulse, int32 AC);
@@ -275,6 +284,9 @@ extern int32 clk (int32 pulse, int32 AC);
 extern int32 lpt (int32 pulse, int32 AC);
 extern int32 rk (int32 pulse, int32 AC);
 extern int32 rx (int32 pulse, int32 AC);
+extern int32 df60 (int32 pulse, int32 AC);
+extern int32 df61 (int32 pulse, int32 AC);
+extern int32 df62 (int32 pulse, int32 AC);
 extern int32 rf60 (int32 pulse, int32 AC);
 extern int32 rf61 (int32 pulse, int32 AC);
 extern int32 rf62 (int32 pulse, int32 AC);
@@ -282,6 +294,8 @@ extern int32 rf64 (int32 pulse, int32 AC);
 extern int32 mt70 (int32 pulse, int32 AC);
 extern int32 mt71 (int32 pulse, int32 AC);
 extern int32 mt72 (int32 pulse, int32 AC);
+extern int32 dt76 (int32 pulse, int32 AC);
+extern int32 dt77 (int32 pulse, int32 AC);
 
 /* Restore register state */
 
@@ -292,6 +306,7 @@ LAC = saved_LAC & 017777;
 MQ = saved_MQ & 07777;
 int_req = INT_UPDATE;
 reason = 0;
+sim_rtc_init (clk_unit.wait);				/* init calibration */
 
 /* Main instruction fetch/decode loop */
 
@@ -898,7 +913,7 @@ case 030:case 031:case 032:case 033:			/* IOT */
 			emode = 0;
 			int_req = int_req & INT_NO_CIF_PENDING;
 			dev_done = 0;
-			dev_enable = INT_INIT_ENABLE;
+			int_enable = INT_INIT_ENABLE;
 			LAC = 0;
 			break;  }			/* end switch pulse */
 		continue;				/* skip rest of IOT */
@@ -993,35 +1008,54 @@ case 030:case 031:case 032:case 033:			/* IOT */
 	case 013:					/* CLK */
 		iot_data = clk (pulse, iot_data);
 		break;
-	case 060:					/* RF08 */
-		iot_data = rf60 (pulse, iot_data);
+	case 060:					/* DF32/RF08 */
+		if (dev_enb & INT_DF) iot_data = df60 (pulse, iot_data);
+		else if (dev_enb & INT_RF) iot_data = rf60 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 061:
-		iot_data = rf61 (pulse, iot_data);
+		if (dev_enb & INT_DF) iot_data = df61 (pulse, iot_data);
+		else if (dev_enb & INT_RF) iot_data = rf61 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 062:
-		iot_data = rf62 (pulse, iot_data);
+		if (dev_enb & INT_DF) iot_data = df62 (pulse, iot_data);
+		else if (dev_enb & INT_RF) iot_data = rf62 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 064:
-		iot_data = rf64 (pulse, iot_data);
+		if (dev_enb & INT_RF) iot_data = rf64 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 066:					/* LPT */
 		iot_data = lpt (pulse, iot_data);
 		break;
 	case 070:					/* TM8E */
-		iot_data = mt70 (pulse, iot_data);
+		if (dev_enb & INT_MT) iot_data = mt70 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 071:
-		iot_data = mt71 (pulse, iot_data);
+		if (dev_enb & INT_MT) iot_data = mt71 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 072:
-		iot_data = mt72 (pulse, iot_data);
+		if (dev_enb & INT_MT) iot_data = mt72 (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 074:					/* RK8E */
-		iot_data = rk (pulse, iot_data);
+		if (dev_enb & INT_RK) iot_data = rk (pulse, iot_data);
+		else reason = stop_inst;
 		break;
 	case 075:					/* RX8E */
-		iot_data = rx (pulse, iot_data);
+		if (dev_enb & INT_RX) iot_data = rx (pulse, iot_data);
+		break;
+	case 076:					/* TC01/TC08 */
+		if (dev_enb & INT_DTA) iot_data = dt76 (pulse, iot_data);
+		else reason = stop_inst;
+		break;
+	case 077:
+		if (dev_enb & INT_DTA) iot_data = dt77 (pulse, iot_data);
+		else reason = stop_inst;
 		break;  }				/* end switch device */
 	LAC = (LAC & 010000) | (iot_data & 07777);
 	if (iot_data & IOT_SKP) PC = (PC + 1) & 07777;

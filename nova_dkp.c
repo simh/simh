@@ -1,6 +1,6 @@
 /* nova_dkp.c: NOVA moving head disk simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,13 +25,14 @@
 
    dkp		moving head disk
 
+   26-Apr-01	RMS	Added device enable/disable support
    12-Dec-00	RMS	Added Eclipse support from Charles Owen
    15-Oct-00	RMS	Editorial changes
    14-Apr-99	RMS	Changed t_addr to unsigned
    15-Sep-97	RMS	Fixed bug in DIB/DOB for new disks
    15-Sep-97	RMS	Fixed bug in cylinder extraction (found by Charles Owen)
    10-Sep-97	RMS	Fixed bug in error reporting (found by Charles Owen)
-   25-Nov-96	RMS	Defaults to autosize
+   25-Nov-96	RMS	Defaulted to autosize
    29-Jun-96	RMS	Added unit disable support
 */
 
@@ -267,16 +268,15 @@ struct drvtyp drv_tab[] = {
 	{ SECT_4231, SURF_4231, CYL_4231, SIZE_4231, NFMT_4231 },
 	{ 0 }  };
 
-extern unsigned int16 M[];
+extern uint16 M[];
 extern UNIT cpu_unit;
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 int_req, dev_busy, dev_done, dev_disable, iot_enb;
 int32 dkp_ma = 0;					/* memory address */
 int32 dkp_ussc = 0;					/* unit/sf/sc/cnt */
 int32 dkp_fccy = 0;					/* flags/cylinder */
 int32 dkp_sta = 0;					/* status register */
 int32 dkp_swait = 100;					/* seek latency */
 int32 dkp_rwait = 100;					/* rotate latency */
-static unsigned int16 tbuf[DKP_NUMWD];		/* transfer buffer */
 t_stat dkp_svc (UNIT *uptr);
 t_stat dkp_reset (DEVICE *dptr);
 t_stat dkp_boot (int32 unitno);
@@ -330,6 +330,7 @@ REG dkp_reg[] = {
 	{ DRDATA (CAPAC1, dkp_unit[1].capac, 32), PV_LEFT + REG_HRO },
 	{ DRDATA (CAPAC2, dkp_unit[2].capac, 32), PV_LEFT + REG_HRO },
 	{ DRDATA (CAPAC3, dkp_unit[3].capac, 32), PV_LEFT + REG_HRO },
+	{ FLDATA (*DEVENB, iot_enb, INT_V_DKP), REG_HRO },
 	{ NULL }  };
 
 MTAB dkp_mod[] = {
@@ -556,6 +557,7 @@ int32 sc, sa, xcsa, awc, bda;
 int32 sx, dx, pa;
 int32 dtype, u, err, newsect, newsurf;
 t_stat rval;
+static uint16 tbuf[DKP_NUMWD];				/* transfer buffer */
 
 rval = SCPE_OK;
 dtype = GET_DTYPE (uptr -> flags);			/* get drive type */
@@ -594,22 +596,22 @@ else {	sc = 16 - GET_COUNT (dkp_ussc);			/* get sector count */
 
 	if (uptr -> FUNC == FCCY_READ) {		/* read? */
 	    for (sx = 0; sx < sc; sx++) {		/* loop thru sectors */
-	        awc = fxread (&tbuf, sizeof(uint16), DKP_NUMWD, uptr -> fileref);
+	        awc = fxread (tbuf, sizeof(uint16), DKP_NUMWD, uptr -> fileref);
 		for ( ; awc < DKP_NUMWD; awc++) tbuf[awc] = 0;
-	        if (err = ferror (uptr -> fileref)) break;
-	        for (dx = 0; dx < DKP_NUMWD; dx++) {	/* loop thru buffer */
+		if (err = ferror (uptr -> fileref)) break;
+		for (dx = 0; dx < DKP_NUMWD; dx++) {	/* loop thru buffer */
 		    pa = MapAddr (0, dkp_ma);
 		    if (MEM_ADDR_OK (pa)) M[pa] = tbuf[dx];
 	            dkp_ma = (dkp_ma + 1) & AMASK;  }  }  }
 
 	if (uptr -> FUNC == FCCY_WRITE) {		/* write? */
 	    for (sx = 0; sx < sc; sx++) {		/* loop thru sectors */
-	        for (dx = 0; dx < DKP_NUMWD; dx++) {	/* loop into buffer */
+		for (dx = 0; dx < DKP_NUMWD; dx++) {	/* loop into buffer */
 		    pa = MapAddr (0, dkp_ma);
 		    tbuf[dx] = M[pa];
 	            dkp_ma = (dkp_ma + 1) & AMASK;  }
-	        fxwrite (&tbuf, sizeof(int16), DKP_NUMWD, uptr -> fileref);
-	        if (err = ferror (uptr -> fileref)) break;  }  }
+		fxwrite (tbuf, sizeof(int16), DKP_NUMWD, uptr -> fileref);
+		if (err = ferror (uptr -> fileref)) break;  }  }
 
 	if (err != 0) {
 		perror ("DKP I/O error");

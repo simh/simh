@@ -1,6 +1,6 @@
 /* nova_clk.c: NOVA real-time clock simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,18 +23,22 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   24-Sep-97	RMS	Fixed bug in unit service (found by Charles Owen)
-
    clk		real-time clock
+
+   05-Mar-01	RMS	Added clock calibration
+   24-Sep-97	RMS	Fixed bug in unit service (found by Charles Owen)
 */
 
 #include "nova_defs.h"
 
 extern int32 int_req, dev_busy, dev_done, dev_disable;
 int32 clk_sel = 0;					/* selected freq */
-int32 clk_alt_time[4] = { 16000, 100000, 10000, 1000 }; /* freq table */
+int32 clk_time[4] = { 16000, 100000, 10000, 1000 };	/* freq table */
+int32 clk_tps[4] = { 60, 10, 100, 1000 };		/* ticks per sec */
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
+extern int32 sim_rtc_init (int32 time);
+extern int32 sim_rtc_calb (int32 tps);
 
 /* CLK data structures
 
@@ -43,7 +47,7 @@ t_stat clk_reset (DEVICE *dptr);
    clk_reg	CLK register list
 */
 
-UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 16000 };
+UNIT clk_unit = { UDATA (&clk_svc, 0, 0) };
 
 REG clk_reg[] = {
 	{ ORDATA (SELECT, clk_sel, 2) },
@@ -51,10 +55,10 @@ REG clk_reg[] = {
 	{ FLDATA (DONE, dev_done, INT_V_CLK) },
 	{ FLDATA (DISABLE, dev_disable, INT_V_CLK) },
 	{ FLDATA (INT, int_req, INT_V_CLK) },
-	{ DRDATA (TIME0, clk_alt_time[0], 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TIME1, clk_alt_time[1], 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TIME2, clk_alt_time[2], 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TIME3, clk_alt_time[3], 24), REG_NZ + PV_LEFT },
+	{ DRDATA (TIME0, clk_time[0], 24), REG_NZ + PV_LEFT },
+	{ DRDATA (TIME1, clk_time[1], 24), REG_NZ + PV_LEFT },
+	{ DRDATA (TIME2, clk_time[2], 24), REG_NZ + PV_LEFT },
+	{ DRDATA (TIME3, clk_time[3], 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
 DEVICE clk_dev = {
@@ -67,13 +71,17 @@ DEVICE clk_dev = {
 
 int32 clk (int32 pulse, int32 code, int32 AC)
 {
-if (code == ioDOA) clk_sel = AC & 3;
+if (code == ioDOA) {					/* DOA */
+	clk_sel = AC & 3;				/* save select */
+	sim_rtc_init (clk_time[clk_sel]);  }		/* init calibr */
 switch (pulse) {					/* decode IR<8:9> */
 case iopS: 						/* start */
 	dev_busy = dev_busy | INT_CLK;			/* set busy */
 	dev_done = dev_done & ~INT_CLK;			/* clear done, int */
 	int_req = int_req & ~INT_CLK;
-	sim_activate (&clk_unit, clk_alt_time[clk_sel]); /* activate unit */
+	if (!sim_is_active (&clk_unit))			/* not running? */
+		sim_activate (&clk_unit,		/* activate */
+		    sim_rtc_init (clk_time[clk_sel]));	/* init calibr */
 	break;
 case iopC:						/* clear */
 	dev_busy = dev_busy & ~INT_CLK;			/* clear busy */
@@ -91,7 +99,8 @@ t_stat clk_svc (UNIT *uptr)
 dev_done = dev_done | INT_CLK;				/* set done */
 dev_busy = dev_busy & ~INT_CLK;				/* clear busy */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-sim_activate (&clk_unit, clk_alt_time[clk_sel]);	/* reactivate unit */
+sim_activate (&clk_unit,				/* reactivate unit */
+	sim_rtc_calb (clk_tps[clk_sel]));		/* calibrate delay */
 return SCPE_OK;
 }
 

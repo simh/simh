@@ -1,6 +1,6 @@
 /* hp2100_mt.c: HP 2100 magnetic tape simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -78,7 +78,7 @@
 #define STA_PAR		0002				/* parity error */
 #define STA_BUSY	0001				/* busy */
 
-extern unsigned int16 M[];
+extern uint16 M[];
 extern struct hpdev infotab[];
 extern int32 PC;
 extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
@@ -89,7 +89,7 @@ int32 mtc_1st = 0;					/* first svc flop */
 int32 mtc_ctime = 1000;					/* command wait */
 int32 mtc_xtime = 10;					/* data xfer time */
 int32 mtc_stopioe = 1;					/* stop on error */
-unsigned int8 mt_buf[DBSIZE] = { 0 };			/* data buffer */
+uint8 mt_buf[DBSIZE] = { 0 };				/* data buffer */
 t_mtrlnt mt_ptr = 0, mt_max = 0;			/* buffer ptrs */
 static const int32 mtc_cmd[] = {
  FNC_WC, FNC_RC, FNC_GAP, FNC_FSR, FNC_BSR, FNC_REW, FNC_RWS, FNC_WFM };

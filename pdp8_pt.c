@@ -1,6 +1,6 @@
 /* pdp8_pt.c: PDP-8 paper tape reader/punch simulator
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,24 +23,20 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   30-Mar-98	RMS	Added RIM loader as PTR bootstrap.
+   ptr,ptp	PC8E paper tape reader/punch
 
-   ptr		paper tape reader
-   ptp		paper tape punch
+   30-Mar-98	RMS	Added RIM loader as PTR bootstrap
 */
 
 #include "pdp8_defs.h"
 
-extern int32 int_req, dev_done, dev_enable, stop_inst;
-extern unsigned int16 M[];
+extern int32 int_req, int_enable, dev_done, stop_inst;
 int32 ptr_stopioe = 0, ptp_stopioe = 0;			/* stop on error */
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 
 /* PTR data structures
 
@@ -55,7 +51,7 @@ UNIT ptr_unit = {
 REG ptr_reg[] = {
 	{ ORDATA (BUF, ptr_unit.buf, 8) },
 	{ FLDATA (DONE, dev_done, INT_V_PTR) },
-	{ FLDATA (ENABLE, dev_enable, INT_V_PTR) },
+	{ FLDATA (ENABLE, int_enable, INT_V_PTR) },
 	{ FLDATA (INT, int_req, INT_V_PTR) },
 	{ DRDATA (POS, ptr_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
@@ -81,7 +77,7 @@ UNIT ptp_unit = {
 REG ptp_reg[] = {
 	{ ORDATA (BUF, ptp_unit.buf, 8) },
 	{ FLDATA (DONE, dev_done, INT_V_PTP) },
-	{ FLDATA (ENABLE, dev_enable, INT_V_PTP) },
+	{ FLDATA (ENABLE, int_enable, INT_V_PTP) },
 	{ FLDATA (INT, int_req, INT_V_PTP) },
 	{ DRDATA (POS, ptp_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
@@ -100,7 +96,7 @@ int32 ptr (int32 pulse, int32 AC)
 {
 switch (pulse) {					/* decode IR<9:11> */
 case 0: 						/* RPE */
-	dev_enable = dev_enable | (INT_PTR+INT_PTP);	/* set enable */
+	int_enable = int_enable | (INT_PTR+INT_PTP);	/* set enable */
 	int_req = INT_UPDATE;				/* update interrupts */
 	return AC;
 case 1:							/* RSF */
@@ -149,7 +145,7 @@ t_stat ptr_reset (DEVICE *dptr)
 ptr_unit.buf = 0;
 dev_done = dev_done & ~INT_PTR;				/* clear done, int */
 int_req = int_req & ~INT_PTR;
-dev_enable = dev_enable | INT_PTR;			/* set enable */
+int_enable = int_enable | INT_PTR;			/* set enable */
 sim_cancel (&ptr_unit);					/* deactivate unit */
 return SCPE_OK;
 }
@@ -160,7 +156,7 @@ int32 ptp (int32 pulse, int32 AC)
 {
 switch (pulse) {					/* decode IR<9:11> */
 case 0: 						/* PCE */
-	dev_enable = dev_enable & ~(INT_PTR+INT_PTP);	/* clear enables */
+	int_enable = int_enable & ~(INT_PTR+INT_PTP);	/* clear enables */
 	int_req = INT_UPDATE;				/* update interrupts */
 	return AC;
 case 1:							/* PSF */
@@ -203,7 +199,7 @@ t_stat ptp_reset (DEVICE *dptr)
 ptp_unit.buf = 0;
 dev_done = dev_done & ~INT_PTP;				/* clear done, int */
 int_req = int_req & ~INT_PTP;
-dev_enable = dev_enable | INT_PTP;			/* set enable */
+int_enable = int_enable | INT_PTP;			/* set enable */
 sim_cancel (&ptp_unit);					/* deactivate unit */
 return SCPE_OK;
 }
@@ -238,6 +234,7 @@ t_stat ptr_boot (int32 unitno)
 {
 int32 i;
 extern int32 saved_PC;
+extern uint16 M[];
 
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 saved_PC = BOOT_START;

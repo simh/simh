@@ -1,6 +1,6 @@
 /* hp2100_dp.c: HP 2100 disk pack simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -100,7 +100,7 @@
 			 STA_HUNT + STA_SKI + STA_SKE + STA_NRDY + STA_EOC + \
 			 STA_FLG + STA_DTE)
 
-extern unsigned int16 M[];
+extern uint16 M[];
 extern struct hpdev infotab[];
 extern int32 PC;
 extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
@@ -115,7 +115,7 @@ int32 dpc_rarc = 0, dpc_rarh = 0, dpc_rars = 0;		/* record addr */
 int32 dpd_obuf = 0, dpd_ibuf = 0;			/* dch buffers */
 int32 dpc_obuf = 0;					/* cch buffers */
 int32 dp_ptr = 0;					/* buffer ptr */
-unsigned int16 dp_buf[DP_NUMWD];			/* sector buffer */
+uint16 dp_buf[DP_NUMWD];				/* sector buffer */
 
 t_stat dpc_svc (UNIT *uptr);
 t_stat dpc_reset (DEVICE *dptr);
@@ -541,7 +541,7 @@ dpc_rarc = dpc_rarh = dpc_rars = 0;			/* clear rar */
 infotab[inDPC].cmd = infotab[inDPD].cmd = 0;		/* clear cmd */
 infotab[inDPC].ctl = infotab[inDPD].ctl = 0;		/* clear ctl */
 infotab[inDPC].fbf = infotab[inDPD].fbf = 1;		/* set fbf */
-infotab[inDPC].flg = infotab[inDPD].flg = 1;		/* set fbf */
+infotab[inDPC].flg = infotab[inDPD].flg = 1;		/* set flg */
 for (i = 0; i < DP_NUMDRV; i++) {			/* loop thru drives */
 	sim_cancel (&dpc_unit[i]);			/* cancel activity */
 	dpc_unit[i].FNC = 0;				/* clear function */

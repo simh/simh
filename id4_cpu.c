@@ -1,6 +1,6 @@
 /* id4_cpu.c: Interdata 4 CPU simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -121,9 +121,9 @@
 				PC = ReadW ((n) + 2); \
 				CC = PSW & CC_MASK
 
-unsigned int16 M[MAXMEMSIZE >> 1] = { 0 };		/* memory */
+uint16 M[MAXMEMSIZE >> 1] = { 0 };			/* memory */
 int32 R[16] = { 0 };					/* general registers */
-unsigned int32 F[8] = { 0 };				/* fp registers */
+uint32 F[8] = { 0 };					/* fp registers */
 int32 PSW = 0;						/* processor status word */
 int32 saved_PC = 0;					/* program counter */
 int32 SR = 0;						/* switch register */

@@ -1,6 +1,6 @@
 /* nova_tt1.c: NOVA second terminal simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,8 @@
 
    tti1		second terminal input
    tto1		second terminal output
+
+   26-Apr-01	RMS	Added device enable/disable support
 */
 
 #include "nova_defs.h"
@@ -33,7 +35,7 @@
 #define	UNIT_V_DASHER	(UNIT_V_UF + 0)			/* Dasher mode */
 #define UNIT_DASHER	(1 << UNIT_V_DASHER)
 
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 int_req, dev_busy, dev_done, dev_disable, iot_enb;
 int32 tti1_stopioe = 0, tto1_stopioe = 0;		/* stop on error */
 t_stat tti1_svc (UNIT *uptr);
 t_stat tto1_svc (UNIT *uptr);
@@ -63,6 +65,7 @@ REG tti1_reg[] = {
 	{ DRDATA (TIME, tti1_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, tti1_stopioe, 0) },
 	{ FLDATA (MODE, tti1_unit.flags, UNIT_V_DASHER), REG_HRO },
+	{ FLDATA (*DEVENB, iot_enb, INT_V_TTI1), REG_HRO },
 	{ NULL }  };
 
 MTAB ttx1_mod[] = {
@@ -95,6 +98,7 @@ REG tto1_reg[] = {
 	{ DRDATA (TIME, tto1_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, tto1_stopioe, 0) },
 	{ FLDATA (MODE, tto1_unit.flags, UNIT_V_DASHER), REG_HRO },
+	{ FLDATA (*DEVENB, iot_enb, INT_V_TTI1), REG_HRO },
 	{ NULL }  };
 
 DEVICE tto1_dev = {

@@ -1,6 +1,6 @@
 /* pdp11_cis.c: PDP-11 CIS optional instruction set simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -313,7 +313,7 @@ int32 c, i, j, k, t, op, rn, addr;
 int32 fill, mask, match, limit, mvlnt, shift;
 int32 spc, ldivd, ldivr;
 int32 arg[6];						/* operands */
-unsigned int32 nc, digit, result;
+uint32 nc, digit, result;
 static DSTR accum, src1, src2, dst;
 static DSTR mptable[10];
 static DSTR Dstr1 = { 0, 0x10, 0, 0, 0 };
@@ -981,9 +981,10 @@ return TestDstr (src);					/* clean -0 */
 
 void WriteDstr (int32 *dscr, DSTR *dst, int32 flag)
 {
-int32 c, i, mask, limit, end, type, lnt;
-static int32 masktab[8] = {
-	0xFFFFFFF0, 0xFFFFFF00, 0xFFFFF000,	0xFFFF0000,
+int32 c, i, limit, end, type, lnt;
+uint32 mask;
+static uint32 masktab[8] = {
+	0xFFFFFFF0, 0xFFFFFF00, 0xFFFFF000, 0xFFFF0000,
 	0xFFF00000, 0xFF000000, 0xF0000000, 0x00000000  };
 static int32 unsignedtab[8] = { 0, 1, 0, 0, 0, 0, 0, 1 };
 

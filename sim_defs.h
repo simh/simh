@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Feb-01	RMS	Revisions for V2.6
    15-Oct-00	RMS	Editorial revisions for V2.5
    11-Jul-99	RMS	Added unsigned int data types
    14-Apr-99	RMS	Converted t_addr to unsigned
@@ -68,10 +69,12 @@ typedef int		t_bool;				/* boolean */
 typedef unsigned int8	uint8;
 typedef unsigned int16	uint16;
 typedef unsigned int32	uint32, t_addr;			/* address */
-#if defined (_INT64) && defined (WIN32)
+#if defined (USE_INT64) && defined (WIN32)
 #define int64 __int64					/* for Windows */
-#elif defined (_INT64)
-#define int64 long
+#elif defined (USE_INT64) && defined (__digital__) && defined (__unix__)
+#define int64 long					/* for DUNIX */
+#elif defined (USE_INT64)
+#define int64 long long					/* for GCC */
 #endif
 #if defined (int64)
 typedef unsigned int64	uint64, t_value;		/* value */
@@ -119,6 +122,12 @@ typedef int32		t_mtrlnt;			/* magtape rec lnt */
 #define SCPE_REL	(SCPE_BASE + 18)		/* relocation error */
 #define SCPE_NOPARAM	(SCPE_BASE + 19)		/* no parameters */
 #define SCPE_ALATT	(SCPE_BASE + 20)		/* already attached */
+#define SCPE_TIMER	(SCPE_BASE + 21)		/* hwre timer err */
+#define SCPE_SIGERR	(SCPE_BASE + 22)		/* signal err */
+#define SCPE_TTYERR	(SCPE_BASE + 23)		/* tty setup err */
+#define SCPE_SUB	(SCPE_BASE + 24)		/* subscript err */
+#define SCPE_NOFNC	(SCPE_BASE + 25)		/* func not imp */
+#define SCPE_UDIS	(SCPE_BASE + 26)		/* unit disabled */
 #define SCPE_KFLAG	01000				/* tti data flag */
 
 /* Print value format codes */
@@ -243,10 +252,10 @@ struct mtab {
 /* Search table */
 
 struct schtab {
-	int		logic;			/* logical operator */
+	int		logic;				/* logical operator */
 	int		bool;				/* boolean operator */
-	t_value	mask;				/* mask for logical */
-	t_value	comp;				/* comparison for boolean */
+	t_value		mask;				/* mask for logical */
+	t_value		comp;				/* comparison for boolean */
 };
 
 /* The following macros define structure contents */

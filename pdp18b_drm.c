@@ -1,6 +1,6 @@
 /* pdp18b_drm.c: drum/fixed head disk simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    drm		(PDP-7) Type 24 serial drum
 		(PDP-9) RM09 serial drum
 
+   26-Apr-01	RMS	Added device enable/disable support
    14-Apr-99	RMS	Changed t_addr to unsigned
 */
 
@@ -52,7 +53,7 @@
 			((double) DRM_NUMWDT)))
 
 extern int32 M[];
-extern int32 int_req;
+extern int32 int_req, dev_enb;
 extern UNIT cpu_unit;
 int32 drm_da = 0;					/* track address */
 int32 drm_ma = 0;					/* memory address */
@@ -63,8 +64,6 @@ int32 drm_stopioe = 1;					/* stop on error */
 t_stat drm_svc (UNIT *uptr);
 t_stat drm_reset (DEVICE *dptr);
 t_stat drm_boot (int32 unitno);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 
 /* DRM data structures
 
@@ -86,6 +85,7 @@ REG drm_reg[] = {
 	{ ORDATA (WLK, drm_wlk, 32) },
 	{ DRDATA (TIME, drm_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, drm_stopioe, 0) },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_DRM), REG_HRO },
 	{ NULL }  };
 
 DEVICE drm_dev = {

@@ -1,6 +1,6 @@
 /* pdp1_sys.c: PDP-1 simulator interface
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Mar-01	RMS	Revised load/dump interface (again)
    30-Oct-00	RMS	Added support for examine to file
    27-Oct-98	RMS	V2.4 load interface
    20-Oct-97	RMS	Fixed endian-dependence in RIM loader
@@ -90,7 +91,7 @@ for (i = 0; i < 3;) {
 return word;
 }
 
-t_stat sim_load (FILE *fileref, char *cptr, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 origin, val;
 

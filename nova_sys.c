@@ -1,6 +1,6 @@
 /* nova_sys.c: NOVA simulator interface
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Mar-01	RMS	Revised load/dump interface (again)
    22-Dec-00	RMS	Added second terminal support
    10-Dec-00	RMS	Added Eclipse support
    08-Dec-00	BKR	Added plotter support
@@ -49,7 +50,7 @@ extern DEVICE clk_dev, lpt_dev;
 extern DEVICE dkp_dev, dsk_dev;
 extern DEVICE mta_dev;
 extern REG cpu_reg[];
-extern unsigned int16 M[];
+extern uint16 M[];
 extern int32 saved_PC;
 
 /* SCP data structures
@@ -119,7 +120,7 @@ const char *sim_stop_messages[] = {
    If the word count is >1, the block is an error block.
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 data, csum, count, state, i;
 t_addr origin;

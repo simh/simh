@@ -1,6 +1,6 @@
 /* pdp1_lp.c: PDP-1 line printer simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    lpt		Type 62 line printer for the PDP-1
+
+   13-Apr-01	RMS	Revised for register arrays
 */
 
 #include "pdp1_defs.h"
@@ -32,12 +34,9 @@
 #define BPTR_MASK	077				/* buf ptr mask */
 extern int32 ioc, sbs, iosta;
 int32 lpt_rpls = 0, lpt_iot = 0, lpt_stopioe = 0, bptr = 0;
-unsigned char lpt_buf[LPT_BSIZE + 1] = { 0 };
-
+char lpt_buf[LPT_BSIZE + 1] = { 0 };
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 
 /* LPT data structures
 
@@ -59,7 +58,7 @@ REG lpt_reg[] = {
 	{ DRDATA (POS, lpt_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
-	{ BRDATA (**BUF, lpt_buf, 8, 8, LPT_BSIZE), REG_HRO },
+	{ BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
 	{ NULL }  };
 
 DEVICE lpt_dev = {

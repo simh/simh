@@ -1,6 +1,6 @@
 /* nova_cpu.c: NOVA CPU simulator
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   cpu		Nova central processor
+
+   26-Apr-01	RMS	Added device enable/disable support
+   05-Mar-01	RMS	Added clock calibration
    22-Dec-00	RMS	Added Bruce Ray's second terminal
    15-Dec-00	RMS	Added Charles Owen's CPU bootstrap
    08-Dec-00	RMS	Changes from Bruce Ray
@@ -219,7 +223,7 @@
 #define UNIT_V_MSIZE	(UNIT_V_UF+3)			/* dummy mask */
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
-unsigned int16 M[MAXMEMSIZE] = { 0 };			/* memory */
+uint16 M[MAXMEMSIZE] = { 0 };				/* memory */
 int32 AC[4] = { 0 };					/* accumulators */
 int32 C = 0;						/* carry flag */
 int32 saved_PC = 0;					/* program counter */
@@ -229,6 +233,7 @@ int32 SR = 0;						/* switch register */
 int32 dev_done = 0;					/* device done flags */
 int32 dev_busy = 0;					/* device busy flags */
 int32 dev_disable = 0;					/* int disable flags */
+int32 iot_enb = -1;					/* IOT enables */
 int32 int_req = 0;					/* interrupt requests */
 int32 pimask = 0;					/* priority int mask */
 int32 pwr_low = 0;					/* power fail flag */
@@ -333,6 +338,7 @@ REG cpu_reg[] = {
 	{ ORDATA (OLDPC, old_PC, 15), REG_RO },
 	{ ORDATA (BREAK, ibkpt_addr, 16) },
 	{ ORDATA (WRU, sim_int_char, 8) },
+	{ ORDATA (IOTENB, iot_enb, 32), REG_HRO },
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
@@ -362,6 +368,8 @@ extern int32 sim_interval;
 register int32 PC, IR, i;
 register t_stat reason;
 void mask_out (int32 mask);
+extern int32 clk_sel, clk_time[4];
+extern int32 sim_rtc_init (int32 time);
 
 /* Restore register state */
 
@@ -369,6 +377,7 @@ PC = saved_PC & AMASK;					/* load local PC */
 C = C & CBIT;
 mask_out (pimask);					/* reset int system */
 reason = 0;
+sim_rtc_init (clk_time[clk_sel]);			/* init calibration */
 
 /* Main instruction fetch/decode loop */
 
@@ -774,10 +783,12 @@ else {							/* IOT */
 			int_req = int_req & ~INT_ION;
 			break;  }			/* end switch pulse */
 		}					/* end CPU control */
-	else {						/* normal device */
+	else if ((dev_table[device].mask == 0) ||
+		 (dev_table[device].mask & iot_enb)) {	/* normal device */
 		iodata = dev_table[device].routine (pulse, code, AC[dstAC]);
 		reason = iodata >> IOT_V_REASON;
 		if (code & 1) AC[dstAC] = iodata & 0177777;  }
+	else reason = stop_dev;
 	}						/* end if IOT */
 }							/* end while */
 

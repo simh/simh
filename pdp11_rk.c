@@ -1,6 +1,6 @@
-/* RK11 cartridge disk simulator
+/* pdp11_rk.c: RK11 cartridge disk simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   rk		RK11/RK05 cartridge disk
+
+   26-Apr-01	RMS	Added device enable/disable support
+   25-Mar-01	RMS	Fixed block fill calculation
+   15-Feb-01	RMS	Corrected bootstrap string
    29-Jun-96	RMS	Added unit disable support.
 
    The RK11 is an eight drive cartridge disk subsystem.  An RK05 drive
@@ -155,8 +160,8 @@
 #define RK_MIN 10
 #define MAX(x,y) (((x) > (y))? (x): (y))
 
-extern int32 int_req;
-extern unsigned int16 *M;				/* memory */
+extern uint16 *M;					/* memory */
+extern int32 int_req, dev_enb;
 extern UNIT cpu_unit;
 int32 rkcs = 0;						/* control/status */
 int32 rkds = 0;						/* drive status */
@@ -175,11 +180,6 @@ void rk_go (void);
 void rk_set_done (int32 error);
 void rk_clr_done (void);
 t_stat rk_boot (int32 unitno);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
-extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 
 /* RK11 data structures
 
@@ -231,6 +231,7 @@ REG rk_reg[] = {
 	{ GRDATA (FLG7, rk_unit[7].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
 		  REG_HRO },
 	{ FLDATA (STOP_IOE, rk_stopioe, 0) },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_RK), REG_HRO },
 	{ NULL }  };
 
 MTAB rk_mod[] = {
@@ -408,11 +409,11 @@ return;
    the current command.
 */
 
-static unsigned int16 fill[RK_NUMWD] = { 0 };
 t_stat rk_svc (UNIT *uptr)
 {
 int32 comp, drv, err, awc, twc, wc;
-int32 pa, da, fillc, track, sect;
+int32 pa, da, remc, track, sect;
+static uint16 fill[RK_NUMWD] = { 0 };
 
 drv = uptr - rk_dev.units;				/* get drv number */
 if (uptr -> FUNC == RKCS_SEEK) {			/* seek */
@@ -451,8 +452,8 @@ if ((uptr -> FUNC == RKCS_READ) && (err == 0)) {	/* read? */
 if ((uptr -> FUNC == RKCS_WRITE) && (err == 0)) {	/* write? */
 	fxwrite (&M[pa], sizeof (int16), wc, uptr -> fileref);
 	err = ferror (uptr -> fileref);
-	if ((err == 0) && (fillc = (wc & (RK_NUMWD - 1)))) {
-		fxwrite (fill, sizeof (int16), fillc, uptr -> fileref);
+	if ((err == 0) && (remc = (wc & (RK_NUMWD - 1)))) {
+		fxwrite (fill, sizeof (int16), RK_NUMWD - remc, uptr -> fileref);
 		err = ferror (uptr -> fileref);  }  }
 
 if ((uptr -> FUNC == RKCS_WCHK) && (err == 0)) {	/* write check? */
@@ -570,7 +571,7 @@ static const int32 boot_rom[] = {
 	0005002,			/* CLR R2 */
 	0005003,			/* CLR R3 */
 	0005004,			/* CLR R4 */
-	0012705, 0062153,		/* MOV #"DK, R5 */
+	0012705, 0045504,		/* MOV #"DK, R5 */
 	0105711,			/* TSTB (R1) */
 	0100376,			/* BPL .-2 */
 	0105011,			/* CLRB (R1) */

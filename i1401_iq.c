@@ -1,6 +1,6 @@
 /* i1401_iq.c: IBM 1407 inquiry terminal
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@
 #include <ctype.h>
 
 extern volatile int32 stop_cpu;
-extern unsigned char M[];
+extern uint8 M[];
 extern int32 BS, iochk, ind[64];
 extern char ascii_to_bcd[128], bcd_to_ascii[64];
 extern UNIT cpu_unit;
@@ -38,7 +38,6 @@ int32 inq_char = 033;					/* request inq */
 t_stat inq_svc (UNIT *uptr);
 t_stat inq_reset (DEVICE *dptr);
 void puts_tty (char *cptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
 extern t_stat sim_poll_kbd (void);
 extern t_stat sim_putchar (int32 out);
 
@@ -117,7 +116,6 @@ case BCD_W:						/* output */
 	return SCPE_OK;
 default:
 	return STOP_INVM;  }				/* invalid mod */
-return SCPE_OK;
 }
 
 /* Unit service - polls for WRU or inquiry request */

@@ -1,6 +1,6 @@
 /* id4_sys.c: Interdata 4 simulator interface
 
-   Copyright (c) 1993-2000, Robert M. Supnik
+   Copyright (c) 1993-2001, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Mar-01	RMS	Revised load/dump interface (again)
    30-Oct-00	RMS	Added support for examine to file
    27-Oct-98	RMS	V2.4 load interface
 */
@@ -34,7 +35,7 @@ extern DEVICE cpu_dev;
 extern DEVICE pt_dev, tt_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
-extern unsigned int16 *M;
+extern uint16 *M;
 extern int32 saved_PC;
 
 /* SCP data structures and interface routines
@@ -69,7 +70,7 @@ const char *sim_stop_messages[] = {
    To be specified
 */
 
-t_stat sim_load (FILE *fileref, char *cptr, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 return SCPE_FMT;					/* unexpected eof */
 }

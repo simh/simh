@@ -1,6 +1,6 @@
-/* RP15/RP02 disk pack simulator
+/* pdp18b_rp.c: RP15/RP02 disk pack simulator
 
-   Copyright (c) 1993-2000, Robert M Supnik
+   Copyright (c) 1993-2001, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,8 +25,9 @@
 
    rp		RP15/RP02 disk pack
 
+   26-Apr-01	RMS	Added device enable/disable support
    14-Apr-99	RMS	Changed t_addr to unsigned
-   29-Jun-96	RMS	Added unit disable support
+   29-Jun-96	RMS	Added unit enable/disable support
 */
 
 #include "pdp18b_defs.h"
@@ -123,7 +124,7 @@
 #define MAX(x,y) (((x) > (y))? (x): (y))
 
 extern int32 M[];
-extern int32 int_req, nexm;
+extern int32 int_req, dev_enb, nexm;
 extern UNIT cpu_unit;
 int32 rp_sta = 0;					/* status A */
 int32 rp_stb = 0;					/* status B */
@@ -139,11 +140,6 @@ void rp_updsta (int32 newa, int32 newb);
 t_stat rp_reset (DEVICE *dptr);
 t_stat rp_attach (UNIT *uptr, char *cptr);
 t_stat rp_detach (UNIT *uptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
-extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 
 /* RP15 data structures
 
@@ -190,6 +186,7 @@ REG rp_reg[] = {
 		  REG_HRO },
 	{ GRDATA (FLG7, rp_unit[7].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
 		  REG_HRO },
+	{ FLDATA (*DEVENB, dev_enb, INT_V_RP), REG_HRO },
 	{ NULL }  };
 
 MTAB rp_mod[] = {
