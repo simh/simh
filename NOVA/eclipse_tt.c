@@ -26,7 +26,7 @@ t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
-t_stat ttx_setmod (UNIT *uptr, int32 value);
+t_stat ttx_setmod (UNIT *uptr, int32 value, char *cptr, void *desc);
 void translate_in();
 int32 translate_out(int32 c);
 int32 putseq(char *seq);
@@ -386,7 +386,7 @@ sim_cancel (&tto_unit);					/* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat ttx_setmod (UNIT *uptr, int32 value)
+t_stat ttx_setmod (UNIT *uptr, int32 value, char *cptr, void *desc)
 {
 tti_unit.flags = (tti_unit.flags & ~UNIT_DASHER) | value;
 tto_unit.flags = (tto_unit.flags & ~UNIT_DASHER) | value;

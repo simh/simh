@@ -157,13 +157,13 @@ case 0:							/* ptr csr */
 	if (PA & 1) return SCPE_OK;
 	if ((data & CSR_IE) == 0) CLR_INT (PTR);
 	else if (((ptr_csr & CSR_IE) == 0) && (ptr_csr & (CSR_ERR | CSR_DONE)))
-		SET_INT (PTR);
+	    SET_INT (PTR);
 	if (data & CSR_GO) {
-		ptr_csr = (ptr_csr & ~CSR_DONE) | CSR_BUSY;
-		CLR_INT (PTR);
-		if (ptr_unit.flags & UNIT_ATT)		/* data to read? */
-			sim_activate (&ptr_unit, ptr_unit.wait);  
-		else sim_activate (&ptr_unit, 0);  }	/* error if not */
+	    ptr_csr = (ptr_csr & ~CSR_DONE) | CSR_BUSY;
+	    CLR_INT (PTR);
+	    if (ptr_unit.flags & UNIT_ATT)		/* data to read? */
+		sim_activate (&ptr_unit, ptr_unit.wait);  
+	    else sim_activate (&ptr_unit, 0);  }	/* error if not */
 	ptr_csr = (ptr_csr & ~PTRCSR_RW) | (data & PTRCSR_RW);
 	return SCPE_OK;
 case 1:							/* ptr buf */
@@ -183,8 +183,8 @@ if ((ptr_unit.flags & UNIT_ATT) == 0)
 	return IORETURN (ptr_stopioe, SCPE_UNATT);
 if ((temp = getc (ptr_unit.fileref)) == EOF) {
 	if (feof (ptr_unit.fileref)) {
-		if (ptr_stopioe) printf ("PTR end of file\n");
-		else return SCPE_OK;  }
+	    if (ptr_stopioe) printf ("PTR end of file\n");
+	    else return SCPE_OK;  }
 	else perror ("PTR I/O error");
 	clearerr (ptr_unit.fileref);
 	return SCPE_IOERR;  }
@@ -243,7 +243,7 @@ case 0:							/* ptp csr */
 	if (PA & 1) return SCPE_OK;
 	if ((data & CSR_IE) == 0) CLR_INT (PTP);
 	else if (((ptp_csr & CSR_IE) == 0) && (ptp_csr & (CSR_ERR | CSR_DONE)))
-		SET_INT (PTP);
+	    SET_INT (PTP);
 	ptp_csr = (ptp_csr & ~PTPCSR_RW) | (data & PTPCSR_RW);
 	return SCPE_OK;
 case 1:							/* ptp buf */
@@ -251,7 +251,7 @@ case 1:							/* ptp buf */
 	ptp_csr = ptp_csr & ~CSR_DONE;
 	CLR_INT (PTP);
 	if (ptp_unit.flags & UNIT_ATT)			/* file to write? */
-		sim_activate (&ptp_unit, ptp_unit.wait);
+	    sim_activate (&ptp_unit, ptp_unit.wait);
 	else sim_activate (&ptp_unit, 0);		/* error if not */
 	return SCPE_OK;  }				/* end switch PA */
 return SCPE_NXM;					/* can't get here */

@@ -59,6 +59,20 @@ struct eth_packet {
   int     len;
 };
 
+struct eth_message {
+  int                 type;
+  struct eth_packet   pack;
+};
+
+struct eth_queue {
+  int                 max;
+  int                 count;
+  int                 head;
+  int                 tail;
+  int                 loss;
+  struct eth_message* arr;
+};
+
 struct eth_list {
   int     num;
   uint8   name[ETH_DEV_NAME_MAX];

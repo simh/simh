@@ -984,7 +984,7 @@ void HandleCommand (HWND hWnd, WPARAM wParam, LPARAM lParam)
 			if (! running) {				/* if card reader is attached to a file, do cold start read of one card */
 				IAR = 0;					/* reset IAR */
 //				stuff_cmd("boot cr");
-				if (cr_boot(0) != SCPE_OK)	/* load boot card */
+				if (cr_boot(0, NULL) != SCPE_OK)	/* load boot card */
 					remark_cmd("IPL failed");
 			}
 			break;

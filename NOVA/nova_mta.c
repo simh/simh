@@ -261,31 +261,33 @@ case iopS:						/* start */
 	c = GET_CMD (mta_cu);				/* get command */
 	if (dev_busy & INT_MTA) break;			/* ignore if busy */
 	if ((uptr->USTAT & STA_RDY) == 0) {		/* drive not ready? */
-		mta_sta = mta_sta | STA_ILL;		/* illegal op */
-		dev_busy = dev_busy & ~INT_MTA;		/* clear busy */
-		dev_done = dev_done | INT_MTA;		/* set done */
-		int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);  }
+	    mta_sta = mta_sta | STA_ILL;		/* illegal op */
+	    dev_busy = dev_busy & ~INT_MTA;		/* clear busy */
+	    dev_done = dev_done | INT_MTA;		/* set done */
+	    int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);  }
 	else if ((c == CU_REWIND) || (c == CU_UNLOAD)) { /* rewind, unload? */
-		mta_upddsta (uptr, (uptr->USTAT &	/* update status */
-			~(STA_BOT | STA_EOF | STA_EOT | STA_RDY)) | STA_REW);
-		sim_activate (uptr, mta_rwait);		/* start IO */
-		if (c == CU_UNLOAD) detach_unit (uptr);  }
-	else {	mta_sta = 0;				/* clear errors */
-		dev_busy = dev_busy | INT_MTA;		/* set busy */
-		dev_done = dev_done & ~INT_MTA;		/* clear done */
-		int_req = int_req & ~INT_MTA;		/* clear int */
-		if (ctype[c]) sim_activate (uptr, mta_cwait);
-		else {	mta_upddsta (uptr, uptr->USTAT &
-			   ~(STA_BOT | STA_EOF | STA_EOT | STA_RDY));
-			sim_activate (uptr, mta_rwait);  }  }
+	    mta_upddsta (uptr, (uptr->USTAT &		/* update status */
+		~(STA_BOT | STA_EOF | STA_EOT | STA_RDY)) | STA_REW);
+	    sim_activate (uptr, mta_rwait);		/* start IO */
+	    if (c == CU_UNLOAD) detach_unit (uptr);  }
+	else {
+	    mta_sta = 0;				/* clear errors */
+	    dev_busy = dev_busy | INT_MTA;		/* set busy */
+	    dev_done = dev_done & ~INT_MTA;		/* clear done */
+	    int_req = int_req & ~INT_MTA;		/* clear int */
+	    if (ctype[c]) sim_activate (uptr, mta_cwait);
+	    else {
+	    	mta_upddsta (uptr, uptr->USTAT &
+		   ~(STA_BOT | STA_EOF | STA_EOT | STA_RDY));
+		sim_activate (uptr, mta_rwait);  }  }
 	mta_updcsta (uptr);				/* update status */
 	break;
 case iopC:						/* clear */
 	for (u = 0; u < MTA_NUMDR; u++) {		/* loop thru units */
-		uptr = mta_dev.units + u;		/* cancel IO */
-		if (sim_is_active (uptr) && !(uptr->USTAT & STA_REW)) {
-			mta_upddsta (uptr, uptr->USTAT | STA_RDY);
-			sim_cancel (uptr);  }  }
+	    uptr = mta_dev.units + u;			/* cancel IO */
+	    if (sim_is_active (uptr) && !(uptr->USTAT & STA_REW)) {
+		mta_upddsta (uptr, uptr->USTAT | STA_RDY);
+		sim_cancel (uptr);  }  }
 	dev_busy = dev_busy & ~INT_MTA;			/* clear busy */
 	dev_done = dev_done & ~INT_MTA;			/* clear done */
 	int_req = int_req & ~INT_MTA;			/* clear int */
@@ -338,7 +340,7 @@ case CU_CMODE:						/* controller mode */
 case CU_DMODE:						/* drive mode */
 	if (uptr->pos) mta_sta = mta_sta | STA_ILL;	/* must be BOT */
 	else mta_upddsta (uptr, (mta_cu & CU_PE)?	/* update drv status */
-		uptr->USTAT | STA_PEM: uptr->USTAT & ~ STA_PEM);
+	    uptr->USTAT | STA_PEM: uptr->USTAT & ~ STA_PEM);
 	break;
 
 /* Unit service, continued */
@@ -350,23 +352,24 @@ case CU_READNS:						/* read non-stop */
 	cbc = wc * 2;					/* expected bc */
 	if (tbc & 1) mta_sta = mta_sta | STA_ODD;	/* odd byte count? */
 	if (tbc > cbc) mta_sta = mta_sta | STA_WCO;	/* too big? */
-	else {	cbc = tbc;				/* no, use it */
-		wc = (cbc + 1) / 2;  }			/* adjust wc */
+	else {
+	    cbc = tbc;					/* no, use it */
+	    wc = (cbc + 1) / 2;  }			/* adjust wc */
 	i = fxread (dbuf, sizeof (int8), cbc, uptr->fileref);
 	for ( ; i < cbc; i++) dbuf[i] = 0;
 	mta_upddsta (uptr, uptr->USTAT | STA_RDY);
 	if (err = ferror (uptr->fileref)) {		/* error? */
-		MT_SET_PNU (uptr);			/* pos not upd */
-		break;  }
+	    MT_SET_PNU (uptr);				/* pos not upd */
+	    break;  }
 	for (i = p = 0; i < wc; i++) {			/* copy buf to mem */
-		c1 = dbuf[p++];
-		c2 = dbuf[p++];
-		pa = MapAddr (0, mta_ma);		/* map address */
-		if (MEM_ADDR_OK (pa)) M[pa] = (c1 << 8) | c2;
-		mta_ma = (mta_ma + 1) & AMASK;  }
+	    c1 = dbuf[p++];
+	    c2 = dbuf[p++];
+	    pa = MapAddr (0, mta_ma);			/* map address */
+	    if (MEM_ADDR_OK (pa)) M[pa] = (c1 << 8) | c2;
+	    mta_ma = (mta_ma + 1) & AMASK;  }
 	mta_wc = (mta_wc + wc) & DMASK;
 	uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
-		(2 * sizeof (t_mtrlnt));
+	    (2 * sizeof (t_mtrlnt));
 	break;
 
 case CU_WRITE:						/* write */
@@ -374,16 +377,17 @@ case CU_WRITE:						/* write */
 	tbc = wc * 2;					/* io byte count */
 	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
 	for (i = p = 0; i < wc; i++) {			/* copy to buffer */
-		pa = MapAddr (0, mta_ma);		/* map address */
-		dbuf[p++] = (M[pa] >> 8) & 0377;
-		dbuf[p++] = M[pa] & 0377;
-		mta_ma = (mta_ma + 1) & AMASK;  }
+	    pa = MapAddr (0, mta_ma);		/* map address */
+	    dbuf[p++] = (M[pa] >> 8) & 0377;
+	    dbuf[p++] = M[pa] & 0377;
+	    mta_ma = (mta_ma + 1) & AMASK;  }
 	fxwrite (dbuf, sizeof (int8), tbc, uptr->fileref);
 	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
 	mta_upddsta (uptr, uptr->USTAT | STA_RDY);
 	if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr); /* error? */
-	else {	mta_wc = 0;
-		uptr->pos = uptr->pos + tbc + (2 * sizeof (t_mtrlnt));  }
+	else {
+	    mta_wc = 0;
+	    uptr->pos = uptr->pos + tbc + (2 * sizeof (t_mtrlnt));  }
 	break;
 
 /* Unit service, continued */
@@ -401,20 +405,23 @@ case CU_ERASE:						/* erase */
 	break;
 
 case CU_SPACEF:						/* space forward */
-	do {	mta_wc = (mta_wc + 1) & DMASK;		/* incr wc */
-		if (mta_rdlntf (uptr, &tbc, &err)) break; /* read rec lnt, err? */
-		uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
-			(2 * sizeof (t_mtrlnt));  }
+	do {
+	    mta_wc = (mta_wc + 1) & DMASK;		/* incr wc */
+	    if (mta_rdlntf (uptr, &tbc, &err)) break;	/* read rec lnt, err? */
+	    uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
+		(2 * sizeof (t_mtrlnt));  }
 	while (mta_wc != 0);
 	mta_upddsta (uptr, uptr->USTAT | STA_RDY);
 	break;
 
 case CU_SPACER:						/* space reverse */
-	do {	mta_wc = (mta_wc + 1) & DMASK;		/* incr wc */
-		if (pnu) pnu = 0;			/* pos not upd? */
-		else {	if (mta_rdlntr (uptr, &tbc, &err)) break;
-			uptr->pos = uptr->pos - ((tbc + 1) & ~1) -
-				(2 * sizeof (t_mtrlnt));  }  }
+	do {
+	    mta_wc = (mta_wc + 1) & DMASK;		/* incr wc */
+	    if (pnu) pnu = 0;				/* pos not upd? */
+	    else {
+	    	if (mta_rdlntr (uptr, &tbc, &err)) break;
+		uptr->pos = uptr->pos - ((tbc + 1) & ~1) -
+		    (2 * sizeof (t_mtrlnt));  }  }
 	while (mta_wc != 0);
 	mta_upddsta (uptr, uptr->USTAT | STA_RDY);
 	break;
@@ -537,9 +544,9 @@ for (u = 0; u < MTA_NUMDR; u++) {			/* loop thru units */
 	MT_CLR_PNU (uptr);				/* clear pos flag */
 	sim_cancel (uptr);				/* cancel activity */
 	if (uptr->flags & UNIT_ATT) uptr->USTAT = STA_RDY |
-			(uptr->USTAT & STA_PEM) |
-			((uptr->flags & UNIT_WPRT)? STA_WLK: 0) |
-			((uptr->pos)? 0: STA_BOT);
+		(uptr->USTAT & STA_PEM) |
+		((uptr->flags & UNIT_WPRT)? STA_WLK: 0) |
+		((uptr->pos)? 0: STA_BOT);
 	else uptr->USTAT = 0;  }
 mta_updcsta (&mta_unit[0]);				/* update status */
 return SCPE_OK;

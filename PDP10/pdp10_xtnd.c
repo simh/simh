@@ -216,14 +216,14 @@ case XT_CMPSG:						/* CMPSG */
 	f2 = Read (ADDA (ea, 2), MM_OPND) & bytemask[GET_S (AC(p4))];
 	b1 = b2 = 0;
 	for (flg = 0; (AC(ac) | AC(p3)) && (b1 == b2); flg++) {
-		if (flg && (t = test_int ())) ABORT (t);
-		rlog = 0;				/* clear log */
-		if (AC(ac)) b1 = incloadbp (p1, pflgs);	/* src1 */
-		else b1 = f1;
-		if (AC(p3)) b2 = incloadbp (p4, pflgs);	/* src2 */
-		else b2 = f2;
-		if (AC(ac)) AC(ac) = (AC(ac) - 1) & XLNTMASK;
-		if (AC(p3)) AC(p3) = (AC(p3) - 1) & XLNTMASK;  }
+	    if (flg && (t = test_int ())) ABORT (t);
+	    rlog = 0;					/* clear log */
+	    if (AC(ac)) b1 = incloadbp (p1, pflgs);	/* src1 */
+	    else b1 = f1;
+	    if (AC(p3)) b2 = incloadbp (p4, pflgs);	/* src2 */
+	    else b2 = f2;
+	    if (AC(ac)) AC(ac) = (AC(ac) - 1) & XLNTMASK;
+	    if (AC(p3)) AC(p3) = (AC(p3) - 1) & XLNTMASK;  }
 	switch (xop) {
 	case XT_CMPSL:	return (b1 < b2)? XT_SKIP: XT_NOSK;
 	case XT_CMPSE:	return (b1 == b2)? XT_SKIP: XT_NOSK;
@@ -245,42 +245,43 @@ case XT_CVTBDO:						/* CVTBDO */
 case XT_CVTBDT:						/* CVTBDT */
 	e1 = calc_ea (xinst, MM_EA);			/* get ext inst addr */
 	if (xop == XT_CVTBDO)				/* offset? */
-		xoff = (e1 & RSIGN)? (e1 | LMASK): e1;	/* get offset */
+	    xoff = (e1 & RSIGN)? (e1 | LMASK): e1;	/* get offset */
 	rs[0] = AC(ac);					/* get src opnd */
 	rs[1] = CLRS (AC(p1));
 	if (!TSTF (F_FPD)) {				/* set up done yet? */
-		if (TSTS (AC(ac))) { DMOVN (rs); }	/* get abs value */
-		for (i = 22; i > 1; i--) {		/* find field width */
-			if (DCMPGE (rs, pwrs10[i])) break;  }
-		if (i > (AC(p3) & XLNTMASK)) return XT_NOSK;
-		if ((i < (AC(p3) & XLNTMASK)) && (AC(p3) & XT_LFLG)) {
-			f1 = Read (ADDA (ea, 1), MM_OPND);
-			filldst (f1, p3, (AC(p3) & XLNTMASK) - i, pflgs);  }
-		else AC(p3) = (AC(p3) & XFLGMASK) | i;
-		if (TSTS (AC(ac))) AC(p3) = AC(p3) | XT_MFLG;
-		if (AC(ac) | AC(p1)) AC(p3) = AC(p3) | XT_NFLG;
-		AC(ac) = rs[0];				/* update state */
-		AC(p1) = rs[1];
-		SETF (F_FPD);  }			/* mark set up done */
+	    if (TSTS (AC(ac))) { DMOVN (rs); }		/* get abs value */
+	    for (i = 22; i > 1; i--) {			/* find field width */
+		if (DCMPGE (rs, pwrs10[i])) break;  }
+	    if (i > (AC(p3) & XLNTMASK)) return XT_NOSK;
+	    if ((i < (AC(p3) & XLNTMASK)) && (AC(p3) & XT_LFLG)) {
+		f1 = Read (ADDA (ea, 1), MM_OPND);
+		filldst (f1, p3, (AC(p3) & XLNTMASK) - i, pflgs);  }
+	    else AC(p3) = (AC(p3) & XFLGMASK) | i;
+	    if (TSTS (AC(ac))) AC(p3) = AC(p3) | XT_MFLG;
+	    if (AC(ac) | AC(p1)) AC(p3) = AC(p3) | XT_NFLG;
+	    AC(ac) = rs[0];				/* update state */
+	    AC(p1) = rs[1];
+	    SETF (F_FPD);  }				/* mark set up done */
 
 /* Now do actual binary to decimal conversion */
 
 	for (flg = 0; AC(p3) & XLNTMASK; flg++) {
-		if (flg && (t = test_int ())) ABORT (t);
-		rlog = 0;				/* clear log */
-		i = (int32) AC(p3) & XLNTMASK;		/* get length */
-		if (i > 22) i = 22;			/* put in range */
-		for (digit = 0; (digit < 10) && DCMPGE (rs, pwrs10[i]); digit++) {
-			rs[0] = rs[0] - pwrs10[i][0] - (rs[1] < pwrs10[i][1]);
-			rs[1] = (rs[1] - pwrs10[i][1]) & MMASK;  }
-		if (xop == XT_CVTBDO) digit = (digit + xoff) & DMASK;
-		else {	f1 = Read (e1 + (int32) digit, MM_OPND);
-			if ((i == 1) && (AC(p3) & XT_LFLG)) f1 = f1 >> 18;
-			digit = f1 & RMASK;  }
-		incstorebp (digit, p4, pflgs);		/* store digit */
-		AC(ac) = rs[0];				/* mem access ok */
-		AC(p1) = rs[1];				/* update state */
-		AC(p3) = (AC(p3) & XFLGMASK) | ((AC(p3) - 1) & XLNTMASK);  }
+	    if (flg && (t = test_int ())) ABORT (t);
+	    rlog = 0;					/* clear log */
+	    i = (int32) AC(p3) & XLNTMASK;		/* get length */
+	    if (i > 22) i = 22;				/* put in range */
+	    for (digit = 0; (digit < 10) && DCMPGE (rs, pwrs10[i]); digit++) {
+		rs[0] = rs[0] - pwrs10[i][0] - (rs[1] < pwrs10[i][1]);
+		rs[1] = (rs[1] - pwrs10[i][1]) & MMASK;  }
+	    if (xop == XT_CVTBDO) digit = (digit + xoff) & DMASK;
+	    else {
+	    	f1 = Read (e1 + (int32) digit, MM_OPND);
+		if ((i == 1) && (AC(p3) & XT_LFLG)) f1 = f1 >> 18;
+		digit = f1 & RMASK;  }
+	    incstorebp (digit, p4, pflgs);		/* store digit */
+	    AC(ac) = rs[0];				/* mem access ok */
+	    AC(p1) = rs[1];				/* update state */
+	    AC(p3) = (AC(p3) & XFLGMASK) | ((AC(p3) - 1) & XLNTMASK);  }
 	CLRF (F_FPD);					/* clear FPD */
 	return XT_SKIP;
 
@@ -298,31 +299,32 @@ case XT_CVTDBO:						/* CVTDBO */
 	if ((AC(ac) & XT_SFLG) == 0) AC(p3) = AC(p4) = 0; /* !S? clr res */
 	else AC(p4) = CLRS (AC(p4));			/* clear low sign */
 	if (xop == XT_CVTDBO) {				/* offset? */
-		xoff = (e1 & RSIGN)? (e1 | LMASK): e1;	/* get offset */
-		AC(ac) = AC(ac) | XT_SFLG;  }		/* set S flag */
+	    xoff = (e1 & RSIGN)? (e1 | LMASK): e1;	/* get offset */
+	    AC(ac) = AC(ac) | XT_SFLG;  }		/* set S flag */
 	xflgs = AC(ac) & XFLGMASK;			/* get xlation flags */
 	for (flg = 0; AC(ac) & XLNTMASK; flg++) {
-		if (flg && (t = test_int ())) ABORT (t);
-		rlog = 0;				/* clear log */
-		b1 = incloadbp (p1, pflgs);		/* get byte */
-		if (xop == XT_CVTDBO) b1 = (b1 + xoff) & DMASK;
-		else {	b1 = xlate (b1, e1, &xflgs, MM_OPND);
-			if (b1 < 0) {			/* terminated? */
-				AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
-				if (TSTS (AC(p3))) AC(p4) = SETS (AC(p4));	
-				return XT_NOSK;  }
-			if (xflgs & XT_SFLG) b1 = b1 & XT_DGMASK;
-			else b1 = 0;  }
-		AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
-		if ((b1 < 0) || (b1 > 9)) {		/* bad digit? done */
-			if (TSTS (AC(p3))) AC(p4) = SETS (AC(p4));	
-			return XT_NOSK;  }
-		AC(p4) = (AC(p4) * 10) + b1;		/* base * 10 + digit */
-		AC(p3) = ((AC(p3) * 10) + (AC(p4) >> 35)) & DMASK;
-		AC(p4) = AC(p4) & MMASK;  }
+	    if (flg && (t = test_int ())) ABORT (t);
+	    rlog = 0;					/* clear log */
+	    b1 = incloadbp (p1, pflgs);			/* get byte */
+	    if (xop == XT_CVTDBO) b1 = (b1 + xoff) & DMASK;
+	    else {
+	    	b1 = xlate (b1, e1, &xflgs, MM_OPND);
+		if (b1 < 0) {				/* terminated? */
+		    AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
+		    if (TSTS (AC(p3))) AC(p4) = SETS (AC(p4));	
+		    return XT_NOSK;  }
+		if (xflgs & XT_SFLG) b1 = b1 & XT_DGMASK;
+		else b1 = 0;  }
+	    AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
+	    if ((b1 < 0) || (b1 > 9)) {			/* bad digit? done */
+		if (TSTS (AC(p3))) AC(p4) = SETS (AC(p4));	
+		return XT_NOSK;  }
+	    AC(p4) = (AC(p4) * 10) + b1;		/* base * 10 + digit */
+	    AC(p3) = ((AC(p3) * 10) + (AC(p4) >> 35)) & DMASK;
+	    AC(p4) = AC(p4) & MMASK;  }
 	if (AC(ac) & XT_MFLG) {
-		AC(p4) = -AC(p4) & MMASK;
-		AC(p3) = (~AC(p3) + (AC(p4) == 0)) & DMASK;  }
+	    AC(p4) = -AC(p4) & MMASK;
+	    AC(p3) = (~AC(p3) + (AC(p4) == 0)) & DMASK;  }
 	if (TSTS (AC(p3))) AC(p4) = SETS (AC(p4));	
 	return XT_SKIP;
 
@@ -343,24 +345,24 @@ case XT_MOVSLJ:						/* MOVSLJ */
 	f1 = Read (ADDA (ea, 1), MM_OPND);		/* get fill */
 	switch (xop) {					/* case on instr */
 	case XT_MOVSO:					/* MOVSO */
-		AC(ac) = AC(ac) & XLNTMASK;		/* trim src length */
-		xoff = calc_ea (xinst, MM_EA);		/* get offset */
-		if (xoff & RSIGN) xoff = xoff | LMASK;	/* sign extend 18b */
-		s2 = GET_S (AC(p4));			/* get dst byte size */
-		break;
+	    AC(ac) = AC(ac) & XLNTMASK;			/* trim src length */
+	    xoff = calc_ea (xinst, MM_EA);		/* get offset */
+	    if (xoff & RSIGN) xoff = xoff | LMASK;	/* sign extend 18b */
+	    s2 = GET_S (AC(p4));			/* get dst byte size */
+	    break;
 	case XT_MOVST:					/* MOVST */
-		e1 = calc_ea (xinst, MM_EA);		/* get xlate tbl addr */
-		break;
+	    e1 = calc_ea (xinst, MM_EA);		/* get xlate tbl addr */
+	    break;
 	case XT_MOVSRJ:					/* MOVSRJ */
-		AC(ac) = AC(ac) & XLNTMASK;		/* trim src length */
-		if (AC(p3) == 0) return (AC(ac)? XT_NOSK: XT_SKIP);
-		if (AC(ac) > AC(p3)) {			/* adv src ptr */
-			for (flg = 0; AC(ac) > AC(p3); flg++) {
-				if (flg && (t = test_int ())) ABORT (t);
-				AC(p1) = incbp (AC(p1));
-				AC(ac) = (AC(ac) - 1) & XLNTMASK;  }  }
-		else if (AC(ac) < AC(p3))
-			filldst (f1, p3, AC(p3) - AC(ac), pflgs);
+	    AC(ac) = AC(ac) & XLNTMASK;			/* trim src length */
+	    if (AC(p3) == 0) return (AC(ac)? XT_NOSK: XT_SKIP);
+	    if (AC(ac) > AC(p3)) {			/* adv src ptr */
+		for (flg = 0; AC(ac) > AC(p3); flg++) {
+		    if (flg && (t = test_int ())) ABORT (t);
+		    AC(p1) = incbp (AC(p1));
+		    AC(ac) = (AC(ac) - 1) & XLNTMASK;  }  }
+	    else if (AC(ac) < AC(p3))
+		filldst (f1, p3, AC(p3) - AC(ac), pflgs);
 		break;
 	case XT_MOVSLJ:					/* MOVSLJ */
 		AC(ac) = AC(ac) & XLNTMASK;		/* trim src length */
@@ -369,27 +371,27 @@ case XT_MOVSLJ:						/* MOVSLJ */
 	xflgs = AC(ac) & XFLGMASK;			/* get xlation flags */
 	if (AC(p3) == 0) return (AC(ac)? XT_NOSK: XT_SKIP);
 	for (flg = 0; AC(p3) & XLNTMASK; flg++) {
-		if (flg && (t = test_int ())) ABORT (t);
-		rlog = 0;				/* clear log */
-		if (AC(ac) & XLNTMASK) {		/* any source? */
-			b1 = incloadbp (p1, pflgs);	/* src byte */
-			if (xop == XT_MOVSO) {		/* offset? */
-				b1 = (b1 + xoff) & DMASK;	/* test fit */
-				if (b1 & ~bytemask[s2]) {
-					AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
-					return XT_NOSK;  }  }
-			else if (xop == XT_MOVST) {	/* translate? */
-				b1 = xlate (b1, e1, &xflgs, MM_OPND);
-				if (b1 < 0) {		/* upd flags in AC */
-					AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
-					return XT_NOSK;  }
-				if (xflgs & XT_SFLG) b1 = b1 & XT_BYMASK;
-				else b1 = -1;  }  }
-		else b1 = f1;
-		if (b1 >= 0) {				/* valid byte? */
-			incstorebp (b1, p4, pflgs);	/* store byte */
-			AC(p3) = (AC(p3) - 1) & XLNTMASK;  }	/* update state */
-		if (AC(ac) & XLNTMASK) AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);  }
+	    if (flg && (t = test_int ())) ABORT (t);
+	    rlog = 0;					/* clear log */
+	    if (AC(ac) & XLNTMASK) {			/* any source? */
+		b1 = incloadbp (p1, pflgs);		/* src byte */
+		if (xop == XT_MOVSO) {			/* offset? */
+		    b1 = (b1 + xoff) & DMASK;		/* test fit */
+		    if (b1 & ~bytemask[s2]) {
+			AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
+			return XT_NOSK;  }  }
+		else if (xop == XT_MOVST) {		/* translate? */
+		    b1 = xlate (b1, e1, &xflgs, MM_OPND);
+		    if (b1 < 0) {			/* upd flags in AC */
+			AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
+			return XT_NOSK;  }
+		    if (xflgs & XT_SFLG) b1 = b1 & XT_BYMASK;
+		    else b1 = -1;  }  }
+	    else b1 = f1;
+	    if (b1 >= 0) {				/* valid byte? */
+		incstorebp (b1, p4, pflgs);		/* store byte */
+		AC(p3) = (AC(p3) - 1) & XLNTMASK;  }	/* update state */
+	    if (AC(ac) & XLNTMASK) AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);  }
 	return (AC(ac) & XLNTMASK)? XT_NOSK: XT_SKIP;
 
 /* Edit - checked against KS10 ucode
@@ -406,80 +408,82 @@ case XT_EDIT:						/* EDIT */
 	xflgs = AC(ac) & XFLGMASK;			/* get xlation flags */
 	e1 = calc_ea (xinst, MM_EA);			/* get xlate tbl addr */
 	for (ppi = 1, ret = -1, flg = 0; ret < 0; flg++, ppi = 1) {
-		if (flg && (t = test_int ())) ABORT (t);
-		rlog = 0;				/* clear log */
-		pp = (int32) AC(ac) & AMASK;		/* get pattern ptr */
-		b1 = Read (pp, MM_OPND);		/* get pattern word */
-		pat = ED_PBYTE (b1, AC(ac));		/* get pattern byte */
-		switch ((pat < 0100)? pat: ((pat >> ED_V_POPC) + 0100)) {
-		case ED_STOP:				/* stop */
-			ret = XT_SKIP;			/* exit loop */
-			break;
-		case ED_SELECT:				/* select source */
-			b1 = incloadbp (p1, pflgs);	/* get src */
-			entad = (e1 + ((int32) b1 >> 1)) & AMASK;
-			f1 = ((Read (entad, MM_OPND) >> ((b1 & 1)? 0: 18)) & RMASK);
-			i = XT_GETCODE (f1);
-			if (i & 2) xflgs = 
-				(i & 1)? xflgs | XT_MFLG: xflgs & ~XT_MFLG;
-			switch (i) {
-			case 00: case 02: case 03:
-				if (xflgs & XT_SFLG) f1 = f1 & XT_BYMASK;
-				else {	f1 = Read (INCA (ea), MM_OPND);
-					if (f1 == 0) break;  }
-				incstorebp (f1, p4, pflgs);
-				break;
-			case 01:
-				ret = XT_NOSK;		/* exit loop */
-				break;
-			case 04: case 06: case 07:
-				xflgs = xflgs | XT_NFLG;
-				f1 = f1 & XT_BYMASK;
-				if ((xflgs & XT_SFLG) == 0) {
-					f2 = Read (ADDA (ea, 2), MM_OPND);
-					Write ((a10) AC(p3), AC(p4), MM_OPND);
-					if (f2) incstorebp (f2, p4, pflgs);
-					xflgs = xflgs | XT_SFLG;  }
-				incstorebp (f1, p4, pflgs);
-				break;
-			case 05:
-				xflgs = xflgs | XT_NFLG;
-				ret = XT_NOSK;		/* exit loop */
-				break;  }		/* end case xlate op */
-			break;
+	    if (flg && (t = test_int ())) ABORT (t);
+	    rlog = 0;					/* clear log */
+	    pp = (int32) AC(ac) & AMASK;		/* get pattern ptr */
+	    b1 = Read (pp, MM_OPND);			/* get pattern word */
+	    pat = ED_PBYTE (b1, AC(ac));		/* get pattern byte */
+	    switch ((pat < 0100)? pat: ((pat >> ED_V_POPC) + 0100)) {
+	    case ED_STOP:				/* stop */
+		ret = XT_SKIP;				/* exit loop */
+		break;
+	    case ED_SELECT:				/* select source */
+		b1 = incloadbp (p1, pflgs);		/* get src */
+		entad = (e1 + ((int32) b1 >> 1)) & AMASK;
+		f1 = ((Read (entad, MM_OPND) >> ((b1 & 1)? 0: 18)) & RMASK);
+		i = XT_GETCODE (f1);
+		if (i & 2) xflgs = 
+		    (i & 1)? xflgs | XT_MFLG: xflgs & ~XT_MFLG;
+		switch (i) {
+		case 00: case 02: case 03:
+		    if (xflgs & XT_SFLG) f1 = f1 & XT_BYMASK;
+		    else {
+		    	f1 = Read (INCA (ea), MM_OPND);
+			if (f1 == 0) break;  }
+		    incstorebp (f1, p4, pflgs);
+		    break;
+		case 01:
+		    ret = XT_NOSK;			/* exit loop */
+		    break;
+		case 04: case 06: case 07:
+		    xflgs = xflgs | XT_NFLG;
+		    f1 = f1 & XT_BYMASK;
+		    if ((xflgs & XT_SFLG) == 0) {
+			f2 = Read (ADDA (ea, 2), MM_OPND);
+			Write ((a10) AC(p3), AC(p4), MM_OPND);
+			if (f2) incstorebp (f2, p4, pflgs);
+			xflgs = xflgs | XT_SFLG;  }
+		    incstorebp (f1, p4, pflgs);
+		    break;
+		case 05:
+		    xflgs = xflgs | XT_NFLG;
+		    ret = XT_NOSK;			/* exit loop */
+		    break;  }				/* end case xlate op */
+		break;
 		case ED_SIGST:				/* start significance */
-			if ((xflgs & XT_SFLG) == 0) {
-				f2 = Read (ADDA (ea, 2), MM_OPND);
-				Write ((a10) AC(p3), AC(p4), MM_OPND);
-				if (f2) incstorebp (f2, p4, pflgs);
-				xflgs = xflgs | XT_SFLG;  }
-			break;
+		    if ((xflgs & XT_SFLG) == 0) {
+			f2 = Read (ADDA (ea, 2), MM_OPND);
+			Write ((a10) AC(p3), AC(p4), MM_OPND);
+			if (f2) incstorebp (f2, p4, pflgs);
+			xflgs = xflgs | XT_SFLG;  }
+		    break;
 		case ED_FLDSEP:				/* separate fields */
-			xflgs = 0;
-			break;
+		    xflgs = 0;
+		    break;
 		case ED_EXCHMD:				/* exchange */
-			f2 = Read ((int32) (AC(p3) & AMASK), MM_OPND);
-			Write ((int32) (AC(p3) & AMASK), AC(p4), MM_OPND);
-			AC(p4) = f2;
-			break;
+		    f2 = Read ((int32) (AC(p3) & AMASK), MM_OPND);
+		    Write ((int32) (AC(p3) & AMASK), AC(p4), MM_OPND);
+		    AC(p4) = f2;
+		    break;
 		case (0100 + (ED_MESSAG >> ED_V_POPC)):	/* message */
-			if (xflgs & XT_SFLG)
-				f1 = Read (ea + (pat & ED_M_NUM) + 1, MM_OPND);
-			else {	f1 = Read (ea + 1, MM_OPND);
-				if (f1 == 0) break;  }
-			incstorebp (f1, p4, pflgs);
-			break;
+		    if (xflgs & XT_SFLG)
+			f1 = Read (ea + (pat & ED_M_NUM) + 1, MM_OPND);
+		    else {
+		    	f1 = Read (ea + 1, MM_OPND);
+			if (f1 == 0) break;  }
+		    incstorebp (f1, p4, pflgs);
+		    break;
 		case (0100 + (ED_SKPM >> ED_V_POPC)):	/* skip on M */
-			if (xflgs & XT_MFLG) ppi = (pat & ED_M_NUM) + 2;
-			break;
+		    if (xflgs & XT_MFLG) ppi = (pat & ED_M_NUM) + 2;
+		    break;
 		case (0100 + (ED_SKPN >> ED_V_POPC)):	/* skip on N */
-			if (xflgs & XT_NFLG) ppi = (pat & ED_M_NUM) + 2;
-			break;
+		    if (xflgs & XT_NFLG) ppi = (pat & ED_M_NUM) + 2;
+		    break;
 		case (0100 + (ED_SKPA >> ED_V_POPC)):	/* skip always */
-			ppi = (pat & ED_M_NUM) + 2;
-			break;
+		    ppi = (pat & ED_M_NUM) + 2;
+		    break;
 		default:				/* NOP or undefined */
-			break;  }			/* end case pttrn op */
+		    break;  }				/* end case pttrn op */
 		AC(ac) = AC(ac) + ((ppi & ED_M_PBYN) << ED_V_PBYN);
 		AC(ac) = AC(ac) + (ppi >> 2) + ((AC(ac) & ED_PBYNO)? 1: 0);
 		AC(ac) = xflgs | (AC(ac) & ~(XT_MBZE | XFLGMASK));  }
@@ -631,8 +635,8 @@ int32 p, reg;
 while (logv) {
 	XT_REMRLOG (reg, logv);				/* get next reg */
 	if ((reg >= 0) && (reg < AC_NUM)) {
-		p = GET_P (AC(reg)) + GET_S (AC(reg));	/* get p + s */
-		AC(reg) = PUT_P (AC(reg), p);  }	/* p <- p + s */
+	    p = GET_P (AC(reg)) + GET_S (AC(reg));	/* get p + s */
+	    AC(reg) = PUT_P (AC(reg), p);  }		/* p <- p + s */
 	}
 return;
 }

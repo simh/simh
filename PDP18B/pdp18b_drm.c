@@ -23,9 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   drm		(PDP-7) Type 24 serial drum
-		(PDP-9) RM09 serial drum
+   drm		(PDP-4,PDP-7) Type 24 serial drum
 
+   05-Dec-02	RMS	Updated from Type 24 documentation
+   22-Nov-02	RMS	Added PDP-4 support
    05-Feb-02	RMS	Added DIB, device number support
    03-Feb-02	RMS	Fixed bug in reset routine (found by Robert Alan Byer)
    06-Jan-02	RMS	Revised enable/disable support
@@ -92,7 +93,7 @@ UNIT drm_unit =
 
 REG drm_reg[] = {
 	{ ORDATA (DA, drm_da, 9) },
-	{ ORDATA (MA, drm_ma, 15) },
+	{ ORDATA (MA, drm_ma, 16) },
 	{ FLDATA (INT, int_hwre[API_DRM], INT_V_DRM) },
 	{ FLDATA (DONE, int_hwre[API_DRM], INT_V_DRM) },
 	{ FLDATA (ERR, drm_err, 0) },
@@ -118,8 +119,8 @@ DEVICE drm_dev = {
 int32 drm60 (int32 pulse, int32 AC)
 {
 if ((pulse & 027) == 06) {				/* DRLR, DRLW */
-	drm_ma = AC & ADDRMASK;				/* load mem addr */
-	drm_unit.FUNC = pulse & 040;  }			/* save function */
+	drm_ma = AC & 0177777;				/* load mem addr */
+	drm_unit.FUNC = pulse & DRM_WRITE;  }		/* save function */
 return AC;
 }
 
@@ -135,7 +136,7 @@ if (pulse & 002) {					/* DRCF */
 if (pulse & 004) {					/* DRSS */
 	drm_da = AC & DRM_SMASK;			/* load sector # */
 	t = ((drm_da % DRM_NUMSC) * DRM_NUMWDS) - GET_POS (drm_time);
-	if (t < 0) t = t + DRM_NUMWDT;			/* wrap around? */
+	if (t <= 0) t = t + DRM_NUMWDT;			/* wrap around? */
 	sim_activate (&drm_unit, t * drm_time);  }	/* schedule op */
 return AC;
 }
@@ -150,7 +151,7 @@ if (pulse & 004) {					/* DRCS */
 	CLR_INT (DRM);					/* clear done */
 	drm_err = 0;					/* clear error */
 	t = ((drm_da % DRM_NUMSC) * DRM_NUMWDS) - GET_POS (drm_time);
-	if (t < 0) t = t + DRM_NUMWDT;			/* wrap around? */
+	if (t <= 0) t = t + DRM_NUMWDT;			/* wrap around? */
 	sim_activate (&drm_unit, t * drm_time);  }	/* schedule op */
 return AC;
 }
@@ -173,13 +174,14 @@ if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 da = drm_da * DRM_NUMWDS;				/* compute dev addr */
 for (i = 0; i < DRM_NUMWDS; i++, da++) {		/* do transfer */
 	if (uptr->FUNC == DRM_READ) {
-		if (MEM_ADDR_OK (drm_ma))		/* read, check nxm */
-			M[drm_ma] = *(((int32 *) uptr->filebuf) + da);  }
-	else {	if ((drm_wlk >> (drm_da >> 4)) & 1) drm_err = 1;
-		else {	*(((int32 *) uptr->filebuf) + da) = M[drm_ma];
-			if (da >= uptr->hwmark)
-				uptr->hwmark = da + 1;  }  }
-	drm_ma = (drm_ma + 1) & ADDRMASK;  }		/* incr mem addr */
+	    if (MEM_ADDR_OK (drm_ma))			/* read, check nxm */
+		M[drm_ma] = *(((int32 *) uptr->filebuf) + da);  }
+	else {
+	    if ((drm_wlk >> (drm_da >> 4)) & 1) drm_err = 1;
+	    else {
+	    	*(((int32 *) uptr->filebuf) + da) = M[drm_ma];
+		if (da >= uptr->hwmark) uptr->hwmark = da + 1;  }  }
+	drm_ma = (drm_ma + 1) & 0177777;  }		/* incr mem addr */
 drm_da = (drm_da + 1) & DRM_SMASK;			/* incr dev addr */
 SET_INT (DRM);						/* set done */
 return SCPE_OK;

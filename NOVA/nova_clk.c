@@ -89,8 +89,8 @@ case iopS: 						/* start */
 	dev_done = dev_done & ~INT_CLK;			/* clear done, int */
 	int_req = int_req & ~INT_CLK;
 	if (!sim_is_active (&clk_unit))			/* not running? */
-		sim_activate (&clk_unit,		/* activate */
-		    sim_rtc_init (clk_time[clk_sel]));	/* init calibr */
+	    sim_activate (&clk_unit,			/* activate */
+		sim_rtc_init (clk_time[clk_sel]));	/* init calibr */
 	break;
 case iopC:						/* clear */
 	dev_busy = dev_busy & ~INT_CLK;			/* clear busy */

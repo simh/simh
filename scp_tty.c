@@ -195,8 +195,8 @@ for (i = 0; i < 64; i++) {				/* 64b quo */
 	tod[0] = tod[0] << 1;
 	quo = quo << 1;					/* shift quo */
 	if (htod >= 10000) {				/* divd work? */
-		htod = htod - 10000;			/* subtract */
-		quo = quo | 1;  }  }			/* set quo bit */
+	    htod = htod - 10000;			/* subtract */
+	    quo = quo | 1;  }  }			/* set quo bit */
 return quo;
 }
 
@@ -379,28 +379,28 @@ static void updateCursor(void) {
 	WindowPtr window;
 	window = FrontWindow();
 	if (SIOUXIsAppWindow(window)) {
-		GrafPtr savePort;
-		Point localMouse;
-		GetPort(&savePort);
-		SetPort(window);
+	    GrafPtr savePort;
+	    Point localMouse;
+	    GetPort(&savePort);
+	    SetPort(window);
 #if TARGET_API_MAC_CARBON
-		GetGlobalMouse(&localMouse);
+	    GetGlobalMouse(&localMouse);
 #else
-		localMouse = LMGetMouseLocation();
+	    localMouse = LMGetMouseLocation();
 #endif
-		GlobalToLocal(&localMouse);
-		if (PtInRect(localMouse, &(*SIOUXTextWindow->edit)->viewRect) && iBeamCursorH) {
-			SetCursor(*iBeamCursorH);
-		}
-		else {
-			SetCursor(&qd.arrow);
-		}
-		TEIdle(SIOUXTextWindow->edit);
-		SetPort(savePort);
+	    GlobalToLocal(&localMouse);
+	    if (PtInRect(localMouse, &(*SIOUXTextWindow->edit)->viewRect) && iBeamCursorH) {
+		SetCursor(*iBeamCursorH);
+	    }
+	    else {
+		SetCursor(&qd.arrow);
+	    }
+	    TEIdle(SIOUXTextWindow->edit);
+	    SetPort(savePort);
 	}
 	else {
-		SetCursor(&qd.arrow);
-		TEIdle(SIOUXTextWindow->edit);
+	    SetCursor(&qd.arrow);
+	    TEIdle(SIOUXTextWindow->edit);
 	}
 	return;
 }
@@ -412,25 +412,25 @@ int ps_kbhit(void) {
 	SIOUXUpdateScrollbar();
 	while (GetNextEvent(updateMask | osMask | mDownMask | mUpMask | activMask |
 		 highLevelEventMask | diskEvt, &event)) {
-		SIOUXHandleOneEvent(&event);
+	    SIOUXHandleOneEvent(&event);
 	}
 	if (SIOUXQuitting) {
-		exit(1);
+	    exit(1);
 	}
   if (EventAvail(keyDownMask,&event)) {
-		c = event.message&charCodeMask;
-		if ((event.modifiers & cmdKey) && (c > 0x20)) {
-			GetNextEvent(keyDownMask, &event);
-			SIOUXHandleOneEvent(&event);
-			if (SIOUXQuitting) {
-				exit(1);
-			}
-			return false;
+	    c = event.message&charCodeMask;
+	    if ((event.modifiers & cmdKey) && (c > 0x20)) {
+		GetNextEvent(keyDownMask, &event);
+		SIOUXHandleOneEvent(&event);
+		if (SIOUXQuitting) {
+			exit(1);
 		}
-		return true;
+		return false;
+	    }
+	    return true;
   }
   else {
-		return false;
+	    return false;
   }
 }
 
@@ -440,22 +440,22 @@ int ps_getch(void) {
   fflush(stdout);
 	updateCursor();
 	while(!GetNextEvent(keyDownMask,&event)) {
-		if (GetNextEvent(updateMask | osMask | mDownMask | mUpMask | activMask |
-			 highLevelEventMask | diskEvt, &event)) {
-			SIOUXUpdateScrollbar();
-			SIOUXHandleOneEvent(&event);
-		}
+	    if (GetNextEvent(updateMask | osMask | mDownMask | mUpMask | activMask |
+		 highLevelEventMask | diskEvt, &event)) {
+		SIOUXUpdateScrollbar();
+		SIOUXHandleOneEvent(&event);
+	    }
 	}
 	if (SIOUXQuitting) {
-		exit(1);
+	    exit(1);
 	}
 	c = event.message&charCodeMask;
 	if ((event.modifiers & cmdKey) && (c > 0x20)) {
-		SIOUXUpdateMenuItems();
-		SIOUXDoMenuChoice(MenuKey(c));
+	    SIOUXUpdateMenuItems();
+	    SIOUXDoMenuChoice(MenuKey(c));
 	}
 	if (SIOUXQuitting) {
-		exit(1);
+	    exit(1);
 	}
    return c;
 }
@@ -477,7 +477,7 @@ t_stat ttinit (void) {
 	strcat(title, " Simulator");
 	title[0] = strlen(title) - 1;			/* Pascal string done */
 	for (i = 0; i <= title[0]; i++) {		/* copy to unsigned char */
-		ptitle[i] = title[i];
+	    ptitle[i] = title[i];
 	}
 	SIOUXSetTitle(ptitle);
 	return SCPE_OK;

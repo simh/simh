@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Dec-02	RMS	Added BDR halt enable definition
    11-Nov-02	RMS	Added log bits for XQ
    10-Oct-02	RMS	Added DEQNA/DELQA, multiple RQ, autoconfigure support
    29-Sep-02	RMS	Revamped bus support macros
@@ -371,7 +372,7 @@ typedef struct pdp_dib DIB;
 #define LOG_CPU_I	0x0001				/* intexc */
 #define LOG_CPU_R	0x0002				/* REI */
 #define LOG_CPU_P	0x0004				/* context */
-#define LOG_CPU_A	0x0008
+#define LOG_CPU_H	0x0008				/* history */
 #define LOG_RP		0x0010
 #define LOG_TS		0x0020
 #define LOG_RQ		0x0040

@@ -25,6 +25,7 @@
 
    cpu		PDP-1 central processor
 
+   05-Dec-02	RMS	Added drum support
    06-Oct-02	RMS	Revised for V2.10
    20-Aug-02	RMS	Added DECtape support
    30-Dec-01	RMS	Added old PC queue
@@ -262,6 +263,7 @@ extern int32 tti (int32 inst, int32 dev, int32 IO);
 extern int32 tto (int32 inst, int32 dev, int32 IO);
 extern int32 lpt (int32 inst, int32 dev, int32 IO);
 extern int32 dt (int32 inst, int32 dev, int32 IO);
+extern int32 drm (int32 inst, int32 dev, int32 IO);
 
 int32 sc_map[512] = {
 	0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,	/* 00000xxxx */
@@ -413,14 +415,15 @@ op = ((IR >> 13) & 037);				/* get opcode */
 if ((op < 032) && (op != 007)) {			/* mem ref instr */
 	MA = (MA & EPCMASK) | (IR & DAMASK);		/* direct address */
 	if (IR & IA) {					/* indirect addr? */
-		if (extm) MA = M[MA] & AMASK;		/* if ext, one level */
-		else {	for (i = 0; i < ind_max; i++) {	/* count indirects */
-				t = M[MA];		/* get indirect word */
-				MA = (MA & EPCMASK) | (t & DAMASK);
-				if ((t & IA) == 0) break;  }
-			if (i >= ind_max) {		/* indirect loop? */
-				reason = STOP_IND;
-				break;  }  }  }  }
+	    if (extm) MA = M[MA] & AMASK;		/* if ext, one level */
+	    else {					/* multi-level */
+	    	for (i = 0; i < ind_max; i++) {		/* count indirects */
+		    t = M[MA];				/* get indirect word */
+		    MA = (MA & EPCMASK) | (t & DAMASK);
+		    if ((t & IA) == 0) break;  }
+		if (i >= ind_max) {			/* indirect loop? */
+		    reason = STOP_IND;
+		    break;  }  }  }  }
 
 switch (op) {						/* decode IR<0:4> */
 
@@ -437,8 +440,8 @@ case 003:						/* XOR */
 	break;
 case 004:						/* XCT */
 	if (xct_count >= xct_max) {			/* too many XCT's? */
-		reason = STOP_XCT;
-		break;  }
+	    reason = STOP_XCT;
+	    break;  }
 	xct_count = xct_count + 1;			/* count XCT's */
 	IR = M[MA];					/* get instruction */
 	goto xct_instr;					/* go execute */
@@ -540,50 +543,52 @@ case 034:						/* LAW */
 
 case 026:						/* MUL */
 	if (cpu_unit.flags & UNIT_MDV) {		/* hardware? */
-		sign = AC ^ M[MA];			/* result sign */
-		IO = ABS (AC);				/* IO = |AC| */
-		v = ABS (M[MA]);			/* v = |mpy| */
-		for (i = AC = 0; i < 17; i++) {
-			if (IO & 1) AC = AC + v;
-			IO = (IO >> 1) | ((AC & 1) << 17);
-			AC = AC >> 1;  }
-		if ((sign & 0400000) && (AC | IO)) {	/* negative, > 0? */
-			AC = AC ^ 0777777;
-			IO = IO ^ 0777777;  }  }
-	else {	if (IO & 1) AC = AC + M[MA];		/* multiply step */
-		if (AC > 0777777) AC = (AC + 1) & 0777777;
-		if (AC == 0777777) AC = 0;
+	    sign = AC ^ M[MA];				/* result sign */
+	    IO = ABS (AC);				/* IO = |AC| */
+	    v = ABS (M[MA]);				/* v = |mpy| */
+	    for (i = AC = 0; i < 17; i++) {
+		if (IO & 1) AC = AC + v;
 		IO = (IO >> 1) | ((AC & 1) << 17);
 		AC = AC >> 1;  }
+	    if ((sign & 0400000) && (AC | IO)) {	/* negative, > 0? */
+		AC = AC ^ 0777777;
+		IO = IO ^ 0777777;  }  }
+	else {						/* multiply step */
+	    if (IO & 1) AC = AC + M[MA];
+	    if (AC > 0777777) AC = (AC + 1) & 0777777;
+	    if (AC == 0777777) AC = 0;
+	    IO = (IO >> 1) | ((AC & 1) << 17);
+	    AC = AC >> 1;  }
 	break;
 
 case 027:						/* DIV */
 	if (cpu_unit.flags & UNIT_MDV) {		/* hardware */
-		sign = AC ^ M[MA];			/* result sign */
-		signd = AC;				/* remainder sign */
-		if (AC & 0400000) {
-			AC = AC ^ 0777777;		/* AC'IO = |AC'IO| */
-			IO = IO ^ 0777777;  }
-		v = ABS (M[MA]);			/* v = |divr| */
-		if (AC >= v) break;			/* overflow? */
-		for (i = t = 0; i < 18; i++) {
-			if (t) AC = (AC + v) & 0777777;
-			else AC = (AC - v) & 0777777;
-			t = AC >> 17;
-			if (i != 17) AC = ((AC << 1) | (IO >> 17)) & 0777777;
-			IO = ((IO << 1) | (t ^ 1)) & 0777777;  }
-		if (t) AC = (AC + v) & 0777777;		/* correct remainder */
-		t = ((signd & 0400000) && AC)? AC ^ 0777777: AC;
-		AC = ((sign & 0400000) && IO)? IO ^ 0777777: IO;
-		IO = t;
-		PC = INCR_ADDR (PC);  }			/* skip */
-	else {	t = AC >> 17;				/* divide step */
-		AC = ((AC << 1) | (IO >> 17)) & 0777777;
-		IO = ((IO << 1) | (t ^ 1)) & 0777777;
-		if (IO & 1) AC = AC + (M[MA] ^ 0777777);
-		else AC = AC + M[MA] + 1;
-		if (AC > 0777777) AC = (AC + 1) & 0777777;
-		if (AC == 0777777) AC = 0;  }
+	    sign = AC ^ M[MA];				/* result sign */
+	    signd = AC;					/* remainder sign */
+	    if (AC & 0400000) {
+		AC = AC ^ 0777777;			/* AC'IO = |AC'IO| */
+		IO = IO ^ 0777777;  }
+	    v = ABS (M[MA]);				/* v = |divr| */
+	    if (AC >= v) break;				/* overflow? */
+	    for (i = t = 0; i < 18; i++) {
+		if (t) AC = (AC + v) & 0777777;
+		else AC = (AC - v) & 0777777;
+		t = AC >> 17;
+		if (i != 17) AC = ((AC << 1) | (IO >> 17)) & 0777777;
+	    IO = ((IO << 1) | (t ^ 1)) & 0777777;  }
+	    if (t) AC = (AC + v) & 0777777;		/* correct remainder */
+	    t = ((signd & 0400000) && AC)? AC ^ 0777777: AC;
+	    AC = ((sign & 0400000) && IO)? IO ^ 0777777: IO;
+	    IO = t;
+	    PC = INCR_ADDR (PC);  }			/* skip */
+	else {						/* divide step */
+	    t = AC >> 17;
+	    AC = ((AC << 1) | (IO >> 17)) & 0777777;
+	    IO = ((IO << 1) | (t ^ 1)) & 0777777;
+	    if (IO & 1) AC = AC + (M[MA] ^ 0777777);
+	    else AC = AC + M[MA] + 1;
+	    if (AC > 0777777) AC = (AC + 1) & 0777777;
+	    if (AC == 0777777) AC = 0;  }
 	break;
 
 /* Skip and operate 
@@ -624,115 +629,120 @@ case 033:
 	sc = sc_map[IR & 0777];				/* map shift count */
 	switch ((IR >> 9) & 017) {			/* case on IR<5:8> */
 	case 001:					/* RAL */
-		AC = ((AC << sc) | (AC >> (18 - sc))) & 0777777;
-		break;
+	    AC = ((AC << sc) | (AC >> (18 - sc))) & 0777777;
+	    break;
 	case 002:					/* RIL */
-		IO = ((IO << sc) | (IO >> (18 - sc))) & 0777777;
-		break;
+	    IO = ((IO << sc) | (IO >> (18 - sc))) & 0777777;
+	    break;
 	case 003:					/* RCL */
-		t = AC;
-		AC = ((AC << sc) | (IO >> (18 - sc))) & 0777777;
-		IO = ((IO << sc) | (t >> (18 - sc))) & 0777777;
-		break;
+	    t = AC;
+	    AC = ((AC << sc) | (IO >> (18 - sc))) & 0777777;
+	    IO = ((IO << sc) | (t >> (18 - sc))) & 0777777;
+	    break;
 	case 005:					/* SAL */
-		t = (AC & 0400000)? 0777777: 0;
-		AC = (AC & 0400000) | ((AC << sc) & 0377777) |
-			(t >> (18 - sc));
-		break;
+	    t = (AC & 0400000)? 0777777: 0;
+	    AC = (AC & 0400000) | ((AC << sc) & 0377777) |
+		(t >> (18 - sc));
+	    break;
 	case 006:					/* SIL */
-		t = (IO & 0400000)? 0777777: 0;
-		IO = (IO & 0400000) | ((IO << sc) & 0377777) |
-			(t >> (18 - sc));
-		break;
+	    t = (IO & 0400000)? 0777777: 0;
+	    IO = (IO & 0400000) | ((IO << sc) & 0377777) |
+		(t >> (18 - sc));
+	    break;
 	case 007:					/* SCL */
-		t = (AC & 0400000)? 0777777: 0;
-		AC = (AC & 0400000) | ((AC << sc) & 0377777) | 
-			(IO >> (18 - sc));
-		IO = ((IO << sc) | (t >> (18 - sc))) & 0777777;
-		break;
+	    t = (AC & 0400000)? 0777777: 0;
+	    AC = (AC & 0400000) | ((AC << sc) & 0377777) | 
+		(IO >> (18 - sc));
+	    IO = ((IO << sc) | (t >> (18 - sc))) & 0777777;
+	    break;
 	case 011:					/* RAR */
-		AC = ((AC >> sc) | (AC << (18 - sc))) & 0777777;
-		break;
+	    AC = ((AC >> sc) | (AC << (18 - sc))) & 0777777;
+	    break;
 	case 012:					/* RIR */
-		IO = ((IO >> sc) | (IO << (18 - sc))) & 0777777;
-		break;
+	    IO = ((IO >> sc) | (IO << (18 - sc))) & 0777777;
+	    break;
 	case 013:					/* RCR */
-		t = IO;
-		IO = ((IO >> sc) | (AC << (18 - sc))) & 0777777;
-		AC = ((AC >> sc) | (t << (18 - sc))) & 0777777;
-		break;
+	    t = IO;
+	    IO = ((IO >> sc) | (AC << (18 - sc))) & 0777777;
+	    AC = ((AC >> sc) | (t << (18 - sc))) & 0777777;
+	    break;
 	case 015:					/* SAR */
-		t = (AC & 0400000)? 0777777: 0;
-		AC = ((AC >> sc) | (t << (18 - sc))) & 0777777;
-		break;
+	    t = (AC & 0400000)? 0777777: 0;
+	    AC = ((AC >> sc) | (t << (18 - sc))) & 0777777;
+	    break;
 	case 016:					/* SIR */
-		t = (IO & 0400000)? 0777777: 0;
-		IO = ((IO >> sc) | (t << (18 - sc))) & 0777777;
-		break;
+	    t = (IO & 0400000)? 0777777: 0;
+	    IO = ((IO >> sc) | (t << (18 - sc))) & 0777777;
+	    break;
 	case 017:					/* SCR */
-		t = (AC & 0400000)? 0777777: 0;
-		IO = ((IO >> sc) | (AC << (18 - sc))) & 0777777;
-		AC = ((AC >> sc) | (t << (18 - sc))) & 0777777;
-		break;
+	    t = (AC & 0400000)? 0777777: 0;
+	    IO = ((IO >> sc) | (AC << (18 - sc))) & 0777777;
+	    AC = ((AC >> sc) | (t << (18 - sc))) & 0777777;
+	    break;
 	default:					/* undefined */
-		reason = stop_inst;
-		break;  }				/* end switch shifts */
+	    reason = stop_inst;
+	    break;  }					/* end switch shifts */
 	break;
 
 /* IOT */
 
 case 035:
 	if (IR & IO_WAIT) {				/* wait? */
-		if (ioh) {				/* I/O halt? */
-			if (ioc) ioh = 0;		/* comp pulse? done */
-			else {	sim_interval = 0;	/* force event */
-				PC = DECR_ADDR (PC);  }	/* re-execute */
-			break;  }			/* skip iot */
-		ioh = 1;				/* turn on halt */
-		PC = DECR_ADDR (PC);  }			/* re-execute */
+	    if (ioh) {					/* I/O halt? */
+		if (ioc) ioh = 0;			/* comp pulse? done */
+		else {					/* wait more */
+		    sim_interval = 0;			/* force event */
+		    PC = DECR_ADDR (PC);  }		/* re-execute */
+		break;  }				/* skip iot */
+	    ioh = 1;					/* turn on halt */
+	    PC = DECR_ADDR (PC);  }			/* re-execute */
 	dev = IR & 077;					/* get dev addr */
 	io_data = IO;					/* default data */
 	switch (dev) {					/* case on dev */
 	case 000:					/* I/O wait */
-		break;
+	    break;
 	case 001:
-		if (IR & 003700) io_data = dt (IR, dev, IO);	/* DECtape */
-		else io_data = ptr (IR, dev, IO);	/* paper tape rdr */
-		break;
+	    if (IR & 003700) io_data = dt (IR, dev, IO);	/* DECtape */
+	    else io_data = ptr (IR, dev, IO);		/* paper tape rdr */
+	    break;
 	case 002: case 030:				/* paper tape rdr */
-		io_data = ptr (IR, dev, IO);
-		break;
+	    io_data = ptr (IR, dev, IO);
+	    break;
 	case 003:					/* typewriter */
-		io_data = tto (IR, dev, IO);
-		break;
+	    io_data = tto (IR, dev, IO);
+	    break;
 	case 004:					/* keyboard */
-		io_data = tti (IR, dev, IO);
-		break;
+	    io_data = tti (IR, dev, IO);
+	    break;
 	case 005: case 006:				/* paper tape punch */
-		io_data = ptp (IR, dev, IO);
-		break;
+	    io_data = ptp (IR, dev, IO);
+	    break;
 	case 033:					/* check status */
-		io_data = iosta | ((sbs & SB_ON)? IOS_SQB: 0);
-		break;
+	    io_data = iosta | ((sbs & SB_ON)? IOS_SQB: 0);
+	    break;
 	case 045:					/* line printer */
-		io_data = lpt (IR, dev, IO);
-		break;
+	    io_data = lpt (IR, dev, IO);
+	    break;
 	case 054:					/* seq brk off */
-		sbs = sbs & ~SB_ON;
-		break;
+	    sbs = sbs & ~SB_ON;
+	    break;
 	case 055:					/* seq brk on */
-		sbs = sbs | SB_ON;
-		break;
+	    sbs = sbs | SB_ON;
+	    break;
 	case 056:					/* clear seq brk */
-		sbs = sbs & ~SB_IP;
-		break;
+	    sbs = sbs & ~SB_IP;
+	    break;
+	case 061: case 062: case 063: case 064:		/* drum */
+	    io_data = drm (IR, dev, IO);
+	    break;
 	case 074:					/* extend mode */
-		extm = (IR >> 11) & 1;			/* set from IR<6> */
-		break;
+	    extm = (IR >> 11) & 1;			/* set from IR<6> */
+	    break;
 	default:					/* undefined */
-		reason = stop_inst;
-		break;  }				/* end switch dev */
+	    reason = stop_inst;
+	    break;  }					/* end switch dev */
 	IO = io_data & 0777777;
+	if (io_data & IOT_SKP) PC = INCR_ADDR (PC);	/* skip? */
 	if (io_data >= IOT_REASON) reason = io_data >> IOT_V_REASON;
 	break;
 default:						/* undefined */

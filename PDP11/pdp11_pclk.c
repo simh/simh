@@ -219,13 +219,13 @@ case 00:						/* CSR */
 	rv = CSR_GETRATE (pclk_csr);			/* new rate */
 	pclk_unit.wait = xtim[rv];			/* new delay */
 	if ((pclk_csr & CSR_GO) == 0) {			/* stopped? */
-		sim_cancel (&pclk_unit);		/* cancel */
-		if (data & CSR_FIX) pclk_tick ();  }	/* fix? tick */
+	    sim_cancel (&pclk_unit);			/* cancel */
+	    if (data & CSR_FIX) pclk_tick ();  }	/* fix? tick */
 	else if (((old_csr & CSR_GO) == 0) ||		/* run 0 -> 1? */
 		 (rv != CSR_GETRATE (old_csr))) {	/* rate change? */
-		sim_cancel (&pclk_unit);		/* cancel */
-		sim_activate (&pclk_unit,		/* start clock */
-			sim_rtcn_init (pclk_unit.wait, TMR_PCLK));
+	    sim_cancel (&pclk_unit);			/* cancel */
+	    sim_activate (&pclk_unit,			/* start clock */
+		sim_rtcn_init (pclk_unit.wait, TMR_PCLK));
 		}
 	break;
 case 01:						/* buffer */
@@ -247,12 +247,13 @@ if (pclk_csr & CSR_UPDN)				/* up or down? */
 else pclk_ctr = (pclk_ctr - 1) & DMASK;			/* 0 = down */
 if (pclk_ctr == 0) {					/* reached zero? */
 	if (pclk_csr & CSR_DONE)			/* done already set? */
-		pclk_csr = pclk_csr | CSR_ERR;		/* set error */
+	    pclk_csr = pclk_csr | CSR_ERR;		/* set error */
 	else pclk_csr = pclk_csr | CSR_DONE;		/* else set done */
 	if (pclk_csr & CSR_IE) SET_INT (PCLK);		/* if IE, set int */
 	if (pclk_csr & CSR_MODE) pclk_ctr = pclk_csb;	/* if rpt, reload */
-	else {	pclk_csb = 0;				/* else clr ctr */
-		pclk_csr = pclk_csr & ~CSR_GO;  }  }	/* and clr go */
+	else {
+	    pclk_csb = 0;				/* else clr ctr */
+	    pclk_csr = pclk_csr & ~CSR_GO;  }  }	/* and clr go */
 return;
 }
 

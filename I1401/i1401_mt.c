@@ -147,16 +147,15 @@ switch (mod) {						/* case on modifier */
 case BCD_B:						/* backspace */
 	ind[IN_END] = 0;				/* clear end of reel */
 	if (pnu || (uptr->pos < sizeof (t_mtrlnt)))	/* bot or pnu? */
-		return SCPE_OK;
-	fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt),
-		SEEK_SET);
+	    return SCPE_OK;
+	fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET);
 	fxread (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
 	if ((err = ferror (uptr->fileref)) ||		/* err or eof? */
 	    feof (uptr->fileref)) break;
 	if ((tbc == MTR_TMK) || (tbc == MTR_EOM))	/* tmk or eom? */
-		uptr->pos = uptr->pos - sizeof (t_mtrlnt);
+	    uptr->pos = uptr->pos - sizeof (t_mtrlnt);
 	else uptr->pos = uptr->pos - ((MTRL (tbc) + 1) & ~1) -
-		(2 * sizeof (t_mtrlnt));
+	    (2 * sizeof (t_mtrlnt));
 	break;  					/* end case */
 
 case BCD_E:						/* erase = nop */
@@ -218,13 +217,13 @@ case BCD_R:						/* read */
 	fxread (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
 	if (err = ferror (uptr->fileref)) break;	/* error? */
 	if (feof (uptr->fileref) || (tbc == MTR_EOM)) {	/* eom or eof? */
-		ind[IN_TAP] = 1;			/* pretend error */
-		MT_SET_PNU (uptr);			/* pos not upd */
-		break;  }
+	    ind[IN_TAP] = 1;				/* pretend error */
+	    MT_SET_PNU (uptr);				/* pos not upd */
+	    break;  }
 	if (tbc == MTR_TMK) {				/* tape mark? */
-		ind[IN_END] = 1;			/* set end mark */
-		uptr->pos = uptr->pos + sizeof (t_mtrlnt);
-		break;  }
+	    ind[IN_END] = 1;				/* set end mark */
+	    uptr->pos = uptr->pos + sizeof (t_mtrlnt);
+	    break;  }
 	if (MTRF (tbc)) ind[IN_TAP] = 1;		/* error? set flag */
 	tbc = MTRL (tbc);				/* clear error flag */
 	if (tbc > MT_MAXFR) return SCPE_MTRLNT;		/* record too long? */	
@@ -232,31 +231,32 @@ case BCD_R:						/* read */
 	if (err = ferror (uptr->fileref)) break;	/* I/O error? */
 	for ( ; i < tbc; i++) dbuf[i] = 0;		/* fill with 0's */
 	uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
-		(2 * sizeof (t_mtrlnt));
+	    (2 * sizeof (t_mtrlnt));
 	for (i = 0; i < tbc; i++) {			/* loop thru buf */
-		if (M[BS] == (BCD_GRPMRK + WM)) {	/* GWM in memory? */
-			BS++;				/* incr BS */
-			if (ADDR_ERR (BS)) {		/* test for wrap */
-				BS = BA | (BS % MAXMEMSIZE);
-				return STOP_WRAP;  }
-			return SCPE_OK;  }		/* done */
-		t = dbuf[i];				/* get char */
-		if ((flag != MD_BIN) && (t == BCD_ALT)) t = BCD_BLANK;
-		if (flag == MD_WM) {			/* word mk mode? */
-			if ((t == BCD_WM) && (wm_seen == 0)) wm_seen = WM;
-			else {	M[BS] = wm_seen | (t & CHAR);
-				wm_seen = 0;  }  }
-		else M[BS] = (M[BS] & WM) | (t & CHAR);
-		if (!wm_seen) BS++;
-		if (ADDR_ERR (BS)) {			/* check next BS */
-			BS = BA | (BS % MAXMEMSIZE);
-			return STOP_WRAP;  }  }
+	    if (M[BS] == (BCD_GRPMRK + WM)) {		/* GWM in memory? */
+		BS++;					/* incr BS */
+		if (ADDR_ERR (BS)) {			/* test for wrap */
+		    BS = BA | (BS % MAXMEMSIZE);
+		    return STOP_WRAP;  }
+		return SCPE_OK;  }			/* done */
+	    t = dbuf[i];				/* get char */
+	    if ((flag != MD_BIN) && (t == BCD_ALT)) t = BCD_BLANK;
+	    if (flag == MD_WM) {			/* word mk mode? */
+		if ((t == BCD_WM) && (wm_seen == 0)) wm_seen = WM;
+		else {
+		    M[BS] = wm_seen | (t & CHAR);
+		    wm_seen = 0;  }  }
+	    else M[BS] = (M[BS] & WM) | (t & CHAR);
+	    if (!wm_seen) BS++;
+	    if (ADDR_ERR (BS)) {			/* check next BS */
+		BS = BA | (BS % MAXMEMSIZE);
+		return STOP_WRAP;  }  }
 	if (flag == MD_WM) M[BS] = WM | BCD_GRPMRK;	/* load? set WM */
 	else M[BS] = (M[BS] & WM) | BCD_GRPMRK;		/* move? save WM */
 	BS++;						/* adv BS */
 	if (ADDR_ERR (BS)) {				/* check final BS */
-		BS = BA | (BS % MAXMEMSIZE);
-		return STOP_WRAP;  }
+	    BS = BA | (BS % MAXMEMSIZE);
+	    return STOP_WRAP;  }
 	break;
 
 case BCD_W:
@@ -264,13 +264,13 @@ case BCD_W:
 	if (M[BS] == (BCD_GRPMRK + WM)) return STOP_MTZ;	/* eor? */
 	ind[IN_TAP] = ind[IN_END] = 0;			/* clear error */
 	for (tbc = 0; (t = M[BS++]) != (BCD_GRPMRK + WM); ) {
-		if ((t & WM) && (flag == MD_WM)) dbuf[tbc++] = BCD_WM;
-		if (((t & CHAR) == BCD_BLANK) && (flag != MD_BIN))
-			dbuf[tbc++] = BCD_ALT;
-		else dbuf[tbc++] = t & CHAR;
-		if (ADDR_ERR (BS)) {			/* check next BS */
-			BS = BA | (BS % MAXMEMSIZE);
-			return STOP_WRAP;  }  }
+	    if ((t & WM) && (flag == MD_WM)) dbuf[tbc++] = BCD_WM;
+	    if (((t & CHAR) == BCD_BLANK) && (flag != MD_BIN))
+		dbuf[tbc++] = BCD_ALT;
+	    else dbuf[tbc++] = t & CHAR;
+	    if (ADDR_ERR (BS)) {			/* check next BS */
+		BS = BA | (BS % MAXMEMSIZE);
+		return STOP_WRAP;  }  }
 	ebc = (tbc + 1) & ~1;				/* force even */
 	fseek (uptr->fileref, uptr->pos, SEEK_SET);
 	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
@@ -279,8 +279,8 @@ case BCD_W:
 	if (err = ferror (uptr->fileref)) break;	/* I/O error? */
 	uptr->pos = uptr->pos + ebc + (2 * sizeof (t_mtrlnt));
 	if (ADDR_ERR (BS)) {				/* check final BS */
-		BS = BA | (BS % MAXMEMSIZE);
-		return STOP_WRAP;  }
+	    BS = BA | (BS % MAXMEMSIZE);
+	    return STOP_WRAP;  }
 	break;
 default:
 	return STOP_INVM;  }

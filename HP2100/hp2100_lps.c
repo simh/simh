@@ -42,8 +42,8 @@
 #define UNIT_V_DIAG	(UNIT_V_UF + 0)			/* diagnostic mode */
 #define UNIT_DIAG	(1 << UNIT_V_DIAG)
 
-extern int32 PC;
-extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 PC;
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 int32 lps_ctime = 1000;					/* char time */
 int32 lps_stopioe = 0;					/* stop on error */
 int32 lps_sta = 0;
@@ -80,8 +80,8 @@ REG lps_reg[] = {
 	{ NULL }  };
 
 MTAB lps_mod[] = {
-	{ UNIT_DIAG, UNIT_DIAG, "DIAG", "DIAG", NULL },
-	{ UNIT_DIAG, 0, "PRINTER", "PRINTER", NULL },
+	{ UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", NULL },
+	{ UNIT_DIAG, 0, "printer mode", "PRINTER", NULL },
 	{ MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&hp_setdev, &hp_showdev, &lps_dev },
 	{ 0 }  };
@@ -117,23 +117,24 @@ case ioLIX:						/* load */
 	dat = 0;					/* default sta = 0 */
 case ioMIX:						/* merge */
 	if ((lps_unit.flags & UNIT_DIAG) == 0) {	/* real lpt? */
-		lps_sta = 0;				/* create status */
-		if ((lps_unit.flags & UNIT_ATT) == 0)
-		    lps_sta = lps_sta | LPS_BUSY | LPS_NRDY;
-		else if (sim_is_active (&lps_unit))
-		    lps_sta = lps_sta | LPS_BUSY;  }
+	    lps_sta = 0;				/* create status */
+	    if ((lps_unit.flags & UNIT_ATT) == 0)
+		lps_sta = lps_sta | LPS_BUSY | LPS_NRDY;
+	    else if (sim_is_active (&lps_unit))
+		lps_sta = lps_sta | LPS_BUSY;  }
 	dat = dat | lps_sta;				/* diag, rtn status */
 	break;
 case ioCTL:						/* control clear/set */
 	if (IR & I_CTL) {				/* CLC */
-		clrCMD (dev);				/* clear ctl, cmd */
-		clrCTL (dev);  }
-	else {	setCMD (dev);				/* STC */
-		setCTL (dev);				/* set ctl, cmd */
-		if (lps_unit.flags & UNIT_DIAG)		/* diagnostic? */
-		    sim_activate (&lps_unit, 1);	/* loop back */
-		else sim_activate (&lps_unit,		/* real lpt, sched */
-		    (lps_unit.buf < 040)? lps_unit.wait: lps_ctime);  }
+	    clrCMD (dev);				/* clear ctl, cmd */
+	    clrCTL (dev);  }
+	else {						/* STC */
+	    setCMD (dev);				/* set ctl, cmd */
+	    setCTL (dev);
+	    if (lps_unit.flags & UNIT_DIAG)		/* diagnostic? */
+		sim_activate (&lps_unit, 1);		/* loop back */
+	    else sim_activate (&lps_unit,		/* real lpt, sched */
+		(lps_unit.buf < 040)? lps_unit.wait: lps_ctime);  }
 	break;
 default:
 	break;  }

@@ -93,10 +93,10 @@ int32 sio0s		(int32 port, int32 io, int32 data);
 int32 sio1d		(int32 port, int32 io, int32 data);
 int32 sio1s		(int32 port, int32 io, int32 data);
 void reset_sio_terminals(int32 useDefault);
-t_stat simh_dev_reset(void);
+t_stat simh_dev_reset(DEVICE *dptr);
 t_stat simh_svc(UNIT *uptr);
-t_stat simh_dev_set_timeron(void);
-t_stat simh_dev_set_timeroff(void);
+t_stat simh_dev_set_timeron(UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat simh_dev_set_timeroff(UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 simh_in(void);
 int32 simh_out(int32 data);
 void attachCPM(UNIT *uptr);
@@ -641,7 +641,7 @@ struct tm *currentTime = NULL;
 uint32 markTime[splimit];
 char version[] = "SIMH002";
 
-t_stat simh_dev_reset(void) {
+t_stat simh_dev_reset(DEVICE *dptr) {
 	currentTime							= NULL;
 	ClockZSDOSDelta					= 0;
 	setClockZSDOSPos				= 0;
@@ -658,12 +658,12 @@ t_stat simh_dev_reset(void) {
 	lastCPMStatus						= SCPE_OK;
 	timerInterrupt					= FALSE;
 	if (simh_unit.flags & UNIT_SIMH_TIMERON) {
-		simh_dev_set_timeron();
+		simh_dev_set_timeron(NULL, 0, NULL, NULL);
 	}
 	return SCPE_OK;
 }
 
-t_stat simh_dev_set_timeron(void) {
+t_stat simh_dev_set_timeron(UNIT *uptr, int32 val, char *cptr, void *desc) {
 	if (rtc_avail) {
 		timeOfNextInterrupt = sim_os_msec() + timerDelta;
 		return sim_activate(&simh_unit, simh_unit.wait);	/* activate unit */
@@ -674,7 +674,7 @@ t_stat simh_dev_set_timeron(void) {
 	}
 }
 
-t_stat simh_dev_set_timeroff(void) {
+t_stat simh_dev_set_timeroff(UNIT *uptr, int32 val, char *cptr, void *desc) {
 	timerInterrupt = FALSE;
 	sim_cancel(&simh_unit);
 	return SCPE_OK;
@@ -997,14 +997,14 @@ int32 simh_out(int32 data) {
 					cpu_unit.flags &= ~UNIT_CHIP;
 					break;
 				case startTimerInterruptsCmd:
-					if (simh_dev_set_timeron() == SCPE_OK) {
+					if (simh_dev_set_timeron(NULL, 0, NULL, NULL) == SCPE_OK) {
 						timerInterrupt = FALSE;
 						simh_unit.flags |= UNIT_SIMH_TIMERON;
 					}
 					break;
 				case stopTimerInterruptsCmd:
 					simh_unit.flags &= ~UNIT_SIMH_TIMERON;
-					simh_dev_set_timeroff();
+					simh_dev_set_timeroff(NULL, 0, NULL, NULL);
 					break;
 				case setTimerDeltaCmd:
 					setTimerDeltaPos = 0;

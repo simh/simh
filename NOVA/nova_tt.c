@@ -1,6 +1,6 @@
 /* nova_tt.c: NOVA console terminal simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti		terminal input
    tto		terminal output
 
+   05-Jan-02	RMS	Fixed calling sequence for setmod
    03-Oct-02	RMS	Added DIBs
    30-May-02	RMS	Widened POS to 32b
    30-Nov-01	RMS	Added extended SET/SHOW support
@@ -46,7 +47,7 @@ t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
-t_stat ttx_setmod (UNIT *uptr, int32 val, char *cptr);
+t_stat ttx_setmod (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* TTI data structures
 
@@ -210,7 +211,7 @@ sim_cancel (&tto_unit);					/* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat ttx_setmod (UNIT *uptr, int32 val, char *cptr)
+t_stat ttx_setmod (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 tti_unit.flags = (tti_unit.flags & ~UNIT_DASHER) | val;
 tto_unit.flags = (tto_unit.flags & ~UNIT_DASHER) | val;

@@ -332,53 +332,54 @@ case 0:							/* RLCS */
 	else rlcs = rlcs | RLCS_DRDY;			/* see if ready */
 
 	if (access == WRITEB) data = (PA & 1)?
-		(rlcs & 0377) | (data << 8): (rlcs & ~0377) | data;
+	    (rlcs & 0377) | (data << 8): (rlcs & ~0377) | data;
 	rlcs = (rlcs & ~RLCS_RW) | (data & RLCS_RW);
 	rlbae = (rlbae & ~RLCS_M_MEX) | ((rlcs >> RLCS_V_MEX) & RLCS_M_MEX);
 	if (data & CSR_DONE) {				/* ready set? */
-		if ((data & CSR_IE) == 0) CLR_INT (RL);
-		else if ((rlcs & (CSR_DONE + CSR_IE)) == CSR_DONE)
-			SET_INT (RL);	
-		return SCPE_OK;  }
+	    if ((data & CSR_IE) == 0) CLR_INT (RL);
+	    else if ((rlcs & (CSR_DONE + CSR_IE)) == CSR_DONE)
+		SET_INT (RL);	
+	    return SCPE_OK;  }
 
 	CLR_INT (RL);					/* clear interrupt */
 	rlcs = rlcs & ~RLCS_ALLERR;			/* clear errors */
 	switch (GET_FUNC (rlcs)) {			/* case on RLCS<3:1> */
 	case RLCS_NOP:					/* nop */
-		rl_set_done (0);
-		break;
+	    rl_set_done (0);
+	    break;
 	case RLCS_SEEK:					/* seek */
-		curr = GET_CYL (uptr->TRK);		/* current cylinder */
-		offs = GET_CYL (rlda);			/* offset */
-		if (rlda & RLDA_SK_DIR) {		/* in or out? */
-			newc = curr + offs;		/* out */
-			maxc = (uptr->flags & UNIT_RL02)?
-				RL_NUMCY * 2: RL_NUMCY;
-			if (newc >= maxc) newc = maxc - 1;  }
-		else {	newc = curr - offs;		/* in */
-			if (newc < 0) newc = 0;  }
-		uptr->TRK = (newc << RLDA_V_CYL) |	/* put on track */
-			((rlda & RLDA_SK_HD)? RLDA_HD1: RLDA_HD0);
-		sim_activate (uptr, rl_swait * abs (newc - curr));
-		break;
+	    curr = GET_CYL (uptr->TRK);			/* current cylinder */
+	    offs = GET_CYL (rlda);			/* offset */
+	    if (rlda & RLDA_SK_DIR) {			/* in or out? */
+		newc = curr + offs;			/* out */
+		maxc = (uptr->flags & UNIT_RL02)?
+		    RL_NUMCY * 2: RL_NUMCY;
+		if (newc >= maxc) newc = maxc - 1;  }
+	    else {
+	    	newc = curr - offs;			/* in */
+		if (newc < 0) newc = 0;  }
+	    uptr->TRK = (newc << RLDA_V_CYL) |		/* put on track */
+		((rlda & RLDA_SK_HD)? RLDA_HD1: RLDA_HD0);
+	    sim_activate (uptr, rl_swait * abs (newc - curr));
+	    break;
 	default:					/* data transfer */
-		sim_activate (uptr, rl_swait);		/* activate unit */
-		break;  }				/* end switch func */
+	    sim_activate (uptr, rl_swait);		/* activate unit */
+	    break;  }					/* end switch func */
 	break;						/* end case RLCS */
 
 case 1:							/* RLBA */
 	if (access == WRITEB) data = (PA & 1)?
-		(rlba & 0377) | (data << 8): (rlba & ~0377) | data;
+	    (rlba & 0377) | (data << 8): (rlba & ~0377) | data;
 	rlba = data & RLBA_IMP;
 	break;
 case 2:							/* RLDA */
 	if (access == WRITEB) data = (PA & 1)?
-		(rlda & 0377) | (data << 8): (rlda & ~0377) | data;
+	    (rlda & 0377) | (data << 8): (rlda & ~0377) | data;
 	rlda = data;
 	break;
 case 3:							/* RLMP */
 	if (access == WRITEB) data = (PA & 1)?
-		(rlmp & 0377) | (data << 8): (rlmp & ~0377) | data;
+	    (rlmp & 0377) | (data << 8): (rlmp & ~0377) | data;
 	rlmp = rlmp1 = rlmp2 = data;
 	break;
 case 4:							/* RLBAE */
@@ -410,7 +411,7 @@ func = GET_FUNC (rlcs);					/* get function */
 if (func == RLCS_GSTA) {				/* get status */
 	if (rlda & RLDA_GS_CLR) uptr->STAT = uptr->STAT & ~RLDS_ERR;
 	rlmp = uptr->STAT | (uptr->TRK & RLDS_HD) |
-		((uptr->flags & UNIT_ATT)? RLDS_ATT: RLDS_UNATT);
+	    ((uptr->flags & UNIT_ATT)? RLDS_ATT: RLDS_UNATT);
 	if (uptr->flags & UNIT_RL02) rlmp = rlmp | RLDS_RL02;
 	if (uptr->flags & UNIT_WPRT) rlmp = rlmp | RLDS_WLK;
 	rlmp2 = rlmp1 = rlmp;
@@ -456,19 +457,19 @@ if ((func >= RLCS_READ) && (err == 0)) {		/* read (no hdr)? */
 	err = ferror (uptr->fileref);
 	for ( ; i < wc; i++) rlxb[i] = 0;		/* fill buffer */
 	if (t = Map_WriteW (ma, wc << 1, rlxb, MAP)) {	/* store buffer */
-		rlcs = rlcs | RLCS_ERR | RLCS_NXM;	/* nxm */
-		wc = wc - t;  }				/* adjust wc */
+	    rlcs = rlcs | RLCS_ERR | RLCS_NXM;		/* nxm */
+	    wc = wc - t;  }				/* adjust wc */
 	}						/* end read */
 
 if ((func == RLCS_WRITE) && (err == 0)) {		/* write? */
 	if (t = Map_ReadW (ma, wc << 1, rlxb, MAP)) {	/* fetch buffer */
-		rlcs = rlcs | RLCS_ERR | RLCS_NXM;	/* nxm */
-		wc = wc - t;  }				/* adj xfer lnt */
+	    rlcs = rlcs | RLCS_ERR | RLCS_NXM;		/* nxm */
+	    wc = wc - t;  }				/* adj xfer lnt */
 	if (wc) {					/* any xfer? */
-		awc = (wc + (RL_NUMWD - 1)) & ~(RL_NUMWD - 1);	/* clr to */
-		for (i = wc; i < awc; i++) rlxb[i] = 0;	/* end of blk */
-		fxwrite (rlxb, sizeof (int16), awc, uptr->fileref);
-		err = ferror (uptr->fileref);  }
+	    awc = (wc + (RL_NUMWD - 1)) & ~(RL_NUMWD - 1);	/* clr to */
+	    for (i = wc; i < awc; i++) rlxb[i] = 0;	/* end of blk */
+	    fxwrite (rlxb, sizeof (int16), awc, uptr->fileref);
+	    err = ferror (uptr->fileref);  }
 	}						/* end write */
 
 if ((func == RLCS_WCHK) && (err == 0)) {		/* write check? */
@@ -477,12 +478,12 @@ if ((func == RLCS_WCHK) && (err == 0)) {		/* write check? */
 	for ( ; i < wc; i++) rlxb[i] = 0;		/* fill buffer */
 	awc = wc;					/* save wc */
 	for (wc = 0; (err == 0) && (wc < awc); wc++)  {	/* loop thru buf */
-		if (Map_ReadW (ma + (wc << 1), 2, &comp, MAP)) { /* mem wd */
-		    rlcs = rlcs | RLCS_ERR | RLCS_NXM;	/* nxm */
-		    break;  }
-		if (comp != rlxb[wc])			/* check to buf */
-		    rlcs = rlcs | RLCS_ERR | RLCS_CRC;
-		}					/* end for */
+	    if (Map_ReadW (ma + (wc << 1), 2, &comp, MAP)) { /* mem wd */
+		rlcs = rlcs | RLCS_ERR | RLCS_NXM;	/* nxm */
+		break;  }
+	    if (comp != rlxb[wc])			/* check to buf */
+		rlcs = rlcs | RLCS_ERR | RLCS_CRC;
+	    }						/* end for */
 	}						/* end wcheck */
 
 rlmp = (rlmp + wc) & 0177777;				/* final word count */

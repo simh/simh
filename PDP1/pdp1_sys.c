@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Dec-02	RMS	Added drum support
    21-Nov-02	RMS	Changed typewriter to half duplex
    20-Aug-02	RMS	Added DECtape support
    17-Sep-01	RMS	Removed multiconsole support
@@ -32,16 +33,19 @@
    30-Oct-00	RMS	Added support for examine to file
    27-Oct-98	RMS	V2.4 load interface
    20-Oct-97	RMS	Fixed endian-dependence in RIM loader
-				(found by Michael Somos)
+			(found by Michael Somos)
 */
 
 #include "pdp1_defs.h"
 #include <ctype.h>
 
 extern DEVICE cpu_dev;
-extern DEVICE ptr_dev, ptp_dev;
+extern DEVICE ptr_dev;
+extern DEVICE ptp_dev;
 extern DEVICE tty_dev;
-extern DEVICE lpt_dev, dt_dev;
+extern DEVICE lpt_dev;
+extern DEVICE dt_dev;
+extern DEVICE drm_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern int32 M[];
@@ -72,6 +76,7 @@ DEVICE *sim_devices[] = {
 	&tty_dev,
 	&lpt_dev,
 	&dt_dev,
+	&drm_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -110,12 +115,12 @@ for (;;) {
 	if ((val = getword (fileref)) < 0) return SCPE_FMT;
 	if (((val & 0770000) == 0320000) ||		/* DIO? */
 	    ((val & 0770000) == 0240000)) {		/* DAC? - incorrect */
-		origin = val & 07777;
-		if ((val = getword (fileref)) < 0) return SCPE_FMT;
-		if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
+	    origin = val & 07777;
+	    if ((val = getword (fileref)) < 0) return SCPE_FMT;
+	    if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
 	else if ((val & 0770000) == 0600000) {		/* JMP? */
-		PC = val & 007777;
-		break;  }
+	    PC = val & 007777;
+	    break;  }
 	}
 return SCPE_OK;						/* done */
 }
@@ -268,9 +273,9 @@ int32 i, j;
 for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
 	if ((j == class) && (opc_val[i] & inst)) {	/* same class? */
-		inst = inst & ~opc_val[i];		/* mask bit set? */
-		fprintf (of, (sp? " %s": "%s"), opcode[i]);
-		sp = 1;  }  }
+	    inst = inst & ~opc_val[i];			/* mask bit set? */
+	    fprintf (of, (sp? " %s": "%s"), opcode[i]);
+	    sp = 1;  }  }
 return sp;
 }
 
@@ -318,35 +323,35 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 
 	switch (j) {					/* case on class */
 	case I_V_NPN:					/* no operands */
-		fprintf (of, "%s", opcode[i]);		/* opcode */
-		break;
+	    fprintf (of, "%s", opcode[i]);		/* opcode */
+	    break;
 	case I_V_IOT:					/* IOT */
-		disp = (inst - opc_val[i]) & 017777;
-		if (disp == IA) fprintf (of, "%s I", opcode[i]);
-		else if (disp) fprintf (of, "%s %-o", opcode[i], disp);
-		else fprintf (of, "%s", opcode[i]);
-		break;
+	    disp = (inst - opc_val[i]) & 017777;
+	    if (disp == IA) fprintf (of, "%s I", opcode[i]);
+	    else if (disp) fprintf (of, "%s %-o", opcode[i], disp);
+	    else fprintf (of, "%s", opcode[i]);
+	    break;
 	case I_V_LAW:					/* LAW */
-		cflag = 0;				/* fall thru to MRF */
+	    cflag = 0;					/* fall thru to MRF */
 	case I_V_MRF:					/* mem ref */
-		fprintf (of, "%s%s%-o", opcode[i],
-			((inst & IA)? " I ": " "), (cflag? ma: disp));
-		break;
+	    fprintf (of, "%s%s%-o", opcode[i],
+		((inst & IA)? " I ": " "), (cflag? ma: disp));
+	    break;
 	case I_V_MRI:					/* mem ref no ind */
-		fprintf (of, "%s %-o", opcode[i], (cflag? ma: disp));
-		break;
+	    fprintf (of, "%s %-o", opcode[i], (cflag? ma: disp));
+	    break;
 	case I_V_OPR:					/* operates */
-		sp = fprint_opr (of, inst & 007700, j, 0);
-		if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
-		break;
+	    sp = fprint_opr (of, inst & 007700, j, 0);
+	    if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
+	    break;
 	case I_V_SKP:					/* skips */
-		sp = fprint_opr (of, inst & 007700, j, 0);
-		if (opcode[i]) sp = fprintf (of, (sp? " %s": "%s"), opcode[i]);
-		if (inst & IA) fprintf (of, sp? " I": "I");
-		break;
+	    sp = fprint_opr (of, inst & 007700, j, 0);
+	    if (opcode[i]) sp = fprintf (of, (sp? " %s": "%s"), opcode[i]);
+	    if (inst & IA) fprintf (of, sp? " I": "I");
+	    break;
 	case I_V_SHF:					/* shifts */
-		fprintf (of, "%s %-d", opcode[i], sc_map[inst & 0777]);
-		break;  }				/* end case */
+	    fprintf (of, "%s %-d", opcode[i], sc_map[inst & 0777]);
+	    break;  }					/* end case */
 	return SCPE_OK;  }				/* end if */
 	}						/* end for */
 return SCPE_ARG;
@@ -422,8 +427,8 @@ case I_V_LAW:						/* LAW */
 case I_V_MRF: case I_V_MRI:				/* mem ref */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get next field */
 	if ((j != I_V_MRI) && strcmp (gbuf, "I") == 0) {	/* indirect? */
-		val[0] = val[0] | IA;
-		cptr = get_glyph (cptr, gbuf, 0);  }
+	    val[0] = val[0] | IA;
+	    cptr = get_glyph (cptr, gbuf, 0);  }
 	d = get_uint (gbuf, 8, AMASK, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	if (d <= DAMASK) val[0] = val[0] | d;
@@ -439,19 +444,20 @@ case I_V_SHF:						/* shift */
 	break;
 case I_V_NPN: case I_V_IOT: case I_V_OPR: case I_V_SKP:
 	for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
-		cptr = get_glyph (cptr, gbuf, 0)) {
-		for (i = 0; (opcode[i] != NULL) &&
-			(strcmp (opcode[i], gbuf) != 0) ; i++) ;
-		if (opcode[i] != NULL) {
-			k = opc_val[i] & 0777777;
-			if ((k != IA) && (((k ^ val[0]) & 0760000) != 0))
-				return SCPE_ARG;
-			val[0] = val[0] | k;  }
-		else {	d = get_sint (gbuf, &sign, &r);
-			if (r != SCPE_OK) return SCPE_ARG;
-			if (sign == 0) val[0] = val[0] + d;  
-			else if (sign < 0) val[0] = val[0] - d;
-			else val[0] = val[0] | d;  }  }
+	    cptr = get_glyph (cptr, gbuf, 0)) {
+	    for (i = 0; (opcode[i] != NULL) &&
+			(strcmp (opcode[i], gbuf) != 0); i++) ;
+	    if (opcode[i] != NULL) {
+		k = opc_val[i] & 0777777;
+		if ((k != IA) && (((k ^ val[0]) & 0760000) != 0))
+		    return SCPE_ARG;
+		val[0] = val[0] | k;  }
+	    else {
+	    	d = get_sint (gbuf, &sign, &r);
+		if (r != SCPE_OK) return SCPE_ARG;
+		if (sign == 0) val[0] = val[0] + d;  
+		else if (sign < 0) val[0] = val[0] - d;
+		else val[0] = val[0] | d;  }  }
 	break;  }					/* end case */
 if (*cptr != 0) return SCPE_ARG;			/* junk at end? */
 return SCPE_OK;

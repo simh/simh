@@ -272,17 +272,17 @@ update_lpcs (0);					/* update csr's */
 switch ((pa >> 1) & 07) {				/* case on PA<3:1> */
 case 00:						/* LPCSA */
 	if (access == WRITEB) data = (pa & 1)?
-		(lpcsa & 0377) | (data << 8): (lpcsa & ~0377) | data;
+	    (lpcsa & 0377) | (data << 8): (lpcsa & ~0377) | data;
 	if (data & CSA_ECLR) {				/* error clear? */
-		lpcsa = (lpcsa | CSA_DONE) & ~CSA_GO;	/* set done, clr go */
-		lpcsb = lpcsb & ~CSB_ECLR;		/* clear err */
-		sim_cancel (&lp20_unit);  }		/* cancel I/O */
+	    lpcsa = (lpcsa | CSA_DONE) & ~CSA_GO;	/* set done, clr go */
+	    lpcsb = lpcsb & ~CSB_ECLR;			/* clear err */
+	    sim_cancel (&lp20_unit);  }			/* cancel I/O */
 	if (data & CSA_INIT) lp20_reset (&lp20_dev);	/* init? */
 	if (data & CSA_GO) {				/* go set? */
-		if ((lpcsa & CSA_GO) == 0) {		/* not set before? */
-			if (lpcsb & CSB_ERR) lpcsb = lpcsb | CSB_GOE;
-			lpcsum = 0;			/* clear checksum */
-			sim_activate (&lp20_unit, lp20_unit.time);  }  }
+	    if ((lpcsa & CSA_GO) == 0) {		/* not set before? */
+		if (lpcsb & CSB_ERR) lpcsb = lpcsb | CSB_GOE;
+		lpcsum = 0;				/* clear checksum */
+		sim_activate (&lp20_unit, lp20_unit.time);  }  }
 	else sim_cancel (&lp20_unit);			/* go clr, stop DMA */
 	lpcsa = (lpcsa & ~CSA_RW) | (data & CSA_RW);
 	break;
@@ -290,31 +290,32 @@ case 01:						/* LPCSB */
 	break;						/* ignore writes to TEST */
 case 02:						/* LPBA */
 	if (access == WRITEB) data = (pa & 1)?
-		(lpba & 0377) | (data << 8): (lpba & ~0377) | data;
+	    (lpba & 0377) | (data << 8): (lpba & ~0377) | data;
 	lpba = data;
 	break;
 case 03:						/* LPBC */
 	if (access == WRITEB) data = (pa & 1)?
-		(lpbc & 0377) | (data << 8): (lpbc & ~0377) | data;
+	    (lpbc & 0377) | (data << 8): (lpbc & ~0377) | data;
 	lpbc = data & BC_MASK;
 	lpcsa = lpcsa & ~CSA_DONE;
 	break;
 case 04:						/* LPPAGC */
 	if (access == WRITEB) data = (pa & 1)?
-		(lppagc & 0377) | (data << 8): (lppagc & ~0377) | data;
+	    (lppagc & 0377) | (data << 8): (lppagc & ~0377) | data;
 	lppagc = data & PAGC_MASK;
 	break;
 case 05:						/* LPRDAT */
 	if (access == WRITEB) data = (pa & 1)?
-		(lprdat & 0377) | (data << 8): (lprdat & ~0377) | data;
+	    (lprdat & 0377) | (data << 8): (lprdat & ~0377) | data;
 	lprdat = data & RDAT_MASK;
 	txram[lpcbuf & TX_AMASK] = lprdat;		/* load RAM */
 	break;
 case 06:						/* LPCOLC/LPCBUF */
 	if ((access == WRITEB) && (pa & 1))		/* odd byte */
-		lpcolc = data & 0377;
-	else {	lpcbuf = data & 0377;			/* even byte, word */
-		if (access == WRITE) lpcolc = (data >> 8) & 0377;  }
+	    lpcolc = data & 0377;
+	else {
+	    lpcbuf = data & 0377;			/* even byte, word */
+	    if (access == WRITE) lpcolc = (data >> 8) & 0377;  }
 	break;
 case 07:						/* LPCSUM/LPPDAT */
 	break;  }					/* read only */
@@ -371,9 +372,9 @@ if ((fnc == FNC_PR) && (dvlnt == 0)) {
 
 for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
 	if (Map_ReadW (ba, 2, &wd10, MAP)) {		/* get word, err? */
-		lpcsb = lpcsb | CSB_MTE;		/* set NXM error */
-		update_lpcs (CSA_ERR);			/* set done */
-		break;  }
+	    lpcsb = lpcsb | CSB_MTE;			/* set NXM error */
+	    update_lpcs (CSA_ERR);			/* set done */
+	    break;  }
 	lpcbuf = (wd10 >> ((ba & 1)? 8: 0)) & 0377;	/* get character */
 	lpcsum = (lpcsum + lpcbuf) & 0377;		/* add into checksum */
 	switch (fnc) {					/* switch on function */
@@ -381,8 +382,8 @@ for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
 /* Translation RAM load */
 
 	case FNC_RAM:					/* RAM load */
-		txram[(i >> 1) & TX_AMASK] = wd10 & TX_DMASK;
-		break;
+	    txram[(i >> 1) & TX_AMASK] = wd10 & TX_DMASK;
+	    break;
 
 /* DAVFU RAM load.  The DAVFU RAM is actually loaded in bytes, delimited by
    a start (354 to 356) and stop (357) byte pair.  If the number of bytes 
@@ -390,48 +391,48 @@ for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
 */
 
 	case FNC_DVU:					/* DVU load */
-		if ((lpcbuf >= 0354) && (lpcbuf <= 0356))	/* start DVU load? */
-			dvld = dvlnt = 0;		/* reset lnt */
-		else if (lpcbuf == 0357) {		/* stop DVU load? */
-			dvptr = 0;			/* reset ptr */
-			if (dvld & 1) dvlnt = 0;  }	/* if odd, invalid */
-		else if (dvld == 0) {			/* even state? */
-			temp = lpcbuf & DV_DMASK;
-			dvld = 1;  }
-		else if (dvld == 1) {			/* odd state? */
-			if (dvlnt < DV_SIZE) davfu[dvlnt++] = 
-				temp | ((lpcbuf & DV_DMASK) << 6);
-			dvld = 0;  }
-		break;
+	    if ((lpcbuf >= 0354) && (lpcbuf <= 0356))	/* start DVU load? */
+		dvld = dvlnt = 0;			/* reset lnt */
+	    else if (lpcbuf == 0357) {			/* stop DVU load? */
+		dvptr = 0;				/* reset ptr */
+		if (dvld & 1) dvlnt = 0;  }		/* if odd, invalid */
+	    else if (dvld == 0) {			/* even state? */
+		temp = lpcbuf & DV_DMASK;
+		dvld = 1;  }
+	    else if (dvld == 1) {			/* odd state? */
+		if (dvlnt < DV_SIZE) davfu[dvlnt++] = 
+		    temp | ((lpcbuf & DV_DMASK) << 6);
+		dvld = 0;  }
+	    break;
 
 /* Print characters */
 
 	case FNC_PR:					/* print */
-		lprdat = txram[lpcbuf];			/* get RAM char */
-		txst = (TX_GETFL (lprdat) << 1) |	/* get state */
-			((lpcsa & CSA_DELH)? 1: 0);	/* plus delim hold */ 
-		if (lprdat & TX_DELH) lpcsa = lpcsa | CSA_DELH;
-		else lpcsa = lpcsa & ~CSA_DELH;
-		lpcsa = lpcsa & ~CSA_UNDF;		/* assume char ok */
-		switch (txcase[txst]) {			/* case on state */
-		case TX_CHR:				/* take char */
-			cont = lp20_print (lpcbuf);
-			break;
-		case TX_RAM:				/* take translation */
-			cont = lp20_print (lprdat);
-			break;
-		case TX_DVU:				/* DAVFU action */
-			if (lprdat & TX_SLEW)
-				cont = lp20_adv (lprdat & TX_VMASK, TRUE);
-			else cont = lp20_davfu (lprdat & TX_VMASK);
-			break;
-		case TX_INT:				/* interrupt */
-			lpcsa = lpcsa | CSA_UNDF;	/* set flag */
-			cont = FALSE;			/* force stop */
-			break;  }			/* end case char state */
+	    lprdat = txram[lpcbuf];			/* get RAM char */
+	    txst = (TX_GETFL (lprdat) << 1) |		/* get state */
+		((lpcsa & CSA_DELH)? 1: 0);		/* plus delim hold */ 
+	    if (lprdat & TX_DELH) lpcsa = lpcsa | CSA_DELH;
+	    else lpcsa = lpcsa & ~CSA_DELH;
+	    lpcsa = lpcsa & ~CSA_UNDF;			/* assume char ok */
+	    switch (txcase[txst]) {			/* case on state */
+	    case TX_CHR:				/* take char */
+		cont = lp20_print (lpcbuf);
 		break;
+	    case TX_RAM:				/* take translation */
+		cont = lp20_print (lprdat);
+		break;
+	    case TX_DVU:				/* DAVFU action */
+		if (lprdat & TX_SLEW)
+		    cont = lp20_adv (lprdat & TX_VMASK, TRUE);
+		else cont = lp20_davfu (lprdat & TX_VMASK);
+		break;
+	    case TX_INT:				/* interrupt */
+		lpcsa = lpcsa | CSA_UNDF;		/* set flag */
+	    	cont = FALSE;				/* force stop */
+	    	break;  }				/* end case char state */
+	    break;
 	case FNC_TST:					/* test */
-		break;  }				/* end case function */
+	    break;  }					/* end case function */
 	}						/* end for */
 lpba = ba & 0177777;
 lpcsa = (lpcsa & ~CSA_UAE) | ((ba >> (16 - CSA_V_UAE)) & CSA_UAE);
@@ -467,12 +468,12 @@ if (lppdat == 015) lpcolc = 0;				/* CR? reset col cntr */
 else if (lppdat == 011) {				/* TAB? simulate */
 	lppdat = ' ';					/* with spaces */
 	if (lpcolc >= 128) {
-		r = lp20_adv (1, TRUE);			/* eol? adv carriage */
-		rpt = 8;  }				/* adv to col 9 */
+	    r = lp20_adv (1, TRUE);			/* eol? adv carriage */
+	    rpt = 8;  }					/* adv to col 9 */
 	else rpt = 8 - (lpcolc & 07);  }		/* else adv 1 to 8 */		
 else {	if (lppdat < 040) lppdat = ' ';			/* cvt non-prnt to spc */
 	if (lpcolc >= LP_WIDTH)				/* line full? */
-		r = lp20_adv (1, TRUE);  }		/* adv carriage */
+	    r = lp20_adv (1, TRUE);  }			/* adv carriage */
 for (i = 0; i < rpt; i++) putc (lppdat, lp20_unit.fileref); 
 lp20_unit.pos = lp20_unit.pos + rpt;
 lpcolc = lpcolc + rpt;
@@ -490,10 +491,11 @@ lp20_unit.pos = lp20_unit.pos + cnt;			/* print 'n' newlines */
 if (dvuadv) dvptr = (dvptr + cnt) % dvlnt;		/* update DAVFU ptr */
 if (davfu[dvptr] & (1 << DV_TOF)) {			/* at top of form? */
 	if (lppagc = (lppagc - 1) & PAGC_MASK) {	/* decr page cntr */
-		lpcsa = lpcsa & ~CSA_PZRO;		/* update status */
-		return TRUE;  }
-	else {	lpcsa = lpcsa | CSA_PZRO;		/* stop if zero */
-		return FALSE;  }  }
+	    lpcsa = lpcsa & ~CSA_PZRO;			/* update status */
+	    return TRUE;  }
+	else {
+	    lpcsa = lpcsa | CSA_PZRO;			/* stop if zero */
+	    return FALSE;  }  }
 return TRUE;
 }
 
@@ -506,15 +508,16 @@ for (i = 0; i < dvlnt; i++) {				/* search DAVFU */
 	dvptr = dvptr + 1;				/* adv DAVFU ptr */
 	if (dvptr >= dvlnt) dvptr = 0;			/* wrap at end */
 	if (davfu[dvptr] & (1 << cnt)) {		/* channel stop set? */
-		if (cnt) return lp20_adv (i + 1, FALSE);	/* ~TOF, adv */
-		if (lpcolc) lp20_adv (1, FALSE);	/* TOF, need newline? */
-		putc ('\f', lp20_unit.fileref);		/* print form feed */
-		lp20_unit.pos = lp20_unit.pos + 1; 
-		if (lppagc = (lppagc - 1) & PAGC_MASK) { /* decr page cntr */
-			lpcsa = lpcsa & ~CSA_PZRO;	/* update status */
-			return TRUE;  }
-		else {	lpcsa = lpcsa | CSA_PZRO;	/* stop if zero */
-			return FALSE;  }  }
+	    if (cnt) return lp20_adv (i + 1, FALSE);	/* ~TOF, adv */
+	    if (lpcolc) lp20_adv (1, FALSE);		/* TOF, need newline? */
+	    putc ('\f', lp20_unit.fileref);		/* print form feed */
+	    lp20_unit.pos = lp20_unit.pos + 1; 
+	    if (lppagc = (lppagc - 1) & PAGC_MASK) {	/* decr page cntr */
+		lpcsa = lpcsa & ~CSA_PZRO;		/* update status */
+		return TRUE;  }
+	    else {
+	    	lpcsa = lpcsa | CSA_PZRO;		/* stop if zero */
+		return FALSE;  }  }
 	}						/* end for */
 dvlnt = 0;						/* DAVFU error */
 return FALSE;

@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   22-Dec-02	RMS	Added break support (from Mark Pizzolato)
    20-Aug-02	RMS	Added tmxr_open_master, tmxr_close_master, tmxr.port
    30-Dec-01	RMS	Renamed tmxr_fstatus, added tmxr_fstats
    20-Oct-01	RMS	Removed tmxr_getchar, formalized buffer guard,
@@ -56,6 +57,7 @@ struct tmln {
 	int32		txbpi;				/* xmt buf insert */
 	int32		txcnt;				/* xmt count */
 	char		rxb[TMXR_MAXBUF];		/* rcv buffer */
+	char		rbr[TMXR_MAXBUF];		/* rcv break */
 	char		txb[TMXR_MAXBUF];		/* xmt buffer */
 	};
 

@@ -127,81 +127,81 @@ switch (inst) {						/* case on opcode */
 case ioOCP:						/* OCP */
 	switch (fnc) {					/* case on fnc */
 	case 000: case 002: case 004:			/* paper adv */
-		lpt_svcst = lpt_svcst | LPT_SVCPA;	/* set state */
-		lpt_svcch = fnc >> 1;			/* save channel */
-		sim_activate (&lpt_unit, lpt_ptime);
-		CLR_READY (INT_LPT);			/* clear int */
-		break;
+	    lpt_svcst = lpt_svcst | LPT_SVCPA;	/* set state */
+	    lpt_svcch = fnc >> 1;			/* save channel */
+	    sim_activate (&lpt_unit, lpt_ptime);
+	    CLR_READY (INT_LPT);			/* clear int */
+	    break;
 	case 007:					/* init scan */
-		lpt_prdn = 0;				/* clear pr done */
-		lpt_wdpos = 0;				/* init scan pos */
-		if (!sim_is_active (&lpt_unit)) lpt_xfer = 1;
-		CLR_READY (INT_LPT);			/* clear int */
-		break;
+	    lpt_prdn = 0;				/* clear pr done */
+	    lpt_wdpos = 0;				/* init scan pos */
+	    if (!sim_is_active (&lpt_unit)) lpt_xfer = 1;
+	    CLR_READY (INT_LPT);			/* clear int */
+	    break;
 	default:
-		return IOBADFNC (dat);  }
+	    return IOBADFNC (dat);  }
 	break;
 case ioSKS:						/* SKS */
 	switch (fnc) {					/* case on fnc */
 	case 000:					/* if xfer rdy */
-		if (lpt_xfer) return IOSKIP (dat);
-		break;
+	    if (lpt_xfer) return IOSKIP (dat);
+	    break;
 	case 002:					/* if !alarm */
-		if (lpt_unit.flags & UNIT_ATT) return IOSKIP (dat);
-		break;
+	    if (lpt_unit.flags & UNIT_ATT) return IOSKIP (dat);
+	    break;
 	case 003:					/* if odd col */
-		if (lpt_crpos) return IOSKIP (dat);
-		break;
+	    if (lpt_crpos) return IOSKIP (dat);
+	    break;
 	case 004:					/* if !interrupt */
-		if (!TST_INTREQ (INT_LPT)) return IOSKIP (dat);
-		break;
+	    if (!TST_INTREQ (INT_LPT)) return IOSKIP (dat);
+	    break;
 	case 011:					/* if line printed */
-		if (lpt_prdn) return IOSKIP (dat);
-		break;
+	    if (lpt_prdn) return IOSKIP (dat);
+	    break;
 	case 012:					/* if !shuttling */
-		if (!(lpt_svcst & LPT_SVCSH)) return IOSKIP (dat);
-		break;
+	    if (!(lpt_svcst & LPT_SVCSH)) return IOSKIP (dat);
+	    break;
 	case 013:
-		if (lpt_prdn && !(lpt_svcst & LPT_SVCSH)) return IOSKIP (dat);
-		break;
+	    if (lpt_prdn && !(lpt_svcst & LPT_SVCSH)) return IOSKIP (dat);
+	    break;
 	case 014:					/* if !advancing */
-		if (!(lpt_svcst & LPT_SVCPA)) return IOSKIP (dat);
-		break;
+	    if (!(lpt_svcst & LPT_SVCPA)) return IOSKIP (dat);
+	    break;
 	case 015:
-		if (lpt_prdn && !(lpt_svcst & LPT_SVCPA)) return IOSKIP (dat);
-		break;
+	    if (lpt_prdn && !(lpt_svcst & LPT_SVCPA)) return IOSKIP (dat);
+	    break;
 	case 016:
-		if (!(lpt_svcst & (LPT_SVCSH | LPT_SVCPA))) return IOSKIP (dat);
-		break;
+	    if (!(lpt_svcst & (LPT_SVCSH | LPT_SVCPA))) return IOSKIP (dat);
+	    break;
 	case 017:
-		if (lpt_prdn && !(lpt_svcst & (LPT_SVCSH | LPT_SVCPA)))
-			return IOSKIP (dat);
-		break;
+	    if (lpt_prdn && !(lpt_svcst & (LPT_SVCSH | LPT_SVCPA)))
+		return IOSKIP (dat);
+	    break;
 	default:
-		return IOBADFNC (dat);  }
+	    return IOBADFNC (dat);  }
 	break;
 case ioOTA:						/* OTA */
 	if (fnc) return IOBADFNC (dat);			/* only fnc 0 */
 	if (lpt_xfer) {					/* xfer ready? */
-		lpt_xfer = 0;				/* clear xfer */
-		chr = (dat >> (lpt_crpos? 0: 8)) & 077;	/* get 6b char */
-		if (chr == lpt_drpos) {			/* match drum pos? */
-			if (chr < 040) chr = chr | 0100;
-			lpt_buf[2 * lpt_wdpos + lpt_crpos] = chr;  }
-		lpt_wdpos++;				/* adv scan pos */
-		if (lpt_wdpos >= LPT_SCAN) {		/* end of scan? */
-			lpt_wdpos = 0;			/* reset scan pos */
-			lpt_drpos++;			/* adv drum pos */
-			if (lpt_drpos >= LPT_DRUM) {	/* end of drum? */
-				lpt_drpos = 0;		/* reset drum pos */
-				lpt_crpos = lpt_crpos ^ 1;	/* shuttle */
-				lpt_svcst = lpt_svcst | LPT_SVCSH;
-				sim_activate (&lpt_unit, lpt_ptime);
-				}			/* end if shuttle */
-			else sim_activate (&lpt_unit, lpt_etime);
-			}				/* end if endscan */
-		else sim_activate (&lpt_unit, lpt_xtime);
-		return IOSKIP (dat);  }			/* skip return */
+	    lpt_xfer = 0;				/* clear xfer */
+	    chr = (dat >> (lpt_crpos? 0: 8)) & 077;	/* get 6b char */
+	    if (chr == lpt_drpos) {			/* match drum pos? */
+		if (chr < 040) chr = chr | 0100;
+		lpt_buf[2 * lpt_wdpos + lpt_crpos] = chr;  }
+	    lpt_wdpos++;				/* adv scan pos */
+	    if (lpt_wdpos >= LPT_SCAN) {		/* end of scan? */
+		lpt_wdpos = 0;				/* reset scan pos */
+		lpt_drpos++;				/* adv drum pos */
+		if (lpt_drpos >= LPT_DRUM) {		/* end of drum? */
+		    lpt_drpos = 0;			/* reset drum pos */
+		    lpt_crpos = lpt_crpos ^ 1;		/* shuttle */
+		    lpt_svcst = lpt_svcst | LPT_SVCSH;
+		    sim_activate (&lpt_unit, lpt_ptime);
+		    }					/* end if shuttle */
+		else sim_activate (&lpt_unit, lpt_etime);
+		}					/* end if endscan */
+	    else sim_activate (&lpt_unit, lpt_xtime);
+	    return IOSKIP (dat);  }			/* skip return */
 	break;  }					/* end case op */
 return dat;
 }
@@ -226,7 +226,7 @@ if (lpt_svcst & LPT_SVCSH) {				/* shuttling */
 if (lpt_svcst & LPT_SVCPA) {				/* paper advance */
 	SET_READY (INT_LPT);				/* interrupt */
 	for (i = LPT_WIDTH - 1; i >= 0; i++)  {
-		if (lpt_buf[i] != ' ') break;  }
+	    if (lpt_buf[i] != ' ') break;  }
 	lpt_buf[i + 1] = 0;
 	fputs (lpt_buf, uptr->fileref);			/* output buf */
 	fputs (lpt_cc[lpt_svcch & 03], uptr->fileref);	/* output eol */

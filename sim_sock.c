@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Dec-02	RMS	Added sim_connect_socket, sim_create_socket
    08-Oct-02	RMS	Revised for .NET compatibility
    22-Aug-02	RMS	Changed calling sequence for sim_accept_conn
    22-May-02	RMS	Added OS2 EMX support from Holger Veit
@@ -46,11 +47,18 @@
    sim_msg_sock		send message to socket
 */
 
+int32 sim_sock_cnt = 0;
+
 /* First, all the non-implemented versions */
 
 #if defined (__OS2__) && !defined (__EMX__)
 
 SOCKET sim_master_sock (int32 port)
+{
+return INVALID_SOCKET;
+}
+
+SOCKET sim_connect_sock (int32 ip, int32 port)
 {
 return INVALID_SOCKET;
 }
@@ -84,54 +92,92 @@ return SOCKET_ERROR;
 
 /* UNIX, Win32, Macintosh, VMS, OS2 (Berkeley socket) routines */
 
+SOCKET sim_err_sock (SOCKET s, char *emsg, int32 flg)
+{
+int32 err = WSAGetLastError ();
+
+printf ("Sockets: %s error %d\n", emsg, err);
+sim_close_sock (s, flg);
+return INVALID_SOCKET;
+}
+
+SOCKET sim_create_sock (void)
+{
+SOCKET newsock;
+int32 err;
+
+#if defined (WIN32)
+WORD wVersionRequested; 
+WSADATA wsaData; 
+wVersionRequested = MAKEWORD (1, 1); 
+
+if (sim_sock_cnt == 0) {
+	err = WSAStartup (wVersionRequested, &wsaData);	/* start Winsock */ 
+	if (err != 0) {
+	    printf ("Winsock: startup error %d\n", err);
+	    return INVALID_SOCKET;  }  }
+sim_sock_cnt = sim_sock_cnt + 1;
+#endif							/* endif Win32 */
+
+newsock = socket (AF_INET, SOCK_STREAM, 0);		/* create socket */
+if (newsock == INVALID_SOCKET) {			/* socket error? */
+	err = WSAGetLastError ();
+	printf ("Sockets: socket error %d\n", err);
+	return INVALID_SOCKET;  }
+return newsock;
+}
+
 SOCKET sim_master_sock (int32 port)
 {
 SOCKET newsock;
 struct sockaddr_in name;
 int32 sta;
 
-#if defined (WIN32)
-WORD wVersionRequested; 
-WSADATA wsaData; 
-wVersionRequested = MAKEWORD (1, 1); 
- 
-sta = WSAStartup (wVersionRequested, &wsaData);		/* start Winsock */ 
-if (sta != 0) {
-	printf ("Winsock: startup error %d\n", sta);
-	return sta;  }
-#endif							/* endif Win32 */
-
-newsock = socket (AF_INET, SOCK_STREAM, 0);		/* create socket */
-if (newsock == INVALID_SOCKET) {			/* socket error? */
-	perror ("Sockets: socket error");
-	return INVALID_SOCKET;  }
+newsock = sim_create_sock ();				/* create socket */
+if (newsock == INVALID_SOCKET) return newsock;		/* socket error? */
 
 name.sin_family = AF_INET;				/* name socket */
 name.sin_port = htons ((unsigned short) port);		/* insert port */
-name.sin_addr.s_addr = htonl (INADDR_ANY);
+name.sin_addr.s_addr = htonl (INADDR_ANY);		/* insert addr */
+
 sta = bind (newsock, (struct sockaddr *) &name, sizeof (name));
-if (sta == SOCKET_ERROR) {				/* bind error? */
-	perror ("Sockets: bind error");
-	sim_close_sock (newsock, 1);
-	return INVALID_SOCKET;  }
+if (sta == SOCKET_ERROR)				/* bind error? */
+	return sim_err_sock (newsock, "bind", 1);
+sta = sim_setnonblock (newsock);			/* set nonblocking */
+if (sta == SOCKET_ERROR)				/* fcntl error? */
+	return sim_err_sock (newsock, "fcntl", 1);
+sta = listen (newsock, 1);				/* listen on socket */
+if (sta == SOCKET_ERROR)				/* listen error? */
+	return sim_err_sock (newsock, "listen", 1);
+return newsock;						/* got it! */
+}
+
+SOCKET sim_connect_sock (int32 ip, int32 port)
+{
+SOCKET newsock;
+struct sockaddr_in name;
+int32 sta;
+
+newsock = sim_create_sock ();				/* create socket */
+if (newsock == INVALID_SOCKET) return newsock;		/* socket error? */
+
+name.sin_family = AF_INET;				/* name socket */
+name.sin_port = htons ((unsigned short) port);		/* insert port */
+name.sin_addr.s_addr = htonl (ip);			/* insert addr */
 
 sta = sim_setnonblock (newsock);			/* set nonblocking */
-if (sta == SOCKET_ERROR) {				/* fcntl error? */
-	perror ("Sockets: fcntl error");
-	sim_close_sock (newsock, 1);
-	return INVALID_SOCKET;  }
+if (sta == SOCKET_ERROR)				/* fcntl error? */
+	return sim_err_sock (newsock, "fcntl", 1);
+sta = connect (newsock, (struct sockaddr *) &name, sizeof (name));
+if ((sta == SOCKET_ERROR) && (WSAGetLastError () != WSAEWOULDBLOCK))
+	return sim_err_sock (newsock, "connect", 1);
 
-sta = listen (newsock, 1);				/* listen on socket */
-if (sta == SOCKET_ERROR) {				/* listen error? */
-	perror ("Sockets: listen error");
-	sim_close_sock (newsock, 1);
-	return INVALID_SOCKET;  }
 return newsock;						/* got it! */
 }
 
 SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr)
 {
-int32 sta;
+int32 sta, err;
 #if defined (macintosh) 
 socklen_t size;
 #elif defined (WIN32) || defined (__EMX__)
@@ -146,28 +192,46 @@ if (master == 0) return INVALID_SOCKET;			/* not attached? */
 size = sizeof (clientname);
 newsock = accept (master, (struct sockaddr *) &clientname, &size);
 if (newsock == INVALID_SOCKET) {			/* error? */
-	if (WSAGetLastError () != WSAEWOULDBLOCK)
-		perror ("Sockets: accept error");
+	err = WSAGetLastError ();
+	if (err != WSAEWOULDBLOCK)
+	    printf ("Sockets: accept error %d\n", err);
 	return INVALID_SOCKET;  }
 if (ipaddr != NULL) *ipaddr = ntohl (clientname.sin_addr.s_addr);
 
 sta = sim_setnonblock (newsock);			/* set nonblocking */
-if (sta == SOCKET_ERROR) {				/* fcntl error? */
-	perror ("Sockets: fcntl error");
-	sim_close_sock (newsock, 0);
-	return INVALID_SOCKET;  }
+if (sta == SOCKET_ERROR)				/* fcntl error? */
+	return sim_err_sock (newsock, "fcntl", 0);
 return newsock;
+}
+
+int32 sim_check_conn (SOCKET sock, t_bool rd)
+{
+fd_set rw_set, er_set;
+fd_set *rw_p = &rw_set;
+fd_set *er_p = &er_set;
+struct timeval tz = { 0, 0};
+
+FD_ZERO (rw_p);
+FD_ZERO (er_p);
+FD_SET (sock, rw_p);
+FD_SET (sock, er_p);
+if (rd) select ((int) sock + 1, rw_p, NULL, er_p, &tz);
+else select ((int) sock + 1, NULL, rw_p, er_p, &tz);
+if (FD_ISSET (sock, rw_p)) return 1;
+if (FD_ISSET (sock, er_p)) return -1;
+return 0;
 }
 
 int32 sim_read_sock (SOCKET sock, char *buf, int32 nbytes)
 {
-int32 rbytes;
+int32 rbytes, err;
 
 rbytes = recv (sock, buf, nbytes, 0);
 if (rbytes == 0) return -1;				/* disconnect */
 if (rbytes == SOCKET_ERROR) {
-	if (WSAGetLastError () == WSAEWOULDBLOCK) return 0;	/* no data */
-	perror("Sockets: read error");
+	err = WSAGetLastError ();
+	if (err == WSAEWOULDBLOCK) return 0;		/* no data */
+	printf ("Sockets: read error %d\n", err);
       	return -1;  }
 return rbytes;
 }
@@ -181,7 +245,11 @@ void sim_close_sock (SOCKET sock, t_bool master)
 {
 #if defined (WIN32)
 closesocket (sock);
-if (master) WSACleanup ();
+if (master) {
+	sim_sock_cnt = sim_sock_cnt - 1;
+	if (sim_sock_cnt <= 0) {
+	    WSACleanup ();
+	    sim_sock_cnt = 0;  }  }
 #else
 close (sock);
 #endif

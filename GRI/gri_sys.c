@@ -96,17 +96,17 @@ for (;;) {						/* until EOF */
 	if (c == EOF) break;				/* EOF? done */
 	for ( ; c != 0; ) {				/* loop until ctl = 0 */
 							/* ign ctrl frame */
-		if ((c = getc (fileref)) == EOF)	/* get high byte */
-			return SCPE_FMT;		/* EOF is error */
-		if (!MEM_ADDR_OK (org)) return SCPE_NXM;
-		M[org] = ((c & 0377) << 8);		/* store high */
-		if ((c = getc (fileref)) == EOF)	/* get low byte */
-			return SCPE_FMT;		/* EOF is error */
-		M[org] = M[org] | (c & 0377);		/* store low */
-		org = org + 1;				/* incr origin */
-		if ((c = getc (fileref)) == EOF)	/* get ctrl frame */
-			return SCPE_OK;			/* EOF is ok */
-		}					/* end block for */
+	    if ((c = getc (fileref)) == EOF)		/* get high byte */
+		return SCPE_FMT;			/* EOF is error */
+	    if (!MEM_ADDR_OK (org)) return SCPE_NXM;
+	    M[org] = ((c & 0377) << 8);			/* store high */
+	    if ((c = getc (fileref)) == EOF)		/* get low byte */
+		return SCPE_FMT;			/* EOF is error */
+	    M[org] = M[org] | (c & 0377);		/* store low */
+	    org = org + 1;				/* incr origin */
+	    if ((c = getc (fileref)) == EOF)		/* get ctrl frame */
+		return SCPE_OK;				/* EOF is ok */
+	    }						/* end block for */
 	if (!(sim_switches & SWMASK ('C'))) return SCPE_OK;
 	}						/* end tape for */
 return SCPE_OK;
@@ -275,10 +275,10 @@ int32 i, nfirst;
 for (i = nfirst = 0; fname[i] != NULL; i++) {
 	if (((inst & fop[i].imask) == fop[i].inst) &&
 	    ((op & fop[i].omask) == fop[i].oper)) {
-		op = op & ~fop[i].omask;
-		if (nfirst) fputc (' ', of);
-		nfirst = 1;
-		fprintf (of, "%s", fname[i]);  }
+	    op = op & ~fop[i].omask;
+	    if (nfirst) fputc (' ', of);
+	    nfirst = 1;
+	    fprintf (of, "%s", fname[i]);  }
 	}
 if (op) fprintf (of, " %o", op);
 return;
@@ -328,64 +328,65 @@ for (i = 0; opcode[i] != NULL; i++) {			/* loop thru ops */
 
 	switch (j) {					/* case on class */
 	case F_V_FO:					/* func out */
-		fprintf (of, "%s ", opcode[i]);
-		fprint_op (of, inst, op);
-		fprintf (of, ",%s", undst[dst]);
-		break;
+	    fprintf (of, "%s ", opcode[i]);
+	    fprint_op (of, inst, op);
+	    fprintf (of, ",%s", undst[dst]);
+	    break;
 	case F_V_FOI:					/* func out impl */
-		fprintf (of, "%s ", opcode[i]);
-		fprint_op (of, inst, op);
-		break;
+	    fprintf (of, "%s ", opcode[i]);
+	    fprint_op (of, inst, op);
+	    break;
 	case F_V_SF:					/* skip func */
-		fprintf (of, "%s %s,", opcode[i], unsrc[src]);
-		fprint_op (of, inst, op);
-		break;
+	    fprintf (of, "%s %s,", opcode[i], unsrc[src]);
+	    fprint_op (of, inst, op);
+	    break;
 	case F_V_SFI:					/* skip func impl */
-		fprintf (of, "%s ", opcode[i]);
-		fprint_op (of, inst, op);
-		break;
+	    fprintf (of, "%s ", opcode[i]);
+	    fprint_op (of, inst, op);
+	    break;
 	case F_V_RR:					/* reg reg */
-		if (strcmp (unsrc[src], undst[dst]) == 0) {
-			if (bop) fprintf (of, "%s %s,%s", opcode[i + 2],
-				unsrc[src], opname[bop]);
-			else fprintf (of, "%s %s", opcode[i + 2], unsrc[src]);  }
-		else {	if (bop) fprintf (of, "%s %s,%s,%s", opcode[i],
-				unsrc[src], opname[bop], undst[dst]);
-			else fprintf (of, "%s %s,%s", opcode[i],
-				 unsrc[src], undst[dst]);  }
-		break;
+	    if (strcmp (unsrc[src], undst[dst]) == 0) {
+		if (bop) fprintf (of, "%s %s,%s", opcode[i + 2],
+		    unsrc[src], opname[bop]);
+		else fprintf (of, "%s %s", opcode[i + 2], unsrc[src]);  }
+	    else {
+	    	if (bop) fprintf (of, "%s %s,%s,%s", opcode[i],
+		    unsrc[src], opname[bop], undst[dst]);
+		else fprintf (of, "%s %s,%s", opcode[i],
+		    unsrc[src], undst[dst]);  }
+	    break;
 	case F_V_ZR:					/* zero reg */
-		if (bop) fprintf (of, "%s %s,%s", opcode[i],
-			opname[bop], undst[dst]);
-		else fprintf (of, "%s %s", opcode[i], undst[dst]);
-		break;
+	    if (bop) fprintf (of, "%s %s,%s", opcode[i],
+		opname[bop], undst[dst]);
+	    else fprintf (of, "%s %s", opcode[i], undst[dst]);
+	    break;
 	case F_V_JC:					/* jump cond */
-		fprintf (of, "%s %s,%s,%o", opcode[i],
-			unsrc[src], cdname[op >> 1], val[1]);
-		break;
+	    fprintf (of, "%s %s,%s,%o", opcode[i],
+		unsrc[src], cdname[op >> 1], val[1]);
+	    break;
 	case F_V_JU:					/* jump uncond */
-		fprintf (of, "%s %o", opcode[i], val[1]);
-		break;
+	    fprintf (of, "%s %o", opcode[i], val[1]);
+	    break;
 	case F_V_RM:					/* reg mem */
-		if (bop) fprintf (of, "%s %s,%s,%o", opcode[i],
-			unsrc[src], opname[bop], val[1]);
-		else fprintf (of, "%s %s,%o", opcode[i], unsrc[src], val[1]);
-		break;
+	    if (bop) fprintf (of, "%s %s,%s,%o", opcode[i],
+		unsrc[src], opname[bop], val[1]);
+	    else fprintf (of, "%s %s,%o", opcode[i], unsrc[src], val[1]);
+	    break;
 	case F_V_ZM:					/* zero mem */
-		if (bop) fprintf (of, "%s %s,%o", opcode[i],
-			opname[bop], val[1]);
-		else fprintf (of, "%s %o", opcode[i], val[1]);
-		break;
+	    if (bop) fprintf (of, "%s %s,%o", opcode[i],
+		opname[bop], val[1]);
+	    else fprintf (of, "%s %o", opcode[i], val[1]);
+	    break;
 	case F_V_MR:					/* mem reg */
-		if (bop) fprintf (of, "%s %o,%s,%s", opcode[i],
-			val[1], opname[bop], undst[dst]);
-		else fprintf (of, "%s %o,%s", opcode[i], val[1], undst[dst]);
-		break;
+	    if (bop) fprintf (of, "%s %o,%s,%s", opcode[i],
+		val[1], opname[bop], undst[dst]);
+	    else fprintf (of, "%s %o,%s", opcode[i], val[1], undst[dst]);
+	    break;
 	case F_V_MS:					/* mem self */
-		if (bop) fprintf (of, "%s %o,%s", opcode[i],
-			val[1], opname[bop]);
-		else fprintf (of, "%s %o", opcode[i], val[1]);
-		break;  }				/* end case */
+	    if (bop) fprintf (of, "%s %o,%s", opcode[i],
+		val[1], opname[bop]);
+	    else fprintf (of, "%s %o", opcode[i], val[1]);
+	    break;  }					/* end case */
 	return (j >= F_2WD)? -1: SCPE_OK;  }		/* end if */
 	}						/* end for */
 return SCPE_ARG;
@@ -409,22 +410,22 @@ uint32 inst = val[0];
 uint32 fncv = 0, fncm = 0;
 
 while (*cptr) {
-    cptr = get_glyph (cptr, gbuf, 0);			/* get glyph */
-    d = get_uint (gbuf, 8, 017, &r);			/* octal? */
-    if (r == SCPE_OK) {					/* ok? */
-	if (d & fncm) return NULL;			/* already filled? */
-	fncv = fncv | d;				/* save */
-	fncm = fncm | d;  }				/* field filled */
-    else {						/* symbol? */
-	for (i = 0; fname[i] != NULL; i++) {		/* search table */
-	    if ((strcmp (gbuf, fname[i]) == 0) &&	/* match for inst? */
-	        ((inst & fop[i].imask) == fop[i].inst)) {
-		if (fop[i].oper & fncm) return NULL;	/* already filled? */
-		fncm = fncm | fop[i].omask;
-		fncv = fncv | fop[i].oper;
-		break;  }  }
+	cptr = get_glyph (cptr, gbuf, 0);		/* get glyph */
+	d = get_uint (gbuf, 8, 017, &r);		/* octal? */
+	if (r == SCPE_OK) {				/* ok? */
+	    if (d & fncm) return NULL;			/* already filled? */
+	    fncv = fncv | d;				/* save */
+	    fncm = fncm | d;  }				/* field filled */
+	else {						/* symbol? */
+	    for (i = 0; fname[i] != NULL; i++) {	/* search table */
+		if ((strcmp (gbuf, fname[i]) == 0) &&	/* match for inst? */
+		    ((inst & fop[i].imask) == fop[i].inst)) {
+		    if (fop[i].oper & fncm) return NULL;/* already filled? */
+		    fncm = fncm | fop[i].omask;
+		    fncv = fncv | fop[i].oper;
+		    break;  }  }
 	if (fname[i] == NULL) return NULL;  }		/* end else */
-    }							/* end while */
+	}						/* end while */
 val[0] = val[0] | (fncv << I_V_OP);			/* store fnc */
 return cptr;
 }
@@ -467,8 +468,8 @@ int32 i;
 tptr = get_glyph (cptr, gbuf, term);			/* get glyph */
 for (i = 1; i < 4; i++) {				/* symbol match? */
 	if (strcmp (gbuf, opname[i]) == 0) {
-		val[0] = val[0] | (i << (I_V_OP + 2));	/* or to inst */
-		return tptr;  }  }
+	    val[0] = val[0] | (i << (I_V_OP + 2));	/* or to inst */
+	    return tptr;  }  }
 return cptr;						/* original ptr */
 }
 
@@ -549,7 +550,7 @@ case F_V_JC:						/* jump cond */
 	if (!cptr) return SCPE_ARG;
 	cptr = get_glyph (cptr, gbuf, ',');		/* cond */
 	for (k = 0; k < 8; k++) {			/* symbol? */
-		if (strcmp (gbuf, cdname[k]) == 0) break;  }
+	    if (strcmp (gbuf, cdname[k]) == 0) break;  }
 	if (k >= 8) return SCPE_ARG;
 	val[0] = val[0] | (k << (I_V_OP + 1));		/* or to inst */
 case F_V_JU:						/* jump uncond */

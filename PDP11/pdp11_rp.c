@@ -571,7 +571,7 @@ case 006:						/* RPER1 */
 case 007:						/* RPAS */
 	*data = 0;
 	for (i = 0; i < RP_NUMDR; i++)
-		if (rpds[i] & DS_ATA) *data = *data | (AS_U0 << i);
+	    if (rpds[i] & DS_ATA) *data = *data | (AS_U0 << i);
 	break;
 case 010:						/* RPLA */
 	*data = GET_SECTOR (rp_rwait, dtype) << LA_V_SC;
@@ -646,52 +646,53 @@ switch (j) {						/* decode PA<5:1> */
 case 000:						/* RPCS1 */
 	if ((access == WRITEB) && (PA & 1)) data = data << 8;
 	if (data & CS1_TRE) {				/* error clear? */
-		rpcs1 = rpcs1 & ~CS1_TRE;		/* clr CS1<TRE> */
-		rpcs2 = rpcs2 & ~CS2_ERR;  }		/* clr CS2<15:8> */
+	    rpcs1 = rpcs1 & ~CS1_TRE;			/* clr CS1<TRE> */
+	    rpcs2 = rpcs2 & ~CS2_ERR;  }		/* clr CS2<15:8> */
 	if ((access == WRITE) || (PA & 1)) {		/* hi byte write? */
-		if (rpcs1 & CS1_DONE)			/* done set? */
-			rpcs1 = (rpcs1 & ~CS1_UAE) | (data & CS1_UAE);  }
+	    if (rpcs1 & CS1_DONE)			/* done set? */
+		rpcs1 = (rpcs1 & ~CS1_UAE) | (data & CS1_UAE);  }
 	if ((access == WRITE) || !(PA & 1)) {		/* lo byte write? */
-		if ((data & CS1_DONE) && (data & CS1_IE))	/* to DONE+IE? */
-			rpiff = 1;			/* set CSTB INTR */
-		rpcs1 = (rpcs1 & ~CS1_IE) | (data & CS1_IE);
-		if (uptr->flags & UNIT_DIS) {		/* nx disk? */
-			rpcs2 = rpcs2 | CS2_NED;	/* set error flag */
-			cs1f = CS1_SC;  }		/* req interrupt */
-		else if (sim_is_active (uptr))
-			rper1[drv] = rper1[drv] | ER1_RMR;	/* won't write */
-		else if (data & CS1_GO) {		/* start op */
-			uptr->FUNC = GET_FNC (data);	/* set func */
-			if ((uptr->FUNC >= FNC_XFER) &&	/* data xfer and */
-			   ((rpcs1 & CS1_DONE) == 0))	/* ~rdy? PGE */
-				rpcs2 = rpcs2 | CS2_PGE;
-			else rp_go (drv, uptr->FUNC);  }  }
+	    if ((data & CS1_DONE) && (data & CS1_IE))	/* to DONE+IE? */
+		rpiff = 1;				/* set CSTB INTR */
+	    rpcs1 = (rpcs1 & ~CS1_IE) | (data & CS1_IE);
+	    if (uptr->flags & UNIT_DIS) {		/* nx disk? */
+		rpcs2 = rpcs2 | CS2_NED;		/* set error flag */
+		cs1f = CS1_SC;  }			/* req interrupt */
+	    else if (sim_is_active (uptr))
+		rper1[drv] = rper1[drv] | ER1_RMR;	/* won't write */
+	    else if (data & CS1_GO) {			/* start op */
+		uptr->FUNC = GET_FNC (data);		/* set func */
+		if ((uptr->FUNC >= FNC_XFER) &&		/* data xfer and */
+		   ((rpcs1 & CS1_DONE) == 0))		/* ~rdy? PGE */
+		    rpcs2 = rpcs2 | CS2_PGE;
+		else rp_go (drv, uptr->FUNC);  }  }
 	rpcs3 = (rpcs3 & ~CS1_IE) | (rpcs1 & CS1_IE);
 	rpbae = (rpbae & ~CS1_M_UAE) | ((rpcs1 >> CS1_V_UAE) & CS1_M_UAE);
 	break;	
 case 001:						/* RPWC */
 	if (access == WRITEB) data = (PA & 1)?
-		(rpwc & 0377) | (data << 8): (rpwc & ~0377) | data;
+	    (rpwc & 0377) | (data << 8): (rpwc & ~0377) | data;
 	rpwc = data;
 	break;
 case 002:						/* RPBA */
 	if (access == WRITEB) data = (PA & 1)?
-		(rpba & 0377) | (data << 8): (rpba & ~0377) | data;
+	    (rpba & 0377) | (data << 8): (rpba & ~0377) | data;
 	rpba = data & ~BA_MBZ;
 	break;
 case 003:						/* RPDA */
 	if (access == WRITEB) data = (PA & 1)?
-		(rpda & 0377) | (data << 8): (rpda & ~0377) | data;
+	    (rpda & 0377) | (data << 8): (rpda & ~0377) | data;
 	rpda = data & ~DA_MBZ;
 	break;
 case 004:						/* RPCS2 */
 	if ((access == WRITEB) && (PA & 1)) data = data << 8;
 	if (data & CS2_CLR) rp_reset (&rp_dev);		/* init? */
-	else {	if ((data & ~rpcs2) & (CS2_PE | CS2_MXF))
-			cs1f = CS1_SC;			/* diagn intr */
-		if (access == WRITEB) data = (rpcs2 &	/* merge data */
-			((PA & 1)? 0377: 0177400)) | data;
-		rpcs2 = (rpcs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR | CS2_OR;  }
+	else {
+	    if ((data & ~rpcs2) & (CS2_PE | CS2_MXF))
+		cs1f = CS1_SC;				/* diagn intr */
+	    if (access == WRITEB) data = (rpcs2 &	/* merge data */
+		((PA & 1)? 0377: 0177400)) | data;
+	    rpcs2 = (rpcs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR | CS2_OR;  }
 	drv = GET_UNIT (rpcs2);
 	break;
 case 006:						/* RPER1 */
@@ -701,26 +702,26 @@ case 006:						/* RPER1 */
 case 007:						/* RPAS */
 	if ((access == WRITEB) && (PA & 1)) break;
 	for (i = 0; i < RP_NUMDR; i++)
-		if (data & (AS_U0 << i)) rpds[i] = rpds[i] & ~DS_ATA;
+	    if (data & (AS_U0 << i)) rpds[i] = rpds[i] & ~DS_ATA;
 	break;
 case 011:						/* RPDB */
 	if (access == WRITEB) data = (PA & 1)?
-		(rpdb & 0377) | (data << 8): (rpdb & ~0377) | data;
+	    (rpdb & 0377) | (data << 8): (rpdb & ~0377) | data;
 	rpdb = data;
 	break;
 case 012:						/* RPMR */
 	if (access == WRITEB) data = (PA & 1)?
-		(rpmr & 0377) | (data << 8): (rpmr & ~0377) | data;
+	    (rpmr & 0377) | (data << 8): (rpmr & ~0377) | data;
 	rpmr = data;
 	break;
 case 015:						/* RPOF */
 	if (access == WRITEB) data = (PA & 1)?
-		(rpof & 0377) | (data << 8): (rpof & ~0377) | data;
+	    (rpof & 0377) | (data << 8): (rpof & ~0377) | data;
 	rpof = data & ~OF_MBZ;
 	break;
 case 016:						/* RPDC */
 	if (access == WRITEB) data = (PA & 1)?
-		(rpdc & 0377) | (data << 8): (rpdc & ~0377) | data;
+	    (rpdc & 0377) | (data << 8): (rpdc & ~0377) | data;
 	rpdc = data & ~DC_MBZ;
 	break;
 case 024:						/* RPBAE */
@@ -796,8 +797,8 @@ case FNC_PACK:						/* pack acknowledge */
 case FNC_OFFSET:					/* offset mode */
 case FNC_RETURN:
 	if ((uptr->flags & UNIT_ATT) == 0) {		/* not attached? */
-		rper1[drv] = rper1[drv] | ER1_UNS;	/* unsafe */
-		break;  }
+	    rper1[drv] = rper1[drv] | ER1_UNS;		/* unsafe */
+	    break;  }
 	rpds[drv] = (rpds[drv] & ~DS_RDY) | DS_PIP;	/* set positioning */
 	sim_activate (uptr, rp_swait);			/* time operation */
 	return;
@@ -808,13 +809,13 @@ case FNC_RECAL:						/* recalibrate */
 case FNC_SEEK:						/* seek */
 case FNC_SEARCH:					/* search */
 	if ((uptr->flags & UNIT_ATT) == 0) {		/* not attached? */
-		rper1[drv] = rper1[drv] | ER1_UNS;	/* unsafe */
-		break;  }
+	    rper1[drv] = rper1[drv] | ER1_UNS;		/* unsafe */
+	    break;  }
 	if ((GET_CY (dc) >= drv_tab[dtype].cyl) ||	/* bad cylinder */
 	    (GET_SF (rpda) >= drv_tab[dtype].surf) ||	/* bad surface */
             (GET_SC (rpda) >= drv_tab[dtype].sect)) {	/* or bad sector? */
-		rper1[drv] = rper1[drv] | ER1_IAE;
-		break;  }
+	    rper1[drv] = rper1[drv] | ER1_IAE;
+	    break;  }
 	rpds[drv] = (rpds[drv] & ~DS_RDY) | DS_PIP;	/* set positioning */
 	t = abs (dc - uptr->CYL);			/* cyl diff */
 	if (t == 0) t = 1;				/* min time */
@@ -828,15 +829,15 @@ case FNC_WCHK:						/* write check */
 case FNC_READ:						/* read */
 case FNC_READH:						/* read headers */
 	if ((uptr->flags & UNIT_ATT) == 0) {		/* not attached? */
-		rper1[drv] = rper1[drv] | ER1_UNS;	/* unsafe */
-		break;  }
+	    rper1[drv] = rper1[drv] | ER1_UNS;		/* unsafe */
+	    break;  }
 	rpcs2 = rpcs2 & ~CS2_ERR;			/* clear errors */
 	rpcs1 = rpcs1 & ~(CS1_TRE | CS1_MCPE | CS1_DONE);
 	if ((GET_CY (dc) >= drv_tab[dtype].cyl) ||	/* bad cylinder */
 	    (GET_SF (rpda) >= drv_tab[dtype].surf) ||	/* bad surface */
             (GET_SC (rpda) >= drv_tab[dtype].sect)) {	/* or bad sector? */
-		rper1[drv] = rper1[drv] | ER1_IAE;
-		break;  }
+	    rper1[drv] = rper1[drv] | ER1_IAE;
+	    break;  }
 	rpds[drv] = rpds[drv] & ~DS_RDY;		/* clear drive rdy */
 	sim_activate (uptr, rp_rwait + (rp_swait * abs (dc - uptr->CYL)));
 	uptr->CYL = dc;					/* save cylinder */
@@ -890,9 +891,9 @@ case FNC_SEEK:						/* seek */
 
 case FNC_WRITE:						/* write */
 	if (uptr->flags & UNIT_WPRT) {			/* write locked? */
-		rper1[drv] = rper1[drv] | ER1_WLE;	/* set drive error */
-		update_rpcs (CS1_DONE | CS1_TRE, drv);	/* set done, err */
-		break;  }
+	    rper1[drv] = rper1[drv] | ER1_WLE;		/* set drive error */
+	    update_rpcs (CS1_DONE | CS1_TRE, drv);	/* set done, err */
+	    break;  }
 case FNC_WCHK:						/* write check */
 case FNC_READ:						/* read */
 case FNC_READH:						/* read headers */
@@ -947,11 +948,11 @@ case FNC_READH:						/* read headers */
 	    awc = wc;
 	    for (wc = 0; wc < awc; wc++) {		/* loop thru buf */
 		if (Map_ReadW (ba, 2, &comp, RH)) {	/* read word */
-			rpcs2 = rpcs2 | CS2_NEM;	/* set error */
-			break;  }
+		    rpcs2 = rpcs2 | CS2_NEM;		/* set error */
+		    break;  }
 		if (comp != rpxb[wc]) {			/* compare wd */
-			rpcs2 = rpcs2 | CS2_WCE;	/* set error */
-			break;  }
+		    rpcs2 = rpcs2 | CS2_WCE;		/* set error */
+		    break;  }
 		if ((rpcs2 & CS2_UAI) == 0) ba = ba + 2;  }
 	    }						/* end else wchk */
 
@@ -968,11 +969,11 @@ case FNC_READH:						/* read headers */
 	rpdc = da / drv_tab[dtype].surf;
 
 	if (err != 0) {					/* error? */
-		rper1[drv] = rper1[drv] | ER1_PAR;	/* set drive error */
-		update_rpcs (CS1_DONE | CS1_TRE, drv);	/* set done, err */
-		perror ("RP I/O error");
-		clearerr (uptr->fileref);
-		return SCPE_IOERR;  }
+	    rper1[drv] = rper1[drv] | ER1_PAR;		/* set drive error */
+	    update_rpcs (CS1_DONE | CS1_TRE, drv);	/* set done, err */
+	    perror ("RP I/O error");
+	    clearerr (uptr->fileref);
+	    return SCPE_IOERR;  }
 case FNC_WRITEH:					/* write headers stub */
 	update_rpcs (CS1_DONE, drv);			/* set done */
 	break;  }					/* end case func */
@@ -1046,7 +1047,7 @@ for (i = 0; i < RP_NUMDR; i++) {
 	sim_cancel (uptr);
 	uptr->CYL = uptr->FUNC = 0;
 	if (uptr->flags & UNIT_ATT) rpds[i] = (rpds[i] & DS_VV) |
-		DS_DPR | DS_RDY | DS_MOL | ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
+	    DS_DPR | DS_RDY | DS_MOL | ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
 	else if (uptr->flags & UNIT_DIS) rpds[i] = 0;
 	else rpds[i] = DS_DPR;
 	rper1[i] = 0;  }
@@ -1076,7 +1077,7 @@ if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
 if ((p = ftell (uptr->fileref)) == 0) {
 	if (uptr->flags & UNIT_RO) return SCPE_OK;
 	return pdp11_bad_block (uptr,
-		drv_tab[GET_DTYPE (uptr->flags)].sect, RP_NUMWD);  }
+	    drv_tab[GET_DTYPE (uptr->flags)].sect, RP_NUMWD);  }
 for (i = 0; drv_tab[i].sect != 0; i++) {
     if (p <= (drv_tab[i].size * (int) sizeof (int16))) {
 	uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
@@ -1098,7 +1099,7 @@ if (sim_is_active (uptr)) {				/* unit active? */
 	sim_cancel (uptr);				/* cancel operation */
 	rper1[drv] = rper1[drv] | ER1_OPI;		/* set drive error */
 	if (uptr->FUNC >= FNC_WCHK)			/* data transfer? */
-		rpcs1 = rpcs1 | CS1_DONE | CS1_TRE;  }	/* set done, err */
+	    rpcs1 = rpcs1 | CS1_DONE | CS1_TRE;  }	/* set done, err */
 update_rpcs (CS1_SC, drv);				/* request intr */
 return detach_unit (uptr);
 }

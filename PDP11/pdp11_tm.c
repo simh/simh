@@ -284,29 +284,30 @@ case 0:							/* MTS: read only */
 case 1:							/* MTC */
 	uptr = tm_dev.units + GET_UNIT (tm_cmd);	/* select unit */
 	if ((tm_cmd & MTC_DONE) == 0) tm_sta = tm_sta | STA_ILL;
-	else {	if (access == WRITEB) data = (PA & 1)?
-			(tm_cmd & 0377) | (data << 8):
-			(tm_cmd & ~0377) | data;
-		if (data & MTC_INIT) {			/* init? */
-			tm_reset (&tm_dev);		/* reset device */
-			return SCPE_OK;  }
-		if ((data & MTC_IE) == 0)		/* int disable? */
-			CLR_INT (TM);			/* clr int request */
-		else if ((tm_cmd & (MTC_ERR + MTC_DONE)) && !(tm_cmd & MTC_IE))
-			SET_INT (TM);			/* set int request */
-		tm_cmd = (tm_cmd & ~MTC_RW) | (data & MTC_RW);
-		uptr = tm_dev.units + GET_UNIT (tm_cmd);	/* new unit */
-		if (data & MTC_GO) tm_go (uptr);  }	/* new function? */
+	else {
+	    if (access == WRITEB) data = (PA & 1)?
+		(tm_cmd & 0377) | (data << 8):
+		(tm_cmd & ~0377) | data;
+	    if (data & MTC_INIT) {			/* init? */
+		tm_reset (&tm_dev);			/* reset device */
+		return SCPE_OK;  }
+	    if ((data & MTC_IE) == 0)			/* int disable? */
+		CLR_INT (TM);				/* clr int request */
+	    else if ((tm_cmd & (MTC_ERR + MTC_DONE)) && !(tm_cmd & MTC_IE))
+		SET_INT (TM);				/* set int request */
+	    tm_cmd = (tm_cmd & ~MTC_RW) | (data & MTC_RW);
+	    uptr = tm_dev.units + GET_UNIT (tm_cmd);	/* new unit */
+	    if (data & MTC_GO) tm_go (uptr);  }		/* new function? */
 	tm_updcsta (uptr);				/* update status */
 	break;
 case 2:							/* MTBRC */
 	if (access == WRITEB) data = (PA & 1)?
-		(tm_bc & 0377) | (data << 8): (tm_bc & ~0377) | data;
+	    (tm_bc & 0377) | (data << 8): (tm_bc & ~0377) | data;
 	tm_bc = data;
 	break;
 case 3:							/* MTCMA */
 	if (access == WRITEB) data = (PA & 1)?
-		(tm_ca & 0377) | (data << 8): (tm_ca & ~0377) | data;
+	    (tm_ca & 0377) | (data << 8): (tm_ca & ~0377) | data;
 	tm_ca = data;
 	break;
 case 4:							/* MTD */
@@ -363,12 +364,12 @@ MT_CLR_PNU (uptr);					/* and clear */
 if (uptr->USTAT & STA_REW) {				/* rewind? */
 	uptr->pos = 0;					/* update position */
 	if (uptr->flags & UNIT_ATT)			/* still on line? */
-		uptr->USTAT = STA_ONL | STA_BOT |
-			((uptr->flags & UNIT_WPRT)? STA_WLK: 0);
+	    uptr->USTAT = STA_ONL | STA_BOT |
+		((uptr->flags & UNIT_WPRT)? STA_WLK: 0);
 	else uptr->USTAT = 0;
 	if (u == GET_UNIT (tm_cmd)) {			/* selected? */
-		tm_set_done ();				/* set done */
-		tm_updcsta (uptr);  }			/* update status */
+	    tm_set_done ();				/* set done */
+	    tm_updcsta (uptr);  }			/* update status */
 	return SCPE_OK;  }
 
 if ((uptr->flags & UNIT_ATT) == 0) {			/* if not attached */
@@ -400,34 +401,35 @@ case MTC_READ:						/* read */
 	if (tbc < cbc) cbc = tbc;			/* use smaller */
 	abc = fxread (tmxb, sizeof (int8), cbc, uptr->fileref);
 	if (err = ferror (uptr->fileref)) {		/* error? */
-		MT_SET_PNU (uptr);			/* pos not upd */
-		break;  }
+	    MT_SET_PNU (uptr);				/* pos not upd */
+	    break;  }
 	for ( ; abc < cbc; abc++) tmxb[abc] = 0;	/* fill with 0's */
 	if (t = Map_WriteB (xma, cbc, tmxb, MAP)) {	/* copy buf to mem */
-		tm_sta = tm_sta | STA_NXM;		/* NXM, set err */
-		cbc = cbc - t;  }			/* adj byte cnt */
+	    tm_sta = tm_sta | STA_NXM;			/* NXM, set err */
+	    cbc = cbc - t;  }				/* adj byte cnt */
 	xma = (xma + cbc) & 0777777;			/* inc bus addr */
 	tm_bc = (tm_bc + cbc) & 0177777;		/* inc byte cnt */
 	uptr->pos = uptr->pos + ((tbc + 1) & ~1) +	/* upd position */
-		(2 * sizeof (t_mtrlnt));
+	    (2 * sizeof (t_mtrlnt));
 	break;
 
 case MTC_WRITE:						/* write */
 case MTC_WREXT:						/* write ext gap */
 	if (t = Map_ReadB (xma, cbc, tmxb, MAP)) {	/* copy mem to buf */
-		tm_sta = tm_sta | STA_NXM;		/* NXM, set err */
-		cbc = cbc - t;				/* adj byte cnt */
-		if (cbc == 0) break;  }			/* no xfr? done */
+	    tm_sta = tm_sta | STA_NXM;			/* NXM, set err */
+	    cbc = cbc - t;				/* adj byte cnt */
+	    if (cbc == 0) break;  }			/* no xfr? done */
 	ebc = (cbc + 1) & ~1;				/* force even */
 	fseek (uptr->fileref, uptr->pos, SEEK_SET);
 	fxwrite (&cbc, sizeof (t_mtrlnt), 1, uptr->fileref);
 	fxwrite (tmxb, sizeof (int8), ebc, uptr->fileref);
 	fxwrite (&cbc, sizeof (t_mtrlnt), 1, uptr->fileref);
 	if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr); /* error? */
-	else {	xma = (xma + cbc) & 0777777;		/* inc bus addr */
-		tm_bc = (tm_bc + cbc) & 0177777;	/* inc byte cnt */
-		uptr->pos = uptr->pos + ebc +		/* upd pos */
-		    (2 * sizeof (t_mtrlnt));  }
+	else {
+	    xma = (xma + cbc) & 0777777;		/* inc bus addr */
+	    tm_bc = (tm_bc + cbc) & 0177777;		/* inc byte cnt */
+	    uptr->pos = uptr->pos + ebc +		/* upd pos */
+		(2 * sizeof (t_mtrlnt));  }
 	break;
 
 /* Unit service, continued */
@@ -440,19 +442,22 @@ case MTC_WREOF:
 	break;
 
 case MTC_SPACEF:					/* space forward */
-	do {	tm_bc = (tm_bc + 1) & 0177777;		/* incr wc */
-		if (tm_rdlntf (uptr, &tbc, &err)) break;/* read rec lnt, err? */
-		uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
-			(2 * sizeof (t_mtrlnt));  }
+	do {
+	    tm_bc = (tm_bc + 1) & 0177777;		/* incr wc */
+	    if (tm_rdlntf (uptr, &tbc, &err)) break;	/* read rec lnt, err? */
+	    uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
+		(2 * sizeof (t_mtrlnt));  }
 	while (tm_bc != 0);
 	break;
 
 case MTC_SPACER:					/* space reverse */
-	do {	tm_bc = (tm_bc + 1) & 0177777;		/* incr wc */
-		if (pnu) pnu = 0;			/* pos not upd? */
-		else {	if (tm_rdlntr (uptr, &tbc, &err)) break;
-			uptr->pos = uptr->pos - ((tbc + 1) & ~1) -
-				(2 * sizeof (t_mtrlnt));  }  }
+	do {
+	    tm_bc = (tm_bc + 1) & 0177777;		/* incr wc */
+	    if (pnu) pnu = 0;				/* pos not upd? */
+	    else {
+	    	if (tm_rdlntr (uptr, &tbc, &err)) break;
+		uptr->pos = uptr->pos - ((tbc + 1) & ~1) -
+		    (2 * sizeof (t_mtrlnt));  }  }
 	while (tm_bc != 0);
 	break;  }					/* end case */
 

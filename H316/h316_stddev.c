@@ -28,6 +28,7 @@
    tty		316/516-33 teleprinter
    clk/options	316/516-12 real time clocks/internal options
 
+   22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7b/8b support to terminal
    30-May-02	RMS	Widened POS to 32b
    03-Nov-01	RMS	Implemented upper case for console output
@@ -199,13 +200,13 @@ case ioSKS:						/* SKS */
 	if (fnc & 013) return IOBADFNC (dat);		/* only fnc 0,4 */
 	if (((fnc == 0) && TST_READY (INT_PTR)) ||	/* fnc 0? skip rdy */
 	    ((fnc == 4) && !TST_INTREQ (INT_PTR)))	/* fnc 4? skip !int */
-		return IOSKIP (dat);
+	    return IOSKIP (dat);
 	break;
 case ioINA:						/* INA */
 	if (fnc & 007) return IOBADFNC (dat);		/* only fnc 0,10 */
 	if (TST_READY (INT_PTR)) {			/* ready? */
-		CLR_READY (INT_PTR);			/* clear ready */
-		return IOSKIP (ptr_unit.buf | dat);  }	/* ret buf, skip */
+	    CLR_READY (INT_PTR);			/* clear ready */
+	    return IOSKIP (ptr_unit.buf | dat);  }	/* ret buf, skip */
 	break;  }					/* end case op */
 return dat;
 }
@@ -220,8 +221,8 @@ if ((ptr_unit.flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (ptr_stopioe, SCPE_UNATT);
 if ((temp = getc (ptr_unit.fileref)) == EOF) {		/* read byte */
 	if (feof (ptr_unit.fileref)) {
-		if (ptr_stopioe) printf ("PTR end of file\n");
-		else return SCPE_OK;  }
+	    if (ptr_stopioe) printf ("PTR end of file\n");
+	    else return SCPE_OK;  }
 	else perror ("PTR I/O error");
 	clearerr (ptr_unit.fileref);
 	return SCPE_IOERR;  }
@@ -284,28 +285,28 @@ switch (inst) {						/* case on opcode */
 case ioOCP:						/* OCP */
 	if (fnc & 016) return IOBADFNC (dat);		/* only fnc 0,1 */
 	if (fnc) {					/* fnc 1? pwr off */
-		CLR_READY (INT_PTP);			/* not ready */
-		ptp_power = 0;				/* turn off power */
-		sim_cancel (&ptp_unit);  }		/* stop punch */
+	    CLR_READY (INT_PTP);			/* not ready */
+	    ptp_power = 0;				/* turn off power */
+	    sim_cancel (&ptp_unit);  }			/* stop punch */
 	else if (ptp_power == 0)			/* fnc 0? start */
-		sim_activate (&ptp_unit, ptp_ptime);
+	    sim_activate (&ptp_unit, ptp_ptime);
 	break;
 case ioSKS:						/* SKS */
 	if ((fnc & 012) || (fnc == 005))		/* only 0, 1, 4 */
-		return IOBADFNC (dat);
+	    return IOBADFNC (dat);
 	if (((fnc == 00) && TST_READY (INT_PTP)) ||	/* fnc 0? skip rdy */
 	    ((fnc == 01)				/* fnc 1? skip ptp on */
 		&& (ptp_power || sim_is_active (&ptp_unit))) ||
 	    ((fnc == 04) && !TST_INTREQ (INT_PTP)))	/* fnc 4? skip !int */
-		return IOSKIP (dat);
+	    return IOSKIP (dat);
 	break;
 case ioOTA:						/* OTA */
 	if (fnc) return IOBADFNC (dat);			/* only fnc 0 */
 	if (TST_READY (INT_PTP)) {			/* if ptp ready */
-		CLR_READY (INT_PTP);			/* clear ready */
-		ptp_unit.buf = dat & 0377;		/* store byte */
-		sim_activate (&ptp_unit, ptp_unit.wait);
-		return IOSKIP (dat);  }			/* skip return */
+	    CLR_READY (INT_PTP);			/* clear ready */
+	    ptp_unit.buf = dat & 0377;			/* store byte */
+	    sim_activate (&ptp_unit, ptp_unit.wait);
+	    return IOSKIP (dat);  }			/* skip return */
 	break;  }
 return dat;
 }
@@ -349,11 +350,12 @@ switch (inst) {						/* case on opcode */
 case ioOCP:						/* OCP */
 	if (fnc & 016) return IOBADFNC (dat);		/* only fnc 0,1 */
 	if (fnc && (tty_mode == 0)) {			/* input to output? */
-		if (!sim_is_active (&tty_unit[TTO])) SET_READY (INT_TTY);
-		tty_mode = 1;  }			/* mode is output */
+	    if (!sim_is_active (&tty_unit[TTO]))	/* set ready */
+		SET_READY (INT_TTY);
+	    tty_mode = 1;  }				/* mode is output */
 	else if ((fnc == 0) && tty_mode) {		/* output to input? */
-		CLR_READY (INT_TTY);			/* clear ready */
-		tty_mode = 0;  }			/* mode is input */
+	    CLR_READY (INT_TTY);			/* clear ready */
+	    tty_mode = 0;  }				/* mode is input */
 	break;
 case ioSKS:						/* SKS */
 	if (fnc & 012) return IOBADFNC (dat);		/* fnc 0,1,4,5 */
@@ -363,26 +365,26 @@ case ioSKS:						/* SKS */
 	    ((fnc == 4) && !TST_INTREQ (INT_TTY)) ||	/* fnc 4? skip !int */
 	    ((fnc == 5) &&				/* fnc 5? skip !xoff */
 		!tty_mode && ((tty_buf & 0177) == 023)))
-		return IOSKIP (dat);
+	    return IOSKIP (dat);
 	break;
 case ioINA:						/* INA */
 	if (fnc & 005) return IOBADFNC (dat);		/* only 0,2,10,12 */
 	if (TST_READY (INT_TTY)) {			/* ready? */
-		if (tty_mode == 0) CLR_READY (INT_TTY);	/* inp? clear rdy */
-		return IOSKIP (dat |
-			(tty_buf & ((fnc & 002)? 077: 0377)));  }
+	    if (tty_mode == 0) CLR_READY (INT_TTY);	/* inp? clear rdy */
+	    return IOSKIP (dat |
+		(tty_buf & ((fnc & 002)? 077: 0377)));  }
 	break;
 case ioOTA:
 	if (fnc & 015) return IOBADFNC (dat);		/* only 0,2 */
 	if (TST_READY (INT_TTY)) {			/* ready? */
-		tty_buf = dat & 0377;			/* store char */
-		if (fnc & 002) {			/* binary mode? */
-			tty_buf = tty_buf | 0100;	/* set ch 7 */
-			if (tty_buf & 040) tty_buf = tty_buf & 0277;  }
-		if (tty_mode) {
-			sim_activate (&tty_unit[TTO], tty_unit[TTO].wait);
-			CLR_READY (INT_TTY);  }
-		return IOSKIP (dat);  }
+	    tty_buf = dat & 0377;			/* store char */
+	    if (fnc & 002) {				/* binary mode? */
+		tty_buf = tty_buf | 0100;		/* set ch 7 */
+		if (tty_buf & 040) tty_buf = tty_buf & 0277;  }
+	    if (tty_mode) {
+		sim_activate (&tty_unit[TTO], tty_unit[TTO].wait);
+		CLR_READY (INT_TTY);  }
+	    return IOSKIP (dat);  }
 	break;  }					/* end case op */
 return dat;
 }
@@ -396,7 +398,8 @@ int32 out, c;
 sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
 out = c & 0177;						/* mask echo to 7b */
-if (tty_unit[TTI].flags & UNIT_KSR) {			/* KSR? */
+if (c & SCPE_BREAK) c = 0;				/* break? */
+else if (tty_unit[TTI].flags & UNIT_KSR) {		/* KSR? */
 	if (islower (out)) out = toupper (out);		/* cvt to UC */
 	c = out | 0200;  }				/* add TTY bit */
 else c = c & ((tty_unit[TTI].flags & UNIT_8B)? 0377: 0177);
@@ -404,7 +407,7 @@ if (tty_mode == 0) {					/* input mode? */
 	tty_buf = c;					/* put char in buf */
 	tty_unit[TTI].pos = tty_unit[TTI].pos + 1;
 	SET_READY (INT_TTY);				/* set flag */
-	sim_putchar (out);  }				/* echo */
+	if (out) sim_putchar (out);  }			/* echo */
 return SCPE_OK;
 }
 
@@ -452,31 +455,32 @@ case ioOCP:						/* OCP */
 	if (fnc & 015) return IOBADFNC (dat);		/* only fnc 0,2 */
 	CLR_READY (INT_CLK);				/* reset ready */
 	if (fnc) sim_cancel (&clk_unit);		/* fnc = 2? stop */
-	else { if (!sim_is_active (&clk_unit))	/* fnc = 0? start */
+	else {						/* fnc = 0? */
+	    if (!sim_is_active (&clk_unit))
 		sim_activate (&clk_unit,		/* activate */
-		    sim_rtc_init (clk_unit.wait));  }	/* init calibr */
+		sim_rtc_init (clk_unit.wait));  }	/* init calibr */
 	break;
 case ioSKS:						/* SKS */
 	if (fnc == 0) {					/* clock skip !int */
-		if (!TST_INTREQ (INT_CLK)) return IOSKIP (dat);  }
+	    if (!TST_INTREQ (INT_CLK)) return IOSKIP (dat);  }
 	else if ((fnc & 007) == 002) {			/* mem parity? */
-		if (((fnc == 002) && !TST_READY (INT_MPE)) ||
-		    ((fnc == 012) && TST_READY (INT_MPE)))
-			return IOSKIP (dat);  }
+	    if (((fnc == 002) && !TST_READY (INT_MPE)) ||
+		((fnc == 012) && TST_READY (INT_MPE)))
+		return IOSKIP (dat);  }
 	else return IOBADFNC (dat);			/* invalid fnc */
 	break;
 case ioOTA:						/* OTA */
 	if (fnc == 000) dev_enable = dat;		/* SMK */
 	else if (fnc == 010) {				/* OTK */
-		C = (dat >> 15) & 1;			/* set C */
-		if (cpu_unit.flags & UNIT_HSA)		/* HSA included? */
-			dp = (dat >> 14) & 1;		/* set dp */
-		if (cpu_unit.flags & UNIT_EXT) {	/* ext opt? */
-			if (dat & 020000) {		/* ext set? */
-				ext = 1;		/* yes, set */
-				extoff_pending = 0;  }
-			else extoff_pending = 1;  }	/* no, clr later */
-		sc = dat & 037;  }			/* set sc */
+	    C = (dat >> 15) & 1;			/* set C */
+	    if (cpu_unit.flags & UNIT_HSA)		/* HSA included? */
+		dp = (dat >> 14) & 1;			/* set dp */
+	    if (cpu_unit.flags & UNIT_EXT) {		/* ext opt? */
+		if (dat & 020000) {			/* ext set? */
+		    ext = 1;				/* yes, set */
+		    extoff_pending = 0;  }
+		else extoff_pending = 1;  }		/* no, clr later */
+	    sc = dat & 037;  }				/* set sc */
 	else return IOBADFNC (dat);
 	break;  }
 return dat;

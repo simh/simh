@@ -154,22 +154,22 @@ static const char *lpt_cc[] = {
 if (lpt_iot & 020) {					/* space? */
 	SET_INT (LPTSPC);				/* set flag */
 	if ((lpt_unit.flags & UNIT_ATT) == 0)		/* attached? */
-		return IORETURN (lpt_stopioe, SCPE_UNATT);
+	    return IORETURN (lpt_stopioe, SCPE_UNATT);
 	fputs (lpt_cc[lpt_iot & 07], lpt_unit.fileref);	/* print cctl */
 	if (ferror (lpt_unit.fileref)) {		/* error? */
-		perror ("LPT I/O error");
-		clearerr (lpt_unit.fileref);
-		return SCPE_IOERR;  }
+	    perror ("LPT I/O error");
+	    clearerr (lpt_unit.fileref);
+	    return SCPE_IOERR;  }
 	lpt_iot = 0;  }					/* clear state */
 else {	SET_INT (LPT);					/* print */
 	if ((lpt_unit.flags & UNIT_ATT) == 0)		/* attached? */
-		return IORETURN (lpt_stopioe, SCPE_UNATT);
+	    return IORETURN (lpt_stopioe, SCPE_UNATT);
 	if (lpt_iot & 010) fputc ('\r', lpt_unit.fileref);
 	fputs (lpt_buf, lpt_unit.fileref);		/* print buffer */
 	if (ferror (lpt_unit.fileref)) {		/* test error */
-		perror ("LPT I/O error");
-		clearerr (lpt_unit.fileref);
-		return SCPE_IOERR;  }
+	    perror ("LPT I/O error");
+	    clearerr (lpt_unit.fileref);
+	    return SCPE_IOERR;  }
 	bptr = 0;
 	for (i = 0; i <= LPT_BSIZE; i++) lpt_buf[i] = 0; /* clear buffer */
 	lpt_iot = 010;  }				/* set state */
@@ -253,33 +253,33 @@ if (pulse & 002) {					/* pulse 02 */
 	lpt_done = 0;					/* clear done */
 	CLR_INT (LPT);					/* clear int req */
 	if (subp == 0) {				/* LPCB */
-		for (i = 0; i < LPT_BSIZE; i++) lpt_buf[i] = 0;
-		bptr = 0;				/* reset buf ptr */
-		lpt_done = 1;				/* set done */
-		if (lpt_ie) SET_INT (LPT);  }  }	/* set int */
+	    for (i = 0; i < LPT_BSIZE; i++) lpt_buf[i] = 0;
+	    bptr = 0;					/* reset buf ptr */
+	    lpt_done = 1;				/* set done */
+	    if (lpt_ie) SET_INT (LPT);  }  }		/* set int */
 if (pulse & 004) {					/* LPDI */
 	switch (subp) {					/* case on subcode */
 	case 0:						/* LPDI */
 #if defined (PDP9)
-		lpt_ie = 0;				/* clear int enable */
-		CLR_INT (LPT);				/* clear int req */
+	    lpt_ie = 0;					/* clear int enable */
+	    CLR_INT (LPT);				/* clear int req */
 #endif
-		break;
+	    break;
 	case 2:						/* LPB3 */
-		if (bptr < LPT_BSIZE) {
-			lpt_buf[bptr] = lpt_buf[bptr] | ((AC >> 12) & 077);
-			bptr = bptr + 1;  }
+	    if (bptr < LPT_BSIZE) {
+		lpt_buf[bptr] = lpt_buf[bptr] | ((AC >> 12) & 077);
+		bptr = bptr + 1;  }
 	case 1:						/* LPB2 */
-		if (bptr < LPT_BSIZE) {
-			lpt_buf[bptr] = lpt_buf[bptr] | ((AC >> 6) & 077);
-			bptr = bptr + 1;  }
+	    if (bptr < LPT_BSIZE) {
+		lpt_buf[bptr] = lpt_buf[bptr] | ((AC >> 6) & 077);
+		bptr = bptr + 1;  }
 	case 3:						/* LPB1 */
-		if (bptr < LPT_BSIZE) {
-			lpt_buf[bptr] = lpt_buf[bptr] | (AC & 077);
-			bptr = bptr + 1;  }
-		lpt_done = 1;				/* set done */
-		if (lpt_ie) SET_INT (LPT);		/* set int */
-		break;  }				/* end case */
+	    if (bptr < LPT_BSIZE) {
+		lpt_buf[bptr] = lpt_buf[bptr] | (AC & 077);
+		bptr = bptr + 1;  }
+	    lpt_done = 1;				/* set done */
+	    if (lpt_ie) SET_INT (LPT);			/* set int */
+	    break;  }					/* end case */
 	}						/* end if pulse 4 */
 return AC;
 }
@@ -293,12 +293,12 @@ if (pulse & 002) {					/* LPCF */
 if (pulse & 004) {
 	int32 subp = (pulse >> 4) & 03;			/* get subpulse */
 	if (subp < 3) {					/* LPLS, LPPB, LPPS */
-		lpt_iot = (pulse & 060) | (AC & 07);	/* save parameters */
-		sim_activate (&lpt_unit, lpt_unit.wait);  }	/* activate */
+	    lpt_iot = (pulse & 060) | (AC & 07);	/* save parameters */
+	    sim_activate (&lpt_unit, lpt_unit.wait);  }	/* activate */
 #if defined (PDP9)
 	else {						/* LPEI */
-		lpt_ie = 1;				/* set int enable */
-		if (lpt_done) SET_INT (LPT);  }
+	    lpt_ie = 1;					/* set int enable */
+	    if (lpt_done) SET_INT (LPT);  }
 #endif
 	}						/* end if pulse 4 */
 return AC;
@@ -332,22 +332,22 @@ if ((lpt_unit.flags & UNIT_ATT) == 0) {			/* not attached? */
 	return IORETURN (lpt_stopioe, SCPE_UNATT);  }
 if ((lpt_iot & 020) == 0) {				/* print? */
 	for (i = 0; i < bptr; i++) 			/* translate buffer */
-		pbuf[i] = lpt_buf[i] | ((lpt_buf[i] >= 040)? 0: 0100);
+	    pbuf[i] = lpt_buf[i] | ((lpt_buf[i] >= 040)? 0: 0100);
 	if ((lpt_iot & 060) == 0) pbuf[bptr++] = '\r';
 	for (i = 0; i < LPT_BSIZE; i++) lpt_buf[i] = 0;	/* clear buffer */
 	fwrite (pbuf, 1, bptr, lpt_unit.fileref);	/* print buffer */
 	if (ferror (lpt_unit.fileref)) {		/* error? */
-		perror ("LPT I/O error");
-		clearerr (lpt_unit.fileref);
-		bptr = 0;
-		return SCPE_IOERR;  }
+	    perror ("LPT I/O error");
+	    clearerr (lpt_unit.fileref);
+	    bptr = 0;
+	    return SCPE_IOERR;  }
 	bptr = 0;  }					/* clear buffer ptr */
 if (lpt_iot & 060) {					/* space? */
 	fputs (lpt_cc[lpt_iot & 07], lpt_unit.fileref);	/* write cctl */
 	if (ferror (lpt_unit.fileref)) {		/* error? */
-		perror ("LPT I/O error");
-		clearerr (lpt_unit.fileref);
-		return SCPE_IOERR;  }  }
+	    perror ("LPT I/O error");
+	    clearerr (lpt_unit.fileref);
+	    return SCPE_IOERR;  }  }
 lpt_unit.pos = ftell (lpt_unit.fileref);		/* update position */
 return SCPE_OK;
 }
@@ -505,29 +505,31 @@ for (more = 1; more != 0; ) {				/* loop until ctrl */
 	w1 = M[(M[LPT_CA] + 2) & ADDRMASK];		/* get second word */
 	M[LPT_CA] = (M[LPT_CA] + 2) & 0777777;		/* advance mem addr */
 	if (mode) {					/* unpacked? */
-		c[0] = w0 & 0177;
-		c[1] = w1 & 0177;
-		ccnt = 2;  }
-	else {	c[0] = (w0 >> 11) & 0177;		/* packed */
-		c[1] = (w0 >> 4) & 0177;
-		c[2] = (((w0 << 3) | (w1 >> 15))) & 0177;
-		c[3] = (w1 >> 8) & 0177;
-		c[4] = (w1 >> 1) & 0177;
-		ccnt = 5;  }
+	    c[0] = w0 & 0177;
+	    c[1] = w1 & 0177;
+	    ccnt = 2;  }
+	else {
+	    c[0] = (w0 >> 11) & 0177;			/* packed */
+	    c[1] = (w0 >> 4) & 0177;
+	    c[2] = (((w0 << 3) | (w1 >> 15))) & 0177;
+	    c[3] = (w1 >> 8) & 0177;
+	    c[4] = (w1 >> 1) & 0177;
+	    ccnt = 5;  }
 	for (i = 0; i < ccnt; i++) {			/* loop through */
-		if ((c[i] <= 037) && ctrl[c[i]]) {	/* control char? */
-			fwrite (lpt_buf, 1, bptr, lpt_unit.fileref);
-			fputs (ctrl[c[i]], lpt_unit.fileref);
-			if (ferror (lpt_unit.fileref)) {	/* error? */
-				perror ("LPT I/O error");
-				clearerr (lpt_unit.fileref);
-				bptr = 0;
-				lpt_updsta (STA_DON | STA_ALM);
-				return SCPE_IOERR;  }
-			lpt_unit.pos = ftell (lpt_unit.fileref);
-			bptr = more = 0;  }
-		else {	if (bptr < LPT_BSIZE) lpt_buf[bptr++] = c[i];
-			else lpt_sta = lpt_sta | STA_OVF;  }  }  }
+	    if ((c[i] <= 037) && ctrl[c[i]]) {		/* control char? */
+		fwrite (lpt_buf, 1, bptr, lpt_unit.fileref);
+		fputs (ctrl[c[i]], lpt_unit.fileref);
+		if (ferror (lpt_unit.fileref)) {	/* error? */
+		    perror ("LPT I/O error");
+		    clearerr (lpt_unit.fileref);
+		    bptr = 0;
+		    lpt_updsta (STA_DON | STA_ALM);
+		    return SCPE_IOERR;  }
+		lpt_unit.pos = ftell (lpt_unit.fileref);
+		bptr = more = 0;  }
+	    else {
+	    	if (bptr < LPT_BSIZE) lpt_buf[bptr++] = c[i];
+		else lpt_sta = lpt_sta | STA_OVF;  }  }  }
 
 lcnt = lcnt - 1;					/* decr line count */
 if (lcnt) sim_activate (&lpt_unit, lpt_unit.wait);	/* more to do? */

@@ -114,11 +114,11 @@ const char *sim_stop_messages[] = {
 	"Exception in interrupt or exception",
 	"Process PTE in P0 or P1 space",
 	"Interrupt at undefined IPL",
-	"Unknown error",
 	"Fatal RQDX3 error",
 	"Infinite loop",
-	"Unknown abort code",
-	"Sanity timer expired"  };
+	"Sanity timer expired",
+	"Unknown error",
+	"Unknown abort code" };
 
 /* Binary loader
 
@@ -156,7 +156,7 @@ else {	origin = 0;					/* memory */
 while ((i = getc (fileref)) != EOF) {			/* read byte stream */
 	if (origin >= limit) return SCPE_NXM;		/* NXM? */
 	if (sim_switches & SWMASK ('R'))		/* ROM? */
-		rom_wr (origin, i, L_BYTE);		/* not writeable */
+	    rom_wr (origin, i, L_BYTE);			/* not writeable */
 	else WriteB (origin, i);			/* store byte */
 	origin = origin + 1;  }
 return SCPE_OK;
@@ -726,7 +726,7 @@ const uint16 drom[NUM_INST][MAX_SPEC + 1] = {
 
 /* Opcode mnemonics table */
 
-static const char *opcode[] = {
+const char *opcode[] = {
 "HALT", "NOP", "REI", "BPT", "RET", "RSB", "LDPCTX", "SVPCTX",
 "CVTPS", "CVTSP", "INDEX", "CRC", "PROBER", "PROBEW", "INSQUE", "REMQUE",
 "BSBB", "BRB", "BNEQ", "BEQL", "BGTR", "BLEQ", "JSB", "JMP",
@@ -845,8 +845,8 @@ if ((sw & SWMASK ('A')) || (sw & SWMASK ('C'))) {	/* char format? */
 	if (sw & SWMASK ('C')) lnt = sim_emax;		/* -c -> string */
 	if ((val[0] & 0x7F) == 0) return SCPE_ARG;
 	while (vp < lnt) {				/* print string */
-		if ((c = (int32) val[vp++] & 0x7F) == 0) break;
-		fprintf (of, (c < 0x20)? "<%02X>": "%c", c);  }
+	    if ((c = (int32) val[vp++] & 0x7F) == 0) break;
+	    fprintf (of, (c < 0x20)? "<%02X>": "%c", c);  }
 	return -(vp - 1);  }				/* return # chars */
 
 if (sw & SWMASK ('M') && (uptr == &cpu_unit)) {		/* inst format? */
@@ -885,73 +885,77 @@ for (i = 0; i < numspec; i++) {				/* loop thru spec */
 	fputc (i? ',': ' ', of);			/* separator */
 	disp = drom[inst][i + 1];			/* get drom value */
 	if (disp == BB) {				/* byte br disp? */
-		GETNUM (num, 1);
-		fprintf (of, "%-X", SXTB (num) + addr + vp);  }
+	    GETNUM (num, 1);
+	    fprintf (of, "%-X", SXTB (num) + addr + vp);  }
 	else if (disp == BW) {				/* word br disp? */
+	    GETNUM (num, 2);
+	    fprintf (of, "%-X", SXTW (num) + addr + vp);  }
+	else {
+	    spec = (int32) val[vp++];			/* get specifier */
+	    if ((spec & 0xF0) == IDX) {			/* index? */
+		index = spec;				/* copy, get next */
+		spec = (int32) val[vp++];  }
+	    else index = 0;
+	    rn = spec & 0xF;				/* get reg # */
+	    switch (spec & 0xF0) {			/* case on mode */
+	    case SH0: case SH1: case SH2: case SH3:	/* s^# */
+		fprintf (of, "#%-X", spec);
+		break;
+	    case GRN:					/* Rn */
+		fprintf (of, "%-s", regname[rn]);
+		break;
+	    case RGD:					/* (Rn) */
+		fprintf (of, "(%-s)", regname[rn]);
+		break;
+	    case ADC:					/* -(Rn) */
+		fprintf (of, "-(%-s)", regname[rn]);
+		break;
+	    case AIN:					/* (Rn)+, #n */
+		if (rn != nPC) fprintf (of, "(%-s)+", regname[rn]);
+		else {
+		    if (disp == OC)
+			vp = fprint_sym_qoimm (of, val, vp, 4);
+		    else if (DR_LNT (disp) == L_QUAD)
+			vp = fprint_sym_qoimm (of, val, vp, 2);
+		    else {
+		    	GETNUM (num, DR_LNT (disp));
+			fprintf (of, "#%-X", num);  }  }
+		break;
+	    case AID:					/* @(Rn)+, @#n */
+		if (rn != nPC) fprintf (of, "@(%-s)+", regname[rn]);
+		else {
+		    GETNUM (num, 4);
+		    fprintf (of, "@#%-X", num);  }
+		break;
+	    case BDD:					/* @b^d(r),@b^n */
+		fputc ('@', of);
+	    case BDP:					/* b^d(r), b^n */
+		GETNUM (num, 1);
+		if (rn == nPC) fprintf (of, "%-X", addr + vp + SXTB (num));
+		else if (num & BSIGN) fprintf (of, "-%-X(%-s)",
+		    -num & BMASK, regname[rn]);
+		else fprintf (of, "%-X(%-s)", num, regname[rn]);
+		break;
+	    case WDD:					/* @w^d(r),@w^n */
+		fputc ('@', of);
+	    case WDP:					/* w^d(r), w^n */
 		GETNUM (num, 2);
-		fprintf (of, "%-X", SXTW (num) + addr + vp);  }
-	else {	spec = (int32) val[vp++];		/* get specifier */
-		if ((spec & 0xF0) == IDX) {		/* index? */
-			index = spec;			/* copy, get next */
-			spec = (int32) val[vp++];  }
-		else index = 0;
-		rn = spec & 0xF;			/* get reg # */
-		switch (spec & 0xF0) {			/* case on mode */
-		case SH0: case SH1: case SH2: case SH3:	/* s^# */
-			fprintf (of, "#%-X", spec);
-			break;
-		case GRN:				/* Rn */
-			fprintf (of, "%-s", regname[rn]);
-			break;
-		case RGD:				/* (Rn) */
-			fprintf (of, "(%-s)", regname[rn]);
-			break;
-		case ADC:				/* -(Rn) */
-			fprintf (of, "-(%-s)", regname[rn]);
-			break;
-		case AIN:				/* (Rn)+, #n */
-			if (rn != nPC) fprintf (of, "(%-s)+", regname[rn]);
-			else {	if (disp == OC)
-					vp = fprint_sym_qoimm (of, val, vp, 4);
-				else if (DR_LNT (disp) == L_QUAD)
-					vp = fprint_sym_qoimm (of, val, vp, 2);
-				else {	GETNUM (num, DR_LNT (disp));
-					fprintf (of, "#%-X", num);  }  }
-			break;
-		case AID:				/* @(Rn)+, @#n */
-			if (rn != nPC) fprintf (of, "@(%-s)+", regname[rn]);
-			else {	GETNUM (num, 4);
-				fprintf (of, "@#%-X", num);  }
-			break;
-		case BDD:				/* @b^d(r),@b^n */
-			fputc ('@', of);
-		case BDP:				/* b^d(r), b^n */
-			GETNUM (num, 1);
-			if (rn == nPC) fprintf (of, "%-X", addr + vp + SXTB (num));
-			else if (num & BSIGN) fprintf (of, "-%-X(%-s)",
-				-num & BMASK, regname[rn]);
-			else fprintf (of, "%-X(%-s)", num, regname[rn]);
-			break;
-		case WDD:				/* @w^d(r),@w^n */
-			fputc ('@', of);
-		case WDP:				/* w^d(r), w^n */
-			GETNUM (num, 2);
-			if (rn == nPC) fprintf (of, "%-X", addr + vp + SXTW (num));
-			else if (num & WSIGN) fprintf (of, "-%-X(%-s)",
-				-num & WMASK, regname[rn]);
-			else fprintf (of, "%-X(%-s)", num, regname[rn]);
-			break;
-		case LDD:				/* @l^d(r),@l^n */
-			fputc ('@', of);
-		case LDP:				/* l^d(r),l^n */
-			GETNUM (num, 4);
-			if (rn == nPC) fprintf (of, "%-X", addr + vp + num);
-			else if (num & LSIGN) fprintf (of, "-%-X(%-s)",
-				-num, regname[rn]);
-			else fprintf (of, "%-X(%-s)", num, regname[rn]);
-			break;  }			/* end case */
-		if (index) fprintf (of, "[%-s]", regname[index & 0xF]);
-		}					/* end else */
+		if (rn == nPC) fprintf (of, "%-X", addr + vp + SXTW (num));
+		else if (num & WSIGN) fprintf (of, "-%-X(%-s)",
+		    -num & WMASK, regname[rn]);
+		else fprintf (of, "%-X(%-s)", num, regname[rn]);
+		break;
+	    case LDD:					/* @l^d(r),@l^n */
+		fputc ('@', of);
+	    case LDP:					/* l^d(r),l^n */
+		GETNUM (num, 4);
+		if (rn == nPC) fprintf (of, "%-X", addr + vp + num);
+		else if (num & LSIGN) fprintf (of, "-%-X(%-s)",
+		    -num, regname[rn]);
+		else fprintf (of, "%-X(%-s)", num, regname[rn]);
+		break;  }				/* end case */
+	    if (index) fprintf (of, "[%-s]", regname[index & 0xF]);
+	    }						/* end else */
 	}						/* end for */
 return -(vp - 1);
 }
@@ -975,8 +979,8 @@ for (i = 0; i < lnt; i++) { GETNUM (num[lnt - 1 - i], 4); }
 for (i = startp = 0; i < lnt; i++) {
 	if (startp) fprintf (of, "%08X", num[i]);
 	else if (num[i] || (i == (lnt - 1))) {
-		fprintf (of, "#%-X", num[i]);
-		startp = 1;  }  }
+	    fprintf (of, "#%-X", num[i]);
+	    startp = 1;  }  }
 return vp;
 }
 
@@ -1019,7 +1023,7 @@ if ((sw & SWMASK ('A')) || (sw & SWMASK ('C'))) {	/* char format? */
 	if (sw & SWMASK ('C')) lnt = sim_emax;		/* -c -> string */
 	if (*cptr == 0) return SCPE_ARG;
 	while ((vp < lnt) && *cptr) {			/* get chars */
-		val[vp++] = *cptr++;  }
+	    val[vp++] = *cptr++;  }
 	return -(vp - 1);  }				/* return # chars */
 
 if (uptr == &cpu_unit) {				/* cpu only */
@@ -1054,7 +1058,7 @@ for (i = 0, opc = -1; (i < NUM_INST) && (opc < 0); i++) {
 	if (opcode[i] && strcmp (gbuf, opcode[i]) == 0) opc = i;  }
 if (opc < 0) {						/* check alternates */
 	for (i = 0; altcod[i] && (opc < 0); i++) {
-		if (strcmp (gbuf, altcod[i]) == 0) opc = altop[i];  }  }
+	    if (strcmp (gbuf, altcod[i]) == 0) opc = altop[i];  }  }
 if (opc < 0) return SCPE_ARG;				/* undefined? */
 vp = 0;
 if (opc >= 0x100) val[vp++] = 0xFD;			/* 2 byte? */
@@ -1129,7 +1133,7 @@ return vp;
 #define PARSE_LOSE	{ *r = SCPE_ARG; return vp; }
 #define SEL_LIM(p,m,u)	((fl & SP_PLUS)? (p): ((fl & SP_MINUS)? (m): (u)))
 
-parse_spec (char *cptr, t_addr addr, t_value *val, int32 vp, int32 disp, t_stat *r)
+int32 parse_spec (char *cptr, t_addr addr, t_value *val, int32 vp, int32 disp, t_stat *r)
 {
 int32 i, k, litsize, rn, index;
 int32 num, dispsize, mode;
@@ -1142,30 +1146,30 @@ const char *force[] = { "S^", "I^", "B^", "W^", "L^", NULL };
 M1C ('@', SP_IND);					/* look for @ */
 if (tptr = parse_rnum (cptr, &rn)) {			/* look for Rn */
 	if (*cptr == '[') {				/* look for [Rx] */
-		cptr = parse_rnum (++cptr, &index);
-		if ((cptr == NULL) || (*cptr++ != ']')) PARSE_LOSE;
-		val[vp++] = index | IDX;  }
+	    cptr = parse_rnum (++cptr, &index);
+	    if ((cptr == NULL) || (*cptr++ != ']')) PARSE_LOSE;
+	    val[vp++] = index | IDX;  }
 	else val[vp++] = rn | GRN | (fl? 1: 0);		/* Rn or @Rn */
 	if (*tptr != 0) *r = SCPE_ARG;			/* must be done */
 	return vp;  }
 for (i = 0; force[i]; i++) {				/* look for x^ */
 	if (strncmp (cptr, force[i], 2) == 0) {
-		cptr = cptr + 2;
-		fl = fl | ((i + 1) << SP_V_FORCE);
-		break;  }  }
+	    cptr = cptr + 2;
+	    fl = fl | ((i + 1) << SP_V_FORCE);
+	    break;  }  }
 M1C ('#', SP_LIT);					/* look for # */
 M1C ('+', SP_PLUS);					/* look for + */
 M1C ('-', SP_MINUS);					/* look for - */
-for (litsize = 0;; cptr++) {			/* look for mprec int */
+for (litsize = 0;; cptr++) {				/* look for mprec int */
 	c = *cptr;
 	if ((c < '0') || (c > 'F') || ((c > '9') && (c < 'A'))) break;
 	num = (c <= '9')? c - '0': c - 'A' + 10;
 	fl = fl | SP_NUM;
 	for (i = 3; i >= 0; i--) {
-		lit[i] = lit[i] << 4;
-		if (i > 0) lit[i] = lit[i] | ((lit[i - 1] >> 28) & 0xF);
-		else lit[i] = lit[i] | num;
-		if (lit[i] && (i > litsize)) litsize = i;  }  }
+	    lit[i] = lit[i] << 4;
+	    if (i > 0) lit[i] = lit[i] | ((lit[i - 1] >> 28) & 0xF);
+	    else lit[i] = lit[i] | num;
+	    if (lit[i] && (i > litsize)) litsize = i;  }  }
 if (*cptr == '(') {					/* look for (Rn) */
 	cptr = parse_rnum (++cptr, &rn);
 	if ((cptr == NULL) || (*cptr++ != ')')) PARSE_LOSE;
@@ -1193,8 +1197,8 @@ case SP_IDX|SP_POSTP:					/* (Rn)+ */
 case SP_LIT|SP_NUM:					/* #n */
 case SP_LIT|SP_PLUS|SP_NUM:				/* #+n */
 	if ((litsize == 0) && ((lit[0] & ~0x3F) == 0)) {
-		val[vp++] = lit[0];
-		break;  }
+	    val[vp++] = lit[0];
+	    break;  }
 case SP_LIT|SP_MINUS|SP_NUM:				/* #-n */
 case SP_FI|SP_LIT|SP_NUM:				/* I^#n */
 case SP_FI|SP_LIT|SP_PLUS|SP_NUM:			/* I^#+n */
@@ -1203,26 +1207,26 @@ case SP_FI|SP_LIT|SP_MINUS|SP_NUM:			/* I^#-n */
 	disp = (disp == OC)? DR_LNMASK + 1: disp & DR_LNMASK;
 	switch (disp) {					/* case spec lnt */
 	case 00:					/* check fit */
-		if ((litsize > 0) || (lit[0] < 0) || 
-			(lit[0] > SEL_LIM (0x7F, 0x80, 0xFF))) PARSE_LOSE;
-		SPUTNUM (lit[0], 1);			/* store */
-		break;
+	    if ((litsize > 0) || (lit[0] < 0) || 
+		(lit[0] > SEL_LIM (0x7F, 0x80, 0xFF))) PARSE_LOSE;
+	    SPUTNUM (lit[0], 1);			/* store */
+	    break;
 	case 01:					/* check fit */
-		if ((litsize > 0) || (lit[0] < 0) ||
-			(lit[0] > SEL_LIM (0x7FFF, 0x8000, 0xFFFF))) PARSE_LOSE;
-		SPUTNUM (lit[0], 2);
-		break;
+	    if ((litsize > 0) || (lit[0] < 0) ||
+		(lit[0] > SEL_LIM (0x7FFF, 0x8000, 0xFFFF))) PARSE_LOSE;
+	    SPUTNUM (lit[0], 2);
+	    break;
 	case 02:					/* check 1 lw */
-		if (litsize > 0) PARSE_LOSE;
-		SPUTNUM (lit[0], 4);
-		break;
+	    if (litsize > 0) PARSE_LOSE;
+	    SPUTNUM (lit[0], 4);
+	    break;
 	case 03:					/* check 2 lw */
-		if (litsize > 1) PARSE_LOSE;
-		vp = parse_sym_qoimm (lit, val, vp, 2, fl & SP_MINUS);
-		break;
+	    if (litsize > 1) PARSE_LOSE;
+	    vp = parse_sym_qoimm (lit, val, vp, 2, fl & SP_MINUS);
+	    break;
 	case DR_LNMASK + 1:
-		vp = parse_sym_qoimm (lit, val, vp, 4, fl & SP_MINUS);
-		break;  }				/* end case disp */
+	    vp = parse_sym_qoimm (lit, val, vp, 4, fl & SP_MINUS);
+	    break;  }				/* end case disp */
 	break;
 case SP_IND|SP_IDX|SP_POSTP:				/* @(Rn)+ */
 	val[vp++] = rn | AID;
@@ -1242,12 +1246,12 @@ case SP_IND|SP_MINUS|SP_NUM|SP_IDX:			/* @-d(rn) */
 	dispsize = 4;					/* find fit for */
 	mode = LDP;					/* displacement */
 	if (lit[0] >= 0) {
-		if (lit[0] <= SEL_LIM (0x7F, 0x80, 0xFF)) {
-			dispsize = 1;
-			mode = BDP;  }
-		else if (lit[0] <= SEL_LIM (0x7FFF, 0x8000, 0xFFFF)) {
-			dispsize = 2;
-			mode = WDP;  }  }
+	    if (lit[0] <= SEL_LIM (0x7F, 0x80, 0xFF)) {
+		dispsize = 1;
+		mode = BDP;  }
+	    else if (lit[0] <= SEL_LIM (0x7FFF, 0x8000, 0xFFFF)) {
+		dispsize = 2;
+		mode = WDP;  }  }
 	val[vp++] = mode | rn | ((fl & SP_IND)? 1: 0);
 	SPUTNUM (lit[0], dispsize);
 	break;
@@ -1258,7 +1262,7 @@ case SP_IND|SP_FB|SP_NUM|SP_IDX:			/* @B^d(rn) */
 case SP_IND|SP_FB|SP_PLUS|SP_NUM|SP_IDX:		/* @B^+d(rn) */
 case SP_IND|SP_FB|SP_MINUS|SP_NUM|SP_IDX:		/* @B^-d(rn) */
 	if ((litsize > 0) || (lit[0] < 0) || 
-		(lit[0] > SEL_LIM (0x7F, 0x80, 0xFF))) PARSE_LOSE;
+	    (lit[0] > SEL_LIM (0x7F, 0x80, 0xFF))) PARSE_LOSE;
 	val[vp++] = rn | BDP | ((fl & SP_IND)? 1: 0);
 	SPUTNUM (lit[0], 1);
 	break;
@@ -1269,7 +1273,7 @@ case SP_IND|SP_FW|SP_NUM|SP_IDX:			/* @W^d(rn) */
 case SP_IND|SP_FW|SP_PLUS|SP_NUM|SP_IDX:		/* @W^+d(rn) */
 case SP_IND|SP_FW|SP_MINUS|SP_NUM|SP_IDX:		/* @W^-d(rn) */
 	if ((litsize > 0) || (lit[0] < 0) ||
-		(lit[0] > SEL_LIM (0x7FFF, 0x8000, 0xFFFF))) PARSE_LOSE;
+	    (lit[0] > SEL_LIM (0x7FFF, 0x8000, 0xFFFF))) PARSE_LOSE;
 	val[vp++] = rn | WDP | ((fl & SP_IND)? 1: 0);
 	SPUTNUM (lit[0], 2);
 	break;
@@ -1288,15 +1292,17 @@ case SP_IND|SP_NUM:					/* @n */
 	if (litsize > 0) PARSE_LOSE;
 	num = lit[0] - (addr + vp + 2);			/* fit in byte? */
 	if ((num >= -128) && (num <= 127)) {
-		mode = BDP;
-		dispsize = 1;  }
-	else {	num = lit[0] - (addr + vp + 3);		/* fit in word? */
-		if ((num >= -32768) && (num <= 32767)) {
-			mode = WDP;
-			dispsize = 2;  }
-		else {	num = lit[0] - (addr + vp + 5);	/* no, use lw */
-			mode = LDP;
-			dispsize = 4;  }  }
+	    mode = BDP;
+	    dispsize = 1;  }
+	else {
+	    num = lit[0] - (addr + vp + 3);		/* fit in word? */
+	    if ((num >= -32768) && (num <= 32767)) {
+		mode = WDP;
+		dispsize = 2;  }
+	    else {
+	    	num = lit[0] - (addr + vp + 5);		/* no, use lw */
+		mode = LDP;
+		dispsize = 4;  }  }
 	val[vp++] = mode | nPC | ((fl & SP_IND)? 1: 0);
 	PUTNUM (num, dispsize);
 	break;
@@ -1336,8 +1342,8 @@ char *tptr;
 for (i = 15; i >= 0; i--) {				/* chk named reg */
 	lnt = strlen (regname[i]);
 	if (strncmp (cptr, regname[i], lnt) == 0) {
-		*rn = i;
-		return cptr + lnt;  }  }
+	    *rn = i;
+	    return cptr + lnt;  }  }
 if (*cptr++ != 'R') return NULL;			/* look for R */
 regnum = strtotv (cptr, &tptr, 10);			/* look for reg # */
 if ((cptr == tptr) || (regnum > 15)) return NULL;

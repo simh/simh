@@ -226,7 +226,7 @@ if (pulse == 004) {					/* DPLA */
 if (pulse == 024) {					/* DPCS */
 	rp_sta = rp_sta & ~(STA_HNF | STA_DON);
 	rp_stb = rp_stb & ~(STB_FME | STB_WPE | STB_LON | STB_WCE |
-		STB_TME | STB_PGE | STB_EOP);
+	    STB_TME | STB_PGE | STB_EOP);
 	rp_updsta (0, 0);  }
 if (pulse == 044) rp_ma = AC;				/* DPCA */
 if (pulse == 064) rp_wc = AC;				/* DPWC */
@@ -261,13 +261,14 @@ if (rp_sta & STA_GO) {
 	rp_busy = 1;					/* set ctrl busy */
 	rp_sta = rp_sta & ~(STA_HNF | STA_DON);		/* clear flags */
 	rp_stb = rp_stb & ~(STB_FME | STB_WPE | STB_LON | STB_WCE |
-		STB_TME | STB_PGE | STB_EOP | (1 << (STB_V_ATT0 - u)));
+	    STB_TME | STB_PGE | STB_EOP | (1 << (STB_V_ATT0 - u)));
 	if (((uptr->flags & UNIT_ATT) == 0) || (f == FN_IDLE) ||
 	     (f == FN_SEEK) || (f == FN_RECAL))
-		sim_activate (uptr, RP_MIN);		/* short delay */
-	else {	c = GET_CYL (rp_da);
-		c = abs (c - uptr->CYL) * rp_swait;	/* seek time */
-		sim_activate (uptr, MAX (RP_MIN, c + rp_rwait));  }  }
+	    sim_activate (uptr, RP_MIN);		/* short delay */
+	else {
+	    c = GET_CYL (rp_da);
+	    c = abs (c - uptr->CYL) * rp_swait;		/* seek time */
+	    sim_activate (uptr, MAX (RP_MIN, c + rp_rwait));  }  }
 rp_updsta (0, 0);
 return AC;
 }
@@ -346,14 +347,14 @@ if ((f == FN_WRITE) && (err == 0)) {			/* write? */
 	fxwrite (&M[pa], sizeof (int32), wc, uptr->fileref);
 	err = ferror (uptr->fileref);
 	if ((err == 0) && (i = (wc & (RP_NUMWD - 1)))) {
-		fxwrite (fill, sizeof (int), i, uptr->fileref);
-		err = ferror (uptr->fileref);  }  }
+	    fxwrite (fill, sizeof (int), i, uptr->fileref);
+	    err = ferror (uptr->fileref);  }  }
 
 if ((f == FN_WRCHK) && (err == 0)) {			/* write check? */
 	for (i = 0; (err == 0) && (i < wc); i++)  {
-		awc = fxread (&comp, sizeof (int32), 1, uptr->fileref);
-		if (awc == 0) comp = 0;
-		if (comp != M[pa + i]) rp_updsta (0, STB_WCE);  }
+	    awc = fxread (&comp, sizeof (int32), 1, uptr->fileref);
+	    if (awc == 0) comp = 0;
+	    if (comp != M[pa + i]) rp_updsta (0, STB_WCE);  }
 	err = ferror (uptr->fileref);  }
 
 rp_wc = (rp_wc + wc) & 0777777;				/* final word count */
@@ -389,7 +390,7 @@ if ((uptr->flags & UNIT_ATT) == 0) rp_stb = rp_stb | STB_SUFU | STB_SUNR;
 else if (sim_is_active (uptr)) {
 	f = (uptr->FUNC) & STA_M_FUNC;
 	if ((f == FN_SEEK) || (f == FN_RECAL))
-		rp_stb = rp_stb | STB_SUSU | STB_SUNR;  }
+	    rp_stb = rp_stb | STB_SUSU | STB_SUNR;  }
 else if (uptr->CYL >= RP_NUMCY) rp_sta = rp_sta | STA_SUSI;
 if ((rp_sta & STA_EFLGS) || (rp_stb & STB_EFLGS)) rp_sta = rp_sta | STA_ERR;
 if (((rp_sta & (STA_ERR | STA_DON)) && (rp_sta & STA_IED)) ||

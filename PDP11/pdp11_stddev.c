@@ -26,6 +26,7 @@
    tti,tto	DL11 terminal input/output
    clk		KW11L line frequency clock
 
+   22-Nov-02	RMS	Changed terminal default to 7B for UNIX
    01-Nov-02	RMS	Added 7B/8B support to terminal
    29-Sep-02	RMS	Added vector display support
 			Split out paper tape
@@ -93,7 +94,7 @@ t_stat clk_reset (DEVICE *dptr);
 DIB tti_dib = { IOBA_TTI, IOLN_TTI, &tti_rd, &tti_wr,
 		1, IVCL (TTI), VEC_TTI, { NULL } };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_8B, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
 	{ ORDATA (BUF, tti_unit.buf, 8) },
@@ -132,7 +133,7 @@ DEVICE tti_dev = {
 DIB tto_dib = { IOBA_TTO, IOLN_TTO, &tto_rd, &tto_wr,
 		1, IVCL (TTO), VEC_TTO, { NULL } };
 
-UNIT tto_unit = { UDATA (&tto_svc, UNIT_8B, 0), SERIAL_OUT_WAIT };
+UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
 	{ ORDATA (BUF, tto_unit.buf, 8) },
@@ -219,7 +220,7 @@ case 00:						/* tti csr */
 	if (PA & 1) return SCPE_OK;
 	if ((data & CSR_IE) == 0) CLR_INT (TTI);
 	else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-		SET_INT (TTI);
+	    SET_INT (TTI);
 	tti_csr = (tti_csr & ~TTICSR_RW) | (data & TTICSR_RW);
 	return SCPE_OK;
 case 01:						/* tti buf */
@@ -235,7 +236,8 @@ int32 c;
 
 sim_activate (&tti_unit, tti_unit.wait);		/* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
-tti_unit.buf = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);
+if (c & SCPE_BREAK) tti_unit.buf = 0;			/* break? */
+else tti_unit.buf = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);
 tti_unit.pos = tti_unit.pos + 1;
 tti_csr = tti_csr | CSR_DONE;
 if (tti_csr & CSR_IE) SET_INT (TTI);
@@ -274,7 +276,7 @@ case 00:						/* tto csr */
 	if (PA & 1) return SCPE_OK;
 	if ((data & CSR_IE) == 0) CLR_INT (TTO);
 	else if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-		SET_INT (TTO);
+	    SET_INT (TTO);
 	tto_csr = (tto_csr & ~TTOCSR_RW) | (data & TTOCSR_RW);
 	return SCPE_OK;
 case 01:						/* tto buf */

@@ -90,9 +90,9 @@ t_stat stat;
 for (i = 0; dibp = dib_tab[i]; i++ ) {
 	if ((pa >= dibp->ba) &&
 	   (pa < (dibp->ba + dibp->lnt))) {
-		stat = dibp->rd (data, pa, access);
-		trap_req = calc_ints (ipl, trap_req);
-		return stat;  }  }
+	    stat = dibp->rd (data, pa, access);
+	    trap_req = calc_ints (ipl, trap_req);
+	    return stat;  }  }
 return SCPE_NXM;
 }
 
@@ -105,9 +105,9 @@ t_stat stat;
 for (i = 0; dibp = dib_tab[i]; i++ ) {
 	if ((pa >= dibp->ba) &&
 	   (pa < (dibp->ba + dibp->lnt))) {
-		stat = dibp->wr (data, pa, access);
-		trap_req = calc_ints (ipl, trap_req);
-		return stat;  }  }
+	    stat = dibp->wr (data, pa, access);
+	    trap_req = calc_ints (ipl, trap_req);
+	    return stat;  }  }
 return SCPE_NXM;
 }
 
@@ -168,12 +168,13 @@ t_stat ubm_wr (int32 data, int32 addr, int32 access)
 if (cpu_ubm) {
 	int32 sc, pg = (addr >> 2) & UBM_M_PN;
 	if (access == WRITEB) {
-		sc = (addr & 3) << 3;
-		ub_map[pg] = (ub_map[pg] & ~(0377 << sc)) |
-			((data & 0377) << sc);  }
-	else {	sc = (addr & 2) << 3;
-		ub_map[pg] = (ub_map[pg] & ~(0177777 << sc)) |
-			((data & 0177777) << sc);  }
+	    sc = (addr & 3) << 3;
+	    ub_map[pg] = (ub_map[pg] & ~(0377 << sc)) |
+		((data & 0377) << sc);  }
+	else {
+	    sc = (addr & 2) << 3;
+	    ub_map[pg] = (ub_map[pg] & ~(0177777 << sc)) |
+		((data & 0177777) << sc);  }
 	ub_map[pg] = ub_map[pg] & 017777776;
 	return SCPE_OK;  }
 return SCPE_NXM;
@@ -191,7 +192,7 @@ if (cpu_bme) {						/* bus map on? */
 	int32 pg = UBM_GETPN (ba);			/* map entry */
 	int32 off = UBM_GETOFF (ba);			/* offset */
 	if (pg != UBM_M_PN)				/* last page? */
-		*ma = (ub_map[pg] + off) & PAMASK;	/* no, use map */
+	    *ma = (ub_map[pg] + off) & PAMASK;		/* no, use map */
 	else *ma = (IOPAGEBASE + off) & PAMASK;  }	/* yes, use fixed */
 else *ma = ba;						/* else physical */
 return TRUE;

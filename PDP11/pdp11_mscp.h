@@ -1,6 +1,6 @@
 /* pdp11_mscp.h: DEC MSCP and TMSCP definitions
 
-   Copyright (c) 2001-2002, Robert M Supnik
+   Copyright (c) 2001-2003, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,6 +24,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Jan-03	RMS	Tape read/write end pkt is longer than disk read/write
    20-Sep-02	RMS	Merged TMSCP definitions
 */
 
@@ -251,21 +252,21 @@
 
 #define ERG_LNT		12
 
-/* Flush - 10 W of status (8 undefined) */
+/* Flush - 10 W status (8 undefined) */
 
 #define FLU_LNT		32
 /*			8 - 15				/* reserved */
 #define FLU_POSL	16				/* position */
 #define FLU_POSH	17
 
-/* Write tape mark - 10W of status (8 undefined) */
+/* Write tape mark - 10W status (8 undefined) */
 
 #define WTM_LNT		32
 /*			8 - 15				/* reserved */
 #define WTM_POSL	16				/* position */
 #define WTM_POSH	17
 
-/* Get command status packet - 2 W parameter, 4 W of status */
+/* Get command status packet - 2 W parameter, 4 W status */
 
 #define GCS_LNT		20
 #define GCS_REFL	8				/* ref # */
@@ -386,9 +387,11 @@
 #define POS_POSL	16				/* position */
 #define POS_POSH	17
 
-/* Data transfer packet - 10 W parameters (disk), 6W parameters (tape), 10 W status */
+/* Data transfer packet - 10 W parameters (disk), 6W parameters (tape),
+   10 W status (disk), 12W status (tape) */
 
-#define RW_LNT		32
+#define RW_LNT_D	32
+#define RW_LNT_T	36
 #define RW_BCL		8				/* byte count */
 #define RW_BCH		9
 #define RW_BAL		10				/* buff desc */

@@ -395,10 +395,10 @@ else if ((dev_done & (INT_PENDING | ISR)) > (INT_PENDING)) {	/* intr? */
 	int32 i, vec;
 	t = dev_done & ISR;				/* find hi pri */
 	for (i = 15; i >= 0; i--) {
-		if ((t >> i) & 1) break;  }
+	    if ((t >> i) & 1) break;  }
 	if ((i < 0) || ((vec = vec_map[i]) < 0)) {	/* undefined? */
-		reason = STOP_ILLINT;			/* stop */
-		break;  }
+	    reason = STOP_ILLINT;			/* stop */
+	    break;  }
 	dev_done = dev_done & ~INT_ON;			/* int off */
 	M[vec] = SC;					/* save SC */
 	SC = vec + 1;					/* new SC */
@@ -433,39 +433,39 @@ else if ((src != U_MEM) && (dst == U_TRP)) {		/* cond jump */
 	t = dev_tab[src].Src (src);			/* get source */
 	switch (op >> 1) {				/* case on jump */
 	case 00:					/* never */
-		jmp = 0;
-		break;
+	    jmp = 0;
+	    break;
 	case 01:					/* always */
-		jmp = 1;
-		break;
+	    jmp = 1;
+	    break;
 	case 02:					/* src == 0 */
-		jmp = (t == 0);
-		break;
+	    jmp = (t == 0);
+	    break;
 	case 03:					/* src != 0 */
-		jmp = (t != 0);
-		break;
+	    jmp = (t != 0);
+	    break;
 	case 04:					/* src < 0 */
-		jmp = (t >= SIGN);
-		break;
+	    jmp = (t >= SIGN);
+	    break;
 	case 05:					/* src >= 0 */
-		jmp = (t < SIGN);
-		break;
-	case 06:
-		jmp = (t == 0) || (t & SIGN);		/* src <= 0 */
-		break;
-	case 07:
-		jmp = (t != 0) && !(t & SIGN);		/* src > 0 */
-		break;  }
+	    jmp = (t < SIGN);
+	    break;
+	case 06:					/* src <= 0 */
+	    jmp = (t == 0) || (t & SIGN);
+	    break;
+	case 07:					/* src > 0 */
+	    jmp = (t != 0) && !(t & SIGN);
+	    break;  }
 	if (jmp) {					/* jump taken? */
-		SCQ_ENTRY;				/* save SC */
-		SC = (SC + 1) & AMASK;			/* incr SC once */
-		MA = M[SC];				/* get jump addr */
-		if (op & TRP_DEF) {			/* defer? */
-			t = (M[MA] + 1) & DMASK;	/* autoinc */
-			if (MEM_ADDR_OK (MA)) M[MA] = t;
-			MA = t & AMASK;  }		/* ind addr */
-		TRP = SC;				/* save SC */
-		SC = MA;  }				/* load new SC */
+	    SCQ_ENTRY;					/* save SC */
+	    SC = (SC + 1) & AMASK;			/* incr SC once */
+	    MA = M[SC];					/* get jump addr */
+	    if (op & TRP_DEF) {				/* defer? */
+		t = (M[MA] + 1) & DMASK;		/* autoinc */
+		if (MEM_ADDR_OK (MA)) M[MA] = t;
+		MA = t & AMASK;  }			/* ind addr */
+	    TRP = SC;					/* save SC */
+	    SC = MA;  }					/* load new SC */
 	else SC = (SC + 2) & AMASK;  }			/* incr SC twice */
 
 else if ((src != U_MEM) && (dst != U_MEM)) {		/* reg-reg? */
@@ -481,31 +481,31 @@ else if ((src != U_MEM) && (dst != U_MEM)) {		/* reg-reg? */
 else {	SC = (SC + 1) & AMASK;				/* incr SC */
 	switch (op & MEM_MOD) {				/* case on addr mode */
 	case MEM_DIR:					/* direct */
-		MA = M[SC] & AMASK;			/* get address */
-		SC = (SC + 1) & AMASK;			/* incr SC again */
-		reason = bus_op (src, op & BUS_FNC, dst); /* xmt and modify */
-		break;
+	    MA = M[SC] & AMASK;				/* get address */
+	    SC = (SC + 1) & AMASK;			/* incr SC again */
+	    reason = bus_op (src, op & BUS_FNC, dst);	/* xmt and modify */
+	    break;
 	case MEM_DEF:					/* defer */
-		MA = M[SC] & AMASK;			/* get ind addr */
-		SC = (SC + 1) & AMASK;			/* incr SC again */
-		t = (M[MA] + 1) & DMASK;		/* autoinc */
-		if (MEM_ADDR_OK (MA)) M[MA] = t;
-		MA = t & AMASK;				/* ind addr */
-		reason = bus_op (src, op & BUS_FNC, dst); /* xmt and modify */
-		break;
+	    MA = M[SC] & AMASK;				/* get ind addr */
+	    SC = (SC + 1) & AMASK;			/* incr SC again */
+	    t = (M[MA] + 1) & DMASK;			/* autoinc */
+	    if (MEM_ADDR_OK (MA)) M[MA] = t;
+	    MA = t & AMASK;				/* ind addr */
+	    reason = bus_op (src, op & BUS_FNC, dst);	/* xmt and modify */
+	    break;
 	case MEM_IMM:					/* immediate */
-		MA = SC;				/* eff addr */
-		reason = bus_op (src, op & BUS_FNC, dst); /* xmt and modify */
-		SC = (SC + 1) & AMASK;			/* incr SC again */
-		break;
+	    MA = SC;					/* eff addr */
+	    reason = bus_op (src, op & BUS_FNC, dst);	/* xmt and modify */
+	    SC = (SC + 1) & AMASK;			/* incr SC again */
+	    break;
 	case MEM_IDF:					/* immediate defer */
-		MA = SC;				/* get ind addr */
-		t = (M[MA] + 1) & DMASK;		/* autoinc */
-		if (MEM_ADDR_OK (MA)) M[MA] = t;
-		MA = t & AMASK;				/* ind addr */
-		SC = (SC + 1) & AMASK;			/* incr SC again */
-		reason = bus_op (src, op & BUS_FNC, dst); /* xmt and modify */
-		break;  }				/* end switch */
+	    MA = SC;					/* get ind addr */
+	    t = (M[MA] + 1) & DMASK;			/* autoinc */
+	    if (MEM_ADDR_OK (MA)) M[MA] = t;
+	    MA = t & AMASK;				/* ind addr */
+	    SC = (SC + 1) & AMASK;			/* incr SC again */
+	    reason = bus_op (src, op & BUS_FNC, dst);	/* xmt and modify */
+	    break;  }					/* end switch */
 	}						/* end mem ref */
 }							/* end while */
 
@@ -775,9 +775,9 @@ if (op == EAO_MUL) {					/* mul? */
 	GR[0] = t & DMASK;  }
 if (op == EAO_DIV) {					/* div? */
 	if (AY && (AX < AY)) {
-		t = (AX << 16) | GR[0];			/* AX'GR1 / AY */
-		GR[0] = t / AY;				/* quo to GR1 */
-		AX = t % AY;  }				/* rem to AX */
+	    t = (AX << 16) | GR[0];			/* AX'GR1 / AY */
+	    GR[0] = t / AY;				/* quo to GR1 */
+	    AX = t % AY;  }				/* rem to AX */
 	}
 return SCPE_OK;
 }

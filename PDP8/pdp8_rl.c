@@ -278,26 +278,27 @@ case 4:							/* RLCB */
 	uptr = rl_dev.units + GET_DRIVE (rlcsb);	/* select unit */
 	switch (GET_FUNC (rlcsb)) {			/* case on func */
 	case RLCSB_CLRD:				/* clear drive */
-		uptr->STAT = uptr->STAT & ~RLDS_ERR;	/* clear errors */
+	    uptr->STAT = uptr->STAT & ~RLDS_ERR;	/* clear errors */
 	case RLCSB_MNT:					/* mnt */
-		rl_set_done (0);
-		break;
+	    rl_set_done (0);
+	    break;
 	case RLCSB_SEEK:				/* seek */
-		curr = GET_CYL (uptr->TRK);		/* current cylinder */
-		offs = GET_CYL (rlcsa);			/* offset */
-		if (rlcsa & RLCSA_DIR) {		/* in or out? */
-			newc = curr + offs;		/* out */
-			maxc = (uptr->flags & UNIT_RL02)?
-				RL_NUMCY * 2: RL_NUMCY;
-			if (newc >= maxc) newc = maxc - 1;  }
-		else {	newc = curr - offs;		/* in */
-			if (newc < 0) newc = 0;  }
-		uptr->TRK = newc | (rlcsa & RLCSA_HD);
-		sim_activate (uptr, rl_swait * abs (newc - curr));
-		break;
+	    curr = GET_CYL (uptr->TRK);			/* current cylinder */
+	    offs = GET_CYL (rlcsa);			/* offset */
+	    if (rlcsa & RLCSA_DIR) {			/* in or out? */
+		newc = curr + offs;			/* out */
+		maxc = (uptr->flags & UNIT_RL02)?
+			RL_NUMCY * 2: RL_NUMCY;
+		if (newc >= maxc) newc = maxc - 1;  }
+	    else {
+		newc = curr - offs;			/* in */
+		if (newc < 0) newc = 0;  }
+	    uptr->TRK = newc | (rlcsa & RLCSA_HD);
+	    sim_activate (uptr, rl_swait * abs (newc - curr));
+	    break;
 	default:					/* data transfer */
-		sim_activate (uptr, rl_swait);		/* activate unit */
-		break;  }				/* end switch func */
+	    sim_activate (uptr, rl_swait);		/* activate unit */
+	    break;  }					/* end switch func */
 	break;
 case 5:							/* RLSA */
 	rlsa = GET_SECT (AC);
@@ -322,7 +323,7 @@ case 0:							/* RRER */
 	uptr = rl_dev.units + GET_DRIVE (rlcsb);	/* select unit */
 	if (!sim_is_active (uptr) &&			/* update drdy */
 	    (uptr->flags & UNIT_ATT))
-		rler = rler | RLER_DRDY;
+	    rler = rler | RLER_DRDY;
 	else rler = rler & ~RLER_DRDY;
 	dat = rler & RLER_MASK;
 	break;
@@ -340,9 +341,9 @@ case 4:							/* RRSA */
 	break;
 case 5:							/* RRSI */
 	if (rl_lft) {					/* silo left? */
-		dat = (rlsi >> 8) & 0377;		/* get left 8b */
-		rlsi = rlsi1;				/* ripple */
-		rlsi1 = rlsi2;  }
+	    dat = (rlsi >> 8) & 0377;			/* get left 8b */
+	    rlsi = rlsi1;				/* ripple */
+	    rlsi1 = rlsi2;  }
 	else dat = rlsi & 0377;				/* get right 8b */
 	rl_lft = rl_lft ^ 1;				/* change side */
 	break;
@@ -374,8 +375,8 @@ t_addr ma;
 func = GET_FUNC (rlcsb);				/* get function */
 if (func == RLCSB_GSTA) {				/* get status? */
 	rlsi = uptr->STAT | 
-		((uptr->TRK & RLCSA_HD)? RLDS_HD: 0) |
-		((uptr->flags & UNIT_ATT)? RLDS_ATT: RLDS_UNATT);
+	    ((uptr->TRK & RLCSA_HD)? RLDS_HD: 0) |
+	    ((uptr->flags & UNIT_ATT)? RLDS_ATT: RLDS_UNATT);
 	if (uptr->flags & UNIT_RL02) rlsi = rlsi | RLDS_RL02;
 	if (uptr->flags & UNIT_WPRT) rlsi = rlsi | RLDS_WLK;
 	rlsi2 = rlsi1 = rlsi;
@@ -416,8 +417,8 @@ if (rlcsb & RLCSB_8B) {					/* 8b mode? */
 	if (bc > maxc) wc = bc = maxc;  }		/* trk ovrun? limit */
 else {	bc = ((wc * 3) + 1) / 2;			/* 12b mode */
 	if (bc > RL_NUMBY) {				/* > 1 sector */
-		bc = RL_NUMBY;				/* cap xfer */
-		wc = (RL_NUMBY * 2) / 3;  }  }
+	    bc = RL_NUMBY;				/* cap xfer */
+	    wc = (RL_NUMBY * 2) / 3;  }  }
 
 err = fseek (uptr->fileref, da, SEEK_SET);
 

@@ -25,6 +25,7 @@
 
    fe		KS10 console front end
 
+   22-Dec-02	RMS	Added break support
    30-May-02	RMS	Widened COUNT to 32b
    30-Nov-01	RMS	Added extended SET/SHOW support
    23-Oct-01	RMS	New IO page address constants
@@ -128,6 +129,7 @@ int32 temp;
 
 sim_activate (&fei_unit, fei_unit.wait);		/* continue poll */
 if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
+if (temp & SCPE_BREAK) return SCPE_OK;			/* ignore break */
 fei_unit.buf = temp & 0177;
 fei_unit.pos = fei_unit.pos + 1;
 M[FE_CTYIN] = fei_unit.buf | FE_CVALID;			/* put char in mem */

@@ -26,6 +26,7 @@
    tti1		keyboard
    tto1		teleprinter
 
+   22-Dec-02	RMS	Added break support
    02-Nov-02	RMS	Added 7B/8B support
    05-Oct-02	RMS	Added DIB, device number support
    22-Aug-02	RMS	Updated for changes to sim_tmxr
@@ -167,11 +168,12 @@ int32 c, newln;
 if (tt1_ldsc.conn) {					/* connected? */
 	tmxr_poll_rx (&tt_desc);			/* poll for input */
 	if (c = tmxr_getc_ln (&tt1_ldsc)) {		/* get char */ 
-	    if (uptr->flags & UNIT_KSR) {		/* KSR? */
+	    if (c & SCPE_BREAK) uptr->buf = 0;		/* break? */
+	    else if (uptr->flags & UNIT_KSR) {		/* KSR? */
 		c = c & 0177;
                 if (islower (c)) c = toupper (c);
 		uptr->buf = c | 0200;  }		/* got char */
-	    else c = c & ((tti1_unit.flags & UNIT_8B)? 0377: 0177);
+	    else uptr->buf = c & ((tti1_unit.flags & UNIT_8B)? 0377: 0177);
 	    SET_INT (TTI1);  }				/* set flag */
 	sim_activate (uptr, uptr->wait);  }		/* continue poll */
 if (uptr->flags & UNIT_ATT) {				/* attached? */

@@ -94,9 +94,9 @@ case 2:							/* CLDI */
 	return AC;
 case 3:							/* CLSC */
 	if (dev_done & INT_CLK) {			/* flag set? */
-		dev_done = dev_done & ~INT_CLK;		/* clear flag */
-		int_req = int_req & ~INT_CLK;		/* clear int req */
-		return IOT_SKP + AC;  }
+	    dev_done = dev_done & ~INT_CLK;		/* clear flag */
+	    int_req = int_req & ~INT_CLK;		/* clear int req */
+	    return IOT_SKP + AC;  }
 	return AC;
 case 5:							/* CLLE */
 	if (AC & 1) int_enable = int_enable | INT_CLK;	/* test AC<11> */

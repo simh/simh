@@ -190,7 +190,7 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_svc (UNIT *uptr);
-t_stat cpu_set_size (UNIT *uptr, int32 value);
+t_stat cpu_set_size (UNIT *uptr, int32 value, char *cptr, void *desc);
 void calc_ints (void);
 
 extern t_stat ts_wr (int32 data, int32 addr, int32 access);
@@ -1182,7 +1182,7 @@ t_stat cpu_svc (UNIT *uptr)
  * Memory allocation
  * ------------------------------------------------------------------------ */
 
-t_stat cpu_set_size (UNIT *uptr, int32 value)
+t_stat cpu_set_size (UNIT *uptr, int32 value, char *cptr, void *desc)
 {
 	t_bool used;
 	int32 i;

@@ -27,6 +27,7 @@
    tto		terminal output
    clk		100Hz and TODR clock
 
+   22-Dec-02	RMS	Added console halt capability
    01-Nov-02	RMS	Added 7B/8B capability to terminal
    12-Sep-02	RMS	Removed paper tape, added variable vector support
    30-May-02	RMS	Widened POS to 32b
@@ -38,6 +39,10 @@
 
 #define TTICSR_IMP	(CSR_DONE + CSR_IE)		/* terminal input */
 #define TTICSR_RW	(CSR_IE)
+#define TTIBUF_ERR	0x8000				/* error */
+#define TTIBUF_OVR	0x4000				/* overrun */
+#define TTIBUF_FRM	0x2000				/* framing error */
+#define TTIBUF_RBR	0x0400				/* receive break */
 #define TTOCSR_IMP	(CSR_DONE + CSR_IE)		/* terminal output */
 #define TTOCSR_RW	(CSR_IE)
 #define CLKCSR_IMP	(CSR_IE)			/* real-time clock */
@@ -49,6 +54,7 @@
 #define UNIT_8B		(1 << UNIT_V_8B)
 
 extern int32 int_req[IPL_HLVL];
+extern int32 hlt_pin;
 
 int32 tti_csr = 0;					/* control/status */
 int32 tto_csr = 0;					/* control/status */
@@ -65,6 +71,8 @@ t_stat clk_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
+
+extern int32 sysd_hlt_enb (void);
 
 /* TTI data structures
 
@@ -78,7 +86,7 @@ DIB tti_dib = { 0, 0, NULL, NULL, 1, IVCL (TTI), SCB_TTI, { NULL } };
 UNIT tti_unit = { UDATA (&tti_svc, UNIT_8B, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
-	{ HRDATA (BUF, tti_unit.buf, 8) },
+	{ HRDATA (BUF, tti_unit.buf, 16) },
 	{ HRDATA (CSR, tti_csr, 16) },
 	{ FLDATA (INT, int_req[IPL_TTI], INT_V_TTI) },
 	{ FLDATA (DONE, tti_csr, CSR_V_DONE) },
@@ -193,9 +201,12 @@ return (tti_csr & TTICSR_IMP);
 
 int32 rxdb_rd (void)
 {
-tti_csr = tti_csr & ~CSR_DONE;
+int32 t = tti_unit.buf;					/* char + error */
+
+tti_csr = tti_csr & ~CSR_DONE;				/* clr done */
+tti_unit.buf = tti_unit.buf & 0377;			/* clr errors */
 CLR_INT (TTI);
-return (tti_unit.buf & 0377);
+return t;
 }
 
 int32 txcs_rd (void)
@@ -256,7 +267,10 @@ int32 c;
 
 sim_activate (&tti_unit, tti_unit.wait);		/* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
-tti_unit.buf = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);
+if (c & SCPE_BREAK) {					/* break? */
+	if (sysd_hlt_enb ()) hlt_pin = 1;		/* if enabled, halt */
+	tti_unit.buf = TTIBUF_ERR | TTIBUF_FRM | TTIBUF_RBR;  }
+else tti_unit.buf = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);
 tti_unit.pos = tti_unit.pos + 1;
 tti_csr = tti_csr | CSR_DONE;
 if (tti_csr & CSR_IE) SET_INT (TTI);

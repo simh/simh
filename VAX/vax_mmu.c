@@ -169,8 +169,8 @@ if (mapen) {						/* mapping on? */
 	tbi = VA_GETTBI (vpn);
 	xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];	/* access tlb */
 	if (((xpte.pte & acc) == 0) || (xpte.tag != vpn) ||
-		((acc & TLB_WACC) && ((xpte.pte & TLB_M) == 0)))
-		xpte = fill (va, lnt, acc, NULL);	/* fill if needed */
+	    ((acc & TLB_WACC) && ((xpte.pte & TLB_M) == 0)))
+	    xpte = fill (va, lnt, acc, NULL);		/* fill if needed */
 	pa = (xpte.pte & TLB_PFN) | off;  }		/* get phys addr */
 else pa = va & PAMASK;
 if ((pa & (lnt - 1)) == 0) {				/* aligned? */
@@ -182,8 +182,8 @@ if (mapen && ((off + lnt) > VA_PAGSIZE)) {		/* cross page? */
 	tbi = VA_GETTBI (vpn);
 	xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];	/* access tlb */
 	if (((xpte.pte & acc) == 0) || (xpte.tag != vpn) ||
-		((acc & TLB_WACC) && ((xpte.pte & TLB_M) == 0)))
-		xpte = fill (va + lnt, lnt, acc, NULL);	/* fill if needed */
+	    ((acc & TLB_WACC) && ((xpte.pte & TLB_M) == 0)))
+	    xpte = fill (va + lnt, lnt, acc, NULL);	/* fill if needed */
 	pa1 = (xpte.pte & TLB_PFN) | VA_GETOFF (va + 4);  }
 else pa1 = (pa + 4) & PAMASK;				/* not cross page */
 bo = pa & 3;
@@ -222,7 +222,8 @@ if (mapen) {
 	tbi = VA_GETTBI (vpn);
 	xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];	/* access tlb */
 	if (((xpte.pte & acc) == 0) || (xpte.tag != vpn) ||
-		((xpte.pte & TLB_M) == 0)) xpte = fill (va, lnt, acc, NULL);
+	    ((xpte.pte & TLB_M) == 0))
+	    xpte = fill (va, lnt, acc, NULL);
 	pa = (xpte.pte & TLB_PFN) | off;  }
 else pa = va & PAMASK;
 if ((pa & (lnt - 1)) == 0) {				/* aligned? */
@@ -235,8 +236,8 @@ if (mapen && ((off + lnt) > VA_PAGSIZE)) {
 	tbi = VA_GETTBI (vpn);
 	xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];	/* access tlb */
 	if (((xpte.pte & acc) == 0) || (xpte.tag != vpn) ||
-		((xpte.pte & TLB_M) == 0))
-		xpte = fill (va + lnt, lnt, acc, NULL);
+	    ((xpte.pte & TLB_M) == 0))
+	    xpte = fill (va + lnt, lnt, acc, NULL);
 	pa1 = (xpte.pte & TLB_PFN) | VA_GETOFF (va + 4);  }
 else pa1 = (pa + 4) & PAMASK;
 bo = pa & 3;
@@ -273,7 +274,7 @@ if (mapen) {						/* mapping on? */
 	tbi = VA_GETTBI (vpn);
 	xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];	/* access tlb */
 	if ((xpte.pte & acc) && (xpte.tag == vpn))	/* TB hit, acc ok? */ 
-		return (xpte.pte & TLB_PFN) | off;
+	    return (xpte.pte & TLB_PFN) | off;
 	xpte = fill (va, L_BYTE, acc, status);		/* fill TB */
 	if (*status == PR_OK) return (xpte.pte & TLB_PFN) | off;
 	else return -1;  }
@@ -354,7 +355,7 @@ void WriteW (t_addr pa, int32 val)
 if (ADDR_IS_MEM (pa)) {
 	int32 id = pa >> 2;
 	M[id] = (pa & 2)? (M[id] & 0xFFFF) | (val << 16):
-		(M[id] & ~0xFFFF) | val;  }
+	    (M[id] & ~0xFFFF) | val;  }
 else {	mchk_ref = REF_V;
 	if (ADDR_IS_IO (pa)) WriteIO (pa, val, L_WORD);
 	else WriteReg (pa, val, L_WORD);  }
@@ -407,23 +408,24 @@ if (va & VA_S0) {					/* system space? */
 	if (ptidx >= slr) MM_ERR (PR_LNV);		/* system */
 	ptead = sbr + ptidx;  }
 else {	if (va & VA_P1) {				/* P1? */
-		if (ptidx < p1lr) MM_ERR (PR_LNV);
-		ptead = p1br + ptidx;  }
-	else {	if (ptidx >= p0lr)
-		MM_ERR (PR_LNV);	/* P0 */
-		ptead = p0br + ptidx;  }
+	    if (ptidx < p1lr) MM_ERR (PR_LNV);
+	    ptead = p1br + ptidx;  }
+	else {						/* P0 */
+	    if (ptidx >= p0lr)
+	    MM_ERR (PR_LNV);
+	    ptead = p0br + ptidx;  }
 	if ((ptead & VA_S0) == 0)
-		ABORT (STOP_PPTE);			/* ppte must be sys */
+	    ABORT (STOP_PPTE);				/* ppte must be sys */
 	vpn = VA_GETVPN (ptead);			/* get vpn, tbi */
 	tbi = VA_GETTBI (vpn);
 	if (stlb[tbi].tag != vpn) {			/* in sys tlb? */
-		ptidx = ((uint32) ptead) >> 7;		/* xlate like sys */
-		if (ptidx >= slr) MM_ERR (PR_PLNV);
-		pte = ReadLP (sbr + ptidx);		/* get system pte */
-		if ((pte & PTE_V) == 0) MM_ERR (PR_PTNV);	/* spte TNV? */
-		stlb[tbi].tag = vpn;			/* set stlb tag */
-		stlb[tbi].pte = cvtacc[PTE_GETACC (pte)] |
-			((pte << VA_N_OFF) & TLB_PFN);  }	/* set stlb data */
+	    ptidx = ((uint32) ptead) >> 7;		/* xlate like sys */
+	    if (ptidx >= slr) MM_ERR (PR_PLNV);
+	    pte = ReadLP (sbr + ptidx);			/* get system pte */
+	    if ((pte & PTE_V) == 0) MM_ERR (PR_PTNV);	/* spte TNV? */
+	    stlb[tbi].tag = vpn;			/* set stlb tag */
+	    stlb[tbi].pte = cvtacc[PTE_GETACC (pte)] |
+		((pte << VA_N_OFF) & TLB_PFN);  }	/* set stlb data */
 	ptead = (stlb[tbi].pte & TLB_PFN) | VA_GETOFF (ptead);  }
 pte = ReadL (ptead);					/* read pte */
 tlbpte = cvtacc[PTE_GETACC (pte)] |			/* cvt access */

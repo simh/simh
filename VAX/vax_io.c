@@ -25,6 +25,7 @@
 
    qba		Qbus adapter
 
+   22-Dec-02	RMS	Addec console halt support
    12-Oct-02	RMS	Added autoconfigure support
 			Added SHOW IO space routine
    29-Sep-02	RMS	Added dynamic table support
@@ -94,7 +95,7 @@ int32 cq_ipc = 0;					/* IPC */
 
 extern uint32 *M;
 extern UNIT cpu_unit;
-extern int32 PSL, SISR, trpirq, mem_err;
+extern int32 PSL, SISR, trpirq, mem_err, hlt_pin;
 extern int32 p1;
 extern int32 ssc_bto;
 extern jmp_buf save_env;
@@ -172,8 +173,8 @@ DIB *dibp;
 for (i = 0; dibp = dib_tab[i]; i++ ) {
 	if ((pa >= dibp->ba) &&
 	   (pa < (dibp->ba + dibp->lnt))) {
-		dibp->rd (&val, pa, READ);
-		return val;  }  }
+	    dibp->rd (&val, pa, READ);
+	    return val;  }  }
 cq_merr (pa);
 MACH_CHECK (MCHK_READ);
 return 0;
@@ -187,8 +188,8 @@ DIB *dibp;
 for (i = 0; dibp = dib_tab[i]; i++ ) {
 	if ((pa >= dibp->ba) &&
 	   (pa < (dibp->ba + dibp->lnt))) {
-		dibp->wr (val, pa, mode);
-		return;  }  }
+	    dibp->wr (val, pa, mode);
+	    return;  }  }
 cq_merr (pa);
 mem_err = 1;
 return;
@@ -247,6 +248,7 @@ static const int32 sw_int_mask[IPL_SMAX] = {
 	0xFE00, 0xFC00, 0xF800, 0xF000,			/* 8 - B */
 	0xE000, 0xC000, 0x8000 };			/* C - E */
 
+if (hlt_pin) return IPL_HLTPIN;				/* hlt pin int */
 if ((ipl < IPL_MEMERR) && mem_err) return IPL_MEMERR;	/* mem err int */
 for (i = IPL_HMAX; i >= IPL_HMIN; i--) {		/* chk hwre int */
 	if (i <= ipl) return 0;				/* at ipl? no int */
@@ -267,9 +269,9 @@ int32 l = lvl - IPL_HMIN;
 
 for (i = 0; int_req[l] && (i < 32); i++) {
 	if ((int_req[l] >> i) & 1) {
-		int_req[l] = int_req[l] & ~(1u << i);
-		if (int_ack[l][i]) return int_ack[l][i]();
-		return int_vec[l][i];  }  }
+	    int_req[l] = int_req[l] & ~(1u << i);
+	    if (int_ack[l][i]) return int_ack[l][i]();
+	    return int_vec[l][i];  }  }
 return 0;
 }
 
@@ -389,10 +391,10 @@ int32 ma = (pa & CQMAPAMASK) + cq_mbr;			/* mem addr */
 
 if (ADDR_IS_MEM (ma)) {
 	if (lnt < L_LONG) {
-		int32 sc = (pa & 3) << 3;
-		int32 mask = (lnt == L_WORD)? 0xFFFF: 0xFF;
-		int32 t = M[ma >> 2];
-		val = ((val & mask) << sc) | (t & ~(mask << sc));  }
+	    int32 sc = (pa & 3) << 3;
+	    int32 mask = (lnt == L_WORD)? 0xFFFF: 0xFF;
+	    int32 t = M[ma >> 2];
+	    val = ((val & mask) << sc) | (t & ~(mask << sc));  }
 	M[ma >> 2] = val;  }
 else {	cq_serr (ma);					/* error */
 	mem_err = 1;  }
@@ -419,12 +421,12 @@ void cqmem_wr (int32 pa, int32 val, int32 lnt)
 int32 qa = pa & CQMAMASK;				/* Qbus addr */
 t_addr ma;
 
-if (map_addr (qa, &ma)) {					/* map addr */
+if (map_addr (qa, &ma)) {				/* map addr */
 	if (lnt < L_LONG) {
-		int32 sc = (pa & 3) << 3;
-		int32 mask = (lnt == L_WORD)? 0xFFFF: 0xFF;
-		int32 t = M[ma >> 2];
-		val = ((val & mask) << sc) | (t & ~(mask << sc));  }
+	    int32 sc = (pa & 3) << 3;
+	    int32 mask = (lnt == L_WORD)? 0xFFFF: 0xFF;
+	    int32 t = M[ma >> 2];
+	    val = ((val & mask) << sc) | (t & ~(mask << sc));  }
 	M[ma >> 2] = val;  }
 else mem_err = 1;
 return;
@@ -440,10 +442,10 @@ int32 qmma = ((qblk << 2) & CQMAPAMASK) + cq_mbr;	/* map entry */
 if (ADDR_IS_MEM (qmma)) {				/* legit? */
 	int32 qmap = M[qmma >> 2];			/* get map */
 	if (qmap & CQMAP_VLD) {				/* valid? */
-		*ma = ((qmap & CQMAP_PAG) << VA_V_VPN) + VA_GETOFF (qa);
-		if (ADDR_IS_MEM (*ma)) return 1;	/* legit addr */
-		cq_serr (*ma);				/* slave nxm */
-		return 0;  }
+	    *ma = ((qmap & CQMAP_PAG) << VA_V_VPN) + VA_GETOFF (qa);
+	    if (ADDR_IS_MEM (*ma)) return 1;		/* legit addr */
+	    cq_serr (*ma);				/* slave nxm */
+	    return 0;  }
 	cq_merr (qa);					/* master nxm */
 	return 0;  }
 cq_serr (0);						/* inv mem */
@@ -516,8 +518,8 @@ t_addr ma;
 
 for (i = ma = 0; i < bc; i++, buf++) {			/* by bytes */
 	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		!ADDR_IS_MEM (ma)) return (bc - i);  }
 	*buf = ReadB (ma);
 	ma = ma + 1;  }
 return 0;
@@ -532,8 +534,8 @@ ba = ba & ~01;
 bc = bc & ~01;
 for (i = ma = 0; i < bc; i = i + 2, buf++) {		/* by words */
 	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		!ADDR_IS_MEM (ma)) return (bc - i);  }
 	*buf = ReadW (ma);
 	ma = ma + 2;  }
 return 0;
@@ -548,8 +550,8 @@ ba = ba & ~03;
 bc = bc & ~03;
 for (i = ma = 0; i < bc; i = i + 4, buf++) {		/* by lw */
 	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		!ADDR_IS_MEM (ma)) return (bc - i);  }
 	*buf = ReadL (ma);
 	ma = ma + 4;  }
 return 0;
@@ -562,8 +564,8 @@ t_addr ma;
 
 for (i = ma = 0; i < bc; i++, buf++) {			/* by bytes */
 	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		!ADDR_IS_MEM (ma)) return (bc - i);  }
 	WriteB (ma, *buf);
 	ma = ma + 1;  }
 return 0;
@@ -578,8 +580,8 @@ ba = ba & ~01;
 bc = bc & ~01;
 for (i = ma = 0; i < bc; i = i + 2, buf++) {		/* by words */
 	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		!ADDR_IS_MEM (ma)) return (bc - i);  }
 	WriteW (ma, *buf);
 	ma = ma + 2;  }
 return 0;
@@ -594,8 +596,8 @@ ba = ba & ~03;
 bc = bc & ~03;
 for (i = ma = 0; i < bc; i = i + 4, buf++) {		/* by lw */
 	if ((ma & VA_M_OFF) == 0) {			/* need map? */
-		if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
-		    !ADDR_IS_MEM (ma)) return (bc - i);  }
+	    if (!map_addr (ba + i, &ma) ||		/* inv or NXM? */
+		!ADDR_IS_MEM (ma)) return (bc - i);  }
 	WriteL (ma, *buf);
 	ma = ma + 4;  }
 return 0;

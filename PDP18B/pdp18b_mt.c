@@ -216,10 +216,11 @@ if (pulse == 004) {					/* MTGO */
 	   (((f == FN_SPACER) || (f == FN_REWIND)) & (uptr->USTAT & STA_BOT)) ||
 	   (((f == FN_WRITE) || (f == FN_WREOF)) && (uptr->flags & UNIT_WPRT))
 	   || ((uptr->flags & UNIT_ATT) == 0) || (f == FN_NOP))
-		mt_sta = mt_sta | STA_ILL;		/* illegal op flag */
-	else {	if (f == FN_REWIND) uptr->USTAT = STA_REW;	/* rewind? */
-		else mt_sta = uptr->USTAT = 0;		/* no, clear status */
-		sim_activate (uptr, mt_time);  }  }	/* start io */
+	    mt_sta = mt_sta | STA_ILL;			/* illegal op flag */
+	else {
+	    if (f == FN_REWIND) uptr->USTAT = STA_REW;	/* rewind? */
+	    else mt_sta = uptr->USTAT = 0;		/* no, clear status */
+	    sim_activate (uptr, mt_time);  }  }		/* start io */
 mt_updcsta (mt_dev.units + GET_UNIT (mt_cu), 0);	/* update status */
 return AC;
 }
@@ -257,8 +258,8 @@ if ((uptr->flags & UNIT_ATT) == 0) {			/* if not attached */
 
 if ((f == FN_WRITE) || (f == FN_WREOF)) {		/* write? */
 	if (uptr->flags & UNIT_WPRT) {			/* write locked? */
-		mt_updcsta (uptr, STA_ILL);		/* illegal operation */
-		return SCPE_OK;  }
+	    mt_updcsta (uptr, STA_ILL);			/* illegal operation */
+	    return SCPE_OK;  }
 	mt_cu = mt_cu & ~CU_ERASE;  }			/* clear erase flag */
 
 switch (f) {						/* case on function */
@@ -268,39 +269,40 @@ switch (f) {						/* case on function */
 case FN_READ:						/* read */
 case FN_CMPARE:						/* read/compare */
 	if (mt_rdlntf (uptr, &tbc, &err)) {		/* read rec lnt, err? */
-		mt_updcsta (uptr, STA_RLE);		/* set RLE flag */
-		break;  }
+	    mt_updcsta (uptr, STA_RLE);			/* set RLE flag */
+	    break;  }
 	if (tbc > MT_MAXFR) return SCPE_MTRLNT;		/* record too long? */
 	wc = DBSIZE - (M[MT_WC] & DBMASK);		/* get word count */
 	cbc = PACKED (mt_cu)? wc * 3: wc * 2;		/* expected bc */
 	if (tbc != cbc) mt_sta = mt_sta | STA_RLE;	/* wrong size? */
 	if (tbc < cbc) {				/* record small? */
-		cbc = tbc;				/* use smaller */
-		wc = PACKED (mt_cu)? ((tbc + 2) / 3): ((tbc + 1) / 2);  }
+	    cbc = tbc;					/* use smaller */
+	    wc = PACKED (mt_cu)? ((tbc + 2) / 3): ((tbc + 1) / 2);  }
 	abc = fxread (dbuf, sizeof (int8), cbc, uptr->fileref);
 	if (err = ferror (uptr->fileref)) {		/* error */
-		MT_SET_PNU (uptr);			/* pos not upd */
-		break;  }
+	    MT_SET_PNU (uptr);				/* pos not upd */
+	    break;  }
 	for ( ; abc < cbc; abc++) dbuf[abc] = 0;	/* fill with 0's */
 	for (i = p = 0; i < wc; i++) {			/* copy buffer */
-		M[MT_WC] = (M[MT_WC] + 1) & 0777777;	/* inc WC, CA */
-		M[MT_CA] = (M[MT_CA] + 1) & 0777777;
-		xma = M[MT_CA] & ADDRMASK;
-		if (PACKED (mt_cu)) {			/* packed? */
-			c1 = dbuf[p++] & 077;
-			c2 = dbuf[p++] & 077;
-			c3 = dbuf[p++] & 077;
-			c = (c1 << 12) | (c2 << 6) | c3;  }
-	    	else {	c1 = dbuf[p++];
-			c2 = dbuf[p++];
-			c = (c1 << 8) | c2;  }
-		if ((f == FN_READ) && MEM_ADDR_OK (xma)) M[xma] = c;
-		else if ((f == FN_CMPARE) && (c != (M[xma] &
-			(PACKED (mt_cu)? 0777777: 0177777)))) {
-			mt_updcsta (uptr, STA_CPE);
-			break;  }  }
+	    M[MT_WC] = (M[MT_WC] + 1) & 0777777;	/* inc WC, CA */
+	    M[MT_CA] = (M[MT_CA] + 1) & 0777777;
+	    xma = M[MT_CA] & ADDRMASK;
+	    if (PACKED (mt_cu)) {			/* packed? */
+		c1 = dbuf[p++] & 077;
+		c2 = dbuf[p++] & 077;
+		c3 = dbuf[p++] & 077;
+		c = (c1 << 12) | (c2 << 6) | c3;  }
+	    else {
+	    	c1 = dbuf[p++];
+		c2 = dbuf[p++];
+		c = (c1 << 8) | c2;  }
+	    if ((f == FN_READ) && MEM_ADDR_OK (xma)) M[xma] = c;
+	    else if ((f == FN_CMPARE) && (c != (M[xma] &
+		(PACKED (mt_cu)? 0777777: 0177777)))) {
+		mt_updcsta (uptr, STA_CPE);
+		break;  }  }
 	uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
-		(2 * sizeof (t_mtrlnt));
+	    (2 * sizeof (t_mtrlnt));
 	break;
 
 case FN_WRITE:						/* write */
@@ -309,15 +311,16 @@ case FN_WRITE:						/* write */
 	tbc = PACKED (mt_cu)? wc * 3: wc * 2;
 	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
 	for (i = p = 0; i < wc; i++) {			/* copy buf to tape */
-		M[MT_WC] = (M[MT_WC] + 1) & 0777777;	/* inc WC, CA */
-		M[MT_CA] = (M[MT_CA] + 1) & 0777777;
-		xma = M[MT_CA] & ADDRMASK;
-		if (PACKED (mt_cu)) {			/* packed? */
-			dbuf[p++] = (M[xma] >> 12) & 077;
-			dbuf[p++] = (M[xma] >> 6) & 077;
-			dbuf[p++] = M[xma] & 077;  }
-		else {	dbuf[p++] = (M[xma] >> 8) & 0377;
-			dbuf[p++] = M[xma] & 0377;  }  }
+	    M[MT_WC] = (M[MT_WC] + 1) & 0777777;	/* inc WC, CA */
+	    M[MT_CA] = (M[MT_CA] + 1) & 0777777;
+	    xma = M[MT_CA] & ADDRMASK;
+	    if (PACKED (mt_cu)) {			/* packed? */
+		dbuf[p++] = (M[xma] >> 12) & 077;
+		dbuf[p++] = (M[xma] >> 6) & 077;
+		dbuf[p++] = M[xma] & 077;  }
+	    else {
+	    	dbuf[p++] = (M[xma] >> 8) & 0377;
+		dbuf[p++] = M[xma] & 0377;  }  }
 	fxwrite (dbuf, sizeof (char), (tbc + 1) & ~1, uptr->fileref);
 	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
 	if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr); /* error? */
@@ -336,17 +339,20 @@ case FN_WREOF:
 	break;
 
 case FN_SPACEF:						/* space forward */
-	do {	if (mt_rdlntf (uptr, &tbc, &err)) break;/* read rec lnt, err? */
-		uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
-			(2 * sizeof (t_mtrlnt));  }
+	do {
+	    if (mt_rdlntf (uptr, &tbc, &err)) break;	/* read rec lnt, err? */
+	    uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
+		(2 * sizeof (t_mtrlnt));  }
 	while ((M[MT_WC] = (M[MT_WC] + 1) & 0777777) != 0);
 	break;
 
 case FN_SPACER:						/* space reverse */
-	do {	if (pnu) pnu = 0;			/* pos not upd? */
-		else {	if (mt_rdlntf (uptr, &tbc, &err)) break;
-			uptr->pos = uptr->pos - ((tbc + 1) & ~1) -
-				(2 * sizeof (t_mtrlnt));  }  }
+	do {
+	    if (pnu) pnu = 0;				/* pos not upd? */
+	    else {
+	    	if (mt_rdlntf (uptr, &tbc, &err)) break;
+		uptr->pos = uptr->pos - ((tbc + 1) & ~1) -
+		    (2 * sizeof (t_mtrlnt));  }  }
 	while ((M[MT_WC] = (M[MT_WC] + 1) & 0777777) != 0);
 	break;  }					/* end case */
 

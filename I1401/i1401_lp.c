@@ -164,14 +164,14 @@ switch (action) {
 case 0:							/* to channel now */
 	if ((mod == 0) || (mod > 12) || CHP (mod, cct[cctptr])) return SCPE_OK;
 	for (i = 1; i < cctlnt + 1; i++) {		/* sweep thru cct */
-		if (CHP (mod, cct[(cctptr + i) % cctlnt]))
-			return space (i, TRUE);  }
+	    if (CHP (mod, cct[(cctptr + i) % cctlnt]))
+		return space (i, TRUE);  }
 	return STOP_CCT;				/* runaway channel */
 case 1:							/* space after */
 	if (mod <= 3) {
-		lines = mod;				/* save # lines */
-		lflag = FALSE;				/* flag spacing */
-		ind[IN_CC9] = ind[IN_CC12] = 0;  }
+	    lines = mod;				/* save # lines */
+	    lflag = FALSE;				/* flag spacing */
+	    ind[IN_CC9] = ind[IN_CC12] = 0;  }
 	return SCPE_OK;
 case 2:							/* space now */
 	if (mod <= 3) return space (mod, FALSE);
@@ -180,10 +180,10 @@ case 3:							/* to channel after */
 	if ((mod == 0) || (mod > 12)) return SCPE_OK;	/* check channel */
 	ind[IN_CC9] = ind[IN_CC12] = 0;
 	for (i = 1; i < cctlnt + 1; i++) {		/* sweep thru cct */
-		if (CHP (mod, cct[(cctptr + i) % cctlnt])) {
-			lines = i;			/* save # lines */
-			lflag = TRUE;			/* flag skipping */
-			return SCPE_OK;  }  }
+	    if (CHP (mod, cct[(cctptr + i) % cctlnt])) {
+		lines = i;				/* save # lines */
+		lflag = TRUE;				/* flag skipping */
+		return SCPE_OK;  }  }
 	return STOP_CCT;  }				/* runaway channel */
 return SCPE_OK;
 }
@@ -203,7 +203,8 @@ if ((lpt_unit.flags & UNIT_ATT) == 0) return SCPE_UNATT;
 cctptr = (cctptr + count) % cctlnt;			/* adv cct, mod lnt */
 if (sflag && CHP (0, cct[cctptr]))			/* skip, top of form? */
 	fputs ("\n\f", lpt_unit.fileref);		/* nl, ff */
-else {	for (i = 0; i < count; i++) fputc ('\n', lpt_unit.fileref);  }
+else {	for (i = 0; i < count; i++)
+	    fputc ('\n', lpt_unit.fileref);  }
 lpt_unit.pos = ftell (lpt_unit.fileref);		/* update position */
 ind[IN_CC9] = CHP (9, cct[cctptr]) != 0;		/* set indicators */
 ind[IN_CC12] = CHP (12, cct[cctptr]) != 0;

@@ -114,59 +114,60 @@ rubout = state = field = newf = origin = csum = 0;
 if ((sim_switches & SWMASK ('R')) ||			/* RIM format? */
     (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B')))) {
 	while ((i = getc (fileref)) != EOF) {
-		switch (state) {
-		case 0:					/* leader */
-			if ((i != 0) && (i < 0200)) state = 1;
-			high = i;
-			break;
-		case 1:					/* low byte */
-			word = (high << 6) | i;		/* form word */
-			if (word > 07777) origin = word & 07777;
-			else M[origin] = word;
-			state = 2;
-			break;
-		case 2:					/* high byte */
-			if (i >= 0200) return SCPE_OK;	/* end of tape? */
-			high = i;			/* save high */
-			state = 1;
-			break;  }			/* end switch */
-		}					/* end while */
+	    switch (state) {
+	    case 0:					/* leader */
+		if ((i != 0) && (i < 0200)) state = 1;
+		high = i;
+		break;
+	    case 1:					/* low byte */
+		word = (high << 6) | i;			/* form word */
+		if (word > 07777) origin = word & 07777;
+		else M[origin] = word;
+		state = 2;
+		break;
+	    case 2:					/* high byte */
+		if (i >= 0200) return SCPE_OK;		/* end of tape? */
+		high = i;				/* save high */
+		state = 1;
+		break;  }				/* end switch */
+	    }						/* end while */
 	}						/* end if */
 else {	while ((i = getc (fileref)) != EOF) {		/* BIN format */
-		if (rubout) {
-			rubout = 0;
-			continue;  }
-		if (i == 0377) {
-			rubout = 1;
-			continue;  }
-		if (i > 0200) {
-			newf = (i & 070) << 9;
-			continue;  }
-		switch (state) {
-		case 0:					/* leader */
-			if ((i != 0) && (i != 0200)) state = 1;
-			high = i;			/* save as high */
-			break;
-		case 1:					/* low byte */
-			low = i;
-			state = 2;
-			break;
-		case 2:					/* high with test */
-			word = (high << 6) | low;
-			if (i == 0200) {		/* end of tape? */
-				if ((csum - word) & 07777) return SCPE_CSUM;
-				return SCPE_OK;  }
-			csum = csum + low + high;
-			if (word >= 010000) origin = word & 07777;
-			else {	if ((field | origin) >= MEMSIZE) 
-					return SCPE_NXM;
-				M[field | origin] = word & 07777;
-				origin = (origin + 1) & 07777;  }
-			field = newf;
-			high = i;
-			state = 1;
-			break;  }			/* end switch */
-		}					/* end while */
+	    if (rubout) {
+		rubout = 0;
+		continue;  }
+	    if (i == 0377) {
+		rubout = 1;
+		continue;  }
+	    if (i > 0200) {
+		newf = (i & 070) << 9;
+		continue;  }
+	    switch (state) {
+	    case 0:					/* leader */
+		if ((i != 0) && (i != 0200)) state = 1;
+		high = i;				/* save as high */
+		break;
+	    case 1:					/* low byte */
+		low = i;
+		state = 2;
+		break;
+	    case 2:					/* high with test */
+		word = (high << 6) | low;
+		if (i == 0200) {			/* end of tape? */
+		    if ((csum - word) & 07777) return SCPE_CSUM;
+		    return SCPE_OK;  }
+		csum = csum + low + high;
+		if (word >= 010000) origin = word & 07777;
+		else {
+		    if ((field | origin) >= MEMSIZE) 
+			return SCPE_NXM;
+		    M[field | origin] = word & 07777;
+		    origin = (origin + 1) & 07777;  }
+		    field = newf;
+		    high = i;
+		    state = 1;
+		    break;  }				/* end switch */
+	    }						/* end while */
 	}						/* end else */
 return SCPE_FMT;					/* eof? error */
 }
@@ -330,9 +331,9 @@ int32 i, j;
 for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
 	if ((j == class) && (opc_val[i] & inst)) {	/* same class? */
-		inst = inst & ~opc_val[i];		/* mask bit set? */
-		fprintf (of, (sp? " %s": "%s"), opcode[i]);
-		sp = 1;  }  }
+	    inst = inst & ~opc_val[i];		/* mask bit set? */
+	    fprintf (of, (sp? " %s": "%s"), opcode[i]);
+	    sp = 1;  }  }
 return sp;
 }
 
@@ -383,34 +384,34 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 
 	switch (j) {					/* case on class */
 	case I_V_NPN:					/* no operands */
-		fprintf (of, "%s", opcode[i]);		/* opcode */
-		break;
+	    fprintf (of, "%s", opcode[i]);		/* opcode */
+	    break;
 	case I_V_FLD:					/* field change */
-		fprintf (of, "%s %-o", opcode[i], (inst >> 3) & 07);
-		break;
+	    fprintf (of, "%s %-o", opcode[i], (inst >> 3) & 07);
+	    break;
 	case I_V_MRF:					/* mem ref */
-		disp = inst & 0177;			/* displacement */
-		fprintf (of, "%s%s", opcode[i], ((inst & 00400)? " I ": " "));
-		if (inst & 0200) {			/* current page? */
-			if (cflag) fprintf (of, "%-o", (addr & 07600) | disp);
-			else fprintf (of, "C %-o", disp);  }
-		else fprintf (of, "%-o", disp);		/* page zero */
-		break;
+	    disp = inst & 0177;				/* displacement */
+	    fprintf (of, "%s%s", opcode[i], ((inst & 00400)? " I ": " "));
+	    if (inst & 0200) {				/* current page? */
+		if (cflag) fprintf (of, "%-o", (addr & 07600) | disp);
+		else fprintf (of, "C %-o", disp);  }
+	    else fprintf (of, "%-o", disp);		/* page zero */
+	    break;
 	case I_V_IOT:					/* IOT */
-		fprintf (of, "%s %-o", opcode[i], inst & 0777);
-		break;
+	    fprintf (of, "%s %-o", opcode[i], inst & 0777);
+	    break;
 	case I_V_OP1:					/* operate group 1 */
-		sp = fprint_opr (of, inst & 0361, j, 0);
-		if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
-		break;
+	    sp = fprint_opr (of, inst & 0361, j, 0);
+	    if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
+	    break;
 	case I_V_OP2:					/* operate group 2 */
-		if (opcode[i]) fprintf (of, "%s", opcode[i]);	/* skips */
-		fprint_opr (of, inst & 0206, j, opcode[i] != NULL);
-		break;	
+	    if (opcode[i]) fprintf (of, "%s", opcode[i]);	/* skips */
+	    fprint_opr (of, inst & 0206, j, opcode[i] != NULL);
+	    break;	
 	case I_V_OP3:					/* operate group 3 */
-		sp = fprint_opr (of, inst & 0320, j, 0);
-		if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
-		break;  }				/* end case */
+	    sp = fprint_opr (of, inst & 0320, j, 0);
+	    if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
+	    break;  }				/* end case */
 	return SCPE_OK;  }				/* end if */
 	}						/* end for */
 return SCPE_ARG;
@@ -468,44 +469,46 @@ case I_V_IOT:						/* IOT */
 	break;
 case I_V_FLD:						/* field */
 	for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
-		cptr = get_glyph (cptr, gbuf, 0)) {
-		for (i = 0; (opcode[i] != NULL) &&
+	    cptr = get_glyph (cptr, gbuf, 0)) {
+	    for (i = 0; (opcode[i] != NULL) &&
 			(strcmp (opcode[i], gbuf) != 0) ; i++) ;
-		if (opcode[i] != NULL) {
-			k = (opc_val[i] >> I_V_FL) & I_M_FL;
-			if (k != j) return SCPE_ARG;
-			val[0] = val[0] | (opc_val[i] & 07777);  }
-		else {	d = get_uint (gbuf, 8, 07, &r);
-			if (r != SCPE_OK) return SCPE_ARG;
-			val[0] = val[0] | (d << 3);
-			break;  }  }
-		break;
+	    if (opcode[i] != NULL) {
+		k = (opc_val[i] >> I_V_FL) & I_M_FL;
+		if (k != j) return SCPE_ARG;
+		val[0] = val[0] | (opc_val[i] & 07777);  }
+	    else {
+	    	d = get_uint (gbuf, 8, 07, &r);
+		if (r != SCPE_OK) return SCPE_ARG;
+		val[0] = val[0] | (d << 3);
+		break;  }  }
+	    break;
 case I_V_MRF:						/* mem ref */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get next field */
 	if (strcmp (gbuf, "I") == 0) {			/* indirect? */
-		val[0] = val[0] | 0400;
-		cptr = get_glyph (cptr, gbuf, 0);  }
+	    val[0] = val[0] | 0400;
+	    cptr = get_glyph (cptr, gbuf, 0);  }
 	if ((k = (strcmp (gbuf, "C") == 0)) || (strcmp (gbuf, "Z") == 0)) {
-		cptr = get_glyph (cptr, gbuf, 0);
-		d = get_uint (gbuf, 8, 0177, &r);
-		if (r != SCPE_OK) return SCPE_ARG;
-		val[0] = val[0] | d | (k? 0200: 0);  }
-	else {	d = get_uint (gbuf, 8, 07777, &r);
-		if (r != SCPE_OK) return SCPE_ARG;
-		if (d <= 0177) val[0] = val[0] | d;
-		else if (cflag && (((addr ^ d) & 07600) == 0))
-			val[0] = val[0] | (d & 0177) | 0200;
-		else return SCPE_ARG;  }
+	    cptr = get_glyph (cptr, gbuf, 0);
+	    d = get_uint (gbuf, 8, 0177, &r);
+	    if (r != SCPE_OK) return SCPE_ARG;
+	    val[0] = val[0] | d | (k? 0200: 0);  }
+	else {
+	    d = get_uint (gbuf, 8, 07777, &r);
+	    if (r != SCPE_OK) return SCPE_ARG;
+	    if (d <= 0177) val[0] = val[0] | d;
+	    else if (cflag && (((addr ^ d) & 07600) == 0))
+		val[0] = val[0] | (d & 0177) | 0200;
+	    else return SCPE_ARG;  }
 	break;
 case I_V_NPN: case I_V_OP1: case I_V_OP2: case I_V_OP3:	/* operates */
 	for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
-		cptr = get_glyph (cptr, gbuf, 0)) {
-		for (i = 0; (opcode[i] != NULL) &&
+	    cptr = get_glyph (cptr, gbuf, 0)) {
+	    for (i = 0; (opcode[i] != NULL) &&
 			(strcmp (opcode[i], gbuf) != 0) ; i++) ;
-		k = opc_val[i] & 07777;
-		if ((opcode[i] == NULL) || (((k ^ val[0]) & 07000) != 0))
-			return SCPE_ARG;
-		val[0] = val[0] | k;  }
+	    k = opc_val[i] & 07777;
+	    if ((opcode[i] == NULL) || (((k ^ val[0]) & 07000) != 0))
+		return SCPE_ARG;
+	    val[0] = val[0] | k;  }
 	break;  }					/* end case */
 if (*cptr != 0) return SCPE_ARG;			/* junk at end? */
 return SCPE_OK;

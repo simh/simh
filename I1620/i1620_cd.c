@@ -222,26 +222,26 @@ case OP_RN: 						/* read numeric */
 	r = cdr_read ();				/* fill reader buf */
 	if (r != SCPE_OK) return r;			/* error? */
 	for (i = 0; i < CD_LEN; i++) {			/* transfer to mem */
-		cdc = cdr_to_num[cdr_buf[i]];		/* translate */
-		if (cdc < 0) {				/* invalid? */
-			ind[IN_RDCHK] = 1;		/* set read check */
-			inv = STOP_INVCHR;		/* set return status */
-			cdc = 0;  }
-		M[pa] = cdc;				/* store digit */
-		PP (pa);  }				/* incr mem addr */
+	    cdc = cdr_to_num[cdr_buf[i]];		/* translate */
+	    if (cdc < 0) {				/* invalid? */
+		ind[IN_RDCHK] = 1;			/* set read check */
+		inv = STOP_INVCHR;			/* set return status */
+		cdc = 0;  }
+	    M[pa] = cdc;				/* store digit */
+	    PP (pa);  }					/* incr mem addr */
 	break;
 case OP_RA:						/* read alphameric */
 	r = cdr_read ();				/* fill reader buf */
 	if (r != SCPE_OK) return r;			/* error? */
 	for (i = 0; i < CD_LEN; i++) {			/* transfer to mem */
-		cdc = cdr_to_alp[cdr_buf[i]];		/* translate */
-		if (cdc < 0) {				/* invalid? */
-			ind[IN_RDCHK] = 1;		/* set read check */
-			inv = STOP_INVCHR;		/* set return status */
-			cdc = 0;  };
-		M[pa] = (M[pa] & FLAG) | (cdc & DIGIT);	/* store 2 digits */
-		M[pa - 1] = (M[pa - 1] & FLAG) | ((cdc >> 4) & DIGIT);
-		pa = ADDR_A (pa, 2);  }			/* incr mem addr */
+	    cdc = cdr_to_alp[cdr_buf[i]];		/* translate */
+	    if (cdc < 0) {				/* invalid? */
+		ind[IN_RDCHK] = 1;			/* set read check */
+		inv = STOP_INVCHR;			/* set return status */
+		cdc = 0;  };
+	    M[pa] = (M[pa] & FLAG) | (cdc & DIGIT);	/* store 2 digits */
+	    M[pa - 1] = (M[pa - 1] & FLAG) | ((cdc >> 4) & DIGIT);
+	    pa = ADDR_A (pa, 2);  }			/* incr mem addr */
 	break;	
 default:						/* invalid function */
 	return STOP_INVFNC;  }
@@ -333,14 +333,14 @@ case OP_WN:
 	return cdp_num (pa, CD_LEN, FALSE);		/* write numeric */
 case OP_WA:
 	for (i = 0; i < CD_LEN; i++) {			/* one card */
-		d = M[pa] & DIGIT;			/* get digit pair */
-		z = M[pa - 1] & DIGIT;
-		cdc = alp_to_cdp[(z << 4) | d];		/* translate */
-		if (cdc < 0) {				/* bad char? */
-			ind[IN_WRCHK] = 1;		/* set write check */
-			CRETIOE (io_stop, STOP_INVCHR);  }
-		cdp_buf[i] = cdc;			/* store in buf */
-		pa = ADDR_A (pa, 2);  }			/* incr mem addr */
+	    d = M[pa] & DIGIT;				/* get digit pair */
+	    z = M[pa - 1] & DIGIT;
+	    cdc = alp_to_cdp[(z << 4) | d];		/* translate */
+	    if (cdc < 0) {				/* bad char? */
+		ind[IN_WRCHK] = 1;			/* set write check */
+		CRETIOE (io_stop, STOP_INVCHR);  }
+	    cdp_buf[i] = cdc;				/* store in buf */
+	    pa = ADDR_A (pa, 2);  }			/* incr mem addr */
 	return cdp_write (CD_LEN);			/* punch buffer */
 default:						/* invalid function */
 	return STOP_INVFNC;  }

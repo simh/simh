@@ -1,6 +1,6 @@
 /* pdp11_sys.c: PDP-11 simulator interface
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Jan-03	RMS	Added DELUA support
    17-Oct-02	RMS	Fixed bugs in branch, SOB address parsing
    09-Oct-02	RMS	Added DELQA support
    12-Sep-02	RMS	Added TMSCP, KW11P, RX211 support, RAD50 examine
@@ -61,7 +62,7 @@ extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE dt_dev;
 extern DEVICE tm_dev, ts_dev;
 extern DEVICE tq_dev;
-extern DEVICE xq_dev;
+extern DEVICE xq_dev, xu_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint16 *M;
@@ -108,6 +109,7 @@ DEVICE *sim_devices[] = {
 	&ts_dev,
 	&tq_dev,
 	&xq_dev,
+	&xu_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {

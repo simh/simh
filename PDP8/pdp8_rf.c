@@ -191,8 +191,8 @@ case 2:							/* DSAC */
 case 5:							/* DIML */
 	rf_sta = (rf_sta & 07007) | (AC & 0770);	/* STA<3:8> <- AC */
 	if (rf_sta & RFS_PIE)				/* photocell int? */
-		sim_activate (&pcell_unit, (RF_NUMWD - GET_POS (rf_time)) *
-			rf_time);
+	    sim_activate (&pcell_unit, (RF_NUMWD - GET_POS (rf_time)) *
+		rf_time);
 	else sim_cancel (&pcell_unit);
 	RF_INT_UPDATE;					/* update int req */
 	return 0;					/* clear AC */
@@ -256,14 +256,15 @@ mex = GET_MEX (rf_sta);
 do {	M[RF_WC] = (M[RF_WC] + 1) & 07777;		/* incr word count */
  	M[RF_MA] = (M[RF_MA] + 1) & 07777;		/* incr mem addr */
 	pa = mex | M[RF_MA]; 				/* add extension */
-	if (uptr->FUNC == RF_READ) {
-		if (MEM_ADDR_OK (pa))			/* read, check nxm */
-			M[pa] = *(((int16 *) uptr->filebuf) + rf_da);  }
-	else {	t = ((rf_da >> 15) & 030) | ((rf_da >> 14) & 07);
-		if ((rf_wlk >> t) & 1) rf_sta = rf_sta | RFS_WLS;
-		else {	*(((int16 *) uptr->filebuf) + rf_da) = M[pa];
-			if (((t_addr) rf_da) >= uptr->hwmark)
-				uptr->hwmark = rf_da + 1;  }  }
+	if (uptr->FUNC == RF_READ) {			/* read? */
+	    if (MEM_ADDR_OK (pa))			/* check nxm */
+		M[pa] = *(((int16 *) uptr->filebuf) + rf_da);  }
+	else {						/* write */
+	    t = ((rf_da >> 15) & 030) | ((rf_da >> 14) & 07);
+	    if ((rf_wlk >> t) & 1) rf_sta = rf_sta | RFS_WLS;
+	    else {
+	    	*(((int16 *) uptr->filebuf) + rf_da) = M[pa];
+		if (((t_addr) rf_da) >= uptr->hwmark) uptr->hwmark = rf_da + 1;  }  }
 	rf_da = (rf_da + 1) & 03777777;  }		/* incr disk addr */
 while ((M[RF_WC] != 0) && (rf_burst != 0));		/* brk if wc, no brst */
 
@@ -330,10 +331,10 @@ extern int32 sim_switches, saved_PC;
 if (rf_dib.dev != DEV_RF) return STOP_NOTSTD;		/* only std devno */
 if (sim_switches & SWMASK ('D')) {
 	for (i = 0; i < DM4_LEN; i = i + 2)
-		M[dm4_rom[i]] = dm4_rom[i + 1];
+	    M[dm4_rom[i]] = dm4_rom[i + 1];
 	saved_PC = DM4_START;  }
 else {	for (i = 0; i < OS8_LEN; i++)
-		M[OS8_START + i] = os8_rom[i];
+	    M[OS8_START + i] = os8_rom[i];
 	saved_PC = OS8_START;  }
 return SCPE_OK;
 }

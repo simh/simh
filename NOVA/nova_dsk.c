@@ -164,10 +164,10 @@ if ((pulse == iopP) && ((dsk_wlk >> GET_DISK (dsk_da)) & 1)) {	/* wrt lock? */
 
 if (pulse & 1) {					/* read or write? */
 	if (((t_addr) (dsk_da * DSK_NUMWD)) >= dsk_unit.capac) { /* inv sev? */
-		dev_done = dev_done | INT_DSK;		/* set done */
-		int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-		dsk_stat = DSKS_ERR + DSKS_NSD;		/* set status */
-		return rval;  }				/* done */
+	    dev_done = dev_done | INT_DSK;		/* set done */
+	    int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
+	    dsk_stat = DSKS_ERR + DSKS_NSD;		/* set status */
+	    return rval;  }				/* done */
 	dsk_unit.FUNC = pulse;				/* save command */
 	dev_busy = dev_busy | INT_DSK;			/* set busy */
 	t = sector_map[dsk_da & DSK_MMASK] - GET_SECTOR (dsk_time);
@@ -193,16 +193,16 @@ if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 da = dsk_da * DSK_NUMWD;				/* calc disk addr */
 if (uptr->FUNC == iopS) {				/* read? */
 	for (i = 0; i < DSK_NUMWD; i++) {		/* copy sector */
-		pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
-		if (MEM_ADDR_OK (pa)) M[pa] =
-			*(((int16 *) uptr->filebuf) + da + i);  }
+	    pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
+	    if (MEM_ADDR_OK (pa)) M[pa] =
+		*(((int16 *) uptr->filebuf) + da + i);  }
 	dsk_ma = (dsk_ma + DSK_NUMWD) & AMASK;  }
 if (uptr->FUNC == iopP) {				/* write? */
 	for (i = 0; i < DSK_NUMWD; i++) {		/* copy sector */
-		pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
-		*(((int16 *) uptr->filebuf) + da + i) = M[pa];  }
+	    pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
+	    *(((int16 *) uptr->filebuf) + da + i) = M[pa];  }
 	if (((t_addr) (da + i)) >= uptr->hwmark)	/* past end? */
-		uptr->hwmark = da + i + 1;		/* upd hwmark */
+	    uptr->hwmark = da + i + 1;			/* upd hwmark */
 	dsk_ma = (dsk_ma + DSK_NUMWD + 3) & AMASK;  }
 
 dsk_stat = 0;						/* set status */

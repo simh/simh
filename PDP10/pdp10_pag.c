@@ -306,24 +306,24 @@ if (ITS) {						/* ITS paging */
 
 	vpn = ITS_GETVPN (ea);				/* get ITS pagno */
 	if (tbl == uptbl)
-		ptead = ((ea & RSIGN)? dbr2: dbr1) + ((vpn >> 1) & 077);
+	    ptead = ((ea & RSIGN)? dbr2: dbr1) + ((vpn >> 1) & 077);
 	else ptead = ((ea & RSIGN)? dbr3: dbr4) + ((vpn >> 1) & 077);
 	ptewd = ReadP (ptead);				/* get PTE pair */
 	pte = (int32) ((ptewd >> ((vpn & 1)? 0: 18)) & RMASK);
 	acc = ITS_GETACC (pte);				/* get access */
 	pager_word = PF_VIRT | ea | ((tbl == uptbl)? PF_USER: 0) |
-		((mode & PTF_WR)? PF_ITS_WRITE: 0) | (acc << PF_ITS_V_ACC);
+	    ((mode & PTF_WR)? PF_ITS_WRITE: 0) | (acc << PF_ITS_V_ACC);
 	if ((acc != ITS_ACC_NO) && (!(mode & PTF_WR) || (acc == ITS_ACC_RW))) { 
-		pte = pte & ~PTE_ITS_AGE;		/* clear age */
-		if (vpn & 1) WriteP (ptead, (ptewd & LMASK) | pte);
-		else WriteP (ptead, (ptewd & RMASK) | (((d10) pte) << 18));
-		xpte = ((pte & PTE_ITS_PPMASK) << ITS_V_PN) | PTBL_V |
-			((acc == ITS_ACC_RW)? PTBL_M: 0);
-		decvpn = PAG_GETVPN (ea);		/* get tlb idx */
-		if (!(mode & PTF_CON)) {
-			tbl[decvpn & ~1] = xpte;	/* map lo ITS page */
-			tbl[decvpn | 1] = xpte + PAG_SIZE;  }	/* map hi */
-		return (xpte + ((decvpn & 1)? PAG_SIZE: 0));  }
+	    pte = pte & ~PTE_ITS_AGE;		/* clear age */
+	    if (vpn & 1) WriteP (ptead, (ptewd & LMASK) | pte);
+	    else WriteP (ptead, (ptewd & RMASK) | (((d10) pte) << 18));
+	    xpte = ((pte & PTE_ITS_PPMASK) << ITS_V_PN) | PTBL_V |
+		((acc == ITS_ACC_RW)? PTBL_M: 0);
+	    decvpn = PAG_GETVPN (ea);			/* get tlb idx */
+	    if (!(mode & PTF_CON)) {
+		tbl[decvpn & ~1] = xpte;		/* map lo ITS page */
+		tbl[decvpn | 1] = xpte + PAG_SIZE;  }	/* map hi */
+	    return (xpte + ((decvpn & 1)? PAG_SIZE: 0));  }
 	PAGE_FAIL_TRAP;
 	}						/* end ITS paging */
 
@@ -349,14 +349,14 @@ else if (!T20) {					/* TOPS-10 paging */
 	pager_word = PF_VIRT | ea | ((tbl == uptbl)? PF_USER: 0) |
 		((mode & PTF_WR)? PF_WRITE: 0) |
 		((pte & PTE_T10_A)? PF_T10_A |
-			((pte & PTE_T10_S)? PF_T10_S: 0): 0);
+		    ((pte & PTE_T10_S)? PF_T10_S: 0): 0);
 	if (mode & PTF_MAP) pager_word = pager_word |	/* map? add to pf wd */
 		((pte & PTE_T10_W)? PF_T10_W: 0) |	/* W, S, C bits */
 		((pte & PTE_T10_S)? PF_T10_S: 0) |
 		((pte & PTE_T10_C)? PF_C: 0);
 	if ((pte & PTE_T10_A) && (!(mode & PTF_WR) || (pte & PTE_T10_W))) {
 		xpte = ((pte & PTE_PPMASK) << PAG_V_PN) | /* calc exp pte */
-			PTBL_V | ((pte & PTE_T10_W)? PTBL_M: 0);
+		     PTBL_V | ((pte & PTE_T10_W)? PTBL_M: 0);
 		if (!(mode & PTF_CON)) tbl[vpn] = xpte;	/* set tbl if ~cons */
 		return xpte;  }
 	PAGE_FAIL_TRAP;
@@ -389,7 +389,7 @@ else {							/* TOPS-20 paging */
 	d10 acc = PTE_T20_W | PTE_T20_C;		/* init access bits */
 
 	pager_word = PF_VIRT | ea | ((tbl == uptbl)? PF_USER: 0) |
-		((mode & PTF_WR)? PF_WRITE: 0);		/* set page fail word */
+	    ((mode & PTF_WR)? PF_WRITE: 0);		/* set page fail word */
 
 /* First phase - evaluate section pointers - returns a ptr to a page map
    As a single section machine, the KS10 short circuits this part of the
@@ -411,90 +411,90 @@ else {							/* TOPS-20 paging */
 	pa = (tbl == uptbl)? upta + UPT_T20_SCTN: epta + EPT_T20_SCTN;
 	READPT (ptr, pa & PAMASK);			/* get section 0 ptr */
 	for (stop = FALSE, flg = 0; !stop; flg++) {	/* eval section ptrs */
-		acc = acc & ptr;			/* cascade acc bits */
-		switch (T20_GETTYP (ptr)) {		/* case on ptr type */
-		case T20_NOA:				/* no access */
-		default:				/* undefined type */
-			PAGE_FAIL_TRAP;			/* page fail */
-		case T20_IMM:				/* immediate */
-			stop = TRUE;			/* exit */
-			break;
-		case T20_SHR:				/* shared */
-			pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
-			READPT (ptr, pa & PAMASK);	/* get SPT entry */
-			stop = TRUE;			/* exit */
-			break;
-		case T20_IND:				/* indirect */
-			if (flg && (t = test_int ())) ABORT (t);
-			pmi = T20_GETPMI (ptr);		/* get sect tbl idx */
-			pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
-			if (pmi) {			/* for dskec */
-				pag_nxm ((pmi << 18) | pa, REF_P, PF_OK);
-				PAGE_FAIL_TRAP;  }
-			READPT (ptr, pa & PAMASK);	/* get SPT entry */
-			if (ptr & PTE_T20_STM) { PAGE_FAIL_TRAP; }
-			pa = PAG_PTEPA (ptr, pmi);	/* index off page */
-			READPT (ptr, pa & PAMASK);	/* get pointer */
-			break;				/* continue in loop */
-			}				/* end case */
-		}					/* end for */
+	    acc = acc & ptr;				/* cascade acc bits */
+	    switch (T20_GETTYP (ptr)) {			/* case on ptr type */
+	    case T20_NOA:				/* no access */
+	    default:					/* undefined type */
+		PAGE_FAIL_TRAP;				/* page fail */
+	    case T20_IMM:				/* immediate */
+		stop = TRUE;				/* exit */
+		break;
+	    case T20_SHR:				/* shared */
+		pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
+		READPT (ptr, pa & PAMASK);		/* get SPT entry */
+		stop = TRUE;				/* exit */
+		break;
+	    case T20_IND:				/* indirect */
+		if (flg && (t = test_int ())) ABORT (t);
+		pmi = T20_GETPMI (ptr);			/* get sect tbl idx */
+		pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
+		if (pmi) {				/* for dskec */
+		    pag_nxm ((pmi << 18) | pa, REF_P, PF_OK);
+			PAGE_FAIL_TRAP;  }
+		READPT (ptr, pa & PAMASK);		/* get SPT entry */
+		if (ptr & PTE_T20_STM) { PAGE_FAIL_TRAP; }
+		pa = PAG_PTEPA (ptr, pmi);		/* index off page */
+		READPT (ptr, pa & PAMASK);		/* get pointer */
+		break;					/* continue in loop */
+		}					/* end case */
+	    }						/* end for */
 
 /* Second phase - found page map ptr, evaluate page pointers */
 
 	pa = PAG_PTEPA (ptr, vpn);			/* get ptbl address */
 	for (stop = FALSE, flg = 0; !stop; flg++) {	/* eval page ptrs */
-		if (ptr & PTE_T20_STM) { PAGE_FAIL_TRAP; }	/* non-res? */
-		if (cst) {				/* cst really there? */
-			csta = (int32) ((cst + (ptr & PTE_PPMASK)) & PAMASK);
-			READPT (cste, csta);		/* get CST entry */
-			if ((cste & CST_AGE) == 0) { PAGE_FAIL_TRAP; }
-			cste = (cste & cstm) | pur;	/* update entry */
-			WriteP (csta, cste);  }		/* rewrite */
-		READPT (ptr, pa & PAMASK);		/* get pointer */
-		acc = acc & ptr;			/* cascade acc bits */
-		switch (T20_GETTYP (ptr)) {		/* case on ptr type */
-		case T20_NOA:				/* no access */
-		default:				/* undefined type */
-			PAGE_FAIL_TRAP;			/* page fail */
-		case T20_IMM:				/* immediate */
-			stop = TRUE;			/* exit */
-			break;
-		case T20_SHR:				/* shared */
-			pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
-			READPT (ptr, pa & PAMASK);	/* get SPT entry */
-			stop = TRUE;			/* exit */
-			break;
-		case T20_IND:				/* indirect */
-			if (flg && (t = test_int ())) ABORT (t);
-			pmi = T20_GETPMI (ptr);		/* get section index */
-			pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
-			READPT (ptr, pa & PAMASK);	/* get SPT entry */
-			pa = PAG_PTEPA (ptr, pmi);	/* index off page */
-			break;				/* continue in loop */
-			}				/* end case */
-		}					/* end for */
+	    if (ptr & PTE_T20_STM) { PAGE_FAIL_TRAP; }	/* non-res? */
+	    if (cst) {					/* cst really there? */
+		csta = (int32) ((cst + (ptr & PTE_PPMASK)) & PAMASK);
+		READPT (cste, csta);			/* get CST entry */
+		if ((cste & CST_AGE) == 0) { PAGE_FAIL_TRAP; }
+		cste = (cste & cstm) | pur;		/* update entry */
+		WriteP (csta, cste);  }			/* rewrite */
+	    READPT (ptr, pa & PAMASK);			/* get pointer */
+	    acc = acc & ptr;				/* cascade acc bits */
+	    switch (T20_GETTYP (ptr)) {			/* case on ptr type */
+	    case T20_NOA:				/* no access */
+	    default:					/* undefined type */
+		PAGE_FAIL_TRAP;				/* page fail */
+	    case T20_IMM:				/* immediate */
+		stop = TRUE;				/* exit */
+		break;
+	    case T20_SHR:				/* shared */
+		pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
+		READPT (ptr, pa & PAMASK);		/* get SPT entry */
+		stop = TRUE;				/* exit */
+		break;
+	    case T20_IND:				/* indirect */
+		if (flg && (t = test_int ())) ABORT (t);
+		pmi = T20_GETPMI (ptr);			/* get section index */
+		pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
+		READPT (ptr, pa & PAMASK);		/* get SPT entry */
+		pa = PAG_PTEPA (ptr, pmi);		/* index off page */
+		break;					/* continue in loop */
+		}					/* end case */
+	    }						/* end for */
 
 /* Last phase - have final page pointer, check modifiability */
 
 	if (ptr & PTE_T20_STM) { PAGE_FAIL_TRAP; }	/* non-resident? */
 	if (cst) {					/* CST really there? */
-		csta = (int32) ((cst + (ptr & PTE_PPMASK)) & PAMASK);
-		READPT (cste, csta);			/* get CST entry */
-		if ((cste & CST_AGE) == 0) { PAGE_FAIL_TRAP; }
-		cste = (cste & cstm) | pur;  }		/* update entry */
+	    csta = (int32) ((cst + (ptr & PTE_PPMASK)) & PAMASK);
+	    READPT (cste, csta);			/* get CST entry */
+	    if ((cste & CST_AGE) == 0) { PAGE_FAIL_TRAP; }
+	    cste = (cste & cstm) | pur;  }		/* update entry */
 	else cste = 0;					/* no, entry = 0 */
 	pager_word = pager_word | PF_T20_DN;		/* set eval done */
 	xpte = ((int32) ((ptr & PTE_PPMASK) << PAG_V_PN)) | PTBL_V;
 	if (mode & PTF_WR) {				/* write? */
-		if (acc & PTE_T20_W) {			/* writable? */
-			xpte = xpte | PTBL_M;		/* set PTE M */
-			cste = cste | CST_M;  }		/* set CST M */
-		else { PAGE_FAIL_TRAP; }  }		/* no, trap */
+	    if (acc & PTE_T20_W) {			/* writable? */
+		xpte = xpte | PTBL_M;			/* set PTE M */
+		cste = cste | CST_M;  }			/* set CST M */
+	    else { PAGE_FAIL_TRAP; }  }			/* no, trap */
 	if (cst) WriteP (csta, cste);			/* write CST entry */
 	if (mode & PTF_MAP) pager_word = pager_word |	/* map? more in pf wd */
-		((xpte & PTBL_M)? PF_T20_M: 0) |	/* M, W, C bits */
-		((acc & PTE_T20_W)? PF_T20_W: 0) |
-		((acc & PTE_T20_C)? PF_C: 0);
+	    ((xpte & PTBL_M)? PF_T20_M: 0) |	/* M, W, C bits */
+	    ((acc & PTE_T20_W)? PF_T20_W: 0) |
+	    ((acc & PTE_T20_C)? PF_C: 0);
 	if (!(mode & PTF_CON)) tbl[vpn] = xpte;		/* set tbl if ~cons */
 	return xpte;
 	}						/* end TOPS20 paging */
@@ -510,8 +510,9 @@ if (PAGING) {
 	ac_cur = &acs[UBR_GETCURAC (ubr) * AC_NUM];
 	ac_prv = &acs[UBR_GETPRVAC (ubr) * AC_NUM];
 	if (TSTF (F_USR)) ptbl_cur = ptbl_prv = &uptbl[0];
-	else {	ptbl_cur = &eptbl[0];
-		ptbl_prv = TSTF (F_UIO)? &uptbl[0]: &eptbl[0];  }  }
+	else {
+	    ptbl_cur = &eptbl[0];
+	    ptbl_prv = TSTF (F_UIO)? &uptbl[0]: &eptbl[0];  }  }
 else {	ac_cur = ac_prv = &acs[0];
 	ptbl_cur = ptbl_prv = &physptbl[0];  }
 t = EBR_GETEBR (ebr);

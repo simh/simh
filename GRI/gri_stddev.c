@@ -29,6 +29,7 @@
    hsp		S42-006 high speed punch
    rtc		real time clock
 
+   22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7b/8B support to terminal
 */
 
@@ -228,7 +229,8 @@ int32 c;
 
 sim_activate (&tti_unit, tti_unit.wait);		/* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
-if (tti_unit.flags & UNIT_KSR) {			/* KSR? */
+if (c & SCPE_BREAK) tti_unit.buf = 0;			/* break? */
+else if (tti_unit.flags & UNIT_KSR) {			/* KSR? */
 	c = c & 0177;					/* force 7b */
 	if (islower (c)) c = toupper (c);		/* cvt to UC */
 	tti_unit.buf = c | 0200;  }			/* add TTY bit */
@@ -316,8 +318,8 @@ if ((hsr_unit.flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (hsr_stopioe, SCPE_UNATT);
 if ((temp = getc (hsr_unit.fileref)) == EOF) {		/* read char */
 	if (feof (hsr_unit.fileref)) {			/* err or eof? */
-		if (hsr_stopioe) printf ("HSR end of file\n");
-		else return SCPE_OK;  }
+	    if (hsr_stopioe) printf ("HSR end of file\n");
+	    else return SCPE_OK;  }
 	else perror ("HSR I/O error");
 	clearerr (hsr_unit.fileref);
 	return SCPE_IOERR;  }

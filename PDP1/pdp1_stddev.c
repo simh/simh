@@ -28,6 +28,8 @@
    tti		keyboard
    tto		teleprinter
 
+   22-Dec-02	RMS	Added break support
+   29-Nov-02	RMS	Fixed output flag initialization (found by Derek Peschel)
    21-Nov-02	RMS	Changed typewriter to half duplex (found by Derek Peschel)
    06-Oct-02	RMS	Revised for V2.10
    30-May-02	RMS	Widened POS to 32b
@@ -217,8 +219,8 @@ if ((ptr_unit.flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (ptr_stopioe, SCPE_UNATT);
 if ((temp = getc (ptr_unit.fileref)) == EOF) {		/* end of file? */
 	if (feof (ptr_unit.fileref)) {
-		if (ptr_stopioe) printf ("PTR end of file\n");
-		else return SCPE_OK;  }
+	    if (ptr_stopioe) printf ("PTR end of file\n");
+	    else return SCPE_OK;  }
 	else perror ("PTR I/O error");
 	clearerr (ptr_unit.fileref);
 	return SCPE_IOERR;  }
@@ -346,6 +348,7 @@ if (tti_hold & CW) {					/* char waiting? */
 	tty_buf = tti_hold & TT_WIDTH;			/* return char */
 	tti_hold = 0;  }				/* not waiting */
 else {	if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;
+	if (temp & SCPE_BREAK) return SCPE_OK;		/* ignore break */
 	temp = temp & 0177;
 	if (temp == 0177) temp = '\b';			/* rubout? bs */
 	sim_putchar (temp);				/* echo */
@@ -353,10 +356,11 @@ else {	if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;
 	in = ascii_to_fiodec[temp];			/* translate char */
 	if (in == 0) return SCPE_OK;			/* no xlation? */
 	if ((in & BOTH) || ((in & UC) == (tty_uc & UC)))
-		tty_buf = in & TT_WIDTH;
-	else {	tty_uc = in & UC;			/* shift case */
-		tty_buf = tty_uc? FIODEC_UC: FIODEC_LC;
-		tti_hold = in | CW;  }  }		/* set 2nd waiting */
+	    tty_buf = in & TT_WIDTH;
+	else {						/* must shift */
+	    tty_uc = in & UC;				/* new case */
+	    tty_buf = tty_uc? FIODEC_UC: FIODEC_LC;
+	    tti_hold = in | CW;  }  }			/* set 2nd waiting */
 iosta = iosta | IOS_TTI;				/* set flag */
 sbs = sbs | SB_RQ;					/* req seq break */
 PF = PF | 040;						/* set prog flag 1 */
@@ -395,7 +399,7 @@ tty_buf = 0;						/* clear buffer */
 tty_uc = 0;						/* clear case */
 tti_hold = 0;						/* clear hold buf */
 tto_rpls = 0;						/* clear reset pulse */
-iosta = iosta & ~(IOS_TTI | IOS_TTO);			/* clear flag */
+iosta = (iosta & ~IOS_TTI) | IOS_TTO;			/* clear flag */
 sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* activate keyboard */
 sim_cancel (&tty_unit[TTO]);				/* stop printer */
 return SCPE_OK;

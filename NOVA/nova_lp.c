@@ -81,7 +81,7 @@ case iopS: 						/* start */
 	int_req = int_req & ~INT_LPT;
 	if ((lpt_unit.buf != 015) && (lpt_unit.buf != 014) &&
 	    (lpt_unit.buf != 012))
-		return (lpt_svc (&lpt_unit) << IOT_V_REASON);
+	    return (lpt_svc (&lpt_unit) << IOT_V_REASON);
 	sim_activate (&lpt_unit, lpt_unit.wait);
 	break;
 case iopC:						/* clear */

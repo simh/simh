@@ -519,18 +519,18 @@ extern UNIT clk_unit;
 #if defined (PDP9)
 #define CHECK_AUTO_INC \
 	if ((IR & 017770) == 010) { \
-		MA = MA & 017; \
-		M[MA] = (M[MA] + 1) & 0777777;  }
+	    MA = MA & 017; \
+	    M[MA] = (M[MA] + 1) & 0777777;  }
 #define INDIRECT \
 	MA = memm? M[MA] & IAMASK: (MA & epcmask) | (M[MA] & damask)
 #define CHECK_ADDR_R(x) \
 	if (usmd) { \
-		if (!MEM_ADDR_OK (x)) { \
-			nexm = prvn = trap_pending = 1; \
-			break;  } \
-		if ((x) < BR) { \
-			prvn = trap_pending = 1;  \
-			break;  }  }  \
+	    if (!MEM_ADDR_OK (x)) { \
+		nexm = prvn = trap_pending = 1; \
+		break;  } \
+	    if ((x) < BR) { \
+		prvn = trap_pending = 1;  \
+		break;  }  }  \
 	if (!MEM_ADDR_OK (x)) nexm = 1
 #define CHECK_INDEX 			/* no indexing capability */
 #define CHECK_ADDR_W(x) \
@@ -550,28 +550,28 @@ extern UNIT clk_unit;
 #if defined (PDP15)
 #define CHECK_AUTO_INC \
 	if ((IR & damask & ~07) == 00010) { \
-		MA = MA & 017; \
-		M[MA] = (M[MA] + 1) & 0777777;  }
+	    MA = MA & 017; \
+	    M[MA] = (M[MA] + 1) & 0777777;  }
 #define INDIRECT \
 	if (rest_pending) { \
-		rest_pending = 0; \
-		LAC = ((M[MA] << 1) & 01000000) | (LAC & 0777777); \
-		memm = (M[MA] >> 16) & 1; \
-		usmd = (M[MA] >> 15) & 1; }  \
+	    rest_pending = 0; \
+	    LAC = ((M[MA] << 1) & 01000000) | (LAC & 0777777); \
+	    memm = (M[MA] >> 16) & 1; \
+	    usmd = (M[MA] >> 15) & 1; }  \
 	MA = ((IR & damask & ~07) != 00010)? \
-		(PC & BLKMASK) | (M[MA] & IAMASK): (M[MA] & ADDRMASK); \
+	    (PC & BLKMASK) | (M[MA] & IAMASK): (M[MA] & ADDRMASK); \
 	damask = memm? 017777: 07777; \
 	epcmask = ADDRMASK & ~damask
 #define CHECK_INDEX \
 	if ((IR & 0010000) && (memm == 0)) MA = (MA + XR) & ADDRMASK
 #define CHECK_ADDR_R(x) \
 	if (usmd) { \
-		if (!MEM_ADDR_OK (x)) { \
-			nexm = prvn = trap_pending = 1; \
-			break;  } \
-		if ((x) < BR) { \
-			prvn = trap_pending = 1;  \
-			break;  }  }  \
+	    if (!MEM_ADDR_OK (x)) { \
+		nexm = prvn = trap_pending = 1; \
+		break;  } \
+	    if ((x) < BR) { \
+		prvn = trap_pending = 1;  \
+		break;  }  }  \
 	if (!MEM_ADDR_OK (x)) nexm = 1
 #define CHECK_ADDR_W(x) \
 	CHECK_ADDR_R (x); \
@@ -644,16 +644,17 @@ if (api_int && !ion_defer) {				/* API intr? */
 	int32 i, lvl = api_int - 1;			/* get req level */
 	api_act = api_act | (0200 >> lvl);		/* set level active */
 	if (lvl >= API_HLVL) {				/* software req? */
-		MA = ACH_SWRE + lvl - API_HLVL;		/* vec = 40:43 */
-		api_req = api_req & ~(0200 >> lvl);  }	/* remove request */
-	else {	MA = 0;					/* assume fails */
-		for (i = 0; i < 32; i++) {		/* loop hi to lo */
-		    if ((int_hwre[lvl] >> i) & 1) {	/* int req set? */
-			MA = api_vec[lvl][i];		/* get vector */
-			break;  }  }  }			/* and stop */
+	    MA = ACH_SWRE + lvl - API_HLVL;		/* vec = 40:43 */
+	    api_req = api_req & ~(0200 >> lvl);  }	/* remove request */
+	else {
+	    MA = 0;					/* assume fails */
+	    for (i = 0; i < 32; i++) {			/* loop hi to lo */
+	    if ((int_hwre[lvl] >> i) & 1) {		/* int req set? */
+		MA = api_vec[lvl][i];			/* get vector */
+		break;  }  }  }				/* and stop */
 	if (MA == 0) {					/* bad channel? */
-		reason = STOP_API;			/* API error */
-		break;  }
+	    reason = STOP_API;				/* API error */
+	    break;  }
 	api_int = api_eval (&int_pend);			/* no API int */
 	api_cycle = 1;					/* in API cycle */
 	emir_pending = rest_pending = 0;		/* emir, restore off */
@@ -687,11 +688,11 @@ if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) {	/* breakpoint? */
 #if defined (PDP9) || defined (PDP15)
 if (usmd) {						/* user mode? */
 	if (!MEM_ADDR_OK (PC)) {			/* nxm? */
-		nexm = prvn = trap_pending = 1;		/* abort fetch */
-		continue;  } \
+	    nexm = prvn = trap_pending = 1;		/* abort fetch */
+	    continue;  }
 	if (PC < BR) {					/* bounds viol? */
-		prvn = trap_pending = 1;		/* abort fetch */
-		continue;  }  }
+	    prvn = trap_pending = 1;			/* abort fetch */
+	    continue;  }  }
 else if (!MEM_ADDR_OK (PC)) nexm = 1;			/* flag nxm */
 if (!ion_defer) usmd = usmdbuf;				/* no IOT? load usmd */
 #endif
@@ -819,11 +820,11 @@ case 020:						/* XCT, dir  */
 	CHECK_INDEX;
 	CHECK_ADDR_R (MA);
 	if (usmd && (xct_count != 0)) {			/* trap and chained? */
-		prvn = trap_pending = 1;
-		break;  }
+	    prvn = trap_pending = 1;
+	    break;  }
 	if (xct_count >= xct_max) {			/* too many XCT's? */
-		reason = STOP_XCT;
-		break;  }
+	    reason = STOP_XCT;
+	    break;  }
 	xct_count = xct_count + 1;			/* count XCT's */
 #if defined (PDP9)
 	ion_defer = 1;					/* defer intr */
@@ -848,8 +849,8 @@ case 001: case 000:					/* CAL */
 #if defined (PDP9) || defined (PDP15)
 	usmd = 0;					/* clear user mode */
 	if ((cpu_unit.flags & UNIT_NOAPI) == 0) {	/* if API, act lvl 4 */
-		api_act = api_act | 010;
-		api_int = api_eval (&int_pend);  }
+	    api_act = api_act | 010;
+	    api_int = api_eval (&int_pend);  }
 #endif
 	if (IR & 0020000) { INDIRECT;  }		/* indirect? */
 	CHECK_ADDR_W (MA);
@@ -885,9 +886,9 @@ CHECK_AUTO_INC;					/* check auto inc */
 #endif
 #if defined (PDP9)
 	if (rest_pending) {				/* restore pending? */
-		LAC = ((M[MA] << 1) & 01000000) | (LAC & 0777777);
-		memm = (M[MA] >> 16) & 1;
-		usmd = (M[MA] >> 15) & 1;  }
+	    LAC = ((M[MA] << 1) & 01000000) | (LAC & 0777777);
+	    memm = (M[MA] >> 16) & 1;
+	    usmd = (M[MA] >> 15) & 1;  }
 #endif
 	INDIRECT;					/* complete indirect */
 	emir_pending = rest_pending = 0;
@@ -907,147 +908,147 @@ case 036:						/* OPR, dir */
 	skp = 0;					/* assume no skip */
 	switch ((IR >> 6) & 017) {			/* decode IR<8:11> */
 	case 0:	 					/* nop */
-		break;
+	    break;
 	case 1: 					/* SMA */
-		if ((LAC & 0400000) != 0) skp = 1;
-		break;
+	    if ((LAC & 0400000) != 0) skp = 1;
+	    break;
 	case 2: 					/* SZA */
-		if ((LAC & 0777777) == 0) skp = 1;
-		break;
+	    if ((LAC & 0777777) == 0) skp = 1;
+	    break;
 	case 3:						/* SZA | SMA */
-		if (((LAC & 0777777) == 0) || ((LAC & 0400000) != 0))
-			skp = 1; 
-		break;
+	    if (((LAC & 0777777) == 0) || ((LAC & 0400000) != 0))
+		skp = 1; 
+	    break;
 	case 4: 					/* SNL */
-		if (LAC >= 01000000) skp = 1;
-		break;
+	    if (LAC >= 01000000) skp = 1;
+	    break;
 	case 5:						/* SNL | SMA */
-		if (LAC >= 0400000) skp = 1;
-		break;
+	    if (LAC >= 0400000) skp = 1;
+	    break;
 	case 6:						/* SNL | SZA */
-		if ((LAC >= 01000000) || (LAC == 0)) skp = 1;
-		break;
+	    if ((LAC >= 01000000) || (LAC == 0)) skp = 1;
+	    break;
 	case 7:						/* SNL | SZA | SMA */
-		if ((LAC >= 0400000) || (LAC == 0)) skp = 1;
-		break;
+	    if ((LAC >= 0400000) || (LAC == 0)) skp = 1;
+	    break;
 	case 010:					/* SKP */
-		skp = 1;
-		break;
+	    skp = 1;
+	    break;
 	case 011: 					/* SPA */
-		if ((LAC & 0400000) == 0) skp = 1;
-		break;
+	    if ((LAC & 0400000) == 0) skp = 1;
+	    break;
 	case 012: 					/* SNA */
-		if ((LAC & 0777777) != 0) skp = 1;
-		break;
+	    if ((LAC & 0777777) != 0) skp = 1;
+	    break;
 	case 013:					/* SNA & SPA */
-		if (((LAC & 0777777) != 0) && ((LAC & 0400000) == 0))
-			skp = 1;
-		break;
+	    if (((LAC & 0777777) != 0) && ((LAC & 0400000) == 0))
+		skp = 1;
+	    break;
 	case 014: 					/* SZL */
-		if (LAC < 01000000) skp = 1;
-		break;
+	    if (LAC < 01000000) skp = 1;
+	    break;
 	case 015:					/* SZL & SPA */
-		if (LAC < 0400000) skp = 1;
-		break;
+	    if (LAC < 0400000) skp = 1;
+	    break;
 	case 016:					/* SZL & SNA */
-		if ((LAC < 01000000) && (LAC != 0)) skp = 1;
-		break;
+	    if ((LAC < 01000000) && (LAC != 0)) skp = 1;
+	    break;
 	case 017:					/* SZL & SNA & SPA */
-		if ((LAC < 0400000) && (LAC != 0)) skp = 1;
-		break;  }				/* end switch skips */
+	    if ((LAC < 0400000) && (LAC != 0)) skp = 1;
+	    break;  }					/* end switch skips */
 
 /* OPR, continued */
 
 	switch (((IR >> 9) & 014) | (IR & 03)) {	/* IR<5:6,16:17> */
 	case 0:						/* NOP */
-		break;
+	    break;
 	case 1:						/* CMA */
-		LAC = LAC ^ 0777777;
-		break;
+	    LAC = LAC ^ 0777777;
+	    break;
 	case 2:						/* CML */
-		LAC = LAC ^ 01000000;
-		break;
+	    LAC = LAC ^ 01000000;
+	    break;
 	case 3:						/* CML CMA */
-		LAC = LAC ^ 01777777;
-		break;
+	    LAC = LAC ^ 01777777;
+	    break;
 	case 4:						/* CLL */
-		LAC = LAC & 0777777;
-		break;
+	    LAC = LAC & 0777777;
+	    break;
 	case 5:						/* CLL CMA */
-		LAC = (LAC & 0777777) ^ 0777777;
-		break;
+	    LAC = (LAC & 0777777) ^ 0777777;
+	    break;
 	case 6:						/* CLL CML = STL */
-		LAC = LAC | 01000000;
-		break;
+	    LAC = LAC | 01000000;
+	    break;
 	case 7:						/* CLL CML CMA */
-		LAC = (LAC | 01000000) ^ 0777777;
-		break;
+	    LAC = (LAC | 01000000) ^ 0777777;
+	    break;
 	case 010:					/* CLA */
-		LAC = LAC & 01000000;
-		break;
+	    LAC = LAC & 01000000;
+	    break;
 	case 011:					/* CLA CMA = STA */
-		LAC = LAC | 0777777;
-		break;
+	    LAC = LAC | 0777777;
+	    break;
 	case 012:					/* CLA CML */
-		LAC = (LAC & 01000000) ^ 01000000;
-		break;
+	    LAC = (LAC & 01000000) ^ 01000000;
+	    break;
 	case 013:					/* CLA CML CMA */
-		LAC = (LAC | 0777777) ^ 01000000;
-		break;
+	    LAC = (LAC | 0777777) ^ 01000000;
+	    break;
 	case 014:					/* CLA CLL */
-		LAC = 0;
-		break;
+	    LAC = 0;
+	    break;
 	case 015:					/* CLA CLL CMA */
-		LAC = 0777777;
-		break;
+	    LAC = 0777777;
+	    break;
 	case 016:					/* CLA CLL CML */
-		LAC = 01000000;
-		break;
+	    LAC = 01000000;
+	    break;
 	case 017:					/* CLA CLL CML CMA */
-		LAC = 01777777;
-		break;  }				/* end decode */
+	    LAC = 01777777;
+	    break;  }					/* end decode */
 
 /* OPR, continued */
 
 	if (IR & 0000004) {				/* OAS */
 #if defined (PDP9) || defined (PDP15)
-		if (usmd) prvn = trap_pending = 1;
-		else
+	    if (usmd) prvn = trap_pending = 1;
+	    else
 #endif
 		LAC = LAC | SR;  }
 
 	switch (((IR >> 8) & 04) | ((IR >> 3) & 03)) {	/* decode IR<7,13:14> */
 	case 1:						/* RAL */
-		LAC = ((LAC << 1) | (LAC >> 18)) & 01777777;
+	    LAC = ((LAC << 1) | (LAC >> 18)) & 01777777;
 		break;
 	case 2:						/* RAR */
-		LAC = ((LAC >> 1) | (LAC << 18)) & 01777777;
-		break;
+	    LAC = ((LAC >> 1) | (LAC << 18)) & 01777777;
+	    break;
 	case 3:						/* RAL RAR */
 #if defined (PDP15)					/* PDP-15 */
-		LAC = (LAC + 1) & 01777777;		/* IAC */
+	    LAC = (LAC + 1) & 01777777;			/* IAC */
 #else							/* PDP-4,-7,-9 */
-		reason = stop_inst;			/* undefined */
+	    reason = stop_inst;				/* undefined */
 #endif
-		break;
+	    break;
 	case 5:						/* RTL */
-		LAC = ((LAC << 2) | (LAC >> 17)) & 01777777;
-		break;
+	    LAC = ((LAC << 2) | (LAC >> 17)) & 01777777;
+	    break;
 	case 6:						/* RTR */
-		LAC = ((LAC >> 2) | (LAC << 17)) & 01777777;
-		break;
+	    LAC = ((LAC >> 2) | (LAC << 17)) & 01777777;
+	    break;
 	case 7:						/* RTL RTR */
 #if defined (PDP15)					/* PDP-15 */
-		LAC = ((LAC >> 9) & 0777) | ((LAC & 0777) << 9) |
-			(LAC & 01000000);		/* BSW */
+	    LAC = ((LAC >> 9) & 0777) | ((LAC & 0777) << 9) |
+		(LAC & 01000000);			/* BSW */
 #else							/* PDP-4,-7,-9 */
-		reason = stop_inst;			/* undefined */
+	    reason = stop_inst;				/* undefined */
 #endif
-		break;  }				/* end switch rotate */
+	    break;  }					/* end switch rotate */
 
 	if (IR & 0000040) {				/* HLT */
-		if (usmd) prvn = trap_pending = 1;
-		else reason = STOP_HALT;  }
+	    if (usmd) prvn = trap_pending = 1;
+	    else reason = STOP_HALT;  }
 	if (skp && !prvn) PC = INCR_ADDR (PC);		/* if skip, inc PC */
 	break;						/* end OPR */
 
@@ -1065,10 +1066,10 @@ case 036:						/* OPR, dir */
 case 033: case 032:					/* EAE */
 	if (cpu_unit.flags & UNIT_NOEAE) break;		/* disabled? */
 	if (IR & 0020000)				/* IR<4>? AC0 to L */
-		LAC = ((LAC << 1) & 01000000) | (LAC & 0777777);
+	    LAC = ((LAC << 1) & 01000000) | (LAC & 0777777);
 	if (IR & 0010000) MQ = 0;			/* IR<5>? clear MQ */
 	if ((IR & 0004000) && (LAC & 0400000))		/* IR<6> and minus? */
-		eae_ac_sign = 01000000;			/* set eae_ac_sign */
+	    eae_ac_sign = 01000000;			/* set eae_ac_sign */
 	else eae_ac_sign = 0;				/* if not, unsigned */
 	if (IR & 0002000) MQ = (MQ | LAC) & 0777777;	/* IR<7>? or AC */
 	else if (eae_ac_sign) LAC = LAC ^ 0777777;	/* if not, |AC| */
@@ -1079,25 +1080,25 @@ case 033: case 032:					/* EAE */
 
 	switch ((IR >> 6) & 07) {			/* case on IR<9:11> */
 	case 0:						/* setup */
-		if (IR & 04) LAC = LAC ^ 0777777;	/* IR<15>? ~AC */
-		if (IR & 02) LAC = LAC | MQ;		/* IR<16>? or MQ */
-		if (IR & 01) LAC = LAC | ((-SC) & 077);	/* IR<17>? or SC */
-		break;
+	    if (IR & 04) LAC = LAC ^ 0777777;		/* IR<15>? ~AC */
+	    if (IR & 02) LAC = LAC | MQ;		/* IR<16>? or MQ */
+	    if (IR & 01) LAC = LAC | ((-SC) & 077);	/* IR<17>? or SC */
+	    break;
 
 	case 1:						/* multiply */
-		CHECK_ADDR_R (PC);			/* validate PC */
-		MA = M[PC];				/* get next word */
-		PC = INCR_ADDR (PC);			/* increment PC */
-		if (eae_ac_sign) MQ = MQ ^ 0777777;	/* EAE AC sign? ~MQ */
-		LAC = LAC & 0777777;			/* clear link */
-		for (SC = esc; SC != 0; SC--) {		/* loop per step cnt */
-			if (MQ & 1) LAC = LAC + MA;	/* MQ<17>? add */
-			MQ = (MQ >> 1) | ((LAC & 1) << 17);
-			LAC = LAC >> 1;  }		/* shift AC'MQ right */
-		if (eae_ac_sign ^ link_init) {		/* result negative? */
-			LAC = LAC ^ 0777777;
-			MQ = MQ ^ 0777777;  }
-		break;
+	    CHECK_ADDR_R (PC);				/* validate PC */
+	    MA = M[PC];					/* get next word */
+	    PC = INCR_ADDR (PC);			/* increment PC */
+	    if (eae_ac_sign) MQ = MQ ^ 0777777;		/* EAE AC sign? ~MQ */
+	    LAC = LAC & 0777777;			/* clear link */
+	    for (SC = esc; SC != 0; SC--) {		/* loop per step cnt */
+		if (MQ & 1) LAC = LAC + MA;		/* MQ<17>? add */
+		MQ = (MQ >> 1) | ((LAC & 1) << 17);
+		LAC = LAC >> 1;  }			/* shift AC'MQ right */
+	    if (eae_ac_sign ^ link_init) {		/* result negative? */
+		LAC = LAC ^ 0777777;
+		MQ = MQ ^ 0777777;  }
+	    break;
 
 /* EAE, continued
 
@@ -1111,26 +1112,26 @@ case 033: case 032:					/* EAE */
 */
 
 	case 3:						/* divide */
-		CHECK_ADDR_R (PC);			/* validate PC */
-		MA = M[PC];				/* get next word */
-		PC = INCR_ADDR (PC);			/* increment PC */
-		if (eae_ac_sign) MQ = MQ ^ 0777777;	/* EAE AC sign? ~MQ */
-		if ((LAC & 0777777) >= MA) {		/* overflow? */
-			LAC = (LAC - MA) | 01000000;	/* set link */
-			break;  }
-		LAC = LAC & 0777777;			/* clear link */
-		t = 0;					/* init loop */
-		for (SC = esc; SC != 0; SC--) {		/* loop per step cnt */
-			if (t) LAC = (LAC + MA) & 01777777;
-			else LAC = (LAC - MA) & 01777777;
-			t = (LAC >> 18) & 1;		/* quotient bit */
-			if (SC > 1) LAC =		/* skip if last */
-				((LAC << 1) | (MQ >> 17)) & 01777777;
-			MQ = ((MQ << 1) | t) & 0777777;  }
+	    CHECK_ADDR_R (PC);				/* validate PC */
+	    MA = M[PC];					/* get next word */
+	    PC = INCR_ADDR (PC);			/* increment PC */
+	    if (eae_ac_sign) MQ = MQ ^ 0777777;		/* EAE AC sign? ~MQ */
+	    if ((LAC & 0777777) >= MA) {		/* overflow? */
+		LAC = (LAC - MA) | 01000000;		/* set link */
+		break;  }
+	    LAC = LAC & 0777777;			/* clear link */
+	    t = 0;					/* init loop */
+	    for (SC = esc; SC != 0; SC--) {		/* loop per step cnt */
 		if (t) LAC = (LAC + MA) & 01777777;
-		if (eae_ac_sign) LAC = LAC ^ 0777777;	/* sgn rem = sgn divd */
-		if (eae_ac_sign ^ link_init ^ 1) MQ = MQ ^ 0777777;
-		break;
+		else LAC = (LAC - MA) & 01777777;
+		t = (LAC >> 18) & 1;			/* quotient bit */
+		if (SC > 1) LAC =			/* skip if last */
+		    ((LAC << 1) | (MQ >> 17)) & 01777777;
+		MQ = ((MQ << 1) | t) & 0777777;  }
+	    if (t) LAC = (LAC + MA) & 01777777;
+	    if (eae_ac_sign) LAC = LAC ^ 0777777;	/* sgn rem = sgn divd */
+	    if (eae_ac_sign ^ link_init ^ 1) MQ = MQ ^ 0777777;
+	    break;
 
 /* EAE, continued
 
@@ -1141,43 +1142,45 @@ case 033: case 032:					/* EAE */
 
 	case 4:						/* normalize */
 #if defined (PDP15)
-		if (!usmd) ion_defer = 2;		/* free cycles */
+	    if (!usmd) ion_defer = 2;			/* free cycles */
 #endif
-		for (SC = esc; (SC != 0) && ((LAC & 0400000) ==
-			((LAC << 1) & 0400000)); SC--) {
-			LAC = (LAC << 1) | ((MQ >> 17) & 1);
-			MQ = (MQ << 1) | (link_init >> 18);  }
-		LAC = link_init | (LAC & 0777777);	/* trim AC, restore L */
-		MQ = MQ & 0777777;			/* trim MQ */
-		SC = SC & 077;				/* trim SC */
-		break;
+	    for (SC = esc; (SC != 0) && ((LAC & 0400000) ==
+		((LAC << 1) & 0400000)); SC--) {
+		LAC = (LAC << 1) | ((MQ >> 17) & 1);
+		MQ = (MQ << 1) | (link_init >> 18);  }
+	    LAC = link_init | (LAC & 0777777);		/* trim AC, restore L */
+	    MQ = MQ & 0777777;				/* trim MQ */
+	    SC = SC & 077;				/* trim SC */
+	    break;
 	case 5:						/* long right shift */
-		if (esc < 18) {
-			MQ = ((LAC << (18 - esc)) | (MQ >> esc)) & 0777777;
-			LAC = ((fill << (18 - esc)) | (LAC >> esc)) & 01777777;  }
-		else {	if (esc < 36) MQ =
-			  ((fill << (36 - esc)) | (LAC >> (esc - 18))) & 0777777;
-			else MQ = fill;
-			LAC = link_init | fill;  }
-		SC = 0;					/* clear step count */
-		break;
+	    if (esc < 18) {
+		MQ = ((LAC << (18 - esc)) | (MQ >> esc)) & 0777777;
+		LAC = ((fill << (18 - esc)) | (LAC >> esc)) & 01777777;  }
+	    else {
+	    	if (esc < 36) MQ =
+		    ((fill << (36 - esc)) | (LAC >> (esc - 18))) & 0777777;
+		else MQ = fill;
+		LAC = link_init | fill;  }
+	    SC = 0;					/* clear step count */
+	    break;
 	case 6:						/* long left shift */
-		if (esc < 18) {
-			LAC = link_init |
-			  (((LAC << esc) | (MQ >> (18 - esc))) & 0777777);
-			MQ = ((MQ << esc) | (fill >> (18 - esc))) & 0777777;  }
-		else {	if (esc < 36) LAC = link_init | 
-			  (((MQ << (esc - 18)) | (fill >> (36 - esc))) & 0777777);
-			else LAC = link_init | fill;
-			MQ = fill;  }
-		SC = 0;					/* clear step count */
-		break;
-	case 7:						/* AC left shift */
-		if (esc < 18) LAC = link_init |
-			(((LAC << esc) | (fill >> (18 - esc))) & 0777777);
+	    if (esc < 18) {
+		LAC = link_init |
+		    (((LAC << esc) | (MQ >> (18 - esc))) & 0777777);
+		MQ = ((MQ << esc) | (fill >> (18 - esc))) & 0777777;  }
+	    else {
+	    	if (esc < 36) LAC = link_init | 
+		     (((MQ << (esc - 18)) | (fill >> (36 - esc))) & 0777777);
 		else LAC = link_init | fill;
-		SC = 0;					/* clear step count */
-		break;  }				/* end switch IR */
+		MQ = fill;  }
+	    SC = 0;					/* clear step count */
+	    break;
+	case 7:						/* AC left shift */
+	    if (esc < 18) LAC = link_init |
+		(((LAC << esc) | (fill >> (18 - esc))) & 0777777);
+	    else LAC = link_init | fill;
+	    SC = 0;					/* clear step count */
+	    break;  }					/* end switch IR */
 	break;						/* end case EAE */
 
 /* PDP-15 index operates: opcode 72 */
@@ -1187,46 +1190,46 @@ case 035:						/* index operates */
 	t = (IR & 0400)? IR | 0777000: IR & 0377;	/* sext immediate */
 	switch ((IR >> 9) & 017) {			/* case on IR<5:8> */
 	case 000:					/* AAS */
-		LAC = (LAC & 01000000) | ((LAC + t) & 0777777);
-		if (SEXT (LAC & 0777777) >= SEXT (LR))
-			PC = INCR_ADDR (PC);
+	    LAC = (LAC & 01000000) | ((LAC + t) & 0777777);
+	    if (SEXT (LAC & 0777777) >= SEXT (LR))
+		PC = INCR_ADDR (PC);
 	case 001:					/* PAX */
-		XR = LAC & 0777777;
-		break;
+	    XR = LAC & 0777777;
+	    break;
 	case 002:					/* PAL */
-		LR = LAC & 0777777;
-		break;
+	    LR = LAC & 0777777;
+	    break;
 	case 003:					/* AAC */
-		LAC = (LAC & 01000000) | ((LAC + t) & 0777777);
-		break;
+	    LAC = (LAC & 01000000) | ((LAC + t) & 0777777);
+	    break;
 	case 004:					/* PXA */
-		LAC = (LAC & 01000000) | XR;
-		break;
+	    LAC = (LAC & 01000000) | XR;
+	    break;
 	case 005:					/* AXS */
-		XR = (XR + t) & 0777777;
-		if (SEXT (XR) >= SEXT (LR)) PC = INCR_ADDR (PC);
-		break;
+	    XR = (XR + t) & 0777777;
+	    if (SEXT (XR) >= SEXT (LR)) PC = INCR_ADDR (PC);
+	    break;
 	case 006:					/* PXL */
-		LR = XR;
-		break;
+	    LR = XR;
+	    break;
 	case 010:					/* PLA */
-		LAC = (LAC & 01000000) | LR;
-		break;
+	    LAC = (LAC & 01000000) | LR;
+	    break;
 	case 011:					/* PLX */
-		XR = LR;
-		break;
+	    XR = LR;
+	    break;
 	case 014:					/* CLAC */
-		LAC = LAC & 01000000;
-		break;
+	    LAC = LAC & 01000000;
+	    break;
 	case 015:					/* CLX */
-		XR = 0;
-		break;
+	    XR = 0;
+	    break;
 	case 016:					/* CLLR */
-		LR = 0;
-		break;
+	    LR = 0;
+	    break;
 	case 017:					/* AXR */
-		XR = (XR + t) & 0777777;
-		break;  }				/* end switch IR */
+	    XR = (XR + t) & 0777777;
+	    break;  }					/* end switch IR */
 	break;						/* end case */
 #endif
 
@@ -1267,12 +1270,12 @@ case 035:						/* index operates */
 case 034:						/* IOT */
 #if defined (PDP15)
 	if (IR & 0010000) {				/* floating point? */
-/*		PC = fp15 (PC, IR);			/* process */
-		break;  }
+/*	    PC = fp15 (PC, IR);				/* process */
+	    break;  }
 #endif
 	if (usmd) {					/* user mode? */
-		prvn = trap_pending = 1;		/* trap */
-		break;  }
+	    prvn = trap_pending = 1;			/* trap */
+	    break;  }
 	device = (IR >> 6) & 077;			/* device = IR<6:11> */
 	pulse = IR & 067;				/* pulse = IR<12:17> */
 	if (IR & 0000010) LAC = LAC & 01000000;		/* clear AC? */
@@ -1283,10 +1286,10 @@ case 034:						/* IOT */
 #if defined (PDP4)
 	switch (device) {				/* decode IR<6:11> */
 	case 0:						/* CPU and clock */
-		if (pulse == 002) ion = 0;		/* IOF */
-		else if (pulse == 042) ion = ion_defer = 1;	/* ION */
-		else iot_data = clk (pulse, iot_data);
-		break;
+	    if (pulse == 002) ion = 0;			/* IOF */
+	    else if (pulse == 042) ion = ion_defer = 1;	/* ION */
+	    else iot_data = clk (pulse, iot_data);
+	    break;
 #endif
 
 /* PDP-7 system IOT's */
@@ -1294,23 +1297,23 @@ case 034:						/* IOT */
 #if defined (PDP7)
 	switch (device) {				/* decode IR<6:11> */
 	case 0:						/* CPU and clock */
-		if (pulse == 002) ion = 0;		/* IOF */
-		else if (pulse == 042) ion = ion_defer = 1;	/* ION */
-		else if (pulse == 062)			/* ITON */
-			usmd = ion = ion_defer = 1;
-		else iot_data = clk (pulse, iot_data);
-		break;
+	    if (pulse == 002) ion = 0;			/* IOF */
+	    else if (pulse == 042) ion = ion_defer = 1;	/* ION */
+	    else if (pulse == 062)			/* ITON */
+		usmd = ion = ion_defer = 1;
+	    else iot_data = clk (pulse, iot_data);
+	    break;
 	case 033:					/* CPU control */
-		if ((pulse == 001) || (pulse == 041)) PC = INCR_ADDR (PC);
-		else if (pulse == 002) reset_all (0);	/* CAF */
-		break;
+	    if ((pulse == 001) || (pulse == 041)) PC = INCR_ADDR (PC);
+	    else if (pulse == 002) reset_all (0);	/* CAF */
+	    break;
 	case 077:					/* extended memory */
-		if ((pulse == 001) && memm) PC = INCR_ADDR (PC);
-		else if (pulse == 002) memm = 1;	/* EEM */
-		else if (pulse == 042)			/* EMIR */
-			memm = emir_pending = 1;	/* ext on, restore */
-		else if (pulse == 004) memm = 0;	/* LEM */
-		break;
+	    if ((pulse == 001) && memm) PC = INCR_ADDR (PC);
+	    else if (pulse == 002) memm = 1;		/* EEM */
+	    else if (pulse == 042)			/* EMIR */
+		memm = emir_pending = 1;		/* ext on, restore */
+	    else if (pulse == 004) memm = 0;		/* LEM */
+	    break;
 #endif
 
 /* PDP-9 and PDP-15 system IOT's */
@@ -1319,73 +1322,73 @@ case 034:						/* IOT */
 	ion_defer = 1;					/* delay interrupts */
 	switch (device) {				/* decode IR<6:11> */
 	case 000:					/* CPU and clock */
-		if (pulse == 002) ion = 0;		/* IOF */
-		else if (pulse == 042) ion = 1;		/* ION */
-		else iot_data = clk (pulse, iot_data);
-		break;
+	    if (pulse == 002) ion = 0;			/* IOF */
+	    else if (pulse == 042) ion = 1;		/* ION */
+	    else iot_data = clk (pulse, iot_data);
+	    break;
 	case 017:					/* mem protection */
-		if ((pulse == 001) && prvn) PC = INCR_ADDR (PC);
-		else if ((pulse == 041) && nexm) PC = INCR_ADDR (PC);
-		else if (pulse == 002) prvn = 0;
-		else if (pulse == 042) usmdbuf = 1;
-		else if (pulse == 004) BR = LAC & BRMASK;
-		else if (pulse == 044) nexm = 0;
-		break;
+	    if ((pulse == 001) && prvn) PC = INCR_ADDR (PC);
+	    else if ((pulse == 041) && nexm) PC = INCR_ADDR (PC);
+	    else if (pulse == 002) prvn = 0;
+	    else if (pulse == 042) usmdbuf = 1;
+	    else if (pulse == 004) BR = LAC & BRMASK;
+	    else if (pulse == 044) nexm = 0;
+	    break;
 	case 032:					/* power fail */
-		if ((pulse == 001) && (TST_INT (PWRFL)))
-			 PC = INCR_ADDR (PC);
-		break;
+	    if ((pulse == 001) && (TST_INT (PWRFL)))
+		 PC = INCR_ADDR (PC);
+	    break;
 	case 033:					/* CPU control */
-		if ((pulse == 001) || (pulse == 041)) PC = INCR_ADDR (PC);
-		else if (pulse == 002) reset_all (0);	/* CAF */
-		else if (pulse == 044) rest_pending = 1; /* DBR */
-		if (((cpu_unit.flags & UNIT_NOAPI) == 0) && (pulse & 004)) {
-			int32 t = api_ffo[api_act & 0377];
-			api_act = api_act & ~(0200 >> t);  }
-		break;
+	    if ((pulse == 001) || (pulse == 041)) PC = INCR_ADDR (PC);
+	    else if (pulse == 002) reset_all (0);	/* CAF */
+	    else if (pulse == 044) rest_pending = 1; /* DBR */
+	    if (((cpu_unit.flags & UNIT_NOAPI) == 0) && (pulse & 004)) {
+		int32 t = api_ffo[api_act & 0377];
+		api_act = api_act & ~(0200 >> t);  }
+	    break;
 	case 055:					/* API control */
-		if (cpu_unit.flags & UNIT_NOAPI) reason = stop_inst;
-		else if (pulse == 001) {		/* SPI */
-			if (((LAC & SIGN) && api_enb) ||
-			    ((LAC & 0377) > api_act))
-				iot_data = iot_data | IOT_SKP;  }
-		else if (pulse == 002) {		/* RPL */
-			iot_data = iot_data | (api_enb << 17) |
-				(api_req << 8) | api_act;  }
-		else if (pulse == 004) {		/* ISA */
-			api_enb = (iot_data & SIGN)? 1: 0;
-			api_req = api_req | ((LAC >> 8) & 017);
-			api_act = api_act | (LAC & 0377);  }
-		break;
+	    if (cpu_unit.flags & UNIT_NOAPI) reason = stop_inst;
+	    else if (pulse == 001) {			/* SPI */
+		if (((LAC & SIGN) && api_enb) ||
+		    ((LAC & 0377) > api_act))
+		    iot_data = iot_data | IOT_SKP;  }
+	    else if (pulse == 002) {			/* RPL */
+		iot_data = iot_data | (api_enb << 17) |
+		    (api_req << 8) | api_act;  }
+	    else if (pulse == 004) {			/* ISA */
+		api_enb = (iot_data & SIGN)? 1: 0;
+		api_req = api_req | ((LAC >> 8) & 017);
+		api_act = api_act | (LAC & 0377);  }
+	    break;
 #endif
 #if defined (PDP9)
 	case 077:					/* extended memory */
-		if ((pulse == 001) && memm) PC = INCR_ADDR (PC);
-		else if (pulse == 002) memm = 1;	/* EEM */
-		else if (pulse == 042)			/* EMIR */
-			memm = emir_pending = 1;	/* ext on, restore */
-		else if (pulse == 004) memm = 0;	/* LEM */
-		break;
+	    if ((pulse == 001) && memm) PC = INCR_ADDR (PC);
+	    else if (pulse == 002) memm = 1;		/* EEM */
+	    else if (pulse == 042)			/* EMIR */
+		memm = emir_pending = 1;		/* ext on, restore */
+	    else if (pulse == 004) memm = 0;		/* LEM */
+	    break;
 #endif
 #if defined (PDP15)
 	case 077:					/* bank addressing */
-		if ((pulse == 041) || ((pulse == 061) && memm))
-			 PC = INCR_ADDR (PC);		/* SKP15, SBA */
-		else if (pulse == 042) rest_pending = 1;	/* RES */
-		else if (pulse == 062) memm = 0;	/* DBA */
-		else if (pulse == 064) memm = 1;	/* EBA */
-		damask = memm? 017777: 07777;		/* set dir addr mask */
-		epcmask = ADDRMASK & ~damask;		/* extended PC mask */
-		break;
+	    if ((pulse == 041) || ((pulse == 061) && memm))
+		 PC = INCR_ADDR (PC);			/* SKP15, SBA */
+	    else if (pulse == 042) rest_pending = 1;	/* RES */
+	    else if (pulse == 062) memm = 0;		/* DBA */
+	    else if (pulse == 064) memm = 1;		/* EBA */
+	    damask = memm? 017777: 07777;		/* set dir addr mask */
+	    epcmask = ADDRMASK & ~damask;		/* extended PC mask */
+	    break;
 #endif
 
 /* IOT, continued */
 
 	default:					/* devices */
-		if (dev_tab[device])			/* defined? */
-		    iot_data = dev_tab[device] (pulse, iot_data);
-		else reason = stop_inst;		/* stop on flag */
-		break;  }				/* end switch device */
+	    if (dev_tab[device])			/* defined? */
+		iot_data = dev_tab[device] (pulse, iot_data);
+	    else reason = stop_inst;			/* stop on flag */
+	    break;  }					/* end switch device */
 	LAC = LAC | (iot_data & 0777777);
 	if (iot_data & IOT_SKP) PC = INCR_ADDR (PC);
 	if (iot_data >= IOT_REASON) reason = iot_data >> IOT_V_REASON;
@@ -1420,7 +1423,7 @@ if (api_enb == 0) return 0;				/* off? no req */
 api_req = api_req & ~0360;				/* clr req<0:3> */
 for (i = 0; i < API_HLVL; i++) {			/* loop thru levels */
 	if (int_hwre[i])				/* req on level? */
-		api_req = api_req | (0200 >> i);  }	/* set api req */
+	    api_req = api_req | (0200 >> i);  }		/* set api req */
 hi = api_ffo[api_req & 0377];				/* find hi req */
 if (hi < api_ffo[api_act & 0377]) return (hi + 1);
 return 0;

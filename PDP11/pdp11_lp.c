@@ -126,7 +126,7 @@ if ((PA & 02) == 0) {					/* csr */
 	if (PA & 1) return SCPE_OK;
 	if ((data & CSR_IE) == 0) CLR_INT (LPT);
 	else if ((lpt_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-		SET_INT (LPT);
+	    SET_INT (LPT);
 	lpt_csr = (lpt_csr & ~LPTCSR_RW) | (data & LPTCSR_RW);  }
 else {	if ((PA & 1) == 0) lpt_unit.buf = data & 0177;	/* buffer */
 	lpt_csr = lpt_csr & ~CSR_DONE;

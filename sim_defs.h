@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Jan-03	RMS	Added hidden switch definitions, device dyn memory support,
+			parameters for function pointers, case sensitive SET support
+   22-Dec-02	RMS	Added break flag
    08-Oct-02	RMS	Increased simulator error code space
-			Added Telnet errors,
+			Added Telnet errors
 			Added end of medium support
 			Added help messages to CTAB
 			Added flag and context fields to DEVICE
@@ -128,6 +131,11 @@ typedef uint32		t_mtrlnt;			/* magtape rec lnt */
 #define PATH_MAX	512
 #endif
 #define CBUFSIZE	(128 + PATH_MAX)		/* string buf size */
+
+/* Extended switch definitions (bits >= 26) */
+
+#define SIM_SW_HIDE	(1u << 26)			/* enable hiding */
+#define SIM_SW_REST	(1u << 27)			/* attach/restore */
 
 /* Simulator status codes
 
@@ -179,7 +187,8 @@ typedef uint32		t_mtrlnt;			/* magtape rec lnt */
 #define SCPE_MTRLNT	(SCPE_BASE + 38)		/* tape rec lnt error */
 #define SCPE_LOST	(SCPE_BASE + 39)		/* Telnet conn lost */
 #define SCPE_TTMO	(SCPE_BASE + 40)		/* Telnet conn timeout */
-#define SCPE_KFLAG	01000				/* tti data flag */
+#define SCPE_KFLAG	0010000				/* tti data flag */
+#define SCPE_BREAK	0020000				/* tti break flag */
 
 /* Print value format codes */
 
@@ -215,25 +224,33 @@ struct device {
 	int32		aincr;				/* addr increment */
 	int32		dradix;				/* data radix */
 	int32		dwidth;				/* data width */
-	t_stat		(*examine)();			/* examine routine */
-	t_stat		(*deposit)();			/* deposit routine */
-	t_stat		(*reset)();			/* reset routine */
-	t_stat		(*boot)();			/* boot routine */
-	t_stat		(*attach)();			/* attach routine */
-	t_stat		(*detach)();			/* detach routine */
+	t_stat		(*examine)(t_value *v, t_addr a, struct unit *up,
+				int32 sw);		/* examine routine */
+	t_stat		(*deposit)(t_value v, t_addr a, struct unit *up,
+				int32 sw);		/* deposit routine */
+	t_stat		(*reset)(struct device *dp);	/* reset routine */
+	t_stat		(*boot)(int32 u, struct device *dp);
+							/* boot routine */
+	t_stat		(*attach)(struct unit *up, char *cp);
+							/* attach routine */
+	t_stat		(*detach)(struct unit *up);	/* detach routine */
 	void		*ctxt;				/* context */
 	int32		flags;				/* flags */
+	t_stat		(*msize)(struct unit *up, int32 v, char *cp, void *dp);
+							/* mem size routine */
 };
 
 /* Device flags */
 
 #define DEV_V_DIS	0				/* dev enabled */
 #define DEV_V_DISABLE	1				/* dev disable-able */
+#define DEV_V_DYNM	2				/* mem size dynamic */
 #define	DEV_V_UF	12				/* user flags */
 #define DEV_V_RSV	31				/* reserved */
 
 #define DEV_DIS		(1 << DEV_V_DIS)
 #define DEV_DISABLE	(1 << DEV_V_DISABLE)
+#define DEV_DYNM	(1 << DEV_V_DYNM)
 
 #define DEV_UFMASK	(((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF) - 1))
 #define DEV_RFLAGS	(DEV_UFMASK|DEV_DIS)		/* restored flags */
@@ -249,7 +266,7 @@ struct device {
 
 struct unit {
 	struct unit	*next;				/* next active */
-	t_stat		(*action)();			/* action routine */
+	t_stat		(*action)(struct unit *up);	/* action routine */
 	char		*filename;			/* open file name */
 	FILE		*fileref;			/* file reference */
 	void		*filebuf;			/* memory buffer */
@@ -322,8 +339,10 @@ struct mtab {
 	int32		match;				/* match or max */
 	char		*pstring;			/* print string */
 	char		*mstring;			/* match string */
-	t_stat		(*valid)();			/* validation routine */
-	t_stat		(*disp)();			/* display routine */
+	t_stat		(*valid)(struct unit *up, int32 v, char *cp, void *dp);
+							/* validation routine */
+	t_stat		(*disp)(FILE *st, struct unit *up, int32 v, void *dp);
+							/* display routine */
 	void		*desc;				/* value descriptor */
 							/* REG * if MTAB_VAL */
 							/* int * if not */
@@ -334,6 +353,7 @@ struct mtab {
 #define MTAB_VUN	002				/* valid for unit */
 #define MTAB_VAL	004				/* takes a value */
 #define MTAB_NMO	010				/* only if named */
+#define MTAB_NC		020				/* no UC conversion */
 
 /* Search table */
 
@@ -395,6 +415,9 @@ t_stat get_yn (char *ques, t_stat deflt);
 char *get_glyph (char *iptr, char *optr, char mchar);
 char *get_glyph_nc (char *iptr, char *optr, char mchar);
 t_value get_uint (char *cptr, int radix, t_value max, t_stat *status);
+char *get_range (char *cptr, t_addr *lo, t_addr *hi, int32 rdx,
+	t_addr max, char term);
+t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp);
 t_value strtotv (char *cptr, char **endptr, int radix);
 t_stat fprint_val (FILE *stream, t_value val, int32 rdx, int32 wid, int32 fmt);
 DEVICE *find_dev_from_unit (UNIT *uptr);
@@ -406,5 +429,6 @@ int32 sim_rtcn_calb (int32 time, int32 tmr);
 t_stat sim_poll_kbd (void);
 t_stat sim_putchar (int32 out);
 t_bool sim_brk_test (t_addr bloc, int32 btyp);
+int sim_os_sleep (unsigned int sec);
 
 #endif

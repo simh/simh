@@ -111,8 +111,8 @@
 #define STA_DYN		(STA_PE|STA_SEL|STA_TBSY|STA_WLK|STA_LOCAL)
 
 extern uint16 *M;
-extern int32 PC, SR;
-extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 PC, SR;
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 extern int32 sim_switches;
 extern UNIT cpu_unit;
 

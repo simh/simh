@@ -356,7 +356,7 @@ if (pulse == 004) {					/* MLC */
 	     (fnc >= FNC_WMRK) ||			/* write mark? */
 	    ((fnc == FNC_WRIT) && (uptr->flags & UNIT_WLK)) ||
 	    ((fnc == FNC_WALL) && (uptr->flags & UNIT_WLK)))
-		dt_seterr (uptr, DTB_SEL);		/* select err */
+	    dt_seterr (uptr, DTB_SEL);			/* select err */
 	else dt_newsa (dtsa);  }
 if (pulse == 005) {					/* MRD */
 	IO = (IO & ~DMASK) | dtdb;
@@ -367,10 +367,10 @@ if (pulse == 006) {					/* MWR */
 if (pulse == 007) {					/* MRS */
 	dtsb = dtsb & ~(DTB_REV | DTB_GO);		/* clr rev, go */
 	if (uptr) {					/* valid unit? */
-		mot = DTS_GETMOT (uptr->STATE);		/* get motion */
-		if (mot & DTS_DIR) dtsb = dtsb | DTB_REV;	/* rev? set */
-		if ((mot >= DTS_ACCF) || (uptr->STATE & 0777700))
-			dtsb = dtsb | DTB_GO;  }	/* accel? go */
+	    mot = DTS_GETMOT (uptr->STATE);		/* get motion */
+	    if (mot & DTS_DIR) dtsb = dtsb | DTB_REV;	/* rev? set */
+	    if ((mot >= DTS_ACCF) || (uptr->STATE & 0777700))
+		dtsb = dtsb | DTB_GO;  }		/* accel? go */
 	IO = (IO & ~DMASK) | dtsb;  }
 DT_UPDINT;
 return IO;
@@ -446,17 +446,17 @@ if (new_mving & ~prev_mving) {				/* start? */
 
 if (prev_mving & ~new_mving) {				/* stop? */
 	if ((prev_mot & ~DTS_DIR) != DTS_DECF) {	/* !already stopping? */
-		if (dt_setpos (uptr)) return;		/* update pos */
-		sim_cancel (uptr);			/* stop current */
-		sim_activate (uptr, dt_dctime);  }	/* schedule decel */
+	    if (dt_setpos (uptr)) return;		/* update pos */
+	    sim_cancel (uptr);				/* stop current */
+	    sim_activate (uptr, dt_dctime);  }		/* schedule decel */
 	DTS_SETSTA (DTS_DECF | prev_dir, 0);		/* state = decel */
 	return;  }
 
 if (prev_dir ^ new_dir) {				/* dir chg? */
 	if ((prev_mot & ~DTS_DIR) != DTS_DECF) {	/* !already stopping? */
-		if (dt_setpos (uptr)) return;  		/* update pos */
-		sim_cancel (uptr);			/* stop current */
-		sim_activate (uptr, dt_dctime);  }	/* schedule decel */
+	    if (dt_setpos (uptr)) return;  		/* update pos */
+	    sim_cancel (uptr);				/* stop current */
+	    sim_activate (uptr, dt_dctime);  }		/* schedule decel */
 	DTS_SETSTA (DTS_DECF | prev_dir, 0);		/* state = decel */
 	DTS_SET2ND (DTS_ACCF | new_dir, 0);		/* next = accel */
 	DTS_SET3RD (DTS_ATSF | new_dir, new_fnc);	/* next next = fnc */
@@ -522,25 +522,26 @@ case FNC_MOVE:						/* move */
 	return;						/* done */
 case FNC_SRCH:						/* search */
 	if (dir) newpos = DT_BLK2LN ((DT_QFEZ (uptr)?
-		DTU_TSIZE (uptr): blk), uptr) - DT_BLKLN - DT_WSIZE;
+	    DTU_TSIZE (uptr): blk), uptr) - DT_BLKLN - DT_WSIZE;
 	else newpos = DT_BLK2LN ((DT_QREZ (uptr)?
-		0: blk + 1), uptr) + DT_BLKLN + (DT_WSIZE - 1);
+	    0: blk + 1), uptr) + DT_BLKLN + (DT_WSIZE - 1);
 	if (dt_log & LOG_MS) printf ("[DT%d: searching %s]\n", unum,
-		(dir? "backward": "forward"));
+	    (dir? "backward": "forward"));
 	break;
 case FNC_WRIT:						/* write */
 case FNC_READ:						/* read */
 case FNC_RALL:						/* read all */
 case FNC_WALL:						/* write all */
 	if (DT_QEZ (uptr)) {				/* in "ok" end zone? */
-		if (dir) newpos = DTU_FWDEZ (uptr) - DT_WSIZE;
-		else newpos = DT_EZLIN + (DT_WSIZE - 1);  }
-	else {	newpos = ((uptr->pos) / DT_WSIZE) * DT_WSIZE;
-		if (!dir) newpos = newpos + (DT_WSIZE - 1);  }
+	    if (dir) newpos = DTU_FWDEZ (uptr) - DT_WSIZE;
+	    else newpos = DT_EZLIN + (DT_WSIZE - 1);  }
+	else {
+	    newpos = ((uptr->pos) / DT_WSIZE) * DT_WSIZE;
+	    if (!dir) newpos = newpos + (DT_WSIZE - 1);  }
 	if ((dt_log & LOG_RA) || ((dt_log & LOG_BL) && (blk == dt_logblk)))
-		printf ("[DT%d: read all block %d %s%s\n",
-			unum, blk, (dir? "backward": "forward"),
-			((dtsa & DTA_MODE)? " continuous]": "]"));
+	    printf ("[DT%d: read all block %d %s%s\n",
+		unum, blk, (dir? "backward": "forward"),
+		((dtsa & DTA_MODE)? " continuous]": "]"));
 	break;
 default:
 	dt_seterr (uptr, DTB_SEL);			/* bad state */
@@ -603,7 +604,7 @@ if (((int32) uptr->pos < 0) ||
 	uptr->STATE = uptr->pos = 0;
 	unum = uptr - dt_dev.units;
 	if (unum == DTA_GETUNIT (dtsa))			/* if selected, */
-		dt_seterr (uptr, DTB_SEL);		/* error */
+	    dt_seterr (uptr, DTB_SEL);			/* error */
 	return TRUE;  }
 return FALSE;
 }
@@ -633,9 +634,9 @@ t_addr ba;
 switch (mot) {
 case DTS_DECF: case DTS_DECR:				/* decelerating */
 	if (dt_setpos (uptr)) return SCPE_OK;		/* update pos */
-	uptr->STATE = DTS_NXTSTA (uptr->STATE);	/* advance state */
+	uptr->STATE = DTS_NXTSTA (uptr->STATE);		/* advance state */
 	if (uptr->STATE)				/* not stopped? */
-		sim_activate (uptr, dt_actime);		/* must be reversing */
+	    sim_activate (uptr, dt_actime);		/* must be reversing */
 	return SCPE_OK;
 case DTS_ACCF: case DTS_ACCR:				/* accelerating */
 	dt_newfnc (uptr, DTS_NXTSTA (uptr->STATE));	/* adv state, sched */
@@ -671,8 +672,8 @@ case DTS_OFR:						/* off reel */
 
 case FNC_SRCH:						/* search */
 	if (dtsb & DTB_DTF) {				/* DTF set? */
-		dt_seterr (uptr, DTB_TIM);		/* timing error */
-		return SCPE_OK;  }
+	    dt_seterr (uptr, DTB_TIM);			/* timing error */
+	    return SCPE_OK;  }
 	sim_activate (uptr, DTU_LPERB (uptr) * dt_ltime);/* sched next block */
 	dtdb = blk;					/* store block # */
 	dtsb = dtsb | DTB_DTF;				/* set DTF */
@@ -682,27 +683,28 @@ case FNC_SRCH:						/* search */
 
 case FNC_READ: case FNC_RALL:
 	if (dtsb & DTB_DTF) {				/* DTF set? */
-		dt_seterr (uptr, DTB_TIM);		/* timing error */
-		return SCPE_OK;  }
+	    dt_seterr (uptr, DTB_TIM);			/* timing error */
+	    return SCPE_OK;  }
 	sim_activate (uptr, DT_WSIZE * dt_ltime);	/* sched next word */
 	relpos = DT_LIN2OF (uptr->pos, uptr);		/* cur pos in blk */
 	if ((relpos >= DT_HTLIN) &&			/* in data zone? */
 	    (relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
-		wrd = DT_LIN2WD (uptr->pos, uptr);
-		ba = (blk * DTU_BSIZE (uptr)) + wrd;
-		dtdb = bptr[ba];			/* get tape word */
-		dtsb = dtsb | DTB_DTF;  }		/* set flag */
-	else {	ma = (2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_CSMWD - 1;
-		wrd = relpos / DT_WSIZE;		/* hdr start = wd 0 */
-		if ((wrd == 0) ||			/* skip 1st, last */
-		    (wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - 1))) break;
-		if ((fnc == FNC_READ) &&		/* read, skip if not */
-		    (wrd != DT_CSMWD) &&		/* fwd, rev cksum */
-		    (wrd != ma)) break;
-		dtdb = dt_gethdr (uptr, blk, relpos);
-		if (wrd == (dir? DT_CSMWD: ma))		/* at end csum? */
-			dtsb = dtsb | DTB_BEF;		/* end block */
-		else dtsb = dtsb | DTB_DTF;  }		/* else next word */
+	    wrd = DT_LIN2WD (uptr->pos, uptr);
+	    ba = (blk * DTU_BSIZE (uptr)) + wrd;
+	    dtdb = bptr[ba];				/* get tape word */
+	    dtsb = dtsb | DTB_DTF;  }			/* set flag */
+	else {
+	    ma = (2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_CSMWD - 1;
+	    wrd = relpos / DT_WSIZE;			/* hdr start = wd 0 */
+	    if ((wrd == 0) ||				/* skip 1st, last */
+		(wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - 1))) break;
+	    if ((fnc == FNC_READ) &&			/* read, skip if not */
+		(wrd != DT_CSMWD) &&			/* fwd, rev cksum */
+		(wrd != ma)) break;
+	    dtdb = dt_gethdr (uptr, blk, relpos);
+	    if (wrd == (dir? DT_CSMWD: ma))		/* at end csum? */
+		dtsb = dtsb | DTB_BEF;			/* end block */
+	    else dtsb = dtsb | DTB_DTF;  }		/* else next word */
 	if (dir) dtdb = dt_comobv (dtdb);
 	break;
 
@@ -710,27 +712,28 @@ case FNC_READ: case FNC_RALL:
 
 case FNC_WRIT: case FNC_WALL:
 	if (dtsb & DTB_DTF) {				/* DTF set? */
-		dt_seterr (uptr, DTB_TIM);		/* timing error */
-		return SCPE_OK;  }
+	    dt_seterr (uptr, DTB_TIM);			/* timing error */
+	    return SCPE_OK;  }
 	sim_activate (uptr, DT_WSIZE * dt_ltime);	/* sched next word */
 	relpos = DT_LIN2OF (uptr->pos, uptr);		/* cur pos in blk */
 	if ((relpos >= DT_HTLIN) &&			/* in data zone? */
     	    (relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
-		wrd = DT_LIN2WD (uptr->pos, uptr);
-		ba = (blk * DTU_BSIZE (uptr)) + wrd;
-		if (dir) bptr[ba] = dt_comobv (dtdb);	/* get data word */
-		else bptr[ba] = dtdb;
-		if (ba >= uptr->hwmark) uptr->hwmark = ba + 1;
-		if (wrd == (dir? 0: DTU_BSIZE (uptr) - 1))
-			dtsb = dtsb | DTB_BEF;		/* end block */
-		else dtsb = dtsb | DTB_DTF;  }		/* else next word */
-	else {	wrd = relpos / DT_WSIZE;		/* hdr start = wd 0 */
-		if ((wrd == 0) ||			/* skip 1st, last */
-		    (wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - 1))) break;
-		if ((fnc == FNC_WRIT) &&		/* wr, skip if !csm */
-		    (wrd != ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_CSMWD - 1)))
-			break;
-		dtsb = dtsb | DTB_DTF;  }		/* set flag */
+	    wrd = DT_LIN2WD (uptr->pos, uptr);
+	    ba = (blk * DTU_BSIZE (uptr)) + wrd;
+	    if (dir) bptr[ba] = dt_comobv (dtdb);	/* get data word */
+	    else bptr[ba] = dtdb;
+	    if (ba >= uptr->hwmark) uptr->hwmark = ba + 1;
+	    if (wrd == (dir? 0: DTU_BSIZE (uptr) - 1))
+		dtsb = dtsb | DTB_BEF;			/* end block */
+	    else dtsb = dtsb | DTB_DTF;  }		/* else next word */
+	else {
+	    wrd = relpos / DT_WSIZE;			/* hdr start = wd 0 */
+	    if ((wrd == 0) ||				/* skip 1st, last */
+		(wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - 1))) break;
+	    if ((fnc == FNC_WRIT) &&			/* wr, skip if !csm */
+		(wrd != ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_CSMWD - 1)))
+		break;
+	    dtsb = dtsb | DTB_DTF;  }			/* set flag */
 	break;
 
 default:
@@ -823,16 +826,17 @@ UNIT *uptr;
 for (i = 0; i < DT_NUMDR; i++) {			/* stop all drives */
 	uptr = dt_dev.units + i;
 	if (sim_is_running) {				/* CAF? */
-		prev_mot = DTS_GETMOT (uptr->STATE);	/* get motion */
-		if ((prev_mot & ~DTS_DIR) > DTS_DECF) {	/* accel or spd? */
-			if (dt_setpos (uptr)) continue;	/* update pos */
-			sim_cancel (uptr);
-			sim_activate (uptr, dt_dctime); /* sched decel */
-			DTS_SETSTA (DTS_DECF | (prev_mot & DTS_DIR), 0);
-			}  }
-	else {	sim_cancel (uptr);			/* sim reset */
-		uptr->STATE = 0;  
-		uptr->LASTT = sim_grtime ();  }  }
+	    prev_mot = DTS_GETMOT (uptr->STATE);	/* get motion */
+	    if ((prev_mot & ~DTS_DIR) > DTS_DECF) {	/* accel or spd? */
+		if (dt_setpos (uptr)) continue;		/* update pos */
+		sim_cancel (uptr);
+		sim_activate (uptr, dt_dctime);		/* sched decel */
+		DTS_SETSTA (DTS_DECF | (prev_mot & DTS_DIR), 0);
+		}  }
+	else {
+	    sim_cancel (uptr);				/* sim reset */
+	    uptr->STATE = 0;  
+	    uptr->LASTT = sim_grtime ();  }  }
 dtsa = dtsb = 0;					/* clear status */
 DT_UPDINT;						/* reset interrupt */
 return SCPE_OK;
@@ -939,8 +943,8 @@ if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;
 if (sim_is_active (uptr)) {
 	sim_cancel (uptr);
 	if ((unum == DTA_GETUNIT (dtsa)) && (dtsa & DTA_STSTP)) {
-		dtsb = dtsb | DTB_ERF | DTB_SEL | DTB_DTF;
-		DT_UPDINT;  }
+	    dtsb = dtsb | DTB_ERF | DTB_SEL | DTB_DTF;
+	    DT_UPDINT;  }
 	uptr->STATE = uptr->pos = 0;  }
 bptr = uptr->filebuf;					/* file buffer */
 if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {	/* any data? */

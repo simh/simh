@@ -348,14 +348,14 @@ if (int_req > INT_PENDING) {				/* interrupt? */
 	PCQ_ENTRY;					/* save old PC */
 	M[INT_SAV] = PC;
 	if (int_req & INT_STK) {			/* stack overflow? */
-		int_req = int_req & ~INT_STK;		/* clear */
-		MA = STK_JMP;  }			/* jmp @3 */
+	    int_req = int_req & ~INT_STK;		/* clear */
+	    MA = STK_JMP;  }				/* jmp @3 */
 	else MA = INT_JMP;				/* intr: jmp @1 */
 	for (i = 0, indf = 1; indf && (i < ind_max); i++) {
-		indf = IND_STEP (MA);  }		/* indirect loop */
+	    indf = IND_STEP (MA);  }			/* indirect loop */
 	if (i >= ind_max) {
-		reason = STOP_IND_INT;
-		break;  }
+	    reason = STOP_IND_INT;
+	    break;  }
 	PC = MA;  }					/* end interrupt */
 
 if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) {	/* breakpoint? */
@@ -375,96 +375,96 @@ if (IR & I_OPR) {					/* operate? */
 	dstAC = I_GETDST (IR);
 	switch (I_GETCRY (IR)) {			/* decode carry */
 	case 0:						/* load */
-		src = AC[srcAC] | C;
-		break;
+	    src = AC[srcAC] | C;
+	    break;
 	case 1:						/* clear */
-		src = AC[srcAC];
-		break;
+	    src = AC[srcAC];
+	    break;
 	case 2:						/* set */
-		src = AC[srcAC] | CBIT;
-		break;
+	    src = AC[srcAC] | CBIT;
+	    break;
 	case 3:						/* complement */
-		src = AC[srcAC] | (C ^ CBIT);
-		break;  }				/* end switch carry */
+	    src = AC[srcAC] | (C ^ CBIT);
+	    break;  }					/* end switch carry */
 	switch (I_GETALU (IR)) {			/* decode ALU */
 	case 0:						/* COM */
-		src = src ^ DMASK;
-		break;
+	    src = src ^ DMASK;
+	    break;
 	case 1:						/* NEG */
-		src = ((src ^ DMASK) + 1) & CMASK;
-		break;
+	    src = ((src ^ DMASK) + 1) & CMASK;
+	    break;
 	case 2:						/* MOV */
-		break;
+	    break;
 	case 3:						/* INC */
-		src = (src + 1) & CMASK;
-		break;
+	    src = (src + 1) & CMASK;
+	    break;
 	case 4:						/* ADC */
-		src = ((src ^ DMASK) + AC[dstAC]) & CMASK;
-		break;
+	    src = ((src ^ DMASK) + AC[dstAC]) & CMASK;
+	    break;
 	case 5:						/* SUB */
-		src = ((src ^ DMASK) + AC[dstAC] + 1) & CMASK;
-		break;
+	    src = ((src ^ DMASK) + AC[dstAC] + 1) & CMASK;
+	    break;
 	case 6:						/* ADD */
-		src = (src + AC[dstAC]) & CMASK;
-		break;
+	    src = (src + AC[dstAC]) & CMASK;
+	    break;
 	case 7:						/* AND */
-		src = src & (AC[dstAC] | CBIT);
-		break;  }				/* end switch oper */
+	    src = src & (AC[dstAC] | CBIT);
+	    break;  }					/* end switch oper */
 
 /* Operate, continued */
 
 	switch (I_GETSHF (IR)) {			/* decode shift */
 	case 0:						/* nop */
-		break;
+	    break;
 	case 1:						/* L */
-		src = ((src << 1) | (src >> 16)) & CMASK;
-		break;
+	    src = ((src << 1) | (src >> 16)) & CMASK;
+	    break;
 	case 2:						/* R */
-		src = ((src >> 1) | (src << 16)) & CMASK;
-		break;
+	    src = ((src >> 1) | (src << 16)) & CMASK;
+	    break;
 	case 3:						/* S */
-		src = ((src & 0377) << 8) | ((src >> 8) & 0377) |
-			(src & CBIT);
-		break;  }				/* end switch shift */
+	    src = ((src & 0377) << 8) | ((src >> 8) & 0377) |
+		(src & CBIT);
+	    break;  }					/* end switch shift */
 	switch (I_GETSKP (IR)) {			/* decode skip */
 	case 0:						/* nop */
-		if ((IR & I_NLD) && (cpu_unit.flags & UNIT_STK)) {
-			int32 indf, MA;			/* Nova 3 or 4 trap */
-			PCQ_ENTRY;			/* save old PC */
-			M[TRP_SAV] = (PC - 1) & AMASK;
-			MA = TRP_JMP;			/* jmp @47 */
-			for (i = 0, indf = 1; indf && (i < ind_max); i++) {
-				indf = IND_STEP (MA);  } /* resolve ind */
-			if (i >= ind_max) {		/* indirect loop? */
-				reason = STOP_IND_TRP;
-				break;  }
-			PC = MA;			/* new PC */
-			break;  }
-		break;
+	    if ((IR & I_NLD) && (cpu_unit.flags & UNIT_STK)) {
+		int32 indf, MA;				/* Nova 3 or 4 trap */
+		PCQ_ENTRY;				/* save old PC */
+		M[TRP_SAV] = (PC - 1) & AMASK;
+		MA = TRP_JMP;				/* jmp @47 */
+		for (i = 0, indf = 1; indf && (i < ind_max); i++) {
+		    indf = IND_STEP (MA);  }		/* resolve ind */
+		if (i >= ind_max) {			/* indirect loop? */
+		    reason = STOP_IND_TRP;
+		    break;  }
+		PC = MA;				/* new PC */
+		break;  }
+	    break;
 	case 1:						/* SKP */
-		PC = (PC + 1) & AMASK;
-		break;
+	    PC = (PC + 1) & AMASK;
+	    break;
 	case 2: 					/* SZC */
-		if (src < CBIT) PC = (PC + 1) & AMASK;
-		break;
+	    if (src < CBIT) PC = (PC + 1) & AMASK;
+	    break;
 	case 3:						/* SNC */
-		if (src >= CBIT) PC = (PC + 1) & AMASK;
-		break;
+	    if (src >= CBIT) PC = (PC + 1) & AMASK;
+	    break;
 	case 4:						/* SZR */
-		if ((src & DMASK) == 0) PC = (PC + 1) & AMASK;
-		break;
+	    if ((src & DMASK) == 0) PC = (PC + 1) & AMASK;
+	    break;
 	case 5:						/* SNR */
-		if ((src & DMASK) != 0) PC = (PC + 1) & AMASK;
-		break;
+	    if ((src & DMASK) != 0) PC = (PC + 1) & AMASK;
+	    break;
 	case 6:						/* SEZ */
-		if (src <= CBIT) PC = (PC + 1) & AMASK;
-		break;
+	    if (src <= CBIT) PC = (PC + 1) & AMASK;
+	    break;
 	case 7:						/* SBN */
-		if (src > CBIT) PC = (PC + 1) & AMASK;
-		break;  }				/* end switch skip */
+	    if (src > CBIT) PC = (PC + 1) & AMASK;
+	    break;  }					/* end switch skip */
 	if ((IR & I_NLD) == 0) {			/* load? */
-		AC[dstAC] = src & DMASK;
-		C = src & CBIT;  }			/* end if load */
+	    AC[dstAC] = src & DMASK;
+	    C = src & CBIT;  }				/* end if load */
 	}						/* end if operate */
 
 /* Memory reference instructions */
@@ -474,70 +474,70 @@ else if (IR < 060000) {					/* mem ref? */
 	MA = I_GETDISP (IR);				/* get disp */
 	switch (I_GETMODE (IR)) {			/* decode mode */
 	case 0:						/* page zero */
-		break;
+	    break;
 	case 1:						/* PC relative */
-		if (MA & DISPSIGN) MA = 077400 | MA;
-		MA = (MA + PC - 1) & AMASK;
-		break;
+	    if (MA & DISPSIGN) MA = 077400 | MA;
+	    MA = (MA + PC - 1) & AMASK;
+	    break;
 	case 2:						/* AC2 relative */
-		if (MA & DISPSIGN) MA = 077400 | MA;
-		MA = (MA + AC[2]) & AMASK;
-		break;
+	    if (MA & DISPSIGN) MA = 077400 | MA;
+	    MA = (MA + AC[2]) & AMASK;
+	    break;
 	case 3:						/* AC3 relative */
-		if (MA & DISPSIGN) MA = 077400 | MA;
-		MA = (MA + AC[3]) & AMASK;
-		break;  }				/* end switch mode */
+	    if (MA & DISPSIGN) MA = 077400 | MA;
+	    MA = (MA + AC[3]) & AMASK;
+	    break;  }					/* end switch mode */
 
 	if (indf = IR & I_IND) {			/* indirect? */
-		for (i = 0; indf && (i < ind_max); i++) {	/* count */
-			indf = IND_STEP (MA);  }	/* resolve indirect */
-		if (i >= ind_max) {			/* too many? */
-			reason = STOP_IND;
-			break;  }  }
+	    for (i = 0; indf && (i < ind_max); i++) {	/* count */
+		indf = IND_STEP (MA);  }		/* resolve indirect */
+	    if (i >= ind_max) {				/* too many? */
+		reason = STOP_IND;
+		break;  }  }
 
 /* Memory reference, continued */
 
 	switch (I_GETOPAC (IR)) {			/* decode op + AC */
 	case 001:					/* JSR */
-		AC[3] = PC;
+	    AC[3] = PC;
 	case 000:					/* JMP */
-		PCQ_ENTRY;
-		PC = MA;
-		break;
+	    PCQ_ENTRY;
+	    PC = MA;
+	    break;
 	case 002:					/* ISZ */
-		src = (M[MA] + 1) & DMASK;
-		if (MEM_ADDR_OK (MA)) M[MA] = src;
-		if (src == 0) PC = (PC + 1) & AMASK;
-		break;
+	    src = (M[MA] + 1) & DMASK;
+	    if (MEM_ADDR_OK (MA)) M[MA] = src;
+	    if (src == 0) PC = (PC + 1) & AMASK;
+	    break;
 	case 003:					/* DSZ */
-		src = (M[MA] - 1) & DMASK;
-		if (MEM_ADDR_OK (MA)) M[MA] = src;
-		if (src == 0) PC = (PC + 1) & AMASK;
-		break;
+	    src = (M[MA] - 1) & DMASK;
+	    if (MEM_ADDR_OK (MA)) M[MA] = src;
+	    if (src == 0) PC = (PC + 1) & AMASK;
+	    break;
 	case 004:					/* LDA 0 */
-		AC[0] = M[MA];
-		break;
+	    AC[0] = M[MA];
+	    break;
 	case 005:					/* LDA 1 */
-		AC[1] = M[MA];
-		break;
+	    AC[1] = M[MA];
+	    break;
 	case 006:					/* LDA 2 */
-		AC[2] = M[MA];
-		break;
+	    AC[2] = M[MA];
+	    break;
 	case 007:					/* LDA 3 */
-		AC[3] = M[MA];
-		break;
+	    AC[3] = M[MA];
+	    break;
 	case 010:					/* STA 0 */
-		if (MEM_ADDR_OK (MA)) M[MA] = AC[0];
-		break;
+	    if (MEM_ADDR_OK (MA)) M[MA] = AC[0];
+	    break;
 	case 011:					/* STA 1 */
-		if (MEM_ADDR_OK (MA)) M[MA] = AC[1];
-		break;
+	    if (MEM_ADDR_OK (MA)) M[MA] = AC[1];
+	    break;
 	case 012:					/* STA 2 */
-		if (MEM_ADDR_OK (MA)) M[MA] = AC[2];
-		break;
+	    if (MEM_ADDR_OK (MA)) M[MA] = AC[2];
+	    break;
 	case 013:					/* STA 3 */
-		if (MEM_ADDR_OK (MA)) M[MA] = AC[3];
-		break;  }				/* end switch */
+	    if (MEM_ADDR_OK (MA)) M[MA] = AC[3];
+	    break;  }					/* end switch */
 	}						/* end mem ref */
 
 /* IOT instruction */
@@ -549,200 +549,199 @@ else {							/* IOT */
 	pulse = I_GETPULSE (IR);
 	device = I_GETDEV (IR);
 	if (code == ioSKP) {				/* IO skip? */
-		switch (pulse) {			/* decode IR<8:9> */
-		case 0:					/* skip if busy */
-			if ((device == DEV_CPU)? (int_req & INT_ION) != 0:
-			    (dev_busy & dev_table[device].mask) != 0)
-				PC = (PC + 1) & AMASK;
-			break;
-		case 1:					/* skip if not busy */
-			if ((device == DEV_CPU)? (int_req & INT_ION) == 0:
-			    (dev_busy & dev_table[device].mask) == 0)
-				PC = (PC + 1) & AMASK;
-			break;
-		case 2:					/* skip if done */
-			if ((device == DEV_CPU)? pwr_low != 0:
-			    (dev_done & dev_table[device].mask) != 0)
-				PC = (PC + 1) & AMASK;
-			break;
-		case 3:					/* skip if not done */
-			if ((device == DEV_CPU)? pwr_low == 0:
-			    (dev_done & dev_table[device].mask) == 0)
-				PC = (PC + 1) & AMASK;
-			break;  }			/* end switch */
-		}					/* end IO skip */
+	    switch (pulse) {				/* decode IR<8:9> */
+	    case 0:					/* skip if busy */
+		if ((device == DEV_CPU)? (int_req & INT_ION) != 0:
+		    (dev_busy & dev_table[device].mask) != 0)
+		    PC = (PC + 1) & AMASK;
+		break;
+	    case 1:					/* skip if not busy */
+		if ((device == DEV_CPU)? (int_req & INT_ION) == 0:
+		    (dev_busy & dev_table[device].mask) == 0)
+		    PC = (PC + 1) & AMASK;
+		break;
+	    case 2:					/* skip if done */
+		if ((device == DEV_CPU)? pwr_low != 0:
+		    (dev_done & dev_table[device].mask) != 0)
+		    PC = (PC + 1) & AMASK;
+		break;
+	    case 3:					/* skip if not done */
+		if ((device == DEV_CPU)? pwr_low == 0:
+		    (dev_done & dev_table[device].mask) == 0)
+		    PC = (PC + 1) & AMASK;
+		break;  }				/* end switch */
+	    }						/* end IO skip */
 
 /* IOT, continued */
 
 	else if (device == DEV_MDV) {
-		switch (code) {				/* case on opcode */
-		case ioNIO:				/* frame ptr */
-			if (cpu_unit.flags & UNIT_STK) {
-				if (pulse == iopN) FP = AC[dstAC] & AMASK;
-				if (pulse == iopC) AC[dstAC] = FP;  }
-			break;
-		case ioDIA:				/* load byte */
-			if (cpu_unit.flags & UNIT_BYT)
-				AC[dstAC] = (M[AC[pulse] >> 1] >>
-					 ((AC[pulse] & 1)? 0: 8)) & 0377;
-			else AC[dstAC] = 0;
-			break;
-		case ioDOA:				/* stack ptr */
-			if (cpu_unit.flags & UNIT_STK) {
-				if (pulse == iopN) SP = AC[dstAC] & AMASK;
-				if (pulse == iopC) AC[dstAC] = SP;  }
-			break;
-		case ioDIB:				/* push, pop */
-			if (cpu_unit.flags & UNIT_STK) {
-				if (pulse == iopN) {	/* push */
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = AC[dstAC];
-					STK_CHECK (SP, 1);  }
-				if (pulse == iopC) {	/* pop */
-					AC[dstAC] = M[SP];
-					SP = DECA (SP);  }
-				if ((pulse == iopP) &&	/* Nova 4 pshn */
-				    (cpu_unit.flags & UNIT_BYT)) {
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = AC[dstAC];
-					if (SP > M[042]) int_req = int_req | INT_STK ;
-					}
-				}
-			break;
-		case ioDOB:				/* store byte */
-			if (cpu_unit.flags & UNIT_BYT) {
-				int32 MA, val;
-				MA = AC[pulse] >> 1;
-				val = AC[dstAC] & 0377;
-				if (MEM_ADDR_OK (MA)) M[MA] = (AC[pulse] & 1)?
-					((M[MA] & ~0377) | val):
-					((M[MA] & 0377) | (val << 8));  }
-			break;
-		case ioDIC:				/* save, return */
-			if (cpu_unit.flags & UNIT_STK) {
-				if (pulse == iopN) {	/* save */
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = AC[0];
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = AC[1];
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = AC[2];
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = FP;
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = (C >> 1) |
-						(AC[3] & AMASK);
-					AC[3] = FP = SP & AMASK;  
-					STK_CHECK (SP, 5);  }
-				if (pulse == iopC) {	/* retn */
-					PCQ_ENTRY;
-					SP = FP & AMASK;
-					C = (M[SP] << 1) & CBIT;
-					PC = M[SP] & AMASK;
-					SP = DECA (SP);
-					AC[3] = M[SP];
-					SP = DECA (SP);
-					AC[2] = M[SP];
-					SP = DECA (SP);
-					AC[1] = M[SP];
-					SP = DECA (SP);
-					AC[0] = M[SP];
-					SP = DECA (SP);
-					FP = AC[3] & AMASK;  }
-				if ((pulse == iopP) &&	/* Nova 4 saven */
-				    (cpu_unit.flags & UNIT_BYT)) {
-					int32 frameSz = M[PC] ;
-					PC = INCA (PC) ;
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = AC[0];
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = AC[1];
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = AC[2];
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = FP;
-					SP = INCA (SP);
-					if (MEM_ADDR_OK (SP)) M[SP] = (C >> 1) |
-						(AC[3] & AMASK);
-					AC[3] = FP = SP & AMASK ;
-					SP = (SP + frameSz) & AMASK ;
-					if (SP > M[042]) int_req = int_req | INT_STK;
-					}
-				}
-			break;
-		case ioDOC:
-			if ((dstAC == 2) && (cpu_unit.flags & UNIT_MDV)) {
-				uint32 mddata, uAC0, uAC1, uAC2;
-				uAC0 = (unsigned int32) AC[0];
-				uAC1 = (unsigned int32) AC[1];
-				uAC2 = (unsigned int32) AC[2];
-				if (pulse == iopP) {	/* mul */
-					mddata = (uAC1 * uAC2) + uAC0;
-					AC[0] = (mddata >> 16) & DMASK;
-					AC[1] = mddata & DMASK;  }
-				if (pulse == iopS) {	/* div */
-					if ((uAC0 >= uAC2) || (uAC2 == 0))
-						C = CBIT;
-					else {	C = 0;
-						mddata = (uAC0 << 16) | uAC1;
-						AC[1] = mddata / uAC2;
-						AC[0] = mddata % uAC2;  }  }  }
-			if ((dstAC == 3) && (cpu_unit.flags & UNIT_BYT)) {
-				int32 mddata;
-				if (pulse == iopC) {	/* muls */
-					mddata = (SEXT (AC[1]) * SEXT (AC[2])) +
-						SEXT (AC[0]);
-					AC[0] = (mddata >> 16) & DMASK;
-					AC[1] = mddata & DMASK;  }
-				if (pulse == iopN) {	/* divs */
-					if (AC[2] == 0) C = CBIT;
-					else {	mddata = (SEXT (AC[0]) << 16) | AC[1];
-						AC[1] = mddata / SEXT (AC[2]);
-						AC[0] = mddata % SEXT (AC[2]);
-						if ((AC[1] > 077777) || (AC[1] < -0100000))
-							C = CBIT;
-						else C = 0;
-						AC[0] = AC[0] & DMASK;  }  }  }
-			break;  }			/* end case code */
-		}					/* end if mul/div */
+	    switch (code) {				/* case on opcode */
+	    case ioNIO:					/* frame ptr */
+		if (cpu_unit.flags & UNIT_STK) {
+		    if (pulse == iopN) FP = AC[dstAC] & AMASK;
+		    if (pulse == iopC) AC[dstAC] = FP;  }
+		break;
+	    case ioDIA:					/* load byte */
+		if (cpu_unit.flags & UNIT_BYT)
+		    AC[dstAC] = (M[AC[pulse] >> 1] >>
+			 ((AC[pulse] & 1)? 0: 8)) & 0377;
+		else AC[dstAC] = 0;
+		break;
+	    case ioDOA:					/* stack ptr */
+		if (cpu_unit.flags & UNIT_STK) {
+		    if (pulse == iopN) SP = AC[dstAC] & AMASK;
+		    if (pulse == iopC) AC[dstAC] = SP;  }
+		break;
+	    case ioDIB:					/* push, pop */
+		if (cpu_unit.flags & UNIT_STK) {
+		    if (pulse == iopN) {		/* push */
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = AC[dstAC];
+			STK_CHECK (SP, 1);  }
+		    if (pulse == iopC) {		/* pop */
+			AC[dstAC] = M[SP];
+			SP = DECA (SP);  }
+		    if ((pulse == iopP) &&		/* Nova 4 pshn */
+			(cpu_unit.flags & UNIT_BYT)) {
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = AC[dstAC];
+			if (SP > M[042]) int_req = int_req | INT_STK ;
+			}
+		    }
+		break;
+	    case ioDOB:					/* store byte */
+		if (cpu_unit.flags & UNIT_BYT) {
+		    int32 MA, val;
+		    MA = AC[pulse] >> 1;
+		    val = AC[dstAC] & 0377;
+		    if (MEM_ADDR_OK (MA)) M[MA] = (AC[pulse] & 1)?
+			((M[MA] & ~0377) | val):
+			((M[MA] & 0377) | (val << 8));  }
+		break;
+	    case ioDIC:					/* save, return */
+		if (cpu_unit.flags & UNIT_STK) {
+		    if (pulse == iopN) {		/* save */
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = AC[0];
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = AC[1];
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = AC[2];
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = FP;
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = (C >> 1) |
+			    (AC[3] & AMASK);
+			AC[3] = FP = SP & AMASK;  
+			STK_CHECK (SP, 5);  }
+		    if (pulse == iopC) {		/* retn */
+			PCQ_ENTRY;
+			SP = FP & AMASK;
+			C = (M[SP] << 1) & CBIT;
+			PC = M[SP] & AMASK;
+			SP = DECA (SP);
+			AC[3] = M[SP];
+			SP = DECA (SP);
+			AC[2] = M[SP];
+			SP = DECA (SP);
+			AC[1] = M[SP];
+			SP = DECA (SP);
+			AC[0] = M[SP];
+			SP = DECA (SP);
+			FP = AC[3] & AMASK;  }
+		    if ((pulse == iopP) &&		/* Nova 4 saven */
+			(cpu_unit.flags & UNIT_BYT)) {
+			int32 frameSz = M[PC] ;
+			PC = INCA (PC) ;
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = AC[0];
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = AC[1];
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = AC[2];
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = FP;
+			SP = INCA (SP);
+			if (MEM_ADDR_OK (SP)) M[SP] = (C >> 1) |
+			    (AC[3] & AMASK);
+			AC[3] = FP = SP & AMASK ;
+			SP = (SP + frameSz) & AMASK ;
+			if (SP > M[042]) int_req = int_req | INT_STK;
+			}
+		    }
+		break;
+	    case ioDOC:
+		if ((dstAC == 2) && (cpu_unit.flags & UNIT_MDV)) {
+		    uint32 mddata, uAC0, uAC1, uAC2;
+		    uAC0 = (unsigned int32) AC[0];
+		    uAC1 = (unsigned int32) AC[1];
+		    uAC2 = (unsigned int32) AC[2];
+		    if (pulse == iopP) {		/* mul */
+			mddata = (uAC1 * uAC2) + uAC0;
+			AC[0] = (mddata >> 16) & DMASK;
+			AC[1] = mddata & DMASK;  }
+		    if (pulse == iopS) {		/* div */
+			if ((uAC0 >= uAC2) || (uAC2 == 0)) C = CBIT;
+			else {
+			    C = 0;
+			    mddata = (uAC0 << 16) | uAC1;
+			    AC[1] = mddata / uAC2;
+			    AC[0] = mddata % uAC2;  }  }  }
+		if ((dstAC == 3) && (cpu_unit.flags & UNIT_BYT)) {
+		    int32 mddata;
+		    if (pulse == iopC) {		/* muls */
+			mddata = (SEXT (AC[1]) * SEXT (AC[2])) + SEXT (AC[0]);
+			AC[0] = (mddata >> 16) & DMASK;
+			AC[1] = mddata & DMASK;  }
+		    if (pulse == iopN) {		/* divs */
+			if (AC[2] == 0) C = CBIT;
+			else {
+			    mddata = (SEXT (AC[0]) << 16) | AC[1];
+			    AC[1] = mddata / SEXT (AC[2]);
+			    AC[0] = mddata % SEXT (AC[2]);
+			    if ((AC[1] > 077777) || (AC[1] < -0100000))
+				C = CBIT;
+			    else C = 0;
+			    AC[0] = AC[0] & DMASK;  }  }  }
+		break;  }			/* end case code */
+	    }					/* end if mul/div */
 
 /* IOT, continued */
 
 	else if (device == DEV_CPU) {			/* CPU control */
-		switch (code) {				/* decode IR<5:7> */
-		case ioDIA:				/* read switches */
-			AC[dstAC] = SR;
-			break;
-		case ioDIB:				/* int ack */
-			AC[dstAC] = 0;
-			int_req = (int_req & ~INT_DEV) |
-				(dev_done & ~dev_disable);
-			iodata = int_req & (-int_req);
-			for (i = DEV_LOW; i <= DEV_HIGH; i++)  {
-				if (iodata & dev_table[i].mask) {
-					AC[dstAC] = i; break;   }  }
-			break;
-		case ioDOB:				/* mask out */
-			mask_out (pimask = AC[dstAC]);
-			break;
-		case ioDIC:				/* io reset */
-			reset_all (0);			/* reset devices */
-			break;
-		case ioDOC:				/* halt */
-			reason = STOP_HALT;
-			break;  }			/* end switch code */
-		switch (pulse) {			/* decode IR<8:9> */
-		case iopS:				/* ion */
-			int_req = (int_req | INT_ION) & ~INT_NO_ION_PENDING;
-			break;
-		case iopC:				/* iof */
-			int_req = int_req & ~INT_ION;
-			break;  }			/* end switch pulse */
-		}					/* end CPU control */
+	    switch (code) {				/* decode IR<5:7> */
+	    case ioDIA:					/* read switches */
+		AC[dstAC] = SR;
+		break;
+	    case ioDIB:					/* int ack */
+		AC[dstAC] = 0;
+		int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
+		iodata = int_req & (-int_req);
+		for (i = DEV_LOW; i <= DEV_HIGH; i++)  {
+		    if (iodata & dev_table[i].mask) {
+			AC[dstAC] = i; break;   }  }
+		break;
+	    case ioDOB:					/* mask out */
+		mask_out (pimask = AC[dstAC]);
+		break;
+	    case ioDIC:					/* io reset */
+		reset_all (0);				/* reset devices */
+		break;
+	    case ioDOC:					/* halt */
+		reason = STOP_HALT;
+		break;  }				/* end switch code */
+	    switch (pulse) {				/* decode IR<8:9> */
+	    case iopS:					/* ion */
+		int_req = (int_req | INT_ION) & ~INT_NO_ION_PENDING;
+		break;
+	    case iopC:					/* iof */
+		int_req = int_req & ~INT_ION;
+		break;  }				/* end switch pulse */
+	    }						/* end CPU control */
 	else if (dev_table[device].routine) {		/* normal device */
-		iodata = dev_table[device].routine (pulse, code, AC[dstAC]);
-		reason = iodata >> IOT_V_REASON;
-		if (code & 1) AC[dstAC] = iodata & 0177777;  }
+	    iodata = dev_table[device].routine (pulse, code, AC[dstAC]);
+	    reason = iodata >> IOT_V_REASON;
+	    if (code & 1) AC[dstAC] = iodata & 0177777;  }
 	else reason = stop_dev;
 	}						/* end if IOT */
 }							/* end while */
@@ -763,7 +762,7 @@ int32 i;
 dev_disable = 0;
 for (i = DEV_LOW; i <= DEV_HIGH; i++)  {
 	if (newmask & dev_table[i].pi)
-		dev_disable = dev_disable | dev_table[i].mask;  }
+	    dev_disable = dev_disable | dev_table[i].mask;  }
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
 return;
 }

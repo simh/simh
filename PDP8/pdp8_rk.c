@@ -205,23 +205,24 @@ case 2:							/* DCLR */
 	rk_sta = 0;					/* clear status */
 	switch (AC & 03) {				/* decode AC<10:11> */
 	case RKX_CLS:					/* clear status */
-		if (rk_busy != 0) rk_sta = rk_sta | RKS_BUSY;
+	    if (rk_busy != 0) rk_sta = rk_sta | RKS_BUSY;
 	case RKX_CLSA:					/* clear status alt */
-		break;
+	    break;
 	case RKX_CLC:					/* clear control */
-		rk_cmd = rk_busy = 0;			/* clear registers */
-		rk_ma = rk_da = 0;
-		for (i = 0; i < RK_NUMDR; i++) sim_cancel (&rk_unit[i]);
-		break;
+	    rk_cmd = rk_busy = 0;			/* clear registers */
+	    rk_ma = rk_da = 0;
+	    for (i = 0; i < RK_NUMDR; i++) sim_cancel (&rk_unit[i]);
+	    break;
 	case RKX_CLD:					/* reset drive */
-		if (rk_busy != 0) rk_sta = rk_sta | RKS_BUSY;
-		else rk_go (RKC_SEEK, 0);		/* seek to 0 */
-		break;  }				/* end switch AC */
+	    if (rk_busy != 0) rk_sta = rk_sta | RKS_BUSY;
+	    else rk_go (RKC_SEEK, 0);			/* seek to 0 */
+	    break;  }					/* end switch AC */
 	break;
 case 3:							/* DLAG */
 	if (rk_busy != 0) rk_sta = rk_sta | RKS_BUSY;
-	else {	rk_da = AC;				/* load disk addr */
-		rk_go (GET_FUNC (rk_cmd), GET_CYL (rk_cmd, rk_da));  }
+	else {
+	    rk_da = AC;					/* load disk addr */
+	    rk_go (GET_FUNC (rk_cmd), GET_CYL (rk_cmd, rk_da));  }
 	break;
 case 4:							/* DLCA */
 	if (rk_busy != 0) rk_sta = rk_sta | RKS_BUSY;
@@ -235,8 +236,9 @@ case 5:							/* DRST */
 	return rk_sta;
 case 6:							/* DLDC */
 	if (rk_busy != 0) rk_sta = rk_sta | RKS_BUSY;
-	else {	rk_cmd = AC;				/* load command */
-		rk_sta = 0;  }				/* clear status */
+	else {
+	    rk_cmd = AC;				/* load command */
+	    rk_sta = 0;  }				/* clear status */
 	break;
 case 7:							/* DMAN */
 	break;  }					/* end case pulse */
@@ -305,8 +307,8 @@ UNIT *seluptr;
 if (uptr->FUNC == RKC_SEEK) {				/* seek? */
 	seluptr = rk_dev.units + GET_DRIVE (rk_cmd);	/* see if selected */
 	if ((uptr == seluptr) && ((rk_cmd & RKC_SKDN) != 0)) {
-		rk_sta = rk_sta | RKS_DONE;
-		RK_INT_UPDATE;  }
+	    rk_sta = rk_sta | RKS_DONE;
+	    RK_INT_UPDATE;  }
 	return SCPE_OK;  }
 
 if ((uptr->flags & UNIT_ATT) == 0) {			/* not att? abort */
@@ -332,21 +334,21 @@ if ((uptr->FUNC == RKC_READ) && (err == 0) && MEM_ADDR_OK (pa)) { /* read? */
 	for ( ; awc < wc; awc++) M[pa + awc] = 0; 	/* fill if eof */
 	err = ferror (uptr->fileref);
 	if ((wc1 > 0) && (err == 0))  {			/* field wraparound? */
-		pa = pa & 070000;			/* wrap phys addr */
-		awc = fxread (&M[pa], sizeof (int16), wc1, uptr->fileref);
-		for ( ; awc < wc1; awc++) M[pa + awc] = 0; /* fill if eof */
-		err = ferror (uptr->fileref);  }  }
+	    pa = pa & 070000;				/* wrap phys addr */
+	    awc = fxread (&M[pa], sizeof (int16), wc1, uptr->fileref);
+	    for ( ; awc < wc1; awc++) M[pa + awc] = 0; /* fill if eof */
+	    err = ferror (uptr->fileref);  }  }
 
 if ((uptr->FUNC == RKC_WRITE) && (err == 0)) {	/* write? */
 	fxwrite (&M[pa], sizeof (int16), wc, uptr->fileref);
 	err = ferror (uptr->fileref);
 	if ((wc1 > 0) && (err == 0)) {			/* field wraparound? */
-		pa = pa & 070000;			/* wrap phys addr */
-		fxwrite (&M[pa], sizeof (int16), wc1, uptr->fileref);
-		err = ferror (uptr->fileref);  }
+	    pa = pa & 070000;				/* wrap phys addr */
+	    fxwrite (&M[pa], sizeof (int16), wc1, uptr->fileref);
+	    err = ferror (uptr->fileref);  }
 	if ((rk_cmd & RKC_HALF) && (err == 0)) {	/* fill half sector */
-		fxwrite (fill, sizeof (int16), RK_NUMWD/2, uptr->fileref);
-		err = ferror (uptr->fileref);  }  }
+	    fxwrite (fill, sizeof (int16), RK_NUMWD/2, uptr->fileref);
+	    err = ferror (uptr->fileref);  }  }
 
 rk_ma = (rk_ma + swc) & 07777;				/* incr mem addr reg */
 rk_sta = rk_sta | RKS_DONE;				/* set done */

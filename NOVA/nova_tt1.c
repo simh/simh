@@ -1,6 +1,6 @@
 /* nova_tt1.c: NOVA second terminal simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
+   Copyright (c) 1993-2003, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -27,6 +27,7 @@
    tti1		second terminal input
    tto1		second terminal output
 
+   05-Jan-03	RMS	Fixed calling sequence for setmod
    03-Oct-02	RMS	Added DIBs
    22-Aug-02	RMS	Updated for changes in sim_tmxr
    30-May-02	RMS	Widened POS to 32b
@@ -58,7 +59,7 @@ t_stat tti1_svc (UNIT *uptr);
 t_stat tto1_svc (UNIT *uptr);
 t_stat tti1_reset (DEVICE *dptr);
 t_stat tto1_reset (DEVICE *dptr);
-t_stat ttx1_setmod (UNIT *uptr, int32 val, char *cptr);
+t_stat ttx1_setmod (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tti1_attach (UNIT *uptr, char *cptr);
 t_stat tti1_detach (UNIT *uptr);
 t_stat tti1_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -259,7 +260,7 @@ sim_cancel (&tto1_unit);				/* deactivate unit */
 return SCPE_OK;
 }
 
-t_stat ttx1_setmod (UNIT *uptr, int32 val, char *cptr)
+t_stat ttx1_setmod (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 tti1_unit.flags = (tti1_unit.flags & ~UNIT_DASHER) | val;
 tto1_unit.flags = (tto1_unit.flags & ~UNIT_DASHER) | val;

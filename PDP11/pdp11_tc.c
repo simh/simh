@@ -400,7 +400,7 @@ case 003:						/* TCBA */
 case 004:						/* TCDT */
 	fnc = DTS_GETFNC (dt_unit[unum].STATE);		/* get function */
 	if (fnc == FNC_RALL) {				/* read all? */
-		DT_CLRDONE;  }				/* clear done */
+	    DT_CLRDONE;  }				/* clear done */
 	*data = tcdt;
 	break;  }
 return SCPE_OK;
@@ -420,34 +420,34 @@ case 000:						/* TCST */
 case 001:						/* TCCM */
 	old_tccm = tccm;				/* save prior */
 	if (access == WRITEB) data = (PA & 1)?
-		(tccm & 0377) | (data << 8): (tccm & ~0377) | data;
+	    (tccm & 0377) | (data << 8): (tccm & ~0377) | data;
 	if ((data & CSR_IE) == 0) CLR_INT (DTA);
 	else if ((((tccm & CSR_IE) == 0) && (tccm & CSR_DONE)) ||
-		(data & CSR_DONE)) SET_INT (DTA);
+	    (data & CSR_DONE)) SET_INT (DTA);
 	tccm = (tccm & ~CSR_RW) | (data & CSR_RW);
 	if ((data & CSR_GO) && (tccm & CSR_DONE)) {	/* new cmd? */
-		tcst = tcst & ~STA_ALLERR;		/* clear errors */
-		tccm = tccm & ~(CSR_ERR | CSR_DONE);	/* clear done, err */
-		CLR_INT (DTA);				/* clear int */
-		if ((old_tccm ^ tccm) & CSR_UNIT) dt_deselect (old_tccm);
-		unum = CSR_GETUNIT (tccm);		/* get drive */
-		fnc = CSR_GETFNC (tccm);		/* get function */
-		if (fnc == FNC_STOP) {			/* stop all? */
-			sim_activate (&dt_dev.units[DT_TIMER], dt_ctime);
-			for (i = 0; i < DT_NUMDR; i++)
-				dt_stopunit (dt_dev.units + i);	/* stop unit */
-			break;  }
-		uptr = dt_dev.units + unum;
-		if (uptr->flags & UNIT_DIS)		/* disabled? */
-			dt_seterr (uptr, STA_SEL);	/* select err */
-		if ((fnc == FNC_WMRK) ||		/* write mark? */
-		   ((fnc == FNC_WALL) && (uptr->flags & UNIT_WPRT)) ||
-		   ((fnc == FNC_WRIT) && (uptr->flags & UNIT_WPRT)))
-			dt_seterr (uptr, STA_ILO);	/* illegal op */
-		if (!(tccm & CSR_ERR)) dt_newsa (tccm);  }
+	    tcst = tcst & ~STA_ALLERR;			/* clear errors */
+	    tccm = tccm & ~(CSR_ERR | CSR_DONE);	/* clear done, err */
+	    CLR_INT (DTA);				/* clear int */
+	    if ((old_tccm ^ tccm) & CSR_UNIT) dt_deselect (old_tccm);
+	    unum = CSR_GETUNIT (tccm);			/* get drive */
+	    fnc = CSR_GETFNC (tccm);			/* get function */
+	    if (fnc == FNC_STOP) {			/* stop all? */
+		sim_activate (&dt_dev.units[DT_TIMER], dt_ctime);
+		for (i = 0; i < DT_NUMDR; i++)
+		    dt_stopunit (dt_dev.units + i);	/* stop unit */
+		break;  }
+	    uptr = dt_dev.units + unum;
+	    if (uptr->flags & UNIT_DIS)			/* disabled? */
+		dt_seterr (uptr, STA_SEL);		/* select err */
+	    if ((fnc == FNC_WMRK) ||			/* write mark? */
+		((fnc == FNC_WALL) && (uptr->flags & UNIT_WPRT)) ||
+		((fnc == FNC_WRIT) && (uptr->flags & UNIT_WPRT)))
+		dt_seterr (uptr, STA_ILO);		/* illegal op */
+	    if (!(tccm & CSR_ERR)) dt_newsa (tccm);  }
 	else if ((tccm & CSR_ERR) == 0) {		/* clear err? */
-		tcst = tcst & ~STA_RWERR;
-		if (tcst & STA_ALLERR) tccm = tccm | CSR_ERR;  }
+	    tcst = tcst & ~STA_RWERR;
+	    if (tcst & STA_ALLERR) tccm = tccm | CSR_ERR;  }
 	break;
 case 002:						/* TCWC */
 	tcwc = data;					/* word write only! */
@@ -459,7 +459,7 @@ case 004:						/* TCDT */
 	unum = CSR_GETUNIT (tccm);			/* get drive */
 	fnc = DTS_GETFNC (dt_unit[unum].STATE);		/* get function */
 	if (fnc == FNC_WALL) {				/* write all? */
-		DT_CLRDONE;  }				/* clear done */
+	    DT_CLRDONE;  }				/* clear done */
 	tcdt = data;					/* word write only! */
 	break;  }
 return SCPE_OK;
@@ -587,49 +587,50 @@ case DTS_OFR:						/* off reel */
 	break;
 case FNC_SRCH:						/* search */
 	if (dir) newpos = DT_BLK2LN ((DT_QFEZ (uptr)?
-		DTU_TSIZE (uptr): blk), uptr) - DT_BLKLN - DT_WSIZE;
+	    DTU_TSIZE (uptr): blk), uptr) - DT_BLKLN - DT_WSIZE;
 	else newpos = DT_BLK2LN ((DT_QREZ (uptr)?
-		0: blk + 1), uptr) + DT_BLKLN + (DT_WSIZE - 1);
+	    0: blk + 1), uptr) + DT_BLKLN + (DT_WSIZE - 1);
 	if (DBG_LOG (LOG_TC_MS)) fprintf (sim_log, ">>DT%d: searching %s\n",
-		unum, (dir? "backward": "forward"));
+	    unum, (dir? "backward": "forward"));
 	break;
 case FNC_WRIT:						/* write */
 case FNC_READ:						/* read */
 	if (DT_QEZ (uptr)) {				/* in "ok" end zone? */
-		if (dir) newpos = DTU_FWDEZ (uptr) - DT_HTLIN - DT_WSIZE;
-		else newpos = DT_EZLIN + DT_HTLIN + (DT_WSIZE - 1);
-		break;  }
+	    if (dir) newpos = DTU_FWDEZ (uptr) - DT_HTLIN - DT_WSIZE;
+	    else newpos = DT_EZLIN + DT_HTLIN + (DT_WSIZE - 1);
+	    break;  }
 	relpos = DT_LIN2OF (uptr->pos, uptr);		/* cur pos in blk */
 	if ((relpos >= DT_HTLIN) &&			/* in data zone? */
 	    (relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
-		dt_seterr (uptr, STA_BLKM);
-		return;  }
+	    dt_seterr (uptr, STA_BLKM);
+	    return;  }
 	if (dir) newpos = DT_BLK2LN (((relpos >= (DTU_LPERB (uptr) - DT_HTLIN))?
-		blk + 1: blk), uptr) - DT_HTLIN - DT_WSIZE;
+	    blk + 1: blk), uptr) - DT_HTLIN - DT_WSIZE;
 	else newpos = DT_BLK2LN (((relpos < DT_HTLIN)?
-		blk: blk + 1), uptr) + DT_HTLIN + (DT_WSIZE - 1);
+	    blk: blk + 1), uptr) + DT_HTLIN + (DT_WSIZE - 1);
 	if (DBG_LOG (LOG_TC_RW) || (DBG_LOG (LOG_TC_BL) && (blk == dt_logblk)))
-		fprintf (sim_log, ">>DT%d: %s block %d %s\n",
-			unum, ((fnc == FNC_READ)? "read": "write"),
-			blk, (dir? "backward": "forward"));
+	    fprintf (sim_log, ">>DT%d: %s block %d %s\n",
+		unum, ((fnc == FNC_READ)? "read": "write"),
+		blk, (dir? "backward": "forward"));
 	break;
 case FNC_RALL:						/* read all */
 case FNC_WALL:						/* write all */
 	if (DT_QEZ (uptr)) {				/* in "ok" end zone? */
-		if (dir) newpos = DTU_FWDEZ (uptr) - DT_WSIZE;
-		else newpos = DT_EZLIN + (DT_WSIZE - 1);  }
-	else {	relpos = DT_LIN2OF (uptr->pos, uptr);		/* cur pos in blk */
-		if (dir? (relpos < (DTU_LPERB (uptr) - DT_CSMLN)): /* switch in time? */
-			 (relpos >= DT_CSMLN)) {
-			dt_seterr (uptr, STA_BLKM);
-			return;  }
-		if (dir) newpos = DT_BLK2LN (blk + 1, uptr) - DT_CSMLN - DT_WSIZE;
-		else newpos = DT_BLK2LN (blk, uptr) + DT_CSMLN + (DT_WSIZE - 1);  }
+	    if (dir) newpos = DTU_FWDEZ (uptr) - DT_WSIZE;
+	    else newpos = DT_EZLIN + (DT_WSIZE - 1);  }
+	else {
+	    relpos = DT_LIN2OF (uptr->pos, uptr);		/* cur pos in blk */
+	    if (dir? (relpos < (DTU_LPERB (uptr) - DT_CSMLN)): /* switch in time? */
+		(relpos >= DT_CSMLN)) {
+		dt_seterr (uptr, STA_BLKM);
+		return;  }
+	    if (dir) newpos = DT_BLK2LN (blk + 1, uptr) - DT_CSMLN - DT_WSIZE;
+	    else newpos = DT_BLK2LN (blk, uptr) + DT_CSMLN + (DT_WSIZE - 1);  }
 	if (fnc == FNC_WALL) sim_activate 		/* write all? */
-		(&dt_dev.units[DT_TIMER], dt_ctime);	/* sched done */
+	    (&dt_dev.units[DT_TIMER], dt_ctime);	/* sched done */
 	if (DBG_LOG (LOG_TC_RW) || (DBG_LOG (LOG_TC_BL) && (blk == dt_logblk)))
-		fprintf (sim_log, ">>DT%d: read all block %d %s\n",
-			unum, blk, (dir? "backward": "forward"));
+	    fprintf (sim_log, ">>DT%d: read all block %d %s\n",
+		unum, blk, (dir? "backward": "forward"));
 	break;
 default:
 	dt_seterr (uptr, STA_SEL);			/* bad state */
@@ -689,7 +690,7 @@ if (((int32) uptr->pos < 0) ||
 	uptr->STATE = uptr->pos = 0;
 	unum = uptr - dt_dev.units;
 	if ((unum == CSR_GETUNIT (tccm)) && (CSR_GETFNC (tccm) != FNC_STOP))
-		dt_seterr (uptr, STA_SEL);		/* error */
+	    dt_seterr (uptr, STA_SEL);			/* error */
 	return TRUE;  }
 return FALSE;
 }
@@ -728,7 +729,7 @@ case DTS_DECF: case DTS_DECR:				/* decelerating */
 	if (dt_setpos (uptr)) return SCPE_OK;		/* update pos */
 	uptr->STATE = DTS_NXTSTA (uptr->STATE);		/* advance state */
 	if (uptr->STATE)				/* not stopped? */
-		sim_activate (uptr, dt_actime);		/* must be reversing */
+	    sim_activate (uptr, dt_actime);		/* must be reversing */
 	return SCPE_OK;
 case DTS_ACCF: case DTS_ACCR:				/* accelerating */
 	dt_newfnc (uptr, DTS_NXTSTA (uptr->STATE));	/* adv state, sched */
@@ -774,24 +775,24 @@ case DTS_OFR:						/* off reel */
 case FNC_READ:						/* read */
 	wrd = DT_LIN2WD (uptr->pos, uptr);		/* get word # */
 	if (!dt_substate) {				/* !wc ovf? */
-		tcwc = tcwc & DMASK;			/* incr MA, WC */
-		tcba = tcba & DMASK;
-		ma = (CSR_GETMEX (tccm) << 16) | tcba;	/* form 18b addr */
-		if (!Map_Addr (ma, &mma) ||		/* map addr */
-		    !ADDR_IS_MEM (mma)) {		/* nx mem? */
-			dt_seterr (uptr, STA_NXM);
-			break;  }
-		ba = (blk * DTU_BSIZE (uptr)) + wrd;	/* buffer ptr */
-		M[mma >> 1] = tcdt = bptr[ba] & DMASK;	/* read word */
-		tcwc = (tcwc + 1) & DMASK;		/* incr MA, WC */
-		tcba = (tcba + 2) & DMASK;
-		if (tcba <= 1) tccm = CSR_INCMEX (tccm);
-		if (tcwc == 0) dt_substate = 1;  }
+	    tcwc = tcwc & DMASK;			/* incr MA, WC */
+	    tcba = tcba & DMASK;
+	    ma = (CSR_GETMEX (tccm) << 16) | tcba;	/* form 18b addr */
+	    if (!Map_Addr (ma, &mma) ||			/* map addr */
+		!ADDR_IS_MEM (mma)) {			/* nx mem? */
+		dt_seterr (uptr, STA_NXM);
+		break;  }
+	    ba = (blk * DTU_BSIZE (uptr)) + wrd;	/* buffer ptr */
+	    M[mma >> 1] = tcdt = bptr[ba] & DMASK;	/* read word */
+	    tcwc = (tcwc + 1) & DMASK;			/* incr MA, WC */
+	    tcba = (tcba + 2) & DMASK;
+	    if (tcba <= 1) tccm = CSR_INCMEX (tccm);
+	    if (tcwc == 0) dt_substate = 1;  }
 	if (wrd != (dir? 0: DTU_BSIZE (uptr) - 1))	/* not end blk? */
-		sim_activate (uptr, DT_WSIZE * dt_ltime);
+	    sim_activate (uptr, DT_WSIZE * dt_ltime);
 	else if (dt_substate) {				/* wc ovf? */
-		dt_schedez (uptr, dir);			/* sched end zone */
-		DT_SETDONE;  }				/* set done */
+	    dt_schedez (uptr, dir);			/* sched end zone */
+	    DT_SETDONE;  }				/* set done */
 	else sim_activate (uptr, ((2 * DT_HTLIN) + DT_WSIZE) * dt_ltime);
 	break;			
 
@@ -808,24 +809,25 @@ case FNC_READ:						/* read */
 case FNC_WRIT:						/* write */
 	wrd = DT_LIN2WD (uptr->pos, uptr);		/* get word # */
 	if (dt_substate) tcdt = 0;			/* wc ovf? fill */
-	else {	ma = (CSR_GETMEX (tccm) << 16) | tcba;	/* form 18b addr */
-		if (!Map_Addr (ma, &mma) ||		/* map addr */
-		    !ADDR_IS_MEM (mma)) {		/* nx mem? */
-			dt_seterr (uptr, STA_NXM);
-			break;  }
-		else tcdt = M[mma >> 1];		/* get word */
-		tcwc = (tcwc + 1) & DMASK;		/* incr MA, WC */
-		tcba = (tcba + 2) & DMASK;
-		if (tcba <= 1) tccm = CSR_INCMEX (tccm);  }
+	else {
+	    ma = (CSR_GETMEX (tccm) << 16) | tcba;	/* form 18b addr */
+	    if (!Map_Addr (ma, &mma) ||			/* map addr */
+		!ADDR_IS_MEM (mma)) {			/* nx mem? */
+		dt_seterr (uptr, STA_NXM);
+		break;  }
+	    else tcdt = M[mma >> 1];			/* get word */
+	    tcwc = (tcwc + 1) & DMASK;			/* incr MA, WC */
+	    tcba = (tcba + 2) & DMASK;
+	    if (tcba <= 1) tccm = CSR_INCMEX (tccm);  }
 	ba = (blk * DTU_BSIZE (uptr)) + wrd;		/* buffer ptr */
 	bptr[ba] = tcdt;				/* write word */
 	if (ba >= uptr->hwmark) uptr->hwmark = ba + 1;
 	if (tcwc == 0) dt_substate = 1;
 	if (wrd != (dir? 0: DTU_BSIZE (uptr) - 1))	/* not end blk? */
-		sim_activate (uptr, DT_WSIZE * dt_ltime);
+	    sim_activate (uptr, DT_WSIZE * dt_ltime);
 	else if (dt_substate) {				/* wc ovf? */
-		dt_schedez (uptr, dir);			/* sched end zone */
-		DT_SETDONE;  }
+	    dt_schedez (uptr, dir);			/* sched end zone */
+	    DT_SETDONE;  }
 	else sim_activate (uptr, ((2 * DT_HTLIN) + DT_WSIZE) * dt_ltime);
 	break;			
 
@@ -833,14 +835,14 @@ case FNC_WRIT:						/* write */
 
 case FNC_RALL:
 	if (tccm & CSR_DONE) {				/* done set? */
-		dt_seterr (uptr, STA_DATM);		/* data miss */
-		break;  }
+	    dt_seterr (uptr, STA_DATM);			/* data miss */
+	    break;  }
 	relpos = DT_LIN2OF (uptr->pos, uptr);		/* cur pos in blk */
 	if ((relpos >= DT_HTLIN) &&			/* in data zone? */
-	    	(relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
-		wrd = DT_LIN2WD (uptr->pos, uptr);
-		ba = (blk * DTU_BSIZE (uptr)) + wrd;	/* buffer ptr */
-		dat = bptr[ba];  }			/* get tape word */
+	    (relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
+	    wrd = DT_LIN2WD (uptr->pos, uptr);
+	    ba = (blk * DTU_BSIZE (uptr)) + wrd;	/* buffer ptr */
+	    dat = bptr[ba];  }				/* get tape word */
 	else dat = dt_gethdr (uptr, blk, relpos);	/* get hdr */
 	if (dir) dat = dt_comobv (dat);			/* rev? comp obv */
 	tcdt = dat & DMASK;				/* low 16b */
@@ -853,17 +855,17 @@ case FNC_RALL:
 
 case FNC_WALL:
 	if (tccm & CSR_DONE) {				/* done set? */
-		dt_seterr (uptr, STA_DATM);		/* data miss */
-		break;  }
+	    dt_seterr (uptr, STA_DATM);		/* data miss */
+	    break;  }
 	relpos = DT_LIN2OF (uptr->pos, uptr);		/* cur pos in blk */
 	if ((relpos >= DT_HTLIN) &&			/* in data zone? */
-	    	(relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
-		wrd = DT_LIN2WD (uptr->pos, uptr);
-		dat = (STA_GETXD (tcst) << 16) | tcdt;	/* get data word */
-		if (dir) dat = dt_comobv (dat);		/* rev? comp obv */
-		ba = (blk * DTU_BSIZE (uptr)) + wrd;	/* buffer ptr */
-		bptr[ba] = dat;				/* write word */
-		if (ba >= uptr->hwmark) uptr->hwmark = ba + 1;  }
+	    (relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
+	    wrd = DT_LIN2WD (uptr->pos, uptr);
+	    dat = (STA_GETXD (tcst) << 16) | tcdt;	/* get data word */
+	    if (dir) dat = dt_comobv (dat);		/* rev? comp obv */
+	    ba = (blk * DTU_BSIZE (uptr)) + wrd;	/* buffer ptr */
+	    bptr[ba] = dat;				/* write word */
+	    if (ba >= uptr->hwmark) uptr->hwmark = ba + 1;  }
 /*	else						/* ignore hdr */ 
 	sim_activate (uptr, DT_WSIZE * dt_ltime);
 	DT_SETDONE;					/* set done */
@@ -972,16 +974,17 @@ UNIT *uptr;
 for (i = 0; i < DT_NUMDR; i++) {			/* stop all activity */
 	uptr = dt_dev.units + i;
 	if (sim_is_running) {				/* RESET? */
-		prev_mot = DTS_GETMOT (uptr->STATE);	/* get motion */
-		if ((prev_mot & ~DTS_DIR) > DTS_DECF) {	/* accel or spd? */
-			if (dt_setpos (uptr)) continue;	/* update pos */
-			sim_cancel (uptr);
-			sim_activate (uptr, dt_dctime); /* sched decel */
-			DTS_SETSTA (DTS_DECF | (prev_mot & DTS_DIR), 0);
-			}  }
-	else {	sim_cancel (uptr);			/* sim reset */
-		uptr->STATE = 0;  
-		uptr->LASTT = sim_grtime ();  }  }
+	    prev_mot = DTS_GETMOT (uptr->STATE);	/* get motion */
+	    if ((prev_mot & ~DTS_DIR) > DTS_DECF) {	/* accel or spd? */
+		if (dt_setpos (uptr)) continue;		/* update pos */
+		sim_cancel (uptr);
+		sim_activate (uptr, dt_dctime);		/* sched decel */
+		DTS_SETSTA (DTS_DECF | (prev_mot & DTS_DIR), 0);
+		}  }
+	else {
+	    sim_cancel (uptr);				/* sim reset */
+	    uptr->STATE = 0;  
+	    uptr->LASTT = sim_grtime ();  }  }
 tcst =  tcwc = tcba = tcdt = 0;				/* clear reg */
 tccm = CSR_DONE;
 CLR_INT (DTA);						/* clear int req */
@@ -1077,7 +1080,7 @@ else if (!(sim_switches & SWMASK ('S')) &&		/* autosize? */
 	  (fseek (uptr->fileref, 0, SEEK_END) == 0) &&
 	  ((p = ftell (uptr->fileref)) > D16_FILSIZ)) {
 	if (p <= D8_FILSIZ)
-		uptr->flags = (uptr->flags | UNIT_8FMT) & ~UNIT_11FMT;
+	    uptr->flags = (uptr->flags | UNIT_8FMT) & ~UNIT_11FMT;
 	else uptr->flags = uptr->flags & ~(UNIT_8FMT | UNIT_11FMT);  }
 uptr->capac = DTU_CAPAC (uptr);				/* set capacity */
 uptr->filebuf = calloc (uptr->capac, sizeof (int32));

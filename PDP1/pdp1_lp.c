@@ -89,10 +89,10 @@ if (lpt_dev.flags & DEV_DIS)				/* disabled? */
 	return (stop_inst << IOT_V_REASON) | data;	/* stop if requested */
 if ((inst & 0700) == 0100) {				/* fill buf */
 	if (bptr < BPTR_MAX) {				/* limit test ptr */
-		i = bptr * 3;				/* cvt to chr ptr */
-		lpt_buf[i] = lpt_trans[(data >> 12) & 077];
-		lpt_buf[i + 1] = lpt_trans[(data >> 6) & 077];
-		lpt_buf[i + 2] = lpt_trans[data & 077];  }
+	    i = bptr * 3;				/* cvt to chr ptr */
+	    lpt_buf[i] = lpt_trans[(data >> 12) & 077];
+	    lpt_buf[i + 1] = lpt_trans[(data >> 6) & 077];
+	    lpt_buf[i + 2] = lpt_trans[data & 077];  }
 	bptr = (bptr + 1) & BPTR_MASK;
 	return data;  }
 lpt_rpls = 0;
@@ -133,22 +133,22 @@ ioc = ioc | lpt_rpls;					/* restart */
 if (lpt_iot & 020) {					/* space? */
 	iosta = iosta | IOS_SPC;			/* set flag */
 	if ((lpt_unit.flags & UNIT_ATT) == 0)		/* attached? */
-		return IORETURN (lpt_stopioe, SCPE_UNATT);
+	    return IORETURN (lpt_stopioe, SCPE_UNATT);
 	fputs (lpt_cc[lpt_iot & 07], lpt_unit.fileref);	/* print cctl */
 	if (ferror (lpt_unit.fileref)) {		/* error? */
-		perror ("LPT I/O error");
-		clearerr (lpt_unit.fileref);
-		return SCPE_IOERR;  }
+	    perror ("LPT I/O error");
+	    clearerr (lpt_unit.fileref);
+	    return SCPE_IOERR;  }
 	lpt_iot = 0;  }					/* clear state */
 else {	iosta = iosta | IOS_PNT;			/* print */
 	if ((lpt_unit.flags & UNIT_ATT) == 0)		/* attached? */
-		return IORETURN (lpt_stopioe, SCPE_UNATT);
+	    return IORETURN (lpt_stopioe, SCPE_UNATT);
 	if (lpt_iot & 010) fputc ('\r', lpt_unit.fileref);
 	fputs (lpt_buf, lpt_unit.fileref);		/* print buffer */
 	if (ferror (lpt_unit.fileref)) {		/* test error */
-		perror ("LPT I/O error");
-		clearerr (lpt_unit.fileref);
-		return SCPE_IOERR;  }
+	    perror ("LPT I/O error");
+	    clearerr (lpt_unit.fileref);
+	    return SCPE_IOERR;  }
 	bptr = 0;
 	for (i = 0; i <= LPT_BSIZE; i++) lpt_buf[i] = 0; /* clear buffer */
 	lpt_iot = 010;  }				/* set state */

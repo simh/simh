@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	15-Nov-2002
+Date:	15-Jan-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -73,7 +73,8 @@ sim/pdp11/	pdp11_defs.h
 		pdp11_tc.c
 		pdp11_tm.c
 		pdp11_ts.c
-		pdp11_xp.c
+		pdp11_xq.c
+		pdp11_xu.c
 
 2. PDP-11 Features
 
@@ -106,10 +107,12 @@ TC		TC11/TU56 DECtape controller with eight drives
 TM		TM11/TU10 magnetic tape controller with eight drives
 TS		TS11/TSV05 magnetic tape controller with one drive
 TQ		TQK50 TMSCP magnetic tape controller with four drives
-XQ		DELQA/DEQNA Ethernet controller
+XQ		DELQA/DEQNA Qbus Ethernet controller
+XU		DEUNA/DELUA Unibus Ethernet controller
 
-The DZ, RK, HK, RL, RP, RQ, RQB, RQC, RQD, RX, RY, TC, TM, TS, TQ, and XQ
-devices can be set DISABLED.  RQB, RQC, RQD, RY, and TS are disabled by default.
+The DZ, RK, HK, RL, RP, RQ, RQB, RQC, RQD, RX, RY, TC, TM, TS, TQ, XQ, and XU
+devices can be set DISABLED.  RQB, RQC, RQD, RY, TS, and XU are disabled by
+default.
 
 The PDP-11 simulator implements several unique stop conditions:
 
@@ -1140,9 +1143,9 @@ Error handling is as follows:
 
 	OS I/O error		fatal tape error
 
-2.10 DELQA/DEQNA Ethernet Controller (XQ)
+2.10 DELQA/DEQNA Qbus Ethernet Controller (XQ)
 
-XQ simulates the DELQA/DEQNA 10Mbps Ethernet controller.  Options allow
+XQ simulates the DELQA/DEQNA Qbus Ethernet controller.  Options allow
 control of the MAC address, the controller mode, and the sanity timer.
 
 	SET  XQ MAC=<mac-address>	ex. 08-00-2B-AA-BB-CC
@@ -1209,7 +1212,12 @@ not limited to the ~1.5Mbit/sec of the real DEQNA/DELQA controllers,
 nor the 10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet
 (100 Mbit/sec) card, and "Feel the Power!" :-)
 
-2.11 Symbolic Display and Input
+2.11 DEUNA/DELUA Unibus Ethernet Controller (XU)
+
+XU simulates the DEUNA/DELUA Unibus Ethernet controller.  THe current
+implementation is a stub and is permanently disabled.
+
+2.12 Symbolic Display and Input
 
 The PDP-11 simulator implements symbolic display and input.  Display is
 controlled by command line switches:

@@ -203,12 +203,12 @@ if ((fnc == FNC_SEEK) &&				/* seek and */
 	if (diff < 0) return STOP_INVDSC;		/* error? */
 	diff = diff >> 1;				/* diff is *2 */
 	if ((M[dcf + DCF_DIR + DCF_DIR_LEN - 1] & ZONE) == BBIT)
-		diff = -diff;				/* get sign */
+	    diff = -diff;				/* get sign */
 	uptr->CYL = uptr->CYL + diff;			/* bound seek */
 	if (uptr->CYL < 0) uptr->CYL = 0;
 	else if (uptr->CYL >= DP_NUMCY) {		/* too big? */
-		uptr->CYL = 0;				/* system hangs */
-		return STOP_INVDCY;  }
+	    uptr->CYL = 0;				/* system hangs */
+	    return STOP_INVDCY;  }
 	sim_activate (&dp_unit[0], dp_time);		/* set ctlr busy */
 	return SCPE_OK;  }				/* done! */
 
@@ -217,7 +217,7 @@ if ((sec < 0) || (sec >= (DP_NUMDR * DP_TOTSC)))	/* bad sector? */
 	return STOP_INVDSC;
 if (fnc == FNC_SEEK) {					/* seek? */
 	uptr->CYL = (sec / (DP_NUMSF * DP_NUMSC)) %	/* set cyl # */
-		DP_NUMCY;
+	    DP_NUMCY;
 	sim_activate (&dp_unit[0], dp_time);		/* set ctlr busy */
 	return SCPE_OK;  }				/* done! */
 
@@ -229,10 +229,11 @@ if (cnt < 0) return STOP_INVDCN;			/* bad count? */
 if (fnc >= FNC_WOFF) return STOP_INVDFN;		/* invalid func */
 if (mod == BCD_W) {					/* write? */
 	if (fnc == FNC_CHECK) {				/* write check? */
-		qwc = 1;				/* special read */
-		fnc = dp_lastf;  }			/* use last func */
-	else {	dp_lastf = fnc;				/* save func */		
-		fnc = fnc + FNC_WOFF;  }  }		/* change to write */
+	    qwc = 1;					/* special read */
+	    fnc = dp_lastf;  }				/* use last func */
+	else {
+	    dp_lastf = fnc;				/* save func */		
+	    fnc = fnc + FNC_WOFF;  }  }			/* change to write */
 else if (mod == BCD_R) dp_lastf = fnc;			/* read? save func */
 else return STOP_INVM;					/* other? error */
 
@@ -311,8 +312,8 @@ if (r == SCPE_OK) {					/* normal so far? */
 	BS++;						/* advance BS */
 	if (ADDR_ERR (BS)) return STOP_WRAP;		/* address error? */
 	if (M[BS - 1] != (WM + BCD_GRPMRK)) {		/* GM + WM at end? */
-		ind[IN_LNG] = ind[IN_DSK] = 1;		/* no, error */
-		r = STOP_INVDLN;  }  }
+	    ind[IN_LNG] = ind[IN_DSK] = 1;		/* no, error */
+	    r = STOP_INVDLN;  }  }
 CRETIOE (iochk || !ind[IN_DSK], r);			/* return status */
 }
 
@@ -330,18 +331,18 @@ static const int32 dec_tab[DP_ADDR] =			/* powers of 10 */
 
 for (i = 0; i < DP_ADDR; i++) {				/* copy address */
 	if (M[BS] == (WM | BCD_GRPMRK)) {		/* premature GWM? */
-		ind[IN_LNG] = ind[IN_DSK] = 1;		/* error */
-		return STOP_INVDLN;  }
+	    ind[IN_LNG] = ind[IN_DSK] = 1;		/* error */
+	    return STOP_INVDLN;  }
 	if (zad) {					/* addr zero? */
-		ac = sec / dec_tab[i];			/* get addr digit */
-		sec = sec % dec_tab[i];			/* get remainder */
-		ac = bcd_to_bin[ac];  }			/* cvt to BCD */
+	    ac = sec / dec_tab[i];			/* get addr digit */
+	    sec = sec % dec_tab[i];			/* get remainder */
+	    ac = bcd_to_bin[ac];  }			/* cvt to BCD */
 	else ac = *ap;					/* addr char */
 	if (qwc) {					/* wr chk? skip if zad */
-		if (!zad && (flg? (M[BS] != ac):	/* L? cmp with WM */
-		   ((M[BS] & CHAR) != (ac & CHAR)))) {	/* M? cmp w/o WM */
-		    ind[IN_DPW] = ind[IN_DSK] = 1;
-		    return STOP_WRCHKE;  }  }
+	    if (!zad && (flg? (M[BS] != ac):		/* L? cmp with WM */
+		((M[BS] & CHAR) != (ac & CHAR)))) {	/* M? cmp w/o WM */
+		ind[IN_DPW] = ind[IN_DSK] = 1;
+		return STOP_WRCHKE;  }  }
 	else if (flg) M[BS] = ac & CHAR;		/* load mode */
 	else M[BS] = (M[BS] & WM) | (ac & CHAR);	/* move mode */
 	ap++; BS++;					/* adv ptrs */
@@ -360,13 +361,13 @@ uint8 *ap = ((uint8 *) uptr->filebuf) + da + DP_ADDR;	/* buf ptr */
 lim = flg? (DP_DATA - 10): DP_DATA;			/* load vs move */
 for (i = 0; i < lim; i++) {				/* copy data */
 	if (M[BS] == (WM | BCD_GRPMRK)) {		/* premature GWM? */
-		ind[IN_LNG] = ind[IN_DSK] = 1;		/* error */
-		return STOP_INVDLN;  }
+	    ind[IN_LNG] = ind[IN_DSK] = 1;		/* error */
+	    return STOP_INVDLN;  }
 	if (qwc) {					/* write check? */
-		if (flg? (M[BS] != *ap):		/* load mode cmp */
-		    ((M[BS] & CHAR) != (*ap & CHAR))) {	/* move mode cmp */
-		    ind[IN_DPW] = ind[IN_DSK] = 1;	/* error */
-		    return STOP_WRCHKE;  }  }
+	    if (flg? (M[BS] != *ap):			/* load mode cmp */
+		((M[BS] & CHAR) != (*ap & CHAR))) {	/* move mode cmp */
+		ind[IN_DPW] = ind[IN_DSK] = 1;		/* error */
+		return STOP_WRCHKE;  }  }
 	else if (flg) M[BS] = *ap & (WM | CHAR);	/* load mode */
 	else M[BS] = (M[BS] & WM) | (*ap & CHAR);	/* word mode */
 	ap++; BS++;					/* adv ptrs */
@@ -384,9 +385,9 @@ uint8 *ap = ((uint8 *) uptr->filebuf) + da;		/* buf ptr */
 
 for (i = 0; i < DP_ADDR; i++) {				/* copy address */
 	if (M[BS] == (WM | BCD_GRPMRK)) {		/* premature GWM? */
-		dp_fill (uptr, da, DP_NUMCH - i);	/* fill, set err */ 
-		ind[IN_LNG] = ind[IN_DSK] = 1;		/* error */
-		return STOP_INVDLN;  }
+	    dp_fill (uptr, da, DP_NUMCH - i);		/* fill, set err */ 
+	    ind[IN_LNG] = ind[IN_DSK] = 1;		/* error */
+	    return STOP_INVDLN;  }
 	if (flg) *ap = M[BS] & (WM | CHAR);		/* L? copy WM */
 	else *ap = M[BS] & CHAR;			/* M? strip WM */
 	if (da >= uptr->hwmark) uptr->hwmark = da + 1;
@@ -406,9 +407,9 @@ uint8 *ap = ((uint8 *) uptr->filebuf) + da;		/* buf ptr */
 lim = flg? (DP_DATA - 10): DP_DATA;			/* load vs move */
 for (i = 0; i < lim; i++) {				/* copy data */
 	if (M[BS] == (WM | BCD_GRPMRK)) {		/* premature GWM? */
-		dp_fill (uptr, da, DP_DATA - i);	/* fill, set err */
-		ind[IN_LNG] = ind[IN_DSK] = 1;		/* error */
-		return STOP_INVDLN;  }
+	    dp_fill (uptr, da, DP_DATA - i);		/* fill, set err */
+	    ind[IN_LNG] = ind[IN_DSK] = 1;		/* error */
+	    return STOP_INVDLN;  }
 	if (flg) *ap = M[BS] & (WM | CHAR);		/* load, copy WM */
 	else *ap = M[BS] & CHAR;			/* move, strip WM */
 	if (da >= uptr->hwmark) uptr->hwmark = da + 1;
@@ -475,7 +476,7 @@ uint8 c;
 for (i = 0; i < DP_ADDR; i++, ap++) {			/* loop thru addr */
 	c = M[dcf + DCF_SEC + i];			/* sector addr char */
 	if ((c & CHAR) != (*ap & CHAR))			/* cmp w/o WM */
-		return FALSE;  }
+	    return FALSE;  }
 return TRUE;						/* compare ok */
 }
 

@@ -99,8 +99,8 @@ case 4:							/* PSTB */
 	lpt_unit.buf = AC & 0177;			/* load buffer */
 	if ((lpt_unit.buf == 015) || (lpt_unit.buf == 014) ||
 	    (lpt_unit.buf == 012)) {
-		sim_activate (&lpt_unit, lpt_unit.wait);
-		return AC;  }
+	    sim_activate (&lpt_unit, lpt_unit.wait);
+	    return AC;  }
 	return (lpt_svc (&lpt_unit) << IOT_V_REASON) + AC;
 case 5:							/* PSIE */
 	int_enable = int_enable | INT_LPT;		/* set enable */

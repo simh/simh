@@ -471,48 +471,50 @@ switch (j) {						/* decode PA<4:1> */
 case 000:						/* MTCS1 */
 	if ((access == WRITEB) && (PA & 1)) data = data << 8;
 	if (data & CS1_TRE) {				/* error clear? */
-		tucs1 = tucs1 & ~CS1_TRE;		/* clr CS1<TRE> */
-		tucs2 = tucs2 & ~CS2_ERR;  }		/* clr CS2<15:8> */
+	    tucs1 = tucs1 & ~CS1_TRE;			/* clr CS1<TRE> */
+	    tucs2 = tucs2 & ~CS2_ERR;  }		/* clr CS2<15:8> */
 	if ((access == WRITE) || (PA & 1)) {		/* hi byte write? */
-		if (tucs1 & CS1_DONE)			/* done set? */
-			tucs1 = (tucs1 & ~CS1_UAE) | (data & CS1_UAE);  }
+	    if (tucs1 & CS1_DONE)			/* done set? */
+		tucs1 = (tucs1 & ~CS1_UAE) | (data & CS1_UAE);  }
 	if ((access == WRITE) || !(PA & 1)) {		/* lo byte write? */
-		if ((data & CS1_DONE) && (data & CS1_IE))	/* to DONE+IE? */
-			tuiff = 1;			/* set CSTB INTR */
-		tucs1 = (tucs1 & ~CS1_IE) | (data & CS1_IE);
-		if (fmtr != 0) {			/* nx formatter? */
-			tucs2 = tucs2 | CS2_NEF;	/* set error flag */
-			cs1f = CS1_SC;  }		/* req interrupt */
-		else if (tucs1 & CS1_GO) {		/* busy? */
-			if (tucs1 & CS1_DONE) tuer = tuer | ER_RMR;
-			else tucs2 = tucs2 | CS2_PGE;  }
-		else {	tucs1 = (tucs1 & ~CS1_DRV) | (data & CS1_DRV);
-			if (tucs1 & CS1_GO) tu_go (drv);  }  }
+	    if ((data & CS1_DONE) && (data & CS1_IE))	/* to DONE+IE? */
+		tuiff = 1;				/* set CSTB INTR */
+	    tucs1 = (tucs1 & ~CS1_IE) | (data & CS1_IE);
+	    if (fmtr != 0) {				/* nx formatter? */
+		tucs2 = tucs2 | CS2_NEF;		/* set error flag */
+		cs1f = CS1_SC;  }			/* req interrupt */
+	    else if (tucs1 & CS1_GO) {			/* busy? */
+		if (tucs1 & CS1_DONE) tuer = tuer | ER_RMR;
+		else tucs2 = tucs2 | CS2_PGE;  }
+	    else {
+	    	tucs1 = (tucs1 & ~CS1_DRV) | (data & CS1_DRV);
+		if (tucs1 & CS1_GO) tu_go (drv);  }  }
 	break;	
 case 001:						/* MTWC */
 	if (access == WRITEB) data = (PA & 1)?
-		(tuwc & 0377) | (data << 8): (tuwc & ~0377) | data;
+	    (tuwc & 0377) | (data << 8): (tuwc & ~0377) | data;
 	tuwc = data;
 	break;
 case 002:						/* MTBA */
 	if (access == WRITEB) data = (PA & 1)?
-		(tuba & 0377) | (data << 8): (tuba & ~0377) | data;
+	    (tuba & 0377) | (data << 8): (tuba & ~0377) | data;
 	tuba = data & ~BA_MBZ;
 	break;
 case 003:						/* MTFC */
 	if (access == WRITEB) data = (PA & 1)?
-		(tufc & 0377) | (data << 8): (tufc & ~0377) | data;
+	    (tufc & 0377) | (data << 8): (tufc & ~0377) | data;
 	tufc = data;
 	tutc = tutc | TC_FCS;				/* set fc flag */
 	break;
 case 004:						/* MTCS2 */
 	if ((access == WRITEB) && (PA & 1)) data = data << 8;
 	if (data & CS2_CLR) tu_reset (&tu_dev);		/* init? */
-	else {	if ((data & ~tucs2) & (CS2_PE | CS2_MXF))
-			cs1f = CS1_SC;			/* diagn intr */
-		if (access == WRITEB) data = (tucs2 &	/* merge data */
-			((PA & 1)? 0377: 0177400)) | data;
-		tucs2 = (tucs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR | CS2_OR;  }
+	else {
+	    if ((data & ~tucs2) & (CS2_PE | CS2_MXF))
+		cs1f = CS1_SC;				/* diagn intr */
+	    if (access == WRITEB) data = (tucs2 &	/* merge data */
+		((PA & 1)? 0377: 0177400)) | data;
+	    tucs2 = (tucs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR | CS2_OR;  }
 	break;
 case 007:						/* MTAS */
 	if ((access == WRITEB) && (PA & 1)) break;
@@ -520,17 +522,17 @@ case 007:						/* MTAS */
 	break;
 case 011:						/* MTDB */
 	if (access == WRITEB) data = (PA & 1)?
-		(tudb & 0377) | (data << 8): (tudb & ~0377) | data;
+	    (tudb & 0377) | (data << 8): (tudb & ~0377) | data;
 	tudb = data;
 	break;
 case 012:						/* MTMR */
 	if (access == WRITEB) data = (PA & 1)?
-		(tumr & 0377) | (data << 8): (tumr & ~0377) | data;
+	    (tumr & 0377) | (data << 8): (tumr & ~0377) | data;
 	tumr = (tumr & ~MR_RW) | (data & MR_RW);
 	break;
 case 015:						/* MTTC */
 	if (access == WRITEB) data = (PA & 1)?
-		(tutc & 0377) | (data << 8): (tutc & ~0377) | data;
+	    (tutc & 0377) | (data << 8): (tutc & ~0377) | data;
 	tutc = (tutc & ~TC_RW) | (data & TC_RW) | TC_SAC;
 	drv = GET_DRV (tutc);
 	break;
@@ -586,8 +588,8 @@ case FNC_RIP:						/* read-in preset */
 
 case FNC_UNLOAD:					/* unload */
 	if ((uptr->flags & UNIT_ATT) == 0) {		/* unattached? */
-		tuer = tuer | ER_UNS;
-		break;  }
+	    tuer = tuer | ER_UNS;
+	    break;  }
 	detach_unit (uptr);
 	uptr->USTAT = FS_REW;
 	sim_activate (uptr, tu_time);
@@ -595,8 +597,8 @@ case FNC_UNLOAD:					/* unload */
 	return;	
 case FNC_REWIND:
 	if ((uptr->flags & UNIT_ATT) == 0) {		/* unattached? */
-		tuer = tuer | ER_UNS;
-		break;  }
+	    tuer = tuer | ER_UNS;
+	    break;  }
 	uptr->USTAT = FS_PIP | FS_REW;
 	sim_activate (uptr, tu_time);
 	tucs1 = tucs1 & ~CS1_GO;
@@ -606,47 +608,47 @@ case FNC_SPACEF:
 	space_test = FS_EOT;	
 case FNC_SPACER:
 	if ((uptr->flags & UNIT_ATT) == 0) {		/* unattached? */
-		tuer = tuer | ER_UNS;
-		break;  }
+	    tuer = tuer | ER_UNS;
+	    break;  }
 	if ((tufs & space_test) || ((tutc & TC_FCS) == 0)) {
-		tuer = tuer | ER_NXF;
-		break;  }
+	    tuer = tuer | ER_NXF;
+	    break;  }
 	uptr->USTAT = FS_PIP;
 	goto GO_XFER;
 
 case FNC_WCHKR:						/* wchk = read */
 case FNC_READR:						/* read rev */
 	if (tufs & FS_BOT) {				/* beginning of tape? */
-		tuer = tuer | ER_NXF;
-		break;  }
+	    tuer = tuer | ER_NXF;
+	    break;  }
 	goto DATA_XFER;
 
 case FNC_WRITE:						/* write */
 	if (((tutc & TC_FCS) == 0) ||			/* frame cnt = 0? */
 	    ((den == TC_800) && (tufc > 0777765))) {	/* NRZI, fc < 13? */
-		tuer = tuer | ER_NXF;
-		break;  }
+	    tuer = tuer | ER_NXF;
+	    break;  }
 case FNC_WREOF:						/* write tape mark */
 case FNC_ERASE:						/* erase */
 	if (uptr->flags & UNIT_WPRT) {			/* write locked? */
-		tuer = tuer | ER_NXF;
-		break;  }
+	    tuer = tuer | ER_NXF;
+	    break;  }
 case FNC_WCHKF:						/* wchk = read */
 case FNC_READF:						/* read */
 DATA_XFER:
 	if ((uptr->flags & UNIT_ATT) == 0) {		/* unattached? */
-		tuer = tuer | ER_UNS;
-		break;  }
+	    tuer = tuer | ER_UNS;
+	    break;  }
 	if (fmt_test[GET_FMT (tutc)] == 0) {		/* invalid format? */
-		tuer = tuer | ER_FER;
-		break;  }
+	    tuer = tuer | ER_FER;
+	    break;  }
 	if (den_test[den] == 0) {			/* invalid density? */
-		tuer = tuer | ER_NXF;
-		break;  }
+	    tuer = tuer | ER_NXF;
+	    break;  }
 	if (uptr->UDENS == UD_UNK) uptr->UDENS = den;	/* set dens */
 /*	else if (uptr->UDENS != den) {			/* density mismatch? */
-/*		tuer = tuer | ER_NXF;
-/*		break;  } */
+/*	    tuer = tuer | ER_NXF;
+/*	    break;  } */
 	uptr->USTAT = 0;
 	tucs1 = tucs1 & ~CS1_DONE;			/* clear done */
 GO_XFER:
@@ -706,10 +708,11 @@ switch (f) {						/* case on function */
 /* Unit service - non-data transfer commands - set ATA when done */
 
 case FNC_SPACEF:					/* space forward */
-	do {	tufc = (tufc + 1) & 0177777;		/* incr fc */
-		if (tu_rdlntf (uptr, &tbc, &err)) break;/* read rec lnt, err? */
-		uptr->pos = uptr->pos + ((MTRL (tbc) + 1) & ~1) +
-			(2 * sizeof (t_mtrlnt));  }
+	do {
+	    tufc = (tufc + 1) & 0177777;		/* incr fc */
+	    if (tu_rdlntf (uptr, &tbc, &err)) break;	/* read rec lnt, err? */
+	    uptr->pos = uptr->pos + ((MTRL (tbc) + 1) & ~1) +
+		(2 * sizeof (t_mtrlnt));  }
 	while (tufc != 0);
 	if (tufc) tuer = tuer | ER_FCE;
 	else tutc = tutc & ~TC_FCS;
@@ -717,11 +720,13 @@ case FNC_SPACEF:					/* space forward */
 	break;
 
 case FNC_SPACER:					/* space reverse */
-	do {	tufc = (tufc + 1) & 0177777;		/* incr wc */
-		if (pnu) pnu = 0;			/* pos not upd? */
-		else {	if (tu_rdlntr (uptr, &tbc, &err)) break;
-			uptr->pos = uptr->pos - ((MTRL (tbc) + 1) & ~1) -
-				(2 * sizeof (t_mtrlnt));  }  }
+	do {
+	    tufc = (tufc + 1) & 0177777;		/* incr wc */
+	    if (pnu) pnu = 0;				/* pos not upd? */
+	    else {
+	    	if (tu_rdlntr (uptr, &tbc, &err)) break;
+		uptr->pos = uptr->pos - ((MTRL (tbc) + 1) & ~1) -
+		    (2 * sizeof (t_mtrlnt));  }  }
 	while (tufc != 0);
 	if (tufc) tuer = tuer | ER_FCE;
 	else tutc = tutc & ~TC_FCS;
@@ -757,28 +762,28 @@ case FNC_READF:						/* read */
 case FNC_WCHKF:						/* wcheck = read */
 	tufc = 0;					/* clear frame count */
 	if ((uptr->UDENS == TC_1600) && (uptr->pos == 0))
-		tufs = tufs | FS_ID;			/* PE BOT? ID burst */
+	    tufs = tufs | FS_ID;			/* PE BOT? ID burst */
 	TXFR (ba, wc, 0);				/* validate transfer */
 	if (tu_rdlntf (uptr, &tbc, &err)) break;	/* read rec lnt, err? */
 	if (MTRF (tbc)) {				/* bad record? */
-		tuer = tuer | ER_CRC;			/* set error flag */
-		uptr->pos = uptr->pos + ((MTRL (tbc) + 1) & ~1) +
-			(2 * sizeof (t_mtrlnt));
-		break;  }
+	    tuer = tuer | ER_CRC;			/* set error flag */
+	    uptr->pos = uptr->pos + ((MTRL (tbc) + 1) & ~1) +
+		(2 * sizeof (t_mtrlnt));
+	    break;  }
 	if (tbc > XBUFLNT) return SCPE_MTRLNT;		/* bad rec length? */
 	abc = fxread (xbuf, sizeof (int8), tbc, uptr->fileref);
 	if (err = ferror (uptr->fileref)) {		/* error? */
-		MT_SET_PNU (uptr);			/* pos not upd */
-		break;  }
+	    MT_SET_PNU (uptr);				/* pos not upd */
+	    break;  }
 	for ( ; abc < tbc + 4; abc++) xbuf[abc] = 0;	/* fill/pad with 0's */
 	for (i = j = 0; (i < wc10) && (j < ((int32) tbc)); i++) {
-		if ((i == 0) || NEWPAGE (ba10 + i, 0)) {	/* map new page */
-			MAPM (ba10 + i, mpa10, 0);  }
-		for (k = 0; k < 4; k++) v[k] = xbuf[j++];
-		val = (v[0] << 28) | (v[1] << 20) | (v[2] << 12) | (v[3] << 4);
-		if (fmt == TC_10C) val = val | ((d10) xbuf[j++] & 017);
-		if (f == FNC_READF) M[mpa10] = val;
-		mpa10 = mpa10 + 1;  }			/* end for */
+	    if ((i == 0) || NEWPAGE (ba10 + i, 0)) {	/* map new page */
+		MAPM (ba10 + i, mpa10, 0);  }
+	    for (k = 0; k < 4; k++) v[k] = xbuf[j++];
+	    val = (v[0] << 28) | (v[1] << 20) | (v[2] << 12) | (v[3] << 4);
+	    if (fmt == TC_10C) val = val | ((d10) xbuf[j++] & 017);
+	    if (f == FNC_READF) M[mpa10] = val;
+	    mpa10 = mpa10 + 1;  }			/* end for */
 	uptr->pos = uptr->pos + ((tbc + 1) & ~1) + (2 * sizeof (t_mtrlnt));
 	tufc = tbc & 0177777;
 	tuwc = (tuwc + (i << 1)) & 0177777;
@@ -789,26 +794,27 @@ case FNC_WRITE:						/* write */
 	TXFR (ba, wc, 0);				/* validate transfer */
 	fseek (uptr->fileref, uptr->pos, SEEK_SET);
 	for (i = j = 0; (i < wc10) && (j < fc); i++) {
-		if ((i == 0) || NEWPAGE (ba10 + i, 0)) {	/* map new page */
-			MAPM (ba10 + i, mpa10, 0);  }
-		val = M[mpa10];
-		xbuf[j++] = (uint8) ((val >> 28) & 0377);
-		xbuf[j++] = (uint8) ((val >> 20) & 0377);
-		xbuf[j++] = (uint8) ((val >> 12) & 0377);
-		xbuf[j++] = (uint8) ((val >> 4) & 0377);
-		if (fmt == TC_10C) xbuf[j++] = (uint8) (val & 017);
-		mpa10 = mpa10 + 1;  }			/* end for */
+	    if ((i == 0) || NEWPAGE (ba10 + i, 0)) {	/* map new page */
+		MAPM (ba10 + i, mpa10, 0);  }
+	    val = M[mpa10];
+	    xbuf[j++] = (uint8) ((val >> 28) & 0377);
+	    xbuf[j++] = (uint8) ((val >> 20) & 0377);
+	    xbuf[j++] = (uint8) ((val >> 12) & 0377);
+	    xbuf[j++] = (uint8) ((val >> 4) & 0377);
+	    if (fmt == TC_10C) xbuf[j++] = (uint8) (val & 017);
+	    mpa10 = mpa10 + 1;  }			/* end for */
 	if (j < fc) fc = j;				/* short record? */
 	fxwrite (&fc, sizeof (t_mtrlnt), 1, uptr->fileref);
 	fxwrite (xbuf, sizeof (int8), (fc + 1) & ~1, uptr->fileref);
 	fxwrite (&fc, sizeof (t_mtrlnt), 1, uptr->fileref);
 	if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr);
-	else {	uptr->pos = uptr->pos + ((fc + 1) & ~1) +
-			(2 * sizeof (t_mtrlnt));
-		tufc = (tufc + fc) & 0177777;
-		if (tufc == 0) tutc = tutc & ~TC_FCS;
-		tuwc = (tuwc + (i << 1)) & 0177777;
-		ba = ba + (i << 2);  }
+	else {
+	    uptr->pos = uptr->pos + ((fc + 1) & ~1) +
+		(2 * sizeof (t_mtrlnt));
+	    tufc = (tufc + fc) & 0177777;
+	    if (tufc == 0) tutc = tutc & ~TC_FCS;
+	    tuwc = (tuwc + (i << 1)) & 0177777;
+	    ba = ba + (i << 2);  }
 	break;
 
 case FNC_READR:						/* read reverse */
@@ -817,24 +823,24 @@ case FNC_WCHKR:						/* wcheck = read */
 	TXFR (ba, wc, 1);				/* validate xfer rev */
 	if (tu_rdlntr (uptr, &tbc, &err)) break;	/* read rec lnt, err? */
 	if (MTRF (tbc)) {				/* bad record? */
-		tuer = tuer | ER_CRC;			/* set error flag */
-		uptr->pos = uptr->pos - ((MTRL (tbc) + 1) & ~1) -
-			(2 * sizeof (t_mtrlnt));
-		break;  }
+	    tuer = tuer | ER_CRC;			/* set error flag */
+	    uptr->pos = uptr->pos - ((MTRL (tbc) + 1) & ~1) -
+		(2 * sizeof (t_mtrlnt));
+	    break;  }
 	if (tbc > XBUFLNT) return SCPE_MTRLNT;		/* bad rec length? */
 	fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt)
-		 - ((tbc + 1) & ~1), SEEK_SET);
+	     - ((tbc + 1) & ~1), SEEK_SET);
 	fxread (xbuf + 4, sizeof (int8), tbc, uptr->fileref);
 	for (i = 0; i < 4; i++) xbuf[i] = 0;
 	err = ferror (uptr->fileref);			/* set err but finish */
 	for (i = 0, j = tbc + 4; (i < wc10) && (j >= 4); i++) {
-		if ((i == 0) || NEWPAGE (ba10 - i, PAG_M_OFF)) { /* map page */
-			MAPM (ba10 - i, mpa10, UMAP_RRV);  }
-		val = ((fmt == TC_10C)? (((d10) xbuf [--j]) & 017): 0);
-		for (k = 0; k < 4; i++) v[k] = xbuf[--j];
-		val = val | (v[0] << 4) | (v[1] << 12) | (v[2] << 20) | (v[3] << 28);
-		if (f == FNC_READR) M[mpa10] = val;
-		mpa10 = mpa10 - 1;  }			/* end for */
+	    if ((i == 0) || NEWPAGE (ba10 - i, PAG_M_OFF)) { /* map page */
+		MAPM (ba10 - i, mpa10, UMAP_RRV);  }
+	    val = ((fmt == TC_10C)? (((d10) xbuf [--j]) & 017): 0);
+	    for (k = 0; k < 4; i++) v[k] = xbuf[--j];
+	    val = val | (v[0] << 4) | (v[1] << 12) | (v[2] << 20) | (v[3] << 28);
+	    if (f == FNC_READR) M[mpa10] = val;
+	    mpa10 = mpa10 - 1;  }			/* end for */
 	uptr->pos = uptr->pos - ((tbc + 1) & ~1) - (2 * sizeof (t_mtrlnt));
 	tufc = tbc & 0177777;
 	tuwc = (tuwc + (i << 1)) & 0177777;
@@ -871,10 +877,10 @@ if ((flag & ~tucs1) & CS1_DONE)				/* DONE 0 to 1? */
 if (GET_FMTR (tucs2) == 0) {				/* formatter present? */
 	tufs = (tufs & ~FS_DYN) | FS_FPR;
 	if (tu_unit[drv].flags & UNIT_ATT) {
-		tufs = tufs | FS_MOL | tu_unit[drv].USTAT;
-		if (tu_unit[drv].UDENS == TC_1600) tufs = tufs | FS_PE;
-		if (tu_unit[drv].flags & UNIT_WPRT) tufs = tufs | FS_WRL;
-		if ((tu_unit[drv].pos == 0) && !act) tufs = tufs | FS_BOT;  }
+	    tufs = tufs | FS_MOL | tu_unit[drv].USTAT;
+	    if (tu_unit[drv].UDENS == TC_1600) tufs = tufs | FS_PE;
+	    if (tu_unit[drv].flags & UNIT_WPRT) tufs = tufs | FS_WRL;
+	    if ((tu_unit[drv].pos == 0) && !act) tufs = tufs | FS_BOT;  }
 	if (tuer) tufs = tufs | FS_ERR;  }
 else tufs = 0;
 tucs1 = (tucs1 & ~(CS1_SC | CS1_MCPE | CS1_MBZ)) | CS1_DVA | flag;

@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Dec-02	RMS	Added IOT skip support (required by drum)
    14-Apr-99	RMS	Changed t_addr to unsigned
 
    The PDP-1 was Digital's first computer.  The system design evolved during
@@ -67,7 +68,9 @@
 
 /* IOT subroutine return codes */
 
-#define IOT_V_REASON	18				/* reason */
+#define IOT_V_SKP	18				/* skip */
+#define IOT_SKP		(1 << IOT_V_SKP)
+#define IOT_V_REASON	(IOT_V_SKP + 1)			/* reason */
 #define IOT_REASON	(1 << IOT_V_REASON)
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* stop on error */
 

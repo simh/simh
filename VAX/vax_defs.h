@@ -42,11 +42,11 @@
 #define STOP_INIE	5				/* exc in intexc */
 #define STOP_PPTE	6				/* proc pte in Px */
 #define STOP_UIPL	7				/* undefined IPL */
-#define STOP_UNKNOWN	8				/* unknown reason */
-#define STOP_RQ		9				/* fatal RQ err */
-#define STOP_LOOP	10				/* infinite loop */
-#define STOP_UNKABO	11				/* unknown abort */
-#define STOP_SANITY	12				/* sanity timer exp */
+#define STOP_RQ		8				/* fatal RQ err */
+#define STOP_LOOP	9				/* infinite loop */
+#define STOP_SANITY	10				/* sanity timer exp */
+#define STOP_UNKNOWN	11				/* unknown reason */
+#define STOP_UNKABO	12				/* unknown abort */
 #define ABORT_INTR	-1				/* interrupt */
 #define ABORT_MCHK	(-SCB_MCHK)			/* machine check */
 #define ABORT_RESIN	(-SCB_RESIN)			/* rsvd instruction */
@@ -247,6 +247,7 @@
 #define SCB_TTO		0xFC				/* console output */
 #define SCB_INTR	0x100				/* hardware intr */
 
+#define IPL_HLTPIN	0x1F				/* halt pin IPL */
 #define IPL_MEMERR	0x1D				/* mem err IPL */
 #define IPL_CRDERR	0x1A				/* CRD err IPL */
 

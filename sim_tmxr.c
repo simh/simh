@@ -26,12 +26,15 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   22-Dec-02	RMS	Fixed bugs in IAC+IAC receive and transmit sequences
+			Added support for received break (all from by Mark Pizzolato)
+			Fixed bug in attach
    31-Oct-02	RMS	Fixed bug in 8b (binary) support
    22-Aug-02	RMS	Added tmxr_open_master, tmxr_close_master
    30-Dec-01	RMS	Added tmxr_fstats, tmxr_dscln, renamed tmxr_fstatus
    03-Dec-01	RMS	Changed tmxr_fconns for extended SET/SHOW
    20-Oct-01	RMS	Fixed bugs in read logic (found by Thord Nilson).
-			added tmxr_rqln, tmxr_tqln
+			Added tmxr_rqln, tmxr_tqln
 */
 
 #include "sim_defs.h"
@@ -45,6 +48,7 @@
 #define TN_DO		-3				/* do */
 #define TN_WONT		-4				/* wont */
 #define TN_WILL		-5				/* will */
+#define TN_BRK		-13				/* break */
 #define TN_BIN		0				/* bin */
 #define TN_ECHO		1				/* echo */
 #define TN_SGA		3				/* sga */
@@ -91,26 +95,27 @@ static char mantra[] = {
 newsock = sim_accept_conn (mp->master, &ipaddr);	/* poll connect */
 if (newsock != INVALID_SOCKET) {			/* got a live one? */
 	for (i = 0; i < mp->lines; i++) {		/* find avail line */
-		lp = mp->ldsc[i];			/* ptr to ln desc */
-		if (lp->conn == 0) break;  }		/* available? */
+	    lp = mp->ldsc[i];				/* ptr to ln desc */
+	    if (lp->conn == 0) break;  }		/* available? */
 	if (i >= mp->lines) {				/* all busy? */
-		tmxr_msg (newsock, "All connections busy\r\n");
-		sim_close_sock (newsock, 0);  }
-	else {	lp = mp->ldsc[i];			/* get line desc */
-		lp->conn = newsock;			/* record connection */
-		lp->ipad = ipaddr;			/* ip address */
-		lp->cnms = sim_os_msec ();		/* time of conn */
-		lp->rxbpr = lp->rxbpi = 0;		/* init buf pointers */
-		lp->txbpr = lp->txbpi = 0;
-		lp->rxcnt = lp->txcnt = 0;		/* init counters */
-		lp->tsta = 0;				/* init telnet state */
-		lp->xmte = 1; 				/* enable transmit */
-		lp->dstb = 0;				/* default bin mode */
-		sim_write_sock (newsock, mantra, 15);
-		tmxr_msg (newsock, "\n\r\nConnected to the ");
-		tmxr_msg (newsock, sim_name);
-		tmxr_msg (newsock, " simulator\r\n\n");
-		return i;  }
+	    tmxr_msg (newsock, "All connections busy\r\n");
+	    sim_close_sock (newsock, 0);  }
+	else {
+	    lp = mp->ldsc[i];				/* get line desc */
+	    lp->conn = newsock;				/* record connection */
+	    lp->ipad = ipaddr;				/* ip address */
+	    lp->cnms = sim_os_msec ();			/* time of conn */
+	    lp->rxbpr = lp->rxbpi = 0;			/* init buf pointers */
+	    lp->txbpr = lp->txbpi = 0;
+	    lp->rxcnt = lp->txcnt = 0;			/* init counters */
+	    lp->tsta = 0;				/* init telnet state */
+	    lp->xmte = 1; 				/* enable transmit */
+	    lp->dstb = 0;				/* default bin mode */
+	    sim_write_sock (newsock, mantra, 15);
+	    tmxr_msg (newsock, "\n\r\nConnected to the ");
+	    tmxr_msg (newsock, sim_name);
+	    tmxr_msg (newsock, " simulator\r\n\n");
+	    return i;  }
 	}						/* end if newsock */
 return -1;
 }
@@ -144,9 +149,10 @@ uint32 tmp;
 if (lp->conn && lp->rcve) {				/* conn & enb? */
 	j = lp->rxbpi - lp->rxbpr;			/* # input chrs */
 	if (j) {					/* any? */
-		tmp = lp->rxb[lp->rxbpr];		/* get char */
-		lp->rxbpr = lp->rxbpr + 1;		/* adv pointer */
-		val = TMXR_VALID | (tmp & 0377);  }	/* valid + chr */
+	    tmp = lp->rxb[lp->rxbpr];			/* get char */
+	    val = TMXR_VALID | (tmp & 0377);		/* valid + chr */
+	    if (lp->rbr[lp->rxbpr]) val = val | SCPE_BREAK;	/* break? */
+	    lp->rxbpr = lp->rxbpr + 1;  }		/* adv pointer */
 	}						/* end if conn */
 if (lp->rxbpi == lp->rxbpr)				/* empty? zero ptrs */
 	lp->rxbpi = lp->rxbpr = 0;
@@ -181,6 +187,7 @@ for (i = 0; i < mp->lines; i++) {			/* loop thru lines */
 	if (nbytes < 0) tmxr_reset_ln (lp);		/* closed? reset ln */
 	else if (nbytes > 0) {				/* if data rcvd */
 	    j = lp->rxbpi;				/* start of data */
+	    memset (&lp->rbr[j], 0, nbytes);		/* clear status */
 	    lp->rxbpi = lp->rxbpi + nbytes;		/* adv pointers */
 	    lp->rxcnt = lp->rxcnt + nbytes;
 
@@ -201,7 +208,14 @@ for (i = 0; i < mp->lines; i++) {			/* loop thru lines */
 		case TNS_IAC:				/* IAC prev */
 		    if ((tmp == TN_IAC) & !lp->dstb) {	/* IAC + IAC, bin? */
 			lp->tsta = TNS_NORM;		/* treat as normal */
+			j = j + 1;			/* advance j */
 			break;  }			/* keep IAC */
+		    if (tmp == TN_BRK) {		/* IAC + BRK? */
+			lp->tsta = TNS_NORM;		/* treat as normal */
+			lp->rxb[j] = 0;			/* char is null */
+			lp->rbr[j] = 1;			/* flag break */
+			j = j + 1;			/* advance j */
+			break;  }
 		    if (tmp == TN_WILL)			/* IAC + WILL? */
 			lp->tsta = TNS_WILL;
 		    else if (tmp == TN_WONT)		/* IAC + WONT? */
@@ -223,7 +237,7 @@ for (i = 0; i < mp->lines; i++) {			/* loop thru lines */
 for (i = 0; i < mp->lines; i++) {			/* loop thru lines */
 	lp = mp->ldsc[i];				/* get line desc */
 	if (lp->rxbpi == lp->rxbpr)			/* if buf empty, */
-		lp->rxbpi = lp->rxbpr = 0;		/* reset pointers */
+	    lp->rxbpi = lp->rxbpr = 0;			/* reset pointers */
 	}						/* end for */
 return;
 }
@@ -235,11 +249,13 @@ int32 tmxr_rqln (TMLN *lp)
 return (lp->rxbpi - lp->rxbpr);
 }
 
-/* Remove character p from line l input buffer */
+/* Remove character p (and matching status) from line l input buffer */
 
 void tmxr_rmvrc (TMLN *lp, int32 p)
 {
-for ( ; p < lp->rxbpi; p++) lp->rxb[p] = lp->rxb[p + 1];
+for ( ; p < lp->rxbpi; p++) {
+	lp->rxb[p] = lp->rxb[p + 1];
+	lp->rbr[p] = lp->rbr[p + 1];  }
 lp->rxbpi = lp->rxbpi - 1;
 return;
 }
@@ -259,8 +275,12 @@ if (lp->conn == 0) return;				/* no conn? done */
 if (lp->txbpi < TMXR_MAXBUF) {				/* room for char? */
 	lp->txb[lp->txbpi] = (char) chr;		/* buffer char */
 	lp->txbpi = lp->txbpi + 1;			/* adv pointer */
+	if (((char) chr == TN_IAC) &&			/* IAC? */
+	    (lp->txbpi < TMXR_MAXBUF)) {		/* room for char? */
+	    lp->txb[lp->txbpi] = (char) chr;		/* IAC + IAC */
+	    lp->txbpi = lp->txbpi + 1;  }		/* adv pointer */	
 	if (lp->txbpi > (TMXR_MAXBUF - TMXR_GUARD))	/* near full? */
-		lp->xmte = 0;  }			/* disable line */
+	    lp->xmte = 0;  }				/* disable line */
 else lp->xmte = 0;					/* disable line */
 return;
 }
@@ -283,16 +303,16 @@ for (i = 0; i < mp->lines; i++) {			/* loop thru lines */
 	if (lp->conn == 0) continue;			/* skip if !conn */
 	nbytes = lp->txbpi - lp->txbpr;			/* avail bytes */
 	if (nbytes) {					/* >0? write */
-		sbytes = sim_write_sock (lp->conn,
-			 &(lp->txb[lp->txbpr]), nbytes);
-		if (sbytes != SOCKET_ERROR) {		/* update ptrs */
-			lp->txbpr = lp->txbpr + sbytes;
-			lp->txcnt = lp->txcnt + sbytes;
-			nbytes = nbytes - sbytes;  }
-		}
+	    sbytes = sim_write_sock (lp->conn,
+		 &(lp->txb[lp->txbpr]), nbytes);
+	    if (sbytes != SOCKET_ERROR) {		/* update ptrs */
+		lp->txbpr = lp->txbpr + sbytes;
+		lp->txcnt = lp->txcnt + sbytes;
+		nbytes = nbytes - sbytes;  }
+	    }
 	if (nbytes == 0) {				/* buf empty? */
-    		lp->xmte = 1;				/* enable this line */
-		lp->txbpr = lp->txbpi = 0;  }
+    	    lp->xmte = 1;				/* enable this line */
+	    lp->txbpr = lp->txbpi = 0;  }
 	}						/* end for */
 return;
 }
@@ -340,6 +360,12 @@ t_stat tmxr_attach (TMXR *mp, UNIT *uptr, char *cptr)
 char* tptr;
 t_stat r;
 
+if (uptr->flags & UNIT_ATT) {				/* attached? */
+	DEVICE *dptr = find_dev_from_unit (uptr);	/* find device */
+	if (dptr == NULL) return SCPE_IERR;
+	if (dptr->detach != NULL) r = dptr->detach (uptr);
+	else r = detach_unit (uptr);			/* detach unit */
+	if (r != SCPE_OK) return r;  }
 tptr = malloc (strlen (cptr) + 1);			/* get string buf */
 if (tptr == NULL) return SCPE_MEM;			/* no more mem? */
 r = tmxr_open_master (mp, cptr);			/* open master socket */
@@ -362,10 +388,10 @@ TMLN *lp;
 for (i = 0; i < mp->lines; i++) {			/* loop thru conn */
 	lp = mp->ldsc[i];
 	if (lp->conn) {
-		tmxr_msg (lp->conn, "\r\nDisconnected from the ");
-		tmxr_msg (lp->conn, sim_name);
-		tmxr_msg (lp->conn, " simulator\r\n\n");
-		tmxr_reset_ln (lp);  }			/* end if conn */
+	    tmxr_msg (lp->conn, "\r\nDisconnected from the ");
+	    tmxr_msg (lp->conn, sim_name);
+	    tmxr_msg (lp->conn, " simulator\r\n\n");
+	    tmxr_reset_ln (lp);  }			/* end if conn */
 	}						/* end for */
 sim_close_sock (mp->master, 1);				/* close master socket */
 mp->master = 0;

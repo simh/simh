@@ -51,6 +51,7 @@ sim/hp2100/	hp2100_defs.h
 		hp2100_dp.c
 		hp2100_dq.c
 		hp2100_dr.c
+		hp2100_ipl.c
 		hp2100_lps.c
 		hp2100_lpt.c
 		hp2100_mt.c
@@ -85,6 +86,8 @@ DR		12606B fixed head disk controller with 2770/2771 disks
 MT		12559C magnetic tape controller with one 3030 drive
 MS		13181A magnetic tape controller with four 7970B drives
 		13183A magnetic tape controller with four 7970E drives
+IPLI		12556B interprocessor link, input side
+IPLO		12556B interprocessor link, output side
 
 The HP2100 simulator implements several unique stop conditions:
 
@@ -107,8 +110,8 @@ CPU options include choice of instruction set and memory size.
 	SET CPU NOEAU		no EAU instructions (2116 only)
 	SET CPU FP		FP instructions (2100 only)
 	SET CPU NOFP		no FP instructions (2100 only)
-	SET CPU IOP		IOP instructions (2100 only)
-	SET CPU NOIOP		no IOP instructions (2100 only)
+	SET CPU IOP		IOP instructions (2100, 21MX only)
+	SET CPU NOIOP		no IOP instructions (2100, 21MX only)
 	SET CPU DMS		DMS instructions (21MX only)
 	SET CPU NODMS		no DMS instructions (21MX only)
 	SET CPU 4K		set memory size = 4K
@@ -505,6 +508,62 @@ The modem control (MUXM) implements these registers:
 The terminal multiplexor does not support save and restore.  All open
 connections are lost when the simulator shuts down or MUXU is detached.
 
+2.4.8 Interprocessor Link (IPLI, IPLO)
+
+The interprocessor link is a pair of 12556B parallel interfaces that
+are cross coupled to provide interprocessor communications to a second
+copy of the HP2100 simulator.  The IPL is intended to support simulation
+of a two system HP TimeShared Basic configuration.  The links are actually
+bidirectional half-duplex; TimeShared Basic uses them unidirectionally.
+The IPL is disabled by default.
+
+To operate, the IPL devices must be enabled and then connected to the IPL
+devices in another copy of the simulator.  The IPLI device in the first
+simulator is connected to the IPLO device in the second, and vice versa.
+Connections are established with the ATTACH command.  One copy of the
+simulator listens for connections on a specified port (ATTACH -L); the
+other establishes connections to an IP address and port (ATTACH -C).
+Either copy may perform either operation, but the operations must be
+done in matched pairs:
+
+	simulator #1			simulator #2
+
+	sim> set ipli ena		sim> set ipli ena
+	(also enables iplo)		(also enables iplo)
+	sim> att -lw ipli 4000
+	Listening on port 4000
+	Waiting for connection
+					sim> att -c iplo 4000
+	Connection established		Connected to 127.0.0.1 port 4000
+	sim> att -lw iplo 4000
+	Listening on port 4001
+	Waiting for connection
+					sim> att -c ipli 4001
+	Connection established		Connected to 127.0.0.1 port 4000
+
+Both forms of ATTACH take a modifier -W (wait); if specified, the command
+will wait up to 30 seconds for the connection process to complete.  ATTACH
+-C can specify both an IP address and a port, in the form aa.bb.cc.dd:port;
+if the IP address is omitted, it defaults to 127.0.0.1 (local system).
+
+Both IPLI and IPLO implement the BOOT command.  BOOT loads the HP Access
+Basic Block Loader for the IOP into the top 64 words of memory and starts
+it running.
+
+Both IPLI and IPLO implement these registers:
+
+	name		size	comments
+
+	BUF		16	buffer
+	HOLD		8	holding buffer
+	CMD		1	device enable
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	TIME		24	polling interval for input
+	STOP_IOE	1	stop on I/O error
+
+	
 2.5 12557A Disk Controller (DPC, DPD) with 2781 Drives
     13210A Disk Controller (DPC, DPD) with 7900 Drives
 

@@ -284,7 +284,7 @@ UNIT *uptr;
 switch ((PA >> 1) & 07) {				/* decode PA<3:1> */
 case 0:							/* RKDS: read only */
 	rkds = (rkds & RKDS_ID) | RKDS_RK05 | RKDS_SC_OK |
-		(rand () % RK_NUMSC);			/* random sector */
+	    (rand () % RK_NUMSC);			/* random sector */
 	uptr = rk_dev.units + GET_DRIVE (rkda);		/* selected unit */
 	if (uptr->flags & UNIT_ATT) rkds = rkds | RKDS_RDY;	/* attached? */
 	if (!sim_is_active (uptr)) rkds = rkds | RKDS_RWS;	/* idle? */
@@ -325,30 +325,30 @@ case 1:							/* RKER: read only */
 case 2:							/* RKCS */
 	rkcs = rkcs & RKCS_REAL;
 	if (access == WRITEB) data = (PA & 1)?
-		(rkcs & 0377) | (data << 8): (rkcs & ~0377) | data;
+	    (rkcs & 0377) | (data << 8): (rkcs & ~0377) | data;
 	if ((data & CSR_IE) == 0) {			/* int disable? */
-		rkintq = 0;				/* clr int queue */
-		CLR_INT (RK);  }			/* clr int request */
+	    rkintq = 0;					/* clr int queue */
+	    CLR_INT (RK);  }				/* clr int request */
 	else if ((rkcs & (CSR_DONE + CSR_IE)) == CSR_DONE) {
-		rkintq = rkintq | RK_CTLI;		/* queue ctrl int */
-		SET_INT (RK);  }			/* set int request */
+	    rkintq = rkintq | RK_CTLI;			/* queue ctrl int */
+	    SET_INT (RK);  }				/* set int request */
 	rkcs = (rkcs & ~RKCS_RW) | (data & RKCS_RW);
 	if ((rkcs & CSR_DONE) && (data & CSR_GO)) rk_go (); /* new function? */
 	return SCPE_OK;
 case 3:							/* RKWC */
 	if (access == WRITEB) data = (PA & 1)?
-		(rkwc & 0377) | (data << 8): (rkwc & ~0377) | data;
+	    (rkwc & 0377) | (data << 8): (rkwc & ~0377) | data;
 	rkwc = data;
 	return SCPE_OK;
 case 4:							/* RKBA */
 	if (access == WRITEB) data = (PA & 1)?
-		(rkba & 0377) | (data << 8): (rkba & ~0377) | data;
+	    (rkba & 0377) | (data << 8): (rkba & ~0377) | data;
 	rkba = data & RKBA_IMP;
 	return SCPE_OK;
 case 5:							/* RKDA */
 	if ((rkcs & CSR_DONE) == 0) return SCPE_OK;
 	if (access == WRITEB) data = (PA & 1)?
-		(rkda & 0377) | (data << 8): (rkda & ~0377) | data;
+	    (rkda & 0377) | (data << 8): (rkda & ~0377) | data;
 	rkda = data;
 	return SCPE_OK;
 default:
@@ -435,10 +435,11 @@ drv = uptr - rk_dev.units;				/* get drv number */
 if (uptr->FUNC == RKCS_SEEK) {				/* seek */
 	rkcs = rkcs | RKCS_SCP;				/* set seek done */
 	if (rkcs & CSR_IE) {				/* ints enabled? */
-		rkintq = rkintq | RK_SCPI (drv);	/* queue request */
-		if (rkcs & CSR_DONE) SET_INT (RK);  }
-	else {	rkintq = 0;				/* clear queue */
-		CLR_INT (RK);  }			/* clear interrupt */
+	    rkintq = rkintq | RK_SCPI (drv);		/* queue request */
+	    if (rkcs & CSR_DONE) SET_INT (RK);  }
+	else {
+	    rkintq = 0;					/* clear queue */
+	    CLR_INT (RK);  }				/* clear interrupt */
 	return SCPE_OK;  }
 
 if ((uptr->flags & UNIT_ATT) == 0) {			/* attached? */
@@ -455,19 +456,19 @@ if ((uptr->FUNC == RKCS_READ) && (err == 0)) {		/* read? */
 	err = ferror (uptr->fileref);
 	for ( ; i < wc; i++) rkxb[i] = 0;		/* fill buf */
 	if (t = Map_WriteW (ma, wc << 1, rkxb, MAP)) {	/* store buf */
-		rker = rker | RKER_NXM;			/* NXM? set flg */
-	  	wc = wc - t;  }				/* adj wd cnt */
+	    rker = rker | RKER_NXM;			/* NXM? set flg */
+	    wc = wc - t;  }				/* adj wd cnt */
 	}						/* end read */
 
-if ((uptr->FUNC == RKCS_WRITE) && (err == 0)) {	/* write? */
+if ((uptr->FUNC == RKCS_WRITE) && (err == 0)) {		/* write? */
 	if (t = Map_ReadW (ma, wc << 1, rkxb, MAP)) {	/* get buf */
-		rker = rker | RKER_NXM;			/* NXM? set flg */
-	  	wc = wc - t;  }				/* adj wd cnt */
+	    rker = rker | RKER_NXM;			/* NXM? set flg */
+	    wc = wc - t;  }				/* adj wd cnt */
 	if (wc) {					/* any xfer? */
-		awc = (wc + (RK_NUMWD - 1)) & ~(RK_NUMWD - 1);	/* clr to */
-		for (i = wc; i < awc; i++) rkxb[i] = 0;	/* end of blk */
-		fxwrite (rkxb, sizeof (int16), awc, uptr->fileref);
-		err = ferror (uptr->fileref);  }
+	    awc = (wc + (RK_NUMWD - 1)) & ~(RK_NUMWD - 1);	/* clr to */
+	    for (i = wc; i < awc; i++) rkxb[i] = 0;	/* end of blk */
+	    fxwrite (rkxb, sizeof (int16), awc, uptr->fileref);
+	    err = ferror (uptr->fileref);  }
 	}						/* end write */
 
 if ((uptr->FUNC == RKCS_WCHK) && (err == 0)) {		/* write check? */
@@ -476,12 +477,12 @@ if ((uptr->FUNC == RKCS_WCHK) && (err == 0)) {		/* write check? */
 	for ( ; i < wc; i++) rkxb[i] = 0;		/* fill buf */
 	awc = wc;					/* save wc */
 	for (wc = 0; (err == 0) && (wc < awc); wc++)  {	/* loop thru buf */
-		if (Map_ReadW (ma + (wc << 1), 2, &comp, MAP)) {	/* mem wd */
-			rker = rker | RKER_NXM;		/* NXM? set flg */
-			break;  }
-		if (comp != rkxb[wc])  {		/* match to disk? */
-			rker = rker | RKER_WCE;		/* no, err */
-			if (rkcs & RKCS_SSE) break;  }  }
+	    if (Map_ReadW (ma + (wc << 1), 2, &comp, MAP)) {	/* mem wd */
+		rker = rker | RKER_NXM;			/* NXM? set flg */
+		break;  }
+	    if (comp != rkxb[wc])  {			/* match to disk? */
+		rker = rker | RKER_WCE;			/* no, err */
+		if (rkcs & RKCS_SSE) break;  }  }
 	}						/* end wcheck */
 
 rkwc = (rkwc + wc) & 0177777;				/* final word count */
@@ -537,11 +538,11 @@ int32 i;
 
 for (i = 0; i <= RK_NUMDR; i++) {			/* loop thru intq */
 	if (rkintq & (1u << i)) {			/* bit i set? */
-		rkintq = rkintq & ~(1u << i);		/* clear bit i */
-		if (rkintq) SET_INT (RK);		/* queue next */
-		rkds = (rkds & ~RKDS_ID) |		/* id drive */
-			(((i == 0)? last_drv: i - 1) << RKDS_V_ID);
-		return rk_dib.vec;  }  }		/* return vector */
+	    rkintq = rkintq & ~(1u << i);		/* clear bit i */
+	    if (rkintq) SET_INT (RK);			/* queue next */
+	    rkds = (rkds & ~RKDS_ID) |			/* id drive */
+		(((i == 0)? last_drv: i - 1) << RKDS_V_ID);
+	    return rk_dib.vec;  }  }			/* return vector */
 rkintq = 0;						/* clear queue */
 return 0;						/* passive release */
 }

@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Nov-02	RMS	Added 21MX IOP support
    24-Oct-02	RMS	Fixed bugs in IOP and extended instructions
 			Fixed bugs in memory protection and DMS
 			Added clock calibration
@@ -283,8 +284,9 @@
 #define UNIT_V_FP	(UNIT_V_UF + 3)			/* FP */
 #define UNIT_V_MPR	(UNIT_V_UF + 4)			/* mem prot */
 #define UNIT_V_DMS	(UNIT_V_UF + 5)			/* DMS */
-#define UNIT_V_IOP	(UNIT_V_UF + 6)			/* IOP */
-#define UNIT_V_MSIZE	(UNIT_V_UF + 7)			/* dummy mask */
+#define UNIT_V_IOP	(UNIT_V_UF + 6)			/* 2100 IOP */
+#define UNIT_V_IOPX	(UNIT_V_UF + 7)			/* 21MX IOP */
+#define UNIT_V_MSIZE	(UNIT_V_UF + 8)			/* dummy mask */
 #define UNIT_2100	(1 << UNIT_V_2100)
 #define UNIT_21MX	(1 << UNIT_V_21MX)
 #define UNIT_EAU	(1 << UNIT_V_EAU)
@@ -292,6 +294,7 @@
 #define UNIT_MPR	(1 << UNIT_V_MPR)
 #define UNIT_DMS	(1 << UNIT_V_DMS)
 #define UNIT_IOP	(1 << UNIT_V_IOP)
+#define UNIT_IOPX	(1 << UNIT_V_IOPX)
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
 #define MOD_2116	1
@@ -330,6 +333,7 @@ uint32 dms_ump = 0;					/* dms user map */
 uint32 dms_sr = 0;					/* dms status reg */
 uint32 dms_vr = 0;					/* dms violation reg */
 uint32 dms_map[MAP_NUM * MAP_LNT] = { 0 };		/* dms maps */
+uint32 iop_sp = 0;					/* iop stack */
 uint32 ind_max = 16;					/* iadr nest limit */
 uint32 stop_inst = 1;					/* stop on ill inst */
 uint32 stop_dev = 0;					/* stop on ill dev */
@@ -347,7 +351,7 @@ static struct opt_table opt_val[] = {
 	{ UNIT_FP,  MOD_2100 },
 	{ UNIT_MPR, MOD_2100 | MOD_21MX },
 	{ UNIT_DMS, MOD_21MX },
-	{ UNIT_IOP, MOD_2100 },
+	{ UNIT_IOP, MOD_2100 | MOD_21MX },
 	{ 0, 0 }  };
 
 extern int32 sim_interval;
@@ -431,6 +435,7 @@ REG cpu_reg[] = {
 	{ ORDATA (DMSSR, dms_sr, 16) },
 	{ ORDATA (DMSVR, dms_vr, 16) },
 	{ BRDATA (DMSMAP, dms_map, 8, PA_N_SIZE, MAP_NUM * MAP_LNT) },
+	{ ORDATA (IOPSP, iop_sp, 16) },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ FLDATA (STOP_DEV, stop_dev, 1) },
 	{ DRDATA (INDMAX, ind_max, 16), REG_NZ + PV_LEFT },
@@ -448,34 +453,36 @@ REG cpu_reg[] = {
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
-	{ UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_MPR+UNIT_DMS+UNIT_IOP,
+	{ UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_MPR+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
 	  0, NULL, "2116", NULL },
-	{ UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_MPR+UNIT_DMS+UNIT_IOP,
+	{ UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_MPR+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
 	  UNIT_2100+UNIT_EAU, NULL, "2100", NULL },
-	{ UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_MPR+UNIT_DMS+UNIT_IOP,
+	{ UNIT_2100+UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_MPR+UNIT_DMS+UNIT_IOP+UNIT_IOPX,
 	  UNIT_21MX+UNIT_EAU+UNIT_FP+UNIT_MPR+UNIT_DMS, NULL, "21MX", NULL },
 	{ UNIT_2100+UNIT_21MX, 0,         "2116", NULL, NULL },
 	{ UNIT_2100+UNIT_21MX, UNIT_2100, "2100", NULL, NULL },
 	{ UNIT_2100+UNIT_21MX, UNIT_21MX, "21MX", NULL, NULL },
 	{ UNIT_EAU, UNIT_EAU, "EAU",   "EAU",   &cpu_set_opt,
 	  NULL, (void *) UNIT_EAU },
-	{ UNIT_EAU, 0,        "NOEAU", "NOEAU", &cpu_set_opt,
+	{ UNIT_EAU, 0,        "no EAU", "NOEAU", &cpu_set_opt,
 	  NULL, (void *) UNIT_EAU },
 	{ UNIT_FP,  UNIT_FP,  "FP",    "FP",    &cpu_set_opt,
 	  NULL, (void *) UNIT_FP },
-	{ UNIT_FP,  0,        "NOFP",  "NOFP",  &cpu_set_opt,
+	{ UNIT_FP,  0,        "no FP",  "NOFP",  &cpu_set_opt,
 	  NULL, (void *) UNIT_FP },
 	{ UNIT_MPR, UNIT_MPR, "MPR",   "MPR",   &cpu_set_opt,
 	  NULL, (void *) UNIT_MPR },
-	{ UNIT_MPR, 0,        "NOMPR", "NOMPR", &cpu_set_opt,
+	{ UNIT_MPR, 0,        "no MPR", "NOMPR", &cpu_set_opt,
 	  NULL, (void *) UNIT_MPR },
 	{ UNIT_DMS, UNIT_DMS, "DMS",   "DMS",   &cpu_set_opt,
 	  NULL, (void *) UNIT_DMS },
-	{ UNIT_DMS, 0,        "NODMS", "NODMS", &cpu_set_opt,
+	{ UNIT_DMS, 0,        "no DMS", "NODMS", &cpu_set_opt,
 	  NULL, (void *) UNIT_DMS },
-	{ UNIT_IOP, UNIT_IOP, "IOP",   "IOP",   &cpu_set_opt,
+	{ UNIT_MSIZE,         2,       NULL,      "IOP",   &cpu_set_opt,
 	  NULL, (void *) UNIT_IOP },
-	{ UNIT_IOP, 0,        "NOIOP", "NOIOP", &cpu_set_opt,
+	{ UNIT_IOP+UNIT_IOPX, UNIT_IOP,  "IOP",   NULL,    NULL },
+	{ UNIT_IOP+UNIT_IOPX, UNIT_IOPX, "IOP",   NULL,    NULL },
+	{ UNIT_IOP+UNIT_IOPX, 0,         "no IOP", "NOIOP", &cpu_set_opt,
 	  NULL, (void *) UNIT_IOP },
 	{ UNIT_MSIZE, 4096, NULL, "4K", &cpu_set_size },
 	{ UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size },
@@ -544,6 +551,7 @@ DEVICE dma1_dev = {
 #define E_21MX		(UNIT_21MX >> (UNIT_V_UF - E_V_FL))
 #define E_DMS		(UNIT_DMS >> (UNIT_V_UF - E_V_FL))
 #define E_IOP		(UNIT_IOP >> (UNIT_V_UF - E_V_FL))
+#define E_IOPX		(UNIT_IOPX >> (UNIT_V_UF - E_V_FL))
 #define E_V_TY		8				/* type */
 #define E_M_TY		0xF
 #define  E_NO		0				/* no operands */
@@ -558,7 +566,7 @@ DEVICE dma1_dev = {
 #define ET_CN		(E_CN << E_V_TY)
 #define ET_AC		(E_AC << E_V_TY)
 #define ET_AZ		(E_AZ << E_V_TY)
-#define E_V_TYI		12				/* type if IOP */
+#define E_V_TYI		12				/* type if 2100 IOP */
 #define E_GETFL(x)	(((x) >> E_V_FL) & E_M_FL)
 #define E_GETTY(f,x)	(((x) >> \
 			    ((((f) & E_IOP) && (cpu_unit.flags & UNIT_IOP))? \
@@ -572,6 +580,9 @@ DEVICE dma1_dev = {
 #define D_NO		E_DMS | ET_NO
 #define D_MR		E_DMS | ET_AD
 #define D_AA		E_DMS | ET_AA
+#define M_NO		E_IOPX | ET_NO
+#define M_CN		E_IOPX | ET_CN
+#define M_AC		E_IOPX | ET_AC
 #define I_NO		E_IOP | (ET_NO << (E_V_TYI - E_V_TY))
 #define I_CN		E_IOP | (ET_CN << (E_V_TYI - E_V_TY))
 #define I_AC		E_IOP | (ET_AC << (E_V_TYI - E_V_TY))
@@ -591,17 +602,20 @@ static const uint32 e_inst[512] = {
  0,0,0,0,0,0,0,0,I_CN,0,0,0,0,0,0,0,			/* CRC */
  I_CN,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* TRSLT */
  I_AZ,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* WMOVE */
- I_NO,I_NO,I_NO,I_NO,0,0,0,0,0,0,0,0,0,0,0,0,		/* READF,PFRIO,PFREI,PFRIO */
- I_NO,0,0,0,0,0,0,0,0,0,0,0,0,0,0,I_NO,			/* ENQ,ENPQ */
+ I_NO,I_NO,I_NO,I_NO,0,0,0,0,0,0,0,0,0,0,0,0,		/* READF,PFRIO,PFREI,PFREX */
+ I_NO,0,0,0,0,0,0,0,0,0,0,0,0,0,0,I_NO,			/* ENQ,PENQ */
  I_NO,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* DEQ */
  I_NO,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* SBYTE */
  I_NO,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* LBYTE */
  I_NO,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* REST */
  0,0,I_NO,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* SAVE */
- 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* 0400 */
- 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* 0420 */
+ M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,		/* LAI-/SAI- */
+ M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,
+ M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,		/* LAI+/SAI+ */
+ M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,
  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* 0440 */
- 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* 0460 */
+ M_CN,M_NO,M_NO,M_NO,M_NO,M_NO,M_NO,M_CN,		/* CRC,REST,READF,INS,ENQ,PENQ,DEQ,TR */
+ M_AC,M_NO,M_NO,M_NO,M_NO,0,0,0,			/* ILIST,PFREI,PFREX,PFRIO,SAVE */
  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* 0500 */
  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* 0520 */
  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,			/* 0540 */
@@ -921,8 +935,8 @@ case 0014:case 0015:case 0016:case 0017:
 		t = (t + 1) & DMASK;
 		if (t == 0) E = 1;
 		if (t == SIGN) O = 1;  }
-	    if ((IR & 000002) && (t == 0)) skip = 1;/* SZx */
-	    }					/* end if ~RSS */
+	    if ((IR & 000002) && (t == 0)) skip = 1;	/* SZx */
+	    }						/* end if ~RSS */
 	ABREG[absel] = t;				/* store result */
 	PC = (PC + skip) & VAMASK;			/* add in skip */
 	break;						/* end if alter/skip */
@@ -1092,42 +1106,33 @@ case 0203:case 0213:					/* MAC1 ext */
 /* Floating point instructions */
 
 	case 0000:					/* IOP ILIST/FAD */
-	    if (cpu_unit.flags & UNIT_IOP) {		/* ILIST (E_AC) */
-		do {					/* for count */
-		    WriteW (MA, AR);			/* write AR to mem */
-		    AR = (AR + 1) & DMASK;		/* incr AR */
-		    MA = (MA + 1) & VAMASK;		/* incr MA */
-		    wc = (wc - 1) & DMASK;  }		/* decr count */
-		while (wc != 0);  }
-	    else {					/* FAD (E_AD) */
-		fop = ReadF (MA);			/* get fop */
-		O = f_as (fop, 0);  }			/* add, upd ovflo */
+	    if (cpu_unit.flags & UNIT_IOP)		/* ILIST (E_AC) */
+		goto IOP_ILIST;
+	    fop = ReadF (MA);				/* get fop */
+	    O = f_as (fop, 0);				/* add, upd ovflo */
 	    break;
 	case 0020:					/* IOP LAI-/FSB */
 	    if (cpu_unit.flags & UNIT_IOP)		/* LAI -20 (I_NO) */
-		AR = ReadW ((BR - 020) & VAMASK);	/* load AR */
-	    else {					/* FSB (E_AD) */
-		fop = ReadF (MA);			/* get fop */
-		O = f_as (fop, 1);  }			/* sub, upd ovflo */
+		goto IOP_LAIM;
+	    fop = ReadF (MA);				/* get fop */
+	    O = f_as (fop, 1);				/* sub, upd ovflo */
 	    break;
 	case 0040:					/* IOP LAI+/FMP */
 	    if (cpu_unit.flags & UNIT_IOP)		/* LAI 0 (I_NO) */
-		AR = ReadW (BR & VAMASK);		/* load AR */
-	    else {					/* FMP (E_AD) */
-		fop = ReadF (MA);			/* get fop */
-		O = f_mul (fop);  }			/* mul, upd ovflo */
+		goto IOP_LAIP;
+	    fop = ReadF (MA);				/* get fop */
+	    O = f_mul (fop);				/* mul, upd ovflo */
 	    break;
 	case 0060:					/* IOP SAI-/FDV */
 	    if (cpu_unit.flags & UNIT_IOP)		/* SAI -20 (I_NO) */
-		WriteW ((BR - 020) & VAMASK, AR);	/* store AR */			
-	    else {					/* FDV (E_AD) */
-		fop = ReadF (MA);			/* get fop */
-		O = f_div (fop);  }			/* div, upd ovflo */
+		goto IOP_SAIM;		
+	    fop = ReadF (MA);				/* get fop */
+	    O = f_div (fop);				/* div, upd ovflo */
 	    break;
 	case 0100:					/* IOP SAI+/FIX */
 	    if (cpu_unit.flags & UNIT_IOP)		/* SAI 0 (I_NO) */
-		WriteW (BR & VAMASK, AR);		/* store AR */	
-	    else O = f_fix ();				/* FIX (E_NO) */
+		goto IOP_SAIP;
+	    O = f_fix ();				/* FIX (E_NO) */
 	    break;
 	case 0120:					/* IOP MBYTE/FLT */
 	    if (cpu_unit.flags & UNIT_IOP)		/* MBYTE (I_AZ) */
@@ -1135,30 +1140,30 @@ case 0203:case 0213:					/* MAC1 ext */
 	    O = f_flt ();				/* FLT (E_NO) */
 	    break;
 
-/* IOP instructions */
+/* 2100 (and 21MX) IOP instructions */
 
-	case 0021: case 0022: case 0023:		/* IOP LAI- (I_NO) */
+	IOP_LAIM:  case 0021: case 0022: case 0023:	/* IOP LAI- (I_NO) */
 	case 0024: case 0025: case 0026: case 0027:
 	case 0030: case 0031: case 0032: case 0033:
 	case 0034: case 0035: case 0036: case 0037:
 	    MA = ((IR | 0177760) + BR) & VAMASK;	/* IR<3:0> = -offset */
 	    AR = ReadW (MA);				/* load AR */
 	    break;
-	case 0041: case 0042: case 0043:		/* IOP LAI+ (I_NO) */
+	IOP_LAIP:  case 0041: case 0042: case 0043:	/* IOP LAI+ (I_NO) */
 	case 0044: case 0045: case 0046: case 0047:
 	case 0050: case 0051: case 0052: case 0053:
 	case 0054: case 0055: case 0056: case 0057:
 	    MA = ((IR & 017) + BR) & VAMASK;		/* IR<3:0> = +offset */
 	    AR = ReadW (MA);				/* load AR */
 	    break;
-	case 0061: case 0062: case 0063:		/* IOP SAI- (I_NO) */
+	IOP_SAIM:  case 0061: case 0062: case 0063:	/* IOP SAI- (I_NO) */
 	case 0064: case 0065: case 0066: case 0067:
 	case 0070: case 0071: case 0072: case 0073:
 	case 0074: case 0075: case 0076: case 0077:
 	    MA = ((IR | 0177760) + BR) & VAMASK;	/* IR<3:0> = -offset */
 	    WriteW (MA, AR);				/* store AR */
 	    break;
-	case 0101: case 0102: case 0103:		/* IOP SAI+ (I_NO) */
+	IOP_SAIP:  case 0101: case 0102: case 0103:	/* IOP SAI+ (I_NO) */
 	case 0104: case 0105: case 0106: case 0107:
 	case 0110: case 0111: case 0112: case 0113:
 	case 0114: case 0115: case 0116: case 0117:
@@ -1166,6 +1171,7 @@ case 0203:case 0213:					/* MAC1 ext */
 	    WriteW (MA, AR);				/* store AR */
 	    break;
 	case 0150:					/* IOP CRC (I_CN) */
+	case 0460:					/* IOPX CRC (I_CN) */
 	    t = (AR & 0xFF) ^ wc;			/* start CRC */
 	    for (i = 0; i < 8; i++) {			/* apply polynomial */
 		t = (t >> 1) | ((t & 1) << 15);		/* rotate right */
@@ -1173,6 +1179,7 @@ case 0203:case 0213:					/* MAC1 ext */
 	    WriteW (awc, t);				/* rewrite CRC */
 	    break;
 	case 0160:					/* IOP TRSLT (I_CN) */
+	case 0467:					/* IOPX TRSLT (I_CN) */
 	    if (wc & SIGN) break;			/* cnt < 0? */
 	    while (wc != 0) {				/* loop */
 		MA = (AR + AR + ReadB (BR)) & VAMASK;
@@ -1180,19 +1187,25 @@ case 0203:case 0213:					/* MAC1 ext */
 		WriteB (BR, t);				/* store char */
 		BR = (BR + 1) & DMASK;			/* incr ptr */
 		wc = (wc - 1) & DMASK;			/* decr cnt */
-		WriteW (awc, wc);  }
+		WriteW (awc, wc);
+		if (wc && intrq) {			/* more and intr? */
+		    PC = err_PC;			/* stop for now */
+		    break;  }  }
 	    break;
 	case 0220:					/* IOP READF (I_NO) */
-	    AR = mp_fence;				/* copy mp_fence */
+	case 0462:					/* IOPX READF (I_NO) */
+	    AR = iop_sp;				/* copy stk ptr */
 	    break;
 	case 0221:					/* IOP PRFIO (I_NO) */
+	case 0473:					/* IOPX PFRIO (I_NO) */
 	    IR = ReadW (PC);				/* get IO instr */
 	    PC = (PC + 1) & VAMASK;
 	    WriteW (PC, 1);				/* set flag */
 	    PC = (PC + 1) & VAMASK;
 	    reason = iogrp (IR, 0);			/* execute instr */
 	    break;
-	case 0222:					/* IOP PRFIE (I_NO) */
+	case 0222:					/* IOP PRFEI (I_NO) */
+	case 0471:					/* IOPX PFREI (I_NO) */
 	    IR = ReadW (PC);				/* get IO instr */
 	    PC = (PC + 1) & VAMASK;
 	    WriteW (PC, 1);				/* set flag */
@@ -1200,12 +1213,14 @@ case 0203:case 0213:					/* MAC1 ext */
 	    reason = iogrp (IR, 0);			/* execute instr */
 							/* fall through */
 	case 0223:					/* IOP PRFEX (I_NO) */
+	case 0472:					/* IOPX PFREX (I_NO) */
 	    MA = ReadW (PC);				/* exit addr */
 	    PCQ_ENTRY;
 	    PC = ReadW (MA) & VAMASK;			/* jump indirect */
 	    WriteW (MA, 0);				/* clear exit */
 	    break;
 	case 0240:					/* IOP ENQ (I_NO) */
+	case 0464:					/* IOPX ENQ (I_NO) */
 	    hp = ReadW (AR & VAMASK);			/* addr of head */
 	    tp = ReadW ((AR + 1) & VAMASK);		/* addr of tail */
 	    WriteW ((BR - 1) & VAMASK, 0);		/* entry link */
@@ -1213,7 +1228,8 @@ case 0203:case 0213:					/* MAC1 ext */
 	    WriteW ((AR + 1) & VAMASK, BR);		/* queue tail */
 	    if (hp != 0) PC = (PC + 1) & VAMASK;	/* q not empty? skip */
 	    break;
-	case 0257:					/* IOP ENQP (I_NO) */
+	case 0257:					/* IOP PENQ (I_NO) */
+	case 0465:					/* IOPX PENQ (I_NO) */
 	    hp = ReadW (AR & VAMASK);			/* addr of head */
 	    WriteW ((BR - 1) & VAMASK, hp);		/* becomes entry link */
 	    WriteW (AR & VAMASK, BR);			/* queue head */
@@ -1222,6 +1238,7 @@ case 0203:case 0213:					/* MAC1 ext */
 	    else PC = (PC + 1) & VAMASK;		/* skip */
 	    break;
 	case 0260:					/* IOP DEQ (I_NO) */
+	case 0466:					/* IOPX DEQ (I_NO) */
 	    BR = ReadW (AR & VAMASK);			/* addr of head */
 	    if (BR) {					/* queue not empty? */
 		hp = ReadW ((BR - 1) & VAMASK);		/* read hd entry link */
@@ -1239,23 +1256,56 @@ case 0203:case 0213:					/* MAC1 ext */
 	    BR = (BR + 1) & DMASK;			/* incr ptr */
 	    break;
 	case 0340:					/* IOP REST (I_NO) */
-	    mp_fence = (mp_fence - 1) & VAMASK;		/* pop E/~O,BR,AR */
-	    t = ReadW (mp_fence);
+	case 0461:					/* IOPX REST (I_NO) */
+	    iop_sp = (iop_sp - 1) & VAMASK;		/* pop E/~O,BR,AR */
+	    t = ReadW (iop_sp);
 	    O = ((t >> 1) ^ 1) & 1;
 	    E = t & 1;
-	    mp_fence = (mp_fence - 1) & VAMASK;
-	    BR = ReadW (mp_fence);
-	    mp_fence = (mp_fence - 1) & VAMASK;
-	    AR = ReadW (mp_fence);
+	    iop_sp = (iop_sp - 1) & VAMASK;
+	    BR = ReadW (iop_sp);
+	    iop_sp = (iop_sp - 1) & VAMASK;
+	    AR = ReadW (iop_sp);
+	    if (cpu_unit.flags & UNIT_2100) mp_fence = iop_sp;
 	    break;
 	case 0362:					/* IOP SAVE (I_NO) */
-	    WriteW (mp_fence, AR);			/* push AR,BR,E/~O */
-	    mp_fence = (mp_fence + 1) & VAMASK;
-	    WriteW (mp_fence, BR);
-	    mp_fence = (mp_fence + 1) & VAMASK;
+	case 0474:					/* IOPX SAVE (I_NO) */
+	    WriteW (iop_sp, AR);			/* push AR,BR,E/~O */
+	    iop_sp = (iop_sp + 1) & VAMASK;
+	    WriteW (iop_sp, BR);
+	    iop_sp = (iop_sp + 1) & VAMASK;
 	    t = ((O ^ 1) << 1) | E;
-	    WriteW (mp_fence, t);
-	    mp_fence = (mp_fence + 1) & VAMASK;
+	    WriteW (iop_sp, t);
+	    iop_sp = (iop_sp + 1) & VAMASK;
+	    if (cpu_unit.flags & UNIT_2100) mp_fence = iop_sp;
+	    break;
+
+	case 0400: case 0401: case 0402: case 0403:	/* IOPX LAI-/SAI- (I_NO) */
+	case 0404: case 0405: case 0406: case 0407:
+	case 0410: case 0411: case 0412: case 0413:
+	case 0414: case 0415: case 0416: case 0417:
+	    MA = ((IR | 0177760) + BR) & VAMASK;	/* IR<3:0> = -offset */
+	    if (IR & I_AB) AR = ReadW (MA);		/* AB = 1? LAI */
+	    else WriteW (MA, AR);			/* AB = 0? SAI */
+	    break;
+	case 0420: case 0421: case 0422: case 0423:	/* IOPX LAI+/SAI+ (I_NO) */
+	case 0424: case 0425: case 0426: case 0427:
+	case 0430: case 0431: case 0432: case 0433:
+	case 0434: case 0435: case 0436: case 0437:
+	    MA = ((IR & 017) + BR) & VAMASK;		/* IR<3:0> = +offset */
+	    if (IR & I_AB) AR = ReadW (MA);		/* AB = 1? LAI */
+	    else WriteW (MA, AR);			/* AB = 0? SAI */
+	    break;
+	case 0463:					/* IOPX INS (I_NO) */
+	    iop_sp = AR;				/* init stk ptr */
+	    break;
+	case 0470:					/* IOPX ILIST (I_CN) */
+	IOP_ILIST:
+	    do {					/* for count */
+		WriteW (MA, AR);			/* write AR to mem */
+		AR = (AR + 1) & DMASK;			/* incr AR */
+		MA = (MA + 1) & VAMASK;			/* incr MA */
+		wc = (wc - 1) & DMASK;  }		/* decr count */
+	    while (wc != 0);
 	    break;
 
 /* DMS instructions, move alternate - interruptible
@@ -2220,6 +2270,7 @@ case ioLIX:						/* load */
 	break;
 case ioOTX:						/* output */
 	mp_fence = dat & VAMASK;
+	if (cpu_unit.flags & UNIT_2100) iop_sp = mp_fence;
 	break;
 case ioCTL:						/* control clear/set */
 	if ((IR & I_CTL) == 0) {			/* STC */
@@ -2420,6 +2471,8 @@ else M[addr] = val & DMASK;
 return SCPE_OK;
 }
 
+/* Memory size validation */
+
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
@@ -2515,11 +2568,14 @@ mod = MOD_2116;
 if (uptr->flags & UNIT_2100) mod = MOD_2100;
 else if (uptr->flags & UNIT_21MX) mod = MOD_21MX;
 for (i = 0; opt_val[i].optf != 0; i++) {
-	if ((val == opt_val[i].optf) && (mod & opt_val[i].cpuf)) {
-	    if (mod == MOD_2100) {
-		if (val == UNIT_FP) uptr->flags = uptr->flags & ~UNIT_IOP;
-		if (val == UNIT_IOP) uptr->flags = uptr->flags & ~UNIT_FP;  }
-	    if (val == UNIT_DMS) uptr->flags  = uptr->flags | UNIT_MPR;
+	if ((opt == opt_val[i].optf) && (mod & opt_val[i].cpuf)) {
+	    if ((mod == MOD_2100) && (val == UNIT_FP))
+		uptr->flags = uptr->flags & ~UNIT_IOP;
+	    if ((opt == UNIT_IOP) && val) {
+		if (mod == MOD_2100) uptr->flags =
+		    (uptr->flags & ~UNIT_FP) | UNIT_IOP | UNIT_MPR;
+		if (mod == MOD_21MX) uptr->flags |= UNIT_IOPX | UNIT_MPR;  }
+	    if (val == UNIT_DMS) uptr->flags |= UNIT_MPR;
 	    return SCPE_OK;  }  }
 return SCPE_NOFNC;
 }

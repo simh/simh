@@ -446,21 +446,21 @@ case ioDIA:						/* DIA */
 	dkp_sta = dkp_sta & ~STA_DYN;			/* clear dynamic */
 	if (uptr->flags & UNIT_ATT) dkp_sta = dkp_sta | STA_DRDY;
 	if (uptr->CYL >= drv_tab[dtype].cyl)
-		dkp_sta = dkp_sta | STA_CYL;		/* bad cylinder? */
+	    dkp_sta = dkp_sta | STA_CYL;		/* bad cylinder? */
 	if (dkp_sta & STA_EFLGS) dkp_sta = dkp_sta | STA_ERR;
 	rval = dkp_sta;
 	break;
 case ioDOA:						/* DOA */
 	if ((dev_busy & INT_DKP) == 0) {
-		dkp_fccy = AC;				/* save cmd, cyl */
-		dkp_sta = dkp_sta & ~(AC & FCCY_FLAGS);  }
+	    dkp_fccy = AC;				/* save cmd, cyl */
+	    dkp_sta = dkp_sta & ~(AC & FCCY_FLAGS);  }
 	break;
 case ioDIB:						/* DIB */
 	rval = dkp_ma;					/* return buf addr */
 	break;
 case ioDOB:						/* DOB */
 	if ((dev_busy & INT_DKP) == 0) dkp_ma = 
-		AC & (drv_tab[dtype].new? DMASK: AMASK);
+	    AC & (drv_tab[dtype].new? DMASK: AMASK);
 	break;
 case ioDIC:						/* DIC */
 	rval = dkp_ussc;				/* return unit, sect */
@@ -559,12 +559,12 @@ rval = SCPE_OK;
 dtype = GET_DTYPE (uptr->flags);			/* get drive type */
 if (uptr->FUNC == FCCY_SEEK) {				/* seek? */
 	if (uptr->CYL >= drv_tab[dtype].cyl)		/* bad cylinder? */
-		dkp_sta = dkp_sta | STA_ERR | STA_CYL;
+	    dkp_sta = dkp_sta | STA_ERR | STA_CYL;
 	dev_done = dev_done | INT_DKP;			/* set done */
 	int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
 	u = uptr - dkp_dev.units;			/* get unit number */
 	dkp_sta = (dkp_sta | (STA_SKDN0 >> u))		/* set seek done */
-		& ~(STA_SEEK0 >> u);			/* clear seeking */
+	    & ~(STA_SEEK0 >> u);			/* clear seeking */
 	return SCPE_OK;  }
 
 if (((uptr->flags & UNIT_ATT) == 0) ||			/* not attached? */
@@ -581,11 +581,11 @@ else if (GET_CYL (dkp_fccy, dtype) != uptr->CYL)		/* address error? */
 
 else {	sc = 16 - GET_COUNT (dkp_ussc);			/* get sector count */
 	sa = GET_SA (uptr->CYL, GET_SURF (dkp_ussc, dtype),
-		GET_SECT (dkp_ussc, dtype), dtype);	/* get disk block */
+	    GET_SECT (dkp_ussc, dtype), dtype);		/* get disk block */
 	xcsa = GET_SA (uptr->CYL + 1, 0, 0, dtype);	/* get next cyl addr */
 	if ((sa + sc) > xcsa ) {			/* across cylinder? */
-		sc = xcsa - sa;				/* limit transfer */
-		dkp_sta = dkp_sta | STA_XCY;  }		/* xcyl error */
+	    sc = xcsa - sa;				/* limit transfer */
+	    dkp_sta = dkp_sta | STA_XCY;  }		/* xcyl error */
 	bda = sa * DKP_NUMWD * sizeof (short);		/* to words, bytes */
 
 	err = fseek (uptr->fileref, bda, SEEK_SET);	/* position drive */
@@ -610,17 +610,17 @@ else {	sc = 16 - GET_COUNT (dkp_ussc);			/* get sector count */
 		if (err = ferror (uptr->fileref)) break;  }  }
 
 	if (err != 0) {
-		perror ("DKP I/O error");
-		rval = SCPE_IOERR;  }
+	    perror ("DKP I/O error");
+	    rval = SCPE_IOERR;  }
 	clearerr (uptr->fileref);
 
 	sa = sa + sc;					/* update sector addr */
 	newsect = sa % drv_tab[dtype].sect;
 	newsurf = (sa / drv_tab[dtype].sect) % drv_tab[dtype].surf;
 	dkp_ussc = (dkp_ussc & USSC_UNIT) | ((dkp_ussc + sc) & USSC_M_COUNT) |
-		((drv_tab[dtype].new)?
-		((newsurf << USSC_V_NSURFACE) | (newsect << USSC_V_NSECTOR)):
-		((newsurf << USSC_V_OSURFACE) | (newsect << USSC_V_OSECTOR)) );
+	    ((drv_tab[dtype].new)?
+	    ((newsurf << USSC_V_NSURFACE) | (newsect << USSC_V_NSECTOR)):
+	    ((newsurf << USSC_V_OSURFACE) | (newsect << USSC_V_OSECTOR)) );
 	dkp_sta = dkp_sta | STA_DONE;  }		/* set status */
 
 dev_busy = dev_busy & ~INT_DKP;				/* clear busy */
@@ -661,9 +661,9 @@ if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
 if ((p = ftell (uptr->fileref)) == 0) return SCPE_OK;
 for (i = 0; drv_tab[i].sect != 0; i++) {
 	if (p <= (drv_tab[i].size * (int) sizeof (short))) {
-		uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
-		uptr->capac = drv_tab[i].size;
-		return SCPE_OK;  }  }
+	    uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
+	    uptr->capac = drv_tab[i].size;
+	    return SCPE_OK;  }  }
 return SCPE_OK;
 }
 

@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    tty		console typewriter
+
+   22-Dec-02	RMS	Added break test
 */
 
 #include "i1620_defs.h"
@@ -153,43 +155,43 @@ switch (op) {						/* case on op */
 case OP_K:						/* control */
 	switch (f1) {					/* case on control */
 	case 1:						/* space */
-		tto_write (' ');
-		break;
+	    tto_write (' ');
+	    break;
 	case 2:						/* return */
-		tto_write ('\r');
-		break;
+	    tto_write ('\r');
+	    break;
 	case 3:						/* backspace */
-		if ((cpu_unit.flags & IF_MII) == 0) return STOP_INVFNC;
-		tto_write ('\b');
-		break;
+	    if ((cpu_unit.flags & IF_MII) == 0) return STOP_INVFNC;
+	    tto_write ('\b');
+	    break;
 	case 4:						/* index */
-		if ((cpu_unit.flags & IF_MII) == 0) return STOP_INVFNC;
-		tto_write ('\n');
-		break;
+	    if ((cpu_unit.flags & IF_MII) == 0) return STOP_INVFNC;
+	    tto_write ('\n');
+	    break;
 	case 8:						/* tab */
-		tto_write ('\t');
-		break;
+	    tto_write ('\t');
+	    break;
 	default:
-		return STOP_INVFNC;  }
+	    return STOP_INVFNC;  }
 	return SCPE_OK;
 case OP_RN: 						/* read numeric */
 	tti_unlock ();					/* unlock keyboard */
 	for (i = 0; i < MEMSIZE; i++) {			/* (stop runaway) */
-		r = tti_rnum (&ttc);			/* read char */
-		if (r != SCPE_OK) return r;		/* error? */
-		if (ttc == 0x7F) return SCPE_OK;	/* end record? */
-		M[pa] = ttc & (FLAG | DIGIT);		/* store char */
-		PP (pa);  }				/* incr mem addr */
+	    r = tti_rnum (&ttc);			/* read char */
+	    if (r != SCPE_OK) return r;			/* error? */
+	    if (ttc == 0x7F) return SCPE_OK;		/* end record? */
+	    M[pa] = ttc & (FLAG | DIGIT);		/* store char */
+	    PP (pa);  }					/* incr mem addr */
 	break;
 case OP_RA:						/* read alphameric */
 	tti_unlock ();
 	for (i = 0; i < MEMSIZE; i = i + 2) {		/* (stop runaway) */
-		r = tti_ralp (&ttc);			/* read char */
-		if (r != SCPE_OK) return r;		/* error? */
-		if (ttc == 0x7F) return SCPE_OK;	/* end record? */
-		M[pa] = (M[pa] & FLAG) | (ttc & DIGIT);	/* store 2 digits */
-		M[pa - 1] = (M[pa - 1] & FLAG) | ((ttc >> 4) & DIGIT);
-		pa = ADDR_A (pa, 2);  }			/* incr mem addr */
+	    r = tti_ralp (&ttc);			/* read char */
+	    if (r != SCPE_OK) return r;			/* error? */
+	    if (ttc == 0x7F) return SCPE_OK;		/* end record? */
+	    M[pa] = (M[pa] & FLAG) | (ttc & DIGIT);	/* store 2 digits */
+	    M[pa - 1] = (M[pa - 1] & FLAG) | ((ttc >> 4) & DIGIT);
+	    pa = ADDR_A (pa, 2);  }			/* incr mem addr */
 	break;	
 case OP_DN:
 	return tto_num (pa, 20000 - (pa % 20000));	/* dump numeric */
@@ -197,16 +199,16 @@ case OP_WN:
 	return tto_num (pa, 0);				/* type numeric */
 case OP_WA:
 	for (i = 0; i < MEMSIZE; i = i + 2) {		/* stop runaway */
-		d = M[pa] & DIGIT;			/* get digit */
-		if ((d & 0xA) == REC_MARK)		/* 8-2 char? */
-			CRETIOE (io_stop, inv);		/* end record */
-		d = ((M[pa - 1] & DIGIT) << 4) | d;	/* get digit pair */
-		ttc = alp_to_tto[d];			/* translate */
-		if (ttc < 0) {				/* bad char? */
-			ind[IN_WRCHK] = 1;		/* set write check */
-			inv = STOP_INVCHR;  }		/* set return status */
-		tto_write (ttc & 0x7F);			/* write */
-		pa = ADDR_A (pa, 2);  }			/* incr mem addr */
+	    d = M[pa] & DIGIT;				/* get digit */
+	    if ((d & 0xA) == REC_MARK)			/* 8-2 char? */
+		CRETIOE (io_stop, inv);			/* end record */
+	    d = ((M[pa - 1] & DIGIT) << 4) | d;		/* get digit pair */
+	    ttc = alp_to_tto[d];			/* translate */
+	    if (ttc < 0) {				/* bad char? */
+		ind[IN_WRCHK] = 1;			/* set write check */
+		inv = STOP_INVCHR;  }			/* set return status */
+	    tto_write (ttc & 0x7F);			/* write */
+	    pa = ADDR_A (pa, 2);  }			/* incr mem addr */
 	break;		
 default:						/* invalid function */
 	return STOP_INVFNC;  }
@@ -260,7 +262,7 @@ t_stat tti_read (int8 *c)
 int32 t;
 
 do {	t = sim_poll_kbd ();  }				/* get character */
-while (t == SCPE_OK);
+while ((t == SCPE_OK) || (t & SCPE_BREAK));		/* ignore break */
 if (t < SCPE_KFLAG) return t;				/* error? */
 *c = t & 0177;						/* store character */
 return SCPE_OK;
@@ -279,7 +281,7 @@ for (i = 0; i < MEMSIZE; i++) {				/* (stop runaway) */
 	d = M[pa];					/* get char */
 	if (len? (pa >= end):				/* dump: end reached? */
 	   ((d & REC_MARK) == REC_MARK))		/* write: rec mark? */
-		return SCPE_OK;				/* end operation */
+	    return SCPE_OK;				/* end operation */
 	if (d & FLAG) tto_write ('~');			/* flag? */
 	r = tto_write (num_to_tto[d & DIGIT]);		/* write */
 	if (r != SCPE_OK) return r;			/* error? */

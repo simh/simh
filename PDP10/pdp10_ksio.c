@@ -371,9 +371,9 @@ DIB *dibp;
 for (i = 0; dibp = dib_tab[i]; i++ ) {
 	if ((pa >= dibp->ba) &&
 	   (pa < (dibp->ba + dibp->lnt))) {
-		dibp->rd (&val, pa, READ);
-		pi_eval ();
-		return ((d10) val);  }  }
+	    dibp->rd (&val, pa, READ);
+	    pi_eval ();
+	    return ((d10) val);  }  }
 UBNXM_FAIL (pa, READ);
 }
 
@@ -386,9 +386,9 @@ DIB *dibp;
 for (i = 0; dibp = dib_tab[i]; i++ ) {
 	if ((pa >= dibp->ba) &&
 	   (pa < (dibp->ba + dibp->lnt))) {
-		dibp->wr ((int32) val, pa, mode);
-		pi_eval ();
-		return;  }  }
+	    dibp->wr ((int32) val, pa, mode);
+	    pi_eval ();
+	    return;  }  }
 UBNXM_FAIL (pa, mode);
 }
 
@@ -414,8 +414,8 @@ lim = ba + bc;
 for ( ; ba < lim; ba++) {				/* by bytes */
 	pa10 = Map_Addr10 (ba, ub);			/* map addr */
 	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
-		ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
-		return (lim - ba);  }			/* return bc */
+	    ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+	    return (lim - ba);  }			/* return bc */
 	*buf++ = (uint8) ((M[pa10] >> ubashf[ba & 3]) & 0377);
 	}
 return 0;
@@ -431,8 +431,8 @@ lim = ba + (bc & ~01);
 for ( ; ba < lim; ba = ba + 2) {			/* by words */
 	pa10 = Map_Addr10 (ba, ub);			/* map addr */
 	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
-		ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
-		return (lim - ba);  }			/* return bc */
+	    ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+	    return (lim - ba);  }			/* return bc */
 	*buf++ = (uint16) ((M[pa10] >> ((ba & 2)? 0: 18)) & 0177777);
 	}
 return 0;
@@ -448,8 +448,8 @@ lim = ba + bc;
 for ( ; ba < lim; ba++) {				/* by bytes */
 	pa10 = Map_Addr10 (ba, ub);			/* map addr */
 	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
-		ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
-		return (lim - ba);  }			/* return bc */
+	    ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+	    return (lim - ba);  }			/* return bc */
 	M[pa10] = (M[pa10] & ~(mask << ubashf[ba & 3])) |
 		(((d10) *buf++) << ubashf[ba & 3]);  }
 return 0;
@@ -466,8 +466,8 @@ lim = ba + (bc & ~01);
 for ( ; ba < lim; ba++) {				/* by bytes */
 	pa10 = Map_Addr10 (ba, ub);			/* map addr */
 	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
-		ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
-		return (lim - ba);  }			/* return bc */
+	    ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+	    return (lim - ba);  }			/* return bc */
 	val = *buf++;					/* get data */
 	if (ba & 2) M[pa10] = (M[pa10] & 0777777600000) | val;
 	else M[pa10] = (M[pa10] & 0600000777777) | (val << 18);
@@ -483,9 +483,9 @@ int32 i, lvl;
 
 for (i = lvl = 0; i < UBANUM; i++) {
 	if (int_req & ubabr76[i])
-		lvl = lvl | pi_l2bit[UBCS_GET_HI (ubcs[i])];
+	    lvl = lvl | pi_l2bit[UBCS_GET_HI (ubcs[i])];
 	if (int_req & ubabr54[i])
-		lvl = lvl | pi_l2bit[UBCS_GET_LO (ubcs[i])];  }
+	    lvl = lvl | pi_l2bit[UBCS_GET_LO (ubcs[i])];  }
 return lvl;
 }
 
@@ -502,15 +502,15 @@ int32 i, masked_irq;
 
 for (i = masked_irq = 0; i < UBANUM; i++) {
 	if ((rlvl == UBCS_GET_HI (ubcs[i])) &&		/* req on hi level? */
-		(masked_irq = int_req & ubabr76[i])) break;
+	    (masked_irq = int_req & ubabr76[i])) break;
 	if ((rlvl == UBCS_GET_LO (ubcs[i])) &&		/* req on lo level? */
-		(masked_irq = int_req & ubabr54[i])) break;  }
+	    (masked_irq = int_req & ubabr54[i])) break;  }
 *uba = (i << 1) + 1;					/* store uba # */
 for (i = 0; (i < 32) && masked_irq; i++) {		/* find hi pri req */
 	if ((masked_irq >> i) & 1) {
-		int_req = int_req & ~(1u << i);		/* clear req */
-		if (int_ack[i]) return int_ack[i]();
-		return int_vec[i];  }  }		/* return vector */
+	    int_req = int_req & ~(1u << i);		/* clear req */
+	    if (int_ack[i]) return int_ack[i]();
+	    return int_vec[i];  }  }			/* return vector */
 return 0;
 }
 

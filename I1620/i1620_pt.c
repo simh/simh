@@ -205,34 +205,34 @@ t_stat r, inv = SCPE_OK;
 switch (op) {						/* case on op */
 case OP_RN: 						/* read numeric */
 	for (i = 0; i < MEMSIZE; i++) {			/* (stop runaway) */
-		r = ptr_read (&ptc, TRUE);		/* read frame */
-		if (r != SCPE_OK) return r;		/* error? */
-		if (ptc & PT_EL) {			/* end record? */
-			M[pa] = REC_MARK;		/* store rec mark */
-			CRETIOE (io_stop, inv);  }	/* done */
-		if (bad_par[ptc]) {			/* bad parity? */
-			ind[IN_RDCHK] = 1;		/* set read check */
-			inv = STOP_INVCHR;		/* set return status */
-			M[pa] = 0;  }			/* store zero */
-		else M[pa] = ptr_to_num[ptc];		/* translate, store */
-		PP (pa);  }				/* incr mem addr */
+	    r = ptr_read (&ptc, TRUE);			/* read frame */
+	    if (r != SCPE_OK) return r;			/* error? */
+	    if (ptc & PT_EL) {				/* end record? */
+		M[pa] = REC_MARK;			/* store rec mark */
+		CRETIOE (io_stop, inv);  }		/* done */
+	    if (bad_par[ptc]) {				/* bad parity? */
+		ind[IN_RDCHK] = 1;			/* set read check */
+		inv = STOP_INVCHR;			/* set return status */
+		M[pa] = 0;  }				/* store zero */
+	    else M[pa] = ptr_to_num[ptc];		/* translate, store */
+	    PP (pa);  }					/* incr mem addr */
 	break;
 case OP_RA:						/* read alphameric */
 	for (i = 0; i < MEMSIZE; i = i + 2) {		/* (stop runaway) */
-		r = ptr_read (&ptc, TRUE);		/* read frame */
-		if (r != SCPE_OK) return r;		/* error? */
-		if (ptc & PT_EL) {			/* end record? */
-			M[pa] = REC_MARK;		/* store rec mark */
-			M[pa - 1] = 0;
-			CRETIOE (io_stop, inv);  }	/* done */
-		mc = ptr_to_alp[ptc];			/* translate */
-		if (bad_par[ptc] || (mc < 0)) {		/* bad par or char? */
-			ind[IN_RDCHK] = 1;		/* set read check */
-			inv = STOP_INVCHR;		/* set return status */
-			mc = 0;  }			/* store blank */
-		M[pa] = (M[pa] & FLAG) | (mc & DIGIT);	/* store 2 digits */
-		M[pa - 1] = (M[pa - 1] & FLAG) | ((mc >> 4) & DIGIT);
-		pa = ADDR_A (pa, 2);  }			/* incr mem addr */
+	    r = ptr_read (&ptc, TRUE);			/* read frame */
+	    if (r != SCPE_OK) return r;			/* error? */
+	    if (ptc & PT_EL) {				/* end record? */
+		M[pa] = REC_MARK;			/* store rec mark */
+		M[pa - 1] = 0;
+		CRETIOE (io_stop, inv);  }		/* done */
+	    mc = ptr_to_alp[ptc];			/* translate */
+	    if (bad_par[ptc] || (mc < 0)) {		/* bad par or char? */
+		ind[IN_RDCHK] = 1;			/* set read check */
+		inv = STOP_INVCHR;			/* set return status */
+		mc = 0;  }				/* store blank */
+	    M[pa] = (M[pa] & FLAG) | (mc & DIGIT);	/* store 2 digits */
+	    M[pa - 1] = (M[pa - 1] & FLAG) | ((mc >> 4) & DIGIT);
+	    pa = ADDR_A (pa, 2);  }			/* incr mem addr */
 	break;	
 default:						/* invalid function */
 	return STOP_INVFNC;  }
@@ -251,19 +251,19 @@ if ((cpu_unit.flags & IF_BIN) == 0) return STOP_INVIO;
 switch (op) {						/* case on op */
 case OP_RA:						/* read alphameric */
 	for (i = 0; i < MEMSIZE; i = i + 2) {		/* (stop runaway) */
-		r = ptr_read (&ptc, FALSE);		/* read frame */
-		if (r != SCPE_OK) return r;		/* error? */
-		if (ptc & PT_EL) {			/* end record? */
-			M[pa] = REC_MARK;		/* store rec mark */
-			M[pa - 1] = 0;
-			CRETIOE (io_stop, inv);  }	/* done */
-		if (bad_par[ptc]) {			/* bad parity? */
-			ind[IN_RDCHK] = 1;		/* set read check */
-			inv = STOP_INVCHR;  }		/* set return status */
-		M[pa] = (M[pa] & FLAG) | (ptc & 07);	/* store 2 digits */
-		M[pa - 1] = (M[pa - 1] & FLAG) |
-			(((ptc >> 5) & 06) | ((ptc >> 3) & 1));
-		pa = ADDR_A (pa, 2);  }			/* incr mem addr */
+	    r = ptr_read (&ptc, FALSE);			/* read frame */
+	    if (r != SCPE_OK) return r;			/* error? */
+	    if (ptc & PT_EL) {				/* end record? */
+		M[pa] = REC_MARK;			/* store rec mark */
+		M[pa - 1] = 0;
+		CRETIOE (io_stop, inv);  }		/* done */
+	    if (bad_par[ptc]) {				/* bad parity? */
+		ind[IN_RDCHK] = 1;			/* set read check */
+		inv = STOP_INVCHR;  }			/* set return status */
+	    M[pa] = (M[pa] & FLAG) | (ptc & 07);	/* store 2 digits */
+	    M[pa - 1] = (M[pa - 1] & FLAG) |
+		(((ptc >> 5) & 06) | ((ptc >> 3) & 1));
+	    pa = ADDR_A (pa, 2);  }			/* incr mem addr */
 	break;	
 default:						/* invalid function */
 	return STOP_INVFNC;  }
@@ -281,12 +281,12 @@ if ((ptr_unit.flags & UNIT_ATT) == 0) {			/* attached? */
 	return SCPE_UNATT;  }
 
 do {	if ((temp = getc (ptr_unit.fileref)) == EOF) {	/* read char */
-		ind[IN_RDCHK] = 1;			/* err, rd chk */
-		if (feof (ptr_unit.fileref))
-			printf ("PTR end of file\n");
-		else perror ("PTR I/O error");
-		clearerr (ptr_unit.fileref);
-		return SCPE_IOERR;  }
+	    ind[IN_RDCHK] = 1;			/* err, rd chk */
+	    if (feof (ptr_unit.fileref))
+		printf ("PTR end of file\n");
+	    else perror ("PTR I/O error");
+	    clearerr (ptr_unit.fileref);
+	    return SCPE_IOERR;  }
 	*c = temp & 0377;				/* save char */
 	ptr_unit.pos = ptr_unit.pos + 1;  }		/* incr file addr */
 while (ignfeed && (*c == PT_FD));			/* until not feed */
@@ -345,17 +345,17 @@ case OP_WN:
 	return ptp_num (pa, 0);				/* punch numeric */
 case OP_WA:
 	for (i = 0; i < MEMSIZE; i = i + 2) {		/* stop runaway */
-		d = M[pa] & DIGIT;			/* get digit */
-		z = M[pa - 1] & DIGIT;			/* get zone */
-		if ((d & REC_MARK) == REC_MARK)		/* 8-2 char? */
-			return ptp_write (PT_EL);	/* end record */
-		ptc = alp_to_ptp[(z << 4) | d];		/* translate pair */
-		if (ptc < 0) {				/* bad char? */
-			ind[IN_WRCHK] = 1;		/* write check */
-			CRETIOE (io_stop, STOP_INVCHR);  }
-		r = ptp_write (ptc);			/* write char */
-		if (r != SCPE_OK) return r;		/* error? */
-		pa = ADDR_A (pa, 2);  }			/* incr mem addr */
+	    d = M[pa] & DIGIT;				/* get digit */
+	    z = M[pa - 1] & DIGIT;			/* get zone */
+	    if ((d & REC_MARK) == REC_MARK)		/* 8-2 char? */
+		return ptp_write (PT_EL);		/* end record */
+	    ptc = alp_to_ptp[(z << 4) | d];		/* translate pair */
+	    if (ptc < 0) {				/* bad char? */
+		ind[IN_WRCHK] = 1;			/* write check */
+		CRETIOE (io_stop, STOP_INVCHR);  }
+	    r = ptp_write (ptc);			/* write char */
+	    if (r != SCPE_OK) return r;			/* error? */
+	    pa = ADDR_A (pa, 2);  }			/* incr mem addr */
 	break;		
 default:						/* invalid function */
 	return STOP_INVFNC;  }
@@ -374,15 +374,15 @@ if ((cpu_unit.flags & IF_BIN) == 0) return STOP_INVIO;
 switch (op) {						/* decode op */
 case OP_WA:
 	for (i = 0; i < MEMSIZE; i = i + 2) {		/* stop runaway */
-		d = M[pa] & DIGIT;			/* get digit */
-		z = M[pa - 1] & DIGIT;			/* get zone */
-		if ((d & REC_MARK) == REC_MARK)		/* 8-2 char? */
-			return ptp_write (PT_EL);	/* end record */
-		ptc = ((z & 06) << 5) | ((z & 01) << 3) | (d & 07);
-		if (bad_par[ptc]) ptc = ptc | PT_C;	/* set parity */
-		r = ptp_write (ptc);			/* write char */
-		if (r != SCPE_OK) return r;		/* error? */
-		pa = ADDR_A (pa, 2);  }			/* incr mem addr */
+	    d = M[pa] & DIGIT;				/* get digit */
+	    z = M[pa - 1] & DIGIT;			/* get zone */
+	    if ((d & REC_MARK) == REC_MARK)		/* 8-2 char? */
+		return ptp_write (PT_EL);		/* end record */
+	    ptc = ((z & 06) << 5) | ((z & 01) << 3) | (d & 07);
+	    if (bad_par[ptc]) ptc = ptc | PT_C;		/* set parity */
+	    r = ptp_write (ptc);			/* write char */
+	    if (r != SCPE_OK) return r;			/* error? */
+	    pa = ADDR_A (pa, 2);  }			/* incr mem addr */
 	break;		
 default:						/* invalid function */
 	return STOP_INVFNC;  }
@@ -402,7 +402,7 @@ for (i = 0; i < MEMSIZE; i++) {				/* stop runaway */
 	d = M[pa] & (FLAG | DIGIT);			/* get char */
 	if (len? (pa >= end):				/* dump: end reached? */
 	   ((d & REC_MARK) == REC_MARK))		/* write: rec mark? */
-		return ptp_write (PT_EL);		/* end record */
+	    return ptp_write (PT_EL);			/* end record */
 	r = ptp_write (num_to_ptp[d]);			/* write */
 	if (r != SCPE_OK) return r;			/* error? */
 	PP (pa);  }					/* incr mem addr */

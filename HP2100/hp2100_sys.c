@@ -51,6 +51,7 @@ extern DEVICE dpd_dev, dpc_dev;
 extern DEVICE dqd_dev, dqc_dev;
 extern DEVICE drd_dev, drc_dev;
 extern DEVICE muxl_dev, muxu_dev, muxc_dev;
+extern DEVICE ipli_dev, iplo_dev;
 extern REG cpu_reg[];
 extern uint16 *M;
 
@@ -86,6 +87,7 @@ DEVICE *sim_devices[] = {
 	&mtd_dev, &mtc_dev,
 	&msd_dev, &msc_dev,
 	&muxl_dev, &muxu_dev, &muxc_dev,
+	&ipli_dev, &iplo_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -95,7 +97,8 @@ const char *sim_stop_messages[] = {
 	"HALT instruction",
 	"Breakpoint",
 	"Indirect address loop",
-	"Indirect address interrupt (should not happen!)"  };
+	"Indirect address interrupt (should not happen!)",
+	"No connection on interprocessor link"  };
 
 /* Binary loader
 

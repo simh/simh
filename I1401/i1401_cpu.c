@@ -521,7 +521,7 @@ unit = (t == BCD_ZERO)? 0: t;				/* save char as unit */
 xa = (AS >> V_INDEX) & M_INDEX;				/* get index reg */
 if (xa && (D != BCD_PERCNT) && (cpu_unit.flags & XSA)) {	/* indexed? */
 	AS = AS + hun_table[M[xa] & CHAR] + ten_table[M[xa + 1] & CHAR] +
-		one_table[M[xa + 2] & CHAR];
+	    one_table[M[xa + 2] & CHAR];
 	AS = (AS & INDEXMASK) % MAXMEMSIZE;  }
 if (!(flags & MLS)) BS = AS;				/* not MLS? B = A */
 PP (IS);
@@ -544,8 +544,8 @@ if ((t = M[IS]) & WM) {					/* WM? 6 char inst */
 BS = BS + one_table[t];					/* finish B addr */
 xa = (BS >> V_INDEX) & M_INDEX;				/* get index reg */
 if (xa && (cpu_unit.flags & XSA)) {			/* indexed? */
-	BS = BS + hun_table[M[xa] & CHAR] + ten_table[M[xa + 1] & CHAR]
-		+ one_table[M[xa + 2] & CHAR];
+	BS = BS + hun_table[M[xa] & CHAR] + ten_table[M[xa + 1] & CHAR] +
+	    one_table[M[xa + 2] & CHAR];
 	BS = (BS & INDEXMASK) % MAXMEMSIZE;  }
 PP (IS);
 
@@ -580,55 +580,65 @@ switch (op) {						/* case on opcode */
 
 case OP_MCW:						/* move char */
 	if (ilnt >= 8) {				/* I/O form? */
-		reason = iodisp (dev, unit, MD_NORM, D);
-		break;  }
+	    reason = iodisp (dev, unit, MD_NORM, D);
+	    break;  }
 	if (ADDR_ERR (AS)) {				/* check A addr */
-		reason = STOP_INVA;
-		break;  }
-	do {	M[BS] = (M[BS] & WM) | (M[AS] & CHAR);	/* move char */
-		wm = M[AS] | M[BS];
-		MM (AS); MM (BS);  }			/* decr pointers */
+	    reason = STOP_INVA;
+	    break;  }
+	do {
+	    M[BS] = (M[BS] & WM) | (M[AS] & CHAR);	/* move char */
+	    wm = M[AS] | M[BS];
+	    MM (AS); MM (BS);  }			/* decr pointers */
 	while ((wm & WM) == 0);				/* stop on A,B WM */
 	break;
+
 case OP_LCA:						/* load char */
 	if (ilnt >= 8) {				/* I/O form? */
-		reason = iodisp (dev, unit, MD_WM, D);
-		break;  }
+	    reason = iodisp (dev, unit, MD_WM, D);
+	    break;  }
 	if (ADDR_ERR (AS)) {				/* check A addr */
-		reason = STOP_INVA;
-		break;  }
-	do {	wm = M[BS] = M[AS];			/* move char + wmark */
-		MM (AS); MM (BS);  }			/* decr pointers */
+	    reason = STOP_INVA;
+	    break;  }
+	do {
+	    wm = M[BS] = M[AS];				/* move char + wmark */
+	    MM (AS); MM (BS);  }			/* decr pointers */
 	while ((wm & WM) == 0);				/* stop on A WM */
 	break;
+
 case OP_MCM:						/* move to rec/group */
-	do {	M[BS] = (M[BS] & WM) | (M[AS] & CHAR);	/* move char */
-		t = M[AS];
-		PP (AS); PP (BS);  }			/* incr pointers */
+	do {
+	    M[BS] = (M[BS] & WM) | (M[AS] & CHAR);	/* move char */
+	    t = M[AS];
+	    PP (AS); PP (BS);  }			/* incr pointers */
 	while (((t & CHAR) != BCD_RECMRK) && (t != (BCD_GRPMRK + WM)));
 	break;
+
 case OP_MSZ:						/* move suppress zero */
 	bsave = BS;					/* save B start */
 	qzero = 1;					/* set suppress */
-	do {	M[BS] = M[AS] & ((BS != bsave)? CHAR: DIGIT);	/* copy char */
-		wm = M[AS];
-		MM (AS); MM (BS);  }			/* decr pointers */
+	do {
+	    M[BS] = M[AS] & ((BS != bsave)? CHAR: DIGIT);	/* copy char */
+	    wm = M[AS];
+	    MM (AS); MM (BS);  }			/* decr pointers */
 	while ((wm & WM) == 0);				/* stop on A WM */
 	if (reason) break;				/* addr err? stop */
-	do {	PP (BS);				/* adv B */
-		t = M[BS];				/* get B, cant be WM */
-		if ((t == BCD_ZERO) || (t == BCD_COMMA)) {
-			if (qzero) M[BS] = 0;  }
-		else if ((t == BCD_BLANK) || (t == BCD_MINUS)) ;
-		else if (((t == BCD_DECIMAL) && (cpu_unit.flags & EPE)) ||
-			 (t <= BCD_NINE)) qzero = 0;
-		else qzero = 1;  }
+	do {
+	    PP (BS);					/* adv B */
+	    t = M[BS];					/* get B, cant be WM */
+	    if ((t == BCD_ZERO) || (t == BCD_COMMA)) {
+		if (qzero) M[BS] = 0;  }
+	    else if ((t == BCD_BLANK) || (t == BCD_MINUS)) ;
+	    else if (((t == BCD_DECIMAL) && (cpu_unit.flags & EPE)) ||
+		 (t <= BCD_NINE)) qzero = 0;
+	    else qzero = 1;  }
 	while (BS <= bsave);
 	break;	
+
 case OP_MN:						/* move numeric */
 	M[BS] = (M[BS] & ~DIGIT) | (M[AS] & DIGIT);	/* move digit */
 	MM (AS); MM (BS);				/* decr pointers */
 	break;
+
 case OP_MZ:						/* move zone */
 	M[BS] = (M[BS] & ~ZONE) | (M[AS] & ZONE);	/* move high bits */
 	MM (AS); MM (BS);				/* decr pointers */
@@ -641,23 +651,24 @@ case OP_MZ:						/* move zone */
 
 case OP_C:						/* compare */
 	if (ilnt != 1) {				/* if not chained */
-		ind[IN_EQU] = 1;			/* clear indicators */
-		ind[IN_UNQ] = ind[IN_HGH] = ind[IN_LOW] = 0;  }
-	do {	a = M[AS];				/* get characters */
-		b = M[BS];
-		wm = a | b;				/* get word marks */
-		if ((a & CHAR) != (b & CHAR)) {		/* unequal? */
-			ind[IN_EQU] = 0;		/* set indicators */
-			ind[IN_UNQ] = 1;
-			ind[IN_HGH] = col_table[b & CHAR] > col_table [a & CHAR];
-			ind[IN_LOW] = ind[IN_HGH] ^ 1;  }
-		MM (AS); MM (BS);  }			/* decr pointers */
+	    ind[IN_EQU] = 1;				/* clear indicators */
+	    ind[IN_UNQ] = ind[IN_HGH] = ind[IN_LOW] = 0;  }
+	do {
+	    a = M[AS];					/* get characters */
+	    b = M[BS];
+	    wm = a | b;					/* get word marks */
+	    if ((a & CHAR) != (b & CHAR)) {		/* unequal? */
+		ind[IN_EQU] = 0;			/* set indicators */
+		ind[IN_UNQ] = 1;
+		ind[IN_HGH] = col_table[b & CHAR] > col_table [a & CHAR];
+		ind[IN_LOW] = ind[IN_HGH] ^ 1;  }
+	    MM (AS); MM (BS);  }			/* decr pointers */
 	while ((wm & WM) == 0);				/* stop on A, B WM */
 	if ((a & WM) && !(b & WM)) {			/* short A field? */
-		ind[IN_EQU] = ind[IN_LOW] = 0;
-		ind[IN_UNQ] = ind[IN_HGH] = 1;  }
+	    ind[IN_EQU] = ind[IN_LOW] = 0;
+	    ind[IN_UNQ] = ind[IN_HGH] = 1;  }
 	if (!(cpu_unit.flags & HLE))			/* no HLE? */
-		ind[IN_EQU] = ind[IN_LOW] = ind[IN_HGH] = 0;
+	    ind[IN_EQU] = ind[IN_LOW] = ind[IN_HGH] = 0;
 	break;
 
 /* Branch instructions					A check	    B check
@@ -673,23 +684,26 @@ case OP_C:						/* compare */
 case OP_B:						/* branch */
 	if (ilnt == 4) { BRANCH; }			/* uncond branch? */
 	else if (ilnt == 5) {				/* branch on ind? */
-		if (ind[D]) { BRANCH;  }		/* test indicator */
-		if (ind_table[D]) ind[D] = 0;  }	/* reset if needed */
-	else {	if (ADDR_ERR (BS)) {			/* branch char eq */
-			reason = STOP_INVB;		/* validate B addr */
-			break;  }
-		if ((M[BS] & CHAR) == D) { BRANCH;  }	/* char equal? */
-		else {	MM (BS);  }  }
+	    if (ind[D]) { BRANCH;  }			/* test indicator */
+	    if (ind_table[D]) ind[D] = 0;  }		/* reset if needed */
+	else {
+	    if (ADDR_ERR (BS)) {			/* branch char eq */
+		reason = STOP_INVB;			/* validate B addr */
+		break;  }
+	    if ((M[BS] & CHAR) == D) { BRANCH;  }	/* char equal? */
+	    else { MM (BS);  }  }
 	break;
+
 case OP_BWZ:						/* branch wm or zone */
 	if (((D & 1) && (M[BS] & WM)) ||		/* d1? test wm */
 	    ((D & 2) && ((M[BS] & ZONE) == (D & ZONE)))) /* d2? test zone */
 		{ BRANCH;  }
-	else {  MM (BS);  }				/* decr pointer */
+	else { MM (BS);  }				/* decr pointer */
 	break;
+
 case OP_BBE:						/* branch if bit eq */
 	if (M[BS] & D & CHAR) { BRANCH;  }		/* any bits set? */
-	else {  MM (BS);  }				/* decr pointer */
+	else { MM (BS);  }				/* decr pointer */
 	break;
 
 /* Arithmetic instructions				A check	B check
@@ -704,16 +718,19 @@ case OP_BBE:						/* branch if bit eq */
 
 case OP_ZA: case OP_ZS:					/* zero and add/sub */
 	a = i = 0;					/* clear flags */
-	do {	if (a & WM) wm = M[BS] = (M[BS] & WM) | BCD_ZERO;
-		else {	a = M[AS];			/* get A char */
-			t = (a & CHAR)? bin_to_bcd[a & DIGIT]: 0;
-			wm = M[BS] = (M[BS] & WM) | t;	/* move digit */
-			MM (AS);  }
-		if (i == 0) i = M[BS] = M[BS] |
-			((((a & ZONE) == BBIT) ^ (op == OP_ZS))? BBIT: ZONE);
-		MM (BS);  }
+	do {
+	    if (a & WM) wm = M[BS] = (M[BS] & WM) | BCD_ZERO;
+	    else {
+	    	a = M[AS];				/* get A char */
+		t = (a & CHAR)? bin_to_bcd[a & DIGIT]: 0;
+		wm = M[BS] = (M[BS] & WM) | t;		/* move digit */
+		MM (AS);  }
+	    if (i == 0) i = M[BS] = M[BS] |
+		((((a & ZONE) == BBIT) ^ (op == OP_ZS))? BBIT: ZONE);
+	    MM (BS);  }
 	while ((wm & WM) == 0);				/* stop on B WM */
 	break;
+
 case OP_A: case OP_S:					/* add/sub */
 	bsave = BS;					/* save sign pos */
 	a = M[AS];					/* get A digit/sign */
@@ -728,30 +745,32 @@ case OP_A: case OP_S:					/* add/sub */
 	M[BS] = b;					/* store result */
 	MM (BS);
 	if (b & WM) {					/* b wm? done */
-		if (qsign && (carry == 0)) M[bsave] =	/* compl, no carry? */
-			WM + ((b & ZONE) ^ ABIT) + sum_table[10 - t];
-		break;  }
-	do {	if (a & WM) a = WM;			/* A WM? char = 0 */
-		else {	a = M[AS];			/* else get A */
-			MM (AS);  }
-		b = M[BS];				/* get B */
-		t = bcd_to_bin[a & DIGIT];		/* get A binary */
-		t = bcd_to_bin[b & DIGIT] + (qsign? 9 - t: t) + carry;
-		carry = (t >= 10);			/* get carry */
-		if ((b & WM) && (qsign == 0)) {		/* last, no recomp? */
-			M[BS] = WM + sum_table[t] +	/* zone add */
-				(((a & ZONE) + b + (carry? ABIT: 0)) & ZONE);
-			ind[IN_OVF] = carry;  }		/* ovflo if carry */
-		else M[BS] = (b & WM) + sum_table[t];	/* normal add */
-		MM (BS);  }
+	    if (qsign && (carry == 0)) M[bsave] =	/* compl, no carry? */
+		WM + ((b & ZONE) ^ ABIT) + sum_table[10 - t];
+	    break;  }
+	do {
+	    if (a & WM) a = WM;				/* A WM? char = 0 */
+	    else {
+	    	a = M[AS];				/* else get A */
+		MM (AS);  }
+	    b = M[BS];					/* get B */
+	    t = bcd_to_bin[a & DIGIT];			/* get A binary */
+	    t = bcd_to_bin[b & DIGIT] + (qsign? 9 - t: t) + carry;
+	    carry = (t >= 10);				/* get carry */
+	    if ((b & WM) && (qsign == 0)) {		/* last, no recomp? */
+		M[BS] = WM + sum_table[t] +		/* zone add */
+		    (((a & ZONE) + b + (carry? ABIT: 0)) & ZONE);
+		ind[IN_OVF] = carry;  }			/* ovflo if carry */
+	    else M[BS] = (b & WM) + sum_table[t];	/* normal add */
+	    MM (BS);  }
 	while ((b & WM) == 0);				/* stop on B WM */
 	if (reason) break;				/* address err? */
 	if (qsign && (carry == 0)) {			/* recompl, no carry? */
-		M[bsave] = M[bsave] ^ ABIT;		/* XOR sign */
-		for (carry = 1; bsave != BS; --bsave) {	/* rescan */
-			t = 9 - bcd_to_bin[M[bsave] & DIGIT] + carry;
-			carry = (t >= 10);
-			M[bsave] = (M[bsave] & ~DIGIT) | sum_table[t];  }  }
+	    M[bsave] = M[bsave] ^ ABIT;			/* XOR sign */
+	    for (carry = 1; bsave != BS; --bsave) {	/* rescan */
+		t = 9 - bcd_to_bin[M[bsave] & DIGIT] + carry;
+		carry = (t >= 10);
+		M[bsave] = (M[bsave] & ~DIGIT) | sum_table[t];  }  }
 	break;
 
 /* I/O instructions					A check	B check
@@ -776,18 +795,21 @@ case OP_R:						/* read */
 	BS = CDR_BUF + CDR_WIDTH;
 	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
 	break;
+
 case OP_W:						/* write */
 	if (reason = iomod (ilnt, D, w_mod)) break;	/* valid modifier? */
 	reason = write_line (ilnt, D);			/* print line */
 	BS = LPT_BUF + LPT_WIDTH;
 	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
 	break;
+
 case OP_P:						/* punch */
 	if (reason = iomod (ilnt, D, NULL)) break;	/* valid modifier? */
 	reason = punch_card (ilnt, D);			/* punch card */
 	BS = CDP_BUF + CDP_WIDTH;
 	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
 	break;
+
 case OP_WR:						/* write and read */
 	if (reason = iomod (ilnt, D, w_mod)) break;	/* valid modifier? */
 	reason = write_line (ilnt, D);			/* print line */
@@ -796,6 +818,7 @@ case OP_WR:						/* write and read */
 	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
 	if (reason == SCPE_OK) reason = r1;		/* merge errors */
 	break;
+
 case OP_WP:						/* write and punch */
 	if (reason = iomod (ilnt, D, w_mod)) break;	/* valid modifier? */
 	reason = write_line (ilnt, D);			/* print line */
@@ -804,6 +827,7 @@ case OP_WP:						/* write and punch */
 	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
 	if (reason == SCPE_OK) reason = r1;		/* merge errors */
 	break;
+
 case OP_RP:						/* read and punch */
 	if (reason = iomod (ilnt, D, NULL)) break;	/* valid modifier? */
 	reason = read_card (ilnt, D);			/* read card */
@@ -812,6 +836,7 @@ case OP_RP:						/* read and punch */
 	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
 	if (reason == SCPE_OK) reason = r1;		/* merge errors */
 	break;
+
 case OP_WRP:						/* write, read, punch */
 	if (reason = iomod (ilnt, D, w_mod)) break;	/* valid modifier? */
 	reason = write_line (ilnt, D);			/* print line */
@@ -821,19 +846,23 @@ case OP_WRP:						/* write, read, punch */
 	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
 	if (reason == SCPE_OK) reason = (r1 == SCPE_OK)? r2: r1;
 	break;
+
 case OP_SS:						/* select stacker */
 	if (reason = iomod (ilnt, D, ss_mod)) break;	/* valid modifier? */
 	if (reason = select_stack (D)) break;		/* sel stack, error? */
 	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
 	break;
+
 case OP_CC:						/* carriage control */
 	if (reason = carriage_control (D)) break;	/* car ctrl, error? */
 	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
 	break;
+
 case OP_MTF:						/* magtape function */
 	if (reason = iomod (ilnt, D, mtf_mod)) break;	/* valid modifier? */
 	if (reason = mt_func (unit, D)) break;		/* mt func, error? */
 	break;						/* can't branch */
+
 case OP_RF: case OP_PF:					/* read, punch feed */
 	break;						/* nop's */
 
@@ -864,11 +893,11 @@ case OP_MCE:						/* edit */
 	a = M[AS];					/* get A char */
 	b = M[BS];					/* get B char */
 	if (a & WM) {					/* one char A field? */
-		reason = STOP_MCE1;
-		break;  }
+	    reason = STOP_MCE1;
+	    break;  }
 	if (b & WM) {					/* one char B field? */
-		reason = STOP_MCE2;
-		break;  }
+	    reason = STOP_MCE2;
+	    break;  }
 	t = a & DIGIT; MM (AS);				/* get A digit */
 	qsign = ((a & ZONE) == BBIT);			/* get A field sign */
 	qawm = qzero = qbody = 0;			/* clear other flags */
@@ -886,78 +915,81 @@ case OP_MCE:						/* edit */
 	&	blank B
 */
 
-	do {	b = M[BS];				/* get B char */
-		M[BS] = M[BS] & ~WM;			/* clr WM */
-		switch (b & CHAR) {			/* case on B char */
-		case BCD_ASTER:				/* * */
-			if (!qbody || qdollar || !(cpu_unit.flags & EPE)) break;
-			qaster = 1;			/* flag */
-			goto A_CYCLE;			/* take A cycle */
-		case BCD_DOLLAR:			/* $ */
-			if (!qbody || qaster || !(cpu_unit.flags & EPE)) break;
-			qdollar = 1;			/* flag */
-			goto A_CYCLE;			/* take A cycle */
-		case BCD_ZERO:				/* 0 */
-			if (qawm && !qzero && !(b & WM)) {
-				M[BS] = BCD_ZERO + WM;	/* mark with WM */
-				qzero = 1;		/* flag supress */
-				break;  }
-			if (!qzero) t = t | WM;		/* first? set WM */
-			qzero = 1;			/* flag supress */
+	do {
+	    b = M[BS];					/* get B char */
+	    M[BS] = M[BS] & ~WM;			/* clr WM */
+	    switch (b & CHAR) {				/* case on B char */
+	    case BCD_ASTER:				/* * */
+		if (!qbody || qdollar || !(cpu_unit.flags & EPE)) break;
+		qaster = 1;				/* flag */
+		goto A_CYCLE;				/* take A cycle */
+	    case BCD_DOLLAR:				/* $ */
+		if (!qbody || qaster || !(cpu_unit.flags & EPE)) break;
+		qdollar = 1;				/* flag */
+		goto A_CYCLE;				/* take A cycle */
+	    case BCD_ZERO:				/* 0 */
+		if (qawm && !qzero && !(b & WM)) {
+		    M[BS] = BCD_ZERO + WM;		/* mark with WM */
+		    qzero = 1;				/* flag supress */
+		    break;  }
+		if (!qzero) t = t | WM;			/* first? set WM */
+		qzero = 1;				/* flag supress */
 							/* fall through */
-		case BCD_BLANK:				/* blank */
-			if (qawm) break;		/* any A left? */
-		A_CYCLE:
-			M[BS] = t;			/* copy char */
-			if (a & WM) {			/* end of A field? */
-				qbody = 0;		/* end body */
-				qawm = 1;  }
-			else {	qbody = 1;		/* in body */
-				a = M[AS]; MM (AS);	/* next A */
-				t = a & CHAR;  }
-			break;
-		case BCD_C: case BCD_R: case BCD_MINUS:	/* C, R, - */
-			if (!qsign && !qbody) M[BS] = BCD_BLANK;
-			break;
-		case BCD_COMMA:				/* , */
-			if (!qbody) M[BS] = BCD_BLANK;	/* bl if status */
-			break;
-		case BCD_AMPER:				/* & */
-			M[BS] = BCD_BLANK;		/* blank B field */
-			break;  }			/* end switch */
-		MM (BS);  }				/* decr B pointer */
+	    case BCD_BLANK:				/* blank */
+		if (qawm) break;			/* any A left? */
+	    A_CYCLE:
+		M[BS] = t;				/* copy char */
+		if (a & WM) {				/* end of A field? */
+		    qbody = 0;				/* end body */
+		    qawm = 1;  }
+		else {
+		    qbody = 1;				/* in body */
+		    a = M[AS]; MM (AS);			/* next A */
+		    t = a & CHAR;  }
+		break;
+	    case BCD_C: case BCD_R: case BCD_MINUS:	/* C, R, - */
+		if (!qsign && !qbody) M[BS] = BCD_BLANK;
+		break;
+	    case BCD_COMMA:				/* , */
+		if (!qbody) M[BS] = BCD_BLANK;		/* bl if status */
+		break;
+	    case BCD_AMPER:				/* & */
+		M[BS] = BCD_BLANK;			/* blank B field */
+		break;  }				/* end switch */
+	    MM (BS);  }					/* decr B pointer */
 	while ((b & WM) == 0);				/* stop on B WM */
 
 	if (reason) break;				/* address err? */
 	if (!qawm || !qzero) {				/* rescan? */
-		if (qdollar) reason = STOP_MCE3;	/* error if $ */
-		break;  }
+	    if (qdollar) reason = STOP_MCE3;		/* error if $ */
+	    break;  }
 
 /* Edit pass 2 - from left to right, supressing zeroes */
 
-	do {	b = M[++BS];				/* get B char */
-		switch (b & CHAR) {			/* case on B char */
-		case BCD_ONE: case BCD_TWO: case BCD_THREE:
-		case BCD_FOUR: case BCD_FIVE: case BCD_SIX:
-		case BCD_SEVEN: case BCD_EIGHT: case BCD_NINE:
-			qzero = 0;			/* turn off supr */
-			break;
-		case BCD_ZERO: case BCD_COMMA:		/* 0 or , */
-			if (qzero && !qdecimal)		/* if supr, blank */
-				M[BS] = qaster? BCD_ASTER: BCD_BLANK;
-			break;
-		case BCD_BLANK:				/* blank */
-			if (qaster) M[BS] = BCD_ASTER;	/* if EPE *, repl */
-			break;
-		case BCD_DECIMAL:			/* . */
-			if (qzero && (cpu_unit.flags & EPE))
-				 qdecimal = 1;		/* flag for EPE */
-		case BCD_PERCNT: case BCD_WM: case BCD_BS:
-		case BCD_TS: case BCD_MINUS:
-			break;				/* ignore */
-		default:				/* other */
-			qzero = 1;			/* restart supr */
-			break;  }  }			/* end case, do */
+	do {
+	    b = M[++BS];				/* get B char */
+	    switch (b & CHAR) {				/* case on B char */
+	    case BCD_ONE: case BCD_TWO: case BCD_THREE:
+	    case BCD_FOUR: case BCD_FIVE: case BCD_SIX:
+	    case BCD_SEVEN: case BCD_EIGHT: case BCD_NINE:
+		qzero = 0;				/* turn off supr */
+		break;
+	    case BCD_ZERO: case BCD_COMMA:		/* 0 or , */
+		if (qzero && !qdecimal)			/* if supr, blank */
+		    M[BS] = qaster? BCD_ASTER: BCD_BLANK;
+		break;
+	    case BCD_BLANK:				/* blank */
+		if (qaster) M[BS] = BCD_ASTER;		/* if EPE *, repl */
+		break;
+	    case BCD_DECIMAL:				/* . */
+	    	if (qzero && (cpu_unit.flags & EPE))
+		    qdecimal = 1;			/* flag for EPE */
+	    case BCD_PERCNT: case BCD_WM: case BCD_BS:
+	    case BCD_TS: case BCD_MINUS:
+		break;					/* ignore */
+	    default:					/* other */
+	    	qzero = 1;				/* restart supr */
+		break;  }  }				/* end case, do */
 	while ((b & WM) == 0);
 
 	M[BS] = M[BS] & ~WM;				/* clear B WM */
@@ -967,16 +999,16 @@ case OP_MCE:						/* edit */
 /* Edit pass 3 (extended print only) - from right to left */
 
 	for (;; ) {					/* until chars */
-		b = M[BS];				/* get B char */
-		if ((b == BCD_BLANK) && qdollar) {	/* blank & flt $? */
-			M[BS] = BCD_DOLLAR;		/* insert $ */
-			break;  }			/* exit for */
-		if (b == BCD_DECIMAL) {			/* decimal? */
-			M[BS] = qaster? BCD_ASTER: BCD_BLANK;
-			break;  }			/* exit for */
-		if ((b == BCD_ZERO) && !qdollar)	/* 0 & ~flt $ */
-			M[BS] = qaster? BCD_ASTER: BCD_BLANK;
-		BS--;  }				/* end for */
+	    b = M[BS];					/* get B char */
+	    if ((b == BCD_BLANK) && qdollar) {		/* blank & flt $? */
+		M[BS] = BCD_DOLLAR;			/* insert $ */
+		break;  }				/* exit for */
+	    if (b == BCD_DECIMAL) {			/* decimal? */
+		M[BS] = qaster? BCD_ASTER: BCD_BLANK;
+		break;  }				/* exit for */
+	    if ((b == BCD_ZERO) && !qdollar)		/* 0 & ~flt $ */
+		M[BS] = qaster? BCD_ASTER: BCD_BLANK;
+	    BS--;  }					/* end for */
 	break;						/* done at last! */	
 
 /* Multiply.  Comments from the PDP-10 based simulator by Len Fehskens.
@@ -995,9 +1027,10 @@ case OP_MCE:						/* edit */
 
 case OP_MUL:
 	asave = AS; bsave = lowprd = BS;		/* save AS, BS */
-	do {	a = M[AS];				/* get mpcd char */
-		M[BS] = BCD_ZERO;			/* zero prod */
-		MM (AS); MM (BS);  }			/* decr pointers */
+	do {
+	    a = M[AS];					/* get mpcd char */
+	    M[BS] = BCD_ZERO;				/* zero prod */
+	    MM (AS); MM (BS);  }			/* decr pointers */
 	while ((a & WM) == 0);				/* until A WM */
 	if (reason) break;				/* address err? */
 	M[BS] = BCD_ZERO;				/* zero hi prod */
@@ -1009,23 +1042,25 @@ case OP_MUL:
    AS and ps cannot produce an address error.
 */
 
-	do {	ps = bsave;				/* ptr to prod */
-		AS = asave;				/* ptr to mpcd */
-		carry = 0;				/* init carry */
-		b = M[BS];				/* get mpyr char */
-		do {	a = M[AS];			/* get mpcd char */
-			t = (bcd_to_bin[a & DIGIT] *	/* mpyr * mpcd */
-			     bcd_to_bin[b & DIGIT]) +	/* + c + partial prod */
-			     carry + bcd_to_bin[M[ps] & DIGIT];
-			carry = cry_table[t];
-			M[ps] = (M[ps] & WM) | sum_table[t];
-			MM (AS); ps--;  }
-		while ((a & WM) == 0);			/* until mpcd done */
-		M[BS] = (M[BS] & WM) | BCD_ZERO;	/* zero mpyr just used */
-		t = bcd_to_bin[M[ps] & DIGIT] + carry;	/* add carry to prod */
-		M[ps] = (M[ps] & WM) | sum_table[t];	/* store */
-		bsave--;				/* adv prod ptr */
-		MM (BS);  }				/* adv mpyr ptr */
+	do {
+	    ps = bsave;					/* ptr to prod */
+	    AS = asave;					/* ptr to mpcd */
+	    carry = 0;					/* init carry */
+	    b = M[BS];					/* get mpyr char */
+	    do {
+	    	a = M[AS];				/* get mpcd char */
+		t = (bcd_to_bin[a & DIGIT] *		/* mpyr * mpcd */
+		     bcd_to_bin[b & DIGIT]) +		/* + c + partial prod */
+		     carry + bcd_to_bin[M[ps] & DIGIT];
+		carry = cry_table[t];
+		M[ps] = (M[ps] & WM) | sum_table[t];
+		MM (AS); ps--;  }
+	    while ((a & WM) == 0);			/* until mpcd done */
+	    M[BS] = (M[BS] & WM) | BCD_ZERO;		/* zero mpyr just used */
+	    t = bcd_to_bin[M[ps] & DIGIT] + carry;	/* add carry to prod */
+	    M[ps] = (M[ps] & WM) | sum_table[t];	/* store */
+	    bsave--;					/* adv prod ptr */
+	    MM (BS);  }					/* adv mpyr ptr */
 	while ((b & WM) == 0);				/* until mpyr done */
 	M[lowprd] = M[lowprd] | ZONE;			/* assume + */
 	if (sign) M[lowprd] = M[lowprd] & ~ABIT;	/* if minus, B only */
@@ -1058,24 +1093,26 @@ case OP_MUL:
 
 case OP_DIV:
 	asave = AS; ahigh = -1;
-	do {	a = M[AS];				/* get dvr char */
-		if ((a & CHAR) != BCD_ZERO) ahigh = AS;	/* mark non-zero */
-		MM (AS);  }
+	do {
+	    a = M[AS];					/* get dvr char */
+	    if ((a & CHAR) != BCD_ZERO) ahigh = AS;	/* mark non-zero */
+	    MM (AS);  }
 	while ((a & WM) == 0);
 	if (reason) break;				/* address err? */
 	if (ahigh < 0) {				/* div? by zero */
-		ind[IN_OVF] = 1;			/* set ovf indic */
-		qs = bsave = BS;			/* quo, dividend */
-		do {	b = M[bsave];			/* find end divd */
-			PP (bsave);  }			/* marked by zone */
-		while ((b & ZONE) == 0);
-		if (reason) break;			/* address err? */
-		if (ADDR_ERR (qs)) {			/* address err? */
-			reason = STOP_WRAP;		/* address wrap? */
-			break;  }
-		div_sign (M[asave], b, qs - 1, bsave - 1);	/* set signs */
-		BS = (BS - 2) - (asave - (AS + 1));	/* final bs */
-		break;	}
+	    ind[IN_OVF] = 1;				/* set ovf indic */
+	    qs = bsave = BS;				/* quo, dividend */
+	    do {
+	    	b = M[bsave];				/* find end divd */
+		PP (bsave);  }				/* marked by zone */
+	    while ((b & ZONE) == 0);
+	    if (reason) break;				/* address err? */
+	    if (ADDR_ERR (qs)) {			/* address err? */
+		reason = STOP_WRAP;			/* address wrap? */
+		break;  }
+	    div_sign (M[asave], b, qs - 1, bsave - 1);	/* set signs */
+	    BS = (BS - 2) - (asave - (AS + 1));	/* final bs */
+	    break;	}
 	bsave = BS + (asave - ahigh);			/* end subdivd */
 	qs = (BS - 2) - (ahigh - (AS + 1));		/* quo start */
 
@@ -1087,17 +1124,19 @@ case OP_DIV:
    qs	=	current quotient digit
 */
 
-	do {	quo = 0;				/* clear quo digit */
-		if (ADDR_ERR (qs) || ADDR_ERR (bsave)) {
-			reason = STOP_WRAP;		/* address wrap? */
-			break;  }
-		b = M[bsave];				/* save low divd */
-		do {	t = div_sub (asave, bsave, ahigh);	/* subtract */
-			quo++;  }			/* incr quo digit */
-		while (t == 0);				/* until borrow */
-		div_add (asave, bsave, ahigh); quo--;	/* restore */
-		M[qs] = (M[qs] & WM) | sum_table[quo];	/* store quo digit */
-		bsave++; qs++;  }			/* adv divd, quo */
+	do {
+	    quo = 0;					/* clear quo digit */
+	    if (ADDR_ERR (qs) || ADDR_ERR (bsave)) {
+		reason = STOP_WRAP;			/* address wrap? */
+		break;  }
+	    b = M[bsave];				/* save low divd */
+	    do {
+	    	t = div_sub (asave, bsave, ahigh);	/* subtract */
+		quo++;  }				/* incr quo digit */
+	    while (t == 0);				/* until borrow */
+	    div_add (asave, bsave, ahigh); quo--;	/* restore */
+	    M[qs] = (M[qs] & WM) | sum_table[quo];	/* store quo digit */
+	    bsave++; qs++;  }				/* adv divd, quo */
 	while ((b & ZONE) == 0);			/* until B sign */
 	if (reason) break;				/* address err? */
 
@@ -1131,17 +1170,20 @@ case OP_SWM:						/* set word mark */
 	M[AS] = M[AS] | WM;				/* set B field mark */
 	MM (AS); MM (BS);				/* decr pointers */
 	break;
+
 case OP_CWM:						/* clear word mark */
 	M[BS] = M[BS] & ~WM;				/* clear A field mark */
 	M[AS] = M[AS] & ~WM;				/* clear B field mark */
 	MM (AS); MM (BS);				/* decr pointers */
 	break;
+
 case OP_CS:						/* clear storage */
 	t = (BS / 100) * 100;				/* lower bound */
 	while (BS >= t) M[BS--] = 0;			/* clear region */
 	if (BS < 0) BS = BS + MEMSIZE;			/* wrap if needed */
 	if (ilnt >= 7) { BRANCH; }			/* branch variant? */
 	break;
+
 case OP_MA:						/* modify address */
 	a = one_table[M[AS] & CHAR]; MM (AS);		/* get A address */
 	a = a + ten_table[M[AS] & CHAR]; MM (AS);
@@ -1155,18 +1197,22 @@ case OP_MA:						/* modify address */
 	M[BS + 1] = (M[BS + 1] & WM) | store_addr_h (t);
 	if (((a % 4000) + (b % 4000)) >= 4000) BS = BS + 2;	/* carry? */
 	break;
+
 case OP_SAR: case OP_SBR:				/* store A, B reg */
 	M[AS] = (M[AS] & WM) | store_addr_u (BS); MM (AS);
 	M[AS] = (M[AS] & WM) | store_addr_t (BS); MM (AS);
 	M[AS] = (M[AS] & WM) | store_addr_h (BS); MM (AS);
 	break;
+
 case OP_NOP:						/* nop */
 	break;
+
 case OP_H:						/* halt */
 	if (ilnt >= 4) { BRANCH;  }			/* branch if called */
 	reason = STOP_HALT;				/* stop simulator */
 	saved_IS = IS;					/* commit instruction */
 	break;
+
 default:
 	reason = STOP_NXI;				/* unimplemented */
 	break;  }					/* end switch */

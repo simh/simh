@@ -129,10 +129,11 @@ if (sc & BSIGN) {					/* right shift? */
 	if (sc > 63) r = (opnd[2] & LSIGN)? -1: 0;	/* sc > 63? */
 	else r = src >> sc;  }
 else {	if (sc > 63) {					/* left shift */
-		r = 0;					/* sc > 63? */
-		*flg = (src != 0);  }			/* ovflo test */
-	else {	r = src << sc;				/* do shift */
-		*flg = (src != (r >> sc));  }  }	/* ovflo test */
+	    r = 0;					/* sc > 63? */
+	    *flg = (src != 0);  }			/* ovflo test */
+	else {
+	    r = src << sc;				/* do shift */
+	    *flg = (src != (r >> sc));  }  }		/* ovflo test */
 *rh = (int32) (r >> 32);				/* hi result */
 return ((int32) r);					/* lo result */
 }
@@ -377,22 +378,23 @@ if (a->exp < b->exp) {					/* s1 < s2? swap */
 ediff = a->exp - b->exp;				/* exp diff */
 if (a->sign ^ b->sign) {				/* eff sub? */
 	if (ediff) {					/* exp diff? */
-		b->frac = (ediff > 63)? ONES:		/* shift b */
-			((-((t_int64) b->frac) >> ediff) |
-			(ONES << (64 - ediff)));	/* preserve sign */
-		a->frac = a->frac + b->frac;  }		/* add frac */
-	else {	if (a->frac < b->frac) {		/* same, check magn */
-			a->frac = b->frac - a->frac;	/* b > a */
-			a->sign = b->sign;  }
-		else a->frac = a->frac - b->frac;  }	/* a >= b */
+	    b->frac = (ediff > 63)? ONES:		/* shift b */
+		((-((t_int64) b->frac) >> ediff) |
+		(ONES << (64 - ediff)));		/* preserve sign */
+	    a->frac = a->frac + b->frac;  }		/* add frac */
+	else {
+	    if (a->frac < b->frac) {			/* same, check magn */
+		a->frac = b->frac - a->frac;		/* b > a */
+		a->sign = b->sign;  }
+	    else a->frac = a->frac - b->frac;  }	/* a >= b */
 	a->frac = a->frac & ~mask;
 	norm (a);  }					/* normalize */
 else {	if (ediff >= 64) b->frac = 0;
 	else b->frac = b->frac >> ediff;		/* add, denorm */
 	a->frac = a->frac + b->frac;			/* add frac */
 	if (a->frac < b->frac) {			/* chk for carry */
-		a->frac = UF_NM | (a->frac >> 1);	/* shift in carry */
-		a->exp = a->exp + 1;  }			/* skip norm */
+	    a->frac = UF_NM | (a->frac >> 1);		/* shift in carry */
+	    a->exp = a->exp + 1;  }			/* skip norm */
 	a->frac = a->frac & ~mask;  }
 return;
 }
@@ -517,8 +519,8 @@ b->frac = b->frac >> 1;
 for (i = 0; (i < prec) && b->frac; i++) {		/* divide loop */
 	quo = quo << 1;					/* shift quo */
 	if (b->frac >= a->frac) {			/* div step ok? */
-		b->frac = b->frac - a->frac;		/* subtract */
-		quo = quo + 1;  }			/* quo bit = 1 */
+	    b->frac = b->frac - a->frac;		/* subtract */
+	    quo = quo + 1;  }				/* quo bit = 1 */
 	b->frac = b->frac << 1;  }			/* shift divd */
 b->frac = quo << (UF_V_NM - i + 1);			/* shift quo */
 norm (b);						/* normalize */
@@ -734,7 +736,7 @@ if (r->frac == 0) {					/* if fraction = 0 */
 	return;  }
 while ((r->frac & UF_NM) == 0) {			/* normalized? */
 	for (i = 0; i < 5; i++) {			/* find first 1 */
-		if (r->frac & normmask[i]) break;  }
+	    if (r->frac & normmask[i]) break;  }
 	r->frac = r->frac << normtab[i];		/* shift frac */
 	r->exp = r->exp - normtab[i];  }		/* decr exp */
 return;

@@ -80,7 +80,7 @@ static t_stat dsk_svc    (UNIT *uptr);
 static t_stat dsk_reset  (DEVICE *dptr);
 static t_stat dsk_attach (UNIT *uptr, char *cptr);
 static t_stat dsk_detach (UNIT *uptr);
-static t_stat dsk_boot   (int unitno);
+static t_stat dsk_boot   (int unitno, DEVICE *dptr);
 
 static void diskfail (UNIT *uptr, int errflag);
 
@@ -511,7 +511,7 @@ static t_stat dsk_detach (UNIT *uptr)
 
 // boot routine - if they type BOOT DSK, load the standard boot card.
 
-static t_stat dsk_boot (int unitno)
+static t_stat dsk_boot (int unitno, DEVICE *dptr)
 {
 	t_stat rval;
 

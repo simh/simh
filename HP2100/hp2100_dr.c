@@ -94,8 +94,8 @@
 
 extern UNIT cpu_unit;
 extern uint16 *M;
-extern int32 PC;
-extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 PC;
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 
 int32 drc_cw = 0;					/* fnc, addr */
 int32 drc_sta = 0;					/* status */

@@ -223,14 +223,15 @@ da = GET_DEX (df_sta) | df_da;				/* form disk addr */
 do {	M[DF_WC] = (M[DF_WC] + 1) & 07777;		/* incr word count */
  	M[DF_MA] = (M[DF_MA] + 1) & 07777;		/* incr mem addr */
 	pa = mex | M[DF_MA]; 				/* add extension */
-	if (uptr->FUNC == DF_READ) {
-		if (MEM_ADDR_OK (pa))			/* read, check nxm */
-			M[pa] = *(((int16 *) uptr->filebuf) + da);  }
-	else {	t = (da >> 14) & 07;
-		if ((df_wlk >> t) & 1) df_sta = df_sta | DFS_WLS;
-		else {	*(((int16 *) uptr->filebuf) + da) = M[pa];
-			if (da >= uptr->hwmark)
-				uptr->hwmark = da + 1;  }  }
+	if (uptr->FUNC == DF_READ) {			/* read? */
+	    if (MEM_ADDR_OK (pa))			/* check nxm */
+		M[pa] = *(((int16 *) uptr->filebuf) + da);  }
+	else {						/* write */
+	    t = (da >> 14) & 07;			/* check wr lock */
+	    if ((df_wlk >> t) & 1) df_sta = df_sta | DFS_WLS;
+	    else {					/* not locked */
+	    	*(((int16 *) uptr->filebuf) + da) = M[pa];
+		if (da >= uptr->hwmark) uptr->hwmark = da + 1;  }  }
 	da = (da + 1) & 0377777;  }			/* incr disk addr */
 while ((M[DF_WC] != 0) && (df_burst != 0));		/* brk if wc, no brst */
 
@@ -287,10 +288,10 @@ extern int32 sim_switches, saved_PC;
 
 if (sim_switches & SWMASK ('D')) {
 	for (i = 0; i < DM4_LEN; i = i + 2)
-		M[dm4_rom[i]] = dm4_rom[i + 1];
+	    M[dm4_rom[i]] = dm4_rom[i + 1];
 	saved_PC = DM4_START;  }
 else {	for (i = 0; i < OS8_LEN; i++)
-		M[OS8_START + i] = os8_rom[i];
+	     M[OS8_START + i] = os8_rom[i];
 	saved_PC = OS8_START;  }
 return SCPE_OK;
 }

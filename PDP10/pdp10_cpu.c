@@ -607,7 +607,7 @@ if (!ITS) its_1pr = 0;					/* ~ITS, clr 1-proc */
 abortval = setjmp (save_env);				/* set abort hdlr */
 if ((abortval > 0) || pager_pi) {			/* stop or pi err? */
 	if (pager_pi && (abortval == PAGE_FAIL))
-		abortval = STOP_PAGINT;			/* stop for pi err */
+	    abortval = STOP_PAGINT;			/* stop for pi err */
 	saved_PC = pager_PC & AMASK;			/* failing instr PC */
 	set_ac_display (ac_cur);			/* set up AC display */
 	pcq_r->qptr = pcq_p;				/* update pc q ptr */
@@ -623,19 +623,20 @@ else if (abortval == PAGE_FAIL) {			/* page fail */
 	rlog = 0;					/* clear log */
 	if (pager_tc) flags = pager_flags;		/* trap? get flags */
 	if (T20) {					/* TOPS-20 */
-		WriteP (upta + UPT_T20_PFL, pager_word);/* write page fail wd */
-		WriteP (upta + UPT_T20_OFL, XWD (flags, 0));
-		WriteP (upta + UPT_T20_OPC, pager_PC);
-		mb = ReadP (upta + UPT_T20_NPC);  }
-	else {	a10 ea;					/* TOPS-10 or ITS */
-		if (ITS) {				/* ITS? */
-		    ea = epta + EPT_ITS_PAG + (pi_m2lvl[pi_act] * 3);
-		    if (its_1pr) flags = flags | F_1PR;	/* store 1-proc */
-		    its_1pr = 0;  }			/* clear 1-proc */
-		else ea = upta + UPT_T10_PAG;
-		WriteP (ea, pager_word); 		/* write page fail wd */
-		WriteP (ADDA (ea, 1), XWD (flags, pager_PC));
-		mb = ReadP (ADDA (ea, 2));  }
+	    WriteP (upta + UPT_T20_PFL, pager_word);	/* write page fail wd */
+	    WriteP (upta + UPT_T20_OFL, XWD (flags, 0));
+	    WriteP (upta + UPT_T20_OPC, pager_PC);
+	    mb = ReadP (upta + UPT_T20_NPC);  }
+	else {
+	    a10 ea;					/* TOPS-10 or ITS */
+	    if (ITS) {					/* ITS? */
+		ea = epta + EPT_ITS_PAG + (pi_m2lvl[pi_act] * 3);
+		if (its_1pr) flags = flags | F_1PR;	/* store 1-proc */
+		its_1pr = 0;  }				/* clear 1-proc */
+	    else ea = upta + UPT_T10_PAG;
+	    WriteP (ea, pager_word); 			/* write page fail wd */
+	    WriteP (ADDA (ea, 1), XWD (flags, pager_PC));
+	    mb = ReadP (ADDA (ea, 2));  }
 	JUMP (mb);					/* set new PC */
 	set_newflags (mb, FALSE);			/* set new flags */
 	pi_eval ();  }					/* eval pi system */
@@ -667,30 +668,29 @@ if (qintr) {
 	int32 vec, uba;
 	pager_pi = TRUE;				/* flag in pi seq */
 	if (vec = pi_ub_vec (qintr, &uba)) {		/* Unibus interrupt? */
-		mb = ReadP (epta + EPT_UBIT + uba);	/* get dispatch table */
-		if (mb == 0) ABORT (STOP_ZERINT);	/* invalid? stop */
-		inst = ReadE ((((a10) mb) + (vec / 4)) & AMASK);
-		if (inst == 0)
-			ABORT (STOP_ZERINT);  }
+	    mb = ReadP (epta + EPT_UBIT + uba);		/* get dispatch table */
+	    if (mb == 0) ABORT (STOP_ZERINT);		/* invalid? stop */
+	    inst = ReadE ((((a10) mb) + (vec / 4)) & AMASK);
+	    if (inst == 0) ABORT (STOP_ZERINT);  }
 	else inst = ReadP (epta + EPT_PIIT + (2 * qintr));
 	op = GET_OP (inst);				/* get opcode */
 	ac = GET_AC (inst);				/* get ac */
 	if (its_1pr && ITS) {				/* 1-proc set? */
-		flags = flags | F_1PR;			/* store 1-proc */
-		its_1pr = 0;  }				/* clear 1-proc */
+	    flags = flags | F_1PR;			/* store 1-proc */
+	    its_1pr = 0;  }				/* clear 1-proc */
 	if (op == OP_JSR) {				/* JSR? */
-		ea = calc_ea (inst, MM_CUR);		/* calc ea, cur mode */
-		WriteE (ea, FLPC);			/* save flags+PC, exec */
-		JUMP (INCA (ea));			/* PC = ea + 1 */
-		set_newflags (0, FALSE);  }		/* set new flags */
+	    ea = calc_ea (inst, MM_CUR);		/* calc ea, cur mode */
+	    WriteE (ea, FLPC);				/* save flags+PC, exec */
+	    JUMP (INCA (ea));				/* PC = ea + 1 */
+	    set_newflags (0, FALSE);  }			/* set new flags */
 	else if ((op == OP_JRST) && (ac == AC_XPCW)) {	/* XPCW? */
-		ea = calc_ea (inst, MM_CUR);		/* calc ea, cur mode */
-		WriteE (ea, XWD (flags, 0));		/* write flags, exec */
-		WriteE (ADDA (ea, 1), PC);		/* write PC, exec */
-		rs[0] = ReadE (ADDA (ea, 2));		/* read new flags */
-		rs[1] = ReadE (ADDA (ea, 3));		/* read new PC */
-		JUMP (rs[1]);				/* set new PC */
-		set_newflags (rs[0], FALSE);  }		/* set new flags */
+	    ea = calc_ea (inst, MM_CUR);		/* calc ea, cur mode */
+	    WriteE (ea, XWD (flags, 0));		/* write flags, exec */
+	    WriteE (ADDA (ea, 1), PC);			/* write PC, exec */
+	    rs[0] = ReadE (ADDA (ea, 2));		/* read new flags */
+	    rs[1] = ReadE (ADDA (ea, 3));		/* read new PC */
+	    JUMP (rs[1]);				/* set new PC */
+	    set_newflags (rs[0], FALSE);  }		/* set new flags */
 	else ABORT (STOP_ILLINT);			/* invalid instr */
 	pi_act = pi_act | pi_l2bit[qintr];		/* set level active */
 	pi_eval ();					/* eval pi system */
@@ -712,7 +712,7 @@ if (TSTF (F_T1 | F_T2) && PAGING) {
 	pager_tc = TRUE;				/* in a trap sequence */
 	pager_flags = flags;				/* save flags */
 	ea = (TSTF (F_USR)? upta + UPT_TRBASE: epta + EPT_TRBASE)
-		+ GET_TRAPS (flags);
+	    + GET_TRAPS (flags);
 	inst = ReadP (ea);				/* get trap instr */
 	CLRF (F_T1 | F_T2);  }				/* clear flags */
 
@@ -720,7 +720,7 @@ if (TSTF (F_T1 | F_T2) && PAGING) {
 
 else {	if (sim_brk_summ &&
 	    sim_brk_test (PC, SWMASK ('E'))) {		/* breakpoint? */
-		ABORT (STOP_IBKPT);  }			/* stop simulation */
+	    ABORT (STOP_IBKPT);  }			/* stop simulation */
 
 /* Ready (at last) to get an instruction */
 
@@ -790,12 +790,12 @@ case 0037:
 /* case 0100:	MUUO					/* UJEN */
 /* case 0101:	MUUO					/* unassigned */
 case 0102:	if (ITS && !TSTF (F_USR)) {		/* GFAD (KL), XCTRI (ITS) */
-			inst = Read (ea, MM_OPND);
-			pflgs = pflgs | ac; goto XCT;  }
+		    inst = Read (ea, MM_OPND);
+		    pflgs = pflgs | ac; goto XCT;  }
 		goto MUUO;
 case 0103:	if (ITS && !TSTF (F_USR)) {		/* GFSB (KL), XCTR (ITS) */
-			inst = Read (ea, MM_OPND);
-			pflgs = pflgs | ac; goto XCT;  }
+		    inst = Read (ea, MM_OPND);
+		    pflgs = pflgs | ac; goto XCT;  }
 		goto MUUO;
 /* case 0104:	MUUO					/* JSYS (T20) */
 case 0105:	AC(ac) = adjsp (AC(ac), ea); break;	/* ADJSP */
@@ -919,9 +919,9 @@ case 0252:	AOBAC; if (TGE (AC(ac))) JUMP (ea); break;	/* AOBJP */
 case 0253:	AOBAC; if (TL (AC(ac))) JUMP (ea); break;	/* AOBJN */
 /* case 0254: 	/* shown later				/* JRST */
 case 0255:	if (flags & (ac << 14)) {		/* JFCL */
-			JUMP (ea); CLRF (ac << 14); } break;
+		    JUMP (ea); CLRF (ac << 14); } break;
 case 0256:	if (xct_cnt++ >= xct_max)		/* XCT */
-			ABORT (STOP_XCT);
+		    ABORT (STOP_XCT);
 		inst = Read (ea, MM_OPND);
 		if (ac && !TSTF (F_USR) && !ITS) pflgs = pflgs | ac;
 		goto XCT;
@@ -1263,16 +1263,17 @@ case 0725:	IOA; io725 (AC(ac), ea); break;		/* BCIOB, IOWRBQ */
 default:
 MUUO:	its_2pr = 0;					/* clear trap */
 	if (T20) {					/* TOPS20? */
-		int32 tf = (op << (INST_V_OP - 18)) | (ac << (INST_V_AC - 18));
-		WriteP (upta + UPT_MUUO, XWD (		/* store flags,,op+ac */
-			flags & ~(F_T2 | F_T1), tf));	/* traps clear */
-		WriteP (upta + UPT_MUPC, PC);		/* store PC */
-		WriteP (upta + UPT_T20_UEA, ea);	/* store eff addr */
-		WriteP (upta + UPT_T20_CTX, UBRWORD); }	/* store context */
-	else {	WriteP (upta + UPT_MUUO, UUOWORD);	/* store instr word */
-		WriteP (upta + UPT_MUPC, XWD (  	/* store flags,,PC */
-			flags & ~(F_T2 | F_T1), PC));	/* traps clear */
-		WriteP (upta + UPT_T10_CTX, UBRWORD); }	/* store context */
+	    int32 tf = (op << (INST_V_OP - 18)) | (ac << (INST_V_AC - 18));
+	    WriteP (upta + UPT_MUUO, XWD (		/* store flags,,op+ac */
+		flags & ~(F_T2 | F_T1), tf));		/* traps clear */
+	    WriteP (upta + UPT_MUPC, PC);		/* store PC */
+	    WriteP (upta + UPT_T20_UEA, ea);		/* store eff addr */
+	    WriteP (upta + UPT_T20_CTX, UBRWORD); }	/* store context */
+	else {						/* TOPS10/ITS */
+	    WriteP (upta + UPT_MUUO, UUOWORD);		/* store instr word */
+	    WriteP (upta + UPT_MUPC, XWD (  		/* store flags,,PC */
+		flags & ~(F_T2 | F_T1), PC));		/* traps clear */
+	    WriteP (upta + UPT_T10_CTX, UBRWORD); }	/* store context */
 	ea = upta + (TSTF (F_USR)? UPT_UNPC: UPT_ENPC) +
 		(pager_tc? UPT_NPCT: 0);		/* calculate vector */
 	mb = ReadP (ea);				/* new flags, PC */
@@ -1292,69 +1293,69 @@ MUUO:	its_2pr = 0;					/* clear trap */
 case 0254:						/* JRST */
 	i = jrst_tab[ac];				/* get subop flags */
 	if ((i == 0) || ((i == JRST_E) && TSTF (F_USR)) ||
-		((i == JRST_UIO) && TSTF (F_USR) && !TSTF (F_UIO)))
-		goto MUUO;				/* not legal */
+	    ((i == JRST_UIO) && TSTF (F_USR) && !TSTF (F_UIO)))
+	    goto MUUO;					/* not legal */
 	switch (ac) {					/* case on subopcode */
 	case 000:					/* JRST 0 = jump */
 	case 001:					/* JRST 1 = portal */
-		JUMP (ea);
-		break;
+	    JUMP (ea);
+	    break;
 	case 002:					/* JRST 2 = JRSTF */
-		mb = calc_jrstfea (inst, pflgs);	/* recalc addr w flgs */
-		JUMP (ea);				/* set new PC */
-		set_newflags (mb, TRUE);		/* set new flags */
-		break;
+	    mb = calc_jrstfea (inst, pflgs);		/* recalc addr w flgs */
+	    JUMP (ea);					/* set new PC */
+	    set_newflags (mb, TRUE);			/* set new flags */
+	    break;
 	case 004:					/* JRST 4 = halt */
-		JUMP (ea);				/* old_PC = halt + 1 */
-		pager_PC = PC;				/* force right PC */
-		ABORT (STOP_HALT);			/* known to be exec */
-		break;
+	    JUMP (ea);					/* old_PC = halt + 1 */
+	    pager_PC = PC;				/* force right PC */
+	    ABORT (STOP_HALT);				/* known to be exec */
+	    break;
 	case 005:					/* JRST 5 = XJRSTF */
-		RD2;					/* read doubleword */
-		JUMP (rs[1]);				/* set new PC */
-		set_newflags (rs[0], TRUE);		/* set new flags */
-		break;
+	    RD2;					/* read doubleword */
+	    JUMP (rs[1]);				/* set new PC */
+	    set_newflags (rs[0], TRUE);			/* set new flags */
+	    break;
 	case 006:					/* JRST 6 = XJEN */
-		RD2;					/* read doubleword */
-		pi_dismiss ();				/* page ok, dismiss */
-		JUMP (rs[1]);				/* set new PC */
-		set_newflags (rs[0], FALSE);		/* known to be exec */
-		break;
+	    RD2;					/* read doubleword */
+	    pi_dismiss ();				/* page ok, dismiss */
+	    JUMP (rs[1]);				/* set new PC */
+	    set_newflags (rs[0], FALSE);		/* known to be exec */
+	    break;
 	case 007:					/* JRST 7 = XPCW */
-		ea = ADDA (i = ea, 2);			/* new flags, PC */
-		RD2;					/* read, test page fail */
-		ReadM (INCA (i), MM_OPND);		/* test PC write */
-		Write (i, XWD (flags, 0), MM_OPND);	/* write flags */
-		Write (INCA (i), PC, MM_OPND);		/* write PC */
-		JUMP (rs[1]);				/* set new PC */
-		set_newflags (rs[0], FALSE);		/* known to be exec */
-		break;
+	    ea = ADDA (i = ea, 2);			/* new flags, PC */
+	    RD2;					/* read, test page fail */
+	    ReadM (INCA (i), MM_OPND);			/* test PC write */
+	    Write (i, XWD (flags, 0), MM_OPND);		/* write flags */
+	    Write (INCA (i), PC, MM_OPND);		/* write PC */
+	    JUMP (rs[1]);				/* set new PC */
+	    set_newflags (rs[0], FALSE);		/* known to be exec */
+	    break;
 	case 010:					/* JRST 10 = dismiss */
-		pi_dismiss ();				/* dismiss int */
-		JUMP (ea);				/* set new PC */
-		break;
+	    pi_dismiss ();				/* dismiss int */
+	    JUMP (ea);					/* set new PC */
+	    break;
 	case 012:					/* JRST 12 = JEN */
-		mb = calc_jrstfea (inst, pflgs);	/* recalc addr w flgs */
-		JUMP (ea);				/* set new PC */
-		set_newflags (mb, TRUE);		/* set new flags */
-		pi_dismiss ();				/* dismiss int */
-		break;
+	    mb = calc_jrstfea (inst, pflgs);		/* recalc addr w flgs */
+	    JUMP (ea);					/* set new PC */
+	    set_newflags (mb, TRUE);			/* set new flags */
+	    pi_dismiss ();				/* dismiss int */
+	    break;
 	case 014:					/* JRST 14 = SFM */
-		Write (ea, XWD (flags, 0), MM_OPND);
-		break;  
+	    Write (ea, XWD (flags, 0), MM_OPND);
+	    break;  
 	case 015:					/* JRST 15 = XJRST */
-		if (!T20) goto MUUO;			/* only in TOPS20 */
-		JUMP (Read (ea, MM_OPND));		/* jump to M[ea] */
-		break;  }				/* end case subop */
+	    if (!T20) goto MUUO;			/* only in TOPS20 */
+	    JUMP (Read (ea, MM_OPND));			/* jump to M[ea] */
+	    break;  }					/* end case subop */
 	break;  }					/* end case op */
 
 if (its_2pr) {						/* 1-proc trap? */
 	its_1pr = its_2pr = 0;				/* clear trap */
 	if (ITS) {					/* better be ITS */
-		WriteP (upta + UPT_1PO, FLPC);		/* wr old flgs, PC */
-		mb = ReadP (upta + UPT_1PN);		/* rd new flgs, PC */
-		JUMP (mb);				/* set PC */
-		set_newflags (mb, TRUE);  }		/* set new flags */
+	    WriteP (upta + UPT_1PO, FLPC);		/* wr old flgs, PC */
+	    mb = ReadP (upta + UPT_1PN);		/* rd new flgs, PC */
+	    JUMP (mb);					/* set PC */
+	    set_newflags (mb, TRUE);  }			/* set new flags */
 	}						/* end if 2-proc */
 }							/* end for */
 
@@ -1490,15 +1491,17 @@ int32 sc = LIT8 (ea);
 if (sc > 71) AC(ac) = AC(p1) = 0;
 else if (ea & RSIGN) {
 	if (sc >= 36) {
-		AC(p1) = AC(ac) >> (sc - 36);
-		AC(ac) = 0;  }
-	else {	AC(p1) = ((AC(p1) >> sc) | (AC(ac) << (36 - sc))) & DMASK;
-		AC(ac) = AC(ac) >> sc;  }  }
+	    AC(p1) = AC(ac) >> (sc - 36);
+	    AC(ac) = 0;  }
+	else {
+	    AC(p1) = ((AC(p1) >> sc) | (AC(ac) << (36 - sc))) & DMASK;
+	    AC(ac) = AC(ac) >> sc;  }  }
 else {	if (sc >= 36) {
-		AC(ac) = (AC(p1) << (sc - 36)) & DMASK;
-		AC(p1) = 0;  }
-	else {	AC(ac) = ((AC(ac) << sc) | (AC(p1) >> (36 - sc))) & DMASK;
-		AC(p1) = (AC(p1) << sc) & DMASK;  }  }
+	    AC(ac) = (AC(p1) << (sc - 36)) & DMASK;
+	    AC(p1) = 0;  }
+	else {
+	    AC(ac) = ((AC(ac) << sc) | (AC(p1) >> (36 - sc))) & DMASK;
+	    AC(p1) = (AC(p1) << sc) & DMASK;  }  }
 return;
 }
 
@@ -1530,10 +1533,10 @@ d10 fill = sign? ONES: 0;
 d10 so;
 
 if (sc == 0) return val;
-if (sc > 35) sc = 35;				/* cap sc at 35 */
+if (sc > 35) sc = 35;					/* cap sc at 35 */
 if (ea & RSIGN)
 	return (((val >> sc) | (fill << (36 - sc))) & DMASK);
-so = val >> (35 - sc);				/* bits lost left + sign */
+so = val >> (35 - sc);					/* bits lost left + sign */
 if (so != (sign? bytemask[sc + 1]: 0)) SETF (F_AOV | F_T1);
 return (sign | ((val << sc) & MMASK));
 }
@@ -1552,22 +1555,24 @@ AC(ac) = CLRS (AC(ac));					/* clear signs */
 AC(p1) = CLRS (AC(p1));
 if (ea & RSIGN) {
 	if (sc >= 35) {					/* right 36..70 */
-		AC(p1) = ((AC(ac) >> (sc - 35)) | (fill << (70 - sc))) & DMASK;
-		AC(ac) = fill;  }
-	else {	AC(p1) = sign |				/* right 1..35 */
-			(((AC(p1) >> sc) | (AC(ac) << (35 - sc))) & MMASK);
-		AC(ac) = ((AC(ac) >> sc) | (fill << (35 - sc))) & DMASK;  }  }
+	    AC(p1) = ((AC(ac) >> (sc - 35)) | (fill << (70 - sc))) & DMASK;
+	    AC(ac) = fill;  }
+	else {
+	    AC(p1) = sign |				/* right 1..35 */
+		(((AC(p1) >> sc) | (AC(ac) << (35 - sc))) & MMASK);
+	    AC(ac) = ((AC(ac) >> sc) | (fill << (35 - sc))) & DMASK;  }  }
 else {	if (sc >= 35) {					/* left 36..70 */
-		so = AC(p1) >> (70 - sc);		/* bits lost left */
-		if ((AC(ac) != (sign? MMASK: 0)) ||
-		     (so != (sign? bytemask[sc - 35]: 0))) SETF (F_AOV | F_T1);
-		AC(ac) = sign | ((AC(p1) << (sc - 35)) & MMASK);
-		AC(p1) = sign;  }
-	else {	so = AC(ac) >> (35 - sc);		/* bits lost left */
-		if (so != (sign? bytemask[sc]: 0)) SETF (F_AOV | F_T1);
-		AC(ac) = sign |
-			(((AC(ac) << sc) | (AC(p1) >> (35 - sc))) & MMASK);
-		AC(p1) = sign | ((AC(p1) << sc) & MMASK);  }  }
+	    so = AC(p1) >> (70 - sc);			/* bits lost left */
+	    if ((AC(ac) != (sign? MMASK: 0)) ||
+		(so != (sign? bytemask[sc - 35]: 0))) SETF (F_AOV | F_T1);
+	    AC(ac) = sign | ((AC(p1) << (sc - 35)) & MMASK);
+	    AC(p1) = sign;  }
+	else {
+	    so = AC(ac) >> (35 - sc);			/* bits lost left */
+	    if (so != (sign? bytemask[sc]: 0)) SETF (F_AOV | F_T1);
+	    AC(ac) = sign |
+		(((AC(ac) << sc) | (AC(p1) >> (35 - sc))) & MMASK);
+	    AC(p1) = sign | ((AC(p1) << sc) & MMASK);  }  }
 return;
 }
 
@@ -1713,14 +1718,14 @@ if (s) {
 	left = (36 - p) / s;				/* bytes to left of p */
 	bywrd = left + (p / s);				/* bytes per word */
 	if (bywrd == 0) {				/* zero bytes? */
-		SETF (F_AOV | F_T1 | F_DCK);		/* set flags */
-		return;  }				/* abort operation */
+	    SETF (F_AOV | F_T1 | F_DCK);		/* set flags */
+	    return;  }					/* abort operation */
 	newby = left + SXT (val);			/* adjusted byte # */
 	wdadj = newby / bywrd;				/* word adjustment */
 	byadj = (newby >= 0)? newby % bywrd: -((-newby) % bywrd);
 	if (byadj <= 0) {
-		byadj = byadj + bywrd;			/* make adj positive */
-		wdadj = wdadj - 1;  }
+	    byadj = byadj + bywrd;			/* make adj positive */
+	    wdadj = wdadj - 1;  }
 	p = (36 - ((int32) byadj) * s) - ((36 - p) % s); /* new p */
 	bp = (PUT_P (bp, p) & LMASK) | ((bp + wdadj) & RMASK);  }
 AC(ac) = bp;		
@@ -1745,14 +1750,14 @@ int32 flg, t;
 AC(ac) = XWD (srca + lnt, dsta + lnt);
 for (flg = 0; dsta <= ea; flg++) {			/* loop */
 	if (flg && (t = test_int ())) {			/* timer event? */
-		AC(ac) = XWD (srca, dsta);		/* AC for intr */
-		ABORT (t);  }
+	    AC(ac) = XWD (srca, dsta);			/* AC for intr */
+	    ABORT (t);  }
 	if (AccViol (srca & AMASK, MM_BSTK, PTF_RD)) {	/* src access viol? */
-		AC(ac) = XWD (srca, dsta);		/* AC for page fail */
-		Read (srca & AMASK, MM_BSTK);  }	/* force trap */
+	    AC(ac) = XWD (srca, dsta);			/* AC for page fail */
+	    Read (srca & AMASK, MM_BSTK);  }		/* force trap */
 	if (AccViol (dsta & AMASK, MM_OPND, PTF_WR)) {	/* dst access viol? */
-		AC(ac) = XWD (srca, dsta);		/* AC for page fail */
-		ReadM (dsta & AMASK, MM_OPND);  }	/* force trap */
+	    AC(ac) = XWD (srca, dsta);			/* AC for page fail */
+	    ReadM (dsta & AMASK, MM_OPND);  }		/* force trap */
 	srcv = Read (srca & AMASK, MM_BSTK);		/* read */
 	Write (dsta & AMASK, srcv, MM_OPND);		/* write */
 	srca = srca + 1;				/* incr addr */
@@ -1779,19 +1784,19 @@ int32 flg, t;
 AC(ac) = XWD (srca + lnt, dsta + lnt);
 for (flg = 0; dsta <= ea; flg++) {			/* loop */
 	if (flg && (t = test_int ())) {			/* timer event? */
-		AC(ac) = XWD (srca, dsta);		/* AC for intr */
-		ABORT (t);  }
+	    AC(ac) = XWD (srca, dsta);			/* AC for intr */
+	    ABORT (t);  }
 	if (AccViol (srca & AMASK, MM_BSTK, PTF_RD)) {	/* src access viol? */
-		AC(ac) = XWD (srca, dsta);		/* AC for page fail */
-		Read (srca & AMASK, MM_BSTK);  }	/* force trap */
+	    AC(ac) = XWD (srca, dsta);			/* AC for page fail */
+	    Read (srca & AMASK, MM_BSTK);  }		/* force trap */
 	if (AccViol (dsta & AMASK, MM_OPND, PTF_WR)) {	/* dst access viol? */
-		AC(ac) = XWD (srca, dsta);		/* AC for page fail */
-		ReadM (dsta & AMASK, MM_OPND);  }	/* force trap */
+	    AC(ac) = XWD (srca, dsta);			/* AC for page fail */
+	    ReadM (dsta & AMASK, MM_OPND);  }		/* force trap */
 	srcv = Read (srca & AMASK, MM_BSTK);		/* read */
 	if (dir) dstv = ((srcv << 10) & BYTE1) | ((srcv >> 6) & BYTE2) |
-		((srcv << 12) & BYTE3) | ((srcv >> 4) & BYTE4);
+	    ((srcv << 12) & BYTE3) | ((srcv >> 4) & BYTE4);
 	else dstv = ((srcv & BYTE1) >> 10) | ((srcv & BYTE2) << 6) |
-		((srcv & BYTE3) >> 12) | ((srcv & BYTE4) << 4);
+	    ((srcv & BYTE3) >> 12) | ((srcv & BYTE4) << 4);
 	Write (dsta & AMASK, dstv, MM_OPND);		/* write */
 	srca = srca + 1;				/* incr addr */
 	dsta = dsta + 1;  }

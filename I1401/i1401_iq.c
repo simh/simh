@@ -25,6 +25,7 @@
 
    inq		1407 inquiry terminal
 
+   22-Dec-02	RMS	Added break support
    07-Sep-01	RMS	Moved function prototypes
    14-Apr-99	RMS	Changed t_addr to unsigned
 */
@@ -82,39 +83,41 @@ case BCD_R:						/* input */
 	ind[IN_INR] = 0;				/* clear req */
 	puts_tty ("[Enter]\r\n");			/* prompt */
 	for (i = 0; M[BS] != (BCD_GRPMRK + WM); i++) {	/* until GM + WM */
-		while ((t = sim_poll_kbd ()) == SCPE_OK)
-			if (stop_cpu) return SCPE_STOP;	/* interrupt? */
-		if (t < SCPE_KFLAG) return t;		/* if not char, err */
-		t = t & 0177;
-		if ((t == '\r') || (t == '\n')) break;
-		if (t == inq_char) {			/* cancel? */
-			ind[IN_INC] = 1;		/* set indicator */
-			puts_tty ("\r\n[Canceled]\r\n");
-			return SCPE_OK;  }
-		if (i && ((i % INQ_WIDTH) == 0)) puts_tty ("\r\n");
-		sim_putchar (t);			/* echo */
-		if (flag == MD_WM) {			/* word mark mode? */
-			if ((t == '~') && (wm_seen == 0)) wm_seen = WM;
-			else {	M[BS] = wm_seen | ascii_to_bcd[t];
-				wm_seen = 0; }  }
-		else M[BS] = (M[BS] & WM) | ascii_to_bcd[t];
-		if (!wm_seen) BS++;
-		if (ADDR_ERR (BS)) {
-			BS = BA | (BS % MAXMEMSIZE);
-			return STOP_NXM;  }  }
+	    while (((t = sim_poll_kbd ()) == SCPE_OK) ||
+		    (t & SCPE_BREAK)) {
+		if (stop_cpu) return SCPE_STOP;  }	/* interrupt? */
+	    if (t < SCPE_KFLAG) return t;		/* if not char, err */
+	    t = t & 0177;
+	    if ((t == '\r') || (t == '\n')) break;
+	    if (t == inq_char) {			/* cancel? */
+		ind[IN_INC] = 1;			/* set indicator */
+		puts_tty ("\r\n[Canceled]\r\n");
+		return SCPE_OK;  }
+	    if (i && ((i % INQ_WIDTH) == 0)) puts_tty ("\r\n");
+	    sim_putchar (t);				/* echo */
+	    if (flag == MD_WM) {			/* word mark mode? */
+		if ((t == '~') && (wm_seen == 0)) wm_seen = WM;
+		else {
+		    M[BS] = wm_seen | ascii_to_bcd[t];
+		    wm_seen = 0; }  }
+	    else M[BS] = (M[BS] & WM) | ascii_to_bcd[t];
+	    if (!wm_seen) BS++;
+	    if (ADDR_ERR (BS)) {
+		BS = BA | (BS % MAXMEMSIZE);
+		return STOP_NXM;  }  }
 	puts_tty ("\r\n");
 	M[BS++] = BCD_GRPMRK + WM;
 	return SCPE_OK;
 case BCD_W:						/* output */
 	for (i = 0; (t = M[BS++]) != (BCD_GRPMRK + WM); i++) {
-		if ((flag == MD_WM) && (t & WM)) {
-			if (i && ((i % INQ_WIDTH) == 0)) puts_tty ("\r\n");
-			sim_putchar ('~');  }
+	    if ((flag == MD_WM) && (t & WM)) {
 		if (i && ((i % INQ_WIDTH) == 0)) puts_tty ("\r\n");
-		sim_putchar (bcd_to_ascii[t & CHAR]);
-		if (ADDR_ERR (BS)) {
-			BS = BA | (BS % MAXMEMSIZE);
-			return STOP_NXM;  }  }
+		sim_putchar ('~');  }
+	    if (i && ((i % INQ_WIDTH) == 0)) puts_tty ("\r\n");
+	    sim_putchar (bcd_to_ascii[t & CHAR]);
+	    if (ADDR_ERR (BS)) {
+		BS = BA | (BS % MAXMEMSIZE);
+		return STOP_NXM;  }  }
 	puts_tty ("\r\n");
 	return SCPE_OK;
 default:

@@ -561,7 +561,7 @@ case OP_BB:
 	    PR1 = 1;  }					/* invalidate */
 	else if (IR2 != 1) {				/* IR2 valid? */
 	    BRANCH (IR2);				/* return to IR2 */
-	     IR2 = 1;  }				/* invalidate */
+	    IR2 = 1;  }					/* invalidate */
 	else reason = STOP_INVRTN;			/* MAR check */
 	break;
 
@@ -770,23 +770,23 @@ case OP_BS:
 	t = M[ADDR_A (saved_PC, I_SEL)] & DIGIT;	/* get select */
 	switch (t) {					/* case on select */
 	case 0:
-		idxe = idxb = 0;			/* indexing off */
-		break;
+	    idxe = idxb = 0;				/* indexing off */
+	    break;
 	case 1:
-		idxe = 1; idxb = 0;			/* index band A */
-		break;
+	    idxe = 1; idxb = 0;				/* index band A */
+	    break;
 	case 2:
-		idxe = idxb = 1;			/* index band B */
-		break;
+	    idxe = idxb = 1;				/* index band B */
+	    break;
 	case 8:
-		iae = 0;				/* indirect off */
-		break;
+	    iae = 0;					/* indirect off */
+	    break;
 	case 9:
-		iae = 1;				/* indirect on */
-		break;
+	    iae = 1;					/* indirect on */
+	    break;
 	default:
-		reason = STOP_INVSEL;			/* undefined */
-		break;  }
+	    reason = STOP_INVSEL;			/* undefined */
+	    break;  }
 	BRANCH (PAR);
 	break;
 
@@ -1683,9 +1683,10 @@ do {	sd = M[s] & DIGIT;				/* src digit */
 	MM (s);						/* decr src addr */
 	MM (tbl);					/* skip 1st tbl dig */
 	tblc = 0;					/* count */
-	do {	tf = M[tbl] & FLAG;			/* get next */
-		MM (tbl);				/* decr ptr */
-		if (tblc++ > MEMSIZE) return STOP_FWRAP;  }
+	do {
+	    tf = M[tbl] & FLAG;				/* get next */
+	    MM (tbl);					/* decr ptr */
+	    if (tblc++ > MEMSIZE) return STOP_FWRAP;  }
 	while (tf == 0);				/* until flag */
 	if (cnt++ > MEMSIZE) return STOP_FWRAP;  }	/* (stop runaway) */
 while (sf == 0);

@@ -133,18 +133,18 @@ ptr = 0;
 for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) {	/* until eof */
 	mask = 0;
 	if (*cptr == '(') {				/* repeat count? */
-		cptr = get_glyph (cptr + 1, gbuf, ')');	/* get 1st field */
-		rpt = get_uint (gbuf, 10, CCT_LNT, &r);	/* repeat count */
-		if (r != SCPE_OK) return SCPE_FMT;  }
+	    cptr = get_glyph (cptr + 1, gbuf, ')');	/* get 1st field */
+	    rpt = get_uint (gbuf, 10, CCT_LNT, &r);	/* repeat count */
+	    if (r != SCPE_OK) return SCPE_FMT;  }
 	else rpt = 1;
 	while (*cptr != 0) {				/* get col no's */
-		cptr = get_glyph (cptr, gbuf, ',');	/* get next field */
-		col = get_uint (gbuf, 10, 12, &r);	/* column number */
-		if (r != SCPE_OK) return SCPE_FMT;
-		mask = mask | (1 << col);  }		/* set bit */
+	    cptr = get_glyph (cptr, gbuf, ',');		/* get next field */
+	    col = get_uint (gbuf, 10, 12, &r);		/* column number */
+	    if (r != SCPE_OK) return SCPE_FMT;
+	    mask = mask | (1 << col);  }		/* set bit */
 	for ( ; rpt > 0; rpt--) {			/* store vals */
-		if (ptr >= CCT_LNT) return SCPE_FMT;
-		cctbuf[ptr++] = mask;  }  }
+	    if (ptr >= CCT_LNT) return SCPE_FMT;
+	    cctbuf[ptr++] = mask;  }  }
 if (ptr == 0) return SCPE_FMT;
 cctlnt = ptr;
 cctptr = 0;
@@ -203,7 +203,7 @@ extern int32 op_table[64], len_table[9];
 if (sw & SWMASK ('C')) {				/* character? */
 	t = val[0];
 	if (uptr->flags & UNIT_BCD)
-		fprintf (of, (t & WM)? "~%c": "%c", bcd_to_ascii[t & CHAR]);
+	    fprintf (of, (t & WM)? "~%c": "%c", bcd_to_ascii[t & CHAR]);
 	else fprintf (of, FMTASC (t & 0177));
 	return SCPE_OK;  }
 if ((uptr != NULL) && (uptr != &cpu_unit)) return SCPE_ARG;	/* CPU? */
@@ -214,8 +214,9 @@ if (sw & SWMASK ('D')) {                                /* dump? */
 	return -(i - 1);  }
 if (sw & SWMASK ('S')) {				/* string? */
 	i = 0;
-	do {	t = val[i++];
-		fprintf (of, (t & WM)? "~%c": "%c", bcd_to_ascii[t & CHAR]);  }
+	do {
+	    t = val[i++];
+	    fprintf (of, (t & WM)? "~%c": "%c", bcd_to_ascii[t & CHAR]);  }
 	while ((i < LINE_LNT) && ((val[i] & WM) == 0));
 	return -(i - 1);  }
 if ((sw & SWMASK ('M')) == 0) return SCPE_ARG;
@@ -300,13 +301,13 @@ if ((sw & SWMASK ('C')) || (sw & SWMASK ('S')) || (*cptr == '~') ||
     ((*cptr == '\'') && cptr++) || ((*cptr == '"') && cptr++)) {
 	wm_seen = 0;
 	for (i = 0; (i < sim_emax) && (*cptr != 0); ) {
-		t = *cptr++;				/* get character */
-		if (cflag && (wm_seen == 0) && (t == '~')) wm_seen = WM;
-		else if (uptr->flags & UNIT_BCD) {
-			if (t < 040) return SCPE_ARG;
-			val[i++] = ascii_to_bcd[t] | wm_seen;
-			wm_seen = 0;  }
-		else val[i++] = t;  }
+	    t = *cptr++;				/* get character */
+	    if (cflag && (wm_seen == 0) && (t == '~')) wm_seen = WM;
+	    else if (uptr->flags & UNIT_BCD) {
+		if (t < 040) return SCPE_ARG;
+		val[i++] = ascii_to_bcd[t] | wm_seen;
+		wm_seen = 0;  }
+	    else val[i++] = t;  }
 	if ((i == 0) || wm_seen) return SCPE_ARG;
 	return -(i-1);  }
 
@@ -321,14 +322,14 @@ if (((op_table[op] && IO) && (get_io (gbuf, &val[1]) == SCPE_OK)) ||
      (get_addr (gbuf, &val[1]) == SCPE_OK)) {
 	cptr = get_glyph (cptr, gbuf, 0);		/* get addr or d */
 	if (get_addr (gbuf, &val[4]) == SCPE_OK) {
-		cptr = get_glyph (cptr, gbuf, ',');	/* get d */
-		ilnt = 7;  }				/* a and b addresses */
+	    cptr = get_glyph (cptr, gbuf, ',');		/* get d */
+	    ilnt = 7;  }				/* a and b addresses */
 	else ilnt = 4;  }				/* a address */
 else ilnt = 1;						/* no addresses */
 if ((gbuf[0] == '\'') || (gbuf[0] == '"')) {		/* d character? */
 	t = gbuf[1];
 	if ((gbuf[2] != 0) || (*cptr != 0) || (t < 040))
-		return SCPE_ARG;			/* end and legal? */
+	    return SCPE_ARG;				/* end and legal? */
 	val[ilnt] = ascii_to_bcd[t];			/* save D char */
 	ilnt = ilnt + 1;  }
 else if (gbuf[0] != 0) return SCPE_ARG;			/* not done? */

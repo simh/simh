@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU simulator
 
-   Copyright (c) 1998-2002, Robert M Supnik
+   Copyright (c) 1998-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu		CVAX central processor
 
+   05-Jan-02	RMS	Added memory size restore support
+   25-Dec-02	RMS	Added instruction history (from Mark Pizzolato)
    29-Sep-02	RMS	Revised to build dib_tab dynamically
    14-Jul-02	RMS	Added halt to console, infinite loop detection
 			(from Mark Pizzolato)
@@ -143,6 +145,7 @@
 #define UNIT_MSIZE	(1u << UNIT_V_MSIZE)
 #define GET_CUR		acc = ACC_MASK (PSL_GETCUR (PSL))
 
+#define OPND_SIZE	10
 #define op0		opnd[0]
 #define op1		opnd[1]
 #define op2		opnd[2]
@@ -166,6 +169,14 @@
 					Write (va, rl, L_LONG, WA); \
 				Write (va + 4, rh, L_LONG, WA);  } \
 			else {	R[rn] = rl; R[rnplus1] = rh;  }
+
+#define HIST_SIZE	4096
+struct InstHistory {
+	int32		iPC;
+	int32		PSL;
+	int32		opc;
+	int32		brdest;
+	int32		opnd[OPND_SIZE]; };
 
 uint32 *M = NULL;					/* memory */
 int32 R[16];						/* registers */
@@ -191,11 +202,12 @@ int32 recq[6];						/* recovery queue */
 int32 recqptr;						/* recq pointer */
 int32 mem_err = 0;					/* mem err intr */
 int32 crd_err = 0;					/* CRD err intr */
+int32 hlt_pin = 0;					/* HLT pin intr */
 int32 p1 = 0, p2 = 0;					/* fault parameters */
 int32 fault_PC;						/* fault PC */
-int32 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
-REG *pcq_r = NULL;					/* PC queue reg ptr */
+int32 hst_p = 0;					/* history pointer */
+int32 hst_lnt = 0;					/* history length */
 int32 badabo = 0;
 int32 cpu_astop = 0;
 int32 dbg_stop = 0;
@@ -204,6 +216,9 @@ int32 ibufl, ibufh;					/* prefetch buf */
 int32 ibcnt, ppc;					/* prefetch ctl */
 int32 cpu_log = 0;					/* logging */
 jmp_buf save_env;
+REG *pcq_r = NULL;					/* PC queue reg ptr */
+int32 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
+static struct InstHistory hst[HIST_SIZE] = { { 0 } };	/* instruction history */
 
 const uint32 byte_mask[33] = { 0x00000000,
  0x00000001, 0x00000003, 0x00000007, 0x0000000F,
@@ -225,6 +240,8 @@ const uint32 byte_sign[33] = { 0x00000000,
  0x10000000, 0x20000000, 0x40000000, 0x80000000 };
 const uint32 align[4] = {
  0xFFFFFFFF, 0x00FFFFFF, 0x0000FFFF, 0x000000FF };
+
+/* External and forward references */
 
 extern int32 sim_interval;
 extern int32 sim_int_char;
@@ -309,7 +326,10 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_virt (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 int32 get_istr (int32 lnt, int32 acc);
+int32 con_halt (int32 code, int32 cc);
 
 /* CPU data structures
 
@@ -364,6 +384,7 @@ REG cpu_reg[] = {
 	{ HRDATA (TRPIRQ, trpirq, 8) },
 	{ FLDATA (CRDERR, crd_err, 0) },
 	{ FLDATA (MEMERR, mem_err, 0) },
+	{ FLDATA (HLTPIN, hlt_pin, 0) },
 	{ HRDATA (DBGLOG, cpu_log, 16), REG_HIDDEN },
 	{ FLDATA (DBGSTOP, dbg_stop, 0), REG_HIDDEN },
 	{ BRDATA (PCQ, pcq, 16, 32, PCQ_SIZE), REG_RO+REG_CIRC },
@@ -381,6 +402,8 @@ MTAB cpu_mod[] = {
 	{ UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
 	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
 	  NULL, &show_iospace },
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "HISTORY", "HISTORY",
+	  &cpu_set_hist, &cpu_show_hist },
 	{ MTAB_XTD|MTAB_VDV, 0, NULL, "VIRTUAL", &cpu_show_virt },
 	{ 0 }  };
 
@@ -389,7 +412,7 @@ DEVICE cpu_dev = {
 	1, 16, 32, 1, 16, 8,
 	&cpu_ex, &cpu_dep, &cpu_reset,
 	&cpu_boot, NULL, NULL,
-	NULL, 0 };
+	NULL, DEV_DYNM, &cpu_set_size };
 
 t_stat sim_instr (void)
 {
@@ -416,70 +439,71 @@ if (abortval > 0) {					/* sim stop? */
 else if (abortval < 0) {				/* mm or rsrv or int */
 	int32 i, temp, st1, st2, hsir;
 	if ((PSL & PSL_FPD) == 0) {			/* FPD? no recovery */
-		for (i = 0; i < recqptr; i++) {		/* unwind inst */
-			int32 rrn, rlnt;
-			rrn = recq[i] & 0xF;		/* recovery reg# */
-			rlnt = DR_LNT ((recq[i] >> 4) & 0x3);	/* recovery lnt */
-			if (recq[i] & 0x800) R[rrn] = R[rrn] - rlnt;
-			else R[rrn] = R[rrn] + rlnt;  }  }
+	    for (i = 0; i < recqptr; i++) {		/* unwind inst */
+		int32 rrn, rlnt;
+		rrn = recq[i] & 0xF;			/* recovery reg# */
+		rlnt = DR_LNT ((recq[i] >> 4) & 0x3);	/* recovery lnt */
+		if (recq[i] & 0x800) R[rrn] = R[rrn] - rlnt;
+		else R[rrn] = R[rrn] + rlnt;  }  }
 	recqptr = 0;					/* clear queue */
 	temp = fault_PC - PC;				/* delta PC if needed */
 	SETPC (fault_PC);				/* restore PC */
 	switch (-abortval) {				/* case on abort code */
 	case SCB_RESIN: case SCB_RESAD: case SCB_RESOP:	/* reserved fault */
-		if (in_ie) ABORT (STOP_INIE);		/* in exc? panic */
-		cc = intexc (-abortval, cc, 0, IE_EXC);	/* take exception */
-		GET_CUR;				/* PSL<cur> changed */
-		break;
+	    if (in_ie) ABORT (STOP_INIE);		/* in exc? panic */
+	    cc = intexc (-abortval, cc, 0, IE_EXC);	/* take exception */
+	    GET_CUR;					/* PSL<cur> changed */
+	    break;
 	case SCB_ARITH:					/* arithmetic fault */
-		if (in_ie) ABORT (STOP_INIE);		/* in exc? panic */
-		cc = intexc (-abortval, cc, 0, IE_EXC);	/* take exception */
+	    if (in_ie) ABORT (STOP_INIE);		/* in exc? panic */
+	    cc = intexc (-abortval, cc, 0, IE_EXC);	/* take exception */
+	    GET_CUR;
+	    in_ie = 1;
+	    Write (SP - 4, p1, L_LONG, WA);		/* write arith param */
+	    SP = SP - 4;
+	    in_ie = 0;
+	    break;
+	case SCB_ACV: case SCB_TNV:			/* mem management */
+	    if (in_ie) {				/* in exception? */
+		if (PSL & PSL_IS) ABORT (STOP_INIE);	/* on is? panic */
+		cc = intexc (SCB_KSNV, cc, 0, IE_SVE);	/* ksnv */
+		GET_CUR;  }
+	    else {
+	    	cc = intexc (-abortval, cc, 0, IE_EXC);	/* take exception */
 		GET_CUR;
 		in_ie = 1;
-		Write (SP - 4, p1, L_LONG, WA);		/* write arith param */
-		SP = SP - 4;
-		in_ie = 0;
-		break;
-	case SCB_ACV: case SCB_TNV:			/* mem management */
-		if (in_ie) {				/* in exception? */
-			if (PSL & PSL_IS) ABORT (STOP_INIE);	/* on is? panic */
-			cc = intexc (SCB_KSNV, cc, 0, IE_SVE);	/* ksnv */
-			GET_CUR;  }
-		else {	cc = intexc (-abortval, cc, 0, IE_EXC);	/* take exception */
-			GET_CUR;
-			in_ie = 1;
-			Write (SP - 8, p1, L_LONG, WA);	/* write mm params */
-			Write (SP - 4, p2, L_LONG, WA);
-			SP = SP - 8;
-			in_ie = 0;  }
-		break;
+		Write (SP - 8, p1, L_LONG, WA);		/* write mm params */
+		Write (SP - 4, p2, L_LONG, WA);
+		SP = SP - 8;
+		in_ie = 0;  }
+	    break;
 	case SCB_MCHK:					/* machine check */
-		if (in_ie) ABORT (STOP_INIE);		/* in exception? */
-		if (p1 & 0x80) p1 = p1 + mchk_ref;	/* mref? set v/p */
-		p2 = mchk_va + 4;			/* save vap */
-		for (i = hsir = 0; i < 16; i++) {	/* find hsir */
-			if ((SISR >> i) & 1) hsir = i;  }
-		st1 = ((((uint32) opc) & 0xFF) << 24) |
-			 (hsir << 16) |
-		         ((CADR & 0xFF) << 8) |
-			 (MSER & 0xFF);
-		st2 = 0x00C07000 + (temp & 0xFF);
-		cc = intexc (-abortval, cc, 0, IE_SVE);	/* take exception */
-		GET_CUR;				/* PSL<cur> changed */
-		in_ie = 1;
-		SP = SP - 20;				/* push 5 words */
-		Write (SP, 16, L_LONG, WA);		/* # bytes */
-		Write (SP + 4, p1, L_LONG, WA);		/* mcheck type */
-		Write (SP + 8, p2, L_LONG, WA);		/* address */
-		Write (SP + 12, st1, L_LONG, WA);	/* state 1 */
-		Write (SP + 16, st2, L_LONG, WA);	/* state 2 */
-		in_ie = 0;
-		break;
+	    if (in_ie) ABORT (STOP_INIE);		/* in exception? */
+	    if (p1 & 0x80) p1 = p1 + mchk_ref;		/* mref? set v/p */
+	    p2 = mchk_va + 4;				/* save vap */
+	    for (i = hsir = 0; i < 16; i++) {		/* find hsir */
+		if ((SISR >> i) & 1) hsir = i;  }
+	    st1 = ((((uint32) opc) & 0xFF) << 24) |
+		 (hsir << 16) |
+	         ((CADR & 0xFF) << 8) |
+		 (MSER & 0xFF);
+	    st2 = 0x00C07000 + (temp & 0xFF);
+	    cc = intexc (-abortval, cc, 0, IE_SVE);	/* take exception */
+	    GET_CUR;					/* PSL<cur> changed */
+	    in_ie = 1;
+	    SP = SP - 20;				/* push 5 words */
+	    Write (SP, 16, L_LONG, WA);			/* # bytes */
+	    Write (SP + 4, p1, L_LONG, WA);		/* mcheck type */
+	    Write (SP + 8, p2, L_LONG, WA);		/* address */
+	    Write (SP + 12, st1, L_LONG, WA);		/* state 1 */
+	    Write (SP + 16, st2, L_LONG, WA);		/* state 2 */
+	    in_ie = 0;
+	    break;
 	case 1:						/* interrupt */
-		break;					/* just proceed */
+	    break;					/* just proceed */
 	default:					/* other */
-		badabo = abortval;			/* save code */
-		ABORT (STOP_UNKABO);  }			/* panic */
+	    badabo = abortval;				/* save code */
+	    ABORT (STOP_UNKABO);  }			/* panic */
 }							/* end else */
 
 /* Main instruction loop */
@@ -489,7 +513,7 @@ int32 spec, disp, rn, index, numspec;
 int32 vfldrp1, brdisp, flg, mstat;
 int32 i, j, r, rh, temp;
 t_addr va, iad;
-int32 opnd[10];						/* operand queue */
+int32 opnd[OPND_SIZE];					/* operand queue */
 
 if (cpu_astop) {
 	cpu_astop = 0;
@@ -513,29 +537,35 @@ if (sim_interval <= 0) {				/* chk clock queue */
 
 if (trpirq) {						/* trap or interrupt? */
 	if (temp = GET_TRAP (trpirq)) {			/* trap? */
-		cc = intexc (SCB_ARITH, cc, 0, IE_EXC);	/* take, clear trap */
-		GET_CUR;				/* set cur mode */
-		in_ie = 1;
-		Write (SP - 4, temp, L_LONG, WA);	/* write parameter */
-		SP = SP - 4;
-		in_ie = 0;  }
+	    cc = intexc (SCB_ARITH, cc, 0, IE_EXC);	/* take, clear trap */
+	    GET_CUR;					/* set cur mode */
+	    in_ie = 1;
+	    Write (SP - 4, temp, L_LONG, WA);		/* write parameter */
+	    SP = SP - 4;
+	    in_ie = 0;  }
 	else if (temp = GET_IRQL (trpirq)) {		/* interrupt? */
-		int32 vec;
-		if (temp > IPL_HMAX) {			/* error req lvl? */
-			if (temp == IPL_MEMERR) {	/* mem error? */
-				vec = SCB_MEMERR;
-				mem_err = 0;  }
-			else if (temp == IPL_CRDERR) {	/* CRD error? */
-				vec = SCB_CRDERR;
-				crd_err = 0;  }
-			else ABORT (STOP_UIPL);  }	/* unknown intr */
-		else if (temp >= IPL_HMIN)		/* hardware req? */
-			 vec = get_vector (temp);	/* get vector */
-		else if (temp > IPL_SMAX) ABORT (STOP_UIPL);
-		else {	vec = SCB_IPLSOFT + (temp << 2);
-			SISR = SISR & ~(1u << temp);  }
-		if (vec) cc = intexc (vec, cc, temp, IE_INT);	/* take intr */
-		GET_CUR;  }				/* set cur mode */
+	    int32 vec;
+	    if (temp == IPL_HLTPIN) {			/* console halt? */
+		cc = con_halt (CON_HLTPIN, cc);		/* invoke firmware */
+		hlt_pin = 0;				/* clear intr */
+		trpirq = 0;				/* clear everything */
+		continue;  }				/* continue */
+	    if (temp == IPL_MEMERR) {			/* mem error? */
+		vec = SCB_MEMERR;
+		mem_err = 0;  }
+	    else if (temp == IPL_CRDERR) {		/* CRD error? */
+		vec = SCB_CRDERR;
+		crd_err = 0;  }
+	    else if (temp > IPL_HMAX) {			/* error req lvl? */
+		ABORT (STOP_UIPL);  }			/* unknown intr */
+	    else if (temp >= IPL_HMIN)			/* hardware req? */
+		 vec = get_vector (temp);		/* get vector */
+	    else if (temp > IPL_SMAX) ABORT (STOP_UIPL);
+	    else {
+	    	vec = SCB_IPLSOFT + (temp << 2);
+		SISR = SISR & ~(1u << temp);  }
+	    if (vec) cc = intexc (vec, cc, temp, IE_INT);/* take intr */
+	    GET_CUR;  }					/* set cur mode */
 	else trpirq = 0;				/* clear everything */
 	SET_IRQL;					/* eval interrupts */
 	continue;  }
@@ -577,385 +607,407 @@ else {	numspec = numspec & DR_NSPMASK;			/* get # specifiers */
 */
 
 	for (i = 1, j = 0; i <= numspec; i++) {		/* loop thru specs */
-		disp = drom[opc][i];			/* get dispatch */
-		if (disp >= BB) {
-			GET_ISTR (brdisp, DR_LNT (disp));
-			break;  }
-		GET_ISTR (spec, L_BYTE);		/* get spec byte */
-		rn = spec & RGMASK;			/* get reg # */
-		disp = (spec & ~RGMASK) | disp;		/* merge w dispatch */
-		switch (disp) {				/* dispatch spec */
+	    disp = drom[opc][i];			/* get dispatch */
+	    if (disp >= BB) {
+		GET_ISTR (brdisp, DR_LNT (disp));
+		break;  }
+	    GET_ISTR (spec, L_BYTE);			/* get spec byte */
+	    rn = spec & RGMASK;				/* get reg # */
+	    disp = (spec & ~RGMASK) | disp;		/* merge w dispatch */
+	    switch (disp) {				/* dispatch spec */
 
 /* Short literal - only read access permitted */
 
-		case SH0|RB: case SH0|RW: case SH0|RL:
-		case SH1|RB: case SH1|RW: case SH1|RL:
-		case SH2|RB: case SH2|RW: case SH2|RL:
-		case SH3|RB: case SH3|RW: case SH3|RL:
-			opnd[j++] = spec;
-			break;
-		case SH0|RQ: case SH1|RQ: case SH2|RQ: case SH3|RQ:
-			opnd[j++] = spec;
-			opnd[j++] = 0;
-			break;
-		case SH0|RF: case SH1|RF: case SH2|RF: case SH3|RF:
-			opnd[j++] = (spec << 4) | 0x4000;
-			break;
-		case SH0|RD: case SH1|RD: case SH2|RD: case SH3|RD:
-			opnd[j++] = (spec << 4) | 0x4000;
-			opnd[j++] = 0;
-			break;
-		case SH0|RG: case SH1|RG: case SH2|RG: case SH3|RG:
-			opnd[j++] = (spec << 1) | 0x4000;
-			opnd[j++] = 0;
-			break;
+	    case SH0|RB: case SH0|RW: case SH0|RL:
+	    case SH1|RB: case SH1|RW: case SH1|RL:
+	    case SH2|RB: case SH2|RW: case SH2|RL:
+	    case SH3|RB: case SH3|RW: case SH3|RL:
+		opnd[j++] = spec;
+		break;
+	    case SH0|RQ: case SH1|RQ: case SH2|RQ: case SH3|RQ:
+		opnd[j++] = spec;
+		opnd[j++] = 0;
+		break;
+	    case SH0|RF: case SH1|RF: case SH2|RF: case SH3|RF:
+		opnd[j++] = (spec << 4) | 0x4000;
+		break;
+	    case SH0|RD: case SH1|RD: case SH2|RD: case SH3|RD:
+		opnd[j++] = (spec << 4) | 0x4000;
+		opnd[j++] = 0;
+		break;
+	    case SH0|RG: case SH1|RG: case SH2|RG: case SH3|RG:
+		opnd[j++] = (spec << 1) | 0x4000;
+		opnd[j++] = 0;
+		break;
 
 /* Register */
 
-		case GRN|RB: case GRN|MB:
-			CHECK_FOR_PC;
-			opnd[j++] = R[rn] & BMASK;
-			break;
-		case GRN|RW: case GRN|MW:
-			CHECK_FOR_PC;
-			opnd[j++] = R[rn] & WMASK;
-			break;
-		case GRN|VB:
-			vfldrp1 = R[rnplus1];
-		case GRN|WB: case GRN|WW: case GRN|WL: case GRN|WQ:
-			opnd[j++] = rn;
-		case GRN|RL: case GRN|RF: case GRN|ML:
-			CHECK_FOR_PC;
-			opnd[j++] = R[rn];
-			break;
-		case GRN|RQ: case GRN|RD: case GRN|RG: case GRN|MQ:
-			CHECK_FOR_SP;
-			opnd[j++] = R[rn];
-			opnd[j++] = R[rnplus1];
-			break;
+	    case GRN|RB: case GRN|MB:
+		CHECK_FOR_PC;
+		opnd[j++] = R[rn] & BMASK;
+		break;
+	    case GRN|RW: case GRN|MW:
+		CHECK_FOR_PC;
+		opnd[j++] = R[rn] & WMASK;
+		break;
+	    case GRN|VB:
+		vfldrp1 = R[rnplus1];
+	    case GRN|WB: case GRN|WW: case GRN|WL: case GRN|WQ:
+		opnd[j++] = rn;
+	    case GRN|RL: case GRN|RF: case GRN|ML:
+		CHECK_FOR_PC;
+		opnd[j++] = R[rn];
+		break;
+	    case GRN|RQ: case GRN|RD: case GRN|RG: case GRN|MQ:
+		CHECK_FOR_SP;
+		opnd[j++] = R[rn];
+		opnd[j++] = R[rnplus1];
+		break;
 
 /*  Register deferred, autodecrement */
 
-		case RGD|VB:
-		case RGD|WB: case RGD|WW: case RGD|WL: case RGD|WQ:
-			opnd[j++] = OP_MEM;
-		case RGD|AB: case RGD|AW: case RGD|AL: case RGD|AQ:
-			CHECK_FOR_PC;
-			va = opnd[j++] = R[rn];
-			break;
-		case ADC|VB:
-		case ADC|WB: case ADC|WW: case ADC|WL: case ADC|WQ:
-			opnd[j++] = OP_MEM;
-		case ADC|AB: case ADC|AW: case ADC|AL: case ADC|AQ:
-			CHECK_FOR_PC;
-			va = opnd[j++] = R[rn] = R[rn] - DR_LNT (disp);
-			recq[recqptr++] = RECW (disp);
-			break;
-		case ADC|RB: case ADC|RW: case ADC|RL: case ADC|RF:
-		case ADC|MB: case ADC|MW: case ADC|ML:
-			R[rn] = R[rn] - (DR_LNT (disp));
-			recq[recqptr++] = RECW (disp);
-		case RGD|RB: case RGD|RW: case RGD|RL: case RGD|RF:
-		case RGD|MB: case RGD|MW: case RGD|ML:
-			CHECK_FOR_PC;
-			opnd[j++] = Read (va = R[rn], DR_LNT (disp), RA);
-			break;
-		case ADC|RQ: case ADC|RD: case ADC|RG: case ADC|MQ:
-			R[rn] = R[rn] - 8;
-			recq[recqptr++] = RECW (disp);
-		case RGD|RQ: case RGD|RD: case RGD|RG: case RGD|MQ:
-			CHECK_FOR_PC;
-			opnd[j++] = Read (va = R[rn], L_LONG, RA);
-			opnd[j++] = Read (R[rn] + 4, L_LONG, RA);
-			break;
+	    case RGD|VB:
+	    case RGD|WB: case RGD|WW: case RGD|WL: case RGD|WQ:
+		opnd[j++] = OP_MEM;
+	    case RGD|AB: case RGD|AW: case RGD|AL: case RGD|AQ:
+		CHECK_FOR_PC;
+		va = opnd[j++] = R[rn];
+		break;
+	    case ADC|VB:
+	    case ADC|WB: case ADC|WW: case ADC|WL: case ADC|WQ:
+		opnd[j++] = OP_MEM;
+	    case ADC|AB: case ADC|AW: case ADC|AL: case ADC|AQ:
+		CHECK_FOR_PC;
+		va = opnd[j++] = R[rn] = R[rn] - DR_LNT (disp);
+		recq[recqptr++] = RECW (disp);
+		break;
+	    case ADC|RB: case ADC|RW: case ADC|RL: case ADC|RF:
+	    case ADC|MB: case ADC|MW: case ADC|ML:
+		R[rn] = R[rn] - (DR_LNT (disp));
+		recq[recqptr++] = RECW (disp);
+	    case RGD|RB: case RGD|RW: case RGD|RL: case RGD|RF:
+	    case RGD|MB: case RGD|MW: case RGD|ML:
+		CHECK_FOR_PC;
+		opnd[j++] = Read (va = R[rn], DR_LNT (disp), RA);
+		break;
+	    case ADC|RQ: case ADC|RD: case ADC|RG: case ADC|MQ:
+	    	R[rn] = R[rn] - 8;
+		recq[recqptr++] = RECW (disp);
+	    case RGD|RQ: case RGD|RD: case RGD|RG: case RGD|MQ:
+		CHECK_FOR_PC;
+		opnd[j++] = Read (va = R[rn], L_LONG, RA);
+		opnd[j++] = Read (R[rn] + 4, L_LONG, RA);
+		break;
 
 /* Autoincrement */
 
-		case AIN|VB:
-		case AIN|WB: case AIN|WW: case AIN|WL: case AIN|WQ:
-/*			CHECK_FOR_PC; */
-			opnd[j++] = OP_MEM;
-		case AIN|AB: case AIN|AW: case AIN|AL: case AIN|AQ:
-			va = opnd[j++] = R[rn];
-			if (rn == nPC) {
-				if (DR_LNT (disp) == L_QUAD) {
-					GET_ISTR (temp, L_LONG);
-					GET_ISTR (temp, L_LONG); }
-				else GET_ISTR (temp, DR_LNT (disp));  }
-			else {	R[rn] = R[rn] + DR_LNT (disp);
-				recq[recqptr++] = RECW (disp);  }
-			break;
-		case AIN|MB: case AIN|MW: case AIN|ML:
-/*			CHECK_FOR_PC; */
-		case AIN|RB: case AIN|RW: case AIN|RL: case AIN|RF:
-			va = R[rn];
-			if (rn == nPC) { GET_ISTR (opnd[j++], DR_LNT (disp)); }
-			else {	opnd[j++] = Read (R[rn], DR_LNT (disp), RA);
-				R[rn] = R[rn] + DR_LNT (disp);
-				recq[recqptr++] = RECW (disp);  }
-			break;
-		case AIN|MQ:
-/*			CHECK_FOR_PC; */
-		case AIN|RQ: case AIN|RD: case AIN|RG:
-			va = R[rn];
-			if (rn == nPC) {
-				GET_ISTR (opnd[j++], L_LONG);
-				GET_ISTR (opnd[j++], L_LONG);  }
-			else {	opnd[j++] = Read (va, L_LONG, RA);
-				opnd[j++] = Read (va + 4, L_LONG, RA);  
-				R[rn] = R[rn] + 8;
-				recq[recqptr++] = RECW (disp);  }
-			break;
+	    case AIN|VB:
+	    case AIN|WB: case AIN|WW: case AIN|WL: case AIN|WQ:
+/*		CHECK_FOR_PC; */
+		opnd[j++] = OP_MEM;
+	    case AIN|AB: case AIN|AW: case AIN|AL: case AIN|AQ:
+		va = opnd[j++] = R[rn];
+		if (rn == nPC) {
+		    if (DR_LNT (disp) == L_QUAD) {
+			GET_ISTR (temp, L_LONG);
+			GET_ISTR (temp, L_LONG); }
+		    else GET_ISTR (temp, DR_LNT (disp));  }
+		else {
+		    R[rn] = R[rn] + DR_LNT (disp);
+		    recq[recqptr++] = RECW (disp);  }
+		break;
+	    case AIN|MB: case AIN|MW: case AIN|ML:
+/*		CHECK_FOR_PC; */
+	    case AIN|RB: case AIN|RW: case AIN|RL: case AIN|RF:
+		va = R[rn];
+		if (rn == nPC) { GET_ISTR (opnd[j++], DR_LNT (disp)); }
+		else {
+		    opnd[j++] = Read (R[rn], DR_LNT (disp), RA);
+		    R[rn] = R[rn] + DR_LNT (disp);
+		    recq[recqptr++] = RECW (disp);  }
+		break;
+	    case AIN|MQ:
+/*		CHECK_FOR_PC; */
+	    case AIN|RQ: case AIN|RD: case AIN|RG:
+		va = R[rn];
+		if (rn == nPC) {
+		    GET_ISTR (opnd[j++], L_LONG);
+		    GET_ISTR (opnd[j++], L_LONG);  }
+		else {
+		    opnd[j++] = Read (va, L_LONG, RA);
+		    opnd[j++] = Read (va + 4, L_LONG, RA);  
+		    R[rn] = R[rn] + 8;
+		    recq[recqptr++] = RECW (disp);  }
+		break;
 
 /* Autoincrement deferred */
 
-		case AID|VB:
-		case AID|WB: case AID|WW: case AID|WL: case AID|WQ:
-			opnd[j++] = OP_MEM;
-		case AID|AB: case AID|AW: case AID|AL: case AID|AQ:
-			if (rn == nPC) { GET_ISTR (va = opnd[j++], L_LONG);  }
-			else {	va = opnd[j++] = Read (R[rn], L_LONG, RA);
-				R[rn] = R[rn] + 4;
-				recq[recqptr++] = RECW (AID|RL);  }
-			break;
-		case AID|RB: case AID|RW: case AID|RL: case AID|RF:
-		case AID|MB: case AID|MW: case AID|ML:
-			if (rn == nPC) { GET_ISTR (va, L_LONG);  }
-			else {	va = Read (R[rn], L_LONG, RA);
-				R[rn] = R[rn] + 4;
-				recq[recqptr++] = RECW (AID|RL);  }
-			opnd[j++] = Read (va, DR_LNT (disp), RA);
-			break;
-		case AID|RQ: case AID|RD: case AID|RG: case AID|MQ:
-			if (rn == nPC) { GET_ISTR (va, L_LONG);  }
-			else {	va = Read (R[rn], L_LONG, RA);
-				R[rn] = R[rn] + 4;
-				recq[recqptr++] = RECW (AID|RL);  }
-			opnd[j++] = Read (va, L_LONG, RA);
-			opnd[j++] = Read (va + 4, L_LONG, RA);
-			break;
+	    case AID|VB:
+	    case AID|WB: case AID|WW: case AID|WL: case AID|WQ:
+		opnd[j++] = OP_MEM;
+	    case AID|AB: case AID|AW: case AID|AL: case AID|AQ:
+		if (rn == nPC) { GET_ISTR (va = opnd[j++], L_LONG);  }
+		else {
+		    va = opnd[j++] = Read (R[rn], L_LONG, RA);
+		    R[rn] = R[rn] + 4;
+		    recq[recqptr++] = RECW (AID|RL);  }
+		break;
+	    case AID|RB: case AID|RW: case AID|RL: case AID|RF:
+	    case AID|MB: case AID|MW: case AID|ML:
+		if (rn == nPC) { GET_ISTR (va, L_LONG);  }
+		else {
+		    va = Read (R[rn], L_LONG, RA);
+		    R[rn] = R[rn] + 4;
+		    recq[recqptr++] = RECW (AID|RL);  }
+		opnd[j++] = Read (va, DR_LNT (disp), RA);
+		break;
+	    case AID|RQ: case AID|RD: case AID|RG: case AID|MQ:
+		if (rn == nPC) { GET_ISTR (va, L_LONG);  }
+		else {
+		    va = Read (R[rn], L_LONG, RA);
+		    R[rn] = R[rn] + 4;
+		    recq[recqptr++] = RECW (AID|RL);  }
+		opnd[j++] = Read (va, L_LONG, RA);
+		opnd[j++] = Read (va + 4, L_LONG, RA);
+		break;
 
 /* Byte displacement */
 
-		case BDP|VB:
-		case BDP|WB: case BDP|WW: case BDP|WL: case BDP|WQ:
-			opnd[j++] = OP_MEM;
-		case BDP|AB: case BDP|AW: case BDP|AL: case BDP|AQ:
-			GET_ISTR (temp, L_BYTE);
-			va = opnd[j++] = R[rn] + SXTB (temp);
-			break;
-		case BDP|RB: case BDP|RW: case BDP|RL: case BDP|RF:
-		case BDP|MB: case BDP|MW: case BDP|ML:
-			GET_ISTR (temp, L_BYTE);
-			va = R[rn] + SXTB (temp);
-			opnd[j++] = Read (va, DR_LNT (disp), RA);
-			break;
-		case BDP|RQ: case BDP|RD: case BDP|RG: case BDP|MQ:
-			GET_ISTR (temp, L_BYTE);	
-				va = R[rn] + SXTB (temp);
-			opnd[j++] = Read (va, L_LONG, RA);
-			opnd[j++] = Read (va + 4, L_LONG, RA);
-			break;
+	    case BDP|VB:
+	    case BDP|WB: case BDP|WW: case BDP|WL: case BDP|WQ:
+		opnd[j++] = OP_MEM;
+	    case BDP|AB: case BDP|AW: case BDP|AL: case BDP|AQ:
+		GET_ISTR (temp, L_BYTE);
+		va = opnd[j++] = R[rn] + SXTB (temp);
+		break;
+	    case BDP|RB: case BDP|RW: case BDP|RL: case BDP|RF:
+	    case BDP|MB: case BDP|MW: case BDP|ML:
+		GET_ISTR (temp, L_BYTE);
+		va = R[rn] + SXTB (temp);
+		opnd[j++] = Read (va, DR_LNT (disp), RA);
+		break;
+	    case BDP|RQ: case BDP|RD: case BDP|RG: case BDP|MQ:
+		GET_ISTR (temp, L_BYTE);	
+		va = R[rn] + SXTB (temp);
+		opnd[j++] = Read (va, L_LONG, RA);
+		opnd[j++] = Read (va + 4, L_LONG, RA);
+		break;
 
 /* Byte displacement deferred */
 
-		case BDD|VB:
-		case BDD|WB: case BDD|WW: case BDD|WL: case BDD|WQ:
-			opnd[j++] = OP_MEM;
-		case BDD|AB: case BDD|AW: case BDD|AL: case BDD|AQ:
-			GET_ISTR (temp, L_BYTE);
-			iad = R[rn] + SXTB (temp);
-			va = opnd[j++] = Read (iad, L_LONG, RA);
-			break;
-		case BDD|RB: case BDD|RW: case BDD|RL: case BDD|RF:
-		case BDD|MB: case BDD|MW: case BDD|ML:
-			GET_ISTR (temp, L_BYTE);	
-			iad = R[rn] + SXTB (temp);
-			va = Read (iad, L_LONG, RA);	
-			opnd[j++] = Read (va, DR_LNT (disp), RA);
-			break;
-		case BDD|RQ: case BDD|RD: case BDD|RG: case BDD|MQ:
-			GET_ISTR (temp, L_BYTE);
-			iad = R[rn] + SXTB (temp);
-			va = Read (iad, L_LONG, RA);
-			opnd[j++] = Read (va, L_LONG, RA);
-			opnd[j++] = Read (va + 4, L_LONG, RA);
-			break;	
+	    case BDD|VB:
+	    case BDD|WB: case BDD|WW: case BDD|WL: case BDD|WQ:
+		opnd[j++] = OP_MEM;
+	    case BDD|AB: case BDD|AW: case BDD|AL: case BDD|AQ:
+		GET_ISTR (temp, L_BYTE);
+		iad = R[rn] + SXTB (temp);
+		va = opnd[j++] = Read (iad, L_LONG, RA);
+		break;
+	    case BDD|RB: case BDD|RW: case BDD|RL: case BDD|RF:
+	    case BDD|MB: case BDD|MW: case BDD|ML:
+		GET_ISTR (temp, L_BYTE);	
+		iad = R[rn] + SXTB (temp);
+		va = Read (iad, L_LONG, RA);	
+		opnd[j++] = Read (va, DR_LNT (disp), RA);
+		break;
+	    case BDD|RQ: case BDD|RD: case BDD|RG: case BDD|MQ:
+		GET_ISTR (temp, L_BYTE);
+		iad = R[rn] + SXTB (temp);
+		va = Read (iad, L_LONG, RA);
+		opnd[j++] = Read (va, L_LONG, RA);
+		opnd[j++] = Read (va + 4, L_LONG, RA);
+		break;	
 
 /* Word displacement */
 
-		case WDP|VB:
-		case WDP|WB: case WDP|WW: case WDP|WL: case WDP|WQ:
-			opnd[j++] = OP_MEM;
-		case WDP|AB: case WDP|AW: case WDP|AL: case WDP|AQ:
-			GET_ISTR (temp, L_WORD);
-			va = opnd[j++] = R[rn] + SXTW (temp);
-			break;
-		case WDP|MB: case WDP|MW: case WDP|ML:
-		case WDP|RB: case WDP|RW: case WDP|RL: case WDP|RF:
-			GET_ISTR (temp, L_WORD);
-			va = R[rn] + SXTW (temp);
-			opnd[j++] = Read (va, DR_LNT (disp), RA);
-			break;
-		case WDP|MQ: case WDP|RQ: case WDP|RD: case WDP|RG:
-			GET_ISTR (temp, L_WORD);
-			va = R[rn] + SXTW (temp);
-			opnd[j++] = Read (va, L_LONG, RA);
-			opnd[j++] = Read (va + 4, L_LONG, RA);
-			break;
+	    case WDP|VB:
+	    case WDP|WB: case WDP|WW: case WDP|WL: case WDP|WQ:
+		opnd[j++] = OP_MEM;
+	    case WDP|AB: case WDP|AW: case WDP|AL: case WDP|AQ:
+		GET_ISTR (temp, L_WORD);
+		va = opnd[j++] = R[rn] + SXTW (temp);
+		break;
+	    case WDP|MB: case WDP|MW: case WDP|ML:
+	    case WDP|RB: case WDP|RW: case WDP|RL: case WDP|RF:
+		GET_ISTR (temp, L_WORD);
+		va = R[rn] + SXTW (temp);
+		opnd[j++] = Read (va, DR_LNT (disp), RA);
+		break;
+	    case WDP|MQ: case WDP|RQ: case WDP|RD: case WDP|RG:
+		GET_ISTR (temp, L_WORD);
+		va = R[rn] + SXTW (temp);
+		opnd[j++] = Read (va, L_LONG, RA);
+		opnd[j++] = Read (va + 4, L_LONG, RA);
+		break;
 
 /* Word displacement deferred */
 
-		case WDD|VB:
-		case WDD|WB: case WDD|WW: case WDD|WL: case WDD|WQ:
-			opnd[j++] = OP_MEM;
-		case WDD|AB: case WDD|AW: case WDD|AL: case WDD|AQ:
-			GET_ISTR (temp, L_WORD);
-			iad = R[rn] + SXTW (temp);
-			va = opnd[j++] = Read (iad, L_LONG, RA);
-			break;
-		case WDD|MB: case WDD|MW: case WDD|ML:
-		case WDD|RB: case WDD|RW: case WDD|RL: case WDD|RF:
-			GET_ISTR (temp, L_WORD);
-			iad = R[rn] + SXTW (temp);
-			va = Read (iad, L_LONG, RA);
-			opnd[j++] = Read (va, DR_LNT (disp), RA);
-			break;
-		case WDD|MQ: case WDD|RQ: case WDD|RD: case WDD|RG:
-			GET_ISTR (temp, L_WORD);	
-			iad = R[rn] + SXTW (temp);
-			va = Read (iad, L_LONG, RA);
-			opnd[j++] = Read (va, L_LONG, RA);
-			opnd[j++] = Read (va + 4, L_LONG, RA);
-			break;
+	    case WDD|VB:
+	    case WDD|WB: case WDD|WW: case WDD|WL: case WDD|WQ:
+		opnd[j++] = OP_MEM;
+	    case WDD|AB: case WDD|AW: case WDD|AL: case WDD|AQ:
+		GET_ISTR (temp, L_WORD);
+		iad = R[rn] + SXTW (temp);
+		va = opnd[j++] = Read (iad, L_LONG, RA);
+		break;
+	    case WDD|MB: case WDD|MW: case WDD|ML:
+	    case WDD|RB: case WDD|RW: case WDD|RL: case WDD|RF:
+		GET_ISTR (temp, L_WORD);
+		iad = R[rn] + SXTW (temp);
+		va = Read (iad, L_LONG, RA);
+		opnd[j++] = Read (va, DR_LNT (disp), RA);
+		break;
+	    case WDD|MQ: case WDD|RQ: case WDD|RD: case WDD|RG:
+		GET_ISTR (temp, L_WORD);	
+		iad = R[rn] + SXTW (temp);
+		va = Read (iad, L_LONG, RA);
+		opnd[j++] = Read (va, L_LONG, RA);
+		opnd[j++] = Read (va + 4, L_LONG, RA);
+		break;
 
 /* Longword displacement */
 
-		case LDP|VB:
-		case LDP|WB: case LDP|WW: case LDP|WL: case LDP|WQ:
-			opnd[j++] = OP_MEM;
-		case LDP|AB: case LDP|AW: case LDP|AL: case LDP|AQ:
-			GET_ISTR (temp, L_LONG);
-			va = opnd[j++] = R[rn] + temp;
-			break;
-		case LDP|MB: case LDP|MW: case LDP|ML:
-		case LDP|RB: case LDP|RW: case LDP|RL: case LDP|RF:
-			GET_ISTR (temp, L_LONG);
-			va = R[rn] + temp;
-			opnd[j++] = Read (va, DR_LNT (disp), RA);
-			break;
-		case LDP|MQ: case LDP|RQ: case LDP|RD: case LDP|RG:
-			GET_ISTR (temp, L_LONG);
-			va = R[rn] + temp;
-			opnd[j++] = Read (va, L_LONG, RA);
-			opnd[j++] = Read (va + 4, L_LONG, RA);
-			break;
+	    case LDP|VB:
+	    case LDP|WB: case LDP|WW: case LDP|WL: case LDP|WQ:
+		opnd[j++] = OP_MEM;
+	    case LDP|AB: case LDP|AW: case LDP|AL: case LDP|AQ:
+		GET_ISTR (temp, L_LONG);
+		va = opnd[j++] = R[rn] + temp;
+		break;
+	    case LDP|MB: case LDP|MW: case LDP|ML:
+	    case LDP|RB: case LDP|RW: case LDP|RL: case LDP|RF:
+		GET_ISTR (temp, L_LONG);
+		va = R[rn] + temp;
+		opnd[j++] = Read (va, DR_LNT (disp), RA);
+		break;
+	    case LDP|MQ: case LDP|RQ: case LDP|RD: case LDP|RG:
+		GET_ISTR (temp, L_LONG);
+		va = R[rn] + temp;
+		opnd[j++] = Read (va, L_LONG, RA);
+		opnd[j++] = Read (va + 4, L_LONG, RA);
+		break;
 
 /* Longword displacement deferred */
 
-		case LDD|VB:
-		case LDD|WB: case LDD|WW: case LDD|WL: case LDD|WQ:
-			opnd[j++] = OP_MEM;
-		case LDD|AB: case LDD|AW: case LDD|AL: case LDD|AQ:
-			GET_ISTR (temp, L_LONG);
-			iad = R[rn] + temp;
-			va = opnd[j++] = Read (iad, L_LONG, RA);
-			break;
-		case LDD|MB: case LDD|MW: case LDD|ML:
-		case LDD|RB: case LDD|RW: case LDD|RL: case LDD|RF:
-			GET_ISTR (temp, L_LONG);
-			iad = R[rn] + temp;
-			va = Read (iad, L_LONG, RA);
-			opnd[j++] = Read (va, DR_LNT (disp), RA);
-			break;
-		case LDD|MQ: case LDD|RQ: case LDD|RD: case LDD|RG:
-			GET_ISTR (temp, L_LONG);
-			iad = R[rn] + temp;
-			va = Read (iad, L_LONG, RA);
-			opnd[j++] = Read (va, L_LONG, RA);
-			opnd[j++] = Read (va + 4, L_LONG, RA);
-			break;
+	    case LDD|VB:
+	    case LDD|WB: case LDD|WW: case LDD|WL: case LDD|WQ:
+		opnd[j++] = OP_MEM;
+	    case LDD|AB: case LDD|AW: case LDD|AL: case LDD|AQ:
+		GET_ISTR (temp, L_LONG);
+		iad = R[rn] + temp;
+		va = opnd[j++] = Read (iad, L_LONG, RA);
+		break;
+	    case LDD|MB: case LDD|MW: case LDD|ML:
+	    case LDD|RB: case LDD|RW: case LDD|RL: case LDD|RF:
+		GET_ISTR (temp, L_LONG);
+		iad = R[rn] + temp;
+		va = Read (iad, L_LONG, RA);
+		opnd[j++] = Read (va, DR_LNT (disp), RA);
+		break;
+	    case LDD|MQ: case LDD|RQ: case LDD|RD: case LDD|RG:
+		GET_ISTR (temp, L_LONG);
+		iad = R[rn] + temp;
+		va = Read (iad, L_LONG, RA);
+		opnd[j++] = Read (va, L_LONG, RA);
+		opnd[j++] = Read (va + 4, L_LONG, RA);
+		break;
 
 /* Index */
 
-		case IDX|VB:
-		case IDX|WB: case IDX|WW: case IDX|WL: case IDX|WQ:
-		case IDX|AB: case IDX|AW: case IDX|AL: case IDX|AQ:
-		case IDX|MB: case IDX|MW: case IDX|ML: case IDX|MQ:
-		case IDX|RB: case IDX|RW: case IDX|RL: case IDX|RQ:
-		case IDX|RF: case IDX|RD: case IDX|RG:
-			index = R[rn] << (disp & 03);
-			CHECK_FOR_PC;
-			GET_ISTR (spec, L_BYTE);
-			rn = spec & RGMASK;
-			switch (spec & ~RGMASK) {
-			case ADC:
-				R[rn] = R[rn] - DR_LNT (disp);
-				recq[recqptr++] = RECW (ADC | (disp & DR_LNMASK));
-			case RGD:
-				CHECK_FOR_PC;	
-				index = index + R[rn];
-				break;
-			case AIN:
-				CHECK_FOR_PC;
-				index = index + R[rn];
-				R[rn] = R[rn] + DR_LNT (disp);
-				recq[recqptr++] = RECW (AIN | (disp & DR_LNMASK));
-				break;
-			case AID:
-				if (rn == nPC) { GET_ISTR (temp, L_LONG);  }
-				else {	temp = Read (R[rn], L_LONG, RA);
-					R[rn] = R[rn] + 4;
-					recq[recqptr++] = RECW (AID|RL);  }
-				index = temp + index;
-				break;
-			case BDP:
-				GET_ISTR (temp, L_BYTE);
-				index = index + R[rn] + SXTB (temp);
-				break;
-			case BDD:
-				GET_ISTR (temp, L_BYTE);
-				index = index + Read (R[rn] + SXTB (temp), L_LONG, RA);
-				break;
-			case WDP:
-				GET_ISTR (temp, L_WORD);
-				index = index + R[rn] + SXTW (temp);
-				break;
-			case WDD:
-				GET_ISTR (temp, L_WORD);
-				index = index + Read (R[rn] + SXTW (temp), L_LONG, RA);
-				break;
-			case LDP:
-				GET_ISTR (temp, L_LONG);
-				index = index + R[rn] + temp;
-				break;
-			case LDD:
-				GET_ISTR (temp, L_LONG);
-				index = index + Read (R[rn] + temp, L_LONG, RA);
-				break;
-			default:
-				RSVD_ADDR_FAULT;  }	/* end case idxspec */
-			switch (disp & 0xF) {		/* case disp type */
-			case WB: case WW: case WL: case WQ:
-				opnd[j++] = OP_MEM;
-			case AB: case AW: case AL: case AQ:
-				va = opnd[j++] = index;
-				break;
-			case MB: case MW: case ML:
-			case RB: case RW: case RL:
-				opnd[j++] = Read (va = index, DR_LNT (disp), RA);
-				break;
-			case RQ: case MQ:
-				opnd[j++] = Read (va = index, L_LONG, RA);
-				opnd[j++] = Read (index + 4, L_LONG, RA);
-				break;  }		/* end case access/lnt */
-			break;				/* end index */
-		default:				/* all others */
-			RSVD_ADDR_FAULT;		/* fault */
-			break;
-		}					/* end case spec */
+	    case IDX|VB:
+	    case IDX|WB: case IDX|WW: case IDX|WL: case IDX|WQ:
+	    case IDX|AB: case IDX|AW: case IDX|AL: case IDX|AQ:
+	    case IDX|MB: case IDX|MW: case IDX|ML: case IDX|MQ:
+	    case IDX|RB: case IDX|RW: case IDX|RL: case IDX|RQ:
+	    case IDX|RF: case IDX|RD: case IDX|RG:
+		index = R[rn] << (disp & 03);
+		CHECK_FOR_PC;
+		GET_ISTR (spec, L_BYTE);
+		rn = spec & RGMASK;
+		switch (spec & ~RGMASK) {
+		case ADC:
+		    R[rn] = R[rn] - DR_LNT (disp);
+		    recq[recqptr++] = RECW (ADC | (disp & DR_LNMASK));
+		case RGD:
+		    CHECK_FOR_PC;	
+		    index = index + R[rn];
+		    break;
+		case AIN:
+		    CHECK_FOR_PC;
+		    index = index + R[rn];
+		    R[rn] = R[rn] + DR_LNT (disp);
+		    recq[recqptr++] = RECW (AIN | (disp & DR_LNMASK));
+		    break;
+		case AID:
+		    if (rn == nPC) { GET_ISTR (temp, L_LONG);  }
+		    else {
+		    	temp = Read (R[rn], L_LONG, RA);
+			R[rn] = R[rn] + 4;
+			recq[recqptr++] = RECW (AID|RL);  }
+		    index = temp + index;
+		    break;
+		case BDP:
+		    GET_ISTR (temp, L_BYTE);
+		    index = index + R[rn] + SXTB (temp);
+		    break;
+		case BDD:
+		    GET_ISTR (temp, L_BYTE);
+		    index = index + Read (R[rn] + SXTB (temp), L_LONG, RA);
+		    break;
+		case WDP:
+		    GET_ISTR (temp, L_WORD);
+		    index = index + R[rn] + SXTW (temp);
+		    break;
+		case WDD:
+		    GET_ISTR (temp, L_WORD);
+		    index = index + Read (R[rn] + SXTW (temp), L_LONG, RA);
+		    break;
+		case LDP:
+		    GET_ISTR (temp, L_LONG);
+		    index = index + R[rn] + temp;
+		    break;
+		case LDD:
+		    GET_ISTR (temp, L_LONG);
+		    index = index + Read (R[rn] + temp, L_LONG, RA);
+		    break;
+		default:
+		    RSVD_ADDR_FAULT;  }			/* end case idxspec */
+		switch (disp & 0xF) {			/* case disp type */
+		case WB: case WW: case WL: case WQ:
+		    opnd[j++] = OP_MEM;
+		case AB: case AW: case AL: case AQ:
+		    va = opnd[j++] = index;
+		    break;
+		case MB: case MW: case ML:
+		case RB: case RW: case RL:
+		    opnd[j++] = Read (va = index, DR_LNT (disp), RA);
+		    break;
+		case RQ: case MQ:
+		    opnd[j++] = Read (va = index, L_LONG, RA);
+		    opnd[j++] = Read (index + 4, L_LONG, RA);
+		    break;  }				/* end case access/lnt */
+		break;					/* end index */
+	    default:					/* all others */
+		RSVD_ADDR_FAULT;			/* fault */
+		break;
+	    }						/* end case spec */
 	}						/* end for */
-}							/* end if not FPD */
+}
+							/* end if not FPD */
+/* Optionally record instruction history */
+
+if (hst_lnt) {
+	struct InstHistory *h = &hst[hst_p];
+	int32 i;
+
+	hst_p = (hst_p + 1) % HIST_SIZE;
+	h->iPC = fault_PC;
+	h->PSL = PSL | cc;
+	h->opc = opc;
+	h->brdest = brdisp + PC;
+	for (i = 0; i < (numspec & DR_NSPMASK); i++)
+	    h->opnd[i] = opnd[i];
+	}
 
 /* Dispatch to instructions */
 
@@ -1139,12 +1191,13 @@ case CVTWB:
 
 case ADAWI:
 	if (op1 >= 0) {					/* reg? ADDW2 */
-		temp = R[op1];
-		r = R[op1] = (op0 + temp) & WMASK;  }
-	else {	if (op2 & 1) RSVD_OPND_FAULT;		/* mem? chk align */
-		temp = Read (op2, L_WORD, WA);		/* ok, ADDW2 */
-		r = (op0 + temp) & WMASK;
-		WRITE_W (r);  }
+	    temp = R[op1];
+	    r = R[op1] = (op0 + temp) & WMASK;  }
+	else {
+	    if (op2 & 1) RSVD_OPND_FAULT;		/* mem? chk align */
+	    temp = Read (op2, L_WORD, WA);		/* ok, ADDW2 */
+	    r = (op0 + temp) & WMASK;
+	    WRITE_W (r);  }
 	CC_ADD_W (r, op0, temp);			/* set cc's */
 	break;
 
@@ -1250,45 +1303,48 @@ case MULL2: case MULL3:
 	break;
 case DIVB2: case DIVB3:
 	if (op0 == 0) {					/* div by zero? */
-		r = op1;
-		temp = CC_V;
-		SET_TRAP (TRAP_DIVZRO);  }
+	    r = op1;
+	    temp = CC_V;
+	    SET_TRAP (TRAP_DIVZRO);  }
 	else if ((op0 == BMASK) && (op1 == BSIGN)) {	/* overflow? */
-		r = op1;
-		temp = CC_V;
-		INTOV;  }
-	else  {	r = SXTB (op1) / SXTB (op0);		/* ok, divide */
-		temp = 0;  }
+	    r = op1;
+	    temp = CC_V;
+	    INTOV;  }
+	else {
+	    r = SXTB (op1) / SXTB (op0);		/* ok, divide */
+	    temp = 0;  }
 	WRITE_B (r);					/* write result */
 	CC_IIZZ_B (r);					/* set cc's */
 	cc = cc | temp;					/* error? set V */
 	break;
 case DIVW2: case DIVW3:
 	if (op0 == 0) {					/* div by zero? */
-		r = op1;
-		temp = CC_V;
-		SET_TRAP (TRAP_DIVZRO);  }
+	    r = op1;
+	    temp = CC_V;
+	    SET_TRAP (TRAP_DIVZRO);  }
 	else if ((op0 == WMASK) && (op1 == WSIGN)) {	/* overflow? */
-		r = op1;
-		temp = CC_V;
-		INTOV;  }
-	else {	r = SXTW (op1) / SXTW (op0);		/* ok, divide */
-		temp = 0;  }
+	    r = op1;
+	    temp = CC_V;
+	    INTOV;  }
+	else {
+	    r = SXTW (op1) / SXTW (op0);		/* ok, divide */
+	    temp = 0;  }
 	WRITE_W (r);					/* write result */
 	CC_IIZZ_W (r);					/* set cc's */
 	cc = cc | temp;					/* error? set V */
 	break;
 case DIVL2: case DIVL3:
 	if (op0 == 0) {					/* div by zero? */
-		r = op1;
-		temp = CC_V;
-		SET_TRAP (TRAP_DIVZRO);  }
+	    r = op1;
+	    temp = CC_V;
+	    SET_TRAP (TRAP_DIVZRO);  }
 	else if ((op0 == LMASK) && (op1 == LSIGN)) {	/* overflow? */
-		r = op1;
-		temp = CC_V;
-		INTOV;  }
-	else {	r = op1 / op0;				/* ok, divide */
-		temp = 0;  }
+	    r = op1;
+	    temp = CC_V;
+	    INTOV;  }
+	else {
+	    r = op1 / op0;				/* ok, divide */
+	    temp = 0;  }
 	WRITE_L (r);					/* write result */
 	CC_IIZZ_L (r);					/* set cc's */
 	cc = cc | temp;					/* error? set V */
@@ -1366,25 +1422,27 @@ case MOVQ:
 case ROTL:
 	j = op0 % 32;					/* reduce sc, mod 32 */
 	if (j) r = ((((uint32) op1) << j) |
-		(((uint32) op1) >> (32 - j))) & LMASK;
+	    (((uint32) op1) >> (32 - j))) & LMASK;
 	else r = op1;
 	WRITE_L (r);					/* store result */
 	CC_IIZP_L (r);					/* set cc's */
 	break;
 case ASHL:
 	if (op0 & BSIGN) {				/* right shift? */
-		temp = 0x100 - op0;			/* get |shift| */
-		if (temp > 31) r = (op1 & LSIGN)? -1: 0; /* sc > 31? */
-		else r = op1 >> temp;			/* shift */
-		WRITE_L (r);				/* store result */
-		CC_IIZZ_L (r);				/* set cc's */
+	    temp = 0x100 - op0;				/* get |shift| */
+	    if (temp > 31) r = (op1 & LSIGN)? -1: 0;	/* sc > 31? */
+	    else r = op1 >> temp;			/* shift */
+	    WRITE_L (r);				/* store result */
+	    CC_IIZZ_L (r);				/* set cc's */
 		break;  }
-	else {	if (op0 > 31) r = temp = 0;		/* sc > 31? */
-		else {	r = ((uint32) op1) << op0;	/* shift */
-			temp = r >> op0;  }		/* shift back */
-		WRITE_L (r);				/* store result */
-		CC_IIZZ_L (r);				/* set cc's */
-		if (op1 != temp) { V_INTOV; } }		/* bits lost? */
+	else {
+	    if (op0 > 31) r = temp = 0;			/* sc > 31? */
+	    else {
+	    	r = ((uint32) op1) << op0;		/* shift */
+		temp = r >> op0;  }			/* shift back */
+	    WRITE_L (r);				/* store result */
+	    CC_IIZZ_L (r);				/* set cc's */
+	    if (op1 != temp) { V_INTOV; } }		/* bits lost? */
 	break;
 case ASHQ:
 	r = op_ashq (opnd, &rh, &flg);			/* do qw shift */
@@ -1405,7 +1463,7 @@ case EMUL:
 	r = op_emul (op0, op1, &rh);			/* calc 64b result */
 	r = r + op2;					/* add 32b value */
 	rh = rh + (((uint32) r) < ((uint32) op2)) -	/* into 64b result */
-		((op2 & LSIGN)? 1: 0);
+	    ((op2 & LSIGN)? 1: 0);
 	WRITE_Q (r, rh);				/* write result */
 	CC_IIZZ_Q (r, rh);				/* set cc's */
 	break;
@@ -1421,12 +1479,13 @@ case EMUL:
 case EDIV:
 	if (op5 < 0) Read (op6, L_LONG, WA);		/* wtest remainder */
 	if (op0 == 0) {					/* divide by zero? */
-		flg = CC_V;				/* set V */
-		r = opnd[1];				/* quo = low divd */
-		rh = 0;					/* rem = 0 */
-		SET_TRAP (TRAP_DIVZRO);  }		/* set trap */
-	else {	r = op_ediv (opnd, &rh, &flg);		/* extended divide */
-		if (flg) { INTOV; }  }			/* if ovf+IV, set trap */
+	    flg = CC_V;					/* set V */
+	    r = opnd[1];				/* quo = low divd */
+	    rh = 0;					/* rem = 0 */
+	    SET_TRAP (TRAP_DIVZRO);  }			/* set trap */
+	else {
+	    r = op_ediv (opnd, &rh, &flg);		/* extended divide */
+	    if (flg) { INTOV; }  }			/* if ovf+IV, set trap */
 	if (op3 >= 0) R[op3] = r;			/* store quotient */
 	else Write (op4, r, L_LONG, WA);
 	if (op5 >= 0) R[op5] = rh;			/* store remainder */
@@ -1442,13 +1501,13 @@ case EDIV:
 case BRB:
 	BRANCHB (brdisp);				/* branch  */
 	if ((PC == fault_PC) && (PSL_GETIPL (PSL) == 0x1F))
-		ABORT (STOP_LOOP);
+	    ABORT (STOP_LOOP);
 	break;
 
 case BRW:
 	BRANCHW (brdisp);				/* branch */
 	if ((PC == fault_PC) && (PSL_GETIPL (PSL) == 0x1F))
-		ABORT (STOP_LOOP);
+	    ABORT (STOP_LOOP);
 	break;
 
 case BSBB:
@@ -1581,7 +1640,7 @@ case ACBB:
 	CC_IIZP_B (r);					/* set cc's */
 	V_ADD_B (r, op1, op2);				/* test for ovflo */
 	if ((op1 & BSIGN)? (SXTB (r) >= SXTB (op0)):
-		(SXTB (r) <= SXTB (op0))) BRANCHW (brdisp);
+	    (SXTB (r) <= SXTB (op0))) BRANCHW (brdisp);
 	break;
 case ACBW:
 	r = (op2 + op1) & WMASK;			/* calc result */
@@ -1589,7 +1648,7 @@ case ACBW:
 	CC_IIZP_W (r);					/* set cc's */
 	V_ADD_W (r, op1, op2);				/* test for ovflo */
 	if ((op1 & WSIGN)? (SXTW (r) >= SXTW (op0)):
-		(SXTW (r) <= SXTW (op0))) BRANCHW (brdisp);
+	    (SXTW (r) <= SXTW (op0))) BRANCHW (brdisp);
 	break;
 case ACBL:
 	r = (op2 + op1) & LMASK;			/* calc result */
@@ -1597,7 +1656,7 @@ case ACBL:
 	CC_IIZP_L (r);					/* set cc's */
 	V_ADD_L (r, op1, op2);				/* test for ovflo */
 	if ((op1 & LSIGN)? (r >= op0): (r <= op0))
-		BRANCHW (brdisp);
+	    BRANCHW (brdisp);
 	break;
 
 /* CASE instructions - casex sel.rx,base.rx,lim.rx
@@ -1611,23 +1670,26 @@ case CASEB:
 	r = (op0 - op1) & BMASK;			/* sel - base */
 	CC_CMP_B (r, op2);				/* r:limit, set cc's */
 	if (r > op2) JUMP (PC + ((op2 + 1) * 2));	/* r > limit (unsgnd)? */
-	else {	temp = Read (PC + (r * 2), L_WORD, RA);
-		BRANCHW (temp);  }
+	else {
+	    temp = Read (PC + (r * 2), L_WORD, RA);
+	    BRANCHW (temp);  }
 	break;
 case CASEW:
 	r = (op0 - op1) & WMASK;			/* sel - base */
 	CC_CMP_W (r, op2);				/* r:limit, set cc's */
 	if (r > op2) JUMP (PC + ((op2 + 1) * 2));	/* r > limit (unsgnd)? */
-	else {	temp = Read (PC + (r * 2), L_WORD, RA);
-		BRANCHW (temp);  }
+	else {
+	    temp = Read (PC + (r * 2), L_WORD, RA);
+	    BRANCHW (temp);  }
 	break;
 case CASEL:
 	r = (op0 - op1) & LMASK;			/* sel - base */
 	CC_CMP_L (r, op2);				/* r:limit, set cc's */
 	if (((uint32) r) > ((uint32) op2))		/* r > limit (unsgnd)? */
 		JUMP (PC + ((op2 + 1) * 2));
-	else {	temp = Read (PC + (r * 2), L_WORD, RA);
-		BRANCHW (temp);  }
+	else {
+	    temp = Read (PC + (r * 2), L_WORD, RA);
+	    BRANCHW (temp);  }
 	break;
 
 /* Branch on bit instructions - bbxy pos.rl,op.wb,disp.bb
@@ -1762,19 +1824,10 @@ case RET:
 
 case HALT:
 	if (PSL & PSL_CUR) RSVD_INST_FAULT;		/* not kern? rsvd inst */
-	else if (cpu_unit.flags & UNIT_CONH) {		/* halt to console? */
-		conpc = PC;				/* save PC */
-		conpsl = ((PSL | cc) & 0xFFFF00FF) | CON_HLTINS; /* PSL, param */
-		temp = (PSL >> PSL_V_CUR) & 0x7;	/* get is'cur */
-		if (temp > 4) conpsl = conpsl | CON_BADPSL;	/* invalid? */
-		else STK[temp] = SP;			/* save stack */
-		if (mapen) conpsl = conpsl | CON_MAPON;	/* mapping on? */
-		mapen = 0;				/* turn off map */
-		SP = IS;				/* set SP from IS */
-		PSL = PSL_IS | PSL_IPL1F;		/* PSL = 41F0000 */
-		cc = 0;
-		JUMP (ROMBASE);  }			/* PC = 20040000 */
-	else {	ABORT (STOP_HALT);  }			/* halt to simulator */
+	else if (cpu_unit.flags & UNIT_CONH)		/* halt to console? */
+	    cc = con_halt (CON_HLTINS, cc);		/* enter firmware */
+	else {
+	    ABORT (STOP_HALT);  }			/* halt to simulator */
 case NOP:
 	break;
 case BPT:
@@ -2046,7 +2099,7 @@ case ACBF:
 	WRITE_L (r);					/* write result */
 	CC_IIZP_FP (r);					/* set cc's */
 	if ((temp & CC_Z) || ((op1 & FPSIGN)?		/* test br cond */
-		 !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
+	     !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
 	break;
 case ACBD:
 	r = op_addd (opnd + 2, &rh, FALSE);
@@ -2054,7 +2107,7 @@ case ACBD:
 	WRITE_Q (r, rh);
 	CC_IIZP_FP (r);
 	if ((temp & CC_Z) || ((op1 & FPSIGN)?		/* test br cond */
-		 !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
+	     !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
 	break;
 case ACBG:
 	r = op_addg (opnd + 2, &rh, FALSE);
@@ -2062,7 +2115,7 @@ case ACBG:
 	WRITE_Q (r, rh);
 	CC_IIZP_FP (r);
 	if ((temp & CC_Z) || ((op1 & FPSIGN)?		/* test br cond */
-		 !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
+	     !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
 	break;
 
 /* EMODF
@@ -2204,26 +2257,45 @@ int32 bo = PC & 3;
 int32 sc, val, t;
 
 while ((bo + lnt) > ibcnt) {				/* until enuf bytes */
-    if ((ppc < 0) || (VA_GETOFF (ppc) == 0)) {		/* PPC inv, xpg? */
-	ppc = Test ((PC + ibcnt) & ~03, RD, &t);	/* xlate PC */
-	if (ppc < 0) Read ((PC + ibcnt) & ~03, L_LONG, RA);  }
-    if (ibcnt == 0) ibufl = ReadLP (ppc);		/* fill low */
-    else ibufh = ReadLP (ppc);				/* or high */
-    ppc = ppc + 4;					/* incr phys PC */
-    ibcnt = ibcnt + 4;  }				/* incr ibuf cnt */
+	if ((ppc < 0) || (VA_GETOFF (ppc) == 0)) {	/* PPC inv, xpg? */
+	    ppc = Test ((PC + ibcnt) & ~03, RD, &t);	/* xlate PC */
+	    if (ppc < 0) Read ((PC + ibcnt) & ~03, L_LONG, RA);  }
+	if (ibcnt == 0) ibufl = ReadLP (ppc);		/* fill low */
+	else ibufh = ReadLP (ppc);			/* or high */
+	ppc = ppc + 4;					/* incr phys PC */
+	ibcnt = ibcnt + 4;  }				/* incr ibuf cnt */
 PC = PC + lnt;						/* incr PC */
 if (lnt == L_BYTE) val = (ibufl >> (bo << 3)) & BMASK;	/* byte? */
 else if (lnt == L_WORD) {				/* word? */
-    if (bo == 3) val = ((ibufl >> 24) & 0xFF) | ((ibufh & 0xFF) << 8);
-    else val = (ibufl >> (bo << 3)) & WMASK;  }
+	if (bo == 3) val = ((ibufl >> 24) & 0xFF) | ((ibufh & 0xFF) << 8);
+	else val = (ibufl >> (bo << 3)) & WMASK;  }
 else if (bo) {						/* unaligned lw? */
-    sc = bo << 3;
-    val =  (((ibufl >> sc) & align[bo]) | (((uint32) ibufh) << (32 - sc)));  }
+	sc = bo << 3;
+	val =  (((ibufl >> sc) & align[bo]) | (((uint32) ibufh) << (32 - sc)));  }
 else val = ibufl;					/* aligned lw */
 if ((bo + lnt) >= 4) {					/* retire ibufl? */
-    ibufl = ibufh;
-    ibcnt = ibcnt - 4;  }
+	ibufl = ibufh;
+	ibcnt = ibcnt - 4;  }
 return val;
+}
+
+/* Console entry */
+
+int32 con_halt (int32 code, int32 cc)
+{
+int32 temp;
+
+conpc = PC;						/* save PC */
+conpsl = ((PSL | cc) & 0xFFFF00FF) | CON_HLTINS;	/* PSL, param */
+temp = (PSL >> PSL_V_CUR) & 0x7;			/* get is'cur */
+if (temp > 4) conpsl = conpsl | CON_BADPSL;		/* invalid? */
+else STK[temp] = SP;					/* save stack */
+if (mapen) conpsl = conpsl | CON_MAPON;			/* mapping on? */
+mapen = 0;						/* turn off map */
+SP = IS;						/* set SP from IS */
+PSL = PSL_IS | PSL_IPL1F;				/* PSL = 41F0000 */
+JUMP (ROMBASE);						/* PC = 20040000 */
+return 0;						/* new cc = 0 */
 }
 
 /* To do list:
@@ -2236,6 +2308,7 @@ t_stat cpu_reset (DEVICE *dptr)
 {
 mem_err = 0;
 crd_err = 0;
+hlt_pin = 0;
 PSL = PSL_IS | PSL_IPL1F;
 SISR = 0;
 ASTLVL = 4;
@@ -2275,7 +2348,7 @@ if (rom == NULL) return SCPE_IERR;
 if (*rom == 0) {					/* no boot? */
 	printf ("Loading boot code from ka655.bin\n");
 	if (sim_log) fprintf (sim_log,
-		"Loading boot code from ka655.bin\n");
+	    "Loading boot code from ka655.bin\n");
 	r = load_cmd (0, "-R ka655.bin");
 	if (r != SCPE_OK) return r;  }
 return SCPE_OK;
@@ -2358,5 +2431,71 @@ if (r != SCPE_OK) return SCPE_ARG;
 pa = Test (va, RD, &st);
 if (st == PR_OK) printf ("Virtual %-X = physical %-X\n", va, pa);
 else printf ("Virtual %-X: %s\n", va, mm_str[st]);
+return SCPE_OK;
+}
+
+/* Set history */
+
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i, lnt;
+t_stat r;
+
+if (cptr == NULL) {
+	for (i = 0; i < HIST_SIZE; i++) hst[i].iPC = 0;
+	return SCPE_OK;  }
+lnt = (int32) get_uint (cptr, 10, HIST_SIZE, &r);
+if (r != SCPE_OK) return SCPE_ARG;
+hst_lnt = lnt;
+return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 i, j, k, di, disp, numspec;
+struct InstHistory *h;
+extern char *opcode[];
+
+if (hst_lnt == 0) return SCPE_NOFNC;			/* enabled? */
+di = hst_p + HIST_SIZE - hst_lnt;			/* work forward */
+for (k = 0; k < hst_lnt; k++) {				/* print specified */
+	h = &hst[(di++) % HIST_SIZE];			/* entry pointer */
+	if (h->iPC == 0) continue;			/* filled in? */
+	fprintf(st, "%08X %08X  ", h->iPC, h->PSL);	/* PC, PSL */
+	numspec = drom[h->opc][0] & DR_NSPMASK;		/* #specifiers */
+	if (opcode[h->opc] == NULL)			/* undefined? */
+	    fprintf (st, "%03X (undefined)", h->opc);
+	else if (h->PSL & PSL_FPD)			/* FPD set? */
+	    fprintf (st, "%s FPD set", opcode[h->opc]);
+	else {						/* normal */
+	    fprintf (st, "%s", opcode[h->opc]);		/* print opcode */
+	    for (i = 1, j = 0; i <= numspec; i++) {	/* loop thru specs */
+	        fputc ((i == 1)? ' ': ',', st);		/* separator */
+		disp = drom[h->opc][i];			/* specifier type */
+		if (disp == RG) disp = RQ;		/* fix specials */
+		else if (disp >= BB) fprintf (st, "%X", h->brdest);
+		else switch (disp & 0xF) {		/* case on type */
+		case RB: case RW: case RL:		/* read */
+		case AB: case AW: case AL: case AQ:	/* address */
+		case MB: case MW: case ML:		/* modify */
+		    fprintf (st, "%X", h->opnd[j++]);
+		    break;
+		case RQ:				/* read quad */
+		case MQ:				/* modify quad */
+		    fprintf (st, "%X%08X", h->opnd[j], h->opnd[j + 1]);
+		    j = j + 2;
+		    break;
+		case WB: case WW: case WL: case WQ:	/* write */
+		    if (h->opnd[j] < 0) fprintf (st, "%X", h->opnd[j + 1]);
+		    else fprintf (st, "R%d", h->opnd[j]);
+		    j = j + 2;
+		    break;
+		    }					/* end case */
+		}					/* end for */
+	    }						/* end else */
+	fputc ('\n', st);				/* end line */
+	}						/* end for */
 return SCPE_OK;
 }

@@ -259,7 +259,7 @@ void xio_error 			(char *msg);
 
 void   bail (char *msg);
 t_stat load_cr_boot (int drv);
-t_stat cr_boot (int unitno);
+t_stat cr_boot (int unitno, DEVICE *dptr);
 void   calc_ints (void);							/* recalculate interrupt bitmask */
 void   trace_io (char *fmt, ...);					/* debugging printout */
 void   scp_panic (char *msg);						/* bail out of simulator */

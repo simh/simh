@@ -29,6 +29,7 @@
    tto		teleprinter
    clk		clock
 
+   22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7B/8B support to terminal
    05-Oct-02	RMS	Added DIBs, device number support, IORS call
    14-Jul-02	RMS	Added ASCII reader/punch support (from Hans Pufal)
@@ -350,11 +351,11 @@ if (pulse & 001) {					/* CLSF */
 	if (TST_INT (CLK)) AC = AC | IOT_SKP;  }
 if (pulse & 004) {					/* CLON/CLOF */
 	if (pulse & 040) {				/* CLON */
-		CLR_INT (CLK);				/* clear flag */
-		clk_state = 1;				/* clock on */
-		if (!sim_is_active (&clk_unit))		/* already on? */
-			sim_activate (&clk_unit,	/* start, calibr */
-			    sim_rtc_init (clk_unit.wait));  }
+	    CLR_INT (CLK);				/* clear flag */
+	    clk_state = 1;				/* clock on */
+	    if (!sim_is_active (&clk_unit))		/* already on? */
+		sim_activate (&clk_unit,		/* start, calibr */
+		    sim_rtc_init (clk_unit.wait));  }
 	else clk_reset (&clk_dev);  }			/* CLOF */
 return AC;
 }
@@ -427,8 +428,8 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {		/* end of file? */
 	ptr_err = 1;
 #endif
 	if (feof (ptr_unit.fileref)) {
-		if (ptr_stopioe) printf ("PTR end of file\n");
-		else return SCPE_OK;  }
+	    if (ptr_stopioe) printf ("PTR end of file\n");
+	    else return SCPE_OK;  }
 	else perror ("PTR I/O error");
 	clearerr (ptr_unit.fileref);
 	return SCPE_IOERR;  }
@@ -671,7 +672,7 @@ if (pulse & 002) CLR_INT (PTP);				/* PCF */
 if (pulse & 004) {					/* PSA, PSB, PLS */
 	CLR_INT (PTP);					/* clear flag */
 	ptp_unit.buf = (pulse & 040)?			/* load punch buf */
-		(AC & 077) | 0200: AC & 0377;		/* bin or alpha */
+	    (AC & 077) | 0200: AC & 0377;		/* bin or alpha */
 	sim_activate (&ptp_unit, ptp_unit.wait);  }	/* activate unit */
 return AC;
 }
@@ -687,7 +688,7 @@ if ((ptp_unit.flags & UNIT_ATT) == 0) {			/* not attached? */
 if (ptp_unit.flags & UNIT_PASCII) {			/* ASCII mode? */
 	ptp_unit.buf = ptp_unit.buf & 0177;		/* force 7b */
 	if ((ptp_unit.buf == 0) || (ptp_unit.buf == 0177))
-		return SCPE_OK;  }			/* skip null, del */
+	    return SCPE_OK;  }				/* skip null, del */
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {	/* I/O error? */
 	ptp_err = 1;					/* set error */
 	perror ("PTP I/O error");
@@ -771,9 +772,10 @@ else {	if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;
 	if (c == 0) return SCPE_OK;			/* untranslatable? */
 	if (((c & TTI_FIGURES) == (tti_state & TTI_FIGURES)) ||
 	    (c & TTI_BOTH)) tti_unit.buf = c & TTI_MASK;
-	else {	tti_unit.buf = (c & TTI_FIGURES)?
-				BAUDOT_FIGURES: BAUDOT_LETTERS;
-		tti_state = c | TTI_2ND;  }  }		/* set 2nd waiting */
+	else {
+	    tti_unit.buf = (c & TTI_FIGURES)?
+		BAUDOT_FIGURES: BAUDOT_LETTERS;
+	    tti_state = c | TTI_2ND;  }  }		/* set 2nd waiting */
 
 #else							/* ASCII... */
 int32 c, out;
@@ -781,11 +783,12 @@ int32 c, out;
 sim_activate (&tti_unit, tti_unit.wait);		/* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
 out = c & 0177;						/* mask echo to 7b */
-if (tti_unit.flags & UNIT_KSR) {			/* KSR? */
+if (c & SCPE_BREAK) c = 0;				/* break? */
+else if (tti_unit.flags & UNIT_KSR) {			/* KSR? */
 	if (islower (out)) out = toupper (out);		/* convert to UC */
 	c = out | 0200;  }				/* set TTY bit */
 else c = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);	/* no, 7b/8b */
-if ((tti_unit.flags & UNIT_HDX) &&			/* half duplex and */
+if ((tti_unit.flags & UNIT_HDX) && out && 		/* half duplex and */
     (!(tto_unit.flags & UNIT_KSR) ||			/* 7b/8b or */
 	  ((out >= 007) && (out <= 0137)))) {		/* in range? */
 	sim_putchar (out);				/* echo */

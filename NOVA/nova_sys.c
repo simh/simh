@@ -134,64 +134,64 @@ state = 0;
 while ((i = getc (fileref)) != EOF) {
 	switch (state) {
 	case 0:						/* leader */
-		count = i;
-		state = (count != 0);
-		break;
+	    count = i;
+	    state = (count != 0);
+	    break;
 	case 1:						/* high count */
-		csum = count = (i << 8) | count;
-		state = 2;
-		break;
+	    csum = count = (i << 8) | count;
+	    state = 2;
+	    break;
 	case 2:						/* low origin */
-		origin = i;
-		state = 3;
-		break;
+	    origin = i;
+	    state = 3;
+	    break;
 	case 3:						/* high origin */
-		origin = (i << 8) | origin;
-		csum = csum + origin;
-		state = 4;
-		break;
+	    origin = (i << 8) | origin;
+	    csum = csum + origin;
+	    state = 4;
+	    break;
 	case 4:						/* low checksum */
-		csum = csum + i;
-		state = 5;
-		break;
+	    csum = csum + i;
+	    state = 5;
+	    break;
 	case 5:						/* high checksum */
-		csum = csum + (i << 8);
-		if (count == 1) saved_PC = origin;	/* count = 1? */
-		if (count <= 1) {			/* count = 0/1? */
-			if (csum & 0177777) return SCPE_CSUM;
-			state = 0;
-			break;  }
-		if (count < 0100000) {			/* count > 1 */
-			state = 8;
-			break;  }
-		count = 0200000 - count;
-		state = 6;
-		break;
+	    csum = csum + (i << 8);
+	    if (count == 1) saved_PC = origin;		/* count = 1? */
+	    if (count <= 1) {				/* count = 0/1? */
+		if (csum & 0177777) return SCPE_CSUM;
+		state = 0;
+		break;  }
+	    if (count < 0100000) {			/* count > 1 */
+		state = 8;
+		break;  }
+	    count = 0200000 - count;
+	    state = 6;
+	    break;
 	case 6:						/* low data  */
-		data = i;
-		state = 7;
-		break;
+	    data = i;
+	    state = 7;
+	    break;
 	case 7:						/* high data */
-		data = (i << 8) | data;
-		csum = csum + data;
-		if (count > 20) {			/* large block */
-			for (count = count - 1; count == 1; count--) {
-				if (origin >= MEMSIZE) return SCPE_NXM;
-				M[origin] = data;
-				origin = origin + 1;  }  }
-		if (origin >= MEMSIZE) return SCPE_NXM;
-		M[origin] = data;
-		origin = origin + 1;
-		count = count - 1;
-		if (count == 0) {
-			if (csum & 0177777) return SCPE_CSUM;
-			state = 0;
-			break;  }
-		state = 6;
-		break;
+	    data = (i << 8) | data;
+	    csum = csum + data;
+	    if (count > 20) {				/* large block */
+		for (count = count - 1; count == 1; count--) {
+		    if (origin >= MEMSIZE) return SCPE_NXM;
+		    M[origin] = data;
+		    origin = origin + 1;  }  }
+	    if (origin >= MEMSIZE) return SCPE_NXM;
+	    M[origin] = data;
+	    origin = origin + 1;
+	    count = count - 1;
+	    if (count == 0) {
+		if (csum & 0177777) return SCPE_CSUM;
+		state = 0;
+		break;  }
+	    state = 6;
+	    break;
 	case 8:						/* error block */
-		if (i == 0377) state = 0;
-		break;  }				/* end switch */
+	    if (i == 0377) state = 0;
+	    break;  }					/* end switch */
 	}						/* end while */
 
 /* Ok to find end of tape between blocks or in error state */
@@ -542,10 +542,11 @@ case 0:							/* absolute */
 	break;
 case 1:							/* PC rel */
 	if (disp & dsign) {
-		if (cflag) fprintf (of, "%-o", (addr - (dmax - disp)) & AMASK);
-		else fprintf (of, ".-%-o", dmax - disp);  }
-	else {	if (cflag) fprintf (of, "%-o", (addr + disp) & AMASK);
-		else fprintf (of, ".+%-o", disp);  }
+	    if (cflag) fprintf (of, "%-o", (addr - (dmax - disp)) & AMASK);
+	    else fprintf (of, ".-%-o", dmax - disp);  }
+	else {
+	    if (cflag) fprintf (of, "%-o", (addr + disp) & AMASK);
+	    else fprintf (of, ".+%-o", disp);  }
 	break;
 case 2:							/* AC2 rel */
 	if (disp & dsign) fprintf (of, "-%-o,2", dmax - disp);
@@ -610,67 +611,67 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 
 	switch (j) {					/* switch on class */
 	case I_V_NPN:					/* no operands */
-		fprintf (of, "%s", opcode[i]);		/* opcode */
-		break;
+	    fprintf (of, "%s", opcode[i]);		/* opcode */
+	    break;
 	case I_V_R:					/* reg only */
-		fprintf (of, "%s %-o", opcode[i], dst);
-		break;
+	    fprintf (of, "%s %-o", opcode[i], dst);
+	    break;
 	case I_V_D:					/* dev only */
-		if (dev_val[dv] >= 0)
-			fprintf (of, "%s %s", opcode[i], device[dv]);
-		else fprintf (of, "%s %-o", opcode[i], dev);
-		break;
+	    if (dev_val[dv] >= 0)
+		fprintf (of, "%s %s", opcode[i], device[dv]);
+	    else fprintf (of, "%s %-o", opcode[i], dev);
+	    break;
 	case I_V_RD:					/* reg, dev */
-		if (dev_val[dv] >= 0)
-			fprintf (of, "%s %-o,%s", opcode[i], dst, device[dv]);
-		else fprintf (of, "%s %-o,%-o", opcode[i], dst, dev);
-		break;
+	    if (dev_val[dv] >= 0)
+		fprintf (of, "%s %-o,%s", opcode[i], dst, device[dv]);
+	    else fprintf (of, "%s %-o,%-o", opcode[i], dst, dev);
+	    break;
 	case I_V_M:					/* addr only */
-		fprintf (of, "%s ", opcode[i]);
-		fprint_addr (of, addr, ind, mode, disp, FALSE, cflag);
-		break;
+	    fprintf (of, "%s ", opcode[i]);
+	    fprint_addr (of, addr, ind, mode, disp, FALSE, cflag);
+	    break;
 	case I_V_RM:					/* reg, addr */
-		fprintf (of, "%s %-o,", opcode[i], dst);
-		fprint_addr (of, addr, ind, mode, disp, FALSE, cflag);
-		break;
+	    fprintf (of, "%s %-o,", opcode[i], dst);
+	    fprint_addr (of, addr, ind, mode, disp, FALSE, cflag);
+	    break;
 	case I_V_RR:					/* operate */
-		fprintf (of, "%s %-o,%-o", opcode[i], src, dst);
-		if (skp) fprintf (of, ",%s", skip[skp-1]);
-		break;
+	    fprintf (of, "%s %-o,%-o", opcode[i], src, dst);
+	    if (skp) fprintf (of, ",%s", skip[skp-1]);
+	    break;
 	case I_V_BY:					/* byte */
-		fprintf (of, "%s %-o,%-o", opcode[i], byac, dst);
-		break;
+	    fprintf (of, "%s %-o,%-o", opcode[i], byac, dst);
+	    break;
 	case I_V_2AC:					/* reg, reg */
-		fprintf (of, "%s %-o,%-o", opcode[i], src, dst);
-		break;
+	    fprintf (of, "%s %-o,%-o", opcode[i], src, dst);
+	    break;
 	case I_V_RSI:					/* reg, short imm */
-		fprintf (of, "%s %-o,%-o", opcode[i], src + 1, dst);
-		break;
+	    fprintf (of, "%s %-o,%-o", opcode[i], src + 1, dst);
+	    break;
 	case I_V_LI:					/* long imm */
-		fprintf (of, "%s %-o", opcode[i], val[1]);
-		return -1;
+	    fprintf (of, "%s %-o", opcode[i], val[1]);
+	    return -1;
 	case I_V_RLI:					/* reg, long imm */
-		fprintf (of, "%s %-o,%-o", opcode[i], val[1], dst);
-		return -1;
+	    fprintf (of, "%s %-o,%-o", opcode[i], val[1], dst);
+	    return -1;
 	case I_V_LM:					/* long addr */
-		fprintf (of, "%s ", opcode[i]);
-		fprint_addr (of, addr, extind, mode, extdisp, TRUE, cflag);
-		return -1;
+	    fprintf (of, "%s ", opcode[i]);
+	    fprint_addr (of, addr, extind, mode, extdisp, TRUE, cflag);
+	    return -1;
 	case I_V_RLM:					/* reg, long addr */
-		fprintf (of, "%s %-o,", opcode[i], dst);
-		fprint_addr (of, addr, extind, mode, extdisp, TRUE, cflag);
-		return -1;
+	    fprintf (of, "%s %-o,", opcode[i], dst);
+	    fprint_addr (of, addr, extind, mode, extdisp, TRUE, cflag);
+	    return -1;
 	case I_V_FRM:					/* flt reg, long addr */
-		fprintf (of, "%s %-o,", opcode[i], dst);
-		fprint_addr (of, addr, extind, src, extdisp, TRUE, cflag);
-		return -1;
+	    fprintf (of, "%s %-o,", opcode[i], dst);
+	    fprint_addr (of, addr, extind, src, extdisp, TRUE, cflag);
+	    return -1;
 	case I_V_FST:					/* flt status */
-		fprintf (of, "%s ", opcode[i]);
-		fprint_addr (of, addr, extind, dst, extdisp, AMASK + 1, cflag);
-		return -1;
+	    fprintf (of, "%s ", opcode[i]);
+	    fprint_addr (of, addr, extind, dst, extdisp, AMASK + 1, cflag);
+	    return -1;
 	case I_V_XP:					/* XOP */
-		fprintf (of, "%s %-o,%-o,%-o", opcode[i], src, dst, xop);
-		break;  }				/* end case */
+	    fprintf (of, "%s %-o,%-o,%-o", opcode[i], src, dst, xop);
+	    break;  }					/* end case */
 	return SCPE_OK;  }				/* end if */
 	}						/* end for */
 return SCPE_ARG;
@@ -746,8 +747,8 @@ case A_NUM+A_FL: case A_NUM+A_SI+A_FL:			/* CPU, (+)num */
 	else if (((d >= (((int32) addr - dsign) & AMASK)) &&
 		  (d < (((int32) addr + dsign) & AMASK))) ||
 		  (d >= ((int32) addr + (-dsign & AMASK)))) {
-		val[1] = 1;				/* PC rel */
-		val[2] = (d - addr) & (dmax - 1);  }
+	    val[1] = 1;					/* PC rel */
+	    val[2] = (d - addr) & (dmax - 1);  }
 	else return NULL;
 	break;
 case A_PER: case A_PER+A_FL:				/* . */
@@ -847,12 +848,13 @@ case I_V_RD:						/* IOT reg,dev */
 	val[0] = val[0] | (d << I_V_DST);		/* put in place */
 case I_V_D:						/* IOT dev */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get device */
-	for (i = 0; (device[i] != NULL) && (strcmp (device[i], gbuf) != 0);
-		i++);
+	for (i = 0; (device[i] != NULL) &&
+		    (strcmp (device[i], gbuf) != 0); i++);
 	if (device[i] != NULL) val[0] = val[0] | dev_val[i];
-	else {	d = get_uint (gbuf, 8, I_M_DEV, &r);
-		if (r != SCPE_OK) return SCPE_ARG;
-		val[0] = val[0] | (d << I_V_DEV);  }
+	else {
+	    d = get_uint (gbuf, 8, I_M_DEV, &r);
+	    if (r != SCPE_OK) return SCPE_ARG;
+	    val[0] = val[0] | (d << I_V_DEV);  }
 	break;
 case I_V_RM:						/* reg, addr */
 	cptr = get_glyph (cptr, gbuf, ',');		/* get register */
@@ -869,11 +871,11 @@ case I_V_RR:						/* operate */
 	if (cptr == NULL) return SCPE_ARG;
 	val[0] = val[0] | (amd[0] << I_V_SRC) | (amd[1] << I_V_DST);
 	if (*cptr != 0) {				/* skip? */
-		cptr = get_glyph (cptr, gbuf, 0);	/* get skip */
-		for (i = 0; (skip[i] != NULL) &&
-			(strcmp (skip[i], gbuf) != 0); i++) ;
-		if (skip[i] == NULL) return SCPE_ARG;
-		val[0] = val[0] | (i + 1);  }		/* end for */
+	    cptr = get_glyph (cptr, gbuf, 0);		/* get skip */
+	    for (i = 0; (skip[i] != NULL) &&
+		(strcmp (skip[i], gbuf) != 0); i++) ;
+	    if (skip[i] == NULL) return SCPE_ARG;
+	    val[0] = val[0] | (i + 1);  }		/* end for */
 	break;
 case I_V_BY:						/* byte */
 	cptr = get_2reg (cptr, 0, amd);			/* get 2 reg */

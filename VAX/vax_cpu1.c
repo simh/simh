@@ -214,10 +214,10 @@ if (size > 32) RSVD_OPND_FAULT;				/* size > 32? fault */
 if (rn >= 0) {						/* in registers? */
 	if (((uint32) pos) > 31) RSVD_OPND_FAULT;	/* pos > 31? fault */
 	if ((pos + size) > 32) {			/* span two reg? */
-		if (rn >= nSP) RSVD_OPND_FAULT;		/* if PC, fault */
-		mask = byte_mask[pos + size - 32];	/* insert fragment */
-		val = ins >> (32 - pos);
-		R[rnplus1] = (vfldrp1 & ~mask) | (val & mask);  }
+	    if (rn >= nSP) RSVD_OPND_FAULT;		/* if PC, fault */
+	    mask = byte_mask[pos + size - 32];		/* insert fragment */
+	    val = ins >> (32 - pos);
+	    R[rnplus1] = (vfldrp1 & ~mask) | (val & mask);  }
 	mask = byte_mask[size] << pos;			/* insert field */
 	val = ins << pos;
 	R[rn] = (R[rn] & ~mask) | (val & mask);  }
@@ -226,10 +226,10 @@ else {	ba = opnd[4] + (pos >> 3);			/* base byte addr */
 	ba = ba & ~03;					/* lw align base */
 	wd = Read (ba, L_LONG, WA);			/* read field */
 	if ((size + pos) > 32) {			/* field span lw? */
-		wd1 = Read (ba + 4, L_LONG, WA);	/* read 2nd lw */
-		mask = byte_mask[pos + size - 32];	/* insert fragment */
-		val = ins >> (32 - pos);
-		Write (ba + 4, (wd1 & ~mask) | (val & mask), L_LONG, WA);  }
+	    wd1 = Read (ba + 4, L_LONG, WA);		/* read 2nd lw */
+	    mask = byte_mask[pos + size - 32];		/* insert fragment */
+	    val = ins >> (32 - pos);
+	    Write (ba + 4, (wd1 & ~mask) | (val & mask), L_LONG, WA);  }
 	mask = byte_mask[size] << pos;			/* insert field */
 	val = ins << pos;
 	Write (ba, (wd & ~mask) | (val & mask), L_LONG, WA);  }
@@ -664,13 +664,13 @@ a = ar + h;						/* abs addr of a */
 if (ar) {						/* queue not empty? */
 	Write (h, ar | 1, L_LONG, WA);			/* acquire interlock */
 	if (Test (a, RA, &t) < 0)			/* read tst a */
-		 Write (h, ar, L_LONG, WA);		/* release if error */
+	     Write (h, ar, L_LONG, WA);			/* release if error */
 	b = Read (a, L_LONG, RA) + a;			/* b <- (a)+a, flt ok */
 	if (b & 07) {					/* b quad aligned? */
-		Write (h, ar, L_LONG, WA);		/* release interlock */
-		RSVD_OPND_FAULT;  }			/* fault */
+	    Write (h, ar, L_LONG, WA);			/* release interlock */
+	    RSVD_OPND_FAULT;  }				/* fault */
 	if (Test (b, WA, &t) < 0)			/* write test b */
-		Write (h, ar, L_LONG, WA);		/* release if err */
+	    Write (h, ar, L_LONG, WA);			/* release if err */
 	Write (b + 4, h - b, L_LONG, WA);		/* (b+4) <- h-b, flt ok */
 	Write (h, b - h, L_LONG, WA);  }		/* (h) <- b-h, rls int */
 if (opnd[1] >= 0) R[opnd[1]] = a;			/* store result */
@@ -695,20 +695,20 @@ if (ar) {						/* queue not empty */
 	Write (h, ar | 1, L_LONG, WA);			/* acquire interlock */
 	c = Read (h + 4, L_LONG, RA);			/* c <- (h+4) */
 	if (ar == c) {					/* single entry? */
-		Write (h, ar, L_LONG, WA);		/* release interlock */
-		return op_remqhi (opnd, acc);  }	/* treat as remqhi */
+	    Write (h, ar, L_LONG, WA);			/* release interlock */
+	    return op_remqhi (opnd, acc);  }		/* treat as remqhi */
 	if (c & 07) {					/* c quad aligned? */
-		Write (h, ar, L_LONG, WA);		/* release interlock */
-		RSVD_OPND_FAULT;  }			/* fault */
+	    Write (h, ar, L_LONG, WA);			/* release interlock */
+	    RSVD_OPND_FAULT;  }				/* fault */
 	c = c + h;					/* abs addr of c */
 	if (Test (c + 4, RA, &t) < 0)			/* read test c+4 */
-		 Write (h, ar, L_LONG, WA);		/* release if error */
+	    Write (h, ar, L_LONG, WA);			/* release if error */
 	b = Read (c + 4, L_LONG, RA) + c;		/* b <- (c+4)+c, flt ok */
 	if (b & 07) {					/* b quad aligned? */
-		Write (h, ar, L_LONG, WA);		/* release interlock */
-		RSVD_OPND_FAULT;  }			/* fault */
+	    Write (h, ar, L_LONG, WA);			/* release interlock */
+	    RSVD_OPND_FAULT;  }				/* fault */
 	if (Test (b, WA, &t) < 0)			/* write test b */
-		 Write (h, ar, L_LONG, WA);		/* release if error */
+	    Write (h, ar, L_LONG, WA);			/* release if error */
 	Write (b, h - b, L_LONG, WA);			/* (b) <- h-b */
 	Write (h + 4, b - h, L_LONG, WA);		/* (h+4) <- b-h */
 	Write (h, ar, L_LONG, WA);  }			/* release interlock */
@@ -772,22 +772,23 @@ if (PSL & PSL_FPD) {					/* FPD set? */
 	if (R[4] > 0) R[4] = R[4] & STR_LNMASK;  }
 else {	R[1] = opnd[1];					/* src addr */
 	if (movc5) {					/* MOVC5? */
-		R[2] = (opnd[0] < opnd[3])? opnd[0]: opnd[3];
-		R[3] = opnd[4];				/* dst addr */
-		R[4] = opnd[3] - opnd[0];		/* dstlen - srclen */
-		fill = opnd[2];				/* set fill */
-		CC_CMP_W (opnd[0], opnd[3]);  }		/* set cc's */
-	else {	R[2] = opnd[0];				/* mvlen = srclen */
-		R[3] = opnd[2];				/* dst addr */
-		R[4] = fill = 0;			/* no fill */
-		cc = CC_Z;  }				/* set cc's */
+	    R[2] = (opnd[0] < opnd[3])? opnd[0]: opnd[3];
+	    R[3] = opnd[4];				/* dst addr */
+	    R[4] = opnd[3] - opnd[0];			/* dstlen - srclen */
+	    fill = opnd[2];				/* set fill */
+	    CC_CMP_W (opnd[0], opnd[3]);  }		/* set cc's */
+	else {
+	    R[2] = opnd[0];				/* mvlen = srclen */
+	    R[3] = opnd[2];				/* dst addr */
+	    R[4] = fill = 0;				/* no fill */
+	    cc = CC_Z;  }				/* set cc's */
 	R[0] = STR_PACK (fill, R[2]);			/* initial mvlen */
 	if (R[2]) {					/* any move? */
-		if (((uint32) R[1]) < ((uint32) R[3])) {
-			R[1] = R[1] + R[2];		/* backward, adjust */
-			R[3] = R[3] + R[2];		/* addr to end */
-			R[5] = MVC_BACK;  }		/* set state */
-		else R[5] = MVC_FRWD;  }		/* fwd, set state */
+	    if (((uint32) R[1]) < ((uint32) R[3])) {
+		R[1] = R[1] + R[2];			/* backward, adjust */
+		R[3] = R[3] + R[2];			/* addr to end */
+		R[5] = MVC_BACK;  }			/* set state */
+	    else R[5] = MVC_FRWD;  }			/* fwd, set state */
 	else R[5] = MVC_FILL;				/* fill, set state */
 	R[5] = R[5] | (cc << MVC_V_CC);			/* pack with state */
 	PSL = PSL | PSL_FPD;  }				/* set FPD */
@@ -809,14 +810,14 @@ case MVC_FRWD:						/* move forward */
 	mlnt[1] = (R[2] - mlnt[0]) & ~03;		/* aligned length */
 	mlnt[2] = R[2] - mlnt[0] - mlnt[1];		/* tail */
 	for (i = 0; i < 3; i++) {			/* head, align, tail */
-		lnt = looplnt[i];			/* length for loop */
-		for (j = 0; j < mlnt[i]; j = j + lnt, sim_interval--) {
-/*			if (sim_interval == 0) ABORT (ABORT_INTR); */
-			wd = Read (R[1], lnt, RA);	/* read src */
-			Write (R[3], wd, lnt, WA);	/* write dst */
-			R[1] = R[1] + lnt;		/* inc src addr */
-			R[3] = R[3] + lnt;		/* inc dst addr */
-			R[2] = R[2] - lnt;  }  }	/* dec move lnt */
+	    lnt = looplnt[i];				/* length for loop */
+	    for (j = 0; j < mlnt[i]; j = j + lnt, sim_interval--) {
+/*		if (sim_interval == 0) ABORT (ABORT_INTR); */
+		wd = Read (R[1], lnt, RA);		/* read src */
+		Write (R[3], wd, lnt, WA);		/* write dst */
+		R[1] = R[1] + lnt;			/* inc src addr */
+		R[3] = R[3] + lnt;			/* inc dst addr */
+		R[2] = R[2] - lnt;  }  }		/* dec move lnt */
 	goto FILL;					/* check for fill */
 case MVC_BACK:						/* move backward */
 	mlnt[0] = R[3] & 03;				/* length to align */
@@ -824,14 +825,14 @@ case MVC_BACK:						/* move backward */
 	mlnt[1] = (R[2] - mlnt[0]) & ~03;		/* aligned length */
 	mlnt[2] = R[2] - mlnt[0] - mlnt[1];		/* tail */
 	for (i = 0; i < 3; i++) {			/* head, align, tail */
-		lnt = looplnt[i];			/* length for loop */
-		for (j = 0; j < mlnt[i]; j = j + lnt, sim_interval--) {
-/*			if (sim_interval == 0) ABORT (ABORT_INTR); */
-			wd = Read (R[1] - lnt, lnt, RA); /* read src */
-			Write (R[3] - lnt, wd, lnt, WA); /* write dst */
-			R[1] = R[1] - lnt;		/* dec src addr */
-			R[3] = R[3] - lnt;		/* dec dst addr */
-			R[2] = R[2] - lnt;  }  }	/* dec move lnt */
+	    lnt = looplnt[i];				/* length for loop */
+	    for (j = 0; j < mlnt[i]; j = j + lnt, sim_interval--) {
+/*		if (sim_interval == 0) ABORT (ABORT_INTR); */
+		wd = Read (R[1] - lnt, lnt, RA);	/* read src */
+		Write (R[3] - lnt, wd, lnt, WA);	/* write dst */
+		R[1] = R[1] - lnt;			/* dec src addr */
+		R[3] = R[3] - lnt;			/* dec dst addr */
+		R[2] = R[2] - lnt;  }  }		/* dec move lnt */
 	R[1] = R[1] + (R[0] & STR_LNMASK);		/* final src addr */
 	R[3] = R[3] + (R[0] & STR_LNMASK);		/* final dst addr */
 case MVC_FILL:						/* fill */
@@ -843,15 +844,15 @@ FILL:
 	mlnt[1] = (R[4] - mlnt[0]) & ~03;		/* aligned length */
 	mlnt[2] = R[4] - mlnt[0] - mlnt[1];		/* tail */
 	for (i = 0; i < 3; i++) {			/* head, align, tail */
-		lnt = looplnt[i];			/* length for loop */
-		fill = fill & BMASK;			/* fill for loop */
-		if (lnt == L_LONG) fill = 
-			(((uint32) fill) << 24) | (fill << 16) | (fill << 8) | fill;
-		for (j = 0; j < mlnt[i]; j = j + lnt, sim_interval--) {
-/*			if (sim_interval == 0) ABORT (ABORT_INTR); */
-			Write (R[3], fill, lnt, WA);	/* write fill */
-			R[3] = R[3] + lnt;		/* inc dst addr */
-			R[4] = R[4] - lnt;  }  }	/* dec fill lnt */
+	    lnt = looplnt[i];				/* length for loop */
+	    fill = fill & BMASK;			/* fill for loop */
+	    if (lnt == L_LONG) fill = 
+		(((uint32) fill) << 24) | (fill << 16) | (fill << 8) | fill;
+	    for (j = 0; j < mlnt[i]; j = j + lnt, sim_interval--) {
+/*		if (sim_interval == 0) ABORT (ABORT_INTR); */
+		Write (R[3], fill, lnt, WA);		/* write fill */
+		R[3] = R[3] + lnt;			/* inc dst addr */
+		R[4] = R[4] - lnt;  }  }		/* dec fill lnt */
 	break;
 default:						/* bad state */
 	RSVD_OPND_FAULT;  }				/* you lose */
@@ -892,12 +893,13 @@ if (PSL & PSL_FPD) {					/* FPD set? */
 	fill = STR_GETCHR (R[0]);  }			/* get fill */
 else {	R[1] = opnd[1];					/* src1len */
 	if (cmpc5) {					/* CMPC5? */
-		R[2] = opnd[3];				/* get src2 opnds */
-		R[3] = opnd[4];
-		fill = opnd[2];  }
-	else {	R[2] = opnd[0];				/* src2len = src1len */
-		R[3] = opnd[2];
-		fill = 0;  }
+	    R[2] = opnd[3];				/* get src2 opnds */
+	    R[3] = opnd[4];
+	    fill = opnd[2];  }
+	else {
+	    R[2] = opnd[0];				/* src2len = src1len */
+	    R[3] = opnd[2];
+	    fill = 0;  }
 	R[0] = STR_PACK (fill, opnd[0]);		/* src1len + FPD data */
 	PSL = PSL | PSL_FPD;  }
 R[2] = R[2] & STR_LNMASK;				/* mask src2len */
@@ -909,11 +911,11 @@ for (s1 = s2 = 0; ((R[0] | R[2]) & STR_LNMASK) != 0; sim_interval--) {
 	else s2 = fill;					/* no, use fill */
 	if (s1 != s2) break;				/* src1 = src2? */
 	if (R[0] & STR_LNMASK) {			/* if src1, decr */
-		R[0] = (R[0] & ~STR_LNMASK) | ((R[0] - 1) & STR_LNMASK);
-		R[1] = R[1] + 1;  }
+	    R[0] = (R[0] & ~STR_LNMASK) | ((R[0] - 1) & STR_LNMASK);
+	    R[1] = R[1] + 1;  }
 	if (R[2]) {					/* if src2, decr */
-		R[2] = (R[2] - 1) & STR_LNMASK;
-		R[3] = R[3] + 1;  }  }
+	    R[2] = (R[2] - 1) & STR_LNMASK;
+	    R[3] = R[3] + 1;  }  }
 PSL = PSL & ~PSL_FPD;					/* clear FPD */
 CC_CMP_B (s1, s2);					/* set cc's */
 R[0] = R[0] & STR_LNMASK;				/* clear packup */
@@ -1022,10 +1024,11 @@ if (newpc & 2) ABORT (STOP_ILLVEC);			/* bad flags? */
 if (oldpsl & PSL_IS) newpsl = PSL_IS;			/* on int stk? */
 else {	STK[oldcur] = SP;				/* no, save cur stk */
 	if (newpc & 1) {				/* to int stk? */
-		newpsl = PSL_IS;			/* flag */
-		SP = IS;  }				/* new stack */
-	else {	newpsl = 0;				/* to ker stk */
-		SP = KSP;  }  }				/* new stack */
+	    newpsl = PSL_IS;				/* flag */
+	    SP = IS;  }					/* new stack */
+	else {
+	    newpsl = 0;					/* to ker stk */
+	    SP = KSP;  }  }				/* new stack */
 if (ei > 0) PSL = newpsl | (ipl << PSL_V_IPL);		/* if int, new IPL */
 else PSL = newpsl | ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) |
 	(oldcur << PSL_V_PRV);
@@ -1108,12 +1111,12 @@ if ((newpsl & PSL_MBZ) ||				/* rule 8 */
 if (newcur) {						/* to esu, skip 2,4,7 */
 	if ((newpsl & (PSL_IS | PSL_IPL)) ||		/* rules 3,5 */
 	    (newcur > PSL_GETPRV (newpsl)))		/* rule 6 */
-		RSVD_OPND_FAULT;	}		/* end rei to esu */
+	    RSVD_OPND_FAULT;	}			/* end rei to esu */
 else {							/* to k, skip 3,5,6 */
 	newipl = PSL_GETIPL (newpsl);			/* get new ipl */
 	if ((newpsl & PSL_IS) &&			/* setting IS? */
 	   (((PSL & PSL_IS) == 0) || (newipl == 0)))	/* test rules 2,4 */
-		RSVD_OPND_FAULT;			/* else skip 2,4 */
+	    RSVD_OPND_FAULT;				/* else skip 2,4 */
 	if (newipl > PSL_GETIPL (PSL)) RSVD_OPND_FAULT;	/* test rule 7 */
 	}						/* end if kernel */
 SP = SP + 8;						/* pop stack */
@@ -1126,9 +1129,9 @@ PSL = (PSL & PSL_TP) | (newpsl & ~CC_MASK);		/* set new PSL */
 if (PSL & PSL_IS) SP = IS;				/* set new stack */
 else {	SP = STK[newcur];				/* if ~IS, chk AST */
 	if (newcur >= ASTLVL) {
-		if (DBG_LOG (LOG_CPU_R)) fprintf (sim_log,
-			">>REI: AST delivered\n");
-		SISR = SISR | SISR_2;  }  }
+	    if (DBG_LOG (LOG_CPU_R)) fprintf (sim_log,
+		">>REI: AST delivered\n");
+	    SISR = SISR | SISR_2;  }  }
 JUMP (newpc);						/* set new PC */
 return newpsl & CC_MASK;				/* set new cc */
 }

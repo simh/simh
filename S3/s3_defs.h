@@ -92,4 +92,3 @@ struct opdef {
 						2 - 2-address (0x<0,1,2,4,5,6,8,9,A>x)
 						3 - 1-address B (0x<3,7,B>x) */
 };
-						

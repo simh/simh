@@ -255,35 +255,35 @@ switch ((IR >> 8) & 017) {				/* decode IR<11:8> */
 case 0:
 	switch (ac) {					/* decode IR<7:6> */
 	case 0:						/* specials */
-		if (IR == 0170000) {			/* CFCC */
-			N = (FPS >> PSW_V_N) & 1;
-			Z = (FPS >> PSW_V_Z) & 1;
-			V = (FPS >> PSW_V_V) & 1;
-			C = (FPS >> PSW_V_C) & 1;  }
-		else if (IR == 0170001)			/* SETF */
-			FPS = FPS & ~FPS_D;
-		else if (IR == 0170002)			/* SETI */
-			FPS = FPS & ~FPS_L;
-		else if (IR == 0170011)			/* SETD */
-			FPS = FPS | FPS_D;
-		else if (IR == 0170012)			/* SETL */
-			FPS = FPS | FPS_L;
-		else fpnotrap (FEC_OP);
-		break;
+	    if (IR == 0170000) {			/* CFCC */
+		N = (FPS >> PSW_V_N) & 1;
+		Z = (FPS >> PSW_V_Z) & 1;
+		V = (FPS >> PSW_V_V) & 1;
+		C = (FPS >> PSW_V_C) & 1;  }
+	    else if (IR == 0170001)			/* SETF */
+		FPS = FPS & ~FPS_D;
+	    else if (IR == 0170002)			/* SETI */
+		FPS = FPS & ~FPS_L;
+	    else if (IR == 0170011)			/* SETD */
+		FPS = FPS | FPS_D;
+	    else if (IR == 0170012)			/* SETL */
+		FPS = FPS | FPS_L;
+	    else fpnotrap (FEC_OP);
+	    break;
 	case 1:						/* LDFPS */
-		dst = (dstspec <= 07)? R[dstspec]: ReadW (GeteaW (dstspec));
-		FPS = dst & FPS_RW;
-		break;
+	    dst = (dstspec <= 07)? R[dstspec]: ReadW (GeteaW (dstspec));
+	    FPS = dst & FPS_RW;
+	    break;
 	case 2:						/* STFPS */
-		FPS = FPS & FPS_RW;
-		if (dstspec <= 07) R[dstspec] = FPS;
-		else WriteW (FPS, GeteaW (dstspec));
-		break;
+	    FPS = FPS & FPS_RW;
+	    if (dstspec <= 07) R[dstspec] = FPS;
+	    else WriteW (FPS, GeteaW (dstspec));
+	    break;
 	case 3:						/* STST */
-		if (dstspec <= 07) R[dstspec] = FEC;
-		else WriteI ((FEC << 16) | FEA, GeteaFP (dstspec, LONG),
-			 dstspec, LONG);
-		break;  }				/* end switch <7:6> */
+	    if (dstspec <= 07) R[dstspec] = FEC;
+	    else WriteI ((FEC << 16) | FEA, GeteaFP (dstspec, LONG),
+		 dstspec, LONG);
+	    break;  }				/* end switch <7:6> */
 	break;						/* end case 0 */
 
 /* "Easy" instructions */
@@ -291,27 +291,27 @@ case 0:
 case 1:
 	switch (ac) {					/* decode IR<7:6> */
 	case 0:						/* CLRf */
-		WriteFP (&zero_fac, GeteaFP (dstspec, lenf), dstspec, lenf);
-		FPS = (FPS & ~FPS_CC) | FPS_Z;
-		break;
+	    WriteFP (&zero_fac, GeteaFP (dstspec, lenf), dstspec, lenf);
+	    FPS = (FPS & ~FPS_CC) | FPS_Z;
+	    break;
 	case 1:						/* TSTf */
-		ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
-		FPS = setfcc (FPS, fsrc.h, 0);
-		break;
+	    ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
+	    FPS = setfcc (FPS, fsrc.h, 0);
+	    break;
 	case 2:						/* ABSf */
-		ReadFP (&fsrc, ea = GeteaFP (dstspec, lenf), dstspec, lenf);
-		if (GET_EXP (fsrc.h) == 0) fsrc = zero_fac;
-		else fsrc.h = fsrc.h & ~FP_SIGN;
-		WriteFP (&fsrc, ea, dstspec, lenf);
-		FPS = setfcc (FPS, fsrc.h, 0);
-		break;
+	    ReadFP (&fsrc, ea = GeteaFP (dstspec, lenf), dstspec, lenf);
+	    if (GET_EXP (fsrc.h) == 0) fsrc = zero_fac;
+	    else fsrc.h = fsrc.h & ~FP_SIGN;
+	    WriteFP (&fsrc, ea, dstspec, lenf);
+	    FPS = setfcc (FPS, fsrc.h, 0);
+	    break;
 	case 3:						/* NEGf */
-		ReadFP (&fsrc, ea = GeteaFP (dstspec, lenf), dstspec, lenf);
-		if (GET_EXP (fsrc.h) == 0) fsrc = zero_fac;
-		else fsrc.h = fsrc.h ^ FP_SIGN;
-		WriteFP (&fsrc, ea, dstspec, lenf);
-		FPS = setfcc (FPS, fsrc.h, 0);
-		break;  }				/* end switch <7:6> */
+	    ReadFP (&fsrc, ea = GeteaFP (dstspec, lenf), dstspec, lenf);
+	    if (GET_EXP (fsrc.h) == 0) fsrc = zero_fac;
+	    else fsrc.h = fsrc.h ^ FP_SIGN;
+	    WriteFP (&fsrc, ea, dstspec, lenf);
+	    FPS = setfcc (FPS, fsrc.h, 0);
+	    break;  }					/* end switch <7:6> */
 	break;						/* end case 1 */
 case 5:							/* LDf */
 	ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
@@ -347,13 +347,13 @@ case 7:							/* CMPf */
 	if (GET_EXP (fsrc.h) == 0) fsrc = zero_fac;
 	if (GET_EXP (fac.h) == 0) fac = zero_fac;
 	if ((fsrc.h == fac.h) && (fsrc.l == fac.l)) {	/* equal? */
-		FPS = (FPS & ~FPS_CC) | FPS_Z;
-		if ((fsrc.h | fsrc.l) == 0) {		/* zero? */
-			F_STORE (qdouble, zero_fac, FR[ac]);  }
-		break;  }
+	    FPS = (FPS & ~FPS_CC) | FPS_Z;
+	    if ((fsrc.h | fsrc.l) == 0) {		/* zero? */
+		F_STORE (qdouble, zero_fac, FR[ac]);  }
+	    break;  }
 	FPS = (FPS & ~FPS_CC) | ((fsrc.h >> (FP_V_SIGN - PSW_V_N)) & FPS_N);
 	if ((GET_SIGN (fsrc.h ^ fac.h) == 0) && (fac.h != 0) &&
-		F_LT (fsrc, fac)) FPS = FPS ^ FPS_N;
+	    F_LT (fsrc, fac)) FPS = FPS ^ FPS_N;
 	break;
 
 /* Load and store exponent instructions */
@@ -364,10 +364,11 @@ case 015:						/* LDEXP */
 	fac.h = (fac.h & ~FP_EXP) | (((dst + FP_BIAS) & FP_M_EXP) << FP_V_EXP);
 	newV = 0;
 	if ((dst > 0177) && (dst <= 0177600)) {
-		if (dst < 0100000) {
-			if (fpnotrap (FEC_OVFLO)) fac = zero_fac;
-			newV = FPS_V;  }
-		else {	if (fpnotrap (FEC_UNFLO)) fac = zero_fac;  }  }
+	    if (dst < 0100000) {
+		if (fpnotrap (FEC_OVFLO)) fac = zero_fac;
+		newV = FPS_V;  }
+	    else {
+	    	if (fpnotrap (FEC_UNFLO)) fac = zero_fac;  }  }
 	F_STORE (qdouble, fac, FR[ac]);
 	FPS = setfcc (FPS, fac.h, newV);
 	break;	
@@ -390,13 +391,13 @@ case 016:						/* LDCif */
 	else fac.l = ReadI (GeteaFP (dstspec, leni), dstspec, leni);
 	fac.h = 0;
 	if (fac.l) {
-		if (sign = GET_SIGN_L (fac.l)) fac.l = (fac.l ^ 0xFFFFFFFF) + 1;
-		for (i = 0; GET_SIGN_L (fac.l) == 0; i++) fac.l = fac.l << 1;
-		exp = ((FPS & FPS_L)? FP_BIAS + 32: FP_BIAS + 16) - i;
-		fac.h = (sign << FP_V_SIGN) | (exp << FP_V_EXP) |
-		  ((fac.l >> (31 - FP_V_HB)) & FP_FRACH);
-		fac.l = (fac.l << (FP_V_HB + 1)) & FP_FRACL;
-		if ((FPS & (FPS_D + FPS_T)) == 0) roundfp11 (&fac);  }
+	    if (sign = GET_SIGN_L (fac.l)) fac.l = (fac.l ^ 0xFFFFFFFF) + 1;
+	    for (i = 0; GET_SIGN_L (fac.l) == 0; i++) fac.l = fac.l << 1;
+	    exp = ((FPS & FPS_L)? FP_BIAS + 32: FP_BIAS + 16) - i;
+	    fac.h = (sign << FP_V_SIGN) | (exp << FP_V_EXP) |
+		((fac.l >> (31 - FP_V_HB)) & FP_FRACH);
+	    fac.l = (fac.l << (FP_V_HB + 1)) & FP_FRACL;
+	    if ((FPS & (FPS_D + FPS_T)) == 0) roundfp11 (&fac);  }
 	F_STORE (qdouble, fac, FR[ac]);
 	FPS = setfcc (FPS, fac.h, 0);
 	break;
@@ -405,28 +406,31 @@ case 013:						/* STCfi */
 	exp = GET_EXP (FR[ac].h);			/* exponent, */
 	F_LOAD_FRAC (qdouble, FR[ac], fac);		/* fraction */
 	if (FPS & FPS_L) {
-		leni = LONG;
-		i = FP_BIAS + 32;  }
-	else {	leni = WORD;
-		i = FP_BIAS + 16;  }
+	    leni = LONG;
+	    i = FP_BIAS + 32;  }
+	else {
+	    leni = WORD;
+	    i = FP_BIAS + 16;  }
 	C = 0;
 	if (exp <= FP_BIAS) dst = 0;
 	else if (exp > i) {
+	    dst = 0;
+	    C = 1;  }
+	else {
+	    F_RSH_V (fac, FP_V_HB + 1 + i - exp, fsrc);
+	    if (leni == WORD) fsrc.l = fsrc.l & ~0177777;
+	    if (fsrc.l >= i_limit[leni == LONG][sign]) {
 		dst = 0;
-		C = 1;  }
-	else {	F_RSH_V (fac, FP_V_HB + 1 + i - exp, fsrc);
-		if (leni == WORD) fsrc.l = fsrc.l & ~0177777;
-		if (fsrc.l >= i_limit[leni == LONG][sign]) {
-			dst = 0;
-			C = 1;  }  
-		else {	dst = fsrc.l;
-			if (sign) dst = -dst;  }  }
+		C = 1;  }  
+	    else {
+	    	dst = fsrc.l;
+		if (sign) dst = -dst;  }  }
 	N = GET_SIGN_L (dst);
 	Z = (dst == 0);
 	V = 0;
 	if (C) fpnotrap (FEC_ICVT);
 	FPS = (FPS & ~FPS_CC) | (N << PSW_V_N) |
-		(Z << PSW_V_Z) | (C << PSW_V_C);
+	    (Z << PSW_V_Z) | (C << PSW_V_C);
 	if (dstspec <= 07) R[dstspec] = (dst >> 16) & 0177777;
 	else WriteI (dst, GeteaFP (dstspec, leni), dstspec, leni);
 	break;
@@ -513,15 +517,15 @@ case 4:							/* -(R) */
 	adr = R[reg] = (R[reg] - len) & 0177777;
 	if (update_MM) MMR1 = (((-len) & 037) << 3) | reg;
 	if ((adr < STKLIM) && (reg == 6) && (cm == KERNEL)) {
-		setTRAP (TRAP_YEL);
-		setCPUERR (CPUE_YEL);  }
+	    setTRAP (TRAP_YEL);
+	    setCPUERR (CPUE_YEL);  }
 	return (adr | ds);
 case 5:							/* @-(R) */
 	adr = R[reg] = (R[reg] - 2) & 0177777;
 	if (update_MM) MMR1 = 0360 | reg;
 	if ((adr < STKLIM) && (reg == 6) && (cm == KERNEL)) {
-		setTRAP (TRAP_YEL);
-		setCPUERR (CPUE_YEL);  }
+	    setTRAP (TRAP_YEL);
+	    setCPUERR (CPUE_YEL);  }
 	adr = ReadW (adr | ds);
 	return (adr | dsenable);
 case 6:							/* d(r) */
@@ -573,10 +577,10 @@ if (spec == 027) {
 	fptr->l = 0;  }
 else {	exta = VA & ~0177777;
 	fptr->h = (ReadW (VA) << FP_V_F0) |
-		(ReadW (exta | ((VA + 2) & 0177777)) << FP_V_F1);
+	    (ReadW (exta | ((VA + 2) & 0177777)) << FP_V_F1);
 	if (len == QUAD) fptr->l = 
-		(ReadW (exta | ((VA + 4) & 0177777)) << FP_V_F2) |
-		(ReadW (exta | ((VA + 6) & 0177777)) << FP_V_F3);
+	    (ReadW (exta | ((VA + 4) & 0177777)) << FP_V_F2) |
+	    (ReadW (exta | ((VA + 6) & 0177777)) << FP_V_F3);
 	else fptr->l = 0;  }
 if ((GET_SIGN (fptr->h) != 0) && (GET_EXP (fptr->h) == 0) &&
 	(fpnotrap (FEC_UNDFV) == 0)) ABORT (TRAP_INT);
@@ -662,26 +666,26 @@ if (GET_SIGN (facp->h) != GET_SIGN (fsrcp->h)) {	/* signs different? */
 	if (ediff) { F_RSH_V (fsrcfrac, ediff, fsrcfrac);  } /* sub, shf fsrc */
 	F_SUB (fsrcfrac, facfrac, facfrac);		/* sub fsrc from fac */
 	if ((facfrac.h | facfrac.l) == 0)  {     	/* result zero? */
-		*facp = zero_fac;			/* no overflow */
-		return 0;  }
+	    *facp = zero_fac;				/* no overflow */
+	    return 0;  }
 	if (ediff <= 1) {				/* big normalize? */
-		if ((facfrac.h & (0x00FFFFFF << FP_GUARD)) == 0) {
-			F_LSH_K (facfrac, 24, facfrac);
-			facexp = facexp - 24;  }
-		if ((facfrac.h & (0x00FFF000 << FP_GUARD)) == 0) {
-			F_LSH_K (facfrac, 12, facfrac);
-			facexp = facexp - 12;  }
-		if ((facfrac.h & (0x00FC0000 << FP_GUARD)) == 0) {
-			F_LSH_K (facfrac, 6, facfrac);
-			facexp = facexp - 6;  }  }
+	    if ((facfrac.h & (0x00FFFFFF << FP_GUARD)) == 0) {
+		F_LSH_K (facfrac, 24, facfrac);
+		facexp = facexp - 24;  }
+	    if ((facfrac.h & (0x00FFF000 << FP_GUARD)) == 0) {
+		F_LSH_K (facfrac, 12, facfrac);
+		facexp = facexp - 12;  }
+	    if ((facfrac.h & (0x00FC0000 << FP_GUARD)) == 0) {
+		F_LSH_K (facfrac, 6, facfrac);
+		facexp = facexp - 6;  }  }
 	while (GET_BIT (facfrac.h, FP_V_HB + FP_GUARD) == 0) {
-		F_LSH_1 (facfrac);
-		facexp = facexp - 1;  }  }
+	    F_LSH_1 (facfrac);
+	    facexp = facexp - 1;  }  }
 else {	if (ediff) { F_RSH_V (fsrcfrac, ediff, fsrcfrac);  } /* add, shf fsrc */
 	F_ADD (fsrcfrac, facfrac, facfrac);		/* add fsrc to fac */
 	if (GET_BIT (facfrac.h, FP_V_HB + FP_GUARD + 1)) {
-		F_RSH_1 (facfrac);			/* carry out, shift */
-		facexp = facexp + 1;  }  }
+	    F_RSH_1 (facfrac);				/* carry out, shift */
+	    facexp = facexp + 1;  }  }
 return round_and_pack (facp, facexp, &facfrac, 1);
 }
 
@@ -770,30 +774,31 @@ if (GET_BIT (facfrac.h, FP_V_HB + FP_GUARD) == 0) {
 */
 
 	if (facexp <= FP_BIAS) {			/* case 1 */
-		*facp = zero_fac;
-		return round_and_pack (fracp, facexp, &facfrac, 1);  }
+	    *facp = zero_fac;
+	    return round_and_pack (fracp, facexp, &facfrac, 1);  }
 	if (facexp > ((FPS & FPS_D)? FP_BIAS + 56: FP_BIAS + 24)) {
-		*fracp = zero_fac;			/* case 2 */
-		return round_and_pack (facp, facexp, &facfrac, 0);  }
+	    *fracp = zero_fac;				/* case 2 */
+	    return round_and_pack (facp, facexp, &facfrac, 0);  }
 	F_RSH_V (fmask_fac, facexp - FP_BIAS, fmask);	/* shift mask */
 	fsrcfrac.l = facfrac.l & fmask.l;		/* extract fraction */
 	fsrcfrac.h = facfrac.h & fmask.h;
 	if ((fsrcfrac.h | fsrcfrac.l) == 0) *fracp = zero_fac;
-	else {	F_LSH_V (fsrcfrac, facexp - FP_BIAS, fsrcfrac);
-		fsrcexp = FP_BIAS;
-		if ((fsrcfrac.h & (0x00FFFFFF << FP_GUARD)) == 0) {
-			F_LSH_K (fsrcfrac, 24, fsrcfrac);
-			fsrcexp = fsrcexp - 24;  }
-		if ((fsrcfrac.h & (0x00FFF000 << FP_GUARD)) == 0) {
-			F_LSH_K (fsrcfrac, 12, fsrcfrac);
-			fsrcexp = fsrcexp - 12;  }
-		if ((fsrcfrac.h & (0x00FC0000 << FP_GUARD)) == 0) {
-			F_LSH_K (fsrcfrac, 6, fsrcfrac);
-			fsrcexp = fsrcexp - 6;  }
-		while (GET_BIT (fsrcfrac.h, FP_V_HB + FP_GUARD) == 0) {
-			F_LSH_1 (fsrcfrac);
-			fsrcexp = fsrcexp - 1;  }
-		round_and_pack (fracp, fsrcexp, &fsrcfrac, 1);  }
+	else {
+	    F_LSH_V (fsrcfrac, facexp - FP_BIAS, fsrcfrac);
+	    fsrcexp = FP_BIAS;
+	    if ((fsrcfrac.h & (0x00FFFFFF << FP_GUARD)) == 0) {
+		F_LSH_K (fsrcfrac, 24, fsrcfrac);
+		fsrcexp = fsrcexp - 24;  }
+	    if ((fsrcfrac.h & (0x00FFF000 << FP_GUARD)) == 0) {
+		F_LSH_K (fsrcfrac, 12, fsrcfrac);
+		fsrcexp = fsrcexp - 12;  }
+	    if ((fsrcfrac.h & (0x00FC0000 << FP_GUARD)) == 0) {
+		F_LSH_K (fsrcfrac, 6, fsrcfrac);
+		fsrcexp = fsrcexp - 6;  }
+	    while (GET_BIT (fsrcfrac.h, FP_V_HB + FP_GUARD) == 0) {
+		F_LSH_1 (fsrcfrac);
+		fsrcexp = fsrcexp - 1;  }
+	    round_and_pack (fracp, fsrcexp, &fsrcfrac, 1);  }
 	facfrac.l = facfrac.l & ~fmask.l;
 	facfrac.h = facfrac.h & ~fmask.h;
 	return round_and_pack (facp, facexp, &facfrac, 0);
@@ -835,18 +840,18 @@ mpc = *f2p;
 F_LSH_GUARD (mpc);					/* guard multipicand */
 if ((mpy.l | mpc.l) == 0) {				/* 24b x 24b? */
 	for (i = 0; i < 24; i++) {
-		if (mpy.h & 1) result.h = result.h + mpc.h;
-		F_RSH_1 (result);
-		mpy.h = mpy.h >> 1;  }  }
+	    if (mpy.h & 1) result.h = result.h + mpc.h;
+	    F_RSH_1 (result);
+	    mpy.h = mpy.h >> 1;  }  }
 else {	if (mpy.l != 0) {				/* 24b x 56b? */
-		for (i = 0; i < 32; i++) {
-			if (mpy.l & 1) { F_ADD (mpc, result, result);  }
-			F_RSH_1 (result);
-			mpy.l = mpy.l >> 1;  }  }
-	for (i = 0; i < 24; i++) {
-		if (mpy.h & 1) { F_ADD (mpc, result, result);  }
+	    for (i = 0; i < 32; i++) {
+		if (mpy.l & 1) { F_ADD (mpc, result, result);  }
 		F_RSH_1 (result);
-		mpy.h = mpy.h >> 1;  }  }
+		mpy.l = mpy.l >> 1;  }  }
+	for (i = 0; i < 24; i++) {
+	    if (mpy.h & 1) { F_ADD (mpc, result, result);  }
+	    F_RSH_1 (result);
+	    mpy.h = mpy.h >> 1;  }  }
 *f1p = result;
 return;
 }
@@ -886,9 +891,9 @@ quo = zero_fac;
 for (i = count; (i > 0) && ((facfrac.h | facfrac.l) != 0); i--) {
 	F_LSH_1 (quo);					/* shift quotient */
 	if (!F_LT (facfrac, fsrcfrac)) {		/* divd >= divr? */
-		F_SUB (fsrcfrac, facfrac, facfrac);	/* divd - divr */
-		if (qd) quo.l = quo.l | 1;		/* double or single? */
-		else quo.h = quo.h | 1;  }
+	    F_SUB (fsrcfrac, facfrac, facfrac);		/* divd - divr */
+	    if (qd) quo.l = quo.l | 1;			/* double or single? */
+	    else quo.h = quo.h | 1;  }
 	F_LSH_1 (facfrac);  }				/* shift divd */
 if (i > 0) { F_LSH_V (quo, i, quo);  }			/* early exit? */
 
@@ -967,8 +972,8 @@ if (r && ((FPS & FPS_T) == 0)) {
 	if (FPS & FPS_D) { F_ADD (dround_guard_fac, frac, frac);  }
 	else { F_ADD (fround_guard_fac, frac, frac);  }
 	if (GET_BIT (frac.h, FP_V_HB + FP_GUARD + 1)) {
-		F_RSH_1 (frac);
-		exp = exp + 1;  }  }
+	    F_RSH_1 (frac);
+	    exp = exp + 1;  }  }
 F_RSH_GUARD (frac);
 facp->l = frac.l & FP_FRACL;
 facp->h = (facp->h & FP_SIGN) | ((exp & FP_M_EXP) << FP_V_EXP) |

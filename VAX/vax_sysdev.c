@@ -84,6 +84,10 @@
 #define CMCSR_MASK	(CMCSR_PMI | CMCSR_CRD | CMCSR_DET | \
 			 CMCSR_FDT | CMCSR_DCM | CMCSR_SYN)
 
+/* KA655 boot/diagnostic register */
+
+#define BDR_BRKENB	0x00000080			/* break enable */
+
 /* KA655 cache control register */
 
 #define CACR_DRO	0x00FFFF00			/* diag bits RO */
@@ -164,7 +168,7 @@ int32 csi_csr = 0;					/* control/status */
 int32 cso_csr = 0;					/* control/status */
 int32 cmctl_reg[CMCTLSIZE >> 2] = { 0 };		/* CMCTL reg */
 int32 ka_cacr = 0;					/* KA655 cache ctl */
-int32 ka_bdr = 0x80;					/* KA655 boot diag */
+int32 ka_bdr = BDR_BRKENB;				/* KA655 boot diag */
 int32 ssc_base = SSCBASE;				/* SSC base */
 int32 ssc_cnf = 0;					/* SSC conf */
 int32 ssc_bto = 0;					/* SSC timeout */
@@ -738,7 +742,7 @@ struct reglink *p;
 
 for (p = &regtable[0]; p->low != 0; p++) {
 	if ((pa >= p->low) && (pa < p->high) && p->read)
-		return p->read (pa);  }
+	    return p->read (pa);  }
 ssc_bto = ssc_bto | SSCBTO_BTO | SSCBTO_RWT;
 MACH_CHECK (MCHK_READ);
 return 0;
@@ -760,8 +764,8 @@ struct reglink *p;
 
 for (p = &regtable[0]; p->low != 0; p++) {
 	if ((pa >= p->low) && (pa < p->high) && p->write) {
-		p->write (pa, val, lnt);  
-		return;  }  }
+	    p->write (pa, val, lnt);  
+	    return;  }  }
 ssc_bto = ssc_bto | SSCBTO_BTO | SSCBTO_RWT;
 MACH_CHECK (MCHK_WRITE);
 return;
@@ -804,10 +808,10 @@ if (lnt < L_LONG) {					/* LW write only */
 switch (rg) {
 default:						/* config reg */
 	if (val & CMCNF_SRQ) {				/* sig request? */
-		for (i = rg; i < (rg + 4); i++) {
-			cmctl_reg[i] = cmctl_reg[i] & ~CMCNF_SIG;
-			if (ADDR_IS_MEM (i * MEM_BANK))
-				cmctl_reg[i] = cmctl_reg[i] | MEM_SIG;  }  }
+	    for (i = rg; i < (rg + 4); i++) {
+		cmctl_reg[i] = cmctl_reg[i] & ~CMCNF_SIG;
+		if (ADDR_IS_MEM (i * MEM_BANK))
+		    cmctl_reg[i] = cmctl_reg[i] | MEM_SIG;  }  }
 	cmctl_reg[rg] = (cmctl_reg[rg] & ~CMCNF_RW) | (val & CMCNF_RW);
 	break;
 case 16:						/* err status */
@@ -842,6 +846,11 @@ if ((rg == 0) && ((pa & 3) == 0)) {			/* lo byte only */
 	ka_cacr = (ka_cacr & ~(val & CACR_W1C)) | CACR_FIXED;
 	ka_cacr = (ka_cacr & ~CACR_RW) | (val & CACR_RW);  }
 return;
+}
+
+int32 sysd_hlt_enb (void)
+{
+return ka_bdr & BDR_BRKENB;
 }
 
 /* Cache diagnostic space - byte/word merges done in WriteReg */
@@ -1055,13 +1064,13 @@ tmr_csr[tmr] = (tmr_csr[tmr] & ~TMR_CSR_RW) |		/* new r/w */
 if (val & TMR_CSR_XFR) tmr_tir[tmr] = tmr_tnir[tmr];	/* xfr set? */
 if (val & TMR_CSR_RUN)	{				/* run? */
 	if (val & TMR_CSR_XFR)				/* new tir? */
-		sim_cancel (&sysd_unit[tmr]);		/* stop prev */
+	    sim_cancel (&sysd_unit[tmr]);		/* stop prev */
 	if (!sim_is_active (&sysd_unit[tmr]))		/* not running? */
-		tmr_sched (tmr);  }			/* activate */
+	    tmr_sched (tmr);  }				/* activate */
 else if (val & TMR_CSR_SGL) {				/* single step? */
 	tmr_incr (tmr, 1);				/* incr tmr */
 	if (tmr_tir[tmr] == 0)				/* if ovflo, */
-		tmr_tir[tmr] = tmr_tnir[tmr];  }	/* reload tir */
+	    tmr_tir[tmr] = tmr_tnir[tmr];  }		/* reload tir */
 if ((tmr_csr[tmr] & (TMR_CSR_DON | TMR_CSR_IE)) !=	/* update int */
     (TMR_CSR_DON | TMR_CSR_IE)) {
 	if (tmr) CLR_INT (TMR1);
@@ -1088,19 +1097,19 @@ uint32 new_tir = tmr_tir[tmr] + inc;			/* add incr */
 if (new_tir < tmr_tir[tmr]) {				/* ovflo? */
 	tmr_tir[tmr] = 0;				/* now 0 */
 	if (tmr_csr[tmr] & TMR_CSR_DON)			/* done? set err */
-		tmr_csr[tmr] = tmr_csr[tmr] | TMR_CSR_ERR;
+	    tmr_csr[tmr] = tmr_csr[tmr] | TMR_CSR_ERR;
 	else tmr_csr[tmr] = tmr_csr[tmr] | TMR_CSR_DON;	/* set done */
 	if (tmr_csr[tmr] & TMR_CSR_STP)			/* stop? */
-		tmr_csr[tmr] = tmr_csr[tmr] & ~TMR_CSR_RUN;	/* clr run */
+	    tmr_csr[tmr] = tmr_csr[tmr] & ~TMR_CSR_RUN;	/* clr run */
 	if (tmr_csr[tmr] & TMR_CSR_RUN) {		/* run? */
-		tmr_tir[tmr] = tmr_tnir[tmr];		/* reload */
-		tmr_sched (tmr);  }			/* reactivate */
+	    tmr_tir[tmr] = tmr_tnir[tmr];		/* reload */
+	    tmr_sched (tmr);  }				/* reactivate */
 	if (tmr_csr[tmr] & TMR_CSR_IE) {		/* set int req */
-		if (tmr) SET_INT (TMR1);
-		else SET_INT (TMR0); }  }
+	    if (tmr) SET_INT (TMR1);
+	    else SET_INT (TMR0); }  }
 else {	tmr_tir[tmr] = new_tir;				/* no, upd tir */
 	if (tmr_csr[tmr] & TMR_CSR_RUN)			/* still running? */
-		tmr_sched (tmr);  }			/* reactivate */
+	    tmr_sched (tmr);  }				/* reactivate */
 return;
 }
 
@@ -1159,7 +1168,6 @@ for (i = 0; i < 2; i++) {
 	tmr_tivr[i] = 0;
 	ssc_adsm[i] = ssc_adsk[i] = 0;  }
 ka_cacr = 0;
-ka_bdr = 0x80;
 ssc_base = SSCBASE;
 ssc_cnf = ssc_cnf & SSCCNF_BLO;
 ssc_bto = 0;

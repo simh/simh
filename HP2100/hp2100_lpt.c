@@ -41,8 +41,8 @@
 #define LPT_SKIPM	0000077				/* line count mask */
 #define LPT_CHANM	0000007				/* channel mask */
 
-extern int32 PC;
-extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 PC;
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 int32 lpt_ctime = 1000;					/* char time */
 int32 lpt_stopioe = 0;					/* stop on error */
 int32 lpt_lcnt = 0;					/* line count */
@@ -117,19 +117,20 @@ case ioLIX:						/* load */
 	dat = 0;					/* default sta = 0 */
 case ioMIX:						/* merge */
 	if (lpt_unit.flags & UNIT_ATT) {
-		dat = dat | LPT_RDY;
-		if (!sim_is_active (&lpt_unit))
-		    dat = dat | LPT_NBSY;  }
+	    dat = dat | LPT_RDY;
+	    if (!sim_is_active (&lpt_unit))
+		dat = dat | LPT_NBSY;  }
 	else dat = dat | LPT_PAPO;
 	break;
 case ioCTL:						/* control clear/set */
 	if (IR & I_CTL) {				/* CLC */
-		clrCMD (dev);				/* clear ctl, cmd */
-		clrCTL (dev);  }
-	else {	setCMD (dev);				/* STC */
-		setCTL (dev);				/* set ctl, cmd */
-		sim_activate (&lpt_unit,		/* schedule op */
-		    (lpt_unit.buf & LPT_CTL)? lpt_unit.wait: lpt_ctime);  }
+	    clrCMD (dev);				/* clear ctl, cmd */
+	    clrCTL (dev);  }
+	else {						/* STC */
+	    setCMD (dev);				/* set ctl, cmd */
+	    setCTL (dev);
+	    sim_activate (&lpt_unit,			/* schedule op */
+		(lpt_unit.buf & LPT_CTL)? lpt_unit.wait: lpt_ctime);  }
 	break;
 default:
 	break;  }

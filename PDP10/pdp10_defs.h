@@ -1,6 +1,6 @@
 /* pdp10_defs.h: PDP-10 simulator definitions
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Jan-03	RMS	Added DEUNA/DELUA support
    29-Sep-02	RMS	Added variable vector, RX211 support
    22-Apr-02	RMS	Removed magtape record length error
    20-Jan-02	RMS	Added multiboard DZ11 support
@@ -637,6 +638,8 @@ typedef struct pdp_dib DIB;
 #define IOLN_UBCS3	001
 #define IOBA_UBMNT3	(IO_UBA3 + 0763101)		/* Unibus 3 maint reg */
 #define IOLN_UBMNT3	001
+#define IOBA_XU		(IO_UBA3 + 0774510)		/* DEUNA/DELUA */
+#define IOLN_XU		010
 #define IOBA_RY		(IO_UBA3 + 0777170)		/* RX211 */
 #define IOLN_RY		004
 #define IOBA_TU		(IO_UBA3 + 0772440)		/* RH11/tape */
@@ -672,6 +675,7 @@ typedef struct pdp_dib DIB;
 
 #define INT_V_RP	6				/* RH11/RP,RM drives */
 #define INT_V_TU	7				/* RH11/TM03/TU45 */
+#define INT_V_XU	15				/* DEUNA/DELUA */
 #define INT_V_DZRX	16				/* DZ11 */
 #define INT_V_DZTX	17
 #define INT_V_RY	18				/* RX211 */
@@ -681,6 +685,7 @@ typedef struct pdp_dib DIB;
 
 #define INT_RP		(1u << INT_V_RP)
 #define INT_TU		(1u << INT_V_TU)
+#define INT_XU		(1u << INT_V_XU)
 #define INT_DZRX	(1u << INT_V_DZRX)
 #define INT_DZTX	(1u << INT_V_DZTX)
 #define INT_RY		(1u << INT_V_RY)
@@ -690,6 +695,7 @@ typedef struct pdp_dib DIB;
 
 #define IPL_RP		6				/* int levels */
 #define IPL_TU		6
+#define IPL_XU		5
 #define IPL_DZRX	5
 #define IPL_DZTX	5
 #define IPL_RY		5
@@ -708,6 +714,7 @@ typedef struct pdp_dib DIB;
 #define VEC_Q		0000				/* vector base */
 #define VEC_PTR		0070				/* interrupt vectors */
 #define VEC_PTP		0074
+#define VEC_XU		0120
 #define VEC_TU		0224
 #define VEC_RP		0254
 #define VEC_RY		0264

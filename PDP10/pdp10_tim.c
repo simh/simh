@@ -153,8 +153,8 @@ if (ttg <= 0) {						/* timeout? */
 if (ITS) {						/* ITS? */
 	if (pi_act == 0) quant = (quant + TIM_HWRE) & DMASK;
 	if (TSTS (pcst)) {				/* PC sampling? */
-		WriteP ((a10) pcst & AMASK, pager_PC);	/* store sample */
-		pcst = AOB (pcst);  }			/* add 1,,1 */
+	    WriteP ((a10) pcst & AMASK, pager_PC);	/* store sample */
+	    pcst = AOB (pcst);  }			/* add 1,,1 */
 	}						/* end ITS */
 return SCPE_OK;
 }

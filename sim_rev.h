@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2002, Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,13 +24,55 @@
    in this Software without prior written authorization from Robert M Supnik.
 */
 
+#ifndef _SIM_REV_H_
+#define _SIM_REV_H_	0
+
 #define	SIM_MAJOR	2
 #define SIM_MINOR	10
-#define SIM_PATCH	0
+#define SIM_PATCH	2
 
 /* V2.10 revision history 
 
 patch	date		module(s) and fix(es)
+
+  2     15-Jan-03	scp.c:
+			-- added dynamic memory size flag and RESTORE support
+			-- added EValuate command
+			-- added get_ipaddr routine
+			-- added ! (OS command) feature (from Mark Pizzolato)
+			-- added BREAK support to sim_poll_kbd (from Mark Pizzolato)
+
+			sim_tmxr.c:
+			-- fixed bugs in IAC+IAC handling (from Mark Pizzolato)
+			-- added IAC+BRK handling (from Mark Pizzolato)
+
+			sim_sock.c:
+			-- added use count for Windows start/stop
+			-- added sim_connect_sock
+
+			pdp1_defs.h, pdp1_cpu.c, pdp1_sys.c, pdp1_drm.c:
+			added Type 24 serial drum
+
+			pdp18_defs.h: added PDP-4 drum support
+
+			hp2100_cpu.c: added 21MX IOP support
+
+			hp2100_ipl.c: added HP interprocessor link support
+
+			pdp11_tq.c: fixed bug in transfer end packet length
+
+			pdp11_xq.c:
+			-- added VMScluster support (thanks to Mark Pizzolato)
+			-- added major performance enhancements (thanks to Mark Pizzolato)
+			-- added local packet processing
+			-- added system id broadcast
+
+			pdp11_stddev.c: changed default to 7b (for early UNIX)
+
+			vax_cpu.c, vax_io.c, vax_stddev.c, vax_sysdev.c:
+			added console halt capability (from Mark Pizzolato)
+
+			all terminals and multiplexors: added BREAK support
 
   1	21-Nov-02	pdp1_stddev.c: changed typewriter to half duplex
 			(found by Derek Peschel)
@@ -496,3 +538,5 @@ patch	date		module(s) and fix(es)
 
 			sim_sock.c: added Macintosh sockets support
 */
+
+#endif

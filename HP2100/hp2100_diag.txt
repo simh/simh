@@ -1,3 +1,5 @@
+HP2100 Diagnostics
+
 CPU						status		writeup		sources
 
 24315	Memory reference group			passed		in 21MX CE	no
@@ -32,7 +34,27 @@ CPU						status		writeup		sources
 	- prints diagnostic name
 	- prints END OF PASS 1 and halts
 
-13206	IOP for 2100 group			passed		13206 manual	no
+13206	IOP for 2100				passed		13206 manual	no
+	- load diagnostic via configurator
+	- D S 0
+	- SET CPU 2100
+	- SET CPU IOP
+	- RUN 2000
+	- prints diagnostic name
+	- prints section names, PASS 000001, and halts
+	- note: will not pass interruptibility tests
+
+13207	IOP for 21MX				passed		13207 manual	no
+	- load diagnostic via configurator
+	- D S 13
+	- SET CPU 21MX
+	- SET CPU IOP
+	- RUN 100
+	- HLT 74, PC = 2425
+	- D S 0
+	- CON
+	- prints diagnostic name
+	- prints section names, PASS 000001, and halts
 
 24320	Floating point				passed		in 21MX CE	no
 	- load diagnostic via configurator

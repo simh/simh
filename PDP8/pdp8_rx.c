@@ -223,44 +223,45 @@ case 1:							/* LCD */
 	rx_tr = rx_err = 0;				/* clear flags */
 	bptr = 0;					/* clear buf pointer */
 	if (rx_28 && (AC & RXCS_MODE)) {		/* RX28 8b mode? */
-		rx_dbr = rx_csr = AC & 0377;		/* save 8b */
-		rx_tr = 1;				/* xfer is ready */
-		rx_state = CMD8;  }			/* wait for part 2 */
-	else {	rx_dbr = rx_csr = AC;			/* save new command */
-		rx_cmd ();  }				/* issue command */
+	    rx_dbr = rx_csr = AC & 0377;		/* save 8b */
+	    rx_tr = 1;					/* xfer is ready */
+	    rx_state = CMD8;  }				/* wait for part 2 */
+	else {
+	    rx_dbr = rx_csr = AC;			/* save new command */
+	    rx_cmd ();  }				/* issue command */
 	return 0;					/* clear AC */
 case 2:							/* XDR */
 	switch (rx_state & 017) {			/* case on state */
 	case EMPTY:					/* emptying buffer */
-		sim_activate (&rx_unit[drv], rx_xwait);	/* sched xfer */
-		return READ_RXDBR;			/* return data reg */
+	    sim_activate (&rx_unit[drv], rx_xwait);	/* sched xfer */
+	    return READ_RXDBR;				/* return data reg */
 	case CMD8:					/* waiting for cmd */
-		rx_dbr = AC & 0377;
-		rx_csr = (rx_csr & 0377) | ((AC & 017) << 8);
-		rx_cmd ();
-		break;
+	    rx_dbr = AC & 0377;
+	    rx_csr = (rx_csr & 0377) | ((AC & 017) << 8);
+	    rx_cmd ();
+	    break;
 	case RWDS:case RWDT:case FILL:case SDCNF:	/* waiting for data */
-		rx_dbr = AC;				/* save data */
-		sim_activate (&rx_unit[drv], rx_xwait);	/* schedule */
-		break;
+	    rx_dbr = AC;				/* save data */
+	    sim_activate (&rx_unit[drv], rx_xwait);	/* schedule */
+	    break;
 	default:					/* default */
-		return READ_RXDBR;  }			/* return data reg */
+	    return READ_RXDBR;  }			/* return data reg */
 	break;
 case 3:							/* STR */
 	if (rx_tr != 0) {
-		rx_tr = 0;
-		return IOT_SKP + AC;  }
+	    rx_tr = 0;
+	    return IOT_SKP + AC;  }
 	break;
 case 4:							/* SER */
 	if (rx_err != 0) {
-		rx_err = 0;
-		return IOT_SKP + AC;  }
+	    rx_err = 0;
+	    return IOT_SKP + AC;  }
 	break;
 case 5:							/* SDN */
 	if ((dev_done & INT_RX) != 0) {
-		dev_done = dev_done & ~INT_RX;
-		int_req = int_req & ~INT_RX;
-		return IOT_SKP + AC;  }
+	    dev_done = dev_done & ~INT_RX;
+	    int_req = int_req & ~INT_RX;
+	    return IOT_SKP + AC;  }
 	break;
 case 6:							/* INTR */
 	if (AC & 1) int_enable = int_enable | INT_RX;
@@ -293,9 +294,9 @@ case RXCS_READ: case RXCS_WRITE: case RXCS_WRDEL:
 	break;
 case RXCS_SDEN:
 	if (rx_28) {					/* RX28? */
-		rx_state = SDCNF;			/* state = get conf */
-		rx_tr = 1;				/* xfer is ready */
-		break;  }				/* else fall thru */
+	    rx_state = SDCNF;				/* state = get conf */
+	    rx_tr = 1;					/* xfer is ready */
+	    break;  }					/* else fall thru */
 default:
 	rx_state = CMD_COMPLETE;			/* state = cmd compl */
 	sim_activate (&rx_unit[drv], rx_cwait);		/* sched done */

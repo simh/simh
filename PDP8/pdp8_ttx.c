@@ -25,6 +25,7 @@
 
    ttix,ttox	PT08/KL8JA terminal input/output
 
+   22-Dec-02	RMS	Added break support
    02-Nov-02	RMS	Added 7B/8B support
    04-Oct-02	RMS	Added DIB, device number support
    22-Aug-02	RMS	Updated for changes to sim_tmxr.c
@@ -202,15 +203,16 @@ if (ln >= 0) {						/* got one? */
     ttx_ldsc[ln].rcve = 1;  }				/* rcv enabled */ 
 tmxr_poll_rx (&ttx_desc);				/* poll for input */
 for (ln = 0; ln < TTX_LINES; ln++) {			/* loop thru lines */
-    if (ttx_ldsc[ln].conn) {				/* connected? */
-	if (temp = tmxr_getc_ln (&ttx_ldsc[ln])) {	/* get char */
-	    if (ttox_unit[ln].flags & UNIT_UC) {	/* UC mode? */
-		c = temp & 0177;
-		if (islower (c)) c = toupper (c);  }
-	    else c = temp & ((ttox_unit[ln].flags & UNIT_8B)? 0377: 0177);
-	    ttix_buf[ln] = c;
-	    dev_done = dev_done | (INT_TTI1 << ln);
-	    int_req = INT_UPDATE;  }  }  }
+	if (ttx_ldsc[ln].conn) {			/* connected? */
+	    if (temp = tmxr_getc_ln (&ttx_ldsc[ln])) {	/* get char */
+		if (temp & SCPE_BREAK) c = 0;		/* break? */
+		else if (ttox_unit[ln].flags & UNIT_UC) {	/* UC? */
+		    c = temp & 0177;
+		    if (islower (c)) c = toupper (c);  }
+		else c = temp & ((ttox_unit[ln].flags & UNIT_8B)? 0377: 0177);
+		ttix_buf[ln] = c;
+		dev_done = dev_done | (INT_TTI1 << ln);
+		int_req = INT_UPDATE;  }  }  }
 return SCPE_OK;
 }
 
@@ -358,10 +360,10 @@ int32 i;
 
 for (i = 0; (i < TTX_LINES) && (ttx_ldsc[i].conn == 0); i++) ;
 if (i < TTX_LINES) {
-    for (i = 0; i < TTX_LINES; i++) {
-	if (ttx_ldsc[i].conn) 
-	    if (val) tmxr_fconns (st, &ttx_ldsc[i], i);
-	    else tmxr_fstats (st, &ttx_ldsc[i], i);  }  }
+	for (i = 0; i < TTX_LINES; i++) {
+	    if (ttx_ldsc[i].conn) 
+		if (val) tmxr_fconns (st, &ttx_ldsc[i], i);
+		else tmxr_fstats (st, &ttx_ldsc[i], i);  }  }
 else fprintf (st, "all disconnected\n");
 return SCPE_OK;
 }

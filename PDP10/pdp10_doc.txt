@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-10 Simulator Usage
-Date:	15-Nov-2002
+Date:	15-Jan-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -45,10 +45,12 @@ sim/		dec_dz.h
 		sim_rev.h
 		sim_sock.h
 		sim_tmxr.h
+		sim_ether.h
 		scp.c
 		scp_tty.c
 		sim_sock.c
 		sim_tmxr.c
+		sim_ether.c
 
 sim/pdp10/	pdp10_defs.h
 		pdp10_cpu.c
@@ -65,6 +67,7 @@ sim/pdp10/	pdp10_defs.h
 		pdp10_xtnd.c
 
 sim/pdp11/	pdp11_ry.c
+		pdp11_xu.c
 
 2. PDP-10 Features
 
@@ -85,6 +88,7 @@ LP20		LP20 line printer
 RP		RH11/RP04/RP05/RP06/RP07/RM03/RM05/RM80 controller with
 		eight drives
 TU		RH11/TM02/TU45 controller with eight drives
+XU		DEUNA/DELUA Ethernet controller
 
 The PTR, PTP, and RX211 are initially set DISABLED.  The DZ11 and LP20 can
 also be set DISABLED.  Some devices support the SET ADDRESS command, which
@@ -563,7 +567,12 @@ Error handling is as follows:
 RX02 data files are buffered in memory; therefore, end of file and OS
 I/O errors cannot occur.
 
-2.13 Symbolic Display and Input
+2.13 DEUNA/DELUA Ethernet Controller (XU)
+
+XU simulates the DEUNA/DELUA Ethernet controller.  The current implementation
+is a stub and is permanently disabled.
+
+2.14 Symbolic Display and Input
 
 The PDP-10 simulator implements symbolic display and input.  Display is
 controlled by command line switches:

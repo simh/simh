@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-1 Simulator Usage
-Date:	15-Nov-2002
+Date:	15-Dec-2002
 
 			COPYRIGHT NOTICE
 
@@ -47,6 +47,7 @@ sim/		sim_defs.h
 
 sim/pdp1/	pdp1_defs.h
 		pdp1_cpu.c
+		pdp1_drm.c
 		pdp1_dt.c
 		pdp1_lp.c
 		pdp1_stddev.c
@@ -63,6 +64,7 @@ CPU		PDP-1 CPU with up to 64KW of memory
 PTR,PTP		integral paper tape reader/punch
 TTY		console typewriter
 LPT		Type 62 line printer
+DRM		Type 24 serial drum
 DT		Type 550 Microtape (DECtape)
 
 The PDP-1 simulator implements the following unique stop conditions:
@@ -299,7 +301,32 @@ operate correctly.
 	- ACTIME must be less than DCTIME, and both need to be at
 	  least 100 times LTIME
 
-2.4 Symbolic Display and Input
+2.4 Type 24 Serial Drum (DRM)
+
+The serial drum (DRM) implements these registers:
+
+	name		size	comments
+
+	DA		9	drum address (sector number)
+	MA		16	current memory address
+	INT		1	interrupt pending flag
+	DONE		1	device done flag
+	ERR		1	error flag
+	WLK		32	write lock switches
+	TIME		24	rotational latency, per word
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+Drum data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.5 Symbolic Display and Input
 
 The PDP-1 simulator implements symbolic display and input.  Display is
 controlled by command line switches:
@@ -359,7 +386,7 @@ Finally, the LAW instruction has the format
 
 where immediate is in the range 0 to 07777.
 
-2.5 Character Sets
+2.6 Character Sets
 
 The PDP-1's console was a Frieden Flexowriter; its character encoding
 was known as FIODEC.  The PDP-1's line printer used a modified Hollerith

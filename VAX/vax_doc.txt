@@ -144,6 +144,11 @@ The LOAD command recognizes one switch:
 	-o			Origin argument follows file name
 
 The CPU supports the BOOT command and is the only VAX device to do so.
+Note that the behavior of the bootstrap depends on the capabilities of
+the console terminator emulator.  If the terminal window supports full
+VT100 emulation (including Multilanguage Character Set support), the
+bootstrap will ask the user to specify the language; otherwise, it will
+default to English.
 
 These switches are recognized when examining or depositing in CPU memory
 (or any other byte oriented device):
@@ -192,6 +197,16 @@ control registers for the interrupt system.
 	PCQ[0:63]	32	PC prior to last PC change or interrupt;
 				most recent PC change first
 	WRU		8	interrupt character
+
+The CPU can maintain a history of the most recently executed instructions.
+This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
+
+	SET CPU HISTORY			-- clear history buffer
+	SET CPU HISTORY=0		-- disable history
+	SET CPU HISTORY=n		-- enable history, display length = n
+	SHOW CPU HISTORY		-- print CPU history
+
+The maximum length for the history is 4096 entries.
 
 2.1.2 Translation Buffer (TLB)
 
@@ -251,6 +266,13 @@ to allow the patched bootstrap code to run.  The SYSD registers are:
 	ADSM1		32	SSC address match 1 address
 	ADSK1		32	SSC address match 1 mask
 	CDGDAT[0:16383]	32	cache diagnostic data store
+
+BDR<7> is the halt-enabled switch.  It controls how the console firmware
+responds to a BOOT command, a kernel halt (if option CONHALT is set), or
+a console halt (BREAK typed on the console terminal).  If BDR<7> is set,
+the console firmware responds to all these conditions by entering its
+interactive command mode.  If BDR<7> is clear, the console firmware
+boots the operating system in response to these conditions.
 
 2.1.6 Qbus Adapter (QBA)
 
@@ -373,6 +395,11 @@ The terminal interfaces (TTI, TTO) can be set to one of two modes:
 7B or 8B.  In 7B mode, input and output characters are masked  to 7
 bits.  In 8B mode, characters are not modified.  Changing the mode
 of either interface changes both.  The default mode is 8B.
+
+When the console terminal is attached to a Telnet session, it
+recognizes BREAK.  If BREAK is entered, and BDR<7> is set, control
+returns to the console firmware; otherwise, BREAK is treated as a
+normal terminal input condition.
 
 The terminal input (TTI) polls the console keyboard for input.  It
 implements these registers:

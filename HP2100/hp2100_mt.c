@@ -88,8 +88,8 @@
 #define STA_PAR		0002				/* parity error */
 #define STA_BUSY	0001				/* busy (d) */
 
-extern int32 PC;
-extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 PC;
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 int32 mtc_fnc = 0;					/* function */
 int32 mtc_sta = 0;					/* status register */
 int32 mtc_dtf = 0;					/* data xfer flop */

@@ -182,9 +182,9 @@ if (pulse == 064) {					/* DLAH */
 if ((pulse & 064) == 044) {				/* DSCN */
 	if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;		/* busy inhibits */
 	else if (GET_FNC (rf_sta) != FN_NOP) {
-		t = (rf_da & RF_WMASK) - GET_POS (rf_time); /* delta to new */
-		if (t < 0) t = t + RF_NUMWD;		     /* wrap around? */
-		sim_activate (&rf_unit, t * rf_time);  }  }  /* schedule op */
+	    t = (rf_da & RF_WMASK) - GET_POS (rf_time);	/* delta to new */
+	    if (t < 0) t = t + RF_NUMWD;		     /* wrap around? */
+	    sim_activate (&rf_unit, t * rf_time);  }  }	/* schedule op */
 rf_updsta (0);						/* update status */
 return AC;
 }
@@ -220,25 +220,25 @@ f = GET_FNC (rf_sta);					/* get function */
 do {	M[RF_WC] = (M[RF_WC] + 1) & 0777777;		/* incr word count */
  	pa = M[RF_CA] = (M[RF_CA] + 1) & ADDRMASK;	/* incr mem addr */
 	if ((f == FN_READ) && MEM_ADDR_OK (pa))		/* read? */
-		M[pa] = *(((int32 *) uptr->filebuf) + rf_da);
+	    M[pa] = *(((int32 *) uptr->filebuf) + rf_da);
 	if ((f == FN_WCHK) &&				/* write check? */
 	    (M[pa] != *(((int32 *) uptr->filebuf) + rf_da))) {
-		rf_updsta (RFS_WCE);			/* flag error */
-		break;  }
+	    rf_updsta (RFS_WCE);			/* flag error */
+	    break;  }
 	if (f == FN_WRITE) {				/* write? */
-		d = (rf_da >> 18) & 07;			/* disk */
-		t = (rf_da >> 14) & 017;		/* track groups */
-		if ((rf_wlk[d] >> t) & 1) {		/* write locked? */
-			rf_updsta (RFS_WLO);
-			break;  }
-		else {	*(((int32 *) uptr->filebuf) + rf_da) = M[pa];
-			if (((t_addr) rf_da) >= uptr->hwmark)
-				uptr->hwmark = rf_da + 1;  }  }
+	    d = (rf_da >> 18) & 07;			/* disk */
+	    t = (rf_da >> 14) & 017;			/* track groups */
+	    if ((rf_wlk[d] >> t) & 1) {			/* write locked? */
+		rf_updsta (RFS_WLO);
+		break;  }
+	    else {
+	    	*(((int32 *) uptr->filebuf) + rf_da) = M[pa];
+		if (((t_addr) rf_da) >= uptr->hwmark) uptr->hwmark = rf_da + 1;  }  }
 	rf_da = rf_da + 1;				/* incr disk addr */
 	if (rf_da > RF_SIZE) {				/* disk overflow? */
-		rf_da = 0;
-		rf_updsta (RFS_NED);			/* nx disk error */
-		break;  }  }
+	    rf_da = 0;
+	    rf_updsta (RFS_NED);			/* nx disk error */
+	    break;  }  }
 while ((M[RF_WC] != 0) && (rf_burst != 0));		/* brk if wc, no brst */
 
 if ((M[RF_WC] != 0) && ((rf_sta & RFS_ERR) == 0))	/* more to do? */

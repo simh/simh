@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Dec-02	RMS	Added sim_connect_sock
    08-Oct-02	RMS	Revised for .NET compatibility
    20-Aug-02	RMS	Changed calling sequence for sim_accept_conn
    30-Apr-02	RMS	Changed VMS stropts include to ioctl
@@ -56,7 +57,9 @@
 #endif
 
 SOCKET sim_master_sock (int32 port);
+SOCKET sim_connect_sock (int32 ip, int32 port);
 SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr);
+int32 sim_check_conn (SOCKET sock, t_bool rd);
 int32 sim_read_sock (SOCKET sock, char *buf, int32 nbytes);
 int32 sim_write_sock (SOCKET sock, char *msg, int32 nbytes);
 void sim_close_sock (SOCKET sock, t_bool master);

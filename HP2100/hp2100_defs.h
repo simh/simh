@@ -45,6 +45,7 @@
 #define STOP_IBKPT	4				/* breakpoint */
 #define STOP_IND	5				/* indirect loop */
 #define STOP_INDINT	6				/* indirect intr */
+#define STOP_NOCONN	7				/* no connection */
 
 #define ABORT_PRO	1				/* protection abort */
 
@@ -207,6 +208,8 @@ struct DMA {						/* DMA channel */
 #define DRC		027				/* 12610A control */
 #define MSD		030				/* 13181A data */
 #define MSC		031				/* 13181A control */
+#define IPLI		032				/* 12556B link in */
+#define IPLO		033				/* 12556B link out */
 #define MUXL		040				/* 12920A lower data */
 #define MUXU		041				/* 12920A upper data */
 #define MUXC		042				/* 12920A control */

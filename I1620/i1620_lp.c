@@ -160,18 +160,18 @@ case OP_WN:
 	return lpt_num (pa, 0, f1);			/* write numeric */
 case OP_WA:
 	for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {	/* only fill buf */
-		d = M[pa] & DIGIT;			/* get digit */
-		z = M[pa - 1] & DIGIT;			/* get zone */
-		if ((d & REC_MARK) == REC_MARK) break;	/* 8-2 char? */
-		lpc = alp_to_lpt[(z << 4) | d];		/* translate pair */
-		if (lpc < 0) {				/* bad char? */
-			ind[IN_WRCHK] = ind[IN_PRCHK] = 1;	/* wr chk */
-			inv = STOP_INVCHR;  }		/* set return status */
-		lpt_buf[lpt_bptr] = lpc & 0x7F;		/* fill buffer */
-		pa = ADDR_A (pa, 2);  }			/* incr mem addr */
+	    d = M[pa] & DIGIT;				/* get digit */
+	    z = M[pa - 1] & DIGIT;			/* get zone */
+	    if ((d & REC_MARK) == REC_MARK) break;	/* 8-2 char? */
+	    lpc = alp_to_lpt[(z << 4) | d];		/* translate pair */
+	    if (lpc < 0) {				/* bad char? */
+		ind[IN_WRCHK] = ind[IN_PRCHK] = 1;	/* wr chk */
+		inv = STOP_INVCHR;  }			/* set return status */
+	    lpt_buf[lpt_bptr] = lpc & 0x7F;		/* fill buffer */
+	    pa = ADDR_A (pa, 2);  }			/* incr mem addr */
 	if ((f1 & 1) == 0) {		;		/* print now? */
-		r = lpt_print ();			/* print line */
-		if (r != SCPE_OK) return r;  }
+	    r = lpt_print ();				/* print line */
+	    if (r != SCPE_OK) return r;  }
 	CRETIOE (io_stop, inv);
 default:						/* invalid function */
 	return STOP_INVFNC;  }
@@ -191,11 +191,11 @@ end = pa + len;
 for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {		/* only fill buf */
 	d = M[pa];					/* get digit */
 	if (len? (pa >= end):				/* end reached? */
-		((d & REC_MARK) == REC_MARK)) break;
+	    ((d & REC_MARK) == REC_MARK)) break;
 	lpc = num_to_lpt[d];				/* translate */
 	if (lpc < 0) {					/* bad char? */
-		ind[IN_WRCHK] = ind[IN_PRCHK] = 1;	/* wr chk */
-		inv = STOP_INVCHR;  }			/* set return status */
+	    ind[IN_WRCHK] = ind[IN_PRCHK] = 1;		/* wr chk */
+	    inv = STOP_INVCHR;  }			/* set return status */
 	lpt_buf[lpt_bptr++] = lpc & 0x7F;		/* fill buffer */
 	PP (pa);  }					/* incr mem addr */
 if ((f1 & 1) == 0) {					/* print now? */
@@ -226,10 +226,10 @@ if (lpt_bptr) {						/* any line? */
 	lpt_unit.pos = ftell (lpt_unit.fileref);	/* update pos */
 	lpt_buf_init ();				/* reinit buf */
 	if (ferror (lpt_unit.fileref)) {		/* error? */
-		ind[IN_PRCHK] = ind[IN_WRCHK] = 1;	/* wr, pri check */
-		perror ("LPT I/O error");
-		clearerr (lpt_unit.fileref);
-		return SCPE_IOERR;  }  }
+	    ind[IN_PRCHK] = ind[IN_WRCHK] = 1;		/* wr, pri check */
+	    perror ("LPT I/O error");
+	    clearerr (lpt_unit.fileref);
+	    return SCPE_IOERR;  }  }
 
 lpt_savctrl = 0x61;					/* reset ctrl */
 if ((ctrl & K_LIN) == ((ctrl & K_IMM)? 0: K_LIN))	/* space lines? */

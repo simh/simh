@@ -187,9 +187,9 @@ int32 i, j;
 for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
 	if ((j == class) && (opc_val[i] & inst)) {	/* same class? */
-		inst = inst & ~opc_val[i];		/* mask bit set? */
-		fprintf (of, (sp? " %s": "%s"), opcode[i]);
-		sp = 1;  }  }
+	    inst = inst & ~opc_val[i];			/* mask bit set? */
+	    fprintf (of, (sp? " %s": "%s"), opcode[i]);
+	    sp = 1;  }  }
 return sp;
 }
 
@@ -232,28 +232,28 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 
 	switch (j) {					/* case on class */
 	case I_V_NPN:					/* no operands */
-		fprintf (of, "%s", opcode[i]);		/* opcode */
-		break;
+	    fprintf (of, "%s", opcode[i]);		/* opcode */
+	    break;
 	case I_V_MRF: case I_V_MRX:			/* mem ref */
-		disp = inst & DISP;			/* displacement */
-		fprintf (of, "%s ", opcode[i]);		/* opcode */
-		if (inst & SC) {			/* current sector? */
-			if (cflag) fprintf (of, "%-o", (addr & PAGENO) | disp);
-			else fprintf (of, "C %-o", disp);  }
-		else fprintf (of, "%-o", disp);		/* sector zero */
-		if ((j == I_V_MRF) && (inst & IDX)) fprintf (of, ",1");
-		break;
+	    disp = inst & DISP;				/* displacement */
+	    fprintf (of, "%s ", opcode[i]);		/* opcode */
+	    if (inst & SC) {				/* current sector? */
+		if (cflag) fprintf (of, "%-o", (addr & PAGENO) | disp);
+		else fprintf (of, "C %-o", disp);  }
+	    else fprintf (of, "%-o", disp);		/* sector zero */
+	    if ((j == I_V_MRF) && (inst & IDX)) fprintf (of, ",1");
+	    break;
 	case I_V_IOT:					/* I/O */
-		disp = inst & 01777;			/* pulse+dev */
-		fprintf (of, "%s %o", opcode[i], disp);
-		break;
+	    disp = inst & 01777;			/* pulse+dev */
+	    fprintf (of, "%s %o", opcode[i], disp);
+	    break;
 	case I_V_SHF:					/* shift */
-		disp = -inst & SHFMASK;			/* shift count */
-		fprintf (of, "%s %o", opcode[i], disp);
-		break;
+	    disp = -inst & SHFMASK;			/* shift count */
+	    fprintf (of, "%s %o", opcode[i], disp);
+	    break;
 	case I_V_SK0: case I_V_SK1:			/* skips */
-		fprint_opr (of, inst & 0777, j, 0);	/* print skips */	
-		break;  }				/* end case */
+	    fprint_opr (of, inst & 0777, j, 0);	/* print skips */	
+	    break;  }				/* end case */
 	return SCPE_OK;  }				/* end if */
 	}						/* end for */
 return SCPE_ARG;
@@ -315,15 +315,15 @@ case I_V_SHF:						/* shift */
 case I_V_MRF: case I_V_MRX:				/* mem ref */
 	cptr = get_glyph (cptr, gbuf, ',');		/* get next field */
 	if (k = (strcmp (gbuf, "C") == 0)) {		/* C specified? */
-		val[0] = val[0] | SC;
-		cptr = get_glyph (cptr, gbuf, 0);  }
+	    val[0] = val[0] | SC;
+	    cptr = get_glyph (cptr, gbuf, 0);  }
 	else if (k = (strcmp (gbuf, "Z") == 0)) {	/* Z specified? */
-		cptr = get_glyph (cptr, gbuf, ',');  }
+	    cptr = get_glyph (cptr, gbuf, ',');  }
 	d = get_uint (gbuf, 8, X_AMASK, &r);		/* construe as addr */
 	if (r != SCPE_OK) return SCPE_ARG;
 	if (d <= DISP) val[0] = val[0] | d;		/* fits? */
 	else if (cflag && !k && (((addr ^ d) & PAGENO) == 0))
-		val[0] = val[0] | (d & DISP) | SC;
+	    val[0] = val[0] | (d & DISP) | SC;
 	else return SCPE_ARG;
 	if ((j == I_V_MRX) || (*cptr == 0)) break;	/* indexed? */
 	cptr = get_glyph (cptr, gbuf, 0);
@@ -334,12 +334,12 @@ case I_V_MRF: case I_V_MRX:				/* mem ref */
 case I_V_SK0: case I_V_SK1:				/* skips */
 	for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
 	     cptr = get_glyph (cptr, gbuf, 0)) {
-		for (i = 0; (opcode[i] != NULL) &&
-			(strcmp (opcode[i], gbuf) != 0) ; i++) ;
-		k = opc_val[i] & DMASK;
-		if ((opcode[i] == NULL) || (((k ^ val[0]) & 0177000) != 0))
-			return SCPE_ARG;
-		val[0] = val[0] | k;  }
+	    for (i = 0; (opcode[i] != NULL) &&
+		(strcmp (opcode[i], gbuf) != 0) ; i++) ;
+	    k = opc_val[i] & DMASK;
+	    if ((opcode[i] == NULL) || (((k ^ val[0]) & 0177000) != 0))
+		return SCPE_ARG;
+	    val[0] = val[0] | k;  }
 	break;  }					/* end case */
 if (*cptr != 0) return SCPE_ARG;			/* junk at end? */
 return SCPE_OK;

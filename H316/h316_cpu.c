@@ -371,8 +371,8 @@ if ((dev_ready & (INT_PENDING | dev_enable)) > INT_PENDING) {	/* int req? */
 
 else {	if (sim_brk_summ &&
 	    sim_brk_test (PC, SWMASK ('E'))) {		/* breakpoint? */
-		reason = STOP_IBKPT;			/* stop simulation */
-		break;  }
+	    reason = STOP_IBKPT;			/* stop simulation */
+	    break;  }
 	Y = PC;						/* set mem addr */
 	MB = Read (Y);					/* fetch instr */
 	PC = NEWA (Y, Y + 1);				/* incr PC */
@@ -394,19 +394,19 @@ case 001: case 021: case 041: case 061:			/* JMP */
 	PCQ_ENTRY;					/* save PC */
 	PC = NEWA (PC, Y);				/* set new PC */
 	if (dlog && sim_log) {				/* logging? */
-		int32 op = I_GETOP (M[PC]) & 017;	/* get target */
-		if ((op == 014) && (PC == (PCQ_TOP - 2))) { /* jmp .-1 to IO? */
-			turnoff = 1;			/* yes, stop */
-			fprintf (sim_log, "Idle loop detected\n");  }
-		else turnoff = 0;  }			/* no, log */
+	    int32 op = I_GETOP (M[PC]) & 017;		/* get target */
+	    if ((op == 014) && (PC == (PCQ_TOP - 2))) { /* jmp .-1 to IO? */
+		turnoff = 1;				/* yes, stop */
+		fprintf (sim_log, "Idle loop detected\n");  }
+	    else turnoff = 0;  }			/* no, log */
 	if (extoff_pending) ext = extoff_pending = 0;	/* cond ext off */
 	break;
 case 002: case 022: case 042: case 062:			/* LDA */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	if (dp) {					/* double prec? */
-		AR = Read (Y & ~1);			/* get doubleword */
-		BR = Read (Y | 1);
-		sc = 0;  }
+	    AR = Read (Y & ~1);				/* get doubleword */
+	    BR = Read (Y | 1);
+	    sc = 0;  }
 	else AR = Read (Y);				/* no, get word */
 	break;
 case 003: case 023: case 043: case 063:			/* ANA */
@@ -416,9 +416,9 @@ case 003: case 023: case 043: case 063:			/* ANA */
 case 004: case 024: case 044: case 064:			/* STA */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	if (dp) {					/* double prec? */
-		if ((Y & 1) == 0) Write (AR, Y);	/* if even, store A */
-		Write (BR, Y | 1);			/* store B */
-		sc = 0;  }
+	    if ((Y & 1) == 0) Write (AR, Y);		/* if even, store A */
+	    Write (BR, Y | 1);				/* store B */
+	    sc = 0;  }
 	else Write (AR, Y);				/* no, store word */
 	break;
 case 005: case 025: case 045: case 065:			/* ERA */
@@ -428,21 +428,21 @@ case 005: case 025: case 045: case 065:			/* ERA */
 case 006: case 026: case 046: case 066:			/* ADD */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	if (dp) {					/* double prec? */
-		t1 = GETDBL_S (AR, BR);			/* get A'B */
-		t2 = GETDBL_S (Read (Y & ~1), Read (Y | 1));
-		t1 = Add31 (t1, t2);			/* 31b add */
-		PUTDBL_S (t1);
-		sc = 0;  }
+	    t1 = GETDBL_S (AR, BR);			/* get A'B */
+	    t2 = GETDBL_S (Read (Y & ~1), Read (Y | 1));
+	    t1 = Add31 (t1, t2);			/* 31b add */
+	    PUTDBL_S (t1);
+	    sc = 0;  }
 	else AR = Add16 (AR, Read (Y));			/* no, 16b add */
 	break;
 case 007: case 027: case 047: case 067:			/* SUB */
 	if (reason = Ea (MB, &Y)) break;		/* eff addr */
 	if (dp) {					/* double prec? */
-		t1 = GETDBL_S (AR, BR);			/* get A'B */
-		t2 = GETDBL_S (Read (Y & ~1), Read (Y | 1));
-		t1 = Add31 (t1, -t2);			/* 31b sub */
-		PUTDBL_S (t1);
-		sc = 0;  }
+	    t1 = GETDBL_S (AR, BR);			/* get A'B */
+	    t2 = GETDBL_S (Read (Y & ~1), Read (Y | 1));
+	    t1 = Add31 (t1, -t2);			/* 31b sub */
+	    PUTDBL_S (t1);
+	    sc = 0;  }
 	else AR = Add16 (AR, (-Read (Y)) & DMASK);	/* no, 16b sub */
 	break;
 
@@ -483,25 +483,25 @@ case 035: case 075:					/* LDX */
 	break;
 case 016: case 036: case 056: case 076:			/* MPY */
 	if (cpu_unit.flags & UNIT_HSA) {		/* installed? */
-		if (reason = Ea (MB, &Y)) break;	/* eff addr */
-		t1 = SEXT (AR) * SEXT (Read (Y));
-		PUTDBL_S (t1);
-		sc = 0;  }
+	    if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	    t1 = SEXT (AR) * SEXT (Read (Y));
+	    PUTDBL_S (t1);
+	    sc = 0;  }
 	else reason = stop_inst;
 	break;
 case 017: case 037: case 057: case 077:			/* DIV */
 	if (cpu_unit.flags & UNIT_HSA) {		/* installed? */
-		if (reason = Ea (MB, &Y)) break;	/* eff addr */
-		t2 = SEXT (Read (Y));			/* divr */
-		if (t2) {				/* divr != 0? */
-			t1 = GETDBL_S (AR, BR);		/* get A'B */
-			BR = (t1 % t2) & DMASK;		/* remainder */
-			t1 = t1 / t2;			/* quotient */
-			AR = t1 & DMASK;
-			if ((t1 > MMASK) || (t1 < (-SIGN))) C = 1;
-			else C = 0;
-			sc = 0;  }
-		else C = 1;  }
+	    if (reason = Ea (MB, &Y)) break;		/* eff addr */
+	    t2 = SEXT (Read (Y));			/* divr */
+	    if (t2) {					/* divr != 0? */
+		t1 = GETDBL_S (AR, BR);			/* get A'B */
+		BR = (t1 % t2) & DMASK;			/* remainder */
+		t1 = t1 / t2;				/* quotient */
+		AR = t1 & DMASK;
+		if ((t1 > MMASK) || (t1 < (-SIGN))) C = 1;
+		else C = 0;
+		sc = 0;  }
+	    else C = 1;  }
 	else reason = stop_inst;
 	break;
 
@@ -516,67 +516,67 @@ case 034:						/* SKS */
 	t2 = iotab[MB & DEVMASK] (ioSKS, I_GETFNC (MB), AR);
 	reason = t2 >> IOT_V_REASON;
 	if (t2 & IOT_SKIP) {				/* skip? */
-		PC = NEWA (PC, PC + 1);
-		turnoff = 0;  }
+	    PC = NEWA (PC, PC + 1);
+	    turnoff = 0;  }
 	break;
 case 054:						/* INA */
 	if (MB & INCLRA) AR = 0;
 	t2 = iotab[MB & DEVMASK] (ioINA, I_GETFNC (MB), AR);
 	reason = t2 >> IOT_V_REASON;
 	if (t2 & IOT_SKIP) {				/* skip? */
-		PC = NEWA (PC, PC + 1);
-		turnoff = 0;  }
+	    PC = NEWA (PC, PC + 1);
+	    turnoff = 0;  }
 	AR = t2 & DMASK;				/* data */
 	break;
 case 074:						/* OTA */
 	t2 = iotab[MB & DEVMASK] (ioOTA, I_GETFNC (MB), AR);
 	reason = t2 >> IOT_V_REASON;
 	if (t2 & IOT_SKIP) {				/* skip? */
-		PC = NEWA (PC, PC + 1);
-		turnoff = 0;  }
+	    PC = NEWA (PC, PC + 1);
+	    turnoff = 0;  }
 	break;
 
 /* Control */
 
 case 000:
 	if ((MB & 1) == 0) {				/* HLT */
-		reason = STOP_HALT;
-		break;  }
+	    reason = STOP_HALT;
+	    break;  }
 	if (MB & m14) {					/* SGL, DBL */
-		if (cpu_unit.flags & UNIT_HSA) dp = (MB & m15)? 1: 0;
-		else reason = stop_inst;  }
+	    if (cpu_unit.flags & UNIT_HSA) dp = (MB & m15)? 1: 0;
+	    else reason = stop_inst;  }
 	if (MB & m13) {					/* DXA, EXA */
-		if (!(cpu_unit.flags & UNIT_EXT)) reason = stop_inst;
-		else if (MB & m15) {			/* EXA */
-			ext = 1;
-			extoff_pending = 0;  }		/* DXA */
-		else extoff_pending = 1;  }
+	    if (!(cpu_unit.flags & UNIT_EXT)) reason = stop_inst;
+	    else if (MB & m15) {			/* EXA */
+		ext = 1;
+		extoff_pending = 0;  }			/* DXA */
+	    else extoff_pending = 1;  }
 	if (MB & m12)					/* RMP */
-		dev_ready = dev_ready & ~INT_MPE;
+	    dev_ready = dev_ready & ~INT_MPE;
 	if (MB & m11) {					/* SCA, INK */
-		if (MB & m15)				/* INK */
-			AR = (C << 15) | (dp << 14) | (pme << 13) | (sc & 037);
-		else if (cpu_unit.flags & UNIT_HSA)	/* SCA */
-			AR = sc & 037;
-		else reason = stop_inst;  }
+	    if (MB & m15)				/* INK */
+		AR = (C << 15) | (dp << 14) | (pme << 13) | (sc & 037);
+	    else if (cpu_unit.flags & UNIT_HSA)		/* SCA */
+		AR = sc & 037;
+	    else reason = stop_inst;  }
 	else if (MB & m10) {				/* NRM */
-		if (cpu_unit.flags & UNIT_HSA) {
-			for (sc = 0;
-			    (sc <= 32) && ((AR & SIGN) != ((AR << 1) & SIGN));
-			     sc++) {
-				AR = (AR & SIGN) | ((AR << 1) & MMASK) |
-				     ((BR >> 14) & 1);
-				BR = (BR & SIGN) | ((BR << 1) & MMASK);  }
-			sc = sc & 037;  }
-		else reason = stop_inst;  }
+	    if (cpu_unit.flags & UNIT_HSA) {
+		for (sc = 0;
+		    (sc <= 32) && ((AR & SIGN) != ((AR << 1) & SIGN));
+		     sc++) {
+		    AR = (AR & SIGN) | ((AR << 1) & MMASK) |
+			((BR >> 14) & 1);
+		    BR = (BR & SIGN) | ((BR << 1) & MMASK);  }
+		sc = sc & 037;  }
+	    else reason = stop_inst;  }
 	else if (MB & m9) {				/* IAB */
-		sc = BR;
-		BR = AR;
-		AR = sc;  }
+	    sc = BR;
+	    BR = AR;
+	    AR = sc;  }
 	if (MB & m8)					/* ENB */
-		dev_ready = (dev_ready | INT_ON) & ~INT_NODEF;
+	    dev_ready = (dev_ready | INT_ON) & ~INT_NODEF;
 	if (MB & m7)					/* INH */
-		dev_ready = dev_ready & ~INT_ON;
+	    dev_ready = dev_ready & ~INT_ON;
 	break;
 
 /* Shift
@@ -607,112 +607,116 @@ case 020:
 	if ((t1 = (-MB) & SHFMASK) == 0) break;		/* shift count */
 	switch (I_GETFNC (MB)) {			/* case shift fnc */
 	case 000:					/* LRL */
-		if (t1 > 32) ut = 0;			/* >32? all 0 */
-		else {	ut = GETDBL_U (AR, BR);		/* get A'B */
-			C = (ut >> (t1 - 1)) & 1;	/* C = last out */
-			ut = ut >> t1;  }		/* log right */
-		PUTDBL_U (ut);				/* store A,B */
-		break;
+	    if (t1 > 32) ut = 0;			/* >32? all 0 */
+	    else {
+	    	ut = GETDBL_U (AR, BR);			/* get A'B */
+		C = (ut >> (t1 - 1)) & 1;		/* C = last out */
+		ut = ut >> t1;  }			/* log right */
+	    PUTDBL_U (ut);				/* store A,B */
+	    break;
 	case 001:					/* LRS */
-		if (t1 > 31) t1 = 31;			/* limit to 31 */
-		t2 = GETDBL_S (SEXT (AR), BR);		/* get A'B signed */
-		C = (t2 >> (t1 - 1)) & 1;		/* C = last out */
-		t2 = t2 >> t1;				/* arith right */
-		PUTDBL_S (t2);				/* store A,B */
-		break;
+	    if (t1 > 31) t1 = 31;			/* limit to 31 */
+	    t2 = GETDBL_S (SEXT (AR), BR);		/* get A'B signed */
+	    C = (t2 >> (t1 - 1)) & 1;			/* C = last out */
+	    t2 = t2 >> t1;				/* arith right */
+	    PUTDBL_S (t2);				/* store A,B */
+	    break;
 	case 002:					/* LRR */
-		t2 = t1 % 32;				/* mod 32 */
-		ut = GETDBL_U (AR, BR);			/* get A'B */
-		ut = (ut >> t2) | (ut << (32 - t2));	/* rot right */
-		C = (ut >> 31) & 1;			/* C = A<1> */
-		PUTDBL_U (ut);				/* store A,B */
-		break;
+	    t2 = t1 % 32;				/* mod 32 */
+	    ut = GETDBL_U (AR, BR);			/* get A'B */
+	    ut = (ut >> t2) | (ut << (32 - t2));	/* rot right */
+	    C = (ut >> 31) & 1;				/* C = A<1> */
+	    PUTDBL_U (ut);				/* store A,B */
+	    break;
 	case 003:					/* "long right arot" */
-		if (reason = stop_inst) break;		/* stop on undef? */
-		for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
-			C = BR & 1;			/* C = last out */
-			BR = (BR & SIGN) | ((AR & 1) << 14) |
-			     ((BR & MMASK) >> 1);
-			AR = ((AR & SIGN) | (C << 15)) | (AR >> 1);  }
-		break;
+	    if (reason = stop_inst) break;		/* stop on undef? */
+	    for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
+		C = BR & 1;				/* C = last out */
+		BR = (BR & SIGN) | ((AR & 1) << 14) |
+		     ((BR & MMASK) >> 1);
+		AR = ((AR & SIGN) | (C << 15)) | (AR >> 1);  }
+	    break;
 	case 004:					/* LGR */
-		if (t1 > 16) AR = 0;			/* > 16? all 0 */
-		else {	C = (AR >> (t1 - 1)) & 1;	/* C = last out */
-			AR = (AR >> t1) & DMASK;  }	/* log right */
-		break;
+	    if (t1 > 16) AR = 0;			/* > 16? all 0 */
+	    else {
+	    	C = (AR >> (t1 - 1)) & 1;		/* C = last out */
+		AR = (AR >> t1) & DMASK;  }		/* log right */
+	    break;
 	case 005:					/* ARS */
-		if (t1 > 16) t1 = 16;			/* limit to 16 */
-		C = ((SEXT (AR)) >> (t1 - 1)) & 1;	/* C = last out */
-		AR = ((SEXT (AR)) >> t1) & DMASK;	/* arith right */
-		break; 
+	    if (t1 > 16) t1 = 16;			/* limit to 16 */
+	    C = ((SEXT (AR)) >> (t1 - 1)) & 1;		/* C = last out */
+	    AR = ((SEXT (AR)) >> t1) & DMASK;		/* arith right */
+	    break; 
 	case 006:					/* ARR */
-		t2 = t1 % 16;				/* mod 16 */
-		AR = ((AR >> t2) | (AR << (16 - t2))) & DMASK;
-		C = (AR >> 15) & 1;			/* C = A<1> */
-		break;
+	    t2 = t1 % 16;				/* mod 16 */
+	    AR = ((AR >> t2) | (AR << (16 - t2))) & DMASK;
+	    C = (AR >> 15) & 1;				/* C = A<1> */
+	    break;
 	case 007:					/* "short right arot" */
-		if (reason = stop_inst) break;		/* stop on undef? */
-		for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
-			C = AR & 1;			/* C = last out */
-			AR = ((AR & SIGN) | (C << 15)) | (AR >> 1);  }
-		break;
+	    if (reason = stop_inst) break;		/* stop on undef? */
+	    for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
+		C = AR & 1;				/* C = last out */
+		AR = ((AR & SIGN) | (C << 15)) | (AR >> 1);  }
+	    break;
 
 /* Shift, continued */
 
 	case 010:					/* LLL */
-		if (t1 > 32) ut = 0;			/* > 32? all 0 */
-		else {	ut = GETDBL_U (AR, BR);		/* get A'B */
-			C = (ut >> (32 - t1)) & 1;	/* C = last out */
-			ut = ut << t1;  }		/* log left */
-		PUTDBL_U (ut);				/* store A,B */
-		break;
+	    if (t1 > 32) ut = 0;			/* > 32? all 0 */
+	    else {
+	    	ut = GETDBL_U (AR, BR);			/* get A'B */
+		C = (ut >> (32 - t1)) & 1;		/* C = last out */
+		ut = ut << t1;  }			/* log left */
+	    PUTDBL_U (ut);				/* store A,B */
+	    break;
 	case 011:					/* LLS */
-		if (t1 > 31) t1 = 31;			/* limit to 31 */
-		t2 = GETDBL_S (SEXT (AR), BR);		/* get A'B */
-		t3 = t2 << t1;				/* "arith" left */
-		PUTDBL_S (t3);				/* store A'B */
-		if ((t2 >> (31 - t1)) !=		/* shf out = sgn? */
-		   ((AR & SIGN)? -1: 0)) C = 1;
-		break;
+	    if (t1 > 31) t1 = 31;			/* limit to 31 */
+	    t2 = GETDBL_S (SEXT (AR), BR);		/* get A'B */
+	    t3 = t2 << t1;				/* "arith" left */
+	    PUTDBL_S (t3);				/* store A'B */
+	    if ((t2 >> (31 - t1)) !=			/* shf out = sgn? */
+		((AR & SIGN)? -1: 0)) C = 1;
+	    break;
 	case 012:					/* LLR */
-		t2 = t1 % 32;				/* mod 32 */
-		ut = GETDBL_U (AR, BR);			/* get A'B */
-		ut = (ut << t2) | (ut >> (32 - t2));	/* rot left */
-		C = ut & 1;				/* C = B<16> */
-		PUTDBL_U (ut);				/* store A,B */
-		break;
+	    t2 = t1 % 32;				/* mod 32 */
+	    ut = GETDBL_U (AR, BR);			/* get A'B */
+	    ut = (ut << t2) | (ut >> (32 - t2));	/* rot left */
+	    C = ut & 1;					/* C = B<16> */
+	    PUTDBL_U (ut);				/* store A,B */
+	    break;
 	case 013:					/* "long left arot" */
-		if (reason = stop_inst) break;		/* stop on undef? */
-		for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
-			AR = (AR << 1) | ((BR >> 14) & 1);
-			BR = (BR & SIGN) | ((BR << 1) & MMASK) |
-			     ((AR >> 16) & 1);
-			if ((AR & SIGN) != ((AR >> 1) & SIGN)) C = 1;
-			AR = AR & DMASK;  }
-		break;
+	    if (reason = stop_inst) break;		/* stop on undef? */
+	    for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
+		AR = (AR << 1) | ((BR >> 14) & 1);
+		BR = (BR & SIGN) | ((BR << 1) & MMASK) |
+		     ((AR >> 16) & 1);
+		if ((AR & SIGN) != ((AR >> 1) & SIGN)) C = 1;
+		AR = AR & DMASK;  }
+	    break;
 	case 014:					/* LGL */
-		if (t1 > 16) AR = 0;			/* > 16? all 0 */
-		else {	C = (AR >> (16 - t1)) & 1;	/* C = last out */
-			AR = (AR << t1) & DMASK;  }	/* log left */
-		break;
+	    if (t1 > 16) AR = 0;			/* > 16? all 0 */
+	    else {
+	    	C = (AR >> (16 - t1)) & 1;		/* C = last out */
+		AR = (AR << t1) & DMASK;  }		/* log left */
+	    break;
 	case 015:					/* ALS */
-		if (t1 > 16) t1 = 16;			/* limit to 16 */
-		t2 = SEXT (AR);				/* save AR */
-		AR = (AR << t1) & DMASK;		/* "arith" left */
-		if ((t2 >> (16 - t1)) !=		/* shf out + sgn */
-		    ((AR & SIGN)? -1: 0)) C = 1;
-		break;
+	    if (t1 > 16) t1 = 16;			/* limit to 16 */
+	    t2 = SEXT (AR);				/* save AR */
+	    AR = (AR << t1) & DMASK;			/* "arith" left */
+	    if ((t2 >> (16 - t1)) !=			/* shf out + sgn */
+		((AR & SIGN)? -1: 0)) C = 1;
+	    break;
 	case 016:					/* ALR */
-		t2 = t1 % 16;				/* mod 16 */
-		AR = ((AR << t2) | (AR >> (16 - t2))) & DMASK;
-		C = AR & 1;				/* C = A<16> */
-		break;
+	    t2 = t1 % 16;				/* mod 16 */
+	    AR = ((AR << t2) | (AR >> (16 - t2))) & DMASK;
+	    C = AR & 1;					/* C = A<16> */
+	    break;
 	case 017:					/* "short left arot" */
-		if (reason = stop_inst) break;		/* stop on undef? */
-		for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
-			if ((AR & SIGN) != ((AR << 1) & SIGN)) C = 1;
-			AR = ((AR << 1) | (AR >> 15)) & DMASK;  }
-		break;  }				/* end case fnc */
+	    if (reason = stop_inst) break;		/* stop on undef? */
+	    for (t2 = 0; t2 < t1; t2++) {		/* bit by bit */
+		if ((AR & SIGN) != ((AR << 1) & SIGN)) C = 1;
+		AR = ((AR << 1) | (AR >> 15)) & DMASK;  }
+	    break;  }					/* end case fnc */
 	break;
 
 /* Skip */
@@ -740,12 +744,12 @@ case 060:
 	else if (MB == 0140100) AR = AR & ~SIGN;	/* SSP */
 	else if (MB == 0140200) C = 0;			/* RCB */
 	else if (MB == 0140320) {			/* CSA */
-		C = (AR & SIGN) >> 15;
-		AR = AR & ~SIGN;  }
+	    C = (AR & SIGN) >> 15;
+	    AR = AR & ~SIGN;  }
 	else if (MB == 0140401) AR = AR ^ DMASK;	/* CMA */
 	else if (MB == 0140407) {			/* TCA */
-		AR = (-AR) & DMASK;
-		sc = 0;  }
+	    AR = (-AR) & DMASK;
+	    sc = 0;  }
 	else if (MB == 0140500) AR = AR | SIGN;		/* SSM */
 	else if (MB == 0140600) C = 1;			/* SCB */
 	else if (MB == 0141044) AR = AR & 0177400;	/* CAR */
@@ -755,7 +759,7 @@ case 060:
 	else if (MB == 0141216) AR = Add16 (AR, C);	/* ACA */
 	else if (MB == 0141240) AR = (AR << 8) & DMASK;	/* ICR */
 	else if (MB == 0141340)				/* ICA */
-		AR = ((AR << 8) | (AR >> 8)) & DMASK;
+	    AR = ((AR << 8) | (AR >> 8)) & DMASK;
 	else if (reason = stop_inst) break;
 	else AR = Operate (MB, AR);			/* undefined */
 	break;
@@ -792,14 +796,14 @@ int32 Y = IR & (IA | DISP);				/* ind + disp */
 if (IR & SC) Y = ((PC - 1) & PAGENO) | Y;		/* cur sec? + pageno */
 if (ext) {						/* extend mode? */
 	for (i = 0; (i < ind_max) && (Y & IA); i++) {	/* resolve ind addr */
-		Y = Read (Y & X_AMASK);  }		/* get ind addr */
+	    Y = Read (Y & X_AMASK);  }			/* get ind addr */
 	if (IR & IDX) Y = Y + XR;			/* post-index */
 	}						/* end if ext */
 else {							/* non-extend */
 	Y = NEWA (PC, Y + ((IR & IDX)? XR: 0));		/* pre-index */
 	for (i = 0; (i < ind_max) && (IR & IA); i++) {	/* resolve ind addr */
-		IR = Read (Y & X_AMASK);		/* get ind addr */
-		Y = NEWA (Y, IR + ((IR & IDX)? XR: 0));  } /* post-index */
+	    IR = Read (Y & X_AMASK);			/* get ind addr */
+	    Y = NEWA (Y, IR + ((IR & IDX)? XR: 0));  }	/* post-index */
 	}						/* end else */
 *addr = Y = Y & X_AMASK;				/* return addr */
 if (dlog && sim_log && !turnoff)			/* cycle log? */

@@ -13,6 +13,7 @@
 // ASM1130 - IBM 1130 Cross Assembler
 //
 // Version
+//		   1.07 - 2003Jan05 - Filenames are now left in lower case. SYMBOLS.SYS stays all upper case
 //		   1.06 - 2002May02	- Fixed bug in ebdic constants (data goes into low byte)
 //							  First stab at adding ISS level # info, this is iffy
 //         1.05 - 2002Apr24 - Made negative BSS size a warning not an error, as it
@@ -155,7 +156,7 @@
 #define TRUE  1
 #define FALSE 0
 
-#define VERSION "ASM1130 CROSS ASSEMBLER V1.06"
+#define VERSION "ASM1130 CROSS ASSEMBLER V1.07"
 
 #define ISTV	0x33			// magic number from DMS R2V12 monitorm symbol @ISTV
 
@@ -1880,9 +1881,10 @@ void proc (char *fname)
 	else
 		strcpy(curfn, fname);					// otherwise use extension specified
 
-#if (defined(WIN32) || defined(VMS))
-	upcase(curfn);								// only force uppercase of name on Windows and VMS
-#endif
+// let's leave filename case alone even if it doesn't matter
+//#if (defined(WIN32) || defined(VMS))
+//	upcase(curfn);								// only force uppercase of name on Windows and VMS
+//#endif
 
 	if (progname[0] == '\0') {					// pick up primary filename
 		if ((c = strrchr(curfn, '\\')) == NULL)

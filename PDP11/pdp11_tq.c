@@ -1,6 +1,6 @@
 /* pdp11_tq.c: TQK50 tape controller simulator
 
-   Copyright (c) 2002, Robert M Supnik
+   Copyright (c) 2002-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tq		TQK50 tape controller
 
+   09-Jan-03	RMS	Fixed bug in transfer end packet status
    17-Oct-02	RMS	Fixed bug in read reverse (found by Hans Pufal)
 */
 
@@ -548,7 +549,8 @@ if (tq_pip) {						/* polling? */
 		tq_pkt[pkt].d[RW_BCH], tq_pkt[pkt].d[RW_BCL],
 		tq_pkt[pkt].d[RW_BAH], tq_pkt[pkt].d[RW_BAL]);
 	    if (up) fprintf (sim_log, ", pos=%d, obj=%d\n", up->pos, up->objp);
-	    else fprintf (sim_log, "\n");  }
+	    else fprintf (sim_log, "\n");
+	    fflush (sim_log);  }
 	if (GETP (pkt, UQ_HCTC, TYP) != UQ_TYP_SEQ)	/* seq packet? */
 	    return tq_fatal (PE_PIE);			/* no, term thread */
 	cnid = GETP (pkt, UQ_HCTC, CID);		/* get conn ID */
@@ -946,7 +948,7 @@ else sts = ST_OFL;					/* offline */
 PUTP32 (pkt, RW_BCL, 0);				/* no bytes processed */
 PUTP32 (pkt, RW_POSL, objp);				/* set obj pos */
 PUTP32 (pkt, RW_RSZL, 0);				/* clr rec size */
-tq_putr (pkt, cmd | OP_END, tq_efl (uptr), sts, RW_LNT, UQ_TYP_SEQ);
+tq_putr (pkt, cmd | OP_END, tq_efl (uptr), sts, RW_LNT_T, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
 
@@ -1139,7 +1141,7 @@ t_bool tq_mot_end (UNIT *uptr, uint32 flg, uint32 sts, uint32 rsiz)
 {
 int32 pkt = uptr->cpkt;					/* packet */
 uint32 cmd = GETP (pkt, CMD_OPC, OPC);			/* get cmd */
-uint32 lnt = RW_LNT;					/* assume rw */
+uint32 lnt = RW_LNT_T;					/* assume rw */
 
 if (cmd == OP_ERG) lnt = ERG_LNT;			/* set pkt lnt */
 else if (cmd == OP_ERS) lnt = ERS_LNT;
@@ -1148,8 +1150,7 @@ else if (cmd == OP_POS) lnt = POS_LNT;
 
 uptr->cpkt = 0;						/* done */
 if (lnt > ERG_LNT) {					/* xfer cmd? */
-	PUTP32 (pkt, RW_POSL, uptr->objp);  }		/* position */
-if (lnt > POS_LNT) {					/* read or write? */
+	PUTP32 (pkt, RW_POSL, uptr->objp);		/* position */
 	PUTP32 (pkt, RW_RSZL, rsiz);  }			/* record size */
 tq_putr (pkt, cmd | OP_END, flg | tq_efl (uptr), sts, lnt, UQ_TYP_SEQ);
 if (!tq_putpkt (pkt, TRUE)) return ERR;			/* send pkt */
@@ -1495,7 +1496,8 @@ if (DBG_LOG (LOG_TQ)) {
 	fprintf (sim_log, ">>TQ: rsp=%04X, sts=%04X",
 	    tq_pkt[pkt].d[RSP_OPF], tq_pkt[pkt].d[RSP_STS]);
 	if (up) fprintf (sim_log, ", pos=%d, obj=%d\n", up->pos, up->objp);
-	else fprintf (sim_log, "\n");  }
+	else fprintf (sim_log, "\n");
+	fflush (sim_log);  }
 if (!tq_getdesc (&tq_rq, &desc)) return ERR;		/* get rsp desc */
 if ((desc & UQ_DESC_OWN) == 0) {			/* not valid? */
 	if (qt) tq_enqt (&tq_rspq, pkt);		/* normal? q tail */

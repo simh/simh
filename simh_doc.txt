@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V2.10
-Date:	15-Nov-2002
+Subj:	Simulator Usage, V2.10-2
+Date:	15-Jan-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -103,9 +103,16 @@ UNIX text conventions.  This can be done with the UNIX UNZIP utility
 (unzip -a).
 
 The supplied makefile will compile the simulators for UNIX systems
-which support the POSIX TERMIOS.  The VAX and PDP-11 will be compiled
-without Ethernet support; use makefile_ether to compile with Ethernet
-support.  Notes for hand compilation:
+which support the POSIX TERMIOS.  The VAX and PDP-11 can be compiled
+with or without Ethernet support.  To compile without Ethernet support:
+
+	gmake {target|ALL}
+
+To compile with Ethernet support:
+
+	gmake USE_NETWORK=1 {target|ALL}
+
+Notes for hand compilation:
 
 - The default UNIX terminal handling model is the POSIX TERMIOS
   interface, which is supported by Linux, Mac OS/X, and Alpha UNIX.
@@ -150,7 +157,7 @@ simulators with Ethernet support.
 - Get the required .lib files (packet.lib, wpcap.lib) from the WinPCAP
   3.0 developer's kit.  If you're using Borland C++, use COFF2OMF to
   convert the .lib files into a format that can be used by the compiler.
-  Then move the libraries to the top level simulation directory.
+  Then move the libraries to the standard library directory.
 - Add -DUSE_NETWORK to the compilation command lines for the PDP-11
   and VAX.
 
@@ -609,7 +616,17 @@ quotation marks.
 If the switch -V is specified, the commands in the file are echoed
 before they are executed.
 
-3.13 Getting Help
+3.13 Executing System Commands
+
+The simulator can execute operating system commands with the ! (spawn)
+command:
+
+	sim> ! <host operating system command>
+
+If no operating system command is provided, the simulator attempts to
+launch the host operating system's command shell.
+
+3.14 Getting Help
 
 The HELP command prints out information about a command or about all
 commands:
@@ -617,7 +634,7 @@ commands:
 	sim> HELP			-- print all HELP messages
 	sim> HELP <command>		-- print HELP for command
 
-3.14 Exiting The Simulator
+3.15 Exiting The Simulator
 
 EXIT (synonyms QUIT and BYE) returns control to the operating system.
 
@@ -716,6 +733,7 @@ extra terminal	y	y	y	-	y
 hard disk	y	y	y	-	h
 fixed disk	y	-	h	-	h
 floppy disk	y	y	y	-	-
+drum		-	-	-	-	h
 DECtape		y	y	-	h	y
 mag tape	h	y	y	-	h
 
@@ -730,28 +748,30 @@ card reader	y	-	-	-	-
 line printer	y	d	y	h	y
 clock		-	d	y	h	y
 extra terminal	-	h	y	-	y
-hard disk	-	h	y	-	y
-fixed disk	-	h	-	-	-
+hard disk	-	d	y	-	y
+fixed disk	-	n	-	-	-
 floppy disk	-	-	h	-	-
+drum		-	n	-	-	-
 DECtape		-	-	-	-	-
 mag tape	y	d	y	-	y
 
-	system	GRI-909	1620
+	system	GRI-909	1620	i16	i32	SDS940
 device
-CPU		h	h
-FPU		-	-
-CIS		-	-
-console		h	h
-paper tape	h	h
-card reader	-	h
-line printer	-	h
-clock		h	-
-extra terminal	-	-
-hard disk	-	h
-fixed disk	-	-
-floppy disk	-	-
-DECtape		-	-
-mag tape	-	-
+CPU		h	h	d	d	d
+FPU		-	-	d	d	-
+CIS		-	-	-	-	-
+console		h	h	d	d	h
+paper tape	h	h	d	d	h
+card reader	-	h	-	-	-
+line printer	-	h	d	d	h
+clock		h	-	d	d	n
+extra terminal	-	-	h	h	h
+hard disk	-	h	d	d	h
+fixed disk	-	-	-	-	h
+floppy disk	-	-	d	d	-
+drum		-	-	-	-	h
+DECtape		-	-	-	-	-
+mag tape	-	-	d	d	h
 
 legend:		y = runs operating system or sample program
 		d = runs diagnostics
@@ -766,10 +786,12 @@ in file sim_rev.c.
 
 Rev 2.10, Nov, 02
 		Added Telnet console capability, removed VT emulation
-		Added DO with substitutable arguments
-		Added quiet mode
+		Added DO with substitutable arguments (from Brian Knittel)
+		Added quiet mode (from Brian Knittel)
+		Added ! command (from Mark Pizzolato)
+		Added Telnet BREAK support (from Mark Pizzolato)
 		Added device enable/disable support
-		Added optional simulator for input, output, commands
+		Added optional simulator hooks for input, output, commands
 		Added PDP-11 KW11P programmable clock
 		Added PDP-11 RK611/RK06/RK07 disk
 		Added PDP-11/VAX TMSCP tape
@@ -782,11 +804,15 @@ Rev 2.10, Nov, 02
 		Added HP2100 12845A line printer
 		Added HP2100 13183 magtape support
 		Added HP2100 boot ROM support
+		Added HP2100 interprocessor link support
 		Added IBM 1620
+		Added SDS 940
+		Added Interdata 16b and 32b systems
 		Added 16b DECtape file format support
 		Added support for statically buffered devices
 		Added magtape end of medium support
 		Added 7B/8B support to terminals and multiplexors
+		Added BREAK support to terminals and multiplexors
 
 Rev 2.9, Jan, 02
 		Added circular register arrays

@@ -87,7 +87,7 @@
 
 #define LIU_SEEK	0100000				/* seeking NI */
 #define LIU_DG		0000010				/* diagnose */
-#define LIU_BRK		0000004				/* break NI */
+#define LIU_BRK		0000004				/* break */
 #define LIU_LOST	0000002				/* char lost */
 #define LIU_TR		0000001				/* trans/rcv */
 
@@ -129,8 +129,8 @@
 			 ((muxc_ota[ch] & (OTC_ES2|OTC_ES1)) >> OTC_V_ES)) \
 			 << LIC_V_I)
 
-extern int32 PC;
-extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 PC;
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 
 uint16 mux_sta[MUX_LINES];				/* line status */
 uint16 mux_rpar[MUX_LINES + MUX_ILINES];		/* rcv param */
@@ -482,19 +482,26 @@ tmxr_poll_rx (&mux_desc);				/* poll for input */
 for (ln = 0; ln < MUX_LINES; ln++) {			/* loop thru lines */
 	if (mux_ldsc[ln].conn) {			/* connected? */
 	    if (c = tmxr_getc_ln (&mux_ldsc[ln])) {	/* get char */
-		if (mux_rchp[ln]) mux_sta[ln] = mux_sta[ln] | LIU_LOST;
-		if (muxl_unit[ln].flags & UNIT_UC) {	/* cvt to UC? */
-		    c = c & 0177;
-		    if (islower (c)) c = toupper (c);  }
-		else c = c & ((muxl_unit[ln].flags & UNIT_8B)? 0377: 0177);
-		if (mux_rpar[ln] & OTL_ECHO) {		/* echo? */
-		    TMLN *lp = &mux_ldsc[ln];		/* get line */
-		    tmxr_putc_ln (lp, c);		/* output char */
-		    tmxr_poll_tx (&mux_desc);  }	/* poll xmt */
+	        if (c & SCPE_BREAK) {			/* break? */
+		    mux_sta[ln] = mux_sta[ln] | LIU_BRK;
+		    mux_rbuf[ln] = 0;  }		/* no char */
+		else {					/* normal */
+		    if (mux_rchp[ln]) mux_sta[ln] = mux_sta[ln] | LIU_LOST;
+		    if (muxl_unit[ln].flags & UNIT_UC) {	/* cvt to UC? */
+			c = c & 0177;
+			if (islower (c)) c = toupper (c);  }
+		    else c = c & ((muxl_unit[ln].flags & UNIT_8B)? 0377: 0177);
+		    if (mux_rpar[ln] & OTL_ECHO) {		/* echo? */
+			TMLN *lp = &mux_ldsc[ln];		/* get line */
+			tmxr_putc_ln (lp, c);		/* output char */
+			tmxr_poll_tx (&mux_desc);  }	/* poll xmt */
+		    mux_rbuf[ln] = c;			/* save char */
+		    mux_rchp[ln] = 1;  }		/* char pending */
 		if (mux_rpar[ln] & OTL_DIAG) mux_diag (c); /* rcv diag? */
-		mux_rbuf[ln] = c;			/* save char */
-		mux_rchp[ln] = 1;  }  }			/* char pending */
-	else muxc_lia[ln] = 0;  }			/* disconnected */						/* end for */
+		}					/* end if char */
+	    }						/* end if connected */
+	else muxc_lia[ln] = 0;				/* disconnected */
+	}						/* end for */
 if (!FLG (muxl_dib.devno)) mux_data_int ();		/* scan for data int */
 if (!FLG (muxc_dib.devno)) mux_ctrl_int ();		/* scan modem */
 return SCPE_OK;
@@ -584,9 +591,13 @@ void mux_diag (int32 c)
 int32 i;
 
 for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++) {
-	if (mux_rchp[i]) mux_sta[i] = mux_sta[i] | LIU_LOST;
-	mux_rchp[i] = 1;
-	mux_rbuf[i] = c;  }
+	if (c & SCPE_BREAK) {				/* break? */
+	    mux_sta[i] = mux_sta[i] | LIU_BRK;
+	    mux_rbuf[i] = 0;  }				/* no char */
+	else {
+	    if (mux_rchp[i]) mux_sta[i] = mux_sta[i] | LIU_LOST;
+	    mux_rchp[i] = 1;
+	    mux_rbuf[i] = c;  }  }
 return;
 }
 

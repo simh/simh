@@ -28,6 +28,11 @@
 
   Modification history:
 
+  15-Jan-03  DTH  Merged Mark Pizzolato's changes into main source
+  13-Jan-03  MP   Added xq_id to countdown the triggering of the System Id
+                  multicast packets
+  10-Jan-03  DTH  Added bootrom
+  30-Dec-02  DTH  Added setup valid field
   21-Oct-02  DTH  Corrected copyright again
   15-Oct-02  DTH  Fixed copyright, added sanity timer support
   10-Oct-02  DTH  Added more setup fields and bitmasks
@@ -69,6 +74,11 @@ struct xq_sanity {
   int       countdown;      /* sanity timer countdown in 1/4 seconds */
 };
 
+struct xq_id {
+  int       enabled;        /* System ID timer enabled ? */
+  int       countdown;      /* System ID timer countdown in seconds */
+};
+
 struct xq_msg_itm {
   int       type;     /* receive (0=setup, 1=loopback, 2=normal) */
   ETH_PACK  packet;   /* packet */
@@ -84,6 +94,7 @@ struct xq_msg_que {
 };
 
 struct xq_setup {
+  int               valid;                /* is the setup block valid? */
   int               promiscuous;          /* promiscuous mode enabled */
   int               multicast;            /* enable all multicast addresses */
   int               l1;                   /* first  diagnostic led state */
@@ -108,6 +119,7 @@ struct xq_device {
   ETH_MAC           mac;                  /* MAC address */
   enum xq_type      type;                 /* controller type */
   struct xq_sanity  sanity;               /* sanity timer information */
+  struct xq_id      id;                   /* System ID timer information */
   /*- initialized values - DO NOT MOVE */
 
   /* I/O register storage */
@@ -130,6 +142,7 @@ struct xq_device {
   ETH_PACK          read_buffer;
   ETH_PACK          write_buffer;
   struct xq_msg_que ReadQ;
+  uint8             bootrom[256];
 };
 
 #define XQ_CSR_RI 0x8000   /* Receive Interrupt Request     (RI) [RO/W1] */

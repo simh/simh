@@ -205,8 +205,8 @@ case 0:							/* RXCS */
 	break;
 case 1:							/* RXDB */
 	if ((rx_state == EMPTY) && (rx_csr & RXCS_TR)) {/* empty? */
-		sim_activate (&rx_unit[0], rx_xwait);
-		rx_csr = rx_csr & ~RXCS_TR;  }		/* clear xfer */
+	    sim_activate (&rx_unit[0], rx_xwait);
+	    rx_csr = rx_csr & ~RXCS_TR;  }		/* clear xfer */
 	*data = rx_dbr;					/* return data */
 	break;  }					/* end switch PA */
 return SCPE_OK;
@@ -230,36 +230,36 @@ switch ((PA >> 1) & 1) {				/* decode PA<1> */
 case 0:							/* RXCS */
 	rx_csr = rx_csr & RXCS_IMP;			/* clear junk */
 	if (access == WRITEB) data = (PA & 1)?		/* write byte? */
-		(rx_csr & 0377) | (data << 8): (rx_csr & ~0377) | data;
+	    (rx_csr & 0377) | (data << 8): (rx_csr & ~0377) | data;
 	if (data & RXCS_INIT) {				/* initialize? */
-		rx_reset (&rx_dev);			/* reset device */
-		return SCPE_OK;  }			/* end if init */
+	    rx_reset (&rx_dev);				/* reset device */
+	    return SCPE_OK;  }				/* end if init */
 	if ((data & CSR_GO) && (rx_state == IDLE)) {	/* new function? */
-		rx_csr = data & (RXCS_IE + RXCS_DRV + RXCS_FUNC);
-		drv = ((rx_csr & RXCS_DRV)? 1: 0);	/* reselect drive */
-		bptr = 0;				/* clear buf pointer */
-		switch (RXCS_GETFNC (data)) {		/* case on func */
-		case RXCS_FILL:
-			rx_state = FILL;		/* state = fill */
-			rx_csr = rx_csr | RXCS_TR;	/* xfer is ready */
-			break;
-		case RXCS_EMPTY:
-			rx_state = EMPTY;		/* state = empty */
-			sim_activate (&rx_unit[drv], rx_xwait);
-			break;
-		case RXCS_READ: case RXCS_WRITE: case RXCS_WRDEL:
-			rx_state = RWDS;		/* state = get sector */
-			rx_csr = rx_csr | RXCS_TR;	/* xfer is ready */
-			rx_esr = rx_esr & RXES_ID;	/* clear errors */
-			break;
-		default:
-			rx_state = CMD_COMPLETE;	/* state = cmd compl */
-			sim_activate (&rx_unit[drv], rx_cwait);
-			break;  }			/* end switch func */
-		return SCPE_OK;  }			/* end if GO */
+	    rx_csr = data & (RXCS_IE + RXCS_DRV + RXCS_FUNC);
+	    drv = ((rx_csr & RXCS_DRV)? 1: 0);		/* reselect drive */
+	    bptr = 0;					/* clear buf pointer */
+	    switch (RXCS_GETFNC (data)) {		/* case on func */
+	    case RXCS_FILL:
+		rx_state = FILL;			/* state = fill */
+		rx_csr = rx_csr | RXCS_TR;		/* xfer is ready */
+		break;
+	    case RXCS_EMPTY:
+		rx_state = EMPTY;			/* state = empty */
+		sim_activate (&rx_unit[drv], rx_xwait);
+		break;
+	    case RXCS_READ: case RXCS_WRITE: case RXCS_WRDEL:
+		rx_state = RWDS;			/* state = get sector */
+		rx_csr = rx_csr | RXCS_TR;		/* xfer is ready */
+		rx_esr = rx_esr & RXES_ID;		/* clear errors */
+		break;
+	    default:
+		rx_state = CMD_COMPLETE;		/* state = cmd compl */
+		sim_activate (&rx_unit[drv], rx_cwait);
+		break;  }				/* end switch func */
+	    return SCPE_OK;  }				/* end if GO */
 	if ((data & RXCS_IE) == 0) CLR_INT (RX);
 	else if ((rx_csr & (RXCS_DONE + RXCS_IE)) == RXCS_DONE)
-		SET_INT (RX);
+	    SET_INT (RX);
 	rx_csr = (rx_csr & ~RXCS_RW) | (data & RXCS_RW);
 	break;						/* end case RXCS */
 
@@ -270,12 +270,12 @@ case 0:							/* RXCS */
 
 case 1:							/* RXDB */
 	if ((PA & 1) || ((rx_state != IDLE) && ((rx_csr & RXCS_TR) == 0)))
-		return SCPE_OK;				/* if ~IDLE, need tr */
+	    return SCPE_OK;				/* if ~IDLE, need tr */
 	rx_dbr = data & 0377;				/* save data */
 	if ((rx_state != IDLE) && (rx_state != EMPTY)) {
-		drv = ((rx_csr & RXCS_DRV)? 1: 0);	/* select drive */
-		sim_activate (&rx_unit[drv], rx_xwait);	/* sched event */
-		rx_csr = rx_csr & ~RXCS_TR;  }		/* clear xfer */
+	    drv = ((rx_csr & RXCS_DRV)? 1: 0);		/* select drive */
+	    sim_activate (&rx_unit[drv], rx_xwait);	/* sched event */
+	    rx_csr = rx_csr & ~RXCS_TR;  }		/* clear xfer */
 	break;						/* end case RXDB */
 	}						/* end switch PA */
 return SCPE_OK;
@@ -311,9 +311,10 @@ case IDLE:						/* idle */
 
 case EMPTY:						/* empty buffer */
 	if (bptr >= RX_NUMBY) rx_done (0, 0);		/* done all? */
-	else {	rx_dbr = rx_buf[bptr];			/* get next */
-		bptr = bptr + 1;
-		rx_csr = rx_csr | RXCS_TR;  }		/* set xfer */
+	else {
+	    rx_dbr = rx_buf[bptr];			/* get next */
+	    bptr = bptr + 1;
+	    rx_csr = rx_csr | RXCS_TR;  }		/* set xfer */
 	break;
 
 case FILL:						/* fill buffer */
@@ -336,34 +337,35 @@ case RWDT:						/* wait for track */
 	return SCPE_OK;
 case RWXFR:
 	if ((uptr->flags & UNIT_BUF) == 0) {		/* not buffered? */
-		rx_done (0, 0110);			/* done, error */
-		return IORETURN (rx_stopioe, SCPE_UNATT);  }
+	    rx_done (0, 0110);				/* done, error */
+	    return IORETURN (rx_stopioe, SCPE_UNATT);  }
 	if (rx_track >= RX_NUMTR) {			/* bad track? */
-		rx_done (0, 0040);			/* done, error */
-		break;  }
+	    rx_done (0, 0040);				/* done, error */
+	    break;  }
 	uptr->TRACK = rx_track;				/* now on track */
 	if ((rx_sector == 0) || (rx_sector > RX_NUMSC)) {	/* bad sect? */
-		rx_done (0, 0070);			/* done, error */
-		break;  }
+	    rx_done (0, 0070);				/* done, error */
+	    break;  }
 	da = CALC_DA (rx_track, rx_sector);		/* get disk address */
 	if (func == RXCS_WRDEL) rx_esr = rx_esr | RXES_DD;	/* del data? */
 	if (func == RXCS_READ) {			/* read? */
-		for (i = 0; i < RX_NUMBY; i++)
-		    rx_buf[i] = *(((int8 *) uptr->filebuf) + da + i);  }
-	else {	if (uptr->flags & UNIT_WPRT) {		/* write and locked? */
-		    rx_done (RXES_WLK, 0100);		/* done, error */
-		    break;  }
-		for (i = 0; i < RX_NUMBY; i++)		/* write */
-		    *(((int8 *) uptr->filebuf) + da + i) = rx_buf[i];
-		da = da + RX_NUMBY;
-		if (da > uptr->hwmark) uptr->hwmark = da;  }
+	    for (i = 0; i < RX_NUMBY; i++)
+		rx_buf[i] = *(((int8 *) uptr->filebuf) + da + i);  }
+	else {
+	    if (uptr->flags & UNIT_WPRT) {		/* write and locked? */
+		rx_done (RXES_WLK, 0100);		/* done, error */
+		break;  }
+	    for (i = 0; i < RX_NUMBY; i++)		/* write */
+		*(((int8 *) uptr->filebuf) + da + i) = rx_buf[i];
+	    da = da + RX_NUMBY;
+	    if (da > uptr->hwmark) uptr->hwmark = da;  }
 	rx_done (0, 0);					/* done */
 	break;
 
 case CMD_COMPLETE:					/* command complete */
 	if (func == RXCS_ECODE) {			/* read ecode? */
-		rx_dbr = rx_ecode;			/* set dbr */
-		rx_done (0, -1);  }			/* don't update */
+	    rx_dbr = rx_ecode;				/* set dbr */
+	    rx_done (0, -1);  }				/* don't update */
 	else rx_done (0, 0);
 	break;
 
@@ -371,11 +373,11 @@ case INIT_COMPLETE:					/* init complete */
 	rx_unit[0].TRACK = 1;				/* drive 0 to trk 1 */
 	rx_unit[1].TRACK = 0;				/* drive 1 to trk 0 */
 	if ((rx_unit[0].flags & UNIT_BUF) == 0) {	/* not buffered? */
-		rx_done (RXES_ID, 0010);		/* init done, error */
-		break;	}
+	    rx_done (RXES_ID, 0010);			/* init done, error */
+	    break;	}
 	da = CALC_DA (1, 1);				/* track 1, sector 1 */
 	for (i = 0; i < RX_NUMBY; i++)			/* read sector */
-		rx_buf[i] = *(((int8 *) uptr->filebuf) + da + i);
+	    rx_buf[i] = *(((int8 *) uptr->filebuf) + da + i);
 	rx_done (RXES_ID, 0);				/* set done */
 	if ((rx_unit[1].flags & UNIT_ATT) == 0) rx_ecode = 0020;
 	break;  }					/* end case state */

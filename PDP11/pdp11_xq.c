@@ -26,9 +26,11 @@
 
   ------------------------------------------------------------------------------
 
-  This DELQA/DEQNA simulation is based on:
+  This DEQNA/DELQA simulation is based on:
     Digital DELQA Users Guide, Part# EK-DELQA-UG-002
     Digital DEQNA Users Guide, Part# EK-DEQNA-UG-001
+  These manuals can be found online at:
+    http://www.spies.com/~aek/pdf/dec/qbus
 
   Certain adaptations have been made because this is an emulation:
       The default MAC address is 08-00-2B-AA-BB-CC unless set otherwise.
@@ -37,17 +39,85 @@
         implemented more like an extended Internal Loopback
       Time Domain Reflectometry (TDR) numbers are faked
       The 10-second approx. hardware/software reset delay does not exist
-      Some physical ethernet receive events like Runts, Overruns, etc. are never
-        reported back, since the packet-level driver never sees them
+      Some physical ethernet receive events like Runts, Overruns, etc. are
+        never reported back, since the packet-level driver never sees them
 
   Certain advantages are derived from this emulation:
       If the real ethernet controller is faster than 10Mbit, the speed is
         passed on since there are no minimum response times.
 
+  Known Bugs or Unsupported features:
+    1) DEQNA and DEQNA-LOCK modes not implemented fully [done! 07-Jan-03]
+    2) Sanity Timer not implemented                     [done! 16-Oct-02]
+    3) MOP functionality not implemented
+    4) Multicast support is weak                        [done! 22-Oct-02]
+    5) Promiscuous mode not implemented                 [done! 22-Oct-02]
+    6) Cannot VMScluster node                           [done! 27-Dec-02]
+    7) Cannot bootstrap module on VAX (>>> B XQA0)      [done! 12-Oct-02]
+    8) PDP11 bootstrap code missing
+    9) Automatic ID broadcast every 8-10 minutes        [done! 30-Dec-02]
+   10) External loopback packet processing              [done! 02-Jan-03]
+   11) NXM detection/protection                         [done! 21-Oct-02]
+
   ------------------------------------------------------------------------------
 
   Modification history:
 
+  16-Jan-03  DTH  Merged Mark Pizzolato's enhancements with main source
+                  Corrected PDP11 XQ_DEBUG compilation
+  15-Jan-03  MP   Fixed the number of units in the xq device structure.
+  13-Jan-03  MP   Reworked the timer management logic which initiated
+                  the system id broadcast messages.  The original
+                  implementation triggered this on the CSR transition
+                  of Receiver Enabled.  This was an issue since the
+                  it seems that at least VMS's XQ driver makes this
+                  transition often and the resulting overhead reduces
+                  the simulated CPU instruction execution thruput by
+                  about 40%.  I start the system id timer on device
+                  reset and it fires once a second so that it can
+                  leverage the reasonably recalibrated tmr_poll value.
+  13-Jan-03  MP   Changed the scheduling of xq_svc to leverage the
+                  dynamically computed clock values to achieve an
+                  approximate interval of 100 per second.  This is
+                  more than sufficient for normal system behaviour
+                  expecially since we service recieves with every
+                  transmit.  The previous fixed value of 2500
+                  attempted to get 200/sec but it was a guess that
+                  didn't adapt.  On faster host systems (possibly
+                  most of them) the 2500 number spends too much time
+                  polling.
+  10-Jan-03  DTH  Removed XQ_DEBUG dependency from Borland #pragmas
+                  Added SET XQ BOOTROM command for PDP11s
+  07-Jan-03  DTH  Added pointer to online manuals
+  02-Jan-03  DTH  Added local packet processing
+  30-Dec-02  DTH  Added automatic system id broadcast
+  27-Dec-02  DTH  Merged Mark Pizzolato's enhancements with main source
+  20-Dec-02  MP   Fix bug that caused VMS system crashes when attempting cluster
+                  operations.  Added additional conditionally compiled debug
+                  info needed to track down the issue.
+  17-Dec-02  MP   Added SIMH "registers" describing the Ethernet state
+                  so this information can be recorded in a "saved" snapshot.
+  05-Dec-02  MP   Adjusted the rtime value from 100 to 2500 which increased the
+                  available CPU cycles for Instruction execution by almost 100%.
+                  This made sense after the below enhancements which, in general
+                  caused the draining of the received data stream much more
+                  agressively with less overhead.
+  05-Dec-02  MP   Added a call to xq_svc after all successful calls to eth_write
+                  to allow receive processing to happen before the next event
+                  service time.
+  05-Dec-02  MP   Restructured the flow of processing in xq_svc so that eth_read
+                  is called repeatedly until either a packet isn't found or
+                  there is no room for another one in the queue.  Once that has
+                  been done, xq_processrdbl is called to pass the queued packets
+                  into the simulated system as space is available there.
+                  xq_process_rdbl is also called at the beginning of xq_svc to
+                  drain the queue into the simulated system, making more room
+                  available in the queue.  No processing is done at all in
+                  xq_svc if the receiver is disabled.
+  04-Dec-02  MP   Changed interface and usage to xq_insert_queue to pass
+                  the packet to be inserted by reference.  This avoids 3K bytes
+                  of buffer copy operations for each packet received.  Now only
+                  copy actual received packet data.
   31-Oct-02  DTH  Cleaned up pointer warnings (found by Federico Schwindt)
                   Corrected unattached and no network behavior
                   Added message when SHOW XQ ETH finds no devices
@@ -60,7 +130,7 @@
                   Added and debugged Sanity Timer code
                   Corrected copyright
   15-Oct-02  DTH  Rollback to known good Beta3 and roll forward; TCP broken
-  12-Oct-02  DTH  Fixed VAX network bootstrap; setup packets must return non-zero TDR
+  12-Oct-02  DTH  Fixed VAX network bootstrap; setup packets must return TDR > 0
   11-Oct-02  DTH  Added SET/SHOW XQ TYPE and SET/SHOW XQ SANITY commands
   10-Oct-02  DTH  Beta 3 released; Integrated with 2.10-0b1
                   Fixed off-by-1 bug on xq.setup.macs[7..13]
@@ -82,32 +152,16 @@
   15-Aug-02  DTH  Started XQ simulation
 
   ------------------------------------------------------------------------------
-
-  Known Bugs or Unsupported features:
-
-  1) DEQNA and DEQNA-LOCK modes not implemented fully
-  2) Sanity Timer not implemented                     [done! 16-Oct-02]
-  3) MOP functionality not implemented
-  4) Multicast support is weak                        [done! 22-Oct-02]
-  5) Promiscuous mode not implemented                 [done! 22-Oct-02]
-  6) Cannot VMScluster node
-  7) Cannot bootstrap module on VAX (>>> B XQA0)
-  8) PDP11 bootstrap code missing
-  9) Automatic ID broadcast every 8-10 minutes
-  10) External loopback packet processing
-  11) NXM detection/protection                        [done! 21-Oct-02]
-
-  ------------------------------------------------------------------------------
 */
 
 /* compiler directives to help the Author keep the code clean :-) */
-#if defined (__BORLANDC__) && defined (XQ_DEBUG)
+#if defined (__BORLANDC__)
 #pragma warn +8070      /* function should return value */
-/* #pragma warn +8071 */ /* conversion may lose significant digits */
+/* #pragma warn +8071 *//* conversion may lose significant digits */
 #pragma warn +8075      /* suspicious pointer conversion */
 #pragma warn +8079      /* mixing different char pointers */
 #pragma warn +8080      /* variable declared but not used */
-#endif /* __BORLANDC__ && XQ_DEBUG */
+#endif /* __BORLANDC__ */
 
 #include <assert.h>
 #include "pdp11_xq.h"
@@ -116,7 +170,7 @@ extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
 
 struct xq_device    xq = {
-  100,                                      /* rtime */
+  2500,                                     /* rtime */
   {0x08, 0x00, 0x2B, 0xAA, 0xBB, 0xCC},     /* mac */
   XQ_T_DELQA,                               /* type */
   {0}                                       /* sanity */
@@ -128,6 +182,7 @@ t_stat xq_rd(int32* data, int32 PA, int32 access);
 t_stat xq_wr(int32  data, int32 PA, int32 access);
 t_stat xq_svc(UNIT * uptr);
 t_stat xq_sansvc(UNIT * uptr);
+t_stat xq_idsvc(UNIT * uptr);
 t_stat xq_reset (DEVICE * dptr);
 t_stat xq_attach (UNIT * uptr, char * cptr);
 t_stat xq_detach (UNIT * uptr);
@@ -137,6 +192,8 @@ t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat xq_set_type (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat xq_set_sanity (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat xq_show_bootrom (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat xq_set_bootrom (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat xq_showeth (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat xq_process_xbdl(void);
 t_stat xq_dispatch_xbdl(void);
@@ -148,15 +205,18 @@ t_stat xq_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void xq_start_santmr(void);
 void xq_cancel_santmr(void);
 void xq_reset_santmr(void);
-
+t_stat xq_boot_host(void);
+void xq_start_idtmr(void);
+t_stat xq_system_id(const ETH_MAC dst, uint16 receipt_id);
 
 /* SIMH device structures */
 DIB xq_dib = { IOBA_XQ, IOLN_XQ, &xq_rd, &xq_wr,
 		1, IVCL (XQ), 0, { &xq_inta } };
 
 UNIT xq_unit[] = {
- { UDATA (&xq_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
- { UDATA (&xq_sansvc, UNIT_DIS, 0) }                        /* sanity timer */
+ { UDATA (&xq_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },     /* receive timer */
+ { UDATA (&xq_sansvc, UNIT_DIS, 0) },                     /* sanity timer */
+ { UDATA (&xq_idsvc, UNIT_DIS, 0) }                       /* system id timer */
 };
 
 REG xq_reg[] = {
@@ -170,6 +230,13 @@ REG xq_reg[] = {
   { GRDATA ( XBDL, xq.xbdl, XQ_RDX, 32, 0) },
   { GRDATA ( VAR,  xq.var,  XQ_RDX, 16, 0) },
   { GRDATA ( CSR,  xq.csr,  XQ_RDX, 16, 0) },
+  { GRDATA ( SETUP_PRM, xq.setup.promiscuous, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SETUP_MLT, xq.setup.multicast, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SETUP_L1, xq.setup.l1, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SETUP_L2, xq.setup.l2, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SETUP_L3, xq.setup.l3, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SETUP_SAN, xq.setup.sanity_timer, XQ_RDX, 32, 0), REG_HRO},
+  { BRDATA ( SETUP_MACS, &xq.setup.macs, XQ_RDX, 8, sizeof(xq.setup.macs)), REG_HRO},
   { NULL },
 };
 
@@ -177,6 +244,8 @@ MTAB xq_mod[] = {
 #if defined (VM_PDP11)
 	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
 		&set_addr, &show_addr, NULL },
+  { MTAB_XTD | MTAB_VDV | MTAB_NMO | MTAB_NC, 0, "BOOTROM", "BOOTROM",
+    &xq_set_bootrom, &xq_show_bootrom, NULL },
 #else
 	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
 		NULL, &show_addr, NULL },
@@ -185,24 +254,37 @@ MTAB xq_mod[] = {
 		NULL, &show_vec, NULL },
   { MTAB_XTD | MTAB_VDV, 0, "MAC", "MAC",
     &xq_setmac, &xq_showmac, &xq.mac },
-  { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "ETH", "ETH",
-    0, &xq_showeth, 0 },
+  { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "ETH", NULL,
+    NULL, &xq_showeth, NULL },
   { MTAB_XTD | MTAB_VDV, 0, "TYPE", "TYPE",
-    &xq_set_type, &xq_show_type, 0 },
-  { MTAB_XTD | MTAB_VDV, 0, "SANITY", "SANITY",
-    &xq_set_sanity, &xq_show_sanity, 0 },
+    &xq_set_type, &xq_show_type, NULL },
+  { MTAB_XTD | MTAB_VDV|MTAB_NMO, 0, "SANITY", "SANITY",
+    &xq_set_sanity, &xq_show_sanity, NULL },
   { 0 },
 };
 
 DEVICE xq_dev = {
   "XQ", xq_unit, xq_reg, xq_mod,
-  2, XQ_RDX, 0, 1, XQ_RDX, 8,
+  3, XQ_RDX, 0, 1, XQ_RDX, 8,
   &xq_ex, &xq_dep, &xq_reset,
   NULL, &xq_attach, &xq_detach,
   &xq_dib, DEV_DISABLE | DEV_QBUS
 };
 
 #ifdef XQ_DEBUG
+#if defined(VM_VAX)
+extern int32 PSL;           /* PSL */
+extern int32 fault_PC;      /* fault PC */
+#endif
+
+const char* const xq_recv_regnames[] = {
+  "MAC0", "MAC1", "MAC2", "MAC3", "MAC4", "MAC5", "VAR", "CSR"
+};
+
+const char* const xq_xmit_regnames[] = {
+  "", "", "RBDL-Lo", "RBDL-Hi", "XBDL-Lo", "XBDL-Hi", "VAR", "CSR"
+};
+
 const char* const xq_csr_bits[] = {
   "RE ", "SR ", "NI ", "BD ", "XL ", "RL ", "IE ", "XI ",
   "IL ", "EL ", "SE ", "RR ", "OK ", "CA ", "PE ", "RI"
@@ -255,7 +337,7 @@ void xq_remove_queue(struct xq_msg_que* que)
   }
 }
 
-void xq_insert_queue(struct xq_msg_que* que, int32 type, ETH_PACK packet, int32 status)
+void xq_insert_queue(struct xq_msg_que* que, int32 type, ETH_PACK* packet, int32 status)
 {
   struct xq_msg_itm* item;
 
@@ -274,12 +356,16 @@ void xq_insert_queue(struct xq_msg_que* que, int32 type, ETH_PACK packet, int32 
     if (++que->head == XQ_QUE_MAX)
       que->head = 0;
     que->loss++;
+#ifdef XQ_DEBUG
+    fprintf(stderr, "Packet Lost\n");
+#endif
     }
 
   /* set information in (new) tail item */
   item = &que->item[que->tail];
-  item->type   = type;
-  item->packet = packet;
+  item->type = type;
+  item->packet.len = packet->len;
+  memcpy(item->packet.msg, packet->msg, packet->len);
   item->status = status;
 }
 
@@ -289,13 +375,13 @@ void xq_insert_queue(struct xq_msg_que* que, int32 type, ETH_PACK packet, int32 
 
 
 /* stop simh from reading non-existant unit data stream */
-t_stat xq_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
+t_stat xq_ex (t_value* vptr, t_addr addr, UNIT* uptr, int32 sw)
 {
   return SCPE_NOFNC;
 }
 
 /* stop simh from writing non-existant unit data stream */
-t_stat xq_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
+t_stat xq_dep (t_value val, t_addr addr, UNIT* uptr, int32 sw)
 {
   return SCPE_NOFNC;
 }
@@ -432,8 +518,29 @@ t_stat xq_set_sanity (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
+t_stat xq_show_bootrom (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+  /* format includes \n for MTAB_NMO compatibility */
+  fprintf(st, "bootrom=%s\n", xq.bootrom);
+  return SCPE_OK;
+}
+
+t_stat xq_set_bootrom (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+  size_t len;
+  if (!cptr) return SCPE_IERR;
+  len = strlen(cptr) + 1;
+  if (len > sizeof(xq.bootrom)) return SCPE_ARG;
+
+  memcpy(xq.bootrom, cptr, strlen(cptr)+1);
+  return SCPE_OK;
+}
+
 t_stat xq_nxm_error(void)
 {
+#ifdef XQ_DEBUG
+  fprintf(stderr,"XQ: Non Existent Memory Error\n");
+#endif
   /* set NXM and associated bits in CSR */
   xq.csr |= (XQ_CSR_NI | XQ_CSR_XI | XQ_CSR_XL | XQ_CSR_RL);
 
@@ -454,18 +561,16 @@ void xq_write_callback (int status)
   const uint16 TDR = 100 + xq.write_buffer.len * 8; /* arbitrary value */
   uint16 write_success[2] = {0};
   uint16 write_failure[2] = {XQ_DSC_C};
-#if 0
-  write_success[1] = TDR;
-  write_failure[1] = TDR;
-#else
   write_success[1] = TDR & 0x03FF; /* Does TDR get set on successful packets ?? */
   write_failure[1] = TDR & 0x03FF; /* TSW2<09:00> */
-#endif
 
   /* update write status words */
   if (status == 0) { /* success */
     wstatus = Map_WriteW(xq.xbdl_ba + 8, 4, write_success, NOMAP);
   } else { /* failure */
+#ifdef XQ_DEBUG
+      fprintf(stderr, "XQ: Packet Write Error\n");
+#endif
     wstatus = Map_WriteW(xq.xbdl_ba + 8, 4, write_failure, NOMAP);
   }
   if (wstatus) {
@@ -492,10 +597,18 @@ void xq_write_callback (int status)
 }
 
 /* read registers: */
-
 t_stat xq_rd(int32* data, int32 PA, int32 access)
 {
   int index = (PA >> 1) & 07;   /* word index */
+
+#ifdef XQ_DEBUG
+  if (index != 7)
+#if defined(VM_VAX)
+    fprintf (stderr,"XQ: %s %08X %08X read: %X\n", xq_recv_regnames[index], fault_PC, PSL, *data);
+#else
+    fprintf (stderr,"XQ: %s read: %X\n", xq_recv_regnames[index], *data);
+#endif /* VM_VAX */
+#endif
 
   switch (index) {
     case 0:
@@ -542,7 +655,7 @@ t_stat xq_process_rbdl(void)
   struct xq_msg_itm* item;
 
 #ifdef XQ_DEBUG
-  printf("CSR: Processing read\n");
+  fprintf(stderr,"XQ: CSR - Processing read\n");
 #endif
   /* process buffer descriptors */
   while(1) {
@@ -612,6 +725,9 @@ t_stat xq_process_rbdl(void)
     }
     xq.rbdl_buf[5] = ((rbl & 0x00FF) << 8) | (rbl & 0x00FF);
     if (xq.ReadQ.loss) {
+#ifdef XQ_DEBUG
+        fprintf(stderr, "XQ: ReadQ overflow\n");
+#endif
       xq.rbdl_buf[4] |= 0x0001;   /* set overflow bit */
       xq.ReadQ.loss = 0;          /* reset loss counter */
     }
@@ -647,6 +763,9 @@ t_stat xq_process_mop(void)
   struct xq_meb* meb = (struct xq_meb*) &xq.write_buffer.msg[0200];
   const struct xq_meb* limit = (struct xq_meb*) &xq.write_buffer.msg[0400];
 
+#ifdef XQ_DEBUG
+  fprintf(stderr, "XQ: Processing MOP data\n");
+#endif
   if (xq.type == XQ_T_DEQNA)  /* DEQNA's don't MOP */
     return SCPE_NOFNC;
 
@@ -657,7 +776,7 @@ t_stat xq_process_mop(void)
     /* MOP stuff here - NOT YET FULLY IMPLEMENTED */
 
 #ifdef XQ_DEBUG
-    printf("Processing MEB type: %d\n", meb->type);
+    printf("XQ: Processing MEB type: %d\n", meb->type);
 #endif
     switch (meb->type) {
       case 0:   /* MOP Termination */
@@ -701,6 +820,7 @@ t_stat xq_process_setup(void)
   ETH_MAC filters[XQ_FILTER_MAX + 1];
 
   /* extract filter addresses from setup packet */
+  memset(xq.setup.macs, '\0', sizeof(xq.setup.macs));
   for (i = 0; i < 7; i++)
     for (j = 0; j < 6; j++) {
       xq.setup.macs[i]  [j] = xq.write_buffer.msg[(i +   01) + (j * 8)];
@@ -756,6 +876,9 @@ t_stat xq_process_setup(void)
   if (xq.write_buffer.msg[0])
     status = xq_process_mop();
 
+  /* mark setup block valid */
+  xq.setup.valid = 1;
+
 #ifdef XQ_DEBUG
   xq_debug_setup();
 #endif
@@ -771,7 +894,7 @@ t_stat xq_process_setup(void)
 */
 t_stat xq_process_xbdl()
 {
-  const uint16  implicit_chain_status[2] = {XQ_DSC_L | XQ_DSC_C, 0};
+  const uint16  implicit_chain_status[2] = {XQ_DSC_V | XQ_DSC_C, 1};
   const uint16  write_success[2] = {0, 1 /*Non-Zero TDR*/};
 
   uint16 b_length, w_length;
@@ -780,7 +903,7 @@ t_stat xq_process_xbdl()
   t_stat status;
 
 #ifdef XQ_DEBUG
-  printf("CSR: Processing write\n");
+  fprintf(stderr,"XQ: xq_process_xbdl - Processing write\n");
 #endif
   /* clear write buffer */
   xq.write_buffer.len = 0;
@@ -789,9 +912,9 @@ t_stat xq_process_xbdl()
   while (1) {
 
     /* Get transmit bdl from memory */
+    rstatus = Map_ReadW (xq.xbdl_ba,    12, &xq.xbdl_buf[0], NOMAP);
     xq.xbdl_buf[0] = 0xFFFF;
     wstatus = Map_WriteW(xq.xbdl_ba,     2, &xq.xbdl_buf[0], NOMAP);
-    rstatus = Map_ReadW (xq.xbdl_ba + 2, 6, &xq.xbdl_buf[1], NOMAP);
     if (rstatus || wstatus) return xq_nxm_error();
 
     /* invalid buffer? */
@@ -799,20 +922,17 @@ t_stat xq_process_xbdl()
       xq.csr |= XQ_CSR_XL;
       if (xq.csr & XQ_CSR_IE)
         SET_INT(XQ);
+#ifdef XQ_DEBUG
+        fprintf(stderr,"XQ: xq_process_xbdl - List Empty - Done Processing write\n");
+#endif
       return SCPE_OK;
     }
 
-    /* explicit chain buffer? */
-    if (xq.xbdl_buf[1] & XQ_DSC_C) {
-      xq.xbdl_ba = ((xq.xbdl_buf[1] & 0x3F) << 16) | xq.xbdl_buf[2];
-      continue;
-    }
-
-    /* get status words */
-    rstatus = Map_ReadW(xq.xbdl_ba + 8, 4, &xq.xbdl_buf[4], NOMAP);
-    if (rstatus) return xq_nxm_error();
-
-    /* get host memory address */
+#ifdef XQ_DEBUG
+  fprintf(stderr,"XQ: xq_process_xbdl: Buffer Descriptor Information: %04X %04X %04X %04X %04X \n",
+          xq.xbdl_buf[1], xq.xbdl_buf[2], xq.xbdl_buf[3], xq.xbdl_buf[4], xq.xbdl_buf[5]);
+#endif
+    /* compute host memory address */
     address = ((xq.xbdl_buf[1] & 0x3F) << 16) | xq.xbdl_buf[2];
 
     /* decode buffer length - two's complement (in words) */
@@ -820,6 +940,15 @@ t_stat xq_process_xbdl()
     b_length = w_length * 2;
     if (xq.xbdl_buf[1] & XQ_DSC_H) b_length -= 1;
     if (xq.xbdl_buf[1] & XQ_DSC_L) b_length -= 1;
+
+    /* explicit chain buffer? */
+    if (xq.xbdl_buf[1] & XQ_DSC_C) {
+      xq.xbdl_ba = address;
+#ifdef XQ_DEBUG
+      fprintf(stderr,"XQ: xq_process_xbdl: Chained Buffer Encountered: %d\n", b_length);
+#endif
+      continue;
+    }
 
     /* add to transmit buffer, making sure it's not too big */
     if ((xq.write_buffer.len + b_length) > sizeof(xq.write_buffer.msg))
@@ -836,10 +965,10 @@ t_stat xq_process_xbdl()
           status = xq_process_setup();
 
           /* put packet in read buffer */
-          xq_insert_queue (&xq.ReadQ, 0, xq.write_buffer, status);
+          xq_insert_queue (&xq.ReadQ, 0, &xq.write_buffer, status);
         } else { /* loopback */
           /* put packet in read buffer */
-          xq_insert_queue (&xq.ReadQ, 1, xq.write_buffer, 0);
+          xq_insert_queue (&xq.ReadQ, 1, &xq.write_buffer, 0);
         }
 
         /* update write status */
@@ -866,11 +995,19 @@ t_stat xq_process_xbdl()
         status = eth_write(xq.etherface, &xq.write_buffer, &xq_write_callback);
         if (status != SCPE_OK)           /* not implemented or unattached */
           xq_write_callback(1);          /* fake failure */
+        else
+          xq_svc(&xq_unit[0]);           /* service any received data */
+#ifdef XQ_DEBUG
+        fprintf(stderr,"XQ: xq_process_xbdl: Completed Processing write\n");
+#endif
         return SCPE_OK;
 
       } /* loopback/non-loopback */
     } else { /* not at end-of-message */
 
+#ifdef XQ_DEBUG
+      fprintf(stderr,"XQ: xq_process_xbdl: Processing Implicit Chained Buffer Segment\n");
+#endif
       /* update bdl status words */
       wstatus = Map_WriteW(xq.xbdl_ba + 8, 4, (uint16*) implicit_chain_status, NOMAP);
       if(wstatus) return xq_nxm_error();
@@ -889,7 +1026,7 @@ t_stat xq_dispatch_rbdl(void)
   t_stat status;
 
 #ifdef XQ_DEBUG
-  printf("CSR: Dispatching read\n");
+  fprintf(stderr,"XQ: CSR - Dispatching read\n");
 #endif
   /* mark receive bdl valid */
   xq.csr &= ~XQ_CSR_RL;
@@ -927,7 +1064,7 @@ t_stat xq_dispatch_xbdl()
   int i;
   t_stat status;
 #ifdef XQ_DEBUG
-  printf("CSR: Dispatching write\n");
+  fprintf(stderr,"XQ: CSR - Dispatching write\n");
 #endif
   /* mark transmit bdl valid */
   xq.csr &= ~XQ_CSR_XL;
@@ -948,20 +1085,110 @@ t_stat xq_dispatch_xbdl()
   return status;
 }
 
+t_stat xq_process_loopback(ETH_PACK* pack)
+{
+  ETH_PACK  reply;
+  ETH_MAC   physical_address;
+  t_stat    status;
+  int offset   = pack->msg[14] | (pack->msg[15] << 8);
+  int function = pack->msg[offset] | (pack->msg[offset+1] << 8);
+
+  if (function != 2 /*forward*/)
+    return SCPE_NOFNC;
+
+  /* create reply packet */
+  memcpy (&reply, pack, sizeof(ETH_PACK));
+  memcpy (physical_address, xq.setup.valid ? xq.setup.macs[0] : xq.mac, sizeof(ETH_MAC));
+  memcpy (&reply.msg[0], &reply.msg[offset+2], sizeof(ETH_MAC));
+  memcpy (&reply.msg[6], physical_address, sizeof(ETH_MAC));
+  memcpy (&reply.msg[offset+2], physical_address, sizeof(ETH_MAC));
+  reply.msg[offset] = 0x01;
+  offset += 8;
+  reply.msg[14] = offset & 0xFF;
+  reply.msg[15] = (offset >> 8) & 0xFF;
+
+  /* send reply packet */
+  status = eth_write(xq.etherface, &reply, NULL);
+
+  return status;
+}
+
+t_stat xq_process_remote_console (ETH_PACK* pack)
+{
+  t_stat status;
+  ETH_MAC source;
+  uint16 receipt;
+  int code = pack->msg[16];
+
+  switch (code) {
+    case 0x05: /* request id */
+      receipt = pack->msg[18] | (pack->msg[19] << 8);
+      memcpy(source, &pack->msg[6], sizeof(ETH_MAC));
+
+      /* send system id to requestor */
+      status = xq_system_id (source, receipt);
+      return status;
+      break;
+    case 0x06:  /* boot */
+      /*
+      NOTE: the verification field should be checked here against the
+      verification value established in the setup packet. If they match the
+      reboot should occur, otherwise nothing happens, and the packet
+      is passed on to the host.
+
+      Verification is not implemented, since the setup packet processing code
+      isn't complete yet.
+
+      Various values are also passed: processor, control, and software id.
+      These control the various boot parameters, however SIMH does not
+      have a mechanism to pass these to the host, so just reboot.
+      */
+
+      status = xq_boot_host();
+      return status;
+      break;
+  } /* switch */
+
+  return SCPE_NOFNC;
+}
+
+t_stat xq_process_local (ETH_PACK* pack)
+{
+  /* returns SCPE_OK if local processing occurred,
+     otherwise returns SCPE_NOFNC or some other code */
+  int protocol;
+
+  /* DEQNA's have no local processing capability */
+  if (xq.type == XQ_T_DEQNA)
+    return SCPE_NOFNC;
+
+  protocol = pack->msg[12] | (pack->msg[13] << 8);
+  switch (protocol) {
+    case 0x0090:  /* ethernet loopback */
+      return xq_process_loopback(pack);
+      break;
+    case 0x0260:  /* MOP remote console */
+      return xq_process_remote_console(pack);
+      break;
+  }
+  return SCPE_NOFNC;
+}
+
 void xq_read_callback(int status)
 {
-  t_stat rstatus;
-
   if (xq.csr & XQ_CSR_RE) { /* receiver enabled */
 
+    /* process any packets locally that can be */
+    t_stat status = xq_process_local (&xq.read_buffer);
+
     /* add packet to read queue */
-      xq_insert_queue(&xq.ReadQ, 2, xq.read_buffer, status);
-
-    /* process packet if receive list is valid */
-    if (~xq.csr & XQ_CSR_RL)
-      rstatus = xq_process_rbdl();
-
+    if (status != SCPE_OK)
+      xq_insert_queue(&xq.ReadQ, 2, &xq.read_buffer, status);
   }
+#ifdef XQ_DEBUG
+  else
+    fprintf(stderr, "XQ: packet received with receiver disabled\n");
+#endif
 }
 
 void xq_sw_reset(void)
@@ -971,6 +1198,9 @@ void xq_sw_reset(void)
 
   /* disconnect ethernet reception */
   sim_cancel(&xq_unit[0]);
+
+  /* stop system_id timer */
+  sim_cancel(&xq_unit[2]);
 
   /* reset csr bits */
   xq.csr = XQ_CSR_XL | XQ_CSR_RL;
@@ -982,8 +1212,7 @@ void xq_sw_reset(void)
   xq_clear_queue(&xq.ReadQ);
 
   /* clear setup info */
-  memset (&xq.setup, 0, 6 * XQ_FILTER_MAX);
-  xq.setup.promiscuous = 0;
+  memset (&xq.setup, 0, sizeof(xq.setup));
 
 }
 
@@ -1038,10 +1267,14 @@ t_stat xq_wr_csr(int32 data)
   if (data & XQ_CSR_XI)         /* clearing XI clears NI too */
     xq.csr &= ~XQ_CSR_NI;
 
-  /* start receiver when RE transitions to set */
+  /* start receiver timer when RE transitions to set */
   if (~saved_csr & XQ_CSR_RE & data) {
-    //xq_start_receiver();
-    sim_activate(&xq_unit[0], xq.rtime);
+    sim_activate(&xq_unit[0], (clk_tps * tmr_poll)/100);
+  }
+
+  /* stop receiver timer when RE transitions to clear */
+  if (saved_csr & XQ_CSR_RE & ~data) {
+    sim_cancel(&xq_unit[0]);
   }
 
   return SCPE_OK;
@@ -1050,8 +1283,18 @@ t_stat xq_wr_csr(int32 data)
 t_stat xq_wr(int32 data, int32 PA, int32 access)
 {
   t_stat status;
+  int index = (PA >> 1) & 07;   /* word index */
 
-  switch ((PA >> 1) & 07) {
+#ifdef XQ_DEBUG
+  if (index != 7)
+#if defined(VM_VAX)
+    fprintf (stderr,"XQ: %s %08X %08X write: %X\n", xq_xmit_regnames[index], fault_PC, PSL, data);
+#else
+    fprintf (stderr,"XQ: %s write: %X\n", xq_xmit_regnames[index], data);
+#endif /* VM_VAX */
+#endif
+
+  switch (index) {
     case 0:   /* these should not be written */
     case 1:
       break;
@@ -1121,6 +1364,7 @@ t_stat xq_reset(DEVICE* dptr)
       break;
     case XQ_T_DELQA:
       /* note that the DELQA in NORMAL mode has no power-on SANITY state! */
+      xq_start_idtmr();
       break;
   };
 
@@ -1134,7 +1378,7 @@ void xq_start_santmr(void)
 
 #if 0
 #ifdef XQ_DEBUG
-  printf("SANITY TIMER: enabled, qsecs: %d, poll:%d\n", xq.sanity.quarter_secs, tmr_poll);
+  fprintf(stderr,"XQ: SANITY TIMER: enabled, qsecs: %d, poll:%d\n", xq.sanity.quarter_secs, tmr_poll);
 #endif
 #endif
   if (sim_is_active(&xq_unit[1]))   /* cancel timer, just in case */
@@ -1149,7 +1393,7 @@ void xq_cancel_santmr(void)
   if (sim_is_active(&xq_unit[1]) && !xq.sanity.enabled) {
 #if 0
 #ifdef XQ_DEBUG
-    printf("SANITY TIMER: cancelled, qsecs: %d\n", xq.sanity.quarter_secs);
+    fprintf(stderr,"XQ: SANITY TIMER: cancelled, qsecs: %d\n", xq.sanity.quarter_secs);
 #endif
 #endif
     sim_cancel(&xq_unit[1]);
@@ -1161,7 +1405,7 @@ void xq_reset_santmr(void)
 #if 0
 #ifdef XQ_DEBUG
   ftime(&start);
-  printf("SANITY TIMER: resetting, qsecs: %d\n", xq.sanity.quarter_secs);
+  fprintf(stderr,"XQ: SANITY TIMER: resetting, qsecs: %d\n", xq.sanity.quarter_secs);
 #endif
 #endif
   xq.sanity.countdown = xq.sanity.quarter_secs;
@@ -1179,23 +1423,125 @@ t_stat xq_sansvc(UNIT* uptr)
     /*
     If this section is entered, it means that the sanity timer has expired
     without being reset, and the controller must reboot the processor.
-
-    The manual says the hardware should force Qbus BDCOK low for
-    3.6 microseconds, which will cause the host to reboot.
-
-    Since the SIMH Qbus emulator does not have this functionality, we call
-    a special STOP_ code, and let the CPU stop dispatch routine decide
-    what the appropriate cpu-specific behavior should be.
     */
 #if 0
 #ifdef XQ_DEBUG
     ftime(&finish);
-    printf("SANITY TIMER: EXPIRED, qsecs: %d, poll: %d, elapsed: %d\n",
+    fprintf(stderr,"XQ: SANITY TIMER: EXPIRED, qsecs: %d, poll: %d, elapsed: %d\n",
            xq.sanity.quarter_secs, tmr_poll, finish.time - start.time);
 #endif
 #endif
-    return STOP_SANITY;
+    xq_boot_host();
   }
+  return SCPE_OK;
+}
+
+t_stat xq_boot_host(void)
+{
+  /*
+  The manual says the hardware should force the Qbus BDCOK low for
+  3.6 microseconds, which will cause the host to reboot.
+
+  Since the SIMH Qbus emulator does not have this functionality, we call
+  a special STOP_ code, and let the CPU stop dispatch routine decide
+  what the appropriate cpu-specific behavior should be.
+  */
+  return STOP_SANITY;
+}
+
+void xq_start_idtmr(void)
+{
+  /* must be recalculated each time since tmr_poll is a dynamic number */
+  const int32 one_sec = clk_tps * tmr_poll;
+
+  if (sim_is_active(&xq_unit[2]))   /* cancel timer, just in case */
+    sim_cancel(&xq_unit[2]);
+  xq.id.enabled = 1;
+  /* every 8-10 minutes (9 in this case) the DELQA broadcasts a system id message */
+  xq.id.countdown = 9 * 60;
+  sim_activate(&xq_unit[2], one_sec);
+}
+
+t_stat xq_system_id (const ETH_MAC dest, uint16 receipt_id)
+{
+  static uint16 receipt = 0;
+  ETH_PACK system_id;
+  uint8* const msg = &system_id.msg[0];
+  t_stat status;
+
+  memset (&system_id, 0, sizeof(system_id));
+  memcpy (&msg[0], dest, sizeof(ETH_MAC));
+  memcpy (&msg[6], xq.setup.valid ? xq.setup.macs[0] : xq.mac, sizeof(ETH_MAC));
+  msg[12] = 0x60;                         /* type */
+  msg[13] = 0x02;                         /* type */
+  msg[14] = 0x1C;                         /* character count */
+  msg[15] = 0x00;                         /* character count */
+  msg[16] = 0x07;                         /* code */
+  msg[17] = 0x00;                         /* zero pad */
+  if (receipt_id) {
+    msg[18] = receipt_id & 0xFF;          /* receipt number */
+    msg[19] = (receipt_id >> 8) & 0xFF;   /* receipt number */
+  } else {
+    msg[18] = receipt & 0xFF;             /* receipt number */
+    msg[19] = (receipt++ >> 8) & 0xFF;    /* receipt number */
+  }
+
+                                          /* MOP VERSION */
+  msg[20] = 0x01;                         /* type */
+  msg[21] = 0x00;                         /* type */
+  msg[22] = 0x03;                         /* length */
+  msg[23] = 0x03;                         /* version */
+  msg[24] = 0x01;                         /* eco */
+  msg[25] = 0x00;                         /* user eco */
+
+                                          /* FUNCTION */
+  msg[26] = 0x02;                         /* type */
+  msg[27] = 0x00;                         /* type */
+  msg[28] = 0x02;                         /* length */
+  msg[29] = 0x00;                         /* value 1 ??? */
+  msg[30] = 0x00;                         /* value 2 */
+
+                                          /* HARDWARE ADDRESS */
+  msg[31] = 0x07;                         /* type */
+  msg[32] = 0x00;                         /* type */
+  msg[33] = 0x06;                         /* length */
+  memcpy (&msg[34], xq.mac, sizeof(ETH_MAC)); /* ROM address */
+
+                                          /* DEVICE TYPE */
+  msg[40] = 37;                           /* type */
+  msg[41] = 0x00;                         /* type */
+  msg[42] = 0x01;                         /* length */
+  msg[43] = 0x11;                         /* value (0x11=DELQA) */
+
+  /* write system id */
+  system_id.len = 60;
+  status = eth_write(xq.etherface, &system_id, NULL);
+
+  return status;
+}
+
+t_stat xq_idsvc(UNIT* uptr)
+{
+/* must be recalculated each time since tmr_poll is a dynamic number */
+const int32 one_sec = clk_tps * tmr_poll;
+const ETH_MAC mop_multicast = {0xAB, 0x00, 0x00, 0x02, 0x00, 0x00};
+
+  /* DEQNAs don't issue system id messages */
+  if (xq.type == XQ_T_DEQNA)
+    return SCPE_NOFNC;
+
+  if (--xq.id.countdown <= 0) {
+    /*
+    If this section is entered, it means that the 9 minute interval has elapsed
+    so broadcast system id to MOP multicast address
+    */
+    xq_system_id(mop_multicast, 0);
+    /* every 8-10 minutes (9 in this case) the DELQA broadcasts a system id message */
+    xq.id.countdown = 9 * 60;
+  }
+
+  /* resubmit - for one second to get a well calibrated value of tmr_poll */
+  sim_activate(&xq_unit[2], one_sec);
   return SCPE_OK;
 }
 
@@ -1205,13 +1551,31 @@ t_stat xq_sansvc(UNIT* uptr)
 t_stat xq_svc(UNIT* uptr)
 {
   t_stat status;
+  int queue_size;
 
-  /* read a packet from the ethernet - processing is via the callback */
-  status = eth_read (xq.etherface, &xq.read_buffer, &xq_read_callback);
+  /* Don't try a read if the receiver is disabled */
+  if (!(xq.csr & XQ_CSR_RE)) return SCPE_OK;
+
+  /* First pump any queued packets into the system */
+  if ((xq.ReadQ.count > 0) && (~xq.csr & XQ_CSR_RL))
+    status = xq_process_rbdl();
+
+  /* Now read and queue packets that have arrived */
+  /* This is repeated as long as they are available and we have room */
+  do
+    {
+    queue_size = xq.ReadQ.count;
+    /* read a packet from the ethernet - processing is via the callback */
+    status = eth_read (xq.etherface, &xq.read_buffer, &xq_read_callback);
+  } while (queue_size != xq.ReadQ.count);
+
+  /* Now pump any still queued packets into the system */
+  if ((xq.ReadQ.count > 0) && (~xq.csr & XQ_CSR_RL))
+    status = xq_process_rbdl();
 
   /* resubmit if still receive enabled */
   if (xq.csr & XQ_CSR_RE)
-    sim_activate(&xq_unit[0], xq.rtime);
+    sim_activate(&xq_unit[0], (clk_tps * tmr_poll)/100);
 
   return SCPE_OK;
 }
@@ -1278,8 +1642,10 @@ int32 xq_inta (void)
 /=============================================================================*/
 
 #ifdef XQ_DEBUG
+
 void xq_dump_csr (void)
 {
+ static int cnt  = 0;
   /* tell user what is changing in register */
   int i;
   int mask = 1;
@@ -1290,7 +1656,12 @@ void xq_dump_csr (void)
     if ((csr & mask))  strcat (hi, xq_csr_bits[i]);
     if ((~csr & mask)) strcat (lo, xq_csr_bits[i]);
   }
-  printf ("CSR read: %s %s\n", hi, lo);
+#if defined (VM_VAX)
+  printf ("CSR %08X %08X read: %s %s\n", fault_PC, PSL, hi, lo);
+#else
+if (cnt < 20)
+  printf ("CSR read[%d]: %s %s\n", cnt++, hi, lo);
+#endif /* VM_VAX */
 }
 
 void xq_dump_var (void)
@@ -1326,7 +1697,11 @@ void xq_csr_changes (uint16 data)
   /* write-one-to-clear bits*/
   if (data & XQ_CSR_RI) strcat(lo, "RI ");
   if (data & XQ_CSR_XI) strcat(lo, "XI ");
+#if defined(VM_VAX)
+  printf ("CSR %08X %08X write: %s %s\n", fault_PC, PSL, hi, lo);
+#else
   printf ("CSR write: %s %s\n", hi, lo);
+#endif /* VM_VAX */
 }
 
 void xq_var_changes (uint16 data)
@@ -1345,9 +1720,11 @@ void xq_var_changes (uint16 data)
   if (~var & XQ_VEC_ID & data) strcat (hi, "ID ");
   if (var & XQ_VEC_ID & ~data) strcat (lo, "ID ");
 
-  if ((var & XQ_VEC_IV) != (data & XQ_VEC_IV))
+  if ((var & XQ_VEC_IV) != (data & XQ_VEC_IV)) {
     vec = (data & XQ_VEC_IV) >> 2;
-  printf ("VAR write: %s %s - Vec: %d\n", hi, lo, vec);
+    printf ("VAR write: %s %s - Vec: %d\n", hi, lo, vec);
+  } else 
+    printf ("VAR write: %s %s\n", hi, lo);
 }
 
 void xq_debug_setup(void)
@@ -1369,8 +1746,7 @@ void xq_debug_setup(void)
     if (len & XQ_SETUP_PM) strcat(buffer, "PM ");
     if (len & XQ_SETUP_LD) strcat(buffer, "LD ");
     if (len & XQ_SETUP_ST) strcat(buffer, "ST ");
-    printf ("Setup: Length [%d] info: %s\n", len, buffer);
+    printf ("Setup: Length [%d =0x%X, LD:%d, ST:%d] info: %s\n", len, len, (len & XQ_SETUP_LD) >> 2, (len & XQ_SETUP_ST) >> 4, buffer);
   }
 }
 #endif
-

@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Nov-02	RMS	Added PDP-4 drum support
    05-Oct-02	RMS	Added DIB structure
    25-Jul-02	RMS	Added PDP-4 DECtape support
    10-Feb-02	RMS	Added PDP-7 DECtape support
@@ -51,10 +52,11 @@
 					integral real time clock
 					Type 62 line printer (Hollerith)
 					Type 550/555 DECtape
+					Type 24 serial drum
 
    PDP7	   32K	Type 177 EAE		Type 649 KSR-33 Teletype
 		Type 148 mem extension	Type 444 paper tape reader
-					Type 75 paper tape punch
+		??KA70A bounds control	Type 75 paper tape punch
 					integral real time clock
 					Type 647B line printer (sixbit)
 					Type 550/555 DECtape
@@ -103,6 +105,7 @@
 #define KSR28		0				/* Baudot terminal */
 #define TYPE62		0				/* Hollerith printer */
 #define TYPE550		0				/* DECtape */
+#define DRM		0				/* drum */
 #elif defined (PDP7)
 #define ADDRSIZE	15
 #define TYPE647		0				/* sixbit printer */

@@ -2,6 +2,16 @@ This file contains information about the XQ/SIM_ETHER package.
 
 -------------------------------------------------------------------------------
 
+16-Jan-03 Release:
+ 1. Added VMScluster support (thanks to Mark Pizzolato)
+ 2. Verified VAX remote boot functionality (>>>B XQA0)
+ 3. Added major performance enhancements (thanks to Mark Pizzolato again)
+ 4. Changed _DEBUG tracers to XQ_DEBUG and ETH_DEBUG 
+ 5. Added local packet processing
+ 6. Added system id broadcast
+
+-------------------------------------------------------------------------------
+
 GOLD Changes: (08-Nov-02)
  1. Added USE_NETWORK conditional to Sim_Ether
  2. Fixed behaviour of SHOW XQ ETH if no devices exist
@@ -68,19 +78,18 @@ supports Windows, Linux, and NetBSD.
 
 Currently, the Sim_Ether module sets the selected ethernet card into
 promiscuous mode to gather all packets, then filters out the packets that it
-doesn't want. This method is somewhat inefficient and will be looked at in
-future versions. Packets having the same source MAC address as the
+doesn't want. In Windows, Packets having the same source MAC address as the
 controller are ignored for WinPCAP compatibility (see Windows notes below).
 
 If your ethernet card is plugged into a switch, the promiscuous mode setting
 should not cause much of a problem, since the switch will still filter out
 most of the undesirable traffic. You will only see "excessive" traffic if you
-are on a hub(repeater) or a direct lan (thickwire/thinwire) segment.
+are on a direct or hub(repeater) segment.
 
 -------------------------------------------------------------------------------
 
 Windows notes:
- 1. The Windows-specific code uses the WinPCAP 3.0 package from
+ 1. The Windows-specific code uses the WinPCAP 3.0 (or 2.3) package from
     http://winpcap.polito.it. This package for windows simulates the libpcap
     package that is freely available for unix systems.
  2. You must *install* WinPCAP.
@@ -91,8 +100,9 @@ Windows notes:
     but this defeats DECNET's duplicate node number detection scheme. A more
     correct fix for WinPCAP will be explored as time allows.
  5. The first time the WinPCAP driver is used, it will be dynamically loaded,
-    and the user must be an Administrator on the machine to do so. See the
-    WinPCAP documentation for a static load workaround if needed.
+    and the user must be an Administrator on the machine to do so. If you need
+    to run as an unprivileged user, you must set the service to autostart. See
+    the WinPCAP documentation for details on the static load workaround.
 
 Building on Windows:
  1. Install WinPCAP 3.0.
@@ -109,8 +119,10 @@ Building on Windows:
 Linux, NetBSD, and OpenBSD notes:
 
  1. You must run SIMH(scp) as root so that the ethernet card can be set into
-    promiscuous mode by the driver.
+    promiscuous mode by the driver. Alternative suggestions will be welcomed.
 
+Building on Linux, NetBSD, and OpenBSD:
+ 1. Define USE_NETWORK if you want the network functionality.
 
 -------------------------------------------------------------------------------
 
@@ -136,28 +148,25 @@ Regression test criteria:
 15. LAT loads sucessfully                                           (passed)
 16. SET HOST/LAT <nodename> works from SIMH to real VAX LAT machine (passed)
 17. SET HOST/LAT <nodename> works from real VAX LAT machine to SIMH (passed)
+18. SIMH node joins VMSCluster                                      (passed)
+19. SIMH node mounts other VMSCluster disks                         (passed)
+20. SIMH node MSCP serves disks to other nodes                      (passed)
+21. SIMH node remote boots into VMScluster (>>>B XQAO)              (passed)
 
-I have NOT tested the following, but have reports that the following work:
- 1. Operation with the PDP-11 emulator (RSX)
- 2. Remote booting of NetBSD (via >>> B XQA0)
+The following are known to NOT work:
+ 1. PDP-11 using RSTS/E v10.1 (fails to enable device - needs bootrom support)
 
-I have tested the following, and they do NOT work correctly:
- 1. VMS NI Clustering (LAVC)
- 2. Remote VAX booting (>>>B XQA0) into a VMScluster;
-    the remote boot works, but VMS BUGCHECKs when joining the cluster
-
+I have reports that the following work:
+ 1. PDP-11 using RSX
+ 2. VAX remote booting of NetBSD (via >>> B XQA0)
+ 
 -------------------------------------------------------------------------------
 
 Things planned for future releases:
- 1. Loopback packet processing
- 2. Full MOP implementation
- 3. Identity broadcast, which should occur every 8-10 minutes
- 4. Full support for network boot (>> B XQA0)
- 5. VMS NI Cluster (LAVC) support
- 6. More efficient Sim_Ether module implementation for windows
- 7. PDP-11 bootstrap
- 8. DESQA support (if someone can get me the user manuals)
- 9. DETQA support [DELQA-Turbo] (I have the manual)
+ 1. Full MOP implementation
+ 2. PDP-11 bootstrap/bootrom
+ 3. DESQA support (if someone can get me the user manuals)
+ 4. DETQA support [DELQA-Turbo] (I have the manual)
 
 -------------------------------------------------------------------------------
 
@@ -166,16 +175,13 @@ Things which I need help with:
  2. Information about Remote MOP processing
  3. PDP-11 bootstrap code.
  4. VAX hardware diagnotics image file and docs, to test XQ thoroughly.
- 5. Feedback on the ethernet timing clock interval.
- 6. Feedback on operation with other VAX OS's.
- 7. Feedback on operation of PDP-11 OS's.
+ 5. Feedback on operation with other VAX OS's.
+ 6. Feedback on operation with PDP-11 OS's.
 
 -------------------------------------------------------------------------------
 
 Please send all patches, questions, feedback, clarifications, and help to:
   dhittner AT northropgrumman DOT com
-
-NOTE: I _have_ corrected my email address!! Sorry about the confusion!
 
 Thanks, and Enjoy!!
 Dave

@@ -149,12 +149,12 @@ extern int32 sim_switches;
 
 static t_stat cr_svc      (UNIT *uptr);
 static t_stat cr_reset    (DEVICE *dptr);
-static t_stat cr_set_code (UNIT *uptr, int32 match);
+static t_stat cr_set_code (UNIT *uptr, int32 match, char *cptr, void *desc);
 static t_stat cr_attach   (UNIT *uptr, char *cptr);
 static t_stat cr_detach   (UNIT *uptr);
 
 static t_stat cp_reset	  (DEVICE *dptr);
-static t_stat cp_set_code (UNIT *uptr, int32 match);
+static t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc);
 static t_stat cp_detach   (UNIT *uptr);
 
 static int16 cr_dsw  = 0;									/* device status word */
@@ -497,12 +497,12 @@ t_stat set_active_cr_code (int match)
 	return SCPE_OK;
 }
 
-t_stat cr_set_code (UNIT *uptr, int32 match)
+t_stat cr_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
 {
 	return set_active_cr_code(match);
 }
 
-t_stat cp_set_code (UNIT *uptr, int32 match)
+t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
 {
 	CPCODE *code;
 	int ncode;
@@ -550,7 +550,7 @@ t_stat load_cr_boot (int drvno)
 	return SCPE_OK;
 }
 
-t_stat cr_boot (int unitno)
+t_stat cr_boot (int unitno, DEVICE *dptr)
 {
 	t_stat rval;
 	short buf[80];
@@ -917,7 +917,7 @@ static t_bool nextdeck (void)
 
 static t_stat cr_reset (DEVICE *dptr)
 {
-	cr_set_code(&cr_unit, active_cr_code & UNIT_CODE);	/* reset to specified code table */
+	cr_set_code(&cr_unit, active_cr_code & UNIT_CODE, NULL, NULL);	/* reset to specified code table */
 
 	readstate  = STATION_EMPTY;
 
@@ -948,7 +948,7 @@ static t_stat cr_reset (DEVICE *dptr)
 
 static t_stat cp_reset (DEVICE *dptr)
 {
-	cp_set_code(&cp_unit, cp_unit.flags & UNIT_CODE);
+	cp_set_code(&cp_unit, cp_unit.flags & UNIT_CODE, NULL, NULL);
 	punchstate = STATION_EMPTY;
 
 	cp_unit.COLUMN = -1;

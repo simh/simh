@@ -1359,7 +1359,7 @@ if (uptr = rq_getucb (cp, lu)) {			/* unit exist? */
 	    return OK;  }  }				/* done */
 else sts = ST_OFL;					/* offline */
 cp->pak[pkt].d[RW_BCL] = cp->pak[pkt].d[RW_BCH] = 0;	/* bad packet */
-rq_putr (cp, pkt, cmd | OP_END, 0, sts, RW_LNT, UQ_TYP_SEQ);
+rq_putr (cp, pkt, cmd | OP_END, 0, sts, RW_LNT_D, UQ_TYP_SEQ);
 return rq_putpkt (cp, pkt, TRUE);
 }
 
@@ -1517,7 +1517,7 @@ cp->pak[pkt].d[RW_WBCL] = 0;
 cp->pak[pkt].d[RW_WBCH] = 0;
 cp->pak[pkt].d[RW_WBLL] = 0;
 cp->pak[pkt].d[RW_WBLH] = 0;
-rq_putr (cp, pkt, cmd | OP_END, flg, sts, RW_LNT, UQ_TYP_SEQ); /* fill pkt */
+rq_putr (cp, pkt, cmd | OP_END, flg, sts, RW_LNT_D, UQ_TYP_SEQ); /* fill pkt */
 if (!rq_putpkt (cp, pkt, TRUE)) return ERR;		/* send pkt */
 if (uptr->pktq)						/* more to do? */
     sim_activate (dptr->units + RQ_QUEUE, rq_qtime);	/* activate thread */

@@ -28,6 +28,7 @@
    tty		12531C buffered teleprinter interface
    clk		12539C time base generator
 
+   22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Revised BOOT command for IBL ROMs
 			Fixed bug in TTY reset, TTY starts in input mode
 			Fixed bug in TTY mode OTA, stores data as well
@@ -77,8 +78,8 @@
 #define CLK_ERROR	(1 << CLK_V_ERROR)
 
 extern uint16 *M;
-extern int32 PC, SR;
-extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 PC, SR;
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 extern UNIT cpu_unit;
 
 int32 ptr_stopioe = 0, ptp_stopioe = 0;			/* stop on error */
@@ -263,8 +264,8 @@ REG clk_reg[] = {
 	{ NULL }  };
 
 MTAB clk_mod[] = {
-	{ UNIT_DIAG, UNIT_DIAG, "DIAG", "DIAG", NULL },
-	{ UNIT_DIAG, 0, "CALIBRATED", "CALIBRATED", NULL },
+	{ UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", NULL },
+	{ UNIT_DIAG, 0, "calibrated", "CALIBRATED", NULL },
 	{ MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&hp_setdev, &hp_showdev, &clk_dev },
 	{ 0 }  };
@@ -350,8 +351,8 @@ return SCPE_OK;
 
 /* Paper tape reader bootstrap routine (HP 12992K ROM) */
 
+#define LDR_BASE	077
 #define CHANGE_DEV	(1 << 24)
-#define CHANGE_ADDR	(1 << 23)
 
 static const int32 pboot[IBL_LNT] = {
 	0107700,		/*ST CLC 0,C		; intr off */
@@ -403,7 +404,7 @@ static const int32 pboot[IBL_LNT] = {
 	0177765,		/*M11 -11		; feed count */
 	0, 0, 0, 0, 0, 0, 0, 0,	/* unused */
 	0, 0, 0, 0, 0, 0, 0,	/* unused */
-	CHANGE_ADDR  };		/*MAXAD -ST		; max addr */
+	0000000  };		/*MAXAD -ST		; max addr */
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
@@ -413,11 +414,10 @@ dev = ptr_dib.devno;					/* get device no */
 PC = ((MEMSIZE - 1) & ~IBL_MASK) & VAMASK;		/* start at mem top */
 SR = IBL_PTR + (dev << IBL_V_DEV);			/* set SR */
 for (i = 0; i < IBL_LNT; i++) {				/* copy bootstrap */
-	if (pboot[i] & CHANGE_ADDR)			/* memory limit? */
-	    M[PC + i] = (-PC) & DMASK;
-	else if (pboot[i] & CHANGE_DEV)			/* IO instr? */
+	if (pboot[i] & CHANGE_DEV)			/* IO instr? */
 	    M[PC + i] = (pboot[i] + dev) & DMASK;
-	else M[PC + i] = pboot[i];  }	
+	else M[PC + i] = pboot[i];  }
+M[PC + LDR_BASE] = (~PC + 1) & DMASK;
 return SCPE_OK;
 }
 
@@ -564,7 +564,8 @@ int32 c, dev;
 dev = tty_dib.devno;					/* get device no */
 sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
-if (tty_unit[TTI].flags & UNIT_UC) {			/* UC only? */
+if (c & SCPE_BREAK) c = 0;				/* break? */
+else if (tty_unit[TTI].flags & UNIT_UC) {		/* UC only? */
 	c = c & 0177;
 	if (islower (c)) c = toupper (c);  }
 else c = c & ((tty_unit[TTI].flags & UNIT_8B)? 0377: 0177);
@@ -572,7 +573,7 @@ if (tty_mode & TM_KBD) {				/* keyboard enabled? */
 	tty_buf = c;					/* put char in buf */
 	tty_unit[TTI].pos = tty_unit[TTI].pos + 1;
 	setFLG (dev);					/* set flag */
-	return tto_out (c);  }				/* echo or punch? */
+	if (c) return tto_out (c);  }			/* echo or punch? */
 return SCPE_OK;
 }
 

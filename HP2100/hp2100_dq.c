@@ -104,8 +104,8 @@
 #define STA_ALLERR	(STA_NRDY + STA_EOC + STA_AER + STA_FLG + STA_DTE)
 
 extern uint16 *M;
-extern int32 PC, SR;
-extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
+extern uint32 PC, SR;
+extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
 extern int32 sim_switches;
 extern UNIT cpu_unit;
 
@@ -654,8 +654,8 @@ return SCPE_OK;
 
 /* 2883/2884 bootstrap routine (subset HP 12992A ROM) */
 
+#define LDR_BASE	077
 #define CHANGE_DEV	(1 << 24)
-#define CHANGE_ADDR	(1 << 23)
 
 static const int32 dboot[IBL_LNT] = {
 	0106700+CHANGE_DEV,	/*ST CLC DC		; clr dch */
@@ -698,7 +698,7 @@ static const int32 dboot[IBL_LNT] = {
 	0164000,		/*CNT   -6144. */
 	0117773,		/*XT JSB ADDR2,I	; start program */
 	0120000+CHANGE_DEV,	/*DMACW 120000+DC */
-	CHANGE_ADDR };		/*   -ST */
+	0000000 };		/*   -ST */
 
 t_stat dqc_boot (int32 unitno, DEVICE *dptr)
 {
@@ -709,10 +709,9 @@ dev = dqd_dib.devno;					/* get data chan dev */
 PC = ((MEMSIZE - 1) & ~IBL_MASK) & VAMASK;		/* start at mem top */
 SR = IBL_DQ + (dev << IBL_V_DEV);			/* set SR */
 for (i = 0; i < IBL_LNT; i++) {				/* copy bootstrap */
-	if (dboot[i] & CHANGE_ADDR)			/* memory limit? */
-	    M[PC + i] = (-PC) & DMASK;
-	else if (dboot[i] & CHANGE_DEV)			/* IO instr? */
+	if (dboot[i] & CHANGE_DEV)			/* IO instr? */
 	    M[PC + i] = (dboot[i] + dev) & DMASK;
 	else M[PC + i] = dboot[i];  }	
+M[PC + LDR_BASE] = (~PC + 1) & DMASK;
 return SCPE_OK;
 }

@@ -25,6 +25,7 @@
 
    tti,tto	KL8E terminal input/output
 
+   22-Dec-02	RMS	Added break support
    01-Nov-02	RMS	Added 7B/8B support
    04-Oct-02	RMS	Added DIBs, device number support
    30-May-02	RMS	Widened POS to 32b
@@ -157,7 +158,8 @@ int32 c;
 
 sim_activate (&tti_unit, tti_unit.wait);		/* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
-if (tti_unit.flags & UNIT_KSR) {			/* UC only? */
+if (c & SCPE_BREAK) tti_unit.buf = 0;			/* break? */
+else if (tti_unit.flags & UNIT_KSR) {			/* UC only? */
 	c = c & 0177;
 	if (islower (c)) c = toupper (c);
 	tti_unit.buf = c | 0200;  }			/* add TTY bit */

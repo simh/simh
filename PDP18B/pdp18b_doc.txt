@@ -81,6 +81,7 @@ PDP-4	CPU		PDP-4 CPU with 8KW of memory
 	LPT		Type 62 line printer (Hollerith code)
 	CLK		integral real-time clock
 	DT		Type 550/555 DECtape
+	DRM		Type 24 serial drum
 
 PDP-7	CPU		PDP-7 CPU with 32KW of memory
 	-		Type 177 extended arithmetic element (EAE)
@@ -500,7 +501,7 @@ The serial drum (DRM) implements these registers:
 	name		size	comments
 
 	DA		9	drum address (sector number)
-	MA		15	current memory address
+	MA		16	current memory address
 	INT		1	interrupt pending flag
 	DONE		1	device done flag
 	ERR		1	error flag
