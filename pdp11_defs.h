@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2000, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@
 #include "sim_defs.h"					/* simulator defns */
 #include <setjmp.h>
 
-/* Constants */
+/* Architectural constants */
 
 #define STKLIM		0400				/* stack limit */
 #define VASIZE		0200000				/* 2**16 */
@@ -168,15 +168,6 @@ typedef struct fpac fpac_t;
 #define CSR_BUSY	(1u << CSR_V_BUSY)
 #define CSR_ERR		(1u << CSR_V_ERR)
 
-/* Simulator stop codes; codes 1:TRAP_V_MAX correspond to traps 0:TRAPMAX-1 */
-
-#define STOP_HALT	TRAP_V_MAX + 1			/* HALT instruction */
-#define STOP_IBKPT	TRAP_V_MAX + 2			/* instruction bkpt */
-#define STOP_WAIT	TRAP_V_MAX + 3			/* wait, no events */
-#define STOP_VECABORT	TRAP_V_MAX + 4			/* abort vector read */
-#define STOP_SPABORT	TRAP_V_MAX + 5			/* abort trap push */
-#define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* cond error return */
-
 /* Trap masks, descending priority order, following J-11
    An interrupt summary bit is kept with traps, to minimize overhead
 */
@@ -230,6 +221,15 @@ typedef struct fpac fpac_t;
 #define VEC_YEL		0004
 #define VEC_PWRFL	0024
 #define VEC_FPE		0244
+
+/* Simulator stop codes; codes 1:TRAP_V_MAX correspond to traps 0:TRAPMAX-1 */
+
+#define STOP_HALT	TRAP_V_MAX + 1			/* HALT instruction */
+#define STOP_IBKPT	TRAP_V_MAX + 2			/* instruction bkpt */
+#define STOP_WAIT	TRAP_V_MAX + 3			/* wait, no events */
+#define STOP_VECABORT	TRAP_V_MAX + 4			/* abort vector read */
+#define STOP_SPABORT	TRAP_V_MAX + 5			/* abort trap push */
+#define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* cond error return */
 
 /* Interrupt assignments, priority is right to left
 

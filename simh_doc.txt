@@ -1,6 +1,6 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V2.5
+Subj:	Simulator Usage, V2.5a
 Date:	1-Jan-01
 
 			COPYRIGHT NOTICE
@@ -743,14 +743,14 @@ The magnetic tape controller implements these registers:
 
 Error handling is as follows:
 
-	error		processed as
+	error			processed as
 
-	not attached	tape not ready
+	not attached		tape not ready
 
-	end of file	(read or space) end of physical tape
-			(write) ignored
+	end of file		(read or space) end of physical tape
+				(write) ignored
 
-	OS I/O error	report error and stop
+	OS I/O error		report error and stop
 
 4.7 Symbolic Display and Input
 
@@ -1288,14 +1288,14 @@ The magnetic tape controller implements these registers:
 
 Error handling is as follows:
 
-	error		processed as
+	error			processed as
 
-	not attached	tape not ready
+	not attached		tape not ready
 
-	end of file	(read or space) end of physical tape
-			(write) ignored
+	end of file		(read or space) end of physical tape
+				(write) ignored
 
-	OS I/O error	report error and stop
+	OS I/O error		report error and stop
 
 5.8 Symbolic Display and Input
 
@@ -1371,7 +1371,9 @@ CPU		Nova CPU with 32KW of memory
 -		hardware multiply/divide
 PTR,PTP		paper tape reader/punch
 TTI,TTO		console terminal
+TTI1,TTO1		second terminal
 LPT		line printer
+PLT		plotter
 CLK		real-time clock
 DK		head-per-track disk controller
 DP		moving head disk controller with four drives
@@ -1406,9 +1408,9 @@ and the size of main memory.
 	SET CPU 28K		set memory size = 28K
 	SET CPU 32K		set memory size = 32K
 
-(Nova 4 = optional multiply/divide, stack, byte, trap instructions)
-(Nova 3 = optional multiply/divide, stack instructions)
-(MDV = multiply/divide instructions)
+(MDV = unsigned multiply/divide instructions)
+(Nova 3 = unsigned multiply/divide, stack, trap instructions)
+(Nova 4 = unsigned and signed multiply/divide, stack, byte, trap instructions)
 
 If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
@@ -1460,7 +1462,7 @@ The paper tape reader implements these registers:
 
 Error handling is as follows:
 
-	errpr   STOP_IOE	processed as
+	error   STOP_IOE	processed as
 
 	not attached	1	report error and stop
 			0	out of tape or paper
@@ -1550,7 +1552,7 @@ The terminal output implements these registers:
 	POS		31	number of characters output
 	TIME		24	time from I/O initiation to interrupt
 
-6.2.5 Programmed I/O Devices (LPT)
+6.2.5 Line Printer (LPT)
 
 The line printer (LPT) writes data to a disk file.  The POS register
 specifies the number of the next data item to be written.  Thus,
@@ -1593,6 +1595,97 @@ The real-time clock (CLK) implements these registers:
 	TIME1		24	clock frequency, select = 1
 	TIME2		24	clock frequency, select = 2
 	TIME3		24	clock frequency, select = 3
+
+6.2.7 Plotter (PTP)
+
+The plotter (PLT) writes data to a disk file.  The POS register
+specifies the number of the next data item to be written. Thus,
+by changing POS, the user can backspace or advance the plotter.
+
+The plotter implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+6.2.8 Second Terminal Input (TTI1)
+
+The second terminal input (TTI1) reads data from a disk file.  When a
+file is attached, the second terminal input will read characters at
+the interval specified by the TIME register.  Detaching the file, or
+reaching end of file, stops input.  The POS register specifies the
+number of the next data item to be read.  Thus, by changing POS, the
+user can backspace or advance the input stream.
+
+The second terminal input implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the input file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error   STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	end of file	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+6.2.9 Second Terminal Output (TTO1)
+
+The second terminal output (TTO1) writes data to a disk file.  The
+POS register specifies the number of the next data item to be written.
+Thus, by changing POS, the user can backspace or advance the output
+stream.
+
+The second terminal outpout implements these registers:
+
+	name		size	comments
+
+	BUF		8	last data item processed
+	BUSY		1	device busy flag
+	DONE		1	device done flag
+	DISABLE		1	interrupt disable flag
+	INT		1	interrupt pending flag
+	POS		31	position in the output file
+	TIME		24	time from I/O initiation to interrupt
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
 
 6.3 Fixed Head Disk (DK)
 
@@ -1675,13 +1768,13 @@ The moving head disk controller implements these registers:
 
 Error handling is as follows:
 
-	error		processed as
+	error			processed as
 
-	not attached	disk not ready
+	not attached		disk not ready
 
-	end of file	assume rest of disk is zero
+	end of file		assume rest of disk is zero
 
-	OS I/O error	report error and stop
+	OS I/O error		report error and stop
 
 6.5 Magnetic Tape (MT)
 
@@ -1715,14 +1808,14 @@ The magnetic tape controller implements these registers:
 
 Error handling is as follows:
 
-	error		processed as
+	error			processed as
 
-	not attached	tape not ready
+	not attached		tape not ready
 
-	end of file	(read or space) end of physical tape
-			(write) ignored
+	end of file		(read or space) end of physical tape
+				(write) ignored
 
-	OS I/O error	report error and stop
+	OS I/O error		report error and stop
 
 6.6 Symbolic Display and Input
 
@@ -2190,8 +2283,10 @@ The 18b PDP simulators implement several unique stop conditions:
 	- more than XCTMAX nested executes are detected during
 	  instruction execution
 
-The 18b PDP loader supports RIM format tapes.  The DUMP command is not
-implemented.
+The PDP-4 and PDP-7 loaders support only RIM format tapes.  The PDP-9
+and PDP-15 support both RIM and BIN format tapes.  BIN is the default; to
+load a RIM format tape, use the -r switch with LOAD.  The DUMP command is
+not implemented.
 
 8.1 CPU
 
@@ -2235,7 +2330,9 @@ control registers for the interrupt system.
 	7,9,15	EAE_AC_SIGN	1	EAE AC sign
 	all	L		1	link
 	7,9	EXTM		1	extend mode
+	9	EXTM_INIT	1	extend mode value after reset
 	15	BANKM		1	bank mode
+	15	BANKM_INIT	1	bank mode value after reset
 	7	TRAPM		1	trap mode
 	9,15	USMD		1	user mode
 	9,15	USMDBUF		1	user mode buffer
@@ -2322,8 +2419,13 @@ Error handling is as follows:
 8.2.3 Terminal Input (TTI)
 
 The terminal input (TTI) reads from the controling console port.  The
-input has one option, UC; when set, it automatically converts lower
-case input to upper case.
+terminal input has one option, UC; when set, it automatically converts
+lower case input to upper case.
+
+The PDP-9 and PDP-15 operated the terminal, by default, as half-duplex.
+For backward compatibility, on the PDP-9 and PDP-15 the terminal input
+has a second option, FDX; when set, it operates the terminal input in
+full-duplex mode.
 
 The terminal input implements these registers:
 
@@ -2533,14 +2635,14 @@ The magnetic tape controller implements these registers:
 
 Error handling is as follows:
 
-	error		processed as
+	error			processed as
 
-	not attached	tape not ready
+	not attached		tape not ready
 
-	end of file	(read or space) end of physical tape
-			(write) ignored
+	end of file		(read or space) end of physical tape
+				(write) ignored
 
-	OS I/O error	report error and stop
+	OS I/O error		report error and stop
 
 8.7 Symbolic Display and Input
 
@@ -2910,13 +3012,13 @@ The line printer registers are:
 
 Error handling is as follows:
 
-	error		processed as
+	error			processed as
 
-	not attached	report error and stop
+	not attached		report error and stop
 
-	OS I/O error	print error message
-			if IOCHK set, report error and stop
-			otherwise, set ERR indicator
+	OS I/O error		print error message
+				if IOCHK set, report error and stop
+				otherwise, set ERR indicator
 
 9.4 1407 Inquiry Terminal (INQ)
 
@@ -2947,7 +3049,9 @@ or write locked.
 	SET MTn LOCKED		set unit n write locked
 	SET MTn ENABLED		set unit n write enabled
 
-Units can also be REMOVEd or ADDed to the configuration.
+Units can also be REMOVEd or ADDed to the configuration.  The magnetic
+tape simulator supports the BOOT command.  The bootstrap reads the first
+record off tape, starting at location 1, and then branches to it. 
 
 The magnetic tape controller implements these registers:
 
@@ -2960,16 +3064,16 @@ The magnetic tape controller implements these registers:
 
 Error handling is as follows:
 
-	error		processed as
+	error			processed as
 
-	not attached	report error and stop
+	not attached		report error and stop
 
-	end of file	(read or space) end of physical tape
-			(write) ignored
+	end of file		(read or space) end of physical tape
+				(write) ignored
 
-	OS I/O error	print error message
-			if IOCHK set, report error and stop
-			otherwise, set ERR indicator
+	OS I/O error		print error message
+				if IOCHK set, report error and stop
+				otherwise, set ERR indicator
 
 9.6 Symbolic Display and Input
 
@@ -3094,12 +3198,12 @@ name(s)
 
 CPU		2116, 2100, or 21MX CPU with 32KW memory
 DMA0, DMA1	dual channel DMA controller
-PTR,PTP		paper tape reader/punch
-TTY		console terminal
-LPT		LE8E line printer
-CLK		12639C time base generator
+PTR,PTP		12597A paper tape reader/punch
+TTY		12631C buffered teleprinter
+LPT		12653A line printer
+CLK		12539A/B/C time base generator
 DP		12557A cartridge disk controller with four drives
-MT		12559 magnetic tape controller with one drives
+MT		12559C magnetic tape controller with one drives
 
 The HP2100 simulator implements several unique stop conditions:
 
@@ -3193,7 +3297,7 @@ the higher is automatically set to the lower + 1.
 
 10.4 Programmed I/O Devices
 
-10.4.1 Paper Tape Reader (PTR)
+10.4.1 12597A-002 Paper Tape Reader (PTR)
 
 The paper tape reader (PTR) reads data from a disk file.  The POS
 register specifies the number of the next data item to be read.
@@ -3207,6 +3311,7 @@ The paper tape reader implements these registers:
 	name		size	comments
 
 	BUF		8	last data item processed
+	CMD		1	reader enable
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
@@ -3227,7 +3332,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-10.4.2 Paper Tape Punch (PTP)
+10.4.2 12597A-005 Paper Tape Punch (PTP)
 
 The paper tape punch (PTP) writes data to a disk file.  The POS
 register specifies the number of the next data item to be written.
@@ -3238,6 +3343,7 @@ The paper tape punch implements these registers:
 	name		size	comments
 
 	BUF		8	last data item processed
+	CMD		1	punch enable
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
@@ -3255,9 +3361,9 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-10.4.3 Console Terminal (TTY)
+10.4.3 12631C Buffered Teleprinter (TTY)
 
-The console terminal has three units: keyboard (unit 0), printer
+The console teleprinter has three units: keyboard (unit 0), printer
 (unit 1), and punch (unit 2).  The keyboard reads from, and the
 printer writes to, the controlling console port.  The punch writes
 to a disk file.  The keyboard has one option, UC; when set, it
@@ -3301,6 +3407,7 @@ The line printer implements these registers:
 	name		size	comments
 
 	BUF		8	last data item processed
+	CMD		1	printer enable
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
@@ -3319,7 +3426,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-10.4.5 12639C Time Base Generator (CLK)
+10.4.5 12539A/B/C Time Base Generator (CLK)
 
 The time base generator (CLK) implements these registers:
 
@@ -3333,9 +3440,9 @@ The time base generator (CLK) implements these registers:
 	TIME0..TIME7	31	clock intervals, select = 0..7
 	DEVNO		6	current device number (read only)
 
-10.5 12559C Cartridge Disk (DP)
+10.5 12557A Cartridge Disk (DP)
 
-The 12559C cartridge disk has two separate devices, a data channel and
+The 12557A cartridge disk has two separate devices, a data channel and
 a device controller.  The data channel includes a 128-word (one sector)
 buffer for reads and writes.  The device controller includes the four
 disk drives.  Disk drives can be REMOVEd or ADDed to the configuration.
@@ -3347,8 +3454,8 @@ The data channel implements these registers:
 	IBUF		16	input buffer
 	OBUF		16	output buffer
 	BPTR		7	sector buffer pointer
-	CMD		1	channel enabled
-	CTL		1	interrupt enabled
+	CMD		1	channel enable
+	CTL		1	interrupt enable
 	FLG		1	channel ready
 	FBF		1	channel ready buffer
 	DEVNO		6	current device number (read only)
@@ -3363,8 +3470,8 @@ The device controller implements these registers:
 	RARH		2	record address register head
 	RARS		4	record address register sector
 	CNT		5	check record count
-	CMD		1	controller enabled
-	CTL		1	interrupt enabled
+	CMD		1	controller enable
+	CTL		1	interrupt enable
 	FLG		1	controller ready
 	FBF		1	controller ready buffer
 	EOC		1	end of cylinder pending
@@ -3387,7 +3494,7 @@ Error handling is as follows:
 
 	OS I/O error	report error and stop
 
-10.6 12557 Magnetic Tape (MT)
+10.6 12559C Magnetic Tape (MT)
 
 Magnetic tape options include the ability to make the unit write enabled
 or write locked.
@@ -3395,7 +3502,7 @@ or write locked.
 	SET MT LOCKED		set unit write locked
 	SET MT ENABLED		set unit write enabled
 
-The 12557 mag tape drive has two separate devices, a data channel and
+The 12559C mag tape drive has two separate devices, a data channel and
 a device controller.  The data channel includes a maximum record sized
 buffer for reads and writes.  The device controller includes the tape
 unit
@@ -3430,14 +3537,14 @@ The device controller implements these registers:
 
 Error handling is as follows:
 
-	error		processed as
+	error			processed as
 
-	not attached	tape not ready
+	not attached		tape not ready
 
-	end of file	(read or space) end of physical tape
-			(write) ignored
+	end of file		(read or space) end of physical tape
+				(write) ignored
 
-	OS I/O error	report error and stop
+	OS I/O error		report error and stop
 
 10.7 Symbolic Display and Input
 
@@ -3715,249 +3822,7 @@ Line printer output is represented by an ASCII file of lines separated by
 the newline character.  Overprinting is represented by a line ending in
 return rather than newline.
 
-Appendix 2: Sample Software
-
-1. PDP-8
-
-1.1 ESI-X
-
-ESI-X is an interactive program for technical computation.  It can
-execute both immediate commands and stored programs (like BASIC).  ESI-X
-is provided as both source and as a binary loader format paper-tape
-image.  For more information see the documentation included with the
-program.  My thanks to Dave Waks, who wrote the program, and to Paul
-Pierce and Tim Litt, who recovered the source from its archival medium.
-
-To load and run ESI-X:
-
-	sim> load esix.bin
-	sim> run 5400
-	_TYPE 2+2.
-	       2+2 =     4
-
-1.2 FOCAL69
-
-FOCAL69 is an interactive program for technical computations.  It can
-execute both immediate commands and stored programs (like BASIC).  FOCAL69
-is provided as a binary loader format paper-tape image.  To load and
-run FOCAL69:
-
-	sim> load focal69.bin
-	sim> run 200
-	*TYPE 2+2
-	=    4.000*
-
-1.3 PDP-8 OS/8
-
-OS/8 is the PDP-8's mass storage-based operating system.  It provides a
-program development and execution environment for assembler, BASIC, and
-FORTRAN programs.  OS/8 is provided under license, as is, without fee, by
-Digital Equipment Corporation, for non-commercial use only.  Please read
-the enclosed license agreement for full terms and conditions.  This license
-agreement must be reproduced with any copy of the OS/8 disk images.  My
-thanks to Doug Jones of the University of Iowa, who provided the disk
-images, and to Digital Equipment Corporation, which provided the license.
-
-To boot and run OS/8:
-
-	sim> att rx0 os8sys_rx.dsk
-	sim> att rx1 os8f4_rx.dsk
-	sim> boot rx0
-	
-	.DA dd-mmm-yy
-	.
-
-Note that OS/8 only recognizes upper case characters.  The first disk
-(drive 0) is the system disk; it also includes BASIC.  The second disk
-(drive 1) includes FORTRAN.
-
-2. PDP-11
-
-2.1 UNIX V5, V6, V7
-
-UNIX was first developed on the PDP-7; its first widespread usage was on
-the PDP-11.  UNIX provides a program development and execution environment
-for assembler and C programs.  UNIX V5, V7, V7 for the PDP-11 is provided
-under license, as is, without fee, by Santa Cruz Organization (SCO), for
-non-commercial use only.  Please read the enclosed license agreement for
-full terms and conditions.  This license must be reproduced with any copy
-of the UNIX V5, V6, V7 disk images.  My thanks to PUPS, the PDP-11 UNIX
-Preservation Society of Australia, which provided the disk images, and to
-SCO, which provided the license.
-
-2.1.1 UNIX V5
-
-UNIX V5 is contained on a single RK05 disk image.  To boot UNIX:
-
-	sim> set cpu 18b
-	sim> att rk0 unix_v5_rk.dsk
-	sim> boot rk
-	@unix
-	login: root
-	#ls -l
-
-2.1.2 UNIX V6
-
-UNIX V6 is contained on three RK05 disk images.  To boot UNIX:
-
-	sim> set cpu 18b
-	sim> att rk0 unix0_v6_rk.dsk
-	sim> att rk1 unix1_v6_rk.dsk
-	sim> att rk3 unix3_v6_rk.dsk
-	sim> boot rk0
-	@unix
-	login: root
-	# ls -l
-
-2.1.3 UNIX V7
-
-NOTE: The V7 disk images with V2.3c and later releases are new and
-replace the prior versions, which were corrupt.
-
-UNIX V7 is contained on a single RL02 disk image.  To boot UNIX:
-
-	sim> set cpu 18b
-	sim> set rl0 RL02
-	sim> att rl0 unix_v7_rl.dsk
-	sim> boot rl0
-	@boot
-	New Boot, known devices are hp ht rk rl rp tm vt
-	: rl(0,0)rl2unix
-	# 
-
-A smaller image is contained on a single RK05 disk image.  To boot UNIX:
-
-	sim> set cpu 18b
-	sim> att rk0 unix_v7_rk.dsk
-	sim> boot rk0
-	@boot
-	New Boot, known devices are hp ht rk rl rp tm vt
-	: rk(0,0)rkunix
-	# STTY -LCASE
-	#
-
-2.2 RT-11
-
-RT-11 is the PDP-11's single user operating system.  It provides a program
-development and execution environment for assembler, BASIC, and FORTRAN
-programs.  RT-11 is provided under license, as is, without fee, by Mentec
-Corporation, for non-commercial use ONLY ON THIS SIMULATOR.  Please read
-the enclosed license agreement for full terms and conditions.  This license
-agreement must be reproduced with any copy of the RT-11 disk image.  My
-thanks to John Wilson, a private collector, who provided the disk image
-for RT-11 V4; to Megan Gentry, of Digital Equipment Corporation, who
-provided the disk image for RT-11 V5.3; and to Mentec Corporation, which
-provided the license.
-
-2.2.1 RT-11 V4
-
-RT-11 is contained in a single RK05 disk image.  To boot and run RT-11:
-
-	sim> att rk0 rtv4_rk.dsk
-	sim> boot rk0
-
-For RL, RM, and RP series disks, RT-11 expects to find a manufacturer's bad
-block table in the last track of the disk.  Therefore, INITialization of a
-new (all zero's) disk fails, because there is no valid bad block table.  To
-create a minimal bad block table, use the SET <unit> BADBLOCK command.
-
-2.2.2 RT-11 V5.3
-
-RT-11 is contained in a single RL02 disk image.  To boot and run RT-11:
-
-	sim> set rl0 rl02
-	sim> att rl0 rtv53_rl.dsk
-	sim> boot rl0
-
-This is a full RT-11 distribution kit.  It expects the user to copy the
-distribution pack and generate a new system.  This requires mounting
-blank packs on RL1.  When a blank pack is attached to the simulator,
-a bad block table must be created with the SET <unit> BADBLOCK command. 
-
-3. Nova RDOS
-
-RDOS is the Nova's real-time mass storage operating system.  It provides a
-program development and execution environment for assembler, BASIC, and
-FORTRAN programs.  RDOS is provided under license, as is, without fee, by
-Data General Corporation, for non-commercial use only.  Please read the
-enclosed license agreement for full terms and conditions.  This license
-agreement must be reproduced with any copy of the RDOS disk image.  My
-thanks to Carl Friend, a private collector, who provided the disk image,
-and to Data General Corporation, which provided the license.
-
-To boot and run RDOS:
-
-	sim> att dp0 rdos_d31.dsk
-	sim> set tti dasher
-	sim> boot dp0
-	FILENAME? (cr)
-	DATE (mm/dd/yy)? xx/yy/zz
-	TIME (hh:mm:ss)? hh:mm:ss
-	R
-	list/e
-
-4. PDP-1 LISP
-
-PDP-1 LISP is an interactive interpreter for the Lisp language.  It can
-execute both interactive commands and stored programs.  The startup
-instructions for LISP are complicated; see the documentation included
-with the program for details.  My thanks to Peter Deutsch, who wrote the
-program, to Gordon Greene, who typed it in from a printed listing, and
-to Paul McJones, who helped with the final debug process.
-
-5. PDP-7 SIM8
-
-PDP-7 SIM8 is a PDP-8 simulator for the PDP-7.  It implements an 8K
-PDP-8/I with keyboard, teleprinter, reader, punch, and line printer.
-It provides an interactive console environment for control and debug
-of the simulated PDP-8.  For more information see the documentation
-included with the program.  My thanks to Dave Waks, who wrote the
-program, and to Paul Pierce and Tim Litt, who recovered the source
-from its archival medium.
-
-To load and run SIM8:
-
-	sim> load sim8.rim
-	sim> run
-	AC/ 0000
-
-6. 1401 Single Card "Koans"
-
-One of the art forms for the IBM 1401 was packing useful programs into a
-single punched card.  Three samples are included:
-
-i1401_ctolp.cd		prints a card deck on the line printer
-i1401_ctopu.cd		copies a card deck to the card punch
-i1401_hello.cd		prints "HELLO WORLD" on the line printer and stops
-
-To use the reproduction cards, simply insert them at the beginning of a
-text file, terminated by newline.  Attach the modified file to the card
-reader, attach a blank file to the output device, and boot the card reader.
-
-7.  HP2116 16K BASIC
-
-HP BASIC is a paper-tape centric implementation of BASIC for a 16KW
-HP2116.  Device numbers correspond to the default simulator settings:
-
-	PTR	=	10
-	TTY	=	11
-	PTP	=	12
-
-The program is a complete but early BASIC and has one unsual requirement:
-all programs must include a valid END statement to run correctly.  My
-thanks to Jeff Moffatt for providing the program.
-
-To load and run BASIC:
-
-	sim> load basic1.abs
-	sim> run 100
-	READY
-	10 PRINT SQR(2)
-	20 END
-	RUN
-	 1.41421
-
-Appendix 3: Debug Status
+Appendix 2: Debug Status
 
 The debug status of each simulated CPU and device is as follows:
 
@@ -3999,7 +3864,34 @@ legend:		y = runs operating system or sample program
 
 Revision History (since Rev 1.1)
 
-Rev 2.5, Jan, 01
+Rev 2.5a, Dec, 00
+		Fixed SCP handling of devices without units
+		Fixed FLG, FBF initialization in many HP peripherals
+		Added CMD flop to HP paper tape and line printer
+		Added status input for HP paper tape punch and TTY
+		Fixed 1401 bugs found by Dutch Owens
+		-- 4, 7 char NOPs are legal
+		-- 1 char B is chained BCE
+		-- MCE moves whole character, not digit, after first
+		Added Dutch Owens' 1401 mag tape boot routine
+		Fixed Nova bugs found by Bruce Ray
+		-- traps implemented on Nova 3 as well as Nova 4
+		-- DIV and DIVS 0/0 set carry
+		-- RETN sets SP from FP at outset
+		-- IORST does not clear carry
+		-- Nova 4 implements two undocumented instructions
+		Added Bruce Ray's Nova plotter and second terminal modules
+		Added Charles Owen's Eclipse CPU support
+		Fixed bugs in 18b PDP's
+		-- XCT indirect address calculation
+		-- missing index instructions in PDP-15
+		-- bank mode handling in PDP-15
+		Added PDP-9/PDP-15 RIM/BIN loader support
+		Added PDP-9/PDP-15 extend/bank initial state registers
+		Added PDP-9/PDP-15 half/full duplex support
+		Moved software documentation to a separate file
+
+Rev 2.5, Nov, 00
 		Removed Digital and Compaq from copyrights, as
 			authorized by Compaq Sr VP Bill Strecker
 		Revised save/restore format for 64b simulators
@@ -4146,12 +4038,16 @@ Ken Harrenstein		PDP-10 simulator
 Bill Haygood		PDP-8 information, simulator, and software
 Jim Jaeger		IBM 1401 information
 Doug Jones		PDP-8 information, simulator, and software
+Al Kossow		HP 21xx, Varian 620, TI 990, DEC documentation and software
 Don Lewine		Nova documentation and legal permissions
 Scott McGregor		PDP-11 UNIX legal permissions
 Jeff Moffatt		HP 2100 information, documentation, and software
 Alec Muffett		Solaris port testing
-Dutch Owen		Nova moving head disk debugging, Altair simulator
+Dutch Owen		Nova moving head disk debugging, Altair simulator,
+			IBM 1401 diagnostics, debugging, and magtape boot
 Paul Pierce		IBM 1401 diagnostics, media recovery
+Bruce Ray		Software, documentation, bug fixes, and new devices
+			for the Nova
 Craig St Clair		PDP documentation
 Richard Schedler	Public repository maintenance
 Stephen Schultz		PDP-11 2.11 BSD debugging

@@ -23,22 +23,29 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ptr		paper tape reader
-   ptp		paper tape punch
-   tty		console
-   clk		12639C time base generator
+   ptr		12597A-002 paper tape reader
+   ptp		12597A-005 paper tape punch
+   tty		12531C buffered teleprinter interface
+   clk		12539A/B/C time base generator
 
+   21-Nov-00	RMS	Fixed flag, buffer power up state
+			Added status input for ptp, tty
    15-Oct-00	RMS	Added dynamic device number support
+
+   The reader and punch, like most HP devices, have a command flop.  The
+   teleprinter and clock do not.
 */
 
 #include "hp2100_defs.h"
 #include <ctype.h>
 #define UNIT_V_UC	(UNIT_V_UF + 1)			/* UC only */
 #define UNIT_UC		(1 << UNIT_V_UC)
+#define PTP_LOW		0000040				/* low tape */
 #define TM_MODE		0100000				/* mode change */
 #define TM_KBD		0040000				/* enable keyboard */
 #define TM_PRI		0020000				/* enable printer */
 #define TM_PUN		0010000				/* enable punch */
+#define TP_BUSY		0100000				/* busy */
 #define CLK_V_ERROR	4				/* clock overrun */
 #define CLK_ERROR	(1 << CLK_V_ERROR)
 
@@ -81,7 +88,7 @@ UNIT ptr_unit = {
 
 REG ptr_reg[] = {
 	{ ORDATA (BUF, ptr_unit.buf, 8) },
-	{ FLDATA (CMD, infotab[inPTR].cmd, 0), REG_HRO },
+	{ FLDATA (CMD, infotab[inPTR].cmd, 0) },
 	{ FLDATA (CTL, infotab[inPTR].ctl, 0) },
 	{ FLDATA (FLG, infotab[inPTR].flg, 0) },
 	{ FLDATA (FBF, infotab[inPTR].fbf, 0) },
@@ -114,7 +121,7 @@ UNIT ptp_unit = {
 
 REG ptp_reg[] = {
 	{ ORDATA (BUF, ptp_unit.buf, 8) },
-	{ FLDATA (CMD, infotab[inPTP].cmd, 0), REG_HRO },
+	{ FLDATA (CMD, infotab[inPTP].cmd, 0) },
 	{ FLDATA (CTL, infotab[inPTP].ctl, 0) },
 	{ FLDATA (FLG, infotab[inPTP].flg, 0) },
 	{ FLDATA (FBF, infotab[inPTP].fbf, 0) },
@@ -243,8 +250,11 @@ case ioLIX:						/* load */
 	dat = ptr_unit.buf;
 	break;
 case ioCTL:						/* control clear/set */
-	if (IR & AB) { clrCTL (dev); }			/* CLC */
-	else {	setCTL (dev);				/* STC */
+	if (IR & AB) {					/* CLC */
+		clrCMD (dev);				/* clear cmd, ctl */
+		clrCTL (dev); }
+	else {	setCMD (dev);				/* STC */
+		setCTL (dev);				/* set cmd, ctl */
 		sim_activate (&ptr_unit, ptr_unit.wait);  }
 	break;
 default:
@@ -260,6 +270,7 @@ t_stat ptr_svc (UNIT *uptr)
 int32 dev, temp;
 
 dev = infotab[inPTR].devno;				/* get device no */
+clrCMD (dev);						/* clear cmd */
 if ((ptr_unit.flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (ptr_stopioe, SCPE_UNATT);
 if ((temp = getc (ptr_unit.fileref)) == EOF) {		/* read byte */
@@ -280,7 +291,7 @@ return SCPE_OK;
 t_stat ptr_reset (DEVICE *dptr)
 {
 infotab[inPTR].cmd = infotab[inPTR].ctl = 0;		/* clear cmd, ctl */
-infotab[inPTR].flg = infotab[inPTR].fbf = 0;		/* clear flg, fbf */
+infotab[inPTR].flg = infotab[inPTR].fbf = 1;		/* set flg, fbf */
 ptr_unit.buf = 0;
 sim_cancel (&ptr_unit);					/* deactivate unit */
 return SCPE_OK;
@@ -340,13 +351,19 @@ case ioSFS:						/* skip flag set */
 	return dat;
 case ioLIX:						/* load */
 	dat = 0;
+case ioMIX:						/* merge */
+	if ((ptp_unit.flags & UNIT_ATT) == 0)
+		dat = dat | PTP_LOW;			/* out of tape? */
 	break;
 case ioOTX:						/* output */
 	ptp_unit.buf = dat;
 	break;
 case ioCTL:						/* control clear/set */
-	if (IR & AB) { clrCTL (dev); }			/* CLC */
-	else {	setCTL (dev);				/* STC */
+	if (IR & AB) {					/* CLC */
+		clrCMD (dev);				/* clear cmd, ctl */
+		clrCTL (dev); }
+	else {	setCMD (dev);				/* STC */
+		setCTL (dev);				/* set cmd, ctl */
 		sim_activate (&ptp_unit, ptp_unit.wait);  }
 	break;
 default:
@@ -362,7 +379,8 @@ t_stat ptp_svc (UNIT *uptr)
 int32 dev;
 
 dev = infotab[inPTP].devno;				/* get device no */
-setFLG (dev);						/* set device flag */
+clrCMD (dev);						/* clear cmd */
+setFLG (dev);						/* set flag */
 if ((ptp_unit.flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {	/* output byte */
@@ -378,7 +396,7 @@ return SCPE_OK;
 t_stat ptp_reset (DEVICE *dptr)
 {
 infotab[inPTP].cmd = infotab[inPTP].ctl = 0;		/* clear cmd, ctl */
-infotab[inPTP].flg = infotab[inPTP].fbf = 0;		/* clear flg, fbf */
+infotab[inPTP].flg = infotab[inPTP].fbf = 1;		/* set flg, fbf */
 ptp_unit.buf = 0;
 sim_cancel (&ptp_unit);					/* deactivate unit */
 return SCPE_OK;
@@ -401,11 +419,12 @@ case ioSFC:						/* skip flag clear */
 case ioSFS:						/* skip flag set */
 	if (FLG (dev) != 0) PC = (PC + 1) & AMASK;
 	return dat;
+case ioLIX:						/* load */
+	dat = 0;
 case ioMIX:						/* merge */
 	dat = dat | tty_buf;
-	break;
-case ioLIX:						/* load */
-	dat = tty_buf;
+	if (!(tty_mode & TM_KBD) && sim_is_active (&tty_unit[TTO]))
+		dat = dat | TP_BUSY;
 	break;
 case ioOTX:						/* output */
 	if (dat & TM_MODE) tty_mode = dat;
@@ -425,33 +444,10 @@ return dat;
 
 /* Unit service routines */
 
-t_stat tti_svc (UNIT *uptr)
+t_stat tto_out (int32 ch)
 {
-int32 temp, dev;
+t_stat ret = SCPE_OK;
 
-dev = infotab[inTTY].devno;				/* get device no */
-sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
-temp = temp & 0177;
-if ((tty_unit[TTO].flags & UNIT_UC) && islower (temp))	/* force upper case? */
-	 temp = toupper (temp);
-if (tty_mode & TM_KBD) {				/* keyboard enabled? */
-	tty_buf = temp;					/* put char in buf */
-	tty_unit[TTI].pos = tty_unit[TTI].pos + 1;
-	setFLG (dev);					/* set flag */
-	if (tty_mode & TM_PRI) sim_putchar (temp);  }	/* echo? */
-return SCPE_OK;
-}
-
-t_stat tto_svc (UNIT *uptr)
-{
-int32 ch, ret, dev;
-
-dev = infotab[inTTY].devno;				/* get device no */
-ret = SCPE_OK;						/* assume ok */
-setFLG (dev);						/* set done flag */
-ch = tty_buf;
-tty_buf = 0377;						/* defang buf */
 if (tty_mode & TM_PRI) {				/* printing? */
 	ret = sim_putchar (ch & 0177);			/* output char */
 	tty_unit[TTO].pos = tty_unit[TTO].pos + 1;  }
@@ -466,12 +462,41 @@ if (tty_mode & TM_PUN) {				/* punching? */
 return ret;
 }
 
+t_stat tti_svc (UNIT *uptr)
+{
+int32 temp, dev;
+
+dev = infotab[inTTY].devno;				/* get device no */
+sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* continue poll */
+if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
+temp = temp & 0177;
+if ((tty_unit[TTI].flags & UNIT_UC) && islower (temp))	/* force upper case? */
+	 temp = toupper (temp);
+if (tty_mode & TM_KBD) {				/* keyboard enabled? */
+	tty_buf = temp;					/* put char in buf */
+	tty_unit[TTI].pos = tty_unit[TTI].pos + 1;
+	setFLG (dev);					/* set flag */
+	return tto_out (temp);  }			/* echo or punch? */
+return SCPE_OK;
+}
+
+t_stat tto_svc (UNIT *uptr)
+{
+int32 ch, dev;
+
+dev = infotab[inTTY].devno;				/* get device no */
+setFLG (dev);						/* set done flag */
+ch = tty_buf;
+tty_buf = 0377;						/* defang buf */
+return tto_out (ch);					/* print and/or punch */
+}
+
 /* Reset routine */
 
 t_stat tty_reset (DEVICE *dptr)
 {
 infotab[inTTY].cmd = infotab[inTTY].ctl = 0;		/* clear cmd, ctl */
-infotab[inTTY].flg = infotab[inTTY].fbf = 0;		/* clear flg, fbf */
+infotab[inTTY].flg = infotab[inTTY].fbf = 1;		/* set flg, fbf */
 tty_mode = 0;
 tty_buf = 0;
 sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* activate poll */
@@ -498,6 +523,7 @@ case ioSFS:						/* skip flag set */
 	return dat;
 case ioMIX:						/* merge */
 	dat = dat | clk_error;
+	break;
 case ioLIX:						/* load */
 	dat = clk_error;
 	break;
@@ -535,7 +561,7 @@ return SCPE_OK;
 t_stat clk_reset (DEVICE *dptr)
 {
 infotab[inCLK].cmd = infotab[inCLK].ctl = 0;		/* clear cmd, ctl */
-infotab[inCLK].flg = infotab[inCLK].fbf = 0;		/* clear flg, fbf */
+infotab[inCLK].flg = infotab[inCLK].fbf = 1;		/* set flg, fbf */
 clk_error = 0;						/* clear error */
 clk_select = 0;						/* clear select */
 sim_cancel (&clk_unit);					/* deactivate unit */

@@ -1,6 +1,6 @@
 /* pdp18b_rf.c: fixed head disk simulator
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2000, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    rf		RF09/RF09 for PDP-9
 		RF15/RS09 for PDP-15
 
+   30-Nov-99	RMS	Added non-zero requirement to rf_time
    14-Apr-99	RMS	Changed t_addr to unsigned
 
    The RFxx is a head-per-track disk.  It uses the multicycle data break
@@ -33,7 +34,7 @@
 
    Two timing parameters are provided:
 
-   rf_time	Interword timing.  If 0, treated as 1.
+   rf_time	Interword timing.  Must be non-zero.
    rf_burst	Burst mode.  If 0, DMA occurs cycle by cycle; otherwise,
 		DMA occurs in a burst.
 */
@@ -76,9 +77,8 @@
 #define RFS_CLR		0000170				/* always clear */
 #define RFS_EFLGS	(RFS_HDW | RFS_APE | RFS_MXF | RFS_WCE | \
 			 RFS_DPE | RFS_WLO | RFS_NED )	/* error flags */
-#define MIN_TIME(x)	((x > 0)? (x): 1)
 #define GET_FNC(x)	(((x) >> RFS_V_FNC) & RFS_M_FNC)
-#define GET_POS(x)	((int) fmod (sim_gtime() / ((double) (MIN_TIME(x))), \
+#define GET_POS(x)	((int) fmod (sim_gtime() / ((double) (x)), \
 			((double) RF_NUMWD)))
 #define RF_BUSY		(sim_is_active (&rf_unit))
 
@@ -125,7 +125,7 @@ REG rf_reg[] = {
 	{ ORDATA (WLK5, rf_wlk[5], 16) },
 	{ ORDATA (WLK6, rf_wlk[6], 16) },
 	{ ORDATA (WLK7, rf_wlk[7], 16) },
-	{ DRDATA (TIME, rf_time, 24), PV_LEFT },
+	{ DRDATA (TIME, rf_time, 24), PV_LEFT + REG_NZ },
 	{ FLDATA (BURST, rf_burst, 0) },
 	{ FLDATA (STOP_IOE, rf_stopioe, 0) },
 	{ NULL }  };
@@ -232,7 +232,7 @@ do { 	pa = M[RF_MA] = (M[RF_MA] + 1) & ADDRMASK;	/* incr mem addr */
 while ((M[RF_WC] != 0) && (rf_burst != 0));		/* brk if wc, no brst */
 
 if ((M[RF_WC] != 0) && ((rf_sta & RFS_ERR) == 0))	/* more to do? */
-	sim_activate (&rf_unit, MIN_TIME (rf_time));	/* sched next */
+	sim_activate (&rf_unit, rf_time);		/* sched next */
 else rf_updsta (RFS_DON);
 return SCPE_OK;
 }

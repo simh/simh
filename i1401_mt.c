@@ -1,6 +1,6 @@
 /* IBM 1401 magnetic tape simulator
 
-   Copyright (c) 1993-1999, Robert M. Supnik
+   Copyright (c) 1993-2000, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Dec-00	RMS	Widened display width from 6 to 8 bits to see record lnt
+		CEO	Added tape bootstrap
    14-Apr-99	RMS	Changed t_addr to unsigned
    04-Oct-98	RMS	V2.4 magtape format
 
@@ -54,6 +56,7 @@ extern int32 BS, iochk;
 extern UNIT cpu_unit;
 unsigned int8 dbuf[MAXMEMSIZE * 2];			/* tape buffer */
 t_stat mt_reset (DEVICE *dptr);
+t_stat mt_boot (int32 unitno);
 UNIT *get_unit (int32 unit);
 extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
 extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
@@ -106,9 +109,9 @@ MTAB mt_mod[] = {
 
 DEVICE mt_dev = {
 	"MT", mt_unit, mt_reg, mt_mod,
-	MT_NUMDR, 10, 31, 1, 8, 6,
+	MT_NUMDR, 10, 31, 1, 8, 8,
 	NULL, NULL, &mt_reset,
-	NULL, NULL, NULL };
+	&mt_boot, NULL, NULL };
 
 /* Function routine
 
@@ -264,5 +267,27 @@ else return mt_dev.units + unit;
 t_stat mt_reset (DEVICE *dptr)
 {
 ind[IN_END] = ind[IN_PAR] = ind[IN_TAP] = 0;		/* clear indicators */
+return SCPE_OK;
+}
+
+/* Bootstrap routine */
+
+#define BOOT_START 3980
+#define BOOT_LEN (sizeof (boot_rom) / sizeof (unsigned char))
+
+static const unsigned char boot_rom[] = {
+	OP_LCA + WM, BCD_PERCNT, BCD_U, BCD_ONE,
+		BCD_ZERO, BCD_ZERO, BCD_ONE, BCD_R,	/* LDA %U1 001 R */
+	OP_B + WM, BCD_ZERO, BCD_ZERO, BCD_ONE,		/* B 001 */
+	OP_H + WM };					/* HALT */
+
+t_stat mt_boot (int32 unitno)
+{
+int32 i;
+extern int32 saved_IS;
+
+for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
+M[BOOT_START + 3] = unitno & 07;
+saved_IS = BOOT_START;
 return SCPE_OK;
 }

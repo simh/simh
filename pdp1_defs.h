@@ -38,20 +38,6 @@
 
 #include "sim_defs.h"
 
-/* Memory and peripheral configuration */
-
-#define ADDRSIZE	16				/* address bits */
-#define MAXMEMSIZE	(1u << ADDRSIZE)		/* max mem size */
-#define ADDRMASK	(MAXMEMSIZE - 1)		/* address mask */
-#define DAMASK		007777				/* direct addr */
-#define EPCMASK		(ADDRMASK & ~DAMASK)		/* extended addr */
-#define IA		010000				/* indirect flag */
-#define IO_WAIT		010000				/* I/O sync wait */
-#define IO_CPLS		004000				/* cmopletion pulse */
-#define GEN_CPLS(x)	(((x) ^ ((x) << 1)) & IO_WAIT)	/* completion pulse? */
-#define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
-#define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
-
 /* Simulator stop codes */
 
 #define STOP_RSRV	1				/* must be 1 */
@@ -60,6 +46,23 @@
 #define STOP_XCT	4				/* nested XCT's */
 #define STOP_IND	5				/* nested indirects */
 #define STOP_WAIT	6				/* wait state */
+
+/* Memory */
+
+#define ASIZE		16				/* address bits */
+#define MAXMEMSIZE	(1u << ASIZE)			/* max mem size */
+#define AMASK		(MAXMEMSIZE - 1)		/* address mask */
+#define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
+#define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
+
+/* Architectural constants */
+
+#define DAMASK		007777				/* direct addr */
+#define EPCMASK		(AMASK & ~DAMASK)		/* extended addr */
+#define IA		010000				/* indirect flag */
+#define IO_WAIT		010000				/* I/O sync wait */
+#define IO_CPLS		004000				/* cmopletion pulse */
+#define GEN_CPLS(x)	(((x) ^ ((x) << 1)) & IO_WAIT)	/* completion pulse? */
 
 /* IOT subroutine return codes */
 

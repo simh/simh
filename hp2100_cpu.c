@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   26-Nov-00	RMS	Fixed bug in dual device number routine
+   21-Nov-00	RMS	Fixed bug in reset routine
    15-Oct-00	RMS	Added dynamic device number support
 
    The register state for the HP 2100 CPU is:
@@ -1325,7 +1327,7 @@ return (stop_dev << IOT_V_REASON) | dat;
 
 t_stat cpu_reset (DEVICE *dptr)
 {
-AR = BR = 0;
+saved_AR = saved_BR = 0;
 XR = YR = 0;
 E = 0;
 O = 0;
@@ -1441,7 +1443,7 @@ return SCPE_OK;
 
 t_stat hp_setdev2 (UNIT *uptr, int32 ord)
 {
-int32 olddev;
+int32 i, olddev;
 t_stat r;
 
 olddev = infotab[ord].devno;
@@ -1449,6 +1451,11 @@ if ((r = hp_setdev (uptr, ord)) != SCPE_OK) return r;
 if (infotab[ord].devno == DEVMASK) {
 	infotab[ord].devno = olddev;
 	return SCPE_ARG;  }
+for (i = 0; infotab[i].devno != 0; i++) {
+	if ((i != (ord + 1)) && 
+	    ((infotab[ord].devno + 1) == infotab[i].devno)) {
+		infotab[ord].devno = olddev;
+		return SCPE_ARG;  }  }
 infotab[ord + 1].devno = infotab[ord].devno + 1;
 return SCPE_OK;
 }

@@ -23,6 +23,15 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Dec-00	RMS	Added Bruce Ray's second terminal
+   15-Dec-00	RMS	Added Charles Owen's CPU bootstrap
+   08-Dec-00	RMS	Changes from Bruce Ray
+			-- fixed trap test to include Nova 3
+			-- fixed DIV and DIVS divide by 0
+			-- fixed RETN to set SP from FP
+			-- fixed IORST to preserve carry
+			-- added "secret" Nova 4 PSHN/SAVEN instructions
+			-- added plotter support
    15-Oct-00	RMS	Fixed bug in MDV test, added stack, byte, trap instructions
    14-Apr-98	RMS	Changed t_addr to unsigned
    15-Sep-97	RMS	Added read and write breakpoints
@@ -57,7 +66,7 @@
    010	AC2 relative direct	MA = AC2 + sext (IR<8:15>)
    011	AC3 relative direct	MA = AC3 + sext (IR<8:15>)
    100	page zero indirect	MA = M[zext (IR<8:15>)]
-   101	PC relative dinirect	MA = M[PC + sext (IR<8:15>)]
+   101	PC relative indirect	MA = M[PC + sext (IR<8:15>)]
    110	AC2 relative indirect	MA = M[AC2 + sext (IR<8:15>)]
    111	AC3 relative indirect	MA = M[AC3 + sext (IR<8:15>)]
 
@@ -111,6 +120,37 @@
 
    The operate instruction can be microprogrammed to perform operations
    on the source and destination AC's and the Carry flag.
+
+   Some notes from Bruce Ray:
+
+   1.	DG uses the value of the autoindex location -before- the
+	modification to determine if additional indirect address
+	levels are to be performed.  Most DG emulators conform to
+	this standard, but some vendor machines (i.e. Point 4 Mark 8)
+	do not.
+
+   2.	Infinite indirect references may occur on unmapped systems
+	and can "hang" the hardware.  Some DG diagnostics perform
+	10,000s of references during a single instruction.
+
+   3.	Nova 3 adds the following instructions to the standard Nova
+	instruction set:
+
+	trap instructions
+	stack push/pop instructions
+	save/return instructions
+	stack register manipulation instructions
+	unsigned MUL/DIV
+
+    4.	Nova 4 adds the following instructions to the Nova 3 instruction
+	set:
+
+	signed MUL/DIV
+	load/store byte
+	secret (undocumented) stack instructions [PSHN, SAVN]
+
+    5.	Nova, Nova 3 and Nova 4 unsigned mul/div instructions are the
+	same instruction code values on all machines.
 */
 
 /* This routine is the instruction decode routine for the NOVA.
@@ -203,11 +243,15 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_svc (UNIT *uptr);
 t_stat cpu_set_size (UNIT *uptr, int32 value);
+t_stat cpu_boot (int32 unitno);
 extern int32 ptr (int32 pulse, int32 code, int32 AC);
 extern int32 ptp (int32 pulse, int32 code, int32 AC);
 extern int32 tti (int32 pulse, int32 code, int32 AC);
 extern int32 tto (int32 pulse, int32 code, int32 AC);
+extern int32 tti1 (int32 pulse, int32 code, int32 AC);
+extern int32 tto1 (int32 pulse, int32 code, int32 AC);
 extern int32 clk (int32 pulse, int32 code, int32 AC);
+extern int32 plt (int32 pulse, int32 code, int32 AC);
 extern int32 lpt (int32 pulse, int32 code, int32 AC);
 extern int32 dsk (int32 pulse, int32 code, int32 AC);
 extern int32 dkp (int32 pulse, int32 code, int32 AC);
@@ -224,7 +268,7 @@ struct ndev dev_table[64] = {
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
 	{ INT_TTI, PI_TTI, &tti }, { INT_TTO, PI_TTO, &tto },	/* 10 - 17 */
 	{ INT_PTR, PI_PTR, &ptr }, { INT_PTP, PI_PTP, &ptp }, 
-	{ INT_CLK, PI_CLK, &clk }, { 0, 0, &nulldev },
+	{ INT_CLK, PI_CLK, &clk }, { INT_PLT, PI_PLT, &plt },
 	{ 0, 0, &nulldev }, { INT_LPT, PI_LPT, &lpt },
 	{ INT_DSK, PI_DSK, &dsk }, { 0, 0, &nulldev },		/* 20 - 27 */
 	{ INT_MTA, PI_MTA, &mta }, { 0, 0, &nulldev }, 
@@ -238,7 +282,7 @@ struct ndev dev_table[64] = {
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev },			/* 50 - 57 */
+	{ INT_TTI1, PI_TTI1, &tti1 }, { INT_TTO1, PI_TTO1, &tto1 }, /* 50 - 57 */
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
 	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
@@ -420,8 +464,8 @@ if (IR & I_OPR) {					/* operate? */
 		break;  }				/* end switch shift */
 	switch (I_GETSKP (IR)) {			/* decode skip */
 	case 0:						/* nop */
-		if ((IR & I_NLD) && (cpu_unit.flags & UNIT_BYT)) {
-			register int32 indf, MA;	/* Nova 4 trap */
+		if ((IR & I_NLD) && (cpu_unit.flags & UNIT_STK)) {
+			register int32 indf, MA;	/* Nova 3 or 4 trap */
 			old_PC = M[TRP_SAV] = (PC - 1) & AMASK;
 			MA = TRP_JMP;			/* jmp @47 */
 			for (i = 0, indf = 1; indf && (i < ind_max); i++) {
@@ -576,6 +620,7 @@ else {							/* IOT */
 			if (cpu_unit.flags & UNIT_BYT)
 				AC[dstAC] = (M[AC[pulse] >> 1] >>
 					 ((AC[pulse] & 1)? 0: 8)) & 0377;
+			else AC[dstAC] = 0;
 			break;
 		case ioDOA:				/* stack ptr */
 			if (cpu_unit.flags & UNIT_STK) {
@@ -584,13 +629,20 @@ else {							/* IOT */
 			break;
 		case ioDIB:				/* push, pop */
 			if (cpu_unit.flags & UNIT_STK) {
-				if (pulse == iopN) {
+				if (pulse == iopN) {	/* push */
 					SP = INCA (SP);
 					if (MEM_ADDR_OK (SP)) M[SP] = AC[dstAC];
 					STK_CHECK (SP, 1);  }
-				if (pulse == iopC) {
+				if (pulse == iopC) {	/* pop */
 					AC[dstAC] = M[SP];
-					SP = DECA (SP);  }  }
+					SP = DECA (SP);  }
+				if ((pulse == iopP) &&	/* Nova 4 pshn */
+				    (cpu_unit.flags & UNIT_BYT)) {
+					SP = INCA (SP);
+					if (MEM_ADDR_OK (SP)) M[SP] = AC[dstAC];
+					if (SP > M[042]) int_req = int_req | INT_STK ;
+					}
+				}
 			break;
 		case ioDOB:				/* store byte */
 			if (cpu_unit.flags & UNIT_BYT) {
@@ -603,7 +655,7 @@ else {							/* IOT */
 			break;
 		case ioDIC:				/* save, return */
 			if (cpu_unit.flags & UNIT_STK) {
-				if (pulse == iopN) {
+				if (pulse == iopN) {	/* save */
 					SP = INCA (SP);
 					if (MEM_ADDR_OK (SP)) M[SP] = AC[0];
 					SP = INCA (SP);
@@ -615,10 +667,11 @@ else {							/* IOT */
 					SP = INCA (SP);
 					if (MEM_ADDR_OK (SP)) M[SP] = (C >> 1) |
 						(AC[3] & AMASK);
-					AC[3] = FP = SP;  
+					AC[3] = FP = SP & AMASK;  
 					STK_CHECK (SP, 5);  }
-				if (pulse == iopC) {
+				if (pulse == iopC) {	/* retn */
 					old_PC = PC;
+					SP = FP & AMASK;
 					C = (M[SP] << 1) & CBIT;
 					PC = M[SP] & AMASK;
 					SP = DECA (SP);
@@ -630,7 +683,27 @@ else {							/* IOT */
 					SP = DECA (SP);
 					AC[0] = M[SP];
 					SP = DECA (SP);
-					FP = AC[3] & AMASK;  }  }
+					FP = AC[3] & AMASK;  }
+				if ((pulse == iopP) &&	/* Nova 4 saven */
+				    (cpu_unit.flags & UNIT_BYT)) {
+					int32 frameSz = M[PC] ;
+					PC = INCA (PC) ;
+					SP = INCA (SP);
+					if (MEM_ADDR_OK (SP)) M[SP] = AC[0];
+					SP = INCA (SP);
+					if (MEM_ADDR_OK (SP)) M[SP] = AC[1];
+					SP = INCA (SP);
+					if (MEM_ADDR_OK (SP)) M[SP] = AC[2];
+					SP = INCA (SP);
+					if (MEM_ADDR_OK (SP)) M[SP] = FP;
+					SP = INCA (SP);
+					if (MEM_ADDR_OK (SP)) M[SP] = (C >> 1) |
+						(AC[3] & AMASK);
+					AC[3] = FP = SP & AMASK ;
+					SP = (SP + frameSz) & AMASK ;
+					if (SP > M[042]) int_req = int_req | INT_STK;
+					}
+				}
 			break;
 		case ioDOC:
 			if ((dstAC == 2) && (cpu_unit.flags & UNIT_MDV)) {
@@ -643,7 +716,8 @@ else {							/* IOT */
 					AC[0] = (mddata >> 16) & DMASK;
 					AC[1] = mddata & DMASK;  }
 				if (pulse == iopS) {	/* div */
-					if (uAC0 >= uAC2) C = CBIT;
+					if ((uAC0 >= uAC2) || (uAC2 == 0))
+						C = CBIT;
 					else {	C = 0;
 						mddata = (uAC0 << 16) | uAC1;
 						AC[1] = mddata / uAC2;
@@ -656,7 +730,7 @@ else {							/* IOT */
 					AC[0] = (mddata >> 16) & DMASK;
 					AC[1] = mddata & DMASK;  }
 				if (pulse == iopN) {	/* divs */
-					if (AC[0] == 0) C = CBIT;
+					if (AC[2] == 0) C = CBIT;
 					else {	mddata = (SEXT (AC[0]) << 16) | AC[1];
 						AC[1] = mddata / SEXT (AC[2]);
 						AC[0] = mddata % SEXT (AC[2]);
@@ -738,7 +812,6 @@ return;
 
 t_stat cpu_reset (DEVICE *dptr)
 {
-C = 0;
 int_req = int_req & ~(INT_ION | INT_STK);
 pimask = 0;
 dev_disable = 0;
@@ -785,5 +858,58 @@ if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
 	return SCPE_OK;
 MEMSIZE = value;
 for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+return SCPE_OK;
+}
+
+/* Bootstrap routine for CPU */
+
+#define BOOT_START 00000
+#define BOOT_LEN (sizeof (boot_rom) / sizeof (int))
+
+static const int32 boot_rom[] = {
+	0062677,	/* 	IORST		;reset all I/O  */
+	0060477,	/* 	READS 0		;read SR into AC0 */
+	0024026,	/*	LDA 1,C77	;get dev mask */
+	0107400,	/*	AND 0,1		;isolate dev code */
+	0124000,	/*	COM 1,1		;- device code - 1 */
+	0010014,	/* LOOP: ISZ OP1	;device code to all */
+	0010030,	/*	ISZ OP2		;I/O instructions */
+	0010032,	/*	ISZ OP3		*/
+	0125404,	/*	INC 1,1,SZR	;done? */
+	0000005,	/*	JMP LOOP	;no, increment again */
+	0030016,	/*	LDA 2,C377	;place JMP 377 into */
+	0050377,	/*	STA 2,377	;location 377 */
+	0060077,	/* OP1: 060077		;start device (NIOS 0) */
+	00101102,	/*	MOVL 0,0,SZC	;test switch 0, low speed? */
+	0000377,	/* C377: JMP 377	;no - jmp 377 & wait */
+	0004030,	/* LOOP2: JSR GET+1	;get a frame */
+	0101065,	/*	MOVC 0,0,SNR	;is it non-zero? */
+	0000017,	/*	JMP LOOP2	;no, ignore */
+	0004027,	/* LOOP4: JSR GET	;yes, get full word */
+	0046026,	/*	STA 1,@C77	;store starting at 100 */
+			/*			;2's complement of word ct */
+	0010100,	/* 	ISZ 100		;done? */
+	0000022,	/*	JMP LOOP4	;no, get another */
+	0000077,	/* C77: JMP 77		;yes location ctr and */
+			/*			;jmp to last word */
+	0126420,	/* GET: SUBZ 1,1	; clr AC1, set carry */
+			/* OP2:			*/
+	0063577,	/* LOOP3: 063577	;done? (SKPDN 0) - 1 */
+	0000030,	/*	JMP LOOP3	;no -- wait */
+	0060477,	/* OP3: 060477		;y -- read in ac0 (DIAS 0,0) */
+	0107363,	/*	ADDCS 0,1,SNC	;add 2 frames swapped - got 2nd? */
+	0000030,	/*	JMP LOOP3	;no go back after it */
+	0125300,	/*	MOVS 1,1	;yes swap them */
+	0001400,	/*	JMP 0,3		;rtn with full word */
+	0000000		/*	0		;padding */
+};
+
+t_stat cpu_boot (int32 unitno)
+{
+int32 i;
+extern int32 saved_PC;
+
+for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
+saved_PC = BOOT_START;
 return SCPE_OK;
 }

@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Dec-00	RMS	Added PDP-9/15 half duplex support
+   30-Nov-00	RMS	Fixed PDP-4/7 bootstrap loader for 4K systems
    30-Oct-00	RMS	Standardized register naming
    06-Jan-97	RMS	Fixed PDP-4 console input
    16-Dec-96	RMS	Fixed bug in binary ptr service
@@ -39,6 +41,7 @@
 
 extern int32 int_req, saved_PC;
 extern int32 M[];
+extern UNIT cpu_unit;
 int32 clk_state = 0;
 int32 ptr_err = 0, ptr_stopioe = 0, ptr_state = 0;
 int32 ptp_err = 0, ptp_stopioe = 0;
@@ -184,8 +187,14 @@ static const int32 tti_trans[128] = {
 #define TTI_MASK	((1 << TTI_WIDTH) - 1)
 #define UNIT_V_UC	(UNIT_V_UF + 0)			/* UC only */
 #define UNIT_UC		(1 << UNIT_V_UC)
+#define UNIT_V_HDX	(UNIT_V_UF + 1)			/* half duplex */
+#define UNIT_HDX	(1 << UNIT_V_HDX)
 
+#if defined (PDP4) || defined (PDP7)
 UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC, 0), KBD_POLL_WAIT };
+#else
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC + UNIT_HDX, 0), KBD_POLL_WAIT };
+#endif
 
 REG tti_reg[] = {
 	{ ORDATA (BUF, tti_unit.buf, TTI_WIDTH) },
@@ -195,6 +204,7 @@ REG tti_reg[] = {
 	{ ORDATA (TTI_STATE, tti_state, (TTI_WIDTH + 3)), REG_HRO },
 #else
 	{ FLDATA (UC, tti_unit.flags, UNIT_V_UC), REG_HRO },
+	{ FLDATA (HDX, tti_unit.flags, UNIT_V_HDX), REG_HRO },
 #endif
 	{ DRDATA (POS, tti_unit.pos, 31), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
@@ -204,6 +214,8 @@ MTAB tti_mod[] = {
 #if !defined (KSR28)
 	{ UNIT_UC, 0, "lower case", "LC", NULL },
 	{ UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
+	{ UNIT_HDX, 0, "full duplex", "FDX", NULL },
+	{ UNIT_HDX, UNIT_HDX, "half duplex", "HDX", NULL },
 #endif
 	{ 0 }  };
 
@@ -392,7 +404,15 @@ ptr_err = 1;
 return detach_unit (uptr);
 }
 
-/* Bootstrap routine */
+#if defined (PDP4) || defined (PDP7)
+
+/* Bootstrap routine, PDP-4 and PDP-7
+
+   In a 4K system, the boostrap resides at 7762-7776.
+   In an 8K or greater system, the bootstrap resides at 17762-17776.
+   Because the program is so small, simple masking can be
+   used to remove addr<5> for a 4K system.
+ */
 
 #define BOOT_START 017762
 #define BOOT_PC 017770
@@ -416,12 +436,26 @@ static const int32 boot_rom[] = {
 
 t_stat ptr_boot (int32 unitno)
 {
-int32 i;
+int32 i, mask;
 
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
-saved_PC = BOOT_PC;
+if (MEMSIZE < 8192) mask = 0767777;			/* 4k? */
+else mask = 0777777;
+for (i = 0; i < BOOT_LEN; i++)
+	M[(BOOT_START & mask) + i] = boot_rom[i] & mask;
+saved_PC = BOOT_PC & mask;
 return SCPE_OK;
 }
+
+#else
+
+/* PDP-9 and PDP-15 have built-in hardware RIM loaders */
+
+t_stat ptr_boot (int32 unitno)
+{
+return SCPE_ARG;
+}
+
+#endif
 
 /* Paper tape punch: IOT routine */
 
@@ -519,6 +553,7 @@ else {	if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;
 if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
 temp = temp & 0177;
 if ((tti_unit.flags & UNIT_UC) && islower (temp)) temp = toupper (temp);
+if (tti_unit.flags & UNIT_HDX) sim_putchar (temp);
 tti_unit.buf = temp | 0200;				/* got char */
 #endif
 int_req = int_req | INT_TTI;				/* set flag */

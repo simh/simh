@@ -1,6 +1,6 @@
 /* scp_tty.c: Operating system-dependent terminal I/O routines.
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2000, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Dec-00	BKR	Added OS/2 support
    18-Aug-98	RMS	Added BeOS support
    13-Oct-97	RMS	Added NetBSD terminal support
    25-Jan-97	RMS	Added POSIX terminal I/O support
@@ -186,6 +187,52 @@ return c | SCPE_KFLAG;
 t_stat sim_putchar (int32 c)
 {
 _putch (c);
+return SCPE_OK;
+}
+
+#endif
+
+/* OS/2 routines */
+
+#ifdef __OS2__
+#define __TTYROUTINES 0
+#include <conio.h>
+
+t_stat ttinit (void)
+{
+return SCPE_OK;
+}
+
+t_stat ttrunstate (void)
+{
+return SCPE_OK;
+}
+
+t_stat ttcmdstate (void)
+{
+return SCPE_OK;
+}
+
+t_stat ttclose (void)
+{
+return SCPE_OK;
+}
+
+t_stat sim_poll_kbd (void)
+{
+int c;
+
+if (!kbhit ()) return SCPE_OK;
+c = getch();
+if ((c & 0177) == '\b') c = 0177;
+if ((c & 0177) == sim_int_char) return SCPE_STOP;
+return c | SCPE_KFLAG;
+}
+
+t_stat sim_putchar (int32 c)
+{
+putch (c);
+fflush (stdout) ;
 return SCPE_OK;
 }
 

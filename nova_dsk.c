@@ -25,6 +25,7 @@
 
    dsk	fixed head disk
 
+   10-Dec-00	RMS	Added Eclipse support
    15-Oct-00	RMS	Editorial changes
    14-Apr-99	RMS	Changed t_addr to unsigned
 
@@ -85,8 +86,11 @@ int32 dsk_time = 100;					/* time per sector */
 t_stat dsk_svc (UNIT *uptr);
 t_stat dsk_reset (DEVICE *dptr);
 t_stat dsk_boot (int32 unitno);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
+#if defined (ECLIPSE)
+extern int32 MapAddr (int32 map, int32 addr);
+#else
+#define MapAddr(m,a)	(a)
+#endif
 
 /* DSK data structures
 
@@ -170,8 +174,7 @@ return rval;
 
 t_stat dsk_svc (UNIT *uptr)
 {
-int32 i, da;
-t_addr j;
+int32 i, da, pa;
 
 dev_busy = dev_busy & ~INT_DSK;				/* clear busy */
 dev_done = dev_done | INT_DSK;				/* set done */
@@ -184,14 +187,14 @@ if ((uptr -> flags & UNIT_BUF) == 0) {			/* not buf? abort */
 da = dsk_da * DSK_NUMWD;				/* calc disk addr */
 if (uptr -> FUNC == iopS) {				/* read? */
 	for (i = 0; i < DSK_NUMWD; i++) {		/* copy sector */
-		j = (dsk_ma + i) & AMASK;
-		if (MEM_ADDR_OK (j))
-			M[j] = *(((int16 *) uptr -> filebuf) + da + i);  }
+		pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
+		if (MEM_ADDR_OK (pa)) M[pa] =
+			*(((int16 *) uptr -> filebuf) + da + i);  }
 	dsk_ma = (dsk_ma + DSK_NUMWD) & AMASK;  }
 if (uptr -> FUNC == iopP) {				/* write? */
 	for (i = 0; i < DSK_NUMWD; i++) {		/* copy sector */
-		*(((int16 *) uptr -> filebuf) + da + i) =
-			M[(dsk_ma + i) & AMASK];  }
+		pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
+		*(((int16 *) uptr -> filebuf) + da + i) = M[pa];  }
 	dsk_ma = (dsk_ma + DSK_NUMWD + 3) & AMASK;  }
 
 dsk_stat = 0;						/* set status */

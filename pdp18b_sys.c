@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Nov-00	RMS	Added PDP-9,-15 RIM/BIN loader format
    30-Oct-00	RMS	Added support for examine to file
    27-Oct-98	RMS	V2.4 load interface
    20-Oct-97	RMS	Fixed endian dependence in RIM loader
@@ -103,24 +104,35 @@ const char *sim_stop_messages[] = {
 	"Breakpoint",
 	"Nested XCT's"  };
 
-/* Binary loader
+/* Binary loader */
 
-   Until someone finds the binary loader documentation,
-   this implements RIM loader format
-*/
-
-int32 getword (FILE *fileref)
+int32 getword (FILE *fileref, int32 *hi)
 {
-int32 i, tmp, word;
+int32 word, bits, st, ch;
 
-word = 0;
-for (i = 0; i < 3;) {
-	if ((tmp = getc (fileref)) == EOF) return -1;
-	if (tmp & 0200) {
-		word = (word << 6) | (tmp & 077);
-		i++;  }  }
+word = st = bits = 0;
+do {	if ((ch = getc (fileref)) == EOF) return -1;
+	if (ch & 0200) {
+		word = (word << 6) | (ch & 077);
+		bits = (bits << 1) | ((ch >> 6) & 1);
+		st++;  }  }
+while (st < 3);
+if (hi != NULL) *hi = bits;
 return word;
 }
+
+#if defined (PDP4) || defined (PDP7)
+
+/* PDP-4/PDP-7: RIM format only
+
+   Tape format
+	dac addr
+	data
+	:
+	dac addr
+	data
+	jmp addr or hlt
+*/
 
 t_stat sim_load (FILE *fileref, char *cptr, int flag)
 {
@@ -128,16 +140,89 @@ int32 origin, val;
 
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 for (;;) {
-	if ((val = getword (fileref)) < 0) return SCPE_FMT;
-	if ((val & 0760000) == 0040000) {	/* DAC? */
+	if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
+	if ((val & 0760000) == 0040000) {		/* DAC? */
 		origin = val & 017777;
-		if ((val = getword (fileref)) < 0) return SCPE_FMT;
+		if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
 		if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
-	else if ((val & 0760000) == 0600000) {
+	else if ((val & 0760000) == 0600000) {		/* JMP? */
 		saved_PC = val & 017777;
-		return SCPE_OK;  }  }
+		return SCPE_OK;  }
+	else if (val == 0740040) return SCPE_OK;	/* HLT? */
+	else return SCPE_FMT;  }			/* error */
 return SCPE_FMT;					/* error */
 }
+
+#else
+
+/* PDP-9/PDP-15: RIM format and BIN format
+
+   RIM format (read in address specified externally)
+	data
+	:
+	data
+	word to execute (bit 1 of last character set)
+
+   BIN format (starts after RIM bootstrap)
+    block/	origin (>= 0)
+		count
+		checksum
+		data
+		:
+		data
+    block/
+    :
+    endblock/	origin (< 0)
+*/
+
+t_stat sim_load (FILE *fileref, char *cptr, int flag)
+{
+extern int32 sim_switches;
+int32 i, bits, origin, count, cksum, val;
+t_stat r;
+char gbuf[CBUFSIZE];
+
+/* RIM loader */
+
+if (sim_switches & SWMASK ('R')) {			/* RIM load? */
+	if (*cptr != 0) {				/* more input? */
+		cptr = get_glyph (cptr, gbuf, 0);	/* get origin */
+		origin = get_uint (gbuf, 8, ADDRMASK, &r);
+		if (r != SCPE_OK) return r;
+		if (*cptr != 0) return SCPE_ARG;  }	/* no more */
+	else origin = 0200;				/* default 200 */
+
+	for (bits = 0; (bits & 1) == 0; ) {		/* word loop */
+		if ((val = getword (fileref, &bits)) < 0) return SCPE_FMT;
+		saved_PC = origin & ADDRMASK;		/* save start */
+		if (MEM_ADDR_OK (origin)) M[origin++] = val;  }	/* store word */
+	return SCPE_OK;  }				/* found word
+
+/* Binary loader */
+
+if (*cptr != 0) return SCPE_ARG;			/* no arguments */
+do {	val = getc (fileref);  }			/* find end RIM */
+while (((val & 0100) == 0) && (val != EOF));
+if (val == EOF) rewind (fileref);			/* no RIM? rewind */ 
+for (;;) {						/* block loop */
+	if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
+	if (val & SIGN) {
+		if (val != DMASK) saved_PC = val & 077777;
+		return SCPE_OK;  }
+	cksum = origin = val;				/* save origin */
+	if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
+	cksum = cksum + val;				/* add to cksum */
+	count = (-val) & DMASK;				/* save count */
+	if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
+	cksum = cksum + val;				/* add to cksum */
+	for (i = 0; i < count; i++) {
+		if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
+		cksum = cksum + val;
+		if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
+	if ((cksum & DMASK) != 0) return SCPE_CSUM;  }
+return SCPE_FMT;
+}
+#endif
 
 /* Symbol tables */
 
@@ -169,7 +254,7 @@ return SCPE_FMT;					/* error */
 #define MD(x) ((I_EMD) + ((x) << I_V_DC))
 
 static const int32 masks[] = {
- 0777777, 0777767, 0740000, 0740000,
+ 0777777, 0777767, 0740000, 0760000,
  0763730, 0760000, 0777000, 0777000,
  0740700, 0760700, 0777700 };
 
@@ -177,7 +262,21 @@ static const char *opcode[] = {
  "CAL", "DAC", "JMS", "DZM",				/* mem refs */
  "LAC", "XOR", "ADD", "TAD",
  "XCT", "ISZ", "AND", "SAD",
- "JMP", "LAW",
+ "JMP",
+
+#if defined (PDP15)					/* mem ref ind */
+ "CAL*", "DAC*", "JMS*", "DZM*",			/* normal */
+ "LAC*", "XOR*", "ADD*", "TAD*",
+ "XCT*", "ISZ*", "AND*", "SAD*",
+ "JMP*",
+#else
+ "CAL I", "DAC I", "JMS I", "DZM I",			/* decode only */
+ "LAC I", "XOR I", "ADD I", "TAD I",
+ "XCT I", "ISZ I", "AND I", "SAD I",
+ "JMP I",
+#endif
+
+ "LAW",							/* LAW */
 
  "LACQ", "LACS", "ABS", "GSM", "LMQ",			/* EAE */
  "MUL", "MULS", "DIV", "DIVS",
@@ -243,10 +342,11 @@ static const char *opcode[] = {
  "LPDI", "LPEI",
 #elif defined (PDP15)
  "PFSF", "TTS", "SPCO", "CAF",
- "DBR", "SKP15", "SBA", "DBA", "EBA",
- "PAX", "PAL", "AAC", "PXA",
- "AXS", "PXL", "PLA", "PLX",
- "CLX", "CLL", "AXR",
+ "DBR", "SKP15", "RES",
+ "SBA", "DBA", "EBA",
+ "AAS", "PAX", "PAL", "AAC",
+ "PXA", "AXS", "PXL", "PLA",
+ "PLX", "CLAC","CLX", "CLLR", "AXR",
 #endif
  "IOT",							/* general */
 
@@ -309,7 +409,13 @@ static const int32 opc_val[] = {
  0000000+I_MRF, 0040000+I_MRF, 0100000+I_MRF, 0140000+I_MRF,
  0200000+I_MRF, 0240000+I_MRF, 0300000+I_MRF, 0340000+I_MRF,
  0400000+I_MRF, 0440000+I_MRF, 0500000+I_MRF, 0540000+I_MRF,
- 0600000+I_MRF, 0760000+I_LAW,
+ 0600000+I_MRF,
+ 0020000+I_MRF, 0060000+I_MRF, 0120000+I_MRF, 0160000+I_MRF,
+ 0220000+I_MRF, 0260000+I_MRF, 0320000+I_MRF, 0360000+I_MRF,
+ 0420000+I_MRF, 0460000+I_MRF, 0520000+I_MRF, 0560000+I_MRF,
+ 0620000+I_MRF,
+
+ 0760000+I_LAW,
 
  0641002+I_NPN, 0641001+I_NPN, 0644000+I_NPN, 0664000+I_NPN, 0652000+I_NPN,
  0653100+MD(022), 0657100+MD(022), 0640300+MD(023), 0644300+MD(023),
@@ -375,10 +481,11 @@ static const int32 opc_val[] = {
  0706504+I_NPI, 0706604+I_NPI,
 #elif defined (PDP15)
  0700062+I_NPI, 0703301+I_NPI, 0703341+I_NPI, 0703302+I_NPI,
- 0703344+I_NPI, 0707741+I_NPI, 0707761+I_NPI, 0707762+I_NPI, 0707764+I_NPI,
- 0721000+I_XR, 0722000+I_XR, 0723000+I_XR9, 0724000+I_XR,
- 0725000+I_XR9, 0726000+I_XR, 0730000+I_XR, 0731000+I_XR,
- 0735000+I_XR, 0736000+I_XR, 0737000+I_XR9,
+ 0703344+I_NPI, 0707741+I_NPI, 0707742+I_NPI,
+ 0707761+I_NPI, 0707762+I_NPI, 0707764+I_NPI,
+ 0720000+I_XR9, 0721000+I_XR, 0722000+I_XR, 0723000+I_XR9,
+ 0724000+I_XR, 0725000+I_XR9, 0726000+I_XR, 0730000+I_XR,
+ 0731000+I_XR, 0734000+I_XR, 0735000+I_XR, 0736000+I_XR, 0737000+I_XR9,
 #endif
  0700000+I_IOT,
 
@@ -515,21 +622,13 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 			ma = (addr & 0760000) | disp;  }
 		else {	disp = inst & 007777;
 			ma = (addr & 0770000) | disp;  }
-#else
-		disp = inst & 017777;
-		ma = (addr & 0760000) | disp;
-#endif
-#if defined (PDP9) || (PDP15)
-		if ((disp & ~07) == 00010) ma = ma & 00017;
-#endif
-#if defined (PDP15)
-		fprintf (of, "%s%s%-o", opcode[i],
-			((inst & 0020000)? " @": " "), 
+		fprintf (of, "%s %-o", opcode[i],
 			(cflag? ma & ADDRMASK: disp));
 		if (!memm && (inst & 0010000)) fprintf (of, ",X");
 #else
-		fprintf (of, "%s%s%-o", opcode[i],
-			((inst & 0020000)? " I ": " "),
+		disp = inst & 017777;
+		ma = (addr & 0760000) | disp;
+		fprintf (of, "%s %-o", opcode[i],
 			(cflag? ma & ADDRMASK: disp));
 #endif
 		break;
@@ -635,7 +734,7 @@ if ((sw & SWMASK ('P')) || ((*cptr == '#') && cptr++)) { /* packed string? */
 cptr = get_glyph (cptr, gbuf, 0);			/* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
 if (opcode[i] == NULL) return SCPE_ARG;
-val[0] = opc_val[i] & 0777777;				/* get value */
+val[0] = opc_val[i] & DMASK;				/* get value */
 j = (opc_val[i] >> I_V_FL) & I_M_FL;			/* get class */
 
 switch (j) {						/* case on class */
@@ -656,33 +755,30 @@ case I_V_LAW:						/* law */
 	val[0] = val[0] | d;
 	break;
 case I_V_MRF:						/* mem ref */
-#if !defined (PDP15)
+#if defined (PDP15)
+	if (memm) dmask = 017777;
+	else dmask = 07777;
+	cptr = get_glyph (cptr, gbuf, ',');		/* get glyph */
+#else
 	dmask = 017777;
 	cptr = get_glyph (cptr, gbuf, 0);		/* get next field */
 	if (strcmp (gbuf, "I") == 0) {			/* indirect? */
 		val[0] = val[0] | 020000;
 		cptr = get_glyph (cptr, gbuf, 0);  }
-#else
-	if (memm) dmask = 017777;
-	else dmask = 07777;
-	if (*cptr == '@') {				/* indirect? */
-		val[0] = val[0] | 020000;
-		cptr++;  }
-	cptr = get_glyph (cptr, gbuf, ',');		/* get glyph */
 #endif
-	epcmask = ADDRMASK & ~dmask;
-	d = get_uint (gbuf, 8, ADDRMASK, &r);
+	epcmask = ADDRMASK & ~dmask;			/* get ePC */
+	d = get_uint (gbuf, 8, ADDRMASK, &r);		/* get addr */
 	if (r != SCPE_OK) return SCPE_ARG;
-	if (d <= dmask) val[0] = val[0] | d;
+	if (d <= dmask) val[0] = val[0] | d;		/* fit in 12/13b? */
 	else if (cflag && (((addr ^ d) & epcmask) == 0))
-		val[0] = val[0] | (d & dmask);
+		val[0] = val[0] | (d & dmask);		/* hi bits = ePC? */
 	else return SCPE_ARG;
 #if defined (PDP15)
 	if (!memm) {
 		cptr = get_glyph (cptr, gbuf, 0);
 		if (gbuf[0] != 0) {
 			if (strcmp (gbuf, "X") != 0) return SCPE_ARG;
-			val[0] = val[0] + 010000;  }  }
+			val[0] = val[0] | 010000;  }  }
 #endif
 	break;
 case I_V_EMD:						/* or'able */
@@ -694,7 +790,7 @@ case I_V_NPN: case I_V_NPI: case I_V_IOT: case I_V_OPR:
 		for (i = 0; (opcode[i] != NULL) &&
 			(strcmp (opcode[i], gbuf) != 0) ; i++) ;
 		if (opcode[i] != NULL) {
-			k = opc_val[i] & 0777777;
+			k = opc_val[i] & DMASK;
 			if (((k ^ val[0]) & 0740000) != 0) return SCPE_ARG;
 			val[0] = val[0] | k;  }
 		else {	d = get_sint (gbuf, & sign, &r);

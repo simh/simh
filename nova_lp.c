@@ -1,6 +1,6 @@
 /* nova_lp.c: NOVA line printer simulator
 
-   Copyright (c) 1993-1999, Robert M. Supnik
+   Copyright (c) 1993-2000, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -32,8 +32,6 @@ extern int32 int_req, dev_busy, dev_done, dev_disable;
 int32 lpt_stopioe = 0;					/* stop on error */
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 
 /* LPT data structures
 

@@ -1,81 +1,84 @@
 {\rtf1\ansi\ansicpg1252\uc1 \deff0\deflang1033\deflangfe1033{\fonttbl{\f0\froman\fcharset0\fprq2{\*\panose 02020603050405020304}Times New Roman;}{\f1\fswiss\fcharset0\fprq2{\*\panose 020b0604020202020204}Arial;}
 {\f3\froman\fcharset2\fprq2{\*\panose 05050102010706020507}Symbol;}{\f16\froman\fcharset238\fprq2 Times New Roman CE;}{\f17\froman\fcharset204\fprq2 Times New Roman Cyr;}{\f19\froman\fcharset161\fprq2 Times New Roman Greek;}
-{\f20\froman\fcharset162\fprq2 Times New Roman Tur;}{\f21\froman\fcharset186\fprq2 Times New Roman Baltic;}}{\colortbl;\red0\green0\blue0;\red0\green0\blue255;\red0\green255\blue255;\red0\green255\blue0;\red255\green0\blue255;\red255\green0\blue0;
-\red255\green255\blue0;\red255\green255\blue255;\red0\green0\blue128;\red0\green128\blue128;\red0\green128\blue0;\red128\green0\blue128;\red128\green0\blue0;\red128\green128\blue0;\red128\green128\blue128;\red192\green192\blue192;}{\stylesheet{
-\widctlpar\adjustright \fs20\cgrid \snext0 Normal;}{\*\cs10 \additive Default Paragraph Font;}}{\*\listtable{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext
-\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid22442644}{\list\listtemplateid-1866037950{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'02\'00.;}{\levelnumbers
-\'01;}\fbias0 \fi-360\li360\jclisttab\tx360 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'03\'00.\'01;}{\levelnumbers\'01\'03;}\fbias0 \fi-360\li360\jclisttab\tx360 }{\listlevel\levelnfc0
-\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'05\'00.\'01.\'02;}{\levelnumbers\'01\'03\'05;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0
-\levelindent0{\leveltext\'07\'00.\'01.\'02.\'03;}{\levelnumbers\'01\'03\'05\'07;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext
-\'09\'00.\'01.\'02.\'03.\'04;}{\levelnumbers\'01\'03\'05\'07\'09;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext
+{\f20\froman\fcharset162\fprq2 Times New Roman Tur;}{\f21\froman\fcharset186\fprq2 Times New Roman Baltic;}{\f22\fswiss\fcharset238\fprq2 Arial CE;}{\f23\fswiss\fcharset204\fprq2 Arial Cyr;}{\f25\fswiss\fcharset161\fprq2 Arial Greek;}
+{\f26\fswiss\fcharset162\fprq2 Arial Tur;}{\f27\fswiss\fcharset186\fprq2 Arial Baltic;}}{\colortbl;\red0\green0\blue0;\red0\green0\blue255;\red0\green255\blue255;\red0\green255\blue0;\red255\green0\blue255;\red255\green0\blue0;\red255\green255\blue0;
+\red255\green255\blue255;\red0\green0\blue128;\red0\green128\blue128;\red0\green128\blue0;\red128\green0\blue128;\red128\green0\blue0;\red128\green128\blue0;\red128\green128\blue128;\red192\green192\blue192;}{\stylesheet{\widctlpar\adjustright 
+\fs20\cgrid \snext0 Normal;}{\*\cs10 \additive Default Paragraph Font;}}{\*\listtable{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}
+\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid22442644}{\list\listtemplateid-1866037950{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'02\'00.;}{\levelnumbers\'01;}\fbias0 \fi-360\li360
+\jclisttab\tx360 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'03\'00.\'01;}{\levelnumbers\'01\'03;}\fbias0 \fi-360\li360\jclisttab\tx360 }{\listlevel\levelnfc0\leveljc0\levelfollow0
+\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'05\'00.\'01.\'02;}{\levelnumbers\'01\'03\'05;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext
+\'07\'00.\'01.\'02.\'03;}{\levelnumbers\'01\'03\'05\'07;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'09\'00.\'01.\'02.\'03.\'04;}{\levelnumbers
+\'01\'03\'05\'07\'09;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'0b\'00.\'01.\'02.\'03.\'04.\'05;}{\levelnumbers\'01\'03\'05\'07\'09\'0b;}\fbias0 
+\fi-1080\li1080\jclisttab\tx1080 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'0d\'00.\'01.\'02.\'03.\'04.\'05.\'06;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d;}\fbias0 \fi-1080\li1080
+\jclisttab\tx1080 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'0f\'00.\'01.\'02.\'03.\'04.\'05.\'06.\'07;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d\'0f;}\fbias0 \fi-1440\li1440
+\jclisttab\tx1440 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'11\'00.\'01.\'02.\'03.\'04.\'05.\'06.\'07.\'08;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d\'0f\'11;}\fbias0 \fi-1440\li1440
+\jclisttab\tx1440 }{\listname ;}\listid155609463}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720
+\jclisttab\tx720 }{\listname ;}\listid602111040}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720
+\jclisttab\tx720 }{\listname ;}\listid621424954}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720
+\jclisttab\tx720 }{\listname ;}\listid717362522}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720
+\jclisttab\tx720 }{\listname ;}\listid1080104542}{\list\listtemplateid-5054418{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat2\levelspace0\levelindent0{\leveltext\'01\'00;}{\levelnumbers\'01;}\fbias0 \fi-435\li435\jclisttab\tx435 }{\listlevel
+\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'03\'00.\'01;}{\levelnumbers\'01\'03;}\fbias0 \fi-435\li435\jclisttab\tx435 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat2\levelspace0\levelindent0{\leveltext
+\'05\'00.\'01.\'02;}{\levelnumbers\'01\'03\'05;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'07\'00.\'01.\'02.\'03;}{\levelnumbers\'01\'03\'05\'07;}\fbias0 
+\fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'09\'00.\'01.\'02.\'03.\'04;}{\levelnumbers\'01\'03\'05\'07\'09;}\fbias0 \fi-1080\li1080\jclisttab\tx1080 }{\listlevel\levelnfc0
+\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'0b\'00.\'01.\'02.\'03.\'04.\'05;}{\levelnumbers\'01\'03\'05\'07\'09\'0b;}\fbias0 \fi-1080\li1080\jclisttab\tx1080 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1
+\levelspace0\levelindent0{\leveltext\'0d\'00.\'01.\'02.\'03.\'04.\'05.\'06;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d;}\fbias0 \fi-1440\li1440\jclisttab\tx1440 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext
+\'0f\'00.\'01.\'02.\'03.\'04.\'05.\'06.\'07;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d\'0f;}\fbias0 \fi-1440\li1440\jclisttab\tx1440 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext
+\'11\'00.\'01.\'02.\'03.\'04.\'05.\'06.\'07.\'08;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d\'0f\'11;}\fbias0 \fi-1800\li1800\jclisttab\tx1800 }{\listname ;}\listid1262834005}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0
+\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid1272592440}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0
+\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid1339387548}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1
+\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid1409111490}{\list\listtemplateid230209238{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat3\levelspace0\levelindent0
+{\leveltext\'02\'00.;}{\levelnumbers\'01;}\fbias0 \fi-360\li360\jclisttab\tx360 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'03\'00.\'01;}{\levelnumbers\'01\'03;}\fbias0 \fi-360\li360
+\jclisttab\tx360 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'05\'00.\'01.\'02;}{\levelnumbers\'01\'03\'05;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0
+\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'07\'00.\'01.\'02.\'03;}{\levelnumbers\'01\'03\'05\'07;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0
+{\leveltext\'09\'00.\'01.\'02.\'03.\'04;}{\levelnumbers\'01\'03\'05\'07\'09;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext
 \'0b\'00.\'01.\'02.\'03.\'04.\'05;}{\levelnumbers\'01\'03\'05\'07\'09\'0b;}\fbias0 \fi-1080\li1080\jclisttab\tx1080 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext
 \'0d\'00.\'01.\'02.\'03.\'04.\'05.\'06;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d;}\fbias0 \fi-1080\li1080\jclisttab\tx1080 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext
 \'0f\'00.\'01.\'02.\'03.\'04.\'05.\'06.\'07;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d\'0f;}\fbias0 \fi-1440\li1440\jclisttab\tx1440 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext
-\'11\'00.\'01.\'02.\'03.\'04.\'05.\'06.\'07.\'08;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d\'0f\'11;}\fbias0 \fi-1440\li1440\jclisttab\tx1440 }{\listname ;}\listid155609463}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0
-\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid602111040}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0
-\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid621424954}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1
-\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid717362522}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0
-\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid1080104542}{\list\listtemplateid-5054418{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat2\levelspace0\levelindent0{\leveltext
-\'01\'00;}{\levelnumbers\'01;}\fbias0 \fi-435\li435\jclisttab\tx435 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'03\'00.\'01;}{\levelnumbers\'01\'03;}\fbias0 \fi-435\li435\jclisttab\tx435 }{\listlevel
-\levelnfc0\leveljc0\levelfollow0\levelstartat2\levelspace0\levelindent0{\leveltext\'05\'00.\'01.\'02;}{\levelnumbers\'01\'03\'05;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0
-{\leveltext\'07\'00.\'01.\'02.\'03;}{\levelnumbers\'01\'03\'05\'07;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'09\'00.\'01.\'02.\'03.\'04;}{\levelnumbers
-\'01\'03\'05\'07\'09;}\fbias0 \fi-1080\li1080\jclisttab\tx1080 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'0b\'00.\'01.\'02.\'03.\'04.\'05;}{\levelnumbers\'01\'03\'05\'07\'09\'0b;}\fbias0 \fi-1080\li1080
-\jclisttab\tx1080 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'0d\'00.\'01.\'02.\'03.\'04.\'05.\'06;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d;}\fbias0 \fi-1440\li1440\jclisttab\tx1440 }{\listlevel
-\levelnfc0\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'0f\'00.\'01.\'02.\'03.\'04.\'05.\'06.\'07;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d\'0f;}\fbias0 \fi-1440\li1440\jclisttab\tx1440 }{\listlevel\levelnfc0\leveljc0
-\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'11\'00.\'01.\'02.\'03.\'04.\'05.\'06.\'07.\'08;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d\'0f\'11;}\fbias0 \fi-1800\li1800\jclisttab\tx1800 }{\listname ;}\listid1262834005}
-{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid1272592440}
-{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid1339387548}
-{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid1409111490}
-{\list\listtemplateid230209238{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat3\levelspace0\levelindent0{\leveltext\'02\'00.;}{\levelnumbers\'01;}\fbias0 \fi-360\li360\jclisttab\tx360 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1
-\levellegal\levelspace0\levelindent0{\leveltext\'03\'00.\'01;}{\levelnumbers\'01\'03;}\fbias0 \fi-360\li360\jclisttab\tx360 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext
-\'05\'00.\'01.\'02;}{\levelnumbers\'01\'03\'05;}\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'07\'00.\'01.\'02.\'03;}{\levelnumbers\'01\'03\'05\'07;}
-\fbias0 \fi-720\li720\jclisttab\tx720 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'09\'00.\'01.\'02.\'03.\'04;}{\levelnumbers\'01\'03\'05\'07\'09;}\fbias0 \fi-720\li720\jclisttab\tx720 }
-{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'0b\'00.\'01.\'02.\'03.\'04.\'05;}{\levelnumbers\'01\'03\'05\'07\'09\'0b;}\fbias0 \fi-1080\li1080\jclisttab\tx1080 }{\listlevel\levelnfc0\leveljc0
-\levelfollow0\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'0d\'00.\'01.\'02.\'03.\'04.\'05.\'06;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d;}\fbias0 \fi-1080\li1080\jclisttab\tx1080 }{\listlevel\levelnfc0\leveljc0\levelfollow0
-\levelstartat1\levellegal\levelspace0\levelindent0{\leveltext\'0f\'00.\'01.\'02.\'03.\'04.\'05.\'06.\'07;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d\'0f;}\fbias0 \fi-1440\li1440\jclisttab\tx1440 }{\listlevel\levelnfc0\leveljc0\levelfollow0\levelstartat1
-\levellegal\levelspace0\levelindent0{\leveltext\'11\'00.\'01.\'02.\'03.\'04.\'05.\'06.\'07.\'08;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d\'0f\'11;}\fbias0 \fi-1440\li1440\jclisttab\tx1440 }{\listname ;}\listid1502426668}{\list\listtemplateid1706078190
-\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid1645162521}{\list\listtemplateid1706078190\listsimple
-{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid2006126440}{\list\listtemplateid1706078190\listsimple{\listlevel
-\levelnfc23\leveljc0\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid2076124660}}{\*\listoverridetable{\listoverride\listid155609463
-\listoverridecount0\ls1}{\listoverride\listid1409111490\listoverridecount0\ls2}{\listoverride\listid1272592440\listoverridecount0\ls3}{\listoverride\listid2076124660\listoverridecount0\ls4}{\listoverride\listid717362522\listoverridecount0\ls5}
-{\listoverride\listid1339387548\listoverridecount0\ls6}{\listoverride\listid621424954\listoverridecount0\ls7}{\listoverride\listid1080104542\listoverridecount0\ls8}{\listoverride\listid1262834005\listoverridecount0\ls9}{\listoverride\listid2006126440
-\listoverridecount0\ls10}{\listoverride\listid602111040\listoverridecount0\ls11}{\listoverride\listid22442644\listoverridecount0\ls12}{\listoverride\listid1502426668\listoverridecount0\ls13}{\listoverride\listid1645162521\listoverridecount0\ls14}}{\info
-{\title Writing a Simulator for the SIMH System}{\author Bob Supnik}{\operator Bob Supnik}{\creatim\yr1997\mo8\dy30\hr19}{\revtim\yr2000\mo11\dy18\hr18\min39}{\version10}{\edmins391}{\nofpages15}{\nofwords5229}{\nofchars29808}
-{\*\company Digital Equipment Corporation}{\nofcharsws0}{\vern113}}\widowctrl\ftnbj\aenddoc\hyphcaps0\formshade\viewkind4\viewscale100\pgbrdrhead\pgbrdrfoot \fet0\sectd \linex0\endnhere\sectdefaultcl {\*\pnseclvl1\pnucrm\pnstart1\pnindent720\pnhang
-{\pntxta .}}{\*\pnseclvl2\pnucltr\pnstart1\pnindent720\pnhang{\pntxta .}}{\*\pnseclvl3\pndec\pnstart1\pnindent720\pnhang{\pntxta .}}{\*\pnseclvl4\pnlcltr\pnstart1\pnindent720\pnhang{\pntxta )}}{\*\pnseclvl5\pndec\pnstart1\pnindent720\pnhang{\pntxtb (}
-{\pntxta )}}{\*\pnseclvl6\pnlcltr\pnstart1\pnindent720\pnhang{\pntxtb (}{\pntxta )}}{\*\pnseclvl7\pnlcrm\pnstart1\pnindent720\pnhang{\pntxtb (}{\pntxta )}}{\*\pnseclvl8\pnlcltr\pnstart1\pnindent720\pnhang{\pntxtb (}{\pntxta )}}{\*\pnseclvl9
-\pnlcrm\pnstart1\pnindent720\pnhang{\pntxtb (}{\pntxta )}}\pard\plain \widctlpar\adjustright \fs20\cgrid {\f1 Writing a Simulator for the SIMH System
-\par Revised 30-Oct-00 for V2.5
+\'11\'00.\'01.\'02.\'03.\'04.\'05.\'06.\'07.\'08;}{\levelnumbers\'01\'03\'05\'07\'09\'0b\'0d\'0f\'11;}\fbias0 \fi-1440\li1440\jclisttab\tx1440 }{\listname ;}\listid1502426668}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0
+\levelfollow0\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid1645162521}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0
+\levelstartat1\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid2006126440}{\list\listtemplateid1706078190\listsimple{\listlevel\levelnfc23\leveljc0\levelfollow0\levelstartat1
+\levelspace0\levelindent0{\leveltext\'01\u-3913 ?;}{\levelnumbers;}\f3\fbias0 \fi-360\li720\jclisttab\tx720 }{\listname ;}\listid2076124660}}{\*\listoverridetable{\listoverride\listid155609463\listoverridecount0\ls1}{\listoverride\listid1409111490
+\listoverridecount0\ls2}{\listoverride\listid1272592440\listoverridecount0\ls3}{\listoverride\listid2076124660\listoverridecount0\ls4}{\listoverride\listid717362522\listoverridecount0\ls5}{\listoverride\listid1339387548\listoverridecount0\ls6}
+{\listoverride\listid621424954\listoverridecount0\ls7}{\listoverride\listid1080104542\listoverridecount0\ls8}{\listoverride\listid1262834005\listoverridecount0\ls9}{\listoverride\listid2006126440\listoverridecount0\ls10}{\listoverride\listid602111040
+\listoverridecount0\ls11}{\listoverride\listid22442644\listoverridecount0\ls12}{\listoverride\listid1502426668\listoverridecount0\ls13}{\listoverride\listid1645162521\listoverridecount0\ls14}}{\info{\title Writing a Simulator for the SIMH System}
+{\author Bob Supnik}{\operator Bob Supnik}{\creatim\yr1997\mo8\dy30\hr19}{\revtim\yr2000\mo12\dy16\hr23\min48}{\version12}{\edmins414}{\nofpages15}{\nofwords5229}{\nofchars29808}{\*\company Digital Equipment Corporation}{\nofcharsws0}{\vern113}}
+\widowctrl\ftnbj\aenddoc\hyphcaps0\formshade\viewkind4\viewscale100\pgbrdrhead\pgbrdrfoot \fet0\sectd \linex0\endnhere\sectdefaultcl {\*\pnseclvl1\pnucrm\pnstart1\pnindent720\pnhang{\pntxta .}}{\*\pnseclvl2\pnucltr\pnstart1\pnindent720\pnhang{\pntxta .}}
+{\*\pnseclvl3\pndec\pnstart1\pnindent720\pnhang{\pntxta .}}{\*\pnseclvl4\pnlcltr\pnstart1\pnindent720\pnhang{\pntxta )}}{\*\pnseclvl5\pndec\pnstart1\pnindent720\pnhang{\pntxtb (}{\pntxta )}}{\*\pnseclvl6\pnlcltr\pnstart1\pnindent720\pnhang{\pntxtb (}
+{\pntxta )}}{\*\pnseclvl7\pnlcrm\pnstart1\pnindent720\pnhang{\pntxtb (}{\pntxta )}}{\*\pnseclvl8\pnlcltr\pnstart1\pnindent720\pnhang{\pntxtb (}{\pntxta )}}{\*\pnseclvl9\pnlcrm\pnstart1\pnindent720\pnhang{\pntxtb (}{\pntxta )}}\pard\plain 
+\widctlpar\adjustright \fs20\cgrid {\f1 Writing a Simulator for the SIMH System
+\par Revised 30-Nov-00 for V2.5a
 \par 
 \par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 1.\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\adjustright {\f1 Overview
 \par }\pard \widctlpar\adjustright {\f1 
-\par SIMH (history simulators) is a set of portable programs, written in C, which simulate various historically interesting computers.  This document describes how to design, write, a
-nd check out a new simulator for SIMH.  It is not an introduction to either the philosophy or external operation of SIMH, and the reader should be familiar with both of those topics before proceeding.  Nor is it a guide to the internal design or operation
- 
-of SIMH, except insofar as those areas interact with simulator design.  Instead, this manual presents and explains the form, meaning, and operation of the interfaces between simulators and the SIMH simulator control package.  It also offers some suggestio
-ns for utilizing the services SIMH offers and explains the constraints which all simulators operating within SIMH will experience.
+\par SIMH (history simulators) is a set of portable programs, written in C, which simulate various historically interesting computers.  This document describes how to design, write, and check out a new simulator for SIMH.  It is not an introduction to either t
+h
+e philosophy or external operation of SIMH, and the reader should be familiar with both of those topics before proceeding.  Nor is it a guide to the internal design or operation of SIMH, except insofar as those areas interact with simulator design.  Inste
+a
+d, this manual presents and explains the form, meaning, and operation of the interfaces between simulators and the SIMH simulator control package.  It also offers some suggestions for utilizing the services SIMH offers and explains the constraints which a
+ll simulators operating within SIMH will experience.
 \par 
-\par Some terminology: Each simulator consists of a standard }{\i\f1 simulator control package}{\f1  (SCP), which provides a control framework and utility routines for a simulator; and a unique }{\i\f1 virtual machine}{\f1 
- (VM), which implements the simulated processor and selected peripherals.  A VM consists of multiple }{\i\f1 devices}{\f1 , such as the CPU, paper tape reader, disk controller, etc.  Each controller consists of a named state space (called }{\i\f1 
-registers}{\f1 ) and one or more }{\i\f1 units}{\f1 .  Each unit consists of a numbered state space (called a }{\i\f1 data set}{\f1 ). }{\i\f1  }{\f1 The }{\i\f1 host computer}{\f1  is the system on which SIMH runs; the }{\i\f1 target computer}{\f1 
+\par Some terminology: Each simulator consists of a standard }{\i\f1 simulator control package}{\f1  (SCP), which provides a control framework and utility routines for a simulator; and a unique }{\i\f1 virtual machine}{\f1  (VM), which 
+implements the simulated processor and selected peripherals.  A VM consists of multiple }{\i\f1 devices}{\f1 , such as the CPU, paper tape reader, disk controller, etc.  Each controller consists of a named state space (called }{\i\f1 registers}{\f1 
+) and one or more }{\i\f1 units}{\f1 .  Each unit consists of a numbered state space (called a }{\i\f1 data set}{\f1 ). }{\i\f1  }{\f1 The }{\i\f1 host computer}{\f1  is the system on which SIMH runs; the }{\i\f1 target computer}{\f1 
  is the system being simulated.
 \par 
 \par SIMH is unabashedly based on the MIMIC simulation system, designed in the late 60\rquote s by Len Fehskens, Mike McCarthy, and Bob Supnik.   This document is based on MIMIC\rquote s published interface specification, \ldblquote 
 How to Write a Virtual Machine for the MIMIC Simulation System\rdblquote , by Len Fehskens and Bob Supnik.
 \par 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 2.\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\adjustright {\f1 Designing a Virtual Machine
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 2.\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\adjustright {\f1 Data Types
 \par }\pard \widctlpar\adjustright {\f1 
-\par SIMH is written in C.  The host system must support (at least) 32-bit data types (64-bit data types for the PDP-10 and other large-word target systems).  To cope with the vagaries of C data types, 
-SIMH defines some unambiguous data types for its interfaces:
+\par SIMH is written 
+in C.  The host system must support (at least) 32-bit data types (64-bit data types for the PDP-10 and other large-word target systems).  To cope with the vagaries of C data types, SIMH defines some unambiguous data types for its interfaces:
 \par 
-\par \tab SIMH data type\tab \tab \tab interpretation in typical C
+\par \tab SIMH data type\tab \tab \tab interpretation in typical 32-bit C
 \par 
-\par \tab int8\tab \tab \tab \tab char
-\par \tab int16\tab \tab \tab \tab short
-\par \tab int32\tab \tab \tab \tab long
-\par \tab int64\tab \tab \tab \tab long long, _int64 (system specific)
+\par \tab int8, uint8\tab \tab \tab char, unsigned char
+\par \tab int16, uint16\tab \tab \tab short, unsigned short
+\par \tab int32, uint32\tab \tab \tab int, unsigned int
+\par \tab int64, uint64\tab \tab \tab long long, _int64 (system specific)
 \par \tab t_addr\tab \tab \tab \tab simulated address, int32
-\par \tab t_val\tab \tab \tab \tab simulated value, unsigned int32
+\par \tab t_value\tab \tab \tab \tab simulated value, unsigned int32 or int64
+\par \tab t_svalue\tab \tab \tab simulated signed value, int32 or int64
 \par \tab t_mtrec\tab \tab \tab \tab mag tape record length, int32
 \par \tab t_stat\tab \tab \tab \tab status code, int
 \par \tab t_bool\tab \tab \tab \tab true/false value, int
@@ -85,6 +88,7 @@ SIMH defines some unambiguous data types for its interfaces:
 \par \tab }{\b\f1 DEVICE}{\f1 \tab \tab \tab device definition structure
 \par \tab }{\b\f1 UNIT}{\f1 \tab \tab \tab \tab unit definition structure
 \par \tab }{\b\f1 REG}{\f1 \tab \tab \tab \tab register definition structure
+\par \tab }{\b\f1 MTAB}{\f1 \tab \tab \tab \tab modifier definition structure
 \par 
 \par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\adjustright {\f1 VM Organization
 \par }\pard \widctlpar\adjustright {\f1 
@@ -98,9 +102,9 @@ SIMH defines some unambiguous data types for its interfaces:
 \par \tab TTO\tab \tab \tab \tab console output
 \par \tab DKP\tab \tab \tab \tab disk pack controller and drives
 \par 
-\par There may 
-be more than one device per physical hardware entity, as for the console; but for each user-accessible device there must be at least one.  One of these devices will have the pre-eminent responsibility for directing simulated operations.  Normally, this is
- the CPU, but it could be a higher-level entity, such as a bus master.
+\par There may be more than one device per physical hardware entity, as for the console;
+ but for each user-accessible device there must be at least one.  One of these devices will have the pre-eminent responsibility for directing simulated operations.  Normally, this is the CPU, but it could be a higher-level entity, such as a bus master.
+
 \par 
 \par The VM actually runs as a subroutine of the simulator control package (SCP).  It provides a master routine for running simulated programs and other routines and data structures to implement SCP\rquote 
 s command and control functions.  The interfaces between a VM and SCP are relatively few:
@@ -112,7 +116,7 @@ s command and control functions.  The interfaces between a VM and SCP are relati
 \par \tab int32 }{\b\f1 sim_emax}{\f1 \tab \tab maximum number of words in an instruction
 \par \tab DEVICE *}{\b\f1 sim_devices[]}{\f1 \tab table of pointers to simulated devices, NULL terminated
 \par \tab char *}{\b\f1 sim_stop_messages[]}{\f1 \tab table of pointers to error messages
-\par \tab t_stat }{\b\f1 sim_load}{\f1  (FILE *fref)\tab binary loader subroutine
+\par \tab t_stat }{\b\f1 sim_load}{\f1  (\'85)\tab \tab binary loader subroutine
 \par \tab t_stat }{\b\f1 sim_inst}{\f1  (void)\tab \tab instruction execution subroutine
 \par \tab t_stat }{\b\f1 parse_sym}{\f1  (\'85)\tab \tab symbolic instruction parse subroutine (optional)
 \par \tab t_stat }{\b\f1 fprint_sym}{\f1  (\'85)\tab \tab symbolic instruction print subroutine (optional)
@@ -120,16 +124,16 @@ s command and control functions.  The interfaces between a VM and SCP are relati
 \par There is no required organization for VM code.  The following convention has been used so far.  Let name be the }{\i\f1 name}{\f1  of the real system (i1401 for the IBM 1401; pdp1 for the PDP-1; pdp18b for the other 18-bit PDP\rquote 
 s; pdp8 for the PDP-8; pdp11 for the PDP11; nova for Nova; hp2100 for the HP 21XX; id4 for the Interdata 4):
 \par 
-\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls2\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls2\adjustright {\i\f1 name}{\f1 .h contains definition
-s for the particular simulator
+\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls2\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls2\adjustright {\i\f1 name}{\f1 
+.h contains definitions for the particular simulator
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls2\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls2\adjustright {\i\f1 name}{\f1 
 _sys.c contains all the SCP interfaces except the instruction simulator
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls2\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls2\adjustright {\i\f1 name}{\f1 
 _cpu.c contains the instruction simulator and CPU data structures
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls2\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls2\adjustright {\i\f1 name}{\f1 
 _stddev.c contains the peripherals which were standard with the real system.
-\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls2\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls2\adjustright {\i\f1 name}{\f1 
-_lp.c contains the line printer.
+\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls2\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls2\adjustright {\i\f1 name}{\f1 _lp.c contains the 
+line printer.
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls2\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls2\adjustright {\i\f1 name}{\f1 
 _mt.c contains the mag tape controller and drives, etc.
 \par }\pard \fi1440\widctlpar\adjustright {\f1 
@@ -151,38 +155,38 @@ _mt.c contains the mag tape controller and drives, etc.
 \par 
 \par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.1.1\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Time Base
 \par }\pard \widctlpar\adjustright {\f1 
-\par In order to simulate asynchronous events, such as I/O completion, the VM must define and keep a time base.  This can be accurate (for example, nanoseconds of executi
-on) or arbitrary (for example, number of instructions executed), but it must be consistently used throughout the VM.  All existing VM\rquote s count time in instructions.
+\par In order to simulate asynchronous events, such as I/O completion, the VM must define and keep a time base.  T
+his can be accurate (for example, nanoseconds of execution) or arbitrary (for example, number of instructions executed), but it must be consistently used throughout the VM.  All existing VM\rquote s count time in instructions.
 \par 
 \par The CPU is responsible for counting down the event counter }{\b\f1 sim_interval}{\f1  and calling the asynchronous event controller }{\b\f1 sim_process_event}{\f1 .  The record keeping for timing is done by SCP.
 \par 
 \par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.1.2\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Memory Organization
 \par }\pard \widctlpar\adjustright {\f1 
-\par The criterion for memory layout is very simple: use the SIMH data type that is as large as (or if necessary, larger than), the word length of
- the real machine.  Note that the criterion is word length, not addressability: the PDP-11 has byte addressable memory, but it is a 16-bit machine, and its memory is defined as unsigned int16 M[].  It may seem tempting to define memory as a union of int8 
-and int16 data types, but this would make the resulting VM endian-dependent.  Instead, the VM should be based on the underlying word size of the real machine, and byte manipulation should be done explicitly.  Examples:
+\par The crit
+erion for memory layout is very simple: use the SIMH data type that is as large as (or if necessary, larger than), the word length of the real machine.  Note that the criterion is word length, not addressability: the PDP-11 has byte addressable memory, bu
+t it is a 16-bit machine, and its memory is defined as uint16 M[].  It may seem tempting to define memory as a union of int8 and int16 data types, but this would make the resulting VM endian-dependent.  Instead, the VM should be based on the underly
+ing word size of the real machine, and byte manipulation should be done explicitly.  Examples:
 \par 
 \par \tab Simulator\tab \tab memory size\tab \tab memory declaration
 \par 
-\par \tab IBM 1401\tab \tab 6-bit\tab \tab \tab int8
-\par \tab PDP-8\tab \tab \tab 12-bit\tab \tab \tab int16
-\par \tab PDP-11, Nova\tab \tab 16-bit\tab \tab \tab int16
-\par \tab PDP-10\tab \tab \tab 36-bit\tab \tab \tab int64
+\par \tab IBM 1401\tab \tab 6-bit\tab \tab \tab unsigned int8
+\par \tab PDP-8\tab \tab \tab 12-bit\tab \tab \tab unsigned int16
+\par \tab PDP-11, Nova\tab \tab 16-bit\tab \tab \tab unsigned int16
+\par \tab PDP-10\tab \tab \tab 36-bit\tab \tab \tab unsigned int64
 \par 
 \par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.1.3\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Interrupt Organization
 \par }\pard \widctlpar\adjustright {\f1 
-\par The design of the VM\rquote s interrupt structure is a complex interaction between efficiency and fidelity to the hardware.  If the VM\rquote 
-s interrupt structure is too abstract, interrupt driven software may not run.  On the other hand, if it follows the hardware too literally, it may significantly reduce simulation speed.  One rule I can offer is to minimize the fetch-phase cost of i
-nterrupts, even if this complicates the (much less frequent) evaluation of the interrupt system following an I/O operation.  Another is not to over-generalize; even if the real hardware could support 64 or 256 interrupting devices, the simulators will be 
-running much smaller configurations.  I\rquote ll start with a simple interrupt structure and then offer suggestions for generalization.
+\par The design of the VM\rquote s interrupt structure is a complex interaction between efficiency and fidelity to the hardware.  If the VM\rquote s interrupt structure is too abstract, interrupt driven software may not 
+run.  On the other hand, if it follows the hardware too literally, it may significantly reduce simulation speed.  One rule I can offer is to minimize the fetch-phase cost of interrupts, even if this complicates the (much less frequent) evaluation of the i
+nterrupt system following an I/O operation or asynchronous event.  Another is not to over-generalize; even if the real hardware could support 64 or 256 interrupting devices, the simulators will be running much smaller configurations.  I\rquote 
+ll start with a simple interrupt structure and then offer suggestions for generalization.
 \par 
-\par In the simplest structure, interrupt requests correspond to device flags and are kept in an interrupt request variable, with o
-ne flag per bit.  The fetch-phase evaluation of interrupts consists of two steps: are interrupts enabled, and is there an interrupt outstanding?  If all the interrupt requests are kept as single-bit flags in a variable, the fetch-phase test is very fast:
-
+\par In the simplest structure, interrupt requests correspond to device flags and are kept in an interrupt request variable, with one flag per bit.  The fetch-phase evaluation of interrupts 
+consists of two steps: are interrupts enabled, and is there an interrupt outstanding?  If all the interrupt requests are kept as single-bit flags in a variable, the fetch-phase test is very fast:
 \par 
 \par \tab if (int_enable && int_requests) \{ \'85process interrupt\'85 \}
 \par 
-\par Indeed, if the interrupt enable flag is not visible state, it can be made the highest bit in the interrupt request variable, and the two tests combined:
+\par Indeed, the interrupt enable flag can be made the highest bit in the interrupt request variable, and the two tests combined:
 \par 
 \par \tab if (int_requests > INT_ENABLE) \{ \'85process interrupt\'85 \}
 \par 
@@ -191,56 +195,54 @@ ne flag per bit.  The fetch-phase evaluation of interrupts consists of two steps
 \par \tab set: \tab int_requests = int_requests | DEVICE_FLAG;
 \par \tab clear:\tab int_requests = int_requests & ~DEVICE_FLAG;
 \par 
-\par At a slightly higher complexity, interrupt
- requests do not correspond directly to device flags but are based on masking the device flags with an enable (or disable) mask.  There are now three parallel variables: interrupt requests, device flags, and interrupt enable mask.  The fetch-phase test do
-es not change; however, the evaluation of whether an interrupt is pending now requires an extra step:
+\par At a slightly higher complexity, interrupt requests do 
+not correspond directly to device flags but are based on masking the device flags with an enable (or disable) mask.  There are now three parallel variables: interrupt requests, device flags, and interrupt enable mask.  The fetch-phase test does not change
+; however, the evaluation of whether an interrupt is pending now requires an extra step:
 \par 
 \par \tab enable:\tab int_requests = device_flags & int_enables;
 \par \tab disable:\tab int_requests = device_flags & ~int_disables;
 \par 
-\par If required for interrupt processing, the high
-est priority interrupting device can be determined by scanning the interrupt request variable from high priority to low until a set bit is found.  The bit position can then be back-mapped through a table to determine the address or interrupt vector of the
- interrupting device.
+\par If required for interrupt processing, the highest priority 
+interrupting device can be determined by scanning the interrupt request variable from high priority to low until a set bit is found.  The bit position can then be back-mapped through a table to determine the address or interrupt vector of the interrupting
+ device.
 \par 
-\par At yet higher complexity, the interrupt system may be too complex or too large to evaluate during the fetch-phase.  In this case, an interrupt pending flag is created, and it is evaluated by subroutine call whenever a change could occ
-ur (start of execution, I/O instruction issued, device time out occurs).  This makes fetch-phase evaluation simple and isolates interrupt evaluation to a common subroutine.
+\par At yet higher complexity, the interrupt system may be too complex or too large to evaluate during the fetch-phase.  In this case, an interrupt pending flag is created, and it is evaluated by subroutine call whenever a change could occur (start of 
+execution, I/O instruction issued, device time out occurs).  This makes fetch-phase evaluation simple and isolates interrupt evaluation to a common subroutine.
 \par 
 \par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.1.4\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 I/O Dispatching
 \par }\pard \widctlpar\adjustright {\f1 
 \par I/O dispatching consists of four steps:
 \par 
-\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls14\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls14\adjustright {\f1 Identify the I/O command
- and analyze for the device address.
+\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls14\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls14\adjustright {\f1 Identify the I/O command and
+ analyze for the device address.
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls14\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls14\adjustright {\f1 Locate the selected device.
 
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls14\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls14\adjustright {\f1 
 Break down the I/O command into standard fields.
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls14\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls14\adjustright {\f1 Call the device processor.
 \par }\pard \widctlpar\adjustright {\f1 
-\par Analyzing an I/O command is usually easy.  Most systems have one or more explicit I/O instructions containing an I
-/O command and a device address.  Memory mapped I/O is more complicated; the identification of a reference to I/O space becomes part of memory addressing.  This usually requires centralizing memory reads and writes into subroutines, rather than as inline 
-code.
+\par Analyzing an I/O command is usually easy.  Most systems have one or more explicit I/O instructions containing
+ an I/O command and a device address.  Memory mapped I/O is more complicated; the identification of a reference to I/O space becomes part of memory addressing.  This usually requires centralizing memory reads and writes into subroutines, rather than as in
+line code.
 \par 
-\par Once an I/O command has been analyzed, the CPU must locate the device subroutine.  The simplest way is a large switch statement with hardwired subroutine calls.  Slightly more modular is to call through a dispatch table, with NULL entries representin
-g non-existant devices.  Before calling the device routine, the CPU usually breaks down the I/O command into standard fields.  This simplifies writing the peripheral simulator.
+\par Once an I/O command has been analyzed, the CPU must locate the device subroutine.  The simplest way is a large switch statement with hardwired subroutine calls.  Slightly more modular is to call through a dispatch table, with NULL 
+entries representing non-existent devices.  Before calling the device routine, the CPU usually breaks down the I/O command into standard fields.  This simplifies writing the peripheral simulator.
 \par 
 \par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.1.5\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Instruction Execution
 \par }\pard \widctlpar\adjustright {\f1 
 \par Instruction execution is the responsibility of VM subroutine }{\b\f1 sim_instr}{\f1 .  It is called from SCP as a result of a RUN, GO, CONT, or BOOT command.  It begins executing instructions at the current PC (}{\b\f1 sim_PC}{\f1 
  points to its register description block) and continues until halted by an error or an external event.
 \par 
-\par Whe
-n called, the CPU needs to account for any state changes that the user made.  For example, it may need to re-evaluate whether an interrupt is pending, or restore frequently used state to local register variables for efficiency.  The actual instruction fet
-ch and execute cycle is usually structured as a loop controlled by an error variable, e.g.,
+\par When called, the CPU needs to account for any state changes that the user made.  For example, it may need to re-evaluate whether an interrupt is pending, or restore frequently used state to local register variables for efficiency.  Th
+e actual instruction fetch and execute cycle is usually structured as a loop controlled by an error variable, e.g.,
 \par 
 \par \tab reason = 0;
 \par \tab do \{ \'85 \} while (reason == 0);\tab or\tab while (reason == 0) \{ \'85 \}
 \par 
 \par Within this loop, the usual order of events is:
 \par 
-\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls4\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls4\adjustright {\f1 
-If the event timer sim_interval has reached zero, process any timed events.  This is done by SCP subroutine sim_process_event (void).  Because this is the polling mechanism for user-generated processor halts (^E), errors must be recognized immediately:
-
+\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls4\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls4\adjustright {\f1 If the event timer }{\b\f1 
+sim_interval}{\f1  has reached zero, process any timed events.  This is done by SCP subroutine }{\b\f1 sim_process_event}{\f1 .  Because this is the polling mechanism for user-generated processor halts (^E), errors must be recognized immediately:
 \par }\pard \widctlpar{\*\pn \pnlvlcont\ilvl0\ls0\pnrnot0\pndec }\adjustright {\f1 
 \par }\pard \li1440\widctlpar{\*\pn \pnlvlcont\ilvl0\ls0\pnrnot0\pndec }\adjustright {\f1 if (sim_interval <= 0) \{
 \par }\pard \fi720\li1440\widctlpar{\*\pn \pnlvlcont\ilvl0\ls0\pnrnot0\pndec }\adjustright {\f1 if (reason = sim_process_event ()) break;  \}
@@ -267,22 +269,22 @@ The VM should provide some debugging aids.  The existing CPU\rquote s all provid
 \par }\pard \widctlpar\adjustright {\f1 
 \par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.2\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\ilvl1\adjustright {\f1 Peripheral Device Organization
 \par }\pard \widctlpar\adjustright {\f1 
-\par The basic elements of a VM are devices, each corresponding roughly to a real chunk of hardware.  A device cons
-ists of register-based state and one or more units.  Thus a multi-drive disk subsystem is a single device (representing the hardware of the real controller) and one or more units (each representing a single disk drive).  Sometimes the device and its unit 
-are the same entity as, for example, in the case of a paper tape reader.  However, a single physical hardware device, such as the console, may be broken up for convenience into separate input and output devices.
+\par The basic elements of a VM are devices, ea
+ch corresponding roughly to a real chunk of hardware.  A device consists of register-based state and one or more units.  Thus, a multi-drive disk subsystem is a single device (representing the hardware of the real controller) and one or more units (each r
+epresenting a single disk drive).  Sometimes the device and its unit are the same entity as, for example, in the case of a paper tape reader.  However, a single physical device, such as the console, may be broken up for convenience into separate in
+put and output devices.
 \par 
-\par In general, units correspond to individual s
-ources of input or output (one tape transport, one A-to-D channel).  Units are the basic medium for both device timing and device I/O.  Except for the console, all I/O devices are simulated as host-resident files.  SCP allows the user to make an explicit 
-association between a host-resident file and a simulated hardware entity.
+\par In general, units correspond to individual sources of input or output (one tape transport, one A-to-D channel).  Units are the basic medium for both device timing and device I/O.  Except for the console, all I/O devices are simulat
+ed as host-resident files.  SCP allows the user to make an explicit association between a host-resident file and a simulated hardware entity.
 \par 
 \par Both devices and units have state.  Devices operate on }{\i\f1 registers}{\f1 , which contain information about the state of the device, and indirectly, about the state of the units.  Units operate on }{\i\f1 data sets}{\f1 
-, which may be thought of as individual instances of input or output, such as a disk pack or a punched paper tape.  In a typical multi-unit device, all units are the same, and the device performs similar operations on all of them, depending o
-n which one has been selected by the program being simulated.  Schematically:
+, which may be thought of as individual instances of input or output, such as a disk pack or a punched paper tape.  In a typical multi-unit device, all units are the same, a
+nd the device performs similar operations on all of them, depending on which one has been selected by the program being simulated.
 \par 
 \par (Note: SIMH, like MIMIC, restricts registers to devices.  This requires replicated registers, for example, disk drive current state, to have unique names in the device name space.)
 \par 
-\par For each structural level, SIMH defines, and the VM must supply, a corresponding data structure.  }{\b\f1 device}{\f1  structures correspond to devices, }{\b\f1 reg}{\f1  structures to registers, and }{\b\f1 unit}{\f1 
- structures to units.  These structures are described in detail in section 3.
+\par For each structural level, SIMH defines, and the VM must supply, a corresponding data structure.  }{\b\f1 device}{\f1  structures correspond to devices, }{\b\f1 reg}{\f1  structures to registers, and }{\b\f1 unit}{\f1  structures to units. 
+ These structures are described in detail in section 4.
 \par 
 \par The primary functions of a peripheral are:
 \par 
@@ -291,16 +293,15 @@ n which one has been selected by the program being simulated.  Schematically:
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls6\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls6\adjustright {\f1 device timing
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls6\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls6\adjustright {\f1 data transmission.
 \par }\pard \widctlpar\adjustright {\f1 
-\par Command decoding is fairly obvious.  At least one section of the peripheral code module will be devoted to processing directives issued by the 
-CPU.  Typically, the command decoder will be responsible for register and flag manipulation, and for issuing or canceling I/O requests.  The former is easy, but the later requires a thorough understanding of device timing.
+\par Command decoding is fairly obvious.  At least one section of the peripheral code 
+module will be devoted to processing directives issued by the CPU.  Typically, the command decoder will be responsible for register and flag manipulation, and for issuing or canceling I/O requests.  The former is easy, but the later requires a thorough un
+derstanding of device timing.
 \par 
 \par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.2.1\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Device Timing
 \par }\pard \widctlpar\adjustright {\f1 
-\par The principal pro
-blem in I/O device simulation is imitating asynchronous operations in a sequential simulation environment.  Fortunately, the timing characteristics of most I/O devices do not vary with external circumstances.  The distinction between devices whose timing 
-i
-s externally generated (e.g., console keyboard) and those whose timing is externally generated (disk, paper tape reader) is crucial.  With an externally timed device, there is no way to know when an in-progress operation will begin or end; with an interna
-lly timed device, given the time when an operation starts, the end time can be calculated.
+\par The principal problem in I/O device simulation is imitating asynchronous operations in a sequential simulation environment.  Fortuna
+tely, the timing characteristics of most I/O devices do not vary with external circumstances.  The distinction between devices whose timing is externally generated (e.g., console keyboard) and those whose timing is externally generated (disk, paper tape r
+eader) is crucial.  With an externally timed device, there is no way to know when an in-progress operation will begin or end; with an internally timed device, given the time when an operation starts, the end time can be calculated.
 \par 
 \par For an internally timed device, the elapsed time between the start and conclusion of an operation is called the wait time.  Some typical internally timed devices and their wait times include:
 \par 
@@ -317,13 +318,13 @@ s poll for keyboard input, thus converting the externally timed keyboard to a ps
 \par SCP provides the supporting routines for device timing.  SCP maintains a list of devices (called }{\i\f1 active devices}{\f1 ) which are in the process of timing out.  It also provides routines for querying or manipulating this list (called the }{\i\f1 
 active queue}{\f1 ).  Lastly, it provides a routine for checking for timed-out units and executing a VM-specified action when a time-out occurs.
 \par 
-\par Device timing is done with the UNIT structure, described in section 3.  To set up a timed operation, the peripheral calculates a waiting period for a unit and places that unit on the active queue.  The CPU counts down the waiting period.  When the wai
-ting period has expired, sim_process_event removes the unit from the active queue and calls a device subroutine.  A device may also cancel an outstanding timed operation and query the state of the queue.  The timing subroutines are:
+\par Device timing is done with the UNIT structure, described in section 3.  To set up a timed operation, the perip
+heral calculates a waiting period for a unit and places that unit on the active queue.  The CPU counts down the waiting period.  When the waiting period has expired, }{\b\f1 sim_process_event}{\f1 
+ removes the unit from the active queue and calls a device subroutine.  A device may also cancel an outstanding timed operation and query the state of the queue.  The timing subroutines are:
 \par 
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls7\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls7\adjustright {\f1 t_stat }{\b\f1 sim_activate}{\f1 
- (U
-NIT *uptr, int32 wait).  This routine places the specified unit on the active queue with the specified waiting period.  A waiting period of 0 is legal; negative waits cause an error.  If the unit is already active, the active queue is not changed, and no 
-error occurs.
+ (UNIT *uptr, int32 wait).  This routine places the specified unit on the active queue with the specified waiting p
+eriod.  A waiting period of 0 is legal; negative waits cause an error.  If the unit is already active, the active queue is not changed, and no error occurs.
 \par }\pard \widctlpar{\*\pn \pnlvlcont\ilvl0\ls0\pnrnot0\pndec }\adjustright {\f1 
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls7\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls7\adjustright {\f1 t_stat }{\b\f1 sim_cancel}{\f1 
  (UNIT *uptr).  This routine removes the specified unit from the active queue.  If the unit is not on the queue, no error occurs.
@@ -342,8 +343,8 @@ error occurs.
 \par }\pard \widctlpar\adjustright {\f1 
 \par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.2.2\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Data I/O
 \par }\pard \widctlpar\adjustright {\f1 
-\par For most devices, timing is half the battle (for clocks it is the entire war); the other half is I/O.  Except for the console, all I/O devices are simulated as files on the host file system in little-endian format. 
- SCP provides facilities for associating files with units (ATTACH command) and for reading and writing data from and to devices in a endian- and size-independent way.
+\par For most devices, timing is half the battle (for clocks it is the entire war); the other half is I/O.  Except for the console, all I/O devices are simulated as files on the host file system in little-endian format.  SCP provides facilities for associating
+ files with units (ATTACH command) and for reading and writing data from and to devices in a endian- and size-independent way.
 \par 
 \par For most devices, the VM designer does not have to be concerned about the formatting of simulated device files.  I/O occurs in 1, 2, or 4 byte quantities; SCP automatically chooses the correct data size and corrects for byte ordering.  Specific issues:
 
@@ -351,33 +352,34 @@ error occurs.
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls8\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls8\adjustright {\f1 
 Line printers should write data as 7-bit ASCII, with newlines replacing carriage-return/line-feed sequences.
 \par }\pard \widctlpar{\*\pn \pnlvlcont\ilvl0\ls0\pnrnot0\pndec }\adjustright {\f1 
-\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls8\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls8\adjustright {\f1 
-Disks should be viewed as linear data sets, from sector 0 of surface 0 of cylinder 0 to the last sector on the disk.  This allows easy transcription of real disks to files usable by the simulator.
+\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls8\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls8\adjustright {\f1 Disks should be
+ viewed as linear data sets, from sector 0 of surface 0 of cylinder 0 to the last sector on the disk.  This allows easy transcription of real disks to files usable by the simulator.
 \par }\pard \widctlpar{\*\pn \pnlvlcont\ilvl0\ls0\pnrnot0\pndec }\adjustright {\f1 
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls8\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls8\adjustright {\f1 
-Magtapes, by convention, use a record 
-based format.  Each record consists of a leading 32-bit record length, the record data (padded with a byte of 0 if the record length is odd), and a trailing 32-bit record length.  File marks are recorded as one record length of 0.
+Magtapes, by convention, use a record based format.  Each record consi
+sts of a leading 32-bit record length, the record data (padded with a byte of 0 if the record length is odd), and a trailing 32-bit record length.  File marks are recorded as one record length of 0.
 \par }\pard \widctlpar{\*\pn \pnlvlcont\ilvl0\ls0\pnrnot0\pndec }\adjustright {\f1 
-\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls8\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls8\adjustright {\f1 Cards have 12 bits of da
-ta per column, but the data is most conveniently viewed as (ASCII) characters.  Existing card reader simulators do not support binary operation.
+\par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls8\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls8\adjustright {\f1 
+Cards have 12 bits of data per column, but the data is most conveniently viewed as (ASCII) characters.  Existing card reader simulators do not support binary operation.
 \par }\pard \widctlpar\adjustright {\f1 
-\par Data I/O varies between fixed and variable capacity devices, and between buffered and non-buffered devices.  A
- fixed capacity device differs from a variable capacity device in that the file attached to the former has a maximum size, while the file attached to the latter may expand indefinitely.  A buffered device differs from a non-buffered device in that the for
-mer buffers its data set in host memory, while the latter maintains it as a file.  Most variable capacity devices (such as the paper tape reader and punch) are sequential; all buffered devices are fixed capacity.
+\par Data I/O varies between fixed and variable capacity devices, and between buffered and non-buffered devices.  A fixed capacity device differ
+s from a variable capacity device in that the file attached to the former has a maximum size, while the file attached to the latter may expand indefinitely.  A buffered device differs from a non-buffered device in that the former buffers its data set in h
+ost memory, while the latter maintains it as a file.  Most variable capacity devices (such as the paper tape reader and punch) are sequential; all buffered devices are fixed capacity.
 \par 
-\par 2.3.2.1 Reading and Writing Data
-\par 
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.2.2.1\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl3\adjustright {\f1 Reading and Writing Data
+\par }\pard \widctlpar\adjustright {\f1 
 \par The ATTACH command creates an association between a host file and an I/O unit.  For non-buffered devices, ATTACH stores the file pointer for the host file in the }{\b\f1 fileref}{\f1 
  field of the UNIT structure.  For buffered devices, ATTACH reads the entire host file into an allocated buffer pointed to by the }{\b\f1 filebuf }{\f1 field of the UNIT structure.
 \par 
-\par For non-buffered devices, I/O is done with standard C subroutines plus the SCP routines }{\b\f1 fxread}{\f1  and }{\b\f1 fxwrite}{\f1 .  }{\b\f1 fxread}{\f1  and }{\b\f1 fxwrite}{\f1  are identical in calling sequence and function to fread 
-and fwrite, respectively, but will correct for endian dependencies.  For buffered devices, I/O is done by copying data to or from the allocated buffer.  The device code must maintain the number (+1) of the highest address modified in the }{\b\f1 hwmark}{
-\f1  field of the UNIT structure.  For both the non-buffered and buffered cases, the device must perform all address calculations and positioning operations.
+\par For non-buffered devices, I/O is done with standard C subroutines plus the SCP routines }{\b\f1 fxread}{\f1  and }{\b\f1 fxwrite}{\f1 .  }{\b\f1 fxread}{\f1  and }{\b\f1 fxwrite}{\f1 
+ are identical in calling sequence and function to fread and fwrite, respectively, but
+ will correct for endian dependencies.  For buffered devices, I/O is done by copying data to or from the allocated buffer.  The device code must maintain the number (+1) of the highest address modified in the }{\b\f1 hwmark}{\f1 
+ field of the UNIT structure.  For both the non-buffered and buffered cases, the device must perform all address calculations and positioning operations.
 \par 
 \par The DETACH command breaks the association between a host file and an I/O unit.  For buffered devices, DETACH writes the allocated buffer back to the host file.
 \par 
-\par 2.3.2.2 Console I/O
-\par 
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.2.2.2\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl3\adjustright {\f1 Console I/O
+\par }\pard \widctlpar\adjustright {\f1 
 \par SCP provides two routines for console I/O.
 \par 
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls10\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls10\adjustright {\f1 t_stat }{\b\f1 sim_poll_char }{
@@ -386,12 +388,12 @@ and fwrite, respectively, but will correct for endian dependencies.  For buffere
 \par {\pntext\pard\plain\f3\fs20\cgrid \loch\af3\dbch\af0\hich\f3 \'b7\tab}}\pard \fi-360\li720\widctlpar\jclisttab\tx720{\*\pn \pnlvlblt\ilvl0\ls10\pnrnot0\pnf3\pnstart1\pnindent720\pnhang{\pntxtb \'b7}}\ls10\adjustright {\f1 t_stat }{\b\f1 sim_putchar}{\f1 
  (int32 char).  This routine types the specified ASCII character on the console.  There are no errors.
 \par }\pard \widctlpar\adjustright {\f1 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls13\adjustright {\f1 Data Structures
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\adjustright {\f1 Data Structures
 \par }\pard \widctlpar\adjustright {\f1 
 \par The devices, units, and registers which make up a VM are formally described through a set of data structures which interface the VM to the control portions of SCP.  The devices themselves are pointed to by the device list array }{\b\f1 sim_devices[]}{\f1 
 .  Within a device, both units and registers are allocated contiguously as arrays of structures.  In addition, many devices allow the user to set or clear options via a modifications table.
 \par 
-\par {\listtext\pard\plain\b\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.1\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls13\ilvl1\adjustright {\b\f1 device}{\f1  Structure
+\par {\listtext\pard\plain\b\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.1\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\ilvl1\adjustright {\b\f1 device}{\f1  Structure
 \par }\pard \widctlpar\adjustright {\f1 
 \par Devices are defined by the }{\b\f1 device}{\f1  structure (typedef }{\b\f1 DEVICE}{\f1 ), which has the following fields:
 \par 
@@ -433,10 +435,10 @@ and fwrite, respectively, but will correct for endian dependencies.  For buffere
 \par }{\b\f1 attach}{\f1 \tab \tab address of special device attach routine, or NULL if none is required.
 \par }{\b\f1 detach}{\f1 \tab \tab address of special device detach routine, or NULL if none is required.
 \par }\pard \widctlpar\adjustright {\f1 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.1.1\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls13\ilvl2\adjustright {\f1 Examine and Deposit Routines
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.1.1\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Examine and Deposit Routines
 \par }\pard \widctlpar\adjustright {\f1 
-\par For devices which maintain their data sets as host files, SCP implements the examine and deposit data functions.  However, devices which maintain their d
-ata sets as private state (typically just the CPU) must supply special examine and deposit routines.  The calling sequences are:
+\par For devices which maintain their data sets as host files, SCP implements the examine and deposit data functions.  However, devices which maintain their data sets as private state (typically just the CPU) must supply special examine and deposit routines.  
+The calling sequences are:
 \par 
 \par }\pard \li720\widctlpar\adjustright {\f1 t_stat }{\i\f1 examine_routine}{\f1  (t_val *eval_array, t_addr addr, UNIT *uptr, int32 switches) \endash  Copy }{\b\f1 sim_emax}{\f1  consecutive addresses for unit }{\i\f1 uptr}{\f1 , starting at }{\i\f1 addr}{
 \f1 , into }{\i\f1 eval_array}{\f1 .  The }{\i\f1 switch}{\f1  variable has bit<n> set if the n\rquote th letter was specified as a switch to the examine command.
@@ -444,7 +446,7 @@ ata sets as private state (typically just the CPU) must supply special examine a
 \par t_stat }{\i\f1 deposit_routine}{\f1  (t_val value, t_addr addr, UNIT *uptr, int32 switches) \endash  Store the specified }{\i\f1 value}{\f1  in the specified }{\i\f1 addr}{\f1  for unit }{\i\f1 uptr}{\f1 .  The }{\i\f1 switch}{\f1 
  variable is the same as for the examine routine.
 \par }\pard \widctlpar\adjustright {\f1 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.1.2\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls13\ilvl2\adjustright {\f1 Reset Routine
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.1.2\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Reset Routine
 \par }\pard \widctlpar\adjustright {\f1 
 \par The reset routine implements the device reset function for the RESET, RUN, and BOOT commands.  Its calling sequence is:
 \par 
@@ -452,15 +454,15 @@ ata sets as private state (typically just the CPU) must supply special examine a
 \par 
 \par A typical reset routine clears all device flags and cancels any outstanding timing operations.
 \par 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.1.3\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls13\ilvl2\adjustright {\f1 Boot Routine
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.1.3\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Boot Routine
 \par }\pard \widctlpar\adjustright {\f1 
 \par If a device responds to a BOOT command, the boot routine implements the bootstrapping function.  Its calling sequence is:
 \par 
-\par \tab t_stat boot_routine (int32 unit_number) \endash  Bootstrap the specified unit.
+\par \tab t_stat }{\i\f1 boot_routine}{\f1  (int32 unit_number) \endash  Bootstrap the specified unit.
 \par 
 \par A typical bootstrap routine copies a bootstrap loader into main memory and sets the PC to the starting address of the loader.  SCP then starts simulation at the specified address.
 \par 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.1.4\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls13\ilvl2\adjustright {\f1 Attach and Detach Routines
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.1.4\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Attach and Detach Routines
 \par }\pard \widctlpar\adjustright {\f1 
 \par Normally, the ATTACH and DETACH commands are handled by SCP.  However, devices which need to pre- or post-process these commands must supply special attach and detach routines.  The calling sequences are:
 \par 
@@ -482,7 +484,7 @@ ata sets as private state (typically just the CPU) must supply special examine a
 \par \tab return detach_unit (uptr);
 \par \}
 \par }\pard \widctlpar\adjustright {\f1 
-\par {\listtext\pard\plain\b\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.2\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls13\ilvl1\adjustright {\b\f1 unit}{\f1  Structure
+\par {\listtext\pard\plain\b\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.2\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\ilvl1\adjustright {\b\f1 unit}{\f1  Structure
 \par }\pard \widctlpar\adjustright {\b\f1 
 \par }{\f1 Units are allocated as contiguous array.  Each unit is defined with a }{\b\f1 unit}{\f1  structure (typedef }{\b\f1 UNIT}{\f1 ), which has the following fields:
 \par 
@@ -531,7 +533,7 @@ ata sets as private state (typically just the CPU) must supply special examine a
 \par 
 \par defines the line printer as a sequential unit with a wait time of 500.
 \par 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.2.1\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls13\ilvl2\adjustright {\f1 Unit Flags
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.2.1\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Unit Flags
 \par }\pard \widctlpar\adjustright {\f1 
 \par The }{\b\f1 flags }{\f1 field contains indicators of current unit status.  SIMH defines 11 flags:
 \par 
@@ -549,10 +551,11 @@ ata sets as private state (typically just the CPU) must supply special examine a
 \par UNIX_FIX\tab \tab the unit is fixed capacity.
 \par UNIT_BINK\tab \tab the unit measures \ldblquote K\rdblquote  as 1024, rather than 1000.
 \par }\pard \widctlpar\adjustright {\f1 
-\par Starting at bit position UNIT_V_UF, the remaining flags are device-specific.  Device-specific flags are set and cleared with the SET and CLEAR commands, which reference the MTAB array (see below).  De
-vice-specific flags and UNIT_DIS are not automatically saved and restored; the device must supply a register covering these bits.
+\par Starting at bit position UNIT_V_UF, the remaining flags are
+ device-specific.  Device-specific flags are set and cleared with the SET and CLEAR commands, which reference the MTAB array (see below).  Device-specific flags and UNIT_DIS are not automatically saved and restored; the device must supply a register cover
+ing these bits.
 \par 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.2.2\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls13\ilvl2\adjustright {\f1 Service Routine
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.2.2\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Service Routine
 \par }\pard \widctlpar\adjustright {\f1 
 \par This routine is called by }{\b\f1 sim_process_event}{\f1  when a unit times out.  Its calling sequence is:
 \par 
@@ -560,7 +563,7 @@ vice-specific flags and UNIT_DIS are not automatically saved and restored; the d
 \par }\pard \widctlpar\adjustright {\f1 
 \par The status returned by the service routine is passed by }{\b\f1 sim_process_event}{\f1  back to the CPU.
 \par 
-\par {\listtext\pard\plain\b\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.3\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls13\ilvl1\adjustright {\b\f1 reg}{\f1  Structure
+\par {\listtext\pard\plain\b\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.3\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\ilvl1\adjustright {\b\f1 reg}{\f1  Structure
 \par }\pard \widctlpar\adjustright {\b\f1 
 \par }{\f1 Registers are allocated as contiguous array, with a NULL register at the end.  Each register is defined with a }{\b\f1 reg}{\f1  structure (typedef }{\b\f1 REG}{\f1 ), which has the following fields:
 \par 
@@ -584,8 +587,8 @@ vice-specific flags and UNIT_DIS are not automatically saved and restored; the d
 \par }{\b\f1 depth\tab }{\f1 \tab size of data array (normally 1).
 \par }{\b\f1 flags}{\f1 \tab \tab flags and formatting information.
 \par }\pard \widctlpar\adjustright {\f1 
-\par The }{\b\f1 depth}{\f1  field is only used with special \ldblquote arrayed registers\rdblquote , like the data buffer in the PDP floppy disk 
-controller.  Arrayed registers cannot be examined or deposited, but all the values in the array will be saved and restored by SAVE and RESTORE.
+\par The }{\b\f1 depth}{\f1  field is only used with special \ldblquote arrayed registers\rdblquote , like the data buffer in the PDP floppy disk controller.  Arrayed registers cannot be examined or deposited, but all th
+e values in the array will be saved and restored by SAVE and RESTORE.
 \par 
 \par Macros }{\b\f1 ORDATA}{\f1 , }{\b\f1 DRDATA}{\f1 , and }{\b\f1 HRDATA}{\f1  define right-justified octal, decimal, and hexidecimal registers, respectively.  They are invoked by:
 \par 
@@ -608,7 +611,7 @@ controller.  Arrayed registers cannot be examined or deposited, but all the valu
 \par \tab REG lpt_reg = \{
 \par \tab \tab \{ DRDATA\tab (POS, lpt_unit.pos, 31), PV_LFT \}, \'85 \}
 \par 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.3.1\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls13\ilvl2\adjustright {\f1 Register Flags
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.3.1\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Register Flags
 \par }\pard \widctlpar\adjustright {\f1 
 \par The }{\b\f1 flags }{\f1 field contains indicators that control register examination and deposit.
 \par 
@@ -622,7 +625,7 @@ controller.  Arrayed registers cannot be examined or deposited, but all the valu
 \par REG_HRO\tab \tab register is read only and hidden.
 \par REG_NZ\tab \tab new register values must be non-zero.
 \par 
-\par {\listtext\pard\plain\b\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.4\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls13\ilvl1\adjustright {\b\f1 mtab}{\f1  Structure
+\par {\listtext\pard\plain\b\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.4\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\ilvl1\adjustright {\b\f1 mtab}{\f1  Structure
 \par }\pard \widctlpar\adjustright {\b\f1 
 \par }{\f1 Device-specific SHOW and SET commands are processed using the modifications array, which is allocated as contiguous array, with a NULL at the end.  Each possible modification is defined with a }{\b\f1 mtab}{\f1  structure (synonym }{\b\f1 MTAB}{\f1 
 ), which has the following fields:
@@ -644,14 +647,14 @@ controller.  Arrayed registers cannot be examined or deposited, but all the valu
 \par }{\b\f1 mstring}{\f1 \tab pointer to character string to be matched (SET, CLEAR)
 \par }{\b\f1 valid}{\f1 \tab address of validation routine, or NULL if none required
 \par }\pard \fi-1440\li1440\widctlpar\adjustright {\f1 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.4.1\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls13\ilvl2\adjustright {\f1 Validation Routine
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.4.1\tab}}\pard \fi-720\li720\widctlpar\jclisttab\tx720\ls1\ilvl2\adjustright {\f1 Validation Routine
 \par }\pard \widctlpar\adjustright {\f1 
 \par The validation routine is called during SET processing to make sure that the proposed modification is valid.  It can make other state changes required by the modification or initiate additional dialogs needed by the modifier.  Its calling sequence is:
 
 \par 
 \par }\pard \li720\widctlpar\adjustright {\f1 t_stat }{\i\f1 validation_routine}{\f1  (UNIT *uptr, int32 value) \endash  test that }{\i\f1 uptr}{\f1 .}{\b\f1 flags}{\f1  can be set to }{\i\f1 value}{\f1 .
 \par }\pard \widctlpar\adjustright {\f1 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 3.5\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls13\ilvl1\adjustright {\f1 Other Data Structures
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.5\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\ilvl1\adjustright {\f1 Other Data Structures
 \par }\pard \widctlpar\adjustright {\f1 
 \par char }{\b\f1 sim_name[]}{\f1  is a character array containing the VM name.
 \par 
@@ -664,15 +667,15 @@ controller.  Arrayed registers cannot be examined or deposited, but all the valu
 \par char *}{\b\f1 sim_stop_messages[]}{\f1  is an array of pointers to character strings, corresponding to error status returns greater than zero.  If }{\b\f1 sim_instr}{\f1  returns status code n > 0, then }{\b\f1 sim_stop_message[n]}{\f1  is printed by SCP.
 
 \par 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls13\adjustright {\f1 VM Provided Routines
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 5.\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\adjustright {\f1 VM Provided Routines
 \par }\pard \widctlpar\adjustright {\f1 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.1\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls13\ilvl1\adjustright {\f1 Instruction Execution
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 5.1\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\ilvl1\adjustright {\f1 Instruction Execution
 \par }\pard \widctlpar\adjustright {\f1 
 \par Instruction execution is performed by routine }{\b\f1 sim_instr}{\f1 .  Its calling sequence is:
 \par 
 \par t_stat }{\b\f1 sim_instr}{\f1  (void) \endash  Execute from current PC until error or halt.
 \par 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.2\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls13\ilvl1\adjustright {\f1 Binary Load and Dump
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 5.2\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\ilvl1\adjustright {\f1 Binary Load and Dump
 \par }\pard \widctlpar\adjustright {\f1 
 \par If the VM responds to the LOAD (or DUMP) command, the loader (dumper) is implemented by routine }{\b\f1 sim_load}{\f1 .  Its calling sequence is:
 \par 
@@ -681,7 +684,7 @@ controller.  Arrayed registers cannot be examined or deposited, but all the valu
 \par }\pard \widctlpar\adjustright {\f1 
 \par If LOAD or DUMP is not implemented, }{\b\f1 sim_load}{\f1  should simply return SCPE_ARG.  The LOAD and DUMP commands open and close the specified file for }{\b\f1 sim_load}{\f1 .
 \par 
-\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 4.3\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls13\ilvl1\adjustright {\f1 Symbolic Examination and Deposit
+\par {\listtext\pard\plain\f1\fs20\cgrid \hich\af1\dbch\af0\loch\f1 5.3\tab}}\pard \fi-360\li360\widctlpar\jclisttab\tx360\ls1\ilvl1\adjustright {\f1 Symbolic Examination and Deposit
 \par }\pard \widctlpar\adjustright {\f1 
 \par If the VM provides symbolic examination and deposit of data, it must provide two routines, }{\b\f1 fprint_sym}{\f1  for output and }{\b\f1 parse_sym}{\f1  for input.  Their calling sequences are:
 \par 
@@ -691,8 +694,8 @@ controller.  Arrayed registers cannot be examined or deposited, but all the valu
 \par t_stat }{\b\f1 parse_sym}{\f1  (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 switch) \endash  Based on the }{\i\f1 switch}{\f1  variable, parse character string }{\i\f1 cptr}{\f1  for a symbolic value }{\i\f1 val}{\f1  at the specified }{
 \i\f1 addr}{\f1  in unit }{\i\f1 uptr}{\f1 .
 \par }\pard \widctlpar\adjustright {\f1 
-\par If symbolic processing is not implemented, or the output value or input string cannot be parsed, these routines should return SCPE_ARG.  If the processing was successful and con
-sumed more than a single word, then these routines should return extra number of words (not bytes) consumed as a }{\b\f1 negative}{\f1 
+\par If symbolic processing is not implemented, or the output value or input string cannot be parsed, these routines should return SCPE_ARG.  If the processing was successful and consume
+d more than a single word, then these routines should return extra number of words (not bytes) consumed as a }{\b\f1 negative}{\f1 
  number.  If the processing was successful and consumed a single word, then these routines should return SCPE_OK.  For example, PDP-11 }{\b\f1 parse_sym}{\f1  would respond as follows to various inputs:
 \par 
 \par \tab input\tab \tab \tab \tab return value

@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-1999, Robert M. Supnik
+   Copyright (c) 1993-2000, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Dec-00	RMS	Fixed bugs found by Charles Owen
+			-- 4,7 char NOPs are legal
+			-- 1 char B is chained BCE
+			-- MCE moves whole char after first
    14-Apr-99	RMS	Changed t_addr to unsigned
 
    The register state for the IBM 1401 is:
@@ -256,7 +260,7 @@ const int32 op_table[64] = {
 	L2 | L5,					/* select stacker */
 	L1 | L4 | L7 | L8 | BREQ | MLS | IO,		/* load */
 	L1 | L4 | L7 | L8 | BREQ | MLS | IO,		/* move */
-	HNOP | L1,					/* nop */
+	HNOP | L1 | L4 | L7,				/* nop */
 	0,						/* illegal */
 	L1 | L4 | L7 | AREQ | BREQ | MR,		/* move to record */
 	L1 | L4 | AREQ | MLS,				/* 50: store A addr */
@@ -599,16 +603,16 @@ case OP_C:						/* compare */
 
 /* Branch instructions					A check	    B check
 
-   B 8 char:	branch if B char equals d		if branch   here
-   B 5 char:	branch if indicator[d] is set		if branch
+   B 1/8 char:	branch if B char equals d		if branch   here
    B 4 char:	unconditional branch			if branch
+   B 5 char:	branch if indicator[d] is set		if branch
    BWZ:		branch if (d<0>: B char WM)		if branch   here
 		(d<1>: B char zone = d zone)
    BBE:		branch if B char & d non-zero		if branch   here
 */
 
 case OP_B:						/* branch */
-	if (ilnt <= 4) { BRANCH; }			/* uncond branch? */
+	if (ilnt == 4) { BRANCH; }			/* uncond branch? */
 	else if (ilnt == 5) {				/* branch on ind? */
 		if (ind[D]) { BRANCH;  }		/* test indicator */
 		if (ind_table[D]) ind[D] = 0;  }	/* reset if needed */
@@ -783,6 +787,17 @@ case OP_RF: case OP_PF:					/* read, punch feed */
 	qdollar		EPE only; $ seen in body
 	qaster		EPE only; * seen in body
 	qdecimal	EPE only; . seen on first rescan
+
+   MCE operates in one to three scans, the first of which has three phases
+
+	1	right to left	qbody = 0, qawm = 0 => right status
+				qbody = 1, qawm = 0 => body
+				qbody = 0, qawm = 1 => left status
+	2	left to right
+	3	right to left, extended print end only
+
+   The first A field character is masked to its digit part, all others
+   are copied intact		
 */
 
 case OP_MCE:						/* edit */
@@ -799,7 +814,17 @@ case OP_MCE:						/* edit */
 	qawm = qzero = qbody = 0;			/* clear other flags */
 	qdollar = qaster = qdecimal = 0;		/* clear EPE flags */
 
-/* Edit pass 1 - from right to left, under B field control */
+/* Edit pass 1 - from right to left, under B field control
+
+	*	in status or !epe, skip B; else, set qaster, repl with A
+	$	in status or !epe, skip B; else, set qdollar, repl with A
+	0	in right status or body, if !qzero, set A WM; set qzero, repl with A
+		else, if !qzero, skip B; else, if (!B WM) set B WM 
+	blank	in right status or body, repl with A; else, skip B
+	C,R,-	in status, blank B; else, skip B
+	,	in status, blank B, else, skip B
+	&	blank B
+*/
 
 	do {	b = M[BS];				/* get B char */
 		M[BS] = M[BS] & ~WM;			/* clr WM */
@@ -818,7 +843,7 @@ case OP_MCE:						/* edit */
 				qzero = 1;		/* flag supress */
 				break;  }
 			if (!qzero) t = t | WM;		/* first? set WM */
-			qzero = 1;			/* flag suppress */
+			qzero = 1;			/* flag supress */
 							/* fall through */
 		case BCD_BLANK:				/* blank */
 			if (qawm) break;		/* any A left? */
@@ -829,7 +854,7 @@ case OP_MCE:						/* edit */
 				qawm = 1;  }
 			else {	qbody = 1;		/* in body */
 				a = M[AS]; MM (AS);	/* next A */
-				t = a & DIGIT;  }
+				t = a & CHAR;  }
 			break;
 		case BCD_C: case BCD_R: case BCD_MINUS:	/* C, R, - */
 			if (!qsign && !qbody) M[BS] = BCD_BLANK;
@@ -847,7 +872,7 @@ case OP_MCE:						/* edit */
 		if (qdollar) reason = STOP_MCE3;	/* error if $ */
 		break;  }
 
-/* Edit pass 2 - from left to right, suppressing zeroes */
+/* Edit pass 2 - from left to right, supressing zeroes */
 
 	do {	b = M[++BS];				/* get B char */
 		switch (b & CHAR) {			/* case on B char */

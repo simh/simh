@@ -1,6 +1,6 @@
 /* nova_clk.c: NOVA real-time clock simulator
 
-   Copyright (c) 1993-1999, Robert M. Supnik
+   Copyright (c) 1993-2000, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   24-Sep-97	RMS	Fixed bug in unit service (found by Dutch Owen)
+   24-Sep-97	RMS	Fixed bug in unit service (found by Charles Owen)
 
    clk		real-time clock
 */
@@ -35,8 +35,6 @@ int32 clk_sel = 0;					/* selected freq */
 int32 clk_alt_time[4] = { 16000, 100000, 10000, 1000 }; /* freq table */
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
 
 /* CLK data structures
 

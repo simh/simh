@@ -25,11 +25,12 @@
 
    dkp		moving head disk
 
+   12-Dec-00	RMS	Added Eclipse support from Charles Owen
    15-Oct-00	RMS	Editorial changes
    14-Apr-99	RMS	Changed t_addr to unsigned
    15-Sep-97	RMS	Fixed bug in DIB/DOB for new disks
-   15-Sep-97	RMS	Fixed bug in cylinder extraction (found by Dutch Owen)
-   10-Sep-97	RMS	Fixed bug in error reporting (found by Dutch Owen)
+   15-Sep-97	RMS	Fixed bug in cylinder extraction (found by Charles Owen)
+   10-Sep-97	RMS	Fixed bug in error reporting (found by Charles Owen)
    25-Nov-96	RMS	Defaults to autosize
    29-Jun-96	RMS	Added unit disable support
 */
@@ -275,17 +276,18 @@ int32 dkp_fccy = 0;					/* flags/cylinder */
 int32 dkp_sta = 0;					/* status register */
 int32 dkp_swait = 100;					/* seek latency */
 int32 dkp_rwait = 100;					/* rotate latency */
+static unsigned int16 tbuf[DKP_NUMWD];		/* transfer buffer */
 t_stat dkp_svc (UNIT *uptr);
 t_stat dkp_reset (DEVICE *dptr);
 t_stat dkp_boot (int32 unitno);
 t_stat dkp_attach (UNIT *uptr, char *cptr);
 t_stat dkp_go (void);
 t_stat dkp_set_size (UNIT *uptr, int32 value);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
-extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
+#if defined (ECLIPSE)
+extern int32 MapAddr (int32 map, int32 addr);
+#else
+#define MapAddr(m,a)	(a)
+#endif
 
 /* DKP data structures
 
@@ -542,24 +544,16 @@ return TRUE;						/* no error */
    else, do read or write
    If controller was busy, clear busy, set done, interrupt
 
-   NXM calculation: this takes advantage of the 4KW granularity of
-   memory, versus the 4KW maximum transfer size.  The end address
-   is calculated as an absolute value; thus it may be ok, non-
-   existant, or greater than 32KW (wraps to first bank).
-
-   start addr	end addr	wc			wc1
-	ok	ok		unchanged		0
-	ok	nxm		MEMSIZE-dkp_ma		< 0
-	ok	wrapped		MEMSIZE-dkp_ma		dkp_ma+wc mod 32K
-	nxm	ok		impossible
-	nxm	nxm		< 0			< 0
-	nxm	wrapped		< 0			dkp-ma+wc mod 32K
+   Memory access: sectors are read into/written from an intermediate
+   buffer to allow word-by-word mapping of memory addresses on the
+   Eclipse.  This allows each word written to memory to be tested
+   for out of range.
 */
 
-t_stat dkp_svc (uptr)
-UNIT *uptr;
+t_stat dkp_svc (UNIT *uptr)
 {
-int32 sc, sa, xcsa, wc, wc1, awc, bda;
+int32 sc, sa, xcsa, awc, bda;
+int32 sx, dx, pa;
 int32 dtype, u, err, newsect, newsurf;
 t_stat rval;
 
@@ -589,40 +583,33 @@ else if (GET_CYL (dkp_fccy, dtype) != uptr -> CYL)		/* address error? */
 
 else {	sc = 16 - GET_COUNT (dkp_ussc);			/* get sector count */
 	sa = GET_SA (uptr -> CYL, GET_SURF (dkp_ussc, dtype),
-		GET_SECT (dkp_ussc, dtype), dtype);		/* get disk block */
+		GET_SECT (dkp_ussc, dtype), dtype);	/* get disk block */
 	xcsa = GET_SA (uptr -> CYL + 1, 0, 0, dtype);	/* get next cyl addr */
 	if ((sa + sc) > xcsa ) {			/* across cylinder? */
 		sc = xcsa - sa;				/* limit transfer */
 		dkp_sta = dkp_sta | STA_XCY;  }		/* xcyl error */
-	wc = sc * DKP_NUMWD;				/* convert blocks */
 	bda = sa * DKP_NUMWD * sizeof (short);		/* to words, bytes */
-	if (((t_addr) (dkp_ma + wc)) <= MEMSIZE) wc1 = 0; /* xfer fit? */
-	else {	wc = MEMSIZE - dkp_ma;			/* calculate xfer */
-		wc1 = (dkp_ma + wc) - MAXMEMSIZE;  }	/* calculate wrap */
 
 	err = fseek (uptr -> fileref, bda, SEEK_SET);	/* position drive */
 
 	if (uptr -> FUNC == FCCY_READ) {		/* read? */
-	    if ((wc > 0) && (err == 0)) {		/* start in memory? */
-		awc = fxread (&M[dkp_ma], sizeof (int16), wc, uptr -> fileref);
-		for ( ; awc < wc; awc++) M[(dkp_ma + awc) & AMASK] = 0;
-		err = ferror (uptr -> fileref);
-		dkp_ma = (dkp_ma + wc) & AMASK;  }
-	    if ((wc1 > 0) && (err == 0)) {		/* memory wrap? */
-		awc = fxread (&M[0], sizeof (int16), wc1, uptr -> fileref);
-		for ( ; awc < wc1; awc++) M[0 + awc] = 0;
-		err = ferror (uptr -> fileref);  
-		dkp_ma = (dkp_ma + wc1) & AMASK;  }  }
+	    for (sx = 0; sx < sc; sx++) {		/* loop thru sectors */
+	        awc = fxread (&tbuf, sizeof(uint16), DKP_NUMWD, uptr -> fileref);
+		for ( ; awc < DKP_NUMWD; awc++) tbuf[awc] = 0;
+	        if (err = ferror (uptr -> fileref)) break;
+	        for (dx = 0; dx < DKP_NUMWD; dx++) {	/* loop thru buffer */
+		    pa = MapAddr (0, dkp_ma);
+		    if (MEM_ADDR_OK (pa)) M[pa] = tbuf[dx];
+	            dkp_ma = (dkp_ma + 1) & AMASK;  }  }  }
 
 	if (uptr -> FUNC == FCCY_WRITE) {		/* write? */
-	    if ((wc > 0) && (err == 0)) {		/* start in memory? */
-		fxwrite (&M[dkp_ma], sizeof (int16), wc, uptr -> fileref);
-		err = ferror (uptr -> fileref);
-		dkp_ma = (dkp_ma + wc + 2) & AMASK;  }
-	    if ((wc1 > 0) && (err == 0)) {		/* memory wrap? */
-		fxwrite (&M[0], sizeof (int16), wc1, uptr -> fileref);
-		err = ferror (uptr -> fileref);
-		dkp_ma = (dkp_ma + wc1) & AMASK;  }  }
+	    for (sx = 0; sx < sc; sx++) {		/* loop thru sectors */
+	        for (dx = 0; dx < DKP_NUMWD; dx++) {	/* loop into buffer */
+		    pa = MapAddr (0, dkp_ma);
+		    tbuf[dx] = M[pa];
+	            dkp_ma = (dkp_ma + 1) & AMASK;  }
+	        fxwrite (&tbuf, sizeof(int16), DKP_NUMWD, uptr -> fileref);
+	        if (err = ferror (uptr -> fileref)) break;  }  }
 
 	if (err != 0) {
 		perror ("DKP I/O error");
@@ -646,8 +633,7 @@ return rval;
 
 /* Reset routine */
 
-t_stat dkp_reset (dptr)
-DEVICE *dptr;
+t_stat dkp_reset (DEVICE *dptr)
 {
 int32 u;
 UNIT *uptr;

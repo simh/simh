@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Dec-00	RMS	Fixed find_device for devices ending in numbers
+   08-Dec-00	RMS	V2.5a changes
    30-Oct-00	RMS	Added output file option to examine
    11-Jul-99	RMS	V2.5 changes
    13-Apr-99	RMS	Fixed handling of 32b addresses
@@ -259,7 +261,7 @@ static CTAB cmd_table[] = {
 
 /* Main command loop */
 
-printf ("\n%s simulator V2.5\n", sim_name);
+printf ("\n%s simulator V2.5a\n", sim_name);
 end_test.i = 1;					/* test endian-ness */
 sim_end = end_test.c[0];
 if (sim_emax <= 0) sim_emax = 1;
@@ -1656,7 +1658,12 @@ int32 i, lenn, unitno;
 t_stat r;
 DEVICE *dptr;
 
-for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* exact match? */
+	if (strcmp (cptr, dptr -> name) != 0) continue;
+	if (iptr != NULL) *iptr = 0;
+	return sim_devices[i];  }
+
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* base + unit#? */
 	lenn = strlen (dptr -> name);
 	if (strncmp (cptr, dptr -> name, lenn) != 0) continue;
 	cptr = cptr + lenn;

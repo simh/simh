@@ -1,6 +1,6 @@
 /* pdp18b_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-1999, Robert M Supnik
+   Copyright (c) 1993-2000, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,7 +29,8 @@
    19-Mar-95	RMS	Added dynamic memory size
 
    The author gratefully acknowledges the help of Craig St. Clair and
-   Deb Tevonian in locating archival material about the 18b PDP's
+   Deb Tevonian in locating archival material about the 18b PDP's, and of
+   Al Kossow and Max Burnet in making documentation and software available.
 */
 
 #include "sim_defs.h"					/* simulator defns */
@@ -74,7 +75,14 @@
 #define PDP9		0				/* default to PDP-9 */
 #endif
 
-/* Memory and peripheral configuration */
+/* Simulator stop codes */
+
+#define STOP_RSRV	1				/* must be 1 */
+#define STOP_HALT	2				/* HALT */
+#define STOP_IBKPT	3				/* breakpoint */
+#define STOP_XCT	4				/* nested XCT's */
+
+/* Peripheral configuration */
 
 #if defined (PDP4)
 #define ADDRSIZE	13
@@ -95,21 +103,23 @@
 #define RF		0				/* fixed head disk */
 #define RP		0				/* disk pack */
 #define MTA		0				/* magtape */
-#define BLKMASK		0300000				/* block mask */
 #endif
+
+/* Memory */
 
 #define ADDRMASK	((1 << ADDRSIZE) - 1)		/* address mask */
 #define IAMASK		077777				/* ind address mask */
+#define BLKMASK		(ADDRMASK & (~IAMASK))		/* block mask */
 #define MAXMEMSIZE	(1 << ADDRSIZE)			/* max memory size */
 #define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
 #define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
 
-/* Simulator stop codes */
+/* Architectural constants */
 
-#define STOP_RSRV	1				/* must be 1 */
-#define STOP_HALT	2				/* HALT */
-#define STOP_IBKPT	3				/* breakpoint */
-#define STOP_XCT	4				/* nested XCT's */
+#define DMASK		0777777				/* data mask */
+#define LINK		(DMASK + 1)			/* link */
+#define LACMASK		(LINK | DMASK)			/* link + data */
+#define SIGN		0400000				/* sign bit */
 
 /* IOT subroutine return codes */
 

@@ -47,7 +47,7 @@
 #define AMASK		(MAXMEMSIZE - 1)		/* address mask */
 #define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
 
-/* Machine architecture */
+/* Architectural constants */
 
 #define SIGN		0100000				/* sign */
 #define DMASK		0177777				/* data mask */
@@ -86,29 +86,7 @@ struct DMA {						/* DMA channel */
 	int32	cw3;					/* word count */
 };
 
-/* I/O macros */
-
-#define INT_V(x)	((x) & 037)			/* device bit pos */
-#define INT_M(x)	(1u << INT_V (x))		/* device bit mask */
-#define setCMD(D)	dev_cmd[(D)/32] = dev_cmd[(D)/32] | INT_M ((D))
-#define clrCMD(D)	dev_cmd[(D)/32] = dev_cmd[(D)/32] & ~INT_M (D)
-#define setCTL(D)	dev_ctl[(D)/32] = dev_ctl[(D)/32] | INT_M ((D))
-#define clrCTL(D)	dev_ctl[(D)/32] = dev_ctl[(D)/32] & ~INT_M (D)
-#define setFBF(D)	dev_fbf[(D)/32] = dev_fbf[(D)/32] | INT_M (D)
-#define clrFBF(D)	dev_fbf[(D)/32] = dev_fbf[(D)/32] & ~INT_M (D)
-#define setFLG(D)	dev_flg[(D)/32] = dev_flg[(D)/32] | INT_M (D); \
-			setFBF(D)
-#define clrFLG(D)	dev_flg[(D)/32] = dev_flg[(D)/32] & ~INT_M (D); \
-			clrFBF(D)
-#define CMD(D)		((dev_cmd[(D)/32] >> INT_V (D)) & 1)
-#define CTL(D)		((dev_ctl[(D)/32] >> INT_V (D)) & 1)
-#define FLG(D)		((dev_flg[(D)/32] >> INT_V (D)) & 1)
-#define FBF(D)		((dev_fbf[(D)/32] >> INT_V (D)) & 1)
-
-#define IOT_V_REASON	16
-#define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* stop on error */
-
-/* I/O instruction sub-opcodes */
+/* I/O sub-opcodes */
 
 #define ioHLT		0				/* halt */
 #define ioFLG		1				/* set/clear flag */
@@ -146,6 +124,8 @@ struct DMA {						/* DMA channel */
 #define MTC		021				/* mag tape control */
 #define DPD		022				/* disk pack data */
 #define DPC		023				/* disk pack control */
+#define DPBD		024				/* second disk pack data */
+#define DPBC		025				/* second disk pack control */
 
 /* Dynamic device information table */
 
@@ -169,5 +149,29 @@ struct hpdev {
 #define inMTC		6
 #define inDPD		7
 #define inDPC		8
+#define inDPBD		9
+#define inDPBC		10
 
 #define UNIT_DEVNO	(1 << UNIT_V_UF)		/* dummy flag */
+
+/* I/O macros */
+
+#define INT_V(x)	((x) & 037)			/* device bit pos */
+#define INT_M(x)	(1u << INT_V (x))		/* device bit mask */
+#define setCMD(D)	dev_cmd[(D)/32] = dev_cmd[(D)/32] | INT_M ((D))
+#define clrCMD(D)	dev_cmd[(D)/32] = dev_cmd[(D)/32] & ~INT_M (D)
+#define setCTL(D)	dev_ctl[(D)/32] = dev_ctl[(D)/32] | INT_M ((D))
+#define clrCTL(D)	dev_ctl[(D)/32] = dev_ctl[(D)/32] & ~INT_M (D)
+#define setFBF(D)	dev_fbf[(D)/32] = dev_fbf[(D)/32] | INT_M (D)
+#define clrFBF(D)	dev_fbf[(D)/32] = dev_fbf[(D)/32] & ~INT_M (D)
+#define setFLG(D)	dev_flg[(D)/32] = dev_flg[(D)/32] | INT_M (D); \
+			setFBF(D)
+#define clrFLG(D)	dev_flg[(D)/32] = dev_flg[(D)/32] & ~INT_M (D); \
+			clrFBF(D)
+#define CMD(D)		((dev_cmd[(D)/32] >> INT_V (D)) & 1)
+#define CTL(D)		((dev_ctl[(D)/32] >> INT_V (D)) & 1)
+#define FLG(D)		((dev_flg[(D)/32] >> INT_V (D)) & 1)
+#define FBF(D)		((dev_fbf[(D)/32] >> INT_V (D)) & 1)
+
+#define IOT_V_REASON	16
+#define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* stop on error */

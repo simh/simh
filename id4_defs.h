@@ -42,6 +42,13 @@
 
 #include "sim_defs.h"					/* simulator defns */
 
+/* Simulator stop codes */
+
+#define STOP_RSRV	1				/* must be 1 */
+#define STOP_HALT	2				/* HALT */
+#define STOP_IBKPT	3				/* breakpoint */
+#define STOP_WAIT	4				/* wait */
+
 /* Memory */
 
 #define MAXMEMSIZE	65536				/* max memory size */
@@ -86,13 +93,6 @@
 #define IDOPSW		0x48				/* int div fault old PSW */
 #define IDNPSW		0x4C				/* int div fault new PSW */
 
-/* Simulator stop codes */
-
-#define STOP_RSRV	1				/* must be 1 */
-#define STOP_HALT	2				/* HALT */
-#define STOP_IBKPT	3				/* breakpoint */
-#define STOP_WAIT	4				/* wait */
-
 /* I/O operations */
 
 #define IO_ADR		0x0				/* address select */
@@ -123,7 +123,7 @@
 #define STA_EOM		0x2				/* end of medium */
 #define STA_DU		0x1				/* device unavailable */
 
-/* Range of implemented device numbers */
+/* Device numbers */
 
 #define DEV_LOW		0x01				/* lowest intr dev */
 #define DEV_MAX		0xFF				/* highest intr dev */
@@ -133,6 +133,9 @@
 #define TT		0x02				/* teletype */
 #define PT		0x03				/* paper tape */
 #define CD		0x04				/* card reader */
+
+/* I/O macros */
+
 #define INT_V(d)	(1u << ((d) & 0x1F))
 #define SET_INT(d)	int_req[(d)/32] = int_req[(d)/32] | INT_V (d)
 #define CLR_INT(d)	int_req[(d)/32] = int_req[(d)/32] & ~INT_V (d)

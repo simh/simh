@@ -1,6 +1,6 @@
 /* pdp1_cpu.c: PDP-1 CPU simulator
 
-   Copyright (c) 1993-1999, Robert M. Supnik
+   Copyright (c) 1993-2000, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   16-Dec-00	RMS	Fixed bug in XCT address calculation
    14-Apr-99	RMS	Changed t_addr to unsigned
 
    The PDP-1 was Digital's first computer.  Although Digital built four
@@ -206,7 +207,7 @@
 
 #include "pdp1_defs.h"
 
-#define ILL_ADR_FLAG	(1 << ADDRSIZE)
+#define ILL_ADR_FLAG	(1 << ASIZE)
 #define save_ibkpt	(cpu_unit.u3)
 #define UNIT_V_MDV	(UNIT_V_UF)			/* mul/div */
 #define UNIT_MDV	(1 << UNIT_V_MDV)
@@ -232,7 +233,7 @@ int32 stop_inst = 0;					/* stop on rsrv inst */
 int32 xct_max = 16;					/* nested XCT limit */
 int32 ind_max = 16;					/* nested ind limit */
 int32 old_PC = 0;					/* old PC */
-int32 ibkpt_addr = ILL_ADR_FLAG | ADDRMASK;		/* breakpoint addr */
+int32 ibkpt_addr = ILL_ADR_FLAG | AMASK;		/* breakpoint addr */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -294,7 +295,7 @@ int32 sc_map[512] = {
 UNIT cpu_unit = { UDATA (&cpu_svc, UNIT_FIX + UNIT_BINK, MAXMEMSIZE) };
 
 REG cpu_reg[] = {
-	{ ORDATA (PC, PC, ADDRSIZE) },
+	{ ORDATA (PC, PC, ASIZE) },
 	{ ORDATA (AC, AC, 18) },
 	{ ORDATA (IO, IO, 18) },
 	{ FLDATA (OV, OV, 0) },
@@ -308,14 +309,14 @@ REG cpu_reg[] = {
 	{ FLDATA (SBIP, sbs, SB_V_IP) },
 	{ FLDATA (IOH, ioh, 0) },
 	{ FLDATA (IOC, ioc, 0) },
-	{ ORDATA (OLDPC, old_PC, ADDRSIZE), REG_RO },
+	{ ORDATA (OLDPC, old_PC, ASIZE), REG_RO },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ FLDATA (SBS_INIT, sbs_init, SB_V_ON) },
 	{ FLDATA (EXTM_INIT, extm_init, 0) },
 	{ FLDATA (MDV, cpu_unit.flags, UNIT_V_MDV), REG_HRO },
 	{ DRDATA (XCT_MAX, xct_max, 8), PV_LEFT + REG_NZ },
 	{ DRDATA (IND_MAX, ind_max, 8), PV_LEFT + REG_NZ },
-	{ ORDATA (BREAK, ibkpt_addr, ADDRSIZE + 1) },
+	{ ORDATA (BREAK, ibkpt_addr, ASIZE + 1) },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ NULL }  };
 
@@ -336,7 +337,7 @@ MTAB cpu_mod[] = {
 
 DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
-	1, 8, ADDRSIZE, 1, 8, 18,
+	1, 8, ASIZE, 1, 8, 18,
 	&cpu_ex, &cpu_dep, &cpu_reset,
 	NULL, NULL, NULL };
 
@@ -382,28 +383,29 @@ if (PC == ibkpt_addr) {					/* breakpoint? */
 
 /* Fetch, decode instruction */
 
-IR = M[PC];						/* fetch instruction */
+MA = PC;						/* PC to MA */
+IR = M[MA];						/* fetch instruction */
 PC = INCR_ADDR (PC);					/* increment PC */
 xct_count = 0;						/* track nested XCT's */
 sim_interval = sim_interval - 1;
 
 xct_instr:						/* label for XCT */
-if ((IR == 0610001) && ((PC & EPCMASK) == 0) && (sbs & SB_ON)) {
+if ((IR == 0610001) && ((MA & EPCMASK) == 0) && (sbs & SB_ON)) {
 	sbs = sbs & ~SB_IP;				/* seq debreak */
 	old_PC = PC;					/* save old PC */
 	OV = (M[1] >> 17) & 1;				/* restore OV */
 	extm = (M[1] >> 16) & 1;			/* restore ext mode */
-	PC = M[1] & ADDRMASK;				/* JMP I 1 */
+	PC = M[1] & AMASK;				/* JMP I 1 */
 	continue;  }
 
 op = ((IR >> 13) & 037);				/* get opcode */
 if ((op < 032) && (op != 007)) {			/* mem ref instr */
-	MA = (PC & EPCMASK) | (IR & DAMASK);		/* effective address */
+	MA = (MA & EPCMASK) | (IR & DAMASK);		/* direct address */
 	if (IR & IA) {					/* indirect addr? */
-		if (extm) MA = M[MA] & ADDRMASK;	/* if ext, one level */
+		if (extm) MA = M[MA] & AMASK;		/* if ext, one level */
 		else {	for (i = 0; i < ind_max; i++) {	/* count indirects */
 				t = M[MA];		/* get indirect word */
-				MA = (PC & EPCMASK) | (t & DAMASK);
+				MA = (MA & EPCMASK) | (t & DAMASK);
 				if ((t & IA) == 0) break;  }
 			if (i >= ind_max) {		/* indirect loop? */
 				reason = STOP_IND;

@@ -409,7 +409,7 @@ case I_V_MRF: case I_V_MRI:				/* mem ref */
 	if ((j != I_V_MRI) && strcmp (gbuf, "I") == 0) {	/* indirect? */
 		val[0] = val[0] | IA;
 		cptr = get_glyph (cptr, gbuf, 0);  }
-	d = get_uint (gbuf, 8, ADDRMASK, &r);
+	d = get_uint (gbuf, 8, AMASK, &r);
 	if (r != SCPE_OK) return SCPE_ARG;
 	if (d <= DAMASK) val[0] = val[0] | d;
 	else if (cflag && (((addr ^ d) & EPCMASK) == 0))

@@ -25,7 +25,9 @@
 
    mta		magnetic tape
 
+   10-Dec-00	RMS	Added Eclipse support from Charles Owen
    15-Oct-00	RMS	Editorial changes
+   11-Nov-98	CEO	Removed clear of mta_ma on iopC 
    04-Oct-98	RMS	V2.4 magtape format
    18-Jan-97	RMS	V2.3 magtape format
    29-Jun-96	RMS	Added unit disable support
@@ -146,11 +148,11 @@ t_stat mta_detach (UNIT *uptr);
 int32 mta_updcsta (UNIT *uptr);
 void mta_upddsta (UNIT *uptr, int32 newsta);
 t_stat mta_vlock (UNIT *uptr, int32 val);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat sim_cancel (UNIT *uptr);
-extern int32 sim_is_active (UNIT *uptr);
-extern size_t fxread (void *bptr, size_t size, size_t count, FILE *fptr);
-extern size_t fxwrite (void *bptr, size_t size, size_t count, FILE *fptr);
+#if defined (ECLIPSE)
+extern int32 MapAddr (int32 map, int32 addr);
+#else
+#define MapAddr(m,a)	(a)
+#endif
 
 static const int ctype[32] = {				/* c vs r timing */
  0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
@@ -299,7 +301,7 @@ case iopC:						/* clear */
 	dev_busy = dev_busy & ~INT_MTA;			/* clear busy */
 	dev_done = dev_done & ~INT_MTA;			/* clear done */
 	int_req = int_req & ~INT_MTA;			/* clear int */
-	mta_sta = mta_cu = mta_ma = 0;			/* clear registers */
+	mta_sta = mta_cu = 0;				/* clear registers */
 	mta_updcsta (&mta_unit[0]);			/* update status */
 	break;  }					/* end case pulse */
 return rval;
@@ -313,7 +315,7 @@ return rval;
 
 t_stat mta_svc (UNIT *uptr)
 {
-int32 c, i, p, u, err;
+int32 c, i, p, u, pa, err;
 t_stat rval;
 t_mtrlnt cbc, tbc, wc;
 unsigned int16 c1, c2;
@@ -377,7 +379,8 @@ case CU_READNS:						/* read non-stop */
 	for (i = p = 0; i < wc; i++) {			/* copy buf to mem */
 		c1 = dbuf[p++];
 		c2 = dbuf[p++];
-		if (MEM_ADDR_OK (mta_ma)) M[mta_ma] = (c1 << 8) | c2;
+		pa = MapAddr (0, mta_ma);		/* map address */
+		if (MEM_ADDR_OK (pa)) M[pa] = (c1 << 8) | c2;
 		mta_ma = (mta_ma + 1) & AMASK;  }
 	mta_wc = (mta_wc + wc) & DMASK;
 	uptr -> pos = uptr -> pos + ((tbc + 1) & ~1) +
@@ -388,9 +391,10 @@ case CU_WRITE:						/* write */
 	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
 	tbc = wc * 2;					/* io byte count */
 	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	for (i = p = 0; i < wc; i++) {		/* copy to buffer */
-		dbuf[p++] = (M[mta_ma] >> 8) & 0377;
-		dbuf[p++] = M[mta_ma] & 0377;
+	for (i = p = 0; i < wc; i++) {			/* copy to buffer */
+		pa = MapAddr (0, mta_ma);		/* map address */
+		dbuf[p++] = (M[pa] >> 8) & 0377;
+		dbuf[p++] = M[pa] & 0377;
 		mta_ma = (mta_ma + 1) & AMASK;  }
 	fxwrite (dbuf, sizeof (int8), tbc, uptr -> fileref);
 	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);

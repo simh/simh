@@ -1,6 +1,6 @@
 /* i1401_defs.h: IBM 1401 simulator definitions
 
-   Copyright (c) 1993-1999, Robert M. Supnik
+   Copyright (c) 1993-2000, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,8 @@
 
    This simulator is based on the 1401 simulator written by Len Fehskens
    with assistance from Sarah Lee Harris and Bob Supnik. This one's for
-   you, Len.
+   you, Len.  I am grateful to Paul Pierce and Charles Owen for their help
+   in answering questions, gathering source material, and debugging.
 */
 
 #include "sim_defs.h"

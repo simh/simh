@@ -25,6 +25,7 @@
 
    mt		12559A nine track magnetic tape
 
+   30-Nov-00	RMS	Made variable names unique
    04-Oct-98	RMS	V2.4 magtape format
 
    Magnetic tapes are represented as a series of variable records
@@ -40,6 +41,9 @@
 
    If the byte count is odd, the record is padded with an extra byte
    of junk.  File marks are represented by a byte count of 0.
+
+   Unusually among HP peripherals, the 12559 does not have a command flop,
+   and its flag and flag buffer power up as clear rather than set.
 */
 
 #include "hp2100_defs.h"
@@ -85,8 +89,8 @@ int32 mtc_1st = 0;					/* first svc flop */
 int32 mtc_ctime = 1000;					/* command wait */
 int32 mtc_xtime = 10;					/* data xfer time */
 int32 mtc_stopioe = 1;					/* stop on error */
-unsigned int8 dbuf[DBSIZE] = { 0 };			/* data buffer */
-t_mtrlnt mtbptr = 0, mtbmax = 0;			/* buffer ptrs */
+unsigned int8 mt_buf[DBSIZE] = { 0 };			/* data buffer */
+t_mtrlnt mt_ptr = 0, mt_max = 0;			/* buffer ptrs */
 static const int32 mtc_cmd[] = {
  FNC_WC, FNC_RC, FNC_GAP, FNC_FSR, FNC_BSR, FNC_REW, FNC_RWS, FNC_WFM };
 
@@ -113,8 +117,8 @@ REG mtd_reg[] = {
 	{ FLDATA (CTL, infotab[inMTD].ctl, 0), REG_HRO },
 	{ FLDATA (FLG, infotab[inMTD].flg, 0) },
 	{ FLDATA (FBF, infotab[inMTD].fbf, 0), REG_HRO },
-	{ DRDATA (BPTR, mtbptr, DB_V_SIZE + 1) },
-	{ DRDATA (BMAX, mtbmax, DB_V_SIZE + 1) },
+	{ DRDATA (BPTR, mt_ptr, DB_V_SIZE + 1) },
+	{ DRDATA (BMAX, mt_max, DB_V_SIZE + 1) },
 	{ ORDATA (DEVNO, infotab[inMTD].devno, 6), REG_RO },
 	{ NULL }  };
 
@@ -238,7 +242,7 @@ case ioOTX:						/* output */
 	else {	sim_activate (&mtc_unit, mtc_ctime);	/* start tape */
 		mtc_fnc = dat;				/* save function */
 		mtc_sta = STA_BUSY;			/* unit busy */
-		mtbptr = 0;				/* init buffer ptr */
+		mt_ptr = 0;				/* init buffer ptr */
 		clrFLG (devc);				/* clear flags */
 		clrFLG (devd);
 		mtc_1st = 1;				/* set 1st flop */
@@ -311,13 +315,13 @@ case FNC_FSR:						/* space forward */
 	setFLG (devc);					/* set cch flg */
 	mtc_sta = mtc_sta & ~STA_BUSY;			/* update status */
 	fseek (mtc_unit.fileref, mtc_unit.pos, SEEK_SET);
-	fxread (&mtbmax, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
+	fxread (&mt_max, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
 	if ((err = ferror (mtc_unit.fileref)) ||	/* error or eof? */
 	     feof (mtc_unit.fileref)) mtc_sta = mtc_sta | STA_EOT;
-	else if (mtbmax == 0) {				/* zero bc? */
+	else if (mt_max == 0) {				/* zero bc? */
 		mtc_sta = mtc_sta | STA_EOF;		/* EOF */
 		mtc_unit.pos = mtc_unit.pos + sizeof (t_mtrlnt);  }
-	else mtc_unit.pos = mtc_unit.pos + ((MTRL (mtbmax) + 1) & ~1) +
+	else mtc_unit.pos = mtc_unit.pos + ((MTRL (mt_max) + 1) & ~1) +
 			(2 * sizeof (t_mtrlnt));	/* update position */
 	break;
 case FNC_BSR:						/* space reverse */
@@ -327,13 +331,13 @@ case FNC_BSR:						/* space reverse */
 		mtc_sta = mtc_sta | STA_BOT;		/* update status */
 		break;  }
 	fseek (mtc_unit.fileref, mtc_unit.pos - sizeof (t_mtrlnt), SEEK_SET);
-	fxread (&mtbmax, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
+	fxread (&mt_max, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
 	if ((err = ferror (mtc_unit.fileref)) || 	/* error or eof? */
 	     feof (mtc_unit.fileref)) mtc_unit.pos = 0;
-	else if (mtbmax == 0) {				/* zero bc? */
+	else if (mt_max == 0) {				/* zero bc? */
 		mtc_sta = mtc_sta | STA_EOF;		/* EOF */
 		mtc_unit.pos = mtc_unit.pos - sizeof (t_mtrlnt);  }
-	else mtc_unit.pos = mtc_unit.pos - ((MTRL (mtbmax) + 1) & ~1) -
+	else mtc_unit.pos = mtc_unit.pos - ((MTRL (mt_max) + 1) & ~1) -
 		(2 * sizeof (t_mtrlnt));		/* update position */
 	if (mtc_unit.pos == 0) mtc_sta = mtc_sta | STA_BOT;
 	break;
@@ -344,30 +348,30 @@ case FNC_RC:						/* read */
 	if (mtc_1st) {					/* first svc? */
 		mtc_1st = 0;				/* clr 1st flop */
 		fseek (mtc_unit.fileref, mtc_unit.pos, SEEK_SET);
-		fxread (&mtbmax, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
+		fxread (&mt_max, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
 		if ((err = ferror (mtc_unit.fileref)) ||
 			feof (mtc_unit.fileref)) {	/* error or eof? */
 			setFLG (devc);			/* set cch flg */
 			mtc_sta = (mtc_sta | STA_EOT) & ~STA_BUSY;
 			break;  }
-		if (mtbmax == 0) {			/* tape mark? */
+		if (mt_max == 0) {			/* tape mark? */
 			mtc_unit.pos = mtc_unit.pos + sizeof (t_mtrlnt);
 			setFLG (devc);			/* set cch flg */
 			mtc_sta = (mtc_sta | STA_EOF) & ~STA_BUSY;
 			break;  }
-		mtbmax = MTRL (mtbmax);			/* ignore errors */
-		mtc_unit.pos = mtc_unit.pos + ((mtbmax + 1) & ~1) +
+		mt_max = MTRL (mt_max);			/* ignore errors */
+		mtc_unit.pos = mtc_unit.pos + ((mt_max + 1) & ~1) +
 			(2 * sizeof (t_mtrlnt));	/* update position */
-		if ((mtbmax > DBSIZE) || (mtbmax < 12)) {
+		if ((mt_max > DBSIZE) || (mt_max < 12)) {
 			setFLG (devc);			/* set cch flg */
 			mtc_sta = (mtc_sta | STA_PAR) & ~STA_BUSY;
 			break;  }
-		i = fxread (dbuf, sizeof (int8), mtbmax, mtc_unit.fileref);
-		for ( ; i < mtbmax; i++) dbuf[i] = 0;	/* fill with 0's */
+		i = fxread (mt_buf, sizeof (int8), mt_max, mtc_unit.fileref);
+		for ( ; i < mt_max; i++) mt_buf[i] = 0;	/* fill with 0's */
 		err = ferror (mtc_unit.fileref);  }
-	if (mtbptr < mtbmax) {				/* more chars? */
+	if (mt_ptr < mt_max) {				/* more chars? */
 		if (FLG (devd)) mtc_sta = mtc_sta | STA_TIM;
-		mtc_unit.buf = dbuf[mtbptr++];		/* fetch next */
+		mtc_unit.buf = mt_buf[mt_ptr++];		/* fetch next */
 		setFLG (devd);				/* set dch flg */
 		sim_activate (uptr, mtc_xtime);  }	/* re-activate */
 	else {	setFLG (devc);				/* set cch flg */
@@ -376,20 +380,20 @@ case FNC_RC:						/* read */
 case FNC_WC:						/* write */
 	if (mtc_dtf) {					/* xfer flop set? */
 		if (!mtc_1st) {				/* not first? */
-			if (mtbptr < DBSIZE)		/* room in buffer? */
-				dbuf[mtbptr++] = mtc_unit.buf;
+			if (mt_ptr < DBSIZE)		/* room in buffer? */
+				mt_buf[mt_ptr++] = mtc_unit.buf;
 			else mtc_sta = mtc_sta | STA_PAR;  }
 		mtc_1st = 0;				/* clr 1st flop */
 		setFLG (devd);				/* set dch flag */
 		sim_activate (uptr, mtc_xtime);		/* re-activate */
 		break;  }
-	if (mtbptr) {					/* write buffer */
+	if (mt_ptr) {					/* write buffer */
 		fseek (mtc_unit.fileref, mtc_unit.pos, SEEK_SET);
-		fxwrite (&mtbptr, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
-		fxwrite (dbuf, sizeof (int8), mtbptr, mtc_unit.fileref);
-		fxwrite (&mtbptr, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
+		fxwrite (&mt_ptr, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
+		fxwrite (mt_buf, sizeof (int8), mt_ptr, mtc_unit.fileref);
+		fxwrite (&mt_ptr, sizeof (t_mtrlnt), 1, mtc_unit.fileref);
 		err = ferror (mtc_unit.fileref);
-		mtc_unit.pos = mtc_unit.pos + ((mtbptr + 1) & ~1) +
+		mtc_unit.pos = mtc_unit.pos + ((mt_ptr + 1) & ~1) +
 			(2 * sizeof (t_mtrlnt));  }
 	setFLG (devc);					/* set cch flg */
 	mtc_sta = mtc_sta & ~STA_BUSY;			/* update status */
@@ -453,7 +457,7 @@ return SCPE_OK;
 t_stat mtd_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 if (addr >= DBSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = dbuf[addr] & 0377;
+if (vptr != NULL) *vptr = mt_buf[addr] & 0377;
 return SCPE_OK;
 }
 
@@ -462,6 +466,6 @@ return SCPE_OK;
 t_stat mtd_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
 if (addr >= DBSIZE) return SCPE_NXM;
-dbuf[addr] = val & 0377;
+mt_buf[addr] = val & 0377;
 return SCPE_OK;
 }

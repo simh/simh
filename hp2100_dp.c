@@ -24,6 +24,9 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    dp		12557A cartridge disk system
+
+   29-Nov-00	RMS	Made variable names unique
+   21-Nov-00	RMS	Fixed flag, buffer power up state
 */
 
 #include "hp2100_defs.h"
@@ -108,11 +111,11 @@ int32 dpc_sta[DP_NUMDRV] = { 0 };			/* status regs */
 int32 dpc_stime = 10;					/* seek time */
 int32 dpc_ctime = 10;					/* command time */
 int32 dpc_xtime = 5;					/* xfer time */
-int32 rarc = 0, rarh = 0, rars = 0;			/* record addr */
+int32 dpc_rarc = 0, dpc_rarh = 0, dpc_rars = 0;		/* record addr */
 int32 dpd_obuf = 0, dpd_ibuf = 0;			/* dch buffers */
 int32 dpc_obuf = 0;					/* cch buffers */
-int32 dpbptr = 0;					/* buffer ptr */
-unsigned int16 dbuf[DP_NUMWD];				/* sector buffer */
+int32 dp_ptr = 0;					/* buffer ptr */
+unsigned int16 dp_buf[DP_NUMWD];			/* sector buffer */
 
 t_stat dpc_svc (UNIT *uptr);
 t_stat dpc_reset (DEVICE *dptr);
@@ -140,7 +143,7 @@ REG dpd_reg[] = {
 	{ FLDATA (CTL, infotab[inDPD].ctl, 0) },
 	{ FLDATA (FLG, infotab[inDPD].flg, 0) },
 	{ FLDATA (FBF, infotab[inDPD].fbf, 0) },
-	{ DRDATA (BPTR, dpbptr, DP_W_NUMWD) },
+	{ DRDATA (BPTR, dp_ptr, DP_W_NUMWD) },
 	{ ORDATA (DEVNO, infotab[inDPD].devno, 6), REG_RO },
 	{ NULL }  };
 
@@ -167,9 +170,9 @@ UNIT dpc_unit[] = {
 REG dpc_reg[] = {
 	{ ORDATA (OBUF, dpc_obuf, 16) },
 	{ ORDATA (BUSY, dpc_busy, 3), REG_RO },
-	{ ORDATA (RARC, rarc, 8) },
-	{ ORDATA (RARH, rarh, 2) },
-	{ ORDATA (RARS, rars, 4) },
+	{ ORDATA (RARC, dpc_rarc, 8) },
+	{ ORDATA (RARH, dpc_rarh, 2) },
+	{ ORDATA (RARS, dpc_rars, 4) },
 	{ ORDATA (CNT, dpc_cnt, 5) },
 	{ FLDATA (CMD, infotab[inDPC].cmd, 0) },
 	{ FLDATA (CTL, infotab[inDPC].ctl, 0) },
@@ -344,7 +347,7 @@ switch (uptr -> FNC) {					/* case function */
 
 case FNC_SEEK:						/* seek, need cyl */
 	if (CMD (devd)) {				/* dch active? */
-		rarc = DA_GETCYL (dpd_obuf);		/* take cyl word */
+		dpc_rarc = DA_GETCYL (dpd_obuf);	/* take cyl word */
 		setFLG (devd);				/* set dch flg */
 		clrCMD (devd);				/* clr dch cmd */
 		uptr -> FNC = FNC_SEEK1;  }		/* advance state */
@@ -352,14 +355,14 @@ case FNC_SEEK:						/* seek, need cyl */
 	return SCPE_OK;
 case FNC_SEEK1:						/* seek, need hd/sec */
 	if (CMD (devd)) {				/* dch active? */
-		rarh = DA_GETHD (dpd_obuf);		/* get head */
-		rars = DA_GETSC (dpd_obuf);		/* get sector */
+		dpc_rarh = DA_GETHD (dpd_obuf);		/* get head */
+		dpc_rars = DA_GETSC (dpd_obuf);		/* get sector */
 		setFLG (devd);				/* set dch flg */
 		clrCMD (devd);				/* clr dch cmd */
-		st = abs (rarc - uptr -> CYL) * dpc_stime; /* calc cyl diff */
+		st = abs (dpc_rarc - uptr -> CYL) * dpc_stime; /* calc diff */
 		if (st == 0) st = dpc_xtime;		/* min time */
 		sim_activate (uptr, st);		/* schedule op */
-		uptr -> CYL = rarc;			/* on cylinder */
+		uptr -> CYL = dpc_rarc;			/* on cylinder */
 		dpc_busy = 0;				/* ctrl is free */
 		uptr -> FNC = FNC_SEEK2;  }		/* advance state */
 	else sim_activate (uptr, dpc_xtime);		/* no, wait more */
@@ -376,7 +379,7 @@ case FNC_SEEK2:						/* seek done */
 
 case FNC_AR:						/* arec, need cyl */
 	if (CMD (devd)) {				/* dch active? */
-		rarc = DA_GETCYL (dpd_obuf);		/* take cyl word */
+		dpc_rarc = DA_GETCYL (dpd_obuf);	/* take cyl word */
 		setFLG (devd);				/* set dch flg */
 		clrCMD (devd);				/* clr dch cmd */
 		uptr -> FNC = FNC_AR1;  }		/* advance state */
@@ -384,8 +387,8 @@ case FNC_AR:						/* arec, need cyl */
 	return SCPE_OK;
 case FNC_AR1:						/* arec, need hd/sec */
 	if (CMD (devd)) {				/* dch active? */
-		rarh = DA_GETHD (dpd_obuf);		/* get head */
-		rars = DA_GETSC (dpd_obuf);		/* get sector */
+		dpc_rarh = DA_GETHD (dpd_obuf);		/* get head */
+		dpc_rars = DA_GETSC (dpd_obuf);		/* get sector */
 		setFLG (devd);				/* set dch flg */
 		clrCMD (devd);  }			/* clr dch cmd */
 	else {	sim_activate (uptr, dpc_xtime);		/* no, wait more */
@@ -404,17 +407,17 @@ case FNC_STA:						/* read status */
 	return SCPE_OK;
 
 case FNC_REF:						/* refine sector */
-	if ((uptr -> CYL != rarc) || (rars >= DP_NUMSC))
+	if ((uptr -> CYL != dpc_rarc) || (dpc_rars >= DP_NUMSC))
 		dpc_sta[drv] = dpc_sta[drv] | STA_AER;
-	else {	for (i = 0; i < DP_NUMWD; i++) dbuf[i] = 0;
-		da = GETDA (rarc, rarh, rars);		/* get address */
-		rars = rars + 1;			/* incr sector */
-		if (rars >= DP_NUMSC) {			/* end of trk? */
-			rars = 0;			/* wrap to */
-			rarh = rarh ^ 1;  }		/* next surf */
+	else {	for (i = 0; i < DP_NUMWD; i++) dp_buf[i] = 0;
+		da = GETDA (dpc_rarc, dpc_rarh, dpc_rars);	/* get addr */
+		dpc_rars = dpc_rars + 1;		/* incr sector */
+		if (dpc_rars >= DP_NUMSC) {		/* end of trk? */
+			dpc_rars = 0;			/* wrap to */
+			dpc_rarh = dpc_rarh ^ 1;  }	/* next surf */
 		if (err = fseek (uptr -> fileref, da * sizeof (int16),
 			SEEK_SET)) break;
-		fxwrite (dbuf, sizeof (int16), DP_NUMWD, uptr -> fileref);
+		fxwrite (dp_buf, sizeof (int16), DP_NUMWD, uptr -> fileref);
 		err = ferror (uptr -> fileref);  }
 	break;
 
@@ -428,40 +431,40 @@ case FNC_CHK:						/* check, need cnt */
 	else sim_activate (uptr, dpc_xtime);		/* wait more */
 	return SCPE_OK;
 case FNC_CHK1:
-	if ((uptr -> CYL != rarc) || (rars >= DP_NUMSC))
+	if ((uptr -> CYL != dpc_rarc) || (dpc_rars >= DP_NUMSC))
 		dpc_sta[drv] = dpc_sta[drv] | STA_AER;
-	else {	maxsc = ((2 - (rarh & 1)) * DP_NUMSC) - rars;
+	else {	maxsc = ((2 - (dpc_rarh & 1)) * DP_NUMSC) - dpc_rars;
 		if (dpc_cnt > maxsc) {			/* too many sec? */
 			dpc_sta[drv] = dpc_sta[drv] | STA_EOC;
-			rarh = rarh & ~1;		/* rar = 0/2, 0 */
-			rars = 0;  }
-		else {	i = rars + dpc_cnt;		/* final sector */
-			rars = i % DP_NUMSC;		/* reposition */
-			rarh = rarh ^ ((i / DP_NUMSC) & 1);  }  }
+			dpc_rarh = dpc_rarh & ~1;	/* rar = 0/2, 0 */
+			dpc_rars = 0;  }
+		else {	i = dpc_rars + dpc_cnt;		/* final sector */
+			dpc_rars = i % DP_NUMSC;	/* reposition */
+			dpc_rarh = dpc_rarh ^ ((i / DP_NUMSC) & 1);  }  }
 	break;						/* done */
 
 case FNC_RD:						/* read */
 	if (!CMD (devd)) break;				/* dch clr? done */
 	if (FLG (devd)) dpc_sta[drv] = dpc_sta[drv] | STA_OVR;
-	if (dpbptr == 0) {				/* new sector? */
-		if ((uptr -> CYL != rarc) || (rars >= DP_NUMSC)) {
+	if (dp_ptr == 0) {				/* new sector? */
+		if ((uptr -> CYL != dpc_rarc) || (dpc_rars >= DP_NUMSC)) {
 			dpc_sta[drv] = dpc_sta[drv] | STA_AER;
 			break;  }
 		if (dpc_eoc) {				/* end of cyl? */
 			dpc_sta[drv] = dpc_sta[drv] | STA_EOC;
 			break;  }
-		da = GETDA (rarc, rarh, rars);		/* get address */
-		rars = rars + 1;			/* incr address */
-		if (rars >= DP_NUMSC) {			/* end of trk? */
-			rars = 0;			/* wrap to */
-			rarh = rarh ^ 1;		/* next cyl */
-			dpc_eoc = ((rarh & 1) == 0);  }	/* calc eoc */
+		da = GETDA (dpc_rarc, dpc_rarh, dpc_rars);	/* get addr */
+		dpc_rars = dpc_rars + 1;		/* incr address */
+		if (dpc_rars >= DP_NUMSC) {		/* end of trk? */
+			dpc_rars = 0;			/* wrap to */
+			dpc_rarh = dpc_rarh ^ 1;	/* next cyl */
+			dpc_eoc = ((dpc_rarh & 1) == 0);  }	/* calc eoc */
 		if (err = fseek (uptr -> fileref, da * sizeof (int16),
 			SEEK_SET)) break;
-		fxread (dbuf, sizeof (int16), DP_NUMWD, uptr -> fileref);
+		fxread (dp_buf, sizeof (int16), DP_NUMWD, uptr -> fileref);
 		if (err = ferror (uptr -> fileref)) break;  }
-	dpd_ibuf = dbuf[dpbptr++];			/* get word */
-	if (dpbptr >= DP_NUMWD) dpbptr = 0;		/* wrap if last */
+	dpd_ibuf = dp_buf[dp_ptr++];			/* get word */
+	if (dp_ptr >= DP_NUMWD) dp_ptr = 0;		/* wrap if last */
 	setFLG (devd);					/* set dch flg */
 	clrCMD (devd);					/* clr dch cmd */
 	sim_activate (uptr, dpc_xtime);			/* sched next word */
@@ -472,24 +475,24 @@ case FNC_WD:						/* write */
 		dpc_sta[drv] = dpc_sta[drv] | STA_EOC;	/* set status */
 		break;  }				/* done */
 	if (FLG (devd)) dpc_sta[drv] = dpc_sta[drv] | STA_OVR;
-	dbuf[dpbptr++] = dpd_obuf;			/* store word */
+	dp_buf[dp_ptr++] = dpd_obuf;			/* store word */
 	if (!CMD (devd)) {				/* dch clr? done */
-		for ( ; dpbptr < DP_NUMWD; dpbptr++) dbuf[dpbptr] = 0;  }
-	if (dpbptr >= DP_NUMWD) {			/* buffer full? */
-		if ((uptr -> CYL != rarc) || (rars >= DP_NUMSC)) {
+		for ( ; dp_ptr < DP_NUMWD; dp_ptr++) dp_buf[dp_ptr] = 0;  }
+	if (dp_ptr >= DP_NUMWD) {			/* buffer full? */
+		if ((uptr -> CYL != dpc_rarc) || (dpc_rars >= DP_NUMSC)) {
 			dpc_sta[drv] = dpc_sta[drv] | STA_AER;
 			break;  }
-		da = GETDA (rarc, rarh, rars);		/* get address */
-		rars = rars + 1;			/* incr address */
-		if (rars >= DP_NUMSC) {			/* end of trk? */
-			rars = 0;			/* wrap to */
-			rarh = rarh ^ 1;		/* next cyl */
-			dpc_eoc = ((rarh & 1) == 0);  }	/* calc eoc */
+		da = GETDA (dpc_rarc, dpc_rarh, dpc_rars);	/* get addr */
+		dpc_rars = dpc_rars + 1;		/* incr address */
+		if (dpc_rars >= DP_NUMSC) {		/* end of trk? */
+			dpc_rars = 0;			/* wrap to */
+			dpc_rarh = dpc_rarh ^ 1;	/* next cyl */
+			dpc_eoc = ((dpc_rarh & 1) == 0);  }	/* calc eoc */
 		if (err = fseek (uptr -> fileref, da * sizeof (int16),
 			SEEK_SET)) return TRUE;
-		fwrite (dbuf, sizeof (int16), DP_NUMWD, uptr -> fileref);
+		fwrite (dp_buf, sizeof (int16), DP_NUMWD, uptr -> fileref);
 		if (err = ferror (uptr -> fileref)) break;
-		dpbptr = 0;  }
+		dp_ptr = 0;  }
 	if (CMD (devd)) {				/* dch active? */
 		setFLG (devd);				/* set dch flg */
 		clrCMD (devd);				/* clr dch cmd */
@@ -517,7 +520,7 @@ if (dev && ((dpc_unit[drv].flags & UNIT_ATT) == 0)) {	/* attach check? */
 	setFLG (dev);					/* set cch flag */
 	clrCMD (dev);  }				/* clr cch cmd */
 else {	dpc_busy = drv + 1;				/* set busy */
-	dpbptr = 0;					/* init buf ptr */
+	dp_ptr = 0;					/* init buf ptr */
 	dpc_eoc = 0;					/* clear end cyl */
 	dpc_unit[drv].FNC = fnc;			/* save function */
 	sim_activate (&dpc_unit[drv], time);  }		/* activate unit */
@@ -533,12 +536,12 @@ int32 i;
 dpd_ibuf = dpd_obuf = 0;				/* clear buffers */
 dpc_busy = dpc_obuf = 0;
 dpc_eoc = 0;
-dpbptr = 0;
-rarc = rarh = rars = 0;					/* clear rar */
+dp_ptr = 0;
+dpc_rarc = dpc_rarh = dpc_rars = 0;			/* clear rar */
 infotab[inDPC].cmd = infotab[inDPD].cmd = 0;		/* clear cmd */
 infotab[inDPC].ctl = infotab[inDPD].ctl = 0;		/* clear ctl */
-infotab[inDPC].fbf = infotab[inDPD].fbf = 0;		/* clear flg */
-infotab[inDPC].flg = infotab[inDPD].flg = 0;		/* clear fbf */
+infotab[inDPC].fbf = infotab[inDPD].fbf = 1;		/* set fbf */
+infotab[inDPC].flg = infotab[inDPD].flg = 1;		/* set fbf */
 for (i = 0; i < DP_NUMDRV; i++) {			/* loop thru drives */
 	sim_cancel (&dpc_unit[i]);			/* cancel activity */
 	dpc_unit[i].FNC = 0;				/* clear function */
@@ -588,7 +591,7 @@ return SCPE_OK;
 t_stat dpd_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 if (addr >= DP_NUMWD) return SCPE_NXM;
-if (vptr != NULL) *vptr = dbuf[addr] & DMASK;
+if (vptr != NULL) *vptr = dp_buf[addr] & DMASK;
 return SCPE_OK;
 }
 
@@ -597,6 +600,6 @@ return SCPE_OK;
 t_stat dpd_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
 if (addr >= DP_NUMWD) return SCPE_NXM;
-dbuf[addr] = val & DMASK;
+dp_buf[addr] = val & DMASK;
 return SCPE_OK;
 }

@@ -25,6 +25,8 @@
 
    lpt		12653A line printer
 
+   21-Nov-00	RMS	Fixed flag, fbf power up state
+			Added command flop
    15-Oct-00	RMS	Added variable device number support
 */
 
@@ -54,7 +56,7 @@ UNIT lpt_unit = {
 
 REG lpt_reg[] = {
 	{ ORDATA (BUF, lpt_unit.buf, 7) },
-	{ FLDATA (CMD, infotab[inLPT].cmd, 0), REG_HRO },
+	{ FLDATA (CMD, infotab[inLPT].cmd, 0) },
 	{ FLDATA (CTL, infotab[inLPT].ctl, 0) },
 	{ FLDATA (FLG, infotab[inLPT].flg, 0) },
 	{ FLDATA (FBF, infotab[inLPT].fbf, 0) },
@@ -102,9 +104,12 @@ case ioMIX:						/* merge */
 	else if (sim_is_active (&lpt_unit)) dat = dat | LPT_BUSY;
 	break;
 case ioCTL:						/* control clear/set */
-	if (IR & AB) { clrCTL (dev); }			/* CLC */
-	else {	setCTL (dev);				/* STC */
-		sim_activate (&lpt_unit,		/* schedule completion */
+	if (IR & AB) {					/* CLC */
+		clrCMD (dev);				/* clear ctl, cmd */
+		clrCTL (dev);  }
+	else {	setCMD (dev);				/* STC */
+		setCTL (dev);				/* set ctl, cmd */
+		sim_activate (&lpt_unit,		/* schedule op */
 			(lpt_unit.buf < 040)? lpt_unit.wait: lpt_ctime);  }
 	break;
 default:
@@ -118,9 +123,10 @@ t_stat lpt_svc (UNIT *uptr)
 int32 dev;
 
 dev = infotab[inLPT].devno;				/* get dev no */
+clrCMD (dev);						/* clear cmd */
 if ((lpt_unit.flags & UNIT_ATT) == 0)			/* attached? */
 	return IORETURN (lpt_stopioe, SCPE_UNATT);
-setFLG (dev);						/* set flag */
+setFLG (dev);						/* set flag, fbf */
 if (putc (lpt_unit.buf & 0177, lpt_unit.fileref) == EOF) {
 	perror ("LPT I/O error");
 	clearerr (lpt_unit.fileref);
@@ -134,7 +140,7 @@ return SCPE_OK;
 t_stat lpt_reset (DEVICE *dptr)
 {
 infotab[inLPT].cmd = infotab[inLPT].ctl = 0;		/* clear cmd, ctl */
-infotab[inLPT].flg = infotab[inLPT].fbf = 0;		/* clear flg, fbf*/
+infotab[inLPT].flg = infotab[inLPT].fbf = 1;		/* set flg, fbf */
 lpt_unit.buf = 0;
 sim_cancel (&lpt_unit);					/* deactivate unit */
 return SCPE_OK;

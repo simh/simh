@@ -399,8 +399,6 @@ char lpt_buf[LPT_BSIZE] = { 0 };
 
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
-t_stat lpt_attach (UNIT *uptr, char *cptr);
-t_stat lpt_detach (UNIT *uptr);
 int32 lpt_updsta (int32 new);
 extern t_stat sim_activate (UNIT *uptr, int32 delay);
 extern t_stat sim_cancel (UNIT *uptr);
@@ -434,7 +432,7 @@ DEVICE lpt_dev = {
 	"LPT", &lpt_unit, lpt_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &lpt_reset,
-	NULL, &lpt_attach, &lpt_detach };
+	NULL, NULL, NULL };
 
 /* LP15 line printer: IOT routines */
 
@@ -463,7 +461,7 @@ return AC;
 int32 lpt66 (int32 pulse, int32 AC)
 {
 if (pulse == 021) lpt_sta = lpt_sta & ~STA_DON;		/* LPCD */
-if (pulse == 041) lpt_sta = lpt_sta & STA_ALM;		/* LPCF */
+if (pulse == 041) lpt_sta = lpt_sta = 0;		/* LPCF */
 lpt_updsta (0);						/* update status */
 return AC;
 }
@@ -540,8 +538,7 @@ t_stat lpt_reset (DEVICE *dptr)
 {
 mode = lcnt = bptr = 0;					/* clear controls */
 sim_cancel (&lpt_unit);					/* deactivate unit */
-if (lpt_unit.flags & UNIT_ATT) lpt_sta = 0;
-else lpt_sta = STA_ALM;
+lpt_sta = 0;						/* clear status */
 lpt_ie = 1;						/* enable interrupts */
 lpt_updsta (0);						/* update status */
 return SCPE_OK;
@@ -554,23 +551,4 @@ int32 lpt_iors (void)
 return ((lpt_sta & STA_DON)? IOS_LPT: 0);
 }
 
-/* Attach routine */
-
-t_stat lpt_attach (UNIT *uptr, char *cptr)
-{
-t_stat reason;
-
-reason = attach_unit (uptr, cptr);
-if (lpt_unit.flags & UNIT_ATT) lpt_sta = lpt_sta & ~STA_ALM;
-lpt_updsta (0);
-return reason;
-}
-
-/* Detach routine */
-
-t_stat lpt_detach (UNIT *uptr)
-{
-lpt_updsta (STA_ALM);
-return detach_unit (uptr);
-}
 #endif

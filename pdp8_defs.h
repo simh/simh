@@ -33,18 +33,18 @@
 
 #include "sim_defs.h"					/* simulator defns */
 
+/* Simulator stop codes */
+
+#define STOP_RSRV	1				/* must be 1 */
+#define STOP_HALT	2				/* HALT */
+#define STOP_IBKPT	3				/* breakpoint */
+
 /* Memory */
 
 #define MAXMEMSIZE	32768				/* max memory size */
 #define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
 #define ADDRMASK	(MAXMEMSIZE - 1)		/* address mask */
 #define MEM_ADDR_OK(x)	(((t_addr) (x)) < MEMSIZE)
-
-/* Simulator stop codes */
-
-#define STOP_RSRV	1				/* must be 1 */
-#define STOP_HALT	2				/* HALT */
-#define STOP_IBKPT	3				/* breakpoint */
 
 /* IOT subroutine return codes */
 
