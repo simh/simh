@@ -18,7 +18,7 @@
  * or modifications.
  *
  * This is not a supported product, but I welcome bug reports and fixes.
- * Mail to sim@ibm1130.org
+ * Mail to simh@ibm1130.org
  */
 
 #define BLIT_MODE					// normally defined, undefine when debugging generate_image()

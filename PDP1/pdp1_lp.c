@@ -25,6 +25,8 @@
 
    lpt		Type 62 line printer for the PDP-1
 
+   23-Jul-03	RMS	Fixed bugs in instruction decoding, overprinting
+			Revised to detect I/O wait hang
    25-Apr-03	RMS	Revised for extended file support
    30-May-02	RMS	Widened POS to 32b
    13-Apr-01	RMS	Revised for register arrays
@@ -36,16 +38,19 @@
 #define LPT_BSIZE	(BPTR_MAX * 3)			/* line size */
 #define BPTR_MASK	077				/* buf ptr mask */
 
-extern int32 ioc, sbs, iosta;
-extern int32 stop_inst;
-
-int32 lpt_rpls = 0, lpt_iot = 0, lpt_stopioe = 0, bptr = 0;
+int32 lpt_spc = 0;					/* print (0) vs spc */
+int32 lpt_ovrpr = 0;					/* overprint */
+int32 lpt_stopioe = 0;					/* stop on error */
+int32 lpt_bptr = 0;					/* buffer ptr */
 char lpt_buf[LPT_BSIZE + 1] = { 0 };
 static const unsigned char lpt_trans[64] = {
 	' ','1','2','3','4','5','6','7','8','9','\'','~','#','V','^','<',
 	'0','/','S','T','U','V','W','X','Y','Z','"',',','>','^','-','?',
 	'@','J','K','L','M','N','O','P','Q','R','$','=','-',')','-','(',
 	'_','A','B','C','D','E','F','G','H','I','*','.','+',']','|','[' };
+
+extern int32 ioc, cpls, sbs, iosta;
+extern int32 stop_inst;
 
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
@@ -64,9 +69,10 @@ REG lpt_reg[] = {
 	{ ORDATA (BUF, lpt_unit.buf, 8) },
 	{ FLDATA (PNT, iosta, IOS_V_PNT) },
 	{ FLDATA (SPC, iosta, IOS_V_SPC) },
-	{ FLDATA (RPLS, lpt_rpls, 0) },
-	{ DRDATA (BPTR, bptr, 6) },
-	{ ORDATA (LPT_STATE, lpt_iot, 6), REG_HRO },
+	{ FLDATA (RPLS, cpls, CPLS_V_LPT) },
+	{ DRDATA (BPTR, lpt_bptr, 6) },
+	{ ORDATA (LPT_STATE, lpt_spc, 6), REG_HRO },
+	{ FLDATA (LPT_OVRPR, lpt_ovrpr, 0), REG_HRO },
 	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
@@ -82,38 +88,39 @@ DEVICE lpt_dev = {
 
 /* Line printer IOT routine */
 
-int32 lpt (int32 inst, int32 dev, int32 data)
+int32 lpt (int32 inst, int32 dev, int32 dat)
 {
 int32 i;
 
 if (lpt_dev.flags & DEV_DIS)				/* disabled? */
-	return (stop_inst << IOT_V_REASON) | data;	/* stop if requested */
-if ((inst & 0700) == 0100) {				/* fill buf */
-	if (bptr < BPTR_MAX) {				/* limit test ptr */
-	    i = bptr * 3;				/* cvt to chr ptr */
-	    lpt_buf[i] = lpt_trans[(data >> 12) & 077];
-	    lpt_buf[i + 1] = lpt_trans[(data >> 6) & 077];
-	    lpt_buf[i + 2] = lpt_trans[data & 077];  }
-	bptr = (bptr + 1) & BPTR_MASK;
-	return data;  }
-lpt_rpls = 0;
-if ((inst & 0700) == 0200) {				/* space */
+	return (stop_inst << IOT_V_REASON) | dat;	/* stop if requested */
+if ((inst & 07000) == 01000) {				/* fill buf */
+	if (lpt_bptr < BPTR_MAX) {			/* limit test ptr */
+	    i = lpt_bptr * 3;				/* cvt to chr ptr */
+	    lpt_buf[i] = lpt_trans[(dat >> 12) & 077];
+	    lpt_buf[i + 1] = lpt_trans[(dat >> 6) & 077];
+	    lpt_buf[i + 2] = lpt_trans[dat & 077];  }
+	lpt_bptr = (lpt_bptr + 1) & BPTR_MASK;
+	return dat;  }
+if ((inst & 07000) == 02000) {				/* space */
 	iosta = iosta & ~IOS_SPC;			/* space, clear flag */
-	lpt_iot = (inst >> 6) & 077;  }			/* state = space n */
-else {	iosta = iosta & ~IOS_PNT;			/* clear flag */
-	lpt_iot = 0;  }					/* state = print */
+	lpt_spc = (inst >> 6) & 077;  }			/* state = space n */
+else if ((inst & 07000) == 00000) {			/* print */
+	iosta = iosta & ~IOS_PNT;			/* clear flag */
+	lpt_spc = 0;  }					/* state = print */
+else return (stop_inst << IOT_V_REASON) | dat;		/* not implemented */
 if (GEN_CPLS (inst)) {					/* comp pulse? */
 	ioc = 0;					/* clear flop */
-	lpt_rpls = 1;  }				/* request completion */
+	cpls = cpls | CPLS_LPT;  }			/* request completion */
+else cpls = cpls & ~CPLS_LPT;
 sim_activate (&lpt_unit, lpt_unit.wait);		/* activate */
-return data;
+return dat;
 }
 
 /* Unit service, printer is in one of three states
 
-   lpt_iot = 000		write buffer to file, set state to
-   lpt_iot = 010		write cr, then write buffer to file
-   lpt_iot = 02x		space command x, then set state to 0
+   lpt_spc = 000		write buffer to file, set overprint
+   lpt_iot = 02x		space command x, clear overprint
 */
 
 t_stat lpt_svc (UNIT *uptr)
@@ -129,30 +136,32 @@ static const char *lpt_cc[] = {
 	"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
 	"\f" };
 
+if (cpls & CPLS_LPT) {					/* completion pulse? */
+	ioc = 1;					/* restart */
+	cpls = cpls & ~CPLS_LPT;  }			/* clr pulse pending */
 sbs = sbs | SB_RQ;					/* req seq break */
-ioc = ioc | lpt_rpls;					/* restart */
-if (lpt_iot & 020) {					/* space? */
+if (lpt_spc) {						/* space? */
 	iosta = iosta | IOS_SPC;			/* set flag */
 	if ((lpt_unit.flags & UNIT_ATT) == 0)		/* attached? */
 	    return IORETURN (lpt_stopioe, SCPE_UNATT);
-	fputs (lpt_cc[lpt_iot & 07], lpt_unit.fileref);	/* print cctl */
+	fputs (lpt_cc[lpt_spc & 07], lpt_unit.fileref);	/* print cctl */
 	if (ferror (lpt_unit.fileref)) {		/* error? */
 	    perror ("LPT I/O error");
 	    clearerr (lpt_unit.fileref);
 	    return SCPE_IOERR;  }
-	lpt_iot = 0;  }					/* clear state */
+	lpt_ovrpr = 0;  }				/* dont overprint */
 else {	iosta = iosta | IOS_PNT;			/* print */
 	if ((lpt_unit.flags & UNIT_ATT) == 0)		/* attached? */
 	    return IORETURN (lpt_stopioe, SCPE_UNATT);
-	if (lpt_iot & 010) fputc ('\r', lpt_unit.fileref);
+	if (lpt_ovrpr) fputc ('\r', lpt_unit.fileref);	/* overprint? */
 	fputs (lpt_buf, lpt_unit.fileref);		/* print buffer */
 	if (ferror (lpt_unit.fileref)) {		/* test error */
 	    perror ("LPT I/O error");
 	    clearerr (lpt_unit.fileref);
 	    return SCPE_IOERR;  }
-	bptr = 0;
+	lpt_bptr = 0;
 	for (i = 0; i <= LPT_BSIZE; i++) lpt_buf[i] = 0; /* clear buffer */
-	lpt_iot = 010;  }				/* set state */
+	lpt_ovrpr = 1;  }				/* set overprint */
 lpt_unit.pos = ftell (lpt_unit.fileref);		/* update position */
 return SCPE_OK;
 }
@@ -163,11 +172,12 @@ t_stat lpt_reset (DEVICE *dptr)
 {
 int32 i;
 
-iosta = iosta & ~(IOS_PNT | IOS_SPC);			/* clear flags */
-bptr = 0;						/* clear buffer ptr */
+lpt_bptr = 0;						/* clear buffer ptr */
 for (i = 0; i <= LPT_BSIZE; i++) lpt_buf[i] = 0;	/* clear buffer */
-lpt_iot = 0;						/* clear state */
-lpt_rpls = 0;
+lpt_spc = 0;						/* clear state */
+lpt_ovrpr = 0;						/* clear overprint */
+cpls = cpls & ~CPLS_LPT;
+iosta = iosta & ~(IOS_PNT | IOS_SPC);			/* clear flags */
 sim_cancel (&lpt_unit);					/* deactivate unit */
 return SCPE_OK;
 }

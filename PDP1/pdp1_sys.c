@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Jul-03	RMS	Updated for "hardware" RIM loader
    05-Dec-02	RMS	Added drum support
    21-Nov-02	RMS	Changed typewriter to half duplex
    20-Aug-02	RMS	Added DECtape support
@@ -52,6 +53,7 @@ extern int32 M[];
 extern int32 PC;
 extern int32 ascii_to_fiodec[], fiodec_to_ascii[];
 extern int32 sc_map[];
+extern int32 sim_switches;
 
 /* SCP data structures and interface routines
 
@@ -86,43 +88,82 @@ const char *sim_stop_messages[] = {
 	"Breakpoint",
 	"Nested XCT's",
 	"Nested indirect addresses",
-	"Infinite wait state"  };
+	"Infinite I/O wait state"  };
 
-/* Binary loader
+/* Binary loader - supports both RIM format and Macro block format */
 
-   At the moment, implements RIM loader format
-*/
-
-int32 getword (FILE *fileref)
+int32 getw (FILE *inf)
 {
 int32 i, tmp, word;
 
 word = 0;
 for (i = 0; i < 3;) {
-	if ((tmp = getc (fileref)) == EOF) return -1;
+	if ((tmp = getc (inf)) == EOF) return -1;
 	if (tmp & 0200) {
 		word = (word << 6) | (tmp & 077);
 		i++;  }  }
 return word;
 }
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat rim_load (FILE *inf)
 {
 int32 origin, val;
 
-if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 for (;;) {
-	if ((val = getword (fileref)) < 0) return SCPE_FMT;
-	if (((val & 0770000) == 0320000) ||		/* DIO? */
-	    ((val & 0770000) == 0240000)) {		/* DAC? - incorrect */
+	if ((val = getw (inf)) < 0) return SCPE_FMT;
+	if (((val & 0760000) == OP_DIO) ||		/* DIO? */
+	    ((val & 0760000) == OP_DAC)) {		/* hack - Macro1 err */
 	    origin = val & 07777;
-	    if ((val = getword (fileref)) < 0) return SCPE_FMT;
-	    if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
-	else if ((val & 0770000) == 0600000) {		/* JMP? */
+	    if ((val = getw (inf)) < 0) return SCPE_FMT;
+	    M[origin] = val;  }
+	else if ((val & 0760000) == OP_JMP) {		/* JMP? */
 	    PC = val & 007777;
 	    break;  }
+	else return SCPE_FMT;				/* bad instr */
 	}
 return SCPE_OK;						/* done */
+}
+
+t_stat blk_load (FILE *inf)
+{
+int32 val, start, count, csum;
+
+for (;;) {
+	if ((val = getw (inf)) < 0) return SCPE_FMT;	/* get word, EOF? */
+	if ((val & 0760000) == OP_DIO) {		/* DIO? */
+	    csum = val;					/* init checksum */
+	    start = val & 07777;			/* starting addr */
+	    if ((val = getw (inf)) < 0) return SCPE_FMT;
+	    if ((val & 0760000) != OP_DIO) return SCPE_FMT;
+	    csum = csum + val;
+	    if (csum > 0777777) csum = (csum + 1) & 0777777;
+	    count = (val & 07777) - start + 1;		/* block count */
+	    if (count <= 0) return SCPE_FMT;
+	    while (count--) {				/* loop on data */
+		if ((val = getw (inf)) < 0) return SCPE_FMT;
+		csum = csum + val;
+		if (csum > 0777777) csum = (csum + 1) & 0777777;
+		M[start++] = val;  }
+	    if ((val = getw (inf)) < 0) return SCPE_FMT;
+	    if (val != csum) return SCPE_CSUM;  }
+	else if ((val & 0760000) == OP_JMP) {		/* JMP? */
+	    PC = val & 007777;
+	    break;  }
+	else return SCPE_FMT;				/* bad instr */
+	}
+return SCPE_OK;						/* done */
+}
+
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+{
+t_stat sta;
+
+if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
+sta = rim_load (fileref);
+if (sta != SCPE_OK) return sta;
+if ((sim_switches & SWMASK ('B')) || match_ext (fnam, "BIN"))
+	return blk_load (fileref);
+return SCPE_OK;
 }
 
 /* Symbol tables */

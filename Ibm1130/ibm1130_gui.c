@@ -9,7 +9,7 @@
  * or modifications.
  *
  * This is not a supported product, but I welcome bug reports and fixes.
- * Mail to sim@ibm1130.org
+ * Mail to simh@ibm1130.org
  *
  * 17-May-02 BLK	Pulled out of ibm1130_cpu.c
  */
@@ -168,30 +168,30 @@ static int bmwid, bmht;
 static struct tag_btn {
 	int x, y;
 	char *txt;
-	BOOL pushable;
+	BOOL pushable, state;
 	COLORREF clr;
 	HBRUSH hbrLit, hbrDark;
 	HWND   hBtn;
 } btn[] = {
-	0, 0,	"KEYBOARD\nSELECT",		FALSE,	RGB(255,255,180),	NULL, NULL, NULL, 
-	0, 1,	"DISK\nUNLOCK",			FALSE, 	RGB(255,255,180),	NULL, NULL, NULL, 
-	0, 2, 	"RUN",					FALSE,	RGB(0,255,0),		NULL, NULL, NULL, 
-	0, 3,	"PARITY\nCHECK",		FALSE,	RGB(255,0,0),		NULL, NULL, NULL, 
+	0, 0,	"KEYBOARD\nSELECT",		FALSE,	FALSE,	RGB(255,255,180),	NULL, NULL, NULL, 
+	0, 1,	"DISK\nUNLOCK",			FALSE, 	TRUE,	RGB(255,255,180),	NULL, NULL, NULL, 
+	0, 2, 	"RUN",					FALSE,	FALSE,	RGB(0,255,0),		NULL, NULL, NULL, 
+	0, 3,	"PARITY\nCHECK",		FALSE,	FALSE,	RGB(255,0,0),		NULL, NULL, NULL, 
 
-	1, 0,	"",						FALSE, 	RGB(255,255,180),	NULL, NULL, NULL, 
-	1, 1,	"FILE\nREADY",			FALSE, 	RGB(0,255,0),		NULL, NULL, NULL, 
-	1, 2,	"FORMS\nCHECK",			FALSE, 	RGB(255,255,0),		NULL, NULL, NULL, 
-	1, 3,	"POWER\nON",			FALSE, 	RGB(255,255,180),	NULL, NULL, NULL, 
+	1, 0,	"",						FALSE, 	FALSE,	RGB(255,255,180),	NULL, NULL, NULL, 
+	1, 1,	"FILE\nREADY",			FALSE, 	FALSE,	RGB(0,255,0),		NULL, NULL, NULL, 
+	1, 2,	"FORMS\nCHECK",			FALSE, 	FALSE,	RGB(255,255,0),		NULL, NULL, NULL, 
+	1, 3,	"POWER\nON",			FALSE, 	TRUE,	RGB(255,255,180),	NULL, NULL, NULL, 
 
-	2, 0,	"POWER",				TRUE,	RGB(255,255,180), 	NULL, NULL, NULL, 
-	2, 1,	"PROGRAM\nSTART",		TRUE,	RGB(0,255,0),		NULL, NULL, NULL, 
-	2, 2,	"PROGRAM\nSTOP",		TRUE,	RGB(255,0,0),		NULL, NULL, NULL, 
-	2, 3,	"LOAD\nIAR",			TRUE,	RGB(0,0,255),		NULL, NULL, NULL, 
+	2, 0,	"POWER",				TRUE,	FALSE,	RGB(255,255,180), 	NULL, NULL, NULL, 
+	2, 1,	"PROGRAM\nSTART",		TRUE,	FALSE,	RGB(0,255,0),		NULL, NULL, NULL, 
+	2, 2,	"PROGRAM\nSTOP",		TRUE,	FALSE,	RGB(255,0,0),		NULL, NULL, NULL, 
+	2, 3,	"LOAD\nIAR",			TRUE,	FALSE,	RGB(0,0,255),		NULL, NULL, NULL, 
 
-	3, 0,	"KEYBOARD",				TRUE, 	RGB(255,255,180),	NULL, NULL, NULL, 
-	3, 1,	"IMM\nSTOP",			TRUE, 	RGB(255,0,0),		NULL, NULL, NULL, 
-	3, 2,	"CHECK\nRESET",			TRUE, 	RGB(0,0,255),		NULL, NULL, NULL, 
-	3, 3,	"PROGRAM\nLOAD",		TRUE, 	RGB(0,0,255),		NULL, NULL, NULL, 
+	3, 0,	"KEYBOARD",				TRUE, 	FALSE,	RGB(255,255,180),	NULL, NULL, NULL, 
+	3, 1,	"IMM\nSTOP",			TRUE, 	FALSE,	RGB(255,0,0),		NULL, NULL, NULL, 
+	3, 2,	"CHECK\nRESET",			TRUE, 	FALSE,	RGB(0,0,255),		NULL, NULL, NULL, 
+	3, 3,	"PROGRAM\nLOAD",		TRUE, 	FALSE,	RGB(0,0,255),		NULL, NULL, NULL, 
 };
 #define NBUTTONS (sizeof(btn) / sizeof(btn[0]))
 
@@ -318,7 +318,8 @@ static void RepaintRegion (HWND hWnd, int left, int top, int right, int bottom)
 
 void update_gui (BOOL force)
 {	
-	int i, sts;
+	int i;
+	BOOL state;
 	static int in_here = FALSE;
 	static int32 displayed = 0;
 
@@ -385,25 +386,33 @@ void update_gui (BOOL force)
 
 	int_lamps = 0;
 
+	// this loop works with lamp buttons that are calculated on-the-fly only
 	for (i = 0; i < NBUTTONS; i++) {
 		if (btn[i].pushable)
 			continue;
 
 		switch (i) {
-			case IDC_RUN:				sts = hFlashTimer || (running && ! wait_state);		break;
-//			case IDC_PARITY_CHECK:		sts = FALSE;		break;
-//			case IDC_POWER_ON:			sts = TRUE;			break;
-			default:
-				continue;
+			case IDC_RUN:
+				state = hFlashTimer || (running && ! wait_state);
+				break;
 
-//			case IDC_FILE_READY:		these windows are enabled&disabled directly
+			// this button is always off
+//			case IDC_PARITY_CHECK:
+
+			// these buttons are enabled/disabled directly
+//			case IDC_POWER_ON:
+//			case IDC_FILE_READY:
 //			case IDC_FORMS_CHECK:
 //			case IDC_KEYBOARD_SELECT:
 //			case IDC_DISK_UNLOCK:
+			default:
+				continue;
 		}
 
-		if (sts != IsWindowEnabled(btn[i].hBtn))		// status has changed
-			EnableWindow(btn[i].hBtn, sts);
+		if (state != btn[i].state) {				// state has changed
+			EnableWindow(btn[i].hBtn, state);
+			btn[i].state = state;
+		}
 	}
 
 	in_here = FALSE;
@@ -423,6 +432,7 @@ LRESULT CALLBACK ButtonProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	if (! btn[i].pushable) {
 		if (uMsg == WM_LBUTTONDOWN || uMsg == WM_LBUTTONUP || uMsg == WM_LBUTTONDBLCLK)
 			return 0;
+
 		if (uMsg == WM_CHAR)
 			if ((TCHAR) wParam == ' ')
 				return 0;
@@ -622,9 +632,9 @@ static DWORD WINAPI Pump (LPVOID arg)
 		class_defined = TRUE;
 	}
 
-	hbWhite = GetStockObject(WHITE_BRUSH);			/* create or fetch useful GDI objects */
-	hbBlack = GetStockObject(BLACK_BRUSH);			/* create or fetch useful GDI objects */
-	hbGray  = GetStockObject(GRAY_BRUSH);
+	hbWhite    = GetStockObject(WHITE_BRUSH);			/* create or fetch useful GDI objects */
+	hbBlack    = GetStockObject(BLACK_BRUSH);			/* create or fetch useful GDI objects */
+	hbGray     = GetStockObject(GRAY_BRUSH);
 	hSwitchPen = CreatePen(PS_SOLID, 5, RGB(255,255,255));
 
 	hWhitePen  = GetStockObject(WHITE_PEN);
@@ -633,8 +643,8 @@ static DWORD WINAPI Pump (LPVOID arg)
 	hGreyPen   = CreatePen(PS_SOLID, 1, RGB(128,128,128));
 	hDkGreyPen = CreatePen(PS_SOLID, 1, RGB(64,64,64));
 
-	hcArrow = LoadCursor(NULL,      IDC_ARROW);
-	hcHand  = LoadCursor(hInstance, MAKEINTRESOURCE(IDC_HAND));
+	hcArrow    = LoadCursor(NULL,      IDC_ARROW);
+	hcHand     = LoadCursor(hInstance, MAKEINTRESOURCE(IDC_HAND));
 
 	if (hBitmap   == NULL)
 		hBitmap   = LoadBitmap(hInstance, MAKEINTRESOURCE(IDB_CONSOLE));
@@ -656,11 +666,12 @@ static DWORD WINAPI Pump (LPVOID arg)
 	bmwid = bm.bmWidth;
 	bmht  = bm.bmHeight;
 
-	for (i = 0; i < NBUTTONS; i++)
+	for (i = 0; i < NBUTTONS; i++) {
 		CreateSubclassedButton(hConsoleWnd, i);
 
-	EnableWindow(btn[IDC_POWER_ON].hBtn,    TRUE);
-	EnableWindow(btn[IDC_DISK_UNLOCK].hBtn, TRUE);
+		if (! btn[i].pushable)
+			EnableWindow(btn[i].hBtn, btn[i].state);
+	}
 
 	GetWindowRect(hConsoleWnd, &r);					/* get window size as created */
 	wx = r.right  - r.left + 1;
@@ -913,12 +924,19 @@ void HandleCommand (HWND hWnd, WPARAM wParam, LPARAM lParam)
 			reset_all(0);
 			if (running && ! power) {		/* turning off */
 				reason = STOP_POWER_OFF;
-				while (running)
-					Sleep(10);				/* wait for execution thread to exit */
+// this prevents message pump from running, which unfortunately locks up
+// the emulator thread when it calls gui_run(FALSE) which calls EnableWindow on the Run lamp
+//				while (running)
+//					Sleep(10);				/* wait for execution thread to exit */
 			}
+
+			btn[IDC_POWER_ON].state = power;
 			EnableWindow(btn[IDC_POWER_ON].hBtn, power);
-			for (i = 0; i < NBUTTONS; i++)
-				InvalidateRect(btn[i].hBtn, NULL, TRUE);
+
+			for (i = 0; i < NBUTTONS; i++)	/* repaint all of the lamps */
+				if (! btn[i].pushable)
+					InvalidateRect(btn[i].hBtn, NULL, TRUE);
+
 			break;
 
 		case IDC_PROGRAM_START:				/* begin execution */
@@ -967,8 +985,11 @@ void HandleCommand (HWND hWnd, WPARAM wParam, LPARAM lParam)
 		case IDC_IMM_STOP:
 			if (running) {
 				reason = STOP_WAIT;			/* terminate execution without setting wait_mode */
-				while (running)
-					Sleep(10);				/* wait for execution thread to exit */
+
+// this prevents message pump from running, which unfortunately locks up
+// the emulator thread when it calls gui_run(FALSE) which calls EnableWindow on the Run lamp
+//				while (running)
+//					Sleep(10);				/* wait for execution thread to exit */
 			}
 			break;
 
@@ -1084,10 +1105,14 @@ void forms_check (int set)
 
 	btn[IDC_FORMS_CHECK].clr = (printerstatus & PRINT_CHECK) ? RGB(255,0,0) : RGB(255,255,0);
 
-	EnableWindow(btn[IDC_FORMS_CHECK].hBtn, printerstatus);
+	btn[IDC_FORMS_CHECK].state = printerstatus;
 
-	if (btn[IDC_FORMS_CHECK].clr != oldcolor)
-		InvalidateRect(btn[IDC_FORMS_CHECK].hBtn, NULL, TRUE);		// change color in any case
+	if (btn[IDC_FORMS_CHECK].hBtn != NULL) {
+		EnableWindow(btn[IDC_FORMS_CHECK].hBtn, printerstatus);
+
+		if (btn[IDC_FORMS_CHECK].clr != oldcolor)
+			InvalidateRect(btn[IDC_FORMS_CHECK].hBtn, NULL, TRUE);		// change color in any case
+	}
 }
 
 void print_check (int set)
@@ -1101,25 +1126,38 @@ void print_check (int set)
 
 	btn[IDC_FORMS_CHECK].clr = (printerstatus & PRINT_CHECK) ? RGB(255,0,0) : RGB(255,255,0);
 
-	EnableWindow(btn[IDC_FORMS_CHECK].hBtn, printerstatus);
+	btn[IDC_FORMS_CHECK].state = printerstatus;
 
-	if (btn[IDC_FORMS_CHECK].clr != oldcolor)
-		InvalidateRect(btn[IDC_FORMS_CHECK].hBtn, NULL, TRUE);		// change color in any case
+	if (btn[IDC_FORMS_CHECK].hBtn != NULL) {
+		EnableWindow(btn[IDC_FORMS_CHECK].hBtn, printerstatus);
+
+		if (btn[IDC_FORMS_CHECK].clr != oldcolor)
+			InvalidateRect(btn[IDC_FORMS_CHECK].hBtn, NULL, TRUE);		// change color in any case
+	}
 }
 
 void keyboard_selected (int select)
 {
-	EnableWindow(btn[IDC_KEYBOARD_SELECT].hBtn, select);
+	btn[IDC_KEYBOARD_SELECT].state = select;
+
+	if (btn[IDC_KEYBOARD_SELECT].hBtn != NULL)
+		EnableWindow(btn[IDC_KEYBOARD_SELECT].hBtn, select);
 }
 
 void disk_ready (int ready)
 {
-	EnableWindow(btn[IDC_FILE_READY].hBtn, ready);
+	btn[IDC_FILE_READY].state = ready;
+
+	if (btn[IDC_FILE_READY].hBtn != NULL)
+		EnableWindow(btn[IDC_FILE_READY].hBtn, ready);
 }
 
 void disk_unlocked (int unlocked)
 {
-	EnableWindow(btn[IDC_DISK_UNLOCK].hBtn, unlocked);
+	btn[IDC_DISK_UNLOCK].state = unlocked;
+
+	if (btn[IDC_DISK_UNLOCK].hBtn != NULL)
+		EnableWindow(btn[IDC_DISK_UNLOCK].hBtn, unlocked);
 }
 
 CRITICAL_SECTION critsect;

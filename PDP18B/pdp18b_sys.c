@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Jul-03	RMS	Fixed FPM class mask
+   18-Jul-03	RMS	Added FP15 support
    02-Mar-03	RMS	Split loaders apart for greater flexibility
    09-Feb-03	RMS	Fixed bug in FMTASC (found by Hans Pufal)
    31-Jan-03	RMS	Added support for RB09
@@ -47,6 +49,9 @@
 #include <ctype.h>
 
 extern DEVICE cpu_dev;
+#if defined (PDP15)
+extern DEVICE fpp_dev;
+#endif
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
 extern UNIT tti_unit, tto_unit;
@@ -87,7 +92,7 @@ extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern int32 M[];
 extern int32 memm;
-extern int32 saved_PC;
+extern int32 PC;
 
 /* SCP data structures and interface routines
 
@@ -111,9 +116,13 @@ char sim_name[] = "PDP-15";
 
 REG *sim_PC = &cpu_reg[0];
 
-int32 sim_emax = 3;
+int32 sim_emax = 2;
 
-DEVICE *sim_devices[] = { &cpu_dev,
+DEVICE *sim_devices[] = {
+	&cpu_dev,
+#if defined (PDP15)
+	&fpp_dev,
+#endif
 	&ptr_dev,
 	&ptp_dev,
 	&tti_dev,
@@ -159,7 +168,8 @@ const char *sim_stop_messages[] = {
 	"Breakpoint",
 	"Nested XCT's",
 	"Invalid API interrupt",
-	"Non-standard device number"  };
+	"Non-standard device number",
+	"Memory management error"  };
 
 /* Binary loaders */
 
@@ -202,7 +212,7 @@ for (;;) {
 	    if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
 	    if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
 	else if ((val & 0760000) == OP_JMP) {		/* JMP? */
-	    saved_PC = ((origin - 1) & 060000) | (val & 017777);
+	    PC = ((origin - 1) & 060000) | (val & 017777);
 	    return SCPE_OK;  }
 	else if (val == OP_HLT) return SCPE_OK;		/* HLT? */
 	else return SCPE_FMT;  }			/* error */
@@ -226,7 +236,7 @@ t_stat r;
 
 if (*cptr != 0) {					/* more input? */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get origin */
-	origin = get_uint (gbuf, 8, ADDRMASK, &r);
+	origin = get_uint (gbuf, 8, AMASK, &r);
 	if (r != SCPE_OK) return r;
 	if (*cptr != 0) return SCPE_ARG;  }		/* no more */
 else origin = 0200;					/* default 200 */
@@ -234,7 +244,7 @@ else origin = 0200;					/* default 200 */
 for (;;) {						/* word loop */
 	if ((val = getword (fileref, &bits)) < 0) return SCPE_FMT;
 	if (bits & 1) {					/* end of tape? */
-	    if ((val & 0760000) == OP_JMP) saved_PC = 
+	    if ((val & 0760000) == OP_JMP) PC = 
 		((origin - 1) & 060000) | (val & 017777);
 	    else if (val != OP_HLT) return SCPE_FMT;
 	    break;  }
@@ -258,16 +268,16 @@ return SCPE_OK;
 
 t_stat bin_load_915 (FILE *fileref, char *cptr)
 {
-int32 i, val, origin, count, cksum;
+int32 i, val, bits, origin, count, cksum;
 
 if (*cptr != 0) return SCPE_2MARG;			/* no arguments */
-do {	val = getc (fileref);  }			/* find end RIM */
-while (((val & 0100) == 0) && (val != EOF));
-if (val == EOF) rewind (fileref);			/* no RIM? rewind */ 
+do {	val = getword (fileref, & bits);  }		/* find end RIM */
+while ((val >= 0) && ((bits & 1) == 0));
+if (val < 0) rewind (fileref);				/* no RIM? rewind */ 
 for (;;) {						/* block loop */
 	if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
 	if (val & SIGN) {
-	    if (val != DMASK) saved_PC = val & 077777;
+	    if (val != DMASK) PC = val & 077777;
 	    break;  }
 	cksum = origin = val;				/* save origin */
 	if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
@@ -328,23 +338,30 @@ return bin_load_915 (fileref, cptr);			/* must be BIN */
 #define I_V_EST		8				/* EAE setup */
 #define I_V_ESH		9				/* EAE shift */
 #define I_V_EMD		10				/* EAE mul-div */
-#define I_NPN		(I_V_NPN << I_V_FL)		/* no operand */
-#define I_NPI		(I_V_NPI << I_V_FL)		/* no operand IOT */
-#define I_IOT		(I_V_IOT << I_V_FL)		/* IOT */
-#define I_MRF		(I_V_MRF << I_V_FL)		/* memory reference */
-#define I_OPR		(I_V_OPR << I_V_FL)		/* OPR */
-#define I_LAW		(I_V_LAW << I_V_FL)		/* LAW */
-#define I_XR		(I_V_XR << I_V_FL)		/* index */
-#define I_XR9		(I_V_XR9 << I_V_FL)		/* index literal */
-#define I_EST		(I_V_EST << I_V_FL)		/* EAE setup */
-#define I_ESH		(I_V_ESH << I_V_FL)		/* EAE shift */
-#define I_EMD		(I_V_EMD << I_V_FL)		/* EAE mul-div */
+#define I_V_FPM		11				/* FP15 mem ref */
+#define I_V_FPI		12				/* FP15 indirect */
+#define I_V_FPN		13				/* FP15 no operand */
+#define I_NPN		(I_V_NPN << I_V_FL)
+#define I_NPI		(I_V_NPI << I_V_FL)
+#define I_IOT		(I_V_IOT << I_V_FL)
+#define I_MRF		(I_V_MRF << I_V_FL)
+#define I_OPR		(I_V_OPR << I_V_FL)
+#define I_LAW		(I_V_LAW << I_V_FL)
+#define I_XR		(I_V_XR << I_V_FL)
+#define I_XR9		(I_V_XR9 << I_V_FL)
+#define I_EST		(I_V_EST << I_V_FL)
+#define I_ESH		(I_V_ESH << I_V_FL)
+#define I_EMD		(I_V_EMD << I_V_FL)
+#define I_FPM		(I_V_FPM << I_V_FL)
+#define I_FPI		(I_V_FPI << I_V_FL)
+#define I_FPN		(I_V_FPN << I_V_FL)
 #define MD(x) ((I_EMD) + ((x) << I_V_DC))
 
 static const int32 masks[] = {
- 0777777, 0777767, 0740000, 0760000,
+ 0777777, 0777767, 0770000, 0760000,
  0763730, 0760000, 0777000, 0777000,
- 0740700, 0760700, 0777700 };
+ 0740700, 0760700, 0777700, 0777777,
+ 0777777, 0777777 };
 
 static const char *opcode[] = {
  "CAL", "DAC", "JMS", "DZM",				/* mem refs */
@@ -452,9 +469,75 @@ static const char *opcode[] = {
 #if defined (PDP15)
  "SPCO", "SKP15", "RES",
  "SBA", "DBA", "EBA",
+ "ORMM", "RDMM", "LDMM", "MPLR",
+ "ENB", "INH", "MPRC", "IPFH",
  "AAS", "PAX", "PAL", "AAC",
  "PXA", "AXS", "PXL", "PLA",
  "PLX", "CLAC","CLX", "CLLR", "AXR",
+
+ "FPT",							/* FP15 */
+ "ISB", "ESB",						/* mem ref */
+ "FSB", "URFSB", "UNFSB", "UUFSB",
+ "DSB", "URDSB", "UNDSB", "UUDSB",
+ "IRS", "ERS",
+ "FRS", "URFRS", "UNFRS", "UUFRS",
+ "DRS", "URDRS", "UNDRS", "UUDRS",
+ "IMP", "EMP",
+ "FMP", "URFMP", "UNFMP", "UUFMP",
+ "DMP", "URDMP", "UNDMP", "UUDMP",
+ "IDV", "EDV",
+ "FDV", "URFDV", "UNFDV", "UUFDV",
+ "DDV", "URDDV", "UNDDV", "UUDDV",
+ "IRD", "ERD",
+ "FRD", "URFRD", "UNFRD", "UUFRD",
+ "DRD", "URDRD", "UNDRD", "UUDRD",
+ "ILD", "ELD",
+ "FLD", "UNFLD", "DLD", "UNDLD",
+ "IST", "EST",
+ "FST", "URFST", "UNFST", "UUFST",
+ "DST", "UNDST",
+ "ILF", "UNILF", "ELF", "UNELF",
+ "FLX", "URFLX", "DLX", "URDLX",
+ "ILQ", "ELQ",
+ "FLQ", "UNFLQ", "DLQ", "UNDLQ",
+ "LJE", "SJE",
+ "IAD", "EAD",
+ "FAD", "URFAD", "UNFAD", "UUFAD",
+ "DAD", "URDAD", "UNDAD", "UUDAD",
+ "BZA", "BMA", "BLE", "BPA",
+ "BRU", "BNA", "BAC",
+ "ISB*", "ESB*",						/* indirect */
+ "FSB*", "URFSB*", "UNFSB*", "UUFSB*",
+ "DSB*", "URDSB*", "UNDSB*", "UUDSB*",
+ "IRS*", "ERS*",
+ "FRS*", "URFRS*", "UNFRS*", "UUFRS*",
+ "DRS*", "URDRS*", "UNDRS*", "UUDRS*",
+ "IMP*", "EMP*",
+ "FMP*", "URFMP*", "UNFMP*", "UUFMP*",
+ "DMP*", "URDMP*", "UNDMP*", "UUDMP*",
+ "IDV*", "EDV*",
+ "FDV*", "URFDV*", "UNFDV*", "UUFDV*",
+ "DDV*", "URDDV*", "UNDDV*", "UUDDV*",
+ "IRD*", "ERD",
+ "FRD*", "URFRD*", "UNFRD*", "UUFRD*",
+ "DRD*", "URDRD*", "UNDRD*", "UUDRD*",
+ "ILD*", "ELD",
+ "FLD*", "UNFLD*", "DLD*", "UNDLD*",
+ "IST*", "EST",
+ "FST*", "URFST*", "UNFST*", "UUFST*",
+ "DST*", "UNDST*",
+ "ILF*", "UNILF*", "ELF*", "UNELF*",
+ "FLX*", "URFLX*", "DLX*", "URDLX*",
+ "ILQ*", "ELQ*",
+ "FLQ*", "UNFLQ*", "DLQ*", "UNDLQ*",
+ "LJE*", "SJE*",
+ "IAD*", "EAD*",
+ "FAD*", "URFAD*", "UNFAD*", "UUFAD*",
+ "DAD*", "URDAD*", "UNDAD*", "UUDAD*",
+
+ "FLA", "UNFLA", "FXA", "URFXA",			/* no operand */
+ "SWQ", "UNSWQ", "FZR",
+ "FAB", "FNG", "FCM", "FNM",
 #endif
 #if defined (PDP9) || defined (PDP15)
  "MPSK", "MPSNE", "MPCV", "MPEU",
@@ -617,9 +700,74 @@ static const int32 opc_val[] = {
 #if defined (PDP15)
  0703341+I_NPI, 0707741+I_NPI, 0707742+I_NPI,
  0707761+I_NPI, 0707762+I_NPI, 0707764+I_NPI,
+ 0700022+I_NPI, 0700032+I_NPN, 0700024+I_NPI, 0701724+I_NPI,
+ 0705521+I_NPI, 0705522+I_NPI, 0701722+I_NPI, 0701764+I_NPI,
  0720000+I_XR9, 0721000+I_XR, 0722000+I_XR, 0723000+I_XR9,
  0724000+I_XR, 0725000+I_XR9, 0726000+I_XR, 0730000+I_XR,
  0731000+I_XR, 0734000+I_XR, 0735000+I_XR, 0736000+I_XR, 0737000+I_XR9,
+
+ 0710314+I_FPN,
+ 0710400+I_FPM, 0710500+I_FPM,
+ 0710440+I_FPM, 0710450+I_FPM, 0710460+I_FPM, 0710470+I_FPM,
+ 0710540+I_FPM, 0710550+I_FPM, 0710560+I_FPM, 0710570+I_FPM,
+ 0711000+I_FPM, 0711100+I_FPM,
+ 0711040+I_FPM, 0711050+I_FPM, 0711060+I_FPM, 0711070+I_FPM,
+ 0711140+I_FPM, 0711150+I_FPM, 0711160+I_FPM, 0711170+I_FPM,
+ 0711400+I_FPM, 0711500+I_FPM,
+ 0711440+I_FPM, 0711450+I_FPM, 0711460+I_FPM, 0711470+I_FPM,
+ 0711540+I_FPM, 0711550+I_FPM, 0711560+I_FPM, 0711570+I_FPM,
+ 0712000+I_FPM, 0712100+I_FPM,
+ 0712040+I_FPM, 0712050+I_FPM, 0712060+I_FPM, 0712070+I_FPM,
+ 0712140+I_FPM, 0712150+I_FPM, 0712160+I_FPM, 0712170+I_FPM,
+ 0712400+I_FPM, 0712500+I_FPM,
+ 0712440+I_FPM, 0712450+I_FPM, 0712460+I_FPM, 0712470+I_FPM,
+ 0712540+I_FPM, 0712550+I_FPM, 0712560+I_FPM, 0712570+I_FPM,
+ 0713000+I_FPM, 0713100+I_FPM,
+ 0713050+I_FPM, 0713070+I_FPM, 0713150+I_FPM, 0713170+I_FPM,
+ 0713600+I_FPM, 0713700+I_FPM,
+ 0713640+I_FPM, 0713650+I_FPM, 0713660+I_FPM, 0713670+I_FPM,
+ 0713750+I_FPM, 0713770+I_FPM,
+ 0714010+I_FPM, 0714030+I_FPM, 0714110+I_FPM, 0714130+I_FPM,
+ 0714460+I_FPM, 0714470+I_FPM, 0714560+I_FPM, 0714570+I_FPM,
+ 0715000+I_FPM, 0715100+I_FPM,
+ 0715050+I_FPM, 0715070+I_FPM, 0715150+I_FPM, 0715170+I_FPM,
+ 0715400+I_FPM, 0715600+I_FPM,
+ 0716000+I_FPM, 0716100+I_FPM,
+ 0716040+I_FPM, 0716050+I_FPM, 0716060+I_FPM, 0716070+I_FPM,
+ 0716140+I_FPM, 0716150+I_FPM, 0716160+I_FPM, 0716170+I_FPM,
+ 0716601+I_FPM, 0716602+I_FPM, 0716603+I_FPM,
+ 0716604+I_FPM, 0716606+I_FPM, 0716610+I_FPM, 0716620+I_FPM,
+ 0710400+I_FPI, 0710500+I_FPI,				/* indirect */
+ 0710440+I_FPI, 0710450+I_FPI, 0710460+I_FPI, 0710470+I_FPI,
+ 0710540+I_FPI, 0710550+I_FPI, 0710560+I_FPI, 0710570+I_FPI,
+ 0711000+I_FPI, 0711100+I_FPI,
+ 0711040+I_FPI, 0711050+I_FPI, 0711060+I_FPI, 0711070+I_FPI,
+ 0711140+I_FPI, 0711150+I_FPI, 0711160+I_FPI, 0711170+I_FPI,
+ 0711400+I_FPI, 0711500+I_FPI,
+ 0711440+I_FPI, 0711450+I_FPI, 0711460+I_FPI, 0711470+I_FPI,
+ 0711540+I_FPI, 0711550+I_FPI, 0711560+I_FPI, 0711570+I_FPI,
+ 0712000+I_FPI, 0712100+I_FPI,
+ 0712040+I_FPI, 0712050+I_FPI, 0712060+I_FPI, 0712070+I_FPI,
+ 0712140+I_FPI, 0712150+I_FPI, 0712160+I_FPI, 0712170+I_FPI,
+ 0712400+I_FPI, 0712500+I_FPI,
+ 0712440+I_FPI, 0712450+I_FPI, 0712460+I_FPI, 0712470+I_FPI,
+ 0712540+I_FPI, 0712550+I_FPI, 0712560+I_FPI, 0712570+I_FPI,
+ 0713000+I_FPI, 0713100+I_FPI,
+ 0713050+I_FPI, 0713070+I_FPI, 0713150+I_FPI, 0713170+I_FPI,
+ 0713600+I_FPI, 0713700+I_FPI,
+ 0713640+I_FPI, 0713650+I_FPI, 0713660+I_FPI, 0713670+I_FPI,
+ 0713750+I_FPI, 0713770+I_FPI,
+ 0714010+I_FPI, 0714030+I_FPI, 0714110+I_FPI, 0714130+I_FPI,
+ 0714460+I_FPI, 0714470+I_FPI, 0714560+I_FPI, 0714570+I_FPI,
+ 0715000+I_FPI, 0715100+I_FPI,
+ 0715050+I_FPI, 0715070+I_FPI, 0715150+I_FPI, 0715170+I_FPI,
+ 0715400+I_FPI, 0715600+I_FPI,
+ 0716000+I_FPI, 0716100+I_FPI,
+ 0716040+I_FPI, 0716050+I_FPI, 0716060+I_FPI, 0716070+I_FPI,
+ 0716140+I_FPI, 0716150+I_FPI, 0716160+I_FPI, 0716170+I_FPI,
+ 0714210+I_FPN, 0714230+I_FPN, 0714660+I_FPN, 0714670+I_FPN,
+ 0715250+I_FPN, 0715270+I_FPN, 0711200+I_FPN,
+ 0713271+I_FPN, 0713272+I_FPN, 0713273+I_FPN, 0713250+I_FPN,
 #endif
 #if defined (PDP9) || defined (PDP15)
  0701701+I_NPI, 0701741+I_NPI, 0701702+I_NPI, 0701742+I_NPI,
@@ -741,7 +889,7 @@ if (!(sw & SWMASK ('M'))) return SCPE_ARG;
 
 for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
-    if ((opc_val[i] & 0777777) == (inst & masks[j])) {	/* match? */
+    if ((opc_val[i] & DMASK) == (inst & masks[j])) {	/* match? */
 
 	switch (j) {					/* case on class */
 	case I_V_NPN:					/* no operands */
@@ -758,17 +906,17 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	case I_V_MRF:					/* mem ref */
 #if defined (PDP15)
 	    if (memm) {
-		disp = inst & 017777;  
-		ma = (addr & 0760000) | disp;  }
+		disp = inst & B_DAMASK;  
+		ma = (addr & (AMASK & ~B_DAMASK)) | disp;  }
 	    else {
-	    	disp = inst & 007777;
-		ma = (addr & 0770000) | disp;  }
-	    fprintf (of, "%s %-o", opcode[i], (cflag? ma & ADDRMASK: disp));
-	    if (!memm && (inst & 0010000)) fprintf (of, ",X");
+	    	disp = inst & P_DAMASK;
+		ma = (addr & (AMASK & ~P_DAMASK)) | disp;  }
+	    fprintf (of, "%s %-o", opcode[i], (cflag? ma & AMASK: disp));
+	    if (!memm && (inst & I_IDX)) fprintf (of, ",X");
 #else
-	    disp = inst & 017777;
-	    ma = (addr & 0760000) | disp;
-	    fprintf (of, "%s %-o", opcode[i], (cflag? ma & ADDRMASK: disp));
+	    disp = inst & B_DAMASK;
+	    ma = (addr & (AMASK & ~B_DAMASK)) | disp;
+	    fprintf (of, "%s %-o", opcode[i], (cflag? ma & AMASK: disp));
 #endif
 		break;
 	case I_V_OPR:					/* operate */
@@ -796,7 +944,15 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 	    if (disp == k) fprintf (of, "%s", opcode[i]);
 	    else if (disp < k) fprintf (of, "%s -%-o", opcode[i], k - disp);
 	    else fprintf (of, "%s +%-o", opcode[i], disp - k);
-	    break;  }					/* end case */
+	    break;
+	case I_V_FPM: case I_V_FPI:			/* FP15 mem ref */
+	    fprintf (of, "%s", opcode[i]);
+	    if (val[1] & SIGN) fputc ('*', of);
+	    fprintf (of, " %-o", val[1] & ~SIGN);
+	    return -1;
+	case I_V_FPN:					/* FP15 no operand */
+	    fprintf (of, "%s", opcode[i]);
+	    return -1;  }				/* end case */
 	return SCPE_OK;  }				/* end if */
 	}						/* end for */
 return SCPE_ARG;
@@ -838,8 +994,8 @@ return get_uint (cptr, 8, 0777777, status);
 
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
-int32 cflag, d, i, j, k, sign, dmask, epcmask;
-t_stat r;
+int32 cflag, d, i, j, k, sign, damask, epcmask;
+t_stat r, sta = SCPE_OK;
 char gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
@@ -895,31 +1051,31 @@ case I_V_LAW:						/* law */
 	break;
 case I_V_MRF:						/* mem ref */
 #if defined (PDP15)
-	if (memm) dmask = 017777;
-	else dmask = 07777;
+	if (memm) damask = B_DAMASK;
+	else damask = P_DAMASK;
 	cptr = get_glyph (cptr, gbuf, ',');		/* get glyph */
 #else
-	dmask = 017777;
+	damask = B_DAMASK;
 	cptr = get_glyph (cptr, gbuf, 0);		/* get next field */
 #endif
 #if defined (PDP4) || defined (PDP7)
 	if (strcmp (gbuf, "I") == 0) {			/* indirect? */
-	    val[0] = val[0] | 020000;
+	    val[0] = val[0] | I_IND;
 	    cptr = get_glyph (cptr, gbuf, 0);  }
 #endif
-	epcmask = ADDRMASK & ~dmask;			/* get ePC */
-	d = get_uint (gbuf, 8, ADDRMASK, &r);		/* get addr */
+	epcmask = AMASK & ~damask;			/* get ePC */
+	d = get_uint (gbuf, 8, AMASK, &r);		/* get addr */
 	if (r != SCPE_OK) return SCPE_ARG;
-	if (d <= dmask) val[0] = val[0] | d;		/* fit in 12/13b? */
+	if (d <= damask) val[0] = val[0] | d;		/* fit in 12/13b? */
 	else if (cflag && (((addr ^ d) & epcmask) == 0))
-	    val[0] = val[0] | (d & dmask);		/* hi bits = ePC? */
+	    val[0] = val[0] | (d & damask);		/* hi bits = ePC? */
 	else return SCPE_ARG;
 #if defined (PDP15)
 	if (!memm) {
 	    cptr = get_glyph (cptr, gbuf, 0);
 	    if (gbuf[0] != 0) {
 		if (strcmp (gbuf, "X") != 0) return SCPE_ARG;
-		val[0] = val[0] | 010000;  }  }
+		val[0] = val[0] | I_IDX;  }  }
 #endif
 	break;
 case I_V_EMD:						/* or'able */
@@ -940,7 +1096,23 @@ case I_V_NPN: case I_V_NPI: case I_V_IOT: case I_V_OPR:
 		if (sign > 0) val[0] = val[0] + d;  
 		else if (sign < 0) val[0] = val[0] - d;
 		else val[0] = val[0] | d;  }  }
+	break;
+case I_V_FPM:						/* FP15 mem ref */
+	cptr = get_glyph (cptr, gbuf, 0);		/* get next field */
+	val[1] = get_uint (gbuf, 8, AMASK, &r);		/* get addr */
+	if (r != SCPE_OK) return SCPE_ARG;
+	sta = -1;
+	break;
+case I_V_FPI:						/* FP15 ind mem ref */
+	cptr = get_glyph (cptr, gbuf, 0);		/* get next field */
+	val[1] = get_uint (gbuf, 8, AMASK, &r) | SIGN;	/* get @addr */
+	if (r != SCPE_OK) return SCPE_ARG;
+	sta = -1;
+	break;
+case I_V_FPN:						/* FP15 no operand */
+	val[1] = 0;
+	sta = -1;
 	break;  }					/* end case */
 if (*cptr != 0) return SCPE_ARG;			/* junk at end? */
-return SCPE_OK;
+return sta;
 }

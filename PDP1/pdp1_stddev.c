@@ -28,6 +28,7 @@
    tti		keyboard
    tto		teleprinter
 
+   23-Jul-03	RMS	Revised to detect I/O wait hang
    25-Apr-03	RMS	Revised for extended file support
    22-Dec-02	RMS	Added break support
    29-Nov-02	RMS	Fixed output flag initialization (found by Derek Peschel)
@@ -52,15 +53,15 @@
 #define TTI		0
 #define TTO		1
 
-extern int32 sbs, ioc, iosta, PF, IO, PC;
-extern int32 M[];
-
-int32 ptr_rpls = 0, ptr_stopioe = 0, ptr_state = 0;
-int32 ptp_rpls = 0, ptp_stopioe = 0;
+int32 ptr_state = 0;
+int32 ptr_stopioe = 0;
+int32 ptp_stopioe = 0;
 int32 tti_hold = 0;					/* tti hold buf */
-int32 tto_rpls = 0;					/* tto restart */
 int32 tty_buf = 0;					/* tty buffer */
 int32 tty_uc = 0;					/* tty uc/lc */
+
+extern int32 sbs, ioc, cpls, iosta, PF, IO, PC;
+extern int32 M[];
 
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
@@ -123,7 +124,7 @@ UNIT ptr_unit = {
 REG ptr_reg[] = {
 	{ ORDATA (BUF, ptr_unit.buf, 18) },
 	{ FLDATA (DONE, iosta, IOS_V_PTR) },
-	{ FLDATA (RPLS, ptr_rpls, 0) },
+	{ FLDATA (RPLS, cpls, CPLS_V_PTR) },
 	{ ORDATA (STATE, ptr_state, 5), REG_HRO },
 	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
@@ -150,7 +151,7 @@ UNIT ptp_unit = {
 REG ptp_reg[] = {
 	{ ORDATA (BUF, ptp_unit.buf, 8) },
 	{ FLDATA (DONE, iosta, IOS_V_PTP) },
-	{ FLDATA (RPLS, ptp_rpls, 0) },
+	{ FLDATA (RPLS, cpls, CPLS_V_PTP) },
 	{ DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
@@ -177,7 +178,7 @@ UNIT tty_unit[] = {
 REG tty_reg[] = {
 	{ ORDATA (BUF, tty_buf, 6) },
 	{ FLDATA (UC, tty_uc, UC_V) },
-	{ FLDATA (RPLS, tto_rpls, 0) },
+	{ FLDATA (RPLS, cpls, CPLS_V_TTO) },
 	{ ORDATA (HOLD, tti_hold, 9), REG_HRO },
 	{ FLDATA (KDONE, iosta, IOS_V_TTI) },
 	{ DRDATA (KPOS, tty_unit[TTI].pos, T_ADDR_W), PV_LEFT },
@@ -196,18 +197,18 @@ DEVICE tty_dev = {
 
 /* Paper tape reader: IOT routine */
 
-int32 ptr (int32 inst, int32 dev, int32 data)
+int32 ptr (int32 inst, int32 dev, int32 dat)
 {
 iosta = iosta & ~IOS_PTR;				/* clear flag */
 if (dev == 0030) return ptr_unit.buf;			/* RRB */
 ptr_state = (dev == 0002)? 18: 0;			/* mode = bin/alp */
-ptr_rpls = 0;
 ptr_unit.buf = 0;					/* clear buffer */
-sim_activate (&ptr_unit, ptr_unit.wait);
 if (GEN_CPLS (inst)) {					/* comp pulse? */
 	ioc = 0;
-	ptr_rpls = 1;  }
-return data;
+	cpls = cpls | CPLS_PTR;  }
+else cpls = cpls & ~CPLS_PTR;
+sim_activate (&ptr_unit, ptr_unit.wait);
+return dat;
 }
 
 /* Unit service */
@@ -231,10 +232,12 @@ else if (temp & 0200) {					/* binary */
 	ptr_state = ptr_state - 6;
 	ptr_unit.buf = ptr_unit.buf | ((temp & 077) << ptr_state);  }
 if (ptr_state == 0) {					/* done? */
-	if (ptr_rpls) IO = ptr_unit.buf;		/* restart? fill IO */
+	if (cpls & CPLS_PTR) {				/* completion pulse? */
+	    IO = ptr_unit.buf;				/* fill IO */
+	    ioc = 1;					/* restart */
+	    cpls = cpls & ~CPLS_PTR;  }
 	iosta = iosta | IOS_PTR;			/* set flag */
-	sbs = sbs | SB_RQ;				/* req seq break */
-	ioc = ioc | ptr_rpls;  }			/* restart */
+	sbs = sbs | SB_RQ;  }				/* req seq break */
 else sim_activate (&ptr_unit, ptr_unit.wait);		/* get next char */
 return SCPE_OK;
 }
@@ -245,7 +248,7 @@ t_stat ptr_reset (DEVICE *dptr)
 {
 ptr_state = 0;						/* clear state */
 ptr_unit.buf = 0;
-ptr_rpls = 0;
+cpls = cpls & ~CPLS_PTR;
 iosta = iosta & ~IOS_PTR;				/* clear flag */
 sim_cancel (&ptr_unit);					/* deactivate unit */
 return SCPE_OK;
@@ -253,48 +256,61 @@ return SCPE_OK;
 
 /* Bootstrap routine */
 
-#define BOOT_START	07772
-#define BOOT_LEN	(sizeof (boot_rom) / sizeof (int))
+int32 ptr_getw (UNIT *uptr)
+{
+int32 i, tmp, word;
 
-static const int32 boot_rom[] = {
-	0730002,					/* r, rpb + wait */
-	0327776,					/* dio x */
-	0107776,					/* xct x */
-	0730002,					/* rpb + wait */
-	0760400,					/* x, halt */
-	0607772						/* jmp r */
-};
+for (i = word = 0; i < 3;) {
+	if ((tmp = getc (uptr->fileref)) == EOF) return -1;
+	uptr->pos = uptr->pos + 1;
+	if (tmp & 0200) {
+		word = (word << 6) | (tmp & 077);
+		i++;  }  }
+return word;
+}
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+int32 origin, val;
 
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
-PC = BOOT_START;
-return SCPE_OK;
+for (;;) {
+	if ((val = ptr_getw (&ptr_unit)) < 0) return SCPE_FMT;
+	if (((val & 0760000) == OP_DIO) ||		/* DIO? */
+	    ((val & 0760000) == OP_DAC)) {		/* hack - Macro1 err */
+	    origin = val & 07777;
+	    if ((val = ptr_getw (&ptr_unit)) < 0) return SCPE_FMT;
+	    M[origin] = val;  }
+	else if ((val & 0760000) == OP_JMP) {		/* JMP? */
+	    PC = val & 007777;
+	    break;  }
+	else return SCPE_FMT;				/* bad instr */
+	}
+return SCPE_OK;						/* done */
 }
 
 /* Paper tape punch: IOT routine */
 
-int32 ptp (int32 inst, int32 dev, int32 data)
+int32 ptp (int32 inst, int32 dev, int32 dat)
 {
 iosta = iosta & ~IOS_PTP;				/* clear flag */
-ptp_rpls = 0;
-ptp_unit.buf = (dev == 0006)? ((data >> 12) | 0200): (data & 0377);
-sim_activate (&ptp_unit, ptp_unit.wait);		/* start unit */
+ptp_unit.buf = (dev == 0006)? ((dat >> 12) | 0200): (dat & 0377);
 if (GEN_CPLS (inst)) {					/* comp pulse? */
 	ioc = 0;
-	ptp_rpls = 1;  }
-return data;
+	cpls = cpls | CPLS_PTP;  }
+else cpls = cpls & ~CPLS_PTP;
+sim_activate (&ptp_unit, ptp_unit.wait);		/* start unit */
+return dat;
 }
 
 /* Unit service */
 
 t_stat ptp_svc (UNIT *uptr)
 {
+if (cpls & CPLS_PTP) {					/* completion pulse? */
+	ioc = 1;					/* restart */
+	cpls = cpls & ~CPLS_PTP;  }
 iosta = iosta | IOS_PTP;				/* set flag */
 sbs = sbs | SB_RQ;					/* req seq break */
-ioc = ioc | ptp_rpls;					/* process restart */
 if ((ptp_unit.flags & UNIT_ATT) == 0)			/* not attached? */
 	return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {	/* I/O error? */
@@ -310,7 +326,7 @@ return SCPE_OK;
 t_stat ptp_reset (DEVICE *dptr)
 {
 ptp_unit.buf = 0;					/* clear state */
-ptp_rpls = 0;
+cpls = cpls & ~CPLS_PTP;
 iosta = iosta & ~IOS_PTP;				/* clear flag */
 sim_cancel (&ptp_unit);					/* deactivate unit */
 return SCPE_OK;
@@ -318,7 +334,7 @@ return SCPE_OK;
 
 /* Typewriter IOT routines */
 
-int32 tti (int32 inst, int32 dev, int32 data)
+int32 tti (int32 inst, int32 dev, int32 dat)
 {
 iosta = iosta & ~IOS_TTI;				/* clear flag */
 if (inst & (IO_WAIT | IO_CPLS))				/* wait or sync? */
@@ -326,16 +342,16 @@ if (inst & (IO_WAIT | IO_CPLS))				/* wait or sync? */
 return tty_buf & 077;
 }
 
-int32 tto (int32 inst, int32 dev, int32 data)
+int32 tto (int32 inst, int32 dev, int32 dat)
 {
 iosta = iosta & ~IOS_TTO;				/* clear flag */
-tto_rpls = 0;
-tty_buf = data & TT_WIDTH;				/* load buffer */
-sim_activate (&tty_unit[TTO], tty_unit[TTO].wait);	/* activate unit */
+tty_buf = dat & TT_WIDTH;				/* load buffer */
 if (GEN_CPLS (inst)) {					/* comp pulse? */
 	ioc = 0;
-	tto_rpls = 1;  }
-return data;
+	cpls = cpls | CPLS_TTO;  }
+else cpls = cpls & ~CPLS_TTO;
+sim_activate (&tty_unit[TTO], tty_unit[TTO].wait);	/* activate unit */
+return dat;
 }
 
 /* Unit service routines */
@@ -373,9 +389,11 @@ t_stat tto_svc (UNIT *uptr)
 {
 int32 out;
 
+if (cpls & CPLS_TTO) {					/* completion pulse? */
+	ioc = 1;					/* restart */
+	cpls = cpls & ~CPLS_TTO;  }
 iosta = iosta | IOS_TTO;				/* set flag */
 sbs = sbs | SB_RQ;					/* req seq break */
-ioc = ioc | tto_rpls;					/* process restart */
 if (tty_buf == FIODEC_UC) {				/* upper case? */
 	tty_uc = UC;
 	return SCPE_OK;  }
@@ -399,7 +417,7 @@ t_stat tty_reset (DEVICE *dptr)
 tty_buf = 0;						/* clear buffer */
 tty_uc = 0;						/* clear case */
 tti_hold = 0;						/* clear hold buf */
-tto_rpls = 0;						/* clear reset pulse */
+cpls = cpls & ~CPLS_TTO;
 iosta = (iosta & ~IOS_TTI) | IOS_TTO;			/* clear flag */
 sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* activate keyboard */
 sim_cancel (&tty_unit[TTO]);				/* stop printer */

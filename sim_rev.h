@@ -29,11 +29,63 @@
 
 #define	SIM_MAJOR	3
 #define SIM_MINOR	0
-#define SIM_PATCH	0
+#define SIM_PATCH	1
 
 /* V3.0 revision history 
 
 patch	date		module(s) and fix(es)
+
+  1	27-Jul-03	pdp1_cpu.c: updated to detect indefinite I/O wait
+
+			pdp1_drm.c: fixed incorrect logical, missing activate, break
+
+			pdp1_lp.c:
+			-- fixed bugs in instruction decoding, overprinting
+			-- updated to detect indefinite I/O wait
+
+			pdp1_stddev.c:
+			-- changed RIM loader to be "hardware"
+			-- updated to detect indefinite I/O wait
+
+			pdp1_sys.c: added block loader format support to LOAD
+
+			pdp10_rp.c: fixed bug in read header
+
+			pdp11_rq: fixed bug in user disk size (found by Chaskiel M Grundman)
+
+			pdp18b_cpu.c:
+			-- added FP15 support
+			-- added XVM support
+			-- added EAE support to the PDP-4
+			-- added PDP-15 "re-entrancy ECO"
+			-- fixed memory protect/skip interaction
+			-- fixed CAF to only reset peripherals
+
+			pdp18b_fpp.c: added FP15
+
+			pdp18b_lp.c: fixed bug in Type 62 overprinting
+
+			pdp18b_rf.c: fixed bug in set size routine
+
+			pdp18b_stddev.c:
+			-- increased PTP TIME for PDP-15 operating systems
+			-- added hardware RIM loader for PDP-7, PDP-9, PDP-15
+
+			pdp18b_sys.c: added FP15, KT15, XVM instructions
+
+			pdp8b_df.c, pdp8_rf.c: fixed bug in set size routine
+
+			hp2100_dr.c:
+			-- fixed drum sizes
+			-- fixed variable capacity interaction with SAVE/RESTORE
+
+			i1401_cpu.c: revised fetch to model hardware more closely
+
+			ibm1130: fixed bugs found by APL 1130
+
+			nova_dsk.c: fixed bug in set size routine
+
+			altairz80: fixed bug in real-time clock on Windows host
 
   0	15-Jun-03	scp.c:
 			-- added ASSIGN/DEASSIGN

@@ -327,8 +327,8 @@ static const int32 map_unit[16] = {			/* Type 550 unit map */
   0, -1, -1, -1, -1, -1, -1, -1 };
 
 DEVICE dt_dev;
-int32 dt75 (int32 pulse, int32 AC);
-int32 dt76 (int32 pulse, int32 AC);
+int32 dt75 (int32 pulse, int32 dat);
+int32 dt76 (int32 pulse, int32 dat);
 int32 dt_iors (void);
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
@@ -423,18 +423,18 @@ DEVICE dt_dev = {
 /* IOT routines */
 
 #if defined (TC02)					/* TC02/TC15 */
-int32 dt75 (int32 pulse, int32 AC)
+int32 dt75 (int32 pulse, int32 dat)
 {
 int32 old_dtsa = dtsa, fnc;
 UNIT *uptr;
 
 if (((pulse & 060) == 040) && (pulse & 05)) {		/* select */
 	if (pulse & 01) dtsa = 0;			/* DTCA */
-	if (pulse & 02) AC = dtsa;			/* DTRA!... */
+	if (pulse & 02) dat = dtsa;			/* DTRA!... */
 	if (pulse & 04) {				/* DTXA */
-	    if ((AC & DTA_CERF) == 0) dtsb = dtsb & ~DTB_ALLERR;
-	    if ((AC & DTA_CDTF) == 0) dtsb = dtsb & ~DTB_DTF;
-	    dtsa = dtsa ^ (AC & DTA_RW);  }
+	    if ((dat & DTA_CERF) == 0) dtsb = dtsb & ~DTB_ALLERR;
+	    if ((dat & DTA_CDTF) == 0) dtsb = dtsb & ~DTB_DTF;
+	    dtsa = dtsa ^ (dat & DTA_RW);  }
 	if ((old_dtsa ^ dtsa) & DTA_UNIT) dt_deselect (old_dtsa);
 	uptr = dt_dev.units + DTA_GETUNIT (dtsa);	/* get unit */
 	fnc = DTA_GETFNC (dtsa);			/* get fnc */
@@ -445,41 +445,41 @@ if (((pulse & 060) == 040) && (pulse & 05)) {		/* select */
 	    dt_seterr (uptr, DTB_SEL);			/* select err */
 	else dt_newsa (dtsa);				/* new func */
 	DT_UPDINT;
-	return AC;  }
+	return dat;  }
 if ((pulse & 067) == 042) return dtsa;			/* DTRA */
 if ((pulse & 067) == 061)				/* DTEF */
-	return ((dtsb & DTB_ERF)? IOT_SKP + AC: AC);
+	return ((dtsb & DTB_ERF)? IOT_SKP + dat: dat);
 if ((pulse & 067) == 062) return dtsb;			/* DTRB */
 if ((pulse & 067) == 063)				/* DTEF!DTRB */
 	return ((dtsb & DTB_ERF)? IOT_SKP + dtsb: dtsb);
-return AC;
+return dat;
 }
 
-int32 dt76 (int32 pulse, int32 AC)
+int32 dt76 (int32 pulse, int32 dat)
 {
 if ((pulse & 01) && (dtsb & DTB_DTF))			/* DTDF */
-	return IOT_SKP + AC;
-return AC;
+	return IOT_SKP + dat;
+return dat;
 }
 
 #else							/* Type 550 */
-int32 dt75 (int32 pulse, int32 AC)
+int32 dt75 (int32 pulse, int32 dat)
 {
 if (((pulse & 041) == 001) && (dtsb & DTB_DTF))		/* MMDF */
-	AC = AC | IOT_SKP;
+	dat = dat | IOT_SKP;
 else if (((pulse & 041) == 041) && (dtsb & DTB_ERF))	/* MMEF */
-	AC = AC | IOT_SKP;
+	dat = dat | IOT_SKP;
 if (pulse & 002) {					/* MMRD */
-	AC = (AC & ~DMASK) | dtdb;
+	dat = (dat & ~DMASK) | dtdb;
 	dtsb = dtsb & ~(DTB_DTF | DTB_BEF);  }
 if (pulse & 004) {					/* MMWR */
-	dtdb = AC & DMASK;
+	dtdb = dat & DMASK;
 	dtsb = dtsb & ~(DTB_DTF | DTB_BEF);  }
 DT_UPDINT;
-return AC;
+return dat;
 }
 
-int32 dt76 (int32 pulse, int32 AC)
+int32 dt76 (int32 pulse, int32 dat)
 {
 int32 fnc, mot, unum;
 UNIT *uptr = NULL;
@@ -487,7 +487,7 @@ UNIT *uptr = NULL;
 unum = DTA_GETUNIT (dtsa);				/* get unit no */
 if (unum >= 0) uptr = dt_dev.units + unum;		/* get unit */
 if ((pulse & 001) && (dtsb & DTB_BEF))			/* MMBF */
-	AC = AC | IOT_SKP;
+	dat = dat | IOT_SKP;
 if (pulse & 002) {					/* MMRS */
 	dtsb = dtsb & ~(DTB_REV | DTB_GO);		/* clr rev, go */
 	if (uptr) {					/* valid unit? */
@@ -495,13 +495,13 @@ if (pulse & 002) {					/* MMRS */
 	    if (mot & DTS_DIR) dtsb = dtsb | DTB_REV;	/* rev? set */
 	    if ((mot >= DTS_ACCF) || (uptr->STATE & 0777700))
 		dtsb = dtsb | DTB_GO;  }		/* accel? go */
-	AC = (AC & ~DMASK) | dtsb;  }
+	dat = (dat & ~DMASK) | dtsb;  }
 if ((pulse & 044) == 044) {				/* MMSE */
-	if ((dtsa ^ AC) & DTA_UNIT) dt_deselect (dtsa);	/* new unit? */
-	dtsa = (dtsa & ~DTA_UNIT) | (AC & DTA_UNIT);
+	if ((dtsa ^ dat) & DTA_UNIT) dt_deselect (dtsa); /* new unit? */
+	dtsa = (dtsa & ~DTA_UNIT) | (dat & DTA_UNIT);
 	dtsb = dtsb & ~(DTB_DTF | DTB_BEF | DTB_ERF | DTB_ALLERR);  }
 else if ((pulse & 044) == 004) {			/* MMLC */
-	dtsa = (dtsa & ~DTA_RW) | (AC & DTA_RW);	/* load dtsa */
+	dtsa = (dtsa & ~DTA_RW) | (dat & DTA_RW);	/* load dtsa */
 	dtsb = dtsb & ~(DTB_DTF | DTB_BEF | DTB_ERF | DTB_ALLERR);
 	fnc = DTA_GETFNC (dtsa);			/* get fnc */
 	if ((uptr == NULL) ||				/* invalid? */
@@ -512,7 +512,7 @@ else if ((pulse & 044) == 004) {			/* MMLC */
 	    dt_seterr (uptr, DTB_SEL);			/* select err */
 	else dt_newsa (dtsa);  }
 DT_UPDINT;
-return AC;
+return dat;
 }
 #endif
 
@@ -836,7 +836,7 @@ case FNC_SRCH:						/* search */
 	    return SCPE_OK;  }
 	sim_activate (uptr, DTU_LPERB (uptr) * dt_ltime);/* sched next block */
 	M[DT_WC] = (M[DT_WC] + 1) & DMASK;		/* inc WC */
-	ma = M[DT_CA] & ADDRMASK;			/* get mem addr */
+	ma = M[DT_CA] & AMASK;				/* get mem addr */
 	if (MEM_ADDR_OK (ma)) M[ma] = blk;		/* store block # */
 	if (((dtsa & DTA_MODE) == 0) || (M[DT_WC] == 0))
 		dtsb = dtsb | DTB_DTF;			/* set DTF */
@@ -870,7 +870,7 @@ case FNC_READ:						/* read */
 	case 0:						/* normal read */
 	    M[DT_WC] = (M[DT_WC] + 1) & DMASK;		/* incr WC, CA */
 	    M[DT_CA] = (M[DT_CA] + 1) & DMASK;
-	    ma = M[DT_CA] & ADDRMASK;			/* mem addr */
+	    ma = M[DT_CA] & AMASK;			/* mem addr */
 	    ba = (blk * DTU_BSIZE (uptr)) + wrd;	/* buffer ptr */
 	    dtdb = bptr[ba];				/* get tape word */
 	    if (dir) dtdb = dt_comobv (dtdb);		/* rev? comp obv */
@@ -920,7 +920,7 @@ case FNC_WRIT:						/* write */
 	    M[DT_WC] = (M[DT_WC] + 1) & DMASK;		/* incr WC, CA */
 	    M[DT_CA] = (M[DT_CA] + 1) & DMASK;
 	case DTO_WCO:					/* wc ovflo */
-	    ma = M[DT_CA] & ADDRMASK;			/* mem addr */
+	    ma = M[DT_CA] & AMASK;			/* mem addr */
 	    ba = (blk * DTU_BSIZE (uptr)) + wrd;	/* buffer ptr */
 	    dtdb = dt_substate? 0: M[ma];		/* get word */
 	    if (dir) dtdb = dt_comobv (dtdb);		/* rev? comp obv */
@@ -955,7 +955,7 @@ case FNC_RALL:
 	    relpos = DT_LIN2OF (uptr->pos, uptr);	/* cur pos in blk */
 	    M[DT_WC] = (M[DT_WC] + 1) & DMASK;		/* incr WC, CA */
 	    M[DT_CA] = (M[DT_CA] + 1) & DMASK;
-	    ma = M[DT_CA] & ADDRMASK;			/* mem addr */
+	    ma = M[DT_CA] & AMASK;			/* mem addr */
 	    if ((relpos >= DT_HTLIN) &&			/* in data zone? */
 	        (relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
 		wrd = DT_LIN2WD (uptr->pos, uptr);
@@ -989,7 +989,7 @@ case FNC_WALL:
 	    relpos = DT_LIN2OF (uptr->pos, uptr);	/* cur pos in blk */
 	    M[DT_WC] = (M[DT_WC] + 1) & DMASK;		/* incr WC, CA */
 	    M[DT_CA] = (M[DT_CA] + 1) & DMASK;
-	    ma = M[DT_CA] & ADDRMASK;			/* mem addr */
+	    ma = M[DT_CA] & AMASK;			/* mem addr */
 	    if ((relpos >= DT_HTLIN) &&			/* in data zone? */
 	        (relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
 		dtdb = M[ma];				/* get mem word */
@@ -1122,7 +1122,7 @@ return;
 
 int32 dt_comobv (int32 dat)
 {
-dat = dat ^ 0777777;					/* compl obverse */
+dat = dat ^ DMASK;					/* compl obverse */
 dat = ((dat >> 15) & 07) | ((dat >> 9) & 070) |
 	((dat >> 3) & 0700) | ((dat & 0700) << 3) |
 	((dat & 070) << 9) | ((dat & 07) << 15);
@@ -1140,16 +1140,16 @@ int32 i, csum, wrd;
 #if defined (TC02)					/* TC02/TC15 */
 csum = 077;						/* init csum */
 for (i = 0; i < DTU_BSIZE (uptr); i++) {		/* loop thru buf */
-	wrd = bptr[ba + i] ^ 0777777;			/* get ~word */
+	wrd = bptr[ba + i] ^ DMASK;			/* get ~word */
 	csum = csum ^ (wrd >> 12) ^ (wrd >> 6) ^ wrd;  }
 return (csum & 077);
 #else							/* Type 550 */
-csum = 0777777;
+csum = DMASK;
 for (i = 0; i < DTU_BSIZE (uptr); i++) {		/* loop thru buf */
 	wrd = bptr[ba + i];				/* get word */
 	csum = csum + wrd;				/* 1's comp add */
-	if (csum > 0777777) csum = (csum + 1) & 0777777;  }
-return (csum ^ 0777777);				/* 1's comp res */
+	if (csum > DMASK) csum = (csum + 1) & DMASK;  }
+return (csum ^ DMASK);					/* 1's comp res */
 #endif
 }
 
@@ -1164,7 +1164,7 @@ if (wrd == DT_BLKWD) return blk;			/* fwd blknum */
 if (wrd == (2 * DT_HTWRD + DTU_BSIZE (uptr) - DT_CSMWD - 1))	/* fwd csum */
 	return (dt_csum (uptr, blk) << 12);
 #else
-if (wrd == DT_CSMWD) return 0777777;			/* rev csum */
+if (wrd == DT_CSMWD) return DMASK;			/* rev csum */
 if (wrd == (2 * DT_HTWRD + DTU_BSIZE (uptr) - DT_CSMWD - 1))	/* fwd csum */
 	return (dt_csum (uptr, blk));
 #endif							/* Type 550 */

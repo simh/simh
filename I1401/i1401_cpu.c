@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Jul-03	RMS	Moved ASCII/BCD tables to included file
+			Revised fetch to model hardware
+			Removed length checking in fetch phase
    16-Mar-03	RMS	Fixed mnemonic, instruction lengths, and reverse
 			scan length check bug for MCS
 			Fixed MCE bug, BS off by 1 if zero suppress
@@ -114,6 +117,7 @@
 */
 
 #include "i1401_defs.h"
+#include "i1401_dat.h"
 
 #define PCQ_SIZE	64				/* must be 2**n */
 #define PCQ_MASK	(PCQ_SIZE - 1)
@@ -268,7 +272,7 @@ const int32 op_table[64] = {
 	L1,						/* punch feed */
 	0,						/* illegal */
 	L1 | L4 | L7 | AREQ | BREQ | MA,		/* modify address */
-	L7 | AREQ | BREQ | MDV,				/* multiply */
+	L1 | L4 | L7 | AREQ | BREQ | MDV,		/* multiply */
 	0,						/* illegal */
 	0,						/* illegal */
 	0,						/* illegal */
@@ -284,7 +288,7 @@ const int32 op_table[64] = {
 	L1 | L4 | L7 | AREQ | BREQ,			/* move supress zero */
 	0,						/* illegal */
 	L1 | L4 | L7 | AREQ | BREQ | NOWM,		/* set word mark */
-	L7 | AREQ | BREQ | MDV,				/* divide */
+	L1 | L4 | L7 | AREQ | BREQ | MDV,		/* divide */
 	0,						/* illegal */
 	0,						/* illegal */
 	0,						/* illegal */
@@ -293,7 +297,7 @@ const int32 op_table[64] = {
 	L2 | L5,					/* select stacker */
 	L1 | L4 | L7 | L8 | BREQ | MLS | IO,		/* load */
 	L1 | L4 | L7 | L8 | BREQ | MLS | IO,		/* move */
-	HNOP | L1 | L4 | L7,				/* nop */
+	HNOP | L1 | L2 | L4 | L5 | L7 | L8,		/* nop */
 	0,						/* illegal */
 	L1 | L4 | L7 | AREQ | BREQ | MR,		/* move to record */
 	L1 | L4 | AREQ | MLS,				/* 50: store A addr */
@@ -315,7 +319,7 @@ const int32 op_table[64] = {
 	L1 | L4 | L7 | AREQ | MLS,			/* 70: store B addr */
 	0,						/* illegal */
 	L1 | L4 | L7 | AREQ | BREQ,			/* zero and add */
-	HNOP | L1 | L4 | L7,				/* halt */
+	HNOP | L1 | L2 | L4 | L5 | L7 | L8,		/* halt */
 	L1 | L4 | L7 | AREQ | BREQ,			/* clear word mark */
 	0,						/* illegal */
 	0,						/* illegal */
@@ -361,38 +365,6 @@ const int32 bin_to_bcd[16] = {
 
 const int32 bcd_to_bin[16] = {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 3, 4, 5, 6, 7 };
-
-/* ASCII to BCD conversion */
-
-const char ascii_to_bcd[128] = {
-	000, 000, 000, 000, 000, 000, 000, 000,		/* 000 - 037 */
-	000, 000, 000, 000, 000, 000, 000, 000,
-	000, 000, 000, 000, 000, 000, 000, 000,
-	000, 000, 000, 000, 000, 000, 000, 000,
-	000, 052, 077, 013, 053, 034, 060, 032,		/* 040 - 077 */
-	017, 074, 054, 037, 033, 040, 073, 021,
-	012, 001, 002, 003, 004, 005, 006, 007,
-	010, 011, 015, 056, 076, 035, 016, 072,
-	014, 061, 062, 063, 064, 065, 066, 067,		/* 100 - 137 */
-	070, 071, 041, 042, 043, 044, 045, 046,
-	047, 050, 051, 022, 023, 024, 025, 026,
-	027, 030, 031, 075, 036, 055, 020, 057,
-	000, 061, 062, 063, 064, 065, 066, 067,		/* 140 - 177 */
-	070, 071, 041, 042, 043, 044, 045, 046,
-	047, 050, 051, 022, 023, 024, 025, 026,
-	027, 030, 031, 000, 000, 000, 000, 000 };
-
-/* BCD to ASCII conversion - also the "full" print chain */
-
-char bcd_to_ascii[64] = {
-	' ', '1', '2', '3', '4', '5', '6', '7',
-	'8', '9', '0', '#', '@', ':', '>', '(',
-	'^', '/', 'S', 'T', 'U', 'V', 'W', 'X',
-	'Y', 'Z', '\'', ',', '%', '=', '\\', '+',
-	'-', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-	'Q', 'R', '!', '$', '*', ']', ';', '_',
-	'&', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
-	'H', 'I', '?', '.', ')', '[', '<', '"' };
 
 /* Indicator resets - a 1 marks an indicator that resets when tested */
 
@@ -501,9 +473,30 @@ if (sim_brk_summ && sim_brk_test (IS, SWMASK ('E'))) {	/* breakpoint? */
 
 sim_interval = sim_interval - 1;
 
-/* Instruction fetch */
+/* Instruction fetch - 1401 fetch works as follows:
 
-if ((M[IS] & WM) == 0) {				/* WM under op? */
+   - Each character fetched enters the B register.  This register is not
+     visible; the variable t represents the B register.
+   - Except for the first and last cycles, each character fetched enters
+     the A register.  This register is not visible; the variable D represents
+     the A register, because this is the instruction modifier for 2, 5, and 8
+     character instructions.
+   - At the start of the second cycle (first address character), the A-address
+     register and, for most instructions, the B-address register, are cleared
+     to blanks.  The simulator represents addresses in binary and creates the
+     effect of blanks (address is bad) if less than three A-address characters
+     are found.  Further, the simulator accumulates only the A-address, and
+     replicates it to the B-address at the appropriate point.
+   - At the start of the fifth cycle (fourth address character), the B-address
+     register is cleared to blanks.  Again, the simulator creates the effect of
+     blanks (address is bad) if less than three B-address characters are found.
+
+   The 1401 does explicitly check for valid instruction lengths.  Most 2,3,5,6
+   character instructions will be invalid because the A-address or B-address
+   (or both) are invalid.
+*/
+
+if ((M[IS] & WM) == 0) {				/* I-Op: WM under op? */
 	reason = STOP_NOWM;				/* no, error */
 	break;  }
 op = M[IS] & CHAR;					/* get opcode */
@@ -514,25 +507,26 @@ if ((flags == 0) || (flags & ALLOPT & ~cpu_unit.flags)) {
 if (op == OP_SAR) BS = AS;				/* SAR? save ASTAR */
 PP (IS);
 
-if ((t = M[IS]) & WM) goto CHECK_LENGTH;		/* WM? 1 char inst */
+if ((t = M[IS]) & WM) goto CHECK_LENGTH;		/* I-1: WM? 1 char inst */
 D = ioind = t;						/* could be D char, % */
 AS = hun_table[t];					/* could be A addr */
 PP (IS);						/* if %xy, BA is set */
 
-if ((t = M[IS]) & WM) {					/* WM? 2 char inst */
+if ((t = M[IS]) & WM) {					/* I-2: WM? 2 char inst */
 	AS = AS | BA;					/* ASTAR bad */
 	if (!(flags & MLS)) BS = AS;
 	goto CHECK_LENGTH;  }
+D = dev = t;						/* could be D char, dev */
 AS = AS + ten_table[t];					/* build A addr */
-dev = t;						/* save char as dev */
 PP (IS);
 
-if ((t = M[IS]) & WM) {					/* WM? 3 char inst */
+if ((t = M[IS]) & WM) {					/* I-3: WM? 3 char inst */
 	AS = AS | BA;					/* ASTAR bad */
 	if (!(flags & MLS)) BS = AS;
 	goto CHECK_LENGTH;  }
+D = unit = t;						/* could be D char, unit */
+if (unit == BCD_ZERO) unit = 0;				/* convert unit to binary */
 AS = AS + one_table[t];					/* finish A addr */
-unit = (t == BCD_ZERO)? 0: t;				/* save char as unit */
 xa = (AS >> V_INDEX) & M_INDEX;				/* get index reg */
 if (xa && (ioind != BCD_PERCNT) && (cpu_unit.flags & XSA)) {	/* indexed? */
 	AS = AS + hun_table[M[xa] & CHAR] + ten_table[M[xa + 1] & CHAR] +
@@ -541,21 +535,23 @@ if (xa && (ioind != BCD_PERCNT) && (cpu_unit.flags & XSA)) {	/* indexed? */
 if (!(flags & MLS)) BS = AS;				/* not MLS? B = A */
 PP (IS);
 
-if ((t = M[IS]) & WM) goto CHECK_LENGTH;		/* WM? 4 char inst */
+if ((t = M[IS]) & WM) goto CHECK_LENGTH;		/* I-4: WM? 4 char inst */
 if ((op == OP_B) && (t == BCD_BLANK)) goto CHECK_LENGTH; /* BR + space? */
 D = t;							/* could be D char */
 BS = hun_table[t];					/* could be B addr */
 PP (IS);
 
-if ((t = M[IS]) & WM) {					/* WM? 5 char inst */
+if ((t = M[IS]) & WM) {					/* I-5: WM? 5 char inst */
 	BS = BS | BA;					/* BSTAR bad */
 	goto CHECK_LENGTH;  }
+D = t;							/* could be D char */
 BS = BS + ten_table[t];					/* build B addr */
 PP (IS);
 
-if ((t = M[IS]) & WM) {					/* WM? 6 char inst */
+if ((t = M[IS]) & WM) {					/* I-6: WM? 6 char inst */
 	BS = BS | BA;					/* BSTAR bad */
 	goto CHECK_LENGTH;  }
+D = t;							/* could be D char */
 BS = BS + one_table[t];					/* finish B addr */
 xa = (BS >> V_INDEX) & M_INDEX;				/* get index reg */
 if (xa && (cpu_unit.flags & XSA)) {			/* indexed? */
@@ -564,39 +560,43 @@ if (xa && (cpu_unit.flags & XSA)) {			/* indexed? */
 	BS = (BS & INDEXMASK) % MAXMEMSIZE;  }
 PP (IS);
 
-if ((M[IS] & WM) || (flags & NOWM)) goto CHECK_LENGTH;	/* WM? 7 chr */
-D = M[IS];						/* last char is D */
-do { PP (IS);  } while ((M[IS] & WM) == 0);		/* find word mark */
+if (flags & NOWM) goto CHECK_LENGTH;			/* I-7: SWM? done */
+if ((t = M[IS]) & WM) goto CHECK_LENGTH;			/* WM? 7 char inst */
+D = t;							/* last char is D */
+for (;;) {						/* I-8: repeats until WM */
+	if ((t = M[IS]) & WM) break;			/* WM? done */
+	D = t;						/* last char is D */
+	PP (IS);  }
 
 CHECK_LENGTH:
 ilnt = IS - saved_IS;					/* get lnt */
-if (((flags & len_table [(ilnt <= 8)? ilnt: 8]) == 0) &&	/* valid lnt? */
-	((flags & HNOP) == 0)) reason = STOP_INVL;
+//if (((flags & len_table [(ilnt <= 8)? ilnt: 8]) == 0) &&	/* valid lnt? */
+//	((flags & HNOP) == 0)) reason = STOP_INVL;
 if ((flags & BREQ) && ADDR_ERR (BS)) reason = STOP_INVB;	/* valid A? */
 if ((flags & AREQ) && ADDR_ERR (AS)) reason = STOP_INVA;	/* valid B? */
 if (reason) break;					/* error in fetch? */
 switch (op) {						/* case on opcode */	
 
-/* Move instructions					A check	B check
+/* Move/load character instructions			A check	B check
 
-   MCW: copy A to B, preserving B WM,			here	fetch
-	until either A or B WM
-   LCA: copy A to B, overwriting B WM,			here	fetch
-	until A WM
-   MCM: copy A to B, preserving B WM,			fetch	fetch
-	until record or group mark
-   MCS: copy A to B, clearing B WM, until A WM;		fetch	fetch
-	reverse scan and suppress leading zeroes
-   MN:	copy A char digit to B char digit,		fetch	fetch
-	preserving B zone and WM
-   MZ:	copy A char zone to B char zone,		fetch	fetch
-	preserving B digit and WM
+   MCW		copy A to B, preserving B WM,		here	fetch
+		until either A or B WM
+   LCA		copy A to B, overwriting B WM,		here	fetch
+		until A WM
+
+   Instruction lengths:
+
+   1		chained A and B
+   2,3		invalid A-address
+   4		chained B address
+   5,6		invalid B-address
+   7		normal
+   8+		normal + modifier
 */
 
 case OP_MCW:						/* move char */
-	if (ilnt >= 8) {				/* I/O form? */
-	    if (ioind != BCD_PERCNT) reason = STOP_INVL;
-	    else reason = iodisp (dev, unit, MD_NORM, D);
+	if ((ilnt >= 4) && (ioind == BCD_PERCNT)) {	/* I/O form? */
+	    reason = iodisp (dev, unit, MD_NORM, D);	/* dispatch I/O */
 	    break;  }
 	if (ADDR_ERR (AS)) {				/* check A addr */
 	    reason = STOP_INVA;
@@ -609,9 +609,8 @@ case OP_MCW:						/* move char */
 	break;
 
 case OP_LCA:						/* load char */
-	if (ilnt >= 8) {				/* I/O form? */
-	    if (ioind != BCD_PERCNT) reason = STOP_INVL;
-	    else reason = iodisp (dev, unit, MD_WM, D);
+	if ((ilnt >= 4) && (ioind == BCD_PERCNT)) {	/* I/O form? */
+	    reason = iodisp (dev, unit, MD_WM, D);
 	    break;  }
 	if (ADDR_ERR (AS)) {				/* check A addr */
 	    reason = STOP_INVA;
@@ -621,6 +620,27 @@ case OP_LCA:						/* load char */
 	    MM (AS); MM (BS);  }			/* decr pointers */
 	while ((wm & WM) == 0);				/* stop on A WM */
 	break;
+
+/* Other move instructions				A check	B check
+
+   MCM		copy A to B, preserving B WM,		fetch	fetch
+		until record or group mark
+   MCS		copy A to B, clearing B WM, until A WM;	fetch	fetch
+		reverse scan and suppress leading zeroes
+   MN		copy A char digit to B char digit,	fetch	fetch
+		preserving B zone and WM
+   MZ		copy A char zone to B char zone,	fetch	fetch
+		preserving B digit and WM
+
+   Instruction lengths:
+
+   1		chained
+   2,3		invalid A-address
+   4		self (B-address = A-address)
+   5,6		invalid B-address
+   7		normal
+   8+		normal + ignored modifier
+*/
 
 case OP_MCM:						/* move to rec/group */
 	do {
@@ -662,38 +682,18 @@ case OP_MZ:						/* move zone */
 	MM (AS); MM (BS);				/* decr pointers */
 	break;
 
-/* Compare - A and B are checked in fetch */
+/* Branch instruction					A check	    B check
 
-case OP_C:						/* compare */
-	if (ilnt != 1) {				/* if not chained */
-	    ind[IN_EQU] = 1;				/* clear indicators */
-	    ind[IN_UNQ] = ind[IN_HGH] = ind[IN_LOW] = 0;  }
-	do {
-	    a = M[AS];					/* get characters */
-	    b = M[BS];
-	    wm = a | b;					/* get word marks */
-	    if ((a & CHAR) != (b & CHAR)) {		/* unequal? */
-		ind[IN_EQU] = 0;			/* set indicators */
-		ind[IN_UNQ] = 1;
-		ind[IN_HGH] = col_table[b & CHAR] > col_table [a & CHAR];
-		ind[IN_LOW] = ind[IN_HGH] ^ 1;  }
-	    MM (AS); MM (BS);  }			/* decr pointers */
-	while ((wm & WM) == 0);				/* stop on A, B WM */
-	if ((a & WM) && !(b & WM)) {			/* short A field? */
-	    ind[IN_EQU] = ind[IN_LOW] = 0;
-	    ind[IN_UNQ] = ind[IN_HGH] = 1;  }
-	if (!(cpu_unit.flags & HLE))			/* no HLE? */
-	    ind[IN_EQU] = ind[IN_LOW] = ind[IN_HGH] = 0;
-	break;
-
-/* Branch instructions					A check	    B check
+   Instruction lengths:
 
-   B 1/8 char:	branch if B char equals d		if branch   here
-   B 4 char:	unconditional branch			if branch
-   B 5 char:	branch if indicator[d] is set		if branch
-   BWZ:		branch if (d<0>: B char WM)		if branch   here
-		(d<1>: B char zone = d zone)
-   BBE:		branch if B char & d non-zero		if branch   here
+   1		branch if B char equals d, chained	if branch   here
+   2,3		invalid B-address			if branch   here
+   4		unconditional branch			if branch
+   5		branch if indicator[d] is set		if branch
+   6		invalid B-address			if branch   here
+   7		branch if B char equals d,		if branch   here
+		d is last character of B-address
+   8		branch if B char equals d		if branch   here
 */
 
 case OP_B:						/* branch */
@@ -701,13 +701,28 @@ case OP_B:						/* branch */
 	else if (ilnt == 5) {				/* branch on ind? */
 	    if (ind[D]) { BRANCH;  }			/* test indicator */
 	    if (ind_table[D]) ind[D] = 0;  }		/* reset if needed */
-	else {
-	    if (ADDR_ERR (BS)) {			/* branch char eq */
-		reason = STOP_INVB;			/* validate B addr */
+	else {						/* branch char eq */
+	    if (ADDR_ERR (BS)) {			/* validate B addr */
+		reason = STOP_INVB;
 		break;  }
 	    if ((M[BS] & CHAR) == D) { BRANCH;  }	/* char equal? */
 	    else { MM (BS);  }  }
 	break;
+
+/* Other branch instructions				A check     B check
+
+   BWZ		branch if (d<0>: B char WM)		if branch   here
+		(d<1>: B char zone = d zone)
+   BBE		branch if B char & d non-zero		if branch   here
+
+   Instruction lengths:
+   1	chained
+   2,3	invalid A-address and B-address
+   4	self (B-address = A-address, d = last character of A-address)
+   5,6	invalid B-address
+   7	normal, d = last character of B-address
+   8+	normal
+*/
 
 case OP_BWZ:						/* branch wm or zone */
 	if (((D & 1) && (M[BS] & WM)) ||		/* d1? test wm */
@@ -721,14 +736,24 @@ case OP_BBE:						/* branch if bit eq */
 	else { MM (BS);  }				/* decr pointer */
 	break;
 
-/* Arithmetic instructions				A check	B check
+/* Arithmetic instructions				A check     B check
 
-   ZA:	move A to B, normalizing A sign,		fetch	fetch
-	preserving B WM, until B WM
-   ZS:	move A to B, complementing A sign,		fetch	fetch
-	preserving B WM, until B WM
-   A:	add A to B					fetch	fetch
-   S:	subtract A from B				fetch	fetch
+   ZA		move A to B, normalizing A sign,	fetch	    fetch
+		preserving B WM, until B WM
+   ZS		move A to B, complementing A sign,	fetch	    fetch
+		preserving B WM, until B WM
+   A		add A to B				fetch	    fetch
+   S		subtract A from B			fetch	    fetch
+   C		compare A to B				fetch	    fetch
+
+   Instruction lengths:
+
+   1		chained
+   2,3		invalid A-address
+   4		self (B-address = A-address)
+   5,6		invalid B-address
+   7		normal
+   8+		normal + ignored modifier
 */
 
 case OP_ZA: case OP_ZS:					/* zero and add/sub */
@@ -787,42 +812,71 @@ case OP_A: case OP_S:					/* add/sub */
 		carry = (t >= 10);
 		M[bsave] = (M[bsave] & ~DIGIT) | sum_table[t];  }  }
 	break;
-
-/* I/O instructions					A check	B check
 
-   R:	read a card					if branch
-   W:	write to line printer				if branch
-   WR:	write and read					if branch
-   P:	punch a card					if branch
-   RP:	read and punch					if branch
-   WP:	write and punch					if branch
-   WRP:	write read and punch				if branch
-   RF:	read feed (nop)
-   PF:	punch feed (nop)
-   SS:	select stacker					if branch
-   CC:	carriage control				if branch
-   MTF:	magtape functions
+case OP_C:						/* compare */
+	if (ilnt != 1) {				/* if not chained */
+	    ind[IN_EQU] = 1;				/* clear indicators */
+	    ind[IN_UNQ] = ind[IN_HGH] = ind[IN_LOW] = 0;  }
+	do {
+	    a = M[AS];					/* get characters */
+	    b = M[BS];
+	    wm = a | b;					/* get word marks */
+	    if ((a & CHAR) != (b & CHAR)) {		/* unequal? */
+		ind[IN_EQU] = 0;			/* set indicators */
+		ind[IN_UNQ] = 1;
+		ind[IN_HGH] = col_table[b & CHAR] > col_table [a & CHAR];
+		ind[IN_LOW] = ind[IN_HGH] ^ 1;  }
+	    MM (AS); MM (BS);  }			/* decr pointers */
+	while ((wm & WM) == 0);				/* stop on A, B WM */
+	if ((a & WM) && !(b & WM)) {			/* short A field? */
+	    ind[IN_EQU] = ind[IN_LOW] = 0;
+	    ind[IN_UNQ] = ind[IN_HGH] = 1;  }
+	if (!(cpu_unit.flags & HLE))			/* no HLE? */
+	    ind[IN_EQU] = ind[IN_LOW] = ind[IN_HGH] = 0;
+	break;
+
+/* I/O instructions					A check     B check
+
+   R		read a card				if branch
+   W		write to line printer			if branch
+   WR		write and read				if branch
+   P		punch a card				if branch
+   RP		read and punch				if branch
+   WP	:	write and punch				if branch
+   WRP		write read and punch			if branch
+   RF		read feed (nop)
+   PF		punch feed (nop)
+   SS		select stacker				if branch
+   CC		carriage control			if branch
+
+   Instruction lengths:
+
+   1		normal
+   2,3		normal, with modifier
+   4		branch; modifier, if any, is last character of branch address
+   5		branch + modifier
+   6+		normal, with modifier
 */
 
 case OP_R:						/* read */
 	if (reason = iomod (ilnt, D, NULL)) break;	/* valid modifier? */
 	reason = read_card (ilnt, D);			/* read card */
 	BS = CDR_BUF + CDR_WIDTH;
-	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
+	if ((ilnt == 4) || (ilnt == 5)) { BRANCH;  }	/* check for branch */
 	break;
 
 case OP_W:						/* write */
 	if (reason = iomod (ilnt, D, w_mod)) break;	/* valid modifier? */
 	reason = write_line (ilnt, D);			/* print line */
 	BS = LPT_BUF + LPT_WIDTH;
-	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
+	if ((ilnt == 4) || (ilnt == 5)) { BRANCH;  }	/* check for branch */
 	break;
 
 case OP_P:						/* punch */
 	if (reason = iomod (ilnt, D, NULL)) break;	/* valid modifier? */
 	reason = punch_card (ilnt, D);			/* punch card */
 	BS = CDP_BUF + CDP_WIDTH;
-	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
+	if ((ilnt == 4) || (ilnt == 5)) { BRANCH;  }	/* check for branch */
 	break;
 
 case OP_WR:						/* write and read */
@@ -830,7 +884,7 @@ case OP_WR:						/* write and read */
 	reason = write_line (ilnt, D);			/* print line */
 	r1 = read_card (ilnt, D);			/* read card */
 	BS = CDR_BUF + CDR_WIDTH;
-	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
+	if ((ilnt == 4) || (ilnt == 5)) { BRANCH;  }	/* check for branch */
 	if (reason == SCPE_OK) reason = r1;		/* merge errors */
 	break;
 
@@ -839,7 +893,7 @@ case OP_WP:						/* write and punch */
 	reason = write_line (ilnt, D);			/* print line */
 	r1 = punch_card (ilnt, D);			/* punch card */
 	BS = CDP_BUF + CDP_WIDTH;
-	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
+	if ((ilnt == 4) || (ilnt == 5)) { BRANCH;  }	/* check for branch */
 	if (reason == SCPE_OK) reason = r1;		/* merge errors */
 	break;
 
@@ -848,7 +902,7 @@ case OP_RP:						/* read and punch */
 	reason = read_card (ilnt, D);			/* read card */
 	r1 = punch_card (ilnt, D);			/* punch card */
 	BS = CDP_BUF + CDP_WIDTH;  
-	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
+	if ((ilnt == 4) || (ilnt == 5)) { BRANCH;  }	/* check for branch */
 	if (reason == SCPE_OK) reason = r1;		/* merge errors */
 	break;
 
@@ -858,24 +912,36 @@ case OP_WRP:						/* write, read, punch */
 	r1 = read_card (ilnt, D);			/* read card */
 	r2 = punch_card (ilnt, D);			/* punch card */
 	BS = CDP_BUF + CDP_WIDTH;
-	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
+	if ((ilnt == 4) || (ilnt == 5)) { BRANCH;  }	/* check for branch */
 	if (reason == SCPE_OK) reason = (r1 == SCPE_OK)? r2: r1;
 	break;
 
 case OP_SS:						/* select stacker */
 	if (reason = iomod (ilnt, D, ss_mod)) break;	/* valid modifier? */
 	if (reason = select_stack (D)) break;		/* sel stack, error? */
-	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
+	if ((ilnt == 4) || (ilnt == 5)) { BRANCH;  }	/* check for branch */
 	break;
 
 case OP_CC:						/* carriage control */
 	if (reason = carriage_control (D)) break;	/* car ctrl, error? */
-	if (ilnt >= 4) { BRANCH;  }			/* check for branch */
+	if ((ilnt == 4) || (ilnt == 5)) { BRANCH;  }	/* check for branch */
 	break;
 
+/* MTF - magtape functions - must be at least 4 characters
+
+   Instruction lengths:
+
+   1-3		invalid I/O address
+   4		normal, d-character is unit
+   5		normal
+   6+		normal, d-character is last character
+*/
+
 case OP_MTF:						/* magtape function */
-	if (reason = iomod (ilnt, D, mtf_mod)) break;	/* valid modifier? */
-	if (reason = mt_func (unit, D)) break;		/* mt func, error? */
+	if (ilnt < 4) reason = STOP_INVL;		/* too short? */
+	else if (ioind != BCD_PERCNT) reason = STOP_INVA;
+	else if (reason = iomod (ilnt, D, mtf_mod)) break;	/* valid modifier? */
+	reason = mt_func (unit, D);			/* mt func, error? */
 	break;						/* can't branch */
 
 case OP_RF: case OP_PF:					/* read, punch feed */
@@ -902,6 +968,15 @@ case OP_RF: case OP_PF:					/* read, punch feed */
 
    The first A field character is masked to its digit part, all others
    are copied intact		
+
+   Instruction lengths:
+
+   1		chained
+   2,3		invalid A-address
+   4		self (B-address = A-address)
+   5,6		invalid B-address
+   7		normal
+   8+		normal + ignored modifier
 */
 
 case OP_MCE:						/* edit */
@@ -1040,6 +1115,15 @@ case OP_MCE:						/* edit */
    LD + 1 + length of multiplier.  Locate the low order multiplier digit,
    and at the same time zero out the product field.  Then compute the sign
    of the result.
+
+   Instruction lengths:
+
+   1		chained
+   2,3		invalid A-address
+   4		self (B-address = A-address)
+   5,6		invalid B-address
+   7		normal
+   8+		normal + ignored modifier
 */
 
 case OP_MUL:
@@ -1085,7 +1169,7 @@ case OP_MUL:
 
 /* Divide.  Comments from the PDP-10 based simulator by Len Fehskens.
 
-   Divide is done, like multiply, pretty muchy the same way you do it with
+   Divide is done, like multiply, pretty much the same way you do it with
    pencil and paper; successive subtraction of the divisor from a substring
    of the dividend while counting up the corresponding quotient digit.
 
@@ -1106,6 +1190,15 @@ case OP_MUL:
 
    Start by locating the high order non-zero digit of the divisor.  This
    also tests for a divide by zero.
+
+   Instruction lengths:
+
+   1		chained
+   2,3		invalid A-address
+   4		self (B-address = A-address)
+   5,6		invalid B-address
+   7		normal
+   8+		normal + ignored modifier
 */
 
 case OP_DIV:
@@ -1170,16 +1263,19 @@ case OP_DIV:
 	BS = qs - 2;					/* BS = quo 10's pos */
 	break;
 
-/* Miscellaneous instructions				A check	   B check
+/* Word mark instructions				A check	   B check
 
-   SWM:	set WM on A char and B char			fetch	   fetch
-   CWM: clear WM on A char and B char			fetch	   fetch
-   CS:	clear from B down to nearest hundreds address	if branch  fetch
-   MA:	add A addr and B addr, store at B addr		fetch	   fetch
-   SAR:	store A* at A addr				fetch
-   SBR: store B* at A addr				fetch
-   NOP:	no operation
-   H:	halt
+   SWM		set WM on A char and B char		fetch	   fetch
+   CWM		clear WM on A char and B char		fetch	   fetch
+
+   Instruction lengths:
+
+   1		chained
+   2,3		invalid A-address
+   4		one operand (B-address = A-address)
+   5,6		invalid B-address
+   7		two operands (SWM cannot be longer than 7)
+   8+		two operands + ignored modifier
 */
 
 case OP_SWM:						/* set word mark */
@@ -1194,12 +1290,40 @@ case OP_CWM:						/* clear word mark */
 	MM (AS); MM (BS);				/* decr pointers */
 	break;
 
+/* Clear storage instruction				A check    B check
+
+   CS		clear from B down to nearest hundreds	if branch  fetch
+		address
+
+   Instruction lengths:
+
+   1		chained
+   2,3		invalid A-address and B-address
+   4		one operand (B-address = A-address)
+   5,6		invalid B-address
+   7		branch
+   8+		one operand, branch ignored
+*/
+
 case OP_CS:						/* clear storage */
 	t = (BS / 100) * 100;				/* lower bound */
 	while (BS >= t) M[BS--] = 0;			/* clear region */
 	if (BS < 0) BS = BS + MEMSIZE;			/* wrap if needed */
-	if (ilnt >= 7) { BRANCH; }			/* branch variant? */
+	if (ilnt == 7) { BRANCH; }			/* branch variant? */
 	break;
+
+/* Modify address instruction				A check    B check
+
+   MA		add A addr and B addr, store at B addr	fetch	   fetch
+
+   Instruction lengths:
+   1		chained
+   2,3		invalid A-address and B-address
+   4		self (B-address = A-address)
+   5,6		invalid B-address
+   7		normal
+   8+		normal + ignored modifier
+*/
 
 case OP_MA:						/* modify address */
 	a = one_table[M[AS] & CHAR]; MM (AS);		/* get A address */
@@ -1215,14 +1339,31 @@ case OP_MA:						/* modify address */
 	if (((a % 4000) + (b % 4000)) >= 4000) BS = BS + 2;	/* carry? */
 	break;
 
+/* Store address instructions				A-check     B-check
+
+   SAR		store A* at A addr			fetch
+   SBR		store B* at A addr			fetch
+
+   Instruction lengths:
+   1		chained
+   2,3		invalid A-address
+   4		normal
+   5+		B-address overwritten from instruction;
+		invalid address ignored
+*/
+
 case OP_SAR: case OP_SBR:				/* store A, B reg */
 	M[AS] = (M[AS] & WM) | store_addr_u (BS); MM (AS);
 	M[AS] = (M[AS] & WM) | store_addr_t (BS); MM (AS);
 	M[AS] = (M[AS] & WM) | store_addr_h (BS); MM (AS);
 	break;
 
+/* NOP - no validity checking, all instructions length ok */
+
 case OP_NOP:						/* nop */
 	break;
+
+/* HALT - unless length = 4 (branch), no validity checking; all lengths ok */
 
 case OP_H:						/* halt */
 	if (ilnt == 4) hb_pend = 1;			/* set pending branch */

@@ -426,7 +426,7 @@ void show_data (void)
 			 (reloc == R_LIBF)     ? 'L' : '@';
 
 		printf("%04x%c ", buf[9+i], ch);
-		rflag << 2;
+		rflag <<= 2;
 		nout++;
 	}
 	putchar('\n');

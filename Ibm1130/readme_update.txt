@@ -1,6 +1,10 @@
-Version: 18 March 2003
+Version: 10 July 2003
 
 History (partial):
+
+2003-07-10	Fixed disk and console terminal bugs uncovered by
+		APL\1130. Added APL keyboard and output font support
+		to enable use of APL\1130. APL will be released soon.
 
 2003-03-18	Fixed bug in asm1130 that produced an error message
 		with a (legal) offset of +127 in MDX instructions.

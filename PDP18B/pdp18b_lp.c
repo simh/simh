@@ -28,6 +28,7 @@
    lp09		(PDP-9,15) LP09 line printer
    lp15		(PDP-15)   LP15 line printer
 
+   23-Jul-03	RMS	Fixed overprint bug in Type 62
    25-Apr-03	RMS	Revised for extended file support
    05-Feb-03	RMS	Added LP09, fixed conditionalization
    05-Oct-02	RMS	Added DIB, device number support
@@ -53,7 +54,8 @@ extern int32 int_hwre[API_HLVL+1];
 #define BPTR_MAX	40				/* pointer max */
 #define BPTR_MASK	077				/* buf ptr max */
 
-int32 lp62_iot = 0;					/* saved state */
+int32 lp62_spc = 0;					/* print vs spc */
+int32 lp62_ovrpr = 0;					/* overprint */
 int32 lp62_stopioe = 0;
 int32 lp62_bp = 0;					/* buffer ptr */
 char lp62_buf[LP62_BSIZE + 1] = { 0 };
@@ -73,8 +75,8 @@ static const char *lp62_cc[] = {
 	"\f" };
 
 DEVICE lp62_dev;
-int32 lp62_65 (int32 pulse, int32 AC);
-int32 lp62_66 (int32 pulse, int32 AC);
+int32 lp62_65 (int32 pulse, int32 dat);
+int32 lp62_66 (int32 pulse, int32 dat);
 int32 lp62_iors (void);
 t_stat lp62_svc (UNIT *uptr);
 t_stat lp62_reset (DEVICE *dptr);
@@ -97,7 +99,8 @@ REG lp62_reg[] = {
 	{ FLDATA (DONE, int_hwre[API_LPT], INT_V_LPT) },
 	{ FLDATA (SPC, int_hwre[API_LPTSPC], INT_V_LPTSPC) },
 	{ DRDATA (BPTR, lp62_bp, 6) },
-	{ ORDATA (STATE, lp62_iot, 6), REG_HRO },
+	{ ORDATA (STATE, lp62_spc, 6), REG_HRO },
+	{ FLDATA (OVRPR, lp62_ovrpr, 0), REG_HRO },
 	{ DRDATA (POS, lp62_unit.pos, T_ADDR_W), PV_LEFT },
 	{ DRDATA (TIME, lp62_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lp62_stopioe, 0) },
@@ -118,62 +121,62 @@ DEVICE lp62_dev = {
 
 /* IOT routines */
 
-int32 lp62_65 (int32 pulse, int32 AC)
+int32 lp62_65 (int32 pulse, int32 dat)
 {
 int32 i;
 
-if ((pulse & 01) && TST_INT (LPT)) AC = IOT_SKP | AC;	/* LPSF */
+if ((pulse & 01) && TST_INT (LPT)) dat = IOT_SKP | dat;	/* LPSF */
 if (pulse & 02) {
 	int32 sb = pulse & 060;				/* subopcode */
 	if (sb == 000) CLR_INT (LPT);			/* LPCF */
 	if ((sb == 040) && (lp62_bp < BPTR_MAX)) {	/* LPLD */
 	    i = lp62_bp * 3;				/* cvt to chr ptr */
-	    lp62_buf[i] = lp62_trans[(AC >> 12) & 077];
-	    lp62_buf[i + 1] = lp62_trans[(AC >> 6) & 077];
-	    lp62_buf[i + 2] = lp62_trans[AC & 077];
+	    lp62_buf[i] = lp62_trans[(dat >> 12) & 077];
+	    lp62_buf[i + 1] = lp62_trans[(dat >> 6) & 077];
+	    lp62_buf[i + 2] = lp62_trans[dat & 077];
 	    lp62_bp = (lp62_bp + 1) & BPTR_MASK;  }
 	}
-if (pulse & 04)						/* LPSE */
-	sim_activate (&lp62_unit, lp62_unit.wait);	/* activate */
-return AC;
+if (pulse & 04) {					/* LPSE */
+	lp62_spc = 0;					/* print */
+	sim_activate (&lp62_unit, lp62_unit.wait);  }	/* activate */
+return dat;
 }
 
-int32 lp62_66 (int32 pulse, int32 AC)
+int32 lp62_66 (int32 pulse, int32 dat)
 {
 if ((pulse & 01) && TST_INT (LPTSPC))			/* LSSF */
-	AC = IOT_SKP | AC;
+	dat = IOT_SKP | dat;
 if (pulse & 02) CLR_INT (LPTSPC);			/* LSCF */
 if (pulse & 04) {					/* LSPR */
-	lp62_iot = 020 | (AC & 07);			/* space, no print */
+	lp62_spc = 020 | (dat & 07);			/* space */
 	sim_activate (&lp62_unit, lp62_unit.wait);  }	/* activate */
-return AC;
+return dat;
 }
 
-/* Unit service, printer is in one of three states
+/* Unit service, action based on lp62_spc
 
-   lp62_iot = 0		write buffer to file, set state to
-   lp62_iot = 10	write cr, then write buffer to file
-   lp62_iot = 2x	space command x, then set state to 0
+   lp62_spc = 0		write buffer to file, set overprint
+   lp62_spc = 2x	space command x, clear overprint
 */
 
 t_stat lp62_svc (UNIT *uptr)
 {
 int32 i;
 
-if (lp62_iot & 020) {					/* space? */
+if (lp62_spc) {						/* space? */
 	SET_INT (LPTSPC);				/* set flag */
 	if ((uptr->flags & UNIT_ATT) == 0)		/* attached? */
 	    return IORETURN (lp62_stopioe, SCPE_UNATT);
-	fputs (lp62_cc[lp62_iot & 07], uptr->fileref);	/* print cctl */
+	fputs (lp62_cc[lp62_spc & 07], uptr->fileref);	/* print cctl */
 	if (ferror (uptr->fileref)) {			/* error? */
 	    perror ("LPT I/O error");
 	    clearerr (uptr->fileref);
 	    return SCPE_IOERR;  }
-	lp62_iot = 0;  }				/* clear state */
+	lp62_ovrpr = 0;  }				/* clear overprint */
 else {	SET_INT (LPT);					/* print */
 	if ((uptr->flags & UNIT_ATT) == 0)		/* attached? */
 	    return IORETURN (lp62_stopioe, SCPE_UNATT);
-	if (lp62_iot & 010) fputc ('\r', uptr->fileref);
+	if (lp62_ovrpr) fputc ('\r', uptr->fileref);	/* overprint? */
 	fputs (lp62_buf, uptr->fileref);		/* print buffer */
 	if (ferror (uptr->fileref)) {			/* test error */
 	    perror ("LPT I/O error");
@@ -181,7 +184,7 @@ else {	SET_INT (LPT);					/* print */
 	    return SCPE_IOERR;  }
 	lp62_bp = 0;
 	for (i = 0; i <= LP62_BSIZE; i++) lp62_buf[i] = 0; /* clear buffer */
-	lp62_iot = 010;  }				/* set state */
+	lp62_ovrpr = 1;  }				/* set overprint */
 uptr->pos = ftell (uptr->fileref);			/* update position */
 return SCPE_OK;
 }
@@ -197,7 +200,8 @@ CLR_INT (LPTSPC);
 sim_cancel (&lp62_unit);				/* deactivate unit */
 lp62_bp = 0;						/* clear buffer ptr */
 for (i = 0; i <= LP62_BSIZE; i++) lp62_buf[i] = 0;	/* clear buffer */
-lp62_iot = 0;						/* clear state */
+lp62_spc = 0;						/* clear state */
+lp62_ovrpr = 0;						/* clear overprint */
 return SCPE_OK;
 }
 
@@ -235,8 +239,8 @@ static const char *lp647_cc[] = {
 	"\f" };
 
 DEVICE lp647_dev;
-int32 lp647_65 (int32 pulse, int32 AC);
-int32 lp647_66 (int32 pulse, int32 AC);
+int32 lp647_65 (int32 pulse, int32 dat);
+int32 lp647_66 (int32 pulse, int32 dat);
 int32 lp647_iors (void);
 t_stat lp647_svc (UNIT *uptr);
 t_stat lp647_reset (DEVICE *dptr);
@@ -285,12 +289,12 @@ DEVICE lp647_dev = {
 
 /* IOT routines */
 
-int32 lp647_65 (int32 pulse, int32 AC)
+int32 lp647_65 (int32 pulse, int32 dat)
 {
 int32 i, sb;
 
 sb = pulse & 060;					/* subcode */
-if ((pulse & 01) && lp647_don) AC = IOT_SKP | AC;	/* LPSF */
+if ((pulse & 01) && lp647_don) dat = IOT_SKP | dat;	/* LPSF */
 if (pulse & 02) {					/* pulse 02 */
 	lp647_don = 0;					/* clear done */
 	CLR_INT (LPT);					/* clear int req */
@@ -310,32 +314,32 @@ if (pulse & 004) {					/* LPDI */
 	    break;
 	case 040:					/* LPB3 */
 	    if (lp647_bp < LP647_BSIZE) {
-		lp647_buf[lp647_bp] = lp647_buf[lp647_bp] | ((AC >> 12) & 077);
+		lp647_buf[lp647_bp] = lp647_buf[lp647_bp] | ((dat >> 12) & 077);
 		lp647_bp = lp647_bp + 1;  }
 	case 020:					/* LPB2 */
 	    if (lp647_bp < LP647_BSIZE) {
-		lp647_buf[lp647_bp] = lp647_buf[lp647_bp] | ((AC >> 6) & 077);
+		lp647_buf[lp647_bp] = lp647_buf[lp647_bp] | ((dat >> 6) & 077);
 		lp647_bp = lp647_bp + 1;  }
 	case 060:					/* LPB1 */
 	    if (lp647_bp < LP647_BSIZE) {
-		lp647_buf[lp647_bp] = lp647_buf[lp647_bp] | (AC & 077);
+		lp647_buf[lp647_bp] = lp647_buf[lp647_bp] | (dat & 077);
 		lp647_bp = lp647_bp + 1;  }
 	    lp647_don = 1;				/* set done */
 	    if (lp647_ie) SET_INT (LPT);		/* set int */
 	    break;  }					/* end case */
 	}
-return AC;
+return dat;
 }
 
-int32 lp647_66 (int32 pulse, int32 AC)
+int32 lp647_66 (int32 pulse, int32 dat)
 {
-if ((pulse & 01) && lp647_err) AC = IOT_SKP | AC;	/* LPSE */
+if ((pulse & 01) && lp647_err) dat = IOT_SKP | dat;	/* LPSE */
 if (pulse & 02) {					/* LPCF */
 	lp647_don = 0;					/* clear done, int */
 	CLR_INT (LPT);  }
 if (pulse & 04) {
 	if ((pulse & 060) < 060) {			/* LPLS, LPPB, LPPS */
-	    lp647_iot = (pulse & 060) | (AC & 07);	/* save parameters */
+	    lp647_iot = (pulse & 060) | (dat & 07);	/* save parameters */
 	    sim_activate (&lp647_unit, lp647_unit.wait);  }	/* activate */
 #if defined (PDP9)
 	else {						/* LPEI */
@@ -343,7 +347,7 @@ if (pulse & 04) {
 	    if (lp647_don) SET_INT (LPT);  }
 #endif
 	}
-return AC;
+return dat;
 }
 
 /* Unit service.  lp647_iot specifies the action to be taken
@@ -442,7 +446,7 @@ int32 lp09_ie = 1;					/* int enable */
 int32 lp09_stopioe = 0;
 DEVICE lp09_dev;
 
-int32 lp09_66 (int32 pulse, int32 AC);
+int32 lp09_66 (int32 pulse, int32 dat);
 int32 lp09_iors (void);
 t_stat lp09_svc (UNIT *uptr);
 t_stat lp09_reset (DEVICE *dptr);
@@ -486,13 +490,13 @@ DEVICE lp09_dev = {
 
 /* IOT routines */
 
-int32 lp09_66 (int32 pulse, int32 AC)
+int32 lp09_66 (int32 pulse, int32 dat)
 {
 int32 sb = pulse & 060;					/* subopcode */
 
 if (pulse & 001) {
-	if ((sb == 000) && lp09_don) AC = IOT_SKP | AC;	/* LSDF */
-	if ((sb == 020) && lp09_err) AC = IOT_SKP | AC;	/* LSEF */
+	if ((sb == 000) && lp09_don) dat = IOT_SKP | dat;	/* LSDF */
+	if ((sb == 020) && lp09_err) dat = IOT_SKP | dat;	/* LSEF */
 	}
 if (pulse & 002) {
 	if (sb == 000) {				/* LSCF */
@@ -501,11 +505,11 @@ if (pulse & 002) {
 	else if (sb == 020) {				/* LPLD */
 	    lp09_don = 0;				/* clear done, int */
 	    CLR_INT (LPT);
-	    lp09_unit.buf = AC & 0177;			/* load char */
+	    lp09_unit.buf = dat & 0177;			/* load char */
 	    if ((lp09_unit.buf == 015) || (lp09_unit.buf == 014) ||
 		(lp09_unit.buf == 012))
 		sim_activate (&lp09_unit, lp09_unit.wait);
-	    else AC = AC | (lp09_svc (&lp09_unit) << IOT_V_REASON);  }
+	    else dat = dat | (lp09_svc (&lp09_unit) << IOT_V_REASON);  }
 	}
 if (pulse & 004) {
 	if (sb == 000) {				/* LIOF */
@@ -515,7 +519,7 @@ if (pulse & 004) {
 	    lp09_ie = 1;				/* set int enab */
 	    if (lp09_don) SET_INT (LPT);  }		/* if done, set int */
 	}
-return AC;
+return dat;
 }
 
 /* Unit service */
@@ -608,8 +612,8 @@ int32 lp15_bp = 0;
 char lp15_buf[LP15_BSIZE] = { 0 };
 
 DEVICE lp15_dev;
-int32 lp15_65 (int32 pulse, int32 AC);
-int32 lp15_66 (int32 pulse, int32 AC);
+int32 lp15_65 (int32 pulse, int32 dat);
+int32 lp15_66 (int32 pulse, int32 dat);
 int32 lp15_iors (void);
 t_stat lp15_svc (UNIT *uptr);
 t_stat lp15_reset (DEVICE *dptr);
@@ -656,18 +660,18 @@ DEVICE lp15_dev = {
 
 /* IOT routines */
 
-int32 lp15_65 (int32 pulse, int32 AC)
+int32 lp15_65 (int32 pulse, int32 dat)
 {
 int32 header, sb;
 
 sb = pulse & 060;					/* subopcode */
 if (pulse & 01) {
 	if ((sb == 000) && (lp15_sta & (STA_ERR | STA_DON)))	/* LPSF */
-	    AC = IOT_SKP | AC;
+	    dat = IOT_SKP | dat;
 	else if ((sb == 020) || (sb == 040)) {		/* LPP1, LPPM */
 	    sim_activate (&lp15_unit, lp15_unit.wait);	/* activate */
-	    header = M[(M[LPT_CA] + 1) & ADDRMASK];	/* get first word */
-	    M[LPT_CA] = (M[LPT_CA] + 2) & 0777777;
+	    header = M[(M[LPT_CA] + 1) & AMASK];	/* get first word */
+	    M[LPT_CA] = (M[LPT_CA] + 2) & DMASK;
 	    lp15_mode = header & 1;			/* mode */
 	    if (sb == 040) lp15_lc = 1;			/* line count */
 	    else lp15_lc = (header >> 9) & 0377;
@@ -675,18 +679,18 @@ if (pulse & 01) {
 	    lp15_bp = 0;  }				/* reset buf ptr */
 	else if (sb == 060) lp15_ie = 0;		/* LPDI */
 	}
-if ((pulse & 02) && (sb == 040)) AC = AC | lp15_updsta (0);	/* LPOS, LPRS */
+if ((pulse & 02) && (sb == 040)) dat = dat | lp15_updsta (0);	/* LPOS, LPRS */
 if ((pulse & 04) && (sb == 040)) lp15_ie = 1;		/* LPEI */
 lp15_updsta (0);					/* update status */
-return AC;
+return dat;
 }
 
-int32 lp15_66 (int32 pulse, int32 AC)
+int32 lp15_66 (int32 pulse, int32 dat)
 {
 if (pulse == 021) lp15_sta = lp15_sta & ~STA_DON;	/* LPCD */
 if (pulse == 041) lp15_sta = 0;				/* LPCF */
 lp15_updsta (0);					/* update status */
-return AC;
+return dat;
 }
 
 /* Unit service */
@@ -709,9 +713,9 @@ if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
 	return IORETURN (lp15_stopioe, SCPE_UNATT);  }
 
 for (more = 1; more != 0; ) {				/* loop until ctrl */
-	w0 = M[(M[LPT_CA] + 1) & ADDRMASK];		/* get first word */
-	w1 = M[(M[LPT_CA] + 2) & ADDRMASK];		/* get second word */
-	M[LPT_CA] = (M[LPT_CA] + 2) & 0777777;		/* advance mem addr */
+	w0 = M[(M[LPT_CA] + 1) & AMASK];		/* get first word */
+	w1 = M[(M[LPT_CA] + 2) & AMASK];		/* get second word */
+	M[LPT_CA] = (M[LPT_CA] + 2) & DMASK;		/* advance mem addr */
 	if (lp15_mode) {				/* unpacked? */
 	    c[0] = w0 & 0177;
 	    c[1] = w1 & 0177;

@@ -305,8 +305,8 @@ The clock implements these registers:
 	TIME2		24	clock frequency, select = 2
 	TIME3		24	clock frequency, select = 3
 
-The real-time clock autocalibrates; the clock interval is adjusted up or
-down so that the clock tracks actual elapsed time.
+The real-time clock autocalibrates; the clock interval is adjusted up
+or down so that the clock tracks actual elapsed time.
 
 2.2.7 Plotter (PTP)
 

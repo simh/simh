@@ -61,7 +61,7 @@ PDP18BD = PDP18B/
 PDP18B = ${PDP18BD}pdp18b_dt.c ${PDP18BD}pdp18b_drm.c ${PDP18BD}pdp18b_cpu.c \
 	${PDP18BD}pdp18b_lp.c ${PDP18BD}pdp18b_mt.c ${PDP18BD}pdp18b_rf.c \
 	${PDP18BD}pdp18b_rp.c ${PDP18BD}pdp18b_stddev.c ${PDP18BD}pdp18b_sys.c \
-	${PDP18BD}pdp18b_rb.c ${PDP18BD}pdp18b_tt1.c
+	${PDP18BD}pdp18b_rb.c ${PDP18BD}pdp18b_tt1.c ${PDP18BD}pdp18b_fpp.c
 PDP4_OPT = -DPDP4 -I ${PDP18BD}
 PDP7_OPT = -DPDP7 -I ${PDP18BD}
 PDP9_OPT = -DPDP9 -I ${PDP18BD}
@@ -150,7 +150,8 @@ IBM1130D = Ibm1130/
 IBM1130 = ${IBM1130D}ibm1130_cpu.c ${IBM1130D}ibm1130_cr.c \
 	${IBM1130D}ibm1130_disk.c ${IBM1130D}ibm1130_stddev.c \
 	${IBM1130D}ibm1130_sys.c ${IBM1130D}ibm1130_gdu.c \
-	${IBM1130D}ibm1130_gui.c ${IBM1130D}ibm1130_prt.c
+	${IBM1130D}ibm1130_gui.c ${IBM1130D}ibm1130_prt.c \
+	${IBM1130D}ibm1130_fmt.c
 IBM1130_OPT = -I ${IBM1130D}
 
 

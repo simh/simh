@@ -1,4 +1,5 @@
 #include "ibm1130_defs.h"
+#include "ibm1130_fmt.h"
 
 /* ibm1130_cr.c: IBM 1130 1442 Card Reader simulator
 
@@ -11,7 +12,210 @@
  * or modifications.
  *
  * This is not a supported product, but I welcome bug reports and fixes.
- * Mail to sim@ibm1130.org
+ * Mail to simh@ibm1130.org
+
+ *  Update 2003-07-23: Added autodetect for card decks (029 vs binary),
+    made this the default.
+ 
+ *  Update 2003-06-21: Fixed bug in XIO_SENSE: op_complete and response
+    bits were being cleared before the DSW was saved in ACC. Somehow DMS
+    worked with this, but APL didn't.
+
+ *  Update 2002-02-29: Added deck-list option.
+
+ *  Update 2003-02-08: Fixed error in declaration of array list_save, pointed
+    out by Ray Comas.
+
+* -----------------------------------------------------------------------
+* USAGE NOTES
+* -----------------------------------------------------------------------
+
+* Attach switches:
+
+   The ATTACH CR command accepts several command-line switches
+
+   -q quiet mode, the simulator will not print the name of each file it opens
+      while processing deck files (which are discussed below). For example,
+	  
+	  ATTACH -q @deckfile
+
+   -l makes the simulator convert lower case letters in text decks
+      to the IBM lower-case Hollerith character codes. Normally, the simulator
+	  converts lower case input to the uppercase Hollerith character codes.
+	  (Lowercase codes are used in APL\1130 save decks).
+
+   -d prints a lot of simulator debugging information
+
+   -f converts tabs in an ascii file to spaces according to Fortran column conventions
+   -a converts tabs in an ascii file to spaces according to 1130 Assembler column conventions
+   -t converts tabs in an ascii file to spaces, with tab settings every 8 columns
+
+   (See below for a discussion of tab formatting)
+
+   The ATTACH CP command accepts the -d switch.
+
+* Deck lists
+   If you issue an attach command and specify the filename as
+   "@filename", the file is interpreted as a list of filenames to
+   be read in sequence; the effect is that the reader sees the concatenation
+   of all of the files listed. The simulator "reset" does NOT rewind the deck list.
+
+   Filenames may be quoted if they contain spaces.
+
+   The strings %1, %2, etc, if they appear, are replaced with arguments passed
+   on the attach command line after the name of the deckfile. These can be the
+   arguments to ibm1130, or to the "do" command if a "do" script is executing, if the
+   attach command is constructed this way:
+
+	   attach @deckfile %1 %2 %3
+   	
+   This will pass the ibm1130 or do script arguments to attach, which will make
+   them available in the deckfile. Then, for instance the line
+
+       %1.for
+
+   would be substituted accordingly.
+
+   Blank lines and lines starting with ; # or * are ignored as comments.
+
+   Filenames may be followed by whitespace and one or more mode options:
+   The mode options are:
+   	
+			b		forces interpration as raw binary
+			a		forces conversion from ascii to 029 coding, tabs are left alone
+			af		forces 029 ascii conversion, and interprets tabs in Fortran mode
+			aa		forces 029 ascii conversion, and interprets tabs in 1130 Assembler mode
+			at		forces 029 ascii conversion, and interprets tabs with settings every 8 spaces
+
+   If "a" or "b" mode is not specified, the device mode setting is used.  In this case,
+   if the mode is "auto", the simulator will select binary or 029 by inspecting each
+   file in turn.
+
+   If a tab mode is not specified, tabs are left unmolested (and are treated as invalid characters)
+
+   Example:
+   
+       attach cr @decklist
+
+   reads filenames from file "decklist," which might contain:
+  
+       file01.for xf
+	   file02.dat a
+	   file03 bin b
+	   file04 bin
+
+   ('a' means 029, so, if you need 026 coding, specify the
+   device default as the correct 026 code and omit the 'a' on the text files lines).
+
+   Literal text cards can be entered in deck files by preceding an input
+   line with an exclamation point. For example,
+
+   !// JOB
+   !// FOR
+   program.for
+   !// XEQ
+   program.dat
+   
+   looks like two literal supervisor control cards, followed by the contents
+   of file program.for, followed by an // XEQ card, followed by the contents
+   of file program.dat.
+
+   %n tokens are not replaced in literal cards.
+
+   The line
+
+   !BREAK
+   
+   has a special meaning: when read from a deck file, it stops the
+   emulator as if "IMMEDIATE STOP" was pressed. This returns control to
+   the command interpreter or to the current DO command script.
+   
+*  Card image format.
+   Card files can be ascii text or binary.  There are several ASCII modes:
+   CODE_029, CODE_26F, etc, corresponding to different code sets.
+   Punch and reader modes can be set independently using
+
+   		set cr binary 		set cp binary *
+		set cr 029			set cp 029
+		set cr 026f			set cp 026f
+		set cr 026c			set cp 026c
+		set cr auto	*
+
+   (* = default mode)
+
+   In "auto" mode, the card reader will examine the first 160 bytes of
+   the deck and guess whether the card is binary or 029 text encoded.
+   When a deck file is used with auto mode, the simulator guesses for
+   each file named in the deck file.
+
+*  Tab formatting. The attach command and deckfile entries can indicate
+   that tabs are to be converted to spaces, to help let you write free-form
+   source files.  There are three tab conversion modes, which are set
+   with the attach command or in a decklist, as discussed earlier
+
+   Fortran mode:
+		Input lines of the form
+
+			[label]<tab>statement
+
+	    or
+
+			[label]<tab>+continuation
+
+		(where + is any nonalphabetic character) are rearranged in the
+		appropriate manner:
+
+					 1		   2
+			12345678901234567890...
+			------------------------
+	  	    label statement
+  		    label+continuation
+
+		However, you must take care that you don't end up with statement text after column 72.
+
+		Input lines with * or C in column 1 (comments and directives) and lines without tabs
+		are left alone.
+
+		(The ! escape is not used before Fortran directives as before Assembler directives)
+
+   Assembler mode:
+		Input lines of the form
+
+			[label]<whitespace>[opcode]<tab>[tag][L]<tab>[argument]
+
+	    are rearranged so that the input fields are placed in the appropriate columns
+
+		The label must start on the first character of the line. If there is no label, 
+		the first character(s) before the opcode must be whitespace. Following the opcode, there
+		MUST be a tab character, followed by the format and tag. Following the format and tag 
+		may be exactly one whitespace character, and then starts the argument.
+
+	    Input lines with * in column 1 and blank lines are turned into Assembler comments,
+		with the * in the Opcode field.
+
+ 		Assembler directive lines at the beginning of the deck must be preceded by
+		! to indicate that they are not comments. For example,
+
+		!*LIST
+		* This is a comment
+
+    Plain Tab mode:
+		Tabs are replaced with spaces. Tab settings are assumed to be eight characters wide,
+		as is standard for vi, notepad, etc.
+
+* CGI mode note: The command
+
+     attach cr -
+
+  will attach the card reader to stdin. However, this is not compatible
+  with the default encoding autodetect feature, so the command must be
+  preceded with
+
+      set cr 029
+
+* -----------------------------------------------------------------------
+* PROGRAMMING NOTES
+* -----------------------------------------------------------------------
 
 NOTE - there is a problem with this code. The Device Status Word (DSW) is
 computed from current conditions when requested by an XIO load status
@@ -19,45 +223,6 @@ command; the value of DSW available to the simulator's examine & save
 commands may NOT be accurate. This should probably be fixed. (I think there's
 a way to have the expression evaluator call a routine? That would be one
 way to solve the problem, the other is to keep DSW up-to-date all the time).
-
-*  Update 2003-02-08: Fixed error in declaration of array list_save, pointed
-   out by Ray Comas.
-
-*  Update 2002-02-29: Added deck-list option. If you issue an attach
-   command and specify the filename as "@filename", the named file is interpreted
-   as a list of filenames to be read in sequence; the effect is that the reader
-   sees the concatenation of all of the files named.  "reset" rewinds the deck
-   list. Filenames can be followed by whitespace and the letter "a" or "b",
-   which indicates "ascii to 029" or "binary", respectively. Example:
-   
-       attach cr @decklist
-
-   where file "decklist" contains:
-  
-       file01 a
-	   file02 b
-	   file03 b
-	   file04 b
-
-   If "a" or "b" is not specified, the device mode setting is used.
-
-   ('a' means 029, so, if you need 026 coding, specify the
-   device default as the correct 026 code and omit the 'a' on the text files lines).
-
-*  note: I'm not sure but I think we'll need a way to simulate the 'start'
-   button. What may end up being necessary is to fake this in the 'attach'
-   command. In a GUI build we may want to wait until they press a button.
-   Have to research: does DMS issue a read request which is only
-   satisfied when START is pressed, or does START cause an interrupt that
-   then asks DMS to issue a read request. I think it's the former but need
-   to check. After all the status register says "empty" and "not ready"
-   when the hopper is empty. So what gives? On the 360 I think the start
-   button causes issues some sort of attention request.
-   
-*  Card image format.
-   Card files can be ascii text or binary.  There are several ASCII modes:
-   CODE_029, CODE_26F, etc, corresponding to different code sets.
-   Punch and reader modes can be set independently.
 
    The 1442 card read/punch has several cycles:
 
@@ -85,10 +250,10 @@ way to solve the problem, the other is to keep DSW up-to-date all the time).
    the appropriate buffer, so you can punch w/o attaching a deck to
    the card reader.
 
-// -- this may need changing depending on how things work in hardware. TBD.
+-- -- this may need changing depending on how things work in hardware. TBD.
 ||  A read cycle on an empty deck causes an error.
 ||  Hmmm -- what takes the place of the Start button on
-\\ the card reader?
+-- the card reader?
 
   Binary format is stored using fxwrite of short ints, in this format:
 
@@ -127,7 +292,7 @@ way to solve the problem, the other is to keep DSW up-to-date all the time).
     9 |
 	  +------------------ - - -
 
-	   12 11  0  1  2            3   4  5  6  7  8  9 
+	   12 11  0  1  2            3   4  5  6  7  8  9   <- columns of cold start card
 	    |  |  |  |  |  0  0  0  / \  |  |  |  |  |  |
 	  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 	  | 0| 1| 2| 3| 4| 5| 6| 7| 8| 9|10|11|12|13|14|15|
@@ -140,66 +305,88 @@ way to solve the problem, the other is to keep DSW up-to-date all the time).
    it's a sign bit.
 
    Boot command on a binary deck does this. Boot on an unattached
-   reader loads the standard boot2 card image. Boot with an ASCII
-   deck will not be very helpful.
+   reader loads one of the built-in boot card images. Boot with an ASCII
+   deck isn't allowed.
 */
 
 #define READ_DELAY		 35			// see how small a number we can get away with
 #define PUNCH_DELAY		 35
 #define FEED_DELAY		 25
 
+// umm, this is a weird little future project of mine.
+// #define ENABLE_PHYSICAL_CARD_READER_SUPPORT
+
 // #define IS_ONLINE(u) (((u)->flags & (UNIT_ATT|UNIT_DIS)) == UNIT_ATT)
 
 extern int32 sim_switches;
+extern UNIT cpu_unit;
 
 static t_stat cr_svc      (UNIT *uptr);
 static t_stat cr_reset    (DEVICE *dptr);
 static t_stat cr_set_code (UNIT *uptr, int32 match, char *cptr, void *desc);
 static t_stat cr_attach   (UNIT *uptr, char *cptr);
 static t_stat cr_detach   (UNIT *uptr);
+static int32  guess_cr_code (void);
 
 static t_stat cp_reset	  (DEVICE *dptr);
 static t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc);
+static t_stat cp_attach   (UNIT *uptr, char *cptr);
 static t_stat cp_detach   (UNIT *uptr);
 
 static int16 cr_dsw  = 0;									/* device status word */
 static int32 cr_wait = READ_DELAY;							/* read per-column wait */
 static int32 cf_wait = PUNCH_DELAY;							/* punch per-column wait */
 static int32 cp_wait = FEED_DELAY;							/* feed op wait */
+static int32 cr_count= 0;									/* read and punch card count */
+static int32 cp_count= 0;
 
 #define UNIT_V_OPERATION   (UNIT_V_UF + 0)					/* operation in progress */
-#define UNIT_V_CODE		   (UNIT_V_UF + 2)
-#define UNIT_V_EMPTY	   (UNIT_V_UF + 4)
-#define UNIT_V_SCRATCH	   (UNIT_V_UF + 5)
-#define UNIT_V_QUIET       (UNIT_V_UF + 6)
-#define UNIT_V_DEBUG       (UNIT_V_UF + 7)
-
-#define UNIT_V_LASTPUNCH   (UNIT_V_UF + 0)					/* bit in unit_cp flags */
+#define UNIT_V_CODE		   (UNIT_V_UF + 2)					/* three bits */
+#define UNIT_V_EMPTY	   (UNIT_V_UF + 5)
+#define UNIT_V_SCRATCH	   (UNIT_V_UF + 6)
+#define UNIT_V_QUIET       (UNIT_V_UF + 7)
+#define UNIT_V_DEBUG       (UNIT_V_UF + 8)
+#define UNIT_V_PHYSICAL	   (UNIT_V_UF + 9)
+#define UNIT_V_LASTPUNCH   (UNIT_V_UF + 10)					/* used in unit_cp only */
+#define UNIT_V_LOWERCASE   (UNIT_V_UF + 10)					/* used in unit_cr only */
+#define UNIT_V_ACTCODE     (UNIT_V_UF + 11)					/* used in unit_cr only, 3 bits */
 
 #define UNIT_OP			 (3u << UNIT_V_OPERATION)			/* two bits */
-#define UNIT_CODE		 (3u << UNIT_V_CODE)				/* two bits */
+#define UNIT_CODE		 (7u << UNIT_V_CODE)				/* three bits */
 #define UNIT_EMPTY		 (1u << UNIT_V_EMPTY)
 #define UNIT_SCRATCH	 (1u << UNIT_V_SCRATCH)				/* temp file */
 #define UNIT_QUIET       (1u << UNIT_V_QUIET)
 #define UNIT_DEBUG       (1u << UNIT_V_DEBUG)
-
+#define UNIT_PHYSICAL	 (1u << UNIT_V_PHYSICAL)
 #define UNIT_LASTPUNCH	 (1u << UNIT_V_LASTPUNCH)
+#define UNIT_LOWERCASE	 (1u << UNIT_V_LOWERCASE)			/* permit lowercase input (needed for APL) */
+#define UNIT_ACTCODE	 (7u << UNIT_V_ACTCODE)
 
 #define OP_IDLE		 	 (0u << UNIT_V_OPERATION)
 #define OP_READING	 	 (1u << UNIT_V_OPERATION)
 #define OP_PUNCHING	 	 (2u << UNIT_V_OPERATION)
 #define OP_FEEDING	 	 (3u << UNIT_V_OPERATION)
 
-#define SET_OP(op) {cr_unit.flags &= ~UNIT_OP; cr_unit.flags |= op;}
-
+#define SET_OP(op) {cr_unit.flags &= ~UNIT_OP; cr_unit.flags |= (op);}
 #define CURRENT_OP (cr_unit.flags & UNIT_OP)
 
-#define CODE_029 		 (0u << UNIT_V_CODE)
-#define CODE_026F		 (1u << UNIT_V_CODE)
-#define CODE_026C		 (2u << UNIT_V_CODE)
-#define CODE_BINARY		 (3u << UNIT_V_CODE)
+#define CODE_AUTO		 (0u << UNIT_V_CODE)
+#define CODE_029 		 (1u << UNIT_V_CODE)
+#define CODE_026F		 (2u << UNIT_V_CODE)
+#define CODE_026C		 (3u << UNIT_V_CODE)
+#define CODE_BINARY		 (4u << UNIT_V_CODE)
 
-#define SET_CODE(un,cd) {un.flags &= ~UNIT_CODE; un.flags |= cd;}
+#define GET_CODE(un)     (un.flags & UNIT_CODE)
+#define SET_CODE(un,cd)  {un.flags &= ~UNIT_CODE; un.flags |= (cd);}
+
+#define ACTCODE_029 	 (CODE_029    << (UNIT_V_ACTCODE-UNIT_V_CODE))	// these are used ONLY in MTAB. Elsewhere
+#define ACTCODE_026F	 (CODE_026F   << (UNIT_V_ACTCODE-UNIT_V_CODE))	// we use values CODE_xxx with macros
+#define ACTCODE_026C	 (CODE_026C   << (UNIT_V_ACTCODE-UNIT_V_CODE))	// GET_ACTCODE and SET_ACTCODE.
+#define ACTCODE_BINARY	 (CODE_BINARY << (UNIT_V_ACTCODE-UNIT_V_CODE))
+
+		// get/set macros for actual-code field, these use values like CODE_029 meant for the UNIT_CODE field
+#define GET_ACTCODE(un)    ((un.flags & UNIT_ACTCODE) >> (UNIT_V_ACTCODE-UNIT_V_CODE))
+#define SET_ACTCODE(un,cd) {un.flags &= ~UNIT_ACTCODE; un.flags |= (cd) << (UNIT_V_ACTCODE-UNIT_V_CODE);}
 
 #define COLUMN		u4										/* column field in unit record */
 
@@ -207,10 +394,15 @@ UNIT cr_unit = { UDATA (&cr_svc, UNIT_ATTABLE|UNIT_ROABLE, 0) };
 UNIT cp_unit = { UDATA (NULL,    UNIT_ATTABLE, 0) };
 
 MTAB cr_mod[] = {
-	{ UNIT_CODE, CODE_029,		"029",		"029",		&cr_set_code},
-	{ UNIT_CODE, CODE_026F,		"026F",		"026F",		&cr_set_code},
-	{ UNIT_CODE, CODE_026C, 	"026C", 	"026C",		&cr_set_code},
-	{ UNIT_CODE, CODE_BINARY,	"BINARY",	"BINARY",	&cr_set_code},
+	{ UNIT_CODE,    CODE_029,		"029",		"029",		&cr_set_code},
+	{ UNIT_CODE,    CODE_026F,		"026F",		"026F",		&cr_set_code},
+	{ UNIT_CODE,    CODE_026C, 		"026C", 	"026C",		&cr_set_code},
+	{ UNIT_CODE,    CODE_BINARY,	"BINARY",	"BINARY",	&cr_set_code},
+	{ UNIT_CODE,    CODE_AUTO,	 	"AUTO",		"AUTO",		&cr_set_code},
+	{ UNIT_ACTCODE, ACTCODE_029,	"(029)",	NULL,		NULL},		/* display-only, shows current mode */
+	{ UNIT_ACTCODE, ACTCODE_026F,	"(026F)",	NULL,		NULL},
+	{ UNIT_ACTCODE, ACTCODE_026C, 	"(026C)", 	NULL,		NULL},
+	{ UNIT_ACTCODE, ACTCODE_BINARY,	"(BINARY)",	NULL,		NULL},
 	{ 0 }  };
 
 MTAB cp_mod[] = {
@@ -224,10 +416,12 @@ REG cr_reg[] = {
 	{ HRDATA (CRDSW,   cr_dsw,  16) },					/* device status word */
 	{ DRDATA (CRTIME,  cr_wait, 24), PV_LEFT },			/* operation wait */
 	{ DRDATA (CFTIME,  cf_wait, 24), PV_LEFT },			/* operation wait */
+	{ DRDATA (CRCOUNT, cr_count, 32),PV_LEFT },			/* number of cards read since last attach cmd */
 	{ NULL }  };
 
 REG cp_reg[] = {
 	{ DRDATA (CPTIME,  cp_wait, 24), PV_LEFT },			/* operation wait */
+	{ DRDATA (CPCOUNT, cp_count, 32),PV_LEFT },			/* number of cards punched since last attach cmd */
 	{ NULL }  };
 
 DEVICE cr_dev = {
@@ -240,7 +434,7 @@ DEVICE cp_dev = {
 	"CP", &cp_unit, cp_reg, cp_mod,
 	1, 16, 16, 1, 16, 16,
 	NULL, NULL, cp_reset,
-	NULL, NULL, cp_detach};
+	NULL, cp_attach, cp_detach};
 
 #define CR_DSW_READ_RESPONSE			0x8000		/* device status word bits */
 #define CR_DSW_PUNCH_RESPONSE			0x4000
@@ -252,7 +446,7 @@ DEVICE cp_dev = {
 #define CR_DSW_NOT_READY				0x0001
 
 typedef struct {
-	int		hollerith;
+	uint16 hollerith;
 	char	ascii;
 } CPCODE;
 
@@ -304,7 +498,7 @@ static CPCODE cardcode_029[] =
 	0x0120,		'\'',
 	0x00A0,		'=',
 	0x0060,		'"',
-	0x8820,		'c',		// cent
+	0x8820,		'\xA2',		// cent, in MS-DOS encoding (this is in guess_cr_code as well)
 	0x8420,		'.',
 	0x8220,		'<',		// ) in 026 Fortran
 	0x8120,		'(',
@@ -315,13 +509,48 @@ static CPCODE cardcode_029[] =
 	0x4220,		'*',
 	0x4120,		')',
 	0x40A0,		';',
-	0x4060,		'n',		// not
-	0x2820,		'x',		// what?
+	0x4060,		'\xAC',		// not, in MS-DOS encoding  (this is in guess_cr_code as well)
 	0x2420,		',',
 	0x2220,		'%',		// ( in 026 Fortran
 	0x2120,		'_',
 	0x20A0,		'>',
-	0x2060,		'>',
+	0xB000,		'a',
+	0xA800,		'b',
+	0xA400,		'c',
+	0xA200,		'd',
+	0xA100,		'e',
+	0xA080,		'f',
+	0xA040,		'g',
+	0xA020,		'h',
+	0xA010,		'i',
+	0xD000,		'j',
+	0xC800,		'k',
+	0xC400,		'l',
+	0xC200,		'm',
+	0xC100,		'n',
+	0xC080,		'o',
+	0xC040,		'p',
+	0xC020,		'q',
+	0xC010,		'r',
+	0x6800,		's',
+	0x6400,		't',
+	0x6200,		'u',
+	0x6100,		'v',
+	0x6080,		'w',
+	0x6040,		'x',
+	0x6020,		'y',
+	0x6010,		'z',				// these odd punch codes are used by APL:
+	0x1010,		'\001',				// no corresponding ASCII	using ^A
+	0x0810,		'\002',				// SYN						using ^B
+	0x0410,		'\003',				// no corresponding ASCII	using ^C
+	0x0210,		'\004',				// PUNCH ON					using ^D
+	0x0110,		'\005',				// READER STOP				using ^E
+	0x0090,		'\006',				// UPPER CASE				using ^F
+	0x0050,		'\013',				// EOT						using ^K
+	0x0030,		'\016',				// no corresponding ASCII	using ^N
+	0x1030,		'\017',				// no corresponding ASCII	using ^O
+	0x0830,		'\020',				// no corresponding ASCII	using ^P
+
 };
 
 static CPCODE cardcode_026F[] =		// 026 fortran
@@ -435,7 +664,6 @@ static int16 ascii_to_card[256];
 
 static CPCODE *cardcode;
 static int ncardcode;
-static int32 active_cr_code;			/* the code most recently specified */
 static FILE *deckfile = NULL;
 static char tempfile[128];
 static int cardnum;
@@ -445,13 +673,23 @@ static int any_punched = 0;
 #define MAXARGS   10					/* max number of arguments to save */
 static char list_save[MAXARGS][MAXARGLEN], *list_arg[MAXARGLEN];
 static int list_nargs = 0;
+static char* (*tab_proc)(char*) = NULL;		/* tab reformatting routine	*/
 
-static int16 punchstation[80];
-static int16 readstation[80];
+static uint16 punchstation[80];
+static uint16 readstation[80];
 static enum {STATION_EMPTY, STATION_LOADED, STATION_READ, STATION_PUNCHED} punchstate = STATION_EMPTY, readstate = STATION_EMPTY;
 
 static t_bool nextdeck (void);
 static void checkdeck (void);
+
+static t_stat pcr_attach(UNIT *uptr, char *devname);
+static t_stat pcr_detach(UNIT *uptr);
+static t_stat pcr_svc(UNIT *uptr);
+static void   pcr_xio_sense(int modify);
+static void   pcr_xio_feedcycle(void);
+static void   pcr_xio_startread(void);
+static void   pcr_reset(void);
+static int    pcr_read_data(void);
 
 /* lookup_codetable - use code flag setting to get code table pointer and length */
 
@@ -490,7 +728,7 @@ t_stat set_active_cr_code (int match)
 	CPCODE *code;
 	int i, ncode;
 
-	active_cr_code = match;
+	SET_ACTCODE(cr_unit, match);
 
 	if (! lookup_codetable(match, &code, &ncode))
 		return SCPE_ARG;
@@ -498,14 +736,74 @@ t_stat set_active_cr_code (int match)
 	memset(ascii_to_card, 0, sizeof(ascii_to_card));
 
 	for (i = 0; i < ncode; i++)		// set ascii to card code table
-		ascii_to_card[code[i].ascii] = (int16) code[i].hollerith;
+		ascii_to_card[code[i].ascii] = code[i].hollerith;
 
 	return SCPE_OK;
 }
 
 static t_stat cr_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
 {
+	if (match == CODE_AUTO)
+		match = guess_cr_code();
+
 	return set_active_cr_code(match);
+}
+
+static int32 guess_cr_code (void)
+{
+	int i;
+	long filepos;
+	int32 guess;
+	union {
+		uint16 w[80];				// one card image, viewed as 80 short words
+		char   c[160];				// same, viewed as 160 characters
+	} line;
+
+	// here, we can see if the attached file is binary or ascii and auto-set the
+	// mode. If we the file is a binary deck, we should be able to read a record of 80 short
+	// words, and the low 4 bits of each word must be zero. If the file was an ascii deck,
+	// then these low 4 bits are the low 4 bits of every other character in the first 160
+	// chararacters of the file. They would all only be 0 if all of these characters were
+	// in the following set: {NUL ^P space 0 @ P ` p} . It seems very unlikely that
+	// this would happen, as even if the deck consisted of untrimmed card images and
+	// the first two lines were blank, the 81'st character would be a newline, and it would
+	// appear at one of the every-other characters seen on little-endian machines, anyway.
+	// So: if the code mode is AUTO, we can use this test and select either BINARY or 029.
+	// Might as well also check for the all-blanks and newlines case in case this is a
+	// big-endian machine.
+
+
+	guess = CODE_029;									// assume ASCII, 029
+
+	if ((cr_unit.flags & UNIT_ATT) && (cr_unit.fileref != NULL)) {
+		filepos = ftell(cr_unit.fileref);				// remember current position in file
+		fseek(cr_unit.fileref, 0, SEEK_SET);			// go to first record of file
+														// read card image; if file too short, leave guess set to 029
+		if (fxread(line.w, sizeof(line.w[0]), 80, cr_unit.fileref) == 80) {
+			guess = CODE_BINARY;						// we got a card image, assume binary
+
+			for (i = 0; i < 80; i++) {					// make sure low bits are zeroes, which our binary card format promises
+				if (line.w[i] & 0x000F) {
+					guess = CODE_029;					// low bits set, must be ascii text
+					break;
+				}
+			}
+
+			if (guess == CODE_BINARY) {					// if we saw no low bits, it could have been all spaces.
+				guess = CODE_029;						// so now assume file is text
+				for (i = 0; i < 160; i++) {				// ensure all 160 characters are 7-bit ASCII (or not or cent)
+					if ((strchr("\r\n\t\xA2\xAC", line.c[i]) == NULL) && ! BETWEEN(line.c[i], ' ', '\x7F')) {
+						guess = CODE_BINARY;			// oops, null or weird character, it's binary after all
+						break;
+					}
+				}
+			}
+		}
+
+		fseek(cr_unit.fileref, filepos, SEEK_SET);		// return to original position
+	}
+
+	return guess;
 }
 
 static t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
@@ -522,12 +820,13 @@ static t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
 	return SCPE_OK;
 }
 
-t_stat load_cr_boot (int drvno)
+t_stat load_cr_boot (int drvno, int switches)
 {
-	/* this is from the "boot2" cold start card. Columns have been */
-	/* expanded already from 12 to 16 bits. */
-
-	static unsigned short boot2_data[] = {
+	int i;
+	char *name, msg[80];
+	t_bool expand;
+	uint16 word, *boot;
+	static uint16 dms_boot_data[] = {				/* DMSV2M12, already expanded to 16 bits */
 		0xc80a, 0x18c2, 0xd008, 0xc019, 0x8007, 0xd017, 0xc033, 0x100a,
 		0xd031, 0x7015, 0x000c, 0xe800, 0x0020, 0x08f8, 0x4828, 0x7035,
 		0x70fa, 0x4814, 0xf026, 0x2000, 0x8800, 0x9000, 0x9800, 0xa000,
@@ -539,41 +838,93 @@ t_stat load_cr_boot (int drvno)
 		0x080d, 0x08c4, 0x1003, 0x4810, 0x70d9, 0x3000, 0x08df, 0x3000,
 		0x7010, 0x00d1, 0x0028, 0x000a, 0x70f3, 0x0000, 0x00d0, 0xa0c0
 	};
-	int i;
+	static uint16 apl_boot_data[] = {				/* APLIPL, already expanded */
+		0x7021, 0x3000, 0x7038, 0xa0c0, 0x0002, 0x4808, 0x0003, 0x0026,
+		0x0001, 0x0001, 0x000c, 0x0000, 0x0000, 0x0800, 0x48f8, 0x0027,
+		0x7002, 0x08f2, 0x3800, 0xe0fe, 0x18cc, 0x100e, 0x10c1, 0x4802,
+		0x7007, 0x4828, 0x7005, 0x4804, 0x7001, 0x70f3, 0x08e7, 0x70e1,
+		0x08ed, 0x70f1, 0xc0e0, 0x1807, 0xd0de, 0xc0df, 0x1801, 0xd0dd,
+		0x800d, 0xd00c, 0xc0e3, 0x1005, 0xe80a, 0xd009, 0xc0d8, 0x1008,
+		0xd0d6, 0xc0dd, 0x1008, 0x80d4, 0xd0da, 0x1000, 0xb000, 0x00f6,
+		0x70e7, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+		0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+		0x9000, 0x4004, 0x40c0, 0x8001, 0x4004, 0x40c0, 0x0000, 0x0000	};
+	static uint16 aplp_boot_data[] = {				/* APLIPL Privileged, already expanded */
+		0x7021, 0x3000, 0x7038, 0xa0c0, 0x0002, 0x4808, 0x0003, 0x0026,
+		0x0001, 0x0001, 0x000c, 0x0000, 0x0000, 0x0800, 0x48f8, 0x0027,
+		0x7002, 0x08f2, 0x3800, 0xe0fe, 0x18cc, 0x100e, 0x10c1, 0x4802,
+		0x7007, 0x4828, 0x7005, 0x4804, 0x7001, 0x70f3, 0x08e7, 0x70e1,
+		0x08ed, 0x70f1, 0xc0e0, 0x1807, 0xd0de, 0xc0df, 0x1801, 0xd0dd,
+		0x800d, 0xd00c, 0xc0e3, 0x1005, 0xe80a, 0xd009, 0xc0d8, 0x1008,
+		0xd0d6, 0xc0dd, 0x1008, 0x80d4, 0xd0da, 0x1002, 0xb000, 0x00f6,
+		0x70e7, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+		0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+		0x9000, 0x4004, 0x40c0, 0x8001, 0x4004, 0x40c0, 0x4004, 0x4001
+	};
+
+	if ((switches & SWMASK('A')) && (switches & SWMASK('P'))) {
+		boot   = aplp_boot_data;
+		name   = "APL\\1130 Privileged";
+		expand = FALSE;
+	}
+	else if (switches & SWMASK('A')) {
+		boot   = apl_boot_data;
+		name   = "APL\\1130";
+		expand = FALSE;
+	}
+	else {
+		boot   = dms_boot_data;
+		name   = "DMS V2M12";
+		expand = FALSE;
+	}
 
 	if (drvno >= 0)					/* if specified, set toggle switches to disk drive no */
-		CES = drvno;				/* so BOOT DSK1 will work correctly */
+		CES = drvno;				/* so BOOT DSK1 will work correctly (DMS boot uses this) */
 
 	IAR = 0;						/* clear IAR */
 
-	for (i = 0; i < 80; i++)		/* copy memory */
-		WriteW(i, boot2_data[i]);
+	for (i = 0; i < 80; i++) {		/* store the boot image to core words 0..79 */
+		word = boot[i];				/* expanding the 12-bit card data to 16 bits if not already expanded */
+		if (expand)
+			word = (word & 0xF800) | ((word & 0x0400) ? 0x00C0 : 0x0000) | ((word & 0x03F0) >> 4);
+
+		WriteW(i, word);
+	}
+									/* quiet switch or CGI mode inhibit the boot remark */
+	if ((switches & SWMASK('Q') == 0) && ! cgi) {
+		sprintf(msg,"Loaded %s cold start card\n", name);
 
 #ifdef GUI_SUPPORT
-	if (! cgi)
-		remark_cmd("Loaded BOOT2 cold start card\n");
+		remark_cmd(msg);
+#else
+		printf(msg);
 #endif
+	}
+
 	return SCPE_OK;
 }
 
 t_stat cr_boot (int unitno, DEVICE *dptr)
 {
 	t_stat rval;
-	short buf[80];
+	uint16 buf[80];
 	int i;
 
 	if ((rval = reset_all(0)) != SCPE_OK)
 		return rval;
 
-	if (! (cr_unit.flags & UNIT_ATT))			// no deck; load standard boot anyway
-		return load_cr_boot(-1);
+	if (! (cr_unit.flags & UNIT_ATT))			/* no deck; load standard boot anyway */
+		return load_cr_boot(-1, 0);
 
-	if ((active_cr_code & UNIT_CODE) != CODE_BINARY) {
+	if (GET_ACTCODE(cr_unit) != CODE_BINARY) {
 		printf("Can only boot from card reader when set to BINARY mode");
 		return SCPE_IOERR;
 	}
 
-	if (fxread(buf, sizeof(short), 80, cr_unit.fileref) != 80)
+	if (cr_unit.fileref == NULL)				/* this will happen if no file in deck file can be opened */
+		return SCPE_IOERR;
+
+	if (fxread(buf, sizeof(buf[0]), 80, cr_unit.fileref) != 80)
 		return SCPE_IOERR;
 
 	IAR = 0;									/* Program Load sets IAR = 0 */
@@ -584,7 +935,7 @@ t_stat cr_boot (int unitno, DEVICE *dptr)
 	return SCPE_OK;
 }
 
-char card_to_ascii (int16 hol)
+char card_to_ascii (uint16 hol)
 {
 	int i;
 
@@ -592,12 +943,12 @@ char card_to_ascii (int16 hol)
 		if (cardcode[i].hollerith == hol)
 			return cardcode[i].ascii;
 
-	return ' ';
+	return '?';
 }
 
 // hollerith_to_ascii - provide a generic conversion for simulator debugging 
 
-char hollerith_to_ascii (int16 hol)
+char hollerith_to_ascii (uint16 hol)
 {
 	int i;
 
@@ -612,18 +963,18 @@ char hollerith_to_ascii (int16 hol)
 
 static void feedcycle (t_bool load, t_bool punching)
 {
-	char buf[84], *x;
+	char buf[84], *x, *result;
 	int i, nread, nwrite, ch;
 
 	/* write punched card if punch is attached to a file */
 	if (cp_unit.flags & UNIT_ATT) {
 		if (any_punched && punchstate != STATION_EMPTY) {
-			if ((cp_unit.flags & UNIT_CODE) == CODE_BINARY) {
-				fxwrite(punchstation, sizeof(short), 80, cp_unit.fileref);
+			if (GET_CODE(cp_unit) == CODE_BINARY) {
+				fxwrite(punchstation, sizeof(punchstation[0]), 80, cp_unit.fileref);
 			}
 			else {
 				for (i = 80; --i >= 0; ) {		/* find last nonblank column */
-					if (buf[i] != 0)
+					if (punchstation[i] != 0)
 						break;
 				}
 
@@ -635,10 +986,15 @@ static void feedcycle (t_bool load, t_bool punching)
 
 				/* nwrite is now number of characters to output */
 
+#ifdef WIN32
+				buf[nwrite++] = '\r';				/* add CR before NL for microsoft */
+#endif
 				buf[nwrite++] = '\n';				/* append newline */
 				fxwrite(buf, sizeof(char), nwrite, cp_unit.fileref);
 			}
 		}
+
+		cp_count++;
 	}
 
 	if (! load)			// all we wanted to do was flush the punch
@@ -672,17 +1028,17 @@ again:		/* jump here if we've loaded a new deck after emptying the previous one 
 		if (cr_unit.fileref == NULL)
 			nread = 0;
 
-		else if ((active_cr_code & UNIT_CODE) == CODE_BINARY)	/* binary read is straightforward */
-			nread = fxread(readstation, sizeof(short), 80, cr_unit.fileref);
+		else if (GET_ACTCODE(cr_unit) == CODE_BINARY)		/* binary read is straightforward */
+			nread = fxread(readstation, sizeof(readstation[0]), 80, cr_unit.fileref);
 
 		else if (fgets(buf, sizeof(buf), cr_unit.fileref) == NULL)	/* read up to 80 chars */
-			nread = 0;									/* hmm, end of file */
+			nread = 0;										/* hmm, end of file */
 
-		else {											/* check for newline */
+		else {												/* check for newline */
 			if ((x = strchr(buf, '\r')) == NULL)
 				x = strchr(buf, '\n');
 
-			if (x == NULL) {							/* there were no delimiters, burn rest of line */
+			if (x == NULL) {								/* there were no delimiters, burn rest of line */
 				while ((ch = getc(cr_unit.fileref)) != EOF) {	/* get character */
 					if (ch == '\n')								/* newline, done */
 						break;
@@ -700,10 +1056,19 @@ again:		/* jump here if we've loaded a new deck after emptying the previous one 
 			else
 				nread = x-buf;							/* reduce length of string */
 
-			upcase(buf);								/* force uppercase */
+			if (! (cr_unit.flags & UNIT_LOWERCASE))
+				upcase(buf);							/* force uppercase */
+
+			if (tab_proc != NULL) {						/* apply tab editing, if specified */
+				buf[nread] = '\0';						/* .. be sure string is terminated	*/
+				result = (*tab_proc)(buf);				/* .. convert tabs 	spaces	 		*/
+				nread  = strlen(result);				/* .. set new read length			*/
+			}
+			else
+				result = buf;
 
 			for (i = 0; i < nread; i++)					/* convert ascii to punch code */
-				readstation[i] = ascii_to_card[buf[i]];
+				readstation[i] = ascii_to_card[result[i]];
 
 			nread = 80;									/* even if line was blank consider it present */
 		}
@@ -712,6 +1077,11 @@ again:		/* jump here if we've loaded a new deck after emptying the previous one 
 			if (deckfile != NULL && nextdeck())
 				goto again;
 
+			if (punching)								/* pretend we loaded a blank card */
+				nread = 80;
+		}
+
+		if (nread == 0) {
 			SETBIT(cr_unit.flags, UNIT_EMPTY);
 			readstate = STATION_EMPTY;
 			cardnum = -1;								/* nix the card counter */
@@ -720,10 +1090,11 @@ again:		/* jump here if we've loaded a new deck after emptying the previous one 
 			CLRBIT(cr_unit.flags, UNIT_EMPTY);
 			readstate = STATION_LOADED;
 			cardnum++;									/* advance card counter */
+			cr_count++;
 		}
 	}
-	else
-		readstate = STATION_EMPTY;
+//	else
+//		readstate = STATION_EMPTY;
 
 	cr_unit.COLUMN = -1;								/* neither device is currently cycling */
 	cp_unit.COLUMN = -1;
@@ -793,10 +1164,10 @@ static void checkdeck (void)
 		empty = TRUE;
 	}
 	else {
-		fseek(cr_unit.fileref, 0, SEEK_END);
-		empty = ftell(cr_unit.fileref) <= 0;		/* see if file has anything) */
-		fseek(cr_unit.fileref, 0, SEEK_SET);		/* rewind deck */
+		fseek(cr_unit.fileref, 0, SEEK_END);		/* seek to end of file */
+		empty = ftell(cr_unit.fileref) <= 0;		/* file is empty if there was nothing in it*/
 		cardnum = 0;								/* reset card counter */
+		fseek(cr_unit.fileref, 0, SEEK_SET);		/* rewind deck */
 	}
 
 	if (empty) {
@@ -804,15 +1175,16 @@ static void checkdeck (void)
 		if (cr_unit.fileref != NULL)				/* real file but it's empty, hmmm, try another */
 			nextdeck();
 	}
-	else
+	else {
 		CLRBIT(cr_unit.flags, UNIT_EMPTY);
+	}
 }
 
 /* nextdeck - attempt to load a new file from the deck list into the hopper */
 
 static t_bool nextdeck (void)
 {
-	char buf[200], tmpbuf[200], *fname, *mode, *tn;
+	char buf[200], tmpbuf[200], *fname, *tn, *c, quote, *mode;
 	int code;
 	long fpos;
 	static char white[] = " \t\r\n";
@@ -822,7 +1194,7 @@ static t_bool nextdeck (void)
 	if (deckfile == NULL)					/* we can't help */
 		return FALSE;
 
-	code = cr_unit.flags & UNIT_CODE;		/* default code */
+	code = GET_CODE(cr_unit);				/* default code as set */
 
 	if (cr_unit.fileref != NULL) {			/* this pulls the rug out from under scp */
 		fclose(cr_unit.fileref);			/* since the attach flag is still set. be careful! */
@@ -835,12 +1207,18 @@ static t_bool nextdeck (void)
 	}
 
 	for (;;) {								/* get a filename */
+		tab_proc = NULL;					/* default: no tab editing */
+
 		if (fgets(buf, sizeof(buf), deckfile) == NULL)
 			break;							/* oops, no more names */
 
-		alltrim(buf);
+		alltrim(buf);						/* remove leading and trailing spaces */
+
 		if (! *buf)
 			continue;						/* empty line */
+
+		if (*buf == '#' || *buf == '*' || *buf == ';')
+			continue;						/* comment */
 
 		if (strnicmp(buf, "!BREAK", 6) == 0) {	/* stop the simulation */
 			break_simulation(STOP_DECK_BREAK);
@@ -866,18 +1244,19 @@ static t_bool nextdeck (void)
 
 			SETBIT(cr_unit.flags, UNIT_SCRATCH);
 
-			for (;;) {						/* store literal cards into temporary file */
+			for (;;) {								/* store literal cards into temporary file */
 				upcase(buf+1);
 				fputs(buf+1, cr_unit.fileref);
 				putc('\n', cr_unit.fileref);
 
-				trace_io("(Literal card %s\n)", buf+1);
+				if (cpu_unit.flags & UNIT_ATT)
+					trace_io("(Literal card %s\n)", buf+1);
 				if (! (cr_unit.flags & UNIT_QUIET))
-					printf("(Literal card %s)\n", buf+1);
+					printf(  "(Literal card %s)\n", buf+1);
 
 				fpos = ftell(deckfile);
 				if (fgets(buf, sizeof(buf), deckfile) == NULL)
-					break;					/* oops, end of file */
+					break;							/* oops, end of file */
 				if (buf[0] != '!' || strnicmp(buf, "!BREAK", 6) == 0)
 					break;
 				alltrim(buf);
@@ -885,47 +1264,102 @@ static t_bool nextdeck (void)
 			fseek(deckfile, fpos, SEEK_SET);		/* restore deck file to just before non-literal card */
 
 			fseek(cr_unit.fileref, 0, SEEK_SET);	/* rewind scratch file for reading */
-			code = CODE_029;						/* assume keycode 029 */
+			code = CODE_029;						/* assume literal cards use keycode 029 */
 			break;
 		}
 
 		sub_args(buf, tmpbuf, sizeof(buf), list_nargs, list_arg);	/* substitute in stuff from the attach command line */
 
-		if ((fname = strtok(buf, white)) == NULL)
+		fname = c = buf;							/* pick filename from string */
+
+	    if (*c == '\'' || *c == '"') {				/* quoted string */
+			quote = *c;								/* remember the quote type */
+			strcpy(c, c+1);							/* slide string down over the quote */
+			while (*c && (*c != quote))
+				c++;								/* skip to end of quote */
+		}
+		else {										/* not quoted; look for terminating whitespace */
+			while (*c && (*c > ' '))
+				c++;
+		}
+
+		if (*c)
+			*c++ = 0;								/* term arg at space or closing quote & move to next character */
+
+		if (! *fname)								/* blank line, no filename */
 			continue;
 
-		if (*fname == '#' || *fname == '*' || *fname == ';')
-			continue;						/* comment */
-
-		if ((mode = strtok(NULL, white)) != NULL) {
-			if (*mode == 'b' || *mode == 'B') 
-				code = CODE_BINARY;
-			else if (*mode == 'a' || *mode == 'A')
-				code = CODE_029;
-		}
-
-		if ((cr_unit.fileref = fopen(fname, "rb")) == NULL)
+		if ((cr_unit.fileref = fopen(fname, "rb")) == NULL) {
 			printf("File '%s' specified in deck file '%s' cannot be opened\n", fname, cr_unit.filename+1);
-		else {
-			trace_io("(Opened %s deck %s)\n", (code == CODE_BINARY) ? "binary" : "text", fname);
-			if (! (cr_unit.flags & UNIT_QUIET))
-				printf("(Opened %s deck %s)\n", (code == CODE_BINARY) ? "binary" : "text", fname);
-			break;
+			continue;
 		}
+
+		mode = c = skipbl(c);						/* skip to next token, which would be mode, if present */
+
+		switch (*c) {
+			case 'b':
+			case 'B':
+				code = CODE_BINARY;					/* force code */
+				c++;								/* accept mode character by moving past it */
+				break;
+
+			case 'a':
+			case 'A':
+				code = CODE_029;
+				c++;
+
+				switch (*c) {						/* is ascii mode followed by another character? */
+					case 'F':
+					case 'f':
+						tab_proc = EditToFortran;
+						c++;
+						break;
+
+					case 'A':
+					case 'a':
+						tab_proc = EditToAsm;
+						c++;
+						break;
+
+					case 't':
+					case 'T':
+						tab_proc = EditToWhitespace;
+						c++;
+						break;
+				}
+		}
+
+		if (*skipbl(c))								/* there should be nothing left */
+			printf("* Bad mode specifier %s after filename %s in deck file", mode, fname);
+
+		if (code == CODE_AUTO)						/* otherwise if mode is auto, guess it, otherwise use default */
+			code = guess_cr_code();
+
+		if (cpu_unit.flags & UNIT_ATT)
+			trace_io("(Opened %s deck %s%s)\n", (code == CODE_BINARY) ? "binary" : "text", fname, tab_proc ? (*tab_proc)(NULL) : "");
+
+		if (! (cr_unit.flags & UNIT_QUIET))
+			printf(  "(Opened %s deck %s%s)\n", (code == CODE_BINARY) ? "binary" : "text", fname, tab_proc ? (*tab_proc)(NULL) : "");
+
+		break;
 	}
 
 	checkdeck();
 
-	set_active_cr_code(code);					/* set specified code */
+	if (code != CODE_AUTO)						/* if code was determined, set it */
+		set_active_cr_code(code);				/* (it may be left at CODE_AUTO when deckfile is exhausted */
 
 	return (cr_unit.flags & UNIT_EMPTY) == 0;	/* return TRUE if a deck has been loaded */
 }
 
 static t_stat cr_reset (DEVICE *dptr)
 {
-	cr_set_code(&cr_unit, active_cr_code & UNIT_CODE, NULL, NULL);	/* reset to specified code table */
+	if (GET_ACTCODE(cr_unit) == CODE_AUTO)
+		SET_ACTCODE(cr_unit, CODE_029);			/* if actual code is not yet set, select 029 for now*/
 
-	readstate  = STATION_EMPTY;
+	cr_set_code(&cr_unit, GET_ACTCODE(cr_unit), NULL, NULL);	/* reset to specified code table */
+
+	readstate = STATION_EMPTY;
 
 	cr_dsw = 0;
 	sim_cancel(&cr_unit);							/* cancel any pending ops */
@@ -933,10 +1367,17 @@ static t_stat cr_reset (DEVICE *dptr)
 
 	SET_OP(OP_IDLE);
 
+	cr_unit.COLUMN = -1;							/* neither device is currently cycling */
+
+	if (cr_unit.flags & UNIT_PHYSICAL) {
+		pcr_reset();
+		return SCPE_OK;
+	}
+
 	SETBIT(cr_unit.flags, UNIT_EMPTY);				/* assume hopper empty */
 
 	if (cr_unit.flags & UNIT_ATT) {
-//		if (deckfile != NULL) {
+//		if (deckfile != NULL) {						/* do NOT rewind the deck file */
 //			fseek(deckfile, 0, SEEK_SET);
 //			nextdeck();
 //		}
@@ -947,14 +1388,15 @@ static t_stat cr_reset (DEVICE *dptr)
 			feedcycle(FALSE, FALSE);
 	}
 
-	cr_unit.COLUMN = -1;							/* neither device is currently cycling */
-
 	return SCPE_OK;
 }
 
 static t_stat cp_reset (DEVICE *dptr)
 {
-	cp_set_code(&cp_unit, cp_unit.flags & UNIT_CODE, NULL, NULL);
+	if (GET_CODE(cp_unit) == CODE_AUTO)
+		SET_CODE(cp_unit, CODE_BINARY);				/* punch is never in auto mode; turn it to binary on startup */
+
+	cp_set_code(&cp_unit, GET_CODE(cp_unit), NULL, NULL);
 	punchstate = STATION_EMPTY;
 
 	cp_unit.COLUMN = -1;
@@ -970,9 +1412,17 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 // no - don't cancel pending read?
 //	sim_cancel(uptr);								/* cancel pending operations */
 
-	CLRBIT(uptr->flags, UNIT_QUIET|UNIT_DEBUG);		/* set debug/quiet flags */
+	CLRBIT(uptr->flags, UNIT_QUIET|UNIT_DEBUG|UNIT_PHYSICAL|UNIT_LOWERCASE);	/* set options */
+
+	tab_proc = NULL;
+
 	if (sim_switches & SWMASK('D')) SETBIT(uptr->flags, UNIT_DEBUG);
-	else if (sim_switches & SWMASK('Q')) SETBIT(uptr->flags, UNIT_QUIET);
+	if (sim_switches & SWMASK('Q')) SETBIT(uptr->flags, UNIT_QUIET);
+	if (sim_switches & SWMASK('L')) SETBIT(uptr->flags, UNIT_LOWERCASE);
+
+	if (sim_switches & SWMASK('F')) tab_proc = EditToFortran;
+	if (sim_switches & SWMASK('A')) tab_proc = EditToAsm;
+	if (sim_switches & SWMASK('T')) tab_proc = EditToWhitespace;
 
 	cr_detach(uptr);								/* detach file and possibly deckfile */
 	CLRBIT(uptr->flags, UNIT_SCRATCH);
@@ -1005,11 +1455,22 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 	if (list_nargs <= 0)							/* need at least 1 */
 		return SCPE_2FARG;
 
+	cardnum = 0;									/* reset card counter */
+	use_decklist = FALSE;
+
 	cptr = list_arg[0];								/* filename is first argument */
 
-	use_decklist = (*cptr == '@');					/* filename starts with @: it's a deck list */
-	if (use_decklist)
+#ifdef ENABLE_ENABLE_PHYSICAL_CARD_READER_SUPPORT
+	if (*cptr == '=') {								/* open physical card reader device */
+		if ((rval = pcr_attach(uptr, ++cptr)) != SCPE_OK)
+			return rval;
+	}
+#endif
+
+	if (*cptr == '@') {
+		use_decklist = TRUE;
 		cptr++;
+	}
 
 	if (strcmp(cptr, "-") == 0 && ! use_decklist) {			/* standard input */
 		if (uptr -> flags & UNIT_DIS) return SCPE_UDIS;		/* disabled? */
@@ -1028,18 +1489,18 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 		cr_unit.fileref  = NULL;
 		nextdeck();
 	}
-	else
+	else {
 		checkdeck();
+		cr_set_code(&cr_unit, GET_CODE(cr_unit), NULL, NULL);
+	}
 
 	// there is a read pending. Pull the card in to make it go
 	if (CURRENT_OP == OP_READING || CURRENT_OP == OP_PUNCHING || CURRENT_OP == OP_FEEDING)
-		feedcycle(TRUE, CURRENT_OP == OP_PUNCHING);
+		feedcycle(TRUE, (cp_unit.flags & UNIT_ATT) != 0);
 
 // no - don't reset the reader
 //	cr_reset(&cr_dev);								/* reset the whole thing */
 //	cp_reset(&cp_dev);
-
-	cardnum = 0;									/* reset card counter */
 
 	return SCPE_OK;
 }
@@ -1047,6 +1508,11 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 static t_stat cr_detach   (UNIT *uptr)
 {
 	t_stat rval;
+
+	cr_count = 0;									/* clear read count */
+
+	if (cr_unit.flags & UNIT_PHYSICAL)
+		return pcr_detach(uptr);
 
 	if (cr_unit.flags & UNIT_ATT && deckfile != NULL) {
 		if (cr_unit.fileref != NULL)			/* close the active card deck */
@@ -1072,6 +1538,14 @@ static t_stat cr_detach   (UNIT *uptr)
 	return rval;
 }
 
+static t_stat cp_attach (UNIT *uptr, char *cptr)
+{
+												/* if -d is specified turn on debugging (bit is in card reader UNIT) */
+	if (sim_switches & SWMASK('D')) SETBIT(cr_unit.flags, UNIT_DEBUG);
+
+	return attach_unit(uptr, cptr);
+}
+
 static t_stat cp_detach   (UNIT *uptr)
 {
 	if (cp_unit.flags & UNIT_ATT)
@@ -1079,6 +1553,7 @@ static t_stat cp_detach   (UNIT *uptr)
 			feedcycle(FALSE, FALSE);			/* flush out card just punched */
 
 	any_punched = 0;							/* reset punch detected */
+	cp_count = 0;								/* clear punch count */
 
 	return detach_unit(uptr);
 }
@@ -1096,6 +1571,9 @@ static void op_done (void)
 
 static t_stat cr_svc (UNIT *uptr)
 {
+	if (uptr->flags & UNIT_PHYSICAL)
+		return pcr_svc(uptr);
+
 	switch (CURRENT_OP) {
 		case OP_IDLE:
 			break;
@@ -1134,13 +1612,17 @@ static t_stat cr_svc (UNIT *uptr)
 				punchstate = STATION_PUNCHED;
 				op_done();
 			}
-			else {
+			else if (++cp_unit.COLUMN < 80) {
 				SETBIT(cr_dsw, CR_DSW_PUNCH_RESPONSE);
 				SETBIT(ILSW[0], ILSW_0_1442_CARD);
 				calc_ints();
 				sim_activate(&cr_unit, cp_wait);
 				if (cr_unit.flags & UNIT_DEBUG)
 					DEBUG_PRINT("!CR Punch Response");
+			}
+			else {
+				punchstate = STATION_PUNCHED;
+				op_done();
 			}
 			break;
 	}
@@ -1157,6 +1639,11 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 
 	switch (func) {
 		case XIO_SENSE_DEV:
+			if (cr_unit.flags & UNIT_PHYSICAL) {
+				pcr_xio_sense(modify);
+				return;
+			}
+
 			if (cp_unit.flags & UNIT_ATT)
 				lastcard = FALSE;					/* if punch file is open, assume infinite blank cards in reader */
 			else if ((cr_unit.flags & UNIT_ATT) == 0)
@@ -1184,6 +1671,11 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 			else if (readstate == STATION_EMPTY && punchstate == STATION_EMPTY && lastcard)
 				SETBIT(cr_dsw, CR_DSW_NOT_READY);
 
+			ACC = cr_dsw;							/* return the DSW */
+
+			if (cr_unit.flags & UNIT_DEBUG)
+				DEBUG_PRINT("#CR Sense %04x%s%s", cr_dsw & 0xFFFF, (modify & 1) ? " RESET0" : "", (modify & 2) ? " RESET4" : "");
+
 			if (modify & 0x01) {					/* reset interrupts */
 				CLRBIT(cr_dsw, CR_DSW_READ_RESPONSE|CR_DSW_PUNCH_RESPONSE);
 				CLRBIT(ILSW[0], ILSW_0_1442_CARD);
@@ -1193,11 +1685,6 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 				CLRBIT(cr_dsw, CR_DSW_OP_COMPLETE);
 				CLRBIT(ILSW[4], ILSW_4_1442_CARD);
 			}
-
-			ACC = cr_dsw;							/* return the DSW */
-
-			if (cr_unit.flags & UNIT_DEBUG)
-				DEBUG_PRINT("#CR Sense %04x%s%s", cr_dsw, (modify & 1) ? " RESET0" : "", (modify & 2) ? " RESET4" : "");
 			break;
 
 		case XIO_READ:								/* get card data into word pointed to in IOCC packet */
@@ -1216,7 +1703,10 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 				}
 			}
 			else {
-				xio_error("1442: Read when not in a read cycle!");
+// don't complain: APL\1130 issues both reads and writes on every interrupt
+// (probably to keep the code small). Apparently it's just ignored if corresponding
+//  control didn't initiate a read cycle.
+//				xio_error("1442: Read when not in a read cycle!");
 			}
 			break;
 
@@ -1243,7 +1733,10 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 				}
 			}
 			else {
-				xio_error("1442: Write when not in a punch cycle!");
+// don't complain: APL\1130 issues both reads and writes on every interrupt
+// (probably to keep the code small). Apparently it's just ignored if corresponding
+//  control didn't initiate a punch cycle.
+//				xio_error("1442: Write when not in a punch cycle!");
 			}
 			break;
 
@@ -1269,7 +1762,12 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 				case 2:								/* feed cycle */
 					if (cr_unit.flags & UNIT_DEBUG)
 						DEBUG_PRINT("#CR Feed");
-					feedcycle(TRUE, FALSE);
+
+					if (cr_unit.flags & UNIT_PHYSICAL) {
+						pcr_xio_feedcycle();
+						return;
+					}
+					feedcycle(TRUE, (cp_unit.flags & UNIT_ATT) != 0);
 
 					SET_OP(OP_FEEDING);
 
@@ -1280,8 +1778,14 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 				case 4:								/* start read */
 					if (cr_unit.flags & UNIT_DEBUG)
 						DEBUG_PRINT("#CR Start read");
+
+					if (cp_unit.flags & UNIT_PHYSICAL) {
+						pcr_xio_startread();
+						return;
+					}
+
 					if (readstate != STATION_LOADED)
-						feedcycle(TRUE, FALSE);
+						feedcycle(TRUE, (cp_unit.flags & UNIT_ATT) != 0);
 
 					SET_OP(OP_READING);
 					cr_unit.COLUMN = -1;
@@ -1309,3 +1813,267 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 			break;
 	}
 }
+
+#if ! (defined(ENABLE_PHYSICAL_CARD_READER_SUPPORT) && defined(WIN32))
+
+	/* stub out the physical card reader routines */
+
+	static t_stat pcr_attach        (UNIT *uptr, char *devname) {return SCPE_ARG;}
+	static t_stat pcr_detach        (UNIT *uptr)                {return detach_unit(uptr);}
+	static t_stat pcr_svc			(UNIT *uptr)                {return SCPE_OK;}
+	static void   pcr_xio_sense     (int modify) {}
+	static void   pcr_xio_feedcycle (void) {}
+	static void   pcr_xio_startread (void) {}
+	static void   pcr_reset         (void) {}
+	static int    pcr_read_data     (void) {return 0;}
+
+#else
+
+/*
+ * This code supports a physical card reader interface I built. Details
+ * available upon request, write to brian@ibm1130.org
+
+ * NOTE: THIS IS NOT COMPLETE OR EVEN CLOSE, JUST SOME CODE SLAMMED INTO THE FILE
+ */
+
+#include <windows.h>
+
+#define PCR_STATUS_READY		 1
+#define PCR_STATUS_ERROR		 2
+#define PCR_STATUS_HEMPTY		 4
+#define PCR_STATUS_EOF			 8
+#define PCR_STATUS_PICKING		16
+
+static char pcr_status = '?';
+static void pcr_cmd (char cmd);
+
+static t_stat pcr_attach (UNIT *uptr, char *devname)
+{
+	HANDLE hPort;
+	DCB dcb;
+	COMMTIMEOUTS cto;
+	DWORD nerr;
+													/* open the COM port */
+	hPort = CreateFile(devname, GENERIC_READ|GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+	if (hPort == INVALID_HANDLE_VALUE)
+		return SCPE_OPENERR;
+
+	memset(&dcb, 0, sizeof(dcb));					/* set communications parameters */
+
+	dcb.DCBlength		= sizeof(DCB);
+	dcb.BaudRate		= CBR_115200;				/* for the USB virtual com port, baud rate is irrelevant */
+    dcb.fBinary  		= 1;
+    dcb.fParity	  		= 0;
+    dcb.fOutxCtsFlow    = 0;
+    dcb.fOutxDsrFlow    = 0;
+    dcb.fDtrControl		= DTR_CONTROL_ENABLE;
+    dcb.fDsrSensitivity = FALSE;
+    dcb.fTXContinueOnXoff = 0;
+    dcb.fOutX			= 0;
+    dcb.fInX			= 0;
+    dcb.fErrorChar		= 0;
+    dcb.fNull			= 0;
+    dcb.fRtsControl		= RTS_CONTROL_ENABLE;                
+    dcb.fAbortOnError   = 0;
+    dcb.XonLim			= 0;
+    dcb.XoffLim			= 0;
+    dcb.ByteSize		= 8;
+    dcb.Parity			= NOPARITY;
+    dcb.StopBits		= ONESTOPBIT;
+    dcb.XonChar			= 0;
+    dcb.XoffChar		= 0;
+    dcb.ErrorChar		= 0;
+    dcb.EofChar			= 0;
+    dcb.EvtChar			= 0;
+
+	if (! SetCommState(hPort, &dcb)) {
+		CloseHandle(hPort);
+		printf("Call to SetCommState failed\n");
+		return SCPE_OPENERR;
+	}
+
+    cto.ReadIntervalTimeout         = 100;			// stop if 100 msec elapses between two received bytes
+    cto.ReadTotalTimeoutMultiplier  = 0;			// no length sensitivity
+    cto.ReadTotalTimeoutConstant    = 400;			// allow 400 msec for a read (reset command can take a while)
+
+    cto.WriteTotalTimeoutMultiplier = 0;
+    cto.WriteTotalTimeoutConstant   = 200;			// allow 200 msec for a write
+
+	if (! SetCommTimeouts(hPort, &cto)) {
+		CloseHandle(hPort);
+		printf("Call to SetCommTimeouts failed\n");
+		return SCPE_OPENERR;
+	}
+
+	PurgeComm(hPort, PURGE_TXABORT|PURGE_RXABORT|PURGE_TXCLEAR|PURGE_RXCLEAR);
+	ClearCommError(hPort, &nerr, NULL);
+
+	SETBIT(uptr->flags, UNIT_PHYSICAL|UNIT_ATT);	/* mark device as attached */
+	uptr->filename = calloc(strlen(devname)+1, sizeof(char));
+	strcpy(uptr->filename, devname);
+
+	uptr->fileref = (FILE *) hPort;					/* store the handle in the slot for the file pointer */
+
+	cr_unit.COLUMN = -1;							/* neither device is currently cycling */
+	return SCPE_OK;
+}
+
+static t_stat pcr_detach (UNIT *uptr)
+{
+	CLRBIT(cr_unit.flags, UNIT_PHYSICAL|UNIT_ATT);	/* drop the attach and physical bits */
+
+	CloseHandle((HANDLE) (uptr->fileref));			/* close the COM port */
+	uptr->fileref = NULL;
+
+	free(uptr->filename);							/* release the name copy */
+	uptr->filename = NULL;
+
+	return SCPE_OK;
+}
+
+static void pcr_xio_sense (int modify)
+{
+	CLRBIT(cr_dsw, CR_DSW_LAST_CARD|CR_DSW_BUSY|CR_DSW_NOT_READY|CR_DSW_ERROR_CHECK);
+
+	if (pcr_status & PCR_STATUS_HEMPTY)				/* set 1130 status bits based on last status recv'd from */
+		SETBIT(cr_dsw, CR_DSW_LAST_CARD);			/* the card reader */
+
+	if (pcr_status & PCR_STATUS_ERROR)
+		SETBIT(cr_dsw, CR_DSW_ERROR_CHECK);
+
+	if (pcr_status & PCR_STATUS_PICKING)
+		SETBIT(cr_dsw, CR_DSW_BUSY);
+
+	if (! (pcr_status & PCR_STATUS_READY))
+		SETBIT(cr_dsw, CR_DSW_NOT_READY);
+
+	if (modify & 0x01) {							/* reset simulated interrupts */
+		CLRBIT(cr_dsw, CR_DSW_READ_RESPONSE|CR_DSW_PUNCH_RESPONSE);
+		CLRBIT(ILSW[0], ILSW_0_1442_CARD);
+	}
+
+	if (modify & 0x02) {
+		CLRBIT(cr_dsw, CR_DSW_OP_COMPLETE);
+		CLRBIT(ILSW[4], ILSW_4_1442_CARD);
+	}
+
+	ACC = cr_dsw;									/* return the DSW */
+
+	if (cr_unit.flags & UNIT_DEBUG)
+		DEBUG_PRINT("#CR Sense %04x%s%s", cr_dsw, (modify & 1) ? " RESET0" : "", (modify & 2) ? " RESET4" : "");
+}
+
+static void pcr_xio_feedcycle (void)
+{
+	pcr_cmd('P');								// initiate pick
+	SET_OP(OP_FEEDING);
+}
+
+static void pcr_xio_startread (void)
+{
+	pcr_cmd('P');								// initiate pick
+	SET_OP(OP_READING);
+}
+
+static void pcr_reset (void)
+{
+	pcr_cmd('X');								// cancel pending pick
+}
+
+static t_stat pcr_svc (UNIT *uptr)
+{
+	switch (CURRENT_OP) {
+		case OP_IDLE:
+			break;
+
+		case OP_FEEDING:
+			op_done();
+			break;
+
+		case OP_READING:
+/*			this needs to poll the usb port for a = or ! */
+
+			if (readstate == STATION_EMPTY) {			/* read active but no cards? hang */
+				sim_activate(&cr_unit, cf_wait);
+				break;
+			}
+
+			if (++cr_unit.COLUMN < 80) {
+				SETBIT(cr_dsw, CR_DSW_READ_RESPONSE);
+				SETBIT(ILSW[0], ILSW_0_1442_CARD);
+				calc_ints();
+				sim_activate(&cr_unit, cr_wait);
+				if (cr_unit.flags & UNIT_DEBUG)
+					DEBUG_PRINT("!CR Read Response %d : %d", cardnum, cr_unit.COLUMN+1);
+			}
+			else {
+				readstate = STATION_READ;
+				op_done();
+			}
+			break;
+
+		case OP_PUNCHING:
+			return cr_svc(uptr);
+	}
+
+	return SCPE_OK;
+}
+
+static void pcr_cmd (char cmd)
+{
+	DWORD nio;
+	char resp;
+	int ntries = 10;
+	BOOL resend = TRUE;
+
+	while (--ntries >= 0) {
+		if (resend && cmd != 0) {
+			if (! WriteFile((HANDLE) cr_unit.fileref, &cmd, 1, &nio, NULL)) {
+				printf("* Error writing to card reader interface\n");
+				return;
+			}
+		}
+
+		resend = TRUE;
+
+		nio = 0;
+		ReadFile((HANDLE) cr_unit.fileref, &resp, 1, &nio, NULL);
+
+		if (nio != 1) {
+			printf("* Timeout reading from card reader interface\n");
+			continue;
+		}
+
+		if (resp == '?')
+			continue;		// it didn't recognize the command
+
+		if (resp >= '@' && resp <= '_') {
+			pcr_status = resp;
+			return;
+		}
+		
+		if (resp == '!') {	// we were expecting a response, but got a cancellation notice from pending pick
+			resend = FALSE;	// status byte is coming
+			ntries++;		// no penalty
+		}
+		else if (resp == '=') {	// we were expecting a response, but are getting data from a pending pick
+			pcr_read_data();
+			resend = FALSE;	// status byte is coming
+			ntries++;		// no penalty
+			continue;
+		}
+		// else -- just ignore it?
+	}
+
+	printf("* Card reader interface failed to respond within 10 tries\n");
+}
+
+static int pcr_read_data (void)
+{
+	DWORD nio;
+
+	ReadFile((HANDLE) cr_unit.fileref, readstation, 160, &nio, NULL);
+	return nio == 160;
+}
+
+#endif

@@ -25,6 +25,12 @@
 
    cpu		PDP-4/7/9/15 central processor
 
+   27-Jul-03	RMS	Added FP15 support
+			Added XVM support
+			Added EAE option to PDP-4
+			Added PDP-15 "re-entrancy ECO"
+			Fixed memory protect/skip interaction
+			Fixed CAF not to reset CPU
    12-Mar-03	RMS	Added logical name support
    18-Feb-03	RMS	Fixed three EAE bugs (found by Hans Pufal)
    05-Oct-02	RMS	Added DIBs, device number support
@@ -64,6 +70,8 @@
    PDP-7		USMD		trap mode
    PDP-9, PDP-15	USMD		user mode
    PDP-9, PDP-15	BR		bounds register
+   PDP-15		RR		relocation register
+   PDP-15 XVM		MMR		memory management register
    PDP-15		XR		index register
    PDP-15		LR		limit register
 */
@@ -251,16 +259,25 @@
 
 #include "pdp18b_defs.h"
 
-#define PCQ_SIZE	64				/* must be 2**n */
-#define PCQ_MASK	(PCQ_SIZE - 1)
-#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
-#define UNIT_V_NOEAE	(UNIT_V_UF)			/* EAE absent */
-#define UNIT_V_NOAPI	(UNIT_V_UF+1)			/* API absent */
-#define UNIT_V_MSIZE	(UNIT_V_UF+2)			/* dummy mask */
+#define SEXT(x)		((int32) (((x) & SIGN)? (x) | ~DMASK: (x) & DMASK))
+
+#define UNIT_V_NOEAE	(UNIT_V_UF + 0)			/* EAE absent */
+#define UNIT_V_NOAPI	(UNIT_V_UF + 1)			/* API absent */
+#define UNIT_V_PROT	(UNIT_V_UF + 2)			/* protection */
+#define UNIT_V_RELOC	(UNIT_V_UF + 3)			/* relocation */
+#define UNIT_V_XVM	(UNIT_V_UF + 4)			/* XVM */
+#define UNIT_V_MSIZE	(UNIT_V_UF + 5)			/* dummy mask */
 #define UNIT_NOEAE	(1 << UNIT_V_NOEAE)
 #define UNIT_NOAPI	(1 << UNIT_V_NOAPI)
-
+#define UNIT_PROT	(1 << UNIT_V_PROT)
+#define UNIT_RELOC	(1 << UNIT_V_RELOC)
+#define UNIT_XVM	(1 << UNIT_V_XVM)
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
+
+#define XVM		(cpu_unit.flags & UNIT_XVM)
+#define RELOC		(cpu_unit.flags & UNIT_RELOC)
+#define PROT		(cpu_unit.flags & UNIT_PROT)
+
 #if defined (PDP4)
 #define EAE_DFLT	UNIT_NOEAE
 #else
@@ -268,17 +285,22 @@
 #endif
 #if defined (PDP4) || defined (PDP7)
 #define API_DFLT	UNIT_NOAPI
+#define PROT_DFLT	0
+#define ASW_DFLT	017763
 #else
 #define API_DFLT	UNIT_NOAPI			/* for now */
+#define PROT_DFLT	UNIT_PROT
+#define ASW_DFLT	017720
 #endif
 
 int32 M[MAXMEMSIZE] = { 0 };				/* memory */
-int32 saved_LAC = 0;					/* link'AC */
-int32 saved_MQ = 0;					/* MQ */
-int32 saved_PC = 0;					/* PC */
+int32 LAC = 0;						/* link'AC */
+int32 MQ = 0;						/* MQ */
+int32 PC = 0;						/* PC */
 int32 iors = 0;						/* IORS */
 int32 ion = 0;						/* int on */
 int32 ion_defer = 0;					/* int defer */
+int32 ion_inh = 0;					/* int inhibit */
 int32 int_pend = 0;					/* int pending */
 int32 int_hwre[API_HLVL+1] = { 0 };			/* int requests */
 int32 api_enb = 0;					/* API enable */
@@ -291,16 +313,20 @@ int32 memm_init = 1;					/* mem init */
 int32 memm_init = 0;
 #endif
 int32 usmd = 0;						/* user mode */
-int32 usmdbuf = 0;					/* user mode buffer */
+int32 usmd_buf = 0;					/* user mode buffer */
+int32 usmd_defer = 0;					/* user mode defer */
 int32 trap_pending = 0;					/* trap pending */
 int32 emir_pending = 0;					/* emir pending */
 int32 rest_pending = 0;					/* restore pending */
 int32 BR = 0;						/* mem mgt bounds */
+int32 RR = 0;						/* mem mgt reloc */
+int32 MMR = 0;						/* XVM mem mgt */
 int32 nexm = 0;						/* nx mem flag */
 int32 prvn = 0;						/* priv viol flag */
 int32 SC = 0;						/* shift count */
 int32 eae_ac_sign = 0;					/* EAE AC sign */
 int32 SR = 0;						/* switch register */
+int32 ASW = ASW_DFLT;					/* address switches */
 int32 XR = 0;						/* index register */
 int32 LR = 0;						/* limit register */
 int32 stop_inst = 0;					/* stop on rsrv inst */
@@ -326,6 +352,20 @@ t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 upd_iors (void);
 int32 api_eval (int32 *pend);
+t_stat Read (int32 ma, int32 *dat, int32 cyc);
+t_stat Write (int32 ma, int32 dat, int32 cyc);
+t_stat Ia (int32 ma, int32 *ea, t_bool jmp);
+int32 Incr_addr (int32 addr);
+int32 Jms_word (int32 t);
+#if defined (PDP15)
+#define INDEX(i,x)	if (!memm && ((i) & I_IDX)) x = ((x) + XR) & AMASK
+int32 Prot15 (int32 ma, t_bool bndchk);
+int32 Reloc15 (int32 ma, int32 acc);
+int32 RelocXVM (int32 ma, int32 acc);
+extern t_stat fp15 (int32 ir);
+#else
+#define INDEX(i,x)
+#endif
 
 extern clk (int32 pulse, int32 AC);
 
@@ -365,19 +405,18 @@ static const int32 api_vec[API_HLVL][32] = {
    cpu_mod	CPU modifier list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK + EAE_DFLT + API_DFLT,
+UNIT cpu_unit = { UDATA (NULL, UNIT_FIX+UNIT_BINK+EAE_DFLT+API_DFLT+PROT_DFLT,
 		MAXMEMSIZE) };
 
 REG cpu_reg[] = {
-	{ ORDATA (PC, saved_PC, ADDRSIZE) },
-	{ ORDATA (AC, saved_LAC, 18) },
-	{ FLDATA (L, saved_LAC, 18) },
-#if !defined (PDP4)
-	{ ORDATA (MQ, saved_MQ, 18) },
+	{ ORDATA (PC, PC, ADDRSIZE) },
+	{ ORDATA (AC, LAC, 18) },
+	{ FLDATA (L, LAC, 18) },
+	{ ORDATA (MQ, MQ, 18) },
 	{ ORDATA (SC, SC, 6) },
 	{ FLDATA (EAE_AC_SIGN, eae_ac_sign, 18) },
-#endif
 	{ ORDATA (SR, SR, 18) },
+	{ ORDATA (ASW, ASW, ADDRSIZE) },
 	{ ORDATA (IORS, iors, 18), REG_RO },
 	{ BRDATA (INT, int_hwre, 8, 32, API_HLVL+1), REG_RO },
 	{ FLDATA (INT_PEND, int_pend, 0), REG_RO },
@@ -396,7 +435,8 @@ REG cpu_reg[] = {
 	{ ORDATA (APIACT, api_act, 8) },
 	{ ORDATA (BR, BR, ADDRSIZE) },
 	{ FLDATA (USMD, usmd, 0) },
-	{ FLDATA (USMDBUF, usmdbuf, 0) },
+	{ FLDATA (USMDBUF, usmd_buf, 0) },
+	{ FLDATA (USMDDEF, usmd_defer, 0) },
 	{ FLDATA (NEXM, nexm, 0) },
 	{ FLDATA (PRVN, prvn, 0) },
 	{ FLDATA (TRAPP, trap_pending, 0) },
@@ -407,14 +447,18 @@ REG cpu_reg[] = {
 	{ FLDATA (PWRFL, int_hwre[API_PWRFL], INT_V_PWRFL) },
 #endif
 #if defined (PDP15)
+	{ FLDATA (ION_INH, ion_inh, 0) },
 	{ FLDATA (APIENB, api_enb, 0) },
 	{ ORDATA (APIREQ, api_req, 8) },
 	{ ORDATA (APIACT, api_act, 8) },
 	{ ORDATA (XR, XR, 18) },
 	{ ORDATA (LR, LR, 18) },
-	{ ORDATA (BR, BR, ADDRSIZE) },
+	{ ORDATA (BR, BR, 18) },
+	{ ORDATA (RR, RR, 18) },
+	{ ORDATA (MMR, MMR, 18) },
 	{ FLDATA (USMD, usmd, 0) },
-	{ FLDATA (USMDBUF, usmdbuf, 0) },
+	{ FLDATA (USMDBUF, usmd_buf, 0) },
+	{ FLDATA (USMDDEF, usmd_defer, 0) },
 	{ FLDATA (NEXM, nexm, 0) },
 	{ FLDATA (PRVN, prvn, 0) },
 	{ FLDATA (TRAPP, trap_pending, 0) },
@@ -431,15 +475,24 @@ REG cpu_reg[] = {
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
-#if !defined (PDP4)
 	{ UNIT_NOEAE, UNIT_NOEAE, "no EAE", "NOEAE", NULL },
 	{ UNIT_NOEAE, 0, "EAE", "EAE", NULL },
-#else
-	{ UNIT_MSIZE, 4096, NULL, "4K", &cpu_set_size },
-#endif
 #if defined (PDP9) || defined (PDP15)
 	{ UNIT_NOAPI, UNIT_NOAPI, "no API", "NOAPI", NULL },
 	{ UNIT_NOAPI, 0, "API", "API", NULL },
+	{ UNIT_PROT+UNIT_RELOC+UNIT_XVM, 0, "no memory protect",
+	  "NOPROTECT", NULL },
+	{ UNIT_PROT+UNIT_RELOC+UNIT_XVM, UNIT_PROT, "memory protect",
+	  "PROTECT", NULL },
+#endif
+#if defined (PDP15)
+	{ UNIT_PROT+UNIT_RELOC+UNIT_XVM, UNIT_PROT+UNIT_RELOC,
+	  "memory relocation", "RELOCATION", NULL },
+	{ UNIT_PROT+UNIT_RELOC+UNIT_XVM, UNIT_PROT+UNIT_RELOC+UNIT_XVM,
+	  "XVM", "XVM", NULL },
+#endif
+#if defined (PDP4)
+	{ UNIT_MSIZE, 4096, NULL, "4K", &cpu_set_size },
 #endif
 	{ UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size },
 #if (MAXMEMSIZE > 8192)
@@ -468,363 +521,250 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-int32 PC, LAC, MQ;
-int32 api_int, api_cycle, skp;
+int32 api_int, api_usmd, skp;
 int32 iot_data, device, pulse;
 t_stat reason;
 extern UNIT clk_unit;
 
-#define JMS_WORD(t)	(((LAC & 01000000) >> 1) | ((memm & 1) << 16) | \
-			 (((t) & 1) << 15) | ((PC) & 077777))
-#define INCR_ADDR(x)	(((x) & epcmask) | (((x) + 1) & damask))
-#define SEXT(x)		((int32) (((x) & 0400000)? (x) | ~0777777: (x) & 0777777))
-
-/* The following macros implement addressing.  They account for autoincrement
-   addressing, extended addressing, and memory protection, if it exists.
-
-   CHECK_AUTO_INC		check auto increment
-   INDIRECT			indirect addressing
-   CHECK_INDEX			check indexing
-   CHECK_ADDR_R			check address for read
-   CHECK_ADDR_W			check address for write
-
-   On the PDP-4 and PDP-7,
-	There are autoincrement locations in every field.  If a field
-		does not exist, it is impossible to generate an
-		autoincrement reference (all instructions are CAL).
-	Indirect addressing range is determined by extend mode.
-	There is no indexing.
-	There is no memory protection, nxm reads zero and ignores writes.
-*/
-
-#if defined (PDP4) || defined (PDP7)
-#define CHECK_AUTO_INC \
-	if ((IR & 017770) == 010) M[MA] = (M[MA] + 1) & 0777777
-#define INDIRECT \
-	MA = memm? M[MA] & IAMASK: (MA & epcmask) | (M[MA] & damask)
-#define CHECK_INDEX 			/* no indexing capability */
-#define CHECK_ADDR_R(x)			/* no read protection */
-#define CHECK_ADDR_W(x) \
-	if (!MEM_ADDR_OK (x)) break
-#endif
-
-/* On the PDP-9,
-	The autoincrement registers are in field zero only.  Regardless
-		of extend mode, indirect addressing through 00010-00017
-		will access absolute locations 00010-00017.
-	Indirect addressing range is determined by extend mode.  If
-		extend mode is off, and autoincrementing is used, the
-		resolved address is in bank 0 (KG09B maintenance manual).
-	There is no indexing.
-	Memory protection is implemented for foreground/background operation.
-*/
-
-#if defined (PDP9)
-#define CHECK_AUTO_INC \
-	if ((IR & 017770) == 010) { \
-	    MA = MA & 017; \
-	    M[MA] = (M[MA] + 1) & 0777777;  }
-#define INDIRECT \
-	MA = memm? M[MA] & IAMASK: (MA & epcmask) | (M[MA] & damask)
-#define CHECK_ADDR_R(x) \
-	if (usmd) { \
-	    if (!MEM_ADDR_OK (x)) { \
-		nexm = prvn = trap_pending = 1; \
-		break;  } \
-	    if ((x) < BR) { \
-		prvn = trap_pending = 1;  \
-		break;  }  }  \
-	if (!MEM_ADDR_OK (x)) nexm = 1
-#define CHECK_INDEX 			/* no indexing capability */
-#define CHECK_ADDR_W(x) \
-	CHECK_ADDR_R (x); \
-	if (!MEM_ADDR_OK (x)) break
-#endif
-
-/*  On the PDP-15,
-	The autoincrement registers are in page zero only.  Regardless
-		of bank mode, indirect addressing through 00010-00017
-		will access absolute locations 00010-00017.
-	Indirect addressing range is determined by autoincrementing.
-	Indexing is available if bank mode is off.
-	Memory protection is implemented for foreground/background operation.
-*/
-
-#if defined (PDP15)
-#define CHECK_AUTO_INC \
-	if ((IR & damask & ~07) == 00010) { \
-	    MA = MA & 017; \
-	    M[MA] = (M[MA] + 1) & 0777777;  }
-#define INDIRECT \
-	if (rest_pending) { \
-	    rest_pending = 0; \
-	    LAC = ((M[MA] << 1) & 01000000) | (LAC & 0777777); \
-	    memm = (M[MA] >> 16) & 1; \
-	    usmd = (M[MA] >> 15) & 1; }  \
-	MA = ((IR & damask & ~07) != 00010)? \
-	    (PC & BLKMASK) | (M[MA] & IAMASK): (M[MA] & ADDRMASK); \
-	damask = memm? 017777: 07777; \
-	epcmask = ADDRMASK & ~damask
-#define CHECK_INDEX \
-	if ((IR & 0010000) && (memm == 0)) MA = (MA + XR) & ADDRMASK
-#define CHECK_ADDR_R(x) \
-	if (usmd) { \
-	    if (!MEM_ADDR_OK (x)) { \
-		nexm = prvn = trap_pending = 1; \
-		break;  } \
-	    if ((x) < BR) { \
-		prvn = trap_pending = 1;  \
-		break;  }  }  \
-	if (!MEM_ADDR_OK (x)) nexm = 1
-#define CHECK_ADDR_W(x) \
-	CHECK_ADDR_R (x); \
-	if (!MEM_ADDR_OK (x)) break
-#endif
-
-/* Restore register state */
-
-#if defined (PDP15)
-int32 epcmask, damask;
-
-damask = memm? 017777: 07777;				/* set dir addr mask */
-epcmask = ADDRMASK & ~damask;				/* extended PC mask */
-
-#else
-#define damask	017777					/* direct addr mask */
-#define epcmask	(ADDRMASK & ~damask)			/* extended PC mask */
-#endif
-
 if (build_dev_tab ()) return SCPE_STOP;			/* build, chk tables */
-PC = saved_PC & ADDRMASK;				/* load local copies */
-LAC = saved_LAC & 01777777;
-MQ = saved_MQ & 0777777;
+PC = PC & AMASK;					/* clean variables */
+LAC = LAC & LACMASK;
+MQ = MQ & DMASK;
 reason = 0;
 sim_rtc_init (clk_unit.wait);				/* init calibration */
 if (cpu_unit.flags & UNIT_NOAPI) api_enb = api_req = api_act = 0;
 api_int = api_eval (&int_pend);				/* eval API */
-api_cycle = 0;						/* not API cycle */
-
-/* Main instruction fetch/decode loop: check trap and interrupt */
+api_usmd = 0;						/* not API user cycle */
+
+/* Main instruction fetch/decode loop */
 
 while (reason == 0) {					/* loop until halted */
-int32 IR, MA, esc, t, xct_count;
+int32 IR, MA, MB, esc, t, xct_count;
 int32 link_init, fill;
 
 if (sim_interval <= 0) {				/* check clock queue */
 	if (reason = sim_process_event ()) break;
 	api_int = api_eval (&int_pend);  }		/* eval API */
 
-/* Protection traps work like interrupts, with these quirks:
+/* PDP-4 and PDP-7 traps and interrupts
 
-   PDP-7		extend mode forced on, M[0] = PC, PC = 2
-   PDP-9		extend mode ???, M[0/20] = PC, PC = 0/21
-   PDP-15		bank mode unchanged, M[0/20] = PC, PC = 0/21
-*/
+   PDP-4		no trap
+   PDP-7		trap: extend mode forced on, M[0] = PC, PC = 2
+   PDP-4, PDP-7		programmable interrupts only */
 
+#if defined (PDP4) || defined (PDP7)
 #if defined (PDP7)
 if (trap_pending) {					/* trap pending? */
 	PCQ_ENTRY;					/* save old PC */
-	M[0] = JMS_WORD (1);				/* save state */
-	PC = 2;						/* fetch next from 2 */
+	MB = Jms_word (1);				/* save state */
 	ion = 0;					/* interrupts off */
 	memm = 1;					/* extend on */
 	emir_pending = trap_pending = 0;		/* emir, trap off */
-	usmd = 0;  }					/* protect off */
+	usmd = usmd_buf = 0;				/* user mode off */
+	Write (0, MB, WR);				/* save in 0 */
+	PC = 2;  }					/* fetch next from 2 */
 #endif
-#if defined (PDP9) || defined (PDP15)
-if (trap_pending) {					/* trap pending? */
-	PCQ_ENTRY;					/* save old PC */
-	MA = ion? 0: 020;				/* save in 0 or 20 */
-	M[MA] = JMS_WORD (1);				/* save state */
-	PC = MA + 1;					/* fetch next */
-	ion = 0;					/* interrupts off */
-	emir_pending = rest_pending = trap_pending = 0;	/* emir,rest,trap off */
-	usmd = 0;  }					/* protect off */
-
-/* PDP-9 and PDP-15 automatic priority interrupt (API) */
-
-if (api_int && !ion_defer) {				/* API intr? */
-	int32 i, lvl = api_int - 1;			/* get req level */
-	api_act = api_act | (0200 >> lvl);		/* set level active */
-	if (lvl >= API_HLVL) {				/* software req? */
-	    MA = ACH_SWRE + lvl - API_HLVL;		/* vec = 40:43 */
-	    api_req = api_req & ~(0200 >> lvl);  }	/* remove request */
-	else {
-	    MA = 0;					/* assume fails */
-	    for (i = 0; i < 32; i++) {			/* loop hi to lo */
-	    if ((int_hwre[lvl] >> i) & 1) {		/* int req set? */
-		MA = api_vec[lvl][i];			/* get vector */
-		break;  }  }  }				/* and stop */
-	if (MA == 0) {					/* bad channel? */
-	    reason = STOP_API;				/* API error */
-	    break;  }
-	api_int = api_eval (&int_pend);			/* no API int */
-	api_cycle = 1;					/* in API cycle */
-	emir_pending = rest_pending = 0;		/* emir, restore off */
-	xct_count = 0;
-	goto xct_instr;  }
-
-/* Standard program interrupt */
-
-if (!(api_enb && api_act) && ion && !ion_defer && int_pend) {
-#else
 if (ion && !ion_defer && int_pend) {			/* interrupt? */
-#endif
 	PCQ_ENTRY;					/* save old PC */
-	M[0] = JMS_WORD (usmd);				/* save state */
-	PC = 1;						/* fetch next from 1 */
+	MB = Jms_word (usmd);				/* save state */
 	ion = 0;					/* interrupts off */
-#if !defined (PDP15)					/* except PDP-15, */
 	memm = 0;					/* extend off */
-#endif
 	emir_pending = rest_pending = 0;		/* emir, restore off */
-	usmd = 0;  }					/* protect off */
-
-/* Breakpoint */
+	usmd = usmd_buf = 0;				/* user mode off */
+	Write (0, MB, WR);				/* physical write */
+	PC = 1;  }					/* fetch next from 1 */
 
 if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) {	/* breakpoint? */
 	reason = STOP_IBKPT;				/* stop simulation */
 	break;  }
+
+#endif							/* end PDP-4/PDP-7 */
 
-/* Fetch, decode instruction */
+/* PDP-9 and PDP-15 traps and interrupts
+
+   PDP-9		trap: extend mode ???, M[0/20] = PC, PC = 0/21
+   PDP-15		trap: bank mode unchanged, M[0/20] = PC, PC = 0/21
+   PDP-9, PDP-15	API and program interrupts */
 
 #if defined (PDP9) || defined (PDP15)
-if (usmd) {						/* user mode? */
-	if (!MEM_ADDR_OK (PC)) {			/* nxm? */
-	    nexm = prvn = trap_pending = 1;		/* abort fetch */
-	    continue;  }
-	if (PC < BR) {					/* bounds viol? */
-	    prvn = trap_pending = 1;			/* abort fetch */
-	    continue;  }  }
-else if (!MEM_ADDR_OK (PC)) nexm = 1;			/* flag nxm */
-if (!ion_defer) usmd = usmdbuf;				/* no IOT? load usmd */
+if (trap_pending) {					/* trap pending? */
+	PCQ_ENTRY;					/* save old PC */
+	MB = Jms_word (1);				/* save state */
+	MA = ion? 0: 020;				/* save in 0/20 */
+	ion = 0;					/* interrupts off */
+	emir_pending = rest_pending = trap_pending = 0;	/* emir,rest,trap off */
+	usmd = usmd_buf = 0;				/* user mode off */
+	Write (MA, MB, WR);				/* physical write */
+	PC = MA + 1;  }					/* fetch next */
+
+if (api_int && !ion_defer) {				/* API intr? */
+	int32 i, lvl = api_int - 1;			/* get req level */
+	api_act = api_act | (API_ML0 >> lvl);		/* set level active */
+	if (lvl >= API_HLVL) {				/* software req? */
+	    MA = ACH_SWRE + lvl - API_HLVL;		/* vec = 40:43 */
+	    api_req = api_req & ~(API_ML0 >> lvl);  }	/* remove request */
+	else {
+	    MA = 0;					/* assume fails */
+	    for (i = 0; i < 32; i++) {			/* loop hi to lo */
+		if ((int_hwre[lvl] >> i) & 1) {		/* int req set? */
+		    MA = api_vec[lvl][i];		/* get vector */
+		    break;  }  }  }			/* and stop */
+	if (MA == 0) {					/* bad channel? */
+	    reason = STOP_API;				/* API error */
+	    break;  }
+	api_int = api_eval (&int_pend);			/* no API int */
+	api_usmd = usmd;				/* API user mode cycle */
+	usmd = usmd_buf = 0;				/* user mode off */
+	emir_pending = rest_pending = 0;		/* emir, restore off */
+	xct_count = 0;
+	goto xct_instr;  }
+
+if (!(api_enb && api_act) && ion && !ion_defer && int_pend) {
+	PCQ_ENTRY;					/* save old PC */
+	MB = Jms_word (usmd);				/* save state */
+	ion = 0;					/* interrupts off */
+#if defined (PDP9)					/* PDP-9, */
+	memm = 0;					/* extend off */
+#else							/* PDP-15 */
+	if (!(cpu_unit.flags & UNIT_NOAPI)) {		/* API? */
+	    api_act = api_act | API_ML3;		/* set lev 3 active */
+	    api_int = api_eval (&int_pend);  }		/* re-evaluate */
 #endif
+	emir_pending = rest_pending = 0;		/* emir, restore off */
+	usmd = usmd_buf = 0;				/* user mode off */
+	Write (0, MB, WR);				/* physical write */
+	PC = 1;  }					/* fetch next from 1 */
+
+if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) {	/* breakpoint? */
+	reason = STOP_IBKPT;				/* stop simulation */
+	break;  }
+if (!usmd_defer) usmd = usmd_buf;			/* no IOT? load usmd */
+else usmd_defer = 0;					/* cancel defer */
+
+#endif							/* PDP-9/PDP-15 */
+
+/* Instruction fetch and address decode */
+
 xct_count = 0;						/* track nested XCT's */
 MA = PC;						/* fetch at PC */
-PC = INCR_ADDR (PC);					/* increment PC */
+PC = Incr_addr (PC);					/* increment PC */
 
 xct_instr:						/* label for XCT */
-IR = M[MA];						/* fetch instruction */
+if (Read (MA, &IR, FE)) continue;			/* fetch instruction */
 if (ion_defer) ion_defer = ion_defer - 1;		/* count down defer */
 if (sim_interval) sim_interval = sim_interval - 1;
-MA = (MA & epcmask) | (IR & damask);			/* effective address */
+
+#if defined (PDP15)					/* PDP15 */
+if (memm) MA = (MA & B_EPCMASK) | (IR & B_DAMASK);	/* bank mode dir addr */
+else MA = (MA & P_EPCMASK) | (IR & P_DAMASK);		/* page mode dir addr */
+#else							/* others */
+MA = (MA & B_EPCMASK) | (IR & B_DAMASK);		/* bank mode only */
+#endif
 switch ((IR >> 13) & 037) {				/* decode IR<0:4> */
 
 /* LAC: opcode 20 */
 
 case 011:						/* LAC, indir */
-	CHECK_AUTO_INC;
-	INDIRECT;
+	if (Ia (MA, &MA, 0)) break;
 case 010:						/* LAC, dir */
-	CHECK_INDEX;
-	CHECK_ADDR_R (MA);
-	LAC = (LAC & 01000000) | M[MA];
+	INDEX (IR, MA);
+	if (Read (MA, &MB, RD)) break;
+	LAC = (LAC & LINK) | MB;
 	break;
 
 /* DAC: opcode 04 */
 
 case 003:						/* DAC, indir */
-	CHECK_AUTO_INC;
-	INDIRECT;
+	if (Ia (MA, &MA, 0)) break;
 case 002:						/* DAC, dir */
-	CHECK_INDEX;
-	CHECK_ADDR_W (MA);
-	M[MA] = LAC & 0777777;
+	INDEX (IR, MA);
+	Write (MA, LAC & DMASK, WR);
 	break;
 
 /* DZM: opcode 14 */
 
 case 007:						/* DZM, indir */
-	CHECK_AUTO_INC;
-	INDIRECT;
+	if (Ia (MA, &MA, 0)) break;
 case 006:						/* DZM, direct */
-	CHECK_INDEX;
-	CHECK_ADDR_W (MA);
-	M[MA] = 0;
+	INDEX (IR, MA);
+	Write (MA, 0, WR);
 	break;
 
 /* AND: opcode 50 */
 
 case 025:						/* AND, ind */
-	CHECK_AUTO_INC;
-	INDIRECT;
+	if (Ia (MA, &MA, 0)) break;
 case 024:						/* AND, dir */
-	CHECK_INDEX;
-	CHECK_ADDR_R (MA);
-	LAC = LAC & (M[MA] | 01000000);
+	INDEX (IR, MA);
+	if (Read (MA, &MB, RD)) break;
+	LAC = LAC & (MB | LINK);
 	break;
 
 /* XOR: opcode 24 */
 
 case 013:						/* XOR, ind */
-	CHECK_AUTO_INC;
-	INDIRECT;
+	if (Ia (MA, &MA, 0)) break;
 case 012:						/* XOR, dir */
-	CHECK_INDEX;
-	CHECK_ADDR_R (MA);
-	LAC = LAC ^ M[MA];
+	INDEX (IR, MA);
+	if (Read (MA, &MB, RD)) break;
+	LAC = LAC ^ MB;
 	break;
 
 /* ADD: opcode 30 */
 
 case 015:						/* ADD, indir */
-	CHECK_AUTO_INC;
-	INDIRECT;
+	if (Ia (MA, &MA, 0)) break;
 case 014:						/* ADD, dir */
-	CHECK_INDEX;
-	CHECK_ADDR_R (MA);
-	t = (LAC & 0777777) + M[MA];
-	if (t > 0777777) t = (t + 1) & 0777777;		/* end around carry */
-	if (((~LAC ^ M[MA]) & (LAC ^ t)) & 0400000)	/* overflow? */
-		LAC = 01000000 | t;			/* set link */
-	else LAC = (LAC & 01000000) | t;
+	INDEX (IR, MA);
+	if (Read (MA, &MB, RD)) break;
+	t = (LAC & DMASK) + MB;
+	if (t > DMASK) t = (t + 1) & DMASK;		/* end around carry */
+	if (((~LAC ^ MB) & (LAC ^ t)) & SIGN)		/* overflow? */
+		LAC = LINK | t;				/* set link */
+	else LAC = (LAC & LINK) | t;
 	break;
 
 /* TAD: opcode 34 */
 
 case 017:						/* TAD, indir */
-	CHECK_AUTO_INC;
-	INDIRECT;
+	if (Ia (MA, &MA, 0)) break;
 case 016:						/* TAD, dir */
-	CHECK_INDEX;
-	CHECK_ADDR_R (MA);
-	LAC = (LAC + M[MA]) & 01777777;
+	INDEX (IR, MA);
+	if (Read (MA, &MB, RD)) break;
+	LAC = (LAC + MB) & LACMASK;
 	break;
 
 /* ISZ: opcode 44 */
 
 case 023:						/* ISZ, indir */
-	CHECK_AUTO_INC;
-	INDIRECT;
+	if (Ia (MA, &MA, 0)) break;
 case 022:						/* ISZ, dir */
-	CHECK_INDEX;
-	CHECK_ADDR_W (MA);
-	M[MA] = (M[MA] + 1) & 0777777;
-	if (M[MA] == 0) PC = INCR_ADDR (PC);
+	INDEX (IR, MA);
+	if (Read (MA, &MB, RD)) break;
+	MB = (MB + 1) & DMASK;
+	if (Write (MA, MB, WR)) break;
+	if (MB == 0) PC = Incr_addr (PC);
 	break;
 
 /* SAD: opcode 54 */
 
 case 027:						/* SAD, indir */
-	CHECK_AUTO_INC;
-	INDIRECT;
+	if (Ia (MA, &MA, 0)) break;
 case 026:						/* SAD, dir */
-	CHECK_INDEX;
-	CHECK_ADDR_R (MA);
-	if ((LAC & 0777777) != M[MA]) PC = INCR_ADDR (PC);
+	INDEX (IR, MA);
+	if (Read (MA, &MB, RD)) break;
+	if ((LAC & DMASK) != MB) PC = Incr_addr (PC);
 	break;
 
 /* XCT: opcode 40 */
 
 case 021:						/* XCT, indir */
-	CHECK_AUTO_INC;
-	INDIRECT;
+	if (Ia (MA, &MA, 0)) break;
 case 020:						/* XCT, dir  */
-	CHECK_INDEX;
-	CHECK_ADDR_R (MA);
-	if (usmd && (xct_count != 0)) {			/* trap and chained? */
-	    prvn = trap_pending = 1;
-	    break;  }
+	INDEX (IR, MA);
+	if ((api_usmd | usmd) && (xct_count != 0)) {	/* chained and usmd? */
+	    if (usmd) prvn = trap_pending = 1;		/* trap if usmd */
+	    break;  }					/* nop if api_usmd */
 	if (xct_count >= xct_max) {			/* too many XCT's? */
 	    reason = STOP_XCT;
 	    break;  }
@@ -834,69 +774,57 @@ case 020:						/* XCT, dir  */
 #endif
 	goto xct_instr;					/* go execute */
 
-/* CAL: opcode 00 
+/* CAL: opcode 00 - api_usmd records whether usmd = 1 at start of API cycle
 
    On the PDP-4 and PDP-7, CAL (I) is exactly the same as JMS (I) 20
    On the PDP-9 and PDP-15, CAL clears user mode
    On the PDP-9 and PDP-15 with API, CAL activates level 4
-   On the PDP-15, CAL goes to absolute 20, regardless of mode
-*/
+   On the PDP-15, CAL goes to absolute 20, regardless of mode */
 
 case 001: case 000:					/* CAL */
-	t = usmd;
-#if defined (PDP15)
-	MA = 020;
-#else
-	MA = (memm? 0: PC & epcmask) | 020;		/* MA = 20 */
+	t = usmd;					/* save user mode */
+#if defined (PDP15)					/* PDP15 */
+	MA = 020;					/* MA = abs 20 */
+	ion_defer = 1;					/* "free instruction" */
+#else							/* others */
+	if (memm) MA = 020;				/* if ext, abs 20 */
+	else MA = (PC & B_EPCMASK) | 020;		/* else bank-rel 20 */
 #endif
 #if defined (PDP9) || defined (PDP15)
-	usmd = 0;					/* clear user mode */
+	usmd = usmd_buf = 0;				/* clear user mode */
 	if ((cpu_unit.flags & UNIT_NOAPI) == 0) {	/* if API, act lvl 4 */
 	    api_act = api_act | 010;
 	    api_int = api_eval (&int_pend);  }
 #endif
-	if (IR & 0020000) { INDIRECT;  }		/* indirect? */
-	CHECK_ADDR_W (MA);
+	if (IR & I_IND) {				/* indirect? */
+		if (Ia (MA, &MA, 0)) break;  }
 	PCQ_ENTRY;
-	M[MA] = JMS_WORD (t);				/* save state */
-	PC = INCR_ADDR (MA);
+	MB = Jms_word (api_usmd | t);			/* save state */
+	Write (MA, MB, WR);
+	PC = Incr_addr (MA);
 	break;
 
-/* JMS: opcode 010 */
+/* JMS: opcode 010 - api_usmd records whether usmd = 1 at start of API cycle */
 
 case 005:						/* JMS, indir */
-	CHECK_AUTO_INC;
-	INDIRECT;
+	if (Ia (MA, &MA, 0)) break;
 case 004:						/* JMS, dir */
-	CHECK_INDEX;
-	CHECK_ADDR_W (MA);
+	INDEX (IR, MA);
 	PCQ_ENTRY;
-	M[MA] = JMS_WORD (usmd);			/* save state */
-	PC = INCR_ADDR (MA);
+#if defined (PDP15)					/* PDP15 */
+	if (!usmd) ion_defer = 1;			/* "free instruction" */
+#endif
+	MB = Jms_word (api_usmd | usmd);		/* save state */
+	if (Write (MA, MB, WR)) break;
+	PC = Incr_addr (MA);
 	break;
-
-/* JMP: opcode 60
 
-   Restore quirks:
-	On the PDP-7 and PDP-9, EMIR can only clear extend
-	On the PDP-15, any I triggers restore, but JMP I is conventional
-*/
+/* JMP: opcode 60 */
 
 case 031:						/* JMP, indir */
-	CHECK_AUTO_INC;					/* check auto inc */
-#if defined (PDP7) || defined (PDP9)
-	if (emir_pending && (((M[MA] >> 16) & 1) == 0)) memm = 0;
-#endif
-#if defined (PDP9)
-	if (rest_pending) {				/* restore pending? */
-	    LAC = ((M[MA] << 1) & 01000000) | (LAC & 0777777);
-	    memm = (M[MA] >> 16) & 1;
-	    usmd = (M[MA] >> 15) & 1;  }
-#endif
-	INDIRECT;					/* complete indirect */
-	emir_pending = rest_pending = 0;
+	if (Ia (MA, &MA, 1)) break;
 case 030:						/* JMP, dir */
-	CHECK_INDEX;
+	INDEX (IR, MA);
 	PCQ_ENTRY;					/* save old PC */
 	PC = MA;
 	break;
@@ -904,7 +832,7 @@ case 030:						/* JMP, dir */
 /* OPR: opcode 74 */
 
 case 037:						/* OPR, indir */
-	LAC = (LAC & 01000000) | IR;			/* LAW */
+	LAC = (LAC & LINK) | IR;			/* LAW */
 	break;
 
 case 036:						/* OPR, dir */
@@ -913,51 +841,51 @@ case 036:						/* OPR, dir */
 	case 0:	 					/* nop */
 	    break;
 	case 1: 					/* SMA */
-	    if ((LAC & 0400000) != 0) skp = 1;
+	    if ((LAC & SIGN) != 0) skp = 1;
 	    break;
 	case 2: 					/* SZA */
-	    if ((LAC & 0777777) == 0) skp = 1;
+	    if ((LAC & DMASK) == 0) skp = 1;
 	    break;
 	case 3:						/* SZA | SMA */
-	    if (((LAC & 0777777) == 0) || ((LAC & 0400000) != 0))
+	    if (((LAC & DMASK) == 0) || ((LAC & SIGN) != 0))
 		skp = 1; 
 	    break;
 	case 4: 					/* SNL */
-	    if (LAC >= 01000000) skp = 1;
+	    if (LAC >= LINK) skp = 1;
 	    break;
 	case 5:						/* SNL | SMA */
-	    if (LAC >= 0400000) skp = 1;
+	    if (LAC >= SIGN) skp = 1;
 	    break;
 	case 6:						/* SNL | SZA */
-	    if ((LAC >= 01000000) || (LAC == 0)) skp = 1;
+	    if ((LAC >= LINK) || (LAC == 0)) skp = 1;
 	    break;
 	case 7:						/* SNL | SZA | SMA */
-	    if ((LAC >= 0400000) || (LAC == 0)) skp = 1;
+	    if ((LAC >= SIGN) || (LAC == 0)) skp = 1;
 	    break;
 	case 010:					/* SKP */
 	    skp = 1;
 	    break;
 	case 011: 					/* SPA */
-	    if ((LAC & 0400000) == 0) skp = 1;
+	    if ((LAC & SIGN) == 0) skp = 1;
 	    break;
 	case 012: 					/* SNA */
-	    if ((LAC & 0777777) != 0) skp = 1;
+	    if ((LAC & DMASK) != 0) skp = 1;
 	    break;
 	case 013:					/* SNA & SPA */
-	    if (((LAC & 0777777) != 0) && ((LAC & 0400000) == 0))
+	    if (((LAC & DMASK) != 0) && ((LAC & SIGN) == 0))
 		skp = 1;
 	    break;
 	case 014: 					/* SZL */
-	    if (LAC < 01000000) skp = 1;
+	    if (LAC < LINK) skp = 1;
 	    break;
 	case 015:					/* SZL & SPA */
-	    if (LAC < 0400000) skp = 1;
+	    if (LAC < SIGN) skp = 1;
 	    break;
 	case 016:					/* SZL & SNA */
-	    if ((LAC < 01000000) && (LAC != 0)) skp = 1;
+	    if ((LAC < LINK) && (LAC != 0)) skp = 1;
 	    break;
 	case 017:					/* SZL & SNA & SPA */
-	    if ((LAC < 0400000) && (LAC != 0)) skp = 1;
+	    if ((LAC < SIGN) && (LAC != 0)) skp = 1;
 	    break;  }					/* end switch skips */
 
 /* OPR, continued */
@@ -966,93 +894,93 @@ case 036:						/* OPR, dir */
 	case 0:						/* NOP */
 	    break;
 	case 1:						/* CMA */
-	    LAC = LAC ^ 0777777;
+	    LAC = LAC ^ DMASK;
 	    break;
 	case 2:						/* CML */
-	    LAC = LAC ^ 01000000;
+	    LAC = LAC ^ LINK;
 	    break;
 	case 3:						/* CML CMA */
-	    LAC = LAC ^ 01777777;
+	    LAC = LAC ^ LACMASK;
 	    break;
 	case 4:						/* CLL */
-	    LAC = LAC & 0777777;
+	    LAC = LAC & DMASK;
 	    break;
 	case 5:						/* CLL CMA */
-	    LAC = (LAC & 0777777) ^ 0777777;
+	    LAC = (LAC & DMASK) ^ DMASK;
 	    break;
 	case 6:						/* CLL CML = STL */
-	    LAC = LAC | 01000000;
+	    LAC = LAC | LINK;
 	    break;
 	case 7:						/* CLL CML CMA */
-	    LAC = (LAC | 01000000) ^ 0777777;
+	    LAC = (LAC | LINK) ^ DMASK;
 	    break;
 	case 010:					/* CLA */
-	    LAC = LAC & 01000000;
+	    LAC = LAC & LINK;
 	    break;
 	case 011:					/* CLA CMA = STA */
-	    LAC = LAC | 0777777;
+	    LAC = LAC | DMASK;
 	    break;
 	case 012:					/* CLA CML */
-	    LAC = (LAC & 01000000) ^ 01000000;
+	    LAC = (LAC & LINK) ^ LINK;
 	    break;
 	case 013:					/* CLA CML CMA */
-	    LAC = (LAC | 0777777) ^ 01000000;
+	    LAC = (LAC | DMASK) ^ LINK;
 	    break;
 	case 014:					/* CLA CLL */
 	    LAC = 0;
 	    break;
 	case 015:					/* CLA CLL CMA */
-	    LAC = 0777777;
+	    LAC = DMASK;
 	    break;
 	case 016:					/* CLA CLL CML */
-	    LAC = 01000000;
+	    LAC = LINK;
 	    break;
 	case 017:					/* CLA CLL CML CMA */
-	    LAC = 01777777;
+	    LAC = LACMASK;
 	    break;  }					/* end decode */
 
 /* OPR, continued */
 
 	if (IR & 0000004) {				/* OAS */
 #if defined (PDP9) || defined (PDP15)
-	    if (usmd) prvn = trap_pending = 1;
-	    else
+	    if (usmd) prvn = trap_pending = 1;		/* trap if usmd */
+	    else if (!api_usmd)				/* nop if api_usmd */
 #endif
 		LAC = LAC | SR;  }
 
 	switch (((IR >> 8) & 04) | ((IR >> 3) & 03)) {	/* decode IR<7,13:14> */
 	case 1:						/* RAL */
-	    LAC = ((LAC << 1) | (LAC >> 18)) & 01777777;
+	    LAC = ((LAC << 1) | (LAC >> 18)) & LACMASK;
 		break;
 	case 2:						/* RAR */
-	    LAC = ((LAC >> 1) | (LAC << 18)) & 01777777;
+	    LAC = ((LAC >> 1) | (LAC << 18)) & LACMASK;
 	    break;
 	case 3:						/* RAL RAR */
 #if defined (PDP15)					/* PDP-15 */
-	    LAC = (LAC + 1) & 01777777;			/* IAC */
+	    LAC = (LAC + 1) & LACMASK;			/* IAC */
 #else							/* PDP-4,-7,-9 */
 	    reason = stop_inst;				/* undefined */
 #endif
 	    break;
 	case 5:						/* RTL */
-	    LAC = ((LAC << 2) | (LAC >> 17)) & 01777777;
+	    LAC = ((LAC << 2) | (LAC >> 17)) & LACMASK;
 	    break;
 	case 6:						/* RTR */
-	    LAC = ((LAC >> 2) | (LAC << 17)) & 01777777;
+	    LAC = ((LAC >> 2) | (LAC << 17)) & LACMASK;
 	    break;
 	case 7:						/* RTL RTR */
 #if defined (PDP15)					/* PDP-15 */
 	    LAC = ((LAC >> 9) & 0777) | ((LAC & 0777) << 9) |
-		(LAC & 01000000);			/* BSW */
+		(LAC & LINK);			/* BSW */
 #else							/* PDP-4,-7,-9 */
 	    reason = stop_inst;				/* undefined */
 #endif
 	    break;  }					/* end switch rotate */
 
 	if (IR & 0000040) {				/* HLT */
-	    if (usmd) prvn = trap_pending = 1;
-	    else reason = STOP_HALT;  }
-	if (skp && !prvn) PC = INCR_ADDR (PC);		/* if skip, inc PC */
+	    if (usmd) prvn = trap_pending = 1;		/* trap if usmd */
+	    else if (!api_usmd) reason = STOP_HALT;  }	/* nop if api_usmd */
+	if (skp) PC = Incr_addr (PC);			/* if skip, inc PC */
 	break;						/* end OPR */
 
 /* EAE: opcode 64 
@@ -1063,47 +991,45 @@ case 036:						/* OPR, dir */
    counter is complemented on load and then counted up to zero; timing
    guarantees an initial increment, which completes the two's complement
    load.  In the simulator, the SC is loaded normally and then counted
-   down to zero; the read SC command compensates.
-*/
+   down to zero; the read SC command compensates. */
 
 case 033: case 032:					/* EAE */
 	if (cpu_unit.flags & UNIT_NOEAE) break;		/* disabled? */
 	if (IR & 0020000)				/* IR<4>? AC0 to L */
-	    LAC = ((LAC << 1) & 01000000) | (LAC & 0777777);
+	    LAC = ((LAC << 1) & LINK) | (LAC & DMASK);
 	if (IR & 0010000) MQ = 0;			/* IR<5>? clear MQ */
-	if ((IR & 0004000) && (LAC & 0400000))		/* IR<6> and minus? */
-	    eae_ac_sign = 01000000;			/* set eae_ac_sign */
+	if ((IR & 0004000) && (LAC & SIGN))		/* IR<6> and minus? */
+	    eae_ac_sign = LINK;				/* set eae_ac_sign */
 	else eae_ac_sign = 0;				/* if not, unsigned */
-	if (IR & 0002000) MQ = (MQ | LAC) & 0777777;	/* IR<7>? or AC */
-	else if (eae_ac_sign) LAC = LAC ^ 0777777;	/* if not, |AC| */
-	if (IR & 0001000) LAC = LAC & 01000000;		/* IR<8>? clear AC */
-	link_init = LAC & 01000000;			/* link temporary */
-	fill = link_init? 0777777: 0;			/* fill = link */
+	if (IR & 0002000) MQ = (MQ | LAC) & DMASK;	/* IR<7>? or AC */
+	else if (eae_ac_sign) LAC = LAC ^ DMASK;	/* if not, |AC| */
+	if (IR & 0001000) LAC = LAC & LINK;		/* IR<8>? clear AC */
+	link_init = LAC & LINK;				/* link temporary */
+	fill = link_init? DMASK: 0;			/* fill = link */
 	esc = IR & 077;					/* get eff SC */
 
 	switch ((IR >> 6) & 07) {			/* case on IR<9:11> */
 	case 0:						/* setup */
-	    if (IR & 04) MQ = MQ ^ 0777777;		/* IR<15>? ~MQ */
+	    if (IR & 04) MQ = MQ ^ DMASK;		/* IR<15>? ~MQ */
 	    if (IR & 02) LAC = LAC | MQ;		/* IR<16>? or MQ */
 	    if (IR & 01) LAC = LAC | ((-SC) & 077);	/* IR<17>? or SC */
 	    break;
 
 	case 1:						/* multiply */
-	    CHECK_ADDR_R (PC);				/* validate PC */
-	    MA = M[PC];					/* get next word */
-	    PC = INCR_ADDR (PC);			/* increment PC */
-	    if (eae_ac_sign) MQ = MQ ^ 0777777;		/* EAE AC sign? ~MQ */
-	    LAC = LAC & 0777777;			/* clear link */
+	    if (Read (PC, &MB, FE)) break;		/* get next word */
+	    PC = Incr_addr (PC);			/* increment PC */
+	    if (eae_ac_sign) MQ = MQ ^ DMASK;		/* EAE AC sign? ~MQ */
+	    LAC = LAC & DMASK;				/* clear link */
 	    SC = esc;					/* init SC */
 	    do {					/* loop */
-		if (MQ & 1) LAC = LAC + MA;		/* MQ<17>? add */
+		if (MQ & 1) LAC = LAC + MB;		/* MQ<17>? add */
 		MQ = (MQ >> 1) | ((LAC & 1) << 17);
 		LAC = LAC >> 1;				/* shift AC'MQ right */
 		SC = (SC - 1) & 077;  }			/* decrement SC */
 	    while (SC != 0);				/* until SC = 0 */
 	    if (eae_ac_sign ^ link_init) {		/* result negative? */
-		LAC = LAC ^ 0777777;
-		MQ = MQ ^ 0777777;  }
+		LAC = LAC ^ DMASK;
+		MQ = MQ ^ DMASK;  }
 	    break;
 
 /* EAE, continued
@@ -1114,62 +1040,59 @@ case 033: case 032:					/* EAE */
 
    The quotient is generated in one's complement form; therefore, the
    quotient is complemented if the input operands had the same sign
-   (that is, if the quotient is positive).
-*/
+   (that is, if the quotient is positive). */
 
 	case 3:						/* divide */
-	    CHECK_ADDR_R (PC);				/* validate PC */
-	    MA = M[PC];					/* get next word */
-	    PC = INCR_ADDR (PC);			/* increment PC */
-	    if (eae_ac_sign) MQ = MQ ^ 0777777;		/* EAE AC sign? ~MQ */
-	    if ((LAC & 0777777) >= MA) {		/* overflow? */
-		LAC = (LAC - MA) | 01000000;		/* set link */
+	    if (Read (PC, &MB, FE)) break;		/* get next word */
+	    PC = Incr_addr (PC);			/* increment PC */
+	    if (eae_ac_sign) MQ = MQ ^ DMASK;		/* EAE AC sign? ~MQ */
+	    if ((LAC & DMASK) >= MB) {			/* overflow? */
+		LAC = (LAC - MB) | LINK;		/* set link */
 		break;  }
-	    LAC = LAC & 0777777;			/* clear link */
+	    LAC = LAC & DMASK;				/* clear link */
 	    t = 0;					/* init loop */
 	    SC = esc;					/* init SC */
 	    do {					/* loop */
-		if (t) LAC = (LAC + MA) & 01777777;
-		else LAC = (LAC - MA) & 01777777;
+		if (t) LAC = (LAC + MB) & LACMASK;
+		else LAC = (LAC - MB) & LACMASK;
 		t = (LAC >> 18) & 1;			/* quotient bit */
 		if (SC > 1) LAC =			/* skip if last */
-		    ((LAC << 1) | (MQ >> 17)) & 01777777;
-		MQ = ((MQ << 1) | t) & 0777777;		/* shift in quo bit */
+		    ((LAC << 1) | (MQ >> 17)) & LACMASK;
+		MQ = ((MQ << 1) | t) & DMASK;		/* shift in quo bit */
 		SC = (SC - 1) & 077;  }			/* decrement SC */
 	    while (SC != 0);				/* until SC = 0 */
-	    if (t) LAC = (LAC + MA) & 01777777;
-	    if (eae_ac_sign) LAC = LAC ^ 0777777;	/* sgn rem = sgn divd */
-	    if ((eae_ac_sign ^ link_init) == 0) MQ = MQ ^ 0777777;
+	    if (t) LAC = (LAC + MB) & LACMASK;
+	    if (eae_ac_sign) LAC = LAC ^ DMASK;	/* sgn rem = sgn divd */
+	    if ((eae_ac_sign ^ link_init) == 0) MQ = MQ ^ DMASK;
 	    break;
 
 /* EAE, continued
 
    EAE shifts, whether left or right, fill from the link.  If the
    operand sign has been copied to the link, this provides correct
-   sign extension for one's complement numbers.
-*/
+   sign extension for one's complement numbers. */
 
 	case 4:						/* normalize */
 #if defined (PDP15)
-	    if (!usmd) ion_defer = 2;			/* free cycles */
+	    if (!usmd) ion_defer = 2;			/* free instructions */
 #endif
-	    for (SC = esc; ((LAC & 0400000) == ((LAC << 1) & 0400000)); ) {
+	    for (SC = esc; ((LAC & SIGN) == ((LAC << 1) & SIGN)); ) {
 		LAC = (LAC << 1) | ((MQ >> 17) & 1);
 		MQ = (MQ << 1) | (link_init >> 18);
 		SC = (SC - 1) & 077;
 		if (SC == 0) break;  }
-	    LAC = link_init | (LAC & 0777777);		/* trim AC, restore L */
-	    MQ = MQ & 0777777;				/* trim MQ */
+	    LAC = link_init | (LAC & DMASK);		/* trim AC, restore L */
+	    MQ = MQ & DMASK;				/* trim MQ */
 	    SC = SC & 077;				/* trim SC */
 	    break;
 
 	case 5:						/* long right shift */
 	    if (esc < 18) {
-		MQ = ((LAC << (18 - esc)) | (MQ >> esc)) & 0777777;
-		LAC = ((fill << (18 - esc)) | (LAC >> esc)) & 01777777;  }
+		MQ = ((LAC << (18 - esc)) | (MQ >> esc)) & DMASK;
+		LAC = ((fill << (18 - esc)) | (LAC >> esc)) & LACMASK;  }
 	    else {
 	    	if (esc < 36) MQ =
-		    ((fill << (36 - esc)) | (LAC >> (esc - 18))) & 0777777;
+		    ((fill << (36 - esc)) | (LAC >> (esc - 18))) & DMASK;
 		else MQ = fill;
 		LAC = link_init | fill;  }
 	    SC = 0;					/* clear step count */
@@ -1178,11 +1101,11 @@ case 033: case 032:					/* EAE */
 	case 6:						/* long left shift */
 	    if (esc < 18) {
 		LAC = link_init |
-		    (((LAC << esc) | (MQ >> (18 - esc))) & 0777777);
-		MQ = ((MQ << esc) | (fill >> (18 - esc))) & 0777777;  }
+		    (((LAC << esc) | (MQ >> (18 - esc))) & DMASK);
+		MQ = ((MQ << esc) | (fill >> (18 - esc))) & DMASK;  }
 	    else {
 	    	if (esc < 36) LAC = link_init | 
-		     (((MQ << (esc - 18)) | (fill >> (36 - esc))) & 0777777);
+		     (((MQ << (esc - 18)) | (fill >> (36 - esc))) & DMASK);
 		else LAC = link_init | fill;
 		MQ = fill;  }
 	    SC = 0;					/* clear step count */
@@ -1190,7 +1113,7 @@ case 033: case 032:					/* EAE */
 
 	case 7:						/* AC left shift */
 	    if (esc < 18) LAC = link_init |
-		(((LAC << esc) | (fill >> (18 - esc))) & 0777777);
+		(((LAC << esc) | (fill >> (18 - esc))) & DMASK);
 	    else LAC = link_init | fill;
 	    SC = 0;					/* clear step count */
 	    break;  }					/* end switch IR */
@@ -1203,36 +1126,36 @@ case 035:						/* index operates */
 	t = (IR & 0400)? IR | 0777000: IR & 0377;	/* sext immediate */
 	switch ((IR >> 9) & 017) {			/* case on IR<5:8> */
 	case 000:					/* AAS */
-	    LAC = (LAC & 01000000) | ((LAC + t) & 0777777);
-	    if (SEXT (LAC & 0777777) >= SEXT (LR))
-		PC = INCR_ADDR (PC);
+	    LAC = (LAC & LINK) | ((LAC + t) & DMASK);
+	    if (SEXT (LAC & DMASK) >= SEXT (LR))
+		PC = Incr_addr (PC);
 	case 001:					/* PAX */
-	    XR = LAC & 0777777;
+	    XR = LAC & DMASK;
 	    break;
 	case 002:					/* PAL */
-	    LR = LAC & 0777777;
+	    LR = LAC & DMASK;
 	    break;
 	case 003:					/* AAC */
-	    LAC = (LAC & 01000000) | ((LAC + t) & 0777777);
+	    LAC = (LAC & LINK) | ((LAC + t) & DMASK);
 	    break;
 	case 004:					/* PXA */
-	    LAC = (LAC & 01000000) | XR;
+	    LAC = (LAC & LINK) | XR;
 	    break;
 	case 005:					/* AXS */
-	    XR = (XR + t) & 0777777;
-	    if (SEXT (XR) >= SEXT (LR)) PC = INCR_ADDR (PC);
+	    XR = (XR + t) & DMASK;
+	    if (SEXT (XR) >= SEXT (LR)) PC = Incr_addr (PC);
 	    break;
 	case 006:					/* PXL */
 	    LR = XR;
 	    break;
 	case 010:					/* PLA */
-	    LAC = (LAC & 01000000) | LR;
+	    LAC = (LAC & LINK) | LR;
 	    break;
 	case 011:					/* PLX */
 	    XR = LR;
 	    break;
 	case 014:					/* CLAC */
-	    LAC = LAC & 01000000;
+	    LAC = LAC & LINK;
 	    break;
 	case 015:					/* CLX */
 	    XR = 0;
@@ -1241,7 +1164,7 @@ case 035:						/* index operates */
 	    LR = 0;
 	    break;
 	case 017:					/* AXR */
-	    XR = (XR + t) & 0777777;
+	    XR = (XR + t) & DMASK;
 	    break;  }					/* end switch IR */
 	break;						/* end case */
 #endif
@@ -1253,14 +1176,19 @@ case 035:						/* index operates */
    IOT		PDP-4		PDP-7		PDP-9		PDP-15
 
    700002	IOF		IOF		IOF		IOF
+   700022	undefined	undefined	undefined	ORMM (XVM)
    700042	ION		ION		ION		ION
+   700024	undefined	undefined	undefined	LDMM (XVM)
    700062	undefined	ITON		undefined	undefined
    701701	undefined	undefined	MPSK		MPSK
    701741	undefined	undefined	MPSNE		MPSNE
    701702	undefined	undefined	MPCV		MPCV
+   701722	undefined	undefined	undefined	MPRC (XVM)
    701742	undefined	undefined	MPEU		MPEU
    701704	undefined	undefined	MPLD		MPLD
+   701724	undefined	undefined	undefined	MPLR (KT15, XVM)
    701744	undefined	undefined	MPCNE		MPCNE
+   701764	undefined	undefined	undefined	IPFH (XVM)
    703201	undefined	undefined	PFSF		PFSF
    703301	undefined	TTS		TTS		TTS
    703341	undefined	SKP7		SKP7		SPCO
@@ -1268,7 +1196,9 @@ case 035:						/* index operates */
    703304	undefined	undefined	DBK		DBK
    703344	undefined	undefined	DBR		DBR
    705501	undefined	undefined	SPI		SPI
+   705521	undefined	undefined	undefined	ENB
    705502	undefined	undefined	RPL		RPL
+   705522	undefined	undefined	undefined	INH
    705504	undefined	undefined	ISA		ISA
    707701	undefined	SEM		SEM		undefined
    707741	undefined	undefined	undefined	SKP15
@@ -1277,22 +1207,22 @@ case 035:						/* index operates */
    707742	undefined	EMIR		EMIR		RES
    707762	undefined	undefined	undefined	DBA
    707704	undefined	LEM		LEM		undefined
-   707764	undefined	undefined	undefined	EBA
-*/
+   707764	undefined	undefined	undefined	EBA */
 
 case 034:						/* IOT */
 #if defined (PDP15)
 	if (IR & 0010000) {				/* floating point? */
-/*	    PC = fp15 (PC, IR);				/* process */
+	    fp15 (IR);					/* process */
 	    break;  }
 #endif
-	if (usmd) {					/* user mode? */
-	    prvn = trap_pending = 1;			/* trap */
-	    break;  }
+	if ((api_usmd | usmd) &&			/* user, not XVM UIOT? */
+	    (!XVM || !(MMR & MM_UIOT))) {
+	    if (usmd) prvn = trap_pending = 1;		/* trap if user */
+	    break;  }					/* nop if api_usmd */
 	device = (IR >> 6) & 077;			/* device = IR<6:11> */
 	pulse = IR & 067;				/* pulse = IR<12:17> */
-	if (IR & 0000010) LAC = LAC & 01000000;		/* clear AC? */
-	iot_data = LAC & 0777777;			/* AC unchanged */
+	if (IR & 0000010) LAC = LAC & LINK;		/* clear AC? */
+	iot_data = LAC & DMASK;				/* AC unchanged */
 
 /* PDP-4 system IOT's */
 
@@ -1313,15 +1243,15 @@ case 034:						/* IOT */
 	    if (pulse == 002) ion = 0;			/* IOF */
 	    else if (pulse == 042) ion = ion_defer = 1;	/* ION */
 	    else if (pulse == 062)			/* ITON */
-		usmd = ion = ion_defer = 1;
+		usmd = usmd_buf = ion = ion_defer = 1;
 	    else iot_data = clk (pulse, iot_data);
 	    break;
 	case 033:					/* CPU control */
-	    if ((pulse == 001) || (pulse == 041)) PC = INCR_ADDR (PC);
-	    else if (pulse == 002) reset_all (0);	/* CAF */
+	    if ((pulse == 001) || (pulse == 041)) PC = Incr_addr (PC);
+	    else if (pulse == 002) reset_all (1);	/* CAF - skip CPU */
 	    break;
 	case 077:					/* extended memory */
-	    if ((pulse == 001) && memm) PC = INCR_ADDR (PC);
+	    if ((pulse == 001) && memm) PC = Incr_addr (PC);
 	    else if (pulse == 002) memm = 1;		/* EEM */
 	    else if (pulse == 042)			/* EMIR */
 		memm = emir_pending = 1;		/* ext on, restore */
@@ -1329,10 +1259,11 @@ case 034:						/* IOT */
 	    break;
 #endif
 
-/* PDP-9 and PDP-15 system IOT's */
+/* PDP-9 system IOT's */
 
-#if defined (PDP9) || defined (PDP15)
+#if defined (PDP9)
 	ion_defer = 1;					/* delay interrupts */
+	usmd_defer = 1;					/* defer load user */
 	switch (device) {				/* decode IR<6:11> */
 	case 000:					/* CPU and clock */
 	    if (pulse == 002) ion = 0;			/* IOF */
@@ -1340,24 +1271,26 @@ case 034:						/* IOT */
 	    else iot_data = clk (pulse, iot_data);
 	    break;
 	case 017:					/* mem protection */
-	    if ((pulse == 001) && prvn) PC = INCR_ADDR (PC);
-	    else if ((pulse == 041) && nexm) PC = INCR_ADDR (PC);
-	    else if (pulse == 002) prvn = 0;
-	    else if (pulse == 042) usmdbuf = 1;
-	    else if (pulse == 004) BR = LAC & BRMASK;
-	    else if (pulse == 044) nexm = 0;
+	    if (PROT) {					/* enabled? */
+		if ((pulse == 001) && prvn) PC = Incr_addr (PC);
+		else if ((pulse == 041) && nexm) PC = Incr_addr (PC);
+		else if (pulse == 002) prvn = 0;
+		else if (pulse == 042) usmd_buf = 1;
+		else if (pulse == 004) BR = LAC & BRMASK;
+		else if (pulse == 044) nexm = 0;  }
+	    else reason = stop_inst;
 	    break;
 	case 032:					/* power fail */
 	    if ((pulse == 001) && (TST_INT (PWRFL)))
-		 PC = INCR_ADDR (PC);
+		 PC = Incr_addr (PC);
 	    break;
 	case 033:					/* CPU control */
-	    if ((pulse == 001) || (pulse == 041)) PC = INCR_ADDR (PC);
-	    else if (pulse == 002) reset_all (0);	/* CAF */
-	    else if (pulse == 044) rest_pending = 1; /* DBR */
+	    if ((pulse == 001) || (pulse == 041)) PC = Incr_addr (PC);
+	    else if (pulse == 002) reset_all (1);	/* CAF - skip CPU */
+	    else if (pulse == 044) rest_pending = 1;	/* DBR */
 	    if (((cpu_unit.flags & UNIT_NOAPI) == 0) && (pulse & 004)) {
 		int32 t = api_ffo[api_act & 0377];
-		api_act = api_act & ~(0200 >> t);  }
+		api_act = api_act & ~(API_ML0 >> t);  }
 	    break;
 	case 055:					/* API control */
 	    if (cpu_unit.flags & UNIT_NOAPI) reason = stop_inst;
@@ -1373,25 +1306,76 @@ case 034:						/* IOT */
 		api_req = api_req | ((LAC >> 8) & 017);
 		api_act = api_act | (LAC & 0377);  }
 	    break;
-#endif
-#if defined (PDP9)
 	case 077:					/* extended memory */
-	    if ((pulse == 001) && memm) PC = INCR_ADDR (PC);
+	    if ((pulse == 001) && memm) PC = Incr_addr (PC);
 	    else if (pulse == 002) memm = 1;		/* EEM */
 	    else if (pulse == 042)			/* EMIR */
 		memm = emir_pending = 1;		/* ext on, restore */
 	    else if (pulse == 004) memm = 0;		/* LEM */
 	    break;
 #endif
+
+/* PDP-15 system IOT's - includes "re-entrancy ECO" ENB/INH as standard */
+
 #if defined (PDP15)
+	ion_defer = 1;					/* delay interrupts */
+	usmd_defer = 1;					/* defer load user */
+	switch (device) {				/* decode IR<6:11> */
+	case 000:					/* CPU and clock */
+	    if (pulse == 002) ion = 0;			/* IOF */
+	    else if (pulse == 042) ion = 1;		/* ION */
+	    else if (XVM && (pulse == 022))		/* ORMM/RDMM */
+		iot_data = MMR;
+	    else if (XVM && (pulse == 024))		/* LDMM */
+	        MMR = iot_data;
+	    else iot_data = clk (pulse, iot_data);
+	    break;
+	case 017:					/* mem protection */
+	    if (PROT) {					/* enabled? */
+		t = XVM? BRMASK_XVM: BRMASK;
+		if ((pulse == 001) && prvn) PC = Incr_addr (PC);
+		else if ((pulse == 041) && nexm) PC = Incr_addr (PC);
+		else if (pulse == 002) prvn = 0;
+		else if (pulse == 042) usmd_buf = 1;
+		else if (pulse == 004) BR = LAC & t;
+	        else if (RELOC && (pulse == 024)) RR = LAC & t;
+		else if (pulse == 044) nexm = 0;  }
+	    else reason = stop_inst;
+	    break;
+	case 032:					/* power fail */
+	    if ((pulse == 001) && (TST_INT (PWRFL)))
+		 PC = Incr_addr (PC);
+	    break;
+	case 033:					/* CPU control */
+	    if ((pulse == 001) || (pulse == 041)) PC = Incr_addr (PC);
+	    else if (pulse == 002) reset_all (2);	/* CAF - skip CPU, FP15 */
+	    else if (pulse == 044) rest_pending = 1;	/* DBR */
+	    if (((cpu_unit.flags & UNIT_NOAPI) == 0) && (pulse & 004)) {
+		int32 t = api_ffo[api_act & 0377];
+		api_act = api_act & ~(API_ML0 >> t);  }
+	    break;
+	case 055:					/* API control */
+	    if (cpu_unit.flags & UNIT_NOAPI) reason = stop_inst;
+	    else if (pulse == 001) {			/* SPI */
+		if (((LAC & SIGN) && api_enb) ||
+		    ((LAC & 0377) > api_act))
+		    iot_data = iot_data | IOT_SKP;  }
+	    else if (pulse == 002) {			/* RPL */
+		iot_data = iot_data | (api_enb << 17) |
+		    (api_req << 8) | api_act;  }
+	    else if (pulse == 004) {			/* ISA */
+		api_enb = (iot_data & SIGN)? 1: 0;
+		api_req = api_req | ((LAC >> 8) & 017);
+		api_act = api_act | (LAC & 0377);  }
+	    else if (pulse == 021) ion_inh = 0;		/* ENB */
+	    else if (pulse == 022) ion_inh = 1;		/* INH */
+	    break;
 	case 077:					/* bank addressing */
 	    if ((pulse == 041) || ((pulse == 061) && memm))
-		 PC = INCR_ADDR (PC);			/* SKP15, SBA */
+		 PC = Incr_addr (PC);			/* SKP15, SBA */
 	    else if (pulse == 042) rest_pending = 1;	/* RES */
 	    else if (pulse == 062) memm = 0;		/* DBA */
 	    else if (pulse == 064) memm = 1;		/* EBA */
-	    damask = memm? 017777: 07777;		/* set dir addr mask */
-	    epcmask = ADDRMASK & ~damask;		/* extended PC mask */
 	    break;
 #endif
 
@@ -1402,23 +1386,17 @@ case 034:						/* IOT */
 		iot_data = dev_tab[device] (pulse, iot_data);
 	    else reason = stop_inst;			/* stop on flag */
 	    break;  }					/* end switch device */
-	LAC = LAC | (iot_data & 0777777);
-	if (iot_data & IOT_SKP) PC = INCR_ADDR (PC);
+	LAC = LAC | (iot_data & DMASK);
+	if (iot_data & IOT_SKP) PC = Incr_addr (PC);
 	if (iot_data >= IOT_REASON) reason = iot_data >> IOT_V_REASON;
 	api_int = api_eval (&int_pend);			/* eval API */
 	break;						/* end case IOT */
 	}						/* end switch opcode */
-if (api_cycle) {					/* API cycle? */
-	api_cycle = 0;					/* cycle over */
-	usmd = 0;					/* exit user mode */
-	trap_pending = prvn = 0;  }			/* no priv viol */
+api_usmd = 0;						/* API cycle over */
 }							/* end while */
 
 /* Simulation halted */
 
-saved_PC = PC & ADDRMASK;				/* save copies */
-saved_LAC = LAC & 01777777;
-saved_MQ = MQ & 0777777;
 iors = upd_iors ();					/* get IORS */
 pcq_r->qptr = pcq_p;					/* update pc q ptr */
 return reason;
@@ -1430,13 +1408,17 @@ int32 api_eval (int32 *pend)
 {
 int32 i, hi;
 
-for (i = *pend = 0; i < API_HLVL+1; i++) {		/* any intr? */
+*pend = 0;						/* assume no intr */
+#if defined (PDP15)					/* PDP15 only */
+if (ion_inh) return 0;					/* inhibited? */
+#endif
+for (i = 0; i < API_HLVL+1; i++) {			/* any intr? */
 	if (int_hwre[i]) *pend = 1;  }
 if (api_enb == 0) return 0;				/* off? no req */
-api_req = api_req & ~0360;				/* clr req<0:3> */
+api_req = api_req & ~(API_ML0|API_ML1|API_ML2|API_ML3);	/* clr req<0:3> */
 for (i = 0; i < API_HLVL; i++) {			/* loop thru levels */
 	if (int_hwre[i])				/* req on level? */
-	    api_req = api_req | (0200 >> i);  }		/* set api req */
+	    api_req = api_req | (API_ML0 >> i);  }	/* set api req */
 hi = api_ffo[api_req & 0377];				/* find hi req */
 if (hi < api_ffo[api_act & 0377]) return (hi + 1);
 return 0;
@@ -1454,17 +1436,308 @@ for (p = 0; dev_iors[p] != NULL; p++) {			/* loop thru table */
 return d;
 }
 
+#if defined (PDP4) || defined (PDP7)
+
+/* Read, write, indirect, increment routines
+   On the PDP-4 and PDP-7,
+	There are autoincrement locations in every field.  If a field
+		does not exist, it is impossible to generate an
+		autoincrement reference (all instructions are CAL).
+	Indirect addressing range is determined by extend mode.
+	JMP I with EMIR pending can only clear extend
+	There is no memory protection, nxm reads zero and ignores writes. */
+
+t_stat Read (int32 ma, int32 *dat, int32 cyc)
+{
+ma = ma & AMASK;
+if (MEM_ADDR_OK (ma)) *dat = M[ma] & DMASK;
+else *dat = 0;
+return MM_OK;
+}
+
+t_stat Write (int32 ma, int32 dat, int32 cyc)
+{
+ma = ma & AMASK;
+if (MEM_ADDR_OK (ma)) M[ma] = dat & DMASK;
+return MM_OK;
+}
+
+t_stat Ia (int32 ma, int32 *ea, t_bool jmp)
+{
+int32 t;
+t_stat sta = MM_OK;
+
+if ((ma & B_DAMASK) == 010) {				/* autoindex? */
+	Read (ma, &t, DF);				/* add 1 before use */
+	t = (t + 1) & DMASK;
+	sta = Write (ma, t, DF);  }
+else sta = Read (ma, &t, DF);				/* fetch indirect */
+if (jmp) {						/* jmp i? */
+	if (emir_pending && (((t >> 16) & 1) == 0)) memm = 0;
+	emir_pending = rest_pending = 0;  }
+if (memm) *ea = t & IAMASK;				/* extend? 15b ia */
+else *ea = (ma & B_EPCMASK) | (t & B_DAMASK);		/* bank-rel ia */
+return sta;
+}
+
+int32 Incr_addr (int32 ma)
+{
+return ((ma & B_EPCMASK) | ((ma + 1) & B_DAMASK));
+}
+
+int32 Jms_word (int32 t)
+{
+return (((LAC & LINK) >> 1) | ((memm & 1) << 16) |
+	((t & 1) << 15) | (PC & IAMASK));
+}
+
+#endif
+
+#if defined (PDP9)
+
+/* Read, write, indirect, increment routines
+   On the PDP-9,
+	The autoincrement registers are in field zero only.  Regardless
+		of extend mode, indirect addressing through 00010-00017
+		will access absolute locations 00010-00017.
+	Indirect addressing range is determined by extend mode.  If
+		extend mode is off, and autoincrementing is used, the
+		resolved address is in bank 0 (KG09B maintenance manual).
+	JMP I with EMIR pending can only clear extend
+	JMP I with DBK pending restores L, user mode, extend mode
+	Memory protection is implemented for foreground/background operation. */
+
+t_stat Read (int32 ma, int32 *dat, int32 cyc)
+{
+ma = ma & AMASK;
+if (usmd) {						/* user mode? */
+	if (!MEM_ADDR_OK (ma)) {			/* nxm? */
+	    nexm = prvn = trap_pending = 1;		/* set flags, trap */
+	    *dat = 0;
+	    return MM_ERR;  }
+	if ((cyc != DF) && (ma < BR)) {			/* boundary viol? */
+	    prvn = trap_pending = 1;			/* set flag, trap */
+	    *dat = 0;
+	    return MM_ERR;  }  }
+if (MEM_ADDR_OK (ma)) *dat = M[ma] & DMASK;		/* valid mem? ok */
+else {	*dat = 0;					/* set flag, no trap */
+	nexm = 1;  }
+return MM_OK;
+}
+
+t_stat Write (int32 ma, int32 dat, int32 cyc)
+{
+ma = ma & AMASK;
+if (usmd) {
+	if (!MEM_ADDR_OK (ma)) {			/* nxm? */
+	    nexm = prvn = trap_pending = 1;		/* set flags, trap */
+	    return MM_ERR;  }
+	if ((cyc != DF) && (ma < BR)) {			/* boundary viol? */
+	    prvn = trap_pending = 1;			/* set flag, trap */
+	    return MM_ERR;  }  }
+if (MEM_ADDR_OK (ma)) M[ma] = dat & DMASK;		/* valid mem? ok */
+else nexm = 1;						/* set flag, no trap */
+return MM_OK;
+}
+
+t_stat Ia (int32 ma, int32 *ea, t_bool jmp)
+{
+int32 t;
+t_stat sta = MM_OK;
+
+if ((ma & B_DAMASK) == 010) {				/* autoindex? */
+	ma = ma & 017;					/* always in bank 0 */
+	Read (ma, &t, DF);				/* +1 before use */
+	t = (t + 1) & DMASK;
+	sta = Write (ma, t, DF);  }
+else sta = Read (ma, &t, DF);
+if (jmp) {						/* jmp i? */
+	if (emir_pending && (((t >> 16) & 1) == 0)) memm = 0;
+	if (rest_pending) {				/* restore pending? */
+	    LAC = ((t << 1) & LINK) | (LAC & DMASK);	/* restore L */
+	    memm = (t >> 16) & 1;			/* restore extend */
+	    usmd = usmd_buf = (t >> 15) & 1;  }		/* restore user */
+	emir_pending = rest_pending = 0;  }
+if (memm) *ea = t & IAMASK;				/* extend? 15b ia */
+else *ea = (ma & B_EPCMASK) | (t & B_DAMASK);		/* bank-rel ia */
+return sta;
+}
+
+int32 Incr_addr (int32 ma)
+{
+return ((ma & B_EPCMASK) | ((ma + 1) & B_DAMASK));
+}
+
+int32 Jms_word (int32 t)
+{
+return (((LAC & LINK) >> 1) | ((memm & 1) << 16) |
+	((t & 1) << 15) | (PC & IAMASK));
+}
+
+#endif
+
+#if defined (PDP15)
+
+/* Read, write, indirect, increment routines
+   On the PDP-15,
+	The autoincrement registers are in page zero only.  Regardless
+		of bank mode, indirect addressing through 00010-00017
+		will access absolute locations 00010-00017.
+	Indirect addressing range is determined by autoincrementing.
+	Any indirect can trigger a restore.
+	Memory protection is implemented for foreground/background operation. */
+
+t_stat Read (int32 ma, int32 *dat, int32 cyc)
+{
+int32 pa;
+
+if (usmd) {						/* user mode? */
+	if (XVM) pa = RelocXVM (ma, REL_R);		/* XVM relocation? */
+	else if (RELOC) pa = Reloc15 (ma, REL_R);	/* PDP-15 relocation? */
+	else pa = Prot15 (ma, cyc == FE);		/* just protection */
+	if (pa < 0) {					/* error? */
+	    *dat = 0;
+	    return MM_ERR;  }  }
+else pa = ma & AMASK;					/* no prot or reloc */
+if (MEM_ADDR_OK (pa)) *dat = M[pa] & DMASK;		/* valid mem? ok */
+else {	nexm = 1;					/* set flag, no trap */
+	*dat = 0;  }
+return MM_OK;
+}
+
+t_stat Write (int32 ma, int32 dat, int32 cyc)
+{
+int32 pa;
+
+if (usmd) {						/* user mode? */
+	if (XVM) pa = RelocXVM (ma, REL_W);		/* XVM relocation? */
+	else if (RELOC) pa = Reloc15 (ma, REL_W);	/* PDP-15 relocation? */
+	else pa = Prot15 (ma, cyc != DF);		/* just protection */
+	if (pa < 0) return MM_ERR;  }			/* error? */
+else pa = ma & AMASK;					/* no prot or reloc */
+if (MEM_ADDR_OK (pa)) M[pa] = dat & DMASK;		/* valid mem? ok */
+else nexm = 1;						/* set flag, no trap */
+return MM_OK;
+}
+
+/* XVM will do 18b defers if user_mode and G_Mode != 0 */
+
+t_stat Ia (int32 ma, int32 *ea, t_bool jmp)
+{
+int32 t;
+int32 damask = memm? B_DAMASK: P_DAMASK;
+t_stat sta = MM_OK;
+
+if ((ma & damask & ~07) == 010) {			/* autoincrement? */
+	ma = ma & 017;					/* always in bank 0 */
+	Read (ma, &t, DF);				/* +1 before use */
+	t = (t + 1) & DMASK;
+	sta = Write (ma, t, DF);  }
+else sta = Read (ma, &t, DF);
+if (rest_pending) {					/* restore pending? */
+	LAC = ((t << 1) & LINK) | (LAC & DMASK);	/* restore L */
+	memm = (t >> 16) & 1;				/* restore bank */
+	usmd = usmd_buf = (t >> 15) & 1;		/* restore user */
+	emir_pending = rest_pending = 0; }
+if (usmd && XVM && (MMR & MM_GM)) *ea = t;		/* XVM G_mode? */
+else if ((ma & damask & ~07) == 010) *ea = t & AMASK;	/* autoindex? */
+else *ea = (PC & BLKMASK) | (t & IAMASK);		/* within 32K */
+return sta;
+}
+
+t_stat Incr_addr (int32 ma)
+{
+if (memm) return ((ma & B_EPCMASK) | ((ma + 1) & B_DAMASK));
+return ((ma & P_EPCMASK) | ((ma + 1) & P_DAMASK));
+}
+
+/* XVM will store all 18b of PC if user mode and G_mode != 0 */
+
+int32 Jms_word (int32 t)
+{
+if (usmd && XVM && (MMR & MM_GM)) return PC;
+return (((LAC & LINK) >> 1) | ((memm & 1) << 16) |
+	((t & 1) << 15) | (PC & IAMASK));
+}
+
+/* PDP-15 protection (KM15 option) */
+
+int32 Prot15 (int32 ma, t_bool bndchk)
+{
+ma = ma & AMASK;					/* 17b addressing */
+if (!MEM_ADDR_OK (ma)) {				/* nxm? */
+	nexm = prvn = trap_pending = 1;			/* set flags, trap */
+	return -1;  }
+if (bndchk && (ma < BR)) {				/* boundary viol? */
+	prvn = trap_pending = 1;			/* set flag, trap */
+	return -1;  }
+return ma;						/* no relocation */
+}
+
+/* PDP-15 relocation and protection (KT15 option) */
+
+int32 Reloc15 (int32 ma, int32 rc)
+{
+int32 pa;
+
+ma = ma & AMASK;					/* 17b addressing */
+if (ma >= (BR | 0377)) {				/* boundary viol? */
+	if (rc != REL_C) prvn = trap_pending = 1;	/* set flag, trap */
+	return -1;  }
+pa = (ma + RR) & AMASK;					/* relocate address */
+if (!MEM_ADDR_OK (pa)) {				/* nxm? */
+	if (rc != REL_C) nexm = prvn = trap_pending = 1; /* set flags, trap */
+	return -1;  }
+return pa;
+}
+
+/* XVM relocation and protection option */
+
+int32 RelocXVM (int32 ma, int32 rc)
+{
+int32 pa, gmode, slr;
+static const int32 g_mask[4] = { MM_G_W0, MM_G_W1, MM_G_W2, MM_G_W3 };
+static const int32 g_base[4] = { MM_G_B0, MM_G_B1, MM_G_B2, MM_G_B3 };
+static const int32 slr_lnt[4] = { MM_SLR_L0, MM_SLR_L1, MM_SLR_L2, MM_SLR_L3 };
+
+gmode = MM_GETGM (MMR);					/* get G_mode */
+slr = MM_GETSLR (MMR);					/* get segment length */
+ma = ma & g_mask[gmode];				/* mask address */
+if (MMR & MM_RDIS) pa = ma;				/* reloc disabled? */
+else if ((MMR & MM_SH) &&				/* shared enabled and */
+	(ma >= g_base[gmode]) &&			/* >= shared base and */
+	(ma < (g_base[gmode] + slr_lnt[slr]))) {	/* < shared end? */
+	if (ma & 017400) {				/* ESAS? */
+	    if ((rc == REL_W) && (MMR & MM_WP)) {	/* write and protected? */
+		prvn = trap_pending = 1;		/* set flag, trap */
+		return -1;  }
+	    pa = (((MMR & MM_SBR_MASK) << 8) + ma) & DMASK;  }	/* ESAS reloc */
+	else pa = RR + (ma & 0377);  }			/* no, ISAS reloc */
+else {	if (ma >= (BR | 0377)) {			/* normal reloc, viol? */
+	    if (rc != REL_C) prvn = trap_pending = 1;	/* set flag, trap */
+	    return -1;  }
+	pa = (RR + ma) & DMASK;  }			/* relocate address */
+if (!MEM_ADDR_OK (pa)) {				/* nxm? */
+	if (rc != REL_C) nexm = prvn = trap_pending = 1; /* set flags, trap */
+	return -1;  }
+return pa;
+}
+
+#endif
+
 /* Reset routine */
 
 t_stat cpu_reset (DEVICE *dptr)
 {
 SC = 0;
 eae_ac_sign = 0;
-ion = ion_defer = 0;
+ion = ion_defer = ion_inh = 0;
 CLR_INT (PWRFL);
 api_enb = api_req = api_act = 0;
 BR = 0;
-usmd = usmdbuf = 0;
+RR = 0;
+MMR = 0;
+usmd = usmd_buf = usmd_defer = 0;
 memm = memm_init;
 nexm = prvn = trap_pending = 0;
 emir_pending = rest_pending = 0;
@@ -1479,8 +1752,14 @@ return SCPE_OK;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
+#if defined (PDP15)
+if (usmd && (sw & SWMASK ('V'))) {
+	if (XVM) addr = RelocXVM (addr, REL_C);
+	else if (RELOC) addr = Reloc15 (addr, REL_C);
+	if (addr < 0) return STOP_MME;  }
+#endif
 if (addr >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = M[addr] & 0777777;
+if (vptr != NULL) *vptr = M[addr] & DMASK;
 return SCPE_OK;
 }
 
@@ -1488,8 +1767,14 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
+#if defined (PDP15)
+if (usmd && (sw & SWMASK ('V'))) {
+	if (XVM) addr = RelocXVM (addr, REL_C);
+	else if (RELOC) addr = Reloc15 (addr, REL_C);
+	if (addr < 0) return STOP_MME;  }
+#endif
 if (addr >= MEMSIZE) return SCPE_NXM;
-M[addr] = val & 0777777;
+M[addr] = val & DMASK;
 return SCPE_OK;
 }
 

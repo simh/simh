@@ -26,6 +26,7 @@
    rf		(PDP-9) RF09/RF09
 		(PDP-15) RF15/RS09
 
+   26-Jul-03	RMS	Fixed bug in set size routine
    14-Mar-03	RMS	Fixed variable platter interaction with save/restore
    03-Mar-03	RMS	Fixed autosizing
    12-Feb-03	RMS	Removed 8 platter sizing hack
@@ -113,8 +114,8 @@ int32 rf_burst = 1;					/* burst mode flag */
 int32 rf_stopioe = 1;					/* stop on error */
 
 DEVICE rf_dev;
-int32 rf70 (int32 pulse, int32 AC);
-int32 rf72 (int32 pulse, int32 AC);
+int32 rf70 (int32 pulse, int32 dat);
+int32 rf72 (int32 pulse, int32 dat);
 int32 rf_iors (void);
 t_stat rf_svc (UNIT *uptr);
 t_stat rf_reset (DEVICE *dptr);
@@ -151,14 +152,14 @@ REG rf_reg[] = {
 	{ NULL }  };
 
 MTAB rf_mod[] = {
-	{ UNIT_PLAT, 0, NULL, "1P", &rf_set_size },
-	{ UNIT_PLAT, 1, NULL, "2P", &rf_set_size },
-	{ UNIT_PLAT, 2, NULL, "3P", &rf_set_size },
-	{ UNIT_PLAT, 3, NULL, "4P", &rf_set_size },
-	{ UNIT_PLAT, 4, NULL, "5P", &rf_set_size },
-	{ UNIT_PLAT, 5, NULL, "6P", &rf_set_size },
-	{ UNIT_PLAT, 6, NULL, "7P", &rf_set_size },
-	{ UNIT_PLAT, 7, NULL, "8P", &rf_set_size },
+	{ UNIT_PLAT, (0 << UNIT_V_PLAT), NULL, "1P", &rf_set_size },
+	{ UNIT_PLAT, (1 << UNIT_V_PLAT), NULL, "2P", &rf_set_size },
+	{ UNIT_PLAT, (2 << UNIT_V_PLAT), NULL, "3P", &rf_set_size },
+	{ UNIT_PLAT, (3 << UNIT_V_PLAT), NULL, "4P", &rf_set_size },
+	{ UNIT_PLAT, (4 << UNIT_V_PLAT), NULL, "5P", &rf_set_size },
+	{ UNIT_PLAT, (5 << UNIT_V_PLAT), NULL, "6P", &rf_set_size },
+	{ UNIT_PLAT, (6 << UNIT_V_PLAT), NULL, "7P", &rf_set_size },
+	{ UNIT_PLAT, (7 << UNIT_V_PLAT), NULL, "8P", &rf_set_size },
 	{ UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
 	{ 0 }  };
@@ -172,14 +173,14 @@ DEVICE rf_dev = {
 
 /* IOT routines */
 
-int32 rf70 (int32 pulse, int32 AC)
+int32 rf70 (int32 pulse, int32 dat)
 {
 int32 t, sb;
 
 sb = pulse & 060;					/* subopcode */
 if (pulse & 01) {
 	if ((sb == 000)	&& (rf_sta & (RFS_ERR | RFS_DON)))
-	    AC = IOT_SKP | AC;				/* DSSF */
+	    dat = IOT_SKP | dat;			/* DSSF */
 	else if (sb == 020) rf_reset (&rf_dev);		/* DSCC */
 	else if (sb == 040) {				/* DSCF */
 	    if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;	/* busy inhibits */
@@ -187,19 +188,19 @@ if (pulse & 01) {
 	}
 if (pulse & 02) {
 	if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;		/* busy sets PGE */
-	else if (sb == 000) AC = AC | rf_dbuf;		/* DRBR */
+	else if (sb == 000) dat = dat | rf_dbuf;	/* DRBR */
 	else if (sb == 020)				/* DRAL */
-	    AC = AC | (rf_da & 0777777);
+	    dat = dat | (rf_da & DMASK);
 	else if (sb == 040)				/* DSFX */
-	    rf_sta = rf_sta ^ (AC & (RFS_FNC | RFS_IE)); /* xor func */
+	    rf_sta = rf_sta ^ (dat & (RFS_FNC | RFS_IE)); /* xor func */
 	else if (sb == 060)				/* DRAH */
-	    AC = AC | (rf_da >> 18) | ((rf_sta & RFS_NED)? 010: 0);
+	    dat = dat | (rf_da >> 18) | ((rf_sta & RFS_NED)? 010: 0);
 	}
 if (pulse & 04) {
 	if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;		/* busy sets PGE */
-	else if (sb == 000) rf_dbuf = AC & 0777777;	/* DLBR */
+	else if (sb == 000) rf_dbuf = dat & DMASK;	/* DLBR */
 	else if (sb == 020)				/* DLAL */
-	    rf_da = (rf_da & ~0777777) | (AC & 0777777);
+	    rf_da = (rf_da & ~DMASK) | (dat & DMASK);
 	else if (sb == 040) {				/* DSCN */
 	    rf_sta = rf_sta & ~RFS_DON;			/* clear done */
 	    if (GET_FNC (rf_sta) != FN_NOP) {
@@ -207,20 +208,20 @@ if (pulse & 04) {
 		if (t < 0) t = t + RF_NUMWD;			/* wrap around? */
 		sim_activate (&rf_unit, t * rf_time);  }  }	/* schedule op */
 	else if (sb == 060) {				/* DLAH */
-	    rf_da = (rf_da & 0777777) | ((AC & 07) << 18);
+	    rf_da = (rf_da & DMASK) | ((dat & 07) << 18);
 	    if ((uint32) rf_da >= rf_unit.capac)	/* for sizing */
 		rf_updsta (RFS_NED);  }
 	}
 rf_updsta (0);						/* update status */
-return AC;
+return dat;
 }
 
-int32 rf72 (int32 pulse, int32 AC)
+int32 rf72 (int32 pulse, int32 dat)
 {
 int32 sb = pulse & 060;
 
 if (pulse & 02) {
-	if (sb == 000) AC = AC | GET_POS (rf_time) |	/* DLOK */
+	if (sb == 000) dat = dat | GET_POS (rf_time) |	/* DLOK */
 	    (sim_is_active (&rf_unit)? 0400000: 0);
 	else if (sb == 040) {				/* DSCD */
 	    if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;	/* busy inhibits */
@@ -228,9 +229,9 @@ if (pulse & 02) {
 	    rf_updsta (0);  }
 	else if (sb == 060) {				/* DSRS */
 	    if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;	/* busy sets PGE */
-	    AC = AC | rf_updsta (0);  }
+	    dat = dat | rf_updsta (0);  }
 	}
-return AC;
+return dat;
 }
 
 /* Unit service - assumes the entire disk is buffered */
@@ -247,8 +248,8 @@ f = GET_FNC (rf_sta);					/* get function */
 do {	if ((uint32) rf_da >= uptr->capac) {		/* disk overflow? */
 	    rf_updsta (RFS_NED);			/* nx disk error */
 	    break;  }
-	M[RF_WC] = (M[RF_WC] + 1) & 0777777;		/* incr word count */
- 	pa = M[RF_CA] = (M[RF_CA] + 1) & ADDRMASK;	/* incr mem addr */
+	M[RF_WC] = (M[RF_WC] + 1) & DMASK;		/* incr word count */
+ 	pa = M[RF_CA] = (M[RF_CA] + 1) & AMASK;		/* incr mem addr */
 	if ((f == FN_READ) && MEM_ADDR_OK (pa))		/* read? */
 	    M[pa] = *(((int32 *) uptr->filebuf) + rf_da);
 	if ((f == FN_WCHK) &&				/* write check? */
@@ -323,9 +324,9 @@ return attach_unit (uptr, cptr);
 
 t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if ((val < 0) || (val > RF_NUMDK)) return SCPE_IERR;
+if (val < 0) return SCPE_IERR;
 if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-uptr->capac = (val + 1) * RF_DKSIZE;
+uptr->capac = UNIT_GETP (val) * RF_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
 }

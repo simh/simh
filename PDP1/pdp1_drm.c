@@ -1,4 +1,4 @@
-/* pdp1_drm.c: drum/fixed head disk simulator
+/* pdp1_drm.c: PDP-1 drum simulator
 
    Copyright (c) 1993-2002, Robert M Supnik
 
@@ -25,6 +25,7 @@
 
    drm		Type 24 serial drum
 
+   23-Jul-03	RMS	Fixed incorrect logical, missing activate
    05-Dec-02	RMS	Cloned from pdp18b_drm.c
 */
 
@@ -95,45 +96,44 @@ DEVICE drm_dev = {
 
 /* IOT routines */
 
-int32 drm (int32 IR, int32 dev, int32 IO)
+int32 drm (int32 IR, int32 dev, int32 dat)
 {
 int32 t;
 int32 pulse = (IR >> 6) & 037;
 
 if (drm_dev.flags & DEV_DIS)				/* disabled? */
-	return (stop_inst << IOT_V_REASON) | IO;	/* stop if requested */
-if ((pulse != 001) & (pulse != 011))			/* invalid pulse? */
-	return (stop_inst << IOT_V_REASON) | IO;	/* stop if requested */
+	return (stop_inst << IOT_V_REASON) | dat;	/* stop if requested */
+if ((pulse != 001) && (pulse != 011))			/* invalid pulse? */
+	return (stop_inst << IOT_V_REASON) | dat;	/* stop if requested */
 switch (dev) {						/* switch on device */
 case 061:						/* DWR, DRD */
-	drm_ma = IO & 0177777;				/* load mem addr */
+	drm_ma = dat & 0177777;				/* load mem addr */
 	drm_unit.FUNC = pulse & DRM_WRITE;		/* save function */
 	break;
 case 062:						/* DBL, DCN */
-	if (pulse & 010) drm_da = IO & DRM_SMASK;	/* load sector # */
+	if (pulse & 010) drm_da = dat & DRM_SMASK;	/* load sector # */
 	iosta = iosta & ~IOS_DRM;			/* clear flags */
 	drm_err = 0;
 	t = ((drm_da % DRM_NUMSC) * DRM_NUMWDS) - GET_POS (drm_time);
 	if (t <= 0) t = t + DRM_NUMWDT;			/* wrap around? */
+	sim_activate (&drm_unit, t);			/* start operation */
 	break;
 case 063:						/* DTD */
-	if (iosta & IOS_DRM) return (IO | IOT_SKP);	/* skip if done */
+	if (pulse == 011) return (stop_inst << IOT_V_REASON) | dat;
+	if (iosta & IOS_DRM) return (dat | IOT_SKP);	/* skip if done */
+	break;
 case 064:						/* DSE, DSP */
 	if ((drm_err == 0) || (pulse & 010))		/* no error, par test? */
-	    return (IO | IOT_SKP);
+	    return (dat | IOT_SKP);
 	}
-return IO;
+return dat;
 }
 
-/* Unit service
-
-   This code assumes the entire drum is buffered.
-*/
+/* Unit service - this code assumes the entire drum is buffered */
 
 t_stat drm_svc (UNIT *uptr)
 {
-int32 i;
-uint32 da;
+uint32 i, da;
 
 if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	drm_err = 1;					/* set error */

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	H316 Simulator Usage
-Date:	20-Apr-2003
+Date:	15-Jul-2003
 
 			COPYRIGHT NOTICE
 
@@ -51,7 +51,7 @@ sim/h316/	h316_defs.h
 		h316_cpu.c
 		h316_lp.c
 		h316_stddev.c
-		h316_cpu.c
+		h316_sys.c
 
 2. H316/H516 Features
 
@@ -230,7 +230,7 @@ The clock implements these registers:
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
 
-2.2.5 316/5116 Line Printer (LPT)
+2.2.5 316/516 Line Printer (LPT)
 
 The line printer (LPT) writes data to a disk file.  The POS register
 specifies the number of the next data item to be written.  Thus,
@@ -294,9 +294,8 @@ where * signifies indirect, C a current sector reference, Z a sector zero
 reference, and 1 indexed.  The address is an octal number in the range 0 -
 077777; if C or Z is specified, the address is a page offset in the range
 0 - 0777.  Normally, C is not needed; the simulator figures out from the
-address what mode to use.  However, when referencing memory outside the CPU
-(eg, disks), there is no valid PC, and C must be used to specify current
-sector addressing.
+address what mode to use.  However, when referencing memory outside the CPU,
+there is no valid PC, and C must be used to specify current sector addressing.
 
 I/O instructions have the format
 

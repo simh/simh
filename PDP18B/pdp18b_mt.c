@@ -131,7 +131,7 @@ int32 mt_log = 0;
 uint8 *mtxb = NULL;					/* transfer buffer */
 
 DEVICE mt_dev;
-int32 mt (int32 pulse, int32 AC);
+int32 mt (int32 pulse, int32 dat);
 int32 mt_iors (void);
 t_stat mt_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
@@ -194,7 +194,7 @@ DEVICE mt_dev = {
 
 /* IOT routine */
 
-int32 mt (int32 pulse, int32 AC)
+int32 mt (int32 pulse, int32 dat)
 {
 int32 f, sb;
 UNIT *uptr;
@@ -205,21 +205,21 @@ sb = pulse & 060;					/* subop */
 if (pulse & 01) {
 	if ((sb == 000) && (uptr->flags & UNIT_ATT) &&	/* MTTR */
 	    !sim_is_active (uptr))
-	    AC = IOT_SKP | AC;
+	    dat = IOT_SKP | dat;
 	else if ((sb == 020) && !mt_busy ())		/* MTCR */
-	    AC = IOT_SKP | AC;
+	    dat = IOT_SKP | dat;
 	else if ((sb == 040) && (mt_sta & (STA_ERR | STA_DON))) /* MTSF */
-	    AC = IOT_SKP | AC;
+	    dat = IOT_SKP | dat;
 	}
 if ((pulse & 06) && mt_log)
 	printf ("[MT%d: IOT=%o, AC=%o, sta=%o]\n",
-	   GET_UNIT (mt_cu), 0707300 + pulse, AC, mt_sta);
+	   GET_UNIT (mt_cu), 0707300 + pulse, dat, mt_sta);
 if (pulse & 02) {
-	if (sb == 000) AC = AC | (mt_cu & 0777700);	/* MTRC */
+	if (sb == 000) dat = dat | (mt_cu & 0777700);	/* MTRC */
 	else if (sb == 020) {				/* MTAF, MTLC */
 	    if (!mt_busy ()) mt_cu = mt_sta = 0;	/* if not busy, clr */
 	    mt_sta = mt_sta & ~(STA_ERR | STA_DON);  }	/* clear flags */
-	else if (sb == 040) AC = AC | mt_sta;		/* MTRS */
+	else if (sb == 040) dat = dat | mt_sta;		/* MTRS */
 	}
 if (pulse & 04) {
 	if (sb == 000) {				/* MTGO */
@@ -236,10 +236,10 @@ if (pulse & 04) {
 	        else mt_sta = uptr->USTAT = 0;		/* no, clear status */
 	        sim_activate (uptr, mt_time);  }  }	/* start io */
 	if (sb == 020)					/* MTCM, MTLC  */
-	    mt_cu = (mt_cu & 0770700) | (AC & 0777700);	/* load status */
+	    mt_cu = (mt_cu & 0770700) | (dat & 0777700);	/* load status */
 	}
 mt_updcsta (mt_dev.units + GET_UNIT (mt_cu), 0);	/* update status */
-return AC;
+return dat;
 }
 
 /* Unit service
@@ -289,9 +289,9 @@ case FN_CMPARE:						/* read/compare */
 	    cbc = tbc;					/* use smaller */
 	    wc = PACKED (mt_cu)? ((tbc + 2) / 3): ((tbc + 1) / 2);  }
 	for (i = p = 0; i < wc; i++) {			/* copy buffer */
-	    M[MT_WC] = (M[MT_WC] + 1) & 0777777;	/* inc WC, CA */
-	    M[MT_CA] = (M[MT_CA] + 1) & 0777777;
-	    xma = M[MT_CA] & ADDRMASK;
+	    M[MT_WC] = (M[MT_WC] + 1) & DMASK;		/* inc WC, CA */
+	    M[MT_CA] = (M[MT_CA] + 1) & DMASK;
+	    xma = M[MT_CA] & AMASK;
 	    if (PACKED (mt_cu)) {			/* packed? */
 		c1 = mtxb[p++] & 077;
 		c2 = mtxb[p++] & 077;
@@ -303,16 +303,16 @@ case FN_CMPARE:						/* read/compare */
 		c = (c1 << 8) | c2;  }
 	    if ((f == FN_READ) && MEM_ADDR_OK (xma)) M[xma] = c;
 	    else if ((f == FN_CMPARE) && (c != (M[xma] &
-		(PACKED (mt_cu)? 0777777: 0177777)))) {
+		(PACKED (mt_cu)? DMASK: 0177777)))) {
 		mt_updcsta (uptr, STA_CPE);
 		break;  }  }
 	break;
 
 case FN_WRITE:						/* write */
 	tbc = PACKED (mt_cu)? wc * 3: wc * 2;
-	xma = M[MT_CA] & ADDRMASK;			/* get mem addr */
+	xma = M[MT_CA] & AMASK;				/* get mem addr */
 	for (i = p = 0; i < wc; i++) {			/* copy buf to tape */
-	    xma = (xma + 1) & ADDRMASK;			/* incr mem addr */
+	    xma = (xma + 1) & AMASK;			/* incr mem addr */
 	    if (PACKED (mt_cu)) {			/* packed? */
 		mtxb[p++] = (M[xma] >> 12) & 077;
 		mtxb[p++] = (M[xma] >> 6) & 077;
@@ -323,7 +323,7 @@ case FN_WRITE:						/* write */
 	if (st = sim_tape_wrrecf (uptr, mtxb, tbc))	/* write rec, err? */
 	    r = mt_map_err (uptr, st);			/* map error */
 	else {
-	    M[MT_CA] = (M[MT_CA] + wc) & 0777777;	/* advance mem addr */
+	    M[MT_CA] = (M[MT_CA] + wc) & DMASK;		/* advance mem addr */
 	    M[MT_WC] = 0;  }				/* clear word cnt */
 	mt_cu = mt_cu & ~CU_ERASE;			/* clear erase flag */
 	break;
@@ -339,7 +339,7 @@ case FN_WREOF:
 
 case FN_SPACEF:						/* space forward */
 	do {
-	    M[MT_WC] = (M[MT_WC] + 1) & 0777777;	/* inc WC */
+	    M[MT_WC] = (M[MT_WC] + 1) & DMASK;		/* inc WC */
 	    if (st = sim_tape_sprecf (uptr, &tbc)) {	/* space rec fwd, err? */
 		r = mt_map_err (uptr, st);		/* map error */
 		break;  }
@@ -349,7 +349,7 @@ case FN_SPACEF:						/* space forward */
 
 case FN_SPACER:						/* space reverse */
 	do {
-	    M[MT_WC] = (M[MT_WC] + 1) & 0777777;	/* inc WC */
+	    M[MT_WC] = (M[MT_WC] + 1) & DMASK;		/* inc WC */
 	    if (st = sim_tape_sprecr (uptr, &tbc)) {	/* space rec rev, err? */
 		r = mt_map_err (uptr, st);		/* map error */
 		break;  }

@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Jul-03	RMS	Added FP15 support
+			Added XVM support
+			Added EAE option for PDP-4
    25-Apr-03	RMS	Revised for extended file support
    04-Feb-03	RMS	Added RB09, LP09 support
    22-Nov-02	RMS	Added PDP-4 drum support
@@ -48,7 +51,7 @@
 
    model memory	CPU options		I/O options
 
-   PDP4	   8K	??Type 18 EAE		Type 65 KSR-28 Teletype (Baudot)
+   PDP4	   8K	Type 18 EAE		Type 65 KSR-28 Teletype (Baudot)
 					integral paper tape reader
 					Type 75 paper tape punch
 					integral real time clock
@@ -79,19 +82,19 @@
 		KA15 auto pri intr	PC15 paper tape reader and punch
 		KF15 power detection	KW15 real time clock
 		KM15 mem protection	LP09 line printer
-		??KT15 mem relocation	LP15 line printer
-					RP15 disk pack
-					RF15/RF09 fixed head disk
+		KT15 mem relocation	LP15 line printer
+		FP15 floating point	RP15 disk pack
+		XVM option		RF15/RF09 fixed head disk
 					TC59D magnetic tape
 					TC15/TU56 DECtape
 					LT15 second Teletype
 
-   ??Indicates not implemented.  The PDP-4 manual refers to both an EAE
-   ??and a memory extension control; there is no documentation on either.
+   ??Indicates not implemented.  The PDP-4 manual refers to a memory
+   ??extension control; there is no documentation on it.
 */
 
 #if !defined (PDP4) && !defined (PDP7) && !defined (PDP9) && !defined (PDP15)
-#define PDP9		0				/* default to PDP-9 */
+#define PDP15		0				/* default to PDP-15 */
 #endif
 
 /* Simulator stop codes */
@@ -102,6 +105,7 @@
 #define STOP_XCT	4				/* nested XCT's */
 #define STOP_API	5				/* invalid API int */
 #define STOP_NONSTD	6				/* non-std dev num */
+#define STOP_MME	7				/* mem mgt error */
 
 /* Peripheral configuration */
 
@@ -136,16 +140,48 @@
 #define TC02		0				/* DECtape */
 #define TTY1		0				/* second Teletype */
 #define BRMASK		0377400				/* bounds mask */
+#define BRMASK_XVM	0777400				/* bounds mask, XVM */
 #endif
 
 /* Memory */
 
-#define ADDRMASK	((1 << ADDRSIZE) - 1)		/* address mask */
+#define AMASK		((1 << ADDRSIZE) - 1)		/* address mask */
 #define IAMASK		077777				/* ind address mask */
-#define BLKMASK		(ADDRMASK & (~IAMASK))		/* block mask */
+#define BLKMASK		(AMASK & (~IAMASK))		/* block mask */
 #define MAXMEMSIZE	(1 << ADDRSIZE)			/* max memory size */
 #define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
 #define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
+
+/* Instructions */
+
+#define I_V_OP		14				/* opcode */
+#define I_M_OP		017
+#define I_V_IND		13				/* indirect */
+#define I_V_IDX		12				/* index */
+#define I_IND		(1 << I_V_IND)
+#define I_IDX		(1 << I_V_IDX)
+#define B_DAMASK	017777				/* bank mode address */
+#define B_EPCMASK	(AMASK & ~B_DAMASK)
+#define P_DAMASK	007777				/* page mode address */
+#define P_EPCMASK	(AMASK & ~P_DAMASK)
+
+/* Memory cycles */
+
+#define FE		0
+#define DF		1
+#define RD		2
+#define WR		3
+
+/* Memory status codes */
+
+#define MM_OK		0
+#define MM_ERR		1
+
+/* Memory management relocation checks (PDP-15 KT15 and XVM only) */
+
+#define REL_C		-1				/* console */
+#define REL_R		0				/* read */
+#define REL_W		1				/* write */
 
 /* Architectural constants */
 
@@ -165,6 +201,39 @@
 #define IOT_REASON	(1 << IOT_V_REASON)
 
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* stop on error */
+
+/* PC change queue */
+
+#define PCQ_SIZE	64				/* must be 2**n */
+#define PCQ_MASK	(PCQ_SIZE - 1)
+#define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
+
+/* XVM memory management registers */
+
+#define MM_RDIS		0400000				/* reloc disabled */
+#define MM_V_GM		15				/* G mode */
+#define MM_M_GM		03
+#define MM_GM		(MM_M_GM << MM_V_GM)
+#define  MM_G_W0	0077777				/* virt addr width */
+#define  MM_G_W1	0177777
+#define  MM_G_W2	0777777
+#define  MM_G_W3	0377777
+#define  MM_G_B0	0060000				/* SAS base */
+#define  MM_G_B1	0160000
+#define  MM_G_B2	0760000
+#define  MM_G_B3	0360000
+#define MM_UIOT		0040000				/* user mode IOT's */
+#define MM_WP		0020000				/* share write prot */
+#define MM_SH		0010000				/* share enabled */
+#define MM_V_SLR	10				/* segment length reg */
+#define MM_M_SLR	03
+#define  MM_SLR_L0	001000				/* SAS length */
+#define  MM_SLR_L1	002000
+#define  MM_SLR_L2	010000
+#define  MM_SLR_L3	020000
+#define MM_SBR_MASK	01777				/* share base reg */
+#define MM_GETGM(x)	(((x) >> MM_V_GM) & MM_M_GM)
+#define MM_GETSLR(x)	(((x) >> MM_V_SLR) & MM_M_SLR)
 
 /* Device information block */
 
@@ -238,6 +307,15 @@ typedef struct pdp18b_dib DIB;
 	36	-
 	37	-
 */
+
+#define API_ML0		0200				/* API masks: level 0 */
+#define API_ML1		0100
+#define API_ML2		0040
+#define API_ML3		0020
+#define API_ML4		0010
+#define API_ML5		0004
+#define API_ML6		0002
+#define API_ML7		0001				/* level 7 */
 
 #define API_HLVL	4				/* hwre levels */
 #define ACH_SWRE	040				/* swre int vec */

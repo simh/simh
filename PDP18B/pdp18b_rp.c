@@ -144,8 +144,8 @@ int32 rp_swait = 10;					/* seek time */
 int32 rp_rwait = 10;					/* rotate time */
 
 DEVICE rp_dev;
-int32 rp63 (int32 pulse, int32 AC);
-int32 rp64 (int32 pulse, int32 AC);
+int32 rp63 (int32 pulse, int32 dat);
+int32 rp64 (int32 pulse, int32 dat);
 int32 rp_iors (void);
 t_stat rp_svc (UNIT *uptr);
 void rp_updsta (int32 newa, int32 newb);
@@ -202,7 +202,7 @@ DEVICE rp_dev = {
 
 /* IOT routines */
 
-int32 rp63 (int32 pulse, int32 AC)
+int32 rp63 (int32 pulse, int32 dat)
 {
 int32 sb = pulse & 060;					/* subopcode */
 
@@ -210,24 +210,24 @@ rp_updsta (0, 0);
 if (pulse & 01) {
 	if ((sb == 000) &&				/* DPSF */
 	    ((rp_sta & (STA_DON | STA_ERR)) || (rp_stb & STB_ATTN)))
-	    AC = IOT_SKP | AC;
+	    dat = IOT_SKP | dat;
 	else if ((sb == 020) && (rp_stb & STB_ATTN))	/* DPSA */
-	    AC = IOT_SKP | AC;
+	    dat = IOT_SKP | dat;
 	else if ((sb == 040) && (rp_sta & STA_DON))	/* DPSJ */
-	    AC = IOT_SKP | AC;
+	    dat = IOT_SKP | dat;
 	else if ((sb == 060) && (rp_sta & STA_ERR))	/* DPSE */
-	    AC = IOT_SKP | AC;
+	    dat = IOT_SKP | dat;
 	}
 if (pulse & 02) {
-	if (sb == 000) AC = AC | rp_sta;		/* DPOSA */
-	else if (sb == 020) AC = AC | rp_stb;		/* DPOSB */
+	if (sb == 000) dat = dat | rp_sta;		/* DPOSA */
+	else if (sb == 020) dat = dat | rp_stb;		/* DPOSB */
 	}
 if (pulse & 04) {
 	if (rp_busy) {					/* busy? */
 	    rp_updsta (0, STB_PGE);
-	    return AC;  }
+	    return dat;  }
 	else if (sb == 000) {				/* DPLA */
-	    rp_da = AC & 0777777;
+	    rp_da = dat & DMASK;
 	    if (GET_SECT (rp_da) >= RP_NUMSC) rp_updsta (STA_NXS, 0);
 	    if (GET_SURF (rp_da) >= RP_NUMSF) rp_updsta (STA_NXF, 0);
 	    if (GET_CYL (rp_da) >= RP_NUMCY) rp_updsta (STA_NXC, 0);  }
@@ -236,38 +236,38 @@ if (pulse & 04) {
 	    rp_stb = rp_stb & ~(STB_FME | STB_WPE | STB_LON | STB_WCE |
 		STB_TME | STB_PGE | STB_EOP);
 	    rp_updsta (0, 0);  }
-	else if (sb == 040) rp_ma = AC & 0777777;	/* DPCA */
-	else if (sb == 060) rp_wc = AC & 0777777;	/* DPWC */
+	else if (sb == 040) rp_ma = dat & DMASK;	/* DPCA */
+	else if (sb == 060) rp_wc = dat & DMASK;	/* DPWC */
 	}
-return AC;
+return dat;
 }
 
 /* IOT 64 */
 
-int32 rp64 (int32 pulse, int32 AC)
+int32 rp64 (int32 pulse, int32 dat)
 {
 int32 u, f, c, sb;
 UNIT *uptr;
 
 sb = pulse & 060;
 if (pulse & 01) {
-	if (sb == 020) AC = IOT_SKP | AC;		/* DPSN */
+	if (sb == 020) dat = IOT_SKP | dat;		/* DPSN */
 	}
 if (pulse & 02) {
-	if (sb == 000) AC = AC | rp_unit[GET_UNIT (rp_sta)].CYL; /* DPOU */
-	else if (sb == 020) AC = AC | rp_da;		/* DPOA */
-	else if (sb == 040) AC = AC | rp_ma;		/* DPOC */
-	else if (sb == 060) AC = AC | rp_wc;		/* DPOW */
+	if (sb == 000) dat = dat | rp_unit[GET_UNIT (rp_sta)].CYL; /* DPOU */
+	else if (sb == 020) dat = dat | rp_da;		/* DPOA */
+	else if (sb == 040) dat = dat | rp_ma;		/* DPOC */
+	else if (sb == 060) dat = dat | rp_wc;		/* DPOW */
 	}
 if (pulse & 04) {
 	if (rp_busy) {					/* busy? */
 	    rp_updsta (0, STB_PGE);
-	    return AC;  }
+	    return dat;  }
 	if (sb == 000) rp_sta = rp_sta & ~STA_RW;	/* DPCF */
-	else if (sb == 020) rp_sta = rp_sta & (AC | ~STA_RW);	/* DPLZ */
-	else if (sb == 040) rp_sta = rp_sta | (AC & STA_RW);	/* DPLO */
+	else if (sb == 020) rp_sta = rp_sta & (dat | ~STA_RW);	/* DPLZ */
+	else if (sb == 040) rp_sta = rp_sta | (dat & STA_RW);	/* DPLO */
 	else if (sb == 060)				/* DPLF */
-	    rp_sta = (rp_sta & ~STA_RW) | (AC & STA_RW);
+	    rp_sta = (rp_sta & ~STA_RW) | (dat & STA_RW);
 	rp_sta = rp_sta & ~STA_DON;			/* clear done */
 	u = GET_UNIT (rp_sta);				/* get unit num */
 	uptr = rp_dev.units + u;			/* select unit */
@@ -286,7 +286,7 @@ if (pulse & 04) {
 		sim_activate (uptr, MAX (RP_MIN, c + rp_rwait));  }  }
 	}
 rp_updsta (0, 0);
-return AC;
+return dat;
 }
 
 /* Unit service
@@ -342,7 +342,7 @@ if (rp_sta & (STA_NXS | STA_NXF | STA_NXC)) {		/* or bad disk addr? */
 	rp_updsta (STA_DON, STB_SUFU);			/* done, unsafe */
 	return SCPE_OK;  }
 
-pa = rp_ma & ADDRMASK;					/* get mem addr */
+pa = rp_ma & AMASK;					/* get mem addr */
 da = GET_DA (rp_da) * RP_NUMWD;				/* get disk addr */
 wc = 01000000 - rp_wc;					/* get true wc */
 if (((uint32) (pa + wc)) > MEMSIZE) {			/* memory overrun? */
@@ -373,8 +373,8 @@ if ((f == FN_WRCHK) && (err == 0)) {			/* write check? */
 	    if (comp != M[pa + i]) rp_updsta (0, STB_WCE);  }
 	err = ferror (uptr->fileref);  }
 
-rp_wc = (rp_wc + wc) & 0777777;				/* final word count */
-rp_ma = (rp_ma + wc) & 0777777;				/* final mem addr */
+rp_wc = (rp_wc + wc) & DMASK;				/* final word count */
+rp_ma = (rp_ma + wc) & DMASK;				/* final mem addr */
 da = (da + wc + (RP_NUMWD - 1)) / RP_NUMWD;		/* final sector num */
 cyl = da / (RP_NUMSC * RP_NUMSF);			/* get cyl */
 if (cyl >= RP_NUMCY) cyl = RP_NUMCY - 1;

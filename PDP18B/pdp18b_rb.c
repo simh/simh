@@ -149,7 +149,7 @@ if (pulse & 001) {
 if (pulse & 002) {
 	if (sb == 000) AC = AC | rb_make_da (rb_da);	/* DBRD */
 	if (sb == 020) AC = AC | rb_sta;		/* DBRS */
-	if (sb == 040) rb_ma = AC & ADDRMASK;		/* DBLM */
+	if (sb == 040) rb_ma = AC & AMASK;		/* DBLM */
 	}
 if (pulse & 004) {
 	if (sb == 000) rb_da = rb_set_da (AC, rb_da);	/* DBLD */
@@ -236,7 +236,7 @@ do {	if (rb_sta & RBS_WR) {				/* write? */
 	else if (MEM_ADDR_OK (rb_ma))			/* read, valid addr? */
 	    M[rb_ma] = *(((int32 *) uptr->filebuf) + rb_da);
 	rb_wc = (rb_wc + 1) & 0177777;			/* incr word count */
- 	rb_ma = (rb_ma + 1) & ADDRMASK;			/* incr mem addr */
+ 	rb_ma = (rb_ma + 1) & AMASK;			/* incr mem addr */
 	rb_da = rb_da + 1;				/* incr disk addr */
 	if (rb_da > RB_SIZE) rb_da = 0;			/* disk wraparound? */
 	}

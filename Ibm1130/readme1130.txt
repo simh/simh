@@ -1,5 +1,10 @@
 Here's the 1130 simulator as it stands now.
 
+Status: 22Jul2003
+
+ * Added support for APL\1130 output translations
+   and some bug fixes uncovered by APL.
+
 Status: 13Sep2002
 
  * Added support for 1403 printer. It's MUCH faster

@@ -258,23 +258,23 @@ void xio_2250_display	(int32 addr, int32 func, int32 modify);				// vector displ
 void xio_error 			(char *msg);
 
 void   bail (char *msg);
-t_stat load_cr_boot (int drv);
+t_stat load_cr_boot (int drv, int switches);
 t_stat cr_boot (int unitno, DEVICE *dptr);
 void   calc_ints (void);							/* recalculate interrupt bitmask */
 void   trace_io (char *fmt, ...);					/* debugging printout */
 void   scp_panic (char *msg);						/* bail out of simulator */
 char  *upcase(char *str);
 void   break_simulation (t_stat reason);			/* let a device halt the simulation */
-char   hollerith_to_ascii (int16 hol);				/* for debugging use only */
+char   hollerith_to_ascii (uint16 hol);				/* for debugging use only */
 t_bool gdu_active (void);
 void   remark_cmd (char *remark);
 void   stuff_cmd (char *cmd);
 void   update_gui (t_bool force);
 void   sim_init (void);
-t_stat register_cmd (char *name, t_stat (*action)(int32, char *), int arg, char *help);
+t_stat register_cmd (char *name, t_stat (*action)(int32 flag, char *ptr), int arg, char *help);
 
 /* GUI interface routines */
-t_bool keyboard_is_locked (void);
+t_bool keyboard_is_busy (void);
 void   forms_check (int set);						/* device notification to console lamp display */
 void   print_check (int set);
 void   keyboard_selected (int select);				

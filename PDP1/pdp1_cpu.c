@@ -25,6 +25,7 @@
 
    cpu		PDP-1 central processor
 
+   23-Jul-03	RMS	Revised to detect I/O wait hang
    05-Dec-02	RMS	Added drum support
    06-Oct-02	RMS	Revised for V2.10
    20-Aug-02	RMS	Added DECtape support
@@ -239,6 +240,7 @@ int32 sbs = 0;						/* sequence break */
 int32 sbs_init = 0;					/* seq break startup */
 int32 ioh = 0;						/* I/O halt */
 int32 ioc = 0;						/* I/O completion */
+int32 cpls = 0;						/* pending completions */
 int32 extm = 0;						/* ext mem mode */
 int32 extm_init = 0;					/* ext mem startup */
 int32 stop_inst = 0;					/* stop on rsrv inst */
@@ -257,13 +259,13 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 
-extern int32 ptr (int32 inst, int32 dev, int32 IO);
-extern int32 ptp (int32 inst, int32 dev, int32 IO);
-extern int32 tti (int32 inst, int32 dev, int32 IO);
-extern int32 tto (int32 inst, int32 dev, int32 IO);
-extern int32 lpt (int32 inst, int32 dev, int32 IO);
-extern int32 dt (int32 inst, int32 dev, int32 IO);
-extern int32 drm (int32 inst, int32 dev, int32 IO);
+extern int32 ptr (int32 inst, int32 dev, int32 dat);
+extern int32 ptp (int32 inst, int32 dev, int32 dat);
+extern int32 tti (int32 inst, int32 dev, int32 dat);
+extern int32 tto (int32 inst, int32 dev, int32 dat);
+extern int32 lpt (int32 inst, int32 dev, int32 dat);
+extern int32 dt (int32 inst, int32 dev, int32 dat);
+extern int32 drm (int32 inst, int32 dev, int32 dat);
 
 int32 sc_map[512] = {
 	0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,	/* 00000xxxx */
@@ -403,7 +405,7 @@ xct_count = 0;						/* track nested XCT's */
 sim_interval = sim_interval - 1;
 
 xct_instr:						/* label for XCT */
-if ((IR == 0610001) && ((MA & EPCMASK) == 0) && (sbs & SB_ON)) {
+if ((IR == (OP_JMP+IA+1)) && ((MA & EPCMASK) == 0) && (sbs & SB_ON)) {
 	sbs = sbs & ~SB_IP;				/* seq debreak */
 	PCQ_ENTRY;					/* save old PC */
 	OV = (M[1] >> 17) & 1;				/* restore OV */
@@ -432,12 +434,15 @@ switch (op) {						/* decode IR<0:4> */
 case 001:						/* AND */
 	AC = AC & M[MA];
 	break;
+
 case 002:						/* IOR */
 	AC = AC | M[MA];
 	break;
+
 case 003:						/* XOR */
 	AC = AC ^ M[MA];
 	break;
+
 case 004:						/* XCT */
 	if (xct_count >= xct_max) {			/* too many XCT's? */
 	    reason = STOP_XCT;
@@ -445,6 +450,7 @@ case 004:						/* XCT */
 	xct_count = xct_count + 1;			/* count XCT's */
 	IR = M[MA];					/* get instruction */
 	goto xct_instr;					/* go execute */
+
 case 007:						/* CAL, JDA */
 	MA = (PC & EPCMASK) | ((IR & IA)? (IR & DAMASK): 0100);
 	PCQ_ENTRY;
@@ -452,24 +458,31 @@ case 007:						/* CAL, JDA */
 	AC = EPC_WORD;
 	PC = INCR_ADDR (MA);
 	break;
+
 case 010:						/* LAC */
 	AC = M[MA];
 	break;
+
 case 011:						/* LIO */
 	IO = M[MA];
 	break;
+
 case 012:						/* DAC */
 	if (MEM_ADDR_OK (MA)) M[MA] = AC;
 	break;
+
 case 013:						/* DAP */
 	if (MEM_ADDR_OK (MA)) M[MA] = (AC & DAMASK) | (M[MA] & ~DAMASK);
 	break;
+
 case 014:						/* DIP */
 	if (MEM_ADDR_OK (MA)) M[MA] = (AC & ~DAMASK) | (M[MA] & DAMASK);
 	break;
+
 case 015:						/* DIO */
 	if (MEM_ADDR_OK (MA)) M[MA] = IO;
 	break;
+
 case 016:						/* DZM */
 	if (MEM_ADDR_OK (MA)) M[MA] = 0;
 	break;
@@ -498,6 +511,7 @@ case 020:						/* ADD */
 	if (((~t ^ M[MA]) & (t ^ AC)) & 0400000) OV = 1;
 	if (AC == 0777777) AC = 0;			/* minus 0 cleanup */
 	break;
+
 case 021:						/* SUB */
 	t = AC ^ 0777777;				/* complement AC */
 	AC = t + M[MA];					/* -AC + MB */
@@ -505,32 +519,39 @@ case 021:						/* SUB */
 	if (((~t ^ M[MA]) & (t ^ AC)) & 0400000) OV = 1;
 	AC = AC ^ 0777777;				/* recomplement AC */
 	break;
+
 case 022:						/* IDX */
 	AC = M[MA] + 1;
 	if (AC >= 0777777) AC = (AC + 1) & 0777777;
 	if (MEM_ADDR_OK (MA)) M[MA] = AC;
 	break;
+
 case 023:						/* ISP */
 	AC = M[MA] + 1;
 	if (AC >= 0777777) AC = (AC + 1) & 0777777;
 	if (MEM_ADDR_OK (MA)) M[MA] = AC;
 	if (AC < 0400000) PC = INCR_ADDR (PC);
 	break;
+
 case 024:						/* SAD */
 	if (AC != M[MA]) PC = INCR_ADDR (PC);
 	break;
+
 case 025:						/* SAS */
 	if (AC == M[MA]) PC = INCR_ADDR (PC);
 	break;
+
 case 030:						/* JMP */
 	PCQ_ENTRY;
 	PC = MA;
 	break;
+
 case 031:						/* JSP */
 	AC = EPC_WORD;
 	PCQ_ENTRY;
 	PC = MA;
 	break;
+
 case 034:						/* LAW */
 	AC = (IR & 07777) ^ ((IR & IA)? 0777777: 0);
 	break;
@@ -691,8 +712,11 @@ case 035:
 	    if (ioh) {					/* I/O halt? */
 		if (ioc) ioh = 0;			/* comp pulse? done */
 		else {					/* wait more */
-		    sim_interval = 0;			/* force event */
-		    PC = DECR_ADDR (PC);  }		/* re-execute */
+		    PC = DECR_ADDR (PC);		/* re-execute */
+		    if (cpls == 0) {			/* any pending pulses? */
+			reason = STOP_WAIT;		/* no, CPU hangs */
+			break;  }
+		    sim_interval = 0;  }		/* force event */
 		break;  }				/* skip iot */
 	    ioh = 1;					/* turn on halt */
 	    PC = DECR_ADDR (PC);  }			/* re-execute */
@@ -745,6 +769,7 @@ case 035:
 	if (io_data & IOT_SKP) PC = INCR_ADDR (PC);	/* skip? */
 	if (io_data >= IOT_REASON) reason = io_data >> IOT_V_REASON;
 	break;
+
 default:						/* undefined */
 	reason = STOP_RSRV;				/* halt */
 	break;  }					/* end switch opcode */
@@ -759,7 +784,7 @@ t_stat cpu_reset (DEVICE *dptr)
 {
 sbs = sbs_init;
 extm = extm_init;
-ioh = ioc = 0;
+ioh = ioc = cpls = 0;
 OV = 0;
 PF = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V3.0
-Date:	15-May-2004
+Subj:	Simulator Usage, V3.1
+Date:	15-Jul-2003
 
 			COPYRIGHT NOTICE
 
@@ -155,8 +155,7 @@ Examples:
 
 The Windows-specific Ethernet code uses the WinPCAP 3.0 package.
 This package for windows simulates the libpcap package that is freely
-available for Unix systems.  Note that WinPCAP DOES NOT SUPPORT dual
-CPU environments.
+available for Unix systems.
 
 WinPCAP must be installed prior to building the PDP-11 and VAX
 simulators with Ethernet support.

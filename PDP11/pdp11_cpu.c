@@ -678,7 +678,7 @@ if (trap_req) {						/* check traps, ints */
 	if (t = trap_req & TRAP_ALL) {			/* if a trap */
 	    for (trapnum = 0; trapnum < TRAP_V_MAX; trapnum++) {
 		if ((t >> trapnum) & 1) {		/* trap set? */
-		    trapea = trap_vec[trapnum];	/* get vec, clr */
+		    trapea = trap_vec[trapnum];		/* get vec, clr */
 		    trap_req = trap_req & ~trap_clear[trapnum];
 		    if ((stop_trap >> trapnum) & 1)	/* stop on trap? */
 			reason = trapnum + 1;
@@ -785,7 +785,7 @@ case 000:
 		    setCPUERR (CPUE_HALT);  }
 		break;
 	    case 1:					/* WAIT */
-		if (cm == MD_KER && wait_enable) wait_state = 1;
+		if ((cm == MD_KER) && wait_enable) wait_state = 1;
 		break;
 	    case 3:					/* BPT */
 		setTRAP (TRAP_BPT);
@@ -838,8 +838,8 @@ case 000:
 		if ((IR == 000002) && tbit) setTRAP (TRAP_TRC);
 		break;
 	    case 7:					/* MFPT */
-		R[0] = 5;			/* report J-11 */
-		break;	}			/* end switch no ops */
+		R[0] = 5;				/* report J-11 */
+		break;	}				/* end switch no ops */
 	    break;					/* end case no ops */
 
 /* Opcode 0: specials, continued */
@@ -1378,7 +1378,7 @@ case 007:
 	case 5:						/* FIS - not impl */
 	    setTRAP (TRAP_ILL);
 	    break;
-	case 6:						/* CIS - not impl */
+	case 6:						/* CIS */
 	    if (cpu_unit.flags & UNIT_CIS) cis11 (IR);
 	    else setTRAP (TRAP_ILL);
 	    break;

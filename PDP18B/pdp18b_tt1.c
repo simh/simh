@@ -58,8 +58,8 @@ TMLN tt1_ldsc = { 0 };					/* line descriptors */
 TMXR tt_desc = { 1, 0, 0, &tt1_ldsc };			/* mux descriptor */
 
 DEVICE tti1_dev, tto1_dev;
-int32 tti1 (int32 pulse, int32 AC);
-int32 tto1 (int32 pulse, int32 AC);
+int32 tti1 (int32 pulse, int32 dat);
+int32 tto1 (int32 pulse, int32 dat);
 t_stat tti1_svc (UNIT *uptr);
 t_stat tto1_svc (UNIT *uptr);
 t_stat tti1_reset (DEVICE *dptr);
@@ -150,14 +150,14 @@ DEVICE tto1_dev = {
 
 /* Terminal input: IOT routine */
 
-int32 tti1 (int32 pulse, int32 AC)
+int32 tti1 (int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* KSF1 */
-	if (TST_INT (TTI1)) AC = AC | IOT_SKP;  }
+	if (TST_INT (TTI1)) dat = dat | IOT_SKP;  }
 if (pulse & 002) {					/* KRB1 */
 	CLR_INT (TTI1);					/* clear flag */
-	AC= AC | tti1_unit.buf;  }			/* return buffer */
-return AC;
+	dat= dat | tti1_unit.buf;  }			/* return buffer */
+return dat;
 }
 
 /* Unit service */
@@ -204,15 +204,15 @@ return SCPE_OK;
 
 /* Terminal output: IOT routine */
 
-int32 tto1 (int32 pulse, int32 AC)
+int32 tto1 (int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* TSF */
-	if (TST_INT (TTO1)) AC = AC | IOT_SKP;  }
+	if (TST_INT (TTO1)) dat = dat | IOT_SKP;  }
 if (pulse & 002) CLR_INT (TTO1);			/* clear flag */
 if (pulse & 004) {					/* load buffer */
 	sim_activate (&tto1_unit, tto1_unit.wait);	/* activate unit */
-	tto1_unit.buf = AC & 0377;  }			/* load buffer */
-return AC;
+	tto1_unit.buf = dat & 0377;  }			/* load buffer */
+return dat;
 }
 
 /* Unit service */

@@ -170,8 +170,9 @@ for channel W, entry [1] for channel Y, etc.
 	MODE[0:7]	12	channel mode (from EOM instruction)
 	FLAG[0:7]	9	channel flags		
 
-The user can display all the registers in a channel with the command SHOW
-CHAN <chan>.
+The user can display all the registers in a channel with the command:
+
+	SHOW CHAN channel-letter
 
 2.3 Console Input (TTI)
 
@@ -364,7 +365,7 @@ The lines (MUXL) implements these registers:
 
 	TIME[0:31]	24	transmit time, lines 0 to 31
 
-The additional terminals do not support save and restore.  All open
+The terminal multiplexor does not support save and restore.  All open
 connections are lost when the simulator shuts down or MUX is detached.
 
 2.10 Project Genie Drum (DRM)
@@ -419,11 +420,8 @@ Error handling is as follows:
 	not attached	1	report error and stop
 			0	disk not ready
 
-	end of file	x	assume rest of disk is zero
-
-	OS I/O error	x	report error and stop
-
-By default, the rapid access disk is assigned to channel E.
+The rapid access disk is buffered in memory; end of file and OS I/O errors
+cannot occur.  By default, the rapid access disk is assigned to channel E.
 
 2.12 Moving Head Disk (DSK)
 
@@ -456,9 +454,12 @@ Error handling is as follows:
 	not attached	1	report error and stop
 			0	disk not ready
 
-Rapid access disk data files are buffered in memory; therefore, end of file
-and OS I/O errors cannot occur.  By default, the rapid access disk is
-assigned to channel F.
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+
+By default, the moving head disk is assigned to channel F.
 
 2.13 Magnetic Tape (MT)
 

@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-1 Simulator Usage
-Date:	15-Dec-2002
+Date:	15-Jul-2003
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2002, written by Robert M Supnik
-   Copyright (c) 1993-2002, Robert M Supnik
+   Original code published in 1993-2003, written by Robert M Supnik
+   Copyright (c) 1993-2003, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -75,8 +75,8 @@ The PDP-1 simulator implements the following unique stop conditions:
 	  memory reference address decoding
 	- more than XCTMAX nested executes are detected during
 	  instruction execution
-	- wait state entered, and no I/O operations outstanding
-	  (ie, no interrupt can ever occur)
+	- I/O wait, and no I/O operations outstanding (i.e, no I/O
+	  completion will ever occur)
 
 The PDP-1 loader supports RIM format tapes.  The DUMP command is not
 implemented.

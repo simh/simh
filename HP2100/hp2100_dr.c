@@ -35,6 +35,8 @@
    
    The drum control channel does not have any of the traditional flip-flops.
 
+   27-Jul-03	RMS	Fixed drum sizes
+			Fixed variable capacity interaction with SAVE/RESTORE
    10-Nov-02	RMS	Added BOOT command
 */
 
@@ -48,8 +50,21 @@
 #define DR_DNUMSC	32				/* drum sec/track */
 #define DR_NUMSC	((drc_unit.flags & UNIT_DR)? DR_DNUMSC: DR_FNUMSC)
 #define DR_SIZE		(512 * DR_DNUMSC * DR_NUMWD)	/* initial size */
-#define UNIT_V_DR	(UNIT_V_UF)			/* disk vs drum */
-#define UNIT_DR		(1 << UNIT_V_DR)
+#define UNIT_V_SZ	(UNIT_V_UF)			/* disk vs drum */
+#define UNIT_M_SZ	017				/* size */
+#define UNIT_SZ		(UNIT_M_SZ << UNIT_V_SZ)
+#define UNIT_DR		(1 << UNIT_V_SZ)		/* low order bit */
+#define  SZ_180K	000				/* disks */
+#define  SZ_360K	002
+#define  SZ_720K	004
+#define  SZ_1024K	001				/* drums: default size */
+#define  SZ_1536K	003
+#define  SZ_384K	005
+#define  SZ_512K	007
+#define  SZ_640K	011
+#define  SZ_768K	013
+#define  SZ_896K	015
+#define DR_GETSZ(x)	(((x) >> UNIT_V_SZ) & UNIT_M_SZ)
 
 /* Command word */
 
@@ -105,11 +120,16 @@ int32 drd_ptr = 0;					/* sector pointer */
 int32 dr_stopioe = 1;					/* stop on error */
 int32 dr_time = 10;					/* time per word */
 
+static int32 sz_tab[16] = {
+ 184320, 1048576, 368640, 1572864, 737280, 393216, 0, 524288,
+ 0, 655360, 0, 786432,  0, 917504, 0, 0 };
+
 DEVICE drd_dev, drc_dev;
 int32 drdio (int32 inst, int32 IR, int32 dat);
 int32 drcio (int32 inst, int32 IR, int32 dat);
 t_stat drc_svc (UNIT *uptr);
 t_stat drc_reset (DEVICE *dptr);
+t_stat drc_attach (UNIT *uptr, char *cptr);
 t_stat drc_boot (int32 unitno, DEVICE *dptr);
 int32 dr_incda (int32 trk, int32 sec, int32 ptr);
 t_stat dr_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -175,21 +195,22 @@ REG drc_reg[] = {
 	{ DRDATA (TIME, dr_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, dr_stopioe, 0) },
 	{ ORDATA (DEVNO, drc_dib.devno, 6), REG_HRO },
+	{ DRDATA (CAPAC, drc_unit.capac, 24), REG_HRO },
 	{ NULL }  };
 
 MTAB drc_mod[] = {
 	{ UNIT_DR, 0, "disk", NULL, NULL },
 	{ UNIT_DR, UNIT_DR, "drum", NULL, NULL },
-	{ UNIT_DR, 184320, NULL, "180K", &dr_set_size },
-	{ UNIT_DR, 368640, NULL, "360K", &dr_set_size },
-	{ UNIT_DR, 737280, NULL, "720K", &dr_set_size },
-	{ UNIT_DR, 368640+1, NULL, "384K", &dr_set_size },
-	{ UNIT_DR, 524280+1, NULL, "512K", &dr_set_size },
-	{ UNIT_DR, 655360+1, NULL, "640K", &dr_set_size },
-	{ UNIT_DR, 786432+1, NULL, "768K", &dr_set_size },
-	{ UNIT_DR, 917504+1, NULL, "896K", &dr_set_size },
-	{ UNIT_DR, 1048576+1, NULL, "1024K", &dr_set_size },
-	{ UNIT_DR, 1572864+1, NULL, "1536K", &dr_set_size },
+	{ UNIT_SZ, (SZ_180K << UNIT_V_SZ), NULL, "180K", &dr_set_size },
+	{ UNIT_SZ, (SZ_360K << UNIT_V_SZ), NULL, "360K", &dr_set_size },
+	{ UNIT_SZ, (SZ_720K << UNIT_V_SZ), NULL, "720K", &dr_set_size },
+	{ UNIT_SZ, (SZ_384K << UNIT_V_SZ), NULL, "384K", &dr_set_size },
+	{ UNIT_SZ, (SZ_512K << UNIT_V_SZ), NULL, "512K", &dr_set_size },
+	{ UNIT_SZ, (SZ_640K << UNIT_V_SZ), NULL, "640K", &dr_set_size },
+	{ UNIT_SZ, (SZ_768K << UNIT_V_SZ), NULL, "768K", &dr_set_size },
+	{ UNIT_SZ, (SZ_896K << UNIT_V_SZ), NULL, "896K", &dr_set_size },
+	{ UNIT_SZ, (SZ_1024K << UNIT_V_SZ), NULL, "1024K", &dr_set_size },
+	{ UNIT_SZ, (SZ_1536K << UNIT_V_SZ), NULL, "1536K", &dr_set_size },
 	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
 		&hp_setdev, &hp_showdev, &drd_dev },
 	{ 0 }  };
@@ -198,7 +219,7 @@ DEVICE drc_dev = {
 	"DRC", &drc_unit, drc_reg, drc_mod,
 	1, 8, 21, 1, 8, 16,
 	NULL, NULL, &drc_reset,
-	&drc_boot, NULL, NULL,
+	&drc_boot, &drc_attach, NULL,
 	&drc_dib, DEV_DISABLE };
 
 /* IOT routines */
@@ -336,14 +357,26 @@ sim_cancel (&drc_unit);
 return SCPE_OK;
 }
 
+/* Attach routine */
+
+t_stat drc_attach (UNIT *uptr, char *cptr)
+{
+int32 sz = sz_tab[DR_GETSZ (uptr->flags)];
+
+if (sz == 0) return SCPE_IERR;
+uptr->capac = sz;
+return attach_unit (uptr, cptr);
+}
 /* Set size routine */
 
 t_stat dr_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
+int32 sz;
+
+if (val < 0) return SCPE_IERR;
+if ((sz = sz_tab[DR_GETSZ (val)]) == 0) return SCPE_IERR;
 if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-if (val & 1) uptr->flags = uptr->flags | UNIT_DR;
-else uptr->flags = uptr->flags & ~UNIT_DR;
-uptr->capac = val & ~1;
+uptr->capac = sz;
 return SCPE_OK;
 }
 

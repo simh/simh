@@ -1,6 +1,6 @@
 /* hp2100_fp.c: HP 2100 floating point instructions
 
-   Copyright (c) 2003, Robert M. Supnik
+   Copyright (c) 2002-2003, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Jul-03	RMS	Fixed signed/unsigned warning
    21-Oct-02	RMS	Recoded for compatibility with 21MX microcode algorithms
 
    The HP2100 uses a unique binary floating point format:
@@ -153,7 +154,7 @@ UnpackFP (&fop1, FPAB);					/* unpack A-B */
 UnpackFP (&fop2, opnd);					/* get op */
 if (sub) {						/* subtract? */
 	fop2.fr = FR_NEG (fop2.fr);			/* negate frac */
-	if (fop2.fr == FP_SIGN) {			/* -1/2? */
+	if (fop2.fr == ((uint32) FP_SIGN)) {		/* -1/2? */
 	    fop2.fr = fop2.fr >> 1;			/* special case */
 	    fop2.exp = fop2.exp + 1;  }  }
 if (fop1.fr == 0) fop1 = fop2;				/* op1 = 0? res = op2 */

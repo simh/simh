@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	VAX Simulator Usage
-Date:	15-Jun-2003
+Date:	15-Jul-2003
 
 			COPYRIGHT NOTICE
 
@@ -37,17 +37,20 @@ This memorandum documents the VAX simulator.
 1. Simulator Files
 
 To compile the VAX, you must define VM_VAX and USE_INT64 as part of the compilation
-command line.
+command line.  To enable extended file support (files greater than 2GB), you must
+define USE_ADDR64 as part of the command line as well.
 
 sim/		sim_defs.h
 		sim_ether.h
 		sim_rev.h
 		sim_sock.h
+		sim_tape.h
 		sim_tmxr.h
 		scp.c
 		scp_tty.c
 		sim_ether.c
 		sim_sock.c
+		sim_tape.c
 		sim_tmxr.c
 
 sim/vax/	vax_defs.h
@@ -59,6 +62,7 @@ sim/vax/	vax_defs.h
 		vax_mmu.c
 		vax_stddev.c
 		vax_sys.c
+		vax_sysdev.c
 
 sim/pdp11/	pdp11_mscp.h
 		pdp11_uqssp.h
@@ -90,7 +94,7 @@ PTR,PTP		PCV11 paper tape reader/punch
 TTI,TTO		console terminal
 LPT		LPV11 line printer
 CLK		real-time clock
-DZ		DZV11 8-line terminal multiplexor (up to 4)
+DZ		DZV11 4-line terminal multiplexor (up to 4)
 RL		RLV12/RL01(2) cartridge disk controller with four drives
 RQ		RQDX3 MSCP controller with four drives
 RQB		second RQDX3 MSCP controller with four drives
@@ -130,6 +134,9 @@ HALT instruction.
 	SET CPU 64M		set memory size = 64MB
 	SET CPU SIMHALT		kernel HALT returns to simulator
 	SET CPU CONHALT		kernel HALT returns to boot ROM console
+
+The CPU implements a show command to display the I/O address map:
+
 	SHOW CPU IOSPACE	show I/O space address map
 
 If memory size is being reduced, and the memory being truncated contains
@@ -201,10 +208,10 @@ control registers for the interrupt system.
 The CPU can maintain a history of the most recently executed instructions.
 This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
 
-	SET CPU HISTORY			-- clear history buffer
-	SET CPU HISTORY=0		-- disable history
-	SET CPU HISTORY=n		-- enable history, display length = n
-	SHOW CPU HISTORY		-- print CPU history
+	SET CPU HISTORY		clear history buffer
+	SET CPU HISTORY=0	disable history
+	SET CPU HISTORY=n	enable history, display length = n
+	SHOW CPU HISTORY	print CPU history
 
 The maximum length for the history is 4096 entries.
 
@@ -225,15 +232,15 @@ The boot ROM consists of a single unit, representing the 128KB boot ROM.
 It has no registers.  The boot ROM is loaded with a binary byte stream
 using the LOAD -r command:
 
-	LOAD -r KA655.BIN	-- load boot ROM image KA655.BIN
+	LOAD -r KA655.BIN	load boot ROM image KA655.BIN
 
 ROM accesses a use a calibrated delay that slows ROM-based execution to
 about 500K instructions per second.  This delay is required to make the
 power-up self-test routines run correctly on very fast hosts.  The delay
 is controlled with the commands:
 
-	SET ROM NODELAY			-- ROM runs like RAM
-	SET ROM DELAY			-- ROM runs slowly
+	SET ROM NODELAY		ROM runs like RAM
+	SET ROM DELAY		ROM runs slowly
 
 2.1.4 Non-volatile Memory (NVR)
 
@@ -491,16 +498,16 @@ The clock (CLK) implements these registers:
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
 
-2.3.7 DZ11 Terminal Multiplexor (DZ)
+2.3.7 DZV11 Terminal Multiplexor (DZ)
 
-The DZ11 is an 8-line terminal multiplexor.  Up to 4 DZ11's (32 lines)
+The DZV11 is an 4-line terminal multiplexor.  Up to 4 DZ11's (16 lines)
 are supported.  The number of lines can be changed with the command
 
-	SET DZ LINES=n			set line count to n
+	SET DZ LINES=n		set line count to n
 
 The line count must be a multiple of 4, with a maximum of 16.
 
-The DZ11 supports 8-bit input and output of characters.  8-bit output
+The DZV11 supports 8-bit input and output of characters.  8-bit output
 may be incompatible with certain operating systems.  The command
 
 	SET DZ 7B
@@ -511,12 +518,15 @@ The terminal lines perform input and output through Telnet sessions
 connected to a user-specified port.  The ATTACH command specifies
 the port to be used:
 
-	ATTACH {-am} DZ <port>		set up listening port
+	ATTACH {-am} DZ <port>	set up listening port
 
 where port is a decimal number between 1 and 65535 that is not being used
-for other TCP/IP activities.  The optional switch -m turns on the DZ11's
+for other TCP/IP activities.  The optional switch -m turns on the DZV11's
 modem controls; the optional switch -a turns on active disconnects
-(disconnect session if computer clears Data Terminal Ready).
+(disconnect session if computer clears Data Terminal Ready).  Without
+modem control, the DZ behaves as though terminals were directly connected;
+disconnecting the Telnet session does not cause any operating system-
+visible change in line status.
 
 Once the DZ is attached and the simulator is running, the DZ will listen
 for connections on the specified port.  It assumes that the incoming
@@ -528,7 +538,7 @@ The SHOW DZ CONNECTIONS command displays the current connections to the DZ.
 The SHOW DZ STATISTICS command displays statistics for active connections.
 The SET DZ DISCONNECT=linenumber disconnects the specified line.
 
-The DZ11 implements these registers:
+The DZV11 implements these registers:
 
 	name		size	comments
 
@@ -544,7 +554,7 @@ The DZ11 implements these registers:
 	MDMTCL		1	modem control enabled
 	AUTODS		1	autodisconnect enabled
 
-The DZ11 does not support save and restore.  All open connections are
+The DZV11 does not support save and restore.  All open connections are
 lost when the simulator shuts down or the DZ is detached.
 
 2.4 RLV12/RL01,RL02 Cartridge Disk (RL)
@@ -613,9 +623,14 @@ of many disk types:
 	SET RQn RA72		set type to RA72
 	SET RQn RA90		set type to RA90
 	SET RQn RA92		set type to RA92
-	SET RQn RA81		set type to RA81 with n LBN's.
+	SET RQn RAUSER{=n}	set type to RA81 with n LBN's
 
 The type options can be used only when a unit is not attached to a file.
+RAUSER is a "user specified" disk; the user can specify the size of the
+disk in logical block numbers (LBN's, 512 bytes each).  The minimum size
+is 50MB. The maximum size is 2GB if the simulator is compiled without
+64b addressing, 1000GB with 64b addressing.
+
 Units can also be set ONLINE or OFFLINE.
 
 Each RQ controller implements the following special SHOW commands:
@@ -662,13 +677,13 @@ Each RQ controller implements these registers:
 
 Error handling is as follows:
 
-	error	     	processed as
+	error	     		processed as
 
-	not attached	disk not ready
+	not attached		disk not ready
 
-	end of file	assume rest of disk is zero
+	end of file		assume rest of disk is zero
 
-	OS I/O error	report error and stop
+	OS I/O error		report error and stop
 
 2.6 TSV11/TSV05 Magnetic Tape (TS)
 
@@ -780,13 +795,13 @@ The TQ controller implements these registers:
 
 Error handling is as follows:
 
-	error	     	processed as
+	error	     		processed as
 
-	not attached	tape not ready
+	not attached		tape not ready
 
-	end of file	end of medium
+	end of file		end of medium
 
-	OS I/O error	report error and stop
+	OS I/O error		report error and stop
 
 2.8  DELQA/DEQNA Qbus Ethernet Controllers (XQ, XQB)
 
@@ -840,18 +855,18 @@ controller will behave as though the ethernet cable were unplugged.
 
 XQ has the following registers:
 
-	name	size	comments
+	name		size	comments
 
-	SA0	16	station address word 0
-	SA1	16	station address word 1
-	SA2	16	station address word 2
-	SA3	16	station address word 3
-	SA4	16	station address word 4
-	SA5	16	station address word 5
-	CSR	16	control status register
-	VAR	16	vector address register
-	RBDL	32	receive buffer descriptor list
-	XBDL	32	trans(X)mit buffer descriptorlList
+	SA0		16	station address word 0
+	SA1		16	station address word 1
+	SA2		16	station address word 2
+	SA3		16	station address word 3
+	SA4		16	station address word 4
+	SA5		16	station address word 5
+	CSR		16	control status register
+	VAR		16	vector address register
+	RBDL		32	receive buffer descriptor list
+	XBDL		32	trans(X)mit buffer descriptorlList
 
 One final note: because of it's asynchronous nature, the XQ controller is
 not limited to the ~1.5Mbit/sec of the real DEQNA/DELQA controllers,

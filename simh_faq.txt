@@ -199,24 +199,12 @@ the source kit.
 
 2.2 How do I install SIMH with Ethernet support on Windows?
 
-First, you must download download and install the WinPCAP AutoInstaller and
-developer's kit from
+The pre-compiled binaries contain Ethernet support.  Before running these
+binaries, you must download download and install the WinPCAP AutoInstaller from
 
   http://winpcap.polito.it
 
 This creates a network packet driver in Windows for SIMH to attach to.
-
-Second, you must download the Gnu C compiler.  You can get a Windows compatible
-GNU C compiler from:
-
-  http://www.mingw.org
-
-Third, place the include (.h) files from the developer's kit in the C
-compiler's include folder, and the libraries from the developer's kit in C
-compiler's library folder.
-
-Then, the batch file build_mingw_ether.bat can be used to build all the
-simulators, with Ethernet suport where appropriate.
 
 To use network support, you must either be an administrator on the Windows
 machine (implied in Windows 9X), or you must set the windows packet driver to

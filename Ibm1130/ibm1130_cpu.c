@@ -9,13 +9,14 @@
  * or modifications.
  *
  * This is not a supported product, but I welcome bug reports and fixes.
- * Mail to sim@ibm1130.org
+ * Mail to simh@ibm1130.org
 
    25-Jun-01 BLK	Written
    10-May-02 BLK	Fixed bug in MDX instruction
    27-Mar-02 BLK	Made BOSC work even in short form
    16-Aug-02 BLK	Fixed bug in multiply instruction; didn't work with negative values
    18-Mar-03 BLK	Fixed bug in divide instruction; didn't work with negative values
+   23-Jul-03 BLK	Prevented tti polling in CGI mode
 
    The register state for the IBM 1130 CPU is:
 
@@ -470,23 +471,17 @@ t_stat sim_instr (void)
 		if (wait_state) {					/* waiting? */
 			sim_interval = 0;				/* run the clock out */
 
-			if (sim_qcount() <= 1) {		/* waiting for keyboard only */
-				if (keyboard_is_locked()) {		/* CPU is not expecting a keystroke */
+			if (sim_qcount() <= (cgi ? 0 : 1)) {		/* one routine queued? we're waiting for keyboard only */
+				if (keyboard_is_busy()) {						/* we are actually waiting for a keystroke */
+					if ((status = sim_process_event()) != 0) 	/* get it with wait_state still set */
+						reason = status;
+				}
+				else {						/* CPU is not expecting a keystroke (keyboard interrupt) */
 					if (wait_state == WAIT_OP)
-						reason = STOP_WAIT;		/* end the simulation */
+						reason = STOP_WAIT;	/* end the simulation */
 					else
 						reason = STOP_INVALID_INSTR;
 				}
-				else {						/* we are actually waiting for a keystroke */
-					if ((status = sim_process_event()) != 0) /* get it with wait_state still set */
-						reason = status;
-				}
-			}
-			else if (sim_clock_queue == NULL) {	/* not waiting for anything */
-				if (wait_state == WAIT_OP)
-					reason = STOP_WAIT;			/* end the simulation */
-				else
-					reason = STOP_INVALID_INSTR;
 			}
 
 			if (gdu_active())				/* but don't stop simulator if 2250 GDU is running */
@@ -1254,7 +1249,7 @@ void xio_error (char *msg)
  * register_cmd - add a command to the extensible command table
  * ------------------------------------------------------------------------ */
 
-t_stat register_cmd (char *name, t_stat (*action)(int32, char *), int arg, char *help)
+t_stat register_cmd (char *name, t_stat (*action)(int32 flag, char *ptr), int arg, char *help)
 {
 	int i;
 

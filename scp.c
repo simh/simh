@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Jul-03	RMS	Removed unnecessary test in reset_all
    15-Jun-03	RMS	Added register flag REG_VMIO
    25-Apr-03	RMS	Added extended address support (V3.0)
 			Fixed bug in SAVE (found by Peter Schorn)
@@ -1324,7 +1325,6 @@ DEVICE *dptr;
 uint32 i;
 t_stat reason;
 
-if (start < 0) return SCPE_IERR;
 for (i = 0; i < start; i++) {
 	if (sim_devices[i] == NULL) return SCPE_IERR;  }
 for (i = start; (dptr = sim_devices[i]) != NULL; i++) {
@@ -3729,7 +3729,7 @@ for (i = 0; i < sec; i++) {				/* loop */
 	c = sim_os_poll_kbd ();				/* check for stop char */
 	if ((c == SCPE_STOP) || stop_cpu) return SCPE_STOP;
 	if ((i % 10) == 0) {				/* Status every 10 sec */
-	    printf ("Waiting for console Telnet connnection\n");
+	    printf ("Waiting for console Telnet connection\n");
 	    fflush (stdout);  }
 	sim_os_sleep (1);				/* wait 1 second */
 	}

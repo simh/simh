@@ -29,6 +29,8 @@
    tto		teleprinter
    clk		clock
 
+   26-Jul-03	RMS	Increased PTP, TTO timeouts for PDP-15 operating systems
+			Added hardware read-in mode support for PDP-7/9/15
    25-Apr-03	RMS	Revised for extended file support
    14-Mar-03	RMS	Clean up flags on detach
    01-Mar-03	RMS	Added SET/SHOW CLK FREQ support, SET TTI CTRL-C support
@@ -62,7 +64,7 @@
 #define UNIT_PASCII	(1 << UNIT_V_PASCII)
 
 extern int32 M[];
-extern int32 int_hwre[API_HLVL+1], saved_PC;
+extern int32 int_hwre[API_HLVL+1], PC, ASW;
 extern int32 sim_switches;
 extern UNIT cpu_unit;
 
@@ -74,10 +76,10 @@ int32 tto_state = 0;
 int32 clk_tps = 60;					/* ticks/second */
 int32 tmxr_poll = 16000;				/* term mux poll */
 
-int32 ptr (int32 pulse, int32 AC);
-int32 ptp (int32 pulse, int32 AC);
-int32 tti (int32 pulse, int32 AC);
-int32 tto (int32 pulse, int32 AC);
+int32 ptr (int32 pulse, int32 dat);
+int32 ptp (int32 pulse, int32 dat);
+int32 tti (int32 pulse, int32 dat);
+int32 tto (int32 pulse, int32 dat);
 int32 clk_iors (void);
 int32 ptr_iors (void);
 int32 ptp_iors (void);
@@ -188,7 +190,7 @@ DEVICE ptr_dev = {
 DIB ptp_dib = { DEV_PTP, 1, &ptp_iors, { &ptp } };
 
 UNIT ptp_unit = {
-	UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
+	UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), 1000 };
 
 REG ptp_reg[] = {
 	{ ORDATA (BUF, ptp_unit.buf, 8) },
@@ -327,7 +329,7 @@ static const char tto_trans[64] = {
 
 DIB tto_dib = { DEV_TTO, 1, &tto_iors, { &tto } };
 
-UNIT tto_unit = { UDATA (&tto_svc, UNIT_KSR, 0), SERIAL_OUT_WAIT };
+UNIT tto_unit = { UDATA (&tto_svc, UNIT_KSR, 0), 1000 };
 
 REG tto_reg[] = {
 	{ ORDATA (BUF, tto_unit.buf, TTO_WIDTH) },
@@ -358,10 +360,10 @@ DEVICE tto_dev = {
 
 /* Clock: IOT routine */
 
-int32 clk (int32 pulse, int32 AC)
+int32 clk (int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* CLSF */
-	if (TST_INT (CLK)) AC = AC | IOT_SKP;  }
+	if (TST_INT (CLK)) dat = dat | IOT_SKP;  }
 if (pulse & 004) {					/* CLON/CLOF */
 	if (pulse & 040) {				/* CLON */
 	    CLR_INT (CLK);				/* clear flag */
@@ -370,7 +372,7 @@ if (pulse & 004) {					/* CLON/CLOF */
 		sim_activate (&clk_unit,		/* start, calibr */
 		    sim_rtc_init (clk_unit.wait));  }
 	else clk_reset (&clk_dev);  }			/* CLOF */
-return AC;
+return dat;
 }
 
 /* Unit service */
@@ -380,7 +382,7 @@ t_stat clk_svc (UNIT *uptr)
 int32 t;
 
 if (clk_state) {					/* clock on? */
-	M[7] = (M[7] + 1) & 0777777;			/* incr counter */
+	M[7] = (M[7] + 1) & DMASK;			/* incr counter */
 	if (M[7] == 0) SET_INT (CLK);			/* ovrflo? set flag */
 	t = sim_rtc_calb (clk_tps);			/* calibrate clock */
 	sim_activate (&clk_unit, t);			/* reactivate unit */
@@ -426,19 +428,19 @@ return SCPE_OK;
 
 /* Paper tape reader: IOT routine */
 
-int32 ptr (int32 pulse, int32 AC)
+int32 ptr (int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* RSF */
-	if (TST_INT (PTR)) AC = AC | IOT_SKP;  }
+	if (TST_INT (PTR)) dat = dat | IOT_SKP;  }
 if (pulse & 002) {					/* RRB, RCF */
 	CLR_INT (PTR);					/* clear done */
-	AC = AC | ptr_unit.buf;  }			/* return buffer */
+	dat = dat | ptr_unit.buf;  }			/* return buffer */
 if (pulse & 004) {					/* RSA, RSB */
 	ptr_state = (pulse & 040)? 18: 0;		/* set mode */
 	CLR_INT (PTR);					/* clear done */
 	ptr_unit.buf = 0;				/* clear buffer */
 	sim_activate (&ptr_unit, ptr_unit.wait);  }
-return AC;
+return dat;
 }
 
 /* Unit service */
@@ -526,6 +528,39 @@ ptr_unit.flags = ptr_unit.flags & ~UNIT_RASCII;
 return detach_unit (uptr);
 }
 
+/* Hardware RIM loader routines, PDP-7/9/15 */
+
+int32 ptr_getw (FILE *fileref, int32 *hi)
+{
+int32 word, bits, st, ch;
+
+word = st = bits = 0;
+do {	if ((ch = getc (fileref)) == EOF) return -1;
+	if (ch & 0200) {
+	    word = (word << 6) | (ch & 077);
+	    bits = (bits << 1) | ((ch >> 6) & 1);
+	    st++;  }  }
+while (st < 3);
+if (hi != NULL) *hi = bits;
+return word;
+}
+
+t_stat ptr_rim_load (FILE *fileref, int32 origin)
+{
+int32 bits, val;
+
+for (;;) {						/* word loop */
+	if ((val = ptr_getw (fileref, &bits)) < 0) return SCPE_FMT;
+	if (bits & 1) {					/* end of tape? */
+	    if ((val & 0760000) == OP_JMP) {
+		PC = ((origin - 1) & 060000) | (val & 017777);
+		return SCPE_OK;  }
+	    else if (val == OP_HLT) return STOP_HALT;
+	    break;  }
+	else if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
+return SCPE_FMT;
+}
+
 #if defined (PDP4) || defined (PDP7)
 
 /* Bootstrap routine, PDP-4 and PDP-7
@@ -533,12 +568,11 @@ return detach_unit (uptr);
    In a 4K system, the boostrap resides at 7762-7776.
    In an 8K or greater system, the bootstrap resides at 17762-17776.
    Because the program is so small, simple masking can be
-   used to remove addr<5> for a 4K system.
- */
+   used to remove addr<5> for a 4K system. */
 
 #define BOOT_START	017577
-#define BOOT_FPC	017577
-#define BOOT_RPC	017770
+#define BOOT_FPC	017577				/* funny format loader */
+#define BOOT_RPC	017770				/* RIM loader */
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int))
 
 static const int32 boot_rom[] = {
@@ -677,6 +711,10 @@ t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 int32 i, mask, wd;
 extern int32 sim_switches;
 
+#if defined (PDP7)
+if (sim_switches & SWMASK ('H'))			/* hardware RIM load? */
+	return ptr_rim_load (ptr_unit.fileref, ASW);
+#endif
 if (ptr_dib.dev != DEV_PTR) return STOP_NONSTD;		/* non-std addr? */
 if (MEMSIZE < 8192) mask = 0767777;			/* 4k? */
 else mask = 0777777;
@@ -684,7 +722,7 @@ for (i = 0; i < BOOT_LEN; i++) {
 	wd = boot_rom[i];
 	if ((wd >= 0040000) && (wd < 0640000)) wd = wd & mask;
 	M[(BOOT_START & mask) + i] = wd;  }
-saved_PC = ((sim_switches & SWMASK ('F'))? BOOT_FPC: BOOT_RPC) & mask;
+PC = ((sim_switches & SWMASK ('F'))? BOOT_FPC: BOOT_RPC) & mask;
 return SCPE_OK;
 }
 
@@ -694,24 +732,24 @@ return SCPE_OK;
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-return SCPE_ARG;
+return ptr_rim_load (ptr_unit.fileref, ASW);
 }
 
 #endif
 
 /* Paper tape punch: IOT routine */
 
-int32 ptp (int32 pulse, int32 AC)
+int32 ptp (int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* PSF */
-	if (TST_INT (PTP)) AC = AC | IOT_SKP;  }
+	if (TST_INT (PTP)) dat = dat | IOT_SKP;  }
 if (pulse & 002) CLR_INT (PTP);				/* PCF */
 if (pulse & 004) {					/* PSA, PSB, PLS */
 	CLR_INT (PTP);					/* clear flag */
 	ptp_unit.buf = (pulse & 040)?			/* load punch buf */
-	    (AC & 077) | 0200: AC & 0377;		/* bin or alpha */
+	    (dat & 077) | 0200: dat & 0377;		/* bin or alpha */
 	sim_activate (&ptp_unit, ptp_unit.wait);  }	/* activate unit */
-return AC;
+return dat;
 }
 
 /* Unit service */
@@ -782,16 +820,16 @@ return detach_unit (uptr);
 
 /* Terminal input: IOT routine */
 
-int32 tti (int32 pulse, int32 AC)
+int32 tti (int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* KSF */
-	if (TST_INT (TTI)) AC = AC | IOT_SKP;  }
+	if (TST_INT (TTI)) dat = dat | IOT_SKP;  }
 if (pulse & 002) {					/* KRB */
 	CLR_INT (TTI);					/* clear flag */
-	AC = AC | tti_unit.buf & TTI_MASK;  }		/* return buffer */
+	dat = dat | tti_unit.buf & TTI_MASK;  }		/* return buffer */
 if (pulse & 004) {					/* IORS */
-	AC = AC | upd_iors ();  }
-return AC;
+	dat = dat | upd_iors ();  }
+return dat;
 }
 
 /* Unit service */
@@ -870,15 +908,15 @@ return SCPE_OK;
 
 /* Terminal output: IOT routine */
 
-int32 tto (int32 pulse, int32 AC)
+int32 tto (int32 pulse, int32 dat)
 {
 if (pulse & 001) {					/* TSF */
-	if (TST_INT (TTO)) AC = AC | IOT_SKP;  }
+	if (TST_INT (TTO)) dat = dat | IOT_SKP;  }
 if (pulse & 002) CLR_INT (TTO);				/* clear flag */
 if (pulse & 004) {					/* load buffer */
 	sim_activate (&tto_unit, tto_unit.wait);	/* activate unit */
-	tto_unit.buf = AC & TTO_MASK;  }		/* load buffer */
-return AC;
+	tto_unit.buf = dat & TTO_MASK;  }		/* load buffer */
+return dat;
 }
 
 /* Unit service */

@@ -25,6 +25,7 @@
 
    rp		RH/RP/RM moving head disks
 
+   23-Jul-03	RMS	Fixed bug in read header stub
    25-Apr-03	RMS	Revised for extended file support
    21-Nov-02	RMS	Fixed bug in bootstrap (reported by Michael Thompson)
    29-Sep-02	RMS	Added variable vector support
@@ -834,14 +835,14 @@ case FNC_READH:						/* read headers */
 		vpn = PAG_GETVPN (pa10);		/* map addr */
 		if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ) || (rpwc & XWC_MBZ) ||
 	          ((ubmap[0][vpn] & (UMAP_VLD | UMAP_DSB | UMAP_RRV)) != UMAP_VLD)) {
-			rpcs2 = rpcs2 | CS2_NEM;	/* set error */
-			ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
-			break;  }
+		    rpcs2 = rpcs2 | CS2_NEM;		/* set error */
+		    ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
+		    break;  }
 		mpa10 = (ubmap[0][vpn] + PAG_GETOFF (pa10)) & PAMASK;
 		if (MEM_ADDR_NXM (mpa10)) {		/* nx memory? */
-			rpcs2 = rpcs2 | CS2_NEM;	/* set error */
-			ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
-			break;  }
+		    rpcs2 = rpcs2 | CS2_NEM;		/* set error */
+		    ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
+		    break;  }
 		dbuf[twc10] = M[mpa10];			/* write to disk */
 		if ((rpcs2 & CS2_UAI) == 0) ba = ba + 4;  }
 	    if (fc10 = twc10 & (RP_NUMWD - 1)) {	/* fill? */
@@ -850,7 +851,7 @@ case FNC_READH:						/* read headers */
 	    fxwrite (dbuf, sizeof (d10), twc10 + fc10, uptr->fileref);
 	    err = ferror (uptr->fileref);
 	    }						/* end if */
-	else {						/* read, wchk */
+	else {						/* read, wchk, readh */
 	    awc10 = fxread (dbuf, sizeof (d10), wc10, uptr->fileref);
 	    err = ferror (uptr->fileref);
 	    for ( ; awc10 < wc10; awc10++) dbuf[awc10] = 0;
@@ -859,18 +860,20 @@ case FNC_READH:						/* read headers */
 		vpn = PAG_GETVPN (pa10);		/* map addr */
 		if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ) || (rpwc & XWC_MBZ) ||
 	          ((ubmap[0][vpn] & (UMAP_VLD | UMAP_DSB | UMAP_RRV)) != UMAP_VLD)) {
-			rpcs2 = rpcs2 | CS2_NEM;	/* set error */
-			ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
-			break;  }
+		    rpcs2 = rpcs2 | CS2_NEM;		/* set error */
+		    ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
+		    break;  }
 		mpa10 = (ubmap[0][vpn] + PAG_GETOFF (pa10)) & PAMASK;
 		if (MEM_ADDR_NXM (mpa10)) {		/* nx memory? */
-			rpcs2 = rpcs2 | CS2_NEM;	/* set error */
-			ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
-			break;  }
-		if (uptr->FUNC == FNC_READ) M[mpa10] = dbuf[twc10];
-		else if (M[mpa10] != dbuf[twc10]) {
-			rpcs2 = rpcs2 | CS2_WCE;	/* set error */
-			break;  }
+		    rpcs2 = rpcs2 | CS2_NEM;		/* set error */
+		    ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
+		    break;  }
+		if ((uptr->FUNC == FNC_READ) ||		/* read or */
+		    (uptr->FUNC == FNC_READH))		/* read header */
+		     M[mpa10] = dbuf[twc10];
+		else if (M[mpa10] != dbuf[twc10]) {	/* wchk, mismatch? */
+		     rpcs2 = rpcs2 | CS2_WCE;		/* set error */
+		     break;  }
 		if ((rpcs2 & CS2_UAI) == 0) ba = ba + 4;  }
 	    }						/* end else */
 

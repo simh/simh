@@ -13,14 +13,17 @@ commands may NOT be accurate. This should probably be fixed.
  * usual yada-yada. Please keep this notice and the copyright in any distributions
  * or modifications.
  *
- * This is not a supported product, but I welcome bug reports and fixes.
- * Mail to sim@ibm1130.org
- *
  * Revision History
+ * 15-jun-03	moved actual read on XIO read to end of time interval,
+ *				as the APL boot card required 2 instructions to run between	the
+ *				time read was initiated and the time the data was read (a jump and a wait)
+ *
  * 01-sep-02	corrected treatment of -m and -r flags in dsk_attach
  *		in cgi mode, so that file is opened readonly but emulated
  *		disk is writable.
  *
+ * This is not a supported product, but I welcome bug reports and fixes.
+ * Mail to simh@ibm1130.org
  */
 
 #include "ibm1130_defs.h"
@@ -75,6 +78,7 @@ static int16 dsk_sec[DSK_NUMDR] = {0};	/* next-sector-up */
 static char dsk_lastio[DSK_NUMDR];		/* last stdio operation: IO_READ or IO_WRITE */
 int32 dsk_swait = 50;					/* seek time  -- see how short a delay we can get away with */
 int32 dsk_rwait = 50;					/* rotate time */
+static t_bool raw_disk_debug = FALSE;
 
 static t_stat dsk_svc    (UNIT *uptr);
 static t_stat dsk_reset  (DEVICE *dptr);
@@ -141,6 +145,15 @@ static int32 dsk_ilswlevel[DSK_NUMDR] =
 	2, 2, 2, 2
 };
 
+typedef enum {DSK_FUNC_IDLE, DSK_FUNC_READ, DSK_FUNC_VERIFY, DSK_FUNC_WRITE, DSK_FUNC_SEEK, DSK_FUNC_FAILED} DSK_FUNC;
+
+static struct tag_dsk_action { 				/* stores data needed for pending IO activity */
+	int32	 io_address;
+	uint32	 io_filepos;
+	int		 io_nwords;
+	int		 io_sector;
+} dsk_action[DSK_NUMDR];
+
 /* xio_disk - XIO command interpreter for the disk drives */
 /*
  * device status word:
@@ -167,7 +180,7 @@ extern void void_backtrace (int afrom, int ato);
 void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 {
 	int i, rev, nsteps, newcyl, sec, nwords;
-	t_addr newpos;
+	uint32 newpos;							// changed from t_addr to uint32 in anticipation of simh 64-bit development
 	char msg[80];
 	UNIT *uptr = dsk_unit+drv;
 	int16 buf[DSK_NUMWD];
@@ -195,7 +208,7 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 
 			nwords = M[iocc_addr++ & mem_mask];		/* get word count w/o upsetting SAR/SBR */
 
-			if (nwords == 0)						/* this is bad -- locks up disk controller ! */
+			if (nwords == 0)						/* this is bad -- on real 1130, this locks up disk controller ! */
 				break;
 
 			if (! BETWEEN(nwords, 1, DSK_NUMWD)) {	/* count bad */
@@ -205,49 +218,32 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 
 			sec = modify & 0x07;					/* get sector on cylinder */
 
-			if ((modify & 0x0080) == 0) {			/* it's real if not a read check */
+			if ((modify & 0x0080) == 0) {			/* it's a real read if it's not a read check */
+				// ah. We have a problem. The APL boot card counts on there being time for at least one
+				// more instruction to execute between the XIO read and the time the data starts loading
+				// into core. So, we have to defer the actual read operation a bit. Might as well wait
+				// until it's time to issue the operation complete interrupt. This means saving the
+				// IO information, then performing the actual read in dsk_svc.
+
 				newpos = (uptr->CYL*DSK_NUMSC*DSK_NUMSF + sec)*2*DSK_NUMWD;
 
-				if (MEM_MAPPED(uptr)) {
-					memcpy(buf, (char *) uptr->filebuf + newpos, 2*DSK_NUMWD);
-				}
-				else {
-					if (uptr->pos != newpos || dsk_lastio[drv] != IO_READ) {
-						fseek(uptr->fileref, newpos, SEEK_SET);
-						dsk_lastio[drv] = IO_READ;
-					}
-					fxread(buf, 2, DSK_NUMWD, uptr->fileref);	// read whole sector so we're in position for next read
-					uptr->pos = newpos + 2*DSK_NUMWD;
-				}
+				dsk_action[drv].io_address = iocc_addr;
+				dsk_action[drv].io_nwords  = nwords;
+				dsk_action[drv].io_sector  = sec;
+				dsk_action[drv].io_filepos = newpos;
 
-				void_backtrace(iocc_addr, iocc_addr + nwords - 1);		// mark prev instruction as altered
-
-				trace_io("* DSK%d read %d words from %d.%d (%x, %x) to M[%04x-%04x]", drv, nwords, uptr->CYL, sec, uptr->CYL*8 + sec, newpos, iocc_addr & mem_mask,
-					(iocc_addr + nwords - 1) & mem_mask);
-
-//		// this will help debug the monitor by letting me watch phase loading
-//				if (nwords >= 3)
-//					printf("* DSK%d XIO @ %04x read %d words from %d.%d (%x, %x) to M[%04x-%04x]\n", drv, prev_IAR, nwords, uptr->CYL, sec, uptr->CYL*8 + sec, newpos, iocc_addr & mem_mask,
-//						(iocc_addr + nwords - 1) & mem_mask);
-
-				i = uptr->CYL*8 + sec;
-				if (buf[0] != i)
-					printf("*DSK read bad sector#\n");
-
-				for (i = 0; i < nwords; i++)
-					M[(iocc_addr+i) & mem_mask] = buf[i];
-
-#ifdef TRACE_DMS_IO
-				if (trace_dms)
-					tracesector(0, nwords, iocc_addr & mem_mask, uptr->CYL*8 + sec);
-#endif
+				uptr->FUNC = DSK_FUNC_READ;
 			}
-			else
+			else {
 				trace_io("* DSK%d verify %d.%d (%x)", drv, uptr->CYL, sec, uptr->CYL*8 + sec);
 
-			uptr->FUNC = func;
-			sim_activate(uptr, dsk_rwait);
+				if (raw_disk_debug)
+					printf("* DSK%d verify %d.%d (%x)", drv, uptr->CYL, sec, uptr->CYL*8 + sec);
 
+				uptr->FUNC = DSK_FUNC_VERIFY;
+			}
+
+			sim_activate(uptr, dsk_rwait);
 			break;
 
 		case XIO_INITW:
@@ -279,7 +275,8 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 
 			trace_io("* DSK%d wrote %d words from M[%04x-%04x] to %d.%d (%x, %x)", drv, nwords, iocc_addr & mem_mask, (iocc_addr + nwords - 1) & mem_mask, uptr->CYL, sec, uptr->CYL*8 + sec, newpos);
 
-//			printf("* DSK%d XIO @ %04x wrote %d words from M[%04x-%04x] to %d.%d (%x, %x)\n", drv, prev_IAR, nwords, iocc_addr & mem_mask, (iocc_addr + nwords - 1) & mem_mask, uptr->CYL, sec, uptr->CYL*8 + sec, newpos);
+			if (raw_disk_debug)
+				printf("* DSK%d XIO @ %04x wrote %d words from M[%04x-%04x] to %d.%d (%x, %x)\n", drv, prev_IAR, nwords, iocc_addr & mem_mask, (iocc_addr + nwords - 1) & mem_mask, uptr->CYL, sec, uptr->CYL*8 + sec, newpos);
 
 #ifdef TRACE_DMS_IO
 			if (trace_dms)
@@ -309,7 +306,7 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 				uptr->pos = newpos + 2*DSK_NUMWD;
 			}
 
-			uptr->FUNC = func;
+			uptr->FUNC = DSK_FUNC_WRITE;
 			sim_activate(uptr, dsk_rwait);
 			break;
 
@@ -332,7 +329,7 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 			else if (newcyl >= DSK_NUMCY)
 				newcyl = DSK_NUMCY-1;
 
-			uptr->FUNC = func;
+			uptr->FUNC = DSK_FUNC_SEEK;
 			uptr->CYL  = newcyl;
 			sim_activate(uptr, dsk_swait);			/* schedule interrupt */
 
@@ -371,30 +368,78 @@ static void diskfail (UNIT *uptr, int errflag)
 {
 	sim_cancel(uptr);					/* cancel any pending ops */
 	SETBIT(uptr->flags, errflag);		/* set the error flag */
-	uptr->FUNC = XIO_FAILED;			/* tell svc routine why it failed */
+	uptr->FUNC = DSK_FUNC_FAILED;		/* tell svc routine why it failed */
 	sim_activate(uptr, 1);				/* schedule an immediate op complete interrupt */
 }
 
 t_stat dsk_svc (UNIT *uptr)
 {
-	int drv = uptr - dsk_unit;
+	int drv = uptr - dsk_unit, i, nwords, sec;
+	int16 buf[DSK_NUMWD];
+	uint32 newpos;							// changed from t_addr to uint32 in anticipation of simh 64-bit development
+	int32 iocc_addr;
+	
+	if (uptr->FUNC == DSK_FUNC_IDLE)					/* service function called with no activity? not good, but ignore */
+		return SCPE_OK;
 
-	CLRBIT(dsk_dsw[drv], DSK_DSW_DISK_BUSY);				/* activate operation complete interrupt */
+	CLRBIT(dsk_dsw[drv], DSK_DSW_DISK_BUSY);			/* activate operation complete interrupt */
 	SETBIT(dsk_dsw[drv], DSK_DSW_OP_COMPLETE);
 
 	if (uptr->flags & (UNIT_OPERR|UNIT_HARDERR)) {		/* word count error or data error */
 		SETBIT(dsk_dsw[drv], DSK_DSW_DATA_ERROR);
-		CLRBIT(uptr->flags, UNIT_OPERR);					/* but don't clear hard error */
+		CLRBIT(uptr->flags, UNIT_OPERR);				/* soft error is one time occurrence; don't clear hard error */
 	}
-
+														/* schedule interrupt */
 	SETBIT(ILSW[dsk_ilswlevel[drv]], dsk_ilswbit[drv]);
 
-#ifdef XXXX
-	switch (uptr->FUNC) {
-		case XIO_CONTROL:
-		case XIO_INITR:
-		case XIO_INITW:
-		case XIO_FAILED:
+	switch (uptr->FUNC) {								/* take care of business */
+		case DSK_FUNC_IDLE:
+		case DSK_FUNC_VERIFY:
+		case DSK_FUNC_WRITE:
+		case DSK_FUNC_SEEK:
+		case DSK_FUNC_FAILED:
+			break;
+
+		case DSK_FUNC_READ:									/* actually read the data into core */
+			iocc_addr = dsk_action[drv].io_address;			/* recover saved parameters */
+			nwords    = dsk_action[drv].io_nwords;
+			newpos    = dsk_action[drv].io_filepos;
+			sec       = dsk_action[drv].io_sector;
+
+			if (MEM_MAPPED(uptr)) {
+				memcpy(buf, (char *) uptr->filebuf + newpos, 2*DSK_NUMWD);
+			}
+			else {
+				if (uptr->pos != newpos || dsk_lastio[drv] != IO_READ) {
+					fseek(uptr->fileref, newpos, SEEK_SET);
+					dsk_lastio[drv] = IO_READ;
+					uptr->pos = newpos;
+				}
+				fxread(buf, 2, DSK_NUMWD, uptr->fileref);	// read whole sector so we're in position for next read
+				uptr->pos = newpos + 2*DSK_NUMWD;
+			}
+
+			void_backtrace(iocc_addr, iocc_addr + nwords - 1);		// mark prev instruction as altered
+
+			trace_io("* DSK%d read %d words from %d.%d (%x, %x) to M[%04x-%04x]", drv, nwords, uptr->CYL, sec, uptr->CYL*8 + sec, newpos, iocc_addr & mem_mask,
+				(iocc_addr + nwords - 1) & mem_mask);
+
+//		// this will help debug the monitor by letting me watch phase loading
+			if (raw_disk_debug)
+				printf("* DSK%d XIO @ %04x read %d words from %d.%d (%x, %x) to M[%04x-%04x]\n", drv, prev_IAR, nwords, uptr->CYL, sec, uptr->CYL*8 + sec, newpos, iocc_addr & mem_mask,
+					(iocc_addr + nwords - 1) & mem_mask);
+
+			i = uptr->CYL*8 + sec;
+			if (buf[0] != i)
+				printf("*DSK read bad sector #\n");
+
+			for (i = 0; i < nwords; i++)
+				M[(iocc_addr+i) & mem_mask] = buf[i];
+
+#ifdef TRACE_DMS_IO
+			if (trace_dms)
+				tracesector(0, nwords, iocc_addr & mem_mask, uptr->CYL*8 + sec);
+#endif
 			break;
 		
 		default:
@@ -402,8 +447,8 @@ t_stat dsk_svc (UNIT *uptr)
 			break;
 			
 	}
-	uptr->FUNC = -1;			// we're done with this operation
-#endif
+
+	uptr->FUNC = DSK_FUNC_IDLE;			// we're done with this operation
 
 	return SCPE_OK;
 }
@@ -428,7 +473,7 @@ t_stat dsk_reset (DEVICE *dptr)
 		CLRBIT(uptr->flags, UNIT_OPERR|UNIT_HARDERR);
 
 		uptr->CYL    = 0;
-		uptr->FUNC   = -1;
+		uptr->FUNC   = DSK_FUNC_IDLE;
 		dsk_dsw[drv] = (uptr->flags & UNIT_ATT) ? DSK_DSW_CARRIAGE_HOME : 0;
 	}
 
@@ -450,7 +495,7 @@ static t_stat dsk_attach (UNIT *uptr, char *cptr)
 			return rval;
 
 	uptr->CYL    =  0;										// reset the device
-	uptr->FUNC   = -1;
+	uptr->FUNC   = DSK_FUNC_IDLE;
 	dsk_dsw[drv] = DSK_DSW_CARRIAGE_HOME;
 
 	CLRBIT(uptr->flags, UNIT_RO|UNIT_ROABLE|UNIT_BUFABLE|UNIT_BUF|UNIT_RONLY|UNIT_OPERR|UNIT_HARDERR);
@@ -479,6 +524,7 @@ static t_stat dsk_attach (UNIT *uptr, char *cptr)
 	}
 
 	enable_dms_tracing(sim_switches & SWMASK('D'));
+	raw_disk_debug = sim_switches & SWMASK('G');
 
 	return SCPE_OK;
 }
@@ -498,7 +544,7 @@ static t_stat dsk_detach (UNIT *uptr)
 	calc_ints();
 
 	uptr->CYL    =  0;
-	uptr->FUNC   = -1;
+	uptr->FUNC   = DSK_FUNC_IDLE;
 	dsk_dsw[drv] = DSK_DSW_NOT_READY;
 
 	if (drv == 0) {
@@ -518,7 +564,7 @@ static t_stat dsk_boot (int unitno, DEVICE *dptr)
 	if ((rval = reset_all(0)) != SCPE_OK)
 		return rval;
 
-	return load_cr_boot(unitno);
+	return load_cr_boot(unitno, sim_switches);
 }
 
 #ifdef TRACE_DMS_IO

@@ -58,9 +58,11 @@ ibm1130D = ./
 ibm1130  = ${ibm1130D}ibm1130_sys.c	${ibm1130D}ibm1130_cpu.c \
 	   ${ibm1130D}ibm1130_cr.c	${ibm1130D}ibm1130_disk.c \
 	   ${ibm1130D}ibm1130_stddev.c	${ibm1130D}ibm1130_gdu.c \
-	   ${ibm1130D}ibm1130_gui.c	${ibm1130D}ibm1130_prt.c
+	   ${ibm1130D}ibm1130_gui.c	${ibm1130D}ibm1130_prt.c \
+	   ${ibm1130D}ibm1130_fmt.c
+
 ibm1130_INC = ibm1130res.h ibm1130_conin.h ibm1130_conout.h \
-	      ibm1130_defs.h ibm1130_prtwheel.h \
+	      ibm1130_defs.h ibm1130_prtwheel.h ibm1130_fmt.h \
 	      dmsr2v12phases.h dmsr2v12slet.h
 
 #

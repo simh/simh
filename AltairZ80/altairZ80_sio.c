@@ -126,13 +126,13 @@ extern UNIT cpu_unit;
 
 /* SIMH pseudo device status registers																																					*/
 /* ZSDOS clock definitions																																											*/
-static int32 ClockZSDOSDelta				= 0;			/* delta between real clock and Altair clock											*/
+static time_t ClockZSDOSDelta				= 0;			/* delta between real clock and Altair clock											*/
 static int32 setClockZSDOSPos				= 0;			/* determines state for receiving address of parameter block			*/
 static int32 setClockZSDOSAdr				= 0;			/* address in M of 6 byte parameter block for setting time				*/
 static int32 getClockZSDOSPos				= 0;			/* determines state for sending clock information									*/
 
 /* CPM3 clock definitions																																												*/
-static int32 ClockCPM3Delta					= 0;			/* delta between real clock and Altair clock											*/
+static time_t ClockCPM3Delta				= 0;			/* delta between real clock and Altair clock											*/
 static int32 setClockCPM3Pos				= 0;			/* determines state for receiving address of parameter block			*/
 static int32 setClockCPM3Adr				= 0;			/* address in M of 5 byte parameter block for setting time				*/
 static int32 getClockCPM3Pos				= 0;			/* determines state for sending clock information									*/
@@ -658,11 +658,12 @@ enum simhPseudoDeviceCommands { /* do not change order or remove commands, add o
 #define cpmCommandLineLength	128
 #define splimit								10	/* stack depth of timer stack	*/
 static uint32 markTime[splimit];	/* timer stack								*/
-static struct tm *currentTime = NULL;
+static struct tm currentTime;
+static int32 currentTimeValid = FALSE;
 static char version[] = "SIMH002";
 
 static t_stat simh_dev_reset(DEVICE *dptr) {
-	currentTime							= NULL;
+	currentTimeValid				= FALSE;
 	ClockZSDOSDelta					= 0;
 	setClockZSDOSPos				= 0;
 	getClockZSDOSPos				= 0;
@@ -783,7 +784,7 @@ static void setClockCPM3(void) {
 }
 
 static int32 simh_in(const int32 port) {
-	int32 result;
+	int32 result = 0;
 	switch(lastCommand) {
 		case attachPTRCmd:
 		case attachPTPCmd:
@@ -791,31 +792,31 @@ static int32 simh_in(const int32 port) {
 			lastCommand = 0;
 			break;
 		case getClockZSDOSCmd:
-			if (currentTime) {
+			if (currentTimeValid) {
 				switch(getClockZSDOSPos) {
 					case 0:
-						result = toBCD(currentTime -> tm_year > 99 ?
-							currentTime -> tm_year - 100 : currentTime -> tm_year);
+						result = toBCD(currentTime.tm_year > 99 ?
+							currentTime.tm_year - 100 : currentTime.tm_year);
 						getClockZSDOSPos = 1;
 						break;
 					case 1:
-						result = toBCD(currentTime -> tm_mon + 1);
+						result = toBCD(currentTime.tm_mon + 1);
 						getClockZSDOSPos = 2;
 						break;
 					case 2:
-						result = toBCD(currentTime -> tm_mday);
+						result = toBCD(currentTime.tm_mday);
 						getClockZSDOSPos = 3;
 						break;
 					case 3:
-						result = toBCD(currentTime -> tm_hour);
+						result = toBCD(currentTime.tm_hour);
 						getClockZSDOSPos = 4;
 						break;
 					case 4:
-						result = toBCD(currentTime -> tm_min);
+						result = toBCD(currentTime.tm_min);
 						getClockZSDOSPos = 5;
 						break;
 					case 5:
-						result = toBCD(currentTime -> tm_sec);
+						result = toBCD(currentTime.tm_sec);
 						getClockZSDOSPos = lastCommand = 0;
 						break;
 				}
@@ -825,7 +826,7 @@ static int32 simh_in(const int32 port) {
 			}
 			break;
 		case getClockCPM3Cmd:
-			if (currentTime) {
+			if (currentTimeValid) {
 				switch(getClockCPM3Pos) {
 					case 0:
 						result = daysCPM3SinceOrg & 0xff;
@@ -836,15 +837,15 @@ static int32 simh_in(const int32 port) {
 						getClockCPM3Pos = 2;
 						break;
 					case 2:
-						result = toBCD(currentTime -> tm_hour);
+						result = toBCD(currentTime.tm_hour);
 						getClockCPM3Pos = 3;
 						break;
 					case 3:
-						result = toBCD(currentTime -> tm_min);
+						result = toBCD(currentTime.tm_min);
 						getClockCPM3Pos = 4;
 						break;
 					case 4:
-						result = toBCD(currentTime -> tm_sec);
+						result = toBCD(currentTime.tm_sec);
 						getClockCPM3Pos = lastCommand = 0;
 						break;
 				}
@@ -1012,7 +1013,8 @@ static int32 simh_out(const int32 port, const int32 data) {
 				case getClockZSDOSCmd:
 					time(&now);
 					now += ClockZSDOSDelta;
-					currentTime = localtime(&now);
+					currentTime = *localtime(&now);
+					currentTimeValid = TRUE;
 					getClockZSDOSPos = 0;
 					break;
 				case setClockZSDOSCmd:
@@ -1021,7 +1023,8 @@ static int32 simh_out(const int32 port, const int32 data) {
 				case getClockCPM3Cmd:
 					time(&now);
 					now += ClockCPM3Delta;
-					currentTime = localtime(&now);
+					currentTime = *localtime(&now);
+					currentTimeValid = TRUE;
 					daysCPM3SinceOrg = (now - mkCPM3Origin()) / secondsPerDay;
 					getClockCPM3Pos = 0;
 					break;

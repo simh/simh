@@ -528,7 +528,7 @@ if (map) map[objc] = tpos;
 return objc;
 }
 
-/* Find the preceding record length in a TPC file */
+/* Find the preceding record in a TPC file */
 
 t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map)
 {

@@ -72,7 +72,8 @@ BSC32_SBRS= \
 	$(INTDIR)/scp.sbr \
 	$(INTDIR)/scp_tty.sbr \
 	$(INTDIR)/sim_tmxr.sbr \
-	$(INTDIR)/sim_sock.sbr
+	$(INTDIR)/sim_sock.sbr \
+	$(INTDIR)/ibm1130_fmt.sbr
 
 $(OUTDIR)/ibm1130.bsc : $(OUTDIR)  $(BSC32_SBRS)
     $(BSC32) @<<
@@ -99,7 +100,8 @@ LINK32_OBJS= \
 	$(INTDIR)/scp.obj \
 	$(INTDIR)/scp_tty.obj \
 	$(INTDIR)/sim_tmxr.obj \
-	$(INTDIR)/sim_sock.obj
+	$(INTDIR)/sim_sock.obj \
+	$(INTDIR)/ibm1130_fmt.obj
 
 $(OUTDIR)/ibm1130.exe : $(OUTDIR)  $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
@@ -149,7 +151,8 @@ BSC32_SBRS= \
 	$(INTDIR)/scp.sbr \
 	$(INTDIR)/scp_tty.sbr \
 	$(INTDIR)/sim_tmxr.sbr \
-	$(INTDIR)/sim_sock.sbr
+	$(INTDIR)/sim_sock.sbr \
+	$(INTDIR)/ibm1130_fmt.sbr
 
 $(OUTDIR)/ibm1130.bsc : $(OUTDIR)  $(BSC32_SBRS)
     $(BSC32) @<<
@@ -176,7 +179,8 @@ LINK32_OBJS= \
 	$(INTDIR)/scp.obj \
 	$(INTDIR)/scp_tty.obj \
 	$(INTDIR)/sim_tmxr.obj \
-	$(INTDIR)/sim_sock.obj
+	$(INTDIR)/sim_sock.obj \
+	$(INTDIR)/ibm1130_fmt.obj
 
 $(OUTDIR)/ibm1130.exe : $(OUTDIR)  $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
@@ -249,7 +253,7 @@ $(INTDIR)/ibm1130_stddev.obj :  $(SOURCE)  $(DEP_IBM1130_) $(INTDIR)
 SOURCE=.\ibm1130.rc
 DEP_IBM1130_R=\
 	.\1130consoleblank.bmp\
-	.\HAND.CUR
+	.\hand.cur
 
 $(INTDIR)/ibm1130.res :  $(SOURCE)  $(DEP_IBM1130_R) $(INTDIR)
    $(RSC) $(RSC_PROJ)  $(SOURCE) 
@@ -353,6 +357,14 @@ DEP_SIM_S=\
 
 $(INTDIR)/sim_sock.obj :  $(SOURCE)  $(DEP_SIM_S) $(INTDIR)
    $(CPP) $(CPP_PROJ)  $(SOURCE) 
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=.\ibm1130_fmt.c
+
+$(INTDIR)/ibm1130_fmt.obj :  $(SOURCE)  $(INTDIR)
 
 # End Source File
 # End Group

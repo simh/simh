@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Jul-03	RMS	Updated for "hardware" RIM loader
+			Revised to detect I/O wait hang
    05-Dec-02	RMS	Added IOT skip support (required by drum)
    14-Apr-99	RMS	Changed t_addr to unsigned
 
@@ -34,7 +36,9 @@
 
    Automatic multiply/divide	Type 10
    Memory extension control	Type 15
+   Serial drum			Type 24
    Line printer control		Type 62
+   Microtape (DECtape) control	Type 550
 */
 
 #include "sim_defs.h"
@@ -46,7 +50,7 @@
 #define STOP_IBKPT	3				/* breakpoint */
 #define STOP_XCT	4				/* nested XCT's */
 #define STOP_IND	5				/* nested indirects */
-#define STOP_WAIT	6				/* wait state */
+#define STOP_WAIT	6				/* IO wait hang */
 
 /* Memory */
 
@@ -59,11 +63,14 @@
 /* Architectural constants */
 
 #define DMASK		0777777				/* data mask */
-#define DAMASK		007777				/* direct addr */
+#define DAMASK		0007777				/* direct addr */
 #define EPCMASK		(AMASK & ~DAMASK)		/* extended addr */
-#define IA		010000				/* indirect flag */
-#define IO_WAIT		010000				/* I/O sync wait */
-#define IO_CPLS		004000				/* completion pulse */
+#define IA		0010000				/* indirect flag */
+#define IO_WAIT		0010000				/* I/O sync wait */
+#define IO_CPLS		0004000				/* completion pulse */
+#define OP_DAC		0240000				/* DAC */
+#define OP_DIO		0320000				/* DIO */
+#define OP_JMP		0600000				/* JMP */
 #define GEN_CPLS(x)	(((x) ^ ((x) << 1)) & IO_WAIT)	/* completion pulse? */
 
 /* IOT subroutine return codes */
@@ -95,6 +102,17 @@
 #define IOS_SQB		(1 << IOS_V_SQB)
 #define IOS_PNT		(1 << IOS_V_PNT)
 #define IOS_SPC		(1 << IOS_V_SPC)
+
+/* Completion pulses */
+
+#define CPLS_V_PTR	5
+#define CPLS_V_PTP	4
+#define CPLS_V_TTO	3
+#define CPLS_V_LPT	2
+#define CPLS_PTR	(1 << CPLS_V_PTR)
+#define CPLS_PTP	(1 << CPLS_V_PTP)
+#define CPLS_TTO	(1 << CPLS_V_TTO)
+#define CPLS_LPT	(1 << CPLS_V_LPT)
 
 /* Sequence break flags */
 

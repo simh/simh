@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	18b PDP Simulator Usage
-Date:	01-Feb-2003
+Date:	25-Jul-2003
 
 			COPYRIGHT NOTICE
 
@@ -44,29 +44,33 @@ PDP-7/		PDP7
 PDP-9/		PDP9
 PDP-15/		PDP15
 
-If no model is specified, the default is the PDP-9.
+If no model is specified, the default is the PDP-15.
 
-sim/		sim_defs.h
-		sim_rev.h
-		sim_sock.h
-		sim_tmxr.h
-		scp.c
-		scp_tty.c
-		sim_sock.c
-		sim_tmxr.c
+				      PDP-4   PDP-7   PDP-9   PDP-15
+sim/		sim_defs.h		x	x	x	x
+		sim_rev.h		x	x	x	x
+		sim_sock.h		x	x	x	x
+		sim_tape.h				x	x
+		sim_tmxr.h		x	x	x	x
+		scp.c			x	x	x	x
+		scp_tty.c		x	x	x	x
+		sim_sock.c		x	x	x	x
+		sim_tape.c				x	x
+		sim_tmxr.c		x	x	x	x
 
-sim/pdp18b/	pdp18b_defs.h
-		pdp18b_cpu.c
-		pdp18b_drm.c
-		pdp18b_dt.c
-		pdp18b_lp.c
-		pdp18b_mt.c
-		pdp18b_rb.c
-		pdp18b_rf.c
-		pdp18b_rp.c
-		pdp18b_stddev.c
-		pdp18b_sys.c
-		pdp18b_tt1.c
+sim/pdp18b/	pdp18b_defs.h		x	x	x	x
+		pdp18b_cpu.c		x	x	x	x
+		pdp18b_drm.c		x	x
+		pdp18b_dt.c		x	x	x	x
+		pdp18b_fpp.c					x
+		pdp18b_lp.c		x	x	x	x
+		pdp18b_mt.c				x	x
+		pdp18b_rb.c				x
+		pdp18b_rf.c				x	x
+		pdp18b_rp.c					x
+		pdp18b_stddev.c		x	x	x	x
+		pdp18b_sys.c		x	x	x	x
+		pdp18b_tt1.c				x	x
 
 2. 18b PDP Features
 
@@ -77,6 +81,7 @@ system	device		simulates
 	name(s)
 
 PDP-4	CPU		PDP-4 CPU with 8KW of memory
+	-		Type 18 extended arithmetic element (EAE)
 	PTR,PTP		integral paper tape/Type 75 punch
 	TTI,TTO		KSR28 console terminal (Baudot code)
 	LPT		Type 62 line printer (Hollerith code)
@@ -116,6 +121,9 @@ PDP-15	CPU		PDP-15 CPU with 32KW of memory
 	-		KA15 automatic priority interrupt (API)
 	-		KF15 power detection
 	-		KM15 memory protection
+	-		KT15 memory relocation and protection
+	-		XVM memory relocation and protection
+	FPP		FP15 floating point processor
 	PTR,PTP		PC15 paper tape reader/punch
 	TTI,TTO		KSR 35 console terminal
 	TTI1,TTO1	LT15 second console terminal
@@ -145,36 +153,58 @@ The 18b PDP simulators implement several unique stop conditions:
 	- more than XCTMAX nested executes are detected during
 	  instruction execution
 
-The PDP-4 and PDP-7 loaders support only RIM format tapes.  The PDP-9
-and PDP-15 support both RIM and BIN format tapes.  If the file extension
-is .RIM, or the -r switch is specified with LOAD, the file is assumed to
-be RIM format; if the file extension is not .RIM, or if the -b switch is
-specified, the file is assumed to be BIN format.  RIM loading requires
-that the loading address be specified on the command line.
+The PDP-4 and PDP-7 LOAD command supports only "second stage" RIM format
+files (alternating DAC address instructions and data):
+
+	LOAD file			load PDP-4/PDP-7 RIM format file
+
+The PDP-9 and PDP-15 LOAD commands upports hardware RIM format (data only),
+PDP-4/PDP-7 RIM loader format (for compatability with Macro7), and BIN
+loader format:
+
+	LOAD -S file			load PDP-4/PDP-7 RIM format file
+	LOAD -R file address		load PDP-9/PDP-15 RIM format
+					  file starting at address
+	LOAD file.RIM address		assume file is PDP-9/PDP-15
+					  RIM format
+	LOAD -B file			load PDP-9/PDP-15 BIN format file
+	LOAD file.BIN			assume file is PDP-9/PDP-15
+					  BIN format
+
+If no address is given for a RIM format load, a starting address of 200
+(octal) is assumed.  If no switch is specified, and the file extension is
+neither RIM nor BIN, the file format is assumed to be BIN.
 
 2.1 CPU
 
-The CPU options are the presence of the EAE, the presense of the API (for
-the PDP-9 and PDP-15), and the size of main memory.
+The CPU options are the presence of the EAE, the presense of the API and
+memory protection (for the PDP-9 and PDP-15), the presense of relocation
+or XVM (PDP-15 only), and the size of main memory.
 
-	SET CPU EAE		enable EAE
-	SET CPU NOEAE		disable EAE
-	SET CPU API		enable API
-	SET CPU NOAPI		disable API
-	SET CPU 4K		set memory size = 4K
-	SET CPU 8K		set memory size = 8K
-	SET CPU 12K		set memory size = 12K
-	SET CPU 16K		set memory size = 16K
-	SET CPU 20K		set memory size = 20K
-	SET CPU 24K		set memory size = 24K
-	SET CPU 28K		set memory size = 28K
-	SET CPU 32K		set memory size = 32K
-	SET CPU 48K		set memory size = 48K
-	SET CPU 64K		set memory size = 64K
-	SET CPU 80K		set memory size = 80K
-	SET CPU 96K		set memory size = 96K
-	SET CPU 112K		set memory size = 112K
-	SET CPU 128K		set memory size = 128K
+	system	option			comment
+
+	all	SET CPU EAE		enable EAE
+	all	SET CPU NOEAE		disable EAE
+	9,15	SET CPU API		enable API
+	9,15	SET CPU NOAPI		disable API
+	9,15	SET CPU PROT		enable memory protection
+	15	SET CPU RELOC		enable memory relocation
+	15	SET CPU XVM		enable XVM relocation
+	9,15	SET CPU NOPROT		disable protection, relocation, XVM
+	4	SET CPU 4K		set memory size = 4K
+	all	SET CPU 8K		set memory size = 8K
+	all	SET CPU 12K		set memory size = 12K
+	all	SET CPU 16K		set memory size = 16K
+	all	SET CPU 20K		set memory size = 20K
+	all	SET CPU 24K		set memory size = 24K
+	all	SET CPU 28K		set memory size = 28K
+	all	SET CPU 32K		set memory size = 32K
+	15	SET CPU 48K		set memory size = 48K
+	15	SET CPU 64K		set memory size = 64K
+	15	SET CPU 80K		set memory size = 80K
+	15	SET CPU 96K		set memory size = 96K
+	15	SET CPU 112K		set memory size = 112K
+	15	SET CPU 128K		set memory size = 128K
 
 Memory sizes greater than 8K are only available on the PDP-7, PDP-9, and
 PDP-15; memory sizes greater than 32KW are only available on the PDP-15.
@@ -182,6 +212,12 @@ If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
 portion of memory is lost.  Initial memory size is 8K for the PDP-4, 32K
 for the PDP-7 and PDP-9, and 128K for the PDP-15.
+
+The PROT option corresponds to the KX09A on the PDP-9 and the KM15 for the
+PDP-15.  The PROT option is required to run the Foreground/Background
+Monitor.  The RELOC option corresponds to the KT15 on the PDP-15, and the
+XVM option corresponds to the XM15 on the PDP-15.  ADSS-15, ADSS-15 Foreground/
+Background, and standard DOS-15 will <not> run if these options are enabled.
 
 CPU registers include the visible state of the processor as well as the
 control registers for the interrupt system.
@@ -191,10 +227,11 @@ control registers for the interrupt system.
 	all	PC		addr	program counter
 	all	AC		18	accumulator
 	all	L		1	link
-	7,9,15	MQ		18	multiplier-quotient
-	7,9,15	SC		6	shift counter
-	7,9,15	EAE_AC_SIGN	1	EAE AC sign
+	all	MQ		18	multiplier-quotient
+	all	SC		6	shift counter
+	all	EAE_AC_SIGN	1	EAE AC sign
 	all	SR		18	front panel switches
+	all	ASW		addr	address switches for RIM load
 	all	INT[0:4]	32	interrupt requests,
 					0:3 = API levels 0-3
 					4 = PI level
@@ -204,12 +241,15 @@ control registers for the interrupt system.
 	9,15	APIENB		1	API enable
 	9,15	APIREQ		8	API requesting levels
 	9,15	APIACT		8	API active levels
-	9,15	BR		addr	memory protection bounds
+	9,15	BR		18	memory protection bounds
 	15	XR		18	index register
 	15	LR		18	limit register
-	15	BR		17	memory protection bounds
+	9,15	BR		18	memory protection bounds
+	15	RR		18	memory protection relocation
+	15	MMR		18	memory protection control
 	9,15	USMD		1	user mode
 	9,15	USMDBUF		1	user mode buffer
+	9,15	USMDDEF		1	user mode load defer
 	9,15	NEXM		1	non-existent memory violation
 	9,15	PRVN		1	privilege violation
 	7,9	EXTM		1	extend mode
@@ -229,18 +269,49 @@ control registers for the interrupt system.
 "addr" signifies the address width of the system (13b for the PDP-4, 15b for
 the PDP-7 and PDP-9, 17b for the PDP-15).
 
-2.2 Programmed I/O Devices
+2.2 Floating Point Processor (FPP)
 
-2.2.1 Paper Tape Reader (PTR)
+The PDP-15 features an optional floating point processor, the FP15 (FPP).
+The FPP can be enabled and disabled; by default it is disabled.
+
+The FPP implements these registers:
+
+	name		size	comments
+
+	FIR		12	floating instruction register
+	EPA		18	EPA (A exponent)
+	FMAS		1	FMA sign
+	FMAH		17	FMA<1:17>
+	FMAL		18	FMA<18:35>
+	EPB		18	EPB (B exponent)
+	FMBS		1	FMB sign
+	FMBH		17	FMB<1:17>
+	FMBL		18	FMB<18:35>
+	FGUARD		1	guard bit
+	FMQH		17	FMQ<1:17>
+	FMQL		18	FMQ<18:35>
+	JEA		18	exception address register
+
+2.3 Programmed I/O Devices
+
+2.3.1 Paper Tape Reader (PTR)
 
 The paper tape reader (PTR) reads data from a disk file.  The POS
 register specifies the number of the next data item to be read.  Thus,
 by changing POS, the user can backspace or advance the reader.
 
-On the PDP-4 and PDP-7, the paper tape reader supports the BOOT command.
-BOOT PTR copies the RIM loader into memory and starts it running, while
-BOOT -F PTR copies the funny format binary loader into memory and starts
-it running.
+The paper tape reader supports the BOOT command.  The specific forms
+recognized vary from system to system:
+
+	BOOT PTR	PDP-4, PDP-7: load RIM loader and start it running
+	BOOT -F PTR	PDP-4, PDP-7: load funny format loader and start
+			  it running
+	BOOT -H PTR	PDP-7: start hardware RIM load at address given
+			  by address switches (ASW)
+	BOOT {-H} PTR	PDP-9, PDP-15: start hardware RIM load at addrss
+			  given by address switches (ASW)
+
+The PDP-4 did not have a hardware read-in mode load capability.
 
 The PTR ATTACH command recognizes one switch, -A for ASCII mode.  In
 ASCII mode, data returned by the read alphabetic command has even parity.
@@ -270,7 +341,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.2 Paper Tape Punch (PTP)
+2.3.2 Paper Tape Punch (PTP)
 
 The paper tape punch (PTP) writes data to a disk file.  The POS
 register specifies the number of the next data item to be written.
@@ -302,7 +373,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.3 Terminal Input (TTI)
+2.3.3 Terminal Input (TTI)
 
 On the PDP-7, PDP-9, and PDP-15, the terminal interfaces (TTI, TTO)
 can be set to one of three modes: KSR, 7B, or 8B.  In KSR mode, lower
@@ -333,7 +404,7 @@ to simulate typing ^C:
 
 	SET TTI CTRL-C
 
-2.2.4 Terminal Output (TTO)
+2.3.4 Terminal Output (TTO)
 
 The terminal output (TTO) writes to the simulator console window.  It
 implements these registers:
@@ -346,7 +417,7 @@ implements these registers:
 	POS		32	number of chararacters output
 	TIME		24	time from I/O initiation to interrupt
 
-2.2.5 Line Printers (LPT, LP9)
+2.3.5 Line Printers (LPT, LP9)
 
 The line printers (LPT, LP9) write data to a disk file.  The POS
 register specifies the number of the next data item to be written.
@@ -423,7 +494,7 @@ For all printers, error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.6 Real-Time Clock (CLK)
+2.3.6 Real-Time Clock (CLK)
 
 The real-time clock (CLK) frequency can be adjusted as follows:
 
@@ -444,7 +515,7 @@ The clock implements these registers:
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
 
-2.2.7 Second Terminal (TTI1, TTO1)
+2.3.7 Second Terminal (TTI1, TTO1)
 
 The second terminal consists of two independent devices, TTI1 and TTO1.
 The second terminal performs input and output through a Telnet session
@@ -491,7 +562,7 @@ The second terminal output implements these registers:
 	DONE		1	device done flag
 	TIME		24	time from I/O initiation to interrupt
 
-2.3 RP15/RP02 Disk Pack (RP)
+2.4 RP15/RP02 Disk Pack (RP)
 
 RP15 options include the ability to make units write enabled or write locked:
 
@@ -526,7 +597,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.4 Type 24 Serial Drum (DRM)
+2.5 Type 24 Serial Drum (DRM)
 
 The serial drum (DRM) implements these registers:
 
@@ -551,7 +622,7 @@ Error handling is as follows:
 Drum data files are buffered in memory; therefore, end of file and OS
 I/O errors cannot occur.
 
-2.5 RB09 Fixed Head Disk (RB)
+2.6 RB09 Fixed Head Disk (RB)
 
 The RB09 was an early fixed-head disk for the PDP-9.  It was superceded
 by the RF09/RS09.  It is disabled by default.
@@ -585,7 +656,7 @@ Error handling is as follows:
 RB09 data files are buffered in memory; therefore, end of file and OS
 I/O errors cannot occur.
 
-2.5 RF09/RF15/RS09 Fixed Head Disk (RF)
+2.7 RF09/RF15/RS09 Fixed Head Disk (RF)
 
 RF09/RF15 options include the ability to set the number of platters
 to a fixed value between 1 and 8, or to autosize the number of platters
@@ -632,7 +703,7 @@ Error handling is as follows:
 RF15/RF09 data files are buffered in memory; therefore, end of file and OS
 I/O errors cannot occur.
 
-2.6 Type 550/555, TC02/TU55, and TC15/TU56 DECtape (DT)
+2.8 Type 550/555, TC02/TU55, and TC15/TU56 DECtape (DT)
 
 The PDP-4 and PDP-7 use the Type 550 DECtape, a programmed I/O controller.
 The PDP-9 uses the TC02, and the PDP-15 uses the TC15.  The TC02 and TC15
@@ -693,7 +764,7 @@ operate correctly.
 	- ACTIME must be less than DCTIME, and both need to be at
 	  least 100 times LTIME
 
-2.7 TC59/TU10 Magnetic Tape (MT)
+2.9 TC59/TU10 Magnetic Tape (MT)
 
 Magnetic tape options include the ability to make units write enabled or
 or write locked.
@@ -727,7 +798,7 @@ Error handling is as follows:
 
 	OS I/O error		parity error; if STOP_IOE, stop
 
-2.8 Symbolic Display and Input
+2.10 Symbolic Display and Input
 
 The 18b PDP simulators implement symbolic display and input.  Display is
 controlled by command line switches:
@@ -754,15 +825,18 @@ The PDP-15 also recognizes an additional input mode:
 	# or -p			five character packed ASCII string in
 				two 18b words
 
-Instruction input uses standard 18b PDP assembler syntax.  There are six
+Instruction input uses standard 18b PDP assembler syntax.  There are eight
 instruction classes: memory reference, EAE, index (PDP-15 only), IOT,
-operate, and LAW.
+operate, LAW, FP15 memory reference (PDP-15 only), and FP15 no operand
+(PDP-15 only).
 
 Memory reference instructions have the format
 
-	memref {I/@} address{,X}
+	PDP-4, PDP-7:	memref {I} address
+	PDP-9:		memref{*} address
+	PDP-15:		memref{*} address{,X}
 
-where I (PDP-4, PDP-7, PDP-9) /@ (PDP-15) signifies indirect reference,
+where I (PDP-4, PDP-7) /* (PDP-9, PDP-15) signifies indirect reference,
 and X signifies indexing (PDP-15 in page mode only).  The address is an
 octal number in the range 0 - 017777 (PDP-4, PDP-7, PDP-9, and PDP-15 in
 bank mode) or 0 - 07777 (PDP-15 in page mode).
@@ -805,13 +879,27 @@ Operate instructions have the format
 The simulator does not check the legality of the proposed combination.  The
 operands for MUY and DVI must be deposited explicitly.
 
-Finally, the LAW instruction has the format
+The LAW instruction has the format
 
 	LAW immediate
 
 where immediate is in the range of 0 to 017777.
 
-2.9 Character Sets
+FP15 memory reference instructions occupy two successive words and have
+the format
+
+	fpmem{*} address
+
+where * signifies indirect addressing.  The address is a number in the range
+0 - 0377777.
+
+FP15 no operand instructions occupy two successive words and have the format
+
+	fpop
+
+The second word is ignored on output and set to 0 on input.
+
+2.11 Character Sets
 
 The PDP-4's console was an ASR-28 Teletype; its character encoding was
 Baudot.  The PDP-4's line printer used a modified Hollerith character

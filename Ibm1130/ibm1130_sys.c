@@ -20,7 +20,7 @@
  * or modifications.
  *
  * This is not a supported product, but I welcome bug reports and fixes.
- * Mail to sim@ibm1130.org
+ * Mail to simh@ibm1130.org
  */
 
 #include "ibm1130_defs.h"

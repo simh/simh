@@ -40,15 +40,17 @@ To compile the PDP-10, you must define VM_PDP10 and USE_INT64 as part of the
 compilation command line.
 
 sim/		sim_defs.h
+		sim_ether.h
 		sim_rev.h
 		sim_sock.h
+		sim_tape.h
 		sim_tmxr.h
-		sim_ether.h
 		scp.c
 		scp_tty.c
-		sim_sock.c
-		sim_tmxr.c
 		sim_ether.c
+		sim_sock.c
+		sim_tape.c
+		sim_tmxr.c
 
 sim/pdp10/	pdp10_defs.h
 		pdp10_cpu.c
@@ -117,11 +119,14 @@ the file format to try to determine the file type.
 
 The CPU options allow the user to specify standard microcode, standard
 microcode with a bug fix for a boostrap problem in TOPS-20 V4.1, or ITS
-microcode
+microcode:
 
 	SET CPU STANDARD	Standard microcode
 	SET CPU TOPS20V41	Standard microcode with TOPS-20 V4.1 bug fix
 	SET CPU ITS		ITS compatible microcode
+
+The CPU implements a SHOW command to display the I/O space address map:
+
 	SHOW CPU IOSPACE	show I/O space address map
 
 CPU registers include the visible state of the processor as well as the
@@ -200,7 +205,7 @@ The front end is the system console.  The keyboard input is unit 0,
 the console output is unit 1.  It supports two options:
 
 	SET FE STOP		halts the PDP-10 operating system
-	SET FE CTLC		simulates typing ^C (for Windoze)
+	SET FE CTLC		simulates typing ^C
 
 The front end has the following registers:
 
@@ -333,7 +338,10 @@ the port to be used:
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.  The optional switch -m turns on the DZ11's
 modem controls; the optional switch -a turns on active disconnects
-(disconnect session if computer clears Data Terminal Ready).
+(disconnect session if computer clears Data Terminal Ready).  Without
+modem control, the DZ behaves as though terminals were directly connected;
+disconnecting the Telnet session does not cause any operating system-
+visible change in line status.
 
 Once the DZ is attached and the simulator is running, the DZ will listen
 for connections on the specified port.  It assumes that the incoming
@@ -525,8 +533,6 @@ locked, single or double density, or autosized:
 	SET RYn SINGLE		set unit n single density
 	SET RYn DOUBLE		set unit n double density (default)
 	SET RYn AUTOSIZE	set unit n autosized
-
-The RX211 supports the BOOT command, but only for double density.
 
 The floppy disk requires an unsupported driver under TOPS-10 and
 is not supported under TOPS-20 or ITS.

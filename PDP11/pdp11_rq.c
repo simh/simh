@@ -26,6 +26,7 @@
 
    rq		RQDX3 disk controller
 
+   11-Jul-03	RMS	Fixed bug in user disk size (found by Chaskiel M Grundman)
    19-May-03	RMS	Revised for new conditional compilation scheme
    25-Apr-03	RMS	Revised for extended file support
    14-Mar-03	RMS	Fixed variable size interaction with save/restore
@@ -2009,7 +2010,7 @@ if ((val < 0) || (val > RA8U_DTYPE) || ((val != RA8U_DTYPE) && cptr))
 	return SCPE_ARG;
 if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
 if (cptr) {
-	cap = (int32) get_uint (cptr, 10, RA8U_MAXC, &r);
+	cap = (int32) get_uint (cptr, 10, max, &r);
 	if ((r != SCPE_OK) || (cap < RA8U_MINC)) return SCPE_ARG;
 	drv_tab[val].lbn = cap << (20 - 9);  }
 uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);

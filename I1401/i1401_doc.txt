@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	IBM 1401 Simulator Usage
-Date:	20-Apr-2003
+Date:	15-Jul-2003
 
 			COPYRIGHT NOTICE
 
@@ -39,13 +39,16 @@ This memorandum documents the IBM 1401 simulator.
 sim/		sim_defs.h
 		sim_rev.h
 		sim_sock.h
+		sim_tape.h
 		sim_tmxr.h
 		scp.c
 		scp_tty.c
 		sim_sock.c
+		sim_tape.c
 		sim_tmxr.c
 
 sim/i1401/	i1401_defs.h
+		i1401_dat.h
 		i1401_cpu.c
 		i1401_cd.c
 		i1401_iq.c

@@ -1,11 +1,75 @@
-Notes For V3.0-0
+Notes For V3.0-1
 
-Because some key files have changed, V3.0 should be unzipped to a
-clean directory.
+RESTRICTION: The FP15 and XVM features of the PDP-15 are only partially
+debugged.  Do NOT enable these features for normal operations.
 
-1. New Features in 3.0-0
+1. New Features in 3.0-1
 
-1.1 SCP and Libraries
+1.1 PDP-1
+
+- Added block loader format support to LOAD.
+- Changed BOOT PTR to allow loading of all of the first bank of memory.
+
+1.2 PDP-18b Family
+
+- Added PDP-4 EAE support.
+- Added PDP-15 FP15 support.
+- Added PDP-15 XVM support.
+- Added PDP-15 "re-entrancy ECO".
+- Added PDP-7, PDP-9, PDP-15 hardware RIM loader support in BOOT PTR.
+
+2. Bugs Fixed in 3.0-1
+
+2.1 PDP-11/VAX
+
+- Fixed bug in user disk size (found by Chaskiel M Grundman).
+
+2.2 PDP-1
+
+- Updated CPU, line printer, standard devices to detect indefinite I/O wait.
+- Fixed incorrect logical, missing activate, break in drum simulator.
+- Fixed bugs in instruction decoding, overprinting for line printer.
+
+2.3 PDP-10
+
+- Fixed bug in RP read header.
+
+2.4 PDP-18b Family
+
+- Fixed bug in PDP-4 line printer overprinting.
+- Fixed bug in PDP-15 memory protect/skip interaction.
+- Fixed bug in RF set size routine.
+- Increased PTP TIME for PDP-15 operating systems.
+
+2.5 PDP-8
+
+- Fixed bug in DF, RF set size routine.
+
+2.6 Nova
+
+- Fixed bug in DSK set size routine.
+
+2.7 1401
+
+- Revised fetch to model hardware more closely.
+
+2.8 Ibm1130
+
+- Fixed bugs found by APL 1130.
+
+2.9 Altairz80
+
+- Fixed bug in real-time clock on Windows host.
+
+2.10 HP2100
+
+-- Fixed DR drum sizes.
+-- Fixed DR variable capacity interaction with SAVE/RESTORE.
+
+
+3. New Features in 3.0 vs prior releases
+
+3.1 SCP and Libraries
 
 - Added ASSIGN/DEASSIGN (logical name) commands.
 - Changed RESTORE to unconditionally detach files.
@@ -13,7 +77,7 @@ clean directory.
 - Fixed bug in SHOW CONNECTIONS.
 - Added USE_ADDR64 support
 
-1.2 All magtapes
+3.2 All magtapes
 
 - Magtapes support SIMH format, E11 format, and TPC format (read only).
 - SET <tape_unit> FORMAT=format sets the specified tape unit's format.
@@ -21,16 +85,16 @@ clean directory.
 - Tape format can also be set as part of the ATTACH command, using
   the -F switch.
 
-1.3 VAX
+3.3 VAX
 
 - VAX can be compiled without USE_INT64.
 - If compiled with USE_INT64 and USE_ADDR64, RQ and TQ controllers support
   files > 2GB.
 - VAX ROM has speed control (SET ROM DELAY/NODELAY).
 
-2. Bugs Fixed in 3.01-0
+4. Bugs Fixed in 3.0 vs prior releases
 
-2.1 VAX
+4.1 VAX
 
 - Fixed CVTfi bug: integer overflow not set if exponent out of range
 - Fixed EMODx bugs:
@@ -41,7 +105,7 @@ clean directory.
 - Fixed interval timer and ROM access to pass power-up self-test even on very
   fast host processors (fixes from Mark Pizzolato).
 
-2.2 1401
+4.2 1401
 
 - Fixed mnemonic, instruction lengths, and reverse scan length check bug for MCS.
 - Fixed MCE bug, BS off by 1 if zero suppress.
@@ -50,15 +114,15 @@ clean directory.
 - Added check for invalid 8 character MCW, LCA.
 - Fixed magtape load-mode end of record response.
 
-2.3 Nova
+4.3 Nova
 
 - Fixed DSK variable size interaction with restore.
 
-2.4 PDP-1
+4.4 PDP-1
 
 - Fixed DT variable size interaction with restore.
 
-2.5 PDP-11
+4.5 PDP-11
 
 - Fixed DT variable size interaction with restore.
 - Fixed bug in MMR1 update (found by Tim Stark).
@@ -71,40 +135,21 @@ clean directory.
   o Added ability to split received packet into multiple buffers.
   o Added explicit runt and giant packet processing.
 
-2.6 PDP-18B
+4.6 PDP-18B
 
 - Fixed DT, RF variable size interaction with restore.
 - Fixed MT bug in MTTR.
 
-2.7 PDP-8
+4.7 PDP-8
 
 - Fixed DT, DF, RF, RX variable size interaction with restore.
 - Fixed MT bug in SKTR.
 
-2.8 HP2100
+4.8 HP2100
 
 - Fixed bug in DP (13210A controller only), DQ read status.
 - Fixed bug in DP, DQ seek complete.
 
-2.9 GRI
+4.9 GRI
 
 - Fixed bug in SC queue pointer management.
-
-3. New Features in 3.0 vs prior releases
-
-N/A
-
-4. Bugs Fixed in 3.0 vs prior releases
-
-N/A
-
-5. General Notes
-
-WARNING: The RESTORE command has changed.  RESTORE will now
-detach an attached file on a unit, if that unit did not have
-an attached file in the saved configuration.  This is required
-to assure that the unit flags and the file state are consistent.
-
-WARNING: The compilation scheme for the PDP-10, PDP-11, and VAX
-has changed.  Use one of the supplied build files, or read the
-documentation carefully, before compiling any of these simulators.

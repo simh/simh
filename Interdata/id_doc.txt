@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Interdata 16b/32b Simulator Usage
-Date:	15-Mar-2003
+Date:	15-Jul-2003
 
 			COPYRIGHT NOTICE
 
@@ -39,10 +39,12 @@ This memorandum documents the Interdata 16b and 32b simulators.
 sim/		sim_defs.h
 		sim_rev.h
 		sim_sock.h
+		sim_tape.h
 		sim_tmxr.h
 		scp.c
 		scp_tty.c
 		sim_sock.c
+		sim_tape.c
 		sim_tmxr.c
 
 sim/interdata/	id_defs.h
@@ -519,8 +521,7 @@ The programmable interval clock (PIC) implements these registers:
 	IARM		1	clock interrupt armed
 
 If the interval requested is an exact multiple of 1 msec, the
-programmable clock auto-calibrates; if not, it simply counts
-counts instructions.
+programmable clock auto-calibrates; if not, it counts instructions.
 
 2.4.7 Floppy Disk Controller (FD)
 
@@ -822,7 +823,7 @@ line switches:
 	alphabetic		instruction mnemonic
 	numeric			octal number
 
-2.7.1 16b Instruction Input
+2.8.1 16b Instruction Input
 
 Instruction input uses standard Interdata assembler syntax.  There are
 seven instruction classes: short branch, extended short branch, short
@@ -883,7 +884,7 @@ preceded by R, between 0 and F (15), the address is a hex number
 between 0 and 0xFFFF, and the index register is a hex (decimal)
 number, optionally preceded by R, between 1 and F (15).
 
-2.7.2 32b Instruction Input
+2.8.2 32b Instruction Input
 
 Instruction input uses standard Interdata assembler syntax.  There are
 nine instruction classes: short branch, extended short branch, short

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	15-Mar-2003
+Date:	15-Jul-2003
 
 			COPYRIGHT NOTICE
 
@@ -40,11 +40,13 @@ sim/		sim_defs.h
 		sim_ether.h
 		sim_rev.h
 		sim_sock.h
+		sim_tape.h
 		sim_tmxr.h
 		scp.c
 		scp_tty.c
 		sim_ether.c
 		sim_sock.c
+		sim_tape.c
 		sim_tmxr.c
 
 sim/pdp11/	pdp11_defs.h
@@ -154,6 +156,9 @@ with RH70-style controllers, 22b Unibus with RH11 style controllers, and
 	SET CPU 2048K (or 2M)	set memory size = 2048KB
 	SET CPU 3072K (or 3M)	set memory size = 3072KB
 	SET CPU 4096K (or 4M)	set memory size = 4096KB
+
+The CPU implements a show command to display the I/O address space map:
+
 	SHOW CPU IOSPACE	show I/O space address map
 
 If memory size is being reduced, and the memory being truncated contains
@@ -486,7 +491,7 @@ clock is disabled by default.
 The DZ11 is an 8-line terminal multiplexor.  Up to 4 DZ11's (32 lines)
 are supported.  The number of lines can be changed with the command
 
-	SET DZ LINES=n			set line count to n
+	SET DZ LINES=n		set line count to n
 
 The line count must be a multiple of 8, with a maximum of 32.
 
@@ -501,12 +506,15 @@ The terminal lines perform input and output through Telnet sessions
 connected to a user-specified port.  The ATTACH command specifies
 the port to be used:
 
-	ATTACH {-am} DZ <port>		set up listening port
+	ATTACH {-am} DZ <port>	set up listening port
 
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.  The optional switch -m turns on the DZ11's
 modem controls; the optional switch -a turns on active disconnects
-(disconnect session if computer clears Data Terminal Ready).
+(disconnect session if computer clears Data Terminal Ready).  Without
+modem control, the DZ behaves as though terminals were directly connected;
+disconnecting the Telnet session does not cause any operating system-
+visible change in line status.
 
 Once the DZ is attached and the simulator is running, the DZ will listen
 for connections on the specified port.  It assumes that the incoming
@@ -876,6 +884,10 @@ of many disk types:
 	SET RQn RAUSER{=n}	set type to RA81 with n LBNs
 
 The type options can be used only when a unit is not attached to a file.
+RAUSER is a "user specified" disk; the user can specify the size of the
+disk in logical block numbers (LBN's, 512 bytes each).  The minimum size
+is 50MB; the maximum size is 2GB.
+
 Units can also be set ONLINE or OFFLINE.  Each RQ controller supports the
 BOOT command.  In a Unibus system, an RQ supports 18b addressing.  In
 a Qbus (22B) system, an RQ supports 22b addressing.
@@ -928,13 +940,13 @@ crash on boot or to hang during operation.
 
 Error handling is as follows:
 
-	error	     	processed as
+	error	     		processed as
 
-	not attached	disk not ready
+	not attached		disk not ready
 
-	end of file	assume rest of disk is zero
+	end of file		assume rest of disk is zero
 
-	OS I/O error	report error and stop
+	OS I/O error		report error and stop
 
 2.8 TC11/TU56 DECtape (DT)
 
@@ -1227,18 +1239,18 @@ controller will behave as though the ethernet cable were unplugged.
 
 XQ has the following registers:
 
-	name	size	comments
+	name		size	comments
 
-	SA0	16	station address word 0
-	SA1	16	station address word 1
-	SA2	16	station address word 2
-	SA3	16	station address word 3
-	SA4	16	station address word 4
-	SA5	16	station address word 5
-	CSR	16	control status register
-	VAR	16	vector address register
-	RBDL	32	receive buffer descriptor list
-	XBDL	32	trans(X)mit buffer descriptorlList
+	SA0		16	station address word 0
+	SA1		16	station address word 1
+	SA2		16	station address word 2
+	SA3		16	station address word 3
+	SA4		16	station address word 4
+	SA5		16	station address word 5
+	CSR		16	control status register
+	VAR		16	vector address register
+	RBDL		32	receive buffer descriptor list
+	XBDL		32	trans(X)mit buffer descriptorlList
 
 One final note: because of it's asynchronous nature, the XQ controller is
 not limited to the ~1.5Mbit/sec of the real DEQNA/DELQA controllers,

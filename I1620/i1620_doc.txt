@@ -138,7 +138,7 @@ standard on the Model 2.
 
 If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
-portion of memory is lost.  Initially, the CPU is a Model I, memory size is
+portion of memory is lost.  Initially, the CPU is a Model 1, memory size is
 20K, and indirect addressing, editing instructions, and divide are enabled.
 
 Memory is implemented as 5 bit BCD digits, as follows:
@@ -393,7 +393,7 @@ controlled by command line switches:
 	-s			display as flag terminated numeric string
 				(CPU and DP only)
 	-m			display instruction mnemonics
-				(CPU and only)
+				(CPU and DP only)
 	-d			display 50 characters per line, with word
 				marks denoted by "_" on the line above
 

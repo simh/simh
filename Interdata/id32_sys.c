@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Jul-03	RMS	Fixed signed/unsigned bug in get_imm
    27-Feb-03	RMS	Added relative addressing support
    23-Dec-01	RMS	Cloned from ID4 sources
 */
@@ -481,7 +482,7 @@ return reg;
 t_stat get_imm (char *cptr, uint32 *imm, uint32 *inst, uint32 max)
 {
 char *tptr;
-uint32 idx;
+int32 idx;
 
 errno = 0;
 *imm = strtoul (cptr, &tptr, 16);			/* get immed */

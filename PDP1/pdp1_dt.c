@@ -334,23 +334,23 @@ DEVICE dt_dev = {
 	NULL, &dt_attach, &dt_detach,
 	NULL, DEV_DISABLE };
 
-int32 dt (int32 IR, int32 dev, int32 IO)
+int32 dt (int32 IR, int32 dev, int32 dat)
 {
 int32 pulse = (IR >> 6) & 037;
 int32 fnc, mot, unum;
 UNIT *uptr = NULL;
 
 if (dt_dev.flags & DEV_DIS)				/* disabled? */
-	return (stop_inst << IOT_V_REASON) | IO;	/* stop if requested */
+	return (stop_inst << IOT_V_REASON) | dat;	/* stop if requested */
 unum = DTA_GETUNIT (dtsa);				/* get unit no */
 if (unum >= 0) uptr = dt_dev.units + unum;		/* get unit */
 
 if (pulse == 003) {					/* MSE */
-	if ((dtsa ^ IO) & DTA_UNIT) dt_deselect (dtsa);	/* new unit? */
-	dtsa = (dtsa & ~DTA_UNIT) | (IO & DTA_UNIT);
+	if ((dtsa ^ dat) & DTA_UNIT) dt_deselect (dtsa); /* new unit? */
+	dtsa = (dtsa & ~DTA_UNIT) | (dat & DTA_UNIT);
 	dtsb = dtsb & ~(DTB_DTF | DTB_BEF | DTB_ERF | DTB_ALLERR);  }
 if (pulse == 004) {					/* MLC */
-	dtsa = (dtsa & ~DTA_RW) | (IO & DTA_RW);	/* load dtsa */
+	dtsa = (dtsa & ~DTA_RW) | (dat & DTA_RW);	/* load dtsa */
 	dtsb = dtsb & ~(DTB_DTF | DTB_BEF | DTB_ERF | DTB_ALLERR);
 	fnc = DTA_GETFNC (dtsa);			/* get fnc */
 	if ((uptr == NULL) ||				/* invalid? */
@@ -361,10 +361,10 @@ if (pulse == 004) {					/* MLC */
 	    dt_seterr (uptr, DTB_SEL);			/* select err */
 	else dt_newsa (dtsa);  }
 if (pulse == 005) {					/* MRD */
-	IO = (IO & ~DMASK) | dtdb;
+	dat = (dat & ~DMASK) | dtdb;
 	dtsb = dtsb & ~(DTB_DTF | DTB_BEF);  }
 if (pulse == 006) {					/* MWR */
-	dtdb = IO & DMASK;
+	dtdb = dat & DMASK;
 	dtsb = dtsb & ~(DTB_DTF | DTB_BEF);  }
 if (pulse == 007) {					/* MRS */
 	dtsb = dtsb & ~(DTB_REV | DTB_GO);		/* clr rev, go */
@@ -373,9 +373,9 @@ if (pulse == 007) {					/* MRS */
 	    if (mot & DTS_DIR) dtsb = dtsb | DTB_REV;	/* rev? set */
 	    if ((mot >= DTS_ACCF) || (uptr->STATE & 0777700))
 		dtsb = dtsb | DTB_GO;  }		/* accel? go */
-	IO = (IO & ~DMASK) | dtsb;  }
+	dat = (dat & ~DMASK) | dtsb;  }
 DT_UPDINT;
-return IO;
+return dat;
 }
 
 /* Unit deselect */

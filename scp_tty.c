@@ -185,9 +185,9 @@ int32 i;
 
 sys$gettim (tod);					/* time 0.1usec */
 
-/* To convert to msec, must divide 64b quantity by 10000.  This is actually done
+/* To convert to msec, must divide a 64b quantity by 10000.  This is actually done
    by dividing the 96b quantity 0'time by 10000, producing 64b of quotient, the
-   high 32b of which are discared.  This can probably be done by a clever multiply...
+   high 32b of which are discarded.  This can probably be done by a clever multiply...
 */
 
 quo = htod = 0;

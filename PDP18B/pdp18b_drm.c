@@ -221,10 +221,10 @@ static const int32 boot_rom[] = {
 t_stat drm_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
-extern int32 saved_PC;
+extern int32 PC;
 
 if (drm_dib.dev != DEV_DRM) return STOP_NONSTD;		/* non-std addr? */
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
-saved_PC = BOOT_START;
+PC = BOOT_START;
 return SCPE_OK;
 }

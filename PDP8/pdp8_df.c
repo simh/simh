@@ -25,6 +25,7 @@
 
    df		DF32 fixed head disk
 
+   26-Jul-03	RMS	Fixed bug in set size routine
    14-Mar-03	RMS	Fixed variable platter interaction with save/restore
    03-Mar-03	RMS	Fixed autosizing
    02-Feb-03	RMS	Added variable platter and autosizing support
@@ -142,10 +143,10 @@ REG df_reg[] = {
 	{ NULL }  };
 
 MTAB df_mod[] = {
-	{ UNIT_PLAT, 0, NULL, "1P", &df_set_size },
-	{ UNIT_PLAT, 1, NULL, "2P", &df_set_size },
-	{ UNIT_PLAT, 2, NULL, "3P", &df_set_size },
-	{ UNIT_PLAT, 3, NULL, "4P", &df_set_size },
+	{ UNIT_PLAT, (0 << UNIT_V_PLAT), NULL, "1P", &df_set_size },
+	{ UNIT_PLAT, (1 << UNIT_V_PLAT), NULL, "2P", &df_set_size },
+	{ UNIT_PLAT, (2 << UNIT_V_PLAT), NULL, "3P", &df_set_size },
+	{ UNIT_PLAT, (3 << UNIT_V_PLAT), NULL, "4P", &df_set_size },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
 		&set_dev, &show_dev, NULL },
 	{ 0 } };
@@ -338,9 +339,9 @@ return attach_unit (uptr, cptr);
 
 t_stat df_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if ((val < 0) || (val >= DF_NUMDK)) return SCPE_IERR;
+if (val < 0) return SCPE_IERR;
 if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-uptr->capac = (val + 1) * DF_DKSIZE;
+uptr->capac = UNIT_GETP (val) * DF_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
 }

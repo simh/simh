@@ -13,6 +13,7 @@
 // ASM1130 - IBM 1130 Cross Assembler
 //
 // Version
+//         1.08 - 2003Mar18 - Fixed bug that complained about valid MDX displacement of +127
 //		   1.07 - 2003Jan05 - Filenames are now left in lower case. SYMBOLS.SYS stays all upper case
 //		   1.06 - 2002May02	- Fixed bug in ebdic constants (data goes into low byte)
 //							  First stab at adding ISS level # info, this is iffy
@@ -156,7 +157,7 @@
 #define TRUE  1
 #define FALSE 0
 
-#define VERSION "ASM1130 CROSS ASSEMBLER V1.07"
+#define VERSION "ASM1130 CROSS ASSEMBLER V1.08"
 
 #define ISTV	0x33			// magic number from DMS R2V12 monitorm symbol @ISTV
 
@@ -3392,7 +3393,7 @@ void mdx_op (struct tag_op *op, char *label, char *mods, char *arg)
 			else 
 				getexpr(tok, FALSE, &incr);
 
-			if (incr.value < -128 || incr.value >= 127)			// displacement style
+			if (incr.value < -128 || incr.value > 127)			// displacement style (fixed in ver 1.08)
 				asm_error("Invalid increment value (8 bits signed)");
 
 			opcode |= (incr.value & 0xFF);
