@@ -1,0 +1,38 @@
+mtdump dumps the record structure of a tape image file in SIMH, E11, or
+TPC format.  mtdump is invoked by
+
+	mtdump {-sec} file1 file2 file3...
+
+where -s specifies SIMH format, -e E11 format, and -c TPC format.  The
+default is SIMH format.  Output is to stdout, unless redirected.
+
+SIMH format is as follows:
+
+	4 byte record length 1
+	record 1
+	repeat of 4 byte record length 1
+	4 byte record length 2
+	record 2
+	repeat of 4 byte record length 2
+	:
+	4 bytes = 00000000 for end of file
+
+and so on.  Records are padded to even byte length.
+
+E11 format is similar to SIMH format, but odd length records are not padded
+to even length.
+
+TPC format is as follows:
+
+	2 byte record length 1
+	record 1
+	2 byte record length 2
+	record 2
+	:
+	2 bytes = 0000 for end of file
+
+and so on.  Records are padded to even byte length.
+
+mmdir is a variant of mtdump that dumps the directory structure of an
+Interdata MMD (multimedia diagnostic) tape.  The tape must be in SMIH
+format.

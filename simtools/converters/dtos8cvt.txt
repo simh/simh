@@ -1,0 +1,13 @@
+dtos8cvt converts a PDP-8 DECtape image from OS/8 format to simulator format.
+
+OS/8 only uses 128 words out of 129 in a PDP-8 DECtape block.  The simulator
+requires all 129 words, in order to simulate the actions of the hardware, and
+to deal with oddball software systems such as the PDP-8 Disk Monitor.
+
+dtos8cvt is invoked by
+
+	dtos8cvt file1 file2 file3...
+
+Each file in turn is converted from OS/8 format to simulator format.  The
+input file can have any extension; the converted file will have a .dt8
+extension.

@@ -1,0 +1,14 @@
+ASC is a simple utility for converting text files (delimited with
+\r, \n, or \r\n) to Windows format (\r\n delimited), Unix format
+(\n delimited) or Mac format (\r delimited).
+
+ASC is invoked from a DOS prompt with the command:
+
+	> ASC {-m|u|w} file1 file2 ...
+
+The optional switch specifies Mac processing (-m), Unix processing
+(-u), or Windows processing (-w).  If no switch is specified, Windows
+processing is performed.
+
+Each file is processed in turn.  If the file is name.ext, the converted
+file is name.new.

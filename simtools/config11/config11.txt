@@ -1,0 +1,17 @@
+Config11 is a program for calculating the floating address space layout of
+a PDP-11 or VAX.
+
+Config11 is an interactive program.  When started, it repeatedly asks for
+the names of controllers and the numbers of instances:
+
+> config11
+Name:	UDA50
+Number:	2
+Name:	DZ11
+Number:	2
+Name:
+
+To end input, simply type ENTER to the NAME: prompt.  Config11 will then
+print out the complete floating address table for the known Unibus and
+Qbus devices.
+

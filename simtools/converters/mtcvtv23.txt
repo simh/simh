@@ -1,0 +1,35 @@
+mtcvtv23 converts a tape images in .tpc format to .tap format.
+
+.tpc format tape images have the format
+
+	2 byte record length 1
+	record 1
+	2 byte record length 2
+	record 2
+	:
+	2 bytes = 0000 for end of file
+
+and so on.  This is the format produced by various UNIX utilities
+for dumping tape images.
+
+.tap format tape images have the format
+
+	4 byte record length 1
+	record 1
+	repeat of 4 byte record length 1
+	4 byte record length 2
+	record 2
+	repeat of 4 byte record length 2
+	:
+	4 bytes = 00000000 for end of file
+
+and so on.  This is the tape format expected by simh, Tim Stark's TS10,
+and John Wilson's E11.
+
+mtcvtv23 is invoked by
+
+	mtcvtv23 file1 file2 file3...
+
+Each file in turn is converted from .tpc format to .tap format.  The
+input file can have any extension; the converted file will have a .tap
+extension.
