@@ -25,7 +25,7 @@
 
    rf		RF08 fixed head disk
 
-   06-Nov-02	RMS	Changed enable/disable support
+   04-Oct-02	RMS	Added DIB, device number support
    28-Nov-01	RMS	Added RL8A support
    25-Apr-01	RMS	Added device enable/disable support
    19-Mar-01	RMS	Added disk monitor bootstrap, fixed IOT decoding
@@ -89,9 +89,9 @@
 			else int_req = int_req & ~INT_RF
 
 extern uint16 M[];
-extern int32 int_req, dev_enb, stop_inst;
+extern int32 int_req, stop_inst;
 extern UNIT cpu_unit;
-extern int32 df_devenb;
+
 int32 rf_sta = 0;					/* status register */
 int32 rf_da = 0;					/* disk address */
 int32 rf_done = 0;					/* done flag */
@@ -99,10 +99,16 @@ int32 rf_wlk = 0;					/* write lock */
 int32 rf_time = 10;					/* inter-word time */
 int32 rf_burst = 1;					/* burst mode flag */
 int32 rf_stopioe = 1;					/* stop on error */
+
+DEVICE rf_dev;
+int32 rf60 (int32 IR, int32 AC);
+int32 rf61 (int32 IR, int32 AC);
+int32 rf62 (int32 IR, int32 AC);
+int32 rf64 (int32 IR, int32 AC);
 t_stat rf_svc (UNIT *uptr);
 t_stat pcell_svc (UNIT *uptr);
 t_stat rf_reset (DEVICE *dptr);
-t_stat rf_boot (int32 unitno);
+t_stat rf_boot (int32 unitno, DEVICE *dptr);
 
 /* RF08 data structures
 
@@ -111,6 +117,8 @@ t_stat rf_boot (int32 unitno);
    pcell_unit	photocell timing unit (orphan)
    rf_reg	RF register list
 */
+
+DIB rf_dib = { DEV_RF, 5, { &rf60, &rf61, &rf62, NULL, &rf64 } };
 
 UNIT rf_unit =
 	{ UDATA (&rf_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
@@ -129,25 +137,27 @@ REG rf_reg[] = {
 	{ DRDATA (TIME, rf_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (BURST, rf_burst, 0) },
 	{ FLDATA (STOP_IOE, rf_stopioe, 0) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_RF), REG_HRO },
+	{ ORDATA (DEVNUM, rf_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
 MTAB rf_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, INT_RF, NULL, "ENABLED", &set_enb },
-	{ MTAB_XTD|MTAB_VDV, INT_RF, NULL, "DISABLED", &set_dsb },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
+		&set_dev, &show_dev, NULL },
 	{ 0 } };
 
 DEVICE rf_dev = {
 	"RF", &rf_unit, rf_reg, rf_mod,
 	1, 8, 20, 1, 8, 12,
 	NULL, NULL, &rf_reset,
-	&rf_boot, NULL, NULL };
+	&rf_boot, NULL, NULL,
+	&rf_dib, DEV_DISABLE | DEV_DIS };
 
 /* IOT routines */
 
-int32 rf60 (int32 pulse, int32 AC)
+int32 rf60 (int32 IR, int32 AC)
 {
 int32 t;
+int32 pulse = IR & 07;
 
 UPDATE_PCELL;						/* update photocell */
 if (pulse & 1) {					/* DCMA */
@@ -165,8 +175,10 @@ if (pulse & 6) {					/* DMAR, DMAW */
 return AC;
 }
 
-int32 rf61 (int32 pulse, int32 AC)
+int32 rf61 (int32 IR, int32 AC)
 {
+int32 pulse = IR & 07;
+
 UPDATE_PCELL;						/* update photocell */
 switch (pulse) {					/* decode IR<9:11> */
 case 1:							/* DCIM */
@@ -191,8 +203,10 @@ return AC;
 
 /* IOT's, continued */
 
-int32 rf62 (int32 pulse, int32 AC)
+int32 rf62 (int32 IR, int32 AC)
 {
+int32 pulse = IR & 07;
+
 UPDATE_PCELL;						/* update photocell */
 if (pulse & 1) {					/* DFSE */
 	if (rf_sta & RFS_ERR) AC = AC | IOT_SKP;  }
@@ -203,8 +217,10 @@ if (pulse & 4) AC = AC | (rf_da & 07777);		/* DMAC */
 return AC;
 }
 
-int32 rf64 (int32 pulse, int32 AC)
+int32 rf64 (int32 IR, int32 AC)
 {
+int32 pulse = IR & 07;
+
 UPDATE_PCELL;						/* update photocell */
 switch (pulse) {					/* decode IR<9:11> */
 case 1:							/* DCXA */
@@ -230,7 +246,7 @@ t_stat rf_svc (UNIT *uptr)
 int32 pa, t, mex;
 
 UPDATE_PCELL;						/* update photocell */
-if ((uptr -> flags & UNIT_BUF) == 0) {			/* not buf? abort */
+if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	rf_sta = rf_sta | RFS_NXD;
 	rf_done = 1;
 	RF_INT_UPDATE;					/* update int req */
@@ -240,14 +256,14 @@ mex = GET_MEX (rf_sta);
 do {	M[RF_WC] = (M[RF_WC] + 1) & 07777;		/* incr word count */
  	M[RF_MA] = (M[RF_MA] + 1) & 07777;		/* incr mem addr */
 	pa = mex | M[RF_MA]; 				/* add extension */
-	if (uptr -> FUNC == RF_READ) {
+	if (uptr->FUNC == RF_READ) {
 		if (MEM_ADDR_OK (pa))			/* read, check nxm */
-			M[pa] = *(((int16 *) uptr -> filebuf) + rf_da);  }
+			M[pa] = *(((int16 *) uptr->filebuf) + rf_da);  }
 	else {	t = ((rf_da >> 15) & 030) | ((rf_da >> 14) & 07);
 		if ((rf_wlk >> t) & 1) rf_sta = rf_sta | RFS_WLS;
-		else {	*(((int16 *) uptr -> filebuf) + rf_da) = M[pa];
-			if (((t_addr) rf_da) >= uptr -> hwmark)
-				uptr -> hwmark = rf_da + 1;  }  }
+		else {	*(((int16 *) uptr->filebuf) + rf_da) = M[pa];
+			if (((t_addr) rf_da) >= uptr->hwmark)
+				uptr->hwmark = rf_da + 1;  }  }
 	rf_da = (rf_da + 1) & 03777777;  }		/* incr disk addr */
 while ((M[RF_WC] != 0) && (rf_burst != 0));		/* brk if wc, no brst */
 
@@ -273,8 +289,6 @@ return SCPE_OK;
 
 t_stat rf_reset (DEVICE *dptr)
 {
-if (dev_enb & INT_RF)					/* RF? no DF or RL */
-	dev_enb = dev_enb & ~(INT_DF | INT_RL);
 rf_sta = rf_da = 0;
 rf_done = 1;
 int_req = int_req & ~INT_RF;				/* clear interrupt */
@@ -286,11 +300,11 @@ return SCPE_OK;
 /* Bootstrap routine */
 
 #define OS8_START	07750
-#define OS8_LEN		(sizeof (os8_rom) / sizeof (int32))
+#define OS8_LEN		(sizeof (os8_rom) / sizeof (int16))
 #define DM4_START	00200
-#define DM4_LEN		(sizeof (dm4_rom) / sizeof (int32))
+#define DM4_LEN		(sizeof (dm4_rom) / sizeof (int16))
 
-static const int32 os8_rom[] = {
+static const uint16 os8_rom[] = {
 	07600,			/* 7750, CLA CLL	; also word count */
 	06603,			/* 7751, DMAR		; also address */
 	06622,			/* 7752, DFSC		; done? */
@@ -298,7 +312,7 @@ static const int32 os8_rom[] = {
 	05752			/* 7754, JMP @.-2	; enter boot */
 };
 
-static const int32 dm4_rom[] = {
+static const uint16 dm4_rom[] = {
 	00200, 07600,		/* 0200, CLA CLL */
 	00201, 06603,		/* 0201, DMAR		; read */
 	00202, 06622,		/* 0202, DFSC		; done? */
@@ -308,11 +322,12 @@ static const int32 dm4_rom[] = {
 	07751, 07576		/* 7751, 7576		; address */
 };
 
-t_stat rf_boot (int32 unitno)
+t_stat rf_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 sim_switches, saved_PC;
 
+if (rf_dib.dev != DEV_RF) return STOP_NOTSTD;		/* only std devno */
 if (sim_switches & SWMASK ('D')) {
 	for (i = 0; i < DM4_LEN; i = i + 2)
 		M[dm4_rom[i]] = dm4_rom[i + 1];

@@ -30,12 +30,22 @@
 */
 
 #include "pdp1_defs.h"
+
 #define BPTR_MAX	40				/* pointer max */
 #define LPT_BSIZE	(BPTR_MAX * 3)			/* line size */
 #define BPTR_MASK	077				/* buf ptr mask */
+
 extern int32 ioc, sbs, iosta;
+extern int32 stop_inst;
+
 int32 lpt_rpls = 0, lpt_iot = 0, lpt_stopioe = 0, bptr = 0;
 char lpt_buf[LPT_BSIZE + 1] = { 0 };
+static const unsigned char lpt_trans[64] = {
+	' ','1','2','3','4','5','6','7','8','9','\'','~','#','V','^','<',
+	'0','/','S','T','U','V','W','X','Y','Z','"',',','>','^','-','?',
+	'@','J','K','L','M','N','O','P','Q','R','$','=','-',')','-','(',
+	'_','A','B','C','D','E','F','G','H','I','*','.','+',']','|','[' };
+
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 
@@ -66,7 +76,8 @@ DEVICE lpt_dev = {
 	"LPT", &lpt_unit, lpt_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &lpt_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, DEV_DISABLE };
 
 /* Line printer IOT routine */
 
@@ -74,18 +85,14 @@ int32 lpt (int32 inst, int32 dev, int32 data)
 {
 int32 i;
 
-static const unsigned char lpt_trans[64] = {
-	' ','1','2','3','4','5','6','7','8','9','\'','~','#','V','^','<',
-	'0','/','S','T','U','V','W','X','Y','Z','"',',','>','^','-','?',
-	'@','J','K','L','M','N','O','P','Q','R','$','=','-',')','-','(',
-	'_','A','B','C','D','E','F','G','H','I','*','.','+',']','|','[' };
-
+if (lpt_dev.flags & DEV_DIS)				/* disabled? */
+	return (stop_inst << IOT_V_REASON) | data;	/* stop if requested */
 if ((inst & 0700) == 0100) {				/* fill buf */
 	if (bptr < BPTR_MAX) {				/* limit test ptr */
 		i = bptr * 3;				/* cvt to chr ptr */
-		lpt_buf[i++] = lpt_trans[(data >> 12) & 077];
-		lpt_buf[i++] = lpt_trans[(data >> 6) & 077];
-		lpt_buf[i++] = lpt_trans[data & 077];  }
+		lpt_buf[i] = lpt_trans[(data >> 12) & 077];
+		lpt_buf[i + 1] = lpt_trans[(data >> 6) & 077];
+		lpt_buf[i + 2] = lpt_trans[data & 077];  }
 	bptr = (bptr + 1) & BPTR_MASK;
 	return data;  }
 lpt_rpls = 0;

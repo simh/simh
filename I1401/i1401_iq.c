@@ -37,9 +37,11 @@ extern uint8 M[];
 extern int32 BS, iochk, ind[64];
 extern char ascii_to_bcd[128], bcd_to_ascii[64];
 extern UNIT cpu_unit;
+
 int32 inq_char = 033;					/* request inq */
 t_stat inq_svc (UNIT *uptr);
 t_stat inq_reset (DEVICE *dptr);
+
 void puts_tty (char *cptr);
 
 /* INQ data structures

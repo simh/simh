@@ -26,6 +26,12 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   11-Nov-02	RMS	Changed log definitions to be VAX compatible
+   10-Oct-02	RMS	Added vector information to DIB
+			Changed DZ11 vector to Unibus standard
+			Added DEQNA/DELQA, DEUNA/DELUA support
+			Added multiple RQDX3, autoconfigure support
+   12-Sep-02	RMS	Added TMSCP, KW11P,and RX211 support
    28-Apr-02	RMS	Clarified PDF ACF mnemonics
    22-Apr-02	RMS	Added HTRAP, BPOK maint register flags, MT_MAXFR
    06-Mar-02	RMS	Changed system type to KDJ11A
@@ -42,6 +48,9 @@
    10-Feb-01	RMS	Added DECtape support
 */
 
+#ifndef _PDP11_DEFS_H
+#define _PDP11_DEFS_H	0
+
 #include "sim_defs.h"					/* simulator defns */
 #include <setjmp.h>
 
@@ -51,6 +60,8 @@
 #define VASIZE		0200000				/* 2**16 */
 #define VAMASK		(VASIZE - 1)			/* 2**16 - 1 */
 #define INIMEMSIZE 	001000000			/* 2**18 */
+#define UNIMEMSIZE	001000000			/* 2**18 */
+#define UNIMASK		(UNIMEMSIZE - 1)		/* 2**18 - 1 */
 #define IOPAGEBASE	017760000			/* 2**22 - 2**13 */
 #define MAXMEMSIZE	020000000			/* 2**22 */
 #define PAMASK		(MAXMEMSIZE - 1)		/* 2**22 - 1 */
@@ -275,34 +286,61 @@ typedef struct fpac fpac_t;
 #define STOP_VECABORT	(TRAP_V_MAX + 4)		/* abort vector read */
 #define STOP_SPABORT	(TRAP_V_MAX + 5)		/* abort trap push */
 #define STOP_RQ		(TRAP_V_MAX + 6)		/* RQDX3 panic */
+#define STOP_SANITY	(TRAP_V_MAX + 7)		/* sanity timer exp */
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* cond error return */
 
 /* Timers */
 
 #define TMR_CLK		0				/* line clock */
-#define TMR_KWP		1				/* KW11P */
+#define TMR_PCLK	1				/* KW11P */
 
 /* IO parameters */
 
 #define DZ_MUXES	4				/* max # of muxes */
 #define DZ_LINES	8				/* lines per mux */
 #define MT_MAXFR	(1 << 16)			/* magtape max rec */
+#define AUTO_LNT	34				/* autoconfig ranks */
+#define DIB_MAX		100				/* max DIBs */
+
+#define DEV_V_UBUS	(DEV_V_UF + 0)			/* Unibus */
+#define DEV_V_QBUS	(DEV_V_UF + 1)			/* Qbus */
+#define DEV_V_FLTA	(DEV_V_UF + 2)			/* flt addr */
+#define DEV_UBUS	(1u << DEV_V_UBUS)
+#define DEV_QBUS	(1u << DEV_V_QBUS)
+#define DEV_FLTA	(1u << DEV_V_FLTA)
+
+#define UNIBUS		(cpu_18b || cpu_ubm)		/* T if 18b */
+
+#define MAP		1				/* mapped */
+#define NOMAP		0				/* not mapped */
 
 /* Device information block */
 
+#define VEC_DEVMAX	4				/* max device vec */
+
 struct pdp_dib {
-	uint32		enb;				/* enabled */
 	uint32		ba;				/* base addr */
 	uint32		lnt;				/* length */
 	t_stat		(*rd)(int32 *dat, int32 ad, int32 md);
-	t_stat		(*wr)(int32 dat, int32 ad, int32 md);  };
+	t_stat		(*wr)(int32 dat, int32 ad, int32 md);
+	int32		vnum;				/* vectors: number */
+	int32		vloc;				/* locator */
+	int32		vec;				/* value */
+	int32		(*ack[VEC_DEVMAX])(void);	/* ack routines */
+};
 
 typedef struct pdp_dib DIB;
 
-/* I/O page layout */
+/* I/O page layout - RQB,RQC,RQD float based on number of DZ's */
 
 #define IOBA_DZ		(IOPAGEBASE + 000100)		/* DZ11 */
 #define IOLN_DZ		010
+#define IOBA_RQB	(IOPAGEBASE + 000334 +  (020 * (DZ_MUXES / 2)))
+#define IOLN_RQB	004
+#define IOBA_RQC	(IOPAGEBASE + IOBA_RQB + IOLN_RQB)
+#define IOLN_RQC	004
+#define IOBA_RQD	(IOPAGEBASE + IOBA_RQC + IOLN_RQC)
+#define IOLN_RQD	004
 #define IOBA_UBM	(IOPAGEBASE + 010200)		/* Unibus map */
 #define IOLN_UBM	(UBM_LNT_LW * sizeof (int32))
 #define IOBA_RQ		(IOPAGEBASE + 012150)		/* RQDX3 */
@@ -315,26 +353,42 @@ typedef struct pdp_dib DIB;
 #define IOLN_TM		014
 #define IOBA_TS		(IOPAGEBASE + 012520)		/* TS11 */
 #define IOLN_TS		004
+#define IOBA_PCLK	(IOPAGEBASE + 012540)		/* KW11P */
+#define IOLN_PCLK	006
 #define IOBA_RL		(IOPAGEBASE + 014400)		/* RL11 */
 #define IOLN_RL		012
+#define IOBA_XQ		(IOPAGEBASE + 014440)		/* DEQNA/DELQA */
+#define IOLN_XQ		020
+#define IOBA_XQB	(IOPAGEBASE + 014460)		/* 2nd DEQNA/DELQA */
+#define IOLN_XQB	020
+#define IOBA_TQ		(IOPAGEBASE + 014500)		/* TMSCP */
+#define IOLN_TQ		004
+#define IOBA_XU		(IOPAGEBASE + 014510)		/* DEUNA/DELUA */
+#define IOLN_XU		010
 #define IOBA_RP		(IOPAGEBASE + 016700)		/* RP/RM */
 #define IOLN_RP		054
 #define IOBA_RX		(IOPAGEBASE + 017170)		/* RX11 */
 #define IOLN_RX		004
+#define IOBA_RY		(IOPAGEBASE + 017170)		/* RY11 */
+#define IOLN_RY		004
 #define IOBA_TC		(IOPAGEBASE + 017340)		/* TC11 */
 #define IOLN_TC		012
 #define IOBA_RK		(IOPAGEBASE + 017400)		/* RK11 */
 #define IOLN_RK		020
-#define IOBA_RK6	(IOPAGEBASE + 017440)		/* RK611 */
-#define IOLN_RK6	040
+#define IOBA_HK		(IOPAGEBASE + 017440)		/* RK611 */
+#define IOLN_HK		040
 #define IOBA_LPT	(IOPAGEBASE + 017514)		/* LP11 */
 #define IOLN_LPT	004
 #define IOBA_CLK	(IOPAGEBASE + 017546)		/* KW11L */
 #define IOLN_CLK	002
-#define IOBA_PT		(IOPAGEBASE + 017550)		/* PC11 */
-#define IOLN_PT		010
-#define IOBA_TT		(IOPAGEBASE + 017560)		/* DL11 */
-#define IOLN_TT		010
+#define IOBA_PTR	(IOPAGEBASE + 017550)		/* PC11 reader */
+#define IOLN_PTR	004
+#define IOBA_PTP	(IOPAGEBASE + 017554)		/* PC11 punch */
+#define IOLN_PTP	004
+#define IOBA_TTI	(IOPAGEBASE + 017560)		/* DL11 rcv */
+#define IOLN_TTI	004
+#define IOBA_TTO	(IOPAGEBASE + 017564)		/* DL11 xmt */
+#define IOLN_TTO	004
 #define IOBA_SRMM	(IOPAGEBASE + 017570)		/* SR, MMR0-2 */
 #define IOLN_SRMM	010
 #define IOBA_APR1	(IOPAGEBASE + 017600)		/* APRs */
@@ -349,8 +403,9 @@ typedef struct pdp_dib DIB;
 #define INT_V_PIR7	0				/* BR7 */
 
 #define INT_V_CLK	0				/* BR6 */
-#define INT_V_DTA	1
-#define INT_V_PIR6	2
+#define INT_V_PCLK	1
+#define INT_V_DTA	2
+#define INT_V_PIR6	3
 
 #define INT_V_RK	0				/* BR5 */
 #define INT_V_RL	1
@@ -362,7 +417,11 @@ typedef struct pdp_dib DIB;
 #define INT_V_RQ	7
 #define INT_V_DZRX	8
 #define INT_V_DZTX	9
-#define INT_V_PIR5	10
+#define INT_V_TQ	10
+#define INT_V_RY	11
+#define INT_V_XQ	12
+#define INT_V_XU	13
+#define INT_V_PIR5	14
 
 #define INT_V_TTI	0				/* BR4 */
 #define INT_V_TTO	1
@@ -377,6 +436,7 @@ typedef struct pdp_dib DIB;
 
 #define INT_PIR7	(1u << INT_V_PIR7)
 #define INT_CLK		(1u << INT_V_CLK)
+#define INT_PCLK	(1u << INT_V_PCLK)
 #define INT_DTA		(1u << INT_V_DTA)
 #define INT_PIR6	(1u << INT_V_PIR6)
 #define INT_RK		(1u << INT_V_RK)
@@ -385,10 +445,14 @@ typedef struct pdp_dib DIB;
 #define INT_TM		(1u << INT_V_TM)
 #define INT_RP		(1u << INT_V_RP)
 #define INT_TS		(1u << INT_V_TS)
-#define INT_RK6		(1u << INT_V_HK)
+#define INT_HK		(1u << INT_V_HK)
 #define INT_RQ		(1u << INT_V_RQ)
 #define INT_DZRX	(1u << INT_V_DZRX)
 #define INT_DZTX	(1u << INT_V_DZTX)
+#define INT_TQ		(1u << INT_V_TQ)
+#define INT_RY		(1u << INT_V_RY)
+#define INT_XQ		(1u << INT_V_XQ)
+#define INT_XU		(1u << INT_V_XU)
 #define INT_PIR5	(1u << INT_V_PIR5)
 #define INT_PTR		(1u << INT_V_PTR)
 #define INT_PTP		(1u << INT_V_PTP)
@@ -401,6 +465,7 @@ typedef struct pdp_dib DIB;
 #define INT_PIR1	(1u << INT_V_PIR1)
 
 #define IPL_CLK		6				/* int pri levels */
+#define IPL_PCLK	6
 #define IPL_DTA		6
 #define IPL_RK		5
 #define IPL_RL		5
@@ -408,10 +473,14 @@ typedef struct pdp_dib DIB;
 #define IPL_TM		5
 #define IPL_RP		5
 #define IPL_TS		5
-#define IPL_RK6		5
+#define IPL_HK		5
 #define IPL_RQ		5
 #define IPL_DZRX	5
 #define IPL_DZTX	5
+#define IPL_TQ		5
+#define IPL_RY		5
+#define IPL_XQ		5
+#define IPL_XU		5
 #define IPL_PTR		4
 #define IPL_PTP		4
 #define IPL_TTI		4
@@ -426,6 +495,8 @@ typedef struct pdp_dib DIB;
 #define IPL_PIR2	2
 #define IPL_PIR1	1
 
+/* Device vectors */
+
 #define VEC_Q		0000				/* vector base */
 #define VEC_PIRQ	0240
 #define VEC_TTI		0060
@@ -433,21 +504,36 @@ typedef struct pdp_dib DIB;
 #define VEC_PTR		0070
 #define VEC_PTP		0074
 #define VEC_CLK		0100
+#define VEC_PCLK	0104
+#define VEC_XQ		0120
+#define VEC_XU		0120
 #define VEC_RQ		0154
 #define VEC_RL		0160
 #define VEC_LPT		0200
-#define VEC_RK6		0210
+#define VEC_HK		0210
 #define VEC_RK		0220
 #define VEC_DTA		0214
 #define VEC_TM		0224
 #define VEC_TS		0224
 #define VEC_RP		0254
+#define VEC_TQ		0260
 #define VEC_RX		0264
-#define VEC_DZRX	0310
-#define VEC_DZTX	0314
+#define VEC_RY		0264
+#define VEC_DZRX	0300
+#define VEC_DZTX	0304
+
+/* Autoconfigure ranks */
+
+#define RANK_DZ		8
+#define RANK_RL		14
+#define RANK_RX		18
+#define RANK_XU		25
+#define RANK_RQ		26
+#define RANK_TQ		30
 
 /* Interrupt macros */
 
+#define IVCL(dv)	((IPL_##dv * 32) + INT_V_##dv)
 #define IREQ(dv)	int_req[IPL_##dv]
 #define SET_INT(dv)	int_req[IPL_##dv] = int_req[IPL_##dv] | (INT_##dv)
 #define CLR_INT(dv)	int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
@@ -463,28 +549,34 @@ typedef struct pdp_dib DIB;
 
 /* Logging */
 
-#define LOG_CPU_I	00000001
-#define LOG_RP		00000010
-#define LOG_TS		00000020
-#define LOG_RQ		00000040
-#define LOG_TC_MS	00000100
-#define LOG_TC_RW	00000200
-#define LOG_TC_RA	00000400
-#define LOG_TC_BL	00001000
+#define LOG_CPU_I	0x0001
+#define LOG_RP		0x0010
+#define LOG_TS		0x0020
+#define LOG_RQ		0x0040
+#define LOG_TQ		0x0080
+#define LOG_XQ0		0x0100
+#define LOG_XQ1		0x0200
+#define LOG_XQ2		0x0400
+#define LOG_XQ3		0x0800
+#define LOG_TC_MS	0x1000
+#define LOG_TC_RW	0x2000
+#define LOG_TC_BL	0x4000
+#define LOG_HK		0x8000
 
 #define DBG_LOG(x)	(sim_log && (cpu_log & (x)))
 
 /* Function prototypes */
 
-#define QB		0				/* Q22 native */
-#define UB		1				/* Unibus */
-
 t_bool Map_Addr (t_addr qa, t_addr *ma);
-int32 Map_ReadB (t_addr ba, int32 bc, uint8 *buf, t_bool ub);
-int32 Map_ReadW (t_addr ba, int32 bc, uint16 *buf, t_bool ub);
-int32 Map_WriteB (t_addr ba, int32 bc, uint8 *buf, t_bool ub);
-int32 Map_WriteW (t_addr ba, int32 bc, uint16 *buf, t_bool ub);
+int32 Map_ReadB (t_addr ba, int32 bc, uint8 *buf, t_bool map);
+int32 Map_ReadW (t_addr ba, int32 bc, uint16 *buf, t_bool map);
+int32 Map_WriteB (t_addr ba, int32 bc, uint8 *buf, t_bool map);
+int32 Map_WriteW (t_addr ba, int32 bc, uint16 *buf, t_bool map);
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_bool dev_conflict (uint32 nba, DIB *curr);
+t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat auto_config (uint32 rank, uint32 num);
+
+#endif

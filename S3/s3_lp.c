@@ -1,7 +1,6 @@
 /* s3_lp.c: IBM 1403 line printer simulator
 
-   Copyright (c) 2001 Charles E. Owen
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 2001, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -20,12 +19,13 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
+   Except as contained in this notice, the name of Charles E. Owen shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from Charles E. Owen.
 
 	lpt		1403 line printer
 
+   08-Oct-02	RMS	Added impossible function catcher
 */
 
 #include "s3_defs.h"
@@ -199,6 +199,8 @@ int32 lpt (int32 op, int32 m, int32 n, int32 data)
 		default:
 			break;
 	}						
+	printf (">>LPT non-existent function %d\n", op);
+	return SCPE_OK;						
 }
 
 
@@ -210,7 +212,7 @@ int32 lpt (int32 op, int32 m, int32 n, int32 data)
 
 t_stat write_line (int32 ilnt, int32 mod)
 {
-int32 i, t, lc, sup;
+int32 i, t, lc;
 static char lbuf[LPT_WIDTH + 1];			/* + null */
 
 if ((lpt_unit.flags & UNIT_ATT) == 0)
@@ -221,13 +223,13 @@ lc = LPDAR;						/* clear error */
 for (i = 0; i < LPT_WIDTH; i++) {			/* convert print buf */
 	t = M[lc];
 	lbuf[i] = ebcdic_to_ascii[t & 0xff];
-	M[lc] = 0x40;          /* HJS MOD */
+	M[lc] = 0x40;					/* HJS MOD */
 	lc++;
 }
 for (i = LPT_WIDTH - 1; (i >= 0) && (lbuf[i] == ' '); i--) lbuf[i] = 0;
 fputs (lbuf, lpt_unit.fileref);				/* write line */
 if (lines) space (lines, lflag);			/* cc action? do it */
-else if (sup == 0) space (1, FALSE);			/* default? 1 line */
+else if (mod == 0) space (1, FALSE);			/* default? 1 line */
 else {	fputc ('\r', lpt_unit.fileref);			/* sup -> overprint */
 	lpt_unit.pos = ftell (lpt_unit.fileref);  }	/* update position */
 lines = lflag = 0;					/* clear cc action */

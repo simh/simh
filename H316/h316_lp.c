@@ -228,9 +228,9 @@ if (lpt_svcst & LPT_SVCPA) {				/* paper advance */
 	for (i = LPT_WIDTH - 1; i >= 0; i++)  {
 		if (lpt_buf[i] != ' ') break;  }
 	lpt_buf[i + 1] = 0;
-	fputs (lpt_buf, uptr -> fileref);		/* output buf */
-	fputs (lpt_cc[lpt_svcch & 03], uptr -> fileref);	/* output eol */
-	uptr -> pos = ftell (uptr -> fileref);		/* update pos */
+	fputs (lpt_buf, uptr->fileref);			/* output buf */
+	fputs (lpt_cc[lpt_svcch & 03], uptr->fileref);	/* output eol */
+	uptr->pos = ftell (uptr->fileref);		/* update pos */
 	for (i = 0; i < LPT_WIDTH; i++) lpt_buf[i] = ' ';	/* clear buf */
 	}
 lpt_svcst = 0;

@@ -25,14 +25,19 @@
 
    lpt		LP8E line printer
 
+   04-Oct-02	RMS	Added DIB, enable/disable, device number support
    30-May-02	RMS	Widened POS to 32b
 */
 
 #include "pdp8_defs.h"
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
+
 int32 lpt_err = 0;					/* error flag */
 int32 lpt_stopioe = 0;					/* stop on error */
+
+DEVICE lpt_dev;
+int32 lpt (int32 IR, int32 AC);
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *cptr);
@@ -44,6 +49,8 @@ t_stat lpt_detach (UNIT *uptr);
    lpt_unit	LPT unit descriptor
    lpt_reg	LPT register list
 */
+
+DIB lpt_dib = { DEV_LPT, 1, { &lpt } };
 
 UNIT lpt_unit = {
 	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
@@ -57,19 +64,26 @@ REG lpt_reg[] = {
 	{ DRDATA (POS, lpt_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
+	{ ORDATA (DEVNUM, lpt_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
+MTAB lpt_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
+		&set_dev, &show_dev, NULL },
+	{ 0 } };
+
 DEVICE lpt_dev = {
-	"LPT", &lpt_unit, lpt_reg, NULL,
+	"LPT", &lpt_unit, lpt_reg, lpt_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &lpt_reset,
-	NULL, &lpt_attach, &lpt_detach };
+	NULL, &lpt_attach, &lpt_detach,
+	&lpt_dib, DEV_DISABLE };
 
 /* IOT routine */
 
-int32 lpt (int32 pulse, int32 AC)
+int32 lpt (int32 IR, int32 AC)
 {
-switch (pulse) {					/* decode IR<9:11> */
+switch (IR & 07) {					/* decode IR<9:11> */
 case 1:							/* PSKF */
 	return (dev_done & INT_LPT)? IOT_SKP + AC: AC;
 case 2:							/* PCLF */

@@ -33,6 +33,8 @@
    cso		console storage output
    sysd		system devices (SSC miscellany)
 
+   19-Aug-02	RMS	Removed unused variables (found by David Hittner)
+			Allowed NVR to be attached to file
    30-May-02	RMS	Widened POS to 32b
    28-Feb-02	RMS	Fixed bug, missing end of table (found by Lars Brinkhoff)
 */
@@ -183,6 +185,8 @@ t_stat rom_reset (DEVICE *dptr);
 t_stat nvr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat nvr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat nvr_reset (DEVICE *dptr);
+t_stat nvr_attach (UNIT *uptr, char *cptr);
+t_stat nvr_detach (UNIT *uptr);
 t_stat csi_reset (DEVICE *dptr);
 t_stat cso_reset (DEVICE *dptr);
 t_stat cso_svc (UNIT *uptr);
@@ -210,6 +214,8 @@ int32 tmr_tir_rd (int32 tmr, t_bool interp);
 void tmr_csr_wr (int32 tmr, int32 val);
 void tmr_sched (int32 tmr);
 void tmr_incr (int32 tmr, uint32 inc);
+int32 tmr0_inta (void);
+int32 tmr1_inta (void);
 int32 parity (int32 val, int32 odd);
 
 extern int32 cqmap_rd (int32 pa);
@@ -248,7 +254,8 @@ DEVICE rom_dev = {
 	"ROM", &rom_unit, rom_reg, NULL,
 	1, 16, ROMAWIDTH, 4, 16, 32,
 	&rom_ex, &rom_dep, &rom_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, 0 };
 
 /* NVR data structures
 
@@ -267,7 +274,8 @@ DEVICE nvr_dev = {
 	"NVR", &nvr_unit, nvr_reg, NULL,
 	1, 16, NVRAWIDTH, 4, 16, 32,
 	&nvr_ex, &nvr_dep, &nvr_reset,
-	NULL, NULL, NULL };
+	NULL, &nvr_attach, &nvr_detach,
+	NULL, 0 };
 
 /* CSI data structures
 
@@ -275,6 +283,8 @@ DEVICE nvr_dev = {
    csi_unit	CSI unit descriptor
    csi_reg	CSI register list
 */
+
+DIB csi_dib = { 0, 0, NULL, NULL, 1, IVCL (CSI), SCB_CSI, { NULL } };
 
 UNIT csi_unit = { UDATA (NULL, 0, 0), KBD_POLL_WAIT };
 
@@ -288,11 +298,16 @@ REG csi_reg[] = {
 	{ DRDATA (TIME, csi_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
+MTAB csi_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,	NULL, &show_vec },
+	{ 0 }  };
+
 DEVICE csi_dev = {
-	"CSI", &csi_unit, csi_reg, NULL,
+	"CSI", &csi_unit, csi_reg, csi_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &csi_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&csi_dib, 0 };
 
 /* CSO data structures
 
@@ -300,6 +315,8 @@ DEVICE csi_dev = {
    cso_unit	CSO unit descriptor
    cso_reg	CSO register list
 */
+
+DIB cso_dib = { 0, 0, NULL, NULL, 1, IVCL (CSO), SCB_CSO, { NULL } };
 
 UNIT cso_unit = { UDATA (&cso_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
 
@@ -313,11 +330,16 @@ REG cso_reg[] = {
 	{ DRDATA (TIME, cso_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 
+MTAB cso_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,	NULL, &show_vec },
+	{ 0 }  };
+
 DEVICE cso_dev = {
-	"CSO", &cso_unit, cso_reg, NULL,
+	"CSO", &cso_unit, cso_reg, cso_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &cso_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&cso_dib, 0 };
 
 /* SYSD data structures
 
@@ -325,6 +347,9 @@ DEVICE cso_dev = {
    sysd_unit	SYSD units
    sysd_reg	SYSD register list
 */
+
+DIB sysd_dib[] = { 0, 0, NULL, NULL,
+		   2, IVCL (TMR0), 0, { &tmr0_inta, &tmr1_inta } };
 
 UNIT sysd_unit[] = {
 	{ UDATA (&tmr_svc, 0, 0) },
@@ -361,7 +386,8 @@ DEVICE sysd_dev = {
 	"SYSD", sysd_unit, sysd_reg, NULL,
 	2, 16, 16, 1, 16, 8,
 	NULL, NULL, &sysd_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&sysd_dib, 0 };
 
 /* ROM: read only memory - stored in a buffered file
    Register space access routines see ROM twice
@@ -462,9 +488,37 @@ t_stat nvr_reset (DEVICE *dptr)
 {
 if (nvr == NULL) {
 	nvr = calloc (NVRSIZE >> 2, sizeof (int32));
+	nvr_unit.filebuf = nvr;
 	ssc_cnf = ssc_cnf | SSCCNF_BLO;  }
 if (nvr == NULL) return SCPE_MEM;
 return SCPE_OK;
+}
+
+/* NVR attach */
+
+t_stat nvr_attach (UNIT *uptr, char *cptr)
+{
+t_stat r;
+
+uptr->flags = uptr->flags | (UNIT_ATTABLE | UNIT_BUFABLE);
+r = attach_unit (uptr, cptr);
+if (r != SCPE_OK)
+	uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
+else {	uptr->hwmark = uptr->capac;
+	ssc_cnf = ssc_cnf & ~SSCCNF_BLO;  }
+return r;
+}
+
+/* NVR detach */
+
+t_stat nvr_detach (UNIT *uptr)
+{
+t_stat r;
+
+r = detach_unit (uptr);
+if ((uptr->flags & UNIT_ATT) == 0)
+	uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
+return r;
 }
 
 /* CSI: console storage input */
@@ -485,7 +539,7 @@ void csrs_wr (int32 data)
 {
 if ((data & CSR_IE) == 0) CLR_INT (CSI);
 else if ((csi_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
-		SET_INT (CSI);
+	SET_INT (CSI);
 csi_csr = (csi_csr & ~CSICSR_RW) | (data & CSICSR_RW);
 return;
 }
@@ -682,9 +736,9 @@ int32 ReadReg (int32 pa, int32 lnt)
 {
 struct reglink *p;
 
-for (p = &regtable[0]; p -> low != 0; p++) {
-	if ((pa >= p -> low) && (pa < p -> high) && p -> read)
-		return p -> read (pa);  }
+for (p = &regtable[0]; p->low != 0; p++) {
+	if ((pa >= p->low) && (pa < p->high) && p->read)
+		return p->read (pa);  }
 ssc_bto = ssc_bto | SSCBTO_BTO | SSCBTO_RWT;
 MACH_CHECK (MCHK_READ);
 return 0;
@@ -704,9 +758,9 @@ void WriteReg (int32 pa, int32 val, int32 lnt)
 {
 struct reglink *p;
 
-for (p = &regtable[0]; p -> low != 0; p++) {
-	if ((pa >= p -> low) && (pa < p -> high) && p -> write) {
-		p -> write (pa, val, lnt);  
+for (p = &regtable[0]; p->low != 0; p++) {
+	if ((pa >= p->low) && (pa < p->high) && p->write) {
+		p->write (pa, val, lnt);  
 		return;  }  }
 ssc_bto = ssc_bto | SSCBTO_BTO | SSCBTO_RWT;
 MACH_CHECK (MCHK_WRITE);
@@ -795,8 +849,6 @@ return;
 int32 cdg_rd (int32 pa)
 {
 int32 t, row = CDG_GETROW (pa);
-int32 tag = CDG_GETTAG (pa);
-int32 tidx = row >> 1;
 
 t = cdg_dat[row];
 ka_cacr = ka_cacr & ~CACR_DRO;				/* clear diag */

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	H316 Simulator Usage
-Date:	15-Jun-2002
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -31,7 +31,7 @@ The following copyright notice applies to both the SIMH source and binary:
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-This memorandum documents Honeywell 316/516 simulator.
+This memorandum documents the Honeywell 316/516 simulator.
 
 
 1. Simulator Files
@@ -39,9 +39,13 @@ This memorandum documents Honeywell 316/516 simulator.
 The H316 requires the following files:
 
 sim/		sim_defs.h
+		sim_rev.h
+		sim_sock.h
+		sim_tmxr.h
 		scp.c
 		scp_tty.c
-		sim_rev.c
+		sim_sock.c
+		sim_tmxr.c
 
 sim/h316/	h316_defs.h
 		h316_cpu.c
@@ -183,12 +187,15 @@ Error handling is as follows:
 
 2.2.3 316/516-33 Console Teletype (TTY)
 
-The terminal reads from the console keyboard and writes to the
-simulator console window.  The terminal has one option, UC; when
-set, the terminal automatically converts lower case input to upper
-case.  This is on by default.
+The Teletype units (TTY0, TTY1) can be set to one of three modes:
+KSR, 7B, or 8B.  In KSR mode, lower case input and output characters
+are automatically converted to upper case, and the high order bit is
+forced to one on input.  In 7B mode, input and output characters are
+masked to 7 bits.  In 8B mode, characters are not modified.  Changing
+the mode of either unit changes both.  The default mode is KSR.
 
-The terminal implements these registers:
+The Teletype reads from the console keyboard and writes to the
+simulator console window.  It implements these registers:
 
 	name		size	comments
 

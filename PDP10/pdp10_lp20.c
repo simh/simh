@@ -25,6 +25,9 @@
 
    lp20		line printer
 
+   29-Sep-02	RMS	Added variable vector support
+			Modified to use common Unibus routines
+			New data structures
    30-May-02	RMS	Widened POS to 32b
    06-Jan-02	RMS	Added enable/disable support
    30-Nov-01	RMS	Added extended SET/SHOW support
@@ -114,8 +117,6 @@
 
 /* LPBA (765404) */
 
-#define XBA_MBZ		0400000				/* addr<17> must be 0 */
-
 /* LPBC (765506) */
 
 #define BC_MASK		0007777				/* <15:12> MBZ */
@@ -134,8 +135,10 @@
 
 extern d10 *M;						/* main memory */
 extern int32 int_req;
+extern int32 int_vec[32];
 extern int32 ubcs[UBANUM];				/* UBA csr */
 extern int32 ubmap[UBANUM][UMAP_MEMSIZE];		/* UBA map */
+
 int32 lpcsa = 0;					/* control/status A */
 int32 lpcsb = 0;					/* control/status B */
 int32 lpba = 0;						/* bus address */
@@ -153,8 +156,10 @@ int32 lp20_stopioe = 0;					/* stop on error */
 int16 txram[TX_SIZE] = { 0 };				/* translation RAM */
 int16 davfu[DV_SIZE] = { 0 };				/* DAVFU */
 
+DEVICE lp20_dev;
 t_stat lp20_rd (int32 *data, int32 pa, int32 access);
 t_stat lp20_wr (int32 data, int32 pa, int32 access);
+int32 lp20_inta (void);
 t_stat lp20_svc (UNIT *uptr);
 t_stat lp20_reset (DEVICE *dptr);
 t_stat lp20_attach (UNIT *uptr, char *ptr);
@@ -172,7 +177,8 @@ void update_lpcs (int32 flg);
    lp20_reg	LPT register list
 */
 
-DIB lp20_dib = { 1, IOBA_LP20, IOLN_LP20, &lp20_rd, &lp20_wr };
+DIB lp20_dib = { IOBA_LP20, IOLN_LP20, &lp20_rd, &lp20_wr,
+		 1, IVCL (LP20), VEC_LP20, { &lp20_inta } };
 
 UNIT lp20_unit = {
 	UDATA (&lp20_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
@@ -200,23 +206,24 @@ REG lp20_reg[] = {
 	{ FLDATA (STOP_IOE, lp20_stopioe, 0) },
 	{ BRDATA (TXRAM, txram, 8, 12, TX_SIZE) },
 	{ BRDATA (DAVFU, davfu, 8, 12, DV_SIZE) },
+	{ ORDATA (DEVADDR, lp20_dib.ba, 32), REG_HRO },
+	{ ORDATA (DEVVEC, lp20_dib.vec, 16), REG_HRO },
 	{ NULL }  };
 
 MTAB lp20_mod[] = {
 	{ UNIT_DUMMY, 0, NULL, "VFUCLEAR", &lp20_clear_vfu },
 	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
-		&set_addr, &show_addr, &lp20_dib },
-	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
-		&set_enbdis, NULL, &lp20_dib },
-	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
-		&set_enbdis, NULL, &lp20_dib },
+		&set_addr, &show_addr, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+		&set_vec, &show_vec, NULL },
 	{ 0 }  };
 
 DEVICE lp20_dev = {
 	"LP20", &lp20_unit, lp20_reg, lp20_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &lp20_reset,
-	NULL, &lp20_attach, &lp20_detach };
+	NULL, &lp20_attach, &lp20_detach,
+	&lp20_dib, DEV_DISABLE | DEV_UBUS };
 
 /* Line printer routines
 
@@ -338,11 +345,12 @@ return SCPE_OK;
 
 t_stat lp20_svc (UNIT *uptr)
 {
-int32 fnc, i, tbc, vpn, temp, txst, wd10;
+int32 fnc, i, tbc, temp, txst;
 int32 dvld = -2;					/* must be even */
 int32 err = 0;
+uint16 wd10;
 t_bool cont;
-a10 ba, pa10;
+a10 ba;
 
 static const uint32 txcase[32] = {
 	TX_CHR, TX_RAM, TX_CHR, TX_DVU, TX_RAM, TX_RAM, TX_DVU, TX_DVU,
@@ -362,20 +370,10 @@ if ((fnc == FNC_PR) && (dvlnt == 0)) {
 	return SCPE_OK;  }
 
 for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
-	vpn = PAG_GETVPN (ba >> 2);			/* get PDP-10 page number */
-	if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ) ||
-	   ((ubmap[1][vpn] & UMAP_VLD) == 0)) {		/* invalid map? */
+	if (Map_ReadW (ba, 2, &wd10, MAP)) {		/* get word, err? */
 		lpcsb = lpcsb | CSB_MTE;		/* set NXM error */
-		ubcs[1] = ubcs[1] | UBCS_TMO;		/* UBA times out */
 		update_lpcs (CSA_ERR);			/* set done */
 		break;  }
-	pa10 = (ubmap[1][vpn] + PAG_GETOFF (ba >> 2)) & PAMASK;
-	if (MEM_ADDR_NXM (pa10)) {			/* nxm? */
-		lpcsb = lpcsb | CSB_MTE;		/* set NXM error */
-		ubcs[1] = ubcs[1] | UBCS_TMO;		/* UBA times out */
-		update_lpcs (CSA_ERR);			/* set done */
-		break;  }
-	wd10 = (int32) ((M[pa10] >> ((ba & 2)? 0: 18)) & 0177777);
 	lpcbuf = (wd10 >> ((ba & 1)? 8: 0)) & 0377;	/* get character */
 	lpcsum = (lpcsum + lpcbuf) & 0377;		/* add into checksum */
 	switch (fnc) {					/* switch on function */
@@ -442,7 +440,7 @@ if (lpbc) update_lpcs (CSA_MBZ);			/* intr, but not done */
 else update_lpcs (CSA_DONE);				/* intr and done */
 if ((fnc == FNC_PR) && ferror (lp20_unit.fileref)) {
 	perror ("LP I/O error");
-	clearerr (uptr -> fileref);
+	clearerr (uptr->fileref);
 	return SCPE_IOERR;  }
 return SCPE_OK;
 }
@@ -547,7 +545,7 @@ return;
 int32 lp20_inta (void)
 {
 lp20_irq = 0;						/* clear int req */
-return VEC_LP20;
+return lp20_dib.vec;
 }
 
 t_stat lp20_reset (DEVICE *dptr)

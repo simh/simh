@@ -25,6 +25,12 @@
 
    ts		TS11/TSV05 magtape
 
+   30-Sep-02	RMS	Added variable address support to bootstrap
+			Added vector change/display support
+			Fixed CTL unload/clean decode
+			Implemented XS0_MOT in extended status
+			New data structures, revamped error recovery
+   28-Aug-02	RMS	Added end of medium support
    30-May-02	RMS	Widened POS to 32b
    22-Apr-02	RMS	Added maximum record length protection
    04-Apr-02	RMS	Fixed bug in residual frame count after space operation
@@ -69,8 +75,7 @@
 #include "vax_defs.h"
 #define VM_VAX		1
 #define TS_RDX		16
-#define TS_DF_ENB	1				/* on by default */
-#define TS_18B		FALSE				/* always 22b */
+#define TS_DIS		0				/* on by default */
 #define ADDRTEST	0177700
 #define DMASK		0xFFFF
 extern int32 ReadB (t_addr pa);
@@ -82,9 +87,8 @@ extern void WriteW (t_addr pa, int32 val);
 #include "pdp11_defs.h"
 #define VM_PDP11	1
 #define TS_RDX		8
-#define TS_DF_ENB	0				/* off by default */
-#define TS_18B		(cpu_18b || cpu_ubm)
-#define ADDRTEST	(TS_18B? 0177774: 0177700)
+#define TS_DIS		DEV_DIS				/* off by default */
+#define ADDRTEST	(UNIBUS? 0177774: 0177700)
 extern uint16 *M;
 extern int32 cpu_18b, cpu_ubm;
 #define ReadB(p)	((M[(p) >> 1] >> (((p) & 1)? 8: 0)) & 0377)
@@ -211,7 +215,7 @@ extern int32 cpu_18b, cpu_ubm;
 #define XS0_NEF		0002000				/* non exec fnc */
 #define XS0_ILC		0001000				/* illegal cmd */
 #define XS0_ILA		0000400				/* illegal addr */
-#define XS0_MOT		0000200				/* motion */
+#define XS0_MOT		0000200				/* tape has moved */
 #define XS0_ONL		0000100				/* online */
 #define XS0_IE		0000040				/* int enb */
 #define XS0_VCK		0000020				/* volume check */
@@ -219,9 +223,11 @@ extern int32 cpu_18b, cpu_ubm;
 #define XS0_WLK		0000004				/* write lock */
 #define XS0_BOT		0000002				/* BOT */
 #define XS0_EOT		0000001				/* EOT */
-#define XS0_ALLERR	0177600				/* all errors */
+#define XS0_ALLCLR	0177600				/* clear at start */
 
-/* Extended status register 1 - none of these errors are ever set */
+/* Extended status register 1 */
+
+#define XS1_UCOR	0000002				/* uncorrectable */
 
 /* Extended status register 2 */
 
@@ -260,6 +266,8 @@ extern int32 cpu_18b, cpu_ubm;
 #define MAX(a,b)	(((a) >= (b))? (a): (b))
 
 extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
+
 extern UNIT cpu_unit;
 extern int32 cpu_log;
 extern FILE *sim_log;
@@ -276,13 +284,14 @@ int32 ts_qatn = 0;					/* queued attn */
 int32 ts_bcmd = 0;					/* boot cmd */
 int32 ts_time = 10;					/* record latency */
 
+DEVICE ts_dev;
 t_stat ts_rd (int32 *data, int32 PA, int32 access);
 t_stat ts_wr (int32 data, int32 PA, int32 access);
 t_stat ts_svc (UNIT *uptr);
 t_stat ts_reset (DEVICE *dptr);
 t_stat ts_attach (UNIT *uptr, char *cptr);
 t_stat ts_detach (UNIT *uptr);
-t_stat ts_boot (int32 unitno);
+t_stat ts_boot (int32 unitno, DEVICE *dptr);
 int32 ts_updtssr (int32 t);
 int32 ts_updxs0 (int32 t);
 void ts_cmpendcmd (int32 s0, int32 s1);
@@ -296,7 +305,8 @@ void ts_endcmd (int32 ssf, int32 xs0f, int32 msg);
    ts_mod	TS modifier list
 */
 
-DIB ts_dib = { TS_DF_ENB, IOBA_TS, IOLN_TS, &ts_rd, &ts_wr };
+DIB ts_dib = { IOBA_TS, IOLN_TS, &ts_rd, &ts_wr,
+		1, IVCL (TS), VEC_TS, { NULL } };
 
 UNIT ts_unit = { UDATA (&ts_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) };
 
@@ -327,27 +337,25 @@ REG ts_reg[] = {
 	{ FLDATA (OWNM, ts_ownm, 0) },
 	{ DRDATA (TIME, ts_time, 24), PV_LEFT + REG_NZ },
 	{ DRDATA (POS, ts_unit.pos, 32), PV_LEFT + REG_RO },
-	{ FLDATA (WLK, ts_unit.flags, UNIT_V_WLK), REG_HRO },
 	{ GRDATA (DEVADDR, ts_dib.ba, TS_RDX, 32, 0), REG_HRO },
-	{ FLDATA (*DEVENB, ts_dib.enb, 0), REG_HRO },
+	{ GRDATA (DEVVEC, ts_dib.vec, TS_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB ts_mod[] = {
 	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
 	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
-		&set_addr, &show_addr, &ts_dib },
-	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
-		&set_enbdis, NULL, &ts_dib },
-	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
-		&set_enbdis, NULL, &ts_dib },
+		&set_addr, &show_addr, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+		&set_vec, &show_vec, NULL },
 	{ 0 }  };
 
 DEVICE ts_dev = {
 	"TS", &ts_unit, ts_reg, ts_mod,
 	1, 10, 31, 1, TS_RDX, 8,
 	NULL, NULL, &ts_reset,
-	&ts_boot, &ts_attach, &ts_detach };
+	&ts_boot, &ts_attach, &ts_detach,
+	&ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS };
 
 /* I/O dispatch routine, I/O addresses 17772520 - 17772522
 
@@ -381,7 +389,7 @@ case 0:							/* TSDB */
 		((data & 03) << 16) | (data & 0177774);
 	tsdbx = 0;					/* clr tsdbx */
 	tssr = ts_updtssr (tssr & TSSR_NBA);		/* clr ssr, err */
-	msgxs0 = ts_updxs0 (msgxs0 & ~XS0_ALLERR);	/* clr err, upd xs0 */
+	msgxs0 = ts_updxs0 (msgxs0 & ~XS0_ALLCLR);	/* clr, upd xs0 */
 	msgrfc = msgxs1 = msgxs2 = msgxs3 = msgxs4 = 0;	/* clr status */
 	CLR_INT (TS);					/* clr int req */
 	for (i = 0; i < CMD_PLNT; i++) {		/* get cmd pkt */
@@ -395,7 +403,7 @@ case 0:							/* TSDB */
 	break;
 case 1:							/* TSSR */
 	if (PA & 1) {					/* TSDBX */
-		if (TS_18B) return SCPE_OK;		/* not in TS11 */
+		if (UNIBUS) return SCPE_OK;		/* not in TS11 */
 		if (tssr & TSSR_SSR) {			/* ready? */
 			tsdbx = data;			/* save */
 			if (data & TSDBX_BOOT) {
@@ -415,10 +423,14 @@ return SCPE_OK;
 
 int32 ts_rdlntf (UNIT *uptr, t_mtrlnt *tbc)
 {
-fseek (uptr -> fileref, uptr -> pos, SEEK_SET);		/* set pos */
-fxread (tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);	/* read rec lnt */
-if (ferror (uptr -> fileref)) return (XTC (XS0_EOT | XS0_RLS, TC2));
-if (feof (uptr -> fileref)) return (XTC (XS0_TMK | XS0_RLS, TC2));
+fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* set pos */
+fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);	/* read rec lnt */
+if (ferror (uptr->fileref)) {				/* error? */
+	msgxs1 = msgxs1 | XS1_UCOR;			/* uncorrectable */
+	return (XTC (XS0_RLS, TC6));  }			/* pos lost */
+if (feof (uptr->fileref) || (*tbc == MTR_EOM)) {	/* end of medium? */
+	msgxs3 = msgxs3 | XS3_OPI;			/* incomplete */
+	return (XTC (XS0_RLS, TC6));  }			/* pos lost */
 return 0;
 }
 
@@ -430,9 +442,11 @@ t_mtrlnt tbc;
 do {	fc = (fc - 1) & DMASK;				/* decr wc */
 	if (upd) msgrfc = fc;
 	if (st = ts_rdlntf (uptr, &tbc)) return st;	/* read rec lnt */
-	uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);	/* update pos */
-	if (tbc == 0) return (XTC (XS0_TMK | XS0_RLS, TC2));
-	uptr -> pos = uptr -> pos + ((MTRL (tbc) + 1) & ~1) + sizeof (t_mtrlnt);
+	uptr->pos = uptr->pos + sizeof (t_mtrlnt);	/* update pos */
+	msgxs0 = msgxs0 | XS0_MOT;			/* tape has moved */
+	if (tbc == MTR_TMK)				/* tape mark? */
+		return (XTC (XS0_TMK | XS0_RLS, TC2));
+	uptr->pos = uptr->pos + ((MTRL (tbc) + 1) & ~1) + sizeof (t_mtrlnt);
 	}
 while (fc != 0);
 return 0;
@@ -445,13 +459,13 @@ t_mtrlnt prvp;
 t_bool tmkprv = FALSE;
 
 msgrfc = fc;
-if ((uptr -> pos == 0) && (wchopt & WCH_ENB)) tmkprv = TRUE;
-do {	prvp = uptr -> pos;				/* save cur pos */
+if ((uptr->pos == 0) && (wchopt & WCH_ENB)) tmkprv = TRUE;
+do {	prvp = uptr->pos;				/* save cur pos */
 	tc = ts_spacef (uptr, 0, FALSE);		/* space fwd */
 	if (GET_X (tc) & XS0_TMK) {			/* tape mark? */
 		msgrfc = (msgrfc - 1) & DMASK;		/* decr count */
 		if (tmkprv && (wchopt & WCH_ESS) &&
-		   (uptr -> pos - prvp == sizeof (t_mtrlnt)))
+		   (uptr->pos - prvp == sizeof (t_mtrlnt)))
 			return (XTC ((msgrfc? XS0_RLS: 0) |
 				XS0_TMK | XS0_LET, TC2));
 		tmkprv = TRUE;  }
@@ -464,12 +478,21 @@ return 0;
 int32 ts_rdlntr (UNIT *uptr, t_mtrlnt *tbc)
 {
 msgxs3 = msgxs3 | XS3_REV;				/* set rev op */
-fseek (uptr -> fileref, uptr -> pos - sizeof (t_mtrlnt), SEEK_SET);
-fxread (tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-if (ferror (uptr -> fileref) ||				/* error or eof? */
-    feof (uptr -> fileref)) {
-	msgxs3 = msgxs3 | XS3_OPI;			/* fatal err */
-	return (XTC (XS0_RLS, TC6));  }
+if (uptr->pos < sizeof (t_mtrlnt)) {			/* BOT? */
+	msgxs3 = msgxs3 | XS3_RIB;			/* set status */
+	return (XTC (XS0_BOT | XS0_RLS, TC2));  }	/* tape alert */
+fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET);
+fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
+if (ferror (uptr->fileref)) {				/* error? */
+	msgxs1 = msgxs1 | XS1_UCOR;			/* uncorrectable */
+	return (XTC (XS0_RLS, TC6));  }			/* pos lost */
+if (feof (uptr->fileref)) {				/* end of file? */
+	msgxs3 = msgxs3 | XS3_OPI;			/* incomplete */
+	return (XTC (XS0_RLS, TC6));  }			/* pos lost */
+if (*tbc == MTR_EOM) {					/* eom? */
+	msgxs3 = msgxs3 | XS3_OPI;			/* incomplete */
+	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* spc over eom */
+	return (XTC (XS0_RLS, TC6));  }			/* pos lost */
 return 0;
 }
 
@@ -479,18 +502,16 @@ int32 st;
 t_mtrlnt tbc;
 
 if (upd) msgrfc = fc;
-do {	if (uptr -> pos == 0) break;			/* BOT? */
-	fc = (fc - 1) & DMASK;				/* decr wc */
+do {	fc = (fc - 1) & DMASK;				/* decr wc */
 	if (upd) msgrfc = fc;
 	if (st = ts_rdlntr (uptr, &tbc)) return st;	/* read rec lnt */
-	uptr -> pos = uptr -> pos - sizeof (t_mtrlnt);	/* update pos */
-	if (tbc == 0) return (XTC (XS0_TMK | XS0_RLS, TC2));
-	uptr -> pos = uptr -> pos - ((MTRL (tbc) + 1) & ~1) - sizeof (t_mtrlnt);
+	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* update pos */
+	msgxs0 = msgxs0 | XS0_MOT;			/* tape has moved */
+	if (tbc == MTR_TMK)				/* tape mark? */
+		return (XTC (XS0_TMK | XS0_RLS, TC2));
+	uptr->pos = uptr->pos - ((MTRL (tbc) + 1) & ~1) - sizeof (t_mtrlnt);
 	}
 while (fc != 0);
-if (uptr -> pos == 0) {
-	msgxs3 = msgxs3 | XS3_RIB;
-	return (XTC (XS0_BOT | (fc? XS0_RLS: 0), TC2));  }
 return 0;
 }
 
@@ -501,12 +522,12 @@ t_mtrlnt prvp;
 t_bool tmkprv = FALSE;
 
 msgrfc = fc;
-do {	prvp = uptr -> pos;				/* save cur pos */
+do {	prvp = uptr->pos;				/* save cur pos */
 	tc = ts_spacer (uptr, 0, FALSE);		/* space rev */
 	if (GET_X (tc) & XS0_TMK) {			/* tape mark? */
 		msgrfc = (msgrfc - 1) & DMASK;		/* decr wc */
 		if (tmkprv && (wchopt & WCH_ESS) &&
-		   (prvp - uptr -> pos == sizeof (t_mtrlnt)))
+		   (prvp - uptr->pos == sizeof (t_mtrlnt)))
 			return (XTC ((msgrfc? XS0_RLS: 0) |
 				XS0_TMK | XS0_LET, TC2));
 		tmkprv = TRUE;  }
@@ -516,26 +537,32 @@ while (msgrfc != 0);
 return 0;
 }
 
-int32 ts_readf (UNIT *uptr, int32 fc)
+int32 ts_readf (UNIT *uptr, uint32 fc)
 {
-int32 i, st;
-t_mtrlnt tbc, wbc;
+int32 st;
+t_mtrlnt i, tbc, wbc;
 t_addr wa, pa;
 
 msgrfc = fc;
 if (st = ts_rdlntf (uptr, &tbc)) return st;		/* read rec lnt */
-if (tbc == 0) {						/* tape mark? */
-	uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);	/* update pos */
+if (tbc == MTR_TMK) {					/* tape mark? */
+	uptr->pos = uptr->pos + sizeof (t_mtrlnt);	/* update pos */
+	msgxs0 = msgxs0 | XS0_MOT;			/* tape has moved */
 	return (XTC (XS0_TMK | XS0_RLS, TC2));  }
 if (fc == 0) fc = 0200000;				/* byte count */
 tsba = (cmdadh << 16) | cmdadl;				/* buf addr */
 tbc = MTRL (tbc);					/* ignore err flag */
-if (tbc > MT_MAXFR) return SCPE_MTRLNT;			/* record too long? */
+if (tbc > MT_MAXFR) {					/* record too long? */
+	msgxs1 = msgxs1 | XS1_UCOR;			/* uncorrectable */
+	return XTC (XS0_RLS, TC6);  }			/* pos lost */
 wbc = (tbc > fc)? fc: tbc;				/* cap buf size */
-i = fxread (tsxb, sizeof (uint8), wbc, uptr -> fileref); /* read record */
-if (ferror (uptr -> fileref)) return XTC (XS0_EOT | XS0_RLS, TC2);
+i = fxread (tsxb, sizeof (uint8), wbc, uptr->fileref);	/* read record */
+if (ferror (uptr->fileref)) {				/* error? */
+	msgxs1 = msgxs1 | XS1_UCOR;			/* uncorrectable */
+	return XTC (XS0_RLS, TC6);  }			/* pos lost */
 for ( ; i < wbc; i++) tsxb[i] = 0;			/* fill with 0's */
-uptr -> pos = uptr -> pos + ((tbc + 1) & ~1) + (2 * sizeof (t_mtrlnt));
+uptr->pos = uptr->pos + ((tbc + 1) & ~1) + (2 * sizeof (t_mtrlnt));
+msgxs0 = msgxs0 | XS0_MOT;				/* tape has moved */
 for (i = 0; i < wbc; i++) {				/* copy buffer */
 	wa = (cmdhdr & CMD_SWP)? tsba ^ 1: tsba;	/* apply OPP */
 	if (Map_Addr (wa, &pa) && ADDR_IS_MEM (pa))	/* map addr, nxm? */
@@ -549,32 +576,33 @@ if (tbc > wbc) return (XTC (XS0_RLL, TC2));		/* rec too big? */
 return 0;
 }
 
-int32 ts_readr (UNIT *uptr, int32 fc)
+int32 ts_readr (UNIT *uptr, uint32 fc)
 {
-int32 i, st;
-t_mtrlnt tbc, wbc;
+int32 st;
+t_mtrlnt i, tbc, wbc;
 t_addr wa, pa;
 
 msgrfc = fc;
-if (uptr -> pos == 0) {					/* BOT? */
-	msgxs3 = msgxs3 | XS3_RIB;			/* nothing to do */
-	return (XTC (XS0_BOT | XS0_RLS, TC2));  }
 if (st = ts_rdlntr (uptr, &tbc)) return st;		/* read rec lnt */
-if (tbc == 0) {						/* tape mark? */
-	uptr -> pos = uptr -> pos - sizeof (t_mtrlnt);	/* update pos */
+if (tbc == MTR_TMK) {					/* tape mark? */
+	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* update pos */
+	msgxs0 = msgxs0 | XS0_MOT;			/* tape has moved */
 	return XTC (XS0_TMK | XS0_RLS, TC2);  }
 if (fc == 0) fc = 0200000;				/* byte count */
 tsba = (cmdadh << 16) | cmdadl + fc;			/* buf addr */
 tbc = MTRL (tbc);					/* ignore err flag */
-if (tbc > MT_MAXFR) return SCPE_MTRLNT;			/* record too long? */
+if (tbc > MT_MAXFR) {					/* record too long? */
+	msgxs1 = msgxs1 | XS1_UCOR;			/* uncorrectable */
+	return XTC (XS0_RLS, TC6);  }			/* pos lost */
 wbc = (tbc > fc)? fc: tbc;				/* cap buf size */
-fseek (uptr -> fileref, uptr -> pos - sizeof (t_mtrlnt) - wbc, SEEK_SET);
-i = fxread (tsxb, sizeof (uint8), wbc, uptr -> fileref);
+fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt) - wbc, SEEK_SET);
+i = fxread (tsxb, sizeof (uint8), wbc, uptr->fileref);
 for ( ; i < wbc; i++) tsxb[i] = 0;			/* fill with 0's */
-if (ferror (uptr -> fileref)) {				/* error? */
-	msgxs3 = msgxs3 | XS3_OPI;
-	return XTC (XS0_RLS, TC6);  }
-uptr -> pos = uptr -> pos - ((tbc + 1) & ~1) - (2 * sizeof (t_mtrlnt));
+if (ferror (uptr->fileref)) {				/* error? */
+	msgxs1 = msgxs1 | XS1_UCOR;			/* uncorrectable */
+	return XTC (XS0_RLS, TC6);  }			/* pos lost */
+uptr->pos = uptr->pos - ((tbc + 1) & ~1) - (2 * sizeof (t_mtrlnt));
+msgxs0 = msgxs0 | XS0_MOT;				/* tape has moved */
 for (i = wbc; i > 0; i--) {				/* copy buffer */
 	tsba = tsba - 1;
 	wa = (cmdhdr & CMD_SWP)? tsba ^ 1: tsba;	/* apply OPP */
@@ -590,7 +618,7 @@ return 0;
 
 int32 ts_write (UNIT *uptr, int32 fc)
 {
-int32 i;
+int32 i, ebc;
 t_addr wa, pa;
 
 msgrfc = fc;
@@ -603,26 +631,29 @@ for (i = 0; i < fc; i++) {				/* copy mem to buf */
 	else {	tssr = ts_updtssr (tssr | TSSR_NXM);
 		return TC5;  }
 	tsba = tsba + 1;  }
-fseek (uptr -> fileref, uptr -> pos, SEEK_SET);		/* position */
-fxwrite (&fc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-fxwrite (tsxb, sizeof (uint8), fc, uptr -> fileref);
-fxwrite (&fc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-uptr -> pos = uptr -> pos + ((fc + 1) & ~1) + (2 * sizeof (t_mtrlnt));
-msgrfc = 0;
-if (ferror (uptr -> fileref)) {				/* error? */
+ebc = (fc + 1) & ~1;					/* force even */
+fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* position */
+fxwrite (&fc, sizeof (t_mtrlnt), 1, uptr->fileref);
+fxwrite (tsxb, sizeof (uint8), ebc, uptr->fileref);
+fxwrite (&fc, sizeof (t_mtrlnt), 1, uptr->fileref);
+if (ferror (uptr->fileref)) {				/* error? */
 	msgxs3 = msgxs3 | XS3_OPI;
 	return TC6;  }
+uptr->pos = uptr->pos + ebc + (2 * sizeof (t_mtrlnt));	/* update pos */
+msgxs0 = msgxs0 | XS0_MOT;				/* tape has moved */
+msgrfc = 0;
 return 0;
 }
 
 int32 ts_wtmk (UNIT *uptr)
 {
-t_mtrlnt bceof = 0;
+t_mtrlnt bceof = MTR_TMK;
 
-fseek (uptr -> fileref, uptr -> pos, SEEK_SET);		/* set pos */
-fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr -> fileref);
-uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);		/* update position */
-if (ferror (uptr -> fileref)) return TC6;
+fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* set pos */
+fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr->fileref);
+if (ferror (uptr->fileref)) return TC6;
+uptr->pos = uptr->pos + sizeof (t_mtrlnt);		/* update position */
+msgxs0 = msgxs0 | XS0_MOT;				/* tape has moved */
 return XTC (XS0_TMK, TC0);
 }
 
@@ -646,8 +677,8 @@ static const int32 fnc_flg[CMD_N_FNC] = {
 
 if (ts_bcmd) {						/* boot? */
 	ts_bcmd = 0;					/* clear flag */
-	uptr -> pos = 0; 				/* rewind */
-	if (uptr -> flags & UNIT_ATT) {			/* attached? */
+	uptr->pos = 0; 					/* rewind */
+	if (uptr->flags & UNIT_ATT) {			/* attached? */
 		cmdlnt = cmdadh = cmdadl = 0;		/* defang rd */
 		ts_spacef (uptr, 1, FALSE);		/* space fwd */
 		ts_readf (uptr, 512);			/* read blk */
@@ -663,6 +694,9 @@ if (!(cmdhdr & CMD_ACK)) {				/* no acknowledge? */
 	return SCPE_OK;  }
 fnc = GET_FNC (cmdhdr);					/* get fnc+mode */
 mod = GET_MOD (cmdhdr);
+if (DBG_LOG (LOG_TS))
+	fprintf (sim_log, ">>TS: cmd=%o, mod=%o, buf=%o, lnt=%d, pos=%d\n",
+		fnc, mod, cmdadl, cmdlnt, ts_unit.pos);
 if ((fnc != FNC_WCHR) && (tssr & TSSR_NBA)) {		/* ~wr chr & nba? */
 	ts_endcmd (TC3, 0, 0);				/* error */
 	return SCPE_OK;  }
@@ -677,16 +711,16 @@ if ((cmdhdr & CMD_MBZ) || (mod >= fnc_mod[fnc])) {	/* test mbz */
 	ts_endcmd (TC3, XS0_ILC, MSG_ACK | MSG_MILL | MSG_CFAIL);
 	return SCPE_OK;  }
 if ((fnc_flg[fnc] & FLG_MO) &&				/* mot+(vck|!att)? */
-	((msgxs0 & XS0_VCK) || !(uptr -> flags & UNIT_ATT))) {
+	((msgxs0 & XS0_VCK) || !(uptr->flags & UNIT_ATT))) {
 	ts_endcmd (TC3, XS0_NEF, MSG_ACK | MSG_MNEF | MSG_CFAIL);
 	return SCPE_OK;  }
 if ((fnc_flg[fnc] & FLG_WR) &&				/* write? */
-    (uptr -> flags & UNIT_WPRT)) {			/* write lck? */
+    (uptr->flags & UNIT_WPRT)) {			/* write lck? */
 	ts_endcmd (TC3, XS0_WLE | XS0_NEF, MSG_ACK | MSG_MNEF | MSG_CFAIL);
 	return SCPE_OK;  }
 if ((((fnc == FNC_READ) && (mod == 1)) ||		/* read rev */
      ((fnc == FNC_POS) && (mod & 1))) &&		/* space rev */
-     (uptr -> pos == 0)) {				/* BOT? */
+     (uptr->pos == 0)) {				/* BOT? */
 	ts_endcmd (TC3, XS0_NEF, MSG_ACK | MSG_MNEF | MSG_CFAIL);
 	return SCPE_OK;  }
 if ((fnc_flg[fnc] & FLG_AD) && (cmdadh & ADDRTEST)) {	/* buf addr > 22b? */
@@ -696,7 +730,8 @@ if ((fnc_flg[fnc] & FLG_AD) && (cmdadh & ADDRTEST)) {	/* buf addr > 22b? */
 st0 = st1 = 0;
 switch (fnc) {						/* case on func */
 case FNC_INIT:						/* init */
-	uptr -> pos = 0;				/* rewind */
+	if (uptr->pos) msgxs0 = msgxs0 | XS0_MOT;	/* set if tape moves */
+	uptr->pos = 0;					/* rewind */
 case FNC_WSSM:						/* write mem */
 case FNC_GSTA:						/* get status */
 	ts_endcmd (TC0, 0, MSG_ACK | MSG_CEND);		/* send end packet */
@@ -725,18 +760,20 @@ case FNC_CTL:						/* control */
 		if (wchopt & WCH_ERI) SET_INT (TS);
 		ts_ownc = 0; ts_ownm = 1;		/* keep msg */
 		break;
-	case 01:					/* clean */
-		ts_endcmd (TC0, 0, MSG_ACK | MSG_CEND);	/* nop */
-		break;
-	case 02:					/* rewind and unload */
+	case 01:					/* rewind and unload */
+		if (uptr->pos) 	msgxs0 = msgxs0 | XS0_MOT; /* if tape moves */
 		detach_unit (uptr);			/* unload */
 		ts_endcmd (TC0, 0, MSG_ACK | MSG_CEND);
+		break;
+	case 02:					/* clean */
+		ts_endcmd (TC0, 0, MSG_ACK | MSG_CEND);	/* nop */
 		break;
 	case 03:					/* undefined */
 		ts_endcmd (TC3, XS0_ILC, MSG_ACK | MSG_MILL | MSG_CFAIL);
 		return SCPE_OK;
 	case 04:					/* rewind */
-		ts_unit.pos = 0;
+		if (uptr->pos) msgxs0 = msgxs0 | XS0_MOT; /* if tape moves */
+		uptr->pos = 0;
 		ts_endcmd (TC0, XS0_BOT, MSG_ACK | MSG_CEND);
 		break;  }
 	break;
@@ -804,13 +841,11 @@ case FNC_POS:
 		st0 = ts_skipr (uptr, cmdadl);
 		break;
 	case 04:					/* rewind */
-		ts_unit.pos = 0;
+		if (uptr->pos) msgxs0 = msgxs0 | XS0_MOT; /* if tape moves */
+		uptr->pos = 0;
 		break;  }
 	ts_cmpendcmd (st0, 0);
 	break;  }
-if (DBG_LOG (LOG_TS))
-	fprintf (sim_log, ">>TS: cmd=%o, mod=%o, buf=%o, lnt=%d, sta=%o, tc=%o, pos=%d\n",
-	fnc, mod, cmdadl, cmdlnt, msgxs0, GET_TC (tssr), ts_unit.pos);
 return SCPE_OK;
 }
 
@@ -875,6 +910,9 @@ if (msg && !(tssr & TSSR_NBA)) {			/* send end pkt */
 tssr = ts_updtssr (tssr | tc | TSSR_SSR | (tc? TSSR_SC: 0));
 if (cmdhdr & CMD_IE) SET_INT (TS);
 ts_ownm = 0; ts_ownc = 0;
+if (DBG_LOG (LOG_TS))
+	fprintf (sim_log, ">>TS: sta=%o, tc=%o, rfc=%d, pos=%d\n",
+		msgxs0, GET_TC (tssr), msgrfc, ts_unit.pos);
 return;
 }
 
@@ -939,10 +977,12 @@ return r;
 /* Boot */
 
 #if defined (VM_PDP11)
-#define BOOT_START 01000
-#define BOOT_LEN (sizeof (boot_rom) / sizeof (int32))
+#define BOOT_START	01000
+#define BOOT_CSR0	(BOOT_START + 006)
+#define BOOT_CSR1	(BOOT_START + 012)
+#define BOOT_LEN	(sizeof (boot_rom) / sizeof (int16))
 
-static const int32 boot_rom[] = {
+static const uint16 boot_rom[] = {
 	0012706, 0001000,		/* mov #boot_start, sp */
 	0012700, 0172520,		/* mov #tsba, r0 */
 	0012701, 0172522,		/* mov #tssr, r1 */
@@ -980,7 +1020,7 @@ static const int32 boot_rom[] = {
 					/* msg:	.blk 4 */
 };
 
-t_stat ts_boot (int32 unitno)
+t_stat ts_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 saved_PC;
@@ -988,12 +1028,14 @@ extern int32 saved_PC;
 ts_unit.pos = 0;
 for (i = 0; i < BOOT_LEN; i++)
 	M[(BOOT_START >> 1) + i] = boot_rom[i];
+M[BOOT_CSR0 >> 1] = ts_dib.ba & DMASK;
+M[BOOT_CSR1 >> 1] = (ts_dib.ba & DMASK) + 02;
 saved_PC = BOOT_START;
 return SCPE_OK;
 } 
 #else
 
-t_stat ts_boot (int32 unitno)
+t_stat ts_boot (int32 unitno, DEVICE *dptr)
 {
 return SCPE_NOFNC;
 }

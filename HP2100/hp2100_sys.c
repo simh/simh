@@ -43,7 +43,8 @@ extern DEVICE cpu_dev;
 extern UNIT cpu_unit;
 extern DEVICE dma0_dev, dma1_dev;
 extern DEVICE ptr_dev, ptp_dev;
-extern DEVICE tty_dev, clk_dev, lpt_dev;
+extern DEVICE tty_dev, clk_dev;
+extern DEVICE lps_dev, lpt_dev;
 extern DEVICE mtd_dev, mtc_dev;
 extern DEVICE msd_dev, msc_dev;
 extern DEVICE dpd_dev, dpc_dev;
@@ -69,17 +70,22 @@ REG *sim_PC = &cpu_reg[0];
 
 int32 sim_emax = 3;
 
-DEVICE *sim_devices[] = { &cpu_dev,
-	&dma0_dev, &dma1_dev,
-	&ptr_dev, &ptp_dev,
+DEVICE *sim_devices[] = {
+	&cpu_dev,
+	&dma0_dev,
+	&dma1_dev,
+	&ptr_dev,
+	&ptp_dev,
 	&tty_dev,
-	&clk_dev, &lpt_dev,
+	&clk_dev,
+	&lps_dev,
+	&lpt_dev,
 	&dpd_dev, &dpc_dev,
 	&dqd_dev, &dqc_dev,
 	&drd_dev, &drc_dev,
 	&mtd_dev, &mtc_dev,
 	&msd_dev, &msc_dev,
-	&muxu_dev, &muxl_dev, &muxc_dev,
+	&muxl_dev, &muxu_dev, &muxc_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -88,7 +94,8 @@ const char *sim_stop_messages[] = {
 	"Non-existent I/O device",
 	"HALT instruction",
 	"Breakpoint",
-	"Indirect address loop"  };
+	"Indirect address loop",
+	"Indirect address interrupt (should not happen!)"  };
 
 /* Binary loader
 
@@ -121,17 +128,17 @@ int32 origin, csum, zerocnt, count, word, i;
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 for (zerocnt = 1;; zerocnt = -10) {			/* block loop */
 	for (;; zerocnt++) {				/* skip 0's */
-		if ((count = fgetc (fileref)) == EOF) return SCPE_OK;
-		else if (count) break;
-		else if (zerocnt == 0) return SCPE_OK;  }
+	    if ((count = fgetc (fileref)) == EOF) return SCPE_OK;
+	    else if (count) break;
+	    else if (zerocnt == 0) return SCPE_OK;  }
 	if (fgetc (fileref) == EOF) return SCPE_FMT;
 	if ((origin = fgetw (fileref)) < 0) return SCPE_FMT;
 	csum = origin;					/* seed checksum */
 	for (i = 0; i < count; i++) {			/* get data words */
-		if ((word = fgetw (fileref)) < 0) return SCPE_FMT;
-		if (MEM_ADDR_OK (origin)) M[origin] = word;
-		origin = origin + 1;
-		csum = csum + word;  }
+	    if ((word = fgetw (fileref)) < 0) return SCPE_FMT;
+	    if (MEM_ADDR_OK (origin)) M[origin] = word;
+	    origin = origin + 1;
+	    csum = csum + word;  }
 	if ((word = fgetw (fileref)) < 0) return SCPE_FMT;
 	if ((word ^ csum) & DMASK) return SCPE_CSUM;  }
 return SCPE_OK;
@@ -172,8 +179,8 @@ static const char *opcode[] = {
  "XOR", "JMP", "IOR", "ISZ",
  "ADA", "ADB" ,"CPA", "CPB",
  "LDA", "LDB", "STA", "STB",
- "ASL", "LSL", "RRL",
- "ASR", "LSR", "RRR",
+ "DIAG", "ASL", "LSL", "TIMER",
+ "RRL", "ASR", "LSR", "RRR",
  "MPY", "DIV", "DLD", "DST",
  "FAD", "FSB", "FMP", "FDV",
  "FIX", "FLT",
@@ -214,8 +221,8 @@ static const int32 opc_val[] = {
  0020000+I_MRF, 0024000+I_MRF, 0030000+I_MRF, 0034000+I_MRF,
  0040000+I_MRF, 0044000+I_MRF, 0050000+I_MRF, 0054000+I_MRF,
  0060000+I_MRF, 0064000+I_MRF, 0070000+I_MRF, 0074000+I_MRF,
- 0100020+I_ESH, 0100040+I_ESH, 0100100+I_ESH,
- 0101020+I_ESH, 0101040+I_ESH, 0101100+I_ESH,
+ 0100000+I_NPN, 0100020+I_ESH, 0100040+I_ESH, 0100060+I_NPN,
+ 0100100+I_ESH, 0101020+I_ESH, 0101040+I_ESH, 0101100+I_ESH,
  0100200+I_EMR, 0100400+I_EMR, 0104200+I_EMR, 0104400+I_EMR,
  0105000+I_EMR, 0105020+I_EMR, 0105040+I_EMR, 0105060+I_EMR,
  0105100+I_NPN, 0105120+I_NPN,
@@ -329,16 +336,16 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 		break;
 	case I_V_NPC:					/* no operands + C */
 		fprintf (of, "%s", opcode[i]);
-		if (inst & HC) fprintf (of, " C");
+		if (inst & I_HC) fprintf (of, " C");
 		break;
 	case I_V_MRF:					/* mem ref */
-		disp = inst & DISP;			/* displacement */
+		disp = inst & I_DISP;			/* displacement */
 		fprintf (of, "%s ", opcode[i]);		/* opcode */
-		if (inst & CP) {			/* current page? */
-			if (cflag) fprintf (of, "%-o", (addr & PAGENO) | disp);
-			else fprintf (of, "C %-o", disp);  }
+		if (inst & I_CP) {			/* current page? */
+		    if (cflag) fprintf (of, "%-o", (addr & I_PAGENO) | disp);
+		    else fprintf (of, "C %-o", disp);  }
 		else fprintf (of, "%-o", disp);		/* page zero */
-		if (inst & IA) fprintf (of, ",I");
+		if (inst & I_IA) fprintf (of, ",I");
 		break;
 	case I_V_ASH:					/* shift, alter-skip */
 		cm = FALSE;
@@ -357,24 +364,24 @@ for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
 		break;
 	case I_V_EMR:					/* extended mem ref */
 		fprintf (of, "%s %-o", opcode[i], val[1] & VAMASK);
-		if (val[1] & IA) fprintf (of, ",I");
+		if (val[1] & I_IA) fprintf (of, ",I");
 		return -1;				/* extra word */
 	case I_V_IO1:					/* IOT with H/C */
-		fprintf (of, "%s %-o", opcode[i], inst & DEVMASK);
-		if (inst & HC) fprintf (of, ",C");
+		fprintf (of, "%s %-o", opcode[i], inst & I_DEVMASK);
+		if (inst & I_HC) fprintf (of, ",C");
 		break;
 	case I_V_IO2:					/* IOT */
-		fprintf (of, "%s %-o", opcode[i], inst & DEVMASK);
+		fprintf (of, "%s %-o", opcode[i], inst & I_DEVMASK);
 		break;
 	case I_V_EGZ:					/* ext grp 1 op + 0 */
 		fprintf (of, "%s %-o", opcode[i], val[1] & VAMASK);
-		if (val[1] & IA) fprintf (of, ",I");
+		if (val[1] & I_IA) fprintf (of, ",I");
 		return -2;				/* extra words */
 	case I_V_EG2:					/* ext grp 2 op */
 		fprintf (of, "%s %-o", opcode[i], val[1] & VAMASK);
-		if (val[1] & IA) fprintf (of, ",I");
+		if (val[1] & I_IA) fprintf (of, ",I");
 		fprintf (of, " %-o", val[2] & VAMASK);
-		if (val[2] & IA) fprintf (of, ",I");
+		if (val[2] & I_IA) fprintf (of, ",I");
 		return -2;  }				/* extra words */
 	return SCPE_OK;  }				/* end if */
 	}						/* end for */
@@ -401,8 +408,9 @@ d = get_uint (gbuf, 8, VAMASK, &r);			/* construe as addr */
 if (r != SCPE_OK) return -1;
 if (*cptr != 0) {					/* more? */
 	cptr = get_glyph (cptr, gbuf, 0);		/* look for indirect */
-	if (strcmp (gbuf, "I")) return -1;
-	d = d | IA;  }
+	if (*cptr != 0) return -1;			/* should be done */
+	if (strcmp (gbuf, "I")) return -1;		/* I? */
+	d = d | I_IA;  }
 return d;
 }
 
@@ -450,21 +458,21 @@ if (opcode[i]) {					/* found opcode? */
 		break;
 	case I_V_NPC:					/* no operand + C */
 		if (*cptr != 0) {
-			cptr = get_glyph (cptr, gbuf, 0);
-			if (strcmp (gbuf, "C")) return SCPE_ARG;
-			val[0] = val[0] | HC;  }
+		    cptr = get_glyph (cptr, gbuf, 0);
+		    if (strcmp (gbuf, "C")) return SCPE_ARG;
+		    val[0] = val[0] | I_HC;  }
 		break;
 	case I_V_MRF:					/* mem ref */
 		cptr = get_glyph (cptr, gbuf, 0);	/* get next field */
 		if (k = (strcmp (gbuf, "C") == 0)) {	/* C specified? */
-			val[0] = val[0] | CP;
-			cptr = get_glyph (cptr, gbuf, 0);  }
+		    val[0] = val[0] | I_CP;
+		    cptr = get_glyph (cptr, gbuf, 0);  }
 		else if (k = (strcmp (gbuf, "Z") == 0)) { /* Z specified? */
-			cptr = get_glyph (cptr, gbuf, ',');  }
+		    cptr = get_glyph (cptr, gbuf, ',');  }
 		if ((d = get_addr (gbuf)) < 0) return SCPE_ARG;
-		if ((d & VAMASK) <= DISP) val[0] = val[0] | d;
-		else if (cflag && !k && (((addr ^ d) & PAGENO) == 0))
-				val[0] = val[0] | (d & (IA | DISP)) | CP;
+		if ((d & VAMASK) <= I_DISP) val[0] = val[0] | d;
+		else if (cflag && !k && (((addr ^ d) & I_PAGENO) == 0))
+		    val[0] = val[0] | (d & (I_IA | I_DISP)) | I_CP;
 		else return SCPE_ARG;
 		break;
 	case I_V_ESH:					/* extended shift */
@@ -481,17 +489,17 @@ if (opcode[i]) {					/* found opcode? */
 		break;
 	case I_V_IO1:					/* IOT + optional C */
 		cptr = get_glyph (cptr, gbuf, ',');	/* get device */
-		d = get_uint (gbuf, 8, DEVMASK, &r);
+		d = get_uint (gbuf, 8, I_DEVMASK, &r);
 		if (r != SCPE_OK) return SCPE_ARG;
 		val[0] = val[0] | d;
 		if (*cptr != 0) {
-			cptr = get_glyph (cptr, gbuf, 0);
-			if (strcmp (gbuf, "C")) return SCPE_ARG;
-			val[0] = val[0] | HC;  }
+		    cptr = get_glyph (cptr, gbuf, 0);
+		    if (strcmp (gbuf, "C")) return SCPE_ARG;
+		    val[0] = val[0] | I_HC;  }
 		break;
 	case I_V_IO2:					/* IOT */
 		cptr = get_glyph (cptr, gbuf, 0);	/* get device */
-		d = get_uint (gbuf, 8, DEVMASK, &r);
+		d = get_uint (gbuf, 8, I_DEVMASK, &r);
 		if (r != SCPE_OK) return SCPE_ARG;
 		val[0] = val[0] | d;
 		break;
@@ -548,21 +556,22 @@ val[0] = 0;
 for (cptr = get_glyph (iptr, gbuf, ','); gbuf[0] != 0;
      cptr = get_glyph (cptr, gbuf, ',')) {		/* loop thru glyphs */
 	if (strcmp (gbuf, "CLE") == 0) {		/* CLE? */
-		if (clef) return SCPE_ARG;		/* already seen? */
-		clef = TRUE;				/* set flag */
-		continue;  }
+	    if (clef) return SCPE_ARG;			/* already seen? */
+	    clef = TRUE;				/* set flag */
+	    continue;  }
 	for (i = 0; stab[i] != NULL; i++) {		/* find subopcode */
-		if ((strcmp (gbuf, stab[i]) == 0) &&
-		   ((i >= 16) || (!clef && ((val[0] & 001710) == 0)))) break;  } 
+	    if ((strcmp (gbuf, stab[i]) == 0) &&
+	       ((i >= 16) || (!clef && ((val[0] & 001710) == 0)))) break;  } 
 	if (stab[i] == NULL) return SCPE_ARG;
-	if (tbits & mtab[i] & (AB | ASKP) & (vtab[i] ^ val[0])) return SCPE_ARG;
-	if (tbits & mtab[i] & ~(AB | ASKP)) return SCPE_ARG;
+	if (tbits & mtab[i] & (I_AB | I_ASKP) & (vtab[i] ^ val[0]))
+	    return SCPE_ARG;
+	if (tbits & mtab[i] & ~(I_AB | I_ASKP)) return SCPE_ARG;
 	tbits = tbits | mtab[i];			/* fill type+mask */
 	val[0] = val[0] | vtab[i];  }			/* fill value */
 if (clef) {						/* CLE seen? */
-	if (val[0] & ASKP) {				/* alter-skip? */
-		if (tbits & 0100) return SCPE_ARG;	/* already filled in? */
-		else val[0] = val[0] | 0100;  }
+	if (val[0] & I_ASKP) {				/* alter-skip? */
+	    if (tbits & 0100) return SCPE_ARG;		/* already filled in? */
+	    else val[0] = val[0] | 0100;  }
 	else val[0] = val[0] | 040;  }			/* fill in shift */
 return ret;
 }

@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Oct-02	RMS	Added device information structure
    22-Dec-00	RMS	Added Bruce Ray's second terminal support
    10-Dec-00	RMS	Added Charles Owen's Eclipse support
    08-Dec-00	RMS	Added Bruce Ray's plotter support
@@ -156,8 +157,24 @@
 #define DEV_LOW		010				/* lowest intr dev */
 #define DEV_HIGH	051				/* highest intr dev */
 #define DEV_MDV		001				/* multiply/divide */
-#define DEV_MAP		003				/* MMPU control */
 #define DEV_ECC		002				/* ECC memory control */
+#define DEV_MAP		003				/* MMPU control */
+#define DEV_TTI		010				/* console input */
+#define DEV_TTO		011				/* console output */
+#define DEV_PTR		012				/* paper tape reader */
+#define DEV_PTP		013				/* paper tape punch */
+#define DEV_CLK		014				/* clock */
+#define DEV_PLT		015				/* plotter */
+#define DEV_CDR		016				/* card reader */
+#define DEV_LPT		017				/* line printer */
+#define DEV_DSK		020				/* fixed head disk */
+#define DEV_MTA		022				/* magtape */
+#define DEV_DCM		024				/* data comm mux */
+#define DEV_ADCV	030				/* A/D converter */
+#define DEV_DKP		033				/* disk pack */
+#define DEV_CAS		034				/* cassette */
+#define DEV_TTI1	050				/* second console input */
+#define DEV_TTO1	051				/* second console output */
 #define DEV_CPU		077				/* CPU control */
 
 /* I/O structure
@@ -168,6 +185,9 @@
 	mask		device mask for busy, done (simulator representation)
 	pi		pi disable bit (hardware representation)
 	routine		IOT action routine
+
+   dev_table is populated at run time from the device information
+   blocks in each device.
 */
 
 struct ndev {
@@ -175,6 +195,15 @@ struct ndev {
 	int32	pi;					/* assigned pi bit */
 	int32	(*routine)();				/* dispatch routine */
 	};
+
+struct nova_dib {
+	int32	dnum;					/* device number */
+	int32	mask;					/* done/busy mask */
+	int32	pi;					/* assigned pi bit */
+	int32	(*routine)();				/* dispatch routine */
+	};
+
+typedef struct nova_dib DIB;
 
 /* Device flags (simulator representation)
 

@@ -25,6 +25,13 @@
 
    tm		TM11/TU10 magtape
 
+   30-Oct-02	RMS	Revised BOT handling, added error record handling
+   30-Sep-02	RMS	Added variable address support to bootstrap
+			Added vector change/display support
+			Changed mapping mnemonics
+			New data structures
+			Updated error handling
+   28-Aug-02	RMS	Added end of medium support
    30-May-02	RMS	Widened POS to 32b
    22-Apr-02	RMS	Fixed max record length, first block bootstrap
 			(found by Jonathan Engdahl)
@@ -68,10 +75,10 @@
 
 #define TM_NUMDR	8				/* #drives */
 #define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
-#define UNIT_WLK	1 << UNIT_V_WLK
-#define UNIT_W_UF	2				/* saved user flags */
+#define UNIT_V_PNU	(UNIT_V_UF + 1)			/* pos not updated */
+#define UNIT_WLK	(1 << UNIT_V_WLK)
+#define UNIT_PNU	(1 << UNIT_V_PNU)
 #define USTAT		u3				/* unit status */
-#define UNUM		u4				/* unit number */
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
 
 /* Command - tm_cmd */
@@ -108,7 +115,7 @@
 #define GET_UNIT(x)	(((x) >> MTC_V_UNIT) & MTC_M_UNIT)
 #define GET_FNC(x)	(((x) >> MTC_V_FNC) & MTC_M_FNC)
 
-/* Status - stored in tm_sta or (*) uptr -> USTAT or (+) calculated */
+/* Status - stored in tm_sta or (*) uptr->USTAT or (+) calculated */
 
 #define STA_ILL		0100000				/* illegal */
 #define STA_EOF		0040000				/* *end of file */
@@ -140,6 +147,8 @@
 
 extern uint16 *M;					/* memory */
 extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
+
 uint8 *tmxb = NULL;					/* xfer buffer */
 int32 tm_sta = 0;					/* status register */
 int32 tm_cmd = 0;					/* command register */
@@ -150,16 +159,19 @@ int32 tm_rdl = 0;					/* read lines */
 int32 tm_time = 10;					/* record latency */
 int32 tm_stopioe = 1;					/* stop on error */
 
+DEVICE tm_dev;
 t_stat tm_rd (int32 *data, int32 PA, int32 access);
 t_stat tm_wr (int32 data, int32 PA, int32 access);
 t_stat tm_svc (UNIT *uptr);
 t_stat tm_reset (DEVICE *dptr);
 t_stat tm_attach (UNIT *uptr, char *cptr);
 t_stat tm_detach (UNIT *uptr);
-t_stat tm_boot (int32 unitno);
+t_stat tm_boot (int32 unitno, DEVICE *dptr);
 void tm_go (UNIT *uptr);
 int32 tm_updcsta (UNIT *uptr);
 void tm_set_done (void);
+t_bool tm_rdlntf (UNIT *uptr, t_mtrlnt *tbc, int32 *err);
+t_bool tm_rdlntr (UNIT *uptr, t_mtrlnt *tbc, int32 *err);
 t_stat tm_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* MT data structures
@@ -170,7 +182,8 @@ t_stat tm_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
    tm_mod	MT modifier list
 */
 
-DIB tm_dib = { 1, IOBA_TM, IOLN_TM, &tm_rd, &tm_wr };
+DIB tm_dib = { IOBA_TM, IOLN_TM, &tm_rd, &tm_wr,
+		1, IVCL (TM), VEC_TM, { NULL } };
 
 UNIT tm_unit[] = {
 	{ UDATA (&tm_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) },
@@ -198,28 +211,25 @@ REG tm_reg[] = {
 	{ URDATA (UST, tm_unit[0].USTAT, 8, 16, 0, TM_NUMDR, 0) },
 	{ URDATA (POS, tm_unit[0].pos, 10, 32, 0,
 		  TM_NUMDR, PV_LEFT | REG_RO) },
-	{ URDATA (FLG, tm_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
-		  TM_NUMDR, REG_HRO) },
 	{ ORDATA (DEVADDR, tm_dib.ba, 32), REG_HRO },
-	{ FLDATA (*DEVENB, tm_dib.enb, 0), REG_HRO },
+	{ ORDATA (DEVVEC, tm_dib.vec, 16), REG_HRO },
 	{ NULL }  };
 
 MTAB tm_mod[] = {
 	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", &tm_vlock },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", &tm_vlock }, 
 	{ MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
-		&set_addr, &show_addr, &tm_dib },
-	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
-		&set_enbdis, NULL, &tm_dib },
-	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
-		&set_enbdis, NULL, &tm_dib },
+		&set_addr, &show_addr, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+		&set_vec, &show_vec, NULL },
 	{ 0 }  };
 
 DEVICE tm_dev = {
 	"TM", tm_unit, tm_reg, tm_mod,
 	TM_NUMDR, 10, 31, 1, 8, 8,
 	NULL, NULL, &tm_reset,
-	&tm_boot, &tm_attach, &tm_detach };
+	&tm_boot, &tm_attach, &tm_detach,
+	&tm_dib, DEV_DISABLE | DEV_UBUS };
 
 /* I/O dispatch routine, I/O addresses 17772520 - 17772532
 
@@ -313,20 +323,20 @@ void tm_go (UNIT *uptr)
 int32 f;
 
 f = GET_FNC (tm_cmd);					/* get function */
-if (((uptr -> flags & UNIT_ATT) == 0) ||		/* not attached? */
+if (((uptr->flags & UNIT_ATT) == 0) ||			/* not attached? */
      sim_is_active (uptr) ||				/* busy? */
     (((f == MTC_WRITE) || (f == MTC_WREOF) || (f == MTC_WREXT)) &&
-      (uptr -> flags & UNIT_WPRT))) {			/* write locked? */
+      (uptr->flags & UNIT_WPRT))) {			/* write locked? */
 	tm_sta = tm_sta | STA_ILL;			/* illegal */
 	tm_set_done ();					/* set done */
 	return;  }
-uptr -> USTAT = uptr -> USTAT & (STA_WLK | STA_ONL);	/* clear status */
+uptr->USTAT = uptr->USTAT & (STA_WLK | STA_ONL);	/* clear status */
 tm_sta = 0;						/* clear errors */
 if (f == MTC_UNLOAD) {					/* unload? */
-	uptr -> USTAT = (uptr -> USTAT | STA_REW) & ~STA_ONL;
+	uptr->USTAT = (uptr->USTAT | STA_REW) & ~STA_ONL;
 	detach_unit (uptr);  }				/* set offline */
 else if (f == MTC_REWIND)				/* rewind */
-	uptr -> USTAT = uptr -> USTAT | STA_REW; 	/* rewinding */
+	uptr->USTAT = uptr->USTAT | STA_REW; 		/* rewinding */
 /* else /* uncomment this else if rewind/unload don't set done */
 tm_cmd = tm_cmd & ~MTC_DONE;				/* clear done */
 CLR_INT (TM);						/* clear int */
@@ -342,25 +352,27 @@ return;
 
 t_stat tm_svc (UNIT *uptr)
 {
-int32 f, i, t, err;
+int32 f, t, err, pnu, u;
 t_addr xma;
-t_stat rval;
-t_mtrlnt tbc, cbc;
-static t_mtrlnt bceof = { 0 };
+t_mtrlnt abc, tbc, cbc, ebc;
+static t_mtrlnt bceof = { MTR_TMK };
 
-if (uptr -> USTAT & STA_REW) {				/* rewind? */
-	uptr -> pos = 0;				/* update position */
-	if (uptr -> flags & UNIT_ATT)			/* still on line? */
-		uptr -> USTAT = STA_ONL | STA_BOT |
-			((uptr -> flags & UNIT_WPRT)? STA_WLK: 0);
-	else uptr -> USTAT = 0;
-	if (uptr -> UNUM == GET_UNIT (tm_cmd)) {	/* selected? */
+u = uptr - tm_dev.units;				/* get unit number */
+pnu = MT_TST_PNU (uptr);				/* get pos not upd */
+MT_CLR_PNU (uptr);					/* and clear */
+if (uptr->USTAT & STA_REW) {				/* rewind? */
+	uptr->pos = 0;					/* update position */
+	if (uptr->flags & UNIT_ATT)			/* still on line? */
+		uptr->USTAT = STA_ONL | STA_BOT |
+			((uptr->flags & UNIT_WPRT)? STA_WLK: 0);
+	else uptr->USTAT = 0;
+	if (u == GET_UNIT (tm_cmd)) {			/* selected? */
 		tm_set_done ();				/* set done */
 		tm_updcsta (uptr);  }			/* update status */
 	return SCPE_OK;  }
 
-if ((uptr -> flags & UNIT_ATT) == 0) {			/* if not attached */
-	uptr -> USTAT = 0;				/* unit off line */
+if ((uptr->flags & UNIT_ATT) == 0) {			/* if not attached */
+	uptr->USTAT = 0;				/* unit off line */
 	tm_sta = tm_sta | STA_ILL;			/* illegal operation */
 	tm_set_done ();					/* set done */
 	tm_updcsta (uptr);				/* update status */
@@ -368,14 +380,13 @@ if ((uptr -> flags & UNIT_ATT) == 0) {			/* if not attached */
 
 f = GET_FNC (tm_cmd);					/* get command */
 if (((f == MTC_WRITE) || (f == MTC_WREOF) || (f == MTC_WREXT)) &&
-     (uptr -> flags & UNIT_WPRT)) {			/* write and locked? */
+     (uptr->flags & UNIT_WPRT)) {			/* write and locked? */
 	tm_sta = tm_sta | STA_ILL;			/* illegal operation */
 	tm_set_done ();					/* set done */
 	tm_updcsta (uptr);				/* update status */
 	return SCPE_OK;  }
 
 err = 0;
-rval = SCPE_OK;
 xma = GET_EMA (tm_cmd) | tm_ca;				/* get mem addr */
 cbc = 0200000 - tm_bc;					/* get bc */
 switch (f) {						/* case on function */
@@ -383,116 +394,85 @@ switch (f) {						/* case on function */
 /* Unit service, continued */
 
 case MTC_READ:						/* read */
-	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
-	fxread (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	if ((err = ferror (uptr -> fileref)) ||		/* error or eof? */
-	    (feof (uptr -> fileref))) {
-		uptr -> USTAT = uptr -> USTAT | STA_EOT;
-		break;  }
-	if (tbc == 0) {					/* tape mark? */
-		uptr -> USTAT = uptr -> USTAT | STA_EOF;
-		uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
-		break;  }
-	tbc = MTRL (tbc);				/* ignore error flag */
+	if (tm_rdlntf (uptr, &tbc, &err)) break;	/* read rec lnt, err? */
 	if (tbc > MT_MAXFR) return SCPE_MTRLNT;		/* record too long? */
 	if (tbc > cbc) tm_sta = tm_sta | STA_RLE;	/* wrong size? */
 	if (tbc < cbc) cbc = tbc;			/* use smaller */
-	i = fxread (tmxb, sizeof (int8), cbc, uptr -> fileref);
-	err = ferror (uptr -> fileref);
-	for ( ; i < cbc; i++) tmxb[i] = 0;		/* fill with 0's */
-	if (t = Map_WriteB (xma, cbc, tmxb, UB)) {	/* copy buf to mem */
+	abc = fxread (tmxb, sizeof (int8), cbc, uptr->fileref);
+	if (err = ferror (uptr->fileref)) {		/* error? */
+		MT_SET_PNU (uptr);			/* pos not upd */
+		break;  }
+	for ( ; abc < cbc; abc++) tmxb[abc] = 0;	/* fill with 0's */
+	if (t = Map_WriteB (xma, cbc, tmxb, MAP)) {	/* copy buf to mem */
 		tm_sta = tm_sta | STA_NXM;		/* NXM, set err */
 		cbc = cbc - t;  }			/* adj byte cnt */
 	xma = (xma + cbc) & 0777777;			/* inc bus addr */
 	tm_bc = (tm_bc + cbc) & 0177777;		/* inc byte cnt */
-	uptr -> pos = uptr -> pos + ((tbc + 1) & ~1) +	/* upd position */
+	uptr->pos = uptr->pos + ((tbc + 1) & ~1) +	/* upd position */
 		(2 * sizeof (t_mtrlnt));
 	break;
+
 case MTC_WRITE:						/* write */
 case MTC_WREXT:						/* write ext gap */
-	if (t = Map_ReadB (xma, cbc, tmxb, UB)) {	/* copy mem to buf */
+	if (t = Map_ReadB (xma, cbc, tmxb, MAP)) {	/* copy mem to buf */
 		tm_sta = tm_sta | STA_NXM;		/* NXM, set err */
 		cbc = cbc - t;				/* adj byte cnt */
 		if (cbc == 0) break;  }			/* no xfr? done */
-	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
-	fxwrite (&cbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	fxwrite (tmxb, sizeof (int8), cbc, uptr -> fileref);
-	fxwrite (&cbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	err = ferror (uptr -> fileref);
-	xma = (xma + cbc) & 0777777;			/* inc bus addr */
-	tm_bc = (tm_bc + cbc) & 0177777;		/* inc byte cnt */
-	uptr -> pos = uptr -> pos + ((cbc + 1) & ~1) +	/* upd position */
-		(2 * sizeof (t_mtrlnt));
-	break;
-case MTC_WREOF:
-	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
-	fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	err = ferror (uptr -> fileref);
-	uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);	/* update position */
+	ebc = (cbc + 1) & ~1;				/* force even */
+	fseek (uptr->fileref, uptr->pos, SEEK_SET);
+	fxwrite (&cbc, sizeof (t_mtrlnt), 1, uptr->fileref);
+	fxwrite (tmxb, sizeof (int8), ebc, uptr->fileref);
+	fxwrite (&cbc, sizeof (t_mtrlnt), 1, uptr->fileref);
+	if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr); /* error? */
+	else {	xma = (xma + cbc) & 0777777;		/* inc bus addr */
+		tm_bc = (tm_bc + cbc) & 0177777;	/* inc byte cnt */
+		uptr->pos = uptr->pos + ebc +		/* upd pos */
+		    (2 * sizeof (t_mtrlnt));  }
 	break;
 
 /* Unit service, continued */
+
+case MTC_WREOF:
+	fseek (uptr->fileref, uptr->pos, SEEK_SET);
+	fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr->fileref);
+	if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr); /* error? */
+	else uptr->pos = uptr->pos + sizeof (t_mtrlnt);	/* update position */
+	break;
 
 case MTC_SPACEF:					/* space forward */
 	do {	tm_bc = (tm_bc + 1) & 0177777;		/* incr wc */
-		fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
-		fxread (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-		if ((err = ferror (uptr -> fileref)) ||	/* error or eof? */
-		     feof (uptr -> fileref)) {
-			uptr -> USTAT = uptr -> USTAT | STA_EOT;
-			break;  }
-		if (tbc == 0) {				/* zero bc? */
-			uptr -> USTAT = uptr -> USTAT | STA_EOF;
-			uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
-			break;  }
-		uptr -> pos = uptr -> pos + ((MTRL (tbc) + 1) & ~1) +
+		if (tm_rdlntf (uptr, &tbc, &err)) break;/* read rec lnt, err? */
+		uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
 			(2 * sizeof (t_mtrlnt));  }
 	while (tm_bc != 0);
 	break;
+
 case MTC_SPACER:					/* space reverse */
-	if (uptr -> pos == 0) {				/* at BOT? */
-		uptr -> USTAT = uptr -> USTAT | STA_BOT;
-		break;  }
 	do {	tm_bc = (tm_bc + 1) & 0177777;		/* incr wc */
-		fseek (uptr -> fileref, uptr -> pos - sizeof (t_mtrlnt),
-			SEEK_SET);
-		fxread (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-		if ((err = ferror (uptr -> fileref)) ||	/* error or eof? */
-		     feof (uptr -> fileref)) {
-			uptr -> USTAT = uptr -> USTAT | STA_BOT;
-			uptr -> pos = 0;
-			break;  }
-		if (tbc == 0) {			/* start of prv file? */
-			uptr -> USTAT = uptr -> USTAT | STA_EOF;
-			uptr -> pos = uptr -> pos - sizeof (t_mtrlnt);
-			break;  }
-		uptr -> pos = uptr -> pos - ((MTRL (tbc) + 1) & ~1) -
-			(2 * sizeof (t_mtrlnt));
-		if (uptr -> pos == 0) {			/* start of tape? */
-			uptr -> USTAT = uptr -> USTAT | STA_BOT;
-			break;  }  }
+		if (pnu) pnu = 0;			/* pos not upd? */
+		else {	if (tm_rdlntr (uptr, &tbc, &err)) break;
+			uptr->pos = uptr->pos - ((tbc + 1) & ~1) -
+				(2 * sizeof (t_mtrlnt));  }  }
 	while (tm_bc != 0);
 	break;  }					/* end case */
-
-/* Unit service, continued */
 
-if (err != 0) {						/* I/O error */
-	tm_sta = tm_sta | STA_PAR | STA_CRC;		/* flag error */
-	perror ("MT I/O error");
-	rval = SCPE_IOERR;
-	clearerr (uptr -> fileref);  }
+if (err != 0) tm_sta = tm_sta | STA_PAR;		/* flag error */
 tm_cmd = (tm_cmd & ~MTC_EMA) | ((xma >> (16 - MTC_V_EMA)) & MTC_EMA);
 tm_ca = xma & 0177777;					/* update mem addr */
 tm_set_done ();						/* set done */
 tm_updcsta (uptr);					/* update status */
-return IORETURN (tm_stopioe, rval);
+if (err != 0) {						/* I/O error */
+	perror ("MT I/O error");
+	clearerr (uptr->fileref);
+	if (tm_stopioe) return SCPE_IOERR;  }
+return SCPE_OK;
 }
-
+
 /* Update controller status */
 
 int32 tm_updcsta (UNIT *uptr)
 {
-tm_sta = (tm_sta & ~(STA_DYN | STA_CLR)) | (uptr -> USTAT & STA_DYN);
+tm_sta = (tm_sta & ~(STA_DYN | STA_CLR)) | (uptr->USTAT & STA_DYN);
 if (sim_is_active (uptr)) tm_sta = tm_sta & ~STA_TUR;
 else tm_sta = tm_sta | STA_TUR;
 if (tm_sta & STA_EFLGS) tm_cmd = tm_cmd | MTC_ERR;
@@ -509,6 +489,57 @@ tm_cmd = tm_cmd | MTC_DONE;
 if (tm_cmd & MTC_IE) SET_INT (TM);
 return;
 }
+
+/* Read record length forward - return T if error, EOM, or EOF */
+
+t_bool tm_rdlntf (UNIT *uptr, t_mtrlnt *tbc, int32 *err)
+{
+fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* set tape pos */
+fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);	/* read rec lnt */
+if (*err = ferror (uptr->fileref)) {			/* error? */
+	tm_sta = tm_sta | STA_PAR;			/* parity error */
+	MT_SET_PNU (uptr);				/* pos not upd */
+	return TRUE;  }
+if (feof (uptr->fileref) || (*tbc == MTR_EOM)) {	/* eof or eom? */
+	tm_sta = tm_sta | STA_BAD;			/* bad tape */
+	MT_SET_PNU (uptr);				/* pos not upd */
+	return TRUE;  }
+if (*tbc == MTR_TMK) {					/* tape mark? */
+	uptr->USTAT = uptr->USTAT | STA_EOF;		/* end of file */
+	uptr->pos = uptr->pos + sizeof (t_mtrlnt);	/* spc over tmk */
+	return TRUE;  }
+if (MTRF (*tbc)) tm_sta = tm_sta | STA_PAR;		/* record in error? */
+*tbc = MTRL (*tbc);					/* clear error flag */
+return FALSE;
+}
+
+/* Read record length reverse - return T if error, EOM, or EOF */
+
+t_bool tm_rdlntr (UNIT *uptr, t_mtrlnt *tbc, int32 *err)
+{
+if (uptr->pos < sizeof (t_mtrlnt)) {			/* at BOT? */
+	uptr->USTAT = uptr->USTAT | STA_BOT;		/* set status */
+	return TRUE;  }					/* error */
+fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET);
+fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
+if (*err = ferror (uptr->fileref)) {			/* error? */
+	tm_sta = tm_sta | STA_PAR;			/* parity error */
+	return TRUE;  }
+if (feof (uptr->fileref)) {				/* eof? */
+	tm_sta = tm_sta | STA_BAD;			/* bad tape */
+	return TRUE;  }
+if (*tbc == MTR_EOM) {					/* eom? */
+	tm_sta = tm_sta | STA_BAD;			/* bad tape */
+	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* spc over eom */
+	return TRUE;  }
+if (*tbc == MTR_TMK) {					/* tape mark? */
+	uptr->USTAT = uptr->USTAT | STA_EOF;		/* end of file */
+	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* spc over tmk */
+	return TRUE;  }
+if (MTRF (*tbc)) tm_sta = tm_sta | STA_PAR;		/* record in error? */
+*tbc = MTRL (*tbc);					/* clear error flag */
+return FALSE;
+}
 
 /* Reset routine */
 
@@ -522,12 +553,12 @@ tm_bc = tm_ca = tm_db = tm_sta = tm_rdl = 0;
 CLR_INT (TM);						/* clear interrupt */
 for (u = 0; u < TM_NUMDR; u++) {			/* loop thru units */
 	uptr = tm_dev.units + u;
-	uptr -> UNUM = u;				/* init drive number */
+	MT_CLR_PNU (uptr);				/* clear pos flag */
 	sim_cancel (uptr);				/* cancel activity */
-	if (uptr -> flags & UNIT_ATT) uptr -> USTAT = STA_ONL |
-		((uptr -> pos)? 0: STA_BOT) |
-		((uptr -> flags & UNIT_WPRT)? STA_WLK: 0);
-	else uptr -> USTAT = 0;  }
+	if (uptr->flags & UNIT_ATT) uptr->USTAT = STA_ONL |
+		((uptr->pos)? 0: STA_BOT) |
+		((uptr->flags & UNIT_WPRT)? STA_WLK: 0);
+	else uptr->USTAT = 0;  }
 if (tmxb == NULL) tmxb = calloc (MT_MAXFR, sizeof (unsigned int8));
 if (tmxb == NULL) return SCPE_MEM;
 return SCPE_OK;
@@ -538,11 +569,13 @@ return SCPE_OK;
 t_stat tm_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
+int32 u = uptr - tm_dev.units;
 
 r = attach_unit (uptr, cptr);
 if (r != SCPE_OK) return r;
-uptr -> USTAT = STA_ONL | STA_BOT | ((uptr -> flags & UNIT_WPRT)? STA_WLK: 0);
-if (uptr -> UNUM == GET_UNIT (tm_cmd)) tm_updcsta (uptr);
+MT_CLR_PNU (uptr);
+uptr->USTAT = STA_ONL | STA_BOT | ((uptr->flags & UNIT_WPRT)? STA_WLK: 0);
+if (u == GET_UNIT (tm_cmd)) tm_updcsta (uptr);
 return r;
 }
 
@@ -550,8 +583,11 @@ return r;
 
 t_stat tm_detach (UNIT* uptr)
 {
-if (!sim_is_active (uptr)) uptr -> USTAT = 0;
-if (uptr -> UNUM == GET_UNIT (tm_cmd)) tm_updcsta (uptr);
+int32 u = uptr - tm_dev.units;
+
+MT_CLR_PNU (uptr);
+if (!sim_is_active (uptr)) uptr->USTAT = 0;
+if (u == GET_UNIT (tm_cmd)) tm_updcsta (uptr);
 return detach_unit (uptr);
 }
 
@@ -559,11 +595,13 @@ return detach_unit (uptr);
 
 t_stat tm_vlock (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if ((uptr -> flags & UNIT_ATT) && 
-    (val || (uptr -> flags & UNIT_RO)))
-	uptr -> USTAT = uptr -> USTAT | STA_WLK;
-else uptr -> USTAT = uptr -> USTAT & ~STA_WLK;
-if (uptr -> UNUM == GET_UNIT (tm_cmd)) tm_updcsta (uptr);
+int32 u = uptr - tm_dev.units;
+
+if ((uptr->flags & UNIT_ATT) && 
+    (val || (uptr->flags & UNIT_RO)))
+	uptr->USTAT = uptr->USTAT | STA_WLK;
+else uptr->USTAT = uptr->USTAT & ~STA_WLK;
+if (u == GET_UNIT (tm_cmd)) tm_updcsta (uptr);
 return SCPE_OK;
 }
 
@@ -578,15 +616,16 @@ return SCPE_OK;
    To boot from the first block, use boot -o (old).
 */
 
-#define BOOT_START	040000
+#define BOOT_START	016000
 #define BOOT_ENTRY	(BOOT_START + 2)
 #define BOOT_UNIT	(BOOT_START + 010)
-#define BOOT1_LEN (sizeof (boot1_rom) / sizeof (int32))
-#define BOOT2_LEN (sizeof (boot2_rom) / sizeof (int32))
+#define BOOT_CSR	(BOOT_START + 014)
+#define BOOT1_LEN	(sizeof (boot1_rom) / sizeof (int16))
+#define BOOT2_LEN	(sizeof (boot2_rom) / sizeof (int16))
 
-static const int32 boot1_rom[] = {
+static const uint16 boot1_rom[] = {
 	0046524,			/* boot_start: "TM" */
-	0012706, 0040000,		/* mov #boot_start, sp */
+	0012706, BOOT_START,		/* mov #boot_start, sp */
 	0012700, 0000000,		/* mov #unit_num, r0 */
 	0012701, 0172526,		/* mov #172526, r1	; mtcma */
 	0005011,			/* clr (r1) */
@@ -604,9 +643,9 @@ static const int32 boot1_rom[] = {
 	0005007				/* clr r7 */
 };
 
-static const int32 boot2_rom[] = {
+static const uint16 boot2_rom[] = {
 	0046524,			/* boot_start: "TM" */
-	0012706, 0040000,		/* mov #boot_start, sp */
+	0012706, BOOT_START,		/* mov #boot_start, sp */
 	0012700, 0000000,		/* mov #unit_num, r0 */
 	0012701, 0172526,		/* mov #172526, r1	; mtcma */
 	0005011,			/* clr (r1) */
@@ -630,7 +669,7 @@ static const int32 boot2_rom[] = {
 	0005007				/* clr r7 */
 };
 
-t_stat tm_boot (int32 unitno)
+t_stat tm_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 saved_PC;
@@ -643,6 +682,7 @@ if (sim_switches & SWMASK ('O')) {
 else {	for (i = 0; i < BOOT2_LEN; i++)
 		M[(BOOT_START >> 1) + i] = boot2_rom[i];  }
 M[BOOT_UNIT >> 1] = unitno;
+M[BOOT_CSR >> 1] = (tm_dib.ba & DMASK) + 06;
 saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 } 

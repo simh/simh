@@ -1,8 +1,31 @@
 /* altair_cpu.c: MITS Altair Intel 8080 CPU simulator
 
-   Copyright (c) 1997,
-   Charles E. Owen, Jr.
-   Commercial use prohibited
+   Copyright (c) 1997, Charles E. Owen
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Charles E. Owen shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Charles E. Owen.
+
+   cpu		8080 CPU
+
+   08-Oct-02	RMS	Tied off spurious compiler warnings
 
    The register state for the 8080 CPU is:
 
@@ -247,8 +270,6 @@ REG cpu_reg[] = {
 	{ FLDATA (S, S, 16) },
 	{ FLDATA (P, P, 16) },
 	{ FLDATA (INTE, INTE, 16) },
-	{ FLDATA (Z80, cpu_unit.flags, UNIT_V_CHIP), REG_HRO },
-	{ FLDATA (OPSTOP, cpu_unit.flags, UNIT_V_OPSTOP), REG_HRO },
 	{ ORDATA (SR, SR, 16) },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ NULL }  };
@@ -718,7 +739,7 @@ int32 sim_instr (void)
         }
         case 017: {		/* RRC */
             C = 0;
-            if (A & 0x01 == 1)
+            if ((A & 0x01) == 1)
             	C |= 0200000;
         	A = (A >> 1) & 0xFF;
             if (C)
@@ -739,7 +760,7 @@ int32 sim_instr (void)
         case 037: {		/* RAR */
         	DAR = C;
             C = 0;
-            if (A & 0x01 == 1)
+            if ((A & 0x01) == 1)
             	C |= 0200000;
         	A = (A >> 1) & 0xFF;
             if (DAR)
@@ -975,6 +996,7 @@ int32 getreg(int32 reg)
         default:
             break;
     }
+    return 0;
 }
 
 /* Put a value into an 8080 register from memory */
@@ -1030,6 +1052,7 @@ int32 getpair(int32 reg)
         default:
             break;
     }
+    return 0;
 }
 
 /* Return the value of a selected register pair, in PUSH
@@ -1057,6 +1080,7 @@ int32 getpush(int32 reg)
         default:
             break;
     }
+    return 0;
 }
 
 
@@ -1160,5 +1184,6 @@ int32 nulldev(int32 flag, int32 data)
 {
 	if (flag == 0)
 		return (0377);
+	return 0;
 }
 

@@ -25,6 +25,9 @@
 
    tu		RH11/TM03/TU45 magtape
 
+   29-Sep-02	RMS	Added variable vector support
+			New data structures
+   28-Aug-02	RMS	Added end of medium support
    30-May-02	RMS	Widened POS to 32b
    22-Apr-02	RMS	Changed record length error code
    06-Jan-02	RMS	Revised enable/disable support
@@ -73,8 +76,9 @@
 #define TU_NUMFM	1				/* #formatters */
 #define TU_NUMDR	8				/* #drives */
 #define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
+#define UNIT_V_PNU	(UNIT_V_UF + 1)			/* pos not updated */
 #define UNIT_WLK	(1 << UNIT_V_WLK)
-#define UNIT_W_UF	2				/* saved user flags */
+#define UNIT_PNU	(1 << UNIT_V_PNU)
 #define USTAT		u3				/* unit status */
 #define UDENS		u4				/* unit density */
 #define  UD_UNK		0				/* unknown */
@@ -181,7 +185,7 @@
 #define ER_MCP		0000010				/* Mbus cpar err NI */
 #define ER_FER		0000020				/* format sel err */
 #define ER_MDP		0000040				/* Mbus dpar err NI */
-#define ER_VPE		0000100				/* vert parity err NI */
+#define ER_VPE		0000100				/* vert parity err */
 #define ER_CRC		0000200				/* CRC err NI */
 #define ER_NSG		0000400				/* non std gap err NI */
 #define ER_FCE		0001000				/* frame count err */
@@ -270,9 +274,11 @@
 
 extern d10 *M;						/* memory */
 extern int32 int_req;
+extern int32 int_vec[32];
 extern int32 ubmap[UBANUM][UMAP_MEMSIZE];		/* Unibus map */
 extern int32 ubcs[UBANUM];
 extern UNIT cpu_unit;
+
 int32 tucs1 = 0;					/* control/status 1 */
 int32 tuwc = 0;						/* word count */
 int32 tuba = 0;						/* bus address */
@@ -301,14 +307,17 @@ int den_test[8] = {					/* valid densities */
 
 t_stat tu_rd (int32 *data, int32 PA, int32 access);
 t_stat tu_wr (int32 data, int32 PA, int32 access);
+int32 tu_inta (void);
 t_stat tu_svc (UNIT *uptr);
 t_stat tu_reset (DEVICE *dptr);
 t_stat tu_attach (UNIT *uptr, char *cptr);
 t_stat tu_detach (UNIT *uptr);
-t_stat tu_boot (int32 unitno);
+t_stat tu_boot (int32 unitno, DEVICE *dptr);
 void tu_go (int32 drv);
 void update_tucs (int32 flag, int32 drv);
 t_stat tu_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_bool tu_rdlntf (UNIT *uptr, t_mtrlnt *tbc, int32 *err);
+t_bool tu_rdlntr (UNIT *uptr, t_mtrlnt *tbc, int32 *err);
 
 /* TU data structures
 
@@ -318,7 +327,8 @@ t_stat tu_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
    tu_mod	TU modifier list
 */
 
-DIB tu_dib = { 1, IOBA_TU, IOLN_TU, &tu_rd, &tu_wr };
+DIB tu_dib = { IOBA_TU, IOLN_TU, &tu_rd, &tu_wr,
+		1, IVCL (TU), VEC_TU, { &tu_inta } };
 
 UNIT tu_unit[] = {
 	{ UDATA (&tu_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0) },
@@ -351,8 +361,6 @@ REG tu_reg[] = {
 	{ URDATA (UST, tu_unit[0].USTAT, 8, 17, 0, TU_NUMDR, 0) },
 	{ URDATA (POS, tu_unit[0].pos, 8, 32, 0,
 		  TU_NUMDR, PV_LEFT | REG_RO) },
-	{ URDATA (FLG, tu_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
-		  TU_NUMDR, REG_HRO) },
 	{ ORDATA (LOG, tu_log, 8), REG_HIDDEN },
 	{ NULL }  };
 
@@ -360,14 +368,17 @@ MTAB tu_mod[] = {
 	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", &tu_vlock },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", &tu_vlock }, 
 	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-		NULL, &show_addr, &tu_dib },
+		NULL, &show_addr, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
+		NULL, &show_vec, NULL },
 	{ 0 }  };
 
 DEVICE tu_dev = {
 	"TU", tu_unit, tu_reg, tu_mod,
 	TU_NUMDR, 10, 31, 1, 8, 8,
 	NULL, NULL, &tu_reset,
-	&tu_boot, &tu_attach, &tu_detach };
+	&tu_boot, &tu_attach, &tu_detach,
+	&tu_dib, DEV_UBUS };
 
 /* I/O dispatch routine, I/O addresses 17772440 - 17772472 */
 
@@ -560,7 +571,7 @@ case FNC_FCLR:						/* drive clear */
 	tutc = tutc & ~TC_FCS;				/* clear fc status */
 	tufs = tufs & ~(FS_SAT | FS_SSC | FS_ID | FS_TMK | FS_ERR);
 	sim_cancel (uptr);				/* reset drive */
-	uptr -> USTAT = 0;
+	uptr->USTAT = 0;
 case FNC_NOP:
 	tucs1 = tucs1 & ~CS1_GO;			/* no operation */
 	return;
@@ -572,19 +583,19 @@ case FNC_RIP:						/* read-in preset */
 	return;
 
 case FNC_UNLOAD:					/* unload */
-	if ((uptr -> flags & UNIT_ATT) == 0) {		/* unattached? */
+	if ((uptr->flags & UNIT_ATT) == 0) {		/* unattached? */
 		tuer = tuer | ER_UNS;
 		break;  }
 	detach_unit (uptr);
-	uptr -> USTAT = FS_REW;
+	uptr->USTAT = FS_REW;
 	sim_activate (uptr, tu_time);
 	tucs1 = tucs1 & ~CS1_GO;
 	return;	
 case FNC_REWIND:
-	if ((uptr -> flags & UNIT_ATT) == 0) {		/* unattached? */
+	if ((uptr->flags & UNIT_ATT) == 0) {		/* unattached? */
 		tuer = tuer | ER_UNS;
 		break;  }
-	uptr -> USTAT = FS_PIP | FS_REW;
+	uptr->USTAT = FS_PIP | FS_REW;
 	sim_activate (uptr, tu_time);
 	tucs1 = tucs1 & ~CS1_GO;
 	return;
@@ -592,13 +603,13 @@ case FNC_REWIND:
 case FNC_SPACEF:
 	space_test = FS_EOT;	
 case FNC_SPACER:
-	if ((uptr -> flags & UNIT_ATT) == 0) {		/* unattached? */
+	if ((uptr->flags & UNIT_ATT) == 0) {		/* unattached? */
 		tuer = tuer | ER_UNS;
 		break;  }
 	if ((tufs & space_test) || ((tutc & TC_FCS) == 0)) {
 		tuer = tuer | ER_NXF;
 		break;  }
-	uptr -> USTAT = FS_PIP;
+	uptr->USTAT = FS_PIP;
 	goto GO_XFER;
 
 case FNC_WCHKR:						/* wchk = read */
@@ -615,13 +626,13 @@ case FNC_WRITE:						/* write */
 		break;  }
 case FNC_WREOF:						/* write tape mark */
 case FNC_ERASE:						/* erase */
-	if (uptr -> flags & UNIT_WPRT) {		/* write locked? */
+	if (uptr->flags & UNIT_WPRT) {			/* write locked? */
 		tuer = tuer | ER_NXF;
 		break;  }
 case FNC_WCHKF:						/* wchk = read */
 case FNC_READF:						/* read */
 DATA_XFER:
-	if ((uptr -> flags & UNIT_ATT) == 0) {		/* unattached? */
+	if ((uptr->flags & UNIT_ATT) == 0) {		/* unattached? */
 		tuer = tuer | ER_UNS;
 		break;  }
 	if (fmt_test[GET_FMT (tutc)] == 0) {		/* invalid format? */
@@ -630,11 +641,11 @@ DATA_XFER:
 	if (den_test[den] == 0) {			/* invalid density? */
 		tuer = tuer | ER_NXF;
 		break;  }
-	if (uptr -> UDENS == UD_UNK) uptr -> UDENS = den;	/* set dens */
-/*	else if (uptr -> UDENS != den) {		/* density mismatch? */
+	if (uptr->UDENS == UD_UNK) uptr->UDENS = den;	/* set dens */
+/*	else if (uptr->UDENS != den) {			/* density mismatch? */
 /*		tuer = tuer | ER_NXF;
 /*		break;  } */
-	uptr -> USTAT = 0;
+	uptr->USTAT = 0;
 	tucs1 = tucs1 & ~CS1_DONE;			/* clear done */
 GO_XFER:
 	tucs2 = tucs2 & ~CS2_ERR;			/* clear errors */
@@ -662,17 +673,19 @@ return;
 
 t_stat tu_svc (UNIT *uptr)
 {
-int32 f, fmt, i, j, k, err, wc10, ba10;
+int32 f, fmt, i, j, k, err, wc10, ba10, pnu;
 int32 ba, fc, wc, drv, mpa10, vpn;
 d10 val, v[4];
-t_mtrlnt tbc;
-static t_mtrlnt bceof = { 0 };
+t_mtrlnt abc, tbc;
+static t_mtrlnt bceof = { MTR_TMK };
 static uint8 xbuf[XBUFLNT + 4];
 
-drv = uptr - tu_dev.units;
-if (uptr -> USTAT & FS_REW) {				/* rewind or unload? */
-	uptr -> pos = 0;				/* update position */
-	uptr -> USTAT = 0;				/* clear status */
+drv = uptr - tu_dev.units;				/* get drive # */
+pnu = MT_TST_PNU (uptr);				/* get pos not upd */
+MT_CLR_PNU (uptr);					/* and clear */
+if (uptr->USTAT & FS_REW) {				/* rewind or unload? */
+	uptr->pos = 0;					/* update position */
+	uptr->USTAT = 0;				/* clear status */
 	tufs = tufs | FS_ATA | FS_SSC;
 	update_tucs (CS1_SC, drv);			/* update status */
 	return SCPE_OK;  }
@@ -685,55 +698,42 @@ fc = 0200000 - tufc;					/* get frame count */
 wc10 = wc >> 1;						/* 10 word count */
 ba10 = ba >> 2;						/* 10 word addr */
 err = 0;
-uptr -> USTAT = 0;					/* clear status */
+uptr->USTAT = 0;					/* clear status */
 switch (f) {						/* case on function */
 
 /* Unit service - non-data transfer commands - set ATA when done */
 
 case FNC_SPACEF:					/* space forward */
 	do {	tufc = (tufc + 1) & 0177777;		/* incr fc */
-		fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
-		fxread (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-		if ((err = ferror (uptr -> fileref)) ||	/* error or eof? */
-		     feof (uptr -> fileref)) {
-			uptr -> USTAT = FS_EOT;
-			break;  }
-		if (tbc == 0) {				/* zero bc? */
-			tufs = tufs | FS_TMK;
-			uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
-			break;  }
-		uptr -> pos = uptr -> pos + ((MTRL (tbc) + 1) & ~1) +
+		if (tu_rdlntf (uptr, &tbc, &err)) break;/* read rec lnt, err? */
+		uptr->pos = uptr->pos + ((MTRL (tbc) + 1) & ~1) +
 			(2 * sizeof (t_mtrlnt));  }
 	while (tufc != 0);
 	if (tufc) tuer = tuer | ER_FCE;
 	else tutc = tutc & ~TC_FCS;
 	tufs = tufs | FS_ATA;
 	break;
+
 case FNC_SPACER:					/* space reverse */
 	do {	tufc = (tufc + 1) & 0177777;		/* incr wc */
-		fseek (uptr -> fileref, uptr -> pos - sizeof (t_mtrlnt),
-			SEEK_SET);
-		fxread (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-		if ((err = ferror (uptr -> fileref)) ||	/* error or eof? */
-		     feof (uptr -> fileref)) {
-			uptr -> pos = 0;
-			break;  }
-		if (tbc == 0) {				/* start of prv file? */
-			tufs = tufs | FS_TMK;
-			uptr -> pos = uptr -> pos - sizeof (t_mtrlnt);
-			break;  }
-		uptr -> pos = uptr -> pos - ((MTRL (tbc) + 1) & ~1) -
-			(2 * sizeof (t_mtrlnt));  }
-	while ((tufc != 0) && (uptr -> pos));
+		if (pnu) pnu = 0;			/* pos not upd? */
+		else {	if (tu_rdlntr (uptr, &tbc, &err)) break;
+			uptr->pos = uptr->pos - ((MTRL (tbc) + 1) & ~1) -
+				(2 * sizeof (t_mtrlnt));  }  }
+	while (tufc != 0);
 	if (tufc) tuer = tuer | ER_FCE;
 	else tutc = tutc & ~TC_FCS;
 	tufs = tufs | FS_ATA;
 	break;
+
 case FNC_WREOF:
-	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
-	fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	err = ferror (uptr -> fileref);
-	uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);	/* update position */
+	fseek (uptr->fileref, uptr->pos, SEEK_SET);
+	fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr->fileref);
+	tufs = tufs | FS_ATA;
+	if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr);
+	else uptr->pos = uptr->pos + sizeof (t_mtrlnt);	/* update position */
+	break;
+
 case FNC_ERASE:
 	tufs = tufs | FS_ATA;
 	break;
@@ -754,29 +754,23 @@ case FNC_ERASE:
 case FNC_READF:						/* read */
 case FNC_WCHKF:						/* wcheck = read */
 	tufc = 0;					/* clear frame count */
-	if ((uptr -> UDENS == TC_1600) && (uptr -> pos == 0))
+	if ((uptr->UDENS == TC_1600) && (uptr->pos == 0))
 		tufs = tufs | FS_ID;			/* PE BOT? ID burst */
 	TXFR (ba, wc, 0);				/* validate transfer */
-	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
-	fxread (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	if ((err = ferror (uptr -> fileref)) ||		/* error or eof? */
-	    (feof (uptr -> fileref))) {
-		uptr -> USTAT = FS_EOT;
-		break;  }
+	if (tu_rdlntf (uptr, &tbc, &err)) break;	/* read rec lnt, err? */
+	fseek (uptr->fileref, uptr->pos, SEEK_SET);
 	if (MTRF (tbc)) {				/* bad record? */
 		tuer = tuer | ER_CRC;			/* set error flag */
-		uptr -> pos = uptr -> pos + ((MTRL (tbc) + 1) & ~1) +
+		uptr->pos = uptr->pos + ((MTRL (tbc) + 1) & ~1) +
 			(2 * sizeof (t_mtrlnt));
 		break;  }
-	if (tbc == 0) {					/* tape mark? */
-		tufs = tufs | FS_TMK;
-		uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
-		break;  }
 	if (tbc > XBUFLNT) return SCPE_MTRLNT;		/* bad rec length? */
-	i = fxread (xbuf, sizeof (int8), tbc, uptr -> fileref);
-	for ( ; i < tbc + 4; i++) xbuf[i] = 0;		/* fill/pad with 0's */
-	err = ferror (uptr -> fileref);
-	for (i = j = 0; (i < wc10) && (j < tbc); i++) {
+	abc = fxread (xbuf, sizeof (int8), tbc, uptr->fileref);
+	if (err = ferror (uptr->fileref)) {		/* error? */
+		MT_SET_PNU (uptr);			/* pos not upd */
+		break;  }
+	for ( ; abc < tbc + 4; abc++) xbuf[abc] = 0;	/* fill/pad with 0's */
+	for (i = j = 0; (i < wc10) && (j < ((int32) tbc)); i++) {
 		if ((i == 0) || NEWPAGE (ba10 + i, 0)) {	/* map new page */
 			MAPM (ba10 + i, mpa10, 0);  }
 		for (k = 0; k < 4; k++) v[k] = xbuf[j++];
@@ -784,15 +778,15 @@ case FNC_WCHKF:						/* wcheck = read */
 		if (fmt == TC_10C) val = val | ((d10) xbuf[j++] & 017);
 		if (f == FNC_READF) M[mpa10] = val;
 		mpa10 = mpa10 + 1;  }			/* end for */
-	uptr -> pos = uptr -> pos + ((tbc + 1) & ~1) + (2 * sizeof (t_mtrlnt));
+	uptr->pos = uptr->pos + ((tbc + 1) & ~1) + (2 * sizeof (t_mtrlnt));
 	tufc = tbc & 0177777;
 	tuwc = (tuwc + (i << 1)) & 0177777;
 	ba = ba + (i << 2);
 	break;
-
+
 case FNC_WRITE:						/* write */
 	TXFR (ba, wc, 0);				/* validate transfer */
-	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
+	fseek (uptr->fileref, uptr->pos, SEEK_SET);
 	for (i = j = 0; (i < wc10) && (j < fc); i++) {
 		if ((i == 0) || NEWPAGE (ba10 + i, 0)) {	/* map new page */
 			MAPM (ba10 + i, mpa10, 0);  }
@@ -804,41 +798,34 @@ case FNC_WRITE:						/* write */
 		if (fmt == TC_10C) xbuf[j++] = (uint8) (val & 017);
 		mpa10 = mpa10 + 1;  }			/* end for */
 	if (j < fc) fc = j;				/* short record? */
-	fxwrite (&fc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	fxwrite (xbuf, sizeof (int8), (fc + 1) & ~1, uptr -> fileref);
-	fxwrite (&fc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	err = ferror (uptr -> fileref);
-	uptr -> pos = uptr -> pos + ((fc + 1) & ~1) + (2 * sizeof (t_mtrlnt));
-	tufc = (tufc + fc) & 0177777;
-	if (tufc == 0) tutc = tutc & ~TC_FCS;
-	tuwc = (tuwc + (i << 1)) & 0177777;
-	ba = ba + (i << 2);
+	fxwrite (&fc, sizeof (t_mtrlnt), 1, uptr->fileref);
+	fxwrite (xbuf, sizeof (int8), (fc + 1) & ~1, uptr->fileref);
+	fxwrite (&fc, sizeof (t_mtrlnt), 1, uptr->fileref);
+	if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr);
+	else {	uptr->pos = uptr->pos + ((fc + 1) & ~1) +
+			(2 * sizeof (t_mtrlnt));
+		tufc = (tufc + fc) & 0177777;
+		if (tufc == 0) tutc = tutc & ~TC_FCS;
+		tuwc = (tuwc + (i << 1)) & 0177777;
+		ba = ba + (i << 2);  }
 	break;
-
+
 case FNC_READR:						/* read reverse */
 case FNC_WCHKR:						/* wcheck = read */
 	tufc = 0;					/* clear frame count */
 	TXFR (ba, wc, 1);				/* validate xfer rev */
-	fseek (uptr -> fileref, uptr -> pos - sizeof (t_mtrlnt), SEEK_SET);
-	fxread (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	if ((err = ferror (uptr -> fileref)) ||		/* error or eof? */
-	    (feof (uptr -> fileref))) {
-		uptr -> USTAT = FS_EOT;
-		break;  }
+	if (tu_rdlntr (uptr, &tbc, &err)) break;	/* read rec lnt, err? */
 	if (MTRF (tbc)) {				/* bad record? */
 		tuer = tuer | ER_CRC;			/* set error flag */
-		uptr -> pos = uptr -> pos - ((MTRL (tbc) + 1) & ~1) -
+		uptr->pos = uptr->pos - ((MTRL (tbc) + 1) & ~1) -
 			(2 * sizeof (t_mtrlnt));
 		break;  }
-	if (tbc == 0) {					/* tape mark? */
-		tufs = tufs | FS_TMK;
-		uptr -> pos = uptr -> pos - sizeof (t_mtrlnt);
-		break;  }
 	if (tbc > XBUFLNT) return SCPE_MTRLNT;		/* bad rec length? */
-	fseek (uptr -> fileref, uptr -> pos - sizeof (t_mtrlnt)
+	fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt)
 		 - ((tbc + 1) & ~1), SEEK_SET);
-	fxread (xbuf + 4, sizeof (int8), tbc, uptr -> fileref);
+	fxread (xbuf + 4, sizeof (int8), tbc, uptr->fileref);
 	for (i = 0; i < 4; i++) xbuf[i] = 0;
+	err = ferror (uptr->fileref);			/* set err but finish */
 	for (i = 0, j = tbc + 4; (i < wc10) && (j >= 4); i++) {
 		if ((i == 0) || NEWPAGE (ba10 - i, PAG_M_OFF)) { /* map page */
 			MAPM (ba10 - i, mpa10, UMAP_RRV);  }
@@ -847,23 +834,21 @@ case FNC_WCHKR:						/* wcheck = read */
 		val = val | (v[0] << 4) | (v[1] << 12) | (v[2] << 20) | (v[3] << 28);
 		if (f == FNC_READR) M[mpa10] = val;
 		mpa10 = mpa10 - 1;  }			/* end for */
-	uptr -> pos = uptr -> pos - ((tbc + 1) & ~1) - (2 * sizeof (t_mtrlnt));
+	uptr->pos = uptr->pos - ((tbc + 1) & ~1) - (2 * sizeof (t_mtrlnt));
 	tufc = tbc & 0177777;
 	tuwc = (tuwc + (i << 1)) & 0177777;
 	ba = ba - (i << 2);
 	break;  }					/* end case */
 
-/* Unit service, continued */
-
 tucs1 = (tucs1 & ~CS1_UAE) | ((ba >> (16 - CS1_V_UAE)) & CS1_UAE);
 tuba = ba & 0177777;					/* update mem addr */
 tucs1 = tucs1 & ~CS1_GO;				/* clear go */
 if (err != 0) {						/* I/O error */
-	tuer = tuer | ER_CRC;				/* flag error */
+	tuer = tuer | ER_VPE;				/* flag error */
 	update_tucs (CS1_DONE | CS1_TRE, drv);		/* set done, err */
 	perror ("TU I/O error");
-	clearerr (uptr -> fileref);
-	return IORETURN (tu_stopioe, SCPE_IOERR);  }
+	clearerr (uptr->fileref);
+	return (tu_stopioe? SCPE_IOERR: SCPE_OK);  }
 update_tucs (CS1_DONE, drv);
 return SCPE_OK;
 }
@@ -910,6 +895,52 @@ tucs1 = tucs1 & ~CS1_IE;				/* clear int enable */
 tuiff = 0;						/* clear CSTB INTR */
 return VEC_TU;						/* acknowledge */
 }
+
+/* Read record length forward - return T if error, EOM, or EOF */
+
+t_bool tu_rdlntf (UNIT *uptr, t_mtrlnt *tbc, int32 *err)
+{
+fseek (uptr->fileref, uptr->pos, SEEK_SET);		/* set tape pos */
+fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);	/* read rec lnt */
+if (*err = ferror (uptr->fileref)) {			/* error? */
+	tuer = tuer | ER_VPE;				/* parity error */
+	MT_SET_PNU (uptr);				/* pos not updated */
+	return TRUE;  }
+if (feof (uptr->fileref) || (*tbc == MTR_EOM)) {	/* eof or eom? */
+	tuer = tuer | ER_OPI;				/* incomplete */
+	MT_SET_PNU (uptr);				/* pos not updated */
+	return TRUE;  }
+if (*tbc == MTR_TMK) {					/* tape mark? */
+	tufs = tufs | FS_TMK;
+	uptr->pos = uptr->pos + sizeof (t_mtrlnt);	/* spc over tmk */
+	return TRUE;  }
+return FALSE;
+}
+
+/* Read record length reverse - return T if error, EOM, or EOF */
+
+t_bool tu_rdlntr (UNIT *uptr, t_mtrlnt *tbc, int32 *err)
+{
+if (uptr->pos < sizeof (t_mtrlnt)) return TRUE;
+fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET);
+fxread (tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
+if (*err = ferror (uptr->fileref)) {			/* error? */
+	tuer = tuer | ER_VPE;				/* parity error */
+	return TRUE;  }
+if (feof (uptr->fileref)) {				/* eof? */
+	tuer = tuer | ER_OPI;				/* incomplete */
+	return TRUE;  }
+if (*tbc == MTR_EOM) {					/* eom? */
+	tuer = tuer | ER_OPI;				/* incomplete */
+	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* spc over eom */
+	return TRUE;  }
+if (*tbc == MTR_TMK) {					/* tape mark? */
+	tufs = tufs | FS_TMK;
+	uptr->pos = uptr->pos - sizeof (t_mtrlnt);	/* spc over tmk */
+	return TRUE;  }
+*tbc = MTRL (*tbc);					/* ignore error flag */
+return FALSE;
+}
 
 /* Reset routine */
 
@@ -927,8 +958,9 @@ tuiff = 0;						/* clear CSTB INTR */
 int_req = int_req & ~INT_TU;				/* clear interrupt */
 for (u = 0; u < TU_NUMDR; u++) {			/* loop thru units */
 	uptr = tu_dev.units + u;
+	MT_CLR_PNU (uptr);				/* clear pos flag */
 	sim_cancel (uptr);				/* cancel activity */
-	uptr -> USTAT = 0;  }
+	uptr->USTAT = 0;  }
 return SCPE_OK;
 }
 
@@ -941,8 +973,9 @@ t_stat r;
 
 r = attach_unit (uptr, cptr);
 if (r != SCPE_OK) return r;
-uptr -> USTAT = 0;					/* clear unit status */
-uptr -> UDENS = UD_UNK;					/* unknown density */
+MT_CLR_PNU (uptr);
+uptr->USTAT = 0;					/* clear unit status */
+uptr->UDENS = UD_UNK;					/* unknown density */
 tufs = tufs | FS_ATA | FS_SSC;				/* set attention */
 if ((GET_FMTR (tucs2) == 0) && (GET_DRV (tutc) == drv))	/* selected drive? */
 	tufs = tufs | FS_SAT;				/* set slave attn */
@@ -959,9 +992,10 @@ int32 drv = uptr - tu_dev.units;
 if (sim_is_active (uptr)) {				/* unit active? */
 	sim_cancel (uptr);				/* cancel operation */
 	tuer = tuer | ER_UNS;				/* set formatter error */
-	if ((uptr -> USTAT & FS_REW) == 0)		/* data transfer? */
+	if ((uptr->USTAT & FS_REW) == 0)		/* data transfer? */
 		tucs1 = tucs1 | CS1_DONE | CS1_TRE;  }	/* set done, err */
-uptr -> USTAT = 0;					/* clear status flags */
+MT_CLR_PNU (uptr);
+uptr->USTAT = 0;					/* clear status flags */
 tufs = tufs | FS_ATA | FS_SSC;				/* set attention */
 update_tucs (CS1_SC, drv);				/* update status */
 return detach_unit (uptr);
@@ -1055,7 +1089,7 @@ static const d10 boot_rom_its[] = {
 	0254200377052,			/*	halt */
 	0254017000000,			/*	jrst 0(17)	; return */
 };
-t_stat tu_boot (int32 unitno)
+t_stat tu_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern a10 saved_PC;

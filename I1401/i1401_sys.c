@@ -202,7 +202,7 @@ extern int32 op_table[64], len_table[9];
 
 if (sw & SWMASK ('C')) {				/* character? */
 	t = val[0];
-	if (uptr -> flags & UNIT_BCD)
+	if (uptr->flags & UNIT_BCD)
 		fprintf (of, (t & WM)? "~%c": "%c", bcd_to_ascii[t & CHAR]);
 	else fprintf (of, FMTASC (t & 0177));
 	return SCPE_OK;  }
@@ -302,7 +302,7 @@ if ((sw & SWMASK ('C')) || (sw & SWMASK ('S')) || (*cptr == '~') ||
 	for (i = 0; (i < sim_emax) && (*cptr != 0); ) {
 		t = *cptr++;				/* get character */
 		if (cflag && (wm_seen == 0) && (t == '~')) wm_seen = WM;
-		else if (uptr -> flags & UNIT_BCD) {
+		else if (uptr->flags & UNIT_BCD) {
 			if (t < 040) return SCPE_ARG;
 			val[i++] = ascii_to_bcd[t] | wm_seen;
 			wm_seen = 0;  }

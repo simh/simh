@@ -1,9 +1,11 @@
 /* ibm1130_sys.c: IBM 1130 simulator interface
 
-   Copyright (c) 2002, Brian Knittel
    Based on PDP-11 simulator written by Robert M Supnik
 
    Revision History
+   0.26 2002Apr24 - Added !BREAK in card deck file to stop simulator
+   0.25	2002Apr18 - Fixed some card reader problems. It starts the reader
+   					properly if you attach a deck while it's waiting to a read.
    0.24 2002Mar27 - Fixed BOSC bug; BOSC works in short instructions too
    0.23 2002Feb26 - Added @decklist feature for ATTACH CR.
    0.22 2002Feb26 - Replaced "strupr" with "upcase" for compatibility.
@@ -11,36 +13,26 @@
                     bugs
    0.01 2001Jul31 - Derived from pdp11_sys.c, which carries this disclaimer:
 
-   Copyright (c) 1993-2001, Robert M Supnik
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
-*/
+ * (C) Copyright 2002, Brian Knittel.
+ * You may freely use this program, but: it offered strictly on an AS-IS, AT YOUR OWN
+ * RISK basis, there is no warranty of fitness for any purpose, and the rest of the
+ * usual yada-yada. Please keep this notice and the copyright in any distributions
+ * or modifications.
+ *
+ * This is not a supported product, but I welcome bug reports and fixes.
+ * Mail to sim@ibm1130.org
+ */
 
 #include "ibm1130_defs.h"
 #include <ctype.h>
+#include <stdarg.h>
 
 extern DEVICE cpu_dev, console_dev, dsk_dev, cr_dev, cp_dev;
 extern DEVICE tti_dev, tto_dev, prt_dev, log_dev;
-extern UNIT cpu_unit;
-extern REG cpu_reg[];
+extern DEVICE gdu_dev, console_dev;
+
+extern UNIT  cpu_unit;
+extern REG   cpu_reg[];
 extern int32 saved_PC;
 
 /* SCP data structures and interface routines
@@ -54,7 +46,7 @@ extern int32 saved_PC;
 */
 
 char sim_name[]    = "IBM 1130";
-char sim_version[] = "V0.24";
+char sim_version[] = "V0.30";
 
 REG *sim_PC = &cpu_reg[0];
 
@@ -62,16 +54,14 @@ int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = {
 	&cpu_dev,			/* the cpu */
-	&log_dev,			/* cpu logging virtual device */
-#ifdef GUI_SUPPORT
-	&console_dev,		/* console display (windows GUI) */
-#endif
 	&dsk_dev,			/* disk drive(s) */
 	&cr_dev,			/* card reader/punch */
 	&cp_dev,
 	&tti_dev,			/* console keyboard, selectric printer */
 	&tto_dev,
 	&prt_dev,			/* 1132 printer */
+	&console_dev,		/* console display (windows GUI) */
+	&gdu_dev,			/* 2250 display */
 	NULL
 };
 
@@ -81,6 +71,11 @@ const char *sim_stop_messages[] = {
 	"Invalid command", 
 	"Simulator breakpoint",
 	"Use of incomplete simulator function",
+	"Power off",
+	"!BREAK in card deck file",
+	"Phase load break",
+	"Program has run amok",
+	"Run time limit exceeded"
 };
 
 /* Loader. IPL is normally performed by card reader (boot command). This function
@@ -238,7 +233,7 @@ static char *opcode[] = {
 	"?00 ",		"XIO ",		"SLA ",		"SRA ",
 	"LDS ",		"STS ",		"WAIT",		"?07 ",
 	"BSI ",		"BSC ",		"?0A ",		"?0B ",
-	"LDX ",		"STD ",		"MDX ",		"?0F ",
+	"LDX ",		"STX ",		"MDX ",		"?0F ",
 	"A   ",		"AD  ",		"S   ",		"SD  ",
 	"M   ",		"D   ",		"?16 ",		"?17 ",
 	"LD  ",		"LDD ",		"STO ",		"STD ",
@@ -260,23 +255,56 @@ static char *lsopcode[] = {"SLA ", "SLCA ", "SLT ", "SLC "};
 static char *rsopcode[] = {"SRA ", "?188 ", "SRT ", "RTE "};
 static char tagc[]      = " 123";
 
+static int ascii_to_ebcdic_table[128] = 
+{
+	0x00,0x01,0x02,0x03,0x37,0x2d,0x2e,0x2f, 0x16,0x05,0x25,0x0b,0x0c,0x0d,0x0e,0x0f,
+	0x10,0x11,0x12,0x13,0x3c,0x3d,0x32,0x26, 0x18,0x19,0x3f,0x27,0x1c,0x1d,0x1e,0x1f,
+	0x40,0x5a,0x7f,0x7b,0x5b,0x6c,0x50,0x7d, 0x4d,0x5d,0x5c,0x4e,0x6b,0x60,0x4b,0x61,
+	0xf0,0xf1,0xf2,0xf3,0xf4,0xf5,0xf6,0xf7, 0xf8,0xf9,0x7a,0x5e,0x4c,0x7e,0x6e,0x6f,
+
+	0x7c,0xc1,0xc2,0xc3,0xc4,0xc5,0xc6,0xc7, 0xc8,0xc9,0xd1,0xd2,0xd3,0xd4,0xd5,0xd6,
+	0xd7,0xd8,0xd9,0xe2,0xe3,0xe4,0xe5,0xe6, 0xe7,0xe8,0xe9,0xba,0xe0,0xbb,0xb0,0x6d,
+	0x79,0x81,0x82,0x83,0x84,0x85,0x86,0x87, 0x88,0x89,0x91,0x92,0x93,0x94,0x95,0x96,
+	0x97,0x98,0x99,0xa2,0xa3,0xa4,0xa5,0xa6, 0xa7,0xa8,0xa9,0xc0,0x4f,0xd0,0xa1,0x07,
+};
+
+static int ebcdic_to_ascii (int ch)
+{
+	int j;
+
+	for (j = 32; j < 128; j++)
+		if (ascii_to_ebcdic_table[j] == ch)
+			return j;
+
+	return '?';
+}
+
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 {
-	int32 cflag, c1, c2, OP, F, TAG, INDIR, DSPLC, IR, eaddr;
+	int32 cflag, ch, OP, F, TAG, INDIR, DSPLC, IR, eaddr;
 	char *mnem, tst[12];
 
 	cflag = (uptr == NULL) || (uptr == &cpu_unit);
-	c1    = val[0] & 0177;
-	c2    = (val[0] >> 8) & 0177;
 
-	if (sw & SWMASK ('A')) {				/* ASCII? */
-		fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
+//	if (sw & SWMASK ('A')) {				/* ASCII? not useful */
+//		fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
+//		return SCPE_OK;
+//	}
+
+	if (sw & SWMASK ('C'))					/* character? not useful -- make it EBCDIC */
+		sw |= SWMASK('E');
+
+	if (sw & SWMASK ('E')) {				/* EBCDIC! */
+		ch = ebcdic_to_ascii((val[0] >> 8) & 0xFF);	/* take high byte first */
+		fprintf (of, (ch < ' ')? "<%03o>": "%c", ch);
+		ch = ebcdic_to_ascii(val[0] & 0xFF);
+		fprintf (of, (ch < ' ')? "<%03o>": "%c", ch);
 		return SCPE_OK;
 	}
 
-	if (sw & SWMASK ('C')) {				/* character? */
-		fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
-		fprintf (of, (c2 < 040)? "<%03o>": "%c", c2);
+	if (sw & SWMASK ('H')) {				/* HOLLERITH! now THIS is useful! */
+		ch = hollerith_to_ascii((int16) val[0]);
+		fprintf (of, (ch < ' ')? "<%03o>": "%c", ch);
 		return SCPE_OK;
 	}
 
@@ -320,8 +348,8 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 		DSPLC &= 0x003F;
 		eaddr = DSPLC;
 	}
-	else if (OP == 0x09) {
-		if (IR & 0x40)
+	else if ((OP == 0x08 && F)|| OP == 0x09) {		// BSI L and BSC any
+		if (OP == 0x09 && (IR & 0x40))
 			mnem = "BOSC";
 
 		tst[0] = '\0';
@@ -414,3 +442,54 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 	return SCPE_ARG;
 }
+
+#ifndef WIN32
+
+int strnicmp (char *a, char *b, int n)
+{
+	int ca, cb;
+
+	for (;;) {
+		if (--n < 0)					// still equal after n characters? quit now
+			return 0;
+
+		if ((ca = *a) == 0)				// get character, stop on null terminator
+			return *b ? -1 : 0;
+
+		if (ca >= 'a' && ca <= 'z')		// fold lowercase to uppercase
+			ca -= 32;
+
+		cb = *b;
+		if (cb >= 'a' && cb <= 'z')
+			cb -= 32;
+
+		if ((ca -= cb) != 0)			// if different, return comparison
+			return ca;
+
+		a++, b++;
+	}
+}
+
+int strcmpi (char *a, char *b)
+{
+	int ca, cb;
+
+	for (;;) {
+		if ((ca = *a) == 0)				// get character, stop on null terminator
+			return *b ? -1 : 0;
+
+		if (ca >= 'a' && ca <= 'z')		// fold lowercase to uppercase
+			ca -= 32;
+
+		cb = *b;
+		if (cb >= 'a' && cb <= 'z')
+			cb -= 32;
+
+		if ((ca -= cb) != 0)			// if different, return comparison
+			return ca;
+
+		a++, b++;
+	}
+}
+
+#endif

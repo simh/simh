@@ -25,6 +25,8 @@
 
    cpu		PDP-4/7/9/15 central processor
 
+   05-Oct-02	RMS	Added DIBs, device number support
+   25-Jul-02	RMS	Added DECtape support for PDP-4
    06-Jan-02	RMS	Revised enable/disable support
    30-Dec-01	RMS	Added old PC queue
    30-Nov-01	RMS	Added extended SET/SHOW support
@@ -242,8 +244,7 @@
    4. Adding I/O devices.  Three modules must be modified:
 
 	pdp18b_defs.h	add interrupt request definition
-	pdp18b_cpu.c	add IOT and IORS dispatches
-	pdp18b_sys.c	add pointer to data structures to sim_devices
+	pdp18b_sys.c	add sim_devices table entry
 */
 
 #include "pdp18b_defs.h"
@@ -252,10 +253,10 @@
 #define PCQ_MASK	(PCQ_SIZE - 1)
 #define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
 #define UNIT_V_NOEAE	(UNIT_V_UF)			/* EAE absent */
-#define UNIT_NOEAE	(1 << UNIT_V_NOEAE)
 #define UNIT_V_NOAPI	(UNIT_V_UF+1)			/* API absent */
-#define UNIT_NOAPI	(1 << UNIT_V_NOAPI)
 #define UNIT_V_MSIZE	(UNIT_V_UF+2)			/* dummy mask */
+#define UNIT_NOEAE	(1 << UNIT_V_NOEAE)
+#define UNIT_NOAPI	(1 << UNIT_V_NOAPI)
 
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 #if defined (PDP4)
@@ -309,16 +310,26 @@ int16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 #endif
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
-int32 dev_enb = -1;					/* device enables */
-extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
 
+extern int32 sim_int_char;
+extern int32 sim_interval;
+extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
+extern DEVICE *sim_devices[];
+extern FILE *sim_log;
+
+t_bool build_dev_tab (void);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 upd_iors (void);
 int32 api_eval (int32 *pend);
+
+extern clk (int32 pulse, int32 AC);
+
+int32 (*dev_tab[DEV_MAX])(int32 pulse, int32 AC);	/* device dispatch */
+
+int32 (*dev_iors[DEV_MAX])(void);			/* IORS dispatch */
 
 static const int32 api_ffo[256] = {
  8, 7, 6, 6, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4,
@@ -412,11 +423,8 @@ REG cpu_reg[] = {
 	{ BRDATA (PCQ, pcq, 8, ADDRSIZE, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
-	{ FLDATA (NOEAE, cpu_unit.flags, UNIT_V_NOEAE), REG_HRO },
-	{ FLDATA (NOAPI, cpu_unit.flags, UNIT_V_NOAPI), REG_HRO },
 	{ DRDATA (XCT_MAX, xct_max, 8), PV_LEFT + REG_NZ },
 	{ ORDATA (WRU, sim_int_char, 8) },
-	{ ORDATA (DEVENB, dev_enb, 32), REG_HRO },
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
@@ -457,49 +465,17 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 int32 PC, LAC, MQ;
 int32 api_int, api_cycle, skp;
 int32 iot_data, device, pulse;
 t_stat reason;
 extern UNIT clk_unit;
-extern int32 tti (int32 pulse, int32 AC);
-extern int32 tto (int32 pulse, int32 AC);
-extern int32 ptr (int32 pulse, int32 AC);
-extern int32 ptp (int32 pulse, int32 AC);
-extern int32 clk (int32 pulse, int32 AC);
-extern int32 lpt65 (int32 pulse, int32 AC);
-extern int32 lpt66 (int32 pulse, int32 AC);
-#if defined (DRM)
-extern int32 drm60 (int32 pulse, int32 AC);
-extern int32 drm61 (int32 pulse, int32 AC);
-extern int32 drm62 (int32 pulse, int32 AC);
-#endif
-#if defined (RF)
-extern int32 rf70 (int32 pulse, int32 AC);
-extern int32 rf72 (int32 pulse, int32 AC);
-#endif
-#if defined (RP)
-extern int32 rp63 (int32 pulse, int32 AC);
-extern int32 rp64 (int32 pulse, int32 AC);
-#endif
-#if defined (MTA)
-extern int32 mt (int32 pulse, int32 AC);
-#endif
-#if defined (DTA)
-extern int32 dt75 (int32 pulse, int32 AC);
-extern int32 dt76 (int32 pulse, int32 AC);
-#endif
-#if defined (TTY1)
-extern int32 tti1 (int32 pulse, int32 AC);
-extern int32 tto1 (int32 pulse, int32 AC);
-#endif
 
 #define JMS_WORD(t)	(((LAC & 01000000) >> 1) | ((memm & 1) << 16) | \
 			 (((t) & 1) << 15) | ((PC) & 077777))
 #define INCR_ADDR(x)	(((x) & epcmask) | (((x) + 1) & damask))
 #define SEXT(x)		((int) (((x) & 0400000)? (x) | ~0777777: (x) & 0777777))
-
+
 /* The following macros implement addressing.  They account for autoincrement
    addressing, extended addressing, and memory protection, if it exists.
 
@@ -615,6 +591,7 @@ epcmask = ADDRMASK & ~damask;				/* extended PC mask */
 #define epcmask	(ADDRMASK & ~damask)			/* extended PC mask */
 #endif
 
+if (build_dev_tab ()) return SCPE_STOP;			/* build, chk tables */
 PC = saved_PC & ADDRMASK;				/* load local copies */
 LAC = saved_LAC & 01777777;
 MQ = saved_MQ & 0777777;
@@ -1300,7 +1277,7 @@ case 034:						/* IOT */
 	pulse = IR & 067;				/* pulse = IR<12:17> */
 	if (IR & 0000010) LAC = LAC & 01000000;		/* clear AC? */
 	iot_data = LAC & 0777777;			/* AC unchanged */
-
+
 /* PDP-4 system IOT's */
 
 #if defined (PDP4)
@@ -1404,87 +1381,10 @@ case 034:						/* IOT */
 
 /* IOT, continued */
 
-	case 1:						/* PTR */
-		iot_data = ptr (pulse, iot_data);
-		break;
-	case 2:						/* PTP */
-		iot_data = ptp (pulse, iot_data);
-		break;
-	case 3:						/* TTI */
-		if (pulse == 004) iot_data = upd_iors ();
-		else iot_data = tti (pulse, iot_data);
-		break;
-	case 4: 					/* TTO */
-		iot_data = tto (pulse, iot_data);
-		break;
-#if defined (TTY1)
-	case 040:					/* TTO1 */
-		if (dev_enb & ENB_TTI1) iot_data = tto1 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 041:					/* TTI1 */
-		if (dev_enb & ENB_TTI1) iot_data = tti1 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-#endif
-#if defined (DRM)
-	case 060:					/* drum */
-		if (dev_enb & ENB_DRM) iot_data = drm60 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 061:
-		if (dev_enb & ENB_DRM) iot_data = drm61 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 062:
-		if (dev_enb & ENB_DRM) iot_data = drm62 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-#endif
-#if defined (RP)
-	case 063:					/* RP15 */
-		if (dev_enb & ENB_RP) iot_data = rp63 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 064:
-		if (dev_enb & ENB_RP) iot_data = rp64 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-#endif
-	case 065:					/* LPT */
-		iot_data = lpt65 (pulse, iot_data);
-		break;
-	case 066:
-		iot_data = lpt66 (pulse, iot_data);
-		break;
-#if defined (RF)
-	case 070:					/* RF09 */
-		if (dev_enb & ENB_RF) iot_data = rf70 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 072:
-		if (dev_enb & ENB_RF) iot_data = rf72 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-#endif
-#if defined (MTA)
-	case 073:					/* TC59 */
-		if (dev_enb & ENB_MTA) iot_data = mt (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-#endif
-#if defined (DTA)
-	case 075:					/* TC02/TC15 */
-		if (dev_enb & ENB_DTA) iot_data = dt75 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 076:
-		if (dev_enb & ENB_DTA) iot_data = dt76 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-#endif
-	default:					/* unknown device */
-		reason = stop_inst;			/* stop on flag */
+	default:					/* devices */
+		if (dev_tab[device])			/* defined? */
+		    iot_data = dev_tab[device] (pulse, iot_data);
+		else reason = stop_inst;		/* stop on flag */
 		break;  }				/* end switch device */
 	LAC = LAC | (iot_data & 0777777);
 	if (iot_data & IOT_SKP) PC = INCR_ADDR (PC);
@@ -1504,7 +1404,7 @@ saved_PC = PC & ADDRMASK;				/* save copies */
 saved_LAC = LAC & 01777777;
 saved_MQ = MQ & 0777777;
 iors = upd_iors ();					/* get IORS */
-pcq_r -> qptr = pcq_p;					/* update pc q ptr */
+pcq_r->qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }
 
@@ -1530,35 +1430,12 @@ return 0;
 
 int32 upd_iors (void)
 {
-extern int32 std_iors (void);
-extern int32 lpt_iors (void);
-#if defined (DRM)
-extern int32 drm_iors (void);
-#endif
-#if defined (RF)
-extern int32 rf_iors (void);
-#endif
-#if defined (RP)
-extern int32 rp_iors (void);
-#endif
-#if defined (MTA)
-extern int32 mt_iors (void);
-#endif
+int32 d, p;
 
-return	(ion? IOS_ION: 0) |
-#if defined (DRM)
-	drm_iors () |
-#endif
-#if defined (RP)
-	rp_iors () |
-#endif
-#if defined (RF)
-	rf_iors () |
-#endif
-#if defined (MTA)
-	mt_iors () |
-#endif
-	std_iors () | lpt_iors ();
+d = (ion? IOS_ION: 0);					/* ION */
+for (p = 0; dev_iors[p] != NULL; p++) {			/* loop thru table */
+	d = d | dev_iors[p]();  }			/* OR in results */
+return d;
 }
 
 /* Reset routine */
@@ -1576,7 +1453,7 @@ memm = memm_init;
 nexm = prvn = trap_pending = 0;
 emir_pending = rest_pending = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r -> qptr = 0;
+if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -1617,38 +1494,89 @@ for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
 return SCPE_OK;
 }
 
-/* Device enable routine */
+/* Change device number for a device */
 
-t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_devno (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 DEVICE *dptr;
+DIB *dibp;
+uint32 newdev;
+t_stat r;
 
-if (cptr != NULL) return SCPE_ARG;
-if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+if (cptr == NULL) return SCPE_ARG;
+if (uptr == NULL) return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
 if (dptr == NULL) return SCPE_IERR;
-dev_enb = dev_enb | val;
-if (dptr -> reset) dptr -> reset (dptr);
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+newdev = get_uint (cptr, 8, DEV_MAX - 1, &r);		/* get new */
+if ((r != SCPE_OK) || (newdev == dibp->dev)) return r;
+dibp->dev = newdev;					/* store */
 return SCPE_OK;
 }
 
-/* Device disable routine */
+/* Show device number for a device */
 
-t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat show_devno (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-int32 i;
 DEVICE *dptr;
-UNIT *up;
+DIB *dibp;
 
-if (cptr != NULL) return SCPE_ARG;
-if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+if (uptr == NULL) return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
 if (dptr == NULL) return SCPE_IERR;
-for (i = 0; i < dptr -> numunits; i++) {		/* check units */
-	up = (dptr -> units) + i;
-	if ((up -> flags & UNIT_ATT) || sim_is_active (up))
-		return SCPE_NOFNC;  }
-dev_enb = dev_enb & ~val;
-if (dptr -> reset) dptr -> reset (dptr);
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+fprintf (st, "devno=%02o", dibp->dev);
+if (dibp-> num > 1) fprintf (st, "-%2o", dibp->dev + dibp->num - 1);
 return SCPE_OK;
+}
+
+/* CPU device handler - should never get here! */
+
+int32 bad_dev (int32 pulse, int32 AC)
+{
+return (SCPE_IERR << IOT_V_REASON) | AC;		/* broken! */
+}
+
+/* Build device dispatch table */
+
+t_bool build_dev_tab (void)
+{
+DEVICE *dptr;
+DIB *dibp;
+uint32 i, j, p;
+static const uint8 std_dev[] =
+#if defined (PDP4)
+	{ 000 };
+#elif defined (PDP7)
+	{ 000, 033, 077 };
+#else
+	{ 000, 017, 033, 055, 077 };
+#endif
+
+for (i = 0; i < DEV_MAX; i++) {				/* clr tables */
+	dev_tab[i] = NULL;
+	dev_iors[i] = NULL;  }
+for (i = 0; i < ((uint32) sizeof (std_dev)); i++)	/* std entries */
+	dev_tab[std_dev[i]] = &bad_dev;
+for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {	/* add devices */
+	dibp = (DIB *) dptr->ctxt;			/* get DIB */
+	if (dibp && !(dptr->flags & DEV_DIS)) {		/* enabled? */
+	    if (dibp->iors) dev_iors[p++] = dibp->iors;	/* if IORS, add */
+	    for (j = 0; j < dibp->num; j++) {		/* loop thru disp */
+		if (dibp->dsp[j]) {			/* any dispatch? */
+		    if (dev_tab[dibp->dev + j]) {	/* already filled? */
+			printf ("%s device number conflict at %02o\n",
+			    dptr->name, dibp->dev + j);
+			if (sim_log) fprintf (sim_log,
+			    "%s device number conflict at %02o\n",
+			    dptr->name, dibp->dev + j);
+			 return TRUE;  }
+		    dev_tab[dibp->dev + j] = dibp->dsp[j];	/* fill */
+		    }					/* end if dsp */
+		}					/* end for j */
+	    }						/* end if enb */
+	}						/* end for i */
+return FALSE;
 }

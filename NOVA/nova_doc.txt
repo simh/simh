@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Nova Simulator Usage
-Date:	15-Jun-2002
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -37,11 +37,11 @@ This memorandum documents the Nova simulator.
 1. Simulator Files
 
 sim/		sim_defs.h
+		sim_rev.h
 		sim_sock.h
 		sim_tmxr.h
 		scp.c
 		scp_tty.c
-		sim_rev.c
 		sim_sock.c
 		sim_tmxr.c
 
@@ -76,8 +76,6 @@ DK		head-per-track disk controller
 DP		moving head disk controller with four drives
 MT		magnetic tape controller with eight drives
 
-The TTI1/TTO1, PLT, DK, DP, and MT devices can be set DISABLED.
-
 The Nova simulator implements these unique stop conditions:
 
 	- reference to undefined I/O device, and STOP_DEV is set
@@ -89,14 +87,21 @@ The Nova simulator implements these unique stop conditions:
 The Nova loader supports standard binary format tapes.  The DUMP command
 is not implemented.
 
+Most devices can be disabled or enabled, by the commands:
+
+	SET <dev> DISABLED
+	SET <dev> ENABLED
+
+All devices are enabled by default.
+
 2.1 CPU
 
 The only CPU options are the presence of the optional instructions
 and the size of main memory.
 
-	SET CPU NOVA4		enable Nova4 instructions
-	SET CPU NOVA3		enable Nova3 instructions
 	SET CPU MDV		enable multiply/divide
+	SET CPU NOVA3		enable Nova3 instructions
+	SET CPU NOVA4		enable Nova4 instructions
 	SET CPU NONE		disable all optional instructions
 	SET CPU 4K		set memory size = 4K
 	SET CPU 8K		set memory size = 8K
@@ -505,8 +510,7 @@ Error handling is as follows:
 
 	not attached		tape not ready
 
-	end of file		(read or space) end of physical tape
-				(write) ignored
+	end of file		bad tape
 
 	OS I/O error		report error and stop
 

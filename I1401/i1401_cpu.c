@@ -103,8 +103,8 @@
 
    4. Adding I/O devices.  These modules must be modified:
 
-	i1401_cpu.c	add IO dispatches to iodisp
-	i1401_sys.c	add pointer to data structures to sim_devices
+	i1401_cpu.c	add device dispatching code to iodisp
+	i1401_sys.c	add sim_devices table entry
 */
 
 #include "i1401_defs.h"
@@ -1178,7 +1178,7 @@ as_err = ADDR_ERR (AS);					/* get addr err flags */
 bs_err = ADDR_ERR (BS);
 AS = AS & ADDRMASK;					/* clean addresses */
 BS = BS & ADDRMASK;
-pcq_r -> qptr = pcq_p;					/* update pc q ptr */
+pcq_r->qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }							/* end sim_instr */
 
@@ -1314,7 +1314,7 @@ ind[IN_UNC] = 1;
 AS = 0; as_err = 1;
 BS = 0; bs_err = 1;
 pcq_r = find_reg ("ISQ", NULL, dptr);
-if (pcq_r) pcq_r -> qptr = 0;
+if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;

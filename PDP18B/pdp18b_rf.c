@@ -26,6 +26,7 @@
    rf		(PDP-9) RF09/RF09
 		(PDP-15) RF15/RS09
 
+   05-Oct-02	RMS	Added DIB, dev number support
    06-Jan-02	RMS	Revised enable/disable support
    25-Nov-01	RMS	Revised interrupt structure
    24-Nov-01	RMS	Changed WLK to array
@@ -88,8 +89,9 @@
 #define RF_BUSY		(sim_is_active (&rf_unit))
 
 extern int32 M[];
-extern int32 int_hwre[API_HLVL+1], dev_enb;
+extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
+
 int32 rf_sta = 0;					/* status register */
 int32 rf_da = 0;					/* disk address */
 int32 rf_dbuf = 0;					/* data buffer */
@@ -97,6 +99,11 @@ int32 rf_wlk[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };		/* write lock */
 int32 rf_time = 10;					/* inter-word time */
 int32 rf_burst = 1;					/* burst mode flag */
 int32 rf_stopioe = 1;					/* stop on error */
+
+DEVICE rf_dev;
+int32 rf70 (int32 pulse, int32 AC);
+int32 rf72 (int32 pulse, int32 AC);
+int32 rf_iors (void);
 t_stat rf_svc (UNIT *uptr);
 t_stat rf_reset (DEVICE *dptr);
 int32 rf_updsta (int32 new);
@@ -107,6 +114,8 @@ int32 rf_updsta (int32 new);
    rf_unit	RF unit descriptor
    rf_reg	RF register list
 */
+
+DIB rf_dib = { DEV_RF, 3, &rf_iors, { &rf70, NULL, &rf72 } };
 
 UNIT rf_unit =
 	{ UDATA (&rf_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
@@ -123,19 +132,19 @@ REG rf_reg[] = {
 	{ DRDATA (TIME, rf_time, 24), PV_LEFT + REG_NZ },
 	{ FLDATA (BURST, rf_burst, 0) },
 	{ FLDATA (STOP_IOE, rf_stopioe, 0) },
-	{ FLDATA (*DEVENB, dev_enb, ENB_V_RF), REG_HRO },
+	{ ORDATA (DEVNO, rf_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
 MTAB rf_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, ENB_RF, NULL, "ENABLED", &set_enb },
-	{ MTAB_XTD|MTAB_VDV, ENB_RF, NULL, "DISABLED", &set_dsb },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
 	{ 0 }  };
 
 DEVICE rf_dev = {
 	"RF", &rf_unit, rf_reg, rf_mod,
 	1, 8, 21, 1, 8, 18,
 	NULL, NULL, &rf_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&rf_dib, DEV_DISABLE };
 
 /* IOT routines */
 
@@ -203,7 +212,7 @@ t_stat rf_svc (UNIT *uptr)
 {
 int32 f, pa, d, t;
 
-if ((uptr -> flags & UNIT_BUF) == 0) {			/* not buf? abort */
+if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	rf_updsta (RFS_NED | RFS_DON);			/* set nxd, done */
 	return IORETURN (rf_stopioe, SCPE_UNATT);  }
 
@@ -211,9 +220,9 @@ f = GET_FNC (rf_sta);					/* get function */
 do {	M[RF_WC] = (M[RF_WC] + 1) & 0777777;		/* incr word count */
  	pa = M[RF_CA] = (M[RF_CA] + 1) & ADDRMASK;	/* incr mem addr */
 	if ((f == FN_READ) && MEM_ADDR_OK (pa))		/* read? */
-		M[pa] = *(((int32 *) uptr -> filebuf) + rf_da);
+		M[pa] = *(((int32 *) uptr->filebuf) + rf_da);
 	if ((f == FN_WCHK) &&				/* write check? */
-	    (M[pa] != *(((int32 *) uptr -> filebuf) + rf_da))) {
+	    (M[pa] != *(((int32 *) uptr->filebuf) + rf_da))) {
 		rf_updsta (RFS_WCE);			/* flag error */
 		break;  }
 	if (f == FN_WRITE) {				/* write? */
@@ -222,9 +231,9 @@ do {	M[RF_WC] = (M[RF_WC] + 1) & 0777777;		/* incr word count */
 		if ((rf_wlk[d] >> t) & 1) {		/* write locked? */
 			rf_updsta (RFS_WLO);
 			break;  }
-		else {	*(((int32 *) uptr -> filebuf) + rf_da) = M[pa];
-			if (((t_addr) rf_da) >= uptr -> hwmark)
-				uptr -> hwmark = rf_da + 1;  }  }
+		else {	*(((int32 *) uptr->filebuf) + rf_da) = M[pa];
+			if (((t_addr) rf_da) >= uptr->hwmark)
+				uptr->hwmark = rf_da + 1;  }  }
 	rf_da = rf_da + 1;				/* incr disk addr */
 	if (rf_da > RF_SIZE) {				/* disk overflow? */
 		rf_da = 0;

@@ -25,6 +25,7 @@
 
    ptr,ptp	PC8E paper tape reader/punch
 
+   04-Oct-02	RMS	Added DIBs
    30-May-02	RMS	Widened POS to 32b
    30-Nov-01	RMS	Added read only unit support
    30-Mar-98	RMS	Added RIM loader as PTR bootstrap
@@ -33,12 +34,16 @@
 #include "pdp8_defs.h"
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
+
 int32 ptr_stopioe = 0, ptp_stopioe = 0;			/* stop on error */
+
+int32 ptr (int32 IR, int32 AC);
+int32 ptp (int32 IR, int32 AC);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
-t_stat ptr_boot (int32 unitno);
+t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 
 /* PTR data structures
 
@@ -46,6 +51,8 @@ t_stat ptr_boot (int32 unitno);
    ptr_unit	PTR unit descriptor
    ptr_reg	PTR register list
 */
+
+DIB ptr_dib = { DEV_PTR, 1, { &ptr } };
 
 UNIT ptr_unit = {
 	UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
@@ -61,11 +68,16 @@ REG ptr_reg[] = {
 	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
 	{ NULL }  };
 
+MTAB ptr_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_dev },
+	{ 0 }  };
+
 DEVICE ptr_dev = {
-	"PTR", &ptr_unit, ptr_reg, NULL,
+	"PTR", &ptr_unit, ptr_reg, ptr_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptr_reset,
-	&ptr_boot, NULL, NULL };
+	&ptr_boot, NULL, NULL,
+	&ptr_dib, 0 };
 
 /* PTP data structures
 
@@ -73,6 +85,8 @@ DEVICE ptr_dev = {
    ptp_unit	PTP unit descriptor
    ptp_reg	PTP register list
 */
+
+DIB ptp_dib = { DEV_PTP, 1, { &ptp } };
 
 UNIT ptp_unit = {
 	UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
@@ -87,17 +101,22 @@ REG ptp_reg[] = {
 	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
 	{ NULL }  };
 
+MTAB ptp_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_dev },
+	{ 0 }  };
+
 DEVICE ptp_dev = {
-	"PTP", &ptp_unit, ptp_reg, NULL,
+	"PTP", &ptp_unit, ptp_reg, ptp_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptp_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&ptp_dib, 0 };
 
 /* Paper tape reader: IOT routine */
 
-int32 ptr (int32 pulse, int32 AC)
+int32 ptr (int32 IR, int32 AC)
 {
-switch (pulse) {					/* decode IR<9:11> */
+switch (IR & 07) {					/* decode IR<9:11> */
 case 0: 						/* RPE */
 	int_enable = int_enable | (INT_PTR+INT_PTP);	/* set enable */
 	int_req = INT_UPDATE;				/* update interrupts */
@@ -155,9 +174,9 @@ return SCPE_OK;
 
 /* Paper tape punch: IOT routine */
 
-int32 ptp (int32 pulse, int32 AC)
+int32 ptp (int32 IR, int32 AC)
 {
-switch (pulse) {					/* decode IR<9:11> */
+switch (IR & 07) {					/* decode IR<9:11> */
 case 0: 						/* PCE */
 	int_enable = int_enable & ~(INT_PTR+INT_PTP);	/* clear enables */
 	int_req = INT_UPDATE;				/* update interrupts */
@@ -210,9 +229,9 @@ return SCPE_OK;
 /* Bootstrap routine */
 
 #define BOOT_START 07756
-#define BOOT_LEN (sizeof (boot_rom) / sizeof (int32))
+#define BOOT_LEN (sizeof (boot_rom) / sizeof (int16))
 
-static const int32 boot_rom[] = {
+static const uint16 boot_rom[] = {
 	06014,				/* 7756, RFC */
 	06011,				/* 7757, LOOP, RSF */
 	05357,				/* JMP .-1 */
@@ -230,15 +249,16 @@ static const int32 boot_rom[] = {
 	03376,				/* 7774, DCA 7776 */
 	05357,				/* JMP 7757 */
 	00000,				/* 7776, 0 */
-	05301					/* 7777, JMP 7701 */
+	05301				/* 7777, JMP 7701 */
 };
 
-t_stat ptr_boot (int32 unitno)
+t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 saved_PC;
 extern uint16 M[];
 
+if (ptr_dib.dev != DEV_PTR) return STOP_NOTSTD;		/* only std devno */
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 saved_PC = BOOT_START;
 return SCPE_OK;

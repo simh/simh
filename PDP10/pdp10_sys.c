@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Sep-02	RMS	Added RX211 support
    22-Apr-02	RMS	Removed magtape record length error
    17-Sep-01	RMS	Removed multiconsole support
    25-Aug-01	RMS	Enabled DZ11
@@ -41,7 +42,7 @@ extern DEVICE cpu_dev, pag_dev;
 extern DEVICE tim_dev, fe_dev, uba_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE rp_dev, tu_dev;
-extern DEVICE dz_dev;
+extern DEVICE dz_dev, ry_dev;
 extern DEVICE lp20_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
@@ -72,6 +73,7 @@ DEVICE *sim_devices[] = {
 	&uba_dev,
 	&ptr_dev,
 	&ptp_dev,
+	&ry_dev,
 	&lp20_dev,
 	&rp_dev,
 	&tu_dev,

@@ -1,0 +1,148 @@
+CPU						status		writeup		sources
+
+24315	Memory reference group			passed		in 21MX CE	no
+	- LOAD diagnostic
+	- RUN 100
+	- HLT 77, PC = 3353
+
+24316	Alter/skip group			passed		in 21MX CE	no
+	- LOAD diagnostic
+	- RUN 100
+	- HLT 77, PC = 633 
+
+24317	Shift/rotate group			passed		in 21MX CE	no
+	- LOAD diagnostic
+	- RUN 100
+	- HLT 77, PC = 1726
+
+24296	Diagnostic configurator			passed		in 21MX CE	no
+	- LOAD configurator
+	- SET CPU 21MX
+	- ATTACH PTR binary image of
+	  diagnostic to be configured
+	- D S XXYY, where XX = device number
+	  of PTR, YY = device number of TTY
+	- RUN 2
+	- HLT 77, PC = 77237 (for 32K mem)
+
+24319	Extended arithmetic group		passed		in 21MX CE	no
+	- load diagnostic via configurator
+	- D S 0
+	- RUN 100
+	- prints diagnostic name
+	- prints END OF PASS 1 and halts
+
+13206	IOP for 2100 group			passed		13206 manual	no
+
+24320	Floating point				passed		in 21MX CE	no
+	- load diagnostic via configurator
+	- D S 0
+	- RUN 100
+	- prints diagnostic name
+	- prints PASS 000001 and halts
+
+12943-1	Extended instruction group, part 1	passed		12943 manual	no
+	- load diagnostic via configurator
+	- D S 0
+	- RUN 100
+	- prints diagnostic name
+	- prints PASS 000001 and halts
+
+12943-2	Extended instruction group, part 2	passed		12943 manual	no
+	- load diagnostic via configurator
+	- D S XX, where XX = device number
+	  of TTY
+	- RUN 100
+	- HLT 74, PC = 2406
+	- D S 0
+	- CONTINUE
+	- prints diagnostic name
+	- prints PASS 000001 and halts
+
+24322	Dual channel port controller		passed		in 21MX CE	no
+	- load diagnostic via configurator
+	- SET LPS ENA
+	- SET LPS DIAG
+	- D S XX, where XX = device number
+	  of LPS
+	- RUN 100
+	- HALT 74, PC = 1541
+	- D S 0
+	- CONTINUE
+	- prints diagnostic name
+	- prints H324 PRESS PRESET AND RUN
+	- HLT 24, PC = 2312
+	- RESET ALL
+	- CONTINUE
+	- prints PASS 000001 and halts
+
+12892	Memory protect-parity error		passed		in 21MX CE	no
+	- load diagnostic via configurator
+	- disable all I/O devices except
+	  PTR, TTY, clock
+	- D S 1400XX, where XX = device number
+	  of PTR
+	- RUN 100
+	- HLT 74, PC = 2444
+	- D S 1000 (test select mode)
+	- CONTINUE
+	- prints diagnostic name
+	- HLT 75, PC = 2026
+	- D S 0
+	- D A 31777 (tests 10-11 can't be run)
+	- Rings bell and prints
+	  H314 PRESS HALT,PRESET AND RUN WITHIN 30 SECONDS
+	- WRU (CTRL+E) to interrupt simulation
+	- RESET ALL
+	- CONTINUE
+	- prints PASS 000001 and halts
+
+12929	Memory expansion unit (DMS)		passed		in 21MX CE	no
+	- load diagnostic via configurator
+	- SET CPU 64K
+	- SET LPS ENA
+	- SET LPS DIAG
+	- D S XX, where XX = device number
+	  of LPS
+	- RUN 100
+	- HLT 74, PC = 2435
+	- D S 0
+	- CONTINUE
+	- Prints H115 PRESS HALT-PRESET-RUN IN LESS THAN 10 SECONDS
+	- WRU (CTRL+E) to interrupt simulation
+	- RESET ALL
+	- CONTINUE
+	- Prints H117 PRESET TEST COMPLETE
+	- Prints PASS 000001 and halts
+	- Test 23 won't run at >256K mem
+	  (real 21MX limited to 304K)
+
+Peripherals
+
+12531	TTY test				passed		in 21MX CE	no
+	- set TTY TTIME to 100
+	- run with test select = 173
+	- remaining tests can't be run
+12539	time base generator			passed		in 21MX CE	no
+	- runs with CLK in diag mode
+12597	reader/punch				passed		in 21MX CE	no
+	- set PTP TIME to 100
+	- run with test select a=4017
+	- remaining tests can't be run
+12984	2767 line printer			passed		in 21MX CE	no
+	- set LPS PTIME, CTIME to 100
+	- run with test select a = 15
+	- remaining tests can't be run
+12960	7900/7901 disk				passed		in 21MX CE	no
+12965	2883/2884 disk				passed		12965 manual	no
+12559	3030 magtape				not run		no documentation
+13181	7970B magtape				partial		in 21MX CE	no
+	- set MSC CTIME to 180000
+	- do not change MSC XTIME
+	- attach scratch tapes to units 0,1
+	- set s = 2000 (suppress CRC/LRC)
+	- run with test select a = 37737, b = 7767
+	- tests 4, 14, 15 are timing dependent
+	- test 19 uses non-supported read rev
+13183	7970E magtape				not run		in 21MX CE	no
+12920	multiplexor				not run		in 21MX CE	no

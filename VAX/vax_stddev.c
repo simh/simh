@@ -23,12 +23,12 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ptr		paper tape reader
-   ptp		paper tape punch
    tti		terminal input
    tto		terminal output
-   clk		line frequency clock
+   clk		100Hz and TODR clock
 
+   01-Nov-02	RMS	Added 7B/8B capability to terminal
+   12-Sep-02	RMS	Removed paper tape, added variable vector support
    30-May-02	RMS	Widened POS to 32b
    30-Apr-02	RMS	Automatically set TODR to VMS-correct value during boot
 */
@@ -36,10 +36,6 @@
 #include "vax_defs.h"
 #include <time.h>
 
-#define PTRCSR_IMP	(CSR_ERR+CSR_BUSY+CSR_DONE+CSR_IE) /* paper tape reader */
-#define PTRCSR_RW	(CSR_IE)
-#define PTPCSR_IMP	(CSR_ERR + CSR_DONE + CSR_IE)	/* paper tape punch */
-#define PTPCSR_RW	(CSR_IE)
 #define TTICSR_IMP	(CSR_DONE + CSR_IE)		/* terminal input */
 #define TTICSR_RW	(CSR_IE)
 #define TTOCSR_IMP	(CSR_DONE + CSR_IE)		/* terminal output */
@@ -49,11 +45,11 @@
 #define CLK_DELAY	5000				/* 100 Hz */
 #define TMXR_MULT	2				/* 50 Hz */
 
+#define UNIT_V_8B	(UNIT_V_UF + 0)			/* 8B mode */
+#define UNIT_8B		(1 << UNIT_V_8B)
+
 extern int32 int_req[IPL_HLVL];
-int32 ptr_csr = 0;					/* control/status */
-int32 ptr_stopioe = 0;					/* stop on error */
-int32 ptp_csr = 0;					/* control/status */
-int32 ptp_stopioe = 0;					/* stop on error */
+
 int32 tti_csr = 0;					/* control/status */
 int32 tto_csr = 0;					/* control/status */
 int32 clk_csr = 0;					/* control/status */
@@ -63,100 +59,12 @@ int32 todr_blow = 1;					/* TODR battery low */
 int32 tmxr_poll = CLK_DELAY * TMXR_MULT;		/* term mux poll */
 int32 tmr_poll = CLK_DELAY;				/* pgm timer poll */
 
-t_stat pt_rd (int32 *data, int32 PA, int32 access);
-t_stat pt_wr (int32 data, int32 PA, int32 access);
-t_stat ptr_svc (UNIT *uptr);
-t_stat ptp_svc (UNIT *uptr);
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat clk_svc (UNIT *uptr);
-t_stat ptr_reset (DEVICE *dptr);
-t_stat ptp_reset (DEVICE *dptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
-t_stat ptr_attach (UNIT *uptr, char *ptr);
-t_stat ptr_detach (UNIT *uptr);
-t_stat ptp_attach (UNIT *uptr, char *ptr);
-t_stat ptp_detach (UNIT *uptr);
-
-/* PTR data structures
-
-   ptr_dev	PTR device descriptor
-   ptr_unit	PTR unit descriptor
-   ptr_reg	PTR register list
-*/
-
-DIB pt_dib = { 1, IOBA_PT, IOLN_PT, &pt_rd, &pt_wr };
-
-UNIT ptr_unit = {
-	UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
-		SERIAL_IN_WAIT };
-
-REG ptr_reg[] = {
-	{ HRDATA (BUF, ptr_unit.buf, 8) },
-	{ HRDATA (CSR, ptr_csr, 16) },
-	{ FLDATA (INT, int_req[IPL_PTR], INT_V_PTR) },
-	{ FLDATA (ERR, ptr_csr, CSR_V_ERR) },
-	{ FLDATA (BUSY, ptr_csr, CSR_V_BUSY) },
-	{ FLDATA (DONE, ptr_csr, CSR_V_DONE) },
-	{ FLDATA (IE, ptr_csr, CSR_V_IE) },
-	{ DRDATA (POS, ptr_unit.pos, 32), PV_LEFT },
-	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
-	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
-	{ NULL }  };
-
-MTAB ptr_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-		NULL, &show_addr, &pt_dib },
-	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
-		&set_enbdis, NULL, &pt_dib },
-	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
-		&set_enbdis, NULL, &pt_dib },
-	{ 0 }  };
-
-DEVICE ptr_dev = {
-	"PTR", &ptr_unit, ptr_reg, ptr_mod,
-	1, 10, 31, 1, 16, 8,
-	NULL, NULL, &ptr_reset,
-	NULL, &ptr_attach, &ptr_detach };
-
-/* PTP data structures
-
-   ptp_dev	PTP device descriptor
-   ptp_unit	PTP unit descriptor
-   ptp_reg	PTP register list
-*/
-
-UNIT ptp_unit = {
-	UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
-
-REG ptp_reg[] = {
-	{ HRDATA (BUF, ptp_unit.buf, 8) },
-	{ HRDATA (CSR, ptp_csr, 16) },
-	{ FLDATA (INT, int_req[IPL_PTP], INT_V_PTP) },
-	{ FLDATA (ERR, ptp_csr, CSR_V_ERR) },
-	{ FLDATA (DONE, ptp_csr, CSR_V_DONE) },
-	{ FLDATA (IE, ptp_csr, CSR_V_IE) },
-	{ DRDATA (POS, ptp_unit.pos, 32), PV_LEFT },
-	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
-	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
-	{ NULL }  };
-
-MTAB ptp_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-		NULL, &show_addr, &pt_dib },
-	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
-		&set_enbdis, NULL, &pt_dib },
-	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
-		&set_enbdis, NULL, &pt_dib },
-	{ 0 }  };
-
-DEVICE ptp_dev = {
-	"PTP", &ptp_unit, ptp_reg, ptp_mod,
-	1, 10, 31, 1, 16, 8,
-	NULL, NULL, &ptp_reset,
-	NULL, &ptp_attach, &ptp_detach };
 
 /* TTI data structures
 
@@ -165,7 +73,9 @@ DEVICE ptp_dev = {
    tti_reg	TTI register list
 */
 
-UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
+DIB tti_dib = { 0, 0, NULL, NULL, 1, IVCL (TTI), SCB_TTI, { NULL } };
+
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_8B, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
 	{ HRDATA (BUF, tti_unit.buf, 8) },
@@ -177,11 +87,18 @@ REG tti_reg[] = {
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
+MTAB tti_mod[] = {
+	{ UNIT_8B, UNIT_8B, "8b", "8B", NULL },
+	{ UNIT_8B, 0      , "7b", "7B", NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,	NULL, &show_vec },
+	{ 0 }  };
+
 DEVICE tti_dev = {
-	"TTI", &tti_unit, tti_reg, NULL,
+	"TTI", &tti_unit, tti_reg, tti_mod,
 	1, 10, 31, 1, 16, 8,
 	NULL, NULL, &tti_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&tti_dib, 0 };
 
 /* TTO data structures
 
@@ -190,7 +107,9 @@ DEVICE tti_dev = {
    tto_reg	TTO register list
 */
 
-UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
+DIB tto_dib = { 0, 0, NULL, NULL, 1, IVCL (TTO), SCB_TTO, { NULL } };
+
+UNIT tto_unit = { UDATA (&tto_svc, UNIT_8B, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
 	{ HRDATA (BUF, tto_unit.buf, 8) },
@@ -202,11 +121,18 @@ REG tto_reg[] = {
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 
+MTAB tto_mod[] = {
+	{ UNIT_8B, UNIT_8B, "8b", "8B", NULL },
+	{ UNIT_8B, 0      , "7b", "7B", NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,	NULL, &show_vec },
+	{ 0 }  };
+
 DEVICE tto_dev = {
-	"TTO", &tto_unit, tto_reg, NULL,
+	"TTO", &tto_unit, tto_reg, tto_mod,
 	1, 10, 31, 1, 16, 8,
 	NULL, NULL, &tto_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&tto_dib, 0 };
 
 /* CLK data structures
 
@@ -214,6 +140,8 @@ DEVICE tto_dev = {
    clk_unit	CLK unit descriptor
    clk_reg	CLK register list
 */
+
+DIB clk_dib = { 0, 0, NULL, NULL, 1, IVCL (CLK), SCB_INTTIM, { NULL } };
 
 UNIT clk_unit = { UDATA (&clk_svc, 0, 0), CLK_DELAY };
 
@@ -227,78 +155,16 @@ REG clk_reg[] = {
 	{ DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
+MTAB clk_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,	NULL, &show_vec },
+	{ 0 }  };
+
 DEVICE clk_dev = {
-	"CLK", &clk_unit, clk_reg, NULL,
+	"CLK", &clk_unit, clk_reg, clk_mod,
 	1, 0, 0, 0, 0, 0,
 	NULL, NULL, &clk_reset,
-	NULL, NULL, NULL };
-
-/* Paper tape I/O dispatch routine, I/O addresses 17777550-17777577
-
-   17777550		ptr CSR
-   17777552		ptr buffer
-   17777554		ptp CSR
-   17777556		ptp buffer
-
-   Note: Word access routines filter out odd addresses.  Thus,
-   an odd address implies an (odd) byte access.
-*/
-
-t_stat pt_rd (int32 *data, int32 PA, int32 access)
-{
-switch ((PA >> 1) & 03) {				/* decode PA<2:1> */
-case 00:						/* ptr csr */
-	*data = ptr_csr & PTRCSR_IMP;
-	break;
-case 01:						/* ptr buf */
-	ptr_csr = ptr_csr & ~CSR_DONE;
-	CLR_INT (PTR);
-	*data = ptr_unit.buf & 0377;
-	break;
-case 02:						/* ptp csr */
-	*data = ptp_csr & PTPCSR_IMP;
-	break;
-case 03:						/* ptp buf */
-	*data = ptp_unit.buf;
-	break;  }
-return SCPE_OK;
-}
-
-t_stat pt_wr (int32 data, int32 PA, int32 access)
-{
-switch ((PA >> 1) & 03) {				/* decode PA<2:1> */
-case 00:						/* ptr csr */
-	if (PA & 1) return SCPE_OK;
-	if ((data & CSR_IE) == 0) CLR_INT (PTR);
-	else if (((ptr_csr & CSR_IE) == 0) && (ptr_csr & (CSR_ERR | CSR_DONE)))
-		SET_INT (PTR);
-	if (data & CSR_GO) {
-		ptr_csr = (ptr_csr & ~CSR_DONE) | CSR_BUSY;
-		CLR_INT (PTR);
-		if (ptr_unit.flags & UNIT_ATT)		/* data to read? */
-			sim_activate (&ptr_unit, ptr_unit.wait);  
-		else sim_activate (&ptr_unit, 0);  }	/* error if not */
-	ptr_csr = (ptr_csr & ~PTRCSR_RW) | (data & PTRCSR_RW);
-	break;
-case 01:						/* ptr buf */
-	break;
-case 02:						/* ptp csr */
-	if (PA & 1) return SCPE_OK;
-	if ((data & CSR_IE) == 0) CLR_INT (PTP);
-	else if (((ptp_csr & CSR_IE) == 0) && (ptp_csr & (CSR_ERR | CSR_DONE)))
-		SET_INT (PTP);
-	ptp_csr = (ptp_csr & ~PTPCSR_RW) | (data & PTPCSR_RW);
-	break;
-case 03:						/* ptp buf */
-	if ((PA & 1) == 0) ptp_unit.buf = data & 0377;
-	ptp_csr = ptp_csr & ~CSR_DONE;
-	CLR_INT (PTP);
-	if (ptp_unit.flags & UNIT_ATT)			/* file to write? */
-		sim_activate (&ptp_unit, ptp_unit.wait);
-	else sim_activate (&ptp_unit, 0);		/* error if not */
-	break;  }					/* end switch PA */
-return SCPE_OK;
-}
+	NULL, NULL, NULL,
+	&clk_dib, 0 };
 
 /* Clock and terminal MxPR routines
 
@@ -378,110 +244,6 @@ sim_activate (&tto_unit, tto_unit.wait);
 return;
 }
 
-/* Paper tape reader routines
-
-   ptr_svc	process event (character ready)
-   ptr_reset	process reset
-   ptr_attach	process attach
-   ptr_detach	process detach
-*/
-
-t_stat ptr_svc (UNIT *uptr)
-{
-int32 temp;
-
-ptr_csr = (ptr_csr | CSR_ERR) & ~CSR_BUSY;
-if (ptr_csr & CSR_IE) SET_INT (PTR);
-if ((ptr_unit.flags & UNIT_ATT) == 0)
-	return IORETURN (ptr_stopioe, SCPE_UNATT);
-if ((temp = getc (ptr_unit.fileref)) == EOF) {
-	if (feof (ptr_unit.fileref)) {
-		if (ptr_stopioe) printf ("PTR end of file\n");
-		else return SCPE_OK;  }
-	else perror ("PTR I/O error");
-	clearerr (ptr_unit.fileref);
-	return SCPE_IOERR;  }
-ptr_csr = (ptr_csr | CSR_DONE) & ~CSR_ERR;
-ptr_unit.buf = temp & 0377;
-ptr_unit.pos = ptr_unit.pos + 1;
-return SCPE_OK;
-}
-
-t_stat ptr_reset (DEVICE *dptr)
-{
-ptr_unit.buf = 0;
-ptr_csr = 0;
-if ((ptr_unit.flags & UNIT_ATT) == 0) ptr_csr = ptr_csr | CSR_ERR;
-CLR_INT (PTR);
-sim_cancel (&ptr_unit);
-return SCPE_OK;
-}
-
-t_stat ptr_attach (UNIT *uptr, char *cptr)
-{
-t_stat reason;
-
-reason = attach_unit (uptr, cptr);
-if ((ptr_unit.flags & UNIT_ATT) == 0) ptr_csr = ptr_csr | CSR_ERR;
-else ptr_csr = ptr_csr & ~CSR_ERR;
-return reason;
-}
-
-t_stat ptr_detach (UNIT *uptr)
-{
-ptr_csr = ptr_csr | CSR_ERR;
-return detach_unit (uptr);
-}
-
-/* Paper tape punch routines
-
-   ptp_svc	process event (character punched)
-   ptp_reset	process reset
-   ptp_attach	process attach
-   ptp_detach	process detach
-*/
-
-t_stat ptp_svc (UNIT *uptr)
-{
-ptp_csr = ptp_csr | CSR_ERR | CSR_DONE;
-if (ptp_csr & CSR_IE) SET_INT (PTP);
-if ((ptp_unit.flags & UNIT_ATT) == 0)
-	return IORETURN (ptp_stopioe, SCPE_UNATT);
-if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {
-	perror ("PTP I/O error");
-	clearerr (ptp_unit.fileref);
-	return SCPE_IOERR;  }
-ptp_csr = ptp_csr & ~CSR_ERR;
-ptp_unit.pos = ptp_unit.pos + 1;
-return SCPE_OK;
-}
-
-t_stat ptp_reset (DEVICE *dptr)
-{
-ptp_unit.buf = 0;
-ptp_csr = CSR_DONE;
-if ((ptp_unit.flags & UNIT_ATT) == 0) ptp_csr = ptp_csr | CSR_ERR;
-CLR_INT (PTP);
-sim_cancel (&ptp_unit);					/* deactivate unit */
-return SCPE_OK;
-}
-
-t_stat ptp_attach (UNIT *uptr, char *cptr)
-{
-t_stat reason;
-
-reason = attach_unit (uptr, cptr);
-if ((ptp_unit.flags & UNIT_ATT) == 0) ptp_csr = ptp_csr | CSR_ERR;
-else ptp_csr = ptp_csr & ~CSR_ERR;
-return reason;
-}
-
-t_stat ptp_detach (UNIT *uptr)
-{
-ptp_csr = ptp_csr | CSR_ERR;
-return detach_unit (uptr);
-}
-
 /* Terminal input routines
 
    tti_svc	process event (character ready)
@@ -490,11 +252,11 @@ return detach_unit (uptr);
 
 t_stat tti_svc (UNIT *uptr)
 {
-int32 temp;
+int32 c;
 
 sim_activate (&tti_unit, tti_unit.wait);		/* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
-tti_unit.buf = temp & 0377;
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
+tti_unit.buf = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);
 tti_unit.pos = tti_unit.pos + 1;
 tti_csr = tti_csr | CSR_DONE;
 if (tti_csr & CSR_IE) SET_INT (TTI);
@@ -518,11 +280,13 @@ return SCPE_OK;
 
 t_stat tto_svc (UNIT *uptr)
 {
-int32 temp;
+int32 c;
+t_stat r;
 
 tto_csr = tto_csr | CSR_DONE;
 if (tto_csr & CSR_IE) SET_INT (TTO);
-if ((temp = sim_putchar (tto_unit.buf & 0177)) != SCPE_OK) return temp;
+c = tto_unit.buf & ((tto_unit.flags & UNIT_8B)? 0377: 0177);
+if ((r = sim_putchar (c)) != SCPE_OK) return r;
 tto_unit.pos = tto_unit.pos + 1;
 return SCPE_OK;
 }
@@ -579,10 +343,10 @@ curr = time (NULL);					/* get curr time */
 if (curr == (time_t) -1) return SCPE_NOFNC;		/* error? */
 ctm = localtime (&curr);				/* decompose */
 if (ctm == NULL) return SCPE_NOFNC;			/* error? */
-base = (((((ctm -> tm_yday * 24) +			/* sec since 1-Jan */
-	    ctm -> tm_hour) * 60) +
-	    ctm -> tm_min) * 60) +
-	    ctm -> tm_sec;
+base = (((((ctm->tm_yday * 24) +			/* sec since 1-Jan */
+	    ctm->tm_hour) * 60) +
+	    ctm->tm_min) * 60) +
+	    ctm->tm_sec;
 todr_reg = (base * 100) + 0x10000000;			/* cvt to VAX form */
 todr_blow = 0;
 return SCPE_OK;

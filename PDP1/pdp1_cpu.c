@@ -25,6 +25,8 @@
 
    cpu		PDP-1 central processor
 
+   06-Oct-02	RMS	Revised for V2.10
+   20-Aug-02	RMS	Added DECtape support
    30-Dec-01	RMS	Added old PC queue
    07-Dec-01	RMS	Revised to use breakpoint package
    30-Nov-01	RMS	Added extended SET/SHOW support
@@ -209,8 +211,8 @@
    4. Adding I/O devices.  Three modules must be modified:
 
 	pdp1_defs.h	add interrupt request definition
-	pdp1_cpu.c	add IOT dispatches
-	pdp1_sys.c	add pointer to data structures to sim_devices
+	pdp1_cpu.c	add IOT dispatch code
+	pdp1_sys.c	add sim_devices table entry
 */
 
 #include "pdp1_defs.h"
@@ -218,9 +220,9 @@
 #define PCQ_SIZE	64				/* must be 2**n */
 #define PCQ_MASK	(PCQ_SIZE - 1)
 #define PCQ_ENTRY	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
-#define UNIT_V_MDV	(UNIT_V_UF)			/* mul/div */
+#define UNIT_V_MDV	(UNIT_V_UF + 0)			/* mul/div */
+#define UNIT_V_MSIZE	(UNIT_V_UF + 1)			/* dummy mask */
 #define UNIT_MDV	(1 << UNIT_V_MDV)
-#define UNIT_V_MSIZE	(UNIT_V_UF+1)			/* dummy mask */
 #define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
 int32 M[MAXMEMSIZE] = { 0 };				/* memory */
@@ -244,6 +246,7 @@ int32 ind_max = 16;					/* nested ind limit */
 uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
+
 extern UNIT *sim_clock_queue;
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
@@ -252,12 +255,13 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+
 extern int32 ptr (int32 inst, int32 dev, int32 IO);
 extern int32 ptp (int32 inst, int32 dev, int32 IO);
 extern int32 tti (int32 inst, int32 dev, int32 IO);
 extern int32 tto (int32 inst, int32 dev, int32 IO);
 extern int32 lpt (int32 inst, int32 dev, int32 IO);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
+extern int32 dt (int32 inst, int32 dev, int32 IO);
 
 int32 sc_map[512] = {
 	0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,	/* 00000xxxx */
@@ -324,7 +328,6 @@ REG cpu_reg[] = {
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ FLDATA (SBS_INIT, sbs_init, SB_V_ON) },
 	{ FLDATA (EXTM_INIT, extm_init, 0) },
-	{ FLDATA (MDV, cpu_unit.flags, UNIT_V_MDV), REG_HRO },
 	{ DRDATA (XCT_MAX, xct_max, 8), PV_LEFT + REG_NZ },
 	{ DRDATA (IND_MAX, ind_max, 8), PV_LEFT + REG_NZ },
 	{ ORDATA (WRU, sim_int_char, 8) },
@@ -349,7 +352,8 @@ DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
 	1, 8, ASIZE, 1, 8, 18,
 	&cpu_ex, &cpu_dep, &cpu_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, 0 };
 
 t_stat sim_instr (void)
 {
@@ -691,7 +695,11 @@ case 035:
 	switch (dev) {					/* case on dev */
 	case 000:					/* I/O wait */
 		break;
-	case 001: case 002: case 030:			/* paper tape rdr */
+	case 001:
+		if (IR & 003700) io_data = dt (IR, dev, IO);	/* DECtape */
+		else io_data = ptr (IR, dev, IO);	/* paper tape rdr */
+		break;
+	case 002: case 030:				/* paper tape rdr */
 		io_data = ptr (IR, dev, IO);
 		break;
 	case 003:					/* typewriter */
@@ -731,7 +739,7 @@ default:						/* undefined */
 	reason = STOP_RSRV;				/* halt */
 	break;  }					/* end switch opcode */
 }							/* end while */
-pcq_r -> qptr = pcq_p;					/* update pc q ptr */
+pcq_r->qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }
 
@@ -745,7 +753,7 @@ ioh = ioc = 0;
 OV = 0;
 PF = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r -> qptr = 0;
+if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;

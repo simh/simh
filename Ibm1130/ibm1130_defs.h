@@ -1,3 +1,14 @@
+/*
+ * (C) Copyright 2002, Brian Knittel.
+ * You may freely use this program, but: it offered strictly on an AS-IS, AT YOUR OWN
+ * RISK basis, there is no warranty of fitness for any purpose, and the rest of the
+ * usual yada-yada. Please keep this notice and the copyright in any distributions
+ * or modifications.
+ *
+ * This is not a supported product, but I welcome bug reports and fixes.
+ * Mail to sim@ibm1130.org
+ */
+
 /* ibm1130_defs.h: IBM-1130 simulator definitions
  */
 
@@ -12,7 +23,12 @@
 #define MIN(a,b)  (((a) <= (b)) ? (a) : (b))
 #define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
 
-// #define ENABLE_GUI		// uncomment to compile the GUI extensions
+#ifndef WIN32
+   int strnicmp (char *a, char *b, int n);
+   int strcmpi  (char *a, char *b);
+#endif
+
+// #define GUI_SUPPORT		// uncomment to compile the GUI extensions. It's defined in the windows ibm1130.mak makefile
 
 /* ------------------------------------------------------------------------ */
 /* Architectural constants */
@@ -28,27 +44,64 @@
 /* ------------------------------------------------------------------------ */
 /* Global state */
 
-extern uint16 M[];				/* core memory, up to 32Kwords */
-extern uint16 ILSW[];			/* interrupt level status words */
-extern int32  IAR;				/* instruction address register */
-extern int32  CES;				/* console entry switches */
-extern int32  ACC, EXT;			/* accumulator and extension */
-extern int32  ipl;				/* current interrupt level (-1 = not handling irq) */
-extern int32  iplpending;		/* bitfield: interrupted IPL's */
-extern int32  tbit;				/* trace flag (causes level 5 IRQ after each instr) */
-extern int32  V, C;				/* condition codes: overflow, carry */
-extern int32  wait_state;		/* wait state (waiting for an IRQ or processor halted) */
-extern int32  int_req;			/* bitfield: interrupt request levels active */
-extern int32  int_mask;			/* current active interrupt mask (ipl sensitive) */
-extern int32  SR;				/* switch register */
-extern int32  DR;				/* display register */
-extern int32  wait_enable;		/* wait state enable */
-extern int32  mem_mask;			/* mem_mask - valid address mask (memsize-1) */
-extern int32  ibkpt_addr;		/* breakpoint addr */
-extern int32  sim_int_char;
+extern int cgi;								// TRUE if we are running as a CGI program
+extern int sim_gui;
+
+extern uint16 M[];							/* core memory, up to 32Kwords (note: don't even think about trying 64K) */
+extern uint16 ILSW[];						/* interrupt level status words */
+extern int32  IAR;							/* instruction address register */
+extern int32  prev_IAR;						/* instruction address register at start of current instruction */
+extern int32  SAR, SBR;						/* storage address/buffer registers */
+extern int32  OP, TAG, CCC;					/* instruction decoded pieces */
+extern int32  CES;							/* console entry switches */
+extern int32  ACC, EXT;						/* accumulator and extension */
+extern int32  RUNMODE;						/* processor run/step mode */
+extern int32  ipl;							/* current interrupt level (-1 = not handling irq) */
+extern int32  iplpending;					/* interrupted IPL's */
+extern int32  tbit;							/* trace flag (causes level 5 IRQ after each instr) */
+extern int32  V, C;							/* condition codes */
+extern int32  wait_state;					/* wait state (waiting for an IRQ) */
+extern int32  wait_lamp;					/* alternate indicator to light the wait lamp on the GUI */
+extern int32  int_req;						/* sum of interrupt request levels active */
+extern int32  int_lamps;					/* accumulated version of int_req - gives lamp persistence */
+extern int32  int_mask;						/* current active interrupt mask (ipl sensitive) */
+extern int32  mem_mask;
+extern int32  cpu_dsw;						/* CPU device status word */
+extern int32  sim_int_char;					/* interrupt character */
+extern t_bool running;
+extern t_bool power;
+extern t_bool cgi;							/* TRUE if we are running as a CGI program */
+extern t_stat reason;						/* CPU execution loop control */
 
 #define WAIT_OP			 1		/* wait state causes: wait instruction, invalid instruction*/
 #define WAIT_INVALID_OP  2
+
+#define MODE_SS				3				/* RUNMODE values. SS and SMC are not implemented in this simulator */
+#define MODE_SMC			2
+#define MODE_INT_RUN		1
+#define MODE_RUN			0
+#define MODE_SI				-1
+#define MODE_DISP			-2
+#define MODE_LOAD			-3
+
+/* ------------------------------------------------------------------------ */
+/* debugging																*/
+/* ------------------------------------------------------------------------ */
+
+#define ENABLE_DEBUG_PRINT
+#define ENABLE_DEBUG_TO_LOG
+
+#ifdef ENABLE_DEBUG_PRINT
+#  define DEBUG_PRINT debug_print
+#else
+#  ifdef ENABLE_DEBUG_TO_LOG
+#      define DEBUG_PRINT trace_io
+#  else
+#      define DEBUG_PRINT if (0) debug_print
+#  endif
+#endif
+
+void debug_print(char *fmt, ...);
 
 /* ------------------------------------------------------------------------ */
 /* memory IO routines */
@@ -71,6 +124,10 @@ void  WriteW (int32 a, int32 d);
 #define STOP_IBKPT			3				/* simulator breakpoint */
 #define STOP_INCOMPLETE		4				/* simulator coding not complete here */
 #define STOP_POWER_OFF		5				/* no power */
+#define STOP_DECK_BREAK		6				/* !BREAK in deck file */
+#define STOP_PHASE_BREAK	7				/* phase load break */
+#define STOP_CRASH			8				/* program has crashed badly */
+#define STOP_TIMED_OUT		9				/* simulation time limit exceeded */
 
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)	/* cond error return */
 
@@ -94,10 +151,10 @@ void  WriteW (int32 a, int32 d);
 
 /* ILSW bits - set by appropriate device whenever an interrupt is outstanding */
 
-#define ILSW_0_1442_CARD			0x8000			/* not actually used */
+#define ILSW_0_1442_CARD			0x8000			/* ILSW 0 is not really defined on the 1130 */
 
-#define ILSW_1_SCA					0x8000
-#define ILSW_1_1132_PRINTER			0x4000
+#define ILSW_1_1132_PRINTER			0x8000			// had these backwards!
+#define ILSW_1_SCA					0x4000
 
 #define ILSW_2_1131_DISK			0x8000
 
@@ -178,10 +235,10 @@ void  WriteW (int32 a, int32 d);
 #define ILSW_5_SAC_BIT_14			0x0002
 #define ILSW_5_SAC_BIT_15			0x0001
 
-//* console DSW bits
+//* CPU  DSW bits
 
-#define CON_DSW_PROGRAM_STOP			0x8000
-#define CON_DSW_INT_RUN					0x4000
+#define CPU_DSW_PROGRAM_STOP			0x8000
+#define CPU_DSW_INT_RUN					0x4000
 
 /* prototypes: xio handlers */
 
@@ -205,20 +262,28 @@ t_stat load_cr_boot (int drv);
 t_stat cr_boot (int unitno);
 void   calc_ints (void);							/* recalculate interrupt bitmask */
 void   trace_io (char *fmt, ...);					/* debugging printout */
-void   panic (char *msg);							/* bail out of simulator */
+void   scp_panic (char *msg);						/* bail out of simulator */
 char  *upcase(char *str);
-
-/* GUI interface routines */
+void   break_simulation (t_stat reason);			/* let a device halt the simulation */
+char   hollerith_to_ascii (int16 hol);				/* for debugging use only */
+t_bool gdu_active (void);
 void   remark_cmd (char *remark);
 void   stuff_cmd (char *cmd);
+void   update_gui (t_bool force);
+void   sim_init (void);
+t_stat register_cmd (char *name, t_stat (*action)(), int arg, char *help);
+
+/* GUI interface routines */
 t_bool keyboard_is_locked (void);
 void   forms_check (int set);						/* device notification to console lamp display */
 void   print_check (int set);
 void   keyboard_selected (int select);				
 void   disk_ready (int ready);
 void   disk_unlocked (int unlocked);
+void   gui_run(int running);
+char   *read_cmdline (char *ptr, int size, FILE *stream);
 
-#ifdef ENABLE_GUI
+#ifdef GUI_SUPPORT
 #  define GUI_BEGIN_CRITICAL_SECTION begin_critical_section();
 #  define GUI_END_CRITICAL_SECTION   end_critical_section();
    void begin_critical_section (void);

@@ -25,6 +25,7 @@
 
    rp		RP15/RP02 disk pack
 
+   05-Oct-02	RMS	Added DIB, device number support
    06-Jan-02	RMS	Revised enable/disable support
    29-Nov-01	RMS	Added read only unit support
    25-Nov-01	RMS	Revised interrupt structure
@@ -48,7 +49,6 @@
 /* Unit specific flags */
 
 #define UNIT_V_WLK	(UNIT_V_UF + 0)			/* hwre write lock */
-#define UNIT_W_UF	2				/* user flags width */
 #define UNIT_WLK	(1u << UNIT_V_WLK)
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
 
@@ -129,8 +129,9 @@
 #define MAX(x,y) (((x) > (y))? (x): (y))
 
 extern int32 M[];
-extern int32 int_hwre[API_HLVL+1], dev_enb, nexm;
+extern int32 int_hwre[API_HLVL+1], nexm;
 extern UNIT cpu_unit;
+
 int32 rp_sta = 0;					/* status A */
 int32 rp_stb = 0;					/* status B */
 int32 rp_ma = 0;					/* memory address */
@@ -140,6 +141,11 @@ int32 rp_busy = 0;					/* busy */
 int32 rp_stopioe = 1;					/* stop on error */
 int32 rp_swait = 10;					/* seek time */
 int32 rp_rwait = 10;					/* rotate time */
+
+DEVICE rp_dev;
+int32 rp63 (int32 pulse, int32 AC);
+int32 rp64 (int32 pulse, int32 AC);
+int32 rp_iors (void);
 t_stat rp_svc (UNIT *uptr);
 void rp_updsta (int32 newa, int32 newb);
 t_stat rp_reset (DEVICE *dptr);
@@ -153,6 +159,8 @@ t_stat rp_detach (UNIT *uptr);
    rp_reg	RP register list
    rp_mod	RP modifier list
 */
+
+DIB rp_dib = { DEV_RP, 2, &rp_iors, { &rp63, &rp64 } };
 
 UNIT rp_unit[] = {
 	{ UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, RP_SIZE) },
@@ -175,23 +183,21 @@ REG rp_reg[] = {
 	{ FLDATA (STOP_IOE, rp_stopioe, 0) },
 	{ DRDATA (STIME, rp_swait, 24), PV_LEFT },
 	{ DRDATA (RTIME, rp_rwait, 24), PV_LEFT },
-	{ URDATA (FLG, rp_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
-		  RP_NUMDR, REG_HRO) },
-	{ FLDATA (*DEVENB, dev_enb, ENB_V_RP), REG_HRO },
+	{ ORDATA (DEVNO, rp_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
 MTAB rp_mod[] = {
 	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
-	{ MTAB_XTD|MTAB_VDV, ENB_RP, NULL, "ENABLED", &set_enb },
-	{ MTAB_XTD|MTAB_VDV, ENB_RP, NULL, "DISABLED", &set_dsb },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
 	{ 0 }  };
 
 DEVICE rp_dev = {
 	"RP", rp_unit, rp_reg, rp_mod,
 	RP_NUMDR, 8, 24, 1, 8, 18,
 	NULL, NULL, &rp_reset,
-	NULL, &rp_attach, &rp_detach };
+	NULL, &rp_attach, &rp_detach,
+	&rp_dib, DEV_DISABLE };
 
 /* IOT routines */
 
@@ -251,16 +257,16 @@ if (rp_sta & STA_GO) {
 	u = GET_UNIT (rp_sta);				/* get unit num */
 	uptr = rp_dev.units + u;			/* select unit */
 	if (sim_is_active (uptr)) return AC;		/* can't if busy */
-	f = uptr -> FUNC = GET_FUNC (rp_sta);		/* get function */
+	f = uptr->FUNC = GET_FUNC (rp_sta);		/* get function */
 	rp_busy = 1;					/* set ctrl busy */
 	rp_sta = rp_sta & ~(STA_HNF | STA_DON);		/* clear flags */
 	rp_stb = rp_stb & ~(STB_FME | STB_WPE | STB_LON | STB_WCE |
 		STB_TME | STB_PGE | STB_EOP | (1 << (STB_V_ATT0 - u)));
-	if (((uptr -> flags & UNIT_ATT) == 0) || (f == FN_IDLE) ||
+	if (((uptr->flags & UNIT_ATT) == 0) || (f == FN_IDLE) ||
 	     (f == FN_SEEK) || (f == FN_RECAL))
 		sim_activate (uptr, RP_MIN);		/* short delay */
 	else {	c = GET_CYL (rp_da);
-		c = abs (c - uptr -> CYL) * rp_swait;	/* seek time */
+		c = abs (c - uptr->CYL) * rp_swait;	/* seek time */
 		sim_activate (uptr, MAX (RP_MIN, c + rp_rwait));  }  }
 rp_updsta (0, 0);
 return AC;
@@ -286,7 +292,7 @@ int32 f, u, comp, cyl, sect, surf;
 int32 err, pa, da, wc, awc, i;
 
 u = uptr - rp_dev.units;				/* get drv number */
-f = uptr -> FUNC;					/* get function */
+f = uptr->FUNC;						/* get function */
 if (f == FN_IDLE) {					/* idle? */
 	rp_busy = 0;					/* clear busy */
 	return SCPE_OK;  }
@@ -294,9 +300,9 @@ if (f == FN_IDLE) {					/* idle? */
 if ((f == FN_SEEK) || (f == FN_RECAL)) {		/* seek or recal? */
 	rp_busy = 0;					/* not busy */
 	cyl = (f == FN_SEEK)? GET_CYL (rp_da): 0;	/* get cylinder */
-	sim_activate (uptr, MAX (RP_MIN, abs (cyl - uptr -> CYL) * rp_swait));
-	uptr -> CYL = cyl;				/* on cylinder */
-	uptr -> FUNC = FN_SEEK | FN_2ND;		/* set second state */
+	sim_activate (uptr, MAX (RP_MIN, abs (cyl - uptr->CYL) * rp_swait));
+	uptr->CYL = cyl;				/* on cylinder */
+	uptr->FUNC = FN_SEEK | FN_2ND;			/* set second state */
 	rp_updsta (0, 0);				/* update status */
 	return SCPE_OK;  }
 
@@ -304,11 +310,11 @@ if (f == (FN_SEEK | FN_2ND)) {				/* seek done? */
 	rp_updsta (0, rp_stb | (1 << (STB_V_ATT0 - u))); /* set attention */
 	return SCPE_OK;  }
 
-if ((uptr -> flags & UNIT_ATT) == 0) {			/* not attached? */
+if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
 	rp_updsta (STA_DON, STB_SUFU);			/* done, unsafe */
 	return IORETURN (rp_stopioe, SCPE_UNATT);  }
 
-if ((f == FN_WRITE) && (uptr -> flags & UNIT_WPRT)) {	/* write locked? */
+if ((f == FN_WRITE) && (uptr->flags & UNIT_WPRT)) {	/* write locked? */
 	rp_updsta (STA_DON | STA_WPE, 0);		/* error */
 	return SCPE_OK;  }
 
@@ -329,26 +335,26 @@ if ((da + wc) > RP_SIZE) {				/* disk overrun? */
 	rp_updsta (0, STB_EOP);				/* error */
 	wc = RP_SIZE - da;  }				/* limit xfer */
 
-err = fseek (uptr -> fileref, da * sizeof (int), SEEK_SET);
+err = fseek (uptr->fileref, da * sizeof (int), SEEK_SET);
 
 if ((f == FN_READ) && (err == 0)) {			/* read? */
-	awc = fxread (&M[pa], sizeof (int32), wc, uptr -> fileref);
+	awc = fxread (&M[pa], sizeof (int32), wc, uptr->fileref);
 	for ( ; awc < wc; awc++) M[pa + awc] = 0;
-	err = ferror (uptr -> fileref);  }
+	err = ferror (uptr->fileref);  }
 
 if ((f == FN_WRITE) && (err == 0)) {			/* write? */
-	fxwrite (&M[pa], sizeof (int32), wc, uptr -> fileref);
-	err = ferror (uptr -> fileref);
+	fxwrite (&M[pa], sizeof (int32), wc, uptr->fileref);
+	err = ferror (uptr->fileref);
 	if ((err == 0) && (i = (wc & (RP_NUMWD - 1)))) {
-		fxwrite (fill, sizeof (int), i, uptr -> fileref);
-		err = ferror (uptr -> fileref);  }  }
+		fxwrite (fill, sizeof (int), i, uptr->fileref);
+		err = ferror (uptr->fileref);  }  }
 
 if ((f == FN_WRCHK) && (err == 0)) {			/* write check? */
 	for (i = 0; (err == 0) && (i < wc); i++)  {
-		awc = fxread (&comp, sizeof (int32), 1, uptr -> fileref);
+		awc = fxread (&comp, sizeof (int32), 1, uptr->fileref);
 		if (awc == 0) comp = 0;
 		if (comp != M[pa + i]) rp_updsta (0, STB_WCE);  }
-	err = ferror (uptr -> fileref);  }
+	err = ferror (uptr->fileref);  }
 
 rp_wc = (rp_wc + wc) & 0777777;				/* final word count */
 rp_ma = (rp_ma + wc) & 0777777;				/* final mem addr */
@@ -363,7 +369,7 @@ rp_updsta (STA_DON, 0);					/* set done */
 
 if (err != 0) {						/* error? */
 	perror ("RP I/O error");
-	clearerr (uptr -> fileref);
+	clearerr (uptr->fileref);
 	return IORETURN (rp_stopioe, SCPE_IOERR);  }
 return SCPE_OK;
 }
@@ -378,13 +384,13 @@ UNIT *uptr;
 uptr = rp_dev.units + GET_UNIT (rp_sta);
 rp_sta = (rp_sta & ~(STA_DYN | STA_ERR)) | newa;
 rp_stb = (rp_stb & ~STB_DYN) | newb;
-if (uptr -> flags & UNIT_WPRT) rp_sta = rp_sta | STA_SUWP;
-if ((uptr -> flags & UNIT_ATT) == 0) rp_stb = rp_stb | STB_SUFU | STB_SUNR;
+if (uptr->flags & UNIT_WPRT) rp_sta = rp_sta | STA_SUWP;
+if ((uptr->flags & UNIT_ATT) == 0) rp_stb = rp_stb | STB_SUFU | STB_SUNR;
 else if (sim_is_active (uptr)) {
-	f = (uptr -> FUNC) & STA_M_FUNC;
+	f = (uptr->FUNC) & STA_M_FUNC;
 	if ((f == FN_SEEK) || (f == FN_RECAL))
 		rp_stb = rp_stb | STB_SUSU | STB_SUNR;  }
-else if (uptr -> CYL >= RP_NUMCY) rp_sta = rp_sta | STA_SUSI;
+else if (uptr->CYL >= RP_NUMCY) rp_sta = rp_sta | STA_SUSI;
 if ((rp_sta & STA_EFLGS) || (rp_stb & STB_EFLGS)) rp_sta = rp_sta | STA_ERR;
 if (((rp_sta & (STA_ERR | STA_DON)) && (rp_sta & STA_IED)) ||
     ((rp_stb & STB_ATTN) && (rp_sta & STA_IEA))) SET_INT (RP);
@@ -404,7 +410,7 @@ CLR_INT (RP);
 for (i = 0; i < RP_NUMDR; i++) {
 	uptr = rp_dev.units + i;
 	sim_cancel (uptr);
-	uptr -> CYL = uptr -> FUNC = 0;  }
+	uptr->CYL = uptr->FUNC = 0;  }
 return SCPE_OK;
 }
 

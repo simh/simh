@@ -26,10 +26,14 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   20-Aug-02	RMS	Added tmxr_open_master, tmxr_close_master, tmxr.port
    30-Dec-01	RMS	Renamed tmxr_fstatus, added tmxr_fstats
    20-Oct-01	RMS	Removed tmxr_getchar, formalized buffer guard,
 			added tmxr_rqln, tmxr_tqln
 */
+
+#ifndef _SIM_TMXR_H_
+#define _SIM_TMXR_H_	0
 
 #define TMXR_V_VALID	15
 #define TMXR_VALID	(1 << TMXR_V_VALID)
@@ -59,18 +63,21 @@ typedef struct tmln TMLN;
 
 struct tmxr {
 	int32		lines;				/* # lines */
+	int32		port;				/* listening port */
 	SOCKET		master;				/* master socket */
 	TMLN		*ldsc[TMXR_MAXLIN];		/* line descriptors */
 	};
 
 typedef struct tmxr TMXR;
 
-int32 tmxr_poll_conn (TMXR *mp, UNIT *uptr);
+int32 tmxr_poll_conn (TMXR *mp);
 void tmxr_reset_ln (TMLN *lp);
 int32 tmxr_getc_ln (TMLN *lp);
 void tmxr_poll_rx (TMXR *mp);
 void tmxr_putc_ln (TMLN *lp, int32 chr);
 void tmxr_poll_tx (TMXR *mp);
+t_stat tmxr_open_master (TMXR *mp, char *cptr);
+t_stat tmxr_close_master (TMXR *mp);
 t_stat tmxr_attach (TMXR *mp, UNIT *uptr, char *cptr);
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr);
 t_stat tmxr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
@@ -81,4 +88,6 @@ void tmxr_fstats (FILE *st, TMLN *lp, int32 ln);
 t_stat tmxr_dscln (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 tmxr_rqln (TMLN *lp);
 int32 tmxr_tqln (TMLN *lp);
+
+#endif
 

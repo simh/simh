@@ -51,7 +51,7 @@ extern char ascii_to_bcd[128];
 int32 s1sel, s2sel, s4sel, s8sel;
 char rbuf[CBUFSIZE];					/* > CDR_WIDTH */
 t_stat cdr_svc (UNIT *uptr);
-t_stat cdr_boot (int32 unitno);
+t_stat cdr_boot (int32 unitno, DEVICE *dptr);
 t_stat cdr_attach (UNIT *uptr, char *cptr);
 t_stat cd_reset (DEVICE *dptr);
 
@@ -158,7 +158,7 @@ if (ferror (cdr_unit.fileref)) {			/* error? */
 	return SCPE_OK;  }
 cdr_unit.pos = ftell (cdr_unit.fileref);		/* update position */
 if (ssa) {						/* if last cd on */
-	i = getc (cdr_unit.fileref);			/* see if more */
+	getc (cdr_unit.fileref);			/* see if more */
 	if (feof (cdr_unit.fileref)) ind[IN_LST] = 1;	/* eof? set flag */
 	fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);  }
 for (i = 0; i < CDR_WIDTH; i++) {			/* cvt to BCD */
@@ -181,17 +181,17 @@ int32 i;
 if (s1sel) uptr = &stack_unit[1];			/* stacker 1? */
 else if (s2sel) uptr = &stack_unit[2];			/* stacker 2? */
 else uptr = &stack_unit[0];				/* then default */
-if ((uptr -> flags & UNIT_ATT) == 0) return SCPE_OK;	/* attached? */
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;	/* attached? */
 for (i = 0; i < CDR_WIDTH; i++) rbuf[i] = bcd_to_ascii[rbuf[i]];
 for (i = CDR_WIDTH - 1; (i >= 0) && (rbuf[i] == ' '); i--) rbuf[i] = 0;
 rbuf[CDR_WIDTH] = 0;					/* null at end */
-fputs (rbuf, uptr -> fileref);				/* write card */
-fputc ('\n', uptr -> fileref);				/* plus new line */
-if (ferror (uptr -> fileref)) {				/* error? */
+fputs (rbuf, uptr->fileref);				/* write card */
+fputc ('\n', uptr->fileref);				/* plus new line */
+if (ferror (uptr->fileref)) {				/* error? */
 	perror ("Card stacker I/O error");
-	clearerr (uptr -> fileref);
+	clearerr (uptr->fileref);
 	if (iochk) return SCPE_IOERR;  }
-uptr -> pos = ftell (uptr -> fileref);			/* update position */
+uptr->pos = ftell (uptr->fileref);			/* update position */
 return SCPE_OK;
 }
 
@@ -210,21 +210,21 @@ UNIT *uptr;
 if (s8sel) uptr = &stack_unit[2];			/* stack 8? */
 else if (s4sel) uptr = &stack_unit[4];			/* stack 4? */
 else uptr = &cdp_unit;					/* normal output */
-if ((uptr -> flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* attached? */
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* attached? */
 ind[IN_PNCH] = s4sel = s8sel = 0;			/* clear flags */
 
 M[CDP_BUF - 1] = 012;					/* set prev loc */
 for (i = 0; i < CDP_WIDTH; i++) pbuf[i] = bcd_to_ascii[M[CDP_BUF + i] & CHAR];
 for (i = CDP_WIDTH - 1; (i >= 0) && (pbuf[i] == ' '); i--) pbuf[i] = 0;
 pbuf[CDP_WIDTH] = 0;					/* trailing null */
-fputs (pbuf, uptr -> fileref);				/* output card */
-fputc ('\n', uptr -> fileref);				/* plus new line */
-if (ferror (uptr -> fileref)) {				/* error? */
+fputs (pbuf, uptr->fileref);				/* output card */
+fputc ('\n', uptr->fileref);				/* plus new line */
+if (ferror (uptr->fileref)) {				/* error? */
 	perror ("Card punch I/O error");
-	clearerr (uptr -> fileref);
+	clearerr (uptr->fileref);
 	if (iochk) return SCPE_IOERR;
 	ind[IN_PNCH] = 1;  }
-uptr -> pos = ftell (uptr -> fileref);			/* update position */
+uptr->pos = ftell (uptr->fileref);			/* update position */
 return SCPE_OK;
 }
 
@@ -269,7 +269,7 @@ return attach_unit (uptr, cptr);
 static const unsigned char boot_rom[] = {
 	OP_R + WM, OP_NOP + WM };                       /* R, NOP */
 
-t_stat cdr_boot (int32 unitno)
+t_stat cdr_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 saved_IS;

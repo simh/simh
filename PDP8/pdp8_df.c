@@ -25,6 +25,7 @@
 
    df		DF32 fixed head disk
 
+   04-Oct-02	RMS	Added DIBs, device number support
    28-Nov-01	RMS	Added RL8A support
    25-Apr-01	RMS	Added device enable/disable support
 
@@ -77,9 +78,9 @@
 			else df_sta = df_sta & ~DFS_PCA
 
 extern uint16 M[];
-extern int32 int_req, dev_enb, stop_inst;
+extern int32 int_req, stop_inst;
 extern UNIT cpu_unit;
-extern int32 rf_devenb;
+
 int32 df_sta = 0;					/* status register */
 int32 df_da = 0;					/* disk address */
 int32 df_done = 0;					/* done flag */
@@ -87,10 +88,15 @@ int32 df_wlk = 0;					/* write lock */
 int32 df_time = 10;					/* inter-word time */
 int32 df_burst = 1;					/* burst mode flag */
 int32 df_stopioe = 1;					/* stop on error */
+
+DEVICE df_dev;
+int32 df60 (int32 IR, int32 AC);
+int32 df61 (int32 IR, int32 AC);
+int32 df62 (int32 IR, int32 AC);
 t_stat df_svc (UNIT *uptr);
 t_stat pcell_svc (UNIT *uptr);
 t_stat df_reset (DEVICE *dptr);
-t_stat df_boot (int32 unitno);
+t_stat df_boot (int32 unitno, DEVICE *dptr);
 
 /* DF32 data structures
 
@@ -99,6 +105,8 @@ t_stat df_boot (int32 unitno);
    pcell_unit	photocell timing unit (orphan)
    df_reg	RF register list
 */
+
+DIB df_dib = { DEV_DF, 3, { &df60, &df61, &df62 } };
 
 UNIT df_unit =
 	{ UDATA (&df_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
@@ -115,25 +123,27 @@ REG df_reg[] = {
 	{ DRDATA (TIME, df_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (BURST, df_burst, 0) },
 	{ FLDATA (STOP_IOE, df_stopioe, 0) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_DF), REG_HRO },
+	{ ORDATA (DEVNUM, df_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
 MTAB df_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, INT_DF, NULL, "ENABLED", &set_enb },
-	{ MTAB_XTD|MTAB_VDV, INT_DF, NULL, "DISABLED", &set_dsb },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
+		&set_dev, &show_dev, NULL },
 	{ 0 } };
 
 DEVICE df_dev = {
 	"DF", &df_unit, df_reg, df_mod,
 	1, 8, 17, 1, 8, 12,
 	NULL, NULL, &df_reset,
-	&df_boot, NULL, NULL };
+	&df_boot, NULL, NULL,
+	&df_dib, DEV_DISABLE };
 
 /* IOT routines */
 
-int32 df60 (int32 pulse, int32 AC)
+int32 df60 (int32 IR, int32 AC)
 {
 int32 t;
+int32 pulse = IR & 07;
 
 UPDATE_PCELL;						/* update photocell */
 if (pulse & 1) {					/* DCMA */
@@ -161,9 +171,10 @@ return AC;
 			  AC = AC | old_df_sta
 */
 
-int32 df61 (int32 pulse, int32 AC)
+int32 df61 (int32 IR, int32 AC)
 {
 int32 old_df_sta = df_sta;
+int32 pulse = IR & 07;
 
 UPDATE_PCELL;						/* update photocell */
 if (pulse & 1)						/* DCEA */
@@ -176,8 +187,10 @@ if (pulse & 4) {
 return AC;
 }
 
-int32 df62 (int32 pulse, int32 AC)
+int32 df62 (int32 IR, int32 AC)
 {
+int32 pulse = IR & 07;
+
 UPDATE_PCELL;						/* update photocell */
 if (pulse & 1) {					/* DFSE */
 	if ((df_sta & DFS_ERR) == 0) AC = AC | IOT_SKP;  }
@@ -200,7 +213,7 @@ int32 pa, t, mex;
 t_addr da;
 
 UPDATE_PCELL;						/* update photocell */
-if ((uptr -> flags & UNIT_BUF) == 0) {			/* not buf? abort */
+if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	df_done = 1;
 	int_req = int_req | INT_DF;			/* update int req */
 	return IORETURN (df_stopioe, SCPE_UNATT);  }
@@ -210,20 +223,20 @@ da = GET_DEX (df_sta) | df_da;				/* form disk addr */
 do {	M[DF_WC] = (M[DF_WC] + 1) & 07777;		/* incr word count */
  	M[DF_MA] = (M[DF_MA] + 1) & 07777;		/* incr mem addr */
 	pa = mex | M[DF_MA]; 				/* add extension */
-	if (uptr -> FUNC == DF_READ) {
+	if (uptr->FUNC == DF_READ) {
 		if (MEM_ADDR_OK (pa))			/* read, check nxm */
-			M[pa] = *(((int16 *) uptr -> filebuf) + da);  }
+			M[pa] = *(((int16 *) uptr->filebuf) + da);  }
 	else {	t = (da >> 14) & 07;
 		if ((df_wlk >> t) & 1) df_sta = df_sta | DFS_WLS;
-		else {	*(((int16 *) uptr -> filebuf) + da) = M[pa];
-			if (da >= uptr -> hwmark)
-				uptr -> hwmark = da + 1;  }  }
+		else {	*(((int16 *) uptr->filebuf) + da) = M[pa];
+			if (da >= uptr->hwmark)
+				uptr->hwmark = da + 1;  }  }
 	da = (da + 1) & 0377777;  }			/* incr disk addr */
 while ((M[DF_WC] != 0) && (df_burst != 0));		/* brk if wc, no brst */
 
 if (M[DF_WC] != 0)					/* more to do? */
 	sim_activate (&df_unit, df_time);		/* sched next */
-else {	if (uptr -> FUNC != DF_READ) da = (da - 1) & 0377777;
+else {	if (uptr->FUNC != DF_READ) da = (da - 1) & 0377777;
 	df_done = 1;					/* done */
 	int_req = int_req | INT_DF;  }			/* update int req */
 df_sta = (df_sta & ~DFS_DEX) | ((da >> (12 - DFS_V_DEX)) & DFS_DEX);
@@ -235,8 +248,6 @@ return SCPE_OK;
 
 t_stat df_reset (DEVICE *dptr)
 {
-if (dev_enb & INT_DF)					/* DF? no RF or RL */
-	dev_enb = dev_enb & ~(INT_RF | INT_RL);
 df_sta = df_da = 0;
 df_done = 1;
 int_req = int_req & ~INT_DF;				/* clear interrupt */
@@ -247,11 +258,11 @@ return SCPE_OK;
 /* Bootstrap routine */
 
 #define OS8_START	07750
-#define OS8_LEN		(sizeof (os8_rom) / sizeof (int32))
+#define OS8_LEN		(sizeof (os8_rom) / sizeof (int16))
 #define DM4_START	00200
-#define DM4_LEN		(sizeof (dm4_rom) / sizeof (int32))
+#define DM4_LEN		(sizeof (dm4_rom) / sizeof (int16))
 
-static const int32 os8_rom[] = {
+static const uint16 os8_rom[] = {
 	07600,			/* 7750, CLA CLL	; also word count */
 	06603,			/* 7751, DMAR		; also address */
 	06622,			/* 7752, DFSC		; done? */
@@ -259,7 +270,7 @@ static const int32 os8_rom[] = {
 	05752			/* 7754, JMP @.-2	; enter boot */
 };
 
-static const int32 dm4_rom[] = {
+static const uint16 dm4_rom[] = {
 	00200, 07600,		/* 0200, CLA CLL */
 	00201, 06603,		/* 0201, DMAR		; read */
 	00202, 06622,		/* 0202, DFSC		; done? */
@@ -269,7 +280,7 @@ static const int32 dm4_rom[] = {
 	07751, 07576		/* 7751, 7576		; address */
 };
 
-t_stat df_boot (int32 unitno)
+t_stat df_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 sim_switches, saved_PC;

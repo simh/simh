@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	15-Jun-2002
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -36,34 +36,44 @@ This memorandum documents the PDP-11 simulator.
 
 1. Simulator Files
 
-sim/		sim_defs.h
+sim/		dec_dz.h
+		dec_pt.h
+		sim_defs.h
+		sim_ether.h
+		sim_rev.h
 		sim_sock.h
 		sim_tmxr.h
-		dec_dz.h
-		dec_mscp.h
-		dec_uqssp.h
 		scp.c
 		scp_tty.c
-		sim_rev.c
+		sim_ether.c
 		sim_sock.c
 		sim_tmxr.c
 
 sim/pdp11/	pdp11_defs.h
+		pdp11_mscp.h
+		pdp11_uqssp.h
+		pdp11_xq.h
 		pdp11_cpu.c
 		pdp11_dz.c
 		pdp11_fp.c
+		pdp11_hk.c
 		pdp11_io.c
 		pdp11_lp.c
+		pdp11_pclk.c
+		pdp11_pt.c
 		pdp11_rk.c
 		pdp11_rl.c
 		pdp11_rp.c
 		pdp11_rq.c
+		pdp11_tq.c
 		pdp11_rx.c
+		pdp11_ry.c
 		pdp11_stddev.c
 		pdp11_sys.c
 		pdp11_tc.c
 		pdp11_tm.c
 		pdp11_ts.c
+		pdp11_xp.c
 
 2. PDP-11 Features
 
@@ -79,27 +89,27 @@ PTR,PTP		PC11 paper tape reader/punch
 TTI,TTO		DL11 console terminal
 LPT		LP11 line printer
 CLK		line frequency clock
+PCLK		KW11P programmable clock
 DZ		DZ11 8-line terminal multiplexor (up to 4)
 RK		RK11/RK05 cartridge disk controller with eight drives
+HK		RK611/RK06(7) cartridge disk controller with eight drives
 RL		RLV12/RL01(2) cartridge disk controller with four drives
 RP		RM02/03/05/80, RP04/05/06/07 Massbus style controller
 		with eight drives
 RQ		RQDX3 MSCP controller with four drives
+RQB		second RQDX3 MSCP controller with four drives
+RQC		third RQDX3 MSCP controller with four drives
+RQD		fourth RQDX3 MSCP controller with four drives
 RX		RX11/RX01 floppy disk controller with two drives
+RY		RX211/RX01 floppy disk controller with two drives
 TC		TC11/TU56 DECtape controller with eight drives
 TM		TM11/TU10 magnetic tape controller with eight drives
 TS		TS11/TSV05 magnetic tape controller with one drive
+TQ		TQK50 TMSCP magnetic tape controller with four drives
+XQ		DELQA/DEQNA Ethernet controller
 
-The DZ, RK, RL, RP, RQ, RX, TC, TM, and TS devices can be set DISABLED.
-With default I/O page addressing, the PDP-11 can support either a TM11
-or a TS11, but not both, since they use the same I/O addresses.  The
-simulator defaults to the TM11.  To change the magtape from TM11 to TS11,
-
-	SET TM DISABLED		disable TM11
-	SET TS ENABLED		enable TS11
-
-Most devices support the SET ADDRESS command, which allows the I/O page
-address of the device to be changed.
+The DZ, RK, HK, RL, RP, RQ, RQB, RQC, RQD, RX, RY, TC, TM, TS, TQ, and XQ
+devices can be set DISABLED.  RQB, RQC, RQD, RY, and TS are disabled by default.
 
 The PDP-11 simulator implements several unique stop conditions:
 
@@ -141,10 +151,39 @@ with RH70-style controllers, 22b Unibus with RH11 style controllers, and
 	SET CPU 2048K (or 2M)	set memory size = 2048KB
 	SET CPU 3072K (or 3M)	set memory size = 3072KB
 	SET CPU 4096K (or 4M)	set memory size = 4096KB
+	SHOW CPU IOSPACE	show I/O space address map
 
 If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
-portion of memory is lost.  Initial memory size is 256KB.
+portion of memory is lost.  Initial memory size is 256KB.  If memory size
+is being increased to more than 256KB, or the bus structue is being changed,
+the simulator asks whether it should disable peripherals that can't run
+in the current bus structure.
+
+DMA peripherals function differently, depending on whether the CPU is
+configured for 18B, URH11, URH70, or 22B addressing and I/O:
+
+	peripheral	18B	URH11	URH70	22B
+
+	RK		18b	18b	18b	won't work, disabled
+	HK		18b	18b	18b	SC02/C 22b, works
+						only with Ultrix-11
+	RL		18b	18b	18b	22b RLV12
+	RP		18b	18b	22b	22b third party
+	RQ		18b	18b	18b	22b RQDX3
+	RY		18b	18b	18b	won't work, disabled
+	TC		18b	18b	18b	won't work, disabled
+	TM		18b	18b	18b	won't work, disabled
+	TS		18b	18b	18b	22b TSV05
+	TQ		18b	18b	18b	22b TQK50
+	XQ		18b	won't work,	22b DELQA
+				disabled
+	XU		18b	18b	18b	won't work, disabled
+
+Non-DMA peripherals work the same in all configurations.  Unibus-only
+peripherals should be disabled in a Qbus (22B) configuration with more
+than 256KB of memory, and Qbus-only peripherals should be disabled in
+a Unibus (URH11 or URH70) configuration with more than 256KB of memory.
 
 These switches are recognized when examining or depositing in CPU memory:
 
@@ -204,9 +243,53 @@ control registers for the interrupt system.
 				most recent PC change first
 	WRU		8	interrupt character
 
-2.2 Programmed I/O Devices
+2.2 I/O Device Addressing
 
-2.2.1 PC11 Paper Tape Reader (PTR)
+PDP-11 I/O space is not large enough to allow all possible devices to be
+configured simultaneously at fixed addresses.  Instead, many devices have
+floating addresses; that is, the assigned device address depends on the
+presense of other devices in the configuration:
+
+	DZ11		all instances have floating addresses
+	RL11		first instance has fixed address, rest floating
+	RX11/RX211	first instance has fixed address, rest floating
+	DEUNA/DELUA	first instance has fixed address, rest floating
+	MSCP disk	first instance has fixed address, rest floating
+	TMSCP tape	first instance has fixed address, rest floating
+
+To maintain addressing consistency as the configuration changes, the
+simulator implements DEC's standard I/O address and vector autoconfiguration
+algorithms for devices DZ, RL, RX, RY, XU, RQ, and TQ.  This allows the
+user to enable or disable devices without needing to manage I/O addresses
+and vectors.  For example, if RY is enabled while RX is present, RY is
+assigned an I/O address in the floating I/O space range; but if RX is
+disabled and then RY is enabled, RY is assigned the fixed "first instance"
+I/O address for floppy disks.
+
+Autoconfiguration cannot solve address conflicts between devices with
+overlapping fixed address.  For example, with default I/O page addressing,
+the PDP-11 can support either a TM11 or a TS11, but not both, since they use
+the same I/O addresses.
+
+In addition to autoconfiguration, most devices support the SET ADDRESS
+command, which allows the I/O page address of the device to be changed,
+and the SET VECTOR command, which allows the vector of the device to be
+changed.  Explicitly setting the I/O address of a device which normally
+uses autoconfiguration DISABLES autoconfiguration for that device.  As
+a consequence, the user may have to manually configure all other
+autoconfigured devices, because the autoconfiguration algorithm no
+longer recognizes the explicitly configured device.  A device can be
+reset to autoconfigure with the SET <device> AUTOCONFIGURE command. 
+
+The current I/O map can be displayed with the SHOW CPU IOSPACE command.
+Address that have set by autoconfiguration are marked with an asterisk (*). 
+
+All devices support the SHOW ADDRESS and SHOW VECTOR commands, which display
+the device address and vector, respectively.
+
+2.3 Programmed I/O Devices
+
+2.3.1 PC11 Paper Tape Reader (PTR)
 
 The paper tape reader (PTR) reads data from a disk file.  The POS
 register specifies the number of the next data item to be read.  Thus,
@@ -239,7 +322,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.2 PC11 Paper Tape Punch (PTP)
+2.3.2 PC11 Paper Tape Punch (PTP)
 
 The paper tape punch (PTP) writes data to a disk file.  The POS
 register specifies the number of the next data item to be written. 
@@ -268,7 +351,12 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.3 DL11 Terminal Input (TTI)
+2.3.3 DL11 Terminal Input (TTI)
+
+The terminal interfaces (TTI, TTO) can be set to one of two modes:
+7B or 8B.  In 7B mode, input and output characters are masked  to 7
+bits.  In 8B mode, characters are not modified.  Changing the mode
+of either interface changes both.  The default mode is 8B.
 
 The terminal input (TTI) polls the console keyboard for input.  It
 implements these registers:
@@ -284,7 +372,7 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
-2.2.4 DL11 Terminal Output (TTO)
+2.3.4 DL11 Terminal Output (TTO)
 
 The terminal output (TTO) writes to the simulator console window.  It
 implements these registers:
@@ -300,7 +388,7 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	time from I/O initiation to interrupt
 
-2.2.5 LP11 Line Printer (LPT)
+2.3.5 LP11 Line Printer (LPT)
 
 The line printer (LPT) writes data to a disk file.  The POS register
 specifies the number of the next data item to be written.  Thus,
@@ -329,7 +417,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.6 Line-Time Clock (CLK)
+2.3.6 Line-Time Clock (CLK)
 
 The line-time clock (CLK) implements these registers:
 
@@ -339,13 +427,37 @@ The line-time clock (CLK) implements these registers:
 	INT		1	interrupt pending flag
 	DONE		1	device done flag (CSR<7>)
 	IE		1	interrupt enable flag (CSR<6>)
-	TIME		24	clock frequency
+	TIME		24	clock interval
 	TPS		8	ticks per second (60 or 50)
 
-The line-time clock autocalibrates; the clock interval is adjusted up or
-down so that the clock tracks actual elapsed time.
+The line-time clock autocalibrates; the clock interval is adjusted up
+or down so that the clock tracks actual elapsed time.
 
-2.2.7 DZ11 Terminal Multiplexor (DZ)
+2.3.7 Programmable Clock (PCLK)
+
+The programmable clock (PCLK) implements these registers:
+
+	name		size	comments
+
+	CSR		16	control/status register
+	CSB		16	count set buffer
+	CNT		16	current count
+	INT		1	interrupt pending flag
+	OVFL		1	overflow (error) flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	UPDN		1	up/down count mode (CSR<4>)
+	MODE		1	single/repeat mode (CSR<3>)
+	RUN		1	clock run (CSR<0>)
+	TIME[0..3]	32	clock interval, rates 0..3
+	TPS[0..3]	32	ticks per second, rates 0..3
+
+The programmable clock autocalibrates; the clock interval is adjusted
+up or down so that the clock tracks actual elapsed time. Operation at
+the highest clock rate (100Khz) is not recommended.  The programmable
+clock is disabled by default.
+
+2.3.8 DZ11 Terminal Multiplexor (DZ)
 
 The DZ11 is an 8-line terminal multiplexor.  Up to 4 DZ11's (32 lines)
 are supported.  The number of lines can be changed with the command
@@ -353,6 +465,13 @@ are supported.  The number of lines can be changed with the command
 	SET DZ LINES=n			set line count to n
 
 The line count must be a multiple of 8, with a maximum of 32.
+
+The DZ11 supports 8-bit input and output of characters.  8-bit output
+may be incompatible with certain operating systems.  The command
+
+	SET DZ 7B
+
+forces output characters (only) to be masked to 7 bits.
 
 The terminal lines perform input and output through Telnet sessions
 connected to a user-specified port.  The ATTACH command specifies
@@ -394,50 +513,11 @@ The DZ11 implements these registers:
 The DZ11 does not support save and restore.  All open connections are
 lost when the simulator shuts down or the DZ is detached.
 
-2.3 RK11/RK05 Cartridge Disk (RK)
+2.4 Floppy Disk Drives
 
-RK11 options include the ability to make units write enabled or write locked:
+2.4.1 RX11/RX01 Floppy Disk (RX)
 
-	SET RKn LOCKED		set unit n write locked
-	SET RKn WRITEENABLED	set unit n write enabled
-
-Units can also be set ONLINE or OFFLINE.  The RK11 supports the BOOT command.
-
-The RK11 implements these registers:
-
-	name		size	comments
-
-	RKCS		16	control/status
-	RKDA		16	disk address
-	RKBA		16	memory address
-	RKWC		16	word count
-	RKDS		16	drive status
-	RKER		16	error status
-	INTQ		9	interrupt queue
-	DRVN		3	number of last selected drive
-	INT		1	interrupt pending flag
-	ERR		1	error flag (CSR<15>)
-	DONE		1	device done flag (CSR<7>)
-	IE		1	interrupt enable flag (CSR<6>)
-	INT		1	interrupt pending flag
-	STIME		24	seek time, per cylinder
-	RTIME		24	rotational delay
-	STOP_IOE	1	stop on I/O error
-
-Error handling is as follows:
-
-	error	     STOP_IOE	processed as
-
-	not attached	1	report error and stop
-			0	disk not ready
-
-	end of file	x	assume rest of disk is zero
-
-	OS I/O error	x	report error and stop
-
-2.4 RX11/RX01 Floppy Disk (RX)
-
-RX11 options include the ability to make units write enabled or write locked:
+RX11 options include the ability to set units write enabled or write locked:
 
 	SET RXn LOCKED		set unit n write locked
 	SET RXn WRITEENABLED	set unit n write enabled
@@ -477,11 +557,161 @@ Error handling is as follows:
 RX01 data files are buffered in memory; therefore, end of file and OS
 I/O errors cannot occur.
 
-2.5 RL11(V12)/RL01,RL02 Cartridge Disk (RL)
+2.4.2 RX211/RX02 Floppy Disk (RY)
 
-RL11 options include the ability to set units write enabled or write locked,
-to set the drive size to RL01, RL02, or autosize, and to write a DEC standard
-044 compliant bad block table on the last track:
+RX211 options include the ability to set units write enabled or write
+locked, single or double density, or autosized:
+
+	SET RYn LOCKED		set unit n write locked
+	SET RYn WRITEENABLED	set unit n write enabled
+	SET RYn SINGLE		set unit n single density
+	SET RYn DOUBLE		set unit n double density (default)
+	SET RYn AUTOSIZE	set unit n autosized
+
+The RX211 supports the BOOT command.  The RX211 will not function
+properly in a Qbus (22B) system with more than 256KB of memory.
+
+The RX211 implements these registers:
+
+	name		size	comments
+
+	RYCS		16	status
+	RYBA		16	buffer address
+	RYWC		8	word count
+	RYDB		16	data buffer
+	RYES		12	error status
+	RYERR		8	error code
+	RYTA		8	current track
+	RYSA		8	current sector
+	STAPTR		4	controller state
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	TR		1	transfer ready flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	DONE		1	device done flag (CSR<5>)
+	CTIME		24	command completion time
+	STIME		24	seek time, per track
+	XTIME		24	transfer ready delay
+	STOP_IOE	1	stop on I/O error
+	SBUF[0:255]	8	sector buffer array
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RX02 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.5 Cartridge Disk Drives
+
+2.5.1 RK11/RK05 Cartridge Disk (RK)
+
+RK11 options include the ability to make units write enabled or write
+locked:
+
+	SET RKn LOCKED		set unit n write locked
+	SET RKn WRITEENABLED	set unit n write enabled
+
+Units can also be set ONLINE or OFFLINE.  The RK11 supports the BOOT
+command.  The RK11 will not function properly in a Qbus (22B) system
+with more than 256KB of memory.
+
+The RK11 implements these registers:
+
+	name		size	comments
+
+	RKCS		16	control/status
+	RKDA		16	disk address
+	RKBA		16	memory address
+	RKWC		16	word count
+	RKDS		16	drive status
+	RKER		16	error status
+	INTQ		9	interrupt queue
+	DRVN		3	number of last selected drive
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	INT		1	interrupt pending flag
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.5.2 RK611/RK06,RK07 Cartridge Disk (RL)
+
+RK611 options include the ability to set units write enabled or write
+locked, to set the drive size to RK06, RK07, or autosize, and to write
+a DEC standard 044 compliant bad block table on the last track:
+
+	SET HKn LOCKED		set unit n write locked
+	SET HKn WRITEENABLED	set unit n write enabled
+	SET HKn RK06		set size to RK06
+	SET HKn RK07		set size to RK07
+	SET HKn AUTOSIZE	set size based on file size at attach
+	SET HKn BADBLOCK	write bad block table on last track
+
+The size options can be used only when a unit is not attached to a file.
+The bad block option can be used only when a unit is attached to a file.
+Units can be set ONLINE or OFFLINE.  The RK611 supports the BOOT command.
+The RK611 will not function properly in a Qbus (22B) system with more
+than 256KB of memory using standard DEC software.  The simulator implements
+a third-party extension of addressing capability to 22b; this is only
+supported by Ultrix-11.
+
+The RK611 implements these registers:
+
+	name		size	comments
+
+	HKCS1		16	control/status 1
+	HKWC		16	word count
+	HKBA		16	bus address
+	HKDA		16	desired surface, sector
+	HKCS2		16	control/status 2
+	HKDS[0:7]	16	drive status, drives 0-7
+	HKER[0:7]	16	drive errors, drives 0-7
+	HKDB[0:2]	16	data buffer silo
+	HKDC		16	desired cylinder
+	HKOF		8	offset
+	HKMR		16	maintenance register
+	HKSPR		16	spare register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR1<7>)
+	IE		1	interrupt enable flag (CSR1<6>)
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.5.3 RL11(V12)/RL01,RL02 Cartridge Disk (RL)
+
+RL11 options include the ability to set units write enabled or write
+locked, to set the drive size to RL01, RL02, or autosize, and to write
+a DEC standard 044 compliant bad block table on the last track:
 
 	SET RLn LOCKED		set unit n write locked
 	SET RLn WRITEENABLED	set unit n write enabled
@@ -490,9 +720,12 @@ to set the drive size to RL01, RL02, or autosize, and to write a DEC standard
 	SET RLn AUTOSIZE	set size based on file size at attach
 	SET RLn BADBLOCK	write bad block table on last track
 
-The size options can be used only when a unit is not attached to a file.  The
-bad block option can be used only when a unit is attached to a file.  Units
-can also be set ONLINE or OFFLINE.  The RL11 supports the BOOT command.
+The size options can be used only when a unit is not attached to a file.
+The bad block option can be used only when a unit is attached to a file.
+Units can be set ONLINE or OFFLINE.  The RL11 supports the BOOT command.
+In an 18B or Unibus system, the RL behaves like an RL11 with 18b
+addressing; in a Qbus (22B) system, the RL behaves like the RLV12 with
+22b addressing.
 
 The RL11 implements these registers:
 
@@ -524,15 +757,16 @@ Error handling is as follows:
 
 2.6 RM02/03/05/80, RP04/05/06/07 Disk Pack Drives (RP)
 
-The RP controller implements a "Massbus style" 22b direct interface for
-large disk drives.  It is more abstract than other device simulators, with
-just enough detail to run operating system drivers.  In addition, the RP
-controller conflates the details of the RM series controllers with the RP
-series controllers, although there were detailed differences.
+The RP controller implements a "Massbus style" 22b direct interface
+for large disk drives.  It is more abstract than other device simulators,
+with just enough detail to run operating system drivers.  In addition,
+the RP controller conflates the details of the RM series controllers
+with the RP series controllers, although there were detailed differences.
 
-RP options include the ability to set units write enabled or write locked,
-to set the drive type to one of six disk types, or autosize, and to write
-a DEC standard 044 compliant bad block table on the last track:
+RP options include the ability to set units write enabled or write
+locked, to set the drive type to one of six disk types, or autosize,
+and to write a DEC standard 044 compliant bad block table on the last
+track:
 
 	SET RPn LOCKED		set unit n write locked
 	SET RPn WRITEENABLED	set unit n write enabled
@@ -547,8 +781,10 @@ a DEC standard 044 compliant bad block table on the last track:
 
 The type options can be used only when a unit is not attached to a file.
 The bad block option can be used only when a unit is attached to a file.
-Units can also be set ONLINE or OFFLINE.  The RP controller supports the
-BOOT command.
+Units can be set ONLINE or OFFLINE.  The RP controller supports the
+BOOT command.  In a Unibus system, the RP can implement either 18b
+(RH11) addressing or 22b (RH70) addressing.  In a Qbus (22B) system,
+the RP always implements 22b addressing.
 
 The RP controller implements these registers:
 
@@ -562,7 +798,7 @@ The RP controller implements these registers:
 	RPDS[0:7]	16	drive status, drives 0-7
 	RPER1[0:7]	16	drive errors, drives 0-7
 	RPOF		16	offset
-	RPDC		8	desired cylinder
+	RPDC		16	desired cylinder
 	RPER2		16	error status 2
 	RPER3		16	error status 3
 	RPEC1		16	ECC syndrome 1
@@ -591,11 +827,13 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.7 RQDX3 MSCP Disk Controller (RQ)
+2.7 RQDX3 MSCP Disk Controllers (RQ, RQB, RQC, RQD)
 
-The RQ controller simulates the RQDX3 MSCP disk controller.  RQ options
-include the ability to set units write enabled or write locked, and to
-set the drive type to one of eleven disk types:
+The simulator implements four MSCP disk controllers, RQ, RQB, RQC, RQD.
+Initially, RQB, RQC, and RQD are disabled.  Each RQ controller simulates
+an RQDX3 MSCP disk controller.  RQ options include the ability to set
+units write enabled or write locked, and to set the drive type to one
+of eleven disk types:
 
 	SET RQn LOCKED		set unit n write locked
 	SET RQn WRITEENABLED	set unit n write enabled
@@ -613,10 +851,11 @@ set the drive type to one of eleven disk types:
 	SET RQn RRD40		set type to RRD40 (CD ROM)
 
 The type options can be used only when a unit is not attached to a file.
-Units can also be set ONLINE or OFFLINE.  The RQ controller supports the
-BOOT command.
+Units can also be set ONLINE or OFFLINE.  Each RQ controller supports the
+BOOT command.  In a Unibus system, an RQ supports 18b addressing.  In
+a Qbus (22B) system, an RQ supports 22b addressing.
 
-The RQ controller implements the following special SHOW commands:
+Each RQ controller implements the following special SHOW commands:
 
 	SHOW RQ RINGS		show command and response rings
 	SHOW RQ FREEQ		show packet free queue
@@ -625,7 +864,7 @@ The RQ controller implements the following special SHOW commands:
 	SHOW RQ ALL		show all ring and queue state
 	SHOW RQn UNITQ		show unit queues for unit n
 
-The RQ controller implements these registers:
+Each RQ controller implements these registers:
 
 	name		size	comments
 
@@ -680,14 +919,17 @@ locked.
 	SET DTn LOCKED		set unit n write locked
 	SET DTn WRITEENABLED	set unit n write enabled
 
-Units can also be set ONLINE or OFFLINE.  The TC11 supports the BOOT command.
+Units can be set ONLINE or OFFLINE.  The TC11 supports the BOOT command.
+The TC11 will not function properly in a 22B (Qbus) system with more
+than 256KB of memory.
 
-The TC11 supports both PDP-8 format and PDP-9/11/15 format DECtape images.
-ATTACH tries to determine the tape format from the DECtape image; the user
-can force a particular format with switches:
+The TC11 supports supports PDP-8 format, PDP-11 format, and 18b format
+DECtape images.  ATTACH tries to determine the tape format from the DECtape
+image; the user can force a particular format with switches:
 
-	-f			foreign (PDP-8) format
-	-n			native (PDP-9/11/15) format
+	-r			PDP-8 format
+	-s			PDP-11 format
+	-t			18b format
 
 The DECtape controller is a data-only simulator; the timing and mark
 track, and block header and trailer, are not stored.  Thus, the WRITE
@@ -695,7 +937,7 @@ TIMING AND MARK TRACK function is not supported; the READ ALL function
 always returns the hardware standard block header and trailer; and the
 WRITE ALL function dumps non-data words into the bit bucket.
 
-The DECtape controller implements these registers:
+The TC controller implements these registers:
 
 	name		size	comments
 
@@ -723,24 +965,30 @@ operate correctly.
 	- LTIME must be at least 6
 	- ACTIME must be less than DCTIME, and both need to be at
 	  least 100 times LTIME
-	
-2.9 TM11 Magnetic Tape (TM)
 
-TM options include the ability to make units write enabled or write locked.
+2.9 Magnetic Tape Controllers
+	
+2.9.1 TM11 Magnetic Tape (TM)
+
+TM options include the ability to make units write enabled or write
+locked.
 
 	SET TMn LOCKED		set unit n write locked
 	SET TMn WRITEENABLED	set unit n write enabled
 
-Units can also be set ONLINE or OFFLINE.
+Units can be set ONLINE or OFFLINE.
 
 The TM11 supports the BOOT command.  The bootstrap supports both original
 and DEC standard boot formats.  Originally, a tape bootstrap read and
 executed the first record on tape.  To allow for ANSI labels, the DEC
-standard bootstrap skipped the first record and read and executed the second.
-The DEC standard is the default; to bootstrap an original format tape, use
-the -o switch.
+standard bootstrap skipped the first record and read and executed the
+second.  The DEC standard is the default; to bootstrap an original format
+tape, use the -o switch.
 
-The magnetic tape controller implements these registers:
+The TM11 will not function properly in a Qbus (22B) system with more
+than 256KB of memory
+
+The TM controller implements these registers:
 
 	name		size	comments
 
@@ -761,14 +1009,13 @@ Error handling is as follows:
 
 	error			processed as
 
-	not attached		tape not ready
+	not attached		tape not ready; if STOP_IOE, stop
 
-	end of file		(read or space) end of physical tape
-				(write) ignored
+	end of file		bad tape
 
-	OS I/O error		report error and stop
+	OS I/O error		parity error; if STOP_IOE, stop
 
-2.10 TS11/TSV05 Magnetic Tape (TS)
+2.9.2 TS11/TSV05 Magnetic Tape (TS)
 
 The TS actually implements the TSV05, with 22-bit addressing, but will
 work with TS11 drivers.  TS options include the ability to make the unit
@@ -778,10 +1025,13 @@ write enabled or write locked.
 	SET TS WRITEENABLED	set unit write enabled
 
 The TS11 supports the BOOT command.  The bootstrap supports only DEC
-standard boot formats.  To allow for ANSI labels, the DEC standard bootstrap
-skipped the first record and read and executed the second.
+standard boot formats.  To allow for ANSI labels, the DEC standard
+bootstrap skipped the first record and read and executed the second.
+In a Unibus system, the TS behaves like the TS11 and implements 18b
+addresses.  In a Qbus (22B) system, the TS behaves like the TSV05
+and implements 22b addresses.
 
-The magnetic tape controller implements these registers:
+The TS controller implements these registers:
 
 	name		size	comments
 
@@ -817,10 +1067,147 @@ Error handling is as follows:
 
 	not attached		tape not ready
 
-	end of file		(read or space) end of physical tape
-				(write) ignored
+	end of file		bad tape
 
 	OS I/O error		fatal tape error
+
+2.9.3 TQK50 TMSCP Disk Controller (TQ)
+
+The TQ controller simulates the TQK50 TMSCP disk controller.  TQ options
+include the ability to set units write enabled or write locked:
+
+	SET TQn LOCKED		set unit n write locked
+	SET TQn WRITEENABLED	set unit n write enabled
+
+The TQ controller supports the BOOT command.   In a Unibus system, the
+TQ supports 18b addressing.  In a Qbus (22B) system, the TQ supports
+22b addressing.
+
+The TQ controller implements the following special SHOW commands:
+
+	SHOW TQ RINGS		show command and response rings
+	SHOW TQ FREEQ		show packet free queue
+	SHOW TQ RESPQ		show packet response queue
+	SHOW TQ UNITQ		show unit queues
+	SHOW TQ ALL		show all ring and queue state
+	SHOW TQn UNITQ		show unit queues for unit n
+
+The TQ controller implements these registers:
+
+	name		size	comments
+
+	SA		16	status/address register
+	S1DAT		16	step 1 init host data
+	CQBA		22	command queue base address
+	CQLNT		8	command queue length
+	CQIDX		8	command queue index
+	RQBA		22	request queue base address
+	RQLNT		8	request queue length
+	RQIDX		8	request queue index
+	FREE		5	head of free packet list
+	RESP		5	head of response packet list
+	PBSY		5	number of busy packets
+	CFLGS		16	controller flags
+	CSTA		4	controller state
+	PERR		9	port error number
+	CRED		5	host credits
+	HAT		17	host available timer
+	HTMO		17	host timeout value
+	CPKT[0:3]	5	current packet, units 0-3
+	PKTQ[0:3]	5	packet queue, units 0-3
+	UFLG[0:3]	16	unit flags, units 0-3
+	POS[0:3]	32	tape position, units 0-3
+	OBJP[0:3]	32	object position, units 0-3
+	INT		1	interrupt request
+	ITIME		1	response time for initialization steps
+				(except for step 4)
+	QTIME		24	response time for 'immediate' packets
+	XTIME		24	response time for data transfers
+	PKTS[33*32]	16	packet buffers, 33W each,
+				32 entries
+
+Some DEC operating systems, notably RSX11M/M+, are very sensitive to
+the timing parameters.  Changing the default values may cause M/M+ to
+crash on boot or to hang during operation.
+
+Error handling is as follows:
+
+	error	     		processed as
+
+	not attached		tape not ready
+
+	end of file		end of medium
+
+	OS I/O error		fatal tape error
+
+2.10 DELQA/DEQNA Ethernet Controller (XQ)
+
+XQ simulates the DELQA/DEQNA 10Mbps Ethernet controller.  Options allow
+control of the MAC address, the controller mode, and the sanity timer.
+
+	SET  XQ MAC=<mac-address>	ex. 08-00-2B-AA-BB-CC
+        SHOW XQ MAC
+
+These commands are used to change or display the MAC address.  <mac-address>
+is a valid ethernet MAC, delimited by dashes or periods.  The controller
+defaults to 08-00-2B-AA-BB-CC, which should be sufficient if there is
+only one SIMH controller on your LAN.  Two cards with the same MAC address
+will see each other's packets, resulting in a serious mess.
+
+	SET  XQ TYPE={DEQNA|[DELQA]}
+        SHOW XQ TYPE
+
+These commands are used to change or display the controller mode. DELQA
+mode is better and faster but may not be usable by older or non-DEC OS's.
+Also, be aware that DEQNA mode is not supported by many modern OS's. The
+DEQNA-LOCK mode of the DELQA card is emulated by setting the the controller
+to DEQNA - there is no need for a separate mode.  DEQNA-LOCK mode behaves
+exactly like a DEQNA, except for the operation of the VAR and MOP processing.
+
+	SET  XQ SANITY={ON|[OFF]}
+	SHOW XQ SANITY
+
+These commands change or display the INITIALIZATION sanity timer (DEQNA
+jumper W3/DELQA switch S4).  The INITIALIZATION sanity timer has a default
+timeout of 4 minutes, and cannot be turned off, just reset.  The normal
+sanity timer can be set by operating system software regardless of the
+state of this switch.  Note that only the DEQNA (or the DELQA in DEQNA-
+LOCK mode (=DEQNA)) supports the sanity timer - it is ignored by a DELQA
+in Normal mode, which uses switch S4 for a different purpose.
+
+To access the network, the simulated Ethernet controller must be attached
+to a real Ethernet interface:
+
+	ATTACH XQ0 {ethX|<device_name>}		ex. eth0 or /dev/era0
+        SHOW XQ ETH
+
+where X in 'ethX' is the number of the ethernet controller to attach, or
+the real device name.  The X number is system dependant.  If you only have
+one ethernet controller, the number will probably be 0. To find out what
+your system thinks the ethernet numbers are, use the SHOW XQ ETH command.
+The device list can be quite cryptic, depending on the host system, but
+is probably better than guessing. If you do not attach the device, the
+controller will behave as though the ethernet cable were unplugged.
+
+XQ has the following registers:
+
+	name	size	comments
+
+	SA0	16	station address word 0
+	SA1	16	station address word 1
+	SA2	16	station address word 2
+	SA3	16	station address word 3
+	SA4	16	station address word 4
+	SA5	16	station address word 5
+	CSR	16	control status register
+	VAR	16	vector address register
+	RBDL	32	receive buffer descriptor list
+	XBDL	32	trans(X)mit buffer descriptorlList
+
+One final note: because of it's asynchronous nature, the XQ controller is
+not limited to the ~1.5Mbit/sec of the real DEQNA/DELQA controllers,
+nor the 10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet
+(100 Mbit/sec) card, and "Feel the Power!" :-)
 
 2.11 Symbolic Display and Input
 

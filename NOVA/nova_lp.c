@@ -31,7 +31,10 @@
 #include "nova_defs.h"
 
 extern int32 int_req, dev_busy, dev_done, dev_disable;
+
 int32 lpt_stopioe = 0;					/* stop on error */
+
+int32 lpt (int32 pulse, int32 code, int32 AC);
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 
@@ -41,6 +44,8 @@ t_stat lpt_reset (DEVICE *dptr);
    lpt_unit	LPT unit descriptor
    lpt_reg	LPT register list
 */
+
+DIB lpt_dib = { DEV_LPT, INT_LPT, PI_LPT, &lpt };
 
 UNIT lpt_unit = {
 	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
@@ -60,7 +65,8 @@ DEVICE lpt_dev = {
 	"LPT", &lpt_unit, lpt_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &lpt_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&lpt_dib, DEV_DISABLE };
 
 /* IOT routine */
 

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	GRI-909 Simulator Usage
-Date:	15-Jul-02
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -37,9 +37,13 @@ This memorandum documents the GRI-909 simulator.
 1. Simulator Files
 
 sim/		sim_defs.h
+		sim_rev.h
+		sim_sock.h
+		sim_tmxr.h
 		scp.c
 		scp_tty.c
-		sim_rev.c
+		sim_sock.c
+		sim_tmxr.c
 
 sim/gri/	gri_defs.h
 		gri_cpu.c
@@ -66,7 +70,13 @@ The GRI-909 simulator implements the following unique stop conditions:
 	  STOP_OPR is set
 	- an invalid interrupt request is made
 
-The LOAD and DUMP commands are not implemented.
+The LOAD commands has an optional argument to specify the load address:
+
+	LOAD <filename> {<starting address>}
+
+The LOAD command loads a paper-tape bootstrap format file at the specified
+address.  If no address is specified, loading starts at location 200.  The
+DUMP command is not supported.
 
 2.1 CPU
 
@@ -129,9 +139,6 @@ The paper tape reader (HSR) reads data from or a disk file.  The POS
 register specifies the number of the next data item to be read.  Thus,
 by changing POS, the user can backspace or advance the reader.
 
-The paper tape reader supports the BOOT command.  BOOT HSR copies the
-boot loader into memory and starts it running.
-
 The paper tape reader implements these registers:
 
 	name		size	comments
@@ -183,6 +190,13 @@ Error handling is as follows:
 
 2.2.3 S42-001 Teletype Input (TTI)
 
+The Teletype interfaces (TTI, TTO) can be set to one of three modes:
+KSR, 7B, or 8B.  In KSR mode, lower case input and output characters
+are automatically converted to upper case, and the high order bit is
+forced to one on input.  In 7B mode, input and output characters are
+masked to 7 bits.  In 8B mode, characters are not modified.  Changing
+the mode of either interface changes both.  The default mode is KSR.
+
 The Teletype input (TTI) polls the console keyboard for input.  It
 implements these registers:
 
@@ -196,8 +210,8 @@ implements these registers:
 
 2.2.4 S42-002 Teletype Output (TTO)
 
-The Teletype output (TTO) writes to the simulator console window.
-It implements these registers:
+The Teletype output (TTO) writes to the simulator console window.  It
+implements these registers:
 
 	name		size	comments
 

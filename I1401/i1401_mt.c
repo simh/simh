@@ -25,7 +25,11 @@
 
    mt		7-track magtape
 
-   12-Jun-02	RMS	End-of-record on read sets GM without WM
+   31-Oct-02	RMS	Added error record handling
+   10-Oct-02	RMS	Fixed end-of-record on load read writes WM plus GM
+   30-Sep-02	RMS	Revamped error handling
+   28-Aug-02	RMS	Added end of medium support
+   12-Jun-02	RMS	End-of-record on move read preserves old WM under GM
 			(found by Van Snyder)
    03-Jun-02	RMS	Modified for 1311 support
    30-May-02	RMS	Widened POS to 32b
@@ -58,8 +62,9 @@
 
 #define MT_NUMDR	7				/* #drives */
 #define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
+#define UNIT_V_PNU	(UNIT_V_UF + 1)			/* pos not upd */
 #define UNIT_WLK	(1 << UNIT_V_WLK)
-#define UNIT_W_UF	2				/* #save flags */
+#define UNIT_PNU	(1 << UNIT_V_PNU)
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
 #define MT_MAXFR	(MAXMEMSIZE * 2)		/* max transfer */
 
@@ -69,7 +74,8 @@ extern int32 BS, iochk;
 extern UNIT cpu_unit;
 uint8 dbuf[MT_MAXFR];					/* tape buffer */
 t_stat mt_reset (DEVICE *dptr);
-t_stat mt_boot (int32 unitno);
+t_stat mt_boot (int32 unitno, DEVICE *dptr);
+t_stat mt_attach (UNIT *uptr, char *cptr);
 UNIT *get_unit (int32 unit);
 
 /* MT data structures
@@ -104,18 +110,6 @@ REG mt_reg[] = {
 	{ DRDATA (POS4, mt_unit[4].pos, 32), PV_LEFT + REG_RO },
 	{ DRDATA (POS5, mt_unit[5].pos, 32), PV_LEFT + REG_RO },
 	{ DRDATA (POS6, mt_unit[6].pos, 32), PV_LEFT + REG_RO },
-	{ GRDATA (FLG1, mt_unit[1].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
-		  REG_HRO },
-	{ GRDATA (FLG2, mt_unit[2].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
-		  REG_HRO },
-	{ GRDATA (FLG3, mt_unit[3].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
-		  REG_HRO },
-	{ GRDATA (FLG4, mt_unit[4].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
-		  REG_HRO },
-	{ GRDATA (FLG5, mt_unit[5].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
-		  REG_HRO },
-	{ GRDATA (FLG6, mt_unit[6].flags, 8, UNIT_W_UF, UNIT_V_UF - 1),
-		  REG_HRO },
 	{ NULL }  };
 
 MTAB mt_mod[] = {
@@ -127,7 +121,7 @@ DEVICE mt_dev = {
 	"MT", mt_unit, mt_reg, mt_mod,
 	MT_NUMDR, 10, 31, 1, 8, 8,
 	NULL, NULL, &mt_reset,
-	&mt_boot, NULL, NULL };
+	&mt_boot, &mt_attach, NULL };
 
 /* Function routine
 
@@ -140,50 +134,59 @@ DEVICE mt_dev = {
 
 t_stat mt_func (int32 unit, int32 mod)
 {
-int32 err;
+int32 err, pnu;
 t_mtrlnt tbc;
 UNIT *uptr;
-static t_mtrlnt bceof = { 0 };
+static t_mtrlnt bceof = { MTR_TMK };
 
 if ((uptr = get_unit (unit)) == NULL) return STOP_INVMTU; /* valid unit? */
-if ((uptr -> flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* attached? */
+pnu = MT_TST_PNU (uptr);				/* get pos not upd */
+MT_CLR_PNU (uptr);					/* and clear */
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* attached? */
 switch (mod) {						/* case on modifier */
 case BCD_B:						/* backspace */
 	ind[IN_END] = 0;				/* clear end of reel */
-	if (uptr -> pos == 0) return SCPE_OK;		/* at bot? */
-	fseek (uptr -> fileref, uptr -> pos - sizeof (t_mtrlnt),
+	if (pnu || (uptr->pos < sizeof (t_mtrlnt)))	/* bot or pnu? */
+		return SCPE_OK;
+	fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt),
 		SEEK_SET);
-	fxread (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	if ((err = ferror (uptr -> fileref)) ||
-	    (feof (uptr -> fileref))) break;
-	if (tbc == 0)				/* file mark? */
-		uptr -> pos = uptr -> pos - sizeof (t_mtrlnt);
-	else uptr -> pos = uptr -> pos - ((MTRL (tbc) + 1) & ~1) -
+	fxread (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
+	if ((err = ferror (uptr->fileref)) ||		/* err or eof? */
+	    feof (uptr->fileref)) break;
+	if ((tbc == MTR_TMK) || (tbc == MTR_EOM))	/* tmk or eom? */
+		uptr->pos = uptr->pos - sizeof (t_mtrlnt);
+	else uptr->pos = uptr->pos - ((MTRL (tbc) + 1) & ~1) -
 		(2 * sizeof (t_mtrlnt));
 	break;  					/* end case */
+
 case BCD_E:						/* erase = nop */
-	if (uptr -> flags & UNIT_WPRT) return STOP_MTL;
+	if (uptr->flags & UNIT_WPRT) return STOP_MTL;
 	return SCPE_OK;
+
 case BCD_M:						/* write tapemark */
-	if (uptr -> flags & UNIT_WPRT) return STOP_MTL;
-	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
-	fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	err = ferror (uptr -> fileref);
-	uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
+	if (uptr->flags & UNIT_WPRT) return STOP_MTL;
+	fseek (uptr->fileref, uptr->pos, SEEK_SET);
+	fxwrite (&bceof, sizeof (t_mtrlnt), 1, uptr->fileref);
+	if (err = ferror (uptr->fileref)) MT_SET_PNU (uptr); /* error */
+	else uptr->pos = uptr->pos + sizeof (t_mtrlnt);
 	break;
+
 case BCD_R:						/* rewind */
-	uptr -> pos = 0;				/* update position */
+	uptr->pos = 0;					/* update position */
 	return SCPE_OK;
+
 case BCD_U:						/* unload */
-	uptr -> pos = 0;				/* update position */
+	uptr->pos = 0;					/* update position */
 	return detach_unit (uptr);			/* detach */
+
 default:
 	return STOP_INVM;  }
+
 if (err != 0) {						/* I/O error */
 	perror ("MT I/O error");
-	clearerr (uptr -> fileref);
-	if (iochk) return SCPE_IOERR;
-	ind[IN_TAP] = 1;  }
+	clearerr (uptr->fileref);
+	ind[IN_TAP] = 1;				/* set indicator */
+	if (iochk) return SCPE_IOERR;  }
 return SCPE_OK;
 }
 
@@ -199,31 +202,36 @@ return SCPE_OK;
 
 t_stat mt_io (int32 unit, int32 flag, int32 mod)
 {
-int32 err, i, t, wm_seen;
-t_mtrlnt tbc;
+int32 err, t, wm_seen;
+t_mtrlnt i, tbc, ebc;
 UNIT *uptr;
 
 if ((uptr = get_unit (unit)) == NULL) return STOP_INVMTU; /* valid unit? */
-if ((uptr -> flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* attached? */
+uptr->flags = uptr->flags & ~UNIT_PNU;			/* clr pos not upd */
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* attached? */
+
 switch (mod) {
 case BCD_R:						/* read */
 	ind[IN_TAP] = ind[IN_END] = 0;			/* clear error */
 	wm_seen = 0;					/* no word mk seen */
-	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
-	fxread (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	if ((err = ferror (uptr -> fileref)) || (feof (uptr -> fileref))) {
-		ind[IN_END] = 1;			/* err or eof? */
+	fseek (uptr->fileref, uptr->pos, SEEK_SET);
+	fxread (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
+	if (err = ferror (uptr->fileref)) break;	/* error? */
+	if (feof (uptr->fileref) || (tbc == MTR_EOM)) {	/* eom or eof? */
+		ind[IN_TAP] = 1;			/* pretend error */
+		MT_SET_PNU (uptr);			/* pos not upd */
 		break;  }
-	if (tbc == 0) {					/* tape mark? */
+	if (tbc == MTR_TMK) {				/* tape mark? */
 		ind[IN_END] = 1;			/* set end mark */
-		uptr -> pos = uptr -> pos + sizeof (t_mtrlnt);
+		uptr->pos = uptr->pos + sizeof (t_mtrlnt);
 		break;  }
-	tbc = MTRL (tbc);				/* ignore error flag */
+	if (MTRF (tbc)) ind[IN_TAP] = 1;		/* error? set flag */
+	tbc = MTRL (tbc);				/* clear error flag */
 	if (tbc > MT_MAXFR) return SCPE_MTRLNT;		/* record too long? */	
-	i = fxread (dbuf, sizeof (int8), tbc, uptr -> fileref);
+	i = fxread (dbuf, sizeof (int8), tbc, uptr->fileref);
+	if (err = ferror (uptr->fileref)) break;	/* I/O error? */
 	for ( ; i < tbc; i++) dbuf[i] = 0;		/* fill with 0's */
-	if (err = ferror (uptr -> fileref)) break;	/* I/O error? */
-	uptr -> pos = uptr -> pos + ((tbc + 1) & ~1) +
+	uptr->pos = uptr->pos + ((tbc + 1) & ~1) +
 		(2 * sizeof (t_mtrlnt));
 	for (i = 0; i < tbc; i++) {			/* loop thru buf */
 		if (M[BS] == (BCD_GRPMRK + WM)) {	/* GWM in memory? */
@@ -243,12 +251,16 @@ case BCD_R:						/* read */
 		if (ADDR_ERR (BS)) {			/* check next BS */
 			BS = BA | (BS % MAXMEMSIZE);
 			return STOP_WRAP;  }  }
-	if (flag == MD_WM) M[BS] = BCD_GRPMRK;		/* load? clear WM */
+	if (flag == MD_WM) M[BS] = WM | BCD_GRPMRK;	/* load? set WM */
 	else M[BS] = (M[BS] & WM) | BCD_GRPMRK;		/* move? save WM */
+	BS++;						/* adv BS */
+	if (ADDR_ERR (BS)) {				/* check final BS */
+		BS = BA | (BS % MAXMEMSIZE);
+		return STOP_WRAP;  }
 	break;
-
+
 case BCD_W:
-	if (uptr -> flags & UNIT_WPRT) return STOP_MTL;	/* locked? */
+	if (uptr->flags & UNIT_WPRT) return STOP_MTL;	/* locked? */
 	if (M[BS] == (BCD_GRPMRK + WM)) return STOP_MTZ;	/* eor? */
 	ind[IN_TAP] = ind[IN_END] = 0;			/* clear error */
 	for (tbc = 0; (t = M[BS++]) != (BCD_GRPMRK + WM); ) {
@@ -259,13 +271,13 @@ case BCD_W:
 		if (ADDR_ERR (BS)) {			/* check next BS */
 			BS = BA | (BS % MAXMEMSIZE);
 			return STOP_WRAP;  }  }
-	fseek (uptr -> fileref, uptr -> pos, SEEK_SET);
-	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	fxwrite (dbuf, sizeof (int8), (tbc + 1) & ~1, uptr -> fileref);
-	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr -> fileref);
-	if (err = ferror (uptr -> fileref)) break;	/* I/O error? */
-	uptr -> pos = uptr -> pos + ((tbc + 1) & ~1) +
-		(2 * sizeof (t_mtrlnt));
+	ebc = (tbc + 1) & ~1;				/* force even */
+	fseek (uptr->fileref, uptr->pos, SEEK_SET);
+	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
+	fxwrite (dbuf, sizeof (int8), ebc, uptr->fileref);
+	fxwrite (&tbc, sizeof (t_mtrlnt), 1, uptr->fileref);
+	if (err = ferror (uptr->fileref)) break;	/* I/O error? */
+	uptr->pos = uptr->pos + ebc + (2 * sizeof (t_mtrlnt));
 	if (ADDR_ERR (BS)) {				/* check final BS */
 		BS = BA | (BS % MAXMEMSIZE);
 		return STOP_WRAP;  }
@@ -273,14 +285,15 @@ case BCD_W:
 default:
 	return STOP_INVM;  }
 
-if (err != 0) {						/* I/O error */
+if (err != 0) {						/* I/O error? */
 	perror ("MT I/O error");
-	clearerr (uptr -> fileref);
+	clearerr (uptr->fileref);
+	MT_SET_PNU (uptr);				/* pos not upd */
 	ind[IN_TAP] = 1;				/* flag error */
 	if (iochk) return SCPE_IOERR;  }
 return SCPE_OK;
 }
-
+
 /* Get unit pointer from unit number */
 
 UNIT *get_unit (int32 unit)
@@ -293,13 +306,26 @@ else return mt_dev.units + unit;
 
 t_stat mt_reset (DEVICE *dptr)
 {
+int32 i;
+UNIT *uptr;
+
+for (i = 0; i < MT_NUMDR; i++) {			/* clear pos flag */
+	if (uptr = get_unit (i)) MT_CLR_PNU (uptr);  }
 ind[IN_END] = ind[IN_TAP] = 0;				/* clear indicators */
 return SCPE_OK;
 }
 
+/* Attach routine */
+
+t_stat mt_attach (UNIT *uptr, char *cptr)
+{
+MT_CLR_PNU (uptr);
+return attach_unit (uptr, cptr);
+}
+
 /* Bootstrap routine */
 
-t_stat mt_boot (int32 unitno)
+t_stat mt_boot (int32 unitno, DEVICE *dptr)
 {
 extern int32 saved_IS;
 

@@ -366,34 +366,34 @@ void vax_fadd (UFP *a, UFP *b, t_int64 mask)
 int32 ediff;
 UFP t;
 
-if (a -> exp == 0) {					/* s1 = 0? */
+if (a->exp == 0) {					/* s1 = 0? */
 	*a = *b;
 	return;  }
-if (b -> exp == 0) return;				/* s2 = 0? */
-if (a -> exp < b -> exp) {				/* s1 < s2? swap */
+if (b->exp == 0) return;				/* s2 = 0? */
+if (a->exp < b->exp) {					/* s1 < s2? swap */
 	t = *a;
 	*a = *b;
 	*b = t;  }
-ediff = a -> exp - b -> exp;				/* exp diff */
-if (a -> sign ^ b -> sign) {				/* eff sub? */
+ediff = a->exp - b->exp;				/* exp diff */
+if (a->sign ^ b->sign) {				/* eff sub? */
 	if (ediff) {					/* exp diff? */
-		b -> frac = (ediff > 63)? ONES:		/* shift b */
-			((-((t_int64) b -> frac) >> ediff) |
+		b->frac = (ediff > 63)? ONES:		/* shift b */
+			((-((t_int64) b->frac) >> ediff) |
 			(ONES << (64 - ediff)));	/* preserve sign */
-		a -> frac = a -> frac + b -> frac;  }	/* add frac */
-	else {	if (a -> frac < b -> frac) {		/* same, check magn */
-			a -> frac = b -> frac - a -> frac;	/* b > a */
-			a -> sign = b -> sign;  }
-		else a -> frac = a -> frac - b -> frac;  }	/* a >= b */
-	a -> frac = a -> frac & ~mask;
+		a->frac = a->frac + b->frac;  }		/* add frac */
+	else {	if (a->frac < b->frac) {		/* same, check magn */
+			a->frac = b->frac - a->frac;	/* b > a */
+			a->sign = b->sign;  }
+		else a->frac = a->frac - b->frac;  }	/* a >= b */
+	a->frac = a->frac & ~mask;
 	norm (a);  }					/* normalize */
-else {	if (ediff >= 64) b -> frac = 0;
-	else b -> frac = b -> frac >> ediff;		/* add, denorm */
-	a -> frac = a -> frac + b -> frac;		/* add frac */
-	if (a -> frac < b -> frac) {			/* chk for carry */
-		a -> frac = UF_NM | (a -> frac >> 1);	/* shift in carry */
-		a -> exp = a -> exp + 1;  }		/* skip norm */
-	a -> frac = a -> frac & ~mask;  }
+else {	if (ediff >= 64) b->frac = 0;
+	else b->frac = b->frac >> ediff;		/* add, denorm */
+	a->frac = a->frac + b->frac;			/* add frac */
+	if (a->frac < b->frac) {			/* chk for carry */
+		a->frac = UF_NM | (a->frac >> 1);	/* shift in carry */
+		a->exp = a->exp + 1;  }			/* skip norm */
+	a->frac = a->frac & ~mask;  }
 return;
 }
 
@@ -419,7 +419,7 @@ UFP a, b;
 	
 unpackd (opnd[0], opnd[1], &a);
 unpackd (opnd[2], opnd[3], &b);
-vax_fmul (&a, &b, 56, FD_BIAS, 0);				/* do multiply */
+vax_fmul (&a, &b, 56, FD_BIAS, 0);			/* do multiply */
 return rpackfd (&a, rh);				/* round and pack */
 }
 
@@ -441,17 +441,17 @@ void vax_fmul (UFP *a, UFP *b, int32 prec, int32 bias, t_int64 mask)
 {
 t_uint64 ah, bh, al, bl, rhi, rlo, rmid1, rmid2;
 
-if ((a -> exp == 0) || (b -> exp == 0)) {		/* zero argument? */
-	a -> frac = a -> sign = a -> exp = 0;		/* result is zero */
+if ((a->exp == 0) || (b->exp == 0)) {			/* zero argument? */
+	a->frac = a->sign = a->exp = 0;			/* result is zero */
 	return;  }
-a -> sign = a -> sign ^ b -> sign;			/* sign of result */
-a -> exp = a -> exp + b -> exp - bias;			/* add exponents */
-ah = (a -> frac >> 32) & M32;				/* split operands */
-bh = (b -> frac >> 32) & M32;				/* into 32b chunks */
+a->sign = a->sign ^ b->sign;				/* sign of result */
+a->exp = a->exp + b->exp - bias;			/* add exponents */
+ah = (a->frac >> 32) & M32;				/* split operands */
+bh = (b->frac >> 32) & M32;				/* into 32b chunks */
 rhi = ah * bh;						/* high result */
 if (prec > 32) {					/* 64b needed? */
-	al = a -> frac & M32;
-	bl = b -> frac & M32;
+	al = a->frac & M32;
+	bl = b->frac & M32;
 	rmid1 = ah * bl;
 	rmid2 = al * bh;
 	rlo = al * bl;
@@ -460,7 +460,7 @@ if (prec > 32) {					/* 64b needed? */
 	if (rmid1 < rlo) rhi = rhi + 1;			/* carry? incr hi */
 	rmid2 = rmid1 + (rmid2 << 32);			/* add mid2 to to */
 	if (rmid2 < rmid1) rhi = rhi + 1;  }		/* carry? incr hi */
-a -> frac = rhi & ~mask;				/* mask out */
+a->frac = rhi & ~mask;					/* mask out */
 norm (a);						/* normalize */
 return;
 }
@@ -508,19 +508,19 @@ void vax_fdiv (UFP *a, UFP *b, int32 prec, int32 bias)
 int32 i;
 t_uint64 quo = 0;
 
-if (a -> exp == 0) FLT_DZRO_FAULT;			/* divr = 0? */
-if (b -> exp == 0) return;				/* divd = 0? */
-b -> sign = b -> sign ^ a -> sign;			/* result sign */
-b -> exp = b -> exp - a -> exp + bias + 1;		/* unbiased exp */
-a -> frac = a -> frac >> 1;				/* allow 1 bit left */
-b -> frac = b -> frac >> 1;
-for (i = 0; (i < prec) && b -> frac; i++) {		/* divide loop */
+if (a->exp == 0) FLT_DZRO_FAULT;			/* divr = 0? */
+if (b->exp == 0) return;				/* divd = 0? */
+b->sign = b->sign ^ a->sign;				/* result sign */
+b->exp = b->exp - a->exp + bias + 1;			/* unbiased exp */
+a->frac = a->frac >> 1;					/* allow 1 bit left */
+b->frac = b->frac >> 1;
+for (i = 0; (i < prec) && b->frac; i++) {		/* divide loop */
 	quo = quo << 1;					/* shift quo */
-	if (b -> frac >= a -> frac) {			/* div step ok? */
-		b -> frac = b -> frac - a -> frac;	/* subtract */
+	if (b->frac >= a->frac) {			/* div step ok? */
+		b->frac = b->frac - a->frac;		/* subtract */
 		quo = quo + 1;  }			/* quo bit = 1 */
-	b -> frac = b -> frac << 1;  }			/* shift divd */
-b -> frac = quo << (UF_V_NM - i + 1);			/* shift quo */
+	b->frac = b->frac << 1;  }			/* shift divd */
+b->frac = quo << (UF_V_NM - i + 1);			/* shift quo */
 norm (b);						/* normalize */
 return;
 }
@@ -572,13 +572,13 @@ return rpackg (&a, flo);				/* return frac */
 
 void vax_fmod (UFP *a, int32 bias, int32 *intgr, int32 *flg)
 {
-if (a -> exp <= bias) *intgr = 0;			/* 0 or <1? int = 0 */
-else if (a -> exp <= (bias + 64)) {			/* in range? */
-	*intgr = (int32) (a -> frac >> (64 - (a -> exp - bias)));
-	a -> frac = a -> frac << (a -> exp - bias);  }
+if (a->exp <= bias) *intgr = 0;				/* 0 or <1? int = 0 */
+else if (a->exp <= (bias + 64)) {			/* in range? */
+	*intgr = (int32) (a->frac >> (64 - (a->exp - bias)));
+	a->frac = a->frac << (a->exp - bias);  }
 else *intgr = 0;					/* out of range */
-if (a -> sign) *intgr = -*intgr;			/* -? comp int */
-if ((a -> exp >= (bias + 32)) || (((a -> sign) != 0) && (*intgr < 0)))
+if (a->sign) *intgr = -*intgr;				/* -? comp int */
+if ((a->exp >= (bias + 32)) || (((a->sign) != 0) && (*intgr < 0)))
 	*flg = CC_V;					/* test ovflo */
 else *flg = 0;
 norm (a);						/* normalize */
@@ -684,40 +684,40 @@ return;
 
 void unpackf (int32 hi, UFP *r)
 {
-r -> sign = hi & FPSIGN;				/* get sign */
-r -> exp = FD_GETEXP (hi);				/* get exponent */
-if (r -> exp == 0) {					/* exp = 0? */
-	if (r -> sign) RSVD_OPND_FAULT;			/* if -, rsvd op */
-	r -> frac = 0;					/* else 0 */
+r->sign = hi & FPSIGN;					/* get sign */
+r->exp = FD_GETEXP (hi);				/* get exponent */
+if (r->exp == 0) {					/* exp = 0? */
+	if (r->sign) RSVD_OPND_FAULT;			/* if -, rsvd op */
+	r->frac = 0;					/* else 0 */
 	return;  }
 hi = (((hi & FD_FRACW) | FD_HB) << 16) | ((hi >> 16) & 0xFFFF);
-r -> frac = ((t_uint64) hi) << (32 + UF_V_FDLO);
+r->frac = ((t_uint64) hi) << (32 + UF_V_FDLO);
 return;
 }
 
 void unpackd (int32 hi, int32 lo, UFP *r)
 {
-r -> sign = hi & FPSIGN;				/* get sign */
-r -> exp = FD_GETEXP (hi);				/* get exponent */
-if (r -> exp == 0) {					/* exp = 0? */
-	if (r -> sign) RSVD_OPND_FAULT;			/* if -, rsvd op */
-	r -> frac = 0;					/* else 0 */
+r->sign = hi & FPSIGN;					/* get sign */
+r->exp = FD_GETEXP (hi);				/* get exponent */
+if (r->exp == 0) {					/* exp = 0? */
+	if (r->sign) RSVD_OPND_FAULT;			/* if -, rsvd op */
+	r->frac = 0;					/* else 0 */
 	return;  }
 hi = (hi & FD_FRACL) | FD_HB;				/* canonical form */
-r -> frac = UNSCRAM (hi, lo) << UF_V_FDLO;		/* guard bits */
+r->frac = UNSCRAM (hi, lo) << UF_V_FDLO;		/* guard bits */
 return;
 }
 
 void unpackg (int32 hi, int32 lo, UFP *r)
 {
-r -> sign = hi & FPSIGN;				/* get sign */
-r -> exp = G_GETEXP (hi);				/* get exponent */
-if (r -> exp == 0) {					/* exp = 0? */
-	if (r -> sign) RSVD_OPND_FAULT;			/* if -, rsvd op */
-	r -> frac = 0;					/* else 0 */
+r->sign = hi & FPSIGN;					/* get sign */
+r->exp = G_GETEXP (hi);					/* get exponent */
+if (r->exp == 0) {					/* exp = 0? */
+	if (r->sign) RSVD_OPND_FAULT;			/* if -, rsvd op */
+	r->frac = 0;					/* else 0 */
 	return;  }
 hi = (hi & G_FRACL) | G_HB;				/* canonical form */
-r -> frac = UNSCRAM (hi, lo) << UF_V_GLO;		/* guard bits */
+r->frac = UNSCRAM (hi, lo) << UF_V_GLO;			/* guard bits */
 return;
 }
 
@@ -729,45 +729,45 @@ static t_uint64 normmask[5] = {
  0xffff000000000000, 0xffffffff00000000 };
 static int32 normtab[6] = { 1, 2, 4, 8, 16, 32};
 
-if (r -> frac == 0) {					/* if fraction = 0 */
-	r -> sign = r -> exp = 0;			/* result is 0 */
+if (r->frac == 0) {					/* if fraction = 0 */
+	r->sign = r->exp = 0;				/* result is 0 */
 	return;  }
-while ((r -> frac & UF_NM) == 0) {			/* normalized? */
+while ((r->frac & UF_NM) == 0) {			/* normalized? */
 	for (i = 0; i < 5; i++) {			/* find first 1 */
-		if (r -> frac & normmask[i]) break;  }
-	r -> frac = r -> frac << normtab[i];		/* shift frac */
-	r -> exp = r -> exp - normtab[i];  }		/* decr exp */
+		if (r->frac & normmask[i]) break;  }
+	r->frac = r->frac << normtab[i];		/* shift frac */
+	r->exp = r->exp - normtab[i];  }		/* decr exp */
 return;
 }
 
 int32 rpackfd (UFP *r, int32 *rh)
 {
 if (rh) *rh = 0;					/* assume 0 */
-if (r -> frac == 0) return 0;				/* result 0? */
-r -> frac = r -> frac + (rh? UF_DRND: UF_FRND);		/* round */
-if ((r -> frac & UF_NM) == 0) {				/* carry out? */
-	r -> frac = r -> frac >> 1;			/* renormalize */
-	r -> exp = r -> exp + 1;  }
-if (r -> exp > (int32) FD_M_EXP) FLT_OVFL_FAULT;	/* ovflo? fault */
-if (r -> exp <= 0) {					/* underflow? */
+if (r->frac == 0) return 0;				/* result 0? */
+r->frac = r->frac + (rh? UF_DRND: UF_FRND);		/* round */
+if ((r->frac & UF_NM) == 0) {				/* carry out? */
+	r->frac = r->frac >> 1;				/* renormalize */
+	r->exp = r->exp + 1;  }
+if (r->exp > (int32) FD_M_EXP) FLT_OVFL_FAULT;		/* ovflo? fault */
+if (r->exp <= 0) {					/* underflow? */
 	if (PSL & PSW_FU) FLT_UNFL_FAULT;		/* fault if fu */
 	return 0;  }					/* else 0 */
-if (rh) *rh = UF_GETFDLO (r -> frac);			/* get low */
-return r -> sign | (r -> exp << FD_V_EXP) | UF_GETFDHI (r -> frac);
+if (rh) *rh = UF_GETFDLO (r->frac);			/* get low */
+return r->sign | (r->exp << FD_V_EXP) | UF_GETFDHI (r->frac);
 }
 
 int32 rpackg (UFP *r, int32 *rh)
 {
 *rh = 0;						/* assume 0 */
-if (r -> frac == 0) return 0;				/* result 0? */
-r -> frac = r -> frac + UF_GRND;			/* round */
-if ((r -> frac & UF_NM) == 0) {				/* carry out? */
-	r -> frac = r -> frac >> 1;			/* renormalize */
-	r -> exp = r -> exp + 1;  }
-if (r -> exp > (int32) G_M_EXP) FLT_OVFL_FAULT;		/* ovflo? fault */
-if (r -> exp <= 0) {					/* underflow? */
+if (r->frac == 0) return 0;				/* result 0? */
+r->frac = r->frac + UF_GRND;				/* round */
+if ((r->frac & UF_NM) == 0) {				/* carry out? */
+	r->frac = r->frac >> 1;				/* renormalize */
+	r->exp = r->exp + 1;  }
+if (r->exp > (int32) G_M_EXP) FLT_OVFL_FAULT;		/* ovflo? fault */
+if (r->exp <= 0) {					/* underflow? */
 	if (PSL & PSW_FU) FLT_UNFL_FAULT;		/* fault if fu */
 	return 0;  }					/* else 0 */
-if (rh) *rh = UF_GETGLO (r -> frac);			/* get low */
-return r -> sign | (r -> exp << G_V_EXP) | UF_GETGHI (r -> frac);
+if (rh) *rh = UF_GETGLO (r->frac);			/* get low */
+return r->sign | (r->exp << G_V_EXP) | UF_GETGHI (r->frac);
 }

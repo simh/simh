@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Sep-02	RMS	Removed VT support, added Telnet console support
+			Added CGI support (from Brian Knittel)
+			Added MacOS sleep (from Peter Schorn)
    14-Jul-02	RMS	Added Windows priority control from Mark Pizzolato
    20-May-02	RMS	Added Windows VT support from Fischer Franz
    01-Feb-02	RMS	Added VAX fix from Robert Alan Byer
@@ -44,12 +47,13 @@
    ttrunstate	-	called to put terminal into run state
    ttcmdstate	-	called to return terminal to command state
    ttclose	-	called once before the simulator exits
-   sim_poll_kbd	-	poll for keyboard input
-   sim_putchar	-	output character to terminal
+   sim_os_poll_kbd -	poll for keyboard input
+   sim_os_putchar -	output character to terminal
 
    This module implements the following routines to support clock calibration:
 
    sim_os_msec	-	return elapsed time in msec
+   sim_os_sleep	-	sleep specified number of seconds
 
    Versions are included for VMS, Windows, OS/2, Macintosh, BSD UNIX, and POSIX UNIX.
    The POSIX UNIX version works with LINUX.
@@ -75,6 +79,7 @@ extern FILE *sim_log;
 #include <iodef.h>
 #include <ssdef.h>
 #include <starlet.h>
+#include <unistd.h>
 #define EFN 0
 unsigned int32 tty_chan = 0;
 typedef struct {
@@ -89,7 +94,6 @@ typedef struct {
 	unsigned int32 dev_status; } IOSB;
 SENSE_BUF cmd_mode = { 0 };
 SENSE_BUF run_mode = { 0 };
-int32 sim_vt = -1;
 
 t_stat ttinit (void)
 {
@@ -135,7 +139,7 @@ t_stat ttclose (void)
 return ttcmdstate ();
 }
 
-t_stat sim_poll_kbd (void)
+t_stat sim_os_poll_kbd (void)
 {
 unsigned int status, term[2];
 unsigned char buf[4];
@@ -156,7 +160,7 @@ if (buf[0] == sim_int_char) return SCPE_STOP;
 return (buf[0] | SCPE_KFLAG);
 }
 
-t_stat sim_putchar (int32 out)
+t_stat sim_os_putchar (int32 out)
 {
 unsigned int status;
 char c;
@@ -196,6 +200,11 @@ for (i = 0; i < 64; i++) {				/* 64b quo */
 return quo;
 }
 
+int sim_os_sleep (unsigned int sec)
+{
+return sleep (sec);
+}
+
 #endif
 
 /* Win32 routines */
@@ -205,9 +214,7 @@ return quo;
 #include <conio.h>
 #include <windows.h>
 #include <signal.h>
-#include "sim_vt.h"
 static volatile int sim_win_ctlc = 0;
-int32 sim_vt = 0;
 
 void win_handler (int sig)
 {
@@ -217,22 +224,18 @@ return;
 
 t_stat ttinit (void)
 {
-vt_init ();
 return SCPE_OK;
 }
 
 t_stat ttrunstate (void)
 {
-sim_win_ctlc = 0;
-if (sim_vt > 0) vt_run ();
-if ((int) signal (SIGINT, win_handler) == -1) return SCPE_SIGERR;
+if (signal (SIGINT, win_handler) == SIG_ERR) return SCPE_SIGERR;
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 return SCPE_OK;
 }
 
 t_stat ttcmdstate (void)
 {
-if (sim_vt > 0) vt_cmd ();
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 return SCPE_OK;
 }
@@ -242,7 +245,7 @@ t_stat ttclose (void)
 return SCPE_OK;
 }
 
-t_stat sim_poll_kbd (void)
+t_stat sim_os_poll_kbd (void)
 {
 int c;
 
@@ -250,21 +253,18 @@ if (sim_win_ctlc) {
 	sim_win_ctlc = 0;
 	signal (SIGINT, win_handler);
 	return 003 | SCPE_KFLAG;  }
-if (sim_vt > 0) {
-	c = vt_read ();
-	if (c == -1) return SCPE_OK;  }
-else {	if (!kbhit ()) return SCPE_OK;
-	c = _getch ();  }
+if (!kbhit ()) return SCPE_OK;
+c = _getch ();
 if ((c & 0177) == '\b') c = 0177;
 if ((c & 0177) == sim_int_char) return SCPE_STOP;
 return c | SCPE_KFLAG;
 }
 
-t_stat sim_putchar (int32 c)
+t_stat sim_os_putchar (int32 c)
 {
-if (sim_vt > 0) vt_write ((char) c);
-else if (c != 0177) _putch (c);
-if (sim_log) fputc (c, sim_log);
+if (c != 0177) {
+	_putch (c);
+	if (sim_log) fputc (c, sim_log);  }
 return SCPE_OK;
 }
 
@@ -275,6 +275,12 @@ uint32 sim_os_msec ()
 return GetTickCount ();
 }
 
+int sim_os_sleep (unsigned int sec)
+{
+Sleep (sec * 1000);
+return 0;
+}
+
 #endif
 
 /* OS/2 routines, from Bruce Ray */
@@ -282,7 +288,6 @@ return GetTickCount ();
 #if defined (__OS2__)
 #define __TTYROUTINES 0
 #include <conio.h>
-int32 sim_vt = -1;
 
 t_stat ttinit (void)
 {
@@ -304,7 +309,7 @@ t_stat ttclose (void)
 return SCPE_OK;
 }
 
-t_stat sim_poll_kbd (void)
+t_stat sim_os_poll_kbd (void)
 {
 int c;
 
@@ -315,7 +320,7 @@ if ((c & 0177) == sim_int_char) return SCPE_STOP;
 return c | SCPE_KFLAG;
 }
 
-t_stat sim_putchar (int32 c)
+t_stat sim_os_putchar (int32 c)
 {
 if (c != 0177) {
 	putch (c);
@@ -345,11 +350,27 @@ return 0;
 #include <Mactypes.h>
 #include <string.h>
 #include <sioux.h>
+#include <unistd.h>
 #include <siouxglobals.h>
 #include <Traps.h>
 #include <LowMem.h>
 
-int32 sim_vt = -1;
+/* function prototypes */
+Boolean SIOUXIsAppWindow(WindowPtr window);
+void SIOUXDoMenuChoice(long menuValue);
+void SIOUXUpdateMenuItems(void);
+void SIOUXUpdateScrollbar(void);
+int ps_kbhit(void);
+int ps_getch(void);
+t_stat ttinit (void);
+t_stat ttrunstate (void);
+t_stat ttcmdstate (void);
+t_stat ttclose (void);
+uint32 sim_os_msec (void);
+t_stat sim_os_poll_kbd (void);
+t_stat sim_os_putchar (int32 c);
+int sim_os_sleep (unsigned int sec);
+
 extern char sim_name[];
 extern pSIOUXWin SIOUXTextWindow;
 static CursHandle iBeamCursorH = NULL;			/* contains the iBeamCursor */
@@ -362,21 +383,21 @@ static void updateCursor(void) {
 		Point localMouse;
 		GetPort(&savePort);
 		SetPort(window);
-#if !TARGET_API_MAC_CARBON
-		localMouse = LMGetMouseLocation();
-#else
+#if TARGET_API_MAC_CARBON
 		GetGlobalMouse(&localMouse);
+#else
+		localMouse = LMGetMouseLocation();
 #endif
 		GlobalToLocal(&localMouse);
 		if (PtInRect(localMouse, &(*SIOUXTextWindow->edit)->viewRect) && iBeamCursorH) {
 			SetCursor(*iBeamCursorH);
-		} 
+		}
 		else {
 			SetCursor(&qd.arrow);
 		}
 		TEIdle(SIOUXTextWindow->edit);
 		SetPort(savePort);
-	} 
+	}
 	else {
 		SetCursor(&qd.arrow);
 		TEIdle(SIOUXTextWindow->edit);
@@ -406,11 +427,11 @@ int ps_kbhit(void) {
 			}
 			return false;
 		}
-  	return true;
+		return true;
   }
   else {
-  	return false;
-  } 
+		return false;
+  }
 }
 
 int ps_getch(void) {
@@ -477,7 +498,7 @@ t_stat ttclose (void)
 return SCPE_OK;
 }
 
-t_stat sim_poll_kbd (void)
+t_stat sim_os_poll_kbd (void)
 {
 int c;
 
@@ -488,7 +509,7 @@ if ((c & 0177) == sim_int_char) return SCPE_STOP;
 return c | SCPE_KFLAG;
 }
 
-t_stat sim_putchar (int32 c)
+t_stat sim_os_putchar (int32 c)
 {
 if (c != 0177) {
 	putchar (c);
@@ -504,11 +525,16 @@ uint32 sim_os_msec (void)
 unsigned long long micros;
 UnsignedWide macMicros;
 unsigned long millis;
-		
+
 Microseconds (&macMicros);
 micros = *((unsigned long long *) &macMicros);
 millis = micros / 1000LL;
 return (uint32) millis;
+}
+
+int sim_os_sleep (unsigned int sec)
+{
+return sleep (sec);
 }
 
 #endif
@@ -520,8 +546,8 @@ return (uint32) millis;
 #include <sgtty.h>
 #include <fcntl.h>
 #include <sys/time.h>
+#include <unistd.h>
 
-int32 sim_vt = -1;
 struct sgttyb cmdtty,runtty;			/* V6/V7 stty data */
 struct tchars cmdtchars,runtchars;		/* V7 editing */
 struct ltchars cmdltchars,runltchars;		/* 4.2 BSD editing */
@@ -575,7 +601,7 @@ t_stat ttclose (void)
 return ttcmdstate ();
 }
 
-t_stat sim_poll_kbd (void)
+t_stat sim_os_poll_kbd (void)
 {
 int status;
 unsigned char buf[1];
@@ -585,7 +611,7 @@ if (status != 1) return SCPE_OK;
 else return (buf[0] | SCPE_KFLAG);
 }
 
-t_stat sim_putchar (int32 out)
+t_stat sim_os_putchar (int32 out)
 {
 char c;
 
@@ -608,6 +634,11 @@ msec = (((uint32) cur.tv_sec) * 1000) + (((uint32) cur.tv_usec) / 1000);
 return msec;
 }
 
+int sim_os_sleep (unsigned int sec)
+{
+return sleep (sec);
+}
+
 #endif
 
 /* POSIX UNIX routines, from Leendert Van Doorn */
@@ -615,12 +646,13 @@ return msec;
 #if !defined (__TTYROUTINES)
 #include <termios.h>
 #include <sys/time.h>
+#include <unistd.h>
 
-int32 sim_vt = -1;
 struct termios cmdtty, runtty;
 
 t_stat ttinit (void)
 {
+if (!isatty (fileno (stdin))) return SCPE_OK;		/* skip if !tty */
 if (tcgetattr (0, &cmdtty) < 0) return SCPE_TTIERR;	/* get old flags */
 runtty = cmdtty;
 runtty.c_lflag = runtty.c_lflag & ~(ECHO | ICANON);	/* no echo or edit */
@@ -660,6 +692,7 @@ return SCPE_OK;
 
 t_stat ttrunstate (void)
 {
+if (!isatty (fileno (stdin))) return SCPE_OK;		/* skip if !tty */
 runtty.c_cc[VINTR] = sim_int_char;			/* in case changed */
 if (tcsetattr (0, TCSAFLUSH, &runtty) < 0) return SCPE_TTIERR;
 return SCPE_OK;
@@ -667,6 +700,7 @@ return SCPE_OK;
 
 t_stat ttcmdstate (void)
 {
+if (!isatty (fileno (stdin))) return SCPE_OK;		/* skip if !tty */
 if (tcsetattr (0, TCSAFLUSH, &cmdtty) < 0) return SCPE_TTIERR;
 return SCPE_OK;
 }
@@ -676,7 +710,7 @@ t_stat ttclose (void)
 return ttcmdstate ();
 }
 
-t_stat sim_poll_kbd (void)
+t_stat sim_os_poll_kbd (void)
 {
 int status;
 unsigned char buf[1];
@@ -686,7 +720,7 @@ if (status != 1) return SCPE_OK;
 else return (buf[0] | SCPE_KFLAG);
 }
 
-t_stat sim_putchar (int32 out)
+t_stat sim_os_putchar (int32 out)
 {
 char c;
 
@@ -706,6 +740,11 @@ uint32 msec;
 gettimeofday (&cur, NULL);
 msec = (((uint32) cur.tv_sec) * 1000) + (((uint32) cur.tv_usec) / 1000);
 return msec;
+}
+
+int sim_os_sleep (unsigned int sec)
+{
+return sleep (sec);
 }
 
 #endif

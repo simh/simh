@@ -66,8 +66,13 @@ BSC32_SBRS= \
 	$(INTDIR)/ibm1130_cr.sbr \
 	$(INTDIR)/ibm1130_stddev.sbr \
 	$(INTDIR)/ibm1130_disk.sbr \
+	$(INTDIR)/ibm1130_gdu.sbr \
+	$(INTDIR)/ibm1130_gui.sbr \
+	$(INTDIR)/ibm1130_prt.sbr \
+	$(INTDIR)/scp.sbr \
 	$(INTDIR)/scp_tty.sbr \
-	$(INTDIR)/scp.sbr
+	$(INTDIR)/sim_tmxr.sbr \
+	$(INTDIR)/sim_sock.sbr
 
 $(OUTDIR)/ibm1130.bsc : $(OUTDIR)  $(BSC32_SBRS)
     $(BSC32) @<<
@@ -76,10 +81,10 @@ $(OUTDIR)/ibm1130.bsc : $(OUTDIR)  $(BSC32_SBRS)
 
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /NOLOGO /SUBSYSTEM:console /MACHINE:I386
-# ADD LINK32 kernel32.lib user32.lib gdi32.lib comdlg32.lib advapi32.lib /NOLOGO /SUBSYSTEM:console /MACHINE:I386
+# ADD LINK32 kernel32.lib user32.lib gdi32.lib comdlg32.lib advapi32.lib wsock32.lib /NOLOGO /SUBSYSTEM:console /MACHINE:I386
 LINK32_FLAGS=kernel32.lib user32.lib gdi32.lib comdlg32.lib advapi32.lib\
- /NOLOGO /SUBSYSTEM:console /INCREMENTAL:no /PDB:$(OUTDIR)/"ibm1130.pdb"\
- /MACHINE:I386 /OUT:$(OUTDIR)/"ibm1130.exe" 
+ wsock32.lib /NOLOGO /SUBSYSTEM:console /INCREMENTAL:no\
+ /PDB:$(OUTDIR)/"ibm1130.pdb" /MACHINE:I386 /OUT:$(OUTDIR)/"ibm1130.exe" 
 DEF_FILE=
 LINK32_OBJS= \
 	$(INTDIR)/ibm1130_cpu.obj \
@@ -88,8 +93,13 @@ LINK32_OBJS= \
 	$(INTDIR)/ibm1130_stddev.obj \
 	$(INTDIR)/ibm1130.res \
 	$(INTDIR)/ibm1130_disk.obj \
+	$(INTDIR)/ibm1130_gdu.obj \
+	$(INTDIR)/ibm1130_gui.obj \
+	$(INTDIR)/ibm1130_prt.obj \
+	$(INTDIR)/scp.obj \
 	$(INTDIR)/scp_tty.obj \
-	$(INTDIR)/scp.obj
+	$(INTDIR)/sim_tmxr.obj \
+	$(INTDIR)/sim_sock.obj
 
 $(OUTDIR)/ibm1130.exe : $(OUTDIR)  $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
@@ -133,8 +143,13 @@ BSC32_SBRS= \
 	$(INTDIR)/ibm1130_cr.sbr \
 	$(INTDIR)/ibm1130_stddev.sbr \
 	$(INTDIR)/ibm1130_disk.sbr \
+	$(INTDIR)/ibm1130_gdu.sbr \
+	$(INTDIR)/ibm1130_gui.sbr \
+	$(INTDIR)/ibm1130_prt.sbr \
+	$(INTDIR)/scp.sbr \
 	$(INTDIR)/scp_tty.sbr \
-	$(INTDIR)/scp.sbr
+	$(INTDIR)/sim_tmxr.sbr \
+	$(INTDIR)/sim_sock.sbr
 
 $(OUTDIR)/ibm1130.bsc : $(OUTDIR)  $(BSC32_SBRS)
     $(BSC32) @<<
@@ -143,10 +158,10 @@ $(OUTDIR)/ibm1130.bsc : $(OUTDIR)  $(BSC32_SBRS)
 
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /NOLOGO /SUBSYSTEM:console /DEBUG /MACHINE:I386
-# ADD LINK32 kernel32.lib user32.lib gdi32.lib comdlg32.lib advapi32.lib /NOLOGO /SUBSYSTEM:console /DEBUG /MACHINE:I386
+# ADD LINK32 kernel32.lib user32.lib gdi32.lib comdlg32.lib advapi32.lib wsock32.lib /NOLOGO /SUBSYSTEM:console /DEBUG /MACHINE:I386
 LINK32_FLAGS=kernel32.lib user32.lib gdi32.lib comdlg32.lib advapi32.lib\
- /NOLOGO /SUBSYSTEM:console /INCREMENTAL:yes /PDB:$(OUTDIR)/"ibm1130.pdb" /DEBUG\
- /MACHINE:I386 /OUT:$(OUTDIR)/"ibm1130.exe" 
+ wsock32.lib /NOLOGO /SUBSYSTEM:console /INCREMENTAL:yes\
+ /PDB:$(OUTDIR)/"ibm1130.pdb" /DEBUG /MACHINE:I386 /OUT:$(OUTDIR)/"ibm1130.exe" 
 DEF_FILE=
 LINK32_OBJS= \
 	$(INTDIR)/ibm1130_cpu.obj \
@@ -155,8 +170,13 @@ LINK32_OBJS= \
 	$(INTDIR)/ibm1130_stddev.obj \
 	$(INTDIR)/ibm1130.res \
 	$(INTDIR)/ibm1130_disk.obj \
+	$(INTDIR)/ibm1130_gdu.obj \
+	$(INTDIR)/ibm1130_gui.obj \
+	$(INTDIR)/ibm1130_prt.obj \
+	$(INTDIR)/scp.obj \
 	$(INTDIR)/scp_tty.obj \
-	$(INTDIR)/scp.obj
+	$(INTDIR)/sim_tmxr.obj \
+	$(INTDIR)/sim_sock.obj
 
 $(OUTDIR)/ibm1130.exe : $(OUTDIR)  $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
@@ -218,7 +238,6 @@ DEP_IBM1130_=\
 	.\ibm1130_defs.h\
 	.\ibm1130_conout.h\
 	.\ibm1130_conin.h\
-	.\ibm1130_prtwheel.h\
 	..\sim_defs.h
 
 $(INTDIR)/ibm1130_stddev.obj :  $(SOURCE)  $(DEP_IBM1130_) $(INTDIR)
@@ -242,9 +261,60 @@ $(INTDIR)/ibm1130.res :  $(SOURCE)  $(DEP_IBM1130_R) $(INTDIR)
 SOURCE=.\ibm1130_disk.c
 DEP_IBM1130_D=\
 	.\ibm1130_defs.h\
+	.\dmsr2v12phases.h\
+	.\dmsr2v12slet.h\
 	..\sim_defs.h
 
 $(INTDIR)/ibm1130_disk.obj :  $(SOURCE)  $(DEP_IBM1130_D) $(INTDIR)
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=.\ibm1130_gdu.c
+DEP_IBM1130_G=\
+	.\ibm1130_defs.h\
+	..\sim_defs.h
+
+$(INTDIR)/ibm1130_gdu.obj :  $(SOURCE)  $(DEP_IBM1130_G) $(INTDIR)
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=.\ibm1130_gui.c
+DEP_IBM1130_GU=\
+	.\ibm1130_defs.h\
+	..\sim_defs.h
+
+$(INTDIR)/ibm1130_gui.obj :  $(SOURCE)  $(DEP_IBM1130_GU) $(INTDIR)
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=.\ibm1130_prt.c
+DEP_IBM1130_P=\
+	.\ibm1130_defs.h\
+	.\ibm1130_prtwheel.h\
+	..\sim_defs.h
+
+$(INTDIR)/ibm1130_prt.obj :  $(SOURCE)  $(DEP_IBM1130_P) $(INTDIR)
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=\pdp11\supnik\scp.c
+DEP_SCP_C=\
+	..\sim_defs.h\
+	\pdp11\supnik\sim_rev.h\
+	\pdp11\supnik\sim_sock.h\
+	\pdp11\supnik\sim_tmxr.h\
+	\MSVC20\INCLUDE\sys\TYPES.H
+
+$(INTDIR)/scp.obj :  $(SOURCE)  $(DEP_SCP_C) $(INTDIR)
+   $(CPP) $(CPP_PROJ)  $(SOURCE) 
 
 # End Source File
 ################################################################################
@@ -261,12 +331,28 @@ $(INTDIR)/scp_tty.obj :  $(SOURCE)  $(DEP_SCP_T) $(INTDIR)
 ################################################################################
 # Begin Source File
 
-SOURCE=.\scp.c
-DEP_SCP_C=\
-	.\sim_defs.h\
-	..\sim_rev.h
+SOURCE=\pdp11\supnik\sim_tmxr.c
+DEP_SIM_T=\
+	..\sim_defs.h\
+	\pdp11\supnik\sim_sock.h\
+	\pdp11\supnik\sim_tmxr.h\
+	\MSVC20\INCLUDE\sys\TYPES.H
 
-$(INTDIR)/scp.obj :  $(SOURCE)  $(DEP_SCP_C) $(INTDIR)
+$(INTDIR)/sim_tmxr.obj :  $(SOURCE)  $(DEP_SIM_T) $(INTDIR)
+   $(CPP) $(CPP_PROJ)  $(SOURCE) 
+
+# End Source File
+################################################################################
+# Begin Source File
+
+SOURCE=\pdp11\supnik\sim_sock.c
+DEP_SIM_S=\
+	..\sim_defs.h\
+	\pdp11\supnik\sim_sock.h\
+	\MSVC20\INCLUDE\sys\TYPES.H
+
+$(INTDIR)/sim_sock.obj :  $(SOURCE)  $(DEP_SIM_S) $(INTDIR)
+   $(CPP) $(CPP_PROJ)  $(SOURCE) 
 
 # End Source File
 # End Group

@@ -46,6 +46,7 @@
 #define STOP_RQ		9				/* fatal RQ err */
 #define STOP_LOOP	10				/* infinite loop */
 #define STOP_UNKABO	11				/* unknown abort */
+#define STOP_SANITY	12				/* sanity timer exp */
 #define ABORT_INTR	-1				/* interrupt */
 #define ABORT_MCHK	(-SCB_MCHK)			/* machine check */
 #define ABORT_RESIN	(-SCB_RESIN)			/* rsvd instruction */
@@ -65,9 +66,10 @@
 
 /* Address space */
 
+#define VAMASK		0xFFFFFFFF			/* virt addr mask */
 #define PAWIDTH		30				/* phys addr width */
 #define PASIZE		(1 << PAWIDTH)			/* phys addr size */
-#define PAMASK		(PASIZE - 1)			/* phys mem mask */
+#define PAMASK		(PASIZE - 1)			/* phys addr mask */
 #define IOPAGE		(1 << (PAWIDTH - 1))		/* start of I/O page */
 
 /* Architectural constants */
@@ -430,9 +432,10 @@ enum opcodes {
 #define SXTB(x)		(((x) & BSIGN)? ((x) | ~BMASK): ((x) & BMASK))
 #define SXTW(x)		(((x) & WSIGN)? ((x) | ~WMASK): ((x) & WMASK))
 #define SXTBW(x)	(((x) & BSIGN)? ((x) | (WMASK - BMASK)): ((x) & BMASK))
+#define SXTL(x)		(((x) & LSIGN)? ((x) | ~LMASK): ((x) & LMASK))
 #define INTOV		if (PSL & PSW_IV) SET_TRAP (TRAP_INTOV)
 #define V_INTOV		cc = cc | CC_V; INTOV
-#define NEG(x)		(-((int32) (x)))
+#define NEG(x)		((~(x) + 1) & LMASK)
 
 /* Istream access */
 

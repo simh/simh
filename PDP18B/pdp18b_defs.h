@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Oct-02	RMS	Added DIB structure
+   25-Jul-02	RMS	Added PDP-4 DECtape support
    10-Feb-02	RMS	Added PDP-7 DECtape support
    25-Nov-01	RMS	Revised interrupt structure
    27-May-01	RMS	Added second Teletype support
@@ -48,6 +50,7 @@
 					Type 75 paper tape punch
 					integral real time clock
 					Type 62 line printer (Hollerith)
+					Type 550/555 DECtape
 
    PDP7	   32K	Type 177 EAE		Type 649 KSR-33 Teletype
 		Type 148 mem extension	Type 444 paper tape reader
@@ -91,6 +94,7 @@
 #define STOP_IBKPT	3				/* breakpoint */
 #define STOP_XCT	4				/* nested XCT's */
 #define STOP_API	5				/* invalid API int */
+#define STOP_NONSTD	6				/* non-std dev num */
 
 /* Peripheral configuration */
 
@@ -98,17 +102,18 @@
 #define ADDRSIZE	13
 #define KSR28		0				/* Baudot terminal */
 #define TYPE62		0				/* Hollerith printer */
+#define TYPE550		0				/* DECtape */
 #elif defined (PDP7)
 #define ADDRSIZE	15
 #define TYPE647		0				/* sixbit printer */
-#define DTA		0				/* DECtape */
+#define TYPE550		0				/* DECtape */
 #define DRM		0				/* drum */
 #elif defined (PDP9)
 #define ADDRSIZE	15
 #define TYPE647		0				/* sixbit printer */
 #define RF		0				/* fixed head disk */
 #define MTA		0				/* magtape */
-#define DTA		0				/* DECtape */
+#define TC02		0				/* DECtape */
 #define TTY1		0				/* second Teletype */
 #define BRMASK		0076000				/* bounds mask */
 #elif defined (PDP15)
@@ -117,7 +122,7 @@
 #define RF		0				/* fixed head disk */
 #define RP		0				/* disk pack */
 #define MTA		0				/* magtape */
-#define DTA		0				/* DECtape */
+#define TC02		0				/* DECtape */
 #define TTY1		0				/* second Teletype */
 #define BRMASK		0377400				/* bounds mask */
 #endif
@@ -149,6 +154,35 @@
 #define IOT_REASON	(1 << IOT_V_REASON)
 
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)		/* stop on error */
+
+/* Device information block */
+
+#define DEV_MAXBLK	8				/* max dev block */
+#define DEV_MAX		64				/* total devices */
+
+struct pdp18b_dib {
+	uint32		dev;				/* base dev number */
+	uint32		num;				/* number of slots */
+	int32		(*iors)(void);			/* IORS responder */
+	int32		(*dsp[DEV_MAXBLK])(int32 IR, int32 dat);
+};
+
+typedef struct pdp18b_dib DIB;
+
+/* Standard device numbers */
+
+#define DEV_PTR		001				/* paper tape reader */
+#define DEV_PTP		002				/* paper tape punch */
+#define DEV_TTI		003				/* console input */
+#define DEV_TTO		004				/* console output */
+#define DEV_TTI1	041				/* extra terminals */
+#define DEV_TTO1	040
+#define DEV_DRM		060				/* drum */
+#define DEV_RP		063				/* RP15 */
+#define DEV_LPT		065				/* line printer */
+#define DEV_RF		070				/* RF09 */
+#define DEV_MT		073				/* magtape */
+#define DEV_DTA		075				/* dectape */
 
 /* Interrupt system
 
@@ -286,22 +320,6 @@
 #define SET_INT(dv)	int_hwre[API_##dv] = int_hwre[API_##dv] | INT_##dv
 #define CLR_INT(dv)	int_hwre[API_##dv] = int_hwre[API_##dv] & ~INT_##dv
 #define TST_INT(dv)	(int_hwre[API_##dv] & INT_##dv)
-
-/* Device enable flags are defined in a single 32b word */
-
-#define ENB_V_DTA	0				/* DECtape */
-#define ENB_V_MTA	1				/* magtape */
-#define ENB_V_DRM	2				/* drum */
-#define ENB_V_RF	3				/* fixed head disk */
-#define ENB_V_RP	4				/* disk pack */
-#define ENB_V_TTI1	5				/* 2nd teletype */
-
-#define ENB_DTA		(1u << ENB_V_DTA)
-#define ENB_MTA		(1u << ENB_V_MTA)
-#define ENB_DRM		(1u << ENB_V_DRM)
-#define ENB_RF		(1u << ENB_V_RF)
-#define ENB_RP		(1u << ENB_V_RP)
-#define ENB_TTI1	(1u << ENB_V_TTI1)
 
 /* I/O status flags for the IORS instruction
 
@@ -358,5 +376,5 @@
 
 /* Function prototypes */
 
-t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat set_devno (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat show_devno (FILE *st, UNIT *uptr, int32 val, void *desc);

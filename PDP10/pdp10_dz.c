@@ -26,5 +26,8 @@
    dz		DZ11 terminal multiplexor
 */
 
+#define VM_PDP10	0				/* no flt addr */
+#define RANK_DZ		0				/* no autoconfig */
+
 #include "pdp10_defs.h"
 #include "dec_dz.h"

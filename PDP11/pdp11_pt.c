@@ -1,7 +1,6 @@
-/* sim_vt.h: VT2xx compatible Terminalemulator
+/* pdp11_pt.c: PDP-11 paper tape reader/punch simulator
 
-   Copyright (c) 2002, Robert M Supnik
-   Written by Fischer Franz and used with his gracious permission
+   Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,11 +23,24 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   15-Mar-02	FF	Original version Fischer Franz
+   ptr		paper tape reader
+   ptp		paper tape punch
+
+   12-Sep-02	RMS	Split off from pdp11_stddev.c
 */
 
-int  vt_read (void);
-void vt_write (char c);
-void vt_init (void);
-void vt_cmd (void);
-void vt_run (void);
+#if defined (USE_INT64)					/* VAX version */
+#include "vax_defs.h"
+#define VM_VAX		1
+#define PT_RDX		16
+#define PT_DIS		DEV_DIS
+#else
+#include "pdp11_defs.h"					/* PDP-11 version */
+#define VM_PDP11	1
+#define PT_RDX		8
+#define PT_DIS		0
+#endif
+
+extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
+#include "dec_pt.h"

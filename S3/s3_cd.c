@@ -1,7 +1,6 @@
 /* s3_cd.c: IBM 1442 card reader/punch
 
-   Copyright (c) 2001 Charles E. Owen
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 2001, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -20,13 +19,15 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
+   Except as contained in this notice, the name of Charles E. Owen shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from Charles E. Owen.
 
    cdr		card reader
    cdp		card punch
    cdp2		card punch stacker 2
+
+   08-Oct-02	RMS	Added impossible function catcher
 
    Normally, cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.  Set the EBCDIC
@@ -43,7 +44,7 @@ extern char ascii_to_ebcdic[256];
 int32 s1sel, s2sel;
 char rbuf[CBUFSIZE];					/* > CDR_WIDTH */
 t_stat cdr_svc (UNIT *uptr);
-t_stat cdr_boot (int32 unitno);
+t_stat cdr_boot (int32 unitno, DEVICE *dptr);
 t_stat cdr_attach (UNIT *uptr, char *cptr);
 t_stat cd_reset (DEVICE *dptr);
 t_stat read_card (int32 ilnt, int32 mod);
@@ -148,7 +149,7 @@ int32 crd (int32 op, int32 m, int32 n, int32 data)
 		case 0:		/* SIO 1442 */
 			/* if (n == 1)
 				return STOP_IBKPT; */
-			switch (data) {					/* Select atacker */
+			switch (data) {					/* Select stacker */
 				case 0x00:
 					break;
 				case 0x01:
@@ -256,6 +257,8 @@ int32 crd (int32 op, int32 m, int32 n, int32 data)
 		default:
 			break;
 	}						
+	printf (">>CRD non-existent function %d\n", op);
+	return SCPE_OK;						
 }
 
 /* Card read routine
@@ -428,7 +431,7 @@ return attach_unit (uptr, cptr);
 
 /* Bootstrap routine */
 
-t_stat cdr_boot (int32 unitno)
+t_stat cdr_boot (int32 unitno, DEVICE *dptr)
 {
 cdr_ebcdic = 1;
 DAR = 0;

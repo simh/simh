@@ -1,3 +1,14 @@
+/*
+ * (C) Copyright 2002, Brian Knittel.
+ * You may freely use this program, but: it offered strictly on an AS-IS, AT YOUR OWN
+ * RISK basis, there is no warranty of fitness for any purpose, and the rest of the
+ * usual yada-yada. Please keep this notice and the copyright in any distributions
+ * or modifications.
+ *
+ * This is not a supported product, but I welcome bug reports and fixes.
+ * Mail to sim@ibm1130.org
+ */
+
 // ctrl-M (Enter) => EOF
 // ctrl-U         => Erase field
 // ctrl-Q         => Interrupt request (not here)

@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Oct-02	RMS	Added indirect address interrupt
    08-Feb-02	RMS	Added DMS definitions
    01-Feb-02	RMS	Added terminal multiplexor support
    16-Jan-02	RMS	Added additional device support
@@ -43,9 +44,9 @@
 #define STOP_HALT	3				/* HALT */
 #define STOP_IBKPT	4				/* breakpoint */
 #define STOP_IND	5				/* indirect loop */
+#define STOP_INDINT	6				/* indirect intr */
 
-#define ABORT_DMS	1				/* DMS abort */
-#define ABORT_FENCE	-1				/* fence abort */
+#define ABORT_PRO	1				/* protection abort */
 
 /* Memory */
 
@@ -66,25 +67,27 @@
 #define AR		M[0]				/* A = location 0 */
 #define BR		M[1]				/* B = location 1 */
 #define ABREG		M				/* register array */
+#define SEXT(x)		((int32) (((x) & SIGN)? ((x) | ~DMASK): ((x) & DMASK)))
 
 /* Memory reference instructions */
 
-#define IA		0100000				/* indirect address */
-#define MROP		0070000				/* opcode */
-#define AB		0004000				/* A/B select */
-#define CP		0002000				/* current page */
-#define DISP		0001777				/* page displacement */
-#define PAGENO		0076000				/* page number */
+#define I_IA		0100000				/* indirect address */
+#define I_AB		0004000				/* A/B select */
+#define I_CP		0002000				/* current page */
+#define I_DISP		0001777				/* page displacement */
+#define I_PAGENO	0076000				/* page number */
 
 /* Other instructions */
 
-#define NMROP		0102000				/* non-mrf opcode */
-#define SHFT		0000000				/* shift */
-#define ASKP		0002000				/* alter/skip */
-#define XTND		0100000				/* extend */
-#define IOT		0102000				/* I/O */
-#define HC		0001000				/* hold/clear */
-#define DEVMASK		0000077				/* device mask */
+#define I_NMRMASK	0102000				/* non-mrf opcode */
+#define I_SRG		0000000				/* shift */
+#define I_ASKP		0002000				/* alter/skip */
+#define I_EXTD		0100000				/* extend */
+#define I_IO		0102000				/* I/O */
+#define I_CTL		0004000				/* CTL on/off */
+#define I_HC		0001000				/* hold/clear */
+#define I_DEVMASK	0000077				/* device mask */
+#define I_GETIOOP(x)	(((x) >> 6) & 07)		/* I/O sub op */
 
 /* DMA channels */
 
@@ -192,7 +195,8 @@ struct DMA {						/* DMA channel */
 #define TTY		011				/* console */
 #define PTP		012				/* paper tape punch */
 #define CLK		013				/* clock */
-#define LPT		014				/* line printer */
+#define LPS		014				/* 12653 line printer */
+#define LPT		015				/* 12845 line printer */
 #define MTD		020				/* 12559A data */
 #define MTC		021				/* 12559A control */
 #define DPD		022				/* 12557A data */
@@ -207,11 +211,22 @@ struct DMA {						/* DMA channel */
 #define MUXU		041				/* 12920A upper data */
 #define MUXC		042				/* 12920A control */
 
+/* IBL assignments */
+
+#define IBL_PTR		0000000				/* PTR */
+#define IBL_DP		0040000				/* DP */
+#define IBL_DQ		0060000				/* DQ */
+#define IBL_MS		0100000				/* MS */
+#define IBL_TBD		0140000				/* tbd */
+#define IBL_V_DEV	6				/* dev in <11:6> */
+#define IBL_FIX		0000001				/* DP fixed */
+#define IBL_LNT		64				/* boot length */
+#define IBL_MASK	(IBL_LNT - 1)			/* boot length mask */
+
 /* Dynamic device information table */
 
 struct hp_dib {
 	int32	devno;					/* device number */
-	int32	enb;					/* enabled */
 	int32	cmd;					/* saved command */
 	int32	ctl;					/* saved control */
 	int32	flg;					/* saved flag */
@@ -247,5 +262,4 @@ typedef struct hp_dib DIB;
 
 t_stat hp_setdev (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_enb (UNIT *uptr, int32 num, char *cptr, void *desc);
-t_stat set_dis (UNIT *uptr, int32 num, char *cptr, void *desc);
+void hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);

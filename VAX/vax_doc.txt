@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	VAX Simulator Usage
-Date:	15-Jun-2002
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -39,15 +39,16 @@ This memorandum documents the VAX simulator.
 To compile the VAX, you must define USE_INT64 as part of the compilation
 command line.
 
-sim/		sim_defs.h
+sim/		dec_dz.h
+		dec_pt.h
+		sim_defs.h
+		sim_ether.h
+		sim_rev.h
 		sim_sock.h
 		sim_tmxr.h
-		dec_dz.h
-		dec_mscp.h
-		dec_uqssp.h
 		scp.c
 		scp_tty.c
-		sim_rev.c
+		sim_ether.c
 		sim_sock.c
 		sim_tmxr.c
 
@@ -61,11 +62,17 @@ sim/vax/	vax_defs.h
 		vax_stddev.c
 		vax_sys.c
 
-sim/pdp11/	pdp11_dz.c
+sim/pdp11/	pdp11_mscp.h
+		pdp11_uqssp.h
+		pdp11_xq.h
+		pdp11_dz.c
 		pdp11_lp.c
+		pdp11_pt.c
 		pdp11_rl.c
 		pdp11_rq.c
+		pdp11_tq.c
 		pdp11_ts.c
+		pdp11_xp.c
 
 2. VAX Features
 
@@ -87,11 +94,15 @@ CLK		real-time clock
 DZ		DZV11 8-line terminal multiplexor (up to 4)
 RL		RLV12/RL01(2) cartridge disk controller with four drives
 RQ		RQDX3 MSCP controller with four drives
+RQB		second RQDX3 MSCP controller with four drives
+RQC		third RQDX3 MSCP controller with four drives
+RQD		fourth RQDX3 MSCP controller with four drives
 TS		TSV11/TSV05 magnetic tape controller with one drive
+TQ		TQK50 TMSCP magnetic tape controller with four drives
+XQ		DELQA/DEQNA Ethernet controller
 
-The PTR, PTP, LPT, DZ, RL, and TS devices can be set DISABLED.  In addition,
-most devices support the SET ADDRESS command, which allows the I/O page
-address of the device to be changed.
+The PTR, PTP, LPT, DZ, RL, RQ, RQB, RQC, RQD, TS, TQ, and XQ devices can
+be set DISABLED.  RQB, RQC, and RQD are disabled by default.
 
 The VAX simulator implements several unique stop conditions:
 
@@ -119,10 +130,13 @@ HALT instruction.
 	SET CPU 64M		set memory size = 64MB
 	SET CPU SIMHALT		kernel HALT returns to simulator
 	SET CPU CONHALT		kernel HALT returns to boot ROM console
+	SHOW CPU IOSPACE	show I/O space address map
 
 If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
-portion of memory is lost.  Initial memory size is 16MB.
+portion of memory is lost.  Initial memory size is 16MB.  If the simulator
+is running VMS, the operating system will not recognize memory size changes
+until AUTOGEN is run.
 
 Memory can be loaded with a binary byte stream using the LOAD command.
 The LOAD command recognizes one switch:
@@ -131,10 +145,12 @@ The LOAD command recognizes one switch:
 
 The CPU supports the BOOT command and is the only VAX device to do so.
 
-These switches are recognized when examining or depositing in CPU memory:
+These switches are recognized when examining or depositing in CPU memory
+(or any other byte oriented device):
 
 	-b			examine/deposit bytes
 	-w			examine/deposit words
+	-l			examine/deposit longwords
 	-d			data radix is decimal
 	-o			data radix is octal
 	-h			data radix is hexadecimal
@@ -200,10 +216,10 @@ using the LOAD -r command:
 
 The NVR consists of a single unit, representing 1KB of battery-backed up
 memory.  When the simulator starts, NVR is cleared to 0, and the SSC
-battery-low indicator is set.  The NVR can be loaded with a binary byte
-stream using the LOAD -n command:
-
-	LOAD -n NVR.BIN		-- load NVR image NVR.BIN
+battery-low indicator is set.  Normally, NVR is saved and restored like
+other memory in the system.  Alternately, NVR can be attached to a file.
+This allows its contents to be saved and restored independently of
+other memories, so that NVR state can be preserved across simulator runs.
 
 Successfully loading an NVR image clears the SSC battery-low indicator.
 
@@ -253,9 +269,43 @@ The QBA represents the CQBIC Qbus adapter chip.  The QBA registers are:
 	IPL15		32	IPL 15 interrupt flags
 	IPL14		32	IPL 14 interrupt flags
 
-2.2 Programmed I/O Devices
+2.2 I/O Device Addressing
 
-2.2.1 PC11 Paper Tape Reader (PTR)
+Qbus I/O space is not large enough to allow all possible devices to be
+configured simultaneously at fixed addresses.  Instead, many devices have
+floating addresses; that is, the assigned device address depends on the
+presense of other devices in the configuration:
+
+	DZ11		all instances have floating addresses
+	RL11		first instance has fixed address, rest floating
+	MSCP disk	first instance has fixed address, rest floating
+	TMSCP tape	first instance has fixed address, rest floating
+
+To maintain addressing consistency as the configuration changes, the
+simulator implements DEC's standard I/O address and vector autoconfiguration
+algorithms for devices DZ, RL, RQ, and TQ.  This allows the user to
+enable or disable devices without needing to manage I/O addresses
+and vectors.
+
+In addition to autoconfiguration, most devices support the SET ADDRESS
+command, which allows the I/O page address of the device to be changed,
+and the SET VECTOR command, which allows the vector of the device to be
+changed.  Explicitly setting the I/O address of a device which normally
+uses autoconfiguration DISABLES autoconfiguration for that device.  As
+a consequence, the user may have to manually configure all other
+autoconfigured devices, because the autoconfiguration algorithm no
+longer recognizes the explicitly configured device.  A device can be
+reset to autoconfigure with the SET <device> AUTOCONFIGURE command. 
+
+The current I/O map can be displayed with the SHOW CPU IOSPACE command.
+Address that have set by autoconfiguration are marked with an asterisk (*). 
+
+All devices support the SHOW ADDRESS and SHOW VECTOR commands, which display
+the device address and vector, respectively.
+
+2.3 Programmed I/O Devices
+
+2.3.1 PC11 Paper Tape Reader (PTR)
 
 The paper tape reader (PTR) reads data from a disk file.  The POS
 register specifies the number of the next data item to be read.  Thus,
@@ -288,7 +338,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.2 PC11 Paper Tape Punch (PTP)
+2.3.2 PC11 Paper Tape Punch (PTP)
 
 The paper tape punch (PTP) writes data to a disk file.  The POS
 register specifies the number of the next data item to be written. 
@@ -317,7 +367,12 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.3 Terminal Input (TTI)
+2.3.3 Terminal Input (TTI)
+
+The terminal interfaces (TTI, TTO) can be set to one of two modes:
+7B or 8B.  In 7B mode, input and output characters are masked  to 7
+bits.  In 8B mode, characters are not modified.  Changing the mode
+of either interface changes both.  The default mode is 8B.
 
 The terminal input (TTI) polls the console keyboard for input.  It
 implements these registers:
@@ -333,7 +388,7 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
-2.2.4 Terminal Output (TTO)
+2.3.4 Terminal Output (TTO)
 
 The terminal output (TTO) writes to the simulator console window.  It
 implements these registers:
@@ -349,7 +404,7 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	time from I/O initiation to interrupt
 
-2.2.5 Line Printer (LPT)
+2.3.5 Line Printer (LPT)
 
 The line printer (LPT) writes data to a disk file.  The POS register
 specifies the number of the next data item to be written.  Thus,
@@ -378,7 +433,7 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.2.6 Real-Time Clock (CLK)
+2.3.6 Real-Time Clock (CLK)
 
 The clock (CLK) implements these registers:
 
@@ -395,14 +450,21 @@ The clock (CLK) implements these registers:
 The real-time clock autocalibrates; the clock interval is adjusted up or
 down so that the clock tracks actual elapsed time.
 
-2.2.7 DZ11 Terminal Multiplexor (DZ)
+2.3.7 DZ11 Terminal Multiplexor (DZ)
 
 The DZ11 is an 8-line terminal multiplexor.  Up to 4 DZ11's (32 lines)
 are supported.  The number of lines can be changed with the command
 
 	SET DZ LINES=n			set line count to n
 
-The line count must be a multiple of 8, with a maximum of 32.
+The line count must be a multiple of 4, with a maximum of 16.
+
+The DZ11 supports 8-bit input and output of characters.  8-bit output
+may be incompatible with certain operating systems.  The command
+
+	SET DZ 7B
+
+forces output characters to be masked to 7 bits.
 
 The terminal lines perform input and output through Telnet sessions
 connected to a user-specified port.  The ATTACH command specifies
@@ -444,7 +506,7 @@ The DZ11 implements these registers:
 The DZ11 does not support save and restore.  All open connections are
 lost when the simulator shuts down or the DZ is detached.
 
-2.3 RLV12/RL01,RL02 Cartridge Disk (RL)
+2.4 RLV12/RL01,RL02 Cartridge Disk (RL)
 
 RLV12 options include the ability to set units write enabled or write locked,
 to set the drive size to RL01, RL02, or autosize, and to write a DEC standard
@@ -489,11 +551,13 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.4 RQDX3 MSCP Disk Controller (RQ)
+2.5 RQDX3 MSCP Disk Controllers (RQ, RQB, RQC, RQD)
 
-The RQ controller simulates the RQDX3 MSCP disk controller.  RQ options
-include the ability to set units write enabled or write locked, and to
-set the drive type to one of eleven disk types:
+The simulator implements four MSCP disk controllers, RQ, RQB, RQC, RQD.
+Initially, RQB, RQC, and RQD are disabled.  Each RQ controller simulates
+an RQDX3 MSCP disk controller.  RQ options include the ability to set
+units write enabled or write locked, and to set the drive type to one
+of eleven disk types:
 
 	SET RQn LOCKED		set unit n write locked
 	SET RQn WRITEENABLED	set unit n write enabled
@@ -512,7 +576,7 @@ set the drive type to one of eleven disk types:
 The type options can be used only when a unit is not attached to a file.
 Units can also be set ONLINE or OFFLINE.
 
-The RQ controller implements the following special SHOW commands:
+Each RQ controller implements the following special SHOW commands:
 
 	SHOW RQ RINGS		show command and response rings
 	SHOW RQ FREEQ		show packet free queue
@@ -521,7 +585,7 @@ The RQ controller implements the following special SHOW commands:
 	SHOW RQ ALL		show all ring and queue state
 	SHOW RQn UNITQ		show unit queues for unit n
 
-The RQ controller implements these registers:
+Each RQ controller implements these registers:
 
 	name		size	comments
 
@@ -563,7 +627,7 @@ Error handling is as follows:
 
 	OS I/O error	report error and stop
 
-2.5 TSV11/TSV05 Magnetic Tape (TS)
+2.6 TSV11/TSV05 Magnetic Tape (TS)
 
 TS options include the ability to make the unit write enabled or write locked.
 
@@ -611,7 +675,137 @@ Error handling is as follows:
 
 	OS I/O error		fatal tape error
 
-2.6 Symbolic Display and Input
+2.7 TQK50 TMSCP Disk Controller (TQ)
+
+The TQ controller simulates the TQK50 TMSCP disk controller.  TQ options
+include the ability to set units write enabled or write locked:
+
+	SET TQn LOCKED		set unit n write locked
+	SET TQn WRITEENABLED	set unit n write enabled
+
+The TQ controller implements the following special SHOW commands:
+
+	SHOW TQ RINGS		show command and response rings
+	SHOW TQ FREEQ		show packet free queue
+	SHOW TQ RESPQ		show packet response queue
+	SHOW TQ UNITQ		show unit queues
+	SHOW TQ ALL		show all ring and queue state
+	SHOW TQn UNITQ		show unit queues for unit n
+
+The TQ controller implements these registers:
+
+	name		size	comments
+
+	SA		16	status/address register
+	S1DAT		16	step 1 init host data
+	CQBA		22	command queue base address
+	CQLNT		8	command queue length
+	CQIDX		8	command queue index
+	RQBA		22	request queue base address
+	RQLNT		8	request queue length
+	RQIDX		8	request queue index
+	FREE		5	head of free packet list
+	RESP		5	head of response packet list
+	PBSY		5	number of busy packets
+	CFLGS		16	controller flags
+	CSTA		4	controller state
+	PERR		9	port error number
+	CRED		5	host credits
+	HAT		17	host available timer
+	HTMO		17	host timeout value
+	CPKT[0:3]	5	current packet, units 0-3
+	PKTQ[0:3]	5	packet queue, units 0-3
+	UFLG[0:3]	16	unit flags, units 0-3
+	POS[0:3]	32	tape position, units 0-3
+	OBJP[0:3]	32	object position, units 0-3
+	INT		1	interrupt request
+	ITIME		1	response time for initialization steps
+				(except for step 4)
+	QTIME		24	response time for 'immediate' packets
+	XTIME		24	response time for data transfers
+	PKTS[33*32]	16	packet buffers, 33W each,
+				32 entries
+
+Error handling is as follows:
+
+	error	     	processed as
+
+	not attached	tape not ready
+
+	end of file	end of medium
+
+	OS I/O error	report error and stop
+
+2.8 DELQA/DEQNA Ethernet Controller (XQ)
+
+XQ simulates the DELQA/DEQNA 10Mbps Ethernet controller.  Options allow
+control of the MAC address, the controller mode, and the sanity timer.
+
+	SET  XQ MAC=<mac-address>	ex. 08-00-2B-AA-BB-CC
+        SHOW XQ MAC
+
+These commands are used to change or display the MAC address.  <mac-address>
+is a valid ethernet MAC, delimited by dashes or periods.  The controller
+defaults to 08-00-2B-AA-BB-CC, which should be sufficient if there is
+only one SIMH controller on your LAN.  Two cards with the same MAC address
+will see each other's packets, resulting in a serious mess.
+
+	SET  XQ TYPE={DEQNA|[DELQA]}
+        SHOW XQ TYPE
+
+These commands are used to change or display the controller mode. DELQA
+mode is better and faster but may not be usable by older or non-DEC OS's.
+Also, be aware that DEQNA mode is not supported by many modern OS's. The
+DEQNA-LOCK mode of the DELQA card is emulated by setting the the controller
+to DEQNA - there is no need for a separate mode.  DEQNA-LOCK mode behaves
+exactly like a DEQNA, except for the operation of the VAR and MOP processing.
+
+	SET  XQ SANITY={ON|[OFF]}
+	SHOW XQ SANITY
+
+These commands change or display the INITIALIZATION sanity timer (DEQNA
+jumper W3/DELQA switch S4).  The INITIALIZATION sanity timer has a default
+timeout of 4 minutes, and cannot be turned off, just reset.  The normal
+sanity timer can be set by operating system software regardless of the
+state of this switch.  Note that only the DEQNA (or the DELQA in DEQNA-
+LOCK mode (=DEQNA)) supports the sanity timer - it is ignored by a DELQA
+in Normal mode, which uses switch S4 for a different purpose.
+
+To access the network, the simulated Ethernet controller must be attached
+to a real Ethernet interface:
+
+	ATTACH XQ0 {ethX|<device_name>}		ex. eth0 or /dev/era0
+        SHOW XQ ETH
+
+where X in 'ethX' is the number of the ethernet controller to attach, or
+the real device name.  The X number is system dependant.  If you only have
+one ethernet controller, the number will probably be 0. To find out what
+your system thinks the ethernet numbers are, use the SHOW XQ ETH command.
+The device list can be quite cryptic, depending on the host system, but
+is probably better than guessing. If you do not attach the device, the
+controller will behave as though the ethernet cable were unplugged.
+
+XQ has the following registers:
+
+	name	size	comments
+
+	SA0	16	station address word 0
+	SA1	16	station address word 1
+	SA2	16	station address word 2
+	SA3	16	station address word 3
+	SA4	16	station address word 4
+	SA5	16	station address word 5
+	CSR	16	control status register
+	VAR	16	vector address register
+	RBDL	32	receive buffer descriptor list
+	XBDL	32	trans(X)mit buffer descriptorlList
+
+One final note: because of it's asynchronous nature, the XQ controller is
+not limited to the ~1.5Mbit/sec of the real DEQNA/DELQA controllers,
+nor the 10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet
+(100 Mbit/sec) card, and "Feel the Power!" :-)
+
+2.9 Symbolic Display and Input
 
 The VAX simulator implements symbolic display and input.  Display is
 controlled by command line switches:

@@ -25,6 +25,7 @@
 
    cpu		Nova central processor
 
+   03-Oct-02	RMS	Added DIB infrastructure
    30-Dec-01	RMS	Added old PC queue
    07-Dec-01	RMS	Revised to use breakpoint package
    30-Nov-01	RMS	Added extended SET/SHOW support
@@ -197,8 +198,7 @@
    4. Adding I/O devices.  These modules must be modified:
 
 	nova_defs.h	add interrupt request definition
-	nova_cpu.c	add IOT mask, PI mask, and routine to dev_table
-	nova_sys.c	add pointer to data structures to sim_devices
+	nova_sys.c	add sim_devices entry
 */
 
 #include "nova_defs.h"
@@ -218,17 +218,17 @@
 				M[x] = (M[x] - 1) & 0177777; \
 			x = M[x] & AMASK
 
-#define UNIT_V_MDV	(UNIT_V_UF)			/* MDV present */
+#define UNIT_V_MDV	(UNIT_V_UF + 0)			/* MDV present */
+#define UNIT_V_STK	(UNIT_V_UF + 1)			/* stack instr */
+#define UNIT_V_BYT	(UNIT_V_UF + 2)			/* byte instr */
+#define UNIT_V_MSIZE	(UNIT_V_UF + 3)			/* dummy mask */
 #define UNIT_MDV	(1 << UNIT_V_MDV)
-#define UNIT_V_STK	(UNIT_V_UF+1)			/* stack instr */
 #define UNIT_STK	(1 << UNIT_V_STK)
-#define UNIT_V_BYT	(UNIT_V_UF+2)			/* byte instr */
 #define UNIT_BYT	(1 << UNIT_V_BYT)
+#define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 #define UNIT_IOPT	(UNIT_MDV | UNIT_STK | UNIT_BYT)
 #define UNIT_NOVA3	(UNIT_MDV | UNIT_STK)
 #define UNIT_NOVA4	(UNIT_MDV | UNIT_STK | UNIT_BYT)
-#define UNIT_V_MSIZE	(UNIT_V_UF+3)			/* dummy mask */
-#define UNIT_MSIZE	(1 << UNIT_V_MSIZE)
 
 uint16 M[MAXMEMSIZE] = { 0 };				/* memory */
 int32 AC[4] = { 0 };					/* accumulators */
@@ -240,7 +240,6 @@ int32 SR = 0;						/* switch register */
 int32 dev_done = 0;					/* device done flags */
 int32 dev_busy = 0;					/* device busy flags */
 int32 dev_disable = 0;					/* int disable flags */
-int32 iot_enb = -1;					/* IOT enables */
 int32 int_req = 0;					/* interrupt requests */
 int32 pimask = 0;					/* priority int mask */
 int32 pwr_low = 0;					/* power fail flag */
@@ -249,64 +248,18 @@ int32 stop_dev = 0;					/* stop on ill dev */
 uint16 pcq[PCQ_SIZE] = { 0 };				/* PC queue */
 int32 pcq_p = 0;					/* PC queue ptr */
 REG *pcq_r = NULL;					/* PC queue reg ptr */
+struct ndev dev_table[64];				/* dispatch table */
+
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
+extern DEVICE *sim_devices[];
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_boot (int32 unitno);
-extern int32 ptr (int32 pulse, int32 code, int32 AC);
-extern int32 ptp (int32 pulse, int32 code, int32 AC);
-extern int32 tti (int32 pulse, int32 code, int32 AC);
-extern int32 tto (int32 pulse, int32 code, int32 AC);
-extern int32 tti1 (int32 pulse, int32 code, int32 AC);
-extern int32 tto1 (int32 pulse, int32 code, int32 AC);
-extern int32 clk (int32 pulse, int32 code, int32 AC);
-extern int32 plt (int32 pulse, int32 code, int32 AC);
-extern int32 lpt (int32 pulse, int32 code, int32 AC);
-extern int32 dsk (int32 pulse, int32 code, int32 AC);
-extern int32 dkp (int32 pulse, int32 code, int32 AC);
-extern int32 mta (int32 pulse, int32 code, int32 AC);
-int32 nulldev (int32 pulse, int32 code, int32 AC);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-
-/* IOT dispatch table */
-
-struct ndev dev_table[64] = {
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev },			/* 0 - 7 */
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev },
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ INT_TTI, PI_TTI, &tti }, { INT_TTO, PI_TTO, &tto },	/* 10 - 17 */
-	{ INT_PTR, PI_PTR, &ptr }, { INT_PTP, PI_PTP, &ptp }, 
-	{ INT_CLK, PI_CLK, &clk }, { INT_PLT, PI_PLT, &plt },
-	{ 0, 0, &nulldev }, { INT_LPT, PI_LPT, &lpt },
-	{ INT_DSK, PI_DSK, &dsk }, { 0, 0, &nulldev },		/* 20 - 27 */
-	{ INT_MTA, PI_MTA, &mta }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev },
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev },			/* 30 - 37 */
-	{ 0, 0, &nulldev }, {INT_DKP, PI_DKP, &dkp },
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev },
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev },
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev },			/* 40 - 47 */
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ INT_TTI1, PI_TTI1, &tti1 }, { INT_TTO1, PI_TTO1, &tto1 }, /* 50 - 57 */
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev },			/* 60 - 67 */
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev },			/* 70 - 77 */
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev }, 
-	{ 0, 0, &nulldev }, { 0, 0, &nulldev } };
+t_stat cpu_boot (int32 unitno, DEVICE *dptr);
+t_stat build_devtab (void);
 
 /* CPU data structures
 
@@ -339,14 +292,10 @@ REG cpu_reg[] = {
 	{ ORDATA (DONE, dev_done, INT_V_ION+1), REG_RO },
 	{ ORDATA (DISABLE, dev_disable, INT_V_ION+1), REG_RO },
 	{ FLDATA (STOP_DEV, stop_dev, 0) },
-	{ FLDATA (MDV, cpu_unit.flags, UNIT_V_MDV), REG_HRO },
-	{ FLDATA (ISTK, cpu_unit.flags, UNIT_V_STK), REG_HRO },
-	{ FLDATA (IBYT, cpu_unit.flags, UNIT_V_BYT), REG_HRO },
 	{ DRDATA (INDMAX, ind_max, 16), REG_NZ + PV_LEFT },
 	{ BRDATA (PCQ, pcq, 8, 16, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
-	{ ORDATA (IOTENB, iot_enb, 32), REG_HRO },
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
@@ -380,6 +329,7 @@ extern int32 clk_sel, clk_time[4];
 
 /* Restore register state */
 
+if (build_devtab () != SCPE_OK) return SCPE_IERR;	/* build dispatch */
 PC = saved_PC & AMASK;					/* load local PC */
 C = C & CBIT;
 mask_out (pimask);					/* reset int system */
@@ -789,8 +739,7 @@ else {							/* IOT */
 			int_req = int_req & ~INT_ION;
 			break;  }			/* end switch pulse */
 		}					/* end CPU control */
-	else if ((dev_table[device].mask == 0) ||
-		 (dev_table[device].mask & iot_enb)) {	/* normal device */
+	else if (dev_table[device].routine) {		/* normal device */
 		iodata = dev_table[device].routine (pulse, code, AC[dstAC]);
 		reason = iodata >> IOT_V_REASON;
 		if (code & 1) AC[dstAC] = iodata & 0177777;  }
@@ -801,15 +750,8 @@ else {							/* IOT */
 /* Simulation halted */
 
 saved_PC = PC;
-pcq_r -> qptr = pcq_p;					/* update pc q ptr */
+pcq_r->qptr = pcq_p;					/* update pc q ptr */
 return reason;
-}
-
-/* Null device */
-
-int32 nulldev (int32 pulse, int32 code, int32 AC)
-{
-return stop_dev << IOT_V_REASON;
 }
 
 /* New priority mask out */
@@ -835,7 +777,7 @@ pimask = 0;
 dev_disable = 0;
 pwr_low = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r -> qptr = 0;
+if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -859,6 +801,8 @@ M[addr] = val & DMASK;
 return SCPE_OK;
 }
 
+/* Alter memory size */
+
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
@@ -874,6 +818,27 @@ for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
 return SCPE_OK;
 }
 
+/* Build dispatch table */
+
+t_stat build_devtab (void)
+{
+DEVICE *dptr;
+DIB *dibp;
+int32 i, dn;
+
+for (i = 0; i < 64; i++) {				/* clr dev_table */
+	dev_table[i].mask = 0;
+	dev_table[i].pi = 0;
+	dev_table[i].routine = NULL;  }
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
+	if (dibp = (DIB *) dptr->ctxt) {		/* get DIB */
+	    dn = dibp->dnum;				/* get dev num */
+	    dev_table[dn].mask = dibp->mask;		/* copy entries */
+	    dev_table[dn].pi = dibp->pi;
+	    dev_table[dn].routine = dibp->routine;  }  }
+return SCPE_OK;
+}
+
 /* Bootstrap routine for CPU */
 
 #define BOOT_START 00000
@@ -917,49 +882,13 @@ static const int32 boot_rom[] = {
 	0000000		/*	0		;padding */
 };
 
-t_stat cpu_boot (int32 unitno)
+t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 saved_PC = BOOT_START;
-return SCPE_OK;
-}
-
-/* Device enable routine */
-
-t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-DEVICE *dptr;
-
-if (cptr != NULL) return SCPE_ARG;
-if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-iot_enb = iot_enb | val;
-if (dptr -> reset) dptr -> reset (dptr);
-return SCPE_OK;
-}
-
-/* Device disable routine */
-
-t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-int32 i;
-DEVICE *dptr;
-UNIT *up;
-
-if (cptr != NULL) return SCPE_ARG;
-if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-for (i = 0; i < dptr -> numunits; i++) {		/* check units */
-	up = (dptr -> units) + i;
-	if ((up -> flags & UNIT_ATT) || sim_is_active (up))
-		return SCPE_NOFNC;  }
-iot_enb = iot_enb & ~val;
-if (dptr -> reset) dptr -> reset (dptr);
 return SCPE_OK;
 }
 

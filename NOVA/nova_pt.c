@@ -26,6 +26,7 @@
    ptr		paper tape reader
    ptp		paper tape punch
 
+   03-Oct-02	RMS	Added DIBs
    30-May-02	RMS	Widened POS to 32b
    29-Nov-01	RMS	Added read only unit support
 */
@@ -33,7 +34,11 @@
 #include "nova_defs.h"
 
 extern int32 int_req, dev_busy, dev_done, dev_disable;
+
 int32 ptr_stopioe = 0, ptp_stopioe = 0;			/* stop on error */
+
+int32 ptr (int32 pulse, int32 code, int32 AC);
+int32 ptp (int32 pulse, int32 code, int32 AC);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
@@ -45,6 +50,8 @@ t_stat ptp_reset (DEVICE *dptr);
    ptr_unit	PTR unit descriptor
    ptr_reg	PTR register list
 */
+
+DIB ptr_dib = { DEV_PTR, INT_PTR, PI_PTR, &ptr };
 
 UNIT ptr_unit = {
 	UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
@@ -65,7 +72,8 @@ DEVICE ptr_dev = {
 	"PTR", &ptr_unit, ptr_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptr_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&ptr_dib, 0 };
 
 /* PTP data structures
 
@@ -73,6 +81,8 @@ DEVICE ptr_dev = {
    ptp_unit	PTP unit descriptor
    ptp_reg	PTP register list
 */
+
+DIB ptp_dib = { DEV_PTP, INT_PTP, PI_PTP, &ptp };
 
 UNIT ptp_unit = {
 	UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
@@ -92,7 +102,8 @@ DEVICE ptp_dev = {
 	"PTP", &ptp_unit, ptp_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptp_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&ptp_dib, 0 };
 
 /* Paper tape reader: IOT routine */
 

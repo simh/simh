@@ -25,6 +25,8 @@
 
    tti,tto	KL8E terminal input/output
 
+   01-Nov-02	RMS	Added 7B/8B support
+   04-Oct-02	RMS	Added DIBs, device number support
    30-May-02	RMS	Widened POS to 32b
    07-Sep-01	RMS	Moved function prototypes
 */
@@ -32,13 +34,20 @@
 #include "pdp8_defs.h"
 #include <ctype.h>
 
-#define UNIT_V_UC	(UNIT_V_UF + 0)			/* UC only */
-#define UNIT_UC		(1 << UNIT_V_UC)
+#define UNIT_V_8B	(UNIT_V_UF + 0)			/* 8B */
+#define UNIT_V_KSR	(UNIT_V_UF + 1)			/* KSR33 */
+#define UNIT_8B		(1 << UNIT_V_8B)
+#define UNIT_KSR	(1 << UNIT_V_KSR)
+
 extern int32 int_req, int_enable, dev_done, stop_inst;
+
+int32 tti (int32 IR, int32 AC);
+int32 tto (int32 IR, int32 AC);
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
+t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* TTI data structures
 
@@ -48,7 +57,9 @@ t_stat tto_reset (DEVICE *dptr);
    tti_mod	TTI modifiers list
 */
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_UC, 0), KBD_POLL_WAIT };
+DIB tti_dib = { DEV_TTI, 1, { &tti } };
+
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_KSR, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
 	{ ORDATA (BUF, tti_unit.buf, 8) },
@@ -57,19 +68,22 @@ REG tti_reg[] = {
 	{ FLDATA (INT, int_req, INT_V_TTI) },
 	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ FLDATA (UC, tti_unit.flags, UNIT_V_UC), REG_HRO },
+	{ FLDATA (UC, tti_unit.flags, UNIT_V_KSR), REG_HRO },
 	{ NULL }  };
 
 MTAB tti_mod[] = {
-	{ UNIT_UC, 0, "lower case", "LC", NULL },
-	{ UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
+	{ UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", &tty_set_mode },
+	{ UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
+	{ UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_dev },
 	{ 0 }  };
 
 DEVICE tti_dev = {
 	"TTI", &tti_unit, tti_reg, tti_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tti_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&tti_dib, 0 };
 
 /* TTO data structures
 
@@ -78,7 +92,9 @@ DEVICE tti_dev = {
    tto_reg	TTO register list
 */
 
-UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
+DIB tto_dib = { DEV_TTO, 1, { &tto } };
+
+UNIT tto_unit = { UDATA (&tto_svc, UNIT_KSR, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
 	{ ORDATA (BUF, tto_unit.buf, 8) },
@@ -89,17 +105,25 @@ REG tto_reg[] = {
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
 	{ NULL }  };
 
+MTAB tto_mod[] = {
+	{ UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", &tty_set_mode },
+	{ UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
+	{ UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_dev },
+	{ 0 }  };
+
 DEVICE tto_dev = {
-	"TTO", &tto_unit, tto_reg, NULL,
+	"TTO", &tto_unit, tto_reg, tto_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tto_reset, 
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&tto_dib, 0 };
 
 /* Terminal input: IOT routine */
 
-int32 tti (int32 pulse, int32 AC)
+int32 tti (int32 IR, int32 AC)
 {
-switch (pulse) {					/* decode IR<9:11> */
+switch (IR & 07) {					/* decode IR<9:11> */
 case 0: 						/* KCF */
 	dev_done = dev_done & ~INT_TTI;			/* clear flag */
 	int_req = int_req & ~INT_TTI;
@@ -129,14 +153,15 @@ default:
 
 t_stat tti_svc (UNIT *uptr)
 {
-int32 temp;
+int32 c;
 
 sim_activate (&tti_unit, tti_unit.wait);		/* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
-temp = temp & 0177;
-if ((tti_unit.flags & UNIT_UC) && islower (temp))
-	temp = toupper (temp);
-tti_unit.buf = temp | 0200;				/* got char */
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
+if (tti_unit.flags & UNIT_KSR) {			/* UC only? */
+	c = c & 0177;
+	if (islower (c)) c = toupper (c);
+	tti_unit.buf = c | 0200;  }			/* add TTY bit */
+else tti_unit.buf = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);
 dev_done = dev_done | INT_TTI;				/* set done */
 int_req = INT_UPDATE;					/* update interrupts */
 tti_unit.pos = tti_unit.pos + 1;
@@ -157,9 +182,9 @@ return SCPE_OK;
 
 /* Terminal output: IOT routine */
 
-int32 tto (int32 pulse, int32 AC)
+int32 tto (int32 IR, int32 AC)
 {
-switch (pulse) {					/* decode IR<9:11> */
+switch (IR & 07) {					/* decode IR<9:11> */
 case 0: 						/* TLF */
 	dev_done = dev_done | INT_TTO;			/* set flag */
 	int_req = INT_UPDATE;				/* update interrupts */
@@ -187,11 +212,16 @@ default:
 
 t_stat tto_svc (UNIT *uptr)
 {
-int32 temp;
+int32 c;
+t_stat r;
 
 dev_done = dev_done | INT_TTO;				/* set done */
 int_req = INT_UPDATE;					/* update interrupts */
-if ((temp = sim_putchar (tto_unit.buf & 0177)) != SCPE_OK) return temp;
+if (tto_unit.flags & UNIT_KSR) {			/* UC only? */
+	c = tto_unit.buf & 0177;
+	if (islower (c)) c = toupper (c);  }
+else c = tto_unit.buf & ((tto_unit.flags & UNIT_8B)? 0377: 0177);
+if ((r = sim_putchar (c)) != SCPE_OK) return r;
 tto_unit.pos = tto_unit.pos + 1;
 return SCPE_OK;
 }
@@ -205,5 +235,12 @@ dev_done = dev_done & ~INT_TTO;				/* clear done, int */
 int_req = int_req & ~INT_TTO;
 int_enable = int_enable | INT_TTO;			/* set enable */
 sim_cancel (&tto_unit);					/* deactivate unit */
+return SCPE_OK;
+}
+
+t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+tti_unit.flags = (tti_unit.flags & ~(UNIT_KSR | UNIT_8B)) | val;
+tto_unit.flags = (tto_unit.flags & ~(UNIT_KSR | UNIT_8B)) | val;
 return SCPE_OK;
 }

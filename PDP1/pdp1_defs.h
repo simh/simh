@@ -57,6 +57,7 @@
 
 /* Architectural constants */
 
+#define DMASK		0777777				/* data mask */
 #define DAMASK		007777				/* direct addr */
 #define EPCMASK		(AMASK & ~DAMASK)		/* extended addr */
 #define IA		010000				/* indirect flag */

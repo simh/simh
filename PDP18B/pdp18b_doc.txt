@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	18b PDP Simulator Usage
-Date:	15-Jul-2002
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -47,11 +47,11 @@ PDP-15/		PDP15
 If no model is specified, the default is the PDP-9.
 
 sim/		sim_defs.h
+		sim_rev.h
 		sim_sock.h
 		sim_tmxr.h
 		scp.c
 		scp_tty.c
-		sim_rev.c
 		sim_sock.c
 		sim_tmxr.c
 
@@ -80,6 +80,7 @@ PDP-4	CPU		PDP-4 CPU with 8KW of memory
 	TTI,TTO		KSR28 console terminal (Baudot code)
 	LPT		Type 62 line printer (Hollerith code)
 	CLK		integral real-time clock
+	DT		Type 550/555 DECtape
 
 PDP-7	CPU		PDP-7 CPU with 32KW of memory
 	-		Type 177 extended arithmetic element (EAE)
@@ -121,7 +122,16 @@ PDP-15	CPU		PDP-15 CPU with 32KW of memory
 	DT		TC15/TU56 DECtape
 	MT		TC59/TU10 magnetic tape
 
-The DRM, RF, RP, DT, and MT devices can be set DISABLED.
+Most devices can be disabled or enabled, by the commands:
+
+	SET <dev> DISABLED
+	SET <dev> ENABLED
+
+The simulator allows most device numbers to be changed, by the command:
+
+	SET <dev> DEV=<number>
+
+However, devices can only be BOOTed with their default device numbers.
 
 The 18b PDP simulators implement several unique stop conditions:
 
@@ -134,7 +144,8 @@ The PDP-4 and PDP-7 loaders support only RIM format tapes.  The PDP-9
 and PDP-15 support both RIM and BIN format tapes.  If the file extension
 is .RIM, or the -r switch is specified with LOAD, the file is assumed to
 be RIM format; if the file extension is not .RIM, or if the -b switch is
-specified, the file is assumed to be BIN format.
+specified, the file is assumed to be BIN format.  RIM loading requires
+that the loading address be specified on the command line.
 
 2.1 CPU
 
@@ -226,7 +237,7 @@ BOOT PTR copies the RIM loader into memory and starts it running, while
 BOOT -F PTR copies the funny format binary loader into memory and starts
 it running.
 
-The PTR ATTACH command recognizes one switch, -a for ASCII mode.  In
+The PTR ATTACH command recognizes one switch, -A for ASCII mode.  In
 ASCII mode, data returned by the read alphabetic command has the high
 order bit automatically set to 1.  This allows normal text files to be
 used as input to the paper tape reader.
@@ -261,7 +272,7 @@ The paper tape punch (PTP) writes data to a disk file.  The POS
 register specifies the number of the next data item to be written.
 Thus, by changing POS, the user can backspace or advance the punch.
 
-The PTP ATTACH command recognizes one switch, -a for ASCII mode.  In
+The PTP ATTACH command recognizes one switch, -A for ASCII mode.  In
 ASCII mode, data is punched with the high order bit clear, and NULL and
 DEL characters are supressed.  This allows punch output to be processed
 with normal text editing utilities.
@@ -289,17 +300,20 @@ Error handling is as follows:
 
 2.2.3 Terminal Input (TTI)
 
-The terminal input (TTI) polls the console keyboard for input.  The
-input side has one option, UC; when set, it automatically converts lower
-case input to upper case.
+On the PDP-7, PDP-9, and PDP-15, the terminal interfaces (TTI, TTO)
+can be set to one of three modes: KSR, 7B, or 8B.  In KSR mode, lower
+case input and output characters are automatically converted to upper
+case, the high order bit is forced to one on input, and printing of
+ALTmode characters is supressed.  In 7B mode, input and output characters
+are masked to 7 bits.  In 8B mode, characters are not modified.  Changing
+the mode of either interface changes both.  The default mode is KSR.
 
-The PDP-9 and PDP-15 operate the console terminal (TTI/TTO), by default,
-with local echo.  For backward compatibility, on the PDP-9 and PDP-15
-the first terminal input has a second option, FDX; when set, it operates
-the terminal input without local echo mode.  The second terminal does
-not offer local echo.
+On the PDP-9 and PDP-15, the console terminal operates, by default,
+with local echo.  For backward compatibility, the terminal input can
+be set to FDX (full duplex), which supresses local echo.
 
-The terminal input implements these registers:
+The terminal input (TTI) polls the console keyboard for input.  It
+implements these registers:
 
 	name		size	comments
 
@@ -311,11 +325,8 @@ The terminal input implements these registers:
 
 2.2.4 Terminal Output (TTO)
 
-The terminal output (TTO) writes to the simulator console window.  The
-terminal output has one option, UC; when set, it suppresses lower case
-output (so that ALTMODE is not echoed as }).
-
-The terminal output implements these registers:
+The terminal output (TTO) writes to the simulator console window.  It
+implements these registers:
 
 	name		size	comments
 
@@ -331,7 +342,7 @@ The line printer (LPT) writes data to a disk file.  The POS register
 specifies the number of the next data item to be written.  Thus,
 by changing POS, the user can backspace or advance the printer.
 
-The PDP-4 used a Type 62 printer controller, with these registers:
+The PDP-4 uses a Type 62 printer controller, with these registers:
 
 	name		size	comments
 
@@ -345,7 +356,7 @@ The PDP-4 used a Type 62 printer controller, with these registers:
 	STOP_IOE	1	stop on I/O error
 	LBUF[0:119]	8	line buffer
 
-The PDP-7 and PDP-7 used a Type 647 printer controller, with these
+The PDP-7 and PDP-9 use a Type 647 printer controller, with these
 registers:
 
 	name		size	comments
@@ -353,7 +364,7 @@ registers:
 	BUF		8	last data item processed
 	INT		1	interrupt pending flag
 	DONE		1	device done flag
-	ENABLE	1	interrupt enable (PDP-9 only)
+	ENABLE		1	interrupt enable (PDP-9 only)
 	ERR		1	error flag
 	BPTR		7	print buffer pointer
 	POS		32	position in the output file
@@ -361,14 +372,14 @@ registers:
 	STOP_IOE	1	stop on I/O error
 	LBUF[0:119]	8	line buffer
 
-The PDP-15 used an LP15 printer controller, with these registers:
+The PDP-15 uses an LP15 printer controller, with these registers:
 
 	name		size	comments
 
 	STA		18	status register
 	MA		18	DMA memory address
 	INT		1	interrupt pending flag
-	ENABLE	1	interrupt enable
+	ENABLE		1	interrupt enable
 	LCNT		8	line counter
 	BPTR		7	print buffer pointer
 	POS		32	position in the output file
@@ -393,7 +404,7 @@ The real-time clock (CLK) implements these registers:
 
 	INT		1	interrupt pending flag
 	DONE		1	device done flag
-	ENABLE	1	clock enable
+	ENABLE		1	clock enable
 	TIME		24	clock frequency
 	TPS		8	ticks per second (60 or 50)
 
@@ -417,10 +428,13 @@ for a connection on the specified port.  It assumes that the incoming
 connection is a Telnet connection.  The connection remain opens until
 disconnected by the Telnet client, or by a DETACH TTI1 command.
 
-The second terminal input has one option, UC;  when set, it automatically
-converts lower case input to upper case.  The second terminal output also
-has one option, UC; when set, it suppresses lower case output (so that
-ALTMODE is not echoed as }).
+The second terminal (TTI1,TTO1) can be set to one of three modes: KSR, 7B,
+or 8B.  In KSR mode, lower case input and output characters are converted
+automatically to upper case, the high order bit is forced to one on input,
+and printing of ALTmode characters is supressed.  In 7B mode, input and
+output characters are masked to 7 bits.  In 8B mode, characters are not
+modified.  Changing the mode of either device changes both.  The default
+mode is KSR.
 
 The SHOW TTI1 CONNECTIONS command displays the current connection to TTI1.
 The SHOW TTI1 STATISTICS command displays statistics for the current connection.
@@ -537,10 +551,10 @@ I/O errors cannot occur.
 
 2.6 Type 550/555, TC02/TU55, and TC15/TU56 DECtape (DT)
 
-The PDP-7 used the Type 550 DECtape, a programmed I/O controller.  The
-PDP-9 used the TC02, and the PDP-15 used the TC15.  The TC02 and TC15 were
-DMA controllers and programmatically identical.  PDP-7 DECtape format had
-4 18b words in its block headers and trailers; PDP-9/15 DECtape format
+The PDP-4 and PDP-7 use the Type 550 DECtape, a programmed I/O controller.
+The PDP-9 uses the TC02, and the PDP-15 uses the TC15.  The TC02 and TC15
+are DMA controllers and programmatically identical.  PDP-4/7 DECtape format
+had 4 18b words in its block headers and trailers; PDP-9/15 DECtape format
 had 5 18b words.
 
 DECtapes drives are numbered 1-8; in the simulator, drive 8 is unit 0.
@@ -552,12 +566,14 @@ locked.
 
 Units can also be set ONLINE or OFFLINE.
 
-The Type 550, TC02, and TC15 support both PDP-8 format and PDP-9/11/15
-format DECtape images.  ATTACH tries to determine the tape format from
-the DECtape image; the user can force a particular format with switches:
+The Type 550, TC02, and TC15 support supports PDP-8 format, PDP-11 format,
+and 18b format DECtape images.  ATTACH tries to determine the tape
+format from the DECtape image; the user can force a particular format
+with switches:
 
-	-f			foreign (PDP-8) format
-	-n			native (PDP-9/11/15) format
+	-r			PDP-8 format
+	-s			PDP-11 format
+	-t			18b format
 
 The DECtape controller is a data-only simulator; the timing and mark
 track, and block header and trailer, are not stored.  Thus, the WRITE
@@ -622,12 +638,11 @@ Error handling is as follows:
 
 	error			processed as
 
-	not attached		tape not ready
+	not attached		tape not ready; if STOP_IOE, stop
 
-	end of file		(read or space) end of physical tape
-				(write) ignored
+	end of file		bad tape
 
-	OS I/O error		report error and stop
+	OS I/O error		parity error; if STOP_IOE, stop
 
 2.8 Symbolic Display and Input
 

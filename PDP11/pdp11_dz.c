@@ -25,6 +25,7 @@
 
    dz		DZ11 terminal multiplexor
 
+   01-Nov-02	RMS	Added 8B support
    09-Nov-01	RMS	Added VAX support
 */
 
@@ -32,11 +33,13 @@
 #define VM_VAX		1
 #include "vax_defs.h"
 #define DZ_RDX		16
+#define DZ_8B_DFLT	UNIT_8B
 
 #else
 #define VM_PDP11	1
 #include "pdp11_defs.h"
 #define DZ_RDX		8
+#define DZ_8B_DFLT	UNIT_8B
 #endif
 
 #include "dec_dz.h"

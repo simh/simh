@@ -25,6 +25,10 @@
 
    cpu		PDP-11 CPU (J-11 microprocessor)
 
+   17-Oct-02	RMS	Fixed bug in examine/deposit (found by Hans Pufal)
+   08-Oct-02	RMS	Revised to build dib_tab dynamically
+			Added SHOW IOSPACE
+   09-Sep-02	RMS	Added KW11P support
    14-Jul-02	RMS	Fixed bug in MMR0 error status load
    03-Jun-02	RMS	Fixed relocation add overflow, added PS<15:12> = 1111
 			special case logic to MFPI and removed it from MTPI
@@ -184,11 +188,10 @@
       Because the PSW can be explicitly written as address 17777776,
       all instructions must update PSW before executing their last write.
 
-   4. Adding I/O devices.  This requires modifications to three modules:
+   4. Adding I/O devices.  These modules must be modified:
 
-	pdp11_defs.h		add interrupt request definitions
-	pdp11_io.c		add to dib_tab
-	pdp11_sys.c		add to sim_devices
+	pdp11_defs.h	add device address and interrupt definitions
+	pdp11_sys.c	add to sim_devices table entry
 */
 
 /* Definitions */
@@ -277,9 +280,10 @@ int32 dsmask[4] = { MMR3_KDS, MMR3_SDS, 0, MMR3_UDS };	/* dspace enables */
 
 extern int32 sim_interval;
 extern UNIT *sim_clock_queue;
-extern UNIT clk_unit;
+extern UNIT clk_unit, pclk_unit;
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
+extern DEVICE *sim_devices[];
 
 /* Function declarations */
 
@@ -287,6 +291,7 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_bus (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 GeteaB (int32 spec);
 int32 GeteaW (int32 spec);
 int32 relocR (int32 addr);
@@ -310,6 +315,8 @@ t_stat MMR3_wr (int32 data, int32 addr, int32 access);
 t_stat ubm_rd (int32 *data, int32 addr, int32 access);
 t_stat ubm_wr (int32 data, int32 addr, int32 access);
 
+extern t_stat build_dib_tab (int32 ubm);
+extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
 extern t_stat iopageR (int32 *data, uint32 addr, int32 access);
 extern t_stat iopageW (int32 data, uint32 addr, int32 access);
 extern int32 calc_ints (int32 nipl, int32 trq);
@@ -336,12 +343,12 @@ int32 trap_clear[TRAP_V_MAX] = {			/* trap clears */
 
 /* Fixed I/O address table entries */
 
-DIB cpu0_dib = { 1, IOBA_CPU, IOLN_CPU, &CPU_rd, &CPU_wr };
-DIB cpu1_dib = { 1, IOBA_APR, IOLN_APR, &APR_rd, &APR_wr };
-DIB cpu2_dib = { 1, IOBA_APR1, IOLN_APR1, &APR_rd, &APR_wr };
-DIB cpu3_dib = { 1, IOBA_SRMM, IOLN_SRMM, &SR_MMR012_rd, &SR_MMR012_wr };
-DIB cpu4_dib = { 1, IOBA_MMR3, IOLN_MMR3, &MMR3_rd, &MMR3_wr };
-DIB ubm_dib = { 0, IOBA_UBM, IOLN_UBM, &ubm_rd, &ubm_wr };
+DIB cpu0_dib = { IOBA_CPU, IOLN_CPU, &CPU_rd, &CPU_wr, 0 };
+DIB cpu1_dib = { IOBA_APR, IOLN_APR, &APR_rd, &APR_wr, 0 };
+DIB cpu2_dib = { IOBA_APR1, IOLN_APR1, &APR_rd, &APR_wr, 0 };
+DIB cpu3_dib = { IOBA_SRMM, IOLN_SRMM, &SR_MMR012_rd, &SR_MMR012_wr, 0 };
+DIB cpu4_dib = { IOBA_MMR3, IOLN_MMR3, &MMR3_rd, &MMR3_wr, 0 };
+DIB ubm_dib = { IOBA_UBM, IOLN_UBM, &ubm_rd, &ubm_wr, 0 };
 
 /* CPU data structures
 
@@ -395,7 +402,7 @@ REG cpu_reg[] = {
 	{ ORDATA (STOP_TRAPS, stop_trap, TRAP_V_MAX) },
 	{ FLDATA (STOP_VECA, stop_vecabort, 0) },
 	{ FLDATA (STOP_SPA, stop_spabort, 0) },
-	{ ORDATA (DBGLOG, cpu_log, 16), REG_HIDDEN },
+	{ HRDATA (DBGLOG, cpu_log, 16), REG_HIDDEN },
 	{ ORDATA (FAC0H, FR[0].h, 32) },
 	{ ORDATA (FAC0L, FR[0].l, 32) },
 	{ ORDATA (FAC1H, FR[1].h, 32) },
@@ -512,10 +519,6 @@ REG cpu_reg[] = {
 	{ GRDATA (UDPAR7, APRFILE[077], 8, 16, 16) },
 	{ GRDATA (UDPDR7, APRFILE[077], 8, 16, 0) },
 	{ BRDATA (UBMAP, ub_map, 8, 22, UBM_LNT_LW) },
-	{ FLDATA (18B_ADDR, cpu_unit.flags, UNIT_V_18B), REG_HRO },
-	{ FLDATA (UB_MAP, cpu_unit.flags, UNIT_V_UBM), REG_HRO },
-	{ FLDATA (RH11, cpu_unit.flags, UNIT_V_RH11), REG_HRO },
-	{ FLDATA (CIS, cpu_unit.flags, UNIT_V_CIS), REG_HRO },
 	{ BRDATA (PCQ, pcq, 8, 16, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
@@ -524,9 +527,9 @@ REG cpu_reg[] = {
 
 MTAB cpu_mod[] = {
 	{ UNIT_MAP, UNIT_18B, "18b addressing", "18B", NULL },
-	{ UNIT_MAP, UNIT_UBM, "22b Unibus + RH70", "URH70", NULL },
-	{ UNIT_MAP, UNIT_UBM + UNIT_RH11, "22b Unibus + RH11", "URH11", NULL },
-	{ UNIT_MAP, 0, "22b addressing", "22B", NULL },
+	{ UNIT_MAP, UNIT_UBM, "22b Unibus + RH70", "URH70", &cpu_set_bus },
+	{ UNIT_MAP, UNIT_UBM + UNIT_RH11, "22b Unibus + RH11", "URH11", &cpu_set_bus },
+	{ UNIT_MAP, 0, "22b addressing", "22B", &cpu_set_bus },
 	{ UNIT_CIS, UNIT_CIS, "CIS", "CIS", NULL },
 	{ UNIT_CIS, 0, "no CIS", "NOCIS", NULL },
 	{ UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size},
@@ -548,6 +551,8 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, 2097152, NULL, "2M", &cpu_set_size},
 	{ UNIT_MSIZE, 3145728, NULL, "3M", &cpu_set_size},
 	{ UNIT_MSIZE, 4186112, NULL, "4M", &cpu_set_size},
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
+	  NULL, &show_iospace },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -573,8 +578,12 @@ void cis11 (int32 IR);
 	5. Interrupt system
 */
 
-if (cpu_unit.flags & UNIT_UBM) ubm_dib.enb = 1;		/* enb/dis map */
-else ubm_dib.enb = 0;
+cpu_18b = cpu_unit.flags & UNIT_18B;			/* export cnf flgs */
+cpu_ubm = cpu_unit.flags & UNIT_UBM;
+cpu_rh11 = cpu_unit.flags & UNIT_RH11;
+cpu_bme = (MMR3 & MMR3_BME) && cpu_ubm;
+reason = build_dib_tab (cpu_ubm);			/* build, chk dib_tab */
+if (reason != SCPE_OK) return reason;
 cm = (PSW >> PSW_V_CM) & 03;				/* call calc_is,ds */
 pm = (PSW >> PSW_V_PM) & 03;
 rs = (PSW >> PSW_V_RS) & 01;
@@ -593,14 +602,11 @@ isenable = calc_is (cm);
 dsenable = calc_ds (cm);
 
 CPU_wr (PIRQ, 017777772, WRITE);			/* rewrite PIRQ */
-cpu_bme = (MMR3 & MMR3_BME) && (cpu_unit.flags & UNIT_UBM);
-cpu_18b = cpu_unit.flags & UNIT_18B;			/* export cnf flgs */
-cpu_ubm = cpu_unit.flags & UNIT_UBM;
-cpu_rh11 = cpu_unit.flags & UNIT_RH11;
 trap_req = calc_ints (ipl, trap_req);			/* upd int req */
 trapea = 0;
 reason = 0;
 sim_rtcn_init (clk_unit.wait, TMR_CLK);			/* init line clock */
+sim_rtcn_init (pclk_unit.wait, TMR_PCLK);		/* init prog clock */
 
 /* Abort handling
 
@@ -1689,7 +1695,7 @@ PSW = (cm << PSW_V_CM) | (pm << PSW_V_PM) | (rs << PSW_V_RS) |
 for (i = 0; i < 6; i++) REGFILE[i][rs] = R[i];
 STACKFILE[cm] = SP;
 saved_PC = PC & 0177777;
-pcq_r -> qptr = pcq_p;					/* update pc q ptr */
+pcq_r->qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }
 
@@ -1805,7 +1811,6 @@ case 2:							/* (R)+ */
 	if (update_MM) MMR1 = calc_MMR1 ((delta << 3) | reg);
 	return (adr | ds);
 case 3:							/* @(R)+ */
-	adr = R[reg];
 	R[reg] = ((adr = R[reg]) + 2) & 0177777;
 	if (update_MM) MMR1 = calc_MMR1 (020 | reg);
 	adr = ReadW (adr | ds);
@@ -2086,7 +2091,7 @@ return pa;
 	sw	=	switches
    Outputs:
 	pa	=	physical address
-   On aborts, this routine returns -1
+   On aborts, this routine returns MAXMEMSIZE
 */
 
 int32 relocC (int32 va, int32 sw)
@@ -2104,8 +2109,8 @@ if (MMR0 & MMR0_MME) {					/* if mmgt */
 	apr = APRFILE[apridx];				/* with va<18:13> */
 	dbn = va & VA_BN;				/* extr block num */
 	plf = (apr & PDR_PLF) >> 2;			/* extr page length */
-	if ((apr & PDR_PRD) == 0) return -1;		/* not readable? */
-	if ((apr & PDR_ED)? dbn < plf: dbn > plf) return -1;
+	if ((apr & PDR_PRD) == 0) return MAXMEMSIZE;	/* not readable? */
+	if ((apr & PDR_ED)? dbn < plf: dbn > plf) return MAXMEMSIZE;
 	pa = ((va & VA_DF) + ((apr >> 10) & 017777700)) & PAMASK;
 	if ((MMR3 & MMR3_M22E) == 0) {
 		pa = pa & 0777777;
@@ -2171,7 +2176,7 @@ if (pa & 1) return SCPE_OK;
 MMR3 = data & MMR3_RW;
 if (cpu_unit.flags & UNIT_18B)
 	MMR3 = MMR3 & ~(MMR3_BME + MMR3_M22E);		/* for UNIX V6 */
-cpu_bme = (MMR3 & MMR3_BME) && (cpu_unit.flags & UNIT_UBM);
+cpu_bme = (MMR3 & MMR3_BME) && cpu_ubm;
 dsenable = calc_ds (cm);
 return SCPE_OK;
 }
@@ -2364,7 +2369,7 @@ wait_state = 0;
 if (M == NULL) M = calloc (MEMSIZE >> 1, sizeof (unsigned int16));
 if (M == NULL) return SCPE_MEM;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r -> qptr = 0;
+if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 for (i = 0; i < UBM_LNT_LW; i++) ub_map[i] = 0;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
@@ -2382,7 +2387,7 @@ if (vptr == NULL) return SCPE_ARG;
 if (sw & SWMASK ('V')) {				/* -v */
 	if (addr >= VASIZE) return SCPE_NXM;
 	addr = relocC (addr, sw);			/* relocate */
-	if (addr < 0) return SCPE_REL;  }
+	if (addr >= MAXMEMSIZE) return SCPE_REL;  }
 if (addr < MEMSIZE) {
 	*vptr = M[addr >> 1] & 0177777;
 	return SCPE_OK;  }
@@ -2399,7 +2404,7 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 if (sw & SWMASK ('V')) {				/* -v */
 	if (addr >= VASIZE) return SCPE_NXM;
 	addr = relocC (addr, sw);			/* relocate */
-	if (addr < 0) return SCPE_REL;  }
+	if (addr >= MAXMEMSIZE) return SCPE_REL;  }
 if (addr < MEMSIZE) {
 	M[addr >> 1] = val & 0177777;
 	return SCPE_OK;  }
@@ -2413,7 +2418,7 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
 t_addr i, clim;
-unsigned int16 *nM = NULL;
+unsigned int16 *nM;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
 	return SCPE_ARG;
@@ -2427,4 +2432,26 @@ for (i = 0; i < clim; i = i + 2) nM[i >> 1] = M[i >> 1];
 free (M);
 M = nM;
 MEMSIZE = val;
-return SCPE_OK;  }
+return cpu_set_bus (uptr, (cpu_unit.flags & UNIT_MAP) | 1, cptr, desc);  }
+
+/* Bus configuration, disable Unibus or Qbus devices */
+
+t_stat cpu_set_bus (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+DEVICE *dptr;
+uint32 i, target;
+
+if ((MEMSIZE <= UNIMEMSIZE) || (val & UNIT_18B) ||
+   (!(val & 1) && ((uint32) val == (cpu_unit.flags & UNIT_MAP)))) return SCPE_OK;
+if (val & UNIT_MAP) target = DEV_QBUS;			/* going to Ubus? */
+else target = DEV_UBUS;					/* going to Qbus */
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+	if ((dptr->flags & DEV_DISABLE) &&		/* disable-able? */
+	    !(dptr->flags & DEV_DIS) &&			/* enabled? */
+	    ((dptr->flags & (DEV_QBUS|DEV_UBUS)) == target)) {
+	    printf ("Disabling %s\n", dptr->name);
+	    if (sim_log) fprintf (sim_log, "Disabling %s\n", dptr->name);
+	    dptr->flags = dptr->flags | DEV_DIS;  }  }
+return SCPE_OK;
+}
+

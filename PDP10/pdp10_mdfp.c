@@ -620,18 +620,18 @@ void funpack (d10 h, d10 l, UFP *r, t_bool sgn)
 {
 d10 fphi, fplo;
 
-r -> sign = GET_FPSIGN (h);
-r -> exp = GET_FPEXP (h);
+r->sign = GET_FPSIGN (h);
+r->exp = GET_FPEXP (h);
 fphi = GET_FPHI (h);
 fplo = GET_FPLO (l);
-r -> fhi = (fphi << FP_V_UFHI) | (fplo << FP_V_UFLO);
-r -> flo = 0;
-if (r -> sign) {
-	r -> exp = r -> exp ^ FP_M_EXP;
-	if (sgn) r -> fhi = r -> fhi | FP_UCRY;		/* ext sign */ 
-	else {	if (r -> fhi) r -> fhi = UNEG (r -> fhi) & FP_UFRAC;
-		else {	r -> exp = r -> exp + 1;
-			r -> fhi = FP_UNORM;  }  }  }
+r->fhi = (fphi << FP_V_UFHI) | (fplo << FP_V_UFLO);
+r->flo = 0;
+if (r->sign) {
+	r->exp = r->exp ^ FP_M_EXP;
+	if (sgn) r->fhi = r->fhi | FP_UCRY;		/* ext sign */ 
+	else {	if (r->fhi) r->fhi = UNEG (r->fhi) & FP_UFRAC;
+		else {	r->exp = r->exp + 1;
+			r->fhi = FP_UNORM;  }  }  }
 return;
 }
 
@@ -645,20 +645,20 @@ static t_uint64 normmask[6] = {
  0x7FFF800000000000, 0x7FFFFFFF80000000, 0x7FFFFFFFFFFFFFFF };
 static int32 normtab[7] = { 1, 2, 4, 8, 16, 32, 63 };
 
-if ((a -> fhi | a -> flo) == 0) {			/* if fraction = 0 */
-	a -> sign = a -> exp = 0;			/* result is 0 */
+if ((a->fhi | a->flo) == 0) {				/* if fraction = 0 */
+	a->sign = a->exp = 0;				/* result is 0 */
 	return;  }
-while ((a -> fhi & FP_UNORM) == 0) {			/* normalized? */
+while ((a->fhi & FP_UNORM) == 0) {			/* normalized? */
 	for (i = 0; i < 6; i++) {
-		if (a -> fhi & normmask[i]) break;  }
-	a -> fhi = (a -> fhi << normtab[i]) | (a -> flo >> (64 - normtab[i]));
-	a -> flo = a -> flo << normtab[i];
-	a -> exp = a -> exp - normtab[i];  }
+		if (a->fhi & normmask[i]) break;  }
+	a->fhi = (a->fhi << normtab[i]) | (a->flo >> (64 - normtab[i]));
+	a->flo = a->flo << normtab[i];
+	a->exp = a->exp - normtab[i];  }
 if (rnd) {						/* rounding? */
-	a -> fhi = a -> fhi + rnd;			/* add round const */
-	if (a -> fhi & FP_UCRY) {			/* if carry out, */
-		a -> fhi = a -> fhi >> 1;		/* renormalize */
-		a -> exp = a -> exp + 1;  }  }
+	a->fhi = a->fhi + rnd;				/* add round const */
+	if (a->fhi & FP_UCRY) {				/* if carry out, */
+		a->fhi = a->fhi >> 1;			/* renormalize */
+		a->exp = a->exp + 1;  }  }
 return;
 }
 
@@ -668,13 +668,13 @@ d10 fpack (UFP *r, d10 *lo, t_bool fdvneg)
 {
 d10 val[2];
 
-if (r -> exp < 0) SETF (F_AOV | F_FOV | F_FXU | F_T1);
-else if (r -> exp > FP_M_EXP) SETF (F_AOV | F_FOV | F_T1);
-val[0] = (((((d10) r -> exp) & FP_M_EXP) << FP_V_EXP) |
-	((r -> fhi & FP_UFHI) >> FP_V_UFHI)) & DMASK;
-if (lo) val[1] = ((r -> fhi & FP_UFLO) >> FP_V_UFLO) & MMASK;
+if (r->exp < 0) SETF (F_AOV | F_FOV | F_FXU | F_T1);
+else if (r->exp > FP_M_EXP) SETF (F_AOV | F_FOV | F_T1);
+val[0] = (((((d10) r->exp) & FP_M_EXP) << FP_V_EXP) |
+	((r->fhi & FP_UFHI) >> FP_V_UFHI)) & DMASK;
+if (lo) val[1] = ((r->fhi & FP_UFLO) >> FP_V_UFLO) & MMASK;
 else val[1] = 0;
-if (r -> sign) {					/* negate? */
+if (r->sign) {						/* negate? */
 	if (fdvneg) {					/* fdvr special? */
 		val[1] = ~val[1] & MMASK;		/* 1's comp */
 		val[0] = ~val[0] & DMASK;  }

@@ -25,6 +25,9 @@
 
    mux,muxl,muxc	12920A terminal multiplexor
 
+   01-Nov-02	RMS	Added 7B/8B support
+   22-Aug-02	RMS	Updated for changes to sim_tmxr
+
    The 12920A consists of three separate devices
 
    mux			scanner (upper data card)
@@ -42,8 +45,10 @@
 
 #define MUX_LINES	16				/* user lines */
 #define MUX_ILINES	5				/* diag rcv only */
-#define UNIT_V_UC	(UNIT_V_UF + 0)			/* UC only */
-#define UNIT_V_MDM	(UNIT_V_UF + 1)			/* modem control */
+#define UNIT_V_8B	(UNIT_V_UF + 0)			/* 8B */
+#define UNIT_V_UC	(UNIT_V_UF + 1)			/* UC only */
+#define UNIT_V_MDM	(UNIT_V_UF + 2)			/* modem control */
+#define UNIT_8B		(1 << UNIT_V_8B)
 #define UNIT_UC		(1 << UNIT_V_UC)
 #define UNIT_MDM	(1 << UNIT_V_MDM)
 #define MUXU_INIT_POLL	8000
@@ -145,8 +150,9 @@ uint32 muxc_chan = 0;					/* ctrl chan */
 uint32 muxc_scan = 0;					/* ctrl scan */
 
 TMLN mux_ldsc[MUX_LINES] = { 0 };			/* line descriptors */
-TMXR mux_desc = { MUX_LINES, 0, NULL };			/* mux descriptor */
+TMXR mux_desc = { MUX_LINES, 0, 0, NULL };		/* mux descriptor */
 
+DEVICE muxl_dev, muxu_dev, muxc_dev;
 int32 muxlio (int32 inst, int32 IR, int32 dat);
 int32 muxuio (int32 inst, int32 IR, int32 dat);
 int32 muxcio (int32 inst, int32 IR, int32 dat);
@@ -160,8 +166,6 @@ t_stat mux_show (FILE *st, UNIT *uptr, int32 val, void *desc);
 void mux_data_int (void);
 void mux_ctrl_int (void);
 void mux_diag (int32 c);
-t_stat mux_enb (UNIT *uptr, int32 num, char *cptr, void *desc);
-t_stat mux_dis (UNIT *uptr, int32 num, char *cptr, void *desc);
 
 static uint8 odd_par[256] = {
  1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,	/* 000-017 */
@@ -183,9 +187,9 @@ static uint8 odd_par[256] = {
 
 #define RCV_PAR(x)	(odd_par[(x) & 0377]? LIL_PAR: 0)
 
- DIB mux_dib[] = {
-	{ MUXL, 1, 0, 0, 0, 0, &muxlio },
-	{ MUXU, 1, 0, 0, 0, 0, &muxuio }  };
+DIB mux_dib[] = {
+	{ MUXL, 0, 0, 0, 0, &muxlio },
+	{ MUXU, 0, 0, 0, 0, &muxuio }  };
 
 #define muxl_dib mux_dib[0]
 #define muxu_dib mux_dib[1]
@@ -208,30 +212,26 @@ REG muxu_reg[] = {
 	{ FLDATA (FLG, muxu_dib.flg, 0), REG_HRO },
 	{ FLDATA (FBF, muxu_dib.fbf, 0), REG_HRO },
 	{ ORDATA (DEVNO, muxu_dib.devno, 6), REG_HRO },
-	{ FLDATA (*DEVENB, muxu_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB muxu_mod[] = {
-	{ MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-		&tmxr_dscln, NULL, &mux_desc },
 	{ UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &mux_summ },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
 		NULL, &mux_show, NULL },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
 		NULL, &mux_show, NULL },
-	{ MTAB_XTD | MTAB_VDV, 0, NULL, "ENABLED",
-		&mux_enb, NULL, NULL },
-	{ MTAB_XTD | MTAB_VDV, 0, NULL, "DISABLED",
-		&mux_dis, NULL, NULL },
 	{ MTAB_XTD|MTAB_VDV, 1, "DEVNO", "DEVNO",
-		&hp_setdev, &hp_showdev, &mux_dib },
+		&hp_setdev, &hp_showdev, &muxl_dev },
+	{ MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
+		&tmxr_dscln, NULL, &mux_desc },
 	{ 0 }  };
 
 DEVICE muxu_dev = {
 	"MUX", &muxu_unit, muxu_reg, muxu_mod,
 	1, 10, 31, 1, 8, 8,
 	&tmxr_ex, &tmxr_dep, &mux_reset,
-	NULL, &mux_attach, &mux_detach };
+	NULL, &mux_attach, &mux_detach,
+	&muxu_dib, DEV_DISABLE };
 
 /* MUXL data structures
 
@@ -261,16 +261,13 @@ UNIT muxl_unit[] = {
 	{ UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT } };
 
 MTAB muxl_mod[] = {
-	{ UNIT_UC, 0, "lower case", "LC", NULL },
-	{ UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
+	{ UNIT_UC+UNIT_8B, UNIT_UC, "UC", "UC", NULL },
+	{ UNIT_UC+UNIT_8B, 0      , "7b", "7B", NULL },
+	{ UNIT_UC+UNIT_8B, UNIT_8B, "8b", "8B", NULL },
 	{ UNIT_MDM, 0, "no dataset", "NODATASET", NULL },
 	{ UNIT_MDM, UNIT_MDM, "dataset", "DATASET", NULL },
-	{ MTAB_XTD | MTAB_VDV, 0, NULL, "ENABLED",
-		&mux_enb, NULL, NULL },
-	{ MTAB_XTD | MTAB_VDV, 0, NULL, "DISABLED",
-		&mux_dis, NULL, NULL },
 	{ MTAB_XTD|MTAB_VDV, 1, "DEVNO", "DEVNO",
-		&hp_setdev, &hp_showdev, &mux_dib },
+		&hp_setdev, &hp_showdev, &muxl_dev },
 	{ 0 }  };
 
 REG muxl_reg[] = {
@@ -287,17 +284,15 @@ REG muxl_reg[] = {
 	{ BRDATA (XDON, mux_xdon, 8, 1, MUX_LINES) },
 	{ URDATA (TIME, muxl_unit[0].wait, 10, 24, 0,
 		  MUX_LINES, REG_NZ + PV_LEFT) },
-	{ URDATA (FLGS, muxl_unit[0].flags, 8, 2, UNIT_V_UF,
-		  MUX_LINES, REG_HRO) },
 	{ ORDATA (DEVNO, muxl_dib.devno, 6), REG_HRO },
-	{ FLDATA (*DEVENB, muxl_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 DEVICE muxl_dev = {
 	"MUXL", muxl_unit, muxl_reg, muxl_mod,
 	MUX_LINES, 10, 31, 1, 8, 8,
 	NULL, NULL, &mux_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&muxl_dib, 0 };
 
 /* MUXM data structures
 
@@ -307,7 +302,7 @@ DEVICE muxl_dev = {
    muxc_mod	MUXM modifiers list
 */
 
-DIB muxc_dib = { MUXC, 1, 0, 0, 0, 0, &muxcio };
+DIB muxc_dib = { MUXC, 0, 0, 0, 0, &muxcio };
 
 UNIT muxc_unit = { UDATA (NULL, 0, 0) };
 
@@ -321,23 +316,19 @@ REG muxc_reg[] = {
 	{ BRDATA (DSO, muxc_ota, 8, 6, MUX_LINES) },
 	{ BRDATA (DSI, muxc_lia, 8, 2, MUX_LINES) },
 	{ ORDATA (DEVNO, muxc_dib.devno, 6), REG_HRO },
-	{ FLDATA (*DEVENB, muxc_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB muxc_mod[] = {
-	{ MTAB_XTD | MTAB_VDV, 0, NULL, "ENABLED",
-		&mux_enb, NULL, NULL },
-	{ MTAB_XTD | MTAB_VDV, 0, NULL, "DISABLED",
-		&mux_dis, NULL, NULL },
 	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
-		&hp_setdev, &hp_showdev, &muxc_dib },
+		&hp_setdev, &hp_showdev, &muxc_dev },
 	{ 0 }  };
 
 DEVICE muxc_dev = {
 	"MUXM", &muxc_unit, muxc_reg, muxc_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &mux_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&muxc_dib, 0 };
 
 /* IOT routines: data cards */
 
@@ -345,10 +336,10 @@ int32 muxlio (int32 inst, int32 IR, int32 dat)
 {
 int32 dev, ln;
 
-dev = IR & DEVMASK;					/* get device no */
+dev = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
 case ioFLG:						/* flag clear/set */
-	if ((IR & HC) == 0) { setFLG (dev); }		/* STF */
+	if ((IR & I_HC) == 0) { setFLG (dev); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
 	if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
@@ -366,7 +357,7 @@ case ioLIX:						/* load */
 	dat = muxl_ibuf;
 	break;
 case ioCTL:						/* control clear/set */
-	if (IR & AB) { clrCTL (dev); }			/* CLC */
+	if (IR & I_CTL) { clrCTL (dev); }		/* CLC */
 	else {						/* STC */
 	    setCTL (dev);				/* set ctl */
 	    ln = MUX_CHAN (muxu_obuf);			/* get chan # */
@@ -386,7 +377,7 @@ case ioCTL:						/* control clear/set */
 	break;
 default:
 	break;  }
-if (IR & HC) {						/* H/C option */
+if (IR & I_HC) {					/* H/C option */
 	clrFLG (dev);					/* clear flag */
 	mux_data_int ();  }				/* look for new int */
 return dat;
@@ -415,10 +406,10 @@ int32 muxcio (int32 inst, int32 IR, int32 dat)
 {
 int32 dev, ln, t, old;
 
-dev = IR & DEVMASK;					/* get device no */
+dev = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
 case ioFLG:						/* flag clear/set */
-	if ((IR & HC) == 0) { setFLG (dev); }		/* STF */
+	if ((IR & I_HC) == 0) { setFLG (dev); }		/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
 	if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
@@ -456,12 +447,12 @@ case ioMIX:						/* merge */
 	muxc_chan = (muxc_chan + 1) & LIC_M_CHAN;	/* incr channel */
 	break;
 case ioCTL:						/* ctrl clear/set */
-	if (IR & AB) { clrCTL (dev); }			/* CLC */
+	if (IR & I_CTL) { clrCTL (dev); }		/* CLC */
 	else { setCTL (dev); }				/* STC */
 	break;
 default:
 	break;  }
-if (IR & HC) {						/* H/C option */
+if (IR & I_HC) {					/* H/C option */
 	clrFLG (dev);					/* clear flag */
 	mux_ctrl_int (); }				/* look for new int */
 return dat;
@@ -477,31 +468,33 @@ t_stat muxi_svc (UNIT *uptr)
 {
 int32 ln, c, t;
 
-if ((uptr -> flags & UNIT_ATT) == 0) return SCPE_OK;	/* attached? */
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;	/* attached? */
 t = sim_rtcn_calb (mux_tps, TMR_MUX);			/* calibrate */
 sim_activate (uptr, t);					/* continue poll */
-ln = tmxr_poll_conn (&mux_desc, uptr);			/* look for connect */
+ln = tmxr_poll_conn (&mux_desc);			/* look for connect */
 if (ln >= 0) {						/* got one? */
-    if ((muxl_unit[ln].flags & UNIT_MDM) &&		/* modem ctrl? */
-	(muxc_ota[ln] & DTR))				/* DTR? */
-	muxc_lia[ln] = muxc_lia[ln] | CDET;		/* set cdet */
-    muxc_lia[ln] = muxc_lia[ln] | DSR;			/* set dsr */
-    mux_ldsc[ln].rcve = 1;  }				/* rcv enabled */ 
+	if ((muxl_unit[ln].flags & UNIT_MDM) &&		/* modem ctrl? */
+	    (muxc_ota[ln] & DTR))			/* DTR? */
+	    muxc_lia[ln] = muxc_lia[ln] | CDET;		/* set cdet */
+	muxc_lia[ln] = muxc_lia[ln] | DSR;		/* set dsr */
+	mux_ldsc[ln].rcve = 1;  }			/* rcv enabled */ 
 tmxr_poll_rx (&mux_desc);				/* poll for input */
 for (ln = 0; ln < MUX_LINES; ln++) {			/* loop thru lines */
-    if (mux_ldsc[ln].conn) {				/* connected? */
-	if (c = tmxr_getc_ln (&mux_ldsc[ln])) {		/* get char */
-	    if (mux_rchp[ln]) mux_sta[ln] = mux_sta[ln] | LIU_LOST;
-	    if ((muxl_unit[ln].flags & UNIT_UC) &&	/* cvt to UC? */
-		 islower (c & 0177)) c = toupper (c);
-	    if (mux_rpar[ln] & OTL_ECHO) {		/* echo? */
-		TMLN *lp = &mux_ldsc[ln];		/* get line */
-		tmxr_putc_ln (lp, c);			/* output char */
-		tmxr_poll_tx (&mux_desc);  }		/* poll xmt */
-	    if (mux_rpar[ln] & OTL_DIAG) mux_diag (c);	/* rcv diag? */
-	    mux_rbuf[ln] = c;				/* save char */
-	    mux_rchp[ln] = 1;  }  }			/* char pending */
-    else muxc_lia[ln] = 0;  }				/* disconnected */						/* end for */
+	if (mux_ldsc[ln].conn) {			/* connected? */
+	    if (c = tmxr_getc_ln (&mux_ldsc[ln])) {	/* get char */
+		if (mux_rchp[ln]) mux_sta[ln] = mux_sta[ln] | LIU_LOST;
+		if (muxl_unit[ln].flags & UNIT_UC) {	/* cvt to UC? */
+		    c = c & 0177;
+		    if (islower (c)) c = toupper (c);  }
+		else c = c & ((muxl_unit[ln].flags & UNIT_8B)? 0377: 0177);
+		if (mux_rpar[ln] & OTL_ECHO) {		/* echo? */
+		    TMLN *lp = &mux_ldsc[ln];		/* get line */
+		    tmxr_putc_ln (lp, c);		/* output char */
+		    tmxr_poll_tx (&mux_desc);  }	/* poll xmt */
+		if (mux_rpar[ln] & OTL_DIAG) mux_diag (c); /* rcv diag? */
+		mux_rbuf[ln] = c;			/* save char */
+		mux_rchp[ln] = 1;  }  }			/* char pending */
+	else muxc_lia[ln] = 0;  }			/* disconnected */						/* end for */
 if (!FLG (muxl_dib.devno)) mux_data_int ();		/* scan for data int */
 if (!FLG (muxc_dib.devno)) mux_ctrl_int ();		/* scan modem */
 return SCPE_OK;
@@ -514,21 +507,23 @@ t_stat muxo_svc (UNIT *uptr)
 int32 c, ln = uptr - muxl_unit;				/* line # */
 
 if (mux_ldsc[ln].conn) {				/* connected? */
-    if (mux_ldsc[ln].xmte) {				/* xmt enabled? */
-	if ((mux_xbuf[ln] & OTL_SYNC) == 0) {		/* start bit 0? */
-	    TMLN *lp = &mux_ldsc[ln];			/* get line */
-	    c = mux_xbuf[ln] & 0177;			/* get char */
-	    if ((muxl_unit[ln].flags & UNIT_UC) && islower (c))
-		c = toupper (c);			/* cvt to UC? */
-	    if (mux_xpar[ln] & OTL_DIAG)		/* xmt diag? */
-		mux_diag (mux_xbuf[ln]);		/* before munge */
-	    mux_xdon[ln] = 1;				/* set done */
-	    tmxr_putc_ln (lp, c);			/* output char */
-	    tmxr_poll_tx (&mux_desc);  }  }		/* poll xmt */
-    else {						/* buf full */
-	tmxr_poll_tx (&mux_desc);			/* poll xmt */
-	sim_activate (uptr, muxl_unit[ln].wait);	/* wait */
-	return SCPE_OK;  }  }
+	if (mux_ldsc[ln].xmte) {			/* xmt enabled? */
+	    if ((mux_xbuf[ln] & OTL_SYNC) == 0) {	/* start bit 0? */
+		TMLN *lp = &mux_ldsc[ln];		/* get line */
+		c = mux_xbuf[ln];			/* get char */
+		if (muxl_unit[ln].flags & UNIT_UC) {	/* cvt to UC? */
+		    c = c & 0177;
+		    if (islower (c)) c = toupper (c);  }
+		else c = c & ((muxl_unit[ln].flags & UNIT_8B)? 0377: 0177);
+		if (mux_xpar[ln] & OTL_DIAG)		/* xmt diag? */
+		    mux_diag (mux_xbuf[ln]);		/* before munge */
+		mux_xdon[ln] = 1;			/* set done */
+		tmxr_putc_ln (lp, c);			/* output char */
+		tmxr_poll_tx (&mux_desc);  }  }		/* poll xmt */
+	else {						/* buf full */
+	    tmxr_poll_tx (&mux_desc);			/* poll xmt */
+	    sim_activate (uptr, muxl_unit[ln].wait);	/* wait */
+	    return SCPE_OK;  }  }
 if (!FLG (muxl_dib.devno)) mux_data_int ();		/* scan for int */
 return SCPE_OK;
 }
@@ -542,7 +537,7 @@ int32 i;
 for (i = 0; i < MUX_LINES; i++) {			/* rcv lines */
     if ((mux_rpar[i] & OTL_ENB) && mux_rchp[i]) {	/* enabled, char? */
 	muxl_ibuf = PUT_CCH (i) | mux_rbuf[i] |		/* lo buf = char */
-		RCV_PAR (mux_rbuf[i]);
+	    RCV_PAR (mux_rbuf[i]);
 	muxu_ibuf = PUT_CCH (i) | mux_sta[i];		/* hi buf = stat */
 	mux_rchp[i] = 0;				/* clr char, stat */
 	mux_sta[i] = 0;
@@ -558,7 +553,7 @@ for (i = 0; i < MUX_LINES; i++) {			/* xmt lines */
 for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++) {	/* diag lines */
     if ((mux_rpar[i] & OTL_ENB) && mux_rchp[i]) {	/* enabled, char? */
 	muxl_ibuf = PUT_CCH (i) | mux_rbuf[i] |		/* lo buf = char */
-		RCV_PAR (mux_rbuf[i]);
+	    RCV_PAR (mux_rbuf[i]);
 	muxu_ibuf = PUT_CCH (i) | mux_sta[i] | LIU_DG;	/* hi buf = stat */
 	mux_rchp[i] = 0;				/* clr char, stat */
 	mux_sta[i] = 0;
@@ -577,8 +572,8 @@ if (muxc_scan == 0) return;
 for (i = 0; i < MUX_LINES; i++) {
 	muxc_chan = (muxc_chan + 1) & LIC_M_CHAN;	/* step channel */
 	if (LIC_TSTI (muxc_chan)) {			/* status change? */
-		setFLG (muxc_dib.devno);		/* set flag */
-		break;  }  }
+	    setFLG (muxc_dib.devno);			/* set flag */
+	    break;  }  }
 return;
 }
 
@@ -617,6 +612,11 @@ t_stat mux_reset (DEVICE *dptr)
 {
 int32 i, t;
 
+if (muxu_dev.flags & DEV_DIS) {				/* enb/dis dev */
+	muxl_dev.flags = muxu_dev.flags | DEV_DIS;
+	muxc_dev.flags = muxc_dev.flags | DEV_DIS;  }
+else {	muxl_dev.flags = muxl_dev.flags & ~DEV_DIS;
+	muxc_dev.flags = muxc_dev.flags & ~DEV_DIS;  }
 muxl_dib.cmd = muxl_dib.ctl = 0;			/* init lower */
 muxl_dib.flg = muxl_dib.fbf = 1;
 muxu_dib.cmd = muxu_dib.ctl = 0;			/* upper not */
@@ -626,8 +626,8 @@ muxc_dib.flg = muxc_dib.fbf = 1;
 muxc_chan = muxc_scan = 0;				/* init modem scan */
 if (muxu_unit.flags & UNIT_ATT) {			/* master att? */
 	if (!sim_is_active (&muxu_unit)) {
-		t = sim_rtcn_init (muxu_unit.wait, TMR_MUX);
-		sim_activate (&muxu_unit, t);  }  }	/* activate */
+	    t = sim_rtcn_init (muxu_unit.wait, TMR_MUX);
+	    sim_activate (&muxu_unit, t);  }  }		/* activate */
 else sim_cancel (&muxu_unit);				/* else stop */
 for (i = 0; i < MUX_LINES; i++) {
 	mux_desc.ldsc[i] = &mux_ldsc[i];
@@ -659,7 +659,7 @@ t_stat r;
 r = tmxr_detach (&mux_desc, uptr);			/* detach */
 for (i = 0; i < MUX_LINES; i++) mux_ldsc[i].rcve = 0;	/* disable rcv */
 sim_cancel (uptr);					/* stop poll */
-return SCPE_OK;
+return r;
 }
 
 /* Show summary processor */
@@ -682,34 +682,11 @@ int32 i;
 
 for (i = 0; (i < MUX_LINES) && (mux_ldsc[i].conn == 0); i++) ;
 if (i < MUX_LINES) {
-    for (i = 0; i < MUX_LINES; i++) {
-	if (mux_ldsc[i].conn) 
-	    if (val) tmxr_fconns (st, &mux_ldsc[i], i);
-	    else tmxr_fstats (st, &mux_ldsc[i], i);  }  }
+	for (i = 0; i < MUX_LINES; i++) {
+	    if (mux_ldsc[i].conn) { 
+		if (val) tmxr_fconns (st, &mux_ldsc[i], i);
+		else tmxr_fstats (st, &mux_ldsc[i], i);  }  }  }
 else fprintf (st, "all disconnected\n");
 return SCPE_OK;
-}
-
-/* Enable device */
-
-t_stat mux_enb (UNIT *uptr, int32 num, char *cptr, void *desc)
-{
-if (cptr != NULL) return SCPE_ARG;
-muxl_dib.enb = 1;
-muxu_dib.enb = 1;
-muxc_dib.enb = 1;
-return mux_reset (&muxl_dev);
-}
-
-/* Disable device */
-
-t_stat mux_dis (UNIT *uptr, int32 num, char *cptr, void *desc)
-{
-if (cptr != NULL) return SCPE_ARG;
-if (muxu_unit.flags & UNIT_ATT) return SCPE_NOFNC;
-muxl_dib.enb = 0;
-muxu_dib.enb = 0;
-muxc_dib.enb = 0;
-return mux_reset (&muxl_dev);
 }
 

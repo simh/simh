@@ -25,6 +25,7 @@
 
    clk		real time clock
 
+   04-Oct-02	RMS	Added DIB, device number support
    30-Dec-01	RMS	Removed for generalized timers
    05-Sep-01	RMS	Added terminal multiplexor support
    17-Jul-01	RMS	Moved function prototype
@@ -36,10 +37,13 @@
 #include "pdp8_defs.h"
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
-t_stat clk_svc (UNIT *uptr);
-t_stat clk_reset (DEVICE *dptr);
+
 int32 clk_tps = 60;					/* ticks/second */
 int32 tmxr_poll = 16000;				/* term mux poll */
+
+int32 clk (int32 IR, int32 AC);
+t_stat clk_svc (UNIT *uptr);
+t_stat clk_reset (DEVICE *dptr);
 
 /* CLK data structures
 
@@ -47,6 +51,8 @@ int32 tmxr_poll = 16000;				/* term mux poll */
    clk_unit	CLK unit descriptor
    clk_reg	CLK register list
 */
+
+DIB clk_dib = { DEV_CLK, 1, { &clk } };
 
 UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 16000 };
 
@@ -58,21 +64,26 @@ REG clk_reg[] = {
 	{ DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
 	{ NULL }  };
 
+MTAB clk_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_dev },
+	{ 0 } };
+
 DEVICE clk_dev = {
-	"CLK", &clk_unit, clk_reg, NULL,
+	"CLK", &clk_unit, clk_reg, clk_mod,
 	1, 0, 0, 0, 0, 0,
 	NULL, NULL, &clk_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&clk_dib, 0 };
 
 /* IOT routine
 
    IOT's 6131-6133 are the PDP-8/E clock
-   IOT's 6135-6137 the PDP-8/A clock
+   IOT's 6135-6137 are the PDP-8/A clock
 */
 
-int32 clk (int32 pulse, int32 AC)
+int32 clk (int32 IR, int32 AC)
 {
-switch (pulse) {					/* decode IR<9:11> */
+switch (IR & 07) {					/* decode IR<9:11> */
 case 1:							/* CLEI */
 	int_enable = int_enable | INT_CLK;		/* enable clk ints */
 	int_req = INT_UPDATE;				/* update interrupts */

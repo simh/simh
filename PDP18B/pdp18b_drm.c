@@ -26,6 +26,7 @@
    drm		(PDP-7) Type 24 serial drum
 		(PDP-9) RM09 serial drum
 
+   05-Feb-02	RMS	Added DIB, device number support
    03-Feb-02	RMS	Fixed bug in reset routine (found by Robert Alan Byer)
    06-Jan-02	RMS	Revised enable/disable support
    25-Nov-01	RMS	Revised interrupt structure
@@ -57,17 +58,24 @@
 			((double) DRM_NUMWDT)))
 
 extern int32 M[];
-extern int32 int_hwre[API_HLVL+1], dev_enb;
+extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
+
 int32 drm_da = 0;					/* track address */
 int32 drm_ma = 0;					/* memory address */
 int32 drm_err = 0;					/* error flag */
 int32 drm_wlk = 0;					/* write lock */
 int32 drm_time = 10;					/* inter-word time */
 int32 drm_stopioe = 1;					/* stop on error */
+
+DEVICE drm_dev;
+int32 drm60 (int32 pulse, int32 AC);
+int32 drm61 (int32 pulse, int32 AC);
+int32 drm62 (int32 pulse, int32 AC);
+int32 drm_iors (void);
 t_stat drm_svc (UNIT *uptr);
 t_stat drm_reset (DEVICE *dptr);
-t_stat drm_boot (int32 unitno);
+t_stat drm_boot (int32 unitno, DEVICE *dptr);
 
 /* DRM data structures
 
@@ -76,9 +84,11 @@ t_stat drm_boot (int32 unitno);
    drm_reg	DRM register list
 */
 
+DIB drm_dib = { DEV_DRM, 3 ,&drm_iors, { &drm60, &drm61, &drm62 } };
+
 UNIT drm_unit =
 	{ UDATA (&drm_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-	DRM_SIZE) };
+		DRM_SIZE) };
 
 REG drm_reg[] = {
 	{ ORDATA (DA, drm_da, 9) },
@@ -89,19 +99,19 @@ REG drm_reg[] = {
 	{ ORDATA (WLK, drm_wlk, 32) },
 	{ DRDATA (TIME, drm_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, drm_stopioe, 0) },
-	{ FLDATA (*DEVENB, dev_enb, ENB_V_DRM), REG_HRO },
+	{ ORDATA (DEVNO, drm_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
 MTAB drm_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, ENB_DRM, NULL, "ENABLED", &set_enb },
-	{ MTAB_XTD|MTAB_VDV, ENB_DRM, NULL, "DISABLED", &set_dsb },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
 	{ 0 } };
 
 DEVICE drm_dev = {
 	"DRM", &drm_unit, drm_reg, drm_mod,
 	1, 8, 20, 1, 8, 18,
 	NULL, NULL, &drm_reset,
-	&drm_boot, NULL, NULL };
+	&drm_boot, NULL, NULL,
+	&drm_dib, DEV_DISABLE };
 
 /* IOT routines */
 
@@ -155,20 +165,20 @@ t_stat drm_svc (UNIT *uptr)
 int32 i;
 t_addr da;
 
-if ((uptr -> flags & UNIT_BUF) == 0) {			/* not buf? abort */
+if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	drm_err = 1;					/* set error */
 	SET_INT (DRM);					/* set done */
 	return IORETURN (drm_stopioe, SCPE_UNATT);  }
 
 da = drm_da * DRM_NUMWDS;				/* compute dev addr */
 for (i = 0; i < DRM_NUMWDS; i++, da++) {		/* do transfer */
-	if (uptr -> FUNC == DRM_READ) {
+	if (uptr->FUNC == DRM_READ) {
 		if (MEM_ADDR_OK (drm_ma))		/* read, check nxm */
-			M[drm_ma] = *(((int32 *) uptr -> filebuf) + da);  }
+			M[drm_ma] = *(((int32 *) uptr->filebuf) + da);  }
 	else {	if ((drm_wlk >> (drm_da >> 4)) & 1) drm_err = 1;
-		else {	*(((int32 *) uptr -> filebuf) + da) = M[drm_ma];
-			if (da >= uptr -> hwmark)
-				uptr -> hwmark = da + 1;  }  }
+		else {	*(((int32 *) uptr->filebuf) + da) = M[drm_ma];
+			if (da >= uptr->hwmark)
+				uptr->hwmark = da + 1;  }  }
 	drm_ma = (drm_ma + 1) & ADDRMASK;  }		/* incr mem addr */
 drm_da = (drm_da + 1) & DRM_SMASK;			/* incr dev addr */
 SET_INT (DRM);						/* set done */
@@ -202,15 +212,16 @@ static const int32 boot_rom[] = {
 	0706006,		/* DRLR			; load ma */
 	0706106,		/* DRSS			; load da, start */
 	0706101,		/* DRSF			; wait for done */
-	0602003,		/* JMP .-1
+	0602003,		/* JMP .-1 */
 	0600000			/* JMP 0		; enter boot */
 };
 
-t_stat drm_boot (int32 unitno)
+t_stat drm_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 saved_PC;
 
+if (drm_dib.dev != DEV_DRM) return STOP_NONSTD;		/* non-std addr? */
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 saved_PC = BOOT_START;
 return SCPE_OK;

@@ -25,6 +25,8 @@
 
    lpt		LP11 line printer
 
+   29-Sep-02	RMS	Added vector change/display support
+			New data structures
    30-May-02	RMS	Widened POS to 32b
    06-Jan-02	RMS	Added enable/disable support
    09-Nov-01	RMS	Added VAX support
@@ -47,10 +49,12 @@
 #define LPTCSR_RW	(CSR_IE)			/* read/write */
 
 extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
 
 int32 lpt_csr = 0;					/* control/status */
 int32 lpt_stopioe = 0;					/* stop on error */
 
+DEVICE lpt_dev;
 t_stat lpt_rd (int32 *data, int32 PA, int32 access);
 t_stat lpt_wr (int32 data, int32 PA, int32 access);
 t_stat lpt_svc (UNIT *uptr);
@@ -65,7 +69,8 @@ t_stat lpt_detach (UNIT *uptr);
    lpt_reg	LPT register list
 */
 
-DIB lpt_dib = { 1, IOBA_LPT, IOLN_LPT, &lpt_rd, &lpt_wr };
+DIB lpt_dib = { IOBA_LPT, IOLN_LPT, &lpt_rd, &lpt_wr,
+		1, IVCL (LPT), VEC_LPT, { NULL } };
 
 UNIT lpt_unit = {
 	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
@@ -81,23 +86,22 @@ REG lpt_reg[] = {
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
 	{ GRDATA (DEVADDR, lpt_dib.ba, LPT_DRDX, 32, 0), REG_HRO },
-	{ FLDATA (*DEVENB, lpt_dib.enb, 0), REG_HRO },
+	{ GRDATA (DEVVEC, lpt_dib.vec, LPT_DRDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB lpt_mod[] = {
 	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
-		&set_addr, &show_addr, &lpt_dib },
-	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
-		&set_enbdis, NULL, &lpt_dib },
-	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
-		&set_enbdis, NULL, &lpt_dib },
+		&set_addr, &show_addr, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+		&set_vec, &show_vec, NULL },
 	{ 0 }  };
 
 DEVICE lpt_dev = {
 	"LPT", &lpt_unit, lpt_reg, lpt_mod,
 	1, 10, 31, 1, LPT_DRDX, 8,
 	NULL, NULL, &lpt_reset,
-	NULL, &lpt_attach, &lpt_detach };
+	NULL, &lpt_attach, &lpt_detach,
+	&lpt_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS };
 
 /* Line printer routines
 

@@ -2,8 +2,16 @@
 
 /* ibm1130_cr.c: IBM 1130 1442 Card Reader simulator
 
-   Copyright (c) 2002, Brian Knittel
-   Based on PDP-11 simulator written by Robert M Supnik
+   Based on the SIMH package written by Robert M Supnik
+
+ * (C) Copyright 2002, Brian Knittel.
+ * You may freely use this program, but: it offered strictly on an AS-IS, AT YOUR OWN
+ * RISK basis, there is no warranty of fitness for any purpose, and the rest of the
+ * usual yada-yada. Please keep this notice and the copyright in any distributions
+ * or modifications.
+ *
+ * This is not a supported product, but I welcome bug reports and fixes.
+ * Mail to sim@ibm1130.org
 
 NOTE - there is a problem with this code. The Device Status Word (DSW) is
 computed from current conditions when requested by an XIO load status
@@ -77,7 +85,7 @@ commands may NOT be accurate. This should probably be fixed.
 ||  Hmmm -- what takes the place of the Start button on
 \\ the card reader?
 
-  Binary format is stored using fwrite of short ints, in this format:
+  Binary format is stored using fxwrite of short ints, in this format:
 
      1 1
 	 2 2 0 1 2 3 4 5 6 7 8 9
@@ -131,11 +139,13 @@ commands may NOT be accurate. This should probably be fixed.
    deck will not be very helpful.
 */
 
-#define READ_DELAY		100
-#define PUNCH_DELAY		300
-#define FEED_DELAY		500
+#define READ_DELAY		 35			// see how small a number we can get away with
+#define PUNCH_DELAY		 35
+#define FEED_DELAY		 25
 
 // #define IS_ONLINE(u) (((u)->flags & (UNIT_ATT|UNIT_DIS)) == UNIT_ATT)
+
+extern int32 sim_switches;
 
 static t_stat cr_svc      (UNIT *uptr);
 static t_stat cr_reset    (DEVICE *dptr);
@@ -155,12 +165,18 @@ static int32 cp_wait = FEED_DELAY;							/* feed op wait */
 #define UNIT_V_OPERATION   (UNIT_V_UF + 0)					/* operation in progress */
 #define UNIT_V_CODE		   (UNIT_V_UF + 2)
 #define UNIT_V_EMPTY	   (UNIT_V_UF + 4)
+#define UNIT_V_SCRATCH	   (UNIT_V_UF + 5)
+#define UNIT_V_QUIET       (UNIT_V_UF + 6)
+#define UNIT_V_DEBUG       (UNIT_V_UF + 7)
 
 #define UNIT_V_LASTPUNCH   (UNIT_V_UF + 0)					/* bit in unit_cp flags */
 
 #define UNIT_OP			 (3u << UNIT_V_OPERATION)			/* two bits */
 #define UNIT_CODE		 (3u << UNIT_V_CODE)				/* two bits */
 #define UNIT_EMPTY		 (1u << UNIT_V_EMPTY)
+#define UNIT_SCRATCH	 (1u << UNIT_V_SCRATCH)				/* temp file */
+#define UNIT_QUIET       (1u << UNIT_V_QUIET)
+#define UNIT_DEBUG       (1u << UNIT_V_DEBUG)
 
 #define UNIT_LASTPUNCH	 (1u << UNIT_V_LASTPUNCH)
 
@@ -171,6 +187,8 @@ static int32 cp_wait = FEED_DELAY;							/* feed op wait */
 
 #define SET_OP(op) {cr_unit.flags &= ~UNIT_OP; cr_unit.flags |= op;}
 
+#define CURRENT_OP (cr_unit.flags & UNIT_OP)
+
 #define CODE_029 		 (0u << UNIT_V_CODE)
 #define CODE_026F		 (1u << UNIT_V_CODE)
 #define CODE_026C		 (2u << UNIT_V_CODE)
@@ -180,7 +198,7 @@ static int32 cp_wait = FEED_DELAY;							/* feed op wait */
 
 #define COLUMN		u4										/* column field in unit record */
 
-UNIT cr_unit = { UDATA (&cr_svc, UNIT_ATTABLE, 0) };
+UNIT cr_unit = { UDATA (&cr_svc, UNIT_ATTABLE|UNIT_ROABLE, 0) };
 UNIT cp_unit = { UDATA (NULL,    UNIT_ATTABLE, 0) };
 
 MTAB cr_mod[] = {
@@ -405,12 +423,22 @@ static CPCODE cardcode_026C[] =		// 026 commercial
 	0x2220,		'(',
 };
 
+extern int cgi;
+extern void sub_args (char *instr, char *tmpbuf, int32 maxstr, int32 nargs, char *arg[]);
+
 static int16 ascii_to_card[256];
 
-CPCODE *cardcode;
-int ncardcode;
-int32 active_cr_code;			/* the code most recently specified */
-FILE *deckfile = NULL;
+static CPCODE *cardcode;
+static int ncardcode;
+static int32 active_cr_code;			/* the code most recently specified */
+static FILE *deckfile = NULL;
+static char tempfile[128];
+static int cardnum;
+static int any_punched = 0;
+
+#define MAXARG 80						/* saved arguments to attach command */
+static char list_save[MAXARG][10], *list_arg[MAXARG];
+static int list_nargs = 0;
 
 static int16 punchstation[80];
 static int16 readstation[80];
@@ -516,7 +544,8 @@ t_stat load_cr_boot (int drvno)
 		WriteW(i, boot2_data[i]);
 
 #ifdef GUI_SUPPORT
-	remark_cmd("Loaded BOOT2 cold start card\n");
+	if (! cgi)
+		remark_cmd("Loaded BOOT2 cold start card\n");
 #endif
 	return SCPE_OK;
 }
@@ -538,7 +567,7 @@ t_stat cr_boot (int unitno)
 		return SCPE_IOERR;
 	}
 
-	if (fread(buf, sizeof(short), 80, cr_unit.fileref) != 80)
+	if (fxread(buf, sizeof(short), 80, cr_unit.fileref) != 80)
 		return SCPE_IOERR;
 
 	IAR = 0;									/* Program Load sets IAR = 0 */
@@ -560,6 +589,19 @@ char card_to_ascii (int16 hol)
 	return ' ';
 }
 
+// hollerith_to_ascii - provide a generic conversion for simulator debugging 
+
+char hollerith_to_ascii (int16 hol)
+{
+	int i;
+
+	for (i = 0; i < ncardcode; i++)
+		if (cardcode_029[i].hollerith == hol)
+			return cardcode[i].ascii;
+
+	return ' ';
+}
+
 /* feedcycle - move cards to next station */
 
 static void feedcycle (t_bool load, t_bool punching)
@@ -569,9 +611,9 @@ static void feedcycle (t_bool load, t_bool punching)
 
 	/* write punched card if punch is attached to a file */
 	if (cp_unit.flags & UNIT_ATT) {
-		if (punchstate != STATION_EMPTY) {
+		if (any_punched && punchstate != STATION_EMPTY) {
 			if ((cp_unit.flags & UNIT_CODE) == CODE_BINARY) {
-				fwrite(punchstation, sizeof(short), 80, cp_unit.fileref);
+				fxwrite(punchstation, sizeof(short), 80, cp_unit.fileref);
 			}
 			else {
 				for (i = 80; --i >= 0; ) {		/* find last nonblank column */
@@ -588,7 +630,7 @@ static void feedcycle (t_bool load, t_bool punching)
 				/* nwrite is now number of characters to output */
 
 				buf[nwrite++] = '\n';				/* append newline */
-				fwrite(buf, sizeof(char), nwrite, cp_unit.fileref);
+				fxwrite(buf, sizeof(char), nwrite, cp_unit.fileref);
 			}
 		}
 	}
@@ -621,48 +663,57 @@ again:		/* jump here if we've loaded a new deck after emptying the previous one 
 
 		memset(readstation, 0, sizeof(readstation));		/* blank out the card image */
 
-		if (cr_unit.fileref == NULL) {
+		if (cr_unit.fileref == NULL)
 			nread = 0;
-		}
-		else if ((active_cr_code & UNIT_CODE) == CODE_BINARY) {	/* binary read is straightforward */
-			nread = fread(readstation, sizeof(short), 80, cr_unit.fileref);
-		}
-		else {												/* text read is harder: */
-			if (fgets(buf, 81, cr_unit.fileref) == NULL)	/* read up to 80 chars */
-				nread = 0;									/* hmm, end of file */
-			else {											/* check for newline */
-				if ((x = strchr(buf, '\r')) == NULL)
-					x = strchr(buf, '\n');
 
-				if (x == NULL) {							/* there were no delimiters, check for newline after the 80 chars, eat if present */
-					ch = getc(cr_unit.fileref);
-					if (ch != '\r' && ch != '\n' && ch != EOF)
-						ungetc(ch, cr_unit.fileref);
+		else if ((active_cr_code & UNIT_CODE) == CODE_BINARY)	/* binary read is straightforward */
+			nread = fxread(readstation, sizeof(short), 80, cr_unit.fileref);
 
-					nread = 80;
+		else if (fgets(buf, sizeof(buf), cr_unit.fileref) == NULL)	/* read up to 80 chars */
+			nread = 0;									/* hmm, end of file */
+
+		else {											/* check for newline */
+			if ((x = strchr(buf, '\r')) == NULL)
+				x = strchr(buf, '\n');
+
+			if (x == NULL) {							/* there were no delimiters, burn rest of line */
+				while ((ch = getc(cr_unit.fileref)) != EOF) {	/* get character */
+					if (ch == '\n')								/* newline, done */
+						break;
+
+					if (ch == '\r') {							/* CR, try to take newline too */
+						ch = getc(cr_unit.fileref);
+						if (ch != EOF && ch != '\n')			/* hmm, put it back */
+							ungetc(ch, cr_unit.fileref);
+
+						break;
+					}
 				}
-				else {
-					*x = ' ';								/* replace with blank */
-					nread = x-buf+1;
-				}
+				nread = 80;								/* take just the first 80 characters */
 			}
+			else
+				nread = x-buf;							/* reduce length of string */
 
-			upcase(buf);									/* force uppercase */
+			upcase(buf);								/* force uppercase */
 
-			for (i = 0; i < nread; i++)						/* convert ascii to punch code */
+			for (i = 0; i < nread; i++)					/* convert ascii to punch code */
 				readstation[i] = ascii_to_card[buf[i]];
+
+			nread = 80;									/* even if line was blank consider it present */
 		}
 
-		if (nread <= 0) {									/* set hopper flag accordingly */
+		if (nread <= 0) {								/* set hopper flag accordingly */
 			if (deckfile != NULL && nextdeck())
 				goto again;
 
 			SETBIT(cr_unit.flags, UNIT_EMPTY);
 			readstate = STATION_EMPTY;
+			cardnum = -1;								/* nix the card counter */
 		}
 		else {
 			CLRBIT(cr_unit.flags, UNIT_EMPTY);
 			readstate = STATION_LOADED;
+			cardnum++;									/* advance card counter */
 		}
 	}
 	else
@@ -684,6 +735,8 @@ static void npro (void)
 		fseek(cr_unit.fileref, 0, SEEK_END);		/* push reader to EOF */
 	if (deckfile != NULL)
 		fseek(deckfile, 0, SEEK_END);				/* skip to end of deck list */
+
+	cardnum = -1;									/* nix the card counter */
 
 	if (punchstate == STATION_PUNCHED)
 		feedcycle(FALSE, FALSE);					/* flush out card just punched */
@@ -737,6 +790,7 @@ static void checkdeck (void)
 		fseek(cr_unit.fileref, 0, SEEK_END);
 		empty = ftell(cr_unit.fileref) <= 0;		/* see if file has anything) */
 		fseek(cr_unit.fileref, 0, SEEK_SET);		/* rewind deck */
+		cardnum = 0;								/* reset card counter */
 	}
 
 	if (empty) {
@@ -752,17 +806,26 @@ static void checkdeck (void)
 
 static t_bool nextdeck (void)
 {
-	char buf[200], *e;
+	char buf[200], tmpbuf[200], *fname, *mode, *tn;
 	int code;
+	long fpos;
+	static char white[] = " \t\r\n";
+
+	cardnum = 0;							/* reset card counter */
 
 	if (deckfile == NULL)					/* we can't help */
 		return FALSE;
 
 	code = cr_unit.flags & UNIT_CODE;		/* default code */
 
-	if (cr_unit.fileref != NULL) {
-		fclose(cr_unit.fileref);
+	if (cr_unit.fileref != NULL) {			/* this pulls the rug out from under scp */
+		fclose(cr_unit.fileref);			/* since the attach flag is still set. be careful! */
 		cr_unit.fileref = NULL;
+
+		if (cr_unit.flags & UNIT_SCRATCH) {
+			unlink(tempfile);
+			CLRBIT(cr_unit.flags, UNIT_SCRATCH);
+		}
 	}
 
 	for (;;) {								/* get a filename */
@@ -773,24 +836,76 @@ static t_bool nextdeck (void)
 		if (! *buf)
 			continue;						/* empty line */
 
-		e = buf + strlen(buf) - 1;			/* last character in name */
-		if (e > (buf+1) && e[-1] <= ' ') {	/* if there is at least a name + blank + character, and 2nd to last is blank */
-			if (*e == 'b' || *e == 'B') {
-				code = CODE_BINARY;
-				e[-1] = '\0';				/* clip at the space and re-trim */
-				alltrim(buf);
-			}
-			else if (*e == 'a' || *e == 'A') {
-				code = CODE_029;
-				e[-1] = '\0';
-				alltrim(buf);
-			}
+		if (strnicmp(buf, "!BREAK", 6) == 0) {	/* stop the simulation */
+			break_simulation(STOP_DECK_BREAK);
+			continue;
 		}
 
-		if ((cr_unit.fileref = fopen(buf, "rb")) == NULL)
-			printf("File '%s' specified in deck file '%s' cannot be opened\n", buf, cr_unit.filename+1);
-		else
+		if (buf[0] == '!') {				/* literal text line, make a temporary file */
+			if (*tempfile == '\0') {
+				if ((tn = tempnam(".", "1130")) == NULL) {
+					printf("Cannot create temporary card file name\n");
+					break_simulation(STOP_DECK_BREAK);
+					return 0;
+				}
+				strcpy(tempfile, tn);
+				strcat(tempfile, ".tmp");
+			}
+
+			if ((cr_unit.fileref = fopen(tempfile, "wb+")) == NULL) {
+				printf("Cannot create temporary file %s\n", tempfile);
+				break_simulation(STOP_DECK_BREAK);
+				return 0;
+			}
+
+			SETBIT(cr_unit.flags, UNIT_SCRATCH);
+
+			for (;;) {						/* store literal cards into temporary file */
+				upcase(buf+1);
+				fputs(buf+1, cr_unit.fileref);
+				putc('\n', cr_unit.fileref);
+
+				trace_io("(Literal card %s\n)", buf+1);
+				if (! (cr_unit.flags & UNIT_QUIET))
+					printf("(Literal card %s)\n", buf+1);
+
+				fpos = ftell(deckfile);
+				if (fgets(buf, sizeof(buf), deckfile) == NULL)
+					break;					/* oops, end of file */
+				if (buf[0] != '!' || strnicmp(buf, "!BREAK", 6) == 0)
+					break;
+				alltrim(buf);
+			}
+			fseek(deckfile, fpos, SEEK_SET);		/* restore deck file to just before non-literal card */
+
+			fseek(cr_unit.fileref, 0, SEEK_SET);	/* rewind scratch file for reading */
+			code = CODE_029;						/* assume keycode 029 */
 			break;
+		}
+
+		sub_args(buf, tmpbuf, sizeof(buf), list_nargs, list_arg);	/* substitute in stuff from the attach command line */
+
+		if ((fname = strtok(buf, white)) == NULL)
+			continue;
+
+		if (*fname == '#' || *fname == '*' || *fname == ';')
+			continue;						/* comment */
+
+		if ((mode = strtok(NULL, white)) != NULL) {
+			if (*mode == 'b' || *mode == 'B') 
+				code = CODE_BINARY;
+			else if (*mode == 'a' || *mode == 'A')
+				code = CODE_029;
+		}
+
+		if ((cr_unit.fileref = fopen(fname, "rb")) == NULL)
+			printf("File '%s' specified in deck file '%s' cannot be opened\n", fname, cr_unit.filename+1);
+		else {
+			trace_io("(Opened %s deck %s)\n", (code == CODE_BINARY) ? "binary" : "text", fname);
+			if (! (cr_unit.flags & UNIT_QUIET))
+				printf("(Opened %s deck %s)\n", (code == CODE_BINARY) ? "binary" : "text", fname);
+			break;
+		}
 	}
 
 	checkdeck();
@@ -844,19 +959,61 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 {
 	t_stat rval;
 	t_bool use_decklist;
+	char *c, *arg, quote;
 
 // no - don't cancel pending read?
 //	sim_cancel(uptr);								/* cancel pending operations */
 
-	cr_detach(uptr);								/* detach file and possibly deckfile */
 
-	cptr = skipbl(cptr);							/* skip any leading whitespace */
+	CLRBIT(uptr->flags, UNIT_QUIET|UNIT_DEBUG);		/* set debug/quiet flags */
+	if (sim_switches & SWMASK('D')) SETBIT(uptr->flags, UNIT_DEBUG);
+	else if (sim_switches & SWMASK('Q')) SETBIT(uptr->flags, UNIT_QUIET);
+
+	cr_detach(uptr);								/* detach file and possibly deckfile */
+	CLRBIT(uptr->flags, UNIT_SCRATCH);
+
+	c = cptr;
+	for (list_nargs = 0; list_nargs < 10; ) {		/* extract arguments */
+		while (*c && (*c <= ' '))					/* skip blanks */
+			c++;
+		if (! *c)
+			break;									/* all done */
+
+		arg = c;									/* save start */
+
+		while (*c && (*c > ' ')) {
+		    if (*c == '\'' || *c == '"') {			/* quoted string */
+				for (quote = *c++; *c;)
+					if (*c++ == quote)
+						break;
+			}
+			else c++;
+		}
+		if (*c)
+			*c++ = 0;								/* term arg at space */
+
+		list_arg[list_nargs] = list_save[list_nargs];	/* set pointer to permanent storage location */
+		strncpy(list_arg[list_nargs++], arg, MAXARG);	/* store copy */
+	}
+
+	if (list_nargs <= 0)							/* need at least 1 */
+		return SCPE_2FARG;
+
+	cptr = list_arg[0];								/* filename is first argument */
 
 	use_decklist = (*cptr == '@');					/* filename starts with @: it's a deck list */
 	if (use_decklist)
 		cptr++;
 
-	if ((rval = attach_unit(uptr, cptr)) != SCPE_OK)
+	if (strcmp(cptr, "-") == 0 && ! use_decklist) {			/* standard input */
+		if (uptr -> flags & UNIT_DIS) return SCPE_UDIS;		/* disabled? */
+		uptr->filename = calloc(CBUFSIZE, sizeof(char));
+		strcpy(uptr->filename, "(stdin)");
+	    uptr->fileref = stdin;
+		SETBIT(uptr->flags, UNIT_ATT);
+		uptr->pos = 0;
+	}
+	else if ((rval = attach_unit(uptr, cptr)) != SCPE_OK)
 		return rval;
 
 	if (use_decklist) {								/* if we skipped the '@', store the actually-specified name */
@@ -868,34 +1025,63 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 	else
 		checkdeck();
 
+	// there is a read pending. Pull the card in to make it go
+	if (CURRENT_OP == OP_READING || CURRENT_OP == OP_PUNCHING || CURRENT_OP == OP_FEEDING)
+		feedcycle(TRUE, CURRENT_OP == OP_PUNCHING);
+
 // no - don't reset the reader
 //	cr_reset(&cr_dev);								/* reset the whole thing */
 //	cp_reset(&cp_dev);
+
+	cardnum = 0;									/* reset card counter */
 
 	return SCPE_OK;
 }
 
 static t_stat cr_detach   (UNIT *uptr)
 {
-	if (deckfile != NULL) {
-		fclose(deckfile);
-		deckfile = NULL;
+	t_stat rval;
+
+	if (cr_unit.flags & UNIT_ATT && deckfile != NULL) {
+		if (cr_unit.fileref != NULL)			/* close the active card deck */
+			fclose(cr_unit.fileref);
+
+		if (cr_unit.flags & UNIT_SCRATCH) {
+			unlink(tempfile);
+			CLRBIT(cr_unit.flags, UNIT_SCRATCH);
+		}
+
+		cr_unit.fileref = deckfile;				/* give scp a file to close */
 	}
 
-	return detach_unit(uptr);
+	if (uptr->fileref == stdout) {
+		CLRBIT(uptr->flags, UNIT_ATT);
+		free(uptr->filename);
+		uptr->filename = NULL;
+		rval = SCPE_OK;
+	}
+	else
+		rval = detach_unit(uptr);
+
+	return rval;
 }
 
 static t_stat cp_detach   (UNIT *uptr)
 {
 	if (cp_unit.flags & UNIT_ATT)
 		if (punchstate == STATION_PUNCHED)
-			feedcycle(FALSE, FALSE);						/* flush out card just punched */
+			feedcycle(FALSE, FALSE);			/* flush out card just punched */
+
+	any_punched = 0;							/* reset punch detected */
 
 	return detach_unit(uptr);
 }
 
 static void op_done (void)
 {
+	if (cr_unit.flags & UNIT_DEBUG)
+		DEBUG_PRINT("!CR Op Complete, card %d", cardnum);
+
 	SET_OP(OP_IDLE);
 	SETBIT(cr_dsw, CR_DSW_OP_COMPLETE);
 	SETBIT(ILSW[4], ILSW_4_1442_CARD);
@@ -904,7 +1090,7 @@ static void op_done (void)
 
 static t_stat cr_svc (UNIT *uptr)
 {
-	switch (cr_unit.flags & UNIT_OP) {
+	switch (CURRENT_OP) {
 		case OP_IDLE:
 			break;
 
@@ -923,6 +1109,8 @@ static t_stat cr_svc (UNIT *uptr)
 				SETBIT(ILSW[0], ILSW_0_1442_CARD);
 				calc_ints();
 				sim_activate(&cr_unit, cr_wait);
+				if (cr_unit.flags & UNIT_DEBUG)
+					DEBUG_PRINT("!CR Read Response %d : %d", cardnum, cr_unit.COLUMN+1);
 			}
 			else {
 				readstate = STATION_READ;
@@ -945,6 +1133,8 @@ static t_stat cr_svc (UNIT *uptr)
 				SETBIT(ILSW[0], ILSW_0_1442_CARD);
 				calc_ints();
 				sim_activate(&cr_unit, cp_wait);
+				if (cr_unit.flags & UNIT_DEBUG)
+					DEBUG_PRINT("!CR Punch Response");
 			}
 			break;
 	}
@@ -963,23 +1153,29 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 		case XIO_SENSE_DEV:
 			if (cp_unit.flags & UNIT_ATT)
 				lastcard = FALSE;					/* if punch file is open, assume infinite blank cards in reader */
-			else if (readstate == STATION_EMPTY || (cr_unit.flags & UNIT_ATT) == 0)
+			else if ((cr_unit.flags & UNIT_ATT) == 0)
 				lastcard = TRUE;					/* if nothing to read, hopper's empty */
-			else if ((ch = getc(cr_unit.fileref)) == EOF)
-				lastcard = TRUE;					/* there is nothing left to read for a next card */
-			else {
+			else if (readstate == STATION_LOADED)
+				lastcard = FALSE;
+			else if (cr_unit.fileref == NULL)
+				lastcard = TRUE;
+			else if ((ch = getc(cr_unit.fileref)) != EOF) {
 				ungetc(ch, cr_unit.fileref);		/* put character back; hopper's not empty */
 				lastcard = FALSE;
 			}
+			else if (deckfile != NULL && nextdeck())
+				lastcard = FALSE;
+			else
+				lastcard = TRUE;					/* there is nothing left to read for a next card */
 
 			CLRBIT(cr_dsw, CR_DSW_LAST_CARD|CR_DSW_BUSY|CR_DSW_NOT_READY);
 
 			if (lastcard)
 				SETBIT(cr_dsw, CR_DSW_LAST_CARD);
 
-			if ((cr_unit.flags & UNIT_OP) != OP_IDLE)
+			if (CURRENT_OP != OP_IDLE)
 				SETBIT(cr_dsw, CR_DSW_BUSY|CR_DSW_NOT_READY);
-			else if (readstate == STATION_EMPTY && punchstate == STATION_EMPTY && ! lastcard)
+			else if (readstate == STATION_EMPTY && punchstate == STATION_EMPTY && lastcard)
 				SETBIT(cr_dsw, CR_DSW_NOT_READY);
 
 			if (modify & 0x01) {					/* reset interrupts */
@@ -993,6 +1189,9 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 			}
 
 			ACC = cr_dsw;							/* return the DSW */
+
+			if (cr_unit.flags & UNIT_DEBUG)
+				DEBUG_PRINT("#CR Sense %04x%s%s", cr_dsw, (modify & 1) ? " RESET0" : "", (modify & 2) ? " RESET4" : "");
 			break;
 
 		case XIO_READ:								/* get card data into word pointed to in IOCC packet */
@@ -1002,6 +1201,8 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 				}
 				else if (cr_unit.COLUMN < 80) {
 					WriteW(addr, readstation[cr_unit.COLUMN]);
+					if (cr_unit.flags & UNIT_DEBUG)
+						DEBUG_PRINT("#CR Read %03x", (readstation[cr_unit.COLUMN] >> 4));
 				}
 				else if (cr_unit.COLUMN == 80) {
 					xio_error("1442: Read past column 80!");
@@ -1027,6 +1228,8 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 					punchstation[cp_unit.COLUMN] = wd & 0xFFF0;
 					if (wd & 0x0008)			/* mark this as last column to be punched */
 						SETBIT(cp_unit.flags, UNIT_LASTPUNCH);
+					if (cr_unit.flags & UNIT_DEBUG)
+						DEBUG_PRINT("#CR Punch %03x%s", (wd >> 4) & 0xFFF, (wd & 8) ? " LAST" : "");
 				}
 				else if (cp_unit.COLUMN == 80) {
 					xio_error("1442: Punch past column 80!");
@@ -1041,6 +1244,8 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 		case XIO_CONTROL:
 			switch (modify & 7) {
 				case 1:								/* start punch */
+					if (cr_unit.flags & UNIT_DEBUG)
+						DEBUG_PRINT("#CR Start Punch");
 					if (punchstate != STATION_LOADED)
 						feedcycle(TRUE, TRUE);
 
@@ -1049,11 +1254,15 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 
 					CLRBIT(cp_unit.flags, UNIT_LASTPUNCH);
 
+					any_punched = 1;				/* we've started punching, so enable writing to output deck file */
+
 					sim_cancel(&cr_unit);
 					sim_activate(&cr_unit, cp_wait);
 					break;
 
 				case 2:								/* feed cycle */
+					if (cr_unit.flags & UNIT_DEBUG)
+						DEBUG_PRINT("#CR Feed");
 					feedcycle(TRUE, FALSE);
 
 					SET_OP(OP_FEEDING);
@@ -1063,6 +1272,8 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 					break;
 
 				case 4:								/* start read */
+					if (cr_unit.flags & UNIT_DEBUG)
+						DEBUG_PRINT("#CR Start read");
 					if (readstate != STATION_LOADED)
 						feedcycle(TRUE, FALSE);
 
@@ -1074,6 +1285,8 @@ void xio_1142_card (int32 addr, int32 func, int32 modify)
 					break;
 
 				case 0:
+					if (cr_unit.flags & UNIT_DEBUG)
+						DEBUG_PRINT("#CR NOP");
 					break;
 
 				default:

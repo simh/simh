@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Sep-02	RMS	Fixed declarations in gdev structure
+
    There are several discrepancies between the original GRI-909 Reference
    Manual of 1969 and the only surviving code sample, the MIT Crystal Growing
    System of 1972:
@@ -113,10 +115,10 @@
 #define U_TTY		077				/* console */
 
 struct gdev {
-	int32	(*Src)();				/* source */
-	t_stat	(*Dst)();				/* dest */
-	t_stat	(*FO)();				/* func out */
-	int32	(*SF)();				/* skip func */
+	uint32	(*Src)(uint32);				/* source */
+	t_stat	(*Dst)(uint32, uint32);			/* dest */
+	t_stat	(*FO)(uint32);				/* func out */
+	uint32	(*SF)(uint32);				/* skip func */
 };
 
 /* Trap (jump) */

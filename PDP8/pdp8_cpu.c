@@ -25,6 +25,7 @@
 
    cpu		central processor
 
+   04-Oct-02	RMS	Revamped device dispatching, added device number support
    06-Jan-02	RMS	Added device enable/disable routines
    30-Dec-01	RMS	Added old PC queue
    16-Dec-01	RMS	Fixed bugs in EAE
@@ -172,11 +173,10 @@
       Thus, only writes outside the current field (indirect writes) need
       be checked against actual memory size.
 
-   3. Adding I/O devices.  Three modules must be modified:
+   3. Adding I/O devices.  These modules must be modified:
 
-	pdp8_defs.h	add interrupt request definition
-	pdp8_cpu.c	add IOT dispatch
-	pdp8_sys.c	add pointer to data structures to sim_devices
+	pdp8_defs.h	add device number and interrupt definitions
+	pdp8_sys.c	add sim_devices table entry
 */
 
 #include "pdp8_defs.h"
@@ -208,41 +208,21 @@ REG *pcq_r = NULL;					/* PC queue reg ptr */
 int32 dev_done = 0;					/* dev done flags */
 int32 int_enable = INT_INIT_ENABLE;			/* intr enables */
 int32 int_req = 0;					/* intr requests */
-int32 dev_enb = -1 & ~INT_DF & ~INT_RL;			/* device enables */
 int32 stop_inst = 0;					/* trap on ill inst */
+int32 (*dev_tab[DEV_MAX])(int32 IR, int32 dat);		/* device dispatch */
+
 extern int32 sim_interval;
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
+extern DEVICE *sim_devices[];
+extern FILE *sim_log;
 extern UNIT clk_unit, ttix_unit;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-extern int32 tti (int32 pulse, int32 AC);
-extern int32 tto (int32 pulse, int32 AC);
-extern int32 ptr (int32 pulse, int32 AC);
-extern int32 ptp (int32 pulse, int32 AC);
-extern int32 clk (int32 pulse, int32 AC);
-extern int32 lpt (int32 pulse, int32 AC);
-extern int32 ttix (int32 inst, int32 AC);
-extern int32 ttox (int32 inst, int32 AC);
-extern int32 rk (int32 pulse, int32 AC);
-extern int32 rx (int32 pulse, int32 AC);
-extern int32 df60 (int32 pulse, int32 AC);
-extern int32 df61 (int32 pulse, int32 AC);
-extern int32 df62 (int32 pulse, int32 AC);
-extern int32 rf60 (int32 pulse, int32 AC);
-extern int32 rf61 (int32 pulse, int32 AC);
-extern int32 rf62 (int32 pulse, int32 AC);
-extern int32 rf64 (int32 pulse, int32 AC);
-extern int32 rl60 (int32 pulse, int32 AC);
-extern int32 rl61 (int32 pulse, int32 AC);
-extern int32 mt70 (int32 pulse, int32 AC);
-extern int32 mt71 (int32 pulse, int32 AC);
-extern int32 mt72 (int32 pulse, int32 AC);
-extern int32 dt76 (int32 pulse, int32 AC);
-extern int32 dt77 (int32 pulse, int32 AC);
+t_bool build_dev_tab (void);
 
 /* CPU data structures
 
@@ -277,12 +257,10 @@ REG cpu_reg[] = {
 	{ ORDATA (INT, int_req, INT_V_ION+1), REG_RO },
 	{ ORDATA (DONE, dev_done, INT_V_DIRECT), REG_RO },
 	{ ORDATA (ENABLE, int_enable, INT_V_DIRECT), REG_RO },
-	{ FLDATA (NOEAE, cpu_unit.flags, UNIT_V_NOEAE), REG_HRO },
 	{ BRDATA (PCQ, pcq, 8, 15, PCQ_SIZE), REG_RO+REG_CIRC },
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ FLDATA (STOP_INST, stop_inst, 0) },
 	{ ORDATA (WRU, sim_int_char, 8) },
-	{ ORDATA (DEVENB, dev_enb, 32), REG_HRO },
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
@@ -302,7 +280,8 @@ DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
 	1, 8, 15, 1, 8, 12,
 	&cpu_ex, &cpu_dep, &cpu_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, 0 };
 
 t_stat sim_instr (void)
 {
@@ -313,6 +292,7 @@ t_stat reason;
 
 /* Restore register state */
 
+if (build_dev_tab ()) return SCPE_STOP;			/* build dev_tab */
 PC = saved_PC & 007777;					/* load local copies */
 IF = saved_PC & 070000;
 DF = saved_DF & 070000;
@@ -940,7 +920,7 @@ case 030:case 031:case 032:case 033:			/* IOT */
 			int_enable = INT_INIT_ENABLE;
 			LAC = 0;
 			break;  }			/* end switch pulse */
-		continue;				/* skip rest of IOT */
+		break;					/* end case 0 */
 
 /* IOT, continued: memory extension */
 
@@ -993,7 +973,7 @@ case 030:case 031:case 032:case 033:			/* IOT */
 		default:
 			reason = stop_inst;
 			break;  }			/* end switch pulse */
-		continue;				/* skip rest of IOT */
+		break;					/* end case 20-27 */
 
 /* IOT, continued: other special cases */
 
@@ -1010,90 +990,16 @@ case 030:case 031:case 032:case 033:			/* IOT */
 		default:
 			reason = stop_inst;
 			break;  }			/* end switch pulse */
-		continue;				/* skip rest of IOT */
-	default:					/* unknown device */
-		reason = stop_inst;			/* stop on flag */
-		continue;				/* skip rest of IOT */
-
-/* IOT, continued: I/O devices */
-
-	case 1:						/* PTR */
-		iot_data = ptr (pulse, iot_data);
-		break;
-	case 2:						/* PTP */
-		iot_data = ptp (pulse, iot_data);
-		break;
-	case 3:						/* TTI */
-		iot_data = tti (pulse, iot_data);
-		break;
-	case 4: 					/* TTO */
-		iot_data = tto (pulse, iot_data);
-		break;
-	case 013:					/* CLK */
-		iot_data = clk (pulse, iot_data);
-		break;
-	case 040: case 042: case 044: case 046:		/* KL8JA in */
-		if (dev_enb & INT_TTI1) iot_data = ttix (IR, iot_data);
-		else reason = stop_inst;
-		break;
-	case 041: case 043: case 045: case 047:		/* KL8JA out */
-		if (dev_enb & INT_TTI1) iot_data = ttox (IR, iot_data);
-		else reason = stop_inst;
-		break;
-	case 060:					/* DF32/RF08 */
-		if (dev_enb & INT_DF) iot_data = df60 (pulse, iot_data);
-		else if (dev_enb & INT_RF) iot_data = rf60 (pulse, iot_data);
-		else if (dev_enb & INT_RL) iot_data = rl60 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 061:
-		if (dev_enb & INT_DF) iot_data = df61 (pulse, iot_data);
-		else if (dev_enb & INT_RF) iot_data = rf61 (pulse, iot_data);
-		else if (dev_enb & INT_RL) iot_data = rl61 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 062:
-		if (dev_enb & INT_DF) iot_data = df62 (pulse, iot_data);
-		else if (dev_enb & INT_RF) iot_data = rf62 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 064:
-		if (dev_enb & INT_RF) iot_data = rf64 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 066:					/* LPT */
-		iot_data = lpt (pulse, iot_data);
-		break;
-	case 070:					/* TM8E */
-		if (dev_enb & INT_MT) iot_data = mt70 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 071:
-		if (dev_enb & INT_MT) iot_data = mt71 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 072:
-		if (dev_enb & INT_MT) iot_data = mt72 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 074:					/* RK8E */
-		if (dev_enb & INT_RK) iot_data = rk (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 075:					/* RX8E */
-		if (dev_enb & INT_RX) iot_data = rx (pulse, iot_data);
-		break;
-	case 076:					/* TC01/TC08 */
-		if (dev_enb & INT_DTA) iot_data = dt76 (pulse, iot_data);
-		else reason = stop_inst;
-		break;
-	case 077:
-		if (dev_enb & INT_DTA) iot_data = dt77 (pulse, iot_data);
-		else reason = stop_inst;
+		break;					/* end case 10 */
+	default:					/* I/O device */
+		if (dev_tab[device]) {			/* dev present? */
+			iot_data = dev_tab[device] (IR, iot_data);
+			LAC = (LAC & 010000) | (iot_data & 07777);
+			if (iot_data & IOT_SKP) PC = (PC + 1) & 07777;
+			if (iot_data >= IOT_REASON)
+			    reason = iot_data >> IOT_V_REASON;  }
+		else reason = stop_inst;		/* stop on flag */
 		break;  }				/* end switch device */
-	LAC = (LAC & 010000) | (iot_data & 07777);
-	if (iot_data & IOT_SKP) PC = (PC + 1) & 07777;
-	if (iot_data >= IOT_REASON) reason = iot_data >> IOT_V_REASON;
 	break;  }					/* end switch opcode */
 }							/* end while */
 
@@ -1103,7 +1009,7 @@ saved_PC = IF | (PC & 07777);				/* save copies */
 saved_DF = DF & 070000;
 saved_LAC = LAC & 017777;
 saved_MQ = MQ & 07777;
-pcq_r -> qptr = pcq_p;					/* update pc q ptr */
+pcq_r->qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }							/* end sim_instr */
 
@@ -1115,7 +1021,7 @@ int_req = (int_req & ~INT_ION) | INT_NO_CIF_PENDING;
 saved_DF = IB = saved_PC & 070000;
 UF = UB = gtf = emode = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r -> qptr = 0;
+if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -1156,38 +1062,80 @@ for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
 return SCPE_OK;
 }
 
-/* Device enable routine */
+/* Change device number for a device */
 
-t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_dev (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 DEVICE *dptr;
+DIB *dibp;
+uint32 newdev;
+t_stat r;
 
-if (cptr != NULL) return SCPE_ARG;
-if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+if (cptr == NULL) return SCPE_ARG;
+if (uptr == NULL) return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
 if (dptr == NULL) return SCPE_IERR;
-dev_enb = dev_enb | val;
-if (dptr -> reset) dptr -> reset (dptr);
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+newdev = get_uint (cptr, 8, DEV_MAX - 1, &r);		/* get new */
+if ((r != SCPE_OK) || (newdev == dibp->dev)) return r;
+dibp->dev = newdev;					/* store */
 return SCPE_OK;
 }
 
-/* Device disable routine */
+/* Show device number for a device */
 
-t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat show_dev (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-int32 i;
 DEVICE *dptr;
-UNIT *up;
+DIB *dibp;
 
-if (cptr != NULL) return SCPE_ARG;
-if ((uptr == NULL) || (val == 0)) return SCPE_IERR;
+if (uptr == NULL) return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
 if (dptr == NULL) return SCPE_IERR;
-for (i = 0; i < dptr -> numunits; i++) {		/* check units */
-	up = (dptr -> units) + i;
-	if ((up -> flags & UNIT_ATT) || sim_is_active (up))
-		return SCPE_NOFNC;  }
-dev_enb = dev_enb & ~val;
-if (dptr -> reset) dptr -> reset (dptr);
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+fprintf (st, "devno=%02o", dibp->dev);
+if (dibp-> num > 1) fprintf (st, "-%2o", dibp->dev + dibp->num - 1);
 return SCPE_OK;
+}
+
+/* CPU device handler - should never get here! */
+
+int32 bad_dev (int32 IR, int32 AC)
+{
+return (SCPE_IERR << IOT_V_REASON) | AC;		/* broken! */
+}
+
+/* Build device dispatch table */
+
+t_bool build_dev_tab (void)
+{
+DEVICE *dptr;
+DIB *dibp;
+uint32 i, j;
+static const uint8 std_dev[] =
+	{ 000, 010, 020, 021, 022, 023, 024, 025, 026, 027 };
+
+for (i = 0; i < DEV_MAX; i++) dev_tab[i] = NULL;	/* clr table */
+for (i = 0; i < ((uint32) sizeof (std_dev)); i++)	/* std entries */
+	dev_tab[std_dev[i]] = &bad_dev;
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* add devices */
+	dibp = (DIB *) dptr->ctxt;			/* get DIB */
+	if (dibp && !(dptr->flags & DEV_DIS)) {		/* enabled? */
+	    for (j = 0; j < dibp->num; j++) {		/* loop thru disp */
+		if (dibp->dsp[j]) {			/* any dispatch? */
+		    if (dev_tab[dibp->dev + j]) {	/* already filled? */
+			printf ("%s device number conflict at %02o\n",
+			    dptr->name, dibp->dev + j);
+			if (sim_log) fprintf (sim_log,
+			    "%s device number conflict at %02o\n",
+			    dptr->name, dibp->dev + j);
+			 return TRUE;  }
+		    dev_tab[dibp->dev + j] = dibp->dsp[j];	/* fill */
+		    }					/* end if dsp */
+		}					/* end for j */
+	    }						/* end if enb */
+	}						/* end for i */
+return FALSE;
 }

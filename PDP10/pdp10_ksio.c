@@ -25,6 +25,9 @@
 
    uba		Unibus adapters
 
+   10-Oct-02	RMS	Revised for dynamic table generation
+			Added SHOW IOSPACE routine
+   29-Sep-02	RMS	Added variable vector, central map support
    25-Jan-02	RMS	Revised for multiple DZ11's
    06-Jan-02	RMS	Revised enable/disable support
    23-Sep-01	RMS	New IO page address constants
@@ -66,6 +69,7 @@
 #include "pdp10_defs.h"
 #include <setjmp.h>
 
+#define XBA_MBZ		0400000				/* ba mbz */
 #define eaRB		(ea & ~1)
 #define GETBYTE(ea,x)	((((ea) & 1)? (x) >> 8: (x)) & 0377)
 #define UBNXM_FAIL(pa,op) \
@@ -91,22 +95,25 @@ static const int32 ubabr76[UBANUM] = {
 	INT_UB1 & (INT_IPL7 | INT_IPL6), INT_UB3 & (INT_IPL7 | INT_IPL6) };
 static const int32 ubabr54[UBANUM] = {
 	INT_UB1 & (INT_IPL5 | INT_IPL4), INT_UB3 & (INT_IPL5 | INT_IPL4) };
+static const int32 ubashf[4] = { 18, 26, 0, 8 };
 
+extern d10 *M;						/* main memory */
 extern d10 *ac_cur;
 extern d10 pager_word;
 extern int32 flags, pi_l2bit[8];
 extern UNIT cpu_unit;
 extern FILE *sim_log;
 extern jmp_buf save_env;
+extern DEVICE *sim_devices[];
 
 extern d10 Read (a10 ea);
 extern void pi_eval ();
-extern DIB dz_dib, pt_dib, lp20_dib, rp_dib, tu_dib, tcu_dib;
 extern int32 rp_inta (void);
 extern int32 tu_inta (void);
 extern int32 lp20_inta (void);
 extern int32 dz_rxinta (void);
 extern int32 dz_txinta (void);
+
 t_stat ubmap_rd (int32 *data, int32 addr, int32 access);
 t_stat ubmap_wr (int32 data, int32 addr, int32 access);
 t_stat ubs_rd (int32 *data, int32 addr, int32 access);
@@ -118,7 +125,6 @@ t_stat uba_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat uba_reset (DEVICE *dptr);
 d10 ReadIO (a10 ea);
 void WriteIO (a10 ea, d10 val, int32 mode);
-t_bool dev_conflict (uint32 nba, DIB *curr);
 
 /* Unibus adapter data structures
 
@@ -127,13 +133,13 @@ t_bool dev_conflict (uint32 nba, DIB *curr);
    uba_reg	UBA register list
 */
 
-DIB ubmp1_dib = { 1, IOBA_UBMAP1, IOLN_UBMAP1, &ubmap_rd, &ubmap_wr };
-DIB ubmp3_dib = { 1, IOBA_UBMAP3, IOLN_UBMAP3, &ubmap_rd, &ubmap_wr };
-DIB ubcs1_dib = { 1, IOBA_UBCS1, IOLN_UBCS1, &ubs_rd, &ubs_wr };
-DIB ubcs3_dib = { 1, IOBA_UBCS3, IOLN_UBCS3, &ubs_rd, &ubs_wr };
-DIB ubmn1_dib = { 1, IOBA_UBMNT1, IOLN_UBMNT1, &rd_zro, &wr_nop };
-DIB ubmn3_dib = { 1, IOBA_UBMNT3, IOLN_UBMNT3, &rd_zro, &wr_nop };
-DIB msys_dib = { 1, 00100000, 00100001, &rd_zro, &wr_nop };
+DIB ubmp1_dib = { IOBA_UBMAP1, IOLN_UBMAP1, &ubmap_rd, &ubmap_wr, 0 };
+DIB ubmp3_dib = { IOBA_UBMAP3, IOLN_UBMAP3, &ubmap_rd, &ubmap_wr, 0 };
+DIB ubcs1_dib = { IOBA_UBCS1, IOLN_UBCS1, &ubs_rd, &ubs_wr, 0 };
+DIB ubcs3_dib = { IOBA_UBCS3, IOLN_UBCS3, &ubs_rd, &ubs_wr, 0 };
+DIB ubmn1_dib = { IOBA_UBMNT1, IOLN_UBMNT1, &rd_zro, &wr_nop, 0 };
+DIB ubmn3_dib = { IOBA_UBMNT3, IOLN_UBMNT3, &rd_zro, &wr_nop, 0 };
+DIB msys_dib = { 00100000, 1, &rd_zro, &wr_nop, 0 };
 
 UNIT uba_unit[] = {
 	{ UDATA (NULL, UNIT_FIX, UMAP_MEMSIZE) },
@@ -149,17 +155,18 @@ DEVICE uba_dev = {
 	"UBA", uba_unit, uba_reg, NULL,
 	UBANUM, 8, UMAP_ASIZE, 1, 8, 32,
 	&uba_ex, &uba_dep, &uba_reset,
-	NULL, NULL, NULL };
-
+	NULL, NULL, NULL,
+	NULL, 0 };
+
 /* PDP-11 I/O structures */
 
-DIB *dib_tab[] = {
-	&rp_dib,
-	&tu_dib,
-	&dz_dib,
-	&lp20_dib,
-	&pt_dib,
-	&tcu_dib,
+DIB *dib_tab[DIB_MAX];					/* run-time DIBs */
+
+int32 (*int_ack[32])(void);				/* int ack routines */
+
+int32 int_vec[32];					/* int vectors */
+
+DIB *std_dib[] = {					/* standard DIBs */
 	&ubmp1_dib,
 	&ubmp3_dib,
 	&ubcs1_dib,
@@ -168,22 +175,6 @@ DIB *dib_tab[] = {
 	&ubmn3_dib,
 	&msys_dib,
 	NULL };
-
-/* Interrupt request to interrupt action map */
-
-int32 (*int_ack[32])() = {				/* int ack routines */
-	NULL, NULL, NULL, NULL, NULL, NULL, &rp_inta, &tu_inta,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	&dz_rxinta, &dz_txinta, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, &lp20_inta, NULL, NULL, NULL, NULL, NULL  };
-
-/* Interrupt request to vector map */
-
-int32 int_vec[32] = {					/* int req to vector */
-	0, 0, 0, 0, 0, 0, VEC_RP, VEC_TU,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	VEC_DZRX, VEC_DZTX, 0, 0, 0, 0, 0, 0, 
-	VEC_PTR, VEC_PTP, VEC_LP20, 0, 0, 0, 0, 0 };
 
 /* IO 710	(DEC) TIOE - test I/O word, skip if zero
 		(ITS) IORDI - read word from Unibus 3
@@ -378,9 +369,9 @@ int32 i, n, val;
 DIB *dibp;
 
 for (i = 0; dibp = dib_tab[i]; i++ ) {
-	if (dibp -> enb && (pa >= dibp -> ba) &&
-	   (pa < (dibp -> ba + dibp -> lnt))) {
-		dibp -> rd (&val, pa, READ);
+	if ((pa >= dibp->ba) &&
+	   (pa < (dibp->ba + dibp->lnt))) {
+		dibp->rd (&val, pa, READ);
 		pi_eval ();
 		return ((d10) val);  }  }
 UBNXM_FAIL (pa, READ);
@@ -393,12 +384,95 @@ int32 i, n;
 DIB *dibp;
 
 for (i = 0; dibp = dib_tab[i]; i++ ) {
-	if (dibp -> enb && (pa >= dibp -> ba) &&
-	   (pa < (dibp -> ba + dibp -> lnt))) {
-		dibp -> wr ((int32) val, pa, mode);
+	if ((pa >= dibp->ba) &&
+	   (pa < (dibp->ba + dibp->lnt))) {
+		dibp->wr ((int32) val, pa, mode);
 		pi_eval ();
 		return;  }  }
 UBNXM_FAIL (pa, mode);
+}
+
+/* Mapped read and write routines - used by word-oriented Unibus devices */
+
+a10 Map_Addr10 (a10 ba, int32 ub)
+{
+a10 pa10;
+int32 vpn = PAG_GETVPN (ba >> 2);			/* get PDP-10 page number */
+	
+if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ) ||
+    ((ubmap[ub][vpn] & UMAP_VLD) == 0)) return -1;	/* invalid map? */
+pa10 = (ubmap[ub][vpn] + PAG_GETOFF (ba >> 2)) & PAMASK;
+return pa10;
+}
+
+int32 Map_ReadB (t_addr ba, int32 bc, uint8 *buf, t_bool ub)
+{
+t_addr lim;
+a10 pa10;
+
+lim = ba + bc;
+for ( ; ba < lim; ba++) {				/* by bytes */
+	pa10 = Map_Addr10 (ba, ub);			/* map addr */
+	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
+		ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+		return (lim - ba);  }			/* return bc */
+	*buf++ = (uint8) ((M[pa10] >> ubashf[ba & 3]) & 0377);
+	}
+return 0;
+}
+
+int32 Map_ReadW (t_addr ba, int32 bc, uint16 *buf, t_bool ub)
+{
+t_addr lim;
+a10 pa10;
+
+ba = ba & ~01;						/* align start */
+lim = ba + (bc & ~01);
+for ( ; ba < lim; ba = ba + 2) {			/* by words */
+	pa10 = Map_Addr10 (ba, ub);			/* map addr */
+	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
+		ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+		return (lim - ba);  }			/* return bc */
+	*buf++ = (uint16) ((M[pa10] >> ((ba & 2)? 0: 18)) & 0177777);
+	}
+return 0;
+}
+
+int32 Map_WriteB (t_addr ba, int32 bc, uint8 *buf, t_bool ub)
+{
+t_addr lim;
+a10 pa10;
+static d10 mask = 0377;
+
+lim = ba + bc;
+for ( ; ba < lim; ba++) {				/* by bytes */
+	pa10 = Map_Addr10 (ba, ub);			/* map addr */
+	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
+		ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+		return (lim - ba);  }			/* return bc */
+	M[pa10] = (M[pa10] & ~(mask << ubashf[ba & 3])) |
+		(((d10) *buf++) << ubashf[ba & 3]);  }
+return 0;
+}
+
+int32 Map_WriteW (t_addr ba, int32 bc, uint16 *buf, t_bool ub)
+{
+t_addr lim;
+a10 pa10;
+d10 val;
+
+ba = ba & ~01;						/* align start */
+lim = ba + (bc & ~01);
+for ( ; ba < lim; ba++) {				/* by bytes */
+	pa10 = Map_Addr10 (ba, ub);			/* map addr */
+	if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {	/* inv map or NXM? */
+		ubcs[ub] = ubcs[ub] | UBCS_TMO;		/* UBA times out */
+		return (lim - ba);  }			/* return bc */
+	val = *buf++;					/* get data */
+	if (ba & 2) M[pa10] = (M[pa10] & 0777777600000) | val;
+	else M[pa10] = (M[pa10] & 0600000777777) | (val << 18);
+	}
+return 0;
 }
 
 /* Evaluate Unibus priority interrupts */
@@ -530,24 +604,27 @@ pi_eval ();
 return SCPE_OK;
 }
 
-/* Change device number for a device */
+/* Change device address */
 
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
+DEVICE *dptr;
 DIB *dibp;
 uint32 newba;
 t_stat r;
 
 if (cptr == NULL) return SCPE_ARG;
-if ((val == 0) || (desc == NULL)) return SCPE_IERR;
-dibp = (DIB *) desc;
+if ((val == 0) || (uptr == NULL)) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
 newba = (uint32) get_uint (cptr, 8, PAMASK, &r);	/* get new */
-if ((r != SCPE_OK) || (newba == dibp -> ba)) return r;
-if ((newba & AMASK) <= IOPAGEBASE) return SCPE_ARG;	/* must be > 0 */
+if ((r != SCPE_OK) || (newba == dibp->ba)) return r;
+if (GET_IOUBA (newba) != GET_IOUBA (dibp->ba)) return SCPE_ARG;
 if (newba % ((uint32) val)) return SCPE_ARG;		/* check modulus */
-if (GET_IOUBA (newba) != GET_IOUBA (dibp -> ba)) return SCPE_ARG;
-if (dev_conflict (newba, dibp)) return SCPE_OK;
-dibp -> ba = newba;					/* store */
+if (GET_IOUBA (newba) != GET_IOUBA (dibp->ba)) return SCPE_ARG;
+dibp->ba = newba;					/* store */
 return SCPE_OK;
 }
 
@@ -555,61 +632,163 @@ return SCPE_OK;
 
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
+DEVICE *dptr;
 DIB *dibp;
 
-if (desc == NULL) return SCPE_IERR;
-dibp = (DIB *) desc;
-if (dibp -> ba <= IOPAGEBASE) return SCPE_IERR;
-fprintf (st, "address=%07o", dibp -> ba);
-if (dibp -> lnt > 1)
-	fprintf (st, "-%07o", dibp -> ba + dibp -> lnt - 1);
+if (uptr == NULL) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+dibp = (DIB *) dptr->ctxt;
+if ((dibp == NULL) || (dibp->ba <= IOPAGEBASE)) return SCPE_IERR;
+fprintf (st, "address=%07o", dibp->ba);
+if (dibp->lnt > 1)
+	fprintf (st, "-%07o", dibp->ba + dibp->lnt - 1);
 return SCPE_OK;
 }
 
-/* Enable or disable a device */
+/* Change device vector */
 
-t_stat set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat set_vec (UNIT *uptr, int32 arg, char *cptr, void *desc)
 {
-int32 i;
 DEVICE *dptr;
 DIB *dibp;
-UNIT *up;
+uint32 newvec;
+t_stat r;
 
-if (cptr != NULL) return SCPE_ARG;
-if ((uptr == NULL) || (desc == NULL)) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);			/* find device */
+if (cptr == NULL) return SCPE_ARG;
+if (uptr == NULL) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
 if (dptr == NULL) return SCPE_IERR;
-dibp = (DIB *) desc;
-if ((val ^ dibp -> enb) == 0) return SCPE_OK;		/* enable chg? */
-if (val) {						/* enable? */
-    if (dev_conflict (dibp -> ba, dibp)) return SCPE_OK;  }
-else {							/* disable */
-    for (i = 0; i < dptr -> numunits; i++) {		/* check units */
-	up = (dptr -> units) + i;
-	if ((up -> flags & UNIT_ATT) || sim_is_active (up))
-	    return SCPE_NOFNC;  }  }
-dibp -> enb = val;
-if (dptr -> reset) return dptr -> reset (dptr);
-else return SCPE_OK;
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+newvec = (uint32) get_uint (cptr, 8, VEC_Q + 01000, &r);
+if ((r != SCPE_OK) || (newvec <= VEC_Q) ||
+    ((newvec + (dibp->vnum * 4)) >= (VEC_Q + 01000)) ||
+    (newvec & ((dibp->vnum > 1)? 07: 03))) return SCPE_ARG;
+dibp->vec = newvec;
+return SCPE_OK;
 }
 
+/* Show device vector */
+
+t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc)
+{
+DEVICE *dptr;
+DIB *dibp;
+uint32 vec, numvec;
+
+if (uptr == NULL) return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL) return SCPE_IERR;
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+vec = dibp->vec;
+if (arg) numvec = arg;
+else numvec = dibp->vnum;
+if (vec == 0) fprintf (st, "no vector");
+else {	fprintf (st, "vector=%o", vec);
+	if (numvec > 1) fprintf (st, "-%o", vec + (4 * (numvec - 1)));  }
+return SCPE_OK;
+}
+
 /* Test for conflict in device addresses */
 
-t_bool dev_conflict (uint32 nba, DIB *curr)
+t_bool dev_conflict (DIB *curr)
 {
 uint32 i, end;
+DEVICE *dptr;
 DIB *dibp;
 
-end = nba + curr -> lnt - 1;				/* get end */
-for (i = 0; dibp = dib_tab[i]; i++) {			/* loop thru dev */
-	if (!dibp -> enb || (dibp == curr)) continue;	/* skip disabled */
-	if (((nba >= dibp -> ba) &&
-	    (nba < (dibp -> ba + dibp -> lnt))) ||
-	    ((end >= dibp -> ba) &&
-	    (end < (dibp -> ba + dibp -> lnt)))) {
-		printf ("Device address conflict at %07o\n", dibp -> ba);
+end = curr->ba + curr->lnt - 1;				/* get end */
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
+	dibp = (DIB *) dptr->ctxt;			/* get DIB */
+	if ((dibp == NULL) || (dibp == curr) ||
+	    (dptr->flags & DEV_DIS)) continue;
+	if (((curr->ba >= dibp->ba) &&			/* overlap start? */
+	    (curr->ba < (dibp->ba + dibp->lnt))) ||
+	    ((end >= dibp->ba) &&			/* overlap end? */
+	    (end < (dibp->ba + dibp->lnt)))) {
+		printf ("Device %s address conflict at %08o\n", dptr->name, dibp->ba);
 		if (sim_log) fprintf (sim_log,
-			"Device number conflict at %07o\n", dibp -> ba);
+			"Device %s address conflict at %08o\n", dptr->name, dibp->ba);
 		return TRUE;  }  }
 return FALSE;
+}
+
+/* Build interrupt tables */
+
+void build_int_vec (int32 vloc, int32 ivec, int32 (*iack)(void) )
+{
+if (iack != NULL) int_ack[vloc] = iack;
+else int_vec[vloc] = ivec;
+return;
+}
+
+/* Build dib_tab from device list */
+
+t_bool build_dib_tab (void)
+{
+int32 i, j, k;
+DEVICE *dptr;
+DIB *dibp;
+
+for (i = 0; i < 32; i++) {				/* clear intr tables */
+	int_vec[i] = 0;
+	int_ack[i] = NULL;  }
+for (i = j = 0; (dptr = sim_devices[i]) != NULL; i++) {	/* loop thru dev */
+	dibp = (DIB *) dptr->ctxt;			/* get DIB */
+	if (dibp && !(dptr->flags & DEV_DIS)) {		/* defined, enabled? */
+	    if (dibp->vnum > VEC_DEVMAX) return SCPE_IERR;
+	    for (k = 0; k < dibp->vnum; k++)		/* loop thru vec */
+	        build_int_vec (dibp->vloc + k,		/* add vector */
+		    dibp->vec + (k * 4), dibp->ack[k]);
+	    if (dibp->lnt != 0) {			/* I/O addresses? */
+		dib_tab[j++] = dibp;			/* add DIB to dib_tab */
+		if (j >= DIB_MAX) return SCPE_IERR;  }	/* too many? */	
+	    }						/* end if enabled */
+	}						/* end for */
+for (i = 0; (dibp = std_dib[i]) != NULL; i++) {		/* loop thru std */
+	dib_tab[j++] = dibp;				/* add to dib_tab */
+	if (j >= DIB_MAX) return SCPE_IERR;  }		/* too many? */
+dib_tab[j] = NULL;					/* end with NULL */
+for (i = 0; (dibp = dib_tab[i]) != NULL; i++) {		/* test built dib_tab */
+	if (dev_conflict (dibp)) return SCPE_STOP;  }	/* for conflicts */
+return SCPE_OK;
+}
+
+/* Show dib_tab */
+
+t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 i, j, done = 0;
+DEVICE *dptr;
+DIB *dibt;
+
+build_dib_tab ();					/* build table */
+while (done == 0) {					/* sort ascending */
+	done = 1;					/* assume done */
+	for (i = 0; dib_tab[i + 1] != NULL; i++) {	/* check table */
+	    if (dib_tab[i]->ba > dib_tab[i + 1]->ba) {	/* out of order? */
+		dibt = dib_tab[i];			/* interchange */
+		dib_tab[i] = dib_tab[i + 1];
+		dib_tab[i + 1] = dibt;
+		done = 0;  }  }				/* not done */
+	}						/* end while */
+for (i = 0; dib_tab[i] != NULL; i++) {			/* print table */
+	for (j = 0, dptr = NULL; sim_devices[j] != NULL; j++) {
+	    if (((DIB*) sim_devices[j]->ctxt) == dib_tab[i]) {
+		dptr = sim_devices[j];
+		break;  }  }
+	fprintf (st, "%07o - %07o\t%s\n", dib_tab[i]->ba,
+		dib_tab[i]->ba + dib_tab[i]->lnt - 1,
+		dptr? dptr->name: "CPU");
+	}
+return SCPE_OK;
+}
+
+/* Stub auto-configure */
+
+t_stat auto_config (uint32 rank, uint32 num)
+{
+return SCPE_OK;
 }

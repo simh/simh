@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-8 Simulator Usage
-Date:	15-Jun-2002
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -37,11 +37,11 @@ This memorandum documents the PDP-8 simulator.
 1. Simulator Files
 
 sim/		sim_defs.h
+		sim_rev.h
 		sim_sock.h
 		sim_tmxr.h
 		scp.c
 		scp_tty.c
-		sim_rev.c
 		sim_sock.c
 		sim_tmxr.c
 
@@ -79,18 +79,34 @@ RK		RK8E/RK05 cartridge disk controller with four drives
 RF		RF08/RS08 fixed head disk controller with four platters, or
 DF		DF32/DS32 fixed head disk controller with four platters
 RL		RL8A/RL01 cartridge disk controller with four drives
-RX		RX8E/RX01 floppy disk controller with two drives
+RX		RX8E/RX01, RX28/RX02 floppy disk controller with two drives
 DT		TC08/TU56 DECtape controller with eight drives
 MT		TM8E/TU10 magnetic tape controller with eight drives
 
-The RK, RF, DF, RL, RX, DT, MT, and TTIX/TTOX devices can be set DISABLEd.
-The PDP-8 can support only one of the set {DF32, RF08, RL8A}, since they
-use the same IOT's.  The simulator defaults to the RF08.  To change the
-disk at device addresses 60-61:
+Most devices can be disabled or enabled, by the commands:
 
-	SET RF DISABLED		disable RF08
-	SET DF ENABLED, or	enable DF32
-	SET RL ENABLED		enable RL8A
+	SET <dev> DISABLED
+	SET <dev> ENABLED
+
+The simulator allows most device numbers to be changed, by the command:
+
+	SET <dev> DEV=<number>
+
+The PDP-8 can support only one of the set {DF32, RF08, RL8A} using the
+default device numbers, since they all use device numbers 60-61.  The
+default is the RF08.  To change the disk at device numbers 60-61:
+
+	sim> SET RF DISABLED		disable RF08
+	sim> SET DF ENABLED, or		enable DF32
+	sim> SET RL ENABLED		enable RL8A
+
+Alternately, the device conflict can be eliminated by changing device
+numbers:
+
+	sim> SET RL DEV=50
+	sim> SET RL ENA
+
+However, devices can only be BOOTed with their default device numbers.
 
 The PDP-8 simulator implements one unique stop condition: if an undefined
 instruction (unimplemented IOT or OPR) is decoded, and register STOP_INST
@@ -218,11 +234,15 @@ Error handling is as follows:
 
 2.2.3 KL8E Terminal Input (TTI)
 
-The terminal input (TTI) polls the console keyboard for input.  The
-input side has one option, UC; when set, it automatically converts lower
-case input to upper case.  This is required by OS/8 and is on by default.
+The terminal interfaces (TTI, TTO) can be set to one of three modes:
+KSR, 7B, or 8B.  In KSR mode, lower case input and output characters
+are automatically converted to upper case, and the high order bit is
+forced to one on input.  In 7B mode, input and output characters are
+masked to 7 bits.  In 8B mode, characters are not modified.  Changing
+the mode of either interface changes both.  The default mode is KSR.
 
-The terminal input implements these registers:
+The terminal input (TTI) polls the console keyboard for input.  It
+implements these registers:
 
 	name		size	comments
 
@@ -235,7 +255,7 @@ The terminal input implements these registers:
 
 2.2.4 KL8E Terminal Output (TTO)
 
-The terminal output (TTO) writes to the simulator console window. It
+The terminal output (TTO) writes to the simulator console window.  It
 implements these registers:
 
 	name		size	comments
@@ -302,9 +322,11 @@ command specifies the port to be used:
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.
 
-The additional terminals have one option, UC; when set, lower case input
-characters are automatically converted to upper case.  This is required
-by TSS/8 and is on by default for all lines.
+The additional terminals can be set to one of three modes: UC, 7B, or
+8B.  In KSR mode, lower case input and output characters are converted
+automatically to upper case.  In 7B mode, input and output characters
+are masked to 7 bits.  In 8B mode, characters are not modified.  The
+default mode is UC.
 
 Once TTIX is attached and the simulator is running, the terminals listen
 for connections on the specified port.  They assume that the incoming
@@ -419,26 +441,43 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.4 RX8E/RX01 Floppy Disk (RX)
+2.4 RX8E/RX01, RX28/RX02 Floppy Disk (RX)
+
+The RX can be configured as an RX8E with two RX01 drives, or an RX28 with
+two RX02 drives:
+
+	SET RX RX8E		set controller to RX8E/RX01
+	SET RX RX28		set controller to RX28/RX02
+
+The controller is set to the RX8E by default.  The RX28 is not backwards-
+compatible with the RX8E and will not work with the standard OS/8 V3D floppy
+disk driver.
 
 RX8E options include the ability to set units write enabled or write locked:
 
 	SET RXn LOCKED		set unit n write locked
 	SET RXn WRITEENABLED	set unit n write enabled
 
-The RX8E supports the BOOT command.
+RX28 options include, in addition, the ability to set the unit density to
+single density, double density, or autosized; autosizing is the default:
 
-The RX8E implements these registers:
+	SET RXn SINGLE		set unit n single density
+	SET RXn DOUBLE		set unit n double density
+	SET RXn AUTOSIZE	set unit n autosize
+
+The RX8E and RX28 support the BOOT command.
+
+The RX8E and RX28 implement these registers:
 
 	name		size	comments
 
 	RXCS		12	status
 	RXDB		12	data buffer
-	RXES		8	error status
+	RXES		12	error status
 	RXTA		8	current track
 	RXSA		8	current sector
-	STAPTR		3	controller state
-	BUFPTR		3	buffer pointer
+	STAPTR		4	controller state
+	BUFPTR		8	buffer pointer
 	INT		1	interrupt pending flag
 	DONE		1	device done flag
 	ENABLE		1	interrupt enable flag
@@ -448,7 +487,7 @@ The RX8E implements these registers:
 	STIME		24	seek time, per track
 	XTIME		24	transfer ready delay
 	STOP_IOE	1	stop on I/O error
-	SBUF[0:127]	8	sector buffer array
+	SBUF[0:255]	8	sector buffer array
 
 Error handling is as follows:
 
@@ -457,13 +496,13 @@ Error handling is as follows:
 	not attached	1	report error and stop
 			0	disk not ready
 
-RX01 data files are buffered in memory; therefore, end of file and OS
-I/O errors cannot occur.
+RX01 and RX02 data files are buffered in memory; therefore, end of file
+and OS I/O errors cannot occur.
 
 2.5 Fixed Head Disks
 
 Either the RF08 or the DF32 can be present in a configuration, but
-not both.
+not both, with default device addressing.
 
 2.5.1 RF08/RS08 Fixed Head Disk (RF)
 
@@ -483,7 +522,7 @@ The RF08 implements these registers:
 	STOP_IOE	1	stop on I/O error
 
 The RF08 supports the BOOT command.  The default bootstrap is for OS/8.  To
-bootstrap the 4K Disk Monitor, use the BOOT -D command.
+bootstrap the 4K Disk Monitor, use the BOOT -D RF command.
 
 The RF08 is a three-cycle data break device.  If BURST = 0, word transfers
 are scheduled individually; if BURST = 1, the entire transfer occurs in
@@ -517,7 +556,7 @@ The DF32 implements these registers:
 	STOP_IOE	1	stop on I/O error
 
 The DF32 supports the BOOT command.  The default bootstrap is for OS/8.  To
-bootstrap the 4K Disk Monitor, use the BOOT -D command.
+bootstrap the 4K Disk Monitor, use the BOOT -D DF command.
 
 The DF32 is a three-cycle data break device.  If BURST = 0, word transfers
 are scheduled individually; if BURST = 1, the entire transfer occurs in
@@ -544,12 +583,13 @@ locked.
 
 Units can also be set ONLINE or OFFLINE.  The TC08 supports the BOOT command.
 
-The TC08 supports both PDP-8 format and PDP-9/11/15 format DECtape images.
-ATTACH tries to determine the tape format from the DECtape image; the user
-can force a particular format with switches:
+The TC08 supports supports PDP-8 format, PDP-11 format, and 18b format
+DECtape images.  ATTACH tries to determine the tape format from the DECtape
+image; the user can force a particular format with switches:
 
-	-f			foreign (PDP-9/11/15) format
-	-n			native (PDP-8) format
+	-r			PDP-8 format
+	-s			PDP-11 format
+	-t			18b format
 
 The DECtape controller is a data-only simulator; the timing and mark
 track, and block header and trailer, are not stored.  Thus, the WRITE
@@ -616,12 +656,11 @@ Error handling is as follows:
 
 	error			processed as
 
-	not attached		tape not ready
+	not attached		tape not ready; if STOP_IOE, stop
 
-	end of file		(read or space) end of physical tape
-				(write) ignored
+	end of file		bad tape
 
-	OS I/O error		report error and stop
+	OS I/O error		parity error; if STOP_IOE, stop
 
 2.8 Symbolic Display and Input
 

@@ -142,7 +142,8 @@ DEVICE pag_dev = {
 	"PAG", pag_unit, pag_reg, NULL,
 	2, 8, PTBL_ASIZE, 1, 8, 32,
 	&pag_ex, &pag_dep, &pag_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, 0 };
 
 /* Memory read and write routines
 

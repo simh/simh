@@ -134,8 +134,8 @@
    4. Adding I/O devices.  These modules must be modified:
 
 	gri_defs.h	add interrupt request definition
-	gri_cpu.c	add dispatches to dev_tab
-	gri_sys.c	add pointer to data structures to sim_devices
+	gri_cpu.c	add dev_tab table entry
+	gri_sys.c	add sim_devices table entry
 */
 
 #include "gri_defs.h"
@@ -342,7 +342,6 @@ REG cpu_reg[] = {
 	{ FLDATA (BKP, bkp, 0) },
 	{ BRDATA (SCQ, scq, 8, 15, SCQ_SIZE), REG_RO+REG_CIRC },
 	{ ORDATA (SCQP, scq_p, 6), REG_HRO },
-	{ FLDATA (NOEAO, cpu_unit.flags, UNIT_V_NOEAO), REG_HRO },
 	{ FLDATA (STOP_OPR, stop_opr, 0) },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ NULL }  };
@@ -845,7 +844,7 @@ BSW = BPK = 0;
 for (i = 0; i < 6; i++) GR[i] = 0;
 dev_done = dev_done & ~INT_PENDING;
 scq_r = find_reg ("SCQ", NULL, dptr);
-if (scq_r) scq_r -> qptr = 0;
+if (scq_r) scq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;

@@ -4,6 +4,10 @@ Altair 8800 Simulator with Z80 support
 0. Revision History
 
 Original version of this document written by Charles E Owen
+- 9-Oct-2002, Peter Schorn (added support for simulated hard disk)
+- 28-Sep-2002, Peter Schorn (number of tracks per disk can be configured)
+- 19-Sep-2002, Peter Schorn (added WARNROM feature)
+- 31-Aug-2002, Peter Schorn (added extended ROM features suggested by Scott LaBombard)
 - 4-May-2002, Peter Schorn (added description of MP/M II sample software)
 - 28-Apr-2002, Peter Schorn (added periodic timer interrupts and three
 	additional consoles)
@@ -78,7 +82,7 @@ a minimum of 24K.
       present and will always boot.
 
   SET CPU BANKED Enables the banked memory support. The simulated memory
-      has four banks with address range 0..'common' (see registers below)
+      has eight banks with address range 0..'common' (see registers below)
       and a common area from 'common' to 0xfff which is common to all
       banks. The currently active bank is determined by register 'bank'
       (see below). You can only switch to banked memory if the memory
@@ -86,18 +90,31 @@ a minimum of 24K.
 
   SET CPU NONBANKED Disables banked memory support.
 
-  SET CPU ROM Enables the boot EPROM at address 0FF00H and prevents
-      write access to the locations from 0FF00H to 0FFFFH. This is the
-      default setting.
+  SET CPU ROM Enables the ROM from address 'ROMLOW' to 'ROMHIGH'
+      (see below under CPU Registers) and prevents write access
+      to these locations. This is the default setting.
 
-  SET CPU NOROM Disables the boot EPROM at address 0FF00H and enables
-      write access to the locations from 0FF00H to 0FFFFH.
+  SET CPU NOROM Disables the ROM.
 
-The BOOT EPROM card starts at address 0FF00H.  Jumping to this address
-will boot drive 0 of the floppy controller (CPU must be set to ROM or
-equivalent code must be present).  If no valid bootable software is
-present there the machine crashes.  This is historically accurate
-behavior.
+  SET CPU ALTAIRROM Enables the slightly modified but downwards compatible
+      Altair boot ROM at addresses 0FF00 to 0FFFF. This is the default.
+
+  SET CPU NOALTAIRROM Disables standard Altair ROM behavior.
+
+  SET CPU WARNROM Enables warning messages to be printed when the CPU
+      attempts to write into ROM or into non-existing memory. Also prints
+      a warning message if the CPU attempts to read from non-existing
+      memory.
+
+  SET CPU NOWARNROM Suppreses all warning message of "WARNROM". Note that
+      some software tries on purpose to write to ROM in order to detect
+      the available RAM.
+
+The BOOT EPROM card starts at address 0FF00 if it has been enabled by 'SET
+CPU ALTAIRROM'.  Jumping to this address will boot drive 0 of the floppy
+controller (CPU must be set to ROM or equivalent code must be present).  If
+no valid bootable software is present there the machine crashes.  This is
+historically accurate behavior.
 
 The real 8080, on receiving a HLT (Halt) instruction, freezes the processor
 and only an interrupt or CPU hardware reset will restore it.  The simulator
@@ -105,7 +122,7 @@ is alot nicer, it will halt but send you back to the simulator command line.
 
 CPU Registers include the following:
 
-  name  size  comments
+  Name  Size  Comment
 
   PC      16  The Program Counter
   AF      16  The accumulator and the flag register
@@ -144,6 +161,8 @@ CPU Registers include the following:
   COMMON  16  The starting address of common memory. Originally set
               to 0xc000 (note this setting must agree with the
               value supplied to GENCPM for CP/M 3 system generation)
+  ROMLOW  16  The starting address of the ROM. Default is 0FF00.
+  ROMHIGH 16  The final address of the ROM. Default is 0FFFF.
 
 2.2 The Serial I/O Card (2SIO)
 
@@ -213,7 +232,11 @@ source file.
 
   The only difference is that the simulated disks may be larger than the
 original ones: The original disk had 77 tracks while the simulated disks
-support up to 254 tracks (only relevant for CP/M).
+support up to 254 tracks (only relevant for CP/M). You can change the
+number of tracks per disk by setting the appropriate value in TRACKS[..].
+For example "D TRACKS[0] 77" sets the number of tracks for disk 0 to
+the original number of 77. The command "D TRACKS[0-7] 77" changes the
+highest track number for all disks to 77.
 
   For debugging purposes you can set the trace level of some disk I/O
 functions. To do so the following bits in TRACE (a register of the disk)
@@ -240,6 +263,26 @@ For example the command "D TRACE 10" will trace options 2+8 from above.
   SET DSK<n> WRITEENABLED  Allow write operations for disk <n>
   SET DSK<n> LOCKED        Disk <n> is locked, i.e. no write operations
                            will be allowed.
+
+
+2.5 The simulated hard disk
+
+  In order to increase the available storage capacity, the simulator
+features 8 simulated hard disks with a capacity of 8MB (HDSK0 to HDSK7).
+Currently only CP/M supports two hard disks as devices I: and J:.
+
+  For debugging purposes one can set the trace flag by executing the
+command "D HDTRACE 1". The default for "HDTRACE" is 0 (no trace).
+
+  The HDSK device can be configured with
+
+  SET HDSK<n> QUIET         Do not print warning messages for hard disk <n>
+  SET HDSK<n> VERBOSE       Print warning messages for hard disk <n>
+                            (useful for debugging)
+
+  SET HDSK<n> WRITEENABLED  Allow write operations for hard disk <n>
+  SET HDSK<n> LOCKED        Hard disk <n> is locked, i.e. no
+                            write operations will be allowed.
 
 
 3. Sample Software
@@ -282,74 +325,78 @@ R FOO.EXT under CP/M will transfer the file onto the CP/M disk.
 Transferring a file from the CP/M environment to the SIMH environment is
 accomplished by W <filename.ext>.
 
+  If you need more storage space you can use a simulated hard disk on
+drives I: and J:. To use do "attach HDSK0 hdi.dsk" and issue the
+"XFORMAT I:" resp.  "XFORMAT J:" command from CP/M do initialize the disk
+to an empty state.
+
 The disk "cpm2.dsk" contains the following files:
 Name    Ext  Size   Comment
 ASM     .COM   8K ; CP/M assembler
-BDOS    .MAC  66K ; Basic Disk Operating System assembler source code
+BDOS    .MAC  68K ; Basic Disk Operating System assembler source code
 BOOT    .COM   1K ; transfer control to boot ROM
 BOOT    .MAC   2K ; source for BOOT.COM
 BOOTGEN .COM   2K ; put a program on the boot sectors
-CBIOSX  .MAC  10K ; CP/M 2 BIOS source for Altair
+CBIOSX  .MAC  48K ; CP/M 2 BIOS source for Altair
 CCP     .MAC  26K ; Console Command Processor assembler source code
-COPY    .COM   1K ; copy disks
+COPY    .COM   2K ; copy disks
 CPMBOOT .COM  12K ; CP/M operating system
 CREF80  .COM   4K ; cross reference utility
-DDT     .COM   5K ; 8080 debugger
+DDT     .COM   6K ; 8080 debugger
 DDTZ    .COM  10K ; Z80 debugger
-DIF     .COM   3K ; determine differences between two files
+DIF     .COM   4K ; determine differences between two files
 DO      .COM   2K ; batch processing
-DSKBOOT .COM   1K ; code for boot ROM
-DSKBOOT .MAC   3K ; source for boot ROM
-DUMP    .COM   1K ; hex dump a file
-ED      .COM   7K ; line editor
-ELIZA   .BAS   9K ; Elisa game in Basic
-EX8080  .COM   9K ; exercise 8080 instruction set
-EX8080  .MAC  47K ; source for EX8080.COM
-EX8080  .SUB   1K ; benchmark execution of EX8080.COM
-EXZ80   .COM   9K ; exercise Z80 instruction set
-EXZ80   .MAC  47K ; source for EXZ80.COM
-EXZ80   .SUB   1K ; benchmark execution of EXZ80.COM
+DSKBOOT .MAC   8K ; source for boot ROM
+DUMP    .COM   2K ; hex dump a file
+ED      .COM   8K ; line editor
+ELIZA   .BAS  10K ; Elisa game in Basic
+EX8080  .COM  10K ; exercise 8080 instruction set
+EX8080  .MAC  48K ; source for EX8080.COM
+EX8080  .SUB   2K ; benchmark execution of EX8080.COM
+EXZ80   .COM  10K ; exercise Z80 instruction set
+EXZ80   .MAC  48K ; source for EXZ80.COM
+EXZ80   .SUB   2K ; benchmark execution of EXZ80.COM
 FORMAT  .COM   2K ; format disks
 GO      .COM   0K ; start the currently loaded program at 100H
-L80     .COM  11K ; Microsoft linker
+HDSKBOOT.MAC   6K ; boot code for hard disk
+L80     .COM  12K ; Microsoft linker
 LADDER  .COM  40K ; game
-LADDER  .DAT   1K ; high score file for LADDER.COM
+LADDER  .DAT   2K ; high score file for LADDER.COM
 LIB80   .COM   6K ; library utility
 LOAD    .COM   2K ; load hex files
-LS      .COM   3K ; directory utility
+LS      .COM   4K ; directory utility
 LU      .COM  20K ; library utility
 M80     .COM  20K ; Microsoft macro assembler
 MBASIC  .COM  24K ; Microsoft Basic interpreter
-MC      .SUB   1K ; assemble and link an assmbler program
-MCC     .SUB   1K ; read, assemble and link an assmbler program
+MC      .SUB   2K ; assemble and link an assembler program
+MCC     .SUB   2K ; read, assemble and link an assembler program
+MCCL    .SUB   2K ; assemble, link and produce listing
+MEMCFG  .LIB   2K ; defines the memory configuration
 MOVER   .MAC   2K ; moves operating system in place
 OTHELLO .COM  12K ; Othello (Reversi) game
 PIP     .COM   8K ; Peripheral Interchange Program
-R       .COM   3K ; read files from SIMH environment
-RSETSIMH.COM   1K ; reset SIMH interface
-RSETSIMH.MAC   1K ; assembler source for RSETSIMH.COM
+R       .COM   4K ; read files from SIMH environment
+RSETSIMH.COM   2K ; reset SIMH interface
+RSETSIMH.MAC   2K ; assembler source for RSETSIMH.COM
 SHOWSEC .COM   3K ; show sectors on a disk
 SID     .COM   8K ; debugger for 8080
 STAT    .COM   6K ; provide information about currently logged disks
 SURVEY  .COM   2K ; system survey
-SURVEY  .MAC  15K ; assembler source for SURVEY.COM
+SURVEY  .MAC  16K ; assembler source for SURVEY.COM
 SYSCOPY .COM   2K ; copy system tracks between disks
-SYSCPM2 .SUB   1K ; create CP/M 2 on drive A:
-TSHOW   .COM   1K ; show split time
-TSHOW   .MAC   1K ; assembler source for TSHOW.COM
-TSTART  .COM   1K ; create timer and start it
-TSTART  .MAC   1K ; assembler source for TSTART.COM
-TSTOP   .COM   1K ; show final time and stop timer
-TSTOP   .MAC   1K ; assembler source for TSTOP.COM
-UNCR    .COM   7K ; un-crunch utility
+SYSCPM2 .SUB   2K ; create CP/M 2 on drive A:
+TIMER   .COM   2K ; perform various timer operations
+TIMER   .MAC   2K	; source code for TIMER.COM
+UNCR    .COM   8K ; un-crunch utility
 UNERA   .COM   2K ; un-erase a file
 UNERA   .MAC  16K ; source for UNERA.COM
 USQ     .COM   2K ; un-squeeze utility
-W       .COM   3K ; write files to SIMH environment
-WM      .COM  11K ; word master screen editor
+W       .COM   4K ; write files to SIMH environment
+WM      .COM  12K ; word master screen editor
 WM      .HLP   3K ; help file for WM.COM
 WORM    .COM   4K ; worm game for VT100 terminal
-XSUB    .COM   1K ; support for DO.COM
+XFORMAT .COM   2K ; initialise a drive (floppy or hard disk)
+XSUB    .COM   2K ; support for DO.COM
 ZSID    .COM  10K ; debugger for Z80
 ZTRAN4  .COM   4K ; translate 8080 mnemonics into Z80 equivalents
 
@@ -457,6 +504,7 @@ version supports four terminals available via Telnet. To boot:
   sim> set cpu rom
   sim> set cpu banked
   sim> attach sio 23
+  sim> d common b000
   sim> boot dsk
 
 Now connect a Telnet session to the simulator and type "MPM" at the "A>"
@@ -622,6 +670,8 @@ TERMBDOS.SPL   2K ; terminal interface to CP/M for PROLOGZ, SPL source
 UTIL    .SPL  18K ; utility functions for PROLOGZ, SPL source
 WRITE   .COM   4K
 WRITE   .SPL   8K ; SPL source for W.COM
+XFORMAT .COM   2K
+XFORMAT .SPL   6K ; SPL source for XFORMAT.COM
 
 
 3.6 MITS Disk Extended BASIC Version 4.1
@@ -658,6 +708,8 @@ ran under.  To boot:
 irrelevant.  A short attempted tour will reveal it to be a dog, far inferior
 to CP/M. To boot:
 
+  sim> d tracks[0-7] 77   ;set to Altair settings
+  sim> set cpu altairrom
   sim> attach dsk altdos.dsk
   sim> set sio upper
   sim> go ff00
@@ -723,7 +775,7 @@ is to get the Switch Register right).
 
 
 3.10 Altair Basic 4.0
-  Execute the following commands to run Altair Extended Basic.
+  Execute the following commands to run Altair Extended Basic:
 
   sim> set sio upper      ;Extended Basic does not like lower case letters as input
   sim> set sio ansi       ;Extended Basic produces 8-bit output, strip to seven bits
@@ -739,6 +791,29 @@ is to get the Switch Register right).
   ALTAIR BASIC REV. 4.0
   [EXTENDED VERSION]
   COPYRIGHT 1977 BY MITS INC.
+  OK
+
+
+3.11 Altair Disk Extended Basic Version 300-5-C
+  This version of Basic was provided by Scott LaBombard. To execute use the
+  following commands:
+
+  sim> d tracks[0-7] 77   ;set to Altair settings
+  sim> at dsk extbas5.dsk
+  sim> g 0
+
+  MEMORY SIZE? [return]
+  LINEPRINTER? [C]
+  HIGHEST DISK NUMBER? [0]
+  HOW MANY FILES? [3]
+  HOW MANY RANDOM FILES? [3]
+
+  42082 BYTES FREE
+
+  ALTAIR DISK EXTENDED BASIC
+  VERSION 300-5-C [01NOV78]
+  COPYRIGHT 1978 BY MITS INC.
+
   OK
 
 

@@ -23,6 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Oct-02	RMS	Added multiple RQ controller support
+   10-Oct-02	RMS	Added DELQA support
+   21-Sep-02	RMS	Extended symbolic ex/mod to all byte devices
+   06-Sep-02	RMS	Added TMSCP support
    14-Jul-02	RMS	Added infinite loop message
 */
 
@@ -36,17 +40,16 @@ extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
 extern DEVICE csi_dev, cso_dev;
 extern DEVICE lpt_dev, clk_dev;
-extern DEVICE rq_dev, rl_dev;
-extern DEVICE ts_dev;
-extern DEVICE dz_dev;
+extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
+extern DEVICE rl_dev;
+extern DEVICE ts_dev, tq_dev;
+extern DEVICE dz_dev, xq_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint32 *M;
 extern int32 saved_PC;
 extern int32 sim_switches;
 
-extern t_stat fprint_val (FILE *stream, t_value val, int radix,
-	int width, int format);
 extern void WriteB (int32 pa, int32 val);
 extern void rom_wr (int32 pa, int32 val, int32 lnt);
 t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val);
@@ -91,10 +94,15 @@ DEVICE *sim_devices[] = {
 	&ptr_dev,
 	&ptp_dev,
 	&lpt_dev,
-	&rq_dev,
-	&rl_dev,
-	&ts_dev,
 	&dz_dev,
+	&rl_dev,
+	&rq_dev,
+	&rqb_dev,
+	&rqc_dev,
+	&rqd_dev,
+	&ts_dev,
+	&tq_dev,
+	&xq_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -109,7 +117,8 @@ const char *sim_stop_messages[] = {
 	"Unknown error",
 	"Fatal RQDX3 error",
 	"Infinite loop",
-	"Unknown abort code"  };
+	"Unknown abort code",
+	"Sanity timer expired"  };
 
 /* Binary loader
 
@@ -178,18 +187,18 @@ int32 i, da;
 int32 *buf;
 
 if ((sec < 2) || (wds < 16)) return SCPE_ARG;
-if ((uptr -> flags & UNIT_ATT) == 0) return SCPE_UNATT;
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;
 if (!get_yn ("Overwrite last track? [N]", FALSE)) return SCPE_OK;
-da = (uptr -> capac - (sec * wds)) * sizeof (int16);
-if (fseek (uptr -> fileref, da, SEEK_SET)) return SCPE_IOERR;
+da = (uptr->capac - (sec * wds)) * sizeof (int16);
+if (fseek (uptr->fileref, da, SEEK_SET)) return SCPE_IOERR;
 if ((buf = malloc (wds * sizeof (int32))) == NULL) return SCPE_MEM;
 buf[0] = 0x12345678;
 buf[1] = 0;
 for (i = 2; i < wds; i++) buf[i] = 0xFFFFFFFF;
 for (i = 0; (i < sec) && (i < 10); i++)
-	fxwrite (buf, sizeof (int32), wds, uptr -> fileref);
+	fxwrite (buf, sizeof (int32), wds, uptr->fileref);
 free (buf);
-if (ferror (uptr -> fileref)) return SCPE_IOERR;
+if (ferror (uptr->fileref)) return SCPE_IOERR;
 return SCPE_OK;
 }
 
@@ -817,25 +826,30 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 {
 int32 c, k, num, vp, lnt, rdx;
 t_stat r;
+DEVICE *dptr;
 
-if (uptr && uptr != &cpu_unit) return SCPE_ARG;		/* only for CPU */
-vp = 0;							/* init ptr */
+if (uptr == NULL) uptr = &cpu_unit;			/* anon = CPU */
+dptr = find_dev_from_unit (uptr);			/* find dev */
+if (dptr == NULL) return SCPE_IERR;
+if (dptr->dwidth != 8) return SCPE_ARG;			/* byte dev only */
 if (sw & SWMASK ('B')) lnt = 1;				/* get length */
 else if (sw & SWMASK ('W')) lnt = 2;
-else lnt = 4;
+else if (sw & SWMASK ('L')) lnt = 4;
+else lnt = (uptr == &cpu_unit)? 4: 1;
 if (sw & SWMASK ('D')) rdx = 10;			/* get radix */
 else if (sw & SWMASK ('O')) rdx = 8;
 else if (sw & SWMASK ('H')) rdx = 16;
-else rdx = cpu_dev.dradix;
+else rdx = dptr->dradix;
+vp = 0;							/* init ptr */
 if ((sw & SWMASK ('A')) || (sw & SWMASK ('C'))) {	/* char format? */
 	if (sw & SWMASK ('C')) lnt = sim_emax;		/* -c -> string */
-	if ((val[0] & 0177) == 0) return SCPE_ARG;
+	if ((val[0] & 0x7F) == 0) return SCPE_ARG;
 	while (vp < lnt) {				/* print string */
-		if ((c = (int32) val[vp++] & 0177) == 0) break;
-		fprintf (of, (c < 040)? "<%03o>": "%c", c);  }
+		if ((c = (int32) val[vp++] & 0x7F) == 0) break;
+		fprintf (of, (c < 0x20)? "<%02X>": "%c", c);  }
 	return -(vp - 1);  }				/* return # chars */
 
-if (sw & SWMASK ('M')) {				/* inst format? */
+if (sw & SWMASK ('M') && (uptr == &cpu_unit)) {		/* inst format? */
 	r = fprint_sym_m (of, addr, val);		/* decode inst */
 	if (r <= 0) return r;  }
 
@@ -985,27 +999,32 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 k, rdx, lnt, num, vp;
 t_stat r;
+DEVICE *dptr;
 static const uint32 maxv[5] = { 0, 0xFF, 0xFFFF, 0, 0xFFFFFFFF };
 
-if (uptr != &cpu_unit) return SCPE_ARG;			/* only for CPU */
-vp = 0;							/* init ptr */
-if (sw & SWMASK ('B')) lnt = 1;				/* set length */
+if (uptr == NULL) uptr = &cpu_unit;			/* anon = CPU */
+dptr = find_dev_from_unit (uptr);			/* find dev */
+if (dptr == NULL) return SCPE_IERR;
+if (dptr->dwidth != 8) return SCPE_ARG;			/* byte dev only */
+if (sw & SWMASK ('B')) lnt = 1;				/* get length */
 else if (sw & SWMASK ('W')) lnt = 2;
-else lnt = 4;
-if (sw & SWMASK ('D')) rdx = 10;			/* set radix */
+else if (sw & SWMASK ('L')) lnt = 4;
+else lnt = (uptr == &cpu_unit)? 4: 1;
+if (sw & SWMASK ('D')) rdx = 10;			/* get radix */
 else if (sw & SWMASK ('O')) rdx = 8;
 else if (sw & SWMASK ('H')) rdx = 16;
-else rdx = cpu_dev.dradix;
+else rdx = dptr->dradix;
+vp = 0;
 if ((sw & SWMASK ('A')) || (sw & SWMASK ('C'))) {	/* char format? */
 	if (sw & SWMASK ('C')) lnt = sim_emax;		/* -c -> string */
 	if (*cptr == 0) return SCPE_ARG;
-	while (vp < lnt) {				/* get chars */
-		if (*cptr == 0) break;
+	while ((vp < lnt) && *cptr) {			/* get chars */
 		val[vp++] = *cptr++;  }
 	return -(vp - 1);  }				/* return # chars */
 
-r = parse_sym_m (cptr, addr, val);			/* try to parse inst */
-if (r <= 0) return r;
+if (uptr == &cpu_unit) {				/* cpu only */
+	r = parse_sym_m (cptr, addr, val);		/* try to parse inst */
+	if (r <= 0) return r;  }
 
 num = (int32) get_uint (cptr, rdx, maxv[lnt], &r);	/* get number */
 if (r != SCPE_OK) return r;

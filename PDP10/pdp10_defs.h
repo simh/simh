@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Sep-02	RMS	Added variable vector, RX211 support
    22-Apr-02	RMS	Removed magtape record length error
    20-Jan-02	RMS	Added multiboard DZ11 support
    23-Oct-01	RMS	New IO page address constants
@@ -33,6 +34,9 @@
    01-Jun-01	RMS	Updated DZ11 vector definitions
    19-May-01	RMS	Added workaround for TOPS-20 V4.1 boot bug
 */
+
+#ifndef _PDP10_DEFS_H_
+#define _PDP10_DEFS_H_	0
 
 #include "sim_defs.h"					/* simulator defns */
 
@@ -576,19 +580,38 @@ typedef t_int64		d10;				/* PDP-10 data (36b) */
 
 /* Device information block */
 
+#define VEC_DEVMAX	8				/* max device vec */
+
 struct pdp_dib {
-	uint32		enb;				/* enabled */
 	uint32		ba;				/* base addr */
 	uint32		lnt;				/* length */
 	t_stat		(*rd)(int32 *dat, int32 ad, int32 md);
-	t_stat		(*wr)(int32 dat, int32 ad, int32 md);  };
+	t_stat		(*wr)(int32 dat, int32 ad, int32 md);
+	int32		vnum;				/* vectors: number */
+	int32		vloc;				/* locator */
+	int32		vec;				/* value */
+	int32		(*ack[VEC_DEVMAX])(void);	/* ack routines */
+};
 
 typedef struct pdp_dib DIB;
 
-/* DZ11 parameters */
+/* I/O system parameters */
 
 #define DZ_MUXES	4				/* max # of muxes */
 #define DZ_LINES	8				/* lines per mux */
+#define DIB_MAX		100				/* max DIBs */
+
+#define DEV_V_UBUS	(DEV_V_UF + 0)			/* Unibus */
+#define DEV_V_QBUS	(DEV_V_UF + 1)			/* Qbus */
+#define DEV_V_FLTA	(DEV_V_UF + 2)			/* float addr */
+#define DEV_UBUS	(1u << DEV_V_UBUS)
+#define DEV_QBUS	(1u << DEV_V_QBUS)
+#define DEV_FLTA	(1u << DEV_V_FLTA)
+
+#define UNIBUS		TRUE				/* 18b only */
+
+#define FST		0				/* Unibus 1 */
+#define MAP		1				/* Unibus 3 */
 
 /* I/O page layout */
 
@@ -614,12 +637,16 @@ typedef struct pdp_dib DIB;
 #define IOLN_UBCS3	001
 #define IOBA_UBMNT3	(IO_UBA3 + 0763101)		/* Unibus 3 maint reg */
 #define IOLN_UBMNT3	001
+#define IOBA_RY		(IO_UBA3 + 0777170)		/* RX211 */
+#define IOLN_RY		004
 #define IOBA_TU		(IO_UBA3 + 0772440)		/* RH11/tape */
 #define IOLN_TU		034
 #define IOBA_LP20	(IO_UBA3 + 0775400)		/* LP20 */
 #define IOLN_LP20	020
-#define IOBA_PT		(IO_UBA3 + 0777550)		/* PC11 */
-#define IOLN_PT		010
+#define IOBA_PTR	(IO_UBA3 + 017550)		/* PC11 reader */
+#define IOLN_PTR	004
+#define IOBA_PTP	(IO_UBA3 + 017554)		/* PC11 punch */
+#define IOLN_PTP	004
 
 /* Common Unibus CSR flags */
 
@@ -647,6 +674,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_TU	7				/* RH11/TM03/TU45 */
 #define INT_V_DZRX	16				/* DZ11 */
 #define INT_V_DZTX	17
+#define INT_V_RY	18				/* RX211 */
 #define INT_V_PTR	24				/* PC11 */
 #define INT_V_PTP	25
 #define INT_V_LP20	26				/* LPT20 */
@@ -655,6 +683,7 @@ typedef struct pdp_dib DIB;
 #define INT_TU		(1u << INT_V_TU)
 #define INT_DZRX	(1u << INT_V_DZRX)
 #define INT_DZTX	(1u << INT_V_DZTX)
+#define INT_RY		(1u << INT_V_RY)
 #define INT_PTR		(1u << INT_V_PTR)
 #define INT_PTP		(1u << INT_V_PTP)
 #define INT_LP20	(1u << INT_V_LP20)
@@ -663,6 +692,7 @@ typedef struct pdp_dib DIB;
 #define IPL_TU		6
 #define IPL_DZRX	5
 #define IPL_DZTX	5
+#define IPL_RY		5
 #define IPL_PTR		4
 #define IPL_PTP		4
 #define IPL_LP20	4
@@ -675,21 +705,31 @@ typedef struct pdp_dib DIB;
 #define INT_IPL5	0x000FFF00
 #define INT_IPL4	0x3FF00000
 
+#define VEC_Q		0000				/* vector base */
 #define VEC_PTR		0070				/* interrupt vectors */
 #define VEC_PTP		0074
 #define VEC_TU		0224
 #define VEC_RP		0254
+#define VEC_RY		0264
 #define VEC_DZRX	0340
 #define VEC_DZTX	0344
 #define VEC_LP20	0754
 
+#define IVCL(dv)	(INT_V_##dv)
 #define IREQ(dv)	int_req
 #define SET_INT(dv)	IREQ(dv) = IREQ(dv) | (INT_##dv)
 #define CLR_INT(dv)	IREQ(dv) = IREQ(dv) & ~(INT_##dv)
 
 /* Function prototypes */
 
+int32 Map_ReadB (t_addr ba, int32 bc, uint8 *buf, t_bool ub);
+int32 Map_ReadW (t_addr ba, int32 bc, uint16 *buf, t_bool ub);
+int32 Map_WriteB (t_addr ba, int32 bc, uint8 *buf, t_bool ub);
+int32 Map_WriteW (t_addr ba, int32 bc, uint16 *buf, t_bool ub);
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_bool dev_conflict (uint32 nba, DIB *curr);
+t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat auto_config (uint32 rank, uint32 num);
+
+#endif

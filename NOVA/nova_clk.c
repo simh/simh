@@ -25,6 +25,7 @@
 
    clk		real-time clock
 
+   03-Oct-02	RMS	Added DIB
    17-Sep-01	RMS	Added terminal multiplexor support
    17-Mar-01	RMS	Moved function prototype
    05-Mar-01	RMS	Added clock calibration
@@ -34,11 +35,14 @@
 #include "nova_defs.h"
 
 extern int32 int_req, dev_busy, dev_done, dev_disable;
+
 int32 clk_sel = 0;					/* selected freq */
 int32 clk_time[4] = { 16000, 100000, 10000, 1000 };	/* freq table */
 int32 clk_tps[4] = { 60, 10, 100, 1000 };		/* ticks per sec */
 int32 clk_adj[4] = { 1, -5, 2, 20 };			/* tmxr adjust */
 int32 tmxr_poll = 16000;				/* tmxr poll */
+
+int32 clk (int32 pulse, int32 code, int32 AC);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
 
@@ -48,6 +52,8 @@ t_stat clk_reset (DEVICE *dptr);
    clk_unit	CLK unit descriptor
    clk_reg	CLK register list
 */
+
+DIB clk_dib = { DEV_CLK, INT_CLK, PI_CLK, &clk };
 
 UNIT clk_unit = { UDATA (&clk_svc, 0, 0) };
 
@@ -67,7 +73,8 @@ DEVICE clk_dev = {
 	"CLK", &clk_unit, clk_reg, NULL,
 	1, 0, 0, 0, 0, 0,
 	NULL, NULL, &clk_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&clk_dib, 0 };
 
 /* IOT routine */
 

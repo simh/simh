@@ -28,6 +28,7 @@
    tti		keyboard
    tto		teleprinter
 
+   06-Oct-02	RMS	Revised for V2.10
    30-May-02	RMS	Widened POS to 32b
    29-Nov-01	RMS	Added read only unit support
    07-Sep-01	RMS	Moved function prototypes
@@ -43,12 +44,15 @@
 #define BOTH		0200				/* both cases */
 #define CW		0400				/* char waiting */
 #define TT_WIDTH	077
+
 extern int32 sbs, ioc, iosta, PF, IO, PC;
 extern int32 M[];
+
 int32 ptr_rpls = 0, ptr_stopioe = 0, ptr_state = 0;
 int32 ptp_rpls = 0, ptp_stopioe = 0;
 int32 tti_state = 0;
 int32 tto_rpls = 0, tto_state = 0;
+
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat tti_svc (UNIT *uptr);
@@ -57,7 +61,7 @@ t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
-t_stat ptr_boot (int32 unitno);
+t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 
 /* Character translation tables */
 
@@ -122,7 +126,8 @@ DEVICE ptr_dev = {
 	"PTR", &ptr_unit, ptr_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptr_reset,
-	&ptr_boot, NULL, NULL };
+	&ptr_boot, NULL, NULL,
+	NULL, 0 };
 
 /* PTP data structures
 
@@ -147,7 +152,8 @@ DEVICE ptp_dev = {
 	"PTP", &ptp_unit, ptp_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptp_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, 0 };
 
 /* TTI data structures
 
@@ -170,7 +176,8 @@ DEVICE tti_dev = {
 	"TTI", &tti_unit, tti_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tti_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, 0 };
 
 /* TTO data structures
 
@@ -194,7 +201,8 @@ DEVICE tto_dev = {
 	"TTO", &tto_unit, tto_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tto_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	NULL, 0 };
 
 /* Paper tape reader: IOT routine */
 
@@ -267,7 +275,7 @@ static const int32 boot_rom[] = {
 	0607772						/* jmp r */
 };
 
-t_stat ptr_boot (int32 unitno)
+t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 

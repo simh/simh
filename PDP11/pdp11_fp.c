@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Oct-02	RMS	Fixed macro definitions
    05-Jun-98	RMS	Fixed implementation specific shift bugs
    20-Apr-98	RMS	Fixed bug in MODf integer truncation
    17-Apr-98	RMS	Fixed bug in STCfi range check
@@ -142,20 +143,20 @@
 /* Double precision operations on 64b quantities */
 
 #define F_LOAD(qd,ac,ds) ds.h = ac.h; ds.l = (qd)? ac.l: 0
-#define F_LOAD_P(qd,ac,ds) ds -> h = ac.h; ds -> l = (qd)? ac.l: 0
+#define F_LOAD_P(qd,ac,ds) ds->h = ac.h; ds->l = (qd)? ac.l: 0
 #define F_LOAD_FRAC(qd,ac,ds) ds.h = (ac.h & FP_FRACH) | FP_HB; \
 	ds.l = (qd)? ac.l: 0
 #define F_STORE(qd,sr,ac) ac.h = sr.h; if ((qd)) ac.l = sr.l
-#define F_STORE_P(qd,sr,ac) ac.h = sr -> h; if ((qd)) ac.l = sr -> l
-#define F_GET_FRAC_P(sr,ds) ds.l = sr -> l; \
-	ds.h = (sr -> h & FP_FRACH) | FP_HB
+#define F_STORE_P(qd,sr,ac) ac.h = sr->h; if ((qd)) ac.l = sr->l
+#define F_GET_FRAC_P(sr,ds) ds.l = sr->l; \
+	ds.h = (sr->h & FP_FRACH) | FP_HB
 #define F_ADD(s2,s1,ds) ds.l = (s1.l + s2.l) & 0xFFFFFFFF; \
 	ds.h = (s1.h + s2.h + (ds.l < s2.l)) & 0xFFFFFFFF
 #define F_SUB(s2,s1,ds) ds.h = (s1.h - s2.h - (s1.l < s2.l)) & 0xFFFFFFFF; \
 	ds.l = (s1.l - s2.l) & 0xFFFFFFFF
 #define F_LT(x,y) ((x.h < y.h) || ((x.h == y.h) && (x.l < y.l)))
-#define F_LT_AP(x,y) (((x -> h & ~FP_SIGN) < (y -> h & ~FP_SIGN)) || \
-	(((x -> h & ~FP_SIGN) == (y -> h & ~FP_SIGN)) && (x -> l < y -> l)))
+#define F_LT_AP(x,y) (((x->h & ~FP_SIGN) < (y->h & ~FP_SIGN)) || \
+	(((x->h & ~FP_SIGN) == (y->h & ~FP_SIGN)) && (x->l < y->l)))
 #define F_LSH_V(sr,n,ds) \
 	ds.h = (((n) >= 32)? (sr.l << ((n) - 32)): \
 		(sr.h << (n)) | ((sr.l >> (32 - (n))) & and_mask[n])) \
@@ -185,11 +186,11 @@
 #define F_LSH_GUARD(ds) F_LSH_K(ds,FP_GUARD,ds)
 #define F_RSH_GUARD(ds) F_RSH_K(ds,FP_GUARD,ds)
 
-#define GET_BIT(ir,n) (((ir) >> n) & 1)
-#define GET_SIGN(ir) GET_BIT((ir), FP_V_SIGN)
-#define GET_EXP(ir) (((ir) >> FP_V_EXP) & FP_M_EXP)
-#define GET_SIGN_L(ir) GET_BIT((ir), 31)
-#define GET_SIGN_W(ir) GET_BIT((ir), 15)
+#define GET_BIT(ir,n)	(((ir) >> (n)) & 1)
+#define GET_SIGN(ir)	GET_BIT((ir), FP_V_SIGN)
+#define GET_EXP(ir)	(((ir) >> FP_V_EXP) & FP_M_EXP)
+#define GET_SIGN_L(ir)	GET_BIT((ir), 31)
+#define GET_SIGN_W(ir)	GET_BIT((ir), 15)
 
 extern jmp_buf save_env;
 extern int32 FEC, FEA, FPS;
@@ -197,9 +198,7 @@ extern int32 CPUERR, trap_req;
 extern int32 N, Z, V, C;
 extern int32 R[8];
 extern fpac_t FR[6];
-extern int32 GeteaW (int32 spec);
-extern int32 ReadW (int32 addr);
-extern void WriteW (int32 data, int32 addr);
+
 fpac_t zero_fac = { 0, 0 };
 fpac_t one_fac = { 1, 0 };
 fpac_t fround_fac = { (1u << (FP_V_FROUND + 32)), 0 };
@@ -218,6 +217,7 @@ static const uint32 and_mask[33] = { 0,
 int32 backup_PC;
 int32 fpnotrap (int32 code);
 int32 GeteaFP (int32 spec, int32 len);
+
 unsigned int32 ReadI (int32 addr, int32 spec, int32 len);
 void ReadFP (fpac_t *fac, int32 addr, int32 spec, int32 len);
 void WriteI (int32 data, int32 addr, int32 spec, int32 len);
@@ -230,6 +230,10 @@ int32 modfp11 (fpac_t *src1, fpac_t *src2, fpac_t *frac);
 void frac_mulfp11 (fpac_t *src1, fpac_t *src2);
 int32 roundfp11 (fpac_t *src);
 int32 round_and_pack (fpac_t *fac, int32 exp, fpac_t *frac, int r);
+
+extern int32 GeteaW (int32 spec);
+extern int32 ReadW (int32 addr);
+extern void WriteW (int32 data, int32 addr);
 
 /* Set up for instruction decode and execution */
 
@@ -565,16 +569,16 @@ if (spec <= 07) {
 	F_LOAD_P (len == QUAD, FR[spec], fptr);
 	return;  }
 if (spec == 027) {
-	fptr -> h = (ReadW (VA) << FP_V_F0);
-	fptr -> l = 0;  }
+	fptr->h = (ReadW (VA) << FP_V_F0);
+	fptr->l = 0;  }
 else {	exta = VA & ~0177777;
-	fptr -> h = (ReadW (VA) << FP_V_F0) |
+	fptr->h = (ReadW (VA) << FP_V_F0) |
 		(ReadW (exta | ((VA + 2) & 0177777)) << FP_V_F1);
-	if (len == QUAD) fptr -> l = 
+	if (len == QUAD) fptr->l = 
 		(ReadW (exta | ((VA + 4) & 0177777)) << FP_V_F2) |
 		(ReadW (exta | ((VA + 6) & 0177777)) << FP_V_F3);
-	else fptr -> l = 0;  }
-if ((GET_SIGN (fptr -> h) != 0) && (GET_EXP (fptr -> h) == 0) &&
+	else fptr->l = 0;  }
+if ((GET_SIGN (fptr->h) != 0) && (GET_EXP (fptr->h) == 0) &&
 	(fpnotrap (FEC_UNDFV) == 0)) ABORT (TRAP_INT);
 return;
 }
@@ -614,13 +618,13 @@ int32 exta;
 if (spec <= 07) {
 	F_STORE_P (len == QUAD, fptr, FR[spec]);
 	return;  }
-WriteW ((fptr -> h >> FP_V_F0) & 0177777, VA);
+WriteW ((fptr->h >> FP_V_F0) & 0177777, VA);
 if (spec == 027) return;
 exta = VA & ~0177777;
-WriteW ((fptr -> h >> FP_V_F1) & 0177777, exta | ((VA + 2) & 0177777));
+WriteW ((fptr->h >> FP_V_F1) & 0177777, exta | ((VA + 2) & 0177777));
 if (len == LONG) return;
-WriteW ((fptr -> l >> FP_V_F2) & 0177777, exta | ((VA + 4) & 0177777));
-WriteW ((fptr -> l >> FP_V_F3) & 0177777, exta | ((VA + 6) & 0177777));
+WriteW ((fptr->l >> FP_V_F2) & 0177777, exta | ((VA + 4) & 0177777));
+WriteW ((fptr->l >> FP_V_F3) & 0177777, exta | ((VA + 6) & 0177777));
 return;
 }
 
@@ -642,8 +646,8 @@ if (F_LT_AP (facp, fsrcp)) {				/* if !fac! < !fsrc! */
 	facfrac = *facp;
 	*facp = *fsrcp;					/* swap operands */
 	*fsrcp = facfrac;  }
-facexp = GET_EXP (facp -> h);				/* get exponents */
-fsrcexp = GET_EXP (fsrcp -> h);
+facexp = GET_EXP (facp->h);				/* get exponents */
+fsrcexp = GET_EXP (fsrcp->h);
 if (facexp == 0) {					/* fac = 0? */
 	*facp = fsrcexp? *fsrcp: zero_fac;		/* result fsrc or 0 */
 	return 0;  }
@@ -654,7 +658,7 @@ F_GET_FRAC_P (facp, facfrac);				/* get fractions */
 F_GET_FRAC_P (fsrcp, fsrcfrac);
 F_LSH_GUARD (facfrac);					/* guard fractions */
 F_LSH_GUARD (fsrcfrac);
-if (GET_SIGN (facp -> h) != GET_SIGN (fsrcp -> h)) {	/* signs different? */
+if (GET_SIGN (facp->h) != GET_SIGN (fsrcp->h)) {	/* signs different? */
 	if (ediff) { F_RSH_V (fsrcfrac, ediff, fsrcfrac);  } /* sub, shf fsrc */
 	F_SUB (fsrcfrac, facfrac, facfrac);		/* sub fsrc from fac */
 	if ((facfrac.h | facfrac.l) == 0)  {     	/* result zero? */
@@ -695,15 +699,15 @@ int32 mulfp11 (fpac_t *facp, fpac_t *fsrcp)
 int32 facexp, fsrcexp;
 fpac_t facfrac, fsrcfrac;
 
-facexp = GET_EXP (facp -> h);				/* get exponents */
-fsrcexp = GET_EXP (fsrcp -> h);
+facexp = GET_EXP (facp->h);				/* get exponents */
+fsrcexp = GET_EXP (fsrcp->h);
 if ((facexp == 0) || (fsrcexp == 0)) {			/* test for zero */
 	*facp = zero_fac;
 	return 0;  }
 F_GET_FRAC_P (facp, facfrac);				/* get fractions */
 F_GET_FRAC_P (fsrcp, fsrcfrac);
 facexp = facexp + fsrcexp - FP_BIAS;			/* calculate exp */
-facp -> h = facp -> h  ^ fsrcp -> h;			/* calculate sign */
+facp->h = facp->h  ^ fsrcp->h;			/* calculate sign */
 frac_mulfp11 (&facfrac, &fsrcfrac);			/* multiply fracs */
 
 /* Multiplying two numbers in the range [.5,1) produces a result in the
@@ -734,8 +738,8 @@ int32 modfp11 (fpac_t *facp, fpac_t *fsrcp, fpac_t *fracp)
 int32 facexp, fsrcexp;
 fpac_t facfrac, fsrcfrac, fmask;
 
-facexp = GET_EXP (facp -> h);				/* get exponents */
-fsrcexp = GET_EXP (fsrcp -> h);
+facexp = GET_EXP (facp->h);				/* get exponents */
+fsrcexp = GET_EXP (fsrcp->h);
 if ((facexp == 0) || (fsrcexp == 0)) {			/* test for zero */
 	*fracp = zero_fac;
 	*facp = zero_fac;
@@ -743,7 +747,7 @@ if ((facexp == 0) || (fsrcexp == 0)) {			/* test for zero */
 F_GET_FRAC_P (facp, facfrac);				/* get fractions */
 F_GET_FRAC_P (fsrcp, fsrcfrac);
 facexp = facexp + fsrcexp - FP_BIAS;			/* calculate exp */
-fracp -> h = facp -> h = facp -> h ^ fsrcp -> h;	/* calculate sign */
+fracp->h = facp->h = facp->h ^ fsrcp->h;		/* calculate sign */
 frac_mulfp11 (&facfrac, &fsrcfrac);			/* multiply fracs */
 
 /* Multiplying two numbers in the range [.5,1) produces a result in the
@@ -861,11 +865,11 @@ int32 divfp11 (fpac_t *facp, fpac_t *fsrcp)
 int32 facexp, fsrcexp, i, count, qd;
 fpac_t facfrac, fsrcfrac, quo;
 
-fsrcexp = GET_EXP (fsrcp -> h);				/* get divisor exp */
+fsrcexp = GET_EXP (fsrcp->h);				/* get divisor exp */
 if (fsrcexp == 0) {					/* divide by zero? */
 	fpnotrap (FEC_DZRO);
 	ABORT (TRAP_INT);  }
-facexp = GET_EXP (facp -> h);				/* get dividend exp */
+facexp = GET_EXP (facp->h);				/* get dividend exp */
 if (facexp == 0) {					/* test for zero */
 	*facp = zero_fac;				/* result zero */
 	return 0;  }
@@ -874,7 +878,7 @@ F_GET_FRAC_P (fsrcp, fsrcfrac);
 F_LSH_GUARD (facfrac);					/* guard fractions */
 F_LSH_GUARD (fsrcfrac);
 facexp = facexp - fsrcexp + FP_BIAS + 1;		/* calculate exp */
-facp -> h = facp -> h ^ fsrcp -> h;			/* calculate sign */
+facp->h = facp->h ^ fsrcp->h;				/* calculate sign */
 qd = FPS & FPS_D;
 count = FP_V_HB + FP_GUARD + (qd? 33: 1);		/* count = 56b/24b */
 
@@ -933,7 +937,7 @@ fpac_t outf;
 
 outf = *fptr;						/* get argument */
 F_ADD (fround_fac, outf, outf);				/* round */
-if (GET_SIGN (outf.h ^ fptr -> h)) {			/* flipped sign? */
+if (GET_SIGN (outf.h ^ fptr->h)) {			/* flipped sign? */
 	outf.h = (outf.h ^ FP_SIGN) & 0xFFFFFFFF;	/* restore sign */
 	if (fpnotrap (FEC_OVFLO)) *fptr = zero_fac; 	/* if no int, clear */
 	else *fptr = outf;				/* return rounded */
@@ -966,8 +970,8 @@ if (r && ((FPS & FPS_T) == 0)) {
 		F_RSH_1 (frac);
 		exp = exp + 1;  }  }
 F_RSH_GUARD (frac);
-facp -> l = frac.l & FP_FRACL;
-facp -> h = (facp -> h & FP_SIGN) | ((exp & FP_M_EXP) << FP_V_EXP) |
+facp->l = frac.l & FP_FRACL;
+facp->h = (facp->h & FP_SIGN) | ((exp & FP_M_EXP) << FP_V_EXP) |
 	(frac.h & FP_FRACH);
 if (exp > 0377) {
 	if (fpnotrap (FEC_OVFLO)) *facp = zero_fac;

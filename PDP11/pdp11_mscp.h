@@ -1,4 +1,4 @@
-/* dec_mscp.c: DEC MSCP definitions
+/* pdp11_mscp.h: DEC MSCP and TMSCP definitions
 
    Copyright (c) 2001-2002, Robert M Supnik
    Derived from work by Stephen F. Shirron
@@ -23,51 +23,74 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   20-Sep-02	RMS	Merged TMSCP definitions
 */
+
+#ifndef _PDP11_MSCP_H_
+#define _PDP11_MSCP_H_	0
 
 /* Misc constants */
 
 #define UID_DISK	2				/* disk class */
+#define UID_TAPE	3				/* tape class */
 
 /* Opcodes */
 
-#define	OP_ABO		1				/* abort */
-#define	OP_GCS		2				/* get command status */
-#define	OP_GUS		3				/* get unit status */
-#define	OP_SCC		4				/* set controller char */
-#define	OP_AVL		8				/* available */
-#define	OP_ONL		9				/* online */
-#define	OP_SUC		10				/* set unit char */
-#define	OP_DAP		11				/* det acc paths - nop */
-#define	OP_ACC		16				/* access */
-#define	OP_CCD		17				/* compare - nop */
-#define	OP_ERS		18				/* erase */
-#define	OP_FLU		19				/* flush - nop */
-#define	OP_CMP		32				/* compare */
-#define	OP_RD		33				/* read */
-#define	OP_WR		34				/* write */
-#define	OP_FMT		47				/* format */
-#define OP_AVA		64				/* unit now avail */
-#define OP_END		0x80				/* end flag */
+#define	OP_ABO		1				/* b: abort */
+#define	OP_GCS		2				/* b: get command status */
+#define	OP_GUS		3				/* b: get unit status */
+#define	OP_SCC		4				/* b: set controller char */
+#define	OP_AVL		8				/* b: available */
+#define	OP_ONL		9				/* b: online */
+#define	OP_SUC		10				/* b: set unit char */
+#define	OP_DAP		11				/* b: det acc paths - nop */
+#define	OP_ACC		16				/* b: access */
+#define	OP_CCD		17				/* d: compare - nop */
+#define	OP_ERS		18				/* b: erase */
+#define	OP_FLU		19				/* d: flush - nop */
+#define OP_ERG		22				/* t: erase gap */
+#define	OP_CMP		32				/* b: compare */
+#define	OP_RD		33				/* b: read */
+#define	OP_WR		34				/* b: write */
+#define OP_WTM		36				/* t: write tape mark */
+#define OP_POS		37				/* t: reposition */
+#define	OP_FMT		47				/* d: format */
+#define OP_AVA		64				/* b: unit now avail */
+#define OP_END		0x80				/* b: end flag */
 
 /* Modifiers */
 
-#define MD_EXP		0x8000				/* express NI */
-#define MD_CMP		0x4000				/* compare NI */
-#define MD_CSE		0x2000				/* clr ser err NI */
-#define MD_ERR		0x1000				/* force error NI*/
-#define MD_SEC		0x0200				/* supr err corr NI */
-#define MD_SER		0x0100				/* supr err rec NI */
-#define MD_SHD		0x0010				/* shadow NI */
-#define MD_SWP		0x0004				/* enb set wrp */
-#define MD_IMF		0x0002				/* onl: ign fmte NI */
-#define MD_NXU		0x0001				/* gus: next unit */
-#define MD_RIP		0x0001				/* onl: allow rip NI */
+#define MD_EXP		0x8000				/* d: express NI */
+#define MD_CMP		0x4000				/* b: compare NI */
+#define MD_CSE		0x2000				/* b: clr ser err */
+#define MD_ERR		0x1000				/* d: force error NI*/
+#define MD_CDL		0x1000				/* t: clr data lost NI*/
+#define MD_SCH		0x0800				/* t: supr cache NI */
+#define MD_SEC		0x0200				/* b: supr err corr NI */
+#define MD_SER		0x0100				/* b: supr err rec NI */
+#define MD_DLE		0x0080				/* t: detect LEOT */
+#define MD_IMM		0x0040				/* t: immediate NI */
+#define MD_EXA		0x0020				/* b: excl access NI */
+#define MD_SHD		0x0010				/* d: shadow NI */
+#define MD_UNL		0x0010				/* t avl: unload */
+#define MD_ERW		0x0008				/* t wr: enb rewrite */
+#define MD_REV		0x0008				/* t rd, pos: reverse */
+#define MD_SWP		0x0004				/* b suc: enb set wrp */
+#define MD_OBC		0x0004				/* t: pos: obj count */
+#define MD_IMF		0x0002				/* d onl: ign fmte NI */
+#define MD_RWD		0x0002				/* t pos: rewind */
+#define MD_ACL		0x0002				/* t avl: all class NI */
+#define MD_NXU		0x0001				/* b gus: next unit */
+#define MD_RIP		0x0001				/* d onl: allow rip NI */
 
 /* End flags */
 
-#define EF_LOG		0x0020				/* error log */
-#define EF_SEX		0x0010				/* serious exc NI */
+#define EF_LOG		0x0020				/* b: error log */
+#define EF_SXC		0x0010				/* b: serious exc */
+#define EF_EOT		0x0008				/* end of tape */
+#define EF_PLS		0x0004				/* pos lost */
+#define EF_DLS		0x0002				/* cached data lost NI */
 
 /* Controller flags */
 
@@ -80,70 +103,104 @@
 
 /* Unit flags */
 
-#define UF_RPL		0x8000				/* ctrl bad blk repl */
-#define UF_WPH		0x2000				/* wr prot hwre */
-#define UF_WPS		0x1000				/* wr prot swre */
-#define	UF_WPD		0x0100				/* wr prot data NI */
-#define UF_RMV		0x0080				/* removable */
+#define UF_RPL		0x8000				/* d: ctrl bad blk repl */
+#define UF_CAC		0x8000				/* t: cache write back */
+#define UF_WPH		0x2000				/* b: wr prot hwre */
+#define UF_WPS		0x1000				/* b: wr prot swre */
+#define UF_SCH		0x0800				/* t: supr cache NI */
+#define UF_EXA		0x0400				/* b: exclusive NI */
+#define	UF_WPD		0x0100				/* b: wr prot data NI */
+#define UF_RMV		0x0080				/* d: removable */
+#define UF_WBN		0x0040				/* t: write back NI */
+#define UF_VSS		0x0020				/* t: supr var speed NI */
+#define UF_VSU		0x0010				/* t: var speed unit NI */
+#define UF_EWR		0x0008				/* t: enh wr recovery NI */
 #define UF_CMW		0x0002				/* cmp writes NI */
 #define UF_CMR		0x0001				/* cmp reads NI */
-#define	UF_MSK		(UF_CMR|UF_CMW)
 
 /* Error log flags */
 
-#define	LF_SUC		0x0080				/* successful */
-#define	LF_CON		0x0040				/* continuing */
-#define	LF_BBR		0x0020				/* bad blk repl NI */
-#define	LF_RCT		0x0010				/* err in repl NI */
-#define	LF_SNR		0x0001				/* seq # reset */
+#define	LF_SUC		0x0080				/* b: successful */
+#define	LF_CON		0x0040				/* b: continuing */
+#define	LF_BBR		0x0020				/* d: bad blk repl NI */
+#define	LF_RCT		0x0010				/* d: err in repl NI */
+#define	LF_SNR		0x0001				/* b: seq # reset */
 
 /* Error log formats */
 
-#define FM_CNT		0				/* port lf err */
-#define FM_BAD		1				/* bad host addr */
-#define FM_DSK		2				/* disk xfer */
-#define FM_SDI		3				/* SDI err */
-#define FM_SDE		4				/* sm disk err */
-#define FM_RPL		9				/* bad blk repl */
+#define FM_CNT		0				/* b: port lf err */
+#define FM_BAD		1				/* b: bad host addr */
+#define FM_DSK		2				/* d: disk xfer */
+#define FM_SDI		3				/* d: SDI err */
+#define FM_SDE		4				/* d: sm disk err */
+#define FM_TAP		5				/* t: tape errors */
+#define FM_RPL		9				/* d: bad blk repl */
 
 /* Status codes */
 
-#define	ST_SUC		0				/* successful */
-#define	ST_CMD		1				/* invalid cmd */
-#define	ST_ABO		2				/* aborted cmd */
-#define	ST_OFL		3				/* unit offline */
-#define	ST_AVL		4				/* unit avail */
-#define	ST_MFE		5				/* media fmt err */
-#define	ST_WPR		6				/* write prot err */
-#define	ST_CMP		7				/* compare err */
-#define	ST_DAT		8				/* data err */
-#define	ST_HST		9				/* host acc err */
-#define	ST_CNT		10				/* ctrl err */
-#define	ST_DRV		11				/* drive err */
-#define	ST_BBR		20				/* bad block */
-#define	ST_DIA		31				/* diagnostic */
+#define	ST_SUC		0				/* b: successful */
+#define	ST_CMD		1				/* b: invalid cmd */
+#define	ST_ABO		2				/* b: aborted cmd */
+#define	ST_OFL		3				/* b: unit offline */
+#define	ST_AVL		4				/* b: unit avail */
+#define	ST_MFE		5				/* b: media fmt err */
+#define	ST_WPR		6				/* b: write prot err */
+#define	ST_CMP		7				/* b: compare err */
+#define	ST_DAT		8				/* b: data err */
+#define	ST_HST		9				/* b: host acc err */
+#define	ST_CNT		10				/* b: ctrl err */
+#define	ST_DRV		11				/* b: drive err */
+#define ST_FMT		12				/* t: formatter err */
+#define ST_BOT		13				/* t: BOT encountered */
+#define ST_TMK		14				/* t: tape mark */
+#define ST_RDT		16				/* t: record trunc */
+#define ST_POL		17				/* t: pos lost */
+#define ST_SXC		18				/* b: serious exc */
+#define ST_LED		19				/* t: LEOT detect */
+#define	ST_BBR		20				/* d: bad block */
+#define	ST_DIA		31				/* b: diagnostic */
 #define	ST_V_SUB	5				/* subcode */
 #define ST_V_INV	8				/* invalid op */
 
 /* Status subcodes */
 
-#define SB_SUC_ON	(8 << ST_V_SUB)			/* already online */
-#define SB_OFL_NV	(1 << ST_V_SUB)			/* no volume */
-#define SB_AVL_INU	(32 << ST_V_SUB)		/* in use */
-#define SB_WPR_SW	(128 << ST_V_SUB)		/* swre wlk */
-#define SB_WPR_HW	(256 << ST_V_SUB)		/* hwre wlk */
-#define SB_HST_OA	(1 << ST_V_SUB)			/* odd addr */
-#define SB_HST_OC	(2 << ST_V_SUB)			/* odd count */
-#define SB_HST_NXM	(3 << ST_V_SUB)			/* nx memory */
-#define SB_HST_PTE	(5 << ST_V_SUB)			/* mapping err */
+#define SB_SUC_IGN	(1 << ST_V_SUB)			/* t: unload ignored */
+#define SB_SUC_ON	(8 << ST_V_SUB)			/* b: already online */
+#define SB_SUC_EOT	(32 << ST_V_SUB)		/* t: EOT encountered */
+#define SB_SUC_RO	(128 << ST_V_SUB)		/* t: read only */
+#define SB_OFL_NV	(1 << ST_V_SUB)			/* b: no volume */
+#define SB_OFL_INOP	(2 << ST_V_SUB)			/* t: inoperative */
+#define SB_AVL_INU	(32 << ST_V_SUB)		/* b: in use */
+#define SB_WPR_SW	(128 << ST_V_SUB)		/* b: swre wlk */
+#define SB_WPR_HW	(256 << ST_V_SUB)		/* b: hwre wlk */
+#define SB_HST_OA	(1 << ST_V_SUB)			/* b: odd addr */
+#define SB_HST_OC	(2 << ST_V_SUB)			/* d: odd count */
+#define SB_HST_NXM	(3 << ST_V_SUB)			/* b: nx memory */
+#define SB_HST_PAR	(4 << ST_V_SUB)			/* b: parity err */
+#define SB_HST_PTE	(5 << ST_V_SUB)			/* b: mapping err */
+#define SB_DAT_RDE	(7 << ST_V_SUB)			/* t: read err */
 
 /* Status invalid command subcodes */
 
 #define	I_OPCD		(8 << ST_V_INV)			/* inv opcode */
+#define I_FLAG		(9 << ST_V_INV)			/* inv flags */
+#define I_MODF		(10 << ST_V_INV)		/* inv modifier */
 #define	I_BCNT		(12 << ST_V_INV)		/* inv byte cnt */
 #define	I_LBN		(28 << ST_V_INV)		/* inv LBN */
 #define	I_VRSN		(12 << ST_V_INV)		/* inv version */
 #define	I_FMTI		(28 << ST_V_INV)		/* inv format */
+
+/* Tape format flags */
+
+#define TF_9TK		0x0100				/* 9 track */
+#define TF_9TK_NRZ	0x0001				/* 800 bpi */
+#define TF_9TK_PE	0x0002				/* 1600 bpi */
+#define TF_9TK_GRP	0x0004				/* 6250 bpi */
+#define TF_CTP		0x0200				/* TK50 */
+#define TF_CTP_LO	0x0001				/* low density */
+#define TF_CTP_HI	0x0002				/* hi density */
+#define TF_3480		0x0300				/* 3480 */
+#define TF_WOD		0x0400				/* RV80 */
 
 /* Packet formats - note that all packet lengths must be multiples of 4 bytes */
 
@@ -160,6 +217,8 @@
 #define CMD_OPC_M_OPC	0xFF
 #define CMD_OPC_V_CAA	8				/* cache NI */
 #define CMD_OPC_M_CAA	0xFF
+#define CMD_OPC_V_FLG	8				/* flags */
+#define CMD_OPC_M_FLG	0xFF
 
 /* Response packet header */
 
@@ -184,6 +243,28 @@
 
 #define AVL_LNT		12
 
+/* Erase packet - min size */
+
+#define ERS_LNT		12
+
+/* Erase gap - min size */
+
+#define ERG_LNT		12
+
+/* Flush - 10 W of status (8 undefined) */
+
+#define FLU_LNT		32
+/*			8 - 15				/* reserved */
+#define FLU_POSL	16				/* position */
+#define FLU_POSH	17
+
+/* Write tape mark - 10W of status (8 undefined) */
+
+#define WTM_LNT		32
+/*			8 - 15				/* reserved */
+#define WTM_POSL	16				/* position */
+#define WTM_POSH	17
+
 /* Get command status packet - 2 W parameter, 4 W of status */
 
 #define GCS_LNT		20
@@ -197,9 +278,10 @@
 #define FMT_LNT		12
 #define FMT_IH		17				/* magic bit */
 
-/* Get unit status packet - 18 W status */
+/* Get unit status packet - 18 W status (disk), 16W status (tape) */
 
-#define GUS_LNT		48
+#define GUS_LNT_D	48
+#define GUS_LNT_T	44
 #define GUS_MLUN	8				/* mlun */
 #define GUS_UFL		9				/* flags */
 #define GUS_RSVL	10				/* reserved */
@@ -210,21 +292,32 @@
 #define GUS_UIDD	15
 #define GUS_MEDL	16				/* media ID */
 #define GUS_MEDH	17
+#define GUS_UVER	23				/* unit version */
+
+/* Disk specific status */
+
 #define GUS_SHUN	18				/* shadowing */
 #define GUS_SHST	19
 #define GUS_TRK		20				/* track */
 #define GUS_GRP		21				/* group */
 #define GUS_CYL		22				/* cylinder */
-#define GUS_UVER	23				/* unit version */
 #define GUS_RCTS	24				/* RCT size */
 #define GUS_RBSC	25				/* RBNs, copies */
+
+/* Tape specific status */
+
+#define GUS_FMT		18				/* format */
+#define GUS_SPEED	19				/* speed */
+#define GUS_MENU	20				/* menu */
+#define GUS_CAP		21				/* capacity */
+#define GUS_FVER	22				/* fmtr version */
 
 #define GUS_UIDD_V_MOD	0				/* unit model */
 #define GUS_UIDD_V_CLS	8				/* unit class */
 #define GUS_RB_V_RBNS	0				/* RBNs/track */
 #define GUS_RB_V_RCTC	8				/* RCT copies */
 
-/* Unit online - 2 W parameter, 16 W status */
+/* Unit online - 2 W parameter, 16 W status (disk or tape) */
 
 #define ONL_LNT		44
 #define ONL_MLUN	8				/* mlun */
@@ -237,12 +330,24 @@
 #define ONL_UIDD	15
 #define ONL_MEDL	16				/* media ID */
 #define ONL_MEDH	17
+
+/* Disk specific status */
+
 #define ONL_SHUN	18				/* shadowing */
 #define ONL_SHST	19
 #define ONL_SIZL	20				/* size */
 #define ONL_SIZH	21
 #define ONL_VSNL	22				/* vol ser # */
 #define ONL_VSNH	23
+
+/* Tape specific status */
+
+#define ONL_FMT		18				/* format */
+#define ONL_SPD		19				/* speed */
+#define ONL_MAXL	20				/* max rec size */
+#define ONL_MAXH	21
+#define ONL_NREC	22				/* noise rec */
+#define ONL_RSVE	23				/* reserved */
 
 #define ONL_UIDD_V_MOD	0				/* unit model */
 #define ONL_UIDD_V_CLS	8				/* unit class */
@@ -270,7 +375,18 @@
 
 #define SUC_LNT		44
 
-/* Data transfer packet - 10 W parameters, 10 W status */
+/* Reposition - 4 W parameters, 10 W status */
+
+#define POS_LNT		32
+#define POS_RCL		8				/* record cnt */
+#define POS_RCH		9
+#define POS_TMCL	10				/* tape mk cnt */
+#define POS_TMCH	11
+/* reserved		12 - 15 */
+#define POS_POSL	16				/* position */
+#define POS_POSH	17
+
+/* Data transfer packet - 10 W parameters (disk), 6W parameters (tape), 10 W status */
 
 #define RW_LNT		32
 #define RW_BCL		8				/* byte count */
@@ -281,6 +397,9 @@
 #define RW_MAPH		13
 /*			14				/* reserved */
 /*			15				/* reserved */
+
+/* Disk specific parameters */
+
 #define RW_LBNL		16				/* LBN */
 #define RW_LBNH		17
 #define RW_WBCL		18				/* working bc */
@@ -289,6 +408,13 @@
 #define RW_WBAH		21
 #define RW_WBLL		22				/* working lbn */
 #define RW_WBLH		23
+
+/* Tape specific status */
+
+#define RW_POSL		16				/* position */
+#define RW_POSH		17
+#define RW_RSZL		18				/* record size */
+#define RW_RSZH		19
 
 /* Error log packet header */
 
@@ -331,13 +457,23 @@
 #define DTE_UIDC	16
 #define DTE_UIDD	17
 #define DTE_UVER	18
+#define DTE_D2		23
+#define DTE_D3		24
+#define DTE_D4		25
+
+/* Disk specific status */
+
 #define DTE_SCYL	19				/* cylinder */
 #define DTE_VSNL	20				/* vol ser # */
 #define DTE_VSNH	21
 #define DTE_D1		22				/* dev params */
-#define DTE_D2		23
-#define DTE_D3		24
-#define DTE_D4		25
+
+/* Tape specific status */
+
+#define DTE_RETR	19				/* retry */
+#define DTE_POSL	20				/* position */
+#define DTE_POSH	21
+#define DTE_FVER	22				/* formatter ver */
 
 #define DTE_CIDD_V_MOD	0				/* ctrl model */
 #define DTE_CIDD_V_CLS	8				/* ctrl class */
@@ -371,3 +507,5 @@
 */
 
 #define UNA_LNT		32
+
+#endif

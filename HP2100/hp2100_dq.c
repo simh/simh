@@ -1,7 +1,6 @@
 /* hp2100_dq.c: HP 2100 12565A disk simulator
 
-   Copyright (c) 1993-2002, Robert M. Supnik
-   Modified from hp2100_dp.c by Bill McDermith; used by permission
+   Copyright (c) 1993-2002, Bill McDermith
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -20,22 +19,29 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
+   Except as contained in this notice, the name of the author shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the author.
 
-   dq		12565A 2883/2884 disk system
+   dq		12565A 2883 disk system
 
+   10-Nov-02	RMS	Added boot command, rebuilt like 12559/13210
    09-Jan-02	WOM	Copied dp driver and mods for 2883
+
+   Differences between 12559/13210 and 12565 controllers
+   - 12565 stops transfers on address miscompares; 12559/13210 only stops writes
+   - 12565 does not set error on positioner busy
+   - 12565 does not set positioner busy if already on cylinder
+   - 12565 does not need eoc logic, it will hit an invalid head number
 */
 
 #include "hp2100_defs.h"
 
 #define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
 #define UNIT_WLK	(1 << UNIT_V_WLK)
-#define UNIT_W_UF	2				/* # flags */
 #define FNC		u3				/* saved function */
 #define CYL		u4				/* cylinder */
+#define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write prot */
 
 #define DQ_N_NUMWD	7
 #define DQ_NUMWD	(1 << DQ_N_NUMWD)		/* words/sector */
@@ -64,9 +70,9 @@
 
 #define	 FNC_SEEK1	020				/* fake - seek1 */
 #define  FNC_SEEK2	021				/* fake - seek2 */
-#define  FNC_CHK1	022				/* fake - check1 */
-#define  FNC_LA1	023				/* fake - arec1 */
-#define  FNC_RCL1	024				/* fake - recal1 */
+#define  FNC_SEEK3	022				/* fake - seek3 */
+#define  FNC_CHK1	023				/* fake - check1 */
+#define  FNC_LA1	024				/* fake - ldaddr1 */
 
 #define CW_V_DRV	0				/* drive */
 #define CW_M_DRV	01
@@ -85,42 +91,50 @@
 #define DA_GETSC(x)	(((x) >> DA_V_SC) & DA_M_SC)
 #define DA_CKMASK	0777				/* check mask */
 
-/* Status */
+/* Status in dqc_sta[drv] - (d) = dynamic */
 
-#define STA_DID		0000200				/* drive ID */
-#define STA_NRDY	0000100				/* not ready */
+#define STA_DID		0000200				/* drive ID (d) */
+#define STA_NRDY	0000100				/* not ready (d) */
 #define STA_EOC		0000040				/* end of cylinder */
 #define STA_AER		0000020				/* addr error */
 #define STA_FLG		0000010				/* flagged */
 #define STA_BSY		0000004				/* seeking */
 #define STA_DTE		0000002				/* data error */
 #define STA_ERR		0000001				/* any error */
-#define STA_ALLERR	(STA_DID + STA_NRDY + STA_EOC + \
-			 STA_FLG + STA_DTE)
+#define STA_ALLERR	(STA_NRDY + STA_EOC + STA_AER + STA_FLG + STA_DTE)
 
-extern int32 PC;
+extern uint16 *M;
+extern int32 PC, SR;
 extern int32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2];
-int32 dqc_busy = 0;					/* cch busy */
+extern int32 sim_switches;
+extern UNIT cpu_unit;
+
+int32 dqc_busy = 0;					/* cch xfer */
 int32 dqc_cnt = 0;					/* check count */
-int32 dqc_eoc = 0;					/* end of cyl */
-int32 dqc_sta[DQ_NUMDRV] = { 0 };			/* status regs */
-int32 dqc_stime = 10;					/* seek time */
-int32 dqc_ctime = 10;					/* command time */
+int32 dqc_stime = 100;					/* seek time */
+int32 dqc_ctime = 100;					/* command time */
 int32 dqc_xtime = 5;					/* xfer time */
-int32 dqc_rarc = 0, dqc_rarh = 0, dqc_rars = 0;		/* record addr */
+int32 dqc_dtime = 2;					/* dch time */
 int32 dqd_obuf = 0, dqd_ibuf = 0;			/* dch buffers */
 int32 dqc_obuf = 0;					/* cch buffers */
+int32 dqd_xfer = 0;					/* xfer in prog */
+int32 dqd_wval = 0;					/* write data valid */
 int32 dq_ptr = 0;					/* buffer ptr */
+uint8 dqc_rarc[DQ_NUMDRV] = { 0 };			/* cylinder */
+uint8 dqc_rarh[DQ_NUMDRV] = { 0 };			/* head */
+uint8 dqc_rars[DQ_NUMDRV] = { 0 };			/* sector */
+uint16 dqc_sta[DQ_NUMDRV] = { 0 };			/* status regs */
 uint16 dqxb[DQ_NUMWD];					/* sector buffer */
 
+DEVICE dqd_dev, dqc_dev;
 int32 dqdio (int32 inst, int32 IR, int32 dat);
 int32 dqcio (int32 inst, int32 IR, int32 dat);
 t_stat dqc_svc (UNIT *uptr);
+t_stat dqd_svc (UNIT *uptr);
 t_stat dqc_reset (DEVICE *dptr);
-t_stat dqc_vlock (UNIT *uptr, int32 val);
-t_stat dqc_attach (UNIT *uptr, char *cptr);
-t_stat dqc_detach (UNIT *uptr);
-void dq_go (int32 fnc, int32 drv, int32 time, int32 attdev);
+t_stat dqc_boot (int32 unitno, DEVICE *dptr);
+void dq_god (int32 fnc, int32 drv, int32 time);
+void dq_goc (int32 fnc, int32 drv, int32 time);
 
 /* DQD data structures
 
@@ -130,13 +144,13 @@ void dq_go (int32 fnc, int32 drv, int32 time, int32 attdev);
 */
 
 DIB dq_dib[] = {
-	{ DQD, 1, 0, 0, 0, 0, &dqdio },
-	{ DQC, 1, 0, 0, 0, 0, &dqcio }  };
+	{ DQD, 0, 0, 0, 0, &dqdio },
+	{ DQC, 0, 0, 0, 0, &dqcio }  };
 
 #define dqd_dib dq_dib[0]
 #define dqc_dib dq_dib[1]
 
-UNIT dqd_unit = { UDATA (NULL, 0, 0) };
+UNIT dqd_unit = { UDATA (&dqd_svc, 0, 0) };
 
 REG dqd_reg[] = {
 	{ ORDATA (IBUF, dqd_ibuf, 16) },
@@ -145,22 +159,24 @@ REG dqd_reg[] = {
 	{ FLDATA (CTL, dqd_dib.ctl, 0) },
 	{ FLDATA (FLG, dqd_dib.flg, 0) },
 	{ FLDATA (FBF, dqd_dib.fbf, 0) },
+	{ FLDATA (XFER, dqd_xfer, 0) },
+	{ FLDATA (WVAL, dqd_wval, 0) },
 	{ BRDATA (DBUF, dqxb, 8, 16, DQ_NUMWD) },
 	{ DRDATA (BPTR, dq_ptr, DQ_N_NUMWD) },
 	{ ORDATA (DEVNO, dqd_dib.devno, 6), REG_HRO },
-	{ FLDATA (*DEVENB, dqd_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB dqd_mod[] = {
 	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-		&hp_setdev, &hp_showdev, &dqd_dib },
+		&hp_setdev, &hp_showdev, &dqd_dev },
 	{ 0 }  };
 
 DEVICE dqd_dev = {
 	"DQD", &dqd_unit, dqd_reg, dqd_mod,
 	1, 10, DQ_N_NUMWD, 1, 8, 16,
 	NULL, NULL, &dqc_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&dqd_dib, 0 };
 
 /* DQC data structures
 
@@ -171,47 +187,47 @@ DEVICE dqd_dev = {
 */
 
 UNIT dqc_unit[] = {
-	{ UDATA (&dqc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, DQ_SIZE) },
-	{ UDATA (&dqc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE, DQ_SIZE) }  };
+	{ UDATA (&dqc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+		UNIT_ROABLE, DQ_SIZE) },
+	{ UDATA (&dqc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+		UNIT_ROABLE, DQ_SIZE) }  };
 
 REG dqc_reg[] = {
 	{ ORDATA (OBUF, dqc_obuf, 16) },
 	{ ORDATA (BUSY, dqc_busy, 2), REG_RO },
-	{ ORDATA (RARC, dqc_rarc, 8) },
-	{ ORDATA (RARH, dqc_rarh, 5) },
-	{ ORDATA (RARS, dqc_rars, 5) },
-	{ ORDATA (CNT, dqc_cnt, 5) },
+	{ ORDATA (CNT, dqc_cnt, 9) },
 	{ FLDATA (CMD, dqc_dib.cmd, 0) },
 	{ FLDATA (CTL, dqc_dib.ctl, 0) },
 	{ FLDATA (FLG, dqc_dib.flg, 0) },
 	{ FLDATA (FBF, dqc_dib.fbf, 0) },
-	{ FLDATA (EOC, dqc_eoc, 0) },
+	{ BRDATA (RARC, dqc_rarc, 8, 8, DQ_NUMDRV) },
+	{ BRDATA (RARH, dqc_rarh, 8, 5, DQ_NUMDRV) },
+	{ BRDATA (RARS, dqc_rars, 8, 5, DQ_NUMDRV) },
+	{ BRDATA (STA, dqc_sta, 8, 16, DQ_NUMDRV) },
 	{ DRDATA (CTIME, dqc_ctime, 24), PV_LEFT },
+	{ DRDATA (DTIME, dqc_dtime, 24), PV_LEFT },
 	{ DRDATA (STIME, dqc_stime, 24), PV_LEFT },
 	{ DRDATA (XTIME, dqc_xtime, 24), REG_NZ + PV_LEFT },
-	{ BRDATA (STA, dqc_sta, 8, 16, DQ_NUMDRV) },
-	{ URDATA (UFLG, dqc_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
-		   DQ_NUMDRV, REG_HRO) },
+	{ URDATA (UCYL, dqc_unit[0].CYL, 10, 8, 0,
+		  DQ_NUMDRV, PV_LEFT | REG_HRO) },
+	{ URDATA (UFNC, dqc_unit[0].FNC, 8, 8, 0,
+		  DQ_NUMDRV, REG_HRO) },
 	{ ORDATA (DEVNO, dqc_dib.devno, 6), REG_HRO },
-	{ FLDATA (*DEVENB, dqc_dib.enb, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB dqc_mod[] = {
-/*	{ UNIT_WLK, 0, "write enabled", "ENABLED", &dqc_vlock }, */
-/*	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", &dqc_vlock }, */
-	{ MTAB_XTD | MTAB_VDV, 1, NULL, "ENABLED",
-		&set_enb, NULL, &dqd_dib },
-	{ MTAB_XTD | MTAB_VDV, 1, NULL, "DISABLED",
-		&set_dis, NULL, &dqd_dib },
+	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
+	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
 	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-		&hp_setdev, &hp_showdev, &dqd_dib },
+		&hp_setdev, &hp_showdev, &dqd_dev },
 	{ 0 }  };
 
 DEVICE dqc_dev = {
 	"DQC", dqc_unit, dqc_reg, dqc_mod,
 	DQ_NUMDRV, 8, 24, 1, 8, 16,
 	NULL, NULL, &dqc_reset,
-	NULL, &dqc_attach, &dqc_detach };
+	&dqc_boot, NULL, NULL,
+	&dqc_dib, DEV_DISABLE };
 
 /* IOT routines */
 
@@ -219,10 +235,10 @@ int32 dqdio (int32 inst, int32 IR, int32 dat)
 {
 int32 devd;
 
-devd = IR & DEVMASK;					/* get device no */
+devd = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
 case ioFLG:						/* flag clear/set */
-	if ((IR & HC) == 0) { setFLG (devd); }		/* STF */
+	if ((IR & I_HC) == 0) { setFLG (devd); }	/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
 	if (FLG (devd) == 0) PC = (PC + 1) & VAMASK;
@@ -232,6 +248,7 @@ case ioSFS:						/* skip flag set */
 	return dat;
 case ioOTX:						/* output */
 	dqd_obuf = dat;
+	if (!dqc_busy || dqd_xfer) dqd_wval = 1;	/* if !overrun, valid */
 	break;
 case ioMIX:						/* merge */
 	dat = dat | dqd_ibuf;
@@ -240,15 +257,19 @@ case ioLIX:						/* load */
 	dat = dqd_ibuf;
 	break;
 case ioCTL:						/* control clear/set */
-	if (IR & AB) {					/* CLC */
-		clrCTL (devd);				/* clr ctl, cmd */
-		clrCMD (devd);  }
-	else {	setCTL (devd);				/* STC */
-		setCMD (devd);  }			/* set ctl, cmd */
+	if (IR & I_CTL) {				/* CLC */
+	    clrCTL (devd);				/* clr ctl, cmd */
+	    clrCMD (devd);
+	    dqd_xfer = 0;  }				/* clr xfer */
+	else {						/* STC */
+	    setCTL (devd);				/* set ctl, cmd */
+	    setCMD (devd);
+	    if (dqc_busy && !dqd_xfer)			/* overrun? */
+		dqc_sta[dqc_busy - 1] |= STA_DTE | STA_ERR;  }
 	break;
 default:
 	break;  }
-if (IR & HC) { clrFLG (devd); }				/* H/C option */
+if (IR & I_HC) { clrFLG (devd); }			/* H/C option */
 return dat;
 }
 
@@ -256,10 +277,10 @@ int32 dqcio (int32 inst, int32 IR, int32 dat)
 {
 int32 devc, fnc, drv;
 
-devc = IR & DEVMASK;					/* get device no */
+devc = IR & I_DEVMASK;					/* get device no */
 switch (inst) {						/* case on opcode */
 case ioFLG:						/* flag clear/set */
-	if ((IR & HC) == 0) { setFLG (devc); }		/* STF */
+	if ((IR & I_HC) == 0) { setFLG (devc); }	/* STF */
 	break;
 case ioSFC:						/* skip flag clear */
 	if (FLG (devc) == 0) PC = (PC + 1) & VAMASK;
@@ -275,56 +296,197 @@ case ioLIX:						/* load */
 case ioMIX:						/* merge */
 	break;						/* no data */
 case ioCTL:						/* control clear/set */
-	if (IR & AB) { 					/* CLC? */
-		clrCMD (devc);				/* clr cmd, ctl */
-		clrCTL (devc);				/* cancel non-seek */
-		if (dqc_busy) sim_cancel (&dqc_unit[dqc_busy - 1]);
-		dqc_busy = 0;  }			/* clr busy */
-	else if (!CTL (devc)) {				/* set and now clr? */
-		setCMD (devc);				/* set cmd, ctl */
-		setCTL (devc);
-		drv = CW_GETDRV (dqc_obuf);		/* get fnc, drv */
-		fnc = CW_GETFNC (dqc_obuf);		/* from cmd word */
-		switch (fnc) {				/* case on fnc */
-		case FNC_SEEK: case FNC_RCL:		/* seek, recal */
-			dqc_sta[drv] = dqc_sta[drv] | STA_BSY;
-			dq_go (fnc, drv, dqc_xtime, devc);
-			break;
-		case FNC_STA: case FNC_LA:		/* rd sta, load addr */
-			dq_go (fnc, drv, dqc_xtime, 0);
-			break;
-		case FNC_CHK:				/* check */
-			dq_go (fnc, drv, dqc_xtime, devc);
-			break;
-		case FNC_RD: case FNC_WD: case FNC_WA:	/* read, write, wr addr */
-			dq_go (fnc, drv, dqc_ctime, devc);
-			break;
-		}					/* end case */
+	if (IR & I_CTL) {				/* CLC? */
+	    clrCMD (devc);				/* clr cmd, ctl */
+	    clrCTL (devc);				/* cancel non-seek */
+	    if (dqc_busy) sim_cancel (&dqc_unit[dqc_busy - 1]);
+	    sim_cancel (&dqd_unit);			/* cancel dch */
+	    dqd_xfer = 0;				/* clr dch xfer */
+	    dqc_busy = 0;  }				/* clr busy */
+	else if (!CTL (devc)) {				/* set and was clr? */
+	    setCMD (devc);				/* set cmd, ctl */
+	    setCTL (devc);
+	    drv = CW_GETDRV (dqc_obuf);			/* get fnc, drv */
+	    fnc = CW_GETFNC (dqc_obuf);			/* from cmd word */
+	    switch (fnc) {				/* case on fnc */
+	    case FNC_SEEK: case FNC_RCL:		/* seek, recal */
+	    case FNC_CHK:				/* check */
+		dqc_sta[drv] = 0;			/* clear status */
+	    case FNC_STA: case FNC_LA:			/* rd sta, load addr */
+		dq_god (fnc, drv, dqc_dtime);		/* sched dch xfer */
+		break;
+	    case FNC_RD: case FNC_WD:			/* read, write */
+	    case FNC_RA: case FNC_WA:			/* rd addr, wr addr */
+	    case FNC_AS:				/* address skip */
+		dq_goc (fnc, drv, dqc_ctime);		/* sched drive */
+		break;
+	    }						/* end case */
 	}						/* end else */
 	break;
 default:
 	break;  }
-if (IR & HC) { clrFLG (devc); }				/* H/C option */
+if (IR & I_HC) { clrFLG (devc); }			/* H/C option */
 return dat;
 }
 
-/* Unit service
+/* Start data channel operation */
 
-   Unit must be attached; detach cancels operation.
+void dq_god (int32 fnc, int32 drv, int32 time)
+{
+dqd_unit.CYL = drv;					/* save unit */
+dqd_unit.FNC = fnc;					/* save function */
+sim_activate (&dqd_unit, time);
+return;
+}
+
+/* Start controller operation */
+
+void dq_goc (int32 fnc, int32 drv, int32 time)
+{
+if (sim_is_active (&dqc_unit[drv])) {			/* still seeking? */
+	sim_cancel (&dqc_unit[drv]);			/* cancel */
+	time = time + dqc_stime;  }			/* take longer */
+dqc_sta[drv] = 0;					/* clear status */
+dq_ptr = 0;						/* init buf ptr */
+dqc_busy = drv + 1;					/* set busy */
+dqd_xfer = 1;						/* xfer in prog */
+dqc_unit[drv].FNC = fnc;				/* save function */
+sim_activate (&dqc_unit[drv], time);			/* activate unit */
+return;
+}
+
+/* Data channel unit service
+
+   This routine handles the data channel transfers.  It also handles
+   data transfers that are blocked by seek in progress.
+
+   uptr->CYL	=	target drive
+   uptr->FNC	=	target function
 
    Seek substates
 	seek	-	transfer cylinder
-	seek1	-	transfer head/surface
-	seek2	-	done
+	seek1	-	transfer head/surface, sched drive
+   Recalibrate substates
+	rcl	-	clear cyl/head/surface, sched drive
    Load address
 	la	-	transfer cylinder
 	la1	-	transfer head/surface, finish operation
    Status check	-	transfer status, finish operation
    Check data
-	chk	-	transfer sector count
+	chk	-	transfer sector count, sched drive
+*/
+
+t_stat dqd_svc (UNIT *uptr)
+{
+int32 drv, devc, devd, st;
+
+drv = uptr->CYL;					/* get drive no */
+devc = dqc_dib.devno;					/* get cch devno */
+devd = dqd_dib.devno;					/* get dch devno */
+switch (uptr->FNC) {					/* case function */
+
+case FNC_SEEK:						/* seek, need cyl */
+	if (CMD (devd)) {				/* dch active? */
+	    dqc_rarc[drv] = DA_GETCYL (dqd_obuf);	/* take cyl word */
+	    dqd_wval = 0;				/* clr data valid */
+	    setFLG (devd);				/* set dch flg */
+	    clrCMD (devd);				/* clr dch cmd */
+	    uptr->FNC = FNC_SEEK1;  }			/* advance state */
+	sim_activate (uptr, dqc_xtime);			/* no, wait more */
+	break;
+case FNC_SEEK1:						/* seek, need hd/sec */
+	if (CMD (devd)) {				/* dch active? */
+	    dqc_rarh[drv] = DA_GETHD (dqd_obuf);	/* get head */
+	    dqc_rars[drv] = DA_GETSC (dqd_obuf);	/* get sector */
+	    dqd_wval = 0;				/* clr data valid */
+	    setFLG (devd);				/* set dch flg */
+	    clrCMD (devd);				/* clr dch cmd */
+	    if (sim_is_active (&dqc_unit[drv])) break;	/* if busy */
+	    st = abs (dqc_rarc[drv] - dqc_unit[drv].CYL) * dqc_stime;
+	    if (st == 0) st = dqc_xtime;		/* if on cyl, min time */
+	    else dqc_sta[drv] = dqc_sta[drv] | STA_BSY;	/* set busy */
+	    sim_activate (&dqc_unit[drv], st);		/* schedule op */
+	    dqc_unit[drv].CYL = dqc_rarc[drv];		/* on cylinder */
+	    dqc_unit[drv].FNC = FNC_SEEK2;  }		/* advance state */
+	else sim_activate (uptr, dqc_xtime);		/* no, wait more */
+	break;
+
+case FNC_RCL:						/* recalibrate */
+	dqc_rarc[drv] = dqc_rarh[drv] = dqc_rars[drv] = 0;	/* clear RAR */
+	if (sim_is_active (&dqc_unit[drv])) break;	/* ignore if busy */
+	st = dqc_unit[drv].CYL * dqc_stime;		/* calc diff */
+	if (st == 0) st = dqc_xtime;			/* if on cyl, min time */
+	else dqc_sta[drv] = dqc_sta[drv] | STA_BSY;	/* set busy */
+	sim_activate (&dqc_unit[drv], st);		/* schedule drive */
+	dqc_unit[drv].CYL = 0;				/* on cylinder */
+	dqc_unit[drv].FNC = FNC_SEEK2;			/* advance state */
+	break;
+
+case FNC_LA:						/* arec, need cyl */
+	if (CMD (devd)) {				/* dch active? */
+	    dqc_rarc[drv] = DA_GETCYL (dqd_obuf);	/* take cyl word */
+	    dqd_wval = 0;				/* clr data valid */
+	    setFLG (devd);				/* set dch flg */
+	    clrCMD (devd);				/* clr dch cmd */
+	    uptr->FNC = FNC_LA1;  }			/* advance state */
+	sim_activate (uptr, dqc_xtime);			/* no, wait more */
+	break;
+case FNC_LA1:						/* arec, need hd/sec */
+	if (CMD (devd)) {				/* dch active? */
+	    dqc_rarh[drv] = DA_GETHD (dqd_obuf);	/* get head */
+	    dqc_rars[drv] = DA_GETSC (dqd_obuf);	/* get sector */
+	    dqd_wval = 0;				/* clr data valid */
+	    setFLG (devc);				/* set cch flg */
+	    clrCMD (devc);				/* clr cch cmd */
+	    setFLG (devd);				/* set dch flg */
+	    clrCMD (devd);  }				/* clr dch cmd */
+	else sim_activate (uptr, dqc_xtime);		/* no, wait more */
+	break;
+
+case FNC_STA:						/* read status */
+	if (CMD (devd)) {				/* dch active? */
+	    if (dqc_unit[drv].flags & UNIT_ATT)		/* attached? */
+		dqd_ibuf = dqc_sta[drv] & ~STA_DID;
+	    else dqd_ibuf = STA_NRDY;
+	    if (drv) dqd_ibuf = dqd_ibuf | STA_DID;
+	    setFLG (devd);				/* set dch flg */
+	    clrCMD (devd);				/* clr dch cmd */
+	    dqc_sta[drv] = dqc_sta[drv] & 		/* clr sta flags */
+		~(STA_DTE | STA_FLG | STA_AER | STA_EOC | STA_ERR);
+	    }
+	else sim_activate (uptr, dqc_xtime);		/* wait more */
+	break;
+
+case FNC_CHK:						/* check, need cnt */
+	if (CMD (devd)) {				/* dch active? */
+	    dqc_cnt = dqd_obuf & DA_CKMASK;		/* get count */
+	    dqd_wval = 0;				/* clr data valid */
+/*	    setFLG (devd);				/* set dch flg */
+/*	    clrCMD (devd);				/* clr dch cmd */
+	    dq_goc (FNC_CHK1, drv, dqc_ctime);  }	/* sched drv */
+	else sim_activate (uptr, dqc_xtime);		/* wait more */
+	break;
+
+default:
+	return SCPE_IERR;  }
+return SCPE_OK;
+}
+
+/* Drive unit service
+
+   This routine handles the data transfers.
+
+   Seek substates
+	seek2	-	done
+   Recalibrate substate
+	rcl1	-	done
+   Check data substates
 	chk1	-	finish operation
    Read
+   Read address
+   Address skip (read without header check)
    Write
+   Write address
 */
 
 #define GETDA(x,y,z) \
@@ -332,252 +494,225 @@ return dat;
 
 t_stat dqc_svc (UNIT *uptr)
 {
-int32 i, da, drv, devc, devd, err, st, maxsc;
+int32 da, drv, devc, devd, err;
 
 err = 0;						/* assume no err */
 drv = uptr - dqc_dev.units;				/* get drive no */
 devc = dqc_dib.devno;					/* get cch devno */
 devd = dqd_dib.devno;					/* get dch devno */
-switch (uptr -> FNC) {					/* case function */
+if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
+	setFLG (devc);					/* set cch flg */
+	clrCMD (devc);					/* clr cch cmd */
+	dqc_sta[drv] = 0;				/* clr status */
+	dqc_busy = 0;					/* ctlr is free */
+	dqd_xfer = dqd_wval = 0;
+	return SCPE_OK;  }
+switch (uptr->FNC) {					/* case function */
 
-case FNC_SEEK:						/* seek, need cyl */
-	if (CMD (devd)) {				/* dch active? */
-		dqc_rarc = DA_GETCYL (dqd_obuf);	/* take cyl word */
-		setFLG (devd);				/* set dch flg */
-		clrCMD (devd);				/* clr dch cmd */
-		uptr -> FNC = FNC_SEEK1;  }		/* advance state */
-	sim_activate (uptr, dqc_xtime);			/* no, wait more */
-	return SCPE_OK;
-case FNC_SEEK1:						/* seek, need hd/sec */
-	if (CMD (devd)) {				/* dch active? */
-		dqc_rarh = DA_GETHD (dqd_obuf);		/* get head */
-		dqc_rars = DA_GETSC (dqd_obuf);		/* get sector */
-		setFLG (devd);				/* set dch flg */
-		clrCMD (devd);				/* clr dch cmd */
-		st = abs (dqc_rarc - uptr -> CYL) * dqc_stime; /* calc diff */
-		if (st == 0) st = dqc_xtime;		/* min time */
-		sim_activate (uptr, st);		/* schedule op */
-		uptr -> CYL = dqc_rarc;			/* on cylinder */
-		dqc_busy = 0;				/* ctrl is free */
-		uptr -> FNC = FNC_SEEK2;  }		/* advance state */
-	else sim_activate (uptr, dqc_xtime);		/* no, wait more */
-	return SCPE_OK;
 case FNC_SEEK2:						/* seek done */
-	if (dqc_busy) sim_activate (uptr, dqc_xtime);	/* ctrl busy? wait */
-	else {	dqc_sta[drv] = dqc_sta[drv] & ~STA_BSY;
-		if (uptr -> CYL >= DQ_NUMCY) {		/* invalid cyl? */
-			dqc_sta[drv] = dqc_sta[drv] | STA_AER;
-			uptr -> CYL = 0;  }
-		if (dqc_rars >= DQ_NUMSC)		/* invalid sec? */
-			dqc_sta[drv] = dqc_sta[drv] | STA_AER;
-		setFLG (devc);				/* set cch flg */
-		clrCMD (devc);  }			/* clr cch cmd */
-	return SCPE_OK;
-case FNC_RCL:						/* recalibrate */
-	if (dqc_busy) sim_activate (uptr, dqc_xtime);	/* ctrl busy? wait */
-	else {	st = uptr -> CYL * dqc_stime;		/* calc diff */
-		if (st == 0) st = dqc_xtime;		/* min time */
-		sim_activate (uptr, st);		/* schedule op */
-		uptr -> CYL = 0;			/* on cylinder */
-		dqc_busy = 0;				/* ctrl is free */
-		uptr -> FNC = FNC_RCL1;  }		/* advance state */
-	return SCPE_OK;
-case FNC_RCL1:						/* recal done */
-	if (dqc_busy) sim_activate (uptr, dqc_xtime);	/* ctrl busy? wait */
-	else {	dqc_sta[drv] = dqc_sta[drv] & ~STA_BSY;
-		setFLG (devc);				/* set cch flg */
-		clrCMD (devc);  }			/* clr cch cmd */
-	return SCPE_OK;
-
-case FNC_LA:						/* arec, need cyl */
-	if (CMD (devd)) {				/* dch active? */
-		dqc_rarc = DA_GETCYL (dqd_obuf);	/* take cyl word */
-		setFLG (devd);				/* set dch flg */
-		clrCMD (devd);				/* clr dch cmd */
-		uptr -> FNC = FNC_LA1;  }		/* advance state */
-	sim_activate (uptr, dqc_xtime);			/* no, wait more */
-	return SCPE_OK;
-case FNC_LA1:						/* arec, need hd/sec */
-	if (CMD (devd)) {				/* dch active? */
-		dqc_rarh = DA_GETHD (dqd_obuf);		/* get head */
-		dqc_rars = DA_GETSC (dqd_obuf);		/* get sector */
-		setFLG (devd);				/* set dch flg */
-		clrCMD (devd);  }			/* clr dch cmd */
-	else {	sim_activate (uptr, dqc_xtime);		/* no, wait more */
-		return SCPE_OK;  }
-	break;						/* done */
-
-case FNC_STA:						/* read status */
-	if (CMD (devd)) {				/* dch active? */
-		dqd_ibuf = dqc_sta[drv] | ((dqc_sta[drv] & STA_ALLERR)? STA_ERR: 0);
-		setFLG (devd);				/* set dch flg */
-		clrCMD (devd);				/* clr dch cmd */
-		dqc_sta[drv] = dqc_sta[drv] & 		/* clr sta flags */
-			~(STA_DTE | STA_FLG | STA_AER | STA_EOC);
-		dqc_busy = 0;  }			/* ctlr is free */
-	else sim_activate (uptr, dqc_xtime);		/* wait more */
+	if (uptr->CYL >= DQ_NUMCY) {			/* out of range? */
+	    dqc_sta[drv] = dqc_sta[drv] | STA_BSY | STA_ERR;
+	    dqc_unit[drv].CYL = 0;  }
+	else dqc_sta[drv] = dqc_sta[drv] & ~STA_BSY;	/* drive not busy */
+case FNC_SEEK3:
+	if (dqc_busy || FLG (devc)) {			/* ctrl busy? */
+	    uptr->FNC = FNC_SEEK3;			/* next state */
+	    sim_activate (uptr, dqc_xtime);  }		/* ctrl busy? wait */
+	else {
+	    setFLG (devc);				/* set cch flg */
+	    clrCMD (devc);  }				/* clr cch cmd */
 	return SCPE_OK;
 
-case FNC_CHK:						/* check, need cnt */
-	if (CMD (devd)) {				/* dch active? */
-		dqc_cnt = dqd_obuf & DA_CKMASK;		/* get count */
-		setFLG (devd);				/* set dch flg */
-		clrCMD (devd);				/* clr dch cmd */
-		sim_activate (uptr, dqc_ctime);		/* schedule op */
-		uptr -> FNC = FNC_CHK1;  }		/* advance state */
-	else sim_activate (uptr, dqc_xtime);		/* wait more */
-	return SCPE_OK;
-case FNC_CHK1:
-	if ((uptr -> CYL != dqc_rarc) || (dqc_rars >= DQ_NUMSC))
-		dqc_sta[drv] = dqc_sta[drv] | STA_AER;
-	else {	maxsc = ((2 - (dqc_rarh & 1)) * DQ_NUMSC) - dqc_rars;
-		if (dqc_cnt > maxsc) {			/* too many sec? */
-			dqc_sta[drv] = dqc_sta[drv] | STA_EOC;
-			dqc_rarh = dqc_rarh & ~1;	/* rar = 0/2, 0 */
-			dqc_rars = 0;  }
-		else {	i = dqc_rars + dqc_cnt;		/* final sector */
-			dqc_rars = i % DQ_NUMSC;	/* reposition */
-			dqc_rarh = dqc_rarh ^ ((i / DQ_NUMSC) & 1);  }  }
-	break;						/* done */
-
-case FNC_RD:						/* read */
+case FNC_RA:						/* read addr */
 	if (!CMD (devd)) break;				/* dch clr? done */
-	if (FLG (devd)) dqc_sta[drv] = dqc_sta[drv] | STA_DTE;
-	if (dq_ptr == 0) {				/* new sector? */
-		if ((uptr -> CYL != dqc_rarc) || (dqc_rars >= DQ_NUMSC)) {
-			dqc_sta[drv] = dqc_sta[drv] | STA_AER;
-			break;  }
-		if (dqc_eoc) {				/* end of cyl? */
-			dqc_sta[drv] = dqc_sta[drv] | STA_EOC;
-			break;  }
-		da = GETDA (dqc_rarc, dqc_rarh, dqc_rars);	/* get addr */
-		dqc_rars = dqc_rars + 1;		/* incr address */
-		if (dqc_rars >= DQ_NUMSC) {		/* end of trk? */
-			dqc_rars = 0;			/* wrap to */
-			dqc_rarh = dqc_rarh ^ 1;	/* next cyl */
-			dqc_eoc = ((dqc_rarh & 1) == 0);  }	/* calc eoc */
-		if (err = fseek (uptr -> fileref, da * sizeof (int16),
-			SEEK_SET)) break;
-		fxread (dqxb, sizeof (int16), DQ_NUMWD, uptr -> fileref);
-		if (err = ferror (uptr -> fileref)) break;  }
-	dqd_ibuf = dqxb[dq_ptr++];			/* get word */
-	if (dq_ptr >= DQ_NUMWD) dq_ptr = 0;		/* wrap if last */
+	if (dq_ptr == 0) dqd_ibuf = uptr->CYL;		/* 1st word? */
+	else if (dq_ptr == 1) { 			/* second word? */
+	    dqd_ibuf = (dqc_rarh[drv] << DA_V_HD) |
+		(dqc_rars[drv] << DA_V_SC);
+	    dqc_rars[drv] = dqc_rars[drv] + 1;		/* incr address */
+	    if (dqc_rars[drv] >= DQ_NUMSC)		/* end of surf? */
+		dqc_rars[drv] = 0;  }
+	else break;
+	dq_ptr = dq_ptr + 1;
 	setFLG (devd);					/* set dch flg */
+	clrCMD (devd);					/* clr dch cmd */
+	sim_activate (uptr, dqc_xtime);			/* sched next word */
+	return SCPE_OK;
+
+case FNC_AS:						/* address skip */
+case FNC_RD:						/* read */
+case FNC_CHK1:						/* check */
+	if (dq_ptr == 0) {				/* new sector? */
+	    if (!CMD (devd) && (uptr->FNC != FNC_CHK1)) break;
+	    if ((uptr->CYL != dqc_rarc[drv]) ||		/* wrong cyl or */
+		(dqc_rars[drv] >= DQ_NUMSC)) {		/* bad sector? */
+		dqc_sta[drv] = dqc_sta[drv] | STA_AER | STA_ERR;
+		break;  }
+	    if (dqc_rarh[drv] >= DQ_NUMSF) {		/* bad head? */
+		dqc_sta[drv] = dqc_sta[drv] | STA_EOC | STA_ERR;
+		break;  }
+	    da = GETDA (dqc_rarc[drv], dqc_rarh[drv], dqc_rars[drv]);
+	    dqc_rars[drv] = dqc_rars[drv] + 1;		/* incr address */
+	    if (dqc_rars[drv] >= DQ_NUMSC) {		/* end of surf? */
+		dqc_rars[drv] = 0;			/* wrap to */
+		dqc_rarh[drv] = dqc_rarh[drv] + 1;  }	/* next head */
+	    if (err = fseek (uptr->fileref, da * sizeof (int16),
+		SEEK_SET)) break;
+	    fxread (dqxb, sizeof (int16), DQ_NUMWD, uptr->fileref);
+	    if (err = ferror (uptr->fileref)) break;  }
+	dqd_ibuf = dqxb[dq_ptr++];			/* get word */
+	if (dq_ptr >= DQ_NUMWD) {			/* end of sector? */
+	    if (uptr->FNC == FNC_CHK1) {		/* check? */
+		dqc_cnt = (dqc_cnt - 1) & DA_CKMASK;	/* decr count */
+		if (dqc_cnt == 0) break;  }		/* if zero, done */
+	    dq_ptr = 0;  }				/* wrap buf ptr */
+	if (CMD (devd) && dqd_xfer) {			/* dch on, xfer? */
+	    setFLG (devd); }				/* set flag */
 	clrCMD (devd);					/* clr dch cmd */
 	sim_activate (uptr, dqc_xtime);			/* sched next word */
 	return SCPE_OK;
 
 case FNC_WA:						/* write address */
 case FNC_WD:						/* write */
-	if (dqc_eoc) {					/* end of cyl? */
-		dqc_sta[drv] = dqc_sta[drv] | STA_EOC;	/* set status */
+	if (dq_ptr == 0) {				/* sector start? */
+	    if (!CMD (devd) && !dqd_wval) break;	/* xfer done? */
+	    if(uptr->flags & UNIT_WPRT) {		/* write protect? */
+		dqc_sta[drv] = dqc_sta[drv] | STA_FLG | STA_ERR;
 		break;  }				/* done */
-	if (FLG (devd)) dqc_sta[drv] = dqc_sta[drv] | STA_DTE;
-	dqxb[dq_ptr++] = dqd_obuf;			/* store word */
-	if (!CMD (devd)) {				/* dch clr? done */
-		for ( ; dq_ptr < DQ_NUMWD; dq_ptr++) dqxb[dq_ptr] = 0;  }
+	    if ((uptr->CYL != dqc_rarc[drv]) ||		/* wrong cyl or */
+		(dqc_rars[drv] >= DQ_NUMSC)) {		/* bad sector? */
+		dqc_sta[drv] = dqc_sta[drv] | STA_AER | STA_ERR;
+		break;  }
+	    if (dqc_rarh[drv] >= DQ_NUMSF) {			/* bad head? */
+		dqc_sta[drv] = dqc_sta[drv] | STA_EOC | STA_ERR;
+		break;  }  }				/* done */
+	dqxb[dq_ptr++] = dqd_wval? dqd_obuf: 0;		/* store word/fill */
+	dqd_wval = 0;					/* clr data valid */
 	if (dq_ptr >= DQ_NUMWD) {			/* buffer full? */
-		if ((uptr -> CYL != dqc_rarc) || (dqc_rars >= DQ_NUMSC)) {
-			dqc_sta[drv] = dqc_sta[drv] | STA_AER;
-			break;  }
-		da = GETDA (dqc_rarc, dqc_rarh, dqc_rars);	/* get addr */
-		dqc_rars = dqc_rars + 1;		/* incr address */
-		if (dqc_rars >= DQ_NUMSC) {		/* end of trk? */
-			dqc_rars = 0;			/* wrap to */
-			dqc_rarh = dqc_rarh ^ 1;	/* next cyl */
-			dqc_eoc = ((dqc_rarh & 1) == 0);  }	/* calc eoc */
-		if (err = fseek (uptr -> fileref, da * sizeof (int16),
-			SEEK_SET)) return TRUE;
-		fxwrite (dqxb, sizeof (int16), DQ_NUMWD, uptr -> fileref);
-		if (err = ferror (uptr -> fileref)) break;
-		dq_ptr = 0;  }
-	if (CMD (devd)) {				/* dch active? */
-		setFLG (devd);				/* set dch flg */
-		clrCMD (devd);				/* clr dch cmd */
-		sim_activate (uptr, dqc_xtime);		/* sched next word */
-		return SCPE_OK;  }
-	break;  }					/* end case fnc */
+	    da = GETDA (dqc_rarc[drv], dqc_rarh[drv], dqc_rars[drv]);
+	    dqc_rars[drv] = dqc_rars[drv] + 1;		/* incr address */
+	    if (dqc_rars[drv] >= DQ_NUMSC) {		/* end of surf? */
+		dqc_rars[drv] = 0;			/* wrap to */
+		dqc_rarh[drv] = dqc_rarh[drv] + 1;  }	/* next head */
+	    if (err = fseek (uptr->fileref, da * sizeof (int16),
+		SEEK_SET)) return TRUE;
+	    fxwrite (dqxb, sizeof (int16), DQ_NUMWD, uptr->fileref);
+	    if (err = ferror (uptr->fileref)) break;
+	    dq_ptr = 0;  }
+	if (CMD (devd) && dqd_xfer) {			/* dch on, xfer? */
+	    setFLG (devd); }				/* set flag */
+	clrCMD (devd);					/* clr dch cmd */
+	sim_activate (uptr, dqc_xtime);			/* sched next word */
+	return SCPE_OK;
+
+default:
+	return SCPE_IERR;  }				/* end case fnc */
 
 setFLG (devc);						/* set cch flg */
 clrCMD (devc);						/* clr cch cmd */
 dqc_busy = 0;						/* ctlr is free */
+dqd_xfer = dqd_wval = 0;
 if (err != 0) {						/* error? */
 	perror ("DQ I/O error");
-	clearerr (uptr -> fileref);
+	clearerr (uptr->fileref);
 	return SCPE_IOERR;  }
 return SCPE_OK;
 }
 
-/* Start disk operation */
-
-void dq_go (int32 fnc, int32 drv, int32 time, int32 dev)
-{
-if (dev && ((dqc_unit[drv].flags & UNIT_ATT) == 0)) {	/* attach check? */
-	dqc_sta[drv] = STA_NRDY;			/* not attached */
-	setFLG (dev);					/* set cch flag */
-	clrCMD (dev);  }				/* clr cch cmd */
-else {	dqc_busy = drv + 1;				/* set busy */
-	dq_ptr = 0;					/* init buf ptr */
-	dqc_eoc = 0;					/* clear end cyl */
-	dqc_unit[drv].FNC = fnc;			/* save function */
-	sim_activate (&dqc_unit[drv], time);  }		/* activate unit */
-return;
-}
-
 /* Reset routine */
 
 t_stat dqc_reset (DEVICE *dptr)
 {
 int32 i;
 
+hp_enbdis_pair (&dqc_dev, &dqd_dev);			/* make pair cons */
 dqd_ibuf = dqd_obuf = 0;				/* clear buffers */
 dqc_busy = dqc_obuf = 0;
-dqc_eoc = 0;
+dqd_xfer = dqd_wval = 0;
 dq_ptr = 0;
-dqc_rarc = dqc_rarh = dqc_rars = 0;			/* clear rar */
 dqc_dib.cmd = dqd_dib.cmd = 0;				/* clear cmd */
 dqc_dib.ctl = dqd_dib.ctl = 0;				/* clear ctl */
 dqc_dib.fbf = dqd_dib.fbf = 1;				/* set fbf */
 dqc_dib.flg = dqd_dib.flg = 1;				/* set flg */
+sim_cancel (&dqd_unit);					/* cancel dch */
 for (i = 0; i < DQ_NUMDRV; i++) {			/* loop thru drives */
 	sim_cancel (&dqc_unit[i]);			/* cancel activity */
 	dqc_unit[i].FNC = 0;				/* clear function */
 	dqc_unit[i].CYL = 0;
-	dqc_sta[i] = (dqc_unit[i].flags & UNIT_ATT)? 0: STA_NRDY;  }
+	dqc_rarc[i] = dqc_rarh[i] = dqc_rars[i] = 0;	/* clear rar */
+	dqc_sta[i] = 0;  }
 return SCPE_OK;
-}
-
-/* Attach routine */
-
-t_stat dqc_attach (UNIT *uptr, char *cptr)
-{
-int32 drv;
-t_stat r;
-
-drv = uptr - dqc_dev.units;				/* get drive no */
-r = attach_unit (uptr, cptr);				/* attach unit */
-if (r != SCPE_OK) return r;
-dqc_sta[drv] = dqc_sta[drv] & ~STA_NRDY;		/* update status */
-return r;
-}
-
-/* Detach routine */
-
-t_stat dqc_detach (UNIT* uptr)
-{
-int32 drv;
-
-drv = uptr - dqc_dev.units;				/* get drive no */
-dqc_sta[drv] = dqc_sta[drv] | STA_NRDY;			/* update status */
-if (drv == (dqc_busy + 1)) dqc_busy = 0;		/* update busy */
-sim_cancel (uptr);					/* cancel op */
-return detach_unit (uptr);				/* detach unit */
 }
 
 /* Write lock/enable routine */
 
 t_stat dqc_vlock (UNIT *uptr, int32 val)
 {
-if (uptr -> flags & UNIT_ATT) return SCPE_ARG;
+if (uptr->flags & UNIT_ATT) return SCPE_ARG;
+return SCPE_OK;
+}
+
+/* 2883/2884 bootstrap routine (subset HP 12992A ROM) */
+
+#define CHANGE_DEV	(1 << 24)
+#define CHANGE_ADDR	(1 << 23)
+
+static const int32 dboot[IBL_LNT] = {
+	0106700+CHANGE_DEV,	/*ST CLC DC		; clr dch */
+	0106701+CHANGE_DEV,	/*   CLC CC		; clr cch */
+	0067771,		/*   LDA SKCMD		; seek cmd */
+	0106600+CHANGE_DEV,	/*   OTB DC		; cyl # */
+	0103700+CHANGE_DEV,	/*   STC DC,C		; to dch */
+	0106601+CHANGE_DEV,	/*   OTB CC		; seek cmd */
+	0103701+CHANGE_DEV,	/*   STC CC,C		; to cch */
+	0102300+CHANGE_DEV,	/*   SFS DC		; addr wd ok? */
+	0027707,		/*   JMP *-1		; no, wait */
+	0006400,		/*   CLB */
+	0106600+CHANGE_DEV,	/*   OTB DC		; head/sector */
+	0103700+CHANGE_DEV,	/*   STC DC,C		; to dch */
+	0102301+CHANGE_DEV,	/*   SFS CC		; seek done? */
+	0027714,		/*   JMP *-1		; no, wait */
+	0063770,		/*   LDA RDCMD		; get read read */
+	0067776,		/*   LDB DMACW		; DMA control */
+	0106606,		/*   OTB 6 */
+	0067772,		/*   LDB ADDR1		; memory addr */
+	0106602,		/*   OTB 2 */
+	0102702,		/*   STC 2		; flip DMA ctrl */
+	0067774,		/*   LDB CNT		; word count */
+	0106602,		/*   OTB 2 */
+	0102601+CHANGE_DEV,	/*   OTA CC		; to cch */
+	0103700+CHANGE_DEV,	/*   STC DC,C		; start dch */
+	0103606,		/*   STC 6,C		; start DMA */
+	0103701+CHANGE_DEV,	/*   STC CC,C		; start cch */
+	0102301+CHANGE_DEV,	/*   SFS CC		; done? */
+	0027732,		/*   JMP *-1		; no, wait */
+	0027775,		/*   JMP XT		; done */
+	0, 0, 0,		/* unused */
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0020000,		/*RDCMD 020000		; read cmd */
+	0030000,		/*SKCMD 030000		; seek cmd */
+	0102011,		/*ADDR1 102011 */
+	0102055,		/*ADDR2 102055 */
+	0164000,		/*CNT   -6144. */
+	0117773,		/*XT JSB ADDR2,I	; start program */
+	0120000+CHANGE_DEV,	/*DMACW 120000+DC */
+	CHANGE_ADDR };		/*   -ST */
+
+t_stat dqc_boot (int32 unitno, DEVICE *dptr)
+{
+int32 i, dev;
+
+if (unitno != 0) return SCPE_NOFNC;			/* only unit 0 */
+dev = dqd_dib.devno;					/* get data chan dev */
+PC = ((MEMSIZE - 1) & ~IBL_MASK) & VAMASK;		/* start at mem top */
+SR = IBL_DQ + (dev << IBL_V_DEV);			/* set SR */
+for (i = 0; i < IBL_LNT; i++) {				/* copy bootstrap */
+	if (dboot[i] & CHANGE_ADDR)			/* memory limit? */
+	    M[PC + i] = (-PC) & DMASK;
+	else if (dboot[i] & CHANGE_DEV)			/* IO instr? */
+	    M[PC + i] = (dboot[i] + dev) & DMASK;
+	else M[PC + i] = dboot[i];  }	
 return SCPE_OK;
 }

@@ -26,6 +26,7 @@
    tti		terminal input
    tto		terminal output
 
+   03-Oct-02	RMS	Added DIBs
    30-May-02	RMS	Widened POS to 32b
    30-Nov-01	RMS	Added extended SET/SHOW support
    17-Sep-01	RMS	Removed multiconsole support
@@ -38,6 +39,9 @@
 #define	UNIT_V_DASHER	(UNIT_V_UF + 0)			/* Dasher mode */
 #define UNIT_DASHER	(1 << UNIT_V_DASHER)
 extern int32 int_req, dev_busy, dev_done, dev_disable;
+
+int32 tti (int32 pulse, int32 code, int32 AC);
+int32 tto (int32 pulse, int32 code, int32 AC);
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
@@ -52,6 +56,8 @@ t_stat ttx_setmod (UNIT *uptr, int32 val, char *cptr);
    ttx_mod	TTI/TTO modifiers list
 */
 
+DIB tti_dib = { DEV_TTI, INT_TTI, PI_TTI, &tti };
+
 UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
@@ -62,7 +68,6 @@ REG tti_reg[] = {
 	{ FLDATA (INT, int_req, INT_V_TTI) },
 	{ DRDATA (POS, tti_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ FLDATA (MODE, tti_unit.flags, UNIT_V_DASHER), REG_HRO },
 	{ NULL }  };
 
 MTAB ttx_mod[] = {
@@ -74,7 +79,8 @@ DEVICE tti_dev = {
 	"TTI", &tti_unit, tti_reg, ttx_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tti_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&tti_dib, 0 };
 
 /* TTO data structures
 
@@ -82,6 +88,8 @@ DEVICE tti_dev = {
    tto_unit	TTO unit descriptor
    tto_reg	TTO register list
 */
+
+DIB tto_dib = { DEV_TTO, INT_TTO, PI_TTO, &tto };
 
 UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
 
@@ -93,14 +101,14 @@ REG tto_reg[] = {
 	{ FLDATA (INT, int_req, INT_V_TTO) },
 	{ DRDATA (POS, tto_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
-	{ FLDATA (MODE, tto_unit.flags, UNIT_V_DASHER), REG_HRO },
 	{ NULL }  };
 
 DEVICE tto_dev = {
 	"TTO", &tto_unit, tto_reg, ttx_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tto_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&tto_dib, 0 };
 
 /* Terminal input: IOT routine */
 

@@ -1,7 +1,6 @@
 /* s3_disk.c: IBM 5444 Disk Drives
 
-   Copyright (c) 2001 Charles E. Owen
-   Copyright (c) 1993-2001, Robert M. Supnik
+   Copyright (c) 2001, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -20,14 +19,16 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
+   Except as contained in this notice, the name of Charles E. Owen shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from Charles E. Owen.
 
    r1	Removeable disk 1
    f1	Fixed disk 1
    r2	Removeable disk 2
    f2	Fixed disk 2
+
+   08-Oct-02	RMS	Added impossible function catcher
 */
 
 #include "s3_defs.h"
@@ -42,19 +43,19 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data);
 int32 read_sector(UNIT *uptr, char *dbuf, int32 sect);
 int32 write_sector(UNIT *uptr, char *dbuf, int32 sect);
 t_stat r1_svc (UNIT *uptr);
-t_stat r1_boot (int32 unitno);
+t_stat r1_boot (int32 unitno, DEVICE *dptr);
 t_stat r1_attach (UNIT *uptr, char *cptr);
 t_stat r1_reset (DEVICE *dptr);
 t_stat f1_svc (UNIT *uptr);
-t_stat f1_boot (int32 unitno);
+t_stat f1_boot (int32 unitno, DEVICE *dptr);
 t_stat f1_attach (UNIT *uptr, char *cptr);
 t_stat f1_reset (DEVICE *dptr);
 t_stat r2_svc (UNIT *uptr);
-t_stat r2_boot (int32 unitno);
+t_stat r2_boot (int32 unitno, DEVICE *dptr);
 t_stat r2_attach (UNIT *uptr, char *cptr);
 t_stat r2_reset (DEVICE *dptr);
 t_stat f2_svc (UNIT *uptr);
-t_stat f2_boot (int32 unitno);
+t_stat f2_boot (int32 unitno, DEVICE *dptr);
 t_stat f2_attach (UNIT *uptr, char *cptr);
 t_stat f2_reset (DEVICE *dptr);
 extern int32 GetMem(int32 addr);
@@ -603,7 +604,9 @@ int32 dsk (int32 disk, int32 op, int32 m, int32 n, int32 data)
 			return ((SCPE_OK << 16) | iodata);
 		default:
 			break;
-	}						
+	}
+	printf (">>DSK%d non-existent function %d\n", disk, op);
+	return SCPE_OK;						
 }
 
 /* Disk unit service.  If a stacker select is active, copy to the
@@ -701,7 +704,7 @@ return attach_unit (uptr, cptr);
 
 /* Bootstrap routine */
 
-t_stat r1_boot (int32 unitno)
+t_stat r1_boot (int32 unitno, DEVICE *dptr)
 {
 int i;
 r1_unit.u3 = 0;
@@ -711,7 +714,7 @@ for (i = 0; i < 256; i++) {
 }
 return SCPE_OK;
 }
-t_stat f1_boot (int32 unitno)
+t_stat f1_boot (int32 unitno, DEVICE *dptr)
 {
 int i;
 f1_unit.u3 = 0;
@@ -721,7 +724,7 @@ for (i = 0; i < 256; i++) {
 }
 return SCPE_OK;
 }
-t_stat r2_boot (int32 unitno)
+t_stat r2_boot (int32 unitno, DEVICE *dptr)
 {
 int i;
 r2_unit.u3 = 0;
@@ -731,7 +734,7 @@ for (i = 0; i < 256; i++) {
 }
 return SCPE_OK;
 }
-t_stat f2_boot (int32 unitno)
+t_stat f2_boot (int32 unitno, DEVICE *dptr)
 {
 int i;
 f2_unit.u3 = 0;

@@ -28,6 +28,7 @@
    tty		316/516-33 teleprinter
    clk/options	316/516-12 real time clocks/internal options
 
+   01-Nov-02	RMS	Added 7b/8b support to terminal
    30-May-02	RMS	Widened POS to 32b
    03-Nov-01	RMS	Implemented upper case for console output
    29-Nov-01	RMS	Added read only unit support
@@ -36,8 +37,11 @@
 
 #include "h316_defs.h"
 #include <ctype.h>
-#define UNIT_V_UC	(UNIT_V_UF + 1)			/* UC only */
-#define UNIT_UC		(1 << UNIT_V_UC)
+
+#define UNIT_V_8B	(UNIT_V_UF + 0)			/* 8B */
+#define UNIT_V_KSR	(UNIT_V_UF + 1)			/* KSR33 */
+#define UNIT_8B		(1 << UNIT_V_8B)
+#define UNIT_KSR	(1 << UNIT_V_KSR)
 
 extern uint16 M[];
 extern int32 PC;
@@ -45,18 +49,21 @@ extern int32 stop_inst;
 extern int32 C, dp, ext, extoff_pending, sc;
 extern int32 dev_ready, dev_enable;
 extern UNIT cpu_unit;
+
 int32 ptr_stopioe = 0, ptp_stopioe = 0;			/* stop on error */
 int32 ptp_power = 0, ptp_ptime;				/* punch power, time */
 int32 tty_mode = 0, tty_buf = 0;			/* tty mode, buf */
 int32 clk_tps = 60;				/* ticks per second */
+
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
-t_stat ptr_boot (int32 unitno);
+t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptp_reset (DEVICE *dptr);
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
+t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
 
@@ -128,8 +135,8 @@ DEVICE ptp_dev = {
 #define TTO	1
 
 UNIT tty_unit[] = {
-	{ UDATA (&tti_svc, UNIT_UC, 0), KBD_POLL_WAIT },
-	{ UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT }  };
+	{ UDATA (&tti_svc, UNIT_KSR, 0), KBD_POLL_WAIT },
+	{ UDATA (&tto_svc, UNIT_KSR, 0), SERIAL_OUT_WAIT }  };
 
 REG tty_reg[] = {
 	{ ORDATA (BUF, tty_buf, 8) },
@@ -140,12 +147,12 @@ REG tty_reg[] = {
 	{ DRDATA (KTIME, tty_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
 	{ DRDATA (TPOS, tty_unit[TTO].pos, 32), PV_LEFT },
 	{ DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
-	{ FLDATA (UC, tty_unit[TTI].flags, UNIT_V_UC), REG_HRO },
 	{ NULL }  };
 
 MTAB tty_mod[] = {
-	{ UNIT_UC, 0, "lower case", "LC", NULL },
-	{ UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
+	{ UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", &tty_set_mode },
+	{ UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
+	{ UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
 	{ 0 }  };
 
 DEVICE tty_dev = {
@@ -259,7 +266,7 @@ static const int32 pboot[] = {
  0100040		/*	SZE */
 };
 
-t_stat ptr_boot (int32 unit)
+t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 
@@ -384,30 +391,34 @@ return dat;
 
 t_stat tti_svc (UNIT *uptr)
 {
-int32 temp;
+int32 out, c;
 
 sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
-temp = temp & 0177;
-if ((tty_unit[TTI].flags & UNIT_UC) && islower (temp))	/* force upper case? */
-	 temp = toupper (temp);
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;	/* no char or error? */
+out = c & 0177;						/* mask echo to 7b */
+if (tty_unit[TTI].flags & UNIT_KSR) {			/* KSR? */
+	if (islower (out)) out = toupper (out);		/* cvt to UC */
+	c = out | 0200;  }				/* add TTY bit */
+else c = c & ((tty_unit[TTI].flags & UNIT_8B)? 0377: 0177);
 if (tty_mode == 0) {					/* input mode? */
-	tty_buf = temp | 0200;				/* put char in buf */
+	tty_buf = c;					/* put char in buf */
 	tty_unit[TTI].pos = tty_unit[TTI].pos + 1;
 	SET_READY (INT_TTY);				/* set flag */
-	sim_putchar (temp);  }				/* echo */
+	sim_putchar (out);  }				/* echo */
 return SCPE_OK;
 }
 
 t_stat tto_svc (UNIT *uptr)
 {
-int32 ch, temp;
+int32 c;
+t_stat r;
 
 SET_READY (INT_TTY);					/* set done flag */
-ch = tty_buf & 0177;					/* get char */
-if ((tty_unit[TTO].flags & UNIT_UC) && islower (ch))	/* force upper case? */
-	 ch = toupper (ch);
-if ((temp = sim_putchar (ch)) != SCPE_OK) return temp;	/* output char */
+if (tty_unit[TTO].flags & UNIT_KSR) {			/* UC only? */
+	c = tty_buf & 0177;				/* mask to 7b */
+	if (islower (c)) c = toupper (c);  }		/* cvt to UC */
+else c = tty_buf & ((tty_unit[TTO].flags & UNIT_8B)? 0377: 0177);
+if ((r = sim_putchar (c)) != SCPE_OK) return r;		/* output char */
 tty_unit[TTO].pos = tty_unit[TTO].pos + 1;
 return SCPE_OK;
 }
@@ -422,6 +433,13 @@ tty_mode = 0;						/* mode = input */
 tty_buf = 0;
 sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* activate poll */
 sim_cancel (&tty_unit[TTO]);				/* cancel output */
+return SCPE_OK;
+}
+
+t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+tty_unit[TTI].flags = (tty_unit[TTI].flags & ~(UNIT_KSR | UNIT_8B)) | val;
+tty_unit[TTO].flags = (tty_unit[TTO].flags & ~(UNIT_KSR | UNIT_8B)) | val;
 return SCPE_OK;
 }
 

@@ -28,6 +28,12 @@
 
    dz		DZ11 terminal multiplexor
 
+   31-Oct-02	RMS	Added 8b support
+   12-Oct-02	RMS	Added autoconfigure support
+   29-Sep-02	RMS	Fixed bug in set number of lines routine
+			Added variable vector support
+			New data structures
+   22-Apr-02	RMS	Updated for changes in sim_tmxr
    28-Apr-02	RMS	Fixed interrupt acknowledge, fixed SHOW DZ ADDRESS
    14-Jan-02	RMS	Added multiboard support
    30-Dec-01	RMS	Added show statistics, set disconnect
@@ -62,6 +68,12 @@
 #if !defined (DZ_LINES)
 #define DZ_LINES	8
 #endif
+#if !defined (DZ_8B_DFLT)
+#define DZ_8B_DFLT	0
+#endif
+
+#define UNIT_V_8B	(UNIT_V_UF + 0)			/* 8b output */
+#define UNIT_8B		(1 << UNIT_V_8B)
 
 #define DZ_MNOMASK	(DZ_MUXES - 1)			/* mask for mux no */
 #define DZ_LNOMASK	(DZ_LINES - 1)			/* mask for lineno */
@@ -136,10 +148,13 @@ uint32 dz_txi = 0;					/* xmt interrupts */
 int32 dz_mctl = 0;					/* modem ctrl enabled */
 int32 dz_auto = 0;					/* autodiscon enabled */
 TMLN dz_ldsc[DZ_MUXES * DZ_LINES] = { 0 };		/* line descriptors */
-TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, NULL };	/* mux descriptor */
+TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, NULL };	/* mux descriptor */
 
+DEVICE dz_dev;
 t_stat dz_rd (int32 *data, int32 PA, int32 access);
 t_stat dz_wr (int32 data, int32 PA, int32 access);
+int32 dz_rxinta (void);
+int32 dz_txinta (void);
 t_stat dz_svc (UNIT *uptr);
 t_stat dz_reset (DEVICE *dptr);
 t_stat dz_attach (UNIT *uptr, char *cptr);
@@ -154,6 +169,7 @@ void dz_clr_txint (int32 dz);
 void dz_set_txint (int32 dz);
 t_stat dz_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dz_show (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dz_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* DZ data structures
@@ -163,9 +179,10 @@ t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
    dz_reg	DZ register list
 */
 
-DIB dz_dib = { 1, IOBA_DZ, IOLN_DZ * DZ_MUXES, &dz_rd, &dz_wr };
+DIB dz_dib = { IOBA_DZ, IOLN_DZ * DZ_MUXES, &dz_rd, &dz_wr,
+		2, IVCL (DZRX), VEC_DZRX, { &dz_rxinta, &dz_txinta } };
 
-UNIT dz_unit = { UDATA (&dz_svc, UNIT_ATTABLE, 0) };
+UNIT dz_unit = { UDATA (&dz_svc, UNIT_ATTABLE + DZ_8B_DFLT, 0) };
 
 REG dz_nlreg = { DRDATA (NLINES, dz_desc.lines, 6), PV_LEFT };
 
@@ -182,23 +199,27 @@ REG dz_reg[] = {
 	{ FLDATA (MDMCTL, dz_mctl, 0) },
 	{ FLDATA (AUTODS, dz_auto, 0) },
 	{ GRDATA (DEVADDR, dz_dib.ba, DZ_RDX, 32, 0), REG_HRO },
-	{ FLDATA (*DEVENB, dz_dib.enb, 0), REG_HRO },
+	{ GRDATA (DEVVEC, dz_dib.vec, DZ_RDX, 16, 0), REG_HRO },
 	{ NULL }  };
 
 MTAB dz_mod[] = {
-	{ UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &dz_summ },
+	{ UNIT_8B, 0, "7b", "7B", NULL },
+	{ UNIT_8B, UNIT_8B, "8b", "8B", NULL },
 	{ MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
 		&tmxr_dscln, NULL, &dz_desc },
+	{ UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &dz_summ },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
 		NULL, &dz_show, NULL },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
 		NULL, &dz_show, NULL },
 	{ MTAB_XTD|MTAB_VDV, 010, "ADDRESS", "ADDRESS",
-		&set_addr, &show_addr, &dz_dib },
-	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
-		&set_enbdis, NULL, &dz_dib },
-	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
-		&set_enbdis, NULL, &dz_dib },
+		&set_addr, &show_addr, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+		&set_vec, &dz_show_vec, NULL },
+#if !defined (VM_PDP10)
+	{ MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
+		&set_addr_flt, NULL, NULL },
+#endif
 	{ MTAB_XTD | MTAB_VDV | MTAB_VAL, 0, "lines", "LINES",
 		&dz_setnl, NULL, &dz_nlreg },
 	{ 0 }  };
@@ -207,7 +228,8 @@ DEVICE dz_dev = {
 	"DZ", &dz_unit, dz_reg, dz_mod,
 	1, DZ_RDX, 8, 1, DZ_RDX, 8,
 	&tmxr_ex, &tmxr_dep, &dz_reset,
-	NULL, &dz_attach, &dz_detach };
+	NULL, &dz_attach, &dz_detach,
+	&dz_dib, DEV_FLTA | DEV_DISABLE | DEV_UBUS | DEV_QBUS };
 
 /* IO dispatch routines, I/O addresses 177601x0 - 177601x7 */
 
@@ -267,8 +289,8 @@ case 01:						/* LPR */
 	dz_lpr[dz] = data;
 	line = (dz * DZ_LINES) + LPR_GETLN (data);	/* get line num */
 	lp = &dz_ldsc[line];				/* get line desc */
-	if (dz_lpr[dz] & LPR_RCVE) lp -> rcve = 1;	/* rcv enb? on */
-	else lp -> rcve = 0;				/* else line off */
+	if (dz_lpr[dz] & LPR_RCVE) lp->rcve = 1;	/* rcv enb? on */
+	else lp->rcve = 0;				/* else line off */
 	tmxr_poll_rx (&dz_desc);			/* poll input */
 	dz_update_rcvi ();				/* update rx intr */
 	break;
@@ -286,8 +308,8 @@ case 02:						/* TCR */
 		    for (i = 0; i < DZ_LINES; i++) {	/* drop hangups */
 			line = (dz * DZ_LINES) + i;	/* get line num */
 			lp = &dz_ldsc[line];		/* get line desc */
-			if (lp -> conn && (drop & (1 << i))) {
-			    tmxr_msg (lp -> conn, "\r\nLine hangup\r\n");
+			if (lp->conn && (drop & (1 << i))) {
+			    tmxr_msg (lp->conn, "\r\nLine hangup\r\n");
 			    tmxr_reset_ln (lp);		/* reset line, cdet */
 			    dz_msr[dz] &= ~(1 << (i + MSR_V_CD));
 			    }				/* end if drop */
@@ -306,7 +328,8 @@ case 03:						/* TDR */
 	if (dz_csr[dz] & CSR_MSE) {			/* enabled? */
 		line = (dz * DZ_LINES) + CSR_GETTL (dz_csr[dz]);
 		lp = &dz_ldsc[line];			/* get line desc */
-		tmxr_putc_ln (lp, dz_tdr[dz] & 0177);	/* store char */
+		tmxr_putc_ln (lp, dz_tdr[dz] &		/* store char */
+		    ((dz_unit.flags & UNIT_8B)? 0377: 0177));
 		tmxr_poll_tx (&dz_desc);		/* poll output */
 		dz_update_xmti ();  }			/* update int */
 	break;  }
@@ -331,7 +354,7 @@ int32 dz, t, newln;
 for (dz = t = 0; dz < DZ_MUXES; dz++)			/* check enabled */
 	t = t | (dz_csr[dz] & CSR_MSE);
 if (t) {						/* any enabled? */
-	newln = tmxr_poll_conn (&dz_desc, uptr);	/* poll connect */
+	newln = tmxr_poll_conn (&dz_desc);		/* poll connect */
 	if ((newln >= 0) && dz_mctl) {			/* got a live one? */
 		dz = newln / DZ_LINES;			/* get mux num */
 		if (dz_tcr[dz] & (1 << (newln + TCR_V_DTR)))	/* DTR set? */
@@ -372,7 +395,7 @@ for (dz = 0; dz < DZ_MUXES; dz++) {			/* loop thru muxes */
 	line = (dz * DZ_LINES) + i;			/* get line num */
 	lp = &dz_ldsc[line];				/* get line desc */
 	scnt[dz] = scnt[dz] + tmxr_rqln (lp);		/* sum buffers */
-	if (dz_mctl && !lp -> conn)			/* if disconn */
+	if (dz_mctl && !lp->conn)			/* if disconn */
 	    dz_msr[dz] &= ~(1 << (i + MSR_V_CD));	/* reset car det */
 	}
     }
@@ -440,7 +463,7 @@ int32 dz;
 for (dz = 0; dz < DZ_MUXES; dz++) {			/* find 1st mux */
 	if (dz_rxi & (1 << dz)) {
 		dz_clr_rxint (dz);			/* clear intr */
-		return (VEC_DZRX + (dz * 010));  }  }	/* return vector */
+		return (dz_dib.vec + (dz * 010));  }  }	/* return vector */
 return 0;
 }
 
@@ -466,7 +489,7 @@ int32 dz;
 for (dz = 0; dz < DZ_MUXES; dz++) {			/* find 1st mux */
 	if (dz_txi & (1 << dz)) {
 		dz_clr_txint (dz);			/* clear intr */
-		return (VEC_DZTX + (dz * 010));  }  }	/* return vector */
+		return (dz_dib.vec + 4 + (dz * 010));  }  }	/* return vector */
 return 0;
 }
 
@@ -494,7 +517,7 @@ return SCPE_OK;
 
 t_stat dz_reset (DEVICE *dptr)
 {
-int32 i;
+int32 i, ndev;
 
 for (i = 0; i < (DZ_MUXES * DZ_LINES); i++)		/* init mux desc */
 	dz_desc.ldsc[i] = &dz_ldsc[i];
@@ -503,7 +526,8 @@ dz_rxi = dz_txi = 0;					/* clr master int */
 CLR_INT (DZRX);
 CLR_INT (DZTX);
 sim_cancel (&dz_unit);					/* stop poll */
-return SCPE_OK;
+ndev = ((dptr->flags & DEV_DIS)? 0: (dz_desc.lines / DZ_LINES));
+return auto_config (RANK_DZ, ndev);			/* auto config */
 }
 
 /* Attach */
@@ -568,7 +592,7 @@ return SCPE_OK;
 
 t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-int32 newln, i, t;
+int32 newln, i, t, ndev;
 t_stat r;
 
 if (cptr == NULL) return SCPE_ARG;
@@ -585,14 +609,16 @@ if (newln < dz_desc.lines) {
 	    tmxr_reset_ln (&dz_ldsc[i]);  }		/* reset line */
 	if ((i % DZ_LINES) == (DZ_LINES - 1))
 	    dz_clear (i / DZ_LINES, TRUE);  }		/* reset mux */
-    dz_dib.lnt = newln;
     }
-else {
-    dz_dib.lnt = newln;					/* set length */
-    if (dev_conflict (dz_dib.ba, &dz_dib)) {		/* chk addr conflict */
-	dz_dib.lnt = dz_desc.lines;
-	return SCPE_OK;  }
-    }
+dz_dib.lnt = (newln / DZ_LINES) * IOLN_DZ;		/* set length */
 dz_desc.lines = newln;
-return SCPE_OK;
+ndev = ((dz_dev.flags & DEV_DIS)? 0: (dz_desc.lines / DZ_LINES));
+return auto_config (RANK_DZ, ndev);			/* auto config */
+}
+
+/* SHOW VECTOR processor */
+
+t_stat dz_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+return show_vec (st, uptr, ((dz_desc.lines * 2) / DZ_LINES), desc);
 }

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-10 Simulator Usage
-Date:	15-Jun-2002
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -39,13 +39,14 @@ This memorandum documents the PDP-10 simulator.
 To compile the PDP-10, you must define USE_INT64 as part of the compilation
 command line.
 
-sim/		sim_defs.h
+sim/		dec_dz.h
+		dec_pt.h
+		sim_defs.h
+		sim_rev.h
 		sim_sock.h
 		sim_tmxr.h
-		dec_dz.h
 		scp.c
 		scp_tty.c
-		sim_rev.c
 		sim_sock.c
 		sim_tmxr.c
 
@@ -63,6 +64,8 @@ sim/pdp10/	pdp10_defs.h
 		pdp10_tu.c
 		pdp10_xtnd.c
 
+sim/pdp11/	pdp11_ry.c
+
 2. PDP-10 Features
 
 The PDP-10 simulator is configured as follows:
@@ -76,14 +79,19 @@ UBA		Unibus adapters (translation maps)
 FE		console
 TIM		timer
 PTR,PTP		PC11 paper tape reader/punch
+RY		RX211/RX02 floppy disk and two drives
 DZ		DZ11 8-line terminal multiplexor (up to 4)
 LP20		LP20 line printer
 RP		RH11/RP04/RP05/RP06/RP07/RM03/RM05/RM80 controller with
 		eight drives
 TU		RH11/TM02/TU45 controller with eight drives
 
-The PTR/PTP are initially set DISABLED.  The DZ11 and LP20 can also be
-set DISABLED.
+The PTR, PTP, and RX211 are initially set DISABLED.  The DZ11 and LP20 can
+also be set DISABLED.  Some devices support the SET ADDRESS command, which
+allows the I/O page address of the device to be changed, and the SET VECTOR
+command, which allows the vector of the device to be changed.  All devices
+support the SHOW ADDRESS and SHOW VECTOR commands, which display the device
+address and vector, respectively.
 
 The PDP-10 simulator implements several unique stop condition:
 
@@ -112,6 +120,7 @@ microcode
 	SET CPU STANDARD	Standard microcode
 	SET CPU TOPS20V41	Standard microcode with TOPS-20 V4.1 bug fix
 	SET CPU ITS		ITS compatible microcode
+	SHOW CPU IOSPACE	show I/O space address map
 
 CPU registers include the visible state of the processor as well as the
 control registers for the interrupt system.
@@ -234,6 +243,9 @@ The paper tape reader (PTR) reads data from a disk file.  The POS
 register specifies the number of the next data item to be read.  Thus,
 by changing POS, the user can backspace or advance the reader.
 
+The paper tape reader requires an unsupported driver under TOPS-10
+and is not supported under TOPS-20 or ITS.
+
 The paper tape reader implements these registers:
 
 	name		size	comments
@@ -268,6 +280,9 @@ The paper tape punch (PTP) writes data to a disk file.  The POS
 register specifies the number of the next data item to be written. 
 Thus, by by changing POS, the user can backspace or advance the punch.
 
+The paper tape punch requires an unsupported driver under TOPS-10
+and is not supported under TOPS-20 or ITS.
+
 The paper tape punch implements these registers:
 
 	name		size	comments
@@ -299,6 +314,13 @@ are supported.  The number of lines can be changed with the command
 	SET DZ LINES=n			set line count to n
 
 The line count must be a multiple of 8, with a maximum of 32.
+
+The DZ11 can support 8-bit input and output of characters.  8-bit
+output is incompatible with TOPS-20 and is off by default.  The command
+
+	SET DZ 8B
+
+allows output characters to be 8 bits.
 
 The terminal lines perform input and output through Telnet sessions
 connected to a user-specified port.  The ATTACH command specifies
@@ -443,12 +465,11 @@ Error handling is as follows:
 
 	error		processed as
 
-	not attached	tape not ready
+	not attached	tape not ready; if STOP_IOE, stop
 
-	end of file	(read or space) end of physical tape
-			(write) ignored
+	end of file	operation incomplete
 
-	OS I/O error	report error and stop
+	OS I/O error	parity error; if STOP_IOE, stop
 
 2.11 LP20 DMA Line Printer (LP20)
 
@@ -492,7 +513,57 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.12 Symbolic Display and Input
+2.12 RX211/RX02 Floppy Disk (RY)
+
+RX211 options include the ability to set units write enabled or write
+locked, single or double density, or autosized:
+
+	SET RYn LOCKED		set unit n write locked
+	SET RYn WRITEENABLED	set unit n write enabled
+	SET RYn SINGLE		set unit n single density
+	SET RYn DOUBLE		set unit n double density (default)
+	SET RYn AUTOSIZE	set unit n autosized
+
+The RX211 supports the BOOT command, but only for double density.
+
+The floppy disk requires an unsupported driver under TOPS-10 and
+is not supported under TOPS-20 or ITS.
+
+The RX211 implements these registers:
+
+	name		size	comments
+
+	RYCS		16	status
+	RYBA		16	buffer address
+	RYWC		8	word count
+	RYDB		16	data buffer
+	RYES		12	error status
+	RYERR		8	error code
+	RYTA		8	current track
+	RYSA		8	current sector
+	STAPTR		4	controller state
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	TR		1	transfer ready flag (CSR<7>)
+	IE		1	interrupt enable flag (CSR<6>)
+	DONE		1	device done flag (CSR<5>)
+	CTIME		24	command completion time
+	STIME		24	seek time, per track
+	XTIME		24	transfer ready delay
+	STOP_IOE	1	stop on I/O error
+	SBUF[0:255]	8	sector buffer array
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RX02 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.13 Symbolic Display and Input
 
 The PDP-10 simulator implements symbolic display and input.  Display is
 controlled by command line switches:

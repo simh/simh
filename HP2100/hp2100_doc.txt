@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	HP2100 Simulator Usage
-Date:	15-Jun-2002
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -37,9 +37,13 @@ This memorandum documents the HP 2100 simulator.
 1. Simulator Files
 
 sim/		sim_defs.h
+		sim_rev.h
+		sim_sock.h
+		sim_tmxr.h
 		scp.c
 		scp_tty.c
-		sim_rev.c
+		sim_sock.c
+		sim_tmxr.c
 
 sim/hp2100/	hp2100_defs.h
 		hp2100_cpu.c
@@ -47,7 +51,8 @@ sim/hp2100/	hp2100_defs.h
 		hp2100_dp.c
 		hp2100_dq.c
 		hp2100_dr.c
-		hp2100_lp.c
+		hp2100_lps.c
+		hp2100_lpt.c
 		hp2100_mt.c
 		hp2100_ms.c
 		hp2100_mux.c
@@ -61,18 +66,25 @@ The HP2100 simulator is configured as follows:
 device		simulates
 name(s)
 
-CPU		2116, 2100, or 21MX CPU with 32KW memory
+CPU		2116 CPU with 32KW memory
+		2100 CPU with 32KW memory, FP or IOP instructions
+		21MX CPU with 1024KW memory, FP or DMS instructions
 DMA0, DMA1	dual channel DMA controller
 PTR,PTP		12597A paper tape reader/punch
-TTY		12631C buffered teleprinter
-LPT		12653A line printer
+TTY		12631C buffered terminal controller
+LPS		12653A printer controller with 2767 printer
+		12566B microcircuit interface for diagnostics
+LPT		12845A printer controller
 CLK		12539A/B/C time base generator
 MUXL,MUXU,MUXC	12920A terminal multiplexor
-DP		12557A/13210A disk controller with four drives
-DQ		12565A disk controller with two drives
-DR		12606A/12610A fixed head disk/drum controller
-MT		12559C magnetic tape controller with one drives
-MS		13181A magnetic tape controller with four drives
+DP		12557A disk controller with four 2871 drives
+		13210A disk controller with four 7900 drives
+DQ		12565A disk controller with two 2883 drives
+DR		12606B fixed head disk controller with 2770/2771 disks
+		12610B drum controller with 2773/2774/2775 drums
+MT		12559C magnetic tape controller with one 3030 drive
+MS		13181A magnetic tape controller with four 7970B drives
+		13183A magnetic tape controller with four 7970E drives
 
 The HP2100 simulator implements several unique stop conditions:
 
@@ -88,46 +100,78 @@ command is not implemented.
 
 CPU options include choice of instruction set and memory size.
 
-	SET CPU 2116		2116 instructions
-	SET CPU 2100		2100 instructions
-	SET CPU 21MX		21MX instructions
+	SET CPU 2116		2116 CPU
+	SET CPU 2100		2100 CPU
+	SET CPU 21MX		21MX CPU
+	SET CPU EAU		EAU instructions (2116 only)
+	SET CPU NOEAU		no EAU instructions (2116 only)
+	SET CPU FP		FP instructions (2100 only)
+	SET CPU NOFP		no FP instructions (2100 only)
+	SET CPU IOP		IOP instructions (2100 only)
+	SET CPU NOIOP		no IOP instructions (2100 only)
+	SET CPU DMS		DMS instructions (21MX only)
+	SET CPU NODMS		no DMS instructions (21MX only)
 	SET CPU 4K		set memory size = 4K
 	SET CPU 8K		set memory size = 8K
 	SET CPU 16K		set memory size = 16K
-	SET CPU 24K		set memory size = 24K
 	SET CPU 32K		set memory size = 32K
+	SET CPU 64K		set memory size = 64K (21MX only)
+	SET CPU 128K		set memory size = 128K (21MX only)
+	SET CPU 256K		set memory size = 256K (21MX only)
+	SET CPU 512K		set memory size = 512K (21MX only)
+	SET CPU 1024K		set memory size = 1024K (21MX only)
+
+On the 2100, EAU is standard, and the FP and IOP options are mutually
+exclusive.  On the 21MX, EAU and FP are standard.  The 2100 and 21MX
+include memory protection as standard; the 21MX optionally includes
+DMS (dynamic memory system).
 
 If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
 portion of memory is lost.  Initial memory size is 32K.
 
+These switches are recognized when examining or depositing in CPU memory:
+
+	-v			if DMS enabled, interpret address as virtual
+	-s			if DMS enabled, force system map
+	-u			if DMS enabled, force user map
+	-p			if DMS enabled, force port A map
+	-q			if DMS enabled, force port B map
+
 CPU registers include the visible state of the processor as well as the
 control registers for the interrupt system.
 
-	name		size	comments
+	name		models		size	comments
 
-	P		15	program counter
-	A		16	A register
-	B		16	B register
-	X		16	X index register (21MX)
-	Y		16	Y index register (21MX)
-	S		16	switch/display register
-	E		1	extend flag
-	O		1	overflow flag
-	ION		1	interrupt enable flag
-	ION_DEFER	1	interrupt defer flag
-	IADDR		6	most recent interrupting device
-	MPCTL		1	memory protection enable (2100, 21MX)
-	MPFLG		1	memory protection flag (2100, 21MX)
-	MPFBF		1	memory protection flag buffer (2100, 21MX)
-	MFENCE		15	memory protection fence (2100, 21MX)
-	MADDR		16	memory protection error address (2100, 21MX)
-	STOP_INST	1	stop on undefined instruction
-	STOP_DEV	1	stop on undefined device
-	INDMAX		1	indirect address limit
-	PCQ[0:63]	15	PC of last JMP, JSB, or interrupt;
-				most recent PC change first
-	WRU		8	interrupt character
+	P		all		15	program counter
+	A		all		16	A register
+	B		all		16	B register
+	X		21MX		16	X index register
+	Y		21MX		16	Y index register
+	S		all		16	switch/display register
+	F		2100,21MX	15	memory protection fence
+	E		all		1	extend flag
+	O		all		1	overflow flag
+	ION		all		1	interrupt enable flag
+	ION_DEFER	all		1	interrupt defer flag
+	IADDR		all		6	most recent interrupting device
+	MPCTL		2100,21MX	1	memory protection enable
+	MPFLG		2100,21MX	1	memory protection flag
+	MPFBF		2100,21MX	1	memory protection flag buffer
+	MPVR		2100,21MX	16	memory protection violation reg
+	MPEVR		2100,21MX	1	memory protection freeze flag
+	MPMEV		2100,21MX	1	memory protection DMS error flag
+	DMSENB		21MX		1	DMS enable
+	DMSCUR		21MX		1	DMS current mode
+	DMSSR		21MX		16	DMS status register
+	DMSVR		21MX		16	DMS violation register
+	DMSMAP[4][32]	21MX		20	DMS maps
+	STOP_INST	all		1	stop on undefined instruction
+	STOP_DEV	all		1	stop on undefined device
+	INDMAX		all		16	indirect address limit
+	PCQ[0:63]	all		15	P of last JMP, JSB, or interrupt;
+						most recent P change first
+	WRU		all		8	interrupt character
 
 2.2 DMA Controllers
 
@@ -140,9 +184,9 @@ DMA channel has the following visible state:
 	CTL		1	interrupt enabled
 	FLG		1	channel ready
 	FBF		1	channel ready buffer
-	CW1		1	command word 1
-	CW2		1	command word 2
-	CW3		1	command word 3
+	CW1		16	command word 1
+	CW2		16	command word 2
+	CW3		16	command word 3
 
 2.3 Variable Device Assignments
 
@@ -165,7 +209,7 @@ The new device number must be in the range 010..077 (octal).  For devices
 with two device numbers, only the lower numbered device number can be
 changed; the higher is automatically set to the lower + 1.  If a
 device number conflict occurs, the simulator will return an error
-message when started.
+when started.
 
 In addition, most devices can be enabled or disabled.  To enable a
 device, use the SET <dev> ENABLED command:
@@ -176,8 +220,8 @@ To disable a device, use the SET <dev> DISABLED command:
 
 	sim> SET DP DISABLED
 
-For devices with two device numbers, disabling or enabling one device
-in the pair disables or enables the other.
+For devices with more than one device number, disabling or enabling any
+device in the set disables all the devices.
 
 2.4 Programmed I/O Devices
 
@@ -243,16 +287,19 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.4.3 12631C Buffered Teleprinter (TTY)
+2.4.3 12631C Buffered Terminal (TTY)
 
-The console teleprinter has three units: keyboard (unit 0), printer
+The console terminal has three units: keyboard (unit 0), printer
 (unit 1), and punch (unit 2).  The keyboard reads from the console
 keyboard; the printer writes to the simulator console window.  The
-punch writes to a disk file.  The keyboard has one option, UC; when
-set, it automatically converts lower case input to upper case.  This
-is on by default.
+punch writes to a disk file.  The keyboard and printer units (TTY0,
+TTY1) can be set to one of three modes: UC, 7B, or 8B.  In UC mode,
+lower case input and output characters are automatically converted to
+upper case.  In 7B mode, input and output characters are masked to 7
+bits.  In 8B mode, characters are not modified.  Changing the mode
+of either unit changes both.  The default mode is UC.
 
-The terminal implements these registers:
+The console teleprinter implements these registers:
 
 	name		size	comments
 
@@ -277,7 +324,52 @@ Error handling for the punch is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.4.4 12653A Line Printer (LPT)
+2.4.4 12653A Printer Controller (LPS) with 2767 Printer
+      12566B Microcircuit Interface
+
+The 12653A line printer uses the 12566B microcircuit interface as
+its controller.  As a line printer, LPS writes data to a disk file.
+The POS register specifies the number of the next data item to be
+written.  Thus, by changing POS, the user can backspace or advance
+the printer.
+
+As a microcircuit interface, LPS provides the DMA test device for
+running the dual channel port controller and DMS diagnostics.  Printer
+mode verus diagnostic mode is controlled by the commands:
+
+	SET LPS PRINTER		configure as line printer
+	SET LPS DIAG		configure for diagnostic tests
+
+The 12653A is disabled by default.
+
+The 12653A implements these registers:
+
+	name		size	comments
+
+	BUF		16	output buffer
+	STA		16	input buffer or status
+	CMD		1	printer enable
+	CTL		1	device/interrupt enable
+	FLG		1	device ready
+	FBF		1	device ready buffer
+	POS		32	position in the output file
+	CTIME		24	time between characters
+	PTIME		24	time for a print operation
+	STOP_IOE	1	stop on I/O error
+
+In printer mode, error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	out of tape or paper
+
+	OS I/O error	x	report error and stop
+
+In diagnostic mode, there are no errors; data sent to the output
+buffer is looped back to the status register with a fixed delay of 1.
+
+2.4.5 12845A Printer Controller (LPT)
 
 The line printer (LPT) writes data to a disk file.  The POS register
 specifies the number of the next data item to be written.  Thus,
@@ -292,6 +384,7 @@ The line printer implements these registers:
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
+	LCNT		7	line count within page
 	POS		32	position in the output file
 	CTIME		24	time between characters
 	PTIME		24	time for a print operation
@@ -306,13 +399,14 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.4.5 12539A/B/C Time Base Generator (CLK)
+2.4.6 12539A/B/C Time Base Generator (CLK)
 
 The time base generator (CLK) implements these registers:
 
 	name		size	comments
 
 	SEL		3	time base select
+	CTR		14	repeat counter for < 1Hz operation
 	CTL		1	device/interrupt enable
 	FLG		1	device ready
 	FBF		1	device ready buffer
@@ -320,7 +414,11 @@ The time base generator (CLK) implements these registers:
 	TIME[0:7]	31	clock intervals, select = 0..7
 	DEVNO		6	current device number (read only)
 
-2.4.6 12920A Terminal Multiplexor (MUXL, MUXU, MUXC)
+The time base generator autocalibrates; the clock interval is adjusted
+up or down so that the clock tracks actual elapsed time.  Operation at
+the fastest rates (100 usec, 1 msec) is not recommended.
+
+2.4.7 12920A Terminal Multiplexor (MUXL, MUXU, MUXC)
 
 The 12920A is a 16-line terminal multiplexor, with five additional
 receive-only diagnostic lines.  It consists of three devices:
@@ -341,10 +439,13 @@ the port to be used:
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.
 
-Each line (each unit of MUXL) supports two options.  UC, when set, causes
-lower case input characters to be automatically converted to upper case.
-DATASET, when set, enables modem control.  By default, UC is on, and
-DATASET is off.
+Each line (each unit of MUXL) can be set to one of three modes: UC, 7B,
+or 8B.  In UC mode, lower case input and output characters are converted
+automatically to upper case.  In 7B mode, input and output characters
+are masked to 7 bits.  In 8B mode, characters are not modified.  The
+default mode is UC.  In addition, each line supports the DATASET option.
+DATASET, when set, enables modem control.  The default settings are UC
+mode and DATASET disabled.
 
 The modem controls model a simplified Bell 103A dataset with just four
 lines: data terminal ready and request to send from the computer to the
@@ -404,7 +505,8 @@ The modem control (MUXM) implements these registers:
 The terminal multiplexor does not support save and restore.  All open
 connections are lost when the simulator shuts down or MUXU is detached.
 
-2.5 12557A/13210A Disk Controller (DP)
+2.5 12557A Disk Controller (DPC, DPD) with 2781 Drives
+    13210A Disk Controller (DPC, DPD) with 7900 Drives
 
 The 12557A/13210A disk controller can be configured as either a
 12557A, supporting 2.5MB drives, or a 13210A, supporting 5MB drives,
@@ -414,12 +516,24 @@ with the commands:
 	SET DP 13210A		5.0MB drives
 
 Drive types cannot be intermixed; the controller is configured for
-one type or the other.
+one type or the other.  The 13210A (for 7900/7901 disks) is selected
+by default.
 
 The simulated controller has two separate devices, a data channel and
 a device controller.  The data channel includes a 128-word (one sector)
 buffer for reads and writes.  The device controller includes the four
 disk drives.  Disk drives can be set ONLINE or OFFLINE.
+
+The 12557A/13210A supports the BOOT command.  BOOT DP loads the IBL
+for 7900 class disks into memory and starts it running.  BOOT -F DP
+boots from the fixed platter (head 2).  The switch register (S) is
+set automatically to the value expected by the IBL loader:
+
+	<15:14>	=	01
+	<13:12>	=	00
+	<11:6>	=	data channel device code
+	<5:1> = 	00000
+	<0> =		1 if booting from the fixed platter
 
 The data channel implements these registers:
 
@@ -433,6 +547,8 @@ The data channel implements these registers:
 	CTL		1	interrupt enable
 	FLG		1	channel ready
 	FBF		1	channel ready buffer
+	XFER		1	transfer in progress flag
+	WVAL		1	write data valid flag
 
 The device controller implements these registers:
 
@@ -440,19 +556,20 @@ The device controller implements these registers:
 
 	OBUF		16	output buffer
 	BUSY		3	busy (unit #, + 1, of active unit)
-	RARC		8	record address register cylinder
-	RARH		2	record address register head
-	RARS		4	record address register sector
 	CNT		5	check record count
 	CMD		1	controller enable
 	CTL		1	interrupt enable
 	FLG		1	controller ready
 	FBF		1	controller ready buffer
 	EOC		1	end of cylinder pending
-	CTIME		24	command delay time
+	RARC[0:3]	8	record address register cylinder, drives 0-3
+	RARH[0:3]	2	record address register head, drives 0-3
+	RARS[0:3]	4	record address register sector, drives 0-3
+	STA[0:3]	16	drive status, drives 0-3
+	CTIME		24	data transfer command delay time
+	DTIME		24	data channel command delay time
 	STIME		24	seek delay time, per cylinder
 	XTIME		24	interword transfer time
-	STA[0:3]	16	drive status, drives 0-3
 
 Error handling is as follows:
 
@@ -464,12 +581,21 @@ Error handling is as follows:
 
 	OS I/O error	report error and stop
 
-2.6 12565A Disk Controller (DP)
+2.6 12565A Disk Controller (DQC, DRC) with 2883 Drives
 
 The 12565A disk controller has two separate devices, a data channel and
 a device controller.  The data channel includes a 128-word (one sector)
 buffer for reads and writes.  The device controller includes the two
 disk drives.  Disk drives can be set ONLINE or OFFLINE.
+
+The 12565A supports the BOOT command.  BOOT DQ loads the IBL for 2883
+class disks into memory and starts it running.  The switch register (S)
+is set automatically to the value expected by the IBL loader:
+
+	<15:14>	=	01
+	<13:12>	=	10
+	<11:6>	=	data channel device code
+	<5:0> = 	00000
 
 The data channel implements these registers:
 
@@ -483,6 +609,8 @@ The data channel implements these registers:
 	CTL		1	interrupt enable
 	FLG		1	channel ready
 	FBF		1	channel ready buffer
+	XFER		1	transfer in progress flag
+	WVAL		1	write data valid flag
 
 The device controller implements these registers:
 
@@ -490,19 +618,19 @@ The device controller implements these registers:
 
 	OBUF		16	output buffer
 	BUSY		2	busy (unit #, + 1, of active unit)
-	RARC		8	record address register cylinder
-	RARH		5	record address register head
-	RARS		5	record address register sector
-	CNT		5	check record count
+	CNT		9	check record count
 	CMD		1	controller enable
 	CTL		1	interrupt enable
 	FLG		1	controller ready
 	FBF		1	controller ready buffer
-	EOC		1	end of cylinder pending
-	CTIME		24	command delay time
+	RARC[0:1]	8	record address register cylinder, drives 0-1
+	RARH[0:1]	5	record address register head, drives 0-1
+	RARS[0:1]	5	record address register sector, drives 0-1
+	STA[0:1]	16	drive status, drives 0-3
+	CTIME		24	data transfer command delay time
+	DTIME		24	data channel command delay time
 	STIME		24	seek delay time, per cylinder
 	XTIME		24	interword transfer time
-	STA[0:3]	16	drive status, drives 0-3
 
 Error handling is as follows:
 
@@ -514,22 +642,28 @@ Error handling is as follows:
 
 	OS I/O error	report error and stop
 
-2.7 12606A/12610A Fixed Head Disk/Drum Controller (DR)
+2.7 12606B Fixed Head Disk Controller (DRC, DRD) with 2770/2771 Disk
+    12610B Drum Controller (DRC, DRD) with 2773/2774/2775 Drum
 
-The 12606A/12610A fixed head disk/drum controller has two separate devices,
+The 12606B/12610B fixed head disk/drum controller has two separate devices,
 a data channel and a device controller.  The device controller includes the
 actual drive.  Ten different models are supported:
 
-	SET DR 180K		12606A, 180K words
-	SET DR 360K		12606A, 360K words
-	SET DR 720K		12606A, 720K words
-	SET DR 384K		12610A, 384K words
-	SET DR 512K		12610A, 512K words
-	SET DR 640K		12610A, 640K words
-	SET DR 768K		12610A, 768K words
-	SET DR 896K		12610A, 896K words
-	SET DR 1024K		12610A, 1024K words
-	SET DR 1536K		12610A, 1536K words 
+	SET DRC 180K		12606B, 180K words
+	SET DRC 360K		12606B, 360K words
+	SET DRC 720K		12606B, 720K words
+	SET DRC 384K		12610B, 84K words
+	SET DRC 512K		12610B, 512K words
+	SET DRC 640K		12610B, 640K words
+	SET DRC 768K		12610B, 768K words
+	SET DRC 896K		12610B, 896K words
+	SET DRC 1024K		12610B, 1024K words
+	SET DRC 1536K		12610B, 1536K words 
+
+The 12606B/12610B support the BOOT command.  The BOOT command loads the
+first sector from the disk or drum into locations 0-77 and then jumps to 77.
+This is very different from the IBL loader protocol used by the 12565A and
+the 12557A/13210A.
 
 The data channel implements these registers:
 
@@ -562,18 +696,25 @@ Error handling is as follows:
 
 	not attached	disk not ready
 
-2.8 12559C Magnetic Tape (MT)
+12606B/12610B data files are buffered in memory; therefore, end of file
+and OS I/O errors cannot occur.
+
+2.8 12559C Magnetic Tape Controller (MTC, MTD) with 3030 Drive
 
 Magnetic tape options include the ability to make the unit write enabled
 or write locked.
 
-	SET MT LOCKED		set unit write locked
-	SET MT WRITEENABLED	set unit write enabled
+	SET MTC LOCKED		set unit write locked
+	SET MTC WRITEENABLED	set unit write enabled
 
 The 12559C mag tape drive has two separate devices, a data channel and
 a device controller.  The data channel includes a maximum record sized
 buffer for reads and writes.  The device controller includes the tape
 unit.
+
+The BOOT command is not supported.  The 12559C was HP's earliest tape
+drive and is not supported by most of its operating systems.  It is
+disabled by default.
 
 The data channel implements these registers:
 
@@ -605,25 +746,40 @@ Error handling is as follows:
 
 	error			processed as
 
-	not attached		tape not ready
+	not attached		tape not ready; if STOP_IOE, stop
 
-	end of file		(read or space) end of physical tape
-				(write) ignored
+	end of file		parity error
 
-	OS I/O error		report error and stop
+	OS I/O error		parity error; if STOP_IOE, stop
 
-2.9 13181A Magnetic Tape (MS)
+2.9 13181A Magnetic Tape Controller (MSC, MSD) with 7970B Drives
+    18183A Magnetic Tape Controller (MSC, MSD) with 7970E Drives
 
 Magnetic tape options include the ability to make the unit write enabled
-or write locked.
+or write locked, and the ability to select the 13181A (800 bpi) controller
+or the 13183A (1600 bpi) controller.
 
-	SET MT LOCKED		set unit write locked
-	SET MT WRITEENABLED	set unit write enabled
+	SET MTn LOCKED		set unit n write locked
+	SET MTn WRITEENABLED	set unit n write enabled
+	SET MT 13181A		set controller to 13181A
+	SET MT 13183A		set controller to 13183A
 
-The 13181A mag tape drive has two separate devices, a data channel and
-a device controller.  The data channel includes a maximum record sized
-buffer for reads and writes.  The device controller includes the tape
-units.
+The 13181A/13183A mag tape drive has two separate devices, a data channel
+and a device controller.  The data channel includes a maximum record
+sized buffer for reads and writes.  The device controller includes the
+tape units.
+
+The 13181A/13183A supports the BOOT command.  BOOT MS loads the IBL for
+7970B/E magnetic tape drives into memory and starts it running.  BOOT -S
+MS causes the loader to space forward the number of files specified in
+the A register before starting to load data.  The switch register (S) is
+set automatically to the value expected by the IBL loader:
+
+	<15:14>	=	10
+	<13:12>	=	00
+	<11:6>	=	data channel device code
+	<5:1> = 	00000
+	<0> =		1 if space forward before loading
 
 The data channel implements these registers:
 
@@ -657,12 +813,11 @@ Error handling is as follows:
 
 	error			processed as
 
-	not attached		tape not ready
+	not attached		tape not ready; if STOP_IOE, stop
 
-	end of file		(read or space) end of physical tape
-				(write) ignored
+	end of file		parity error
 
-	OS I/O error		report error and stop
+	OS I/O error		parity error; if STOP_IOE, stop
 
 2.10 Symbolic Display and Input
 

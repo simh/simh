@@ -25,6 +25,7 @@
 
    cpu		CVAX central processor
 
+   29-Sep-02	RMS	Revised to build dib_tab dynamically
    14-Jul-02	RMS	Added halt to console, infinite loop detection
 			(from Mark Pizzolato)
    02-May-02	RMS	Fixed bug in indexed autoincrement register logging
@@ -125,11 +126,10 @@
    2. Interrupt requests are maintained in the int_req array, one word per
       interrupt level, one bit per device.
 
-   3. Adding I/O devices.  This requires modifications to three modules:
+   3. Adding I/O devices.  These modules must be modified:
 
-	vax_defs.h		add interrupt request definitions
-	vax_mm.c		add I/O page linkages
-	vax_sys.c		add to sim_devices
+	vax_defs.h	add device address and interrupt definitions
+	vax_sys.c	add sim_devices table entry
 */
 
 /* Definitions */
@@ -231,6 +231,7 @@ extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
 extern UNIT clk_unit;
 
+extern t_stat build_dib_tab (void);
 extern UNIT rom_unit, nvr_unit;
 extern int32 op_ashq (int32 *opnd, int32 *rh, int32 *flg);
 extern int32 op_emul (int32 mpy, int32 mpc, int32 *rh);
@@ -300,8 +301,10 @@ extern int32 get_vector (int32 lvl);
 extern void set_map_reg (void);
 extern void rom_wr (int32 pa, int32 val, int32 lnt);
 extern uint16 drom[NUM_INST][MAX_SPEC + 1];
+extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
+
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_boot (int32 unitno);
+t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -376,6 +379,8 @@ MTAB cpu_mod[] = {
 	{ UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size },
 	{ UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL },
 	{ UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
+	  NULL, &show_iospace },
 	{ MTAB_XTD|MTAB_VDV, 0, NULL, "VIRTUAL", &cpu_show_virt },
 	{ 0 }  };
 
@@ -383,14 +388,17 @@ DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
 	1, 16, 32, 1, 16, 8,
 	&cpu_ex, &cpu_dep, &cpu_reset,
-	&cpu_boot, NULL, NULL };
+	&cpu_boot, NULL, NULL,
+	NULL, 0 };
 
 t_stat sim_instr (void)
 {
 volatile int32 opc, cc;					/* used by setjmp */
 int32 acc;						/* set by setjmp */
 int abortval;
+t_stat r;
 
+if ((r = build_dib_tab ()) != SCPE_OK) return r;	/* build, chk dib_tab */
 cc = PSL & CC_MASK;					/* split PSL */
 PSL = PSL & ~CC_MASK;
 in_ie = 0;						/* not in exc */
@@ -403,7 +411,7 @@ sim_rtcn_init (clk_unit.wait, TMR_CLK);			/* init clock */
 abortval = setjmp (save_env);				/* set abort hdlr */
 if (abortval > 0) {					/* sim stop? */
 	PSL = PSL | cc;					/* put PSL together */
-	pcq_r -> qptr = pcq_p;				/* update pc q ptr */
+	pcq_r->qptr = pcq_p;				/* update pc q ptr */
 	return abortval;  }				/* return to SCP */
 else if (abortval < 0) {				/* mm or rsrv or int */
 	int32 i, temp, st1, st2, hsir;
@@ -2237,7 +2245,7 @@ mapen = 0;
 if (M == NULL) M = calloc (MEMSIZE >> 2, sizeof (int32));
 if (M == NULL) return SCPE_MEM;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r -> qptr = 0;
+if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -2245,12 +2253,16 @@ return SCPE_OK;
 
 /* Bootstrap */
 
-t_stat cpu_boot (int32 unitno)
+t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 extern int32 clk_csr;
 extern t_stat qba_powerup (void);
 extern t_stat sysd_powerup (void);
 extern t_stat todr_powerup (void);
+extern uint32 *rom;
+extern t_stat load_cmd (int32 flag, char *cptr);
+extern FILE *sim_log;
+t_stat r;
 
 qba_powerup ();
 sysd_powerup ();
@@ -2259,6 +2271,13 @@ PC = ROMBASE;
 PSL = PSL_IS | PSL_IPL1F;
 conpc = 0;
 conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
+if (rom == NULL) return SCPE_IERR;
+if (*rom == 0) {					/* no boot? */
+	printf ("Loading boot code from ka655.bin\n");
+	if (sim_log) fprintf (sim_log,
+		"Loading boot code from ka655.bin\n");
+	r = load_cmd (0, "-R ka655.bin");
+	if (r != SCPE_OK) return r;  }
 return SCPE_OK;
 }
 

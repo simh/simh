@@ -174,7 +174,7 @@ int32 pos = opnd[0];
 int32 size = opnd[1];
 int32 rn = opnd[2];
 uint32 wd = opnd[3];
-int32 ba, wd1;
+int32 ba, wd1 = 0;
 
 if (size == 0) return 0;				/* size 0? field = 0 */
 if (size > 32) RSVD_OPND_FAULT;				/* size > 32? fault */

@@ -26,6 +26,7 @@
 
    plt		plotter
 
+   03-Oct-02	RMS	Added DIB
    30-May-02	RMS	Widened POS to 32b
    06-Jan-02	RMS	Revised enable/disable support
    26-Apr-01	RMS	Added device enable/disable support
@@ -33,8 +34,12 @@
 
 #include "nova_defs.h"
 
-extern int32 int_req, dev_busy, dev_done, dev_disable, iot_enb;
+extern int32 int_req, dev_busy, dev_done, dev_disable;
+
 int32 plt_stopioe = 0;					/* stop on error */
+
+DEVICE plt_dev;
+int32 plt (int32 pulse, int32 code, int32 AC);
 t_stat plt_svc (UNIT *uptr);
 t_stat plt_reset (DEVICE *dptr);
 
@@ -44,6 +49,8 @@ t_stat plt_reset (DEVICE *dptr);
    plt_unit	PLT unit descriptor
    plt_reg	PLT register list
 */
+
+DIB plt_dib = { DEV_PLT, INT_PLT, PI_PLT, &plt };
 
 UNIT plt_unit = {
 	UDATA (&plt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
@@ -57,19 +64,14 @@ REG plt_reg[] = {
 	{ DRDATA (POS, plt_unit.pos, 32), PV_LEFT },
 	{ DRDATA (TIME, plt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, plt_stopioe, 0) },
-	{ FLDATA (*DEVENB, iot_enb, INT_V_PLT), REG_HRO },
 	{ NULL }  };
 
-MTAB plt_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, INT_PLT, NULL, "ENABLED", &set_enb },
-	{ MTAB_XTD|MTAB_VDV, INT_PLT, NULL, "DISABLED", &set_dsb },
-	{ 0 } };
-
 DEVICE plt_dev = {
-	"PLT", &plt_unit, plt_reg, plt_mod,
+	"PLT", &plt_unit, plt_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &plt_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&plt_dib, DEV_DISABLE };
 
 /* plotter: IOT routine */
 

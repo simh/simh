@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   18-Oct-02	RMS	Fixed bug in symbolic decode (found by Hans Pufal)
 */
 
 #include "gri_defs.h"
@@ -320,7 +322,7 @@ src = I_GETSRC (inst);					/* get fields */
 op = I_GETOP (inst);
 dst = I_GETDST (inst);
 bop = op >> 2;						/* bus op */
-for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
+for (i = 0; opcode[i] != NULL; i++) {			/* loop thru ops */
     j = (opc_val[i] >> F_V_FL) & F_M_FL;		/* get class */
     if ((opc_val[i] & DMASK) == (inst & masks[j])) {	/* match? */
 

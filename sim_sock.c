@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Oct-02	RMS	Revised for .NET compatibility
+   22-Aug-02	RMS	Changed calling sequence for sim_accept_conn
    22-May-02	RMS	Added OS2 EMX support from Holger Veit
    06-Feb-02	RMS	Added VMS support from Robert Alan Byer
    16-Sep-01	RMS	Added Macintosh support from Peter Schorn
@@ -53,7 +55,7 @@ SOCKET sim_master_sock (int32 port)
 return INVALID_SOCKET;
 }
 
-SOCKET sim_accept_conn (SOCKET master, UNIT *uptr)
+SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr)
 {
 return INVALID_SOCKET;
 }
@@ -88,12 +90,12 @@ SOCKET newsock;
 struct sockaddr_in name;
 int32 sta;
 
-#if defined (_WIN32)
+#if defined (WIN32)
 WORD wVersionRequested; 
 WSADATA wsaData; 
-wVersionRequested = MAKEWORD(1, 1); 
+wVersionRequested = MAKEWORD (1, 1); 
  
-sta = WSAStartup(wVersionRequested, &wsaData);		/* start Winsock */ 
+sta = WSAStartup (wVersionRequested, &wsaData);		/* start Winsock */ 
 if (sta != 0) {
 	printf ("Winsock: startup error %d\n", sta);
 	return sta;  }
@@ -127,12 +129,12 @@ if (sta == SOCKET_ERROR) {				/* listen error? */
 return newsock;						/* got it! */
 }
 
-SOCKET sim_accept_conn (SOCKET master, UNIT *uptr, uint32 *ipaddr)
+SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr)
 {
 int32 sta;
 #if defined (macintosh) 
 socklen_t size;
-#elif defined (__EMX__)
+#elif defined (WIN32) || defined (__EMX__)
 int size;
 #else 
 size_t size; 
@@ -140,8 +142,7 @@ size_t size;
 SOCKET newsock;
 struct sockaddr_in clientname;
 
-if ((uptr -> flags & UNIT_ATT) == 0)			/* not attached? */
-	 return INVALID_SOCKET;
+if (master == 0) return INVALID_SOCKET;			/* not attached? */
 size = sizeof (clientname);
 newsock = accept (master, (struct sockaddr *) &clientname, &size);
 if (newsock == INVALID_SOCKET) {			/* error? */
@@ -178,7 +179,7 @@ return send (sock, msg, nbytes, 0);
 
 void sim_close_sock (SOCKET sock, t_bool master)
 {
-#if defined (_WIN32)
+#if defined (WIN32)
 closesocket (sock);
 if (master) WSACleanup ();
 #else
@@ -187,21 +188,23 @@ close (sock);
 return;
 }
 
-#if defined (_WIN32)
+#if defined (WIN32)					/* Windows */
 SOCKET sim_setnonblock (SOCKET sock)
 {
 unsigned long non_block = 1;
 
 return ioctlsocket (sock, FIONBIO, &non_block);		/* set nonblocking */
 }
-#elif defined (VMS)
+
+#elif defined (VMS)					/* VMS */
 SOCKET sim_setnonblock (SOCKET sock)
 {
 int non_block = 1;
 
 return ioctl (sock, FIONBIO, &non_block);		/* set nonblocking */
 }
-#else
+
+#else							/* Mac, Unix, OS/2 */
 int32 sim_setnonblock (SOCKET sock)
 {
 int32 fl, sta;
@@ -210,12 +213,13 @@ fl = fcntl (sock, F_GETFL,0);				/* get flags */
 if (fl == -1) return SOCKET_ERROR;
 sta = fcntl (sock, F_SETFL, fl | O_NONBLOCK);		/* set nonblock */
 if (sta == -1) return SOCKET_ERROR;
-#if !defined (macintosh) && !defined (__EMX__)
+#if !defined (macintosh) && !defined (__EMX__)		/* Unix only */
 sta = fcntl (sock, F_SETOWN, getpid());			/* set ownership */
 if (sta == -1) return SOCKET_ERROR;
 #endif
 return 0;
 }
-#endif							/* endif !Win32 */
 
-#endif							/* endif Win32/UNIX/Mac/VMS */
+#endif							/* endif !Win32 && !VMS */
+
+#endif							/* end else !implemented */

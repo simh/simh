@@ -25,6 +25,7 @@
 
    tim		timer subsystem
 
+   29-Jan-02	RMS	New data structures
    06-Jan-02	RMS	Added enable/disable support
    02-Dec-01	RMS	Fixed bug in ITS PC sampling (found by Dave Conroy)
    31-Aug-01	RMS	Changed int64 to t_int64 for Windoze
@@ -55,6 +56,7 @@ d10 quant = 0;						/* ITS quantum */
 int32 diagflg = 0;					/* diagnostics? */
 int32 tmxr_poll = TIM_DELAY * DZ_MULT;			/* term mux poll */
 
+DEVICE tim_dev;
 t_stat tcu_rd (int32 *data, int32 PA, int32 access);
 extern t_stat wr_nop (int32 data, int32 PA, int32 access);
 t_stat tim_svc (UNIT *uptr);
@@ -72,7 +74,7 @@ extern int32 pi_eval (void);
    tim_reg	TIM register list
 */
 
-DIB tcu_dib = { 1, IOBA_TCU, IOLN_TCU, &tcu_rd, &wr_nop };
+DIB tcu_dib = { IOBA_TCU, IOLN_TCU, &tcu_rd, &wr_nop, 0 };
 
 UNIT tim_unit = { UDATA (&tim_svc, 0, 0), TIM_DELAY };
 
@@ -90,18 +92,15 @@ MTAB tim_mod[] = {
 	{ UNIT_Y2K, 0, "non Y2K OS", "NOY2K", NULL },
 	{ UNIT_Y2K, UNIT_Y2K, "Y2K OS", "Y2K", NULL },
 	{ MTAB_XTD|MTAB_VDV, 000, "ADDRESS", NULL,
-		NULL, &show_addr, &tcu_dib },
-	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
-		&set_enbdis, NULL, &tcu_dib },
-	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
-		&set_enbdis, NULL, &tcu_dib },
+		NULL, &show_addr, NULL },
 	{ 0 }  };
 
 DEVICE tim_dev = {
 	"TIM", &tim_unit, tim_reg, tim_mod,
 	1, 0, 0, 0, 0, 0,
 	NULL, NULL, &tim_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&tcu_dib, DEV_DISABLE | DEV_UBUS };
 
 /* Timer instructions */
 
@@ -179,21 +178,21 @@ struct tm *tptr;
 curtim = time (NULL);					/* get time */
 tptr = localtime (&curtim);				/* decompose */
 if (tptr == NULL) return SCPE_NXM;			/* Y2K prob? */
-if ((tptr -> tm_year > 99) && !(tim_unit.flags & UNIT_Y2K))
-	tptr -> tm_year = 99; 
+if ((tptr->tm_year > 99) && !(tim_unit.flags & UNIT_Y2K))
+	tptr->tm_year = 99; 
 
 switch ((PA >> 1) & 03) {				/* decode PA<3:1> */
 case 0:							/* year/month/day */
-	*data = (((tptr -> tm_year) & 0177) << 9) |
-		(((tptr -> tm_mon + 1) & 017) << 5) |
-		((tptr -> tm_mday) & 037);
+	*data = (((tptr->tm_year) & 0177) << 9) |
+		(((tptr->tm_mon + 1) & 017) << 5) |
+		((tptr->tm_mday) & 037);
 	return SCPE_OK;
 case 1:							/* hour/minute */
-	*data = (((tptr -> tm_hour) & 037) << 8) |
-		((tptr -> tm_min) & 077);
+	*data = (((tptr->tm_hour) & 037) << 8) |
+		((tptr->tm_min) & 077);
 	return SCPE_OK;
 case 2:							/* second */
-	*data = (tptr -> tm_sec) & 077;
+	*data = (tptr->tm_sec) & 077;
 	return SCPE_OK;
 case 3:							/* status */
 	*data = CSR_DONE;

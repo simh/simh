@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-1 Simulator Usage
-Date:	15-Jun-02
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -37,12 +37,17 @@ This memorandum documents the PDP-1 simulator.
 1. Simulator Files
 
 sim/		sim_defs.h
+		sim_rev.h
+		sim_sock.h
+		sim_tmxr.h
 		scp.c
 		scp_tty.c
-		sim_rev.c
+		sim_sock.c
+		sim_tmxr.c
 
 sim/pdp1/	pdp1_defs.h
 		pdp1_cpu.c
+		pdp1_dt.c
 		pdp1_lp.c
 		pdp1_stddev.c
 		pdp1_sys.c
@@ -58,6 +63,7 @@ CPU		PDP-1 CPU with up to 64KW of memory
 PTR,PTP		integral paper tape reader/punch
 TTI,TTO		Flexowriter typewriter input/output
 LPT		Type 62 line printer
+DT		Type 550 Microtape (DECtape)
 
 The PDP-1 simulator implements the following unique stop conditions:
 
@@ -212,6 +218,9 @@ The paper line printer (LPT) writes data to a disk file.  The POS
 register specifies the number of the next data item to be written.
 Thus, by changing POS, the user can backspace or advance the printer.
 
+The line printer can be disabled and enabled with the SET LPT DISABLED
+and SET LPT ENABLED commands, respectively.
+
 The line printer implements these registers:
 
 	name		size	comments
@@ -235,7 +244,64 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.3 Symbolic Display and Input
+2.3 Type 550/555 Microtape (DECtape) (DT)
+
+The PDP-1 used the Type 550 Microtape (later renamed DECtape), a programmed
+I/O controller.  PDP-1 DECtape format had 4 18b words in its block headers
+and trailers.
+
+DECtapes drives are numbered 1-8; in the simulator, drive 8 is unit 0.
+DECtape options include the ability to make units write enabled or write
+locked.
+
+	SET DTn WRITEENABLED	set unit n write enabled
+	SET DTn LOCKED		set unit n write locked
+
+Units can also be set ONLINE or OFFLINE.
+
+The DECtape controller can be disabled and enabled with the SET DT DISABLED
+and SET DT ENABLED commands, respectively.
+
+The Type 550 supports PDP-8 format, PDP-11 format, and 18b format DECtape
+images.  ATTACH tries to determine the tape format from the DECtape image;
+the user can force a particular format with switches:
+
+	-r			PDP-8 format
+	-s			PDP-11 format
+	-t			18b format
+
+The DECtape controller is a data-only simulator; the timing and mark
+track, and block header and trailer, are not stored.  Thus, the WRITE
+TIMING AND MARK TRACK function is not supported; the READ ALL function
+always returns the hardware standard block header and trailer; and the
+WRITE ALL function dumps non-data words into the bit bucket.
+
+The DECtape controller implements these registers:
+
+	name		size	comments
+
+	DTSA		12	status register A
+	DTSB		12	status register B
+	DTDB		18	data buffer
+	DTF		1	DECtape flag
+	BEF		1	block end flag
+	ERF		1	error flag
+	LTIME		31	time between lines
+	ACTIME		31	time to accelerate to full speed
+	DCTIME		31	time to decelerate to a full stop
+	SUBSTATE	2	read/write command substate
+	POS[0:7]	32	position, in lines, units 0-7
+	STATT[0:7]	18	unit state, units 0-7
+
+It is critically important to maintain certain timing relationships
+among the DECtape parameters, or the DECtape simulator will fail to
+operate correctly.
+
+	- LTIME must be at least 6
+	- ACTIME must be less than DCTIME, and both need to be at
+	  least 100 times LTIME
+
+2.4 Symbolic Display and Input
 
 The PDP-1 simulator implements symbolic display and input.  Display is
 controlled by command line switches:
@@ -295,7 +361,7 @@ Finally, the LAW instruction has the format
 
 where immediate is in the range 0 to 07777.
 
-2.4 Character Sets
+2.5 Character Sets
 
 The PDP-1's console was a Frieden Flexowriter; its character encoding
 was known as FIODEC.  The PDP-1's line printer used a modified Hollerith

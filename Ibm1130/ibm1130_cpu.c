@@ -1,27 +1,20 @@
 /* ibm1130_cpu.c: IBM 1130 CPU simulator
 
-   Copyright (c) 2002, Brian Knittel
-   Based on PDP-11 simulator written by Robert M Supnik
+   Based on the SIMH package written by Robert M Supnik
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * (C) Copyright 2002, Brian Knittel.
+ * You may freely use this program, but: it offered strictly on an AS-IS, AT YOUR OWN
+ * RISK basis, there is no warranty of fitness for any purpose, and the rest of the
+ * usual yada-yada. Please keep this notice and the copyright in any distributions
+ * or modifications.
+ *
+ * This is not a supported product, but I welcome bug reports and fixes.
+ * Mail to sim@ibm1130.org
 
    25-Jun-01 BLK	Written
+   10-May-02 BLK	Fixed bug in MDX instruction
    27-Mar-02 BLK	Made BOSC work even in short form
+   16-Aug-02 BLK	Fixed bug in multiply instruction; didn't work with negative values
 
    The register state for the IBM 1130 CPU is:
 
@@ -40,7 +33,6 @@
    WRU				simulator-break character
    IntRun			Int Run flag (causes level 5 interrupt after every instruction)
    ILSW0..5			interrupt level status words
-   IPS				instructions per second throttle (not a real 1130 register)
 
    The SAR (storage address register) and SBR (storage buffer register) are updated
    but not saved in the CPU state; they matter only to the GUI.
@@ -129,7 +121,28 @@
 
 #define save_ibkpt	(cpu_unit.u3)			/* will be SAVEd */
 
-#define UPDATE_INTERVAL	2500	 			// GUI: set to 100000/f where f = desired updates/second of 1130 time
+#define UPDATE_BY_TIMER
+#define ENABLE_BACKTRACE
+#define CGI_SUPPORT
+
+static void cgi_start(void);
+static void cgi_stop(t_stat reason);
+
+// hook pointers from scp.c
+void (*sim_vm_init) (void) = &sim_init;
+extern char* (*sim_vm_read) (char *ptr, int32 size, FILE *stream);
+extern void (*sim_vm_post) (t_bool from_scp);
+extern CTAB *sim_vm_cmd;
+
+// space to store extra simulator-specific commands
+#define MAX_EXTRA_COMMANDS 10
+CTAB x_cmds[MAX_EXTRA_COMMANDS];
+
+#ifdef WIN32
+#   define CRLF "\r\n"
+#else
+#   define CRLF "\n"
+#endif
 
 /* ------------------------------------------------------------------------
  * initializers for globals
@@ -138,17 +151,10 @@
 #define SIGN_BIT(v)   ((v) & 0x8000)
 #define DWSIGN_BIT(v) ((v) & 0x80000000)
 
-#define MODE_SS				3		/* RUNMODE values. SS and SMC are not implemented in this simulator */
-#define MODE_SMC			2
-#define MODE_INT_RUN		1
-#define MODE_RUN			0
-#define MODE_SI				-1
-#define MODE_DISP			-2
-#define MODE_LOAD			-3
-
-uint16 M[MAXMEMSIZE];				/* core memory, up to 32Kwords */
+uint16 M[MAXMEMSIZE];				/* core memory, up to 32Kwords (note: don't even think about trying 64K) */
 uint16 ILSW[6] = {0,0,0,0,0,0};		/* interrupt level status words */
 int32 IAR;							/* instruction address register */
+int32 prev_IAR;						/* instruction address register at start of current instruction */
 int32 SAR, SBR;						/* storage address/buffer registers */
 int32 OP, TAG, CCC;					/* instruction decoded pieces */
 int32 CES;							/* console entry switches */
@@ -159,15 +165,22 @@ int32 iplpending = 0;				/* interrupted IPL's */
 int32 tbit = 0;						/* trace flag (causes level 5 IRQ after each instr) */
 int32 V = 0, C = 0;					/* condition codes */
 int32 wait_state = 0;				/* wait state (waiting for an IRQ) */
+int32 wait_lamp = TRUE;				/* alternate indicator to light the wait lamp on the GUI */
 int32 int_req = 0;					/* sum of interrupt request levels active */
+int32 int_lamps = 0;				/* accumulated version of int_req - gives lamp persistence */
 int32 int_mask;						/* current active interrupt mask (ipl sensitive) */
-int32 SR = 0;						/* switch register */
-int32 DR = 0;						/* display register */
 int32 mem_mask;
-int32 IPS = 0;						/* throttle: instructions per second */
+int32 cpu_dsw = 0;					/* CPU device status word */
 int32 ibkpt_addr = -1;				/* breakpoint addr */
+int32 sim_gui = TRUE;				/* enable gui */
+t_bool running = FALSE;				/* TRUE if CPU is running */
+t_bool power   = TRUE;				/* TRUE if CPU power is on */
+t_bool cgi     = FALSE;				/* TRUE if we are running as a CGI program */
+t_stat reason;						/* CPU execution loop control */
 
-t_bool display_console = 1;
+static int32 int_masks[6] = {
+	0x00, 0x20, 0x30, 0x38, 0x3C, 0x3E		/* IPL 0 is highest prio (sees no other interrupts) */
+};
 
 /* ------------------------------------------------------------------------
  * Function declarations
@@ -178,32 +191,32 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_svc (UNIT *uptr);
 t_stat cpu_set_size (UNIT *uptr, int32 value);
-
-t_stat console_reset (DEVICE *dptr);
-
-extern t_stat ts_wr (int32 data, int32 addr, int32 access);
-
-extern UNIT cr_unit;
-
 void calc_ints (void);
 
+extern t_stat ts_wr (int32 data, int32 addr, int32 access);
+extern t_stat detach_cmd (int flags, char *cptr);
+extern UNIT cr_unit;
+extern int32 sim_switches;
+
+#ifdef ENABLE_BACKTRACE
+	static void   archive_backtrace(char *inst);
+	static void   reset_backtrace (void);
+	static void   show_backtrace (int nshow);
+	static t_stat backtrace_cmd (int flag, char *cptr);
+#else
+	#define archive_backtrace(inst)
+	#define reset_backtrace()
+	#define show_backtrace(ntrace)
+#endif
+
+static void   init_console_window (void);
+static void   destroy_console_window (void);
+static t_stat view_cmd (int flag, char *cptr);
+static t_stat cgi_cmd (int flag, char *cptr);
+static t_stat cpu_attach (UNIT *uptr, char *cptr);
 static t_bool bsctest (int32 DSPLC, t_bool reset_V);
 static void   exit_irq (void);
 static void   trace_instruction (void);
-
-static int32 int_masks[6] = {
-	0x00, 0x20, 0x30, 0x38, 0x3C, 0x3E		/* IPL 0 is highest prio (sees no other interrupts) */
-};
-
-static void init_console_window (void);
-static void destroy_console_window (void);
-static void sleep_msec (int msec);
-
-/* ------------------------------------------------------------------------ 
- * cpu IO state
- * ------------------------------------------------------------------------ */
-
-static int con_dsw = 0;
 
 /* ------------------------------------------------------------------------
  * CPU data structures:
@@ -213,7 +226,7 @@ static int con_dsw = 0;
  *    cpu_mod	CPU modifier list
  * ------------------------------------------------------------------------ */
 
-UNIT cpu_unit = { UDATA (&cpu_svc, UNIT_FIX + UNIT_BINK, INIMEMSIZE) };
+UNIT cpu_unit = { UDATA (&cpu_svc, UNIT_FIX | UNIT_BINK | UNIT_ATTABLE | UNIT_SEQ, INIMEMSIZE) };
 
 REG cpu_reg[] = {
 	{ HRDATA (IAR, IAR, 32) },
@@ -225,7 +238,7 @@ REG cpu_reg[] = {
 	{ HRDATA (ipl, ipl, 32), REG_RO },
 	{ HRDATA (iplpending, iplpending, 32), REG_RO },
 	{ HRDATA (wait_state, wait_state, 32)},
-	{ HRDATA (DSW, con_dsw, 32), REG_RO },
+	{ HRDATA (DSW, cpu_dsw, 32), REG_RO },
 	{ HRDATA (RUNMODE, RUNMODE, 32) },
 	{ HRDATA (BREAK, ibkpt_addr, 32) },
 	{ ORDATA (WRU, sim_int_char, 8) },
@@ -237,8 +250,6 @@ REG cpu_reg[] = {
 	{ HRDATA (ILSW3, ILSW[3], 32), REG_RO },
 	{ HRDATA (ILSW4, ILSW[4], 32), REG_RO },
 	{ HRDATA (ILSW5, ILSW[5], 32), REG_RO },
-
-	{ HRDATA (IPS, IPS, 32) },
 
 	{ NULL}
 };
@@ -254,18 +265,7 @@ DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
 	1, 16, 16, 1, 16, 16,
 	&cpu_ex, &cpu_dep, &cpu_reset,
-	NULL, NULL, NULL };
-
-REG console_reg[] = {							// the GUI, so you can use Enable/Disable console
-	{HRDATA (*DEVENB, display_console, 1) },
-	{NULL}
-};
-
-DEVICE console_dev = {
-	"CONSOLE", NULL, console_reg, NULL,
-	0, 16, 16, 1, 16, 16,
-	NULL, NULL, console_reset,
-	NULL, NULL, NULL };
+	NULL, cpu_attach, NULL};			// attaching to CPU creates cpu log file
 
 /* ------------------------------------------------------------------------ 
 	Memory read/write -- save SAR and SBR on the way in and out
@@ -335,8 +335,9 @@ void calc_ints (void)
 			newbits |= 0x20;
 	}
 
-	int_req  = newbits;
-	int_mask = (ipl < 0) ? 0xFFFF : int_masks[ipl];		/* be sure this is set correctly */
+	int_req    = newbits;
+	int_lamps |= int_req;
+	int_mask   = (ipl < 0) ? 0xFFFF : int_masks[ipl];		/* be sure this is set correctly */
 
     GUI_END_CRITICAL_SECTION
 }
@@ -350,13 +351,13 @@ void calc_ints (void)
 
 void bail (char *msg)
 {
-	fprintf(stderr, "%s\n", msg);
+	printf("%s\n", msg);
 	exit(1);
 }
 
 static void weirdop (char *msg, int offset)
 {
-	fprintf(stderr, "Weird opcode: %s at %04x\n", msg, IAR+offset);
+	printf("Weird opcode: %s at %04x\n", msg, IAR+offset);
 }
 
 static char *xio_devs[]  = {
@@ -375,10 +376,6 @@ static char *xio_funcs[] = {
 	"control", "initw", "initr", "sense"
 };
 
-static t_stat reason;						/* execution loop control */
-static t_bool running = FALSE;
-static t_bool power   = TRUE;
-
 t_stat sim_instr (void)
 {
 	extern int32 sim_interval;
@@ -386,8 +383,14 @@ t_stat sim_instr (void)
 	int32 i, eaddr, INDIR, IR, F, DSPLC, word2, oldval, newval, src, src2, dst, abit, xbit;
 	int32 iocc_addr, iocc_op, iocc_dev, iocc_func, iocc_mod;
 	char msg[50];
-	int cwincount = 0, idelay, status;
+	int cwincount = 0, status;
 	static long ninstr = 0;
+	static char *intlabel[] = {"INT0","INT1","INT2","INT3","INT4","INT5"};
+
+#ifdef CGI_SUPPORT
+	if (cgi)
+		cgi_start();
+#endif
 
 	if (running)							/* this is definitely not reentrant */
 		return -1;
@@ -403,20 +406,18 @@ t_stat sim_instr (void)
 	/* Main instruction fetch/decode loop */
 
 	reason = 0;
-
-	idelay = (IPS == 0) ? 0 : 1000/IPS;
+	wait_lamp = 0;							/* release lock on wait lamp */
 
 #ifdef GUI_SUPPORT
 	update_gui(TRUE);
+	gui_run(TRUE);
 #endif
 
 	while (reason == 0)  {
+		IAR &= mem_mask;
+
 #ifdef GUI_SUPPORT
-		if (idelay) {						/* if we're running in slow mode, update GUI every time */
-			update_gui(TRUE);
-			sleep_msec(idelay);
-		}
-		else {
+#ifndef UPDATE_BY_TIMER
 #if (UPDATE_INTERVAL > 0)
 			if (--cwincount <= 0) {
 				update_gui(FALSE);			/* update console lamps only every so many instructions */
@@ -424,9 +425,9 @@ t_stat sim_instr (void)
 			}
 #else
 			update_gui(FALSE);
-#endif // UPDATE_INTERVAL
-		}
-#endif // GUI_SUPPORT
+#endif // ifdef  UPDATE_INTERVAL
+#endif // ifndef UPDATE_BY_TIMER
+#endif // ifdef  GUI_SUPPORT
 
 		if (sim_interval <= 0) {			/* any events timed out? */
 			if (sim_clock_queue != NULL) {
@@ -459,6 +460,7 @@ t_stat sim_instr (void)
 
 			wait_state = 0;					/* exit wait state */
 			eaddr = ReadW(8+i);				/* get IRQ vector */
+			archive_backtrace(intlabel[i]);
 			WriteW(eaddr, IAR);				/* save IAR */
 			IAR = (eaddr+1) & mem_mask;		/* go to next address */
 			continue;						/* now continue processing */
@@ -486,6 +488,9 @@ t_stat sim_instr (void)
 					reason = STOP_INVALID_INSTR;
 			}
 
+			if (gdu_active())				/* but don't stop simulator if 2250 GDU is running */
+				reason = 0;
+
 			continue;
 		}
 
@@ -499,7 +504,10 @@ t_stat sim_instr (void)
 		}
 
 		ninstr++;
-		trace_instruction();				/* log CPU details if logging is enabled */
+		if (cpu_unit.flags & UNIT_ATT)
+			trace_instruction();			/* log CPU details if logging is enabled */
+
+		prev_IAR = IAR;						/* save IAR before incrementing it */
 
 		IR = ReadW(IAR);					/* fetch 1st word of instruction */
 		INCREMENT_IAR;
@@ -549,13 +557,14 @@ t_stat sim_instr (void)
 				iocc_func = (iocc_op  >>  8) & 0x0007;
 				iocc_mod  =  iocc_op         & 0x00FF;
 
-				trace_io("* XIO %s %s mod %02x addr %04x", xio_funcs[iocc_func], xio_devs[iocc_dev], iocc_mod, iocc_addr);
+				if (cpu_unit.flags & UNIT_ATT)
+					trace_io("* XIO %s %s mod %02x addr %04x", xio_funcs[iocc_func], xio_devs[iocc_dev], iocc_mod, iocc_addr);
 
 				ACC = 0;					/* ACC is destroyed, and default XIO_SENSE_DEV result is 0 */
 
 				switch (iocc_func) {
 					case XIO_UNUSED:
-						sprintf(msg, "Unknown XIO op %x on XIO device %02x", iocc_func, iocc_dev);
+						sprintf(msg, "Unknown op %x on device %02x", iocc_func, iocc_dev);
 						xio_error(msg);
 						break;
 					
@@ -623,7 +632,7 @@ t_stat sim_instr (void)
 								xio_2250_display(iocc_addr, iocc_func, iocc_mod);
 								break;
 							default:
-								sprintf(msg, "XIO on unknown device %02x", iocc_dev);
+								sprintf(msg, "unknown device %02x", iocc_dev);
 								xio_error(msg);
 								break;
 						}
@@ -775,6 +784,7 @@ t_stat sim_instr (void)
 						break;				/* if any condition is true, do nothing */
 				}
 				WriteW(eaddr, IAR);			/* do subroutine call */
+				archive_backtrace("BSI");	/* save info in back-trace buffer */
 				IAR = (eaddr + 1) & mem_mask;
 				break;
 
@@ -783,11 +793,14 @@ t_stat sim_instr (void)
 					if (bsctest(IR, F))		/* long format; any indicator cancels branch */
 						break;
 
+					archive_backtrace((DSPLC & 0x40) ? "BOSC" : "BSC");	/* save info in back-trace buffer */
 					IAR = eaddr;			/* no indicator means branch taken */
 				}
 				else {						/* short format: skip if any indicator hits */
-					if (bsctest(IR, F))
+					if (bsctest(IR, F)) {
+						archive_backtrace((DSPLC & 0x40) ? "BOSC" : "BSC");		/* save info in back-trace buffer */
 						INCREMENT_IAR;
+					}
 				}
 // 27Mar02: moved this test out of the (F) condition; BOSC works even in the
 // short form. The displacement field in this instruction is always the set of
@@ -806,8 +819,10 @@ t_stat sim_instr (void)
 
 				if (TAG)
 					WriteW(TAG, eaddr);
-				else
+				else {
+					archive_backtrace("LDX");			/* save info in back-trace buffer */
 					IAR = eaddr;			/* what happens in short form? can onlyjump to low addresses? */
+				}
 				break;
 
 			case 0x0d:						/* --- STX - Store Index --- */
@@ -845,13 +860,15 @@ t_stat sim_instr (void)
 					else {
 						oldval = IAR;		/* add displacement to IAR */
 						newval = IAR + DSPLC;
+						archive_backtrace("MDX");
 						IAR    = newval & mem_mask;
 					}
 				}
 
-				if ((F || TAG) && ((newval == 0) || ((oldval & 0x8000) != (newval & 0x8000))))
+				if ((F || TAG) && (((newval & 0xFFFF) == 0) || ((oldval & 0x8000) != (newval & 0x8000)))) {
+					archive_backtrace("SKP");
 					INCREMENT_IAR;			/* skip if index sign change or zero */
-
+				}
 				break;
 
 			case 0x10:						/* --- A - Add --- */
@@ -900,9 +917,14 @@ t_stat sim_instr (void)
 				break;
 
 			case 0x14:						/* --- M - Multiply	--- */
-				dst  = ACC * ReadW(eaddr);
-				ACC  = (dst >> 16) & 0xFFFF;
-				EXT  = dst & 0xFFFF;
+				if ((src = ACC & 0xFFFF)  & 0x8000)		/* sign extend the values */
+					src	 |= 0xFFFF0000;
+				if ((src2 = ReadW(eaddr)) & 0x8000)
+					src2 |= 0xFFFF0000;
+
+				dst = src * src2;
+				ACC = (dst >> 16) & 0xFFFF;				/* split the results */
+				EXT = dst & 0xFFFF;
 				break;
 
 			case 0x15:						/* --- D - Divide --- */
@@ -969,19 +991,29 @@ t_stat sim_instr (void)
 
 		if (tbit && (ipl < 0)) {			/* if INT_RUN mode, set IRQ5 after this instr */
 			GUI_BEGIN_CRITICAL_SECTION
-			SETBIT(con_dsw, CON_DSW_INT_RUN);
+			SETBIT(cpu_dsw, CPU_DSW_INT_RUN);
 			SETBIT(ILSW[5], ILSW_5_INT_RUN);
 			int_req |= INT_REQ_5;
 			GUI_END_CRITICAL_SECTION
 		}
 	}										/* end main loop */
 
-	running = FALSE;
+#ifdef GUI_SUPPORT
+	gui_run(FALSE);
+#endif
+
+	running   = FALSE;
+	int_lamps = 0;			/* display only currently active interrupts while halted */
 
 	if (reason == STOP_WAIT || reason == STOP_INVALID_INSTR) {
 		wait_state = 0;						// on resume, don't wait
+		wait_lamp = TRUE;					// but keep the lamp lit on the GUI
 	}
 
+#ifdef CGI_SUPPORT
+	if (cgi)
+		cgi_stop(reason);
+#endif
 
 	return reason;
 }
@@ -1019,7 +1051,7 @@ static t_bool bsctest (int32 DSPLC, t_bool reset_V)
 			return TRUE;
 
 	if (DSPLC & 0x20)		 				/* Zero */
-		if (ACC == 0)
+		if ((ACC & 0xFFFF) == 0)
 			return TRUE;
 
 	return FALSE;
@@ -1053,6 +1085,13 @@ static void exit_irq (void)
 	calc_ints();						/* recompute pending interrupt mask */
 }										/* because we probably cleared some ILSW bits before this instruction */
 
+/* let a device halt the simulation */
+
+void break_simulation (t_stat stopreason)
+{
+	reason = stopreason;
+}
+
 /* ------------------------------------------------------------------------ 
  * SIMH required routines
  * ------------------------------------------------------------------------ */
@@ -1064,16 +1103,25 @@ static void exit_irq (void)
 t_stat cpu_reset (DEVICE *dptr)
 {
 	wait_state = 0;						/* cancel wait */
+	wait_lamp  = TRUE;					/* but keep the wait lamp lit on the GUI */
+
+	if (cpu_unit.flags & UNIT_ATT) {						/* record reset in CPU log */
+		fseek(cpu_unit.fileref, 0, SEEK_END);
+		fprintf(cpu_unit.fileref, "---RESET---" CRLF);
+	}
 
 	GUI_BEGIN_CRITICAL_SECTION
 
-	int_req = 0;						/* reset all interrupts */
+	reset_backtrace();
+
 	ipl = -1;
 	int_mask = 0xFFFF;
+	int_req    = 0;						/* hmmm, it SHOULD reset the int req, right? */
+	int_lamps  = 0;
 	iplpending = 0;
 	memset(ILSW, 0, sizeof(ILSW));
 
-	con_dsw = 0;						/* clear int req and prot stop bits */
+	cpu_dsw = 0;						/* clear int req and prot stop bits */
 	tbit = 0;							/* cancel INT_RUN mode */
 
 	C = V = 0;							/* clear processor flags */
@@ -1085,18 +1133,6 @@ t_stat cpu_reset (DEVICE *dptr)
 	GUI_END_CRITICAL_SECTION
 
 	return cpu_svc(&cpu_unit);			/* reset breakpoint */
-}
-
-// reset for the "console" display device 
-
-t_stat console_reset (DEVICE *dptr)
-{
-	if (display_console)
-		init_console_window();
-	else
-		destroy_console_window();
-
-	return SCPE_OK;
 }
 
 /* ------------------------------------------------------------------------ 
@@ -1187,15 +1223,15 @@ void xio_1131_switches (int32 addr, int32 func, int32 modify)
 			break;
 
 		case XIO_SENSE_DEV:
-			ACC = con_dsw;
+			ACC = cpu_dsw;
 			if (modify & 0x01) {						/* reset interrupts */
-				CLRBIT(con_dsw, CON_DSW_PROGRAM_STOP|CON_DSW_INT_RUN);
+				CLRBIT(cpu_dsw, CPU_DSW_PROGRAM_STOP|CPU_DSW_INT_RUN);
 				CLRBIT(ILSW[5], ILSW_5_INT_RUN);		/* (these bits are set in the keyboard handler in 1130_stddev.c) */
 			}
 			break;
 
 		default:
-			sprintf(msg, "Invalid console switch XIO function %x", func);
+			sprintf(msg, "Invalid console switch function %x", func);
 			xio_error(msg);
 	}
 }
@@ -1206,1119 +1242,633 @@ void xio_1131_switches (int32 addr, int32 func, int32 modify)
 
 void xio_error (char *msg)
 {
-	fprintf(stderr, "*** XIO error: %s\n", msg);
+	printf("*** XIO error at %04x: %s\n", prev_IAR, msg);
+	if (cgi)
+		break_simulation(STOP_CRASH);
 }
 
 /* ------------------------------------------------------------------------ 
- * LOG device - if attached to a file, records a CPU trace
+ * register_cmd - add a command to the extensible command table
  * ------------------------------------------------------------------------ */
 
-static t_stat log_reset (DEVICE *dptr);
-static t_stat log_attach (UNIT *uptr, char *cptr);
+t_stat register_cmd (char *name, t_stat (*action)(), int arg, char *help)
+{
+	int i;
 
-UNIT log_unit = { UDATA (NULL, UNIT_ATTABLE + UNIT_SEQ, 0) };
+	for (i = 0; i < MAX_EXTRA_COMMANDS; i++) {	// find end of command table
+		if (x_cmds[i].action == action)
+			return SCPE_OK;						// command is already there, just return
+		if (x_cmds[i].name == NULL)
+			break;
+	}
 
-DEVICE log_dev = {
-	"LOG", &log_unit, NULL, NULL,
-	1, 16, 16, 1, 16, 16,
-	NULL, NULL, log_reset,
-	NULL, log_attach, NULL };
+	if (i >= (MAX_EXTRA_COMMANDS-1)) {			// no more room (we need room for the NULL)
+		fprintf(stderr, "The command table is full - rebuild the simulator with more free slots\n");
+		return SCPE_ARG;
+	}
+
+	x_cmds[i].action = action;					// add new command
+	x_cmds[i].name   = name;
+	x_cmds[i].arg    = arg;
+	x_cmds[i].help   = help;
+
+	i++;
+	x_cmds[i].action = NULL;	// move the NULL terminator
+	x_cmds[i].name   = NULL;
+
+	return SCPE_OK;
+}
+
+/* ------------------------------------------------------------------------ 
+ * echo_cmd - just echo the command line
+ * ------------------------------------------------------------------------ */
+
+static t_stat echo_cmd (int flag, char *cptr)
+{
+	printf("%s\n", cptr);
+	return SCPE_OK;
+}
+
+/* ------------------------------------------------------------------------ 
+ * sim_init - initialize simulator upon startup of scp, before reset
+ * ------------------------------------------------------------------------ */
+
+void sim_init (void)
+{
+	sim_gui = ! (sim_switches & SWMASK('G'));	/* -g means no GUI */
+
+	sim_vm_cmd = x_cmds;						/* provide list of additional commands */
+
+#ifdef GUI_SUPPORT
+	// set hook routines for GUI command processing
+	if (sim_gui) {
+		sim_vm_read = &read_cmdline;
+		sim_vm_post = &update_gui;
+	}
+#endif
+
+#ifdef ENABLE_BACKTRACE
+	// add the BACKTRACE command
+	register_cmd("BACKTRACE", &backtrace_cmd, 0, "ba{cktrace} {n}          list last n branches/skips/interrupts\n");
+#endif
+
+	register_cmd("VIEW",      &view_cmd,      0, "v{iew} filename          view a text file with notepad\n");
+
+#ifdef CGI_SUPPORT
+	register_cmd("CGI",       &cgi_cmd,       0, "cgi                      run simulator in CGI mode\n");
+#endif
+
+	register_cmd("ECHO",      &echo_cmd,      0, "echo args...             echo arguments passed to command\n");
+}
+
+/* ------------------------------------------------------------------------ 
+ * archive_backtrace - record a jump, skip, branch or whatever
+ * ------------------------------------------------------------------------ */
+
+#ifdef ENABLE_BACKTRACE
+
+#define MAXARCHIVE 16
+
+static struct tag_arch {
+	int iar;
+	char *inst;
+} arch[MAXARCHIVE];
+int narchived = 0, archind = 0;
+
+static void archive_backtrace (char *inst)
+{
+	static int prevind;
+
+	if (narchived < MAXARCHIVE)
+		narchived++;
+
+	if (narchived > 0 && arch[prevind].iar == prev_IAR)
+		return;
+
+	arch[archind].iar  = prev_IAR;
+	arch[archind].inst = inst;
+
+	prevind = archind;
+	archind = (archind+1) % MAXARCHIVE;
+}
+
+static void reset_backtrace (void)
+{
+	narchived = 0;
+	archind = 0;
+}
+
+void void_backtrace (int afrom, int ato)
+{
+	int i;
+
+	afrom &= mem_mask;
+	ato   &= mem_mask;
+
+	for (i = 0; i < narchived; i++)
+		if (arch[i].iar >= afrom && arch[i].iar <= ato)
+			arch[i].inst = "OVERWRITTEN";
+}
+
+static void show_backtrace (int nshow)
+{
+	int n = narchived, i = archind;
+
+	if (n > nshow) n = nshow;
+
+	while (--n >= 0) {
+		i = (i > 0) ? (i-1) : (MAXARCHIVE-1);
+		printf("from %04x (%s) ", arch[i].iar, arch[i].inst);
+	}
+
+	if (narchived)
+		putchar('\n');
+}
+
+static t_stat backtrace_cmd (int flag, char *cptr)
+{
+	int n;
+
+	if ((n = atoi(cptr)) <= 0)
+		n = 6;
+
+	show_backtrace(n);
+	return SCPE_OK;
+}
+#else
+
+// stub this for the disk routine
+
+void void_backtrace (int afrom, int ato)
+{
+}
+
+#endif
+
+// CPU log routines -- attaching a file to the CPU creates a trace of instructions and register values
+//
+// Syntax is WEIRD:
+//
+// attach cpu logfile					log instructions and registers to file "logfile"
+// attach -f cpu cpu.log				log instructions, registers and floating point acc
+// attach -m cpu mapfile logfile		read addresses from "mapfile", log instructions to "logfile"
+// attach -f -m cpu mapfile logfile		same and log floating point stuff too
+//
+// mapfile if specified is a list of symbols and addresses of the form:
+//       symbol hexval
+//
+// e.g.
+// FSIN   082E
+// FARC   09D4
+// FMPY   09A4
+// NORM   0976
+// XMDS   095A
+// START  021A
+//
+// These values are easily obtained from a load map created by
+// XEQ       L
+//
+// The log output is of the form
+//
+//  IAR             ACC  EXT  (flt)    XR1  XR2  XR3 CVI      FAC      OPERATION
+// --------------- ---- ---- -------- ---- ---- ---- --- ------------- -----------------------
+// 002a       002a 1234 5381  0.14222 00b3 0236 3f7e CV   1.04720e+000 4c80 BSC  I  ,0028   
+// 081d PAUSE+000d 1234 5381  0.14222 00b3 0236 3f7e CV   1.04720e+000 7400 MDM  L  00f0,0 (0)   
+// 0820 PAUSE+0010 1234 5381  0.14222 00b3 0236 3f7e CV   1.04720e+000 7201 MDX   2 0001   
+// 0821 PAUSE+0011 1234 5381  0.14222 00b3 0237 3f7e CV   1.04720e+000 6a03 STX   2 0003   
+// 0822 PAUSE+0012 1234 5381  0.14222 00b3 0237 3f7e CV   1.04720e+000 6600 LDX  L2 0231   
+// 0824 PAUSE+0014 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4c00 BSC  L  ,0237   
+// 0237 START+001d 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4480 BSI  I  ,3fff   
+// 082f FSIN +0001 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4356 BSI   3 0056   
+// 3fd5 ILS01+35dd 1234 5381  0.14222 00b3 0231 3f7e CV   1.04720e+000 4c00 BSC  L  ,08de   
+//
+// IAR - instruction address register value, optionally including symbol and offset
+// ACC - accumulator
+// EXT - extension
+// flt - ACC+EXT interpreted as the mantissa of a floating pt number (value 0.5 -> 1)
+// XR* - index registers
+// CVI - carry, overflow and interrupt indicators
+// FAC - floating point accumulator (exponent at 125+XR3, mantissa at 126+XR3 and 127+XR3)
+// OP  - opcode value and crude disassembly
+//
+// flt and FAC are displayed only when the -f flag is specified in the attach command
+// The label and offset and displayed only when the -m flag is specified in the attach command
+//
+// The register values shown are the values BEFORE the instruction is executed.
+//
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 
-#ifdef WIN32
-#   define CRLF "\r\n"
-#else
-#   define CRLF "\n"
-#endif
+typedef struct tag_symentry {
+	struct tag_symentry *next;
+	int  addr;
+	char sym[6];
+} SYMENTRY, *PSYMENTRY;
 
-static t_bool new_log;
+static PSYMENTRY syms = NULL;
+static t_bool new_log, log_fac;
 
-static t_stat log_attach (UNIT *uptr, char *cptr)
+static t_stat cpu_attach (UNIT *uptr, char *cptr)
 {
+	char mapfile[200], buf[200], sym[100];
+	int addr;
+	PSYMENTRY n, prv, s;
+	FILE *fd;
+
 	unlink(cptr);							// delete old log file, if present
 	new_log = TRUE;
+	log_fac = sim_switches & SWMASK ('F');	// display the FAC and the ACC/EXT as fixed point.
+
+	for (s = syms; s != NULL; s = n) {		// free any old map entries
+		n = s->next;
+		free(s);
+	}
+	syms = NULL;
+		
+	if (sim_switches & SWMASK('M')) {		// use a map file to display relative addresses
+		cptr = get_glyph(cptr, mapfile, 0);
+		if (! *mapfile) {
+			printf("/m must be followed by a filename\n");
+			return SCPE_ARG;
+		}
+		if ((fd = fopen(mapfile, "r")) == NULL) {
+			perror(mapfile);
+			return SCPE_OPENERR;
+		}
+
+		while (fgets(buf, sizeof(buf), fd) != NULL) {		// read symbols & addresses, link in descending address order
+			if (sscanf(buf, "%s %x", sym, &addr) != 2)
+				continue;
+			if (*buf == ';')
+				continue;
+
+			for (prv = NULL, s = syms; s != NULL; prv = s, s = s->next) {
+				if (s->addr < addr)
+					break;
+			}
+
+			if ((n = malloc(sizeof(SYMENTRY))) == NULL) {
+				printf("out of memory reading map!\n");
+				break;
+			}
+
+			sym[5] = '\0';
+			strcpy(n->sym, sym);
+			upcase(n->sym);
+			n->addr = addr;
+
+			if (prv == NULL) {
+				n->next = syms;
+				syms = n;
+			}
+			else {
+				n->next = prv->next;
+				prv ->next = n;
+			}
+		}
+		fclose(fd);
+	}
+
 	return attach_unit(uptr, cptr);
 }
 
 static void trace_instruction (void)
 {
 	t_value v[2];
+	float fac;
+	short exp;
+	int addr;
+	PSYMENTRY s;
+	long mant, sign;
+	char facstr[20], fltstr[20];
 
-	if ((log_unit.flags & UNIT_ATT) == 0)
+	if ((cpu_unit.flags & UNIT_ATT) == 0)
 		return;
 
 	if (new_log) {
-		fseek(log_unit.fileref, 0, SEEK_END);
-		fprintf(log_unit.fileref, " IAR  ACC  EXT  XR1  XR2  XR3 CVI OPERATION" CRLF);
-		fprintf(log_unit.fileref, "---- ---- ---- ---- ---- ---- --- ---------" CRLF);
+		fseek(cpu_unit.fileref, 0, SEEK_END);
 		new_log = FALSE;
+
+		fprintf(cpu_unit.fileref, " IAR%s  ACC  EXT %s XR1  XR2  XR3 CVI %sOPERATION" CRLF,
+			syms ? "           " : "", log_fac ? " (flt)   " : "", log_fac ? "     FAC      " : "");
+		fprintf(cpu_unit.fileref, "----%s ---- ---- %s---- ---- ---- --- %s-----------------------" CRLF,
+			syms ? "-----------" : "", log_fac ? "-------- " : "", log_fac ? "------------- " : "");
 	}
 
-	fprintf(log_unit.fileref, "%04x %04x %04x %04x %04x %04x %c%c%c ",
-		IAR & 0xFFFF, ACC & 0xFFFF, EXT & 0xFFFF, M[1] & 0xFFFF, M[2] & 0xFFFF, M[3] & 0xFFFF,
-		C ? 'C' : ' ', V ? 'V' : ' ',
-		(ipl < 0) ? ' ' : (ipl+'0'));
+	if (! log_fac)	
+		facstr[0] = fltstr[0] = '\0';
+	else {
+		mant = ((ACC & 0xFFFF) << 16) | (EXT & 0xFFFF);
+		if (mant == 0x80000000) {
+			sign = TRUE;
+			fac = 1.f;
+		}
+		else {
+			if ((sign = mant & 0x80000000))
+				mant = -mant;
+			fac = (float) mant * ((float) 1./ (float) (unsigned long) 0x80000000);
+		}
+		sprintf(fltstr, "%c%.5f ", sign ? '-' : ' ', fac);
+
+		if (BETWEEN(M[3], 0x300, MEMSIZE-128)) {
+			exp  = (M[M[3]+125] & 0xFF) - 128;
+			mant = (M[M[3]+126] << 8) | ((M[M[3]+127] >> 8) & 0xFF);
+			if ((sign = (mant & 0x00800000)))
+				mant = (-mant) & 0x00FFFFFF;
+
+			fac = (float) mant * ((float) 1. / (float) 0x00800000);
+
+			if (exp > 30) {
+				fac *= (float) (1 << 30);
+				exp -= 30;
+				while (exp > 0)
+					fac *= 2;
+			}
+			else if (exp > 0)
+				fac *= (float) (1 << exp);
+			else if (exp < -30) {
+				fac /= (float) (1 << 30);
+				exp += 30;
+				while (exp < 0)
+					fac /= 2;
+			}
+			else if (exp < 0)
+				fac /= (float) (1 << -exp);
+
+			sprintf(facstr, "%c%.5e ", sign ? '-' : ' ', fac);
+		}
+		else
+			strcpy(facstr, "             ");
+	}
+
+	addr = IAR & 0xFFFF;
+	fprintf(cpu_unit.fileref, "%04x ", addr);
+
+	if (syms) {
+		for (s = syms; s != NULL; s = s->next)
+			if (s->addr <= addr)
+				break;
+		
+		if (s == NULL)
+			fprintf(cpu_unit.fileref, "      %04x ", addr);
+		else
+			fprintf(cpu_unit.fileref, "%-5s+%04x ", s->sym, addr - s->addr);
+	}
+
+	fprintf(cpu_unit.fileref, "%04x %04x %s%04x %04x %04x %c%c%c %s",
+		ACC & 0xFFFF, EXT & 0xFFFF, fltstr, M[1] & 0xFFFF, M[2] & 0xFFFF, M[3] & 0xFFFF,
+		C ? 'C' : ' ', V ? 'V' : ' ', (ipl < 0) ? ' ' : (ipl+'0'), facstr);
 
 	v[0] = M[ IAR    & mem_mask];
 	v[1] = M[(IAR+1) & mem_mask];
-	fprint_sym(log_unit.fileref, IAR & mem_mask, v, NULL, SWMASK('M'));
+	fprint_sym(cpu_unit.fileref, IAR & mem_mask, v, NULL, SWMASK('M'));		/* disassemble instruction */
 
-	fputs(CRLF, log_unit.fileref);
+	fputs(CRLF, cpu_unit.fileref);
 }
 
 void trace_io (char *fmt, ...)
 {
 	va_list args;
 
-	if ((log_unit.flags & UNIT_ATT) == 0)
+	if ((cpu_unit.flags & UNIT_ATT) == 0)
 		return;
 
 	va_start(args, fmt);							// get pointer to argument list
-	vfprintf(log_unit.fileref, fmt, args);			// write errors to terminal (stderr)
+	vfprintf(cpu_unit.fileref, fmt, args);			// write errors to terminal (stderr)
 	va_end(args);
 
-	fputs(CRLF, log_unit.fileref);
+	fputs(CRLF, cpu_unit.fileref);
 }
 
-static t_stat log_reset (DEVICE *dptr)
-{
-	if ((log_unit.flags & UNIT_ATT) == 0)
-		return SCPE_OK;
+/* debugging */
 
-	fseek(log_unit.fileref, 0, SEEK_END);
-	fprintf(log_unit.fileref, "---RESET---" CRLF);
+void debug_print (char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	vprintf(fmt, args);
+	if (cpu_unit.flags & UNIT_ATT)
+		vfprintf(cpu_unit.fileref, fmt, args);
+	va_end(args);
+
+	if (strchr(fmt, '\n') == NULL) {		// be sure to emit a newline
+		putchar('\n');
+		if (cpu_unit.flags & UNIT_ATT)
+			putc('\n', cpu_unit.fileref);
+	}
+}
+
+#ifdef WIN32
+#include <windows.h>
+#endif
+
+// view_cmd - let user view and/or edit a file (e.g. a printer output file, script, or source deck)
+
+static t_stat view_cmd (int flag, char *cptr)
+{
+#ifdef WIN32
+	char cmdline[256];
+
+	sprintf(cmdline, "notepad %s", cptr);
+	WinExec(cmdline, SW_SHOWNORMAL);
+#endif
 	return SCPE_OK;
 }
 
-/* ------------------------------------------------------------------------ 
- * Console display - on Windows builds (only) this code displays the 1130 console
- * and toggle switches. It really enhances the experience.
- *
- * Currently, when the IPS throttle is nonzero, I update the display after every
- * UPDATE_INTERVAL instructions, plus or minus a random amount to avoid aliased
- * sampling in loops.  When UPDATE_INTERVAL is defined as zero, we update every
- * instruction no matter what the throttle. This makes the simulator too slow
- * but it's cool and helpful during development.
- * ------------------------------------------------------------------------ */
+#ifdef CGI_SUPPORT
 
-#ifndef GUI_SUPPORT
+int cgi_maxsec = 0;								// default run time limit
 
-void update_gui (int force)			{}		/* stubs for non-GUI builds */
-void forms_check (int set)			{}
-void print_check (int set)			{}
-void keyboard_select (int select)	{}
-void keyboard_selected (int select) {}
-void disk_ready (int ready)         {}
-void disk_unlocked (int unlocked)   {}
-static void init_console_window (void) 	  {}
-static void destroy_console_window (void) {}
-static void sleep_msec	(int msec)		  {}
+// cgi_cmd - enable cgi mode. Specify time limit on command line if desired
+
+static t_stat cgi_cmd (int flag, char *cptr)
+{
+	cgi = TRUE;									// set CGI flag
+
+	while (*cptr && *cptr <= ' ')
+		cptr++;
+
+	if (*cptr)
+		cgi_maxsec = atoi(cptr);				// set time limit, if specified
+
+	return SCPE_OK;
+}
+
+// cgi_timeout - called when timer runs out
+
+static void cgi_timeout (int dummy)
+{
+	break_simulation(STOP_TIMED_OUT);			// stop the simulator
+}
+
+// cgi_clockfail - report failure to set alarm
+
+static void cgi_clockfail (void)
+{
+	printf("<B>Set CGI time limit failed!</B>");
+}
+
+// cgi_start_timer - OS dependent routine to set things up so that
+// cgi_timeout() will be called after cgi_maxsec seconds.
+
+#if defined(WIN32)
+	static DWORD WINAPI cgi_timer_thread (LPVOID arg)
+	{
+		Sleep(cgi_maxsec*1000);					// timer thread -- wait, then call timeout routine
+		cgi_timeout(0);
+		return 0;
+	}
+
+	static void cgi_start_timer (void)
+	{
+		DWORD dwThreadID;
+
+		if (CreateThread(NULL, 0, cgi_timer_thread, NULL, 0, &dwThreadID) == NULL)
+			cgi_clockfail();
+	}
 #else
+	#include <signal.h>
 
-#ifdef WIN32
+	#if defined(SIGVTALRM)	&& defined(ITMER_VIRTUAL)
 
-// only have a WIN32 gui right now
+		// setitimer counts actual runtime CPU seconds, so is insensitive to
+        // system load  and is a better timer to use. Be sure to check, though,
+        // that it actually works on your OS. Note that time spent performing
+        // I/O does not count -- this counts user mode CPU time only, so
+        // the elapsed time it allows could be much larger, especially if
+        // the job is spewing output.
 
-#include <windows.h>
-#include <math.h>
-#include "ibm1130res.h"
+		#include <sys/time.h>
 
-static BOOL class_defined = FALSE;
-static HWND hConsoleWnd = NULL;
-static HBITMAP hBitmap = NULL;
-static HFONT  hFont = NULL;
-static HFONT  hBtnFont = NULL;
-static HBRUSH hbLampOut = NULL;
-static HBRUSH hbWhite = NULL;
-static HBRUSH hbBlack = NULL;
-static HBRUSH hbGray  = NULL;
-static HPEN   hSwitchPen = NULL;
-static HPEN   hWhitePen  = NULL;
-static HPEN   hBlackPen  = NULL;
-static HPEN   hLtGreyPen = NULL;
-static HPEN   hGreyPen   = NULL;
-static HPEN   hDkGreyPen = NULL;
+		static void cgi_start_timer (void)
+		{
+			struct itimerval rtime, otime;
 
-static HCURSOR hcArrow = NULL;
-static HCURSOR hcHand  = NULL;
-static HINSTANCE hInstance;
-static HDC hCDC = NULL;
-static char szConsoleClassName[] = "1130CONSOLE";
-static DWORD PumpID = 0;
-static HANDLE hPump = INVALID_HANDLE_VALUE;
-static int bmwid, bmht;
+			rtime.it_value.tv_sec     = cgi_maxsec;
+			rtime.it_value.tv_usec    = 0;
+			rtime.it_interval.tv_sec  = cgi_maxsec;
+			rtime.it_interval.tv_usec = 0;
 
-#define BUTTON_WIDTH  90
-#define BUTTON_HEIGHT 50
+			if (signal(SIGVTALRM, cgi_timeout) == SIG_ERR)		// set alarm handler
+				cgi_clockfail();
+			else if (setitimer(ITIMER_VIRTUAL, &rtime, &otime))	// start timer
+				cgi_clockfail();
+		}
 
-#define IDC_KEYBOARD_SELECT		0
-#define IDC_DISK_UNLOCK			1
-#define IDC_RUN					2
-#define IDC_PARITY_CHECK		3
-#define IDC_UNUSED				4
-#define IDC_FILE_READY			5
-#define IDC_FORMS_CHECK			6
-#define IDC_POWER_ON			7
-#define IDC_POWER				8
-#define IDC_PROGRAM_START		9
-#define IDC_PROGRAM_STOP		10
-#define IDC_LOAD_IAR			11
-#define IDC_KEYBOARD			12
-#define IDC_IMM_STOP			13
-#define IDC_RESET				14
-#define IDC_PROGRAM_LOAD		15
+	#elif defined(SIGALRM)
+		#include <unistd.h>
 
-#define LAMPTIME 500			// 500 msec delay on updating
-#define UPDATE_TIMER_ID 1
+		// if it's all we have, standard POSIX alarm will do the trick too
 
-static struct tag_btn {
-	int x, y;
-	char *txt;
-	BOOL pushable, immed_off;
-	DWORD offtime;
-	COLORREF clr;
-	HBRUSH hbrLit, hbrDark;
-	HWND   hBtn;
-} btn[] = {
-	0, 0,	"KEYBOARD\nSELECT",		FALSE,	TRUE,  0, RGB(255,255,180),	NULL, NULL, NULL, 
-	0, 1,	"DISK\nUNLOCK",			FALSE, 	TRUE,  0, RGB(255,255,180),	NULL, NULL, NULL, 
-	0, 2, 	"RUN",					FALSE,	FALSE, 0, RGB(0,255,0),		NULL, NULL, NULL, 
-	0, 3,	"PARITY\nCHECK",		FALSE,	TRUE,  0, RGB(255,0,0),		NULL, NULL, NULL, 
+		static void cgi_start_timer (void)
+		{
+			if (signal(SIGALRM, cgi_timeout) == SIG_ERR)		// set alarm handler
+				cgi_clockfail();
+			else if (alarm(cgi_maxsec))							// start timer
+				cgi_clockfail();
+		}
 
-	1, 0,	"",						FALSE, 	TRUE,  0, RGB(255,255,180),	NULL, NULL, NULL, 
-	1, 1,	"FILE\nREADY",			FALSE, 	TRUE,  0, RGB(0,255,0),		NULL, NULL, NULL, 
-	1, 2,	"FORMS\nCHECK",			FALSE, 	TRUE,  0, RGB(255,255,0),	NULL, NULL, NULL, 
-	1, 3,	"POWER\nON",			FALSE, 	TRUE,  0, RGB(255,255,180),	NULL, NULL, NULL, 
+	#else
+		// don't seem to have a clock available. Better say so.
 
-	2, 0,	"POWER",				TRUE,	TRUE,  0, RGB(255,255,180), NULL, NULL, NULL, 
-	2, 1,	"PROGRAM\nSTART",		TRUE,	TRUE,  0, RGB(0,255,0),		NULL, NULL, NULL, 
-	2, 2,	"PROGRAM\nSTOP",		TRUE,	TRUE,  0, RGB(255,0,0),		NULL, NULL, NULL, 
-	2, 3,	"LOAD\nIAR",			TRUE,	TRUE,  0, RGB(0,0,255),		NULL, NULL, NULL, 
+		static void cgi_start_timer (void)
+		{
+			printf("<B>CGI time limit is not supported by this build</B>\n");
+		}
 
-	3, 0,	"KEYBOARD",				TRUE, 	TRUE,  0, RGB(255,255,180),	NULL, NULL, NULL, 
-	3, 1,	"IMM\nSTOP",			TRUE, 	TRUE,  0, RGB(255,0,0),		NULL, NULL, NULL, 
-	3, 2,	"CHECK\nRESET",			TRUE, 	TRUE,  0, RGB(0,0,255),		NULL, NULL, NULL, 
-	3, 3,	"PROGRAM\nLOAD",		TRUE, 	TRUE,  0, RGB(0,0,255),		NULL, NULL, NULL, 
-};
-#define NBUTTONS (sizeof(btn) / sizeof(btn[0]))
+	#endif
+#endif
 
-LRESULT CALLBACK ConsoleWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-static DWORD WINAPI Pump (LPVOID arg);
-
-/* ------------------------------------------------------------------------ 
- * sleep_msec - delay msec to throttle the cpu down
- * ------------------------------------------------------------------------ */
-
-static void sleep_msec (int msec)
+static void cgi_start(void)
 {
-	Sleep(msec);
+	if (cgi_maxsec > 0)							// if time limit was specified, set timer now
+		cgi_start_timer();
+
+//	printf("Content-type: text/html\n\n<HTML>\n<HEAD>\n    <TITLE>IBM 1130 Simulation Results</TITLE>\n</HEAD>\n<BODY background=\"greenbar.gif\">\n<PRE>");
 }
 
-/* ------------------------------------------------------------------------ 
- * init_console_window - display the 1130 console. Actually just creates a thread 
- * to run the Pump routine which does the actual work.
- * ------------------------------------------------------------------------ */
-
-static void init_console_window (void)
+static void cgi_stop(t_stat reason)
 {
-	static BOOL did_atexit = FALSE;
-
-	if (hConsoleWnd != NULL)
-		return;
-
-	if (PumpID == 0)
-		hPump = CreateThread(NULL, 0, Pump, 0, 0, &PumpID);
-
-	if (! did_atexit) {
-		atexit(destroy_console_window);
-		did_atexit = TRUE;
-	}
-}
-
-/* ------------------------------------------------------------------------ 
- * destroy_console_window - delete GDI objects.
- * ------------------------------------------------------------------------ */
-
-#define NIXOBJECT(hObj) if (hObj != NULL) {DeleteObject(hObj); hObj = NULL;}
-
-static void destroy_console_window (void)
-{
+	typedef enum {O_END, O_FORTRAN, O_MONITOR} ORIGIN;
+	char *errmsg = "";
+	static struct tag_pretstop {
+		int acc;
+		ORIGIN orig;
+		char *msg;
+	} pretstop[] = {
+		0xF000, O_FORTRAN, "No *IOCS was specified but I/O was attempted",
+		0xF001, O_FORTRAN, "Local unit defined incorrectly, or no *IOCS for specified device",
+		0xF002, O_FORTRAN, "Requested record exceeds buffer size",
+		0xF003, O_FORTRAN, "Illegal character encountered in input record",
+		0xF004, O_FORTRAN, "Exponent too large or too small in input",
+		0xF005, O_FORTRAN, "More than one exponent encountered in input",
+		0xF006, O_FORTRAN, "More than one sign encountered in input",
+		0xF007, O_FORTRAN, "More than one decimal point encountered in input",
+		0xF008, O_FORTRAN, "Read of output-only device, or write to input-only device",
+		0xF009, O_FORTRAN, "Real variable transmitted with I format or integer transmitted with E or F",
+		0xF020, O_FORTRAN, "Illegal unit reference",
+		0xF021, O_FORTRAN, "Read list exceeds length of write list",
+		0xF022, O_FORTRAN, "Record does not exist in read list",
+		0xF023, O_FORTRAN, "Maximum length of $$$$$ area on disk has been exceeded",
+		0xF024, O_FORTRAN, "*IOCS (UDISK) was not specified",
+		0xF100, O_FORTRAN, "File not defined by DEFINE FILE statement",
+		0xF101, O_FORTRAN, "File record number too large, zero or negative",
+		0xF103, O_FORTRAN, "*IOCS(DISK) was not specified",
+		0xF105, O_FORTRAN, "Length of a list element exceeds record length in DEFINE FILE",
+		0xF107, O_FORTRAN, "Attempt to read or write an invalid sector address (may occur if a core image program is run with too little room in working storage)",
+		0xF10A, O_FORTRAN, "Define file table and/or core image header corrupted, probably by an out-of-bounds array subscript",
+		0x1000, O_MONITOR, "1442 card read/punch or 1442 punch: not ready or hopper empty. [emulator: attach a file to CR or CP and go]",
+		0x1001, O_MONITOR, "Illegal device, function or word count",
+		0x100F, O_MONITOR, "Occurs in a DUP operation after DUP error D112",
+		0x2000, O_MONITOR, "Keyboard/Console Printer not ready",
+		0x2001, O_MONITOR, "Illegal device, function or word count",
+		0x3000, O_MONITOR, "1134/1055 Paper Tape not ready",
+		0x3001, O_MONITOR, "Illegal device, function or word count, or invalid check digit",
+		0x4000, O_MONITOR, "2501 Card Reader not ready",
+		0x4001, O_MONITOR, "Illegal device, function or word count",
+		0x5000, O_MONITOR, "Disk not ready",
+		0x5001, O_MONITOR, "Illegal device, function or word count, or attempt to write in protected area",
+		0x5002, O_MONITOR, "Write select or power unsafe",
+		0x5003, O_MONITOR, "Read/write/seek failure after 16 attempts or disk overflow. Extension may display logical drive number in bits 0..3 and working storage address in bits 4..15. Program Start retries 16 more times.",
+		0x5004, O_MONITOR, "Same as above from routine DISK1 and DISKN, or, an uninitialized cartridge is online during a cold start.",
+		0x6000, O_MONITOR, "1132 Printer not ready or out of paper",
+		0x6001, O_MONITOR, "Illegal device, function or word count",
+		0x7000, O_MONITOR, "1627 Plotter not ready",
+		0x7001, O_MONITOR, "Illegal device, function or word count",
+		0x8001, O_MONITOR, "SCA error: Illegal function or word count",
+		0x8002, O_MONITOR, "SCA error: if STR mode, receive or transmit operation not completed;\n"
+						   "if BSC mode, invalid start characters in the I/O area for a transmit operation",
+		0x8003, O_MONITOR, "SCA error: if STR mode, failed to synchronize before attempt to read or write, or, attempted to receive before receiving INQ sequence;\n"
+						   "if BSC mode, invalid number of identification characters for an identification specification operation",
+		0x9000, O_MONITOR, "1403 printer no ready or out of paper",
+		0x9001, O_MONITOR, "Illegal device, function or word count",
+		0x9002, O_MONITOR, "Parity check, scan check or ring check",
+		0xA000, O_MONITOR, "1231 Optical Mark Reader not ready",
+		0xA001, O_MONITOR, "Illegal device, function or word count",
+		0xA002, O_MONITOR, "Feed check, last document was processed. Clear jam, do not refeed",
+		0xA003, O_MONITOR, "Feed check, last document not  processed. Clear jam and refeed",
+		0,      O_END, 	   NULL
+	};
 	int i;
 
-	if (hConsoleWnd != NULL)
-		SendMessage(hConsoleWnd, WM_CLOSE, 0, 0);	// cross thread call is OK
+	detach_cmd(0, "prt");		/* flush last print line */
 
-	if (hPump != INVALID_HANDLE_VALUE) {			// this is not the most graceful way to do it
-		TerminateThread(hPump, 0);
-		hPump  = INVALID_HANDLE_VALUE;
-		PumpID = 0;
-		hConsoleWnd = NULL;
-	}
-	if (hCDC != NULL) {
-		DeleteDC(hCDC);
-		hCDC = NULL;
-	}
-
-	NIXOBJECT(hBitmap)
-	NIXOBJECT(hbLampOut)
-	NIXOBJECT(hFont)
-	NIXOBJECT(hBtnFont);
-	NIXOBJECT(hcHand)
-	NIXOBJECT(hSwitchPen)
-	NIXOBJECT(hLtGreyPen)
-	NIXOBJECT(hGreyPen)
-	NIXOBJECT(hDkGreyPen)
-
-	for (i = 0; i < NBUTTONS; i++) {
-		NIXOBJECT(btn[i].hbrLit);
-		NIXOBJECT(btn[i].hbrDark);
-	}
-
-//	if (class_defined) {
-//		UnregisterClass(hInstance, szConsoleClassName);
-//		class_defined = FALSE;
-//	}
-}
-
-/* ------------------------------------------------------------------------ 
- * these variables hold the displayed versions of the system registers 
- * ------------------------------------------------------------------------ */
-
-static int shown_iar = 0, shown_sar = 0, shown_sbr = 0, shown_afr = 0, shown_acc = 0, shown_ext  = 0;
-static int shown_op  = 0, shown_tag = 0, shown_irq = 0, shown_ccc = 0, shown_cnd = 0, shown_wait = 0;
-static int shown_ces = 0, shown_runmode = MODE_RUN;
-static int CND;
-
-/* ------------------------------------------------------------------------ 
- * RedrawRegion - mark a region for redrawing without background erase
- * ------------------------------------------------------------------------ */
-
-static void RedrawRegion (HWND hWnd, int left, int top, int right, int bottom)
-{
-	RECT r;
-
-	r.left   = left;
-	r.top    = top;
-	r.right  = right;
-	r.bottom = bottom;
-
-	InvalidateRect(hWnd, &r, FALSE);
-}
-
-/* ------------------------------------------------------------------------ 
- * RepaintRegion - mark a region for redrawing with background erase
- * ------------------------------------------------------------------------ */
-
-static void RepaintRegion (HWND hWnd, int left, int top, int right, int bottom)
-{
-	RECT r;
-
-	r.left   = left;
-	r.top    = top;
-	r.right  = right;
-	r.bottom = bottom;
-
-	InvalidateRect(hWnd, &r, TRUE);
-}
-
-/* ------------------------------------------------------------------------ 
- * update_gui - sees if anything on the console display has changed, and invalidates 
- * the changed regions. Then it calls UpdateWindow to force an immediate repaint. This
- * function (update_gui) should probably not be called every time through the main
- * instruction loop but it should be called at least whenever wait_state or int_req change, and then
- * every so many instructions.  It's also called after every simh command so manual changes are
- * reflected instantly.
- * ------------------------------------------------------------------------ */
-
-void update_gui (BOOL force)
-{	
-	int i, sts;
-
-	if (hConsoleWnd == NULL)
-		return;
-
-	CND = 0;	/* combine carry and V as two bits */
-	if (C)
-		CND |= 2;
-	if (V)
-		CND |= 1;
-
-	if (RUNMODE == MODE_LOAD)
-		SBR = CES;			/* in load mode, SBR follows the console switches */
-
-	if (IAR != shown_iar)
-			{shown_iar = IAR; 		 RedrawRegion(hConsoleWnd, 75,    8, 364,  32);}	/* lamps: don't bother erasing bkgnd */
-	if (SAR != shown_sar)
-			{shown_sar = SAR; 		 RedrawRegion(hConsoleWnd, 75,   42, 364,  65);}
-	if (ACC != shown_acc)
-			{shown_acc = ACC; 		 RedrawRegion(hConsoleWnd, 75,  141, 364, 164);}
-	if (EXT != shown_ext)
-			{shown_ext = EXT; 		 RedrawRegion(hConsoleWnd, 75,  174, 364, 197);}
-	if (SBR != shown_sbr)
-			{shown_sbr = SBR; 		 RedrawRegion(hConsoleWnd, 75,   77, 364,  97);}
-	if (OP  != shown_op)		  			 
-			{shown_op  = OP;  		 RedrawRegion(hConsoleWnd, 501,   8, 595,  32);}
-	if (TAG != shown_tag)
-			{shown_tag = TAG; 		 RedrawRegion(hConsoleWnd, 501,  77, 595,  97);}
-	if (int_req != shown_irq)
-			{shown_irq = int_req;    RedrawRegion(hConsoleWnd, 501, 108, 595, 130);}
-	if (CCC != shown_ccc)
-			{shown_ccc = CCC;		 RedrawRegion(hConsoleWnd, 501, 141, 595, 164);}
-	if (CND != shown_cnd)
-			{shown_cnd = CND;        RedrawRegion(hConsoleWnd, 501, 174, 595, 197);}
-	if (wait_state != shown_wait)
-			{shown_wait= wait_state; RedrawRegion(hConsoleWnd, 380,  77, 414,  97);}
-	if (CES != shown_ces)
-			{shown_ces = CES; 		 RepaintRegion(hConsoleWnd, 115, 230, 478, 275);}	/* console entry sw: do erase bkgnd */
-	if (RUNMODE != shown_runmode)
-			{shown_runmode = RUNMODE;RepaintRegion(hConsoleWnd, 270, 359, 330, 418);}
-
-	for (i = 0; i < NBUTTONS; i++) {
-		if (btn[i].pushable)
-			continue;
-
-		switch (i) {
-			case IDC_RUN:				sts = running && ! wait_state;		break;
-//			case IDC_PARITY_CHECK:		sts = FALSE;		break;
-//			case IDC_POWER_ON:			sts = TRUE;			break;
-			default:
-				continue;
-
-//			case IDC_FILE_READY:		these windows are enabled&disabled directly
-//			case IDC_FORMS_CHECK:
-//			case IDC_KEYBOARD_SELECT:
-//			case IDC_DISK_UNLOCK:
-		}
-
-		if (sts != IsWindowEnabled(btn[i].hBtn)) {		// status has changed
-			if (sts || force || btn[i].immed_off) {		// if lamp should be on or must be set now
-				EnableWindow(btn[i].hBtn, sts);			// set it and reset cumulative off-time
-				btn[i].offtime = 0;
-			}
-			else if (btn[i].offtime == 0) {				// it just went out, note the time
-				btn[i].offtime = GetTickCount();
-			}
-			else if ((GetTickCount()-btn[i].offtime) >= LAMPTIME) {
-				EnableWindow(btn[i].hBtn, FALSE);		// it's been long enough -- switch the lamp off
+	if (reason == STOP_TIMED_OUT)
+		printf("\n<HR><B>Sorry, emulation run time exceeded %d second%s</B>\n", cgi_maxsec, (cgi_maxsec == 1) ? "" : "s");
+	else if (IAR != 0x2a || ACC != 0x1000) {
+		ACC &= 0xFFFF;
+		for (i = 0; pretstop[i].orig != O_END; i++) {
+			if (pretstop[i].acc == ACC) {
+				errmsg = pretstop[i].msg;
+				break;
 			}
 		}
+		printf("\n<HR><B>Abnormal exit: %s</B>\nIAR = %04x, ACC = %04x\n", errmsg, IAR, ACC);
 	}
 
-/*	UpdateWindow(hConsoleWnd); */
+//	printf("</PRE>\n</BODY>\n</HTML>\n");
+	exit(0);					/* save w/o writing disk image */
 }
 
-WNDPROC oldButtonProc = NULL;
-
-/* ------------------------------------------------------------------------ 
- * ------------------------------------------------------------------------ */
-
-LRESULT CALLBACK ButtonProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-	int i;
-
-	i = GetWindowLong(hWnd, GWL_ID);
-
-	if (! btn[i].pushable) {
-		if (uMsg == WM_LBUTTONDOWN || uMsg == WM_LBUTTONUP || uMsg == WM_LBUTTONDBLCLK)
-			return 0;
-		if (uMsg == WM_CHAR)
-			if ((TCHAR) wParam == ' ')
-				return 0;
-	}
-
-   	return CallWindowProc(oldButtonProc, hWnd, uMsg, wParam, lParam);
-}
-
-static int occurs (char *txt, char ch)
-{
-	int count = 0;
-
-	while (*txt)
-		if (*txt++ == ch)
-			count++;
-
-	return count;
-}
-
-// turns out to get properly colored buttons you have to paint them yourself. Sheesh.
-// On the plus side, this lets do a better job of aligning the button text than
-// the button would by itself.
-
-void PaintButton (LPDRAWITEMSTRUCT dis)
-{
-	int i = dis->CtlID, nc, nlines, x, y, dy;
- 	BOOL down = dis->itemState & ODS_SELECTED;
-	HPEN hOldPen;
-	HFONT hOldFont;
-	UINT oldAlign;
-	COLORREF oldBk;
-	char *txt, *tstart;
-
-	if (! BETWEEN(i, 0, NBUTTONS-1))
-		return;
-
-	FillRect(dis->hDC, &dis->rcItem, ((btn[i].pushable || power) && IsWindowEnabled(btn[i].hBtn)) ? btn[i].hbrLit : btn[i].hbrDark);
-
-	if (! btn[i].pushable) {
-		hOldPen = SelectObject(dis->hDC, hBlackPen);
-		MoveToEx(dis->hDC, dis->rcItem.left,    dis->rcItem.top, NULL);
-		LineTo(dis->hDC,   dis->rcItem.right-1, dis->rcItem.top);
-		LineTo(dis->hDC,   dis->rcItem.right-1, dis->rcItem.bottom-1);
-		LineTo(dis->hDC,   dis->rcItem.left,    dis->rcItem.bottom-1);
-		LineTo(dis->hDC,   dis->rcItem.left,    dis->rcItem.top);
-	}
-	else if (down) {
-		// do the three-D thing
-		hOldPen = SelectObject(dis->hDC, hDkGreyPen);
-		MoveToEx(dis->hDC, dis->rcItem.left,    dis->rcItem.bottom-2, NULL);
-		LineTo(dis->hDC,   dis->rcItem.left,    dis->rcItem.top);
-		LineTo(dis->hDC,   dis->rcItem.right-1, dis->rcItem.top);
-
-		SelectObject(dis->hDC, hWhitePen);
-		MoveToEx(dis->hDC, dis->rcItem.left,    dis->rcItem.bottom-1, NULL);
-		LineTo(dis->hDC,   dis->rcItem.right-1, dis->rcItem.bottom-1);
-		LineTo(dis->hDC,   dis->rcItem.right-1, dis->rcItem.top);
-
-		SelectObject(dis->hDC, hGreyPen);
-		MoveToEx(dis->hDC, dis->rcItem.left+1,  dis->rcItem.bottom-3, NULL);
-		LineTo(dis->hDC,   dis->rcItem.left+1,  dis->rcItem.top+1);
-		LineTo(dis->hDC,   dis->rcItem.right-3, dis->rcItem.top+1);
-	}
-	else {
-		hOldPen = SelectObject(dis->hDC, hWhitePen);
-		MoveToEx(dis->hDC, dis->rcItem.left,    dis->rcItem.bottom-2, NULL);
-		LineTo(dis->hDC,   dis->rcItem.left,    dis->rcItem.top);
-		LineTo(dis->hDC,   dis->rcItem.right-1, dis->rcItem.top);
-
-		SelectObject(dis->hDC, hDkGreyPen);
-		MoveToEx(dis->hDC, dis->rcItem.left,    dis->rcItem.bottom-1, NULL);
-		LineTo(dis->hDC,   dis->rcItem.right-1, dis->rcItem.bottom-1);
-		LineTo(dis->hDC,   dis->rcItem.right-1, dis->rcItem.top);
-
-		SelectObject(dis->hDC, hGreyPen);
-		MoveToEx(dis->hDC, dis->rcItem.left+1,  dis->rcItem.bottom-2, NULL);
-		LineTo(dis->hDC,   dis->rcItem.right-2, dis->rcItem.bottom-2);
-		LineTo(dis->hDC,   dis->rcItem.right-2, dis->rcItem.top+1);
-	}
-
-	SelectObject(dis->hDC, hOldPen);
-
-	hOldFont = SelectObject(dis->hDC, hBtnFont);
-	oldAlign = SetTextAlign(dis->hDC, TA_CENTER|TA_TOP);
-	oldBk    = SetBkMode(dis->hDC, TRANSPARENT);
-
-	txt = btn[i].txt;
-	nlines = occurs(txt, '\n')+1;
-	x  = (dis->rcItem.left + dis->rcItem.right)  / 2;
-	y  = (dis->rcItem.top  + dis->rcItem.bottom) / 2;
-
-	dy = 14;
-	y  = y - (nlines*dy)/2;
-
-	if (down) {
-		x += 1;
-		y += 1;
-	}
-
-	for (;;) {
-		for (nc = 0, tstart = txt; *txt && *txt != '\n'; txt++, nc++)
-			;
-
-		TextOut(dis->hDC, x, y, tstart, nc);
-
-		if (*txt == '\0')
-			break;
-
-		txt++;
-		y += dy;
-	}
-
-	SetTextAlign(dis->hDC, oldAlign);
-	SetBkMode(dis->hDC,    oldBk);
-	SelectObject(dis->hDC, hOldFont);
-}
-	
-/* ------------------------------------------------------------------------ 
- * ------------------------------------------------------------------------ */
-
-HWND CreateSubclassedButton (HWND hwParent, int i)
-{
-	HWND hBtn;
-	int x, y;
-	int r, g, b;
-
-	y = bmht - (4*BUTTON_HEIGHT) + BUTTON_HEIGHT * btn[i].y;
-	x = (btn[i].x < 2) ? (btn[i].x*BUTTON_WIDTH) : (bmwid - (4-btn[i].x)*BUTTON_WIDTH);
-
-	if ((hBtn = CreateWindow("BUTTON", btn[i].txt, WS_CHILD|WS_VISIBLE|BS_CENTER|BS_MULTILINE|BS_OWNERDRAW,
-			x, y, BUTTON_WIDTH, BUTTON_HEIGHT, hwParent, (HMENU) i, hInstance, NULL)) == NULL)
-		return NULL;
-
-	btn[i].hBtn = hBtn;
-
-	if (oldButtonProc == NULL)
-		oldButtonProc = (WNDPROC) GetWindowLong(hBtn, GWL_WNDPROC);
-
-	btn[i].hbrLit = CreateSolidBrush(btn[i].clr);
-
-	if (! btn[i].pushable) {
-		r = GetRValue(btn[i].clr) / 4;
-		g = GetGValue(btn[i].clr) / 4;
-		b = GetBValue(btn[i].clr) / 4;
-
-		btn[i].hbrDark = CreateSolidBrush(RGB(r,g,b));
-		EnableWindow(hBtn, FALSE);
-	}
-
-	SetWindowLong(hBtn, GWL_WNDPROC, (LONG) ButtonProc);
-	return hBtn;
-}
-
-/* ------------------------------------------------------------------------ 
- * Pump - thread that takes care of the console window. It has to be a separate thread so that it gets
- * execution time even when the simulator is compute-bound or IO-blocked. This routine creates the window
- * and runs a standard Windows message pump. The window function does the actual display work.
- * ------------------------------------------------------------------------ */
-
-static DWORD WINAPI Pump (LPVOID arg)
-{
-	MSG msg;
-	int wx, wy, i;
-	RECT r, ra;
-	BITMAP bm;
-	WNDCLASS cd;
-	HDC hDC;
-	HWND hActWnd;
-
-	hActWnd = GetForegroundWindow();
-
-	if (! class_defined) {							/* register Window class */
-		hInstance = GetModuleHandle(NULL);
-
-		memset(&cd, 0, sizeof(cd));
-		cd.style         = CS_NOCLOSE;
-		cd.lpfnWndProc   = ConsoleWndProc;
-		cd.cbClsExtra    = 0;
-		cd.cbWndExtra    = 0;
-		cd.hInstance     = hInstance;
-		cd.hIcon         = NULL;
-		cd.hCursor       = hcArrow;
-		cd.hbrBackground = NULL;
-		cd.lpszMenuName  = NULL;
-		cd.lpszClassName = szConsoleClassName;
-
-		if (! RegisterClass(&cd)) {
-			PumpID = 0;
-			return 0;
-		}
-
-		class_defined = TRUE;
-	}
-
-	hbWhite = GetStockObject(WHITE_BRUSH);			/* create or fetch useful GDI objects */
-	hbBlack = GetStockObject(BLACK_BRUSH);			/* create or fetch useful GDI objects */
-	hbGray  = GetStockObject(GRAY_BRUSH);
-	hSwitchPen = CreatePen(PS_SOLID, 5, RGB(255,255,255));
-
-	hWhitePen  = GetStockObject(WHITE_PEN);
-	hBlackPen  = GetStockObject(BLACK_PEN);
-	hLtGreyPen = CreatePen(PS_SOLID, 1, RGB(190,190,190));
-	hGreyPen   = CreatePen(PS_SOLID, 1, RGB(128,128,128));
-	hDkGreyPen = CreatePen(PS_SOLID, 1, RGB(64,64,64));
-
-	hcArrow = LoadCursor(NULL,      IDC_ARROW);
-	hcHand  = LoadCursor(hInstance, MAKEINTRESOURCE(IDC_HAND));
-
-	if (hBitmap   == NULL)
-		hBitmap   = LoadBitmap(hInstance, MAKEINTRESOURCE(IDB_CONSOLE));
-	if (hbLampOut == NULL)
-		hbLampOut = CreateSolidBrush(RGB(50,50,50));
-	if (hFont     == NULL)
-		hFont     = CreateFont(-10, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, FIXED_PITCH, FF_SWISS, "Arial");
-	if (hBtnFont  == NULL)
-		hBtnFont  = CreateFont(-12, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, FIXED_PITCH, FF_SWISS, "Arial");
-
-	if (hConsoleWnd == NULL) {						/* create window */
-		if ((hConsoleWnd = CreateWindow(szConsoleClassName, "IBM 1130", WS_OVERLAPPED, 0, 0, 200, 200, NULL, NULL, hInstance, NULL)) == NULL) {
-			PumpID = 0;
-			return 0;
-		}
-	}
-
-	GetObject(hBitmap, sizeof(bm), &bm);			/* get bitmap size */
-	bmwid = bm.bmWidth;
-	bmht  = bm.bmHeight;
-
-	for (i = 0; i < NBUTTONS; i++)
-		CreateSubclassedButton(hConsoleWnd, i);
-
-	EnableWindow(btn[IDC_POWER_ON].hBtn,    TRUE);
-	EnableWindow(btn[IDC_DISK_UNLOCK].hBtn, TRUE);
-
-	GetWindowRect(hConsoleWnd, &r);					/* get window size as created */
-	wx = r.right  - r.left + 1;
-	wy = r.bottom - r.top  + 1;
-
-	if (hCDC == NULL) {								/* get a memory DC and select the bitmap into ti */
-		hDC = GetDC(hConsoleWnd);
-		hCDC = CreateCompatibleDC(hDC);
-		SelectObject(hCDC, hBitmap);
-		ReleaseDC(hConsoleWnd, hDC);
-	}
-
-	GetClientRect(hConsoleWnd, &r);
-	wx = (wx - r.right  - 1) + bmwid;				/* compute new desired size based on how client area came out */
-	wy = (wy - r.bottom - 1) + bmht;
-	MoveWindow(hConsoleWnd, 0, 0, wx, wy, FALSE);	/* resize window */
-
-	ShowWindow(hConsoleWnd, SW_SHOWNOACTIVATE);		/* display it */
-	UpdateWindow(hConsoleWnd);
-
-	if (hActWnd != NULL) {							/* bring console (sim) window back to top */
-		GetWindowRect(hConsoleWnd, &r);
-		ShowWindow(hActWnd, SW_NORMAL);				/* and move it just below the display window */
-		SetWindowPos(hActWnd, HWND_TOP, 0, r.bottom, 0, 0, SWP_NOSIZE);
-		GetWindowRect(hActWnd, &ra);
-		if (ra.bottom >= GetSystemMetrics(SM_CYSCREEN)) {	/* resize if it goes of bottom of screen */
-			ra.bottom = GetSystemMetrics(SM_CYSCREEN) - 1;
-			SetWindowPos(hActWnd, 0, 0, 0, ra.right-ra.left+1, ra.bottom-ra.top+1, SWP_NOZORDER|SWP_NOMOVE);
-		}
-	}
-
-	while (GetMessage(&msg, hConsoleWnd, 0, 0)) {	/* message pump - this basically loops forevermore */
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
-	}
-
-	if (hConsoleWnd != NULL) {
-		DestroyWindow(hConsoleWnd);						/* but if a quit message got posted, clean up */
-		hConsoleWnd = NULL;
-	}
-
-	PumpID = 0;
-	return 0;
-}
-
-/* ------------------------------------------------------------------------ 
- * DrawBits - starting at position (x,y), draw lamps for nbits bits of word 'bits',	looking only at masked bits
- * ------------------------------------------------------------------------ */
-
-static void DrawBits (HDC hDC, int x, int y, int bits, int nbits, int mask, char *syms)
-{
-	int i, b = 0x0001 << (nbits-1);
-
-	for (i = 0; i < nbits; i++, b >>= 1) {
-		if (mask & b) {								/* select white or black lettering then write 2 chars */
-			SetTextColor(hDC, (b & bits && power) ? RGB(255,255,255) : RGB(0,0,0));
-			TextOut(hDC, x, y, syms, 2);
-		}
-		syms += 2;									/* go to next symbol pair */
-
-		if (i < 10)
-			x += 15;								/* step between lamps */
-		else
-			x += 19;
-
-		if (x < 500) {
-			if (b & 0x1110)
-				x += 10;							/* step over nibble divisions on left side */
-			else if (b & 0x0001)
-				x += 9;
-		}
-	}
-}
-
-/* ------------------------------------------------------------------------ 
- * DrawToggles - display the console sense switches
- * ------------------------------------------------------------------------ */
-
-static void DrawToggles (HDC hDC, int bits)
-{
-	int b, x;
-
-	for (b = 0x8000, x = 122; b != 0; b >>= 1) {
-		if (shown_ces & b) {			/* up */
-			SelectObject(hDC, hbWhite);
-			Rectangle(hDC, x, 232, x+9, 240);
-			SelectObject(hDC, hbGray);
-			Rectangle(hDC, x, 239, x+9, 255);
- 		}
-		else {							/* down */
-			SelectObject(hDC, hbWhite);
-			Rectangle(hDC, x, 263, x+9, 271);
-			SelectObject(hDC, hbGray);
-			Rectangle(hDC, x, 248, x+9, 264);
-		}
-
-		x += (b & 0x1111) ? 31 : 21;
-	}
-}
-
-/* ------------------------------------------------------------------------ 
- * DrawRunmode - draw the run mode rotary switch's little tip
- * ------------------------------------------------------------------------ */
-
-void DrawRunmode (HDC hDC, int mode)
-{
-	double angle = (mode*45. + 90.) * 3.1415926 / 180.;		/* convert mode position to angle in radians */
-	double ca, sa;											/* sine and cosine */
-	int x0, y0, x1, y1;
-	HPEN hOldPen;
-
-	ca = cos(angle);
-	sa = sin(angle);
-
-	x0 = 301 + (int) (20.*ca + 0.5);		/* inner radius */
-	y0 = 389 - (int) (20.*sa + 0.5);
-	x1 = 301 + (int) (25.*ca + 0.5);		/* outer radius */
-	y1 = 389 - (int) (25.*sa + 0.5);
-
-	hOldPen = SelectObject(hDC, hSwitchPen);
-
-	MoveToEx(hDC, x0, y0, NULL);
-	LineTo(hDC, x1, y1);
-
-	SelectObject(hDC, hOldPen);
-}
-
-/* ------------------------------------------------------------------------ 
- * HandleClick - handle mouse clicks on the console window. Now we just 
- * look at the console sense switches.  Actual says this is a real click, rather
- * than a mouse-region test.  Return value TRUE means the cursor is over a hotspot.
- * ------------------------------------------------------------------------ */
-
-static BOOL HandleClick (HWND hWnd, int xh, int yh, BOOL actual)
-{
-	int b, x, r, ang, i;
-
-	for (b = 0x8000, x = 122; b != 0; b >>= 1) {
-		if (BETWEEN(xh, x-3, x+8+3) && BETWEEN(yh, 230, 275)) {
-			if (actual) {
-				CES ^= b;						/* a hit. Invert the bit and redisplay */
-				update_gui(TRUE);
-			}
-			return TRUE;
-		}
-		x += (b & 0x1111) ? 31 : 21;
-	}
-
-	if (BETWEEN(xh, 245, 355) && BETWEEN(yh, 345, 425)) {		/* hit near rotary switch */
-		ang = (int) (atan2(301.-xh, 389.-yh)*180./3.1415926);	/* this does implicit 90 deg rotation by the way */
-		r = (int) sqrt((xh-301)*(xh-301)+(yh-389)*(yh-389));
-		if (r > 12) {
-			for (i = MODE_LOAD; i <= MODE_INT_RUN; i++) {
-				if (BETWEEN(ang, i*45-12, i*45+12)) {
-					if (actual) {
-						RUNMODE = i;
-						update_gui(TRUE);
-					}
-					return TRUE;
-				}
-			}
-			
-		}
-	}
-
-	return FALSE;
-}
-
-/* ------------------------------------------------------------------------ 
- * DrawConsole - refresh the console display. (This routine could be sped up by intersecting
- * the various components' bounding rectangles with the repaint rectangle.  The bounding rects
- * could be put into an array and used both here and in the refresh routine).
- *
- * RedrawRegion -> force repaint w/o background redraw. used for lamps which are drawn in the same place in either state
- * RepaintRegion-> repaint with background redraw. Used for toggles which change position.
- * ------------------------------------------------------------------------ */
-
-static void DrawConsole (HDC hDC)
-{
-	static char digits[] = " 0 1 2 3 4 5 6 7 8 9101112131415";
-	static char cccs[]   = "3216 8 4 2 1";
-	static char cnds[]   = " C V";
-	static char waits[]  = " W";
-	HFONT hOldFont, hOldBrush;
-
-	hOldFont  = SelectObject(hDC, hFont);			/* use that tiny font */
-	hOldBrush = SelectObject(hDC, hbWhite);
-
-	SetBkMode(hDC, TRANSPARENT);					/* overlay letters w/o changing background */
-
-	DrawBits(hDC,  76,  15, shown_iar,    16, 0x3FFF, digits);
-	DrawBits(hDC,  76, 	48, shown_sar,    16, 0x3FFF, digits);
-	DrawBits(hDC,  76,  81, shown_sbr,    16, 0xFFFF, digits);
-	DrawBits(hDC,  76, 147, shown_acc,    16, 0xFFFF, digits);
-	DrawBits(hDC,  76, 180, shown_ext,    16, 0xFFFF, digits);
-
-	DrawBits(hDC, 506,  15, shown_op,      5, 0x001F, digits);
-	DrawBits(hDC, 506,  81, shown_tag,     4, 0x0007, digits);
-	DrawBits(hDC, 506, 114, shown_irq,     6, 0x003F, digits);
-	DrawBits(hDC, 506, 147, shown_ccc,     6, 0x003F, cccs);
-	DrawBits(hDC, 506, 180, shown_cnd,     2, 0x0003, cnds);
-
-	DrawBits(hDC, 390,  81, shown_wait?1:0,1, 0x0001, waits);
-
-	DrawToggles(hDC, shown_ces);
-
-	DrawRunmode(hDC, shown_runmode);
-
-	SelectObject(hDC, hOldFont);
-	SelectObject(hDC, hOldBrush);
-}
-
-/* ------------------------------------------------------------------------ 
- * Handles button presses. Remember that this occurs in the context of 
- * the Pump thread, not the simulator thread.
- * ------------------------------------------------------------------------ */
-
-extern void stuff_cmd (char *cmd);
-extern void remark_cmd (char *cmd);
-
-void flash_run (void)              
-{
-	EnableWindow(btn[IDC_RUN].hBtn, TRUE);		// enable the run lamp
-	btn[IDC_RUN].offtime = GetTickCount();		// reset timeout
-
-	KillTimer(hConsoleWnd, UPDATE_TIMER_ID);	// (re)schedule lamp update
-	SetTimer(hConsoleWnd, UPDATE_TIMER_ID, LAMPTIME+1, NULL);
-}
-
-void HandleCommand (HWND hWnd, WPARAM wParam, LPARAM lParam)
-{
-	int i;
-
-	switch (wParam) {
-		case IDC_POWER:						/* toggle system power */
-			power = ! power;
-			reset_all(0);
-			if (running && ! power) {		/* turning off */
-				reason = STOP_POWER_OFF;
-				while (running)
-					Sleep(10);				/* wait for execution thread to exit */
-			}
-			EnableWindow(btn[IDC_POWER_ON].hBtn, power);
-			for (i = 0; i < NBUTTONS; i++)
-				InvalidateRect(btn[i].hBtn, NULL, TRUE);
-			break;
-
-		case IDC_PROGRAM_START:				/* begin execution */
-			if (! running) {
-				switch (RUNMODE) {
-					case MODE_INT_RUN:
-					case MODE_RUN:
-					case MODE_SI:
-						stuff_cmd("go");
-						break;
-
-					case MODE_DISP:			/* display core and advance IAR */
-						ReadW(IAR);
-						IAR = IAR+1;
-						flash_run();		/* illuminate run lamp for .5 sec */
-						break;
-
-					case MODE_LOAD:			/* store to core and advance IAR */
-						WriteW(IAR, CES);
-						IAR = IAR+1;
-						flash_run();
-						break;
-				}
-			}
-			break;
-
-		case IDC_PROGRAM_STOP:
-			if (running) {					/* potential race condition here */
-				GUI_BEGIN_CRITICAL_SECTION
-				SETBIT(con_dsw, CON_DSW_PROGRAM_STOP);
-				SETBIT(ILSW[5], ILSW_5_PROGRAM_STOP);
-				int_req |= INT_REQ_5;
-				GUI_END_CRITICAL_SECTION
-			}
-			break;
-
-		case IDC_LOAD_IAR:
-			if (! running) {
-				IAR = CES & 0x3FFF;			/* set IAR from console entry switches */
-			}
-			break;
-
-		case IDC_KEYBOARD:					/* toggle between console/keyboard mode */
-			break;
-
-		case IDC_IMM_STOP:
-			if (running) {
-				reason = STOP_WAIT;			/* terminate execution without setting wait_mode */
-				while (running)
-					Sleep(10);				/* wait for execution thread to exit */
-			}
-			break;
-
-		case IDC_RESET:
-			if (! running) {				/* check-reset is disabled while running */
-				reset_all(0);
-				forms_check(0);				/* clear forms-check status */
-				print_check(0);
-			}
-			break;
-
-		case IDC_PROGRAM_LOAD:
-			if (! running) {				/* if card reader is attached to a file, do cold start read of one card */
-				IAR = 0;					/* reset IAR */
-//				stuff_cmd("boot cr");
-				if (cr_boot(0) != SCPE_OK)	/* load boot card */
-					remark_cmd("IPL failed");
-			}
-			break;
-	}
-	
-	update_gui(FALSE);
-}
-
-/* ------------------------------------------------------------------------ 
- * ConsoleWndProc - window process for the console display
- * ------------------------------------------------------------------------ */
-
-LRESULT CALLBACK ConsoleWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-	HDC hDC;
-	PAINTSTRUCT ps;
-	POINT p;
-	RECT clip, xsect, rbmp;
-	int i;
-
-	switch (uMsg) {
-		case WM_CLOSE:
-			DestroyWindow(hWnd);
-			break;
-
-		case WM_DESTROY:
-			hConsoleWnd = NULL;
-			break;
-
-		case WM_ERASEBKGND:
-			hDC = (HDC) wParam;
-			GetClipBox(hDC, &clip);
-			SetRect(&rbmp, 0, 0, bmwid, bmht);
-			if (IntersectRect(&xsect, &clip, &rbmp))
-				BitBlt(hDC, xsect.left, xsect.top, xsect.right-xsect.left+1, xsect.bottom-xsect.top+1, hCDC, xsect.left, xsect.top, SRCCOPY);
-//			rbmp.top = rbmp.bottom;
-//			rbmp.bottom += 200;
-//			if (IntersectRect(&xsect, &clip, &rbmp))
-//				FillRect(hDC, &xsect, hbBlack);
-			return TRUE;			/* let Paint do this so we know what the update region is (ps.rcPaint) */
-
-		case WM_PAINT:
-			hDC = BeginPaint(hWnd, &ps);
-			DrawConsole(hDC);
-			EndPaint(hWnd, &ps);
-			break;
-
-		case WM_COMMAND:			/* button click */
-			HandleCommand(hWnd, wParam, lParam);
-			break;
-
-		case WM_DRAWITEM:
-			PaintButton((LPDRAWITEMSTRUCT) lParam);
-			break;
-
-		case WM_SETCURSOR:
-			GetCursorPos(&p);
-			ScreenToClient(hWnd, &p);
-			SetCursor(HandleClick(hWnd, p.x, p.y, FALSE) ? hcHand : hcArrow);
-			return TRUE;
-
-		case WM_LBUTTONDOWN:
-			HandleClick(hWnd, LOWORD(lParam), HIWORD(lParam), TRUE);
-			break;
-
-		case WM_CTLCOLORBTN:
-			i = GetWindowLong((HWND) lParam, GWL_ID);
-			if (BETWEEN(i, 0, NBUTTONS-1))
-				return (LRESULT) (power && IsWindowEnabled((HWND) lParam) ? btn[i].hbrLit : btn[i].hbrDark);
-
-		case WM_TIMER:
-			if (wParam == UPDATE_TIMER_ID) {
-				update_gui(FALSE);
-				KillTimer(hWnd, UPDATE_TIMER_ID);
-			}
-			break;
-
-		default:
-			return DefWindowProc(hWnd, uMsg, wParam, lParam);
-	}
-
-	return 0;
-}
-
-enum {PRINTER_OK = 0, FORMS_CHECK = 1, PRINT_CHECK = 2, BOTH_CHECK = 3} printerstatus = PRINTER_OK;
-
-void forms_check (int set)
-{
-	COLORREF oldcolor = btn[IDC_FORMS_CHECK].clr;
-
-	if (set)
-		SETBIT(printerstatus, FORMS_CHECK);
-	else
-		CLRBIT(printerstatus, FORMS_CHECK);
-
-	btn[IDC_FORMS_CHECK].clr = (printerstatus & PRINT_CHECK) ? RGB(255,0,0) : RGB(255,255,0);
-
-	EnableWindow(btn[IDC_FORMS_CHECK].hBtn, printerstatus);
-
-	if (btn[IDC_FORMS_CHECK].clr != oldcolor)
-		InvalidateRect(btn[IDC_FORMS_CHECK].hBtn, NULL, TRUE);		// change color in any case
-}
-
-void print_check (int set)
-{
-	COLORREF oldcolor = btn[IDC_FORMS_CHECK].clr;
-
-	if (set)
-		SETBIT(printerstatus, PRINT_CHECK);
-	else
-		CLRBIT(printerstatus, PRINT_CHECK);
-
-	btn[IDC_FORMS_CHECK].clr = (printerstatus & PRINT_CHECK) ? RGB(255,0,0) : RGB(255,255,0);
-
-	EnableWindow(btn[IDC_FORMS_CHECK].hBtn, printerstatus);
-
-	if (btn[IDC_FORMS_CHECK].clr != oldcolor)
-		InvalidateRect(btn[IDC_FORMS_CHECK].hBtn, NULL, TRUE);		// change color in any case
-}
-
-void keyboard_selected (int select)
-{
-	EnableWindow(btn[IDC_KEYBOARD_SELECT].hBtn, select);
-}
-
-void disk_ready (int ready)
-{
-	EnableWindow(btn[IDC_FILE_READY].hBtn, ready);
-}
-
-void disk_unlocked (int unlocked)
-{
-	EnableWindow(btn[IDC_DISK_UNLOCK].hBtn, unlocked);
-}
-
-CRITICAL_SECTION critsect;
-
-void begin_critical_section (void)
-{
-	static BOOL mustinit = TRUE;
-
-	if (mustinit) {
-		InitializeCriticalSection(&critsect);
-		mustinit = FALSE;
-	}
-
-	EnterCriticalSection(&critsect);
-}
-
-void end_critical_section (void)
-{
-	LeaveCriticalSection(&critsect);
-}
-
-#endif // WIN32
-#endif // GUI_SUPPORT
+#endif		// ifdef CGI_SUPPORT

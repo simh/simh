@@ -87,7 +87,8 @@ const char *sim_stop_messages[] = {
 	"Unknown error",
 	"Unimplemented instruction",
 	"HALT instruction",
-	"Breakpoint"  };
+	"Breakpoint",
+	"Non-standard device number"  };
 
 /* Binary loader
 

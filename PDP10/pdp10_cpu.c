@@ -25,6 +25,8 @@
 
    cpu		KS10 central processor
 
+   08-Oct-02	RMS	Revised to build dib_tab dynamically
+			Added SHOW IOSPACE
    30-Dec-01	RMS	Added old PC queue
    25-Dec-01	RMS	Cleaned up sim_inst declarations
    07-Dec-01	RMS	Revised to use new breakpoint package
@@ -111,11 +113,10 @@
 
    3. Arithmetic.  The PDP-10 is a 2's complement system.
 
-   4. Adding I/O devices.  Three modules must be modified:
+   4. Adding I/O devices.  These modules must be modified:
 
-	pdp10_defs.h	add interrupt request definition
-	pdp10_ksio.c	add I/O page linkages
-	pdp10_sys.c	add pointer to data structures to sim_devices
+	pdp10_defs.h	add device address and interrupt definitions
+	pdp10_sys.c	add sim_devices table entry
 
    A note on ITS 1-proceed.  The simulator follows the implementation
    on the KS10, keeping 1-proceed as a side flag (its_1pr) rather than
@@ -225,6 +226,8 @@ int32 pi_eval (void);
 int32 test_int (void);
 void set_ac_display (d10 *acbase);
 
+extern t_stat build_dib_tab (void);
+extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
 extern d10 Read (a10 ea, int32 prv);			/* read, read check */
 extern d10 ReadM (a10 ea, int32 prv);			/* read, write check */
 extern d10 ReadE (a10 ea);				/* read, exec */
@@ -361,8 +364,6 @@ REG cpu_reg[] = {
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ DRDATA (INDMAX, ind_max, 8), PV_LEFT + REG_NZ },
 	{ DRDATA (XCTMAX, xct_max, 8), PV_LEFT + REG_NZ },
-	{ FLDATA (ITS, cpu_unit.flags, UNIT_V_ITS), REG_HRO },
-	{ FLDATA (T20V41, cpu_unit.flags, UNIT_V_T20V41), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ FLDATA (STOP_ILL, stop_op0, 0) },
 	{ BRDATA (REG, acs, 8, 36, AC_NUM * AC_NBLK) },
@@ -372,6 +373,8 @@ MTAB cpu_mod[] = {
 	{ UNIT_ITS+UNIT_T20V41, 0, "Standard microcode", "STANDARD", NULL },
 	{ UNIT_ITS+UNIT_T20V41, UNIT_T20V41, "TOPS-20 V4.1", "TOPS20V41", NULL },
 	{ UNIT_ITS+UNIT_T20V41, UNIT_ITS, "ITS microcode", "ITS", NULL },
+	{ MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
+	  NULL, &show_iospace },
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -581,9 +584,11 @@ t_stat sim_instr (void)
 {
 a10 PC;							/* set by setjmp */
 int abortval = 0;					/* abort value */
+t_stat r;
 
 /* Restore register state */
 
+if ((r = build_dib_tab ()) != SCPE_OK) return r;	/* build, chk dib_tab */
 pager_PC = PC = saved_PC & AMASK;			/* load local PC */
 set_dyn_ptrs ();					/* set up local ptrs */
 pager_tc = FALSE;					/* not in trap cycle */
@@ -605,7 +610,7 @@ if ((abortval > 0) || pager_pi) {			/* stop or pi err? */
 		abortval = STOP_PAGINT;			/* stop for pi err */
 	saved_PC = pager_PC & AMASK;			/* failing instr PC */
 	set_ac_display (ac_cur);			/* set up AC display */
-	pcq_r -> qptr = pcq_p;				/* update pc q ptr */
+	pcq_r->qptr = pcq_p;				/* update pc q ptr */
 	return abortval;  }				/* return to SCP */
 
 /* Page fail - checked against KS10 ucode
@@ -2044,7 +2049,7 @@ pi_eval ();
 if (M == NULL) M = calloc (MAXMEMSIZE, sizeof (d10));
 if (M == NULL) return SCPE_MEM;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r -> qptr = 0;
+if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -2087,6 +2092,6 @@ int i;
 
 rptr = find_reg ("AC0", NULL, &cpu_dev);
 if (rptr == NULL) return;
-for (i = 0; i < AC_NUM; i++, rptr++) rptr -> loc = (void *) (acbase + i);
+for (i = 0; i < AC_NUM; i++, rptr++) rptr->loc = (void *) (acbase + i);
 return;
 }

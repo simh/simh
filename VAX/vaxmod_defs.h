@@ -23,6 +23,10 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   11-Nov-02	RMS	Added log bits for XQ
+   10-Oct-02	RMS	Added DEQNA/DELQA, multiple RQ, autoconfigure support
+   29-Sep-02	RMS	Revamped bus support macros
+   06-Sep-02	RMS	Added TMSCP support
    14-Jul-02	RMS	Added additional console halt codes
    28-Apr-02	RMS	Fixed DZV vector base and number of lines
 
@@ -185,47 +189,76 @@
 #define CSR_BUSY	(1u << CSR_V_BUSY)
 #define CSR_ERR		(1u << CSR_V_ERR)
 
-/* IO parameters */
-
-#define DZ_MUXES	4				/* max # of muxes */
-#define DZ_LINES	4				/* (DZV) lines per mux */
-#define MT_MAXFR	(1 << 16)			/* magtape max rec */
-
 /* Timers */
 
 #define TMR_CLK		0				/* 100Hz clock */
 
 /* I/O system definitions */
 
+#define DZ_MUXES	4				/* max # of muxes */
+#define DZ_LINES	4				/* (DZV) lines per mux */
+#define MT_MAXFR	(1 << 16)			/* magtape max rec */
+#define AUTO_LNT	34				/* autoconfig ranks */
+#define DIB_MAX		100				/* max DIBs */
+
+#define DEV_V_UBUS	(DEV_V_UF + 0)			/* Unibus */
+#define DEV_V_QBUS	(DEV_V_UF + 1)			/* Qbus */
+#define DEV_V_FLTA	(DEV_V_UF + 2)			/* flt addr */
+#define DEV_UBUS	(1u << DEV_V_UBUS)
+#define DEV_QBUS	(1u << DEV_V_QBUS)
+#define DEV_FLTA	(1u << DEV_V_FLTA)
+
+#define UNIBUS		FALSE				/* 22b only */
+
 /* Device information block */
 
+#define VEC_DEVMAX	4				/* max device vec */
+
 struct pdp_dib {
-	uint32		enb;				/* enabled */
 	uint32		ba;				/* base addr */
 	uint32		lnt;				/* length */
 	t_stat		(*rd)(int32 *dat, int32 ad, int32 md);
-	t_stat		(*wr)(int32 dat, int32 ad, int32 md);  };
+	t_stat		(*wr)(int32 dat, int32 ad, int32 md);
+	int32		vnum;				/* vectors: number */
+	int32		vloc;				/* locator */
+	int32		vec;				/* value */
+	int32		(*ack[VEC_DEVMAX])(void);	/* ack routines */
+};
 
 typedef struct pdp_dib DIB;
 
-/* I/O page layout */
+/* I/O page layout - RQB,RQC,RQD float based on number of DZ's */
 
 #define IOBA_DZ		(IOPAGEBASE + 000100)		/* DZ11 */
 #define IOLN_DZ		010
+#define IOBA_RQB	(IOPAGEBASE + 000334 +  (020 * (DZ_MUXES / 2)))
+#define IOLN_RQB	004
+#define IOBA_RQC	(IOPAGEBASE + IOBA_RQB + IOLN_RQB)
+#define IOLN_RQC	004
+#define IOBA_RQD	(IOPAGEBASE + IOBA_RQC + IOLN_RQC)
+#define IOLN_RQD	004
 #define IOBA_RQ		(IOPAGEBASE + 012150)		/* RQDX3 */
 #define IOLN_RQ		004
 #define IOBA_TS		(IOPAGEBASE + 012520)		/* TS11 */
 #define IOLN_TS		004
 #define IOBA_RL		(IOPAGEBASE + 014400)		/* RL11 */
 #define IOLN_RL		012
+#define IOBA_XQ		(IOPAGEBASE + 014440)		/* DEQNA/DELQA */
+#define IOLN_XQ		020
+#define IOBA_XQB	(IOPAGEBASE + 014460)		/* 2nd DEQNA/DELQA */
+#define IOLN_XQB	020
+#define IOBA_TQ		(IOPAGEBASE + 014500)		/* TMSCP */
+#define IOLN_TQ		004
 #define IOBA_RP		(IOPAGEBASE + 016700)		/* RP/RM */
 #define IOLN_RP		054
 #define IOBA_DBL	(IOPAGEBASE + 017500)		/* doorbell */
 #define IOLN_DBL	002
 #define IOBA_LPT	(IOPAGEBASE + 017514)		/* LP11 */
 #define IOLN_LPT	004
-#define IOBA_PT		(IOPAGEBASE + 017550)		/* PC11 */
-#define IOLN_PT		010
+#define IOBA_PTR	(IOPAGEBASE + 017550)		/* PC11 reader */
+#define IOLN_PTR	004
+#define IOBA_PTP	(IOPAGEBASE + 017554)		/* PC11 punch */
+#define IOLN_PTP	004
 
 /* The KA65x maintains 4 separate hardware IPL levels, IPL 17 to IPL 14
    Within each IPL, priority is right to left
@@ -245,6 +278,8 @@ typedef struct pdp_dib DIB;
 #define INT_V_DZTX	3
 #define INT_V_RP	4				/* RP,RM drives */
 #define INT_V_TS	5				/* TS11/TSV05 */
+#define INT_V_TQ	6				/* TMSCP */
+#define INT_V_XQ	7				/* DEQNA/DELQA */
 
 /* IPL 14 */
 
@@ -265,6 +300,8 @@ typedef struct pdp_dib DIB;
 #define INT_DZTX	(1u << INT_V_DZTX)
 #define INT_RP		(1u << INT_V_RP)
 #define INT_TS		(1u << INT_V_TS)
+#define INT_TQ		(1u << INT_V_TQ)
+#define INT_XQ		(1u << INT_V_XQ)
 #define INT_TTI		(1u << INT_V_TTI)
 #define INT_TTO		(1u << INT_V_TTO)
 #define INT_PTR		(1u << INT_V_PTR)
@@ -282,6 +319,8 @@ typedef struct pdp_dib DIB;
 #define IPL_DZTX	(0x15 - IPL_HMIN)
 #define IPL_RP		(0x15 - IPL_HMIN)
 #define IPL_TS		(0x15 - IPL_HMIN)
+#define IPL_TQ		(0x15 - IPL_HMIN)
+#define IPL_XQ		(0x15 - IPL_HMIN)
 #define IPL_TTI		(0x14 - IPL_HMIN)
 #define IPL_TTO		(0x14 - IPL_HMIN)
 #define IPL_PTR		(0x14 - IPL_HMIN)
@@ -297,17 +336,31 @@ typedef struct pdp_dib DIB;
 #define IPL_HLVL	(IPL_HMAX - IPL_HMIN + 1)	/* # hardware levels */
 #define IPL_SMAX	0xF				/* highest swre level */
 
+/* Device vectors */
+
 #define VEC_Q		0x200				/* Qbus vector offset */
-#define VEC_PTR		(VEC_Q + 0070)			/* Qbus vectors */
+#define VEC_PTR		(VEC_Q + 0070)
 #define VEC_PTP		(VEC_Q + 0074)
+#define VEC_XQ		(VEC_Q + 0120)
 #define VEC_RQ		(VEC_Q + 0154)
 #define VEC_RL		(VEC_Q + 0160)
 #define VEC_LPT		(VEC_Q + 0200)
 #define VEC_TS		(VEC_Q + 0224)
 #define VEC_RP		(VEC_Q + 0254)
+#define VEC_TQ		(VEC_Q + 0260)
 #define VEC_DZRX	(VEC_Q + 0300)
 #define VEC_DZTX	(VEC_Q + 0304)
 
+/* Autoconfigure ranks */
+
+#define RANK_DZ		8
+#define RANK_RL		14
+#define RANK_RQ		26
+#define RANK_TQ		30
+
+/* Interrupt macros */
+
+#define IVCL(dv)	((IPL_##dv * 32) + INT_V_##dv)
 #define IREQ(dv)	int_req[IPL_##dv]
 #define SET_INT(dv)	int_req[IPL_##dv] = int_req[IPL_##dv] | (INT_##dv)
 #define CLR_INT(dv)	int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
@@ -315,13 +368,18 @@ typedef struct pdp_dib DIB;
 
 /* Logging */
 
-#define LOG_CPU_I	0x001				/* intexc */
-#define LOG_CPU_R	0x002				/* REI */
-#define LOG_CPU_P	0x004				/* context */
-#define LOG_CPU_A	0x008
-#define LOG_RP		0x010
-#define LOG_TS		0x020
-#define LOG_RQ		0x040
+#define LOG_CPU_I	0x0001				/* intexc */
+#define LOG_CPU_R	0x0002				/* REI */
+#define LOG_CPU_P	0x0004				/* context */
+#define LOG_CPU_A	0x0008
+#define LOG_RP		0x0010
+#define LOG_TS		0x0020
+#define LOG_RQ		0x0040
+#define LOG_TQ		0x0080
+#define LOG_XQ0		0x0100
+#define LOG_XQ1		0x0200
+#define LOG_XQ2		0x0400
+#define LOG_XQ3		0x0800
 
 #define DBG_LOG(x)	(sim_log && (cpu_log & (x)))
 
@@ -335,17 +393,15 @@ int32 map_writeB (t_addr ba, int32 bc, uint8 *buf);
 int32 map_writeW (t_addr ba, int32 bc, uint16 *buf);
 int32 map_writeL (t_addr ba, int32 bc, uint32 *buf);
 
-/* Macros for PDP-11 compatibility */
-
-#define QB		0				/* Q22 native */
-#define UB		1				/* Unibus */
-
 #define Map_Addr(a,b)		map_addr (a, b)
 #define Map_ReadB(a,b,c,d)	map_readB (a, b, c)
 #define Map_ReadW(a,b,c,d)	map_readW (a, b, c)
 #define Map_WriteB(a,b,c,d)	map_writeB (a, b, c)
 #define Map_WriteW(a,b,c,d)	map_writeW (a, b, c)
+
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_bool dev_conflict (uint32 nba, DIB *curr);
+t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat auto_config (uint32 rank, uint32 num);

@@ -34,11 +34,14 @@
 extern uint8 M[];
 extern char bcd_to_ascii[64];
 extern int32 iochk, ind[64];
+
 int32 cct[CCT_LNT] = { 03 };
 int32 cctlnt = 66, cctptr = 0, lines = 0, lflag = 0;
+
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *cptr);
 t_stat space (int32 lines, int32 lflag);
+
 char bcd_to_pca[64] = {
 	' ', '1', '2', '3', '4', '5', '6', '7',
 	'8', '9', '0', '#', '@', ' ', ' ', ' ',
@@ -89,7 +92,6 @@ REG lpt_reg[] = {
 	{ DRDATA (LINES, lines, 8), PV_LEFT },
 	{ DRDATA (CCTP, cctptr, 8), PV_LEFT },
 	{ DRDATA (CCTL, cctlnt, 8), REG_RO + PV_LEFT },
-	{ GRDATA (CHAIN, lpt_unit.flags, 10, 2, UNIT_V_PCHAIN), REG_HRO },
 	{ NULL }  };
 
 MTAB lpt_mod[] = {

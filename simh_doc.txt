@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V2.11
-Date:	15-Jul-2002
+Subj:	Simulator Usage, V2.10
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -45,28 +45,22 @@ documented in separate, machine-specific memoranda.
 1. Compiling And Running A Simulator
 
 The simulators have been tested on VAX VMS, Alpha VMS, Alpha UNIX,
-Intel FreeBSD, Intel LINUX, Windows 9x/Me/NT/2000 (Visual C++ and
-MINGW gcc), Macintosh 9 and X (CodeWarrior), and OS/2.  Porting to
-other environments will require changes to the operating system
-dependent code in scp_tty.c and scp_sock.c.
+NetBSD, FreeBSD, OpenBSD, Linux, Solaris, Windows 9x/Me/NT/2000, MacOS
+9 and X, and OS/2.  Porting to other environments will require changes
+to the operating system dependent code in scp_tty.c, scp_sock.c, and
+sim_ether.c.
 
-The simulator sources are provided in a zip archive.  The sources
-originate on a Windows system and have cr-lf at the end of every line.
-For use on UNIX or Mac, the sources must be converted to UNIX and MAC
-text conventions.  This can usually be done with the UNZIP utility
-(e.g., unzip -a on UNIX). 
-
-The simulator sources are organized hierarchically.  Source files for
-the simulator libraries are in the top level directory; source files
-for each simulator are in individual subdirectories.  Note that the
-include files in the top level directory are referenced from the
-subdirectories, without path identifiers.  Your build tool needs
-to search the top level directory for include files not found in the
-simulator-specific directory, or you will have to copy all files
-from the subdirectories into the master directory.  File manifests
+The simulator sources are provided in a zip archive and are organized
+hierarchically.  Source files for the simulator libraries are in the
+top level directory; source files for each simulator are in individual
+subdirectories.  Note that the include files in the top level directory
+are referenced from the subdirectories, without path identifiers.  Your
+build tool needs to search the top level directory for include files not
+found in the simulator-specific directory, or you will have to copy all
+files from the subdirectories into the master directory.  File manifests
 for each simulator are given in that simulator's documentation.
 
-Compilation notes:
+The simulators recognize or require a few compile-time #defines:
 
 - The 18b simulators require that the model name be defined as part
   of the compilation command line (i.e., PDP4 for the PDP-4, PDP7
@@ -79,6 +73,40 @@ Compilation notes:
   default is GNU C (long long).  If your compiler uses a different
   convention, you will have to modify sim_defs.h.
 
+- The PDP-11 and VAX simulators optionally support Ethernet.  To
+  include Ethernet emulation, USE_NETWORK must be defined as part
+  of the compilation command line.  At present, Ethernet support is
+  available only on Windows, Linux, NetBSD, and OpenBSD.
+
+To start the simulator, simply type its name.  (On version of VMS
+prior to 6.2, the simulators must then be defined as foreign commands
+in order to be be started by name.)  The simulator recognizes one
+switch, -Q; if specified, certain informational messages are suppressed.
+The simulator interprets the arguments on the command line, if any,
+as the file name and arguments for a DO command.  If a startup file
+is specified, it should contain a series of non-interactive simulator
+commands, one per line.  These command can be used to set up standard
+parameters, for example, disk sizes:
+
+	% pdp10 {<startup file> {arg,arg,...}}(cr)
+
+The simulator types out its name and version, executes the commands
+in the startup file, if any, and then prompts for input with
+
+	sim>
+
+1.1 Compiling Under UNIX/Linux
+
+The sources originate on a Windows system and have cr-lf at the end of
+every line.  For use on UNIX or Mac, the sources must be converted to
+UNIX text conventions.  This can be done with the UNIX UNZIP utility
+(unzip -a).
+
+The supplied makefile will compile the simulators for UNIX systems
+which support the POSIX TERMIOS.  The VAX and PDP-11 will be compiled
+without Ethernet support; use makefile_ether to compile with Ethernet
+support.  Notes for hand compilation:
+
 - The default UNIX terminal handling model is the POSIX TERMIOS
   interface, which is supported by Linux, Mac OS/X, and Alpha UNIX.
   If your UNIX only supports the BSD terminal interface, BSDTTY
@@ -88,17 +116,7 @@ Compilation notes:
   math library.  If your UNIX does not link the math library
   automatically, you must add -lm to the compilation command line.
 
-- Simulators supporting multiple terminals require a sockets library.
-  Under UNIX, this library is linked in automatically.  Under Visual
-  C++, wsock32.lib must be added to the library search list.  Under
-  OS/2, socket support requires the EMX compiler.
-
 Examples:
-
-- PDP-8 under VMS:
-
-	$ cc pdp8_*.c,scp.c,scp_tty.c,sim_*.c		! PDP-8
-	$ link/exec=pdp8 pdp8_*.obj,scp.obj,scp_tty.obj,sim_*.obj
 
 - PDP-11 under TERMIOS UNIX:
 
@@ -112,35 +130,99 @@ Examples:
 
 	% cc -DUSE_INT64 -DBSDTTY pdp10_*.c scp*.c sim_*.c -lm -o pdp10
 
-A batch file for compiling under the Windows MINGW environment, and
-a Make file for UNIX, are included in the distribution.
+1.2 Compiling Under Windows
 
-To start the simulator, simply type its name.  (On version of VMS
-prior to 6.2, the simulators must then be defined as foreign commands
-in order to be be started by name.)  The simulator takes one optional
-argument, a startup command file.  If specified, this file should
-contain a series of non-interactive simulator commands, one per line.
-These command can be used to set up standard parameters, for example,
-disk sizes:
+1.2.1 Compiling PDP-11 and VAX with Ethernet Support
 
-	% pdp10 <startup file>(cr)		or
+The Windows-specific Ethernet code uses the WinPCAP 3.0 package.
+This package for windows simulates the libpcap package that is freely
+available for Unix systems.  Note that WinPCAP DOES NOT SUPPORT dual
+CPU environments.
 
-The simulator types out its name and version, executes the commands
-in the startup file, if any, and then prompts for input with
+WinPCAP must be installed prior to building the PDP-11 and VAX
+simulators with Ethernet support.
 
-	sim>
+- Download V3.0 from http://winpcap.polito.it.
+- Install the package as directed.
+- Copy the required .h files (bittypes.h, devioctl.h, ip6_misc.h,
+  packet32.h, pcap.h, pcap-stdinc.h) from the WinPCAP 3.0 developer's
+  kit to the top level simulation directory.
+- Get the required .lib files (packet.lib, wpcap.lib) from the WinPCAP
+  3.0 developer's kit.  If you're using Borland C++, use COFF2OMF to
+  convert the .lib files into a format that can be used by the compiler.
+  Then move the libraries to the top level simulation directory.
+- Add -DUSE_NETWORK to the compilation command lines for the PDP-11
+  and VAX.
+
+1.2.2 Compiling Under MinGW
+
+MinGW (Minimum GCC for Windows) is a free C compiler available from
+http://www.mingw.org.  The distribution includes a batch file
+(build_mingw.bat) that will build all the simulators from source.
+By default, the PDP-11 and VAX are built without Ethernet support.  To
+enable Ethernet support, install WinPCAP as described in the previous
+section, and then use the alternative batch file (build_mingw_ether.bat).
+
+1.2.3 Compiling Under Visual C++
+
+Each simulator must be organized as a separate Visual C++ project. 
+Starting from an empty console application,
+
+- Add all the files from the simulator file manifest to the project.
+- Open the Project->Settings dialog box.
+- On the C/C++ tab, Category: General, add any required preprocessor
+  definitions (for example, USE_INT64).
+- On the C/C++ tab, Category: Preprocessor, add the top level
+  simulation directory to the Additional Include Directories.  For
+  the VAX and PDP-10, you must also add the PDP-11 directory.
+- On the Link tab, add wsock32.lib at the end of the list of
+  Object/Module Libraries.
+- If you are building the PDP-11 and VAX with Ethernet support, you
+  must also add the WinPCAP libraries (packet.lib, wpcap.lib) to the
+  list of Object/Module libraries.
+
+If you are using Visual C++ .NET, you must turn off /Wp (warn about
+potential 64b incompatibilities); otherwise, the compilations will
+generate a lot of spurious conversion warnings.
+
+1.2.4 Compiling Under Borland C++
+
+The Borland C++ compiler generates lots of spurious warnings about
+missing function prototypes and conversions.  All of these warnings
+can be safely ignored.
+
+1.3 Compiling Under OpenVMS
+
+Compiling on OpenVMS requires DEC C.  The simulators that require
+64b (PDP-10 and VAX) will not compile on OpenVMS/VAX.  The SIMH
+distribution includes an MMS command file descrip.mms that will
+build all the simulators from source.  An example of hand compilation:
+
+- PDP-8 under VMS:
+
+	$ cc scp*.c,sim_*.c,[.pdp8]pdp8*.c
+	$ link/exec=pdp8 scp*.obj,sim_*.obj,[.pdp8]pdp8*.obj
+
+1.4 Compiling Under MacOS
+
+The simulators have been tested on both MacOS 9 (with Codewarrior)
+and MacOS/X (with Apple's tools).
+
+1.5 Compiling Under OS/2
+
+Socket support requires the EMX compiler.
 
 2. Simulator Conventions
 
-A simulator consists of a series of devices, the first of which is always
-the CPU.  A device consists of named registers and one or more numbered
-units.  Registers correspond to device state, units to device address
-spaces.  Thus, the CPU device might have registers like PC, ION, etc,
-and a unit corresponding to main memory; a disk device might have
-registers like BUSY, DONE, etc, and units corresponding to individual
+A simulator consists of a series of devices, the first of which is
+always the CPU.  A device consists of named registers and one or more
+numbered units.  Registers correspond to device state, units to device
+address spaces.  Thus, the CPU device might have registers like PC,
+ION, etc, and a unit corresponding to main memory; a disk device might
+have registers like BUSY, DONE, etc, and units corresponding to individual
 disk drives.  Except for main memory, device address spaces are simulated
-as unstructured binary disk files in the host file system.  The SHOW CONFIG
-command displays the simulator configuration.
+as unstructured binary disk files in the host file system.  The SHOW
+CONFIG command displays the simulator configuration.
 
 A simulator keeps time in terms of arbitrary units, usually one time unit
 per instruction executed.  Simulated events (such as completion of I/O)
@@ -152,8 +234,8 @@ displays the simulator event queue.
 
 3. Commands
 
-Simulator commands consist of a command verb, optional switches, and optional
-arguments.  Switches take the form:
+Simulator commands consist of a command verb, optional switches, and
+optional arguments.  Switches take the form:
 
 	-<letter>{<letter>...}
 
@@ -161,7 +243,8 @@ Multiple switches may be specified separately or together: -abcd or
 -a -b -c -d are treated identically.  Verbs, switches, and other
 input (except for file names) are case insensitive.
 
-Any command beginning with semicolon (;) is considered a comment and ignored.
+Any command beginning with semicolon (;) is considered a comment and
+ignored.
 
 3.1 Loading and Saving Programs
 
@@ -211,24 +294,26 @@ does not clear main memory or affect I/O connections.
 
 3.4 Connecting and Disconnecting Devices
 
-Except for main memory, simulated unit address spaces are simulated as
-unstructured binary disk files in the host file system.  Before using a
-simulated unit the user must specify the file to be accessed by that
-unit.  The ATTACH (abbreviation AT) command associates a unit and a file:
+Except for main memory, simulated unit address spaces are simulated
+as unstructured binary disk files in the host file system.  Before
+using a simulated unit, the user must specify the file to be accessed
+by that unit.  The ATTACH (abbreviation AT) command associates a unit
+and a file:
 
 	sim> ATTACH <unit> <filename>(cr)
 
-If the file does not exist, and the -e switch was not specified, a new
-file is created, and an appropriate message is printed.  If the -e switch
-was specified, a new file is not created, and an error message is printed.
+If the file does not exist, and the -e switch was not specified, a
+new file is created, and an appropriate message is printed.  If the
+-e switch was specified, a new file is not created, and an error
+message is printed.
 
-If the -r switch is specified, or the file is write protected, ATTACH tries
-to open the file read only.  If the file does not exist, or the unit
-does not support read only operation, an error occurs.  Input-only
-devices, such as paper-tape readers, and devices with write lock switches,
-such as disks and tapes, support read only operation; other devices do
-not.  If a file is ATTACHed read only, its contents can be examined but
-not modified. 
+If the -r switch is specified, or the file is write protected, ATTACH
+tries to open the file read only.  If the file does not exist, or the
+unit does not support read only operation, an error occurs.  Input-
+only devices, such as paper-tape readers, and devices with write lock
+switches, such as disks and tapes, support read only operation; other
+devices do not.  If a file is ATTACHed read only, its contents can be
+examined but not modified. 
 
 For Telnet-based terminal emulators, the ATTACH command associates the
 master unit with a TCP/IP port:
@@ -238,11 +323,11 @@ master unit with a TCP/IP port:
 The port is a decimal number between 1 and 65535 and should not used
 by standard TCP/IP protocols.
 
-The DETACH (abbreviation DET) command breaks the association between a
-unit and a file, or between a unit and a port:
+The DETACH (abbreviation DET) command breaks the association between
+a unit and a file, or between a unit and a port:
 
-	sim> DETACH ALL(cr)			-- detach all units
-	sim> DETACH <unit>(cr)	-- detach specified unit
+	sim> DETACH ALL(cr)		-- detach all units
+	sim> DETACH <unit>(cr)		-- detach specified unit
 
 The EXIT command performs an automatic DETACH ALL.
 
@@ -322,7 +407,8 @@ Switches can be used to control the format of display information:
 	-d			display as decimal
 	-h			display as hexidecimal
 
-The simulators typically accept symbolic input (see simulator sections).
+The simulators typically accept symbolic input (see documentation with
+each simulator).
 
 Examples:
 
@@ -347,16 +433,16 @@ The RUN command (abbreviated RU) resets all devices, deposits its argument
 (if given) in the PC, and starts execution.  If no argument is given,
 execution starts at the current PC.
 
-The GO command does NOT reset devices, deposits its argument (if given) in
-the PC, and starts execution.  If no argument is given, execution starts at
-the current PC.
+The GO command does NOT reset devices, deposits its argument (if given)
+in the PC, and starts execution.  If no argument is given, execution
+starts at the current PC.
 
 The CONT command (abbreviated CO) does NOT reset devices and resumes
 execution at the current PC.
 
-The STEP command (abbreviated S) resumes execution at the current PC for
-the number of instructions given by its argument.  If no argument is
-supplied, one instruction is executed.
+The STEP command (abbreviated S) resumes execution at the current PC
+for the number of instructions given by its argument.  If no argument
+is supplied, one instruction is executed.
 
 The BOOT command (abbreviated BO) bootstraps the device and unit given
 by its argument.  If no unit is supplied, unit 0 is bootstrapped.  The
@@ -405,18 +491,18 @@ A breakpoint is set by the BREAK command:
 
 	sim> BREAK {-types} <addr range>{[count]},{addr range...}
 
-If no type is specified, the simulator-specific default breakpoint type
-(usually E for execution) is used.  As with EXAMINE and DEPOSIT, an address
-range may be a single address, a range of addresses low-high, or a relative
-range of address/length.  Examples of BREAK:
+If no type is specified, the simulator-specific default breakpoint
+type (usually E for execution) is used.  As with EXAMINE and DEPOSIT,
+an address range may be a single address, a range of addresses low-high,
+or a relative range of address/length.  Examples of BREAK:
 
-	sim> break -e 200			-- set E break at 200
-	sim> break 2000/2[2]			-- set E breaks at 2000,2001
-						   with count = 2
+	sim> break -e 200		-- set E break at 200
+	sim> break 2000/2[2]		-- set E breaks at 2000,2001
+					   with count = 2
 
 Currently set breakpoints can be displayed with the SHOW BREAK command:
 
-	sim> SHOW {-types} BREAK ALL|<addr range>{,<addr range>...}
+	sim> SHOW {-types} BREAK {ALL|<addr range>{,<addr range>...}}
 
 Locations with breakpoints of the specified type are displayed.
 
@@ -445,35 +531,37 @@ All devices recognize the following parameters:
 
 3.9 Displaying Parameters and Status
 
-The SHOW CONFIGURATION command shows the simulator configuration and the
-status of all simulated devices and units.
+The SHOW CONFIGURATION command shows the simulator configuration and
+the status of all simulated devices and units.
 
-The SHOW DEVICES command shows the configuration of all simulated devices.
-
-The SHOW MODIFIERS command shows the modifiers available on all simulated
+The SHOW DEVICES command shows the configuration of all simulated
 devices.
 
-The SHOW QUEUE command shows the state of the simulator event queue.  Times
-are in "simulation units", typically one unit per instruction execution,
-relative to the current simulation time.
+The SHOW MODIFIERS command shows the modifiers available on all
+simulated devices.
+
+The SHOW QUEUE command shows the state of the simulator event queue.
+Times are in "simulation units", typically one unit per instruction
+execution, relative to the current simulation time.
 
 The SHOW TIME command shows the number of time units elapsed since
 the last RUN command.
 
-The SHOW <device> command shows the status of the named simulated device.
-SHOW <device> <parameter> shows the value of the named parameter, if it
-display a result.
+The SHOW <device> command shows the status of the named simulated
+device. SHOW <device> <parameter> shows the value of the named
+parameter, if it can display a value.
 
 The SHOW <unit> command shows the status of the named simulated unit.
-SHOW <unit> <parameter> shows the value of the named parameter, if it can
-display a result.
+SHOW <unit> <parameter> shows the value of the named parameter, if
+it can display a value.
 
 3.10 Altering the Simulated Configuration
 
-In most simulators, the SET <device> DISABLED command removes the specified
-device from the configuration.  A DISABLED device is invisible to running
-programs.  The device can still be RESET but it cannot be ATTAChed, DETACHed,
-or BOOTed.  SET <device> ENABLED restores a disabled device to a configuration.
+In most simulators, the SET <device> DISABLED command removes the
+specified device from the configuration.  A DISABLED device is
+invisible to running programs.  The device can still be RESET but
+it cannot be ATTAChed, DETACHed, or BOOTed.  SET <device> ENABLED
+restores a disabled device to a configuration.
 
 Most multi-unit devices allow units to be placed online or offline:
 
@@ -482,25 +570,26 @@ Most multi-unit devices allow units to be placed online or offline:
 
 When a unit is offline, it will not be displayed by SHOW DEVICE.
 
-If the host is VMS or UNIX, VT100 terminal emulation for the console window
-is built in to the Xterm program.  For Windows, VT100 emulation foir the
-console window can be enabled or disabled explicitly:
+The console terminal normally runs in the controlling window.
+Optionally,  the console terminal can be connected to a Telnet port.
+This allows systems to emulate a VT100 using the built-in terminal
+emulation of the Telnet client.
 
-	sim> SET VT				-- enable VT emulation
-	sim> SET NOVT				-- disable VT emulation
-
-VT100 emulation is not presently available on Mac or OS/2 hosts.
+	sim> SET TELNET <port>		-- listen for console
+					   Telnet connection on port
+	sim> SET NOTELNET		-- disable console Telnet
+	sim> SHOW TELNET		-- show console Telnet status
 
 3.11 Logging Console Output
 
-Output to the console can be logged simultaneously to a file.  Logging is
-enabled by the LOG command:
+Output to the console can be logged simultaneously to a file.  Logging
+is enabled by the LOG command:
 
-	sim> SET LOG <filename>			-- log console output to file
+	sim> SET LOG <filename>		-- log console output to file
 
 Logging is disabled by the NOLOG command:
 
-	sim> SET NOLOG				-- disable logging
+	sim> SET NOLOG			-- disable logging
 
 SHOW LOG displays whether logging is enabled or disabled.
 
@@ -508,12 +597,27 @@ SHOW LOG displays whether logging is enabled or disabled.
 
 The simulator can execute command files with the DO command:
 
-	sim> DO <filename>			-- execute commands in file
+	sim> DO <filename> {arguments...}	-- execute commands in file
 
-If the switch -V is specified, the commands in the file are echoed before
-they are executed.
+The DO command allows command files to contain substitutable arguments.
+The string %n is recognized as meaning argument n from the DO command
+line. The character \ has the usual UNIX meaning of an escape character;
+the next character is interpreted literally, even if it is % or \.
+Arguments with spaces can be enclosed in matching single or double
+quotation marks.
 
-3.13 Exiting The Simulator
+If the switch -V is specified, the commands in the file are echoed
+before they are executed.
+
+3.13 Getting Help
+
+The HELP command prints out information about a command or about all
+commands:
+
+	sim> HELP			-- print all HELP messages
+	sim> HELP <command>		-- print HELP for command
+
+3.14 Exiting The Simulator
 
 EXIT (synonyms QUIT and BYE) returns control to the operating system.
 
@@ -524,26 +628,33 @@ simulator automatically performs any required byte swapping.
 
 1. Hard Disks
 
-Hard disks are represented as unstructured binary files of 16b data items for
-the 12b and 16b simulators, of 32b data items for the 18b and 32b simulators,
-and 64b for the 36b simulators.
+Hard disks are represented as unstructured binary files of 16b data
+items for the 12b and 16b simulators, of 32b data items for the 18b,
+24b, and 32b simulators, and 64b for the 36b simulators.
 
 2. Floppy Disks
 
-PDP-8 and PDP-11 floppy disks are represented as unstructured binary files
-of 8b data items.  They are nearly identical to the floppy disk images for
-Doug Jones' PDP-8 simulator but lack the initial 256 byte header.  A utility
-for converting between the two formats is easily written.
+PDP-8 and PDP-11 floppy disks are represented as unstructured binary
+files of 8b data items.  They are nearly identical to the floppy disk
+images for Doug Jones' PDP-8 simulator but lack the initial 256 byte
+header.  A utility for converting between the two formats is easily
+written.
 
 3. Magnetic Tapes
 
 Magnetic tapes are represented as unstructured binary files of 8b data
 items.  Each record consists of a 32b record header, in little endian
-format, followed by n 8b bytes of data, followed by a repeat of the 32b
-record header.  The high order bit of the record header is used as an
-error flag; the remaining 31b are the byte count of the record.  If
-the byte count is odd, the record is padded to even length; the pad
-byte is undefined.
+format.  If the record header is not a special header, it is followed
+by n 8b bytes of data, followed by a repeat of the 32b record header.
+A 1 in the high order bit of the record header indicates an error in
+the record. If the byte count is odd, the record is padded to even
+length; the pad byte is undefined.
+
+Special record headers occur only once and have no data.  The currently
+defined special headers are:
+
+	0x00000000		file mark (not repeated)
+	0xFFFFFFFF		end of medium (not repeated)
 
 Magnetic tapes are endian independent and consistent across simulator
 families.  A magtape produced by the Nova simulator will appear to
@@ -551,19 +662,21 @@ have its 16b words byte swapped if read by the PDP-11 simulator.
 
 4. Line Printers
 
-Line printer output is represented by an ASCII file of lines separated by
-the newline character.  Overprinting is represented by a line ending in
-return rather than newline.
+Line printer output is represented by an ASCII file of lines separated
+by the newline character.  Overprinting is represented by a line ending
+in return rather than newline.
 
 5. DECtapes
 
-DECtapes are structured as fixed length blocks.  PDP-9/11/15 DECtapes
+DECtapes are structured as fixed length blocks.  PDP-1/4/7/9/15 DECtapes
 use 578 blocks of 256 32b words.  Each 32b word contains 18b (6 lines)
-of data.  PDP-8 DECtapes use 1474 blocks of 129 16b words.  Each 16b
-word contains 12b (4 lines) of data.  Note that PDP-8 OS/8 does not use
-the 129th word of each block, and OS/8 DECtape dumps contain only 128
-words per block.  A utility, DTOS8CVT.C, is provided to convert OS/8
-DECtape dumps to simulator format.
+of data.  PDP-11 DECtapes use 578 blocks of 256 16b words.  Each 16b word
+contains 6 lines of data, with 2b omitted.  This is compatible with native
+PDP-11 DECtape dump facilities, and with John Wilson's PUTR Program.  PDP-8
+DECtapes use 1474 blocks of 129 16b words.  Each 16b word contains 12b
+(4 lines) of data.  PDP-8 OS/8 does not use the 129th word of each block,
+and OS/8 DECtape dumps contain only 128 words per block.  A utility,
+DTOS8CVT.C, is provided to convert OS/8 DECtape dumps to simulator format.
 
 A known problem in DECtape format is that when a block is recorded in
 one direction and read in the other, the bits in a word are scrambled
@@ -593,7 +706,7 @@ The debug status of each simulated CPU and device is as follows:
 device
 CPU		y	y	y	y	y
 FPU		-	y	-	-	-
-CIS		-	h	-	-	-
+EIS/CIS		-	h	-	-	-
 console		y	y	y	y	y
 paper tape	y	y	y	h	y
 card reader	-	-	-	-	-
@@ -603,42 +716,42 @@ extra terminal	y	y	y	-	y
 hard disk	y	y	y	-	h
 fixed disk	y	-	h	-	h
 floppy disk	y	y	y	-	-
-DECtape		y	y	-	-	y
+DECtape		y	y	-	h	y
 mag tape	h	y	y	-	h
 
 	system	1401	2100	PDP-10	H316	VAX
 device
 CPU		y	y	y	h	y
-FPU		-	-	y	-	y
-CIS		-	-	y	-	-
+FPU		-	d	y	-	y
+EIS/CIS		-	d	y	-	-
 console		h	y	y	h	y
-paper tape	-	h	h	h	y
+paper tape	-	d	h	h	y
 card reader	y	-	-	-	-
-line printer	y	h	y	h	y
-clock		-	h	y	h	y
+line printer	y	d	y	h	y
+clock		-	d	y	h	y
 extra terminal	-	h	y	-	y
 hard disk	-	h	y	-	y
 fixed disk	-	h	-	-	-
-floppy disk	-	-	-	-	-
+floppy disk	-	-	h	-	-
 DECtape		-	-	-	-	-
-mag tape	y	h	y	-	y
+mag tape	y	d	y	-	y
 
-	system	GRI-909
+	system	GRI-909	1620
 device
-CPU		h
-FPU		-
-CIS		-
-console		h
-paper tape	h
-card reader	-
-line printer	-
-clock		h
-extra terminal	-
-hard disk	-
-fixed disk	-
-floppy disk	-
-DECtape		-
-mag tape	-
+CPU		h	h
+FPU		-	-
+CIS		-	-
+console		h	h
+paper tape	h	h
+card reader	-	h
+line printer	-	h
+clock		h	-
+extra terminal	-	-
+hard disk	-	h
+fixed disk	-	-
+floppy disk	-	-
+DECtape		-	-
+mag tape	-	-
 
 legend:		y = runs operating system or sample program
 		d = runs diagnostics
@@ -646,10 +759,34 @@ legend:		y = runs operating system or sample program
 		n = untested
 		- = not applicable
 
-Revision History (covering Rev 1.1 to 2.9)
+Revision History (covering Rev 2.0 to present)
 
 Starting with Rev 2.7, detailed revision histories can be found
 in file sim_rev.c.
+
+Rev 2.10, Nov, 02
+		Added Telnet console capability, removed VT emulation
+		Added DO with substitutable arguments
+		Added quiet mode
+		Added device enable/disable support
+		Added optional simulator for input, output, commands
+		Added PDP-11 KW11P programmable clock
+		Added PDP-11 RK611/RK06/RK07 disk
+		Added PDP-11/VAX TMSCP tape
+		Added PDP-11/VAX DELQA Ethernet support (from David Hittner)
+		Added PDP-11/PDP-10 RX211/RX02 floppy disk
+		Added PDP-11/VAX autoconfiguration support
+		Added PDP-10/PDP-11/VAX variable vector support
+		Added PDP-1 DECtape
+		Added PDP-8 RX28 support
+		Added HP2100 12845A line printer
+		Added HP2100 13183 magtape support
+		Added HP2100 boot ROM support
+		Added IBM 1620
+		Added 16b DECtape file format support
+		Added support for statically buffered devices
+		Added magtape end of medium support
+		Added 7B/8B support to terminals and multiplexors
 
 Rev 2.9, Jan, 02
 		Added circular register arrays
@@ -948,6 +1085,7 @@ Ken Harrenstein		KLH PDP-10 simulator
 Bill Haygood		PDP-8 information, simulator, and software
 Wolfgang Helbig		DZ11 implementation
 Mark Hittinger		PDP-10 debugging
+Dave Hittner		SCP debugging, Ethernet emulation
 Sellam Ismail		GRI-909 documentation
 Jay Jaeger		IBM 1401 information
 Doug Jones		PDP-8 information, simulator, and software
@@ -964,6 +1102,7 @@ Bill McDermith		HP 2100 debugging, 12565A simulator
 Scott McGregor		PDP-11 UNIX legal permissions
 Jeff Moffatt		HP 2100 information, documentation, and software
 Alec Muffett		Solaris port testing
+Terry Newton		HP 21MX debugging
 Thord Nilson		DZ11 implementation
 Charles Owen		Nova moving head disk debugging, Altair simulator,
 			 Eclipse simulator, IBM System 3 simulator,

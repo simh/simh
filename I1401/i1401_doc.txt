@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	IBM 1401 Simulator Usage
-Date:	15-Jun-2002
+Date:	15-Nov-2002
 
 			COPYRIGHT NOTICE
 
@@ -37,9 +37,13 @@ This memorandum documents the IBM 1401 simulator.
 1. Simulator Files
 
 sim/		sim_defs.h
+		sim_rev.h
+		sim_sock.h
+		sim_tmxr.h
 		scp.c
 		scp_tty.c
-		sim_rev.c
+		sim_sock.c
+		sim_tmxr.c
 
 sim/i1401/	i1401_defs.h
 		i1401_cpu.c
@@ -297,8 +301,7 @@ pack options include the ability to enable address writing (formatting).
 	SET DPn ADDROFF		set unit n address enable off
 	SET DPn ADDRON		set unit n address enable on
 
-Units can also be set ONLINE or OFFLINE.  Disk data is buffered in
-memory; IO errors cannot occur.
+Units can also be set ONLINE or OFFLINE.
 
 Unlike most simulated disks, the 1311 includes explicit representation
 for sector addresses.  This is to support non-standard formats, such as
@@ -327,6 +330,11 @@ The disk pack controller implements these registers:
 	LASTF		3	most recent function
 	TIME		24	seek time
 
+The 1311 has a primative overlapped seek capability.  If TIME is set
+non-zero, the 1311 will report itself busy for the specified amount
+of time following a seek.  This allows programs to utilize the seek
+time for processing.
+
 Error handling is as follows:
 
 	error			processed as
@@ -334,10 +342,8 @@ Error handling is as follows:
 	not attached		set DSK indicator
 				if IOCHK set, report error and stop
 
-The 1311 has a primative overlapped seek capability.  If TIME is set
-non-zero, the 1311 will report itself busy for the specified amount
-of time following a seek.  This allows programs to utilize the seek
-time for processing.
+1311 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
 
 2.6 729 Magnetic Tape (MT)
 
@@ -367,12 +373,11 @@ Error handling is as follows:
 
 	not attached		report error and stop
 
-	end of file		(read or space) end of physical tape
-				(write) ignored
+	end of file		set error indicator
 
 	OS I/O error		print error message
+				set error indicator
 				if IOCHK set, report error and stop
-				otherwise, set ERR indicator
 
 2.7 Symbolic Display and Input
 

@@ -23,8 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   dsk	fixed head disk
+   dsk		fixed head disk
 
+   03-Oct-02	RMS	Added DIB
    06-Jan-02	RMS	Revised enable/disable support
    23-Aug-01	RMS	Fixed bug in write watermarking
    26-Apr-01	RMS	Added device enable/disable support
@@ -79,16 +80,20 @@ static const int32 sector_map[] = {
 
 extern uint16 M[];
 extern UNIT cpu_unit;
-extern int32 int_req, dev_busy, dev_done, dev_disable, iot_enb;
+extern int32 int_req, dev_busy, dev_done, dev_disable;
+
 int32 dsk_stat = 0;					/* status register */
 int32 dsk_da = 0;					/* disk address */
 int32 dsk_ma = 0;					/* memory address */
 int32 dsk_wlk = 0;					/* wrt lock switches */
 int32 dsk_stopioe = 1;					/* stop on error */
 int32 dsk_time = 100;					/* time per sector */
+
+DEVICE dsk_dev;
+int32 dsk (int32 pulse, int32 code, int32 AC);
 t_stat dsk_svc (UNIT *uptr);
 t_stat dsk_reset (DEVICE *dptr);
-t_stat dsk_boot (int32 unitno);
+t_stat dsk_boot (int32 unitno, DEVICE *dptr);
 
 /* DSK data structures
 
@@ -96,6 +101,8 @@ t_stat dsk_boot (int32 unitno);
    dsk_unit	unit descriptor
    dsk_reg	register list
 */
+
+DIB dsk_dib = { DEV_DSK, INT_DSK, PI_DSK, &dsk };
 
 UNIT dsk_unit =
 	{ UDATA (&dsk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
@@ -112,19 +119,14 @@ REG dsk_reg[] = {
 	{ ORDATA (WLK, dsk_wlk, 8) },
 	{ DRDATA (TIME, dsk_time, 24), REG_NZ + PV_LEFT },
 	{ FLDATA (STOP_IOE, dsk_stopioe, 0) },
-	{ FLDATA (*DEVENB, iot_enb, INT_V_DSK), REG_HRO },
 	{ NULL }  };
 
-MTAB dsk_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, INT_DSK, NULL, "ENABLED", &set_enb },
-	{ MTAB_XTD|MTAB_VDV, INT_DSK, NULL, "DISABLED", &set_dsb },
-	{ 0 }  };
-
 DEVICE dsk_dev = {
-	"DK", &dsk_unit, dsk_reg, dsk_mod,
+	"DK", &dsk_unit, dsk_reg, NULL,
 	1, 8, 21, 1, 8, 16,
 	NULL, NULL, &dsk_reset,
-	&dsk_boot, NULL, NULL };
+	&dsk_boot, NULL, NULL,
+	&dsk_dib, DEV_DISABLE };
 
 /* IOT routine */
 
@@ -184,23 +186,23 @@ dev_busy = dev_busy & ~INT_DSK;				/* clear busy */
 dev_done = dev_done | INT_DSK;				/* set done */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
 
-if ((uptr -> flags & UNIT_BUF) == 0) {			/* not buf? abort */
+if ((uptr->flags & UNIT_BUF) == 0) {			/* not buf? abort */
 	dsk_stat = DSKS_ERR + DSKS_NSD;			/* set status */
 	return IORETURN (dsk_stopioe, SCPE_UNATT);  }
 
 da = dsk_da * DSK_NUMWD;				/* calc disk addr */
-if (uptr -> FUNC == iopS) {				/* read? */
+if (uptr->FUNC == iopS) {				/* read? */
 	for (i = 0; i < DSK_NUMWD; i++) {		/* copy sector */
 		pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
 		if (MEM_ADDR_OK (pa)) M[pa] =
-			*(((int16 *) uptr -> filebuf) + da + i);  }
+			*(((int16 *) uptr->filebuf) + da + i);  }
 	dsk_ma = (dsk_ma + DSK_NUMWD) & AMASK;  }
-if (uptr -> FUNC == iopP) {				/* write? */
+if (uptr->FUNC == iopP) {				/* write? */
 	for (i = 0; i < DSK_NUMWD; i++) {		/* copy sector */
 		pa = MapAddr (0, (dsk_ma + i) & AMASK);	/* map address */
-		*(((int16 *) uptr -> filebuf) + da + i) = M[pa];  }
-	if (((t_addr) (da + i)) >= uptr -> hwmark)	/* past end? */
-		uptr -> hwmark = da + i + 1;		/* upd hwmark */
+		*(((int16 *) uptr->filebuf) + da + i) = M[pa];  }
+	if (((t_addr) (da + i)) >= uptr->hwmark)	/* past end? */
+		uptr->hwmark = da + i + 1;		/* upd hwmark */
 	dsk_ma = (dsk_ma + DSK_NUMWD + 3) & AMASK;  }
 
 dsk_stat = 0;						/* set status */
@@ -234,7 +236,7 @@ static const int32 boot_rom[] = {
 	000377,			/* JMP 377 */
 };
 
-t_stat dsk_boot (int32 unitno)
+t_stat dsk_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 saved_PC;

@@ -1,6 +1,29 @@
 /*	altairZ80_sio: MITS Altair serial I/O card
-		Written by Peter Schorn, 2001-2002
-		Based on work by Charles E Owen ((c) 1997, Commercial use prohibited)
+
+   Copyright (c) 2002, Peter Schorn
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Peter Schorn shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Peter Schorn.
+
+   Based on work by Charles E Owen (c) 1997
 
 		These functions support a simulated MITS 2SIO interface card.
 		The card had two physical I/O ports which could be connected
@@ -29,7 +52,7 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#include "altairZ80_defs.h"
+#include "altairz80_defs.h"
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 #include <time.h>
@@ -164,7 +187,7 @@ SIO_TERMINAL sio_terminals[Terminals] = {	{0, 0, 0x10, 0x11, 0x02},
 																					{0, 0, 0x16, 0x17, 0x00},
 																					{0, 0, 0x18, 0x19, 0x00} };
 TMLN TerminalLines[Terminals] = { {0} };	/* four terminals				*/
-TMXR altairTMXR = {Terminals, 0, NULL };	/* mux descriptor				*/
+TMXR altairTMXR = {Terminals, 0, 0 };	/* mux descriptor				*/
 
 UNIT sio_unit = { UDATA (&sio_svc, UNIT_ATTABLE, 0), KBD_POLL_WAIT };
 
@@ -200,7 +223,7 @@ DEVICE sio_dev = {
 	"SIO", &sio_unit, sio_reg, sio_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &sio_reset,
-	NULL, &sio_attach, &sio_detach };
+	NULL, &sio_attach, &sio_detach, NULL, 0 };
 
 UNIT ptr_unit = { UDATA (NULL, UNIT_SEQ + UNIT_ATTABLE + UNIT_ROABLE, 0),
 	KBD_POLL_WAIT };
@@ -215,7 +238,7 @@ DEVICE ptr_dev = {
 	"PTR", &ptr_unit, ptr_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptr_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL, NULL, 0 };
 
 UNIT ptp_unit = { UDATA (NULL, UNIT_SEQ + UNIT_ATTABLE, 0),
 	KBD_POLL_WAIT };
@@ -230,7 +253,7 @@ DEVICE ptp_dev = {
 	"PTP", &ptp_unit, ptp_reg, NULL,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &ptp_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL, NULL, 0 };
 
 /*	Synthetic device SIMH for communication
 		between Altair and SIMH environment using port 0xfe */
@@ -269,7 +292,7 @@ DEVICE simh_device = {
 	"SIMH", &simh_unit, simh_reg, simh_mod,
 	1, 10, 31, 1, 16, 4,
 	NULL, NULL, &simh_dev_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL, NULL, 0 };
 
 
 void resetSIOWarningFlags(void) {
@@ -317,10 +340,10 @@ t_stat sio_svc(UNIT *uptr) {
 	sim_activate(&sio_unit, sio_unit.wait);						/* continue poll			*/
 
 	if (sio_unit.flags & UNIT_ATT) {
-		if (sim_poll_kbd() == SCPE_STOP) {							/* listen for ^E			*/
+		if (sim_poll_kbd() == SCPE_STOP) {						/* listen for ^E			*/
 			return SCPE_STOP;
 		}
-		temp = tmxr_poll_conn(&altairTMXR, &sio_unit);	/* poll connection		*/
+		temp = tmxr_poll_conn(&altairTMXR);							/* poll connection		*/
 		if (temp >= 0) {
 			altairTMXR.ldsc[temp] -> rcve = 1;						/* enable receive			*/
 		}
@@ -584,7 +607,7 @@ int32 fromBCD(int32 x) {
 		the pseudo device is left in an unexpected state.
 
 	4) Commands requiring parameters and returning results do not exist currently.
-			
+
 */
 
 #define splimit									10
@@ -747,8 +770,8 @@ int32 simh_in(void) {
 							currentTime -> tm_year - 100 : currentTime -> tm_year);
 						break;
 					case 1:		result = toBCD(currentTime -> tm_mon + 1);	break;
-					case 2: 	result = toBCD(currentTime -> tm_mday);			break;
-					case 3: 	result = toBCD(currentTime -> tm_hour);			break;
+					case 2:		result = toBCD(currentTime -> tm_mday);			break;
+					case 3:		result = toBCD(currentTime -> tm_hour);			break;
 					case 4:		result = toBCD(currentTime -> tm_min);			break;
 					case 5:		result = toBCD(currentTime -> tm_sec);			break;
 					default:	result = 0;

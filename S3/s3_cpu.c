@@ -21,6 +21,10 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+   Except as contained in this notice, the name of Charles E. Owen shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Charles E. Owen.
+
    ------------------------------------------------------------------------------
 
    cpu		System/3 (models 10 and 15)  central processor
@@ -384,7 +388,7 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_boot (int32 unitno);
+t_stat cpu_boot (int32 unitno, DEVICE *dptr1);
 extern int32 pkb (int32 op, int32 m, int32 n, int32 data);
 extern int32 crd (int32 op, int32 m, int32 n, int32 data);
 extern int32 lpt (int32 op, int32 m, int32 n, int32 data);
@@ -567,7 +571,7 @@ if (debug_reg & 0x01) {
 	val[3] = GetMem(PC+3);
 	val[4] = GetMem(PC+4);
 	val[5] = GetMem(PC+5);
-	fprint_sym(trace, PC, val, &cpu_unit, SWMASK('M'));
+	fprint_sym(trace, PC, (uint32 *) val, &cpu_unit, SWMASK('M'));
 	fprintf(trace, "\n");	
 }
 	
@@ -1820,7 +1824,7 @@ for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
 return SCPE_OK;
 }
 
-t_stat cpu_boot (int32 unitno)
+t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 level = 8;
 IAR[8] = 0;

@@ -25,6 +25,10 @@
 
    rk		RK11/RK05 cartridge disk
 
+   29-Sep-02	RMS	Added variable address support to bootstrap
+			Added vector change/display support
+			Revised mapping mnemonics
+			New data structures
    26-Jan-02	RMS	Revised bootstrap to conform to M9312
    06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
@@ -75,7 +79,6 @@
 
 #define UNIT_V_HWLK	(UNIT_V_UF + 0)			/* hwre write lock */
 #define UNIT_V_SWLK	(UNIT_V_UF + 1)			/* swre write lock */
-#define UNIT_W_UF	3				/* user flags width */
 #define UNIT_HWLK	(1u << UNIT_V_HWLK)
 #define UNIT_SWLK	(1u << UNIT_V_SWLK)
 #define UNIT_WPRT	(UNIT_HWLK|UNIT_SWLK|UNIT_RO)	/* write prot */
@@ -169,6 +172,8 @@
 
 extern uint16 *M;					/* memory */
 extern int32 int_req[IPL_HLVL];
+extern int32 int_vec[IPL_HLVL][32];
+
 uint16 *rkxb = NULL;					/* xfer buffer */
 int32 rkcs = 0;						/* control/status */
 int32 rkds = 0;						/* drive status */
@@ -182,14 +187,16 @@ int32 rk_stopioe = 1;					/* stop on error */
 int32 rk_swait = 10;					/* seek time */
 int32 rk_rwait = 10;					/* rotate time */
 
+DEVICE rk_dev;
 t_stat rk_rd (int32 *data, int32 PA, int32 access);
 t_stat rk_wr (int32 data, int32 PA, int32 access);
+int32 rk_inta (void);
 t_stat rk_svc (UNIT *uptr);
 t_stat rk_reset (DEVICE *dptr);
 void rk_go (void);
 void rk_set_done (int32 error);
 void rk_clr_done (void);
-t_stat rk_boot (int32 unitno);
+t_stat rk_boot (int32 unitno, DEVICE *dptr);
 
 /* RK11 data structures
 
@@ -199,7 +206,8 @@ t_stat rk_boot (int32 unitno);
    rk_mod	RK modifier list
 */
 
-DIB rk_dib = { 1, IOBA_RK, IOLN_RK, &rk_rd, &rk_wr };
+DIB rk_dib = { IOBA_RK, IOLN_RK, &rk_rd, &rk_wr,
+		1, IVCL (RK), VEC_RK, { &rk_inta } };
 
 UNIT rk_unit[] = {
 	{ UDATA (&rk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
@@ -234,29 +242,26 @@ REG rk_reg[] = {
 	{ FLDATA (IE, rkcs, CSR_V_IE) },
 	{ DRDATA (STIME, rk_swait, 24), PV_LEFT },
 	{ DRDATA (RTIME, rk_rwait, 24), PV_LEFT },
-	{ URDATA (FLG, rk_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
-		  RK_NUMDR, REG_HRO) },
 	{ FLDATA (STOP_IOE, rk_stopioe, 0) },
 	{ ORDATA (DEVADDR, rk_dib.ba, 32), REG_HRO },
-	{ FLDATA (*DEVENB, rk_dib.enb, 0), REG_HRO },
+	{ ORDATA (DEVVEC, rk_dib.vec, 16), REG_HRO },
 	{ NULL }  };
 
 MTAB rk_mod[] = {
 	{ UNIT_HWLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_HWLK, UNIT_HWLK, "write locked", "LOCKED", NULL },
 	{ MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
-		&set_addr, &show_addr, &rk_dib },
-	{ MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
-		&set_enbdis, NULL, &rk_dib },
-	{ MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
-		&set_enbdis, NULL, &rk_dib },
+		&set_addr, &show_addr, NULL },
+	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+		&set_vec, &show_vec, NULL },
 	{ 0 }  };
 
 DEVICE rk_dev = {
 	"RK", rk_unit, rk_reg, rk_mod,
 	RK_NUMDR, 8, 24, 1, 8, 16,
 	NULL, NULL, &rk_reset,
-	&rk_boot, NULL, NULL };
+	&rk_boot, NULL, NULL,
+	&rk_dib, DEV_DISABLE | DEV_UBUS };
 
 /* I/O dispatch routine, I/O addresses 17777400 - 17777416
 
@@ -281,9 +286,9 @@ case 0:							/* RKDS: read only */
 	rkds = (rkds & RKDS_ID) | RKDS_RK05 | RKDS_SC_OK |
 		(rand () % RK_NUMSC);			/* random sector */
 	uptr = rk_dev.units + GET_DRIVE (rkda);		/* selected unit */
-	if (uptr -> flags & UNIT_ATT) rkds = rkds | RKDS_RDY;	/* attached? */
+	if (uptr->flags & UNIT_ATT) rkds = rkds | RKDS_RDY;	/* attached? */
 	if (!sim_is_active (uptr)) rkds = rkds | RKDS_RWS;	/* idle? */
-	if (uptr -> flags & UNIT_WPRT) rkds = rkds | RKDS_WLK;
+	if (uptr->flags & UNIT_WPRT) rkds = rkds | RKDS_WLK;
 	if (GET_SECT (rkda) == (rkds & RKDS_SC)) rkds = rkds | RKDS_ON_SC;
 	*data = rkds;
 	return SCPE_OK;
@@ -323,10 +328,10 @@ case 2:							/* RKCS */
 		(rkcs & 0377) | (data << 8): (rkcs & ~0377) | data;
 	if ((data & CSR_IE) == 0) {			/* int disable? */
 		rkintq = 0;				/* clr int queue */
-		CLR_INT (RK);  }		/* clr int request */
+		CLR_INT (RK);  }			/* clr int request */
 	else if ((rkcs & (CSR_DONE + CSR_IE)) == CSR_DONE) {
 		rkintq = rkintq | RK_CTLI;		/* queue ctrl int */
-		SET_INT (RK);  }		/* set int request */
+		SET_INT (RK);  }			/* set int request */
 	rkcs = (rkcs & ~RKCS_RW) | (data & RKCS_RW);
 	if ((rkcs & CSR_DONE) && (data & CSR_GO)) rk_go (); /* new function? */
 	return SCPE_OK;
@@ -364,7 +369,7 @@ if (func == RKCS_CTLRESET) {				/* control reset? */
 	rkba = 0;
 	rkcs = CSR_DONE;
 	rkintq = 0;					/* clr int queue */
-	CLR_INT (RK);			/* clr int request */
+	CLR_INT (RK);					/* clr int request */
 	return;  }
 rker = rker & ~RKER_SOFT;				/* clear soft errors */
 if (rker == 0) rkcs = rkcs & ~RKCS_ERR;			/* redo summary */
@@ -372,24 +377,24 @@ rkcs = rkcs & ~RKCS_SCP;				/* clear sch compl*/
 rk_clr_done ();						/* clear done */
 last_drv = GET_DRIVE (rkda);				/* get drive no */
 uptr = rk_dev.units + last_drv;				/* select unit */
-if (uptr -> flags & UNIT_DIS) {				/* not present? */
+if (uptr->flags & UNIT_DIS) {				/* not present? */
 	rk_set_done (RKER_NXD);
 	return;  }
-if (((uptr -> flags & UNIT_ATT) == 0) || sim_is_active (uptr)) {
+if (((uptr->flags & UNIT_ATT) == 0) || sim_is_active (uptr)) {
 	rk_set_done (RKER_DRE);				/* not att or busy */
 	return;  }
 if (rkcs & (RKCS_INH + RKCS_FMT)) {			/* format? */
 	rk_set_done (RKER_PGE);
 	return;  }
-if ((func == RKCS_WRITE) && (uptr -> flags & UNIT_WPRT)) {
+if ((func == RKCS_WRITE) && (uptr->flags & UNIT_WPRT)) {
 	rk_set_done (RKER_WLK);				/* write and locked? */
 	return;  }
 if (func == RKCS_WLK) {					/* write lock? */
-	uptr -> flags = uptr -> flags | UNIT_SWLK;
+	uptr->flags = uptr->flags | UNIT_SWLK;
 	rk_set_done (0);
 	return;  }
 if (func == RKCS_DRVRESET) {				/* drive reset? */
-	uptr -> flags = uptr -> flags & ~UNIT_SWLK;
+	uptr->flags = uptr->flags & ~UNIT_SWLK;
 	cyl = sect = 0;
 	func = RKCS_SEEK;  }
 else {	sect = GET_SECT (rkda);
@@ -400,13 +405,13 @@ if (sect >= RK_NUMSC) {					/* bad sector? */
 if (cyl >= RK_NUMCY) {					/* bad cyl? */
 	rk_set_done (RKER_NXC);
 	return;  }
-i = abs (cyl - uptr -> CYL) * rk_swait;			/* seek time */
+i = abs (cyl - uptr->CYL) * rk_swait;			/* seek time */
 if (func == RKCS_SEEK) {				/* seek? */
 	rk_set_done (0);				/* set done */
 	sim_activate (uptr, MAX (RK_MIN, i));  }	/* schedule */
 else sim_activate (uptr, i + rk_rwait);
-uptr -> FUNC = func;					/* save func */
-uptr -> CYL = cyl;					/* put on cylinder */
+uptr->FUNC = func;					/* save func */
+uptr->CYL = cyl;					/* put on cylinder */
 return;
 }
 
@@ -427,7 +432,7 @@ t_addr ma;
 uint16 comp;
 
 drv = uptr - rk_dev.units;				/* get drv number */
-if (uptr -> FUNC == RKCS_SEEK) {			/* seek */
+if (uptr->FUNC == RKCS_SEEK) {				/* seek */
 	rkcs = rkcs | RKCS_SCP;				/* set seek done */
 	if (rkcs & CSR_IE) {				/* ints enabled? */
 		rkintq = rkintq | RK_SCPI (drv);	/* queue request */
@@ -436,42 +441,42 @@ if (uptr -> FUNC == RKCS_SEEK) {			/* seek */
 		CLR_INT (RK);  }			/* clear interrupt */
 	return SCPE_OK;  }
 
-if ((uptr -> flags & UNIT_ATT) == 0) {			/* attached? */
+if ((uptr->flags & UNIT_ATT) == 0) {			/* attached? */
 	rk_set_done (RKER_DRE);
 	return IORETURN (rk_stopioe, SCPE_UNATT);  }
 ma = ((rkcs & RKCS_MEX) << (16 - RKCS_V_MEX)) | rkba;	/* get mem addr */
 da = GET_DA (rkda) * RK_NUMWD;				/* get disk addr */
 wc = 0200000 - rkwc;					/* get wd cnt */
 
-err = fseek (uptr -> fileref, da * sizeof (int16), SEEK_SET);
+err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
 
-if ((uptr -> FUNC == RKCS_READ) && (err == 0)) {	/* read? */
-	i = fxread (rkxb, sizeof (int16), wc, uptr -> fileref);
-	err = ferror (uptr -> fileref);
+if ((uptr->FUNC == RKCS_READ) && (err == 0)) {		/* read? */
+	i = fxread (rkxb, sizeof (int16), wc, uptr->fileref);
+	err = ferror (uptr->fileref);
 	for ( ; i < wc; i++) rkxb[i] = 0;		/* fill buf */
-	if (t = Map_WriteW (ma, wc << 1, rkxb, UB)) {	/* store buf */
+	if (t = Map_WriteW (ma, wc << 1, rkxb, MAP)) {	/* store buf */
 		rker = rker | RKER_NXM;			/* NXM? set flg */
 	  	wc = wc - t;  }				/* adj wd cnt */
 	}						/* end read */
 
-if ((uptr -> FUNC == RKCS_WRITE) && (err == 0)) {	/* write? */
-	if (t = Map_ReadW (ma, wc << 1, rkxb, UB)) {	/* get buf */
+if ((uptr->FUNC == RKCS_WRITE) && (err == 0)) {	/* write? */
+	if (t = Map_ReadW (ma, wc << 1, rkxb, MAP)) {	/* get buf */
 		rker = rker | RKER_NXM;			/* NXM? set flg */
 	  	wc = wc - t;  }				/* adj wd cnt */
 	if (wc) {					/* any xfer? */
 		awc = (wc + (RK_NUMWD - 1)) & ~(RK_NUMWD - 1);	/* clr to */
 		for (i = wc; i < awc; i++) rkxb[i] = 0;	/* end of blk */
-		fxwrite (rkxb, sizeof (int16), awc, uptr -> fileref);
-		err = ferror (uptr -> fileref);  }
+		fxwrite (rkxb, sizeof (int16), awc, uptr->fileref);
+		err = ferror (uptr->fileref);  }
 	}						/* end write */
 
-if ((uptr -> FUNC == RKCS_WCHK) && (err == 0)) {	/* write check? */
-	i = fxread (rkxb, sizeof (int16), wc, uptr -> fileref);
-	err = ferror (uptr -> fileref);
+if ((uptr->FUNC == RKCS_WCHK) && (err == 0)) {		/* write check? */
+	i = fxread (rkxb, sizeof (int16), wc, uptr->fileref);
+	err = ferror (uptr->fileref);
 	for ( ; i < wc; i++) rkxb[i] = 0;		/* fill buf */
 	awc = wc;					/* save wc */
 	for (wc = 0; (err == 0) && (wc < awc); wc++)  {	/* loop thru buf */
-		if (Map_ReadW (ma + (wc << 1), 2, &comp, UB)) {	/* mem wd */
+		if (Map_ReadW (ma + (wc << 1), 2, &comp, MAP)) {	/* mem wd */
 			rker = rker | RKER_NXM;		/* NXM? set flg */
 			break;  }
 		if (comp != rkxb[wc])  {		/* match to disk? */
@@ -491,7 +496,7 @@ rk_set_done (0);
 
 if (err != 0) {						/* error? */
 	perror ("RK I/O error");
-	clearerr (uptr -> fileref);
+	clearerr (uptr->fileref);
 	return SCPE_IOERR;  }
 return SCPE_OK;
 }
@@ -505,25 +510,25 @@ return SCPE_OK;
 
 void rk_set_done (int32 error)
 {
-	rkcs = rkcs | CSR_DONE;				/* set done */
-	if (error != 0) {
-		rker = rker | error;			/* update error */
-		if (rker) rkcs = rkcs | RKCS_ERR;	/* update err flags */
-		if (rker & RKER_HARD) rkcs = rkcs | RKCS_HERR;  }
-	if (rkcs & CSR_IE) {				/* int enable? */
-		rkintq = rkintq | RK_CTLI;		/* set ctrl int */
-		SET_INT (RK);  }			/* request int */
-	else {	rkintq = 0;				/* clear queue */
-		CLR_INT (RK);  }
-	return;
+rkcs = rkcs | CSR_DONE;					/* set done */
+if (error != 0) {
+	rker = rker | error;				/* update error */
+	if (rker) rkcs = rkcs | RKCS_ERR;		/* update err flags */
+	if (rker & RKER_HARD) rkcs = rkcs | RKCS_HERR;  }
+if (rkcs & CSR_IE) {					/* int enable? */
+	rkintq = rkintq | RK_CTLI;			/* set ctrl int */
+	SET_INT (RK);  }				/* request int */
+else {	rkintq = 0;					/* clear queue */
+	CLR_INT (RK);  }
+return;
 }
 
 void rk_clr_done (void)
 {
-	rkcs = rkcs & ~CSR_DONE;			/* clear done */
-	rkintq = rkintq & ~RK_CTLI;			/* clear ctl int */
-	CLR_INT (RK);					/* clear int req */
-	return;
+rkcs = rkcs & ~CSR_DONE;				/* clear done */
+rkintq = rkintq & ~RK_CTLI;				/* clear ctl int */
+CLR_INT (RK);						/* clear int req */
+return;
 }
 
 int32 rk_inta (void)
@@ -536,7 +541,7 @@ for (i = 0; i <= RK_NUMDR; i++) {			/* loop thru intq */
 		if (rkintq) SET_INT (RK);		/* queue next */
 		rkds = (rkds & ~RKDS_ID) |		/* id drive */
 			(((i == 0)? last_drv: i - 1) << RKDS_V_ID);
-		return VEC_RK;  }  }			/* return vector */
+		return rk_dib.vec;  }  }		/* return vector */
 rkintq = 0;						/* clear queue */
 return 0;						/* passive release */
 }
@@ -555,8 +560,8 @@ CLR_INT (RK);
 for (i = 0; i < RK_NUMDR; i++) {
 	uptr = rk_dev.units + i;
 	sim_cancel (uptr);
-	uptr -> CYL = uptr -> FUNC = 0;
-	uptr -> flags = uptr -> flags & ~UNIT_SWLK;  }
+	uptr->CYL = uptr->FUNC = 0;
+	uptr->flags = uptr->flags & ~UNIT_SWLK;  }
 if (rkxb == NULL) rkxb = calloc (RK_MAXFR, sizeof (unsigned int16));
 if (rkxb == NULL) return SCPE_MEM;
 return SCPE_OK;
@@ -565,13 +570,14 @@ return SCPE_OK;
 /* Device bootstrap */
 
 #define BOOT_START	02000				/* start */
-#define BOOT_ENTRY	02002				/* entry */
-#define BOOT_UNIT	02010				/* unit number */
-#define BOOT_LEN (sizeof (boot_rom) / sizeof (int32))
+#define BOOT_ENTRY	(BOOT_START + 002)		/* entry */
+#define BOOT_UNIT	(BOOT_START + 010)		/* unit number */
+#define BOOT_CSR	(BOOT_START + 032)		/* CSR */
+#define BOOT_LEN	(sizeof (boot_rom) / sizeof (int16))
 
-static const int32 boot_rom[] = {
+static const uint16 boot_rom[] = {
 	0042113,			/* "KD" */
-	0012706, 0002000,		/* MOV #2000, SP */
+	0012706, BOOT_START,		/* MOV #boot_start, SP */
 	0012700, 0000000,		/* MOV #unit, R0	; unit number */
 	0010003,			/* MOV R0, R3 */
 	0000303,			/* SWAB R3 */
@@ -595,13 +601,14 @@ static const int32 boot_rom[] = {
 	0005007				/* CLR PC */
 };
 
-t_stat rk_boot (int32 unitno)
+t_stat rk_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & RK_M_NUMDR;
+M[BOOT_CSR >> 1] = (rk_dib.ba & DMASK) + 012;
 saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 }

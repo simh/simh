@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Aug-02	RMS	Added DECtape support
    17-Sep-01	RMS	Removed multiconsole support
    13-Jul-01	RMS	Fixed RIM loader format
    27-May-01	RMS	Added multiconsole support
@@ -39,7 +40,7 @@
 extern DEVICE cpu_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
-extern DEVICE lpt_dev;
+extern DEVICE lpt_dev, dt_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern int32 M[];
@@ -63,9 +64,15 @@ REG *sim_PC = &cpu_reg[0];
 
 int32 sim_emax = 1;
 
-DEVICE *sim_devices[] = { &cpu_dev,
-	&ptr_dev, &ptp_dev, &tti_dev, &tto_dev,
-	&lpt_dev, NULL };
+DEVICE *sim_devices[] = {
+	&cpu_dev,
+	&ptr_dev,
+	&ptp_dev,
+	&tti_dev,
+	&tto_dev,
+	&lpt_dev,
+	&dt_dev,
+	NULL };
 
 const char *sim_stop_messages[] = {
 	"Unknown error",
@@ -108,8 +115,9 @@ for (;;) {
 		if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
 	else if ((val & 0770000) == 0600000) {		/* JMP? */
 		PC = val & 007777;
-		return SCPE_OK;  }  }
-return SCPE_FMT;					/* error */
+		break;  }
+	}
+return SCPE_OK;						/* done */
 }
 
 /* Symbol tables */
@@ -150,6 +158,7 @@ static const char *opcode[] = {
  "PPA", "PPB", "TYO", "TYI",
  "LSM", "ESM", "CBS",
  "LEM", "EEM", "CKS",
+ "MSE", "MLC", "MRD", "MWR", "MRS",
 
  "SKP", "SKP I", "CLO",
  "SFT", "LAW", "OPR",
@@ -201,6 +210,7 @@ static const int32 opc_val[] = {
  0720005+I_IOT, 0720006+I_IOT, 0720003+I_IOT, 0720004+I_IOT,
  0720054+I_NPN, 0720055+I_NPN, 0720056+I_NPN,
  0720074+I_NPN, 0724074+I_NPN, 0720033+I_NPN,
+ 0720301+I_NPN, 0720401+I_NPN, 0720501+I_NPN, 0720601+I_NPN, 0720701+I_NPN, 
 
  0640000+I_NPN, 0650000+I_NPN, 0651600+I_NPN,
  0660000+I_NPN, 0700000+I_LAW, 0760000+I_NPN,

@@ -184,7 +184,7 @@
    4. Adding I/O devices.  These modules must be modified:
 
 	h316_defs.h	add interrupt request definition
-	h316_cpu.c	add device information table entry
+	h316_cpu.c	add device dispatch table entry
 	h316_sys.c	add sim_devices table entry
 */
 
@@ -280,8 +280,6 @@ REG cpu_reg[] = {
 	{ ORDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ ORDATA (WRU, sim_int_char, 8) },
 	{ FLDATA (DLOG, dlog, 0), REG_HIDDEN },
-	{ FLDATA (HEXT, cpu_unit.flags, UNIT_V_EXT), REG_HRO },
-	{ FLDATA (HSA, cpu_unit.flags, UNIT_V_HSA), REG_HRO },
 	{ NULL }  };
 
 MTAB cpu_mod[] = {
@@ -767,7 +765,7 @@ case 060:
 saved_AR = AR & DMASK;
 saved_BR = BR & DMASK;
 saved_XR = XR & DMASK;
-pcq_r -> qptr = pcq_p;					/* update pc q ptr */
+pcq_r->qptr = pcq_p;					/* update pc q ptr */
 return reason;
 }
 
@@ -788,7 +786,7 @@ return reason;
 
 t_stat Ea (int32 IR, int32 *addr)
 {
-int32 i = 0;
+int32 i;
 int32 Y = IR & (IA | DISP);				/* ind + disp */
 
 if (IR & SC) Y = ((PC - 1) & PAGENO) | Y;		/* cur sec? + pageno */
@@ -972,8 +970,8 @@ if (cbitl) {						/* ovflo to C */
 	0	x	x	can't overflow
 	A	0	0	can't overflow
 	A	-1	1	can't overflow
-	A	0	1	overflow if 77777 -> 100000
-	A	-1	0	overflow if 100000 -> 77777
+	A	0	1	overflow if 77777->100000
+	A	-1	0	overflow if 100000->77777
 */
 
 	if (!jamkn &&
@@ -995,7 +993,7 @@ ext = pme = extoff_pending = 0;
 dev_ready = dev_ready & ~INT_PENDING;
 dev_enable = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r -> qptr = 0;
+if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;

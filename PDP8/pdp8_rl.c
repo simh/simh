@@ -25,6 +25,7 @@
 
    rl		RL8A cartridge disk
 
+   04-Oct-02	RMS	Added DIB, device number support
    06-Jan-02	RMS	Changed enable/disable support
    30-Nov-01	RMS	Cloned from RL11
 
@@ -58,11 +59,10 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK	(UNIT_V_UF)			/* write lock */
-#define UNIT_V_RL02	(UNIT_V_UF+1)			/* RL01 vs RL02 */
-#define UNIT_V_AUTO	(UNIT_V_UF+2)			/* autosize enable */
-#define UNIT_W_UF	4				/* saved flags width */
-#define UNIT_V_DUMMY	(UNIT_V_UF + UNIT_W_UF)		/* dummy flag */
+#define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write lock */
+#define UNIT_V_RL02	(UNIT_V_UF + 1)			/* RL01 vs RL02 */
+#define UNIT_V_AUTO	(UNIT_V_UF + 2)			/* autosize enable */
+#define UNIT_V_DUMMY	(UNIT_V_UF + 3)			/* dummy flag */
 #define UNIT_DUMMY	(1u << UNIT_V_DUMMY)
 #define UNIT_WLK	(1u << UNIT_V_WLK)
 #define UNIT_RL02	(1u << UNIT_V_RL02)
@@ -96,7 +96,7 @@
 #define RLDS_ERR 	(RLDS_WDE+RLDS_HCE+RLDS_STO+RLDS_SPE+RLDS_WGE+ \
 			RLDS_VCK+RLDS_DSE)		/* errors bits */
 
-/* RLCSA, seek = offset/rw = address (also uptr -> TRK) */
+/* RLCSA, seek = offset/rw = address (also uptr->TRK) */
 
 #define RLCSA_DIR	04000				/* direction */
 #define RLCSA_HD	02000				/* head select */
@@ -151,8 +151,9 @@
 #define RLSI_V_TRK	6				/* track */
 
 extern uint16 M[];
-extern int32 int_req, dev_enb;
+extern int32 int_req;
 extern UNIT cpu_unit;
+
 uint8 *rlxb = NULL;					/* xfer buffer */
 int32 rlcsa = 0;					/* control/status A */
 int32 rlcsb = 0;					/* control/status B */
@@ -167,10 +168,14 @@ int32 rl_erf = 0;					/* error flag */
 int32 rl_swait = 10;					/* seek wait */
 int32 rl_rwait = 10;					/* rotate wait */
 int32 rl_stopioe = 1;					/* stop on error */
+
+DEVICE rl_dev;
+int32 rl60 (int32 IR, int32 AC);
+int32 rl61 (int32 IR, int32 AC);
 t_stat rl_svc (UNIT *uptr);
 t_stat rl_reset (DEVICE *dptr);
 void rl_set_done (int32 error);
-t_stat rl_boot (int32 unitno);
+t_stat rl_boot (int32 unitno, DEVICE *dptr);
 t_stat rl_attach (UNIT *uptr, char *cptr);
 t_stat rl_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rl_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -182,6 +187,8 @@ t_stat rl_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
    rl_reg	RL register list
    rl_mod	RL modifier list
 */
+
+DIB rl_dib = { DEV_RL, 2, { &rl60, &rl61 } };
 
 UNIT rl_unit[] = {
 	{ UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
@@ -210,12 +217,10 @@ REG rl_reg[] = {
 	{ FLDATA (ERR, rl_erf, 0) },
 	{ DRDATA (STIME, rl_swait, 24), PV_LEFT },
 	{ DRDATA (RTIME, rl_rwait, 24), PV_LEFT },
-	{ URDATA (FLG, rl_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
-		  RL_NUMDR, REG_HRO) },
 	{ URDATA (CAPAC, rl_unit[0].capac, 10, 31, 0,
 		  RL_NUMDR, PV_LEFT + REG_HRO) },
 	{ FLDATA (STOP_IOE, rl_stopioe, 0) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_RL), REG_HRO },
+	{ ORDATA (DEVNUM, rl_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
 MTAB rl_mod[] = {
@@ -230,24 +235,25 @@ MTAB rl_mod[] = {
 	{ UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", NULL },
 	{ (UNIT_AUTO+UNIT_RL02), 0, NULL, "RL01", &rl_set_size },
 	{ (UNIT_AUTO+UNIT_RL02), UNIT_RL02, NULL, "RL02", &rl_set_size },
-	{ MTAB_XTD|MTAB_VDV, INT_RL, NULL, "ENABLED", &set_enb },
-	{ MTAB_XTD|MTAB_VDV, INT_RL, NULL, "DISABLED", &set_dsb },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
+		&set_dev, &show_dev, NULL },
 	{ 0 }  };
 
 DEVICE rl_dev = {
 	"RL", rl_unit, rl_reg, rl_mod,
 	RL_NUMDR, 8, 24, 1, 8, 8,
 	NULL, NULL, &rl_reset,
-	&rl_boot, &rl_attach, NULL };
+	&rl_boot, &rl_attach, NULL,
+	&rl_dib, DEV_DISABLE | DEV_DIS };
 
 /* IOT 60 routine */
 
-int32 rl60 (int32 pulse, int32 AC)
+int32 rl60 (int32 IR, int32 AC)
 {
 int32 curr, offs, newc, maxc;
 UNIT *uptr;
 
-switch (pulse) {					/* case IR<9:11> */
+switch (IR & 07) {					/* case IR<9:11> */
 case 0:							/* RLDC */
 	rl_reset (&rl_dev);				/* reset device */
 	break;
@@ -272,21 +278,21 @@ case 4:							/* RLCB */
 	uptr = rl_dev.units + GET_DRIVE (rlcsb);	/* select unit */
 	switch (GET_FUNC (rlcsb)) {			/* case on func */
 	case RLCSB_CLRD:				/* clear drive */
-		uptr -> STAT = uptr -> STAT & ~RLDS_ERR; /* clear errors */
+		uptr->STAT = uptr->STAT & ~RLDS_ERR;	/* clear errors */
 	case RLCSB_MNT:					/* mnt */
 		rl_set_done (0);
 		break;
 	case RLCSB_SEEK:				/* seek */
-		curr = GET_CYL (uptr -> TRK);		/* current cylinder */
+		curr = GET_CYL (uptr->TRK);		/* current cylinder */
 		offs = GET_CYL (rlcsa);			/* offset */
 		if (rlcsa & RLCSA_DIR) {		/* in or out? */
 			newc = curr + offs;		/* out */
-			maxc = (uptr -> flags & UNIT_RL02)?
+			maxc = (uptr->flags & UNIT_RL02)?
 				RL_NUMCY * 2: RL_NUMCY;
 			if (newc >= maxc) newc = maxc - 1;  }
 		else {	newc = curr - offs;		/* in */
 			if (newc < 0) newc = 0;  }
-		uptr -> TRK = newc | (rlcsa & RLCSA_HD);
+		uptr->TRK = newc | (rlcsa & RLCSA_HD);
 		sim_activate (uptr, rl_swait * abs (newc - curr));
 		break;
 	default:					/* data transfer */
@@ -315,7 +321,7 @@ switch (pulse) {					/* case IR<9:11> */
 case 0:							/* RRER */
 	uptr = rl_dev.units + GET_DRIVE (rlcsb);	/* select unit */
 	if (!sim_is_active (uptr) &&			/* update drdy */
-	    (uptr -> flags & UNIT_ATT))
+	    (uptr->flags & UNIT_ATT))
 		rler = rler | RLER_DRDY;
 	else rler = rler & ~RLER_DRDY;
 	dat = rler & RLER_MASK;
@@ -367,22 +373,22 @@ t_addr ma;
 
 func = GET_FUNC (rlcsb);				/* get function */
 if (func == RLCSB_GSTA) {				/* get status? */
-	rlsi = uptr -> STAT | 
-		((uptr -> TRK & RLCSA_HD)? RLDS_HD: 0) |
-		((uptr -> flags & UNIT_ATT)? RLDS_ATT: RLDS_UNATT);
-	if (uptr -> flags & UNIT_RL02) rlsi = rlsi | RLDS_RL02;
-	if (uptr -> flags & UNIT_WPRT) rlsi = rlsi | RLDS_WLK;
+	rlsi = uptr->STAT | 
+		((uptr->TRK & RLCSA_HD)? RLDS_HD: 0) |
+		((uptr->flags & UNIT_ATT)? RLDS_ATT: RLDS_UNATT);
+	if (uptr->flags & UNIT_RL02) rlsi = rlsi | RLDS_RL02;
+	if (uptr->flags & UNIT_WPRT) rlsi = rlsi | RLDS_WLK;
 	rlsi2 = rlsi1 = rlsi;
 	rl_set_done (0);				/* done */
 	return SCPE_OK;  }
 
-if ((uptr -> flags & UNIT_ATT) == 0) {			/* attached? */
-	uptr -> STAT = uptr -> STAT | RLDS_SPE;		/* spin error */
+if ((uptr->flags & UNIT_ATT) == 0) {			/* attached? */
+	uptr->STAT = uptr->STAT | RLDS_SPE;		/* spin error */
 	rl_set_done (RLER_INCMP);			/* flag error */
 	return IORETURN (rl_stopioe, SCPE_UNATT);  }
 
-if ((func == RLCSB_WRITE) && (uptr -> flags & UNIT_WPRT)) {
-	uptr -> STAT = uptr -> STAT | RLDS_WGE;		/* write and locked */
+if ((func == RLCSB_WRITE) && (uptr->flags & UNIT_WPRT)) {
+	uptr->STAT = uptr->STAT | RLDS_WGE;		/* write and locked */
 	rl_set_done (RLER_DRE);				/* flag error */
 	return SCPE_OK;  }
 
@@ -391,12 +397,12 @@ if (func == RLCSB_SEEK) {				/* seek? */
 	return SCPE_OK;  }
 
 if (func == RLCSB_RHDR) {				/* read header? */
-	rlsi = (GET_TRK (uptr -> TRK) << RLSI_V_TRK) | rlsa;
+	rlsi = (GET_TRK (uptr->TRK) << RLSI_V_TRK) | rlsa;
 	rlsi1 = rlsi2 = 0;
 	rl_set_done (0);				/* done */
 	return SCPE_OK;  }
 
-if (((func != RLCSB_RNOHDR) && (GET_CYL (uptr -> TRK) != GET_CYL (rlcsa)))
+if (((func != RLCSB_RNOHDR) && (GET_CYL (uptr->TRK) != GET_CYL (rlcsa)))
    || (rlsa >= RL_NUMSC)) {				/* bad cyl or sector? */
 	rl_set_done (RLER_HDE | RLER_INCMP);		/* flag error */
 	return SCPE_OK;  }
@@ -413,12 +419,12 @@ else {	bc = ((wc * 3) + 1) / 2;			/* 12b mode */
 		bc = RL_NUMBY;				/* cap xfer */
 		wc = (RL_NUMBY * 2) / 3;  }  }
 
-err = fseek (uptr -> fileref, da, SEEK_SET);
+err = fseek (uptr->fileref, da, SEEK_SET);
 
 if ((func >= RLCSB_READ) && (err == 0) &&		/* read (no hdr)? */
 	MEM_ADDR_OK (ma)) {				/* valid bank? */
-	i = fxread (rlxb, sizeof (int8), bc, uptr -> fileref);
-	err = ferror (uptr -> fileref);
+	i = fxread (rlxb, sizeof (int8), bc, uptr->fileref);
+	err = ferror (uptr->fileref);
 	for ( ; i < bc; i++) rlxb[i] = 0;		/* fill buffer */
 	for (i = j = 0; i < wc; i++) {			/* store buffer */
 	    if (rlcsb & RLCSB_8B) 			/* 8b mode? */
@@ -448,8 +454,8 @@ if ((func == RLCSB_WRITE) && (err == 0)) {		/* write? */
 	    }						/* end for */
 	wbc = (bc + (RL_NUMBY - 1)) & ~(RL_NUMBY - 1);	/* clr to */
 	for (i = bc; i < wbc; i++) rlxb[i] = 0;		/* end of blk */
-	fxwrite (rlxb, sizeof (int8), wbc, uptr -> fileref);
-	err = ferror (uptr -> fileref);
+	fxwrite (rlxb, sizeof (int8), wbc, uptr->fileref);
+	err = ferror (uptr->fileref);
 	}						/* end write */
 
 rlwc = (rlwc + wc) & 07777;				/* final word count */
@@ -460,7 +466,7 @@ rl_set_done (0);
 
 if (err != 0) {						/* error? */
 	perror ("RL I/O error");
-	clearerr (uptr -> fileref);
+	clearerr (uptr->fileref);
 	return SCPE_IOERR;  }
 return SCPE_OK;
 }
@@ -487,8 +493,6 @@ t_stat rl_reset (DEVICE *dptr)
 int32 i;
 UNIT *uptr;
 
-if (dev_enb & INT_RL)					/* RL? no DF or RF */
-	dev_enb = dev_enb & ~(INT_DF | INT_RF);
 rlcsa = rlcsb = rlsa = rler = 0;
 rlma = rlwc = 0;
 rlsi = rlsi1 = rlsi2 = 0;
@@ -499,7 +503,7 @@ int_req = int_req & ~INT_RL;
 for (i = 0; i < RL_NUMDR; i++) {
 	uptr = rl_dev.units + i;
 	sim_cancel (uptr);
-	uptr -> STAT = 0;  }
+	uptr->STAT = 0;  }
 if (rlxb == NULL) rlxb = calloc (RL_MAXFR, sizeof (unsigned int8));
 if (rlxb == NULL) return SCPE_MEM;
 return SCPE_OK;
@@ -512,21 +516,21 @@ t_stat rl_attach (UNIT *uptr, char *cptr)
 int32 p;
 t_stat r;
 
-uptr -> capac = (uptr -> flags & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
+uptr->capac = (uptr->flags & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
 
 r = attach_unit (uptr, cptr);
-if ((r != SCPE_OK) || ((uptr -> flags & UNIT_AUTO) == 0)) return r;
-uptr -> TRK = 0;					/* cyl 0 */
-uptr -> STAT = RLDS_VCK;				/* new volume */
-if (fseek (uptr -> fileref, 0, SEEK_END)) return SCPE_OK;
-if ((p = ftell (uptr -> fileref)) == 0) {
-	if (uptr -> flags & UNIT_RO) return SCPE_OK;
+if ((r != SCPE_OK) || ((uptr->flags & UNIT_AUTO) == 0)) return r;
+uptr->TRK = 0;						/* cyl 0 */
+uptr->STAT = RLDS_VCK;					/* new volume */
+if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
+if ((p = ftell (uptr->fileref)) == 0) {
+	if (uptr->flags & UNIT_RO) return SCPE_OK;
 	return rl_set_bad (uptr, 0, NULL, NULL);  }
 if (p > (RL01_SIZE * sizeof (int16))) {
-	uptr -> flags = uptr -> flags | UNIT_RL02;
-	uptr -> capac = RL02_SIZE;  }
-else {	uptr -> flags = uptr -> flags & ~UNIT_RL02;
-	uptr -> capac = RL01_SIZE;  }
+	uptr->flags = uptr->flags | UNIT_RL02;
+	uptr->capac = RL02_SIZE;  }
+else {	uptr->flags = uptr->flags & ~UNIT_RL02;
+	uptr->capac = RL01_SIZE;  }
 return SCPE_OK;
 }
 
@@ -534,8 +538,8 @@ return SCPE_OK;
 
 t_stat rl_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (uptr -> flags & UNIT_ATT) return SCPE_ALATT;
-uptr -> capac = (val & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
+if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+uptr->capac = (val & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
 return SCPE_OK;
 }
 
@@ -559,14 +563,14 @@ t_stat rl_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 i, da = RL_BBMAP * RL_NUMBY;
 
-if ((uptr -> flags & UNIT_ATT) == 0) return SCPE_UNATT;
-if (uptr -> flags & UNIT_RO) return SCPE_RO;
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;
+if (uptr->flags & UNIT_RO) return SCPE_RO;
 if (!get_yn ("Create bad block table? [N]", FALSE)) return SCPE_OK;
-if (fseek (uptr -> fileref, da, SEEK_SET)) return SCPE_IOERR;
+if (fseek (uptr->fileref, da, SEEK_SET)) return SCPE_IOERR;
 rlxb[0] = RL_BBID;
 for (i = 1; i < RL_NUMBY; i++) rlxb[i] = 0;
-fxwrite (rlxb, sizeof (int8), RL_NUMBY, uptr -> fileref);
-if (ferror (uptr -> fileref)) return SCPE_IOERR;
+fxwrite (rlxb, sizeof (int8), RL_NUMBY, uptr->fileref);
+if (ferror (uptr->fileref)) return SCPE_IOERR;
 return SCPE_OK;
 }
 
@@ -576,7 +580,7 @@ return SCPE_OK;
 #define BOOT_UNIT 02006					/* unit number */
 #define BOOT_LEN (sizeof (boot_rom) / sizeof (int16))
 
-static const int16 boot_rom[] = {
+static const uint16 boot_rom[] = {
 	06600,			/* BT, RLDC		; reset */
 	07201,			/* 02, CLA IAC		; clr drv = 1 */
 	04027,			/* 03, JMS GO		; do io */
@@ -609,12 +613,13 @@ static const int16 boot_rom[] = {
 };
 
 
-t_stat rl_boot (int32 unitno)
+t_stat rl_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 saved_PC;
 
 if (unitno) return SCPE_ARG;
+if (rl_dib.dev != DEV_RL) return STOP_NOTSTD;		/* only std devno */
 rl_unit[unitno].TRK = 0;
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 saved_PC = BOOT_START;

@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Oct-02	RMS	Fixed bugs in branch, SOB address parsing
+   09-Oct-02	RMS	Added DELQA support
+   12-Sep-02	RMS	Added TMSCP, KW11P, RX211 support, RAD50 examine
    29-Nov-01	RMS	Added read only unit support
    17-Sep-01	RMS	Removed multiconsole support
    26-Aug-01	RMS	Added DZ11
@@ -47,12 +50,18 @@
 extern DEVICE cpu_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
-extern DEVICE lpt_dev, clk_dev;
+extern DEVICE lpt_dev;
+extern DEVICE clk_dev, pclk_dev;
 extern DEVICE dz_dev;
 extern DEVICE rk_dev, rl_dev;
-extern DEVICE rp_dev, rq_dev;
-extern DEVICE rx_dev, dt_dev;
+extern DEVICE hk_dev;
+extern DEVICE rx_dev, ry_dev;
+extern DEVICE rp_dev;
+extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
+extern DEVICE dt_dev;
 extern DEVICE tm_dev, ts_dev;
+extern DEVICE tq_dev;
+extern DEVICE xq_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint16 *M;
@@ -76,14 +85,29 @@ int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = {
 	&cpu_dev,
-	&ptr_dev, &ptp_dev,
-	&tti_dev, &tto_dev,
-	&lpt_dev, &clk_dev,
+	&ptr_dev,
+	&ptp_dev,
+	&tti_dev,
+	&tto_dev,
+	&lpt_dev,
+	&clk_dev,
+	&pclk_dev,
 	&dz_dev,
-	&rk_dev, &rl_dev,
-	&rp_dev, &rq_dev,
-	&rx_dev, &dt_dev,
-	&tm_dev, &ts_dev,
+	&rk_dev,
+	&rl_dev,
+	&hk_dev,
+	&rx_dev,
+	&ry_dev,
+	&rp_dev,
+	&rq_dev,
+	&rqb_dev,
+	&rqc_dev,
+	&rqd_dev,
+	&dt_dev,
+	&tm_dev,
+	&ts_dev,
+	&tq_dev,
+	&xq_dev,
 	NULL };
 
 const char *sim_stop_messages[] = {
@@ -108,7 +132,8 @@ const char *sim_stop_messages[] = {
 	"Wait state",
 	"Trap vector fetch abort",
 	"Trap stack push abort",
-	"RQDX3 consistency error"  };
+	"RQDX3 consistency error",
+	"Sanity timer expired"  };
 
 /* Binary loader.
 
@@ -210,19 +235,19 @@ int32 i, da;
 int16 *buf;
 
 if ((sec < 2) || (wds < 16)) return SCPE_ARG;
-if ((uptr -> flags & UNIT_ATT) == 0) return SCPE_UNATT;
-if (uptr -> flags & UNIT_RO) return SCPE_RO;
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;
+if (uptr->flags & UNIT_RO) return SCPE_RO;
 if (!get_yn ("Create bad block table on last track? [N]", FALSE)) return SCPE_OK;
-da = (uptr -> capac - (sec * wds)) * sizeof (int16);
-if (fseek (uptr -> fileref, da, SEEK_SET)) return SCPE_IOERR;
+da = (uptr->capac - (sec * wds)) * sizeof (int16);
+if (fseek (uptr->fileref, da, SEEK_SET)) return SCPE_IOERR;
 if ((buf = malloc (wds * sizeof (int16))) == NULL) return SCPE_MEM;
 buf[0] = buf[1] = 012345u;
 buf[2] = buf[3] = 0;
 for (i = 4; i < wds; i++) buf[i] = 0177777u;
 for (i = 0; (i < sec) && (i < 10); i++)
-	fxwrite (buf, sizeof (int16), wds, uptr -> fileref);
+	fxwrite (buf, sizeof (int16), wds, uptr->fileref);
 free (buf);
-if (ferror (uptr -> fileref)) return SCPE_IOERR;
+if (ferror (uptr->fileref)) return SCPE_IOERR;
 return SCPE_OK;
 }
 
@@ -417,6 +442,8 @@ static const char *rname [] =
 
 static const char *fname [] =
 { "F0", "F1", "F2", "F3", "F4", "F5", "?6", "?7" };
+
+static const char r50_to_asc[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ$._0123456789";
 
 /* Specifier decode
 
@@ -489,7 +516,7 @@ return ((reg == 07)? pcwd[mode]: rgwd[mode]);
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 	UNIT *uptr, int32 sw)
 {
-int32 cflag, i, j, c1, c2, inst, fac, srcm, srcr, dstm, dstr;
+int32 cflag, i, j, c1, c2, c3, inst, fac, srcm, srcr, dstm, dstr;
 int32 l8b, brdisp, wd1, wd2;
 extern int32 FPS;
 
@@ -502,6 +529,14 @@ if (sw & SWMASK ('A')) {				/* ASCII? */
 if (sw & SWMASK ('C')) {				/* character? */
 	fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
 	fprintf (of, (c2 < 040)? "<%03o>": "%c", c2);
+	return SCPE_OK;  }
+if (sw & SWMASK ('R')) {				/* radix 50? */
+	if (val[0] > 0174777) return SCPE_ARG;		/* max value */
+	c3 = val[0] % 050;
+	c2 = (val[0] / 050) % 050;
+	c1 = val[0] / (050 * 050);
+	fprintf (of, "%c%c%c", r50_to_asc[c1],
+		r50_to_asc[c2], r50_to_asc[c3]);
 	return SCPE_OK;  }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
 
@@ -638,8 +673,9 @@ if (*cptr == '-') {					/* -? */
 errno = 0;
 val = strtoul (cptr, &tptr, 8);
 if (cptr == tptr) {					/* no number? */
-	if (*pflag != (A_REL + A_NUM)) return cptr;
-	else return NULL;  }
+	if (*pflag == (A_REL + A_NUM)) return NULL;	/* .+, .-? */
+	*dptr = 0;
+	return cptr;  }
 if (errno || (*pflag == A_REL)) return NULL;		/* .n? */
 *dptr = (minus? -val: val) & 0177777;
 *pflag = *pflag | A_NUM;
@@ -756,7 +792,7 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, d, i, j, reg, spec, n1, n2, disp, pflag;
 t_stat r;
-char gbuf[CBUFSIZE];
+char *tptr, gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 while (isspace (*cptr)) cptr++;				/* absorb spaces */
@@ -768,6 +804,7 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* ASCII string? */
 	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
 	val[0] = ((t_value) cptr[1] << 8) + (t_value) cptr[0];
 	return SCPE_OK;  }
+if (sw & SWMASK ('R')) return SCPE_ARG;			/* radix 50 */
 
 cptr = get_glyph (cptr, gbuf, 0);			/* get opcode */
 n1 = n2 = pflag = 0;
@@ -792,7 +829,8 @@ case I_V_3B: case I_V_6B: case I_V_8B:			/* xb literal */
 	break;
 case I_V_BR:						/* cond br */
 	cptr = get_glyph (cptr, gbuf, 0);		/* get address */
-	if ((cptr = get_addr (gbuf, &disp, &pflag)) == NULL) return SCPE_ARG;
+	tptr = get_addr (gbuf, &disp, &pflag);		/* parse */
+	if ((tptr == NULL) || (*tptr != 0)) return SCPE_ARG;
 	if ((pflag & A_REL) == 0) {
 		if (cflag) disp = (disp - addr) & 0177777;
 		else return SCPE_ARG;  }
@@ -804,7 +842,8 @@ case I_V_SOB:						/* sob */
 	if ((reg = get_reg (gbuf, rname, 0)) < 0) return SCPE_ARG;
 	val[0] = val[0] | (reg << 6);
 	cptr = get_glyph (cptr, gbuf, 0);		/* get address */
-	if ((cptr = get_addr (gbuf, &disp, &pflag)) == NULL) return SCPE_ARG;
+	tptr = get_addr (gbuf, &disp, &pflag);		/* parse */
+	if ((tptr == NULL) || (*tptr != 0)) return SCPE_ARG;
 	if ((pflag & A_REL) == 0) {
 		if (cflag) disp = (disp - addr) & 0177777;
 		else return SCPE_ARG;  }

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Sample Software Packages
-Date:	15-Apr-2002
+Date:	15-Nov-2002
 
 This memorandum documents the sample software packages available to run
 with the SIMH simulators.  Many of these packages are available under
@@ -241,9 +241,9 @@ RT-11 is contained in a single RK05 disk image.  To boot and run RT-11:
 	sim> att rk0 rtv4_rk.dsk
 	sim> boot rk0
 
-For RL, RM, and RP series disks, RT-11 expects to find a manufacturer's bad
-block table in the last track of the disk.  Therefore, INITialization of a
-new (all zero's) disk fails, because there is no valid bad block table.  To
+For RL, HK, RM, and RP series disks, RT-11 expects to find a manufacturer's
+bad block table in the last track of the disk.  Therefore, INITialization of
+a new (all zero's) disk fails, because there is no valid bad block table.  To
 create a minimal bad block table, use the SET <unit> BADBLOCK command.
 
 2.2.2 RT-11 V5.3
@@ -322,9 +322,10 @@ To load and run SIM8:
 6.1 FOCAL
 
 FOCAL15 is an interactive program for technical computations.  It can
-execute both immediate commands and stored programs (like BASIC).  FOCAL15
-is provided as a binary loader format paper-tape image.  My thanks to Al
-Kossow, who provided the binary image.  To load and run FOCAL15:
+execute both immediate commands and stored programs (like BASIC).
+FOCAL15 is provided as a binary loader format paper-tape image.  My
+thanks to Al Kossow, who provided the binary image.  To load and run
+FOCAL15:
 
 	sim> load focal15.bin
 	sim> run
@@ -334,9 +335,9 @@ Kossow, who provided the binary image.  To load and run FOCAL15:
 
 6.2 Advanced Software System/Keyboard Monitor
 
-The Advanced Software System Keyboard Monitor is the simplest mass storage
-monitor for the PDP-15.  It offers single-user program development and
-execution capabilities.  To load and run ADSS/KM-15:
+The Advanced Software System Keyboard Monitor is the simplest mass
+storage monitor for the PDP-15.  It offers single-user program 
+development and execution capabilities.  To load and run ADSS/KM-15:
 
 - On the PDP-9 (only), initialize extend mode to on:
 
@@ -386,9 +387,9 @@ execution capabilities.  To load and run ADSS/KM-15:
 
 6.3 Advanced Software System/Foreground Background
 
-Note: your environment must have a functioning second Teletype; that is, you cannot
-at present run Foreground/Background if your host system does not support the SIMH
-sockets library.
+Note: your environment must have a functioning second Teletype; that is,
+you cannot at present run Foreground/Background if your host system
+does not support the SIMH sockets library.
 
 - Load the paper-tape bootstrap into upper memory:
 

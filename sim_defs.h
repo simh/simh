@@ -23,6 +23,13 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Oct-02	RMS	Increased simulator error code space
+			Added Telnet errors,
+			Added end of medium support
+			Added help messages to CTAB
+			Added flag and context fields to DEVICE
+			Added restore flag masks
+			Revised 64b definitions
    02-May-02	RMS	Removed log status codes
    22-Apr-02	RMS	Added magtape record length error
    30-Dec-01	RMS	Generalized timer package, added circular arrays
@@ -62,6 +69,9 @@
 	parse_sym		parse symbolic input
 */
 
+#ifndef _SIM_DEFS_H_
+#define _SIM_DEFS_H_	0
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -84,34 +94,40 @@ typedef int		t_bool;				/* boolean */
 typedef unsigned int8	uint8;
 typedef unsigned int16	uint16;
 typedef unsigned int32	uint32, t_addr;			/* address */
-#if defined (USE_INT64) && defined (_WIN32)
-#define t_int64 __int64					/* for Windows */
-#elif defined (USE_INT64) && defined (VMS) && defined (__ALPHA)
-#define t_int64 __int64					/* for AVMS */
-#elif defined (USE_INT64) && defined (__ALPHA) && defined (__unix__)
-#define t_int64 long					/* for DUNIX */
-#elif defined (USE_INT64)
-#define t_int64 long long				/* for GCC */
-#endif
-#if defined (t_int64)
+#if defined (USE_INT64)					/* 64b */
+#if defined (WIN32)					/* Windows */
+#define t_int64 __int64
+#elif defined (__ALPHA) && defined (VMS)		/* Alpha VMS */
+#define t_int64 __int64
+#elif defined (__ALPHA) && defined (__unix__)		/* Alpha UNIX */
+#define t_int64 long
+#else							/* default GCC */
+#define t_int64 long long
+#endif							/* end OS's */
 typedef unsigned t_int64	t_uint64, t_value;	/* value */
 typedef t_int64 		t_svalue;		/* signed value */
-#else
+#else							/* 32b */
 typedef unsigned int32	t_value;
 typedef int32 		t_svalue;
-#endif
+#endif							/* end else 64b */
 
 /* System independent definitions */
 
-typedef int32		t_mtrlnt;			/* magtape rec lnt */
-#define MTRF(x)		((x) & (1u << 31))		/* record error flg */
-#define MTRL(x)		((x) & ((1u << 31) - 1))	/* record length */
+typedef uint32		t_mtrlnt;			/* magtape rec lnt */
+#define MTR_TMK		0x00000000			/* tape mark */
+#define MTR_EOM		0xFFFFFFFF			/* end of medium */
+#define MTR_ERF		0x80000000			/* error flag */
+#define MTRF(x)		((x) & MTR_ERF)			/* record error flg */
+#define MTRL(x)		((x) & ~MTR_ERF)		/* record length */
+#define MT_SET_PNU(u)	(u)->flags = (u)->flags | UNIT_PNU
+#define MT_CLR_PNU(u)	(u)->flags = (u)->flags & ~UNIT_PNU
+#define MT_TST_PNU(u)	((u)->flags & UNIT_PNU)
+
 #define FLIP_SIZE	(1 << 16)			/* flip buf size */
 #if !defined (PATH_MAX)					/* usually in limits */
 #define PATH_MAX	512
 #endif
 #define CBUFSIZE	(128 + PATH_MAX)		/* string buf size */
-#define CONS_SIZE	4096				/* console buffer */
 
 /* Simulator status codes
 
@@ -121,7 +137,7 @@ typedef int32		t_mtrlnt;			/* magtape rec lnt */
 */
 
 #define SCPE_OK		0				/* normal return */
-#define SCPE_BASE	32				/* base for messages */
+#define SCPE_BASE	64				/* base for messages */
 #define SCPE_NXM	(SCPE_BASE + 0)			/* nxm */
 #define SCPE_UNATT	(SCPE_BASE + 1)			/* no file */
 #define SCPE_IOERR 	(SCPE_BASE + 2)			/* I/O error */
@@ -161,6 +177,8 @@ typedef int32		t_mtrlnt;			/* magtape rec lnt */
 #define SCPE_NEST	(SCPE_BASE + 36)		/* nested DO */
 #define SCPE_IERR	(SCPE_BASE + 37)		/* internal error */
 #define SCPE_MTRLNT	(SCPE_BASE + 38)		/* tape rec lnt error */
+#define SCPE_LOST	(SCPE_BASE + 39)		/* Telnet conn lost */
+#define SCPE_TTMO	(SCPE_BASE + 40)		/* Telnet conn timeout */
 #define SCPE_KFLAG	01000				/* tti data flag */
 
 /* Print value format codes */
@@ -203,7 +221,22 @@ struct device {
 	t_stat		(*boot)();			/* boot routine */
 	t_stat		(*attach)();			/* attach routine */
 	t_stat		(*detach)();			/* detach routine */
+	void		*ctxt;				/* context */
+	int32		flags;				/* flags */
 };
+
+/* Device flags */
+
+#define DEV_V_DIS	0				/* dev enabled */
+#define DEV_V_DISABLE	1				/* dev disable-able */
+#define	DEV_V_UF	12				/* user flags */
+#define DEV_V_RSV	31				/* reserved */
+
+#define DEV_DIS		(1 << DEV_V_DIS)
+#define DEV_DISABLE	(1 << DEV_V_DISABLE)
+
+#define DEV_UFMASK	(((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF) - 1))
+#define DEV_RFLAGS	(DEV_UFMASK|DEV_DIS)		/* restored flags */
 
 /* Unit data structure
 
@@ -233,6 +266,9 @@ struct unit {
 
 /* Unit flags */
 
+#define UNIT_V_UF	12				/* device specific */
+#define UNIT_V_RSV	31				/* reserved!! */
+
 #define UNIT_ATTABLE	000001				/* attachable */
 #define UNIT_RO		000002				/* read only */
 #define UNIT_FIX	000004				/* fixed capacity */
@@ -245,9 +281,9 @@ struct unit {
 #define UNIT_ROABLE	001000				/* read only ok */
 #define UNIT_DISABLE	002000				/* disable-able */
 #define UNIT_DIS	004000				/* disabled */
-#define UNIT_V_UF	12				/* device specific */
-							/* must be DIS+1!! */
-#define UNIT_V_RSV	31				/* reserved!! */
+
+#define UNIT_UFMASK	(((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF) - 1))
+#define UNIT_RFLAGS	(UNIT_UFMASK|UNIT_DIS)		/* restored flags */
 
 /* Register data structure */
 
@@ -276,6 +312,7 @@ struct ctab {
 	char		*name;				/* name */
 	t_stat		(*action)();			/* action routine */
 	int32		arg;				/* argument */
+	char		*help;				/* help string */
 };
 
 /* Modifier table - only extended entries have disp, reg, or flags */
@@ -301,8 +338,8 @@ struct mtab {
 /* Search table */
 
 struct schtab {
-	int		logic;				/* logical operator */
-	int		bool;				/* boolean operator */
+	int32		logic;				/* logical operator */
+	int32		bool;				/* boolean operator */
 	t_value		mask;				/* mask for logical */
 	t_value		comp;				/* comparison for boolean */
 };
@@ -359,6 +396,7 @@ char *get_glyph (char *iptr, char *optr, char mchar);
 char *get_glyph_nc (char *iptr, char *optr, char mchar);
 t_value get_uint (char *cptr, int radix, t_value max, t_stat *status);
 t_value strtotv (char *cptr, char **endptr, int radix);
+t_stat fprint_val (FILE *stream, t_value val, int32 rdx, int32 wid, int32 fmt);
 DEVICE *find_dev_from_unit (UNIT *uptr);
 REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
 int32 sim_rtc_init (int32 time);
@@ -368,3 +406,5 @@ int32 sim_rtcn_calb (int32 time, int32 tmr);
 t_stat sim_poll_kbd (void);
 t_stat sim_putchar (int32 out);
 t_bool sim_brk_test (t_addr bloc, int32 btyp);
+
+#endif

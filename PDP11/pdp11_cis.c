@@ -25,6 +25,9 @@
 
    This module simulates the PDP-11 commercial instruction set (CIS).
 
+   17-Oct-02	RMS	Fixed compiler warning (found by Hans Pufal)
+   08-Oct-02	RMS	Fixed macro definitions
+
    The commercial instruction set consists of three instruction formats:
 
    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+	register operands
@@ -138,11 +141,11 @@
 
 /* Condition code macros */
 
-#define GET_BIT(ir,n)	(((ir) >> n) & 1)
+#define GET_BIT(ir,n)	(((ir) >> (n)) & 1)
 #define GET_SIGN_L(ir)	GET_BIT((ir), 31)
 #define GET_SIGN_W(ir)	GET_BIT((ir), 15)
 #define GET_SIGN_B(ir)	GET_BIT((ir), 7)
-#define GET_Z(ir)	(ir == 0)
+#define GET_Z(ir)	((ir) == 0)
 
 /* Decimal string structure */
 
@@ -151,8 +154,8 @@
 #define MAXDVAL		429496730			/* 2^32 / 10 */
 
 struct dstr {
-	unsigned int32 sign;
-	unsigned int32 val[DSTRLNT];  };
+	unsigned int32	sign;
+	unsigned int32	val[DSTRLNT];  };
 
 typedef struct dstr DSTR;
 
@@ -354,9 +357,6 @@ for (i = j = 0; (i < MAXOPN) && opntab[op][i]; i++) {	/* parse operands */
 		break;  }				/* end case */
 	}						/* end for */
 switch (op) {						/* case on opcode */
-default:
-	setTRAP (TRAP_ILL);
-	return;
 
 /* MOVC, MOVTC, MOVCI, MOVTCI
 
@@ -891,7 +891,10 @@ CVTLx:
 		dst.val[i / 8] = dst.val[i / 8] | (digit << ((i % 8) * 4));  }
 	V = C = 0;
 	WriteDstr (A1, &dst, op);			/* write result */
-	return;  }
+	return;
+default:
+	setTRAP (TRAP_ILL);
+	break;  }
 return;
 }							/* end cis */
 
@@ -934,25 +937,25 @@ if (flag & PACKED) {					/* packed? */
 		if ((i == end) && ((lnt & 1) == 0)) c = c & 0xF;
 		if (c >= 0xA0) c = c & 0xF;		/* check hi digit */
 		if ((c & 0xF) >= 0xA) c = c & 0xF0;	/* check lo digit */	
-		src -> val[i / 4] = src -> val[i / 4] | (c << ((i % 4) * 8));
+		src->val[i / 4] = src->val[i / 4] | (c << ((i % 4) * 8));
 		}					/* end for */
-	if ((t == 0xB) || (t == 0xD)) src -> sign = 1;	/* if -, set sign */
-	src -> val[0] = src -> val[0] & ~0xF;		/* clear sign */
+	if ((t == 0xB) || (t == 0xD)) src->sign = 1;	/* if -, set sign */
+	src->val[0] = src->val[0] & ~0xF;		/* clear sign */
 	}						/* end packed */
 else {							/* numeric */
-	if (type >= TS) src -> sign = (ReadB ((((type == TS)?
+	if (type >= TS) src->sign = (ReadB ((((type == TS)?
 		 dscr[1] + lnt: dscr[1] - 1) & 0177777) | dsenable) == '-');
 	for (i = 1; i <= lnt; i++) {			/* loop thru string */
 		c = ReadB (((dscr[1] + lnt - i) & 0177777) | dsenable);
 		if ((i == 1) && (type == XZ) && ((c & 0xF0) == 0x70))
-			src -> sign = 1;		/* signed zoned */
+			src->sign = 1;			/* signed zoned */
 		else if (((i == 1) && (type == TO)) ||
 			((i == lnt) && (type == LO))) {
 			c = overbin[c & 0177];		/* get sign and digit */
-			src -> sign = c >> 7;  }	/* set sign */
+			src->sign = c >> 7;  }		/* set sign */
 		c = c & 0xF;				/* get digit */
 		if (c > 9) c = 0;			/* range check */
-		src -> val[i / 8] = src -> val[i / 8] | (c << ((i % 8) * 4));
+		src->val[i / 8] = src->val[i / 8] | (c << ((i % 8) * 4));
 		}					/* end for */
 	}						/* end numeric */
 return TestDstr (src);					/* clean -0 */
@@ -995,30 +998,30 @@ limit = lnt / 8;					/* limit for test */
 for (i = 0; i < DSTRLNT; i++) {				/* loop thru value */
 	if (i == limit) mask = masktab[lnt % 8];	/* at limit, get mask */
 	else if (i > limit) mask = 0xFFFFFFFF;		/* beyond, all ovflo */
-	if (dst -> val[i] & mask) V = 1;		/* test for ovflo */
-	if (dst -> val[i] = dst -> val[i] & ~mask) Z = 0;  }	/* test nz */
-dst -> sign = dst -> sign & ~unsignedtab[type] & ~(Z & ~V);
-N = dst -> sign & ~Z;					/* N = sign, if ~zero */
+	if (dst->val[i] & mask) V = 1;			/* test for ovflo */
+	if (dst->val[i] = dst->val[i] & ~mask) Z = 0;  } /* test nz */
+dst->sign = dst->sign & ~unsignedtab[type] & ~(Z & ~V);
+N = dst->sign & ~Z;					/* N = sign, if ~zero */
 
 if (flag & PACKED) {					/* packed? */
 	end = lnt / 2;					/* end of string */
-	if (type == UP) dst -> val[0] = dst -> val[0] | 0xF;
-	else dst -> val[0] = dst -> val[0] | 0xC | dst -> sign;
+	if (type == UP) dst->val[0] = dst->val[0] | 0xF;
+	else dst->val[0] = dst->val[0] | 0xC | dst->sign;
 	for (i = 0; i <= end; i++) {			/* store string */
-		c = (dst -> val[i / 4] >> ((i % 4) * 8)) & 0xFF;
+		c = (dst->val[i / 4] >> ((i % 4) * 8)) & 0xFF;
 		WriteB (c, ((dscr[1] + end - i) & 0177777));
 		}					/* end for */
 	}						/* end packed */
 else {
-	if (type >= TS) WriteB (dst -> sign? '-': '+', (((type == TS)?
+	if (type >= TS) WriteB (dst->sign? '-': '+', (((type == TS)?
 		 dscr[1] + lnt: dscr[1] - 1) & 0177777) | dsenable);
 	for (i = 1; i <= lnt; i++) {			/* store string */
-		c = (dst -> val[i / 8] >> ((i % 8) * 4)) & 0xF;	/* get digit */
-		if ((i == 1) && (type == XZ) && dst -> sign)
+		c = (dst->val[i / 8] >> ((i % 8) * 4)) & 0xF;	/* get digit */
+		if ((i == 1) && (type == XZ) && dst->sign)
 			c = c | 0x70;			/* signed zoned */
 		else if (((i == 1) && (type == TO)) ||
 			((i == lnt) && (type == LO)))
-			c = binover[dst -> sign][c];	/* get sign and digit */
+			c = binover[dst->sign][c];	/* get sign and digit */
 		else c = c | 0x30;			/* default */
 		WriteB (c, ((dscr[1] + lnt - i) & 0177777));	
 		}					/* end for */
@@ -1070,14 +1073,14 @@ int32 i;
 unsigned int32 sm1, sm2, tm1, tm2, tm3, tm4;
 
 for (i = 0; i < DSTRLNT; i++) {				/* loop low to high */
-	tm1 = s1 -> val[i] ^ (s2 -> val[i] + cy);	/* xor operands */
-	sm1 = s1 -> val[i] + (s2 -> val[i] + cy);	/* sum operands */
+	tm1 = s1->val[i] ^ (s2->val[i] + cy);		/* xor operands */
+	sm1 = s1->val[i] + (s2->val[i] + cy);		/* sum operands */
 	sm2 = sm1 + 0x66666666;				/* force carry out */
-	cy = ((sm1 < s1 -> val[i]) || (sm2 < sm1));	/* check for overflow */
+	cy = ((sm1 < s1->val[i]) || (sm2 < sm1));	/* check for overflow */
 	tm2 = tm1 ^ sm2;				/* get carry flags */
 	tm3 = (tm2 >> 3) | (cy << 29);			/* compute adjustment */
 	tm4 = 0x22222222 & ~tm3;			/* clear where carry */
-	ds -> val[i] = sm2 - (3 * tm4);  }		/* final result */
+	ds->val[i] = sm2 - (3 * tm4);  }		/* final result */
 return cy;
 }
 
@@ -1098,7 +1101,7 @@ void SubDstr (DSTR *s1, DSTR *s2, DSTR *ds)
 int32 i;
 DSTR compl;
 
-for (i = 0; i < DSTRLNT; i++) compl.val[i] = 0x99999999 - s1 -> val[i];
+for (i = 0; i < DSTRLNT; i++) compl.val[i] = 0x99999999 - s1->val[i];
 AddDstr (&compl, s2, ds, 1);				/* s1 + ~s2 + 1 */
 return;
 }
@@ -1116,8 +1119,8 @@ int32 CmpDstr (DSTR *s1, DSTR *s2)
 int32 i;
 
 for (i = DSTRMAX; i >=0; i--) {
-	if (s1 -> val[i] > s2 -> val[i]) return 1;
-	if (s1 -> val[i] < s2 -> val[i]) return -1;  }
+	if (s1->val[i] > s2->val[i]) return 1;
+	if (s1->val[i] < s2->val[i]) return -1;  }
 return 0;
 }
 
@@ -1133,8 +1136,8 @@ int32 TestDstr (DSTR *dsrc)
 {
 int32 i;
 
-for (i = DSTRMAX; i >= 0; i--) if (dsrc -> val[i]) return (i + 1);
-dsrc -> sign = 0;
+for (i = DSTRMAX; i >= 0; i--) if (dsrc->val[i]) return (i + 1);
+dsrc->sign = 0;
 return 0;
 }
 
@@ -1150,7 +1153,7 @@ int32 LntDstr (DSTR *dsrc, int32 nz)
 int32 i;
 
 for (i = 7; i > 0; i--) {
-	if ((dsrc -> val[nz - 1] >> (i * 4)) & 0xF) break;  }
+	if ((dsrc->val[nz - 1] >> (i * 4)) & 0xF) break;  }
 return ((nz - 1) * 8) + i;
 }
 
@@ -1187,8 +1190,8 @@ int32 i;
 
 if (sc) {
 	for (i = 0; i < DSTRLNT; i++) {
-		if ((i + sc) < DSTRLNT) dsrc -> val[i] = dsrc -> val[i + sc];
-		else dsrc -> val[i] = 0;  }  }
+		if ((i + sc) < DSTRLNT) dsrc->val[i] = dsrc->val[i + sc];
+		else dsrc->val[i] = 0;  }  }
 return;
 }
 
@@ -1206,9 +1209,9 @@ int32 i, c;
 c = 0;
 if (sc) {
 	for (i = DSTRMAX; i >= 0; i--) {
-		if (i > (DSTRMAX - sc)) c = c | dsrc -> val[i];
-		if ((i - sc) >= 0) dsrc -> val[i] = dsrc -> val[i - sc];
-		else dsrc -> val[i] = 0;  }  }
+		if (i > (DSTRMAX - sc)) c = c | dsrc->val[i];
+		if ((i - sc) >= 0) dsrc->val[i] = dsrc->val[i - sc];
+		else dsrc->val[i] = 0;  }  }
 return c;
 }		
 
@@ -1227,8 +1230,8 @@ int32 i, s, rs, nc;
 if (s = sc * 4) {
 	rs = 32 - s;
 	for (i = DSTRMAX; i >= 0; i--) {
-		nc = dsrc -> val[i];
-		dsrc -> val[i] = ((dsrc -> val[i] >> s) |
+		nc = dsrc->val[i];
+		dsrc->val[i] = ((dsrc->val[i] >> s) |
 			(cin << rs)) & 0xFFFFFFFF;
 		cin = nc;  }
 	return cin;  }
@@ -1250,8 +1253,8 @@ int32 i, s, rs, nc;
 if (s = sc * 4) {
 	rs = 32 - s;
 	for (i = 0; i < DSTRLNT; i++) {
-		nc = dsrc -> val[i];
-		dsrc -> val[i] = ((dsrc -> val[i] << s) |
+		nc = dsrc->val[i];
+		dsrc->val[i] = ((dsrc->val[i] << s) |
 			(cin >> rs)) & 0xFFFFFFFF;
 		cin = nc;  }
 	return cin;  }

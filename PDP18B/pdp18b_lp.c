@@ -27,6 +27,7 @@
 		(PDP-7,9) Type 647 line printer
 		(PDP-15) LP15 line printer
 
+   05-Oct-02	RMS	Added DIB, device number support
    30-May-02	RMS	Widened POS to 32b
    03-Feb-02	RMS	Fixed typo (found by Robert Alan Byer)
    25-Nov-01	RMS	Revised interrupt structure
@@ -40,17 +41,31 @@
 
 #include "pdp18b_defs.h"
 
+DEVICE lpt_dev;
+int32 lpt65 (int32 pulse, int32 AC);
+int32 lpt66 (int32 pulse, int32 AC);
+int32 lpt_iors (void);
+t_stat lpt_svc (UNIT *uptr);
+t_stat lpt_reset (DEVICE *dptr);
+
+extern int32 int_hwre[API_HLVL+1];
+
+DIB lpt_dib = { DEV_LPT, 2, &lpt_iors, { &lpt65, &lpt66 } };
+
+UNIT lpt_unit = {
+	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
+
+MTAB lpt_mod[] = {
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
+	{ 0 } };
+
 #if defined (TYPE62)
 
 #define BPTR_MAX	40				/* pointer max */
 #define LPT_BSIZE	120				/* line size */
 #define BPTR_MASK	077				/* buf ptr max */
-extern int32 int_hwre[API_HLVL+1];
 int32 lpt_iot = 0, lpt_stopioe = 0, bptr = 0;
 char lpt_buf[LPT_BSIZE + 1] = { 0 };
-
-t_stat lpt_svc (UNIT *uptr);
-t_stat lpt_reset (DEVICE *dptr);
 
 /* Type 62 LPT data structures
 
@@ -58,9 +73,6 @@ t_stat lpt_reset (DEVICE *dptr);
    lpt_unit	LPT unit
    lpt_reg	LPT register list
 */
-
-UNIT lpt_unit = {
-	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
 
 REG lpt_reg[] = {
 	{ ORDATA (BUF, lpt_unit.buf, 8) },
@@ -73,13 +85,15 @@ REG lpt_reg[] = {
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
 	{ BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
+	{ ORDATA (DEVNO, lpt_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
 DEVICE lpt_dev = {
-	"LPT", &lpt_unit, lpt_reg, NULL,
+	"LPT", &lpt_unit, lpt_reg, lpt_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &lpt_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&lpt_dib, DEV_DISABLE };
 
 /* Type 62 line printer: IOT routines */
 
@@ -97,9 +111,9 @@ if ((pulse & 001) && TST_INT (LPT)) AC = IOT_SKP | AC;	/* LPSF */
 if ((pulse & 042) == 002) CLR_INT (LPT);		/* LPCF */
 if (((pulse & 042) == 042) && (bptr < BPTR_MAX)) {	/* LPLD */
 	i = bptr * 3;					/* cvt to chr ptr */
-	lpt_buf[i++] = lpt_trans[(AC >> 12) & 077];
-	lpt_buf[i++] = lpt_trans[(AC >> 6) & 077];
-	lpt_buf[i++] = lpt_trans[AC & 077];
+	lpt_buf[i] = lpt_trans[(AC >> 12) & 077];
+	lpt_buf[i + 1] = lpt_trans[(AC >> 6) & 077];
+	lpt_buf[i + 2] = lpt_trans[AC & 077];
 	bptr = (bptr + 1) & BPTR_MASK;  }
 if (pulse & 004) {					/* LPSE */
 	sim_activate (&lpt_unit, lpt_unit.wait);  }	/* activate */
@@ -189,13 +203,10 @@ return	(TST_INT (LPT)? IOS_LPT: 0) |
 #elif defined (TYPE647)
 
 #define LPT_BSIZE	120				/* line size */
-extern int32 int_hwre[API_HLVL+1];
 int32 lpt_done = 0, lpt_ie = 1, lpt_err = 0;
 int32 lpt_iot = 0, lpt_stopioe = 0, bptr = 0;
 char lpt_buf[LPT_BSIZE] = { 0 };
 
-t_stat lpt_svc (UNIT *uptr);
-t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *cptr);
 t_stat lpt_detach (UNIT *uptr);
 
@@ -205,9 +216,6 @@ t_stat lpt_detach (UNIT *uptr);
    lpt_unit	LPT unit
    lpt_reg	LPT register list
 */
-
-UNIT lpt_unit = {
-	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
 
 REG lpt_reg[] = {
 	{ ORDATA (BUF, lpt_unit.buf, 8) },
@@ -223,13 +231,15 @@ REG lpt_reg[] = {
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
 	{ BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
+	{ ORDATA (DEVNO, lpt_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
 DEVICE lpt_dev = {
-	"LPT", &lpt_unit, lpt_reg, NULL,
+	"LPT", &lpt_unit, lpt_reg, lpt_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &lpt_reset,
-	NULL, &lpt_attach, &lpt_detach };
+	NULL, &lpt_attach, &lpt_detach,
+	&lpt_dib, DEV_DISABLE };
 
 /* Type 647 line printer: IOT routines */
 
@@ -404,13 +414,10 @@ return detach_unit (uptr);
 #define STA_CLR		0003777				/* always clear */
 
 extern int32 M[];
-extern int32 int_hwre[API_HLVL+1];
 int32 lpt_sta = 0, lpt_ie = 1, lpt_stopioe = 0;
 int32 mode = 0, lcnt = 0, bptr = 0;
 char lpt_buf[LPT_BSIZE] = { 0 };
 
-t_stat lpt_svc (UNIT *uptr);
-t_stat lpt_reset (DEVICE *dptr);
 int32 lpt_updsta (int32 new);
 
 /* LP15 LPT data structures
@@ -419,9 +426,6 @@ int32 lpt_updsta (int32 new);
    lpt_unit	LPT unit
    lpt_reg	LPT register list
 */
-
-UNIT lpt_unit = {
-	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
 
 REG lpt_reg[] = {
 	{ ORDATA (STA, lpt_sta, 18) },
@@ -435,13 +439,15 @@ REG lpt_reg[] = {
 	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
 	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
 	{ BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
+	{ ORDATA (DEVNO, lpt_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
 DEVICE lpt_dev = {
-	"LPT", &lpt_unit, lpt_reg, NULL,
+	"LPT", &lpt_unit, lpt_reg, lpt_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &lpt_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&lpt_dib, DEV_DISABLE };
 
 /* LP15 line printer: IOT routines */
 

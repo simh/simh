@@ -1,14 +1,38 @@
 /*	altairz80_sys.c: MITS Altair system interface
-		Written by Peter Schorn, 2001-2002
-		Based on work by Charles E Owen ((c) 1997 - Commercial use prohibited)
-		Disassembler from Marat Fayzullin ((c) 1995, 1996, 1997 - Commercial use prohibited)
+
+   Copyright (c) 2002, Peter Schorn
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Peter Schorn shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Peter Schorn.
+
+   Based on work by Charles E Owen (c) 1997
+   Disassembler from Marat Fayzullin ((c) 1995, 1996, 1997 - Commercial use prohibited)
 */
 
 #include <ctype.h>
-#include "altairZ80_defs.h"
+#include "altairz80_defs.h"
 
 extern DEVICE cpu_dev;
 extern DEVICE dsk_dev;
+extern DEVICE hdsk_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern DEVICE sio_dev;
@@ -20,7 +44,12 @@ extern char *get_range(char *cptr, t_addr *lo, t_addr *hi, int rdx,
 	t_addr max, char term);
 extern t_value get_uint(char *cptr, int radix, t_value max, t_stat *status);
 extern void PutBYTEWrapper(register uint32 Addr, register uint32 Value);
+extern void PutBYTEForced(register uint32 Addr, register uint32 Value);
 extern uint8 GetBYTEWrapper(register uint32 Addr);
+extern int32 addressIsInROM(uint32 Addr);
+extern int32 addressExists(uint32 Addr);
+extern uint32 ROMLow;
+extern uint32 ROMHigh;
 
 int32 sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag);
 int32 fprint_sym(FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw);
@@ -45,7 +74,7 @@ int32 checkXY(char xy);
 char		sim_name[]			= "Altair 8800 (Z80)";
 REG			*sim_PC					= &cpu_reg[0];
 int32		sim_emax				= 4;
-DEVICE	*sim_devices[]	= { &cpu_dev, &sio_dev, &simh_device, &ptr_dev, &ptp_dev, &dsk_dev, NULL };
+DEVICE	*sim_devices[]	= { &cpu_dev, &sio_dev, &simh_device, &ptr_dev, &ptp_dev, &dsk_dev, &hdsk_dev, NULL };
 
 char memoryAccessMessage[80];
 const char *sim_stop_messages[] = {
@@ -693,18 +722,18 @@ int32 parse_sym(char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw) {
 		val[0] = (uint32) cptr[0];
 		return SCPE_OK;
 	}
-	return (cpu_unit.flags & UNIT_CHIP) ?
-		parse_X80(cptr, addr, val, MnemonicsZ80) : parse_X80(cptr, addr, val, Mnemonics8080);
+	return parse_X80(cptr, addr, val, cpu_unit.flags & UNIT_CHIP ? MnemonicsZ80 : Mnemonics8080);
 }
 
 
 /*	This is the binary loader. The input file is considered to be
 		a string of literal bytes with no format special format. The
-		load starts at the current value of the PC.
+		load starts at the current value of the PC. ROM/NOROM and
+		ALTAIRROM/NOALTAIRROM settings are ignored.
 */
 
 int32 sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
-	int32 i, addr = 0, cnt = 0, org;
+	int32 i, addr = 0, cnt = 0, org, cntROM = 0, cntNonExist = 0;
 	t_addr j, lo, hi;
 	char *result;
 	t_stat status;
@@ -718,7 +747,7 @@ int32 sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
 				return SCPE_IOERR;
 			}
 		}
-		printf("%d Bytes dumped [%x - %x].\n", hi + 1 - lo, lo, hi);
+		printf("%d bytes dumped [%x - %x].\n", hi + 1 - lo, lo, hi);
 	}
 	else {
 		if (*cptr == 0) {
@@ -732,11 +761,24 @@ int32 sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
 		}
 		org = addr;
 		while ((addr < MAXMEMSIZE) && ((i = getc(fileref)) != EOF)) {
-			PutBYTEWrapper(addr, i);
+			PutBYTEForced(addr, i);
+			if (addressIsInROM(addr)) {
+				cntROM++;
+			}
+			if (!addressExists(addr)) {
+				cntNonExist++;
+			}
 			addr++;
 			cnt++;
 		}						/* end while */
-		printf("%d Bytes loaded at %x.\n", cnt, org);
+		printf("%d bytes [%d page%s] loaded at %x.\n", cnt, (cnt + 255) >> 8,
+			((cnt + 255) >> 8) == 1 ? "" : "s", org);
+		if (cntROM) {
+			printf("Warning: %d bytes written to ROM [%04X - %04X].\n", cntROM, ROMLow, ROMHigh);
+		}
+		if (cntNonExist) {
+			printf("Warning: %d bytes written to non-existing memory (for this configuration).\n", cntNonExist);
+		}
 	}
 	return SCPE_OK;
 }

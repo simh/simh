@@ -25,6 +25,7 @@
 
    rk		RK8E/RK05 cartridge disk
 
+   04-Oct-02	RMS	Added DIB, device number support
    06-Jan-02	RMS	Changed enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Converted FLG to array, made register names consistent
@@ -48,7 +49,6 @@
 
 #define UNIT_V_HWLK	(UNIT_V_UF + 0)			/* hwre write lock */
 #define UNIT_V_SWLK	(UNIT_V_UF + 1)			/* swre write lock */
-#define UNIT_W_UF	3				/* user flags width */
 #define UNIT_HWLK	(1 << UNIT_V_HWLK)
 #define UNIT_SWLK	(1 << UNIT_V_SWLK)
 #define UNIT_WPRT	(UNIT_HWLK|UNIT_SWLK|UNIT_RO)	/* write protect */
@@ -123,8 +123,9 @@
 #define MAX(x,y) (((x) > (y))? (x): (y))
 
 extern uint16 M[];
-extern int32 int_req, dev_enb, stop_inst;
+extern int32 int_req, stop_inst;
 extern UNIT cpu_unit;
+
 int32 rk_busy = 0;					/* controller busy */
 int32 rk_sta = 0;					/* status register */
 int32 rk_cmd = 0;					/* command register */
@@ -132,9 +133,12 @@ int32 rk_da = 0;					/* disk address */
 int32 rk_ma = 0;					/* memory address */
 int32 rk_swait = 10, rk_rwait = 10;			/* seek, rotate wait */
 int32 rk_stopioe = 1;					/* stop on error */
+
+DEVICE rk_dev;
+int32 rk (int32 IR, int32 AC);
 t_stat rk_svc (UNIT *uptr);
 t_stat rk_reset (DEVICE *dptr);
-t_stat rk_boot (int32 unitno);
+t_stat rk_boot (int32 unitno, DEVICE *dptr);
 void rk_go (int32 function, int32 cylinder);
 
 /* RK-8E data structures
@@ -144,6 +148,8 @@ void rk_go (int32 function, int32 cylinder);
    rk_reg	RK register list
    rk_mod	RK modifiers list
 */
+
+DIB rk_dib = { DEV_RK, 1, { &rk } };
 
 UNIT rk_unit[] = {
 	{ UDATA (&rk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
@@ -164,33 +170,32 @@ REG rk_reg[] = {
 	{ FLDATA (INT, int_req, INT_V_RK) },
 	{ DRDATA (STIME, rk_swait, 24), PV_LEFT },
 	{ DRDATA (RTIME, rk_rwait, 24), PV_LEFT },
-	{ URDATA (FLG, rk_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
-		  RK_NUMDR, REG_HRO) },
 	{ FLDATA (STOP_IOE, rk_stopioe, 0) },
-	{ FLDATA (*DEVENB, dev_enb, INT_V_RK), REG_HRO },
+	{ ORDATA (DEVNUM, rk_dib.dev, 6), REG_HRO },
 	{ NULL }  };
 
 MTAB rk_mod[] = {
 	{ UNIT_HWLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_HWLK, UNIT_HWLK, "write locked", "LOCKED", NULL },
-	{ MTAB_XTD|MTAB_VDV, INT_RK, NULL, "ENABLED", &set_enb },
-	{ MTAB_XTD|MTAB_VDV, INT_RK, NULL, "DISABLED", &set_dsb },
+	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
+		&set_dev, &show_dev, NULL },
 	{ 0 }  };
 
 DEVICE rk_dev = {
 	"RK", rk_unit, rk_reg, rk_mod,
 	RK_NUMDR, 8, 24, 1, 8, 12,
 	NULL, NULL, &rk_reset,
-	&rk_boot, NULL, NULL };
+	&rk_boot, NULL, NULL,
+	&rk_dib, DEV_DISABLE };
 
 /* IOT routine */
 
-int32 rk (int32 pulse, int32 AC)
+int32 rk (int32 IR, int32 AC)
 {
 int32 i;
 UNIT *uptr;
 
-switch (pulse) {					/* decode IR<9:11> */
+switch (IR & 07) {					/* decode IR<9:11> */
 case 0:							/* unused */
 	return (stop_inst << IOT_V_REASON) + AC;
 case 1:							/* DSKP */
@@ -225,7 +230,7 @@ case 4:							/* DLCA */
 case 5:							/* DRST */
 	uptr = rk_dev.units + GET_DRIVE (rk_cmd);	/* selected unit */
 	rk_sta = rk_sta & ~(RKS_HMOV + RKS_NRDY);	/* clear dynamic */
-	if ((uptr -> flags & UNIT_ATT) == 0) rk_sta = rk_sta | RKS_NRDY;
+	if ((uptr->flags & UNIT_ATT) == 0) rk_sta = rk_sta | RKS_NRDY;
 	if (sim_is_active (uptr)) rk_sta = rk_sta | RKS_HMOV;
 	return rk_sta;
 case 6:							/* DLDC */
@@ -256,27 +261,27 @@ UNIT *uptr;
 if (func == RKC_RALL) func = RKC_READ;			/* all? use standard */
 if (func == RKC_WALL) func = RKC_WRITE;
 uptr = rk_dev.units + GET_DRIVE (rk_cmd);		/* selected unit */
-if ((uptr -> flags & UNIT_ATT) == 0) {			/* not attached? */
+if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
 	rk_sta = rk_sta | RKS_DONE | RKS_NRDY | RKS_STAT;
 	return;  }
 if (sim_is_active (uptr) || (cyl >= RK_NUMCY)) {	/* busy or bad cyl? */
 	rk_sta = rk_sta | RKS_DONE | RKS_STAT;
 	return;  }
-if ((func == RKC_WRITE) && (uptr -> flags & UNIT_WPRT)) {
+if ((func == RKC_WRITE) && (uptr->flags & UNIT_WPRT)) {
 	rk_sta = rk_sta | RKS_DONE | RKS_WLK;		/* write and locked? */
 	return;  }
 if (func == RKC_WLK) {					/* write lock? */
-	uptr -> flags = uptr -> flags | UNIT_SWLK;
+	uptr->flags = uptr->flags | UNIT_SWLK;
 	rk_sta = rk_sta | RKS_DONE;
 	return;  }
-t = abs (cyl - uptr -> CYL) * rk_swait;			/* seek time */
+t = abs (cyl - uptr->CYL) * rk_swait;			/* seek time */
 if (func == RKC_SEEK) {					/* seek? */
 	sim_activate (uptr, MAX (RK_MIN, t));		/* schedule */
 	rk_sta = rk_sta | RKS_DONE;  }			/* set done */
 else {	sim_activate (uptr, t + rk_rwait);		/* schedule */
 	rk_busy = 1;  }					/* set busy */
-uptr -> FUNC = func;					/* save func */
-uptr -> CYL = cyl;					/* put on cylinder */
+uptr->FUNC = func;					/* save func */
+uptr->CYL = cyl;					/* put on cylinder */
 return;
 }
 
@@ -297,20 +302,20 @@ t_stat rk_svc (UNIT *uptr)
 int32 err, wc, wc1, awc, swc, pa, da;
 UNIT *seluptr;
 
-if (uptr -> FUNC == RKC_SEEK) {				/* seek? */
+if (uptr->FUNC == RKC_SEEK) {				/* seek? */
 	seluptr = rk_dev.units + GET_DRIVE (rk_cmd);	/* see if selected */
 	if ((uptr == seluptr) && ((rk_cmd & RKC_SKDN) != 0)) {
 		rk_sta = rk_sta | RKS_DONE;
 		RK_INT_UPDATE;  }
 	return SCPE_OK;  }
 
-if ((uptr -> flags & UNIT_ATT) == 0) {			/* not att? abort */
+if ((uptr->flags & UNIT_ATT) == 0) {			/* not att? abort */
 	rk_sta = rk_sta | RKS_DONE | RKS_NRDY | RKS_STAT;
 	rk_busy = 0;
 	RK_INT_UPDATE;
 	return IORETURN (rk_stopioe, SCPE_UNATT);  }
 
-if ((uptr -> FUNC == RKC_WRITE) && (uptr -> flags & UNIT_WPRT)) {
+if ((uptr->FUNC == RKC_WRITE) && (uptr->flags & UNIT_WPRT)) {
 	rk_sta = rk_sta | RKS_DONE | RKS_WLK;		/* write and locked? */
 	rk_busy = 0;
 	RK_INT_UPDATE;
@@ -320,28 +325,28 @@ pa = GET_MEX (rk_cmd) | rk_ma;				/* phys address */
 da = GET_DA (rk_cmd, rk_da) * RK_NUMWD * sizeof (int16);/* disk address */
 swc = wc = (rk_cmd & RKC_HALF)? RK_NUMWD / 2: RK_NUMWD;	/* get transfer size */
 if ((wc1 = ((rk_ma + wc) - 010000)) > 0) wc = wc - wc1; /* if wrap, limit */
-err = fseek (uptr -> fileref, da, SEEK_SET);		/* locate sector */
+err = fseek (uptr->fileref, da, SEEK_SET);		/* locate sector */
 
-if ((uptr -> FUNC == RKC_READ) && (err == 0) && MEM_ADDR_OK (pa)) { /* read? */
-	awc = fxread (&M[pa], sizeof (int16), wc, uptr -> fileref);
+if ((uptr->FUNC == RKC_READ) && (err == 0) && MEM_ADDR_OK (pa)) { /* read? */
+	awc = fxread (&M[pa], sizeof (int16), wc, uptr->fileref);
 	for ( ; awc < wc; awc++) M[pa + awc] = 0; 	/* fill if eof */
-	err = ferror (uptr -> fileref);
+	err = ferror (uptr->fileref);
 	if ((wc1 > 0) && (err == 0))  {			/* field wraparound? */
 		pa = pa & 070000;			/* wrap phys addr */
-		awc = fxread (&M[pa], sizeof (int16), wc1, uptr -> fileref);
+		awc = fxread (&M[pa], sizeof (int16), wc1, uptr->fileref);
 		for ( ; awc < wc1; awc++) M[pa + awc] = 0; /* fill if eof */
-		err = ferror (uptr -> fileref);  }  }
+		err = ferror (uptr->fileref);  }  }
 
-if ((uptr -> FUNC == RKC_WRITE) && (err == 0)) {	/* write? */
-	fxwrite (&M[pa], sizeof (int16), wc, uptr -> fileref);
-	err = ferror (uptr -> fileref);
+if ((uptr->FUNC == RKC_WRITE) && (err == 0)) {	/* write? */
+	fxwrite (&M[pa], sizeof (int16), wc, uptr->fileref);
+	err = ferror (uptr->fileref);
 	if ((wc1 > 0) && (err == 0)) {			/* field wraparound? */
 		pa = pa & 070000;			/* wrap phys addr */
-		fxwrite (&M[pa], sizeof (int16), wc1, uptr -> fileref);
-		err = ferror (uptr -> fileref);  }
+		fxwrite (&M[pa], sizeof (int16), wc1, uptr->fileref);
+		err = ferror (uptr->fileref);  }
 	if ((rk_cmd & RKC_HALF) && (err == 0)) {	/* fill half sector */
-		fxwrite (fill, sizeof (int16), RK_NUMWD/2, uptr -> fileref);
-		err = ferror (uptr -> fileref);  }  }
+		fxwrite (fill, sizeof (int16), RK_NUMWD/2, uptr->fileref);
+		err = ferror (uptr->fileref);  }  }
 
 rk_ma = (rk_ma + swc) & 07777;				/* incr mem addr reg */
 rk_sta = rk_sta | RKS_DONE;				/* set done */
@@ -350,7 +355,7 @@ RK_INT_UPDATE;
 
 if (err != 0) {
 	perror ("RK I/O error");
-	clearerr (uptr -> fileref);
+	clearerr (uptr->fileref);
 	return SCPE_IOERR;  }
 return SCPE_OK;
 }
@@ -367,8 +372,8 @@ int_req = int_req & ~INT_RK;				/* clear interrupt */
 for (i = 0; i < RK_NUMDR; i++) {			/* stop all units */
 	uptr = rk_dev.units + i;
 	sim_cancel (uptr);
-	uptr -> flags = uptr -> flags & ~UNIT_SWLK;
-	uptr -> CYL = uptr -> FUNC = 0;  }
+	uptr->flags = uptr->flags & ~UNIT_SWLK;
+	uptr->CYL = uptr->FUNC = 0;  }
 return SCPE_OK;
 }
 
@@ -376,9 +381,9 @@ return SCPE_OK;
 
 #define BOOT_START 023
 #define BOOT_UNIT 032
-#define BOOT_LEN (sizeof (boot_rom) / sizeof (int))
+#define BOOT_LEN (sizeof (boot_rom) / sizeof (int16))
 
-static const int32 boot_rom[] = {
+static const uint16 boot_rom[] = {
 	06007,			/* 23, CAF */
 	06744,			/* 24, DLCA		; addr = 0 */
 	01032,			/* 25, TAD UNIT		; unit no */
@@ -389,11 +394,12 @@ static const int32 boot_rom[] = {
 	00000			/* UNIT, 0 		; in bits <9:10> */
 };
 
-t_stat rk_boot (int32 unitno)
+t_stat rk_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 extern int32 saved_PC;
 
+if (rk_dib.dev != DEV_RK) return STOP_NOTSTD;		/* only std devno */
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 M[BOOT_UNIT] = (unitno & RK_M_NUMDR) << 1;
 saved_PC = BOOT_START;

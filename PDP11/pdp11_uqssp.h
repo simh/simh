@@ -1,4 +1,4 @@
-/* dec_uqssp.h: Unibus/Qbus storage systems port definitions file
+/* pdp11_uqssp.h: Unibus/Qbus storage systems port definitions file
 
    Copyright (c) 2001-2002, Robert M Supnik
    Derived from work by Stephen F. Shirron
@@ -23,7 +23,12 @@
    Except as contained in this notice, the name of Robert M Supnik shall not
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   30-Aug-02	RMS	Added TMSCP support
 */
+
+#ifndef _PDP11_UQSSP_H_
+#define _PDP11_UQSSP_H_	0
 
 /* IP register - initialization and polling
 
@@ -129,7 +134,7 @@
 /* Command/response rings */
 
 struct uq_ring {
-	const int32	ioff;				/* intr offset */
+	int32	ioff;					/* intr offset */
 	t_addr		ba;				/* base addr */
 	uint32		lnt;				/* size in bytes */
 	uint32		idx;				/* current index */
@@ -156,7 +161,9 @@ struct uq_ring {
 #define  UQ_TYP_DAT	1				/* datagram */
 #define UQ_HCTC_V_CID	8				/* conn ID */
 #define UQ_HCTC_M_CID	0xFF
-#define  UQ_CID_MSCP	0				/* standard */
+#define  UQ_CID_MSCP	0				/* MSCP */
+#define  UQ_CID_TMSCP	1				/* TMSCP */
 #define  UQ_CID_DUP	2				/* DUP */
 #define  UQ_CID_DIAG	0xFF				/* diagnostic */
 
+#endif

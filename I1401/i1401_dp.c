@@ -25,7 +25,9 @@
 
    dp		1311 disk pack
 
-   15-Jun-02	Reworked address comparison logic
+   18-Oct-02	RMS	Fixed bug in address comparison logic
+   19-Sep-02	RMS	Minor edit for consistency with 1620
+   15-Jun-02	RMS	Reworked address comparison logic
 
    The 1311 disk pack has 100 cylinders, 10 tracks/cylinder, 20 sectors/track.
    Each sector contains 106 characters of information:
@@ -49,7 +51,6 @@
 #define DP_NUMDR	5				/* #drives */
 #define UNIT_V_WAE	(UNIT_V_UF + 0)			/* write addr enab */
 #define UNIT_WAE	(1 << UNIT_V_WAE)
-#define UNIT_W_UF	2				/* #save flags */
 
 /* Disk format */
 
@@ -105,10 +106,10 @@ t_stat dp_rdadr (UNIT *uptr, int32 sec, int32 flg, int32 wchk);
 t_stat dp_rdsec (UNIT *uptr, int32 sec, int32 flg, int32 wchk);
 t_stat dp_wradr (UNIT *uptr, int32 sec, int32 flg);
 t_stat dp_wrsec (UNIT *uptr, int32 sec, int32 flg);
-int32 dp_fndsec (UNIT *uptr, int32 sec, int32 dcf, int32 flg);
-t_stat dp_nexsec (UNIT *uptr, int32 psec, int32 dcf, int32 flg);
+int32 dp_fndsec (UNIT *uptr, int32 sec, int32 dcf);
+t_stat dp_nexsec (UNIT *uptr, int32 psec, int32 dcf);
 t_bool dp_zeroad (uint8 *ap);
-t_bool dp_cmp_ad (uint8 *ap, int32 dcf, int32 flg);
+t_bool dp_cmp_ad (uint8 *ap, int32 dcf);
 int32 dp_trkop (int32 drv, int32 sec);
 int32 dp_cvt_bcd (int32 ad, int32 len);
 void dp_cvt_bin (int32 ad, int32 len, int32 val, int32 flg);
@@ -146,8 +147,6 @@ REG dp_reg[] = {
 	{ DRDATA (TIME, dp_time, 24), PV_LEFT },
 	{ URDATA (CYL, dp_unit[0].CYL, 10, 8, 0,
 		  DP_NUMDR, PV_LEFT + REG_RO) },
-	{ URDATA (FLG, dp_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
-		  DP_NUMDR, REG_HRO) },
 	{ NULL }  };
 
 MTAB dp_mod[] = {
@@ -175,7 +174,7 @@ t_stat dp_io (int32 fnc, int32 flg, int32 mod)
 {
 int32 dcf, drv, sec, psec, cnt, qwc, qzr, diff;
 UNIT *uptr;
-t_stat r = SCPE_OK;
+t_stat r;
 
 dcf = BS;						/* save DCF addr */
 qwc = 0;						/* not wcheck */
@@ -194,7 +193,7 @@ if ((drv == 0) || (drv & 1) || (drv > BCD_ZERO))	/* bad drive #? */
 	return STOP_INVDSK;
 drv = bcd_to_bin[drv] >> 1;				/* convert */
 uptr = dp_dev.units + drv;				/* get unit ptr */
-if ((uptr -> flags & UNIT_ATT) == 0) {			/* attached? */
+if ((uptr->flags & UNIT_ATT) == 0) {			/* attached? */
 	ind[IN_DSK] = ind[IN_ACC] = 1;			/* no, error */
 	CRETIOE (iochk, SCPE_UNATT);  }
 
@@ -205,10 +204,10 @@ if ((fnc == FNC_SEEK) &&				/* seek and */
 	diff = diff >> 1;				/* diff is *2 */
 	if ((M[dcf + DCF_DIR + DCF_DIR_LEN - 1] & ZONE) == BBIT)
 		diff = -diff;				/* get sign */
-	uptr -> CYL = uptr -> CYL + diff;		/* bound seek */
-	if (uptr -> CYL < 0) uptr -> CYL = 0;
-	else if (uptr -> CYL >= DP_NUMCY) {		/* too big? */
-		uptr -> CYL = 0;			/* system hangs */
+	uptr->CYL = uptr->CYL + diff;			/* bound seek */
+	if (uptr->CYL < 0) uptr->CYL = 0;
+	else if (uptr->CYL >= DP_NUMCY) {		/* too big? */
+		uptr->CYL = 0;				/* system hangs */
 		return STOP_INVDCY;  }
 	sim_activate (&dp_unit[0], dp_time);		/* set ctlr busy */
 	return SCPE_OK;  }				/* done! */
@@ -217,7 +216,7 @@ sec = dp_cvt_bcd (dcf + DCF_SEC, DCF_SEC_LEN);		/* cvt sector */
 if ((sec < 0) || (sec >= (DP_NUMDR * DP_TOTSC)))	/* bad sector? */
 	return STOP_INVDSC;
 if (fnc == FNC_SEEK) {					/* seek? */
-	uptr -> CYL = (sec / (DP_NUMSF * DP_NUMSC)) %	/* set cyl # */
+	uptr->CYL = (sec / (DP_NUMSF * DP_NUMSC)) %	/* set cyl # */
 		DP_NUMCY;
 	sim_activate (&dp_unit[0], dp_time);		/* set ctlr busy */
 	return SCPE_OK;  }				/* done! */
@@ -236,13 +235,13 @@ if (mod == BCD_W) {					/* write? */
 		fnc = fnc + FNC_WOFF;  }  }		/* change to write */
 else if (mod == BCD_R) dp_lastf = fnc;			/* read? save func */
 else return STOP_INVM;					/* other? error */
-psec = dp_fndsec (uptr, sec, dcf, flg);			/* find sector */
 
 switch (fnc) {						/* case on function */
 case FNC_RSCO:						/* read sec cnt ov */
 	BS = dcf + DCF_CNT;				/* set count back */
 							/* fall thru */
 case FNC_READ:						/* read */
+	psec = dp_fndsec (uptr, sec, dcf);		/* find sector */
 	if (psec < 0) CRETIOE (iochk, STOP_INVDAD);	/* addr cmp error? */
 	for (;;) {					/* loop */
 	    qzr = (--cnt == 0);				/* set zero latch */
@@ -254,7 +253,7 @@ case FNC_READ:						/* read */
 	    if (qzr) break;				/* zero latch? done */
 	    sec++; psec++;				/* next sector */
 	    dp_cvt_bin (dcf + DCF_SEC, DCF_SEC_LEN, sec, flg); /* rewr sec */
-	    if (r = dp_nexsec (uptr, psec, dcf, flg)) break;   /* find next */
+	    if (r = dp_nexsec (uptr, psec, dcf)) break;   /* find next */
 	    }
 	break;						/* done, clean up */
 
@@ -278,6 +277,7 @@ case FNC_WRSCO:						/* write sec cnt ov */
 	BS = dcf + DCF_CNT;				/* set count back */
 							/* fall through */
 case FNC_WRITE:						/* read */
+	psec = dp_fndsec (uptr, sec, dcf);		/* find sector */
 	if (psec < 0) CRETIOE (iochk, STOP_INVDAD);	/* addr cmp error? */
 	for (;;) {					/* loop */
 	    qzr = (--cnt == 0);				/* set zero latch */
@@ -286,12 +286,12 @@ case FNC_WRITE:						/* read */
 	    if (qzr) break;				/* zero latch? done */
 	    sec++; psec++;				/* next sector */
 	    dp_cvt_bin (dcf + DCF_SEC, DCF_SEC_LEN, sec, flg); /* rewr sec */
-	    if (r = dp_nexsec (uptr, psec, dcf, flg)) break;   /* find next */
+	    if (r = dp_nexsec (uptr, psec, dcf)) break;   /* find next */
 	    }
 	break;						/* done, clean up */
 
 case FNC_WRTRK:						/* write track */
-	if ((uptr -> flags & UNIT_WAE) == 0)		/* enabled? */
+	if ((uptr->flags & UNIT_WAE) == 0)		/* enabled? */
 		return STOP_WRADIS;
 	AS = dcf + 9;					/* special AS */
 	psec = dp_trkop (drv, sec);			/* start of track */
@@ -323,7 +323,7 @@ t_stat dp_rdadr (UNIT *uptr, int32 sec, int32 flg, int32 qwc)
 int32 i;
 uint8 ac;
 int32 da = (sec % DP_TOTSC) * DP_NUMCH;			/* char number */
-uint8 *ap = ((uint8 *) uptr -> filebuf) + da;		/* buf ptr */
+uint8 *ap = ((uint8 *) uptr->filebuf) + da;		/* buf ptr */
 t_bool zad = dp_zeroad (ap);				/* zero address */
 static const int32 dec_tab[DP_ADDR] =			/* powers of 10 */
 	{ 100000, 10000, 1000, 100, 10, 1} ;
@@ -337,13 +337,13 @@ for (i = 0; i < DP_ADDR; i++) {				/* copy address */
 		sec = sec % dec_tab[i];			/* get remainder */
 		ac = bcd_to_bin[ac];  }			/* cvt to BCD */
 	else ac = *ap;					/* addr char */
-	if (qwc) {					/* wr chk? zad ok */
-		if (!zad && (flg? (M[BS] != *ap):	/* L? cmp with WM */
-		   ((M[BS] & CHAR) != (*ap & CHAR)))) {	/* M? cmp w/o WM */
+	if (qwc) {					/* wr chk? skip if zad */
+		if (!zad && (flg? (M[BS] != ac):	/* L? cmp with WM */
+		   ((M[BS] & CHAR) != (ac & CHAR)))) {	/* M? cmp w/o WM */
 		    ind[IN_DPW] = ind[IN_DSK] = 1;
 		    return STOP_WRCHKE;  }  }
-	else if (flg) M[BS] = *ap & CHAR;		/* load mode */
-	else M[BS] = (M[BS] & WM) | (*ap & CHAR);	/* move mode */
+	else if (flg) M[BS] = ac & CHAR;		/* load mode */
+	else M[BS] = (M[BS] & WM) | (ac & CHAR);	/* move mode */
 	ap++; BS++;					/* adv ptrs */
 	if (ADDR_ERR (BS)) return STOP_WRAP;  }
 return SCPE_OK;
@@ -355,7 +355,7 @@ t_stat dp_rdsec (UNIT *uptr, int32 sec, int32 flg, int32 qwc)
 {
 int32 i, lim;
 int32 da = (sec % DP_TOTSC) * DP_NUMCH;			/* char number */
-uint8 *ap = ((uint8 *) uptr -> filebuf) + da + DP_ADDR;	/* buf ptr */
+uint8 *ap = ((uint8 *) uptr->filebuf) + da + DP_ADDR;	/* buf ptr */
 
 lim = flg? (DP_DATA - 10): DP_DATA;			/* load vs move */
 for (i = 0; i < lim; i++) {				/* copy data */
@@ -380,7 +380,7 @@ t_stat dp_wradr (UNIT *uptr, int32 sec, int32 flg)
 {
 int32 i;
 uint32 da = (sec % DP_TOTSC) * DP_NUMCH;		/* char number */
-uint8 *ap = ((uint8 *) uptr -> filebuf) + da;		/* buf ptr */
+uint8 *ap = ((uint8 *) uptr->filebuf) + da;		/* buf ptr */
 
 for (i = 0; i < DP_ADDR; i++) {				/* copy address */
 	if (M[BS] == (WM | BCD_GRPMRK)) {		/* premature GWM? */
@@ -389,7 +389,7 @@ for (i = 0; i < DP_ADDR; i++) {				/* copy address */
 		return STOP_INVDLN;  }
 	if (flg) *ap = M[BS] & (WM | CHAR);		/* L? copy WM */
 	else *ap = M[BS] & CHAR;			/* M? strip WM */
-	if (da >= uptr -> hwmark) uptr -> hwmark = da + 1;
+	if (da >= uptr->hwmark) uptr->hwmark = da + 1;
 	da++; ap++; BS++;				/* adv ptrs */
 	if (ADDR_ERR (BS)) return STOP_WRAP;  }
 return SCPE_OK;
@@ -401,7 +401,7 @@ t_stat dp_wrsec (UNIT *uptr, int32 sec, int32 flg)
 {
 int32 i, lim;
 uint32 da = ((sec % DP_TOTSC) * DP_NUMCH) + DP_ADDR;	/* char number */
-uint8 *ap = ((uint8 *) uptr -> filebuf) + da;		/* buf ptr */
+uint8 *ap = ((uint8 *) uptr->filebuf) + da;		/* buf ptr */
 
 lim = flg? (DP_DATA - 10): DP_DATA;			/* load vs move */
 for (i = 0; i < lim; i++) {				/* copy data */
@@ -411,7 +411,7 @@ for (i = 0; i < lim; i++) {				/* copy data */
 		return STOP_INVDLN;  }
 	if (flg) *ap = M[BS] & (WM | CHAR);		/* load, copy WM */
 	else *ap = M[BS] & CHAR;			/* move, strip WM */
-	if (da >= uptr -> hwmark) uptr -> hwmark = da + 1;
+	if (da >= uptr->hwmark) uptr->hwmark = da + 1;
 	da++; ap++; BS++;				/* adv ptrs */
 	if (ADDR_ERR (BS)) return STOP_WRAP;  }
 return SCPE_OK;
@@ -419,37 +419,37 @@ return SCPE_OK;
 
 /* Find sector */
 
-int32 dp_fndsec (UNIT *uptr, int32 sec, int32 dcf, int32 flg)
+int32 dp_fndsec (UNIT *uptr, int32 sec, int32 dcf)
 {
 int32 ctrk = sec % (DP_NUMSF * DP_NUMSC);		/* curr trk-sec */
-int32 psec = ((uptr -> CYL) * (DP_NUMSF * DP_NUMSC)) + ctrk;
+int32 psec = ((uptr->CYL) * (DP_NUMSF * DP_NUMSC)) + ctrk;
 int32 da = psec * DP_NUMCH;				/* char number */
-uint8 *ap = ((uint8 *) uptr -> filebuf) + da;		/* buf ptr */
+uint8 *ap = ((uint8 *) uptr->filebuf) + da;		/* buf ptr */
 int32 i;
 
 if (dp_zeroad (ap)) return psec;			/* addr zero? ok */
-if (dp_cmp_ad (ap, dcf, flg)) return psec;		/* addr comp? ok */
+if (dp_cmp_ad (ap, dcf)) return psec;			/* addr comp? ok */
 psec = psec - (psec % DP_NUMSC);			/* sector 0 */
 for (i = 0; i < DP_NUMSC; i++, psec++) {		/* check track */
 	da = psec * DP_NUMCH;				/* char number */
-	ap = ((uint8 *) uptr -> filebuf) + da;		/* word pointer */
+	ap = ((uint8 *) uptr->filebuf) + da;		/* word pointer */
 	if (dp_zeroad (ap)) continue;			/* no implicit match */
-	if (dp_cmp_ad (ap, dcf, flg)) return psec;  }	/* match? */
+	if (dp_cmp_ad (ap, dcf)) return psec;  }	/* match? */
 ind[IN_UNA] = ind[IN_DSK] = 1;				/* no match */
 return -1;
 }
 
 /* Find next sector - must be sequential, cannot cross cylinder boundary */
 
-t_stat dp_nexsec (UNIT *uptr, int32 psec, int32 dcf, int32 flg)
+t_stat dp_nexsec (UNIT *uptr, int32 psec, int32 dcf)
 {
 int32 ctrk = psec % (DP_NUMSF * DP_NUMSC);		/* curr trk-sec */
 int32 da = psec * DP_NUMCH;				/* word number */
-uint8 *ap = ((uint8 *) uptr -> filebuf) + da;		/* buf ptr */
+uint8 *ap = ((uint8 *) uptr->filebuf) + da;		/* buf ptr */
 
 if (ctrk) {						/* not trk zero? */
 	if (dp_zeroad (ap)) return SCPE_OK;		/* addr zero? ok */
-	if (dp_cmp_ad (ap, dcf, flg)) return SCPE_OK;  }/* addr comp? ok */
+	if (dp_cmp_ad (ap, dcf)) return SCPE_OK;  }	/* addr comp? ok */
 ind[IN_UNA] = ind[IN_DSK] = 1;				/* no, error */
 return STOP_INVDAD;
 }
@@ -467,7 +467,7 @@ return TRUE;						/* all zeroes */
 
 /* Compare disk address to memory sector address - always omit word marks */
 
-t_bool dp_cmp_ad (uint8 *ap, int32 dcf, int32 flg)
+t_bool dp_cmp_ad (uint8 *ap, int32 dcf)
 {
 int32 i;
 uint8 c;
@@ -533,8 +533,8 @@ return cnt;
 void dp_fill (UNIT *uptr, uint32 da, int32 cnt)
 {
 while (cnt-- > 0) {					/* fill with blanks */
-	*(((uint8 *) uptr -> filebuf) + da) = BCD_BLANK;
-	if (da >= uptr -> hwmark) uptr -> hwmark = da + 1;
+	*(((uint8 *) uptr->filebuf) + da) = BCD_BLANK;
+	if (da >= uptr->hwmark) uptr->hwmark = da + 1;
 	da++;  }
 return;
 }

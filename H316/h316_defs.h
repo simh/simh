@@ -55,8 +55,8 @@
 /* CPU options */
 
 #define UNIT_V_EXT	(UNIT_V_UF + 1)			/* extended mem */
-#define UNIT_EXT	(1 << UNIT_V_EXT)
 #define UNIT_V_HSA	(UNIT_V_UF + 2)			/* high speed arith */
+#define UNIT_EXT	(1 << UNIT_V_EXT)
 #define UNIT_HSA	(1 << UNIT_V_HSA)
 
 /* Instruction format */

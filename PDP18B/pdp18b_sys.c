@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Oct-02	RMS	Added variable device number support
+   25-Jul-02	RMS	Added PDP-4 DECtape support
    10-Feb-02	RMS	Added PDP-7 DECtape IOT's
    03-Feb-02	RMS	Fixed typo (found by Robert Alan Byer)
    17-Sep-01	RMS	Removed multiconsole support
@@ -47,6 +49,7 @@ extern DEVICE tti_dev, tto_dev;
 extern UNIT tti_unit, tto_unit;
 extern DEVICE clk_dev;
 extern DEVICE lpt_dev;
+extern DEVICE dt_dev;
 #if defined (DRM)
 extern DEVICE drm_dev;
 #endif
@@ -58,9 +61,6 @@ extern DEVICE rp_dev;
 #endif
 #if defined (MTA)
 extern DEVICE mt_dev;
-#endif
-#if defined (DTA)
-extern DEVICE dt_dev;
 #endif
 #if defined (TTY1)
 extern DEVICE tti1_dev, tto1_dev;
@@ -109,9 +109,7 @@ DEVICE *sim_devices[] = { &cpu_dev,
 #if defined (RP)
 	&rp_dev,
 #endif
-#if defined (DTA)
 	&dt_dev,
-#endif
 #if defined (MTA)
 	&mt_dev,
 #endif
@@ -126,7 +124,8 @@ const char *sim_stop_messages[] = {
 	"HALT instruction",
 	"Breakpoint",
 	"Nested XCT's",
-	"Invalid API interrupt"  };
+	"Invalid API interrupt",
+	"Non-standard device number"  };
 
 /* Binary loader */
 
@@ -238,7 +237,7 @@ for (;;) {						/* block loop */
 	if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
 	if (val & SIGN) {
 		if (val != DMASK) saved_PC = val & 077777;
-		return SCPE_OK;  }
+		break;  }
 	cksum = origin = val;				/* save origin */
 	if ((val = getword (fileref, NULL)) < 0) return SCPE_FMT;
 	cksum = cksum + val;				/* add to cksum */
@@ -250,7 +249,7 @@ for (;;) {						/* block loop */
 		cksum = cksum + val;
 		if (MEM_ADDR_OK (origin)) M[origin++] = val;  }
 	if ((cksum & DMASK) != 0) return SCPE_CSUM;  }
-return SCPE_FMT;
+return SCPE_OK;
 }
 #endif
 
@@ -361,14 +360,12 @@ static const char *opcode[] = {
  "MTTR", "MTCR", "MTSF", "MTRC", "MTAF",
  "MTRS", "MTGO", "MTCM", "MTLC",
 #endif
-#if defined (DTA)					/* DECtape */
-#if defined (PDP7)					/* Type 550 */
+#if defined (TYPE550)					/* Type 550 */
  "MMDF", "MMEF", "MMRD", "MMWR",
  "MMBF", "MMRS", "MMLC", "MMSE",
-#elif defined (PDP9) || defined (PDP15)			/* TC02/TC15 */
+#elif defined (TC02)					/* TC02/TC15 */
  "DTCA", "DTRA", "DTXA", "DTLA",
  "DTEF", "DTRB", "DTDF",
-#endif
 #endif
 #if defined (TTY1)
  "KSF1", "KRB1",
@@ -517,14 +514,12 @@ static const int32 opc_val[] = {
  0707301+I_NPI, 0707321+I_NPI, 0707341+I_NPI, 0707312+I_NPN, 0707322+I_NPI,
  0707352+I_NPN, 0707304+I_NPI, 0707324+I_NPI, 0707326+I_NPI, 
 #endif
-#if defined (DTA)
-#if defined (PDP7)					/* Type 550 */
+#if defined (TYPE550)					/* Type 550 */
  0707501+I_NPI, 0707541+I_NPI, 0707512+I_NPN, 0707504+I_NPI,
  0707601+I_NPI, 0707612+I_NPN, 0707604+I_NPI, 0707644+I_NPI,
-#elif defined (PDP9) || defined (PDP15)			/* TC02/TC15 */
+#elif defined (TC02)					/* TC02/TC15 */
  0707541+I_NPI, 0707552+I_NPN, 0707544+I_NPI, 0707545+I_NPI,
  0707561+I_NPI, 0707572+I_NPN, 0707601+I_NPI,
-#endif
 #endif
 #if defined (TTY1)
  0704101+I_NPI, 0704112+I_NPN,
@@ -639,7 +634,6 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 int32 cflag, i, j, k, sp, inst, disp, ma;
 
 inst = val[0];
-i = val[1];
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 if (sw & SWMASK ('A')) {				/* ASCII? */
 	if (inst > 0377) return SCPE_ARG;
@@ -652,6 +646,7 @@ if (sw & SWMASK ('C')) {				/* character? */
 	return SCPE_OK;  }
 #if defined (PDP15)
 if (sw & SWMASK ('P')) {				/* packed ASCII? */
+	i = val[1];
 	fprintf (of, "%c", FMTASC ((inst >> 11) & 0177));
 	fprintf (of, "%c", FMTASC ((inst >> 4) & 0177));
 	fprintf (of, "%c", FMTASC (((inst << 3) | (i >> 15)) & 0177));

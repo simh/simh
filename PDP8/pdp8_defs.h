@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   04-Oct-02	RMS	Added variable device number support
    20-Jan-02	RMS	Fixed bug in TTx interrupt enable initialization
    25-Nov-01	RMS	Added RL8A support
    16-Sep-01	RMS	Added multiple KL support
@@ -43,6 +44,7 @@
 #define STOP_RSRV	1				/* must be 1 */
 #define STOP_HALT	2				/* HALT */
 #define STOP_IBKPT	3				/* breakpoint */
+#define STOP_NOTSTD	4				/* non-std devno */
 
 /* Memory */
 
@@ -63,6 +65,36 @@
 
 #define TMR_CLK		0				/* timer 0 = clock */
 #define TMR_TTX		1				/* timer 1 = TTx */
+
+/* Device information block */
+
+#define DEV_MAXBLK	8				/* max dev block */
+#define DEV_MAX		64				/* total devices */
+
+struct pdp8_dib {
+	uint32		dev;				/* base dev number */
+	uint32		num;				/* number of slots */
+	int32		(*dsp[DEV_MAXBLK])(int32 IR, int32 dat);
+};
+
+typedef struct pdp8_dib DIB;
+
+/* Standard device numbers */
+
+#define DEV_PTR		001				/* paper tape reader */
+#define DEV_PTP		002				/* paper tape punch */
+#define DEV_TTI		003				/* console input */
+#define DEV_TTO		004				/* console output */
+#define DEV_CLK		013				/* clock */
+#define DEV_KJ8		040				/* extra terminals */
+#define DEV_DF		060				/* DF32 */
+#define DEV_RF		060				/* RF08 */
+#define DEV_RL		060				/* RL8A */
+#define DEV_LPT		066				/* line printer */
+#define DEV_MT		070				/* TM8E */
+#define DEV_RK		074				/* RK8E */
+#define DEV_RX		075				/* RX8E/RX28 */
+#define DEV_DTA		076				/* TC08 */
 
 /* Interrupt flags
 
@@ -152,5 +184,5 @@
 
 /* Function prototypes */
 
-t_stat set_enb (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat set_dsb (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat set_dev (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat show_dev (FILE *st, UNIT *uptr, int32 val, void *desc);

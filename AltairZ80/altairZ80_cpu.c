@@ -1,27 +1,46 @@
 /*	altairz80_cpu.c: MITS Altair CPU (8080 and Z80)
-		Written by Peter Schorn, 2001-2002
-		Based on work by Charles E Owen ((c) 1997 - Commercial use prohibited)
-		Code for Z80 CPU from Frank D. Cringle ((c) 1995 under GNU license)
+
+   Copyright (c) 2002, Peter Schorn
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Peter Schorn shall not
+   be used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Peter Schorn.
+
+   Based on work by Charles E Owen (c) 1997
+   Code for Z80 CPU from Frank D. Cringle ((c) 1995 under GNU license)
 */
 
 #include <stdio.h>
-#include "altairZ80_defs.h"
+#include "altairz80_defs.h"
 
-#define PCQ_SIZE	64													/* must be 2**n											*/
+#define PCQ_SIZE	64													/* must be 2**n												*/
 #define PCQ_MASK	(PCQ_SIZE - 1)
 #define PCQ_ENTRY(PC)	pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
 
-#define MEMSIZE					(cpu_unit.capac)			/* actual memory size								*/
-#define KB							1024									/* kilo byte												*/
-#define bootrom_origin	0xff00								/* start address of boot rom				*/
-
 /* Simulator stop codes */
-#define STOP_HALT				2											/* HALT															*/
-#define STOP_IBKPT			3											/* breakpoint	(program counter)			*/
-#define STOP_MEM				4											/* breakpoint	(memory access)				*/
-#define STOP_OPCODE			5											/* unknown 8080 or Z80 instruction	*/
+#define STOP_HALT				2											/* HALT																*/
+#define STOP_IBKPT			3											/* breakpoint	(program counter)				*/
+#define STOP_MEM				4											/* breakpoint	(memory access)					*/
+#define STOP_OPCODE			5											/* unknown 8080 or Z80 instruction		*/
 
-/*-------------------------------- definitions for memory space ------------------*/
+/*-------------------------------- definitions for memory space --------------------*/
 
 uint8 M[MAXMEMSIZE][MAXBANKS];	/* RAM which is present */
 
@@ -55,12 +74,12 @@ uint16 IFF;
 #define TSTFLAG(f)	((AF & FLAG_ ## f) != 0)
 
 #define ldig(x)		((x) & 0xf)
-#define hdig(x)		(((x)>>4)&0xf)
-#define lreg(x)		((x)&0xff)
-#define hreg(x)		(((x)>>8)&0xff)
+#define hdig(x)		(((x) >> 4) & 0xf)
+#define lreg(x)		((x) & 0xff)
+#define hreg(x)		(((x) >> 8) & 0xff)
 
-#define Setlreg(x, v)	x = (((x)&0xff00) | ((v)&0xff))
-#define Sethreg(x, v)	x = (((x)&0xff) | (((v)&0xff) << 8))
+#define Setlreg(x, v)	x = (((x) & 0xff00) | ((v) & 0xff))
+#define Sethreg(x, v)	x = (((x) & 0xff) | (((v) & 0xff) << 8))
 
 /*	SetPV and SetPV2 are used to provide correct parity flag semantics for the 8080 in cases
 		where the Z80 uses the overflow flag
@@ -70,7 +89,7 @@ uint16 IFF;
 
 /* checkCPU8080 must be invoked whenever a Z80 only instruction is executed */
 #define checkCPU8080																													\
-	if ((cpu_unit.flags & UNIT_CHIP == 0) && (cpu_unit.flags & UNIT_OPSTOP)) {	\
+	if (((cpu_unit.flags & UNIT_CHIP) == 0) && (cpu_unit.flags & UNIT_OPSTOP)) {	\
 		reason = STOP_OPCODE;																											\
 		goto end_decode;																													\
 	}
@@ -101,7 +120,7 @@ static const uint8 partab[256] = {
 	4,0,0,4,0,4,4,0,0,4,4,0,4,0,0,4,
 };
 
-#define parity(x)	partab[(x)&0xff]
+#define parity(x)	partab[(x) & 0xff]
 
 #define POP(x)	do {													\
 	register uint32 y = RAM_pp(SP);							\
@@ -132,11 +151,13 @@ static const uint8 partab[256] = {
 	}																						\
 }
 
-int32 saved_PC = 0;			/* program counter														*/
-int32 SR = 0;						/* switch register														*/
-int32 PCX;							/* External view of PC												*/
-int32 bankSelect = 0;		/* determines selected memory bank						*/
-uint32 common = 0xc000;	/* addresses >= 'common' are in common memory	*/
+int32 saved_PC		= 0;							/* program counter														*/
+int32 SR					= 0;							/* switch register														*/
+int32 PCX;													/* External view of PC												*/
+int32 bankSelect	= 0;							/* determines selected memory bank						*/
+uint32 common			= 0xc000;					/* addresses >= 'common' are in common memory	*/
+uint32 ROMLow			= defaultROMLow;	/* lowest address of ROM											*/
+uint32 ROMHigh		= defaultROMHigh;	/* highest address of ROM											*/
 
 extern int32 sim_int_char;
 extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
@@ -148,10 +169,13 @@ extern int32 dsk10				(int32 port, int32 io, int32 data);
 extern int32 dsk11				(int32 port, int32 io, int32 data);
 extern int32 dsk12				(int32 port, int32 io, int32 data);
 extern int32 nulldev			(int32 port, int32 io, int32 data);
+extern int32 hdsk_io			(int32 port, int32 io, int32 data);
 extern int32 simh_dev			(int32 port, int32 io, int32 data);
 extern int32 sr_dev				(int32 port, int32 io, int32 data);
 extern int32 bootrom[bootrom_size];
 extern char memoryAccessMessage[];
+extern char messageBuffer[];
+extern void printMessage(void);
 
 /* function prototypes */
 t_stat cpu_ex(t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
@@ -160,22 +184,32 @@ t_stat cpu_reset(DEVICE *dptr);
 t_stat cpu_set_size(UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_banked(UNIT *uptr, int32 value, char *cptr, void *desc);
 t_stat cpu_set_rom(UNIT *uptr, int32 value, char *cptr, void *desc);
+t_stat cpu_set_norom(UNIT *uptr, int32 value, char *cptr, void *desc);
+t_stat cpu_set_altairrom(UNIT *uptr, int32 value, char *cptr, void *desc);
 uint32 in(uint32 Port);
 void out(uint32 Port, uint32 Value);
 uint8 GetBYTE(register uint32 Addr);
 void PutBYTE(register uint32 Addr, register uint32 Value);
 void PutBYTEForced(register uint32 Addr, register uint32 Value);
+int32 addressIsInROM(uint32 Addr);
+int32 addressExists(uint32 Addr);
 uint16 GetWORD(register uint32 a);
 void PutWORD(register uint32 a, register uint32 v);
-int32 sim_instr (void);
-void install_bootrom(void);
-void clear_memory(int32 starting);
+int32 sim_instr(void);
+int32 install_bootrom(void);
+void reset_memory(void);
 t_bool sim_brk_lookup (t_addr bloc, int32 btyp);
 void prepareMemoryAccessMessage(t_addr loc);
+void checkROMBoundaries(void);
+void warnUnsuccessfulWriteAttempt(uint32 Addr);
+uint8 warnUnsuccessfulReadAttempt(uint32 Addr);
+t_stat cpu_set_warnrom(UNIT *uptr, int32 value, char *cptr, void *desc);
+void protect(int32 l, int32 h);
+void resetCell(int32 address, int32 bank);
 
+#ifndef NO_INLINE
 /*	in case of using inline we need to ensure that the GetBYTE and PutBYTE
 		are accessible externally */
-#ifndef NO_INLINE
 uint8 GetBYTEWrapper(register uint32 Addr);
 void PutBYTEWrapper(register uint32 Addr, register uint32 Value);
 #endif
@@ -187,7 +221,7 @@ void PutBYTEWrapper(register uint32 Addr, register uint32 Value);
 		cpu_mod	CPU modifiers list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK + UNIT_ROM, MAXMEMSIZE) };
+UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK + UNIT_ROM + UNIT_ALTAIRROM, MAXMEMSIZE) };
 
 int32 AF_S;
 int32 BC_S;
@@ -226,37 +260,50 @@ REG cpu_reg[] = {
 	{ HRDATA (SR, SR, 8) },
 	{ HRDATA (BANK, bankSelect, MAXBANKSLOG2) },
 	{ HRDATA (COMMON, common, 16) },
+	{ HRDATA (ROMLOW, ROMLow, 16) },
+	{ HRDATA (ROMHIGH, ROMHigh, 16) },
+	{ HRDATA (CAPACITY, cpu_unit.capac, 17), REG_RO },
 	{ BRDATA (PCQ, pcq, 16, 16, PCQ_SIZE), REG_RO + REG_CIRC },
 	{ DRDATA (PCQP, pcq_p, 6), REG_HRO },
 	{ HRDATA (WRU, sim_int_char, 8) },
 	{ NULL }	};
 
 MTAB cpu_mod[] = {
-	{ UNIT_CHIP,		UNIT_CHIP,		"Z80",				"Z80",				NULL						},
-	{ UNIT_CHIP,		0,						"8080",				"8080",				NULL						},
-	{ UNIT_OPSTOP,	UNIT_OPSTOP,	"ITRAP",			"ITRAP",			NULL						},
-	{ UNIT_OPSTOP,	0,						"NOITRAP",		"NOITRAP",		NULL						},
-	{ UNIT_BANKED,	UNIT_BANKED,	"BANKED",			"BANKED",			&cpu_set_banked	},
-	{ UNIT_BANKED,	0,						"NONBANKED",	"NONBANKED",	NULL						},
-	{ UNIT_ROM,			UNIT_ROM,			"ROM",				"ROM",				&cpu_set_rom		},
-	{ UNIT_ROM,			0,						"NOROM",			"NOROM",			NULL						},
-	{ UNIT_MSIZE,		4 * KB,				NULL,					"4K",					&cpu_set_size		},
-	{ UNIT_MSIZE,		8 * KB,				NULL,					"8K",					&cpu_set_size		},
-	{ UNIT_MSIZE,		12 * KB,			NULL,					"12K",				&cpu_set_size		},
-	{ UNIT_MSIZE,		16 * KB,			NULL,					"16K",				&cpu_set_size		},
-	{ UNIT_MSIZE,		20 * KB,			NULL,					"20K",				&cpu_set_size		},
-	{ UNIT_MSIZE,		24 * KB,			NULL,					"24K",				&cpu_set_size		},
-	{ UNIT_MSIZE,		28 * KB,			NULL,					"28K",				&cpu_set_size		},
-	{ UNIT_MSIZE,		32 * KB,			NULL,					"32K",				&cpu_set_size		},
-	{ UNIT_MSIZE,		48 * KB,			NULL,					"48K",				&cpu_set_size		},
-	{ UNIT_MSIZE,		64 * KB,			NULL,					"64K",				&cpu_set_size		},
+	{ UNIT_CHIP,			UNIT_CHIP,			"Z80",					"Z80",					NULL								},
+	{ UNIT_CHIP,			0,							"8080",					"8080",					NULL								},
+	{ UNIT_OPSTOP,		UNIT_OPSTOP,		"ITRAP",				"ITRAP",				NULL								},
+	{ UNIT_OPSTOP,		0,							"NOITRAP",			"NOITRAP",			NULL								},
+	{ UNIT_BANKED,		UNIT_BANKED,		"BANKED",				"BANKED",				&cpu_set_banked			},
+	{ UNIT_BANKED,		0,							"NONBANKED",		"NONBANKED",		NULL								},
+	{ UNIT_ROM,				UNIT_ROM,				"ROM",					"ROM",					&cpu_set_rom				},
+	{ UNIT_ROM,				0,							"NOROM",				"NOROM",				&cpu_set_norom			},
+	{ UNIT_ALTAIRROM,	UNIT_ALTAIRROM,	"ALTAIRROM",		"ALTAIRROM",		&cpu_set_altairrom	},
+	{ UNIT_ALTAIRROM,	0,							"NOALTAIRROM",	"NOALTAIRROM",	NULL								},
+	{ UNIT_WARNROM,		UNIT_WARNROM,		"WARNROM",			"WARNROM",			&cpu_set_warnrom		},
+	{ UNIT_WARNROM,		0,							"NOWARNROM",		"NOWARNROM",		NULL								},
+	{ UNIT_MSIZE,			4 * KB,					NULL,						"4K",						&cpu_set_size				},
+	{ UNIT_MSIZE,			8 * KB,					NULL,						"8K",						&cpu_set_size				},
+	{ UNIT_MSIZE,			12 * KB,				NULL,						"12K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			16 * KB,				NULL,						"16K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			20 * KB,				NULL,						"20K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			24 * KB,				NULL,						"24K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			28 * KB,				NULL,						"28K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			32 * KB,				NULL,						"32K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			36 * KB,				NULL,						"36K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			40 * KB,				NULL,						"40K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			44 * KB,				NULL,						"44K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			48 * KB,				NULL,						"48K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			52 * KB,				NULL,						"52K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			56 * KB,				NULL,						"56K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			60 * KB,				NULL,						"60K",					&cpu_set_size				},
+	{ UNIT_MSIZE,			64 * KB,				NULL,						"64K",					&cpu_set_size				},
 	{ 0 }	};
 
 DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
 	1, 16, 16, 1, 16, 8,
 	&cpu_ex, &cpu_dep, &cpu_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL, NULL, 0 };
 
 /* data structure for IN/OUT instructions */
 struct idev {
@@ -331,7 +378,7 @@ struct idev dev_table[256] = {
 {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},					/* F0 */
 {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},					/* F4 */
 {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},					/* F8 */
-{&nulldev}, {&nulldev}, {&simh_dev}, {&sr_dev} };				/* FC */
+{&nulldev}, {&hdsk_io}, {&simh_dev}, {&sr_dev} };				/* FC */
 
 INLINE void out(uint32 Port, uint32 Value) {
 	dev_table[Port].routine(Port, 1, Value);
@@ -341,13 +388,52 @@ INLINE uint32 in(uint32 Port) {
 	return dev_table[Port].routine(Port, 0, 0);
 }
 
+void warnUnsuccessfulWriteAttempt(uint32 Addr) {
+	if (cpu_unit.flags & UNIT_WARNROM) {
+		if (addressIsInROM(Addr)) {
+			message2("Attempt to write to ROM " AddressFormat ".\n", Addr);
+		}
+		else {
+			message2("Attempt to write to non existing memory " AddressFormat ".\n", Addr);
+		}
+	}
+}
+
+uint8 warnUnsuccessfulReadAttempt(uint32 Addr) {
+	if (cpu_unit.flags & UNIT_WARNROM) {
+		message2("Attempt to read from non existing memory " AddressFormat ".\n", Addr);
+	}
+	return 0xff;
+}
+
+/* Determine whether Addr points to Read Only Memory */
+int32 addressIsInROM(uint32 Addr) {
+	Addr &= ADDRMASK;	/* registers are NOT guaranteed to be always 16-bit values */
+	return (cpu_unit.flags & UNIT_ROM) && ( /* must have ROM enabled */
+		/* in banked case we have standard Altair ROM */
+		((cpu_unit.flags & UNIT_BANKED) && (defaultROMLow <= Addr)) ||
+		/* in non-banked case we check the bounds of the ROM */
+		(((cpu_unit.flags & UNIT_BANKED) == 0) && (ROMLow <= Addr) && (Addr <= ROMHigh)));
+}
+
+/* Determine whether Addr points to a valid memory address */
+int32 addressExists(uint32 Addr) {
+	Addr &= ADDRMASK;	/* registers are NOT guaranteed to be always 16-bit values */
+	return (cpu_unit.flags & UNIT_BANKED) || (Addr < MEMSIZE) ||
+		((cpu_unit.flags & UNIT_BANKED) == 0) && (cpu_unit.flags & UNIT_ROM)
+			&& (ROMLow <= Addr) && (Addr <= ROMHigh);
+}
+
 INLINE uint8 GetBYTE(register uint32 Addr) {
 	Addr &= ADDRMASK;	/* registers are NOT guaranteed to be always 16-bit values */
-	if (cpu_unit.flags & UNIT_BANKED) {
+	if (cpu_unit.flags & UNIT_BANKED) { /* banked memory case */
+		/* if Addr below "common" take from selected bank, otherwise from bank 0 */
 		return Addr < common ? M[Addr][bankSelect] : M[Addr][0];
 	}
-	else {
-		return ((Addr < MEMSIZE) || (bootrom_origin <= Addr)) ? M[Addr][0] : 0xff;
+	else { /* non-banked memory case */
+		return ((Addr < MEMSIZE) ||
+			(cpu_unit.flags & UNIT_ROM) && (ROMLow <= Addr) && (Addr <= ROMHigh)) ?
+			M[Addr][0] : warnUnsuccessfulReadAttempt(Addr);
 	}
 }
 
@@ -357,26 +443,27 @@ INLINE void PutBYTE(register uint32 Addr, register uint32 Value) {
 		if (Addr < common) {
 			M[Addr][bankSelect] = Value;
 		}
-		else if ((Addr < bootrom_origin) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
+		else if ((Addr < defaultROMLow) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
 			M[Addr][0] = Value;
+		}
+		else {
+			warnUnsuccessfulWriteAttempt(Addr);
 		}
 	}
 	else {
-		if ((Addr < MEMSIZE) && ((Addr < bootrom_origin) || ((cpu_unit.flags & UNIT_ROM) == 0))) {
+		if ((Addr < MEMSIZE) && ((Addr < ROMLow) || (Addr > ROMHigh) || ((cpu_unit.flags & UNIT_ROM) == 0))) {
 			M[Addr][0] = Value;
+		}
+		else {
+			warnUnsuccessfulWriteAttempt(Addr);
 		}
 	}
 }
 
 void PutBYTEForced(register uint32 Addr, register uint32 Value) {
 	Addr &= ADDRMASK;	/* registers are NOT guaranteed to be always 16-bit values */
-	if (cpu_unit.flags & UNIT_BANKED) {
-		if (Addr < common) {
-			M[Addr][bankSelect] = Value;
-		}
-		else {
-			M[Addr][0] = Value;
-		}
+	if ((cpu_unit.flags & UNIT_BANKED) && (Addr < common)) {
+		M[Addr][bankSelect] = Value;
 	}
 	else {
 		M[Addr][0] = Value;
@@ -389,24 +476,36 @@ INLINE void PutWORD(register uint32 Addr, register uint32 Value) {
 		if (Addr < common) {
 			M[Addr][bankSelect] = Value;
 		}
-		else if ((Addr < bootrom_origin) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
+		else if ((Addr < defaultROMLow) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
 			M[Addr][0] = Value;
+		}
+		else {
+			warnUnsuccessfulWriteAttempt(Addr);
 		}
 		Addr = (Addr + 1) & ADDRMASK;
 		if (Addr < common) {
 			M[Addr][bankSelect] = Value >> 8;
 		}
-		else if ((Addr < bootrom_origin) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
+		else if ((Addr < defaultROMLow) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
 			M[Addr][0] = Value >> 8;
+		}
+		else {
+			warnUnsuccessfulWriteAttempt(Addr);
 		}
 	}
 	else {
-		if ((Addr < MEMSIZE) && ((Addr < bootrom_origin) || ((cpu_unit.flags & UNIT_ROM) == 0))) {
+		if ((Addr < MEMSIZE) && ((Addr < ROMLow) || (Addr > ROMHigh) || ((cpu_unit.flags & UNIT_ROM) == 0))) {
 			M[Addr][0] = Value;
 		}
+		else {
+			warnUnsuccessfulWriteAttempt(Addr);
+		}
 		Addr = (Addr + 1) & ADDRMASK;
-		if ((Addr < MEMSIZE) && ((Addr < bootrom_origin) || ((cpu_unit.flags & UNIT_ROM) == 0))) {
+		if ((Addr < MEMSIZE) && ((Addr < ROMLow) || (Addr > ROMHigh) || ((cpu_unit.flags & UNIT_ROM) == 0))) {
 			M[Addr][0] = Value >> 8;
+		}
+		else {
+			warnUnsuccessfulWriteAttempt(Addr);
 		}
 	}
 }
@@ -574,11 +673,11 @@ int32 sim_instr (void) {
 		PCX = PC;
 		sim_interval--;
 
-		 /* make sure that each instructions properly sets sim_brk_pend:
-		 		1) Either directly to FALSE if no memory access takes place or
-		 		2) through a call to a Check... routine
-		 */
-		switch(RAM_pp(PC)) { 
+		/*	make sure that each instructions properly sets sim_brk_pend:
+				1) Either directly to FALSE if no memory access takes place or
+				2) through a call to a Check... routine
+		*/
+		switch(RAM_pp(PC)) {
 			case 0x00:			/* NOP */
 				sim_brk_pend = FALSE;
 				break;
@@ -966,7 +1065,7 @@ int32 sim_instr (void) {
 				break;
 			case 0x37:			/* SCF */
 				sim_brk_pend = FALSE;
-				AF = (AF&~0x3b)|((AF>>8)&0x28)|1;
+				AF = (AF & ~0x3b) | ((AF>>8) & 0x28) | 1;
 				break;
 			case 0x38:			/* JR C,dd */
 				sim_brk_pend = FALSE;
@@ -1023,7 +1122,8 @@ int32 sim_instr (void) {
 				break;
 			case 0x3f:			/* CCF */
 				sim_brk_pend = FALSE;
-				AF = (AF&~0x3b)|((AF>>8)&0x28)|((AF&1)<<4)|(~AF&1);
+				AF = (AF & ~0x3b) | ((AF >> 8) & 0x28) |
+					((AF & 1) << 4) | (~AF & 1);
 				break;
 			case 0x40:			/* LD B,B */
 				sim_brk_pend = FALSE;
@@ -1982,7 +2082,7 @@ int32 sim_instr (void) {
 					else {
 						AF = (AF & ~0xfe) | 0x54;
 					}
-					if ((op&7) != 6) {
+					if ((op & 7) != 6) {
 						AF |= (acu & 0x28);
 					}
 					temp = acu;
@@ -2689,7 +2789,7 @@ int32 sim_instr (void) {
 						else {
 							AF = (AF & ~0xfe) | 0x54;
 						}
-						if ((op&7) != 6) {
+						if ((op & 7) != 6) {
 							AF |= (acu & 0x28);
 						}
 						temp = acu;
@@ -3142,7 +3242,7 @@ int32 sim_instr (void) {
 					sum = acu - temp;
 					cbits = acu ^ temp ^ sum;
 					AF = (AF & ~0xfe) | (sum & 0x80) | (!(sum & 0xff) << 6) |
-						(((sum - ((cbits&16)>>4))&2) << 4) | (cbits & 16) |
+						(((sum - ((cbits & 16)>>4)) & 2) << 4) | (cbits & 16) |
 						((sum - ((cbits >> 4) & 1)) & 8) |
 						((--BC & ADDRMASK) != 0) << 2 | 2;
 					if ((sum & 15) == 8 && (cbits & 16) != 0) {
@@ -3177,7 +3277,7 @@ int32 sim_instr (void) {
 					sum = acu - temp;
 					cbits = acu ^ temp ^ sum;
 					AF = (AF & ~0xfe) | (sum & 0x80) | (!(sum & 0xff) << 6) |
-						(((sum - ((cbits&16)>>4))&2) << 4) | (cbits & 16) |
+						(((sum - ((cbits & 16)>>4)) & 2) << 4) | (cbits & 16) |
 						((sum - ((cbits >> 4) & 1)) & 8) |
 						((--BC & ADDRMASK) != 0) << 2 | 2;
 					if ((sum & 15) == 8 && (cbits & 16) != 0) {
@@ -3220,7 +3320,7 @@ int32 sim_instr (void) {
 					} while (op && sum != 0);
 					cbits = acu ^ temp ^ sum;
 					AF = (AF & ~0xfe) | (sum & 0x80) | (!(sum & 0xff) << 6) |
-						(((sum - ((cbits&16)>>4))&2) << 4) |
+						(((sum - ((cbits & 16)>>4)) & 2) << 4) |
 						(cbits & 16) | ((sum - ((cbits >> 4) & 1)) & 8) |
 						op << 2 | 2;
 					if ((sum & 15) == 8 && (cbits & 16) != 0) {
@@ -3268,7 +3368,7 @@ int32 sim_instr (void) {
 					} while (op && sum != 0);
 					cbits = acu ^ temp ^ sum;
 					AF = (AF & ~0xfe) | (sum & 0x80) | (!(sum & 0xff) << 6) |
-						(((sum - ((cbits&16)>>4))&2) << 4) |
+						(((sum - ((cbits & 16)>>4)) & 2) << 4) |
 						(cbits & 16) | ((sum - ((cbits >> 4) & 1)) & 8) |
 						op << 2 | 2;
 					if ((sum & 15) == 8 && (cbits & 16) != 0) {
@@ -3327,7 +3427,6 @@ int32 sim_instr (void) {
 				sim_brk_pend = FALSE;
 				JPC(!TSTFLAG(S));
 				break;
-
 			case 0xf3:			/* DI */
 				sim_brk_pend = FALSE;
 				IFF = 0;
@@ -3959,7 +4058,7 @@ int32 sim_instr (void) {
 						else {
 							AF = (AF & ~0xfe) | 0x54;
 						}
-						if ((op&7) != 6) {
+						if ((op & 7) != 6) {
 							AF |= (acu & 0x28);
 						}
 						temp = acu;
@@ -4055,28 +4154,60 @@ int32 sim_instr (void) {
 	return reason;
 }
 
-void install_bootrom(void) {
-	int32 i;
+int32 install_bootrom(void) {
+	int32 i, cnt = 0;
 	for (i = 0; i < bootrom_size; i++) {
-		M[i + bootrom_origin][0] = bootrom[i] & 0xff;
+		if (M[i + defaultROMLow][0] != (bootrom[i] & 0xff)) {
+			cnt++;
+			M[i + defaultROMLow][0] = bootrom[i] & 0xff;
+		}
+	}
+	return cnt;
+}
+
+int32 lowProtect;
+int32 highProtect;
+int32 isProtected = FALSE;
+
+void protect(int32 l, int32 h) {
+	isProtected = TRUE;
+	lowProtect = l;
+	highProtect = h;
+}
+
+void resetCell(int32 address, int32 bank) {
+	if (!(isProtected && (bank == 0) && (lowProtect <= address) && (address <= highProtect))) {
+		M[address][bank] = 0;
 	}
 }
 
-void clear_memory(int32 starting) {
-	int32 i, j;
+void reset_memory(void) {
+	uint32 i, j;
+	checkROMBoundaries();
 	if (cpu_unit.flags & UNIT_BANKED) {
 		for (i = 0; i < MAXMEMSIZE; i++) {
 			for (j = 0; j < MAXBANKS; j++) {
-				M[i][j] = 0;
+				resetCell(i, j);
 			}
 		}
 	}
-	else {
-		for (i = starting; i < MAXMEMSIZE; i++) {
-			M[i][0] = 0;
+	else if (cpu_unit.flags & UNIT_ROM) {
+		for (i = 0; i < ROMLow; i++) {
+			resetCell(i, 0);
+		}
+		for (i = ROMHigh+1; i < MAXMEMSIZE; i++) {
+			resetCell(i, 0);
 		}
 	}
-	install_bootrom();
+	else {
+		for (i = 0; i < MAXMEMSIZE; i++) {
+			resetCell(i, 0);
+		}
+	}
+	if (cpu_unit.flags & (UNIT_ALTAIRROM | UNIT_BANKED)) {
+		install_bootrom();
+	}
+	isProtected = FALSE;
 }
 
 /* Reset routine */
@@ -4091,8 +4222,7 @@ t_stat cpu_reset(DEVICE *dptr) {
 	INT_S = IX_S = IY_S = SP_S = 0;
 	IFF_S = 3;
 	bankSelect = 0;
-	saved_PC = 0;
-	clear_memory(0);
+	reset_memory();
 	sim_brk_types = (SWMASK('E') | SWMASK('M'));
 	sim_brk_dflt = SWMASK('E');
 	for (i = 0; i < PCQ_SIZE; i++) {
@@ -4111,62 +4241,109 @@ t_stat cpu_reset(DEVICE *dptr) {
 
 /* Memory examine */
 t_stat cpu_ex(t_value *vptr, t_addr addr, UNIT *uptr, int32 sw) {
-	if (cpu_unit.flags & UNIT_BANKED) {
-		if (addr >= MAXMEMSIZE) {
-			return SCPE_NXM;
+	if (addressExists(addr)) {
+		if (vptr != NULL) {
+			*vptr = GetBYTE(addr) & 0xff;
 		}
+		return SCPE_OK;
 	}
 	else {
-		if ((addr >= MEMSIZE) && (addr < bootrom_origin)) {
-			return SCPE_NXM;
-		}
+		return SCPE_NXM;
 	}
-	if (vptr != NULL) {
-		*vptr = GetBYTE(addr) & 0xff;
-	}
-	return SCPE_OK;
 }
 
 /* Memory deposit */
 t_stat cpu_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw) {
-	if (cpu_unit.flags & UNIT_BANKED) {
-		if ((addr >= bootrom_origin) && (cpu_unit.flags & UNIT_ROM)) {
-			return SCPE_NXM;
-		}
+	if (addressExists(addr) && (!addressIsInROM(addr))) {
+		PutBYTE(addr, val & 0xff);
+		return SCPE_OK;
 	}
 	else {
-		if ((addr >= MEMSIZE) || ((addr >= bootrom_origin) && (cpu_unit.flags & UNIT_ROM))) {
-			return SCPE_NXM;
+		return SCPE_NXM;
+	}
+}
+
+void checkROMBoundaries(void) {
+	uint32 temp;
+	if (ROMLow > ROMHigh) {
+		printf("ROMLOW [%04X] must be less than or equal to ROMHIGH [%04X]. Values exchanged.\n",
+			ROMLow, ROMHigh);
+		temp		= ROMLow;
+		ROMLow	= ROMHigh;
+		ROMHigh	= temp;
+	}
+	if (cpu_unit.flags & UNIT_ALTAIRROM) {
+		if (defaultROMLow < ROMLow) {
+			printf("ROMLOW [%04X] reset to %04X since Altair ROM was desired.\n", ROMLow, defaultROMLow);
+			ROMLow = defaultROMLow;
+		}
+		if (ROMHigh < defaultROMHigh) {
+			printf("ROMHIGH [%04X] reset to %04X since Altair ROM was desired.\n", ROMHigh, defaultROMHigh);
+			ROMHigh = defaultROMHigh;
 		}
 	}
-	PutBYTE(addr, val & 0xff);
-	return SCPE_OK;
 }
 
 t_stat cpu_set_rom(UNIT *uptr, int32 value, char *cptr, void *desc) {
+	checkROMBoundaries();
+	return SCPE_OK;
+}
+
+t_stat cpu_set_norom(UNIT *uptr, int32 value, char *cptr, void *desc) {
+	if (cpu_unit.flags & UNIT_ALTAIRROM) {
+		printf("\"SET CPU NOALTAIRROM\" also executed.\n");
+		cpu_unit.flags &= ~UNIT_ALTAIRROM;
+	}
+	return SCPE_OK;
+}
+
+t_stat cpu_set_altairrom(UNIT *uptr, int32 value, char *cptr, void *desc) {
 	install_bootrom();
+	if (ROMLow != defaultROMLow) {
+		printf("\"D ROMLOW %04X\" also executed.\n", defaultROMLow);
+		ROMLow = defaultROMLow;
+	}
+	if (ROMHigh != defaultROMHigh) {
+		printf("\"D ROMHIGH %04X\" also executed.\n", defaultROMHigh);
+		ROMHigh = defaultROMHigh;
+	}
+	if (!(cpu_unit.flags & UNIT_ROM)) {
+		printf("\"SET CPU ROM\" also executed.\n");
+		cpu_unit.flags |= UNIT_ROM;
+	}
+	return SCPE_OK;
+}
+
+t_stat cpu_set_warnrom(UNIT *uptr, int32 value, char *cptr, void *desc) {
+	if ((!(cpu_unit.flags & UNIT_ROM)) && (MEMSIZE == 64*KB)) {
+		printf("CPU has currently 64 Kb available for writing.\n");
+	}
 	return SCPE_OK;
 }
 
 t_stat cpu_set_banked(UNIT *uptr, int32 value, char *cptr, void *desc) {
-	return MEMSIZE < MAXMEMSIZE ? SCPE_ARG : SCPE_OK;
+	if (common > defaultROMLow) {
+		printf("Warning: COMMON [%04X] must not be greater than %04X. Reset to %04X.\n",
+			common, defaultROMLow, defaultROMLow);
+		common = defaultROMLow;
+	}
+	if (MEMSIZE < MAXMEMSIZE) {
+		printf("\"SET CPU 64K\" also executed.\n");
+		MEMSIZE = MAXMEMSIZE;
+		reset_memory();
+	}
+	return SCPE_OK;
 }
 
 t_stat cpu_set_size(UNIT *uptr, int32 value, char *cptr, void *desc) {
-	int32 i, limit, mc = 0;
-
-	if ((cpu_unit.flags & UNIT_BANKED) ||
-		(value <= 0) || (value > MAXMEMSIZE) || ((value & 0xfff) != 0)) {
-			return SCPE_ARG;
+	if ((cpu_unit.flags & UNIT_BANKED) && (value < MAXMEMSIZE)) {
+		printf("\"SET CPU NONBANKED\" also executed.\n");
+		cpu_unit.flags &= ~UNIT_BANKED;
 	}
-	limit = (bootrom_origin < MEMSIZE) ? bootrom_origin : MEMSIZE;
-	for (i = value; i < limit; i++) {
-		mc |= GetBYTE(i);
-	}
-	if (mc && (!get_yn("Really truncate memory [N]?", FALSE))) {
-		return SCPE_OK;
+	if ((value <= 0) || (value > MAXMEMSIZE) || ((value & 0xfff) != 0)) {
+		return SCPE_ARG;
 	}
 	MEMSIZE = value;
-	clear_memory(value);
+	reset_memory();
 	return SCPE_OK;
 }

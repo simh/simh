@@ -27,6 +27,8 @@
    tti1		second terminal input
    tto1		second terminal output
 
+   03-Oct-02	RMS	Added DIBs
+   22-Aug-02	RMS	Updated for changes in sim_tmxr
    30-May-02	RMS	Widened POS to 32b
    06-Jan-02	RMS	Revised enable/disable support
    30-Dec-01	RMS	Added show statistics, set disconnect
@@ -44,11 +46,14 @@
 #define	UNIT_V_DASHER	(UNIT_V_UF + 0)			/* Dasher mode */
 #define UNIT_DASHER	(1 << UNIT_V_DASHER)
 
-extern int32 int_req, dev_busy, dev_done, dev_disable, iot_enb;
+extern int32 int_req, dev_busy, dev_done, dev_disable;
 extern int32 tmxr_poll;					/* calibrated poll */
 TMLN tt1_ldsc = { 0 };					/* line descriptors */
-TMXR tt_desc = { 1, 0, &tt1_ldsc };			/* mux descriptor */
+TMXR tt_desc = { 1, 0, 0, &tt1_ldsc };			/* mux descriptor */
 
+DEVICE tti1_dev, tto1_dev;
+int32 tti1 (int32 pulse, int32 code, int32 AC);
+int32 tto1 (int32 pulse, int32 code, int32 AC);
 t_stat tti1_svc (UNIT *uptr);
 t_stat tto1_svc (UNIT *uptr);
 t_stat tti1_reset (DEVICE *dptr);
@@ -58,7 +63,8 @@ t_stat tti1_attach (UNIT *uptr, char *cptr);
 t_stat tti1_detach (UNIT *uptr);
 t_stat tti1_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tti1_show (FILE *st, UNIT *uptr, int32 val, void *desc);
-
+void ttx1_enbdis (int32 dis);
+
 /* TTI1 data structures
 
    tti1_dev	TTI1 device descriptor
@@ -66,6 +72,8 @@ t_stat tti1_show (FILE *st, UNIT *uptr, int32 val, void *desc);
    tti1_reg	TTI1 register list
    ttx1_mod	TTI1/TTO1 modifiers list
 */
+
+DIB tti1_dib = { DEV_TTI1, INT_TTI1, PI_TTI1, &tti1 };
 
 UNIT tti1_unit = { UDATA (&tti1_svc, UNIT_ATTABLE, 0), KBD_POLL_WAIT };
 
@@ -77,8 +85,6 @@ REG tti1_reg[] = {
 	{ FLDATA (INT, int_req, INT_V_TTI1) },
 	{ DRDATA (POS, tt1_ldsc.rxcnt, 32), PV_LEFT },
 	{ DRDATA (TIME, tti1_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ FLDATA (MODE, tti1_unit.flags, UNIT_V_DASHER), REG_HRO },
-	{ FLDATA (*DEVENB, iot_enb, INT_V_TTI1), REG_HRO },
 	{ NULL }  };
 
 MTAB tti1_mod[] = {
@@ -91,15 +97,14 @@ MTAB tti1_mod[] = {
 		NULL, &tti1_show, NULL },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
 		NULL, &tti1_show, NULL },
-	{ MTAB_XTD|MTAB_VDV, INT_TTI1 | INT_TTO1, NULL, "ENABLED", &set_enb },
-	{ MTAB_XTD|MTAB_VDV, INT_TTI1 | INT_TTO1, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE tti1_dev = {
 	"TTI1", &tti1_unit, tti1_reg, tti1_mod,
 	1, 10, 31, 1, 8, 8,
 	&tmxr_ex, &tmxr_dep, &tti1_reset,
-	NULL, &tti1_attach, &tti1_detach  };
+	NULL, &tti1_attach, &tti1_detach,
+	&tti1_dib, DEV_DISABLE  };
 
 /* TTO1 data structures
 
@@ -107,6 +112,8 @@ DEVICE tti1_dev = {
    tto1_unit	TTO1 unit descriptor
    tto1_reg	TTO1 register list
 */
+
+DIB tto1_dib = { DEV_TTO1, INT_TTO1, PI_TTO1, &tto1 };
 
 UNIT tto1_unit = { UDATA (&tto1_svc, 0, 0), SERIAL_OUT_WAIT };
 
@@ -118,8 +125,6 @@ REG tto1_reg[] = {
 	{ FLDATA (INT, int_req, INT_V_TTO1) },
 	{ DRDATA (POS, tt1_ldsc.txcnt, 32), PV_LEFT },
 	{ DRDATA (TIME, tto1_unit.wait, 24), PV_LEFT },
-	{ FLDATA (MODE, tto1_unit.flags, UNIT_V_DASHER), REG_HRO },
-	{ FLDATA (*DEVENB, iot_enb, INT_V_TTO1), REG_HRO },
 	{ NULL }  };
 
 MTAB tto1_mod[] = {
@@ -131,7 +136,8 @@ DEVICE tto1_dev = {
 	"TTO1", &tto1_unit, tto1_reg, tto1_mod,
 	1, 10, 31, 1, 8, 8,
 	NULL, NULL, &tto1_reset,
-	NULL, NULL, NULL };
+	NULL, NULL, NULL,
+	&tto1_dib, DEV_DISABLE };
 
 /* Terminal input: IOT routine */
 
@@ -163,16 +169,16 @@ int32 temp, newln;
 if (tt1_ldsc.conn) {					/* connected? */
 	tmxr_poll_rx (&tt_desc);			/* poll for input */
 	if (temp = tmxr_getc_ln (&tt1_ldsc)) {		/* get char */ 
-		uptr -> buf = temp & 0177;
-		if ((uptr -> flags & UNIT_DASHER) &&
-		    (uptr -> buf == '\r'))
-			uptr -> buf = '\n';		/* Dasher: cr -> nl */
+		uptr->buf = temp & 0177;
+		if ((uptr->flags & UNIT_DASHER) &&
+		    (uptr->buf == '\r'))
+			uptr->buf = '\n';		/* Dasher: cr->nl */
 		dev_busy = dev_busy & ~INT_TTI1;	/* clear busy */
 		dev_done = dev_done | INT_TTI1;		/* set done */
 		int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);  }
-	sim_activate (uptr, uptr -> wait);  }		/* continue poll */
-if (uptr -> flags & UNIT_ATT) {				/* attached? */
-	newln = tmxr_poll_conn (&tt_desc, uptr);	/* poll connect */
+	sim_activate (uptr, uptr->wait);  }		/* continue poll */
+if (uptr->flags & UNIT_ATT) {				/* attached? */
+	newln = tmxr_poll_conn (&tt_desc);		/* poll connect */
 	if (newln >= 0) {				/* got one? */
 		sim_activate (&tti1_unit, tti1_unit.wait);
 		tt1_ldsc.rcve = 1;  }			/* rcv enabled */ 
@@ -184,6 +190,7 @@ return SCPE_OK;
 
 t_stat tti1_reset (DEVICE *dptr)
 {
+ttx1_enbdis (dptr->flags & DEV_DIS);			/* sync devices */
 tti1_unit.buf = 0;
 dev_busy = dev_busy & ~INT_TTI1;			/* clear busy */
 dev_done = dev_done & ~INT_TTI1;			/* clear done, int */
@@ -243,6 +250,7 @@ return SCPE_OK;
 
 t_stat tto1_reset (DEVICE *dptr)
 {
+ttx1_enbdis (dptr->flags & DEV_DIS);			/* sync devices */
 tto1_unit.buf = 0;
 dev_busy = dev_busy & ~INT_TTO1;			/* clear busy */
 dev_done = dev_done & ~INT_TTO1;			/* clear done, int */
@@ -298,4 +306,16 @@ t_stat tti1_show (FILE *st, UNIT *uptr, int32 val, void *desc)
 if (val) tmxr_fconns (st, &tt1_ldsc, -1);
 else tmxr_fstats (st, &tt1_ldsc, -1);
 return SCPE_OK;
+}
+
+/* Enable/disable device */
+
+void ttx1_enbdis (int32 dis)
+{
+if (dis) {
+	tti1_dev.flags = tto1_dev.flags | DEV_DIS;
+	tto1_dev.flags = tto1_dev.flags | DEV_DIS;  }
+else {	tti1_dev.flags = tti1_dev.flags & ~DEV_DIS;
+	tto1_dev.flags = tto1_dev.flags & ~DEV_DIS;  }
+return;
 }

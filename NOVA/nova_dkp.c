@@ -25,6 +25,7 @@
 
    dkp		moving head disk
 
+   08-Oct-02	RMS	Added DIB
    06-Jan-02	RMS	Revised enable/disable support
    30-Nov-01	RMS	Added read only unit, extended SET/SHOW support
    24-Nov-01	RMS	Changed FLG, CAPAC to arrays
@@ -47,7 +48,6 @@
 #define UNIT_V_DTYPE	(UNIT_V_UF + 1)			/* disk type */
 #define UNIT_M_DTYPE	017
 #define UNIT_V_AUTO	(UNIT_V_UF + 5)			/* autosize */
-#define UNIT_W_UF	7				/* saved flag width */
 #define UNIT_WLK	(1 << UNIT_V_WLK)
 #define UNIT_DTYPE	(UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define UNIT_AUTO	(1 << UNIT_V_AUTO)
@@ -274,16 +274,20 @@ struct drvtyp drv_tab[] = {
 
 extern uint16 M[];
 extern UNIT cpu_unit;
-extern int32 int_req, dev_busy, dev_done, dev_disable, iot_enb;
+extern int32 int_req, dev_busy, dev_done, dev_disable;
+
 int32 dkp_ma = 0;					/* memory address */
 int32 dkp_ussc = 0;					/* unit/sf/sc/cnt */
 int32 dkp_fccy = 0;					/* flags/cylinder */
 int32 dkp_sta = 0;					/* status register */
 int32 dkp_swait = 100;					/* seek latency */
 int32 dkp_rwait = 100;					/* rotate latency */
+
+DEVICE dkp_dev;
+int32 dkp (int32 pulse, int32 code, int32 AC);
 t_stat dkp_svc (UNIT *uptr);
 t_stat dkp_reset (DEVICE *dptr);
-t_stat dkp_boot (int32 unitno);
+t_stat dkp_boot (int32 unitno, DEVICE *dptr);
 t_stat dkp_attach (UNIT *uptr, char *cptr);
 t_stat dkp_go (void);
 t_stat dkp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -295,6 +299,8 @@ t_stat dkp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
    dkp_reg	DKP register list
    dkp_mod	DKP modifier list
 */
+
+DIB dkp_dib = { DEV_DKP, INT_DKP, PI_DKP, &dkp };
 
 UNIT dkp_unit[] = {
 	{ UDATA (&dkp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
@@ -317,11 +323,8 @@ REG dkp_reg[] = {
 	{ FLDATA (DISABLE, dev_disable, INT_V_DKP) },
 	{ DRDATA (STIME, dkp_swait, 24), PV_LEFT },
 	{ DRDATA (RTIME, dkp_rwait, 24), PV_LEFT },
-	{ URDATA (FLG, dkp_unit[0].flags, 8, UNIT_W_UF, UNIT_V_UF - 1,
-		  DKP_NUMDR, REG_HRO) },
 	{ URDATA (CAPAC, dkp_unit[0].capac, 10, 31, 0,
 		  DKP_NUMDR, PV_LEFT | REG_HRO) },
-	{ FLDATA (*DEVENB, iot_enb, INT_V_DKP), REG_HRO },
 	{ NULL }  };
 
 MTAB dkp_mod[] = {
@@ -419,15 +422,14 @@ MTAB dkp_mod[] = {
 		NULL, "4231", &dkp_set_size },
  	{ (UNIT_AUTO+UNIT_DTYPE), (TYPE_4231 << UNIT_V_DTYPE),
 		NULL, "3330", &dkp_set_size },
-	{ MTAB_XTD|MTAB_VDV, INT_DKP, NULL, "ENABLED", &set_enb },
-	{ MTAB_XTD|MTAB_VDV, INT_DKP, NULL, "DISABLED", &set_dsb },
 	{ 0 }  };
 
 DEVICE dkp_dev = {
 	"DP", dkp_unit, dkp_reg, dkp_mod,
 	DKP_NUMDR, 8, 30, 1, 8, 16,
 	NULL, NULL, &dkp_reset,
-	&dkp_boot, &dkp_attach, NULL };
+	&dkp_boot, &dkp_attach, NULL,
+	&dkp_dib, DEV_DISABLE };
 
 /* IOT routine */
 
@@ -437,13 +439,13 @@ UNIT *uptr;
 int32 u, rval, dtype;
 
 rval = 0;
-uptr = dkp_dev.units + GET_UNIT (dkp_ussc);	/* select unit */
-dtype = GET_DTYPE (uptr -> flags);	/* get drive type */
+uptr = dkp_dev.units + GET_UNIT (dkp_ussc);		/* select unit */
+dtype = GET_DTYPE (uptr->flags);			/* get drive type */
 switch (code) {						/* decode IR<5:7> */
 case ioDIA:						/* DIA */
 	dkp_sta = dkp_sta & ~STA_DYN;			/* clear dynamic */
-	if (uptr -> flags & UNIT_ATT) dkp_sta = dkp_sta | STA_DRDY;
-	if (uptr -> CYL >= drv_tab[dtype].cyl)
+	if (uptr->flags & UNIT_ATT) dkp_sta = dkp_sta | STA_DRDY;
+	if (uptr->CYL >= drv_tab[dtype].cyl)
 		dkp_sta = dkp_sta | STA_CYL;		/* bad cylinder? */
 	if (dkp_sta & STA_EFLGS) dkp_sta = dkp_sta | STA_ERR;
 	rval = dkp_sta;
@@ -454,7 +456,7 @@ case ioDOA:						/* DOA */
 		dkp_sta = dkp_sta & ~(AC & FCCY_FLAGS);  }
 	break;
 case ioDIB:						/* DIB */
-	rval = dkp_ma;				/* return buf addr */
+	rval = dkp_ma;					/* return buf addr */
 	break;
 case ioDOB:						/* DOB */
 	if ((dev_busy & INT_DKP) == 0) dkp_ma = 
@@ -510,10 +512,10 @@ int32 newcyl, func, u, dtype;
 dkp_sta = dkp_sta & ~STA_EFLGS;				/* clear errors */
 u = GET_UNIT (dkp_ussc);				/* get unit number */
 uptr = dkp_dev.units + u;				/* get unit */
-if (((uptr -> flags & UNIT_ATT) == 0) || sim_is_active (uptr)) {
+if (((uptr->flags & UNIT_ATT) == 0) || sim_is_active (uptr)) {
 	dkp_sta = dkp_sta | STA_ERR;			/* attached or busy? */
 	return FALSE;  }
-dtype = GET_DTYPE (uptr -> flags);			/* get drive type */
+dtype = GET_DTYPE (uptr->flags);			/* get drive type */
 func = GET_CMD (dkp_fccy, dtype);			/* get function */
 newcyl = GET_CYL (dkp_fccy, dtype);			/* get cylinder */
 switch (func) {						/* decode command */
@@ -524,11 +526,11 @@ case FCCY_RECAL:					/* recalibrate */
 	newcyl = 0;
 	func = FCCY_SEEK;
 case FCCY_SEEK: 					/* seek */
-	sim_activate (uptr, dkp_swait * abs (newcyl - uptr -> CYL));
+	sim_activate (uptr, dkp_swait * abs (newcyl - uptr->CYL));
 	dkp_sta = dkp_sta | (STA_SEEK0 >> u);		/* set seeking */
-	uptr -> CYL = newcyl;				/* on cylinder */
+	uptr->CYL = newcyl;				/* on cylinder */
 	break;  }					/* end case command */
-uptr -> FUNC = func;					/* save command */
+uptr->FUNC = func;					/* save command */
 return TRUE;						/* no error */
 }
 
@@ -546,16 +548,17 @@ return TRUE;						/* no error */
 
 t_stat dkp_svc (UNIT *uptr)
 {
-int32 sc, sa, xcsa, awc, bda;
-int32 sx, dx, pa;
-int32 dtype, u, err, newsect, newsurf;
+int32 sc, sa, xcsa, bda;
+int32 sx, dx, pa, u;
+int32 dtype, err, newsect, newsurf;
+uint32 awc;
 t_stat rval;
 static uint16 tbuf[DKP_NUMWD];				/* transfer buffer */
 
 rval = SCPE_OK;
-dtype = GET_DTYPE (uptr -> flags);			/* get drive type */
-if (uptr -> FUNC == FCCY_SEEK) {			/* seek? */
-	if (uptr -> CYL >= drv_tab[dtype].cyl)		/* bad cylinder? */
+dtype = GET_DTYPE (uptr->flags);			/* get drive type */
+if (uptr->FUNC == FCCY_SEEK) {				/* seek? */
+	if (uptr->CYL >= drv_tab[dtype].cyl)		/* bad cylinder? */
 		dkp_sta = dkp_sta | STA_ERR | STA_CYL;
 	dev_done = dev_done | INT_DKP;			/* set done */
 	int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
@@ -564,52 +567,52 @@ if (uptr -> FUNC == FCCY_SEEK) {			/* seek? */
 		& ~(STA_SEEK0 >> u);			/* clear seeking */
 	return SCPE_OK;  }
 
-if (((uptr -> flags & UNIT_ATT) == 0) ||		/* not attached? */
-    ((uptr -> flags & UNIT_WPRT) && (uptr -> FUNC == FCCY_WRITE)))
+if (((uptr->flags & UNIT_ATT) == 0) ||			/* not attached? */
+    ((uptr->flags & UNIT_WPRT) && (uptr->FUNC == FCCY_WRITE)))
 	dkp_sta = dkp_sta | STA_DONE | STA_ERR;		/* error */
 
-else if ((uptr -> CYL >= drv_tab[dtype].cyl) ||		/* bad cylinder */
+else if ((uptr->CYL >= drv_tab[dtype].cyl) ||		/* bad cylinder */
 	 (GET_SURF (dkp_ussc, dtype) >= drv_tab[dtype].surf) || /* bad surface */
          (GET_SECT (dkp_ussc, dtype) >= drv_tab[dtype].sect))	/* or bad sector? */
 	dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_UNS;
 
-else if (GET_CYL (dkp_fccy, dtype) != uptr -> CYL)		/* address error? */
+else if (GET_CYL (dkp_fccy, dtype) != uptr->CYL)		/* address error? */
 	dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_UNS;
 
 else {	sc = 16 - GET_COUNT (dkp_ussc);			/* get sector count */
-	sa = GET_SA (uptr -> CYL, GET_SURF (dkp_ussc, dtype),
+	sa = GET_SA (uptr->CYL, GET_SURF (dkp_ussc, dtype),
 		GET_SECT (dkp_ussc, dtype), dtype);	/* get disk block */
-	xcsa = GET_SA (uptr -> CYL + 1, 0, 0, dtype);	/* get next cyl addr */
+	xcsa = GET_SA (uptr->CYL + 1, 0, 0, dtype);	/* get next cyl addr */
 	if ((sa + sc) > xcsa ) {			/* across cylinder? */
 		sc = xcsa - sa;				/* limit transfer */
 		dkp_sta = dkp_sta | STA_XCY;  }		/* xcyl error */
 	bda = sa * DKP_NUMWD * sizeof (short);		/* to words, bytes */
 
-	err = fseek (uptr -> fileref, bda, SEEK_SET);	/* position drive */
+	err = fseek (uptr->fileref, bda, SEEK_SET);	/* position drive */
 
-	if (uptr -> FUNC == FCCY_READ) {		/* read? */
+	if (uptr->FUNC == FCCY_READ) {			/* read? */
 	    for (sx = 0; sx < sc; sx++) {		/* loop thru sectors */
-	        awc = fxread (tbuf, sizeof(uint16), DKP_NUMWD, uptr -> fileref);
+	        awc = fxread (tbuf, sizeof(uint16), DKP_NUMWD, uptr->fileref);
 		for ( ; awc < DKP_NUMWD; awc++) tbuf[awc] = 0;
-		if (err = ferror (uptr -> fileref)) break;
+		if (err = ferror (uptr->fileref)) break;
 		for (dx = 0; dx < DKP_NUMWD; dx++) {	/* loop thru buffer */
 		    pa = MapAddr (0, dkp_ma);
 		    if (MEM_ADDR_OK (pa)) M[pa] = tbuf[dx];
 	            dkp_ma = (dkp_ma + 1) & AMASK;  }  }  }
 
-	if (uptr -> FUNC == FCCY_WRITE) {		/* write? */
+	if (uptr->FUNC == FCCY_WRITE) {			/* write? */
 	    for (sx = 0; sx < sc; sx++) {		/* loop thru sectors */
 		for (dx = 0; dx < DKP_NUMWD; dx++) {	/* loop into buffer */
 		    pa = MapAddr (0, dkp_ma);
 		    tbuf[dx] = M[pa];
 	            dkp_ma = (dkp_ma + 1) & AMASK;  }
-		fxwrite (tbuf, sizeof(int16), DKP_NUMWD, uptr -> fileref);
-		if (err = ferror (uptr -> fileref)) break;  }  }
+		fxwrite (tbuf, sizeof(int16), DKP_NUMWD, uptr->fileref);
+		if (err = ferror (uptr->fileref)) break;  }  }
 
 	if (err != 0) {
 		perror ("DKP I/O error");
 		rval = SCPE_IOERR;  }
-	clearerr (uptr -> fileref);
+	clearerr (uptr->fileref);
 
 	sa = sa + sc;					/* update sector addr */
 	newsect = sa % drv_tab[dtype].sect;
@@ -640,7 +643,7 @@ dkp_fccy = dkp_ussc = dkp_ma = dkp_sta = 0;		/* clear registers */
 for (u = 0; u < DKP_NUMDR; u++) {			/* loop thru units */
 	uptr = dkp_dev.units + u;
 	sim_cancel (uptr);				/* cancel activity */
-	uptr -> CYL = uptr -> FUNC = 0;  }
+	uptr->CYL = uptr->FUNC = 0;  }
 return SCPE_OK;
 }
 
@@ -651,15 +654,15 @@ t_stat dkp_attach (UNIT *uptr, char *cptr)
 int32 i, p;
 t_stat r;
 
-uptr -> capac = drv_tab[GET_DTYPE (uptr -> flags)].size;
+uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = attach_unit (uptr, cptr);
-if ((r != SCPE_OK) || ((uptr -> flags & UNIT_AUTO) == 0)) return r;
-if (fseek (uptr -> fileref, 0, SEEK_END)) return SCPE_OK;
-if ((p = ftell (uptr -> fileref)) == 0) return SCPE_OK;
+if ((r != SCPE_OK) || ((uptr->flags & UNIT_AUTO) == 0)) return r;
+if (fseek (uptr->fileref, 0, SEEK_END)) return SCPE_OK;
+if ((p = ftell (uptr->fileref)) == 0) return SCPE_OK;
 for (i = 0; drv_tab[i].sect != 0; i++) {
 	if (p <= (drv_tab[i].size * (int) sizeof (short))) {
-		uptr -> flags = (uptr -> flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
-		uptr -> capac = drv_tab[i].size;
+		uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
+		uptr->capac = drv_tab[i].size;
 		return SCPE_OK;  }  }
 return SCPE_OK;
 }
@@ -668,8 +671,8 @@ return SCPE_OK;
 
 t_stat dkp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (uptr -> flags & UNIT_ATT) return SCPE_ALATT;
-uptr -> capac = drv_tab[GET_DTYPE (val)].size;
+if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+uptr->capac = drv_tab[GET_DTYPE (val)].size;
 return SCPE_OK;
 }
 
@@ -704,7 +707,7 @@ static const int32 boot_rom[] = {
 	0174000			/* REDCMD: 174000 */
 };
 
-t_stat dkp_boot (int32 unitno)
+t_stat dkp_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i, dtype;
 extern int32 saved_PC;
