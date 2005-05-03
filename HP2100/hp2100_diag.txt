@@ -1,6 +1,6 @@
                       SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2004-12-29
+                             Last update: 2005-03-22
 
 
 The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
@@ -12,7 +12,7 @@ The test system configuration is the default SIMH configuration with these
 alterations (except where noted in the individual diagnostic reports):
 
  * All I/O devices are enabled.
- * The CPU is configured as a 21MX with 128KW of memory.
+ * The CPU is configured as a 21MX-E with 128KW of memory.
 
 Detailed diagnostic configuration, operation, and results are given after the
 summary table.  These may be used to duplicate the diagnostic results.
@@ -42,9 +42,9 @@ The results of the diagnostic runs are summarized below:
 
 101011  Extended Instruction Group (Index)       1432  3.2-3  Passed
 101112  Extended Instruction Group (Word, Byte)  1728  3.2-3  Passed
-101110  2100 Fast FORTRAN Package                1632    -    No simulation
-101213  M/E-Series Fast FORTRAN Package 1        1822    -    No simulation
-101115  M/E-Series Fast FORTRAN Package 2        1632    -    No simulation
+101110  2100 Fast FORTRAN Package                1632  3.4-0  Partial
+101213  M/E-Series Fast FORTRAN Package 1        1822  3.4-0  Passed
+101114  M/E-Series Fast FORTRAN Package 2        1632  3.4-0  Passed
 101121  F-Series FPP/SIS/FFP                     1926    -    No simulation
 
 102103  Memory Expansion Unit                    1830  3.2-3  Passed
@@ -492,7 +492,7 @@ TEST RESULT:    Passed.
 DSN 101011 - Extended Instruction Group (Index)
 -----------------------------------------------
 
-TESTED DEVICE:  CPU (hp2100_cpu.c)
+TESTED DEVICE:  CPU (hp2100_cpu1.c)
 
 CONFIGURATION:  sim> deposit S 000000
                 sim> reset
@@ -511,7 +511,7 @@ TEST RESULT:    Passed.
 DSN 101112 - Extended Instruction Group (Word, Byte, Bit)
 ---------------------------------------------------------
 
-TESTED DEVICE:  CPU (hp2100_cpu.c)
+TESTED DEVICE:  CPU (hp2100_cpu1.c)
 
 CONFIGURATION:  sim> set LPS diag
                 sim> deposit S 000014
@@ -525,6 +525,148 @@ CONFIGURATION:  sim> set LPS diag
                 sim> go
 
 TEST REPORT:    EIG (WORD,BYTE,BIT) DIAGNOSTIC  DSN 101112
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+--------------------------------------
+DSN 101110 - 2100 Fast FORTRAN Package
+--------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu1.c)
+
+CONFIGURATION:  sim> set CPU 2100
+                sim> set CPU 32K
+                sim> set CPU FFP
+
+                sim> deposit S 000013
+                sim> reset
+                sim> go 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> reset
+                sim> go
+
+TEST REPORT:    START 2100A-S FFP DIAGNOSTIC
+                H030 .GOTO TEST
+                H050 .ENTR TEST
+                H060 .ENTP TEST
+                H100 .SETP TEST
+                H110 ..MAP TEST
+                H120 SNGL TEST
+                H130 DBLE TEST
+                H140 .XADD TEST
+
+                TEST  07
+                E142 NOT INTERRUPTIBLE
+
+                HALT instruction 106042
+
+                sim> go
+
+                H150 .XSUB TEST
+                H160 .XMPY TEST
+
+                TEST  11
+                E162 NOT INTERRUPTIBLE
+
+                HALT instruction 106062
+
+                sim> go
+
+                H200 .XDIV TEST
+                H210 .DFER TEST
+                H220 .XFER TEST
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Partially passed.
+
+TEST NOTES:     Tests 07 and 11 test the interruptibility of the .XADD and .XMPY
+                instructions.  These features are not simulated.
+
+
+
+----------------------------------------------
+DSN 101213 - M/E-Series Fast FORTRAN Package 1
+----------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu1.c)
+
+CONFIGURATION:  sim> set CPU FFP
+                sim> set LPS diag
+
+                sim> deposit S 000014
+                sim> reset
+                sim> go 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> reset
+                sim> go
+
+TEST REPORT:    START 21MX FFP DIAGNOSTIC 1
+                H110 ..MAP TEST
+                H120 SNGL TEST
+                H130 DBLE TEST
+                H210 .DFER TEST
+                H220 .XFER TEST
+                H230 PWR2 TEST
+                H240 .PACK TEST
+                H250 FLUN TEST
+                H260 .XPAK TEST
+                H300 .XCOM TEST
+                H310 ..DCM TEST
+                H320 DDINT TEST
+                H330 .CFER TEST
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+----------------------------------------------
+DSN 101115 - M/E-Series Fast FORTRAN Package 2
+----------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu1.c)
+
+CONFIGURATION:  sim> set CPU FFP
+                sim> set LPS diag
+
+                sim> deposit S 000014
+                sim> reset
+                sim> go 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> reset
+                sim> go
+
+TEST REPORT:    START 21MX FFP DIAGNOSTIC 2
+                H030 .GOTO TEST
+                H050 .ENTR TEST
+                H060 .ENTP TEST
+                H100 .SETP TEST
+                H115 XADD TEST
+                H125 XSUB TEST
+                H135 XMPY TEST
+                H140 .XADD TEST
+                H150 .XSUB TEST
+                H160 .XMPY TEST
+                H200 .XDIV TEST
+                H215 XDIV TEST
                 PASS 000001
 
                 HALT instruction 102077
@@ -933,7 +1075,7 @@ TEST REPORT:    H0 7900/7901 CARTRIDGE DISC MEMORY DIAGNOSTIC
 
                 HALT instruction 102002
 
-                sim> detach DPC0
+                sim> set DPC0 unloaded
                 sim> go
 
                 H40 PROTECT U/D THEN READY UNIT  0
@@ -942,7 +1084,7 @@ TEST REPORT:    H0 7900/7901 CARTRIDGE DISC MEMORY DIAGNOSTIC
                 Simulation stopped
 
                 sim> set DPC0 locked
-                sim> attach DPC0 scratch.U0.7900.disc
+                sim> set DPC0 loaded
                 sim> go
 
                 H41 CLEAR U/D PROTECT,LOAD,PUSH RUN
@@ -1113,7 +1255,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 HALT instruction 102002
 
-                sim> set DS0 FORMAT
+                sim> set DS0 format
                 sim> go
 
                 H46 READ IN STEP  04
@@ -1142,7 +1284,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 HALT instruction 102002
 
-                sim> set DS0 NOFORMAT
+                sim> set DS0 noformat
                 sim> go
 
                 H46 READ IN STEP  07
@@ -1171,7 +1313,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 HALT instruction 102002
 
-                sim> set DS0 FORMAT
+                sim> set DS0 format
                 sim> go
 
                 H45 WRITE  IN STEP  10
@@ -1189,7 +1331,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 HALT instruction 102002
 
-                sim> detach DS0
+                sim> set DS0 unloaded
                 sim> go
 
                 H107 READY UNIT  0
@@ -1197,21 +1339,21 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                 [CTRL+E]
                 Simulation stopped
 
-                sim> attach DS0 scratch.U0.7905.disc
+                sim> set DS0 loaded
                 sim> go
 
                 H142 PROTECT  U/D,PUSH RUN
 
                 HALT instruction 102002
 
-                sim> set DS0 LOCKED
+                sim> set DS0 locked
                 sim> go
 
                 H143 CLEAR  U/D PROTECT,PUSH RUN
 
                 HALT instruction 102002
 
-                sim> set DS0 WRITEENABLED
+                sim> set DS0 writeenabled
                 sim> go
 
                 H110 PRESS PRESET(S),PRESS RUN
@@ -1323,12 +1465,14 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                 sim> go
 
                 H46 READ IN STEP  43
+                E47 DATA WORD 0000 IS 156164 SHOULD BE  144300
+                E47 DATA WORD 0001 IS 023302 SHOULD BE  117306
+                E47 DATA WORD 0002 IS 114642 SHOULD BE  045322
                 H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
-                E64 STATUS IS 0 0 0 00111 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
+                E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
                     SHOULD BE 1 0 0 00000 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
-                H137 TERMINATION STATUS IS "CYL CMP ERROR "  SHOULD BE "NORMAL COMPLET"
-                E13 0000 WORDS TRANSFERRED  0128 EXPECTED
-                START 0016/00/33-LAST 0016/00/33 WORD COUNT  00128,OLD CYL  0016,UNIT 00
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                START 0016/00/33-LAST 0016/00/34 WORD COUNT  00128,OLD CYL  0016,UNIT 00
 
                 HALT instruction 102001
 
@@ -1462,28 +1606,28 @@ TEST REPORT:    7970-13181 DIAG.
 
                 HALT instruction 106037
 
-                sim> attach MSC0 scratch.U0.7970.tape
+                sim> set MSC0 online
                 sim> go
 
                 H137 PUT TAPE UNIT ON-LINE
 
                 HALT instruction 106037
 
-                sim> attach MSC1 scratch.U1.7970.tape
+                sim> set MSC1 online
                 sim> go
 
                 H137 PUT TAPE UNIT ON-LINE
 
                 HALT instruction 106037
 
-                sim> attach MSC2 scratch.U2.7970.tape
+                sim> set MSC2 online
                 sim> go
 
                 H137 PUT TAPE UNIT ON-LINE
 
                 HALT instruction 106037
 
-                sim> attach MSC3 scratch.U3.7970.tape
+                sim> set MSC3 online
                 sim> go
 
                 PASS 000001
@@ -1599,28 +1743,28 @@ TEST REPORT:    7970-13183 DIAG.
 
                 HALT instruction 106037
 
-                sim> attach MSC0 scratch.U0.7970.tape
+                sim> set MSC0 online
                 sim> go
 
                 H137 PUT TAPE UNIT ON-LINE
 
                 HALT instruction 106037
 
-                sim> attach MSC1 scratch.U1.7970.tape
+                sim> set MSC1 online
                 sim> go
 
                 H137 PUT TAPE UNIT ON-LINE
 
                 HALT instruction 106037
 
-                sim> attach MSC2 scratch.U2.7970.tape
+                sim> set MSC2 online
                 sim> go
 
                 H137 PUT TAPE UNIT ON-LINE
 
                 HALT instruction 106037
 
-                sim> attach MSC3 scratch.U3.7970.tape
+                sim> set MSC3 online
                 sim> go
 
                 PASS 000001
@@ -2257,7 +2401,7 @@ TEST REPORT:    H0 HP2100A CARTRIDGE DISC MEMORY DIAGNOSTIC
 
                 HALT instruction 102002
 
-                sim> detach DPC0
+                sim> set DPC0 unloaded
                 sim> go
 
                 H40 READY UNIT  0
@@ -2265,7 +2409,7 @@ TEST REPORT:    H0 HP2100A CARTRIDGE DISC MEMORY DIAGNOSTIC
                 [CTRL+E]
                 Simulation stopped
 
-                sim> attach DPC0 scratch.U0.2871.disc
+                sim> set DPC0 loaded
                 sim> go
 
                 H71 PRESS PRESET THEN PRESS RUN 
@@ -2446,7 +2590,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 HALT instruction 102002
 
-                sim> detach DQC0
+                sim> set DQC0 unloaded
                 sim> go
 
                 H40 ENABLE UNIT  0
@@ -2454,7 +2598,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                 [CTRL+E]
                 Simulation stopped
 
-                sim> attach DQC0 scratch.U0.2883.disc
+                sim> set DQC0 loaded
                 sim> go
 
                 H71 PRESS PRESET THEN PRESS RUN 
@@ -2497,7 +2641,7 @@ CONFIGURATION:  sim> reset
                 HALT instruction 107001
 
                 sim> set DRC 180K
-                sim> set DRC TRACKPROT=8
+                sim> set DRC trackprot=8
                 sim> attach DRC0 scratch.U0.2770.disc
                 sim> deposit S 002611
                 sim> go
@@ -2516,14 +2660,14 @@ TEST REPORT:    H12 DEVICE HAS  90 SECTORS
 
                 HALT instruction 102002
 
-                sim> set DRC UNPROTECTED
+                sim> set DRC unprotected
                 sim> go
 
                 H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN 
 
                 HALT instruction 102002
 
-                sim> set DRC PROTECTED
+                sim> set DRC protected
                 sim> go
 
                 H14 DEVICE HAS  0032 TRACKS,THE FOLLOWING ARE PROTECTED:
@@ -2532,7 +2676,7 @@ TEST REPORT:    H12 DEVICE HAS  90 SECTORS
 
                 HALT instruction 102002
 
-                sim> set DRC UNPROTECTED
+                sim> set DRC unprotected
                 sim> go
 
                 H36 PASS  0001
@@ -2560,7 +2704,7 @@ CONFIGURATION:  sim> reset
                 HALT instruction 107001
 
                 sim> set DRC 720K
-                sim> set DRC TRACKPROT=32
+                sim> set DRC trackprot=32
                 sim> attach DRC0 scratch.U0.2771.disc
                 sim> deposit S 002611
                 sim> go
@@ -2579,14 +2723,14 @@ TEST REPORT:    H12 DEVICE HAS  90 SECTORS
 
                 HALT instruction 102002
 
-                sim> set DRC UNPROTECTED
+                sim> set DRC unprotected
                 sim> go
 
                 H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN 
 
                 HALT instruction 102002
 
-                sim> set DRC PROTECTED
+                sim> set DRC protected
                 sim> go
 
                 H14 DEVICE HAS  0128 TRACKS,THE FOLLOWING ARE PROTECTED:
@@ -2595,7 +2739,7 @@ TEST REPORT:    H12 DEVICE HAS  90 SECTORS
 
                 HALT instruction 102002
 
-                sim> set DRC UNPROTECTED
+                sim> set DRC unprotected
                 sim> go
 
                 H36 PASS  0001
@@ -2623,7 +2767,7 @@ CONFIGURATION:  sim> reset
                 HALT instruction 107001
 
                 sim> set DRC 384K
-                sim> set DRC TRACKPROT=16
+                sim> set DRC trackprot=16
                 sim> attach DRC0 scratch.U0.2773.disc
                 sim> deposit S 002611
                 sim> go
@@ -2642,14 +2786,14 @@ TEST REPORT:    H12 DEVICE HAS  32 SECTORS
 
                 HALT instruction 102002
 
-                sim> set DRC UNPROTECTED
+                sim> set DRC unprotected
                 sim> go
                 
                 H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN 
 
                 HALT instruction 102002
 
-                sim> set DRC PROTECTED
+                sim> set DRC protected
                 sim> go
 
                 H14 DEVICE HAS  0192 TRACKS,THE FOLLOWING ARE PROTECTED:
@@ -2658,7 +2802,7 @@ TEST REPORT:    H12 DEVICE HAS  32 SECTORS
 
                 HALT instruction 102002
 
-                sim> set DRC UNPROTECTED
+                sim> set DRC unprotected
                 sim> go
 
                 H36 PASS  0001
@@ -2686,7 +2830,7 @@ CONFIGURATION:  sim> reset
                 HALT instruction 107001
 
                 sim> set DRC 1536K
-                sim> set DRC TRACKPROT=64
+                sim> set DRC trackprot=64
                 sim> attach DRC0 scratch.U0.2775.disc
                 sim> deposit S 002611
                 sim> go
@@ -2705,14 +2849,14 @@ TEST REPORT:    H12 DEVICE HAS  32 SECTORS
 
                 HALT instruction 102002
 
-                sim> set DRC UNPROTECTED
+                sim> set DRC unprotected
                 sim> go
 
                 H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN 
 
                 HALT instruction 102002
 
-                sim> set DRC PROTECTED
+                sim> set DRC protected
                 sim> go
 
                 H14 DEVICE HAS  0768 TRACKS,THE FOLLOWING ARE PROTECTED:
@@ -2721,7 +2865,7 @@ TEST REPORT:    H12 DEVICE HAS  32 SECTORS
 
                 HALT instruction 102002
 
-                sim> set DRC UNPROTECTED
+                sim> set DRC unprotected
                 sim> go
 
                 H36 PASS  0001

@@ -1,6 +1,6 @@
 /* sim_sock.h: OS-dependent socket routines header file
 
-   Copyright (c) 2001-2004, Robert M Supnik
+   Copyright (c) 2001-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Apr-05	RMS	Added WSAEINPROGRESS (from Tim Riker)
    20-Aug-04	HV	Added missing definition for OS/2 (from Holger Veit)
    22-Oct-03    MP      Changed WIN32 winsock include to use winsock2.h to
                         avoid a conflict if sim_sock.h and sim_ether.h get
@@ -49,6 +50,7 @@
 #define WSAGetLastError()	errno			/* Windows macros */
 #define SOCKET		int32
 #define WSAEWOULDBLOCK	EWOULDBLOCK
+#define WSAEINPROGRESS	EINPROGRESS
 #define INVALID_SOCKET	-1 
 #define SOCKET_ERROR	-1
 #include <sys/types.h>					/* for fcntl, getpid */

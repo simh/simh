@@ -28,12 +28,50 @@
 #define _SIM_REV_H_	0
 
 #define	SIM_MAJOR	3
-#define SIM_MINOR	3
-#define SIM_PATCH	2
+#define SIM_MINOR	4
+#define SIM_PATCH	0
 
-/* V3.3 revision history 
+/* V3.4 revision history 
 
 patch	date		module(s) and fix(es)
+
+  0	01-May-04	scp.c:
+			- fixed ASSERT code
+			- revised syntax for SET DEBUG (from Dave Bryan)
+			- revised interpretation of fprint_sym, fparse_sym returns
+			- moved DETACH sanity tests into detach_unit
+
+			sim_sock.h and sim_sock.c:
+			- added test for WSAEINPROGRESS (from Tim Riker)
+
+			many: revised detach routines to test for attached state
+
+			hp2100_cpu.c: reorganized CPU options (from Dave Bryan)
+
+			hp2100_cpu1.c: reorganized EIG routines (from Dave Bryan)
+
+			hp2100_fp1.c: added FFP support (from Dave Bryan)
+
+			id16_cpu.c:
+			- fixed bug in show history routine (from Mark Hittinger)
+			- revised examine/deposit to do words rather than bytes
+
+			id32_cpu.c:
+			- fixed bug in initial memory allocation
+			- fixed bug in show history routine (from Mark Hittinger)
+			- revised examine/deposit to do words rather than bytes
+
+			id16_sys.c, id32_sys:
+			- revised examine/deposit to do words rather than bytes
+
+			pdp10_tu.c:
+			- fixed bug, ERASE and WREOF should not clear done (reported
+			  by Rich Alderson)
+			- fixed error reporting
+
+			pdp11_tu.c: fixed error reporting
+
+/* V3.3 revision history 
 
   2	08-Mar-05	scp.c: added ASSERT command (from Dave Bryan)
 

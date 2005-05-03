@@ -25,6 +25,7 @@
 
    dq		12565A 2883 disk system
 
+   01-Mar-05	JDB	Added SET UNLOAD/LOAD
    07-Oct-04	JDB	Fixed enable/disable from either device
 			Shortened xtime from 5 to 3 (drive avg 156KW/second)
 			Fixed not ready/any error status
@@ -71,7 +72,9 @@
 #include "hp2100_defs.h"
 
 #define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
+#define UNIT_V_UNLOAD	(UNIT_V_UF + 1)			/* heads unloaded */
 #define UNIT_WLK	(1 << UNIT_V_WLK)
+#define UNIT_UNLOAD	(1 << UNIT_V_UNLOAD)
 #define FNC		u3				/* saved function */
 #define DRV		u4				/* drive number (DC) */
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write prot */
@@ -166,6 +169,9 @@ int32 dqcio (int32 inst, int32 IR, int32 dat);
 t_stat dqc_svc (UNIT *uptr);
 t_stat dqd_svc (UNIT *uptr);
 t_stat dqc_reset (DEVICE *dptr);
+t_stat dqc_attach (UNIT *uptr, char *cptr);
+t_stat dqc_detach (UNIT* uptr);
+t_stat dqc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc);
 t_stat dqc_boot (int32 unitno, DEVICE *dptr);
 void dq_god (int32 fnc, int32 drv, int32 time);
 void dq_goc (int32 fnc, int32 drv, int32 time);
@@ -222,10 +228,10 @@ DEVICE dqd_dev = {
 */
 
 UNIT dqc_unit[] = {
-	{ UDATA (&dqc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, DQ_SIZE) },
-	{ UDATA (&dqc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, DQ_SIZE) }  };
+	{ UDATA (&dqc_svc, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, DQ_SIZE) },
+	{ UDATA (&dqc_svc, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, DQ_SIZE) }  };
 
 REG dqc_reg[] = {
 	{ ORDATA (OBUF, dqc_obuf, 16) },
@@ -252,6 +258,8 @@ REG dqc_reg[] = {
 	{ NULL }  };
 
 MTAB dqc_mod[] = {
+	{ UNIT_UNLOAD, UNIT_UNLOAD, "heads unloaded", "UNLOADED", dqc_load_unload },
+	{ UNIT_UNLOAD, 0, "heads loaded", "LOADED", dqc_load_unload },
 	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
 	{ MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
@@ -262,7 +270,7 @@ DEVICE dqc_dev = {
 	"DQC", dqc_unit, dqc_reg, dqc_mod,
 	DQ_NUMDRV, 8, 24, 1, 8, 16,
 	NULL, NULL, &dqc_reset,
-	&dqc_boot, NULL, NULL,
+	&dqc_boot, &dqc_attach, &dqc_detach,
 	&dqc_dib, DEV_DISABLE };
 
 /* IOT routines */
@@ -472,7 +480,7 @@ case FNC_RCL:						/* recalibrate */
 
 case FNC_STA:						/* read status */
 	if (CMD (devd)) {				/* dch active? */
-	    if (dqc_unit[drv].flags & UNIT_ATT)		/* attached? */
+	    if ((dqc_unit[drv].flags & UNIT_UNLOAD) == 0)  /* drive up? */
 		dqd_ibuf = dqc_sta[drv] & ~STA_DID;
 	    else dqd_ibuf = STA_NRDY;
 	    if (dqd_ibuf & STA_ANYERR)			/* errors? set flg */
@@ -527,7 +535,7 @@ err = 0;						/* assume no err */
 drv = uptr - dqc_dev.units;				/* get drive no */
 devc = dqc_dib.devno;					/* get cch devno */
 devd = dqd_dib.devno;					/* get dch devno */
-if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
+if (uptr->flags & UNIT_UNLOAD) {			/* drive down? */
 	setFSR (devc);					/* set cch flg */
 	clrCMD (devc);					/* clr cch cmd */
 	dqc_sta[drv] = 0;				/* clr status */
@@ -671,11 +679,33 @@ for (drv = 0; drv < DQ_NUMDRV; drv++) {			/* loop thru drives */
 return SCPE_OK;
 }
 
-/* Write lock/enable routine */
+/* Attach routine */
 
-t_stat dqc_vlock (UNIT *uptr, int32 val)
+t_stat dqc_attach (UNIT *uptr, char *cptr)
 {
-if (uptr->flags & UNIT_ATT) return SCPE_ARG;
+t_stat r;
+
+r = attach_unit (uptr, cptr);				/* attach unit */
+if (r == SCPE_OK) dqc_load_unload (uptr, 0, NULL, NULL);/* if OK, load heads */
+return r;
+}
+
+/* Detach routine */
+
+t_stat dqc_detach (UNIT* uptr)
+{
+dqc_load_unload (uptr, UNIT_UNLOAD, NULL, NULL);	/* unload heads */
+return detach_unit (uptr);				/* detach unit */
+}
+
+/* Load and unload heads */
+
+t_stat dqc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
+{
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* must be attached to load */
+if (value == UNIT_UNLOAD)				/* unload heads? */
+	uptr->flags = uptr->flags | UNIT_UNLOAD;	/* indicate unload */
+else uptr->flags = uptr->flags & ~UNIT_UNLOAD;		/* indicate load */
 return SCPE_OK;
 }
 

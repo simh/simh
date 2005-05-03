@@ -1,6 +1,6 @@
 /* pdp11_tm.c: PDP-11 magnetic tape simulator
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tm		TM11/TU10 magtape
 
+   18-Mar-05	RMS	Added attached test to detach routine
    07-Dec-04	RMS	Added read-only file support
    30-Sep-04	RMS	Revised Unibus interface
    25-Jan-04	RMS	Revised for device debug support
@@ -557,6 +558,7 @@ t_stat tm_detach (UNIT* uptr)
 {
 int32 u = uptr - tm_dev.units;
 
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;
 if (!sim_is_active (uptr)) uptr->USTAT = 0;
 if (u == GET_UNIT (tm_cmd)) tm_updcsta (uptr);
 return sim_tape_detach (uptr);

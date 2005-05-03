@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
-Subj:	Simulator Usage, V3.3
-Date:	25-Jan-2005
+Subj:	Simulator Usage, V3.4
+Date:	01-May-2005
 
 			COPYRIGHT NOTICE
 
@@ -88,6 +88,13 @@ The simulators recognize or require a few compile-time #defines:
   devices files greater than 2GB.  To include large device support,
   both USE_INT64 and USE_ADDR64 must be defined as part of the
   compilation command line.
+
+- The HP2100 Fast FORTRAN Processor (FFP) option requires 64b integer
+  support.  Define HAVE_INT64 (not USE_INT64) as part of the compilation
+  command line if your host compiler supports 64b integers.  On systems
+  without 64b support, the extended-precision instructions (e.g., XADD)
+  will be disabled; the remainder of the FFP instructions will work
+  normally.  There may be some compilation warnings.
 
 To start the simulator, simply type its name.  (On version of VMS
 prior to 6.2, the simulators must then be defined as foreign commands
@@ -725,15 +732,60 @@ the next character is interpreted literally, even if it is % or \.
 Arguments with spaces can be enclosed in matching single or double
 quotation marks.
 
-If the switch -V is specified, the commands in the file are echoed
-before they are executed.
+If the switch -V is specified, the commands in the file are echoed before
+they are executed.  DO commands may be nested up to ten invocations deep.
 
+Several commands are particularly useful within command files.  While they
+may be executed interactively, they have only limited functionality when so
+used.
+
+3.13.1 Displaying Arbitrary Text
+ 
 The ECHO command is a useful way of annotating command files.  ECHO
 prints out its argument on the console:
-
+ 
 	sim> ECHO <string>		-- output string to console
+ 
+If there is no argument, ECHO prints a blank line on the console.  This may
+be used to provide spacing in the console display or log.
 
-If there is no argument, ECHO prints a blank line on the console.
+3.13.2 Testing Simulator State
+
+The ASSERT command tests a simulator state condition and halts command file
+execution if the condition is false:
+
+	sim> ASSERT {<dev>} <reg>{<logical-op><value>}<conditional-op><value>
+
+If <dev> is not specified, CPU is assumed.  <reg> is a register (scalar or
+subscripted) belonging to the indicated device.  The <conditional-op> and
+optional <logical-op> are the same as those used for "search specifiers" by
+the EXAMINE and DEPOSIT commands (see above).  The <value>s are expressed in
+the radix specified for <reg>, not in the radix for the device.
+
+If the <logical-op> and <value> are specified, the target register value is
+first altered as indicated.  The result is then compared to the <value> via
+the <conditional-op>.  If the result is false, an "Assertion failed" message
+is printed, and any running command file is aborted.  Otherwise, the command
+has no effect.
+
+For example, a command file might be used to bootstrap an operating system
+that halts after the initial load from disk.  The ASSERT command is then
+used to confirm that the load completed successfully by examining the CPU's
+"A" register for the expected value:
+
+	; OS bootstrap command file
+	;
+	ATTACH DS0 os.disk
+	BOOT DS
+	; A register contains error code; 0 = good boot
+	ASSERT A=0
+	ATTACH MT0 sys.tape
+	ATTACH MT1 user.tape
+	RUN
+
+In the example, if the A register is not 0, the command file will be aborted
+with an "Assertion failed (A=0)" message.  Otherwise, the command file will
+continue to bring up the operating system.
 
 3.14 Executing System Commands
 
@@ -768,13 +820,14 @@ or disabled entirely:
 If debug output is enabled, individual devices can be controlled with the
 SET command.  If a device has only a single debug flag:
 
-	sim> SET <device> DEBUG		-- enable device debug output
-	sim> SET <device> NODEBUG	-- disable device debug output
+	sim> SET <device> DEBUG		  -- enable device debug output
+	sim> SET <device> NODEBUG	  -- disable device debug output
 
 If the device has individual, named debug flags:
 
-	sim> SET <device> DEBUG=n1,n2,...   -- enable device debug flags n1, n2, ...
-	sim> SET <device> NODEBUG=n1,n2,... -- disable device debug flags n1, n2, ...
+	sim> SET <device> DEBUG		    -- enable all device debug flags
+	sim> SET <device> DEBUG=n1;n2;...   -- enable device debug flags n1, n2, ...
+	sim> SET <device> NODEBUG=n1;n2;... -- disable device debug flags n1, n2, ...
 	sim> SET <device> NODEBUG	    -- disable all device debug flags
 
 If debug output is directed to stdout, it will be intermixed with normal
@@ -956,6 +1009,9 @@ Revision History (covering Rev 2.0 to present)
 
 Starting with Rev 2.7, detailed revision histories can be found
 in file sim_rev.c.
+
+Rev 3.4, May, 05
+	Revised memory interaction model
 
 Rev 3.3, Nov, 04
 	Added PDP-11/VAX DHQ11 support

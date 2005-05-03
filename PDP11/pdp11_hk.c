@@ -1,6 +1,6 @@
 /* pdp11_hk.c - RK611/RK06/RK07 disk controller
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    hk		RK611/RK06/RK07 disk
 
+   18-Mar-05	RMS	Added attached test to detach routine
    03-Oct-04	RMS	Revised Unibus interface
 		RMS	Fixed state of output ready for M+
    26-Mar-04	RMS	Fixed warnings with -std=c99
@@ -1062,6 +1063,7 @@ t_stat hk_detach (UNIT *uptr)
 {
 int32 drv;
 
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* attached? */
 drv = uptr - hk_dev.units;				/* get drv number */
 hkds[drv] = (hkds[drv] & ~(DS_RDY | DS_WRL | DS_VV | DS_OF)) | DS_ATA;
 if (sim_is_active (uptr)) {				/* unit active? */

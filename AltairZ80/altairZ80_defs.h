@@ -1,6 +1,6 @@
 /*	altairz80_defs.h: MITS Altair simulator definitions
 
-		Copyright (c) 2002-2004, Peter Schorn
+		Copyright (c) 2002-2005, Peter Schorn
 
 		Permission is hereby granted, free of charge, to any person obtaining a
 		copy of this software and associated documentation files (the "Software"),
@@ -36,15 +36,15 @@
 #define BANKMASK					(MAXBANKS-1)					/* bank mask																	*/
 #define MEMSIZE						(cpu_unit.capac)			/* actual memory size													*/
 #define KB								1024									/* kilo byte																	*/
-#define defaultROMLow			0xff00								/* default for lowest addres of ROM						*/
-#define defaultROMHigh		0xffff								/* default for highest addres of ROM					*/
+#define defaultROMLow			0xff00								/* default for lowest address of ROM						*/
+#define defaultROMHigh		0xffff								/* default for highest address of ROM					*/
 
 #define NUM_OF_DSK				8											/* NUM_OF_DSK must be power of two						*/
 #define LDAInstruction		0x3e									/* op-code for LD A,<8-bit value> instruction	*/
 #define unitNoOffset1			0x37									/* LD A,<unitno>															*/
 #define unitNoOffset2			0xb4									/* LD a,80h | <unitno>												*/
 
-#define UNIT_V_OPSTOP			(UNIT_V_UF+0)					/* stop on nvalid operation										*/
+#define UNIT_V_OPSTOP			(UNIT_V_UF+0)					/* stop on invalid operation										*/
 #define UNIT_OPSTOP				(1 << UNIT_V_OPSTOP)
 #define UNIT_V_CHIP				(UNIT_V_UF+1)					/* 8080 or Z80 CPU														*/
 #define UNIT_CHIP					(1 << UNIT_V_CHIP)

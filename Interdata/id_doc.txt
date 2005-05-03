@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Interdata 16b/32b Simulator Usage
-Date:	15-Nov-2004
+Date:	15-Mar-2005
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2004, written by Robert M Supnik
-   Copyright (c) 1993-2004, Robert M Supnik
+   Original code published in 1993-2005, written by Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -166,16 +166,22 @@ If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
 portion of memory is lost.  Initial memory size is 64KB.
 
-These switches are recognized when examining or depositing in CPU memory
-(or any other byte oriented device):
+These switches are recognized when examining or depositing in CPU memory:
 
+	-a			examine/deposit ASCII characters
 	-b			examine/deposit bytes
+	-c			examine/deposit packed ASCII characters
 	-w			examine/deposit halfwords (CPU default)
 	-f			examine/deposit fullwords
 	-d			data radix is decimal
 	-o			data radix is octal
 	-h			data radix is hexadecimal
+	-m			examine as instruction mnemonics
 	-v			interpret address as virtual
+
+Packed characters, halfwords, fullwords, and instructions must be aligned
+on a halfword (16b) boundary.  If an odd address is specified, the low
+order bit is ignored.
 
 CPU registers include the visible state of the processor as well as the
 control registers for the interrupt system.
@@ -234,16 +240,21 @@ If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
 portion of memory is lost.  Initial memory size is 1024KB.
 
-These switches are recognized when examining or depositing in CPU memory
-(or any other byte oriented device):
+These switches are recognized when examining or depositing in CPU memory:
 
+	-a			examine/deposit ASCII characters
 	-b			examine/deposit bytes
-	-w			examine/deposit halfwords
+	-c			examine/deposit packed ASCII characters
 	-f			examine/deposit fullwords (CPU default)
 	-d			data radix is decimal
 	-o			data radix is octal
 	-h			data radix is hexadecimal
+	-m			examine as instruction mnemonics
 	-v			interpret address as virtual
+
+Packed characters, halfwords, fullwords, and instructions must be aligned
+on a halfword (16b) boundary.  If an odd address is specified, the low
+order bit is ignored.
 
 CPU registers include the visible state of the processor as well as the
 control registers for the interrupt system.
@@ -845,8 +856,8 @@ Error handling is as follows:
 The Interdata simulator implements symbolic display and input.  Display is
 controlled by command line switches:
 
-	-a			display as ASCII character
-	-c			display as two character string
+	-a			display byte as ASCII character
+	-c			display halfword as two packed ASCII characters
 	-m			display instruction mnemonics
 
 Input parsing is controlled by the first character typed in or by command
@@ -855,7 +866,7 @@ line switches:
 	' or -a			ASCII character
 	" or -c			two character sixbit string
 	alphabetic		instruction mnemonic
-	numeric			octal number
+	numeric			hexadecimal number
 
 2.8.1 16b Instruction Input
 

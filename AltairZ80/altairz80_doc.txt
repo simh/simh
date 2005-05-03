@@ -1,13 +1,13 @@
 To:   Users
 From: Peter Schorn
 Subj: AltairZ80 Simulator Usage
-Date: 12-Apr-2004
+Date: 05-Apr-2005
 
       COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-  Copyright (c) 2002-2004, Peter Schorn
+  Copyright (c) 2002-2005, Peter Schorn
 
   Permission is hereby granted, free of charge, to any person obtaining a
   copy of this software and associated documentation files (the "Software"),
@@ -61,7 +61,10 @@ sim/AltairZ80/altairz80_defs.h
 
 2. Revision History
 
-- 12-Apr-2004, Peter Schorn (added MAP/NOMAP capability to switch off key mapping)
+- 05-Apr-2005, removed bogus t-state stepping support
+- 24-Jul-2004, Peter Schorn (updated CP/M 2 and SPL packages)
+- 12-Apr-2004, Peter Schorn (added MAP/NOMAP capability to switch off
+                             key mapping)
 - 26-Jan-2004, Peter Schorn (added support for t-state stepping)
 - 25-Feb-2003, Peter Schorn (added support for real time simulation)
 -  9-Oct-2002, Peter Schorn (added support for simulated hard disk)
@@ -169,7 +172,7 @@ the MITS Disk Basic and Altair DOS require about a minimum of 24K.
       a warning message if the CPU attempts to read from non-existing
       memory.
 
-  SET CPU NOWARNROM Suppreses all warning message of "WARNROM". Note that
+  SET CPU NOWARNROM Suppresses all warning message of "WARNROM". Note that
       some software tries on purpose to write to ROM in order to detect
       the available RAM.
 
@@ -181,7 +184,7 @@ crashes.  This is historically accurate behavior.
 
   The real 8080, on receiving a HLT (Halt) instruction, freezes the
 processor and only an interrupt or CPU hardware reset will restore it.  The
-simulator is alot nicer, it will halt but send you back to the simulator
+simulator is a lot nicer, it will halt but send you back to the simulator
 command line.
 
 CPU Registers include the following:
@@ -193,7 +196,7 @@ CPU Registers include the following:
               F = S Z - AC - P/V N C
                 S    = Sign flag.
                 Z    = Zero Flag.
-                AC   = Auxillary Carry flag.
+                AC   = Auxiliary Carry flag.
                 P/V  = Parity flag on 8080
                        Parity / Overflow flag on Z80
                 -    = not used (undefined)
@@ -307,10 +310,10 @@ for debugging purposes.
 
   The MITS 88-DISK is a simple programmed I/O interface to the MITS 8-inch
 floppy drive, which was basically a Pertec FD-400 with a power supply and
-buffer board builtin.  The controller supports neither interrupts nor DMA,
+buffer board built-in.  The controller supports neither interrupts nor DMA,
 so floppy access required the sustained attention of the CPU. The standard
 I/O addresses were 8, 9, and 0A (hex), and we follow the standard.  Details
-on controlling this hardware are in the altair_dsk.c source file.
+on controlling this hardware are in the altairz80_dsk.c source file.
 
   The only difference is that the simulated disks may be larger than the
 original ones: The original disk had 77 tracks while the simulated disks
@@ -438,10 +441,10 @@ DUMP    .COM   2K ; hex dump a file
 ED      .COM   8K ; line editor
 ELIZA   .BAS  10K ; Eliza game in Basic
 EX8080  .COM  12K ; exercise 8080 instruction set
-EXZ80N  .COM  12K ; exercise Z80 instruction set, No undefined status bits
-EXZ80U  .COM  12K ; exercise Z80 instruction set, Undefined status bits
-EXZ80   .MAC  54K ; source for EX8080.COM, EXZ80N.COM, EXZ80U.COM
-EX      .SUB   2K ; benchmark execution of EX8080.COM, EXZ80N.COM, EXZ80U.COM
+EXZ80DOC.COM  12K ; exercise Z80 instruction set, No undefined status bits
+EXZ80ALL.COM  12K ; exercise Z80 instruction set, Undefined status bits
+EX      .MAC  54K ; source for EX8080.COM, EXZ80DOC.COM, EXZ80ALL.COM
+EX      .SUB   2K ; benchmark execution of EX8080.COM,EXZ80DOC.COM,EXZ80ALL.COM
 FORMAT  .COM   2K ; format disks
 GO      .COM   0K ; start the currently loaded program at 100H
 HDSKBOOT.MAC   6K ; boot code for hard disk
@@ -484,7 +487,7 @@ W       .COM   4K ; write files to SIMH environment
 WM      .COM  12K ; word master screen editor
 WM      .HLP   3K ; help file for WM.COM
 WORM    .COM   4K ; worm game for VT100 terminal
-XFORMAT .COM   2K ; initialise a drive (floppy or hard disk)
+XFORMAT .COM   2K ; initialize a drive (floppy or hard disk)
 XSUB    .COM   2K ; support for DO.COM
 ZAP     .COM  10K ; SuperZap 5.2 disk editor configured for VT100
 ZSID    .COM  10K ; debugger for Z80
@@ -493,7 +496,7 @@ ZTRAN4  .COM   4K ; translate 8080 mnemonics into Z80 equivalents
 
 5.2 CP/M Version 3 with banked memory
 
-  CP/M 3 is the successor to CP/M 2.2. A customised BIOS (BIOS3.MAC) is
+  CP/M 3 is the successor to CP/M 2.2. A customized BIOS (BIOS3.MAC) is
 included to facilitate modification if so desired. The defaults supplied in
 GENCPM.DAT for system generation can be used. BOOTGEN.COM is used to place
 the CP/M loader (LDR.COM) on the boot tracks of a disk.
@@ -545,13 +548,13 @@ HEXCOM  .CPM   2K
 HIST    .UTL   2K
 INITDIR .COM  32K
 L80     .COM  12K ; Microsoft linker
-LDR     .COM   4K ; CP/M loader with optimised loader BIOS
-LDRBIOS3.MAC  14K ; optimised (for space) loader BIOS
+LDR     .COM   4K ; CP/M loader with optimized loader BIOS
+LDRBIOS3.MAC  14K ; optimized (for space) loader BIOS
 LIB     .COM   8K ; Digital Research librarian
 LINK    .COM  16K ; Digital Research linker
 LOAD    .COM   2K
 M80     .COM  20K ; Microsoft macro assembler
-MC      .SUB   2K ; assemble and link an assmbler program
+MC      .SUB   2K ; assemble and link an assembler program
 MCC     .SUB   2K ; read, assemble and link an assembler program
 PATCH   .COM   4K
 PIP     .COM  10K ; Peripheral Interchange Program
@@ -626,7 +629,7 @@ DUMP    .MAC   6K ; source for DUMP.PRL
 DUMP    .PRL   2K ; dump command
 ED      .PRL  10K ; MP/M line editor
 ERA     .PRL   2K ; erase command
-ERAQ    .PRL   4K ; erase comand (verbose)
+ERAQ    .PRL   4K ; erase command (verbose)
 GENHEX  .COM   2K
 GENMOD  .COM   2K
 GENSYS  .COM  10K
@@ -636,7 +639,7 @@ LIB     .COM   8K ; library utility
 LINK    .COM  16K ; linker
 LOAD    .COM   2K ; loader
 M80     .COM  20K ; Microsoft macro assembler
-MC      .SUB   2K ; assemble and link an assmbler program
+MC      .SUB   2K ; assemble and link an assembler program
 MCC     .SUB   2K ; read, assemble and link an assembler program
 MPM     .COM   8K ; start MP/M II
 MPM     .SYS  26K ; MP/M system file
@@ -703,21 +706,22 @@ before booting CP/M.
 
 The disk "app.dsk" contains the following files:
 Name    Ext  Size   Comment
+ACKER   .SPL   4K ; compute the Ackermann function
+ACKER   .COM   2K ; compute the Ackermann function, SPL source
 BOOTGEN .COM   2K
 BOOTGEN .SPL   6K ; SPL source for BOOTGEN.COM
 C       .SUB   2K ; batch file for compiling an SPL source file
 CALC    .PRO   4K ; Prolog demo program: Calculator
-CC      .SUB   2K ; compile an SPL source which is on the underlying
-                    file system
-DECLARAT.     12K ; common include file, SPL source
 DIF     .COM   4K
 DIF     .SPL  10K ; SPL source for DIF.COM
-EDIT    .SPL  10K ; screen editor for PROLOGZ, SPL source
+FAC     .COM   4K ; compute the factorial
+FAC     .SPL   4K ; compute the factorial, SPL source
 FAMILY  .PRO   4K ; Prolog demo program: Family relations
+FORMEL  .COM   4K ; calculator
+FORMEL  .SPL   6K ; calculator, SPL source
 INTEGER .PRO   2K ; Prolog demo program: Integer arithmetic
 KNAKE   .PRO   2K ; Prolog demo program: Logic puzzle
 LINKMT  .COM  12K ; Pascal MT+ 5.5 linker
-MAIN    .SPL  14K ; main module for PROLOGZ, SPL source
 MOVE    .MAC   4K ; helper functions for PROLOGZ in assembler
 MTERRS  .TXT   6K ; Pascal MT+ error messages
 MTPLUS  .000  14K ; Pascal MT+ 5.5 compiler file
@@ -733,34 +737,31 @@ PASCFORM.PAS  54K ; Pascal formatter source code
 PASCFORM.SUB   2K ; create Pascal formatter
 PASLIB  .ERL  24K ; Pascal MT+ 5.5 run time library
 PINST   .COM   4K ; terminal installation program for PROLOGZ
-PINST   .SPL  16K ; terminal installation program for PROLOGZ,
-                    SPL source
+PINST   .SPL  16K ; terminal installation program for PROLOGZ, SPL source
+PRIM    .COM   2K ; compute prime numbers
+PRIM    .SPL   2K ; compute prime numbers, SPL source
 PROLOGZ .COM  18K ; PROLOGZ interpreter and screen editor
-PROLOGZ .SPL   2K ; PROLOGZ main program, SPL source
+PROLOGZ .SPL   2K ; SPL source for PROLOGZ
 PROLOGZ .TXT  40K ; PROLOGZ documentation in German
-PROVE   .SPL  16K ; backtrack theorem prover for PROLOGZ, SPL source
-PZCLEAN .SUB   2K ; PROLOGZ: remove all created ".rel" and ".lst" files
-PZLINK  .SUB   2K ; PROLOGZ: create PINST, PROLOGZ and personalise the
-                    serial number
-PZMAKE  .SUB   2K ; PROLOGZ: compiles the sources (you can ignore
-                    any compiler errors)
 QUEEN   .PRO   2K ; Prolog demo program: N-queens problem
 READ    .COM   4K
 READ    .SPL  10K ; SPL source for R.COM
-SHOWSEC .COM   4K
+RELDUMP .COM   4K ; dump a .REL file to the console
+RELDUMP .SPL  10K ; dump a .REL file to the console, SPL source
+SHOWSEC .COM   2K
 SHOWSEC .SPL   6K ; SPL source for SHOWSEC.COM
+SIEVE   .COM   2K ; compute prime numbers with a sieve
+SIEVE   .SPL   6K ; compute prime numbers with a sieve, SPL source
 SPEED   .COM   2K ; utility to measure the clock speed of the simulated CPU
-SPEED   .SPL   2K ; SPL source for SPEED.COM, requires SWLIB.MAC
-SPL     .COM  38K ; the SPL compiler itself
-SPL     .TXT  56K ; SPL language and compiler documentation in German
-SPLERROR.DAT  12K ; error messages of the compiler (in German)
-SPLIB   .REL   6K ; SPL runtime library
-STDIO   .      2K ; include file for SPL programs
-SWLIB   .MAC   2K ; assembler utility routines needed by SPEED.SPL
+SPEED   .SPL   4K ; SPL source for SPEED.COM
+SPL     .COM  28K ; the SPL compiler itself
+SPL     .TXT  50K ; SPL language and compiler documentation
+SPLERROR.DAT   8K ; error messages of the compiler
+SPLRTLB .REL   2K ; SPL runtime library
 SYSCOPY .COM   2K
 SYSCOPY .SPL   6K ; SPL source for SYSCOPY.COM
-TERMBDOS.SPL   2K ; terminal interface to CP/M for PROLOGZ, SPL source
-UTIL    .SPL  18K ; utility functions for PROLOGZ, SPL source
+WC      .COM   6K ; word count and query facility
+WC      .SPL  14K ; word count and query facility, SPL source
 WRITE   .COM   4K
 WRITE   .SPL   8K ; SPL source for W.COM
 XFORMAT .COM   2K
@@ -828,7 +829,7 @@ trick is to get the Switch Register right).
 
   sim> set cpu 8080     ;note 4k Basic will not run on a Z80 CPU
   sim> set sio upper    ;4k Basic does not like lower case letters as input
-  sim> set cpu noitrap  ;4k Basic likes to execute non 8080 instructions - ignore
+  sim> set cpu noitrap  ;4k Basic likes to execute non 8080 instructions-ignore
   sim> set sio ansi     ;4k Basic produces 8-bit output, strip to seven bits
   sim> d sr 8           ;good setting for the Switch Register
   sim> load 4kbas.bin 0 ;load it at 0
@@ -873,8 +874,8 @@ trick is to get the Switch Register right).
 
   Execute the following commands to run Altair Extended Basic:
 
-  sim> set sio upper      ;Extended Basic does not like lower case letters as input
-  sim> set sio ansi       ;Extended Basic produces 8-bit output, strip to seven bits
+  sim> set sio upper      ;Extended Basic requires upper case input
+  sim> set sio ansi       ;Extended Basic produces 8-bit output, strip to 7 bits
   sim> d sr 8             ;good setting for the Switch Register
   sim> load exbas.bin 0   ;load it at 0
   sim> go 0               ;and start it
@@ -914,10 +915,7 @@ following commands:
   OK
 
 
-6. Special simulator features
-
-
-6.1 Memory access breakpoints
+6. Special simulator feature: Memory access breakpoints
 
   In addition to the regular SIMH features such as PC queue, breakpoints
 etc., this simulator supports memory access breakpoints. A memory access
@@ -930,21 +928,6 @@ sim> break -m <location>
 a memory access breakpoint is not triggered by fetching code from memory
 (this is the job of regular breakpoints). This feature has been implemented
 by using the typing facility of the SIMH breakpoints.
-
-
-6.2 T-state stepping
-
-  The SIMH step command supports the "-t" modifier to allow steppping for
-a predefined number of t-states. For example
-
-sim> step -t 1000
-
-will cause the simulated CPU to execute 1000 t-states (note that the shortest
-instruction will have 4 t-states). On the other hand, the command
-
-sim> step 1000
-
-will cause the simulated CPU to execute 1000 instructions.
 
 
 7. Brief summary of all major changes to the original Altair simulator

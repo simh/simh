@@ -1,6 +1,6 @@
 /* pdp8_mt.c: PDP-8 magnetic tape simulator
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt		TM8E/TU10 magtape
 
+   18-Mar-05	RMS	Added attached test to detach routine
    25-Apr-03	RMS	Revised for extended file support
    29-Mar-03	RMS	Added multiformat support
    04-Mar-03	RMS	Fixed bug in SKTR
@@ -563,6 +564,7 @@ t_stat mt_detach (UNIT* uptr)
 {
 int32 u = uptr - mt_dev.units;				/* get unit number */
 
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* check for attached */
 if (!sim_is_active (uptr)) uptr->USTAT = STA_REM;
 if (u == GET_UNIT (mt_cu)) mt_updcsta (uptr);
 return sim_tape_detach (uptr);

@@ -1,6 +1,6 @@
 /* id_dp.c: Interdata 2.5MB/10MB cartridge disk simulator
 
-   Copyright (c) 2001-2004, Robert M. Supnik
+   Copyright (c) 2001-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dp		M46-421 2.5MB/10MB cartridge disk
 
+   18-Mar-05	RMS	Added attached test to detach routine
    25-Jan-04	RMS	Revised for device debug support
    25-Apr-03	RMS	Revised for extended file support
    16-Feb-03	RMS	Fixed read to test transfer ok before selch operation
@@ -532,6 +533,7 @@ t_stat dp_detach (UNIT *uptr)
 {
 uint32 u = uptr - dp_dev.units;
 
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* attached? */
 if (dpd_arm[u]) SET_INT (v_DPC + u + 1);		/* if arm, intr */
 return detach_unit (uptr);
 }

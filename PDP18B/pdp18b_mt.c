@@ -1,6 +1,6 @@
 /* pdp18b_mt.c: 18b PDP magnetic tape simulator
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    mt		(PDP-9) TC59 magtape
 		(PDP-15) TC59D magtape
 
+   18-Mar-05	RMS	Added attached test to detach routine
    14-Jan-04	RMS	Revised IO device call interface
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
@@ -471,6 +472,7 @@ return r;
 
 t_stat mt_detach (UNIT* uptr)
 {
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* attached? */
 if (!sim_is_active (uptr)) uptr->USTAT = 0;
 mt_updcsta (mt_dev.units + GET_UNIT (mt_cu), 0);	/* update status */
 return sim_tape_detach (uptr);

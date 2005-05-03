@@ -1,6 +1,6 @@
 /*	altairz80_sys.c: MITS Altair system interface
 
-		Copyright (c) 2002-2004, Peter Schorn
+		Copyright (c) 2002-2005, Peter Schorn
 
 		Permission is hereby granted, free of charge, to any person obtaining a
 		copy of this software and associated documentation files (the "Software"),
@@ -425,7 +425,7 @@ int32 fprint_sym(FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw) {
 	return 1 - ch;	/* need to return additional bytes */
 }
 
-/* numString checks determines the base of the number (ch, *numString)
+/* checkbase determines the base of the number (ch, *numString)
 	and returns FALSE if the number is bad */
 static int32 checkbase(char ch, const char *numString) {
 	int32 decimal = (ch <= '9');
@@ -475,7 +475,7 @@ static int32 match(const char *pattern, const char *input, char *xyFirst, char *
 	char inp = *input++;
 	while ((pat) && (inp)) {
 		switch(pat) {
-			case '_': /* patterns containting '_' should never match */
+			case '_': /* patterns containing '_' should never match */
 				return FALSE;
 			case ',':
 				if (inp == ' ') {

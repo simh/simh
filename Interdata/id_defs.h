@@ -464,6 +464,8 @@ int32 int_chg (uint32 irq, int32 dat, int32 armdis);
 int32 io_2b (int32 val, int32 pos, int32 old);
 uint32 IOReadB (uint32 loc);
 void IOWriteB (uint32 loc, uint32 val);
+uint32 IOReadH (uint32 loc);
+void IOWriteH (uint32 loc, uint32 val);
 uint32 ReadF (uint32 loc, uint32 rel);
 void WriteF (uint32 loc, uint32 val, uint32 rel);
 uint32 IOReadBlk (uint32 loc, uint32 cnt, uint8 *buf);

@@ -26,6 +26,7 @@
    dp		12557A 2871 disk subsystem
 		13210A 7900 disk subsystem
 
+   01-Mar-05	JDB	Added SET UNLOAD/LOAD
    07-Oct-04	JDB	Fixed enable/disable from either device
 			Fixed ANY ERROR status for 12557A interface
 			Fixed unattached drive status for 12557A interface
@@ -113,7 +114,9 @@
 #include "hp2100_defs.h"
 
 #define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
+#define UNIT_V_UNLOAD	(UNIT_V_UF + 1)			/* heads unloaded */
 #define UNIT_WLK	(1 << UNIT_V_WLK)
+#define UNIT_UNLOAD	(1 << UNIT_V_UNLOAD)
 #define FNC		u3				/* saved function */
 #define DRV		u4				/* drive number (DC) */
 #define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write prot */
@@ -231,11 +234,12 @@ int32 dpcio (int32 inst, int32 IR, int32 dat);
 t_stat dpc_svc (UNIT *uptr);
 t_stat dpd_svc (UNIT *uptr);
 t_stat dpc_reset (DEVICE *dptr);
-t_stat dpc_vlock (UNIT *uptr, int32 val);
 t_stat dpc_attach (UNIT *uptr, char *cptr);
+t_stat dpc_detach (UNIT* uptr);
 t_stat dpc_boot (int32 unitno, DEVICE *dptr);
 void dp_god (int32 fnc, int32 drv, int32 time);
 void dp_goc (int32 fnc, int32 drv, int32 time);
+t_stat dpc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc);
 t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
 
@@ -291,14 +295,14 @@ DEVICE dpd_dev = {
 */
 
 UNIT dpc_unit[] = {
-	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, DP_SIZE3) },
-	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, DP_SIZE3) },
-	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, DP_SIZE3) },
-	{ UDATA (&dpc_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, DP_SIZE3) }  };
+	{ UDATA (&dpc_svc, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, DP_SIZE3) },
+	{ UDATA (&dpc_svc, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, DP_SIZE3) },
+	{ UDATA (&dpc_svc, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, DP_SIZE3) },
+	{ UDATA (&dpc_svc, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, DP_SIZE3) }  };
 
 REG dpc_reg[] = {
 	{ ORDATA (OBUF, dpc_obuf, 16) },
@@ -329,6 +333,8 @@ REG dpc_reg[] = {
 	{ NULL }  };
 
 MTAB dpc_mod[] = {
+	{ UNIT_UNLOAD, UNIT_UNLOAD, "heads unloaded", "UNLOADED", dpc_load_unload },
+	{ UNIT_UNLOAD, 0, "heads loaded", "LOADED", dpc_load_unload },
 	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
 	{ MTAB_XTD | MTAB_VDV, 1, NULL, "13210A",
@@ -345,7 +351,7 @@ DEVICE dpc_dev = {
 	"DPC", dpc_unit, dpc_reg, dpc_mod,
 	DP_NUMDRV, 8, 24, 1, 8, 16,
 	NULL, NULL, &dpc_reset,
-	&dpc_boot, &dpc_attach, NULL,
+	&dpc_boot, &dpc_attach, &dpc_detach,
 	&dpc_dib, DEV_DISABLE };
 
 /* IOT routines */
@@ -561,7 +567,7 @@ case FNC_SEEK1:						/* seek, need hd/sec */
 
 case FNC_STA:						/* read status */
 	if (CMD (devd) || dp_ctype) {			/* dch act or 13210? */
-	    if (dpc_unit[drv].flags & UNIT_ATT) {	/* attached? */
+	    if ((dpc_unit[drv].flags & UNIT_UNLOAD) == 0) {  /* drive up? */
 		dpd_ibuf = dpc_sta[drv] & ~STA_ERR;	/* clear err */
 		if (dp_ctype) dpd_ibuf =		/* 13210? */
 		    (dpd_ibuf & ~(STA_MBZ13 | STA_PROT)) |
@@ -621,7 +627,7 @@ err = 0;						/* assume no err */
 drv = uptr - dpc_dev.units;				/* get drive no */
 devc = dpc_dib.devno;					/* get cch devno */
 devd = dpd_dib.devno;					/* get dch devno */
-if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
+if (uptr->flags & UNIT_UNLOAD) {			/* drive down? */
 	setFSR (devc);					/* set cch flg */
 	clrCMD (devc);					/* clr cch cmd */
 	dpc_sta[drv] = 0;				/* clr status */
@@ -760,18 +766,40 @@ return SCPE_OK;
 
 t_stat dpc_attach (UNIT *uptr, char *cptr)
 {
-int32 drv;
 t_stat r;
 
-drv = uptr - dpc_dev.units;				/* get drive no */
 r = attach_unit (uptr, cptr);				/* attach unit */
-if (r != SCPE_OK) return r;
-dpc_sta[drv] = dpc_sta[drv] | STA_ATN | STA_1ST;	/* update status */
-if (dpc_poll) {						/* polling enabled? */
-	dpc_dib.fbf = 1;				/* set fbf */
-	dpc_dib.flg = 1;				/* set flg */
-	dpc_dib.srq = 1; }				/* srq follows flg */
+if (r == SCPE_OK) dpc_load_unload (uptr, 0, NULL, NULL);/* if OK, load heads */
 return r;
+}
+
+/* Detach routine */
+
+t_stat dpc_detach (UNIT* uptr)
+{
+dpc_load_unload (uptr, UNIT_UNLOAD, NULL, NULL);	/* unload heads */
+return detach_unit (uptr);				/* detach unit */
+}
+
+/* Load and unload heads */
+
+t_stat dpc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
+{
+uint32 drv;
+
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* must be attached to load */
+
+if (value == UNIT_UNLOAD)				/* unload heads? */
+	uptr->flags = uptr->flags | UNIT_UNLOAD;	/* indicate unload */
+else {							/* load heads */
+	uptr->flags = uptr->flags & ~UNIT_UNLOAD;	/* indicate load */
+	drv = uptr - dpc_dev.units;			/* get drive no */
+	dpc_sta[drv] = dpc_sta[drv] | STA_ATN | STA_1ST;/* update status */
+	if (dpc_poll) {					/* polling enabled? */
+	    dpc_dib.fbf = 1;				/* set fbf */
+	    dpc_dib.flg = 1;				/* set flg */
+	    dpc_dib.srq = 1;  } }			/* srq follows flg */
+return SCPE_OK;
 }
 
 /* Set controller type */

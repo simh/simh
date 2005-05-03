@@ -1,6 +1,6 @@
 /*	altairz80_sio: MITS Altair serial I/O card
 
-		Copyright (c) 2002-2004, Peter Schorn
+		Copyright (c) 2002-2005, Peter Schorn
 
 		Permission is hereby granted, free of charge, to any person obtaining a
 		copy of this software and associated documentation files (the "Software"),
@@ -58,7 +58,7 @@
 
 #define	UNIT_V_ANSI					(UNIT_V_UF + 0)				/* ANSI mode, strip bit 8 on output							*/
 #define UNIT_ANSI						(1 << UNIT_V_ANSI)
-#define	UNIT_V_UPPER				(UNIT_V_UF + 1)				/* uppper case mode															*/
+#define	UNIT_V_UPPER				(UNIT_V_UF + 1)				/* upper case mode															*/
 #define UNIT_UPPER					(1 << UNIT_V_UPPER)
 #define	UNIT_V_BS						(UNIT_V_UF + 2)				/* map delete to backspace											*/
 #define UNIT_BS							(1 << UNIT_V_BS)
@@ -170,7 +170,7 @@ static int32 warnUnattachedPTR			= 0;			/* display a warning message if < warnLe
 static int32 warnPTREOF							= 0;			/* display a warning message if < warnLevel and SIO set to
 																								VERBOSE and attempt to read from PTR past EOF										*/
 static int32 warnUnassignedPort			= 0;			/* display a warning message if < warnLevel and SIO set to
-																								VERBOSE andattempt to perform IN or OUT on an unassigned PORT		*/
+																								VERBOSE and attempt to perform IN or OUT on an unassigned PORT		*/
 struct sio_terminal {
 	int32 data;						/* data for this terminal									*/
 	int32 status;					/* status information for this terminal		*/
@@ -743,10 +743,10 @@ static t_stat simh_svc(UNIT *uptr) {
 	return SCPE_OK;
 }
 
-/* The CP/M commandline is used as the name of a file and UNIT* uptr is attached to it. */
+/* The CP/M command line is used as the name of a file and UNIT* uptr is attached to it. */
 static void attachCPM(UNIT *uptr) {
 	char cpmCommandLine[cpmCommandLineLength];
-	uint32 i, len = (GetBYTEWrapper(0x80) & 0x7f) - 1; /* 0x80 contains length of commandline, discard first char */
+	uint32 i, len = (GetBYTEWrapper(0x80) & 0x7f) - 1; /* 0x80 contains length of command line, discard first char */
 	for (i = 0; i < len; i++) {
 		cpmCommandLine[i] = (char)GetBYTEWrapper(0x82 + i); /* the first char, typically ' ', is discarded */
 	}

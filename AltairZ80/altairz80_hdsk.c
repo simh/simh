@@ -1,6 +1,6 @@
 /*	altairz80_hdsk.c: simulated hard disk device to increase capacity
 
-		Copyright (c) 2002-2004, Peter Schorn
+		Copyright (c) 2002-2005, Peter Schorn
 
 		Permission is hereby granted, free of charge, to any person obtaining a
 		copy of this software and associated documentation files (the "Software"),

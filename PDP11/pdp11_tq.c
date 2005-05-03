@@ -47,7 +47,7 @@
 #elif defined (VM_VAX)					/* VAX version */
 #include "vax_defs.h"
 #if (UNIBUS)
-#define INIT_TYPE	TQU_TYPE
+#define INIT_TYPE	TQ8_TYPE
 #else
 #define INIT_TYPE	TQ5_TYPE
 #endif
@@ -1754,7 +1754,6 @@ return SCPE_OK;
 #define BOOT_UNIT	(BOOT_START + 010)		/* unit number */
 #define BOOT_CSR	(BOOT_START + 014)		/* CSR */
 #define BOOT_LEN	(sizeof (boot_rom) / sizeof (int16))
-
 
 /* Data structure definitions */
 

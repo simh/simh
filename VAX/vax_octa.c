@@ -81,6 +81,8 @@ int32 op_mulh (int32 *opnd, int32 *hf);
 int32 op_divh (int32 *opnd, int32 *hf);
 int32 op_emodh (int32 *opnd, int32 *hflt, int32 *intgr, int32 *flg);
 void op_polyh (int32 *opnd, int32 acc);
+void h_write_b (int32 spec, int32 va, int32 val, int32 acc);
+void h_write_w (int32 spec, int32 va, int32 val, int32 acc);
 void h_write_l (int32 spec, int32 va, int32 val, int32 acc);
 void h_write_q (int32 spec, int32 va, int32 vl, int32 vh, int32 acc);
 void h_write_o (int32 spec, int32 va, int32 *val, int32 acc);
@@ -90,7 +92,6 @@ void vax_hmod (UFPH *a, int32 *intgr, int32 *flg);
 void vax_hdiv (UFPH *a, UFPH *b);
 void qp_add (UQP *a, UQP *b);
 void qp_inc (UQP *a);
-void qp_sub (UQP *a, UQP *b);
 void qp_lsh (UQP *a, uint32 sc);
 void qp_rsh (UQP *a, uint32 sc);
 void qp_rsh_s (UQP *a, uint32 sc, uint32 neg);
@@ -110,7 +111,7 @@ static int32 z_octa[4] = { 0, 0, 0, 0 };
 
 int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, int32 va)
 {
-int32 r, rh, temp, flg, rn;
+int32 r, rh, temp, flg;
 int32 r_octa[4];
 
 switch (opc) {
@@ -173,12 +174,14 @@ case MOVO:
 	h_write_o (spec, va, opnd, acc);		/* write src */
 	CC_IIZP_O (opnd[0], opnd[1], opnd[2], opnd[3]);	/* set cc's */
 	break;
+
 case MOVH:
 	if (r = op_tsth (opnd[0]))			/* test for 0 */
 	    h_write_o (spec, va, opnd, acc);		/* nz, write result */
 	else h_write_o (spec, va, z_octa, acc);		/* zero, write 0 */
 	CC_IIZP_FP (r);					/* set cc's */
 	break;
+
 case MNEGH:
 	if (r = op_tsth (opnd[0])) {			/* test for 0 */
 	    opnd[0] = opnd[0] ^ FPSIGN;			/* nz, invert sign */
@@ -211,11 +214,13 @@ case CVTBH:
 	h_write_o (spec, va, r_octa, acc);		/* write reslt */
 	CC_IIZZ_FP (r);					/* set cc's */
 	break;
+
 case CVTWH:
 	r = op_cvtih (SXTW (opnd[0]), r_octa);		/* convert */
 	h_write_o (spec, va, r_octa, acc);		/* write result */
 	CC_IIZZ_FP (r);					/* set cc's */
 	break;
+
 case CVTLH:
 	r = op_cvtih (opnd[0], r_octa);			/* convert */
 	h_write_o (spec, va, r_octa, acc);		/* write result */
@@ -232,22 +237,18 @@ case CVTLH:
 
 case CVTHB:
 	r = op_cvthi (opnd, &temp, opc) & BMASK;	/* convert */
-	if (spec > (GRN | nPC)) Write (va, r, L_BYTE, WA);
-	else {
-	    rn = spec & 0xF;
-	    R[rn] = (R[rn] & ~BMASK) | r;  }
+	h_write_b (spec, va, r, acc);			/* write result */
 	CC_IIZZ_B (r);					/* set cc's */
 	cc = cc | temp;					/* or in V */
 	break;
+
 case CVTHW:
 	r = op_cvthi (opnd, &temp, opc) & WMASK;	/* convert */
-	if (spec > (GRN | nPC)) Write (va, r, L_WORD, WA);
-	else {
-	    rn = spec & 0xF;
-	    R[rn] = (R[rn] & ~WMASK) | r;  }
+	h_write_w (spec, va, r, acc);			/* write result */
 	CC_IIZZ_W (r);					/* set cc's */
 	cc = cc | temp;					/* or in V */
 	break;
+
 case CVTHL: case CVTRHL:
 	r = op_cvthi (opnd, &temp, opc) & LMASK;	/* convert */
 	h_write_l (spec, va, r, acc);			/* write result */
@@ -282,6 +283,7 @@ case CVTDH:
 	h_write_o (spec, va, r_octa, acc);		/* write result */
 	CC_IIZZ_FP (r);					/* set cc's */
 	break;
+
 case CVTGH:
 	r = op_cvtgh (opnd[0], opnd[1], r_octa);	/* convert */
 	h_write_o (spec, va, r_octa, acc);		/* write result */
@@ -301,11 +303,13 @@ case CVTHF:
 	h_write_l (spec, va, r, acc);			/* write result */
 	CC_IIZZ_FP (r);					/* set cc's */
 	break;
+
 case CVTHD:
 	r = op_cvthfd (opnd, &rh);			/* convert */
 	h_write_q (spec, va, r, rh, acc);		/* write result */
 	CC_IIZZ_FP (r);					/* set cc's */
 	break;
+
 case CVTHG:
 	r = op_cvthg (opnd, &rh);			/* convert */
 	h_write_q (spec, va, r, rh, acc);		/* write result */
@@ -334,16 +338,19 @@ case ADDH2: case ADDH3:
 	h_write_o (spec, va, r_octa, acc);		/* write result */
 	CC_IIZZ_FP (r);					/* set cc's */
 	break;
+
 case SUBH2: case SUBH3:
 	r = op_addh (opnd, r_octa, TRUE);		/* subtract */
 	h_write_o (spec, va, r_octa, acc);		/* write result */
 	CC_IIZZ_FP (r);					/* set cc's */
 	break;
+
 case MULH2: case MULH3:
 	r = op_mulh (opnd, r_octa);			/* multiply */
 	h_write_o (spec, va, r_octa, acc);		/* write result */
 	CC_IIZZ_FP (r);					/* set cc's */
 	break;
+
 case DIVH2: case DIVH3:
 	r = op_divh (opnd, r_octa);			/* divide */
 	h_write_o (spec, va, r_octa, acc);		/* write result */
@@ -649,12 +656,9 @@ if ((a->exp < b->exp) ||				/* |s1| < |s2|? */
 	}
 ediff = a->exp - b->exp;				/* exp diff */
 if (a->sign ^ b->sign) {				/* eff sub? */
-	if (ediff) {					/* exp diff? */
-	    qp_neg (&b->frac);				/* negate fraction */
-	    qp_rsh_s (&b->frac, ediff, 1);		/* signed right */
-	    qp_add (&a->frac, &b->frac);		/* "add" frac */
-	    }
-	else qp_sub (&a->frac, &b->frac);		/* a >= b */
+	qp_neg (&b->frac);				/* negate fraction */
+	if (ediff) qp_rsh_s (&b->frac, ediff, 1);	/* denormalize */
+	qp_add (&a->frac, &b->frac);			/* "add" frac */
 	h_normh (a);					/* normalize */
 	}
 else {	if (ediff) qp_rsh (&b->frac, ediff);		/* add, denormalize */
@@ -738,7 +742,7 @@ return;
 void vax_hdiv (UFPH *a, UFPH *b)
 {
 int32 i;
-UQP quo = { 0, 0, 0, 0 };
+UQP ndvr, quo = { 0, 0, 0, 0 };
 
 if (a->exp == 0) FLT_DZRO_FAULT;			/* divr = 0? */
 if (b->exp == 0) return;				/* divd = 0? */
@@ -746,11 +750,14 @@ b->sign = b->sign ^ a->sign;				/* result sign */
 b->exp = b->exp - a->exp + H_BIAS + 1;			/* unbiased exp */
 qp_rsh (&a->frac, 1);					/* allow 1 bit left */
 qp_rsh (&b->frac, 1);
+ndvr = a->frac;						/* copy divisor */
+qp_neg (&ndvr);						/* and negate */
 for (i = 0; i < 128; i++) {				/* divide loop */
 	qp_lsh (&quo, 1);				/* shift quo */
 	if (qp_cmp (&b->frac, &a->frac) >= 0) {		/* div step ok? */
-	    qp_sub (&b->frac, &a->frac);		/* subtract */
-	    quo.f0 = quo.f0 + 1;  }			/* quo bit = 1 */
+	    qp_add (&b->frac, &ndvr);			/* "subtract" */
+	    quo.f0 = quo.f0 + 1;			/* quo bit = 1 */
+	    }
 	qp_lsh (&b->frac, 1);				/* shift divd */
 	}
 b->frac = quo;
@@ -800,15 +807,6 @@ r->f0 = NEG (r->f0);					/* neg lo */
 r->f1 = (~r->f1 + (r->f0 == 0)) & LMASK;		/* complement rest */
 r->f2 = (~r->f2 + (r->f1 == 0)) & LMASK;		/* propagate carry */
 r->f3 = (~r->f3 + (r->f2 == 0)) & LMASK;
-return;
-}
-
-void qp_sub (UQP *a, UQP *b)
-{
-UQP nb = *b;
-
-qp_neg (&nb);
-qp_add (a, &nb);
 return;
 }
 
@@ -1050,6 +1048,28 @@ hflt[3] = WORDSWAP (r->frac.f0);
 return hflt[0];
 }
 
+void h_write_b (int32 spec, int32 va, int32 val, int32 acc)
+{
+int32 rn;
+
+if (spec > (GRN | nPC)) Write (va, val, L_BYTE, WA);
+else {	rn = spec & 0xF;
+	R[rn] = (R[rn] & ~BMASK) | val;
+	}
+return;
+}
+
+void h_write_w (int32 spec, int32 va, int32 val, int32 acc)
+{
+int32 rn;
+
+if (spec > (GRN | nPC)) Write (va, val, L_WORD, WA);
+else {	rn = spec & 0xF;
+	R[rn] = (R[rn] & ~WMASK) | val;
+	}
+return;
+}
+
 void h_write_l (int32 spec, int32 va, int32 val, int32 acc)
 {
 if (spec > (GRN | nPC)) Write (va, val, L_LONG, WA);
@@ -1064,11 +1084,13 @@ int32 rn, mstat;
 if (spec > (GRN | nPC)) {
 	if (Test (va + 7, WA, &mstat) >= 0)
 	    Write (va, vl, L_LONG, WA);
-	Write (va + 4, vh, L_LONG, WA);  }
+	Write (va + 4, vh, L_LONG, WA);
+	}
 else {	rn = spec & 0xF;
 	if (rn >= nSP) RSVD_ADDR_FAULT;
 	R[rn] = vl;
-	R[rn + 1] = vh;  }
+	R[rn + 1] = vh;
+	}
 return;
 }
 
@@ -1081,13 +1103,15 @@ if (spec > (GRN | nPC)) {
 	    Write (va, val[0], L_LONG, WA);
 	Write (va + 4, val[1], L_LONG, WA);
 	Write (va + 8, val[2], L_LONG, WA);
-	Write (va + 12, val[3], L_LONG, WA);  }
+	Write (va + 12, val[3], L_LONG, WA);
+	}
 else {	rn = spec & 0xF;
 	if (rn >= nAP) RSVD_ADDR_FAULT;
 	R[rn] = val[0];
 	R[rn + 1] = val[1];
 	R[rn + 2] = val[2];
-	R[rn + 3] = val[3];  }
+	R[rn + 3] = val[3];
+	}
 return;
 }
 

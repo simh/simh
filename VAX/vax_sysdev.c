@@ -1,6 +1,6 @@
 /* vax_sysdev.c: VAX 3900 system-specific logic
 
-   Copyright (c) 1998-2004, Robert M Supnik
+   Copyright (c) 1998-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -32,6 +32,7 @@
    cso		console storage output
    sysd		system devices (SSC miscellany)
 
+   10-Mar-05	RMS	Fixed bug in timer schedule routine (from Mark Hittinger)
    30-Sep-04	RMS	Moved CADR, MSER, CONPC, CONPSL, machine_check, cpu_boot,
 			 con_halt here from vax_cpu.c
 			Moved model-specific IPR's here from vax_cpu1.c
@@ -1283,7 +1284,7 @@ if (tmr_tir[tmr] > (0xFFFFFFFFu - TMR_INC)) {		/* short interval? */
 else {	tmr_inc[tmr] = TMR_INC;				/* usec/interval */
         tmr_time = tmr_poll; }
 if (tmr_time == 0) tmr_time = 1;
-if ((tmr_inc[tmr] = TMR_INC) && (tmr_time > clk_time)) {
+if ((tmr_inc[tmr] == TMR_INC) && (tmr_time > clk_time)) {
 
 /* Align scheduled event to be identical to the event for the next clock
    tick.  This lets us always see a consistent calibrated value, both for

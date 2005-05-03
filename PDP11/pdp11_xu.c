@@ -1,7 +1,7 @@
 /* pdp11_xu.c: DEUNA/DELUA ethernet controller simulator
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2003-2004, David T. Hittner
+   Copyright (c) 2003-2005, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -52,6 +52,7 @@
 
   Modification history:
 
+  10-Mar-05  RMS  Fixed equality test in RCSTAT (from Mark Hittinger)
   16-Jan-04  DTH  Added more info to SHOW MOD commands
   09-Jan-04  DTH  Made XU floating address so that XUB will float correctly
   08-Jan-04  DTH  Added system_id message
@@ -783,7 +784,7 @@ int32 xu_command(CTLR* xu)
       if ((wstatus != SCPE_OK) || (wstatus2 != SCPE_OK) || (wstatus3 != SCPE_OK))
         return PCSR0_PCEI + 1;
 
-      if (fnc = FC_RCSTAT)
+      if (fnc == FC_RCSTAT)
         xu->var->stat &= 0377;	/* clear high byte */
       break;
 

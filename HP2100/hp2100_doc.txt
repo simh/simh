@@ -55,9 +55,11 @@ sim/		scp.h
 
 sim/hp2100/	hp2100_cpu.h
 		hp2100_defs.h
+		hp2100_fp1.h
 		hp2100_cpu.c
 		hp2100_cpu1.c
 		hp2100_fp.c
+		hp2100_fp1.c
 		hp2100_dp.c
 		hp2100_dq.c
 		hp2100_dr.c
@@ -78,9 +80,10 @@ The HP2100 simulator is configured as follows:
 device		simulates
 name(s)
 
-CPU		2116 CPU with 32KW memory
-		2100 CPU with 32KW memory, FP or IOP instructions
-		21MX-M/E CPU with 1024KW memory, FP, DMS, and/or IOP instructions
+CPU		2116 CPU with up to 32KW of memory
+		2100 CPU with up to 32KW of memory
+		21MX-M or -E CPU with up to 1024KW of memory
+		EAU, FP, FFP, IOP, and/or DMS microcode extensions
 MP		12892B memory protect
 DMA0, DMA1	12895A/12897B direct memory access/dual channel port controller
 PTR		12597A duplex register interface with 2748 paper tape reader
@@ -110,13 +113,21 @@ The HP2100 simulator implements several unique stop conditions:
 	- more than INDMAX indirect references are detected during
 	  memory reference address decoding
 
-The HP2100 loader supports standard absolute binary format.  The DUMP
+The HP2100 LOAD command supports standard absolute binary format.  The DUMP
 command is not implemented.
 
 2.1 CPU
 
-CPU options include choice of instruction set and memory size.  The
-general command form is:
+CPU options include choice of model, memory size, and instruction sets.
+Several microcode options are simulated:
+
+	EAU	Extended Arithmetic Unit
+	FP	Single-Precision Floating Point
+	FFP	Fast FORTRAN Processor
+	IOP	2000/Access I/O Processor
+	DMS	Dynamic Mapping System
+
+The general command form is:
 
 	SET {-F} CPU <option>
 
@@ -132,6 +143,8 @@ Options that may be specified are:
 	SET CPU NOFP		no FP instructions (2100 only)
 	SET CPU IOP		IOP instructions (2100, 21MX only)
 	SET CPU NOIOP		no IOP instructions (2100, 21MX only)
+	SET CPU FFP		FFP instructions (2100, 21MX only)
+	SET CPU NOFFP		no FFP instructions (2100, 21MX only)
 	SET CPU DMS		DMS instructions (21MX only)
 	SET CPU NODMS		no DMS instructions (21MX only)
 	SET CPU 4K		set memory size = 4K
@@ -144,11 +157,10 @@ Options that may be specified are:
 	SET CPU 512K		set memory size = 512K (21MX only)
 	SET CPU 1024K		set memory size = 1024K (21MX only)
 
-On the 2100, EAU is standard, and the FP and IOP options are mutually
-exclusive.  On the 21MX, EAU and FP are standard.  The 21MX optionally
-includes DMS (dynamic mapping system) and IOP instructions.  The 21MX-E
-supports the TIMER instruction; on the 21MX-M, this instruction decodes
-as MPY.
+On the 2100, EAU is standard, and the FP or FFP and IOP options are mutually
+exclusive.  On the 21MX, EAU and FP are standard.  The DMS, FFP, and IOP
+instructions are optional.  The 21MX-E supports the TIMER instruction; on
+the 21MX-M, this instruction decodes as MPY.
 
 Setting the CPU type to 2116, 2100, or 21MX establishes a consistent set
 of common options.  Additional SET CPU commands may follow to fine-tune
@@ -813,6 +825,14 @@ Separate protection for the upper and lower platters of the 7900 drive
 is not supported.  Also, the drive Protect/Override switch is not
 supported; drive protection is permanently overridden.
 
+Drives may also have their heads unloaded and loaded:
+
+	SET DPCn UNLOADED	unload heads on unit n
+	SET DPCn LOADED		load heads on unit n
+
+This provides a convenient method of setting a drive "down" without
+detaching the associated disk image file.
+
 The 12557A/13210A supports the BOOT command.  BOOT DPC copies the IBL
 for 7900 class disks into memory and starts it running.  BOOT -R DPC
 boots from the removable platter (head 0).  The switch register (S) is
@@ -869,7 +889,7 @@ Error handling is as follows:
 
 	error	     		processed as
 
-	not attached		disk not ready (drive unloaded)
+	not attached		disk not ready (heads unloaded)
 
 	end of file		assume rest of disk is zero
 
@@ -886,6 +906,14 @@ Individual drives may be protected against writing:
 
 	SET DQCn LOCKED		set unit n write locked
 	SET DQCn WRITEENABLED	set unit n write enabled
+
+Drives may also have their heads unloaded and loaded:
+
+	SET DQCn UNLOADED	unload heads on unit n
+	SET DQCn LOADED		load heads on unit n
+
+This provides a convenient method of setting a drive "down" without
+detaching the associated disk image file.
 
 The 12565A supports the BOOT command.  BOOT DQC copies the IBL for 2883
 class disks into memory and starts it running.  The switch register (S)
@@ -939,7 +967,7 @@ Error handling is as follows:
 
 	error	     		processed as
 
-	not attached		disk not ready
+	not attached		disk not ready (heads unloaded)
 
 	end of file		assume rest of disk is zero
 
@@ -1052,6 +1080,14 @@ Separate protection for the upper and lower platters of the 7905 and
 7906 drives is not supported.  Protecting a 7905 or 7906 drive behaves
 as though both of the Disc Protect switches were on.
 
+Drives may also have their heads unloaded and loaded:
+
+	SET DSn UNLOADED	unload heads on unit n
+	SET DSn LOADED		load heads on unit n
+
+This provides a convenient method of setting a drive "down" without
+detaching the associated disk image file.
+
 The setting of the drive Format switch may be changed with:
 
 	SET DSn FORMAT		set format enabled
@@ -1105,7 +1141,7 @@ Error handling is as follows:
 
 	error	     		processed as
 
-	not attached		disk not ready
+	not attached		disk not ready (heads unloaded)
 
 	end of file		assume rest of disk is zero
 
@@ -1171,10 +1207,12 @@ Error handling is as follows:
 2.7.2 13181A Magnetic Tape Controller (MSC, MSD) with Four 7970B Drives
       18183A Magnetic Tape Controller (MSC, MSD) with Four 7970E Drives
 
-Magnetic tape options include the ability to make the unit write enabled
-or write locked, and the ability to select the 13181A (800 bpi) controller
-or the 13183A (1600 bpi) controller.
+Magnetic tape options include the ability to set a drive offline and
+online, write enabled or write locked, and the ability to select the
+13181A (800 bpi) controller or the 13183A (1600 bpi) controller.
 
+	SET MSCn OFFLINE	set unit n offline
+	SET MSCn ONLINE		set unit n online
 	SET MSCn LOCKED		set unit n write locked
 	SET MSCn WRITEENABLED	set unit n write enabled
 	SET MSC 13181A		set controller to 13181A

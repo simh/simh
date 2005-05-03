@@ -1,6 +1,6 @@
 /* nova_mta.c: NOVA magnetic tape simulator
 
-   Copyright (c) 1993-2004, Robert M. Supnik
+   Copyright (c) 1993-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mta		magnetic tape
 
+   18-Mar-05	RMS	Added attached test to detach routine
    22-Nov-03	CEO	DIB returns # records skipped after space fwd
    22-Nov-03	CEO	Removed cancel of tape events in IORST
    25-Apr-03	RMS	Revised for extended file support
@@ -546,6 +547,7 @@ return r;
 
 t_stat mta_detach (UNIT* uptr)
 {
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* attached? */
 if (!sim_is_active (uptr)) mta_upddsta (uptr, 0);
 return sim_tape_detach (uptr);
 }

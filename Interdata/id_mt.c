@@ -1,6 +1,6 @@
 /* id_mt.c: Interdata magnetic tape simulator
 
-   Copyright (c) 2001-2004, Robert M Supnik
+   Copyright (c) 2001-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt		M46-494 dual density 9-track magtape controller
 
+   18-Mar-05	RMS	Added attached test to detach routine
    07-Dec-04	RMS	Added read-only file support
    25-Apr-03	RMS	Revised for extended file support
    28-Mar-03	RMS	Added multiformat support
@@ -445,6 +446,7 @@ t_stat mt_detach (UNIT* uptr)
 int32 u = uptr - mt_dev.units;
 t_stat r;
 
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;
 r = sim_tape_detach (uptr);
 if (r != SCPE_OK) return r;
 if (mt_arm[u]) SET_INT (v_MT + u);

@@ -1,6 +1,6 @@
 /* pdp11_rp.c - RP04/05/06/07 RM02/03/05/80 Massbus disk controller
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp		RH/RP/RM moving head disks
 
+   18-Mar-05	RMS	Added attached test to detach routine
    12-Sep-04	RMS	Cloned from pdp11_rp.c
 
    Note: The VMS driver and the RP controller documentation state that
@@ -922,6 +923,7 @@ t_stat rp_detach (UNIT *uptr)
 {
 int32 drv;
 
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* attached? */
 drv = uptr - rp_dev.units;				/* get drv number */
 rpds[drv] = rpds[drv] & ~(DS_MOL | DS_RDY | DS_WRL | DS_VV | DS_OFM);
 rp_update_ds (DS_ATA, drv);				/* request intr */

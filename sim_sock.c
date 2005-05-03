@@ -1,6 +1,6 @@
 /* sim_sock.c: OS-dependent socket routines
 
-   Copyright (c) 2001-2004, Robert M Supnik
+   Copyright (c) 2001-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Apr-05	RMS	Added WSAEINPROGRESS test (from Tim Riker)
    09-Jan-04	RMS	Fixed typing problem in Alpha Unix (found by Tim Chapman)
    17-Apr-03	RMS	Fixed non-implemented version of sim_close_sock
 			(found by Mark Pizzolato)
@@ -172,7 +173,9 @@ sta = sim_setnonblock (newsock);			/* set nonblocking */
 if (sta == SOCKET_ERROR)				/* fcntl error? */
 	return sim_err_sock (newsock, "fcntl", 1);
 sta = connect (newsock, (struct sockaddr *) &name, sizeof (name));
-if ((sta == SOCKET_ERROR) && (WSAGetLastError () != WSAEWOULDBLOCK))
+if ((sta == SOCKET_ERROR) && 
+    (WSAGetLastError () != WSAEWOULDBLOCK) &&
+    (WSAGetLastError () != WSAEINPROGRESS))
 	return sim_err_sock (newsock, "connect", 1);
 
 return newsock;						/* got it! */

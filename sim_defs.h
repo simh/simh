@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   11-Mar-05	RMS	Moved 64b data type definitions outside USE_INT64
    07-Feb-05	RMS	Added assertion fail stop
    05-Nov-04	RMS	Added support for SHOW opt=val
    20-Oct-04	RMS	Converted all base types to typedefs
@@ -115,8 +116,12 @@ typedef unsigned int	uint32;
 typedef int		t_stat;				/* status */
 typedef int		t_bool;				/* boolean */
 
-#if defined (USE_INT64)					/* 64b data */
-#if defined (_WIN32)					/* Windows */
+/* 64b integers */
+
+#if defined (__GNUC__)					/* GCC */
+typedef signed long long	t_int64;
+typedef unsigned long long	t_uint64;
+#elif defined (_WIN32)					/* Windows */
 typedef signed __int64		t_int64;
 typedef unsigned __int64	t_uint64;
 #elif defined (__ALPHA) && defined (VMS)		/* Alpha VMS */
@@ -125,10 +130,12 @@ typedef unsigned __int64	t_uint64;
 #elif defined (__ALPHA) && defined (__unix__)		/* Alpha UNIX */
 typedef signed long		t_int64;
 typedef unsigned long		t_uint64;
-#else							/* default GCC */
-typedef signed long long	t_int64;
-typedef unsigned long long	t_uint64;
-#endif							/* end OS's */
+#else							/* default */
+#define t_int64			signed long long
+#define t_uint64		unsigned long long
+#endif							/* end 64b */
+
+#if defined (USE_INT64)					/* 64b data */
 typedef t_int64 	t_svalue;			/* signed value */
 typedef t_uint64	t_value;			/* value */
 #else							/* 32b data */

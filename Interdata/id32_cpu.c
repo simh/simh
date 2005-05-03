@@ -25,6 +25,9 @@
 
    cpu			Interdata 32b CPU
 
+   10-Mar-05	RMS	Fixed bug in initial memory allocation
+		RMS	Fixed bug in show history routine (from Mark Hittinger)
+		RMS	Revised examine/deposit to do words rather than bytes
    18-Feb-05	RMS	Fixed branches to mask new PC (from Greg Johnson)
    06-Nov-04	RMS	Added =n to SHOW HISTORY
    25-Jan-04	RMS	Revised for device debug support
@@ -574,7 +577,7 @@ DEBTAB cpu_deb[] = {
 
 DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
-	1, 16, 20, 1, 16, 8,
+	1, 16, 20, 2, 16, 16,
 	&cpu_ex, &cpu_dep, &cpu_reset,
 	NULL, NULL, NULL,
 	&cpu_dib, DEV_DEBUG, 0,
@@ -1870,6 +1873,8 @@ return 0;						/* ok */
    WriteF	write fullword (processor)
    IOReadB	read byte (IO)
    IOWriteB	write byte (IO)
+   IOReadH	read halfword (IO)
+   IOWriteH	write halfword (IO)
 */
 
 uint32 ReadB (uint32 loc, uint32 rel)
@@ -1987,12 +1992,26 @@ uint32 sc = (3 - (loc & 3)) << 3;
 return (M[loc >> 2] >> sc) & DMASK8;
 }
 
+uint32 IOReadH (uint32 loc)
+{
+return (M[loc >> 2] >> ((loc & 2)? 0: 16)) & DMASK16;
+}
+
 void IOWriteB (uint32 loc, uint32 val)
 {
 uint32 sc = (3 - (loc & 3)) << 3;
 
 val = val & DMASK8;
 M[loc >> 2] = (M[loc >> 2] & ~(DMASK8 << sc)) | (val << sc);
+return;
+}
+
+void IOWriteH (uint32 loc, uint32 val)
+{
+uint32 sc = (loc & 2)? 0: 16;
+
+val = val & DMASK16;
+M[loc >> 2] = (M[loc >> 2] & ~(DMASK16 << sc)) | (val << sc);
 return;
 }
 
@@ -2008,7 +2027,7 @@ DR = 0;							/* clear display */
 drmod = 0;
 blk_io.dfl = blk_io.cur = blk_io.end = 0;		/* no block I/O */
 sim_brk_types = sim_brk_dflt = SWMASK ('E');		/* init bkpts */
-if (M == NULL) M = calloc (MAXMEMSIZE32 >> 1, sizeof (uint16));
+if (M == NULL) M = calloc (MAXMEMSIZE32 >> 2, sizeof (uint32));
 if (M == NULL) return SCPE_MEM;
 pcq_r = find_reg ("PCQ", NULL, dptr);			/* init PCQ */
 if (pcq_r) pcq_r->qptr = 0;
@@ -2024,7 +2043,7 @@ if ((sw & SWMASK ('V')) && (PSW & PSW_REL)) {
 	int32 cc = RelocT (addr, MAC_BASE, P, &addr);
 	if (cc & (CC_C | CC_V)) return SCPE_NXM;  }
 if (addr >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = IOReadB (addr);
+if (vptr != NULL) *vptr = IOReadH (addr);
 return SCPE_OK;
 }
 
@@ -2036,7 +2055,7 @@ if ((sw & SWMASK ('V')) && (PSW & PSW_REL)) {
 	int32 cc = RelocT (addr, MAC_BASE, P, &addr);
 	if (cc & (CC_C | CC_V)) return SCPE_NXM;  }
 if (addr >= MEMSIZE) return SCPE_NXM;
-IOWriteB (addr, val & 0xFF);
+IOWriteH (addr, val);
 return SCPE_OK;
 }
 
@@ -2108,9 +2127,9 @@ return SCPE_OK;
 
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-uint32 op, k, di, lnt;
+int32 op, k, di, lnt;
 char *cptr = (char *) desc;
-t_value sim_eval[6];
+t_value sim_eval[3];
 t_stat r;
 struct InstHistory *h;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
@@ -2128,14 +2147,12 @@ for (k = 0; k < lnt; k++) {				/* print specified */
 	h = &hst[(di++) % hst_lnt];			/* entry pointer */
 	if (h->pc & HIST_PC) {				/* instruction? */
 	    fprintf (st, "%06X %08X %08X ", h->pc & VAMASK32, h->r1, h->opnd);
-	    sim_eval[0] = op = (h->ir1 >> 8) & 0xFF;
-	    sim_eval[1] = h->ir1 & 0xFF;
-	    sim_eval[2] = (h->ir2 >> 8) & 0xFF;
-	    sim_eval[3] = h->ir2 & 0xFF;
-	    sim_eval[4] = (h->ir3 >> 8) & 0xFF;
-	    sim_eval[5] = h->ir3 & 0xFF;
+	    op = (h->ir1 >> 8) & 0xFF;
 	    if (OP_TYPE (op) >= OP_RX) fprintf (st, "%06X ", h->ea);
 	    else fprintf (st, "       ");
+	    sim_eval[0] = h->ir1;
+	    sim_eval[1] = h->ir2;
+	    sim_eval[2] = h->ir3;
 	    if ((fprint_sym (st, h->pc & VAMASK32, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
 		fprintf (st, "(undefined) %04X", h->ir1);
 	    fputc ('\n', st);				/* end line */

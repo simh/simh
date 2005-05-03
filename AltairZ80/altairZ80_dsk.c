@@ -1,6 +1,6 @@
 /*	altairz80_dsk.c: MITS Altair 88-DISK Simulator
 
-		Copyright (c) 2002-2004, Peter Schorn
+		Copyright (c) 2002-2005, Peter Schorn
 
 		Permission is hereby granted, free of charge, to any person obtaining a
 		copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@
 		Each diskette has physically 77 tracks of 32 137-byte sectors
 		each.
 
-		The controller is interfaced to the CPU by use of 3 I/O addreses,
+		The controller is interfaced to the CPU by use of 3 I/O addresses,
 		standardly, these are device numbers 10, 11, and 12 (octal).
 
 		Address	Mode	Function

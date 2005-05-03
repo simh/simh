@@ -147,8 +147,9 @@ HP2100 = ${HP2100D}hp2100_stddev.c ${HP2100D}hp2100_dp.c ${HP2100D}hp2100_dq.c \
 	${HP2100D}hp2100_dr.c ${HP2100D}hp2100_lps.c ${HP2100D}hp2100_ms.c \
 	${HP2100D}hp2100_mt.c ${HP2100D}hp2100_mux.c ${HP2100D}hp2100_cpu.c \
 	${HP2100D}hp2100_fp.c ${HP2100D}hp2100_sys.c ${HP2100D}hp2100_lpt.c \
-	${HP2100D}hp2100_ipl.c ${HP2100D}hp2100_ds.c ${HP2100D}hp2100_cpu1.c
-HP2100_OPT = -I ${HP2100D}
+	${HP2100D}hp2100_ipl.c ${HP2100D}hp2100_ds.c ${HP2100D}hp2100_cpu1.c \
+	${HP2100D}hp2100_fp1.c
+HP2100_OPT = -DHAVE_INT64 -I ${HP2100D}
 
 
 

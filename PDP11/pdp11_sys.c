@@ -537,15 +537,20 @@ int32 l8b, brdisp, wd1, wd2;
 extern int32 FPS;
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
-c1 = val[0] & 0177;
-c2 = (val[0] >> 8) & 0177;
 if (sw & SWMASK ('A')) {				/* ASCII? */
+	c1 = (val[0] >> ((addr & 1)? 8: 0)) & 0177;
 	fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
-	return SCPE_OK;  }
+	return 0;  }
+if (sw & SWMASK ('B')) {				/* byte? */
+	c1 = (val[0] >> ((addr & 1)? 8: 0)) & 0377;
+	fprintf (of, "%o", c1);
+	return 0;  }
 if (sw & SWMASK ('C')) {				/* character? */
+	c1 = val[0] & 0177;
+	c2 = (val[0] >> 8) & 0177;
 	fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
 	fprintf (of, (c2 < 040)? "<%03o>": "%c", c2);
-	return SCPE_OK;  }
+	return -1;  }
 if (sw & SWMASK ('R')) {				/* radix 50? */
 	if (val[0] > 0174777) return SCPE_ARG;		/* max value */
 	c3 = val[0] % 050;
@@ -553,76 +558,84 @@ if (sw & SWMASK ('R')) {				/* radix 50? */
 	c1 = val[0] / (050 * 050);
 	fprintf (of, "%c%c%c", r50_to_asc[c1],
 		r50_to_asc[c2], r50_to_asc[c3]);
-	return SCPE_OK;  }
+	return -1;  }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
 
 inst = val[0] | ((FPS << (I_V_L - FPS_V_L)) & I_L) |
 	((FPS << (I_V_D - FPS_V_D)) & I_D);		/* inst + fp mode */
 for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
-    j = (opc_val[i] >> I_V_CL) & I_M_CL;		/* get class */
-    if ((opc_val[i] & 0777777) == (inst & masks[j])) {	/* match? */
-	srcm = (inst >> 6) & 077;			/* opr fields */
-	srcr = srcm & 07;
-	fac = srcm & 03;
-	dstm = inst & 077;
-	dstr = dstm & 07;
-	l8b = inst & 0377;
+	j = (opc_val[i] >> I_V_CL) & I_M_CL;		/* get class */
+	if ((opc_val[i] & 0777777) == (inst & masks[j])) {	/* match? */
+	    srcm = (inst >> 6) & 077;			/* opr fields */
+	    srcr = srcm & 07;
+	    fac = srcm & 03;
+	    dstm = inst & 077;
+	    dstr = dstm & 07;
+	    l8b = inst & 0377;
+	    wd1 = wd2 = 0;
 
 /* Instruction decode */
 
-	switch (j) {					/* case on class */
-	case I_V_NPN: case I_V_CCC: case I_V_CCS:	/* no operands */
+	    switch (j) {				/* case on class */
+	    case I_V_NPN: case I_V_CCC: case I_V_CCS:	/* no operands */
 		fprintf (of, "%s", opcode[i]);
-		return SCPE_OK;
-	case I_V_REG:					/* reg */
+		break;
+	    case I_V_REG:				/* reg */
 		fprintf (of, "%s %-s", opcode[i], rname[dstr]);
-		return SCPE_OK;
-	case I_V_SOP:					/* sop */
+		break;
+	    case I_V_SOP:				/* sop */
 		fprintf (of, "%s ", opcode[i]);
-		return fprint_spec (of, addr, dstm, val[1], cflag, TRUE);
-	case I_V_3B:					/* 3b */
+		wd1 = fprint_spec (of, addr, dstm, val[1], cflag, TRUE);
+		break;
+	    case I_V_3B:				/* 3b */
 		fprintf (of, "%s %-o", opcode[i], dstr);
-		return SCPE_OK;
-	case I_V_FOP:					/* fop */
+		break;
+	    case I_V_FOP:				/* fop */
 		fprintf (of, "%s ", opcode[i]);
-		return fprint_spec (of, addr, dstm, val[1], cflag, FALSE);
-	case I_V_AFOP:					/* afop */
+		wd1 = fprint_spec (of, addr, dstm, val[1], cflag, FALSE);
+		break;
+	    case I_V_AFOP:				/* afop */
 		fprintf (of, "%s %s,", opcode[i], fname[fac]);
-		return fprint_spec (of, addr, dstm, val[1], cflag, FALSE);
-	case I_V_6B:					/* 6b */
+		wd1 = fprint_spec (of, addr, dstm, val[1], cflag, FALSE);
+		break;
+	    case I_V_6B:				/* 6b */
 		fprintf (of, "%s %-o", opcode[i], dstm);
-		return SCPE_OK;
-	case I_V_BR:					/* cond branch */
+		break;
+	    case I_V_BR:				/* cond branch */
 		fprintf (of, "%s ", opcode[i]);
 		brdisp = (l8b + l8b + ((l8b & 0200)? 0177002: 2)) & 0177777;
 	 	if (cflag) fprintf (of, "%-o", (addr + brdisp) & 0177777);
 		else if (brdisp < 01000) fprintf (of, ".+%-o", brdisp);
 		else fprintf (of, ".-%-o", 0200000 - brdisp);
-		return SCPE_OK;
-	case I_V_8B:					/* 8b */
+		break;
+	    case I_V_8B:				/* 8b */
 		fprintf (of, "%s %-o", opcode[i], l8b);
-		return SCPE_OK;
-	case I_V_SOB:					/* sob */
+		break;
+	    case I_V_SOB:				/* sob */
 		fprintf (of, "%s %s,", opcode[i], rname[srcr]);
 		brdisp = (dstm * 2) - 2;
 		if (cflag) fprintf (of, "%-o", (addr - brdisp) & 0177777);
 		else if (brdisp <= 0) fprintf (of, ".+%-o", -brdisp);
 		else fprintf (of, ".-%-o", brdisp);
-		return SCPE_OK;
-	case I_V_RSOP:					/* rsop */
+		break;
+	    case I_V_RSOP:				/* rsop */
 		fprintf (of, "%s %s,", opcode[i], rname[srcr]);
-		return fprint_spec (of, addr, dstm, val[1], cflag, TRUE);
-	case I_V_ASOP: case I_V_ASMD:			/* asop, asmd */
+		wd1 = fprint_spec (of, addr, dstm, val[1], cflag, TRUE);
+		break;
+	    case I_V_ASOP: case I_V_ASMD:		/* asop, asmd */
 		fprintf (of, "%s %s,", opcode[i], fname[fac]);
-		return fprint_spec (of, addr, dstm, val[1], cflag, TRUE);
-	case I_V_DOP:					/* dop */
+		wd1 = fprint_spec (of, addr, dstm, val[1], cflag, TRUE);
+		break;
+	    case I_V_DOP:				/* dop */
 		fprintf (of, "%s ", opcode[i]);
 		wd1 = fprint_spec (of, addr, srcm, val[1], cflag, TRUE);
 		fprintf (of, ",");
 		wd2 = fprint_spec (of, addr - wd1 - wd1, dstm,
-			val[1 - wd1], cflag, TRUE);
-		return wd1 + wd2;  }			/* end case */
-		}					/* end if */
+		    val[1 - wd1], cflag, TRUE);
+		break;
+		}					/* end case */
+	    return ((wd1 + wd2) * 2) - 1;
+	    }						/* end if */
 	}						/* end for */
 return SCPE_ARG;					/* no match */
 }
@@ -807,6 +820,7 @@ default:
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, d, i, j, reg, spec, n1, n2, disp, pflag;
+t_value by;
 t_stat r;
 char *tptr, gbuf[CBUFSIZE];
 
@@ -814,12 +828,19 @@ cflag = (uptr == NULL) || (uptr == &cpu_unit);
 while (isspace (*cptr)) cptr++;				/* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
 	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = (t_value) cptr[0];
-	return SCPE_OK;  }
+	if (addr & 1) val[0] = (val[0] & 0377) | (((t_value) cptr[0]) << 8);
+	else val[0] = (val[0] & ~0377) | ((t_value) cptr[0]);
+	return 0;  }
+if (sw & SWMASK ('B')) {				/* byte? */
+	by = get_uint (cptr, 8, 0377, &r);		/* get byte */
+	if (r != SCPE_OK) return SCPE_ARG;
+	if (addr & 1) val[0] = (val[0] & 0377) | (by << 8);
+	else val[0] = (val[0] & ~0377) | by;
+	return 0;  }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* ASCII string? */
 	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = ((t_value) cptr[1] << 8) + (t_value) cptr[0];
-	return SCPE_OK;  }
+	val[0] = ((t_value) cptr[1] << 8) | (t_value) cptr[0];
+	return -1;  }
 if (sw & SWMASK ('R')) return SCPE_ARG;			/* radix 50 */
 
 cptr = get_glyph (cptr, gbuf, 0);			/* get opcode */
@@ -909,5 +930,5 @@ case I_V_CCC: case I_V_CCS:				/* cond code oper */
 default:
 	return SCPE_ARG;  }
 if (*cptr != 0) return SCPE_ARG;			/* junk at end? */
-return n1 + n2;
+return ((n1 + n2) * 2) - 1;
 }

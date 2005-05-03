@@ -63,7 +63,7 @@
 #define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
 #define VA_N_SIZE	15				/* virtual addr size */
 #define VASIZE		(1 << VA_N_SIZE)
-#define VAMASK		(VASIZE - 1)			/* virt addr mask */
+#define VAMASK		077777				/* virt addr mask */
 #define PA_N_SIZE	20				/* phys addr size */
 #define PASIZE		(1 << PA_N_SIZE)
 #define PAMASK		(PASIZE - 1)			/* phys addr mask */

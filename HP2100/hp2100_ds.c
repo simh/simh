@@ -1,6 +1,6 @@
 /* hp2100_ds.c: HP 2100 13037 disk controller simulator
 
-   Copyright (c) 2004, Robert M. Supnik
+   Copyright (c) 2004-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,9 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    ds		13037 disk controller
+
+   18-Mar-05	RMS	Added attached test to detach routine
+   01-Mar-05	JDB	Added SET UNLOAD/LOAD
 
    States of the controller: the controller uP runs all the time, but most of
    the time it is waiting for an event.  The simulator only 'runs' the controller
@@ -77,14 +80,16 @@
 /* Flags in the unit flags word */
 
 #define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
-#define UNIT_V_FMT	(UNIT_V_UF + 1)			/* format enabled */
+#define UNIT_V_UNLOAD	(UNIT_V_UF + 1)			/* heads unloaded */
 #define UNIT_V_DTYPE	(UNIT_V_UF + 2)			/* disk type */
 #define UNIT_M_DTYPE	3
 #define UNIT_V_AUTO	(UNIT_V_UF + 4)			/* autosize */
+#define UNIT_V_FMT	(UNIT_V_UF + 5)			/* format enabled */
 #define UNIT_WLK	(1 << UNIT_V_WLK)
 #define UNIT_FMT	(1 << UNIT_V_FMT)
 #define UNIT_DTYPE	(UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define UNIT_AUTO	(1 << UNIT_V_AUTO)
+#define UNIT_UNLOAD	(1 << UNIT_V_UNLOAD)
 #define GET_DTYPE(x)	(((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
 #define UNIT_WPR	(UNIT_WLK | UNIT_RO)		/* write prot */
 
@@ -406,6 +411,7 @@ t_stat ds_reset (DEVICE *dptr);
 t_stat ds_attach (UNIT *uptr, char *cptr);
 t_stat ds_detach (UNIT *uptr);
 t_stat ds_boot (int32 unitno, DEVICE *dptr);
+t_stat ds_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc);
 t_stat ds_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 void ds_poll (void);
 void ds_docmd (uint32 cmd);
@@ -443,22 +449,22 @@ void ds_fifo_reset (void);
 DIB ds_dib = { DS, 0, 0, 0, 0, 0, &dsio };
 
 UNIT ds_unit[] = {
-	{ UDATA (&ds_svc_u, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, D7905_SIZE) },
-	{ UDATA (&ds_svc_u, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, D7905_SIZE) },
-	{ UDATA (&ds_svc_u, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, D7905_SIZE) },
-	{ UDATA (&ds_svc_u, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, D7905_SIZE) },
-	{ UDATA (&ds_svc_u, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, D7905_SIZE) },
-	{ UDATA (&ds_svc_u, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, D7905_SIZE) },
-	{ UDATA (&ds_svc_u, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, D7905_SIZE) },
-	{ UDATA (&ds_svc_u, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE, D7905_SIZE) },
+	{ UDATA (&ds_svc_u, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, D7905_SIZE) },
+	{ UDATA (&ds_svc_u, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, D7905_SIZE) },
+	{ UDATA (&ds_svc_u, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, D7905_SIZE) },
+	{ UDATA (&ds_svc_u, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, D7905_SIZE) },
+	{ UDATA (&ds_svc_u, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, D7905_SIZE) },
+	{ UDATA (&ds_svc_u, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, D7905_SIZE) },
+	{ UDATA (&ds_svc_u, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, D7905_SIZE) },
+	{ UDATA (&ds_svc_u, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_UNLOAD, D7905_SIZE) },
 	{ UDATA (&ds_svc_c, UNIT_DIS, 0) },
 	{ UDATA (&ds_svc_t, UNIT_DIS, 0) }  };
 
@@ -504,6 +510,8 @@ REG ds_reg[] = {
 	{ NULL }  };
 
 MTAB ds_mod[] = {
+	{ UNIT_UNLOAD, UNIT_UNLOAD, "heads unloaded", "UNLOADED", ds_load_unload },
+	{ UNIT_UNLOAD, 0, "heads loaded", "LOADED", ds_load_unload },
 	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
 	{ UNIT_FMT, 0, "format disabled", "NOFORMAT", NULL },
@@ -850,7 +858,7 @@ switch (op) {						/* case on function */
 /* Seek and recalibrate */
 
 case DSC_RECAL:						/* recalibrate */
-	if (uptr->flags & UNIT_ATT) {			/* attached? */
+	if ((uptr->flags & UNIT_UNLOAD) == 0) {		/* drive up? */
 	    ds_start_seek (uptr, 0, DSC_RECAL|DSC_2ND);	/* set up seek */
 	    ds_set_idle ();				/* ctrl is idle */
 	    }
@@ -873,7 +881,7 @@ case DSC_SEEK | DSC_2ND:				/* waiting for word 1 */
 case DSC_SEEK | DSC_3RD:				/* waiting for word 2 */
 	if (!DS_FIFO_EMPTY) {				/* OTA ds? */
 	    ds_hs = ds_fifo_read ();			/* save head/sector */
-	    if (uptr->flags & UNIT_ATT) {		/* attached? */
+	    if ((uptr->flags & UNIT_UNLOAD) == 0) {	/* drive up? */
 		ds_start_seek (uptr, ds_cyl, DSC_SEEK|DSC_4TH); /* set up seek */
 		ds_set_idle ();				/* ctrl is idle */
 		}
@@ -900,7 +908,7 @@ case DSC_ROFF | DSC_2ND:				/* poll done */
 	break;
 
 case DSC_COLD:						/* cold load read */
-	if (uptr->flags & UNIT_ATT)			/* attached? */
+	if ((uptr->flags & UNIT_UNLOAD) == 0)		/* drive up? */
 	    ds_start_seek (uptr, 0, DSC_READ);		/* set up seek */
 	else ds_cmd_done (1, DS1_S2ERR);		/* no, not ready error */
 	break;
@@ -1065,7 +1073,7 @@ sta = drv_tab[dtyp].id |				/* form status */
 	uptr->STA |					/* static bits */
 	((uptr->flags & UNIT_WPR)? DS2_RO: 0) |		/* dynamic bits */
 	((uptr->flags & UNIT_FMT)? DS2_FRM: 0) |
-	((uptr->flags & UNIT_ATT)? 0: DS2_NR | DS2_BS) |
+	((uptr->flags & UNIT_UNLOAD)? DS2_NR | DS2_BS: 0) |
 	(sim_is_active (uptr)? DS2_BS: 0);
 if (sta & DS2_ALLERR) sta = sta | DS2_ERR;		/* set error */
 return sta;
@@ -1133,7 +1141,7 @@ uint32 dtyp = GET_DTYPE (uptr->flags);
 
 ds_eod = 0;						/* init eod */
 ds_ptr = 0;						/* init buffer ptr */
-if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
+if (uptr->flags & UNIT_UNLOAD) {			/* drive down? */
 	ds_cmd_done (1, DS1_S2ERR);
 	return TRUE;
 	}
@@ -1410,7 +1418,7 @@ t_stat r;
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = attach_unit (uptr, cptr);				/* attach unit */
 if (r != SCPE_OK) return r;				/* error? */
-uptr->STA = DS2_ATN | DS2_FS;				/* update drive status */
+ds_load_unload (uptr, 0, NULL, NULL);			/* if OK, load heads */
 ds_sched_atn (uptr);					/* schedule attention */
 if (((uptr->flags & UNIT_AUTO) == 0) ||			/* static size? */
     ((p = sim_fsize (uptr->fileref)) == 0)) return SCPE_OK;	/* new file? */
@@ -1428,9 +1436,24 @@ return SCPE_OK;
 
 t_stat ds_detach (UNIT *uptr)
 {
-uptr->STA = DS2_ATN;					/* update drive status */
-ds_sched_atn (uptr);					/* schedule attention */
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* attached? */
+ds_load_unload (uptr, UNIT_UNLOAD, NULL, NULL);		/* unload heads */
 return detach_unit (uptr);
+}
+
+/* Load and unload heads */
+
+t_stat ds_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
+{
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;	/* must be attached to [un]load */
+if (value == UNIT_UNLOAD) {				/* unload heads? */
+	uptr->flags = uptr->flags | UNIT_UNLOAD;	/* indicate unload */
+	uptr->STA = DS2_ATN;				/* update drive status */
+	ds_sched_atn (uptr);  }				/* schedule attention */
+else {							/* load heads */
+	uptr->flags = uptr->flags & ~UNIT_UNLOAD;	/* indicate load */
+	uptr->STA = DS2_ATN | DS2_FS;  }		/* update drive status */
+return SCPE_OK;
 }
 
 /* Schedule attention interrupt if CTL set, not restore, and controller idle */

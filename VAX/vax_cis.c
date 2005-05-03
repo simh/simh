@@ -408,8 +408,8 @@ case CRC:
 */
 
 case MOVP:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if (op[0] > 31) RSVD_OPND_FAULT;
+	if ((PSL & PSL_FPD) || (op[0] > 31))
+	    RSVD_OPND_FAULT;
 	ReadDstr (op[0], op[1], &dst, acc);		/* read source */
 	cc = WriteDstr (op[0], op[2], &dst, 0, acc) |	/* write dest */
 	    (cc & CC_C);				/* preserve C */
@@ -445,8 +445,8 @@ case ADDP4: case SUBP4:
 	op[4] = op[2];					/* copy dst */
 	op[5] = op[3];
 case ADDP6: case SUBP6:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if ((op[0] > 31) || (op[2] > 31) || (op[4] > 31))
+	if ((PSL & PSL_FPD) || (op[0] > 31) ||
+	    (op[2] > 31) || (op[4] > 31))
 	    RSVD_OPND_FAULT;
 	ReadDstr (op[0], op[1], &src1, acc);		/* get src1 */
 	ReadDstr (op[2], op[3], &src2, acc);		/* get src2 */
@@ -498,8 +498,8 @@ case ADDP6: case SUBP6:
 */
 
 case MULP:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if ((op[0] > 31) || (op[2] > 31) || (op[4] > 31))
+	if ((PSL & PSL_FPD) || (op[0] > 31) ||
+	    (op[2] > 31) || (op[4] > 31))
 	    RSVD_OPND_FAULT;
 	dst = Dstr_zero;				/* clear result */
 	if (ReadDstr (op[0], op[1], &src1, acc) &&	/* read src1, src2 */
@@ -548,8 +548,8 @@ case MULP:
 */
 
 case DIVP:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if ((op[0] > 31) || (op[2] > 31) || (op[4] > 31))
+	if ((PSL & PSL_FPD) || (op[0] > 31) ||
+	    (op[2] > 31) || (op[4] > 31))
 	    RSVD_OPND_FAULT;
 	ldivr = ReadDstr (op[0], op[1], &src1, acc);	/* get divisor */
 	if (ldivr == 0) {				/* divisor = 0? */
@@ -613,8 +613,8 @@ case CMPP3:
 	op[3] = op[2];					/* reposition ops */
 	op[2] = op[0];
 case CMPP4:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if ((op[0] > 31) || (op[2] > 31)) RSVD_OPND_FAULT;
+	if ((PSL & PSL_FPD) || (op[0] > 31) || (op[2] > 31))
+	    RSVD_OPND_FAULT;
 	ReadDstr (op[0], op[1], &src1, acc);		/* get src1 */
 	ReadDstr (op[1], op[2], &src2, acc);		/* get src2 */
 	cc = 0;
@@ -651,8 +651,8 @@ case CMPP4:
 */
 
 case ASHP:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if ((op[1] > 31) || (op[4] > 31)) RSVD_OPND_FAULT;
+	if ((PSL & PSL_FPD) || (op[1] > 31) || (op[4] > 31))
+	    RSVD_OPND_FAULT;
 	ReadDstr (op[1], op[2], &src1, acc);		/* get source */
 	V = 0;						/* init V */
 	shift = op[0];					/* get shift count */
@@ -695,8 +695,8 @@ case ASHP:
 */
 
 case CVTPL:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if (op[0] > 31) RSVD_OPND_FAULT;
+	if ((PSL & PSL_FPD) || (op[0] > 31))
+	    RSVD_OPND_FAULT;
 	ReadDstr (op[0], op[1], &src1, acc);		/* get source */
 	V = result = 0;					/* clear V, result */
 	for (i = (DSTRLNT * 8) - 1; i > 0; i--) {	/* loop thru digits */
@@ -737,8 +737,8 @@ case CVTPL:
 */
 
 case CVTLP:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if (op[1] > 31) RSVD_OPND_FAULT;
+	if ((PSL & PSL_FPD) || (op[1] > 31))
+	    RSVD_OPND_FAULT;
 	dst = Dstr_zero;				/* clear result */
 	result = op[0];
 	if ((result & LSIGN) != 0) {
@@ -775,8 +775,8 @@ case CVTLP:
 */
 
 case CVTSP:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if ((op[0] > 31) || (op[2] > 31)) RSVD_OPND_FAULT;
+	if ((PSL & PSL_FPD) || (op[0] > 31) || (op[2] > 31))
+	    RSVD_OPND_FAULT;
 	dst = Dstr_zero;				/* clear result */
 	t = Read (op[1], L_BYTE, RA);			/* read source sign */
 	if (t == C_MINUS) dst.sign = 1;			/* sign -, */
@@ -815,8 +815,8 @@ case CVTSP:
 */
 
 case CVTPS:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if ((op[0] > 31) || (op[2] > 31)) RSVD_OPND_FAULT;
+	if ((PSL & PSL_FPD) || (op[0] > 31) || (op[2] > 31))
+	    RSVD_OPND_FAULT;
 	ReadDstr (op[0], op[1], &dst, acc);		/* get src */
 	ProbeDstr (op[2], op[3], WA);			/* test dst write */
 	Write (op[3], dst.sign? C_MINUS: C_PLUS, L_BYTE, WA);
@@ -851,8 +851,8 @@ case CVTPS:
 */
 
 case CVTTP:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if ((op[0] > 31) || (op[3] > 31)) RSVD_OPND_FAULT;
+	if ((PSL & PSL_FPD) || (op[0] > 31) || (op[3] > 31))
+	    RSVD_OPND_FAULT;
 	dst = Dstr_zero;				/* clear result */
 	for (i = 1; i <= op[0]; i++) {			/* loop thru char */
 	    c = Read ((op[1] + op[0] - i) & LMASK, L_BYTE, RA); /* read char */
@@ -897,17 +897,17 @@ case CVTTP:
 */
 
 case CVTPT:
-	if (PSL & PSL_FPD) RSVD_INST_FAULT;
-	if ((op[0] > 31) || (op[3] > 31)) RSVD_OPND_FAULT;
+	if ((PSL & PSL_FPD) || (op[0] > 31) || (op[3] > 31))
+	    RSVD_OPND_FAULT;
 	ReadDstr (op[0], op[1], &dst, acc);		/* get source */
 	ProbeDstr (op[3], op[4], WA);			/* test writeability */
 	for (i = 1; i <= op[3]; i++) {			/* loop thru chars */
-	    if (i != op[3]) {				/* not last? */
+	    if (i != 1) {				/* not last? */
 		d = (dst.val[i / 8] >> ((i % 8) * 4)) & 0xF;	/* get digit */
 		c = d + C_ZERO;				/* convert */
 		}
 	    else {					/* translate last */
-		t = Read ((op[1] + op[0]) & LMASK, L_BYTE, RA);
+		t = Read ((op[1] + (op[0] / 2)) & LMASK, L_BYTE, RA);
 		c = Read ((op[2] + t) & LMASK, L_BYTE, RA);
 		}
 	    Write ((op[4] + op[3] - i) & LMASK, c, L_BYTE, WA);
@@ -971,8 +971,8 @@ case EDITPC:
 	    }
 	else {						/* new instr */
 	    if (op[0] > 31) RSVD_OPND_FAULT;		/* lnt > 31? */
-	    d = Read ((op[1] + (op[0] / 2)) & LMASK, L_BYTE, RA) & 0xF;
-	    if ((d == 0xB) || (d == 0xD)) {
+	    t = Read ((op[1] + (op[0] / 2)) & LMASK, L_BYTE, RA) & 0xF;
+	    if ((t == 0xB) || (t == 0xD)) {
 		cc = CC_N | CC_Z;
 		sign = C_MINUS;
 		}

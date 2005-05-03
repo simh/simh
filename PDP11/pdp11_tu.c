@@ -1,6 +1,6 @@
 /* pdp11_tu.c - PDP-11 TM02/TU16 TM03/TU45/TU77 Massbus magnetic tape controller
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    tu		TM02/TM03 magtape
 
+   31-Mar-05	RMS	Fixed inaccuracies in error reporting
+   18-Mar-05	RMS	Added attached test to detach routine
    10-Sep-04	RMS	Cloned from pdp10_tu.c
 
    Magnetic tapes are represented as a series of variable 8b records
@@ -246,7 +248,7 @@ int32 tu_abort (void);
 void tu_set_er (int32 flg);
 void tu_clr_as (int32 mask);
 void tu_update_fs (int32 flg, int32 drv);
-t_stat tu_map_err (int32 drv, t_stat st);
+t_stat tu_map_err (int32 drv, t_stat st, t_bool qdt);
 
 /* TU data structures
 
@@ -569,7 +571,7 @@ case FNC_SPACEF:					/* space forward */
 	do {
 	    tufc = (tufc + 1) & 0177777;		/* incr fc */
 	    if (st = sim_tape_sprecf (uptr, &tbc)) {	/* space rec fwd, err? */
-		r = tu_map_err (drv, st);		/* map error */
+		r = tu_map_err (drv, st, 0);		/* map error */
 		break;  }
 	    }
 	while (tufc != 0);
@@ -581,7 +583,7 @@ case FNC_SPACER:					/* space reverse */
 	do {
 	    tufc = (tufc + 1) & 0177777;		/* incr wc */
 	    if (st = sim_tape_sprecr (uptr, &tbc)) {	/* space rec rev, err? */
-		r = tu_map_err (drv, st);		/* map error */
+		r = tu_map_err (drv, st, 0);		/* map error */
 		break;  }
 	    }
 	while (tufc != 0);
@@ -591,12 +593,12 @@ case FNC_SPACER:					/* space reverse */
 
 case FNC_WREOF:						/* write end of file */
 	if (st = sim_tape_wrtmk (uptr))			/* write tmk, err? */
-	    r = tu_map_err (drv, st);			/* map error */
+	    r = tu_map_err (drv, st, 0);		/* map error */
 	break;
 
 case FNC_ERASE:
 	if (sim_tape_wrp (uptr))			/* write protected? */
-	    r = tu_map_err (drv, MTSE_WRP);		/* map error */
+	    r = tu_map_err (drv, MTSE_WRP, 0);		/* map error */
 	break;
 
 /* Unit service - data transfer commands */
@@ -607,7 +609,7 @@ case FNC_WCHKF:						/* wcheck = read */
 	if ((uptr->UDENS == TC_1600) && sim_tape_bot (uptr))
 	    tufs = tufs | FS_ID;			/* PE BOT? ID burst */
 	if (st = sim_tape_rdrecf (uptr, xbuf, &tbc, MT_MAXFR)) { /* read fwd */
-	    r = tu_map_err (drv, st);			/* map error */
+	    r = tu_map_err (drv, st, 1);		/* map error */
 	    break;  }					/* done */
 	for (i = tbc; i < tbc + 4; i++) xbuf[i] = 0;	/* pad with 0's */
 	if (fmt == TC_CDUMP) {				/* core dump? */
@@ -652,7 +654,7 @@ case FNC_WRITE:						/* write */
 	    tbc = xbc;
 	    }
 	if (st = sim_tape_wrrecf (uptr, xbuf, tbc))	/* write rec, err? */
-	    r = tu_map_err (drv, st);			/* map error */
+	    r = tu_map_err (drv, st, 1);		/* map error */
 	else {
 	    tufc = (tufc + tbc) & 0177777;
 	    if (tufc == 0) tutc = tutc & ~TC_FCS;
@@ -663,7 +665,7 @@ case FNC_READR:						/* read reverse */
 case FNC_WCHKR:						/* wcheck = read */
 	tufc = 0;					/* clear frame count */
 	if (st = sim_tape_rdrecr (uptr, xbuf + 4, &tbc, MT_MAXFR)) { /* read rev */
-	    r = tu_map_err (drv, st);			/* map error */
+	    r = tu_map_err (drv, st, 1);		/* map error */
 	    break;  }					/* done */
 	for (i = 0; i < 4; i++) xbuf[i] = 0;		/* pad with 0's */
 	if (fmt == TC_CDUMP) {				/* core dump? */
@@ -740,12 +742,13 @@ return;
 
 /* Map tape error status */
 
-t_stat tu_map_err (int32 drv, t_stat st)
+t_stat tu_map_err (int32 drv, t_stat st, t_bool qdt)
 {
 switch (st) {
 case MTSE_FMT:						/* illegal fmt */
 case MTSE_UNATT:					/* not attached */
 	tu_set_er (ER_NXF);				/* can't execute */
+	if (qdt) mba_set_exc (tu_dib.ba);		/* set exception */
 	break;
 case MTSE_TMK:						/* end of file */
 	tufs = tufs | FS_TMK;
@@ -753,21 +756,25 @@ case MTSE_TMK:						/* end of file */
 	break;
 case MTSE_IOERR:					/* IO error */
 	tu_set_er (ER_VPE);				/* flag error */
-	mba_set_exc (tu_dib.ba);			/* set exception */
+	if (qdt) mba_set_exc (tu_dib.ba);		/* set exception */
 	return (tu_stopioe? SCPE_IOERR: SCPE_OK);
 case MTSE_INVRL:					/* invalid rec lnt */
 	tu_set_er (ER_VPE);				/* flag error */
+	if (qdt) mba_set_exc (tu_dib.ba);		/* set exception */
 	return SCPE_MTRLNT;
 case MTSE_RECE:						/* record in error */
 	tu_set_er (ER_CRC);				/* set crc err */
+	if (qdt) mba_set_exc (tu_dib.ba);		/* set exception */
 	break;
 case MTSE_EOM:						/* end of medium */
 	tu_set_er (ER_OPI);				/* incomplete */
+	if (qdt) mba_set_exc (tu_dib.ba);		/* set exception */
 	break;
 case MTSE_BOT:						/* reverse into BOT */
 	return SCPE_OK;
 case MTSE_WRP:						/* write protect */
 	tu_set_er (ER_NXF);				/* can't execute */
+	if (qdt) mba_set_exc (tu_dib.ba);		/* set exception */
 	break;
 default:						/* unknown error */
 	return SCPE_IERR;  }
@@ -822,6 +829,7 @@ t_stat tu_detach (UNIT* uptr)
 {
 int32 drv = uptr - tu_dev.units;
 
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* attached? */
 uptr->USTAT = 0;					/* clear status flags */
 tu_update_fs (FS_ATA | FS_SSC, drv);			/* update status */
 return sim_tape_detach (uptr);

@@ -26,6 +26,7 @@
    ms		13181A 7970B 800bpi nine track magnetic tape
 		13183A 7970E 1600bpi nine track magnetic tape
 
+   01-Mar-05	JDB	Added SET OFFLINE; rewind/offline now does not detach
    07-Oct-04	JDB	Fixed enable/disable from either device
    14-Aug-04	JDB	Fixed many functional and timing problems (from Dave Bryan)
 			- fixed erroneous execution of rejected command
@@ -74,6 +75,9 @@
 
 #include "hp2100_defs.h"
 #include "sim_tape.h"
+
+#define UNIT_V_OFFLINE	(MTUF_V_UF + 0)			/* unit offline */
+#define UNIT_OFFLINE	(1 << UNIT_V_OFFLINE)
 
 #define MS_NUMDR	4				/* number of drives */
 #define DB_N_SIZE	16				/* max data buf */
@@ -190,6 +194,7 @@ t_stat msc_svc (UNIT *uptr);
 t_stat msc_reset (DEVICE *dptr);
 t_stat msc_attach (UNIT *uptr, char *cptr);
 t_stat msc_detach (UNIT *uptr);
+t_stat msc_online (UNIT *uptr, int32 value, char *cptr, void *desc);
 t_stat msc_boot (int32 unitno, DEVICE *dptr);
 t_stat ms_map_err (UNIT *uptr, t_stat st);
 t_stat ms_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -250,10 +255,14 @@ DEVICE msd_dev = {
 */
 
 UNIT msc_unit[] = {
-	{ UDATA (&msc_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&msc_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&msc_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) },
-	{ UDATA (&msc_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) }  };
+	{ UDATA (&msc_svc, UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_OFFLINE, 0) },
+	{ UDATA (&msc_svc, UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_OFFLINE, 0) },
+	{ UDATA (&msc_svc, UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_OFFLINE, 0) },
+	{ UDATA (&msc_svc, UNIT_ATTABLE | UNIT_ROABLE |
+		UNIT_DISABLE | UNIT_OFFLINE, 0) }  };
 
 REG msc_reg[] = {
 	{ ORDATA (STA, msc_sta, 12) },
@@ -282,6 +291,8 @@ REG msc_reg[] = {
 	{ NULL }  };
 
 MTAB msc_mod[] = {
+	{ UNIT_OFFLINE, UNIT_OFFLINE, "offline", "OFFLINE", NULL },
+	{ UNIT_OFFLINE, 0, "online", "ONLINE", msc_online },
 	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
 	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
 	{ MTAB_XTD|MTAB_VUN, 0, "REEL", "REEL",
@@ -396,7 +407,7 @@ case ioLIX:						/* load */
 	dat = 0;
 case ioMIX:						/* merge */
 	dat = dat | (msc_sta & ~STA_DYN);		/* get card status */
-	if (uptr->flags & UNIT_ATT) {			/* online? */
+	if ((uptr->flags & UNIT_OFFLINE) == 0) {	/* online? */
 	    dat = dat | uptr->UST;			/* add unit status */
 	    if (sim_is_active (uptr) &&			/* TBSY unless RWD at BOT */
 		!((uptr->FNC & FNF_RWD) && (uptr->UST & STA_BOT)))
@@ -482,14 +493,17 @@ devc = msc_dib.devno;					/* get device nos */
 devd = msd_dib.devno;
 unum = uptr - msc_dev.units;				/* get unit number */
 
-if ((uptr->FNC != FNC_RWS) && !(uptr->flags & UNIT_ATT)) {  /* offline? */
+if ((uptr->FNC != FNC_RWS) && (uptr->flags & UNIT_OFFLINE)) {  /* offline? */
 	msc_sta = (msc_sta | STA_REJ) & ~STA_BUSY;	/* reject */
 	setFSR (devc);					/* set cch flg */
 	return IORETURN (msc_stopioe, SCPE_UNATT);  }
 
 switch (uptr->FNC) {					/* case on function */
+
 case FNC_RWS:						/* rewind offline */
-	detach_unit (uptr);				/* detach == offline */
+	sim_tape_rewind (uptr);				/* rewind tape */
+	uptr->flags = uptr->flags | UNIT_OFFLINE;	/* set offline */
+	uptr->UST = STA_BOT;				/* BOT when online again */
 	break;						/* we're done */
 
 case FNC_REW:						/* rewind */
@@ -680,7 +694,9 @@ t_stat msc_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);			/* attach unit */
-if (r == SCPE_OK) uptr->UST = STA_BOT;			/* tape starts at BOT */
+if (r == SCPE_OK) {
+	uptr->flags = uptr->flags & ~UNIT_OFFLINE;	/* set online */
+	uptr->UST = STA_BOT;  }				/* tape starts at BOT */
 return r;
 }
 
@@ -689,7 +705,16 @@ return r;
 t_stat msc_detach (UNIT* uptr)
 {
 uptr->UST = 0;						/* update status */
+uptr->flags = uptr->flags | UNIT_OFFLINE;		/* set offline */
 return sim_tape_detach (uptr);				/* detach unit */
+}
+
+/* Online routine */
+
+t_stat msc_online (UNIT *uptr, int32 value, char *cptr, void *desc)
+{
+if (uptr->flags & UNIT_ATT) return SCPE_OK;
+else return SCPE_UNATT;
 }
 
 /* Configure timing */

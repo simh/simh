@@ -1,6 +1,6 @@
 /* pdp11_ts.c: TS11/TSV05 magnetic tape simulator
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ts		TS11/TSV05 magtape
 
+   18-Mar-05	RMS	Added attached test to detach routine
    07-Dec-04	RMS	Added read-only file support
    30-Sep-04	RMS	Revised Unibus interface
    25-Jan-04	RMS	Revised for device debug support
@@ -935,6 +936,7 @@ t_stat ts_detach (UNIT* uptr)
 {
 t_stat r;
 
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* attached? */
 r = sim_tape_detach (uptr);				/* detach unit */
 if (r != SCPE_OK) return r;				/* error? */
 tssr = tssr | TSSR_OFL;					/* set offline */

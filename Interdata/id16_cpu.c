@@ -1,6 +1,6 @@
 /* id16_cpu.c: Interdata 16b CPU simulator
 
-   Copyright (c) 2000-2004, Robert M. Supnik
+   Copyright (c) 2000-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu			Interdata 16b CPU
 
+   10-Mar-05	RMS	Fixed bug in show history routine (from Mark Hittinger)
+			Revised examine/deposit to do words rather than bytes
    07-Nov-04	RMS	Added instruction history
    22-Sep-03	RMS	Added additional instruction decode types
    07-Feb-03	RMS	Fixed bug in SETM, SETMR (found by Mark Pizzolato)
@@ -521,7 +523,7 @@ MTAB cpu_mod[] = {
 
 DEVICE cpu_dev = {
 	"CPU", &cpu_unit, cpu_reg, cpu_mod,
-	1, 16, 18, 1, 16, 8,
+	1, 16, 18, 2, 16, 16,
 	&cpu_ex, &cpu_dep, &cpu_reset,
 	NULL, NULL, NULL,
 	&cpu_dib, 0 };
@@ -1681,6 +1683,17 @@ M[loc >> 1] = ((loc & 1)?
 	((M[loc >> 1] & DMASK8) | (val << 8)));
 return;
 }
+
+uint32 IOReadH (uint32 loc)
+{
+return (M[loc >> 1] & DMASK16);
+}
+
+void IOWriteH (uint32 loc, uint32 val)
+{
+M[loc >> 1] = val & DMASK16;
+return;
+}
 
 /* Reset routine */
 
@@ -1708,7 +1721,7 @@ if (sw & SWMASK ('V')) {
 	if (addr > VAMASK) return SCPE_NXM;
 	addr = (addr + ((addr & VA_S1)? s1_rel: s0_rel)) & PAMASK16E;  }
 if (addr >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = IOReadB (addr);
+if (vptr != NULL) *vptr = IOReadH (addr);
 return SCPE_OK;
 }
 
@@ -1720,7 +1733,7 @@ if (sw & SWMASK ('V')) {
 	if (addr > VAMASK) return SCPE_NXM;
 	addr = (addr + ((addr & VA_S1)? s1_rel: s0_rel)) & PAMASK16E;  }
 if (addr >= MEMSIZE) return SCPE_NXM;
-IOWriteB (addr, val & 0xFF);
+IOWriteH (addr, val);
 return SCPE_OK;
 }
 
@@ -1794,9 +1807,9 @@ return SCPE_OK;
 
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-uint32 op, k, di, lnt;
+int32 op, k, di, lnt;
 char *cptr = (char *) desc;
-t_value sim_eval[4];
+t_value sim_eval[2];
 t_stat r;
 struct InstHistory *h;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
@@ -1814,12 +1827,11 @@ for (k = 0; k < lnt; k++) {				/* print specified */
 	h = &hst[(di++) % hst_lnt];			/* entry pointer */
 	if (h->vld) {					/* instruction? */
 	    fprintf (st, "%04X  %04X  %04X  ", h->pc, h->r1, h->opnd);
-	    sim_eval[0] = op = (h->ir1 >> 8) & 0xFF;
-	    sim_eval[1] = h->ir1 & 0xFF;
-	    sim_eval[2] = (h->ir2 >> 8) & 0xFF;
-	    sim_eval[3] = h->ir2 & 0xFF;
+	    op = (h->ir1 >> 8) & 0xFF;
 	    if (OP_TYPE (op) >= OP_RX) fprintf (st, "%04X  ", h->ea);
 	    else fprintf (st, "      ");
+	    sim_eval[0] = h->ir1;
+	    sim_eval[1] = h->ir2;
 	    if ((fprint_sym (st, h->pc, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
 		fprintf (st, "(undefined) %04X", h->ir1);
 	    fputc ('\n', st);				/* end line */
