@@ -1,6 +1,6 @@
 /* s3_pkb.c: System/3 5471 console terminal simulator
 
-   Copyright (c) 2001, Charles E. Owen
+   Copyright (c) 2001-2005, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,14 +19,14 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Charles E. Owen shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Charles E. Owen shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Charles E. Owen.
 
-   pkb		5471 printer/keyboard
+   pkb          5471 printer/keyboard
 
-   25-Apr-03	RMS	Revised for extended file support
-   08-Oct-02	RMS	Added impossible function catcher
+   25-Apr-03    RMS     Revised for extended file support
+   08-Oct-02    RMS     Added impossible function catcher
 */
 
 #include "s3_defs.h"
@@ -39,56 +39,59 @@ extern t_stat sim_poll_kbd (void);
 extern t_stat sim_putchar (int32 out);
 extern int32 IAR[], level;
 extern int32 debug_reg;
-
+
 /* 5471 data structures
 
-   pkb_dev	TTI device descriptor
-   pkb_unit	TTI unit descriptor
-   pkb_reg	TTI register list
-   pkb_mod	TTI/TTO modifiers list
+   pkb_dev      TTI device descriptor
+   pkb_unit     TTI unit descriptor
+   pkb_reg      TTI register list
+   pkb_mod      TTI/TTO modifiers list
 */
 
 /* Flag bits : (kept in pkb_unit.u3) */
 
-#define PRT_INTREQ 0x800		/* Printer interrupt pending */
-#define KBD_INTREQ 0x400		/* Request key interrupt pending */
-#define KBD_INTEND 0x200		/* End or cancel key interrupt pending */
-#define KBD_INTKEY 0x100		/* Return or other key interrupt pending */
-#define KBD_REQLIGHT 0x20		/* Request Pending Indicator (light on/off) */
-#define KBD_PROLIGHT 0x10		/* Proceed indicator (light on/off) */
-#define KBD_REQINT 0x04			/* Req key interrupts enabled */
-#define KBD_KEYINT 0x02			/* Other key interrupts enabled */
-#define PRT_PRTINT 0x01			/* Printer interrupts enabled */
+#define PRT_INTREQ 0x800                                /* Printer interrupt pending */
+#define KBD_INTREQ 0x400                                /* Request key interrupt pending */
+#define KBD_INTEND 0x200                                /* End or cancel key interrupt pending */
+#define KBD_INTKEY 0x100                                /* Return or other key interrupt pending */
+#define KBD_REQLIGHT 0x20                               /* Request Pending Indicator (light on/off) */
+#define KBD_PROLIGHT 0x10                               /* Proceed indicator (light on/off) */
+#define KBD_REQINT 0x04                                 /* Req key interrupts enabled */
+#define KBD_KEYINT 0x02                                 /* Other key interrupts enabled */
+#define PRT_PRTINT 0x01                                 /* Printer interrupts enabled */
 
 /* Keys mapped to 5471 functions */
 
-int32 key_req = 0x01;		/* Request key: ^A */
-int32 key_rtn = 0x12;		/* Return key: ^R */
-int32 key_can = 0x1B;		/* Cancel key: ESC */
-int32 key_end = 0x0d;		/* End key - CR */
+int32 key_req = 0x01;                                   /* Request key: ^A */
+int32 key_rtn = 0x12;                                   /* Return key: ^R */
+int32 key_can = 0x1B;                                   /* Cancel key: ESC */
+int32 key_end = 0x0d;                                   /* End key - CR */
 
 UNIT pkb_unit = { UDATA (&pkb_svc, 0, 0), KBD_POLL_WAIT };
 
 REG pkb_reg[] = {
-	{ HRDATA (FLAG, pkb_unit.u3, 16) },
-	{ HRDATA (IBUF, pkb_unit.buf, 8) },
-	{ HRDATA (OBUF, pkb_unit.u4, 8) },
-	{ HRDATA (REQKEY, key_req, 8) },
-	{ HRDATA (RTNKEY, key_rtn, 8) },
-	{ HRDATA (CANKEY, key_can, 8) },
-	{ HRDATA (ENDKEY, key_end, 8) },
-	{ DRDATA (POS, pkb_unit.pos, T_ADDR_W), PV_LEFT },
-	{ DRDATA (TIME, pkb_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ NULL }  };
+    { HRDATA (FLAG, pkb_unit.u3, 16) },
+    { HRDATA (IBUF, pkb_unit.buf, 8) },
+    { HRDATA (OBUF, pkb_unit.u4, 8) },
+    { HRDATA (REQKEY, key_req, 8) },
+    { HRDATA (RTNKEY, key_rtn, 8) },
+    { HRDATA (CANKEY, key_can, 8) },
+    { HRDATA (ENDKEY, key_end, 8) },
+    { DRDATA (POS, pkb_unit.pos, T_ADDR_W), PV_LEFT },
+    { DRDATA (TIME, pkb_unit.wait, 24), REG_NZ + PV_LEFT },
+    { NULL }
+};
 
 MTAB pkb_mod[] = {
-	{ 0 }  };
+    { 0 }
+};
 
 DEVICE pkb_dev = {
-	"PKB", &pkb_unit, pkb_reg, pkb_mod,
-	1, 10, 31, 1, 8, 8,
-	NULL, NULL, &pkb_reset,
-	NULL, NULL, NULL };
+    "PKB", &pkb_unit, pkb_reg, pkb_mod,
+    1, 10, 31, 1, 8, 8,
+    NULL, NULL, &pkb_reset,
+    NULL, NULL, NULL
+};
 
 
 /*-------------------------------------------------------------------*/
@@ -141,97 +144,97 @@ unsigned char ascii_to_ebcdic[] = {
 
 int32 pkb (int32 op, int32 m, int32 n, int32 data)
 {
-	int32 iodata= 0, ec, ac;
-	switch (op) {
-		case 0:		/* SIO 5471 */
-			if (n != 0)
-				return STOP_INVDEV;
-			/*printf("%04X SIO %d,%d,%02X\n\r", IAR[level]-4, m, n, data);*/
-			if (m == 0) {			/* Keyboard */
-				pkb_unit.u3 &= 0xFC1;
-				pkb_unit.u3 |= data;
-				if (data & 0x01) {
-					pkb_unit.u3 &= ~KBD_INTREQ;
-					pkb_unit.u3 &= ~KBD_INTKEY;
-					pkb_unit.u3 &= ~KBD_INTEND;
-					return RESET_INTERRUPT;
-				}	
-			} else {			/* Printer */
-				if (data & 0x80) {	/* start print bit */
-					if (debug_reg & 0x80)
-						return STOP_IBKPT;
-					ec = pkb_unit.u4 & 0xff;
-					ac = ebcdic_to_ascii[ec];
-					sim_putchar(ac);
-					pkb_unit.u3 |= PRT_INTREQ;
-				}
-				if (data & 0x40) {	/* Carr. Return */
-					sim_putchar('\n');
-					sim_putchar('\r');
-					pkb_unit.u3 |= PRT_INTREQ;
-				}	
-				pkb_unit.u3 &= 0xFFe;
-				if (data & 0x04)	/* Print interrupt flag */
-					pkb_unit.u3 |= PRT_PRTINT;
-				if (data & 0x01) {	/* Reset Interrupt */
-					if (level < 8) {
-						if (!(data & 0x80))
-							pkb_unit.u3 &= ~PRT_INTREQ;
-						return RESET_INTERRUPT;
-					}
-				}	
-			}
-			return SCPE_OK;
-		case 1: 	/* LIO 5471 */
-			if (n != 0)
-				return STOP_INVDEV;
-			if (m != 1)
-				return STOP_INVDEV;
-			pkb_unit.u4 = (data >> 8) & 0xff;
-			return SCPE_OK;
-			break;
-		case 2:		/* TIO 5471 */
-			return STOP_INVDEV;
-		case 3:		/* SNS 5471 */
-			if (n != 1 && n != 3)
-				return (STOP_INVDEV << 16);
-			if (m == 0) {			/* Keyboard data */
-				if (n == 1) {		/* Sense bytes 0 & 1 */
-					iodata = (pkb_unit.buf << 8) & 0xff00;
-					if (pkb_unit.u3 & KBD_INTREQ)
-						iodata |= 0x80;
-					if (pkb_unit.u3 & KBD_INTEND)
-						iodata |= 0x40;
-					if (pkb_unit.u3 & KBD_INTKEY)
-						iodata |= 0x08;
-					if (pkb_unit.buf == 0x12)	/* Return key */
-						iodata |= 0x04;
-					if (pkb_unit.buf == 0x03)	/* Cancel key */
-						iodata |= 0x20;
-					if (pkb_unit.buf == 0x0d)	/* End key */
-						iodata |= 0x10;				
-					iodata |= ((SCPE_OK << 16) & 0xffff0000);			
-				} else {		/* Sense bytes 2 & 3 */
-					iodata = 0;	/* Manual says CE use only */	
-				}	
-			} else {			/* Printer Data */
-				if (n == 1) {		/* Sense bytes 0 & 1 */
-					iodata = 0;
-					if (pkb_unit.u3 & PRT_INTREQ)
-						iodata |= 0x80;
-				} else {
-					iodata = 0;	/* CE use only */
-				}	
-			}
-			iodata |= ((SCPE_OK << 16) & 0xffff0000);
-			return (iodata);			
-		case 4:		/* APL 5471 */
-			return STOP_INVDEV;
-		default:
-			break;
-	}						
-	printf (">>PKB non-existent function %d\n", op);
-	return SCPE_OK;						
+    int32 iodata= 0, ec, ac;
+    switch (op) {
+        case 0:                                         /* SIO 5471 */
+            if (n != 0)
+                return STOP_INVDEV;
+            /*printf("%04X SIO %d,%d,%02X\n\r", IAR[level]-4, m, n, data);*/
+            if (m == 0) {                               /* Keyboard */
+                pkb_unit.u3 &= 0xFC1;
+                pkb_unit.u3 |= data;
+                if (data & 0x01) {
+                    pkb_unit.u3 &= ~KBD_INTREQ;
+                    pkb_unit.u3 &= ~KBD_INTKEY;
+                    pkb_unit.u3 &= ~KBD_INTEND;
+                    return RESET_INTERRUPT;
+                }   
+            } else {                                    /* Printer */
+                if (data & 0x80) {                      /* start print bit */
+                    if (debug_reg & 0x80)
+                        return STOP_IBKPT;
+                    ec = pkb_unit.u4 & 0xff;
+                    ac = ebcdic_to_ascii[ec];
+                    sim_putchar(ac);
+                    pkb_unit.u3 |= PRT_INTREQ;
+                }
+                if (data & 0x40) {                      /* Carr. Return */
+                    sim_putchar('\n');
+                    sim_putchar('\r');
+                    pkb_unit.u3 |= PRT_INTREQ;
+                }   
+                pkb_unit.u3 &= 0xFFe;
+                if (data & 0x04)                        /* Print interrupt flag */
+                    pkb_unit.u3 |= PRT_PRTINT;
+                if (data & 0x01) {                      /* Reset Interrupt */
+                    if (level < 8) {
+                        if (!(data & 0x80))
+                            pkb_unit.u3 &= ~PRT_INTREQ;
+                        return RESET_INTERRUPT;
+                    }
+                }   
+            }
+            return SCPE_OK;
+        case 1:                                         /* LIO 5471 */
+            if (n != 0)
+                return STOP_INVDEV;
+            if (m != 1)
+                return STOP_INVDEV;
+            pkb_unit.u4 = (data >> 8) & 0xff;
+            return SCPE_OK;
+            break;
+        case 2:                                         /* TIO 5471 */
+            return STOP_INVDEV;
+        case 3:                                         /* SNS 5471 */
+            if (n != 1 && n != 3)
+                return (STOP_INVDEV << 16);
+            if (m == 0) {                               /* Keyboard data */
+                if (n == 1) {                           /* Sense bytes 0 & 1 */
+                    iodata = (pkb_unit.buf << 8) & 0xff00;
+                    if (pkb_unit.u3 & KBD_INTREQ)
+                        iodata |= 0x80;
+                    if (pkb_unit.u3 & KBD_INTEND)
+                        iodata |= 0x40;
+                    if (pkb_unit.u3 & KBD_INTKEY)
+                        iodata |= 0x08;
+                    if (pkb_unit.buf == 0x12)           /* Return key */
+                        iodata |= 0x04;
+                    if (pkb_unit.buf == 0x03)           /* Cancel key */
+                        iodata |= 0x20;
+                    if (pkb_unit.buf == 0x0d)           /* End key */
+                        iodata |= 0x10;             
+                    iodata |= ((SCPE_OK << 16) & 0xffff0000);           
+                } else {                                /* Sense bytes 2 & 3 */
+                    iodata = 0;                         /* Manual says CE use only */   
+                }   
+            } else {                                    /* Printer Data */
+                if (n == 1) {                           /* Sense bytes 0 & 1 */
+                    iodata = 0;
+                    if (pkb_unit.u3 & PRT_INTREQ)
+                        iodata |= 0x80;
+                } else {
+                    iodata = 0;                         /* CE use only */
+                }   
+            }
+            iodata |= ((SCPE_OK << 16) & 0xffff0000);
+            return (iodata);            
+        case 4:                                         /* APL 5471 */
+            return STOP_INVDEV;
+        default:
+            break;
+    }                       
+    printf (">>PKB non-existent function %d\n", op);
+    return SCPE_OK;                     
 }
 
 /* Unit service */
@@ -240,58 +243,58 @@ t_stat pkb_svc (UNIT *uptr)
 {
 int32 temp, ac, ec;
 
-sim_activate (&pkb_unit, pkb_unit.wait);		/* continue poll */
+sim_activate (&pkb_unit, pkb_unit.wait);                /* continue poll */
 
-if (pkb_unit.u3 & PRT_INTREQ) {				/* Printer Interrupt */
-	int_req |= 2;
-	return SCPE_OK;
-}	
+if (pkb_unit.u3 & PRT_INTREQ) {                         /* Printer Interrupt */
+    int_req |= 2;
+    return SCPE_OK;
+}   
 
 /* Keyboard : handle input */
 
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
+if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp; /* no char or error? */
 
-ac = temp & 0x7f;						/* placed type ASCII char in ac */
+ac = temp & 0x7f;                                       /* placed type ASCII char in ac */
 if (pkb_unit.u3 & KBD_REQINT) {
-	if (ac == key_req) {					/* Request Key */
-		pkb_unit.u3 |= KBD_INTREQ;
-		int_req |= 2;
-		return SCPE_OK;
-	}
+    if (ac == key_req) {                                /* Request Key */
+        pkb_unit.u3 |= KBD_INTREQ;
+        int_req |= 2;
+        return SCPE_OK;
+    }
 }
 if (islower(ac))
-	ac = toupper(ac);				 
-ec = ascii_to_ebcdic[ac];				/* Translate */
-pkb_unit.buf = ec;						/* put in buf */
+    ac = toupper(ac);                
+ec = ascii_to_ebcdic[ac];                               /* Translate */
+pkb_unit.buf = ec;                                      /* put in buf */
 pkb_unit.pos = pkb_unit.pos + 1;
-if (ac == key_end) {					/* End key */
-	if (pkb_unit.u3 & KBD_KEYINT) {		
-		pkb_unit.u3 |= KBD_INTEND;
-		pkb_unit.buf = 0x0d;
-		int_req |= 2;
-	}	
-	return SCPE_OK;
+if (ac == key_end) {                                    /* End key */
+    if (pkb_unit.u3 & KBD_KEYINT) {     
+        pkb_unit.u3 |= KBD_INTEND;
+        pkb_unit.buf = 0x0d;
+        int_req |= 2;
+    }   
+    return SCPE_OK;
 }
-if (ac == key_can) {						/* Cancel key */
-	if (pkb_unit.u3 & KBD_KEYINT) {		
-		pkb_unit.u3 |= KBD_INTEND;
-		pkb_unit.buf = 0x03;
-		int_req |= 2;
-	}	
-	return SCPE_OK;
+if (ac == key_can) {                                    /* Cancel key */
+    if (pkb_unit.u3 & KBD_KEYINT) {     
+        pkb_unit.u3 |= KBD_INTEND;
+        pkb_unit.buf = 0x03;
+        int_req |= 2;
+    }   
+    return SCPE_OK;
 }
-if (ac == key_rtn) {						/* Return key */
-	if (pkb_unit.u3 & KBD_KEYINT) {		
-		pkb_unit.u3 |= KBD_INTKEY;
-		pkb_unit.buf = 0x12;
-		int_req |= 2;
-	}	
-	return SCPE_OK;
+if (ac == key_rtn) {                                    /* Return key */
+    if (pkb_unit.u3 & KBD_KEYINT) {     
+        pkb_unit.u3 |= KBD_INTKEY;
+        pkb_unit.buf = 0x12;
+        int_req |= 2;
+    }   
+    return SCPE_OK;
 }
-if (pkb_unit.u3 & KBD_KEYINT) {			/* Key interupts enabled ? */
-	int_req |= 2;						/* Device 1 Interrupt! */
-	pkb_unit.u3 |= KBD_INTKEY;			/* Set pending flag */
-}	
+if (pkb_unit.u3 & KBD_KEYINT) {                         /* Key interupts enabled ? */
+    int_req |= 2;                                       /* Device 1 Interrupt! */
+    pkb_unit.u3 |= KBD_INTKEY;                          /* Set pending flag */
+}   
 return SCPE_OK;
 }
 
@@ -300,8 +303,8 @@ return SCPE_OK;
 t_stat pkb_reset (DEVICE *dptr)
 {
 pkb_unit.buf = 0;
-int_req = int_req & ~0x02;				/* reset interrupt */	
-sim_activate (&pkb_unit, pkb_unit.wait);		/* activate unit */
+int_req = int_req & ~0x02;                              /* reset interrupt */   
+sim_activate (&pkb_unit, pkb_unit.wait);                /* activate unit */
 return SCPE_OK;
 }
 

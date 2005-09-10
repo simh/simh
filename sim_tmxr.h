@@ -1,6 +1,6 @@
 /* sim_tmxr.h: terminal multiplexor definitions
 
-   Copyright (c) 2001-2004, Robert M Supnik
+   Copyright (c) 2001-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,60 +19,60 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
-   04-Jan-04	RMS	Changed TMXR ldsc to be pointer to linedesc array
-			Added tmxr_linemsg, logging (from Mark Pizzolato)
-   29-Dec-03	RMS	Added output stall support, increased buffer size
-   22-Dec-02	RMS	Added break support (from Mark Pizzolato)
-   20-Aug-02	RMS	Added tmxr_open_master, tmxr_close_master, tmxr.port
-   30-Dec-01	RMS	Renamed tmxr_fstatus, added tmxr_fstats
-   20-Oct-01	RMS	Removed tmxr_getchar, formalized buffer guard,
-			added tmxr_rqln, tmxr_tqln
+   04-Jan-04    RMS     Changed TMXR ldsc to be pointer to linedesc array
+                        Added tmxr_linemsg, logging (from Mark Pizzolato)
+   29-Dec-03    RMS     Added output stall support, increased buffer size
+   22-Dec-02    RMS     Added break support (from Mark Pizzolato)
+   20-Aug-02    RMS     Added tmxr_open_master, tmxr_close_master, tmxr.port
+   30-Dec-01    RMS     Renamed tmxr_fstatus, added tmxr_fstats
+   20-Oct-01    RMS     Removed tmxr_getchar, formalized buffer guard,
+                        added tmxr_rqln, tmxr_tqln
 */
 
 #ifndef _SIM_TMXR_H_
-#define _SIM_TMXR_H_	0
+#define _SIM_TMXR_H_    0
 
-#define TMXR_V_VALID	15
-#define TMXR_VALID	(1 << TMXR_V_VALID)
-#define TMXR_MAXBUF	256				/* buffer size */
-#define TMXR_GUARD	12				/* buffer guard */
+#define TMXR_V_VALID    15
+#define TMXR_VALID      (1 << TMXR_V_VALID)
+#define TMXR_MAXBUF     256                             /* buffer size */
+#define TMXR_GUARD      12                              /* buffer guard */
 
 struct tmln {
-	SOCKET		conn;				/* line conn */
-	uint32		ipad;				/* IP address */
-	uint32		cnms;				/* conn time */
-	int32		tsta;				/* Telnet state */
-	int32		rcve;				/* rcv enable */
-	int32		xmte;				/* xmt enable */
-	int32		dstb;				/* disable Tlnt bin */
-	int32		rxbpr;				/* rcv buf remove */
-	int32		rxbpi;				/* rcv buf insert */
-	int32		rxcnt;				/* rcv count */
-	int32		txbpr;				/* xmt buf remove */
-	int32		txbpi;				/* xmt buf insert */
-	int32		txcnt;				/* xmt count */
-	FILE		*txlog;				/* xmt log file */
-	char		*txlogname;			/* xmt log file name */
-	char		rxb[TMXR_MAXBUF];		/* rcv buffer */
-	char		rbr[TMXR_MAXBUF];		/* rcv break */
-	char		txb[TMXR_MAXBUF];		/* xmt buffer */
-	};
+    SOCKET              conn;                           /* line conn */
+    uint32              ipad;                           /* IP address */
+    uint32              cnms;                           /* conn time */
+    int32               tsta;                           /* Telnet state */
+    int32               rcve;                           /* rcv enable */
+    int32               xmte;                           /* xmt enable */
+    int32               dstb;                           /* disable Tlnt bin */
+    int32               rxbpr;                          /* rcv buf remove */
+    int32               rxbpi;                          /* rcv buf insert */
+    int32               rxcnt;                          /* rcv count */
+    int32               txbpr;                          /* xmt buf remove */
+    int32               txbpi;                          /* xmt buf insert */
+    int32               txcnt;                          /* xmt count */
+    FILE                *txlog;                         /* xmt log file */
+    char                *txlogname;                     /* xmt log file name */
+    char                rxb[TMXR_MAXBUF];               /* rcv buffer */
+    char                rbr[TMXR_MAXBUF];               /* rcv break */
+    char                txb[TMXR_MAXBUF];               /* xmt buffer */
+    };
 
 typedef struct tmln TMLN;
 
 struct tmxr {
-	int32		lines;				/* # lines */
-	int32		port;				/* listening port */
-	SOCKET		master;				/* master socket */
-	TMLN		*ldsc;				/* line descriptors */
-	};
+    int32               lines;                          /* # lines */
+    int32               port;                           /* listening port */
+    SOCKET              master;                         /* master socket */
+    TMLN                *ldsc;                          /* line descriptors */
+    };
 
 typedef struct tmxr TMXR;
 

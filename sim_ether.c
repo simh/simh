@@ -1,6 +1,6 @@
 /* sim_ether.c: OS-dependent network routines
   ------------------------------------------------------------------------------
-   Copyright (c) 2002-2004, David T. Hittner
+   Copyright (c) 2002-2005, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -134,6 +134,7 @@
 
   Modification history:
 
+  01-Dec-04  DTH  Added Windows user-defined adapter names (from Timothe Litt)
   25-Mar-04  MP   Revised comments and minor #defines to deal with updated
                   libpcap which now provides pcap_sendpacket on all platforms.
   04-Feb-04  MP   Returned success/fail status from eth_write to support
@@ -399,6 +400,31 @@ char* eth_getname(int number, char* name)
   return name;
 }
 
+char* eth_getname_bydesc(char* desc, char* name)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int count = eth_devices(ETH_MAX_DEVICE, list);
+  int i;
+  int j=strlen(desc);
+
+  for (i=0; i<count; i++) {
+    int found = 1;
+    int k = strlen(list[i].desc);
+
+    if (j != k) continue;
+    for (k=0; k<j; k++)
+      if (tolower(list[i].desc[k]) != tolower(desc[k]))
+        found = 0;
+    if (found == 0) continue;
+
+    /* found a case-insensitive description match */
+    strcpy(name, list[i].name);
+    return name;
+  }
+  /* not found */
+  return 0;
+}
+
 void eth_zero(ETH_DEV* dev)
 {
   /* set all members to NULL OR 0 */
@@ -433,7 +459,7 @@ t_stat ethq_init(ETH_QUE* que, int max)
   if (!que->item) {
     size_t size = sizeof(struct eth_item) * max;
     que->max = max;
-    que->item = malloc(size);
+    que->item = (struct eth_item *) malloc(size);
     if (que->item) {
       /* init dynamic memory */
       memset(que->item, 0, size);
@@ -533,6 +559,11 @@ int eth_devices (int max, ETH_LIST* dev)
 #include <pcap.h>
 #include <string.h>
 
+/* Allows windows to look up user-defined adapter names */
+#if defined(_WIN32)
+#include <winreg.h>
+#endif
+
 /* Some platforms have always had pcap_sendpacket */
 #if defined(_WIN32) || defined(VMS)
 #define HAS_PCAP_SENDPACKET 1
@@ -619,6 +650,13 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
      ) {
     num = atoi(&name[3]);
     savname = eth_getname(num, temp);
+    if (savname == 0) /* didn't translate */
+      return SCPE_OPENERR;
+  } else {
+    /* are they trying to use device description? */
+    savname = eth_getname_bydesc(name, temp);
+    if (savname == 0) /* didn't translate */
+      return SCPE_OPENERR;
   }
 
   /* attempt to connect device */
@@ -1074,8 +1112,45 @@ int eth_host_devices(int used, int max, ETH_LIST* list)
         list[i+j] = list[i+j+1];
       --used;
     }
-  }
-  return used;
+  } /* for */
+
+#if defined(_WIN32)
+  /* replace device description with user-defined adapter name (if defined) */
+  for (i=0; i<used; i++) {
+		char regkey[2048];
+    char regval[2048];
+		LONG status;
+    DWORD reglen, regtype;
+    HKEY reghnd;
+
+		/* These registry keys don't seem to exist for all devices, so we simply ignore errors. */
+		if(list[i].name[strlen( "\\Device\\NPF_" )] == '{') {
+			  sprintf( regkey, "SYSTEM\\CurrentControlSet\\Control\\Network\\"
+							"{4D36E972-E325-11CE-BFC1-08002BE10318}\\%hs\\Connection", list[i].name+
+							strlen( "\\Device\\NPF_" ) );
+			  if((status = RegOpenKeyEx (HKEY_LOCAL_MACHINE, regkey, 0, KEY_QUERY_VALUE, &reghnd)) != ERROR_SUCCESS) {
+				  continue;
+			  }
+	    reglen = sizeof(regval);
+
+      /* look for user-defined adapter name, bail if not found */	
+      if((status = RegQueryValueEx (reghnd, "Name", NULL, &regtype, regval, &reglen)) != ERROR_SUCCESS) {
+			  RegCloseKey (reghnd);
+		    continue;
+	    }
+      /* make sure value is the right type, bail if not acceptable */
+	    if((regtype != REG_SZ) || (reglen > sizeof(regval))) {
+		    RegCloseKey (reghnd);
+		    continue;
+	    }
+      /* registry value seems OK, finish up and replace description */
+	    RegCloseKey (reghnd );
+      sprintf (list[i].desc, "%s", regval);
+    }
+  } /* for */
+#endif
+
+    return used;
 }
 
 int eth_devices(int max, ETH_LIST* list)

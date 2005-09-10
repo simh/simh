@@ -19,32 +19,33 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   rp		RH/RP/RM moving head disks
+   rp           RH/RP/RM moving head disks
 
-   18-Mar-05	RMS	Added attached test to detach routine
-   20-Sep-04	RMS	Fixed bugs in replicated state, RP vs RM accuracy
-   04-Jan-04	RMS	Changed sim_fsize calling sequence
-   23-Jul-03	RMS	Fixed bug in read header stub
-   25-Apr-03	RMS	Revised for extended file support
-   21-Nov-02	RMS	Fixed bug in bootstrap (reported by Michael Thompson)
-   29-Sep-02	RMS	Added variable vector support
-			New data structures
-   30-Nov-01	RMS	Added read only unit, extended SET/SHOW support support
-   24-Nov-01	RMS	Changed RPER, RPDS, FNC, FLG to arrays
-   23-Oct-01	RMS	Fixed bug in error interrupts
-			New IO page address constants
-   05-Oct-01	RMS	Rewrote interrupt handling from schematics
-   02-Oct-01	RMS	Revised CS1 write code
-   30-Sep-01	RMS	Moved CS1<5:0> into drives
-   28-Sep-01	RMS	Fixed interrupt handling for SC/ATA
-   23-Aug-01	RMS	Added read/write header stubs for ITS
-			(found by Mirian Crzig Lennox) 
-   13-Jul-01	RMS	Changed fread call to fxread (found by Peter Schorn)
-   14-May-01	RMS	Added check for unattached drive
+   07-Jul-05    RMS     Removed extraneous externs
+   18-Mar-05    RMS     Added attached test to detach routine
+   20-Sep-04    RMS     Fixed bugs in replicated state, RP vs RM accuracy
+   04-Jan-04    RMS     Changed sim_fsize calling sequence
+   23-Jul-03    RMS     Fixed bug in read header stub
+   25-Apr-03    RMS     Revised for extended file support
+   21-Nov-02    RMS     Fixed bug in bootstrap (reported by Michael Thompson)
+   29-Sep-02    RMS     Added variable vector support
+                        New data structures
+   30-Nov-01    RMS     Added read only unit, extended SET/SHOW support support
+   24-Nov-01    RMS     Changed RPER, RPDS, FNC, FLG to arrays
+   23-Oct-01    RMS     Fixed bug in error interrupts
+                        New IO page address constants
+   05-Oct-01    RMS     Rewrote interrupt handling from schematics
+   02-Oct-01    RMS     Revised CS1 write code
+   30-Sep-01    RMS     Moved CS1<5:0> into drives
+   28-Sep-01    RMS     Fixed interrupt handling for SC/ATA
+   23-Aug-01    RMS     Added read/write header stubs for ITS
+                        (found by Mirian Crzig Lennox) 
+   13-Jul-01    RMS     Changed fread call to fxread (found by Peter Schorn)
+   14-May-01    RMS     Added check for unattached drive
 
    The "Massbus style" disks consisted of several different large
    capacity drives interfaced through a reasonably common (but not
@@ -65,155 +66,155 @@
    - The DONE interrupt, once set, is not disabled if IE is cleared,
      but the SC interrupt is.
 */
-
+
 #include "pdp10_defs.h"
 #include <math.h>
 
-#define RP_NUMDR	8				/* #drives */
-#define RP_NUMWD	128				/* 36b words/sector */
-#define RP_MAXFR	32768				/* max transfer */
-#define GET_SECTOR(x,d)	((int) fmod (sim_gtime() / ((double) (x)), \
-			((double) drv_tab[d].sect)))
-#define MBA_RP_CTRL	0				/* RP drive */
-#define MBA_RM_CTRL	1				/* RM drive */
+#define RP_NUMDR        8                               /* #drives */
+#define RP_NUMWD        128                             /* 36b words/sector */
+#define RP_MAXFR        32768                           /* max transfer */
+#define GET_SECTOR(x,d) ((int) fmod (sim_gtime() / ((double) (x)), \
+                    ((double) drv_tab[d].sect)))
+#define MBA_RP_CTRL     0                               /* RP drive */
+#define MBA_RM_CTRL     1                               /* RM drive */
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK	(UNIT_V_UF + 0)			/* write locked */
-#define UNIT_V_DTYPE	(UNIT_V_UF + 1)			/* disk type */
-#define UNIT_M_DTYPE	7
-#define UNIT_V_AUTO	(UNIT_V_UF + 4)			/* autosize */
-#define UNIT_V_DUMMY	(UNIT_V_UF + 5)			/* dummy flag */
-#define UNIT_WLK	(1 << UNIT_V_WLK)
-#define UNIT_DTYPE	(UNIT_M_DTYPE << UNIT_V_DTYPE)
-#define UNIT_AUTO	(1 << UNIT_V_AUTO)
-#define UNIT_DUMMY	(1 << UNIT_V_DUMMY)
-#define GET_DTYPE(x)	(((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
-#define UNIT_WPRT	(UNIT_WLK | UNIT_RO)		/* write protect */
+#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
+#define UNIT_V_DTYPE    (UNIT_V_UF + 1)                 /* disk type */
+#define UNIT_M_DTYPE    7
+#define UNIT_V_AUTO     (UNIT_V_UF + 4)                 /* autosize */
+#define UNIT_V_DUMMY    (UNIT_V_UF + 5)                 /* dummy flag */
+#define UNIT_WLK        (1 << UNIT_V_WLK)
+#define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
+#define UNIT_AUTO       (1 << UNIT_V_AUTO)
+#define UNIT_DUMMY      (1 << UNIT_V_DUMMY)
+#define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
+#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* Parameters in the unit descriptor */
 
-#define CYL		u3				/* current cylinder */
-#define FUNC		u4				/* function */
+#define CYL             u3                              /* current cylinder */
+#define FUNC            u4                              /* function */
 
 /* RPCS1 - 176700 - control/status 1 */
 
-#define CS1_GO		CSR_GO				/* go */
-#define CS1_V_FNC	1				/* function pos */
-#define CS1_M_FNC	037				/* function mask */
-#define CS1_FNC		(CS1_M_FNC << CS1_V_FNC)
-#define  FNC_NOP	000				/* no operation */
-#define  FNC_UNLOAD	001				/* unload */
-#define  FNC_SEEK	002				/* seek */
-#define  FNC_RECAL	003				/* recalibrate */
-#define  FNC_DCLR	004				/* drive clear */
-#define  FNC_RELEASE	005				/* port release */
-#define  FNC_OFFSET	006				/* offset */
-#define  FNC_RETURN	007				/* return to center */
-#define  FNC_PRESET	010				/* read-in preset */
-#define  FNC_PACK	011				/* pack acknowledge */
-#define  FNC_SEARCH	014				/* search */
-#define FNC_XFER	024				/* >=? data xfr */
-#define  FNC_WCHK	024				/* write check */
-#define  FNC_WRITE	030				/* write */
-#define  FNC_WRITEH	031				/* write w/ headers */
-#define  FNC_READ	034				/* read */
-#define  FNC_READH	035				/* read w/ headers */
-#define CS1_IE		CSR_IE				/* int enable */
-#define CS1_DONE	CSR_DONE			/* ready */
-#define CS1_V_UAE	8				/* Unibus addr ext */
-#define CS1_M_UAE	03
-#define CS1_UAE		(CS1_M_UAE << CS1_V_UAE)
-#define CS1_DVA		0004000				/* drive avail NI */
-#define CS1_MCPE	0020000				/* Mbus par err NI */
-#define CS1_TRE		0040000				/* transfer err */
-#define CS1_SC		0100000				/* special cond */
-#define CS1_MBZ		0012000
-#define CS1_DRV		(CS1_FNC | CS1_GO)
-#define GET_FNC(x)	(((x) >> CS1_V_FNC) & CS1_M_FNC)
-#define GET_UAE(x)	(((x) & CS1_UAE) << (16 - CS1_V_UAE))
+#define CS1_GO          CSR_GO                          /* go */
+#define CS1_V_FNC       1                               /* function pos */
+#define CS1_M_FNC       037                             /* function mask */
+#define CS1_FNC         (CS1_M_FNC << CS1_V_FNC)
+#define  FNC_NOP        000                             /* no operation */
+#define  FNC_UNLOAD     001                             /* unload */
+#define  FNC_SEEK       002                             /* seek */
+#define  FNC_RECAL      003                             /* recalibrate */
+#define  FNC_DCLR       004                             /* drive clear */
+#define  FNC_RELEASE    005                             /* port release */
+#define  FNC_OFFSET     006                             /* offset */
+#define  FNC_RETURN     007                             /* return to center */
+#define  FNC_PRESET     010                             /* read-in preset */
+#define  FNC_PACK       011                             /* pack acknowledge */
+#define  FNC_SEARCH     014                             /* search */
+#define FNC_XFER        024                             /* >=? data xfr */
+#define  FNC_WCHK       024                             /* write check */
+#define  FNC_WRITE      030                             /* write */
+#define  FNC_WRITEH     031                             /* write w/ headers */
+#define  FNC_READ       034                             /* read */
+#define  FNC_READH      035                             /* read w/ headers */
+#define CS1_IE          CSR_IE                          /* int enable */
+#define CS1_DONE        CSR_DONE                        /* ready */
+#define CS1_V_UAE       8                               /* Unibus addr ext */
+#define CS1_M_UAE       03
+#define CS1_UAE         (CS1_M_UAE << CS1_V_UAE)
+#define CS1_DVA         0004000                         /* drive avail NI */
+#define CS1_MCPE        0020000                         /* Mbus par err NI */
+#define CS1_TRE         0040000                         /* transfer err */
+#define CS1_SC          0100000                         /* special cond */
+#define CS1_MBZ         0012000
+#define CS1_DRV         (CS1_FNC | CS1_GO)
+#define GET_FNC(x)      (((x) >> CS1_V_FNC) & CS1_M_FNC)
+#define GET_UAE(x)      (((x) & CS1_UAE) << (16 - CS1_V_UAE))
 
 /* RPWC - 176702 - word count */
 
 /* RPBA - 176704 - base address */
 
-#define BA_MBZ		0000001				/* must be zero */
+#define BA_MBZ          0000001                         /* must be zero */
 
 /* RPDA - 176706 - sector/track */
 
-#define DA_V_SC		0				/* sector pos */
-#define DA_M_SC		077				/* sector mask */
-#define DA_V_SF		8				/* track pos */
-#define DA_M_SF		077				/* track mask */
-#define DA_MBZ		0140300
-#define GET_SC(x)	(((x) >> DA_V_SC) & DA_M_SC)
-#define GET_SF(x)	(((x) >> DA_V_SF) & DA_M_SF)
+#define DA_V_SC         0                               /* sector pos */
+#define DA_M_SC         077                             /* sector mask */
+#define DA_V_SF         8                               /* track pos */
+#define DA_M_SF         077                             /* track mask */
+#define DA_MBZ          0140300
+#define GET_SC(x)       (((x) >> DA_V_SC) & DA_M_SC)
+#define GET_SF(x)       (((x) >> DA_V_SF) & DA_M_SF)
 
 /* RPCS2 - 176710 - control/status 2 */
 
-#define CS2_V_UNIT	0				/* unit pos */
-#define CS2_M_UNIT	07				/* unit mask */
-#define CS2_UNIT	(CS2_M_UNIT << CS2_V_UNIT)
-#define CS2_UAI		0000010				/* addr inhibit */
-#define CS2_PAT		0000020				/* parity test NI */
-#define CS2_CLR		0000040				/* controller clear */
-#define CS2_IR		0000100				/* input ready */
-#define CS2_OR		0000200				/* output ready */
-#define CS2_MDPE	0000400				/* Mbus par err NI */
-#define CS2_MXF		0001000				/* missed xfer NI */
-#define CS2_PGE		0002000				/* program err */
-#define CS2_NEM		0004000				/* nx mem err */
-#define CS2_NED		0010000				/* nx drive err */
-#define CS2_PE		0020000				/* parity err NI */
-#define CS2_WCE		0040000				/* write check err */
-#define CS2_DLT		0100000				/* data late NI */
-#define CS2_MBZ		(CS2_CLR)
-#define CS2_RW		(CS2_UNIT | CS2_UAI | CS2_PAT | CS2_MXF | CS2_PE)
-#define CS2_ERR		(CS2_MDPE | CS2_MXF | CS2_PGE | CS2_NEM | \
-			 CS2_NED | CS2_PE | CS2_WCE | CS2_DLT )
-#define GET_UNIT(x)	(((x) >> CS2_V_UNIT) & CS2_M_UNIT)
+#define CS2_V_UNIT      0                               /* unit pos */
+#define CS2_M_UNIT      07                              /* unit mask */
+#define CS2_UNIT        (CS2_M_UNIT << CS2_V_UNIT)
+#define CS2_UAI         0000010                         /* addr inhibit */
+#define CS2_PAT         0000020                         /* parity test NI */
+#define CS2_CLR         0000040                         /* controller clear */
+#define CS2_IR          0000100                         /* input ready */
+#define CS2_OR          0000200                         /* output ready */
+#define CS2_MDPE        0000400                         /* Mbus par err NI */
+#define CS2_MXF         0001000                         /* missed xfer NI */
+#define CS2_PGE         0002000                         /* program err */
+#define CS2_NEM         0004000                         /* nx mem err */
+#define CS2_NED         0010000                         /* nx drive err */
+#define CS2_PE          0020000                         /* parity err NI */
+#define CS2_WCE         0040000                         /* write check err */
+#define CS2_DLT         0100000                         /* data late NI */
+#define CS2_MBZ         (CS2_CLR)
+#define CS2_RW          (CS2_UNIT | CS2_UAI | CS2_PAT | CS2_MXF | CS2_PE)
+#define CS2_ERR         (CS2_MDPE | CS2_MXF | CS2_PGE | CS2_NEM | \
+                         CS2_NED | CS2_PE | CS2_WCE | CS2_DLT )
+#define GET_UNIT(x)     (((x) >> CS2_V_UNIT) & CS2_M_UNIT)
 
 /* RPDS - 176712 - drive status */
 
-#define DS_OF		0000001				/* offset mode */
-#define DS_VV		0000100				/* volume valid */
-#define DS_RDY		0000200				/* drive ready */
-#define DS_DPR		0000400				/* drive present */
-#define DS_PGM		0001000				/* programable NI */
-#define DS_LST		0002000				/* last sector */
-#define DS_WRL		0004000				/* write locked */
-#define DS_MOL		0010000				/* medium online */
-#define DS_PIP		0020000				/* pos in progress */
-#define DS_ERR		0040000				/* error */
-#define DS_ATA		0100000				/* attention active */
-#define DS_MBZ		0000076
+#define DS_OF           0000001                         /* offset mode */
+#define DS_VV           0000100                         /* volume valid */
+#define DS_RDY          0000200                         /* drive ready */
+#define DS_DPR          0000400                         /* drive present */
+#define DS_PGM          0001000                         /* programable NI */
+#define DS_LST          0002000                         /* last sector */
+#define DS_WRL          0004000                         /* write locked */
+#define DS_MOL          0010000                         /* medium online */
+#define DS_PIP          0020000                         /* pos in progress */
+#define DS_ERR          0040000                         /* error */
+#define DS_ATA          0100000                         /* attention active */
+#define DS_MBZ          0000076
 
 /* RPER1 - 176714 - error status 1 */
 
-#define ER1_ILF		0000001				/* illegal func */
-#define ER1_ILR		0000002				/* illegal register */
-#define ER1_RMR		0000004				/* reg mod refused */
-#define ER1_PAR		0000010				/* parity err */
-#define ER1_FER		0000020				/* format err NI */
-#define ER1_WCF		0000040				/* write clk fail NI */
-#define ER1_ECH		0000100				/* ECC hard err NI */
-#define ER1_HCE		0000200				/* hdr comp err NI */
-#define ER1_HCR		0000400				/* hdr CRC err NI */
-#define ER1_AOE		0001000				/* addr ovflo err */
-#define ER1_IAE		0002000				/* invalid addr err */
-#define ER1_WLE		0004000				/* write lock err */
-#define ER1_DTE		0010000				/* drive time err NI */
-#define ER1_OPI		0020000				/* op incomplete */
-#define ER1_UNS		0040000				/* drive unsafe */
-#define ER1_DCK		0100000				/* data check NI */
+#define ER1_ILF         0000001                         /* illegal func */
+#define ER1_ILR         0000002                         /* illegal register */
+#define ER1_RMR         0000004                         /* reg mod refused */
+#define ER1_PAR         0000010                         /* parity err */
+#define ER1_FER         0000020                         /* format err NI */
+#define ER1_WCF         0000040                         /* write clk fail NI */
+#define ER1_ECH         0000100                         /* ECC hard err NI */
+#define ER1_HCE         0000200                         /* hdr comp err NI */
+#define ER1_HCR         0000400                         /* hdr CRC err NI */
+#define ER1_AOE         0001000                         /* addr ovflo err */
+#define ER1_IAE         0002000                         /* invalid addr err */
+#define ER1_WLE         0004000                         /* write lock err */
+#define ER1_DTE         0010000                         /* drive time err NI */
+#define ER1_OPI         0020000                         /* op incomplete */
+#define ER1_UNS         0040000                         /* drive unsafe */
+#define ER1_DCK         0100000                         /* data check NI */
 
 /* RPAS - 176716 - attention summary */
 
-#define AS_U0		0000001				/* unit 0 flag */
+#define AS_U0           0000001                         /* unit 0 flag */
 
 /* RPLA - 176720 - look ahead register */
 
-#define LA_V_SC		6				/* sector pos */
+#define LA_V_SC         6                               /* sector pos */
 
 /* RPDB - 176722 - data buffer */
 /* RPMR - 176724 - maintenace register */
@@ -222,39 +223,39 @@
 
 /* RPOF - 176732 - offset register */
 
-#define OF_HCI		0002000				/* hdr cmp inh NI */
-#define OF_ECI		0004000				/* ECC inhibit NI */
-#define OF_F22		0010000				/* format NI */
-#define OF_MBZ		0161400
+#define OF_HCI          0002000                         /* hdr cmp inh NI */
+#define OF_ECI          0004000                         /* ECC inhibit NI */
+#define OF_F22          0010000                         /* format NI */
+#define OF_MBZ          0161400
 
 /* RPDC - 176734 - desired cylinder */
 
-#define DC_V_CY		0				/* cylinder pos */
-#define DC_M_CY		01777				/* cylinder mask */
-#define DC_MBZ		0176000
-#define GET_CY(x)	(((x) >> DC_V_CY) & DC_M_CY)
-#define GET_DA(c,fs,d)	((((GET_CY (c) * drv_tab[d].surf) + \
-			    GET_SF (fs)) * drv_tab[d].sect) + GET_SC (fs))
+#define DC_V_CY         0                               /* cylinder pos */
+#define DC_M_CY         01777                           /* cylinder mask */
+#define DC_MBZ          0176000
+#define GET_CY(x)       (((x) >> DC_V_CY) & DC_M_CY)
+#define GET_DA(c,fs,d)  ((((GET_CY (c) * drv_tab[d].surf) + \
+                        GET_SF (fs)) * drv_tab[d].sect) + GET_SC (fs))
 
 /* RPCC - 176736 - current cylinder */
 /* RPER2 - 176740 - error status 2 - drive unsafe conditions - unimplemented */
 /* RPER3 - 176742 - error status 3 - more unsafe conditions - unimplemented */
 /* RPEC1 - 176744 - ECC status 1 - unimplemented */
 /* RPEC2 - 176746 - ECC status 2 - unimplemented */
-
+
 /* This controller supports many different disk drive types.  These drives
    are operated in 576 bytes/sector (128 36b words/sector) mode, which gives
    them somewhat different geometry from the PDP-11 variants:
 
-   type		#sectors/	#surfaces/	#cylinders/
-		 surface	 cylinder	 drive
+   type         #sectors/       #surfaces/      #cylinders/
+                 surface         cylinder        drive
 
-   RM02/3   	30		5		823		=67MB
-   RP04/5   	20		19		411		=88MB
-   RM80   	30		14		559		=124MB
-   RP06   	20		19		815		=176MB
-   RM05   	30		19		823		=256MB
-   RP07		43		32		630		=516MB
+   RM02/3       30              5               823             =67MB
+   RP04/5       20              19              411             =88MB
+   RM80         30              14              559             =124MB
+   RP06         20              19              815             =176MB
+   RM05         30              19              823             =256MB
+   RP07         43              32              630             =516MB
 
    In theory, each drive can be a different type.  The size field in
    each unit selects the drive capacity for each drive and thus the
@@ -263,98 +264,98 @@
    The RP07, despite its name, uses an RM-style controller.
 */
 
-#define RM03_DTYPE	0
-#define RM03_SECT	30
-#define RM03_SURF	5
-#define RM03_CYL	823
-#define RM03_DEV	020024
-#define RM03_SIZE	(RM03_SECT * RM03_SURF * RM03_CYL * RP_NUMWD)
+#define RM03_DTYPE      0
+#define RM03_SECT       30
+#define RM03_SURF       5
+#define RM03_CYL        823
+#define RM03_DEV        020024
+#define RM03_SIZE       (RM03_SECT * RM03_SURF * RM03_CYL * RP_NUMWD)
 
-#define RP04_DTYPE	1
-#define RP04_SECT	20
-#define RP04_SURF	19
-#define RP04_CYL	411
-#define RP04_DEV	020020
-#define RP04_SIZE	(RP04_SECT * RP04_SURF * RP04_CYL * RP_NUMWD)
+#define RP04_DTYPE      1
+#define RP04_SECT       20
+#define RP04_SURF       19
+#define RP04_CYL        411
+#define RP04_DEV        020020
+#define RP04_SIZE       (RP04_SECT * RP04_SURF * RP04_CYL * RP_NUMWD)
 
-#define RM80_DTYPE	2
-#define RM80_SECT	30
-#define RM80_SURF	14
-#define RM80_CYL	559
-#define RM80_DEV	020026
-#define RM80_SIZE	(RM80_SECT * RM80_SURF * RM80_CYL * RP_NUMWD)
+#define RM80_DTYPE      2
+#define RM80_SECT       30
+#define RM80_SURF       14
+#define RM80_CYL        559
+#define RM80_DEV        020026
+#define RM80_SIZE       (RM80_SECT * RM80_SURF * RM80_CYL * RP_NUMWD)
 
-#define RP06_DTYPE	3
-#define RP06_SECT	20
-#define RP06_SURF	19
-#define RP06_CYL	815
-#define RP06_DEV	020022
-#define RP06_SIZE	(RP06_SECT * RP06_SURF * RP06_CYL * RP_NUMWD)
+#define RP06_DTYPE      3
+#define RP06_SECT       20
+#define RP06_SURF       19
+#define RP06_CYL        815
+#define RP06_DEV        020022
+#define RP06_SIZE       (RP06_SECT * RP06_SURF * RP06_CYL * RP_NUMWD)
 
-#define RM05_DTYPE	4
-#define RM05_SECT	30
-#define RM05_SURF	19
-#define RM05_CYL	823
-#define RM05_DEV	020027
-#define RM05_SIZE	(RM05_SECT * RM05_SURF * RM05_CYL * RP_NUMWD)
+#define RM05_DTYPE      4
+#define RM05_SECT       30
+#define RM05_SURF       19
+#define RM05_CYL        823
+#define RM05_DEV        020027
+#define RM05_SIZE       (RM05_SECT * RM05_SURF * RM05_CYL * RP_NUMWD)
 
-#define RP07_DTYPE	5
-#define RP07_SECT	43
-#define RP07_SURF	32
-#define RP07_CYL	630
-#define RP07_DEV	020042
-#define RP07_SIZE	(RP07_SECT * RP07_SURF * RP07_CYL * RP_NUMWD)
+#define RP07_DTYPE      5
+#define RP07_SECT       43
+#define RP07_SURF       32
+#define RP07_CYL        630
+#define RP07_DEV        020042
+#define RP07_SIZE       (RP07_SECT * RP07_SURF * RP07_CYL * RP_NUMWD)
 
 struct drvtyp {
-	int32	sect;					/* sectors */
-	int32	surf;					/* surfaces */
-	int32	cyl;					/* cylinders */
-	int32	size;					/* #blocks */
-	int32	devtype;				/* device type */
-	int32	ctrl;					/* ctrl type */
-};
+    int32       sect;                                   /* sectors */
+    int32       surf;                                   /* surfaces */
+    int32       cyl;                                    /* cylinders */
+    int32       size;                                   /* #blocks */
+    int32       devtype;                                /* device type */
+    int32       ctrl;                                   /* ctrl type */
+    };
 
 struct drvtyp drv_tab[] = {
-	{ RM03_SECT, RM03_SURF, RM03_CYL, RM03_SIZE, RM03_DEV, MBA_RM_CTRL },
-	{ RP04_SECT, RP04_SURF, RP04_CYL, RP04_SIZE, RP04_DEV, MBA_RP_CTRL },
-	{ RM80_SECT, RM80_SURF, RM80_CYL, RM80_SIZE, RM80_DEV, MBA_RM_CTRL },
-	{ RP06_SECT, RP06_SURF, RP06_CYL, RP06_SIZE, RP06_DEV, MBA_RP_CTRL },
-	{ RM05_SECT, RM05_SURF, RM05_CYL, RM05_SIZE, RM05_DEV, MBA_RM_CTRL },
-	{ RP07_SECT, RP07_SURF, RP07_CYL, RP07_SIZE, RP07_DEV, MBA_RM_CTRL },
-	{ 0 }  };
-
-extern d10 *M;						/* memory */
+    { RM03_SECT, RM03_SURF, RM03_CYL, RM03_SIZE, RM03_DEV, MBA_RM_CTRL },
+    { RP04_SECT, RP04_SURF, RP04_CYL, RP04_SIZE, RP04_DEV, MBA_RP_CTRL },
+    { RM80_SECT, RM80_SURF, RM80_CYL, RM80_SIZE, RM80_DEV, MBA_RM_CTRL },
+    { RP06_SECT, RP06_SURF, RP06_CYL, RP06_SIZE, RP06_DEV, MBA_RP_CTRL },
+    { RM05_SECT, RM05_SURF, RM05_CYL, RM05_SIZE, RM05_DEV, MBA_RM_CTRL },
+    { RP07_SECT, RP07_SURF, RP07_CYL, RP07_SIZE, RP07_DEV, MBA_RM_CTRL },
+    { 0 }
+    };
+
+extern d10 *M;                                          /* memory */
 extern int32 int_req;
-extern int32 int_vec[32];
-extern int32 ubmap[UBANUM][UMAP_MEMSIZE];		/* Unibus maps */
+extern int32 ubmap[UBANUM][UMAP_MEMSIZE];               /* Unibus maps */
 extern int32 ubcs[UBANUM];
 extern UNIT cpu_unit;
 
-int32 rpcs1 = 0;					/* control/status 1 */
-int32 rpwc = 0;						/* word count */
-int32 rpba = 0;						/* bus address */
-int32 rpcs2 = 0;					/* control/status 2 */
-int32 rpdb = 0;						/* data buffer */
-uint16 rpda[RP_NUMDR] = { 0 };				/* track/sector */
-uint16 rpds[RP_NUMDR] = { 0 };				/* drive status */
-uint16 rper1[RP_NUMDR] = { 0 };				/* error status 1 */
-uint16 rmhr[RP_NUMDR] = { 0 };				/* holding reg */
-uint16 rpmr[RP_NUMDR] = { 0 };				/* maint reg */
-uint16 rmmr2[RP_NUMDR] = { 0 };				/* maint reg 2 */
-uint16 rpof[RP_NUMDR] = { 0 };				/* offset */
-uint16 rpdc[RP_NUMDR] = { 0 };				/* cylinder */
-uint16 rper2[RP_NUMDR] = { 0 };				/* error status 2 */
-uint16 rper3[RP_NUMDR] = { 0 };				/* error status 3 */
-uint16 rpec1[RP_NUMDR] = { 0 };				/* ECC correction 1 */
-uint16 rpec2[RP_NUMDR] = { 0 };				/* ECC correction 2 */
-int32 rpiff = 0;					/* INTR flip/flop */
-int32 rp_stopioe = 1;					/* stop on error */
-int32 rp_swait = 10;					/* seek time */
-int32 rp_rwait = 10;					/* rotate time */
+int32 rpcs1 = 0;                                        /* control/status 1 */
+int32 rpwc = 0;                                         /* word count */
+int32 rpba = 0;                                         /* bus address */
+int32 rpcs2 = 0;                                        /* control/status 2 */
+int32 rpdb = 0;                                         /* data buffer */
+uint16 rpda[RP_NUMDR] = { 0 };                          /* track/sector */
+uint16 rpds[RP_NUMDR] = { 0 };                          /* drive status */
+uint16 rper1[RP_NUMDR] = { 0 };                         /* error status 1 */
+uint16 rmhr[RP_NUMDR] = { 0 };                          /* holding reg */
+uint16 rpmr[RP_NUMDR] = { 0 };                          /* maint reg */
+uint16 rmmr2[RP_NUMDR] = { 0 };                         /* maint reg 2 */
+uint16 rpof[RP_NUMDR] = { 0 };                          /* offset */
+uint16 rpdc[RP_NUMDR] = { 0 };                          /* cylinder */
+uint16 rper2[RP_NUMDR] = { 0 };                         /* error status 2 */
+uint16 rper3[RP_NUMDR] = { 0 };                         /* error status 3 */
+uint16 rpec1[RP_NUMDR] = { 0 };                         /* ECC correction 1 */
+uint16 rpec2[RP_NUMDR] = { 0 };                         /* ECC correction 2 */
+int32 rpiff = 0;                                        /* INTR flip/flop */
+int32 rp_stopioe = 1;                                   /* stop on error */
+int32 rp_swait = 10;                                    /* seek time */
+int32 rp_rwait = 10;                                    /* rotate time */
 static int32 reg_in_drive[32] = {
- 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1,
- 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-static char *rp_mapnam[MBA_RM_CTRL + 1] = { "RP", "RM" };
+    0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    };
 
 t_stat rp_rd (int32 *data, int32 PA, int32 access);
 t_stat rp_wr (int32 data, int32 PA, int32 access);
@@ -368,325 +369,377 @@ void set_rper (int32 flag, int32 drv);
 void update_rpcs (int32 flags, int32 drv);
 void rp_go (int32 drv, int32 fnc);
 t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-
+
 /* RP data structures
 
-   rp_dev	RP device descriptor
-   rp_unit	RP unit list
-   rp_reg	RP register list
-   rp_mod	RP modifier list
+   rp_dev       RP device descriptor
+   rp_unit      RP unit list
+   rp_reg       RP register list
+   rp_mod       RP modifier list
 */
 
-DIB rp_dib = { IOBA_RP, IOLN_RP, &rp_rd, &rp_wr,
-		1, IVCL (RP), VEC_RP, { &rp_inta } };
+DIB rp_dib = {
+    IOBA_RP, IOLN_RP, &rp_rd, &rp_wr,
+    1, IVCL (RP), VEC_RP, { &rp_inta }
+    };
 
 UNIT rp_unit[] = {
-	{ UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-	{ UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-	{ UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-	{ UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-	{ UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-	{ UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-	{ UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-	{ UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-		UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) }  };
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) }
+    };
 
 REG rp_reg[] = {
-	{ ORDATA (RPCS1, rpcs1, 16) },
-	{ ORDATA (RPWC, rpwc, 16) },
-	{ ORDATA (RPBA, rpba, 16) },
-	{ ORDATA (RPCS2, rpcs2, 16) },
-	{ ORDATA (RPDB, rpdb, 16) },
-	{ BRDATA (RPDA, rpda, 8, 16, RP_NUMDR) },
-	{ BRDATA (RPDS, rpds, 8, 16, RP_NUMDR) },
-	{ BRDATA (RPER1, rper1, 8, 16, RP_NUMDR) },
-	{ BRDATA (RPHR, rmhr, 8, 16, RP_NUMDR) },
-	{ BRDATA (RPOF, rpof, 8, 16, RP_NUMDR) },
-	{ BRDATA (RPDC, rpdc, 8, 16, RP_NUMDR) },
-	{ BRDATA (RPER2, rper2, 8, 16, RP_NUMDR) },
-	{ BRDATA (RPER3, rper3, 8, 16, RP_NUMDR) },
-	{ BRDATA (RPEC1, rpec1, 8, 16, RP_NUMDR) },
-	{ BRDATA (RPEC2, rpec2, 8, 16, RP_NUMDR) },
-	{ BRDATA (RMMR, rpmr, 8, 16, RP_NUMDR) },
-	{ BRDATA (RMMR2, rmmr2, 8, 16, RP_NUMDR) },
-	{ FLDATA (IFF, rpiff, 0) },
-	{ FLDATA (INT, int_req, INT_V_RP) },
-	{ FLDATA (SC, rpcs1, CSR_V_ERR) },
-	{ FLDATA (DONE, rpcs1, CSR_V_DONE) },
-	{ FLDATA (IE, rpcs1, CSR_V_IE) },
-	{ DRDATA (STIME, rp_swait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (RTIME, rp_rwait, 24), REG_NZ + PV_LEFT },
-	{ URDATA (FNC, rp_unit[0].FUNC, 8, 5, 0, RP_NUMDR, REG_HRO) },
-	{ URDATA (CAPAC, rp_unit[0].capac, 10, T_ADDR_W, 0,
-		  RP_NUMDR, PV_LEFT | REG_HRO) },
-	{ FLDATA (STOP_IOE, rp_stopioe, 0) },
-	{ NULL }  };
+    { ORDATA (RPCS1, rpcs1, 16) },
+    { ORDATA (RPWC, rpwc, 16) },
+    { ORDATA (RPBA, rpba, 16) },
+    { ORDATA (RPCS2, rpcs2, 16) },
+    { ORDATA (RPDB, rpdb, 16) },
+    { BRDATA (RPDA, rpda, 8, 16, RP_NUMDR) },
+    { BRDATA (RPDS, rpds, 8, 16, RP_NUMDR) },
+    { BRDATA (RPER1, rper1, 8, 16, RP_NUMDR) },
+    { BRDATA (RPHR, rmhr, 8, 16, RP_NUMDR) },
+    { BRDATA (RPOF, rpof, 8, 16, RP_NUMDR) },
+    { BRDATA (RPDC, rpdc, 8, 16, RP_NUMDR) },
+    { BRDATA (RPER2, rper2, 8, 16, RP_NUMDR) },
+    { BRDATA (RPER3, rper3, 8, 16, RP_NUMDR) },
+    { BRDATA (RPEC1, rpec1, 8, 16, RP_NUMDR) },
+    { BRDATA (RPEC2, rpec2, 8, 16, RP_NUMDR) },
+    { BRDATA (RMMR, rpmr, 8, 16, RP_NUMDR) },
+    { BRDATA (RMMR2, rmmr2, 8, 16, RP_NUMDR) },
+    { FLDATA (IFF, rpiff, 0) },
+    { FLDATA (INT, int_req, INT_V_RP) },
+    { FLDATA (SC, rpcs1, CSR_V_ERR) },
+    { FLDATA (DONE, rpcs1, CSR_V_DONE) },
+    { FLDATA (IE, rpcs1, CSR_V_IE) },
+    { DRDATA (STIME, rp_swait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (RTIME, rp_rwait, 24), REG_NZ + PV_LEFT },
+    { URDATA (FNC, rp_unit[0].FUNC, 8, 5, 0, RP_NUMDR, REG_HRO) },
+    { URDATA (CAPAC, rp_unit[0].capac, 10, T_ADDR_W, 0,
+              RP_NUMDR, PV_LEFT | REG_HRO) },
+    { FLDATA (STOP_IOE, rp_stopioe, 0) },
+    { NULL }
+    };
 
 MTAB rp_mod[] = {
-	{ UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-	{ UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
-	{ (UNIT_DTYPE+UNIT_ATT), (RM03_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-		"RM03", NULL, NULL },
-	{ (UNIT_DTYPE+UNIT_ATT), (RP04_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-		"RP04", NULL, NULL },
-	{ (UNIT_DTYPE+UNIT_ATT), (RM80_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-		"RM80", NULL, NULL },
-	{ (UNIT_DTYPE+UNIT_ATT), (RP06_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-		"RP06", NULL, NULL },
-	{ (UNIT_DTYPE+UNIT_ATT), (RM05_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-		"RM05", NULL, NULL },
-	{ (UNIT_DTYPE+UNIT_ATT), (RP07_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-		"RP07", NULL, NULL },
-	{ (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RM03_DTYPE << UNIT_V_DTYPE),
-		"RM03", NULL, NULL },
-	{ (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RP04_DTYPE << UNIT_V_DTYPE),
-		"RP04", NULL, NULL },
-	{ (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RM80_DTYPE << UNIT_V_DTYPE),
-		"RM80", NULL, NULL },
-	{ (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RP06_DTYPE << UNIT_V_DTYPE),
-		"RP06", NULL, NULL },
-	{ (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RM05_DTYPE << UNIT_V_DTYPE),
-		"RM05", NULL, NULL },
-	{ (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RP07_DTYPE << UNIT_V_DTYPE),
-		"RP07", NULL, NULL },
-	{ (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL, NULL },
-	{ UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", NULL },
- 	{ (UNIT_AUTO+UNIT_DTYPE), (RM03_DTYPE << UNIT_V_DTYPE),
-		NULL, "RM03", &rp_set_size },
-	{ (UNIT_AUTO+UNIT_DTYPE), (RP04_DTYPE << UNIT_V_DTYPE),
-		NULL, "RP04", &rp_set_size }, 
- 	{ (UNIT_AUTO+UNIT_DTYPE), (RM80_DTYPE << UNIT_V_DTYPE),
-		NULL, "RM80", &rp_set_size },
- 	{ (UNIT_AUTO+UNIT_DTYPE), (RP06_DTYPE << UNIT_V_DTYPE),
-		NULL, "RP06", &rp_set_size },
- 	{ (UNIT_AUTO+UNIT_DTYPE), (RM05_DTYPE << UNIT_V_DTYPE),
-		NULL, "RM05", &rp_set_size },
- 	{ (UNIT_AUTO+UNIT_DTYPE), (RP07_DTYPE << UNIT_V_DTYPE),
-		NULL, "RP07", &rp_set_size },
-	{ MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-		NULL, &show_addr, NULL },
-	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-		NULL, &show_vec, NULL },
-	{ 0 }  };
+    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
+    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { (UNIT_DTYPE+UNIT_ATT), (RM03_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
+      "RM03", NULL, NULL },
+    { (UNIT_DTYPE+UNIT_ATT), (RP04_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
+      "RP04", NULL, NULL },
+    { (UNIT_DTYPE+UNIT_ATT), (RM80_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
+      "RM80", NULL, NULL },
+    { (UNIT_DTYPE+UNIT_ATT), (RP06_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
+      "RP06", NULL, NULL },
+    { (UNIT_DTYPE+UNIT_ATT), (RM05_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
+      "RM05", NULL, NULL },
+    { (UNIT_DTYPE+UNIT_ATT), (RP07_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
+      "RP07", NULL, NULL },
+    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RM03_DTYPE << UNIT_V_DTYPE),
+      "RM03", NULL, NULL },
+    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RP04_DTYPE << UNIT_V_DTYPE),
+      "RP04", NULL, NULL },
+    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RM80_DTYPE << UNIT_V_DTYPE),
+      "RM80", NULL, NULL },
+    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RP06_DTYPE << UNIT_V_DTYPE),
+      "RP06", NULL, NULL },
+    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RM05_DTYPE << UNIT_V_DTYPE),
+      "RM05", NULL, NULL },
+    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RP07_DTYPE << UNIT_V_DTYPE),
+      "RP07", NULL, NULL },
+    { (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL, NULL },
+    { UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", NULL },
+    { (UNIT_AUTO+UNIT_DTYPE), (RM03_DTYPE << UNIT_V_DTYPE),
+      NULL, "RM03", &rp_set_size },
+    { (UNIT_AUTO+UNIT_DTYPE), (RP04_DTYPE << UNIT_V_DTYPE),
+      NULL, "RP04", &rp_set_size }, 
+    { (UNIT_AUTO+UNIT_DTYPE), (RM80_DTYPE << UNIT_V_DTYPE),
+      NULL, "RM80", &rp_set_size },
+    { (UNIT_AUTO+UNIT_DTYPE), (RP06_DTYPE << UNIT_V_DTYPE),
+      NULL, "RP06", &rp_set_size },
+    { (UNIT_AUTO+UNIT_DTYPE), (RM05_DTYPE << UNIT_V_DTYPE),
+      NULL, "RM05", &rp_set_size },
+    { (UNIT_AUTO+UNIT_DTYPE), (RP07_DTYPE << UNIT_V_DTYPE),
+      NULL, "RP07", &rp_set_size },
+    { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
+      NULL, &show_addr, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
+      NULL, &show_vec, NULL },
+    { 0 }
+    };
 
 DEVICE rp_dev = {
-	"RP", rp_unit, rp_reg, rp_mod,
-	RP_NUMDR, 8, 30, 1, 8, 36,
-	NULL, NULL, &rp_reset,
-	&rp_boot, &rp_attach, &rp_detach,
-	&rp_dib, DEV_UBUS };
-
+    "RP", rp_unit, rp_reg, rp_mod,
+    RP_NUMDR, 8, 30, 1, 8, 36,
+    NULL, NULL, &rp_reset,
+    &rp_boot, &rp_attach, &rp_detach,
+    &rp_dib, DEV_UBUS
+    };
+
 /* I/O dispatch routines, I/O addresses 17776700 - 17776776 */
 
 t_stat rp_rd (int32 *data, int32 PA, int32 access)
 {
 int32 drv, dtype, i, j;
 
-drv = GET_UNIT (rpcs2);					/* get current unit */
-dtype = GET_DTYPE (rp_unit[drv].flags);			/* get drive type */
-j = (PA >> 1) & 037;					/* get reg offset */
-if (reg_in_drive[j] && (rp_unit[drv].flags & UNIT_DIS)) {	/* nx disk */
-	rpcs2 = rpcs2 | CS2_NED;			/* set error flag */
-	update_rpcs (CS1_SC, drv);			/* request intr */
-	*data = 0;
-	return SCPE_OK;  }
+drv = GET_UNIT (rpcs2);                                 /* get current unit */
+dtype = GET_DTYPE (rp_unit[drv].flags);                 /* get drive type */
+j = (PA >> 1) & 037;                                    /* get reg offset */
+if (reg_in_drive[j] && (rp_unit[drv].flags & UNIT_DIS)) { /* nx disk */
+    rpcs2 = rpcs2 | CS2_NED;                            /* set error flag */
+    update_rpcs (CS1_SC, drv);                          /* request intr */
+    *data = 0;
+    return SCPE_OK;
+    }
 
-update_rpcs (0, drv);					/* update status */
-switch (j) {						/* decode PA<5:1> */
-case 000:						/* RPCS1 */
-	*data = rpcs1;
-	break;
-case 001:						/* RPWC */
-	*data = rpwc;
-	break;
-case 002:						/* RPBA */
-	*data = rpba = rpba & ~BA_MBZ;
-	break;
-case 003:						/* RPDA */
-	*data = rpda[drv] = rpda[drv] & ~DA_MBZ;
-	break;
-case 004:						/* RPCS2 */
-	*data = rpcs2 = (rpcs2 & ~CS2_MBZ) | CS2_IR | CS2_OR;
-	break;
-case 005:						/* RPDS */
-	*data = rpds[drv];
-	break;
-case 006:						/* RPER1 */
-	*data = rper1[drv];
-	break;
-case 007:						/* RPAS */
-	*data = 0;
-	for (i = 0; i < RP_NUMDR; i++)
-	    if (rpds[i] & DS_ATA) *data = *data | (AS_U0 << i);
-	break;
-case 010:						/* RPLA */
-	*data = GET_SECTOR (rp_rwait, dtype) << LA_V_SC;
-	break;
-case 011:						/* RPDB */
-	*data = rpdb;
-	break;
-case 012:						/* RPMR */
-	*data = rpmr[drv];
-	break;
-case 013:						/* RPDT */
-	*data = drv_tab[dtype].devtype;
-	break;
-case 014:						/* RPSN */
-	*data = 020 | (drv + 1);
-	break;
-case 015:						/* RPOF */
-	*data = rpof[drv] = rpof[drv] & ~OF_MBZ;
-	break;
-case 016:						/* RPDC */
-	*data = rpdc[drv] = rpdc[drv] & ~DC_MBZ;
-	break;
-case 017:						/* RPCC, RMHR */
-	if (drv_tab[dtype].ctrl == MBA_RP_CTRL)		/* RP is CC */
-	    *data = rp_unit[drv].CYL;
-	else *data = rmhr[drv] ^ 0177777;		/* RM is HR */
-	break;
-case 020:						/* RPER2, RMMR2 */
-	if (drv_tab[dtype].ctrl == MBA_RP_CTRL)		/* RP is ER2 */
-	    *data = rper2[drv];
-	else *data = rmmr2[drv];			/* RM is MR2 */
-	break;
-case 021:						/* RPER3, RMER2 */
-	if (drv_tab[dtype].ctrl == MBA_RP_CTRL)		/* RP is ER3 */
-	    *data = rper3[drv];
-	else *data = rper2[drv];			/* RM is ER2 */
-	break;
-case 022:						/* RPEC1 */
-	*data = rpec1[drv];
-	break;
-case 023:						/* RPEC2 */
-	*data = rpec2[drv];
-	break;
-default:						/* all others */
-	set_rper (ER1_ILR, drv);
-	update_rpcs (0, drv);
-	break;  }
+update_rpcs (0, drv);                                   /* update status */
+switch (j) {                                            /* decode PA<5:1> */
+
+    case 000:                                           /* RPCS1 */
+        *data = rpcs1;
+        break;
+
+    case 001:                                           /* RPWC */
+        *data = rpwc;
+        break;
+
+    case 002:                                           /* RPBA */
+        *data = rpba = rpba & ~BA_MBZ;
+        break;
+
+    case 003:                                           /* RPDA */
+        *data = rpda[drv] = rpda[drv] & ~DA_MBZ;
+        break;
+
+    case 004:                                           /* RPCS2 */
+        *data = rpcs2 = (rpcs2 & ~CS2_MBZ) | CS2_IR | CS2_OR;
+        break;
+
+    case 005:                                           /* RPDS */
+        *data = rpds[drv];
+        break;
+
+    case 006:                                           /* RPER1 */
+        *data = rper1[drv];
+        break;
+
+    case 007:                                           /* RPAS */
+        *data = 0;
+        for (i = 0; i < RP_NUMDR; i++)
+            if (rpds[i] & DS_ATA) *data = *data | (AS_U0 << i);
+        break;
+
+    case 010:                                           /* RPLA */
+        *data = GET_SECTOR (rp_rwait, dtype) << LA_V_SC;
+        break;
+
+    case 011:                                           /* RPDB */
+        *data = rpdb;
+        break;
+
+    case 012:                                           /* RPMR */
+        *data = rpmr[drv];
+        break;
+
+    case 013:                                           /* RPDT */
+        *data = drv_tab[dtype].devtype;
+        break;
+
+    case 014:                                           /* RPSN */
+        *data = 020 | (drv + 1);
+        break;
+
+    case 015:                                           /* RPOF */
+        *data = rpof[drv] = rpof[drv] & ~OF_MBZ;
+        break;
+
+    case 016:                                           /* RPDC */
+        *data = rpdc[drv] = rpdc[drv] & ~DC_MBZ;
+        break;
+
+    case 017:                                           /* RPCC, RMHR */
+        if (drv_tab[dtype].ctrl == MBA_RP_CTRL)         /* RP is CC */
+            *data = rp_unit[drv].CYL;
+        else *data = rmhr[drv] ^ 0177777;               /* RM is HR */
+        break;
+
+    case 020:                                           /* RPER2, RMMR2 */
+        if (drv_tab[dtype].ctrl == MBA_RP_CTRL)         /* RP is ER2 */
+            *data = rper2[drv];
+        else *data = rmmr2[drv];                        /* RM is MR2 */
+        break;
+
+    case 021:                                           /* RPER3, RMER2 */
+        if (drv_tab[dtype].ctrl == MBA_RP_CTRL)         /* RP is ER3 */
+            *data = rper3[drv];
+        else *data = rper2[drv];                        /* RM is ER2 */
+        break;
+
+    case 022:                                           /* RPEC1 */
+        *data = rpec1[drv];
+        break;
+
+    case 023:                                           /* RPEC2 */
+        *data = rpec2[drv];
+        break;
+
+    default:                                            /* all others */
+        set_rper (ER1_ILR, drv);
+        update_rpcs (0, drv);
+        break;
+        }
 return SCPE_OK;
 }
-
+
 t_stat rp_wr (int32 data, int32 PA, int32 access)
 {
 int32 cs1f, drv, dtype, i, j;
 UNIT *uptr;
 
-cs1f = 0;						/* no int on cs1 upd */
-drv = GET_UNIT (rpcs2);					/* get current unit */
-dtype = GET_DTYPE (rp_unit[drv].flags);			/* get drive type */
-uptr = rp_dev.units + drv;				/* get unit */
-j = (PA >> 1) & 037;					/* get reg offset */
-if (reg_in_drive[j] && (rp_unit[drv].flags & UNIT_DIS)) {	/* nx disk */
-	rpcs2 = rpcs2 | CS2_NED;			/* set error flag */
-	update_rpcs (CS1_SC, drv);			/* request intr */
-	return SCPE_OK;  }
-if (reg_in_drive[j] && sim_is_active (&rp_unit[drv])) {	/* unit busy? */
-	set_rper (ER1_RMR, drv);			/* won't write */
-	update_rpcs (0, drv);
-	return SCPE_OK;  }
+cs1f = 0;                                               /* no int on cs1 upd */
+drv = GET_UNIT (rpcs2);                                 /* get current unit */
+dtype = GET_DTYPE (rp_unit[drv].flags);                 /* get drive type */
+uptr = rp_dev.units + drv;                              /* get unit */
+j = (PA >> 1) & 037;                                    /* get reg offset */
+if (reg_in_drive[j] && (rp_unit[drv].flags & UNIT_DIS)) { /* nx disk */
+    rpcs2 = rpcs2 | CS2_NED;                            /* set error flag */
+    update_rpcs (CS1_SC, drv);                          /* request intr */
+    return SCPE_OK;
+    }
+if (reg_in_drive[j] && sim_is_active (&rp_unit[drv])) { /* unit busy? */
+    set_rper (ER1_RMR, drv);                            /* won't write */
+    update_rpcs (0, drv);
+    return SCPE_OK;
+    }
 rmhr[drv] = data;
 
-switch (j) {						/* decode PA<5:1> */
-case 000:						/* RPCS1 */
-	if ((access == WRITEB) && (PA & 1)) data = data << 8;
-	if (data & CS1_TRE) {				/* error clear? */
-	    rpcs1 = rpcs1 & ~CS1_TRE;			/* clr CS1<TRE> */
-	    rpcs2 = rpcs2 & ~CS2_ERR;  }		/* clr CS2<15:8> */
-	if ((access == WRITE) || (PA & 1)) {		/* hi byte write? */
-	    if (rpcs1 & CS1_DONE)			/* done set? */
-		rpcs1 = (rpcs1 & ~CS1_UAE) | (data & CS1_UAE);  }
-	if ((access == WRITE) || !(PA & 1)) {		/* lo byte write? */
-	    if ((data & CS1_DONE) && (data & CS1_IE))	/* to DONE+IE? */
-		rpiff = 1;				/* set CSTB INTR */
-	    rpcs1 = (rpcs1 & ~CS1_IE) | (data & CS1_IE);
-	    if (uptr->flags & UNIT_DIS) {		/* nx disk? */
-		rpcs2 = rpcs2 | CS2_NED;		/* set error flag */
-		cs1f = CS1_SC;  }			/* req interrupt */
-	    else if (sim_is_active (uptr))
-		set_rper (ER1_RMR, drv);		/* won't write */
-	    else if (data & CS1_GO) {			/* start op */
-		uptr->FUNC = GET_FNC (data);		/* set func */
-		if ((uptr->FUNC >= FNC_XFER) &&		/* data xfer and */
-		   ((rpcs1 & CS1_DONE) == 0))		/* ~rdy? PGE */
-			rpcs2 = rpcs2 | CS2_PGE;
-		else rp_go (drv, uptr->FUNC);  }  }
-	break;	
-case 001:						/* RPWC */
-	if (access == WRITEB) data = (PA & 1)?
-	    (rpwc & 0377) | (data << 8): (rpwc & ~0377) | data;
-	rpwc = data;
-	break;
-case 002:						/* RPBA */
-	if (access == WRITEB) data = (PA & 1)?
-	    (rpba & 0377) | (data << 8): (rpba & ~0377) | data;
-	rpba = data & ~BA_MBZ;
-	break;
-case 003:						/* RPDA */
-	if ((access == WRITEB) && (PA & 1)) data = data << 8;
-	rpda[drv] = data & ~DA_MBZ;
-	break;
-case 004:						/* RPCS2 */
-	if ((access == WRITEB) && (PA & 1)) data = data << 8;
-	if (data & CS2_CLR) rp_reset (&rp_dev);		/* init? */
-	else {
-	    if ((data & ~rpcs2) & (CS2_PE | CS2_MXF))
-		cs1f = CS1_SC;				/* diagn intr */
-	    if (access == WRITEB) data = (rpcs2 &	/* merge data */
-		((PA & 1)? 0377: 0177400)) | data;
-	    rpcs2 = (rpcs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR | CS2_OR;  }
-	drv = GET_UNIT (rpcs2);
-	break;
-case 006:						/* RPER1 */
-	if ((access == WRITEB) && (PA & 1)) data = data << 8;
-	rper1[drv] = data;
-	break;
-case 007:						/* RPAS */
-	if ((access == WRITEB) && (PA & 1)) break;
-	for (i = 0; i < RP_NUMDR; i++)
-	    if (data & (AS_U0 << i)) rpds[i] = rpds[i] & ~DS_ATA;
-	break;
-case 011:						/* RPDB */
-	if (access == WRITEB) data = (PA & 1)?
-	    (rpdb & 0377) | (data << 8): (rpdb & ~0377) | data;
-	rpdb = data;
-	break;
-case 012:						/* RPMR */
-	if ((access == WRITEB) && (PA & 1)) data = data << 8;
-	rpmr[drv] = data;
-	break;
-case 015:						/* RPOF */
-	rpof[drv] = data & ~OF_MBZ;
-	break;
-case 016:						/* RPDC */
-	if ((access == WRITEB) && (PA & 1)) data = data << 8;
-	rpdc[drv] = data & ~DC_MBZ;
-	break;
-case 005:						/* RPDS */
-case 010:						/* RPLA */
-case 013:						/* RPDT */
-case 014:						/* RPSN */
-case 017:						/* RPCC, RMHR */
-case 020:						/* RPER2, RMMR2 */
-case 021:						/* RPER3, RMER2 */
-case 022:						/* RPEC1 */
-case 023:						/* RPEC2 */
-	break;						/* read only */
-default:						/* all others */
-	set_rper (ER1_ILR, drv);
-	break;  }					/* end switch */
-update_rpcs (cs1f, drv);				/* update status */
+switch (j) {                                            /* decode PA<5:1> */
+
+    case 000:                                           /* RPCS1 */
+        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        if (data & CS1_TRE) {                           /* error clear? */
+            rpcs1 = rpcs1 & ~CS1_TRE;                   /* clr CS1<TRE> */
+            rpcs2 = rpcs2 & ~CS2_ERR;                   /* clr CS2<15:8> */
+            }
+        if ((access == WRITE) || (PA & 1)) {            /* hi byte write? */
+            if (rpcs1 & CS1_DONE)                       /* done set? */
+                rpcs1 = (rpcs1 & ~CS1_UAE) | (data & CS1_UAE);
+            }
+        if ((access == WRITE) || !(PA & 1)) {           /* lo byte write? */
+            if ((data & CS1_DONE) && (data & CS1_IE))   /* to DONE+IE? */
+                rpiff = 1;                              /* set CSTB INTR */
+            rpcs1 = (rpcs1 & ~CS1_IE) | (data & CS1_IE);
+            if (uptr->flags & UNIT_DIS) {               /* nx disk? */
+                rpcs2 = rpcs2 | CS2_NED;                /* set error flag */
+                cs1f = CS1_SC;                          /* req interrupt */
+                }
+            else if (sim_is_active (uptr))
+                set_rper (ER1_RMR, drv);                /* won't write */
+            else if (data & CS1_GO) {                   /* start op */
+                uptr->FUNC = GET_FNC (data);            /* set func */
+                if ((uptr->FUNC >= FNC_XFER) &&         /* data xfer and */
+                   ((rpcs1 & CS1_DONE) == 0))           /* ~rdy? PGE */
+                        rpcs2 = rpcs2 | CS2_PGE;
+                else rp_go (drv, uptr->FUNC);
+                }
+            }
+        break;  
+
+    case 001:                                           /* RPWC */
+        if (access == WRITEB) data = (PA & 1)?
+            (rpwc & 0377) | (data << 8): (rpwc & ~0377) | data;
+        rpwc = data;
+        break;
+
+    case 002:                                           /* RPBA */
+        if (access == WRITEB) data = (PA & 1)?
+            (rpba & 0377) | (data << 8): (rpba & ~0377) | data;
+        rpba = data & ~BA_MBZ;
+        break;
+
+    case 003:                                           /* RPDA */
+        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        rpda[drv] = data & ~DA_MBZ;
+        break;
+
+    case 004:                                           /* RPCS2 */
+        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        if (data & CS2_CLR) rp_reset (&rp_dev);         /* init? */
+        else {
+            if ((data & ~rpcs2) & (CS2_PE | CS2_MXF))
+                cs1f = CS1_SC;                          /* diagn intr */
+            if (access == WRITEB) data = (rpcs2 &       /* merge data */
+                ((PA & 1)? 0377: 0177400)) | data;
+            rpcs2 = (rpcs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR | CS2_OR;
+            }
+        drv = GET_UNIT (rpcs2);
+        break;
+
+    case 006:                                           /* RPER1 */
+        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        rper1[drv] = data;
+        break;
+
+    case 007:                                           /* RPAS */
+        if ((access == WRITEB) && (PA & 1)) break;
+        for (i = 0; i < RP_NUMDR; i++)
+            if (data & (AS_U0 << i)) rpds[i] = rpds[i] & ~DS_ATA;
+        break;
+
+    case 011:                                           /* RPDB */
+        if (access == WRITEB) data = (PA & 1)?
+            (rpdb & 0377) | (data << 8): (rpdb & ~0377) | data;
+        rpdb = data;
+        break;
+
+    case 012:                                           /* RPMR */
+        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        rpmr[drv] = data;
+        break;
+
+    case 015:                                           /* RPOF */
+        rpof[drv] = data & ~OF_MBZ;
+        break;
+
+    case 016:                                           /* RPDC */
+        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        rpdc[drv] = data & ~DC_MBZ;
+        break;
+
+    case 005:                                           /* RPDS */
+    case 010:                                           /* RPLA */
+    case 013:                                           /* RPDT */
+    case 014:                                           /* RPSN */
+    case 017:                                           /* RPCC, RMHR */
+    case 020:                                           /* RPER2, RMMR2 */
+    case 021:                                           /* RPER3, RMER2 */
+    case 022:                                           /* RPEC1 */
+    case 023:                                           /* RPEC2 */
+        break;                                          /* read only */
+
+    default:                                            /* all others */
+        set_rper (ER1_ILR, drv);
+        break;
+        }                                               /* end switch */
+
+update_rpcs (cs1f, drv);                                /* update status */
 return SCPE_OK;
 }
-
+
 /* Initiate operation - unit not busy, function set */
 
 void rp_go (int32 drv, int32 fnc)
@@ -694,91 +747,101 @@ void rp_go (int32 drv, int32 fnc)
 int32 dc, dtype, t;
 UNIT *uptr;
 
-uptr = rp_dev.units + drv;				/* get unit */
-if (uptr->flags & UNIT_DIS) {				/* nx unit? */
-	rpcs2 = rpcs2 | CS2_NED;			/* set error flag */
-	update_rpcs (CS1_SC, drv);			/* request intr */
-	return;  }
-if ((fnc != FNC_DCLR) && (rpds[drv] & DS_ERR)) { 	/* err & ~clear? */
-	set_rper (ER1_ILF, drv);			/* set err, ATN */
-	update_rpcs (CS1_SC, drv);			/* request intr */
-	return;  }
-dtype = GET_DTYPE (uptr->flags);			/* get drive type */
-rpds[drv] = rpds[drv] & ~DS_ATA;			/* clear attention */
-dc = rpdc[drv];						/* assume seek, sch */
+uptr = rp_dev.units + drv;                              /* get unit */
+if (uptr->flags & UNIT_DIS) {                           /* nx unit? */
+    rpcs2 = rpcs2 | CS2_NED;                            /* set error flag */
+    update_rpcs (CS1_SC, drv);                          /* request intr */
+    return;
+    }
+if ((fnc != FNC_DCLR) && (rpds[drv] & DS_ERR)) {        /* err & ~clear? */
+    set_rper (ER1_ILF, drv);                            /* set err, ATN */
+    update_rpcs (CS1_SC, drv);                          /* request intr */
+    return;
+    }
+dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
+rpds[drv] = rpds[drv] & ~DS_ATA;                        /* clear attention */
+dc = rpdc[drv];                                         /* assume seek, sch */
 
-switch (fnc) {						/* case on function */
-case FNC_DCLR:						/* drive clear */
-	rpda[drv] = 0;					/* clear disk addr */
-	rper1[drv] = rper2[drv] = rper3[drv] = 0;	/* clear errors */
-case FNC_NOP:						/* no operation */
-case FNC_RELEASE:					/* port release */
-	return;
+switch (fnc) {                                          /* case on function */
 
-case FNC_PRESET:					/* read-in preset */
-	rpdc[drv] = 0;					/* clear disk addr */
-	rpda[drv] = 0;
-	rpof[drv] = 0;					/* clear offset */
-case FNC_PACK:						/* pack acknowledge */
-	rpds[drv] = rpds[drv] | DS_VV;			/* set volume valid */
-	return;
+    case FNC_DCLR:                                      /* drive clear */
+        rpda[drv] = 0;                                  /* clear disk addr */
+        rper1[drv] = rper2[drv] = rper3[drv] = 0;       /* clear errors */
+    case FNC_NOP:                                       /* no operation */
+    case FNC_RELEASE:                                   /* port release */
+        return;
 
-case FNC_OFFSET:					/* offset mode */
-case FNC_RETURN:
-	if ((uptr->flags & UNIT_ATT) == 0) {		/* not attached? */
-	    set_rper (ER1_UNS, drv);			/* unsafe */
-	    break;  }
-	rpds[drv] = (rpds[drv] & ~DS_RDY) | DS_PIP;	/* set positioning */
-	sim_activate (uptr, rp_swait);			/* time operation */
-	return;
+    case FNC_PRESET:                                    /* read-in preset */
+        rpdc[drv] = 0;                                  /* clear disk addr */
+        rpda[drv] = 0;
+        rpof[drv] = 0;                                  /* clear offset */
+    case FNC_PACK:                                      /* pack acknowledge */
+        rpds[drv] = rpds[drv] | DS_VV;                  /* set volume valid */
+        return;
 
-case FNC_UNLOAD:					/* unload */
-case FNC_RECAL:						/* recalibrate */
-	dc = 0;						/* seek to 0 */
-case FNC_SEEK:						/* seek */
-case FNC_SEARCH:					/* search */
-	if ((uptr->flags & UNIT_ATT) == 0) {		/* not attached? */
-	    set_rper (ER1_UNS, drv);			/* unsafe */
-	    break;  }
-	if ((GET_CY (dc) >= drv_tab[dtype].cyl) ||	/* bad cylinder */
-	    (GET_SF (rpda[drv]) >= drv_tab[dtype].surf) ||	/* bad surface */
-            (GET_SC (rpda[drv]) >= drv_tab[dtype].sect)) {	/* or bad sector? */
-	    set_rper (ER1_IAE, drv);
-	    break;  }
-	rpds[drv] = (rpds[drv] & ~DS_RDY) | DS_PIP;	/* set positioning */
-	t = abs (dc - uptr->CYL);			/* cyl diff */
-	if (t == 0) t = 1;				/* min time */
-	sim_activate (uptr, rp_swait * t);		/* schedule */
-	uptr->CYL = dc;					/* save cylinder */
-	return;
+    case FNC_OFFSET:                                    /* offset mode */
+    case FNC_RETURN:
+        if ((uptr->flags & UNIT_ATT) == 0) {            /* not attached? */
+            set_rper (ER1_UNS, drv);                    /* unsafe */
+            break;
+            }
+        rpds[drv] = (rpds[drv] & ~DS_RDY) | DS_PIP;     /* set positioning */
+        sim_activate (uptr, rp_swait);                  /* time operation */
+        return;
 
-case FNC_WRITEH:					/* write headers */
-case FNC_WRITE:						/* write */
-case FNC_WCHK:						/* write check */
-case FNC_READ:						/* read */
-case FNC_READH:						/* read headers */
-	if ((uptr->flags & UNIT_ATT) == 0) {		/* not attached? */
-	    set_rper (ER1_UNS, drv);			/* unsafe */
-	    break;  }
-	rpcs2 = rpcs2 & ~CS2_ERR;			/* clear errors */
-	rpcs1 = rpcs1 & ~(CS1_TRE | CS1_MCPE | CS1_DONE);
-	if ((GET_CY (dc) >= drv_tab[dtype].cyl) ||	/* bad cylinder */
-	    (GET_SF (rpda[drv]) >= drv_tab[dtype].surf) ||	/* bad surface */
-            (GET_SC (rpda[drv]) >= drv_tab[dtype].sect)) {	/* or bad sector? */
-	    set_rper (ER1_IAE, drv);
-	    break;  }
-	rpds[drv] = rpds[drv] & ~DS_RDY;		/* clear drive rdy */
-	sim_activate (uptr, rp_rwait + (rp_swait * abs (dc - uptr->CYL)));
-	uptr->CYL = dc;					/* save cylinder */
-	return;
+    case FNC_UNLOAD:                                    /* unload */
+    case FNC_RECAL:                                     /* recalibrate */
+        dc = 0;                                         /* seek to 0 */
+    case FNC_SEEK:                                      /* seek */
+    case FNC_SEARCH:                                    /* search */
+        if ((uptr->flags & UNIT_ATT) == 0) {            /* not attached? */
+            set_rper (ER1_UNS, drv);                    /* unsafe */
+            break;
+            }
+        if ((GET_CY (dc) >= drv_tab[dtype].cyl) ||      /* bad cylinder */
+            (GET_SF (rpda[drv]) >= drv_tab[dtype].surf) ||      /* bad surface */
+            (GET_SC (rpda[drv]) >= drv_tab[dtype].sect)) {      /* or bad sector? */
+            set_rper (ER1_IAE, drv);
+            break;
+            }
+        rpds[drv] = (rpds[drv] & ~DS_RDY) | DS_PIP;     /* set positioning */
+        t = abs (dc - uptr->CYL);                       /* cyl diff */
+        if (t == 0) t = 1;                              /* min time */
+        sim_activate (uptr, rp_swait * t);              /* schedule */
+        uptr->CYL = dc;                                 /* save cylinder */
+        return;
 
-default:						/* all others */
-	set_rper (ER1_ILF, drv);			/* not supported */
-	break;  }
-update_rpcs (CS1_SC, drv);				/* req intr */
+    case FNC_WRITEH:                                    /* write headers */
+    case FNC_WRITE:                                     /* write */
+    case FNC_WCHK:                                      /* write check */
+    case FNC_READ:                                      /* read */
+    case FNC_READH:                                     /* read headers */
+        if ((uptr->flags & UNIT_ATT) == 0) {            /* not attached? */
+            set_rper (ER1_UNS, drv);                    /* unsafe */
+            break;
+            }
+        rpcs2 = rpcs2 & ~CS2_ERR;                       /* clear errors */
+        rpcs1 = rpcs1 & ~(CS1_TRE | CS1_MCPE | CS1_DONE);
+        if ((GET_CY (dc) >= drv_tab[dtype].cyl) ||      /* bad cylinder */
+            (GET_SF (rpda[drv]) >= drv_tab[dtype].surf) ||      /* bad surface */
+            (GET_SC (rpda[drv]) >= drv_tab[dtype].sect)) {      /* or bad sector? */
+            set_rper (ER1_IAE, drv);
+            break;
+            }
+        rpds[drv] = rpds[drv] & ~DS_RDY;                /* clear drive rdy */
+        sim_activate (uptr, rp_rwait + (rp_swait * abs (dc - uptr->CYL)));
+        uptr->CYL = dc;                                 /* save cylinder */
+        return;
+
+    default:                                            /* all others */
+        set_rper (ER1_ILF, drv);                        /* not supported */
+        break;
+        }
+
+update_rpcs (CS1_SC, drv);                              /* req intr */
 return;
 }
-
+
 /* Service unit timeout
 
    Complete movement or data transfer command
@@ -794,28 +857,32 @@ a10 pa10, mpa10;
 int32 wc10, twc10, awc10, fc10;
 static d10 dbuf[RP_MAXFR];
 
-dtype = GET_DTYPE (uptr->flags);			/* get drive type */
-drv = uptr - rp_dev.units;				/* get drv number */
-rpds[drv] = (rpds[drv] & ~DS_PIP) | DS_RDY;		/* change drive status */
+dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
+drv = (int32) (uptr - rp_dev.units);                    /* get drv number */
+rpds[drv] = (rpds[drv] & ~DS_PIP) | DS_RDY;             /* change drive status */
 
-switch (uptr->FUNC) {					/* case on function */
-case FNC_OFFSET:					/* offset */
-	rpds[drv] = rpds[drv] | DS_OF | DS_ATA;		/* set offset, attention */
-	update_rpcs (CS1_SC, drv);
-	break;
-case FNC_RETURN:					/* return to centerline */
-	rpds[drv] = (rpds[drv] & ~DS_OF) | DS_ATA;	/* clear offset, set attn */
-	update_rpcs (CS1_SC, drv);
-	break;	
-case FNC_UNLOAD:					/* unload */
-	rp_detach (uptr);				/* detach unit */
-	break;
-case FNC_RECAL:						/* recalibrate */
-case FNC_SEARCH:					/* search */
-case FNC_SEEK:						/* seek */
-	rpds[drv] = rpds[drv] | DS_ATA;			/* set attention */
-	update_rpcs (CS1_SC, drv);
-	break;
+switch (uptr->FUNC) {                                   /* case on function */
+
+    case FNC_OFFSET:                                    /* offset */
+        rpds[drv] = rpds[drv] | DS_OF | DS_ATA;         /* set offset, attention */
+        update_rpcs (CS1_SC, drv);
+        break;
+
+    case FNC_RETURN:                                    /* return to centerline */
+        rpds[drv] = (rpds[drv] & ~DS_OF) | DS_ATA;      /* clear offset, set attn */
+        update_rpcs (CS1_SC, drv);
+        break;  
+
+    case FNC_UNLOAD:                                    /* unload */
+        rp_detach (uptr);                               /* detach unit */
+        break;
+
+    case FNC_RECAL:                                     /* recalibrate */
+    case FNC_SEARCH:                                    /* search */
+    case FNC_SEEK:                                      /* seek */
+        rpds[drv] = rpds[drv] | DS_ATA;                 /* set attention */
+        update_rpcs (CS1_SC, drv);
+        break;
 
 /* Reads and writes must take into account the complicated relationship
    between Unibus addresses and PDP-10 memory addresses, and Unibus
@@ -824,97 +891,111 @@ case FNC_SEEK:						/* seek */
    8b bytes to do a 36b transfer, whereas the UBA did four 9b bytes).
 */
 
-#define XWC_MBZ		0000001				/* wc<0> must be 0 */
-#define XBA_MBZ		0000003				/* addr<1:0> must be 0 */
+#define XWC_MBZ         0000001                         /* wc<0> must be 0 */
+#define XBA_MBZ         0000003                         /* addr<1:0> must be 0 */
 
-case FNC_WRITE:						/* write */
-	if (uptr->flags & UNIT_WPRT) {			/* write locked? */
-	    set_rper (ER1_WLE, drv);			/* set drive error */
-	    update_rpcs (CS1_DONE | CS1_TRE, drv);	/* set done, err */
-	    break;  }
-case FNC_WCHK:						/* write check */
-case FNC_READ:						/* read */
-case FNC_READH:						/* read headers */
-	ba = GET_UAE (rpcs1) | rpba;			/* get byte addr */
-	wc10 = (0200000 - rpwc) >> 1;			/* get PDP-10 wc */
-	da = GET_DA (rpdc[drv], rpda[drv], dtype) * RP_NUMWD;	/* get disk addr */
-	if ((da + wc10) > drv_tab[dtype].size) {	/* disk overrun? */
-	    set_rper (ER1_AOE, drv);
-	    if (wc10 > (drv_tab[dtype].size - da))
-		wc10 = drv_tab[dtype].size - da;  }
+    case FNC_WRITE:                                     /* write */
+        if (uptr->flags & UNIT_WPRT) {                  /* write locked? */
+            set_rper (ER1_WLE, drv);                    /* set drive error */
+            update_rpcs (CS1_DONE | CS1_TRE, drv);      /* set done, err */
+            break;
+            }
+    case FNC_WCHK:                                      /* write check */
+    case FNC_READ:                                      /* read */
+    case FNC_READH:                                     /* read headers */
+        ba = GET_UAE (rpcs1) | rpba;                    /* get byte addr */
+        wc10 = (0200000 - rpwc) >> 1;                   /* get PDP-10 wc */
+        da = GET_DA (rpdc[drv], rpda[drv], dtype) * RP_NUMWD;   /* get disk addr */
+        if ((da + wc10) > drv_tab[dtype].size) {        /* disk overrun? */
+            set_rper (ER1_AOE, drv);
+            if (wc10 > (drv_tab[dtype].size - da))
+                wc10 = drv_tab[dtype].size - da;
+            }
 
-	err = fseek (uptr->fileref, da * sizeof (d10), SEEK_SET);
-	if (uptr->FUNC == FNC_WRITE) {			/* write? */
-	    for (twc10 = 0; twc10 < wc10; twc10++) {
-		pa10 = ba >> 2;
-		vpn = PAG_GETVPN (pa10);		/* map addr */
-		if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ) || (rpwc & XWC_MBZ) ||
-	          ((ubmap[0][vpn] & (UMAP_VLD | UMAP_DSB | UMAP_RRV)) != UMAP_VLD)) {
-		    rpcs2 = rpcs2 | CS2_NEM;		/* set error */
-		    ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
-		    break;  }
-		mpa10 = (ubmap[0][vpn] + PAG_GETOFF (pa10)) & PAMASK;
-		if (MEM_ADDR_NXM (mpa10)) {		/* nx memory? */
-		    rpcs2 = rpcs2 | CS2_NEM;		/* set error */
-		    ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
-		    break;  }
-		dbuf[twc10] = M[mpa10];			/* write to disk */
-		if ((rpcs2 & CS2_UAI) == 0) ba = ba + 4;  }
-	    if (fc10 = twc10 & (RP_NUMWD - 1)) {	/* fill? */
-		fc10 = RP_NUMWD - fc10;
-		for (i = 0; i < fc10; i++) dbuf[twc10 + i] = 0;  }
-	    fxwrite (dbuf, sizeof (d10), twc10 + fc10, uptr->fileref);
-	    err = ferror (uptr->fileref);
-	    }						/* end if */
-	else {						/* read, wchk, readh */
-	    awc10 = fxread (dbuf, sizeof (d10), wc10, uptr->fileref);
-	    err = ferror (uptr->fileref);
-	    for ( ; awc10 < wc10; awc10++) dbuf[awc10] = 0;
-	    for (twc10 = 0; twc10 < wc10; twc10++) {
-		pa10 = ba >> 2;
-		vpn = PAG_GETVPN (pa10);		/* map addr */
-		if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ) || (rpwc & XWC_MBZ) ||
-	          ((ubmap[0][vpn] & (UMAP_VLD | UMAP_DSB | UMAP_RRV)) != UMAP_VLD)) {
-		    rpcs2 = rpcs2 | CS2_NEM;		/* set error */
-		    ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
-		    break;  }
-		mpa10 = (ubmap[0][vpn] + PAG_GETOFF (pa10)) & PAMASK;
-		if (MEM_ADDR_NXM (mpa10)) {		/* nx memory? */
-		    rpcs2 = rpcs2 | CS2_NEM;		/* set error */
-		    ubcs[0] = ubcs[0] | UBCS_TMO;	/* UBA times out */
-		    break;  }
-		if ((uptr->FUNC == FNC_READ) ||		/* read or */
-		    (uptr->FUNC == FNC_READH))		/* read header */
-		     M[mpa10] = dbuf[twc10];
-		else if (M[mpa10] != dbuf[twc10]) {	/* wchk, mismatch? */
-		     rpcs2 = rpcs2 | CS2_WCE;		/* set error */
-		     break;  }
-		if ((rpcs2 & CS2_UAI) == 0) ba = ba + 4;  }
-	    }						/* end else */
+        err = fseek (uptr->fileref, da * sizeof (d10), SEEK_SET);
+        if (uptr->FUNC == FNC_WRITE) {                  /* write? */
+            for (twc10 = 0; twc10 < wc10; twc10++) {
+                pa10 = ba >> 2;
+                vpn = PAG_GETVPN (pa10);                /* map addr */
+                if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ) || (rpwc & XWC_MBZ) ||
+                  ((ubmap[0][vpn] & (UMAP_VLD | UMAP_DSB | UMAP_RRV)) != UMAP_VLD)) {
+                    rpcs2 = rpcs2 | CS2_NEM;            /* set error */
+                    ubcs[0] = ubcs[0] | UBCS_TMO;       /* UBA times out */
+                    break;
+                    }
+                mpa10 = (ubmap[0][vpn] + PAG_GETOFF (pa10)) & PAMASK;
+                if (MEM_ADDR_NXM (mpa10)) {             /* nx memory? */
+                    rpcs2 = rpcs2 | CS2_NEM;            /* set error */
+                    ubcs[0] = ubcs[0] | UBCS_TMO;       /* UBA times out */
+                    break;
+                    }
+                dbuf[twc10] = M[mpa10];                 /* write to disk */
+                if ((rpcs2 & CS2_UAI) == 0) ba = ba + 4;
+                }
+            if (fc10 = twc10 & (RP_NUMWD - 1)) {        /* fill? */
+                fc10 = RP_NUMWD - fc10;
+                for (i = 0; i < fc10; i++) dbuf[twc10 + i] = 0;
+                }
+            fxwrite (dbuf, sizeof (d10), twc10 + fc10, uptr->fileref);
+            err = ferror (uptr->fileref);
+            }                                           /* end if */
+        else {                                          /* read, wchk, readh */
+            awc10 = fxread (dbuf, sizeof (d10), wc10, uptr->fileref);
+            err = ferror (uptr->fileref);
+            for ( ; awc10 < wc10; awc10++) dbuf[awc10] = 0;
+            for (twc10 = 0; twc10 < wc10; twc10++) {
+                pa10 = ba >> 2;
+                vpn = PAG_GETVPN (pa10);                /* map addr */
+                if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ) || (rpwc & XWC_MBZ) ||
+                  ((ubmap[0][vpn] & (UMAP_VLD | UMAP_DSB | UMAP_RRV)) != UMAP_VLD)) {
+                    rpcs2 = rpcs2 | CS2_NEM;            /* set error */
+                    ubcs[0] = ubcs[0] | UBCS_TMO;       /* UBA times out */
+                    break;
+                    }
+                mpa10 = (ubmap[0][vpn] + PAG_GETOFF (pa10)) & PAMASK;
+                if (MEM_ADDR_NXM (mpa10)) {             /* nx memory? */
+                    rpcs2 = rpcs2 | CS2_NEM;            /* set error */
+                    ubcs[0] = ubcs[0] | UBCS_TMO;       /* UBA times out */
+                    break;
+                    }
+                if ((uptr->FUNC == FNC_READ) ||         /* read or */
+                    (uptr->FUNC == FNC_READH))          /* read header */
+                     M[mpa10] = dbuf[twc10];
+                else if (M[mpa10] != dbuf[twc10]) {     /* wchk, mismatch? */
+                     rpcs2 = rpcs2 | CS2_WCE;           /* set error */
+                     break;
+                     }
+                if ((rpcs2 & CS2_UAI) == 0) ba = ba + 4;
+                }
+            }                                           /* end else */
 
-	rpwc = (rpwc + (twc10 << 1)) & 0177777;		/* final word count */
-	rpba = (ba & 0177777) & ~BA_MBZ;		/* lower 16b */
-	rpcs1 = (rpcs1 & ~ CS1_UAE) | ((ba >> (16 - CS1_V_UAE)) & CS1_UAE);
-	da = da + twc10 + (RP_NUMWD - 1);
-	if (da >= drv_tab[dtype].size) rpds[drv] = rpds[drv] | DS_LST;
-	da = da / RP_NUMWD;
-	rpda[drv] = da % drv_tab[dtype].sect;
-	da = da / drv_tab[dtype].sect;
-	rpda[drv] = rpda[drv] | ((da % drv_tab[dtype].surf) << DA_V_SF);
-	rpdc[drv] = da / drv_tab[dtype].surf;
+        rpwc = (rpwc + (twc10 << 1)) & 0177777;         /* final word count */
+        rpba = (ba & 0177777) & ~BA_MBZ;                /* lower 16b */
+        rpcs1 = (rpcs1 & ~ CS1_UAE) | ((ba >> (16 - CS1_V_UAE)) & CS1_UAE);
+        da = da + twc10 + (RP_NUMWD - 1);
+        if (da >= drv_tab[dtype].size) rpds[drv] = rpds[drv] | DS_LST;
+        da = da / RP_NUMWD;
+        rpda[drv] = da % drv_tab[dtype].sect;
+        da = da / drv_tab[dtype].sect;
+        rpda[drv] = rpda[drv] | ((da % drv_tab[dtype].surf) << DA_V_SF);
+        rpdc[drv] = da / drv_tab[dtype].surf;
 
-	if (err != 0) {					/* error? */
-	    set_rper (ER1_PAR, drv);			/* set drive error */
-	    update_rpcs (CS1_DONE | CS1_TRE, drv);	/* set done, err */
-	    perror ("RP I/O error");
-	    clearerr (uptr->fileref);
-	    return SCPE_IOERR;  }
-case FNC_WRITEH:					/* write headers stub */
-	update_rpcs (CS1_DONE, drv);			/* set done */
-	break;  }					/* end case func */
+        if (err != 0) {                                 /* error? */
+            set_rper (ER1_PAR, drv);                    /* set drive error */
+            update_rpcs (CS1_DONE | CS1_TRE, drv);      /* set done, err */
+            perror ("RP I/O error");
+            clearerr (uptr->fileref);
+            return SCPE_IOERR;
+            }
+
+    case FNC_WRITEH:                                    /* write headers stub */
+        update_rpcs (CS1_DONE, drv);                    /* set done */
+        break;
+        }                                               /* end case func */
+
 return SCPE_OK;
 }
-
+
 /* Set drive error */
 
 void set_rper (int32 flag, int32 drv)
@@ -938,15 +1019,15 @@ void update_rpcs (int32 flag, int32 drv)
 int32 i;
 UNIT *uptr;
 
-if ((flag & ~rpcs1) & CS1_DONE)				/* DONE 0 to 1? */
-	rpiff = (rpcs1 & CS1_IE)? 1: 0;			/* CSTB INTR <- IE */
-uptr = rp_dev.units + drv;				/* get unit */
+if ((flag & ~rpcs1) & CS1_DONE)                         /* DONE 0 to 1? */
+    rpiff = (rpcs1 & CS1_IE)? 1: 0;                     /* CSTB INTR <- IE */
+uptr = rp_dev.units + drv;                              /* get unit */
 if (rp_unit[drv].flags & UNIT_DIS) rpds[drv] = rper1[drv] = 0;
 else rpds[drv] = (rpds[drv] | DS_DPR) & ~DS_PGM;
 if (rp_unit[drv].flags & UNIT_ATT) rpds[drv] = rpds[drv] | DS_MOL;
 else rpds[drv] = rpds[drv] & ~(DS_MOL | DS_VV | DS_RDY);
 if (rper1[drv] | rper2[drv] | rper3[drv])
-	rpds[drv] = rpds[drv] | DS_ERR;
+    rpds[drv] = rpds[drv] | DS_ERR;
 else rpds[drv] = rpds[drv] & ~DS_ERR;
 
 rpcs1 = (rpcs1 & ~(CS1_SC | CS1_MCPE | CS1_MBZ | CS1_DRV)) | CS1_DVA | flag;
@@ -955,9 +1036,9 @@ if (sim_is_active (uptr)) rpcs1 = rpcs1 | CS1_GO;
 if (rpcs2 & CS2_ERR) rpcs1 = rpcs1 | CS1_TRE | CS1_SC;
 else if (rpcs1 & CS1_TRE) rpcs1 = rpcs1 | CS1_SC;
 for (i = 0; i < RP_NUMDR; i++)
-	if (rpds[i] & DS_ATA) rpcs1 = rpcs1 | CS1_SC;
+    if (rpds[i] & DS_ATA) rpcs1 = rpcs1 | CS1_SC;
 if (rpiff || ((rpcs1 & CS1_SC) && (rpcs1 & CS1_DONE) && (rpcs1 & CS1_IE)))
-	int_req = int_req | INT_RP;
+    int_req = int_req | INT_RP;
 else int_req = int_req & ~INT_RP;
 return;
 }
@@ -966,11 +1047,11 @@ return;
 
 int32 rp_inta (void)
 {
-rpcs1 = rpcs1 & ~CS1_IE;				/* clear int enable */
-rpiff = 0;						/* clear CSTB INTR */
-return VEC_RP;						/* acknowledge */
+rpcs1 = rpcs1 & ~CS1_IE;                                /* clear int enable */
+rpiff = 0;                                              /* clear CSTB INTR */
+return VEC_RP;                                          /* acknowledge */
 }
-
+
 /* Device reset */
 
 t_stat rp_reset (DEVICE *dptr)
@@ -981,27 +1062,28 @@ UNIT *uptr;
 rpcs1 = CS1_DVA | CS1_DONE;
 rpcs2 = CS2_IR | CS2_OR;
 rpba = rpwc = 0;
-rpiff = 0;						/* clear CSTB INTR */
-int_req = int_req & ~INT_RP;				/* clear intr req */
+rpiff = 0;                                              /* clear CSTB INTR */
+int_req = int_req & ~INT_RP;                            /* clear intr req */
 for (i = 0; i < RP_NUMDR; i++) {
-	uptr = rp_dev.units + i;
-	sim_cancel (uptr);
-	uptr->CYL = uptr->FUNC = 0;
-	if (uptr->flags & UNIT_ATT) rpds[i] = (rpds[i] & DS_VV) |
-	    DS_DPR | DS_RDY | DS_MOL | ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
-	else if (uptr->flags & UNIT_DIS) rpds[i] = 0;
-	else rpds[i] = DS_DPR;
-	rper1[i] = 0;
-	rper2[i] = 0;
-	rper3[i] = 0;
-	rpda[i] = 0;
-	rpdc[i] = 0;
-	rpmr[i] = 0;
-	rpof[i] = 0;
-	rpec1[i] = 0;
-	rpec2[i] = 0;
-	rmmr2[i] = 0;
-	rmhr[i] = 0;  }
+    uptr = rp_dev.units + i;
+    sim_cancel (uptr);
+    uptr->CYL = uptr->FUNC = 0;
+    if (uptr->flags & UNIT_ATT) rpds[i] = (rpds[i] & DS_VV) |
+        DS_DPR | DS_RDY | DS_MOL | ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
+    else if (uptr->flags & UNIT_DIS) rpds[i] = 0;
+    else rpds[i] = DS_DPR;
+    rper1[i] = 0;
+    rper2[i] = 0;
+    rper3[i] = 0;
+    rpda[i] = 0;
+    rpdc[i] = 0;
+    rpmr[i] = 0;
+    rpof[i] = 0;
+    rpec1[i] = 0;
+    rpec2[i] = 0;
+    rmmr2[i] = 0;
+    rmhr[i] = 0;
+    }
 return SCPE_OK;
 }
 
@@ -1015,19 +1097,21 @@ t_stat r;
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = attach_unit (uptr, cptr);
 if (r != SCPE_OK) return r;
-drv = uptr - rp_dev.units;				/* get drv number */
+drv = (int32) (uptr - rp_dev.units);                    /* get drv number */
 rpds[drv] = DS_ATA | DS_MOL | DS_RDY | DS_DPR |
-	((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
+    ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
 rper1[drv] = 0;
 update_rpcs (CS1_SC, drv);
 
-if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;	/* autosize? */
+if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;     /* autosize? */
 if ((p = sim_fsize (uptr->fileref)) == 0) return SCPE_OK;
 for (i = 0; drv_tab[i].sect != 0; i++) {
     if (p <= (drv_tab[i].size * (int) sizeof (d10))) {
-	uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
-	uptr->capac = drv_tab[i].size;
-	return SCPE_OK;  }  }
+        uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
+        uptr->capac = drv_tab[i].size;
+        return SCPE_OK;
+        }
+    }
 return SCPE_OK;
 }
 
@@ -1037,16 +1121,17 @@ t_stat rp_detach (UNIT *uptr)
 {
 int32 drv;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;		/* attached? */
-drv = uptr - rp_dev.units;				/* get drv number */
+if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;          /* attached? */
+drv = (int32) (uptr - rp_dev.units);                    /* get drv number */
 rpds[drv] = (rpds[drv] & ~(DS_MOL | DS_RDY | DS_WRL | DS_VV | DS_OF)) |
-	DS_ATA;
-if (sim_is_active (uptr)) {				/* unit active? */
-	sim_cancel (uptr);				/* cancel operation */
-	rper1[drv] = rper1[drv] | ER1_OPI;		/* set drive error */
-	if (uptr->FUNC >= FNC_WCHK)			/* data transfer? */
-	    rpcs1 = rpcs1 | CS1_DONE | CS1_TRE;  }	/* set done, err */
-update_rpcs (CS1_SC, drv);				/* request intr */
+    DS_ATA;
+if (sim_is_active (uptr)) {                             /* unit active? */
+    sim_cancel (uptr);                                  /* cancel operation */
+    rper1[drv] = rper1[drv] | ER1_OPI;                  /* set drive error */
+    if (uptr->FUNC >= FNC_WCHK)                         /* data transfer? */
+        rpcs1 = rpcs1 | CS1_DONE | CS1_TRE;             /* set done, err */
+    }
+update_rpcs (CS1_SC, drv);                              /* request intr */
 return detach_unit (uptr);
 }
 
@@ -1063,102 +1148,102 @@ return SCPE_OK;
 
 /* Device bootstrap */
 
-#define BOOT_START	0377000		/* start */
+#define BOOT_START      0377000                         /* start */
 #define BOOT_LEN (sizeof (boot_rom_dec) / sizeof (d10))
 
 static const d10 boot_rom_dec[] = {
-	0515040000001,			/* boot:hrlzi 1,1	; uba # */
-	0201000140001,			/*	movei 0,140001	; vld,fst,pg 1 */
-	0713001000000+(IOBA_UBMAP+1 & RMASK),	/*	wrio 0,763001(1); set ubmap */
-	0435040000000+(IOBA_RP & RMASK),	/*	iori 1,776700	; rh addr */
-	0202040000000+FE_RHBASE,	/*	movem 1,FE_RHBASE */
-	0201000000040,			/*	movei 0,40	; ctrl reset */
-	0713001000010,			/*	wrio 0,10(1)	; ->RPCS2 */
-	0201000000021,			/*	movei 0,21	; preset */
-	0713001000000,			/*	wrio 0,0(1)	; ->RPCS1 */
-	0201100000001,			/*	movei 2,1	; blk #1 */
-	0265740377032,			/*	jsp 17,rdbl	; read */
-	0204140001000,			/*	movs 3,1000	; id word */
-	0306140505755,			/*	cain 3,sixbit /HOM/ */
-	0254000377023,			/*	jrst .+6	; match */
-	0201100000010,			/*	movei 2,10	; blk #10 */
-	0265740377032,			/*	jsp 17,rdbl	; read */
-	0204140001000,			/*	movs 3,1000	; id word */
-	0302140505755,			/*	caie 3,sixbit /HOM/ */
-	0254200377022,			/*	halt .		; inv home */
-	0336100001103,			/*	skipn 2,1103	; pg of ptrs */
-	0254200377024,			/*	halt .		; inv ptr */
-	0265740377032,			/*	jsp 17,rdbl	; read */
-	0336100001004,			/*	skipn 2,1004	; mon boot */
-	0254200377027,			/*	halt .		; inv ptr */
-	0265740377032,			/*	jsp 17,rdbl	; read */
-	0254000001000,			/*	jrst 1000	; start */
-	0201140176000,			/* rdbl:movei 3,176000 	; wd cnt */
-	0201200004000,			/*	movei 4,4000 	; addr */
-	0200240000000+FE_UNIT,		/*	move 5,FE_UNIT 	; unit */
-	0200300000002,			/*	move 6,2 */
-	0242300777750,			/*	lsh 6,-24.	; cyl */
-	0713141000002,			/*	wrio 3,2(1) 	; ->RPWC */
-	0713201000004,			/*	wrio 4,4(1) 	; ->RPBA */
-	0713101000006,			/*	wrio 2,6(1) 	; ->RPDA */
-	0713241000010,			/*	wrio 5,10(1) 	; ->RPCS2 */
-	0713301000034,			/*	wrio 6,34(1)	; ->RPDC */
-	0201000000071,			/*	movei 0,71	; read+go */
-	0713001000000,			/*	wrio 0,0(1)	; ->RPCS1 */
-	0712341000000,			/*	rdio 7,0(1)	; read csr */
-	0606340000200,			/*	trnn 7,200	; test rdy */
-	0254000377046,			/*	jrst .-2	; loop */
-	0602340100000,			/*	trne 7,100000	; test err */
-	0254200377052,			/*	halt */
-	0254017000000,			/*	jrst 0(17)	; return */
-};
+    0515040000001,                          /* boot:hrlzi 1,1       ; uba # */
+    0201000140001,                          /*      movei 0,140001  ; vld,fst,pg 1 */
+    0713001000000+(IOBA_UBMAP+1 & RMASK),   /*      wrio 0,763001(1); set ubmap */
+    0435040000000+(IOBA_RP & RMASK),        /*      iori 1,776700   ; rh addr */
+    0202040000000+FE_RHBASE,                /*      movem 1,FE_RHBASE */
+    0201000000040,                          /*      movei 0,40      ; ctrl reset */
+    0713001000010,                          /*      wrio 0,10(1)    ; ->RPCS2 */
+    0201000000021,                          /*      movei 0,21      ; preset */
+    0713001000000,                          /*      wrio 0,0(1)     ; ->RPCS1 */
+    0201100000001,                          /*      movei 2,1       ; blk #1 */
+    0265740377032,                          /*      jsp 17,rdbl     ; read */
+    0204140001000,                          /*      movs 3,1000     ; id word */
+    0306140505755,                          /*      cain 3,sixbit /HOM/ */
+    0254000377023,                          /*      jrst .+6        ; match */
+    0201100000010,                          /*      movei 2,10      ; blk #10 */
+    0265740377032,                          /*      jsp 17,rdbl     ; read */
+    0204140001000,                          /*      movs 3,1000     ; id word */
+    0302140505755,                          /*      caie 3,sixbit /HOM/ */
+    0254200377022,                          /*      halt .          ; inv home */
+    0336100001103,                          /*      skipn 2,1103    ; pg of ptrs */
+    0254200377024,                          /*      halt .          ; inv ptr */
+    0265740377032,                          /*      jsp 17,rdbl     ; read */
+    0336100001004,                          /*      skipn 2,1004    ; mon boot */
+    0254200377027,                          /*      halt .          ; inv ptr */
+    0265740377032,                          /*      jsp 17,rdbl     ; read */
+    0254000001000,                          /*      jrst 1000       ; start */
+    0201140176000,                          /* rdbl:movei 3,176000  ; wd cnt */
+    0201200004000,                          /*      movei 4,4000    ; addr */
+    0200240000000+FE_UNIT,                  /*      move 5,FE_UNIT  ; unit */
+    0200300000002,                          /*      move 6,2 */
+    0242300777750,                          /*      lsh 6,-24.      ; cyl */
+    0713141000002,                          /*      wrio 3,2(1)     ; ->RPWC */
+    0713201000004,                          /*      wrio 4,4(1)     ; ->RPBA */
+    0713101000006,                          /*      wrio 2,6(1)     ; ->RPDA */
+    0713241000010,                          /*      wrio 5,10(1)    ; ->RPCS2 */
+    0713301000034,                          /*      wrio 6,34(1)    ; ->RPDC */
+    0201000000071,                          /*      movei 0,71      ; read+go */
+    0713001000000,                          /*      wrio 0,0(1)     ; ->RPCS1 */
+    0712341000000,                          /*      rdio 7,0(1)     ; read csr */
+    0606340000200,                          /*      trnn 7,200      ; test rdy */
+    0254000377046,                          /*      jrst .-2        ; loop */
+    0602340100000,                          /*      trne 7,100000   ; test err */
+    0254200377052,                          /*      halt */
+    0254017000000,                          /*      jrst 0(17)      ; return */
+    };
 
 static const d10 boot_rom_its[] = {
-	0515040000001,			/* boot:hrlzi 1,1	; uba # */
-	0201000140001,			/*	movei 0,140001	; vld,fst,pg 1 */
-	0715000000000+(IOBA_UBMAP+1 & RMASK),	/*	iowrq 0,763001	; set ubmap */
-	0435040000000+(IOBA_RP & RMASK),	/*	iori 1,776700	; rh addr */
-	0202040000000+FE_RHBASE,	/*	movem 1,FE_RHBASE */
-	0201000000040,			/*	movei 0,40	; ctrl reset */
-	0715001000010,			/*	iowrq 0,10(1)	; ->RPCS2 */
-	0201000000021,			/*	movei 0,21	; preset */
-	0715001000000,			/*	iowrq 0,0(1)	; ->RPCS1 */
-	0201100000001,			/*	movei 2,1	; blk #1 */
-	0265740377032,			/*	jsp 17,rdbl	; read */
-	0204140001000,			/*	movs 3,1000	; id word */
-	0306140505755,			/*	cain 3,sixbit /HOM/ */
-	0254000377023,			/*	jrst .+6	; match */
-	0201100000010,			/*	movei 2,10	; blk #10 */
-	0265740377032,			/*	jsp 17,rdbl	; read */
-	0204140001000,			/*	movs 3,1000	; id word */
-	0302140505755,			/*	caie 3,sixbit /HOM/ */
-	0254200377022,			/*	halt .		; inv home */
-	0336100001103,			/*	skipn 2,1103	; pg of ptrs */
-	0254200377024,			/*	halt .		; inv ptr */
-	0265740377032,			/*	jsp 17,rdbl	; read */
-	0336100001004,			/*	skipn 2,1004	; mon boot */
-	0254200377027,			/*	halt .		; inv ptr */
-	0265740377032,			/*	jsp 17,rdbl	; read */
-	0254000001000,			/*	jrst 1000	; start */
-	0201140176000,			/* rdbl:movei 3,176000 	; wd cnt */
-	0201200004000,			/*	movei 4,4000 	; addr */
-	0200240000000+FE_UNIT,		/*	move 5,FE_UNIT 	; unit */
-	0200300000002,			/*	move 6,2 */
-	0242300777750,			/*	lsh 6,-24.	; cyl */
-	0715141000002,			/*	iowrq 3,2(1) 	; ->RPWC */
-	0715201000004,			/*	iowrq 4,4(1) 	; ->RPBA */
-	0715101000006,			/*	iowrq 2,6(1) 	; ->RPDA */
-	0715241000010,			/*	iowrq 5,10(1) 	; ->RPCS2 */
-	0715301000034,			/*	iowrq 6,34(1)	; ->RPDC */
-	0201000000071,			/*	movei 0,71	; read+go */
-	0715001000000,			/*	iowrq 0,0(1)	; ->RPCS1 */
-	0711341000000,			/*	iordq 7,0(1)	; read csr */
-	0606340000200,			/*	trnn 7,200	; test rdy */
-	0254000377046,			/*	jrst .-2	; loop */
-	0602340100000,			/*	trne 7,100000	; test err */
-	0254200377052,			/*	halt */
-	0254017000000,			/*	jrst 0(17)	; return */
-};
+    0515040000001,                          /* boot:hrlzi 1,1       ; uba # */
+    0201000140001,                          /*      movei 0,140001  ; vld,fst,pg 1 */
+    0715000000000+(IOBA_UBMAP+1 & RMASK),   /*      iowrq 0,763001  ; set ubmap */
+    0435040000000+(IOBA_RP & RMASK),        /*      iori 1,776700   ; rh addr */
+    0202040000000+FE_RHBASE,                /*      movem 1,FE_RHBASE */
+    0201000000040,                          /*      movei 0,40      ; ctrl reset */
+    0715001000010,                          /*      iowrq 0,10(1)   ; ->RPCS2 */
+    0201000000021,                          /*      movei 0,21      ; preset */
+    0715001000000,                          /*      iowrq 0,0(1)    ; ->RPCS1 */
+    0201100000001,                          /*      movei 2,1       ; blk #1 */
+    0265740377032,                          /*      jsp 17,rdbl     ; read */
+    0204140001000,                          /*      movs 3,1000     ; id word */
+    0306140505755,                          /*      cain 3,sixbit /HOM/ */
+    0254000377023,                          /*      jrst .+6        ; match */
+    0201100000010,                          /*      movei 2,10      ; blk #10 */
+    0265740377032,                          /*      jsp 17,rdbl     ; read */
+    0204140001000,                          /*      movs 3,1000     ; id word */
+    0302140505755,                          /*      caie 3,sixbit /HOM/ */
+    0254200377022,                          /*      halt .          ; inv home */
+    0336100001103,                          /*      skipn 2,1103    ; pg of ptrs */
+    0254200377024,                          /*      halt .          ; inv ptr */
+    0265740377032,                          /*      jsp 17,rdbl     ; read */
+    0336100001004,                          /*      skipn 2,1004    ; mon boot */
+    0254200377027,                          /*      halt .          ; inv ptr */
+    0265740377032,                          /*      jsp 17,rdbl     ; read */
+    0254000001000,                          /*      jrst 1000       ; start */
+    0201140176000,                          /* rdbl:movei 3,176000  ; wd cnt */
+    0201200004000,                          /*      movei 4,4000    ; addr */
+    0200240000000+FE_UNIT,                  /*      move 5,FE_UNIT  ; unit */
+    0200300000002,                          /*      move 6,2 */
+    0242300777750,                          /*      lsh 6,-24.      ; cyl */
+    0715141000002,                          /*      iowrq 3,2(1)    ; ->RPWC */
+    0715201000004,                          /*      iowrq 4,4(1)    ; ->RPBA */
+    0715101000006,                          /*      iowrq 2,6(1)    ; ->RPDA */
+    0715241000010,                          /*      iowrq 5,10(1)   ; ->RPCS2 */
+    0715301000034,                          /*      iowrq 6,34(1)   ; ->RPDC */
+    0201000000071,                          /*      movei 0,71      ; read+go */
+    0715001000000,                          /*      iowrq 0,0(1)    ; ->RPCS1 */
+    0711341000000,                          /*      iordq 7,0(1)    ; read csr */
+    0606340000200,                          /*      trnn 7,200      ; test rdy */
+    0254000377046,                          /*      jrst .-2        ; loop */
+    0602340100000,                          /*      trne 7,100000   ; test err */
+    0254200377052,                          /*      halt */
+    0254017000000,                          /*      jrst 0(17)      ; return */
+    };
 
 t_stat rp_boot (int32 unitno, DEVICE *dptr)
 {
@@ -1167,7 +1252,7 @@ extern a10 saved_PC;
 
 M[FE_UNIT] = unitno & CS2_M_UNIT;
 for (i = 0; i < BOOT_LEN; i++)
-	M[BOOT_START + i] = ITS? boot_rom_its[i]: boot_rom_dec[i];
+    M[BOOT_START + i] = ITS? boot_rom_its[i]: boot_rom_dec[i];
 saved_PC = BOOT_START;
 return SCPE_OK;
 }

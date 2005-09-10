@@ -1,6 +1,6 @@
 /* sim_console.h: simulator console I/O library headers
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,17 +19,17 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   05-Nov-04	RMS	Moved SET/SHOW DEBUG under CONSOLE hierarchy
-   28-May-04	RMS	Added SET/SHOW CONSOLE
-   02-Jan-04	RMS	Removed timer routines, added Telnet console routines
+   05-Nov-04    RMS     Moved SET/SHOW DEBUG under CONSOLE hierarchy
+   28-May-04    RMS     Added SET/SHOW CONSOLE
+   02-Jan-04    RMS     Removed timer routines, added Telnet console routines
 */
 
 #ifndef _SIM_CONSOLE_H_
-#define _SIM_CONSOLE_H_	0
+#define _SIM_CONSOLE_H_ 0
 
 t_stat sim_set_console (int32 flag, char *cptr);
 t_stat sim_set_kmap (int32 flag, char *cptr);

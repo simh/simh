@@ -52,6 +52,9 @@
 
   Modification history:
 
+  07-Sep-05  DTH  Corrected runt packet processing (found by Tim Chapman),
+                  Removed unused variable
+  16-Aug-05  RMS  Fixed C++ declaration and cast problems
   10-Mar-05  RMS  Fixed equality test in RCSTAT (from Mark Hittinger)
   16-Jan-04  DTH  Added more info to SHOW MOD commands
   09-Jan-04  DTH  Made XU floating address so that XUB will float correctly
@@ -971,7 +974,6 @@ void xu_process_transmit(CTLR* xu)
   uint32 segb, ba;
   int slen, wlen, i, off, giant, runt;
   t_stat rstatus, wstatus;
-  const ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
 
   sim_debug(DBG_TRC, xu->dev, "xu_process_transmit()\n");
 
@@ -1023,9 +1025,10 @@ void xu_process_transmit(CTLR* xu)
     if (xu->var->txhdr[2] & TXR_ENF) {
 
       /* make sure packet is minimum length */
-      if ((xu->var->write_buffer.len < ETH_MIN_PACKET) && (xu->var->mode & MODE_TPAD)) {
-        xu->var->write_buffer.len = ETH_MIN_PACKET;
-        runt = 1;
+      if (xu->var->write_buffer.len < ETH_MIN_PACKET) {
+        xu->var->write_buffer.len = ETH_MIN_PACKET;  /* pad packet to minimum length */
+        if ((xu->var->mode & MODE_TPAD) == 0)  /* if pad mode is NOT on, set runt error flag */
+         runt = 1;
       }
 
       /* are we in internal loopback mode ? */
@@ -1297,11 +1300,11 @@ t_stat xu_attach(UNIT* uptr, char* cptr)
   CTLR* xu = xu_unit2ctlr(uptr);
 
   sim_debug(DBG_TRC, xu->dev, "xu_attach(cptr=%s)\n", cptr);
-  tptr = malloc(strlen(cptr) + 1);
+  tptr = (char *) malloc(strlen(cptr) + 1);
   if (tptr == NULL) return SCPE_MEM;
   strcpy(tptr, cptr);
 
-  xu->var->etherface = malloc(sizeof(ETH_DEV));
+  xu->var->etherface = (ETH_DEV *) malloc(sizeof(ETH_DEV));
   if (!xu->var->etherface) return SCPE_MEM;
 
   status = eth_open(xu->var->etherface, cptr, xu->dev, DBG_ETH);

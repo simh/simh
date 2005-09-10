@@ -1,6 +1,6 @@
 /* pdp11_vh.c: DHQ11 asynchronous terminal multiplexor simulator
 
-   Copyright (c) 2004, John A. Dundas III
+   Copyright (c) 2004-2005, John A. Dundas III
    Portions derived from work by Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -20,31 +20,32 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of the Author shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of the Author shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the Author.
 
-  vh		DHQ11 asynch multiplexor for SIMH
+   vh		DHQ11 asynch multiplexor for SIMH
 
-  12-Jun-04	RMS	Repair MS2SIMH macro to avoid possible divide by
-			0 bug.
-   8-Jun-04	JAD	Repair vh_dev initialization; remove unused
-			variables, cast to avoid conversion confusion.
-   7-Jun-04	JAD	Complete function prototypes of forward declarations.
-			Repair broken prototypes of vh_rd() and vh_wr().
-			Explicitly size integer declarations.
+   07-Jul-05	RMS	Removed extraneous externs
+   15-Jun-05	RMS	Revised for new autoconfigure interface
+			Fixed bug in vector display routine
+   12-Jun-04	RMS	Repair MS2SIMH macro to avoid divide by	0 bug
+   08-Jun-04	JAD	Repair vh_dev initialization; remove unused
+			variables, cast to avoid conversion confusion
+   07-Jun-04	JAD	Complete function prototypes of forward declarations.
+			Repair broken prototypes of vh_rd() and vh_wr()
+			Explicitly size integer declarations
    4-Jun-04	JAD	Preliminary code: If operating in a PDP-11 Unibus
-			environment, force DHU mode.
-  29-May-04	JAD	Make certain RX.TIMER is within allowable range.
-  25-May-04	JAD	All time-based operations are scaled by tmxr_poll
-			units.
-  23-May-04	JAD	Change to fifo_get() and dq_tx_report() to avoid
-			gratuitous stack manipulation.
-  20-May-04	JAD	Made modem control and auto-hangup unit flags
-  19-May-04	JAD	Fix problem with modem status where the line number
+			environment, force DHU mode
+   29-May-04	JAD	Make certain RX.TIMER is within allowable range
+   25-May-04	JAD	All time-based operations are scaled by tmxr_poll units
+   23-May-04	JAD	Change to fifo_get() and dq_tx_report() to avoid
+			gratuitous stack manipulation
+   20-May-04	JAD	Made modem control and auto-hangup unit flags
+   19-May-04	JAD	Fix problem with modem status where the line number
 			was not being included
-  12-May-04	JAD	Revised for updated tmxr interfaces
-  28-Jan-04	JAD	Original creation and testing
+   12-May-04	JAD	Revised for updated tmxr interfaces
+   28-Jan-04	JAD	Original creation and testing
 
 I/O Page Registers
 
@@ -57,18 +58,16 @@ Priority:	BR4
 Rank:		32
 
 */
-/* MANY constants needed! */
+/* MANY constants needed! */
 
 #if	defined (VM_VAX)
 #include "vax_defs.h"
 extern int32	int_req[IPL_HLVL];
-extern int32	int_vec[IPL_HLVL][32];
 #endif
 
 #if	defined (VM_PDP11)
 #include "pdp11_defs.h"
 extern int32	int_req[IPL_HLVL];
-extern int32	int_vec[IPL_HLVL][32];
 extern int32	cpu_opt;
 #endif
 
@@ -235,7 +234,7 @@ extern FILE	*sim_log;
 #define	LOOP_NONE		(0)
 #define	LOOP_H325		(1)
 #define	LOOP_H3101		(2)	/* p.2-13 DHQ manual */
-/* Local storage */
+/* Local storage */
 
 static uint16	vh_csr[VH_MUXES]	= { 0 };	/* CSRs */
 static uint16	vh_timer[VH_MUXES]	= { 1 };	/* controller timeout */
@@ -281,7 +280,7 @@ static TMLN vh_ldsc[VH_MUXES * VH_LINES] = { 0 };
 static TMXR vh_desc = { VH_MUXES * VH_LINES, 0, 0, vh_ldsc };
 static TMLX vh_parm[VH_MUXES * VH_LINES] = { 0 };
 
-/* Forward references */
+/* Forward references */
 static t_stat vh_rd (int32 *data, int32 PA, int32 access);
 static t_stat vh_wr (int32 data, int32 PA, int32 access);
 static t_stat vh_svc (UNIT *uptr);
@@ -302,7 +301,7 @@ static t_stat vh_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 int32 tmxr_send_buffered_data (TMLN *lp);
 
-/* SIMH I/O Structures */
+/* SIMH I/O Structures */
 
 static DIB vh_dib = {
 	IOBA_VH,
@@ -386,7 +385,7 @@ DEVICE vh_dev = {
 	DEV_FLTA | DEV_DISABLE | DEV_NET | DEV_QBUS | DEV_UBUS,	/* flags */
 };
 
-/* Interrupt routines */
+/* Interrupt routines */
 
 static void vh_clr_rxint (	int32	vh	)
 {
@@ -447,7 +446,7 @@ static int32 vh_txinta (void)
 	}
 	return (0);
 }
-/* RX FIFO get/put routines */
+/* RX FIFO get/put routines */
 
 /* return 0 on success, -1 on FIFO overflow */
 
@@ -574,7 +573,7 @@ static int32 fifo_get (	int32	vh	)
 	}
 	return (data & 0177777);
 }
-/* TX Q manipulation */
+/* TX Q manipulation */
 
 static int32 dq_tx_report (	int32	vh	)
 {
@@ -603,7 +602,7 @@ static void q_tx_report (	int32	vh,
 	vh_txq[vh][txq_idx[vh]] = CSR_TX_ACTION | data;
 	txq_idx[vh] += 1;
 }
-/* Channel get/put routines */
+/* Channel get/put routines */
 
 static void HangupModem (	int32	vh,
 				TMLX	*lp,
@@ -692,7 +691,7 @@ static void vh_getc (	int32	vh	)
 	}
 }
 
-/* I/O dispatch routines */
+/* I/O dispatch routines */
 
 static t_stat vh_rd (	int32	*data,
 			int32	PA,
@@ -775,7 +774,7 @@ fprintf (stderr, "\rtqln %d\n", 64 - tmxr_tqln (lp->tmln));
 	}
 	return (SCPE_OK);
 }
-
+
 static t_stat vh_wr (	int32	data,
 			int32	PA,
 			int32	access	)
@@ -1039,7 +1038,7 @@ static t_stat vh_wr (	int32	data,
 	}
 	return (SCPE_OK);
 }
-
+
 static void doDMA (	int32	vh,
 			int32	chan	)
 {
@@ -1133,7 +1132,7 @@ static t_stat vh_svc (	UNIT	*uptr	)
 	return (SCPE_OK);
 }
 
-/* init a channel on a controller */
+/* init a channel on a controller */
 
 /* set for:
 send/receive 9600
@@ -1250,10 +1249,10 @@ static t_stat vh_reset (	DEVICE	*dptr	)
 	CLR_INT (VHTX);
 	for (i = 0; i < VH_MUXES; i++)
 		sim_cancel (&vh_unit[i]);
-	return (auto_config (RANK_VH, (dptr->flags & DEV_DIS) ? 0 : VH_MUXES));
+	return (auto_config (dptr->name, (dptr->flags & DEV_DIS) ? 0 : VH_MUXES));
 }
 
-
+
 static t_stat vh_attach (	UNIT	*uptr,
 				char	*cptr	)
 {
@@ -1298,7 +1297,7 @@ static t_stat vh_show_vec (	FILE	*st,
 				int32	val,
 				void	*desc	)
 {
-	return (show_vec (st, uptr, val, desc));
+	return (show_vec (st, uptr, ((vh_desc.lines * 2) / VH_LINES), desc));
 }
 
 static void debug_line (	FILE	*st,

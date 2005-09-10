@@ -25,17 +25,17 @@
 */
 
 #ifndef _HP2100_FP1_H_
-#define _HP2100_FP1_H_	0
-
+#define _HP2100_FP1_H_  0
 
 /* HP memory representation of an extended-precision number */
 
-typedef struct { uint32 high;
-		 uint32 low; }	XPN;
+typedef struct {
+    uint32      high;
+    uint32      low;
+    } XPN;
 
 
-#define AS_XPN(x) (*(XPN *) &(x))			/* view as XPN */
-
+#define AS_XPN(x) (*(XPN *) &(x))                       /* view as XPN */
 
 XPN ReadX (uint32 va);
 void WriteX (uint32 va, XPN packed);

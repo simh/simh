@@ -1,6 +1,6 @@
 /* sim_fio.h: simulator file I/O library headers
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,22 +19,23 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
+   Except as contained in this notice, the name of Robert M Supnik shall not be
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   02-Jan-04	RMS	Split out from SCP
+   16-Aug-05    RMS     Fixed C++ declaration and cast problems
+   02-Jan-04    RMS     Split out from SCP
 */
 
 #ifndef _SIM_FIO_H_
-#define _SIM_FIO_H_	0
+#define _SIM_FIO_H_     0
 
-#define FLIP_SIZE	(1 << 16)			/* flip buf size */
-#define fxread(a,b,c,d)		sim_fread (a, b, c, d)
-#define fxwrite(a,b,c,d)	sim_fwrite (a, b, c, d)
+#define FLIP_SIZE       (1 << 16)                       /* flip buf size */
+#define fxread(a,b,c,d)         sim_fread (a, b, c, d)
+#define fxwrite(a,b,c,d)        sim_fwrite (a, b, c, d)
 
 int32 sim_finit (void);
-FILE *sim_fopen (char *file, char *mode);
+FILE *sim_fopen (const char *file, const char *mode);
 int sim_fseek (FILE *st, t_addr offset, int whence);
 size_t sim_fread (void *bptr, size_t size, size_t count, FILE *fptr);
 size_t sim_fwrite (void *bptr, size_t size, size_t count, FILE *fptr);

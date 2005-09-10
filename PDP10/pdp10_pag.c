@@ -1,6 +1,6 @@
 /* pdp10_pag.c: PDP-10 paging subsystem simulator
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,18 +19,18 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   pag		KS10 pager
+   pag          KS10 pager
 
-   02-Dec-01	RMS	Fixed bug in ITS LPMR (found by Dave Conroy)
-   21-Aug-01	RMS	Fixed bug in ITS paging (found by Miriam Lennox)
-			Removed register from declarations
-   19-May-01	RMS	Added workaround for TOPS-20 V4.1 boot bug
-   03-May-01	RMS	Fixed bug in indirect page table pointer processing
-   29-Apr-01	RMS	Added CLRCSH for ITS, fixed LPMR
+   02-Dec-01    RMS     Fixed bug in ITS LPMR (found by Dave Conroy)
+   21-Aug-01    RMS     Fixed bug in ITS paging (found by Miriam Lennox)
+                        Removed register from declarations
+   19-May-01    RMS     Added workaround for TOPS-20 V4.1 boot bug
+   03-May-01    RMS     Fixed bug in indirect page table pointer processing
+   29-Apr-01    RMS     Added CLRCSH for ITS, fixed LPMR
 
    The pager consists of a standard hardware part (the translation
    tables) and an operating-system specific page table fill routine.
@@ -45,10 +45,10 @@
    reads and writes.  An expanded pte contains a valid bit, a writeable
    bit, and the physical page number shifted left by the page size.
 
-   	Expanded pte		meaning
-	0			invalid
-	>0			read only
-	<0			read write
+        Expanded pte            meaning
+        0                       invalid
+        >0                      read only
+        <0                      read write
 
    There is a third, physical table, which is used in place of the
    executive and user tables if paging is off.  Its entries are always
@@ -65,34 +65,34 @@
    The page fill routine is operating system dependent.  Three styles
    of paging are supported:
 
-	TOPS10		known in the KS10 microcode as KI10 paging,
-			used by earlier versions of TOPS10
-	TOPS20		known in the KS10 microcode as KL10 paging,
-			used by later versions of TOPS10, and TOPS20
-	ITS		used only by ITS
+        TOPS10          known in the KS10 microcode as KI10 paging,
+                        used by earlier versions of TOPS10
+        TOPS20          known in the KS10 microcode as KL10 paging,
+                        used by later versions of TOPS10, and TOPS20
+        ITS             used only by ITS
 
    TOPS10 vs TOPS20 is selected by a bit in the EBR; ITS paging is
    "hardwired" (it required different microcode).
 */
-
+
 #include "pdp10_defs.h"
 #include <setjmp.h>
 
 /* Page table (contains expanded pte's) */
 
-#define PTBL_ASIZE	PAG_N_VPN
-#define PTBL_MEMSIZE	(1 << PTBL_ASIZE)		/* page table size */
-#define PTBL_AMASK	(PTBL_MEMSIZE - 1)
-#define PTBL_M		(1u << 31)			/* must be sign bit */
-#define PTBL_V		(1u << 30)
-#define PTBL_MASK	(PAG_PPN | PTBL_M | PTBL_V)
+#define PTBL_ASIZE      PAG_N_VPN
+#define PTBL_MEMSIZE    (1 << PTBL_ASIZE)               /* page table size */
+#define PTBL_AMASK      (PTBL_MEMSIZE - 1)
+#define PTBL_M          (1u << 31)                      /* must be sign bit */
+#define PTBL_V          (1u << 30)
+#define PTBL_MASK       (PAG_PPN | PTBL_M | PTBL_V)
 
 /* NXM processing */
 
-#define REF_V		0				/* ref is virt */
-#define REF_P		1				/* ref is phys */
-#define PF_OK		0				/* pfail ok */
-#define PF_TR		1				/* pfail trap */
+#define REF_V           0                               /* ref is virt */
+#define REF_P           1                               /* ref is phys */
+#define PF_OK           0                               /* pfail ok */
+#define PF_TR           1                               /* pfail trap */
 
 extern d10 *M;
 extern d10 acs[AC_NBLK * AC_NUM];
@@ -111,9 +111,9 @@ extern jmp_buf save_env;
 extern int32 test_int (void);
 extern int32 pi_eval (void);
 
-int32 eptbl[PTBL_MEMSIZE];				/* exec page table */
-int32 uptbl[PTBL_MEMSIZE];				/* user page table */
-int32 physptbl[PTBL_MEMSIZE];				/* phys page table */
+int32 eptbl[PTBL_MEMSIZE];                              /* exec page table */
+int32 uptbl[PTBL_MEMSIZE];                              /* user page table */
+int32 physptbl[PTBL_MEMSIZE];                           /* phys page table */
 int32 *ptbl_cur, *ptbl_prv;
 int32 save_ea;
 
@@ -122,29 +122,32 @@ t_stat pag_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat pag_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat pag_reset (DEVICE *dptr);
 void pag_nxm (a10 pa, int32 phys, int32 trap);
-
+
 /* Pager data structures
 
-   pag_dev	pager device descriptor
-   pag_unit	pager units
-   pager_reg	pager register list
+   pag_dev      pager device descriptor
+   pag_unit     pager units
+   pager_reg    pager register list
 */
 
 UNIT pag_unit[] = {
-	{ UDATA (NULL, UNIT_FIX, PTBL_MEMSIZE) },
-	{ UDATA (NULL, UNIT_FIX, PTBL_MEMSIZE) }  };
+    { UDATA (NULL, UNIT_FIX, PTBL_MEMSIZE) },
+    { UDATA (NULL, UNIT_FIX, PTBL_MEMSIZE) }
+    };
 
 REG pag_reg[] = {
-	{ ORDATA (PANIC_EA, save_ea, PASIZE), REG_HRO },
-	{ NULL }  };
+    { ORDATA (PANIC_EA, save_ea, PASIZE), REG_HRO },
+    { NULL }
+    };
 
 DEVICE pag_dev = {
-	"PAG", pag_unit, pag_reg, NULL,
-	2, 8, PTBL_ASIZE, 1, 8, 32,
-	&pag_ex, &pag_dep, &pag_reset,
-	NULL, NULL, NULL,
-	NULL, 0 };
-
+    "PAG", pag_unit, pag_reg, NULL,
+    2, 8, PTBL_ASIZE, 1, 8, 32,
+    &pag_ex, &pag_dep, &pag_reset,
+    NULL, NULL, NULL,
+    NULL, 0
+    };
+
 /* Memory read and write routines
 
    Read - read current or previous, read checking
@@ -161,62 +164,65 @@ d10 Read (a10 ea, int32 prv)
 {
 int32 pa, vpn, xpte;
 
-if (ea < AC_NUM) return (prv? ac_prv[ea]: ac_cur[ea]);	/* AC request */
-vpn = PAG_GETVPN (ea);					/* get page num */
-xpte = prv? ptbl_prv[vpn]: ptbl_cur[vpn];		/* get exp pte */
+if (ea < AC_NUM) return (prv? ac_prv[ea]: ac_cur[ea]);  /* AC request */
+vpn = PAG_GETVPN (ea);                                  /* get page num */
+xpte = prv? ptbl_prv[vpn]: ptbl_cur[vpn];               /* get exp pte */
 if (xpte == 0) xpte = ptbl_fill (ea, prv? ptbl_prv: ptbl_cur, PTF_RD);
-pa = PAG_XPTEPA (xpte, ea);				/* calc phys addr */
-if (MEM_ADDR_NXM (pa)) pag_nxm (pa, REF_V, PF_TR);	/* process nxm */
-return M[pa];						/* return data */
+pa = PAG_XPTEPA (xpte, ea);                             /* calc phys addr */
+if (MEM_ADDR_NXM (pa)) pag_nxm (pa, REF_V, PF_TR);      /* process nxm */
+return M[pa];                                           /* return data */
 }
 
 d10 ReadM (a10 ea, int32 prv)
 {
 int32 pa, vpn, xpte;
 
-if (ea < AC_NUM) return (prv? ac_prv[ea]: ac_cur[ea]);	/* AC request */
-vpn = PAG_GETVPN (ea);					/* get page num */
-xpte = prv? ptbl_prv[vpn]: ptbl_cur[vpn];		/* get exp pte */
+if (ea < AC_NUM) return (prv? ac_prv[ea]: ac_cur[ea]);  /* AC request */
+vpn = PAG_GETVPN (ea);                                  /* get page num */
+xpte = prv? ptbl_prv[vpn]: ptbl_cur[vpn];               /* get exp pte */
 if (xpte >= 0) xpte = ptbl_fill (ea, prv? ptbl_prv: ptbl_cur, PTF_WR);
-pa = PAG_XPTEPA (xpte, ea);				/* calc phys addr */
-if (MEM_ADDR_NXM (pa)) pag_nxm (pa, REF_V, PF_TR);	/* process nxm */
-return M[pa];						/* return data */
+pa = PAG_XPTEPA (xpte, ea);                             /* calc phys addr */
+if (MEM_ADDR_NXM (pa)) pag_nxm (pa, REF_V, PF_TR);      /* process nxm */
+return M[pa];                                           /* return data */
 }
 
 d10 ReadE (a10 ea)
 {
 int32 pa, vpn, xpte;
 
-if (ea < AC_NUM) return AC(ea);				/* AC? use current */
-if (!PAGING) return M[ea];				/* phys? no mapping */
-vpn = PAG_GETVPN (ea);					/* get page num */
-xpte = eptbl[vpn];					/* get exp pte, exec tbl */
+if (ea < AC_NUM) return AC(ea);                         /* AC? use current */
+if (!PAGING) return M[ea];                              /* phys? no mapping */
+vpn = PAG_GETVPN (ea);                                  /* get page num */
+xpte = eptbl[vpn];                                      /* get exp pte, exec tbl */
 if (xpte == 0) xpte = ptbl_fill (ea, eptbl, PTF_RD);
-pa = PAG_XPTEPA (xpte, ea);				/* calc phys addr */
-if (MEM_ADDR_NXM (pa)) pag_nxm (pa, REF_V, PF_TR);	/* process nxm */
-return M[pa];						/* return data */
+pa = PAG_XPTEPA (xpte, ea);                             /* calc phys addr */
+if (MEM_ADDR_NXM (pa)) pag_nxm (pa, REF_V, PF_TR);      /* process nxm */
+return M[pa];                                           /* return data */
 }
 
 d10 ReadP (a10 ea)
 {
-if (ea < AC_NUM) return AC(ea);				/* AC request */
-if (MEM_ADDR_NXM (ea)) pag_nxm (ea, REF_P, PF_TR);	/* process nxm */
-return M[ea];						/* return data */
+if (ea < AC_NUM) return AC(ea);                         /* AC request */
+if (MEM_ADDR_NXM (ea)) pag_nxm (ea, REF_P, PF_TR);      /* process nxm */
+return M[ea];                                           /* return data */
 }
 
 void Write (a10 ea, d10 val, int32 prv)
 {
 int32 pa, vpn, xpte;
 
-if (ea < AC_NUM) {					/* AC request */
-	if (prv) ac_prv[ea] = val;			/* write AC */
-	else ac_cur[ea] = val;  }
-else {	vpn = PAG_GETVPN (ea);				/* get page num */
-	xpte = prv? ptbl_prv[vpn]: ptbl_cur[vpn];	/* get exp pte */
-	if (xpte >= 0) xpte = ptbl_fill (ea, prv? ptbl_prv: ptbl_cur, PTF_WR);
-	pa = PAG_XPTEPA (xpte, ea);			/* calc phys addr */
-	if (MEM_ADDR_NXM (pa)) pag_nxm (pa, REF_V, PF_TR); /* process nxm */
-	else M[pa] = val;  }				/* write data */
+if (ea < AC_NUM) {                                      /* AC request */
+    if (prv) ac_prv[ea] = val;                          /* write AC */
+    else ac_cur[ea] = val;
+    }
+else {
+    vpn = PAG_GETVPN (ea);                              /* get page num */
+    xpte = prv? ptbl_prv[vpn]: ptbl_cur[vpn];           /* get exp pte */
+    if (xpte >= 0) xpte = ptbl_fill (ea, prv? ptbl_prv: ptbl_cur, PTF_WR);
+    pa = PAG_XPTEPA (xpte, ea);                         /* calc phys addr */
+    if (MEM_ADDR_NXM (pa)) pag_nxm (pa, REF_V, PF_TR);  /* process nxm */
+    else M[pa] = val;                                   /* write data */
+    }
 return;
 }
 
@@ -224,22 +230,26 @@ void WriteE (a10 ea, d10 val)
 {
 int32 pa, vpn, xpte;
 
-if (ea < AC_NUM) AC(ea) = val;				/* AC? use current */
-else if (!PAGING) M[ea] = val;				/* phys? no mapping */
-else {	vpn = PAG_GETVPN (ea);				/* get page num */
-	xpte = eptbl[vpn];				/* get exp pte, exec tbl */
-	if (xpte >= 0) xpte = ptbl_fill (ea, eptbl, PTF_WR);
-	pa = PAG_XPTEPA (xpte, ea);			/* calc phys addr */
-	if (MEM_ADDR_NXM (pa)) pag_nxm (pa, REF_V, PF_TR); /* process nxm */
-	else M[pa] = val;  }				/* write data */
+if (ea < AC_NUM) AC(ea) = val;                          /* AC? use current */
+else if (!PAGING) M[ea] = val;                          /* phys? no mapping */
+else {
+    vpn = PAG_GETVPN (ea);                              /* get page num */
+    xpte = eptbl[vpn];                                  /* get exp pte, exec tbl */
+    if (xpte >= 0) xpte = ptbl_fill (ea, eptbl, PTF_WR);
+    pa = PAG_XPTEPA (xpte, ea);                         /* calc phys addr */
+    if (MEM_ADDR_NXM (pa)) pag_nxm (pa, REF_V, PF_TR);  /* process nxm */
+    else M[pa] = val;                                   /* write data */
+    }
 return;
 }
 
 void WriteP (a10 ea, d10 val)
 {
-if (ea < AC_NUM) AC(ea) = val;				/* AC request */
-else {	if (MEM_ADDR_NXM (ea)) pag_nxm (ea, REF_P, PF_TR); /* process nxm */
-	M[ea] = val;  }					/* memory */
+if (ea < AC_NUM) AC(ea) = val;                          /* AC request */
+else {
+    if (MEM_ADDR_NXM (ea)) pag_nxm (ea, REF_P, PF_TR);  /* process nxm */
+    M[ea] = val;                                        /* memory */
+    }
 return;
 }
 
@@ -247,25 +257,25 @@ t_bool AccViol (a10 ea, int32 prv, int32 mode)
 {
 int32 vpn, xpte;
 
-if (ea < AC_NUM) return FALSE;				/* AC request */
-vpn = PAG_GETVPN (ea);					/* get page num */
-xpte = prv? ptbl_prv[vpn]: ptbl_cur[vpn];		/* get exp pte */
-if ((xpte == 0) || ((mode & PTF_WR) && (xpte > 0)))	/* not accessible? */
-	xpte = ptbl_fill (ea, prv? ptbl_prv: ptbl_cur, mode | PTF_MAP);
-if (xpte) return FALSE;					/* accessible */
-return TRUE;						/* not accessible */
+if (ea < AC_NUM) return FALSE;                          /* AC request */
+vpn = PAG_GETVPN (ea);                                  /* get page num */
+xpte = prv? ptbl_prv[vpn]: ptbl_cur[vpn];               /* get exp pte */
+if ((xpte == 0) || ((mode & PTF_WR) && (xpte > 0)))     /* not accessible? */
+    xpte = ptbl_fill (ea, prv? ptbl_prv: ptbl_cur, mode | PTF_MAP);
+if (xpte) return FALSE;                                 /* accessible */
+return TRUE;                                            /* not accessible */
 }
 
 void pag_nxm (a10 pa, int32 phys, int32 trap)
 {
-apr_flg = apr_flg | APRF_NXM;				/* set APR flag */
-pi_eval ();						/* eval intr */
+apr_flg = apr_flg | APRF_NXM;                           /* set APR flag */
+pi_eval ();                                             /* eval intr */
 pager_word = PF_NXM | (phys? PF_NXMP: 0) |
-	(TSTF (F_USR)? PF_USER: 0) | ((d10) pa);
-if (PAGING && trap) ABORT (PAGE_FAIL);			/* trap? */
+    (TSTF (F_USR)? PF_USER: 0) | ((d10) pa);
+if (PAGING && trap) ABORT (PAGE_FAIL);                  /* trap? */
 return;
 }
-
+
 /* Page table fill
 
    This routine is called if the page table is invalid, or on a write
@@ -274,18 +284,19 @@ return;
    pte for use by the caller.  Otherwise, it generates a page fail.
 
    Notes:
-	- If called from the console, invalid references return a pte
-	  of 0, and the page table entry is not filled.
-	- If called from MAP, invalid references return a pte of 0. The
-	  page fail word is properly set up.
+        - If called from the console, invalid references return a pte
+          of 0, and the page table entry is not filled.
+        - If called from MAP, invalid references return a pte of 0. The
+          page fail word is properly set up.
 */
 
-#define PAGE_FAIL_TRAP	if (mode & (PTF_CON | PTF_MAP)) return 0; \
-			ABORT (PAGE_FAIL)
-#define READPT(x,y)	if (MEM_ADDR_NXM (y)) { \
-				pag_nxm (y, REF_P, PF_OK); \
-				PAGE_FAIL_TRAP;  } \
-			x = ReadP (y)
+#define PAGE_FAIL_TRAP  if (mode & (PTF_CON | PTF_MAP)) return 0; \
+                        ABORT (PAGE_FAIL)
+#define READPT(x,y)     if (MEM_ADDR_NXM (y)) { \
+                            pag_nxm (y, REF_P, PF_OK); \
+                            PAGE_FAIL_TRAP; \
+                            } \
+                        x = ReadP (y)
 
 int32 ptbl_fill (a10 ea, int32 *tbl, int32 mode)
 {
@@ -300,32 +311,34 @@ int32 ptbl_fill (a10 ea, int32 *tbl, int32 mode)
    ITS has no MAP instruction, therefore, physical NXM traps are ok.
 */
 
-if (ITS) {						/* ITS paging */
-	int32 acc, decvpn, pte, vpn, ptead, xpte;
-	d10 ptewd;
+if (ITS) {                                              /* ITS paging */
+    int32 acc, decvpn, pte, vpn, ptead, xpte;
+    d10 ptewd;
 
-	vpn = ITS_GETVPN (ea);				/* get ITS pagno */
-	if (tbl == uptbl)
-	    ptead = ((ea & RSIGN)? dbr2: dbr1) + ((vpn >> 1) & 077);
-	else ptead = ((ea & RSIGN)? dbr3: dbr4) + ((vpn >> 1) & 077);
-	ptewd = ReadP (ptead);				/* get PTE pair */
-	pte = (int32) ((ptewd >> ((vpn & 1)? 0: 18)) & RMASK);
-	acc = ITS_GETACC (pte);				/* get access */
-	pager_word = PF_VIRT | ea | ((tbl == uptbl)? PF_USER: 0) |
-	    ((mode & PTF_WR)? PF_ITS_WRITE: 0) | (acc << PF_ITS_V_ACC);
-	if ((acc != ITS_ACC_NO) && (!(mode & PTF_WR) || (acc == ITS_ACC_RW))) { 
-	    pte = pte & ~PTE_ITS_AGE;		/* clear age */
-	    if (vpn & 1) WriteP (ptead, (ptewd & LMASK) | pte);
-	    else WriteP (ptead, (ptewd & RMASK) | (((d10) pte) << 18));
-	    xpte = ((pte & PTE_ITS_PPMASK) << ITS_V_PN) | PTBL_V |
-		((acc == ITS_ACC_RW)? PTBL_M: 0);
-	    decvpn = PAG_GETVPN (ea);			/* get tlb idx */
-	    if (!(mode & PTF_CON)) {
-		tbl[decvpn & ~1] = xpte;		/* map lo ITS page */
-		tbl[decvpn | 1] = xpte + PAG_SIZE;  }	/* map hi */
-	    return (xpte + ((decvpn & 1)? PAG_SIZE: 0));  }
-	PAGE_FAIL_TRAP;
-	}						/* end ITS paging */
+    vpn = ITS_GETVPN (ea);                              /* get ITS pagno */
+    if (tbl == uptbl)
+        ptead = ((ea & RSIGN)? dbr2: dbr1) + ((vpn >> 1) & 077);
+    else ptead = ((ea & RSIGN)? dbr3: dbr4) + ((vpn >> 1) & 077);
+    ptewd = ReadP (ptead);                              /* get PTE pair */
+    pte = (int32) ((ptewd >> ((vpn & 1)? 0: 18)) & RMASK);
+    acc = ITS_GETACC (pte);                             /* get access */
+    pager_word = PF_VIRT | ea | ((tbl == uptbl)? PF_USER: 0) |
+        ((mode & PTF_WR)? PF_ITS_WRITE: 0) | (acc << PF_ITS_V_ACC);
+    if ((acc != ITS_ACC_NO) && (!(mode & PTF_WR) || (acc == ITS_ACC_RW))) { 
+        pte = pte & ~PTE_ITS_AGE;                       /* clear age */
+        if (vpn & 1) WriteP (ptead, (ptewd & LMASK) | pte);
+        else WriteP (ptead, (ptewd & RMASK) | (((d10) pte) << 18));
+        xpte = ((pte & PTE_ITS_PPMASK) << ITS_V_PN) | PTBL_V |
+            ((acc == ITS_ACC_RW)? PTBL_M: 0);
+        decvpn = PAG_GETVPN (ea);                       /* get tlb idx */
+        if (!(mode & PTF_CON)) {
+            tbl[decvpn & ~1] = xpte;                    /* map lo ITS page */
+            tbl[decvpn | 1] = xpte + PAG_SIZE;          /* map hi */
+            }
+        return (xpte + ((decvpn & 1)? PAG_SIZE: 0));
+        }
+    PAGE_FAIL_TRAP;
+    }                                                   /* end ITS paging */
 
 /* TOPS-10 paging - checked against KS10 microcode
 
@@ -335,61 +348,62 @@ if (ITS) {						/* ITS paging */
    user process tables.
 */
 
-else if (!T20) {					/* TOPS-10 paging */
-	int32 pte, vpn, ptead, xpte;
-	d10 ptewd;
+else if (!T20) {                                        /* TOPS-10 paging */
+    int32 pte, vpn, ptead, xpte;
+    d10 ptewd;
 
-	vpn = PAG_GETVPN (ea);				/* get virt page num */
-	if (tbl == uptbl) ptead = upta + UPT_T10_UMAP + (vpn >> 1);
-	else if (vpn < 0340) ptead = epta + EPT_T10_X000 + (vpn >> 1);
-	else if (vpn < 0400) ptead = upta + UPT_T10_X340 + ((vpn - 0340) >> 1);
-	else ptead = epta + EPT_T10_X400 + ((vpn - 0400) >> 1);
-	READPT (ptewd, ptead);				/* get PTE pair */
-	pte = (int32) ((ptewd >> ((vpn & 1)? 0: 18)) & RMASK);
-	pager_word = PF_VIRT | ea | ((tbl == uptbl)? PF_USER: 0) |
-		((mode & PTF_WR)? PF_WRITE: 0) |
-		((pte & PTE_T10_A)? PF_T10_A |
-		    ((pte & PTE_T10_S)? PF_T10_S: 0): 0);
-	if (mode & PTF_MAP) pager_word = pager_word |	/* map? add to pf wd */
-		((pte & PTE_T10_W)? PF_T10_W: 0) |	/* W, S, C bits */
-		((pte & PTE_T10_S)? PF_T10_S: 0) |
-		((pte & PTE_T10_C)? PF_C: 0);
-	if ((pte & PTE_T10_A) && (!(mode & PTF_WR) || (pte & PTE_T10_W))) {
-		xpte = ((pte & PTE_PPMASK) << PAG_V_PN) | /* calc exp pte */
-		     PTBL_V | ((pte & PTE_T10_W)? PTBL_M: 0);
-		if (!(mode & PTF_CON)) tbl[vpn] = xpte;	/* set tbl if ~cons */
-		return xpte;  }
-	PAGE_FAIL_TRAP;
-	}						/* end TOPS10 paging */
+    vpn = PAG_GETVPN (ea);                              /* get virt page num */
+    if (tbl == uptbl) ptead = upta + UPT_T10_UMAP + (vpn >> 1);
+    else if (vpn < 0340) ptead = epta + EPT_T10_X000 + (vpn >> 1);
+    else if (vpn < 0400) ptead = upta + UPT_T10_X340 + ((vpn - 0340) >> 1);
+    else ptead = epta + EPT_T10_X400 + ((vpn - 0400) >> 1);
+    READPT (ptewd, ptead);                              /* get PTE pair */
+    pte = (int32) ((ptewd >> ((vpn & 1)? 0: 18)) & RMASK);
+    pager_word = PF_VIRT | ea | ((tbl == uptbl)? PF_USER: 0) |
+        ((mode & PTF_WR)? PF_WRITE: 0) |
+        ((pte & PTE_T10_A)? PF_T10_A |
+        ((pte & PTE_T10_S)? PF_T10_S: 0): 0);
+    if (mode & PTF_MAP) pager_word = pager_word |       /* map? add to pf wd */
+        ((pte & PTE_T10_W)? PF_T10_W: 0) |              /* W, S, C bits */
+        ((pte & PTE_T10_S)? PF_T10_S: 0) |
+        ((pte & PTE_T10_C)? PF_C: 0);
+    if ((pte & PTE_T10_A) && (!(mode & PTF_WR) || (pte & PTE_T10_W))) {
+        xpte = ((pte & PTE_PPMASK) << PAG_V_PN) |       /* calc exp pte */
+            PTBL_V | ((pte & PTE_T10_W)? PTBL_M: 0);
+        if (!(mode & PTF_CON)) tbl[vpn] = xpte;         /* set tbl if ~cons */
+        return xpte;
+        }
+    PAGE_FAIL_TRAP;
+    }                                                   /* end TOPS10 paging */
 
 /* TOPS-20 paging - checked against KS10 ucode.
 
    TOPS-20 paging has three phases:
 
-   1.	Starting at EPT/UPT + 540 + section number, chase section pointers to
-	get the pointer to the section page table.  In the KS10, because there
-	is only one section, the microcode caches the result of this evaluation.
-	Also, the evaluation of indirect pointers is simplified, as the section
-	table index is ignored.
+   1.   Starting at EPT/UPT + 540 + section number, chase section pointers to
+        get the pointer to the section page table.  In the KS10, because there
+        is only one section, the microcode caches the result of this evaluation.
+        Also, the evaluation of indirect pointers is simplified, as the section
+        table index is ignored.
 
-   2.	Starting with the page map pointer, chase page pointers to get the
-	pointer to the page.  The KS10 allows the operating system to inhibit
-	updating of the CST (base address = 0).
+   2.   Starting with the page map pointer, chase page pointers to get the
+        pointer to the page.  The KS10 allows the operating system to inhibit
+        updating of the CST (base address = 0).
 
-   3.	Use the page pointer to get the CST entry.  If a write reference to
-	a writeable page, set CST_M.  If CST_M is set, set M in page table.
+   3.   Use the page pointer to get the CST entry.  If a write reference to
+        a writeable page, set CST_M.  If CST_M is set, set M in page table.
 */
 
-else {							/* TOPS-20 paging */
-	int32 pmi, vpn, xpte;
-	int32 flg, t;
-	t_bool stop;
-	a10 pa, csta;
-	d10 ptr, cste;
-	d10 acc = PTE_T20_W | PTE_T20_C;		/* init access bits */
+else {                                                  /* TOPS-20 paging */
+    int32 pmi, vpn, xpte;
+    int32 flg, t;
+    t_bool stop;
+    a10 pa, csta;
+    d10 ptr, cste;
+    d10 acc = PTE_T20_W | PTE_T20_C;                    /* init access bits */
 
-	pager_word = PF_VIRT | ea | ((tbl == uptbl)? PF_USER: 0) |
-	    ((mode & PTF_WR)? PF_WRITE: 0);		/* set page fail word */
+    pager_word = PF_VIRT | ea | ((tbl == uptbl)? PF_USER: 0) |
+        ((mode & PTF_WR)? PF_WRITE: 0);                 /* set page fail word */
 
 /* First phase - evaluate section pointers - returns a ptr to a page map
    As a single section machine, the KS10 short circuits this part of the
@@ -407,99 +421,112 @@ else {							/* TOPS-20 paging */
    to generate the right behavior for the diagnostic.
 */
 
-	vpn = PAG_GETVPN (ea);				/* get virt page num */
-	pa = (tbl == uptbl)? upta + UPT_T20_SCTN: epta + EPT_T20_SCTN;
-	READPT (ptr, pa & PAMASK);			/* get section 0 ptr */
-	for (stop = FALSE, flg = 0; !stop; flg++) {	/* eval section ptrs */
-	    acc = acc & ptr;				/* cascade acc bits */
-	    switch (T20_GETTYP (ptr)) {			/* case on ptr type */
-	    case T20_NOA:				/* no access */
-	    default:					/* undefined type */
-		PAGE_FAIL_TRAP;				/* page fail */
-	    case T20_IMM:				/* immediate */
-		stop = TRUE;				/* exit */
-		break;
-	    case T20_SHR:				/* shared */
-		pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
-		READPT (ptr, pa & PAMASK);		/* get SPT entry */
-		stop = TRUE;				/* exit */
-		break;
-	    case T20_IND:				/* indirect */
-		if (flg && (t = test_int ())) ABORT (t);
-		pmi = T20_GETPMI (ptr);			/* get sect tbl idx */
-		pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
-		if (pmi) {				/* for dskec */
-		    pag_nxm ((pmi << 18) | pa, REF_P, PF_OK);
-			PAGE_FAIL_TRAP;  }
-		READPT (ptr, pa & PAMASK);		/* get SPT entry */
-		if (ptr & PTE_T20_STM) { PAGE_FAIL_TRAP; }
-		pa = PAG_PTEPA (ptr, pmi);		/* index off page */
-		READPT (ptr, pa & PAMASK);		/* get pointer */
-		break;					/* continue in loop */
-		}					/* end case */
-	    }						/* end for */
+    vpn = PAG_GETVPN (ea);                              /* get virt page num */
+    pa = (tbl == uptbl)? upta + UPT_T20_SCTN: epta + EPT_T20_SCTN;
+    READPT (ptr, pa & PAMASK);                          /* get section 0 ptr */
+    for (stop = FALSE, flg = 0; !stop; flg++) {         /* eval section ptrs */
+        acc = acc & ptr;                                /* cascade acc bits */
+        switch (T20_GETTYP (ptr)) {                     /* case on ptr type */
+
+        case T20_NOA:                                   /* no access */
+        default:                                        /* undefined type */
+            PAGE_FAIL_TRAP;                             /* page fail */
+
+        case T20_IMM:                                   /* immediate */
+            stop = TRUE;                                /* exit */
+            break;
+
+        case T20_SHR:                                   /* shared */
+            pa = (int32) (spt + (ptr & RMASK));         /* get SPT idx */
+            READPT (ptr, pa & PAMASK);                  /* get SPT entry */
+            stop = TRUE;                                /* exit */
+            break;
+
+        case T20_IND:                                   /* indirect */
+            if (flg && (t = test_int ())) ABORT (t);
+            pmi = T20_GETPMI (ptr);                     /* get sect tbl idx */
+            pa = (int32) (spt + (ptr & RMASK));         /* get SPT idx */
+            if (pmi) {                                  /* for dskec */
+                pag_nxm ((pmi << 18) | pa, REF_P, PF_OK);
+                PAGE_FAIL_TRAP;
+                }
+            READPT (ptr, pa & PAMASK);                  /* get SPT entry */
+            if (ptr & PTE_T20_STM) { PAGE_FAIL_TRAP; }
+            pa = PAG_PTEPA (ptr, pmi);                  /* index off page */
+            READPT (ptr, pa & PAMASK);                  /* get pointer */
+            break;                                      /* continue in loop */
+            }                                           /* end case */
+        }                                               /* end for */
 
 /* Second phase - found page map ptr, evaluate page pointers */
 
-	pa = PAG_PTEPA (ptr, vpn);			/* get ptbl address */
-	for (stop = FALSE, flg = 0; !stop; flg++) {	/* eval page ptrs */
-	    if (ptr & PTE_T20_STM) { PAGE_FAIL_TRAP; }	/* non-res? */
-	    if (cst) {					/* cst really there? */
-		csta = (int32) ((cst + (ptr & PTE_PPMASK)) & PAMASK);
-		READPT (cste, csta);			/* get CST entry */
-		if ((cste & CST_AGE) == 0) { PAGE_FAIL_TRAP; }
-		cste = (cste & cstm) | pur;		/* update entry */
-		WriteP (csta, cste);  }			/* rewrite */
-	    READPT (ptr, pa & PAMASK);			/* get pointer */
-	    acc = acc & ptr;				/* cascade acc bits */
-	    switch (T20_GETTYP (ptr)) {			/* case on ptr type */
-	    case T20_NOA:				/* no access */
-	    default:					/* undefined type */
-		PAGE_FAIL_TRAP;				/* page fail */
-	    case T20_IMM:				/* immediate */
-		stop = TRUE;				/* exit */
-		break;
-	    case T20_SHR:				/* shared */
-		pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
-		READPT (ptr, pa & PAMASK);		/* get SPT entry */
-		stop = TRUE;				/* exit */
-		break;
-	    case T20_IND:				/* indirect */
-		if (flg && (t = test_int ())) ABORT (t);
-		pmi = T20_GETPMI (ptr);			/* get section index */
-		pa = (int32) (spt + (ptr & RMASK));	/* get SPT idx */
-		READPT (ptr, pa & PAMASK);		/* get SPT entry */
-		pa = PAG_PTEPA (ptr, pmi);		/* index off page */
-		break;					/* continue in loop */
-		}					/* end case */
-	    }						/* end for */
+    pa = PAG_PTEPA (ptr, vpn);                          /* get ptbl address */
+    for (stop = FALSE, flg = 0; !stop; flg++) {         /* eval page ptrs */
+        if (ptr & PTE_T20_STM) { PAGE_FAIL_TRAP; }      /* non-res? */
+        if (cst) {                                      /* cst really there? */
+            csta = (int32) ((cst + (ptr & PTE_PPMASK)) & PAMASK);
+            READPT (cste, csta);                        /* get CST entry */
+            if ((cste & CST_AGE) == 0) { PAGE_FAIL_TRAP; }
+            cste = (cste & cstm) | pur;                 /* update entry */
+            WriteP (csta, cste);                        /* rewrite */
+            }
+        READPT (ptr, pa & PAMASK);                      /* get pointer */
+        acc = acc & ptr;                                /* cascade acc bits */
+        switch (T20_GETTYP (ptr)) {                     /* case on ptr type */
+
+        case T20_NOA:                                   /* no access */
+        default:                                        /* undefined type */
+            PAGE_FAIL_TRAP;                             /* page fail */
+
+        case T20_IMM:                                   /* immediate */
+            stop = TRUE;                                /* exit */
+            break;
+
+        case T20_SHR:                                   /* shared */
+            pa = (int32) (spt + (ptr & RMASK));         /* get SPT idx */
+            READPT (ptr, pa & PAMASK);                  /* get SPT entry */
+            stop = TRUE;                                /* exit */
+            break;
+
+        case T20_IND:                                   /* indirect */
+            if (flg && (t = test_int ())) ABORT (t);
+            pmi = T20_GETPMI (ptr);                     /* get section index */
+            pa = (int32) (spt + (ptr & RMASK));         /* get SPT idx */
+            READPT (ptr, pa & PAMASK);                  /* get SPT entry */
+            pa = PAG_PTEPA (ptr, pmi);                  /* index off page */
+            break;                                      /* continue in loop */
+            }                                           /* end case */
+        }                                               /* end for */
 
 /* Last phase - have final page pointer, check modifiability */
 
-	if (ptr & PTE_T20_STM) { PAGE_FAIL_TRAP; }	/* non-resident? */
-	if (cst) {					/* CST really there? */
-	    csta = (int32) ((cst + (ptr & PTE_PPMASK)) & PAMASK);
-	    READPT (cste, csta);			/* get CST entry */
-	    if ((cste & CST_AGE) == 0) { PAGE_FAIL_TRAP; }
-	    cste = (cste & cstm) | pur;  }		/* update entry */
-	else cste = 0;					/* no, entry = 0 */
-	pager_word = pager_word | PF_T20_DN;		/* set eval done */
-	xpte = ((int32) ((ptr & PTE_PPMASK) << PAG_V_PN)) | PTBL_V;
-	if (mode & PTF_WR) {				/* write? */
-	    if (acc & PTE_T20_W) {			/* writable? */
-		xpte = xpte | PTBL_M;			/* set PTE M */
-		cste = cste | CST_M;  }			/* set CST M */
-	    else { PAGE_FAIL_TRAP; }  }			/* no, trap */
-	if (cst) WriteP (csta, cste);			/* write CST entry */
-	if (mode & PTF_MAP) pager_word = pager_word |	/* map? more in pf wd */
-	    ((xpte & PTBL_M)? PF_T20_M: 0) |	/* M, W, C bits */
-	    ((acc & PTE_T20_W)? PF_T20_W: 0) |
-	    ((acc & PTE_T20_C)? PF_C: 0);
-	if (!(mode & PTF_CON)) tbl[vpn] = xpte;		/* set tbl if ~cons */
-	return xpte;
-	}						/* end TOPS20 paging */
+    if (ptr & PTE_T20_STM) { PAGE_FAIL_TRAP; }          /* non-resident? */
+    if (cst) {                                          /* CST really there? */
+        csta = (int32) ((cst + (ptr & PTE_PPMASK)) & PAMASK);
+        READPT (cste, csta);                            /* get CST entry */
+        if ((cste & CST_AGE) == 0) { PAGE_FAIL_TRAP; }
+        cste = (cste & cstm) | pur;                     /* update entry */
+        }
+    else cste = 0;                                      /* no, entry = 0 */
+    pager_word = pager_word | PF_T20_DN;                /* set eval done */
+    xpte = ((int32) ((ptr & PTE_PPMASK) << PAG_V_PN)) | PTBL_V;
+    if (mode & PTF_WR) {                                /* write? */
+        if (acc & PTE_T20_W) {                          /* writable? */
+            xpte = xpte | PTBL_M;                       /* set PTE M */
+            cste = cste | CST_M;                        /* set CST M */
+            }
+        else { PAGE_FAIL_TRAP; }                        /* no, trap */
+        }
+    if (cst) WriteP (csta, cste);                       /* write CST entry */
+    if (mode & PTF_MAP) pager_word = pager_word |       /* map? more in pf wd */
+        ((xpte & PTBL_M)? PF_T20_M: 0) |                /* M, W, C bits */
+        ((acc & PTE_T20_W)? PF_T20_W: 0) |
+        ((acc & PTE_T20_C)? PF_C: 0);
+    if (!(mode & PTF_CON)) tbl[vpn] = xpte;             /* set tbl if ~cons */
+    return xpte;
+    }                                                   /* end TOPS20 paging */
 }
-
+
 /* Set up pointers for AC, memory, and process table access */
 
 void set_dyn_ptrs (void)
@@ -507,19 +534,25 @@ void set_dyn_ptrs (void)
 int32 t;
 
 if (PAGING) {
-	ac_cur = &acs[UBR_GETCURAC (ubr) * AC_NUM];
-	ac_prv = &acs[UBR_GETPRVAC (ubr) * AC_NUM];
-	if (TSTF (F_USR)) ptbl_cur = ptbl_prv = &uptbl[0];
-	else {
-	    ptbl_cur = &eptbl[0];
-	    ptbl_prv = TSTF (F_UIO)? &uptbl[0]: &eptbl[0];  }  }
-else {	ac_cur = ac_prv = &acs[0];
-	ptbl_cur = ptbl_prv = &physptbl[0];  }
+    ac_cur = &acs[UBR_GETCURAC (ubr) * AC_NUM];
+    ac_prv = &acs[UBR_GETPRVAC (ubr) * AC_NUM];
+    if (TSTF (F_USR)) ptbl_cur = ptbl_prv = &uptbl[0];
+    else {
+        ptbl_cur = &eptbl[0];
+        ptbl_prv = TSTF (F_UIO)? &uptbl[0]: &eptbl[0];
+        }
+    }
+else {
+    ac_cur = ac_prv = &acs[0];
+    ptbl_cur = ptbl_prv = &physptbl[0];
+    }
 t = EBR_GETEBR (ebr);
 epta = t << PAG_V_PN;
 if (ITS) upta = (int32) ubr & PAMASK;
-else {	t = UBR_GETUBR (ubr);
-	upta = t << PAG_V_PN;  }
+else {
+    t = UBR_GETUBR (ubr);
+    upta = t << PAG_V_PN;
+    }
 return;
 }
 
@@ -538,8 +571,10 @@ d10 val = (TSTF (F_USR)? PF_USER: 0);
 if (!PAGING) return (val | PF_T10_A | PF_T10_W | PF_T10_S | ea);
 xpte = ptbl_fill (ea, prv? ptbl_prv: ptbl_cur, PTF_MAP); /* get exp pte */
 if (xpte) val = (pager_word & ~PAMASK) | PAG_XPTEPA (xpte, ea);
-else {	if (pager_word & PF_HARD) val = pager_word;	/* hard error */
-	else val = val | PF_VIRT | ea;  }		/* inaccessible */
+else {
+    if (pager_word & PF_HARD) val = pager_word;         /* hard error */
+    else val = val | PF_VIRT | ea;                      /* inaccessible */
+    }
 return val;
 }
 
@@ -550,7 +585,7 @@ a10 conmap (a10 ea, int32 mode, int32 sw)
 int32 xpte, *tbl;
 
 if (!PAGING) return ea;
-set_dyn_ptrs ();					/* in case changed */
+set_dyn_ptrs ();                                        /* in case changed */
 if (sw & SWMASK ('E')) tbl = eptbl;
 else if (sw & SWMASK ('U')) tbl = uptbl;
 else tbl = ptbl_cur;
@@ -558,28 +593,31 @@ xpte = ptbl_fill (ea, tbl, mode);
 if (xpte) return PAG_XPTEPA (xpte, ea);
 else return MAXMEMSIZE;
 }
-
+
 /* Common pager instructions */
 
 t_bool clrpt (a10 ea, int32 prv)
 {
-int32 vpn = PAG_GETVPN (ea);				/* get page num */
+int32 vpn = PAG_GETVPN (ea);                            /* get page num */
 
-if (ITS) {						/* ITS? */
-	uptbl[vpn & ~1] = 0;				/* clear double size */
-	uptbl[vpn | 1] = 0;				/* entries in */
-	eptbl[vpn & ~1] = 0;				/* both page tables */
-	eptbl[vpn | 1] = 0;  }
-else {	uptbl[vpn] = 0;					/* clear entries in */
-	eptbl[vpn] = 0;  }				/* both page tables */
+if (ITS) {                                              /* ITS? */
+    uptbl[vpn & ~1] = 0;                                /* clear double size */
+    uptbl[vpn | 1] = 0;                                 /* entries in */
+    eptbl[vpn & ~1] = 0;                                /* both page tables */
+    eptbl[vpn | 1] = 0;
+    }
+else {
+    uptbl[vpn] = 0;                                     /* clear entries in */
+    eptbl[vpn] = 0;                                     /* both page tables */
+    }
 return FALSE;
 } 
 
 t_bool wrebr (a10 ea, int32 prv)
 {
-ebr = ea & EBR_MASK;					/* store EBR */
-pag_reset (&pag_dev);					/* clear page tables */
-set_dyn_ptrs ();					/* set dynamic ptrs */
+ebr = ea & EBR_MASK;                                    /* store EBR */
+pag_reset (&pag_dev);                                   /* clear page tables */
+set_dyn_ptrs ();                                        /* set dynamic ptrs */
 return FALSE;
 }
 
@@ -592,14 +630,15 @@ return FALSE;
 t_bool wrubr (a10 ea, int32 prv)
 {
 d10 val = Read (ea, prv);
-d10 ubr_mask = (ITS)? PAMASK: UBR_UBRMASK;		/* ITS: ubr is wd addr */
+d10 ubr_mask = (ITS)? PAMASK: UBR_UBRMASK;              /* ITS: ubr is wd addr */
 
-if (val & UBR_SETACB) ubr = ubr & ~UBR_ACBMASK;		/* set AC's? */
-else val = val & ~UBR_ACBMASK;				/* no, keep old val */
-if (val & UBR_SETUBR) {					/* set UBR? */
-	ubr = ubr & ~ubr_mask;
-	pag_reset (&pag_dev);  }			/* yes, clr pg tbls */
-else val = val & ~ubr_mask;				/* no, keep old val */
+if (val & UBR_SETACB) ubr = ubr & ~UBR_ACBMASK;         /* set AC's? */
+else val = val & ~UBR_ACBMASK;                          /* no, keep old val */
+if (val & UBR_SETUBR) {                                 /* set UBR? */
+    ubr = ubr & ~ubr_mask;
+    pag_reset (&pag_dev);                               /* yes, clr pg tbls */
+    }
+else val = val & ~ubr_mask;                             /* no, keep old val */
 ubr = (ubr | val) & (UBR_ACBMASK | ubr_mask);
 set_dyn_ptrs ();
 return FALSE;
@@ -623,7 +662,7 @@ t_bool rdhsb (a10 ea, int32 prv)
 Write (ea, hsb, prv);
 return FALSE;
 }
-
+
 /* TOPS20 pager instructions */
 
 t_bool wrspb (a10 ea, int32 prv)
@@ -666,7 +705,7 @@ t_bool wrcstm (a10 ea, int32 prv)
 {
 cstm = Read (ea, prv);
 if ((cpu_unit.flags & UNIT_T20V41) && (ea == 040127))
-	cstm = 0770000000000;
+    cstm = 0770000000000;
 return FALSE;
 }
 
@@ -675,7 +714,7 @@ t_bool rdcstm (a10 ea, int32 prv)
 Write (ea, cstm, prv);
 return FALSE;
 }
-
+
 /* ITS pager instructions
    The KS10 does not implement the JPC option.
 */
@@ -770,7 +809,9 @@ Write (ADDA (ea, 1), dbr2, prv);
 Write (ADDA (ea, 2), quant, prv);
 return FALSE;
 }
-
+
+/* Simulator interface routines */
+
 t_stat pag_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 int32 tbln = uptr - pag_unit;
@@ -795,7 +836,8 @@ t_stat pag_reset (DEVICE *dptr)
 int32 i;
 
 for (i = 0; i < PTBL_MEMSIZE; i++) {
-	eptbl[i] = uptbl[i] = 0;
-	physptbl[i] = (i << PAG_V_PN) + PTBL_M + PTBL_V;  }
+    eptbl[i] = uptbl[i] = 0;
+    physptbl[i] = (i << PAG_V_PN) + PTBL_M + PTBL_V;
+    }
 return SCPE_OK;
 }

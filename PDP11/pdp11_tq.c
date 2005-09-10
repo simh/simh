@@ -1,6 +1,6 @@
 /* pdp11_tq.c: TMSCP tape controller simulator
 
-   Copyright (c) 2002-2004, Robert M Supnik
+   Copyright (c) 2002-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,42 +19,44 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   tq		TQK50 tape controller
+   tq           TQK50 tape controller
 
-   30-Sep-04	RMS	Revised Unibus interface
-   12-Jun-04	RMS	Fixed bug in reporting write protect (reported by Lyle Bickley)
-   18-Apr-04	RMS	Fixed TQK70 media ID and model byte (found by Robert Schaffrath)
-   26-Mar-04	RMS	Fixed warnings with -std=c99
-   25-Jan-04	RMS	Revised for device debug support
-   19-May-03	RMS	Revised for new conditional compilation scheme
-   25-Apr-03	RMS	Revised for extended file support
-   28-Mar-03	RMS	Added multiformat support
-   28-Feb-03	RMS	Added variable controller, user-defined drive support
-   26-Feb-03	RMS	Fixed bug in vector calculation for VAXen
-   22-Feb-03	RMS	Fixed ordering bug in queue process
-			Fixed flags table to allow MD_CSE everywhere
-   09-Jan-03	RMS	Fixed bug in transfer end packet status
-   17-Oct-02	RMS	Fixed bug in read reverse (found by Hans Pufal)
+   16-Aug-05    RMS     Fixed C++ declaration and cast problems
+   22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
+   30-Sep-04    RMS     Revised Unibus interface
+   12-Jun-04    RMS     Fixed bug in reporting write protect (reported by Lyle Bickley)
+   18-Apr-04    RMS     Fixed TQK70 media ID and model byte (found by Robert Schaffrath)
+   26-Mar-04    RMS     Fixed warnings with -std=c99
+   25-Jan-04    RMS     Revised for device debug support
+   19-May-03    RMS     Revised for new conditional compilation scheme
+   25-Apr-03    RMS     Revised for extended file support
+   28-Mar-03    RMS     Added multiformat support
+   28-Feb-03    RMS     Added variable controller, user-defined drive support
+   26-Feb-03    RMS     Fixed bug in vector calculation for VAXen
+   22-Feb-03    RMS     Fixed ordering bug in queue process
+                        Fixed flags table to allow MD_CSE everywhere
+   09-Jan-03    RMS     Fixed bug in transfer end packet status
+   17-Oct-02    RMS     Fixed bug in read reverse (found by Hans Pufal)
 */
 
-#if defined (VM_PDP10)					/* PDP10 version */
+#if defined (VM_PDP10)                                  /* PDP10 version */
 #error "TQK50 not supported on PDP-10!"
 
-#elif defined (VM_VAX)					/* VAX version */
+#elif defined (VM_VAX)                                  /* VAX version */
 #include "vax_defs.h"
 #if (UNIBUS)
-#define INIT_TYPE	TQ8_TYPE
+#define INIT_TYPE       TQ8_TYPE
 #else
-#define INIT_TYPE	TQ5_TYPE
+#define INIT_TYPE       TQ5_TYPE
 #endif
 
-#else							/* PDP-11 version */
+#else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-#define INIT_TYPE	TQ5_TYPE
+#define INIT_TYPE       TQ5_TYPE
 extern int32 cpu_opt;
 #endif
 
@@ -62,153 +64,155 @@ extern int32 cpu_opt;
 #include "pdp11_mscp.h"
 #include "sim_tape.h"
 
-#define	UF_MSK		(UF_SCH|UF_VSS|UF_CMR|UF_CMW)	/* settable flags */
+#define UF_MSK          (UF_SCH|UF_VSS|UF_CMR|UF_CMW)   /* settable flags */
 
-#define TQ_SH_MAX	24				/* max display wds */
-#define TQ_SH_PPL	8				/* wds per line */
-#define TQ_SH_DPL	4				/* desc per line */
-#define TQ_SH_RI	001				/* show rings */
-#define TQ_SH_FR	002				/* show free q */
-#define TQ_SH_RS	004				/* show resp q */
-#define TQ_SH_UN	010				/* show unit q's */
+#define TQ_SH_MAX       24                              /* max display wds */
+#define TQ_SH_PPL       8                               /* wds per line */
+#define TQ_SH_DPL       4                               /* desc per line */
+#define TQ_SH_RI        001                             /* show rings */
+#define TQ_SH_FR        002                             /* show free q */
+#define TQ_SH_RS        004                             /* show resp q */
+#define TQ_SH_UN        010                             /* show unit q's */
+#define TQ_SH_ALL       017                             /* show all */
 
-#define TQ_CLASS	1				/* TQK50 class */
-#define TQ_DHTMO	0				/* def host timeout */
-#define TQ_DCTMO	120				/* def ctrl timeout */
-#define TQ_NUMDR	4				/* # drives */
-#define TQ_MAXFR	(1 << 16)			/* max xfer */
+#define TQ_CLASS        1                               /* TQK50 class */
+#define TQ_DHTMO        0                               /* def host timeout */
+#define TQ_DCTMO        120                             /* def ctrl timeout */
+#define TQ_NUMDR        4                               /* # drives */
+#define TQ_MAXFR        (1 << 16)                       /* max xfer */
 
-#define UNIT_V_ONL	(MTUF_V_UF + 0)			/* online */
-#define UNIT_V_ATP	(MTUF_V_UF + 1)			/* attn pending */
-#define UNIT_V_SXC	(MTUF_V_UF + 2)			/* serious exc */
-#define UNIT_V_POL	(MTUF_V_UF + 3)			/* position lost */
-#define UNIT_V_TMK	(MTUF_V_UF + 4)			/* tape mark seen */
-#define UNIT_ONL	(1 << UNIT_V_ONL)
-#define UNIT_ATP	(1 << UNIT_V_ATP)
-#define UNIT_SXC	(1 << UNIT_V_SXC)
-#define UNIT_POL	(1 << UNIT_V_POL)
-#define UNIT_TMK	(1 << UNIT_V_TMK)
-#define cpkt		u3				/* current packet */
-#define pktq		u4				/* packet queue */
-#define uf		buf				/* settable unit flags */
-#define objp		wait				/* object position */
-#define TQ_WPH(u)	((sim_tape_wrp (u))? UF_WPH: 0)
+#define UNIT_V_ONL      (MTUF_V_UF + 0)                 /* online */
+#define UNIT_V_ATP      (MTUF_V_UF + 1)                 /* attn pending */
+#define UNIT_V_SXC      (MTUF_V_UF + 2)                 /* serious exc */
+#define UNIT_V_POL      (MTUF_V_UF + 3)                 /* position lost */
+#define UNIT_V_TMK      (MTUF_V_UF + 4)                 /* tape mark seen */
+#define UNIT_ONL        (1 << UNIT_V_ONL)
+#define UNIT_ATP        (1 << UNIT_V_ATP)
+#define UNIT_SXC        (1 << UNIT_V_SXC)
+#define UNIT_POL        (1 << UNIT_V_POL)
+#define UNIT_TMK        (1 << UNIT_V_TMK)
+#define cpkt            u3                              /* current packet */
+#define pktq            u4                              /* packet queue */
+#define uf              buf                             /* settable unit flags */
+#define objp            wait                            /* object position */
+#define TQ_WPH(u)       ((sim_tape_wrp (u))? UF_WPH: 0)
 
-#define CST_S1		0				/* init stage 1 */
-#define CST_S1_WR	1				/* stage 1 wrap */
-#define CST_S2		2				/* init stage 2 */
-#define CST_S3		3				/* init stage 3 */
-#define CST_S3_PPA	4				/* stage 3 sa wait */
-#define CST_S3_PPB	5				/* stage 3 ip wait */
-#define CST_S4		6				/* stage 4 */
-#define CST_UP		7				/* online */
-#define CST_DEAD	8				/* fatal error */
+#define CST_S1          0                               /* init stage 1 */
+#define CST_S1_WR       1                               /* stage 1 wrap */
+#define CST_S2          2                               /* init stage 2 */
+#define CST_S3          3                               /* init stage 3 */
+#define CST_S3_PPA      4                               /* stage 3 sa wait */
+#define CST_S3_PPB      5                               /* stage 3 ip wait */
+#define CST_S4          6                               /* stage 4 */
+#define CST_UP          7                               /* online */
+#define CST_DEAD        8                               /* fatal error */
 
-#define tq_comm		tq_rq.ba
+#define tq_comm         tq_rq.ba
 
-#define ERR		0				/* must be SCPE_OK! */
-#define OK		1
+#define ERR             0                               /* must be SCPE_OK! */
+#define OK              1
 
-#define CMF_IMM		0x10000				/* immediate */
-#define CMF_SEQ		0x20000				/* sequential */
-#define CMF_WR		0x40000				/* write */
-#define CMF_RW		0x80000				/* resp to GCS */
-
+#define CMF_IMM         0x10000                         /* immediate */
+#define CMF_SEQ         0x20000                         /* sequential */
+#define CMF_WR          0x40000                         /* write */
+#define CMF_RW          0x80000                         /* resp to GCS */
+
 /* Internal packet management */
 
-#define TQ_NPKTS	32				/* # packets (pwr of 2) */
-#define TQ_M_NPKTS	(TQ_NPKTS - 1)			/* mask */
-#define TQ_PKT_SIZE_W	32				/* payload size (wds) */
-#define TQ_PKT_SIZE	(TQ_PKT_SIZE_W * sizeof (int16))
+#define TQ_NPKTS        32                              /* # packets (pwr of 2) */
+#define TQ_M_NPKTS      (TQ_NPKTS - 1)                  /* mask */
+#define TQ_PKT_SIZE_W   32                              /* payload size (wds) */
+#define TQ_PKT_SIZE     (TQ_PKT_SIZE_W * sizeof (int16))
 
 struct tqpkt {
-	int16	link;					/* link to next */
-	uint16	d[TQ_PKT_SIZE_W];  };			/* data */
+    int16       link;                                   /* link to next */
+    uint16      d[TQ_PKT_SIZE_W];                       /* data */
+    };
 
 /* Packet payload extraction and insertion */
 
-#define GETP(p,w,f)	((tq_pkt[p].d[w] >> w##_V_##f) & w##_M_##f)
-#define GETP32(p,w)	(((uint32) tq_pkt[p].d[w]) | \
-			(((uint32) tq_pkt[p].d[(w)+1]) << 16))
-#define PUTP32(p,w,x)	tq_pkt[p].d[w] = (x) & 0xFFFF; \
-			tq_pkt[p].d[(w)+1] = ((x) >> 16) & 0xFFFF
+#define GETP(p,w,f)     ((tq_pkt[p].d[w] >> w##_V_##f) & w##_M_##f)
+#define GETP32(p,w)     (((uint32) tq_pkt[p].d[w]) | \
+                        (((uint32) tq_pkt[p].d[(w)+1]) << 16))
+#define PUTP32(p,w,x)   tq_pkt[p].d[w] = (x) & 0xFFFF; \
+                        tq_pkt[p].d[(w)+1] = ((x) >> 16) & 0xFFFF
 
 /* Controller and device types - TQK50 must be swre rev 5 or later */
 
-#define TQ5_TYPE	0				/* TK50 */
-#define TQ5_UQPM	3				/* UQ port ID */
-#define TQ5_CMOD	9				/* ctrl ID */
-#define TQ5_UMOD	3				/* unit ID */
-#define TQ5_MED		0x6D68B032			/* media ID */
-#define TQ5_CREV	((1 << 8) | 5)			/* ctrl revs */	
-#define TQ5_FREV	0				/* formatter revs */
-#define TQ5_UREV	0				/* unit revs */
-#define TQ5_CAP		(94 * (1 << 20))		/* capacity */
-#define TQ5_FMT		(TF_CTP|TF_CTP_LO)		/* menu */
+#define TQ5_TYPE        0                               /* TK50 */
+#define TQ5_UQPM        3                               /* UQ port ID */
+#define TQ5_CMOD        9                               /* ctrl ID */
+#define TQ5_UMOD        3                               /* unit ID */
+#define TQ5_MED         0x6D68B032                      /* media ID */
+#define TQ5_CREV        ((1 << 8) | 5)                  /* ctrl revs */ 
+#define TQ5_FREV        0                               /* formatter revs */
+#define TQ5_UREV        0                               /* unit revs */
+#define TQ5_CAP         (94 * (1 << 20))                /* capacity */
+#define TQ5_FMT         (TF_CTP|TF_CTP_LO)              /* menu */
 
-#define TQ7_TYPE	1				/* TK70 */
-#define TQ7_UQPM	14				/* UQ port ID */
-#define TQ7_CMOD	14				/* ctrl ID */
-#define TQ7_UMOD	14				/* unit ID */
-#define TQ7_MED		0x6D68B046			/* media ID */
-#define TQ7_CREV	((1 << 8) | 5)			/* ctrl revs */	
-#define TQ7_FREV	0				/* formatter revs */
-#define TQ7_UREV	0				/* unit revs */
-#define TQ7_CAP		(300 * (1 << 20))		/* capacity */
-#define TQ7_FMT		(TF_CTP|TF_CTP_LO)		/* menu */
+#define TQ7_TYPE        1                               /* TK70 */
+#define TQ7_UQPM        14                              /* UQ port ID */
+#define TQ7_CMOD        14                              /* ctrl ID */
+#define TQ7_UMOD        14                              /* unit ID */
+#define TQ7_MED         0x6D68B046                      /* media ID */
+#define TQ7_CREV        ((1 << 8) | 5)                  /* ctrl revs */ 
+#define TQ7_FREV        0                               /* formatter revs */
+#define TQ7_UREV        0                               /* unit revs */
+#define TQ7_CAP         (300 * (1 << 20))               /* capacity */
+#define TQ7_FMT         (TF_CTP|TF_CTP_LO)              /* menu */
 
-#define TQ8_TYPE	2				/* TU81 */
-#define TQ8_UQPM	5				/* UQ port ID */
-#define TQ8_CMOD	5				/* ctrl ID */
-#define TQ8_UMOD	2				/* unit ID */
-#define TQ8_MED		0x6D695051			/* media ID */
-#define TQ8_CREV	((1 << 8) | 5)			/* ctrl revs */	
-#define TQ8_FREV	0				/* formatter revs */
-#define TQ8_UREV	0				/* unit revs */
-#define TQ8_CAP		(180 * (1 << 20))		/* capacity */
-#define TQ8_FMT		(TF_9TK|TF_9TK_GRP)		/* menu */
+#define TQ8_TYPE        2                               /* TU81 */
+#define TQ8_UQPM        5                               /* UQ port ID */
+#define TQ8_CMOD        5                               /* ctrl ID */
+#define TQ8_UMOD        2                               /* unit ID */
+#define TQ8_MED         0x6D695051                      /* media ID */
+#define TQ8_CREV        ((1 << 8) | 5)                  /* ctrl revs */ 
+#define TQ8_FREV        0                               /* formatter revs */
+#define TQ8_UREV        0                               /* unit revs */
+#define TQ8_CAP         (180 * (1 << 20))               /* capacity */
+#define TQ8_FMT         (TF_9TK|TF_9TK_GRP)             /* menu */
 
-#define TQU_TYPE	3				/* TKuser defined */
-#define TQU_UQPM	3				/* UQ port ID */
-#define TQU_CMOD	9				/* ctrl ID */
-#define TQU_UMOD	3				/* unit ID */
-#define TQU_MED		0x6D68B032			/* media ID */
-#define TQU_CREV	((1 << 8) | 5)			/* ctrl revs */	
-#define TQU_FREV	0				/* formatter revs */
-#define TQU_UREV	0				/* unit revs */
-#define TQU_CAP		(94 * (1 << 20))		/* capacity */
-#define TQU_FMT		(TF_CTP|TF_CTP_LO)		/* menu */
-#define TQU_MINC	30				/* min cap MB */
-#define TQU_MAXC	2000				/* max cap MB */
-#define TQU_EMAXC	2000000000			/* ext max cap MB */
+#define TQU_TYPE        3                               /* TKuser defined */
+#define TQU_UQPM        3                               /* UQ port ID */
+#define TQU_CMOD        9                               /* ctrl ID */
+#define TQU_UMOD        3                               /* unit ID */
+#define TQU_MED         0x6D68B032                      /* media ID */
+#define TQU_CREV        ((1 << 8) | 5)                  /* ctrl revs */ 
+#define TQU_FREV        0                               /* formatter revs */
+#define TQU_UREV        0                               /* unit revs */
+#define TQU_CAP         (94 * (1 << 20))                /* capacity */
+#define TQU_FMT         (TF_CTP|TF_CTP_LO)              /* menu */
+#define TQU_MINC        30                              /* min cap MB */
+#define TQU_MAXC        2000                            /* max cap MB */
+#define TQU_EMAXC       2000000000                      /* ext max cap MB */
 
 #define TQ_DRV(d) \
-	d##_UQPM, \
-	d##_CMOD, d##_MED,  d##_FMT,  d##_CAP, \
-	d##_UMOD, d##_CREV, d##_FREV, d##_UREV
+    d##_UQPM, \
+    d##_CMOD, d##_MED,  d##_FMT,  d##_CAP, \
+    d##_UMOD, d##_CREV, d##_FREV, d##_UREV
 
-#define TEST_EOT(u)	(sim_tape_eot (u, drv_tab[tq_typ].cap))
+#define TEST_EOT(u)     (sim_tape_eot (u, drv_tab[tq_typ].cap))
 
 struct drvtyp {
-	uint32	uqpm;					/* UQ port model */
-	uint32	cmod;					/* ctrl model */
-	uint32	med;					/* MSCP media */
-	uint32	fmt;					/* flags */
-	t_addr	cap;					/* capacity */
-	uint32	umod;					/* unit model */
-	uint32	cver;
-	uint32	fver;
-	uint32	uver;
-	char	*name;
-};
+    uint32      uqpm;                                   /* UQ port model */
+    uint32      cmod;                                   /* ctrl model */
+    uint32      med;                                    /* MSCP media */
+    uint32      fmt;                                    /* flags */
+    t_addr      cap;                                    /* capacity */
+    uint32      umod;                                   /* unit model */
+    uint32      cver;
+    uint32      fver;
+    uint32      uver;
+    char        *name;
+    };
 
 static struct drvtyp drv_tab[] = {
-	{ TQ_DRV (TQ5), "TK50" },
-	{ TQ_DRV (TQ7), "TK70" },
-	{ TQ_DRV (TQ8), "TU81" },
-	{ TQ_DRV (TQU), "TKUSER" },
-};
-
+    { TQ_DRV (TQ5), "TK50" },
+    { TQ_DRV (TQ7), "TK70" },
+    { TQ_DRV (TQ8), "TU81" },
+    { TQ_DRV (TQU), "TKUSER" },
+    };
+
 /* Data */
 
 extern int32 int_req[IPL_HLVL];
@@ -217,67 +221,68 @@ extern UNIT cpu_unit;
 extern FILE *sim_deb;
 extern uint32 sim_taddr_64;
 
-uint8 *tqxb = NULL;					/* xfer buffer */
-uint32 tq_sa = 0;					/* status, addr */
-uint32 tq_saw = 0;					/* written data */
-uint32 tq_s1dat = 0;					/* S1 data */
-uint32 tq_csta = 0;					/* ctrl state */
-uint32 tq_perr = 0;					/* last error */
-uint32 tq_cflgs = 0;					/* ctrl flags */
-uint32 tq_prgi = 0;					/* purge int */
-uint32 tq_pip = 0;					/* poll in progress */
-struct uq_ring tq_cq = { 0 };				/* cmd ring */
-struct uq_ring tq_rq = { 0 };				/* rsp ring */
-struct tqpkt tq_pkt[TQ_NPKTS];				/* packet queue */
-int32 tq_freq = 0;					/* free list */
-int32 tq_rspq = 0;					/* resp list */
-uint32 tq_pbsy = 0;					/* #busy pkts */
-uint32 tq_credits = 0;					/* credits */
-uint32 tq_hat = 0;					/* host timer */
-uint32 tq_htmo = TQ_DHTMO;				/* host timeout */
-int32 tq_itime = 200;					/* init time, except */
-int32 tq_itime4 = 10;					/* stage 4 */
-int32 tq_qtime = 200;					/* queue time */
-int32 tq_xtime = 500;					/* transfer time */
-int32 tq_typ = INIT_TYPE;				/* device type */
+uint8 *tqxb = NULL;                                     /* xfer buffer */
+uint32 tq_sa = 0;                                       /* status, addr */
+uint32 tq_saw = 0;                                      /* written data */
+uint32 tq_s1dat = 0;                                    /* S1 data */
+uint32 tq_csta = 0;                                     /* ctrl state */
+uint32 tq_perr = 0;                                     /* last error */
+uint32 tq_cflgs = 0;                                    /* ctrl flags */
+uint32 tq_prgi = 0;                                     /* purge int */
+uint32 tq_pip = 0;                                      /* poll in progress */
+struct uq_ring tq_cq = { 0 };                           /* cmd ring */
+struct uq_ring tq_rq = { 0 };                           /* rsp ring */
+struct tqpkt tq_pkt[TQ_NPKTS];                          /* packet queue */
+int32 tq_freq = 0;                                      /* free list */
+int32 tq_rspq = 0;                                      /* resp list */
+uint32 tq_pbsy = 0;                                     /* #busy pkts */
+uint32 tq_credits = 0;                                  /* credits */
+uint32 tq_hat = 0;                                      /* host timer */
+uint32 tq_htmo = TQ_DHTMO;                              /* host timeout */
+int32 tq_itime = 200;                                   /* init time, except */
+int32 tq_itime4 = 10;                                   /* stage 4 */
+int32 tq_qtime = 200;                                   /* queue time */
+int32 tq_xtime = 500;                                   /* transfer time */
+int32 tq_typ = INIT_TYPE;                               /* device type */
 
 /* Command table - legal modifiers (low 16b) and flags (high 16b) */
 
 static uint32 tq_cmf[64] = {
-	0,						/* 0 */
-	CMF_IMM,					/* abort */
-	CMF_IMM|MD_CSE,					/* get cmd status */
-	CMF_IMM|MD_CSE|MD_NXU,				/* get unit status */
-	CMF_IMM|MD_CSE,					/* set ctrl char */
-	0, 0, 0,					/* 5-7 */
-	CMF_SEQ|MD_ACL|MD_CDL|MD_CSE|MD_EXA|MD_UNL,	/* available */
-	CMF_SEQ|MD_CDL|MD_CSE|MD_SWP|MD_EXA,		/* online */
-	CMF_SEQ|MD_CDL|MD_CSE|MD_SWP|MD_EXA,		/* set unit char */
-	CMF_IMM,					/* define acc paths */
-	0, 0, 0, 0,					/* 12-15 */
-	CMF_SEQ|CMF_RW|MD_CDL|MD_CSE|MD_REV|		/* access */
-		MD_SCH|MD_SEC|MD_SER,
-	0,						/* 17 */
-	CMF_SEQ|CMF_WR|MD_CDL|MD_CSE|MD_IMM,		/* erase */
-	CMF_SEQ|CMF_WR|MD_CDL|MD_CSE,			/* flush */
-	0, 0,						/* 20-21 */
-	CMF_SEQ|CMF_WR|MD_CDL|MD_CSE|MD_IMM,		/* erase gap */
-	0, 0, 0, 0, 0, 0, 0, 0, 0,			/* 22-31 */
-	CMF_SEQ|CMF_RW|MD_CDL|MD_CSE|MD_REV|		/* compare */
-		MD_SCH|MD_SEC|MD_SER,
-	CMF_SEQ|CMF_RW|MD_CDL|MD_CSE|MD_REV|MD_CMP|	/* read */
-		MD_SCH|MD_SEC|MD_SER,
-	CMF_SEQ|CMF_RW|CMF_WR|MD_CDL|MD_CSE|MD_IMM|	/* write */
-		MD_CMP|MD_ERW|MD_SEC|MD_SER,
-	0,						/* 35 */
-	CMF_SEQ|MD_CDL|MD_CSE|MD_IMM,			/* wr tape mark */
-	CMF_SEQ|MD_CDL|MD_CSE|MD_IMM|MD_OBC|		/* reposition */
-		MD_REV|MD_RWD|MD_DLE|
-		MD_SCH|MD_SEC|MD_SER,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,			/* 38-47 */
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0 };	
-
+    0,                                                  /* 0 */
+    CMF_IMM,                                            /* abort */
+    CMF_IMM|MD_CSE,                                     /* get cmd status */
+    CMF_IMM|MD_CSE|MD_NXU,                              /* get unit status */
+    CMF_IMM|MD_CSE,                                     /* set ctrl char */
+    0, 0, 0,                                            /* 5-7 */
+    CMF_SEQ|MD_ACL|MD_CDL|MD_CSE|MD_EXA|MD_UNL,         /* available */
+    CMF_SEQ|MD_CDL|MD_CSE|MD_SWP|MD_EXA,                /* online */
+    CMF_SEQ|MD_CDL|MD_CSE|MD_SWP|MD_EXA,                /* set unit char */
+    CMF_IMM,                                            /* define acc paths */
+    0, 0, 0, 0,                                         /* 12-15 */
+    CMF_SEQ|CMF_RW|MD_CDL|MD_CSE|MD_REV|                /* access */
+            MD_SCH|MD_SEC|MD_SER,
+    0,                                                  /* 17 */
+    CMF_SEQ|CMF_WR|MD_CDL|MD_CSE|MD_IMM,                /* erase */
+    CMF_SEQ|CMF_WR|MD_CDL|MD_CSE,                       /* flush */
+    0, 0,                                               /* 20-21 */
+    CMF_SEQ|CMF_WR|MD_CDL|MD_CSE|MD_IMM,                /* erase gap */
+    0, 0, 0, 0, 0, 0, 0, 0, 0,                          /* 22-31 */
+    CMF_SEQ|CMF_RW|MD_CDL|MD_CSE|MD_REV|                /* compare */
+            MD_SCH|MD_SEC|MD_SER,
+    CMF_SEQ|CMF_RW|MD_CDL|MD_CSE|MD_REV|MD_CMP|         /* read */
+            MD_SCH|MD_SEC|MD_SER,
+    CMF_SEQ|CMF_RW|CMF_WR|MD_CDL|MD_CSE|MD_IMM|         /* write */
+            MD_CMP|MD_ERW|MD_SEC|MD_SER,
+    0,                                                  /* 35 */
+    CMF_SEQ|MD_CDL|MD_CSE|MD_IMM,                       /* wr tape mark */
+    CMF_SEQ|MD_CDL|MD_CSE|MD_IMM|MD_OBC|                /* reposition */
+            MD_REV|MD_RWD|MD_DLE|
+            MD_SCH|MD_SEC|MD_SER,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,                       /* 38-47 */
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0
+    };  
+
 /* Forward references */
 
 DEVICE tq_dev;
@@ -343,149 +348,163 @@ void tq_init_int (void);
 void tq_ring_int (struct uq_ring *ring);
 t_bool tq_fatal (uint32 err);
 UNIT *tq_getucb (uint32 lu);
-
+
 /* TQ data structures
 
-   tq_dev	TQ device descriptor
-   tq_unit	TQ unit list
-   tq_reg	TQ register list
-   tq_mod	TQ modifier list
+   tq_dev       TQ device descriptor
+   tq_unit      TQ unit list
+   tq_reg       TQ register list
+   tq_mod       TQ modifier list
 */
 
-DIB tq_dib = { IOBA_TQ, IOLN_TQ, &tq_rd, &tq_wr,
-		1, IVCL (TQ), 0, { &tq_inta } };
+DIB tq_dib = {
+    IOBA_TQ, IOLN_TQ, &tq_rd, &tq_wr,
+    1, IVCL (TQ), 0, { &tq_inta }
+    };
 
 UNIT tq_unit[] = {
-	{ UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
-	{ UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
-	{ UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
-	{ UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
-	{ UDATA (&tq_tmrsvc, UNIT_DIS, 0) },
-	{ UDATA (&tq_quesvc, UNIT_DIS, 0) }  };
+    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
+    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
+    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
+    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
+    { UDATA (&tq_tmrsvc, UNIT_DIS, 0) },
+    { UDATA (&tq_quesvc, UNIT_DIS, 0) }
+    };
 
-#define TQ_TIMER	(TQ_NUMDR)
-#define TQ_QUEUE	(TQ_TIMER + 1)
+#define TQ_TIMER        (TQ_NUMDR)
+#define TQ_QUEUE        (TQ_TIMER + 1)
 
 REG tq_reg[] = {
-	{ GRDATA (SA, tq_sa, DEV_RDX, 16, 0) },
-	{ GRDATA (SAW, tq_saw, DEV_RDX, 16, 0) },
-	{ GRDATA (S1DAT, tq_s1dat, DEV_RDX, 16, 0) },
-	{ GRDATA (CQBA, tq_cq.ba, DEV_RDX, 22, 0) },
-	{ GRDATA (CQLNT, tq_cq.lnt, DEV_RDX, 8, 2), REG_NZ },
-	{ GRDATA (CQIDX, tq_cq.idx, DEV_RDX, 8, 2) },
-	{ GRDATA (TQBA, tq_rq.ba, DEV_RDX, 22, 0) },
-	{ GRDATA (TQLNT, tq_rq.lnt, DEV_RDX, 8, 2), REG_NZ },
-	{ GRDATA (TQIDX, tq_rq.idx, DEV_RDX, 8, 2) },
-	{ DRDATA (FREE, tq_freq, 5) },
-	{ DRDATA (RESP, tq_rspq, 5) },
-	{ DRDATA (PBSY, tq_pbsy, 5) },
-	{ GRDATA (CFLGS, tq_cflgs, DEV_RDX, 16, 0) },
-	{ GRDATA (CSTA, tq_csta, DEV_RDX, 4, 0) },
-	{ GRDATA (PERR, tq_perr, DEV_RDX, 9, 0) },
-	{ DRDATA (CRED, tq_credits, 5) },
-	{ DRDATA (HAT, tq_hat, 17) },
-	{ DRDATA (HTMO, tq_htmo, 17) },
-	{ URDATA (CPKT, tq_unit[0].cpkt, 10, 5, 0, TQ_NUMDR, 0) },
-	{ URDATA (PKTQ, tq_unit[0].pktq, 10, 5, 0, TQ_NUMDR, 0) },
-	{ URDATA (UFLG, tq_unit[0].uf, DEV_RDX, 16, 0, TQ_NUMDR, 0) },
-	{ URDATA (POS, tq_unit[0].pos, 10, T_ADDR_W, 0, TQ_NUMDR, 0) },
-	{ URDATA (OBJP, tq_unit[0].objp, 10, 32, 0, TQ_NUMDR, 0) },
-	{ FLDATA (PRGI, tq_prgi, 0), REG_HIDDEN },
-	{ FLDATA (PIP, tq_pip, 0), REG_HIDDEN },
-	{ FLDATA (INT, IREQ (TQ), INT_V_TQ) },
-	{ DRDATA (ITIME, tq_itime, 24), PV_LEFT + REG_NZ },
-	{ DRDATA (I4TIME, tq_itime4, 24), PV_LEFT + REG_NZ },
-	{ DRDATA (QTIME, tq_qtime, 24), PV_LEFT + REG_NZ },
-	{ DRDATA (XTIME, tq_xtime, 24), PV_LEFT + REG_NZ },
-	{ BRDATA (PKTS, tq_pkt, DEV_RDX, 16, TQ_NPKTS * (TQ_PKT_SIZE_W + 1)) },
-	{ DRDATA (DEVTYPE, tq_typ, 2), REG_HRO },
-	{ DRDATA (DEVCAP, drv_tab[TQU_TYPE].cap, T_ADDR_W), PV_LEFT | REG_HRO },
-	{ GRDATA (DEVADDR, tq_dib.ba, DEV_RDX, 32, 0), REG_HRO },
-	{ GRDATA (DEVVEC, tq_dib.vec, DEV_RDX, 16, 0), REG_HRO },
-	{ NULL }  };
+    { GRDATA (SA, tq_sa, DEV_RDX, 16, 0) },
+    { GRDATA (SAW, tq_saw, DEV_RDX, 16, 0) },
+    { GRDATA (S1DAT, tq_s1dat, DEV_RDX, 16, 0) },
+    { GRDATA (CQBA, tq_cq.ba, DEV_RDX, 22, 0) },
+    { GRDATA (CQLNT, tq_cq.lnt, DEV_RDX, 8, 2), REG_NZ },
+    { GRDATA (CQIDX, tq_cq.idx, DEV_RDX, 8, 2) },
+    { GRDATA (TQBA, tq_rq.ba, DEV_RDX, 22, 0) },
+    { GRDATA (TQLNT, tq_rq.lnt, DEV_RDX, 8, 2), REG_NZ },
+    { GRDATA (TQIDX, tq_rq.idx, DEV_RDX, 8, 2) },
+    { DRDATA (FREE, tq_freq, 5) },
+    { DRDATA (RESP, tq_rspq, 5) },
+    { DRDATA (PBSY, tq_pbsy, 5) },
+    { GRDATA (CFLGS, tq_cflgs, DEV_RDX, 16, 0) },
+    { GRDATA (CSTA, tq_csta, DEV_RDX, 4, 0) },
+    { GRDATA (PERR, tq_perr, DEV_RDX, 9, 0) },
+    { DRDATA (CRED, tq_credits, 5) },
+    { DRDATA (HAT, tq_hat, 17) },
+    { DRDATA (HTMO, tq_htmo, 17) },
+    { URDATA (CPKT, tq_unit[0].cpkt, 10, 5, 0, TQ_NUMDR, 0) },
+    { URDATA (PKTQ, tq_unit[0].pktq, 10, 5, 0, TQ_NUMDR, 0) },
+    { URDATA (UFLG, tq_unit[0].uf, DEV_RDX, 16, 0, TQ_NUMDR, 0) },
+    { URDATA (POS, tq_unit[0].pos, 10, T_ADDR_W, 0, TQ_NUMDR, 0) },
+    { URDATA (OBJP, tq_unit[0].objp, 10, 32, 0, TQ_NUMDR, 0) },
+    { FLDATA (PRGI, tq_prgi, 0), REG_HIDDEN },
+    { FLDATA (PIP, tq_pip, 0), REG_HIDDEN },
+    { FLDATA (INT, IREQ (TQ), INT_V_TQ) },
+    { DRDATA (ITIME, tq_itime, 24), PV_LEFT + REG_NZ },
+    { DRDATA (I4TIME, tq_itime4, 24), PV_LEFT + REG_NZ },
+    { DRDATA (QTIME, tq_qtime, 24), PV_LEFT + REG_NZ },
+    { DRDATA (XTIME, tq_xtime, 24), PV_LEFT + REG_NZ },
+    { BRDATA (PKTS, tq_pkt, DEV_RDX, 16, TQ_NPKTS * (TQ_PKT_SIZE_W + 1)) },
+    { DRDATA (DEVTYPE, tq_typ, 2), REG_HRO },
+    { DRDATA (DEVCAP, drv_tab[TQU_TYPE].cap, T_ADDR_W), PV_LEFT | REG_HRO },
+    { GRDATA (DEVADDR, tq_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA (DEVVEC, tq_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+    { NULL }
+    };
 
 MTAB tq_mod[] = {
-	{ MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-	{ MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
-	{ MTAB_XTD | MTAB_VDV, TQ5_TYPE, NULL, "TK50",
-		&tq_set_type, NULL, NULL },
-	{ MTAB_XTD | MTAB_VDV, TQ7_TYPE, NULL, "TK70",
-		&tq_set_type, NULL, NULL },
-	{ MTAB_XTD | MTAB_VDV, TQ8_TYPE, NULL, "TU81",
-		&tq_set_type, NULL, NULL },
-	{ MTAB_XTD | MTAB_VDV, TQU_TYPE, NULL, "TKUSER",
-		&tq_set_type, NULL, NULL },
-	{ MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL,
-		NULL, &tq_show_type, NULL },
-	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, TQ_SH_RI, "RINGS", NULL,
-		NULL, &tq_show_ctrl, NULL },
-	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, TQ_SH_FR, "FREEQ", NULL,
-		NULL, &tq_show_ctrl, NULL },
-	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, TQ_SH_RS, "RESPQ", NULL,
-		NULL, &tq_show_ctrl, NULL },
-	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, TQ_SH_UN, "UNITQ", NULL,
-		NULL, &tq_show_ctrl, NULL },
-	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, -1, "ALL", NULL,
-		NULL, &tq_show_ctrl, NULL },
-	{ MTAB_XTD | MTAB_VUN | MTAB_NMO, 0, "UNITQ", NULL,
-		NULL, &tq_show_unitq, NULL },
-	{ MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
-		&sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+    { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
+    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD | MTAB_VDV, TQ5_TYPE, NULL, "TK50",
+      &tq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, TQ7_TYPE, NULL, "TK70",
+      &tq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, TQ8_TYPE, NULL, "TU81",
+      &tq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, TQU_TYPE, NULL, "TKUSER",
+      &tq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL,
+      NULL, &tq_show_type, NULL },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, TQ_SH_RI, "RINGS", NULL,
+      NULL, &tq_show_ctrl, NULL },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, TQ_SH_FR, "FREEQ", NULL,
+      NULL, &tq_show_ctrl, NULL },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, TQ_SH_RS, "RESPQ", NULL,
+      NULL, &tq_show_ctrl, NULL },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, TQ_SH_UN, "UNITQ", NULL,
+      NULL, &tq_show_ctrl, NULL },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, TQ_SH_ALL, "ALL", NULL,
+      NULL, &tq_show_ctrl, NULL },
+    { MTAB_XTD | MTAB_VUN | MTAB_NMO, 0, "UNITQ", NULL,
+      NULL, &tq_show_unitq, NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
 #if defined (VM_PDP11)
-	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
-		&set_addr, &show_addr, NULL },
+    { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+      &set_addr, &show_addr, NULL },
 #else
-	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
-		NULL, &show_addr, NULL },
+    { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
+      NULL, &show_addr, NULL },
 #endif
-	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-		NULL, &show_vec, NULL },
-	{ 0 }  };
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
+      NULL, &show_vec, NULL },
+    { 0 }
+    };
 
 DEVICE tq_dev = {
-	"TQ", tq_unit, tq_reg, tq_mod,
-	TQ_NUMDR + 2, 10, 31, 1, DEV_RDX, 8,
-	NULL, NULL, &tq_reset,
-	&tq_boot, &tq_attach, &tq_detach,
-	&tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG };
-
-/* I/O dispatch routine, I/O addresses 17772150 - 17772152
+    "TQ", tq_unit, tq_reg, tq_mod,
+    TQ_NUMDR + 2, 10, 31, 1, DEV_RDX, 8,
+    NULL, NULL, &tq_reset,
+    &tq_boot, &tq_attach, &tq_detach,
+    &tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG
+    };
 
-   17772150	IP	read/write
-   17772152	SA	read/write
+/* I/O dispatch routines, I/O addresses 17772150 - 17772152
+
+   17772150     IP      read/write
+   17772152     SA      read/write
 */
 
 t_stat tq_rd (int32 *data, int32 PA, int32 access)
 {
-switch ((PA >> 1) & 01) {				/* decode PA<1> */
-case 0:							/* IP */
-	*data = 0;					/* reads zero */
-	if (tq_csta == CST_S3_PPB) tq_step4 ();		/* waiting for poll? */
-	else if (tq_csta == CST_UP) {			/* if up */
-	    tq_pip = 1;					/* poll host */
-	    sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);  }
-	break;
-case 1:							/* SA */
-	*data = tq_sa;
-	break;  }
+switch ((PA >> 1) & 01) {                               /* decode PA<1> */
+    case 0:                                             /* IP */
+        *data = 0;                                      /* reads zero */
+        if (tq_csta == CST_S3_PPB) tq_step4 ();         /* waiting for poll? */
+        else if (tq_csta == CST_UP) {                   /* if up */
+            tq_pip = 1;                                 /* poll host */
+            sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);
+            }
+        break;
+
+    case 1:                                             /* SA */
+        *data = tq_sa;
+        break;
+        }
+
 return SCPE_OK;
 }
 
 t_stat tq_wr (int32 data, int32 PA, int32 access)
 {
-switch ((PA >> 1) & 01) {				/* decode PA<1> */
-case 0:							/* IP */
-	tq_reset (&tq_dev);				/* init device */
-	if (DEBUG_PRS (tq_dev)) fprintf (sim_deb,
-	    ">>TQ: initialization started, time=%.0f\n", sim_gtime ());
-	break;
-case 1:							/* SA */
-	tq_saw = data;
-	if (tq_csta < CST_S4)				/* stages 1-3 */
-		sim_activate (&tq_unit[TQ_QUEUE], tq_itime);
-	else if (tq_csta == CST_S4)			/* stage 4 (fast) */
-		sim_activate (&tq_unit[TQ_QUEUE], tq_itime4);
-	break;  }
+switch ((PA >> 1) & 01) {                               /* decode PA<1> */
+
+    case 0:                                             /* IP */
+        tq_reset (&tq_dev);                             /* init device */
+        if (DEBUG_PRS (tq_dev)) fprintf (sim_deb,
+            ">>TQ: initialization started, time=%.0f\n", sim_gtime ());
+        break;
+
+    case 1:                                             /* SA */
+        tq_saw = data;
+        if (tq_csta < CST_S4)                           /* stages 1-3 */
+            sim_activate (&tq_unit[TQ_QUEUE], tq_itime);
+        else if (tq_csta == CST_S4)                     /* stage 4 (fast) */
+            sim_activate (&tq_unit[TQ_QUEUE], tq_itime4);
+        break;
+        }
+
 return SCPE_OK;
 }
 
@@ -497,27 +516,27 @@ int32 i, lnt;
 uint32 base;
 uint16 zero[SA_COMM_MAX >> 1];
 
-tq_rq.ioff = SA_COMM_RI;				/* set intr offset */
-tq_rq.ba = tq_comm;					/* set rsp q base */
-tq_rq.lnt = SA_S1H_RQ (tq_s1dat) << 2;			/* get resp q len */
-tq_cq.ioff = SA_COMM_CI;				/* set intr offset */
-tq_cq.ba = tq_comm + tq_rq.lnt;				/* set cmd q base */
-tq_cq.lnt = SA_S1H_CQ (tq_s1dat) << 2;			/* get cmd q len */
-tq_cq.idx = tq_rq.idx = 0;				/* clear q idx's */
+tq_rq.ioff = SA_COMM_RI;                                /* set intr offset */
+tq_rq.ba = tq_comm;                                     /* set rsp q base */
+tq_rq.lnt = SA_S1H_RQ (tq_s1dat) << 2;                  /* get resp q len */
+tq_cq.ioff = SA_COMM_CI;                                /* set intr offset */
+tq_cq.ba = tq_comm + tq_rq.lnt;                         /* set cmd q base */
+tq_cq.lnt = SA_S1H_CQ (tq_s1dat) << 2;                  /* get cmd q len */
+tq_cq.idx = tq_rq.idx = 0;                              /* clear q idx's */
 if (tq_prgi) base = tq_comm + SA_COMM_QQ;
 else base = tq_comm + SA_COMM_CI;
-lnt = tq_comm + tq_cq.lnt + tq_rq.lnt - base;		/* comm lnt */
-if (lnt > SA_COMM_MAX) lnt = SA_COMM_MAX;		/* paranoia */
-for (i = 0; i < (lnt >> 1); i++) zero[i] = 0;		/* clr buffer */
-if (Map_WriteW (base, lnt, zero))			/* zero comm area */
-	return tq_fatal (PE_QWE);			/* error? */
+lnt = tq_comm + tq_cq.lnt + tq_rq.lnt - base;           /* comm lnt */
+if (lnt > SA_COMM_MAX) lnt = SA_COMM_MAX;               /* paranoia */
+for (i = 0; i < (lnt >> 1); i++) zero[i] = 0;           /* clr buffer */
+if (Map_WriteW (base, lnt, zero))                       /* zero comm area */
+    return tq_fatal (PE_QWE);                           /* error? */
 tq_sa = SA_S4 | (drv_tab[tq_typ].uqpm << SA_S4C_V_MOD) |/* send step 4 */
-	((drv_tab[tq_typ].cver & 0xFF) << SA_S4C_V_VER);
-tq_csta = CST_S4;					/* set step 4 */
-tq_init_int ();						/* poke host */
+    ((drv_tab[tq_typ].cver & 0xFF) << SA_S4C_V_VER);
+tq_csta = CST_S4;                                       /* set step 4 */
+tq_init_int ();                                         /* poke host */
 return OK;
 }
-
+
 /* Queue service - invoked when any of the queues (host queue, unit
    queues, response queue) require servicing.  Also invoked during
    initialization to provide some delay to the next step.
@@ -535,91 +554,107 @@ int32 i, cnid;
 int32 pkt = 0;
 UNIT *nuptr;
 
-if (tq_csta < CST_UP) {					/* still init? */
-    switch (tq_csta) {					/* controller state? */
-    case CST_S1:					/* need S1 reply */
-	if (tq_saw & SA_S1H_VL) {			/* valid? */
-	    if (tq_saw & SA_S1H_WR) {			/* wrap? */
-		tq_sa = tq_saw;				/* echo data */
-		tq_csta = CST_S1_WR;  }			/* endless loop */
-	else {
-	    tq_s1dat = tq_saw;				/* save data */
-	    tq_dib.vec = (tq_s1dat & SA_S1H_VEC) << 2;	/* get vector */
-	    if (tq_dib.vec) tq_dib.vec = tq_dib.vec + VEC_Q; /* if nz, bias */
-	    tq_sa = SA_S2 | SA_S2C_PT | SA_S2C_EC (tq_s1dat);
-	    tq_csta = CST_S2;				/* now in step 2 */
-	    tq_init_int ();  }				/* intr if req */
-	    }						/* end if valid */
-	break;
-    case CST_S1_WR:					/* wrap mode */
-	tq_sa = tq_saw;					/* echo data */
-	break;
-    case CST_S2:					/* need S2 reply */
-	tq_comm = tq_saw & SA_S2H_CLO;			/* get low addr */
-	tq_prgi = tq_saw & SA_S2H_PI;			/* get purge int */
-	tq_sa = SA_S3 | SA_S3C_EC (tq_s1dat);
-	tq_csta = CST_S3;				/* now in step 3 */
-	tq_init_int ();					/* intr if req */
-	break;
-    case CST_S3:					/* need S3 reply */
-	tq_comm = ((tq_saw & SA_S3H_CHI) << 16) | tq_comm;
-	if (tq_saw & SA_S3H_PP) {			/* purge/poll test? */
-	    tq_sa = 0;					/* put 0 */
-	    tq_csta = CST_S3_PPA;  }			/* wait for 0 write */
-	else tq_step4 ();				/* send step 4 */
-	break;
-    case CST_S3_PPA:					/* need purge test */
-	if (tq_saw) tq_fatal (PE_PPF);			/* data not zero? */
-	else tq_csta = CST_S3_PPB;			/* wait for poll */
-	break;
-    case CST_S4:					/* need S4 reply */
-	if (tq_saw & SA_S4H_GO) {			/* go set? */
-	    if (DEBUG_PRS (tq_dev)) fprintf (sim_deb,
-		">>TQ: initialization complete\n");
-	    tq_csta = CST_UP;				/* we're up */
-	    tq_sa = 0;					/* clear SA */
-	    sim_activate (&tq_unit[TQ_TIMER], tmr_poll * clk_tps);
-	    if ((tq_saw & SA_S4H_LF) && tq_perr) tq_plf (tq_perr);
-	    tq_perr = 0;  }
-	break;  }					/* end switch */			
-    return SCPE_OK;  }					/* end if */
+if (tq_csta < CST_UP) {                                 /* still init? */
+    switch (tq_csta) {                                  /* controller state? */
 
-for (i = 0; i < TQ_NUMDR; i++) {			/* chk unit q's */
-	nuptr = tq_dev.units + i;			/* ptr to unit */
-	if (nuptr->cpkt || (nuptr->pktq == 0)) continue;
-	pkt = tq_deqh (&nuptr->pktq);			/* get top of q */
-	if (!tq_mscp (pkt, FALSE)) return SCPE_OK;  }	/* process */
-if ((pkt == 0) && tq_pip) {				/* polling? */
-    if (!tq_getpkt (&pkt)) return SCPE_OK;		/* get host pkt */
-    if (pkt) {						/* got one? */
+    case CST_S1:                                        /* need S1 reply */
+        if (tq_saw & SA_S1H_VL) {                       /* valid? */
+            if (tq_saw & SA_S1H_WR) {                   /* wrap? */
+                tq_sa = tq_saw;                         /* echo data */
+                tq_csta = CST_S1_WR;                    /* endless loop */
+                }
+            else {
+                tq_s1dat = tq_saw;                      /* save data */
+                tq_dib.vec = (tq_s1dat & SA_S1H_VEC) << 2; /* get vector */
+                if (tq_dib.vec) tq_dib.vec = tq_dib.vec + VEC_Q; /* if nz, bias */
+                tq_sa = SA_S2 | SA_S2C_PT | SA_S2C_EC (tq_s1dat);
+                tq_csta = CST_S2;                       /* now in step 2 */
+                tq_init_int ();                         /* intr if req */
+                }
+            }                                           /* end if valid */
+        break;
+
+    case CST_S1_WR:                                     /* wrap mode */
+        tq_sa = tq_saw;                                 /* echo data */
+        break;
+
+    case CST_S2:                                        /* need S2 reply */
+        tq_comm = tq_saw & SA_S2H_CLO;                  /* get low addr */
+        tq_prgi = tq_saw & SA_S2H_PI;                   /* get purge int */
+        tq_sa = SA_S3 | SA_S3C_EC (tq_s1dat);
+        tq_csta = CST_S3;                               /* now in step 3 */
+        tq_init_int ();                                 /* intr if req */
+        break;
+
+    case CST_S3:                                        /* need S3 reply */
+        tq_comm = ((tq_saw & SA_S3H_CHI) << 16) | tq_comm;
+        if (tq_saw & SA_S3H_PP) {                       /* purge/poll test? */
+            tq_sa = 0;                                  /* put 0 */
+            tq_csta = CST_S3_PPA;                       /* wait for 0 write */
+            }
+        else tq_step4 ();                               /* send step 4 */
+        break;
+
+    case CST_S3_PPA:                                    /* need purge test */
+        if (tq_saw) tq_fatal (PE_PPF);                  /* data not zero? */
+        else tq_csta = CST_S3_PPB;                      /* wait for poll */
+        break;
+
+    case CST_S4:                                        /* need S4 reply */
+        if (tq_saw & SA_S4H_GO) {                       /* go set? */
+            if (DEBUG_PRS (tq_dev)) fprintf (sim_deb,
+                ">>TQ: initialization complete\n");
+            tq_csta = CST_UP;                           /* we're up */
+            tq_sa = 0;                                  /* clear SA */
+            sim_activate (&tq_unit[TQ_TIMER], tmr_poll * clk_tps);
+            if ((tq_saw & SA_S4H_LF) && tq_perr) tq_plf (tq_perr);
+            tq_perr = 0;
+            }
+        break;
+        }                                               /* end switch */                        
+    return SCPE_OK;
+    }                                                   /* end if */
+
+for (i = 0; i < TQ_NUMDR; i++) {                        /* chk unit q's */
+    nuptr = tq_dev.units + i;                           /* ptr to unit */
+    if (nuptr->cpkt || (nuptr->pktq == 0)) continue;
+    pkt = tq_deqh (&nuptr->pktq);                       /* get top of q */
+    if (!tq_mscp (pkt, FALSE)) return SCPE_OK;          /* process */
+    }
+if ((pkt == 0) && tq_pip) {                             /* polling? */
+    if (!tq_getpkt (&pkt)) return SCPE_OK;              /* get host pkt */
+    if (pkt) {                                          /* got one? */
         if (DEBUG_PRS (tq_dev)) {
             UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
-	    fprintf (sim_deb, ">>TQ: cmd=%04X, mod=%04X, unit=%d, ",
-		tq_pkt[pkt].d[CMD_OPC], tq_pkt[pkt].d[CMD_MOD], tq_pkt[pkt].d[CMD_UN]);
-	    fprintf (sim_deb, "bc=%04X%04X, ma=%04X%04X",
-		tq_pkt[pkt].d[RW_BCH], tq_pkt[pkt].d[RW_BCL],
-		tq_pkt[pkt].d[RW_BAH], tq_pkt[pkt].d[RW_BAL]);
-	    if (up) fprintf (sim_deb, ", pos=%d, obj=%d\n", up->pos, up->objp);
-	    else fprintf (sim_deb, "\n");
-	    fflush (sim_deb);  }
-	if (GETP (pkt, UQ_HCTC, TYP) != UQ_TYP_SEQ)	/* seq packet? */
-	    return tq_fatal (PE_PIE);			/* no, term thread */
-	cnid = GETP (pkt, UQ_HCTC, CID);		/* get conn ID */
-	if (cnid == UQ_CID_TMSCP) {			/* TMSCP packet? */
-	    if (!tq_mscp (pkt, TRUE)) return SCPE_OK;  } /* proc, q non-seq */
-	else if (cnid == UQ_CID_DUP) {			/* DUP packet? */
-	    tq_putr (pkt, OP_END, 0, ST_CMD | I_OPCD, RSP_LNT, UQ_TYP_SEQ);
-	    if (!tq_putpkt (pkt, TRUE)) return SCPE_OK;  } /* ill cmd */
- 	else return tq_fatal (PE_ICI);			/* no, term thread */
-	}						/* end if pkt */
-    else tq_pip = 0;					/* discontinue poll */
-    }							/* end if pip */
-if (tq_rspq) {						/* resp q? */
-    pkt = tq_deqh (&tq_rspq);				/* get top of q */
-    if (!tq_putpkt (pkt, FALSE)) return SCPE_OK;	/* send to hst */
-    }							/* end if resp q */
-if (pkt) sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);	/* more to do? */
-return SCPE_OK;						/* done */
+            fprintf (sim_deb, ">>TQ: cmd=%04X, mod=%04X, unit=%d, ",
+                tq_pkt[pkt].d[CMD_OPC], tq_pkt[pkt].d[CMD_MOD], tq_pkt[pkt].d[CMD_UN]);
+            fprintf (sim_deb, "bc=%04X%04X, ma=%04X%04X",
+                tq_pkt[pkt].d[RW_BCH], tq_pkt[pkt].d[RW_BCL],
+                tq_pkt[pkt].d[RW_BAH], tq_pkt[pkt].d[RW_BAL]);
+            if (up) fprintf (sim_deb, ", pos=%d, obj=%d\n", up->pos, up->objp);
+            else fprintf (sim_deb, "\n");
+            fflush (sim_deb);
+            }
+        if (GETP (pkt, UQ_HCTC, TYP) != UQ_TYP_SEQ)     /* seq packet? */
+            return tq_fatal (PE_PIE);                   /* no, term thread */
+        cnid = GETP (pkt, UQ_HCTC, CID);                /* get conn ID */
+        if (cnid == UQ_CID_TMSCP) {                     /* TMSCP packet? */
+            if (!tq_mscp (pkt, TRUE)) return SCPE_OK;   /* proc, q non-seq */
+            }
+        else if (cnid == UQ_CID_DUP) {                  /* DUP packet? */
+            tq_putr (pkt, OP_END, 0, ST_CMD | I_OPCD, RSP_LNT, UQ_TYP_SEQ);
+            if (!tq_putpkt (pkt, TRUE)) return SCPE_OK; /* ill cmd */
+            }
+        else return tq_fatal (PE_ICI);                  /* no, term thread */
+        }                                               /* end if pkt */
+    else tq_pip = 0;                                    /* discontinue poll */
+    }                                                   /* end if pip */
+if (tq_rspq) {                                          /* resp q? */
+    pkt = tq_deqh (&tq_rspq);                           /* get top of q */
+    if (!tq_putpkt (pkt, FALSE)) return SCPE_OK;        /* send to hst */
+    }                                                   /* end if resp q */
+if (pkt) sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);   /* more to do? */
+return SCPE_OK;                                         /* done */
 }
 
 /* Clock service (roughly once per second) */
@@ -629,88 +664,109 @@ t_stat tq_tmrsvc (UNIT *uptr)
 int32 i;
 UNIT *nuptr;
 
-sim_activate (uptr, tmr_poll * clk_tps);		/* reactivate */
-for (i = 0; i < TQ_NUMDR; i++) {			/* poll */
-	nuptr = tq_dev.units + i;
-	if ((nuptr->flags & UNIT_ATP) &&		/* ATN pending? */
-	    (nuptr->flags & UNIT_ATT) &&		/* still online? */
-	    (tq_cflgs & CF_ATN)) {			/* wanted? */
-		if (!tq_una (nuptr)) return SCPE_OK;  }
-	nuptr->flags = nuptr->flags & ~UNIT_ATP;  }
-if ((tq_hat > 0) && (--tq_hat == 0))			/* host timeout? */
-	tq_fatal (PE_HAT);				/* fatal err */	
+sim_activate (uptr, tmr_poll * clk_tps);                /* reactivate */
+for (i = 0; i < TQ_NUMDR; i++) {                        /* poll */
+    nuptr = tq_dev.units + i;
+    if ((nuptr->flags & UNIT_ATP) &&                    /* ATN pending? */
+        (nuptr->flags & UNIT_ATT) &&                    /* still online? */
+        (tq_cflgs & CF_ATN)) {                          /* wanted? */
+            if (!tq_una (nuptr)) return SCPE_OK;
+        }
+    nuptr->flags = nuptr->flags & ~UNIT_ATP;
+    }
+if ((tq_hat > 0) && (--tq_hat == 0))                    /* host timeout? */
+    tq_fatal (PE_HAT);                                  /* fatal err */ 
 return SCPE_OK;
 }
-
+
 /* MSCP packet handling */
 
 t_bool tq_mscp (int32 pkt, t_bool q)
 {
 uint32 sts;
-uint32 cmd = GETP (pkt, CMD_OPC, OPC);			/* command */
-uint32 flg = GETP (pkt, CMD_OPC, FLG);			/* flags */
-uint32 mdf = tq_pkt[pkt].d[CMD_MOD];			/* modifier */
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
+uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* command */
+uint32 flg = GETP (pkt, CMD_OPC, FLG);                  /* flags */
+uint32 mdf = tq_pkt[pkt].d[CMD_MOD];                    /* modifier */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 UNIT *uptr;
 
-if ((cmd >= 64) || (tq_cmf[cmd] == 0)) {		/* invalid cmd? */
-	cmd = OP_END;					/* set end op */
-	sts = ST_CMD | I_OPCD;  }			/* ill op */
-else if (flg) {						/* flags? */
-	cmd = cmd | OP_END;				/* set end flag */
-	sts = ST_CMD | I_FLAG;  }			/* ill flags */
-else if (mdf & ~tq_cmf[cmd]) {				/* invalid mod? */
-	cmd = cmd | OP_END;				/* set end flag */
-	sts = ST_CMD | I_MODF;  }			/* ill mods */
-else {							/* valid cmd */
-    if (uptr = tq_getucb (lu)) {			/* valid unit? */
-	if (q && (tq_cmf[cmd] & CMF_SEQ) &&		/* queueing, seq, */
-	    (uptr->cpkt || uptr->pktq)) {		/* and active? */
-		tq_enqt (&uptr->pktq, pkt);		/* do later */
-		return OK;  }
-/*	if (tq_cmf[cmd] & MD_CDL)			/* clr cch lost? */
-/*		uptr->flags = uptr->flags & ~UNIT_CDL; */
-	if (tq_cmf[cmd] & MD_CSE)			/* clr ser exc? */
-		uptr->flags = uptr->flags & ~UNIT_SXC;  }
+if ((cmd >= 64) || (tq_cmf[cmd] == 0)) {                /* invalid cmd? */
+    cmd = OP_END;                                       /* set end op */
+    sts = ST_CMD | I_OPCD;                              /* ill op */
+    }
+else if (flg) {                                         /* flags? */
+    cmd = cmd | OP_END;                                 /* set end flag */
+    sts = ST_CMD | I_FLAG;                              /* ill flags */
+    }
+else if (mdf & ~tq_cmf[cmd]) {                          /* invalid mod? */
+    cmd = cmd | OP_END;                                 /* set end flag */
+    sts = ST_CMD | I_MODF;                              /* ill mods */
+    }
+else {                                                  /* valid cmd */
+    if (uptr = tq_getucb (lu)) {                        /* valid unit? */
+        if (q && (tq_cmf[cmd] & CMF_SEQ) &&             /* queueing, seq, */
+            (uptr->cpkt || uptr->pktq)) {               /* and active? */
+            tq_enqt (&uptr->pktq, pkt);                 /* do later */
+            return OK;
+            }
+/*      if (tq_cmf[cmd] & MD_CDL)                       /* clr cch lost? */
+/*          uptr->flags = uptr->flags & ~UNIT_CDL; */
+        if (tq_cmf[cmd] & MD_CSE)                       /* clr ser exc? */
+            uptr->flags = uptr->flags & ~UNIT_SXC;
+        }
     switch (cmd) {
-    case OP_ABO:					/* abort */
-	return tq_abo (pkt);
-    case OP_AVL:					/* avail */
-	return tq_avl (pkt);
-    case OP_GCS:					/* get cmd status */
-	return tq_gcs (pkt);
-    case OP_GUS:					/* get unit status */
-	return tq_gus (pkt);
-    case OP_ONL:					/* online */
-	return tq_onl (pkt);
-    case OP_SCC:					/* set ctrl char */
-	return tq_scc (pkt);
-    case OP_SUC:					/* set unit char */
-	return tq_suc (pkt);
-    case OP_ERS:					/* erase */
-    case OP_ERG:					/* erase gap */
-	return tq_erase (pkt);
-    case OP_FLU:					/* flush */
-	return tq_flu (pkt);
-    case OP_POS:					/* position */
-	return tq_pos (pkt);
-    case OP_WTM:					/* write tape mark */
-	return tq_wtm (pkt);
-    case OP_ACC:					/* access */
-    case OP_CMP:					/* compare */
-    case OP_RD:						/* read */
-    case OP_WR:						/* write */
-	return tq_rw (pkt);
+
+    case OP_ABO:                                        /* abort */
+        return tq_abo (pkt);
+
+    case OP_AVL:                                        /* avail */
+        return tq_avl (pkt);
+
+    case OP_GCS:                                        /* get cmd status */
+        return tq_gcs (pkt);
+
+    case OP_GUS:                                        /* get unit status */
+        return tq_gus (pkt);
+
+    case OP_ONL:                                        /* online */
+        return tq_onl (pkt);
+
+    case OP_SCC:                                        /* set ctrl char */
+        return tq_scc (pkt);
+
+    case OP_SUC:                                        /* set unit char */
+        return tq_suc (pkt);
+
+    case OP_ERS:                                        /* erase */
+    case OP_ERG:                                        /* erase gap */
+        return tq_erase (pkt);
+
+    case OP_FLU:                                        /* flush */
+        return tq_flu (pkt);
+
+    case OP_POS:                                        /* position */
+        return tq_pos (pkt);
+
+    case OP_WTM:                                        /* write tape mark */
+        return tq_wtm (pkt);
+
+    case OP_ACC:                                        /* access */
+    case OP_CMP:                                        /* compare */
+    case OP_RD:                                         /* read */
+    case OP_WR:                                         /* write */
+        return tq_rw (pkt);
+
     case OP_DAP:
-	cmd = cmd | OP_END;				/* set end flag */
-	sts = ST_SUC;					/* success */
-	break;
+        cmd = cmd | OP_END;                             /* set end flag */
+        sts = ST_SUC;                                   /* success */
+        break;
+
     default:
-	cmd = OP_END;					/* set end op */
-	sts = ST_CMD | I_OPCD;				/* ill op */
-	break;
-	}						/* end switch */
-    }							/* end else */
+        cmd = OP_END;                                   /* set end op */
+        sts = ST_CMD | I_OPCD;                          /* ill op */
+        break;
+        }                                               /* end switch */
+    }                                                   /* end else */
 tq_putr (pkt, cmd, 0, sts, RSP_LNT, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
@@ -719,33 +775,39 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_abo (int32 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
-uint32 ref = GETP32 (pkt, ABO_REFL);			/* cmd ref # */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint32 ref = GETP32 (pkt, ABO_REFL);                    /* cmd ref # */
 int32 tpkt, prv;
 UNIT *uptr;
 
-tpkt = 0;						/* set no mtch */
-if (uptr = tq_getucb (lu)) {				/* get unit */
-    if (uptr->cpkt &&					/* curr pkt? */
-	(GETP32 (uptr->cpkt, CMD_REFL) == ref)) {	/* match ref? */
-	tpkt = uptr->cpkt;				/* save match */
-	uptr->cpkt = 0;					/* gonzo */
-	sim_cancel (uptr);				/* cancel unit */
-	sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);  }
-    else if (uptr->pktq &&				/* head of q? */
-	(GETP32 (uptr->pktq, CMD_REFL) == ref)) {	/* match ref? */
-	tpkt = uptr->pktq;				/* save match */
-	uptr->pktq = tq_pkt[tpkt].link;  }		/* unlink */
-    else if (prv = uptr->pktq) {			/* srch pkt q */
-	while (tpkt = tq_pkt[prv].link) {		/* walk list */
-	    if (GETP32 (tpkt, RSP_REFL) == ref) {	/* match ref? */
-		tq_pkt[prv].link = tq_pkt[tpkt].link;	/* unlink */
-		    break;  }  }  }
-    if (tpkt) {						/* found target? */
-	uint32 tcmd = GETP (tpkt, CMD_OPC, OPC);	/* get opcode */
-	tq_putr (tpkt, tcmd | OP_END, 0, ST_ABO, RSP_LNT, UQ_TYP_SEQ);
-	if (!tq_putpkt (tpkt, TRUE)) return ERR;  }
-	}						/* end if unit */
+tpkt = 0;                                               /* set no mtch */
+if (uptr = tq_getucb (lu)) {                            /* get unit */
+    if (uptr->cpkt &&                                   /* curr pkt? */
+        (GETP32 (uptr->cpkt, CMD_REFL) == ref)) {       /* match ref? */
+        tpkt = uptr->cpkt;                              /* save match */
+        uptr->cpkt = 0;                                 /* gonzo */
+        sim_cancel (uptr);                              /* cancel unit */
+        sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);
+        }
+    else if (uptr->pktq &&                              /* head of q? */
+        (GETP32 (uptr->pktq, CMD_REFL) == ref)) {       /* match ref? */
+        tpkt = uptr->pktq;                              /* save match */
+        uptr->pktq = tq_pkt[tpkt].link;                 /* unlink */
+        }
+    else if (prv = uptr->pktq) {                        /* srch pkt q */
+        while (tpkt = tq_pkt[prv].link) {               /* walk list */
+            if (GETP32 (tpkt, RSP_REFL) == ref) {       /* match ref? */
+                tq_pkt[prv].link = tq_pkt[tpkt].link;   /* unlink */
+                    break;
+                }
+            }
+        }
+    if (tpkt) {                                         /* found target? */
+        uint32 tcmd = GETP (tpkt, CMD_OPC, OPC);        /* get opcode */
+        tq_putr (tpkt, tcmd | OP_END, 0, ST_ABO, RSP_LNT, UQ_TYP_SEQ);
+        if (!tq_putpkt (tpkt, TRUE)) return ERR;
+        }
+    }                                                   /* end if unit */
 tq_putr (pkt, OP_ABO | OP_END, 0, ST_SUC, ABO_LNT, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
@@ -755,22 +817,25 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_avl (int32 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
-uint32 mdf = tq_pkt[pkt].d[CMD_MOD];			/* modifiers */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint32 mdf = tq_pkt[pkt].d[CMD_MOD];                    /* modifiers */
 uint32 sts;
 UNIT *uptr;
 
-if (uptr = tq_getucb (lu)) {				/* unit exist? */
-   if (uptr->flags & UNIT_SXC) sts = ST_SXC;		/* ser exc pending? */
-   else {
-	uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_TMK | UNIT_POL);
-	sim_tape_rewind (uptr);				/* rewind */
-	uptr->uf = uptr->objp = 0;			/* clr flags */
-	if (uptr->flags & UNIT_ATT) {			/* attached? */
-	    sts = ST_SUC;				/* success */
-	    if (mdf & MD_UNL) tq_detach (uptr);  }	/* unload? */
-	else sts = ST_OFL | SB_OFL_NV;  }  }		/* no, offline */
-else sts = ST_OFL;					/* offline */
+if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+	if (uptr->flags & UNIT_SXC) sts = ST_SXC;           /* ser exc pending? */
+	else {
+		uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_TMK | UNIT_POL);
+		sim_tape_rewind (uptr);                         /* rewind */
+		uptr->uf = uptr->objp = 0;                      /* clr flags */
+		if (uptr->flags & UNIT_ATT) {                   /* attached? */
+			sts = ST_SUC;                               /* success */
+			if (mdf & MD_UNL) tq_detach (uptr);         /* unload? */
+			}
+		else sts = ST_OFL | SB_OFL_NV;                  /* no, offline */
+		}
+    }
+else sts = ST_OFL;                                      /* offline */
 tq_putr (pkt, OP_AVL | OP_END, tq_efl (uptr), sts, AVL_LNT, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
@@ -779,17 +844,18 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_gcs (int32 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
-uint32 ref = GETP32 (pkt, GCS_REFL);			/* ref # */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint32 ref = GETP32 (pkt, GCS_REFL);                    /* ref # */
 int32 tpkt;
 UNIT *uptr;
 
-if ((uptr = tq_getucb (lu)) && 				/* valid lu? */
-    (tpkt = uptr->cpkt) &&				/* queued pkt? */
-    (GETP32 (tpkt, CMD_REFL) == ref) &&			/* match ref? */
-    (tq_cmf[GETP (tpkt, CMD_OPC, OPC)] & CMF_RW)) {	/* rd/wr cmd? */
-	tq_pkt[pkt].d[GCS_STSL] = tq_pkt[tpkt].d[RW_BCL];
-	tq_pkt[pkt].d[GCS_STSH] = tq_pkt[tpkt].d[RW_BCH];  }
+if ((uptr = tq_getucb (lu)) &&                          /* valid lu? */
+    (tpkt = uptr->cpkt) &&                              /* queued pkt? */
+    (GETP32 (tpkt, CMD_REFL) == ref) &&                 /* match ref? */
+    (tq_cmf[GETP (tpkt, CMD_OPC, OPC)] & CMF_RW)) {     /* rd/wr cmd? */
+    tq_pkt[pkt].d[GCS_STSL] = tq_pkt[tpkt].d[RW_BCL];
+    tq_pkt[pkt].d[GCS_STSH] = tq_pkt[tpkt].d[RW_BCH];
+    }
 else tq_pkt[pkt].d[GCS_STSL] = tq_pkt[pkt].d[GCS_STSH] = 0;
 tq_putr (pkt, OP_GCS | OP_END, 0, ST_SUC, GCS_LNT, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
@@ -799,26 +865,28 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_gus (int32 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 uint32 sts;
 UNIT *uptr;
 
-if (tq_pkt[pkt].d[CMD_MOD] & MD_NXU) {			/* next unit? */
-	if (lu >= TQ_NUMDR) {				/* end of range? */
-		lu = 0;					/* reset to 0 */
-		tq_pkt[pkt].d[RSP_UN] = lu;  }  }
-if (uptr = tq_getucb (lu)) {				/* unit exist? */
-	if ((uptr->flags & UNIT_ATT) == 0)		/* not attached? */
-		sts = ST_OFL | SB_OFL_NV;		/* offl no vol */
-	else if (uptr->flags & UNIT_ONL) sts = ST_SUC;	/* online */
-	else sts = ST_AVL;				/* avail */
-	tq_putr_unit (pkt, uptr, lu, FALSE);		/* fill unit fields */
-	tq_pkt[pkt].d[GUS_MENU] = drv_tab[tq_typ].fmt;	/* format menu */
-	tq_pkt[pkt].d[GUS_CAP] = 0;			/* free capacity */
-	tq_pkt[pkt].d[GUS_FVER] = drv_tab[tq_typ].fver;	/* formatter version */
-	tq_pkt[pkt].d[GUS_UVER] = drv_tab[tq_typ].uver;	/* unit version */
-	}
-else sts = ST_OFL;					/* offline */
+if (tq_pkt[pkt].d[CMD_MOD] & MD_NXU) {                  /* next unit? */
+    if (lu >= TQ_NUMDR) {                               /* end of range? */
+        lu = 0;                                         /* reset to 0 */
+        tq_pkt[pkt].d[RSP_UN] = lu;
+        }
+    }
+if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+    if ((uptr->flags & UNIT_ATT) == 0)                  /* not attached? */
+            sts = ST_OFL | SB_OFL_NV;                   /* offl no vol */
+    else if (uptr->flags & UNIT_ONL) sts = ST_SUC;      /* online */
+    else sts = ST_AVL;                                  /* avail */
+    tq_putr_unit (pkt, uptr, lu, FALSE);                /* fill unit fields */
+    tq_pkt[pkt].d[GUS_MENU] = drv_tab[tq_typ].fmt;      /* format menu */
+    tq_pkt[pkt].d[GUS_CAP] = 0;                         /* free capacity */
+    tq_pkt[pkt].d[GUS_FVER] = drv_tab[tq_typ].fver;     /* formatter version */
+    tq_pkt[pkt].d[GUS_UVER] = drv_tab[tq_typ].uver;     /* unit version */
+    }
+else sts = ST_OFL;                                      /* offline */
 tq_putr (pkt, OP_GUS | OP_END, tq_efl (uptr), sts, GUS_LNT_T, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
@@ -827,23 +895,26 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_onl (int32 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 uint32 sts;
 UNIT *uptr;
 
-if (uptr = tq_getucb (lu)) {				/* unit exist? */
-	if ((uptr->flags & UNIT_ATT) == 0)		/* not attached? */
-		sts = ST_OFL | SB_OFL_NV;		/* offl no vol */
-	else if (uptr->flags & UNIT_ONL)		/* already online? */
-		sts = ST_SUC | SB_SUC_ON;
-	else {	sts = ST_SUC;				/* mark online */
-		sim_tape_rewind (uptr);			/* rewind */
-		uptr->objp = 0;				/* clear flags */
-		uptr->flags = (uptr->flags | UNIT_ONL) &
-			~(UNIT_TMK | UNIT_POL);		/* onl, pos ok */
-		tq_setf_unit (pkt, uptr);  }		/* hack flags */
-	tq_putr_unit (pkt, uptr, lu, TRUE);  }		/* set fields */
-else sts = ST_OFL;					/* offline */
+if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+    if ((uptr->flags & UNIT_ATT) == 0)                  /* not attached? */
+        sts = ST_OFL | SB_OFL_NV;                       /* offl no vol */
+    else if (uptr->flags & UNIT_ONL)                    /* already online? */
+        sts = ST_SUC | SB_SUC_ON;
+    else {
+        sts = ST_SUC;                                   /* mark online */
+        sim_tape_rewind (uptr);                         /* rewind */
+        uptr->objp = 0;                                 /* clear flags */
+        uptr->flags = (uptr->flags | UNIT_ONL) &
+            ~(UNIT_TMK | UNIT_POL);                     /* onl, pos ok */
+        tq_setf_unit (pkt, uptr);                       /* hack flags */
+        }
+    tq_putr_unit (pkt, uptr, lu, TRUE);                 /* set fields */
+    }
+else sts = ST_OFL;                                      /* offline */
 tq_putr (pkt, OP_ONL | OP_END, tq_efl (uptr), sts, ONL_LNT, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
@@ -852,56 +923,60 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_scc (int32 pkt)
 {
-if (tq_pkt[pkt].d[SCC_MSV])				/* MSCP ver = 0? */
-	tq_putr (pkt, 0, 0, ST_CMD | I_VRSN, SCC_LNT, UQ_TYP_SEQ);
-else {	tq_cflgs = (tq_cflgs & CF_RPL) |		/* hack ctrl flgs */
-		tq_pkt[pkt].d[SCC_CFL];
-	if (tq_htmo = tq_pkt[pkt].d[SCC_TMO])		/* set timeout */
-		tq_htmo = tq_htmo + 2;			/* if nz, round up */
-	tq_pkt[pkt].d[SCC_CFL] = tq_cflgs;		/* return flags */
-	tq_pkt[pkt].d[SCC_TMO] = TQ_DCTMO;		/* ctrl timeout */
-	tq_pkt[pkt].d[SCC_VER] = drv_tab[tq_typ].cver;	/* ctrl version */
-	tq_pkt[pkt].d[SCC_CIDA] = 0;			/* ctrl ID */
-	tq_pkt[pkt].d[SCC_CIDB] = 0;
-	tq_pkt[pkt].d[SCC_CIDC] = 0;
-	tq_pkt[pkt].d[SCC_CIDD] = (TQ_CLASS << SCC_CIDD_V_CLS) |
-		(drv_tab[tq_typ].cmod << SCC_CIDD_V_MOD);
-	PUTP32 (pkt, SCC_MBCL, TQ_MAXFR);		/* max bc */
-	tq_putr (pkt, OP_SCC | OP_END, 0, ST_SUC, SCC_LNT, UQ_TYP_SEQ);
-	}
+if (tq_pkt[pkt].d[SCC_MSV])                             /* MSCP ver = 0? */
+    tq_putr (pkt, 0, 0, ST_CMD | I_VRSN, SCC_LNT, UQ_TYP_SEQ);
+else {
+    tq_cflgs = (tq_cflgs & CF_RPL) |                    /* hack ctrl flgs */
+        tq_pkt[pkt].d[SCC_CFL];
+    if (tq_htmo = tq_pkt[pkt].d[SCC_TMO])               /* set timeout */
+        tq_htmo = tq_htmo + 2;                          /* if nz, round up */
+    tq_pkt[pkt].d[SCC_CFL] = tq_cflgs;                  /* return flags */
+    tq_pkt[pkt].d[SCC_TMO] = TQ_DCTMO;                  /* ctrl timeout */
+    tq_pkt[pkt].d[SCC_VER] = drv_tab[tq_typ].cver;      /* ctrl version */
+    tq_pkt[pkt].d[SCC_CIDA] = 0;                        /* ctrl ID */
+    tq_pkt[pkt].d[SCC_CIDB] = 0;
+    tq_pkt[pkt].d[SCC_CIDC] = 0;
+    tq_pkt[pkt].d[SCC_CIDD] = (TQ_CLASS << SCC_CIDD_V_CLS) |
+        (drv_tab[tq_typ].cmod << SCC_CIDD_V_MOD);
+    PUTP32 (pkt, SCC_MBCL, TQ_MAXFR);                   /* max bc */
+    tq_putr (pkt, OP_SCC | OP_END, 0, ST_SUC, SCC_LNT, UQ_TYP_SEQ);
+    }
 return tq_putpkt (pkt, TRUE);
 }
-	
+    
 /* Set unit characteristics - defer if q'd commands */
 
 t_bool tq_suc (int32 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 uint32 sts;
 UNIT *uptr;
 
-if (uptr = tq_getucb (lu)) {				/* unit exist? */
-	if ((uptr->flags & UNIT_ATT) == 0)		/* not attached? */
-		sts = ST_OFL | SB_OFL_NV;		/* offl no vol */
-	else {	sts = ST_SUC;				/* avail or onl */
-		tq_setf_unit (pkt, uptr);  }		/* hack flags */
-	tq_putr_unit (pkt, uptr, lu, TRUE);  }		/* set fields */
-else sts = ST_OFL;					/* offline */
+if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+    if ((uptr->flags & UNIT_ATT) == 0)                  /* not attached? */
+        sts = ST_OFL | SB_OFL_NV;                       /* offl no vol */
+    else {
+        sts = ST_SUC;                                   /* avail or onl */
+        tq_setf_unit (pkt, uptr);                       /* hack flags */
+        }
+    tq_putr_unit (pkt, uptr, lu, TRUE);                 /* set fields */
+    }
+else sts = ST_OFL;                                      /* offline */
 tq_putr (pkt, OP_SUC | OP_END, 0, sts, SUC_LNT, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
-
+
 /* Flush - sequential nop - deferred if q'd cmds, bypassed if ser exc */
 
 t_bool tq_flu (int32 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 uint32 sts;
 UNIT *uptr;
 
-if (uptr = tq_getucb (lu)) { 				/* unit exist? */
-	sts = tq_mot_valid (uptr, OP_FLU);  }		/* validate req */
-else sts = ST_OFL;					/* offline */
+if (uptr = tq_getucb (lu))                              /* unit exist? */
+    sts = tq_mot_valid (uptr, OP_FLU);                  /* validate req */
+else sts = ST_OFL;                                      /* offline */
 tq_putr (pkt, OP_FLU | OP_END, tq_efl (uptr), sts, FLU_LNT, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
@@ -910,18 +985,20 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_erase (int32 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
-uint32 cmd = GETP (pkt, CMD_OPC, OPC);			/* opcode */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* opcode */
 uint32 sts;
 UNIT *uptr;
 
-if (uptr = tq_getucb (lu)) {				/* unit exist? */
-	sts = tq_mot_valid (uptr, cmd);			/* validity checks */
-	if (sts == ST_SUC) {				/* ok? */
-		uptr->cpkt = pkt;			/* op in progress */
-		sim_activate (uptr, tq_xtime);		/* activate */
-		return OK;  }  }			/* done */
-else sts = ST_OFL;					/* offline */
+if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+    sts = tq_mot_valid (uptr, cmd);                     /* validity checks */
+    if (sts == ST_SUC) {                                /* ok? */
+        uptr->cpkt = pkt;                               /* op in progress */
+        sim_activate (uptr, tq_xtime);                  /* activate */
+        return OK;                                      /* done */
+        }
+    }
+else sts = ST_OFL;                                      /* offline */
 tq_putr (pkt, cmd | OP_END, tq_efl (uptr), sts, ERS_LNT, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
@@ -930,19 +1007,21 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_wtm (int32 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 uint32 sts, objp = 0;
 UNIT *uptr;
 
-if (uptr = tq_getucb (lu)) {				/* unit exist? */
-	objp = uptr->objp;				/* position op */
-	sts = tq_mot_valid (uptr, OP_WTM);		/* validity checks */
-	if (sts == ST_SUC) {				/* ok? */
-		uptr->cpkt = pkt;			/* op in progress */
-		sim_activate (uptr, tq_xtime);		/* activate */
-		return OK;  }  }			/* done */
-else sts = ST_OFL;					/* offline */
-PUTP32 (pkt, WTM_POSL, objp);				/* set obj pos */
+if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+    objp = uptr->objp;                                  /* position op */
+    sts = tq_mot_valid (uptr, OP_WTM);                  /* validity checks */
+    if (sts == ST_SUC) {                                /* ok? */
+        uptr->cpkt = pkt;                               /* op in progress */
+        sim_activate (uptr, tq_xtime);                  /* activate */
+        return OK;                                      /* done */
+        }
+    }
+else sts = ST_OFL;                                      /* offline */
+PUTP32 (pkt, WTM_POSL, objp);                           /* set obj pos */
 tq_putr (pkt, OP_WTM | OP_END, tq_efl (uptr), sts, WTM_LNT, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
@@ -951,50 +1030,56 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_pos (int32 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
 uint32 sts, objp = 0;
 UNIT *uptr;
 
-if (uptr = tq_getucb (lu)) {				/* unit exist? */
-	objp = uptr->objp;				/* position op */
-	sts = tq_mot_valid (uptr, OP_POS);		/* validity checks */
-	if (sts == ST_SUC) {				/* ok? */
-		uptr->cpkt = pkt;			/* op in progress */
-		sim_activate (uptr, tq_xtime);		/* activate */
-		return OK;  }  }			/* done */
-else sts = ST_OFL;					/* offline */
-PUTP32 (pkt, POS_RCL, 0);				/* clear #skipped */
+if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+    objp = uptr->objp;                                  /* position op */
+    sts = tq_mot_valid (uptr, OP_POS);                  /* validity checks */
+    if (sts == ST_SUC) {                                /* ok? */
+        uptr->cpkt = pkt;                               /* op in progress */
+        sim_activate (uptr, tq_xtime);                  /* activate */
+        return OK;                                      /* done */
+        }
+    }
+else sts = ST_OFL;                                      /* offline */
+PUTP32 (pkt, POS_RCL, 0);                               /* clear #skipped */
 PUTP32 (pkt, POS_TMCL, 0);
-PUTP32 (pkt, POS_POSL, objp);				/* set obj pos */
+PUTP32 (pkt, POS_POSL, objp);                           /* set obj pos */
 tq_putr (pkt, OP_POS | OP_END, tq_efl (uptr), sts, POS_LNT, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
-
+
 /* Data transfer commands - deferred if q'd commands, bypassed if ser exc */
 
 t_bool tq_rw (int32 pkt)
 {
-uint32 lu = tq_pkt[pkt].d[CMD_UN];			/* unit # */
-uint32 cmd = GETP (pkt, CMD_OPC, OPC);			/* opcode */
-uint32 bc = GETP32 (pkt, RW_BCL);			/* byte count */
+uint32 lu = tq_pkt[pkt].d[CMD_UN];                      /* unit # */
+uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* opcode */
+uint32 bc = GETP32 (pkt, RW_BCL);                       /* byte count */
 uint32 sts, objp = 0;
 UNIT *uptr;
 
-if (uptr = tq_getucb (lu)) {				/* unit exist? */
-	objp = uptr->objp;				/* position op */
-	sts = tq_mot_valid (uptr, cmd);			/* validity checks */
-	if (sts == ST_SUC) {				/* ok? */
-	    if ((bc == 0) || (bc > TQ_MAXFR)) {		/* invalid? */
-		uptr->flags = uptr->flags | UNIT_SXC;	/* set ser exc */
-		sts = ST_CMD | I_BCNT;  }
-	    else {
-		uptr->cpkt = pkt;			/* op in progress */
-		sim_activate (uptr, tq_xtime);		/* activate */
-		return OK;  }  }  }			/* done */
-else sts = ST_OFL;					/* offline */
-PUTP32 (pkt, RW_BCL, 0);				/* no bytes processed */
-PUTP32 (pkt, RW_POSL, objp);				/* set obj pos */
-PUTP32 (pkt, RW_RSZL, 0);				/* clr rec size */
+if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+    objp = uptr->objp;                                  /* position op */
+    sts = tq_mot_valid (uptr, cmd);                     /* validity checks */
+    if (sts == ST_SUC) {                                /* ok? */
+        if ((bc == 0) || (bc > TQ_MAXFR)) {             /* invalid? */
+            uptr->flags = uptr->flags | UNIT_SXC;       /* set ser exc */
+            sts = ST_CMD | I_BCNT;
+            }
+        else {
+            uptr->cpkt = pkt;                           /* op in progress */
+            sim_activate (uptr, tq_xtime);              /* activate */
+            return OK;                                  /* done */
+            }
+        }
+    }
+else sts = ST_OFL;                                      /* offline */
+PUTP32 (pkt, RW_BCL, 0);                                /* no bytes processed */
+PUTP32 (pkt, RW_POSL, objp);                            /* set obj pos */
+PUTP32 (pkt, RW_RSZL, 0);                               /* clr rec size */
 tq_putr (pkt, cmd | OP_END, tq_efl (uptr), sts, RW_LNT_T, UQ_TYP_SEQ);
 return tq_putpkt (pkt, TRUE);
 }
@@ -1003,19 +1088,22 @@ return tq_putpkt (pkt, TRUE);
 
 int32 tq_mot_valid (UNIT *uptr, uint32 cmd)
 {
-if (uptr->flags & UNIT_SXC) return ST_SXC;		/* ser exc pend? */
-if ((uptr->flags & UNIT_ATT) == 0)			/* not attached? */
-	return (ST_OFL | SB_OFL_NV);			/* offl no vol */
-if ((uptr->flags & UNIT_ONL) == 0)			/* not online? */
-	return ST_AVL;					/* only avail */
-if (tq_cmf[cmd] & CMF_WR) {				/* write op? */
-	if (uptr->uf & UF_WPS) {			/* swre wlk? */
-		uptr->flags = uptr->flags | UNIT_SXC;	/* set ser exc */
-		return (ST_WPR | SB_WPR_SW);  }
-	if (TQ_WPH (uptr)) {				/* hwre wlk? */
-		uptr->flags = uptr->flags | UNIT_SXC;	/* set ser exc */
-		return (ST_WPR | SB_WPR_HW);  }  }
-return ST_SUC;						/* success! */
+if (uptr->flags & UNIT_SXC) return ST_SXC;              /* ser exc pend? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
+    return (ST_OFL | SB_OFL_NV);                        /* offl no vol */
+if ((uptr->flags & UNIT_ONL) == 0)                      /* not online? */
+    return ST_AVL;                                      /* only avail */
+if (tq_cmf[cmd] & CMF_WR) {                             /* write op? */
+    if (uptr->uf & UF_WPS) {                            /* swre wlk? */
+        uptr->flags = uptr->flags | UNIT_SXC;           /* set ser exc */
+        return (ST_WPR | SB_WPR_SW);
+        }
+    if (TQ_WPH (uptr)) {                                /* hwre wlk? */
+        uptr->flags = uptr->flags | UNIT_SXC;           /* set ser exc */
+        return (ST_WPR | SB_WPR_HW);
+        }
+    }
+return ST_SUC;                                          /* success! */
 }
 
 /* Unit service for motion commands */
@@ -1024,138 +1112,155 @@ t_stat tq_svc (UNIT *uptr)
 {
 uint32 t, sts, sktmk, skrec;
 t_mtrlnt i, tbc, wbc;
-int32 pkt = uptr->cpkt;					/* get packet */
-uint32 cmd = GETP (pkt, CMD_OPC, OPC);			/* get cmd */
-uint32 mdf = tq_pkt[pkt].d[CMD_MOD];			/* modifier */
-uint32 ba = GETP32 (pkt, RW_BAL);			/* buf addr */
-t_mtrlnt bc = GETP32 (pkt, RW_BCL);			/* byte count */
-uint32 nrec = GETP32 (pkt, POS_RCL);			/* #rec to skip */
-uint32 ntmk = GETP32 (pkt, POS_TMCL);			/* #tmk to skp */
+int32 pkt = uptr->cpkt;                                 /* get packet */
+uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* get cmd */
+uint32 mdf = tq_pkt[pkt].d[CMD_MOD];                    /* modifier */
+uint32 ba = GETP32 (pkt, RW_BAL);                       /* buf addr */
+t_mtrlnt bc = GETP32 (pkt, RW_BCL);                     /* byte count */
+uint32 nrec = GETP32 (pkt, POS_RCL);                    /* #rec to skip */
+uint32 ntmk = GETP32 (pkt, POS_TMCL);                   /* #tmk to skp */
 
-if (pkt == 0) return SCPE_IERR;				/* what??? */
-if ((uptr->flags & UNIT_ATT) == 0) {			/* not attached? */
-	tq_mot_end (uptr, 0, ST_OFL | SB_OFL_NV, 0);	/* offl no vol */
-	return SCPE_OK;  }
+if (pkt == 0) return SCPE_IERR;                         /* what??? */
+if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
+    tq_mot_end (uptr, 0, ST_OFL | SB_OFL_NV, 0);        /* offl no vol */
+    return SCPE_OK;
+    }
 
-if (tq_cmf[cmd] & CMF_WR) {				/* write op? */
-	if (TQ_WPH (uptr)) {				/* hwre write prot? */
-	    uptr->flags = uptr->flags | UNIT_SXC;	/* set ser exc */
-	    tq_mot_end (uptr, 0, ST_WPR | SB_WPR_HW, 0);
-	    return SCPE_OK;  }
-	if (uptr->uf & UF_WPS) {			/* swre write prot? */
-	    uptr->flags = uptr->flags | UNIT_SXC;	/* set ser exc */
-	    tq_mot_end (uptr, 0, ST_WPR | SB_WPR_SW, 0);
-	    return SCPE_OK;  }  }
-sts = ST_SUC;						/* assume success */
-tbc = 0;						/* assume zero rec */
-switch (cmd) {						/* case on command */
+if (tq_cmf[cmd] & CMF_WR) {                             /* write op? */
+    if (TQ_WPH (uptr)) {                                /* hwre write prot? */
+        uptr->flags = uptr->flags | UNIT_SXC;           /* set ser exc */
+        tq_mot_end (uptr, 0, ST_WPR | SB_WPR_HW, 0);
+        return SCPE_OK;
+        }
+    if (uptr->uf & UF_WPS) {                            /* swre write prot? */
+        uptr->flags = uptr->flags | UNIT_SXC;           /* set ser exc */
+        tq_mot_end (uptr, 0, ST_WPR | SB_WPR_SW, 0);
+        return SCPE_OK;
+        }
+    }
+sts = ST_SUC;                                           /* assume success */
+tbc = 0;                                                /* assume zero rec */
+switch (cmd) {                                          /* case on command */
 
-case OP_RD:case OP_ACC:case OP_CMP:			/* read-like op */
-	if (mdf & MD_REV) sts = tq_rdbufr (uptr, &tbc);	/* read record */
-	else sts = tq_rdbuff (uptr, &tbc);
-	if (sts == ST_DRV) {				/* read error? */
-	    PUTP32 (pkt, RW_BCL, 0);			/* no bytes processed */
-	    return tq_mot_err (uptr, tbc);  }		/* log, done */
-	if ((sts != ST_SUC) || (cmd == OP_ACC)) {	/* error or access? */
-	    PUTP32 (pkt, RW_BCL, 0);			/* no bytes processed */
-	    break;  }
-	if (tbc > bc) {					/* tape rec > buf? */
-	    uptr->flags = uptr->flags | UNIT_SXC;	/* serious exc */
-	    sts = ST_RDT;				/* data truncated */
-	    wbc = bc;  }				/* set working bc */
-	else wbc = tbc;
-	if (cmd == OP_RD) {				/* read? */
-	    if (t = Map_WriteB (ba, wbc, tqxb)) {	/* store, nxm? */
-		PUTP32 (pkt, RW_BCL, wbc - t);		/* adj bc */
-		if (tq_hbe (uptr, ba + wbc - t))	/* post err log */
-		    tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, tbc);	
-		return SCPE_OK;  }			/* end if nxm */
-	    }						/* end if read */
-	else {						/* compare */
-	    uint8 mby, dby;
-	    uint32 mba;
-	    for (i = 0; i < wbc; i++) {			/* loop */
-		if (mdf & MD_REV) {			/* reverse? */
-		    mba = ba + bc - 1 - i;		/* mem addr */
-		    dby = tqxb[tbc - 1 - i];  }		/* byte */
-		else {
-		    mba = ba + i;
-		    dby = tqxb[i];  }
-		if (Map_ReadB (mba, 1, &mby)) {		/* fetch, nxm? */
-		    PUTP32 (pkt, RW_BCL, i);		/* adj bc */
-		    if (tq_hbe (uptr, mba))		/* post err log */
-			tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, tbc);
-		    return SCPE_OK;  }
-		if (mby != dby) {			/* cmp err? */
-		    uptr->flags = uptr->flags | UNIT_SXC; /* ser exc */
-		    PUTP32 (pkt, RW_BCL, i);		/* adj bc */
-		    tq_mot_end (uptr, 0, ST_CMP, tbc);
-		    return SCPE_OK;  }			/* exit */
-		}					/* end for */
-	    }						/* end if compare */
-	PUTP32 (pkt, RW_BCL, wbc);			/* bytes read/cmp'd */
-	break;
+    case OP_RD:case OP_ACC:case OP_CMP:                 /* read-like op */
+        if (mdf & MD_REV) sts = tq_rdbufr (uptr, &tbc); /* read record */
+        else sts = tq_rdbuff (uptr, &tbc);
+        if (sts == ST_DRV) {                            /* read error? */
+            PUTP32 (pkt, RW_BCL, 0);                    /* no bytes processed */
+            return tq_mot_err (uptr, tbc);              /* log, done */
+            }
+        if ((sts != ST_SUC) || (cmd == OP_ACC)) {       /* error or access? */
+            PUTP32 (pkt, RW_BCL, 0);                    /* no bytes processed */
+            break;
+            }
+        if (tbc > bc) {                                 /* tape rec > buf? */
+            uptr->flags = uptr->flags | UNIT_SXC;       /* serious exc */
+            sts = ST_RDT;                               /* data truncated */
+            wbc = bc;                                   /* set working bc */
+            }
+        else wbc = tbc;
+        if (cmd == OP_RD) {                             /* read? */
+            if (t = Map_WriteB (ba, wbc, tqxb)) {       /* store, nxm? */
+                PUTP32 (pkt, RW_BCL, wbc - t);          /* adj bc */
+                if (tq_hbe (uptr, ba + wbc - t))        /* post err log */
+                    tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, tbc);        
+                return SCPE_OK;                         /* end if nxm */
+                }
+            }                                           /* end if read */
+        else {                                          /* compare */
+            uint8 mby, dby;
+            uint32 mba;
+            for (i = 0; i < wbc; i++) {                 /* loop */
+                if (mdf & MD_REV) {                     /* reverse? */
+                    mba = ba + bc - 1 - i;              /* mem addr */
+                    dby = tqxb[tbc - 1 - i];            /* byte */
+                    }
+                else {
+                    mba = ba + i;
+                    dby = tqxb[i];
+                    }
+                if (Map_ReadB (mba, 1, &mby)) {         /* fetch, nxm? */
+                    PUTP32 (pkt, RW_BCL, i);            /* adj bc */
+                    if (tq_hbe (uptr, mba))             /* post err log */
+                        tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, tbc);
+                    return SCPE_OK;
+                    }
+                if (mby != dby) {                       /* cmp err? */
+                    uptr->flags = uptr->flags | UNIT_SXC; /* ser exc */
+                    PUTP32 (pkt, RW_BCL, i);            /* adj bc */
+                    tq_mot_end (uptr, 0, ST_CMP, tbc);
+                    return SCPE_OK;                     /* exit */
+                    }
+                }                                       /* end for */
+            }                                           /* end if compare */
+        PUTP32 (pkt, RW_BCL, wbc);                      /* bytes read/cmp'd */
+        break;
 
-case OP_WR:						/* write */
-	if (t = Map_ReadB (ba, bc, tqxb)) {		/* fetch buf, nxm? */
-	    PUTP32 (pkt, RW_BCL, 0);			/* no bytes xfer'd */
-	    if (tq_hbe (uptr, ba + bc - t))		/* post err log */
-		tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, bc);	
-	    return SCPE_OK;  }				/* end else wr */
-	if (sim_tape_wrrecf (uptr, tqxb, bc))		/* write rec fwd, err? */
-	    return tq_mot_err (uptr, bc);		/* log, end */
-	uptr->objp = uptr->objp + 1;			/* upd obj pos */
-	if (TEST_EOT (uptr))				/* EOT on write? */
-	    uptr->flags = uptr->flags | UNIT_SXC;
-	uptr->flags = uptr->flags & ~UNIT_TMK;		/* disable LEOT */
-	tbc = bc;					/* RW_BC is ok */
-	break;
+    case OP_WR:                                         /* write */
+        if (t = Map_ReadB (ba, bc, tqxb)) {             /* fetch buf, nxm? */
+            PUTP32 (pkt, RW_BCL, 0);                    /* no bytes xfer'd */
+            if (tq_hbe (uptr, ba + bc - t))             /* post err log */
+                tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, bc);     
+            return SCPE_OK;                             /* end else wr */
+            }
+        if (sim_tape_wrrecf (uptr, tqxb, bc))           /* write rec fwd, err? */
+            return tq_mot_err (uptr, bc);               /* log, end */
+        uptr->objp = uptr->objp + 1;                    /* upd obj pos */
+        if (TEST_EOT (uptr))                            /* EOT on write? */
+            uptr->flags = uptr->flags | UNIT_SXC;
+        uptr->flags = uptr->flags & ~UNIT_TMK;          /* disable LEOT */
+        tbc = bc;                                       /* RW_BC is ok */
+        break;
 
-case OP_WTM:						/* write tape mark */
-	if (sim_tape_wrtmk (uptr))			/* write tmk, err? */
-	    return tq_mot_err (uptr, 0);		/* log, end */
-	uptr->objp = uptr->objp + 1;			/* incr obj cnt */
-case OP_ERG:						/* erase gap */
-	if (TEST_EOT (uptr))				/* EOT on write? */
-	    uptr->flags = uptr->flags | UNIT_SXC;
-	uptr->flags = uptr->flags & ~UNIT_TMK;		/* disable LEOT */
-	break;
+    case OP_WTM:                                        /* write tape mark */
+        if (sim_tape_wrtmk (uptr))                      /* write tmk, err? */
+            return tq_mot_err (uptr, 0);                /* log, end */
+        uptr->objp = uptr->objp + 1;                    /* incr obj cnt */
+    case OP_ERG:                                        /* erase gap */
+        if (TEST_EOT (uptr))                            /* EOT on write? */
+            uptr->flags = uptr->flags | UNIT_SXC;
+        uptr->flags = uptr->flags & ~UNIT_TMK;          /* disable LEOT */
+        break;
 
-case OP_ERS:						/* erase */
-	if (sim_tape_wreom (uptr))			/* write eom, err? */
-	    return tq_mot_err (uptr, 0);		/* log, end */
-	sim_tape_rewind (uptr);				/* rewind */
-	uptr->objp = 0;
-	uptr->flags = uptr->flags & ~(UNIT_TMK | UNIT_POL);
-	break;
+    case OP_ERS:                                        /* erase */
+        if (sim_tape_wreom (uptr))                      /* write eom, err? */
+            return tq_mot_err (uptr, 0);                /* log, end */
+        sim_tape_rewind (uptr);                         /* rewind */
+        uptr->objp = 0;
+        uptr->flags = uptr->flags & ~(UNIT_TMK | UNIT_POL);
+        break;
 
-case OP_POS:						/* position */
-	sktmk = skrec = 0;				/* clr skipped */
-	if (mdf & MD_RWD) {				/* rewind? */
-	    sim_tape_rewind (uptr);
-	    uptr->objp = 0;				/* clr flags */
-	    uptr->flags = uptr->flags & ~(UNIT_TMK | UNIT_POL);  }
-	if (mdf & MD_OBC) {				/* skip obj? */
-	    if (mdf & MD_REV)				/* reverse? */
-		sts = tq_spacer (uptr, nrec, &skrec, FALSE);
-	    else sts = tq_spacef (uptr, nrec, &skrec, FALSE);
-	    } 
-	else {						/* skip tmk, rec */
-	    if (mdf & MD_REV) sts = tq_skipfr (uptr, ntmk, &sktmk);
-	    else sts = tq_skipff (uptr, ntmk, &sktmk); 
-	    if (sts == ST_SUC) {			/* tmk succeed? */
-		if (mdf & MD_REV)			/* reverse? */
-		    sts = tq_spacer (uptr, nrec, &skrec, TRUE);
-		else sts = tq_spacef (uptr, nrec, &skrec, TRUE);
-		if (sts == ST_TMK) sktmk = sktmk + 1;  }
-	    }
-	PUTP32 (pkt, POS_RCL, skrec);			/* #rec skipped */
-	PUTP32 (pkt, POS_TMCL, sktmk);			/* #tmk skipped */
-	break;
+    case OP_POS:                                        /* position */
+        sktmk = skrec = 0;                              /* clr skipped */
+        if (mdf & MD_RWD) {                             /* rewind? */
+            sim_tape_rewind (uptr);
+            uptr->objp = 0;                             /* clr flags */
+            uptr->flags = uptr->flags & ~(UNIT_TMK | UNIT_POL);
+            }
+        if (mdf & MD_OBC) {                             /* skip obj? */
+            if (mdf & MD_REV)                           /* reverse? */
+                sts = tq_spacer (uptr, nrec, &skrec, FALSE);
+            else sts = tq_spacef (uptr, nrec, &skrec, FALSE);
+            } 
+        else {                                          /* skip tmk, rec */
+            if (mdf & MD_REV) sts = tq_skipfr (uptr, ntmk, &sktmk);
+            else sts = tq_skipff (uptr, ntmk, &sktmk); 
+            if (sts == ST_SUC) {                        /* tmk succeed? */
+                if (mdf & MD_REV)                       /* reverse? */
+                    sts = tq_spacer (uptr, nrec, &skrec, TRUE);
+                else sts = tq_spacef (uptr, nrec, &skrec, TRUE);
+                if (sts == ST_TMK) sktmk = sktmk + 1;
+                }
+            }
+        PUTP32 (pkt, POS_RCL, skrec);                   /* #rec skipped */
+        PUTP32 (pkt, POS_TMCL, sktmk);                  /* #tmk skipped */
+        break;
 
-default:
-	return SCPE_IERR;  }
-tq_mot_end (uptr, 0, sts, tbc);				/* done */
+    default:
+        return SCPE_IERR;
+        }
+
+tq_mot_end (uptr, 0, sts, tbc);                         /* done */
 return SCPE_OK;
 }
 
@@ -1163,9 +1268,9 @@ return SCPE_OK;
 
 t_stat tq_mot_err (UNIT *uptr, uint32 rsiz)
 {
-uptr->flags = (uptr->flags | UNIT_SXC) & ~UNIT_TMK;	/* serious exception */
-if (tq_dte (uptr, ST_DRV))				/* post err log */
-    tq_mot_end (uptr, EF_LOG, ST_DRV, rsiz);		/* if ok, report err */
+uptr->flags = (uptr->flags | UNIT_SXC) & ~UNIT_TMK;     /* serious exception */
+if (tq_dte (uptr, ST_DRV))                              /* post err log */
+    tq_mot_end (uptr, EF_LOG, ST_DRV, rsiz);            /* if ok, report err */
 perror ("TQ I/O error");
 clearerr (uptr->fileref);
 return SCPE_IOERR;
@@ -1175,59 +1280,70 @@ return SCPE_IOERR;
 
 t_bool tq_mot_end (UNIT *uptr, uint32 flg, uint32 sts, uint32 rsiz)
 {
-int32 pkt = uptr->cpkt;					/* packet */
-uint32 cmd = GETP (pkt, CMD_OPC, OPC);			/* get cmd */
-uint32 lnt = RW_LNT_T;					/* assume rw */
+int32 pkt = uptr->cpkt;                                 /* packet */
+uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* get cmd */
+uint32 lnt = RW_LNT_T;                                  /* assume rw */
 
-if (cmd == OP_ERG) lnt = ERG_LNT;			/* set pkt lnt */
+if (cmd == OP_ERG) lnt = ERG_LNT;                       /* set pkt lnt */
 else if (cmd == OP_ERS) lnt = ERS_LNT;
 else if (cmd == OP_WTM) lnt = WTM_LNT;
 else if (cmd == OP_POS) lnt = POS_LNT;
 
-uptr->cpkt = 0;						/* done */
-if (lnt > ERG_LNT) {					/* xfer cmd? */
-	PUTP32 (pkt, RW_POSL, uptr->objp);		/* position */
-	PUTP32 (pkt, RW_RSZL, rsiz);  }			/* record size */
+uptr->cpkt = 0;                                         /* done */
+if (lnt > ERG_LNT) {                                    /* xfer cmd? */
+    PUTP32 (pkt, RW_POSL, uptr->objp);                  /* position */
+    PUTP32 (pkt, RW_RSZL, rsiz);                        /* record size */
+    }
 tq_putr (pkt, cmd | OP_END, flg | tq_efl (uptr), sts, lnt, UQ_TYP_SEQ);
-if (!tq_putpkt (pkt, TRUE)) return ERR;			/* send pkt */
-if (uptr->pktq)						/* more to do? */
-	sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);	/* activate thread */
+if (!tq_putpkt (pkt, TRUE)) return ERR;                 /* send pkt */
+if (uptr->pktq)                                         /* more to do? */
+    sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);        /* activate thread */
 return OK;
 }
-
+
 /* Tape motion routines */
 
 uint32 tq_map_status (UNIT *uptr, t_stat st)
 {
-switch (st)
-{
-case MTSE_OK:
-	break;
-case MTSE_UNATT:
-	uptr->flags = uptr->flags | UNIT_SXC;
-	return (ST_OFL | SB_OFL_NV);
-case MTSE_FMT:
-	uptr->flags = uptr->flags | UNIT_SXC;
-	return ST_MFE;
-case MTSE_TMK:
-	uptr->flags = uptr->flags | UNIT_SXC;
-	return ST_TMK;
-case MTSE_INVRL:
-	uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
-	return ST_FMT;
-case MTSE_RECE:
-case MTSE_IOERR:
-	uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
-	return ST_DRV;
-case MTSE_EOM:
-	uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
-	return ST_DAT;
-case MTSE_BOT:
-	uptr->flags = (uptr->flags | UNIT_SXC) & ~UNIT_POL;
-	return ST_BOT;
-case MTSE_WRP:
-	uptr->flags = uptr->flags | UNIT_SXC;
-	return ST_WPR;  }
+switch (st) {
+
+    case MTSE_OK:
+        break;
+
+    case MTSE_UNATT:
+        uptr->flags = uptr->flags | UNIT_SXC;
+        return (ST_OFL | SB_OFL_NV);
+
+    case MTSE_FMT:
+        uptr->flags = uptr->flags | UNIT_SXC;
+        return ST_MFE;
+
+    case MTSE_TMK:
+        uptr->flags = uptr->flags | UNIT_SXC;
+        return ST_TMK;
+
+    case MTSE_INVRL:
+        uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
+        return ST_FMT;
+
+    case MTSE_RECE:
+    case MTSE_IOERR:
+        uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
+        return ST_DRV;
+
+    case MTSE_EOM:
+        uptr->flags = uptr->flags | UNIT_SXC | UNIT_POL;
+        return ST_DAT;
+
+    case MTSE_BOT:
+        uptr->flags = (uptr->flags | UNIT_SXC) & ~UNIT_POL;
+        return ST_BOT;
+
+    case MTSE_WRP:
+        uptr->flags = uptr->flags | UNIT_SXC;
+        return ST_WPR;
+        }
+
 return ST_SUC;
 }
 
@@ -1237,22 +1353,25 @@ t_stat st;
 t_mtrlnt tbc;
 
 *skipped = 0;
-while (*skipped < cnt) {				/* loop */
-	st = sim_tape_sprecf (uptr, &tbc);		/* space rec fwd */
-	if ((st != MTSE_OK) && (st != MTSE_TMK))	/* real error? */
-	    return tq_map_status (uptr, st);		/* map status */
-	uptr->objp = uptr->objp + 1;			/* upd obj cnt */
-	if (st == MTSE_TMK) {				/* tape mark? */
-	    int32 pkt = uptr->cpkt;			/* get pkt */
-	    if ((tq_pkt[pkt].d[CMD_MOD] & MD_DLE) &&	/* LEOT? */
-		(uptr->flags & UNIT_TMK)) {
-		sim_tape_sprecr (uptr, &tbc);		/* rev over tmk */
-		uptr->flags = uptr->flags | UNIT_SXC;	/* serious exc */	    
-		return ST_LED;  }
-	    uptr->flags = uptr->flags | UNIT_TMK;	/* set TM seen */
-	    if (qrec) return ST_TMK;  }			/* rec spc? stop */
-	else uptr->flags = uptr->flags & ~UNIT_TMK;	/* clr TM seen */
-	*skipped = *skipped + 1;  }			/* # obj skipped */
+while (*skipped < cnt) {                                /* loop */
+    st = sim_tape_sprecf (uptr, &tbc);                  /* space rec fwd */
+    if ((st != MTSE_OK) && (st != MTSE_TMK))            /* real error? */
+        return tq_map_status (uptr, st);                /* map status */
+    uptr->objp = uptr->objp + 1;                        /* upd obj cnt */
+    if (st == MTSE_TMK) {                               /* tape mark? */
+        int32 pkt = uptr->cpkt;                         /* get pkt */
+        if ((tq_pkt[pkt].d[CMD_MOD] & MD_DLE) &&        /* LEOT? */
+            (uptr->flags & UNIT_TMK)) {
+            sim_tape_sprecr (uptr, &tbc);               /* rev over tmk */
+            uptr->flags = uptr->flags | UNIT_SXC;       /* serious exc */           
+            return ST_LED;
+            }
+        uptr->flags = uptr->flags | UNIT_TMK;           /* set TM seen */
+        if (qrec) return ST_TMK;                        /* rec spc? stop */
+        }
+    else uptr->flags = uptr->flags & ~UNIT_TMK;         /* clr TM seen */
+    *skipped = *skipped + 1;                            /* # obj skipped */
+    }
 return ST_SUC;
 }
 
@@ -1261,10 +1380,11 @@ uint32 tq_skipff (UNIT *uptr, uint32 cnt, uint32 *skipped)
 uint32 st, skrec;
 
 *skipped = 0;
-while (*skipped < cnt) {				/* loop */
-	st = tq_spacef (uptr, 0x7FFFFFFF, &skrec, TRUE);/* rec spc fwd */
-	if (st == ST_TMK) *skipped = *skipped + 1;	/* count files */
-	else if (st != ST_SUC) return st;  }
+while (*skipped < cnt) {                                /* loop */
+    st = tq_spacef (uptr, 0x7FFFFFFF, &skrec, TRUE);    /* rec spc fwd */
+    if (st == ST_TMK) *skipped = *skipped + 1;          /* count files */
+    else if (st != ST_SUC) return st;
+    }
 return ST_SUC;
 }
 
@@ -1274,13 +1394,14 @@ t_stat st;
 t_mtrlnt tbc;
 
 *skipped = 0;
-while (*skipped < cnt) {				/* loop */
-	st = sim_tape_sprecr (uptr, &tbc);		/* spc rec rev */
-	if ((st != MTSE_OK) && (st != MTSE_TMK))	/* real error? */
-	    return tq_map_status (uptr, st);		/* map status */
-	uptr->objp = uptr->objp - 1;			/* upd obj cnt */
-	if ((st == MTSE_TMK) && qrec) return ST_TMK;	/* tape mark, stop? */
-	*skipped = *skipped + 1;  }			/* # obj skipped */
+while (*skipped < cnt) {                                /* loop */
+    st = sim_tape_sprecr (uptr, &tbc);                  /* spc rec rev */
+    if ((st != MTSE_OK) && (st != MTSE_TMK))            /* real error? */
+        return tq_map_status (uptr, st);                /* map status */
+    uptr->objp = uptr->objp - 1;                        /* upd obj cnt */
+    if ((st == MTSE_TMK) && qrec) return ST_TMK;        /* tape mark, stop? */
+    *skipped = *skipped + 1;                            /* # obj skipped */
+    }
 return ST_SUC;
 }
 
@@ -1289,27 +1410,29 @@ uint32 tq_skipfr (UNIT *uptr, uint32 cnt, uint32 *skipped)
 uint32 st, skrec;
 
 *skipped = 0;
-while (*skipped < cnt) {				/* loopo */
-	st = tq_spacer (uptr, 0x7FFFFFFF, &skrec, TRUE);/* rec spc rev */
-	if (st == ST_TMK) *skipped = *skipped + 1;	/* tape mark? */
-	else if (st != 0) return st;  }			/* error? */
+while (*skipped < cnt) {                                /* loopo */
+    st = tq_spacer (uptr, 0x7FFFFFFF, &skrec, TRUE);    /* rec spc rev */
+    if (st == ST_TMK) *skipped = *skipped + 1;          /* tape mark? */
+    else if (st != 0) return st;                        /* error? */
+    }
 return ST_SUC;
 }
-
+
 /* Read buffer - can return ST_TMK, ST_FMT, or ST_DRV */
 
 uint32 tq_rdbuff (UNIT *uptr, t_mtrlnt *tbc)
 {
 t_stat st;
 
-st = sim_tape_rdrecf (uptr, tqxb, tbc, MT_MAXFR);	/* read rec fwd */
-if (st == MTSE_TMK) {					/* tape mark? */
-	uptr->flags = uptr->flags | UNIT_SXC | UNIT_TMK;/* serious exc */
-	uptr->objp = uptr->objp + 1;			/* update obj cnt */
-	return ST_TMK;  }
-if (st != MTSE_OK) return tq_map_status (uptr, st);	/* other error? */
-uptr->flags = uptr->flags & ~UNIT_TMK;			/* clr tape mark */
-uptr->objp = uptr->objp + 1;				/* upd obj cnt */
+st = sim_tape_rdrecf (uptr, tqxb, tbc, MT_MAXFR);       /* read rec fwd */
+if (st == MTSE_TMK) {                                   /* tape mark? */
+    uptr->flags = uptr->flags | UNIT_SXC | UNIT_TMK;    /* serious exc */
+    uptr->objp = uptr->objp + 1;                        /* update obj cnt */
+    return ST_TMK;
+    }
+if (st != MTSE_OK) return tq_map_status (uptr, st);     /* other error? */
+uptr->flags = uptr->flags & ~UNIT_TMK;                  /* clr tape mark */
+uptr->objp = uptr->objp + 1;                            /* upd obj cnt */
 return ST_SUC;
 }
 
@@ -1317,16 +1440,17 @@ uint32 tq_rdbufr (UNIT *uptr, t_mtrlnt *tbc)
 {
 t_stat st;
 
-st = sim_tape_rdrecr (uptr, tqxb, tbc, MT_MAXFR);	/* read rec rev */
-if (st == MTSE_TMK) {					/* tape mark? */
-	uptr->flags = uptr->flags | UNIT_SXC;		/* serious exc */
-	uptr->objp = uptr->objp - 1;			/* update obj cnt */
-	return ST_TMK;  }
-if (st != MTSE_OK) return tq_map_status (uptr, st);	/* other error? */
-uptr->objp = uptr->objp - 1;				/* upd obj cnt */
+st = sim_tape_rdrecr (uptr, tqxb, tbc, MT_MAXFR);       /* read rec rev */
+if (st == MTSE_TMK) {                                   /* tape mark? */
+    uptr->flags = uptr->flags | UNIT_SXC;               /* serious exc */
+    uptr->objp = uptr->objp - 1;                        /* update obj cnt */
+    return ST_TMK;
+    }
+if (st != MTSE_OK) return tq_map_status (uptr, st);     /* other error? */
+uptr->objp = uptr->objp - 1;                            /* upd obj cnt */
 return ST_SUC;
 }
-
+
 /* Data transfer error log packet */
 
 t_bool tq_dte (UNIT *uptr, uint32 err)
@@ -1334,30 +1458,30 @@ t_bool tq_dte (UNIT *uptr, uint32 err)
 int32 pkt, tpkt;
 uint32 lu;
 
-if ((tq_cflgs & CF_THS) == 0) return OK;		/* logging? */
-if (!tq_deqf (&pkt)) return ERR;			/* get log pkt */
-tpkt = uptr->cpkt;					/* rw pkt */
-lu = tq_pkt[tpkt].d[CMD_UN];				/* unit # */
+if ((tq_cflgs & CF_THS) == 0) return OK;                /* logging? */
+if (!tq_deqf (&pkt)) return ERR;                        /* get log pkt */
+tpkt = uptr->cpkt;                                      /* rw pkt */
+lu = tq_pkt[tpkt].d[CMD_UN];                            /* unit # */
 
-tq_pkt[pkt].d[ELP_REFL] = tq_pkt[tpkt].d[CMD_REFL];	/* copy cmd ref */
-tq_pkt[pkt].d[ELP_REFH] = tq_pkt[tpkt].d[CMD_REFH];	/* copy cmd ref */
-tq_pkt[pkt].d[ELP_UN] = lu;				/* copy unit */
-tq_pkt[pkt].d[ELP_SEQ] = 0;				/* clr seq # */
-tq_pkt[pkt].d[DTE_CIDA] = 0;				/* ctrl ID */
+tq_pkt[pkt].d[ELP_REFL] = tq_pkt[tpkt].d[CMD_REFL];     /* copy cmd ref */
+tq_pkt[pkt].d[ELP_REFH] = tq_pkt[tpkt].d[CMD_REFH];     /* copy cmd ref */
+tq_pkt[pkt].d[ELP_UN] = lu;                             /* copy unit */
+tq_pkt[pkt].d[ELP_SEQ] = 0;                             /* clr seq # */
+tq_pkt[pkt].d[DTE_CIDA] = 0;                            /* ctrl ID */
 tq_pkt[pkt].d[DTE_CIDB] = 0;
 tq_pkt[pkt].d[DTE_CIDC] = 0;
 tq_pkt[pkt].d[DTE_CIDD] = (TQ_CLASS << DTE_CIDD_V_CLS) |
-	(drv_tab[tq_typ].cmod << DTE_CIDD_V_MOD);
-tq_pkt[pkt].d[DTE_VER] = drv_tab[tq_typ].cver;		/* ctrl ver */
-tq_pkt[pkt].d[DTE_MLUN] = lu;				/* MLUN */
-tq_pkt[pkt].d[DTE_UIDA] = lu;				/* unit ID */
+    (drv_tab[tq_typ].cmod << DTE_CIDD_V_MOD);
+tq_pkt[pkt].d[DTE_VER] = drv_tab[tq_typ].cver;          /* ctrl ver */
+tq_pkt[pkt].d[DTE_MLUN] = lu;                           /* MLUN */
+tq_pkt[pkt].d[DTE_UIDA] = lu;                           /* unit ID */
 tq_pkt[pkt].d[DTE_UIDB] = 0;
 tq_pkt[pkt].d[DTE_UIDC] = 0;
 tq_pkt[pkt].d[DTE_UIDD] = (UID_TAPE << DTE_UIDD_V_CLS) |
-	(drv_tab[tq_typ].umod << DTE_UIDD_V_MOD);
-tq_pkt[pkt].d[DTE_UVER] = drv_tab[tq_typ].uver;		/* unit ver */
-PUTP32 (pkt, DTE_POSL, uptr->objp);			/* position */
-tq_pkt[pkt].d[DTE_FVER] = drv_tab[tq_typ].fver;		/* fmtr ver */
+    (drv_tab[tq_typ].umod << DTE_UIDD_V_MOD);
+tq_pkt[pkt].d[DTE_UVER] = drv_tab[tq_typ].uver;         /* unit ver */
+PUTP32 (pkt, DTE_POSL, uptr->objp);                     /* position */
+tq_pkt[pkt].d[DTE_FVER] = drv_tab[tq_typ].fver;         /* fmtr ver */
 tq_putr (pkt, FM_TAP, LF_SNR, err, DTE_LNT, UQ_TYP_DAT);
 return tq_putpkt (pkt, TRUE);
 }
@@ -1368,21 +1492,21 @@ t_bool tq_hbe (UNIT *uptr, uint32 ba)
 {
 int32 pkt, tpkt;
 
-if ((tq_cflgs & CF_THS) == 0) return OK;		/* logging? */
-if (!tq_deqf (&pkt)) return ERR;			/* get log pkt */
-tpkt = uptr->cpkt;					/* rw pkt */
-tq_pkt[pkt].d[ELP_REFL] = tq_pkt[tpkt].d[CMD_REFL];	/* copy cmd ref */
-tq_pkt[pkt].d[ELP_REFH] = tq_pkt[tpkt].d[CMD_REFH];	/* copy cmd ref */
-tq_pkt[pkt].d[ELP_UN] = tq_pkt[tpkt].d[CMD_UN];		/* copy unit */
-tq_pkt[pkt].d[ELP_SEQ] = 0;				/* clr seq # */
-tq_pkt[pkt].d[HBE_CIDA] = 0;				/* ctrl ID */
+if ((tq_cflgs & CF_THS) == 0) return OK;                /* logging? */
+if (!tq_deqf (&pkt)) return ERR;                        /* get log pkt */
+tpkt = uptr->cpkt;                                      /* rw pkt */
+tq_pkt[pkt].d[ELP_REFL] = tq_pkt[tpkt].d[CMD_REFL];     /* copy cmd ref */
+tq_pkt[pkt].d[ELP_REFH] = tq_pkt[tpkt].d[CMD_REFH];     /* copy cmd ref */
+tq_pkt[pkt].d[ELP_UN] = tq_pkt[tpkt].d[CMD_UN];         /* copy unit */
+tq_pkt[pkt].d[ELP_SEQ] = 0;                             /* clr seq # */
+tq_pkt[pkt].d[HBE_CIDA] = 0;                            /* ctrl ID */
 tq_pkt[pkt].d[HBE_CIDB] = 0;
 tq_pkt[pkt].d[HBE_CIDC] = 0;
 tq_pkt[pkt].d[DTE_CIDD] = (TQ_CLASS << DTE_CIDD_V_CLS) |
-	(drv_tab[tq_typ].cmod << DTE_CIDD_V_MOD);
-tq_pkt[pkt].d[HBE_VER] = drv_tab[tq_typ].cver;		/* ctrl ver */
+    (drv_tab[tq_typ].cmod << DTE_CIDD_V_MOD);
+tq_pkt[pkt].d[HBE_VER] = drv_tab[tq_typ].cver;          /* ctrl ver */
 tq_pkt[pkt].d[HBE_RSV] = 0;
-PUTP32 (pkt, HBE_BADL, ba);				/* bad addr */
+PUTP32 (pkt, HBE_BADL, ba);                             /* bad addr */
 tq_putr (pkt, FM_BAD, LF_SNR, ST_HST | SB_HST_NXM, HBE_LNT, UQ_TYP_DAT);
 return tq_putpkt (pkt, TRUE);
 }
@@ -1393,14 +1517,14 @@ t_bool tq_plf (uint32 err)
 {
 int32 pkt;
 
-if (!tq_deqf (&pkt)) return ERR;			/* get log pkt */
-tq_pkt[pkt].d[ELP_REFL] = tq_pkt[pkt].d[ELP_REFH] = 0;	/* ref = 0 */
-tq_pkt[pkt].d[ELP_UN] = tq_pkt[pkt].d[ELP_SEQ] = 0;	/* no unit, seq */
-tq_pkt[pkt].d[PLF_CIDA] = 0;				/* cntl ID */
+if (!tq_deqf (&pkt)) return ERR;                        /* get log pkt */
+tq_pkt[pkt].d[ELP_REFL] = tq_pkt[pkt].d[ELP_REFH] = 0;  /* ref = 0 */
+tq_pkt[pkt].d[ELP_UN] = tq_pkt[pkt].d[ELP_SEQ] = 0;     /* no unit, seq */
+tq_pkt[pkt].d[PLF_CIDA] = 0;                            /* cntl ID */
 tq_pkt[pkt].d[PLF_CIDB] = 0;
 tq_pkt[pkt].d[PLF_CIDC] = 0;
 tq_pkt[pkt].d[PLF_CIDD] = (TQ_CLASS << PLF_CIDD_V_CLS) |
-	(drv_tab[tq_typ].cmod << PLF_CIDD_V_MOD);
+    (drv_tab[tq_typ].cmod << PLF_CIDD_V_MOD);
 tq_pkt[pkt].d[PLF_VER] = drv_tab[tq_typ].cver;
 tq_pkt[pkt].d[PLF_ERR] = err;
 tq_putr (pkt, FM_CNT, LF_SNR, ST_CNT, PLF_LNT, UQ_TYP_DAT);
@@ -1415,60 +1539,62 @@ int32 tq_una (UNIT *uptr)
 int32 pkt;
 uint32 lu;
 
-if (!tq_deqf (&pkt)) return ERR;			/* get log pkt */
-lu = uptr - tq_dev.units;				/* get unit */
-tq_pkt[pkt].d[RSP_REFL] = tq_pkt[pkt].d[RSP_REFH] = 0;	/* ref = 0 */
+if (!tq_deqf (&pkt)) return ERR;                        /* get log pkt */
+lu = (uint32) (uptr - tq_dev.units);                    /* get unit */
+tq_pkt[pkt].d[RSP_REFL] = tq_pkt[pkt].d[RSP_REFH] = 0;  /* ref = 0 */
 tq_pkt[pkt].d[RSP_UN] = lu;
 tq_pkt[pkt].d[RSP_RSV] = 0;
-tq_putr_unit (pkt, uptr, lu, FALSE);			/* fill unit fields */
-tq_putr (pkt, OP_AVA, 0, 0, UNA_LNT, UQ_TYP_SEQ);	/* fill std fields */
+tq_putr_unit (pkt, uptr, lu, FALSE);                    /* fill unit fields */
+tq_putr (pkt, OP_AVA, 0, 0, UNA_LNT, UQ_TYP_SEQ);       /* fill std fields */
 return tq_putpkt (pkt, TRUE);
 }
-
+
 /* List handling
 
-   tq_deqf	-	dequeue head of free list (fatal err if none)
-   tq_deqh	-	dequeue head of list
-   tq_enqh	-	enqueue at head of list
-   tq_enqt	-	enqueue at tail of list
+   tq_deqf      -       dequeue head of free list (fatal err if none)
+   tq_deqh      -       dequeue head of list
+   tq_enqh      -       enqueue at head of list
+   tq_enqt      -       enqueue at tail of list
 */
 
 t_bool tq_deqf (int32 *pkt)
 {
-if (tq_freq == 0) return tq_fatal (PE_NSR);		/* no free pkts?? */
-tq_pbsy = tq_pbsy + 1;					/* cnt busy pkts */
-*pkt = tq_freq;						/* head of list */
-tq_freq = tq_pkt[tq_freq].link;				/* next */
+if (tq_freq == 0) return tq_fatal (PE_NSR);             /* no free pkts?? */
+tq_pbsy = tq_pbsy + 1;                                  /* cnt busy pkts */
+*pkt = tq_freq;                                         /* head of list */
+tq_freq = tq_pkt[tq_freq].link;                         /* next */
 return OK;
 }
 
 int32 tq_deqh (int32 *lh)
 {
-int32 ptr = *lh;					/* head of list */
+int32 ptr = *lh;                                        /* head of list */
 
-if (ptr) *lh = tq_pkt[ptr].link;			/* next */
+if (ptr) *lh = tq_pkt[ptr].link;                        /* next */
 return ptr;
 }
 
 void tq_enqh (int32 *lh, int32 pkt)
 {
-if (pkt == 0) return;					/* any pkt? */
-tq_pkt[pkt].link = *lh;					/* link is old lh */
-*lh = pkt;						/* pkt is new lh */
+if (pkt == 0) return;                                   /* any pkt? */
+tq_pkt[pkt].link = *lh;                                 /* link is old lh */
+*lh = pkt;                                              /* pkt is new lh */
 return;
 }
 
 void tq_enqt (int32 *lh, int32 pkt)
 {
-if (pkt == 0) return;					/* any pkt? */
-tq_pkt[pkt].link = 0;					/* it will be tail */
-if (*lh == 0) *lh = pkt;				/* if empty, enqh */
-else {	uint32 ptr = *lh;				/* chase to end */
-	while (tq_pkt[ptr].link) ptr = tq_pkt[ptr].link;
-	tq_pkt[ptr].link = pkt;  }			/* enq at tail */
+if (pkt == 0) return;                                   /* any pkt? */
+tq_pkt[pkt].link = 0;                                   /* it will be tail */
+if (*lh == 0) *lh = pkt;                                /* if empty, enqh */
+else {
+    uint32 ptr = *lh;                                   /* chase to end */
+    while (tq_pkt[ptr].link) ptr = tq_pkt[ptr].link;
+    tq_pkt[ptr].link = pkt;                             /* enq at tail */
+    }
 return;
 }
-
+
 /* Packet and descriptor handling */
 
 /* Get packet from command ring */
@@ -1477,16 +1603,17 @@ t_bool tq_getpkt (int32 *pkt)
 {
 uint32 addr, desc;
 
-if (!tq_getdesc (&tq_cq, &desc)) return ERR;		/* get cmd desc */
-if ((desc & UQ_DESC_OWN) == 0) {			/* none */
-	*pkt = 0;					/* pkt = 0 */
-	return OK;  }					/* no error */
-if (!tq_deqf (pkt)) return ERR;				/* get cmd pkt */
-tq_hat = 0;						/* dsbl hst timer */
-addr = desc & UQ_ADDR;					/* get Q22 addr */
+if (!tq_getdesc (&tq_cq, &desc)) return ERR;            /* get cmd desc */
+if ((desc & UQ_DESC_OWN) == 0) {                        /* none */
+    *pkt = 0;                                           /* pkt = 0 */
+    return OK;                                          /* no error */
+    }
+if (!tq_deqf (pkt)) return ERR;                         /* get cmd pkt */
+tq_hat = 0;                                             /* dsbl hst timer */
+addr = desc & UQ_ADDR;                                  /* get Q22 addr */
 if (Map_ReadW (addr + UQ_HDR_OFF, TQ_PKT_SIZE, tq_pkt[*pkt].d))
-	return tq_fatal (PE_PRE);			/* read pkt */
-return tq_putdesc (&tq_cq, desc);			/* release desc */
+    return tq_fatal (PE_PRE);                           /* read pkt */
+return tq_putdesc (&tq_cq, desc);                       /* release desc */
 }
 
 /* Put packet to response ring - note the clever hack about credits.
@@ -1498,33 +1625,36 @@ t_bool tq_putpkt (int32 pkt, t_bool qt)
 {
 uint32 addr, desc, lnt, cr;
 
-if (pkt == 0) return OK;				/* any packet? */
+if (pkt == 0) return OK;                                /* any packet? */
 if (DEBUG_PRS (tq_dev)) {
-        UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
-	fprintf (sim_deb, ">>TQ: rsp=%04X, sts=%04X",
-	    tq_pkt[pkt].d[RSP_OPF], tq_pkt[pkt].d[RSP_STS]);
-	if (up) fprintf (sim_deb, ", pos=%d, obj=%d\n", up->pos, up->objp);
-	else fprintf (sim_deb, "\n");
-	fflush (sim_deb);  }
-if (!tq_getdesc (&tq_rq, &desc)) return ERR;		/* get rsp desc */
-if ((desc & UQ_DESC_OWN) == 0) {			/* not valid? */
-	if (qt) tq_enqt (&tq_rspq, pkt);		/* normal? q tail */
-	else tq_enqh (&tq_rspq, pkt);			/* resp q call */
-	sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);	/* activate q thrd */
-	return OK;  }
-addr = desc & UQ_ADDR;					/* get Q22 addr */
-lnt = tq_pkt[pkt].d[UQ_HLNT] - UQ_HDR_OFF;		/* size, with hdr */
-if ((GETP (pkt, UQ_HCTC, TYP) == UQ_TYP_SEQ) &&		/* seq packet? */
-    (GETP (pkt, CMD_OPC, OPC) & OP_END)) {		/* end packet? */
-	cr = (tq_credits >= 14)? 14: tq_credits;	/* max 14 credits */
-	tq_credits = tq_credits - cr;			/* decr credits */
-	tq_pkt[pkt].d[UQ_HCTC] |= ((cr + 1) << UQ_HCTC_V_CR);  }
+    UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
+    fprintf (sim_deb, ">>TQ: rsp=%04X, sts=%04X",
+        tq_pkt[pkt].d[RSP_OPF], tq_pkt[pkt].d[RSP_STS]);
+    if (up) fprintf (sim_deb, ", pos=%d, obj=%d\n", up->pos, up->objp);
+    else fprintf (sim_deb, "\n");
+    fflush (sim_deb);
+    }
+if (!tq_getdesc (&tq_rq, &desc)) return ERR;            /* get rsp desc */
+if ((desc & UQ_DESC_OWN) == 0) {                        /* not valid? */
+    if (qt) tq_enqt (&tq_rspq, pkt);                    /* normal? q tail */
+    else tq_enqh (&tq_rspq, pkt);                       /* resp q call */
+    sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);        /* activate q thrd */
+    return OK;
+    }
+addr = desc & UQ_ADDR;                                  /* get Q22 addr */
+lnt = tq_pkt[pkt].d[UQ_HLNT] - UQ_HDR_OFF;              /* size, with hdr */
+if ((GETP (pkt, UQ_HCTC, TYP) == UQ_TYP_SEQ) &&         /* seq packet? */
+    (GETP (pkt, CMD_OPC, OPC) & OP_END)) {              /* end packet? */
+    cr = (tq_credits >= 14)? 14: tq_credits;            /* max 14 credits */
+    tq_credits = tq_credits - cr;                       /* decr credits */
+    tq_pkt[pkt].d[UQ_HCTC] |= ((cr + 1) << UQ_HCTC_V_CR);
+    }
 if (Map_WriteW (addr + UQ_HDR_OFF, lnt, tq_pkt[pkt].d))
-	return tq_fatal (PE_PWE);			/* write pkt */
-tq_enqh (&tq_freq, pkt);				/* pkt is free */
-tq_pbsy = tq_pbsy - 1;					/* decr busy cnt */
-if (tq_pbsy == 0) tq_hat = tq_htmo;			/* idle? strt hst tmr */
-return tq_putdesc (&tq_rq, desc);			/* release desc */
+    return tq_fatal (PE_PWE);                           /* write pkt */
+tq_enqh (&tq_freq, pkt);                                /* pkt is free */
+tq_pbsy = tq_pbsy - 1;                                  /* decr busy cnt */
+if (tq_pbsy == 0) tq_hat = tq_htmo;                     /* idle? strt hst tmr */
+return tq_putdesc (&tq_rq, desc);                       /* release desc */
 }
 
 /* Get a descriptor from the host */
@@ -1534,8 +1664,8 @@ t_bool tq_getdesc (struct uq_ring *ring, uint32 *desc)
 uint32 addr = ring->ba + ring->idx;
 uint16 d[2];
 
-if (Map_ReadW (addr, 4, d))				/* fetch desc */
-	return tq_fatal (PE_QRE);			/* err? dead */
+if (Map_ReadW (addr, 4, d))                             /* fetch desc */
+    return tq_fatal (PE_QRE);                           /* err? dead */
 *desc = ((uint32) d[0]) | (((uint32) d[1]) << 16);
 return OK;
 }
@@ -1552,22 +1682,25 @@ uint32 prvd, newd = (desc & ~UQ_DESC_OWN) | UQ_DESC_F;
 uint32 prva, addr = ring->ba + ring->idx;
 uint16 d[2];
 
-d[0] = newd & 0xFFFF;					/* 32b to 16b */
+d[0] = newd & 0xFFFF;                                   /* 32b to 16b */
 d[1] = (newd >> 16) & 0xFFFF;
-if (Map_WriteW (addr, 4, d))				/* store desc */
-	return tq_fatal (PE_QWE);			/* err? dead */
-if (desc & UQ_DESC_F) {					/* was F set? */
-	if (ring->lnt <= 4) tq_ring_int (ring);		/* lnt = 1? intr */
-	else {	prva = ring->ba +			/* prv desc */
-			((ring->idx - 4) & (ring->lnt - 1));
-		if (Map_ReadW (prva, 4, d))		/* read prv */
-			return tq_fatal (PE_QRE);
-		prvd = ((uint32) d[0]) | (((uint32) d[1]) << 16);
-		if (prvd & UQ_DESC_OWN) tq_ring_int (ring);  }  }
+if (Map_WriteW (addr, 4, d))                            /* store desc */
+    return tq_fatal (PE_QWE);                           /* err? dead */
+if (desc & UQ_DESC_F) {                                 /* was F set? */
+    if (ring->lnt <= 4) tq_ring_int (ring);             /* lnt = 1? intr */
+    else {
+        prva = ring->ba +                               /* prv desc */
+            ((ring->idx - 4) & (ring->lnt - 1));
+        if (Map_ReadW (prva, 4, d))                     /* read prv */
+            return tq_fatal (PE_QRE);
+        prvd = ((uint32) d[0]) | (((uint32) d[1]) << 16);
+        if (prvd & UQ_DESC_OWN) tq_ring_int (ring);
+        }
+    }
 ring->idx = (ring->idx + 4) & (ring->lnt - 1);
 return OK;
 }
-
+
 /* Get unit descriptor for logical unit - trivial now,
    but eventually, hide multiboard complexities here */
 
@@ -1585,10 +1718,10 @@ return uptr;
 
 void tq_setf_unit (int32 pkt, UNIT *uptr)
 {
-uptr->uf = tq_pkt[pkt].d[ONL_UFL] & UF_MSK;		/* settable flags */
-if ((tq_pkt[pkt].d[CMD_MOD] & MD_SWP) &&		/* swre wrp enb? */
-	(tq_pkt[pkt].d[ONL_UFL] & UF_WPS))		/* swre wrp on? */
-	uptr->uf = uptr->uf | UF_WPS;			/* simon says... */
+uptr->uf = tq_pkt[pkt].d[ONL_UFL] & UF_MSK;             /* settable flags */
+if ((tq_pkt[pkt].d[CMD_MOD] & MD_SWP) &&                /* swre wrp enb? */
+    (tq_pkt[pkt].d[ONL_UFL] & UF_WPS))                  /* swre wrp on? */
+    uptr->uf = uptr->uf | UF_WPS;                       /* simon says... */
 return;
 }
 
@@ -1598,10 +1731,11 @@ uint32 tq_efl (UNIT *uptr)
 {
 uint32 t = 0;
 
-if (uptr) {						/* any unit? */
-	if (uptr->flags & UNIT_POL) t = t | EF_PLS;	/* note pos lost */
-	if (uptr->flags & UNIT_SXC) t = t | EF_SXC;	/* note ser exc */
-	if (TEST_EOT (uptr)) t = t | EF_EOT;  }		/* note EOT */
+if (uptr) {                                             /* any unit? */
+    if (uptr->flags & UNIT_POL) t = t | EF_PLS;         /* note pos lost */
+    if (uptr->flags & UNIT_SXC) t = t | EF_SXC;         /* note ser exc */
+    if (TEST_EOT (uptr)) t = t | EF_EOT;                /* note EOT */
+    }
 return t;
 }
 
@@ -1609,21 +1743,22 @@ return t;
 
 void tq_putr_unit (int32 pkt, UNIT *uptr, uint32 lu, t_bool all)
 {
-tq_pkt[pkt].d[ONL_MLUN] = lu;				/* multi-unit */
-tq_pkt[pkt].d[ONL_UFL] = uptr->uf | TQ_WPH (uptr);	/* unit flags */
-tq_pkt[pkt].d[ONL_RSVL] = tq_pkt[pkt].d[ONL_RSVH] = 0;	/* reserved */
-tq_pkt[pkt].d[ONL_UIDA] = lu;				/* UID low */
+tq_pkt[pkt].d[ONL_MLUN] = lu;                           /* multi-unit */
+tq_pkt[pkt].d[ONL_UFL] = uptr->uf | TQ_WPH (uptr);      /* unit flags */
+tq_pkt[pkt].d[ONL_RSVL] = tq_pkt[pkt].d[ONL_RSVH] = 0;  /* reserved */
+tq_pkt[pkt].d[ONL_UIDA] = lu;                           /* UID low */
 tq_pkt[pkt].d[ONL_UIDB] = 0;
 tq_pkt[pkt].d[ONL_UIDC] = 0;
 tq_pkt[pkt].d[ONL_UIDD] = (UID_TAPE << ONL_UIDD_V_CLS) |
-	(drv_tab[tq_typ].umod << ONL_UIDD_V_MOD);	/* UID hi */
-PUTP32 (pkt, ONL_MEDL, drv_tab[tq_typ].med);		/* media type */
-if (all) {						/* if long form */
-	tq_pkt[pkt].d[ONL_FMT] = drv_tab[tq_typ].fmt;	/* format */
-	tq_pkt[pkt].d[ONL_SPD] = 0;			/* speed */
-	PUTP32 (pkt, ONL_MAXL, TQ_MAXFR);		/* max xfr */
-	tq_pkt[pkt].d[ONL_NREC] = 0;			/* noise rec */
-	tq_pkt[pkt].d[ONL_RSVE] = 0;  }			/* reserved */
+    (drv_tab[tq_typ].umod << ONL_UIDD_V_MOD);           /* UID hi */
+PUTP32 (pkt, ONL_MEDL, drv_tab[tq_typ].med);            /* media type */
+if (all) {                                              /* if long form */
+    tq_pkt[pkt].d[ONL_FMT] = drv_tab[tq_typ].fmt;       /* format */
+    tq_pkt[pkt].d[ONL_SPD] = 0;                         /* speed */
+    PUTP32 (pkt, ONL_MAXL, TQ_MAXFR);                   /* max xfr */
+    tq_pkt[pkt].d[ONL_NREC] = 0;                        /* noise rec */
+    tq_pkt[pkt].d[ONL_RSVE] = 0;                        /* reserved */
+    }
 return;
 }
 
@@ -1631,12 +1766,12 @@ return;
 
 void tq_putr (int32 pkt, uint32 cmd, uint32 flg, uint32 sts, uint32 lnt, uint32 typ)
 {
-tq_pkt[pkt].d[RSP_OPF] = (cmd << RSP_OPF_V_OPC) |	/* set cmd, flg */
-	(flg << RSP_OPF_V_FLG);
+tq_pkt[pkt].d[RSP_OPF] = (cmd << RSP_OPF_V_OPC) |       /* set cmd, flg */
+    (flg << RSP_OPF_V_FLG);
 tq_pkt[pkt].d[RSP_STS] = sts;
-tq_pkt[pkt].d[UQ_HLNT] = lnt;				/* length */
-tq_pkt[pkt].d[UQ_HCTC] = (typ << UQ_HCTC_V_TYP) |	/* type, cid */
-	(UQ_CID_TMSCP << UQ_HCTC_V_CID);		/* clr credits */
+tq_pkt[pkt].d[UQ_HLNT] = lnt;                           /* length */
+tq_pkt[pkt].d[UQ_HCTC] = (typ << UQ_HCTC_V_TYP) |       /* type, cid */
+    (UQ_CID_TMSCP << UQ_HCTC_V_CID);                    /* clr credits */
 return;
 }
 
@@ -1652,11 +1787,11 @@ return;
 
 void tq_ring_int (struct uq_ring *ring)
 {
-uint32 iadr = tq_comm + ring->ioff;			/* addr intr wd */
+uint32 iadr = tq_comm + ring->ioff;                     /* addr intr wd */
 uint16 flag = 1;
 
-Map_WriteW (iadr, 2, &flag);				/* write flag */
-if (tq_dib.vec) SET_INT (TQ);				/* if enb, intr */
+Map_WriteW (iadr, 2, &flag);                            /* write flag */
+if (tq_dib.vec) SET_INT (TQ);                           /* if enb, intr */
 return;
 }
 
@@ -1664,7 +1799,7 @@ return;
 
 int32 tq_inta (void)
 {
-return tq_dib.vec;					/* prog vector */
+return tq_dib.vec;                                      /* prog vector */
 }
 
 /* Fatal error */
@@ -1672,13 +1807,13 @@ return tq_dib.vec;					/* prog vector */
 t_bool tq_fatal (uint32 err)
 {
 if (DEBUG_PRS (tq_dev)) fprintf (sim_deb, ">>TQ: fatal err=%X\n", err);
-tq_reset (&tq_dev);					/* reset device */
-tq_sa = SA_ER | err;					/* SA = dead code */
-tq_csta = CST_DEAD;					/* state = dead */
-tq_perr = err;						/* save error */
+tq_reset (&tq_dev);                                     /* reset device */
+tq_sa = SA_ER | err;                                    /* SA = dead code */
+tq_csta = CST_DEAD;                                     /* state = dead */
+tq_perr = err;                                          /* save error */
 return ERR;
 }
-
+
 /* Device attach */
 
 t_stat tq_attach (UNIT *uptr, char *cptr)
@@ -1688,7 +1823,7 @@ t_stat r;
 r = sim_tape_attach (uptr, cptr);
 if (r != SCPE_OK) return r;
 if (tq_csta == CST_UP) uptr->flags = (uptr->flags | UNIT_ATP) &
-	~(UNIT_SXC | UNIT_POL | UNIT_TMK);
+    ~(UNIT_SXC | UNIT_POL | UNIT_TMK);
 return SCPE_OK;
 }
 
@@ -1698,10 +1833,10 @@ t_stat tq_detach (UNIT *uptr)
 {
 t_stat r;
 
-r = sim_tape_detach (uptr);				/* detach unit */
+r = sim_tape_detach (uptr);                             /* detach unit */
 if (r != SCPE_OK) return r;
 uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_ATP | UNIT_SXC | UNIT_POL | UNIT_TMK);
-uptr->uf = 0;						/* clr unit flgs */
+uptr->uf = 0;                                           /* clr unit flgs */
 return SCPE_OK;
 } 
 
@@ -1712,147 +1847,149 @@ t_stat tq_reset (DEVICE *dptr)
 int32 i, j;
 UNIT *uptr;
 
-tq_csta = CST_S1;					/* init stage 1 */
-tq_s1dat = 0;						/* no S1 data */
-tq_dib.vec = 0;						/* no vector */
-if (UNIBUS) tq_sa = SA_S1 | SA_S1C_DI | SA_S1C_MP;	/* Unibus? */
+tq_csta = CST_S1;                                       /* init stage 1 */
+tq_s1dat = 0;                                           /* no S1 data */
+tq_dib.vec = 0;                                         /* no vector */
+if (UNIBUS) tq_sa = SA_S1 | SA_S1C_DI | SA_S1C_MP;      /* Unibus? */
 else tq_sa = SA_S1 | SA_S1C_Q22 | SA_S1C_DI | SA_S1C_MP; /* init SA val */
-tq_cflgs = CF_RPL;					/* ctrl flgs off */
-tq_htmo = TQ_DHTMO;					/* default timeout */
-tq_hat = tq_htmo;					/* default timer */
-tq_cq.ba = tq_cq.lnt = tq_cq.idx = 0;			/* clr cmd ring */
-tq_rq.ba = tq_rq.lnt = tq_rq.idx = 0;			/* clr rsp ring */
-tq_credits = (TQ_NPKTS / 2) - 1;			/* init credits */
-tq_freq = 1;						/* init free list */
-for (i = 0; i < TQ_NPKTS; i++) {			/* all pkts free */
-	if (i) tq_pkt[i].link = (i + 1) & TQ_M_NPKTS;
-	else tq_pkt[i].link = 0;
-	for (j = 0; j < TQ_PKT_SIZE_W; j++) tq_pkt[i].d[j] = 0;  }
-tq_rspq = 0;						/* no q'd rsp pkts */
-tq_pbsy = 0;						/* all pkts free */
-tq_pip = 0;						/* not polling */
-CLR_INT (TQ);						/* clr intr req */
-for (i = 0; i < TQ_NUMDR + 2; i++) {			/* init units */
-	uptr = tq_dev.units + i;
-	sim_cancel (uptr);				/* clr activity */
-	sim_tape_reset (uptr);
-	uptr->flags = uptr->flags &			/* not online */
-		~(UNIT_ONL|UNIT_ATP|UNIT_SXC|UNIT_POL|UNIT_TMK);
-	uptr->uf = 0;					/* clr unit flags */
-	uptr->cpkt = uptr->pktq = 0;  }			/* clr pkt q's */
-if (tqxb == NULL) tqxb = calloc (TQ_MAXFR, sizeof (uint8));
+tq_cflgs = CF_RPL;                                      /* ctrl flgs off */
+tq_htmo = TQ_DHTMO;                                     /* default timeout */
+tq_hat = tq_htmo;                                       /* default timer */
+tq_cq.ba = tq_cq.lnt = tq_cq.idx = 0;                   /* clr cmd ring */
+tq_rq.ba = tq_rq.lnt = tq_rq.idx = 0;                   /* clr rsp ring */
+tq_credits = (TQ_NPKTS / 2) - 1;                        /* init credits */
+tq_freq = 1;                                            /* init free list */
+for (i = 0; i < TQ_NPKTS; i++) {                        /* all pkts free */
+    if (i) tq_pkt[i].link = (i + 1) & TQ_M_NPKTS;
+    else tq_pkt[i].link = 0;
+    for (j = 0; j < TQ_PKT_SIZE_W; j++) tq_pkt[i].d[j] = 0;
+    }
+tq_rspq = 0;                                            /* no q'd rsp pkts */
+tq_pbsy = 0;                                            /* all pkts free */
+tq_pip = 0;                                             /* not polling */
+CLR_INT (TQ);                                           /* clr intr req */
+for (i = 0; i < TQ_NUMDR + 2; i++) {                    /* init units */
+    uptr = tq_dev.units + i;
+    sim_cancel (uptr);                                  /* clr activity */
+    sim_tape_reset (uptr);
+    uptr->flags = uptr->flags &                         /* not online */
+        ~(UNIT_ONL|UNIT_ATP|UNIT_SXC|UNIT_POL|UNIT_TMK);
+    uptr->uf = 0;                                       /* clr unit flags */
+    uptr->cpkt = uptr->pktq = 0;                        /* clr pkt q's */
+    }
+if (tqxb == NULL) tqxb = (uint8 *) calloc (TQ_MAXFR, sizeof (uint8));
 if (tqxb == NULL) return SCPE_MEM;
 return SCPE_OK;
 }
-
+
 /* Device bootstrap */
 
 #if defined (VM_PDP11)
 
-#define BOOT_START	016000				/* start */
-#define BOOT_ENTRY	(BOOT_START + 002)		/* entry */
-#define BOOT_UNIT	(BOOT_START + 010)		/* unit number */
-#define BOOT_CSR	(BOOT_START + 014)		/* CSR */
-#define BOOT_LEN	(sizeof (boot_rom) / sizeof (int16))
+#define BOOT_START      016000                          /* start */
+#define BOOT_ENTRY      (BOOT_START + 002)              /* entry */
+#define BOOT_UNIT       (BOOT_START + 010)              /* unit number */
+#define BOOT_CSR        (BOOT_START + 014)              /* CSR */
+#define BOOT_LEN        (sizeof (boot_rom) / sizeof (int16))
 
 /* Data structure definitions */
 
-#define B_CMDINT	(BOOT_START - 01000)		/* cmd int */
-#define B_RSPINT	(B_CMDINT + 002)		/* rsp int */
-#define B_RING		(B_RSPINT + 002)		/* ring base */
-#define B_RSPH		(B_RING + 010)			/* resp pkt hdr */
-#define B_TKRSP		(B_RSPH + 004)			/* resp pkt */
-#define B_CMDH		(B_TKRSP + 060)			/* cmd pkt hdr */
-#define B_TKCMD		(B_CMDH + 004)			/* cmd pkt */
-#define B_UNIT		(B_TKCMD + 004)			/* unit # */
+#define B_CMDINT        (BOOT_START - 01000)            /* cmd int */
+#define B_RSPINT        (B_CMDINT + 002)                /* rsp int */
+#define B_RING          (B_RSPINT + 002)                /* ring base */
+#define B_RSPH          (B_RING + 010)                  /* resp pkt hdr */
+#define B_TKRSP         (B_RSPH + 004)                  /* resp pkt */
+#define B_CMDH          (B_TKRSP + 060)                 /* cmd pkt hdr */
+#define B_TKCMD         (B_CMDH + 004)                  /* cmd pkt */
+#define B_UNIT          (B_TKCMD + 004)                 /* unit # */
 
 static const uint16 boot_rom[] = {
 
-	0046525,			/* ST: "UM" */
+    0046525,                        /* ST: "UM" */
 
-	0012706, 0016000,		/*   mov  #st,sp */
-	0012700, 0000000,		/*   mov  #unitno,r0 */
-	0012701, 0174500,		/*   mov  #174500,r1	; ip addr */
-	0005021,			/*   clr  (r1)+		; init */
-	0012704, 0004000,		/*   mov  #4000,r4	; s1 mask */
-	0005002,			/*   clr  r2 */
-	0005022,			/* 10$: clr (r2)+	; clr up to boot */
-	0020237, BOOT_START - 2,	/*   cmp  r2,#st-2 */
-	0103774,			/*   blo  10$ */
-	0012705, BOOT_START+0312,	/*   mov  #cmdtbl,r5	; addr of tbl */
+    0012706, 0016000,               /*   mov  #st,sp */
+    0012700, 0000000,               /*   mov  #unitno,r0 */
+    0012701, 0174500,               /*   mov  #174500,r1    ; ip addr */
+    0005021,                        /*   clr  (r1)+         ; init */
+    0012704, 0004000,               /*   mov  #4000,r4      ; s1 mask */
+    0005002,                        /*   clr  r2 */
+    0005022,                        /* 10$: clr (r2)+       ; clr up to boot */
+    0020237, BOOT_START - 2,        /*   cmp  r2,#st-2 */
+    0103774,                        /*   blo  10$ */
+    0012705, BOOT_START+0312,       /*   mov  #cmdtbl,r5    ; addr of tbl */
 
-	/* Four step init process */
+                                    /* Four step init process */
 
-	0005711,			/* 20$: tst (r1)	; err? */
-	0100001,			/*   bpl  30$ */
-	0000000,			/*   halt */
-	0030411,			/* 30$: bit r4,(r1)	; step set? */
-	0001773,			/*   beq  20$		; wait */
-	0012511,			/*   mov  (r5)+,(r1)	; send next */
-	0006304,			/*   asl  r4		; next mask */
-	0100370,			/*   bpl  20$		; s4 done? */
+    0005711,                        /* 20$: tst (r1)        ; err? */
+    0100001,                        /*   bpl  30$ */
+    0000000,                        /*   halt */
+    0030411,                        /* 30$: bit r4,(r1)     ; step set? */
+    0001773,                        /*   beq  20$           ; wait */
+    0012511,                        /*   mov  (r5)+,(r1)    ; send next */
+    0006304,                        /*   asl  r4            ; next mask */
+    0100370,                        /*   bpl  20$           ; s4 done? */
 
-	/* Set up rings, issue ONLINE, REWIND, READ */
+                                    /* Set up rings, issue ONLINE, REWIND, READ */
 
-	0012737, 0000400, B_CMDH + 2,	/*   mov  #400,cmdh+2	; VCID = 1 */
-	0012737, 0000044, B_CMDH,	/*   mov  #36.,cmdh	; cmd pkt lnt */
-	0010037, B_UNIT,		/*   mov  r0,unit	; unit # */
-	0012737, 0000011, B_TKCMD + 8,	/*   mov  #11,tkcmd+8.	; online op */
-	0012737, 0020000, B_TKCMD + 10,	/*   mov  #20000,tkcmd+10. ; clr ser ex */
-	0012702, B_RING,		/*   mov  #ring,r2	; init rings */
-	0012722, B_TKRSP,		/*   mov  #tkrsp,(r2)+	; rsp pkt addr */
-	0010203,			/*   mov  r2,r3		; save ring+2 */
-	0010423,			/*   mov  r4,(r3)+	; set TK own */
-	0012723, B_TKCMD,		/*   mov  #tkcmd,(r3)+	; cmd pkt addr */
-	0010423,			/*   mov  r4,(r3)+	; set TK own */
-	0005741,			/*   tst  -(r1)		; start poll */
-	0005712,			/* 40$: tst (r2)	; wait for resp */
-	0100776,			/*   bmi  40$ */
-	0105737, B_TKRSP + 10,		/*   tstb tkrsp+10.	; check stat */
-	0001401,			/*   beq  50$ */
-	0000000,			/*   halt */
-	0012703, B_TKCMD + 8,		/* 50$: mov #tkcmd+8.,r3 */
-	0012723, 0000045,		/*   mov  #45,(r3)+	; reposition */
-	0012723, 0020002,		/*   mov  #20002,(r3)+	; rew, clr exc */
-	0012723, 0000001,		/*   mov  #1,(r3)+	; lo rec skp */
-	0005023,			/*   clr  (r3)+		; hi rec skp */
-	0005023,			/*   clr  (r3)+		; lo tmk skp */
-	0005023,			/*   clr  (r3)+		; hi tmk skp */
-	0010412,			/*   mov  r4,(r2)	; TK own rsp */
-	0010437, B_RING + 6,		/*   mov  r4,ring+6	; TK own cmd */
-	0005711,			/*   tst  (r1)		; start poll */
-	0005712,			/* 60$: tst (r2)	; wait for resp */
-	0100776,			/*   bmi  60$ */
-	0105737, B_TKRSP + 10,		/*   tstb tkrsp+10.	; check stat */
-	0001401,			/*   beq  70$ */
-	0000000,			/*   halt */
-	0012703, B_TKCMD + 8,		/* 70$: mov #tkcmd+8.,r3 */
-	0012723, 0000041,		/*   mov  #41,(r3)+	; read */
-	0012723, 0020000,		/*   mov  #20000,(r3)+	; clr exc */
-	0012723, 0001000,		/*   mov  #512.,(r3)+	; bc = 512 */
-	0005023,			/*   clr  (r3)+		; clr args */
-	0005023,			/*   clr  (r3)+		; ba = 0 */
-	0010412,			/*   mov  r4,(r2)	; TK own rsp */
-	0010437, B_RING + 6,		/*   mov  r4,ring+6	; TK own cmd */
-	0005711,			/*   tst  (r1)		; start poll */
-	0005712,			/* 80$: tst (r2)	; wait for resp */
-	0100776,			/*   bmi  80$ */
-	0105737, B_TKRSP + 10,		/*   tstb tkrsp+10.	; check stat */
-	0001401,			/*   beq  90$ */
-	0000000,			/*   halt */
+    0012737, 0000400, B_CMDH + 2,   /*   mov  #400,cmdh+2   ; VCID = 1 */
+    0012737, 0000044, B_CMDH,       /*   mov  #36.,cmdh     ; cmd pkt lnt */
+    0010037, B_UNIT,                /*   mov  r0,unit       ; unit # */
+    0012737, 0000011, B_TKCMD + 8,  /*   mov  #11,tkcmd+8.  ; online op */
+    0012737, 0020000, B_TKCMD + 10, /*   mov  #20000,tkcmd+10. ; clr ser ex */
+    0012702, B_RING,                /*   mov  #ring,r2      ; init rings */
+    0012722, B_TKRSP,               /*   mov  #tkrsp,(r2)+  ; rsp pkt addr */
+    0010203,                        /*   mov  r2,r3         ; save ring+2 */
+    0010423,                        /*   mov  r4,(r3)+      ; set TK own */
+    0012723, B_TKCMD,               /*   mov  #tkcmd,(r3)+  ; cmd pkt addr */
+    0010423,                        /*   mov  r4,(r3)+      ; set TK own */
+    0005741,                        /*   tst  -(r1)         ; start poll */
+    0005712,                        /* 40$: tst (r2)        ; wait for resp */
+    0100776,                        /*   bmi  40$ */
+    0105737, B_TKRSP + 10,          /*   tstb tkrsp+10.     ; check stat */
+    0001401,                        /*   beq  50$ */
+    0000000,                        /*   halt */
+    0012703, B_TKCMD + 8,           /* 50$: mov #tkcmd+8.,r3 */
+    0012723, 0000045,               /*   mov  #45,(r3)+     ; reposition */
+    0012723, 0020002,               /*   mov  #20002,(r3)+  ; rew, clr exc */
+    0012723, 0000001,               /*   mov  #1,(r3)+      ; lo rec skp */
+    0005023,                        /*   clr  (r3)+         ; hi rec skp */
+    0005023,                        /*   clr  (r3)+         ; lo tmk skp */
+    0005023,                        /*   clr  (r3)+         ; hi tmk skp */
+    0010412,                        /*   mov  r4,(r2)       ; TK own rsp */
+    0010437, B_RING + 6,            /*   mov  r4,ring+6     ; TK own cmd */
+    0005711,                        /*   tst  (r1)          ; start poll */
+    0005712,                        /* 60$: tst (r2)        ; wait for resp */
+    0100776,                        /*   bmi  60$ */
+    0105737, B_TKRSP + 10,          /*   tstb tkrsp+10.     ; check stat */
+    0001401,                        /*   beq  70$ */
+    0000000,                        /*   halt */
+    0012703, B_TKCMD + 8,           /* 70$: mov #tkcmd+8.,r3 */
+    0012723, 0000041,               /*   mov  #41,(r3)+     ; read */
+    0012723, 0020000,               /*   mov  #20000,(r3)+  ; clr exc */
+    0012723, 0001000,               /*   mov  #512.,(r3)+   ; bc = 512 */
+    0005023,                        /*   clr  (r3)+         ; clr args */
+    0005023,                        /*   clr  (r3)+         ; ba = 0 */
+    0010412,                        /*   mov  r4,(r2)       ; TK own rsp */
+    0010437, B_RING + 6,            /*   mov  r4,ring+6     ; TK own cmd */
+    0005711,                        /*   tst  (r1)          ; start poll */
+    0005712,                        /* 80$: tst (r2)        ; wait for resp */
+    0100776,                        /*   bmi  80$ */
+    0105737, B_TKRSP + 10,          /*   tstb tkrsp+10.     ; check stat */
+    0001401,                        /*   beq  90$ */
+    0000000,                        /*   halt */
 
-	/* Boot block read in, jump to 0 - leave controller init'd */
+                                    /* Boot block read in, jump to 0 - leave controller init'd */
 
-	0005003,			/*   clr  r3 */
-	0012704, BOOT_START+020,	/*   mov  #st+020,r4 */
-	0005005,			/*   clr  r5 */
-	0005007,			/*   clr  pc */
+    0005003,                        /*   clr  r3 */
+    0012704, BOOT_START+020,        /*   mov  #st+020,r4 */
+    0005005,                        /*   clr  r5 */
+    0005007,                        /*   clr  pc */
 
-	0100000,			/* cmdtbl: init step 1 */
-	B_RING,				/* ring base */
-	0000000,			/* high ring base */
-	0000001				/* go */
-};
+    0100000,                        /* cmdtbl: init step 1 */
+    B_RING,                         /* ring base */
+    0000000,                        /* high ring base */
+    0000001                         /* go */
+    };
 
 t_stat tq_boot (int32 unitno, DEVICE *dptr)
 {
@@ -1875,7 +2012,7 @@ return SCPE_NOFNC;
 }
 
 #endif
-
+
 /* Special show commands */
 
 void tq_show_ring (FILE *st, struct uq_ring *rp)
@@ -1885,22 +2022,23 @@ uint16 d[2];
 
 #if defined (VM_PDP11)
 fprintf (st, "ring, base = %o, index = %d, length = %d\n",
-	 rp->ba, rp->idx >> 2, rp->lnt >> 2);
+     rp->ba, rp->idx >> 2, rp->lnt >> 2);
 #else
 fprintf (st, "ring, base = %x, index = %d, length = %d\n",
-	 rp->ba, rp->idx >> 2, rp->lnt >> 2);
+     rp->ba, rp->idx >> 2, rp->lnt >> 2);
 #endif
 for (i = 0; i < (rp->lnt >> 2); i++) {
-	if (Map_ReadW (rp->ba + (i << 2), 4, d)) {
-		fprintf (st, " %3d: non-existent memory\n", i);
-		break;  }
-	desc = ((uint32) d[0]) | (((uint32) d[1]) << 16);
+    if (Map_ReadW (rp->ba + (i << 2), 4, d)) {
+        fprintf (st, " %3d: non-existent memory\n", i);
+        break;
+        }
+    desc = ((uint32) d[0]) | (((uint32) d[1]) << 16);
 #if defined (VM_PDP11)
-	fprintf (st, " %3d: %011o\n", i, desc);
+    fprintf (st, " %3d: %011o\n", i, desc);
 #else
-	fprintf (st, " %3d: %08x\n", i, desc);
+    fprintf (st, " %3d: %08x\n", i, desc);
 #endif
-	}
+    }
 return;
 }
 
@@ -1912,17 +2050,17 @@ uint32 typ = GETP (pkt, UQ_HCTC, TYP);
 uint32 cid = GETP (pkt, UQ_HCTC, CID);
 
 fprintf (st, "packet %d, credits = %d, type = %d, cid = %d\n",
-	pkt, cr, typ, cid);
+    pkt, cr, typ, cid);
 for (i = 0; i < TQ_SH_MAX; i = i + TQ_SH_PPL) {
-	fprintf (st, " %2d:", i);
-	for (j = i; j < (i + TQ_SH_PPL); j++)
+    fprintf (st, " %2d:", i);
+    for (j = i; j < (i + TQ_SH_PPL); j++)
 #if defined (VM_PDP11)
-		fprintf (st, " %06o", tq_pkt[pkt].d[j]);
+    fprintf (st, " %06o", tq_pkt[pkt].d[j]);
 #else
-		fprintf (st, " %04x", tq_pkt[pkt].d[j]);
+    fprintf (st, " %04x", tq_pkt[pkt].d[j]);
 #endif
-		fprintf (st, "\n");
-	}
+    fprintf (st, "\n");
+    }
 return;
 }
 
@@ -1931,20 +2069,25 @@ t_stat tq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc)
 int32 pkt, u = uptr - tq_dev.units;
 
 if (tq_csta != CST_UP) {
-	fprintf (st, "Controller is not initialized\n");
-	return SCPE_OK;  }
+    fprintf (st, "Controller is not initialized\n");
+    return SCPE_OK;
+    }
 if ((uptr->flags & UNIT_ONL) == 0) {
-	if (uptr->flags & UNIT_ATT)
-		fprintf (st, "Unit %d is available\n", u);
-	else fprintf (st, "Unit %d is offline\n", u);
-	return SCPE_OK;  }
+    if (uptr->flags & UNIT_ATT)
+        fprintf (st, "Unit %d is available\n", u);
+    else fprintf (st, "Unit %d is offline\n", u);
+    return SCPE_OK;
+    }
 if (uptr->cpkt) {
-	fprintf (st, "Unit %d current ", u);
-	tq_show_pkt (st, uptr->cpkt);
-	if (pkt = uptr->pktq) {
-		do {	fprintf (st, "Unit %d queued ", u);
-			tq_show_pkt (st, pkt);  }
-		while (pkt = tq_pkt[pkt].link);  }  }
+    fprintf (st, "Unit %d current ", u);
+    tq_show_pkt (st, uptr->cpkt);
+    if (pkt = uptr->pktq) {
+        do {
+            fprintf (st, "Unit %d queued ", u);
+            tq_show_pkt (st, pkt);
+            } while (pkt = tq_pkt[pkt].link);
+        }
+    }
 else fprintf (st, "Unit %d queues are empty\n", u);
 return SCPE_OK;
 }
@@ -1955,7 +2098,8 @@ int32 i, pkt;
 
 if (tq_csta != CST_UP) {
     fprintf (st, "Controller is not initialized\n");
-    return SCPE_OK;  }
+    return SCPE_OK;
+    }
 if (val & TQ_SH_RI) {
     if (tq_pip) fprintf (st, "Polling in progress, host timer = %d\n", tq_hat);
     else fprintf (st, "Host timer = %d\n", tq_hat);
@@ -1966,23 +2110,27 @@ if (val & TQ_SH_RI) {
     }
 if (val & TQ_SH_FR) {
     if (pkt = tq_freq) {
-	for (i = 0; pkt != 0; i++, pkt = tq_pkt[pkt].link) {
-	    if (i == 0) fprintf (st, "Free queue = %d", pkt);
-	    else if ((i % 16) == 0) fprintf (st, ",\n %d", pkt);
-	    else fprintf (st, ", %d", pkt);  }
-        fprintf (st, "\n");  }
+        for (i = 0; pkt != 0; i++, pkt = tq_pkt[pkt].link) {
+            if (i == 0) fprintf (st, "Free queue = %d", pkt);
+            else if ((i % 16) == 0) fprintf (st, ",\n %d", pkt);
+            else fprintf (st, ", %d", pkt);
+            }
+        fprintf (st, "\n");
+        }
     else fprintf (st, "Free queue is empty\n");
     }
 if (val & TQ_SH_RS) {
     if (pkt = tq_rspq) {
-	do {	fprintf (st, "Response ");
-		tq_show_pkt (st, pkt);  }
-	while (pkt = tq_pkt[pkt].link);  }
+        do {
+            fprintf (st, "Response ");
+            tq_show_pkt (st, pkt);
+            } while (pkt = tq_pkt[pkt].link);
+        }
     else fprintf (st, "Response queue is empty\n");
     }
 if (val & TQ_SH_UN) {
     for (i = 0; i < TQ_NUMDR; i++)
-	tq_show_unitq (st, &tq_unit[i], 0, NULL);
+        tq_show_unitq (st, &tq_unit[i], 0, NULL);
     }
 return SCPE_OK;
 }
@@ -1996,13 +2144,15 @@ uint32 max = sim_taddr_64? TQU_EMAXC: TQU_MAXC;
 t_stat r;
 
 if ((val < 0) || (val > TQU_TYPE) || ((val != TQU_TYPE) && cptr))
-	return SCPE_ARG;
+    return SCPE_ARG;
 for (i = 0; i < TQ_NUMDR; i++) {
-	if (tq_unit[i].flags & UNIT_ATT) return SCPE_ALATT;  }
+    if (tq_unit[i].flags & UNIT_ATT) return SCPE_ALATT;
+    }
 if (cptr) {
-	cap = (uint32) get_uint (cptr, 10, max, &r);
-	if ((r != SCPE_OK) || (cap < TQU_MINC)) return SCPE_ARG;
-	drv_tab[TQU_TYPE].cap = ((t_addr) cap) << 20;  }
+    cap = (uint32) get_uint (cptr, 10, max, &r);
+    if ((r != SCPE_OK) || (cap < TQU_MINC)) return SCPE_ARG;
+    drv_tab[TQU_TYPE].cap = ((t_addr) cap) << 20;
+    }
 tq_typ = val;
 return SCPE_OK;
 }

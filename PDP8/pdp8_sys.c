@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,24 +19,24 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   17-Oct-03	RMS	Added TSC8-75, TD8E support, DECtape off reel message
-   25-Apr-03	RMS	Revised for extended file support
-   30-Dec-01	RMS	Revised for new TTX
-   26-Nov-01	RMS	Added RL8A support
-   17-Sep-01	RMS	Removed multiconsole support
-   16-Sep-01	RMS	Added TSS/8 packed char support, added KL8A support
-   27-May-01	RMS	Added multiconsole support
-   18-Mar-01	RMS	Added DF32 support
-   14-Mar-01	RMS	Added extension detection of RIM binary tapes
-   15-Feb-01	RMS	Added DECtape support
-   30-Oct-00	RMS	Added support for examine to file
-   27-Oct-98	RMS	V2.4 load interface
-   10-Apr-98	RMS	Added RIM loader support
-   17-Feb-97	RMS	Fixed bug in handling of bin loader fields
+   17-Oct-03    RMS     Added TSC8-75, TD8E support, DECtape off reel message
+   25-Apr-03    RMS     Revised for extended file support
+   30-Dec-01    RMS     Revised for new TTX
+   26-Nov-01    RMS     Added RL8A support
+   17-Sep-01    RMS     Removed multiconsole support
+   16-Sep-01    RMS     Added TSS/8 packed char support, added KL8A support
+   27-May-01    RMS     Added multiconsole support
+   18-Mar-01    RMS     Added DF32 support
+   14-Mar-01    RMS     Added extension detection of RIM binary tapes
+   15-Feb-01    RMS     Added DECtape support
+   30-Oct-00    RMS     Added support for examine to file
+   27-Oct-98    RMS     V2.4 load interface
+   10-Apr-98    RMS     Added RIM loader support
+   17-Feb-97    RMS     Fixed bug in handling of bin loader fields
 */
 
 #include "pdp8_defs.h"
@@ -60,13 +60,13 @@ extern int32 sim_switches;
 
 /* SCP data structures and interface routines
 
-   sim_name		simulator name string
-   sim_PC		pointer to saved PC register descriptor
-   sim_emax		maximum number of words for examine/deposit
-   sim_devices		array of pointers to simulated devices
-   sim_consoles		array of pointers to consoles (if more than one)
-   sim_stop_messages	array of pointers to stop messages
-   sim_load		binary loader
+   sim_name             simulator name string
+   sim_PC               pointer to saved PC register descriptor
+   sim_emax             maximum number of words for examine/deposit
+   sim_devices          array of pointers to simulated devices
+   sim_consoles         array of pointers to consoles (if more than one)
+   sim_stop_messages    array of pointers to stop messages
+   sim_load             binary loader
 */
 
 char sim_name[] = "PDP-8";
@@ -76,34 +76,36 @@ REG *sim_PC = &cpu_reg[0];
 int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = {
-	&cpu_dev,
-	&tsc_dev,
-	&ptr_dev,
-	&ptp_dev,
-	&tti_dev,
-	&tto_dev,
-	&ttix_dev,
-	&ttox_dev,
-	&clk_dev,
-	&lpt_dev,
-	&rk_dev,
-	&rl_dev,
-	&rx_dev,
-	&df_dev,
-	&rf_dev,
-	&dt_dev,
-	&td_dev,
-	&mt_dev,
-	NULL };
+    &cpu_dev,
+    &tsc_dev,
+    &ptr_dev,
+    &ptp_dev,
+    &tti_dev,
+    &tto_dev,
+    &ttix_dev,
+    &ttox_dev,
+    &clk_dev,
+    &lpt_dev,
+    &rk_dev,
+    &rl_dev,
+    &rx_dev,
+    &df_dev,
+    &rf_dev,
+    &dt_dev,
+    &td_dev,
+    &mt_dev,
+    NULL
+    };
 
 const char *sim_stop_messages[] = {
-	"Unknown error",
-	"Unimplemented instruction",
-	"HALT instruction",
-	"Breakpoint",
-	"Non-standard device number",
-	"DECtape off reel"  };
-
+    "Unknown error",
+    "Unimplemented instruction",
+    "HALT instruction",
+    "Breakpoint",
+    "Non-standard device number",
+    "DECtape off reel"
+    };
+
 /* Binary loader
 
    Two loader formats are supported: RIM loader (-r) and BIN (-b) loader.
@@ -124,89 +126,105 @@ uint32 origin, field;
 
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 rubout = state = field = newf = origin = csum = 0;
-if ((sim_switches & SWMASK ('R')) ||			/* RIM format? */
+if ((sim_switches & SWMASK ('R')) ||                    /* RIM format? */
     (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B')))) {
-	while ((i = getc (fileref)) != EOF) {
-	    switch (state) {
-	    case 0:					/* leader */
-		if ((i != 0) && (i < 0200)) state = 1;
-		high = i;
-		break;
-	    case 1:					/* low byte */
-		word = (high << 6) | i;			/* form word */
-		if (word > 07777) origin = word & 07777;
-		else M[origin] = word;
-		state = 2;
-		break;
-	    case 2:					/* high byte */
-		if (i >= 0200) return SCPE_OK;		/* end of tape? */
-		high = i;				/* save high */
-		state = 1;
-		break;  }				/* end switch */
-	    }						/* end while */
-	}						/* end if */
-else {	while ((i = getc (fileref)) != EOF) {		/* BIN format */
-	    if (rubout) {
-		rubout = 0;
-		continue;  }
-	    if (i == 0377) {
-		rubout = 1;
-		continue;  }
-	    if (i > 0200) {
-		newf = (i & 070) << 9;
-		continue;  }
-	    switch (state) {
-	    case 0:					/* leader */
-		if ((i != 0) && (i != 0200)) state = 1;
-		high = i;				/* save as high */
-		break;
-	    case 1:					/* low byte */
-		low = i;
-		state = 2;
-		break;
-	    case 2:					/* high with test */
-		word = (high << 6) | low;
-		if (i == 0200) {			/* end of tape? */
-		    if ((csum - word) & 07777) return SCPE_CSUM;
-		    return SCPE_OK;  }
-		csum = csum + low + high;
-		if (word >= 010000) origin = word & 07777;
-		else {
-		    if ((field | origin) >= MEMSIZE) 
-			return SCPE_NXM;
-		    M[field | origin] = word & 07777;
-		    origin = (origin + 1) & 07777;  }
-		    field = newf;
-		    high = i;
-		    state = 1;
-		    break;  }				/* end switch */
-	    }						/* end while */
-	}						/* end else */
-return SCPE_FMT;					/* eof? error */
+    while ((i = getc (fileref)) != EOF) {
+        switch (state) {
+
+        case 0:                                         /* leader */
+            if ((i != 0) && (i < 0200)) state = 1;
+            high = i;
+            break;
+
+        case 1:                                         /* low byte */
+            word = (high << 6) | i;                     /* form word */
+            if (word > 07777) origin = word & 07777;
+            else M[origin] = word;
+            state = 2;
+            break;
+
+        case 2:                                         /* high byte */
+            if (i >= 0200) return SCPE_OK;              /* end of tape? */
+            high = i;                                   /* save high */
+            state = 1;
+            break;
+            }                                           /* end switch */
+        }                                               /* end while */
+    }                                                   /* end if */
+
+else {
+    while ((i = getc (fileref)) != EOF) {               /* BIN format */
+        if (rubout) {
+            rubout = 0;
+            continue;
+            }
+        if (i == 0377) {
+            rubout = 1;
+            continue;
+            }
+        if (i > 0200) {
+            newf = (i & 070) << 9;
+            continue;
+            }
+        switch (state) {
+
+        case 0:                                         /* leader */
+            if ((i != 0) && (i != 0200)) state = 1;
+            high = i;                                   /* save as high */
+            break;
+
+        case 1:                                         /* low byte */
+            low = i;
+            state = 2;
+            break;
+
+        case 2:                                         /* high with test */
+            word = (high << 6) | low;
+            if (i == 0200) {                            /* end of tape? */
+                if ((csum - word) & 07777) return SCPE_CSUM;
+                return SCPE_OK;
+                }
+            csum = csum + low + high;
+            if (word >= 010000) origin = word & 07777;
+            else {
+                if ((field | origin) >= MEMSIZE) 
+                    return SCPE_NXM;
+                M[field | origin] = word & 07777;
+                origin = (origin + 1) & 07777;
+                }
+            field = newf;
+            high = i;
+            state = 1;
+            break;
+            }                                           /* end switch */
+        }                                               /* end while */
+    }                                                   /* end else */
+return SCPE_FMT;                                        /* eof? error */
 }
-
+
 /* Symbol tables */
 
-#define I_V_FL		18				/* flag start */
-#define I_M_FL		07				/* flag mask */
-#define I_V_NPN		0				/* no operand */
-#define I_V_FLD		1				/* field change */
-#define I_V_MRF		2				/* mem ref */
-#define I_V_IOT		3				/* general IOT */
-#define I_V_OP1		4				/* operate 1 */
-#define I_V_OP2		5				/* operate 2 */
-#define I_V_OP3		6				/* operate 3 */
-#define I_NPN		(I_V_NPN << I_V_FL)
-#define I_FLD		(I_V_FLD << I_V_FL)
-#define I_MRF		(I_V_MRF << I_V_FL)
-#define I_IOT		(I_V_IOT << I_V_FL)
-#define I_OP1		(I_V_OP1 << I_V_FL)
-#define I_OP2		(I_V_OP2 << I_V_FL)
-#define I_OP3		(I_V_OP3 << I_V_FL)
+#define I_V_FL          18                              /* flag start */
+#define I_M_FL          07                              /* flag mask */
+#define I_V_NPN         0                               /* no operand */
+#define I_V_FLD         1                               /* field change */
+#define I_V_MRF         2                               /* mem ref */
+#define I_V_IOT         3                               /* general IOT */
+#define I_V_OP1         4                               /* operate 1 */
+#define I_V_OP2         5                               /* operate 2 */
+#define I_V_OP3         6                               /* operate 3 */
+#define I_NPN           (I_V_NPN << I_V_FL)
+#define I_FLD           (I_V_FLD << I_V_FL)
+#define I_MRF           (I_V_MRF << I_V_FL)
+#define I_IOT           (I_V_IOT << I_V_FL)
+#define I_OP1           (I_V_OP1 << I_V_FL)
+#define I_OP2           (I_V_OP2 << I_V_FL)
+#define I_OP3           (I_V_OP3 << I_V_FL)
 
 static const int32 masks[] = {
  07777, 07707, 07000, 07000,
- 07416, 07571, 017457 };
+ 07416, 07571, 017457
+ };
 
 static const char *opcode[] = {
  "SKON", "ION", "IOF", "SRQ",
@@ -261,11 +279,12 @@ static const char *opcode[] = {
  "ACS", "MUY", "DVI", "NMI", "SHL", "ASR", "LSR",
  "SCA", "DAD", "DST", "SWBA",
  "DPSZ", "DPIC", "DCIM", "SAM",
- "CLA", "CLL", "CMA", "CML", "IAC",			/* encode only */
+ "CLA", "CLL", "CMA", "CML", "IAC",                     /* encode only */
  "CLA", "OAS", "HLT",
  "CLA", "MQA", "MQL",
- NULL, NULL, NULL, NULL,				/* decode only */
- NULL  };
+ NULL, NULL, NULL, NULL,                                /* decode only */
+ NULL
+ };
  
 static const int32 opc_val[] = {
  06000+I_NPN, 06001+I_NPN, 06002+I_NPN, 06003+I_NPN,
@@ -328,42 +347,45 @@ static const int32 opc_val[] = {
  07600+I_OP2, 07404+I_OP2, 07402+I_OP2,
  07601+I_OP3, 07501+I_OP3, 07421+I_OP3,
  07000+I_OP1, 07400+I_OP2, 07401+I_OP3, 017401+I_OP3,
- -1 };
-
+ -1
+ };
+
 /* Operate decode
 
    Inputs:
-	*of	=	output stream
-	inst	=	mask bits
-	class	=	instruction class code
-	sp	=	space needed?
+        *of     =       output stream
+        inst    =       mask bits
+        class   =       instruction class code
+        sp      =       space needed?
    Outputs:
-	status	=	space needed
+        status  =       space needed
 */
 
 int32 fprint_opr (FILE *of, int32 inst, int32 class, int32 sp)
 {
 int32 i, j;
 
-for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
-	j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
-	if ((j == class) && (opc_val[i] & inst)) {	/* same class? */
-	    inst = inst & ~opc_val[i];		/* mask bit set? */
-	    fprintf (of, (sp? " %s": "%s"), opcode[i]);
-	    sp = 1;  }  }
+for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
+    j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
+    if ((j == class) && (opc_val[i] & inst)) {          /* same class? */
+        inst = inst & ~opc_val[i];                      /* mask bit set? */
+        fprintf (of, (sp? " %s": "%s"), opcode[i]);
+        sp = 1;
+        }
+    }
 return sp;
 }
 
 /* Symbolic decode
 
    Inputs:
-	*of	=	output stream
-	addr	=	current PC
-	*val	=	pointer to data
-	*uptr	=	pointer to unit 
-	sw	=	switches
+        *of     =       output stream
+        addr    =       current PC
+        *val    =       pointer to data
+        *uptr   =       pointer to unit 
+        sw      =       switches
    Outputs:
-	return	=	status code
+        return  =       status code
 */
 
 #define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
@@ -371,79 +393,93 @@ return sp;
 #define TSSTOASC(x) ((x) + 040)
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
-	UNIT *uptr, int32 sw)
+    UNIT *uptr, int32 sw)
 {
 int32 cflag, i, j, sp, inst, disp;
 extern int32 emode;
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 inst = val[0];
-if (sw & SWMASK ('A')) {				/* ASCII? */
-	if (inst > 0377) return SCPE_ARG;
-	fprintf (of, FMTASC (inst & 0177));
-	return SCPE_OK;  }
-if (sw & SWMASK ('C')) {				/* characters? */
-	fprintf (of, "%c", SIXTOASC ((inst >> 6) & 077));
-	fprintf (of, "%c", SIXTOASC (inst & 077));
-	return SCPE_OK;  }
-if (sw & SWMASK ('T')) {				/* TSS8 packed? */
-	fprintf (of, "%c", TSSTOASC ((inst >> 6) & 077));
-	fprintf (of, "%c", TSSTOASC (inst & 077));
-	return SCPE_OK;  }
+if (sw & SWMASK ('A')) {                                /* ASCII? */
+    if (inst > 0377) return SCPE_ARG;
+    fprintf (of, FMTASC (inst & 0177));
+    return SCPE_OK;
+    }
+if (sw & SWMASK ('C')) {                                /* characters? */
+    fprintf (of, "%c", SIXTOASC ((inst >> 6) & 077));
+    fprintf (of, "%c", SIXTOASC (inst & 077));
+    return SCPE_OK;
+    }
+if (sw & SWMASK ('T')) {                                /* TSS8 packed? */
+    fprintf (of, "%c", TSSTOASC ((inst >> 6) & 077));
+    fprintf (of, "%c", TSSTOASC (inst & 077));
+    return SCPE_OK;
+    }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
-
+
 /* Instruction decode */
 
-inst = val[0] | ((emode & 1) << 12);			/* include EAE mode */
-for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
-    j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
-    if ((opc_val[i] & 017777) == (inst & masks[j])) {	/* match? */
+inst = val[0] | ((emode & 1) << 12);                    /* include EAE mode */
+for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
+    j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
+    if ((opc_val[i] & 017777) == (inst & masks[j])) {   /* match? */
 
-	switch (j) {					/* case on class */
-	case I_V_NPN:					/* no operands */
-	    fprintf (of, "%s", opcode[i]);		/* opcode */
-	    break;
-	case I_V_FLD:					/* field change */
-	    fprintf (of, "%s %-o", opcode[i], (inst >> 3) & 07);
-	    break;
-	case I_V_MRF:					/* mem ref */
-	    disp = inst & 0177;				/* displacement */
-	    fprintf (of, "%s%s", opcode[i], ((inst & 00400)? " I ": " "));
-	    if (inst & 0200) {				/* current page? */
-		if (cflag) fprintf (of, "%-o", (addr & 07600) | disp);
-		else fprintf (of, "C %-o", disp);  }
-	    else fprintf (of, "%-o", disp);		/* page zero */
-	    break;
-	case I_V_IOT:					/* IOT */
-	    fprintf (of, "%s %-o", opcode[i], inst & 0777);
-	    break;
-	case I_V_OP1:					/* operate group 1 */
-	    sp = fprint_opr (of, inst & 0361, j, 0);
-	    if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
-	    break;
-	case I_V_OP2:					/* operate group 2 */
-	    if (opcode[i]) fprintf (of, "%s", opcode[i]);	/* skips */
-	    fprint_opr (of, inst & 0206, j, opcode[i] != NULL);
-	    break;	
-	case I_V_OP3:					/* operate group 3 */
-	    sp = fprint_opr (of, inst & 0320, j, 0);
-	    if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
-	    break;  }					/* end case */
-	return SCPE_OK;  }				/* end if */
-	}						/* end for */
+        switch (j) {                                    /* case on class */
+
+        case I_V_NPN:                                   /* no operands */
+            fprintf (of, "%s", opcode[i]);              /* opcode */
+            break;
+
+        case I_V_FLD:                                   /* field change */
+            fprintf (of, "%s %-o", opcode[i], (inst >> 3) & 07);
+            break;
+
+        case I_V_MRF:                                   /* mem ref */
+            disp = inst & 0177;                         /* displacement */
+            fprintf (of, "%s%s", opcode[i], ((inst & 00400)? " I ": " "));
+            if (inst & 0200) {                          /* current page? */
+                if (cflag) fprintf (of, "%-o", (addr & 07600) | disp);
+                else fprintf (of, "C %-o", disp);
+                }
+            else fprintf (of, "%-o", disp);             /* page zero */
+            break;
+
+        case I_V_IOT:                                   /* IOT */
+            fprintf (of, "%s %-o", opcode[i], inst & 0777);
+            break;
+
+        case I_V_OP1:                                   /* operate group 1 */
+            sp = fprint_opr (of, inst & 0361, j, 0);
+            if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
+            break;
+
+        case I_V_OP2:                                   /* operate group 2 */
+            if (opcode[i]) fprintf (of, "%s", opcode[i]);       /* skips */
+            fprint_opr (of, inst & 0206, j, opcode[i] != NULL);
+            break;      
+
+        case I_V_OP3:                                   /* operate group 3 */
+            sp = fprint_opr (of, inst & 0320, j, 0);
+            if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
+            break;
+            }                                           /* end case */
+
+        return SCPE_OK;
+        }                                               /* end if */
+    }                                                   /* end for */
 return SCPE_ARG;
 }
-
+
 /* Symbolic input
 
    Inputs:
-	*cptr	=	pointer to input string
-	addr	=	current PC
-	*uptr	=	pointer to unit
-	*val	=	pointer to output values
-	sw	=	switches
+        *cptr   =       pointer to input string
+        addr    =       current PC
+        *uptr   =       pointer to unit
+        *val    =       pointer to output values
+        sw      =       switches
    Outputs:
-	status	=	error status
+        status  =       error status
 */
 
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
@@ -453,80 +489,96 @@ t_stat r;
 char gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
-while (isspace (*cptr)) cptr++;				/* absorb spaces */
+while (isspace (*cptr)) cptr++;                         /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = (t_value) cptr[0] | 0200;
-	return SCPE_OK;  }
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    val[0] = (t_value) cptr[0] | 0200;
+    return SCPE_OK;
+    }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* sixbit string? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = (((t_value) cptr[0] & 077) << 6) |
-		  ((t_value) cptr[1] & 077);
-	return SCPE_OK;  }
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    val[0] = (((t_value) cptr[0] & 077) << 6) |
+              ((t_value) cptr[1] & 077);
+    return SCPE_OK;
+    }
 if ((sw & SWMASK ('T')) || ((*cptr == '"') && cptr++)) { /* TSS8 string? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = (((t_value) (cptr[0] - 040) & 077) << 6) |
-		  ((t_value) (cptr[1] - 040) & 077);
-	return SCPE_OK;  }
-
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    val[0] = (((t_value) (cptr[0] - 040) & 077) << 6) |
+              ((t_value) (cptr[1] - 040) & 077);
+    return SCPE_OK;
+    }
+
 /* Instruction parse */
 
-cptr = get_glyph (cptr, gbuf, 0);			/* get opcode */
+cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
 if (opcode[i] == NULL) return SCPE_ARG;
-val[0] = opc_val[i] & 07777;				/* get value */
-j = (opc_val[i] >> I_V_FL) & I_M_FL;			/* get class */
+val[0] = opc_val[i] & 07777;                            /* get value */
+j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 
-switch (j) {						/* case on class */
-case I_V_IOT:						/* IOT */
-	cptr = get_glyph (cptr, gbuf, 0);		/* get dev+pulse */
-	d = get_uint (gbuf, 8, 0777, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	val[0] = val[0] | d;
-	break;
-case I_V_FLD:						/* field */
-	for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
-	    cptr = get_glyph (cptr, gbuf, 0)) {
-	    for (i = 0; (opcode[i] != NULL) &&
-			(strcmp (opcode[i], gbuf) != 0) ; i++) ;
-	    if (opcode[i] != NULL) {
-		k = (opc_val[i] >> I_V_FL) & I_M_FL;
-		if (k != j) return SCPE_ARG;
-		val[0] = val[0] | (opc_val[i] & 07777);  }
-	    else {
-	    	d = get_uint (gbuf, 8, 07, &r);
-		if (r != SCPE_OK) return SCPE_ARG;
-		val[0] = val[0] | (d << 3);
-		break;  }  }
-	    break;
-case I_V_MRF:						/* mem ref */
-	cptr = get_glyph (cptr, gbuf, 0);		/* get next field */
-	if (strcmp (gbuf, "I") == 0) {			/* indirect? */
-	    val[0] = val[0] | 0400;
-	    cptr = get_glyph (cptr, gbuf, 0);  }
-	if ((k = (strcmp (gbuf, "C") == 0)) || (strcmp (gbuf, "Z") == 0)) {
-	    cptr = get_glyph (cptr, gbuf, 0);
-	    d = get_uint (gbuf, 8, 0177, &r);
-	    if (r != SCPE_OK) return SCPE_ARG;
-	    val[0] = val[0] | d | (k? 0200: 0);  }
-	else {
-	    d = get_uint (gbuf, 8, 07777, &r);
-	    if (r != SCPE_OK) return SCPE_ARG;
-	    if (d <= 0177) val[0] = val[0] | d;
-	    else if (cflag && (((addr ^ d) & 07600) == 0))
-		val[0] = val[0] | (d & 0177) | 0200;
-	    else return SCPE_ARG;  }
-	break;
-case I_V_NPN: case I_V_OP1: case I_V_OP2: case I_V_OP3:	/* operates */
-	for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
-	    cptr = get_glyph (cptr, gbuf, 0)) {
-	    for (i = 0; (opcode[i] != NULL) &&
-			(strcmp (opcode[i], gbuf) != 0) ; i++) ;
-	    k = opc_val[i] & 07777;
-	    if ((opcode[i] == NULL) || (((k ^ val[0]) & 07000) != 0))
-		return SCPE_ARG;
-	    val[0] = val[0] | k;  }
-	break;  }					/* end case */
-if (*cptr != 0) return SCPE_ARG;			/* junk at end? */
+switch (j) {                                            /* case on class */
+
+    case I_V_IOT:                                       /* IOT */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get dev+pulse */
+        d = get_uint (gbuf, 8, 0777, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | d;
+        break;
+
+    case I_V_FLD:                                       /* field */
+        for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
+            cptr = get_glyph (cptr, gbuf, 0)) {
+            for (i = 0; (opcode[i] != NULL) &&
+                        (strcmp (opcode[i], gbuf) != 0) ; i++) ;
+            if (opcode[i] != NULL) {
+                k = (opc_val[i] >> I_V_FL) & I_M_FL;
+                if (k != j) return SCPE_ARG;
+                val[0] = val[0] | (opc_val[i] & 07777);
+                }
+            else {
+                d = get_uint (gbuf, 8, 07, &r);
+                if (r != SCPE_OK) return SCPE_ARG;
+                val[0] = val[0] | (d << 3);
+                break;
+                }
+            }
+        break;
+
+    case I_V_MRF:                                       /* mem ref */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get next field */
+        if (strcmp (gbuf, "I") == 0) {                  /* indirect? */
+            val[0] = val[0] | 0400;
+            cptr = get_glyph (cptr, gbuf, 0);
+            }
+        if ((k = (strcmp (gbuf, "C") == 0)) || (strcmp (gbuf, "Z") == 0)) {
+            cptr = get_glyph (cptr, gbuf, 0);
+            d = get_uint (gbuf, 8, 0177, &r);
+            if (r != SCPE_OK) return SCPE_ARG;
+            val[0] = val[0] | d | (k? 0200: 0);
+            }
+        else {
+            d = get_uint (gbuf, 8, 07777, &r);
+            if (r != SCPE_OK) return SCPE_ARG;
+            if (d <= 0177) val[0] = val[0] | d;
+            else if (cflag && (((addr ^ d) & 07600) == 0))
+                val[0] = val[0] | (d & 0177) | 0200;
+            else return SCPE_ARG;
+            }
+        break;
+
+    case I_V_NPN: case I_V_OP1: case I_V_OP2: case I_V_OP3:     /* operates */
+        for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
+            cptr = get_glyph (cptr, gbuf, 0)) {
+            for (i = 0; (opcode[i] != NULL) &&
+                        (strcmp (opcode[i], gbuf) != 0) ; i++) ;
+            k = opc_val[i] & 07777;
+            if ((opcode[i] == NULL) || (((k ^ val[0]) & 07000) != 0))
+                return SCPE_ARG;
+            val[0] = val[0] | k;
+            }
+        break;
+        }                                               /* end case */
+
+if (*cptr != 0) return SCPE_ARG;                        /* junk at end? */
 return SCPE_OK;
 }

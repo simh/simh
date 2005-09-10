@@ -1,6 +1,6 @@
 /* h316_sys.c: Honeywell 316/516 simulator interface
 
-   Copyright (c) 1999-2004, Robert M Supnik
+   Copyright (c) 1999-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,13 +19,13 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   01-Dec-04	RMS	Fixed fprint_opr calling sequence
-   24-Oct-03	RMS	Added DMA/DMC support
-   17-Sep-01	RMS	Removed multiconsole support
+   01-Dec-04    RMS     Fixed fprint_opr calling sequence
+   24-Oct-03    RMS     Added DMA/DMC support
+   17-Sep-01    RMS     Removed multiconsole support
 */
 
 #include "h316_defs.h"
@@ -47,12 +47,12 @@ extern int32 sim_switches;
 
 /* SCP data structures and interface routines
 
-   sim_name		simulator name string
-   sim_PC		pointer to saved PC register descriptor
-   sim_emax		maximum number of words for examine/deposit
-   sim_devices		array of pointers to simulated devices
-   sim_stop_messages	array of pointers to stop messages
-   sim_load		binary loader
+   sim_name             simulator name string
+   sim_PC               pointer to saved PC register descriptor
+   sim_emax             maximum number of words for examine/deposit
+   sim_devices          array of pointers to simulated devices
+   sim_stop_messages    array of pointers to stop messages
+   sim_load             binary loader
 */
 
 char sim_name[] = "H316";
@@ -62,29 +62,31 @@ REG *sim_PC = &cpu_reg[0];
 int32 sim_emax = 1;
 
 DEVICE *sim_devices[] = {
-	&cpu_dev,
-	&ptr_dev,
-	&ptp_dev,
-	&tty_dev,
-	&lpt_dev,
-	&clk_dev,
-	&dp_dev,
-	&fhd_dev,
-	&mt_dev,
-	NULL };
+    &cpu_dev,
+    &ptr_dev,
+    &ptp_dev,
+    &tty_dev,
+    &lpt_dev,
+    &clk_dev,
+    &dp_dev,
+    &fhd_dev,
+    &mt_dev,
+    NULL
+    };
 
 const char *sim_stop_messages[] = {
-	"Unknown error",
-	"Unimplemented instruction",
-	"Unimplemented I/O device",
-	"HALT instruction",
-	"Breakpoint",
-	"Indirect address loop",
-	"DMA error",
-	"MT write protected",
-	"DP write overrun, track destroyed",
-	"DP track format invalid"  };
-
+    "Unknown error",
+    "Unimplemented instruction",
+    "Unimplemented I/O device",
+    "HALT instruction",
+    "Breakpoint",
+    "Indirect address loop",
+    "DMA error",
+    "MT write protected",
+    "DP write overrun, track destroyed",
+    "DP track format invalid"
+    };
+
 /* Binary loader
 
    Tbs.
@@ -94,29 +96,30 @@ t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 return SCPE_FMT;
 }
-
+
 /* Symbol tables */
 
-#define I_V_FL		16				/* flag start */
-#define I_M_FL		07				/* flag mask */
-#define I_V_NPN		0				/* no operand */
-#define I_V_MRF		1				/* mem ref */
-#define I_V_MRX		2				/* mem ref, no idx */
-#define I_V_IOT		3				/* I/O */
-#define I_V_SHF		4				/* shift */
-#define I_V_SK0		5				/* skip 0 */
-#define I_V_SK1		6				/* skip 1 */
-#define I_NPN		(I_V_NPN << I_V_FL)
-#define I_MRF		(I_V_MRF << I_V_FL)
-#define I_MRX		(I_V_MRX << I_V_FL)
-#define I_IOT		(I_V_IOT << I_V_FL)
-#define I_SHF		(I_V_SHF << I_V_FL)
-#define I_SK0		(I_V_SK0 << I_V_FL)
-#define I_SK1		(I_V_SK1 << I_V_FL)
+#define I_V_FL          16                              /* flag start */
+#define I_M_FL          07                              /* flag mask */
+#define I_V_NPN         0                               /* no operand */
+#define I_V_MRF         1                               /* mem ref */
+#define I_V_MRX         2                               /* mem ref, no idx */
+#define I_V_IOT         3                               /* I/O */
+#define I_V_SHF         4                               /* shift */
+#define I_V_SK0         5                               /* skip 0 */
+#define I_V_SK1         6                               /* skip 1 */
+#define I_NPN           (I_V_NPN << I_V_FL)
+#define I_MRF           (I_V_MRF << I_V_FL)
+#define I_MRX           (I_V_MRX << I_V_FL)
+#define I_IOT           (I_V_IOT << I_V_FL)
+#define I_SHF           (I_V_SHF << I_V_FL)
+#define I_SK0           (I_V_SK0 << I_V_FL)
+#define I_SK1           (I_V_SK1 << I_V_FL)
 
 static const int32 masks[] = {
  0177777, 0136000, 0176000, 0176000,
- 0177700, 0177000, 0177000 };
+ 0177700, 0177000, 0177000
+ };
 
 static const char *opcode[] = {
  "HLT", "SGL", "DBL",
@@ -143,14 +146,15 @@ static const char *opcode[] = {
  "LGL", "ALS", "ALR",
  "OCP", "SKS", "INA", "OTA",
  "SMK",
- "SPL", "SPN", "SLZ",					/* encode only */
+ "SPL", "SPN", "SLZ",                                   /* encode only */
  "SZE", "SR1", "SR2",
  "SR3", "SR4", "SRC",
  "SMI", "SPS", "SLN",
  "SNZ", "SS1", "SS2",
  "SS3", "SS4", "SSC",
- NULL, NULL,						/* decode only */
- NULL  };
+ NULL, NULL,                                            /* decode only */
+ NULL
+ };
  
 static const int32 opc_val[] = {
  0000000+I_NPN, 0000005+I_NPN, 0000007+I_NPN,
@@ -177,115 +181,129 @@ static const int32 opc_val[] = {
  0041400+I_SHF, 0041500+I_SHF, 0041600+I_SHF,
  0030000+I_IOT, 0070000+I_IOT, 0130000+I_IOT, 0170000+I_IOT,
  0170000+I_IOT,
- 0100400+I_SK0, 0100200+I_SK0, 0100100+I_SK0,		/* encode only */
+ 0100400+I_SK0, 0100200+I_SK0, 0100100+I_SK0,           /* encode only */
  0100040+I_SK0, 0100020+I_SK0, 0100010+I_SK0,
  0100004+I_SK0, 0100002+I_SK0, 0100001+I_SK0,
  0101400+I_SK1, 0101200+I_SK1, 0101100+I_SK1,
  0101040+I_SK1, 0101020+I_SK1, 0101010+I_SK1,
  0101004+I_SK1, 0101002+I_SK1, 0101001+I_SK1,
- 0100000+I_SK0, 0101000+I_SK1,				/* decode only */
- -1 };
-
+ 0100000+I_SK0, 0101000+I_SK1,                          /* decode only */
+ -1
+ };
+
 /* Operate decode
 
    Inputs:
-	*of	=	output stream
-	inst	=	mask bits
-	class	=	instruction class code
-	sp	=	space needed?
+        *of     =       output stream
+        inst    =       mask bits
+        class   =       instruction class code
+        sp      =       space needed?
    Outputs:
-	status	=	space needed
+        status  =       space needed
 */
 
 void fprint_opr (FILE *of, int32 inst, int32 class)
 {
 int32 i, j, sp;
 
-for (i = sp = 0; opc_val[i] >= 0; i++) {		/* loop thru ops */
-	j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
-	if ((j == class) && (opc_val[i] & inst)) {	/* same class? */
-	    inst = inst & ~opc_val[i];			/* mask bit set? */
-	    fprintf (of, (sp? " %s": "%s"), opcode[i]);
-	    sp = 1;  }  }
+for (i = sp = 0; opc_val[i] >= 0; i++) {                /* loop thru ops */
+    j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
+    if ((j == class) && (opc_val[i] & inst)) {          /* same class? */
+        inst = inst & ~opc_val[i];                      /* mask bit set? */
+        fprintf (of, (sp? " %s": "%s"), opcode[i]);
+        sp = 1;
+        }
+    }
 return;
 }
 
 /* Symbolic decode
 
    Inputs:
-	*of	=	output stream
-	addr	=	current PC
-	*val	=	pointer to data
-	*uptr	=	pointer to unit 
-	sw	=	switches
+        *of     =       output stream
+        addr    =       current PC
+        *val    =       pointer to data
+        *uptr   =       pointer to unit 
+        sw      =       switches
    Outputs:
-	return	=	status code
+        return  =       status code
 */
 
 #define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
-	UNIT *uptr, int32 sw)
+    UNIT *uptr, int32 sw)
 {
 int32 cflag, i, j, inst, disp;
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 inst = val[0];
-if (sw & SWMASK ('A')) {				/* ASCII? */
-	if (inst > 0377) return SCPE_ARG;
-	fprintf (of, FMTASC (inst & 0177));
-	return SCPE_OK;  }
-if (sw & SWMASK ('C')) {				/* characters? */
-	fprintf (of, FMTASC ((inst >> 8) & 0177));
-	fprintf (of, FMTASC (inst & 0177));
-	return SCPE_OK;  }
+if (sw & SWMASK ('A')) {                                /* ASCII? */
+    if (inst > 0377) return SCPE_ARG;
+    fprintf (of, FMTASC (inst & 0177));
+    return SCPE_OK;
+    }
+if (sw & SWMASK ('C')) {                                /* characters? */
+    fprintf (of, FMTASC ((inst >> 8) & 0177));
+    fprintf (of, FMTASC (inst & 0177));
+    return SCPE_OK;
+    }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
-
+
 /* Instruction decode */
 
-for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
-    j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
-    if ((opc_val[i] & DMASK) == (inst & masks[j])) {	/* match? */
+for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
+    j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
+    if ((opc_val[i] & DMASK) == (inst & masks[j])) {    /* match? */
 
-	switch (j) {					/* case on class */
-	case I_V_NPN:					/* no operands */
-	    fprintf (of, "%s", opcode[i]);		/* opcode */
-	    break;
-	case I_V_MRF: case I_V_MRX:			/* mem ref */
-	    disp = inst & DISP;				/* displacement */
-	    fprintf (of, "%s ", opcode[i]);		/* opcode */
-	    if (inst & SC) {				/* current sector? */
-		if (cflag) fprintf (of, "%-o", (addr & PAGENO) | disp);
-		else fprintf (of, "C %-o", disp);  }
-	    else fprintf (of, "%-o", disp);		/* sector zero */
-	    if ((j == I_V_MRF) && (inst & IDX)) fprintf (of, ",1");
-	    break;
-	case I_V_IOT:					/* I/O */
-	    disp = inst & 01777;			/* pulse+dev */
-	    fprintf (of, "%s %o", opcode[i], disp);
-	    break;
-	case I_V_SHF:					/* shift */
-	    disp = -inst & SHFMASK;			/* shift count */
-	    fprintf (of, "%s %o", opcode[i], disp);
-	    break;
-	case I_V_SK0: case I_V_SK1:			/* skips */
-	    fprint_opr (of, inst & 0777, j);		/* print skips */	
-	    break;  }					/* end case */
-	return SCPE_OK;  }				/* end if */
-	}						/* end for */
+        switch (j) {                                    /* case on class */
+
+        case I_V_NPN:                                   /* no operands */
+            fprintf (of, "%s", opcode[i]);              /* opcode */
+            break;
+
+        case I_V_MRF: case I_V_MRX:                     /* mem ref */
+            disp = inst & DISP;                         /* displacement */
+            fprintf (of, "%s ", opcode[i]);             /* opcode */
+            if (inst & SC) {                            /* current sector? */
+                if (cflag) fprintf (of, "%-o", (addr & PAGENO) | disp);
+                else fprintf (of, "C %-o", disp);
+                }
+            else fprintf (of, "%-o", disp);             /* sector zero */
+            if ((j == I_V_MRF) && (inst & IDX)) fprintf (of, ",1");
+            break;
+
+        case I_V_IOT:                                   /* I/O */
+            disp = inst & 01777;                        /* pulse+dev */
+            fprintf (of, "%s %o", opcode[i], disp);
+            break;
+
+        case I_V_SHF:                                   /* shift */
+            disp = -inst & SHFMASK;                     /* shift count */
+            fprintf (of, "%s %o", opcode[i], disp);
+            break;
+
+        case I_V_SK0: case I_V_SK1:                     /* skips */
+            fprint_opr (of, inst & 0777, j);            /* print skips */       
+            break;
+            }                                           /* end case */
+
+        return SCPE_OK;
+        }                                               /* end if */
+    }                                                   /* end for */
 return SCPE_ARG;
 }
-
+
 /* Symbolic input
 
    Inputs:
-	*cptr	=	pointer to input string
-	addr	=	current PC
-	*uptr	=	pointer to unit
-	*val	=	pointer to output values
-	sw	=	switches
+        *cptr   =       pointer to input string
+        addr    =       current PC
+        *uptr   =       pointer to unit
+        *val    =       pointer to output values
+        sw      =       switches
    Outputs:
-	status	=	error status
+        status  =       error status
 */
 
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
@@ -295,69 +313,81 @@ t_stat r;
 char gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
-while (isspace (*cptr)) cptr++;				/* absorb spaces */
+while (isspace (*cptr)) cptr++;                         /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = (t_value) cptr[0] & 0177;
-	return SCPE_OK;  }
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    val[0] = (t_value) cptr[0] & 0177;
+    return SCPE_OK;
+    }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* char string? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = (((t_value) cptr[0] & 0177) << 8) |
-		  ((t_value) cptr[1] & 0177);
-	return SCPE_OK;  }
-
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    val[0] = (((t_value) cptr[0] & 0177) << 8) |
+              ((t_value) cptr[1] & 0177);
+    return SCPE_OK;
+    }
+
 /* Instruction parse */
 
-cptr = get_glyph (cptr, gbuf, 0);			/* get opcode */
+cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
 if (opcode[i] == NULL) return SCPE_ARG;
-val[0] = opc_val[i] & DMASK;				/* get value */
-j = (opc_val[i] >> I_V_FL) & I_M_FL;			/* get class */
+val[0] = opc_val[i] & DMASK;                            /* get value */
+j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 
-switch (j) {						/* case on class */
-case I_V_NPN:						/* no operand */
-	break;
-case I_V_IOT:						/* IOT */
-	cptr = get_glyph (cptr, gbuf, 0);		/* get pulse+dev */
-	d = get_uint (gbuf, 8, 01777, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	val[0] = val[0] | d;
-	break;
-case I_V_SHF:						/* shift */
-	cptr = get_glyph (cptr, gbuf, 0);		/* get shift count */
-	d = get_uint (gbuf, 8, SHFMASK, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	val[0] = val[0] | (-d & SHFMASK);		/* store 2's comp */
-	break;
-case I_V_MRF: case I_V_MRX:				/* mem ref */
-	cptr = get_glyph (cptr, gbuf, ',');		/* get next field */
-	if (k = (strcmp (gbuf, "C") == 0)) {		/* C specified? */
-	    val[0] = val[0] | SC;
-	    cptr = get_glyph (cptr, gbuf, 0);  }
-	else if (k = (strcmp (gbuf, "Z") == 0)) {	/* Z specified? */
-	    cptr = get_glyph (cptr, gbuf, ',');  }
-	d = get_uint (gbuf, 8, X_AMASK, &r);		/* construe as addr */
-	if (r != SCPE_OK) return SCPE_ARG;
-	if (d <= DISP) val[0] = val[0] | d;		/* fits? */
-	else if (cflag && !k && (((addr ^ d) & PAGENO) == 0))
-	    val[0] = val[0] | (d & DISP) | SC;
-	else return SCPE_ARG;
-	if ((j == I_V_MRX) || (*cptr == 0)) break;	/* indexed? */
-	cptr = get_glyph (cptr, gbuf, 0);
-	d = get_uint (gbuf, 8, 1, &r);			/* get tag */
-	if (r != SCPE_OK) return SCPE_ARG;
-	if (d) val[0] = val[0] | IDX;			/* or in index */
-	break;
-case I_V_SK0: case I_V_SK1:				/* skips */
-	for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
-	     cptr = get_glyph (cptr, gbuf, 0)) {
-	    for (i = 0; (opcode[i] != NULL) &&
-		(strcmp (opcode[i], gbuf) != 0) ; i++) ;
-	    k = opc_val[i] & DMASK;
-	    if ((opcode[i] == NULL) || (((k ^ val[0]) & 0177000) != 0))
-		return SCPE_ARG;
-	    val[0] = val[0] | k;  }
-	break;  }					/* end case */
-if (*cptr != 0) return SCPE_ARG;			/* junk at end? */
+switch (j) {                                            /* case on class */
+
+    case I_V_NPN:                                       /* no operand */
+        break;
+
+    case I_V_IOT:                                       /* IOT */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get pulse+dev */
+        d = get_uint (gbuf, 8, 01777, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | d;
+        break;
+
+    case I_V_SHF:                                       /* shift */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get shift count */
+        d = get_uint (gbuf, 8, SHFMASK, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | (-d & SHFMASK);               /* store 2's comp */
+        break;
+
+    case I_V_MRF: case I_V_MRX:                         /* mem ref */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
+        if (k = (strcmp (gbuf, "C") == 0)) {            /* C specified? */
+            val[0] = val[0] | SC;
+            cptr = get_glyph (cptr, gbuf, 0);
+            }
+        else if (k = (strcmp (gbuf, "Z") == 0)) {       /* Z specified? */
+            cptr = get_glyph (cptr, gbuf, ',');
+            }
+        d = get_uint (gbuf, 8, X_AMASK, &r);            /* construe as addr */
+        if (r != SCPE_OK) return SCPE_ARG;
+        if (d <= DISP) val[0] = val[0] | d;             /* fits? */
+        else if (cflag && !k && (((addr ^ d) & PAGENO) == 0))
+            val[0] = val[0] | (d & DISP) | SC;
+        else return SCPE_ARG;
+        if ((j == I_V_MRX) || (*cptr == 0)) break;      /* indexed? */
+        cptr = get_glyph (cptr, gbuf, 0);
+        d = get_uint (gbuf, 8, 1, &r);                  /* get tag */
+        if (r != SCPE_OK) return SCPE_ARG;
+        if (d) val[0] = val[0] | IDX;                   /* or in index */
+        break;
+
+    case I_V_SK0: case I_V_SK1:                         /* skips */
+        for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
+             cptr = get_glyph (cptr, gbuf, 0)) {
+            for (i = 0; (opcode[i] != NULL) &&
+                (strcmp (opcode[i], gbuf) != 0) ; i++) ;
+            k = opc_val[i] & DMASK;
+            if ((opcode[i] == NULL) || (((k ^ val[0]) & 0177000) != 0))
+                return SCPE_ARG;
+            val[0] = val[0] | k;
+            }
+        break;
+        }                                               /* end case */
+
+if (*cptr != 0) return SCPE_ARG;                        /* junk at end? */
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* sds_sys.c: SDS 940 simulator interface
 
-   Copyright (c) 2001-2004, Robert M Supnik
+   Copyright (c) 2001-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,8 +19,8 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 */
 
@@ -47,12 +47,12 @@ extern uint32 M[MAXMEMSIZE];
 
 /* SCP data structures and interface routines
 
-   sim_name		simulator name string
-   sim_PC		pointer to saved PC register descriptor
-   sim_emax		number of words for examine
-   sim_devices		array of pointers to simulated devices
-   sim_stop_messages	array of pointers to stop messages
-   sim_load		binary loader
+   sim_name             simulator name string
+   sim_PC               pointer to saved PC register descriptor
+   sim_emax             number of words for examine
+   sim_devices          array of pointers to simulated devices
+   sim_stop_messages    array of pointers to stop messages
+   sim_load             binary loader
 */
 
 char sim_name[] = "SDS 940";
@@ -62,85 +62,89 @@ REG *sim_PC = &cpu_reg[0];
 int32 sim_emax = 1;
 
 DEVICE *sim_devices[] = {
-	&cpu_dev,
-	&chan_dev,
-	&ptr_dev,
-	&ptp_dev,
-	&tti_dev,
-	&tto_dev,
-	&lpt_dev,
-	&rtc_dev,
-	&drm_dev,
-	&rad_dev,
-	&dsk_dev,
-	&mt_dev,
-	&mux_dev,
-	&muxl_dev,
-	NULL };
+    &cpu_dev,
+    &chan_dev,
+    &ptr_dev,
+    &ptp_dev,
+    &tti_dev,
+    &tto_dev,
+    &lpt_dev,
+    &rtc_dev,
+    &drm_dev,
+    &rad_dev,
+    &dsk_dev,
+    &mt_dev,
+    &mux_dev,
+    &muxl_dev,
+    NULL
+    };
 
 const char *sim_stop_messages[] = {
-	"Unknown error",
-	"IO device not ready",
-	"HALT instruction",
-	"Breakpoint",
-	"Invalid IO device",
-	"Invalid instruction",
-	"Invalid I/O operation",
-	"Nested indirects exceed limit",
-	"Nested EXU's exceed limit",
-	"Memory management trap during interrupt",
-	"Memory management trap during trap",
-	"Trap instruction not BRM",
-	"RTC instruction not MIN or SKR",
-	"Interrupt vector zero",
-	"Runaway carriage control tape"  };
-
+    "Unknown error",
+    "IO device not ready",
+    "HALT instruction",
+    "Breakpoint",
+    "Invalid IO device",
+    "Invalid instruction",
+    "Invalid I/O operation",
+    "Nested indirects exceed limit",
+    "Nested EXU's exceed limit",
+    "Memory management trap during interrupt",
+    "Memory management trap during trap",
+    "Trap instruction not BRM",
+    "RTC instruction not MIN or SKR",
+    "Interrupt vector zero",
+    "Runaway carriage control tape"
+    };
+
 /* Character conversion tables */
 
 const char sds_to_ascii[64] = {
-	'0', '1', '2', '3', '4', '5', '6', '7',
-	'8', '9', ' ', '=', '\'', ':', '>', '%',	/* 17 = check mark */
-	'+', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
-	'H', 'I', '?', '.', ')', '[', '<', '@',		/* 37 = stop code */
-	'-', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-	'Q', 'R', '!', '$', '*', ']', ';', '^',		/* 57 = triangle */
-	'_', '/', 'S', 'T', 'U', 'V', 'W', 'X',
-	'Y', 'Z', '?', ',', '(', '~', '\\', '#'  };	/* 72 = rec mark */
-							/* 75 = squiggle, 77 = del */
+    '0', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', ' ', '=', '\'', ':', '>', '%',            /* 17 = check mark */
+    '+', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
+    'H', 'I', '?', '.', ')', '[', '<', '@',             /* 37 = stop code */
+    '-', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+    'Q', 'R', '!', '$', '*', ']', ';', '^',             /* 57 = triangle */
+    '_', '/', 'S', 'T', 'U', 'V', 'W', 'X',
+    'Y', 'Z', '?', ',', '(', '~', '\\', '#'             /* 72 = rec mark */
+     };                                                 /* 75 = squiggle, 77 = del */
 
 const char ascii_to_sds[128] = {
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,		/* 0 - 37 */
-	032, 072,  -1,  -1,  -1, 052,  -1,  -1,
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-	012, 052,  -1, 077, 053, 017,  -1, 014,		/* 40 - 77 */
-	074, 034, 054, 020, 073, 040, 033, 061,
-	000, 001, 002, 003, 004, 005, 006, 007,
-	010, 011, 015, 056, 036, 013, 016, 072,
-	037, 021, 022, 023, 024, 025, 026, 027,		/* 100 - 137 */
-	030, 031, 041, 042, 043, 044, 045, 046,
-	047, 050, 051, 062, 063, 064, 065, 066,
-	067, 070, 071, 035, 076, 055, 057, 060,
-	000, 021, 022, 023, 024, 025, 026, 027,		/* 140 - 177 */
-	030, 031, 041, 042, 043, 044, 045, 046,
-	047, 050, 051, 062, 063, 064, 065, 066,
-	067, 070, 071,  -1,  -1,  -1,  -1,  -1  };
+     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,             /* 0 - 37 */
+    032, 072,  -1,  -1,  -1, 052,  -1,  -1,
+     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    012, 052,  -1, 077, 053, 017,  -1, 014,             /* 40 - 77 */
+    074, 034, 054, 020, 073, 040, 033, 061,
+    000, 001, 002, 003, 004, 005, 006, 007,
+    010, 011, 015, 056, 036, 013, 016, 072,
+    037, 021, 022, 023, 024, 025, 026, 027,             /* 100 - 137 */
+    030, 031, 041, 042, 043, 044, 045, 046,
+    047, 050, 051, 062, 063, 064, 065, 066,
+    067, 070, 071, 035, 076, 055, 057, 060,
+    000, 021, 022, 023, 024, 025, 026, 027,             /* 140 - 177 */
+    030, 031, 041, 042, 043, 044, 045, 046,
+    047, 050, 051, 062, 063, 064, 065, 066,
+    067, 070, 071,  -1,  -1,  -1,  -1,  -1
+    };
 
 const char odd_par[64] = {
-	0100, 0001, 0002, 0103, 0004, 0105, 0106, 0007,
-	0010, 0111, 0112, 0013, 0114, 0015, 0016, 0117,
-	0020, 0121, 0122, 0023, 0124, 0025, 0026, 0127,
-	0130, 0031, 0032, 0133, 0034, 0135, 0136, 0037,
-	0040, 0141, 0142, 0043, 0144, 0045, 0046, 0147,
-	0150, 0051, 0052, 0153, 0054, 0155, 0156, 0057,
-	0160, 0061, 0062, 0163, 0064, 0165, 0166, 0067,
-	0070, 0171, 0172, 0073, 0174, 0075, 0076, 0177 };
-
+    0100, 0001, 0002, 0103, 0004, 0105, 0106, 0007,
+    0010, 0111, 0112, 0013, 0114, 0015, 0016, 0117,
+    0020, 0121, 0122, 0023, 0124, 0025, 0026, 0127,
+    0130, 0031, 0032, 0133, 0034, 0135, 0136, 0037,
+    0040, 0141, 0142, 0043, 0144, 0045, 0046, 0147,
+    0150, 0051, 0052, 0153, 0054, 0155, 0156, 0057,
+    0160, 0061, 0062, 0163, 0064, 0165, 0166, 0067,
+    0070, 0171, 0172, 0073, 0174, 0075, 0076, 0177
+    };
+
 /* Load carriage control tape
 
    A carriage control tape consists of entries of the form
 
-	(repeat count) column number,column number,column number,...
+        (repeat count) column number,column number,column number,...
 
    The CCT entries are stored in lpt_cct[0:lnt-1], lpt_ccl contains the
    number of entries
@@ -154,21 +158,25 @@ extern int32 lpt_ccl, lpt_ccp, lpt_cct[CCT_LNT];
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
 ptr = 0;
-for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) {	/* until eof */
+for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) {   /* until eof */
     mask = 0;
-    if (*cptr == '(') {					/* repeat count? */
-	cptr = get_glyph (cptr + 1, gbuf, ')');		/* get 1st field */
-	rpt = get_uint (gbuf, 10, CCT_LNT, &r);		/* repeat count */
-	if (r != SCPE_OK) return SCPE_FMT;  }
+    if (*cptr == '(') {                                 /* repeat count? */
+        cptr = get_glyph (cptr + 1, gbuf, ')');         /* get 1st field */
+        rpt = get_uint (gbuf, 10, CCT_LNT, &r);         /* repeat count */
+        if (r != SCPE_OK) return SCPE_FMT;
+        }
     else rpt = 1;
-    while (*cptr != 0) {				/* get col no's */
-	cptr = get_glyph (cptr, gbuf, ',');		/* get next field */
-	col = get_uint (gbuf, 10, 7, &r);		/* column number */
-	if (r != SCPE_OK) return SCPE_FMT;
-	mask = mask | (1 << col);  }			/* set bit */
-    for ( ; rpt > 0; rpt--) {				/* store vals */
-	if (ptr >= CCT_LNT) return SCPE_FMT;
-	cctbuf[ptr++] = mask;  }  }
+    while (*cptr != 0) {                                /* get col no's */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
+        col = get_uint (gbuf, 10, 7, &r);               /* column number */
+        if (r != SCPE_OK) return SCPE_FMT;
+        mask = mask | (1 << col);                       /* set bit */
+        }
+    for ( ; rpt > 0; rpt--) {                           /* store vals */
+        if (ptr >= CCT_LNT) return SCPE_FMT;
+        cctbuf[ptr++] = mask;
+        }
+    }
 if (ptr == 0) return SCPE_FMT;
 lpt_ccl = ptr;
 lpt_ccp = 0;
@@ -190,10 +198,11 @@ for (i = wd = 0; i < 4; ) {
     if (c == 0) continue;
     *ldr = 0;
     wd = (wd << 6) | (c & 077);
-    i++;  }
+    i++;
+    }
 return wd;
 }
-	
+    
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 i, wd, buf[8];
@@ -203,50 +212,53 @@ extern uint32 P;
 
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 if (sim_switches & SWMASK ('L')) return sim_load_cct (fileref);
-for (i = 0; i < 8; i++) {				/* read boot */
+for (i = 0; i < 8; i++) {                               /* read boot */
     if ((wd = get_word (fileref, &ldr)) < 0) return SCPE_FMT;
-    buf[i] = wd;  }
-if ((buf[0] != 023200012) ||				/* 2 = WIM 12,2 */
-    (buf[1] != 004100002) ||				/* 3 = BRX 2 */
-    (buf[2] != 007100011) ||				/* 4 = LDX 11 */
-    (buf[3] != 023200000) ||				/* 5 = WIM 0,2 */
-    (buf[4] != 004021000) ||				/* 6 = SKS 21000 */
-    (buf[5] != 004100005)) return SCPE_FMT;		/* 7 = BRX 5 */
-for (i = 0; i < 8; i++) M[i + 2] = buf[i];		/* copy boot */
+    buf[i] = wd;
+	}
+if ((buf[0] != 023200012) ||                            /* 2 = WIM 12,2 */
+    (buf[1] != 004100002) ||                            /* 3 = BRX 2 */
+    (buf[2] != 007100011) ||                            /* 4 = LDX 11 */
+    (buf[3] != 023200000) ||                            /* 5 = WIM 0,2 */
+    (buf[4] != 004021000) ||                            /* 6 = SKS 21000 */
+    (buf[5] != 004100005)) return SCPE_FMT;             /* 7 = BRX 5 */
+for (i = 0; i < 8; i++) M[i + 2] = buf[i];              /* copy boot */
 if (I_GETOP (buf[6]) == BRU) P = buf[6] & VA_MASK;
-for (i = buf[7] & VA_MASK; i <= VA_MASK; i++) {		/* load data */
+for (i = buf[7] & VA_MASK; i <= VA_MASK; i++) {         /* load data */
     if ((wd = get_word (fileref, &ldr)) < 0) return SCPE_OK;
-    M[i] = wd;  }
+    M[i] = wd;
+    }
 return SCPE_NXM;
 }
-
+
 /* Symbol tables */
 
-#define I_V_FL		24				/* inst class */
-#define	I_M_FL		017				/* class mask */
-#define I_V_NPN		000				/* no operand */
-#define I_V_PPO		001				/* POP */
-#define I_V_IOI		002				/* IO */
-#define I_V_MRF		003				/* memory reference */
-#define I_V_REG		004				/* register change */
-#define I_V_SHF		005				/* shift */
-#define I_V_OPO		006				/* opcode only */
-#define I_V_CHC		007				/* chan cmd */
-#define I_V_CHT		010				/* chan test */
-#define I_NPN		(I_V_NPN << I_V_FL)	
-#define I_PPO		(I_V_PPO << I_V_FL)	
-#define I_IOI		(I_V_IOI << I_V_FL)	
-#define I_MRF		(I_V_MRF << I_V_FL)	
-#define I_REG		(I_V_REG << I_V_FL)	
-#define I_SHF		(I_V_SHF << I_V_FL)	
-#define I_OPO		(I_V_OPO << I_V_FL)
-#define I_CHC		(I_V_CHC << I_V_FL)
-#define I_CHT		(I_V_CHT << I_V_FL)	
+#define I_V_FL          24                              /* inst class */
+#define I_M_FL          017                             /* class mask */
+#define I_V_NPN         000                             /* no operand */
+#define I_V_PPO         001                             /* POP */
+#define I_V_IOI         002                             /* IO */
+#define I_V_MRF         003                             /* memory reference */
+#define I_V_REG         004                             /* register change */
+#define I_V_SHF         005                             /* shift */
+#define I_V_OPO         006                             /* opcode only */
+#define I_V_CHC         007                             /* chan cmd */
+#define I_V_CHT         010                             /* chan test */
+#define I_NPN           (I_V_NPN << I_V_FL)     
+#define I_PPO           (I_V_PPO << I_V_FL)     
+#define I_IOI           (I_V_IOI << I_V_FL)     
+#define I_MRF           (I_V_MRF << I_V_FL)     
+#define I_REG           (I_V_REG << I_V_FL)     
+#define I_SHF           (I_V_SHF << I_V_FL)     
+#define I_OPO           (I_V_OPO << I_V_FL)
+#define I_CHC           (I_V_CHC << I_V_FL)
+#define I_CHT           (I_V_CHT << I_V_FL)     
 
 static const int32 masks[] = {
  037777777, 010000000, 017700000,
  017740000, 017700000, 017774000,
- 017700000, 017377677, 027737677  };
+ 017700000, 017377677, 027737677
+ };
 
 static const char *opcode[] = {
  "POP", "EIR", "DIR",
@@ -292,11 +304,12 @@ static const char *opcode[] = {
  "ALC", "DSC", "ASC", "TOP",
  "CAT", "CET", "CZT", "CIT",
 
- "CLA", "CLB", "CAB",					/* encode only */
+ "CLA", "CLB", "CAB",                                   /* encode only */
  "CBA", "CBX", "CXB",
  "XPO", "CXA", "CAX",
  "CNA", "CLX", NULL,
- NULL  };
+ NULL
+ };
 
 static const int32 opc_val[] = {
  010000000+I_PPO, 000220002+I_NPN, 000220004+I_NPN,
@@ -346,121 +359,136 @@ static const int32 opc_val[] = {
  004600010+I_REG, 004600020+I_REG, 004600040+I_REG,
  004600100+I_REG, 004600200+I_REG, 004600400+I_REG,
  004601000+I_REG, 024600000+I_REG, 004600000+I_REG,
- -1 };
+ -1
+ };
 
 static const char *chname[] = {
- "W", "Y", "C", "D", "E", "F", "G", "H", NULL };
-
+ "W", "Y", "C", "D", "E", "F", "G", "H", NULL
+ };
+
 /* Register change decode
 
    Inputs:
-	*of	=	output stream
-	inst	=	mask bits
+        *of     =       output stream
+        inst    =       mask bits
 */
 
 void fprint_reg (FILE *of, int32 inst)
 {
 int32 i, j, sp;
 
-inst = inst & ~(I_M_OP << I_V_OP);			/* clear opcode */
-for (i = sp = 0; opc_val[i] >= 0; i++) {		/* loop thru ops */
-    j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
-    if ((j == I_V_REG) && (opc_val[i] & inst)) {	/* reg class? */
-	inst = inst & ~opc_val[i];			/* mask bit set? */
-	fprintf (of, (sp? " %s": "%s"), opcode[i]);
-	sp = 1;  }  }
+inst = inst & ~(I_M_OP << I_V_OP);                      /* clear opcode */
+for (i = sp = 0; opc_val[i] >= 0; i++) {                /* loop thru ops */
+    j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
+    if ((j == I_V_REG) && (opc_val[i] & inst)) {        /* reg class? */
+        inst = inst & ~opc_val[i];                      /* mask bit set? */
+        fprintf (of, (sp? " %s": "%s"), opcode[i]);
+        sp = 1;
+        }
+    }
 return;
 }
 
 /* Symbolic decode
 
    Inputs:
-	*of	=	output stream
-	addr	=	current PC
-	*val	=	pointer to values
-	*uptr	=	pointer to unit
-	sw	=	switches
+        *of     =       output stream
+        addr    =       current PC
+        *val    =       pointer to values
+        *uptr   =       pointer to unit
+        sw      =       switches
    Outputs:
-	return	=	status code
+        return  =       status code
 */
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
-	UNIT *uptr, int32 sw)
+    UNIT *uptr, int32 sw)
 {
 int32 i, j, ch;
 int32 inst, op, tag, va, shf, nonop;
 
-inst = val[0];						/* get inst */
-op = I_GETOP (inst);					/* get fields */
+inst = val[0];                                          /* get inst */
+op = I_GETOP (inst);                                    /* get fields */
 tag = (inst >> 21) & 06;
 va = inst & VA_MASK;
 shf = inst & I_SHFMSK;
 nonop = inst & 077777;
 
-if (sw & SWMASK ('A')) {				/* ASCII? */
+if (sw & SWMASK ('A')) {                                /* ASCII? */
     if (inst > 0377) return SCPE_ARG;
     fprintf (of, FMTASC (inst & 0177));
-    return SCPE_OK;  }
-if (sw & SWMASK ('C')) {				/* character? */
+    return SCPE_OK;
+    }
+if (sw & SWMASK ('C')) {                                /* character? */
     fprintf (of, "%c", sds_to_ascii[(inst >> 18) & 077]);
     fprintf (of, "%c", sds_to_ascii[(inst >> 12) & 077]);
     fprintf (of, "%c", sds_to_ascii[(inst >> 6) & 077]);
     fprintf (of, "%c", sds_to_ascii[inst & 077]);
-    return SCPE_OK;  }
+    return SCPE_OK;
+    }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
-
+
 /* Instruction decode */
 
-for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
-    j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
-    if ((opc_val[i] & DMASK) == (inst & masks[j])) {	/* match? */
+for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
+    j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
+    if ((opc_val[i] & DMASK) == (inst & masks[j])) {    /* match? */
 
-	switch (j) {					/* case on class */
-	case I_V_NPN:					/* no operands */
-	case I_V_OPO:					/* opcode only */
-	    fprintf (of, "%s", opcode[i]);		/* opcode */
-	    break;
-	case I_V_SHF:					/* shift */
-	    fprintf (of, "%s %-o", opcode[i], shf);
-	    if (tag) fprintf (of, ",%-o", tag);
-	    break;
-	case I_V_PPO:					/* pop */
-	    fprintf (of, "POP %-o,%-o", op, nonop);
-	    if (tag) fprintf (of, ",%-o", tag);
-	    break;
-	case I_V_IOI:					/* I/O */
-	    fprintf (of, "%s %-o", opcode[i], nonop);
-	    if (tag) fprintf (of, ",%-o", tag);
-	    break;
-	case I_V_MRF:					/* mem ref */
-	    fprintf (of, "%s %-o", opcode[i], va);
-	    if (tag) fprintf (of, ",%-o", tag);
-	    break;
-	case I_V_REG:					/* reg change */
-	    fprint_reg (of, inst);			/* decode */
-	    break;
-	case I_V_CHC:					/* chan cmd */
-	    ch = I_GETEOCH (inst);			/* get chan */
-	    fprintf (of, "%s %s", opcode[i], chname[ch]);
-	    break;
-	case I_V_CHT:					/* chan test */
-	    ch = I_GETSKCH (inst);			/* get chan */
-	    fprintf (of, "%s %s", opcode[i], chname[ch]);
-	    break;
-	    }						/* end case */
-	return SCPE_OK;
-	}						/* end if */
-    }							/* end for */
+        switch (j) {                                    /* case on class */
+
+        case I_V_NPN:                                   /* no operands */
+        case I_V_OPO:                                   /* opcode only */
+            fprintf (of, "%s", opcode[i]);              /* opcode */
+            break;
+
+        case I_V_SHF:                                   /* shift */
+            fprintf (of, "%s %-o", opcode[i], shf);
+            if (tag) fprintf (of, ",%-o", tag);
+            break;
+
+        case I_V_PPO:                                   /* pop */
+            fprintf (of, "POP %-o,%-o", op, nonop);
+            if (tag) fprintf (of, ",%-o", tag);
+            break;
+
+        case I_V_IOI:                                   /* I/O */
+            fprintf (of, "%s %-o", opcode[i], nonop);
+            if (tag) fprintf (of, ",%-o", tag);
+            break;
+
+        case I_V_MRF:                                   /* mem ref */
+            fprintf (of, "%s %-o", opcode[i], va);
+            if (tag) fprintf (of, ",%-o", tag);
+            break;
+
+        case I_V_REG:                                   /* reg change */
+            fprint_reg (of, inst);                      /* decode */
+            break;
+
+        case I_V_CHC:                                   /* chan cmd */
+            ch = I_GETEOCH (inst);                      /* get chan */
+            fprintf (of, "%s %s", opcode[i], chname[ch]);
+            break;
+
+        case I_V_CHT:                                   /* chan test */
+            ch = I_GETSKCH (inst);                      /* get chan */
+            fprintf (of, "%s %s", opcode[i], chname[ch]);
+            break;
+            }                                           /* end case */
+
+        return SCPE_OK;
+        }                                               /* end if */
+    }                                                   /* end for */
 return SCPE_ARG;
 }
-
+
 /* Get (optional) tag
 
    Inputs:
-	*cptr =	pointer to input string
-	*tag  =	pointer to tag
+        *cptr = pointer to input string
+        *tag  = pointer to tag
    Outputs:
-	cptr  =	updated pointer to input string
+        cptr  = updated pointer to input string
 */
 
 char *get_tag (char *cptr, t_value *tag)
@@ -468,23 +496,23 @@ char *get_tag (char *cptr, t_value *tag)
 char *tptr, gbuf[CBUFSIZE];
 t_stat r;
 
-tptr = get_glyph (cptr, gbuf, 0);			/* get next field */
-*tag = get_uint (gbuf, 8, 07, &r) << I_V_TAG;		/* parse */
-if (r == SCPE_OK) return tptr;				/* ok? advance */
+tptr = get_glyph (cptr, gbuf, 0);                       /* get next field */
+*tag = get_uint (gbuf, 8, 07, &r) << I_V_TAG;           /* parse */
+if (r == SCPE_OK) return tptr;                          /* ok? advance */
 *tag = 0;
-return cptr;						/* no change */
+return cptr;                                            /* no change */
 }
 
 /* Symbolic input
 
    Inputs:
-	*cptr	=	pointer to input string
-	addr	=	current PC
-	uptr	=	pointer to unit
-	*val	=	pointer to output values
-	sw	=	switches
+        *cptr   =       pointer to input string
+        addr    =       current PC
+        uptr    =       pointer to unit
+        *val    =       pointer to output values
+        sw      =       switches
    Outputs:
-	status	=	error status
+        status  =       error status
 */
 
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
@@ -498,79 +526,93 @@ while (isspace (*cptr)) cptr++;
 for (i = 1; (i < 4) && (cptr[i] != 0); i++)
     if (cptr[i] == 0) for (j = i + 1; j <= 4; j++) cptr[j] = 0;
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-    if (cptr[0] == 0) return SCPE_ARG;			/* must have 1 char */
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
     val[0] = (t_value) cptr[0] | 0200;
-    return SCPE_OK;  }
+    return SCPE_OK;
+    }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* string? */
-    if (cptr[0] == 0) return SCPE_ARG;			/* must have 1 char */
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
     for (i = j = 0, val[0] = 0; i < 4; i++) {
-	if (cptr[i] == 0) j = 1;			/* latch str end */
-	k = ascii_to_sds[cptr[i] & 0177];		/* cvt char */
-	if (j || (k < 0)) k = 0;			/* bad, end? spc */
-	val[0] = (val[0] << 6) | k;  }
-    return SCPE_OK;  }
-
-/* Symbolic input, continued */
+        if (cptr[i] == 0) j = 1;                        /* latch str end */
+        k = ascii_to_sds[cptr[i] & 0177];               /* cvt char */
+        if (j || (k < 0)) k = 0;                        /* bad, end? spc */
+        val[0] = (val[0] << 6) | k;
+        }
+    return SCPE_OK;
+    }
 
-cptr = get_glyph (cptr, gbuf, 0);			/* get opcode */
+cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
 if (opcode[i] == NULL) return SCPE_ARG;
-val[0] = opc_val[i] & DMASK;				/* get value */
-j = (opc_val[i] >> I_V_FL) & I_M_FL;			/* get class */
+val[0] = opc_val[i] & DMASK;                            /* get value */
+j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 
-switch (j) {						/* case on class */
-case I_V_NPN: case I_V_OPO:				/* opcode only */
-    break;
-case I_V_SHF:						/* shift */
-    cptr = get_glyph (cptr, gbuf, ',');			/* get next field */
-    d = get_uint (gbuf, 8, I_SHFMSK, &r);		/* shift count */
-    if (r != SCPE_OK) return SCPE_ARG;
-    cptr = get_tag (cptr, &tag);			/* get opt tag */
-    val[0] = val[0] | d | tag;
-    break;
-case I_V_PPO:						/* pop */
-    cptr = get_glyph (cptr, gbuf, ',');			/* get next field */
-    d = get_uint (gbuf, 8, 077, &r);			/* opcode */
-    if (r != SCPE_OK) return SCPE_ARG;
-    val[0] = val[0] | d;				/* fall thru */
-case I_V_IOI:						/* I/O */
-    cptr = get_glyph (cptr, gbuf, ',');			/* get next field */
-    d = get_uint (gbuf, 8, 077777, &r);			/* 15b address */
-    if (r != SCPE_OK) return SCPE_ARG;
-    cptr = get_tag (cptr, &tag);			/* get opt tag */
-    val[0] = val[0] | d | tag;
-    break;
-case I_V_MRF:						/* mem ref */
-    cptr = get_glyph (cptr, gbuf, ',');			/* get next field */
-    d = get_uint (gbuf, 8, VA_MASK, &r);		/* virt address */
-    if (r != SCPE_OK) return SCPE_ARG;
-    cptr = get_tag (cptr, &tag);			/* get opt tag */
-    val[0] = val[0] | d | tag;
-    break;
-case I_V_REG:						/* register */
-    for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
-	 cptr = get_glyph (cptr, gbuf, 0)) {
-	for (i = 0; (opcode[i] != NULL) &&
-	    (strcmp (opcode[i], gbuf) != 0); i++) ;
-	if (opcode[i] != NULL) {
-	    k = opc_val[i] & DMASK;;
-	    if (I_GETOP (k) != RCH) return SCPE_ARG;
-	    val[0] = val[0] | k;  }
-	else {
-	    d = get_uint (gbuf, 8, 077777, &r);
-	    if (r != SCPE_OK) return SCPE_ARG;
-	    else val[0] = val[0] | d;  }  }
-    break;
-case I_V_CHC: case I_V_CHT:				/* channel */
-    cptr = get_glyph (cptr, gbuf, ',');			/* get next field */
-    for (i = 0; (chname[i] != NULL) && (strcmp (chname[i], gbuf) != 0);
-	i++);
-    if (chname[i] != NULL) d = i;			/* named chan */
-    else {
-    	d = get_uint (gbuf, 8, NUM_CHAN - 1, &r);
-	if (r != SCPE_OK) return SCPE_ARG;  }		/* numbered chan */
-    val[0] = val[0] | ((j == I_V_CHC)? I_SETEOCH (d): I_SETSKCH (d));
-    break;  }						/* end case */
-if (*cptr != 0) return SCPE_ARG;			/* junk at end? */
+switch (j) {                                            /* case on class */
+
+    case I_V_NPN: case I_V_OPO:                         /* opcode only */
+        break;
+
+    case I_V_SHF:                                       /* shift */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
+        d = get_uint (gbuf, 8, I_SHFMSK, &r);           /* shift count */
+        if (r != SCPE_OK) return SCPE_ARG;
+        cptr = get_tag (cptr, &tag);                    /* get opt tag */
+        val[0] = val[0] | d | tag;
+        break;
+
+    case I_V_PPO:                                       /* pop */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
+        d = get_uint (gbuf, 8, 077, &r);                /* opcode */
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | d;                            /* fall thru */
+
+    case I_V_IOI:                                       /* I/O */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
+        d = get_uint (gbuf, 8, 077777, &r);             /* 15b address */
+        if (r != SCPE_OK) return SCPE_ARG;
+        cptr = get_tag (cptr, &tag);                    /* get opt tag */
+        val[0] = val[0] | d | tag;
+        break;
+
+    case I_V_MRF:                                       /* mem ref */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
+        d = get_uint (gbuf, 8, VA_MASK, &r);            /* virt address */
+        if (r != SCPE_OK) return SCPE_ARG;
+        cptr = get_tag (cptr, &tag);                    /* get opt tag */
+        val[0] = val[0] | d | tag;
+        break;
+
+    case I_V_REG:                                       /* register */
+        for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
+             cptr = get_glyph (cptr, gbuf, 0)) {
+            for (i = 0; (opcode[i] != NULL) &&
+                (strcmp (opcode[i], gbuf) != 0); i++) ;
+            if (opcode[i] != NULL) {
+                k = opc_val[i] & DMASK;;
+                if (I_GETOP (k) != RCH) return SCPE_ARG;
+                val[0] = val[0] | k;
+                }
+            else {
+                d = get_uint (gbuf, 8, 077777, &r);
+                if (r != SCPE_OK) return SCPE_ARG;
+                else val[0] = val[0] | d;
+                }
+            }
+        break;
+
+    case I_V_CHC: case I_V_CHT:                         /* channel */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
+        for (i = 0; (chname[i] != NULL) && (strcmp (chname[i], gbuf) != 0);
+            i++);
+        if (chname[i] != NULL) d = i;                   /* named chan */
+        else {
+            d = get_uint (gbuf, 8, NUM_CHAN - 1, &r);
+            if (r != SCPE_OK) return SCPE_ARG;          /* numbered chan */
+            }
+        val[0] = val[0] | ((j == I_V_CHC)? I_SETEOCH (d): I_SETSKCH (d));
+        break;
+        }                                               /* end case */
+
+if (*cptr != 0) return SCPE_ARG;                        /* junk at end? */
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* pdp15_ttx.c: PDP-15 additional terminals simulator
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,13 +19,15 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ttix,ttox	LT15/LT19 terminal input/output
+   ttix,ttox    LT15/LT19 terminal input/output
 
-   14-Jan-04	RMS	Cloned from pdp8_ttx.c
+   29-Jun-05    RMS     Added SET TTOXn DISCONNECT
+   21-Jun-05    RMS     Fixed bug in SHOW CONN/STATS
+   14-Jan-04    RMS     Cloned from pdp8_ttx.c
 
    This module implements 16 individual serial interfaces similar in function
    to the console.  These interfaces are mapped to Telnet based connections as
@@ -39,25 +41,25 @@
 #include <ctype.h>
 
 #if defined (PDP15)
-#define TTX_MAXL	16				/* max number of lines */
+#define TTX_MAXL        16                              /* max number of lines */
 #elif defined (PDP9)
-#define TTX_MAXL	4
+#define TTX_MAXL        4
 #else
-#define TTX_MAXL	1
+#define TTX_MAXL        1
 #endif
 
-#define UNIT_V_8B	(UNIT_V_UF + 0)			/* 8B */
-#define UNIT_V_KSR	(UNIT_V_UF + 1)			/* KSR33 */
-#define UNIT_8B		(1 << UNIT_V_8B)
-#define UNIT_KSR	(1 << UNIT_V_KSR)
+#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
+#define UNIT_V_KSR      (UNIT_V_UF + 1)                 /* KSR33 */
+#define UNIT_8B         (1 << UNIT_V_8B)
+#define UNIT_KSR        (1 << UNIT_V_KSR)
 
-uint32 ttix_done = 0;					/* input flags */
-uint32 ttox_done = 0;					/* output flags */
-uint8 ttix_buf[TTX_MAXL] = { 0 };			/* input buffers */
-uint8 ttox_buf[TTX_MAXL] = { 0 };			/* output buffers */
-TMLN ttx_ldsc[TTX_MAXL] = { 0 };			/* line descriptors */
-TMXR ttx_desc = { 1, 0, 0, ttx_ldsc };			/* mux descriptor */
-#define ttx_lines ttx_desc.lines			/* current number of lines */
+uint32 ttix_done = 0;                                   /* input flags */
+uint32 ttox_done = 0;                                   /* output flags */
+uint8 ttix_buf[TTX_MAXL] = { 0 };                       /* input buffers */
+uint8 ttox_buf[TTX_MAXL] = { 0 };                       /* output buffers */
+TMLN ttx_ldsc[TTX_MAXL] = { 0 };                        /* line descriptors */
+TMXR ttx_desc = { 1, 0, 0, ttx_ldsc };                  /* mux descriptor */
+#define ttx_lines ttx_desc.lines                        /* current number of lines */
 
 extern int32 int_hwre[API_HLVL+1];
 extern int32 tmxr_poll;
@@ -82,113 +84,126 @@ void ttx_reset_ln (int32 i);
 t_stat ttx_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat ttx_show (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat ttx_vlines (UNIT *uptr, int32 val, char *cptr, void *desc);
-
+
 /* TTIx data structures
 
-   ttix_dev	TTIx device descriptor
-   ttix_unit	TTIx unit descriptor
-   ttix_reg	TTIx register list
-   ttix_mod	TTIx modifiers list
+   ttix_dev     TTIx device descriptor
+   ttix_unit    TTIx unit descriptor
+   ttix_reg     TTIx register list
+   ttix_mod     TTIx modifiers list
 */
 
-DIB ttix_dib = { DEV_TTO1, 8, NULL,
-		 { &ttox, &ttix, &ttox, &ttix, &ttox, &ttix, &ttox, &ttix } };
+DIB ttix_dib = { 
+    DEV_TTO1, 8, NULL,
+    { &ttox, &ttix, &ttox, &ttix, &ttox, &ttix, &ttox, &ttix }
+    };
 
 UNIT ttix_unit = { UDATA (&ttix_svc, UNIT_ATTABLE, 0), KBD_POLL_WAIT };
 
 REG ttx_nlreg = { DRDATA (NLINES, ttx_lines, 4), PV_LEFT };
 
 REG ttix_reg[] = {
-	{ BRDATA (BUF, ttix_buf, 8, 8, TTX_MAXL) },
-	{ ORDATA (DONE, ttix_done, TTX_MAXL) },
-	{ FLDATA (INT, int_hwre[API_TTI1], INT_V_TTI1) },
-	{ DRDATA (TIME, ttix_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ ORDATA (DEVNUM, ttix_dib.dev, 6), REG_HRO },
-	{ NULL }  };
+    { BRDATA (BUF, ttix_buf, 8, 8, TTX_MAXL) },
+    { ORDATA (DONE, ttix_done, TTX_MAXL) },
+    { FLDATA (INT, int_hwre[API_TTI1], INT_V_TTI1) },
+    { DRDATA (TIME, ttix_unit.wait, 24), REG_NZ + PV_LEFT },
+    { ORDATA (DEVNUM, ttix_dib.dev, 6), REG_HRO },
+    { NULL }
+    };
 
 MTAB ttix_mod[] = {
-	{ MTAB_XTD | MTAB_VDV | MTAB_VAL, 0, "lines", "LINES",
-	    &ttx_vlines, NULL, &ttx_nlreg },
-	{ UNIT_ATT, UNIT_ATT, "summary", NULL, NULL, &ttx_summ },
-	{ MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-		&tmxr_dscln, NULL, &ttx_desc },
-	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-		NULL, &ttx_show, NULL },
-	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-		NULL, &ttx_show, NULL },
-	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
-		&set_devno, &show_devno, NULL },
-	{ MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
-	    &tmxr_set_log, &tmxr_show_log, &ttx_desc },
-	{ MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
-	    &tmxr_set_nolog, NULL, &ttx_desc },
-	{ 0 }  };
+    { MTAB_XTD | MTAB_VDV | MTAB_VAL, 0, "lines", "LINES",
+        &ttx_vlines, NULL, &ttx_nlreg },
+    { UNIT_ATT, UNIT_ATT, "summary", NULL, NULL, &ttx_summ },
+    { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
+      &tmxr_dscln, NULL, &ttx_desc },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
+      NULL, &ttx_show, NULL },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
+      NULL, &ttx_show, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
+      &set_devno, &show_devno, NULL },
+    { 0 }
+    };
 
 DEVICE tti1_dev = {
-	"TTIX", &ttix_unit, ttix_reg, ttix_mod,
-	1, 10, 31, 1, 8, 8,
-	&tmxr_ex, &tmxr_dep, &ttx_reset,
-	NULL, &ttx_attach, &ttx_detach,
-	&ttix_dib, DEV_NET | DEV_DISABLE };
+    "TTIX", &ttix_unit, ttix_reg, ttix_mod,
+    1, 10, 31, 1, 8, 8,
+    &tmxr_ex, &tmxr_dep, &ttx_reset,
+    NULL, &ttx_attach, &ttx_detach,
+    &ttix_dib, DEV_NET | DEV_DISABLE
+    };
 
 /* TTOx data structures
 
-   ttox_dev	TTOx device descriptor
-   ttox_unit	TTOx unit descriptor
-   ttox_reg	TTOx register list
+   ttox_dev     TTOx device descriptor
+   ttox_unit    TTOx unit descriptor
+   ttox_reg     TTOx register list
 */
 
 UNIT ttox_unit[] = {
-	{ UDATA (&ttox_svc, UNIT_KSR, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-	{ UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT }  };
+    { UDATA (&ttox_svc, UNIT_KSR, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT }
+    };
 
 REG ttox_reg[] = {
-	{ BRDATA (BUF, ttox_buf, 8, 8, TTX_MAXL) },
-	{ ORDATA (DONE, ttox_done, TTX_MAXL) },
-	{ FLDATA (INT, int_hwre[API_TTO1], INT_V_TTO1) },
-	{ URDATA (TIME, ttox_unit[0].wait, 10, 24, 0,
-		  TTX_MAXL, PV_LEFT) },
-	{ NULL }  };
+    { BRDATA (BUF, ttox_buf, 8, 8, TTX_MAXL) },
+    { ORDATA (DONE, ttox_done, TTX_MAXL) },
+    { FLDATA (INT, int_hwre[API_TTO1], INT_V_TTO1) },
+    { URDATA (TIME, ttox_unit[0].wait, 10, 24, 0,
+              TTX_MAXL, PV_LEFT) },
+    { NULL }
+    };
 
 MTAB ttox_mod[] = {
-	{ UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", NULL },
-	{ UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , NULL },
-	{ UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , NULL },
-	{ 0 }  };
+    { UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", NULL },
+    { UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , NULL },
+    { UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , NULL },
+    { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
+      &tmxr_dscln, NULL, &ttx_desc },
+    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
+      &tmxr_set_log, &tmxr_show_log, &ttx_desc },
+    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
+      &tmxr_set_nolog, NULL, &ttx_desc },
+    { 0 }
+    };
 
 DEVICE tto1_dev = {
-	"TTOX", ttox_unit, ttox_reg, ttox_mod,
-	TTX_MAXL, 10, 31, 1, 8, 8,
-	NULL, NULL, &ttx_reset, 
-	NULL, NULL, NULL,
-	NULL, DEV_DISABLE };
-
+    "TTOX", ttox_unit, ttox_reg, ttox_mod,
+    TTX_MAXL, 10, 31, 1, 8, 8,
+    NULL, NULL, &ttx_reset, 
+    NULL, NULL, NULL,
+    NULL, DEV_DISABLE
+    };
+
 /* Terminal input: IOT routine */
 
 int32 ttix (int32 dev, int32 pulse, int32 dat)
 {
-int32 ln = ttx_getln (dev, pulse);			/* line # */
+int32 ln = ttx_getln (dev, pulse);                      /* line # */
 
 if (ln > ttx_lines) return dat;
-if (pulse & 001) {					/* KSF1 */
-	if (ttix_test_done (ln)) dat = dat | IOT_SKP;  }
-if (pulse & 002) {					/* KRB1 */
-	ttix_clr_done (ln);				/* clear flag */
-	dat = dat | ttix_buf[ln];  }			/* return buffer */
+if (pulse & 001) {                                      /* KSF1 */
+    if (ttix_test_done (ln)) dat = dat | IOT_SKP;
+    }
+if (pulse & 002) {                                      /* KRB1 */
+    ttix_clr_done (ln);                                 /* clear flag */
+    dat = dat | ttix_buf[ln];                           /* return buffer */
+    }
 return dat;
 }
 
@@ -198,22 +213,26 @@ t_stat ttix_svc (UNIT *uptr)
 {
 int32 ln, c, temp;
 
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;	/* attached? */
-sim_activate (uptr, tmxr_poll);				/* continue poll */
-ln = tmxr_poll_conn (&ttx_desc);			/* look for connect */
-if (ln >= 0) ttx_ldsc[ln].rcve = 1;			/* got one? rcv enab */
-tmxr_poll_rx (&ttx_desc);				/* poll for input */
-for (ln = 0; ln < TTX_MAXL; ln++) {			/* loop thru lines */
-	if (ttx_ldsc[ln].conn) {			/* connected? */
-	    if (temp = tmxr_getc_ln (&ttx_ldsc[ln])) {	/* get char */
-		if (temp & SCPE_BREAK) c = 0;		/* break? */
-		else if (ttox_unit[ln].flags & UNIT_KSR) {	/* KSR? */
-		    c = temp & 0177;
-		    if (islower (c)) c = toupper (c);
-		    c = c | 0200;  }
-		else c = temp & ((ttox_unit[ln].flags & UNIT_8B)? 0377: 0177);
-		ttix_buf[ln] = c;
-		ttix_set_done (ln);  }  }  }
+if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;      /* attached? */
+sim_activate (uptr, tmxr_poll);                         /* continue poll */
+ln = tmxr_poll_conn (&ttx_desc);                        /* look for connect */
+if (ln >= 0) ttx_ldsc[ln].rcve = 1;                     /* got one? rcv enab */
+tmxr_poll_rx (&ttx_desc);                               /* poll for input */
+for (ln = 0; ln < TTX_MAXL; ln++) {                     /* loop thru lines */
+    if (ttx_ldsc[ln].conn) {                            /* connected? */
+        if (temp = tmxr_getc_ln (&ttx_ldsc[ln])) {      /* get char */
+            if (temp & SCPE_BREAK) c = 0;               /* break? */
+            else if (ttox_unit[ln].flags & UNIT_KSR) {  /* KSR? */
+                c = temp & 0177;
+                if (islower (c)) c = toupper (c);
+                c = c | 0200;
+                }
+            else c = temp & ((ttox_unit[ln].flags & UNIT_8B)? 0377: 0177);
+            ttix_buf[ln] = c;
+            ttix_set_done (ln);
+            }
+        }
+    }
 return SCPE_OK;
 }
 
@@ -236,23 +255,27 @@ void ttix_clr_done (int32 ln)
 {
 ttix_done = ttix_done & ~(1 << ln);
 if (ttix_done) { SET_INT (TTI1); }
-else {	CLR_INT (TTI1);  }
+else {
+    CLR_INT (TTI1);
+	}
 return;
 }
-
+
 /* Terminal output: IOT routine */
 
 int32 ttox (int32 dev, int32 pulse, int32 dat)
 {
-int32 ln = ttx_getln (dev, pulse);			/* line # */
+int32 ln = ttx_getln (dev, pulse);                      /* line # */
 
 if (ln > ttx_lines) return dat;
-if (pulse & 001) {					/* TSF */
-	if (ttox_test_done (ln)) dat = dat | IOT_SKP;  }
-if (pulse & 002) ttox_clr_done (ln);			/* clear flag */
-if (pulse & 004) {					/* load buffer */
-	sim_activate (&ttox_unit[ln], ttox_unit[ln].wait);	/* activate unit */
-	ttox_buf[ln] = dat & 0377;  }			/* load buffer */
+if (pulse & 001) {                                      /* TSF */
+    if (ttox_test_done (ln)) dat = dat | IOT_SKP;
+    }
+if (pulse & 002) ttox_clr_done (ln);                    /* clear flag */
+if (pulse & 004) {                                      /* load buffer */
+    sim_activate (&ttox_unit[ln], ttox_unit[ln].wait);  /* activate unit */
+    ttox_buf[ln] = dat & 0377;                          /* load buffer */
+    }
 return dat;
 }
 
@@ -260,23 +283,27 @@ return dat;
 
 t_stat ttox_svc (UNIT *uptr)
 {
-int32 c, ln = uptr - ttox_unit;				/* line # */
+int32 c, ln = uptr - ttox_unit;                         /* line # */
 
-if (ttx_ldsc[ln].conn) {				/* connected? */
-	if (ttx_ldsc[ln].xmte) {			/* tx enabled? */
-	    TMLN *lp = &ttx_ldsc[ln];			/* get line */
-	    if (ttox_unit[ln].flags & UNIT_KSR) {	/* KSR mode? */
-		c = ttox_buf[ln] & 0177;		/* get char */
-		if (islower (c)) c = toupper (c);
-		if ((c < 007) || (c > 0137)) c = -1;  }
-	    else c = ttox_buf[ln] & ((ttox_unit[ln].flags & UNIT_8B)? 0377: 0177);
-	    if (c >= 0) tmxr_putc_ln (lp, c);		/* output char */
-	    tmxr_poll_tx (&ttx_desc);  }		/* poll xmt */
-	else {
-	    tmxr_poll_tx (&ttx_desc);			/* poll xmt */
-	    sim_activate (uptr, ttox_unit[ln].wait);	/* wait */
-	    return SCPE_OK;  }  }
-ttox_set_done (ln);					/* set done */
+if (ttx_ldsc[ln].conn) {                                /* connected? */
+    if (ttx_ldsc[ln].xmte) {                            /* tx enabled? */
+        TMLN *lp = &ttx_ldsc[ln];                       /* get line */
+        if (ttox_unit[ln].flags & UNIT_KSR) {           /* KSR mode? */
+            c = ttox_buf[ln] & 0177;                    /* get char */
+            if (islower (c)) c = toupper (c);
+            if ((c < 007) || (c > 0137)) c = -1;
+            }
+        else c = ttox_buf[ln] & ((ttox_unit[ln].flags & UNIT_8B)? 0377: 0177);
+        if (c >= 0) tmxr_putc_ln (lp, c);               /* output char */
+        tmxr_poll_tx (&ttx_desc);                       /* poll xmt */
+        }
+    else {
+        tmxr_poll_tx (&ttx_desc);                       /* poll xmt */
+        sim_activate (uptr, ttox_unit[ln].wait);        /* wait */
+        return SCPE_OK;
+        }
+    }
+ttox_set_done (ln);                                     /* set done */
 return SCPE_OK;
 }
 
@@ -299,10 +326,10 @@ void ttox_clr_done (int32 ln)
 {
 ttox_done = ttox_done & ~(1 << ln);
 if (ttox_done) { SET_INT (TTO1); }
-else {	CLR_INT (TTO1);  }
+else { CLR_INT (TTO1); }
 return;
 }
-
+
 /* Compute relative line number
 
    This algorithm does not assign contiguous line numbers of ascending
@@ -313,11 +340,11 @@ int32 ttx_getln (int32 dev, int32 pulse)
 {
 int32 rdno = ((dev - ttix_dib.dev) >> 1) & 3;
 
-#if defined (PDP15)					/* PDP-15? */
+#if defined (PDP15)                                     /* PDP-15? */
 int32 sub = (pulse >> 4) & 3;
-return (rdno * 4) + sub;				/* use dev, subdev */
-#else							/* others */			
-return rdno;						/* use dev only */
+return (rdno * 4) + sub;                                /* use dev, subdev */
+#else                                                   /* others */                    
+return rdno;                                            /* use dev only */
 #endif
 }
 
@@ -327,15 +354,18 @@ t_stat ttx_reset (DEVICE *dptr)
 {
 int32 ln;
 
-if (dptr->flags & DEV_DIS) {				/* sync enables */
-	ttix_dev.flags = ttox_dev.flags | DEV_DIS;
-	ttox_dev.flags = ttox_dev.flags | DEV_DIS;  }
-else {	ttix_dev.flags = ttix_dev.flags & ~DEV_DIS;
-	ttox_dev.flags = ttox_dev.flags & ~DEV_DIS;  }
-if (ttix_unit.flags & UNIT_ATT)				/* if attached, */
-	sim_activate (&ttix_unit, tmxr_poll);		/* activate */
-else sim_cancel (&ttix_unit);				/* else stop */
-for (ln = 0; ln < TTX_MAXL; ln++) ttx_reset_ln (ln);	/* for all lines */
+if (dptr->flags & DEV_DIS) {                            /* sync enables */
+    ttix_dev.flags = ttox_dev.flags | DEV_DIS;
+    ttox_dev.flags = ttox_dev.flags | DEV_DIS;
+    }
+else {
+    ttix_dev.flags = ttix_dev.flags & ~DEV_DIS;
+    ttox_dev.flags = ttox_dev.flags & ~DEV_DIS;
+    }
+if (ttix_unit.flags & UNIT_ATT)                         /* if attached, */
+    sim_activate (&ttix_unit, tmxr_poll);               /* activate */
+else sim_cancel (&ttix_unit);                           /* else stop */
+for (ln = 0; ln < TTX_MAXL; ln++) ttx_reset_ln (ln);    /* for all lines */
 return SCPE_OK;
 }
 
@@ -343,11 +373,11 @@ return SCPE_OK;
 
 void ttx_reset_ln (int32 ln)
 {
-ttix_buf[ln] = 0;					/* clear buf, */
+ttix_buf[ln] = 0;                                       /* clear buf, */
 ttox_buf[ln] = 0;
-ttix_clr_done (ln);					/* clear done */
+ttix_clr_done (ln);                                     /* clear done */
 ttox_clr_done (ln);
-sim_cancel (&ttox_unit[ln]);				/* stop poll */
+sim_cancel (&ttox_unit[ln]);                            /* stop poll */
 return;
 }
 
@@ -357,9 +387,9 @@ t_stat ttx_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
 
-r = tmxr_attach (&ttx_desc, uptr, cptr);		/* attach */
-if (r != SCPE_OK) return r;				/* error */
-sim_activate (uptr, tmxr_poll);				/* start poll */
+r = tmxr_attach (&ttx_desc, uptr, cptr);                /* attach */
+if (r != SCPE_OK) return r;                             /* error */
+sim_activate (uptr, tmxr_poll);                         /* start poll */
 return SCPE_OK;
 }
 
@@ -370,9 +400,9 @@ t_stat ttx_detach (UNIT *uptr)
 int32 i;
 t_stat r;
 
-r = tmxr_detach (&ttx_desc, uptr);			/* detach */
-sim_cancel (uptr);					/* stop poll */
-for (i = 0; i < TTX_MAXL; i++) ttx_ldsc[i].rcve = 0;	/* disable rcv */
+r = tmxr_detach (&ttx_desc, uptr);                      /* detach */
+sim_cancel (uptr);                                      /* stop poll */
+for (i = 0; i < TTX_MAXL; i++) ttx_ldsc[i].rcve = 0;    /* disable rcv */
 return r;
 }
 
@@ -392,14 +422,17 @@ return SCPE_OK;
 
 t_stat ttx_show (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-int32 i;
+int32 i, t;
 
-for (i = 0; (i < ttx_lines) && (ttx_ldsc[i].conn == 0); i++) ;
-if (i < ttx_lines) {
-	for (i = 0; i < ttx_lines; i++) {
-	    if (ttx_ldsc[i].conn) 
-		if (val) tmxr_fconns (st, &ttx_ldsc[i], i);
-		else tmxr_fstats (st, &ttx_ldsc[i], i);  }  }
+for (i = t = 0; i < TTX_MAXL; i++) t = t + (ttx_ldsc[i].conn != 0);
+if (t) {
+    for (i = 0; i < ttx_lines; i++) {
+        if (ttx_ldsc[i].conn) {
+            if (val) tmxr_fconns (st, &ttx_ldsc[i], i);
+            else tmxr_fstats (st, &ttx_ldsc[i], i);
+            }
+        }
+    }
 else fprintf (st, "all disconnected\n");
 return SCPE_OK;
 }
@@ -416,20 +449,24 @@ newln = get_uint (cptr, 10, TTX_MAXL, &r);
 if ((r != SCPE_OK) || (newln == ttx_lines)) return r;
 if (newln == 0) return SCPE_ARG;
 if (newln < ttx_lines) {
-	for (i = newln, t = 0; i < ttx_lines; i++) t = t | ttx_ldsc[i].conn;
-	if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
-	    return SCPE_OK;
-	for (i = newln; i < ttx_lines; i++) {
-	    if (ttx_ldsc[i].conn) {
-		tmxr_linemsg (&ttx_ldsc[i], "\r\nOperator disconnected line\r\n");
-		tmxr_reset_ln (&ttx_ldsc[i]);  }	/* reset line */
-	    ttox_unit[i].flags = ttox_unit[i].flags | UNIT_DIS;
-	    ttx_reset_ln (i);  }
-	}
-else {	for (i = ttx_lines; i < newln; i++) {
-	    ttox_unit[i].flags = ttox_unit[i].flags & ~UNIT_DIS;
-	    ttx_reset_ln (i);  }
-	}
+    for (i = newln, t = 0; i < ttx_lines; i++) t = t | ttx_ldsc[i].conn;
+    if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
+        return SCPE_OK;
+    for (i = newln; i < ttx_lines; i++) {
+        if (ttx_ldsc[i].conn) {
+            tmxr_linemsg (&ttx_ldsc[i], "\r\nOperator disconnected line\r\n");
+            tmxr_reset_ln (&ttx_ldsc[i]);               /* reset line */
+			}
+        ttox_unit[i].flags = ttox_unit[i].flags | UNIT_DIS;
+        ttx_reset_ln (i);
+        }
+    }
+else {
+    for (i = ttx_lines; i < newln; i++) {
+        ttox_unit[i].flags = ttox_unit[i].flags & ~UNIT_DIS;
+        ttx_reset_ln (i);
+        }
+    }
 ttx_lines = newln;
 return SCPE_OK;
 }

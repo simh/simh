@@ -1,6 +1,6 @@
 /* pdp10_sys.c: PDP-10 simulator interface
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,21 +19,22 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   09-Jan-03	RMS	Added DEUNA/DELUA support
-   12-Sep-02	RMS	Added RX211 support
-   22-Apr-02	RMS	Removed magtape record length error
-   17-Sep-01	RMS	Removed multiconsole support
-   25-Aug-01	RMS	Enabled DZ11
-   27-May-01	RMS	Added multiconsole support
-   29-Apr-01	RMS	Fixed format for RDPCST, WRPCST
-			Added CLRCSH for ITS
-   03-Apr-01	RMS	Added support for loading EXE files
-   19-Mar-01	RMS	Added support for loading SAV files
-   30-Oct-00	RMS	Added support for examine to file
+   22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
+   09-Jan-03    RMS     Added DEUNA/DELUA support
+   12-Sep-02    RMS     Added RX211 support
+   22-Apr-02    RMS     Removed magtape record length error
+   17-Sep-01    RMS     Removed multiconsole support
+   25-Aug-01    RMS     Enabled DZ11
+   27-May-01    RMS     Added multiconsole support
+   29-Apr-01    RMS     Fixed format for RDPCST, WRPCST
+                        Added CLRCSH for ITS
+   03-Apr-01    RMS     Added support for loading EXE files
+   19-Mar-01    RMS     Added support for loading SAV files
+   30-Oct-00    RMS     Added support for examine to file
 */
 
 #include "pdp10_defs.h"
@@ -53,12 +54,12 @@ extern a10 saved_PC;
 
 /* SCP data structures and interface routines
 
-   sim_name		simulator name string
-   sim_PC		pointer to saved PC register descriptor
-   sim_emax		number of words for examine
-   sim_devices		array of pointers to simulated devices
-   sim_stop_messages	array of pointers to stop messages
-   sim_load		binary loader
+   sim_name             simulator name string
+   sim_PC               pointer to saved PC register descriptor
+   sim_emax             number of words for examine
+   sim_devices          array of pointers to simulated devices
+   sim_stop_messages    array of pointers to stop messages
+   sim_load             binary loader
 */
 
 char sim_name[] = "PDP-10";
@@ -68,59 +69,61 @@ REG *sim_PC = &cpu_reg[0];
 int32 sim_emax = 1;
 
 DEVICE *sim_devices[] = { 
-	&cpu_dev,
-	&pag_dev,
-	&tim_dev,
-	&fe_dev,
-	&uba_dev,
-	&ptr_dev,
-	&ptp_dev,
-	&ry_dev,
-	&lp20_dev,
-	&rp_dev,
-	&tu_dev,
-	&dz_dev,
-	&xu_dev,
-	NULL };
+    &cpu_dev,
+    &pag_dev,
+    &tim_dev,
+    &fe_dev,
+    &uba_dev,
+    &ptr_dev,
+    &ptp_dev,
+    &ry_dev,
+    &lp20_dev,
+    &rp_dev,
+    &tu_dev,
+    &dz_dev,
+    &xu_dev,
+    NULL
+    };
 
 const char *sim_stop_messages[] = {
-	"Unknown error",
-	"HALT instruction",
-	"Breakpoint",
-	"Illegal instruction",
-	"Illegal interrupt instruction",
-	"Paging error in interrupt",
-	"Zero vector table",
-	"NXM on UPT/EPT reference",
-	"Nested indirect address limit exceeded",
-	"Nested XCT limit exceeded",
-	"Invalid I/O controller",
-	"Address stop",
-	"Panic stop"  };
-
+    "Unknown error",
+    "HALT instruction",
+    "Breakpoint",
+    "Illegal instruction",
+    "Illegal interrupt instruction",
+    "Paging error in interrupt",
+    "Zero vector table",
+    "NXM on UPT/EPT reference",
+    "Nested indirect address limit exceeded",
+    "Nested XCT limit exceeded",
+    "Invalid I/O controller",
+    "Address stop",
+    "Panic stop"
+     };
+
 /* Binary loader, supports RIM10, SAV, EXE */
 
-#define FMT_R	1					/* RIM10 */
-#define FMT_S	2					/* SAV */
-#define FMT_E	3					/* EXE */
+#define FMT_R   1                                       /* RIM10 */
+#define FMT_S   2                                       /* SAV */
+#define FMT_E   3                                       /* EXE */
 
-#define EXE_DIR	01776					/* EXE directory */
-#define EXE_VEC	01775					/* EXE entry vec */
-#define EXE_PDV	01774					/* EXE ignored */
-#define EXE_END	01777					/* EXE end
+#define EXE_DIR 01776                                   /* EXE directory */
+#define EXE_VEC 01775                                   /* EXE entry vec */
+#define EXE_PDV 01774                                   /* EXE ignored */
+#define EXE_END 01777                                   /* EXE end
 
 /* RIM10 loader
 
    RIM10 format is a binary paper tape format (all data frames
    are 200 or greater).  It consists of blocks containing
 
-	-count,,origin-1
-	word
-	:
-	word
-	checksum (includes IOWD)
-	:
-	JRST start
+        -count,,origin-1
+        word
+        :
+        word
+        checksum (includes IOWD)
+        :
+        JRST start
 */
 
 d10 getrimw (FILE *fileref)
@@ -130,10 +133,12 @@ d10 word;
 
 word = 0;
 for (i = 0; i < 6;) {
-	if ((tmp = getc (fileref)) == EOF) return -1;
-	if (tmp & 0200) {
-	    word = (word << 6) | ((d10) tmp & 077);
-	    i++;  }  }
+    if ((tmp = getc (fileref)) == EOF) return -1;
+    if (tmp & 0200) {
+        word = (word << 6) | ((d10) tmp & 077);
+        i++;
+        }
+    }
 return word;
 }
 
@@ -143,27 +148,29 @@ d10 count, cksm, data;
 a10 pa;
 int32 op;
 
-for ( ;; ) {						/* loop until JRST */
-	count = cksm = getrimw (fileref);		/* get header */
-	if (count < 0) return SCPE_FMT;			/* read err? */
-	if (TSTS (count)) {				/* hdr = IOWD? */
-	    for ( ; TSTS (count); count = AOB (count)) {
-		data = getrimw (fileref);		/* get data wd */
-		if (data < 0) return SCPE_FMT;
-		cksm = cksm + data;			/* add to cksm */
-		pa = ((a10) count + 1) & AMASK;		/* store */
-		M[pa] = data;  }			/* end for */
-	    data = getrimw (fileref);			/* get cksm */
-	    if (data < 0) return SCPE_FMT;
-	    if ((cksm + data) & DMASK) return SCPE_CSUM;/* test cksm */
-	    }						/* end if count */
-	else {
-	    op = GET_OP (count);			/* not IOWD */
-	    if (op != OP_JRST) return SCPE_FMT;		/* JRST? */
-	    saved_PC = (a10) count & AMASK;		/* set PC */
-	    return SCPE_OK;  }				/* end else */
-	}						/* end for */
-return SCPE_FMT;
+for ( ;; ) {                                            /* loop until JRST */
+    count = cksm = getrimw (fileref);                   /* get header */
+    if (count < 0) return SCPE_FMT;                     /* read err? */
+    if (TSTS (count)) {                                 /* hdr = IOWD? */
+        for ( ; TSTS (count); count = AOB (count)) {
+            data = getrimw (fileref);                   /* get data wd */
+            if (data < 0) return SCPE_FMT;
+            cksm = cksm + data;                         /* add to cksm */
+            pa = ((a10) count + 1) & AMASK;             /* store */
+            M[pa] = data;
+            }                                           /* end for */
+        data = getrimw (fileref);                       /* get cksm */
+        if (data < 0) return SCPE_FMT;
+        if ((cksm + data) & DMASK) return SCPE_CSUM;    /* test cksm */
+        }                                               /* end if count */
+    else {
+        op = GET_OP (count);                            /* not IOWD */
+        if (op != OP_JRST) return SCPE_FMT;             /* JRST? */
+        saved_PC = (a10) count & AMASK;                 /* set PC */
+        break;
+        }                                               /* end else */
+    }                                                   /* end for */
+return SCPE_OK;
 }
 
 /* SAV file loader
@@ -171,12 +178,12 @@ return SCPE_FMT;
    SAV format is a disk file format (36b words).  It consists of
    blocks containing:
 
-	-count,,origin-1
-	word
-	:
-	word
-	:
-	JRST start
+        -count,,origin-1
+        word
+        :
+        word
+        :
+        JRST start
 */
 
 t_stat load_sav (FILE *fileref)
@@ -185,50 +192,52 @@ d10 count, data;
 a10 pa;
 int32 wc, op;
 
-for ( ;; ) {						/* loop */
-	wc = fxread (&count, sizeof (d10), 1, fileref);	/* read IOWD */
-	if (wc == 0) return SCPE_OK;			/* done? */
-	if (TSTS (count)) {				/* IOWD? */
-	    for ( ; TSTS (count); count = AOB (count)) {
-		wc = fxread (&data, sizeof (d10), 1, fileref);
-		if (wc == 0) return SCPE_FMT;
-		pa = ((a10) count + 1) & AMASK;		/* store data */
-		M[pa] = data;  }			/* end for */
-	    }						/* end if  count*/
-	else {
-	    op = GET_OP (count);			/* not IOWD */
-	    if (op != OP_JRST) return SCPE_FMT;		/* JRST? */
-	    saved_PC = (a10) count & AMASK;		/* set PC */
-	    return SCPE_OK;  }				/* end else */
-	}						/* end for */
-return SCPE_FMT;
+for ( ;; ) {                                            /* loop */
+    wc = fxread (&count, sizeof (d10), 1, fileref);     /* read IOWD */
+    if (wc == 0) return SCPE_OK;                        /* done? */
+    if (TSTS (count)) {                                 /* IOWD? */
+        for ( ; TSTS (count); count = AOB (count)) {
+            wc = fxread (&data, sizeof (d10), 1, fileref);
+            if (wc == 0) return SCPE_FMT;
+            pa = ((a10) count + 1) & AMASK;             /* store data */
+            M[pa] = data;
+            }                                           /* end for */
+        }                                               /* end if  count*/
+    else {
+        op = GET_OP (count);                            /* not IOWD */
+        if (op != OP_JRST) return SCPE_FMT;             /* JRST? */
+        saved_PC = (a10) count & AMASK;                 /* set PC */
+        break;
+        }                                               /* end else */
+    }                                                   /* end for */
+return SCPE_OK;
 }
-
+
 /* EXE file loader
 
    EXE format is a disk file format (36b words).  It consists of
    blocks containing:
 
-	block type,,total words = n
-	n - 1 data words
+        block type,,total words = n
+        n - 1 data words
 
    Block types are
 
-	EXE_DIR (1776)	directory
-	EXE_VEC (1775)	entry vector
-	EXE_PDV (1774)	optional blocks
-	EXE_END (1777)	end block
+        EXE_DIR (1776)  directory
+        EXE_VEC (1775)  entry vector
+        EXE_PDV (1774)  optional blocks
+        EXE_END (1777)  end block
 
    The directory blocks are the most important and contain doubleword
    page loading information:
 
-	word0<0:8>	=	flags
-	    <9:35>	=	page in file (0 if 0 page)
-	word1<0:8>	=	repeat count - 1
-	    <9:35>	=	page in memory
+        word0<0:8>      =       flags
+            <9:35>      =       page in file (0 if 0 page)
+        word1<0:8>      =       repeat count - 1
+            <9:35>      =       page in memory
 */
 
-#define DIRSIZ	(2 * PAG_SIZE)
+#define DIRSIZ  (2 * PAG_SIZE)
 
 t_stat load_exe (FILE *fileref)
 {
@@ -237,59 +246,66 @@ int32 ndir, entvec, i, j, k, cont, bsz, bty, rpt, wc;
 int32 fpage, mpage;
 a10 ma;
 
-ndir = entvec = 0;					/* no dir, entvec */
+ndir = entvec = 0;                                      /* no dir, entvec */
 cont = 1;
-do {	wc = fxread (&data, sizeof (d10), 1, fileref);	/* read blk hdr */
-	if (wc == 0) return SCPE_FMT;			/* error? */
-	bsz = (int32) ((data & RMASK) - 1);		/* get count */
-	if (bsz <= 0) return SCPE_FMT;			/* zero? */
-	bty = (int32) LRZ (data);			/* get type */
-	switch (bty) {					/* case type */
-	case EXE_DIR:					/* directory */
-	    if (ndir) return SCPE_FMT;			/* got one */
-	    ndir = fxread (dirbuf, sizeof (d10), bsz, fileref);
-	    if (ndir < bsz) return SCPE_FMT;		/* error */
-	    break;
-	case EXE_PDV:					/* ??? */
-	    fseek (fileref, bsz * sizeof (d10), SEEK_CUR);
-	    break;
-	case EXE_VEC:					/* entry vec */
-	    if (bsz != 2) return SCPE_FMT;		/* must be 2 wds */
-	    entvec = fxread (entbuf, sizeof (d10), bsz, fileref);
-	    if (entvec < 2) return SCPE_FMT;		/* error? */
-	    cont = 0;					/* stop */
-	    break;
-	case EXE_END:					/* end */
-	    if (bsz != 0) return SCPE_FMT;		/* must be hdr */
-	    cont = 0;					/* stop */
-	    break;
-	default:
-	    return SCPE_FMT;  }				/* end switch */
-	}						/* end do */
-while (cont);
+do {
+    wc = fxread (&data, sizeof (d10), 1, fileref);      /* read blk hdr */
+    if (wc == 0) return SCPE_FMT;                       /* error? */
+    bsz = (int32) ((data & RMASK) - 1);                 /* get count */
+    if (bsz <= 0) return SCPE_FMT;                      /* zero? */
+    bty = (int32) LRZ (data);                           /* get type */
+    switch (bty) {                                      /* case type */
 
-for (i = 0; i < ndir; i = i + 2) {			/* loop thru dir */
-	fpage = (int32) (dirbuf[i] & RMASK);		/* file page */
-	mpage = (int32) (dirbuf[i + 1] & RMASK);	/* memory page */
-	rpt = (int32) ((dirbuf[i + 1] >> 27) + 1);	/* repeat count */
-	for (j = 0; j < rpt; j++, mpage++) {		/* loop thru rpts */
-	    if (fpage) {				/* file pages? */
-		fseek (fileref, (fpage << PAG_V_PN) * sizeof (d10), SEEK_SET);
-		wc = fxread (pagbuf, sizeof (d10), PAG_SIZE, fileref);
-		if (wc < PAG_SIZE) return SCPE_FMT;
-		fpage++;  }
-	    ma = mpage << PAG_V_PN;			/* mem addr */
-	    for (k = 0; k < PAG_SIZE; k++, ma++) {	/* copy buf to mem */
-		if (MEM_ADDR_NXM (ma)) return SCPE_NXM;
-		M[ma] = fpage? (pagbuf[k] & DMASK): 0;
-		}					/* end copy */
-	    }						/* end rpt */
-	}						/* end directory */
+    case EXE_DIR:                                       /* directory */
+        if (ndir) return SCPE_FMT;                      /* got one */
+        ndir = fxread (dirbuf, sizeof (d10), bsz, fileref);
+        if (ndir < bsz) return SCPE_FMT;                /* error */
+        break;
+
+    case EXE_PDV:                                       /* ??? */
+        fseek (fileref, bsz * sizeof (d10), SEEK_CUR);
+        break;
+
+    case EXE_VEC:                                       /* entry vec */
+        if (bsz != 2) return SCPE_FMT;                  /* must be 2 wds */
+        entvec = fxread (entbuf, sizeof (d10), bsz, fileref);
+        if (entvec < 2) return SCPE_FMT;                /* error? */
+        cont = 0;                                       /* stop */
+        break;
+
+    case EXE_END:                                       /* end */
+        if (bsz != 0) return SCPE_FMT;                  /* must be hdr */
+        cont = 0;                                       /* stop */
+        break;
+
+    default:
+        return SCPE_FMT;
+        }                                               /* end switch */
+    } while (cont);                                     /* end do */
+
+for (i = 0; i < ndir; i = i + 2) {                      /* loop thru dir */
+    fpage = (int32) (dirbuf[i] & RMASK);                /* file page */
+    mpage = (int32) (dirbuf[i + 1] & RMASK);            /* memory page */
+    rpt = (int32) ((dirbuf[i + 1] >> 27) + 1);          /* repeat count */
+    for (j = 0; j < rpt; j++, mpage++) {                /* loop thru rpts */
+        if (fpage) {                                    /* file pages? */
+            fseek (fileref, (fpage << PAG_V_PN) * sizeof (d10), SEEK_SET);
+            wc = fxread (pagbuf, sizeof (d10), PAG_SIZE, fileref);
+            if (wc < PAG_SIZE) return SCPE_FMT;
+            fpage++;
+            }
+        ma = mpage << PAG_V_PN;                         /* mem addr */
+        for (k = 0; k < PAG_SIZE; k++, ma++) {          /* copy buf to mem */
+            if (MEM_ADDR_NXM (ma)) return SCPE_NXM;
+            M[ma] = fpage? (pagbuf[k] & DMASK): 0;
+            }                                           /* end copy */
+        }                                               /* end rpt */
+    }                                                   /* end directory */
 if (entvec && entbuf[1])
-	saved_PC = (int32) entbuf[1] & RMASK;		/* start addr */
+    saved_PC = (int32) entbuf[1] & RMASK;               /* start addr */
 return SCPE_OK;
 }
-
+
 /* Master loader */
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
@@ -298,54 +314,63 @@ d10 data;
 int32 wc, fmt;
 extern int32 sim_switches;
 
-fmt = 0;						/* no fmt */
-if (sim_switches & SWMASK ('R')) fmt = FMT_R;		/* -r? */
-else if (sim_switches & SWMASK ('S')) fmt = FMT_S;	/* -s? */
-else if (sim_switches & SWMASK ('E')) fmt = FMT_E;	/* -e? */
-else if (match_ext (fnam, "RIM")) fmt = FMT_R;		/* .RIM? */
-else if (match_ext (fnam, "SAV")) fmt = FMT_S;		/* .SAV? */
-else if (match_ext (fnam, "EXE")) fmt = FMT_E;		/* .EXE? */
-else {	wc = fxread (&data, sizeof (d10), 1, fileref);	/* read hdr */
-	if (wc == 0) return SCPE_FMT;			/* error? */
-	if (LRZ (data) == EXE_DIR) fmt = FMT_E;		/* EXE magic? */
-	else if (TSTS (data)) fmt = FMT_S;		/* SAV magic? */
-	fseek (fileref, 0, SEEK_SET);  }		/* rewind */
-switch (fmt) {						/* case fmt */
-case FMT_R:						/* RIM */
-	return load_rim (fileref);
-case FMT_S:						/* SAV */
-	return load_sav (fileref);
-case FMT_E:						/* EXE */
-	return load_exe (fileref);  }
+fmt = 0;                                                /* no fmt */
+if (sim_switches & SWMASK ('R')) fmt = FMT_R;           /* -r? */
+else if (sim_switches & SWMASK ('S')) fmt = FMT_S;      /* -s? */
+else if (sim_switches & SWMASK ('E')) fmt = FMT_E;      /* -e? */
+else if (match_ext (fnam, "RIM")) fmt = FMT_R;          /* .RIM? */
+else if (match_ext (fnam, "SAV")) fmt = FMT_S;          /* .SAV? */
+else if (match_ext (fnam, "EXE")) fmt = FMT_E;          /* .EXE? */
+else {
+    wc = fxread (&data, sizeof (d10), 1, fileref);      /* read hdr */
+    if (wc == 0) return SCPE_FMT;                       /* error? */
+    if (LRZ (data) == EXE_DIR) fmt = FMT_E;             /* EXE magic? */
+    else if (TSTS (data)) fmt = FMT_S;                  /* SAV magic? */
+    fseek (fileref, 0, SEEK_SET);                       /* rewind */
+    }
+
+switch (fmt) {                                          /* case fmt */
+
+    case FMT_R:                                         /* RIM */
+        return load_rim (fileref);
+
+    case FMT_S:                                         /* SAV */
+        return load_sav (fileref);
+
+    case FMT_E:                                         /* EXE */
+        return load_exe (fileref);
+        }
+
 printf ("Can't determine load file format\n");
 return SCPE_FMT;
 }
-
+
 /* Symbol tables */
 
-#define I_V_FL		39				/* inst class */
-#define I_M_FL		03				/* class mask */
-#define I_ITS		004000000000000			/* ITS flag */
-#define I_AC		000000000000000			/* AC, address */
-#define I_OP		010000000000000			/* address only */
-#define I_IO		020000000000000			/* classic I/O */
-#define I_V_AC		00
-#define I_V_OP		01
-#define I_V_IO		02
+#define I_V_FL          39                              /* inst class */
+#define I_M_FL          03                              /* class mask */
+#define I_ITS           004000000000000                 /* ITS flag */
+#define I_AC            000000000000000                 /* AC, address */
+#define I_OP            010000000000000                 /* address only */
+#define I_IO            020000000000000                 /* classic I/O */
+#define I_V_AC          00
+#define I_V_OP          01
+#define I_V_IO          02
 
 static const d10 masks[] = {
  0777000000000, 0777740000000,
- 0700340000000, 0777777777777 }; 
+ 0700340000000, 0777777777777
+ }; 
 
 static const char *opcode[] = {
-"XCTR", "XCTI",						/* ITS only */
+"XCTR", "XCTI",                                         /* ITS only */
 "IORDI", "IORDQ", "IORD", "IOWR", "IOWRI", "IOWRQ",
 "IORDBI", "IORDBQ", "IORDB", "IOWRB", "IOWRBI", "IOWRBQ",
 "CLRCSH", "RDPCST", "WRPCST",
 "SDBR1", "SDBR2", "SDBR3", "SDBR4", "SPM",
 "LDBR1", "LDBR2", "LDBR3", "LDBR4", "LPMR",
 
-"PORTAL", "JRSTF", "HALT",				/* AC defines op */
+"PORTAL", "JRSTF", "HALT",                              /* AC defines op */
 "XJRSTF", "XJEN", "XPCW",
 "JEN", "SFM", "XJRST", "IBP",
 "JFOV", "JCRY1", "JCRY0", "JCRY", "JOV",
@@ -418,19 +443,19 @@ static const char *opcode[] = {
 "TRO", "TLO", "TROE", "TLOE", "TROA", "TLOA", "TRON", "TLON",
 "TDO", "TSO", "TDOE", "TSOE", "TDOA", "TSOA", "TDON", "TSON",
 
-"UMOVE", "UMOVEM",					/* KS10 I/O */
+"UMOVE", "UMOVEM",                                      /* KS10 I/O */
 "TIOE", "TION", "RDIO", "WRIO",
 "BSIO", "BCIO", "BLTBU", "BLTUB",
 "TIOEB", "TIONB", "RDIOB", "WRIOB",
 "BSIOB", "BCIOB", 
 
-"BLKI", "DATAI", "BLKO", "DATAO",			/* classic I/O */
+"BLKI", "DATAI", "BLKO", "DATAO",                       /* classic I/O */
 "CONO",  "CONI", "CONSZ", "CONSO",
 
 "CLEAR", "CLEARI", "CLEARM", "CLEARB",
-"OR", "ORI", "ORM", "ORB", "XMOVEI", "XHLLI",		/* alternate ops */
+"OR", "ORI", "ORM", "ORB", "XMOVEI", "XHLLI",           /* alternate ops */
 
-        "CMPSL", "CMPSE", "CMPSLE",			/* extended ops */
+        "CMPSL", "CMPSE", "CMPSLE",                     /* extended ops */
 "EDIT", "CMPSGE", "CMPSN", "CMPSG",
 "CVTDBO", "CVTDBT", "CVTBDO", "CVTBDT",
 "MOVSO", "MOVST", "MOVSLJ", "MOVSRJ",
@@ -438,7 +463,8 @@ static const char *opcode[] = {
 "GFIX", "GDFIXR", "GFIXR", "DGFLTR",
 "GFLTR", "GFSC",
 
-NULL  };
+NULL
+};
 
 static const d10 opc_val[] = {
  0102000000000+I_AC+I_ITS, 0103000000000+I_AC+I_ITS,
@@ -605,51 +631,57 @@ static const d10 opc_val[] = {
  0020000000000+I_AC, 0021000000000+I_AC, 0022000000000+I_AC, 0023000000000+I_AC,
  0024000000000+I_AC, 0025000000000+I_AC, 0026000000000+I_AC, 0027000000000+I_AC,
  0030000000000+I_AC, 0031000000000+I_AC,
--1 };
+ -1
+ };
 
-#define NUMDEV	6
+#define NUMDEV  6
 
 static const char *devnam[NUMDEV] = {
- "APR", "PI", "PAG", "CCA", "TIM", "MTR"};
+ "APR", "PI", "PAG", "CCA", "TIM", "MTR"
+ };
 
-
 /* Symbolic decode
 
    Inputs:
-	*of	=	output stream
-	addr	=	current PC
-	*val	=	pointer to values
-	*uptr	=	pointer to unit
-	sw	=	switches
+        *of     =       output stream
+        addr    =       current PC
+        *val    =       pointer to values
+        *uptr   =       pointer to unit
+        sw      =       switches
    Outputs:
-	return	=	status code
+        return  =       status code
 */
 
 #define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
 #define SIXTOASC(x) ((x) + 040)
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
-	UNIT *uptr, int32 sw)
+    UNIT *uptr, int32 sw)
 {
 int32 i, j, c, cflag, ac, xr, y, dev;
 d10 inst;
 
 inst = val[0];
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
-if (sw & SWMASK ('A')) {				/* ASCII? */
-	if (inst > 0377) return SCPE_ARG;
-	fprintf (of, FMTASC ((int32) (inst & 0177)));
-	return SCPE_OK;  }
-if (sw & SWMASK ('C')) {				/* character? */
-	for (i = 30; i >= 0; i = i - 6) {
-	    c = (int32) ((inst >> i) & 077);
-	    fprintf (of, "%c", SIXTOASC (c));  }	
-	return SCPE_OK;  }
-if (sw & SWMASK ('P')) {				/* packed? */
-	for (i = 29; i >= 0; i = i - 7) {
-	    c = (int32) ((inst >> i) & 0177);
-	    fprintf (of, FMTASC (c));  }
-	return SCPE_OK;  }
+if (sw & SWMASK ('A')) {                                /* ASCII? */
+    if (inst > 0377) return SCPE_ARG;
+    fprintf (of, FMTASC ((int32) (inst & 0177)));
+    return SCPE_OK;
+    }
+if (sw & SWMASK ('C')) {                                /* character? */
+    for (i = 30; i >= 0; i = i - 6) {
+        c = (int32) ((inst >> i) & 077);
+        fprintf (of, "%c", SIXTOASC (c));
+		}    
+    return SCPE_OK;
+    }
+if (sw & SWMASK ('P')) {                                /* packed? */
+    for (i = 29; i >= 0; i = i - 7) {
+        c = (int32) ((inst >> i) & 0177);
+        fprintf (of, FMTASC (c));
+		}
+    return SCPE_OK;
+    }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
 
 /* Instruction decode */
@@ -658,38 +690,42 @@ ac = GET_AC (inst);
 xr = GET_XR (inst);
 y = GET_ADDR (inst);
 dev = GET_DEV (inst);
-for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
-    j = (int32) ((opc_val[i] >> I_V_FL) & I_M_FL);	/* get class */
-    if (((opc_val[i] & DMASK) == (inst & masks[j])) && 	/* match? */
-	    (((opc_val[i] & I_ITS) == 0) || ITS)) {
-	fprintf (of, "%s ", opcode[i]);			/* opcode */
-	switch (j) {					/* case on class */
-	case I_V_AC:					/* AC + address */
-	    fprintf (of, "%-o,", ac);			/* print AC, fall thru */
-	case I_V_OP:					/* address only */
-	    if (inst & INST_IND) fprintf (of, "@");
-	    if (xr) fprintf (of, "%-o(%-o)", y, xr);
-	    else fprintf (of, "%-o", y);
-	    break;
-	case I_V_IO:					/* I/O */
-	    if (dev < NUMDEV) fprintf (of, "%s,", devnam[dev]);
-	    else fprintf (of, "%-o,", dev);
-	    if (inst & INST_IND) fprintf (of, "@");
-	    if (xr) fprintf (of, "%-o(%-o)", y, xr);
-	    else fprintf (of, "%-o", y);
-	    break;  }					/* end case */
-	return SCPE_OK;  }				/* end if */
-	}						/* end for */
+for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
+    j = (int32) ((opc_val[i] >> I_V_FL) & I_M_FL);      /* get class */
+    if (((opc_val[i] & DMASK) == (inst & masks[j])) &&  /* match? */
+            (((opc_val[i] & I_ITS) == 0) || ITS)) {
+        fprintf (of, "%s ", opcode[i]);                 /* opcode */
+        switch (j) {                                    /* case on class */
+
+        case I_V_AC:                                    /* AC + address */
+            fprintf (of, "%-o,", ac);                   /* print AC, fall thru */
+        case I_V_OP:                                    /* address only */
+            if (inst & INST_IND) fprintf (of, "@");
+            if (xr) fprintf (of, "%-o(%-o)", y, xr);
+            else fprintf (of, "%-o", y);
+            break;
+
+        case I_V_IO:                                    /* I/O */
+            if (dev < NUMDEV) fprintf (of, "%s,", devnam[dev]);
+            else fprintf (of, "%-o,", dev);
+            if (inst & INST_IND) fprintf (of, "@");
+            if (xr) fprintf (of, "%-o(%-o)", y, xr);
+            else fprintf (of, "%-o", y);
+            break;
+            }                                           /* end case */
+        return SCPE_OK;
+        }                                               /* end if */
+    }                                                   /* end for */
 return SCPE_ARG;
 }
-
+
 /* Get operand, including indirect and index
 
    Inputs:
-	*cptr	=	pointer to input string
-	*status	=	pointer to error status
+        *cptr   =       pointer to input string
+        *status =       pointer to error status
    Outputs:
-	val	=	output value
+        val     =       output value
 */
 
 t_value get_opnd (char *cptr, t_stat *status)
@@ -698,38 +734,41 @@ int32 sign = 0;
 t_value val, xr = 0, ind = 0;
 char *tptr;
 
-*status = SCPE_ARG;					/* assume fail */
+*status = SCPE_ARG;                                     /* assume fail */
 if (*cptr == '@') {
-	ind = INST_IND;
-	cptr++;  }	
+    ind = INST_IND;
+    cptr++;
+    }   
 if (*cptr == '+') cptr++;
 else if (*cptr == '-') {
-	sign = 1;
-	cptr++;  }
+    sign = 1;
+    cptr++;
+    }
 val = strtotv (cptr, &tptr, 8);
 if (val > 0777777) return 0;
 if (sign) val = (~val + 1) & 0777777;
 cptr = tptr;
 if (*cptr == '(') {
-	cptr++;
-	xr = strtotv (cptr, &tptr, 8);
-	if ((cptr == tptr) || (*tptr != ')') ||
-	    (xr > AC_NUM) || (xr == 0)) return 0;
-	cptr = ++tptr;  }
+    cptr++;
+    xr = strtotv (cptr, &tptr, 8);
+    if ((cptr == tptr) || (*tptr != ')') ||
+        (xr > AC_NUM) || (xr == 0)) return 0;
+    cptr = ++tptr;
+    }
 if (*cptr == 0) *status = SCPE_OK;
 return (ind | (xr << 18) | val);
 }
-
+
 /* Symbolic input
 
    Inputs:
-	*cptr	=	pointer to input string
-	addr	=	current PC
-	uptr	=	pointer to unit
-	*val	=	pointer to output values
-	sw	=	switches
+        *cptr   =       pointer to input string
+        addr    =       current PC
+        uptr    =       pointer to unit
+        *val    =       pointer to output values
+        sw      =       switches
    Outputs:
-	status	=	error status
+        status  =       error status
 */
 
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
@@ -742,57 +781,70 @@ char gbuf[CBUFSIZE];
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 while (isspace (*cptr)) cptr++;
 for (i = 0; i < 6; i++) {
-	if (cptr[i] == 0) {
-	    for (j = i + 1; j <= 6; j++) cptr[j] = 0;
-	    break;  }  }
+    if (cptr[i] == 0) {
+        for (j = i + 1; j <= 6; j++) cptr[j] = 0;
+        break;
+        }
+    }
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = (t_value) cptr[0];
-	return SCPE_OK;  }
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    val[0] = (t_value) cptr[0];
+    return SCPE_OK;
+    }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* sixbit string? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	for (i = 0; i < 6; i++) {
-	    val[0] = (val[0] << 6);
-	    if (cptr[i]) val[0] = val[0] |
-		((t_value) ((cptr[i] + 040) & 077));  }
-	return SCPE_OK;  }
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    for (i = 0; i < 6; i++) {
+        val[0] = (val[0] << 6);
+        if (cptr[i]) val[0] = val[0] |
+            ((t_value) ((cptr[i] + 040) & 077));
+        }
+    return SCPE_OK;
+    }
 if ((sw & SWMASK ('P')) || ((*cptr == '#') && cptr++)) { /* packed string? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	for (i = 0; i < 5; i++) val[0] = (val[0] << 7) | ((t_value) cptr[i]);
-	val[0] = val[0] << 1;
-	return SCPE_OK;  }
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    for (i = 0; i < 5; i++) val[0] = (val[0] << 7) | ((t_value) cptr[i]);
+    val[0] = val[0] << 1;
+    return SCPE_OK;
+    }
 
-/* Symbolic input, continued */
+/* Instruction parse */
 
-cptr = get_glyph (cptr, gbuf, 0);			/* get opcode */
+cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
 if (opcode[i] == NULL) return SCPE_ARG;
-val[0] = opc_val[i] & DMASK;				/* get value */
-j = (int32) ((opc_val[i] >> I_V_FL) & I_M_FL);		/* get class */
-switch (j) {						/* case on class */
-case I_V_AC:						/* AC + operand */
-	if (strchr (cptr, ',')) {			/* AC specified? */
-	    cptr = get_glyph (cptr, gbuf, ',');		/* get glyph */
-	    if (gbuf[0]) {				/* can be omitted */
-		ac = get_uint (gbuf, 8, AC_NUM - 1, &r);
-		if (r != SCPE_OK) return SCPE_ARG;
-		val[0] = val[0] | (ac << INST_V_AC);  }	 }
-case I_V_OP:						/* operand */
-	cptr = get_glyph (cptr, gbuf, 0);
-	val[0] = val[0] | get_opnd (gbuf, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	break;
-case I_V_IO:						/* I/O */
-	cptr = get_glyph (cptr, gbuf, ',');		/* get glyph */
-	for (dev = 0; (dev < NUMDEV) && (strcmp (devnam[dev], gbuf) != 0); dev++);
-	if (dev >= NUMDEV) {
-	    dev = get_uint (gbuf, 8, INST_M_DEV, &r);
-	    if (r != SCPE_OK) return SCPE_ARG;  }
-	val[0] = val[0] | (dev << INST_V_DEV);
-	cptr = get_glyph (cptr, gbuf, 0);
-	val[0] = val[0] | get_opnd (gbuf, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	break;  }					/* end case */
-if (*cptr != 0) return SCPE_ARG;			/* junk at end? */
+val[0] = opc_val[i] & DMASK;                            /* get value */
+j = (int32) ((opc_val[i] >> I_V_FL) & I_M_FL);          /* get class */
+switch (j) {                                            /* case on class */
+
+    case I_V_AC:                                        /* AC + operand */
+        if (strchr (cptr, ',')) {                       /* AC specified? */
+            cptr = get_glyph (cptr, gbuf, ',');         /* get glyph */
+            if (gbuf[0]) {                              /* can be omitted */
+                ac = get_uint (gbuf, 8, AC_NUM - 1, &r);
+                if (r != SCPE_OK) return SCPE_ARG;
+                val[0] = val[0] | (ac << INST_V_AC);
+                }
+            }                                           /* fall through */
+    case I_V_OP:                                        /* operand */
+        cptr = get_glyph (cptr, gbuf, 0);
+        val[0] = val[0] | get_opnd (gbuf, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        break;
+
+    case I_V_IO:                                        /* I/O */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get glyph */
+        for (dev = 0; (dev < NUMDEV) && (strcmp (devnam[dev], gbuf) != 0); dev++);
+        if (dev >= NUMDEV) {
+            dev = get_uint (gbuf, 8, INST_M_DEV, &r);
+            if (r != SCPE_OK) return SCPE_ARG;
+            }
+        val[0] = val[0] | (dev << INST_V_DEV);
+        cptr = get_glyph (cptr, gbuf, 0);
+        val[0] = val[0] | get_opnd (gbuf, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        break;
+        }                                               /* end case */
+
+if (*cptr != 0) return SCPE_ARG;                        /* junk at end? */
 return SCPE_OK;
 }

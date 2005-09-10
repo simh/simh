@@ -1,4 +1,4 @@
-SIMH FAQ, 31-Mar-2004
+SIMH FAQ, 07-Sep-2005
 
 1 General
 
@@ -21,12 +21,12 @@ SIMH FAQ, 31-Mar-2004
 2.2 How do I install SIMH with Ethernet support on Windows?
 2.3 How do I install SIMH on Unix?
 2.4 How do I install SIMH on VMS?
-2.5 How do I transcribe a real CD for use with SIMH?
+2.5 How do I transcribe a real CD for use with SIMH? [Updated]
 2.6 How do I transcribe other archival media for use with SIMH?
 2.7 How can I get text files in and out of SIMH?
 2.8 How can I get binary files in and out of SIMH?
 2.9 Can I connect real devices on the host computer to SIMH?
-2.10 My Windows host can't communicate with the PDP-11 or VAX over Ethernet; why?
+2.10 My Windows host can't communicate with the PDP-11 or VAX over Ethernet; why? [Updated]
 2.11 How can I use my wireless Ethernet card with SIMH?
 
 --------------------------------------------------------------------------------
@@ -142,7 +142,7 @@ SIMH simulates the following computer systems:
 	Digital Equipment Corporation	PDP-1, PDP-4, PDP-7, PDP-8, PDP-9,
 					PDP-10, PDP-11, PDP-15, VAX
 	Data General Corporation	Nova, Eclipse
-	IBM Corporation			1130, 1401, 1620, System 3
+	IBM Corporation			1130, 1401, 1620, System 3, 7094
 	GRI Corporation			GRI-909
 	Honeywell Corporation		H316/516
 	Hewlett Packard Corporation	HP2116, HP2100, HP21MX
@@ -211,7 +211,7 @@ ka655x.bin from the source kit.
 Separate pre-compiled binaries contain Ethernet support.  Before running these
 binaries, you must download download and install the WinPCAP AutoInstaller from
 
-  http://winpcap.polito.it
+  http://www.winpcap.org
 
 This creates a network packet driver in Windows for SIMH to attach to.
 
@@ -254,6 +254,7 @@ On a VAX use:
 $ MMx
 
 On a Alpha use:
+
 $ MMx/MACRO=("__ALPHA__=1")              !Without ethernet support
 $ MMx/MACRO=("__ALPHA__=1","__PCAP__=1") !With    ethernet support
 
@@ -285,17 +286,26 @@ emulators. Ethernet support is only available on Alpha VMS 7.3-1 and above.
   software before proceeding. Antivirus software tends to interfere with
   the smooth flow of data from the CD and will occasionally transform the
   data in strange and unexpected ways to 'protect' you.
+  
+  You may also need to limit the read speed. Some burnt CD-Rs do not read
+  correctly at the highest rate of speed, depending on the accuracy of the
+  burner; pressed CD-ROMs should not have this problem.
 
-  1) Roxio EZ-CD Creator 5.x
-     Go to the the Disc menu and select Disc Info (there will be a delay).
-     Select the track shown, then click the Read Track button.
-     Enter the Save file name, then OK.
+  1) Roxio
+     A) EZ-CD Creator 5.x
+        Go to the the Disc menu and select Disc Info (there will be a delay).
+        Select the track shown, then click the Read Track button.
+        Enter the Save file name, then OK.
+     B) Easy Media Creator 7.x
+        Go to Creator Classic
+        Select Other Tasks | Disc and Device Utility
+        Drill down on the device until you find the data track, then select it
+        Click the 'Read Track...' button
+        Enter the save file name, then OK.
 
   2) Nero 5.5
      Select Recorder|Save Track
      Select the track, set the output filename
-     In Options, you may need to set the Read Speed down;
-      the VMS Hobbyist CD didn't work after a 52x read, but worked fine at 8x
      Click GO
 
 --------------------------------------------------------------------------------
@@ -376,6 +386,11 @@ with the host on the primary interface.  To establish communications between SIM
 and a PC host, add a second Ethernet controller, attach both controllers to the
 same hub, and attach SIMH to the second controller.  The host and SIMH will now
 be able to communicate across the physical network connection.
+
+Attaching the ethernet device to a TAP-Win32 pseudo-controller can also solve
+this problem, since you would normally bridge the pseudo-controller to the main
+ethernet controller; the simulated system and the host will communicate over
+the bridge. TAP-Win32 is a component of OpenVPN software: http://openvpn.net.
 
 --------------------------------------------------------------------------------
 
@@ -482,7 +497,7 @@ completing the current instruction.
 3.4 What is the release process for SIMH?
 
 SIMH is released whenever a significant number of new features, or
-important bug fixes, has accumulated.  This has averaged every 4-8
+important bug fixes, has accumulated.  This has averaged every 8-16
 weeks.  The major version number only changes when there is a major
 restructuring of SIMH's internal structures.  The minor version number
 is changed when the format of the save/restore file must be updated.
@@ -495,7 +510,7 @@ is changed when the format of the save/restore file must be updated.
 
 HP (formerly Compaq formerly DEC) provides licenses to OpenVMS for
 hobbyist use.  A description of the hobbyist license program can be
-found on http://www.montagar.com/hobbyist/.
+found on http://www.openvmshobbyist.com.
 
 --------------------------------------------------------------------------------
 
@@ -580,7 +595,7 @@ By default, the system type is a VAXserver 3900.  To change the type
 to a MicroVAX 3900, patch the boot ROM as follows:
 
 	sim> set ptr ena
-	sim> att ptr ka655.bin
+	sim> att ptr ka655x.bin
 	sim> ie ptr 4
 	4:	2	1
 	sim> det ptr
@@ -601,7 +616,7 @@ similar but will have different file name syntax.
 
 c:\simh> vax                         ; run VAX emulator
 sim> set cpu 64m                     ; set memory size to 64MB
-sim> load -r vax\ka655.bin           ; load the MicroVAX 3900 console ROM
+sim> load -r vax\ka655x.bin          ; load the MicroVAX 3900 console ROM
 sim> attach NVR vax\ka655.nvr        ; create/load a Non-Volatile RAM file
 sim> set LPT disable                 ; disable devices we don't want/need
 sim> set TQ disable                  ;   "
@@ -642,7 +657,7 @@ Ethernet Adapter 0 (774440)
 
 - Use a CD burner program, like Easy CD Creator or Nero, to create an ISO 9660
   CD image containing the files you want to import.  Note that file names are
-  limite to DOS '8.3' conventions.
+  limited to DOS '8.3' conventions.
 - Attach the simulated CD image to a simulated CD drive.
 - Mount the simulated CD as an ISO 9660 file system under VMS.
 - Copy the files you need from the simulated CD to the simulated disk.

@@ -1,6 +1,6 @@
 /* pdp8_lp.c: PDP-8 line printer simulator
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,23 +19,23 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   lpt		LP8E line printer
+   lpt          LP8E line printer
 
-   25-Apr-03	RMS	Revised for extended file support
-   04-Oct-02	RMS	Added DIB, enable/disable, device number support
-   30-May-02	RMS	Widened POS to 32b
+   25-Apr-03    RMS     Revised for extended file support
+   04-Oct-02    RMS     Added DIB, enable/disable, device number support
+   30-May-02    RMS     Widened POS to 32b
 */
 
 #include "pdp8_defs.h"
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
 
-int32 lpt_err = 0;					/* error flag */
-int32 lpt_stopioe = 0;					/* stop on error */
+int32 lpt_err = 0;                                      /* error flag */
+int32 lpt_stopioe = 0;                                  /* stop on error */
 
 DEVICE lpt_dev;
 int32 lpt (int32 IR, int32 AC);
@@ -46,88 +46,104 @@ t_stat lpt_detach (UNIT *uptr);
 
 /* LPT data structures
 
-   lpt_dev	LPT device descriptor
-   lpt_unit	LPT unit descriptor
-   lpt_reg	LPT register list
+   lpt_dev      LPT device descriptor
+   lpt_unit     LPT unit descriptor
+   lpt_reg      LPT register list
 */
 
 DIB lpt_dib = { DEV_LPT, 1, { &lpt } };
 
 UNIT lpt_unit = {
-	UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
+    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
+    };
 
 REG lpt_reg[] = {
-	{ ORDATA (BUF, lpt_unit.buf, 8) },
-	{ FLDATA (ERR, lpt_err, 0) },
-	{ FLDATA (DONE, dev_done, INT_V_LPT) },
-	{ FLDATA (ENABLE, int_enable, INT_V_LPT) },
-	{ FLDATA (INT, int_req, INT_V_LPT) },
-	{ DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
-	{ DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
-	{ FLDATA (STOP_IOE, lpt_stopioe, 0) },
-	{ ORDATA (DEVNUM, lpt_dib.dev, 6), REG_HRO },
-	{ NULL }  };
+    { ORDATA (BUF, lpt_unit.buf, 8) },
+    { FLDATA (ERR, lpt_err, 0) },
+    { FLDATA (DONE, dev_done, INT_V_LPT) },
+    { FLDATA (ENABLE, int_enable, INT_V_LPT) },
+    { FLDATA (INT, int_req, INT_V_LPT) },
+    { DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
+    { DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
+    { FLDATA (STOP_IOE, lpt_stopioe, 0) },
+    { ORDATA (DEVNUM, lpt_dib.dev, 6), REG_HRO },
+    { NULL }
+    };
 
 MTAB lpt_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
-		&set_dev, &show_dev, NULL },
-	{ 0 } };
+    { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
+      &set_dev, &show_dev, NULL },
+    { 0 }
+    };
 
 DEVICE lpt_dev = {
-	"LPT", &lpt_unit, lpt_reg, lpt_mod,
-	1, 10, 31, 1, 8, 8,
-	NULL, NULL, &lpt_reset,
-	NULL, &lpt_attach, &lpt_detach,
-	&lpt_dib, DEV_DISABLE };
-
+    "LPT", &lpt_unit, lpt_reg, lpt_mod,
+    1, 10, 31, 1, 8, 8,
+    NULL, NULL, &lpt_reset,
+    NULL, &lpt_attach, &lpt_detach,
+    &lpt_dib, DEV_DISABLE
+    };
+
 /* IOT routine */
 
 int32 lpt (int32 IR, int32 AC)
 {
-switch (IR & 07) {					/* decode IR<9:11> */
-case 1:							/* PSKF */
-	return (dev_done & INT_LPT)? IOT_SKP + AC: AC;
-case 2:							/* PCLF */
-	dev_done = dev_done & ~INT_LPT;			/* clear flag */
-	int_req = int_req & ~INT_LPT;			/* clear int req */
-	return AC;
-case 3:							/* PSKE */
-	return (lpt_err)? IOT_SKP + AC: AC;
-case 6:							/* PCLF!PSTB */
-	dev_done = dev_done & ~INT_LPT;			/* clear flag */
-	int_req = int_req & ~INT_LPT;			/* clear int req */
-case 4:							/* PSTB */
-	lpt_unit.buf = AC & 0177;			/* load buffer */
-	if ((lpt_unit.buf == 015) || (lpt_unit.buf == 014) ||
-	    (lpt_unit.buf == 012)) {
-	    sim_activate (&lpt_unit, lpt_unit.wait);
-	    return AC;  }
-	return (lpt_svc (&lpt_unit) << IOT_V_REASON) + AC;
-case 5:							/* PSIE */
-	int_enable = int_enable | INT_LPT;		/* set enable */
-	int_req = INT_UPDATE;				/* update interrupts */
-	return AC;
-case 7:							/* PCIE */
-	int_enable = int_enable & ~INT_LPT;		/* clear enable */
-	int_req = int_req & ~INT_LPT;			/* clear int req */
-	return AC;
-default:
-	return (stop_inst << IOT_V_REASON) + AC;  }	/* end switch */
+switch (IR & 07) {                                      /* decode IR<9:11> */
+
+    case 1:                                             /* PSKF */
+        return (dev_done & INT_LPT)? IOT_SKP + AC: AC;
+
+    case 2:                                             /* PCLF */
+        dev_done = dev_done & ~INT_LPT;                 /* clear flag */
+        int_req = int_req & ~INT_LPT;                   /* clear int req */
+        return AC;
+
+    case 3:                                             /* PSKE */
+        return (lpt_err)? IOT_SKP + AC: AC;
+
+    case 6:                                             /* PCLF!PSTB */
+        dev_done = dev_done & ~INT_LPT;                 /* clear flag */
+        int_req = int_req & ~INT_LPT;                   /* clear int req */
+
+    case 4:                                             /* PSTB */
+        lpt_unit.buf = AC & 0177;                       /* load buffer */
+        if ((lpt_unit.buf == 015) || (lpt_unit.buf == 014) ||
+            (lpt_unit.buf == 012)) {
+            sim_activate (&lpt_unit, lpt_unit.wait);
+            return AC;
+            }
+        return (lpt_svc (&lpt_unit) << IOT_V_REASON) + AC;
+
+    case 5:                                             /* PSIE */
+        int_enable = int_enable | INT_LPT;              /* set enable */
+        int_req = INT_UPDATE;                           /* update interrupts */
+        return AC;
+
+    case 7:                                             /* PCIE */
+        int_enable = int_enable & ~INT_LPT;             /* clear enable */
+        int_req = int_req & ~INT_LPT;                   /* clear int req */
+        return AC;
+
+    default:
+        return (stop_inst << IOT_V_REASON) + AC;
+        }                                               /* end switch */
 }
-
+
 /* Unit service */
 
 t_stat lpt_svc (UNIT *uptr)
 {
-dev_done = dev_done | INT_LPT;				/* set done */
-int_req = INT_UPDATE;					/* update interrupts */
+dev_done = dev_done | INT_LPT;                          /* set done */
+int_req = INT_UPDATE;                                   /* update interrupts */
 if ((lpt_unit.flags & UNIT_ATT) == 0) {
-	lpt_err = 1;
-	return IORETURN (lpt_stopioe, SCPE_UNATT);  }
+    lpt_err = 1;
+    return IORETURN (lpt_stopioe, SCPE_UNATT);
+    }
 if (putc (lpt_unit.buf, lpt_unit.fileref) == EOF) {
-	perror ("LPT I/O error");
-	clearerr (lpt_unit.fileref);
-	return SCPE_IOERR;  }
+    perror ("LPT I/O error");
+    clearerr (lpt_unit.fileref);
+    return SCPE_IOERR;
+    }
 lpt_unit.pos = lpt_unit.pos + 1;
 return SCPE_OK;
 }
@@ -137,11 +153,11 @@ return SCPE_OK;
 t_stat lpt_reset (DEVICE *dptr)
 {
 lpt_unit.buf = 0;
-dev_done = dev_done & ~INT_LPT;				/* clear done, int */
+dev_done = dev_done & ~INT_LPT;                         /* clear done, int */
 int_req = int_req & ~INT_LPT;
-int_enable = int_enable | INT_LPT;			/* set enable */
+int_enable = int_enable | INT_LPT;                      /* set enable */
 lpt_err = (lpt_unit.flags & UNIT_ATT) == 0;
-sim_cancel (&lpt_unit);					/* deactivate unit */
+sim_cancel (&lpt_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 

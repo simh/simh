@@ -1,6 +1,6 @@
 /* nova_pt.c: NOVA paper tape read/punch simulator
 
-   Copyright (c) 1993-2004, Robert M. Supnik
+   Copyright (c) 1993-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,24 +19,24 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ptr		paper tape reader
-   ptp		paper tape punch
+   ptr          paper tape reader
+   ptp          paper tape punch
 
-   25-Apr-03	RMS	Revised for extended file support
-   03-Oct-02	RMS	Added DIBs
-   30-May-02	RMS	Widened POS to 32b
-   29-Nov-01	RMS	Added read only unit support
+   25-Apr-03    RMS     Revised for extended file support
+   03-Oct-02    RMS     Added DIBs
+   30-May-02    RMS     Widened POS to 32b
+   29-Nov-01    RMS     Added read only unit support
 */
 
 #include "nova_defs.h"
 
 extern int32 int_req, dev_busy, dev_done, dev_disable;
 
-int32 ptr_stopioe = 0, ptp_stopioe = 0;			/* stop on error */
+int32 ptr_stopioe = 0, ptp_stopioe = 0;                 /* stop on error */
 
 int32 ptr (int32 pulse, int32 code, int32 AC);
 int32 ptp (int32 pulse, int32 code, int32 AC);
@@ -44,68 +44,74 @@ t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
-
+
 /* PTR data structures
 
-   ptr_dev	PTR device descriptor
-   ptr_unit	PTR unit descriptor
-   ptr_reg	PTR register list
+   ptr_dev      PTR device descriptor
+   ptr_unit     PTR unit descriptor
+   ptr_reg      PTR register list
 */
 
 DIB ptr_dib = { DEV_PTR, INT_PTR, PI_PTR, &ptr };
 
 UNIT ptr_unit = {
-	UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
-		SERIAL_IN_WAIT };
+    UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
+            SERIAL_IN_WAIT
+    };
 
 REG ptr_reg[] = {
-	{ ORDATA (BUF, ptr_unit.buf, 8) },
-	{ FLDATA (BUSY, dev_busy, INT_V_PTR) },
-	{ FLDATA (DONE, dev_done, INT_V_PTR) },
-	{ FLDATA (DISABLE, dev_disable, INT_V_PTR) },
-	{ FLDATA (INT, int_req, INT_V_PTR) },
-	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
-	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
-	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
-	{ NULL }  };
+    { ORDATA (BUF, ptr_unit.buf, 8) },
+    { FLDATA (BUSY, dev_busy, INT_V_PTR) },
+    { FLDATA (DONE, dev_done, INT_V_PTR) },
+    { FLDATA (DISABLE, dev_disable, INT_V_PTR) },
+    { FLDATA (INT, int_req, INT_V_PTR) },
+    { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
+    { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
+    { FLDATA (STOP_IOE, ptr_stopioe, 0) },
+    { NULL }
+    };
 
 DEVICE ptr_dev = {
-	"PTR", &ptr_unit, ptr_reg, NULL,
-	1, 10, 31, 1, 8, 8,
-	NULL, NULL, &ptr_reset,
-	NULL, NULL, NULL,
-	&ptr_dib, 0 };
+    "PTR", &ptr_unit, ptr_reg, NULL,
+    1, 10, 31, 1, 8, 8,
+    NULL, NULL, &ptr_reset,
+    NULL, NULL, NULL,
+    &ptr_dib, 0
+    };
 
 /* PTP data structures
 
-   ptp_dev	PTP device descriptor
-   ptp_unit	PTP unit descriptor
-   ptp_reg	PTP register list
+   ptp_dev      PTP device descriptor
+   ptp_unit     PTP unit descriptor
+   ptp_reg      PTP register list
 */
 
 DIB ptp_dib = { DEV_PTP, INT_PTP, PI_PTP, &ptp };
 
 UNIT ptp_unit = {
-	UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
+    UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
+    };
 
 REG ptp_reg[] = {
-	{ ORDATA (BUF, ptp_unit.buf, 8) },
-	{ FLDATA (BUSY, dev_busy, INT_V_PTP) },
-	{ FLDATA (DONE, dev_done, INT_V_PTP) },
-	{ FLDATA (DISABLE, dev_disable, INT_V_PTP) },
-	{ FLDATA (INT, int_req, INT_V_PTP) },
-	{ DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
-	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
-	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
-	{ NULL }  };
+    { ORDATA (BUF, ptp_unit.buf, 8) },
+    { FLDATA (BUSY, dev_busy, INT_V_PTP) },
+    { FLDATA (DONE, dev_done, INT_V_PTP) },
+    { FLDATA (DISABLE, dev_disable, INT_V_PTP) },
+    { FLDATA (INT, int_req, INT_V_PTP) },
+    { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
+    { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
+    { FLDATA (STOP_IOE, ptp_stopioe, 0) },
+    { NULL }
+    };
 
 DEVICE ptp_dev = {
-	"PTP", &ptp_unit, ptp_reg, NULL,
-	1, 10, 31, 1, 8, 8,
-	NULL, NULL, &ptp_reset,
-	NULL, NULL, NULL,
-	&ptp_dib, 0 };
-
+    "PTP", &ptp_unit, ptp_reg, NULL,
+    1, 10, 31, 1, 8, 8,
+    NULL, NULL, &ptp_reset,
+    NULL, NULL, NULL,
+    &ptp_dib, 0
+    };
+
 /* Paper tape reader: IOT routine */
 
 int32 ptr (int32 pulse, int32 code, int32 AC)
@@ -113,19 +119,23 @@ int32 ptr (int32 pulse, int32 code, int32 AC)
 int32 iodata;
 
 iodata = (code == ioDIA)? ptr_unit.buf & 0377: 0;
-switch (pulse) {					/* decode IR<8:9> */
-case iopS: 						/* start */
-	dev_busy = dev_busy | INT_PTR;			/* set busy */
-	dev_done = dev_done & ~INT_PTR;			/* clear done, int */
-	int_req = int_req & ~INT_PTR;
-	sim_activate (&ptr_unit, ptr_unit.wait);	/* activate unit */
-	break;
-case iopC:						/* clear */
-	dev_busy = dev_busy & ~INT_PTR;			/* clear busy */
-	dev_done = dev_done & ~INT_PTR;			/* clear done, int */
-	int_req = int_req & ~INT_PTR;
-	sim_cancel (&ptr_unit);				/* deactivate unit */
-	break;  }					/* end switch */
+switch (pulse) {                                        /* decode IR<8:9> */
+
+    case iopS:                                          /* start */
+        dev_busy = dev_busy | INT_PTR;                  /* set busy */
+        dev_done = dev_done & ~INT_PTR;                 /* clear done, int */
+        int_req = int_req & ~INT_PTR;
+        sim_activate (&ptr_unit, ptr_unit.wait);        /* activate unit */
+        break;
+
+    case iopC:                                          /* clear */
+        dev_busy = dev_busy & ~INT_PTR;                 /* clear busy */
+        dev_done = dev_done & ~INT_PTR;                 /* clear done, int */
+        int_req = int_req & ~INT_PTR;
+        sim_cancel (&ptr_unit);                         /* deactivate unit */
+        break;
+        }                                               /* end switch */
+
 return iodata;
 }
 
@@ -135,17 +145,19 @@ t_stat ptr_svc (UNIT *uptr)
 {
 int32 temp;
 
-if ((ptr_unit.flags & UNIT_ATT) == 0)			/* attached? */
-	return IORETURN (ptr_stopioe, SCPE_UNATT);
-if ((temp = getc (ptr_unit.fileref)) == EOF) {		/* end of file? */
-	if (feof (ptr_unit.fileref)) {
-	    if (ptr_stopioe) printf ("PTR end of file\n");
-	    else return SCPE_OK;  }
-	else perror ("PTR I/O error");
-	clearerr (ptr_unit.fileref);
-	return SCPE_IOERR;  }
-dev_busy = dev_busy & ~INT_PTR;				/* clear busy */
-dev_done = dev_done | INT_PTR;				/* set done */
+if ((ptr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
+    return IORETURN (ptr_stopioe, SCPE_UNATT);
+if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
+    if (feof (ptr_unit.fileref)) {
+        if (ptr_stopioe) printf ("PTR end of file\n");
+        else return SCPE_OK;
+        }
+    else perror ("PTR I/O error");
+    clearerr (ptr_unit.fileref);
+    return SCPE_IOERR;
+    }
+dev_busy = dev_busy & ~INT_PTR;                         /* clear busy */
+dev_done = dev_done | INT_PTR;                          /* set done */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
 ptr_unit.buf = temp & 0377;
 ptr_unit.pos = ptr_unit.pos + 1;
@@ -157,31 +169,35 @@ return SCPE_OK;
 t_stat ptr_reset (DEVICE *dptr)
 {
 ptr_unit.buf = 0;
-dev_busy = dev_busy & ~INT_PTR;				/* clear busy */
-dev_done = dev_done & ~INT_PTR;				/* clear done, int */
+dev_busy = dev_busy & ~INT_PTR;                         /* clear busy */
+dev_done = dev_done & ~INT_PTR;                         /* clear done, int */
 int_req = int_req & ~INT_PTR;
-sim_cancel (&ptr_unit);					/* deactivate unit */
+sim_cancel (&ptr_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
-
+
 /* Paper tape punch: IOT routine */
 
 int32 ptp (int32 pulse, int32 code, int32 AC)
 {
 if (code == ioDOA) ptp_unit.buf = AC & 0377;
-switch (pulse) {					/* decode IR<8:9> */
-case iopS: 						/* start */
-	dev_busy = dev_busy | INT_PTP;			/* set busy */
-	dev_done = dev_done & ~INT_PTP;			/* clear done, int */
-	int_req = int_req & ~INT_PTP;
-	sim_activate (&ptp_unit, ptp_unit.wait);	/* activate unit */
-	break;
-case iopC:						/* clear */
-	dev_busy = dev_busy & ~INT_PTP;			/* clear busy */
-	dev_done = dev_done & ~INT_PTP;			/* clear done, int */
-	int_req = int_req & ~INT_PTP;
-	sim_cancel (&ptp_unit);				/* deactivate unit */
-	break;  }					/* end switch */
+switch (pulse) {                                        /* decode IR<8:9> */
+
+    case iopS:                                          /* start */
+        dev_busy = dev_busy | INT_PTP;                  /* set busy */
+        dev_done = dev_done & ~INT_PTP;                 /* clear done, int */
+        int_req = int_req & ~INT_PTP;
+        sim_activate (&ptp_unit, ptp_unit.wait);        /* activate unit */
+        break;
+
+    case iopC:                                          /* clear */
+        dev_busy = dev_busy & ~INT_PTP;                 /* clear busy */
+        dev_done = dev_done & ~INT_PTP;                 /* clear done, int */
+        int_req = int_req & ~INT_PTP;
+        sim_cancel (&ptp_unit);                         /* deactivate unit */
+        break;
+        }                                               /* end switch */
+
 return 0;
 }
 
@@ -189,15 +205,16 @@ return 0;
 
 t_stat ptp_svc (UNIT *uptr)
 {
-dev_busy = dev_busy & ~INT_PTP;				/* clear busy */
-dev_done = dev_done | INT_PTP;				/* set done */
+dev_busy = dev_busy & ~INT_PTP;                         /* clear busy */
+dev_done = dev_done | INT_PTP;                          /* set done */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-if ((ptp_unit.flags & UNIT_ATT) == 0)			/* attached? */
-	return IORETURN (ptp_stopioe, SCPE_UNATT);
+if ((ptp_unit.flags & UNIT_ATT) == 0)                   /* attached? */
+    return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {
-	perror ("PTP I/O error");
-	clearerr (ptp_unit.fileref);
-	return SCPE_IOERR;  }
+    perror ("PTP I/O error");
+    clearerr (ptp_unit.fileref);
+    return SCPE_IOERR;
+    }
 ptp_unit.pos = ptp_unit.pos + 1;
 return SCPE_OK;
 }
@@ -207,9 +224,9 @@ return SCPE_OK;
 t_stat ptp_reset (DEVICE *dptr)
 {
 ptp_unit.buf = 0;
-dev_busy = dev_busy & ~INT_PTP;				/* clear busy */
-dev_done = dev_done & ~INT_PTP;				/* clear done, int */
+dev_busy = dev_busy & ~INT_PTP;                         /* clear busy */
+dev_done = dev_done & ~INT_PTP;                         /* clear done, int */
 int_req = int_req & ~INT_PTP;
-sim_cancel (&ptp_unit);					/* deactivate unit */
+sim_cancel (&ptp_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }

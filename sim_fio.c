@@ -1,6 +1,6 @@
 /* sim_fio.c: simulator file I/O library
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,22 +19,23 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   17-Jul-04	RMS	Fixed bug in optimized sim_fread (reported by Scott Bailey)
-   26-May-04	RMS	Optimized sim_fread (suggested by John Dundas)
-   02-Jan-04	RMS	Split out from SCP
+   16-Aug-05    RMS     Fixed C++ declaration and cast problems
+   17-Jul-04    RMS     Fixed bug in optimized sim_fread (reported by Scott Bailey)
+   26-May-04    RMS     Optimized sim_fread (suggested by John Dundas)
+   02-Jan-04    RMS     Split out from SCP
 
    This library includes:
 
-   sim_finit	-	initialize package
-   sim_fopen	-	open file
-   sim_fread	-	endian independent read (formerly fxread)
-   sim_write	-	endian independent write (formerly fxwrite)
-   sim_fseek	-	extended (>32b) seek (formerly fseek_ext)
-   sim_fsize	-	get file size
+   sim_finit    -       initialize package
+   sim_fopen    -       open file
+   sim_fread    -       endian independent read (formerly fxread)
+   sim_write    -       endian independent write (formerly fxwrite)
+   sim_fseek    -       extended (>32b) seek (formerly fseek_ext)
+   sim_fsize    -       get file size
 
    sim_fopen and sim_fseek are OS-dependent.  The other routines are not.
    sim_fsize is always a 32b routine (it is used only with small capacity random
@@ -44,8 +45,8 @@
 #include "sim_defs.h"
 
 static unsigned char sim_flip[FLIP_SIZE];
-int32 sim_end = 1;					/* 1 = little */
-
+int32 sim_end = 1;                                      /* 1 = little */
+
 /* OS-independent, endian independent binary I/O package
 
    For consistency, all binary data read and written by the simulator
@@ -67,7 +68,7 @@ int32 sim_finit (void)
 {
 union {int32 i; char c[sizeof (int32)]; } end_test;
 
-end_test.i = 1;						/* test endian-ness */
+end_test.i = 1;                                         /* test endian-ness */
 sim_end = end_test.c[0];
 return sim_end;
 }
@@ -78,16 +79,18 @@ size_t c, j;
 int32 k;
 unsigned char by, *sptr, *dptr;
 
-if ((size == 0) || (count == 0)) return 0;		/* check arguments */
-c = fread (bptr, size, count, fptr);			/* read buffer */
-if (sim_end || (size == sizeof (char)) || (c == 0))	/* le, byte, or err? */
-	return c;					/* done */
-for (j = 0, dptr = sptr = bptr; j < c; j++) {		/* loop on items */
-	for (k = size - 1; k >= (((int32) size + 1) / 2); k--) {
-	    by = *sptr;					/* swap end-for-end */
-	    *sptr++ = *(dptr + k);
-	    *(dptr + k) = by;  }
-	sptr = dptr = dptr + size;  }			/* next item */
+if ((size == 0) || (count == 0)) return 0;              /* check arguments */
+c = fread (bptr, size, count, fptr);                    /* read buffer */
+if (sim_end || (size == sizeof (char)) || (c == 0))     /* le, byte, or err? */
+    return c;                                           /* done */
+for (j = 0, dptr = sptr = (unsigned char *) bptr; j < c; j++) { /* loop on items */
+    for (k = size - 1; k >= (((int32) size + 1) / 2); k--) {
+        by = *sptr;                                     /* swap end-for-end */
+        *sptr++ = *(dptr + k);
+        *(dptr + k) = by;
+        }
+    sptr = dptr = dptr + size;                          /* next item */
+    }
 return c;
 }
 
@@ -97,24 +100,26 @@ size_t c, j, nelem, nbuf, lcnt, total;
 int32 i, k;
 unsigned char *sptr, *dptr;
 
-if ((size == 0) || (count == 0)) return 0;		/* check arguments */
-if (sim_end || (size == sizeof (char)))			/* le or byte? */
-	return fwrite (bptr, size, count, fptr);	/* done */
-nelem = FLIP_SIZE / size;				/* elements in buffer */
-nbuf = count / nelem;					/* number buffers */
-lcnt = count % nelem;					/* count in last buf */
+if ((size == 0) || (count == 0)) return 0;              /* check arguments */
+if (sim_end || (size == sizeof (char)))                 /* le or byte? */
+    return fwrite (bptr, size, count, fptr);            /* done */
+nelem = FLIP_SIZE / size;                               /* elements in buffer */
+nbuf = count / nelem;                                   /* number buffers */
+lcnt = count % nelem;                                   /* count in last buf */
 if (lcnt) nbuf = nbuf + 1;
 else lcnt = nelem;
 total = 0;
-sptr = bptr;						/* init input ptr */
-for (i = nbuf; i > 0; i--) {				/* loop on buffers */
-	c = (i == 1)? lcnt: nelem;
-	for (j = 0, dptr = sim_flip; j < c; j++) {	/* loop on items */
-	    for (k = size - 1; k >= 0; k--) *(dptr + k) = *sptr++;
-	    dptr = dptr + size;  }
-	c = fwrite (sim_flip, size, c, fptr);
-	if (c == 0) return total;
-	total = total + c;  }
+sptr = (unsigned char *) bptr;                          /* init input ptr */
+for (i = nbuf; i > 0; i--) {                            /* loop on buffers */
+    c = (i == 1)? lcnt: nelem;
+    for (j = 0, dptr = sim_flip; j < c; j++) {          /* loop on items */
+        for (k = size - 1; k >= 0; k--) *(dptr + k) = *sptr++;
+        dptr = dptr + size;
+        }
+    c = fwrite (sim_flip, size, c, fptr);
+    if (c == 0) return total;
+    total = total + c;
+    }
 return total;
 }
 
@@ -131,16 +136,16 @@ sz = ftell (fp);
 fseek (fp, pos, SEEK_SET);
 return sz;
 }
-
+
 /* OS-dependent routines */
 
 /* Optimized file open */
 
-FILE *sim_fopen (char *file, char *mode)
+FILE *sim_fopen (const char *file, const char *mode)
 {
 #if defined (VMS)
 return fopen (file, mode, "ALQ=32", "DEQ=4096",
-         "MBF=6", "MBC=127", "FOP=cbt,tef", "ROP=rah,wbh", "CTX=stm");
+        "MBF=6", "MBC=127", "FOP=cbt,tef", "ROP=rah,wbh", "CTX=stm");
 #elif defined (USE_INT64) && defined (USE_ADDR64) && defined (linux)
 return fopen64 (file, mode);
 #else
@@ -154,12 +159,12 @@ return fopen (file, mode);
 
 /* Alpha VMS */
 
-#if defined (__ALPHA) && defined (VMS)			/* Alpha VMS */
-#define _SIM_IO_FSEEK_EXT_	1
+#if defined (__ALPHA) && defined (VMS)                  /* Alpha VMS */
+#define _SIM_IO_FSEEK_EXT_      1
 
 static t_int64 fpos_t_to_int64 (fpos_t *pos)
 {
-unsigned short *w = (unsigned short *) pos;		/* endian dep! */
+unsigned short *w = (unsigned short *) pos;             /* endian dep! */
 t_int64 result;
 
 result = w[1];
@@ -183,8 +188,10 @@ w[0] = (unsigned short) ipos;
 ipos >>= 16;
 w[1] = (unsigned short) ipos;
 if ((w[2] == 0) && (w[0] || w[1])) {
-	w[2] = bufsize;
-	w[0] -= mbc;  }
+    w[2] = bufsize;
+    w[0] -= mbc;
+    }
+return;
 }
 
 int sim_fseek (FILE *st, t_addr offset, int whence)
@@ -193,17 +200,22 @@ t_addr fileaddr;
 fpos_t filepos;
 
 switch (whence) {
-	case SEEK_SET:
-	    fileaddr = offset;
-	    break;
-	case SEEK_CUR:
-	    if (fgetpos (st, &filepos)) return (-1);
-	    fileaddr = fpos_t_to_int64 (&filepos);
-	    fileaddr = fileaddr + offset;
-	    break;
-	default:
-	    errno = EINVAL;
-	    return (-1);  }
+
+    case SEEK_SET:
+        fileaddr = offset;
+        break;
+
+    case SEEK_CUR:
+        if (fgetpos (st, &filepos)) return (-1);
+        fileaddr = fpos_t_to_int64 (&filepos);
+        fileaddr = fileaddr + offset;
+        break;
+
+    default:
+        errno = EINVAL;
+        return (-1);
+        }
+
 int64_to_fpos_t (fileaddr, &filepos, 127);
 return fsetpos (st, &filepos);
 }
@@ -212,8 +224,8 @@ return fsetpos (st, &filepos);
 
 /* Alpha UNIX - natively 64b */
 
-#if defined (__ALPHA) && defined (__unix__)		/* Alpha UNIX */
-#define _SIM_IO_FSEEK_EXT_	1
+#if defined (__ALPHA) && defined (__unix__)             /* Alpha UNIX */
+#define _SIM_IO_FSEEK_EXT_      1
 
 int sim_fseek (FILE *st, t_addr offset, int whence)
 {
@@ -225,46 +237,51 @@ return fseek (st, offset, whence);
 /* Windows */
 
 #if defined (_WIN32)
-#define _SIM_IO_FSEEK_EXT_	1
+#define _SIM_IO_FSEEK_EXT_      1
 
 int sim_fseek (FILE *st, t_addr offset, int whence)
 {
 fpos_t fileaddr;
 
 switch (whence) {
-	case SEEK_SET:
-	    fileaddr = offset;
-	    break;
-	case SEEK_CUR:
-	    if (fgetpos (st, &fileaddr)) return (-1);
-	    fileaddr = fileaddr + offset;
-	    break;
-	default:
-	    errno = EINVAL;
-	    return (-1);  }
+
+    case SEEK_SET:
+        fileaddr = offset;
+        break;
+
+    case SEEK_CUR:
+        if (fgetpos (st, &fileaddr)) return (-1);
+        fileaddr = fileaddr + offset;
+        break;
+
+    default:
+        errno = EINVAL;
+        return (-1);
+        }
+
 return fsetpos (st, &fileaddr);
 }
 
-#endif							/* end Windows */
+#endif                                                  /* end Windows */
 
 /* Linux */
 
 #if defined (linux)
-#define _SIM_IO_FSEEK_EXT_	1
+#define _SIM_IO_FSEEK_EXT_      1
 
 int sim_fseek (FILE *st, t_addr xpos, int origin)
 {
 return fseeko64 (st, xpos, origin);
 }
 
-#endif							/* end Linux with LFS */
+#endif                                                  /* end Linux with LFS */
 
-#endif							/* end 64b seek defs */
+#endif                                                  /* end 64b seek defs */
 
 /* Default: no OS-specific routine has been defined */
 
 #if !defined (_SIM_IO_FSEEK_EXT_)
-#define _SIM_IO_FSEEK_EXT_	0
+#define _SIM_IO_FSEEK_EXT_      0
 
 int sim_fseek (FILE *st, t_addr xpos, int origin)
 {

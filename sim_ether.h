@@ -1,7 +1,7 @@
 /* sim_ether.h: OS-dependent network information
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2002-2004, David T. Hittner
+   Copyright (c) 2002-2005, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -100,14 +100,14 @@
 
 /* structure declarations */
 
-#define ETH_PROMISC            1      /* promiscuous mode = true */
-#define ETH_TIMEOUT           -1      /* read timeout in milliseconds (immediate) */
-#define ETH_FILTER_MAX        20      /* maximum address filters */
-#define ETH_DEV_NAME_MAX     256      /* maximum device name size */
-#define ETH_DEV_DESC_MAX     256      /* maximum device description size */
-#define ETH_MIN_PACKET        60      /* minimum ethernet packet size */
-#define ETH_MAX_PACKET      1514      /* maximum ethernet packet size */
-#define ETH_MAX_DEVICE        10      /* maximum ethernet devices */
+#define ETH_PROMISC            1                        /* promiscuous mode = true */
+#define ETH_TIMEOUT           -1                        /* read timeout in milliseconds (immediate) */
+#define ETH_FILTER_MAX        20                        /* maximum address filters */
+#define ETH_DEV_NAME_MAX     256                        /* maximum device name size */
+#define ETH_DEV_DESC_MAX     256                        /* maximum device description size */
+#define ETH_MIN_PACKET        60                        /* minimum ethernet packet size */
+#define ETH_MAX_PACKET      1514                        /* maximum ethernet packet size */
+#define ETH_MAX_DEVICE        10                        /* maximum ethernet devices */
 
 #define DECNET_SELF_FRAME(dnet_mac, msg)    \
     ((memcmp(dnet_mac, msg  , 6) == 0) &&   \
@@ -121,7 +121,7 @@ struct eth_packet {
 };
 
 struct eth_item {
-  int                 type;           /* receive (0=setup, 1=loopback, 2=normal) */
+  int                 type;                             /* receive (0=setup, 1=loopback, 2=normal) */
   struct eth_packet   packet;
 };
 
@@ -150,25 +150,25 @@ typedef struct eth_queue ETH_QUE;
 typedef struct eth_item ETH_ITEM;
 
 struct eth_device {
-  char*         name;                           /* name of ethernet device */
-  void*         handle;                         /* handle of implementation-specific device */
-  ETH_PCALLBACK read_callback;                  /* read callback function */
-  ETH_PCALLBACK write_callback;                 /* write callback function */
-  ETH_PACK*     read_packet;                    /* read packet */
-  ETH_PACK*     write_packet;                   /* write packet */
-  ETH_MAC       filter_address[ETH_FILTER_MAX]; /* filtering addresses */
-  int		addr_count;			/* count of filtering addresses */
-  ETH_BOOL      promiscuous;                    /* promiscuous mode flag */
-  ETH_BOOL      all_multicast;                  /* receive all multicast messages */
-  int32         decnet_self_sent;               /* loopback packets sent but not seen */
-  ETH_MAC       decnet_addr;                    /* decnet address of interface */
-  DEVICE*       dptr;                           /* device ethernet is attached to */
-  uint32        dbit;                           /* debugging bit */
-  int           reflections;                    /* packet reflections on interface */
+  char*         name;                                   /* name of ethernet device */
+  void*         handle;                                 /* handle of implementation-specific device */
+  ETH_PCALLBACK read_callback;                          /* read callback function */
+  ETH_PCALLBACK write_callback;                         /* write callback function */
+  ETH_PACK*     read_packet;                            /* read packet */
+  ETH_PACK*     write_packet;                           /* write packet */
+  ETH_MAC       filter_address[ETH_FILTER_MAX];         /* filtering addresses */
+  int           addr_count;                             /* count of filtering addresses */
+  ETH_BOOL      promiscuous;                            /* promiscuous mode flag */
+  ETH_BOOL      all_multicast;                          /* receive all multicast messages */
+  int32         decnet_self_sent;                       /* loopback packets sent but not seen */
+  ETH_MAC       decnet_addr;                            /* decnet address of interface */
+  DEVICE*       dptr;                                   /* device ethernet is attached to */
+  uint32        dbit;                                   /* debugging bit */
+  int           reflections;                            /* packet reflections on interface */
 #if defined (USE_READER_THREAD)
   ETH_QUE       read_queue;
   pthread_mutex_t     lock;
-  pthread_t     reader_thread;                  /* Reader Thread Id */
+  pthread_t     reader_thread;                          /* Reader Thread Id */
 #endif
 };
 
@@ -176,31 +176,31 @@ typedef struct eth_device  ETH_DEV;
 
 /* prototype declarations*/
 
-t_stat eth_open   (ETH_DEV* dev, char* name,      /* open ethernet interface */
+t_stat eth_open   (ETH_DEV* dev, char* name,            /* open ethernet interface */
                    DEVICE* dptr, uint32 dbit);
-t_stat eth_close  (ETH_DEV* dev);                 /* close ethernet interface */
-t_stat eth_write  (ETH_DEV* dev, ETH_PACK* packet,/* write sychronous packet; */
-                   ETH_PCALLBACK routine);        /*  callback when done */
-t_stat eth_read   (ETH_DEV* dev, ETH_PACK* packet,/* read single packet; */
-                   ETH_PCALLBACK routine);        /*  callback when done*/
-t_stat eth_filter (ETH_DEV* dev, int addr_count,  /* set filter on incoming packets */
+t_stat eth_close  (ETH_DEV* dev);                       /* close ethernet interface */
+t_stat eth_write  (ETH_DEV* dev, ETH_PACK* packet,      /* write sychronous packet; */
+                   ETH_PCALLBACK routine);              /*  callback when done */
+t_stat eth_read   (ETH_DEV* dev, ETH_PACK* packet,      /* read single packet; */
+                   ETH_PCALLBACK routine);              /*  callback when done*/
+t_stat eth_filter (ETH_DEV* dev, int addr_count,        /* set filter on incoming packets */
                    ETH_MAC* addresses,
                    ETH_BOOL all_multicast,
                    ETH_BOOL promiscuous);
-int eth_devices   (int max, ETH_LIST* dev);       /* get ethernet devices on host */
+int eth_devices   (int max, ETH_LIST* dev);             /* get ethernet devices on host */
 
 void eth_packet_trace (ETH_DEV* dev, const uint8 *msg, int len, char* txt); /* trace ethernet packet */
-t_stat eth_show  (FILE* st, UNIT* uptr,           /* show ethernet devices */
+t_stat eth_show  (FILE* st, UNIT* uptr,                 /* show ethernet devices */
                   int32 val, void* desc);
 
-void eth_mac_fmt      (ETH_MAC* add, char* buffer);  /* format ethernet mac address */
-t_stat eth_mac_scan (ETH_MAC* mac, char* strmac);  /* scan string for mac, put in mac */
+void eth_mac_fmt      (ETH_MAC* add, char* buffer);     /* format ethernet mac address */
+t_stat eth_mac_scan (ETH_MAC* mac, char* strmac);       /* scan string for mac, put in mac */
 
-t_stat ethq_init (ETH_QUE* que, int max);         /* initialize FIFO queue */
-void ethq_clear  (ETH_QUE* que);                  /* clear FIFO queue */
-void ethq_remove (ETH_QUE* que);                  /* remove item from FIFO queue */
-void ethq_insert (ETH_QUE* que, int32 type,       /* insert item into FIFO queue */
+t_stat ethq_init (ETH_QUE* que, int max);               /* initialize FIFO queue */
+void ethq_clear  (ETH_QUE* que);                        /* clear FIFO queue */
+void ethq_remove (ETH_QUE* que);                        /* remove item from FIFO queue */
+void ethq_insert (ETH_QUE* que, int32 type,             /* insert item into FIFO queue */
                   ETH_PACK* packet, int32 status);
 
 
-#endif  /* _SIM_ETHER_H */
+#endif                                                  /* _SIM_ETHER_H */

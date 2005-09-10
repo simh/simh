@@ -1,6 +1,6 @@
 /* sim_timer.h: simulator timer library headers
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,18 +19,18 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   02-Jan-04	RMS	Split out from SCP
+   02-Jan-04    RMS     Split out from SCP
 */
 
 #ifndef _SIM_TIMER_H_
-#define _SIM_TIMER_H_	0
+#define _SIM_TIMER_H_   0
 
-#define SIM_NTIMERS	8				/* # timers */
-#define SIM_TMAX	500				/* max timer makeup */
+#define SIM_NTIMERS     8                               /* # timers */
+#define SIM_TMAX        500                             /* max timer makeup */
 
 int32 sim_rtcn_init (int32 time, int32 tmr);
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr);

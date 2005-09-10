@@ -23,29 +23,29 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   07-Feb-05	RMS	Added ASSERT command
-   09-Sep-04	RMS	Added reset_all_p
-   14-Feb-04	RMS	Added debug prototypes (from Dave Hittner)
-   02-Jan-04	RMS	Split out from SCP
+   07-Feb-05    RMS     Added ASSERT command
+   09-Sep-04    RMS     Added reset_all_p
+   14-Feb-04    RMS     Added debug prototypes (from Dave Hittner)
+   02-Jan-04    RMS     Split out from SCP
 */
 
 #ifndef _SIM_SCP_H_
-#define _SIM_SCP_H_	0
+#define _SIM_SCP_H_     0
 
 /* run_cmd parameters */
 
-#define RU_RUN		0				/* run */
-#define RU_GO		1				/* go */
-#define RU_STEP		2				/* step */
-#define RU_CONT		3				/* continue */
-#define RU_BOOT		4				/* boot */
+#define RU_RUN          0                               /* run */
+#define RU_GO           1                               /* go */
+#define RU_STEP         2                               /* step */
+#define RU_CONT         3                               /* continue */
+#define RU_BOOT         4                               /* boot */
 
 /* get_sim_opt parameters */
 
-#define CMD_OPT_SW	001				/* switches */
-#define CMD_OPT_OF	002				/* output file */
-#define CMD_OPT_SCH	004				/* search */
-#define CMD_OPT_DFT	010				/* defaults */
+#define CMD_OPT_SW      001                             /* switches */
+#define CMD_OPT_OF      002                             /* output file */
+#define CMD_OPT_SCH     004                             /* search */
+#define CMD_OPT_DFT     010                             /* defaults */
 
 /* Command processors */
 
@@ -90,7 +90,7 @@ char *get_glyph (char *iptr, char *optr, char mchar);
 char *get_glyph_nc (char *iptr, char *optr, char mchar);
 t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status);
 char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
-	uint32 rdx, t_addr max, char term);
+    uint32 rdx, t_addr max, char term);
 t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp);
 t_value strtotv (char *cptr, char **endptr, uint32 radix);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
@@ -107,7 +107,7 @@ t_bool sim_brk_test (t_addr bloc, int32 btyp);
 char *match_ext (char *fnam, char *ext);
 t_stat sim_cancel_step (void);
 void sim_debug_u16 (uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
-	uint16 before, uint16 after, int terminate);
+    uint16 before, uint16 after, int terminate);
 void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
 
 #endif

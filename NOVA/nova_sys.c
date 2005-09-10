@@ -1,6 +1,6 @@
 /* nova_sys.c: NOVA simulator interface
 
-   Copyright (c) 1993-2004, Robert M. Supnik
+   Copyright (c) 1993-2005, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,25 +19,25 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   26-Mar-04	RMS	Fixed warning with -std=c99
-   14-Jan-04	BKR	Added support for QTY and ALM
-   04-Jan-04	RMS	Fixed 64b issues found by VMS 8.1
-   24-Nov-03	CEO	Added symbolic support for LEF instruction
-   17-Sep-01	RMS	Removed multiconsole support
-   31-May-01	RMS	Added multiconsole support
-   14-Mar-01	RMS	Revised load/dump interface (again)
-   22-Dec-00	RMS	Added second terminal support
-   10-Dec-00	RMS	Added Eclipse support
-   08-Dec-00	BKR	Added plotter support
-   30-Oct-00	RMS	Added support for examine to file
-   15-Oct-00	RMS	Added stack, byte, trap instructions
-   14-Apr-99	RMS	Changed t_addr to unsigned
-   27-Oct-98	RMS	V2.4 load interface
-   24-Sep-97	RMS	Fixed bug in device name table (found by Charles Owen)
+   26-Mar-04    RMS     Fixed warning with -std=c99
+   14-Jan-04    BKR     Added support for QTY and ALM
+   04-Jan-04    RMS     Fixed 64b issues found by VMS 8.1
+   24-Nov-03    CEO     Added symbolic support for LEF instruction
+   17-Sep-01    RMS     Removed multiconsole support
+   31-May-01    RMS     Added multiconsole support
+   14-Mar-01    RMS     Revised load/dump interface (again)
+   22-Dec-00    RMS     Added second terminal support
+   10-Dec-00    RMS     Added Eclipse support
+   08-Dec-00    BKR     Added plotter support
+   30-Oct-00    RMS     Added support for examine to file
+   15-Oct-00    RMS     Added stack, byte, trap instructions
+   14-Apr-99    RMS     Changed t_addr to unsigned
+   27-Oct-98    RMS     V2.4 load interface
+   24-Sep-97    RMS     Fixed bug in device name table (found by Charles Owen)
 */
 
 #include "nova_defs.h"
@@ -72,12 +72,12 @@ extern int32 saved_PC;
 
 /* SCP data structures
 
-   sim_name		simulator name string
-   sim_PC		pointer to saved PC register descriptor
-   sim_emax		number of words needed for examine
-   sim_devices		array of pointers to simulated devices
-   sim_stop_messages	array of pointers to stop messages
-   sim_load		binary loader
+   sim_name             simulator name string
+   sim_PC               pointer to saved PC register descriptor
+   sim_emax             number of words needed for examine
+   sim_devices          array of pointers to simulated devices
+   sim_stop_messages    array of pointers to stop messages
+   sim_load             binary loader
 */
 
 #if defined (ECLIPSE)
@@ -91,55 +91,57 @@ REG *sim_PC = &cpu_reg[0];
 int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = {
-	&cpu_dev,
+    &cpu_dev,
 #if defined (ECLIPSE)
-	&map_dev,
-	&fpu_dev,
-	&pit_dev,
+    &map_dev,
+    &fpu_dev,
+    &pit_dev,
 #endif
-	&ptr_dev,
-	&ptp_dev,
-	&tti_dev,
-	&tto_dev,
-	&tti1_dev,
-	&tto1_dev,
-	&clk_dev,
-	&plt_dev,
-	&lpt_dev,
-	&dsk_dev,
-	&dkp_dev,
-	&mta_dev,
-	&qty_dev,
-	&alm_dev,
-	NULL };
+    &ptr_dev,
+    &ptp_dev,
+    &tti_dev,
+    &tto_dev,
+    &tti1_dev,
+    &tto1_dev,
+    &clk_dev,
+    &plt_dev,
+    &lpt_dev,
+    &dsk_dev,
+    &dkp_dev,
+    &mta_dev,
+    &qty_dev,
+    &alm_dev,
+    NULL
+    };
 
 const char *sim_stop_messages[] = {
-	"Unknown error",
-	"Unknown I/O instruction",
-	"HALT instruction",
-	"Breakpoint",
-	"Nested indirect address limit exceeded",
-	"Nested indirect interrupt address limit exceeded",
-	"Nested indirect trap address limit exceeded",
-	"Read breakpoint",
-	"Write breakpoint"  };
-
+    "Unknown error",
+    "Unknown I/O instruction",
+    "HALT instruction",
+    "Breakpoint",
+    "Nested indirect address limit exceeded",
+    "Nested indirect interrupt address limit exceeded",
+    "Nested indirect trap address limit exceeded",
+    "Read breakpoint",
+    "Write breakpoint"
+    };
+
 /* Binary loader
 
    Loader format consists of blocks, optionally preceded, separated, and
    followed by zeroes.  Each block consists of:
 
-	lo_count
-	hi_count
-	lo_origin
-	hi_origin
-	lo_checksum
-	hi_checksum
-	lo_data byte	---
-	hi_data byte	 |
-	:		 > -count words
-	lo_data byte	 |
-	hi_data byte	---
+        lo_count
+        hi_count
+        lo_origin
+        hi_origin
+        lo_checksum
+        hi_checksum
+        lo_data byte    ---
+        hi_data byte     |
+        :                > -count words
+        lo_data byte     |
+        hi_data byte    ---
 
    If the word count is [0,-20], then the block is normal data.
    If the word count is [-21,-n], then the block is repeated data.
@@ -155,118 +157,125 @@ uint32 origin;
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 state = 0;
 while ((i = getc (fileref)) != EOF) {
-	switch (state) {
-	case 0:						/* leader */
-	    count = i;
-	    state = (count != 0);
-	    break;
-	case 1:						/* high count */
-	    csum = count = (i << 8) | count;
-	    state = 2;
-	    break;
-	case 2:						/* low origin */
-	    origin = i;
-	    state = 3;
-	    break;
-	case 3:						/* high origin */
-	    origin = (i << 8) | origin;
-	    csum = csum + origin;
-	    state = 4;
-	    break;
-	case 4:						/* low checksum */
-	    csum = csum + i;
-	    state = 5;
-	    break;
-	case 5:						/* high checksum */
-	    csum = csum + (i << 8);
-	    if (count == 1) saved_PC = origin;		/* count = 1? */
-	    if (count <= 1) {				/* count = 0/1? */
-		if (csum & 0177777) return SCPE_CSUM;
-		state = 0;
-		break;  }
-	    if (count < 0100000) {			/* count > 1 */
-		state = 8;
-		break;  }
-	    count = 0200000 - count;
-	    state = 6;
-	    break;
-	case 6:						/* low data  */
-	    data = i;
-	    state = 7;
-	    break;
-	case 7:						/* high data */
-	    data = (i << 8) | data;
-	    csum = csum + data;
-	    if (count > 20) {				/* large block */
-		for (count = count - 1; count == 1; count--) {
-		    if (origin >= MEMSIZE) return SCPE_NXM;
-		    M[origin] = data;
-		    origin = origin + 1;  }  }
-	    if (origin >= MEMSIZE) return SCPE_NXM;
-	    M[origin] = data;
-	    origin = origin + 1;
-	    count = count - 1;
-	    if (count == 0) {
-		if (csum & 0177777) return SCPE_CSUM;
-		state = 0;
-		break;  }
-	    state = 6;
-	    break;
-	case 8:						/* error block */
-	    if (i == 0377) state = 0;
-	    break;  }					/* end switch */
-	}						/* end while */
+    switch (state) {
+        case 0:                                         /* leader */
+            count = i;
+            state = (count != 0);
+            break;
+        case 1:                                         /* high count */
+            csum = count = (i << 8) | count;
+            state = 2;
+            break;
+        case 2:                                         /* low origin */
+            origin = i;
+            state = 3;
+            break;
+        case 3:                                         /* high origin */
+            origin = (i << 8) | origin;
+            csum = csum + origin;
+            state = 4;
+            break;
+        case 4:                                         /* low checksum */
+            csum = csum + i;
+            state = 5;
+            break;
+        case 5:                                         /* high checksum */
+            csum = csum + (i << 8);
+            if (count == 1) saved_PC = origin;          /* count = 1? */
+            if (count <= 1) {                           /* count = 0/1? */
+                if (csum & 0177777) return SCPE_CSUM;
+                state = 0;
+                break;
+				}
+            if (count < 0100000) {                      /* count > 1 */
+                state = 8;
+                break;
+				}
+            count = 0200000 - count;
+            state = 6;
+            break;
+        case 6:                                         /* low data  */
+            data = i;
+            state = 7;
+            break;
+        case 7:                                         /* high data */
+            data = (i << 8) | data;
+            csum = csum + data;
+            if (count > 20) {                           /* large block */
+                for (count = count - 1; count == 1; count--) {
+                    if (origin >= MEMSIZE) return SCPE_NXM;
+                    M[origin] = data;
+                    origin = origin + 1;
+                    }
+                }
+            if (origin >= MEMSIZE) return SCPE_NXM;
+            M[origin] = data;
+            origin = origin + 1;
+            count = count - 1;
+            if (count == 0) {
+                if (csum & 0177777) return SCPE_CSUM;
+                state = 0;
+                break;
+                }
+            state = 6;
+            break;
+        case 8:                                         /* error block */
+            if (i == 0377) state = 0;
+            break;
+            }                                           /* end switch */
+        }                                               /* end while */
 
 /* Ok to find end of tape between blocks or in error state */
 
 return ((state == 0) || (state == 8))? SCPE_OK: SCPE_FMT;
 }
-
+
 /* Symbol tables */
 
-#define I_V_FL		18				/* flag bits */
-#define I_M_FL		037				/* flag width */
-#define I_V_NPN		000				/* no operands */
-#define I_V_R		001				/* reg */
-#define I_V_D		002				/* device */
-#define I_V_RD		003				/* reg,device */
-#define I_V_M		004				/* mem addr */
-#define I_V_RM		005				/* reg,mem addr */
-#define I_V_RR		006				/* operate */
-#define I_V_BY		007				/* Nova byte pointer */
-#define I_V_2AC		010				/* reg,reg */
-#define I_V_RSI		011				/* reg,short imm */
-#define I_V_LI		012				/* long imm */
-#define I_V_RLI		013				/* reg,long imm */
-#define I_V_LM		014				/* long mem addr */
-#define I_V_RLM		015				/* reg,long mem addr */
-#define I_V_FRM		016				/* flt reg,long mem addr */
-#define I_V_FST		017				/* flt long mem, status */
-#define I_V_XP		020				/* XOP */
-#define I_NPN		(I_V_NPN << I_V_FL)
-#define I_R		(I_V_R << I_V_FL)
-#define I_D		(I_V_D << I_V_FL)
-#define I_RD		(I_V_RD << I_V_FL)
-#define I_M		(I_V_M << I_V_FL)
-#define I_RM		(I_V_RM << I_V_FL)
-#define I_RR		(I_V_RR << I_V_FL)
-#define I_BY		(I_V_BY << I_V_FL)
-#define I_2AC		(I_V_2AC << I_V_FL)
-#define I_RSI		(I_V_RSI << I_V_FL)
-#define I_LI		(I_V_LI << I_V_FL)
-#define I_RLI		(I_V_RLI << I_V_FL)
-#define I_LM		(I_V_LM << I_V_FL)
-#define I_RLM		(I_V_RLM << I_V_FL)
-#define I_FRM		(I_V_FRM << I_V_FL)
-#define I_FST		(I_V_FST << I_V_FL)
-#define I_XP		(I_V_XP << I_V_FL)
+#define I_V_FL          18                              /* flag bits */
+#define I_M_FL          037                             /* flag width */
+#define I_V_NPN         000                             /* no operands */
+#define I_V_R           001                             /* reg */
+#define I_V_D           002                             /* device */
+#define I_V_RD          003                             /* reg,device */
+#define I_V_M           004                             /* mem addr */
+#define I_V_RM          005                             /* reg,mem addr */
+#define I_V_RR          006                             /* operate */
+#define I_V_BY          007                             /* Nova byte pointer */
+#define I_V_2AC         010                             /* reg,reg */
+#define I_V_RSI         011                             /* reg,short imm */
+#define I_V_LI          012                             /* long imm */
+#define I_V_RLI         013                             /* reg,long imm */
+#define I_V_LM          014                             /* long mem addr */
+#define I_V_RLM         015                             /* reg,long mem addr */
+#define I_V_FRM         016                             /* flt reg,long mem addr */
+#define I_V_FST         017                             /* flt long mem, status */
+#define I_V_XP          020                             /* XOP */
+#define I_NPN           (I_V_NPN << I_V_FL)
+#define I_R             (I_V_R << I_V_FL)
+#define I_D             (I_V_D << I_V_FL)
+#define I_RD            (I_V_RD << I_V_FL)
+#define I_M             (I_V_M << I_V_FL)
+#define I_RM            (I_V_RM << I_V_FL)
+#define I_RR            (I_V_RR << I_V_FL)
+#define I_BY            (I_V_BY << I_V_FL)
+#define I_2AC           (I_V_2AC << I_V_FL)
+#define I_RSI           (I_V_RSI << I_V_FL)
+#define I_LI            (I_V_LI << I_V_FL)
+#define I_RLI           (I_V_RLI << I_V_FL)
+#define I_LM            (I_V_LM << I_V_FL)
+#define I_RLM           (I_V_RLM << I_V_FL)
+#define I_FRM           (I_V_FRM << I_V_FL)
+#define I_FST           (I_V_FST << I_V_FL)
+#define I_XP            (I_V_XP << I_V_FL)
 
 static const int32 masks[] = {
-0177777, 0163777, 0177700, 0163700,
-0174000, 0160000, 0103770, 0163477,
-0103777, 0103777, 0177777, 0163777,
-0176377, 0162377, 0103777, 0163777,
-0100077  };
+ 0177777, 0163777, 0177700, 0163700,
+ 0174000, 0160000, 0103770, 0163477,
+ 0103777, 0103777, 0177777, 0163777,
+ 0176377, 0162377, 0103777, 0163777,
+ 0100077
+ };
 
 static const char *opcode[] = {
  "JMP", "JSR", "ISZ", "DSZ",
@@ -392,7 +401,8 @@ static const char *opcode[] = {
 #if defined (ECLIPSE)
   "LEF", "LEF", "LEF", "LEF",
 #endif
- NULL };
+ NULL
+ };
 
 static const int32 opc_val[] = {
  0000000+I_M, 0004000+I_M, 0010000+I_M, 0014000+I_M,
@@ -518,11 +528,13 @@ static const int32 opc_val[] = {
 #if defined (ECLIPSE)
  0064000+I_D, 0070000+I_D, 0074000+I_D, 0076000+I_D,
 #endif
- -1 };
+ -1
+ };
  
 static const char *skip[] = {
  "SKP", "SZC", "SNC", "SZR", "SNR", "SEZ", "SBN",
- NULL };
+ NULL
+ };
 
 static const char *device[] = {
 #if defined (ECLIPSE)
@@ -531,7 +543,8 @@ static const char *device[] = {
  "TTI", "TTO", "PTR", "PTP", "RTC", "PLT", "CDR", "LPT",
  "DSK", "MTA", "DCM", "ADCV", "DKP", "CAS",
  "TTI1", "TTO1", "CPU",
- NULL };
+ NULL
+ };
 
 static const int32 dev_val[] = {
 #if defined (ECLIPSE)
@@ -540,68 +553,77 @@ static const int32 dev_val[] = {
  010, 011, 012, 013, 014, 015, 016, 017,
  020, 022, 024, 030, 033, 034, 
  050, 051, 077,
- -1 };
-
+ -1
+ };
+
 /* Address decode
 
    Inputs:
-	*of	=	output stream
-	addr	=	current PC
-	ind	=	indirect flag
-	mode	=	addressing mode
-	disp	=	displacement
-	ext	=	true if extended address
-	cflag	=	true if decoding for CPU
+        *of     =       output stream
+        addr    =       current PC
+        ind     =       indirect flag
+        mode    =       addressing mode
+        disp    =       displacement
+        ext     =       true if extended address
+        cflag   =       true if decoding for CPU
    Outputs:
-	return	=	error code
+        return  =       error code
 */
 
 t_stat fprint_addr (FILE *of, t_addr addr, int32 ind, int32 mode,
-	int32 disp, t_bool ext, int32 cflag)
+    int32 disp, t_bool ext, int32 cflag)
 {
 int32 dsign, dmax;
 
-if (ext) dmax = AMASK + 1;				/* get max disp */
+if (ext) dmax = AMASK + 1;                              /* get max disp */
 else dmax = I_M_DISP + 1;
-dsign = dmax >> 1;					/* get disp sign */
-if (ind) fprintf (of, "@");				/* indirect? */
-switch (mode & 03) {					/* mode */
-case 0:							/* absolute */
-	fprintf (of, "%-o", disp);
-	break;
-case 1:							/* PC rel */
-	if (disp & dsign) {
-	    if (cflag) fprintf (of, "%-o", (addr - (dmax - disp)) & AMASK);
-	    else fprintf (of, ".-%-o", dmax - disp);  }
-	else {
-	    if (cflag) fprintf (of, "%-o", (addr + disp) & AMASK);
-	    else fprintf (of, ".+%-o", disp);  }
-	break;
-case 2:							/* AC2 rel */
-	if (disp & dsign) fprintf (of, "-%-o,2", dmax - disp);
-	else fprintf (of, "%-o,2", disp);
-	break;
-case 3:							/* AC3 rel */
-	if (disp & dsign) fprintf (of, "-%-o,3", dmax - disp);
-	else fprintf (of, "%-o,3", disp);
-	break;  }					/* end switch */
+dsign = dmax >> 1;                                      /* get disp sign */
+if (ind) fprintf (of, "@");                             /* indirect? */
+switch (mode & 03) {                                    /* mode */
+
+    case 0:                                             /* absolute */
+        fprintf (of, "%-o", disp);
+        break;
+
+    case 1:                                             /* PC rel */
+        if (disp & dsign) {
+            if (cflag) fprintf (of, "%-o", (addr - (dmax - disp)) & AMASK);
+            else fprintf (of, ".-%-o", dmax - disp);
+            }
+        else {
+            if (cflag) fprintf (of, "%-o", (addr + disp) & AMASK);
+            else fprintf (of, ".+%-o", disp);
+            }
+        break;
+
+    case 2:                                             /* AC2 rel */
+        if (disp & dsign) fprintf (of, "-%-o,2", dmax - disp);
+        else fprintf (of, "%-o,2", disp);
+        break;
+
+    case 3:                                             /* AC3 rel */
+        if (disp & dsign) fprintf (of, "-%-o,3", dmax - disp);
+        else fprintf (of, "%-o,3", disp);
+        break;
+        }                                               /* end switch */
+
 return SCPE_OK;
 }
-
+
 /* Symbolic output
 
    Inputs:
-	*of	=	output stream
-	addr	=	current PC
-	*val	=	pointer to values
-	*uptr	=	pointer to unit
-	sw	=	switches
+        *of     =       output stream
+        addr    =       current PC
+        *val    =       pointer to values
+        *uptr   =       pointer to unit
+        sw      =       switches
    Outputs:
-	status	=	error code
+        status  =       error code
 */
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
-	UNIT *uptr, int32 sw)
+    UNIT *uptr, int32 sw)
 {
 int32 cflag, i, j, c1, c2, inst, inst1, dv, src, dst, skp;
 int32 ind, mode, disp, dev;
@@ -610,132 +632,154 @@ int32 byac, extind, extdisp, xop;
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 c1 =  ((int32) val[0] >> 8) & 0177;
 c2 = (int32) val[0] & 0177;
-if (sw & SWMASK ('A')) {				/* ASCII? */
-	fprintf (of, (c2 < 040)? "<%03o>": "%c", c2);
-	return SCPE_OK;  }
-if (sw & SWMASK ('C')) {				/* character? */
-	fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
-	fprintf (of, (c2 < 040)? "<%03o>": "%c", c2);
-	return SCPE_OK;  }
-if (!(sw & SWMASK ('M'))) return SCPE_ARG;		/* mnemonic? */
-
+if (sw & SWMASK ('A')) {                                /* ASCII? */
+    fprintf (of, (c2 < 040)? "<%03o>": "%c", c2);
+    return SCPE_OK;
+    }
+if (sw & SWMASK ('C')) {                                /* character? */
+    fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
+    fprintf (of, (c2 < 040)? "<%03o>": "%c", c2);
+    return SCPE_OK;
+    }
+if (!(sw & SWMASK ('M'))) return SCPE_ARG;              /* mnemonic? */
+
 /* Instruction decode */
 
 inst = (int32) val[0];
 inst1 = (int32) val[1];
-for (i = 0; opc_val[i] >= 0; i++) {			/* loop thru ops */
-    j = (opc_val[i] >> I_V_FL) & I_M_FL;		/* get class */
-    if ((opc_val[i] & 0177777) == (inst & masks[j])) {	/* match? */
-	src = I_GETSRC (inst);				/* opr fields */
-	dst = I_GETDST (inst);
-	skp = I_GETSKP (inst);
-	ind = inst & I_IND;				/* mem ref fields */
-	mode = I_GETMODE (inst);
-	disp = I_GETDISP (inst);
-	dev = I_GETDEV (inst);				/* IOT fields */
-	byac = I_GETPULSE (inst);			/* byte fields */
-	xop = I_GETXOP (inst);				/* XOP fields */
-	extind = inst1 & A_IND;			/* extended fields */
-	extdisp = inst1 & AMASK;
-	for (dv = 0; (dev_val[dv] >= 0) && (dev_val[dv] != dev); dv++) ;
+for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
+    j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
+    if ((opc_val[i] & 0177777) == (inst & masks[j])) {  /* match? */
+        src = I_GETSRC (inst);                          /* opr fields */
+        dst = I_GETDST (inst);
+        skp = I_GETSKP (inst);
+        ind = inst & I_IND;                             /* mem ref fields */
+        mode = I_GETMODE (inst);
+        disp = I_GETDISP (inst);
+        dev = I_GETDEV (inst);                          /* IOT fields */
+        byac = I_GETPULSE (inst);                       /* byte fields */
+        xop = I_GETXOP (inst);                          /* XOP fields */
+        extind = inst1 & A_IND;                         /* extended fields */
+        extdisp = inst1 & AMASK;
+        for (dv = 0; (dev_val[dv] >= 0) && (dev_val[dv] != dev); dv++) ;
 
-	switch (j) {					/* switch on class */
-	case I_V_NPN:					/* no operands */
-	    fprintf (of, "%s", opcode[i]);		/* opcode */
-	    break;
-	case I_V_R:					/* reg only */
-	    fprintf (of, "%s %-o", opcode[i], dst);
-	    break;
-	case I_V_D:					/* dev only */
+        switch (j) {                                    /* switch on class */
+
+        case I_V_NPN:                                   /* no operands */
+            fprintf (of, "%s", opcode[i]);              /* opcode */
+            break;
+
+        case I_V_R:                                     /* reg only */
+            fprintf (of, "%s %-o", opcode[i], dst);
+            break;
+
+        case I_V_D:                                     /* dev only */
 #if defined (ECLIPSE)
-	    if (Usermap && (MapStat & 0100)) {		/* the evil LEF mode */
-		fprintf (of, "LEF %-o,", dst);
-		fprint_addr (of, addr, ind, mode, disp, FALSE, cflag);
-		break;
-		}
+            if (Usermap && (MapStat & 0100)) {          /* the evil LEF mode */
+                fprintf (of, "LEF %-o,", dst);
+                fprint_addr (of, addr, ind, mode, disp, FALSE, cflag);
+                break;
+                }
 #endif
-	    if (dev_val[dv] >= 0)
-		fprintf (of, "%s %s", opcode[i], device[dv]);
-	    else fprintf (of, "%s %-o", opcode[i], dev);
-	    break;
-	case I_V_RD:					/* reg, dev */
-	    if (dev_val[dv] >= 0)
-		fprintf (of, "%s %-o,%s", opcode[i], dst, device[dv]);
-	    else fprintf (of, "%s %-o,%-o", opcode[i], dst, dev);
-	    break;
-	case I_V_M:					/* addr only */
-	    fprintf (of, "%s ", opcode[i]);
-	    fprint_addr (of, addr, ind, mode, disp, FALSE, cflag);
-	    break;
-	case I_V_RM:					/* reg, addr */
-	    fprintf (of, "%s %-o,", opcode[i], dst);
-	    fprint_addr (of, addr, ind, mode, disp, FALSE, cflag);
-	    break;
-	case I_V_RR:					/* operate */
-	    fprintf (of, "%s %-o,%-o", opcode[i], src, dst);
-	    if (skp) fprintf (of, ",%s", skip[skp-1]);
-	    break;
-	case I_V_BY:					/* byte */
-	    fprintf (of, "%s %-o,%-o", opcode[i], byac, dst);
-	    break;
-	case I_V_2AC:					/* reg, reg */
-	    fprintf (of, "%s %-o,%-o", opcode[i], src, dst);
-	    break;
-	case I_V_RSI:					/* reg, short imm */
-	    fprintf (of, "%s %-o,%-o", opcode[i], src + 1, dst);
-	    break;
-	case I_V_LI:					/* long imm */
-	    fprintf (of, "%s %-o", opcode[i], inst1);
-	    return -1;
-	case I_V_RLI:					/* reg, long imm */
-	    fprintf (of, "%s %-o,%-o", opcode[i], inst1, dst);
-	    return -1;
-	case I_V_LM:					/* long addr */
-	    fprintf (of, "%s ", opcode[i]);
-	    fprint_addr (of, addr, extind, mode, extdisp, TRUE, cflag);
-	    return -1;
-	case I_V_RLM:					/* reg, long addr */
-	    fprintf (of, "%s %-o,", opcode[i], dst);
-	    fprint_addr (of, addr, extind, mode, extdisp, TRUE, cflag);
-	    return -1;
-	case I_V_FRM:					/* flt reg, long addr */
-	    fprintf (of, "%s %-o,", opcode[i], dst);
-	    fprint_addr (of, addr, extind, src, extdisp, TRUE, cflag);
-	    return -1;
-	case I_V_FST:					/* flt status */
-	    fprintf (of, "%s ", opcode[i]);
-	    fprint_addr (of, addr, extind, dst, extdisp, AMASK + 1, cflag);
-	    return -1;
-	case I_V_XP:					/* XOP */
-	    fprintf (of, "%s %-o,%-o,%-o", opcode[i], src, dst, xop);
-	    break;  					/* end case */
-	default:
-		fprintf (of, "??? [%-o]", inst);
-		break;	}
-	return SCPE_OK;  }				/* end if */
-	}						/* end for */
+            if (dev_val[dv] >= 0)
+                fprintf (of, "%s %s", opcode[i], device[dv]);
+            else fprintf (of, "%s %-o", opcode[i], dev);
+            break;
+
+        case I_V_RD:                                    /* reg, dev */
+            if (dev_val[dv] >= 0)
+                fprintf (of, "%s %-o,%s", opcode[i], dst, device[dv]);
+            else fprintf (of, "%s %-o,%-o", opcode[i], dst, dev);
+            break;
+
+        case I_V_M:                                     /* addr only */
+            fprintf (of, "%s ", opcode[i]);
+            fprint_addr (of, addr, ind, mode, disp, FALSE, cflag);
+            break;
+
+        case I_V_RM:                                    /* reg, addr */
+            fprintf (of, "%s %-o,", opcode[i], dst);
+            fprint_addr (of, addr, ind, mode, disp, FALSE, cflag);
+            break;
+
+        case I_V_RR:                                    /* operate */
+            fprintf (of, "%s %-o,%-o", opcode[i], src, dst);
+            if (skp) fprintf (of, ",%s", skip[skp-1]);
+            break;
+
+        case I_V_BY:                                    /* byte */
+            fprintf (of, "%s %-o,%-o", opcode[i], byac, dst);
+            break;
+
+        case I_V_2AC:                                   /* reg, reg */
+            fprintf (of, "%s %-o,%-o", opcode[i], src, dst);
+            break;
+
+        case I_V_RSI:                                   /* reg, short imm */
+            fprintf (of, "%s %-o,%-o", opcode[i], src + 1, dst);
+            break;
+
+        case I_V_LI:                                    /* long imm */
+            fprintf (of, "%s %-o", opcode[i], inst1);
+            return -1;
+
+        case I_V_RLI:                                   /* reg, long imm */
+            fprintf (of, "%s %-o,%-o", opcode[i], inst1, dst);
+            return -1;
+
+        case I_V_LM:                                    /* long addr */
+            fprintf (of, "%s ", opcode[i]);
+            fprint_addr (of, addr, extind, mode, extdisp, TRUE, cflag);
+            return -1;
+
+        case I_V_RLM:                                   /* reg, long addr */
+            fprintf (of, "%s %-o,", opcode[i], dst);
+            fprint_addr (of, addr, extind, mode, extdisp, TRUE, cflag);
+            return -1;
+
+        case I_V_FRM:                                   /* flt reg, long addr */
+            fprintf (of, "%s %-o,", opcode[i], dst);
+            fprint_addr (of, addr, extind, src, extdisp, TRUE, cflag);
+            return -1;
+
+        case I_V_FST:                                   /* flt status */
+            fprintf (of, "%s ", opcode[i]);
+            fprint_addr (of, addr, extind, dst, extdisp, AMASK + 1, cflag);
+            return -1;
+
+        case I_V_XP:                                    /* XOP */
+            fprintf (of, "%s %-o,%-o,%-o", opcode[i], src, dst, xop);
+            break;                                      /* end case */
+
+        default:
+            fprintf (of, "??? [%-o]", inst);
+            break;
+            }
+        return SCPE_OK;
+        }                                               /* end if */
+    }                                                   /* end for */
 return SCPE_ARG;
 }
-
+
 /* Address parse
 
    Inputs:
-	*cptr	=	pointer to input string
-	addr	=	current PC
-	ext	=	extended address
-	cflag	=	true if parsing for CPU
-	val[3]	=	output array
+        *cptr   =       pointer to input string
+        addr    =       current PC
+        ext     =       extended address
+        cflag   =       true if parsing for CPU
+        val[3]  =       output array
    Outputs:
-	optr	=	pointer to next char in input string
-			NULL if error
+        optr    =       pointer to next char in input string
+                        NULL if error
 */
 
-#define A_FL	001					/* CPU flag */
-#define A_NX	002					/* index seen */
-#define A_PER	004					/* period seen */
-#define A_NUM	010					/* number seen */
-#define A_SI	020					/* sign seen */
-#define A_MI	040					/* - seen */
+#define A_FL    001                                     /* CPU flag */
+#define A_NX    002                                     /* index seen */
+#define A_PER   004                                     /* period seen */
+#define A_NUM   010                                     /* number seen */
+#define A_SI    020                                     /* sign seen */
+#define A_MI    040                                     /* - seen */
 
 char *get_addr (char *cptr, t_addr addr, t_bool ext, int32 cflag, int32 *val)
 {
@@ -743,81 +787,92 @@ int32 d, r, x, pflag;
 char gbuf[CBUFSIZE];
 int32 dmax, dsign;
 
-if (ext) dmax = AMASK + 1;				/* get max disp */
+if (ext) dmax = AMASK + 1;                              /* get max disp */
 else dmax = I_M_DISP + 1;
-dsign = dmax >> 1;					/* get disp sign */
-val[0] = 0;						/* no indirect */
-val[1] = 0;						/* PC rel */
-val[2] = 0;						/* no addr */
+dsign = dmax >> 1;                                      /* get disp sign */
+val[0] = 0;                                             /* no indirect */
+val[1] = 0;                                             /* PC rel */
+val[2] = 0;                                             /* no addr */
 
-pflag = cflag & A_FL;					/* isolate flag */
-if (*cptr == '@') {					/* indirect? */
-	val[0] = 1;
-	cptr++;  }		
-if (*cptr == '.') {					/* relative? */
-	pflag = pflag | A_PER;
-	x = 1;						/* "index" is PC */
-	cptr++;  }
-if (*cptr == '+') {					/* + sign? */
-	pflag = pflag | A_SI;
-	cptr++;  }
-else if (*cptr == '-') {				/* - sign? */
-	pflag = pflag | A_MI | A_SI;
-	cptr++;  }	
-if (*cptr != 0) {					/* number? */
-	cptr = get_glyph (cptr, gbuf, ',');		/* get glyph */
-	d = (int32) get_uint (gbuf, 8, AMASK, &r);
-	if (r != SCPE_OK) return NULL;
-	pflag = pflag | A_NUM;  }
-if (*cptr != 0) {					/* index? */
-	cptr = get_glyph (cptr, gbuf, 0);		/* get glyph */
-	x = (int32) get_uint (gbuf, 8, I_M_DST, &r);
-	if ((r != SCPE_OK) || (x < 2)) return NULL;
-	pflag = pflag | A_NX;  }
-
-/* Address parse, continued */
+pflag = cflag & A_FL;                                   /* isolate flag */
+if (*cptr == '@') {                                     /* indirect? */
+    val[0] = 1;
+    cptr++;
+    }           
+if (*cptr == '.') {                                     /* relative? */
+    pflag = pflag | A_PER;
+    x = 1;                                              /* "index" is PC */
+    cptr++;
+    }
+if (*cptr == '+') {                                     /* + sign? */
+    pflag = pflag | A_SI;
+    cptr++;
+    }
+else if (*cptr == '-') {                                /* - sign? */
+    pflag = pflag | A_MI | A_SI;
+    cptr++;
+    }   
+if (*cptr != 0) {                                       /* number? */
+    cptr = get_glyph (cptr, gbuf, ',');                 /* get glyph */
+    d = (int32) get_uint (gbuf, 8, AMASK, &r);
+    if (r != SCPE_OK) return NULL;
+    pflag = pflag | A_NUM;
+    }
+if (*cptr != 0) {                                       /* index? */
+    cptr = get_glyph (cptr, gbuf, 0);                   /* get glyph */
+    x = (int32) get_uint (gbuf, 8, I_M_DST, &r);
+    if ((r != SCPE_OK) || (x < 2)) return NULL;
+    pflag = pflag | A_NX;
+    }
 
-switch (pflag) {					/* case on flags */
-case A_NUM: case A_NUM+A_SI:				/* ~CPU, (+)num */
-	if (d < dmax) val[2] = d;
-	else return NULL;
-	break;
-case A_NUM+A_FL: case A_NUM+A_SI+A_FL:			/* CPU, (+)num */
-	if (d < dmax) val[2] = d;
-	else if (((d >= (((int32) addr - dsign) & AMASK)) &&
-		  (d < (((int32) addr + dsign) & AMASK))) ||
-		  (d >= ((int32) addr + (-dsign & AMASK)))) {
-	    val[1] = 1;					/* PC rel */
-	    val[2] = (d - addr) & (dmax - 1);  }
-	else return NULL;
-	break;
-case A_PER: case A_PER+A_FL:				/* . */
-case A_PER+A_SI+A_NUM: case A_PER+A_SI+A_NUM+A_FL:	/* . + num */
-case A_PER+A_SI+A_MI+A_NUM:				/* . - num */
-case A_PER+A_SI+A_MI+A_NUM+A_FL:
-case A_NX+A_NUM: case A_NX+A_NUM+A_FL:			/* num, ndx */
-case A_NX+A_SI+A_NUM: case A_NX+A_SI+A_NUM+A_FL:	/* +num, ndx */
-case A_NX+A_SI+A_MI+A_NUM:				/* -num, ndx */
-case A_NX+A_SI+A_MI+A_NUM+A_FL:
-	val[1] = x;					/* set mode */
-	if (((pflag & A_MI) == 0) && (d < dsign)) val[2] = d;
-	else if ((pflag & A_MI) && (d <= dsign)) val[2] = (dmax - d);
-	else return NULL;
-	break;
-default:
-	return NULL;  }					/* end case */
+switch (pflag) {                                        /* case on flags */
+
+    case A_NUM: case A_NUM+A_SI:                        /* ~CPU, (+)num */
+        if (d < dmax) val[2] = d;
+        else return NULL;
+        break;
+
+    case A_NUM+A_FL: case A_NUM+A_SI+A_FL:              /* CPU, (+)num */
+        if (d < dmax) val[2] = d;
+        else if (((d >= (((int32) addr - dsign) & AMASK)) &&
+                  (d < (((int32) addr + dsign) & AMASK))) ||
+                  (d >= ((int32) addr + (-dsign & AMASK)))) {
+            val[1] = 1;                                 /* PC rel */
+            val[2] = (d - addr) & (dmax - 1);
+            }
+        else return NULL;
+        break;
+
+    case A_PER: case A_PER+A_FL:                        /* . */
+    case A_PER+A_SI+A_NUM: case A_PER+A_SI+A_NUM+A_FL:  /* . + num */
+    case A_PER+A_SI+A_MI+A_NUM:                         /* . - num */
+    case A_PER+A_SI+A_MI+A_NUM+A_FL:
+    case A_NX+A_NUM: case A_NX+A_NUM+A_FL:              /* num, ndx */
+    case A_NX+A_SI+A_NUM: case A_NX+A_SI+A_NUM+A_FL:    /* +num, ndx */
+    case A_NX+A_SI+A_MI+A_NUM:                          /* -num, ndx */
+    case A_NX+A_SI+A_MI+A_NUM+A_FL:
+        val[1] = x;                                     /* set mode */
+        if (((pflag & A_MI) == 0) && (d < dsign)) val[2] = d;
+        else if ((pflag & A_MI) && (d <= dsign)) val[2] = (dmax - d);
+        else return NULL;
+        break;
+
+    default:
+        return NULL;
+        }                                               /* end case */
+
 return cptr;
 }
 
 /* Parse two registers 
 
    Inputs:
-	*cptr	=	input string
-	term	=	second terminating character
-	val	=	output array
+        *cptr   =       input string
+        term    =       second terminating character
+        val     =       output array
    Outputs:
-	optr	=	pointer to next char in input string
-			NULL if error
+        optr    =       pointer to next char in input string
+                        NULL if error
 */
 
 char *get_2reg (char *cptr, char term, int32 *val)
@@ -825,25 +880,25 @@ char *get_2reg (char *cptr, char term, int32 *val)
 char gbuf[CBUFSIZE];
 t_stat r;
 
-cptr = get_glyph (cptr, gbuf, ',');			/* get register */
+cptr = get_glyph (cptr, gbuf, ',');                     /* get register */
 val[0] = (int32) get_uint (gbuf, 8, I_M_SRC, &r);
 if (r != SCPE_OK) return NULL;
-cptr = get_glyph (cptr, gbuf, term);			/* get register */
+cptr = get_glyph (cptr, gbuf, term);                    /* get register */
 val[1] = (int32) get_uint (gbuf, 8, I_M_DST, &r);
 if (r != SCPE_OK) return NULL;
 return cptr;
 }
-
+
 /* Symbolic input
 
    Inputs:
-	*cptr	=	pointer to input string
-	addr	=	current PC
-	*uptr	=	pointer to unit
-	*val	=	pointer to output values
-	sw	=	switches
+        *cptr   =       pointer to input string
+        addr    =       current PC
+        *uptr   =       pointer to unit
+        *val    =       pointer to output values
+        sw      =       switches
    Outputs:
-	status	=	error status
+        status  =       error status
 */
 
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
@@ -853,145 +908,165 @@ t_stat r, rtn;
 char gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
-while (isspace (*cptr)) cptr++;				/* absorb spaces */
+while (isspace (*cptr)) cptr++;                         /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = (t_value) cptr[0];
-	return SCPE_OK;  }
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    val[0] = (t_value) cptr[0];
+    return SCPE_OK;
+    }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* ASCII string? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = ((t_value) cptr[0] << 8) + (t_value) cptr[1];
-	return SCPE_OK;  }
-
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    val[0] = ((t_value) cptr[0] << 8) + (t_value) cptr[1];
+    return SCPE_OK;
+    }
+
 /* Instruction parse */
 
-rtn = SCPE_OK;						/* assume 1 word */
-cptr = get_glyph (cptr, gbuf, 0);			/* get opcode */
+rtn = SCPE_OK;                                          /* assume 1 word */
+cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
 if (opcode[i] == NULL) return SCPE_ARG;
-val[0] = opc_val[i] & 0177777;				/* get value */
-j = (opc_val[i] >> I_V_FL) & I_M_FL;			/* get class */
+val[0] = opc_val[i] & 0177777;                          /* get value */
+j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 
-switch (j) {						/* case on class */
-case I_V_NPN:						/* no operand */
-	break;
-case I_V_R:						/* IOT reg */
-	cptr = get_glyph (cptr, gbuf, 0);		/* get register */
-	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	val[0] = val[0] | (d << I_V_DST);		/* put in place */
-	break;
-case I_V_RD:						/* IOT reg,dev */
-	cptr = get_glyph (cptr, gbuf, ',');		/* get register */
-	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	val[0] = val[0] | (d << I_V_DST);		/* put in place */
-case I_V_D:						/* IOT dev */
-	cptr = get_glyph (cptr, gbuf, 0);		/* get device */
-	for (i = 0; (device[i] != NULL) &&
-		    (strcmp (device[i], gbuf) != 0); i++);
-	if (device[i] != NULL) val[0] = val[0] | dev_val[i];
-	else {
-	    d = (int32) get_uint (gbuf, 8, I_M_DEV, &r);
-	    if (r != SCPE_OK) return SCPE_ARG;
-	    val[0] = val[0] | (d << I_V_DEV);  }
-	break;
-case I_V_RM:						/* reg, addr */
-	cptr = get_glyph (cptr, gbuf, ',');		/* get register */
-	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	val[0] = val[0] | (d << I_V_DST);		/* put in place */
-case I_V_M:						/* addr */
-	cptr = get_addr (cptr, addr, FALSE, cflag, amd);
-	if (cptr == NULL) return SCPE_ARG;
-	val[0] = val[0] | (amd[0] << I_V_IND) | (amd[1] << I_V_MODE) | amd[2];
-	break;
-case I_V_RR:						/* operate */
-	cptr = get_2reg (cptr, ',', amd);		/* get 2 reg */
-	if (cptr == NULL) return SCPE_ARG;
-	val[0] = val[0] | (amd[0] << I_V_SRC) | (amd[1] << I_V_DST);
-	if (*cptr != 0) {				/* skip? */
-	    cptr = get_glyph (cptr, gbuf, 0);		/* get skip */
-	    for (i = 0; (skip[i] != NULL) &&
-		(strcmp (skip[i], gbuf) != 0); i++) ;
-	    if (skip[i] == NULL) return SCPE_ARG;
-	    val[0] = val[0] | (i + 1);  }		/* end for */
-	break;
-case I_V_BY:						/* byte */
-	cptr = get_2reg (cptr, 0, amd);			/* get 2 reg */
-	if (cptr == NULL) return SCPE_ARG;
-	val[0] = val[0] | (amd[0] << I_V_PULSE) | (amd[1] << I_V_DST);
-	break;
-case I_V_2AC:						/* reg, reg */
-	cptr = get_2reg (cptr, 0, amd);			/* get 2 reg */
-	if (cptr == NULL) return SCPE_ARG;
-	val[0] = val[0] | (amd[0] << I_V_SRC) | (amd[1] << I_V_DST);
-	break;
-case I_V_RSI:						/* reg, short imm */
-	cptr = get_glyph (cptr, gbuf, ',');		/* get immediate */
-	d = (int32) get_uint (gbuf, 8, I_M_SRC + 1, &r);
-	if ((d == 0) || (r != SCPE_OK)) return SCPE_ARG;
-	val[0] = val[0] | ((d - 1) << I_V_SRC);		/* put in place */
-	cptr = get_glyph (cptr, gbuf, 0);		/* get register */
-	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	val[0] = val[0] | (d << I_V_DST);		/* put in place */
-	break;
-case I_V_RLI:						/* reg, long imm */
-	cptr = get_glyph (cptr, gbuf, ',');		/* get immediate */
-	val[1] = (int32) get_uint (gbuf, 8, DMASK, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	cptr = get_glyph (cptr, gbuf, 0);		/* get register */
-	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	val[0] = val[0] | (d << I_V_DST);		/* put in place */
-	rtn = -1;
-	break;
-case I_V_LI:						/* long imm */
-	cptr = get_glyph (cptr, gbuf, 0);		/* get immediate */
-	val[1] = (int32) get_uint (gbuf, 8, DMASK, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	rtn = -1;
-	break;
-case I_V_RLM:						/* reg, long mem */
-	cptr = get_glyph (cptr, gbuf, ',');		/* get register */
-	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	val[0] = val[0] | (d << I_V_DST);		/* put in place */
-case I_V_LM:						/* long mem */
-	cptr = get_addr (cptr, addr, TRUE, cflag, amd);
-	if (cptr == NULL) return SCPE_ARG;
-	val[0] = val[0] | (amd[1] << I_V_MODE);
-	val[1] = (amd[0] << A_V_IND) | amd[2];
-	rtn = -1;
-	break;
-case I_V_FRM:						/* flt reg, long mem */
-	cptr = get_glyph (cptr, gbuf, ',');		/* get register */
-	d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	val[0] = val[0] | (d << I_V_DST);		/* put in place */
-	cptr = get_addr (cptr, addr, TRUE, cflag, amd);
-	if (cptr == NULL) return SCPE_ARG;
-	val[0] = val[0] | (amd[1] << I_V_SRC);
-	val[1] = (amd[0] << A_V_IND) | amd[2];
-	rtn = -1;
-	break;
-case I_V_FST:						/* flt status */
-	cptr = get_addr (cptr, addr, TRUE, cflag, amd);
-	if (cptr == NULL) return SCPE_ARG;
-	val[0] = val[0] | (amd[1] << I_V_DST);
-	val[1] = (amd[0] << A_V_IND) | amd[2];
-	rtn = -1;
-	break;
-case I_V_XP:						/* XOP */
-	cptr = get_2reg (cptr, ',', amd);		/* get 2 reg */
-	if (cptr == NULL) return SCPE_ARG;
-	val[0] = val[0] | (amd[0] << I_V_SRC) | (amd[1] << I_V_DST);	
-	cptr = get_glyph (cptr, gbuf, 0);		/* get argument */
-	d = (int32) get_uint (gbuf, 8, I_M_XOP, &r);
-	if (r != SCPE_OK) return SCPE_ARG;
-	val[0] = val[0] | (d << I_V_XOP);
-	break;  }					/* end case */
-if (*cptr != 0) return SCPE_ARG;			/* any leftovers? */
+switch (j) {                                            /* case on class */
+
+    case I_V_NPN:                                       /* no operand */
+        break;
+
+    case I_V_R:                                         /* IOT reg */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get register */
+        d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | (d << I_V_DST);               /* put in place */
+        break;
+
+    case I_V_RD:                                        /* IOT reg,dev */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get register */
+        d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | (d << I_V_DST);               /* put in place */
+    case I_V_D:                                         /* IOT dev */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get device */
+        for (i = 0; (device[i] != NULL) &&
+                    (strcmp (device[i], gbuf) != 0); i++);
+        if (device[i] != NULL) val[0] = val[0] | dev_val[i];
+        else {
+            d = (int32) get_uint (gbuf, 8, I_M_DEV, &r);
+            if (r != SCPE_OK) return SCPE_ARG;
+            val[0] = val[0] | (d << I_V_DEV);
+            }
+        break;
+
+    case I_V_RM:                                        /* reg, addr */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get register */
+        d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | (d << I_V_DST);               /* put in place */
+    case I_V_M:                                         /* addr */
+        cptr = get_addr (cptr, addr, FALSE, cflag, amd);
+        if (cptr == NULL) return SCPE_ARG;
+        val[0] = val[0] | (amd[0] << I_V_IND) | (amd[1] << I_V_MODE) | amd[2];
+        break;
+
+    case I_V_RR:                                        /* operate */
+        cptr = get_2reg (cptr, ',', amd);               /* get 2 reg */
+        if (cptr == NULL) return SCPE_ARG;
+        val[0] = val[0] | (amd[0] << I_V_SRC) | (amd[1] << I_V_DST);
+        if (*cptr != 0) {                               /* skip? */
+            cptr = get_glyph (cptr, gbuf, 0);           /* get skip */
+            for (i = 0; (skip[i] != NULL) &&
+                (strcmp (skip[i], gbuf) != 0); i++) ;
+            if (skip[i] == NULL) return SCPE_ARG;
+            val[0] = val[0] | (i + 1);
+            }                                           /* end if */
+        break;
+
+    case I_V_BY:                                        /* byte */
+        cptr = get_2reg (cptr, 0, amd);                 /* get 2 reg */
+        if (cptr == NULL) return SCPE_ARG;
+        val[0] = val[0] | (amd[0] << I_V_PULSE) | (amd[1] << I_V_DST);
+        break;
+
+    case I_V_2AC:                                       /* reg, reg */
+        cptr = get_2reg (cptr, 0, amd);                 /* get 2 reg */
+        if (cptr == NULL) return SCPE_ARG;
+        val[0] = val[0] | (amd[0] << I_V_SRC) | (amd[1] << I_V_DST);
+        break;
+
+    case I_V_RSI:                                       /* reg, short imm */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get immediate */
+        d = (int32) get_uint (gbuf, 8, I_M_SRC + 1, &r);
+        if ((d == 0) || (r != SCPE_OK)) return SCPE_ARG;
+        val[0] = val[0] | ((d - 1) << I_V_SRC);         /* put in place */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get register */
+        d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | (d << I_V_DST);               /* put in place */
+        break;
+
+    case I_V_RLI:                                       /* reg, long imm */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get immediate */
+        val[1] = (int32) get_uint (gbuf, 8, DMASK, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        cptr = get_glyph (cptr, gbuf, 0);               /* get register */
+        d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | (d << I_V_DST);               /* put in place */
+        rtn = -1;
+        break;
+
+    case I_V_LI:                                        /* long imm */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get immediate */
+        val[1] = (int32) get_uint (gbuf, 8, DMASK, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        rtn = -1;
+        break;
+
+    case I_V_RLM:                                       /* reg, long mem */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get register */
+        d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | (d << I_V_DST);               /* put in place */
+    case I_V_LM:                                        /* long mem */
+        cptr = get_addr (cptr, addr, TRUE, cflag, amd);
+        if (cptr == NULL) return SCPE_ARG;
+        val[0] = val[0] | (amd[1] << I_V_MODE);
+        val[1] = (amd[0] << A_V_IND) | amd[2];
+        rtn = -1;
+        break;
+
+    case I_V_FRM:                                       /* flt reg, long mem */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get register */
+        d = (int32) get_uint (gbuf, 8, I_M_DST, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | (d << I_V_DST);               /* put in place */
+        cptr = get_addr (cptr, addr, TRUE, cflag, amd);
+        if (cptr == NULL) return SCPE_ARG;
+        val[0] = val[0] | (amd[1] << I_V_SRC);
+        val[1] = (amd[0] << A_V_IND) | amd[2];
+        rtn = -1;
+        break;
+
+    case I_V_FST:                                       /* flt status */
+        cptr = get_addr (cptr, addr, TRUE, cflag, amd);
+        if (cptr == NULL) return SCPE_ARG;
+        val[0] = val[0] | (amd[1] << I_V_DST);
+        val[1] = (amd[0] << A_V_IND) | amd[2];
+        rtn = -1;
+        break;
+
+    case I_V_XP:                                        /* XOP */
+        cptr = get_2reg (cptr, ',', amd);               /* get 2 reg */
+        if (cptr == NULL) return SCPE_ARG;
+        val[0] = val[0] | (amd[0] << I_V_SRC) | (amd[1] << I_V_DST);    
+        cptr = get_glyph (cptr, gbuf, 0);               /* get argument */
+        d = (int32) get_uint (gbuf, 8, I_M_XOP, &r);
+        if (r != SCPE_OK) return SCPE_ARG;
+        val[0] = val[0] | (d << I_V_XOP);
+        break;
+        }                                               /* end case */
+
+if (*cptr != 0) return SCPE_ARG;                        /* any leftovers? */
 return rtn;
 }

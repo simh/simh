@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Interdata 16b/32b Simulator Usage
-Date:	15-Mar-2005
+Date:	01-Jul-2005
 
 			COPYRIGHT NOTICE
 
@@ -27,8 +27,8 @@ The following copyright notice applies to both the SIMH source and binary:
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
 This memorandum documents the Interdata 16b and 32b simulators.
@@ -641,8 +641,7 @@ or a DETACH PAS command.
 
 The SHOW PAS CONNECTIONS command displays the current connections to the
 extra terminals.  The SHOW PAS STATISTICS command displays statistics for
-active connections.  The SET PAS DISCONNECT=linenumber disconnects the
-specified line.
+active connections.  The SET PASLn DISCONNECT command disconnects line n.
 
 The controller (PAS) implements these registers:
 

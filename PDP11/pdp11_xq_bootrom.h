@@ -1,7 +1,7 @@
 /* pdp11_xq_bootrom.h: DEQNA/DELQA bootrom data
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2003, David T. Hittner
+   Copyright (c) 2003-2005, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -307,6 +307,6 @@
     0000000,0000000,0000000,0000000,0000000,0000000,0000000,0000000,
     0000000,0000000,0000000,0000000,0000000,0000000,0000000,0102206
   };
-#endif /* VM_PDP11 */
+#endif                                                  /* VM_PDP11 */
 
-#endif /* _PDP11_XQ_BOOTROM_H */
+#endif                                                  /* _PDP11_XQ_BOOTROM_H */

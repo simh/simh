@@ -1,6 +1,6 @@
 /* sim_console.c: simulator console I/O library
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,81 +19,81 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   05-Nov-04	RMS	Moved SET/SHOW DEBUG under CONSOLE hierarchy
-   28-Oct-04	JDB	Fixed SET CONSOLE to allow comma-separated parameters
-   20-Aug-04	RMS	Added OS/2 EMX fixes (from Holger Veit)
-   14-Jul-04	RMS	Revised Windows console code (from Dave Bryan)
-   28-May-04	RMS	Added SET/SHOW CONSOLE
-		RMS	Added break, delete character maps
-   02-Jan-04	RMS	Removed timer routines, added Telnet console routines
-		RMS	Moved console logging to OS-independent code
-   25-Apr-03	RMS	Added long seek support from Mark Pizzolato
-			Added Unix priority control from Mark Pizzolato
-   24-Sep-02	RMS	Removed VT support, added Telnet console support
-			Added CGI support (from Brian Knittel)
-			Added MacOS sleep (from Peter Schorn)
-   14-Jul-02	RMS	Added Windows priority control from Mark Pizzolato
-   20-May-02	RMS	Added Windows VT support from Fischer Franz
-   01-Feb-02	RMS	Added VAX fix from Robert Alan Byer
-   19-Sep-01	RMS	More Mac changes
-   31-Aug-01	RMS	Changed int64 to t_int64 for Windoze
-   20-Jul-01	RMS	Added Macintosh support (from Louis Chretien, Peter Schorn,
-				and Ben Supnik)
-   15-May-01	RMS	Added logging support
-   05-Mar-01	RMS	Added clock calibration support
-   08-Dec-00	BKR	Added OS/2 support (from Bruce Ray)
-   18-Aug-98	RMS	Added BeOS support
-   13-Oct-97	RMS	Added NetBSD terminal support
-   25-Jan-97	RMS	Added POSIX terminal I/O support
-   02-Jan-97	RMS	Fixed bug in sim_poll_kbd
+   05-Nov-04    RMS     Moved SET/SHOW DEBUG under CONSOLE hierarchy
+   28-Oct-04    JDB     Fixed SET CONSOLE to allow comma-separated parameters
+   20-Aug-04    RMS     Added OS/2 EMX fixes (from Holger Veit)
+   14-Jul-04    RMS     Revised Windows console code (from Dave Bryan)
+   28-May-04    RMS     Added SET/SHOW CONSOLE
+                RMS     Added break, delete character maps
+   02-Jan-04    RMS     Removed timer routines, added Telnet console routines
+                RMS     Moved console logging to OS-independent code
+   25-Apr-03    RMS     Added long seek support from Mark Pizzolato
+                        Added Unix priority control from Mark Pizzolato
+   24-Sep-02    RMS     Removed VT support, added Telnet console support
+                        Added CGI support (from Brian Knittel)
+                        Added MacOS sleep (from Peter Schorn)
+   14-Jul-02    RMS     Added Windows priority control from Mark Pizzolato
+   20-May-02    RMS     Added Windows VT support from Fischer Franz
+   01-Feb-02    RMS     Added VAX fix from Robert Alan Byer
+   19-Sep-01    RMS     More Mac changes
+   31-Aug-01    RMS     Changed int64 to t_int64 for Windoze
+   20-Jul-01    RMS     Added Macintosh support (from Louis Chretien, Peter Schorn,
+                                and Ben Supnik)
+   15-May-01    RMS     Added logging support
+   05-Mar-01    RMS     Added clock calibration support
+   08-Dec-00    BKR     Added OS/2 support (from Bruce Ray)
+   18-Aug-98    RMS     Added BeOS support
+   13-Oct-97    RMS     Added NetBSD terminal support
+   25-Jan-97    RMS     Added POSIX terminal I/O support
+   02-Jan-97    RMS     Fixed bug in sim_poll_kbd
 
    This module implements the following routines to support terminal I/O:
 
-   sim_poll_kbd	-	poll for keyboard input
-   sim_putchar	-	output character to console
-   sim_putchar_s -	output character to console, stall if congested
-   sim_set_console -	set console parameters
-   sim_show_console -	show console parameters
+   sim_poll_kbd -       poll for keyboard input
+   sim_putchar  -       output character to console
+   sim_putchar_s -      output character to console, stall if congested
+   sim_set_console -    set console parameters
+   sim_show_console -   show console parameters
 
-   sim_ttinit	-	called once to get initial terminal state
-   sim_ttrun	-	called to put terminal into run state
-   sim_ttcmd	-	called to return terminal to command state
-   sim_ttclose	-	called once before the simulator exits
-   sim_os_poll_kbd -	poll for keyboard input
-   sim_os_putchar -	output character to console
+   sim_ttinit   -       called once to get initial terminal state
+   sim_ttrun    -       called to put terminal into run state
+   sim_ttcmd    -       called to return terminal to command state
+   sim_ttclose  -       called once before the simulator exits
+   sim_os_poll_kbd -    poll for keyboard input
+   sim_os_putchar -     output character to console
 
    The first group is OS-independent; the second group is OS-dependent.
 
    The following routines are exposed but deprecated:
 
-   sim_set_telnet -	set console to Telnet port
-   sim_set_notelnet -	close console Telnet port
-   sim_show_telnet -	show console status
+   sim_set_telnet -     set console to Telnet port
+   sim_set_notelnet -   close console Telnet port
+   sim_show_telnet -    show console status
 */
 
 #include "sim_defs.h"
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 
-#define KMAP_WRU	0
-#define KMAP_BRK	1
-#define KMAP_DEL	2
-#define KMAP_MASK	0377
-#define KMAP_NZ		0400
+#define KMAP_WRU        0
+#define KMAP_BRK        1
+#define KMAP_DEL        2
+#define KMAP_MASK       0377
+#define KMAP_NZ         0400
 
-int32 sim_int_char = 005;				/* interrupt character */
-int32 sim_brk_char = 000;				/* break character */
+int32 sim_int_char = 005;                               /* interrupt character */
+int32 sim_brk_char = 000;                               /* break character */
 #if defined (_WIN32) || defined (__OS2__) || (defined (__MWERKS__) && defined (macintosh))
-int32 sim_del_char = '\b';				/* delete character */
+int32 sim_del_char = '\b';                              /* delete character */
 #else
 int32 sim_del_char = 0177;
 #endif
-TMLN sim_con_ldsc = { 0 };				/* console line descr */
-TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc };		/* console line mux */
+TMLN sim_con_ldsc = { 0 };                              /* console line descr */
+TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc };         /* console line mux */
 
 extern volatile int32 stop_cpu;
 extern int32 sim_quiet, sim_deb_close;
@@ -103,31 +103,34 @@ extern DEVICE *sim_devices[];
 /* Set/show data structures */
 
 static CTAB set_con_tab[] = {
-	{ "WRU", &sim_set_kmap, KMAP_WRU | KMAP_NZ },
-	{ "BRK", &sim_set_kmap, KMAP_BRK },
-	{ "DEL", &sim_set_kmap, KMAP_DEL |KMAP_NZ },
-	{ "TELNET", &sim_set_telnet, 0 },
-	{ "NOTELNET", &sim_set_notelnet, 0 },
-	{ "LOG", &sim_set_logon, 0 },
-	{ "NOLOG", &sim_set_logoff, 0 },
-	{ "DEBUG", &sim_set_debon, 0 },
-	{ "NODEBUG", &sim_set_deboff, 0 },
-	{ NULL, NULL, 0 }  };
+    { "WRU", &sim_set_kmap, KMAP_WRU | KMAP_NZ },
+    { "BRK", &sim_set_kmap, KMAP_BRK },
+    { "DEL", &sim_set_kmap, KMAP_DEL |KMAP_NZ },
+    { "TELNET", &sim_set_telnet, 0 },
+    { "NOTELNET", &sim_set_notelnet, 0 },
+    { "LOG", &sim_set_logon, 0 },
+    { "NOLOG", &sim_set_logoff, 0 },
+    { "DEBUG", &sim_set_debon, 0 },
+    { "NODEBUG", &sim_set_deboff, 0 },
+    { NULL, NULL, 0 }
+    };
 
 static SHTAB show_con_tab[] = {
-	{ "WRU", &sim_show_kmap, KMAP_WRU },
-	{ "BRK", &sim_show_kmap, KMAP_BRK },
-	{ "DEL", &sim_show_kmap, KMAP_DEL },
-	{ "LOG", &sim_show_log, 0 },
-	{ "TELNET", &sim_show_telnet, 0 },
-	{ "DEBUG", &sim_show_debug, 0 },
-	{ NULL, NULL, 0 }  };
+    { "WRU", &sim_show_kmap, KMAP_WRU },
+    { "BRK", &sim_show_kmap, KMAP_BRK },
+    { "DEL", &sim_show_kmap, KMAP_DEL },
+    { "LOG", &sim_show_log, 0 },
+    { "TELNET", &sim_show_telnet, 0 },
+    { "DEBUG", &sim_show_debug, 0 },
+    { NULL, NULL, 0 }
+    };
 
 static int32 *cons_kmap[] = {
-	&sim_int_char,
-	&sim_brk_char,
-	&sim_del_char };
-
+    &sim_int_char,
+    &sim_brk_char,
+    &sim_del_char
+    };
+
 /* Console I/O package.
 
    The console terminal can be attached to the controlling window
@@ -145,15 +148,16 @@ CTAB *ctptr;
 t_stat r;
 
 if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;
-while (*cptr != 0) {					/* do all mods */
-	cptr = get_glyph_nc (cptr, gbuf, ',');		/* get modifier */
-	if (cvptr = strchr (gbuf, '=')) *cvptr++ = 0;	/* = value? */
-	get_glyph (gbuf, gbuf, 0);			/* modifier to UC */
-	if (ctptr = find_ctab (set_con_tab, gbuf)) {	/* match? */
-	    r = ctptr->action (ctptr->arg, cvptr);	/* do the rest */
-	    if (r != SCPE_OK) return r;  }
-	else return SCPE_NOPARAM;
-	}
+while (*cptr != 0) {                                    /* do all mods */
+    cptr = get_glyph_nc (cptr, gbuf, ',');              /* get modifier */
+    if (cvptr = strchr (gbuf, '=')) *cvptr++ = 0;       /* = value? */
+    get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
+    if (ctptr = find_ctab (set_con_tab, gbuf)) {        /* match? */
+        r = ctptr->action (ctptr->arg, cvptr);          /* do the rest */
+        if (r != SCPE_OK) return r;
+        }
+    else return SCPE_NOPARAM;
+    }
 return SCPE_OK;
 }
 
@@ -165,17 +169,17 @@ char gbuf[CBUFSIZE];
 SHTAB *shptr;
 int32 i;
 
-if (*cptr == 0) {					/* show all */
-	for (i = 0; show_con_tab[i].name; i++)
-	    show_con_tab[i].action (st, dptr, uptr, show_con_tab[i].arg, cptr);
-	return SCPE_OK;
-	}
+if (*cptr == 0) {                                       /* show all */
+    for (i = 0; show_con_tab[i].name; i++)
+        show_con_tab[i].action (st, dptr, uptr, show_con_tab[i].arg, cptr);
+    return SCPE_OK;
+    }
 while (*cptr != 0) {
-	cptr = get_glyph (cptr, gbuf, ',');		/* get modifier */
-	if (shptr = find_shtab (show_con_tab, gbuf))
-	    shptr->action (st, dptr, uptr, shptr->arg, cptr);
-	else return SCPE_NOPARAM;
-	}
+    cptr = get_glyph (cptr, gbuf, ',');                 /* get modifier */
+    if (shptr = find_shtab (show_con_tab, gbuf))
+        shptr->action (st, dptr, uptr, shptr->arg, cptr);
+    else return SCPE_NOPARAM;
+    }
 return SCPE_OK;
 }
 
@@ -192,7 +196,7 @@ if (dptr->dradix == 16) rdx = 16;
 else rdx = 8;
 val = (int32) get_uint (cptr, rdx, 0177, &r);
 if ((r != SCPE_OK) ||
-	((val == 0) && (flag & KMAP_NZ))) return SCPE_ARG;
+    ((val == 0) && (flag & KMAP_NZ))) return SCPE_ARG;
 *(cons_kmap[flag & KMAP_MASK]) = val;
 return SCPE_OK;
 }
@@ -217,14 +221,14 @@ t_stat sim_set_logon (int32 flag, char *cptr)
 {
 char gbuf[CBUFSIZE];
 
-if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;	/* need arg */
-cptr = get_glyph_nc (cptr, gbuf, 0);			/* get file name */
-if (*cptr != 0) return SCPE_2MARG;			/* now eol? */
-sim_set_logoff (0, NULL);				/* close cur log */
-sim_log = sim_fopen (gbuf, "a");			/* open log */
-if (sim_log == NULL) return SCPE_OPENERR;		/* error? */
+if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;  /* need arg */
+cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
+if (*cptr != 0) return SCPE_2MARG;                      /* now eol? */
+sim_set_logoff (0, NULL);                               /* close cur log */
+sim_log = sim_fopen (gbuf, "a");                        /* open log */
+if (sim_log == NULL) return SCPE_OPENERR;               /* error? */
 if (!sim_quiet) printf ("Logging to file \"%s\"\n", gbuf);
-fprintf (sim_log, "Logging to file \"%s\"\n", gbuf);	/* start of log */
+fprintf (sim_log, "Logging to file \"%s\"\n", gbuf);    /* start of log */
 return SCPE_OK;
 }
 
@@ -232,10 +236,10 @@ return SCPE_OK;
 
 t_stat sim_set_logoff (int32 flag, char *cptr)
 {
-if (cptr && (*cptr != 0)) return SCPE_2MARG;		/* now eol? */
-if (sim_log == NULL) return SCPE_OK;			/* no log? */
+if (cptr && (*cptr != 0)) return SCPE_2MARG;            /* now eol? */
+if (sim_log == NULL) return SCPE_OK;                    /* no log? */
 if (!sim_quiet) printf ("Log file closed\n");
-fprintf (sim_log, "Log file closed\n");			/* close log */
+fprintf (sim_log, "Log file closed\n");                 /* close log */
 fclose (sim_log);
 sim_log = NULL;
 return SCPE_OK;
@@ -257,33 +261,36 @@ t_stat sim_set_debon (int32 flag, char *cptr)
 {
 char *tptr, gbuf[CBUFSIZE];
 
-if (*cptr == 0) return SCPE_2FARG;			/* need arg */
-tptr = get_glyph (cptr, gbuf, 0);			/* get file name */
-if (*tptr != 0) return SCPE_2MARG;			/* now eol? */
-sim_set_deboff (0, NULL);				/* close cur debug */
-if (strcmp (gbuf, "LOG") == 0) {			/* debug to log? */
-	if (sim_log == NULL) return SCPE_ARG;		/* any log? */
-	sim_deb = sim_log;  }
+if (*cptr == 0) return SCPE_2FARG;                      /* need arg */
+tptr = get_glyph (cptr, gbuf, 0);                       /* get file name */
+if (*tptr != 0) return SCPE_2MARG;                      /* now eol? */
+sim_set_deboff (0, NULL);                               /* close cur debug */
+if (strcmp (gbuf, "LOG") == 0) {                        /* debug to log? */
+    if (sim_log == NULL) return SCPE_ARG;               /* any log? */
+    sim_deb = sim_log;
+    }
 else if (strcmp (gbuf, "STDOUT") == 0) sim_deb = stdout; /* debug to stdout? */
 else if (strcmp (gbuf, "STDERR") == 0) sim_deb = stderr; /* debug to stderr? */
-else {	cptr = get_glyph_nc (cptr, gbuf, 0);		/* reparse */
-	sim_deb = sim_fopen (gbuf, "a");		/* open debug */
-	if (sim_deb == NULL) return SCPE_OPENERR;	/* error? */
-	sim_deb_close = 1;  }				/* need close */
+else {
+    cptr = get_glyph_nc (cptr, gbuf, 0);                /* reparse */
+    sim_deb = sim_fopen (gbuf, "a");                    /* open debug */
+    if (sim_deb == NULL) return SCPE_OPENERR;           /* error? */
+    sim_deb_close = 1;                                  /* need close */
+    }
 if (!sim_quiet) printf ("Debug output to \"%s\"\n", gbuf);
 if (sim_log) fprintf (sim_log, "Debug output to \"%s\"\n", gbuf);
 return SCPE_OK;
 }
 
- /* Set nodebug routine */
+/* Set nodebug routine */
 
 t_stat sim_set_deboff (int32 flag, char *cptr)
 {
-if (cptr && (*cptr != 0)) return SCPE_2MARG;		/* now eol? */
-if (sim_deb == NULL) return SCPE_OK;			/* no log? */
+if (cptr && (*cptr != 0)) return SCPE_2MARG;            /* now eol? */
+if (sim_deb == NULL) return SCPE_OK;                    /* no log? */
 if (!sim_quiet) printf ("Debug output disabled\n");
 if (sim_log) fprintf (sim_log, "Debug output disabled\n");
-if (sim_deb_close) fclose (sim_deb);			/* close if needed */
+if (sim_deb_close) fclose (sim_deb);                    /* close if needed */
 sim_deb_close = 0;
 sim_deb = NULL;
 return SCPE_OK;
@@ -303,18 +310,18 @@ return SCPE_OK;
 
 t_stat sim_set_telnet (int32 flg, char *cptr)
 {
-if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;	/* too few arguments? */
-if (sim_con_tmxr.master) return SCPE_ALATT;		/* already open? */
-return tmxr_open_master (&sim_con_tmxr, cptr);		/* open master socket */
+if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;  /* too few arguments? */
+if (sim_con_tmxr.master) return SCPE_ALATT;             /* already open? */
+return tmxr_open_master (&sim_con_tmxr, cptr);          /* open master socket */
 }
 
 /* Close console Telnet port */
 
 t_stat sim_set_notelnet (int32 flag, char *cptr)
 {
-if (cptr && (*cptr != 0)) return SCPE_2MARG;		/* too many arguments? */
-if (sim_con_tmxr.master == 0) return SCPE_OK;		/* ignore if already closed */
-return tmxr_close_master (&sim_con_tmxr);		/* close master socket */
+if (cptr && (*cptr != 0)) return SCPE_2MARG;            /* too many arguments? */
+if (sim_con_tmxr.master == 0) return SCPE_OK;           /* ignore if already closed */
+return tmxr_close_master (&sim_con_tmxr);               /* close master socket */
 }
 
 /* Show console Telnet status */
@@ -323,13 +330,15 @@ t_stat sim_show_telnet (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag, ch
 {
 if (cptr && (*cptr != 0)) return SCPE_2MARG;
 if (sim_con_tmxr.master == 0)
-	fprintf (st, "Connected to console window\n");
+    fprintf (st, "Connected to console window\n");
 else if (sim_con_ldsc.conn == 0)
-	fprintf (st, "Listening on port %d\n", sim_con_tmxr.port);
-else {	fprintf (st, "Listening on port %d, connected to socket %d\n",
-	    sim_con_tmxr.port, sim_con_ldsc.conn);
-	tmxr_fconns (st, &sim_con_ldsc, -1);
-	tmxr_fstats (st, &sim_con_ldsc, -1);  }
+    fprintf (st, "Listening on port %d\n", sim_con_tmxr.port);
+else {
+    fprintf (st, "Listening on port %d, connected to socket %d\n",
+        sim_con_tmxr.port, sim_con_ldsc.conn);
+    tmxr_fconns (st, &sim_con_ldsc, -1);
+    tmxr_fstats (st, &sim_con_ldsc, -1);
+    }
 return SCPE_OK;
 }
 
@@ -339,25 +348,29 @@ t_stat sim_check_console (int32 sec)
 {
 int32 c, i;
 
-if (sim_con_tmxr.master == 0) return SCPE_OK;		/* not Telnet? done */
-if (sim_con_ldsc.conn) {				/* connected? */
-	tmxr_poll_rx (&sim_con_tmxr);			/* poll (check disconn) */
-	if (sim_con_ldsc.conn) return SCPE_OK;  }	/* still connected? */
-for (i = 0; i < sec; i++) {				/* loop */
-	if (tmxr_poll_conn (&sim_con_tmxr) >= 0) {	/* poll connect */
-	    sim_con_ldsc.rcve = 1;			/* rcv enabled */
-	    if (i) {					/* if delayed */
-		printf ("Running\n");			/* print transition */
-		fflush (stdout);  }
-	    return SCPE_OK;  }				/* ready to proceed */
-	c = sim_os_poll_kbd ();				/* check for stop char */
-	if ((c == SCPE_STOP) || stop_cpu) return SCPE_STOP;
-	if ((i % 10) == 0) {				/* Status every 10 sec */
-	    printf ("Waiting for console Telnet connection\n");
-	    fflush (stdout);  }
-	sim_os_sleep (1);				/* wait 1 second */
-	}
-return SCPE_TTMO;					/* timed out */
+if (sim_con_tmxr.master == 0) return SCPE_OK;           /* not Telnet? done */
+if (sim_con_ldsc.conn) {                                /* connected? */
+    tmxr_poll_rx (&sim_con_tmxr);                       /* poll (check disconn) */
+    if (sim_con_ldsc.conn) return SCPE_OK;              /* still connected? */
+    }
+for (i = 0; i < sec; i++) {                             /* loop */
+    if (tmxr_poll_conn (&sim_con_tmxr) >= 0) {          /* poll connect */
+        sim_con_ldsc.rcve = 1;                          /* rcv enabled */
+        if (i) {                                        /* if delayed */
+            printf ("Running\n");                       /* print transition */
+            fflush (stdout);
+            }
+        return SCPE_OK;                                 /* ready to proceed */
+        }
+    c = sim_os_poll_kbd ();                             /* check for stop char */
+    if ((c == SCPE_STOP) || stop_cpu) return SCPE_STOP;
+    if ((i % 10) == 0) {                                /* Status every 10 sec */
+        printf ("Waiting for console Telnet connection\n");
+        fflush (stdout);
+        }
+    sim_os_sleep (1);                                   /* wait 1 second */
+    }
+return SCPE_TTMO;                                       /* timed out */
 }
 
 /* Poll for character */
@@ -366,13 +379,13 @@ t_stat sim_poll_kbd (void)
 {
 int32 c;
 
-c = sim_os_poll_kbd ();					/* get character */
-if ((c == SCPE_STOP) || (sim_con_tmxr.master == 0))	/* ^E or not Telnet? */
-	return c;					/* in-window */
-if (sim_con_ldsc.conn == 0) return SCPE_LOST;		/* no Telnet conn? */
-tmxr_poll_rx (&sim_con_tmxr);				/* poll for input */
-if (c = tmxr_getc_ln (&sim_con_ldsc))			/* any char? */ 
-	return (c & (SCPE_BREAK | 0377)) | SCPE_KFLAG;
+c = sim_os_poll_kbd ();                                 /* get character */
+if ((c == SCPE_STOP) || (sim_con_tmxr.master == 0))     /* ^E or not Telnet? */
+    return c;                                           /* in-window */
+if (sim_con_ldsc.conn == 0) return SCPE_LOST;           /* no Telnet conn? */
+tmxr_poll_rx (&sim_con_tmxr);                           /* poll for input */
+if (c = tmxr_getc_ln (&sim_con_ldsc))                   /* any char? */ 
+    return (c & (SCPE_BREAK | 0377)) | SCPE_KFLAG;
 return SCPE_OK;
 }
 
@@ -380,12 +393,12 @@ return SCPE_OK;
 
 t_stat sim_putchar (int32 c)
 {
-if (sim_log) fputc (c, sim_log);			/* log file? */
-if (sim_con_tmxr.master == 0)				/* not Telnet? */
-	return sim_os_putchar (c);			/* in-window version */
-if (sim_con_ldsc.conn == 0) return SCPE_LOST;		/* no Telnet conn? */
-tmxr_putc_ln (&sim_con_ldsc, c);			/* output char */
-tmxr_poll_tx (&sim_con_tmxr);				/* poll xmt */
+if (sim_log) fputc (c, sim_log);                        /* log file? */
+if (sim_con_tmxr.master == 0)                           /* not Telnet? */
+    return sim_os_putchar (c);                          /* in-window version */
+if (sim_con_ldsc.conn == 0) return SCPE_LOST;           /* no Telnet conn? */
+tmxr_putc_ln (&sim_con_ldsc, c);                        /* output char */
+tmxr_poll_tx (&sim_con_tmxr);                           /* poll xmt */
 return SCPE_OK;
 }
 
@@ -393,16 +406,16 @@ t_stat sim_putchar_s (int32 c)
 {
 t_stat r;
 
-if (sim_log) fputc (c, sim_log);			/* log file? */
-if (sim_con_tmxr.master == 0)				/* not Telnet? */
-	return sim_os_putchar (c);			/* in-window version */
-if (sim_con_ldsc.conn == 0) return SCPE_LOST;		/* no Telnet conn? */
-if (sim_con_ldsc.xmte == 0) r = SCPE_STALL;		/* xmt disabled? */
-else r = tmxr_putc_ln (&sim_con_ldsc, c);		/* no, Telnet output */
-tmxr_poll_tx (&sim_con_tmxr);				/* poll xmt */
-return r;						/* return status */
+if (sim_log) fputc (c, sim_log);                        /* log file? */
+if (sim_con_tmxr.master == 0)                           /* not Telnet? */
+    return sim_os_putchar (c);                          /* in-window version */
+if (sim_con_ldsc.conn == 0) return SCPE_LOST;           /* no Telnet conn? */
+if (sim_con_ldsc.xmte == 0) r = SCPE_STALL;             /* xmt disabled? */
+else r = tmxr_putc_ln (&sim_con_ldsc, c);               /* no, Telnet output */
+tmxr_poll_tx (&sim_con_tmxr);                           /* poll xmt */
+return r;                                               /* return status */
 }
-
+
 /* VMS routines, from Ben Thomas, with fixes from Robert Alan Byer */
 
 #if defined (VMS)
@@ -424,16 +437,16 @@ return r;						/* return status */
 uint32 tty_chan = 0;
 
 typedef struct {
-	unsigned short sense_count;
-	unsigned char sense_first_char;
-	unsigned char sense_reserved;
-	unsigned int stat;
-	unsigned int stat2; } SENSE_BUF;
+    unsigned short sense_count;
+    unsigned char sense_first_char;
+    unsigned char sense_reserved;
+    unsigned int stat;
+    unsigned int stat2; } SENSE_BUF;
 
 typedef struct {
-	unsigned short status;
-	unsigned short count;
-	unsigned int dev_status; } IOSB;
+    unsigned short status;
+    unsigned short count;
+    unsigned int dev_status; } IOSB;
 
 SENSE_BUF cmd_mode = { 0 };
 SENSE_BUF run_mode = { 0 };
@@ -447,7 +460,7 @@ $DESCRIPTOR (terminal_device, "tt");
 status = sys$assign (&terminal_device, &tty_chan, 0, 0);
 if (status != SS$_NORMAL) return SCPE_TTIERR;
 status = sys$qiow (EFN, tty_chan, IO$_SENSEMODE, &iosb, 0, 0,
-	&cmd_mode, sizeof (cmd_mode), 0, 0, 0, 0);
+    &cmd_mode, sizeof (cmd_mode), 0, 0, 0, 0);
 if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTIERR;
 run_mode = cmd_mode;
 run_mode.stat = cmd_mode.stat | TT$M_NOECHO & ~(TT$M_HOSTSYNC | TT$M_TTSYNC);
@@ -461,7 +474,7 @@ unsigned int status;
 IOSB iosb;
 
 status = sys$qiow (EFN, tty_chan, IO$_SETMODE, &iosb, 0, 0,
-	&run_mode, sizeof (run_mode), 0, 0, 0, 0);
+    &run_mode, sizeof (run_mode), 0, 0, 0, 0);
 if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTIERR;
 return SCPE_OK;
 }
@@ -472,7 +485,7 @@ unsigned int status;
 IOSB iosb;
 
 status = sys$qiow (EFN, tty_chan, IO$_SETMODE, &iosb, 0, 0,
-	&cmd_mode, sizeof (cmd_mode), 0, 0, 0, 0);
+    &cmd_mode, sizeof (cmd_mode), 0, 0, 0, 0);
 if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTIERR;
 return SCPE_OK;
 }
@@ -491,13 +504,13 @@ SENSE_BUF sense;
 
 term[0] = 0; term[1] = 0;
 status = sys$qiow (EFN, tty_chan, IO$_SENSEMODE | IO$M_TYPEAHDCNT, &iosb,
-	0, 0, &sense, 8, 0, term, 0, 0);
+    0, 0, &sense, 8, 0, term, 0, 0);
 if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTIERR;
 if (sense.sense_count == 0) return SCPE_OK;
 term[0] = 0; term[1] = 0;
 status = sys$qiow (EFN, tty_chan,
-	IO$_READLBLK | IO$M_NOECHO | IO$M_NOFILTR | IO$M_TIMED | IO$M_TRMNOECHO,
-	&iosb, 0, 0, buf, 1, 0, term, 0, 0);
+    IO$_READLBLK | IO$M_NOECHO | IO$M_NOFILTR | IO$M_TIMED | IO$M_TRMNOECHO,
+    &iosb, 0, 0, buf, 1, 0, term, 0, 0);
 if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_OK;
 if (buf[0] == sim_int_char) return SCPE_STOP;
 if (sim_brk_char && (buf[0] == sim_brk_char)) return SCPE_BREAK;
@@ -512,11 +525,11 @@ IOSB iosb;
 
 c = out;
 status = sys$qiow (EFN, tty_chan, IO$_WRITELBLK | IO$M_NOFORMAT,
-	&iosb, 0, 0, &c, 1, 0, 0, 0, 0);
+    &iosb, 0, 0, &c, 1, 0, 0, 0, 0);
 if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTOERR;
 return SCPE_OK;
 }
-
+
 /* Win32 routines */
 
 #elif defined (_WIN32)
@@ -533,17 +546,18 @@ t_stat sim_ttinit (void)
 {
 std_input = GetStdHandle (STD_INPUT_HANDLE);
 if ((std_input == INVALID_HANDLE_VALUE) ||
-	!GetConsoleMode (std_input, &saved_mode)) return SCPE_TTYERR;
+    !GetConsoleMode (std_input, &saved_mode)) return SCPE_TTYERR;
 return SCPE_OK;
 }
  
 t_stat sim_ttrun (void)
 {
 if (!GetConsoleMode(std_input, &saved_mode) ||
-	!SetConsoleMode(std_input, RAW_MODE)) return SCPE_TTYERR;
+    !SetConsoleMode(std_input, RAW_MODE)) return SCPE_TTYERR;
 if (sim_log) {
-	fflush (sim_log);
-	_setmode (_fileno (sim_log), _O_BINARY);  }
+    fflush (sim_log);
+    _setmode (_fileno (sim_log), _O_BINARY);
+    }
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 return SCPE_OK;
 }
@@ -551,8 +565,9 @@ return SCPE_OK;
 t_stat sim_ttcmd (void)
 {
 if (sim_log) {
-	fflush (sim_log);
-	_setmode (_fileno (sim_log), _O_TEXT);  }
+    fflush (sim_log);
+    _setmode (_fileno (sim_log), _O_TEXT);
+	}
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 if (!SetConsoleMode(std_input, saved_mode)) return SCPE_TTYERR;
 return SCPE_OK;
@@ -580,7 +595,7 @@ t_stat sim_os_putchar (int32 c)
 if (c != 0177) _putch (c);
 return SCPE_OK;
 }
-
+
 /* OS/2 routines, from Bruce Ray and Holger Veit */
 
 #elif defined (__OS2__)
@@ -612,14 +627,18 @@ t_stat sim_os_poll_kbd (void)
 int c;
 
 #if defined (__EMX__)
-switch (c = _read_kbd(0,0,0)) {			/* EMX has _read_kbd */
-case -1:					/* no char*/
-	return SCPE_OK;
-case 0:						/* char pending */
-	c = _read_kbd(0,1,0);
-	break;
-default:					/* got char */
-	break; }
+switch (c = _read_kbd(0,0,0)) {                         /* EMX has _read_kbd */
+
+    case -1:                                            /* no char*/
+        return SCPE_OK;
+
+    case 0:                                             /* char pending */
+        c = _read_kbd(0,1,0);
+        break;
+
+    default:                                            /* got char */
+        break;
+        }
 #else
 if (!kbhit ()) return SCPE_OK;
 c = getch();
@@ -634,14 +653,15 @@ t_stat sim_os_putchar (int32 c)
 {
 if (c != 0177) {
 #if defined (__EMX__)
-	putchar (c);
+    putchar (c);
 #else
-	putch (c);
+    putch (c);
 #endif
-	fflush (stdout);  }
+    fflush (stdout);
+	}
 return SCPE_OK;
 }
-
+
 /* Metrowerks CodeWarrior Macintosh routines, from Louis Chretien and
    Peter Schorn */
 
@@ -667,114 +687,116 @@ int ps_getch(void);
 
 extern char sim_name[];
 extern pSIOUXWin SIOUXTextWindow;
-static CursHandle iBeamCursorH = NULL;			/* contains the iBeamCursor */
+static CursHandle iBeamCursorH = NULL;                  /* contains the iBeamCursor */
 
 static void updateCursor(void) {
-	WindowPtr window;
-	window = FrontWindow();
-	if (SIOUXIsAppWindow(window)) {
-	    GrafPtr savePort;
-	    Point localMouse;
-	    GetPort(&savePort);
-	    SetPort(window);
+    WindowPtr window;
+    window = FrontWindow();
+    if (SIOUXIsAppWindow(window)) {
+        GrafPtr savePort;
+        Point localMouse;
+        GetPort(&savePort);
+        SetPort(window);
 #if TARGET_API_MAC_CARBON
-	    GetGlobalMouse(&localMouse);
+        GetGlobalMouse(&localMouse);
 #else
-	    localMouse = LMGetMouseLocation();
+        localMouse = LMGetMouseLocation();
 #endif
-	    GlobalToLocal(&localMouse);
-	    if (PtInRect(localMouse, &(*SIOUXTextWindow->edit)->viewRect) && iBeamCursorH) {
-		SetCursor(*iBeamCursorH);
-	    }
-	    else {
-		SetCursor(&qd.arrow);
-	    }
-	    TEIdle(SIOUXTextWindow->edit);
-	    SetPort(savePort);
-	}
-	else {
-	    SetCursor(&qd.arrow);
-	    TEIdle(SIOUXTextWindow->edit);
-	}
-	return;
+        GlobalToLocal(&localMouse);
+        if (PtInRect(localMouse, &(*SIOUXTextWindow->edit)->viewRect) && iBeamCursorH) {
+            SetCursor(*iBeamCursorH);
+        }
+        else {
+            SetCursor(&qd.arrow);
+        }
+        TEIdle(SIOUXTextWindow->edit);
+        SetPort(savePort);
+    }
+    else {
+        SetCursor(&qd.arrow);
+        TEIdle(SIOUXTextWindow->edit);
+    }
+    return;
 }
 
 int ps_kbhit(void) {
-  EventRecord event;
-  int c;
-	updateCursor();
-	SIOUXUpdateScrollbar();
-	while (GetNextEvent(updateMask | osMask | mDownMask | mUpMask | activMask |
-		 highLevelEventMask | diskEvt, &event)) {
-	    SIOUXHandleOneEvent(&event);
-	}
-	if (SIOUXQuitting) {
-	    exit(1);
-	}
-  if (EventAvail(keyDownMask,&event)) {
-	    c = event.message&charCodeMask;
-	    if ((event.modifiers & cmdKey) && (c > 0x20)) {
-		GetNextEvent(keyDownMask, &event);
-		SIOUXHandleOneEvent(&event);
-		if (SIOUXQuitting) {
-			exit(1);
-		}
-		return false;
-	    }
-	    return true;
-  }
-  else {
-	    return false;
-  }
+    EventRecord event;
+    int c;
+    updateCursor();
+    SIOUXUpdateScrollbar();
+    while (GetNextEvent(updateMask | osMask | mDownMask | mUpMask | activMask |
+             highLevelEventMask | diskEvt, &event)) {
+        SIOUXHandleOneEvent(&event);
+    }
+    if (SIOUXQuitting) {
+        exit(1);
+    }
+    if (EventAvail(keyDownMask,&event)) {
+        c = event.message&charCodeMask;
+        if ((event.modifiers & cmdKey) && (c > 0x20)) {
+            GetNextEvent(keyDownMask, &event);
+            SIOUXHandleOneEvent(&event);
+            if (SIOUXQuitting) {
+                exit(1);
+            }
+            return false;
+        }
+        return true;
+    }
+    else {
+        return false;
+    }
 }
 
 int ps_getch(void) {
-  int c;
-  EventRecord event;
-  fflush(stdout);
-	updateCursor();
-	while(!GetNextEvent(keyDownMask,&event)) {
-	    if (GetNextEvent(updateMask | osMask | mDownMask | mUpMask | activMask |
-		 highLevelEventMask | diskEvt, &event)) {
-		SIOUXUpdateScrollbar();
-		SIOUXHandleOneEvent(&event);
-	    }
-	}
-	if (SIOUXQuitting) {
-	    exit(1);
-	}
-	c = event.message&charCodeMask;
-	if ((event.modifiers & cmdKey) && (c > 0x20)) {
-	    SIOUXUpdateMenuItems();
-	    SIOUXDoMenuChoice(MenuKey(c));
-	}
-	if (SIOUXQuitting) {
-	    exit(1);
-	}
+    int c;
+    EventRecord event;
+    fflush(stdout);
+    updateCursor();
+    while(!GetNextEvent(keyDownMask,&event)) {
+        if (GetNextEvent(updateMask | osMask | mDownMask | mUpMask | activMask |
+             highLevelEventMask | diskEvt, &event)) {
+            SIOUXUpdateScrollbar();
+            SIOUXHandleOneEvent(&event);
+        }
+    }
+    if (SIOUXQuitting) {
+        exit(1);
+    }
+    c = event.message&charCodeMask;
+    if ((event.modifiers & cmdKey) && (c > 0x20)) {
+        SIOUXUpdateMenuItems();
+        SIOUXDoMenuChoice(MenuKey(c));
+    }
+    if (SIOUXQuitting) {
+        exit(1);
+    }
    return c;
 }
 
-t_stat sim_ttinit (void) {
 /* Note that this only works if the call to sim_ttinit comes before any output to the console */
-	int i;
-	char title[50] = " "; /* this blank will later be replaced by the number of characters */
-	unsigned char ptitle[50];
-	SIOUXSettings.autocloseonquit	= TRUE;
-	SIOUXSettings.asktosaveonclose = FALSE;
-	SIOUXSettings.showstatusline = FALSE;
-	SIOUXSettings.columns = 80;
-	SIOUXSettings.rows = 40;
-	SIOUXSettings.toppixel = 42;
-	SIOUXSettings.leftpixel	= 6;
-	iBeamCursorH = GetCursor(iBeamCursor);
-	strcat(title, sim_name);
-	strcat(title, " Simulator");
-	title[0] = strlen(title) - 1;			/* Pascal string done */
-	for (i = 0; i <= title[0]; i++) {		/* copy to unsigned char */
-	    ptitle[i] = title[i];
-	}
-	SIOUXSetTitle(ptitle);
-	return SCPE_OK;
+
+t_stat sim_ttinit (void) {
+    int i;
+    /* this blank will later be replaced by the number of characters */
+    char title[50] = " ";
+    unsigned char ptitle[50];
+    SIOUXSettings.autocloseonquit       = TRUE;
+    SIOUXSettings.asktosaveonclose = FALSE;
+    SIOUXSettings.showstatusline = FALSE;
+    SIOUXSettings.columns = 80;
+    SIOUXSettings.rows = 40;
+    SIOUXSettings.toppixel = 42;
+    SIOUXSettings.leftpixel     = 6;
+    iBeamCursorH = GetCursor(iBeamCursor);
+    strcat(title, sim_name);
+    strcat(title, " Simulator");
+    title[0] = strlen(title) - 1;                       /* Pascal string done */
+    for (i = 0; i <= title[0]; i++) {                   /* copy to unsigned char */
+        ptitle[i] = title[i];
+    }
+    SIOUXSetTitle(ptitle);
+    return SCPE_OK;
 }
 
 t_stat sim_ttrun (void)
@@ -807,11 +829,12 @@ return c | SCPE_KFLAG;
 t_stat sim_os_putchar (int32 c)
 {
 if (c != 0177) {
-	putchar (c);
-	fflush (stdout);  }
+    putchar (c);
+    fflush (stdout);
+    }
 return SCPE_OK;
 }
-
+
 /* BSD UNIX routines */
 
 #elif defined (BSDTTY)
@@ -820,50 +843,50 @@ return SCPE_OK;
 #include <fcntl.h>
 #include <unistd.h>
 
-struct sgttyb cmdtty,runtty;			/* V6/V7 stty data */
-struct tchars cmdtchars,runtchars;		/* V7 editing */
-struct ltchars cmdltchars,runltchars;		/* 4.2 BSD editing */
-int cmdfl,runfl;				/* TTY flags */
+struct sgttyb cmdtty,runtty;                            /* V6/V7 stty data */
+struct tchars cmdtchars,runtchars;                      /* V7 editing */
+struct ltchars cmdltchars,runltchars;                   /* 4.2 BSD editing */
+int cmdfl,runfl;                                        /* TTY flags */
 
 t_stat sim_ttinit (void)
 {
-cmdfl = fcntl (0, F_GETFL, 0);			/* get old flags  and status */
+cmdfl = fcntl (0, F_GETFL, 0);                          /* get old flags  and status */
 runfl = cmdfl | FNDELAY;
 if (ioctl (0, TIOCGETP, &cmdtty) < 0) return SCPE_TTIERR;
 if (ioctl (0, TIOCGETC, &cmdtchars) < 0) return SCPE_TTIERR;
 if (ioctl (0, TIOCGLTC, &cmdltchars) < 0) return SCPE_TTIERR;
-runtty = cmdtty;				/* initial run state */
+runtty = cmdtty;                                        /* initial run state */
 runtty.sg_flags = cmdtty.sg_flags & ~(ECHO|CRMOD) | CBREAK;
-runtchars.t_intrc = sim_int_char;		/* interrupt */
-runtchars.t_quitc = 0xFF;			/* no quit */
-runtchars.t_startc = 0xFF;			/* no host sync */
+runtchars.t_intrc = sim_int_char;                       /* interrupt */
+runtchars.t_quitc = 0xFF;                               /* no quit */
+runtchars.t_startc = 0xFF;                              /* no host sync */
 runtchars.t_stopc = 0xFF;
 runtchars.t_eofc = 0xFF;
 runtchars.t_brkc = 0xFF;
-runltchars.t_suspc = 0xFF;			/* no specials of any kind */
+runltchars.t_suspc = 0xFF;                              /* no specials of any kind */
 runltchars.t_dsuspc = 0xFF;
 runltchars.t_rprntc = 0xFF;
 runltchars.t_flushc = 0xFF;
 runltchars.t_werasc = 0xFF;
 runltchars.t_lnextc = 0xFF;
-return SCPE_OK;					/* return success */
+return SCPE_OK;                                         /* return success */
 }
 
 t_stat sim_ttrun (void)
 {
-runtchars.t_intrc = sim_int_char;		/* in case changed */
-fcntl (0, F_SETFL, runfl);			/* non-block mode */
+runtchars.t_intrc = sim_int_char;                       /* in case changed */
+fcntl (0, F_SETFL, runfl);                              /* non-block mode */
 if (ioctl (0, TIOCSETP, &runtty) < 0) return SCPE_TTIERR;
 if (ioctl (0, TIOCSETC, &runtchars) < 0) return SCPE_TTIERR;
 if (ioctl (0, TIOCSLTC, &runltchars) < 0) return SCPE_TTIERR;
-nice (10);					/* lower priority */
+nice (10);                                              /* lower priority */
 return SCPE_OK;
 }
 
 t_stat sim_ttcmd (void)
 {
-nice (-10);					/* restore priority */
-fcntl (0, F_SETFL, cmdfl);			/* block mode */
+nice (-10);                                             /* restore priority */
+fcntl (0, F_SETFL, cmdfl);                              /* block mode */
 if (ioctl (0, TIOCSETP, &cmdtty) < 0) return SCPE_TTIERR;
 if (ioctl (0, TIOCSETC, &cmdtchars) < 0) return SCPE_TTIERR;
 if (ioctl (0, TIOCSLTC, &cmdltchars) < 0) return SCPE_TTIERR;
@@ -894,7 +917,7 @@ c = out;
 write (1, &c, 1);
 return SCPE_OK;
 }
-
+
 /* POSIX UNIX routines, from Leendert Van Doorn */
 
 #else
@@ -907,23 +930,23 @@ static int prior_norm = 1;
 
 t_stat sim_ttinit (void)
 {
-if (!isatty (fileno (stdin))) return SCPE_OK;		/* skip if !tty */
-if (tcgetattr (0, &cmdtty) < 0) return SCPE_TTIERR;	/* get old flags */
+if (!isatty (fileno (stdin))) return SCPE_OK;           /* skip if !tty */
+if (tcgetattr (0, &cmdtty) < 0) return SCPE_TTIERR;     /* get old flags */
 runtty = cmdtty;
-runtty.c_lflag = runtty.c_lflag & ~(ECHO | ICANON);	/* no echo or edit */
-runtty.c_oflag = runtty.c_oflag & ~OPOST;		/* no output edit */
-runtty.c_iflag = runtty.c_iflag & ~ICRNL;		/* no cr conversion */
-runtty.c_cc[VINTR] = sim_int_char;			/* interrupt */
-runtty.c_cc[VQUIT] = 0;					/* no quit */
+runtty.c_lflag = runtty.c_lflag & ~(ECHO | ICANON);     /* no echo or edit */
+runtty.c_oflag = runtty.c_oflag & ~OPOST;               /* no output edit */
+runtty.c_iflag = runtty.c_iflag & ~ICRNL;               /* no cr conversion */
+runtty.c_cc[VINTR] = sim_int_char;                      /* interrupt */
+runtty.c_cc[VQUIT] = 0;                                 /* no quit */
 runtty.c_cc[VERASE] = 0;
 runtty.c_cc[VKILL] = 0;
 runtty.c_cc[VEOF] = 0;
 runtty.c_cc[VEOL] = 0;
-runtty.c_cc[VSTART] = 0;				/* no host sync */
+runtty.c_cc[VSTART] = 0;                                /* no host sync */
 runtty.c_cc[VSUSP] = 0;
 runtty.c_cc[VSTOP] = 0;
 #if defined (VREPRINT)
-runtty.c_cc[VREPRINT] = 0;				/* no specials */
+runtty.c_cc[VREPRINT] = 0;                              /* no specials */
 #endif
 #if defined (VDISCARD)
 runtty.c_cc[VDISCARD] = 0;
@@ -934,7 +957,7 @@ runtty.c_cc[VWERASE] = 0;
 #if defined (VLNEXT)
 runtty.c_cc[VLNEXT] = 0;
 #endif
-runtty.c_cc[VMIN] = 0;					/* no waiting */
+runtty.c_cc[VMIN] = 0;                                  /* no waiting */
 runtty.c_cc[VTIME] = 0;
 #if defined (VDSUSP)
 runtty.c_cc[VDSUSP] = 0;
@@ -947,23 +970,25 @@ return SCPE_OK;
 
 t_stat sim_ttrun (void)
 {
-if (!isatty (fileno (stdin))) return SCPE_OK;		/* skip if !tty */
-runtty.c_cc[VINTR] = sim_int_char;			/* in case changed */
+if (!isatty (fileno (stdin))) return SCPE_OK;           /* skip if !tty */
+runtty.c_cc[VINTR] = sim_int_char;                      /* in case changed */
 if (tcsetattr (0, TCSAFLUSH, &runtty) < 0) return SCPE_TTIERR;
-if (prior_norm) {					/* at normal pri? */
-	errno =	0;
-	nice (10);					/* try to lower pri */
-	prior_norm = errno; }				/* if no error, done */
+if (prior_norm) {                                       /* at normal pri? */
+    errno =     0;
+    nice (10);                                          /* try to lower pri */
+    prior_norm = errno;                                 /* if no error, done */
+    }
 return SCPE_OK;
 }
 
 t_stat sim_ttcmd (void)
 {
-if (!isatty (fileno (stdin))) return SCPE_OK;		/* skip if !tty */
-if (!prior_norm) {					/* priority down? */
-	errno =	0;
-	nice (-10);					/* try to raise pri*/
-	prior_norm = (errno == 0); }			/* if no error, done */
+if (!isatty (fileno (stdin))) return SCPE_OK;           /* skip if !tty */
+if (!prior_norm) {                                      /* priority down? */
+    errno =     0;
+    nice (-10);                                         /* try to raise pri */
+    prior_norm = (errno == 0);                          /* if no error, done */
+    }
 if (tcsetattr (0, TCSAFLUSH, &cmdtty) < 0) return SCPE_TTIERR;
 return SCPE_OK;
 }

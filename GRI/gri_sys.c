@@ -1,6 +1,6 @@
 /* gri_sys.c: GRI-909 simulator interface
 
-   Copyright (c) 2001-2004, Robert M Supnik
+   Copyright (c) 2001-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,11 +19,11 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   18-Oct-02	RMS	Fixed bug in symbolic decode (found by Hans Pufal)
+   18-Oct-02    RMS     Fixed bug in symbolic decode (found by Hans Pufal)
 */
 
 #include "gri_defs.h"
@@ -40,12 +40,12 @@ extern int32 sim_switches;
 
 /* SCP data structures and interface routines
 
-   sim_name		simulator name string
-   sim_PC		pointer to saved PC register descriptor
-   sim_emax		maximum number of words for examine/deposit
-   sim_devices		array of pointers to simulated devices
-   sim_stop_messages	array of pointers to stop messages
-   sim_load		binary loader
+   sim_name             simulator name string
+   sim_PC               pointer to saved PC register descriptor
+   sim_emax             maximum number of words for examine/deposit
+   sim_devices          array of pointers to simulated devices
+   sim_stop_messages    array of pointers to stop messages
+   sim_load             binary loader
 */
 
 char sim_name[] = "GRI-909";
@@ -55,21 +55,23 @@ REG *sim_PC = &cpu_reg[0];
 int32 sim_emax = 2;
 
 DEVICE *sim_devices[] = {
-	&cpu_dev,
-	&tti_dev,
-	&tto_dev,
-	&hsr_dev,
-	&hsp_dev,
-	&rtc_dev,
-	NULL };
+    &cpu_dev,
+    &tti_dev,
+    &tto_dev,
+    &hsr_dev,
+    &hsp_dev,
+    &rtc_dev,
+    NULL
+    };
 
 const char *sim_stop_messages[] = {
-	"Unknown error",
-	"Unimplemented unit",
-	"HALT instruction",
-	"Breakpoint",
-	"Invalid interrupt request"  };
-
+    "Unknown error",
+    "Unimplemented unit",
+    "HALT instruction",
+    "Breakpoint",
+    "Invalid interrupt request"
+     };
+
 /* Binary loader
 
    Bootstrap loader format consists of blocks separated by zeroes.  Each
@@ -85,78 +87,81 @@ uint32 org;
 t_stat r;
 char gbuf[CBUFSIZE];
 
-if (*cptr != 0) {					/* more input? */
-	cptr = get_glyph (cptr, gbuf, 0);		/* get origin */
-	org = get_uint (gbuf, 8, AMASK, &r);
-	if (r != SCPE_OK) return r;
-	if (*cptr != 0) return SCPE_ARG;  }		/* no more */
-else org = 0200;					/* default 200 */
+if (*cptr != 0) {                                       /* more input? */
+    cptr = get_glyph (cptr, gbuf, 0);                   /* get origin */
+    org = get_uint (gbuf, 8, AMASK, &r);
+    if (r != SCPE_OK) return r;
+    if (*cptr != 0) return SCPE_ARG;                    /* no more */
+    }
+else org = 0200;                                        /* default 200 */
 
-for (;;) {						/* until EOF */
-	while ((c = getc (fileref)) == 0) ;		/* skip starting 0's */
-	if (c == EOF) break;				/* EOF? done */
-	for ( ; c != 0; ) {				/* loop until ctl = 0 */
-							/* ign ctrl frame */
-	    if ((c = getc (fileref)) == EOF)		/* get high byte */
-		return SCPE_FMT;			/* EOF is error */
-	    if (!MEM_ADDR_OK (org)) return SCPE_NXM;
-	    M[org] = ((c & 0377) << 8);			/* store high */
-	    if ((c = getc (fileref)) == EOF)		/* get low byte */
-		return SCPE_FMT;			/* EOF is error */
-	    M[org] = M[org] | (c & 0377);		/* store low */
-	    org = org + 1;				/* incr origin */
-	    if ((c = getc (fileref)) == EOF)		/* get ctrl frame */
-		return SCPE_OK;				/* EOF is ok */
-	    }						/* end block for */
-	if (!(sim_switches & SWMASK ('C'))) return SCPE_OK;
-	}						/* end tape for */
+for (;;) {                                              /* until EOF */
+    while ((c = getc (fileref)) == 0) ;                 /* skip starting 0's */
+    if (c == EOF) break;                                /* EOF? done */
+    for ( ; c != 0; ) {                                 /* loop until ctl = 0 */
+                                                        /* ign ctrl frame */
+        if ((c = getc (fileref)) == EOF)                /* get high byte */
+            return SCPE_FMT;                            /* EOF is error */
+        if (!MEM_ADDR_OK (org)) return SCPE_NXM;
+        M[org] = ((c & 0377) << 8);                     /* store high */
+        if ((c = getc (fileref)) == EOF)                /* get low byte */
+            return SCPE_FMT;                            /* EOF is error */
+        M[org] = M[org] | (c & 0377);                   /* store low */
+        org = org + 1;                                  /* incr origin */
+        if ((c = getc (fileref)) == EOF)                /* get ctrl frame */
+            return SCPE_OK;                             /* EOF is ok */
+        }                                               /* end block for */
+    if (!(sim_switches & SWMASK ('C'))) return SCPE_OK;
+    }                                                   /* end tape for */
 return SCPE_OK;
 }
-
+
 /* Symbol tables */
 
-#define F_V_FL	16					/* class flag */
-#define F_M_FL	017
-#define F_V_FO	000					/* function out */
-#define F_V_FOI	001					/* FO, impl reg */
-#define F_V_SF	002					/* skip function */
-#define F_V_SFI	003					/* SF, impl reg */
-#define F_V_RR	004					/* reg reg */
-#define F_V_ZR	005					/* zero reg */
-#define F_V_RS	006					/* reg self */
-#define F_V_JC	010					/* jump cond */
-#define F_V_JU	011					/* jump uncond */
-#define F_V_RM	012					/* reg mem */
-#define F_V_ZM	013					/* zero mem */
-#define F_V_MR	014					/* mem reg */
-#define F_V_MS	015					/* mem self */
-#define F_2WD	010					/* 2 words */
+#define F_V_FL  16                                      /* class flag */
+#define F_M_FL  017
+#define F_V_FO  000                                     /* function out */
+#define F_V_FOI 001                                     /* FO, impl reg */
+#define F_V_SF  002                                     /* skip function */
+#define F_V_SFI 003                                     /* SF, impl reg */
+#define F_V_RR  004                                     /* reg reg */
+#define F_V_ZR  005                                     /* zero reg */
+#define F_V_RS  006                                     /* reg self */
+#define F_V_JC  010                                     /* jump cond */
+#define F_V_JU  011                                     /* jump uncond */
+#define F_V_RM  012                                     /* reg mem */
+#define F_V_ZM  013                                     /* zero mem */
+#define F_V_MR  014                                     /* mem reg */
+#define F_V_MS  015                                     /* mem self */
+#define F_2WD   010                                     /* 2 words */
 
-#define F_FO	(F_V_FO << F_V_FL)
-#define F_FOI	(F_V_FOI << F_V_FL)
-#define F_SF	(F_V_SF << F_V_FL)
-#define F_SFI	(F_V_SFI << F_V_FL)
-#define F_RR	(F_V_RR << F_V_FL)
-#define F_ZR	(F_V_ZR << F_V_FL)
-#define F_RS	(F_V_RS << F_V_FL)
-#define F_JC	(F_V_JC << F_V_FL)
-#define F_JU	(F_V_JU << F_V_FL)
-#define F_RM	(F_V_RM << F_V_FL)
-#define F_ZM	(F_V_ZM << F_V_FL)
-#define F_MR	(F_V_MR << F_V_FL)
-#define F_MS	(F_V_MS << F_V_FL)
+#define F_FO    (F_V_FO << F_V_FL)
+#define F_FOI   (F_V_FOI << F_V_FL)
+#define F_SF    (F_V_SF << F_V_FL)
+#define F_SFI   (F_V_SFI << F_V_FL)
+#define F_RR    (F_V_RR << F_V_FL)
+#define F_ZR    (F_V_ZR << F_V_FL)
+#define F_RS    (F_V_RS << F_V_FL)
+#define F_JC    (F_V_JC << F_V_FL)
+#define F_JU    (F_V_JU << F_V_FL)
+#define F_RM    (F_V_RM << F_V_FL)
+#define F_ZM    (F_V_ZM << F_V_FL)
+#define F_MR    (F_V_MR << F_V_FL)
+#define F_MS    (F_V_MS << F_V_FL)
 
 struct fnc_op {
-	uint32	inst;					/* instr prot */
-	uint32	imask;					/* instr mask */
-	uint32	oper;					/* operator */
-	uint32	omask;  };				/* oper mask */
+    uint32      inst;                                   /* instr prot */
+    uint32      imask;                                  /* instr mask */
+    uint32      oper;                                   /* operator */
+    uint32      omask;                                  /* oper mask */
+    };
 
 static const int32 masks[] = {
- 0176000, 0176077, 0000077, 0176077,
- 0000300, 0176300, 0000300, 0177777,
- 0000077, 0177777, 0000377, 0176377,
- 0176300, 0176377 };
+    0176000, 0176077, 0000077, 0176077,
+    0000300, 0176300, 0000300, 0177777,
+    0000077, 0177777, 0000377, 0176377,
+    0176300, 0176377
+    };
 
 /* Instruction mnemonics
 
@@ -174,17 +179,18 @@ static const int32 masks[] = {
 */
 
 static const char *opcode[] = {
- "FOM", "FOA", "FOI", "FO",				/* FOx before FO */
- "SFM", "SFA", "SFI", "SF",				/* SFx before SF */
- "ZM", "ZMD", "ZMI", "ZMID",				/* ZM before RM */
+ "FOM", "FOA", "FOI", "FO",                             /* FOx before FO */
+ "SFM", "SFA", "SFI", "SF",                             /* SFx before SF */
+ "ZM", "ZMD", "ZMI", "ZMID",                            /* ZM before RM */
  "MS", "MSD", "MSI", "MSID",
  "RM", "RMD", "RMI", "RMID",
  "MR", "MRD", "MRI", "MRID",
- "JO", "JOD", "JN", "JND",				/* JU before JC */
+ "JO", "JOD", "JN", "JND",                              /* JU before JC */
  "JU", "JUD", "JC", "JCD",
- "ZR", "ZRC", "RR", "RRC",				/* ZR before RR */
+ "ZR", "ZRC", "RR", "RRC",                              /* ZR before RR */
  "RS", "RSC",
- NULL };
+ NULL
+ };
 
 static const uint32 opc_val[] = {
  0004000+F_FOI, 0004013+F_FOI, 0004004+F_FOI, 0004000+F_FO,
@@ -196,77 +202,84 @@ static const uint32 opc_val[] = {
  0037003+F_JU, 0037103+F_JU, 0037203+F_JU, 0037303+F_JU,
  0000403+F_JU, 0000503+F_JU, 0000003+F_JC, 0000103+F_JC,
  0000000+F_ZR, 0000200+F_ZR, 0000000+F_RR, 0000200+F_RR,
- 0000000+F_RS, 0000200+F_RS };
+ 0000000+F_RS, 0000200+F_RS
+ };
 
 /* Unit mnemonics.  All 64 units are decoded, most just to octal integers */
 
 static const char *unsrc[64] = {
- "0", "IR", "2", "TRP", "ISR", "MA", "MB", "SC",	/* 00 - 07 */
- "SWR", "AX", "AY", "AO", "14", "15", "16", "MSR",	/* 10 - 17 */
- "20", "21", "22", "23", "BSW", "BPK", "26", "27",	/* 20 - 27 */
- "GR1", "GR2", "GR3", "GR4", "GR5", "GR6", "36", "37",	/* 30 - 37 */
+ "0", "IR", "2", "TRP", "ISR", "MA", "MB", "SC",        /* 00 - 07 */
+ "SWR", "AX", "AY", "AO", "14", "15", "16", "MSR",      /* 10 - 17 */
+ "20", "21", "22", "23", "BSW", "BPK", "26", "27",      /* 20 - 27 */
+ "GR1", "GR2", "GR3", "GR4", "GR5", "GR6", "36", "37",  /* 30 - 37 */
  "40", "41", "42", "43", "44", "45", "46", "47",
  "50", "51", "52", "53", "54", "55", "56", "57",
  "60", "61", "62", "63", "64", "65", "66", "67",
- "70", "71", "72", "73", "74", "RTC", "HSR", "TTI" };	/* 70 - 77 */
+ "70", "71", "72", "73", "74", "RTC", "HSR", "TTI"      /* 70 - 77 */
+ };
 
 static const char *undst[64] = {
- "0", "IR", "2", "TRP", "ISR", "5", "MB", "SC",		/* 00 - 07 */
- "SWR", "AX", "AY", "13", "EAO", "15", "16", "MSR",	/* 10 - 17 */
- "20", "21", "22", "23", "BSW", "BPK", "26", "27",	/* 20 - 27 */
- "GR1", "GR2", "GR3", "GR4", "GR5", "GR6", "36", "37",	/* 30 - 37 */
+ "0", "IR", "2", "TRP", "ISR", "5", "MB", "SC",         /* 00 - 07 */
+ "SWR", "AX", "AY", "13", "EAO", "15", "16", "MSR",     /* 10 - 17 */
+ "20", "21", "22", "23", "BSW", "BPK", "26", "27",      /* 20 - 27 */
+ "GR1", "GR2", "GR3", "GR4", "GR5", "GR6", "36", "37",  /* 30 - 37 */
  "40", "41", "42", "43", "44", "45", "46", "47",
  "50", "51", "52", "53", "54", "55", "56", "57",
  "60", "61", "62", "63", "64", "65", "66", "67",
- "70", "71", "72", "73", "74", "RTC", "HSP", "TTO" };	/* 70 - 77 */
+ "70", "71", "72", "73", "74", "RTC", "HSP", "TTO"      /* 70 - 77 */
+ };
 
- /* Operators */
+                                                        /* Operators */
 
 static const char *opname[4] = {
- NULL, "P1", "L1", "R1" };
+ NULL, "P1", "L1", "R1"
+ };
 
 /* Conditions */
 
 static const char *cdname[8] = {
- "NEVER", "ALWAYS", "ETZ", "NEZ", "LTZ", "GEZ", "LEZ", "GTZ" };
+ "NEVER", "ALWAYS", "ETZ", "NEZ", "LTZ", "GEZ", "LEZ", "GTZ"
+ };
 
 /* Function out/sense function */
 
 static const char *fname[] = {
- "NOT",							/* any SF */
- "POK", "LNK", "BOV", 					/* SFM */
- "SOV", "AOV",						/* SFA */
- "IRDY", "ORDY",					/* any SF */
- "CLL", "STL", "CML", "HLT",				/* FOM */
- "ICF", "ICO",						/* FOI */
- "ADD", "AND", "XOR", "OR",				/* FOA */
- "INP", "IRDY", "ORDY", "STRT",				/* any FO */
- NULL };
+ "NOT",                                                 /* any SF */
+ "POK", "LNK", "BOV",                                   /* SFM */
+ "SOV", "AOV",                                          /* SFA */
+ "IRDY", "ORDY",                                        /* any SF */
+ "CLL", "STL", "CML", "HLT",                            /* FOM */
+ "ICF", "ICO",                                          /* FOI */
+ "ADD", "AND", "XOR", "OR",                             /* FOA */
+ "INP", "IRDY", "ORDY", "STRT",                         /* any FO */
+ NULL
+ };
 
 static const struct fnc_op fop[] = {
- { 0000002, 0000077, 001, 001 },			/* NOT */
- { 0000002, 0176077, 010, 010 },			/* POK */
- { 0000002, 0176077, 004, 004 },			/* LNK */
- { 0000002, 0176077, 002, 002 },			/* BOV */
- { 0026002, 0176077, 004, 004 },			/* SOV */
- { 0026002, 0176077, 002, 002 },			/* AOV */
- { 0000002, 0000077, 010, 010 },			/* IRDY */
- { 0000002, 0000077, 002, 002 },			/* ORDY */
- { 0004000, 0176077, 001, 003 },			/* CLL */
- { 0004000, 0176077, 002, 003 },			/* STL */
- { 0004000, 0176077, 003, 003 },			/* CML */
- { 0004000, 0176077, 004, 004 },			/* HLT */
- { 0004004, 0176077, 001, 001 },			/* ICF */
- { 0004004, 0176077, 002, 002 },			/* ICO */
- { 0004013, 0176077, 000, 014 },			/* ADD */
- { 0004013, 0176077, 004, 014 },			/* AND */
- { 0004013, 0176077, 010, 014 },			/* XOR */
- { 0004013, 0176077, 014, 014 },			/* OR */
- { 0004000, 0176000, 011, 011 },			/* INP */
- { 0004000, 0176000, 010, 010 },			/* IRDY */
- { 0004000, 0176000, 002, 002 },			/* ORDY */
- { 0004000, 0176000, 001, 001 }  };			/* STRT */
-
+ { 0000002, 0000077, 001, 001 },                        /* NOT */
+ { 0000002, 0176077, 010, 010 },                        /* POK */
+ { 0000002, 0176077, 004, 004 },                        /* LNK */
+ { 0000002, 0176077, 002, 002 },                        /* BOV */
+ { 0026002, 0176077, 004, 004 },                        /* SOV */
+ { 0026002, 0176077, 002, 002 },                        /* AOV */
+ { 0000002, 0000077, 010, 010 },                        /* IRDY */
+ { 0000002, 0000077, 002, 002 },                        /* ORDY */
+ { 0004000, 0176077, 001, 003 },                        /* CLL */
+ { 0004000, 0176077, 002, 003 },                        /* STL */
+ { 0004000, 0176077, 003, 003 },                        /* CML */
+ { 0004000, 0176077, 004, 004 },                        /* HLT */
+ { 0004004, 0176077, 001, 001 },                        /* ICF */
+ { 0004004, 0176077, 002, 002 },                        /* ICO */
+ { 0004013, 0176077, 000, 014 },                        /* ADD */
+ { 0004013, 0176077, 004, 014 },                        /* AND */
+ { 0004013, 0176077, 010, 014 },                        /* XOR */
+ { 0004013, 0176077, 014, 014 },                        /* OR */
+ { 0004000, 0176000, 011, 011 },                        /* INP */
+ { 0004000, 0176000, 010, 010 },                        /* IRDY */
+ { 0004000, 0176000, 002, 002 },                        /* ORDY */
+ { 0004000, 0176000, 001, 001 }                         /* STRT */
+ };
+
 /* Print opcode field for FO, SF */
 
 void fprint_op (FILE *of, uint32 inst, uint32 op)
@@ -274,13 +287,14 @@ void fprint_op (FILE *of, uint32 inst, uint32 op)
 int32 i, nfirst;
 
 for (i = nfirst = 0; fname[i] != NULL; i++) {
-	if (((inst & fop[i].imask) == fop[i].inst) &&
-	    ((op & fop[i].omask) == fop[i].oper)) {
-	    op = op & ~fop[i].omask;
-	    if (nfirst) fputc (' ', of);
-	    nfirst = 1;
-	    fprintf (of, "%s", fname[i]);  }
-	}
+    if (((inst & fop[i].imask) == fop[i].inst) &&
+        ((op & fop[i].omask) == fop[i].oper)) {
+        op = op & ~fop[i].omask;
+        if (nfirst) fputc (' ', of);
+        nfirst = 1;
+        fprintf (of, "%s", fname[i]);
+        }
+    }
 if (op) fprintf (of, " %o", op);
 return;
 }
@@ -288,117 +302,136 @@ return;
 /* Symbolic decode
 
    Inputs:
-	*of	=	output stream
-	addr	=	current PC
-	*val	=	pointer to data
-	*uptr	=	pointer to unit 
-	sw	=	switches
+        *of     =       output stream
+        addr    =       current PC
+        *val    =       pointer to data
+        *uptr   =       pointer to unit 
+        sw      =       switches
    Outputs:
-	return	=	status code
+        return  =       status code
 */
 
 #define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
-	UNIT *uptr, int32 sw)
+    UNIT *uptr, int32 sw)
 {
 int32 i, j;
 uint32 inst, src, dst, op, bop;
 
 inst = val[0];
-if (sw & SWMASK ('A')) {				/* ASCII? */
-	if (inst > 0377) return SCPE_ARG;
-	fprintf (of, FMTASC (inst & 0177));
-	return SCPE_OK;  }
-if (sw & SWMASK ('C')) {				/* characters? */
-	fprintf (of, FMTASC ((inst >> 8) & 0177));
-	fprintf (of, FMTASC (inst & 0177));
-	return SCPE_OK;  }
+if (sw & SWMASK ('A')) {                                /* ASCII? */
+    if (inst > 0377) return SCPE_ARG;
+    fprintf (of, FMTASC (inst & 0177));
+    return SCPE_OK;
+    }
+if (sw & SWMASK ('C')) {                                /* characters? */
+    fprintf (of, FMTASC ((inst >> 8) & 0177));
+    fprintf (of, FMTASC (inst & 0177));
+    return SCPE_OK;
+    }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
-
+
 /* Instruction decode */
 
 inst = val[0];
-src = I_GETSRC (inst);					/* get fields */
+src = I_GETSRC (inst);                                  /* get fields */
 op = I_GETOP (inst);
 dst = I_GETDST (inst);
-bop = op >> 2;						/* bus op */
-for (i = 0; opcode[i] != NULL; i++) {			/* loop thru ops */
-    j = (opc_val[i] >> F_V_FL) & F_M_FL;		/* get class */
-    if ((opc_val[i] & DMASK) == (inst & masks[j])) {	/* match? */
+bop = op >> 2;                                          /* bus op */
+for (i = 0; opcode[i] != NULL; i++) {                   /* loop thru ops */
+    j = (opc_val[i] >> F_V_FL) & F_M_FL;                /* get class */
+    if ((opc_val[i] & DMASK) == (inst & masks[j])) {    /* match? */
 
-	switch (j) {					/* case on class */
-	case F_V_FO:					/* func out */
-	    fprintf (of, "%s ", opcode[i]);
-	    fprint_op (of, inst, op);
-	    fprintf (of, ",%s", undst[dst]);
-	    break;
-	case F_V_FOI:					/* func out impl */
-	    fprintf (of, "%s ", opcode[i]);
-	    fprint_op (of, inst, op);
-	    break;
-	case F_V_SF:					/* skip func */
-	    fprintf (of, "%s %s,", opcode[i], unsrc[src]);
-	    fprint_op (of, inst, op);
-	    break;
-	case F_V_SFI:					/* skip func impl */
-	    fprintf (of, "%s ", opcode[i]);
-	    fprint_op (of, inst, op);
-	    break;
-	case F_V_RR:					/* reg reg */
-	    if (strcmp (unsrc[src], undst[dst]) == 0) {
-		if (bop) fprintf (of, "%s %s,%s", opcode[i + 2],
-		    unsrc[src], opname[bop]);
-		else fprintf (of, "%s %s", opcode[i + 2], unsrc[src]);  }
-	    else {
-	    	if (bop) fprintf (of, "%s %s,%s,%s", opcode[i],
-		    unsrc[src], opname[bop], undst[dst]);
-		else fprintf (of, "%s %s,%s", opcode[i],
-		    unsrc[src], undst[dst]);  }
-	    break;
-	case F_V_ZR:					/* zero reg */
-	    if (bop) fprintf (of, "%s %s,%s", opcode[i],
-		opname[bop], undst[dst]);
-	    else fprintf (of, "%s %s", opcode[i], undst[dst]);
-	    break;
-	case F_V_JC:					/* jump cond */
-	    fprintf (of, "%s %s,%s,%o", opcode[i],
-		unsrc[src], cdname[op >> 1], val[1]);
-	    break;
-	case F_V_JU:					/* jump uncond */
-	    fprintf (of, "%s %o", opcode[i], val[1]);
-	    break;
-	case F_V_RM:					/* reg mem */
-	    if (bop) fprintf (of, "%s %s,%s,%o", opcode[i],
-		unsrc[src], opname[bop], val[1]);
-	    else fprintf (of, "%s %s,%o", opcode[i], unsrc[src], val[1]);
-	    break;
-	case F_V_ZM:					/* zero mem */
-	    if (bop) fprintf (of, "%s %s,%o", opcode[i],
-		opname[bop], val[1]);
-	    else fprintf (of, "%s %o", opcode[i], val[1]);
-	    break;
-	case F_V_MR:					/* mem reg */
-	    if (bop) fprintf (of, "%s %o,%s,%s", opcode[i],
-		val[1], opname[bop], undst[dst]);
-	    else fprintf (of, "%s %o,%s", opcode[i], val[1], undst[dst]);
-	    break;
-	case F_V_MS:					/* mem self */
-	    if (bop) fprintf (of, "%s %o,%s", opcode[i],
-		val[1], opname[bop]);
-	    else fprintf (of, "%s %o", opcode[i], val[1]);
-	    break;  }					/* end case */
-	return (j >= F_2WD)? -1: SCPE_OK;  }		/* end if */
-	}						/* end for */
+        switch (j) {                                    /* case on class */
+
+        case F_V_FO:                                    /* func out */
+            fprintf (of, "%s ", opcode[i]);
+            fprint_op (of, inst, op);
+            fprintf (of, ",%s", undst[dst]);
+            break;
+
+        case F_V_FOI:                                   /* func out impl */
+            fprintf (of, "%s ", opcode[i]);
+            fprint_op (of, inst, op);
+            break;
+
+        case F_V_SF:                                    /* skip func */
+            fprintf (of, "%s %s,", opcode[i], unsrc[src]);
+            fprint_op (of, inst, op);
+            break;
+
+        case F_V_SFI:                                   /* skip func impl */
+            fprintf (of, "%s ", opcode[i]);
+            fprint_op (of, inst, op);
+            break;
+
+        case F_V_RR:                                    /* reg reg */
+            if (strcmp (unsrc[src], undst[dst]) == 0) {
+                if (bop) fprintf (of, "%s %s,%s", opcode[i + 2],
+                    unsrc[src], opname[bop]);
+                else fprintf (of, "%s %s", opcode[i + 2], unsrc[src]);
+                }
+            else {
+                if (bop) fprintf (of, "%s %s,%s,%s", opcode[i],
+                    unsrc[src], opname[bop], undst[dst]);
+                else fprintf (of, "%s %s,%s", opcode[i],
+                    unsrc[src], undst[dst]);
+                }
+            break;
+
+        case F_V_ZR:                                    /* zero reg */
+            if (bop) fprintf (of, "%s %s,%s", opcode[i],
+                opname[bop], undst[dst]);
+            else fprintf (of, "%s %s", opcode[i], undst[dst]);
+            break;
+
+        case F_V_JC:                                    /* jump cond */
+            fprintf (of, "%s %s,%s,%o", opcode[i],
+                unsrc[src], cdname[op >> 1], val[1]);
+            break;
+
+        case F_V_JU:                                    /* jump uncond */
+            fprintf (of, "%s %o", opcode[i], val[1]);
+            break;
+
+        case F_V_RM:                                    /* reg mem */
+            if (bop) fprintf (of, "%s %s,%s,%o", opcode[i],
+                unsrc[src], opname[bop], val[1]);
+            else fprintf (of, "%s %s,%o", opcode[i], unsrc[src], val[1]);
+            break;
+
+        case F_V_ZM:                                    /* zero mem */
+            if (bop) fprintf (of, "%s %s,%o", opcode[i],
+                opname[bop], val[1]);
+            else fprintf (of, "%s %o", opcode[i], val[1]);
+            break;
+
+        case F_V_MR:                                    /* mem reg */
+            if (bop) fprintf (of, "%s %o,%s,%s", opcode[i],
+                val[1], opname[bop], undst[dst]);
+            else fprintf (of, "%s %o,%s", opcode[i], val[1], undst[dst]);
+            break;
+
+        case F_V_MS:                                    /* mem self */
+            if (bop) fprintf (of, "%s %o,%s", opcode[i],
+                val[1], opname[bop]);
+            else fprintf (of, "%s %o", opcode[i], val[1]);
+            break;
+            }                                           /* end case */
+
+        return (j >= F_2WD)? -1: SCPE_OK;
+        }                                               /* end if */
+    }                                                   /* end for */
 return SCPE_ARG;
 }
-
+
 /* Field parse routines
 
-	get_fnc		get function field
-	get_ma		get memory address
-	get_sd		get source or dest
-	get_op		get optional bus operator
+        get_fnc         get function field
+        get_ma          get memory address
+        get_sd          get source or dest
+        get_op          get optional bus operator
 */
 
 char *get_fnc (char *cptr, t_value *val)
@@ -411,23 +444,27 @@ uint32 inst = val[0];
 uint32 fncv = 0, fncm = 0;
 
 while (*cptr) {
-	cptr = get_glyph (cptr, gbuf, 0);		/* get glyph */
-	d = get_uint (gbuf, 8, 017, &r);		/* octal? */
-	if (r == SCPE_OK) {				/* ok? */
-	    if (d & fncm) return NULL;			/* already filled? */
-	    fncv = fncv | d;				/* save */
-	    fncm = fncm | d;  }				/* field filled */
-	else {						/* symbol? */
-	    for (i = 0; fname[i] != NULL; i++) {	/* search table */
-		if ((strcmp (gbuf, fname[i]) == 0) &&	/* match for inst? */
-		    ((inst & fop[i].imask) == fop[i].inst)) {
-		    if (fop[i].oper & fncm) return NULL;/* already filled? */
-		    fncm = fncm | fop[i].omask;
-		    fncv = fncv | fop[i].oper;
-		    break;  }  }
-	if (fname[i] == NULL) return NULL;  }		/* end else */
-	}						/* end while */
-val[0] = val[0] | (fncv << I_V_OP);			/* store fnc */
+    cptr = get_glyph (cptr, gbuf, 0);                   /* get glyph */
+    d = get_uint (gbuf, 8, 017, &r);                    /* octal? */
+    if (r == SCPE_OK) {                                 /* ok? */
+        if (d & fncm) return NULL;                      /* already filled? */
+        fncv = fncv | d;                                /* save */
+        fncm = fncm | d;                                /* field filled */
+        }
+    else {                                              /* symbol? */
+        for (i = 0; fname[i] != NULL; i++) {            /* search table */
+            if ((strcmp (gbuf, fname[i]) == 0) &&       /* match for inst? */
+                ((inst & fop[i].imask) == fop[i].inst)) {
+                if (fop[i].oper & fncm) return NULL;    /* already filled? */
+                fncm = fncm | fop[i].omask;
+                fncv = fncv | fop[i].oper;
+                break;
+                }
+            }
+        if (fname[i] == NULL) return NULL;
+        }                                               /* end else */
+    }                                                   /* end while */
+val[0] = val[0] | (fncv << I_V_OP);                     /* store fnc */
 return cptr;
 }
 
@@ -437,10 +474,10 @@ char gbuf[CBUFSIZE];
 t_value d;
 t_stat r;
 
-cptr = get_glyph (cptr, gbuf, term);			/* get glyph */
-d = get_uint (gbuf, 8, DMASK, &r);			/* [0,177777] */
+cptr = get_glyph (cptr, gbuf, term);                    /* get glyph */
+d = get_uint (gbuf, 8, DMASK, &r);                      /* [0,177777] */
 if (r != SCPE_OK) return NULL;
-val[1] = d;						/* second wd */
+val[1] = d;                                             /* second wd */
 return cptr;
 }
 
@@ -450,14 +487,16 @@ char gbuf[CBUFSIZE];
 int32 d;
 t_stat r;
 
-cptr = get_glyph (cptr, gbuf, term);			/* get glyph */
-for (d = 0; d < 64; d++) {				/* symbol match? */
-	if ((strcmp (gbuf, unsrc[d]) == 0) ||
-	    (strcmp (gbuf, undst[d]) == 0)) break;  }
-if (d >= 64) {						/* no, [0,63]? */
-	d = get_uint (gbuf, 8, 077, &r);
-	if (r != SCPE_OK) return NULL;  }
-val[0] = val[0] | (d << (src? I_V_SRC: I_V_DST));	/* or to inst */
+cptr = get_glyph (cptr, gbuf, term);                    /* get glyph */
+for (d = 0; d < 64; d++) {                              /* symbol match? */
+    if ((strcmp (gbuf, unsrc[d]) == 0) ||
+        (strcmp (gbuf, undst[d]) == 0)) break;
+    }
+if (d >= 64) {                                          /* no, [0,63]? */
+    d = get_uint (gbuf, 8, 077, &r);
+    if (r != SCPE_OK) return NULL;
+    }
+val[0] = val[0] | (d << (src? I_V_SRC: I_V_DST));       /* or to inst */
 return cptr;
 }
 
@@ -466,24 +505,26 @@ char *get_op (char *cptr, t_value *val, char term)
 char gbuf[CBUFSIZE], *tptr;
 int32 i;
 
-tptr = get_glyph (cptr, gbuf, term);			/* get glyph */
-for (i = 1; i < 4; i++) {				/* symbol match? */
-	if (strcmp (gbuf, opname[i]) == 0) {
-	    val[0] = val[0] | (i << (I_V_OP + 2));	/* or to inst */
-	    return tptr;  }  }
-return cptr;						/* original ptr */
+tptr = get_glyph (cptr, gbuf, term);                    /* get glyph */
+for (i = 1; i < 4; i++) {                               /* symbol match? */
+    if (strcmp (gbuf, opname[i]) == 0) {
+        val[0] = val[0] | (i << (I_V_OP + 2));          /* or to inst */
+        return tptr;
+        }
+    }
+return cptr;                                            /* original ptr */
 }
-
+
 /* Symbolic input
 
    Inputs:
-	*cptr	=	pointer to input string
-	addr	=	current PC
-	*uptr	=	pointer to unit
-	*val	=	pointer to output values
-	sw	=	switches
+        *cptr   =       pointer to input string
+        addr    =       current PC
+        *uptr   =       pointer to unit
+        *val    =       pointer to output values
+        sw      =       switches
    Outputs:
-	status	=	error status
+        status  =       error status
 */
 
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
@@ -491,92 +532,109 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 int32 i, j, k;
 char *tptr, gbuf[CBUFSIZE];
 
-while (isspace (*cptr)) cptr++;				/* absorb spaces */
+while (isspace (*cptr)) cptr++;                         /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = (t_value) cptr[0] & 0177;
-	return SCPE_OK;  }
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    val[0] = (t_value) cptr[0] & 0177;
+    return SCPE_OK;
+    }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* char string? */
-	if (cptr[0] == 0) return SCPE_ARG;		/* must have 1 char */
-	val[0] = (((t_value) cptr[0] & 0177) << 8) |
-		  ((t_value) cptr[1] & 0177);
-	return SCPE_OK;  }
-
+    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    val[0] = (((t_value) cptr[0] & 0177) << 8) |
+              ((t_value) cptr[1] & 0177);
+    return SCPE_OK;
+    }
+
 /* Instruction parse */
 
-cptr = get_glyph (cptr, gbuf, 0);			/* get opcode */
+cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
 if (opcode[i] == NULL) return SCPE_ARG;
-val[0] = opc_val[i] & DMASK;				/* get value */
-j = (opc_val[i] >> F_V_FL) & F_M_FL;			/* get class */
+val[0] = opc_val[i] & DMASK;                            /* get value */
+j = (opc_val[i] >> F_V_FL) & F_M_FL;                    /* get class */
 
-switch (j) {						/* case on class */
-case F_V_FO:						/* func out */
-	tptr = strchr (cptr, ',');			/* find dst */
-	if (!tptr) return SCPE_ARG;			/* none? */
-	*tptr = 0;					/* split fields */
-	cptr = get_fnc (cptr, val);			/* fo # */
-	if (!cptr) return SCPE_ARG;
-	cptr = get_sd (tptr + 1, val, 0, FALSE);	/* dst */
-	break;
-case F_V_FOI:						/* func out impl */
-	cptr = get_fnc (cptr, val);			/* fo # */
-	break;
-case F_V_SF:						/* skip func */
-	cptr = get_sd (cptr, val, ',', TRUE);		/* src */
-	if (!cptr) return SCPE_ARG;
-case F_V_SFI:						/* skip func impl */
-	cptr = get_fnc (cptr, val);			/* fo # */
-	break;
-case F_V_RR:						/* reg-reg */
-	cptr = get_sd (cptr, val, ',', TRUE);		/* src */
-	if (!cptr) return SCPE_ARG;
-	cptr = get_op (cptr, val, ',');			/* op */
-	if (!cptr) return SCPE_ARG;
-	cptr = get_sd (cptr, val, 0, FALSE);		/* dst */
-	break;
-case F_V_ZR:						/* zero-reg */
-	cptr = get_op (cptr, val, ',');			/* op */
-	if (!cptr) return SCPE_ARG;
-	cptr = get_sd (cptr, val, 0, FALSE);		/* dst */
-	break;
-case F_V_RS:						/* reg self */
-	cptr = get_sd (cptr, val, ',', TRUE);		/* src */
-	if (!cptr) return SCPE_ARG;
-	val[0] = val[0] | I_GETSRC (val[0]);		/* duplicate */
-	cptr = get_op (cptr, val, 0);			/* op */
-	break;
-case F_V_JC:						/* jump cond */
-	cptr = get_sd (cptr, val, ',', TRUE);		/* src */
-	if (!cptr) return SCPE_ARG;
-	cptr = get_glyph (cptr, gbuf, ',');		/* cond */
-	for (k = 0; k < 8; k++) {			/* symbol? */
-	    if (strcmp (gbuf, cdname[k]) == 0) break;  }
-	if (k >= 8) return SCPE_ARG;
-	val[0] = val[0] | (k << (I_V_OP + 1));		/* or to inst */
-case F_V_JU:						/* jump uncond */
-	cptr = get_ma (cptr, val, 0);			/* addr */
-	break;
-case F_V_RM:						/* reg mem */
-	cptr = get_sd (cptr, val, ',', TRUE);		/* src */
-	if (!cptr) return SCPE_ARG;
-case F_V_ZM:						/* zero mem */
-	cptr = get_op (cptr, val, ',');			/* op */
-	if (!cptr) return SCPE_ARG;
-	cptr = get_ma (cptr, val, 0);			/* addr */
-	break;
-case F_V_MR:						/* mem reg */
-	cptr = get_ma (cptr, val, ',');			/* addr */
-	if (!cptr) return SCPE_ARG;
-	cptr = get_op (cptr, val, ',');			/* op */
-	if (!cptr) return SCPE_ARG;
-	cptr = get_sd (cptr, val, 0, FALSE);		/* dst */
-	break;
-case F_V_MS:						/* mem self */
-	cptr = get_ma (cptr, val, ',');			/* addr */
-	if (!cptr) return SCPE_ARG;
-	cptr = get_op (cptr, val, 0);			/* op */
-	break;  }
-if (!cptr || (*cptr != 0)) return SCPE_ARG;		/* junk at end? */
+switch (j) {                                            /* case on class */
+
+    case F_V_FO:                                        /* func out */
+        tptr = strchr (cptr, ',');                      /* find dst */
+        if (!tptr) return SCPE_ARG;                     /* none? */
+        *tptr = 0;                                      /* split fields */
+        cptr = get_fnc (cptr, val);                     /* fo # */
+        if (!cptr) return SCPE_ARG;
+        cptr = get_sd (tptr + 1, val, 0, FALSE);        /* dst */
+        break;
+
+    case F_V_FOI:                                       /* func out impl */
+        cptr = get_fnc (cptr, val);                     /* fo # */
+        break;
+
+    case F_V_SF:                                        /* skip func */
+        cptr = get_sd (cptr, val, ',', TRUE);           /* src */
+        if (!cptr) return SCPE_ARG;
+
+    case F_V_SFI:                                       /* skip func impl */
+        cptr = get_fnc (cptr, val);                     /* fo # */
+        break;
+
+    case F_V_RR:                                        /* reg-reg */
+        cptr = get_sd (cptr, val, ',', TRUE);           /* src */
+        if (!cptr) return SCPE_ARG;
+        cptr = get_op (cptr, val, ',');                 /* op */
+        if (!cptr) return SCPE_ARG;
+        cptr = get_sd (cptr, val, 0, FALSE);            /* dst */
+        break;
+
+    case F_V_ZR:                                        /* zero-reg */
+        cptr = get_op (cptr, val, ',');                 /* op */
+        if (!cptr) return SCPE_ARG;
+        cptr = get_sd (cptr, val, 0, FALSE);            /* dst */
+        break;
+
+    case F_V_RS:                                        /* reg self */
+        cptr = get_sd (cptr, val, ',', TRUE);           /* src */
+        if (!cptr) return SCPE_ARG;
+        val[0] = val[0] | I_GETSRC (val[0]);            /* duplicate */
+        cptr = get_op (cptr, val, 0);                   /* op */
+        break;
+
+    case F_V_JC:                                        /* jump cond */
+        cptr = get_sd (cptr, val, ',', TRUE);           /* src */
+        if (!cptr) return SCPE_ARG;
+        cptr = get_glyph (cptr, gbuf, ',');             /* cond */
+        for (k = 0; k < 8; k++) {                       /* symbol? */
+            if (strcmp (gbuf, cdname[k]) == 0) break;
+            }
+        if (k >= 8) return SCPE_ARG;
+        val[0] = val[0] | (k << (I_V_OP + 1));          /* or to inst */
+
+    case F_V_JU:                                        /* jump uncond */
+        cptr = get_ma (cptr, val, 0);                   /* addr */
+        break;
+
+    case F_V_RM:                                        /* reg mem */
+        cptr = get_sd (cptr, val, ',', TRUE);           /* src */
+        if (!cptr) return SCPE_ARG;
+    case F_V_ZM:                                        /* zero mem */
+        cptr = get_op (cptr, val, ',');                 /* op */
+        if (!cptr) return SCPE_ARG;
+        cptr = get_ma (cptr, val, 0);                   /* addr */
+        break;
+
+    case F_V_MR:                                        /* mem reg */
+        cptr = get_ma (cptr, val, ',');                 /* addr */
+        if (!cptr) return SCPE_ARG;
+        cptr = get_op (cptr, val, ',');                 /* op */
+        if (!cptr) return SCPE_ARG;
+        cptr = get_sd (cptr, val, 0, FALSE);            /* dst */
+        break;
+
+    case F_V_MS:                                        /* mem self */
+        cptr = get_ma (cptr, val, ',');                 /* addr */
+        if (!cptr) return SCPE_ARG;
+        cptr = get_op (cptr, val, 0);                   /* op */
+        break;
+    }                                                   /* end case */
+
+if (!cptr || (*cptr != 0)) return SCPE_ARG;             /* junk at end? */
 return (j >= F_2WD)? -1: SCPE_OK;
 }

@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Simulator Usage, V3.4
-Date:	01-May-2005
+Date:	20-Jul-2005
 
 			COPYRIGHT NOTICE
 
@@ -27,8 +27,8 @@ The following copyright notice applies to both the SIMH source and binary:
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
 This memorandum documents SIMH simulators.  These simulators are freeware;
@@ -885,6 +885,11 @@ header, with 0x0000 denoting file mark.  The record header is not
 repeated at the end of the record.  Odd-length records are padded with
 an extra byte.
 
+SIMH can read Pierce-format seven-track magtape images.  Pierce format
+uses only 6 data bits, and one parity bit, in each byte.  The high
+order bit indicates start of record.  End of file is indicated by a
+record of one (occasionally two) bytes consisting of code 017 (octal).
+
 4. Line Printers
 
 Line printer output is represented by an ASCII file of lines separated
@@ -981,23 +986,23 @@ drum		-	-	-	-	h
 DECtape		-	-	-	-	-
 mag tape	-	-	d	y	h
 
-	system	LGP-30	1130
+	system	LGP-30	1130	7094
 device
-CPU		h	y
-FPU		-	-
-CIS		-	-
-console		h	y
-paper tape	h	-
-card reader	-	y
-line printer	-	y
-clock		-	-
-extra terminal	-	-
-hard disk	-	y
-fixed disk	-	-
-floppy disk	-	-
-drum		-	-
-DECtape		-	-
-mag tape	-	-
+CPU		h	y	d
+FPU		-	-	d
+CIS		-	-	-
+console		h	y	-
+paper tape	h	-	-
+card reader	-	y	h
+line printer	-	y	h
+clock		-	-	n
+extra terminal	-	-	n
+hard disk	-	y	d
+fixed disk	-	-	d
+floppy disk	-	-	-
+drum		-	-	d
+DECtape		-	-	-
+mag tape	-	-	h
 
 legend:		y = runs operating system or sample program
 		d = runs diagnostics
@@ -1012,6 +1017,7 @@ in file sim_rev.c.
 
 Rev 3.4, May, 05
 	Revised memory interaction model
+	Added IBM 7094
 
 Rev 3.3, Nov, 04
 	Added PDP-11/VAX DHQ11 support

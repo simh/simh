@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	20-Jan-2005
+Date:	01-Jul-2005
 
 			COPYRIGHT NOTICE
 
@@ -27,8 +27,8 @@ The following copyright notice applies to both the SIMH source and binary:
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
 This memorandum documents the PDP-11 simulator.
@@ -104,7 +104,7 @@ PTR,PTP		PC11 paper tape reader/punch
 TTI,TTO		DL11 console terminal
 LPT		LP11 line printer
 CLK		line frequency clock
-PCLK		KW11P programmable clock
+PCLK		KW11-P programmable clock
 DZ		DZ11 8-line terminal multiplexor (up to 4)
 VH		DHU11/DHQ11 8-line terminal multiplexor (up to 4)
 RK		RK11/RK05 cartridge disk controller with eight drives
@@ -228,14 +228,14 @@ type	bus	memory	MMU?	Umap?	EIS?	FIS?	FPP?	CIS?
 If a capability is standard, it cannot be disabled; if a capability is
 not included, it cannot be enabled.
 
-The CPU implements a show command to display the I/O address assignments:
+The CPU implements a SHOW command to display the I/O address assignments:
 
 	SHOW CPU IOSPACE	show I/O space address assignments
 
 If memory size is being reduced, and the memory being truncated contains
 non-zero data, the simulator asks for confirmation.  Data in the truncated
 portion of memory is lost.  Initial memory size is 256KB.  If memory size
-is being increased to more than 256KB, or the bus structue is being changed,
+is being increased to more than 256KB, or the bus structure is being changed,
 the simulator asks whether it should disable peripherals that can't run
 in the current bus structure.
 
@@ -378,7 +378,7 @@ disabled in a Qbus configuration with more than 256KB memory.
 PDP-11 I/O space is not large enough to allow all possible devices to be
 configured simultaneously at fixed addresses.  Instead, many devices have
 floating addresses; that is, the assigned device address depends on the
-presense of other devices in the configuration:
+presence of other devices in the configuration:
 
 	DZ11		all instances have floating addresses
 	DHU11/DHQ11	all instances have floating addresses
@@ -1355,7 +1355,7 @@ DISCONNECT command, or a DETACH DZ command.
 
 The SHOW DZ CONNECTIONS command displays the current connections to the DZ.
 The SHOW DZ STATISTICS command displays statistics for active connections.
-The SET DZ DISCONNECT=linenumber disconnects the specified line.
+The SET DZ DISCONNECT=linenumber command disconnects the specified line.
 
 The DZ11 implements these registers:
 
@@ -1439,7 +1439,7 @@ a SET VH DISCONNECT command, or a DETACH VH command.
 
 The SHOW VH CONNECTIONS command displays the current connections to the VH.
 The SHOW VH STATISTICS command displays statistics for active connections.
-The SET VH DISCONNECT=linenumber disconnects the specified line.
+The SET VH DISCONNECT=linenumber command disconnects the specified line.
 
 The DHQ11 implements these registers, though not all can be examined
 from SCP:
@@ -1537,7 +1537,7 @@ XQ and XQB have the following registers:
 	VAR		16	vector address register
 	INT		1	interrupt request flag
 
-One final note: because of it's asynchronous nature, the XQ controller is
+One final note: because of its asynchronous nature, the XQ controller is
 not limited to the ~1.5Mbit/sec of the real DEQNA/DELQA controllers,
 nor the 10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet
 (100 Mbit/sec) card, and "Feel the Power!" :-)

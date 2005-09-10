@@ -1,7 +1,7 @@
 /* pdp11_xq.c: DEQNA/DELQA ethernet controller simulator
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2002-2004, David T. Hittner
+   Copyright (c) 2002-2005, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -66,6 +66,9 @@
 
   Modification history:
 
+  07-Sep-05  DTH  Removed unused variable
+  16-Aug-05  RMS  Fixed C++ declaration and cast problems
+  01-Dec-04  DTH  Added runtime attach prompt
   27-Feb-04  DTH  Removed struct timeb deuggers
   31-Jan-04  DTH  Replaced #ifdef debuggers with inline debugging
   19-Jan-04  DTH  Combined service timers into one for efficiency
@@ -206,6 +209,7 @@
 
 extern int32 tmr_poll, clk_tps;
 extern FILE* sim_deb;
+extern char* read_line (char *ptr, int32 size, FILE *stream);
 
 /* forward declarations */
 t_stat xq_rd(int32* data, int32 PA, int32 access);
@@ -1869,14 +1873,25 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
   t_stat status;
   char* tptr;
   CTLR* xq = xq_unit2ctlr(uptr);
+  char buffer[80];                                          /* buffer for runtime input */
 
   sim_debug(DBG_TRC, xq->dev, "xq_attach(cptr=%s)\n", cptr);
 
-  tptr = malloc(strlen(cptr) + 1);
+  /* runtime selection of ethernet port? */
+  if (*cptr == '?') {                                       /* I/O style derived from main() */
+    memset (buffer, 0, sizeof(buffer));                     /* clear read buffer */
+    eth_show (stdout, uptr, 0, NULL);                       /* show ETH devices */
+    printf ("Select device (ethX or <device_name>)? ");     /* prompt for device */
+    cptr = read_line (buffer, sizeof(buffer), stdin);       /* read command line */
+    if (cptr == NULL) return SCPE_ARG;                      /* ignore EOF */
+    if (*cptr == 0) return SCPE_ARG;                        /* ignore blank */
+  }                                                         /* resume attaching */
+
+  tptr = (char *) malloc(strlen(cptr) + 1);
   if (tptr == NULL) return SCPE_MEM;
   strcpy(tptr, cptr);
 
-  xq->var->etherface = malloc(sizeof(ETH_DEV));
+  xq->var->etherface = (ETH_DEV *) malloc(sizeof(ETH_DEV));
   if (!xq->var->etherface) return SCPE_MEM;
 
   status = eth_open(xq->var->etherface, cptr, xq->dev, DBG_ETH);
@@ -1906,7 +1921,7 @@ t_stat xq_detach(UNIT* uptr)
   sim_debug(DBG_TRC, xq->dev, "xq_detach()\n");
 
   if (uptr->flags & UNIT_ATT) {
-    t_stat status = eth_close (xq->var->etherface);
+    eth_close (xq->var->etherface);
     free(xq->var->etherface);
     xq->var->etherface = 0;
     free(uptr->filename);

@@ -19,31 +19,31 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ptr		316/516-50 paper tape reader
-   ptp		316/516-52 paper tape punch
-   tty		316/516-33 teleprinter
-   clk/options	316/516-12 real time clocks/internal options
+   ptr          316/516-50 paper tape reader
+   ptp          316/516-52 paper tape punch
+   tty          316/516-33 teleprinter
+   clk/options  316/516-12 real time clocks/internal options
 
-   05-Feb-05	RMS	Fixed bug in OCP '0001 (found by Philipp Hachtmann)
-   31-Jan-05	RMS	Fixed bug in TTY print (found by Philipp Hachtmann)
-   01-Dec-04	RMS	Fixed problem in SKS '104 (reported by Philipp Hachtmann)
-			Fixed bug in SKS '504
-			Added PTR detach routine, stops motion
-			Added PTR/PTP ASCII file support
-			Added TTR/TTP support
-   24-Oct-03	RMS	Added DMA/DMC support
-   25-Apr-03	RMS	Revised for extended file support
-   01-Mar-03	RMS	Added SET/SHOW CLK FREQ support
-   22-Dec-02	RMS	Added break support
-   01-Nov-02	RMS	Added 7b/8b support to terminal
-   30-May-02	RMS	Widened POS to 32b
-   03-Nov-01	RMS	Implemented upper case for console output
-   29-Nov-01	RMS	Added read only unit support
-   07-Sep-01	RMS	Moved function prototypes
+   05-Feb-05    RMS     Fixed bug in OCP '0001 (found by Philipp Hachtmann)
+   31-Jan-05    RMS     Fixed bug in TTY print (found by Philipp Hachtmann)
+   01-Dec-04    RMS     Fixed problem in SKS '104 (reported by Philipp Hachtmann)
+                        Fixed bug in SKS '504
+                        Added PTR detach routine, stops motion
+                        Added PTR/PTP ASCII file support
+                        Added TTR/TTP support
+   24-Oct-03    RMS     Added DMA/DMC support
+   25-Apr-03    RMS     Revised for extended file support
+   01-Mar-03    RMS     Added SET/SHOW CLK FREQ support
+   22-Dec-02    RMS     Added break support
+   01-Nov-02    RMS     Added 7b/8b support to terminal
+   30-May-02    RMS     Widened POS to 32b
+   03-Nov-01    RMS     Implemented upper case for console output
+   29-Nov-01    RMS     Added read only unit support
+   07-Sep-01    RMS     Moved function prototypes
 
    The ASR-33/35 reader/punch logic, and the ASCII file support for all paper tape
    devices, logic is taken, with grateful thanks, from Adrian Wise's H316 emulator.
@@ -66,31 +66,31 @@
 #include "h316_defs.h"
 #include <ctype.h>
 
-#define CHAR_FLAG(c)	(1u << (c))
+#define CHAR_FLAG(c)    (1u << (c))
 
-#define BEL_FLAG	CHAR_FLAG('\a')
-#define LF_FLAG		CHAR_FLAG('\n')
-#define CR_FLAG		CHAR_FLAG('\r')
-#define HT_FLAG		CHAR_FLAG('\t')
+#define BEL_FLAG        CHAR_FLAG('\a')
+#define LF_FLAG         CHAR_FLAG('\n')
+#define CR_FLAG         CHAR_FLAG('\r')
+#define HT_FLAG         CHAR_FLAG('\t')
 
-#define CNTL_SET	(BEL_FLAG | HT_FLAG | LF_FLAG | CR_FLAG)
+#define CNTL_SET        (BEL_FLAG | HT_FLAG | LF_FLAG | CR_FLAG)
 
-#define UNIT_V_8B	(UNIT_V_UF + 0)			/* 8B */
-#define UNIT_V_KSR	(UNIT_V_UF + 1)			/* KSR33 */
-#define UNIT_V_ASC	(UNIT_V_UF + 2)			/* ASCII */
-#define UNIT_V_UASC	(UNIT_V_UF + 3)			/* Unix ASCII */
-#define UNIT_8B		(1 << UNIT_V_8B)
-#define UNIT_KSR	(1 << UNIT_V_KSR)
-#define UNIT_ASC	(1 << UNIT_V_ASC)
-#define UNIT_UASC	(1 << UNIT_V_UASC)
-#define STA		u3				/* state bits */
-#define LF_PEND		01				/* lf pending */
-#define RUNNING		02				/* tape running */
+#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
+#define UNIT_V_KSR      (UNIT_V_UF + 1)                 /* KSR33 */
+#define UNIT_V_ASC      (UNIT_V_UF + 2)                 /* ASCII */
+#define UNIT_V_UASC     (UNIT_V_UF + 3)                 /* Unix ASCII */
+#define UNIT_8B         (1 << UNIT_V_8B)
+#define UNIT_KSR        (1 << UNIT_V_KSR)
+#define UNIT_ASC        (1 << UNIT_V_ASC)
+#define UNIT_UASC       (1 << UNIT_V_UASC)
+#define STA             u3                              /* state bits */
+#define LF_PEND         01                              /* lf pending */
+#define RUNNING         02                              /* tape running */
 
-#define XON		0021
-#define TAPE		0022
-#define XOFF		0023
-#define RUBOUT		0377
+#define XON             0021
+#define TAPE            0022
+#define XOFF            0023
+#define RUBOUT          0377
 
 extern uint16 M[];
 extern int32 PC;
@@ -100,18 +100,18 @@ extern int32 dev_int, dev_enb;
 extern int32 sim_switches;
 extern UNIT cpu_unit;
 
-uint32 ptr_motion = 0;					/* read motion */
-uint32 ptr_stopioe = 0;					/* stop on error */
+uint32 ptr_motion = 0;                                  /* read motion */
+uint32 ptr_stopioe = 0;                                 /* stop on error */
 uint32 ptp_stopioe = 0;
-uint32 ptp_power = 0;					/* punch power, time */
+uint32 ptp_power = 0;                                   /* punch power, time */
 int32 ptp_ptime;
 uint32 ttr_stopioe = 0;
-uint32 tty_mode = 0;					/* input (0), output (1) */
-uint32 tty_buf = 0;					/* tty buffer */
+uint32 tty_mode = 0;                                    /* input (0), output (1) */
+uint32 tty_buf = 0;                                     /* tty buffer */
 uint32 ttr_xoff_read = 0;
 uint32 ttp_tape_rcvd = 0;
 uint32 ttp_xoff_rcvd = 0;
-int32 clk_tps = 60;					/* ticks per second */
+int32 clk_tps = 60;                                     /* ticks per second */
 
 int32 ptrio (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat ptr_svc (UNIT *uptr);
@@ -136,198 +136,217 @@ t_stat pt_attach (UNIT *uptr, char *cptr);
 t_stat pt_detach (UNIT *uptr);
 t_stat tto_write (int32 c);
 t_stat ttp_write (int32 c);
-
+
 /* PTR data structures
 
-   ptr_dev	PTR device descriptor
-   ptr_unit	PTR unit descriptor
-   ptr_mod	PTR modifiers
-   ptr_reg	PTR register list
+   ptr_dev      PTR device descriptor
+   ptr_unit     PTR unit descriptor
+   ptr_mod      PTR modifiers
+   ptr_reg      PTR register list
 */
 
 DIB ptr_dib = { PTR, IOBUS, 1, &ptrio };
 
 UNIT ptr_unit = {
-	UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
-		SERIAL_IN_WAIT };
+    UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
+           SERIAL_IN_WAIT
+    };
 
 REG ptr_reg[] = {
-	{ ORDATA (BUF, ptr_unit.buf, 8) },
-	{ FLDATA (READY, dev_int, INT_V_PTR) },
-	{ FLDATA (ENABLE, dev_enb, INT_V_PTR) },
-	{ FLDATA (MOTION, ptr_motion, 0) },
-	{ DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
-	{ DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
-	{ ORDATA (RSTATE, ptr_unit.STA, 2), REG_HIDDEN },
-	{ FLDATA (STOP_IOE, ptr_stopioe, 0) },
-	{ NULL }  };
+    { ORDATA (BUF, ptr_unit.buf, 8) },
+    { FLDATA (READY, dev_int, INT_V_PTR) },
+    { FLDATA (ENABLE, dev_enb, INT_V_PTR) },
+    { FLDATA (MOTION, ptr_motion, 0) },
+    { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
+    { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
+    { ORDATA (RSTATE, ptr_unit.STA, 2), REG_HIDDEN },
+    { FLDATA (STOP_IOE, ptr_stopioe, 0) },
+    { NULL }
+    };
 
 MTAB pt_mod[] = {
-	{ UNIT_ATT+UNIT_ASC+UNIT_UASC, UNIT_ATT+UNIT_ASC, "ASCII", NULL },
-	{ UNIT_ATT+UNIT_ASC+UNIT_UASC, UNIT_ATT+UNIT_ASC+UNIT_UASC, "Unix ASCII", NULL },
-	{ 0 }  };
+    { UNIT_ATT+UNIT_ASC+UNIT_UASC, UNIT_ATT+UNIT_ASC, "ASCII", NULL },
+    { UNIT_ATT+UNIT_ASC+UNIT_UASC, UNIT_ATT+UNIT_ASC+UNIT_UASC, "Unix ASCII", NULL },
+    { 0 }
+    };
 
 DEVICE ptr_dev = {
-	"PTR", &ptr_unit, ptr_reg, pt_mod,
-	1, 10, 31, 1, 8, 8,
-	NULL, NULL, &ptr_reset,
-	&ptr_boot, &pt_attach, &pt_detach,
-	&ptr_dib, 0 };
+    "PTR", &ptr_unit, ptr_reg, pt_mod,
+    1, 10, 31, 1, 8, 8,
+    NULL, NULL, &ptr_reset,
+    &ptr_boot, &pt_attach, &pt_detach,
+    &ptr_dib, 0
+    };
 
 /* PTP data structures
 
-   ptp_dev	PTP device descriptor
-   ptp_unit	PTP unit descriptor
-   ptp_mod	PTP modifiers
-   ptp_reg	PTP register list
+   ptp_dev      PTP device descriptor
+   ptp_unit     PTP unit descriptor
+   ptp_mod      PTP modifiers
+   ptp_reg      PTP register list
 */
 
 DIB ptp_dib = { PTP, IOBUS, 1, &ptpio };
 
 UNIT ptp_unit = {
-	UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
+    UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
+    };
 
 REG ptp_reg[] = {
-	{ ORDATA (BUF, ptp_unit.buf, 8) },
-	{ FLDATA (READY, dev_int, INT_V_PTP) },
-	{ FLDATA (ENABLE, dev_enb, INT_V_PTP) },
-	{ FLDATA (POWER, ptp_power, 0) },
-	{ DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
-	{ ORDATA (PSTATE, ptp_unit.STA, 2), REG_HIDDEN },
-	{ DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
-	{ DRDATA (PWRTIME, ptp_ptime, 24), PV_LEFT },
-	{ FLDATA (STOP_IOE, ptp_stopioe, 0) },
-	{ NULL }  };
+    { ORDATA (BUF, ptp_unit.buf, 8) },
+    { FLDATA (READY, dev_int, INT_V_PTP) },
+    { FLDATA (ENABLE, dev_enb, INT_V_PTP) },
+    { FLDATA (POWER, ptp_power, 0) },
+    { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
+    { ORDATA (PSTATE, ptp_unit.STA, 2), REG_HIDDEN },
+    { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
+    { DRDATA (PWRTIME, ptp_ptime, 24), PV_LEFT },
+    { FLDATA (STOP_IOE, ptp_stopioe, 0) },
+    { NULL }
+    };
 
 DEVICE ptp_dev = {
-	"PTP", &ptp_unit, ptp_reg, pt_mod,
-	1, 10, 31, 1, 8, 8,
-	NULL, NULL, &ptp_reset,
-	NULL, &pt_attach, NULL,
-	&ptp_dib, 0 };
-
+    "PTP", &ptp_unit, ptp_reg, pt_mod,
+    1, 10, 31, 1, 8, 8,
+    NULL, NULL, &ptp_reset,
+    NULL, &pt_attach, NULL,
+    &ptp_dib, 0
+    };
+
 /* TTY data structures
 
-   tty_dev	TTY device descriptor
-   tty_unit	TTY unit descriptor
-   tty_reg	TTY register list
-   tty_mod	TTy modifiers list
+   tty_dev      TTY device descriptor
+   tty_unit     TTY unit descriptor
+   tty_reg      TTY register list
+   tty_mod      TTy modifiers list
 */
 
-#define TTI	0
-#define TTO	1
-#define TTR	2
-#define TTP	3
+#define TTI     0
+#define TTO     1
+#define TTR     2
+#define TTP     3
 
 DIB tty_dib = { TTY, IOBUS, 1, &ttyio };
 
 UNIT tty_unit[] = {
-	{ UDATA (&tti_svc, UNIT_KSR, 0), KBD_POLL_WAIT },
-	{ UDATA (&tto_svc, UNIT_KSR, 0), SERIAL_OUT_WAIT },
-	{ UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0) },
-	{ UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) }  };
+    { UDATA (&tti_svc, UNIT_KSR, 0), KBD_POLL_WAIT },
+    { UDATA (&tto_svc, UNIT_KSR, 0), SERIAL_OUT_WAIT },
+    { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0) },
+    { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) }
+    };
 
 REG tty_reg[] = {
-	{ ORDATA (BUF, tty_buf, 8) },
-	{ FLDATA (MODE, tty_mode, 0) },
-	{ FLDATA (READY, dev_int, INT_V_TTY) },
-	{ FLDATA (ENABLE, dev_enb, INT_V_TTY) },
-	{ DRDATA (KPOS, tty_unit[TTI].pos, T_ADDR_W), PV_LEFT },
-	{ DRDATA (KTIME, tty_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPOS, tty_unit[TTO].pos, T_ADDR_W), PV_LEFT },
-	{ DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
-	{ ORDATA (RXOFF, ttr_xoff_read, 2), REG_HIDDEN },
-	{ ORDATA (RSTATE, tty_unit[TTR].STA, 2), REG_HIDDEN },
-	{ DRDATA (RPOS, tty_unit[TTR].pos, T_ADDR_W), PV_LEFT },
-	{ ORDATA (PTAPE, ttp_tape_rcvd, 2), REG_HIDDEN },
-	{ ORDATA (PXOFF, ttp_xoff_rcvd, 2), REG_HIDDEN },
-	{ ORDATA (PSTATE, tty_unit[TTP].STA, 2), REG_HIDDEN },
-	{ DRDATA (PPOS, tty_unit[TTP].pos, T_ADDR_W), PV_LEFT },
-	{ FLDATA (STOP_IOE, ttr_stopioe, 0) },
-	{ NULL }  };
+    { ORDATA (BUF, tty_buf, 8) },
+    { FLDATA (MODE, tty_mode, 0) },
+    { FLDATA (READY, dev_int, INT_V_TTY) },
+    { FLDATA (ENABLE, dev_enb, INT_V_TTY) },
+    { DRDATA (KPOS, tty_unit[TTI].pos, T_ADDR_W), PV_LEFT },
+    { DRDATA (KTIME, tty_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (TPOS, tty_unit[TTO].pos, T_ADDR_W), PV_LEFT },
+    { DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
+    { ORDATA (RXOFF, ttr_xoff_read, 2), REG_HIDDEN },
+    { ORDATA (RSTATE, tty_unit[TTR].STA, 2), REG_HIDDEN },
+    { DRDATA (RPOS, tty_unit[TTR].pos, T_ADDR_W), PV_LEFT },
+    { ORDATA (PTAPE, ttp_tape_rcvd, 2), REG_HIDDEN },
+    { ORDATA (PXOFF, ttp_xoff_rcvd, 2), REG_HIDDEN },
+    { ORDATA (PSTATE, tty_unit[TTP].STA, 2), REG_HIDDEN },
+    { DRDATA (PPOS, tty_unit[TTP].pos, T_ADDR_W), PV_LEFT },
+    { FLDATA (STOP_IOE, ttr_stopioe, 0) },
+    { NULL }
+    };
 
 MTAB tty_mod[] = {
-	{ UNIT_KSR+UNIT_8B+UNIT_ATTABLE, UNIT_KSR, "KSR", "KSR", &ttio_set_mode },
-	{ UNIT_KSR+UNIT_8B+UNIT_ATTABLE, 0       , "7b" , "7B" , &ttio_set_mode },
-	{ UNIT_KSR+UNIT_8B+UNIT_ATTABLE, UNIT_8B , "8b" , "8B" , &ttio_set_mode },
-	{ UNIT_ATTABLE+UNIT_ASC+UNIT_UASC, UNIT_ATTABLE, NULL, "BINARY",
-	  &ttrp_set_mode },
-	{ UNIT_ATTABLE+UNIT_ASC+UNIT_UASC, UNIT_ATTABLE+UNIT_ASC, "ASCII", "ASCII",
-	  &ttrp_set_mode },
-	{ UNIT_ATTABLE+UNIT_ASC+UNIT_UASC, UNIT_ATTABLE+UNIT_ASC+UNIT_UASC, "Unix ASCII", "UASCII",
-	  &ttrp_set_mode },
-	{ MTAB_XTD|MTAB_VUN|MTAB_NMO, 1, NULL, "START", &ttrp_set_start_stop },
-	{ MTAB_XTD|MTAB_VUN|MTAB_NMO, 0, NULL, "STOP", &ttrp_set_start_stop },
-	{ 0 }  };
+    { UNIT_KSR+UNIT_8B+UNIT_ATTABLE, UNIT_KSR, "KSR", "KSR", &ttio_set_mode },
+    { UNIT_KSR+UNIT_8B+UNIT_ATTABLE, 0       , "7b" , "7B" , &ttio_set_mode },
+    { UNIT_KSR+UNIT_8B+UNIT_ATTABLE, UNIT_8B , "8b" , "8B" , &ttio_set_mode },
+    { UNIT_ATTABLE+UNIT_ASC+UNIT_UASC, UNIT_ATTABLE, NULL, "BINARY",
+      &ttrp_set_mode },
+    { UNIT_ATTABLE+UNIT_ASC+UNIT_UASC, UNIT_ATTABLE+UNIT_ASC, "ASCII", "ASCII",
+      &ttrp_set_mode },
+    { UNIT_ATTABLE+UNIT_ASC+UNIT_UASC, UNIT_ATTABLE+UNIT_ASC+UNIT_UASC, "Unix ASCII", "UASCII",
+      &ttrp_set_mode },
+    { MTAB_XTD|MTAB_VUN|MTAB_NMO, 1, NULL, "START", &ttrp_set_start_stop },
+    { MTAB_XTD|MTAB_VUN|MTAB_NMO, 0, NULL, "STOP", &ttrp_set_start_stop },
+    { 0 }
+    };
 
 DEVICE tty_dev = {
-	"TTY", tty_unit, tty_reg, tty_mod,
-	4, 10, 31, 1, 8, 8,
-	NULL, NULL, &tty_reset,
-	NULL, &pt_attach, &pt_detach,
-	&tty_dib, 0 };
+    "TTY", tty_unit, tty_reg, tty_mod,
+    4, 10, 31, 1, 8, 8,
+    NULL, NULL, &tty_reset,
+    NULL, &pt_attach, &pt_detach,
+    &tty_dib, 0
+    };
 
 /* CLK data structures
 
-   clk_dev	CLK device descriptor
-   clk_unit	CLK unit descriptor
-   clk_mod	CLK modifiers
-   clk_reg	CLK register list
+   clk_dev      CLK device descriptor
+   clk_unit     CLK unit descriptor
+   clk_mod      CLK modifiers
+   clk_reg      CLK register list
 */
 
 DIB clk_dib = { CLK_KEYS, IOBUS, 1, &clkio };
 
-UNIT clk_unit = {
-	UDATA (&clk_svc, 0, 0), 16000 };
+UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 16000 };
 
 REG clk_reg[] = {
-	{ FLDATA (READY, dev_int, INT_V_CLK) },
-	{ FLDATA (ENABLE, dev_enb, INT_V_CLK) },
-	{ DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
-	{ NULL }  };
+    { FLDATA (READY, dev_int, INT_V_CLK) },
+    { FLDATA (ENABLE, dev_enb, INT_V_CLK) },
+    { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
+    { NULL }
+    };
 
 MTAB clk_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, 50, NULL, "50HZ",
-		&clk_set_freq, NULL, NULL },
-	{ MTAB_XTD|MTAB_VDV, 60, NULL, "60HZ",
-		&clk_set_freq, NULL, NULL },
-	{ MTAB_XTD|MTAB_VDV, 0, "FREQUENCY", NULL,
-		NULL, &clk_show_freq, NULL },
-	{ 0 } };
+    { MTAB_XTD|MTAB_VDV, 50, NULL, "50HZ",
+      &clk_set_freq, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, 60, NULL, "60HZ",
+      &clk_set_freq, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "FREQUENCY", NULL,
+      NULL, &clk_show_freq, NULL },
+    { 0 }
+    };
 
 DEVICE clk_dev = {
-	"CLK", &clk_unit, clk_reg, clk_mod,
-	1, 0, 0, 0, 0, 0,
-	NULL, NULL, &clk_reset,
-	NULL, NULL, NULL,
-	&clk_dib, 0 };
-
+    "CLK", &clk_unit, clk_reg, clk_mod,
+    1, 0, 0, 0, 0, 0,
+    NULL, NULL, &clk_reset,
+    NULL, NULL, NULL,
+    &clk_dib, 0
+    };
+
 /* Paper tape reader: IO routine */
 
 int32 ptrio (int32 inst, int32 fnc, int32 dat, int32 dev)
 {
-switch (inst) {						/* case on opcode */
-case ioOCP:						/* OCP */
-	if (fnc & 016) return IOBADFNC (dat);		/* only fnc 0,1 */
-	ptr_motion = fnc ^ 1;
-	if (fnc) sim_cancel (&ptr_unit);		/* fnc 1? stop */
-	else sim_activate (&ptr_unit, ptr_unit.wait);	/* fnc 0? start */
-	break;
-case ioSKS:						/* SKS */
-	if (fnc & 013) return IOBADFNC (dat);		/* only fnc 0,4 */
-	if (((fnc == 000) && TST_INT (INT_PTR)) ||	/* fnc 0? skip rdy */
-	    ((fnc == 004) && !TST_INTREQ (INT_PTR)))	/* fnc 4? skip !int */
-	    return IOSKIP (dat);
-	break;
-case ioINA:						/* INA */
-	if (fnc) return IOBADFNC (dat);			/* only fnc 0 */
-	if (TST_INT (INT_PTR)) {			/* ready? */
-	    CLR_INT (INT_PTR);				/* clear ready */
-	    if (ptr_motion)				/* if motion, restart */
-		sim_activate (&ptr_unit, ptr_unit.wait);
-	    return IOSKIP (ptr_unit.buf | dat);  }	/* ret buf, skip */
-	break;  }					/* end case op */
+switch (inst) {                                         /* case on opcode */
+
+    case ioOCP:                                         /* OCP */
+        if (fnc & 016) return IOBADFNC (dat);           /* only fnc 0,1 */
+        ptr_motion = fnc ^ 1;
+        if (fnc) sim_cancel (&ptr_unit);                /* fnc 1? stop */
+        else sim_activate (&ptr_unit, ptr_unit.wait);   /* fnc 0? start */
+        break;
+
+    case ioSKS:                                         /* SKS */
+        if (fnc & 013) return IOBADFNC (dat);           /* only fnc 0,4 */
+        if (((fnc == 000) && TST_INT (INT_PTR)) ||      /* fnc 0? skip rdy */
+            ((fnc == 004) && !TST_INTREQ (INT_PTR)))    /* fnc 4? skip !int */
+            return IOSKIP (dat);
+        break;
+
+    case ioINA:                                         /* INA */
+        if (fnc) return IOBADFNC (dat);                 /* only fnc 0 */
+        if (TST_INT (INT_PTR)) {                        /* ready? */
+            CLR_INT (INT_PTR);                          /* clear ready */
+            if (ptr_motion)                             /* if motion, restart */
+                sim_activate (&ptr_unit, ptr_unit.wait);
+            return IOSKIP (ptr_unit.buf | dat);         /* ret buf, skip */
+            }
+        break;
+        }                                               /* end case op */
+
 return dat;
 }
 
@@ -337,28 +356,32 @@ t_stat ptr_svc (UNIT *uptr)
 {
 int32 c;
 
-if ((uptr->flags & UNIT_ATT) == 0)			/* attached? */
-	return IORETURN (ptr_stopioe, SCPE_UNATT);
-if (uptr->STA & LF_PEND) {				/* lf pending? */
-	uptr->STA &= ~LF_PEND;				/* clear flag */
-	c = 0212;					/* insert LF */
-	}
-else {	if ((c = getc (uptr->fileref)) == EOF) {	/* read byte */
-	    if (feof (uptr->fileref)) {
-		if (ptr_stopioe) printf ("PTR end of file\n");
-		else return SCPE_OK;  }
-	    else perror ("PTR I/O error");
-	    clearerr (uptr->fileref);
-	    return SCPE_IOERR;  }
-	if ((uptr->flags & UNIT_UASC) && (c == '\n')) {	/* Unix newline? */
-	    c = 0215;					/* insert CR */
-	    uptr->STA |= LF_PEND;  }			/* lf pending */
-	else if ((uptr->flags & UNIT_ASC) && (c != 0))	/* ASCII? */
-	    c = c | 0200;
-	uptr->pos = ftell (uptr->fileref);		/* update pos */
-	}
-SET_INT (INT_PTR);					/* set ready flag */
-uptr->buf = c & 0377;					/* get byte */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
+    return IORETURN (ptr_stopioe, SCPE_UNATT);
+if (uptr->STA & LF_PEND) {                              /* lf pending? */
+    uptr->STA &= ~LF_PEND;                              /* clear flag */
+    c = 0212;                                           /* insert LF */
+    }
+else {
+    if ((c = getc (uptr->fileref)) == EOF) {            /* read byte */
+        if (feof (uptr->fileref)) {
+            if (ptr_stopioe) printf ("PTR end of file\n");
+            else return SCPE_OK;
+            }
+        else perror ("PTR I/O error");
+        clearerr (uptr->fileref);
+        return SCPE_IOERR;
+        }
+    if ((uptr->flags & UNIT_UASC) && (c == '\n')) {     /* Unix newline? */
+        c = 0215;                                       /* insert CR */
+        uptr->STA |= LF_PEND;                           /* lf pending */
+		}
+    else if ((uptr->flags & UNIT_ASC) && (c != 0))      /* ASCII? */
+        c = c | 0200;
+    uptr->pos = ftell (uptr->fileref);                  /* update pos */
+    }
+SET_INT (INT_PTR);                                      /* set ready flag */
+uptr->buf = c & 0377;                                   /* get byte */
 return SCPE_OK;
 }
 
@@ -370,12 +393,12 @@ t_stat r;
 
 if (!(uptr->flags & UNIT_ATTABLE)) return SCPE_NOFNC;
 if (r = attach_unit (uptr, cptr)) return r;
-if (sim_switches & SWMASK ('A'))			/* -a? ASCII */
-	uptr->flags |= UNIT_ASC;
-else if (sim_switches & SWMASK ('U'))			/* -u? Unix ASCII */
-	uptr->flags |= (UNIT_ASC|UNIT_UASC);
-else if (sim_switches & SWMASK ('B'))			/* -b? binary */
-	uptr->flags &= ~(UNIT_ASC|UNIT_UASC);
+if (sim_switches & SWMASK ('A'))                        /* -a? ASCII */
+    uptr->flags |= UNIT_ASC;
+else if (sim_switches & SWMASK ('U'))                   /* -u? Unix ASCII */
+    uptr->flags |= (UNIT_ASC|UNIT_UASC);
+else if (sim_switches & SWMASK ('B'))                   /* -b? binary */
+    uptr->flags &= ~(UNIT_ASC|UNIT_UASC);
 uptr->STA = 0;
 return r;
 }
@@ -384,7 +407,7 @@ return r;
 
 t_stat pt_detach (UNIT *uptr)
 {
-if (!(sim_switches & SIM_SW_REST)) sim_cancel (uptr);	/* stop motion */
+if (!(sim_switches & SIM_SW_REST)) sim_cancel (uptr);   /* stop motion */
 uptr->STA = 0;
 return detach_unit (uptr);
 }
@@ -393,79 +416,86 @@ return detach_unit (uptr);
 
 t_stat ptr_reset (DEVICE *dptr)
 {
-CLR_INT (INT_PTR);					/* clear ready, enb */
+CLR_INT (INT_PTR);                                      /* clear ready, enb */
 CLR_ENB (INT_PTR);
-ptr_unit.buf = 0;					/* clear buffer */
+ptr_unit.buf = 0;                                       /* clear buffer */
 ptr_unit.STA = 0;
-ptr_motion = 0;						/* unit stopped */
-sim_cancel (&ptr_unit);					/* deactivate unit */
+ptr_motion = 0;                                         /* unit stopped */
+sim_cancel (&ptr_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 
 /* Paper tape reader bootstrap routine */
 
-#define PBOOT_START	1
-#define PBOOT_SIZE	(sizeof (pboot) / sizeof (int32))
+#define PBOOT_START     1
+#define PBOOT_SIZE      (sizeof (pboot) / sizeof (int32))
 
 static const int32 pboot[] = {
- 0010057,		/*	STA 57 */
- 0030001,		/*	OCP 1 */
- 0131001,		/* READ,	INA 1001 */
- 0002003,		/*	JMP READ */
- 0101040,		/*	SNZ */
- 0002003,		/* 	JMP READ */
- 0010000,		/*	STA 0 */
- 0131001,		/* READ1,	INA 1001 */
- 0002010,		/*	JMP READ1 */
- 0041470,		/*	LGL 8 */
- 0130001,		/* READ2,	INA 1 */
- 0002013,		/*	JMP READ2 */
- 0110000,		/*	STA* 0 */
- 0024000,		/*	IRS 0 */
- 0100040		/*	SZE */
-};
+    0010057,                                            /*        STA 57 */
+    0030001,                                            /*        OCP 1 */
+    0131001,                                            /* READ,  INA 1001 */
+    0002003,                                            /*        JMP READ */
+    0101040,                                            /*        SNZ */
+    0002003,                                            /*        JMP READ */
+    0010000,                                            /*        STA 0 */
+    0131001,                                            /* READ1, INA 1001 */
+    0002010,                                            /*        JMP READ1 */
+    0041470,                                            /*        LGL 8 */
+    0130001,                                            /* READ2, INA 1 */
+    0002013,                                            /*        JMP READ2 */
+    0110000,                                            /*        STA* 0 */
+    0024000,                                            /*        IRS 0 */
+    0100040                                             /*        SZE */
+    };
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
 
-for (i = 0; i < PBOOT_SIZE; i++)			/* copy bootstrap */
-	M[PBOOT_START + i] = pboot[i];
-PC = PBOOT_START;	
+for (i = 0; i < PBOOT_SIZE; i++)                        /* copy bootstrap */
+    M[PBOOT_START + i] = pboot[i];
+PC = PBOOT_START;       
 return SCPE_OK;
 }
-
+
 /* Paper tape punch: IO routine */
 
 int32 ptpio (int32 inst, int32 fnc, int32 dat, int32 dev)
 {
-switch (inst) {						/* case on opcode */
-case ioOCP:						/* OCP */
-	if (fnc & 016) return IOBADFNC (dat);		/* only fnc 0,1 */
-	if (fnc) {					/* fnc 1? pwr off */
-	    CLR_INT (INT_PTP);				/* not ready */
-	    ptp_power = 0;				/* turn off power */
-	    sim_cancel (&ptp_unit);  }			/* stop punch */
-	else if (ptp_power == 0)			/* fnc 0? start */
-	    sim_activate (&ptp_unit, ptp_ptime);
-	break;
-case ioSKS:						/* SKS */
-	if ((fnc & 012) || (fnc == 005))		/* only 0, 1, 4 */
-	    return IOBADFNC (dat);
-	if (((fnc == 000) && TST_INT (INT_PTP)) ||	/* fnc 0? skip rdy */
-	    ((fnc == 001) &&				/* fnc 1? skip ptp on */
-		(ptp_power || sim_is_active (&ptp_unit))) ||
-	    ((fnc == 004) && !TST_INTREQ (INT_PTP)))	/* fnc 4? skip !int */
-	    return IOSKIP (dat);
-	break;
-case ioOTA:						/* OTA */
-	if (fnc) return IOBADFNC (dat);			/* only fnc 0 */
-	if (TST_INT (INT_PTP)) {			/* if ptp ready */
-	    CLR_INT (INT_PTP);				/* clear ready */
-	    ptp_unit.buf = dat & 0377;			/* store byte */
-	    sim_activate (&ptp_unit, ptp_unit.wait);
-	    return IOSKIP (dat);  }			/* skip return */
-	break;  }
+switch (inst) {                                         /* case on opcode */
+
+    case ioOCP:                                         /* OCP */
+        if (fnc & 016) return IOBADFNC (dat);           /* only fnc 0,1 */
+        if (fnc) {                                      /* fnc 1? pwr off */
+            CLR_INT (INT_PTP);                          /* not ready */
+            ptp_power = 0;                              /* turn off power */
+            sim_cancel (&ptp_unit);                     /* stop punch */
+            }
+        else if (ptp_power == 0)                        /* fnc 0? start */
+            sim_activate (&ptp_unit, ptp_ptime);
+        break;
+
+    case ioSKS:                                         /* SKS */
+        if ((fnc & 012) || (fnc == 005))                /* only 0, 1, 4 */
+            return IOBADFNC (dat);
+        if (((fnc == 000) && TST_INT (INT_PTP)) ||      /* fnc 0? skip rdy */
+            ((fnc == 001) &&                            /* fnc 1? skip ptp on */
+                (ptp_power || sim_is_active (&ptp_unit))) ||
+            ((fnc == 004) && !TST_INTREQ (INT_PTP)))    /* fnc 4? skip !int */
+            return IOSKIP (dat);
+        break;
+
+    case ioOTA:                                         /* OTA */
+        if (fnc) return IOBADFNC (dat);                 /* only fnc 0 */
+        if (TST_INT (INT_PTP)) {                        /* if ptp ready */
+            CLR_INT (INT_PTP);                          /* clear ready */
+            ptp_unit.buf = dat & 0377;                  /* store byte */
+            sim_activate (&ptp_unit, ptp_unit.wait);
+            return IOSKIP (dat);                        /* skip return */
+            }
+        break;
+        }
+
 return dat;
 }
 
@@ -475,23 +505,26 @@ t_stat ptp_svc (UNIT *uptr)
 {
 int32 c;
 
-SET_INT (INT_PTP);					/* set flag */
-if (ptp_power == 0) {					/* power on? */
-	ptp_power = 1;					/* ptp is ready */
-	return SCPE_OK;  }
-if ((uptr->flags & UNIT_ATT) == 0)			/* attached? */
-	return IORETURN (ptp_stopioe, SCPE_UNATT);
-if (uptr->flags & UNIT_ASC) {				/* ASCII? */
-	c = uptr->buf & 0177;				/* mask to 7b */
-	if ((uptr->flags & UNIT_UASC) && (c == 015))	/* cr? drop if Unix */
-	    return SCPE_OK;
-	else if (c == 012) c = '\n';  }			/* lf? cvt to nl */
-else c = uptr->buf & 0377;				/* no, binary */
-if (putc (c, uptr->fileref) == EOF) {			/* output byte */
-	perror ("PTP I/O error");
-	clearerr (uptr->fileref);
-	return SCPE_IOERR;  }
-uptr->pos = ftell (uptr->fileref);			/* update pos */
+SET_INT (INT_PTP);                                      /* set flag */
+if (ptp_power == 0) {                                   /* power on? */
+    ptp_power = 1;                                      /* ptp is ready */
+    return SCPE_OK;
+    }
+if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
+    return IORETURN (ptp_stopioe, SCPE_UNATT);
+if (uptr->flags & UNIT_ASC) {                           /* ASCII? */
+    c = uptr->buf & 0177;                               /* mask to 7b */
+    if ((uptr->flags & UNIT_UASC) && (c == 015))        /* cr? drop if Unix */
+        return SCPE_OK;
+    else if (c == 012) c = '\n';                        /* lf? cvt to nl */
+    }
+else c = uptr->buf & 0377;                              /* no, binary */
+if (putc (c, uptr->fileref) == EOF) {                   /* output byte */
+    perror ("PTP I/O error");
+    clearerr (uptr->fileref);
+    return SCPE_IOERR;
+    }
+uptr->pos = ftell (uptr->fileref);                      /* update pos */
 return SCPE_OK;
 }
 
@@ -499,59 +532,71 @@ return SCPE_OK;
 
 t_stat ptp_reset (DEVICE *dptr)
 {
-CLR_INT (INT_PTP);					/* clear ready, enb */
+CLR_INT (INT_PTP);                                      /* clear ready, enb */
 CLR_ENB (INT_PTP);
-ptp_power = 0;						/* power off */
-ptp_unit.buf = 0;					/* clear buffer */
+ptp_power = 0;                                          /* power off */
+ptp_unit.buf = 0;                                       /* clear buffer */
 ptp_unit.STA = 0;
-sim_cancel (&ptp_unit);					/* deactivate unit */
+sim_cancel (&ptp_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
-
+
 /* Terminal: IO routine */
 
 int32 ttyio (int32 inst, int32 fnc, int32 dat, int32 dev)
 {
-switch (inst) {						/* case on opcode */
-case ioOCP:						/* OCP */
-	if (fnc & 016) return IOBADFNC (dat);		/* only fnc 0,1 */
-	if (fnc && (tty_mode == 0)) {			/* input to output? */
-	    if (!sim_is_active (&tty_unit[TTO]))	/* set ready */
-		SET_INT (INT_TTY);
-	    tty_mode = 1;  }				/* mode is output */
-	else if ((fnc == 0) && tty_mode) {		/* output to input? */
-	    CLR_INT (INT_TTY);				/* clear ready */
-	    tty_mode = 0;  }				/* mode is input */
-	break;
-case ioSKS:						/* SKS */
-	if (fnc & 012) return IOBADFNC (dat);		/* fnc 0,1,4,5 */
-	if (((fnc == 000) && TST_INT (INT_TTY)) ||	/* fnc 0? skip rdy */
-	    ((fnc == 001) &&				/* fnc 1? skip !busy */
-		(!tty_mode || !sim_is_active (&tty_unit[TTO]))) ||
-	    ((fnc == 004) && !TST_INTREQ (INT_TTY)) ||	/* fnc 4? skip !int */
-	    ((fnc == 005) && (tty_mode ||		/* fnc 5? skip !xoff */
-		((tty_buf & 0177) != XOFF))))		/* input & XOFF char */
-	    return IOSKIP (dat);
-	break;
-case ioINA:						/* INA */
-	if (fnc & 005) return IOBADFNC (dat);		/* only 0,2 */
-	if (TST_INT (INT_TTY)) {			/* ready? */
-	    if (tty_mode == 0) CLR_INT (INT_TTY);	/* inp? clear rdy */
-	    return IOSKIP (dat |
-		(tty_buf & ((fnc & 002)? 077: 0377)));  }
-	break;
-case ioOTA:
-	if (fnc & 015) return IOBADFNC (dat);		/* only 0,2 */
-	if (TST_INT (INT_TTY)) {			/* ready? */
-	    tty_buf = dat & 0377;			/* store char */
-	    if (fnc & 002) {				/* binary mode? */
-		tty_buf = tty_buf | 0100;		/* set ch 7 */
-		if (tty_buf & 040) tty_buf = tty_buf & 0277;  }
-	    if (tty_mode) {
-		sim_activate (&tty_unit[TTO], tty_unit[TTO].wait);
-		CLR_INT (INT_TTY);  }
-	    return IOSKIP (dat);  }
-	break;  }					/* end case op */
+switch (inst) {                                         /* case on opcode */
+
+    case ioOCP:                                         /* OCP */
+        if (fnc & 016) return IOBADFNC (dat);           /* only fnc 0,1 */
+        if (fnc && (tty_mode == 0)) {                   /* input to output? */
+            if (!sim_is_active (&tty_unit[TTO]))        /* set ready */
+                SET_INT (INT_TTY);
+            tty_mode = 1;                               /* mode is output */
+            }
+        else if ((fnc == 0) && tty_mode) {              /* output to input? */
+            CLR_INT (INT_TTY);                          /* clear ready */
+            tty_mode = 0;                               /* mode is input */
+            }
+        break;
+
+    case ioSKS:                                         /* SKS */
+        if (fnc & 012) return IOBADFNC (dat);           /* fnc 0,1,4,5 */
+        if (((fnc == 000) && TST_INT (INT_TTY)) ||      /* fnc 0? skip rdy */
+            ((fnc == 001) &&                            /* fnc 1? skip !busy */
+                (!tty_mode || !sim_is_active (&tty_unit[TTO]))) ||
+            ((fnc == 004) && !TST_INTREQ (INT_TTY)) ||  /* fnc 4? skip !int */
+            ((fnc == 005) && (tty_mode ||               /* fnc 5? skip !xoff */
+                ((tty_buf & 0177) != XOFF))))           /* input & XOFF char */
+            return IOSKIP (dat);
+        break;
+
+    case ioINA:                                         /* INA */
+        if (fnc & 005) return IOBADFNC (dat);           /* only 0,2 */
+        if (TST_INT (INT_TTY)) {                        /* ready? */
+            if (tty_mode == 0) CLR_INT (INT_TTY);       /* inp? clear rdy */
+            return IOSKIP (dat |
+                (tty_buf & ((fnc & 002)? 077: 0377)));
+            }
+        break;
+
+    case ioOTA:
+        if (fnc & 015) return IOBADFNC (dat);           /* only 0,2 */
+        if (TST_INT (INT_TTY)) {                        /* ready? */
+            tty_buf = dat & 0377;                       /* store char */
+            if (fnc & 002) {                            /* binary mode? */
+                tty_buf = tty_buf | 0100;               /* set ch 7 */
+                if (tty_buf & 040) tty_buf = tty_buf & 0277;
+                }
+            if (tty_mode) {
+                sim_activate (&tty_unit[TTO], tty_unit[TTO].wait);
+                CLR_INT (INT_TTY);
+                }
+            return IOSKIP (dat);
+            }
+        break;
+        }                                               /* end case op */
+
 return dat;
 }
 
@@ -562,52 +607,59 @@ t_stat tti_svc (UNIT *uptr)
 int32 out, c;
 UNIT *ruptr = &tty_unit[TTR];
 
-sim_activate (uptr, uptr->wait);			/* continue poll */
-if ((c = sim_poll_kbd ()) >= SCPE_KFLAG) {		/* character? */
-	out = c & 0177;					/* mask echo to 7b */
-	if (c & SCPE_BREAK) c = 0;			/* break? */
-	else if (uptr->flags & UNIT_KSR) {		/* KSR? */
-	    if (islower (out)) out = toupper (out);	/* cvt to UC */
-	    c = out | 0200;  }				/* add TTY bit */
-	else if (!(uptr->flags & UNIT_8B)) c = out;	/* 7b? */
-	uptr->pos = uptr->pos + 1;
-	}
-else if (c != SCPE_OK) return c;			/* error? */
-else if ((ruptr->flags & UNIT_ATT) &&			/* TTR attached */
-	(ruptr->STA & RUNNING)) {			/* and running? */
-	if (ruptr->STA & LF_PEND) {			/* lf pending? */
-	    c = 0212;					/* char is lf */
-	    ruptr->STA &= LF_PEND;  }			/* clear flag */
-	else {						/* normal read */
-	    if ((c = getc (ruptr->fileref)) == EOF) {	/* read byte */
-		if (feof (ruptr->fileref)) {		/* EOF? */
-		    ruptr->STA &= ~RUNNING;		/* stop reader */
-		    if (ttr_stopioe) printf ("TTR end of file\n");
-		    else return SCPE_OK;  }
-		else perror ("TTR I/O error");
-		clearerr (ruptr->fileref);
-		return SCPE_IOERR;  }
-	    if ((ruptr->flags & UNIT_UASC) && (c == '\n')) {
-		c = 0215;				/* Unix ASCII NL? */
-		ruptr->STA |= LF_PEND;  }		/* LF pending */
-	    else if ((ruptr->flags & UNIT_ASC) && (c != 0))
-		c = c | 0200;				/* ASCII nz? cvt */
-	    ruptr->pos = ftell (ruptr->fileref);
-	    }
-	if (ttr_xoff_read != 0) {			/* reader stopping? */
-	    if (c == RUBOUT) ttr_xoff_read = 0;		/* rubout? stop */
-	    else ttr_xoff_read--;			/* else decr state */
-	    if (ttr_xoff_read == 0)			/* delay done? */
-		ruptr->STA &= ~RUNNING;  }		/* stop reader */
-	else if ((c & 0177) == XOFF) ttr_xoff_read = 2;	/* XOFF read? */
-	out = c;					/* echo char */
-	}
-else return SCPE_OK;					/* no char */
-if (tty_mode == 0) {					/* input mode? */
-	tty_buf = c & 0377;				/* put char in buf */
-	SET_INT (INT_TTY);  }				/* set flag */
-tto_write (out);					/* echo to printer */
-return ttp_write (out);					/* and punch */
+sim_activate (uptr, uptr->wait);                        /* continue poll */
+if ((c = sim_poll_kbd ()) >= SCPE_KFLAG) {              /* character? */
+    out = c & 0177;                                     /* mask echo to 7b */
+    if (c & SCPE_BREAK) c = 0;                          /* break? */
+    else if (uptr->flags & UNIT_KSR) {                  /* KSR? */
+        if (islower (out)) out = toupper (out);         /* cvt to UC */
+        c = out | 0200;                                 /* add TTY bit */
+        }
+    else if (!(uptr->flags & UNIT_8B)) c = out;         /* 7b? */
+    uptr->pos = uptr->pos + 1;
+    }
+else if (c != SCPE_OK) return c;                        /* error? */
+else if ((ruptr->flags & UNIT_ATT) &&                   /* TTR attached */
+    (ruptr->STA & RUNNING)) {                           /* and running? */
+    if (ruptr->STA & LF_PEND) {                         /* lf pending? */
+        c = 0212;                                       /* char is lf */
+        ruptr->STA &= LF_PEND;                          /* clear flag */
+        }
+    else {                                              /* normal read */
+        if ((c = getc (ruptr->fileref)) == EOF) {       /* read byte */
+            if (feof (ruptr->fileref)) {                /* EOF? */
+                ruptr->STA &= ~RUNNING;                 /* stop reader */
+                if (ttr_stopioe) printf ("TTR end of file\n");
+                else return SCPE_OK;
+                }
+            else perror ("TTR I/O error");
+            clearerr (ruptr->fileref);
+            return SCPE_IOERR;
+            }
+        if ((ruptr->flags & UNIT_UASC) && (c == '\n')) {
+            c = 0215;                                   /* Unix ASCII NL? */
+            ruptr->STA |= LF_PEND;                      /* LF pending */
+            }
+        else if ((ruptr->flags & UNIT_ASC) && (c != 0))
+            c = c | 0200;                               /* ASCII nz? cvt */
+        ruptr->pos = ftell (ruptr->fileref);
+        }
+    if (ttr_xoff_read != 0) {                           /* reader stopping? */
+        if (c == RUBOUT) ttr_xoff_read = 0;             /* rubout? stop */
+        else ttr_xoff_read--;                           /* else decr state */
+        if (ttr_xoff_read == 0)                         /* delay done? */
+            ruptr->STA &= ~RUNNING;                     /* stop reader */
+        }
+    else if ((c & 0177) == XOFF) ttr_xoff_read = 2;     /* XOFF read? */
+    out = c;                                            /* echo char */
+    }
+else return SCPE_OK;                                    /* no char */
+if (tty_mode == 0) {                                    /* input mode? */
+    tty_buf = c & 0377;                                 /* put char in buf */
+    SET_INT (INT_TTY);                                  /* set flag */
+    }
+tto_write (out);                                        /* echo to printer */
+return ttp_write (out);                                 /* and punch */
 }
 
 /* Output service - printer and punch */
@@ -620,23 +672,27 @@ UNIT *puptr = &tty_unit[TTP];
 t_stat r;
 
 c7b = tty_buf & 0177;
-if (ttp_tape_rcvd != 0) {				/* prev = tape? */
-	ttp_tape_rcvd--;				/* decrement state */
-	if ((ttp_tape_rcvd == 0) && (puptr->flags & UNIT_ATT))
-	    puptr->STA |= RUNNING;  }			/* start after delay */
-else if (c7b == TAPE) ttp_tape_rcvd = 2;		/* char = TAPE? */
-if (ttp_xoff_rcvd != 0) {				/* prev = XOFF? */
-	ttp_xoff_rcvd--;				/* decrement state */
-	if (ttp_xoff_rcvd == 0) puptr->STA &= RUNNING;  } /* stop after delay */
-else if (c7b == XOFF) ttp_xoff_rcvd = 2;		/* char = XOFF? */
-if ((c7b == XON) && (ruptr->flags & UNIT_ATT)) {	/* char = XON? */
-	ruptr->STA |= RUNNING;				/* start reader */
-	ttr_xoff_read = 0;  }				/* cancel stop */
-if ((r = tto_write (tty_buf)) != SCPE_OK) {		/* print; error? */
-	sim_activate (uptr, uptr->wait);		/* try again */
-	return ((r == SCPE_STALL)? SCPE_OK: r);  }	/* !stall? report */
-if ((r = ttp_write (tty_buf)) != SCPE_OK) return r;	/* punch; error? */
-SET_INT (INT_TTY);					/* set done flag */
+if (ttp_tape_rcvd != 0) {                               /* prev = tape? */
+    ttp_tape_rcvd--;                                    /* decrement state */
+    if ((ttp_tape_rcvd == 0) && (puptr->flags & UNIT_ATT))
+        puptr->STA |= RUNNING;                          /* start after delay */
+    }
+else if (c7b == TAPE) ttp_tape_rcvd = 2;                /* char = TAPE? */
+if (ttp_xoff_rcvd != 0) {                               /* prev = XOFF? */
+    ttp_xoff_rcvd--;                                    /* decrement state */
+    if (ttp_xoff_rcvd == 0) puptr->STA &= RUNNING;      /* stop after delay */
+    }
+else if (c7b == XOFF) ttp_xoff_rcvd = 2;                /* char = XOFF? */
+if ((c7b == XON) && (ruptr->flags & UNIT_ATT)) {        /* char = XON? */
+    ruptr->STA |= RUNNING;                              /* start reader */
+    ttr_xoff_read = 0;                                  /* cancel stop */
+    }
+if ((r = tto_write (tty_buf)) != SCPE_OK) {             /* print; error? */
+    sim_activate (uptr, uptr->wait);                    /* try again */
+    return ((r == SCPE_STALL)? SCPE_OK: r);             /* !stall? report */
+    }
+if ((r = ttp_write (tty_buf)) != SCPE_OK) return r;     /* punch; error? */
+SET_INT (INT_TTY);                                      /* set done flag */
 return SCPE_OK;
 }
 
@@ -646,15 +702,16 @@ t_stat tto_write (int32 c)
 {
 UNIT *tuptr = &tty_unit[TTO];
 
-if (tuptr->flags & UNIT_8B) c = c & 0377;		/* 8b? */
-else {	c = c & 0177;					/* 7b, KSR: mask */
-	if (c) return SCPE_OK;				/* supress NUL */
-	if (tuptr->flags & UNIT_KSR) {			/* KSR? */
-	    if ((c < 040) &&				/* not in ctrl set? */
-		!(CNTL_SET & CHAR_FLAG (c))) return SCPE_OK;
-	    if (islower (c)) c = toupper (c);		/* cvt to UC */
-	    }
-	}
+if (tuptr->flags & UNIT_8B) c = c & 0377;               /* 8b? */
+else {
+    c = c & 0177;                                       /* 7b, KSR: mask */
+    if (c) return SCPE_OK;                              /* supress NUL */
+    if (tuptr->flags & UNIT_KSR) {                      /* KSR? */
+        if ((c < 040) &&                                /* not in ctrl set? */
+            !(CNTL_SET & CHAR_FLAG (c))) return SCPE_OK;
+        if (islower (c)) c = toupper (c);               /* cvt to UC */
+        }
+    }
 tuptr->pos = tuptr->pos + 1;
 return sim_putchar_s (c);
 }
@@ -666,21 +723,23 @@ t_stat ttp_write (int32 c)
 uint32 p, c7b;
 UNIT *puptr = &tty_unit[TTP];
 
-if ((puptr->flags & UNIT_ATT) &&			/* TTP attached */
-    (puptr->STA & RUNNING)) {				/* and running? */
-	c7b = c & 0177;
-	if (!(puptr->flags & UNIT_UASC) || (c7b != 015)) {
-	    if (puptr->flags & UNIT_ASC) {		/* ASCII? */
-		if (c7b == 012) p = '\n';		/* cvt LF */
-		else p = c7b;  }			/* else 7b */
-	    else p = c;					/* untouched */
-	    if (putc (p, puptr->fileref) == EOF) {	/* output byte */
-		perror ("TTP I/O error");
-		clearerr (puptr->fileref);
-		return SCPE_IOERR;  }
-	    puptr->pos = ftell (puptr->fileref);	/* update pos */
-	    }
-	}
+if ((puptr->flags & UNIT_ATT) &&                        /* TTP attached */
+    (puptr->STA & RUNNING)) {                           /* and running? */
+    c7b = c & 0177;
+    if (!(puptr->flags & UNIT_UASC) || (c7b != 015)) {
+        if (puptr->flags & UNIT_ASC) {                  /* ASCII? */
+            if (c7b == 012) p = '\n';                   /* cvt LF */
+            else p = c7b;                               /* else 7b */
+            }
+        else p = c;                                     /* untouched */
+        if (putc (p, puptr->fileref) == EOF) {          /* output byte */
+            perror ("TTP I/O error");
+            clearerr (puptr->fileref);
+            return SCPE_IOERR;
+            }
+        puptr->pos = ftell (puptr->fileref);            /* update pos */
+        }
+    }
 return SCPE_OK;
 }
 
@@ -688,17 +747,17 @@ return SCPE_OK;
 
 t_stat tty_reset (DEVICE *dptr)
 {
-CLR_INT (INT_TTY);					/* clear ready, enb */
+CLR_INT (INT_TTY);                                      /* clear ready, enb */
 CLR_ENB (INT_TTY);
-tty_mode = 0;						/* mode = input */
+tty_mode = 0;                                           /* mode = input */
 tty_buf = 0;
-ttr_xoff_read = 0;					/* clr TTR, TTP flags */
+ttr_xoff_read = 0;                                      /* clr TTR, TTP flags */
 ttp_tape_rcvd = 0;
 ttp_xoff_rcvd = 0;
 tty_unit[TTR].STA = 0;
 tty_unit[TTP].STA = 0;
-sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);	/* activate poll */
-sim_cancel (&tty_unit[TTO]);				/* cancel output */
+sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);      /* activate poll */
+sim_cancel (&tty_unit[TTO]);                            /* cancel output */
 return SCPE_OK;
 }
 
@@ -706,7 +765,7 @@ return SCPE_OK;
 
 t_stat ttio_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (uptr->flags & UNIT_ATTABLE) return SCPE_NOFNC;	/* not TTR, TTP */
+if (uptr->flags & UNIT_ATTABLE) return SCPE_NOFNC;      /* not TTR, TTP */
 tty_unit[TTI].flags = (tty_unit[TTI].flags & ~(UNIT_KSR | UNIT_8B)) | val;
 tty_unit[TTO].flags = (tty_unit[TTO].flags & ~(UNIT_KSR | UNIT_8B)) | val;
 return SCPE_OK;
@@ -716,7 +775,7 @@ return SCPE_OK;
 
 t_stat ttrp_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (!(uptr->flags & UNIT_ATTABLE)) return SCPE_NOFNC;	/* TTR, TTP only */
+if (!(uptr->flags & UNIT_ATTABLE)) return SCPE_NOFNC;   /* TTR, TTP only */
 if (!(val & UNIT_UASC)) uptr->STA &= ~LF_PEND;
 return SCPE_OK;
 }
@@ -725,52 +784,63 @@ return SCPE_OK;
 
 t_stat ttrp_set_start_stop (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (!(uptr->flags & UNIT_ATTABLE)) return SCPE_NOFNC;	/* TTR, TTP only */
-if (!(uptr->flags & UNIT_ATT)) return SCPE_UNATT;	/* must be attached */
-if (val) uptr->STA |= RUNNING;				/* start? set running */
-else uptr->STA &= ~RUNNING;				/* stop? clr running */
-if (uptr->flags & UNIT_ROABLE) ttr_xoff_read = 0;	/* TTR? cancel stop */
-else ttp_tape_rcvd = ttp_xoff_rcvd = 0;			/* TTP? cancel all */
+if (!(uptr->flags & UNIT_ATTABLE)) return SCPE_NOFNC;   /* TTR, TTP only */
+if (!(uptr->flags & UNIT_ATT)) return SCPE_UNATT;       /* must be attached */
+if (val) uptr->STA |= RUNNING;                          /* start? set running */
+else uptr->STA &= ~RUNNING;                             /* stop? clr running */
+if (uptr->flags & UNIT_ROABLE) ttr_xoff_read = 0;       /* TTR? cancel stop */
+else ttp_tape_rcvd = ttp_xoff_rcvd = 0;                 /* TTP? cancel all */
 return SCPE_OK;
 }
-
+
 /* Clock/options: IO routine */
 
 int32 clkio (int32 inst, int32 fnc, int32 dat, int32 dev)
 {
-switch (inst) {						/* case on opcode */
-case ioOCP:						/* OCP */
-	if (fnc & 015) return IOBADFNC (dat);		/* only fnc 0,2 */
-	CLR_INT (INT_CLK);				/* reset ready */
-	if (fnc) sim_cancel (&clk_unit);		/* fnc = 2? stop */
-	else {						/* fnc = 0? */
-	    if (!sim_is_active (&clk_unit))
-		sim_activate (&clk_unit,		/* activate */
-		sim_rtc_init (clk_unit.wait));  }	/* init calibr */
-	break;
-case ioSKS:						/* SKS */
-	if (fnc == 000) {				/* clock skip !int */
-	    if (!TST_INTREQ (INT_CLK)) return IOSKIP (dat);  }
-	else if ((fnc & 007) == 002) {			/* mem parity? */
-	    if (((fnc == 002) && !TST_INT (INT_MPE)) ||
-		((fnc == 012) && TST_INT (INT_MPE)))
-		return IOSKIP (dat);  }
-	else return IOBADFNC (dat);			/* invalid fnc */
-	break;
-case ioOTA:						/* OTA */
-	if (fnc == 000) dev_enb = dat;			/* SMK */
-	else if (fnc == 010) {				/* OTK */
-	    C = (dat >> 15) & 1;			/* set C */
-	    if (cpu_unit.flags & UNIT_HSA)		/* HSA included? */
-		dp = (dat >> 14) & 1;			/* set dp */
-	    if (cpu_unit.flags & UNIT_EXT) {		/* ext opt? */
-		if (dat & 020000) {			/* ext set? */
-		    ext = 1;				/* yes, set */
-		    extoff_pending = 0;  }
-		else extoff_pending = 1;  }		/* no, clr later */
-	    sc = dat & 037;  }				/* set sc */
-	else return IOBADFNC (dat);
-	break;  }
+switch (inst) {                                         /* case on opcode */
+
+    case ioOCP:                                         /* OCP */
+        if (fnc & 015) return IOBADFNC (dat);           /* only fnc 0,2 */
+        CLR_INT (INT_CLK);                              /* reset ready */
+        if (fnc) sim_cancel (&clk_unit);                /* fnc = 2? stop */
+        else {                                          /* fnc = 0? */
+            if (!sim_is_active (&clk_unit))
+                sim_activate (&clk_unit,                /* activate */
+            sim_rtc_init (clk_unit.wait));              /* init calibr */
+            }
+        break;
+
+    case ioSKS:                                         /* SKS */
+        if (fnc == 000) {                               /* clock skip !int */
+            if (!TST_INTREQ (INT_CLK)) return IOSKIP (dat);
+			}
+        else if ((fnc & 007) == 002) {                  /* mem parity? */
+            if (((fnc == 002) && !TST_INT (INT_MPE)) ||
+                ((fnc == 012) && TST_INT (INT_MPE)))
+                return IOSKIP (dat);
+            }
+        else return IOBADFNC (dat);                     /* invalid fnc */
+        break;
+
+    case ioOTA:                                         /* OTA */
+        if (fnc == 000) dev_enb = dat;                  /* SMK */
+        else if (fnc == 010) {                          /* OTK */
+            C = (dat >> 15) & 1;                        /* set C */
+            if (cpu_unit.flags & UNIT_HSA)              /* HSA included? */
+                dp = (dat >> 14) & 1;                   /* set dp */
+            if (cpu_unit.flags & UNIT_EXT) {            /* ext opt? */
+                if (dat & 020000) {                     /* ext set? */
+                    ext = 1;                            /* yes, set */
+                    extoff_pending = 0;
+                    }
+                else extoff_pending = 1;                /* no, clr later */
+                }
+            sc = dat & 037;                             /* set sc */
+            }
+        else return IOBADFNC (dat);
+        break;
+        }
+
 return dat;
 }
 
@@ -779,9 +849,9 @@ return dat;
 t_stat clk_svc (UNIT *uptr)
 {
 
-M[M_CLK] = M[M_CLK + 1] & DMASK;			/* increment mem ctr */
-if (M[M_CLK] == 0) SET_INT (INT_CLK);			/* = 0? set flag */
-sim_activate (&clk_unit, sim_rtc_calb (clk_tps));	/* reactivate */
+M[M_CLK] = M[M_CLK + 1] & DMASK;                        /* increment mem ctr */
+if (M[M_CLK] == 0) SET_INT (INT_CLK);                   /* = 0? set flag */
+sim_activate (&clk_unit, sim_rtc_calb (clk_tps));       /* reactivate */
 return SCPE_OK;
 }
 
@@ -789,9 +859,9 @@ return SCPE_OK;
 
 t_stat clk_reset (DEVICE *dptr)
 {
-CLR_INT (INT_CLK);					/* clear ready, enb */
+CLR_INT (INT_CLK);                                      /* clear ready, enb */
 CLR_ENB (INT_CLK);
-sim_cancel (&clk_unit);					/* deactivate unit */
+sim_cancel (&clk_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
 

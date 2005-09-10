@@ -1,6 +1,6 @@
 /* altair_defs.h: MITS Altair simulator definitions
 
-   Copyright (c) 1997-2003, Charles E. Owen
+   Copyright (c) 1997-2005, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -19,24 +19,24 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Charles E. Owen shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Charles E. Owen shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Charles E. Owen.
 */
 
-#include "sim_defs.h"					/* simulator defns */
+#include "sim_defs.h"					                /* simulator defns */
 
 /* Memory */
 
-#define MAXMEMSIZE	65536				/* max memory size */
-#define MEMSIZE		(cpu_unit.capac)		/* actual memory size */
-#define ADDRMASK	(MAXMEMSIZE - 1)		/* address mask */
+#define MAXMEMSIZE	    65536				            /* max memory size */
+#define MEMSIZE		    (cpu_unit.capac)		        /* actual memory size */
+#define ADDRMASK	    (MAXMEMSIZE - 1)		        /* address mask */
 #define MEM_ADDR_OK(x)	(((uint32) (x)) < MEMSIZE)
 
 /* Simulator stop codes */
 
-#define STOP_RSRV	1				/* must be 1 */
-#define STOP_HALT	2				/* HALT */
-#define STOP_IBKPT	3				/* breakpoint */
+#define STOP_RSRV	1				                    /* must be 1 */
+#define STOP_HALT	2				                    /* HALT */
+#define STOP_IBKPT	3				                    /* breakpoint */
 #define STOP_OPCODE	4
 

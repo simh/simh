@@ -19,24 +19,24 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   fe		KS10 console front end
+   fe           KS10 console front end
 
-   28-May-04	RMS	Removed SET FE CTRL-C
-   29-Dec-03	RMS	Added console backpressure support
-   25-Apr-03	RMS	Revised for extended file support
-   22-Dec-02	RMS	Added break support
-   30-May-02	RMS	Widened COUNT to 32b
-   30-Nov-01	RMS	Added extended SET/SHOW support
-   23-Oct-01	RMS	New IO page address constants
-   07-Sep-01	RMS	Moved function prototypes
+   28-May-04    RMS     Removed SET FE CTRL-C
+   29-Dec-03    RMS     Added console backpressure support
+   25-Apr-03    RMS     Revised for extended file support
+   22-Dec-02    RMS     Added break support
+   30-May-02    RMS     Widened COUNT to 32b
+   30-Nov-01    RMS     Added extended SET/SHOW support
+   23-Oct-01    RMS     New IO page address constants
+   07-Sep-01    RMS     Moved function prototypes
 */
 
 #include "pdp10_defs.h"
-#define UNIT_DUMMY	(1 << UNIT_V_UF)
+#define UNIT_DUMMY      (1 << UNIT_V_UF)
 
 extern d10 *M;
 extern int32 apr_flg;
@@ -47,37 +47,41 @@ t_stat fe_stop_os (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* FE data structures
 
-   fe_dev	FE device descriptor
-   fe_unit	FE unit descriptor
-   fe_reg	FE register list
+   fe_dev       FE device descriptor
+   fe_unit      FE unit descriptor
+   fe_reg       FE register list
 */
 
-#define fei_unit	fe_unit[0]
-#define feo_unit	fe_unit[1]
+#define fei_unit        fe_unit[0]
+#define feo_unit        fe_unit[1]
 
 UNIT fe_unit[] = {
-	{ UDATA (&fei_svc, 0, 0), KBD_POLL_WAIT },
-	{ UDATA (&feo_svc, 0, 0), SERIAL_OUT_WAIT }  };
+    { UDATA (&fei_svc, 0, 0), KBD_POLL_WAIT },
+    { UDATA (&feo_svc, 0, 0), SERIAL_OUT_WAIT }
+    };
 
 REG fe_reg[] = {
-	{ ORDATA (IBUF, fei_unit.buf, 8) },
-	{ DRDATA (ICOUNT, fei_unit.pos, T_ADDR_W), REG_RO + PV_LEFT },
-	{ DRDATA (ITIME, fei_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ ORDATA (OBUF, feo_unit.buf, 8) },
-	{ DRDATA (OCOUNT, feo_unit.pos, T_ADDR_W), REG_RO + PV_LEFT },
-	{ DRDATA (OTIME, feo_unit.wait, 24), REG_NZ + PV_LEFT },
-	{ NULL }  };
+    { ORDATA (IBUF, fei_unit.buf, 8) },
+    { DRDATA (ICOUNT, fei_unit.pos, T_ADDR_W), REG_RO + PV_LEFT },
+    { DRDATA (ITIME, fei_unit.wait, 24), REG_NZ + PV_LEFT },
+    { ORDATA (OBUF, feo_unit.buf, 8) },
+    { DRDATA (OCOUNT, feo_unit.pos, T_ADDR_W), REG_RO + PV_LEFT },
+    { DRDATA (OTIME, feo_unit.wait, 24), REG_NZ + PV_LEFT },
+    { NULL }
+    };
 
 MTAB fe_mod[] = {
-	{ UNIT_DUMMY, 0, NULL, "STOP", &fe_stop_os },
-	{ 0 }  };
+    { UNIT_DUMMY, 0, NULL, "STOP", &fe_stop_os },
+    { 0 }
+    };
 
 DEVICE fe_dev = {
-	"FE", fe_unit, fe_reg, fe_mod,
-	2, 10, 31, 1, 8, 8,
-	NULL, NULL, &fe_reset,
-	NULL, NULL, NULL };
-
+    "FE", fe_unit, fe_reg, fe_mod,
+    2, 10, 31, 1, 8, 8,
+    NULL, NULL, &fe_reset,
+    NULL, NULL, NULL
+    };
+
 /* Front end processor (console terminal)
 
    Communications between the KS10 and its front end is based on an in-memory
@@ -106,13 +110,15 @@ DEVICE fe_dev = {
 
 void fe_intr (void)
 {
-if (M[FE_CTYOUT] & FE_CVALID) {				/* char to print? */
-	feo_unit.buf = (int32) M[FE_CTYOUT] & 0177;	/* pick it up */
-	feo_unit.pos = feo_unit.pos + 1;
-	sim_activate (&feo_unit, feo_unit.wait);  }	/* sched completion */
-else if ((M[FE_CTYIN] & FE_CVALID) == 0) {		/* input char taken? */
-	sim_cancel (&fei_unit);				/* sched immediate */
-	sim_activate (&fei_unit, 0);  };		/* keyboard poll */
+if (M[FE_CTYOUT] & FE_CVALID) {                         /* char to print? */
+    feo_unit.buf = (int32) M[FE_CTYOUT] & 0177;         /* pick it up */
+    feo_unit.pos = feo_unit.pos + 1;
+    sim_activate (&feo_unit, feo_unit.wait);            /* sched completion */
+    }
+else if ((M[FE_CTYIN] & FE_CVALID) == 0) {              /* input char taken? */
+    sim_cancel (&fei_unit);                             /* sched immediate */
+    sim_activate (&fei_unit, 0);                        /* keyboard poll */
+    }
 return;
 }
 
@@ -120,11 +126,12 @@ t_stat feo_svc (UNIT *uptr)
 {
 t_stat r;
 
-if ((r = sim_putchar_s (uptr->buf)) != SCPE_OK) {	/* output; error? */
-	sim_activate (uptr, uptr->wait);		/* try again */
-	return ((r == SCPE_STALL)? SCPE_OK: r);  }	/* !stall? report */
-M[FE_CTYOUT] = 0;					/* clear char */
-apr_flg = apr_flg | APRF_CON;				/* interrupt KS10 */
+if ((r = sim_putchar_s (uptr->buf)) != SCPE_OK) {       /* output; error? */
+    sim_activate (uptr, uptr->wait);                    /* try again */
+    return ((r == SCPE_STALL)? SCPE_OK: r);             /* !stall? report */
+    }
+M[FE_CTYOUT] = 0;                                       /* clear char */
+apr_flg = apr_flg | APRF_CON;                           /* interrupt KS10 */
 return SCPE_OK;
 }
 
@@ -132,16 +139,16 @@ t_stat fei_svc (UNIT *uptr)
 {
 int32 temp;
 
-sim_activate (&fei_unit, fei_unit.wait);		/* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;	/* no char or error? */
-if (temp & SCPE_BREAK) return SCPE_OK;			/* ignore break */
+sim_activate (&fei_unit, fei_unit.wait);                /* continue poll */
+if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp; /* no char or error? */
+if (temp & SCPE_BREAK) return SCPE_OK;                  /* ignore break */
 fei_unit.buf = temp & 0177;
 fei_unit.pos = fei_unit.pos + 1;
-M[FE_CTYIN] = fei_unit.buf | FE_CVALID;			/* put char in mem */
-apr_flg = apr_flg | APRF_CON;				/* interrupt KS10 */
+M[FE_CTYIN] = fei_unit.buf | FE_CVALID;                 /* put char in mem */
+apr_flg = apr_flg | APRF_CON;                           /* interrupt KS10 */
 return SCPE_OK;
 }
-
+
 /* Reset */
 
 t_stat fe_reset (DEVICE *dptr)
@@ -149,7 +156,7 @@ t_stat fe_reset (DEVICE *dptr)
 fei_unit.buf = feo_unit.buf = 0;
 M[FE_CTYIN] = M[FE_CTYOUT] = 0;
 apr_flg = apr_flg & ~(APRF_ITC | APRF_CON);
-sim_activate (&fei_unit, fei_unit.wait);		/* start input poll */
+sim_activate (&fei_unit, fei_unit.wait);                /* start input poll */
 return SCPE_OK;
 }
 
@@ -157,6 +164,6 @@ return SCPE_OK;
 
 t_stat fe_stop_os (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-M[FE_SWITCH] = IOBA_RP;					/* tell OS to stop */
+M[FE_SWITCH] = IOBA_RP;                                 /* tell OS to stop */
 return SCPE_OK;
 }

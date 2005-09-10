@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	HP2100 Simulator Usage
-Date:	20-Jan-2005
+Date:	01-Jul-2005
 
 			COPYRIGHT NOTICE
 
@@ -694,8 +694,7 @@ or a DETACH MUX command.
 
 The SHOW MUX CONNECTIONS command displays the current connections to the
 extra terminals.  The SHOW MUX STATISTICS command displays statistics for
-active connections.  The SET MUX DISCONNECT=linenumber disconnects the
-specified line.
+active connections.  The SET MUXLn DISCONNECT command disconnects line n.
 
 The scanner (MUX) implements these registers:
 

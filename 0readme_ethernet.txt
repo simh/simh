@@ -41,7 +41,7 @@ route TAP devices for you.
 
 Windows notes:
  1. The Windows-specific code uses the WinPCAP 3.0 package from
-    http://winpcap.polito.it. This package for windows simulates the libpcap
+    http://www.winpcap.org. This package for windows simulates the libpcap
     package that is freely available for un*x systems.
 
  2. You must *install* the WinPCAP runtime package.
