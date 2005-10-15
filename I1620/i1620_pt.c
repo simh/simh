@@ -26,6 +26,7 @@
    ptr          1621 paper tape reader
    ptp          1624 paper tape punch
 
+   21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
    25-Apr-03    RMS     Revised for extended file support
 */
 
@@ -213,8 +214,9 @@ t_stat ptr (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 uint32 i;
 int8 mc;
 uint8 ptc;
-t_stat r, inv = SCPE_OK;
+t_stat r, sta;
 
+sta = SCPE_OK;
 switch (op) {                                           /* case on op */
 
     case OP_RN:                                         /* read numeric */
@@ -223,11 +225,11 @@ switch (op) {                                           /* case on op */
             if (r != SCPE_OK) return r;                 /* error? */
             if (ptc & PT_EL) {                          /* end record? */
                 M[pa] = REC_MARK;                       /* store rec mark */
-                CRETIOE (io_stop, inv);                 /* done */
+                return sta;                             /* done */
                 }
             if (bad_par[ptc]) {                         /* bad parity? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
-                inv = STOP_INVCHR;                      /* set return status */
+                if (io_stop) sta = STOP_INVCHR;         /* set return status */
                 M[pa] = 0;                              /* store zero */
                 }
             else M[pa] = ptr_to_num[ptc];               /* translate, store */
@@ -242,12 +244,12 @@ switch (op) {                                           /* case on op */
             if (ptc & PT_EL) {                          /* end record? */
                 M[pa] = REC_MARK;                       /* store rec mark */
                 M[pa - 1] = 0;
-                CRETIOE (io_stop, inv);                 /* done */
+                return sta;                             /* done */
                 }
             mc = ptr_to_alp[ptc];                       /* translate */
             if (bad_par[ptc] || (mc < 0)) {             /* bad par or char? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
-                inv = STOP_INVCHR;                      /* set return status */
+                if (io_stop) sta = STOP_INVCHR;         /* set return status */
                 mc = 0;                                 /* store blank */
                 }
             M[pa] = (M[pa] & FLAG) | (mc & DIGIT);      /* store 2 digits */
@@ -269,10 +271,11 @@ t_stat btr (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 {
 uint32 i;
 uint8 ptc;
-t_stat r, inv = SCPE_OK;
+t_stat r, sta;
 
 if ((cpu_unit.flags & IF_BIN) == 0) return STOP_INVIO;
 
+sta = SCPE_OK;
 switch (op) {                                           /* case on op */
 
     case OP_RA:                                         /* read alphameric */
@@ -282,11 +285,11 @@ switch (op) {                                           /* case on op */
             if (ptc & PT_EL) {                          /* end record? */
                 M[pa] = REC_MARK;                       /* store rec mark */
                 M[pa - 1] = 0;
-                CRETIOE (io_stop, inv);                 /* done */
+                return sta;                             /* done */
                 }
             if (bad_par[ptc]) {                         /* bad parity? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
-                inv = STOP_INVCHR;                      /* set return status */
+                if (io_stop) sta = STOP_INVCHR;         /* set return status */
                 }
             M[pa] = (M[pa] & FLAG) | (ptc & 07);        /* store 2 digits */
             M[pa - 1] = (M[pa - 1] & FLAG) |

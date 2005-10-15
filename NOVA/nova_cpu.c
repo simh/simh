@@ -25,6 +25,7 @@
 
    cpu          Nova central processor
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    25-Aug-05    RMS     Fixed DIVS case 2^31 / - 1
    14-Jan-04    RMS     Fixed device enable/disable support (found by Bruce Ray)
    19-Jan-03    RMS     Changed CMASK to CDMASK for Apple Dev Kit conflict
@@ -252,7 +253,7 @@ REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 struct ndev dev_table[64];                              /* dispatch table */
 
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern DEVICE *sim_devices[];
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);

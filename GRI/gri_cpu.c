@@ -25,6 +25,7 @@
 
    cpu          GRI-909 CPU
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    18-Jul-04    RMS     Fixed missing ao_update calls in AX, AY write
    17-Jul-04    RMS     Revised MSR, EAO based on additional documentation
    14-Mar-03    RMS     Fixed bug in SC queue tracking
@@ -174,7 +175,7 @@ REG *scq_r = NULL;                                      /* PC queue reg ptr */
 
 extern int32 sim_interval;
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);

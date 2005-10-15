@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    30-Sep-04    RMS     Added conditionals for full VAX
                         Moved emulation to vax_cis.c
                         Moved model-specific IPRs to system module
@@ -77,7 +78,7 @@ static const uint8 rcnt[128] = {
 int32 last_chm = 0;
 
 extern uint32 *M;
-extern uint32 byte_mask[33];
+extern const uint32 byte_mask[33];
 extern int32 R[16];
 extern int32 STK[5];
 extern int32 PSL;

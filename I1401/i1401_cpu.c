@@ -23,7 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   01-Sep-05	RMS	Removed error stops in MCE
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   01-Sep-05	RMS	    Removed error stops in MCE
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    02-Jun-05    RMS     Fixed SSB-SSG clearing on RESET
                         (reported by Ralph Reinke)
@@ -182,12 +183,13 @@ int32 iochk = 0;                                        /* I/O check stop */
 int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
+t_bool conv_old = 0;                                    /* old conversions */
 
 extern int32 sim_int_char;
 extern int32 sim_emax;
 extern t_value *sim_eval;
 extern FILE *sim_deb;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -195,6 +197,8 @@ t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_conv (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, void *desc);
 int32 store_addr_h (int32 addr);
 int32 store_addr_t (int32 addr);
 int32 store_addr_u (int32 addr);
@@ -253,6 +257,7 @@ REG cpu_reg[] = {
     { BRDATA (ISQ, pcq, 10, 14, PCQ_SIZE), REG_RO+REG_CIRC },
     { DRDATA (ISQP, pcq_p, 6), REG_HRO },
     { ORDATA (WRU, sim_int_char, 8) },
+    { FLDATA (CONVOLD, conv_old, 0), REG_HIDDEN },
     { NULL }
     };
 
@@ -277,6 +282,10 @@ MTAB cpu_mod[] = {
     { UNIT_MSIZE, 16000, NULL, "16K", &cpu_set_size },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
       &cpu_set_hist, &cpu_show_hist },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "CONVERSIONS", "NEWCONVERSIONS",
+      &cpu_set_conv, &cpu_show_conv },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, NULL, "OLDCONVERSIONS",
+      &cpu_set_conv, NULL },
     { 0 }
     };
 
@@ -1768,5 +1777,22 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         fputc ('\n', st);                               /* end line */
         }                                               /* end else instruction */
     }                                                   /* end for */
+return SCPE_OK;
+}
+
+/* Set conversions */
+
+t_stat cpu_set_conv (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+conv_old = val;
+return SCPE_OK;
+}
+
+/* Show conversions */
+
+t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if (conv_old) fputs ("Old (pre-3.5-1) conversions\n", st);
+else fputs ("New conversions\n", st);
 return SCPE_OK;
 }

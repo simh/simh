@@ -25,6 +25,7 @@
 
    rl           RL11(RLV12)/RL01/RL02 cartridge disk
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
    30-Sep-04    RMS     Revised Unibus interface
@@ -79,7 +80,7 @@
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-extern int32 cpu_opt;
+extern uint32 cpu_opt;
 #endif
 
 /* Constants */

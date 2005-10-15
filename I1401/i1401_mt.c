@@ -25,6 +25,8 @@
 
    mt           7-track magtape
 
+   15-Sep-05    RMS     Yet another fix to load read group mark plus word mark
+                        Added debug printouts (from Van Snyder)
    26-Aug-05    RMS     Revised to use API for write lock check
    16-Aug-03    RMS     End-of-record on load read works like move read
                         (verified on real 1401)
@@ -72,11 +74,14 @@
 #define MT_NUMDR        7                               /* #drives */
 #define MT_MAXFR        (MAXMEMSIZE * 2)                /* max transfer */
 
+uint8 dbuf[MT_MAXFR];                                   /* tape buffer */
+
 extern uint8 M[];                                       /* memory */
 extern int32 ind[64];
 extern int32 BS, iochk;
 extern UNIT cpu_unit;
-uint8 dbuf[MT_MAXFR];                                   /* tape buffer */
+extern FILE *sim_deb;
+
 t_stat mt_reset (DEVICE *dptr);
 t_stat mt_boot (int32 unitno, DEVICE *dptr);
 t_stat mt_map_status (t_stat st);
@@ -130,7 +135,8 @@ DEVICE mt_dev = {
     "MT", mt_unit, mt_reg, mt_mod,
     MT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
-    &mt_boot, &sim_tape_attach, &sim_tape_detach
+    &mt_boot, &sim_tape_attach, &sim_tape_detach,
+    NULL, DEV_DEBUG
     };
 
 /* Function routine
@@ -153,28 +159,40 @@ if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;   /* attached? */
 switch (mod) {                                          /* case on modifier */
 
     case BCD_A:                                         /* diagnostic read */
+        if (DEBUG_PRS (mt_dev)) fprintf (sim_deb,
+            ">>MT%d: diagnostic read\n", unit);
         ind[IN_END] = 0;                                /* clear end of file */
         st = sim_tape_sprecf (uptr, &tbc);              /* space fwd */
         break;
 
     case BCD_B:                                         /* backspace */
+        if (DEBUG_PRS (mt_dev)) fprintf (sim_deb,
+            ">>MT%d: backspace\n", unit);
         ind[IN_END] = 0;                                /* clear end of file */
         st = sim_tape_sprecr (uptr, &tbc);              /* space rev */
         break;                                          /* end case */
 
     case BCD_E:                                         /* erase = nop */
+        if (DEBUG_PRS (mt_dev)) fprintf (sim_deb,
+            ">>MT%d: erase\n", unit);
         if (sim_tape_wrp (uptr)) return STOP_MTL;
         return SCPE_OK;
 
     case BCD_M:                                         /* write tapemark */
+        if (DEBUG_PRS (mt_dev)) fprintf (sim_deb,
+            ">>MT%d: write tape mark\n", unit);
         st = sim_tape_wrtmk (uptr);                     /* write tmk */
         break;
 
     case BCD_R:                                         /* rewind */
+        if (DEBUG_PRS (mt_dev)) fprintf (sim_deb,
+            ">>MT%d: rewind\n", unit);
         sim_tape_rewind (uptr);                         /* update position */
         return SCPE_OK;
 
     case BCD_U:                                         /* unload */
+        if (DEBUG_PRS (mt_dev)) fprintf (sim_deb,
+            ">>MT%d: rewind and unload\n", unit);
         sim_tape_rewind (uptr);                         /* update position */
         return detach_unit (uptr);                      /* detach */
 
@@ -214,13 +232,21 @@ if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;   /* attached? */
 switch (mod) {
 
     case BCD_R:                                         /* read */
+        if (DEBUG_PRS (mt_dev))
+            fprintf (sim_deb, ">>MT%d: read from %d", unit, BS);
         ind[IN_TAP] = ind[IN_END] = 0;                  /* clear error */
         wm_seen = 0;                                    /* no word mk seen */
         st = sim_tape_rdrecf (uptr, dbuf, &tbc, MT_MAXFR); /* read rec */
         if (st == MTSE_RECE) ind[IN_TAP] = 1;           /* rec in error? */
-        else if (st != MTSE_OK) break;                  /* stop on error */
+        else if (st != MTSE_OK) {                       /* stop on error */
+            if (DEBUG_PRS (mt_dev))
+                fprintf (sim_deb, ", stopped by status = %d\n", st);
+            break;
+            }
         for (i = 0; i < tbc; i++) {                     /* loop thru buf */
             if (M[BS] == (BCD_GRPMRK + WM)) {           /* GWM in memory? */
+                if (DEBUG_PRS (mt_dev))
+                    fprintf (sim_deb, " to %d, stopped by GMWM\n", BS);
                 BS++;                                   /* incr BS */
                 if (ADDR_ERR (BS)) {                    /* test for wrap */
                     BS = BA | (BS % MAXMEMSIZE);
@@ -244,21 +270,24 @@ switch (mod) {
                 return STOP_WRAP;
                 }
             }
-/*  if (M[BS] != (BCD_GRPMRK + WM)) {                   /* not GM+WM at end? */
-/*      if (flag == MD_WM) M[BS] = BCD_GRPMRK;          /* LCA: clear WM */
-/*      else M[BS] = (M[BS] & WM) | BCD_GRPMRK;         /* MCW: save WM */
-/*		} */
-    M[BS] = (M[BS] & WM) | BCD_GRPMRK;                  /* write GM, save WM */
-    BS++;                                               /* adv BS */
-    if (ADDR_ERR (BS)) {                                /* check final BS */
-        BS = BA | (BS % MAXMEMSIZE);
-        return STOP_WRAP;
-        }
-    break;
+        if (M[BS] != (BCD_GRPMRK + WM)) {               /* not GM+WM at end? */
+            if (flag == MD_WM) M[BS] = BCD_GRPMRK;      /* LCA: clear WM */
+            else M[BS] = (M[BS] & WM) | BCD_GRPMRK;     /* MCW: save WM */
+		    }
+        if (DEBUG_PRS (mt_dev))
+            fprintf (sim_deb, " to %d, stopped by EOR\n", BS);
+        BS++;                                           /* adv BS */
+        if (ADDR_ERR (BS)) {                            /* check final BS */
+            BS = BA | (BS % MAXMEMSIZE);
+            return STOP_WRAP;
+            }
+        break;
 
     case BCD_W:
         if (sim_tape_wrp (uptr)) return STOP_MTL;       /* locked? */
         if (M[BS] == (BCD_GRPMRK + WM)) return STOP_MTZ;/* eor? */
+        if (DEBUG_PRS (mt_dev))
+            fprintf (sim_deb, ">>MT%d: write from %d", unit, BS);
         ind[IN_TAP] = ind[IN_END] = 0;                  /* clear error */
         for (tbc = 0; (t = M[BS++]) != (BCD_GRPMRK + WM); ) {
             if ((t & WM) && (flag == MD_WM)) dbuf[tbc++] = BCD_WM;
@@ -270,6 +299,7 @@ switch (mod) {
                 return STOP_WRAP;
                 }
             }
+        if (DEBUG_PRS (mt_dev)) fprintf (sim_deb, " to %d\n", BS - 1);
         st = sim_tape_wrrecf (uptr, dbuf, tbc);         /* write record */
         if (ADDR_ERR (BS)) {                            /* check final BS */
             BS = BA | (BS % MAXMEMSIZE);

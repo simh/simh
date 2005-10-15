@@ -25,6 +25,7 @@
 
    cpu          PDP-4/7/9/15 central processor
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    22-Jul-05    RMS     Removed AAS, error in V1 reference manual
    06-Nov-04    RMS     Added =n to SHOW HISTORY
@@ -370,7 +371,7 @@ InstHistory *hst = NULL;                                /* instruction history *
 
 extern int32 sim_int_char;
 extern int32 sim_interval;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern DEVICE *sim_devices[];
 extern FILE *sim_log;
 

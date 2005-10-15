@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-Sep-05    RMS     Fixed bug in 32b structure definitions (from Jason Stevens)
    30-Sep-04    RMS     Comment and formating changes based on vax_octa.c
    18-Apr-04    RMS     Moved format definitions to vax_defs.h
    19-Jun-03    RMS     Simplified add algorithm
@@ -65,7 +66,7 @@ extern int32 Read (uint32 va, int32 size, int32 acc);
 typedef struct {
     int32               sign;
     int32               exp;
-    t_uint64    frac;
+    t_uint64            frac;
     } UFP;
 
 #define UF_NM           0x8000000000000000              /* normalized */
@@ -566,7 +567,7 @@ typedef struct {
 typedef struct {
     int32               sign;
     int32               exp;
-    struct udp  frac;
+    UDP                 frac;
     } UFP;
 
 #define UF_NM_H         0x80000000                      /* normalized */

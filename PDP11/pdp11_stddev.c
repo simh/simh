@@ -26,6 +26,7 @@
    tti,tto      DL11 terminal input/output
    clk          KW11L (and other) line frequency clock
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    07-Jul-05    RMS     Removed extraneous externs
    11-Oct-04    RMS     Added clock model dependencies
    28-May-04    RMS     Removed SET TTI CTRL-C
@@ -66,7 +67,7 @@
 #define UNIT_8B         (1 << UNIT_V_8B)
 
 extern int32 int_req[IPL_HLVL];
-extern int32 cpu_type;
+extern uint32 cpu_type;
 
 int32 tti_csr = 0;                                      /* control/status */
 int32 tto_csr = 0;                                      /* control/status */

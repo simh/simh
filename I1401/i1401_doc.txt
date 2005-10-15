@@ -190,6 +190,14 @@ stackers (STKR).  STRK units 0, 1, 2, and 4 correspond to the reader
 normal stacker, reader stacker 1, shared stacker 2/8, and punch stacker
 4, respectively.
 
+Card punch and stacker units support both the business (1403 print chain
+A) and Fortran (1403 H chain) character sets:
+
+	SET CDP BUSINESS	business character set
+	SET CDP FORTRAN		Fortran character set
+
+The business character set is the default.
+
 The card reader supports the BOOT command.  BOOT CDR reads a card image
 into locations 1-80, sets a word mark under location 1, clears storage,
 and then transfers control to location 1.
@@ -245,12 +253,19 @@ Error handling is as follows:
 2.3 1403 Line Printer (LPT)
 
 The IBM 1403 line printer (LPT) writes its data, converted to ASCII, to
-a disk file.  The line printer supports three different print character
-sets or "chains":
+a disk file.  The line printer implements both 48- and 64-character print
+chains:
 
-	SET LPT PCF			full 64 character chain
-	SET LPT PCA			48 character business chain
-	SET LPT PCH			48 character FORTRAN chain
+	SET LPT 64		64-character print chain
+	SET LPT 48		48-character print chain
+
+The line printer also implements both the business (1403 print chain
+A) and Fortran (1403 H chain) character sets:
+
+	SET LPT BUSINESS	business print character set
+	SET LPT FORTRAN		Fortran character set
+
+The default is the 64 character print chain with the business set.
 
 In addition, the line printer can be programmed with a carriage control
 tape.  The LOAD command loads a new carriage control tape:
@@ -297,8 +312,18 @@ Error handling is as follows:
 2.4 1407 Inquiry Terminal (INQ)
 
 The IBM 1407 inquiry terminal (INQ) is a half-duplex console.  It polls
-the console keyboard periodically for inquiry requests.  The inquiry
-terminal registers are:
+the console keyboard periodically for inquiry requests.
+
+The inquiry terminal supports both the business (1403 print chain A)
+and Fortran (1403 H chain) character sets for output:
+
+	SET INQ BUSINESS	business character set
+	SET INQ FORTRAN		Fortran character set
+
+The business character set is the default.
+
+
+The inquiry terminal registers are:
 
 	name		size	comments
 
@@ -414,7 +439,7 @@ controlled by command line switches:
 	-d			display 50 characters per line, with word
 				marks denoted by "1" on the line below
 
-In a CPU character display, word marks are denoted by ~.
+In a CPU character display, word marks are denoted by `.
 
 Input parsing is controlled by the first character typed in or by command
 line switches:
@@ -462,11 +487,11 @@ code	representation	character		chains
 10	8
 11	9
 12	0
-13	#					= in H chain
-14	@					' in H chain
+13	# or =					= in H chain
+14	@ or '					' in H chain
 15	:					blank in A, H chains
 16	>					blank in A, H chains
-17	(		tape mark		blank in A, H chains
+17	{		tape mark		blank in A, H chains
 20	^		alternate blank		blank in A, H chains
 21	/
 22	S
@@ -477,12 +502,12 @@ code	representation	character		chains
 27	X
 30	Y
 31	Z
-32	'		record mark
+32	|		record mark
 33	,
-34	%					( in H chain
-35	=		word mark		blank in A, H chains
+34	% or (					( in H chain
+35	~		word mark		blank in A, H chains
 36	\					blank in A, H chains
-37	+					blank in A, H chains
+37	"					blank in A, H chains
 40	-
 41	J
 42	K
@@ -514,4 +539,32 @@ code	representation	character		chains
 74	)		lozenge
 75	[					blank in A, H chains
 76	<					blank in A, H chains
-77	"		group mark		blank in A, H chains
+77	}		group mark		blank in A, H chains
+
+2.8 Old Conversions
+
+Starting with V3.5-1, the 1401 simulator was changed to use the same character
+set as the 7094 (and other 7094 simulators).  This involved the following changes
+
+code	V3.5-0 or earlier	V3.5-1 or later
+
+13	#			# or = on input
+14	@			@ or ' on input
+17	(			{
+32	'			|
+34	%			% or ( on input
+35	=			~
+37	+			"
+60	&			& or + on input
+77	"			}
+
+In addition, the word mark indicator was changed from ~ to `.
+
+The 1401 simulator can be set to operate with either set of conventions:
+
+	SET CPU OLDCONVERSIONS
+	SET CPU NEWCONVERSIONS
+
+The default is NEWCONVERSIONS.
+
+	

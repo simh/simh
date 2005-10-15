@@ -35,6 +35,7 @@
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
 
+   20-Sep-05    RMS     Revised for new code tables, compatible colbinary treatment
    30-Aug-05    RMS     Fixed read, punch to ignore modifier on 1,4 char inst
                         (reported by Van Snyder)
    14-Nov-04    WVS     Added column binary support
@@ -48,17 +49,21 @@
 #include "i1401_defs.h"
 #include <ctype.h>
 
+#define UNIT_V_PCH      (UNIT_V_UF + 0)                 /* output conv */
+#define UNIT_PCH        (1 << UNIT_V_PCH)
+
 extern uint8 M[];
 extern int32 ind[64], ssa, iochk;
-extern char bcd_to_ascii[64];
-extern char ascii_to_bcd[128];
-extern int16 colbin[64];
+extern int32 conv_old;
+
 int32 s1sel, s2sel, s4sel, s8sel;
 char rbuf[2 * CBUFSIZE];                                /* > CDR_WIDTH */
 t_stat cdr_svc (UNIT *uptr);
 t_stat cdr_boot (int32 unitno, DEVICE *dptr);
 t_stat cdr_attach (UNIT *uptr, char *cptr);
 t_stat cd_reset (DEVICE *dptr);
+int32 bcd2asc (int32 c, UNIT *uptr);
+char colbin_to_bcd (uint32 cb);
 
 /* Card reader data structures
 
@@ -108,8 +113,14 @@ REG cdp_reg[] = {
     { NULL }
     };
 
+MTAB cdp_mod[] = {
+    { UNIT_PCH, 0,        "business set", "BUSINESS" },
+    { UNIT_PCH, UNIT_PCH, "Fortran set", "FORTRAN" },
+    { 0 }
+    };
+
 DEVICE cdp_dev = {
-    "CDP", &cdp_unit, cdp_reg, NULL,
+    "CDP", &cdp_unit, cdp_reg, cdp_mod,
     1, 10, 31, 1, 8, 7,
     NULL, NULL, &cd_reset,
     NULL, NULL, NULL
@@ -139,7 +150,7 @@ REG stack_reg[] = {
     };
 
 DEVICE stack_dev = {
-    "STKR", stack_unit, stack_reg, NULL,
+    "STKR", stack_unit, stack_reg, cdp_mod,
     5, 10, 31, 1, 8, 7,
     NULL, NULL, &cd_reset,
     NULL, NULL, NULL
@@ -153,8 +164,7 @@ DEVICE stack_dev = {
 
 t_stat read_card (int32 ilnt, int32 mod)
 {
-int32 i, j, cbn;
-int16 c;
+int32 i, cbn, c1, c2;
 t_stat r;
 
 if (sim_is_active (&cdr_unit)) {                        /* busy? */
@@ -182,24 +192,23 @@ if (ssa) {                                              /* if last cd on */
     fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);
     }
 if (cbn) {                                              /* column binary */
-    for (i = 0; i < 2 * CDR_WIDTH; i++)                 /* cvt to BCD */
-        rbuf[i] = ascii_to_bcd[rbuf[i]];
     for (i = 0; i < CDR_WIDTH; i++) {
-        M[CD_CBUF1 + i] = (M[CD_CBUF1 + i] & WM) | rbuf[i];
-        M[CD_CBUF2 + i] = (M[CD_CBUF2 + i] & WM) | rbuf[CDR_WIDTH + i];
-        c = (rbuf[i] << 6) | rbuf[CDR_WIDTH + i];
-        M[CDR_BUF + i] = (M[CDR_BUF + i] & WM) | 077;
-        for (j = 0; j < 64; j++) {                      /* look for char */
-            if (c == colbin[j]) {
-                M[CDR_BUF + i] = (M[CDR_BUF + i] & WM) | j;
-                break;
-                }                                       /* end if */
-            }                                           /* end for j */
+        if (conv_old) {
+            c1 = ascii2bcd (rbuf[i]);
+            c2 = ascii2bcd (rbuf[CDR_WIDTH + i]);
+            }
+        else {
+            c1 = ascii2bcd (rbuf[2 * i]);
+            c2 = ascii2bcd (rbuf[(2 * i) + 1]);
+            }
+        M[CD_CBUF1 + i] = (M[CD_CBUF1 + i] & WM) | c1;
+        M[CD_CBUF2 + i] = (M[CD_CBUF2 + i] & WM) | c2;
+        M[CDR_BUF + i] = colbin_to_bcd ((c1 << 6) | c2);
         }                                               /* end for i */
     }                                                   /* end if col bin */
 else {                                                  /* normal read */
     for (i = 0; i < CDR_WIDTH; i++) {                   /* cvt to BCD */
-        rbuf[i] = ascii_to_bcd[rbuf[i]];
+        rbuf[i] = ascii2bcd (rbuf[i]);
         M[CDR_BUF + i] = (M[CDR_BUF + i] & WM) | rbuf[i];
         }
     }
@@ -221,7 +230,8 @@ if (s1sel) uptr = &stack_unit[1];                       /* stacker 1? */
 else if (s2sel) uptr = &stack_unit[2];                  /* stacker 2? */
 else uptr = &stack_unit[0];                             /* then default */
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;      /* attached? */
-for (i = 0; i < CDR_WIDTH; i++) rbuf[i] = bcd_to_ascii[rbuf[i]];
+for (i = 0; i < CDR_WIDTH; i++)
+    rbuf[i] = bcd2ascii (rbuf[i], uptr->flags & UNIT_PCH);
 for (i = CDR_WIDTH - 1; (i >= 0) && (rbuf[i] == ' '); i--) rbuf[i] = 0;
 rbuf[CDR_WIDTH] = 0;                                    /* null at end */
 fputs (rbuf, uptr->fileref);                            /* write card */
@@ -243,22 +253,32 @@ return SCPE_OK;
 
 t_stat punch_card (int32 ilnt, int32 mod)
 {
-int32 i, cbn;
+int32 i, cbn, c1, c2;
 static char pbuf[(2 * CDP_WIDTH) + 1];                  /* + null */
+t_bool use_h;
 UNIT *uptr;
 
 if (s8sel) uptr = &stack_unit[2];                       /* stack 8? */
 else if (s4sel) uptr = &stack_unit[4];                  /* stack 4? */
 else uptr = &cdp_unit;                                  /* normal output */
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;   /* attached? */
+use_h = uptr->flags & UNIT_PCH;
 ind[IN_PNCH] = s4sel = s8sel = 0;                       /* clear flags */
 cbn = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_C);   /* col binary? */
 
 M[CDP_BUF - 1] = 012;                                   /* set prev loc */
 if (cbn) {                                              /* column binary */
     for (i = 0; i < CDP_WIDTH; i++) {
-        pbuf[i] = bcd_to_ascii[M[CD_CBUF1 + i] & CHAR];
-        pbuf[i + CDP_WIDTH] = bcd_to_ascii[M[CD_CBUF2 + i] & CHAR];
+        c1 = bcd2ascii (M[CD_CBUF1 + i] & CHAR, use_h);
+        c2 = bcd2ascii (M[CD_CBUF2 + i] & CHAR, use_h);
+        if (conv_old) {
+            pbuf[i] = c1;
+            pbuf[i + CDP_WIDTH] = c2;
+            }
+        else {
+            pbuf[2 * i] = c1;
+            pbuf[(2 * i) + 1] = c2;
+            }
         }
     for (i = 2 * CDP_WIDTH - 1; (i >= 0) && (pbuf[i] == ' '); i--)
          pbuf[i] = 0;
@@ -266,7 +286,7 @@ if (cbn) {                                              /* column binary */
     }
 else {                                                  /* normal */
     for (i = 0; i < CDP_WIDTH; i++)
-        pbuf[i] = bcd_to_ascii[M[CDP_BUF + i] & CHAR];
+        pbuf[i] = bcd2ascii (M[CDP_BUF + i] & CHAR, use_h);
     for (i = CDP_WIDTH - 1; (i >= 0) && (pbuf[i] == ' '); i--)
         pbuf[i] = 0;
     pbuf[CDP_WIDTH] = 0;                                /* trailing null */
@@ -334,4 +354,31 @@ for (i = 0; i < CDR_WIDTH; i++) M[CDR_BUF + i] = 0;     /* clear buffer */
 for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
 saved_IS = BOOT_START;
 return SCPE_OK;
+}
+
+/* Column binary to BCD
+
+   This is based on documentation in the IBM 1620 manual and may not be
+   accurate for the 7094.  Each row (12,11,0,1..9) is interpreted as a bit
+   pattern, and the appropriate bits are set.  (Double punches inclusive
+   OR, eg, 1,8,9 is 9.)  On the 1620, double punch errors are detected;
+   since the 7094 only reads column binary, double punches are ignored.
+
+   Bit order, left to right, is 12, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9.
+   The for loop works right to left, so the table is reversed. */
+
+static const char row_val[12] = {
+    011, 010, 007, 006, 005, 004,
+    003, 002, 001, 020, 040, 060
+    };
+
+char colbin_to_bcd (uint32 cb)
+{
+uint32 i;
+char bcd;
+
+for (i = 0, bcd = 0; i < 12; i++) {                     /* 'sum' rows */
+    if (cb & (1 << i)) bcd |= row_val[i];
+    }
+return bcd;
 }

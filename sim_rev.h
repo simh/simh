@@ -29,11 +29,34 @@
 
 #define SIM_MAJOR       3
 #define SIM_MINOR       5
-#define SIM_PATCH       0
+#define SIM_PATCH       1
 
 /* V3.5 revision history 
 
 patch   date            module(s) and fix(es)
+
+  1     15-Oct-05       All CPU's, other sources: fixed declaration inconsistencies
+                        (from Sterling Garwood)
+
+                        i1401_cpu.c: added control for old/new character encodings
+
+                        i1401_cd.c, i1401_lpt.c, i1401_tty.c:
+                        - changed character encodings to be consistent with 7094
+                        - changed column binary format to be consistent with 7094
+                        - added choice of business or Fortran set for output encoding
+
+                        i1401_sys.c: changed WM character to ` under new encodings
+
+                        i1620_cd.c, i1620_lpt.c, i1620_tty.c:
+                        - changed character encodings to be consistent with 7094
+
+                        pdp10_cpu.c: changed MOVNI to eliminate gcc warning
+
+                        pdp11_io.c: fixed bug in autoconfiguration (missing XU)
+
+                        vax_io.c: fixed bug in autoconfiguration (missing XU)
+
+			vax_fpa.c: fixed bug in 32b structure definitions (from Jason Stevens)
 
   0     1-Sep-05        Note: most source modules have been edited to improve
                         readability and to fix declaration and cast problems in C++

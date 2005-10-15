@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Oct-05    RMS     Added XU definitions for autoconfigure
    15-Jun-05    RMS     Added QDSS support
    12-Sep-04    RMS     Removed map_address prototype
    16-Jun-04    RMS     Added DHQ11 support
@@ -280,6 +281,8 @@ typedef struct {
 #define IOLN_XQB        020
 #define IOBA_TQ         (IOPAGEBASE + 014500)           /* TMSCP */
 #define IOLN_TQ         004
+#define IOBA_XU         (IOPAGEBASE + 014510)           /* DEUNA/DELUA */
+#define IOLN_XU         010
 #define IOBA_RP         (IOPAGEBASE + 016700)           /* RP/RM */
 #define IOLN_RP         054
 #define IOBA_RX         (IOPAGEBASE + 017170)           /* RXV11 */
@@ -391,6 +394,7 @@ typedef struct {
 #define VEC_PTR         (VEC_Q + 0070)
 #define VEC_PTP         (VEC_Q + 0074)
 #define VEC_XQ          (VEC_Q + 0120)
+#define VEC_XU          (VEC_Q + 0120)
 #define VEC_RQ          (VEC_Q + 0154)
 #define VEC_RL          (VEC_Q + 0160)
 #define VEC_LPT         (VEC_Q + 0200)

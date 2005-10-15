@@ -898,8 +898,8 @@ return;
 */
 
 struct reglink {                                        /* register linkage */
-    int32       low;                                    /* low addr */
-    int32       high;                                   /* high addr */
+    uint32      low;                                    /* low addr */
+    uint32      high;                                   /* high addr */
     t_stat      (*read)(int32 pa);                      /* read routine */
     void        (*write)(int32 pa, int32 val, int32 lnt);       /* write routine */
     };
@@ -927,7 +927,7 @@ struct reglink regtable[] = {
         longword of data
 */
 
-int32 ReadReg (int32 pa, int32 lnt)
+int32 ReadReg (uint32 pa, int32 lnt)
 {
 struct reglink *p;
 
@@ -950,7 +950,7 @@ return 0;
         none
 */
 
-void WriteReg (int32 pa, int32 val, int32 lnt)
+void WriteReg (uint32 pa, int32 val, int32 lnt)
 {
 struct reglink *p;
 

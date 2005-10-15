@@ -25,6 +25,7 @@
 
    cpu          central processor
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    06-Nov-04    RMS     Added =n to SHOW HISTORY
    31-Dec-03    RMS     Fixed bug in set_cpu_hist
@@ -237,7 +238,7 @@ InstHistory *hst = NULL;                                /* instruction history *
 
 extern int32 sim_interval;
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern DEVICE *sim_devices[];
 extern FILE *sim_log;
 extern UNIT clk_unit, ttix_unit;

@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    30-Sep-04    RMS     Comment and formating changes
    19-Sep-03    RMS     Fixed upper/lower case linkage problems on VMS
    01-Jun-03    RMS     Fixed compilation problem with USE_ADDR64
@@ -52,7 +53,7 @@ typedef struct {
     } TLBENT;
 
 extern uint32 *M;
-extern uint32 align[4];
+extern const uint32 align[4];
 extern int32 PSL;
 extern int32 mapen;
 extern int32 p1, p2;
@@ -281,7 +282,7 @@ return;
 
 /* Test access to a byte (VAX PROBEx) */
 
-int32 Test (int32 va, int32 acc, int32 *status)
+int32 Test (uint32 va, int32 acc, int32 *status)
 {
 int32 vpn, off, tbi;
 TLBENT xpte;
@@ -515,7 +516,7 @@ return;
 
 /* Zap single tb entry corresponding to va */
 
-void zap_tb_ent (int32 va)
+void zap_tb_ent (uint32 va)
 {
 int32 tbi = VA_GETTBI (VA_GETVPN (va));
 
@@ -526,7 +527,7 @@ return;
 
 /* Check for tlb entry corresponding to va */
 
-t_bool chk_tb_ent (int32 va)
+t_bool chk_tb_ent (uint32 va)
 {
 int32 vpn = VA_GETVPN (va);
 int32 tbi = VA_GETTBI (vpn);

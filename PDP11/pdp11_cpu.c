@@ -25,6 +25,7 @@
 
    cpu          PDP-11 CPU
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    19-May-05    RMS     Replaced WAIT clock queue check with API call
    19-Jan-05    RMS     Fixed bug(s) in RESET for 11/70 (reported by Tim Chapman)
@@ -279,7 +280,7 @@ extern int32 CPUERR, MAINT;
 extern int32 sim_interval;
 extern UNIT clk_unit, pclk_unit;
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern DEVICE *sim_devices[];
 extern CPUTAB cpu_tab[];
 
@@ -314,7 +315,7 @@ void put_PIRQ (int32 val);
 
 extern void fp11 (int32 IR);
 extern void cis11 (int32 IR);
-extern void fis11 (int32 IR);
+extern t_stat fis11 (int32 IR);
 extern t_stat build_dib_tab (void);
 extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
 extern t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);

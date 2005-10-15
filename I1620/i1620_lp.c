@@ -25,6 +25,7 @@
 
    lpt          1443 line printer
 
+   21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
    29-Dec-03    RMS     Fixed bug in scheduling
    25-Apr-03    RMS     Revised for extended file support
 */
@@ -99,7 +100,7 @@ DEVICE lpt_dev = {
 
 const char num_to_lpt[32] = {
  '0', '1', '2', '3', '4', '5', '6', '7',
- '8', '9', '\'', ' ', '@', ':', ' ', 'G',
+ '8', '9', '|', ' ', '@', ':', ' ', 'G',
  '-', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
  'Q', 'R', 'W', ' ', '*', ' ',  -1, 'X'
  };
@@ -111,7 +112,7 @@ const char alp_to_lpt[256] = {
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
  '+',  -1, '!', '$', '*', ' ',  -1,  -1,                /* 10 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
- '-', '/', '\'', ',', '(', -1,  -1,  -1,                /* 20 */
+ '-', '/', '|', ',', '(',  -1,  -1,  -1,                /* 20 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
   -1,  -1, '0', '=', '@', ':',  -1,  -1,                /* 30 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
@@ -152,8 +153,9 @@ t_stat lpt (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 {
 int8 lpc;
 uint8 z, d;
-t_stat r, inv = SCPE_OK;
+t_stat r, sta;
 
+sta = SCPE_OK;
 sim_cancel (&lpt_unit);                                 /* "stall" until */
 ind[IN_PRBSY] = 0;                                      /* printer free */
 
@@ -178,8 +180,8 @@ switch (op) {                                           /* decode op */
             lpc = alp_to_lpt[(z << 4) | d];             /* translate pair */
             if (lpc < 0) {                              /* bad char? */
                 ind[IN_WRCHK] = ind[IN_PRCHK] = 1;      /* wr chk */
-                inv = STOP_INVCHR;                      /* set return status */
-				}
+                if (io_stop) sta = STOP_INVCHR;         /* set return status */
+                }
             lpt_buf[lpt_bptr] = lpc & 0x7F;             /* fill buffer */
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
@@ -187,7 +189,7 @@ switch (op) {                                           /* decode op */
             r = lpt_print ();                           /* print line */
             if (r != SCPE_OK) return r;
             }
-        CRETIOE (io_stop, inv);
+        return sta;
 
     default:                                            /* invalid function */
         return STOP_INVFNC;
@@ -203,8 +205,9 @@ t_stat lpt_num (uint32 pa, uint32 len, uint32 f1)
 uint32 end;
 uint8 d;
 int8 lpc;
-t_stat r, inv = SCPE_OK;
+t_stat r, sta;
 
+sta = SCPE_OK;
 end = pa + len;
 for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {             /* only fill buf */
     d = M[pa];                                          /* get digit */
@@ -213,7 +216,7 @@ for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {             /* only fill buf */
     lpc = num_to_lpt[d];                                /* translate */
     if (lpc < 0) {                                      /* bad char? */
         ind[IN_WRCHK] = ind[IN_PRCHK] = 1;              /* wr chk */
-        inv = STOP_INVCHR;                              /* set return status */
+        if (io_stop) sta = STOP_INVCHR;                 /* set return status */
         }
     lpt_buf[lpt_bptr++] = lpc & 0x7F;                   /* fill buffer */
     PP (pa);                                            /* incr mem addr */
@@ -222,7 +225,7 @@ if ((f1 & 1) == 0) {                                    /* print now? */
     r = lpt_print ();                                   /* print line */
     if (r != SCPE_OK) return r;
     }
-CRETIOE (io_stop, inv);
+return sta;
 }
 
 /* Print and space */
@@ -268,7 +271,7 @@ if (lpt_savctrl & K_CH10) {                             /* chan 10-12? */
 if ((chan == 0) || (chan > 12)) return STOP_INVFNC;
 for (i = 1; i < cct_lnt + 1; i++) {                     /* sweep thru cct */
     if (CHP (chan, cct[(cct_ptr + i) % cct_lnt]))
-            return lpt_space (i, TRUE);
+        return lpt_space (i, TRUE);
     }
 return STOP_CCT;                                        /* runaway channel */
 }

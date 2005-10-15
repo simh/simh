@@ -25,6 +25,7 @@
 
    cpu          PDP-1 central processor
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    09-Nov-04    RMS     Added instruction history
    07-Sep-03    RMS     Added additional explanation on I/O simulation
@@ -270,7 +271,7 @@ InstHistory *hst = NULL;                                /* instruction history *
 
 extern UNIT *sim_clock_queue;
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);

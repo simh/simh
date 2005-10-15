@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Oct-05    RMS     Fixed bug in autoconfiguration (missing XU)
    25-Jul-05    RMS     Revised autoconfiguration algorithm and interface
    30-Sep-04    RMS     Revised Unibus interface
    28-May-04    RMS     Revised I/O dispatching (from John Dundas)
@@ -626,7 +627,7 @@ AUTO_CON auto_tab[] = {
     { { NULL }, 1, 2, 8, 8 },                           /* DPV11 */
     { { NULL }, 1, 2, 8, 8 },                           /* ISB11 */
     { { NULL }, 1, 2, 16, 8 },                          /* DMV11 */
-//  { { "XU", "XUB" }, 1, 1, 8, 4, {IOBA_XU}, {VEC_XU} },   /* DEUNA */
+    { { "XU", "XUB" }, 1, 1, 8, 4, {IOBA_XU}, {VEC_XU} },   /* DEUNA */
     { { "XQ", "XQB" }, 1, 1, 0, 4,                      /* DEQNA */
         {IOBA_XQ,IOBA_XQB}, {VEC_XQ} },
     { { "RQ", "RQB", "RQC", "RQD" }, 1, -1, 4, 4,       /* RQDX3 */

@@ -282,4 +282,10 @@
 
 #define CRETIOE(f,c)    return ((f)? (c): SCPE_OK)
 
+/* Function prototypes */
+
+int32 bcd2ascii (int32 c, t_bool use_h);
+int32 ascii2bcd (int32 c);
+
+
 #endif

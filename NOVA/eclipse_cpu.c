@@ -28,6 +28,7 @@
 
    cpu          Eclipse central processor
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    25-Aug-05    RMS     Fixed DIVS overflow cases
    29-Nov-03    CEO     Corrected POPJ and Bit operations bugs
    26-Nov-03    CEO     Added FPU and PIT devices 
@@ -492,7 +493,7 @@ FILE *Trace;
 
 t_stat reason;
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern DEVICE *sim_devices[];
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);

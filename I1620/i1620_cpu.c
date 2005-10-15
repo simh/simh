@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Nov-04    RMS     Added instruction history
    26-Mar-04    RMS     Fixed warnings with -std=c99
@@ -131,7 +132,7 @@ uint8 ind[NUM_IND] = { 0 };                             /* indicators */
 
 extern int32 sim_int_char;
 extern int32 sim_interval;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern FILE *sim_log;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);

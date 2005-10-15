@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	IBM 1620 Simulator Usage
-Date:	15-Nov-2004
+Date:	15-Sep-2005
 
 			COPYRIGHT NOTICE
 
@@ -209,8 +209,8 @@ registers are:
 	COL		7	current column
 	TIME		24	polling interval
 
-When the 1620 CPU requests input from the keyboard, a reverse apostrophe
-(`) is printed.  The CPU hangs waiting for input until the return/enter
+When the 1620 CPU requests input from the keyboard, a greater than sign
+(>) is printed.  The CPU hangs waiting for input until the return/enter
 key is pressed.  The typewriter has no errors.
 
 2.3 1621 Paper Tape Reader (PTR)
@@ -407,21 +407,19 @@ controlled by command line switches:
 
 	-c			display as single character (alphameric
 				for CPU and DP, ASCII for others)
-	-s			display as flag terminated numeric string
+	-s			display as flag terminated alphameric string
 				(CPU and DP only)
 	-m			display instruction mnemonics
 				(CPU and DP only)
 	-d			display 50 characters per line, with word
 				marks denoted by "_" on the line above
 
-In a CPU string display, word marks are denoted by ~.
-
 Input parsing is controlled by the first character typed in or by command
 line switches:
 
 	' or -c			character (alphameric for CPU and DP, ASCII
 				for others)
-	" or -s			numeric string (CPU and DP only)
+	" or -s			alphameric string (CPU and DP only)
 	alphabetic		instruction mnemonic (CPU and DP only)
 	numeric			octal number
 
@@ -462,9 +460,6 @@ are accepted on input as equivalent to upper case.
 Card code	PT code	RA	RN	LPT WA	ASCII representation
 
 <blank>		C	0	0	blank	blank
-12		XOC	10	0	+	+
-11		X	20	F+0	-	-
-0		O	70	0	0	0
 1		1	71	1	1	1
 2		2	72	2	2	2
 3		C21	73	3	3	3
@@ -474,6 +469,13 @@ Card code	PT code	RA	RN	LPT WA	ASCII representation
 7		421	77	7	7	7
 8		8	78	8	8	8
 9		C81	79	9	9	9
+2 + 8		C82	? 0A	A	na	^
+3 + 8		821	33	B	=	= (or #)
+4 + 8		C84	34	C	@	@ (or ')
+5 + 8		841	70	0	0	:
+6 + 8		842	? 0E	E	na	>
+7 + 8		C8421	? 0F	F	na	{
+12		XOC	10	0	+	+ (or &)
 12 + 1		XO1	41	1	A	A
 12 + 2		XO2	42	2	B	B
 12 + 3		XOC21	43	3	C	C
@@ -483,6 +485,13 @@ Card code	PT code	RA	RN	LPT WA	ASCII representation
 12 + 7		XO421	47	7	G	G
 12 + 8		XO8	48	8	H	H
 12 + 9		XOC81	49	9	I	I
+12 + 2 + 8	XOC82	? 5A	? F+A	na	?
+12 + 3 + 8	XO821	3	? F+B	.	.
+12 + 4 + 8	XOC84	4	C	)	)
+12 + 5 + 8	XO841	40	0	na	[
+12 + 6 + 8	XO842	? 5E	? F+E	na	<
+12 + 7 + 8	XOC8421	5F	F+F	na	}
+11		X	20	F+0	-	-
 11 + 1		XC1	51	F+1	J	J
 11 + 2		XC2	52	F+2	K	K
 11 + 3		X21	53	F+3	L	L
@@ -492,6 +501,13 @@ Card code	PT code	RA	RN	LPT WA	ASCII representation
 11 + 7		XC421	57	F+7	P	P
 11 + 8		XC8	58	F+8	Q	Q
 11 + 9		X81	59	F+9	R	R
+11 + 2 + 8	X82	5A	F+A	na	!
+11 + 3 + 8	XC821	13	F+B	$	$
+11 + 4 + 8	X84	14	F+C	*	*
+11 + 5 + 8	XC841	50	F+0	-	]
+11 + 6 + 8	XC842	? 5E	? F+E	na	;
+11 + 7 + 8	X8421	5F	F+F	na	_
+0		O	70	0	0	0
 0 + 1		OC1	21	1	/	/
 0 + 2		OC2	62	2	S	S
 0 + 3		O21	63	3	T	T
@@ -501,35 +517,17 @@ Card code	PT code	RA	RN	LPT WA	ASCII representation
 0 + 7		OC421	67	7	X	X
 0 + 8		OC8	68	8	Y	Y
 0 + 9		O81	69	9	Z	Z
-2 + 8		C82	? 0A	A	na	%
-3 + 8		821	33	B	=	=
-4 + 8		C84	34	C	@	@
-5 + 8		841	70	0	0	:
-6 + 8		842	? 0E	E	na	>
-7 + 8		C8421	? 0F	F	na	^
-12 + 2 + 8	XOC82	? 5A	? F+A	na	?
-12 + 3 + 8	XO821	3	? F+B	.	.
-12 + 4 + 8	XOC84	4	C	)	)
-12 + 5 + 8	XO841	40	0	na	[
-12 + 6 + 8	XO842	? 5E	? F+E	na	<
-12 + 7 + 8	XOC8421	5F	F+F	na	"
-11 + 2 + 8	X82	5A	F+A	na	!
-11 + 3 + 8	XC821	13	F+B	$	$
-11 + 4 + 8	X84	14	F+C	*	*
-11 + 5 + 8	XC841	50	F+0	-	]
-11 + 6 + 8	XC842	? 5E	? F+E	na	;
-11 + 7 + 8	X8421	5F	F+F	na	_
-0 + 2 + 8	O82	0A	A	na	 '
+0 + 2 + 8	O82	0A	A	na	|
 0 + 3 + 8	OC821	23	B	,	,
-0 + 4 + 8	O84	24	C	(	(
-0 + 5 + 8	OC841	60	0	na	#
+0 + 4 + 8	O84	24	C	(	( (or %)
+0 + 5 + 8	OC841	60	0	na	~
 0 + 6 + 8	OC842	0E	E	na	\
-0 + 7 + 8	O8421	0F	F	na	&
+0 + 7 + 8	O8421	0F	F	na	"
 
 			2		?	
 			12		!	
-			22		 '	
+			22		|	
 			32		0	
 			35		:	
 			36		blank	
-11 + 0			50		-	]
+11 + 0			50		-	`

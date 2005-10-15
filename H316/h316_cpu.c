@@ -25,6 +25,7 @@
 
    cpu          H316/H516 CPU
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    15-Feb-05    RMS     Added start button interrupt
    01-Dec-04    RMS     Fixed bug in DIV
@@ -259,7 +260,7 @@ InstHistory *hst = NULL;                                /* instruction history *
 
 extern int32 sim_int_char;
 extern int32 sim_interval;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern FILE *sim_log;
 extern DEVICE *sim_devices[];
 

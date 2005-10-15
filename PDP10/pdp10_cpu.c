@@ -25,6 +25,8 @@
 
    cpu          KS10 central processor
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+                        Fixed warning in MOVNI
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    10-Nov-04    RMS     Added instruction history
    08-Oct-02    RMS     Revised to build dib_tab dynamically
@@ -196,7 +198,7 @@ InstHistory *hst = NULL;                                /* instruction history *
 
 extern int32 sim_int_char;
 extern int32 sim_interval;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern UNIT tim_unit;
 
 /* Forward and external declarations */
@@ -943,7 +945,8 @@ case 0205:  AC(ac) = IMS; break;                        /* MOVSI */
 case 0206:  mb = SWP (AC(ac)); WR; break;               /* MOVSM */
 case 0207:  RM; mb = SWP (mb); WR; LAC; break;          /* MOVSS */
 case 0210:  RD; AC(ac) = MOVN (mb); break;              /* MOVN */
-case 0211:  AC(ac) = MOVN (IM); break;                  /* MOVNI */
+case 0211:  AC(ac) = NEG (IM);                          /* MOVNI */
+            if (AC(ac) == 0) SETF (F_C0 | F_C1); break;
 case 0212:  RM; mb = MOVN (AC(ac)); WR; break;          /* MOVNM */
 case 0213:  RM; mb = MOVN (mb); WR; LAC; break;         /* MOVNS */
 case 0214:  RD; AC(ac) = MOVM (mb); break;              /* MOVM */

@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    30-Aug-05    RMS     Revised to trim trailing spaces on file names
    25-Aug-05    RMS     Added variable default device support
    23-Aug-05    RMS     Added Linux line history support
@@ -225,7 +226,7 @@
 extern char sim_name[];
 extern DEVICE *sim_devices[];
 extern REG *sim_PC;
-extern char *sim_stop_messages[];
+extern const char *sim_stop_messages[];
 extern t_stat sim_instr (void);
 extern t_stat sim_load (FILE *ptr, char *cptr, char *fnam, int32 flag);
 extern int32 sim_emax;

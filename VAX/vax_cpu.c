@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    13-Jan-05    RMS     Fixed initial state of cpu_extmem
    06-Nov-04    RMS     Added =n to SHOW HISTORY
@@ -264,7 +265,7 @@ const uint32 align[4] = {
 
 extern int32 sim_interval;
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern UNIT clk_unit;
 
 extern t_stat build_dib_tab (void);
@@ -341,7 +342,7 @@ extern int32 get_vector (int32 lvl);
 extern void set_map_reg (void);
 extern void rom_wr_B (int32 pa, int32 val);
 extern int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta);
-extern uint16 drom[NUM_INST][MAX_SPEC + 1];
+extern const uint16 drom[NUM_INST][MAX_SPEC + 1];
 extern t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 extern int32 con_halt (int32 code, int32 cc);
 
@@ -2801,7 +2802,7 @@ int32 i, j, k, di, disp, numspec, lnt;
 char *cptr = (char *) desc;
 t_stat r;
 InstHistory *h;
-extern char *opcode[];
+extern const char *opcode[];
 
 if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
 if (cptr) {

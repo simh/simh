@@ -34,8 +34,11 @@
 #include "i1401_defs.h"
 
 extern uint8 M[];
-extern char bcd_to_ascii[64];
+extern char bcd_to_ascii_old[64];
+extern char bcd_to_ascii_a[64], bcd_to_ascii_h[64];
+extern char bcd_to_pca[64], bcd_to_pch[64];
 extern int32 iochk, ind[64];
+extern t_bool conv_old;
 
 int32 cct[CCT_LNT] = { 03 };
 int32 cctlnt = 66, cctptr = 0, lines = 0, lflag = 0;
@@ -44,42 +47,18 @@ t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *cptr);
 t_stat space (int32 lines, int32 lflag);
 
-char bcd_to_pca[64] = {
-    ' ', '1', '2', '3', '4', '5', '6', '7',
-    '8', '9', '0', '#', '@', ' ', ' ', ' ',
-    ' ', '/', 'S', 'T', 'U', 'V', 'W', 'X',
-    'Y', 'Z', ' ', ',', '%', ' ', ' ', ' ',
-    '-', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-    'Q', 'R', '-', '$', '*', ' ', ' ', ' ',
-    '&', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
-    'H', 'I', '&', '.', ')', ' ', ' ', ' '
+char *pch_table_old[4] = {
+    bcd_to_ascii_old, bcd_to_pca, bcd_to_pch, bcd_to_ascii_old
     };
-
-char bcd_to_pch[64] = {
-    ' ', '1', '2', '3', '4', '5', '6', '7',
-    '8', '9', '0', '=', '\'', ' ', ' ', ' ',
-    ' ', '/', 'S', 'T', 'U', 'V', 'W', 'X',
-    'Y', 'Z', ' ', ',', '(', ' ', ' ', ' ',
-    '-', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-    'Q', 'R', '-', '$', '*', ' ', ' ', ' ',
-    '&', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
-    'H', 'I', '&', '.', ')', ' ', ' ', ' '
-    };
-
 char *pch_table[4] = {
-    bcd_to_ascii, bcd_to_pca, bcd_to_pch, bcd_to_ascii
+    bcd_to_ascii_a, bcd_to_pca, bcd_to_pch, bcd_to_ascii_h
     };
 
-#define UNIT_V_PCHAIN   (UNIT_V_UF + 0)
-#define UNIT_M_PCHAIN   03
-#define M_PCF           00                              /* full */
-#define M_PCA           01                              /* business */
-#define M_PCH           02                              /* Fortran */
-#define UNIT_PCHAIN     (UNIT_M_PCHAIN << UNIT_V_PCHAIN)
-#define PCF             (M_PCF << UNIT_V_PCHAIN)
-#define PCA             (M_PCA << UNIT_V_PCHAIN)
-#define PCH             (M_PCH << UNIT_V_PCHAIN)
-#define GET_PCHAIN(x)   (((x) >> UNIT_V_PCHAIN) & UNIT_M_PCHAIN)
+#define UNIT_V_FT       (UNIT_V_UF + 0)
+#define UNIT_V_48       (UNIT_V_UF + 1)
+#define UNIT_FT         (1 << UNIT_V_FT)
+#define UNIT_48         (1 << UNIT_V_48)
+#define GET_PCHAIN(x)   (((x) >> UNIT_V_FT) & (UNIT_FT|UNIT_48))
 #define CHP(ch,val)     ((val) & (1 << (ch)))
 
 /* LPT data structures
@@ -104,9 +83,13 @@ REG lpt_reg[] = {
     };
 
 MTAB lpt_mod[] = {
-    { UNIT_PCHAIN, PCF, "F chain", "PCF", NULL },
-    { UNIT_PCHAIN, PCA, "A chain", "PCA", NULL },
-    { UNIT_PCHAIN, PCH, "H chain", "PCH", NULL },
+    { UNIT_48, UNIT_48, "48 character chain", "48" },
+    { UNIT_48, 0,       "64 character chain", "64" },
+    { UNIT_FT, UNIT_FT, "Fortran set", "FORTRAN" },
+    { UNIT_FT, 0,       "business set", "BUSINESS" },
+    { UNIT_FT|UNIT_48, 0,               NULL, "PCF" },  /* obsolete */
+    { UNIT_FT|UNIT_48, UNIT_48,         NULL, "PCA" },
+    { UNIT_FT|UNIT_48, UNIT_FT|UNIT_48, NULL, "PCH" },
     { 0 }
     };
 
@@ -127,18 +110,20 @@ DEVICE lpt_dev = {
 t_stat write_line (int32 ilnt, int32 mod)
 {
 int32 i, t, wm, sup;
-char *pch;
+char *bcd2asc;
 static char lbuf[LPT_WIDTH + 1];                        /* + null */
 
-if ((lpt_unit.flags & UNIT_ATT) == 0) return SCPE_UNATT;        /* attached? */
+if ((lpt_unit.flags & UNIT_ATT) == 0) return SCPE_UNATT; /* attached? */
 wm = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_SQUARE);
 sup = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_S);
 ind[IN_LPT] = 0;                                        /* clear error */
-pch = pch_table[GET_PCHAIN (lpt_unit.flags)];           /* get print chain */
+if (conv_old)                                           /* get print chain */
+    bcd2asc = pch_table_old[GET_PCHAIN (lpt_unit.flags)];
+else bcd2asc = pch_table[GET_PCHAIN (lpt_unit.flags)];
 for (i = 0; i < LPT_WIDTH; i++) {                       /* convert print buf */
     t = M[LPT_BUF + i];
     if (wm) lbuf[i] = (t & WM)? '1': ' ';               /* wmarks -> 1 or sp */
-    else lbuf[i] = pch[t & CHAR];                       /* normal */
+    else lbuf[i] = bcd2asc[t & CHAR];                   /* normal */
     }
 lbuf[LPT_WIDTH] = 0;                                    /* trailing null */
 for (i = LPT_WIDTH - 1; (i >= 0) && (lbuf[i] == ' '); i--) lbuf[i] = 0;

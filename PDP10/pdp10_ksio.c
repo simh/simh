@@ -25,6 +25,7 @@
 
    uba          Unibus adapters
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    25-Jan-04    RMS     Added stub floating address routine
    12-Mar-03    RMS     Added logical name support
    10-Oct-02    RMS     Revised for dynamic table generation
@@ -105,14 +106,14 @@ static const int32 ubashf[4] = { 18, 26, 0, 8 };
 extern d10 *M;                                          /* main memory */
 extern d10 *ac_cur;
 extern d10 pager_word;
-extern int32 flags, pi_l2bit[8];
+extern int32 flags;
+extern const int32 pi_l2bit[8];
 extern UNIT cpu_unit;
 extern FILE *sim_log;
 extern jmp_buf save_env;
 extern DEVICE *sim_devices[];
 
-extern d10 Read (a10 ea);
-extern void pi_eval ();
+extern int32 pi_eval (void);
 extern int32 rp_inta (void);
 extern int32 tu_inta (void);
 extern int32 lp20_inta (void);

@@ -25,6 +25,7 @@
 
    pag          KS10 pager
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    02-Dec-01    RMS     Fixed bug in ITS LPMR (found by Dave Conroy)
    21-Aug-01    RMS     Fixed bug in ITS paging (found by Miriam Lennox)
                         Removed register from declarations

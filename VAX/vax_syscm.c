@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-Sep-05	RMS	Fixed warnings compiling with 64b addresses
    15-Sep-04    RMS     Cloned from pdp11_sys.c
 */
 
@@ -439,7 +440,7 @@ return tptr;
                         = +1 error
 */
 
-t_stat get_spec (char *cptr, t_addr addr, int32 n1, int32 *sptr, int32 *dptr)
+t_stat get_spec (char *cptr, int32 addr, int32 n1, int32 *sptr, int32 *dptr)
 {
 int32 reg, indir, pflag, disp;
 
@@ -541,11 +542,12 @@ t_stat parse_sym_cm (char *cptr, t_addr addr, t_value *bytes, int32 sw)
 {
 int32 d, i, j, reg, spec, n1, n2, disp, pflag;
 int32 val[3];
+int32 ad32 = (int32) addr;
 t_stat r;
 char *tptr, gbuf[CBUFSIZE];
 
 if (sw & SWMASK ('R')) return SCPE_ARG;                 /* radix 50 */
-if (!(sw & SWMASK ('P')) || (addr & 1) || (addr > WMASK))
+if (!(sw & SWMASK ('P')) || (ad32 & 1) || (ad32 > WMASK))
     return SCPE_ARG;
 
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
@@ -578,7 +580,7 @@ switch (j) {                                            /* case on class */
         tptr = get_addr (gbuf, &disp, &pflag);          /* parse */
         if ((tptr == NULL) || (*tptr != 0)) return SCPE_ARG;
         if ((pflag & A_REL) == 0)
-            disp = (disp - addr) & 0177777;
+            disp = (disp - ad32) & 0177777;
         if ((disp & 1) || (disp > 0400) && (disp < 0177402)) return SCPE_ARG;
         val[0] = val[0] | (((disp - 2) >> 1) & 0377);
         break;
@@ -591,7 +593,7 @@ switch (j) {                                            /* case on class */
         tptr = get_addr (gbuf, &disp, &pflag);          /* parse */
         if ((tptr == NULL) || (*tptr != 0)) return SCPE_ARG;
         if ((pflag & A_REL) == 0)
-            disp = (disp - addr) & 0177777;
+            disp = (disp - ad32) & 0177777;
         if ((disp & 1) || ((disp > 2) && (disp < 0177604))) return SCPE_ARG;
         val[0] = val[0] | (((2 - disp) >> 1) & 077);
         break;
@@ -602,18 +604,18 @@ switch (j) {                                            /* case on class */
         val[0] = val[0] | (reg << 6);                   /* fall through */
     case I_V_SOP:                                       /* sop */
         cptr = get_glyph (cptr, gbuf, 0);               /* get glyph */
-        if ((n1 = get_spec (gbuf, addr, 0, &spec, &val[1])) > 0)
+        if ((n1 = get_spec (gbuf, ad32, 0, &spec, &val[1])) > 0)
             return SCPE_ARG;
         val[0] = val[0] | spec;
         break;
 
     case I_V_DOP:                                       /* double op */
         cptr = get_glyph (cptr, gbuf, ',');             /* get glyph */
-        if ((n1 = get_spec (gbuf, addr, 0, &spec, &val[1])) > 0)
+        if ((n1 = get_spec (gbuf, ad32, 0, &spec, &val[1])) > 0)
             return SCPE_ARG;
         val[0] = val[0] | (spec << 6);
         cptr = get_glyph (cptr, gbuf, 0);               /* get glyph */
-        if ((n2 = get_spec (gbuf, addr, n1, &spec, &val[1 - n1])) > 0)
+        if ((n2 = get_spec (gbuf, ad32, n1, &spec, &val[1 - n1])) > 0)
              return SCPE_ARG;
         val[0] = val[0] | spec;
         break;

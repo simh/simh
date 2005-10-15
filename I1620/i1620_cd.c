@@ -26,6 +26,7 @@
    cdr          1622 card reader
    cdp          1622 card punch
 
+   21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
    25-Apr-03    RMS     Revised for extended file support
 
    Cards are represented as ASCII text streams terminated by newlines.
@@ -112,25 +113,25 @@ const char cdr_to_num[128] = {
    -1, 0x00, 0x00,   -1,   -1, 0x00,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* 10 */
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
- 0x00, 0x1A, 0x1F, 0x00, 0x1B, 0x0A, 0x0F, 0x0A,        /*  !"#$%&' */
+ 0x00, 0x1A, 0x0F, 0x0B, 0x1B, 0x0C, 0x00, 0x0C,        /*  !"#$%&' */
  0x0C, 0x0C, 0x1C, 0x00, 0x0B, 0x10, 0x1B, 0x01,        /* ()*+,-./ */
  0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* 01234567 */
  0x08, 0x09, 0x00, 0x1E, 0x1E, 0x0B, 0x0E, 0x1A,        /* 89:;<=>? */
  0x0C, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* @ABCDEFG */
  0x08, 0x09, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,        /* HIJKLMNO */
  0x17, 0x18, 0x19, 0x02, 0x03, 0x04, 0x05, 0x06,        /* PQRSTUVW */
- 0x07, 0x08, 0x09, 0x00, 0x0E, 0x10, 0x0F, 0x1F,        /* XYZ[\]^_ */
-   -1, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /*  abcdefg */
+ 0x07, 0x08, 0x09, 0x00, 0x0E, 0x10, 0x0A, 0x1F,        /* XYZ[\]^_ */
+   -1, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* `abcdefg */
  0x08, 0x09, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,        /* hijklmno */
  0x17, 0x18, 0x19, 0x02, 0x03, 0x04, 0x05, 0x06,        /* pqrstuvw */
- 0x07, 0x08, 0x09,   -1,   -1,   -1,   -1,   -1         /* xyz      */
+ 0x07, 0x08, 0x09, 0x0F, 0x0A, 0x1F, 0x00,   -1         /* xyz{|}~  */
  };
 
 /* Numeric (flag + digit) to card punch (ASCII) */
 
 const char num_to_cdp[32] = {
  '0', '1', '2', '3', '4', '5', '6', '7',                /* 0 */
- '8', '9', '\'', ',', ' ', '&', ' ', '&',
+ '8', '9', '|', ',', ' ', '"', ' ', '"',
  ']', 'J', 'K', 'L', 'M', 'N', 'O', 'P',                /* F + 0 */
  'Q', 'R', '!', '$',  -1,  -1,  -1, '"'
  };
@@ -141,7 +142,7 @@ const char num_to_cdp[32] = {
    11-7-8 (_) reads as 5F
    12-2-8 (?) reads inconsistently (here 02)
    12-6-8 (<) reads inconsistently (here 5E)
-   12-7-8 (") reads as 5F
+   12-7-8 (}) reads as 5F
 */
 
 const char cdr_to_alp[128] = {
@@ -149,53 +150,53 @@ const char cdr_to_alp[128] = {
    -1, 0x00, 0x00,   -1,   -1, 0x00,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* 10 */
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
- 0x00, 0x5A, 0x5F, 0x60, 0x13, 0x0A, 0x0F, 0x0A,        /*  !"#$%&' */
+ 0x00, 0x5A, 0x0F, 0x33, 0x13, 0x24, 0x10, 0x34,        /*  !"#$%&' */
  0x24, 0x04, 0x14, 0x10, 0x23, 0x20, 0x03, 0x21,        /* ()*+,-./ */
  0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77,        /* 01234567 */
  0x78, 0x79, 0x70, 0x5E, 0x5E, 0x33, 0x0E, 0x02,        /* 89:;<=>? */
  0x34, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,        /* @ABCDEFG */
  0x48, 0x49, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56,        /* HIJKLMNO */
  0x57, 0x58, 0x59, 0x62, 0x63, 0x64, 0x65, 0x66,        /* PQRSTUVW */
- 0x67, 0x68, 0x69, 0x40, 0x0E, 0x50, 0x0F, 0x5F,        /* XYZ[\]^_ */
-   -1, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,        /*  abcdefg */
+ 0x67, 0x68, 0x69, 0x40, 0x0E, 0x50, 0x0A, 0x5F,        /* XYZ[\]^_ */
+ 0x50, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,        /* `abcdefg */
  0x48, 0x49, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56,        /* hijklmno */
  0x57, 0x58, 0x59, 0x62, 0x63, 0x64, 0x65, 0x66,        /* pqrstuvw */
- 0x67, 0x68, 0x69,   -1,   -1,   -1,   -1,   -1         /* xyz      */
+ 0x67, 0x68, 0x69, 0x0F, 0x0A, 0x5F, 0x60,   -1         /* xyz{|}~  */
  };
 
 /* Alphameric (two digits) to card punch (ASCII).  Oddities:
 
         02 -> 12-2-8 (?), symmetric
-        07 -> 12-7-8 ("), reads as 5F
+        07 -> 12-7-8 (}), reads as 5F
         12 -> 11-2-8 (!), reads as 5A
-        15 -> 11,0 (]), reads as 50
-        22 -> 0-2-8 ('), reads as 0A
-        32 -> 2-8 (%), reads as 0A
+        15 -> 11,0 (`), reads as 50
+        22 -> 0-2-8 (|), reads as 0A
+        32 -> 2-8 (^), reads as 0A
         5B -> 11-3-8 (=), reads as 13
-        6A -> 0-2-8 ('), reads as 0A
+        6A -> 0-2-8 (|), reads as 0A
         6B -> 0-3-8 (,), reads as 23
-        AA -> 0-2-8 ('), reads as 0A
+        AA -> 0-2-8 (|), reads as 0A
 
-   There is no way to punch 0-5-8 (#), 0-6-8 (\),
+   There is no way to punch 0-5-8 (~), 0-6-8 (\),
    11-5-8 (]), 11-6-8 (;), 11-7-8 (_),
    12-5-8 ([), or 12-6-8 (<)
 */
 
 const char alp_to_cdp[256] = {
- ' ',  -1, '?', '.', ')',  -1,  -1, '"',                /* 00 */
-  -1,  -1, '\'', -1,  -1,  -1,  -1, '&',
+ ' ',  -1, '?', '.', ')',  -1,  -1, '}',                /* 00 */
+  -1,  -1, '\'', -1,  -1,  -1,  -1, '"',
  '+',  -1, '!', '$', '*', ']',  -1,  -1,                /* 10 */ 
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
- '-', '/', '\'', ',', '(', -1,  -1,  -1,                /* 20 */
+ '-', '/', '|', ',', '(',  -1,  -1,  -1,                /* 20 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-  -1,  -1, '%', '=', '@', ':', ' ',  -1,                /* 30 */
-  -1,  -1, '\'', -1,  -1,  -1,  -1, '&',
+  -1,  -1, '^', '=', '@', ':', ' ',  -1,                /* 30 */
+  -1,  -1, '|',  -1,  -1,  -1,  -1, '"',
   -1, 'A', 'B', 'C', 'D', 'E', 'F', 'G',                /* 40 */
  'H', 'I',  -1,  -1,  -1,  -1,  -1,  -1,
  '_', 'J', 'K', 'L', 'M', 'N', 'O', 'P',                /* 50 */
- 'Q', 'R', '?', '=',  -1,  -1,  -1, '"',
+ 'Q', 'R', '?', '=',  -1,  -1,  -1, '}',
   -1, '/', 'S', 'T', 'U', 'V', 'W', 'X',                /* 60 */
- 'Y', 'Z', '\'', ',', -1,  -1,  -1,  -1,
+ 'Y', 'Z', '|', ',',  -1,  -1,  -1,  -1,
  '0', '1', '2', '3', '4', '5', '6', '7',                /* 70 */
  '8', '9',  -1,  -1,  -1,  -1,  -1,  -1,
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,                /* 80 */
@@ -203,7 +204,7 @@ const char alp_to_cdp[256] = {
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,                /* 90 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,                /* A0 */
-  -1,  -1, '\'', -1,  -1,  -1,  -1,  -1,
+  -1,  -1, '|',  -1,  -1,  -1,  -1,  -1,
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,                /* B0 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,                /* C0 */
@@ -227,8 +228,9 @@ t_stat cdr (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 {
 int32 i;
 int8 cdc;
-t_stat r, inv = SCPE_OK;
+t_stat r, sta;
 
+sta = SCPE_OK;                                          /* assume ok */
 switch (op) {                                           /* case on op */
 
     case OP_RN:                                         /* read numeric */
@@ -238,7 +240,7 @@ switch (op) {                                           /* case on op */
             cdc = cdr_to_num[cdr_buf[i]];               /* translate */
             if (cdc < 0) {                              /* invalid? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
-                inv = STOP_INVCHR;                      /* set return status */
+                if (io_stop) sta = STOP_INVCHR;         /* set return status */
                 cdc = 0;
                 }
             M[pa] = cdc;                                /* store digit */
@@ -253,7 +255,7 @@ switch (op) {                                           /* case on op */
             cdc = cdr_to_alp[cdr_buf[i]];               /* translate */
             if (cdc < 0) {                              /* invalid? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
-                inv = STOP_INVCHR;                      /* set return status */
+                if (io_stop) sta = STOP_INVCHR;         /* set return status */
                 cdc = 0;
                 };
             M[pa] = (M[pa] & FLAG) | (cdc & DIGIT);     /* store 2 digits */
@@ -266,7 +268,7 @@ switch (op) {                                           /* case on op */
         return STOP_INVFNC;
 		}
 
-CRETIOE (io_stop, inv);
+return sta;
 }
 
 /* Fill card reader buffer - all errors are hard errors */
@@ -366,7 +368,7 @@ switch (op) {                                           /* decode op */
             if (cdc < 0) {                              /* bad char? */
                 ind[IN_WRCHK] = 1;                      /* set write check */
                 CRETIOE (io_stop, STOP_INVCHR);
-				}
+                }
             cdp_buf[i] = cdc;                           /* store in buf */
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }

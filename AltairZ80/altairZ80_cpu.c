@@ -1732,7 +1732,7 @@ t_stat sim_instr (void) {
     extern int32 timerInterruptHandler;
     extern uint32 sim_os_msec(void);
     extern t_bool rtc_avail;
-    extern int32 sim_brk_summ;
+    extern uint32 sim_brk_summ;
     int32 reason = 0;
     register uint32 specialProcessing;
     register uint32 AF;

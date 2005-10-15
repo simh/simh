@@ -25,6 +25,7 @@
 
    inq          1407 inquiry terminal
 
+   20-Sep-05    RMS     Revised for new code tables
    22-Dec-02    RMS     Added break support
    07-Sep-01    RMS     Moved function prototypes
    14-Apr-99    RMS     Changed t_addr to unsigned
@@ -33,11 +34,14 @@
 #include "i1401_defs.h"
 #include <ctype.h>
 
+#define UNIT_V_PCH      (UNIT_V_UF + 0)                 /* output conv */
+#define UNIT_PCH        (1 << UNIT_V_PCH)
+
 extern volatile int32 stop_cpu;
 extern uint8 M[];
 extern int32 BS, iochk, ind[64];
-extern char ascii_to_bcd[128], bcd_to_ascii[64];
 extern UNIT cpu_unit;
+extern t_bool conv_old;
 
 int32 inq_char = 033;                                   /* request inq */
 t_stat inq_svc (UNIT *uptr);
@@ -62,8 +66,14 @@ REG inq_reg[] = {
     { NULL }
     };
 
+MTAB inq_mod[] = {
+    { UNIT_PCH, 0,        "business set", "BUSINESS" },
+    { UNIT_PCH, UNIT_PCH, "Fortran set", "FORTRAN" },
+    { 0 }
+    };
+
 DEVICE inq_dev = {
-    "INQ", &inq_unit, inq_reg, NULL,
+    "INQ", &inq_unit, inq_reg, inq_mod,
     1, 10, 31, 1, 8, 7,
     NULL, NULL, &inq_reset,
     NULL, NULL, NULL
@@ -77,6 +87,7 @@ DEVICE inq_dev = {
 t_stat inq_io (int32 flag, int32 mod)
 {
 int32 i, t, wm_seen = 0;
+t_bool use_h = inq_unit.flags & UNIT_PCH;
 
 ind[IN_INC] = 0;                                        /* clear inq clear */
 switch (mod) {                                          /* case on mod */
@@ -103,11 +114,11 @@ switch (mod) {                                          /* case on mod */
             if (flag == MD_WM) {                        /* word mark mode? */
                 if ((t == '~') && (wm_seen == 0)) wm_seen = WM;
                 else {
-                    M[BS] = wm_seen | ascii_to_bcd[t];
+                    M[BS] = wm_seen | ascii2bcd (t);
                     wm_seen = 0;
                     }
                 }
-            else M[BS] = (M[BS] & WM) | ascii_to_bcd[t];
+            else M[BS] = (M[BS] & WM) | ascii2bcd (t);
             if (!wm_seen) BS++;
             if (ADDR_ERR (BS)) {
                 BS = BA | (BS % MAXMEMSIZE);
@@ -122,10 +133,11 @@ switch (mod) {                                          /* case on mod */
         for (i = 0; (t = M[BS++]) != (BCD_GRPMRK + WM); i++) {
             if ((flag == MD_WM) && (t & WM)) {
                 if (i && ((i % INQ_WIDTH) == 0)) puts_tty ("\r\n");
-                sim_putchar ('~');
+                if (conv_old) sim_putchar ('~');
+                else sim_putchar ('`');
                 }
             if (i && ((i % INQ_WIDTH) == 0)) puts_tty ("\r\n");
-            sim_putchar (bcd_to_ascii[t & CHAR]);
+            sim_putchar (bcd2ascii (t & CHAR, use_h));
             if (ADDR_ERR (BS)) {
                 BS = BA | (BS % MAXMEMSIZE);
                 return STOP_NXM;

@@ -81,7 +81,7 @@ extern DEVICE cpu_dev, *sim_devices[];
 extern UNIT cpu_unit;
 extern FILE *sim_log;
 extern int32 STKLIM, PIRQ;
-extern int32 cpu_model, cpu_type, cpu_opt;
+extern uint32 cpu_model, cpu_type, cpu_opt;
 extern int32 clk_fie, clk_fnxm, clk_tps, clk_default;
 
 t_stat CPU24_rd (int32 *data, int32 addr, int32 access);

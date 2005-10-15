@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    04-Oct-04    RMS     Added FIS instructions
    19-Jan-03    RMS     Changed mode definitions for Apple Dev Kit conflict
    08-Oct-02    RMS     Fixed macro definitions
@@ -195,7 +196,7 @@
 #define GET_SIGN_W(ir)  GET_BIT((ir), 15)
 
 extern jmp_buf save_env;
-extern int32 cpu_type;
+extern uint32 cpu_type;
 extern int32 FEC, FEA, FPS;
 extern int32 CPUERR, trap_req;
 extern int32 N, Z, V, C;

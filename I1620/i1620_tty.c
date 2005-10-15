@@ -25,6 +25,7 @@
 
    tty          console typewriter
 
+   21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
    22-Dec-02    RMS     Added break test
 */
 
@@ -74,7 +75,7 @@ DEVICE tty_dev = {
 
 /* Keyboard to numeric */
 
-const char *tti_to_num = "0123456789'=@:;\"";
+const char *tti_to_num = "0123456789|=@:;}";
 
 /* Keyboard to alphameric (digit pair) - translates LC to UC */
 
@@ -83,7 +84,7 @@ const int8 tti_to_alp[128] = {
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* 10 */
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,
- 0x00, 0x02, 0x0F,   -1, 0x13,   -1,   -1,   -1,        /*  !"#$%&' */
+ 0x00, 0x02,   -1, 0x33, 0x13, 0x24, 0x10, 0x34,        /*  !"#$%&' */
  0x24, 0x04, 0x14, 0x10, 0x23, 0x20, 0x03, 0x21,        /* ()*+,-./ */
  0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77,        /* 01234567 */
  0x78, 0x79,   -1,   -1,   -1, 0x33,   -1,   -1,        /* 89:;<=>? */
@@ -91,17 +92,17 @@ const int8 tti_to_alp[128] = {
  0x48, 0x49, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56,        /* HIJKLMNO */
  0x57, 0x58, 0x59, 0x62, 0x63, 0x64, 0x65, 0x66,        /* PQRSTUVW */
  0x67, 0x68, 0x69,   -1,   -1,   -1,   -1,   -1,        /* XYZ[\]^_ */
-   -1, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,        /*  abcdefg */
+   -1, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,        /* `abcdefg */
  0x48, 0x49, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56,        /* hijklmno */
  0x57, 0x58, 0x59, 0x62, 0x63, 0x64, 0x65, 0x66,        /* pqrstuvw */
- 0x67, 0x68, 0x69,   -1,   -1,   -1,   -1,   -1         /* xyz      */
+ 0x67, 0x68, 0x69,   -1,   -1, 0x0F,   -1,   -1         /* xyz{|}~  */
  };
 
 /* Numeric (digit) to typewriter */
 
 const char num_to_tto[16] = {
  '0', '1', '2', '3', '4', '5', '6', '7',
- '8', '9', '\'', '=', '@', ':', ';', '"'
+ '8', '9', '|', '=', '@', ':', ';', '}'
  };
 
 /* Alphameric (digit pair) to typewriter */
@@ -111,7 +112,7 @@ const char alp_to_tto[256] = {
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
  '+',  -1, '!', '$', '*', ' ',  -1,  -1,                /* 10 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
- '-', '/', '\'', ',', '(', -1,  -1,  -1,                /* 20 */
+ '-', '/', '|', ',', '(',  -1,  -1,  -1,                /* 20 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
   -1,  -1, '0', '=', '@', ':',  -1,  -1,                /* 30 */
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
@@ -154,8 +155,9 @@ t_stat tty (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 t_addr i;
 uint8 d;
 int8 ttc;
-t_stat r, inv = SCPE_OK;
+t_stat r, sta;
 
+sta = SCPE_OK;
 switch (op) {                                           /* case on op */
 
     case OP_K:                                          /* control */
@@ -214,13 +216,12 @@ switch (op) {                                           /* case on op */
     case OP_WA:
         for (i = 0; i < MEMSIZE; i = i + 2) {           /* stop runaway */
             d = M[pa] & DIGIT;                          /* get digit */
-            if ((d & 0xA) == REC_MARK)                  /* 8-2 char? */
-                CRETIOE (io_stop, inv);                 /* end record */
+            if ((d & 0xA) == REC_MARK) return sta;      /* 8-2 char? done */
             d = ((M[pa - 1] & DIGIT) << 4) | d;         /* get digit pair */
             ttc = alp_to_tto[d];                        /* translate */
             if (ttc < 0) {                              /* bad char? */
                 ind[IN_WRCHK] = 1;                      /* set write check */
-                inv = STOP_INVCHR;                      /* set return status */
+                if (io_stop) sta = STOP_INVCHR;         /* set return status */
                 }
             tto_write (ttc & 0x7F);                     /* write */
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
@@ -247,7 +248,7 @@ do {
     r = tti_read (&raw);                                /* get char */
     if (r != SCPE_OK) return r;                         /* error? */
     if (raw == '\r') *c = 0x7F;                         /* return? mark */
-    else if (raw == '~') flg = FLAG;                    /* flag? mark */
+    else if ((raw == '~') || (raw == '`')) flg = FLAG;  /* flag? mark */
     else if (cp = strchr (tti_to_num, raw))             /* legal? */
         *c = ((int8) (cp - tti_to_num)) | flg;          /* assemble char */
     else raw = 007;                                     /* beep! */
@@ -283,7 +284,7 @@ t_stat tti_read (int8 *c)
 int32 t;
 
 do {
-    t = sim_poll_kbd ();								/* get character */
+    t = sim_poll_kbd ();                                /* get character */
 	} while ((t == SCPE_OK) || (t & SCPE_BREAK));       /* ignore break */
 if (t < SCPE_KFLAG) return t;                           /* error? */
 *c = t & 0177;                                          /* store character */
@@ -304,7 +305,7 @@ for (i = 0; i < MEMSIZE; i++) {                         /* (stop runaway) */
     if (len? (pa >= end):                               /* dump: end reached? */
        ((d & REC_MARK) == REC_MARK))                    /* write: rec mark? */
         return SCPE_OK;                                 /* end operation */
-    if (d & FLAG) tto_write ('~');                      /* flag? */
+    if (d & FLAG) tto_write ('`');                      /* flag? */
     r = tto_write (num_to_tto[d & DIGIT]);              /* write */
     if (r != SCPE_OK) return r;                         /* error? */
     PP (pa);                                            /* incr mem addr */
@@ -369,6 +370,6 @@ return SCPE_OK;
 
 void tti_unlock (void)
 {
-tto_write ('`');
+tto_write ('>');
 return;
 }

@@ -27,6 +27,7 @@
    MP           12892B memory protect
    DMA0,DMA1    12895A/12897B direct memory access/dual channel port controller
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    21-Jan-05    JDB     Reorganized CPU option flags
    15-Jan-05    RMS     Split out EAU and MAC instructions
    26-Dec-04    RMS     DMA reset doesn't clear alternate CTL flop (from Dave Bryan)
@@ -417,7 +418,7 @@ extern int32 sim_interval;
 extern int32 sim_int_char;
 extern int32 sim_brk_char;
 extern int32 sim_del_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern FILE *sim_log;
 extern DEVICE *sim_devices[];
 extern int32 sim_switches;

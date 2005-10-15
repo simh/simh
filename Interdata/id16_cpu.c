@@ -25,6 +25,7 @@
 
    cpu                  Interdata 16b CPU
 
+   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    25-Aug-05    RMS     Fixed DH integer overflow cases
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    10-Mar-05    RMS     Fixed bug in show history routine (from Mark Hittinger)
@@ -215,7 +216,7 @@ uint32 (*dev_tab[DEVNO])(uint32 dev, uint32 op, uint32 datout) = { NULL };
 
 extern int32 sim_interval;
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern UNIT pic_unit, lfc_unit, pas_unit;               /* timers */
 
 uint32 ReadB (uint32 loc);
