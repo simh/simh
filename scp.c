@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Jan-06    RMS     Added fprint_stopped_gen
+                        Added breakpoint spaces
+                        Fixed unaligned register access (found by Doug Carman)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    30-Aug-05    RMS     Revised to trim trailing spaces on file names
    25-Aug-05    RMS     Added variable default device support
@@ -284,7 +287,7 @@ t_stat sim_brk_show (FILE *st, t_addr loc, int32 sw);
 t_stat sim_brk_showall (FILE *st, int32 sw);
 char *sim_brk_getact (char *buf, int32 size);
 void sim_brk_clract (void);
-void sim_brk_npc (void);
+void sim_brk_npc (uint32 cnt);
 BRKTAB *sim_brk_new (t_addr loc);
 
 /* Commands support routines */
@@ -345,8 +348,8 @@ BRKTAB *sim_brk_tab = NULL;
 int32 sim_brk_ent = 0;
 int32 sim_brk_lnt = 0;
 int32 sim_brk_ins = 0;
-t_bool sim_brk_pend = FALSE;
-t_addr sim_brk_ploc = 0;
+t_bool sim_brk_pend[SIM_BKPT_N_SPC] = { FALSE };
+t_addr sim_brk_ploc[SIM_BKPT_N_SPC] = { 0 };
 int32 sim_quiet = 0;
 int32 sim_step = 0;
 static double sim_time;
@@ -2325,22 +2328,21 @@ return SCPE_OK;
 
 /* Print stopped message */
 
-void fprint_stopped (FILE *st, t_stat v)
+void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr)
 {
 int32 i;
 t_stat r = 0;
 t_addr k;
 t_value pcval;
-DEVICE *dptr;
 
 if (v >= SCPE_BASE) fprintf (st, "\n%s, %s: ",
-    scp_error_messages[v - SCPE_BASE], sim_PC->name);
-else fprintf (st, "\n%s, %s: ", sim_stop_messages[v], sim_PC->name);
-pcval = get_rval (sim_PC, 0);
-if (sim_vm_fprint_addr) sim_vm_fprint_addr (st, sim_dflt_dev, (t_addr) pcval);
-else fprint_val (st, pcval, sim_PC->radix, sim_PC->width,
-    sim_PC->flags & REG_FMT);
-if (((dptr = sim_dflt_dev) != NULL) && (dptr->examine != NULL)) {
+    scp_error_messages[v - SCPE_BASE], pc->name);
+else fprintf (st, "\n%s, %s: ", sim_stop_messages[v], pc->name);
+pcval = get_rval (pc, 0);
+if (sim_vm_fprint_addr) sim_vm_fprint_addr (st, dptr, (t_addr) pcval);
+else fprint_val (st, pcval, pc->radix, pc->width,
+    pc->flags & REG_FMT);
+if ((dptr != NULL) && (dptr->examine != NULL)) {
     for (i = 0; i < sim_emax; i++) sim_eval[i] = 0;
     for (i = 0, k = (t_addr) pcval; i < sim_emax; i++, k = k + dptr->aincr) {
         if ((r = dptr->examine (&sim_eval[i], k, dptr->units,
@@ -2354,6 +2356,12 @@ if (((dptr = sim_dflt_dev) != NULL) && (dptr->examine != NULL)) {
         }
     }
 fprintf (st, "\n");
+return;
+}
+
+void fprint_stopped (FILE *st, t_stat v)
+{
+fprint_stopped_gen (st, v, sim_PC, sim_dflt_dev);
 return;
 }
 
@@ -2598,9 +2606,11 @@ if ((rptr->depth > 1) && (rptr->flags & REG_UNIT)) {
     val = *((uint32 *) uptr);
 #endif
     }
-else if ((rptr->depth > 1) && (sz == sizeof (uint8)))
+else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
+    (sz == sizeof (uint8)))
     val = *(((uint8 *) rptr->loc) + idx);
-else if ((rptr->depth > 1) && (sz == sizeof (uint16)))
+else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
+    (sz == sizeof (uint16)))
     val = *(((uint16 *) rptr->loc) + idx);
 #if defined (USE_INT64)
 else if (sz <= sizeof (uint32))
@@ -2678,7 +2688,7 @@ UNIT *uptr;
             (*(((sz *) rp->loc) + id) & \
             ~((m) << (rp)->offset)) | ((v) << (rp)->offset)
 
-if (rptr == sim_PC) sim_brk_npc ();
+if (rptr == sim_PC) sim_brk_npc (0);
 sz = SZ_R (rptr);
 mask = width_mask[rptr->width];
 if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {
@@ -2700,9 +2710,11 @@ if ((rptr->depth > 1) && (rptr->flags & REG_UNIT)) {
         (((uint32) val) << rptr->offset);
 #endif
     }
-else if ((rptr->depth > 1) && (sz == sizeof (uint8)))
+else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
+    (sz == sizeof (uint8)))
     PUT_RVAL (uint8, rptr, idx, (uint32) val, (uint32) mask);
-else if ((rptr->depth > 1) && (sz == sizeof (uint16)))
+else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
+    (sz == sizeof (uint16)))
     PUT_RVAL (uint16, rptr, idx, (uint32) val, (uint32) mask);
 #if defined (USE_INT64)
 else if (sz <= sizeof (uint32))
@@ -3868,8 +3880,8 @@ sim_brk_lnt = SIM_BRK_INILNT;
 sim_brk_tab = (BRKTAB *) calloc (sim_brk_lnt, sizeof (BRKTAB));
 if (sim_brk_tab == NULL) return SCPE_MEM;
 sim_brk_ent = sim_brk_ins = 0;
-sim_brk_pend = FALSE;
 sim_brk_act = NULL;
+sim_brk_npc (0);
 return SCPE_OK;
 }
 
@@ -4034,22 +4046,22 @@ return SCPE_OK;
 
 /* Test for breakpoint */
 
-t_bool sim_brk_test (t_addr loc, int32 btyp)
+uint32 sim_brk_test (t_addr loc, uint32 btyp)
 {
 BRKTAB *bp;
+uint32 spc = (btyp >> SIM_BKPT_V_SPC) & (SIM_BKPT_N_SPC - 1);
 
-if ((bp = sim_brk_fnd (loc)) &&                         /* entry in table? */
-    (btyp & bp->typ) &&                                 /* type match? */
-    (!sim_brk_pend || (loc != sim_brk_ploc)) &&         /* new location? */
-    (--(bp->cnt) <= 0)) {                               /* count reach 0? */
+if ((bp = sim_brk_fnd (loc)) && (btyp & bp->typ)) {     /* in table, type match? */
+    if ((sim_brk_pend[spc] && (loc == sim_brk_ploc[spc])) || /* previous location? */
+        (--bp->cnt > 0)) return 0;                      /* count > 0? */
     bp->cnt = 0;                                        /* reset count */
-    sim_brk_ploc = loc;                                 /* save location */
+    sim_brk_ploc[spc] = loc;                            /* save location */
+    sim_brk_pend[spc] = TRUE;                           /* don't do twice */
     sim_brk_act = bp->act;                              /* set up actions */
-    sim_brk_pend = TRUE;                                /* don't do twice */
-    return TRUE;
+    return (btyp & bp->typ);
     }
-sim_brk_pend = FALSE;
-return FALSE;
+sim_brk_pend[spc] = FALSE;
+return 0;
 }
 
 /* Get next pending action, if any */
@@ -4084,9 +4096,26 @@ sim_brk_act = NULL;
 
 /* New PC */
 
-void sim_brk_npc (void)
+void sim_brk_npc (uint32 cnt)
 {
-sim_brk_pend = FALSE;
+uint32 i;
+
+if ((cnt == 0) || (cnt > SIM_BKPT_N_SPC)) cnt = SIM_BKPT_N_SPC;
+for (i = 0; i < cnt; i++) {
+    sim_brk_pend[i] = FALSE;
+    sim_brk_ploc[i] = 0;
+    }
+return;
+}
+
+/* Clear breakpoint space */
+
+void sim_brk_clrspc (uint32 spc)
+{
+if (spc < SIM_BKPT_N_SPC) {
+    sim_brk_pend[spc] = FALSE;
+    sim_brk_ploc[spc] = 0;
+    }
 return;
 }
 

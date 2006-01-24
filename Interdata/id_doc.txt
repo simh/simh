@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	Interdata 16b/32b Simulator Usage
-Date:	01-Jul-2005
+Date:	01-Dec-2005
 
 			COPYRIGHT NOTICE
 
@@ -373,12 +373,24 @@ Error handling is as follows:
 
 The Teletype keyboard (TT0) reads from the console keyboard; the
 Teletype printer (TT1) writes to the simulator console window.
-The Teletype units (TT0, TT1) can be set to one of three modes:
-KSR, 7B, or 8B.  In KSR mode, lower case input and output characters
-are automatically converted to upper case, and the high order bit is
-forced to one on input.  In 7B mode, input and output characters are
-masked to 7 bits.  In 8B mode, characters are not modified.  Changing
-the mode of either unit changes both.  The default mode is KSR.
+The Teletype units (TT0, TT1) can be set to one of four modes,
+KSR, 7P, 7B, or 8B:
+
+	mode	input characters	output characters
+
+	KSR	lower case converted	lower case converted
+		 to upper case,		 to upper case,
+		high-order bit set	high-order bit cleared,
+					non-printing characters
+					 suppressed
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+Changing the mode of either unit changes both.  The default mode
+is KSR.
 
 The Teletype has a BREAK key, which is not present on today's
 keyboards.  To simulate pressing the break key, stop the simulator
@@ -435,12 +447,24 @@ Otherwise, a device number conflict occurs.
 
 The PASLA keyboard (TTP0) reads from the console keyboard; the
 PALSA printer (TTP1) writes to the simulator console window.
-The PASLA units (TTP0, TTP1) can be set to one of three modes:
-UC, 7B, or 8B.  In UC mode, lower case input and output characters
-are automatically converted to upper case.  In 7B mode, input and
-output characters are masked to 7 bits.  In 8B mode, characters
-are not modified.  Changing the mode of either unit changes both.
-The default mode is 7B.
+The PASLA units (TTP0, TTP1) can be set to one of four modes,
+UC, 7P, 7B, or 8B:
+
+	mode	input characters	output characters
+
+	UC	lower case converted	lower case converted
+		 to upper case,		 to upper case,
+		high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+Changing the mode of either unit changes both.  The default mode
+is 7B.
 
 To simulate pressing the break key, stop the simulator and use
 the command:
@@ -619,14 +643,26 @@ user-specified port.  The ATTACH command specifies the port to be used:
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.
 
-Each line (each unit of PASL) can be set to one of three modes: UC, 7B,
-or 8B.  In UC mode, lower case input and output characters are converted
-automatically to upper case.  In 7B mode, input and output characters are
-masked to 7 bits.  In 8B mode, characters are not modified.  The default
-mode is UC.  Each line (each unit of PASL) can also be set for modem
-control with the command SET PASLn DATASET.  The defaults are 7b mode
-and DATASET disabled.  Finally, each line supports output logging.
-The SET PASLn LOG command enables logging on a line:
+Each line (each unit of PASL) can be set to one of four modes, UC, 7P,
+7B, or 8B:
+
+	mode	input characters	output characters
+
+	UC	lower case converted	lower case converted
+		 to upper case,		 to upper case,
+		high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+Each line (each unit of PASL) can also be set for modem control with
+the command SET PASLn DATASET.  The defaults are 7b mode and DATASET
+disabled.  Finally, each line supports output logging.  The SET
+PASLn LOG command enables logging on a line:
 
 	SET PASLn LOG=filename	log output of line n to filename
 

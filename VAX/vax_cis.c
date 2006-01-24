@@ -615,7 +615,7 @@ switch (opc) {                                          /* case on opcode */
         if ((PSL & PSL_FPD) || (op[0] > 31) || (op[2] > 31))
             RSVD_OPND_FAULT;
         ReadDstr (op[0], op[1], &src1, acc);            /* get src1 */
-        ReadDstr (op[1], op[2], &src2, acc);            /* get src2 */
+        ReadDstr (op[2], op[3], &src2, acc);            /* get src2 */
         cc = 0;
         if (src1.sign != src2.sign) cc = (src1.sign)? CC_N: 0;
         else {
@@ -710,7 +710,7 @@ switch (opc) {                                          /* case on opcode */
         if (src1.sign ^ ((result & LSIGN) != 0)) V = 1; /* test for overflow */
         if (op[2] >= 0) R[op[2]] = result;
         else Write (op[3], result, L_LONG, WA);
-        if (V) SET_TRAP (TRAP_INTOV);
+        if (V && (PSL & PSW_IV)) SET_TRAP (TRAP_INTOV); /* ovflo and IV? trap */
         R[0] = 0;
         R[1] = op[1];
         R[2] = 0;
@@ -1221,7 +1221,8 @@ for (i = 0; i < DSTRLNT; i++) {                         /* loop thru value */
     if (i == limit) mask = masktab[lnt % 8];            /* at limit, get mask */
     else if (i > limit) mask = 0xFFFFFFFF;              /* beyond, all ovflo */
     if (dst->val[i] & mask) pslv = 1;                   /* test for ovflo */
-    if (dst->val[i] = dst->val[i] & ~mask) pslz = 0;    /* test nz */
+    dst->val[i] = dst->val[i] & ~mask;                  /* clr digits past end */
+    if (dst->val[i]) pslz = 0;                          /* test nz */
     }
 dst->sign = dst->sign & ~(pslz & ~pslv);
 psln = dst->sign & ~pslz;                               /* N = sign, if ~zero */
@@ -1451,7 +1452,7 @@ if (s = sc * 4) {
     for (i = DSTRMAX; i >= 0; i--) {
         nc = dsrc->val[i];
         dsrc->val[i] = ((dsrc->val[i] >> s) |
-            (cin << rs)) & 0xFFFFFFFF;
+            (cin << rs)) & LMASK;
         cin = nc;
         }
     return cin;
@@ -1476,7 +1477,7 @@ if (s = sc * 4) {
     for (i = 0; i < DSTRLNT; i++) {
         nc = dsrc->val[i];
         dsrc->val[i] = ((dsrc->val[i] << s) |
-            (cin >> rs)) & 0xFFFFFFFF;
+            (cin >> rs)) & LMASK;
         cin = nc;
         }
     return cin;

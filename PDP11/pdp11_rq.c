@@ -26,6 +26,7 @@
 
    rq           RQDX3 disk controller
 
+   31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
    17-Jan-05    RMS     Added more RA and RD disks
@@ -768,7 +769,7 @@ MTAB rq_mod[] = {
 
 DEVICE rq_dev = {
     "RQ", rq_unit, rq_reg, rq_mod,
-    RQ_NUMDR + 2, DEV_RDX, 31, 2, DEV_RDX, 16,
+    RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rq_dib, DEV_FLTA | DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG
@@ -837,7 +838,7 @@ REG rqb_reg[] = {
 
 DEVICE rqb_dev = {
     "RQB", rqb_unit, rqb_reg, rq_mod,
-    RQ_NUMDR + 2, DEV_RDX, 31, 2, DEV_RDX, 16,
+    RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqb_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG
@@ -906,7 +907,7 @@ REG rqc_reg[] = {
 
 DEVICE rqc_dev = {
     "RQC", rqc_unit, rqc_reg, rq_mod,
-    RQ_NUMDR + 2, DEV_RDX, 31, 2, DEV_RDX, 16,
+    RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqc_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG
@@ -975,7 +976,7 @@ REG rqd_reg[] = {
 
 DEVICE rqd_dev = {
     "RQD", rqd_unit, rqd_reg, rq_mod,
-    RQ_NUMDR + 2, DEV_RDX, 31, 2, DEV_RDX, 16,
+    RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqd_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG
@@ -1213,7 +1214,7 @@ if ((pkt == 0) && cp->pip) {                            /* polling? */
     }                                                   /* end if pip */
 if (cp->rspq) {                                         /* resp q? */
     pkt = rq_deqh (cp, &cp->rspq);                      /* get top of q */
-    if (!rq_putpkt (cp, pkt, FALSE)) return SCPE_OK;    /* send to hst */
+    if (!rq_putpkt (cp, pkt, FALSE)) return SCPE_OK;    /* send to host */
     }                                                   /* end if resp q */
 if (pkt) sim_activate (uptr, rq_qtime);                 /* more to do? */
 return SCPE_OK;                                         /* done */
@@ -1605,7 +1606,7 @@ if ((uptr->flags & UNIT_ONL) == 0)                      /* not online? */
     return ST_AVL;                                      /* only avail */
 if ((cmd != OP_ACC) && (cmd != OP_ERS) &&               /* 'real' xfer */
     (cp->pak[pkt].d[RW_BAL] & 1))                       /* odd address? */
-        return (ST_HST | SB_HST_OA);                    /* host buf odd */
+    return (ST_HST | SB_HST_OA);                        /* host buf odd */
 if (bc & 1) return (ST_HST | SB_HST_OC);                /* odd byte cnt? */
 if (bc & 0xF0000000) return (ST_CMD | I_BCNT);          /* 'reasonable' bc? */
 /* if (lbn & 0xF0000000) return (ST_CMD | I_LBN);       /* 'reasonable' lbn? */

@@ -1,6 +1,6 @@
 /* pdp8_df.c: DF32 fixed head disk simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    df           DF32 fixed head disk
 
+   07-Jan-06    RMS     Fixed unaligned register access bug (found by Doug Carman)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
    26-Oct-03    RMS     Cleaned up buffer copy code
    26-Jul-03    RMS     Fixed bug in set size routine
@@ -133,8 +134,8 @@ UNIT df_unit = {
 REG df_reg[] = {
     { ORDATA (STA, df_sta, 12) },
     { ORDATA (DA, df_da, 12) },
-    { ORDATA (WC, M[DF_WC], 12) },
-    { ORDATA (MA, M[DF_MA], 12) },
+    { ORDATA (WC, M[DF_WC], 12), REG_FIT },
+    { ORDATA (MA, M[DF_MA], 12), REG_FIT },
     { FLDATA (DONE, df_done, 0) },
     { FLDATA (INT, int_req, INT_V_DF) },
     { ORDATA (WLS, df_wlk, 8) },

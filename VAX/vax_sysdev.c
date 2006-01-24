@@ -32,6 +32,7 @@
    cso          console storage output
    sysd         system devices (SSC miscellany)
 
+   25-Oct-05    RMS     Automated CMCTL extended memory
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    10-Mar-05    RMS     Fixed bug in timer schedule routine (from Mark Hittinger)
    30-Sep-04    RMS     Moved CADR, MSER, CONPC, CONPSL, machine_check, cpu_boot,
@@ -187,7 +188,6 @@ extern int32 p1;
 extern int32 sim_switches;
 extern int32 MSER;
 extern int32 tmr_poll;
-extern int32 cpu_extmem;
 
 uint32 *rom = NULL;                                     /* boot ROM */
 uint32 *nvr = NULL;                                     /* non-volatile mem */
@@ -994,7 +994,8 @@ switch (rg) {
         return cmctl_reg[rg] & CMCSR_MASK;
 
     case 18:                                            /* KA655X ext mem */
-        if (cpu_extmem) return ((int32) MEMSIZE);
+        if (MEMSIZE > MAXMEMSIZE)                       /* more than 128MB? */
+            return ((int32) MEMSIZE);
         MACH_CHECK (MCHK_READ);
         }
 

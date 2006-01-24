@@ -232,24 +232,24 @@ switch (opc) {
 */
 
     case CVTHB:
-        r = op_cvthi (opnd, &temp, opc) & BMASK;        /* convert */
+        r = op_cvthi (opnd, &flg, opc) & BMASK;         /* convert */
         h_write_b (spec, va, r, acc);                   /* write result */
         CC_IIZZ_B (r);                                  /* set cc's */
-        cc = cc | temp;                                 /* or in V */
+        if (flg) { V_INTOV; }
         break;
 
     case CVTHW:
-        r = op_cvthi (opnd, &temp, opc) & WMASK;        /* convert */
+        r = op_cvthi (opnd, &flg, opc) & WMASK;         /* convert */
         h_write_w (spec, va, r, acc);                   /* write result */
         CC_IIZZ_W (r);                                  /* set cc's */
-        cc = cc | temp;                                 /* or in V */
+        if (flg) { V_INTOV; }
         break;
 
     case CVTHL: case CVTRHL:
-        r = op_cvthi (opnd, &temp, opc) & LMASK;        /* convert */
+        r = op_cvthi (opnd, &flg, opc) & LMASK;         /* convert */
         h_write_l (spec, va, r, acc);                   /* write result */
         CC_IIZZ_L (r);                                  /* set cc's */
-        cc = cc | temp;                                 /* or in V */
+        if (flg) { V_INTOV; }
         break;
 
 /* CVTFH

@@ -25,6 +25,7 @@
 
    qba          Qbus adapter
 
+   03-Dec-05    RMS     Added SHOW QBA VIRT and ex/dep via map
    05-Oct-05    RMS     Fixed bug in autoconfiguration (missing XU)
    25-Jul-05    RMS     Revised autoconfiguration algorithm and interface
    30-Sep-04    RMS     Revised Qbus interface
@@ -130,10 +131,14 @@ int32 eval_int (void);
 void cq_merr (int32 pa);
 void cq_serr (int32 pa);
 t_stat qba_reset (DEVICE *dptr);
-t_bool map_addr (uint32 qa, uint32 *ma);
+t_stat qba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
+t_stat qba_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
+t_bool qba_map_addr (uint32 qa, uint32 *ma);
+t_bool qba_map_addr_c (uint32 qa, uint32 *ma);
 t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat qba_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc);
 
 /* Qbus adapter data structures
 
@@ -168,13 +173,15 @@ MTAB qba_mod[] = {
       &set_autocon, &show_autocon },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOAUTOCONFIG",
       &set_autocon, NULL },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
+      NULL, &qba_show_virt },
     { 0 }
     };
 
 DEVICE qba_dev = {
     "QBA", &qba_unit, qba_reg, qba_mod,
-    1, 0, 0, 0, 0, 0,
-    NULL, NULL, &qba_reset,
+    1, 16, CQMAWIDTH, 2, 16, 16,
+    &qba_ex, &qba_dep, &qba_reset,
     NULL, NULL, NULL,
     &qba_dib, DEV_QBUS
     };
@@ -479,7 +486,7 @@ int32 cqmem_rd (int32 pa)
 int32 qa = pa & CQMAMASK;                               /* Qbus addr */
 uint32 ma;
 
-if (map_addr (qa, &ma)) return M[ma >> 2];              /* map addr */
+if (qba_map_addr (qa, &ma)) return M[ma >> 2];          /* map addr */
 MACH_CHECK (MCHK_READ);                                 /* err? mcheck */
 return 0;
 }
@@ -489,7 +496,7 @@ void cqmem_wr (int32 pa, int32 val, int32 lnt)
 int32 qa = pa & CQMAMASK;                               /* Qbus addr */
 uint32 ma;
 
-if (map_addr (qa, &ma)) {                               /* map addr */
+if (qba_map_addr (qa, &ma)) {                           /* map addr */
     if (lnt < L_LONG) {
         int32 sc = (pa & 3) << 3;
         int32 mask = (lnt == L_WORD)? 0xFFFF: 0xFF;
@@ -504,7 +511,7 @@ return;
 
 /* Map an address via the translation map */
 
-t_bool map_addr (uint32 qa, uint32 *ma)
+t_bool qba_map_addr (uint32 qa, uint32 *ma)
 {
 int32 qblk = (qa >> VA_V_VPN);                          /* Qbus blk */
 int32 qmma = ((qblk << 2) & CQMAPAMASK) + cq_mbr;       /* map entry */
@@ -513,15 +520,32 @@ if (ADDR_IS_MEM (qmma)) {                               /* legit? */
     int32 qmap = M[qmma >> 2];                          /* get map */
     if (qmap & CQMAP_VLD) {                             /* valid? */
         *ma = ((qmap & CQMAP_PAG) << VA_V_VPN) + VA_GETOFF (qa);
-        if (ADDR_IS_MEM (*ma)) return 1;                /* legit addr */
+        if (ADDR_IS_MEM (*ma)) return TRUE;             /* legit addr */
         cq_serr (*ma);                                  /* slave nxm */
-        return 0;
+        return FALSE;
         }
     cq_merr (qa);                                       /* master nxm */
-    return 0;
+    return FALSE;
     }
 cq_serr (0);                                            /* inv mem */
-return 0;
+return FALSE;
+}
+
+/* Map an address via the translation map - console version (no status changes) */
+
+t_bool qba_map_addr_c (uint32 qa, uint32 *ma)
+{
+int32 qblk = (qa >> VA_V_VPN);                          /* Qbus blk */
+int32 qmma = ((qblk << 2) & CQMAPAMASK) + cq_mbr;       /* map entry */
+
+if (ADDR_IS_MEM (qmma)) {                               /* legit? */
+    int32 qmap = M[qmma >> 2];                          /* get map */
+    if (qmap & CQMAP_VLD) {                             /* valid? */
+        *ma = ((qmap & CQMAP_PAG) << VA_V_VPN) + VA_GETOFF (qa);
+        return TRUE;                                    /* legit addr */
+        }
+    }
+return FALSE;
 }
 
 /* Set master error */
@@ -590,8 +614,8 @@ uint32 ma, dat;
 if ((ba | bc) & 03) {                                   /* check alignment */
     for (i = ma = 0; i < bc; i++, buf++) {              /* by bytes */
         if ((ma & VA_M_OFF) == 0) {                     /* need map? */
-            if (!map_addr (ba + i, &ma) ||              /* inv or NXM? */
-                !ADDR_IS_MEM (ma)) return (bc - i);
+            if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
+                return (bc - i);
             }
         *buf = ReadB (ma);
         ma = ma + 1;
@@ -600,8 +624,8 @@ if ((ba | bc) & 03) {                                   /* check alignment */
 else {
     for (i = ma = 0; i < bc; i = i + 4, buf++) {        /* by longwords */
         if ((ma & VA_M_OFF) == 0) {                     /* need map? */
-            if (!map_addr (ba + i, &ma) ||              /* inv or NXM? */
-                !ADDR_IS_MEM (ma)) return (bc - i);
+            if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
+                return (bc - i);
             }
         dat = ReadL (ma);                               /* get lw */
         *buf++ = dat & BMASK;                           /* low 8b */
@@ -624,8 +648,8 @@ bc = bc & ~01;
 if ((ba | bc) & 03) {                                   /* check alignment */
     for (i = ma = 0; i < bc; i = i + 2, buf++) {        /* by words */
         if ((ma & VA_M_OFF) == 0) {                     /* need map? */
-            if (!map_addr (ba + i, &ma) ||              /* inv or NXM? */
-                !ADDR_IS_MEM (ma)) return (bc - i);
+            if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
+                return (bc - i);
             }
         *buf = ReadW (ma);
         ma = ma + 2;
@@ -634,8 +658,8 @@ if ((ba | bc) & 03) {                                   /* check alignment */
 else {
     for (i = ma = 0; i < bc; i = i + 4, buf++) {        /* by longwords */
         if ((ma & VA_M_OFF) == 0) {                     /* need map? */
-            if (!map_addr (ba + i, &ma) ||              /* inv or NXM? */
-                !ADDR_IS_MEM (ma)) return (bc - i);
+            if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
+                return (bc - i);
             }
         dat = ReadL (ma);                               /* get lw */
         *buf++ = dat & WMASK;                           /* low 16b */
@@ -654,8 +678,8 @@ uint32 ma, dat;
 if ((ba | bc) & 03) {                                   /* check alignment */
     for (i = ma = 0; i < bc; i++, buf++) {              /* by bytes */
         if ((ma & VA_M_OFF) == 0) {                     /* need map? */
-            if (!map_addr (ba + i, &ma) ||              /* inv or NXM? */
-                !ADDR_IS_MEM (ma)) return (bc - i);
+            if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
+                return (bc - i);
             }
         WriteB (ma, *buf);
         ma = ma + 1;
@@ -664,8 +688,8 @@ if ((ba | bc) & 03) {                                   /* check alignment */
 else {
     for (i = ma = 0; i < bc; i = i + 4, buf++) {        /* by longwords */
         if ((ma & VA_M_OFF) == 0) {                     /* need map? */
-            if (!map_addr (ba + i, &ma) ||              /* inv or NXM? */
-                !ADDR_IS_MEM (ma)) return (bc - i);
+            if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
+                return (bc - i);
             }
         dat = (uint32) *buf++;                          /* get low 8b */
         dat = dat | (((uint32) *buf++) << 8);           /* merge next 8b */
@@ -688,8 +712,8 @@ bc = bc & ~01;
 if ((ba | bc) & 03) {                                   /* check alignment */
     for (i = ma = 0; i < bc; i = i + 2, buf++) {        /* by words */
         if ((ma & VA_M_OFF) == 0) {                     /* need map? */
-            if (!map_addr (ba + i, &ma) ||              /* inv or NXM? */
-                !ADDR_IS_MEM (ma)) return (bc - i);
+            if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
+                return (bc - i);
             }
         WriteW (ma, *buf);
         ma = ma + 2;
@@ -698,8 +722,8 @@ if ((ba | bc) & 03) {                                   /* check alignment */
 else {
     for (i = ma = 0; i < bc; i = i + 4, buf++) {        /* by longwords */
         if ((ma & VA_M_OFF) == 0) {                     /* need map? */
-            if (!map_addr (ba + i, &ma) ||              /* inv or NXM? */
-                !ADDR_IS_MEM (ma)) return (bc - i);
+            if (!qba_map_addr (ba + i, &ma))            /* inv or NXM? */
+                return (bc - i);
             }
         dat = (uint32) *buf++;                          /* get low 16b */
         dat = dat | (((uint32) *buf) << 16);            /* merge hi 16b */
@@ -708,6 +732,34 @@ else {
         }
     }
 return 0;
+}
+
+/* Memory examine via map (word only) */
+
+t_stat qba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw)
+{
+uint32 qa = (uint32) exta, pa;
+
+if ((vptr == NULL) || (qa >= CQMSIZE)) return SCPE_ARG;
+if (qba_map_addr_c (qa, &pa) && ADDR_IS_MEM (pa)) {
+    *vptr = (uint32) ReadW (pa);
+    return SCPE_OK;
+    }
+return SCPE_NXM;
+}
+
+/* Memory deposit via map (word only) */
+
+t_stat qba_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw)
+{
+uint32 qa = (uint32) exta, pa;
+
+if (qa >= CQMSIZE) return SCPE_ARG;
+if (qba_map_addr_c (qa, &pa) && ADDR_IS_MEM (pa)) {
+    WriteW (pa, (int32) val);
+    return SCPE_OK;
+    }
+return SCPE_NXM;
 }
 
 /* Enable/disable autoconfiguration */
@@ -949,6 +1001,27 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
             dptr? sim_dname (dptr): "CPU");
         }                                               /* end if */
     }                                                   /* end for i */
+return SCPE_OK;
+}
+
+/* Show QBA virtual address */
+
+t_stat qba_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc)
+{
+t_stat r;
+char *cptr = (char *) desc;
+uint32 qa, pa;
+
+if (cptr) {
+    qa = (uint32) get_uint (cptr, 16, CQMSIZE - 1, &r);
+    if (r == SCPE_OK) {
+        if (qba_map_addr_c (qa, &pa))
+            fprintf (of, "Qbus %-X = physical %-X\n", qa, pa);
+        else fprintf (of, "Qbus %-X: invalid mapping\n", qa);
+        return SCPE_OK;
+        }
+    }
+fprintf (of, "Invalid argument\n");
 return SCPE_OK;
 }
 

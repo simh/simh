@@ -25,6 +25,8 @@
 
    tu           TM02/TM03 magtape
 
+   12-Nov-05    RMS     Changed default formatter to TM03 (for VMS)
+   31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    31-Mar-05    RMS     Fixed inaccuracies in error reporting
    18-Mar-05    RMS     Added attached test to detach routine
@@ -290,10 +292,15 @@ REG tu_reg[] = {
 
 MTAB tu_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "MASSBUS", "MASSBUS", NULL, &mba_show_num },
+#if defined (VM_PDP11)
     { MTAB_XTD|MTAB_VDV, 0, "FORMATTER", "TM02",
       &tu_set_fmtr, &tu_show_fmtr },
     { MTAB_XTD|MTAB_VDV, 1, NULL, "TM03",
       &tu_set_fmtr, NULL },
+#else
+    { MTAB_XTD|MTAB_VDV, 0, "FORMATTER", NULL,
+      NULL, &tu_show_fmtr },
+#endif
     { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
     { UNIT_TYPE, UNIT_TE16, "TE16", "TE16", NULL },
@@ -306,10 +313,10 @@ MTAB tu_mod[] = {
 
 DEVICE tu_dev = {
     "TU", tu_unit, tu_reg, tu_mod,
-    TU_NUMDR, 10, 31, 1, DEV_RDX, 8,
+    TU_NUMDR, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &tu_reset,
     &tu_boot, &tu_attach, &tu_detach,
-    &tu_dib, DEV_MBUS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISABLE | DEV_DIS_INIT
+    &tu_dib, DEV_MBUS|DEV_UBUS|DEV_QBUS|DEV_DEBUG|DEV_DISABLE|DEV_DIS_INIT|DEV_TM03
     };
 
 /* Massbus register read */
@@ -846,6 +853,7 @@ t_stat tu_reset (DEVICE *dptr)
 int32 u;
 UNIT *uptr;
 
+mba_set_enbdis (MBA_TU, tu_dev.flags & DEV_DIS);
 tucs1 = 0;
 tufc = 0;
 tuer = 0;

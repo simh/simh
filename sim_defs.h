@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Jan-06    RMS     Added support for breakpoint spaces
+                        Added REG_FIT flag
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    11-Mar-05    RMS     Moved 64b data type definitions outside USE_INT64
    07-Feb-05    RMS     Added assertion fail stop
@@ -159,6 +161,11 @@ typedef uint32          t_addr;
 #define PATH_MAX        512
 #endif
 #define CBUFSIZE        (128 + PATH_MAX)                /* string buf size */
+
+/* Breakpoint spaces definitions */
+
+#define SIM_BKPT_N_SPC  64                              /* max number spaces */
+#define SIM_BKPT_V_SPC  26                              /* location in arg */
 
 /* Extended switch definitions (bits >= 26) */
 
@@ -365,14 +372,15 @@ struct sim_reg {
     uint32              qptr;                           /* circ q ptr */
     };
 
-#define REG_FMT         0003                            /* see PV_x */
-#define REG_RO          0004                            /* read only */
-#define REG_HIDDEN      0010                            /* hidden */
-#define REG_NZ          0020                            /* must be non-zero */
-#define REG_UNIT        0040                            /* in unit struct */
-#define REG_CIRC        0100                            /* circular array */
-#define REG_VMIO        0200                            /* use VM data print/parse */
-#define REG_VMAD        0400                            /* use VM addr print/parse */
+#define REG_FMT         00003                           /* see PV_x */
+#define REG_RO          00004                           /* read only */
+#define REG_HIDDEN      00010                           /* hidden */
+#define REG_NZ          00020                           /* must be non-zero */
+#define REG_UNIT        00040                           /* in unit struct */
+#define REG_CIRC        00100                           /* circular array */
+#define REG_VMIO        00200                           /* use VM data print/parse */
+#define REG_VMAD        00400                           /* use VM addr print/parse */
+#define REG_FIT         01000                           /* fit access to size */
 #define REG_HRO         (REG_RO | REG_HIDDEN)           /* hidden, read only */
 
 /* Command tables, base and alternate formats */

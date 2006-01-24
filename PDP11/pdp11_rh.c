@@ -25,6 +25,7 @@
 
    rha, rhb             RH11/RH70 Massbus adapter
 
+   21-Nov-05    RMS     Added enable/disable routine
    07-Jul-05    RMS     Removed extraneous externs
 
    WARNING: The interupt logic of the RH11/RH70 is unusual and must be
@@ -177,11 +178,6 @@ DEVICE mba0_dev, mba1_dev;
 
 extern uint32 Map_Addr (uint32 ba);
 
-/* Maps */
-
-static MBACTX *ctxmap[MBA_NUM] = { &massbus[0], &massbus[1] };
-static DEVICE *devmap[MBA_NUM] = { &mba0_dev, &mba1_dev };
-
 /* Massbus register dispatches */
 
 static t_stat (*mbregR[MBA_NUM])(int32 *dat, int32 ad, int32 md);
@@ -237,14 +233,6 @@ MTAB mba0_mod[] = {
     { 0 }
     };
 
-DEVICE mba0_dev = {
-    "RHA", &mba0_unit, mba0_reg, mba0_mod,
-    1, 0, 0, 0, 0, 0,
-    NULL, NULL, &mba_reset,
-    NULL, NULL, NULL,
-    &mba0_dib, DEV_DEBUG | DEV_DISABLE | DEV_UBUS | DEV_QBUS
-    };
-
 DIB mba1_dib = {
     IOBA_TU, IOLN_TU, &mba_rd, &mba_wr,
     1, IVCL (TU), VEC_TU, { &mba1_inta }
@@ -278,12 +266,21 @@ MTAB mba1_mod[] = {
     { 0 }
     };
 
-DEVICE mba1_dev = {
+DEVICE mba_dev[] = {
+    {
+    "RHA", &mba0_unit, mba0_reg, mba0_mod,
+    1, 0, 0, 0, 0, 0,
+    NULL, NULL, &mba_reset,
+    NULL, NULL, NULL,
+    &mba0_dib, DEV_DEBUG | DEV_DISABLE | DEV_UBUS | DEV_QBUS
+    },
+    {
     "RHB", &mba1_unit, mba1_reg, mba1_mod,
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
     &mba1_dib, DEV_DEBUG | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS
+    }
     };
 
 /* Read Massbus adapter register */
@@ -292,12 +289,10 @@ t_stat mba_rd (int32 *val, int32 pa, int32 mode)
 {
 int32 ofs, dat, mb, drv;
 t_stat r;
-MBACTX *mbp;
 
 mb = mba_map_pa (pa, &ofs);                             /* get mb number */
 if ((mb < 0) || (ofs < 0)) return SCPE_NXM;             /* valid? */
-mbp = ctxmap[mb];                                       /* get context */
-drv = GET_UNIT (mbp->cs2);                              /* get drive */
+drv = GET_UNIT (massbus[mb].cs2);                       /* get drive */
 mba_upd_cs1 (0, 0, mb);                                 /* update CS1 */
 
 if (ofs & EXT) {                                        /* external? */
@@ -314,31 +309,32 @@ switch (ofs) {                                          /* case on reg */
         if (!mbregR[mb]) return SCPE_NXM;               /* nx device? */
         r = mbregR[mb] (&dat, ofs, drv);                /* get dev cs1 */
         if (r == MBE_NXD) mba_set_cs2 (CS2_NED, mb);    /* nx drive? */
-        *val = mbp->cs1 | dat;
+        *val = massbus[mb].cs1 | dat;
         break;
 
     case WC_OF:                                         /* WC */
-        *val = mbp->wc;
+        *val = massbus[mb].wc;
         break;
 
     case BA_OF:                                         /* BA */
-        *val = mbp->ba & ~BA_MBZ;
+        *val = massbus[mb].ba & ~BA_MBZ;
         break;
 
     case CS2_OF:                                        /* CS2 */
-        *val = mbp->cs2 = (mbp->cs2 & ~CS2_MBZ) | CS2_IR | CS2_OR;
+        *val = massbus[mb].cs2 = (massbus[mb].cs2 & ~CS2_MBZ) | CS2_IR | CS2_OR;
         break;
 
     case DB_OF:                                         /* DB */
-        *val = mbp->db;
+        *val = massbus[mb].db;
         break;
 
     case BAE_OF:                                        /* BAE */
-        *val = mbp->bae = mbp->bae & ~AE_MBZ;
+        *val = massbus[mb].bae = massbus[mb].bae & ~AE_MBZ;
         break;
 
     case CS3_OF:                                        /* CS3 */
-        *val = mbp->cs3 = (mbp->cs3 & ~(CS1_IE | CS3_MBZ)) | (mbp->cs1 & CS1_IE);
+        *val = massbus[mb].cs3 = (massbus[mb].cs3 & ~(CS1_IE | CS3_MBZ)) |
+            (massbus[mb].cs1 & CS1_IE);
         break;
 
     default:                                            /* huh? */
@@ -353,12 +349,10 @@ t_stat mba_wr (int32 val, int32 pa, int32 access)
 int32 ofs, cs1f, drv, mb;
 t_stat r;
 t_bool cs1dt;
-MBACTX *mbp;
 
 mb = mba_map_pa (pa, &ofs);                             /* get mb number */
 if ((mb < 0) || (ofs < 0)) return SCPE_NXM;             /* valid? */
-mbp = ctxmap[mb];                                       /* get context */
-drv = GET_UNIT (mbp->cs2);                              /* get drive */
+drv = GET_UNIT (massbus[mb].cs2);                       /* get drive */
 
 if (ofs & EXT) {                                        /* external? */
     if (!mbregW[mb]) return SCPE_NXM;                   /* device there? */
@@ -378,81 +372,84 @@ switch (ofs) {                                          /* case on reg */
         if (!mbregW[mb]) return SCPE_NXM;               /* device exist? */
         if ((access == WRITEB) && (pa & 1)) val = val << 8;
         if (val & CS1_TRE) {                            /* error clear? */
-            mbp->cs1 = mbp->cs1 & ~CS1_TRE;             /* clr CS1<TRE> */
-            mbp->cs2 = mbp->cs2 & ~CS2_ERR;             /* clr CS2<15:8> */
-            mbp->cs3 = mbp->cs3 & ~CS3_ERR;             /* clr CS3<15:11> */
+            massbus[mb].cs1 &= ~CS1_TRE;                /* clr CS1<TRE> */
+            massbus[mb].cs2 &= ~CS2_ERR;                /* clr CS2<15:8> */
+            massbus[mb].cs3 &= ~CS3_ERR;                /* clr CS3<15:11> */
             }
         if ((access == WRITE) || (pa & 1)) {            /* hi byte write? */
-            if (mbp->cs1 & CS1_DONE)                    /* done set? */
-                mbp->cs1 = (mbp->cs1 & ~CS1_UAE) | (val & CS1_UAE);
+            if (massbus[mb].cs1 & CS1_DONE)             /* done set? */
+                massbus[mb].cs1 = (massbus[mb].cs1 & ~CS1_UAE) | (val & CS1_UAE);
             }
         if ((access == WRITE) || !(pa & 1)) {           /* lo byte write? */
             if ((val & CS1_DONE) && (val & CS1_IE))     /* to DONE+IE? */
-                mbp->iff = 1;                           /* set CSTB INTR */
-            mbp->cs1 = (mbp->cs1 & ~CS1_IE) | (val & CS1_IE);
+                massbus[mb].iff = 1;                    /* set CSTB INTR */
+            massbus[mb].cs1 = (massbus[mb].cs1 & ~CS1_IE) | (val & CS1_IE);
             cs1dt = (val & CS1_GO) && (GET_FNC (val) >= FNC_XFER);
-            if (cs1dt && ((mbp->cs1 & CS1_DONE) == 0))  /* dt, done clr? */
+            if (cs1dt && ((massbus[mb].cs1 & CS1_DONE) == 0))  /* dt, done clr? */
                 mba_set_cs2 (CS2_PGE, mb);              /* prgm error */
             else {
                 r = mbregW[mb] (val & 077, ofs, drv);   /* write dev CS1 */
                 if (r == MBE_NXD) mba_set_cs2 (CS2_NED, mb);    /* nx drive? */
                 else if (r == MBE_NXR) return SCPE_NXM; /* nx reg? */
                 else if (cs1dt && (r == SCPE_OK)) {     /* xfer, no err? */
-                    mbp->cs1 &= ~(CS1_TRE | CS1_MCPE | CS1_DONE);
-                    mbp->cs2 &= ~CS2_ERR;               /* clear errors */
-                    mbp->cs3 &= ~(CS3_ERR | CS3_DBL);
+                    massbus[mb].cs1 &= ~(CS1_TRE | CS1_MCPE | CS1_DONE);
+                    massbus[mb].cs2 &= ~CS2_ERR;        /* clear errors */
+                    massbus[mb].cs3 &= ~(CS3_ERR | CS3_DBL);
                     }
                 }
             }
-        mbp->cs3 = (mbp->cs3 & ~CS1_IE) |               /* update CS3 */
-            (mbp->cs1 & CS1_IE);
-        mbp->bae = (mbp->bae & ~CS1_M_UAE) |            /* update BAE */
-            ((mbp->cs1 >> CS1_V_UAE) & CS1_M_UAE);
+        massbus[mb].cs3 = (massbus[mb].cs3 & ~CS1_IE) | /* update CS3 */
+            (massbus[mb].cs1 & CS1_IE);
+        massbus[mb].bae = (massbus[mb].bae & ~CS1_M_UAE) | /* update BAE */
+            ((massbus[mb].cs1 >> CS1_V_UAE) & CS1_M_UAE);
         break;  
 
     case WC_OF:                                         /* WC */
         if (access == WRITEB) val = (pa & 1)?
-            (mbp->wc & 0377) | (val << 8): (mbp->wc & ~0377) | val;
-        mbp->wc = val;
+            (massbus[mb].wc & 0377) | (val << 8):
+            (massbus[mb].wc & ~0377) | val;
+        massbus[mb].wc = val;
         break;
 
     case BA_OF:                                         /* BA */
         if (access == WRITEB) val = (pa & 1)?
-            (mbp->ba & 0377) | (val << 8): (mbp->ba & ~0377) | val;
-        mbp->ba = val & ~BA_MBZ;
+            (massbus[mb].ba & 0377) | (val << 8):
+            (massbus[mb].ba & ~0377) | val;
+        massbus[mb].ba = val & ~BA_MBZ;
         break;
 
     case CS2_OF:                                        /* CS2 */
         if ((access == WRITEB) && (pa & 1)) val = val << 8;
-        if (val & CS2_CLR) mba_reset (devmap[mb]);      /* init? */
+        if (val & CS2_CLR) mba_reset (&mba_dev[mb]);    /* init? */
         else {
-            if ((val & ~mbp->cs2) & (CS2_PE | CS2_MXF))
+            if ((val & ~massbus[mb].cs2) & (CS2_PE | CS2_MXF))
                 cs1f = CS1_SC;                          /* diagn intr */
-            if (access == WRITEB) val = (mbp->cs2 &     /* merge val */
+            if (access == WRITEB) val = (massbus[mb].cs2 &  /* merge val */
                 ((pa & 1)? 0377: 0177400)) | val;
-            mbp->cs2 = (mbp->cs2 & ~CS2_RW) |
+            massbus[mb].cs2 = (massbus[mb].cs2 & ~CS2_RW) |
                 (val & CS2_RW) | CS2_IR | CS2_OR;
             }
         break;
 
     case DB_OF:                                         /* DB */
         if (access == WRITEB) val = (pa & 1)?
-            (mbp->db & 0377) | (val << 8): (mbp->db & ~0377) | val;
-        mbp->db = val;
+            (massbus[mb].db & 0377) | (val << 8):
+            (massbus[mb].db & ~0377) | val;
+        massbus[mb].db = val;
         break;
 
     case BAE_OF:                                       /* BAE */
         if ((access == WRITEB) && (pa & 1)) break;
-        mbp->bae = val & ~AE_MBZ;
-        mbp->cs1 = (mbp->cs1 & ~CS1_UAE) |              /* update CS1 */
-            ((mbp->bae << CS1_V_UAE) & CS1_UAE);
+        massbus[mb].bae = val & ~AE_MBZ;
+        massbus[mb].cs1 = (massbus[mb].cs1 & ~CS1_UAE) | /* update CS1 */
+            ((massbus[mb].bae << CS1_V_UAE) & CS1_UAE);
         break;
 
     case CS3_OF:                                        /* CS3 */
         if ((access == WRITEB) && (pa & 1)) break;
-        mbp->cs3 = (mbp->cs3 & ~CS3_RW) | (val & CS3_RW);
-        mbp->cs1 = (mbp->cs1 & ~CS1_IE) |               /* update CS1 */
-            (mbp->cs3 & CS1_IE);
+        massbus[mb].cs3 = (massbus[mb].cs3 & ~CS3_RW) | (val & CS3_RW);
+        massbus[mb].cs1 = (massbus[mb].cs1 & ~CS1_IE) | /* update CS1 */
+            (massbus[mb].cs3 & CS1_IE);
         break;
 
     default:
@@ -474,15 +471,13 @@ return SCPE_OK;
 
 int32 mba_rdbufW (uint32 mb, int32 bc, uint16 *buf)
 {
-MBACTX *mbp;
 int32 i, j, ba, mbc, pbc;
 uint32 pa;
 
 bc = bc & ~1;                                           /* bc even */
 if (mb >= MBA_NUM) return 0;                            /* valid MBA? */
-mbp = ctxmap[mb];                                       /* get context */
-ba = (mbp->bae << 16) | mbp->ba;                        /* get busaddr */
-mbc = (0200000 - mbp->wc) << 1;                         /* MB byte count */
+ba = (massbus[mb].bae << 16) | massbus[mb].ba;          /* get busaddr */
+mbc = (0200000 - massbus[mb].wc) << 1;                  /* MB byte count */
 if (bc > mbc) bc = mbc;                                 /* use smaller */
 for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     if (RH11 && cpu_bme) pa = Map_Addr (ba);            /* map addr */
@@ -495,31 +490,29 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     if (pbc > (bc - i)) pbc = bc - i;                   /* limit to rem xfr */
     for (j = 0; j < pbc; j = j + 2) {                   /* loop by words */
         *buf++ = M[pa >> 1];                            /* fetch word */
-        if (!(mbp->cs2 & CS2_UAI)) {                    /* if not inhb */
+        if (!(massbus[mb].cs2 & CS2_UAI)) {             /* if not inhb */
             ba = ba + 2;                                /* incr ba, pa */
             pa = pa + 2;
             }
         }
     }
-mbp->wc = (mbp->wc + (bc >> 1)) & DMASK;                /* update wc */
-mbp->ba = ba & DMASK;                                   /* update ba */
-mbp->bae = (ba >> 16) & ~AE_MBZ;                        /* upper 6b */
-mbp->cs1 = (mbp->cs1 & ~ CS1_UAE) |                     /* update CS1 */
-    ((mbp->bae << CS1_V_UAE) & CS1_UAE);
+massbus[mb].wc = (massbus[mb].wc + (bc >> 1)) & DMASK;   /* update wc */
+massbus[mb].ba = ba & DMASK;                             /* update ba */
+massbus[mb].bae = (ba >> 16) & ~AE_MBZ;                  /* upper 6b */
+massbus[mb].cs1 = (massbus[mb].cs1 & ~ CS1_UAE) |         /* update CS1 */
+    ((massbus[mb].bae << CS1_V_UAE) & CS1_UAE);
 return i;
 }
 
 int32 mba_wrbufW (uint32 mb, int32 bc, uint16 *buf)
 {
-MBACTX *mbp;
 int32 i, j, ba, mbc, pbc;
 uint32 pa;
 
 bc = bc & ~1;                                           /* bc even */
 if (mb >= MBA_NUM) return 0;                            /* valid MBA? */
-mbp = ctxmap[mb];                                       /* get context */
-ba = (mbp->bae << 16) | mbp->ba;                        /* get busaddr */
-mbc = (0200000 - mbp->wc) << 1;                         /* MB byte count */
+ba = (massbus[mb].bae << 16) | massbus[mb].ba;          /* get busaddr */
+mbc = (0200000 - massbus[mb].wc) << 1;                  /* MB byte count */
 if (bc > mbc) bc = mbc;                                 /* use smaller */
 for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     if (RH11 && cpu_bme) pa = Map_Addr (ba);            /* map addr */
@@ -532,31 +525,29 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     if (pbc > (bc - i)) pbc = bc - i;                   /* limit to rem xfr */
     for (j = 0; j < pbc; j = j + 2) {                   /* loop by words */
         M[pa >> 1] = *buf++;                            /* put word */
-        if (!(mbp->cs2 & CS2_UAI)) {                    /* if not inhb */
+        if (!(massbus[mb].cs2 & CS2_UAI)) {             /* if not inhb */
             ba = ba + 2;                                /* incr ba, pa */
             pa = pa + 2;
             }
         }
     }
-mbp->wc = (mbp->wc + (bc >> 1)) & DMASK;                /* update wc */
-mbp->ba = ba & DMASK;                                   /* update ba */
-mbp->bae = (ba >> 16) & ~AE_MBZ;                        /* upper 6b */
-mbp->cs1 = (mbp->cs1 & ~ CS1_UAE) |                     /* update CS1 */
-    ((mbp->bae << CS1_V_UAE) & CS1_UAE);
+massbus[mb].wc = (massbus[mb].wc + (bc >> 1)) & DMASK;  /* update wc */
+massbus[mb].ba = ba & DMASK;                            /* update ba */
+massbus[mb].bae = (ba >> 16) & ~AE_MBZ;                 /* upper 6b */
+massbus[mb].cs1 = (massbus[mb].cs1 & ~ CS1_UAE) |       /* update CS1 */
+    ((massbus[mb].bae << CS1_V_UAE) & CS1_UAE);
 return i;
 }
 
 int32 mba_chbufW (uint32 mb, int32 bc, uint16 *buf)
 {
-MBACTX *mbp;
 int32 i, j, ba, mbc, pbc;
 uint32 pa;
 
 bc = bc & ~1;                                           /* bc even */
 if (mb >= MBA_NUM) return 0;                            /* valid MBA? */
-mbp = ctxmap[mb];                                       /* get context */
-ba = (mbp->bae << 16) | mbp->ba;                        /* get busaddr */
-mbc = (0200000 - mbp->wc) << 1;                         /* MB byte count */
+ba = (massbus[mb].bae << 16) | massbus[mb].ba;          /* get busaddr */
+mbc = (0200000 - massbus[mb].wc) << 1;                  /* MB byte count */
 if (bc > mbc) bc = mbc;                                 /* use smaller */
 for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     if (RH11 && cpu_bme) pa = Map_Addr (ba);            /* map addr */
@@ -568,24 +559,24 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     pbc = UBM_PAGSIZE - UBM_GETOFF (pa);                /* left in page */
     if (pbc > (bc - i)) pbc = bc - i;                   /* limit to rem xfr */
     for (j = 0; j < pbc; j = j + 2) {                   /* loop by words */
-        mbp->db = *buf++;                               /* get dev word */
-        if (M[pa >> 1] != mbp->db) {                    /* miscompare? */
+        massbus[mb].db = *buf++;                        /* get dev word */
+        if (M[pa >> 1] != massbus[mb].db) {             /* miscompare? */
             mba_set_cs2 (CS2_WCE, mb);                  /* set error */
-            mbp->cs3 = mbp->cs3 |                       /* set even/odd */
+            massbus[mb].cs3 = massbus[mb].cs3 |         /* set even/odd */
                 ((pa & 1)? CS3_WCO: CS3_WCE);
             break;
             }
-        if (!(mbp->cs2 & CS2_UAI)) {                    /* if not inhb */
+        if (!(massbus[mb].cs2 & CS2_UAI)) {             /* if not inhb */
             ba = ba + 2;                                /* incr ba, pa */
             pa = pa + 2;
             }
         }
     }
-mbp->wc = (mbp->wc + (bc >> 1)) & DMASK;                /* update wc */
-mbp->ba = ba & DMASK;                                   /* update ba */
-mbp->bae = (ba >> 16) & ~AE_MBZ;                        /* upper 6b */
-mbp->cs1 = (mbp->cs1 & ~ CS1_UAE) |                     /* update CS1 */
-    ((mbp->bae << CS1_V_UAE) & CS1_UAE);
+massbus[mb].wc = (massbus[mb].wc + (bc >> 1)) & DMASK;  /* update wc */
+massbus[mb].ba = ba & DMASK;                            /* update ba */
+massbus[mb].bae = (ba >> 16) & ~AE_MBZ;                 /* upper 6b */
+massbus[mb].cs1 = (massbus[mb].cs1 & ~ CS1_UAE) |       /* update CS1 */
+    ((massbus[mb].bae << CS1_V_UAE) & CS1_UAE);
 return i;
 }
 
@@ -612,63 +603,51 @@ return;
 
 int32 mba_get_bc (uint32 mb)
 {
-MBACTX *mbp;
-
 if (mb >= MBA_NUM) return 0;
-mbp = ctxmap[mb];
-return ((0200000 - mbp->wc) << 1);
+return ((0200000 - massbus[mb].wc) << 1);
 }
 
 int32 mba_get_csr (uint32 mb)
 {
-DEVICE *dptr;
 DIB *dibp;
 
 if (mb >= MBA_NUM) return 0;
-dptr = devmap[mb];
-dibp = (DIB *) dptr->ctxt;
+dibp = (DIB *) mba_dev[mb].ctxt;
 return dibp->ba;
 }
 
 void mba_set_int (uint32 mb)
 {
-DEVICE *dptr;
 DIB *dibp;
 
 if (mb >= MBA_NUM) return;
-dptr = devmap[mb];
-dibp = (DIB *) dptr->ctxt;
+dibp = (DIB *) mba_dev[mb].ctxt;
 int_req[dibp->vloc >> 5] |= (1 << (dibp->vloc & 037));
 return;
 }
 
 void mba_clr_int (uint32 mb)
 {
-DEVICE *dptr;
 DIB *dibp;
 
 if (mb >= MBA_NUM) return;
-dptr = devmap[mb];
-dibp = (DIB *) dptr->ctxt;
+dibp = (DIB *) mba_dev[mb].ctxt;
 int_req[dibp->vloc >> 5] &= ~(1 << (dibp->vloc & 037));
 return;
 }
 
 void mba_upd_cs1 (uint32 set, uint32 clr, uint32 mb)
 {
-MBACTX *mbp;
-
 if (mb >= MBA_NUM) return;
-mbp = ctxmap[mb];
-if ((set & ~mbp->cs1) & CS1_DONE)                       /* DONE 0 to 1? */
-    mbp->iff = (mbp->cs1 & CS1_IE)? 1: 0;               /* CSTB INTR <- IE */
-mbp->cs1 = (mbp->cs1 & ~(clr | CS1_MCPE | CS1_MBZ | CS1_DRV)) | CS1_DVA | set;
-if (mbp->cs2 & CS2_ERR) mbp->cs1 = mbp->cs1 | CS1_TRE | CS1_SC;
-else if (mbp->cs1 & CS1_TRE) mbp->cs1 = mbp->cs1 | CS1_SC;
-if (mbp->iff ||
-    ((mbp->cs1 & CS1_SC) &&
-     (mbp->cs1 & CS1_DONE) &&
-     (mbp->cs1 & CS1_IE)))
+if ((set & ~massbus[mb].cs1) & CS1_DONE)                    /* DONE 0 to 1? */
+    massbus[mb].iff = (massbus[mb].cs1 & CS1_IE)? 1: 0;     /* CSTB INTR <- IE */
+massbus[mb].cs1 = (massbus[mb].cs1 & ~(clr | CS1_MCPE | CS1_MBZ | CS1_DRV)) | CS1_DVA | set;
+if (massbus[mb].cs2 & CS2_ERR) massbus[mb].cs1 = massbus[mb].cs1 | CS1_TRE | CS1_SC;
+else if (massbus[mb].cs1 & CS1_TRE) massbus[mb].cs1 = massbus[mb].cs1 | CS1_SC;
+if (massbus[mb].iff ||
+    ((massbus[mb].cs1 & CS1_SC) &&
+     (massbus[mb].cs1 & CS1_DONE) &&
+     (massbus[mb].cs1 & CS1_IE)))
     mba_set_int (mb);
 else mba_clr_int (mb);
 return;
@@ -676,11 +655,8 @@ return;
 
 void mba_set_cs2 (uint32 flag, uint32 mb)
 {
-MBACTX *mbp;
-
 if (mb >= MBA_NUM) return;
-mbp = ctxmap[mb];
-mbp->cs2 = mbp->cs2 | flag;
+massbus[mb].cs2 = massbus[mb].cs2 | flag;
 mba_upd_cs1 (0, 0, mb);
 return;
 }
@@ -708,12 +684,10 @@ return mba1_dib.vec;                                    /* acknowledge */
 uint32 mba_map_pa (int32 pa, int32 *ofs)
 {
 int32 i, uo, ba, lnt;
-DEVICE *dptr;
 DIB *dibp;
 
 for (i = 0; i < MBA_NUM; i++) {                         /* loop thru ctrls */
-    dptr = devmap[i];                                   /* get device */
-    dibp = (DIB *) dptr->ctxt;                          /* get DIB */
+    dibp = (DIB *) mba_dev[i].ctxt;                     /* get DIB */
     ba = dibp->ba;
     lnt = dibp->lnt;
     if ((pa >= ba) &&                                   /* in range? */
@@ -738,25 +712,31 @@ return -1;
 
 t_stat mba_reset (DEVICE *dptr)
 {
-int32 mb;
-MBACTX *mbp;
+uint32 mb;
 
-for (mb = 0; mb < MBA_NUM; mb++) {
-    mbp = ctxmap[mb];
-    if (dptr == devmap[mb]) break;
-    }
+mb = dptr - mba_dev;
 if (mb >= MBA_NUM) return SCPE_NOFNC;
-mbp->cs1 = CS1_DONE;
-mbp->wc = 0;
-mbp->ba = 0;
-mbp->cs2 = 0;
-mbp->db = 0;
-mbp->bae= 0;
-mbp->cs3 = 0;
-mbp->iff = 0;
+massbus[mb].cs1 = CS1_DONE;
+massbus[mb].wc = 0;
+massbus[mb].ba = 0;
+massbus[mb].cs2 = 0;
+massbus[mb].db = 0;
+massbus[mb].bae= 0;
+massbus[mb].cs3 = 0;
+massbus[mb].iff = 0;
 mba_clr_int (mb);
 if (mbabort[mb]) mbabort[mb] ();
 return SCPE_OK;
+}
+
+/* Enable/disable Massbus adapter */
+
+void mba_set_enbdis (uint32 mb, t_bool dis)
+{
+if (mb >= MBA_NUM) return;                              /* valid MBA? */
+if (dis) mba_dev[mb].flags |= DEV_DIS;
+else mba_dev[mb].flags &= ~DEV_DIS;
+return;
 }
 
 /* Show Massbus adapter number */

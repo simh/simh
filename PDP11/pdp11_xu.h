@@ -28,6 +28,7 @@
 
   Modification history:
 
+  08-Dec-05  DTH  Added load_server, increased UDBSIZE for system ID parameters
   07-Jul-05  RMS  Removed extraneous externs
   05-Jan-04  DTH  Added network statistics
   31-Dec-03  DTH  Added reserved states
@@ -68,7 +69,7 @@ extern int32 int_req[IPL_HLVL];
 #define XU_FILTER_MAX         11                        /* mac + 10 multicast addrs */
 #define XU_SERVICE_INTERVAL  100                        /* times per second */
 #define XU_ID_TIMER_VAL      540                        /* 9 min * 60 sec */
-#define UDBSIZE              100                        /* max size of UDB (in words) */
+#define UDBSIZE              200                        /* max size of UDB (in words) */
 
 enum xu_type {XU_T_DEUNA, XU_T_DELUA};
 
@@ -124,6 +125,7 @@ struct xu_device {
   ETH_PACK          read_buffer;
   ETH_PACK          write_buffer;
   ETH_QUE           ReadQ;
+  ETH_MAC           load_server;                        /* load server address */
   int               idtmr;                              /* countdown for ID Timer */
   int               sectmr;                             /* countup for one second timer */
   struct xu_setup   setup;
@@ -298,6 +300,7 @@ typedef struct xu_controller CTLR;
 #define DBG_TRC  0x0001                                 /* trace routine calls */
 #define DBG_REG  0x0002                                 /* trace read/write registers */
 #define DBG_WRN  0x0004                                 /* display warnings */
+#define DBG_PCK  0x0080                                 /* display packets */
 #define DBG_ETH  0x8000                                 /* debug ethernet device */
 
 #endif                                                  /* _PDP11_XU_H */

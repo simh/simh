@@ -141,8 +141,6 @@
 
 extern uint32 PC, SR;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
-extern int32 sim_switches;
-extern UNIT cpu_unit;
 
 int32 dqc_busy = 0;                                     /* cch xfer */
 int32 dqc_cnt = 0;                                      /* check count */

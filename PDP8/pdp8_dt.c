@@ -1,6 +1,6 @@
 /* pdp8_dt.c: PDP-8 DECtape simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dt           TC08/TU56 DECtape
 
+   07-Jan-06    RMS     Fixed unaligned register access bug (found by Doug Carman)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    25-Jan-04    RMS     Revised for device debug support
    09-Jan-04    RMS     Changed sim_fsize calling sequence, added STOP_OFFR
@@ -329,10 +330,10 @@ REG dt_reg[] = {
     { FLDATA (ENB, dtsa, DTA_V_ENB) },
     { FLDATA (DTF, dtsb, DTB_V_DTF) },
     { FLDATA (ERF, dtsb, DTB_V_ERF) },
-    { ORDATA (WC, M[DT_WC], 18) },
-    { ORDATA (CA, M[DT_CA], 18) },
-    { DRDATA (LTIME, dt_ltime, 31), REG_NZ | PV_LEFT },
-    { DRDATA (DCTIME, dt_dctime, 31), REG_NZ | PV_LEFT },
+    { ORDATA (WC, M[DT_WC], 12), REG_FIT },
+    { ORDATA (CA, M[DT_CA], 12), REG_FIT },
+    { DRDATA (LTIME, dt_ltime, 24), REG_NZ | PV_LEFT },
+    { DRDATA (DCTIME, dt_dctime, 24), REG_NZ | PV_LEFT },
     { ORDATA (SUBSTATE, dt_substate, 2) },
     { DRDATA (LBLK, dt_logblk, 12), REG_HIDDEN },
     { URDATA (POS, dt_unit[0].pos, 10, T_ADDR_W, 0,

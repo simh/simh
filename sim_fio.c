@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Nov-05    RMS     Added OS/X large file support (from Peter Schorn)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    17-Jul-04    RMS     Fixed bug in optimized sim_fread (reported by Scott Bailey)
    26-May-04    RMS     Optimized sim_fread (suggested by John Dundas)
@@ -275,6 +276,18 @@ return fseeko64 (st, xpos, origin);
 }
 
 #endif                                                  /* end Linux with LFS */
+
+/* Apple OS/X */
+
+#if defined (__APPLE__)
+#define _SIM_IO_FSEEK_EXT_      1
+
+int sim_fseek (FILE *st, t_addr xpos, int origin) 
+{
+return fseeko (st, xpos, origin);
+}
+
+#endif  /* end Apple OS/X */
 
 #endif                                                  /* end 64b seek defs */
 

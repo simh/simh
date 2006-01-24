@@ -27,6 +27,7 @@
    tto          terminal output
    clk          100Hz and TODR clock
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    09-Sep-04    RMS     Integrated powerup into RESET (with -p)
    28-May-04    RMS     Removed SET TTI CTRL-C
    29-Dec-03    RMS     Added console backpressure support
@@ -54,9 +55,6 @@
 #define CLKCSR_RW       (CSR_IE)
 #define CLK_DELAY       5000                            /* 100 Hz */
 #define TMXR_MULT       2                               /* 50 Hz */
-
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B mode */
-#define UNIT_8B         (1 << UNIT_V_8B)
 
 extern int32 int_req[IPL_HLVL];
 extern int32 hlt_pin;
@@ -89,7 +87,7 @@ extern int32 sysd_hlt_enb (void);
 
 DIB tti_dib = { 0, 0, NULL, NULL, 1, IVCL (TTI), SCB_TTI, { NULL } };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_8B, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_8B, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
     { HRDATA (BUF, tti_unit.buf, 16) },
@@ -103,8 +101,8 @@ REG tti_reg[] = {
     };
 
 MTAB tti_mod[] = {
-    { UNIT_8B, UNIT_8B, "8b", "8B", NULL },
-    { UNIT_8B, 0      , "7b", "7B", NULL },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
       NULL, &show_vec, NULL },
     { 0 }
@@ -127,7 +125,7 @@ DEVICE tti_dev = {
 
 DIB tto_dib = { 0, 0, NULL, NULL, 1, IVCL (TTO), SCB_TTO, { NULL } };
 
-UNIT tto_unit = { UDATA (&tto_svc, UNIT_8B, 0), SERIAL_OUT_WAIT };
+UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_8B, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
     { HRDATA (BUF, tto_unit.buf, 8) },
@@ -141,8 +139,9 @@ REG tto_reg[] = {
     };
 
 MTAB tto_mod[] = {
-    { UNIT_8B, UNIT_8B, "8b", "8B", NULL },
-    { UNIT_8B, 0      , "7b", "7B", NULL },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,     NULL, &show_vec },
     { 0 }
     };
@@ -173,6 +172,7 @@ REG clk_reg[] = {
     { DRDATA (TODR, todr_reg, 32), PV_LEFT },
     { FLDATA (BLOW, todr_blow, 0) },
     { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (POLL, tmr_poll, 24), REG_NZ + PV_LEFT + REG_HRO },
     { DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
     { NULL }
     };
@@ -281,14 +281,14 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (&tti_unit, tti_unit.wait);                /* continue poll */
+sim_activate (uptr, uptr->wait);                        /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
 if (c & SCPE_BREAK) {                                   /* break? */
     if (sysd_hlt_enb ()) hlt_pin = 1;                   /* if enabled, halt */
     tti_unit.buf = TTIBUF_ERR | TTIBUF_FRM | TTIBUF_RBR;
     }
-else tti_unit.buf = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);
-tti_unit.pos = tti_unit.pos + 1;
+else tti_unit.buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
+uptr->pos = uptr->pos + 1;
 tti_csr = tti_csr | CSR_DONE;
 if (tti_csr & CSR_IE) SET_INT (TTI);
 return SCPE_OK;
@@ -314,14 +314,16 @@ t_stat tto_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-c = tto_unit.buf & ((tto_unit.flags & UNIT_8B)? 0377: 0177);
-if ((r = sim_putchar_s (c)) != SCPE_OK) {               /* output; error? */
-    sim_activate (uptr, uptr->wait);                    /* retry */
-    return ((r == SCPE_STALL)? SCPE_OK: r);             /* !stall? report */
+c = sim_tt_outcvt (tto_unit.buf, TT_GET_MODE (uptr->flags));
+if (c >= 0) {
+    if ((r = sim_putchar_s (c)) != SCPE_OK) {           /* output; error? */
+        sim_activate (uptr, uptr->wait);                /* retry */
+        return ((r == SCPE_STALL)? SCPE_OK: r);         /* !stall? report */
+        }
     }
 tto_csr = tto_csr | CSR_DONE;
 if (tto_csr & CSR_IE) SET_INT (TTO);
-tto_unit.pos = tto_unit.pos + 1;
+uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
 

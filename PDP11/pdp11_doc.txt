@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-11 Simulator Usage
-Date:	01-Jul-2005
+Date:	01-Dec-2005
 
 			COPYRIGHT NOTICE
 
@@ -486,10 +486,18 @@ Error handling is as follows:
 
 2.3.3 DL11 Terminal Input (TTI)
 
-The terminal interfaces (TTI, TTO) can be set to one of two modes:
-7B or 8B.  In 7B mode, input and output characters are masked  to 7
-bits.  In 8B mode, characters are not modified.  Changing the mode
-of either interface changes both.  The default mode is 8B.
+The terminal interfaces (TTI, TTO) can be set to one of three modes, 
+7P, 7B or 8B:
+
+	mode	input characters	output characters
+
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+The default mode is 8B.
 
 The terminal input (TTI) polls the console keyboard for input.  It
 implements these registers:
@@ -1310,12 +1318,17 @@ are supported.  The number of lines can be changed with the command
 
 The line count must be a multiple of 8, with a maximum of 32.
 
-The DZ11 supports 8-bit input and output of characters.  8-bit output
-may be incompatible with certain operating systems.  The command
+The DZ11 supports three character processing modes, 7P, 7B, and 8B:
 
-	SET DZ 7B
+	mode	input characters	output characters
 
-forces output characters (only) to be masked to 7 bits.
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+The default is 8B.
 
 The DZ11 supports logging on a per-line basis.  The command
 

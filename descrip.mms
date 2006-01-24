@@ -41,6 +41,7 @@
 #            S3              Just Build The IBM System 3.
 #            SDS             Just Build The SDS 940.
 #            VAX             Just Build The DEC VAX.
+#            VAX780          Just Build The DEC VAX780.
 #            CLEAN           Will Clean Files Back To Base Kit.
 #
 # To build with debugging enabled (which will also enable traceback 
@@ -422,17 +423,41 @@ SDS_OPTIONS = /INCLUDE=($(SIMH_DIR),$(SDS_DIR))/DEFINE=($(CC_DEFS))
 #
 VAX_DIR = SYS$DISK:[.VAX]
 VAX_LIB = $(LIB_DIR)VAX-$(ARCH).OLB
-VAX_SOURCE = $(VAX_DIR)VAX_CPU1.C,$(VAX_DIR)VAX_CPU.C,\
-             $(VAX_DIR)VAX_FPA.C,$(VAX_DIR)VAX_IO.C,\
-             $(VAX_DIR)VAX_MMU.C,$(VAX_DIR)VAX_STDDEV.C,\
-             $(VAX_DIR)VAX_SYS.C,$(VAX_DIR)VAX_SYSDEV.C,\
-	       $(VAX_DIR)VAX_SYSCM.C,$(VAX_DIR)VAX_SYSLIST.C,\
+VAX_SOURCE = $(VAX_DIR)VAX_CIS.C,$(VAX_DIR)VAX_CMODE.C,\
+             $(VAX_DIR)VAX_CPU.C,$(VAX_DIR)VAX_CPU1.C,\
+             $(VAX_DIR)VAX_FPA.C,$(VAX_DIR)VAX_MMU.C,\
+             $(VAX_DIR)VAX_OCTA.C,$(VAX_DIR)VAX_SYS.C,\
+             $(VAX_DIR)VAX_SYSCM.C,$(VAX_DIR)VAX_SYSDEV.C,\
+	       $(VAX_DIR)VAX_SYSLIST.C,$(VAX_DIR)VAX_IO.C,\
+             $(VAX_DIR)VAX_STDDEV.C,\
              $(PDP11_DIR)PDP11_RL.C,$(PDP11_DIR)PDP11_RQ.C,\
              $(PDP11_DIR)PDP11_TS.C,$(PDP11_DIR)PDP11_DZ.C,\
              $(PDP11_DIR)PDP11_LP.C,$(PDP11_DIR)PDP11_TQ.C,\
              $(PDP11_DIR)PDP11_XQ.C,\
              $(PDP11_DIR)PDP11_RY.C,$(PDP11_DIR)PDP11_VH.C
 VAX_OPTIONS = /INCLUDE=($(SIMH_DIR),$(VAX_DIR),$(PDP11_DIR)$(PCAP_INC))\
+		/DEFINE=($(CC_DEFS),"VM_VAX=1"$(PCAP_DEFS))
+
+#
+# Digital Equipment VAX780 Simulator Definitions.
+#
+VAX780_DIR = SYS$DISK:[.VAX]
+VAX780_LIB = $(LIB_DIR)VAX780-$(ARCH).OLB
+VAX780_SOURCE = $(VAX780_DIR)VAX_CIS.C,$(VAX780_DIR)VAX_CMODE.C,\
+             $(VAX780_DIR)VAX_CPU.C,$(VAX780_DIR)VAX_CPU1.C,\
+             $(VAX780_DIR)VAX_FPA.C,$(VAX780_DIR)VAX_MMU.C,\
+             $(VAX780_DIR)VAX_OCTA.C,$(VAX780_DIR)VAX_SYS.C,\
+             $(VAX780_DIR)VAX_SYSCM.C,\
+             $(VAX780_DIR)VAX780_MBA.C,$(VAX780_DIR)VAX780_MEM.C,\
+             $(VAX780_DIR)VAX_SBI.C,$(VAX780_DIR)VAX780_STDDEV.C,\
+             $(VAX780_DIR)VAX780_SYSLIST.C,$(VAX780_DIR)VAX780_UBA.C,\
+             $(PDP11_DIR)PDP11_DZ.C,$(PDP11_DIR)PDP11_HK.C,\
+             $(PDP11_DIR)PDP11_LP.C,$(PDP11_DIR)PDP11_RL.C,\
+             $(PDP11_DIR)PDP11_RP.C,$(PDP11_DIR)PDP11_RQ.C,\
+             $(PDP11_DIR)PDP11_RY.C,$(PDP11_DIR)PDP11_TQ.C,\
+             $(PDP11_DIR)PDP11_TS.C,$(PDP11_DIR)PDP11_TU.C,\
+             $(PDP11_DIR)PDP11_XU.C
+VAX780_OPTIONS = /INCLUDE=($(SIMH_DIR),$(VAX780_DIR),$(PDP11_DIR)$(PCAP_INC))\
 		/DEFINE=($(CC_DEFS),"VM_VAX=1"$(PCAP_DEFS))
 
 #
@@ -447,7 +472,7 @@ ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 I1401 I1620 IBM1130 ID16 ID32
 # Since VAX Dosen't Have INT64
 #
 ALL : ALTAIR ALTAIRZ80 GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
-      NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX SDS
+      NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX VAX780 SDS
 .ENDIF
 
 CLEAN : 
@@ -782,6 +807,17 @@ $(VAX_LIB) : $(VAX_SOURCE)
                 $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
                 $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
+$(VAX780_LIB) : $(VAX780_SOURCE)
+                $!
+		$! Building The $(VAX_780LIB) Library.
+                $!
+                $ $(CC)$(VAX780_OPTIONS)/OBJECT=$(VAX780_DIR) -
+    			/OBJECT=$(BLD_DIR) $(MMS$CHANGED_LIST)
+                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+                        LIBRARY/CREATE $(MMS$TARGET)
+                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
 $(PCAP_LIB) : $(PCAP_SOURCE)
                 $!
 		$! Building The $(PCAP_LIB) Library.
@@ -1041,6 +1077,15 @@ VAX : $(SIMH_LIB) $(PCAP_LIBD) $(VAX_LIB) $(PCAP_EXECLET)
       $ $(CC)$(VAX_OPTIONS)/OBJECT=$(BLD_DIR) SCP.C
       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)VAX-$(ARCH).EXE -
              $(BLD_DIR)SCP.OBJ,$(VAX_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY$(PCAP_LIBR)
+      $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+VAX780 : $(SIMH_LIB) $(PCAP_LIBD) $(VAX780_LIB) $(PCAP_EXECLET)
+      $!
+      $! Building The $(BIN_DIR)VAX780-$(ARCH).EXE Simulator.
+      $!
+      $ $(CC)$(VAX780_OPTIONS)/OBJECT=$(BLD_DIR) SCP.C
+      $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)VAX780-$(ARCH).EXE -
+             $(BLD_DIR)SCP.OBJ,$(VAX780_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY$(PCAP_LIBR)
       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 #

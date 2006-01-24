@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Nov-05    RMS     Added conditional for OpenBSD (from Federico G. Schwindt)
    16-Aug-05    RMS     Fixed spurious SIGPIPE signal error in Unix
    14-Apr-05    RMS     Added WSAEINPROGRESS test (from Tim Riker)
    09-Jan-04    RMS     Fixed typing problem in Alpha Unix (found by Tim Chapman)
@@ -191,7 +192,8 @@ return newsock;                                         /* got it! */
 SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr)
 {
 int32 sta, err;
-#if defined (macintosh) || defined (__linux) || defined (__APPLE__)
+#if defined (macintosh) || defined (__linux) || \
+    defined (__APPLE__) || defined (__OpenBSD__)
 socklen_t size;
 #elif defined (_WIN32) || defined (__EMX__) ||\
      (defined (__ALPHA) && defined (__unix__))

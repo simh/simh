@@ -28,6 +28,7 @@
    tty          12531C buffered teleprinter interface
    clk          12539C time base generator
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    13-Sep-04    JDB     Added paper tape loop mode, DIAG/READER modifiers to PTR
                         Added PV_LEFT to PTR TRLLIM register
                         Modified CLK to permit disable
@@ -96,12 +97,8 @@
 #define FULL_SET        0xFFFFFFFF
 #define CNTL_SET        (BEL_FLAG | BS_FLAG | HT_FLAG | LF_FLAG | CR_FLAG)
 
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
-#define UNIT_V_UC       (UNIT_V_UF + 1)                 /* UC only */
-#define UNIT_V_DIAG     (UNIT_V_UF + 2)                 /* diag mode */
-#define UNIT_V_AUTOLF   (UNIT_V_UF + 3)                 /* auto linefeed */
-#define UNIT_8B         (1 << UNIT_V_8B)
-#define UNIT_UC         (1 << UNIT_V_UC)
+#define UNIT_V_DIAG     (TTUF_V_UF + 0)                 /* diag mode */
+#define UNIT_V_AUTOLF   (TTUF_V_UF + 1)                 /* auto linefeed */
 #define UNIT_DIAG       (1 << UNIT_V_DIAG)
 #define UNIT_AUTOLF     (1 << UNIT_V_AUTOLF)
 
@@ -117,7 +114,6 @@
 
 extern uint32 PC, SR;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
-extern UNIT cpu_unit;
 
 int32 ptr_stopioe = 0;                                  /* stop on error */
 int32 ptr_trlcnt = 0;                                   /* trailer counter */
@@ -157,6 +153,7 @@ t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
 t_stat tty_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tty_set_alf (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 clkio (int32 inst, int32 IR, int32 dat);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
@@ -268,9 +265,9 @@ DEVICE ptp_dev = {
 DIB tty_dib = { TTY, 0, 0, 0, 0, 0, &ttyio };
 
 UNIT tty_unit[] = {
-    { UDATA (&tti_svc, UNIT_UC, 0), KBD_POLL_WAIT },
-    { UDATA (&tto_svc, UNIT_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&tto_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_8B, 0), SERIAL_OUT_WAIT }
+    { UDATA (&tti_svc, TT_MODE_UC, 0), KBD_POLL_WAIT },
+    { UDATA (&tto_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&tto_svc, UNIT_SEQ+UNIT_ATTABLE+TT_MODE_8B, 0), SERIAL_OUT_WAIT }
     };
 
 REG tty_reg[] = {
@@ -296,16 +293,12 @@ REG tty_reg[] = {
     };
 
 MTAB tty_mod[] = {
-    { UNIT_UC+UNIT_8B, UNIT_UC, "UC", "UC", &tty_set_opt,
-      NULL, ((void *) (UNIT_UC + UNIT_8B)) },
-    { UNIT_UC+UNIT_8B, 0      , "7b", "7B", &tty_set_opt,
-      NULL, ((void *) (UNIT_UC + UNIT_8B)) },
-    { UNIT_UC+UNIT_8B, UNIT_8B, "8b", "8B", &tty_set_opt,
-      NULL, ((void *) (UNIT_UC + UNIT_8B)) },
-    { UNIT_AUTOLF, UNIT_AUTOLF, "autolf", "AUTOLF", &tty_set_opt,
-      NULL, ((void *) UNIT_AUTOLF) },
-    { UNIT_AUTOLF, 0          , NULL, "NOAUTOLF", &tty_set_opt,
-      NULL, ((void *) UNIT_AUTOLF) },
+    { TT_MODE, TT_MODE_UC, "UC", "UC", &tty_set_opt },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", &tty_set_opt },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", &tty_set_opt },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", &tty_set_opt },
+    { UNIT_AUTOLF, UNIT_AUTOLF, "autolf", "AUTOLF", &tty_set_alf },
+    { UNIT_AUTOLF, 0          , NULL, "NOAUTOLF", &tty_set_alf },
     { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
       &hp_setdev, &hp_showdev, &tty_dev },
     { 0 }
@@ -699,7 +692,7 @@ t_stat tti_svc (UNIT *uptr)
 int32 c, dev;
 
 dev = tty_dib.devno;                                    /* get device no */
-sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);      /* continue poll */
+sim_activate (uptr, uptr->wait);                        /* continue poll */
 tty_shin = 0377;                                        /* assume inactive */
 if (tty_lf) {                                           /* auto lf pending? */
     c = 012;                                            /* force lf */
@@ -708,16 +701,12 @@ if (tty_lf) {                                           /* auto lf pending? */
 else {
     if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;   /* no char or error? */
     if (c & SCPE_BREAK) c = 0;                          /* break? */
-    else if (tty_unit[TTI].flags & UNIT_UC) {           /* UC only? */
-        c = c & 0177;
-        if (islower (c)) c = toupper (c);
-        }
-    else c = c & ((tty_unit[TTI].flags & UNIT_8B)? 0377: 0177);
+    else c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
     tty_lf = ((c & 0177) == 015) && (uptr->flags & UNIT_AUTOLF);
     }
 if (tty_mode & TM_KBD) {                                /* keyboard enabled? */
     tty_buf = c;                                        /* put char in buf */
-    tty_unit[TTI].pos = tty_unit[TTI].pos + 1;
+    uptr->pos = uptr->pos + 1;
     setFSR (dev);                                       /* set flag */
     if (c) {
         tto_out (c);                                    /* echo? */
@@ -750,12 +739,8 @@ t_stat tto_out (int32 c)
 t_stat r;
 
 if (tty_mode & TM_PRI) {                                /* printing? */
-    if (tty_unit[TTO].flags & UNIT_UC) {                /* UC only? */
-        c = c & 0177;
-        if (islower (c)) c = toupper (c);
-        }
-    else c = c & ((tty_unit[TTO].flags & UNIT_8B)? 0377: 0177);
-    if ((c > 31) || (CHAR_FLAG (c) & tty_cntlprt)) {    /* normal, ctrl? */
+    c = sim_tt_outcvt (c, TT_GET_MODE (tty_unit[TTO].flags));
+    if (c >= 0) {                                       /* valid? */
         if (r = sim_putchar_s (c)) return r;            /* output char */
         tty_unit[TTO].pos = tty_unit[TTO].pos + 1;
         }
@@ -796,13 +781,19 @@ return SCPE_OK;
 t_stat tty_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 u = uptr - tty_dev.units;
-int32 mask = (int32) desc;
 
-if (u > 1) return SCPE_NOFNC;
-tty_unit[TTI].flags = (tty_unit[TTI].flags & ~mask) | val;
-tty_unit[TTO].flags = (tty_unit[TTO].flags & ~mask) | val;
-if (val == UNIT_8B) tty_cntlprt = FULL_SET;
-else tty_cntlprt = tty_cntlset;
+if (u > TTO) return SCPE_NOFNC;
+tty_unit[TTO].flags = (tty_unit[TTO].flags & ~TT_MODE) | val;
+if (val == TT_MODE_7P) val = TT_MODE_7B;
+tty_unit[TTI].flags = (tty_unit[TTI].flags & ~TT_MODE) | val;
+return SCPE_OK;
+}
+
+t_stat tty_set_alf (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 u = uptr - tty_dev.units;
+
+if (u != TTI) return SCPE_NOFNC;
 return SCPE_OK;
 }
 

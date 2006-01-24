@@ -24,28 +24,28 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the Author.
 
-   vh		DHQ11 asynch multiplexor for SIMH
+   vh		    DHQ11 asynch multiplexor for SIMH
 
-   07-Jul-05	RMS	Removed extraneous externs
-   15-Jun-05	RMS	Revised for new autoconfigure interface
-			Fixed bug in vector display routine
-   12-Jun-04	RMS	Repair MS2SIMH macro to avoid divide by	0 bug
-   08-Jun-04	JAD	Repair vh_dev initialization; remove unused
-			variables, cast to avoid conversion confusion
-   07-Jun-04	JAD	Complete function prototypes of forward declarations.
-			Repair broken prototypes of vh_rd() and vh_wr()
-			Explicitly size integer declarations
-   4-Jun-04	JAD	Preliminary code: If operating in a PDP-11 Unibus
-			environment, force DHU mode
-   29-May-04	JAD	Make certain RX.TIMER is within allowable range
-   25-May-04	JAD	All time-based operations are scaled by tmxr_poll units
-   23-May-04	JAD	Change to fifo_get() and dq_tx_report() to avoid
-			gratuitous stack manipulation
-   20-May-04	JAD	Made modem control and auto-hangup unit flags
-   19-May-04	JAD	Fix problem with modem status where the line number
-			was not being included
-   12-May-04	JAD	Revised for updated tmxr interfaces
-   28-Jan-04	JAD	Original creation and testing
+   07-Jul-05	RMS	    Removed extraneous externs
+   15-Jun-05	RMS	    Revised for new autoconfigure interface
+			            Fixed bug in vector display routine
+   12-Jun-04	RMS	    Repair MS2SIMH macro to avoid divide by	0 bug
+   08-Jun-04	JAD	    Repair vh_dev initialization; remove unused
+			             variables, cast to avoid conversion confusion
+   07-Jun-04	JAD	    Complete function prototypes of forward declarations.
+			            Repair broken prototypes of vh_rd() and vh_wr()
+			            Explicitly size integer declarations
+   4-Jun-04	    JAD     Preliminary code: If operating in a PDP-11 Unibus
+			             environment, force DHU mode
+   29-May-04	JAD	    Make certain RX.TIMER is within allowable range
+   25-May-04	JAD	    All time-based operations are scaled by tmxr_poll units
+   23-May-04	JAD	    Change to fifo_get() and dq_tx_report() to avoid
+			             gratuitous stack manipulation
+   20-May-04	JAD	    Made modem control and auto-hangup unit flags
+   19-May-04	JAD	    Fix problem with modem status where the line number
+			             was not being included
+   12-May-04	JAD	    Revised for updated tmxr interfaces
+   28-Jan-04	JAD	    Original creation and testing
 
 I/O Page Registers
 

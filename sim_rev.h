@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,11 +29,55 @@
 
 #define SIM_MAJOR       3
 #define SIM_MINOR       5
-#define SIM_PATCH       1
+#define SIM_PATCH       2
 
 /* V3.5 revision history 
 
 patch   date            module(s) and fix(es)
+
+  2     07-Jan-06       scp.c:
+                        - added breakpoint spaces
+                        - added REG_FIT support
+
+                        sim_console.c: added ASCII character processing routines
+
+                        sim_tape.c, sim_tape.h:
+                        - added write support for P7B format
+                        - fixed bug in write forward (found by Dave Bryan)
+
+                        h316_stddev.c, hp2100_stddev.c, hp2100_mux.c, id_tt.c,
+                        id_ttp.c, id_pas.c, pdp8_tt.c, pdp8_ttx.c, pdp11_stddev.c,
+                        pdp11_dz.c, pdp18b_stddev.c, pdp18b_tt1.c, vax_stddev,
+                        gri_stddev.c:
+                        - revised to support new character handling routines
+
+                        pdp10_rp.c: fixed DCLR not to clear disk address
+
+                        pdp11_hk.c: fixed overlapped seek interaction with NOP, etc
+
+                        pdp11_rh.c: added enable/disable routine
+
+                        pdp11_rq.c, pdp11_tm.c, pdp11_tq.c, pdp11_ts.c
+                        - widened address display to 64b when USE_ADDR64
+
+                        pdp11_rp.c:
+                        - fixed DCLR not to clear disk address
+                        - fixed device enable/disable logic to include Massbus adapter
+                        - widened address display to 64b when USE_ADDR64
+
+                        pdp11_tu.c:
+                        - fixed device enable/disable logic to include Massbus adapter
+                        - widened address display to 64b when USE_ADDR64
+                        - changed default adapter to TM03 (for VMS)
+
+                        pdp8_df.c, pdp8_dt.c, pdp8_rf.c:
+                        - fixed unaligned access bug (found by Doug Carman)
+
+                        pdp8_rl.c: fixed IOT 61 decoding bug (found by David Gesswein)
+
+                        vax_cpu.c:
+                        - fixed breakpoint detection when USE_ADDR64 option is active
+                        - fixed CVTfi to trap on integer overflow if PSW<iv> set
 
   1     15-Oct-05       All CPU's, other sources: fixed declaration inconsistencies
                         (from Sterling Garwood)
@@ -56,7 +100,7 @@ patch   date            module(s) and fix(es)
 
                         vax_io.c: fixed bug in autoconfiguration (missing XU)
 
-			vax_fpa.c: fixed bug in 32b structure definitions (from Jason Stevens)
+                        vax_fpa.c: fixed bug in 32b structure definitions (from Jason Stevens)
 
   0     1-Sep-05        Note: most source modules have been edited to improve
                         readability and to fix declaration and cast problems in C++

@@ -1,6 +1,6 @@
 /* pdp8_rf.c: RF08 fixed head disk simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rf           RF08 fixed head disk
 
+   07-Jan-06    RMS     Fixed unaligned register access bug (found by Doug Carman)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
    26-Oct-03    RMS     Cleaned up buffer copy code
    26-Jul-03    RMS     Fixed bug in set size routine
@@ -145,8 +146,8 @@ UNIT pcell_unit = { UDATA (&pcell_svc, 0, 0) };
 REG rf_reg[] = {
     { ORDATA (STA, rf_sta, 12) },
     { ORDATA (DA, rf_da, 20) },
-    { ORDATA (WC, M[RF_WC], 12) },
-    { ORDATA (MA, M[RF_MA], 12) },
+    { ORDATA (WC, M[RF_WC], 12), REG_FIT },
+    { ORDATA (MA, M[RF_MA], 12), REG_FIT },
     { FLDATA (DONE, rf_done, 0) },
     { FLDATA (INT, int_req, INT_V_RF) },
     { ORDATA (WLK, rf_wlk, 32) },

@@ -77,7 +77,7 @@ images, and to Digital Equipment Corporation, which provided the license.
 
 To boot and run OS/8:
 
-	sim> att rx0 os8sys_rx.dsk
+	sim> att rx0 os8_rx.dsk
 	sim> att rx1 os8f4_rx.dsk
 	sim> boot rx0
 	

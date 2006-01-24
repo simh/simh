@@ -1,0 +1,17 @@
+1. RP: drive clear does not clear RPDA.
+2. TU: default formatter must be TM03.
+3. SBI: drive 'letter' is actually a 1-based number.
+4. MBA: drive register reads return SR<31:16> as high word.
+5. UBA: DMA addresses must be masked to Unibus width (18b).
+6. HK: thread used multiple times if SEEK is followed by NOP or DCLR.
+7. HK: only DCLR clears ATA.
+8. MEM: MS780E size declaration off-by-1.
+9. MEM: MS780E array start off by >> 4.
+10. MEM: CSR-C register write logic incorrect.
+11. CIS: CMPP3/CMPP4 using wrong arguments to ReadDstr.
+12. CPU, OCTA: CVTfi with integer overflow not setting trap if PSW<iv> = 1.
+13. STDDEV: read of ICR was missing the call parameter.
+
+
+
+

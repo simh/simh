@@ -25,6 +25,7 @@
 
    dz           DZ11 terminal multiplexor
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    07-Jul-05    RMS     Removed extraneous externs
    15-Jun-05    RMS     Revised for new autoconfigure interface
    04-Apr-04    RMS     Added per-line logging
@@ -61,12 +62,12 @@ extern int32 int_req;
 
 #elif defined (VM_VAX)                                  /* VAX version */
 #include "vax_defs.h"
-#define DZ_8B_DFLT      UNIT_8B
+#define DZ_8B_DFLT      TT_MODE_8B
 extern int32 int_req[IPL_HLVL];
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-#define DZ_8B_DFLT      UNIT_8B
+#define DZ_8B_DFLT      TT_MODE_8B
 extern int32 int_req[IPL_HLVL];
 #endif
 
@@ -79,9 +80,6 @@ extern int32 int_req[IPL_HLVL];
 #if !defined (DZ_LINES)
 #define DZ_LINES        8
 #endif
-
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8b output */
-#define UNIT_8B         (1 << UNIT_V_8B)
 
 #define DZ_MNOMASK      (DZ_MUXES - 1)                  /* mask for mux no */
 #define DZ_LNOMASK      (DZ_LINES - 1)                  /* mask for lineno */
@@ -217,8 +215,9 @@ REG dz_reg[] = {
     };
 
 MTAB dz_mod[] = {
-    { UNIT_8B, 0, "7b", "7B", NULL },
-    { UNIT_8B, UNIT_8B, "8b", "8B", NULL },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &dz_desc },
     { UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &dz_summ },
@@ -295,7 +294,7 @@ return SCPE_OK;
 t_stat dz_wr (int32 data, int32 PA, int32 access)
 {
 int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;        /* get mux num */
-int32 i, line;
+int32 i, c, line;
 TMLN *lp;
 
 switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
@@ -364,8 +363,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         if (dz_csr[dz] & CSR_MSE) {                     /* enabled? */
             line = (dz * DZ_LINES) + CSR_GETTL (dz_csr[dz]);
             lp = &dz_ldsc[line];                        /* get line desc */
-            tmxr_putc_ln (lp, dz_tdr[dz] &              /* store char */
-                ((dz_unit.flags & UNIT_8B)? 0377: 0177));
+            c = sim_tt_outcvt (dz_tdr[dz], TT_GET_MODE (dz_unit.flags));
+            if (c >= 0) tmxr_putc_ln (lp, c);           /* store char */
             tmxr_poll_tx (&dz_desc);                    /* poll output */
             dz_update_xmti ();                          /* update int */
             }

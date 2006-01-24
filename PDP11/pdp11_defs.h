@@ -780,6 +780,7 @@ int32 mba_get_csr (uint32 mbus);
 void mba_upd_ata (uint32 mbus, uint32 val);
 void mba_set_exc (uint32 mbus);
 void mba_set_don (uint32 mbus);
+void mba_set_enbdis (uint32 mb, t_bool dis);
 t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #endif

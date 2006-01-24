@@ -25,6 +25,7 @@
 
    rp           RH/RP/RM moving head disks
 
+   12-Nov-05    RMS     Fixed DCLR not to clear drive address
    07-Jul-05    RMS     Removed extraneous externs
    18-Mar-05    RMS     Added attached test to detach routine
    20-Sep-04    RMS     Fixed bugs in replicated state, RP vs RM accuracy
@@ -765,8 +766,11 @@ dc = rpdc[drv];                                         /* assume seek, sch */
 switch (fnc) {                                          /* case on function */
 
     case FNC_DCLR:                                      /* drive clear */
-        rpda[drv] = 0;                                  /* clear disk addr */
         rper1[drv] = rper2[drv] = rper3[drv] = 0;       /* clear errors */
+        rpec2[drv] = 0;                                 /* clear EC2 */
+        if (drv_tab[dtype].ctrl == MBA_RM_CTRL)         /* RM? */
+            rpmr[drv] = 0;                              /* clear maint */
+        else rpec1[drv] = 0;                            /* RP, clear EC1 */
     case FNC_NOP:                                       /* no operation */
     case FNC_RELEASE:                                   /* port release */
         return;

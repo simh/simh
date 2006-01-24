@@ -273,7 +273,7 @@ switch (mod) {
         if (M[BS] != (BCD_GRPMRK + WM)) {               /* not GM+WM at end? */
             if (flag == MD_WM) M[BS] = BCD_GRPMRK;      /* LCA: clear WM */
             else M[BS] = (M[BS] & WM) | BCD_GRPMRK;     /* MCW: save WM */
-		    }
+            }
         if (DEBUG_PRS (mt_dev))
             fprintf (sim_deb, " to %d, stopped by EOR\n", BS);
         BS++;                                           /* adv BS */

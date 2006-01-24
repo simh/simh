@@ -23,7 +23,34 @@ characters.
 
 1.1.4 PDP-11
 
-- Revised autoconfigure to handle more casees
+- Revised autoconfigure to handle more cases
+
+1.2 3.5-1
+
+No new features
+
+1.3 3.5-2
+
+1.3.1 All ASCII terminals
+
+- Most ASCII terminal emulators have supported 7-bit and 8-bit
+  operation; where required, they have also supported an upper-
+  case only or KSR-emulation mode.  This release adds a new mode,
+  7P, for 7-bit printing characters.  In 7P mode, non-printing
+  characters in the range 0-31 (decimal), and 127 (decimal), are
+  automatically suppressed.  This prevents printing of fill
+  characters under Windows.
+
+  The printable character set for ASCII code values 0-31 can be
+  changed with the SET CONSOLE PCHAR command.  Code value 127
+  (DELETE) is always suppressed.
+
+1.3.2 VAX-11/780
+
+- First release.  The VAX-11/780 has successfully run VMS V7.2.  The
+  commercial instructions and compatability mode have not been
+  extensively tested.  The Ethernet controller is not working yet
+  and is disabled.
 
 2. Bugs Fixed
 
@@ -95,5 +122,27 @@ characters.
 
 - Fixed bug in autoconfiguration table
 
+2.3 3.5-2
 
+2.3.1 PDP-10
 
+- RP: fixed drive clear not to clear disk address
+
+2.3.2 PDP-11 (VAX, VAX-11/780, for shared peripherals)
+
+- HK: fixed overlap seek interaction with drive select, drive clear, etc
+- RQ, TM, TQ, TS, TU: widened address display to 64b when USE_ADDR64 option selected
+- TU: changed default adapter from TM02 to TM03 (required by VMS)
+- RP: fixed drive clear not to clear disk address
+- RP, TU: fixed device enable/disable to enabled/disable Massbus adapter as well
+- XQ: fixed register access alignment bug (found by Doug Carman)
+
+2.3.3 PDP-8
+
+- RL: fixed IOT 61 decoding bug (found by David Gesswein)
+- DF, DT, RF: fixed register access alignment bug (found by Doug Carman)
+
+2.3.4 VAX
+
+- Fixed CVTfi to trap on integer overflow if PSW<iv> is set
+- Fixed breakpoint detection when USE_ADDR64 option selected

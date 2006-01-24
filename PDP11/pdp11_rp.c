@@ -25,6 +25,8 @@
 
    rp           RH/RP/RM moving head disks
 
+   21-Nov-05    RMS     Enable/disable device also enables/disables Massbus adapter
+   12-Nov-05	RMS     Fixed DriveClear, does not clear disk address
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    18-Mar-05    RMS     Added attached test to detach routine
    12-Sep-04    RMS     Cloned from pdp11_rp.c
@@ -673,8 +675,11 @@ if ((fnc != FNC_DCLR) && (rpds[drv] & DS_ERR)) {        /* err & ~clear? */
 switch (fnc) {                                          /* case on function */
 
     case FNC_DCLR:                                      /* drive clear */
-        rpda[drv] = 0;                                  /* clear disk addr */
         rper1[drv] = rper2[drv] = rper3[drv] = 0;       /* clear errors */
+        rpec2[drv] = 0;                                 /* clear EC2 */
+        if (drv_tab[dtype].ctrl == RM_CTRL)             /* RM? */
+            rpmr[drv] = 0;                              /* clear maint */
+        else rpec1[drv] = 0;                            /* RP, clear EC1 */
     case FNC_NOP:                                       /* no operation */
     case FNC_RELEASE:                                   /* port release */
         return SCPE_OK;
@@ -918,6 +923,7 @@ t_stat rp_reset (DEVICE *dptr)
 int32 i;
 UNIT *uptr;
 
+mba_set_enbdis (MBA_RP, rp_dev.flags & DEV_DIS);
 for (i = 0; i < RP_NUMDR; i++) {
     uptr = rp_dev.units + i;
     sim_cancel (uptr);

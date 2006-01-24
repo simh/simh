@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Nov-05    RMS     Added central input/output conversion support
    05-Nov-04    RMS     Moved SET/SHOW DEBUG under CONSOLE hierarchy
    28-Oct-04    JDB     Fixed SET CONSOLE to allow comma-separated parameters
    20-Aug-04    RMS     Added OS/2 EMX fixes (from Holger Veit)
@@ -58,6 +59,8 @@
    sim_putchar_s -      output character to console, stall if congested
    sim_set_console -    set console parameters
    sim_show_console -   show console parameters
+   sim_tt_inpcvt -      convert input character per mode
+   sim_tt_outcvt -      convert output character per mode
 
    sim_ttinit   -       called once to get initial terminal state
    sim_ttrun    -       called to put terminal into run state
@@ -78,6 +81,7 @@
 #include "sim_defs.h"
 #include "sim_sock.h"
 #include "sim_tmxr.h"
+#include <ctype.h>
 
 #define KMAP_WRU        0
 #define KMAP_BRK        1
@@ -87,6 +91,7 @@
 
 int32 sim_int_char = 005;                               /* interrupt character */
 int32 sim_brk_char = 000;                               /* break character */
+int32 sim_tt_pchar = 0x00002780;
 #if defined (_WIN32) || defined (__OS2__) || (defined (__MWERKS__) && defined (macintosh))
 int32 sim_del_char = '\b';                              /* delete character */
 #else
@@ -414,6 +419,41 @@ if (sim_con_ldsc.xmte == 0) r = SCPE_STALL;             /* xmt disabled? */
 else r = tmxr_putc_ln (&sim_con_ldsc, c);               /* no, Telnet output */
 tmxr_poll_tx (&sim_con_tmxr);                           /* poll xmt */
 return r;                                               /* return status */
+}
+
+/* Input character processing */
+
+int32 sim_tt_inpcvt (int32 c, uint32 mode)
+{
+uint32 md = mode & TTUF_M_MODE;
+
+if (md != TTUF_MODE_8B) {
+    c = c & 0177;
+    if (md == TTUF_MODE_UC) {
+        if (islower (c)) c = toupper (c);
+        if (mode & TTUF_KSR) c = c | 0200;
+        }
+    }
+else c = c & 0377;
+return c;
+}
+
+/* Output character processing */
+
+int32 sim_tt_outcvt (int32 c, uint32 mode)
+{
+uint32 md = mode & TTUF_M_MODE;
+
+if (md != TTUF_MODE_8B) {
+    c = c & 0177;
+    if ((md == TTUF_MODE_UC) && islower (c)) c = toupper (c);
+    if (((md == TTUF_MODE_UC) || (md == TTUF_MODE_7P)) &&
+        ((c == 0177) ||
+         ((c < 040) && !((sim_tt_pchar >> c) & 1))))
+        return -1;
+    }
+else c = c & 0377;
+return c;
 }
 
 /* VMS routines, from Ben Thomas, with fixes from Robert Alan Byer */

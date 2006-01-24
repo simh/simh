@@ -1,6 +1,6 @@
 To:	Users
 From:	Bob Supnik
-Subj:	VAX Simulator Usage
+Subj:	VAX780 Simulator Usage
 Date:	01-Dec-2005
 
 			COPYRIGHT NOTICE
@@ -36,9 +36,9 @@ This memorandum documents the VAX simulator.
 
 1. Simulator Files
 
-To compile the VAX, you must define VM_VAX and USE_INT64 as part of the compilation
-command line.  To enable extended file support (files greater than 2GB), you must
-define USE_ADDR64 as part of the command line as well.
+To compile the VAX780, you must define VM_VAX, VAX780, and USE_INT64 as part of
+the compilation command line.  To enable extended file support (files greater
+than 2GB), you must define USE_ADDR64 as part of the command line as well.
 
 sim/		scp.h
 		sim_console.h
@@ -60,75 +60,81 @@ sim/		scp.h
 		sim_tmxr.c
 
 sim/vax/	vax_defs.h
-		vaxmod_defs.h
+		vax780_defs.h
 		vax_cis.c
 		vax_cmode.c
 		vax_cpu.c
 		vax_cpu1.c
 		vax_fpa.c
-		vax_io.c
 		vax_mmu.c
 		vax_octa.c
-		vax_stddev.c
 		vax_sys.c
 		vax_syscm.c
-		vax_sysdev.c
-		vax_syslist.c
+		vax780_mba.c
+		vax780_mem.c
+		vax780_sbi.c
+		vax780_stddev.c
+		vax780_syslist.c
+		vax780_uba.c
 
 sim/pdp11/	pdp11_mscp.h
 		pdp11_uqssp.h
-		pdp11_xq.h
-		pdp11_xq_bootrom.h
+		pdp11_xu.h
 		pdp11_dz.c
+		pdp11_hk.c
 		pdp11_lp.c
 		pdp11_rl.c
-		pdp11_ry.c
+		pdp11_rp.c
 		pdp11_rq.c
+		pdp11_ry.c
 		pdp11_tq.c
 		pdp11_ts.c
-		pdp11_vh.c
-		pdp11_xq.c
+		pdp11_tu.c
+		pdp11_xu.c
 
 Additional files are:
 
-sim/vax/	ka655.bin		standard boot ROM code
-		ka655x.bin		extended memory boot ROM code
+sim/vax/	vmb780.bin		standard boot code
 
-2. VAX Features
+2. VAX780 Features
 
 The VAX simulator is configured as follows:
 
 device		simulates
 name(s)
 
-CPU		KA655 CPU with 16MB-64MB of memory, or
-		"KA655X" CPU with 16MB-512MB of memory
+CPU		VAX-11/780 CPU
 TLB		translation buffer
-ROM		read-only memory
-NVR		non-volatile memory
-QBA		Qbus adapter
-SYSD		system devices
+SBI		system bus controller
+MCTL0,MTCL1	memory controllers, MS780C with 4MB memory each, or
+		MS780E with 8MB-64MB each
+UBA		DW780 Unibus adapter
+MBA0,MBA1	RH780 Massbus adapters
+TODR		time-of-day clock
+TMR		interval timer
 TTI,TTO		console terminal
-CLK		real-time clock
-DZ		DZV11 4-line terminal multiplexor (up to 4)
-VH		DHQ11 8-line terminal multiplexor (up to 4)
-LPT		LPV11 line printer
-RL		RLV12/RL01(2) cartridge disk controller with four drives
-RQ		RQDX3 MSCP controller with four drives
-RQB		second RQDX3 MSCP controller with four drives
-RQC		third RQDX3 MSCP controller with four drives
-RQD		fourth RQDX3 MSCP controller with four drives
-RY		RXV21 floppy disk controller with two drives
-TS		TSV11/TSV05 magnetic tape controller with one drive
-TQ		TQK50 TMSCP magnetic tape controller with four drives
-XQ		DELQA/DEQNA Ethernet controller
-XQB		second DELQA/DEQNA Ethernet controller
+RX		console floppy
+DZ		DZ11 8-line terminal multiplexor (up to 4)
+LPT		LP11 line printer
+RP		RP04/RP05/RP06/RM03/RM05/RP07/RM80 Massbus disks, up to eight
+HK		RK611/RK06(7) cartridge disk controller with eight drives
+RL		RL11/RL01(2) cartridge disk controller with four drives
+RQ		UDA50 MSCP controller with four drives
+RQB		second UDA50 MSCP controller with four drives
+RQC		third UDA50 MSCP controller with four drives
+RQD		fourth UDA50 MSCP controller with four drives
+RY		RX211 floppy disk controller with two drives
+TS		TS11 magnetic tape controller with one drive
+TQ		TUK50 TMSCP magnetic tape controller with four drives
+TU		TM02/TM03 tape formatter with eight drives
+XU		DEUNA/DELUA Ethernet controller
+XUB		second DEUNA/DELUA Ethernet controller
 
-The DZ, VH, LPT, RL, RQ, RQB, RQC, RQD, RY, TS, TQ, XQ, and XQB
-devices can be set DISABLED.  RQB, RQC, RQD, and XQB are disabled by
+The DZ, LPT, RP, RL, RQ, RQB, RQC, RQD, RY, TS, TQ, TU, XU, and XUB
+devices can be set DISABLED.  RQB, RQC, RQD, and XUB are disabled by
 default.
 
-The VAX simulator implements several unique stop conditions:
+The VAX780 simulator implements several unique stop conditions:
 
 	- change mode to interrupt stack
 	- illegal vector (bits<1:0> = 2 or 3)
@@ -137,26 +143,22 @@ The VAX simulator implements several unique stop conditions:
 	- unknown IPL
 	- infinite loop (BRB/W to self at IPL 1F)
 
-The VAX supports a simple binary format consisting of a stream of
-binary bytes without origin or checksum, for loading memory, the boot
-ROM, or the non-volatile memory.
+The VAX780 supports a simple binary format consisting of a stream of
+binary bytes without origin or checksum, for loading memory.
 
 2.1 CPU and System Devices
 
-2.2 CPU
+2.1.1 CPU
 
 CPU options include the size of main memory and the treatment of the
 HALT instruction.
 
+	SET CPU 8M		set memory size = 8MB
 	SET CPU 16M		set memory size = 16MB
 	SET CPU 32M		set memory size = 32MB
 	SET CPU 48M		set memory size = 48MB
 	SET CPU 64M		set memory size = 64MB
 	SET CPU 128M		set memory size = 128MB
-	SET CPU 256M		set memory size = 256MB
-	SET CPU 512M		set memory size = 512MB
-	SET CPU SIMHALT		kernel HALT returns to simulator
-	SET CPU CONHALT		kernel HALT returns to boot ROM console
 
 The CPU implements a show command to display the I/O address map:
 
@@ -169,42 +171,20 @@ translation:
 
 Notes on memory size:
 
-- The real KA655 CPU only supported 16MB to 64MB of memory.  The simulator
-  provides a KA655"X" mode, which increases supported memory to 512MB.
-  The firmware (ka655x.bin) contains code to determine the size of extended
-  memory and set up the PFN bit map accordingly.  Other than setting up
-  the PFN bootmap, the firmware does not recognize extended memory and
-  will behave as though memory size was 64MB. 
-- If memory size is being reduced, and the memory being truncated contains
-  non-zero data, the simulator asks for confirmation.  Data in the truncated
-  portion of memory is lost.
-- If the simulator is running VMS, the operating system may have a SYSGEN 
-  parameter set called PHYSICAL PAGES (viewable from "MCR SYSGEN SHOW
-  PHYSICALPAGES").  PHYSICALPAGES limits the maximum number of physical pages
-  of memory the OS will recognize.  If it is set to a lower value than the
-  new memory size of the machine, then only the first PHYSICALPAGES of
-  memory will be recognized, otherwise the actual size of the extended
-  memory will be realized by VMS upon each boot.  Some users and/or sites
-  may specify the PHYSICALPAGES parameter in the input file to AUTOGEN
-  (SYS$SYSTEM:MODPARAMS.DAT).  If PHYSICALPAGES is specified there, it will
-  have to be adjusted before running AUTOGEN to recognize more memory.  The
-  default value for PHYSICALPAGES is 1048576, which describes 512MB of RAM.
+- The first version of the VAX-11/780 used MS780C controllers, which
+  supported  1-4MB of memory per controller.  This is the only memory
+  controller recognized by VMS V1.
+- MS780E controllers supported 4MB-64MB per controller.
+- The controller type is set automatically based on memory size.
 
-Initial memory size is 16MB.
+Initial memory size is 8MB.
 
 Memory can be loaded with a binary byte stream using the LOAD command.
-The LOAD command recognizes three switch:
+The LOAD command recognizes three switches:
 
 	-o			origin argument follows file name
-	-r			load the boot ROM
-	-n			load the non-volatile RAM
-
-The CPU supports the BOOT command and is the only VAX device to do so.
-Note that the behavior of the bootstrap depends on the capabilities of
-the console terminator emulator.  If the terminal window supports full
-VT100 emulation (including Multilanguage Character Set support), the
-bootstrap will ask the user to specify the language; otherwise, it will
-default to English.
+	-r			load ROM in memory controller 0
+	-s			load ROM in memory controller 1
 
 These switches are recognized when examining or depositing in CPU memory
 (or any other byte oriented device):
@@ -252,8 +232,7 @@ control registers for the interrupt system.
 	SLR		22	system length register
 	SISR		16	software interrupt summary register
 	ASTLVL		4	AST level register
-	MAPEN		1	memory management enable
-	PME		1	performance monitor enable
+	MAPEN		1	memory management enable flag
 	TRPIRQ		8	trap/interrupt pending
 	CRDERR		1	correctible read data error flag
 	MEMERR		1	memory error flag
@@ -283,120 +262,150 @@ translation buffer entry consists of two 32b words, as follows:
 
 An invalid entry is indicated by a tag of FFFFFFFF.
 
-2.1.3 Qbus Adapter (QBA)
+2.1.3 SBI Controller (SBI)
 
-The QBA represents the CQBIC Qbus adapter chip.  It recognizes the
-following options:
-
-	SET QBA AUTOCONFIGURE	enable autoconfiguration
-	SET QBA NOAUTOCONFIGURE	disable autoconfiguration
-
-and the following display command:
-
-	SHOW QBA IOSPACE	show IO space addresses
-
-The QBA registers are:
+The SBI was the VAX-11/780 system bus.  The simulated SBI implements
+these registers:
 
 	name		size	comments
 
-	SCR		16	system configuration register
-	DSER		8	DMA system error register
-	MEAR		13	master error address register
-	SEAR		20	slave error address register
-	MBR		29	Qbus map base register
-	IPC		16	interprocessor communications register
-	IPL17		32	IPL 17 interrupt flags
-	IPL16		32	IPL 16 interrupt flags
-	IPL15		32	IPL 15 interrupt flags
-	IPL14		32	IPL 14 interrupt flags
+	NREQ14		16	Nexus IPL14 interrupt requests
+	NREQ15		16	Nexus IPL15 interrupt requests
+	NREQ16		16	Nexus IPL16 interrupt requests
+	NREQ17		16	Nexus IPL17 interrupt requests
+	WCSA		16	writeable control store address
+	WCSD		32	writeable control store data
+	MBRK		13	microbreak register
+	SBIFS		32	SBI fault status
+	SBISC		32	SBI silo compare
+	SBIMT		32	SBI maintenance register
+	SBIER		32	SBI error status
+	SBITMO		32	SBI timeout address
 
-2.1.4 Read-only memory (ROM)
+2.1.4 Memory Controllers (MCTL0, MCTL1)
 
-The boot ROM consists of a single unit, representing the 128KB boot ROM.
-It has no registers.  The boot ROM is loaded with a binary byte stream
-using the LOAD -r command:
-
-	LOAD -r KA655.BIN	load ROM image KA655.BIN (normal memory)
-	LOAD -r KA655X.BIN	laod ROM image KA655X.BIN (extended memory)
-
-ROM accesses a use a calibrated delay that slows ROM-based execution to
-about 500K instructions per second.  This delay is required to make the
-power-up self-test routines run correctly on very fast hosts.  The delay
-is controlled with the commands:
-
-	SET ROM NODELAY		ROM runs like RAM
-	SET ROM DELAY		ROM runs slowly
-
-2.1.5 Non-volatile Memory (NVR)
-
-The NVR consists of a single unit, representing 1KB of battery-backed up
-memory.  When the simulator starts, NVR is cleared to 0, and the SSC
-battery-low indicator is set.  Normally, NVR is saved and restored like
-other memory in the system.  Alternately, NVR can be attached to a file.
-This allows its contents to be saved and restored independently of
-other memories, so that NVR state can be preserved across simulator runs.
-
-Successfully loading an NVR image clears the SSC battery-low indicator.
-
-2.1.6 System Devices (SYSD)
-
-The system devices are the system-specific facilities implemented in the
-CVAX chip, the KA655 CPU board, the CMCTL memory controller, and the SSC
-system support chip.  Note that the simulation of these devices is
-incomplete and is intended strictly to allow the patched bootstrap and
-console code to run.  The SYSD registers are:
+The memory controllers implement the registers for the MS780C (non-
+extended memory) or MS780E (extended memory).  Each controller implements
+these registers:
 
 	name		size	comments
 
-	CADR		8	cache disable register
-	MSER		8	memory system error register
-	CONPC		32	PC at console halt
-	CONPSL		32	PSL at console halt
-	CMCSR[0:17]	32	CMCTL control and status registers
-	CACR		8	second-level cache control register
-	BDR		8	front panel jumper register
-	BASE		29	SSC base address register
-	CNF		32	SSC configuration register
-	BTO		32	SSC bus timeout register
-	TCSR0		32	SSC timer 0 control/status register
-	TIR0		32	SSC timer 0 interval register
-	TNIR0		32	SSC timer 0 next interval register
-	TIVEC0		9	SSC timer 0 interrupt vector register
-	TCSR1		32	SSC timer 1 control/status register
-	TIR1		32	SSC timer 1 interval register
-	TNIR1		32	SSC timer 1 next interval register
-	TIVEC1		9	SSC timer 1 interrupt vector register
-	ADSM0		32	SSC address match 0 address
-	ADSK0		32	SSC address match 0 mask
-	ADSM1		32	SSC address match 1 address
-	ADSK1		32	SSC address match 1 mask
-	CDGDAT[0:16383]	32	cache diagnostic data store
+	CRA		32	control register A
+	CRB		32	control register B
+	CRC		32	control register C
+	CRD		32	control register D (MS780E only)
+	ROM[0:1023]	32	bootstrap ROM
 
-BDR<7> is the halt-enabled switch.  It controls how the console firmware
-responds to a BOOT command, a kernel halt (if option CONHALT is set), or
-a console halt (BREAK typed on the console terminal).  If BDR<7> is set,
-the console firmware responds to all these conditions by entering its
-interactive command mode.  If BDR<7> is clear, the console firmware
-boots the operating system in response to these conditions.
+ROM can be loaded from a file with the commands
+
+	LOAD -R <file>		load MCTL0 ROM
+	LOAD -S <file>		load MCTL1 ROM
+
+2.1.5 Time-Of-Day Clock (TODR)
+
+The TODR tracks time since an arbitrary start in 1 usec intervals.  It
+has these registers:
+
+	name		size	comments
+
+	TODR		32	time-of-day register
+	TIME		24	delay between ticks
+
+The TODR register autocalibrates against real-world time.
+
+2.1.6 Interval Timer (TMR)
+
+The interval timer implements the VAX architectural timer, with 1 usec
+intervals.  It has these registers:
+
+	name		size	comments
+
+	ICCS		32	interval timer control and status
+	ICR		32	interval count register
+	NICR		32	next interval count register
+	INT		1	interrupt request
+
+For standard VMS intervals (10msec = 100Hz), the interval timer
+autocalibrates against real-world time.
+
+2.1.7 Unibus Adapter (UBA)
+
+The Unibus adapter (UBA) simulates the DW780.  It recognizes these options:
+
+	SET UBA AUTOCONFIGURE	enable autoconfiguration
+	SET UBA NOAUTOCONFIGURE	disable autoconfiguration
+
+and this display command:
+
+	SHOW UBA IOSPACE	display IO address space assignments
+
+The UBA has these registers:
+
+	name		size	comments
+
+	IPL14		32	Unibus IPL14 interrupt requests
+	IPL15		32	Unibus IPL15 interrupt requests
+	IPL16		32	Unibus IPL16 interrupt requests
+	IPL17		32	Unibus IPL17 interrupt requests
+	CNFR		32	configuration register
+	CR		32	control register
+	SR		32	status register
+	DR		32	diagnostic register
+	INT		1	internal UBA interrupt request
+	NEXINT		1	UBA Nexus interrupt request
+	AIIP		1	adapter initialization in progress flag
+	UIIP		1	Unibus initialization in progress flag
+	FMER		32	failing memory address
+	FUBAR		32	failing UBA map register
+	BRSVR0		32	spare register 0
+	BRSVR1		32	spare register 1
+	BRSVR2		32	spare register 2
+	BRSVR3		32	spare register 3
+	BRRVR4		32	vector register, IPL 14
+	BRRVR5		32	vector register, IPL 15
+	BRRVR6		32	vector register, IPL 16
+	BRRVR7		32	vector register, IPL 17
+	DPR[0:15]	32	data path registers 0..15
+	MAP[0:495]	32	map registers 0..495
+	AITIME		24	adapter initialization time
+	UITIME		24	Unibus initialization time
+
+2.1.8 Massbus Adapters (MBA0, MBA1)
+
+The Massbus adapters (MBA0, MBA1) simulate RH780's.  MBA0 is assigned
+to the RP disk drives, MBA1 to the TU tape drives.  Each MBA has
+these registers:
+
+	name		size	comments
+
+	CNFR		32	configuration register
+	CR		32	control register
+	SR		32	status register
+	VA		17	virtual address register
+	BC		32	byte count register
+	DR		32	diagnostic register
+	SMR		32	selected map register
+	MAP[0:255]	32	map registers
+	NEXINT		1	MBA Nexus interrupt request
 
 2.2 I/O Device Addressing
 
-Qbus I/O space is not large enough to allow all possible devices to be
+Unibus I/O space is not large enough to allow all possible devices to be
 configured simultaneously at fixed addresses.  Instead, many devices have
 floating addresses; that is, the assigned device address depends on the
 presense of other devices in the configuration:
 
 	DZ11		all instances have floating addresses
-	DHQ11		all instances have floating addresses
 	RL11		first instance has fixed address, rest floating
 	RX11/RX211	first instance has fixed address, rest floating
+	DEUNA/DELUA	first instance has fixed address, rest floating
 	MSCP disk	first instance has fixed address, rest floating
 	TMSCP tape	first instance has fixed address, rest floating
 
 To maintain addressing consistency as the configuration changes, the
 simulator implements DEC's standard I/O address and vector autoconfiguration
-algorithms for devices DZ, VH, RL, RQn, and TQ.  This allows the user to
-enable or disable devices without needing to manage I/O addresses
+algorithms for devices DZ, VH, RL, RY, XUn, RQn, and TQ.  This allows the
+user to enable or disable devices without needing to manage I/O addresses
 and vectors.
 
 In addition to autoconfiguration, most devices support the SET ADDRESS
@@ -408,10 +417,10 @@ the entire system.  As a consequence, the user may have to manually configure
 all other autoconfigured devices, because the autoconfiguration algorithm
 no longer recognizes the explicitly configured device.  A device can be
 reset to autoconfigure with the SET <device> AUTOCONFIGURE command.  Auto-
-configuration can be restored for the entire system with the SET QBA
+configuration can be restored for the entire system with the SET UBA
 AUTOCONFIGURE command.
 
-The current I/O map can be displayed with the SHOW QBA IOSPACE command.
+The current I/O addresses can be displayed with the SHOW UBA IOSPACE command.
 Addresses that have set by autoconfiguration are marked with an asterisk (*). 
 
 All devices support the SHOW ADDRESS and SHOW VECTOR commands, which display
@@ -419,7 +428,7 @@ the device address and vector, respectively.
 
 2.3 Programmed I/O Devices
 
-2.3.1 Terminal Input (TTI)
+2.3.1 Console Input (TTI)
 
 The console interfaces (TTI, TTO) can be set to one of three modes, 
 7P, 7B or 8B:
@@ -434,12 +443,7 @@ The console interfaces (TTI, TTO) can be set to one of three modes,
 
 The default mode is 8B.
 
-When the console terminal is attached to a Telnet session, it
-recognizes BREAK.  If BREAK is entered, and BDR<7> is set, control
-returns to the console firmware; otherwise, BREAK is treated as a
-normal terminal input condition.
-
-The terminal input (TTI) polls the console keyboard for input.  It
+The console input (TTI) polls the console keyboard for input.  It
 implements these registers:
 
 	name		size	comments
@@ -453,9 +457,9 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	keyboard polling interval
 
-2.3.2 Terminal Output (TTO)
+2.3.2 Console Output (TTO)
 
-The terminal output (TTO) writes to the simulator console window.  It
+The console output (TTO) writes to the simulator console window.  It
 implements these registers:
 
 	name		size	comments
@@ -469,7 +473,42 @@ implements these registers:
 	POS		32	number of characters input
 	TIME		24	time from I/O initiation to interrupt
 
-2.3.3 Line Printer (LPT)
+2.3.3 RX01 Console Floppy Disk (RX)
+
+RX01 options include the ability to set units write enabled or write
+locked:
+
+	SET RXn LOCKED		set unit n write locked
+	SET RXn WRITEENABLED	set unit n write enabled
+
+The RX01 implements these registers:
+
+	name		size	comments
+
+	FNC		8	function select
+	ES		8	error status
+	ECODE		8	error code
+	TA		8	track address
+	SA		8	sector address
+	STATE		4	protocol state
+	BPTR		7	data buffer pointer
+	CTIME		24	command initiation delay
+	STIME		24	seek time delay, per track
+	XTIME		24	transfer time delay, per byte
+	STOP_IOE	1	stop on I/O error
+	DBUF[0:127]	8	data buffer
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+RX01 data files are buffered in memory; therefore, end of file and OS
+I/O errors cannot occur.
+
+2.3.4 Line Printer (LPT)
 
 The line printer (LPT) writes data to a disk file.  The POS register
 specifies the number of the next data item to be written.  Thus,
@@ -498,28 +537,81 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.3.4 Real-Time Clock (CLK)
+2.4 Disks
 
-The clock (CLK) implements these registers:
+All VAX-11/780 disks support a special form of the boot command, with
+the following syntax:
+
+	BOOT <unit>{/R5:<value>}
+
+For example,
+
+	BOOT HK0/R5:1
+
+The optional switch, /R5, specifies that R5 is to be loaded with the
+specified value prior to booting.  If the switch is omitted, R5 is loaded
+with 0.
+
+2.4.1 RM02/03/05/80, RP04/05/06/07 Disk Pack Drives (RP)
+
+The RP controller implements the Massbus family of large disk drives.
+RP options include the ability to set units write enabled or write
+locked, to set the drive type to one of six disk types, or autosize,
+and to write a DEC standard 044 compliant bad block table on the last
+track:
+
+	SET RPn LOCKED		set unit n write locked
+	SET RPn WRITEENABLED	set unit n write enabled
+	SET RPn RM03		set type to RM03
+	SET RPn RM05		set type to RM05
+	SET RPn RM80		set type to RM80
+	SET RPn RP04		set type to RP04
+	SET RPn RP06		set type to RP06
+	SET RPn RP07		set type to RP07
+	SET RPn AUTOSIZE	set type based on file size at attach
+	SET RPn BADBLOCK	write bad block table on last track
+
+The type options can be used only when a unit is not attached to a file.
+The bad block option can be used only when a unit is attached to a file.
+Units can be set ENABLED or DISABLED.  The RP controller supports the
+BOOT command.
+
+The RP controller implements the registers listed below.  Registers
+suffixed with [0:7] are replicated per drive.
 
 	name		size	comments
 
-	CSR		16	control/status register
-	INT		1	interrupt pending flag
-	IE		1	interrupt enable flag (CSR<6>)
-	TODR		32	time-of-day register
-	BLOW		1	TODR battery low indicator
-	TIME		24	clock frequency
-	TPS		8	ticks per second (100)
+	CS1[0:7]	16	current operation
+	DA[0:7]		16	desired surface, sector
+	DS[0:7]		16	drive status
+	ER1[0:7]	16	drive errors
+	OF[0:7]		16	offset
+	DC[0:7]		16	desired cylinder
+	ER2[0:7]	16	error status 2
+	ER3[0:7]	16	error status 3
+	EC1[0:7]	16	ECC syndrome 1
+	EC2[0:7]	16	ECC syndrome 2
+	MR[0:7]		16	maintenance register
+	MR2[0:7]	16	maintenance register 2 (RM only)
+	HR[0:7]		16	holding register (RM only)
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
 
-The real-time clock autocalibrates; the clock interval is adjusted up or
-down so that the clock tracks actual elapsed time.
+Error handling is as follows:
 
-2.4 Disks
+	error	     STOP_IOE	processed as
 
-2.4.1 RLV12/RL01,RL02 Cartridge Disk (RL)
+	not attached	1	report error and stop
+			0	disk not ready
 
-RLV12 options include the ability to set units write enabled or write locked,
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.4.2 RL11/RL01/RL02 Cartridge Disk (RL)
+
+RL11 options include the ability to set units write enabled or write locked,
 to set the drive size to RL01, RL02, or autosize, and to write a DEC standard
 044 compliant bad block table on the last track:
 
@@ -541,7 +633,7 @@ The RL11 implements these registers:
 	RLCS		16	control/status
 	RLDA		16	disk address
 	RLBA		16	memory address
-	RLBAE		6	memory address extension (RLV12)
+	RLBAE		6	memory address extension (not used)
 	RLMP..RLMP2	16	multipurpose register queue
 	INT		1	interrupt pending flag
 	ERR		1	error flag (CSR<15>)
@@ -562,11 +654,63 @@ Error handling is as follows:
 
 	OS I/O error	x	report error and stop
 
-2.4.2 RQDX3 MSCP Disk Controllers (RQ, RQB, RQC, RQD)
+2.4.3 RK611/RK06/RK07 Cartridge Disk (HK)
+
+RK611 options include the ability to set units write enabled or write
+locked, to set the drive size to RK06, RK07, or autosize, and to write
+a DEC standard 044 compliant bad block table on the last track:
+
+	SET HKn LOCKED		set unit n write locked
+	SET HKn WRITEENABLED	set unit n write enabled
+	SET HKn RK06		set size to RK06
+	SET HKn RK07		set size to RK07
+	SET HKn AUTOSIZE	set size based on file size at attach
+	SET HKn BADBLOCK	write bad block table on last track
+
+The size options can be used only when a unit is not attached to a file.
+The bad block option can be used only when a unit is attached to a file.
+Units can be set ENABLED or DISABLED.  The RK611 supports the BOOT command.
+
+The RK611 implements these registers:
+
+	name		size	comments
+
+	HKCS1		16	control/status 1
+	HKWC		16	word count
+	HKBA		16	bus address
+	HKDA		16	desired surface, sector
+	HKCS2		16	control/status 2
+	HKDS[0:7]	16	drive status, drives 0-7
+	HKER[0:7]	16	drive errors, drives 0-7
+	HKDB[0:2]	16	data buffer silo
+	HKDC		16	desired cylinder
+	HKOF		8	offset
+	HKMR		16	maintenance register
+	HKSPR		16	spare register
+	INT		1	interrupt pending flag
+	ERR		1	error flag (CSR<15>)
+	DONE		1	device done flag (CSR1<7>)
+	IE		1	interrupt enable flag (CSR1<6>)
+	STIME		24	seek time, per cylinder
+	RTIME		24	rotational delay
+	STOP_IOE	1	stop on I/O error
+
+Error handling is as follows:
+
+	error	     STOP_IOE	processed as
+
+	not attached	1	report error and stop
+			0	disk not ready
+
+	end of file	x	assume rest of disk is zero
+
+	OS I/O error	x	report error and stop
+
+2.4.4 UDA50 MSCP Disk Controllers (RQ, RQB, RQC, RQD)
 
 The simulator implements four MSCP disk controllers, RQ, RQB, RQC, RQD.
 Initially, RQB, RQC, and RQD are disabled.  Each RQ controller simulates
-an RQDX3 MSCP disk controller.  RQ options include the ability to set
+an UDA50 MSCP disk controller.  RQ options include the ability to set
 units write enabled or write locked, and to set the drive type to one
 of many disk types:
 
@@ -579,7 +723,9 @@ of many disk types:
 	SET RQn RD53		set type to RD53
 	SET RQn RD54		set type to RD54
 	SET RQn RD31		set type to RD31
+	SET RQn RA81		set type to RA81
 	SET RQn RA82		set type to RA82
+	set RQn RA71		set type to RA71
 	SET RQn RA72		set type to RA72
 	SET RQn RA90		set type to RA90
 	SET RQn RA92		set type to RA92
@@ -650,69 +796,64 @@ Error handling is as follows:
 
 	OS I/O error		report error and stop
 
-2.4.3 RXV21/RX02 Floppy Disk (RY)
+2.5 Tapes
 
-RXV21 options include the ability to set units write enabled or write
-locked, single or double density, or autosized:
+2.5.1 TM02/TM03/TE16/TU45/TU77 Magtapes (TU)
 
-	SET RYn LOCKED		set unit n write locked
-	SET RYn WRITEENABLED	set unit n write enabled
-	SET RYn SINGLE		set unit n single density
-	SET RYn DOUBLE		set unit n double density (default)
-	SET RYn AUTOSIZE	set unit n autosized
+The TU controller implementes the Massbus family of 800/1600bpi tape
+drives.  TU options include the ability to select the formatter type
+(TM02 or TM03), to set the drive type to one of three drives (TE16,
+TU45, or TU77), and to set the drives write enabled or write locked.
 
-The RXV21 does not support the boot command.
+	SET TU TM02		set controller type to TM02
+	SET TU TM03		set controller type to TM03
+	set TUn TE16		set drive type to TE16
+	SET TUn TU45		set drive type to TU45
+	SET TUn TU77		set drive type to TU77
+	SET TUn LOCKED		set unit write locked
+	SET TUn WRITEENABLED	set unit write enabled
 
-The RXV21 implements these registers:
+Units can be set ENABLED or DISABLED.
+
+The TU controller implements the following registers:
 
 	name		size	comments
 
-	RYCS		16	status
-	RYBA		16	buffer address
-	RYWC		8	word count
-	RYDB		16	data buffer
-	RYES		12	error status
-	RYERR		8	error code
-	RYTA		8	current track
-	RYSA		8	current sector
-	STAPTR		4	controller state
-	INT		1	interrupt pending flag
-	ERR		1	error flag (CSR<15>)
-	TR		1	transfer ready flag (CSR<7>)
-	IE		1	interrupt enable flag (CSR<6>)
-	DONE		1	device done flag (CSR<5>)
-	CTIME		24	command completion time
-	STIME		24	seek time, per track
-	XTIME		24	transfer ready delay
-	STOP_IOE	1	stop on I/O error
-	SBUF[0:255]	8	sector buffer array
+	CS1		6	current operation
+	FC		16	frame count
+	FS		16	formatter status
+	ER		16	formatter errors
+	CC		16	check character
+	MR		16	maintenance register
+	TC		16	tape control register
+	TIME		24	operation execution time
+	STOP_IOE	1	stop of I/O error
 
 Error handling is as follows:
 
-	error	     STOP_IOE	processed as
+	error			processed as
 
-	not attached	1	report error and stop
-			0	disk not ready
+	not attached		tape not ready; if STOP_IOE, stop
 
-RX02 data files are buffered in memory; therefore, end of file and OS
-I/O errors cannot occur.
+	end of file		bad tape
 
-2.5 Tapes
+	OS I/O error		parity error; if STOP_IOE, stop
 
-2.5.1 TSV11/TSV05 Magnetic Tape (TS)
+2.5.2 TS11 Magnetic Tape (TS)
 
-TS options include the ability to make the unit write enabled or write locked.
+TS options include the ability to set the drive write enabled or write
+locked.
 
 	SET TS LOCKED		set unit write locked
 	SET TS WRITEENABLED	set unit write enabled
 
-The magnetic tape controller implements these registers:
+The TS controller implements these registers:
 
 	name		size	comments
 
 	TSSR		16	status register
 	TSBA		16	bus address register
-	TSDBX		16	data buffer extension register
+	TSDBX		16	data buffer extension register (not used)
 	CHDR		16	command packet header
 	CADL		16	command packet low address or count
 	CADH		16	command packet high address
@@ -747,9 +888,9 @@ Error handling is as follows:
 
 	OS I/O error		fatal tape error
 
-2.5.2 TQK50 TMSCP Disk Controller (TQ)
+2.5.3 TUK50 TMSCP Disk Controller (TQ)
 
-The TQ controller simulates the TQK50 TMSCP disk controller.  TQ options
+The TQ controller simulates the TUK50 TMSCP disk controller.  TQ options
 include the ability to set units write enabled or write locked, and to
 specify the controller type and tape length:
 
@@ -819,14 +960,14 @@ Error handling is as follows:
 
 2.6 Communications Devices
 
-2.6.1 DZV11 Terminal Multiplexor (DZ)
+2.6.1 DZ11 Terminal Multiplexor (DZ)
 
-The DZV11 is an 4-line terminal multiplexor.  Up to 4 DZ11's (16 lines)
+The DZ11 is an 8-line terminal multiplexor.  Up to 4 DZ11's (32 lines)
 are supported.  The number of lines can be changed with the command
 
 	SET DZ LINES=n		set line count to n
 
-The line count must be a multiple of 4, with a maximum of 16.
+The line count must be a multiple of 8, with a maximum of 32.
 
 The DZ11 supports three character processing modes, 7P, 7B, and 8B:
 
@@ -863,7 +1004,7 @@ the port to be used:
 	ATTACH {-am} DZ <port>	set up listening port
 
 where port is a decimal number between 1 and 65535 that is not being used
-for other TCP/IP activities.  The optional switch -m turns on the DZV11's
+for other TCP/IP activities.  The optional switch -m turns on the DZ11's
 modem controls; the optional switch -a turns on active disconnects
 (disconnect session if computer clears Data Terminal Ready).  Without
 modem control, the DZ behaves as though terminals were directly connected;
@@ -878,9 +1019,9 @@ DISCONNECT command, or a DETACH DZ command.
 
 The SHOW DZ CONNECTIONS command displays the current connections to the DZ.
 The SHOW DZ STATISTICS command displays statistics for active connections.
-The SET DZ DISCONNECT=linenumber command disconnects the specified line.
+The SET DZ DISCONNECT=linenumber disconnects the specified line.
 
-The DZV11 implements these registers:
+The DZ11 implements these registers:
 
 	name		size	comments
 
@@ -896,175 +1037,12 @@ The DZV11 implements these registers:
 	MDMTCL		1	modem control enabled
 	AUTODS		1	autodisconnect enabled
 
-The DZV11 does not support save and restore.  All open connections are
+The DZ11 does not support save and restore.  All open connections are
 lost when the simulator shuts down or the DZ is detached.
-
-2.6.2 DHQ11 Terminal Multiplexor (VH)
-
-The DHQ11 is an 8-line terminal multiplexor for Qbus systems.  Up
-to 4 DHQ11's are supported.
-
-The DHQ11 is a programmable asynchronous terminal multiplexor.  It
-has two programming modes: DHV11 and DHU11.  The register sets are
-compatible with these devices.  For transmission, the DHQ11 can be
-used in either DMA or programmed I/O mode.  For reception, there
-is a 256-entry FIFO for received characters, dataset status changes,
-and diagnostic information, and a programmable input interrupt
-timer (in DHU mode).  The device supports 16-, 18-, and 22-bit
-addressing.  The DHQ11 can be programmed to filter and/or handle
-XON/XOFF characters independently of the processor.  The DHQ11
-supports programmable bit width (between 5 and 8) for the input
-and output of characters.
-
-The DHQ11 has a rocker switch for determining the programming mode.
-By default, the DHV11 mode is selected, though DHU11 mode is
-recommended for applications that can support it.  The VH controller
-may be adjusted on a per controller basis as follows:
-
-	SET VHn DHU		use the DHU programming mode and registers
-	SET VHn DHV		use the DHV programming mode and registers
-
-DMA output is supported.  In a real DHQ11, DMA is not initiated
-immediately upon receipt of TX.DMA.START but is dependent upon some
-internal processes.  The VH controller mimics this behavior by default.
-It may be desirable to alter this and start immediately, though
-this may not be compatible with all operating systems and diagnostics.
-You can change the behavior of the VH controller as follows:
-
-	SET VHn NORMAL		use normal DMA procedures
-	SET VHn FASTDMA		set DMA to initiate immediately
-
-The terminal lines perform input and output through Telnet sessions
-connected to a user-specified port.  The ATTACH command specifies
-the port to be used:
-
-        ATTACH VH <port>	set up listening port
-	DETACH VH
-
-where port is a decimal number between 1 and 65535 that is not
-being used for other TCP/IP activities.  This port is the point of
-entry for al lines on all VH controllers.
-
-Modem and auto-disconnect support may be set on an individual
-controller basis.  The SET MODEM command directs the controller to
-report modem status changes to the computer.  The SET HANGUP command
-turns on active disconnects (disconnect session if computer clears
-Data Terminal Ready).
-
-	SET VHn [NO]MODEM	disable/enable modem control
-	SET VHn [NO]HANGUP	disable/enable disconnect on DTR drop
-
-Once the VH is attached and the simulator is running, the VH will
-listen for connections on the specified port.  It assumes that the
-incoming connections are Telnet connections.  The connection remains
-open until disconnected by the simulated program, the Telnet client,
-a SET VH DISCONNECT command, or a DETACH VH command.
-
-The SHOW VH CONNECTIONS command displays the current connections to the VH.
-The SHOW VH STATISTICS command displays statistics for active connections.
-The SET VH DISCONNECT=linenumber command disconnects the specified line.
-
-The DHQ11 implements these registers, though not all can be examined
-from SCP:
-
-        name            size    comments
-
-        CSR[0:3]        16      control/status register, boards 0..3
-        RBUF[0:3]       16      receive buffer, boards 0..3
-        LPR[0:3]        16      line parameter register, boards 0..3
-        RXINT           4       receive interrupts, boards 3..0
-        TXINT           4       transmit interrupts, boards 3..0
-[more to be described...]
-
-The DHQ11 does not support save and restore.  All open connections
-are lost when the simulator shuts down or the VH is detached.
-
-2.6.3 DELQA/DEQNA Qbus Ethernet Controllers (XQ, XQB)
-
-The simulator implements two DELQA/DEQNA Qbus Ethernet controllers (XQ,
-XQB).  Initially, XQ is enabled, and XQB is disabled.  Options allow
-control of the MAC address, the controller mode, and the sanity timer.
-
-	SET  XQ MAC=<mac-address>	ex. 08-00-2B-AA-BB-CC
-        SHOW XQ MAC
-
-These commands are used to change or display the MAC address.  <mac-address>
-is a valid ethernet MAC, delimited by dashes or periods.  The controller
-defaults to 08-00-2B-AA-BB-CC, which should be sufficient if there is
-only one SIMH controller on your LAN.  Two cards with the same MAC address
-will see each other's packets, resulting in a serious mess.
-
-	SET  XQ TYPE={DEQNA|[DELQA]}
-        SHOW XQ TYPE
-
-These commands are used to change or display the controller mode. DELQA
-mode is better and faster but may not be usable by older or non-DEC OS's.
-Also, be aware that DEQNA mode is not supported by many modern OS's. The
-DEQNA-LOCK mode of the DELQA card is emulated by setting the the controller
-to DEQNA - there is no need for a separate mode.  DEQNA-LOCK mode behaves
-exactly like a DEQNA, except for the operation of the VAR and MOP processing.
-
-	SET  XQ SANITY={ON|[OFF]}
-	SHOW XQ SANITY
-
-These commands change or display the INITIALIZATION sanity timer (DEQNA
-jumper W3/DELQA switch S4).  The INITIALIZATION sanity timer has a default
-timeout of 4 minutes, and cannot be turned off, just reset.  The normal
-sanity timer can be set by operating system software regardless of the
-state of this switch.  Note that only the DEQNA (or the DELQA in DEQNA-
-LOCK mode (=DEQNA)) supports the sanity timer - it is ignored by a DELQA
-in Normal mode, which uses switch S4 for a different purpose.
-
-	SET  XQ POLL={DEFAULT|4..2500}
-	SHOW XQ POLL
-
-These commands change or display the service polling timer.  The polling
-timer is calibrated to run the service thread 200 times per second.  This
-value can be changed to accomodate particular system requirements for
-more (or less) frequent polling.
-
-	SHOW XQ STATS
-
-This command will display the accumulated statistics for the simulated
-Ethernet controller.
-To access the network, the simulated Ethernet controller must be attached
-to a real Ethernet interface:
-
-	ATTACH XQ0 {ethX|<device_name>}		ex. eth0 or /dev/era0
-        SHOW XQ ETH
-
-where X in 'ethX' is the number of the ethernet controller to attach, or
-the real device name.  The X number is system dependant.  If you only have
-one ethernet controller, the number will probably be 0. To find out what
-your system thinks the ethernet numbers are, use the SHOW XQ ETH command.
-The device list can be quite cryptic, depending on the host system, but
-is probably better than guessing. If you do not attach the device, the
-controller will behave as though the ethernet cable were unplugged.
-
-XQ and XQB have the following registers:
-
-	name		size	comments
-
-	SA0		16	station address word 0
-	SA1		16	station address word 1
-	SA2		16	station address word 2
-	SA3		16	station address word 3
-	SA4		16	station address word 4
-	SA5		16	station address word 5
-	RBDL		32	receive buffer descriptor list
-	XBDL		32	trans(X)mit buffer descriptor list
-	CSR		16	control status register
-	VAR		16	vector address register
-	INT		1	interrupt request flag
-
-One final note: because of it's asynchronous nature, the XQ controller is
-not limited to the ~1.5Mbit/sec of the real DEQNA/DELQA controllers,
-nor the 10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet
-(100 Mbit/sec) card, and "Feel the Power!" :-)
 
 2.7 Symbolic Display and Input
 
-The VAX simulator implements symbolic display and input.  Display is
+The VAX780 simulator implements symbolic display and input.  Display is
 controlled by command line switches:
 
 	-a,-c			display as ASCII data
@@ -1113,21 +1091,3 @@ l^d		EF		d - PC		long PC relative
 
 If no override is given for a literal (s^ or i^) or for a displacement or PC
 relative addres (b^, w^, or l^), the simulator chooses the mode automatically.
-
-Appendix - The KA655"X"
-
-The real KA655 is limited to 64MB of memory, and the KA655 firmware is coded
-to this limit.  However, the VAX operating systems (VMS, Ultrix, NetBSD)
-know very little about the hardware details.  Instead, they take their memory
-size information from the Restart Parameter Block (RPB).  If the firmware
-sets up an RPB for more than 64MB, the operating systems use the extra
-memory without requiring source changes.
-
-In extended memory mode, the simulator implements an 18th CMCTL register.
-This read-only register gives the size of main memory in MB.  The extended
-memory firmware (ka655x.bin) bootstrap code uses this to set up the RPB.
-No other parts of the firmware are aware of extended memory; thus, all the
-diagnostic and display commands operate only on the first 64MB of memory.
-
-If extended memory mode is disabled, the 18th CMCTL register is invisible,
-and the simulator operates like a real KA655.

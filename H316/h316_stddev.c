@@ -28,6 +28,7 @@
    tty          316/516-33 teleprinter
    clk/options  316/516-12 real time clocks/internal options
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    05-Feb-05    RMS     Fixed bug in OCP '0001 (found by Philipp Hachtmann)
    31-Jan-05    RMS     Fixed bug in TTY print (found by Philipp Hachtmann)
    01-Dec-04    RMS     Fixed problem in SKS '104 (reported by Philipp Hachtmann)
@@ -66,21 +67,8 @@
 #include "h316_defs.h"
 #include <ctype.h>
 
-#define CHAR_FLAG(c)    (1u << (c))
-
-#define BEL_FLAG        CHAR_FLAG('\a')
-#define LF_FLAG         CHAR_FLAG('\n')
-#define CR_FLAG         CHAR_FLAG('\r')
-#define HT_FLAG         CHAR_FLAG('\t')
-
-#define CNTL_SET        (BEL_FLAG | HT_FLAG | LF_FLAG | CR_FLAG)
-
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
-#define UNIT_V_KSR      (UNIT_V_UF + 1)                 /* KSR33 */
-#define UNIT_V_ASC      (UNIT_V_UF + 2)                 /* ASCII */
-#define UNIT_V_UASC     (UNIT_V_UF + 3)                 /* Unix ASCII */
-#define UNIT_8B         (1 << UNIT_V_8B)
-#define UNIT_KSR        (1 << UNIT_V_KSR)
+#define UNIT_V_ASC      (TTUF_V_UF + 0)                 /* ASCII */
+#define UNIT_V_UASC     (TTUF_V_UF + 1)                 /* Unix ASCII */
 #define UNIT_ASC        (1 << UNIT_V_ASC)
 #define UNIT_UASC       (1 << UNIT_V_UASC)
 #define STA             u3                              /* state bits */
@@ -229,8 +217,8 @@ DEVICE ptp_dev = {
 DIB tty_dib = { TTY, IOBUS, 1, &ttyio };
 
 UNIT tty_unit[] = {
-    { UDATA (&tti_svc, UNIT_KSR, 0), KBD_POLL_WAIT },
-    { UDATA (&tto_svc, UNIT_KSR, 0), SERIAL_OUT_WAIT },
+    { UDATA (&tti_svc, TT_MODE_KSR, 0), KBD_POLL_WAIT },
+    { UDATA (&tto_svc, TT_MODE_KSR, 0), SERIAL_OUT_WAIT },
     { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0) },
     { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) }
     };
@@ -256,9 +244,10 @@ REG tty_reg[] = {
     };
 
 MTAB tty_mod[] = {
-    { UNIT_KSR+UNIT_8B+UNIT_ATTABLE, UNIT_KSR, "KSR", "KSR", &ttio_set_mode },
-    { UNIT_KSR+UNIT_8B+UNIT_ATTABLE, 0       , "7b" , "7B" , &ttio_set_mode },
-    { UNIT_KSR+UNIT_8B+UNIT_ATTABLE, UNIT_8B , "8b" , "8B" , &ttio_set_mode },
+    { TT_MODE, TT_MODE_KSR, "KSR", "KSR", &ttio_set_mode },
+    { TT_MODE, TT_MODE_7B,  "7b",  "7B",  &ttio_set_mode },
+    { TT_MODE, TT_MODE_8B,  "8b",  "8B",  &ttio_set_mode },
+    { TT_MODE, TT_MODE_7P,  "7p",  "7P",  &ttio_set_mode },
     { UNIT_ATTABLE+UNIT_ASC+UNIT_UASC, UNIT_ATTABLE, NULL, "BINARY",
       &ttrp_set_mode },
     { UNIT_ATTABLE+UNIT_ASC+UNIT_UASC, UNIT_ATTABLE+UNIT_ASC, "ASCII", "ASCII",
@@ -611,11 +600,7 @@ sim_activate (uptr, uptr->wait);                        /* continue poll */
 if ((c = sim_poll_kbd ()) >= SCPE_KFLAG) {              /* character? */
     out = c & 0177;                                     /* mask echo to 7b */
     if (c & SCPE_BREAK) c = 0;                          /* break? */
-    else if (uptr->flags & UNIT_KSR) {                  /* KSR? */
-        if (islower (out)) out = toupper (out);         /* cvt to UC */
-        c = out | 0200;                                 /* add TTY bit */
-        }
-    else if (!(uptr->flags & UNIT_8B)) c = out;         /* 7b? */
+    else c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
     uptr->pos = uptr->pos + 1;
     }
 else if (c != SCPE_OK) return c;                        /* error? */
@@ -702,18 +687,10 @@ t_stat tto_write (int32 c)
 {
 UNIT *tuptr = &tty_unit[TTO];
 
-if (tuptr->flags & UNIT_8B) c = c & 0377;               /* 8b? */
-else {
-    c = c & 0177;                                       /* 7b, KSR: mask */
-    if (c) return SCPE_OK;                              /* supress NUL */
-    if (tuptr->flags & UNIT_KSR) {                      /* KSR? */
-        if ((c < 040) &&                                /* not in ctrl set? */
-            !(CNTL_SET & CHAR_FLAG (c))) return SCPE_OK;
-        if (islower (c)) c = toupper (c);               /* cvt to UC */
-        }
-    }
+c = sim_tt_outcvt (c, TT_GET_MODE (tuptr->flags));
 tuptr->pos = tuptr->pos + 1;
-return sim_putchar_s (c);
+if (c >= 0) return sim_putchar_s (c);
+else return SCPE_OK;
 }
 
 /* Output to punch */
@@ -766,8 +743,9 @@ return SCPE_OK;
 t_stat ttio_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if (uptr->flags & UNIT_ATTABLE) return SCPE_NOFNC;      /* not TTR, TTP */
-tty_unit[TTI].flags = (tty_unit[TTI].flags & ~(UNIT_KSR | UNIT_8B)) | val;
-tty_unit[TTO].flags = (tty_unit[TTO].flags & ~(UNIT_KSR | UNIT_8B)) | val;
+tty_unit[TTO].flags = (tty_unit[TTO].flags & ~TT_MODE) | val;
+if (val == TT_MODE_7P) val = TT_MODE_7B;
+tty_unit[TTI].flags = (tty_unit[TTI].flags & ~TT_MODE) | val;
 return SCPE_OK;
 }
 

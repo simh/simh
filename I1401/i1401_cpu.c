@@ -24,7 +24,7 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
-   01-Sep-05	RMS	    Removed error stops in MCE
+   01-Sep-05	RMS     Removed error stops in MCE
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    02-Jun-05    RMS     Fixed SSB-SSG clearing on RESET
                         (reported by Ralph Reinke)

@@ -63,7 +63,7 @@ extern DEVICE vh_dev;
 extern DEVICE rk_dev, rl_dev;
 extern DEVICE hk_dev;
 extern DEVICE rx_dev, ry_dev;
-extern DEVICE mba0_dev, mba1_dev;
+extern DEVICE mba_dev[];
 extern DEVICE rp_dev, tu_dev;
 extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE dt_dev;
@@ -95,8 +95,8 @@ int32 sim_emax = 4;
 DEVICE *sim_devices[] = {
     &cpu_dev,
     &sys_dev,
-    &mba0_dev,
-    &mba1_dev,
+    &mba_dev[0],
+    &mba_dev[1],
     &ptr_dev,
     &ptp_dev,
     &tti_dev,

@@ -1,4 +1,4 @@
-                                                        /* pdp8_rl.c: RL8A cartridge disk simulator
+/* pdp8_rl.c: RL8A cartridge disk simulator
 
    Copyright (c) 1993-2005, Robert M Supnik
 
@@ -25,6 +25,7 @@
 
    rl           RL8A cartridge disk
 
+   25-Oct-05    RMS     Fixed IOT 61 decode bug (found by David Gesswein)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    04-Jan-04    RMS     Changed attach routine to use sim_fsize
    25-Apr-03    RMS     Revised for extended file support
@@ -334,12 +335,12 @@ switch (IR & 07) {                                      /* case IR<9:11> */
 return 0;                                               /* clear AC */
 }
 
-int32 rl61 (int32 pulse, int32 AC)
+int32 rl61 (int32 IR, int32 AC)
 {
 int32 dat;
 UNIT *uptr;
 
-switch (pulse) {                                        /* case IR<9:11> */
+switch (IR & 07) {                                      /* case IR<9:11> */
 
     case 0:                                             /* RRER */
         uptr = rl_dev.units + GET_DRIVE (rlcsb);        /* select unit */

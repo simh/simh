@@ -25,6 +25,7 @@
 
    tt           console
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    29-Dec-03    RMS     Added support for console backpressure
    25-Apr-03    RMS     Revised for extended file support
    11-Jan-03    RMS     Added TTP support
@@ -33,11 +34,6 @@
 
 #include "id_defs.h"
 #include <ctype.h>
-
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
-#define UNIT_V_KSR      (UNIT_V_UF + 1)                 /* KSR33 */
-#define UNIT_8B         (1 << UNIT_V_8B)
-#define UNIT_KSR        (1 << UNIT_V_KSR)
 
 /* Device definitions */
 
@@ -78,8 +74,8 @@ t_stat tt_set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc);
 DIB tt_dib = { d_TT, -1, v_TT, NULL, &tt, NULL };
 
 UNIT tt_unit[] = {
-    { UDATA (&tti_svc, UNIT_KSR, 0), KBD_POLL_WAIT },
-    { UDATA (&tto_svc, UNIT_KSR, 0), SERIAL_OUT_WAIT }
+    { UDATA (&tti_svc, TT_MODE_KSR, 0), KBD_POLL_WAIT },
+    { UDATA (&tto_svc, TT_MODE_KSR, 0), SERIAL_OUT_WAIT }
     };
 
 REG tt_reg[] = {
@@ -101,9 +97,10 @@ REG tt_reg[] = {
     };
 
 MTAB tt_mod[] = {
-    { UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", &tt_set_mode },
-    { UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , &tt_set_mode },
-    { UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tt_set_mode },
+    { TT_MODE, TT_MODE_KSR, "KSR", "KSR", &tt_set_mode },
+    { TT_MODE, TT_MODE_7B,  "7b",  "7B",  &tt_set_mode },
+    { TT_MODE, TT_MODE_8B,  "8b",  "8B",  &tt_set_mode },
+    { TT_MODE, TT_MODE_7P,  "7p",  "7P",  &tt_set_mode },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, NULL, "ENABLED",
       &tt_set_enbdis, NULL, NULL },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, DEV_DIS, NULL, "DISABLED",
@@ -192,15 +189,14 @@ if (temp & SCPE_BREAK) {                                /* break? */
     tt_sta = tt_sta | STA_BRK;                          /* set status */
     uptr->buf = 0;                                      /* no character */
     }
-else if (uptr->flags & UNIT_KSR) {                      /* KSR mode? */
-    if (islower (out)) out = toupper (out);             /* cvt to UC */ 
-    uptr->buf = out | 0x80;                             /* set high bit */
-    }
-else uptr->buf = temp & ((tt_unit[TTI].flags & UNIT_8B)? 0xFF: 0x7F);
+else uptr->buf = sim_tt_inpcvt (temp, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 uptr->pos = uptr->pos + 1;                              /* incr count */
 if (!tt_fdpx) {                                         /* half duplex? */
-    if (out) sim_putchar (out);                         /* write char */
-    tt_unit[TTO].pos = tt_unit[TTO].pos + 1;
+    out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags));
+    if (out >= 0) {                                     /* valid echo? */
+        sim_putchar (out);                              /* write char */
+        tt_unit[TTO].pos = tt_unit[TTO].pos + 1;
+        }
     }
 return SCPE_OK;
 }
@@ -210,13 +206,8 @@ t_stat tto_svc (UNIT *uptr)
 int32 ch;
 t_stat r;
 
-if (uptr->flags & UNIT_KSR) {                           /* KSR mode? */
-    ch = uptr->buf & 0x7F;                              /* mask to 7b */
-    if (islower (ch)) ch = toupper (ch);                /* cvt to UC */
-    }
-else ch = uptr->buf & ((tt_unit[TTO].flags & UNIT_8B)? 0xFF: 0x7F);
-if ((uptr->flags & UNIT_8B) ||                          /* KSR or 7b? */
-    ((ch != 0) && (ch != 0x7F))) {                      /* supr NULL, DEL */
+ch = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags));
+if (ch >= 0) {
     if ((r = sim_putchar_s (ch)) != SCPE_OK) {          /* output; error? */
         sim_activate (uptr, uptr->wait);                /* try again */
         return ((r == SCPE_STALL)? SCPE_OK: r);
@@ -250,8 +241,9 @@ return SCPE_OK;
 
 t_stat tt_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-tt_unit[TTI].flags = (tt_unit[TTI].flags & ~(UNIT_KSR | UNIT_8B)) | val;
-tt_unit[TTO].flags = (tt_unit[TTO].flags & ~(UNIT_KSR | UNIT_8B)) | val;
+tt_unit[TTO].flags = (tt_unit[TTO].flags & ~TT_MODE) | val;
+if (val == TT_MODE_7P) val = TT_MODE_7B;
+tt_unit[TTI].flags = (tt_unit[TTI].flags & ~TT_MODE) | val;
 return SCPE_OK;
 }
 

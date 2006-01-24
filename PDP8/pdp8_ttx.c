@@ -25,6 +25,7 @@
 
    ttix,ttox    PT08/KL8JA terminal input/output
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    29-Jun-05    RMS     Added SET TTOXn DISCONNECT
                         Fixed bug in SET LOG/NOLOG
    21-Jun-05    RMS     Fixed bug in SHOW CONN/STATS
@@ -52,11 +53,6 @@
 
 #define TTX_LINES       4
 #define TTX_MASK        (TTX_LINES - 1)
-
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
-#define UNIT_V_UC       (UNIT_V_UF + 1)                 /* upper case */
-#define UNIT_8B         (1 << UNIT_V_8B)
-#define UNIT_UC         (1 << UNIT_V_UC)
 
 #define TTX_GETLN(x)    (((x) >> 4) & TTX_MASK)
 
@@ -134,10 +130,10 @@ DEVICE ttix_dev = {
 */
 
 UNIT ttox_unit[] = {
-    { UDATA (&ttox_svc, UNIT_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_UC, 0), SERIAL_OUT_WAIT }
+    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT }
     };
 
 REG ttox_reg[] = {
@@ -151,9 +147,10 @@ REG ttox_reg[] = {
     };
 
 MTAB ttox_mod[] = {
-    { UNIT_UC+UNIT_8B, UNIT_UC, "UC", "UC", NULL },
-    { UNIT_UC+UNIT_8B, 0      , "7b", "7B", NULL },
-    { UNIT_UC+UNIT_8B, UNIT_8B, "8b", "8B", NULL },
+    { TT_MODE, TT_MODE_UC, "UC", "UC", NULL },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &ttx_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
@@ -232,11 +229,7 @@ for (ln = 0; ln < TTX_LINES; ln++) {                    /* loop thru lines */
     if (ttx_ldsc[ln].conn) {                            /* connected? */
         if (temp = tmxr_getc_ln (&ttx_ldsc[ln])) {      /* get char */
             if (temp & SCPE_BREAK) c = 0;               /* break? */
-            else if (ttox_unit[ln].flags & UNIT_UC) {   /* UC? */
-                c = temp & 0177;
-                if (islower (c)) c = toupper (c);
-                }
-            else c = temp & ((ttox_unit[ln].flags & UNIT_8B)? 0377: 0177);
+            else c = sim_tt_inpcvt (temp, TT_GET_MODE (ttox_unit[ln].flags));
             ttix_buf[ln] = c;
             dev_done = dev_done | (INT_TTI1 << ln);
             int_req = INT_UPDATE;
@@ -321,12 +314,8 @@ int32 c, ln = uptr - ttox_unit;                         /* line # */
 if (ttx_ldsc[ln].conn) {                                /* connected? */
     if (ttx_ldsc[ln].xmte) {                            /* tx enabled? */
         TMLN *lp = &ttx_ldsc[ln];                       /* get line */
-        if (ttox_unit[ln].flags & UNIT_UC) {            /* UC mode? */
-            c = ttox_buf[ln] & 0177;                    /* get char */
-            if (islower (c)) c = toupper (c);
-            }
-        else c = ttox_buf[ln] & ((ttox_unit[ln].flags & UNIT_8B)? 0377: 0177);
-        tmxr_putc_ln (lp, c);                           /* output char */
+        c = sim_tt_outcvt (ttox_buf[ln], TT_GET_MODE (ttox_unit[ln].flags));
+        if (c >= 0) tmxr_putc_ln (lp, c);               /* output char */
         tmxr_poll_tx (&ttx_desc);                       /* poll xmt */
         }
     else {

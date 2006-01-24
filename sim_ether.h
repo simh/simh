@@ -28,6 +28,7 @@
 
   Modification history:
 
+  30-Nov-05  DTH  Added CRC length to packet and more field comments
   04-Feb-04  DTH  Added debugging information
   14-Jan-04  MP   Generalized BSD support issues
   05-Jan-04  DTH  Added eth_mac_scan
@@ -108,16 +109,19 @@
 #define ETH_MIN_PACKET        60                        /* minimum ethernet packet size */
 #define ETH_MAX_PACKET      1514                        /* maximum ethernet packet size */
 #define ETH_MAX_DEVICE        10                        /* maximum ethernet devices */
+#define ETH_CRC_SIZE           4                        /* ethernet CRC size */
+#define ETH_FRAME_SIZE      1518                        /* ethernet maximum frame size */
 
 #define DECNET_SELF_FRAME(dnet_mac, msg)    \
     ((memcmp(dnet_mac, msg  , 6) == 0) &&   \
      (memcmp(dnet_mac, msg+6, 6) == 0))
 
 struct eth_packet {
-  uint8   msg[1518];
-  int     len;
-  int     used;
-  int     status;
+  uint8   msg[ETH_FRAME_SIZE];                          /* ethernet frame (message) */
+  int     len;                                          /* packet length without CRC */
+  int     used;                                         /* bytes processed (used in packet chaining) */
+  int     status;                                       /* transmit/receive status */
+  int     crc_len;                                      /* packet length with CRC */
 };
 
 struct eth_item {
@@ -165,6 +169,7 @@ struct eth_device {
   DEVICE*       dptr;                                   /* device ethernet is attached to */
   uint32        dbit;                                   /* debugging bit */
   int           reflections;                            /* packet reflections on interface */
+  int           need_crc;				/* device needs CRC (Cyclic Redundancy Check) */
 #if defined (USE_READER_THREAD)
   ETH_QUE       read_queue;
   pthread_mutex_t     lock;
@@ -188,6 +193,7 @@ t_stat eth_filter (ETH_DEV* dev, int addr_count,        /* set filter on incomin
                    ETH_BOOL all_multicast,
                    ETH_BOOL promiscuous);
 int eth_devices   (int max, ETH_LIST* dev);             /* get ethernet devices on host */
+void eth_setcrc   (ETH_DEV* dev, int need_crc);         /* enable/disable CRC mode */
 
 void eth_packet_trace (ETH_DEV* dev, const uint8 *msg, int len, char* txt); /* trace ethernet packet */
 t_stat eth_show  (FILE* st, UNIT* uptr,                 /* show ethernet devices */

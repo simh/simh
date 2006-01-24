@@ -25,6 +25,7 @@
 
    tm           TM11/TU10 magtape
 
+   31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
    18-Mar-05    RMS     Added attached test to detach routine
@@ -238,7 +239,7 @@ MTAB tm_mod[] = {
 
 DEVICE tm_dev = {
     "TM", tm_unit, tm_reg, tm_mod,
-    TM_NUMDR, 10, 31, 1, 8, 8,
+    TM_NUMDR, 10, T_ADDR_W, 1, 8, 8,
     NULL, NULL, &tm_reset,
     &tm_boot, &tm_attach, &tm_detach,
     &tm_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG

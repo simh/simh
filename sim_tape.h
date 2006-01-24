@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Dec-05    RMS     Added write support for Paul Pierce 7b format
    02-May-05    RMS     Added support for Paul Pierce 7b format
 */
 
@@ -46,8 +47,9 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 /* P7B tape format */
 
 #define P7B_SOR         0x80                            /* start of record */
-#define P7B_DPAR        0x7F                            /* data and parity */
+#define P7B_PAR         0x40                            /* parity */
 #define P7B_DATA        0x3F                            /* data */
+#define P7B_DPAR        (P7B_PAR|P7B_DATA)              /* data and parity */
 #define P7B_EOF         0x0F                            /* eof character */
 
 #define TPC_TMK         0x0000                          /* tape mark */
@@ -70,6 +72,12 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define MTUF_WLK        (1u << MTUF_V_WLK)
 #define MTUF_FMT        (MTUF_M_FMT << MTUF_V_FMT)
 #define MTUF_WRP        (MTUF_WLK | UNIT_RO)
+
+#define MT_F_STD        (MTUF_F_STD << MTUF_V_FMT)
+#define MT_F_E11        (MTUF_F_E11 << MTUF_V_FMT)
+#define MT_F_TPC        (MTUF_F_TPC << MTUF_V_FMT)
+#define MT_F_P7B        (MTUF_F_P7B << MTUF_V_FMT)
+#define MT_F_TDF        (MTUF_F_TDF << MTUF_V_FMT)
 
 #define MT_SET_PNU(u)   (u)->flags = (u)->flags | MTUF_PNU
 #define MT_CLR_PNU(u)   (u)->flags = (u)->flags & ~MTUF_PNU

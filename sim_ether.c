@@ -134,6 +134,13 @@
 
   Modification history:
 
+  15-Dec-05  DTH  Patched eth_host_devices [remove non-ethernet devices]
+                  (from Mark Pizzolato and Galen Tackett, 08-Jun-05)
+                  Patched eth_open [tun fix](from Antal Ritter, 06-Oct-05)
+  30-Nov-05  DTH  Added option to regenerate CRC on received packets; some
+                  ethernet devices need to pass it on to the simulation, and by
+                  the time libpcap/winpcap gets the packet, the host OS network
+                  layer has already stripped CRC out of the packet
   01-Dec-04  DTH  Added Windows user-defined adapter names (from Timothe Litt)
   25-Mar-04  MP   Revised comments and minor #defines to deal with updated
                   libpcap which now provides pcap_sendpacket on all platforms.
@@ -341,6 +348,24 @@ uint32 eth_crc32(uint32 crc, const void* vbuf, size_t len)
   return(crc ^ mask);
 }
 
+void eth_add_crc32(ETH_PACK* packet)
+{
+  if (packet->len <= ETH_MAX_PACKET) {
+    uint32 crc = eth_crc32(0, packet->msg, packet->len);  /* calculate CRC */
+    uint32 ncrc = htonl(crc);                             /* CRC in network order */
+    int size = sizeof(ncrc);                              /* size of crc field */
+    memcpy(&packet->msg[packet->len], &ncrc, size);       /* append crc to packet */
+    packet->crc_len = packet->len + size;                 /* set packet crc length */
+  } else {
+    packet->crc_len = 0;                                  /* appending crc would destroy packet */
+  }
+}
+
+void eth_setcrc(ETH_DEV* dev, int need_crc)
+{
+  dev->need_crc = need_crc;
+}
+
 void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int dmp)
 {
   if (dev->dptr->dctrl & dev->dbit) {
@@ -387,7 +412,7 @@ void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int
 
 void eth_packet_trace(ETH_DEV* dev, const uint8 *msg, int len, char* txt)
 {
-  eth_packet_trace_ex(dev, msg, len, txt, len > ETH_MAX_PACKET);
+  eth_packet_trace_ex(dev, msg, len, txt, 1/*len > ETH_MAX_PACKET*/);
 }
 
 char* eth_getname(int number, char* name)
@@ -423,6 +448,48 @@ char* eth_getname_bydesc(char* desc, char* name)
   }
   /* not found */
   return 0;
+}
+
+/* strncasecmp() is not available on all platforms */
+int eth_strncasecmp(char* string1, char* string2, int len)
+{
+  int i;
+  unsigned char s1, s2;
+
+  for (i=0; i<len; i++) {
+    s1 = string1[i];
+    s2 = string2[i];
+    if (islower (s1)) s1 = toupper (s1);
+    if (islower (s2)) s2 = toupper (s2);
+
+    if (s1 < s2)
+      return -1;
+    if (s1 > s2)
+      return 1;
+    if (s1 == 0) return 0;
+  }
+  return 0;
+}
+
+char* eth_getname_byname(char* name, char* temp)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int count = eth_devices(ETH_MAX_DEVICE, list);
+  int i, n, found;
+
+  found = 0;
+  n = strlen(name);
+  for (i=0; i<count && !found; i++) {
+    if (eth_strncasecmp(name, list[i].name, n) == 0) {
+      found = 1;
+      strcpy(temp, list[i].name); /* only case might be different */
+    }
+  }
+  if (found) {
+    return temp;
+  } else {
+    return 0;
+  }
 }
 
 void eth_zero(ETH_DEV* dev)
@@ -522,7 +589,8 @@ void ethq_insert(ETH_QUE* que, int32 type, ETH_PACK* pack, int32 status)
   item->type = type;
   item->packet.len = pack->len;
   item->packet.used = 0;
-  memcpy(item->packet.msg, pack->msg, pack->len);
+  item->packet.crc_len = pack->crc_len;
+  memcpy(item->packet.msg, pack->msg, ((pack->len > pack->crc_len) ? pack->len : pack->crc_len));
   item->packet.status = status;
 }
 
@@ -655,8 +723,12 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
   } else {
     /* are they trying to use device description? */
     savname = eth_getname_bydesc(name, temp);
-    if (savname == 0) /* didn't translate */
-      return SCPE_OPENERR;
+    if (savname == 0) { /* didn't translate */
+      /* probably is not ethX and has no description */
+      savname = eth_getname_byname(name, temp);
+      if (savname == 0) /* didn't translate */
+        return SCPE_OPENERR;
+    }
   }
 
   /* attempt to connect device */
@@ -867,6 +939,8 @@ void eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* 
     /* set data in passed read packet */
     tmp_packet.len = header->len;
     memcpy(tmp_packet.msg, data, header->len);
+    if (dev->need_crc)
+      eth_add_crc32(&tmp_packet);
 
     eth_packet_trace (dev, tmp_packet.msg, tmp_packet.len, "rcvqd");
 
@@ -877,6 +951,8 @@ void eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* 
     /* set data in passed read packet */
     dev->read_packet->len = header->len;
     memcpy(dev->read_packet->msg, data, header->len);
+    if (dev->need_crc)
+      eth_add_crc32(dev->read_packet);
 
     eth_packet_trace (dev, dev->read_packet->msg, dev->read_packet->len, "reading");
 
@@ -892,6 +968,7 @@ t_stat eth_read(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
   int status;
 
   /* make sure device exists */
+
   if (!dev) return SCPE_UNATT;
 
   /* make sure packet exists */
@@ -1109,8 +1186,9 @@ int eth_host_devices(int used, int max, ETH_LIST* list)
     if (NULL != conn) datalink = pcap_datalink(conn), pcap_close(conn);
     if ((NULL == conn) || (datalink != DLT_EN10MB)) {
       for (j=i+1; j<used; ++j)
-        list[i+j] = list[i+j+1];
+        list[j] = list[j+1];
       --used;
+      --i;
     }
   } /* for */
 

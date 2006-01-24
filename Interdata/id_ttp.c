@@ -25,17 +25,13 @@
 
    ttp          console (on PAS)
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    29-Dec-03    RMS     Added support for console backpressure
    25-Apr-03    RMS     Revised for extended file support
 */
 
 #include "id_defs.h"
 #include <ctype.h>
-
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
-#define UNIT_V_UC       (UNIT_V_UF + 1)                 /* UC only */
-#define UNIT_8B         (1 << UNIT_V_8B)
-#define UNIT_UC         (1 << UNIT_V_UC)
 
 #define TTI             0
 #define TTO             1
@@ -103,9 +99,10 @@ REG ttp_reg[] = {
     };
 
 MTAB ttp_mod[] = {
-    { UNIT_UC+UNIT_8B, UNIT_UC, "UC", "UC", &ttp_set_mode },
-    { UNIT_UC+UNIT_8B, 0      , "7b", "7B", &ttp_set_mode },
-    { UNIT_UC+UNIT_8B, UNIT_8B, "8b", "8B", &ttp_set_mode },
+    { TT_MODE, TT_MODE_UC, "UC", "UC", &ttp_set_mode },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", &ttp_set_mode },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", &ttp_set_mode },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", &ttp_set_mode },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, NULL, "ENABLED",
       &ttp_set_enbdis, NULL, NULL },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, DEV_DIS, NULL, "DISABLED",
@@ -188,18 +185,17 @@ if (c & SCPE_BREAK) {                                   /* break? */
     ttp_sta = ttp_sta | STA_FR;                         /* framing error */
     uptr->buf = 0;                                      /* no character */
     }
-else {  c = c & 0xFF;                                   /* char is 8b */
+else {
     out = c & 0x7F;                                     /* echo is 7b */
-    if (!(uptr->flags & UNIT_8B)) {                     /* not 8b? */
-        if ((uptr->flags & UNIT_UC) && islower (out))
-            out = toupper (out);                        /* cvt to UC */
-        c = pas_par (ttp_cmd, out);                     /* apply parity */
-        }
+    c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
+    if (TT_GET_MODE (uptr->flags) != TT_MODE_8B)        /* not 8b mode? */
+        c = pas_par (ttp_cmd, c);                       /* apply parity */
     uptr->buf = c;                                      /* save char */
     uptr->pos = uptr->pos + 1;                          /* incr count */
     ttp_kchp = 1;                                       /* char pending */
     if (ttp_cmd & CMD_ECHO) {
-        sim_putchar (out);
+        out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags));
+        if (c >= 0) sim_putchar (out);
         ttp_unit[TTO].pos = ttp_unit[TTO].pos + 1;
         }
     }
@@ -211,15 +207,10 @@ t_stat ttpo_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-if (uptr->flags & UNIT_8B)                              /* 8b? */
+if (TT_GET_MODE (uptr->flags) == TT_MODE_8B)            /* 8b? */
     c = pas_par (ttp_cmd, uptr->buf);                   /* apply parity */
-else {
-    c = uptr->buf & 0x7F;                               /* mask char */
-    if ((uptr->flags & UNIT_UC) && islower (c))
-        c = toupper (c);                                /* cvt to UC */
-    }
-if ((uptr->flags & UNIT_8B) ||                          /* UC or 7b? */
-    ((c != 0) && (c != 0x7F))){                         /* supr NULL, DEL */
+else c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags));
+if (c >= 0) {
     if ((r = sim_putchar_s (c)) != SCPE_OK) {           /* output; error? */
         sim_activate (uptr, uptr->wait);                /* try again */
         return ((r == SCPE_STALL)? SCPE_OK: r);
@@ -253,8 +244,9 @@ return SCPE_OK;
 
 t_stat ttp_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-ttp_unit[TTI].flags = (ttp_unit[TTI].flags & ~(UNIT_UC | UNIT_8B)) | val;
-ttp_unit[TTO].flags = (ttp_unit[TTO].flags & ~(UNIT_UC | UNIT_8B)) | val;
+ttp_unit[TTO].flags = (ttp_unit[TTO].flags & ~TT_MODE) | val;
+if (val == TT_MODE_7P) val = TT_MODE_7B;
+ttp_unit[TTI].flags = (ttp_unit[TTI].flags & ~TT_MODE) | val;
 return SCPE_OK;
 }
 

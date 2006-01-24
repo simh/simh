@@ -128,7 +128,7 @@
 #define CTG_V           (1u << (CTGAWIDTH + 0))         /* tag valid */
 #define CTG_WP          (1u << (CTGAWIDTH + 1))         /* wrong parity */
 #define ADDR_IS_CDG(x)  ((((uint32) (x)) >= CDGBASE) && \
-                     (((uint32) (x)) < (CDGBASE + CDGSIZE)))
+                        (((uint32) (x)) < (CDGBASE + CDGSIZE)))
 
 /* Qbus I/O registers */
 
@@ -137,7 +137,7 @@
 #define IOPAGEMASK      (IOPAGESIZE - 1)                /* IO addr mask */
 #define IOPAGEBASE      0x20000000                      /* IO page base */
 #define ADDR_IS_IO(x)   ((((uint32) (x)) >= IOPAGEBASE) && \
-                     (((uint32) (x)) < (IOPAGEBASE + IOPAGESIZE)))
+                        (((uint32) (x)) < (IOPAGEBASE + IOPAGESIZE)))
 
 /* Read only memory - appears twice */
 
@@ -146,7 +146,7 @@
 #define ROMAMASK        (ROMSIZE - 1)                   /* ROM addr mask */
 #define ROMBASE         0x20040000                      /* ROM base */
 #define ADDR_IS_ROM(x)  ((((uint32) (x)) >= ROMBASE) && \
-                     (((uint32) (x)) < (ROMBASE + ROMSIZE + ROMSIZE)))
+                        (((uint32) (x)) < (ROMBASE + ROMSIZE + ROMSIZE)))
 
 /* Local register space */
 
@@ -189,7 +189,7 @@
 #define NVRAMASK        (NVRSIZE - 1)                   /* NVR addr mask */
 #define NVRBASE         0x20140400                      /* NVR base */
 #define ADDR_IS_NVR(x)  ((((uint32) (x)) >= NVRBASE) && \
-                     (((uint32) (x)) < (NVRBASE + NVRSIZE)))
+                        (((uint32) (x)) < (NVRBASE + NVRSIZE)))
 
 /* CQBIC Qbus memory space (seen from CVAX) */
 

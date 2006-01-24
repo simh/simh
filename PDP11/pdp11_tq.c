@@ -25,6 +25,7 @@
 
    tq           TQK50 tape controller
 
+   31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
    30-Sep-04    RMS     Revised Unibus interface
@@ -454,7 +455,7 @@ MTAB tq_mod[] = {
 
 DEVICE tq_dev = {
     "TQ", tq_unit, tq_reg, tq_mod,
-    TQ_NUMDR + 2, 10, 31, 1, DEV_RDX, 8,
+    TQ_NUMDR + 2, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &tq_reset,
     &tq_boot, &tq_attach, &tq_detach,
     &tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG
@@ -651,7 +652,7 @@ if ((pkt == 0) && tq_pip) {                             /* polling? */
     }                                                   /* end if pip */
 if (tq_rspq) {                                          /* resp q? */
     pkt = tq_deqh (&tq_rspq);                           /* get top of q */
-    if (!tq_putpkt (pkt, FALSE)) return SCPE_OK;        /* send to hst */
+    if (!tq_putpkt (pkt, FALSE)) return SCPE_OK;        /* send to host */
     }                                                   /* end if resp q */
 if (pkt) sim_activate (&tq_unit[TQ_QUEUE], tq_qtime);   /* more to do? */
 return SCPE_OK;                                         /* done */

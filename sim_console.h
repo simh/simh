@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Nov-05    RMS     Added central input/output conversion support
    05-Nov-04    RMS     Moved SET/SHOW DEBUG under CONSOLE hierarchy
    28-May-04    RMS     Added SET/SHOW CONSOLE
    02-Jan-04    RMS     Removed timer routines, added Telnet console routines
@@ -30,6 +31,23 @@
 
 #ifndef _SIM_CONSOLE_H_
 #define _SIM_CONSOLE_H_ 0
+
+#define TTUF_V_MODE     (UNIT_V_UF + 0)
+#define TTUF_W_MODE     2
+#define  TTUF_MODE_7B   0
+#define  TTUF_MODE_8B   1
+#define  TTUF_MODE_UC   2
+#define  TTUF_MODE_7P   3
+#define  TTUF_KSR       (1u << TTUF_W_MODE)
+#define TTUF_M_MODE     ((1u << TTUF_W_MODE) - 1)
+#define TTUF_V_UF       (TTUF_V_MODE + TTUF_W_MODE)
+#define TT_MODE         (TTUF_M_MODE << TTUF_V_MODE)
+#define  TT_MODE_7B     (TTUF_MODE_7B << TTUF_V_MODE)
+#define  TT_MODE_8B     (TTUF_MODE_8B << TTUF_V_MODE)
+#define  TT_MODE_UC     (TTUF_MODE_UC << TTUF_V_MODE)
+#define  TT_MODE_7P     (TTUF_MODE_7P << TTUF_V_MODE)
+#define  TT_MODE_KSR    (TT_MODE_UC)
+#define TT_GET_MODE(x)  (((x) >> TTUF_V_MODE) & TTUF_M_MODE)
 
 t_stat sim_set_console (int32 flag, char *cptr);
 t_stat sim_set_kmap (int32 flag, char *cptr);
@@ -54,5 +72,7 @@ t_stat sim_ttcmd (void);
 t_stat sim_ttclose (void);
 t_stat sim_os_poll_kbd (void);
 t_stat sim_os_putchar (int32 out);
+int32 sim_tt_inpcvt (int32 c, uint32 mode);
+int32 sim_tt_outcvt (int32 c, uint32 mode);
 
 #endif

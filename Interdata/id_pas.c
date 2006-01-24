@@ -25,6 +25,7 @@
 
    pas          Programmable asynchronous line adapter(s)
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    29-Jun-05    RMS     Added SET PASLn DISCONNECT
    21-Jun-05    RMS     Fixed bug in SHOW CONN/STATS
    05-Jan-04    RMS     Revised for tmxr library changes
@@ -45,11 +46,7 @@
 
 #define PAS_LINES       32
 
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
-#define UNIT_V_UC       (UNIT_V_UF + 1)                 /* UC only */
-#define UNIT_V_MDM      (UNIT_V_UF + 2)                 /* modem control */
-#define UNIT_8B         (1 << UNIT_V_8B)
-#define UNIT_UC         (1 << UNIT_V_UC)
+#define UNIT_V_MDM      (TTUF_V_UF + 0)                 /* modem control */
 #define UNIT_MDM        (1 << UNIT_V_MDM)
 
 #define PAS_INIT_POLL   8000
@@ -214,9 +211,10 @@ UNIT pasl_unit[] = {
     };
 
 MTAB pasl_mod[] = {
-    { UNIT_UC+UNIT_8B, UNIT_UC, "UC", "UC", NULL },
-    { UNIT_UC+UNIT_8B, 0      , "7b", "7B", NULL },
-    { UNIT_UC+UNIT_8B, UNIT_8B, "8b", "8B", NULL },
+    { TT_MODE, TT_MODE_UC, "UC", "UC", NULL },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
     { UNIT_MDM, 0, "no dataset", "NODATASET", NULL },
     { UNIT_MDM, UNIT_MDM, "dataset", "DATASET", NULL },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "DISCONNECT",
@@ -341,18 +339,15 @@ for (ln = 0; ln < PAS_ENAB; ln++) {                     /* loop thru lines */
                 }
             else {                                      /* normal */
                 out = c & 0x7F;                         /* echo is 7b */
-                if (pasl_unit[ln].flags & UNIT_8B)      /* 8b? */
-                    c = c & 0xFF;
-                else {                                  /* UC or 7b */
-                    if ((pasl_unit[ln].flags & UNIT_UC) && islower (out))
-                        out = toupper (out);            /* cvt to UC */
-                    c = pas_par (pas_cmd[ln], out);     /* apply parity */
-                    }
+                c = sim_tt_inpcvt (c, TT_GET_MODE (pasl_unit[ln].flags));
+                if (TT_GET_MODE (pasl_unit[ln].flags) != TT_MODE_8B)
+                    c = pas_par (pas_cmd[ln], c);       /* apply parity */
                 pas_rbuf[ln] = c;                       /* save char */
                 pas_rchp[ln] = 1;                       /* char pending */
                 if ((pas_cmd[ln] & CMD_ECHO) && pas_ldsc[ln].xmte) {
                     TMLN *lp = &pas_ldsc[ln];           /* get line */
-                    tmxr_putc_ln (lp, out);             /* output char */
+                    out = sim_tt_outcvt (out, TT_GET_MODE (pasl_unit[ln].flags));
+                    if (out >= 0) tmxr_putc_ln (lp, out); /* output char */
                     tmxr_poll_tx (&pas_desc);           /* poll xmt */
                     }
                 }                                       /* end else normal */
@@ -376,14 +371,12 @@ uint32 ln = uptr - pasl_unit;                           /* line # */
 if (pas_ldsc[ln].conn) {                                /* connected? */
     if (pas_ldsc[ln].xmte) {                            /* xmt enabled? */
         TMLN *lp = &pas_ldsc[ln];                       /* get line */
-        if (pasl_unit[ln].flags & UNIT_8B)              /* 8b? */
+        if (TT_GET_MODE (pasl_unit[ln].flags) == TT_MODE_8B)
             c = pas_par (pas_cmd[ln], pas_xbuf[ln]);    /* apply parity */
-        else {                                          /* UC or 7b */
-            c = pas_xbuf[ln] & 0x7F;                    /* mask char */
-            if ((pasl_unit[ln].flags & UNIT_UC) && islower (c))
-                c = toupper (c);                        /* cvt to UC */
+        else c = sim_tt_outcvt (pas_xbuf[ln], TT_GET_MODE (pasl_unit[ln].flags));
+        if (c >= 0) {
+            tmxr_putc_ln (lp, c);                       /* output char */
             }
-        tmxr_putc_ln (lp, c);                           /* output char */
         tmxr_poll_tx (&pas_desc);                       /* poll xmt */
         }
     else {                                              /* buf full */

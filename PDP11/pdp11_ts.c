@@ -25,6 +25,7 @@
 
    ts           TS11/TSV05 magtape
 
+   31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
    18-Mar-05    RMS     Added attached test to detach routine
@@ -354,7 +355,7 @@ MTAB ts_mod[] = {
 
 DEVICE ts_dev = {
     "TS", &ts_unit, ts_reg, ts_mod,
-    1, 10, 31, 1, DEV_RDX, 8,
+    1, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &ts_reset,
     &ts_boot, &ts_attach, &ts_detach,
     &ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG

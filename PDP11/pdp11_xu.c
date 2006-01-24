@@ -40,6 +40,11 @@
   Testing performed:
    1) Receives/Transmits single packet under custom RSX driver
    2) Passes RSTS 10.1 controller diagnostics during boot
+   3) VMS 7.2 on VAX780 summary:
+        LAT    - Runs properly both in and out
+        DECNET - Starts without error, but will not do anything
+        TCP/IP - Starts with errors, will ping in/out but nothing else
+        Clustering - Not tested
 
   Known issues:
    1) Transmit/Receive rings have not been thoroughly tested,
@@ -52,6 +57,8 @@
 
   Modification history:
 
+  08-Dec-05  DTH  Implemented ancilliary functions 022/023/024/025
+  18-Nov-05  DTH  Corrected time between system ID packets
   07-Sep-05  DTH  Corrected runt packet processing (found by Tim Chapman),
                   Removed unused variable
   16-Aug-05  RMS  Fixed C++ declaration and cast problems
@@ -76,7 +83,7 @@
 
 #include "pdp11_xu.h"
 
-extern int32 tmr_poll, clk_tps;
+extern int32 tmr_poll, clk_tps, cpu_astop;
 extern FILE *sim_log;
 
 t_stat xu_rd(int32* data, int32 PA, int32 access);
@@ -101,6 +108,8 @@ void xub_write_callback(int status);
 void xu_setint (CTLR* xu);
 void xu_clrint (CTLR* xu);
 void xu_process_receive(CTLR* xu);
+void xu_dump_rxring(CTLR* xu);
+void xu_dump_txring(CTLR* xu);
 
 DIB xua_dib = { IOBA_XU, IOLN_XU, &xu_rd, &xu_wr,
 1, IVCL (XU), VEC_XU, {&xu_int} };
@@ -144,6 +153,7 @@ DEBTAB xu_debug[] = {
   {"TRACE",  DBG_TRC},
   {"WARN",   DBG_WRN},
   {"REG",    DBG_REG},
+  {"PACKET", DBG_PCK},
   {"ETH",    DBG_ETH},
   {0}
 };
@@ -463,7 +473,7 @@ t_stat xu_svc(UNIT* uptr)
   if (--xu->var->idtmr <= 0) {
     if ((xu->var->mode & MODE_DMNT) == 0)           /* if maint msg is not disabled */
       status = xu_system_id(xu, mop_multicast, 0);  /*   then send ID packet */
-    xu->var->idtmr = XU_ID_TIMER_VAL;               /* reset timer */
+    xu->var->idtmr = XU_ID_TIMER_VAL * one_second;  /* reset timer */
   }
 
   /* has one second timer expired? if so, update stats and reset timer */
@@ -517,11 +527,17 @@ t_stat xu_sw_reset (CTLR* xu)
   sim_debug(DBG_TRC, xu->dev, "xu_sw_reset()\n");
 
   /* Clear the registers. */
-  xu->var->pcsr0 = 0;
+  xu->var->pcsr0 = PCSR0_DNI | PCSR0_INTR;
   xu->var->pcsr1 = STATE_READY;
   switch (xu->var->type) {
-    case XU_T_DELUA:   xu->var->pcsr1 |= TYPE_DELUA;  break;
-    case XU_T_DEUNA:   xu->var->pcsr1 |= TYPE_DEUNA;  break;
+    case XU_T_DELUA:
+      xu->var->pcsr1 |= TYPE_DELUA;
+      break;
+    case XU_T_DEUNA:
+      xu->var->pcsr1 |= TYPE_DEUNA;
+      if (!xu->var->etherface)  /* if not attached, set transceiver powerfail */
+        xu->var->pcsr1 |= PCSR1_XPWR;
+      break;
   }
   xu->var->pcsr2 = 0;
   xu->var->pcsr3 = 0;
@@ -554,6 +570,9 @@ t_stat xu_sw_reset (CTLR* xu)
     sim_activate(&xu->unit[0], one_second/XU_SERVICE_INTERVAL);
   }
 
+  /* clear load_server address */
+  memset(xu->var->load_server, 0, sizeof(ETH_MAC));
+
   return SCPE_OK;
 }
 
@@ -563,6 +582,7 @@ t_stat xu_reset(DEVICE* dptr)
   t_stat status;
   CTLR* xu = xu_dev2ctlr(dptr);
 
+  sim_debug(DBG_TRC, xu->dev, "xu_reset()\n");
   /* init read queue (first time only) */
   status = ethq_init (&xu->var->ReadQ, XU_QUE_MAX);
   if (status != SCPE_OK)
@@ -574,15 +594,19 @@ t_stat xu_reset(DEVICE* dptr)
   return SCPE_OK;
 }
 
+
 /* Perform one of the defined ancillary functions. */
 int32 xu_command(CTLR* xu)
 {
   uint32 udbb;
   int fnc, mtlen;
-  uint16 value;
+  uint16 value, pltlen;
   t_stat status, rstatus, wstatus, wstatus2, wstatus3;
   struct xu_stats* stats = &xu->var->stats;
   uint16* udb = xu->var->udb;
+  uint16* mac_w = (uint16*) xu->var->mac;
+  static const ETH_MAC zeros = {0,0,0,0,0,0};
+  static const ETH_MAC mcast_load_server = {0xAB, 0x00, 0x00, 0x01, 0x00, 0x00};
   static char* command[] = {
       "NO-OP",
       "Start Microaddress",
@@ -610,11 +634,12 @@ int32 xu_command(CTLR* xu)
 
   /* Grab the PCB from the host. */
   rstatus = Map_ReadW(xu->var->pcbb, 8, xu->var->pcb);
-  if (rstatus != SCPE_OK)
+  if (rstatus != 0)
     return PCSR0_PCEI + 1;
 
   /* High 8 bits are defined as MBZ. */
-  if (xu->var->pcb[0] & 0177400) return PCSR0_PCEI;
+  if (xu->var->pcb[0] & 0177400)
+    return PCSR0_PCEI;
 
   /* Decode the function to be performed. */
   fnc = xu->var->pcb[0] & 0377;
@@ -625,28 +650,31 @@ int32 xu_command(CTLR* xu)
       break;
 
     case FC_RDPA:			/* read default physical address */
-      wstatus = Map_WriteW(xu->var->pcbb + 2, 6, (uint16*)xu->var->mac);
-      if (wstatus != SCPE_OK)
+      wstatus = Map_WriteB(xu->var->pcbb + 2, 6, xu->var->mac);
+      if (wstatus)
         return PCSR0_PCEI + 1;
       break;
 
     case FC_RPA:			/* read current physical address */
-      wstatus = Map_WriteW(xu->var->pcbb + 2, 6, (uint16*)&xu->var->setup.macs[0]);
-      if (wstatus != SCPE_OK)
+      wstatus = Map_WriteB(xu->var->pcbb + 2, 6, (uint8*)&xu->var->setup.macs[0]);
+      if (wstatus)
         return PCSR0_PCEI + 1;
       break;
 
     case FC_WPA:			/* write current physical address */
-      rstatus = Map_ReadW(xu->var->pcbb + 2, 6, (uint16*)&xu->var->setup.macs[0]);
-      if (xu->var->pcb[1] & 1) return PCSR0_PCEI;
+      rstatus = Map_ReadB(xu->var->pcbb + 2, 6, (uint8*)&xu->var->setup.macs[0]);
+      if (xu->var->pcb[1] & 1)
+        return PCSR0_PCEI;
       break;
 
     case FC_WMAL:   /* write multicast address list */
       mtlen = (xu->var->pcb[2] & 0xFF00) >> 8;
-      if (mtlen > 10) return PCSR0_PCEI;
+sim_debug(DBG_TRC, xu->dev, "FC_WAL: mtlen=%d\n", mtlen);
+      if (mtlen > 10)
+        return PCSR0_PCEI;
       udbb = xu->var->pcb[1] | ((xu->var->pcb[2] & 03) << 16);
-      rstatus = Map_ReadW(udbb, mtlen * 6, (uint16*) &xu->var->setup.macs[1]);
-      if (rstatus == SCPE_OK) {
+      rstatus = Map_ReadB(udbb, mtlen * 6, (uint8*) &xu->var->setup.macs[1]);
+      if (rstatus == 0) {
         xu->var->setup.mac_count = mtlen + 1;
         status = eth_filter (xu->var->etherface, xu->var->setup.mac_count,
                              xu->var->setup.macs, xu->var->setup.multicast,
@@ -669,7 +697,7 @@ int32 xu_command(CTLR* xu)
       /* Write UDB to host memory. */
       udbb = xu->var->pcb[1] + ((xu->var->pcb[2] & 3) << 16);
       wstatus = Map_WriteW(udbb, 12, xu->var->pcb);
-      if (wstatus != SCPE_OK)
+      if (wstatus != 0)
         return PCSR0_PCEI+1;
       break;
 
@@ -682,7 +710,7 @@ int32 xu_command(CTLR* xu)
       /* Read UDB into local memory. */
       udbb = xu->var->pcb[1] + ((xu->var->pcb[2] & 3) << 16);
       rstatus = Map_ReadW(udbb, 12, xu->var->udb);
-      if (rstatus != SCPE_OK)
+      if (rstatus)
         return PCSR0_PCEI+1;
 
       if ((xu->var->udb[0] & 1) || (xu->var->udb[1] & 0374) ||
@@ -699,6 +727,9 @@ int32 xu_command(CTLR* xu)
       xu->var->rrlen = xu->var->udb[5];
       xu->var->rxnext = 0;
       xu->var->txnext = 0;
+xu_dump_rxring(xu);
+xu_dump_txring(xu);
+/*cpu_astop=1;*/
       break;
 
     case FC_RDCTR:      /* read counters */
@@ -745,7 +776,7 @@ int32 xu_command(CTLR* xu)
       /* transfer udb to host */
       udbb = xu->var->pcb[1] + ((xu->var->pcb[2] & 3) << 16);
       wstatus = Map_WriteW(udbb, 68, xu->var->udb);
-      if (wstatus != SCPE_OK) {
+      if (wstatus) {
         xu->var->pcsr0 |= PCSR0_PCEI;
       }
 
@@ -757,13 +788,14 @@ int32 xu_command(CTLR* xu)
     case FC_RMODE:			/* read mode register */
       value = xu->var->mode;
       wstatus = Map_WriteW(xu->var->pcbb+2, 2, &value);
-      if (wstatus != SCPE_OK)
+      if (wstatus)
         return PCSR0_PCEI + 1;
       break;
 
     case FC_WMODE:			/* write mode register */
       value = xu->var->mode;
       xu->var->mode = xu->var->pcb[1];
+sim_debug(DBG_TRC, xu->dev, "FC_WMODE: mode=%04x\n", xu->var->mode);
 
       /* set promiscuous and multicast flags */
       xu->var->setup.promiscuous = (xu->var->mode & MODE_PROM) ? 1 : 0;
@@ -784,11 +816,77 @@ int32 xu_command(CTLR* xu)
       wstatus2 = Map_WriteW(xu->var->pcbb+4, 2, &value);
       value = 32;
       wstatus3 = Map_WriteW(xu->var->pcbb+6, 2, &value);
-      if ((wstatus != SCPE_OK) || (wstatus2 != SCPE_OK) || (wstatus3 != SCPE_OK))
+      if (wstatus + wstatus2 + wstatus3)
         return PCSR0_PCEI + 1;
 
       if (fnc == FC_RCSTAT)
         xu->var->stat &= 0377;	/* clear high byte */
+      break;
+
+    case FC_RSID: /* read system id parameters */
+      /* prepare udb for transfer */
+      memset(xu->var->udb, 0, sizeof(xu->var->udb));
+
+      udb[11] = 0x260;                    /* type */
+      udb[12] = 28/* + parameter size */; /* ccount */
+      udb[13] = 7;                        /* code */
+      udb[14] = 0;                        /* recnum */
+                                          /* mop information */
+      udb[15] = 1;                        /* mvtype */
+      udb[16] = 0x0303;                   /* mvver + mvlen */
+      udb[17] = 0;                        /* mvueco + mveco */
+                                          /* function information */
+      udb[18] = 2;                        /* ftype */
+      udb[19] = 0x0502;                   /* fval1 + flen */
+      udb[20] = 0x0700;                   /* hatype<07:00> + fval2 */
+      udb[21] = 0x0600;                   /* halen + hatype<15:08> */
+                                          /* built-in MAC address */
+      udb[21] = mac_w[0];                 /* HA<15:00> */
+      udb[22] = mac_w[1];                 /* HA<31:16> */
+      udb[23] = mac_w[2];                 /* HA<47:32> */
+      udb[24] = 0x64;                     /* dtype */
+      udb[25] = (11 << 8) + 1;            /* dvalue + dlen */
+      
+      /* transfer udb to host */
+      udbb = xu->var->pcb[1] + ((xu->var->pcb[2] & 3) << 16);
+      wstatus = Map_WriteW(udbb, 52, xu->var->udb);
+      if (wstatus)
+        xu->var->pcsr0 |= PCSR0_PCEI;
+      break;
+
+    case FC_WSID: /* write system id parameters */
+      /* get udb base */
+      udbb = xu->var->pcb[1] + ((xu->var->pcb[2] & 3) << 16);
+      /* get udb length */
+      pltlen = xu->var->pcb[3];
+
+      /* transfer udb from host */
+      rstatus = Map_ReadW(udbb, pltlen * 2, xu->var->udb);
+      if (rstatus)
+        return PCSR0_PCEI + 1;
+
+      /* decode and store system ID fields , if we ever need to.
+         for right now, just return "success" */
+
+      break;
+
+    case FC_RLSA: /* read load server address */
+      if (memcmp(xu->var->load_server, zeros, sizeof(ETH_MAC))) {
+        /* not set, use default multicast load address */
+        wstatus = Map_WriteB(xu->var->pcbb + 2, 6, (uint8*) mcast_load_server);
+      } else {
+        /* is set, use load_server */
+        wstatus = Map_WriteB(xu->var->pcbb + 2, 6, xu->var->load_server);
+      }
+      if (wstatus)
+        return PCSR0_PCEI + 1;
+      break;
+
+
+    case FC_WLSA: /* write load server address */
+      rstatus = Map_ReadB(xu->var->pcbb + 2, 6, xu->var->load_server);
+      if (rstatus)
+        return PCSR0_PCEI + 1;
       break;
 
     default:			/* Unknown (unimplemented) command. */
@@ -812,6 +910,8 @@ void xu_process_receive(CTLR* xu)
   int no_buffers = xu->var->pcsr0 & PCSR0_RCBI;
 
   sim_debug(DBG_TRC, xu->dev, "xu_process_receive(), buffers: %d\n", xu->var->rrlen);
+
+/* xu_dump_rxring(xu); /* debug receive ring */
 
   /* process only when in the running state, and host buffers are available */
   if ((state != STATE_RUNNING) || no_buffers)
@@ -839,7 +939,7 @@ void xu_process_receive(CTLR* xu)
     /* if buffer not owned by controller, exit [at end of ring] */
     if (!(xu->var->rxhdr[2] & RXR_OWN)) {
       /* tell the host there are no more buffers */
-      xu->var->pcsr0 |= PCSR0_RCBI;
+      /* xu->var->pcsr0 |= PCSR0_RCBI; */ /* I don't think this is correct 08-dec-2005 dth */
       break;
     }
 
@@ -881,7 +981,7 @@ void xu_process_receive(CTLR* xu)
     }
 
     /* figure out chained packet size */
-    wlen = item->packet.len - item->packet.used;
+    wlen = item->packet.crc_len - item->packet.used;
     if (wlen > slen)
       wlen = slen;
 
@@ -899,7 +999,7 @@ void xu_process_receive(CTLR* xu)
     off += wlen;
 
     /* Is this the end-of-frame? */
-    if (item->packet.used == item->packet.len) {
+    if (item->packet.used == item->packet.crc_len) {
       /* mark end-of-frame */
       xu->var->rxhdr[2] |= RXR_ENF;
 
@@ -918,9 +1018,14 @@ void xu_process_receive(CTLR* xu)
        * size is only 1514, not 1518, I doubt the CRC is actually
        * transferred in normal mode. Maybe CRC is transferred
        * and used in Loopback mode.. -- DTH
+       *
+       * The VMS XEDRIVER indicates that CRC is transferred as
+       * part of the packet, and is included in the MLEN count. -- DTH
        */
       xu->var->rxhdr[3] &= ~RXR_MLEN;
-      xu->var->rxhdr[3] |= (item->packet.len + 4/*CRC*/);
+      xu->var->rxhdr[3] |= (item->packet.crc_len);
+      if (xu->var->mode & MODE_DRDC) /* data chaining disabled */
+        xu->var->rxhdr[3] |= RXR_NCHN;
 
       /* update stats */
       upd_stat32(&xu->var->stats.frecv, 1);
@@ -967,6 +1072,8 @@ void xu_process_receive(CTLR* xu)
 
   /* set or clear interrupt, depending on what happened */
   xu_setclrint(xu, 0);
+xu_dump_rxring(xu); /* debug receive ring */
+
 }
 
 void xu_process_transmit(CTLR* xu)
@@ -976,6 +1083,7 @@ void xu_process_transmit(CTLR* xu)
   t_stat rstatus, wstatus;
 
   sim_debug(DBG_TRC, xu->dev, "xu_process_transmit()\n");
+/* xu_dump_txring(xu); /* debug receive ring */
 
   for (;;) {
 
@@ -1125,18 +1233,20 @@ void xu_port_command (CTLR* xu)
     };
 
   sim_debug(DBG_TRC, xu->dev, "xu_port_command(), Command = %s [0%o]\n", commands[command], command);
-  switch (command) {
-    case CMD_NOOP:      /* NO-OP */
-      /* NOOP does NOT set DNI */
-      break;
-
-    case CMD_GETPCBB:		/* GET PCB-BASE */
-      xu->var->pcbb = (xu->var->pcsr3 << 16) | xu->var->pcsr2;
+  switch (command) {  /* cases in order of most used to least used */
+    case CMD_PDMD:			/* POLLING DEMAND */
+      /* process transmit buffers, receive buffers are done in the service timer */
+      xu_process_transmit(xu);
       xu->var->pcsr0 |= PCSR0_DNI;
       break;
 
     case CMD_GETCMD:		/* GET COMMAND */
       bits = xu_command(xu);
+      xu->var->pcsr0 |= PCSR0_DNI;
+      break;
+
+    case CMD_GETPCBB:		/* GET PCB-BASE */
+      xu->var->pcbb = (xu->var->pcsr3 << 16) | xu->var->pcsr2;
       xu->var->pcsr0 |= PCSR0_DNI;
       break;
 
@@ -1159,21 +1269,6 @@ void xu_port_command (CTLR* xu)
         xu->var->pcsr0 |= PCSR0_PCEI;
       break;
 
-    case CMD_BOOT:      /* BOOT */
-      /* not implemented */
-      msg = "%s: BOOT command not implemented!\n";
-      printf (msg, xu->dev->name);
-      if (sim_log) fprintf(sim_log, msg, xu->dev->name);
-
-      xu->var->pcsr0 |= PCSR0_PCEI;
-      break;
-
-    case CMD_PDMD:			/* POLLING DEMAND */
-      /* process transmit buffers, receive buffers are done in the service timer */
-      xu_process_transmit(xu);
-      xu->var->pcsr0 |= PCSR0_DNI;
-      break;
-
     case CMD_HALT:      /* HALT */
       if ((state == STATE_READY) || (state == STATE_RUNNING)) {
         sim_cancel (&xu->unit[0]);        /* cancel service timer */
@@ -1193,6 +1288,19 @@ void xu_port_command (CTLR* xu)
         xu->var->pcsr0 |= PCSR0_PCEI;
       break;
 
+    case CMD_BOOT:      /* BOOT */
+      /* not implemented */
+      msg = "%s: BOOT command not implemented!\n";
+      printf (msg, xu->dev->name);
+      if (sim_log) fprintf(sim_log, msg, xu->dev->name);
+
+      xu->var->pcsr0 |= PCSR0_PCEI;
+      break;
+
+    case CMD_NOOP:      /* NO-OP */
+      /* NOOP does NOT set DNI */
+      break;
+
     case CMD_RSV06:     /* RESERVED */
     case CMD_RSV07:     /* RESERVED */
     case CMD_RSV11:     /* RESERVED */
@@ -1200,8 +1308,9 @@ void xu_port_command (CTLR* xu)
     case CMD_RSV13:     /* RESERVED */
     case CMD_RSV14:     /* RESERVED */
     case CMD_RSV15:     /* RESERVED */
+      /* all reserved commands act as a no-op but set DNI */
       xu->var->pcsr0 |= PCSR0_DNI;
-      break;            /* all reserved commands act as a no-op but set DNI */
+      break;
   } /* switch */
 
   /* set interrupt if needed */
@@ -1212,10 +1321,6 @@ t_stat xu_rd(int32 *data, int32 PA, int32 access)
 {
   CTLR* xu = xu_pa2ctlr(PA);
   int reg = (PA >> 1) & 03;
-
-  sim_debug(DBG_TRC, xu->dev, "xu_rd(), PCSR%d\n", reg);
-  if (PA & 1)
-    sim_debug(DBG_WRN, xu->dev, "xu_rd(), Unexpected Odd address access of PCSR%d\n", reg);
 
   switch (reg) {
     case 00:
@@ -1231,6 +1336,9 @@ t_stat xu_rd(int32 *data, int32 PA, int32 access)
       *data = xu->var->pcsr3;
       break;
   }
+  sim_debug(DBG_TRC, xu->dev, "xu_rd(), PCSR%d, data=%04x\n", reg, *data);
+  if (PA & 1)
+    sim_debug(DBG_WRN, xu->dev, "xu_rd(), Unexpected Odd address access of PCSR%d\n", reg);
   return SCPE_OK;
 }
 
@@ -1238,10 +1346,27 @@ t_stat xu_wr(int32 data, int32 PA, int32 access)
 {
   CTLR* xu = xu_pa2ctlr(PA);
   int reg = (PA >> 1) & 03;
+  char desc[10];
 
-  sim_debug(DBG_TRC, xu->dev, "xu_wr(), PCSR%d\n", reg);
+  switch (access) {
+    case WRITE :
+      strcpy(desc, "Word");
+      break;
+    case WRITEB:
+      if (PA & 1) {
+        strcpy(desc, "ByteHi");
+      } else {
+        strcpy(desc, "ByteLo");
+      }
+      break;
+    default :
+      strcpy(desc, "Unknown");
+      break;
+  }
+  sim_debug(DBG_TRC, xu->dev, "xu_wr(), PCSR%d, data=%08x, PA=%08x, access=%d[%s]\n", reg, data, PA, access, desc);
   switch (reg) {
     case 00:
+	/* Clear write-one-to-clear interrupt bits */
       if (access == WRITEB) {
         data &= 0377;
         if (PA & 1) {
@@ -1252,20 +1377,27 @@ t_stat xu_wr(int32 data, int32 PA, int32 access)
           xu_setclrint(xu, 0);
 
           /* Bail out early to avoid PCMD crap. */
-          break;
+          return SCPE_OK;
         }
+      } else {                       /* access == WRITE [Word] */
+        uint16 mask = data & 0xFF00; /* only interested in high byte */
+        xu->var->pcsr0 &= ~mask;     /* clear write-one-to-clear bits */
       }
       /* RESET function requested? */
       if (data & PCSR0_RSET) {
         xu_sw_reset(xu);
-        xu->var->pcsr0 |= PCSR0_DNI;
         xu_setclrint(xu, 0);
-        return SCPE_OK;
+        return SCPE_OK;              /* nothing else to do on reset */
       }
-      /* Nope.  Handle the INTE interlock thingie. */
+      /* Handle the INTE interlock; if INTE changes state, no commands can occur */
       if ((xu->var->pcsr0 ^ data) & PCSR0_INTE) {
         xu->var->pcsr0 ^= PCSR0_INTE;
         xu->var->pcsr0 |= PCSR0_DNI;
+        if (xu->var->pcsr0 & PCSR0_INTE) {
+          sim_debug(DBG_TRC, xu->dev, "xu_wr(), Interrupts Enabled\n");
+        } else {
+          sim_debug(DBG_TRC, xu->dev, "xu_wr(), Interrupts Disabled\n");
+        }
       } else {
         /* Normal write, no interlock. */
         xu->var->pcsr0 &= ~PCSR0_PCMD;
@@ -1316,6 +1448,7 @@ t_stat xu_attach(UNIT* uptr, char* cptr)
   }
   uptr->filename = tptr;
   uptr->flags |= UNIT_ATT;
+  eth_setcrc(xu->var->etherface, 1); /* enable CRC */
 
   /* reset the device with the new attach info */
   xu_reset(xu->dev);
@@ -1376,4 +1509,40 @@ int32 xu_int (void)
     }
   }
   return 0;                                       /* no interrupt request active */
+}
+
+/*==============================================================================
+/                               debugging routines
+/=============================================================================*/
+
+void xu_dump_rxring (CTLR* xu)
+{
+  int i;
+  int rrlen = xu->var->rrlen;
+  printf ("receive ring[%s]: base address: %08x  headers: %d, header size: %d, current: %d\n", xu->dev->name, xu->var->rdrb, xu->var->rrlen, xu->var->relen, xu->var->rxnext);
+  for (i=0; i<rrlen; i++) {
+    uint16 rxhdr[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+    uint32 ba = xu->var->rdrb + (xu->var->relen * 2) * i;
+    t_stat rstatus = Map_ReadW (ba, 8, rxhdr);	/* get rxring entry[i] */
+    int own = (rxhdr[2] & RXR_OWN) >> 15;
+    int len = rxhdr[0];
+    uint32 addr = rxhdr[1] + ((rxhdr[2] & 3) << 16);
+    printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, rxhdr[0], rxhdr[1], rxhdr[2], rxhdr[3]);
+  }
+}
+
+void xu_dump_txring (CTLR* xu)
+{
+  int i;
+  int trlen = xu->var->trlen;
+  printf ("transmit ring[%s]: base address: %08x  headers: %d, header size: %d, current: %d\n", xu->dev->name, xu->var->tdrb, xu->var->trlen, xu->var->telen, xu->var->txnext);
+  for (i=0; i<trlen; i++) {
+    uint16 txhdr[4];
+    uint32 ba = xu->var->tdrb + (xu->var->telen * 2) * i;
+    t_stat tstatus = Map_ReadW (ba, 8, txhdr);	/* get rxring entry[i] */
+    int own = (txhdr[2] & RXR_OWN) >> 15;
+    int len = txhdr[0];
+    uint32 addr = txhdr[1] + ((txhdr[2] & 3) << 16);
+    printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, txhdr[0], txhdr[1], txhdr[2], txhdr[3]);
+  }
 }

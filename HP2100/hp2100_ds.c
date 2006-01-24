@@ -342,7 +342,6 @@ static struct drvtyp drv_tab[] = {
 extern uint32 PC, SR;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
 extern int32 sim_switches;
-extern UNIT cpu_unit;
 
 uint32 ds_fifo[DS_FIFO_SIZE] = { 0 };                   /* fifo */
 uint32 ds_fifo_ip = 0;                                  /* insertion ptr */

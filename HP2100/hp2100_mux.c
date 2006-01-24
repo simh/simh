@@ -25,6 +25,7 @@
 
    mux,muxl,muxc        12920A terminal multiplexor
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    29-Jun-05    RMS     Added SET MUXLn DISCONNECT
    07-Oct-04    JDB     Allow enable/disable from any device
    26-Apr-04    RMS     Fixed SFS x,C and SFC x,C
@@ -56,11 +57,7 @@
 
 #define MUX_LINES       16                              /* user lines */
 #define MUX_ILINES      5                               /* diag rcv only */
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
-#define UNIT_V_UC       (UNIT_V_UF + 1)                 /* UC only */
-#define UNIT_V_MDM      (UNIT_V_UF + 2)                 /* modem control */
-#define UNIT_8B         (1 << UNIT_V_8B)
-#define UNIT_UC         (1 << UNIT_V_UC)
+#define UNIT_V_MDM      (TTUF_V_UF + 0)                 /* modem control */
 #define UNIT_MDM        (1 << UNIT_V_MDM)
 #define MUXU_INIT_POLL  8000
 #define MUXL_WAIT       500
@@ -259,29 +256,30 @@ DEVICE muxu_dev = {
 */
 
 UNIT muxl_unit[] = {
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT }
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT }
     };
 
 MTAB muxl_mod[] = {
-    { UNIT_UC+UNIT_8B, UNIT_UC, "UC", "UC", NULL },
-    { UNIT_UC+UNIT_8B, 0      , "7b", "7B", NULL },
-    { UNIT_UC+UNIT_8B, UNIT_8B, "8b", "8B", NULL },
+    { TT_MODE, TT_MODE_UC, "UC", "UC", NULL },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
     { UNIT_MDM, 0, "no dataset", "NODATASET", NULL },
     { UNIT_MDM, UNIT_MDM, "dataset", "DATASET", NULL },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
@@ -552,11 +550,7 @@ for (ln = 0; ln < MUX_LINES; ln++) {                    /* loop thru lines */
                 }
             else {                                      /* normal */
                 if (mux_rchp[ln]) mux_sta[ln] = mux_sta[ln] | LIU_LOST;
-                if (muxl_unit[ln].flags & UNIT_UC) {    /* cvt to UC? */
-                    c = c & 0177;
-                    if (islower (c)) c = toupper (c);
-                    }
-                else c = c & ((muxl_unit[ln].flags & UNIT_8B)? 0377: 0177);
+                c = sim_tt_inpcvt (c, TT_GET_MODE (muxl_unit[ln].flags));
                 if (mux_rpar[ln] & OTL_ECHO) {          /* echo? */
                     TMLN *lp = &mux_ldsc[ln];           /* get line */
                     tmxr_putc_ln (lp, c);               /* output char */
@@ -586,18 +580,17 @@ if (mux_ldsc[ln].conn) {                                /* connected? */
         if ((mux_xbuf[ln] & OTL_SYNC) == 0) {           /* start bit 0? */
             TMLN *lp = &mux_ldsc[ln];                   /* get line */
             c = mux_xbuf[ln];                           /* get char */
-            if (muxl_unit[ln].flags & UNIT_UC) {        /* cvt to UC? */
-                c = c & 0177;
-                if (islower (c)) c = toupper (c);
-                }
-            else c = c & ((muxl_unit[ln].flags & UNIT_8B)? 0377: 0177);
+            c = sim_tt_outcvt (c, TT_GET_MODE (muxl_unit[ln].flags));
             if (mux_xpar[ln] & OTL_DIAG)                /* xmt diag? */
                 mux_diag (mux_xbuf[ln]);                /* before munge */
             mux_xdon[ln] = 1;                           /* set done */
-            if (!(muxl_unit[ln].flags & UNIT_8B) &&     /* not transparent? */
-                (c != 0x7f) &&  (c != 0x13) &&          /* not del, ^S? */
-                (c != 0x11) && (c != 0x5))              /* not ^Q, ^E? */
-                 tmxr_putc_ln (lp, c);                  /* output char */
+
+/* In (default) UC or (new) 7P, all these chars are suppressed automatically */
+/*            if ((TT_GET_MODE (muxl_unit[ln].flags) != TT_MODE_8B) &&
+/*                (c != 0x7f) &&  (c != 0x13) &&          /* not del, ^S? */
+/*                (c != 0x11) && (c != 0x5))              /* not ^Q, ^E? */
+            if (c >= 0)                                 /* valid? */
+                tmxr_putc_ln (lp, c);                   /* output char */
             tmxr_poll_tx (&mux_desc);                   /* poll xmt */
             }
         }

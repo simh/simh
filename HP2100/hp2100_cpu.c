@@ -27,6 +27,7 @@
    MP           12892B memory protect
    DMA0,DMA1    12895A/12897B direct memory access/dual channel port controller
 
+   26-Dec-05    JDB     Improved reporting in dev_conflict
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    21-Jan-05    JDB     Reorganized CPU option flags
    15-Jan-05    RMS     Split out EAU and MAC instructions
@@ -2051,29 +2052,47 @@ return;
 
 t_bool dev_conflict (void)
 {
-DEVICE *dptr, *cdptr;
-DIB *dibp, *chkp;
-uint32 i, j, dno;
+DEVICE *dptr;
+DIB *dibp;
+uint32 i, j, k;
+t_bool is_conflict = FALSE;
+uint32 conflicts[I_DEVMASK + 1] = { 0 };
 
-for (i = 0; cdptr = sim_devices[i]; i++) {
-    chkp = (DIB *) cdptr->ctxt;
-    if (chkp && !(cdptr->flags & DEV_DIS)) {
-        dno = chkp->devno;
-        for (j = 0; dptr = sim_devices[j]; j++) {
-            dibp = (DIB *) dptr->ctxt;
-            if (dibp && !(dptr->flags & DEV_DIS) &&
-                (chkp != dibp) && (dno == dibp->devno)) {
-                printf ("%s device number conflict, devno = %d\n",
-                    sim_dname (dptr), dno);
-                if (sim_log) fprintf (sim_log,
-                    "%s device number conflict, devno = %d\n",
-                    sim_dname (dptr), dno);
-                return TRUE;
+for (i = 0; dptr = sim_devices[i]; i++) {
+    dibp = (DIB *) dptr->ctxt;
+    if (dibp && !(dptr->flags & DEV_DIS))
+        if (++conflicts[dibp->devno] > 1)
+            is_conflict = TRUE;
+    }
+
+if (is_conflict) {
+    sim_ttcmd();
+    for (i = 0; i <= I_DEVMASK; i++) {
+        if (conflicts[i] > 1) {
+            k = conflicts[i];
+            printf ("Select code %o conflict:", i);
+            if (sim_log) fprintf (sim_log, "Select code %o conflict:", i);
+            for (j = 0; dptr = sim_devices[j]; j++) {
+                dibp = (DIB *) dptr->ctxt;
+                if (dibp && !(dptr->flags & DEV_DIS) && (i == dibp->devno)) {
+                    if (k < conflicts[i]) {
+                        printf (" and");
+                        if (sim_log) fputs (" and", sim_log);
+                        }
+                    printf (" %s", sim_dname (dptr));
+                    if (sim_log) fprintf (sim_log, " %s", sim_dname (dptr));
+                    k = k - 1;
+                    if (k == 0) {
+                        putchar ('\n');
+                        if (sim_log) fputc ('\n', sim_log);
+                        break;
+                        }
+                    }
                 }
             }
         }
     }
-return FALSE;
+return is_conflict;
 }
 
 /* Configuration validation

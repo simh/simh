@@ -1,7 +1,7 @@
 /* pdp11_xq.c: DEQNA/DELQA ethernet controller simulator
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2002-2005, David T. Hittner
+   Copyright (c) 2002-2006, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -66,6 +66,7 @@
 
   Modification history:
 
+  07-Jan-06  RMS  Fixed unaligned access bugs (found by Doug Carman)
   07-Sep-05  DTH  Removed unused variable
   16-Aug-05  RMS  Fixed C++ declaration and cast problems
   01-Dec-04  DTH  Added runtime attach prompt
@@ -274,16 +275,18 @@ UNIT xqa_unit[] = {
 };
 
 REG xqa_reg[] = {
-  { GRDATA ( SA0,  xqa.addr[0], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( SA1,  xqa.addr[1], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( SA2,  xqa.addr[2], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( SA3,  xqa.addr[3], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( SA4,  xqa.addr[4], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( SA5,  xqa.addr[5], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( RBDL, xqa.rbdl, XQ_RDX, 32, 0) },
-  { GRDATA ( XBDL, xqa.xbdl, XQ_RDX, 32, 0) },
-  { GRDATA ( VAR,  xqa.var,  XQ_RDX, 16, 0) },
-  { GRDATA ( CSR,  xqa.csr,  XQ_RDX, 16, 0) },
+  { GRDATA ( SA0,  xqa.addr[0], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA1,  xqa.addr[1], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA2,  xqa.addr[2], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA3,  xqa.addr[3], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA4,  xqa.addr[4], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA5,  xqa.addr[5], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( RBDL, xqa.rbdl[0], XQ_RDX, 16, 0), REG_FIT },
+  { GRDATA ( RBDH, xqa.rbdl[1], XQ_RDX, 16, 0), REG_FIT },
+  { GRDATA ( XBDL, xqa.xbdl[0], XQ_RDX, 16, 0), REG_FIT },
+  { GRDATA ( XBDH, xqa.xbdl[1], XQ_RDX, 16, 0), REG_FIT },
+  { GRDATA ( VAR,  xqa.var,  XQ_RDX, 16, 0), REG_FIT },
+  { GRDATA ( CSR,  xqa.csr,  XQ_RDX, 16, 0), REG_FIT },
   { FLDATA ( INT,  xqa.irq, 0) },
   { GRDATA ( SETUP_PRM, xqa.setup.promiscuous, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SETUP_MLT, xqa.setup.multicast, XQ_RDX, 32, 0), REG_HRO},

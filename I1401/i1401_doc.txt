@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	IBM 1401 Simulator Usage
-Date:	01-Sep-05
+Date:	01-Nov-05
 
 			COPYRIGHT NOTICE
 
@@ -182,6 +182,16 @@ This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:
 
 The maximum length for the history is 65536 entries.
 
+The original character encoding used by the 1401 simulator was revised to be
+compatible with the coding used by Paul Pierce's 709X and 1401 simulators.
+The user can select between the original (old) and compatible (new) encodings,
+as follows:
+
+	SET CPU OLDCONVERSIONS	use original character encoding
+	SET CPU NEWCONVERSIONS	use compatible character encoding
+
+NEWCONVERSIONS is the default.
+
 2.2 1402 Card Reader/Punch (CDR, CDP, STKR)
 
 The IBM 1402 card/reader punch is simulated as three independent devices:
@@ -321,7 +331,6 @@ and Fortran (1403 H chain) character sets for output:
 	SET INQ FORTRAN		Fortran character set
 
 The business character set is the default.
-
 
 The inquiry terminal registers are:
 

@@ -1,6 +1,6 @@
 /* sim_tape.c: simulator tape support library
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    Ultimately, this will be a place to hide processing of various tape formats,
    as well as OS-specific direct hardware access.
 
+   23-Jan-05    RMS     Fixed bug in write forward (found by Dave Bryan)
+   17-Dec-05    RMS     Added write support for Paul Pierce 7b format
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    02-May-05    RMS     Added support for Pierce 7b format
    28-Jul-04    RMS     Fixed bug in writing error records (found by Dave Bryan)
@@ -44,6 +46,7 @@
    sim_tape_sprecf      space tape record forward
    sim_tape_sprecr      space tape record reverse
    sim_tape_wrtmk       write tape mark
+   sim_tape_wrtmk_7t    write tape mark, 7 track with parity
    sim_tape_wreom       erase remainder of tape
    sim_tape_rewind      rewind
    sim_tape_reset       reset unit
@@ -67,7 +70,7 @@ static struct sim_tape_fmt fmts[MTUF_N_FMT] = {
     { "SIMH", 0,       sizeof (t_mtrlnt) - 1 },
     { "E11",  0,       sizeof (t_mtrlnt) - 1 },
     { "TPC",  UNIT_RO, sizeof (t_tpclnt) - 1 },
-    { "P7B",  UNIT_RO, 0 },
+    { "P7B",  0,       0 },
 /*  { "TPF",  UNIT_RO, 0 }, */
     { NULL,   0,       0 }
     };
@@ -220,7 +223,7 @@ switch (f) {                                            /* switch on fmt */
                 break;                                  /* treat like eor */
                 }
             if ((sbc != 0) && (c & P7B_SOR)) break;     /* next record? */
-            if ((c & P7B_DATA) != P7B_EOF) all_eof = 0;
+            if ((c & P7B_DPAR) != P7B_EOF) all_eof = 0;
             }
         *bc = sbc;                                      /* save rec lnt */
         sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
@@ -303,7 +306,7 @@ switch (f) {                                            /* switch on fmt */
             if (ferror (uptr->fileref))                 /* error? */
                 return sim_tape_ioerr (uptr);
             if (feof (uptr->fileref)) return MTSE_EOM;  /* eof? */
-            if ((c & P7B_DATA) != P7B_EOF) all_eof = 0;
+            if ((c & P7B_DPAR) != P7B_EOF) all_eof = 0;
             if (c & P7B_SOR) break;                     /* start of record? */
             }
         uptr->pos = uptr->pos - sbc;                    /* update position */
@@ -429,17 +432,34 @@ t_mtrlnt sbc;
 MT_CLR_PNU (uptr);
 if ((uptr->flags & UNIT_ATT) == 0) return MTSE_UNATT;   /* not attached? */
 if (sim_tape_wrp (uptr)) return MTSE_WRP;               /* write prot? */
-if (f == MTUF_F_STD) sbc = MTR_L ((bc + 1) & ~1);
-else sbc = MTR_L (bc);
+sbc = MTR_L (bc);
 sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* set pos */
-sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
-sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
-sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
-if (ferror (uptr->fileref)) {                           /* error? */
-    MT_SET_PNU (uptr);
-    return sim_tape_ioerr (uptr);
-    }
-uptr->pos = uptr->pos + sbc + (2 * sizeof (t_mtrlnt));  /* move tape */
+switch (f) {                                            /* case on format */
+
+    case MTUF_F_STD:                                    /* standard */
+        sbc = MTR_L ((bc + 1) & ~1);                    /* pad odd length */
+    case MTUF_F_E11:                                    /* E11 */
+        sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
+        sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
+        sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
+        if (ferror (uptr->fileref)) {                   /* error? */
+            MT_SET_PNU (uptr);
+            return sim_tape_ioerr (uptr);
+            }
+        uptr->pos = uptr->pos + sbc + (2 * sizeof (t_mtrlnt));  /* move tape */
+        break;
+
+    case MTUF_F_P7B:                                    /* Pierce 7B */
+        buf[0] = buf[0] | P7B_SOR;                      /* mark start of rec */
+        sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
+        if (ferror (uptr->fileref)) {                   /* error? */
+            MT_SET_PNU (uptr);
+            return sim_tape_ioerr (uptr);
+            }
+        uptr->pos = uptr->pos + sbc;                    /* move tape */
+        break;
+        }
+
 return MTSE_OK;
 }
 
@@ -464,6 +484,10 @@ return MTSE_OK;
 
 t_stat sim_tape_wrtmk (UNIT *uptr)
 {
+if (MT_GET_FMT (uptr) == MTUF_F_P7B) {                  /* P7B? */
+    uint8 buf= P7B_EOF;                                 /* eof mark */
+    return  sim_tape_wrrecf (uptr, &buf, 1);            /* write char */
+    }
 return sim_tape_wrdata (uptr, MTR_TMK);
 }
 
@@ -471,6 +495,7 @@ return sim_tape_wrdata (uptr, MTR_TMK);
 
 t_stat sim_tape_wreom (UNIT *uptr)
 {
+if (MT_GET_FMT (uptr) == MTUF_F_P7B) return MTSE_FMT;   /* cant do P7B */
 return sim_tape_wrdata (uptr, MTR_EOM);
 }
 

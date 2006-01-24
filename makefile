@@ -96,20 +96,20 @@ VAX = ${VAXD}vax_cpu.c ${VAXD}vax_cpu1.c ${VAXD}vax_fpa.c ${VAXD}vax_io.c \
 	${PDP11D}pdp11_dz.c ${PDP11D}pdp11_lp.c ${PDP11D}pdp11_tq.c \
 	${PDP11D}pdp11_xq.c ${PDP11D}pdp11_ry.c \
 	${PDP11D}pdp11_vh.c
-VAX_OPT = -DVM_VAX -DUSE_INT64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+VAX_OPT = -DVM_VAX -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
 
 VAX780 = ${VAXD}vax_cpu.c ${VAXD}vax_cpu1.c ${VAXD}vax_fpa.c \
 	${VAXD}vax_cis.c ${VAXD}vax_octa.c  ${VAXD}vax_cmode.c \
-	${VAXD}vax_mmu.c ${VAXD}vax780_stddev.c ${VAXD}vax780_sbimem.c \
-	${VAXD}vax780_uba.c ${VAXD}vax780_mba.c \
+	${VAXD}vax_mmu.c ${VAXD}vax780_stddev.c ${VAXD}vax780_sbi.c \
+	${VAXD}vax780_mem.c ${VAXD}vax780_uba.c ${VAXD}vax780_mba.c \
 	${VAXD}vax_sys.c  ${VAXD}vax_syscm.c ${VAXD}vax780_syslist.c \
 	${PDP11D}pdp11_rl.c ${PDP11D}pdp11_rq.c ${PDP11D}pdp11_ts.c \
 	${PDP11D}pdp11_dz.c ${PDP11D}pdp11_lp.c ${PDP11D}pdp11_tq.c \
 	${PDP11D}pdp11_xu.c ${PDP11D}pdp11_ry.c \
 	${PDP11D}pdp11_rp.c ${PDP11D}pdp11_tu.c ${PDP11D}pdp11_hk.c
-VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
 
@@ -244,11 +244,11 @@ SDS_OPT = -I ${SDSD}
 #
 ALL = ${BIN}pdp1${EXE} ${BIN}pdp4${EXE} ${BIN}pdp7${EXE} ${BIN}pdp8${EXE} \
 	${BIN}pdp9${EXE} ${BIN}pdp15${EXE} ${BIN}pdp11${EXE} ${BIN}pdp10${EXE} \
-	${BIN}vax${EXE} ${BIN}nova${EXE} ${BIN}eclipse${EXE} ${BIN}h316${EXE} \
+	${BIN}vax${EXE} ${BIN}vax780${EXE} ${BIN}nova${EXE} ${BIN}eclipse${EXE} \
 	${BIN}hp2100${EXE} ${BIN}i1401${EXE} ${BIN}i1620${EXE} ${BIN}s3${EXE} \
 	${BIN}altair${EXE} ${BIN}altairz80${EXE} ${BIN}gri${EXE} \
 	${BIN}i1620${EXE} ${BIN}ibm1130${EXE} ${BIN}id16${EXE} \
-	${BIN}id32${EXE} ${BIN}sds${EXE} ${BIN}lgp${EXE}
+	${BIN}id32${EXE} ${BIN}sds${EXE} ${BIN}lgp${EXE} ${BIN}h316${EXE} 
 
 all : ${ALL}
 

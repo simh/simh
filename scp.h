@@ -1,6 +1,6 @@
 /* scp.h: simulator control program headers
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   06-Jan-06    RMS     Added fprint_stopped_gen
+                        Changed arg type in sim_brk_test
    07-Feb-05    RMS     Added ASSERT command
    09-Sep-04    RMS     Added reset_all_p
    14-Feb-04    RMS     Added debug prototypes (from Dave Hittner)
@@ -103,11 +105,13 @@ CTAB *find_ctab (CTAB *tab, char *gbuf);
 C1TAB *find_c1tab (C1TAB *tab, char *gbuf);
 SHTAB *find_shtab (SHTAB *tab, char *gbuf);
 BRKTAB *sim_brk_fnd (t_addr loc);
-t_bool sim_brk_test (t_addr bloc, int32 btyp);
+uint32 sim_brk_test (t_addr bloc, uint32 btyp);
+void sim_brk_clrspc (uint32 spc);
 char *match_ext (char *fnam, char *ext);
 t_stat sim_cancel_step (void);
 void sim_debug_u16 (uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
     uint16 before, uint16 after, int terminate);
 void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
+void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
 
 #endif

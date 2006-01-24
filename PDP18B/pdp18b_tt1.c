@@ -25,6 +25,7 @@
 
    ttix,ttox    LT15/LT19 terminal input/output
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    29-Jun-05    RMS     Added SET TTOXn DISCONNECT
    21-Jun-05    RMS     Fixed bug in SHOW CONN/STATS
    14-Jan-04    RMS     Cloned from pdp8_ttx.c
@@ -47,11 +48,6 @@
 #else
 #define TTX_MAXL        1
 #endif
-
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
-#define UNIT_V_KSR      (UNIT_V_UF + 1)                 /* KSR33 */
-#define UNIT_8B         (1 << UNIT_V_8B)
-#define UNIT_KSR        (1 << UNIT_V_KSR)
 
 uint32 ttix_done = 0;                                   /* input flags */
 uint32 ttox_done = 0;                                   /* output flags */
@@ -142,22 +138,22 @@ DEVICE tti1_dev = {
 */
 
 UNIT ttox_unit[] = {
-    { UDATA (&ttox_svc, UNIT_KSR, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, UNIT_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT }
+    { UDATA (&ttox_svc, TT_MODE_KSR, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT },
+    { UDATA (&ttox_svc, TT_MODE_KSR+UNIT_DIS, 0), SERIAL_OUT_WAIT }
     };
 
 REG ttox_reg[] = {
@@ -170,9 +166,10 @@ REG ttox_reg[] = {
     };
 
 MTAB ttox_mod[] = {
-    { UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", NULL },
-    { UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , NULL },
-    { UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , NULL },
+    { TT_MODE, TT_MODE_KSR, "KSR", "KSR", NULL },
+    { TT_MODE, TT_MODE_7B,  "7b",  "7B",  NULL },
+    { TT_MODE, TT_MODE_8B,  "8b",  "8B",  NULL },
+    { TT_MODE, TT_MODE_7P,  "7p",  "7P",  NULL },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &ttx_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
@@ -222,12 +219,7 @@ for (ln = 0; ln < TTX_MAXL; ln++) {                     /* loop thru lines */
     if (ttx_ldsc[ln].conn) {                            /* connected? */
         if (temp = tmxr_getc_ln (&ttx_ldsc[ln])) {      /* get char */
             if (temp & SCPE_BREAK) c = 0;               /* break? */
-            else if (ttox_unit[ln].flags & UNIT_KSR) {  /* KSR? */
-                c = temp & 0177;
-                if (islower (c)) c = toupper (c);
-                c = c | 0200;
-                }
-            else c = temp & ((ttox_unit[ln].flags & UNIT_8B)? 0377: 0177);
+            else c = sim_tt_inpcvt (temp, TT_GET_MODE (ttox_unit[ln].flags));
             ttix_buf[ln] = c;
             ttix_set_done (ln);
             }
@@ -288,12 +280,7 @@ int32 c, ln = uptr - ttox_unit;                         /* line # */
 if (ttx_ldsc[ln].conn) {                                /* connected? */
     if (ttx_ldsc[ln].xmte) {                            /* tx enabled? */
         TMLN *lp = &ttx_ldsc[ln];                       /* get line */
-        if (ttox_unit[ln].flags & UNIT_KSR) {           /* KSR mode? */
-            c = ttox_buf[ln] & 0177;                    /* get char */
-            if (islower (c)) c = toupper (c);
-            if ((c < 007) || (c > 0137)) c = -1;
-            }
-        else c = ttox_buf[ln] & ((ttox_unit[ln].flags & UNIT_8B)? 0377: 0177);
+        c = sim_tt_outcvt (ttox_buf[ln], TT_GET_MODE (ttox_unit[ln].flags));
         if (c >= 0) tmxr_putc_ln (lp, c);               /* output char */
         tmxr_poll_tx (&ttx_desc);                       /* poll xmt */
         }

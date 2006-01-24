@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Stephen Shirron, Antonio
    Carlini, and Kevin Peterson in providing specifications for the Qbus VAX's
 
+   03-Nov-05    RMS     Added 780 stop codes
    22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
    02-Sep-04    RMS     Added octa specifier definitions
    30-Aug-04    RMS     Added octa, h_floating instruction definitions
@@ -58,8 +59,10 @@
 #define STOP_RQ         8                               /* fatal RQ err */
 #define STOP_LOOP       9                               /* infinite loop */
 #define STOP_SANITY     10                              /* sanity timer exp */
-#define STOP_UNKNOWN    11                              /* unknown reason */
-#define STOP_UNKABO     12                              /* unknown abort */
+#define STOP_SWDN       11                              /* software done (780) */
+#define STOP_BOOT       12                              /* reboot (780) */
+#define STOP_UNKNOWN    13                              /* unknown reason */
+#define STOP_UNKABO     14                              /* unknown abort */
 #define ABORT_INTR      -1                              /* interrupt */
 #define ABORT_MCHK      (-SCB_MCHK)                     /* machine check */
 #define ABORT_RESIN     (-SCB_RESIN)                    /* rsvd instruction */

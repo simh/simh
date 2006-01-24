@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	H316 Simulator Usage
-Date:	15-Nov-2004
+Date:	01-Dec-2005
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2004, written by Robert M Supnik
-   Copyright (c) 1993-2004, Robert M Supnik
+   Original code published in 1993-2005, written by Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -273,14 +273,24 @@ The console Teletype (TTY) consists of four separate units:
 	TTY2			paper tape reader
 	TTY3			paper tape punch
 
-The keyboard and printer (TTY0, TTY1) can be set to one of three modes:
-KSR, 7B, or 8B.  In KSR mode, lower case input and output characters
-are automatically converted to upper case, and the high order bit is
-forced to one on input.  In 7B mode, input and output characters are
-masked to 7 bits.  In 8B mode, characters are not modified.  Changing
-the mode of either unit changes both.  The default mode is KSR.  The
-Teletype keyboard reads from the console keyboard, and the printer
-prites to the simulator console window.  
+The keyboard and printer (TTY0, TTY1) can be set to one of four modes,
+KSR, 7P, 7B, or 8B:
+
+	mode	input characters	output characters
+
+	KSR	lower case converted	lower case converted
+		 to upper case,		 to upper case,
+		high-order bit set	high-order bit cleared,
+					non-printing characters
+					 suppressed
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+The default mode is KSR.  The Teletype keyboard reads from the console
+keyboard, and the printer writes to the simulator console window.  
 
 The paper tape reader (TTY2) can bet set to operate in binary, ASCII, or
 Unix ASCII mode:

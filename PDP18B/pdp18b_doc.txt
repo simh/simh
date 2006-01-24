@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	18b PDP Simulator Usage
-Date:	01-Jul-2005
+Date:	01-Dec-2005
 
 			COPYRIGHT NOTICE
 
@@ -395,12 +395,22 @@ Error handling is as follows:
 2.3.3 Terminal Input (TTI)
 
 On the PDP-7, PDP-9, and PDP-15, the terminal interfaces (TTI, TTO)
-can be set to one of three modes: KSR, 7B, or 8B.  In KSR mode, lower
-case input and output characters are automatically converted to upper
-case, the high order bit is forced to one on input, and printing of
-ALTmode characters is supressed.  In 7B mode, input and output characters
-are masked to 7 bits.  In 8B mode, characters are not modified.  Changing
-the mode of either interface changes both.  The default mode is KSR.
+can be set to one of four modes, KSR, 7P, 7B, or 8B:
+
+	mode	input characters	output characters
+
+	KSR	lower case converted	lower case converted
+		 to upper case,		 to upper case,
+		high-order bit set	high-order bit cleared,
+					non-printing characters
+					 suppressed
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+The default mode is KSR.
 
 On the PDP-9 and PDP-15, the console terminal operates, by default,
 with local echo.  For backward compatibility, the terminal input can
@@ -549,11 +559,23 @@ with the command:
 
 The default is one additional terminal.
 
-The additional terminals can be set to one of three modes: UC, 7B, or
-8B.  In KSR mode, lower case input and output characters are converted
-automatically to upper case.  In 7B mode, input and output characters
-are masked to 7 bits.  In 8B mode, characters are not modified.  The
-default mode is KSR.  Finally, each line supports output logging.
+The additional terminals can be set to one of four modes, KSR, 7P, 7B,
+or 8B:
+
+	mode	input characters	output characters
+
+	KSR	lower case converted	lower case converted
+		 to upper case,		 to upper case,
+		high-order bit set	high-order bit cleared,
+					non-printing characters
+					 suppressed
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+The default mode is KSR.  Finally, each line supports output logging.
 The SET TTOXn LOG command enables logging on a line:
 
 	SET TTOXn LOG=filename	log output of line n to filename

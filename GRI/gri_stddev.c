@@ -29,6 +29,7 @@
    hsp          S42-006 high speed punch
    rtc          real time clock
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    29-Dec-03    RMS     Added support for console backpressure
    25-Apr-03    RMS     Revised for extended file support
    22-Dec-02    RMS     Added break support
@@ -37,11 +38,6 @@
 
 #include "gri_defs.h"
 #include <ctype.h>
-
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
-#define UNIT_V_KSR      (UNIT_V_UF + 1)                 /* KSR33 */
-#define UNIT_8B         (1 << UNIT_V_8B)
-#define UNIT_KSR        (1 << UNIT_V_KSR)
 
 uint32 hsr_stopioe = 1, hsp_stopioe = 1;
 
@@ -69,7 +65,7 @@ int32 rtc_tps = 1000;
    tti_mod      TTI modifiers list
 */
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_KSR, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, 8) },
@@ -77,14 +73,14 @@ REG tti_reg[] = {
     { FLDATA (IENB, ISR, INT_V_TTI) },
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
-    { FLDATA (UC, tti_unit.flags, UNIT_V_KSR), REG_HRO },
     { NULL }
     };
 
 MTAB tti_mod[] = {
-    { UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", &tty_set_mode },
-    { UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
-    { UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
+    { TT_MODE, TT_MODE_KSR, "KSR", "KSR", &tty_set_mode },
+    { TT_MODE, TT_MODE_7B,  "7b",  "7B",  &tty_set_mode },
+    { TT_MODE, TT_MODE_8B,  "8b",  "8B",  &tty_set_mode },
+    { TT_MODE, TT_MODE_7P,  "7b",  NULL,  NULL },
     { 0 }
     };
 
@@ -102,7 +98,7 @@ DEVICE tti_dev = {
    tto_reg      TTO register list
 */
 
-UNIT tto_unit = { UDATA (&tto_svc, UNIT_KSR, 0), SERIAL_OUT_WAIT };
+UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_KSR, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
     { ORDATA (BUF, tto_unit.buf, 8) },
@@ -114,9 +110,10 @@ REG tto_reg[] = {
     };
 
 MTAB tto_mod[] = {
-    { UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", &tty_set_mode },
-    { UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
-    { UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
+    { TT_MODE, TT_MODE_KSR, "KSR", "KSR", &tty_set_mode },
+    { TT_MODE, TT_MODE_7B,  "7b",  "7B",  &tty_set_mode },
+    { TT_MODE, TT_MODE_8B,  "8b",  "8B",  &tty_set_mode },
+    { TT_MODE, TT_MODE_7P,  "7p",  "7P",  &tty_set_mode },
     { 0 }
     };
 
@@ -243,17 +240,12 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (&tti_unit, tti_unit.wait);                /* continue poll */
+sim_activate (uptr, uptr->wait);                        /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
-if (c & SCPE_BREAK) tti_unit.buf = 0;                   /* break? */
-else if (tti_unit.flags & UNIT_KSR) {                   /* KSR? */
-    c = c & 0177;                                       /* force 7b */
-    if (islower (c)) c = toupper (c);                   /* cvt to UC */
-    tti_unit.buf = c | 0200;                            /* add TTY bit */
-    }
-else tti_unit.buf = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);
+if (c & SCPE_BREAK) uptr->buf = 0;                      /* break? */
+else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 dev_done = dev_done | INT_TTI;                          /* set ready */
-tti_unit.pos = tti_unit.pos + 1;
+uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
 
@@ -262,17 +254,15 @@ t_stat tto_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-if (tto_unit.flags & UNIT_KSR) {                        /* KSR? */
-    c = tto_unit.buf & 0177;                            /* force 7b */
-    if (islower (c)) c = toupper (c);                   /* cvt to UC */
-    }
-else c = tto_unit.buf & ((tto_unit.flags & UNIT_8B)? 0377: 0177);
-if ((r = sim_putchar_s (c)) != SCPE_OK) {               /* output; error? */
-    sim_activate (uptr, uptr->wait);                    /* try again */
-    return ((r == SCPE_STALL)? SCPE_OK: r);             /* !stall? report */
+c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags));
+if (c >= 0) {
+    if ((r = sim_putchar_s (c)) != SCPE_OK) {           /* output; error? */
+        sim_activate (uptr, uptr->wait);                /* try again */
+        return ((r == SCPE_STALL)? SCPE_OK: r);         /* !stall? report */
+        }
     }
 dev_done = dev_done | INT_TTO;                          /* set ready */
-tto_unit.pos = tto_unit.pos + 1;
+uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
 
@@ -296,8 +286,8 @@ return SCPE_OK;
 
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-tti_unit.flags = (tti_unit.flags & ~(UNIT_KSR | UNIT_8B)) | val;
-tto_unit.flags = (tto_unit.flags & ~(UNIT_KSR | UNIT_8B)) | val;
+tti_unit.flags = (tti_unit.flags & ~TT_MODE) | val;
+tto_unit.flags = (tto_unit.flags & ~TT_MODE) | val;
 return SCPE_OK;
 }
 

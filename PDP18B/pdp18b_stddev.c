@@ -29,6 +29,7 @@
    tto          teleprinter
    clk          clock
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    28-May-04    RMS     Removed SET TTI CTRL-C
    16-Feb-04    RMS     Fixed bug in hardware read-in mode bootstrap
    14-Jan-04    RMS     Revised IO device call interface
@@ -271,19 +272,15 @@ static const int32 tti_trans[128] = {
 #endif
 
 #define TTI_MASK        ((1 << TTI_WIDTH) - 1)
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
-#define UNIT_V_KSR      (UNIT_V_UF + 1)                 /* KSR33 */
-#define UNIT_V_HDX      (UNIT_V_UF + 2)                 /* half duplex */
-#define UNIT_8B         (1 << UNIT_V_8B)
-#define UNIT_KSR        (1 << UNIT_V_KSR)
+#define UNIT_V_HDX      (TTUF_V_UF + 0)                 /* half duplex */
 #define UNIT_HDX        (1 << UNIT_V_HDX)
 
 DIB tti_dib = { DEV_TTI, 1, &tti_iors, { &tti } };
 
 #if defined (PDP4) || defined (PDP7)
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_KSR, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR, 0), KBD_POLL_WAIT };
 #else
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_KSR+UNIT_HDX, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR+UNIT_HDX, 0), KBD_POLL_WAIT };
 #endif
 
 REG tti_reg[] = {
@@ -300,9 +297,10 @@ REG tti_reg[] = {
 
 MTAB tti_mod[] = {
 #if !defined (KSR28)
-    { UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", &tty_set_mode },
-    { UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
-    { UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
+    { TT_MODE, TT_MODE_KSR, "KSR", "KSR", &tty_set_mode },
+    { TT_MODE, TT_MODE_7B,  "7b",  "7B",  &tty_set_mode },
+    { TT_MODE, TT_MODE_8B,  "8b",  "8B",  &tty_set_mode },
+    { TT_MODE, TT_MODE_7P,  "7b",  NULL,  NULL },
     { UNIT_HDX, 0       , "full duplex", "FDX", NULL },
     { UNIT_HDX, UNIT_HDX, "half duplex", "HDX", NULL },
 #endif
@@ -349,7 +347,7 @@ static const char tto_trans[64] = {
 
 DIB tto_dib = { DEV_TTO, 1, &tto_iors, { &tto } };
 
-UNIT tto_unit = { UDATA (&tto_svc, UNIT_KSR, 0), 1000 };
+UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_KSR, 0), 1000 };
 
 REG tto_reg[] = {
     { ORDATA (BUF, tto_unit.buf, TTO_WIDTH) },
@@ -365,9 +363,10 @@ REG tto_reg[] = {
 
 MTAB tto_mod[] = {
 #if !defined (KSR28)
-    { UNIT_KSR+UNIT_8B, UNIT_KSR, "KSR", "KSR", &tty_set_mode },
-    { UNIT_KSR+UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
-    { UNIT_KSR+UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
+    { TT_MODE, TT_MODE_KSR, "KSR", "KSR", &tty_set_mode },
+    { TT_MODE, TT_MODE_7B,  "7b",  "7B",  &tty_set_mode },
+    { TT_MODE, TT_MODE_8B,  "8b",  "8B",  &tty_set_mode },
+    { TT_MODE, TT_MODE_7P,  "7p",  "7P",  &tty_set_mode },
 #endif
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_devno },
     { 0 }
@@ -917,14 +916,9 @@ sim_activate (uptr, uptr->wait);                        /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
 out = c & 0177;                                         /* mask echo to 7b */
 if (c & SCPE_BREAK) c = 0;                              /* break? */
-else if (uptr->flags & UNIT_KSR) {                      /* KSR? */
-    if (islower (out)) out = toupper (out);             /* convert to UC */
-    c = out | 0200;                                     /* set TTY bit */
-	}
-else c = c & ((uptr->flags & UNIT_8B)? 0377: 0177);     /* no, 7b/8b */
+else c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 if ((uptr->flags & UNIT_HDX) && out &&                  /* half duplex and */
-    (!(tto_unit.flags & UNIT_KSR) ||                    /* 7b/8b or */
-    ((out >= 007) && (out <= 0137)))) {                 /* in range? */
+    ((out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags))) >= 0)) {
     sim_putchar (out);                                  /* echo */
     tto_unit.pos = tto_unit.pos + 1;
     }
@@ -985,12 +979,9 @@ else {
     c = tto_trans[uptr->buf + tto_state];               /* translate */
 
 #else
-c = uptr->buf & 0177;                                   /* assume 7b or KSR */
-if (!(uptr->flags & UNIT_KSR) ||                        /* 7b/8b or */
-      ((c >= 007) && (c <= 0137))) {                    /* in range? */
-    if ((uptr->flags & UNIT_KSR) && islower (c))        /* KSR? */
-        c = toupper (c);
-    else if (tto_unit.flags & UNIT_8B) c = uptr->buf;
+c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags));
+if (c >= 0) {
+
 #endif
 
     if ((r = sim_putchar_s (c)) != SCPE_OK) {           /* output; error? */
@@ -1025,7 +1016,7 @@ return SCPE_OK;
 
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-tti_unit.flags = (tti_unit.flags & ~(UNIT_KSR | UNIT_8B)) | val;
-tto_unit.flags = (tto_unit.flags & ~(UNIT_KSR | UNIT_8B)) | val;
+tti_unit.flags = (tti_unit.flags & ~TT_MODE) | val;
+tto_unit.flags = (tto_unit.flags & ~TT_MODE) | val;
 return SCPE_OK;
 }

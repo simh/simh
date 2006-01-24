@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	HP2100 Simulator Usage
-Date:	01-Jul-2005
+Date:	01-Dec-2005
 
 			COPYRIGHT NOTICE
 
@@ -442,13 +442,22 @@ The console teleprinter has three units: keyboard (unit 0), printer
 (unit 1), and punch (unit 2).  The keyboard reads from the console
 keyboard; the printer writes to the simulator console window.  The punch
 writes to a disk file.  The keyboard and printer units (TTY0, TTY1) can
-be set to one of three modes: UC, 7B, or 8B.  In UC mode, lower case
-input and output characters are automatically converted to upper case.
-In 7B mode, input and output characters are masked to 7 bits.  In 8B
-mode, characters are not modified.  In UC and 7B mode, output of control
-characters other than BEL, BS, HT, LF, and CR is suppressed; in 8B mode,
-output of all characters is permitted.  Changing the mode of either the
-keyboard or the printer changes both.  The default mode is UC.
+be set to one of four modes: UC, 7P, 7B, or 8B:
+
+	mode	input characters	output characters
+
+	UC	lower case converted	lower case converted
+		 to upper case,		 to upper case,
+		high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+The default mode is UC.
 
 Some HP software systems expect the console to transmit line-feed
 automatically following carriage-return.  This feature is enabled with:
@@ -664,14 +673,26 @@ the port to be used:
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.
 
-Each line (each unit of MUXL) can be set to one of three modes: UC, 7B,
-or 8B.  In UC mode, lower case input and output characters are converted
-automatically to upper case.  In 7B mode, input and output characters
-are masked to 7 bits.  In 8B mode, characters are not modified.  The
-default mode is UC.  In addition, each line supports the DATASET option.
-DATASET, when set, enables modem control.  The default settings are UC
-mode and DATASET disabled.  Finally, each line supports output logging.
-The SET MUXLn LOG command enables logging on a line:
+Each line (each unit of MUXL) can be set to one of four modes: UC, 7P, 7B,
+or 8B:
+
+	mode	input characters	output characters
+
+	UC	lower case converted	lower case converted
+		 to upper case,		 to upper case,
+		high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+In addition, each line supports the DATASET option.  DATASET, when set,
+enables modem control.  The default settings are UC mode and DATASET disabled.
+Finally, each line supports output logging.  The SET MUXLn LOG command enables
+logging on a line:
 
 	SET MUXLn LOG=filename	log output of line n to filename
 

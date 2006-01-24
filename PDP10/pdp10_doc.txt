@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-10 Simulator Usage
-Date:	01-Jul-2005
+Date:	01-Dec-2005
 
 			COPYRIGHT NOTICE
 
@@ -338,12 +338,17 @@ are supported.  The number of lines can be changed with the command
 
 The line count must be a multiple of 8, with a maximum of 32.
 
-The DZ11 can support 8-bit input and output of characters.  8-bit
-output is incompatible with TOPS-20 and is off by default.  The command
+The DZ11 supports three character processing modes, 7P, 7B, and 8B:
 
-	SET DZ 8B
+	mode	input characters	output characters
 
-allows output characters to be 8 bits.
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+The default is 7B, for compatability with TOPS-20.
 
 The DZ11 supports logging on a per-line basis.  The command
 

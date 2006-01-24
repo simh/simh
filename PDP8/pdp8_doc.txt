@@ -1,7 +1,7 @@
 To:	Users
 From:	Bob Supnik
 Subj:	PDP-8 Simulator Usage
-Date:	01-Jul-2005
+Date:	01-Dec-2005
 
 			COPYRIGHT NOTICE
 
@@ -287,12 +287,23 @@ Error handling is as follows:
 
 2.3.3 KL8E Terminal Input (TTI)
 
-The terminal interfaces (TTI, TTO) can be set to one of three modes:
-KSR, 7B, or 8B.  In KSR mode, lower case input and output characters
-are automatically converted to upper case, and the high order bit is
-forced to one on input.  In 7B mode, input and output characters are
-masked to 7 bits.  In 8B mode, characters are not modified.  Changing
-the mode of either interface changes both.  The default mode is KSR.
+The terminal interfaces (TTI, TTO) can be set to one of four modes,
+KSR, 7B, 7B, or 8B:
+
+	mode	input characters	output characters
+
+	KSR	lower case converted	lower case converted
+		 to upper case,		 to upper case,
+		high-order bit set	high-order bit cleared,
+					non-printing characters
+					 suppressed
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+The default mode is KSR.
 
 The terminal input (TTI) polls the console keyboard for input.  It
 implements these registers:
@@ -381,11 +392,24 @@ command specifies the port to be used:
 where port is a decimal number between 1 and 65535 that is not being used
 for other TCP/IP activities.
 
-The additional terminals can be set to one of three modes: UC, 7B, or
-8B.  In UC mode, lower case input and output characters are converted
-automatically to upper case.  In 7B mode, input and output characters
-are masked to 7 bits.  In 8B mode, characters are not modified.  The
-default mode is UC.  Finally, each line supports output logging.
+The additional terminals can be set to one of four modes: UC, 7P, 7B,
+or 8B.  
+
+	mode	input characters	output characters
+
+	UC	lower case converted	lower case converted
+		 to upper case,		 to upper case,
+		high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+
+The default mode is UC.  Finally, each line supports output logging.
 The SET TTOXn LOG command enables logging on a line:
 
 	SET TTOXn LOG=filename	log output of line n to filename

@@ -1,14 +1,14 @@
 To:	Users
 From:	Bob Supnik
 Subj:	GRI-909 Simulator Usage
-Date:	15-Feb-2004
+Date:	01-Dec-2005
 
 			COPYRIGHT NOTICE
 
 The following copyright notice applies to both the SIMH source and binary:
 
-   Original code published in 1993-2004, written by Robert M Supnik
-   Copyright (c) 1993-2004, Robert M Supnik
+   Original code published in 1993-2005, written by Robert M Supnik
+   Copyright (c) 1993-2005, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -196,12 +196,23 @@ Error handling is as follows:
 
 2.2.3 S42-001 Teletype Input (TTI)
 
-The Teletype interfaces (TTI, TTO) can be set to one of three modes:
-KSR, 7B, or 8B.  In KSR mode, lower case input and output characters
-are automatically converted to upper case, and the high order bit is
-forced to one on input.  In 7B mode, input and output characters are
-masked to 7 bits.  In 8B mode, characters are not modified.  Changing
-the mode of either interface changes both.  The default mode is KSR.
+The Teletype interfaces (TTI, TTO) can be set to one of four modes,
+KSR, 7P, 7B, or 8B:
+
+	mode	input characters	output characters
+
+	KSR	lower case converted	lower case converted
+		 to upper case,		 to upper case,
+		high-order bit set	high-order bit cleared,
+					non-printing characters
+					 suppressed
+	7P	high-order bit cleared	high-order bit cleared,
+					non-printing characters
+					 suppressed	
+	7B	high-order bit cleared	high-order bit cleared
+	8B	no changes		no changes
+
+The default mode is KSR.
 
 The Teletype input (TTI) polls the console keyboard for input.  It
 implements these registers:

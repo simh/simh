@@ -26,6 +26,7 @@
    tti,tto      DL11 terminal input/output
    clk          KW11L (and other) line frequency clock
 
+   22-Nov-05    RMS     Revised for new terminal processing routines
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    07-Jul-05    RMS     Removed extraneous externs
    11-Oct-04    RMS     Added clock model dependencies
@@ -62,9 +63,6 @@
 #define CLKCSR_IMP      (CSR_DONE + CSR_IE)             /* real-time clock */
 #define CLKCSR_RW       (CSR_IE)
 #define CLK_DELAY       8000
-
-#define UNIT_V_8B       (UNIT_V_UF + 0)                 /* 8B */
-#define UNIT_8B         (1 << UNIT_V_8B)
 
 extern int32 int_req[IPL_HLVL];
 extern uint32 cpu_type;
@@ -123,8 +121,9 @@ REG tti_reg[] = {
     };
 
 MTAB tti_mod[] = {
-    { UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
-    { UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", &tty_set_mode },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", &tty_set_mode },
+    { TT_MODE, TT_MODE_7P, "7b", NULL, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
@@ -167,8 +166,9 @@ REG tto_reg[] = {
     };
 
 MTAB tto_mod[] = {
-    { UNIT_8B, 0       , "7b" , "7B" , &tty_set_mode },
-    { UNIT_8B, UNIT_8B , "8b" , "8B" , &tty_set_mode },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", &tty_set_mode },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", &tty_set_mode },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", &tty_set_mode },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
@@ -278,11 +278,11 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (&tti_unit, tti_unit.wait);                /* continue poll */
+sim_activate (uptr, uptr->wait);                        /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
-if (c & SCPE_BREAK) tti_unit.buf = 0;                   /* break? */
-else tti_unit.buf = c & ((tti_unit.flags & UNIT_8B)? 0377: 0177);
-tti_unit.pos = tti_unit.pos + 1;
+if (c & SCPE_BREAK) uptr->buf = 0;                      /* break? */
+else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
+uptr->pos = uptr->pos + 1;
 tti_csr = tti_csr | CSR_DONE;
 if (tti_csr & CSR_IE) SET_INT (TTI);
 return SCPE_OK;
@@ -347,14 +347,16 @@ t_stat tto_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-c = tto_unit.buf & ((tto_unit.flags & UNIT_8B)? 0377: 0177);
-if ((r = sim_putchar_s (c)) != SCPE_OK) {               /* output; error? */
-    sim_activate (uptr, uptr->wait);                    /* try again */
-    return ((r == SCPE_STALL)? SCPE_OK: r);             /* !stall? report */
+c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags));
+if (c >= 0) {
+    if ((r = sim_putchar_s (c)) != SCPE_OK) {           /* output; error? */
+        sim_activate (uptr, uptr->wait);                /* try again */
+        return ((r == SCPE_STALL)? SCPE_OK: r);         /* !stall? report */
+        }
     }
 tto_csr = tto_csr | CSR_DONE;
 if (tto_csr & CSR_IE) SET_INT (TTO);
-tto_unit.pos = tto_unit.pos + 1;
+uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
 
@@ -371,8 +373,8 @@ return SCPE_OK;
 
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-tti_unit.flags = (tti_unit.flags & ~UNIT_8B) | val;
-tto_unit.flags = (tto_unit.flags & ~UNIT_8B) | val;
+tti_unit.flags = (tti_unit.flags & ~TT_MODE) | val;
+tto_unit.flags = (tto_unit.flags & ~TT_MODE) | val;
 return SCPE_OK;
 }
 

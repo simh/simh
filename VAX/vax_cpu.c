@@ -25,6 +25,9 @@
 
    cpu          VAX central processor
 
+   17-Nov-05    RMS     Fixed CVTfi with integer overflow to trap if PSW<iv> set
+   13-Nov-05    RMS     Fixed breakpoint test with 64b addresses
+   25-Oct-05    RMS     Removed cpu_extmem
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    13-Jan-05    RMS     Fixed initial state of cpu_extmem
@@ -150,10 +153,8 @@
 
 #define OP_MEM          -1
 #define UNIT_V_CONH     (UNIT_V_UF + 0)                 /* halt to console */
-#define UNIT_V_EXTM     (UNIT_V_UF + 1)                 /* ext memory enable */
-#define UNIT_V_MSIZE    (UNIT_V_UF + 2)                 /* dummy */
+#define UNIT_V_MSIZE    (UNIT_V_UF + 1)                 /* dummy */
 #define UNIT_CONH       (1u << UNIT_V_CONH)
-#define UNIT_EXTM       (1u << UNIT_V_EXTM)
 #define UNIT_MSIZE      (1u << UNIT_V_MSIZE)
 #define GET_CUR         acc = ACC_MASK (PSL_GETCUR (PSL))
 
@@ -231,7 +232,6 @@ int32 cpu_astop = 0;
 int32 mchk_va, mchk_ref;                                /* mem ref param */
 int32 ibufl, ibufh;                                     /* prefetch buf */
 int32 ibcnt, ppc;                                       /* prefetch ctl */
-int32 cpu_extmem = 1;                                   /* extended memory */
 jmp_buf save_env;
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 int32 pcq[PCQ_SIZE] = { 0 };                            /* PC queue */
@@ -306,7 +306,7 @@ extern int32 op_mnegg (int32 val);
 extern int32 op_cmpfd (int32 h1, int32 l1, int32 h2, int32 l2);
 extern int32 op_cmpg (int32 h1, int32 l1, int32 h2, int32 l2);
 extern int32 op_cvtifdg (int32 val, int32 *rh, int32 opc);
-extern int32 op_cvtfdgi (int32 *opnd, int32 *rh, int32 opc);
+extern int32 op_cvtfdgi (int32 *opnd, int32 *flg, int32 opc);
 extern int32 op_cvtdf (int32 *opnd);
 extern int32 op_cvtgf (int32 *opnd);
 extern int32 op_cvtfg (int32 *opnd, int32 *rh);
@@ -350,7 +350,6 @@ t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_extm (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -365,7 +364,7 @@ int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
    cpu_mod      CPU modifier list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK + UNIT_EXTM, INITMEMSIZE) };
+UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, INITMEMSIZE) };
 
 REG cpu_reg[] = {
     { HRDATA (PC, R[nPC], 32) },
@@ -418,16 +417,16 @@ REG cpu_reg[] = {
     };
 
 MTAB cpu_mod[] = {
-    { UNIT_EXTM, UNIT_EXTM, NULL, "EXTENDEDMEMORY", &cpu_set_extm },
-    { UNIT_EXTM, 0, NULL, "NOEXTENDEDMEMORY", &cpu_set_extm },
     { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size },
+#if !defined (VAX_780)
     { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size },
+#endif
     { UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL },
     { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
@@ -525,7 +524,7 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
             GET_CUR;
             }
         else {
-                cc = intexc (-abortval, cc, 0, IE_EXC); /* take exception */
+            cc = intexc (-abortval, cc, 0, IE_EXC);     /* take exception */
             GET_CUR;
             in_ie = 1;
             Write (SP - 8, p1, L_LONG, WA);             /* write mm params */
@@ -627,7 +626,8 @@ for ( ;; ) {
             }
         }                                               /* end PSL event */
 
-    if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
+    if (sim_brk_summ &&
+        sim_brk_test ((uint32) PC, SWMASK ('E'))) {     /* breakpoint? */
         ABORT (STOP_IBKPT);                             /* stop simulation */
         }
 
@@ -2292,25 +2292,25 @@ for ( ;; ) {
         break;
 
     case CVTFB: case CVTDB: case CVTGB:
-        r = op_cvtfdgi (opnd, &temp, opc) & BMASK;
+        r = op_cvtfdgi (opnd, &flg, opc) & BMASK;
         WRITE_B (r);
         CC_IIZZ_B (r);
-        cc = cc | temp;
+        if (flg) { V_INTOV; }
         break;
 
     case CVTFW: case CVTDW: case CVTGW:
-        r = op_cvtfdgi (opnd, &temp, opc) & WMASK;
+        r = op_cvtfdgi (opnd, &flg, opc) & WMASK;
         WRITE_W (r);
         CC_IIZZ_W (r);
-        cc = cc | temp;
+        if (flg) { V_INTOV; }
         break;
 
     case CVTFL: case CVTDL: case CVTGL:
     case CVTRFL: case CVTRDL: case CVTRGL:
-        r = op_cvtfdgi (opnd, &temp, opc) & LMASK;
+        r = op_cvtfdgi (opnd, &flg, opc) & LMASK;
         WRITE_L (r);
         CC_IIZZ_L (r);
-        cc = cc | temp;
+        if (flg) { V_INTOV; }
         break;
 
     case CVTFD:
@@ -2703,15 +2703,6 @@ if (ADDR_IS_ROM (addr)) {
 return SCPE_NXM;
 }
 
-/* Enable/disable extended physical memory */
-
-t_stat cpu_set_extm (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-if ((val == 0) && (MEMSIZE > MAXMEMSIZE)) return SCPE_ARG;
-cpu_extmem = val;
-return SCPE_OK;
-}
-
 /* Memory allocation */
 
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
@@ -2720,8 +2711,7 @@ int32 mc = 0;
 uint32 i, clim;
 uint32 *nM = NULL;
 
-if ((val <= 0) ||
-    (val > ((uptr->flags & UNIT_EXTM)? MAXMEMSIZE_X: MAXMEMSIZE))) return SCPE_ARG;
+if ((val <= 0) || (val > MAXMEMSIZE_X)) return SCPE_ARG;
 for (i = val; i < MEMSIZE; i = i + 4) mc = mc | M[i >> 2];
 if ((mc != 0) && !get_yn ("Really truncate memory [N]?", FALSE))
     return SCPE_OK;
@@ -2757,12 +2747,12 @@ if (cptr) {
     va = (uint32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
     if (r == SCPE_OK) {
         pa = Test (va, RD, &st);
-        if (st == PR_OK) fprintf (of, "Virtual %-X = physical %-X", va, pa);
-        else fprintf (of, "Virtual %-X: %s", va, mm_str[st]);
+        if (st == PR_OK) fprintf (of, "Virtual %-X = physical %-X\n", va, pa);
+        else fprintf (of, "Virtual %-X: %s\n", va, mm_str[st]);
         return SCPE_OK;
         }
     }
-fprintf (of, "Invalid argument");
+fprintf (of, "Invalid argument\n");
 return SCPE_OK;
 }
 
