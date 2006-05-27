@@ -1,6 +1,6 @@
 /* i1401_mt.c: IBM 1401 magnetic tape simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           7-track magtape
 
+   16-Feb-06    RMS     Added tape capacity checking
    15-Sep-05    RMS     Yet another fix to load read group mark plus word mark
                         Added debug printouts (from Van Snyder)
    26-Aug-05    RMS     Revised to use API for write lock check
@@ -128,6 +129,8 @@ MTAB mt_mod[] = {
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
     { 0 }
     };
 
@@ -224,6 +227,7 @@ t_stat mt_io (int32 unit, int32 flag, int32 mod)
 int32 t, wm_seen;
 t_mtrlnt i, tbc;
 t_stat st;
+t_bool passed_eot;
 UNIT *uptr;
 
 if ((uptr = get_unit (unit)) == NULL) return STOP_INVMTU; /* valid unit? */
@@ -300,7 +304,10 @@ switch (mod) {
                 }
             }
         if (DEBUG_PRS (mt_dev)) fprintf (sim_deb, " to %d\n", BS - 1);
+        passed_eot = sim_tape_eot (uptr);               /* passed EOT? */
         st = sim_tape_wrrecf (uptr, dbuf, tbc);         /* write record */
+        if (!passed_eot && sim_tape_eot (uptr))         /* just passed EOT? */
+            ind[IN_END] = 1;
         if (ADDR_ERR (BS)) {                            /* check final BS */
             BS = BA | (BS % MAXMEMSIZE);
             return STOP_WRAP;

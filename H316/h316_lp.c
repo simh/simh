@@ -1,6 +1,6 @@
 /* h316_lp.c: Honeywell 316/516 line printer
 
-   Copyright (c) 1999-2005, Robert M. Supnik
+   Copyright (c) 1999-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          line printer
 
+   03-Apr-06    RMS     Fixed bug in blanks backscanning (from Theo Engel)
    01-Dec-04    RMS     Fixed bug in DMA/DMC support
    24-Oct-03    RMS     Added DMA/DMC support
    25-Apr-03    RMS     Revised for extended file support
@@ -298,7 +299,7 @@ if (lpt_svcst & LPT_SVCSH) {                            /* shuttling */
     }
 if (lpt_svcst & LPT_SVCPA) {                            /* paper advance */
     SET_INT (INT_LPT);                                  /* interrupt */
-    for (i = LPT_WIDTH - 1; i >= 0; i++)  {
+    for (i = LPT_WIDTH - 1; i >= 0; i--)  {             /* backscan for blanks */
         if (lpt_buf[i] != ' ') break; 
         }
     lpt_buf[i + 1] = 0;

@@ -1,6 +1,6 @@
 /* vax_fpa.c - VAX f_, d_, g_floating instructions
 
-   Copyright (c) 1998-2005, Robert M Supnik
+   Copyright (c) 1998-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,17 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   16-May-06    RMS     Fixed bug in 32b floating multiply routine
+                        Fixed bug in 64b extended modulus routine
+   03-May-06    RMS     Fixed POLYD, POLYG to clear R4, R5
+                        Fixed POLYD, POLYG to set R3 correctly
+                        Fixed POLYD, POLYG to not exit prematurely if arg = 0
+                        Fixed POLYD, POLYG to do full 64b multiply
+                        Fixed POLYF, POLYD, POLYG to remove truncation on add
+                        Fixed POLYF, POLYD, POLYG to mask mul reslt to 31b/63b/63b
+                        Fixed fp add routine to test for zero via fraction
+                         to support "denormal" argument from POLYF, POLYD, POLYG
+                        (all reported by Tim Stark)
    27-Sep-05    RMS     Fixed bug in 32b structure definitions (from Jason Stevens)
    30-Sep-04    RMS     Comment and formating changes based on vax_octa.c
    18-Apr-04    RMS     Moved format definitions to vax_defs.h
@@ -93,8 +104,8 @@ void unpackg (int32 hi, int32 lo, UFP *a);
 void norm (UFP *a);
 int32 rpackfd (UFP *a, int32 *rh);
 int32 rpackg (UFP *a, int32 *rh);
-void vax_fadd (UFP *a, UFP *b, t_int64 mask);
-void vax_fmul (UFP *a, UFP *b, int32 prec, int32 bias, t_int64 mask);
+void vax_fadd (UFP *a, UFP *b);
+void vax_fmul (UFP *a, UFP *b, t_bool qd, int32 bias, uint32 mhi, uint32 mlo);
 void vax_fdiv (UFP *b, UFP *a, int32 prec, int32 bias);
 void vax_fmod (UFP *a, int32 bias, int32 *intgr, int32 *flg);
 
@@ -285,7 +296,7 @@ UFP a, b;
 unpackf (opnd[0], &a);                                  /* unpack operands */
 unpackf (opnd[2], &b);
 a.frac = a.frac | (((t_uint64) opnd[1]) << 32);         /* extend src1 */
-vax_fmul (&a, &b, 32, FD_BIAS, LMASK);                  /* multiply */
+vax_fmul (&a, &b, 0, FD_BIAS, 0, LMASK);                /* multiply */
 vax_fmod (&a, FD_BIAS, intgr, flg);                     /* sep int & frac */
 return rpackfd (&a, NULL);                              /* return frac */
 }
@@ -297,7 +308,7 @@ UFP a, b;
 unpackd (opnd[0], opnd[1], &a);                         /* unpack operands */
 unpackd (opnd[3], opnd[4], &b);
 a.frac = a.frac | opnd[2];                              /* extend src1 */
-vax_fmul (&a, &b, 64, FD_BIAS, 0);                      /* multiply */
+vax_fmul (&a, &b, 1, FD_BIAS, 0, 0);                    /* multiply */
 vax_fmod (&a, FD_BIAS, intgr, flg);                     /* sep int & frac */
 return rpackfd (&a, flo);                               /* return frac */
 }
@@ -309,23 +320,23 @@ UFP a, b;
 unpackg (opnd[0], opnd[1], &a);                         /* unpack operands */
 unpackg (opnd[3], opnd[4], &b);
 a.frac = a.frac | (opnd[2] >> 5);                       /* extend src1 */
-vax_fmul (&a, &b, 64, G_BIAS, 0);                       /* multiply */                  
+vax_fmul (&a, &b, 1, G_BIAS, 0, 0);                     /* multiply */
 vax_fmod (&a, G_BIAS, intgr, flg);                      /* sep int & frac */
 return rpackg (&a, flo);                                /* return frac */
 }
 
 /* Unpacked floating point routines */
 
-void vax_fadd (UFP *a, UFP *b, t_int64 mask)
+void vax_fadd (UFP *a, UFP *b)
 {
 int32 ediff;
 UFP t;
 
-if (a->exp == 0) {                                      /* s1 = 0? */
+if (a->frac == 0) {                                     /* s1 = 0? */
     *a = *b;
     return;
     }
-if (b->exp == 0) return;                                /* s2 = 0? */
+if (b->frac == 0) return;                               /* s2 = 0? */
 if ((a->exp < b->exp) ||                                /* |s1| < |s2|? swap */
     ((a->exp == b->exp) && (a->frac < b->frac))) {
     t = *a;
@@ -341,7 +352,6 @@ if (a->sign ^ b->sign) {                                /* eff sub? */
         a->frac = a->frac + b->frac;                    /* add frac */
         }
     else a->frac = a->frac - b->frac;                   /* sub frac */
-    a->frac = a->frac & ~mask;
     norm (a);                                           /* normalize */
     }
 else {
@@ -352,16 +362,16 @@ else {
         a->frac = UF_NM | (a->frac >> 1);               /* shift in carry */
         a->exp = a->exp + 1;                            /* skip norm */
         }
-    a->frac = a->frac & ~mask;
     }
 return;
 }
 
 /* Floating multiply - 64b * 64b with cross products */
 
-void vax_fmul (UFP *a, UFP *b, int32 prec, int32 bias, t_int64 mask)
+void vax_fmul (UFP *a, UFP *b, t_bool qd, int32 bias, uint32 mhi, uint32 mlo)
 {
 t_uint64 ah, bh, al, bl, rhi, rlo, rmid1, rmid2;
+t_uint64 mask = (((t_uint64) mhi) << 32) | ((t_uint64) mlo);
 
 if ((a->exp == 0) || (b->exp == 0)) {                   /* zero argument? */
     a->frac = a->sign = a->exp = 0;                     /* result is zero */
@@ -372,7 +382,7 @@ a->exp = a->exp + b->exp - bias;                        /* add exponents */
 ah = (a->frac >> 32) & LMASK;                           /* split operands */
 bh = (b->frac >> 32) & LMASK;                           /* into 32b chunks */
 rhi = ah * bh;                                          /* high result */
-if (prec > 32) {                                        /* 64b needed? */
+if (qd) {                                               /* 64b needed? */
     al = a->frac & LMASK;
     bl = b->frac & LMASK;
     rmid1 = ah * bl;
@@ -381,10 +391,10 @@ if (prec > 32) {                                        /* 64b needed? */
     rhi = rhi + ((rmid1 >> 32) & LMASK) + ((rmid2 >> 32) & LMASK);
     rmid1 = rlo + (rmid1 << 32);                        /* add mid1 to lo */
     if (rmid1 < rlo) rhi = rhi + 1;                     /* carry? incr hi */
-    rmid2 = rmid1 + (rmid2 << 32);                      /* add mid2 to to */
+    rmid2 = rmid1 + (rmid2 << 32);                      /* add mid2 to lo */
     if (rmid2 < rmid1) rhi = rhi + 1;                   /* carry? incr hi */
     }
-a->frac = rhi & ~mask;                                  /* mask out */
+a->frac = rhi & ~mask;
 norm (a);                                               /* normalize */
 return;
 }
@@ -402,7 +412,7 @@ return;
 void vax_fmod (UFP *a, int32 bias, int32 *intgr, int32 *flg)
 {
 if (a->exp <= bias) *intgr = *flg = 0;                  /* 0 or <1? int = 0 */
-else if (a->exp <= (bias + 64)) {                       /* in range? */
+else if (a->exp <= (bias + 64)) {                       /* in range [1,64]? */
     *intgr = (int32) (a->frac >> (64 - (a->exp - bias)));
     if ((a->exp > (bias + 32)) ||                       /* test ovflo */
         ((a->exp == (bias + 32)) &&
@@ -410,7 +420,8 @@ else if (a->exp <= (bias + 64)) {                       /* in range? */
         *flg = CC_V;
     else *flg = 0;
     if (a->sign) *intgr = -*intgr;                      /* -? comp int */
-    a->frac = a->frac << (a->exp - bias);
+    if (a->exp == (bias + 64)) a->frac = 0;             /* special case 64 */
+    else a->frac = a->frac << (a->exp - bias);
     a->exp = bias;
     }
 else {
@@ -585,11 +596,10 @@ void unpackg (uint32 hi, uint32 lo, UFP *a);
 void norm (UFP *a);
 int32 rpackfd (UFP *a, int32 *rh);
 int32 rpackg (UFP *a, int32 *rh);
-void vax_fadd (UFP *a, UFP *b, uint32 mask);
-void vax_fmul (UFP *a, UFP *b, int32 prec, int32 bias, uint32 mask);
+void vax_fadd (UFP *a, UFP *b);
+void vax_fmul (UFP *a, UFP *b, t_bool qd, int32 bias, uint32 mhi, uint32 mlo);
 void vax_fmod (UFP *a, int32 bias, int32 *intgr, int32 *flg);
 void vax_fdiv (UFP *b, UFP *a, int32 prec, int32 bias);
-int32 vax_fcmp (UFP *a, UFP *b);
 void dp_add (UDP *a, UDP *b);
 void dp_inc (UDP *a);
 void dp_sub (UDP *a, UDP *b);
@@ -787,7 +797,7 @@ UFP a, b;
 unpackf (opnd[0], &a);                                  /* unpack operands */
 unpackf (opnd[2], &b);
 a.frac.hi = a.frac.hi | opnd[1];                        /* extend src1 */
-vax_fmul (&a, &b, 32, FD_BIAS, LMASK);                  /* multiply */
+vax_fmul (&a, &b, 0, FD_BIAS, 0, LMASK);                /* multiply */
 vax_fmod (&a, FD_BIAS, intgr, flg);                     /* sep int & frac */
 return rpackfd (&a, NULL);                              /* return frac */
 }
@@ -799,7 +809,7 @@ UFP a, b;
 unpackd (opnd[0], opnd[1], &a);                         /* unpack operands */
 unpackd (opnd[3], opnd[4], &b);
 a.frac.lo = a.frac.lo | opnd[2];                        /* extend src1 */
-vax_fmul (&a, &b, 64, FD_BIAS, 0);                      /* multiply */
+vax_fmul (&a, &b, 1, FD_BIAS, 0, 0);                    /* multiply */
 vax_fmod (&a, FD_BIAS, intgr, flg);                     /* sep int & frac */
 return rpackfd (&a, flo);                               /* return frac */
 }
@@ -811,7 +821,7 @@ UFP a, b;
 unpackg (opnd[0], opnd[1], &a);                         /* unpack operands */
 unpackg (opnd[3], opnd[4], &b);
 a.frac.lo = a.frac.lo | (opnd[2] >> 5);                 /* extend src1 */
-vax_fmul (&a, &b, 64, G_BIAS, 0);                       /* multiply */                  
+vax_fmul (&a, &b, 1, G_BIAS, 0, 0);                     /* multiply */
 vax_fmod (&a, G_BIAS, intgr, flg);                      /* sep int & frac */
 return rpackg (&a, flo);                                /* return frac */
 }
@@ -820,16 +830,16 @@ return rpackg (&a, flo);                                /* return frac */
 
 /* Floating add */
 
-void vax_fadd (UFP *a, UFP *b, uint32 mask)
+void vax_fadd (UFP *a, UFP *b)
 {
 int32 ediff;
 UFP t;
 
-if (a->exp == 0) {                                      /* s1 = 0? */
+if ((a->frac.hi == 0) && (a->frac.lo == 0)) {           /* s1 = 0? */
     *a = *b;
     return;
     }
-if (b->exp == 0) return;                                /* s2 = 0? */
+if ((b->frac.hi == 0) && (b->frac.lo == 0)) return;     /* s2 = 0? */
 if ((a->exp < b->exp) ||                                /* |s1| < |s2|? swap */
     ((a->exp == b->exp) && (dp_cmp (&a->frac, &b->frac) < 0))) {
     t = *a;
@@ -844,7 +854,6 @@ if (a->sign ^ b->sign) {                                /* eff sub? */
         dp_add (&a->frac, &b->frac);                    /* "add" frac */
         }
     else dp_sub (&a->frac, &b->frac);                   /* a >= b */
-    a->frac.lo = a->frac.lo & ~mask;                    /* trim low result */
     norm (a);                                           /* normalize */
     }
 else {
@@ -855,28 +864,13 @@ else {
         a->frac.hi = a->frac.hi | UF_NM_H;              /* add norm bit */
         a->exp = a->exp + 1;                            /* skip norm */
         }
-    a->frac.lo = a->frac.lo & ~mask;                    /* trim low result */
     }
 return;
 }
 
-/* Floating compare */
-
-int32 vax_fcmp (UFP *a, UFP *b)
-{
-int32 r;
-
-if (a->sign != b->sign) return ((a->sign)? CC_N: 0);
-r = a->exp - b->exp;
-if (r == 0) r = dp_cmp (&a->frac, &b->frac);
-if (r == 0) return CC_Z;
-if (r < 0) return (a->sign? 0: CC_N);
-else return (a->sign? CC_N: 0);
-}
-
 /* Floating multiply - 64b * 64b with cross products */
 
-void vax_fmul (UFP *a, UFP *b, int32 prec, int32 bias, uint32 mask)
+void vax_fmul (UFP *a, UFP *b, t_bool qd, int32 bias, uint32 mhi, uint32 mlo)
 {
 UDP rhi, rlo, rmid1, rmid2;
 
@@ -888,7 +882,7 @@ if ((a->exp == 0) || (b->exp == 0)) {                   /* zero argument? */
 a->sign = a->sign ^ b->sign;                            /* sign of result */
 a->exp = a->exp + b->exp - bias;                        /* add exponents */
 dp_imul (a->frac.hi, b->frac.hi, &rhi);                 /* high result */
-if (prec > 32) {                                        /* 64b needed? */
+if (qd) {                                               /* 64b needed? */
     dp_imul (a->frac.hi, b->frac.lo, &rmid1);           /* cross products */
     dp_imul (a->frac.lo, b->frac.hi, &rmid2);
     dp_imul (a->frac.lo, b->frac.lo, &rlo);             /* low result */
@@ -901,10 +895,10 @@ if (prec > 32) {                                        /* 64b needed? */
     rlo.hi = (rlo.hi + rmid1.lo) & LMASK;               /* add mid1 to low res */
     if (rlo.hi < rmid1.lo) dp_inc (&rhi);               /* carry? incr high res */
     rlo.hi = (rlo.hi + rmid2.lo) & LMASK;               /* add mid2 to low res */
-    if (rlo.hi < rmid1.hi) dp_inc (&rhi);               /* carry? incr high res */
+    if (rlo.hi < rmid2.lo) dp_inc (&rhi);               /* carry? incr high res */
     }
-a->frac.hi = rhi.hi;                                    /* mask low fraction */
-a->frac.lo = rhi.lo & ~mask;
+a->frac.hi = rhi.hi & ~mhi;                             /* mask fraction */
+a->frac.lo = rhi.lo & ~mlo;
 norm (a);                                               /* normalize */
 return;
 }
@@ -924,7 +918,7 @@ void vax_fmod (UFP *a, int32 bias, int32 *intgr, int32 *flg)
 UDP ifr;
 
 if (a->exp <= bias) *intgr = *flg = 0;                  /* 0 or <1? int = 0 */
-else if (a->exp <= (bias + 64)) {                       /* in range? */
+else if (a->exp <= (bias + 64)) {                       /* in range [1,64]? */
     ifr = a->frac;
     dp_rsh (&ifr, 64 - (a->exp - bias));                /* separate integer */
     if ((a->exp > (bias + 32)) ||                       /* test ovflo */
@@ -1073,7 +1067,7 @@ rlo = al * bl;
 rhi = rhi + ((rmid1 >> 16) & WMASK) + ((rmid2 >> 16) & WMASK);
 rmid1 = (rlo + (rmid1 << 16)) & LMASK;                  /* add mid1 to lo */
 if (rmid1 < rlo) rhi = rhi + 1;                         /* carry? incr hi */
-rmid2 = (rmid1 + (rmid2 << 16)) & LMASK;                        /* add mid2 to to */
+rmid2 = (rmid1 + (rmid2 << 16)) & LMASK;                /* add mid2 to to */
 if (rmid2 < rmid1) rhi = rhi + 1;                       /* carry? incr hi */
 r->hi = rhi & LMASK;                                    /* mask result */
 r->lo = rmid2;
@@ -1277,7 +1271,7 @@ UFP a, b;
 unpackf (opnd[0], &a);                                  /* F format */
 unpackf (opnd[1], &b);
 if (sub) a.sign = a.sign ^ FPSIGN;                      /* sub? -s1 */
-vax_fadd (&a, &b, 0);                                   /* add fractions */
+vax_fadd (&a, &b);                                      /* add fractions */
 return rpackfd (&a, NULL);
 }
 
@@ -1288,7 +1282,7 @@ UFP a, b;
 unpackd (opnd[0], opnd[1], &a);
 unpackd (opnd[2], opnd[3], &b);
 if (sub) a.sign = a.sign ^ FPSIGN;                      /* sub? -s1 */
-vax_fadd (&a, &b, 0);                                   /* add fractions */
+vax_fadd (&a, &b);                                      /* add fractions */
 return rpackfd (&a, rh);
 }
 
@@ -1299,7 +1293,7 @@ UFP a, b;
 unpackg (opnd[0], opnd[1], &a);
 unpackg (opnd[2], opnd[3], &b);
 if (sub) a.sign = a.sign ^ FPSIGN;                      /* sub? -s1 */
-vax_fadd (&a, &b, 0);                                   /* add fractions */
+vax_fadd (&a, &b);                                   /* add fractions */
 return rpackg (&a, rh);                                 /* round and pack */
 }
 
@@ -1311,7 +1305,7 @@ UFP a, b;
     
 unpackf (opnd[0], &a);                                  /* F format */
 unpackf (opnd[1], &b);
-vax_fmul (&a, &b, 24, FD_BIAS, 0);                      /* do multiply */
+vax_fmul (&a, &b, 0, FD_BIAS, 0, 0);                    /* do multiply */
 return rpackfd (&a, NULL);                              /* round and pack */
 }
 
@@ -1319,9 +1313,9 @@ int32 op_muld (int32 *opnd, int32 *rh)
 {
 UFP a, b;
     
-unpackd (opnd[0], opnd[1], &a);
+unpackd (opnd[0], opnd[1], &a);                         /* D format */
 unpackd (opnd[2], opnd[3], &b);
-vax_fmul (&a, &b, 56, FD_BIAS, 0);                      /* do multiply */
+vax_fmul (&a, &b, 1, FD_BIAS, 0, 0);                    /* do multiply */
 return rpackfd (&a, rh);                                /* round and pack */
 }
 
@@ -1331,7 +1325,7 @@ UFP a, b;
 
 unpackg (opnd[0], opnd[1], &a);                         /* G format */
 unpackg (opnd[2], opnd[3], &b);
-vax_fmul (&a, &b, 53, G_BIAS, 0);                       /* do multiply */
+vax_fmul (&a, &b, 1, G_BIAS, 0, 0);                     /* do multiply */
 return rpackg (&a, rh);                                 /* round and pack */
 }
 
@@ -1351,7 +1345,7 @@ int32 op_divd (int32 *opnd, int32 *rh)
 {
 UFP a, b;
 
-unpackd (opnd[0], opnd[1], &a);
+unpackd (opnd[0], opnd[1], &a);                         /* D format */
 unpackd (opnd[2], opnd[3], &b);
 vax_fdiv (&a, &b, 58, FD_BIAS);                         /* do divide */
 return rpackfd (&b, rh);                                /* round and pack */
@@ -1370,9 +1364,9 @@ return rpackg (&b, rh);                                 /* round and pack */
 /* Polynomial evaluation
    The most mis-implemented instruction in the VAX (probably here too).
    POLY requires a precise combination of masking versus normalizing
-   to achieve the desired answer.  In particular, both the multiply
-   and add steps are masked prior to normalization.  In addition,
-   negative small fractions must not be treated as 0 during denorm.
+   to achieve the desired answer.  In particular, the multiply step
+   is masked prior to normalization.  In addition, negative small
+   fractions must not be treated as 0 during denorm.
 */
 
 void op_polyf (int32 *opnd, int32 acc)
@@ -1388,18 +1382,18 @@ wd = Read (ptr, L_LONG, RD);                            /* get C0 */
 ptr = ptr + 4;
 unpackf (wd, &r);                                       /* unpack C0 */
 res = rpackfd (&r, NULL);                               /* first result */
-for (i = 0; (i < deg) && a.exp; i++) {                  /* loop */
+for (i = 0; i < deg; i++) {                             /* loop */
     unpackf (res, &r);                                  /* unpack result */
-    vax_fmul (&r, &a, 32, FD_BIAS, LMASK);              /* r = r * arg */
+    vax_fmul (&r, &a, 0, FD_BIAS, 1, LMASK);            /* r = r * arg, mask */
     wd = Read (ptr, L_LONG, RD);                        /* get Cnext */
     ptr = ptr + 4;
     unpackf (wd, &c);                                   /* unpack Cnext */
-    vax_fadd (&r, &c, LMASK);                           /* r = r + Cnext */
+    vax_fadd (&r, &c);                                  /* r = r + Cnext */
     res = rpackfd (&r, NULL);                           /* round and pack */
     }
 R[0] = res;
 R[1] = R[2] = 0;
-R[3] = opnd[2] + 4 + (opnd[1] << 2);
+R[3] = ptr;
 return;
 }
 
@@ -1417,20 +1411,22 @@ wd1 = Read (ptr + 4, L_LONG, RD);
 ptr = ptr + 8;
 unpackd (wd, wd1, &r);                                  /* unpack C0 */
 res = rpackfd (&r, &resh);                              /* first result */
-for (i = 0; (i < deg) && a.exp; i++) {                  /* loop */
+for (i = 0; i < deg; i++) {                             /* loop */
     unpackd (res, resh, &r);                            /* unpack result */
-    vax_fmul (&r, &a, 32, FD_BIAS, 0);                  /* r = r * arg */
+    vax_fmul (&r, &a, 1, FD_BIAS, 0, 1);                /* r = r * arg, mask */
     wd = Read (ptr, L_LONG, RD);                        /* get Cnext */
     wd1 = Read (ptr + 4, L_LONG, RD);
     ptr = ptr + 8;
     unpackd (wd, wd1, &c);                              /* unpack Cnext */
-    vax_fadd (&r, &c, 0);                               /* r = r + Cnext */
+    vax_fadd (&r, &c);                                  /* r = r + Cnext */
     res = rpackfd (&r, &resh);                          /* round and pack */
     }
 R[0] = res;
 R[1] = resh;
 R[2] = 0;
-R[3] = opnd[3] + 4 + (opnd[2] << 2);
+R[3] = ptr;
+R[4] = 0;
+R[5] = 0;
 return;
 }
 
@@ -1448,19 +1444,21 @@ wd1 = Read (ptr + 4, L_LONG, RD);
 ptr = ptr + 8;
 unpackg (wd, wd1, &r);                                  /* unpack C0 */
 res = rpackg (&r, &resh);                               /* first result */
-for (i = 0; (i < deg) && a.exp; i++) {                  /* loop */
+for (i = 0; i < deg; i++) {                             /* loop */
     unpackg (res, resh, &r);                            /* unpack result */
-    vax_fmul (&r, &a, 32, G_BIAS, 0);                   /* r = r * arg */
+    vax_fmul (&r, &a, 1, G_BIAS, 0, 1);                 /* r = r * arg */
     wd = Read (ptr, L_LONG, RD);                        /* get Cnext */
     wd1 = Read (ptr + 4, L_LONG, RD);
     ptr = ptr + 8;
     unpackg (wd, wd1, &c);                              /* unpack Cnext */
-    vax_fadd (&r, &c, 0);                               /* r = r + Cnext */
+    vax_fadd (&r, &c);                                  /* r = r + Cnext */
     res = rpackg (&r, &resh);                           /* round and pack */
     }
 R[0] = res;
 R[1] = resh;
 R[2] = 0;
-R[3] = opnd[3] + 4 + (opnd[2] << 2);
+R[3] = ptr;
+R[4] = 0;
+R[5] = 0;
 return;
 }

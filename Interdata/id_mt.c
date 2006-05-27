@@ -1,6 +1,6 @@
 /* id_mt.c: Interdata magnetic tape simulator
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           M46-494 dual density 9-track magtape controller
 
+   16-Feb-06    RMS     Added tape capacity checking
    18-Mar-05    RMS     Added attached test to detach routine
    07-Dec-04    RMS     Added read-only file support
    25-Apr-03    RMS     Revised for extended file support
@@ -153,6 +154,8 @@ MTAB mt_mod[] = {
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
       &set_dev, &show_dev, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "SELCH", "SELCH",
@@ -260,6 +263,7 @@ uint32 i;
 int32 u = uptr - mt_dev.units;
 uint32 dev = mt_dib.dno + (u * o_MT0);
 t_mtrlnt tbc;
+t_bool passed_eot;
 t_stat st, r = SCPE_OK;
 
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
@@ -273,7 +277,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
 
 if (uptr->UCMD & MTC_STOP2) {                           /* stop, gen NMTN? */
     uptr->UCMD = 0;                                     /* clr cmd */
-    uptr->UST = STA_NMTN;                               /* set nmtn, not eot */
+    uptr->UST = uptr->UST | STA_NMTN;                   /* set nmtn */
     mt_xfr = 0;                                         /* clr xfr */
     if (mt_arm[u]) SET_INT (v_MT + u);                  /* set intr */
     return SCPE_OK;
@@ -287,6 +291,7 @@ if (uptr->UCMD & MTC_STOP1) {                           /* stop, gen EOM? */
     return SCPE_OK;
     }
 
+passed_eot = sim_tape_eot (uptr);                       /* passed EOT? */
 switch (uptr->UCMD) {                                   /* case on function */
 
     case MTC_REW:                                       /* rewind */
@@ -388,6 +393,8 @@ switch (uptr->UCMD) {                                   /* case on function */
         break;
         }                                               /* end case */
 
+if (!passed_eot && sim_tape_eot (uptr))                 /* just passed EOT? */
+    uptr->UST = uptr->UST | STA_EOT;
 uptr->UCMD = uptr->UCMD | MTC_STOP1;                    /* set stop stage 1 */
 sim_activate (uptr, mt_rtime);                          /* schedule */
 return r;

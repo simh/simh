@@ -1,6 +1,6 @@
 /* vax780_stddev.c: VAX 11/780 standard I/O devices
 
-   Copyright (c) 1998-2005, Robert M Supnik
+   Copyright (c) 1998-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,7 +29,7 @@
    todr         TODR clock
    tmr          interval timer
 
-
+   11-May-06    RMS     Revised timer logic for EVKAE
    22-Nov-05    RMS     Revised for new terminal processing routines
    10-Mar-05    RMS     Fixed bug in timer schedule routine (from Mark Hittinger)
    08-Sep-04    RMS     Cloned from vax_stddev.c, vax_sysdev.c, and pdp11_rx.c
@@ -101,7 +101,6 @@
 #define TMR_CSR_W1C     (TMR_CSR_ERR | TMR_CSR_DON)
 #define TMR_CSR_WR      (TMR_CSR_IE | TMR_CSR_RUN)
 #define TMR_INC         10000                           /* usec/interval */
-#define TMR_NICR_STD    ((~TMR_INC + 1) & LMASK)
 #define CLK_DELAY       5000                            /* 100 Hz */
 #define TMXR_MULT       2                               /* 50 Hz */
 
@@ -162,6 +161,7 @@ uint32 tmr_nicr = 0;                                    /* next interval */
 uint32 tmr_inc = 0;                                     /* timer increment */
 int32 tmr_sav = 0;                                      /* timer save */
 int32 tmr_int = 0;                                      /* interrupt */
+int32 tmr_use_100hz = 1;                                /* use 100Hz for timer */
 int32 clk_tps = 100;                                    /* ticks/second */
 int32 tmxr_poll = CLK_DELAY * TMXR_MULT;                /* term mux poll */
 int32 tmr_poll = CLK_DELAY;                             /* pgm timer poll */
@@ -299,6 +299,7 @@ REG tmr_reg[] = {
     { HRDATA (NICR, tmr_nicr, 32) },
     { HRDATA (INCR, tmr_inc, 32), REG_HIDDEN },
     { HRDATA (SAVE, tmr_sav, 32), REG_HIDDEN },
+    { FLDATA (USE100HZ, tmr_use_100hz, 0), REG_HIDDEN },
     { FLDATA (INT, tmr_int, 0) },
     { NULL }
     };
@@ -476,13 +477,13 @@ return SCPE_OK;
    accurately simulated due to the overhead that would be required
    for 1M clock events per second.  Instead, a hidden calibrated
    100Hz timer is run (because that's what VMS expects), and a
-   gross hack is used for the interval timer.
+   hack is used for the interval timer.
 
    When the timer is started, the timer interval is inspected.
 
-   if the interval is the standard 10msec, then the 100Hz timer
-        supplies timer interrupts
-   if the interval is non-standard then count instructions
+   if the interval is >= 10msec, then the 100Hz timer drives the
+        next interval
+   if the interval is < 10mec, then count instructions
 
    If the interval register is read, then its value between events
    is interpolated using the current instruction count versus the
@@ -502,6 +503,7 @@ void iccs_wr (int32 val)
 {
 if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
     sim_cancel (&tmr_unit);                             /* cancel timer */
+    tmr_use_100hz = 0;
     if (tmr_iccs & TMR_CSR_RUN)                         /* run 1 -> 0? */
         tmr_icr = icr_rd (TRUE);                        /* update itr */
     }
@@ -531,8 +533,7 @@ uint32 delta;
 
 if (interp || (tmr_iccs & TMR_CSR_RUN)) {               /* interp, running? */
     delta = sim_grtime () - tmr_sav;                    /* delta inst */
-    if ((tmr_inc == TMR_INC) &&                         /* scale large int */
-        (tmr_poll > TMR_INC))
+    if (tmr_use_100hz && (tmr_poll > TMR_INC))          /* scale large int */
         delta = (uint32) ((((double) delta) * TMR_INC) / tmr_poll);
     if (delta >= tmr_inc) delta = tmr_inc - 1;
     return tmr_icr + delta;
@@ -554,15 +555,11 @@ tmr_nicr = val;
 
 t_stat clk_svc (UNIT *uptr)
 {
-int32 t;
-
-t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
-sim_activate (&clk_unit, t);                            /* reactivate unit */
-tmr_poll = t;                                           /* set tmr poll */
-tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
+tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);            /* calibrate clock */
+sim_activate (&clk_unit, tmr_poll);                     /* reactivate unit */
+tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 todr_reg = todr_reg + 1;                                /* incr TODR */
-if ((tmr_iccs & TMR_CSR_RUN) &&                         /* timer running? */
-    (tmr_nicr == TMR_NICR_STD))                         /* standard interval? */
+if ((tmr_iccs & TMR_CSR_RUN) && tmr_use_100hz)          /* timer on, std intvl? */
     tmr_incr (TMR_INC);                                 /* do timer service */
 return SCPE_OK;
 }
@@ -606,24 +603,23 @@ return;
 void tmr_sched (void)
 {
 tmr_sav = sim_grtime ();                                /* save intvl base */
-if (tmr_nicr != TMR_NICR_STD) {                         /* non-std interval? */
-    tmr_inc = (~tmr_icr + 1);                           /* inc = interval */
-    if (tmr_inc == 0) tmr_inc = 1;
-    sim_activate (&tmr_unit, tmr_inc);
+tmr_inc = (~tmr_icr + 1);                               /* inc = interval */
+if (tmr_inc == 0) tmr_inc = 1;
+if (tmr_inc < TMR_INC) {                                /* 100Hz multiple? */
+    sim_activate (&tmr_unit, tmr_inc);                  /* schedule timer */
+    tmr_use_100hz = 0;
     }
-return;                                                 /* let clk handle */
+else tmr_use_100hz = 1;                                 /* let clk handle */
+return;
 }
 
 /* 100Hz clock reset */
 
 t_stat clk_reset (DEVICE *dptr)
 {
-int32 t;
-
-t = sim_rtcn_init (clk_unit.wait, TMR_CLK);             /* init 100Hz timer */
-sim_activate (&clk_unit, t);                            /* activate 100Hz unit */
-tmr_poll = t;                                           /* set tmr poll */
-tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
+tmr_poll = sim_rtcn_init (clk_unit.wait, TMR_CLK);      /* init 100Hz timer */
+sim_activate (&clk_unit, tmr_poll);                     /* activate 100Hz unit */
+tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 return SCPE_OK;
 }
 
@@ -635,6 +631,7 @@ tmr_iccs = 0;
 tmr_icr = 0;
 tmr_nicr = 0;
 tmr_int = 0;
+tmr_use_100hz = 1;
 sim_cancel (&tmr_unit);                                 /* cancel timer */
 if (sim_switches & SWMASK ('P')) todr_powerup ();       /* powerup? set TODR */
 return SCPE_OK;

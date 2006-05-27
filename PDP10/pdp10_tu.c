@@ -1,6 +1,6 @@
 /* pdp10_tu.c - PDP-10 RH11/TM03/TU45 magnetic tape simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tu           RH11/TM03/TU45 magtape
 
+   16-Feb-06    RMS     Added tape capacity checking
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
    31-Mar-05    RMS     Fixed bug, ERASE/WREOF incorrectly clear CS1<done>
@@ -399,6 +400,8 @@ MTAB tu_mod[] = {
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
@@ -625,7 +628,7 @@ return SCPE_OK;
 
 void tu_go (int32 drv)
 {
-int32 fnc, den, space_test = FS_BOT;
+int32 fnc, den;
 UNIT *uptr;
 
 fnc = GET_FNC (tucs1);                                  /* get function */
@@ -687,13 +690,23 @@ switch (fnc) {                                          /* case on function */
         return;
 
     case FNC_SPACEF:
-        space_test = FS_EOT;    
+        if ((uptr->flags & UNIT_ATT) == 0) {            /* unattached? */
+            set_tuer (ER_UNS);
+            break;
+            }
+        if (sim_tape_eot (uptr) || ((tutc & TC_FCS) == 0)) {
+            set_tuer (ER_NXF);
+            break;
+            }
+        uptr->USTAT = FS_PIP;
+        goto GO_XFER;
+
     case FNC_SPACER:
         if ((uptr->flags & UNIT_ATT) == 0) {            /* unattached? */
             set_tuer (ER_UNS);
             break;
             }
-        if ((tufs & space_test) || ((tutc & TC_FCS) == 0)) {
+        if (sim_tape_bot (uptr) || ((tutc & TC_FCS) == 0)) {
             set_tuer (ER_NXF);
             break;
             }
@@ -807,7 +820,7 @@ switch (fnc) {                                          /* case on function */
                 r = tu_map_err (uptr, st, 0);           /* map error */
                 break;
                 }
-            } while (tufc != 0);
+            } while ((tufc != 0) && !sim_tape_eot (uptr));
         if (tufc) set_tuer (ER_FCE);
         else tutc = tutc & ~TC_FCS;
         tufs = tufs | FS_ATA;
@@ -977,7 +990,10 @@ if (GET_FMTR (tucs2) == 0) {                            /* formatter present? */
         tufs = tufs | FS_MOL | tu_unit[drv].USTAT;
         if (tu_unit[drv].UDENS == TC_1600) tufs = tufs | FS_PE;
         if (sim_tape_wrp (&tu_unit[drv])) tufs = tufs | FS_WRL;
-        if (sim_tape_bot (&tu_unit[drv]) && !act) tufs = tufs | FS_BOT;
+        if (!act) {
+            if (sim_tape_bot (&tu_unit[drv])) tufs = tufs | FS_BOT;
+            if (sim_tape_eot (&tu_unit[drv])) tufs = tufs | FS_EOT;
+            }
         }
     if (tuer) tufs = tufs | FS_ERR;
     }

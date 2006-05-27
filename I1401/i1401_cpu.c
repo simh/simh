@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-May-06    RMS     Fixed format error in CPU history (found by Peter Schorn)
+   06-Mar-06    RMS     Fixed bug in divide (found by Van Snyder)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    01-Sep-05	RMS     Removed error stops in MCE
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -1333,7 +1335,8 @@ CHECK_LENGTH:
 */
 
     case OP_DIV:
-        asave = AS; ahigh = -1;
+        asave = AS;
+        ahigh = -1;
         do {
             a = M[AS];                                  /* get dvr char */
             if ((a & CHAR) != BCD_ZERO) ahigh = AS;     /* mark non-zero */
@@ -1379,9 +1382,11 @@ CHECK_LENGTH:
             t = div_sub (asave, bsave, ahigh);          /* subtract */
             quo++;                                      /* incr quo digit */
             } while (t == 0);                           /* until borrow */
-        div_add (asave, bsave, ahigh); quo--;           /* restore */
+        div_add (asave, bsave, ahigh);                  /* restore */
+        quo--;
         M[qs] = (M[qs] & WM) | sum_table[quo];          /* store quo digit */
-        bsave++; qs++;                                  /* adv divd, quo */
+        bsave++;                                        /* adv divd, quo */
+        qs++;
         } while ((b & ZONE) == 0);                      /* until B sign */
     if (reason) break;                                  /* address err? */
 
@@ -1583,7 +1588,8 @@ int32 a, b, c, r;
 
 c = 0;                                                  /* init borrow */
 do {
-    a = M[ap]; b = M[bp];                               /* get operands */
+    a = M[ap];                                          /* get operands */
+    b = M[bp];
     r = bcd_to_bin[b & DIGIT] -                         /* a - b - borrow */
         bcd_to_bin[a & DIGIT] - c;
     c = (r < 0);                                        /* set borrow out */
@@ -1592,7 +1598,7 @@ do {
     bp--;
     } while (ap >= aend);
 b = M[bp] & CHAR;                                       /* borrow position */
-if (b != BCD_ZERO) {                                    /* non-zero? */
+if (b && (b != BCD_ZERO)) {                             /* non-zero? */
     r = bcd_to_bin[b & DIGIT] - c;                      /* subtract borrow */
     M[bp] = sum_table[r];                               /* store result */
     return 0;                                           /* subtract worked */
@@ -1772,7 +1778,7 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         if ((fprint_sym (st, h->is, sim_eval, &cpu_unit, SWMASK ('M'))) > 0) {
             fprintf (st, "(undefined)");
             for (i = 0; i < h->ilnt; i++)
-                fprintf (st, "% 02o", h->inst[i]);
+                fprintf (st, " %02o", h->inst[i]);
             }
         fputc ('\n', st);                               /* end line */
         }                                               /* end else instruction */

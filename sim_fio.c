@@ -1,6 +1,6 @@
 /* sim_fio.c: simulator file I/O library
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-May-06    RMS     Added sim_fsize_name
+   21-Apr-06    RMS     Added FreeBSD large file support (from Mark Martinec)
    19-Nov-05    RMS     Added OS/X large file support (from Peter Schorn)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    17-Jul-04    RMS     Fixed bug in optimized sim_fread (reported by Scott Bailey)
@@ -125,6 +127,17 @@ return total;
 }
 
 /* Get file size */
+
+uint32 sim_fsize_name (char *fname)
+{
+FILE *fp;
+uint32 sz;
+
+if ((fp = sim_fopen (fname, "rb")) == NULL) return 0;
+sz = sim_fsize (fp);
+fclose (fp);
+return sz;
+}
 
 uint32 sim_fsize (FILE *fp)
 {
@@ -279,7 +292,7 @@ return fseeko64 (st, xpos, origin);
 
 /* Apple OS/X */
 
-#if defined (__APPLE__)
+#if defined (__APPLE__) || defined (__FreeBSD__)
 #define _SIM_IO_FSEEK_EXT_      1
 
 int sim_fseek (FILE *st, t_addr xpos, int origin) 

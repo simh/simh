@@ -1,6 +1,6 @@
 /* id_defs.h: Interdata 16b/32b simulator definitions
 
-   Copyright (c) 2000-2005, Robert M. Supnik
+   Copyright (c) 2000-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Carl Friend and Al Kossow,
    who provided key documents about the Interdata product line.
 
+   09-Mar-06    RMS     Increased register sets to architectural limit
    25-Jan-04    RMS     Removed local logging support
    22-Sep-03    RMS     Added additional instruction decode types
    21-Jun-03    RMS     Changed subroutine argument for ARM compiler conflict
@@ -65,9 +66,9 @@
 
 #if defined (IFP_IN_MEM)
 #define ReadFReg(r)     (fp_in_hwre? \
-                     F[(r) >> 1]: ReadF (((r) << 1) & ~3, P))
+                        F[(r) >> 1]: ReadF (((r) << 1) & ~3, P))
 #define WriteFReg(r,v)  if (fp_in_hwre) F[(r) >> 1] = (v); \
-                    else WriteF (((r) << 1) & ~3, (v), P)
+                        else WriteF (((r) << 1) & ~3, (v), P)
 #else
 #define ReadFReg(r)     (F[(r) >> 1])
 #define WriteFReg(r,v)  F[(r) >> 1] = (v)
@@ -114,13 +115,11 @@ typedef struct {
 #define PSW_M_MAP       0xF
 #define PSW_MAP         (PSW_M_MAP << PSW_V_MAP)
 #define PSW_V_REG       4                               /* reg set, 32b */
-#define PSW_M_REG       0x1
+#define PSW_M_REG       0xF
 #define PSW_ID4         0xF40F                          /* I3, I4 PSW */
 #define PSW_x16         0xFF0F                          /* 7/16, 8/16 PSW */
 #define PSW_816E        0xFFFF                          /* 8/16E PSW */
 #define PSW_x32         0xFFFF                          /* 7/32, 8/32 PSW */
-#define PSW_GETMAP(x)   (((x) >> PSW_V_MAP) & PSW_M_MAP)
-#define PSW_GETREG(x)   (((x) >> PSW_V_REG) & PSW_M_REG)
 
 #define MCKOPSW         0x20                            /* mchk old PSW, 32b */
 #define FPFPSW          0x28                            /* flt fault PSW, 16b */

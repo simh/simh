@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   24-May-06    RMS     Added 11/44 DR support (from CIS diagnostic)
+   17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
    30-Sep-04    RMS     Added Massbus support
                         Removed Map_Addr prototype
                         Removed map argument from Unibus routines
@@ -162,7 +164,7 @@
 
 /* Feature sets
 
-   SDSD                 source addr, source fetch, dest addr, dest fetch
+   SDSD                 source addr, dest addr, source fetch, dest fetch
    SR                   switch register
    DR                   display register
    RTT                  RTT instruction
@@ -195,7 +197,7 @@
 #define HAS_SR          (CPUT_04|CPUT_05|CPUT_20|CPUT_34|CPUT_40| \
                          CPUT_44|CPUT_45|CPUT_60|CPUT_70)
 #define HAS_DR          (CPUT_04|CPUT_05|CPUT_20|CPUT_24|CPUT_34| \
-                         CPUT_40|CPUT_45|CPUT_60|CPUT_70)
+                         CPUT_40|CPUT_44|CPUT_45|CPUT_60|CPUT_70)
 #define HAS_RTT         (CPUT_03|CPUT_04|CPUT_F|CPUT_34|CPUT_40| \
                          CPUT_44|CPUT_45|CPUT_60|CPUT_70|CPUT_J|CPUT_T)
 #define HAS_SXS         (CPUT_03|CPUT_F|CPUT_34|CPUT_40|CPUT_44| \
@@ -548,6 +550,8 @@ typedef struct pdp_dib DIB;
 #define IOLN_XU         010
 #define IOBA_RP         (IOPAGEBASE + 016700)           /* RP/RM */
 #define IOLN_RP         054
+#define IOBA_CR         (IOPAGEBASE + 017160)           /* CD/CR/CM */
+#define IOLN_CR         010
 #define IOBA_RX         (IOPAGEBASE + 017170)           /* RX11 */
 #define IOLN_RX         004
 #define IOBA_RY         (IOPAGEBASE + 017170)           /* RY11 */
@@ -628,7 +632,8 @@ typedef struct pdp_dib DIB;
 #define INT_V_LPT       4
 #define INT_V_VHRX      5
 #define INT_V_VHTX      6  
-#define INT_V_PIR4      7
+#define INT_V_CR        7
+#define INT_V_PIR4      8
 
 #define INT_V_PIR3      0                               /* BR3 */
 #define INT_V_PIR2      0                               /* BR2 */
@@ -662,6 +667,7 @@ typedef struct pdp_dib DIB;
 #define INT_LPT         (1u << INT_V_LPT)
 #define INT_VHRX        (1u << INT_V_VHRX)
 #define INT_VHTX        (1u << INT_V_VHTX)
+#define INT_CR          (1u << INT_V_CR)
 #define INT_PIR4        (1u << INT_V_PIR4)
 #define INT_PIR3        (1u << INT_V_PIR3)
 #define INT_PIR2        (1u << INT_V_PIR2)
@@ -692,6 +698,7 @@ typedef struct pdp_dib DIB;
 #define IPL_LPT         4
 #define IPL_VHRX        4
 #define IPL_VHTX        4
+#define IPL_CR          4
 
 #define IPL_PIR7        7
 #define IPL_PIR6        6
@@ -722,6 +729,7 @@ typedef struct pdp_dib DIB;
 #define VEC_TM          0224
 #define VEC_TS          0224
 #define VEC_TU          0224
+#define VEC_CR          0230
 #define VEC_RP          0254
 #define VEC_TQ          0260
 #define VEC_RX          0264

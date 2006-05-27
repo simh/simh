@@ -1,6 +1,6 @@
 /* pdp11_tc.c: PDP-11 DECtape simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tc           TC11/TU56 DECtape
 
+   10-Feb-06    RMS     READ sets extended data bits in TCST (found by Alan Frisbie)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
    30-Sep-04    RMS     Revised Unibus interface
@@ -866,6 +867,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             ma = (CSR_GETMEX (tccm) << 16) | tcba;      /* form 18b addr */
             ba = (blk * DTU_BSIZE (uptr)) + wrd;        /* buffer ptr */
             tcdt = wbuf = fbuf[ba] & DMASK;             /* read word */
+            tcst = (tcst & ~STA_M_XD) | ((fbuf[ma] >> 16) & STA_M_XD);
             if (Map_WriteW (ma, 2, &wbuf)) {            /* store, nxm? */
                 dt_seterr (uptr, STA_NXM);
                 break;

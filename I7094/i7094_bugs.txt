@@ -1,0 +1,72 @@
+Bugs found
+
+1. CPU: MPY tested sign of AC instead of sign of MQ.
+2. CPU: VLM, VDP, VDH need alternate opcode decode points for large counts.
+3. CPU: STL not in decode table.
+4. CPU: Partial stores lacked initial read in decode table.
+5. CPU: PXD, PCD needed (t_uint64) cast.
+6. CPU: SXD, SCD needed (t_uint64) cast.
+7. CPU: SBM at wrong case offset.
+8. CPU: All transfers used IR<21:35> instead of calculated effective address.
+9. CPU: HPR, TRA need alternate negative opcodes.
+10. CPU: STT missing final write to memory.
+11. IO: Channel output process model incorrect, extensive revision required.
+12. IO: Channel connect test should not test channel state, only connection.
+13. IO: Channel opcode with nostore doesn't increment channel address.
+14. CDR: Card reader missing activate at end of state 2.
+15. SYS: Zero operand instructions printed with trailing space.
+16. CPU: Convert class count bit field start definition incorrect.
+17. CPU: CAQ cut and paste error from CVR.
+18. CPU: Shift count is 8b wide, not 9b.
+19. SYS: Mnemonic is LDQ not LMQ.
+20. SYS: RQL opcode incorrect in symbolic decode table.
+21. CPU: Multi-tag mode stores OR'd value of tags on any index read except
+    normal effective address.
+22. CPU: Floating point trap does not write location 0 if trap suppressed.
+23. SYS: TRA instructions should have symbolic class MXN not MXR.
+24. CPU: Floating add instructions test for zero result only if normalization enabled.
+25. CPU: Floating add with unlike signs and equal magnitudes, result sign is sign
+    of SR rather than sign of AC.
+26. CPU: Floating multiply does not test spill prior to normalization step.
+27. CPU: Channel activity proceeds under HALT.
+28. MT: Any read error should stop the channel and the tape controller.
+29. MT: EOR write flag cleared before testing.
+39. IO: EOR write flag set after data sent to device.
+40. IO: EOR write flag incorrect set on IOCP, IOCT, IOSP, IOST.
+41. MT: End of file errors not masked on backspace operations.
+42. CPU: LCHx, RCHx miscoded in decode table.
+43. IO: Only 7607 error completions (IOxT without new command) set trap.
+44. CPU: 7067 channel trap flags misdefined with extraneous decrement shift.
+45. CPU: pcq array misdeclared as uint32 instead of uint16.
+46. IO: SDC and SCD tested chan_flags instead of chan_dev.flags.
+47. SYS: 7907 opcodes defined incorrectly.
+48. SYS: TCH not decoding bit<19>.
+49. IO: CTL not clearing EOR after device end.
+50. DSK: Format code not incrementing track in writing all tracks in cylinder.
+51. DSK: THA mode overwrites record structure of first record.
+52. DSK: Write doesn't set channel request for initial word.
+53. DSK: Saved record number was command digits 3..8 instead of 5..10.
+54. CLK: Compute 60th's from location 5, so Chrono clock is in sync with interval clock.
+55. CPU: Enable Chronolog clock if CTSS.
+56. CPU: Read/write protection error not setting protection trap.
+57. CPU: SCHx not setting protection trap in user mode.
+58: CPU: Protection trap overwriting wrong location.
+59. CPU: Stop message reporting physical, not virtual, PC.
+60. IO: Test for "request another cycle" in channel processor was inverted.
+61. IO: Valid bit handling incorrect across multiple transfers.
+62. IO: BSR doesn't set EOF indicator.
+63. IO: 7607 channel modeled incorrectly, could stall.
+64. IO: All 7607 "effective NOP" conditions must be tested when a new command is
+    decoded (wc == 0 for IOCx and IOSx, EOR set for IOSx and IORx).
+
+
+
+
+
+
+
+
+
+
+
+

@@ -82,7 +82,8 @@ PDP11 = ${PDP11D}pdp11_fp.c ${PDP11D}pdp11_cpu.c ${PDP11D}pdp11_dz.c \
 	${PDP11D}pdp11_rq.c ${PDP11D}pdp11_tq.c ${PDP11D}pdp11_pclk.c \
 	${PDP11D}pdp11_ry.c ${PDP11D}pdp11_pt.c ${PDP11D}pdp11_hk.c \
 	${PDP11D}pdp11_xq.c ${PDP11D}pdp11_xu.c ${PDP11D}pdp11_vh.c \
-	${PDP11D}pdp11_rh.c ${PDP11D}pdp11_tu.c ${PDP11D}pdp11_cpumod.c
+	${PDP11D}pdp11_rh.c ${PDP11D}pdp11_tu.c ${PDP11D}pdp11_cpumod.c \
+	${PDP11D}pdp11_cr.c
 PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -95,19 +96,20 @@ VAX = ${VAXD}vax_cpu.c ${VAXD}vax_cpu1.c ${VAXD}vax_fpa.c ${VAXD}vax_io.c \
 	${PDP11D}pdp11_rl.c ${PDP11D}pdp11_rq.c ${PDP11D}pdp11_ts.c \
 	${PDP11D}pdp11_dz.c ${PDP11D}pdp11_lp.c ${PDP11D}pdp11_tq.c \
 	${PDP11D}pdp11_xq.c ${PDP11D}pdp11_ry.c \
-	${PDP11D}pdp11_vh.c
+	${PDP11D}pdp11_vh.c ${PDP11D}pdp11_cr.c
 VAX_OPT = -DVM_VAX -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
 
 VAX780 = ${VAXD}vax_cpu.c ${VAXD}vax_cpu1.c ${VAXD}vax_fpa.c \
 	${VAXD}vax_cis.c ${VAXD}vax_octa.c  ${VAXD}vax_cmode.c \
-	${VAXD}vax_mmu.c ${VAXD}vax780_stddev.c ${VAXD}vax780_sbi.c \
+	${VAXD}vax_mmu.c ${VAXD}vax_sys.c  ${VAXD}vax_syscm.c \
+	${VAXD}vax780_stddev.c ${VAXD}vax780_sbi.c \
 	${VAXD}vax780_mem.c ${VAXD}vax780_uba.c ${VAXD}vax780_mba.c \
-	${VAXD}vax_sys.c  ${VAXD}vax_syscm.c ${VAXD}vax780_syslist.c \
+	${VAXD}vax780_fload.c ${VAXD}vax780_syslist.c \
 	${PDP11D}pdp11_rl.c ${PDP11D}pdp11_rq.c ${PDP11D}pdp11_ts.c \
 	${PDP11D}pdp11_dz.c ${PDP11D}pdp11_lp.c ${PDP11D}pdp11_tq.c \
-	${PDP11D}pdp11_xu.c ${PDP11D}pdp11_ry.c \
+	${PDP11D}pdp11_xu.c ${PDP11D}pdp11_ry.c ${PDP11D}pdp11_cr.c \
 	${PDP11D}pdp11_rp.c ${PDP11D}pdp11_tu.c ${PDP11D}pdp11_hk.c
 VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
@@ -166,6 +168,15 @@ I1620 = ${I1620D}i1620_cd.c ${I1620D}i1620_dp.c ${I1620D}i1620_pt.c \
 	${I1620D}i1620_tty.c ${I1620D}i1620_cpu.c ${I1620D}i1620_lp.c \
 	${I1620D}i1620_fp.c ${I1620D}i1620_sys.c
 I1620_OPT = -I ${I1620D}
+
+
+
+I7094D = I7094/
+I7094 = ${I7094D}i7094_cpu.c ${I7094D}i7094_cpu1.c ${I7094D}i7094_io.c \
+	${I7094D}i7094_cd.c ${I7094D}i7094_clk.c ${I7094D}i7094_com.c \
+	${I7094D}i7094_drm.c ${I7094D}i7094_dsk.c ${I7094D}i7094_sys.c \
+	${I7094D}i7094_lp.c ${I7094D}i7094_mt.c
+I7094_OPT = -DUSE_INT64 -I ${I7094D}
 
 
 
@@ -247,7 +258,7 @@ ALL = ${BIN}pdp1${EXE} ${BIN}pdp4${EXE} ${BIN}pdp7${EXE} ${BIN}pdp8${EXE} \
 	${BIN}vax${EXE} ${BIN}vax780${EXE} ${BIN}nova${EXE} ${BIN}eclipse${EXE} \
 	${BIN}hp2100${EXE} ${BIN}i1401${EXE} ${BIN}i1620${EXE} ${BIN}s3${EXE} \
 	${BIN}altair${EXE} ${BIN}altairz80${EXE} ${BIN}gri${EXE} \
-	${BIN}i1620${EXE} ${BIN}ibm1130${EXE} ${BIN}id16${EXE} \
+	${BIN}i1620${EXE} ${BIN}i7094${EXE} ${BIN}ibm1130${EXE} ${BIN}id16${EXE} \
 	${BIN}id32${EXE} ${BIN}sds${EXE} ${BIN}lgp${EXE} ${BIN}h316${EXE} 
 
 all : ${ALL}
@@ -336,6 +347,11 @@ ${BIN}i1401${EXE} : ${I1401} ${SIM}
 
 ${BIN}i1620${EXE} : ${I1620} ${SIM}
 	${CC} ${I1620} ${SIM} ${I1620_OPT} -o $@ ${LDFLAGS}
+
+
+${BIN}i7094${EXE} : ${I7094} ${SIM}
+	${CC} ${I7094} ${SIM} ${I7094_OPT} -o $@ ${LDFLAGS}
+
 
 
 ${BIN}ibm1130${EXE} : ${IBM1130}

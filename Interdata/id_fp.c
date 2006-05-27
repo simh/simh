@@ -505,7 +505,7 @@ if (OP_DPFP (op)) {                                     /* double precision? */
     }
 else {
     WriteFReg (r1, hi);
-	}
+    }
 return cc;
 }
 
@@ -527,6 +527,6 @@ if (OP_DPFP (op)) {                                     /* double precision? */
     }
 else {
     WriteFReg (r1, fop->h);
-	}
+    }
 return cc;
 }

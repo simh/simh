@@ -1,6 +1,6 @@
 /* pdp11_cis.c: PDP-11 CIS optional instruction set simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,10 @@
 
    This module simulates the PDP-11 commercial instruction set (CIS).
 
+   22-May-06    RMS     Fixed bug in decode table (found by John Dundas)
+                        Fixed bug in ASHP (reported by John Dundas)
+                        Fixed bug in write decimal string with mmgt enabled
+                        Fixed bug in 0-length strings in multiply/divide
    16-Sep-04    RMS     Fixed bug in CMPP/N of negative strings
    17-Oct-02    RMS     Fixed compiler warning (found by Hans Pufal)
    08-Oct-02    RMS     Fixed macro definitions
@@ -175,7 +179,7 @@ void SubDstr (DSTR *src1, DSTR *src2, DSTR *dst);
 int32 CmpDstr (DSTR *src1, DSTR *src2);
 int32 TestDstr (DSTR *dsrc);
 int32 LntDstr (DSTR *dsrc, int32 nz);
-uint32 NibbleLshift (DSTR *dsrc, int32 sc, uint32 cin);
+uint32 NibbleLshift (DSTR *dsrc, int32 sc);
 uint32 NibbleRshift (DSTR *dsrc, int32 sc, uint32 cin);
 int32 WordLshift (DSTR *dsrc, int32 sc);
 void WordRshift (DSTR *dsrc, int32 sc);
@@ -269,7 +273,7 @@ static int32 opntab[128][MAXOPN] = {
     IN_DESC, IN_DESC, IN_DESC, 0,                       /* ADDPI */
     IN_DESC, IN_DESC, IN_DESC, 0,                       /* SUBPI */
     IN_DESC, IN_DESC, 0, 0,                             /* CMPPI */
-    IN_DESC, 0, 0, 0,                                   /* CVTPLI */
+    IN_DESC, IN_ARG, 0, 0,                              /* CVTPLI */
     IN_DESC, IN_DESC, IN_DESC, 0,                       /* MULPI */
     IN_DESC, IN_DESC, IN_DESC, 0,                       /* DIVPI */
     IN_DESC, IN_DESC, IN_ARG, 0,                        /* ASHPI */
@@ -357,8 +361,8 @@ for (i = j = 0; (i < MAXOPN) && opntab[op][i]; i++) {   /* parse operands */
             R[0] = ReadW (addr | dsenable);
             R[1] = ReadW (((addr + 2) & 0177777) | dsenable);
             break;
-        case IN_ARG:
 
+        case IN_ARG:
             arg[j++] = ReadW (PC | isenable);
             PC = (PC + 2) & 0177777;
             break;
@@ -729,7 +733,7 @@ switch (op) {                                           /* case on opcode */
         NibbleRshift (&src2, 1, 0);
         if ((t = ldivd - ldivr) >= 0) {                 /* any divide to do? */
             WordLshift (&src1, t / 8);                  /* align divr to divd */
-            NibbleLshift (&src1, t % 8, 0);
+            NibbleLshift (&src1, t % 8);
             CreateTable (&src1, mptable);               /* create *1, *2, ... */
             for (i = 0; i <= t; i++) {                  /* divide loop */
                 for (digit = 9; digit > 0; digit--) {   /* find digit */
@@ -739,8 +743,8 @@ switch (op) {                                           /* case on opcode */
                         break;
                         }                               /* end if */
                     }                                   /* end for */
-                NibbleLshift (&src2, 1, 0);             /* shift dividend */
-                NibbleLshift (&dst, 1, 0);              /* shift quotient */
+                NibbleLshift (&src2, 1);                /* shift dividend */
+                NibbleLshift (&dst, 1);                 /* shift quotient */
                 }                                       /* end divide loop */
             dst.sign = src1.sign ^ src2.sign;           /* calculate sign */
             }                                           /* end if */
@@ -810,7 +814,7 @@ switch (op) {                                           /* case on opcode */
             }                                           /* end right shift */
         else if (shift) {                               /* left shift? */
             if (WordLshift (&src1, shift / 8)) V = 1;   /* do word shifts */
-            if (NibbleLshift (&src1, shift % 8, 0)) V = 1;
+            if (NibbleLshift (&src1, shift % 8)) V = 1;
             }                                           /* end left shift */
         WriteDstr (A2, &src1, op);                      /* store result */
         if ((op & INLINE) == 0)                         /* if reg, clr reg */
@@ -1056,7 +1060,7 @@ if (flag & PACKED) {                                    /* packed? */
     else dst->val[0] = dst->val[0] | 0xC | dst->sign;
     for (i = 0; i <= end; i++) {                        /* store string */
         c = (dst->val[i / 4] >> ((i % 4) * 8)) & 0xFF;
-        WriteB (c, ((dscr[1] + end - i) & 0177777));
+        WriteB (c, ((dscr[1] + end - i) & 0177777) | dsenable);
         }                                               /* end for */
     }                                                   /* end packed */
 else {
@@ -1070,7 +1074,7 @@ else {
             ((i == lnt) && (type == LO)))
             c = binover[dst->sign][c];                  /* get sign and digit */
         else c = c | 0x30;                              /* default */
-        WriteB (c, ((dscr[1] + lnt - i) & 0177777));    
+        WriteB (c, ((dscr[1] + lnt - i) & 0177777) |dsenable );    
         }                                               /* end for */
     }                                                   /* end numeric */
 return;
@@ -1201,6 +1205,7 @@ int32 LntDstr (DSTR *dsrc, int32 nz)
 {
 int32 i;
 
+if (nz == 0) return 0;
 for (i = 7; i > 0; i--) {
     if ((dsrc->val[nz - 1] >> (i * 4)) & 0xF) break;
     }
@@ -1299,22 +1304,22 @@ return 0;
    Arguments:
         dsrc    =       decimal string structure
         sc      =       shift count
-        cin     =       carry in
 */
 
-uint32 NibbleLshift (DSTR *dsrc, int32 sc, uint32 cin)
+uint32 NibbleLshift (DSTR *dsrc, int32 sc)
 {
-int32 i, s, rs, nc;
+int32 i, s, rs;
+uint32 sv_val, cout;
 
+cout = 0;
 if (s = sc * 4) {
     rs = 32 - s;
     for (i = 0; i < DSTRLNT; i++) {
-        nc = dsrc->val[i];
-        dsrc->val[i] = ((dsrc->val[i] << s) |
-            (cin >> rs)) & 0xFFFFFFFF;
-        cin = nc;
+        sv_val = dsrc->val[i];
+        dsrc->val[i] = ((dsrc->val[i] << s) | cout) & 0xFFFFFFFF;
+        cout = sv_val >> rs;
         }
-    return cin;
+    return cout;
     }
 return 0;
 }

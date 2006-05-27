@@ -1,6 +1,6 @@
-/*  altairz80_sio: MITS Altair serial I/O card
+/*  altairz80_sio.c: MITS Altair serial I/O card
 
-    Copyright (c) 2002-2005, Peter Schorn
+    Copyright (c) 2002-2006, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -115,7 +115,7 @@ extern t_stat sim_poll_kbd(void);
 extern t_stat sim_putchar(int32 out);
 extern t_stat attach_unit(UNIT *uptr, char *cptr);
 extern int32 getBankSelect(void);
-extern void setBankSelect(int32 b);
+extern void setBankSelect(const int32 b);
 extern uint32 getCommon(void);
 extern t_bool rtc_avail;
 extern FILE *sim_log;
@@ -124,7 +124,7 @@ extern int32 sim_switches;
 extern uint32 sim_os_msec(void);
 extern const char *scp_error_messages[];
 extern int32 SR;
-extern uint8 GetBYTEWrapper(register uint32 Addr);
+extern uint8 GetBYTEWrapper(const uint32 Addr);
 extern UNIT cpu_unit;
 
 /* SIMH pseudo device status registers                                                                          */

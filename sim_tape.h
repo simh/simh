@@ -1,6 +1,6 @@
 /* sim_tape.h: simulator tape support library definitions
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Feb-06    RMS     Added variable tape capacity
    17-Dec-05    RMS     Added write support for Paul Pierce 7b format
    02-May-05    RMS     Added support for Paul Pierce 7b format
 */
@@ -112,8 +113,10 @@ t_stat sim_tape_rewind (UNIT *uptr);
 t_stat sim_tape_reset (UNIT *uptr);
 t_bool sim_tape_bot (UNIT *uptr);
 t_bool sim_tape_wrp (UNIT *uptr);
-t_bool sim_tape_eot (UNIT *uptr, t_addr cap);
+t_bool sim_tape_eot (UNIT *uptr);
 t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat sim_tape_set_capac (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat sim_tape_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #endif

@@ -1,6 +1,6 @@
 /* pdp8_rx.c: RX8E/RX01, RX28/RX02 floppy disk simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rx           RX8E/RX01, RX28/RX02 floppy disk
 
+   15-May-06    RMS     Fixed bug in autosize attach (reported by Dave Gesswein)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
    05-Nov-03    RMS     Fixed bug in RX28 read status (found by Charles Dickman)
    26-Oct-03    RMS     Cleaned up buffer copy code, fixed double density write
@@ -579,16 +580,13 @@ return SCPE_OK;
 t_stat rx_attach (UNIT *uptr, char *cptr)
 {
 uint32 sz;
-t_stat r;
 
-r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (uptr->fileref))) {
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     if (sz > RX_SIZE) uptr->flags = uptr->flags | UNIT_DEN;
     else uptr->flags = uptr->flags & ~UNIT_DEN;
     }
 uptr->capac = (uptr->flags & UNIT_DEN)? RX2_SIZE: RX_SIZE;
-return SCPE_OK;
+return attach_unit (uptr, cptr);
 }
 
 /* Set size routine */
@@ -613,9 +611,9 @@ for (i = 0; i < RX_NUMDR; i++) {
     if (rx_unit[i].flags & UNIT_ATT) return SCPE_ALATT;
     }
 for (i = 0; i < RX_NUMDR; i++) {
-    rx_unit[i].flags = rx_unit[i].flags & ~(UNIT_DEN | UNIT_AUTO);
-    rx_unit[i].capac = RX_SIZE;
-    if (val) rx_unit[i].flags = rx_unit[i].flags | UNIT_AUTO;
+    if (val) rx_unit[i].flags = rx_unit[i].flags | UNIT_DEN | UNIT_AUTO;
+    else rx_unit[i].flags = rx_unit[i].flags & ~(UNIT_DEN | UNIT_AUTO);
+    rx_unit[i].capac = val? RX2_SIZE: RX_SIZE;
     }
 rx_28 = val;
 return SCPE_OK;

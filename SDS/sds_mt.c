@@ -1,6 +1,6 @@
 /* sds_mt.c: SDS 940 magnetic tape simulator
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           7 track magnetic tape
 
+   16-Feb-06    RMS     Added tape capacity checking
    07-Dec-04    RMS     Added read-only file support
    25-Apr-03    RMS     Revised for extended file support
    28-Mar-03    RMS     Added multiformat support
@@ -154,6 +155,8 @@ MTAB mt_mod[] = {
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "CHANNEL", "CHANNEL",
       &set_chan, &show_chan, NULL },
     { 0 }
@@ -333,7 +336,12 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* attached? */
     }
 if (mt_inst & CHC_REV)                                  /* reverse? */
     st = sim_tape_rdrecr (uptr, mtxb, &tbc, MT_MAXFR);  /* read rec rev */
-else st = sim_tape_rdrecf (uptr, mtxb, &tbc, MT_MAXFR); /* no, fwd */
+else {                                                  /* no, fwd */
+    t_bool passed_eot = sim_tape_eot (uptr);            /* passed EOT? */
+    st = sim_tape_rdrecf (uptr, mtxb, &tbc, MT_MAXFR);
+    if (!passed_eot && sim_tape_eot (uptr))             /* just passed eot? */
+        uptr->eotf = 1;
+    }
 if (st == MTSE_TMK) {                                   /* tape mark? */
     mt_eof = 1;                                         /* set eof flag */
     mtxb[0] = mtxb[1] = 017;                            /* EOR char */
@@ -390,10 +398,13 @@ if (dev & DEV_MTS) {                                    /* erase? */
     st = sim_tape_wreom (uptr);                         /* write eom */
     }
 else {
+    t_bool passed_eot = sim_tape_eot (uptr);            /* passed EOT? */
     if ((mt_bptr == 1) && (mtxb[0] == 017) &&           /* wr eof? */
         ((mt_inst & 01670) == 00050))
         st = sim_tape_wrtmk (uptr);                     /* write tape mark */
     else st = sim_tape_wrrecf (uptr, mtxb, mt_bptr);    /* write record */
+    if (!passed_eot && sim_tape_eot (uptr))             /* just passed EOT? */
+        uptr->eotf = 1;
     }
 mt_bptr = 0;
 if (st != MTSE_OK) mt_set_err (uptr);                   /* error? */

@@ -1,6 +1,6 @@
 /*  altairz80_hdsk.c: simulated hard disk device to increase capacity
 
-    Copyright (c) 2002-2005, Peter Schorn
+    Copyright (c) 2002-2006, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -54,9 +54,9 @@ extern int32 saved_PC;
 extern int32 install_bootrom(void);
 extern void printMessage(void);
 extern void PutBYTEBasic(const uint32 Addr, const uint32 Bank, const uint32 Value);
-extern void PutBYTEWrapper(register uint32 Addr, register uint32 Value);
+extern void PutBYTEWrapper(const uint32 Addr, const uint32 Value);
 extern void protect(const int32 l, const int32 h);
-extern uint8 GetBYTEWrapper(register uint32 Addr);
+extern uint8 GetBYTEWrapper(const uint32 Addr);
 extern int32 bootrom[bootrom_size];
 
 static t_stat hdsk_svc(UNIT *uptr);
@@ -204,7 +204,7 @@ static int32 hdsk_hasVerbose(void) {
     l:  out (0fdh),a
         dec b
         jp  nz,l
-    
+
     2.  Read / write
         ; parameter block
         cmd:        db  hdsk_read or hdsk_write
@@ -212,7 +212,7 @@ static int32 hdsk_hasVerbose(void) {
         sector: db  0       ; 0 .. 31, defines sector
         track:  dw  0       ; 0 .. 2047, defines track
         dma:        dw  0   ; defines where result is placed in memory
-    
+
         ; routine to execute
         ld  b,7             ; size of parameter block
         ld  hl,cmd          ; start address of parameter block

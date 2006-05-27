@@ -66,6 +66,7 @@
 
   Modification history:
 
+  27-Jan-06  RMS  Fixed unaligned accesses in XQB (found by Doug Carman)
   07-Jan-06  RMS  Fixed unaligned access bugs (found by Doug Carman)
   07-Sep-05  DTH  Removed unused variable
   16-Aug-05  RMS  Fixed C++ declaration and cast problems
@@ -306,16 +307,18 @@ UNIT xqb_unit[] = {
 };
 
 REG xqb_reg[] = {
-  { GRDATA ( SA0,  xqb.addr[0], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( SA1,  xqb.addr[1], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( SA2,  xqb.addr[2], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( SA3,  xqb.addr[3], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( SA4,  xqb.addr[4], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( SA5,  xqb.addr[5], XQ_RDX, 16, 0), REG_RO},
-  { GRDATA ( RBDL, xqb.rbdl, XQ_RDX, 32, 0) },
-  { GRDATA ( XBDL, xqb.xbdl, XQ_RDX, 32, 0) },
-  { GRDATA ( VAR,  xqb.var,  XQ_RDX, 16, 0) },
-  { GRDATA ( CSR,  xqb.csr,  XQ_RDX, 16, 0) },
+  { GRDATA ( SA0,  xqb.addr[0], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA1,  xqb.addr[1], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA2,  xqb.addr[2], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA3,  xqb.addr[3], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA4,  xqb.addr[4], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA5,  xqb.addr[5], XQ_RDX, 8, 0), REG_RO|REG_FIT},
+  { GRDATA ( RBDL, xqb.rbdl[0], XQ_RDX, 16, 0), REG_FIT },
+  { GRDATA ( RBDH, xqb.rbdl[1], XQ_RDX, 16, 0), REG_FIT },
+  { GRDATA ( XBDL, xqb.xbdl[0], XQ_RDX, 16, 0), REG_FIT },
+  { GRDATA ( XBDH, xqb.xbdl[1], XQ_RDX, 16, 0), REG_FIT },
+  { GRDATA ( VAR,  xqb.var,  XQ_RDX, 16, 0), REG_FIT },
+  { GRDATA ( CSR,  xqb.csr,  XQ_RDX, 16, 0), REG_FIT },
   { FLDATA ( INT,  xqb.irq, 0) },
   { GRDATA ( SETUP_PRM, xqb.setup.promiscuous, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SETUP_MLT, xqb.setup.multicast, XQ_RDX, 32, 0), REG_HRO},

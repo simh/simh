@@ -25,6 +25,7 @@
 
    rf           RF08 fixed head disk
 
+   15-May-06    RMS     Fixed bug in autosize attach (reported by Dave Gesswein)
    07-Jan-06    RMS     Fixed unaligned register access bug (found by Doug Carman)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
    26-Oct-03    RMS     Cleaned up buffer copy code
@@ -413,18 +414,15 @@ t_stat rf_attach (UNIT *uptr, char *cptr)
 {
 uint32 sz, p;
 uint32 ds_bytes = RF_DKSIZE * sizeof (int16);
-t_stat r;
 
-r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (uptr->fileref))) {
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     p = (sz + ds_bytes - 1) / ds_bytes;
     if (p >= RF_NUMDK) p = RF_NUMDK - 1;
     uptr->flags = (uptr->flags & ~UNIT_PLAT) |
         (p << UNIT_V_PLAT);
     }
 uptr->capac = UNIT_GETP (uptr->flags) * RF_DKSIZE;
-return SCPE_OK;
+return attach_unit (uptr, cptr);
 }
 
 /* Change disk size */

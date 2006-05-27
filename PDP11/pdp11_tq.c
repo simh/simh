@@ -1,6 +1,6 @@
 /* pdp11_tq.c: TMSCP tape controller simulator
 
-   Copyright (c) 2002-2005, Robert M Supnik
+   Copyright (c) 2002-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tq           TQK50 tape controller
 
+   16-Feb-06    RMS     Revised for new magtape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
@@ -51,13 +52,16 @@
 #include "vax_defs.h"
 #if (UNIBUS)
 #define INIT_TYPE       TQ8_TYPE
+#define INIT_CAP        TQ8_CAP
 #else
 #define INIT_TYPE       TQ5_TYPE
+#define INIT_CAP        TQ5_CAP
 #endif
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 #define INIT_TYPE       TQ5_TYPE
+#define INIT_CAP        TQ5_CAP
 extern int32 cpu_opt;
 #endif
 
@@ -192,7 +196,7 @@ struct tqpkt {
     d##_CMOD, d##_MED,  d##_FMT,  d##_CAP, \
     d##_UMOD, d##_CREV, d##_FREV, d##_UREV
 
-#define TEST_EOT(u)     (sim_tape_eot (u, drv_tab[tq_typ].cap))
+#define TEST_EOT(u)     (sim_tape_eot (u))
 
 struct drvtyp {
     uint32      uqpm;                                   /* UQ port model */
@@ -364,10 +368,10 @@ DIB tq_dib = {
     };
 
 UNIT tq_unit[] = {
-    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
-    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
-    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
-    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), 0 },
+    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), INIT_CAP },
+    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), INIT_CAP },
+    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), INIT_CAP },
+    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), INIT_CAP },
     { UDATA (&tq_tmrsvc, UNIT_DIS, 0) },
     { UDATA (&tq_quesvc, UNIT_DIS, 0) }
     };
@@ -2155,14 +2159,15 @@ if (cptr) {
     drv_tab[TQU_TYPE].cap = ((t_addr) cap) << 20;
     }
 tq_typ = val;
+for (i = 0; i < TQ_NUMDR; i++)
+    tq_unit[i].capac = drv_tab[tq_typ].cap;
 return SCPE_OK;
 }
 
-/* Show controller type (and capacity for user-defined type) */
+/* Show controller type and capacity */
 
 t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf (st, "%s", drv_tab[tq_typ].name);
-if (tq_typ == TQU_TYPE) fprintf (st, " (%dMB)", drv_tab[tq_typ].cap >> 20);
+fprintf (st, "%s (%dMB)", drv_tab[tq_typ].name, (uint32) (drv_tab[tq_typ].cap >> 20));
 return SCPE_OK;
 }

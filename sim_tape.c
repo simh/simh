@@ -26,7 +26,8 @@
    Ultimately, this will be a place to hide processing of various tape formats,
    as well as OS-specific direct hardware access.
 
-   23-Jan-05    RMS     Fixed bug in write forward (found by Dave Bryan)
+   14-Feb-06    RMS     Added variable tape capacity
+   23-Jan-06    JDB     Fixed odd-byte-write problem in sim_tape_wrrecf
    17-Dec-05    RMS     Added write support for Paul Pierce 7b format
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    02-May-05    RMS     Added support for Pierce 7b format
@@ -46,7 +47,6 @@
    sim_tape_sprecf      space tape record forward
    sim_tape_sprecr      space tape record reverse
    sim_tape_wrtmk       write tape mark
-   sim_tape_wrtmk_7t    write tape mark, 7 track with parity
    sim_tape_wreom       erase remainder of tape
    sim_tape_rewind      rewind
    sim_tape_reset       reset unit
@@ -55,6 +55,8 @@
    sim_tape_wrp         TRUE if write protected
    sim_tape_set_fmt     set tape format
    sim_tape_show_fmt    show tape format
+   sim_tape_set_capac   set tape capacity
+   sim_tape_show_capac  show tape capacity
 */
 
 #include "sim_defs.h"
@@ -300,7 +302,7 @@ switch (f) {                                            /* switch on fmt */
         break;
 
     case MTUF_F_P7B:
-        for (sbc = 1, all_eof = 1; ; sbc++) {           /* loop thru record */
+        for (sbc = 1, all_eof = 1; (t_addr) sbc <= uptr->pos ; sbc++) {
             sim_fseek (uptr->fileref, uptr->pos - sbc, SEEK_SET);
             sim_fread (&c, sizeof (uint8), 1, uptr->fileref);
             if (ferror (uptr->fileref))                 /* error? */
@@ -452,6 +454,7 @@ switch (f) {                                            /* case on format */
     case MTUF_F_P7B:                                    /* Pierce 7B */
         buf[0] = buf[0] | P7B_SOR;                      /* mark start of rec */
         sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
+        sim_fwrite (buf, sizeof (uint8), 1, uptr->fileref); /* delimit rec */
         if (ferror (uptr->fileref)) {                   /* error? */
             MT_SET_PNU (uptr);
             return sim_tape_ioerr (uptr);
@@ -485,8 +488,8 @@ return MTSE_OK;
 t_stat sim_tape_wrtmk (UNIT *uptr)
 {
 if (MT_GET_FMT (uptr) == MTUF_F_P7B) {                  /* P7B? */
-    uint8 buf= P7B_EOF;                                 /* eof mark */
-    return  sim_tape_wrrecf (uptr, &buf, 1);            /* write char */
+    uint8 buf = P7B_EOF;                                /* eof mark */
+    return sim_tape_wrrecf (uptr, &buf, 1);             /* write char */
     }
 return sim_tape_wrdata (uptr, MTR_TMK);
 }
@@ -554,9 +557,9 @@ return (uptr->pos <= fmts[f].bot)? TRUE: FALSE;
 
 /* Test for end of tape */
 
-t_bool sim_tape_eot (UNIT *uptr, t_addr cap)
+t_bool sim_tape_eot (UNIT *uptr)
 {
-return (uptr->pos > cap)? TRUE: FALSE;
+return (uptr->capac && (uptr->pos >= uptr->capac))? TRUE: FALSE;
 }
 
 /* Test for write protect */
@@ -644,4 +647,29 @@ do {
     }
 while (lo <= hi);
 return ((p == 0)? map[p]: map[p - 1]);
+}
+
+/* Set tape capacity */
+
+t_stat sim_tape_set_capac (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+extern uint32 sim_taddr_64;
+t_addr cap;
+t_stat r;
+
+if ((cptr == NULL) || (*cptr == 0)) return SCPE_ARG;
+if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+cap = (t_addr) get_uint (cptr, 10, sim_taddr_64? 2000000: 2000, &r);
+if (r != SCPE_OK) return SCPE_ARG;
+uptr->capac = cap * ((t_addr) 1000000);
+return SCPE_OK;
+}
+
+/* Show tape capacity */
+
+t_stat sim_tape_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if (uptr->capac) fprintf (st, "capacity=%dMB", (uint32) (uptr->capac / ((t_addr) 1000000)));
+else fprintf (st, "unlimited capacity");
+return SCPE_OK;
 }

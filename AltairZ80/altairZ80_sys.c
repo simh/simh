@@ -1,6 +1,6 @@
 /*  altairz80_sys.c: MITS Altair system interface
 
-    Copyright (c) 2002-2005, Peter Schorn
+    Copyright (c) 2002-2006, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -584,7 +584,7 @@ static int32 match(const char *pattern, const char *input, char *xyFirst, char *
     return (pat == 0) && (inp == 0);
 }
 
-static INLINE int32 checkXY(const char xy) {
+static int32 checkXY(const char xy) {
     return xy == 'X' ? 0xdd : 0xfd; /* else is 'Y' */
 }
 

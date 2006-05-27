@@ -1,6 +1,6 @@
 /* id_io.c: Interdata CPU-independent I/O routines
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Mar-06    RMS     Fixed bug, GO preserves EXA and SSTA (found by Davis Johnson)
    21-Jun-03    RMS     Changed subroutine argument for ARM compiler conflict
 
    Interdata I/O devices are defined by a device information block:
@@ -209,7 +210,7 @@ switch (op) {                                           /* case IO op */
             sch_wdc[ch] = 0;
             }
         else if (dat & SCHC_GO) {                       /* go? */
-            sch_cmd[ch] = dat & (SCHC_GO | SCHC_RD);
+            sch_cmd[ch] = dat & (SCHC_EXA | SCHC_SSTA| SCHC_GO | SCHC_RD);
             if (sch_wdc[ch] <= 4) {                     /* 4 bytes? */
                 sch_sa[ch] = (sch_sa[ch] & PAMASK16) | bank;    /* 16b addr */
                 sch_ea[ch] = (sch_ea[ch] & PAMASK16) | bank;

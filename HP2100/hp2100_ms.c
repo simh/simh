@@ -1,6 +1,6 @@
 /* hp2100_ms.c: HP 2100 13181A/13183A magnetic tape simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    ms           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
+   16-Feb-06    RMS     Revised for new EOT test
    22-Jul-05    RMS     Fixed compiler warning on Solaris (from Doug Glyn)
    01-Mar-05    JDB     Added SET OFFLINE; rewind/offline now does not detach
    07-Oct-04    JDB     Fixed enable/disable from either device
@@ -445,8 +446,8 @@ switch (inst) {                                         /* case on opcode */
                 dat = dat | STA_TBSY;
             if (sim_tape_wrp (uptr))                    /* write prot? */
                 dat = dat | STA_WLK;
-            if (uptr->REEL &&
-                sim_tape_eot (uptr, (TCAP << uptr->REEL) << ms_ctype))
+            uptr->capac = (TCAP << uptr->REEL) << ms_ctype;
+            if (sim_tape_eot (uptr))
                 dat = dat | STA_EOT;
             }
         else dat = dat | STA_TBSY | STA_LOCAL;
@@ -529,7 +530,7 @@ return dat;
 
 t_stat msc_svc (UNIT *uptr)
 {
-int32 devc, devd, unum, cap;
+int32 devc, devd, unum;
 t_mtrlnt tbc;
 t_stat st, r = SCPE_OK;
 
@@ -588,10 +589,9 @@ switch (uptr->FNC) {                                    /* case on function */
         break;
 
     case FNC_FSF:                                       /* space fwd file */
-        cap = (TCAP << uptr->REEL) << ms_ctype;
+        uptr->capac = (TCAP << uptr->REEL) << ms_ctype;
         while ((st = sim_tape_sprecf (uptr, &tbc)) == MTSE_OK) {
-            if (uptr->REEL && sim_tape_eot (uptr, cap))
-                break;                                  /* EOT stops */
+            if (sim_tape_eot (uptr)) break;             /* EOT stops */
             }
         r = ms_map_err (uptr, st);                      /* map error */
         break;

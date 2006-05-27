@@ -1,6 +1,6 @@
 /* pdp18b_rf.c: fixed head disk simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    rf           (PDP-9) RF09/RF09
                 (PDP-15) RF15/RS09
 
+   15-May-06    RMS     Fixed bug in autosize attach (reported by David Gesswein)
    14-Jan-04    RMS     Revised IO device call interface
                         Changed sim_fsize calling sequence
    26-Oct-03    RMS     Cleaned up buffer copy code
@@ -329,18 +330,15 @@ t_stat rf_attach (UNIT *uptr, char *cptr)
 {
 uint32 p, sz;
 uint32 ds_bytes = RF_DKSIZE * sizeof (int32);
-t_stat r;
 
-r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (uptr->fileref))) {
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     p = (sz + ds_bytes - 1) / ds_bytes;
     if (p >= RF_NUMDK) p = RF_NUMDK - 1;
     uptr->flags = (uptr->flags & ~UNIT_PLAT) |
         (p << UNIT_V_PLAT);
     }
 uptr->capac = UNIT_GETP (uptr->flags) * RF_DKSIZE;
-return SCPE_OK;
+return attach_unit (uptr, cptr);
 }
 
 /* Change disk size */

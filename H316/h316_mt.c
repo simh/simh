@@ -1,6 +1,6 @@
 /* h316_mt.c: H316/516 magnetic tape simulator
 
-   Copyright (c) 2003-2005, Robert M. Supnik
+   Copyright (c) 2003-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           516-4100 seven track magnetic tape
 
+   16-Feb-06    RMS     Added tape capacity checking
    26-Aug-05    RMS     Revised to use API for write lock check
    08-Feb-05    RMS     Fixed error reporting from OCP (found by Philipp Hachtmann)
    01-Dec-04    RMS     Fixed bug in DMA/DMC support
@@ -154,6 +155,8 @@ MTAB mt_mod[] = {
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "IOBUS",
       &io_set_iobus, NULL, NULL },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "DMC",
@@ -177,7 +180,7 @@ DEVICE mt_dev = {
 
 int32 mtio (int32 inst, int32 fnc, int32 dat, int32 dev)
 {
-uint32 u = dev & 03;
+uint32 i, u = dev & 03;
 UNIT *uptr = mt_dev.units + u;
 static uint8 wrt_fnc[16] = {                            /* >0 = wr, 1 = chan op */
     0, 0, 0, 0, 1, 1, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0
@@ -222,6 +225,8 @@ switch (inst) {                                         /* case on opcode */
             uptr->FNC = fnc;
             uptr->UST = 0;
             mt_busy = 1;
+            for (i = 0; i < MT_NUMDR; i++)              /* clear all EOT flags */
+                mt_unit[i].UST = mt_unit[i].UST & ~STA_EOT;
             sim_activate (uptr, mt_ctime);              /* schedule */
             break;
             }
@@ -319,6 +324,7 @@ t_stat mt_svc (UNIT *uptr)
 int32 ch = mt_dib.chan - 1;                             /* DMA/DMC ch */
 uint32 i, c1, c2, c3;
 t_mtrlnt tbc;
+t_bool passed_eot;
 t_stat st, r = SCPE_OK;
 
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* offline? */
@@ -328,6 +334,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* offline? */
     return IORETURN (mt_stopioe, SCPE_UNATT);
     }
 
+passed_eot = sim_tape_eot (uptr);                       /* passed EOT? */
 switch (uptr->FNC) {                                    /* case on function */
 
     case FNC_REW:                                       /* rewind (initial) */
@@ -442,6 +449,8 @@ switch (uptr->FNC) {                                    /* case on function */
 
 /* End of command, process error or schedule end of motion */
 
+if (!passed_eot && sim_tape_eot (uptr))                 /* just passed EOT? */
+    uptr->UST = uptr->UST | STA_EOT;
 if (r != SCPE_OK) {
     uptr->FNC = FNC_NOP;                                /* nop function */
     mt_busy = 0;                                        /* not busy */

@@ -28,8 +28,124 @@
 #define _SIM_REV_H_     0
 
 #define SIM_MAJOR       3
-#define SIM_MINOR       5
-#define SIM_PATCH       2
+#define SIM_MINOR       6
+#define SIM_PATCH       0
+
+/* V3.6 revision history 
+
+patch   date            module(s) and fix(es)
+
+  0     15-May-06       scp.c:
+                        - revised save file format to save options, unit capacity
+
+                        sim_tape.c, sim_tape.h:
+                        - added support for finite reel size
+                        - fixed bug in P7B write record
+
+                        most magtapes:
+                        - added support for finite reel size
+
+                        h316_cpu.c: fixed bugs in LLL, LRL (found by Theo Engel)
+
+                        h316_lp.c: fixed bug in blanks backscanning (found by Theo Engel)
+
+                        h316_stddev.c: fixed bugs in punch state handling (found by Theo Engel)
+
+                        i1401_cpu.c: fixed bug in divide (reported by Van Snyder)
+
+                        i16_cpu.c: fixed bug in DH (found by Mark Hittinger)
+
+                        i32_cpu.c:
+                        - fixed bug in DH (found by Mark Hittinger)
+                        - added support for 8 register banks in 8/32
+
+                        i7094: first release
+
+                        id_io.c: fixed bug, GO preserves EXA and SSTA (found by Davis Johnson)
+
+                        id_idc.c:
+                        - fixed WD/WH handling (found by Davis Johnson)
+                        - fixed bug, nop command should be ignored (found by Davis Johnson)
+
+                        nova_cpu.c: fixed bug in DIVS (found by Mark Hittinger)
+
+                        pdp11_cis.c: (all reported by John Dundas)
+                        - fixed bug in decode table
+                        - fixed bug in ASHP
+                        - fixed bug in write decimal string with mmgt enabled
+                        - fixed bug in 0-length strings in multiply/divide
+
+                        pdp11_cpu.c: fixed order of operand fetching in XOR for SDSD models
+
+                        pdp11_cr.c: added CR11/CD11 support
+
+                        pdp11_tc.c:
+                        - fixed READ to set extended data bits in TCST (found by Alan Frisbie)
+
+                        vax780_fload.c: added FLOAD command
+
+                        vax780_sbi.c: fixed writes to ACCS
+
+                        vax780_stddev.c: revised timer logic for EVKAE (reported by Tim Stark)
+
+                        vax_cis.c: (all reported by Tim Stark)
+                        - fixed MOVTC, MOVTUC to preserve cc's through page faults
+                        - fixed MOVTUC to stop on translated == escape
+                        - fixed CVTPL to set registers before destination reg write
+                        - fixed CVTPL to set correct cc bit on overflow
+                        - fixed EDITPC to preserve cc's through page faults
+                        - fixed EDITPC EO$BLANK_ZERO count, cc test
+                        - fixed EDITPC EO$INSERT to insert fill instead of blank
+                        - fixed EDITPC EO$LOAD_PLUS/MINUS to skip character
+
+                        vax_cpu.c:
+                        - added KESU capability to virtual examine
+                        - fixed bugs in virtual examine
+                        - rewrote CPU history function for improved usability
+                        (bugs below reported by Tim Stark)
+                        - fixed fault cleanup to clear PSL<tp>
+                        - fixed ADAWI r-mode to preserve dst<31:16>
+                        - fixed ACBD/G to test correct operand
+                        - fixed access checking on modify-class specifiers
+                        - fixed branch address calculation in CPU history
+                        - fixed bug in reported VA on faulting cross-page write
+
+                        vax_cpu1.c: (all reported by Tim Stark)
+                        - added access check on system PTE for 11/780
+                        - added mbz check in LDPCTX for 11/780
+
+                        vax_cmode.c: (all reported by Tim Stark)
+                        - fixed omission of SXT
+                        - fixed order of operand fetching in XOR
+
+                        vax_fpa.c: (all reported by Tim Stark)
+                        - fixed POLYD, POLYG to clear R4, R5
+                        - fixed POLYD, POLYG to set R3 correctly
+                        - fixed POLYD, POLYG to not exit prematurely if arg = 0
+                        - fixed POLYD, POLYG to do full 64b multiply
+                        - fixed POLYF, POLYD, POLYG to remove truncation on add
+                        - fixed POLYF, POLYD, POLYG to mask mul reslt to 31b/63b/63b
+                        - fixed fp add routine to test for zero via fraction
+                          to support "denormal" argument from POLYF, POLYD, POLYG
+                        - fixed bug in 32b floating multiply routine
+                        - fixed bug in 64b extended modulus routine
+
+                        vax_mmu.c:
+                        - added access check on system PTE for 11/780
+
+                        vax_octa.c: (all reported by Tim Stark)
+                        - fixed MNEGH to test negated sign, clear C
+                        - fixed carry propagation in qp_inc, qp_neg, qp_add
+                        - fixed pack routines to test for zero via fraction
+                        - fixed ACBH to set cc's on result
+                        - fixed POLYH to set R3 correctly
+                        - fixed POLYH to not exit prematurely if arg = 0
+                        - fixed POLYH to mask mul reslt to 127b
+                        - fixed fp add routine to test for zero via fraction
+                          to support "denormal" argument from POLYH
+                        - fixed EMODH to concatenate 15b of 16b extension
+                        - fixed bug in reported VA on faulting cross-page write
+
 
 /* V3.5 revision history 
 

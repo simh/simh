@@ -1,6 +1,6 @@
 /* vax_sys.c: VAX simulator interface
 
-   Copyright (c) 1998-2005, Robert M Supnik
+   Copyright (c) 1998-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
    01-Oct-2004  RMS     Cloned from vax_sys.c
 */
 
@@ -37,6 +38,7 @@ extern DEVICE nvr_dev;
 extern DEVICE sysd_dev;
 extern DEVICE qba_dev;
 extern DEVICE tti_dev, tto_dev;
+extern DEVICE cr_dev;
 extern DEVICE lpt_dev;
 extern DEVICE clk_dev;
 extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
@@ -68,6 +70,7 @@ DEVICE *sim_devices[] = {
     &clk_dev,
     &dz_dev,
     &vh_dev,
+    &cr_dev,
     &lpt_dev,
     &rl_dev,
     &rq_dev,

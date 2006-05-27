@@ -1,6 +1,6 @@
 /* pdp11_tm.c: PDP-11 magnetic tape simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tm           TM11/TU10 magtape
 
+   16-Feb-06    RMS     Added tape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
@@ -129,7 +130,7 @@
 #define STA_CRC         0020000                         /* CRC error */
 #define STA_PAR         0010000                         /* parity error */
 #define STA_DLT         0004000                         /* data late */
-#define STA_EOT         0002000                         /* *end of tape */
+#define STA_EOT         0002000                         /* +end of tape */
 #define STA_RLE         0001000                         /* rec lnt error */
 #define STA_BAD         0000400                         /* bad tape error */
 #define STA_NXM         0000200                         /* non-existent mem */
@@ -143,7 +144,7 @@
 
 #define STA_CLR         (STA_7TK | STA_SDN)             /* always clear */
 #define STA_DYN         (STA_EOF | STA_EOT | STA_ONL | STA_BOT | \
-                         STA_WLK | STA_REW | STA_TUR)   /* kept in USTAT */
+                         STA_WLK | STA_REW | STA_TUR)   /* dynamic */
 #define STA_EFLGS       (STA_ILL | STA_EOF | STA_CRC | STA_PAR | \
                          STA_DLT | STA_EOT | STA_RLE | STA_BAD | STA_NXM)
                                                         /* set error */
@@ -230,6 +231,8 @@ MTAB tm_mod[] = {
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", &tm_vlock }, 
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
     { MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
@@ -495,6 +498,7 @@ return r;
 int32 tm_updcsta (UNIT *uptr)
 {
 tm_sta = (tm_sta & ~(STA_DYN | STA_CLR)) | (uptr->USTAT & STA_DYN);
+if (sim_tape_eot (uptr)) tm_sta = tm_sta | STA_EOT;
 if (sim_is_active (uptr)) tm_sta = tm_sta & ~STA_TUR;
 else tm_sta = tm_sta | STA_TUR;
 if (tm_sta & STA_EFLGS) tm_cmd = tm_cmd | MTC_ERR;

@@ -1,6 +1,6 @@
 /* vax780_sbi.c: VAX 11/780 SBI
 
-   Copyright (c) 2004-2005, Robert M Supnik
+   Copyright (c) 2004-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    This module contains the VAX 11/780 system-specific registers and devices.
 
    sbi                  bus controller
+
+   03-May-2006  RMS     Fixed writes to ACCS
 */
 
 #include "vax_defs.h"
@@ -126,9 +128,10 @@ extern CTAB *sim_vm_cmd;
 
 t_stat sbi_reset (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);
+void uba_eval_int (void);
 t_stat vax780_boot (int32 flag, char *ptr);
 
-void uba_eval_int (void);
+extern t_stat vax780_fload (int flag, char *cptr);
 extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 iccs_rd (void);
@@ -188,6 +191,8 @@ DEVICE sbi_dev = {
 CTAB vax780_cmd[] = {
     { "BOOT", &vax780_boot, RU_BOOT,
       "bo{ot} <device>{/R5:flg} boot device\n" },
+    { "FLOAD", &vax780_fload, 0,
+      "fl{oad} <file> {<start>} load file from console floppy\n" },
     { NULL }
     };
 
@@ -386,6 +391,9 @@ switch (rg) {
 
     case MT_TODR:                                       /* TODR */
         todr_wr (val);
+        break;
+
+    case MT_ACCS:                                       /* ACCS (not impl) */
         break;
 
     case MT_WCSA:                                       /* WCSA */

@@ -1,6 +1,6 @@
 /* id16_cpu.c: Interdata 16b CPU simulator
 
-   Copyright (c) 2000-2005, Robert M. Supnik
+   Copyright (c) 2000-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu                  Interdata 16b CPU
 
+   06-Feb-06    RMS     Fixed bug in DH (found by Mark Hittinger)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    25-Aug-05    RMS     Fixed DH integer overflow cases
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -169,6 +170,7 @@ typedef struct {
     uint16              opnd;
     } InstHistory;
 
+#define PSW_GETMAP(x)   (((x) >> PSW_V_MAP) & PSW_M_MAP)
 #define SEXT16(x)       (((x) & SIGN16)? ((int32) ((x) | 0xFFFF8000)): \
                         ((int32) ((x) & 0x7FFF)))
 #define CC_GL_16(x)     if ((x) & SIGN16) cc = CC_L; \
@@ -1058,7 +1060,7 @@ while (reason == 0) {                                   /* loop until halted */
     case 0x4D:                                          /* DH - RXH */
         r1p1 = (r1 + 1) & 0xF;                          /* R1 + 1 */
         if ((opnd == 0) ||
-            ((R[r1] == 0x8000) && (R[r1p1] == 0) && (opnd = 0xFFFF))) {
+            ((R[r1] == 0x8000) && (R[r1p1] == 0) && (opnd == 0xFFFF))) {
             if (PSW & PSW_AFI)                          /* div fault enabled? */
                 cc = swap_psw (AFIPSW, cc);             /* swap PSW */
             break;

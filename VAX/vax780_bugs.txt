@@ -11,6 +11,49 @@
 11. CIS: CMPP3/CMPP4 using wrong arguments to ReadDstr.
 12. CPU, OCTA: CVTfi with integer overflow not setting trap if PSW<iv> = 1.
 13. STDDEV: read of ICR was missing the call parameter.
+14. ACBD/G: testing wrong operand register to get limit sign.
+15. CPU: faults not clearing PSL<tp>.
+16. ADAWI: register mode implemented incorrectly.
+17. MOVTC: condition codes not preserved through page fault.
+18. MOVTUC: condition codes not preserved through page fault.
+19. MOVTUC: escape tested against untranslated rather than translated character.
+20. CVTPT: condition code and decimal overflow calculation incorrect.
+21. CVTPS: condition code and decimal overflow calculation incorrect.
+22. CVTPL: if destination is register, result is stored after register updates.
+23. CVTPL: integer overflow set <C> rather than <V>.
+24. all decimal string: 11/780 does not validate characters in decimal strings.
+25. EDITPC: condition codes not preserved through page fault.
+26. EDITPC EO$INSERT: inserts sign instead of fill.
+27. EDITPC EO$BLANK_ZERO: address off by one.
+28. EDITPC EO$BLANK_ZERO: not testing for <C> set.
+29. EDITPC EO$LOAD_PLUS: not skipping character if test fails.
+30. EDITPC EO$LOAD_MINUS: not skipping character if test fails.
+31. Compatibility mode: SXT not implemented.
+32. Compatibility mode: XOR operands fetched in wrong order.
+33. MNEGH: condition codes set from original sign.
+34. MNEGH: <C> not cleared.
+35. H_floating quad precision integer routines (add, inc, neg): carry propagation incorrect.
+36. H_floating packup routines: test for zero used exponent not fraction.
+37. MULH: carries out of floating accumulator lost.
+38. DIVH: stores wrong operand as result.
+39. POLYF/D/G: truncation after add not needed.
+40. POLYF/D/G: early SRM requires truncation to 31b/63b, not 32b/64b.
+41. POLYF/D/G/H: exits too early if argument is zero.
+42. POLYD/G/H: calculates address of residual pointer result incorrectly.
+43. POLYD/G: performs single precision rather than double precision multiply.
+44. POLYH: fails to truncate intermediate result from 128b to 127b.
+45. POLYF/D/G/H: internal add routine must test fraction rather than exponent to
+    detect zero, POLYx can create "denormalized" intermediate result.
+46. EMODH: concatenate 16b of extension operand instead of 15b.
+47. Specifier flows: modify flows testing for read access rather than write access.
+48. Quad/octa writes: wrong address reported on faulting cross-page writes.
+49. Memory management: 11/780 implements access control test on first level PTE's.
+50. LDPCTX: 11/780 implements mbz tests on PCB fields.
+51. LDPCTX/MTPR: 11/780 validity checks PCBB, SCBB, SBR, SLR, P0BR, P0LR, P1BR, P1LR.
+52. TMR: tmr_inc not updated in standard (100Hz) mode.
+
+
+
 
 
 

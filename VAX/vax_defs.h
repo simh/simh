@@ -1,6 +1,6 @@
 /* vax_defs.h: VAX architecture definitions file
 
-   Copyright (c) 1998-2005, Robert M Supnik
+   Copyright (c) 1998-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    The author gratefully acknowledges the help of Stephen Shirron, Antonio
    Carlini, and Kevin Peterson in providing specifications for the Qbus VAX's
 
+   09-May-06    RMS     Added system PTE ACV error code
+   03-May-06    RMS     Added EDITPC get/put cc's macros
    03-Nov-05    RMS     Added 780 stop codes
    22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
    02-Sep-04    RMS     Added octa specifier definitions
@@ -235,6 +237,7 @@
 #define PTE_V           (1u << PTE_V_V)
 #define PTE_V_ACC       27                              /* access */
 #define PTE_M_ACC       0xF
+#define PTE_ACC         (PTE_M_ACC << PTE_V_ACC)
 #define PTE_V_M         26                              /* modified */
 #define PTE_M           (1u << PTE_V_M)
 #define PTE_GETACC(x)   (((x) >> PTE_V_ACC) & PTE_M_ACC)
@@ -310,14 +313,19 @@
 
 /* EDITPC R2 packup parameters */
 
+#define ED_V_CC         16                              /* condition codes */
+#define ED_M_CC         0xFF
+#define ED_CC           (ED_M_CC << ED_V_CC)
 #define ED_V_SIGN       8                               /* sign */
 #define ED_M_SIGN       0xFF
 #define ED_SIGN         (ED_M_SIGN << ED_V_SIGN)
 #define ED_V_FILL       0                               /* fill */
 #define ED_M_FILL       0xFF
 #define ED_FILL         (ED_M_FILL << ED_V_FILL)
+#define ED_GETCC(x)     (((x) >> ED_V_CC) & CC_MASK)
 #define ED_GETSIGN(x)   (((x) >> ED_V_SIGN) & ED_M_SIGN)
 #define ED_GETFILL(x)   (((x) >> ED_V_FILL) & ED_M_FILL)
+#define ED_PUTCC(r,x)   (((r) & ~ED_CC) | (((x) << ED_V_CC) & ED_CC))
 #define ED_PUTSIGN(r,x) (((r) & ~ED_SIGN) | (((x) << ED_V_SIGN) & ED_SIGN))
 #define ED_PUTFILL(r,x) (((r) & ~ED_FILL) | (((x) << ED_V_FILL) & ED_FILL))
 
@@ -461,7 +469,7 @@
 
 #define PR_ACV          0                               /* ACV */
 #define PR_LNV          1                               /* length viol */
-/* #define PR_PACV      2                               /* impossible */
+#define PR_PACV         2                               /* pte ACV (780) */
 #define PR_PLNV         3                               /* pte len viol */
 #define PR_TNV          4                               /* TNV */
 /* #define PR_TB        5                               /* impossible */

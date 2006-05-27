@@ -1,6 +1,6 @@
 /* vaxmod_defs.h: VAX model-specific definitions file
 
-   Copyright (c) 1998-2005, Robert M Supnik
+   Copyright (c) 1998-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-May-06    RMS     Added CR11/CD11 support
+   10-May-06    RMS     Added NOP'd reserved operand checking macros
    05-Oct-05    RMS     Added XU definitions for autoconfigure
    15-Jun-05    RMS     Added QDSS support
    12-Sep-04    RMS     Removed map_address prototype
@@ -198,6 +200,15 @@
 #define CQMAMASK        (CQMSIZE - 1)                   /* Qmem addr mask */
 #define CQMBASE         0x30000000                      /* Qmem base */
 
+/* Machine specific reserved operand tests (all NOPs) */
+
+#define ML_PA_TEST(r)
+#define ML_LR_TEST(r)
+#define ML_BR_TEST(r)
+#define LP_AST_TEST(r)
+#define LP_MBZ84_TEST(r)
+#define LP_MBZ92_TEST(r)
+
 /* Qbus I/O modes */
 
 #define READ            0                               /* PDP-11 compatibility */
@@ -285,6 +296,8 @@ typedef struct {
 #define IOLN_XU         010
 #define IOBA_RP         (IOPAGEBASE + 016700)           /* RP/RM */
 #define IOLN_RP         054
+#define IOBA_CR         (IOPAGEBASE + 017160)           /* CD/CR/CM */
+#define IOLN_CR         010
 #define IOBA_RX         (IOPAGEBASE + 017170)           /* RXV11 */
 #define IOLN_RX         004
 #define IOBA_RY         (IOPAGEBASE + 017170)           /* RXV21 */
@@ -336,6 +349,7 @@ typedef struct {
 #define INT_V_VHRX      9                               /* DHQ11 */
 #define INT_V_VHTX      10 
 #define INT_V_QDSS      11                              /* QDSS */
+#define INT_V_CR        12
 
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_RQ          (1u << INT_V_RQ)
@@ -359,6 +373,7 @@ typedef struct {
 #define INT_VHRX        (1u << INT_V_VHRX)
 #define INT_VHTX        (1u << INT_V_VHTX)
 #define INT_QDSS        (1u << INT_V_QDSS)
+#define INT_CR          (1u << INT_V_CR)
 
 #define IPL_CLK         (0x16 - IPL_HMIN)                       /* relative IPL */
 #define IPL_RQ          (0x15 - IPL_HMIN)
@@ -382,6 +397,7 @@ typedef struct {
 #define IPL_VHRX        (0x14 - IPL_HMIN)
 #define IPL_VHTX        (0x14 - IPL_HMIN)
 #define IPL_QDSS        (0x14 - IPL_HMIN)
+#define IPL_CR          (0x14 - IPL_HMIN)
 
 #define IPL_HMAX        0x17                            /* highest hwre level */
 #define IPL_HMIN        0x14                            /* lowest hwre level */
@@ -399,6 +415,7 @@ typedef struct {
 #define VEC_RL          (VEC_Q + 0160)
 #define VEC_LPT         (VEC_Q + 0200)
 #define VEC_TS          (VEC_Q + 0224)
+#define VEC_CR          (VEC_Q + 0230)
 #define VEC_RP          (VEC_Q + 0254)
 #define VEC_TQ          (VEC_Q + 0260)
 #define VEC_RX          (VEC_Q + 0264)

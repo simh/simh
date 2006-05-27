@@ -1,6 +1,6 @@
 /* h316_cpu.c: Honeywell 316/516 CPU simulator
 
-   Copyright (c) 1999-2005, Robert M. Supnik
+   Copyright (c) 1999-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          H316/H516 CPU
 
+   03-Apr-06    RMS     Fixed bugs in LLL, LRL (from Theo Engel)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    15-Feb-05    RMS     Added start button interrupt
@@ -427,7 +428,7 @@ if (chan_req) {                                         /* channel request? */
             if (st & DMA_IN) {                          /* input? */
                 t = iotab[dev] (ioINA, 0, 0, dev);      /* input word */
                 if ((t & IOT_SKIP) == 0) return STOP_DMAER;
-                if (r = (t >> IOT_V_REASON)) return r;
+                if ((r = t >> IOT_V_REASON) != 0) return r;
                 Write (ad, t & DMASK);                  /* write to mem */
                 }
             else {                                      /* no, output */
@@ -441,7 +442,7 @@ if (chan_req) {                                         /* channel request? */
                 if (dma_wc[i] == 0) {                   /* done? */
                     dma_eor[i] = 1;                     /* set end of range */
                     t = iotab[dev] (ioEND, 0, 0, dev);  /* send end range */
-                    if (r = (t >> IOT_V_REASON)) return r;
+                    if ((r = t >> IOT_V_REASON) != 0) return r;
                     }
                 }
             else {                                      /* DMC */
@@ -450,7 +451,7 @@ if (chan_req) {                                         /* channel request? */
                 end = Read (dmcad + 1);                 /* get end */
                 if (((ad ^ end) & X_AMASK) == 0) {      /* start == end? */
                     t = iotab[dev] (ioEND, 0, 0, dev);  /* send end range */
-                    if (r = (t >> IOT_V_REASON)) return r;
+                    if ((r = t >> IOT_V_REASON) != 0) return r;
                     }                                   /* end if end range */
                 }                                       /* end else DMC */
             }                                           /* end if chan i */
@@ -659,6 +660,7 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
 
     case 000:
         if ((MB & 1) == 0) {                            /* HLT */
+            if ((reason = sim_process_event ()) != SCPE_OK) break;
             reason = STOP_HALT;
             break;
             }
@@ -739,7 +741,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             else {
                 ut = GETDBL_U (AR, BR);                 /* get A'B */
                 C = (ut >> (t1 - 1)) & 1;               /* C = last out */
-                ut = ut >> t1;                          /* log right */
+                if (t1 == 32) ut = 0;                   /* =32? all 0 */
+                else ut = ut >> t1;                      /* log right */
                 }
             PUTDBL_U (ut);                              /* store A,B */
             break;
@@ -803,7 +806,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             else {
                 ut = GETDBL_U (AR, BR);                 /* get A'B */
                 C = (ut >> (32 - t1)) & 1;              /* C = last out */
-                ut = ut << t1;                          /* log left */
+                if (t1 == 32) ut = 0;                   /* =32? all 0 */
+                else ut = ut << t1;                     /* log left */
                 }
             PUTDBL_U (ut);                              /* store A,B */
             break;
@@ -879,7 +883,7 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             ((MB & 000020) && ss[0]) ||                 /* SS1 */
             ((MB & 000040) && AR) ||                    /* SNZ */
             ((MB & 000100) && (AR & 1)) ||              /* SLN */
-            ((MB & 000200) && (TST_INTREQ (INT_MPE))) ||        /* SPS */
+            ((MB & 000200) && (TST_INTREQ (INT_MPE))) || /* SPS */
             ((MB & 000400) && (AR & SIGN))) skip = 1;   /* SMI */
         if ((MB & 001000) == 0) skip = skip ^ 1;        /* reverse? */
         PC = NEWA (PC, PC + skip);
@@ -895,12 +899,12 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         else if (MB == 0140320) {                       /* CSA */
             C = (AR & SIGN) >> 15;
             AR = AR & ~SIGN;
-			}
+            }
         else if (MB == 0140401) AR = AR ^ DMASK;        /* CMA */
         else if (MB == 0140407) {                       /* TCA */
             AR = (-AR) & DMASK;
             sc = 0;
-			}
+            }
         else if (MB == 0140500) AR = AR | SIGN;         /* SSM */
         else if (MB == 0140600) C = 1;                  /* SCB */
         else if (MB == 0141044) AR = AR & 0177400;      /* CAR */
@@ -1369,9 +1373,11 @@ for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru devices */
     dno = dibp->dev;                                    /* device number */
     for (j = 0; j < dibp->num; j++) {                   /* repeat for slots */
         if (iotab[dno + j]) {                           /* conflict? */
-            printf ("%s device number conflict, devno = %02o\n", sim_dname (dptr), dno + j);
+            printf ("%s device number conflict, devno = %02o\n",
+                sim_dname (dptr), dno + j);
             if (sim_log) fprintf (sim_log,
-                "%s device number conflict, devno = %02o\n", sim_dname (dptr), dno + j);
+                "%s device number conflict, devno = %02o\n",
+                sim_dname (dptr), dno + j);
             return TRUE;
             }
         iotab[dno + j] = dibp->io;                      /* set I/O routine */
@@ -1379,21 +1385,27 @@ for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru devices */
     if (dibp->chan) {                                   /* DMA/DMC? */
         chan = dibp->chan - 1;
         if ((chan < DMC_V_DMC1) && (chan >= dma_nch)) {
-            printf ("%s configured for DMA channel %d\n", sim_dname (dptr), chan + 1);
+            printf ("%s configured for DMA channel %d\n",
+                sim_dname (dptr), chan + 1);
             if (sim_log) fprintf (sim_log,
-                "%s configured for DMA channel %d\n", sim_dname (dptr), chan + 1);
+                "%s configured for DMA channel %d\n",
+                sim_dname (dptr), chan + 1);
             return TRUE;
             }
         if ((chan >= DMC_V_DMC1) && !(cpu_unit.flags & UNIT_DMC)) {
-            printf ("%s configured for DMC, option disabled\n", sim_dname (dptr));
+            printf ("%s configured for DMC, option disabled\n",
+                sim_dname (dptr));
             if (sim_log) fprintf (sim_log, 
-                "%s configured for DMC, option disabled\n", sim_dname (dptr));
+                "%s configured for DMC, option disabled\n",
+                sim_dname (dptr));
             return TRUE;
             }
         if (chan_map[chan]) {                           /* channel conflict? */
-            printf ("%s DMA/DMC channel conflict, devno = %02o\n", sim_dname (dptr), dno);
+            printf ("%s DMA/DMC channel conflict, devno = %02o\n",
+                sim_dname (dptr), dno);
             if (sim_log) fprintf (sim_log,
-                "%s DMA/DMC channel conflict, devno = %02o\n", sim_dname (dptr), dno);
+                "%s DMA/DMC channel conflict, devno = %02o\n",
+                sim_dname (dptr), dno);
             return TRUE;
             }
         chan_map[chan] = dno;                           /* channel back map */
@@ -1466,7 +1478,8 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         if (h->pc & HIST_EA) fprintf (st, "%05o  ", h->ea);
         else fprintf (st, "       ");
         sim_eval = h->ir;
-        if ((fprint_sym (st, h->pc & X_AMASK, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+        if ((fprint_sym (st, h->pc & X_AMASK, &sim_eval,
+            &cpu_unit, SWMASK ('M'))) > 0)
             fprintf (st, "(undefined) %06o", h->ir);
         op = I_GETOP (h->ir) & 017;                     /* base op */
         if (has_opnd[op]) fprintf (st, "  [%06o]", h->opnd);

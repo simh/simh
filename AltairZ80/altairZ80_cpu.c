@@ -1,6 +1,6 @@
 /*  altairz80_cpu.c: MITS Altair CPU (8080 and Z80)
 
-    Copyright (c) 2002-2005, Peter Schorn
+    Copyright (c) 2002-2006, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -82,7 +82,7 @@
             goto end_decode;                    \
         }                                       \
         else {                                  \
-            sim_brk_pend = FALSE;               \
+            sim_brk_pend[0] = FALSE;            \
             continue;                           \
         }                                       \
     }
@@ -120,7 +120,7 @@
         tStates += 17;                          \
     }                                           \
     else {                                      \
-        sim_brk_pend = FALSE;                   \
+        sim_brk_pend[0] = FALSE;                \
         PC += 2;                                \
         tStates += 10;                          \
     }                                           \
@@ -148,19 +148,18 @@ t_stat cpu_reset(DEVICE *dptr);
 t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag);
 
 void PutBYTEBasic(const uint32 Addr, const uint32 Bank, const uint32 Value);
-void PutBYTEForced(register uint32 Addr, register uint32 Value);
-int32 addressIsInROM(const uint32 Addr);
-int32 addressExists(const uint32 Addr);
 t_stat sim_instr(void);
 int32 install_bootrom(void);
 void protect(const int32 l, const int32 h);
-void printROMMessage(const uint32 cntROM);
-uint8 GetBYTEWrapper(register uint32 Addr);
-void PutBYTEWrapper(register uint32 Addr, register uint32 Value);
+uint8 GetBYTEWrapper(const uint32 Addr);
+void PutBYTEWrapper(const uint32 Addr, const uint32 Value);
 int32 getBankSelect(void);
-void setBankSelect(int32 b);
+void setBankSelect(const int32 b);
 uint32 getCommon(void);
-void setCommon(uint32 c);
+static void PutBYTEForced(uint32 Addr, const uint32 Value);
+static int32 addressIsInROM(const uint32 Addr);
+static int32 addressExists(const uint32 Addr);
+static void printROMMessage(const uint32 cntROM);
 static void warnUnsuccessfulWriteAttempt(const uint32 Addr);
 static uint8 warnUnsuccessfulReadAttempt(const uint32 Addr);
 static t_stat cpu_set_rom       (UNIT *uptr, int32 value, char *cptr, void *desc);
@@ -175,9 +174,7 @@ static void checkROMBoundaries(void);
 static void reset_memory(void);
 static uint32 in(const uint32 Port);
 static void out(const uint32 Port, const uint32 Value);
-static uint8 GetBYTE(register uint32 Addr);
 static void PutBYTE(register uint32 Addr, register uint32 Value);
-static uint16 GetWORD(register uint32 a);
 static void PutWORD(register uint32 a, register uint32 v);
 static t_bool sim_brk_lookup (const t_addr bloc, const int32 btyp);
 static void resetCell(const int32 address, const int32 bank);
@@ -374,11 +371,11 @@ static const struct idev dev_table[256] = {
     {&nulldev}, {&hdsk_io}, {&simh_dev}, {&sr_dev}          /* FC */
 };
 
-static INLINE void out(const uint32 Port, const uint32 Value) {
+static void out(const uint32 Port, const uint32 Value) {
     dev_table[Port].routine(Port, 1, Value);
 }
 
-static INLINE uint32 in(const uint32 Port) {
+static uint32 in(const uint32 Port) {
     return dev_table[Port].routine(Port, 0, 0);
 }
 
@@ -1502,20 +1499,7 @@ int32 addressExists(const uint32 Addr) {
         && (ROMLow <= addr) && (addr <= ROMHigh) );
 }
 
-static INLINE uint8 GetBYTE(register uint32 Addr) {
-    Addr &= ADDRMASK;   /* registers are NOT guaranteed to be always 16-bit values */
-    if (cpu_unit.flags & UNIT_BANKED) { /* banked memory case */
-        /* if Addr below "common" take from selected bank, otherwise from bank 0 */
-        return Addr < common ? M[Addr][bankSelect] : M[Addr][0];
-    }
-    else { /* non-banked memory case */
-        return ((Addr < MEMSIZE) ||
-        ( (cpu_unit.flags & UNIT_ROM) && (ROMLow <= Addr) && (Addr <= ROMHigh) )) ?
-        M[Addr][0] : warnUnsuccessfulReadAttempt(Addr);
-    }
-}
-
-static INLINE void PutBYTE(register uint32 Addr, register uint32 Value) {
+static void PutBYTE(register uint32 Addr, const register uint32 Value) {
     Addr &= ADDRMASK;   /* registers are NOT guaranteed to be always 16-bit values */
     if (cpu_unit.flags & UNIT_BANKED) {
         if (Addr < common) {
@@ -1538,7 +1522,7 @@ static INLINE void PutBYTE(register uint32 Addr, register uint32 Value) {
     }
 }
 
-static INLINE void PutWORD(register uint32 Addr, register uint32 Value) {
+static void PutWORD(register uint32 Addr, const register uint32 Value) {
     Addr &= ADDRMASK;   /* registers are NOT guaranteed to be always 16-bit values */
     if (cpu_unit.flags & UNIT_BANKED) {
         if (Addr < common) {
@@ -1578,7 +1562,7 @@ static INLINE void PutWORD(register uint32 Addr, register uint32 Value) {
     }
 }
 
-void PutBYTEForced(register uint32 Addr, register uint32 Value) {
+static void PutBYTEForced(uint32 Addr, const uint32 Value) {
     Addr &= ADDRMASK;   /* registers are NOT guaranteed to be always 16-bit values */
     if ((cpu_unit.flags & UNIT_BANKED) && (Addr < common)) {
         M[Addr][bankSelect] = Value;
@@ -1626,7 +1610,7 @@ int32 getBankSelect(void) {
     return bankSelect;
 }
 
-void setBankSelect(int32 b) {
+void setBankSelect(const int32 b) {
     bankSelect = b;
 }
 
@@ -1634,51 +1618,80 @@ uint32 getCommon(void) {
     return common;
 }
 
-void setCommon(uint32 c) {
-    common = c;
-}
+#define Reduce(Addr) ((Addr) & ADDRMASK)
 
-uint8 GetBYTEWrapper(register uint32 Addr) { /* make sure that non-inlined version exists */
+#define GetBYTE(Addr)                                                                                                               \
+    ((cpu_unit.flags & UNIT_BANKED) ?                                                                                               \
+        (Reduce(Addr) < common ?                                                                                                    \
+            M[Reduce(Addr)][bankSelect]                                                                                             \
+        :                                                                                                                           \
+            M[Reduce(Addr)][0])                                                                                                     \
+    :                                                                                                                               \
+        (((Reduce(Addr) < MEMSIZE) || ( (cpu_unit.flags & UNIT_ROM) && (ROMLow <= Reduce(Addr)) && (Reduce(Addr) <= ROMHigh) )) ?   \
+            M[Reduce(Addr)][0]                                                                                                      \
+        :                                                                                                                           \
+           warnUnsuccessfulReadAttempt(Reduce(Addr))))
+
+#define RAM_pp(Addr)                                                                                                                \
+    ((cpu_unit.flags & UNIT_BANKED) ?                                                                                               \
+        (Reduce(Addr) < common ?                                                                                                    \
+            M[Reduce(Addr++)][bankSelect]                                                                                           \
+        :                                                                                                                           \
+            M[Reduce(Addr++)][0])                                                                                                   \
+    :                                                                                                                               \
+        (((Reduce(Addr) < MEMSIZE) || ( (cpu_unit.flags & UNIT_ROM) && (ROMLow <= Reduce(Addr)) && (Reduce(Addr) <= ROMHigh) )) ?   \
+            M[Reduce(Addr++)][0]                                                                                                    \
+        :                                                                                                                           \
+           warnUnsuccessfulReadAttempt(Reduce(Addr++))))
+
+#define RAM_mm(Addr)                                                                                                                \
+    ((cpu_unit.flags & UNIT_BANKED) ?                                                                                               \
+        (Reduce(Addr) < common ?                                                                                                    \
+            M[Reduce(Addr--)][bankSelect]                                                                                           \
+        :                                                                                                                           \
+            M[Reduce(Addr--)][0])                                                                                                   \
+    :                                                                                                                               \
+        (((Reduce(Addr) < MEMSIZE) || ( (cpu_unit.flags & UNIT_ROM) && (ROMLow <= Reduce(Addr)) && (Reduce(Addr) <= ROMHigh) )) ?   \
+            M[Reduce(Addr--)][0]                                                                                                    \
+        :                                                                                                                           \
+           warnUnsuccessfulReadAttempt(Reduce(Addr--))))
+
+#define GetWORD(Addr) (GetBYTE(Addr) | (GetBYTE(Addr + 1) << 8))
+
+uint8 GetBYTEWrapper(const uint32 Addr) {
     return GetBYTE(Addr);
 }
 
-void PutBYTEWrapper(register uint32 Addr, register uint32 Value) {
+void PutBYTEWrapper(const uint32 Addr, const uint32 Value) {
     PutBYTE(Addr, Value);
 }
-
-#define RAM_mm(a)   GetBYTE(a--)
-#define RAM_pp(a)   GetBYTE(a++)
 
 #define PutBYTE_pp(a,v) PutBYTE(a++, v)
 #define PutBYTE_mm(a,v) PutBYTE(a--, v)
 #define mm_PutBYTE(a,v) PutBYTE(--a, v)
 
-static INLINE uint16 GetWORD(register uint32 a) {
-    return GetBYTE(a) | (GetBYTE(a + 1) << 8);
-}
-
 #define MASK_BRK (TRUE + 1)
 
 /* this is a modified version of sim_brk_test with two differences:
-    1) is does not set sim_brk_pend to FALSE (this if left to the instruction decode)
+    1) is does not set sim_brk_pend to FALSE (this is left to the instruction decode)
     2) it returns MASK_BRK if a breakpoint is found but should be ignored
 */
 static int32 sim_brk_lookup (const t_addr loc, const int32 btyp) {
-    extern t_bool sim_brk_pend;
-    extern t_addr sim_brk_ploc;
+    extern t_bool sim_brk_pend[SIM_BKPT_N_SPC];
+    extern t_addr sim_brk_ploc[SIM_BKPT_N_SPC];
     extern char *sim_brk_act;
     BRKTAB *bp;
-    if ((bp = sim_brk_fnd (loc)) &&                 /* entry in table?  */
-        (btyp & bp -> typ) &&                       /* type match?      */
-        (!sim_brk_pend || (loc != sim_brk_ploc)) && /* new location?    */
-        (--(bp -> cnt) <= 0)) {                     /* count reach 0?   */
-        bp -> cnt = 0;                              /* reset count      */
-        sim_brk_ploc = loc;                         /* save location    */
-        sim_brk_act = bp -> act;                    /* set up actions   */
-        sim_brk_pend = TRUE;                        /* don't do twice   */
+    if ((bp = sim_brk_fnd (loc)) &&                         /* entry in table?  */
+        (btyp & bp -> typ) &&                               /* type match?      */
+        (!sim_brk_pend[0] || (loc != sim_brk_ploc[0])) &&   /* new location?    */
+        (--(bp -> cnt) <= 0)) {                             /* count reach 0?   */
+        bp -> cnt = 0;                                      /* reset count      */
+        sim_brk_ploc[0] = loc;                              /* save location    */
+        sim_brk_act = bp -> act;                            /* set up actions   */
+        sim_brk_pend[0] = TRUE;                             /* don't do twice   */
         return TRUE;
     }
-    return (sim_brk_pend && (loc == sim_brk_ploc)) ? MASK_BRK : FALSE;
+    return (sim_brk_pend[0] && (loc == sim_brk_ploc[0])) ? MASK_BRK : FALSE;
 }
 
 static void prepareMemoryAccessMessage(t_addr loc) {
@@ -1703,7 +1716,7 @@ static void prepareMemoryAccessMessage(t_addr loc) {
         br1 = sim_brk_lookup(a1, SWMASK('M'));                  \
         br2 = br1 ? FALSE : sim_brk_lookup(a2, SWMASK('M'));    \
         if ((br1 == MASK_BRK) || (br2 == MASK_BRK)) {           \
-            sim_brk_pend = FALSE;                               \
+            sim_brk_pend[0] = FALSE;                            \
         }                                                       \
         else if (br1 || br2) {                                  \
             reason = STOP_MEM;                                  \
@@ -1717,7 +1730,7 @@ static void prepareMemoryAccessMessage(t_addr loc) {
             goto end_decode;                                    \
         }                                                       \
         else {                                                  \
-            sim_brk_pend = FALSE;                               \
+            sim_brk_pend[0] = FALSE;                            \
         }                                                       \
     }
 
@@ -1727,7 +1740,7 @@ static void prepareMemoryAccessMessage(t_addr loc) {
 
 t_stat sim_instr (void) {
     extern int32 sim_interval;
-    extern t_bool sim_brk_pend;
+    extern t_bool sim_brk_pend[SIM_BKPT_N_SPC];
     extern int32 timerInterrupt;
     extern int32 timerInterruptHandler;
     extern uint32 sim_os_msec(void);
@@ -1829,12 +1842,12 @@ t_stat sim_instr (void) {
 
             case 0x00:      /* NOP */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 break;
 
             case 0x01:      /* LD BC,nnnn */
                 tStates += 10;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = GetWORD(PC);
                 PC += 2;
                 break;
@@ -1847,13 +1860,13 @@ t_stat sim_instr (void) {
 
             case 0x03:      /* INC BC */
                 tStates += 6;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 ++BC;
                 break;
 
             case 0x04:      /* INC B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC += 0x100;
                 temp = hreg(BC);
                 AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80); /* SetPV2 uses temp */
@@ -1861,7 +1874,7 @@ t_stat sim_instr (void) {
 
             case 0x05:      /* DEC B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC -= 0x100;
                 temp = hreg(BC);
                 AF = (AF & ~0xfe) | decTable[temp] | SetPV2(0x7f); /* SetPV2 uses temp */
@@ -1869,20 +1882,20 @@ t_stat sim_instr (void) {
 
             case 0x06:      /* LD B,nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 Sethreg(BC, RAM_pp(PC));
                 break;
 
             case 0x07:      /* RLCA */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = ((AF >> 7) & 0x0128) | ((AF << 1) & ~0x1ff) |
                     (AF & 0xc4) | ((AF >> 15) & 1);
                 break;
 
             case 0x08:      /* EX AF,AF' */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 checkCPU8080;
                 temp = AF;
                 AF = AF1_S;
@@ -1891,7 +1904,7 @@ t_stat sim_instr (void) {
 
             case 0x09:      /* ADD HL,BC */
                 tStates += 11;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL &= ADDRMASK;
                 BC &= ADDRMASK;
                 sum = HL + BC;
@@ -1907,13 +1920,13 @@ t_stat sim_instr (void) {
 
             case 0x0b:      /* DEC BC */
                 tStates += 6;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 --BC;
                 break;
 
             case 0x0c:      /* INC C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(BC) + 1;
                 Setlreg(BC, temp);
                 AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80);
@@ -1921,7 +1934,7 @@ t_stat sim_instr (void) {
 
             case 0x0d:      /* DEC C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(BC) - 1;
                 Setlreg(BC, temp);
                 AF = (AF & ~0xfe) | decTable[temp & 0xff] | SetPV2(0x7f);
@@ -1929,18 +1942,18 @@ t_stat sim_instr (void) {
 
             case 0x0e:      /* LD C,nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 Setlreg(BC, RAM_pp(PC));
                 break;
 
             case 0x0f:      /* RRCA */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xc4) | rrcaTable[hreg(AF)];
                 break;
 
             case 0x10:      /* DJNZ dd */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 checkCPU8080;
                 if ((BC -= 0x100) & 0xff00) {
                     PCQ_ENTRY(PC - 1);
@@ -1955,7 +1968,7 @@ t_stat sim_instr (void) {
 
             case 0x11:      /* LD DE,nnnn */
                 tStates += 10;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = GetWORD(PC);
                 PC += 2;
                 break;
@@ -1968,13 +1981,13 @@ t_stat sim_instr (void) {
 
             case 0x13:      /* INC DE */
                 tStates += 6;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 ++DE;
                 break;
 
             case 0x14:      /* INC D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE += 0x100;
                 temp = hreg(DE);
                 AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80); /* SetPV2 uses temp */
@@ -1982,7 +1995,7 @@ t_stat sim_instr (void) {
 
             case 0x15:      /* DEC D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE -= 0x100;
                 temp = hreg(DE);
                 AF = (AF & ~0xfe) | decTable[temp] | SetPV2(0x7f); /* SetPV2 uses temp */
@@ -1990,20 +2003,20 @@ t_stat sim_instr (void) {
 
             case 0x16:      /* LD D,nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 Sethreg(DE, RAM_pp(PC));
                 break;
 
             case 0x17:      /* RLA */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = ((AF << 8) & 0x0100) | ((AF >> 7) & 0x28) | ((AF << 1) & ~0x01ff) |
                     (AF & 0xc4) | ((AF >> 15) & 1);
                 break;
 
             case 0x18:      /* JR dd */
                 tStates += 12;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 checkCPU8080;
                 PCQ_ENTRY(PC - 1);
                 PC += (int8) GetBYTE(PC) + 1;
@@ -2011,7 +2024,7 @@ t_stat sim_instr (void) {
 
             case 0x19:      /* ADD HL,DE */
                 tStates += 11;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL &= ADDRMASK;
                 DE &= ADDRMASK;
                 sum = HL + DE;
@@ -2027,13 +2040,13 @@ t_stat sim_instr (void) {
 
             case 0x1b:      /* DEC DE */
                 tStates += 6;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 --DE;
                 break;
 
             case 0x1c:      /* INC E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(DE) + 1;
                 Setlreg(DE, temp);
                 AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80);
@@ -2041,7 +2054,7 @@ t_stat sim_instr (void) {
 
             case 0x1d:      /* DEC E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(DE) - 1;
                 Setlreg(DE, temp);
                 AF = (AF & ~0xfe) | decTable[temp & 0xff] | SetPV2(0x7f);
@@ -2049,18 +2062,18 @@ t_stat sim_instr (void) {
 
             case 0x1e:      /* LD E,nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 Setlreg(DE, RAM_pp(PC));
                 break;
 
             case 0x1f:      /* RRA */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = ((AF & 1) << 15) | (AF & 0xc4) | rraTable[hreg(AF)];
                 break;
 
             case 0x20:      /* JR NZ,dd */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 checkCPU8080;
                 if (TSTFLAG(Z)) {
                     PC++;
@@ -2075,7 +2088,7 @@ t_stat sim_instr (void) {
 
             case 0x21:      /* LD HL,nnnn */
                 tStates += 10;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = GetWORD(PC);
                 PC += 2;
                 break;
@@ -2090,13 +2103,13 @@ t_stat sim_instr (void) {
 
             case 0x23:      /* INC HL */
                 tStates += 6;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 ++HL;
                 break;
 
             case 0x24:      /* INC H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL += 0x100;
                 temp = hreg(HL);
                 AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80); /* SetPV2 uses temp */
@@ -2104,7 +2117,7 @@ t_stat sim_instr (void) {
 
             case 0x25:      /* DEC H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL -= 0x100;
                 temp = hreg(HL);
                 AF = (AF & ~0xfe) | decTable[temp] | SetPV2(0x7f); /* SetPV2 uses temp */
@@ -2112,13 +2125,13 @@ t_stat sim_instr (void) {
 
             case 0x26:      /* LD H,nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 Sethreg(HL, RAM_pp(PC));
                 break;
 
             case 0x27:      /* DAA */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 acu = hreg(AF);
                 temp = ldig(acu);
                 cbits = TSTFLAG(C);
@@ -2148,7 +2161,7 @@ t_stat sim_instr (void) {
                 break;
 
             case 0x28:      /* JR Z,dd */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 checkCPU8080;
                 if (TSTFLAG(Z)) {
                     PCQ_ENTRY(PC - 1);
@@ -2163,7 +2176,7 @@ t_stat sim_instr (void) {
 
             case 0x29:      /* ADD HL,HL */
                 tStates += 11;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL &= ADDRMASK;
                 sum = HL + HL;
                 AF = (AF & ~0x3b) | cbitsDup16Table[sum >> 8];
@@ -2180,13 +2193,13 @@ t_stat sim_instr (void) {
 
             case 0x2b:      /* DEC HL */
                 tStates += 6;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 --HL;
                 break;
 
             case 0x2c:      /* INC L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(HL) + 1;
                 Setlreg(HL, temp);
                 AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80);
@@ -2194,7 +2207,7 @@ t_stat sim_instr (void) {
 
             case 0x2d:      /* DEC L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(HL) - 1;
                 Setlreg(HL, temp);
                 AF = (AF & ~0xfe) | decTable[temp & 0xff] | SetPV2(0x7f);
@@ -2202,18 +2215,18 @@ t_stat sim_instr (void) {
 
             case 0x2e:      /* LD L,nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 Setlreg(HL, RAM_pp(PC));
                 break;
 
             case 0x2f:      /* CPL */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = (~AF & ~0xff) | (AF & 0xc5) | ((~AF >> 8) & 0x28) | 0x12;
                 break;
 
             case 0x30:      /* JR NC,dd */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 checkCPU8080;
                 if (TSTFLAG(C)) {
                     PC++;
@@ -2228,7 +2241,7 @@ t_stat sim_instr (void) {
 
             case 0x31:      /* LD SP,nnnn */
                 tStates += 10;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 SP = GetWORD(PC);
                 PC += 2;
                 break;
@@ -2243,7 +2256,7 @@ t_stat sim_instr (void) {
 
             case 0x33:      /* INC SP */
                 tStates += 6;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 ++SP;
                 break;
 
@@ -2271,12 +2284,12 @@ t_stat sim_instr (void) {
 
             case 0x37:      /* SCF */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = (AF & ~0x3b) | ((AF >> 8) & 0x28) | 1;
                 break;
 
             case 0x38:      /* JR C,dd */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 checkCPU8080;
                 if (TSTFLAG(C)) {
                     PCQ_ENTRY(PC - 1);
@@ -2291,7 +2304,7 @@ t_stat sim_instr (void) {
 
             case 0x39:      /* ADD HL,SP */
                 tStates += 11;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL &= ADDRMASK;
                 SP &= ADDRMASK;
                 sum = HL + SP;
@@ -2309,13 +2322,13 @@ t_stat sim_instr (void) {
 
             case 0x3b:      /* DEC SP */
                 tStates += 6;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 --SP;
                 break;
 
             case 0x3c:      /* INC A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF += 0x100;
                 temp = hreg(AF);
                 AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80); /* SetPV2 uses temp */
@@ -2323,7 +2336,7 @@ t_stat sim_instr (void) {
 
             case 0x3d:      /* DEC A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF -= 0x100;
                 temp = hreg(AF);
                 AF = (AF & ~0xfe) | decTable[temp] | SetPV2(0x7f); /* SetPV2 uses temp */
@@ -2331,48 +2344,48 @@ t_stat sim_instr (void) {
 
             case 0x3e:      /* LD A,nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 Sethreg(AF, RAM_pp(PC));
                 break;
 
             case 0x3f:      /* CCF */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = (AF & ~0x3b) | ((AF >> 8) & 0x28) | ((AF & 1) << 4) | (~AF & 1);
                 break;
 
             case 0x40:      /* LD B,B */
                 tStates += 4;
-                sim_brk_pend = FALSE; /* nop */
+                sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x41:      /* LD B,C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | ((BC & 0xff) << 8);
                 break;
 
             case 0x42:      /* LD B,D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | (DE & ~0xff);
                 break;
 
             case 0x43:      /* LD B,E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | ((DE & 0xff) << 8);
                 break;
 
             case 0x44:      /* LD B,H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | (HL & ~0xff);
                 break;
 
             case 0x45:      /* LD B,L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | ((HL & 0xff) << 8);
                 break;
 
@@ -2384,42 +2397,42 @@ t_stat sim_instr (void) {
 
             case 0x47:      /* LD B,A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | (AF & ~0xff);
                 break;
 
             case 0x48:      /* LD C,B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | ((BC >> 8) & 0xff);
                 break;
 
             case 0x49:      /* LD C,C */
                 tStates += 4;
-                sim_brk_pend = FALSE; /* nop */
+                sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x4a:      /* LD C,D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | ((DE >> 8) & 0xff);
                 break;
 
             case 0x4b:      /* LD C,E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | (DE & 0xff);
                 break;
 
             case 0x4c:      /* LD C,H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | ((HL >> 8) & 0xff);
                 break;
 
             case 0x4d:      /* LD C,L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | (HL & 0xff);
                 break;
 
@@ -2431,42 +2444,42 @@ t_stat sim_instr (void) {
 
             case 0x4f:      /* LD C,A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | ((AF >> 8) & 0xff);
                 break;
 
             case 0x50:      /* LD D,B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | (BC & ~0xff);
                 break;
 
             case 0x51:      /* LD D,C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | ((BC & 0xff) << 8);
                 break;
 
             case 0x52:      /* LD D,D */
                 tStates += 4;
-                sim_brk_pend = FALSE; /* nop */
+                sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x53:      /* LD D,E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | ((DE & 0xff) << 8);
                 break;
 
             case 0x54:      /* LD D,H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | (HL & ~0xff);
                 break;
 
             case 0x55:      /* LD D,L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | ((HL & 0xff) << 8);
                 break;
 
@@ -2478,42 +2491,42 @@ t_stat sim_instr (void) {
 
             case 0x57:      /* LD D,A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | (AF & ~0xff);
                 break;
 
             case 0x58:      /* LD E,B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | ((BC >> 8) & 0xff);
                 break;
 
             case 0x59:      /* LD E,C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | (BC & 0xff);
                 break;
 
             case 0x5a:      /* LD E,D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | ((DE >> 8) & 0xff);
                 break;
 
             case 0x5b:      /* LD E,E */
                 tStates += 4;
-                sim_brk_pend = FALSE; /* nop */
+                sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x5c:      /* LD E,H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | ((HL >> 8) & 0xff);
                 break;
 
             case 0x5d:      /* LD E,L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | (HL & 0xff);
                 break;
 
@@ -2525,42 +2538,42 @@ t_stat sim_instr (void) {
 
             case 0x5f:      /* LD E,A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | ((AF >> 8) & 0xff);
                 break;
 
             case 0x60:      /* LD H,B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | (BC & ~0xff);
                 break;
 
             case 0x61:      /* LD H,C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | ((BC & 0xff) << 8);
                 break;
 
             case 0x62:      /* LD H,D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | (DE & ~0xff);
                 break;
 
             case 0x63:      /* LD H,E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | ((DE & 0xff) << 8);
                 break;
 
             case 0x64:      /* LD H,H */
                 tStates += 4;
-                sim_brk_pend = FALSE; /* nop */
+                sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x65:      /* LD H,L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | ((HL & 0xff) << 8);
                 break;
 
@@ -2572,43 +2585,43 @@ t_stat sim_instr (void) {
 
             case 0x67:      /* LD H,A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | (AF & ~0xff);
                 break;
 
             case 0x68:      /* LD L,B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | ((BC >> 8) & 0xff);
                 break;
 
             case 0x69:      /* LD L,C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | (BC & 0xff);
                 break;
 
             case 0x6a:      /* LD L,D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | ((DE >> 8) & 0xff);
                 break;
 
             case 0x6b:      /* LD L,E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | (DE & 0xff);
                 break;
 
             case 0x6c:      /* LD L,H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | ((HL >> 8) & 0xff);
                 break;
 
             case 0x6d:      /* LD L,L */
                 tStates += 4;
-                sim_brk_pend = FALSE; /* nop */
+                sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x6e:      /* LD L,(HL) */
@@ -2619,7 +2632,7 @@ t_stat sim_instr (void) {
 
             case 0x6f:      /* LD L,A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | ((AF >> 8) & 0xff);
                 break;
 
@@ -2661,7 +2674,7 @@ t_stat sim_instr (void) {
 
             case 0x76:      /* HALT */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 reason = STOP_HALT;
                 PC--;
                 goto end_decode;
@@ -2674,37 +2687,37 @@ t_stat sim_instr (void) {
 
             case 0x78:      /* LD A,B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | (BC & ~0xff);
                 break;
 
             case 0x79:      /* LD A,C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | ((BC & 0xff) << 8);
                 break;
 
             case 0x7a:      /* LD A,D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | (DE & ~0xff);
                 break;
 
             case 0x7b:      /* LD A,E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | ((DE & 0xff) << 8);
                 break;
 
             case 0x7c:      /* LD A,H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | (HL & ~0xff);
                 break;
 
             case 0x7d:      /* LD A,L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | ((HL & 0xff) << 8);
                 break;
 
@@ -2716,12 +2729,12 @@ t_stat sim_instr (void) {
 
             case 0x7f:      /* LD A,A */
                 tStates += 4;
-                sim_brk_pend = FALSE; /* nop */
+                sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x80:      /* ADD A,B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(BC);
                 acu = hreg(AF);
                 sum = acu + temp;
@@ -2731,7 +2744,7 @@ t_stat sim_instr (void) {
 
             case 0x81:      /* ADD A,C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(BC);
                 acu = hreg(AF);
                 sum = acu + temp;
@@ -2741,7 +2754,7 @@ t_stat sim_instr (void) {
 
             case 0x82:      /* ADD A,D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(DE);
                 acu = hreg(AF);
                 sum = acu + temp;
@@ -2751,7 +2764,7 @@ t_stat sim_instr (void) {
 
             case 0x83:      /* ADD A,E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(DE);
                 acu = hreg(AF);
                 sum = acu + temp;
@@ -2761,7 +2774,7 @@ t_stat sim_instr (void) {
 
             case 0x84:      /* ADD A,H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(HL);
                 acu = hreg(AF);
                 sum = acu + temp;
@@ -2771,7 +2784,7 @@ t_stat sim_instr (void) {
 
             case 0x85:      /* ADD A,L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(HL);
                 acu = hreg(AF);
                 sum = acu + temp;
@@ -2791,14 +2804,14 @@ t_stat sim_instr (void) {
 
             case 0x87:      /* ADD A,A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 cbits = 2 * hreg(AF);
                 AF = cbitsDup8Table[cbits] | (SetPVS(cbits));
                 break;
 
             case 0x88:      /* ADC A,B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(BC);
                 acu = hreg(AF);
                 sum = acu + temp + TSTFLAG(C);
@@ -2808,7 +2821,7 @@ t_stat sim_instr (void) {
 
             case 0x89:      /* ADC A,C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(BC);
                 acu = hreg(AF);
                 sum = acu + temp + TSTFLAG(C);
@@ -2818,7 +2831,7 @@ t_stat sim_instr (void) {
 
             case 0x8a:      /* ADC A,D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(DE);
                 acu = hreg(AF);
                 sum = acu + temp + TSTFLAG(C);
@@ -2828,7 +2841,7 @@ t_stat sim_instr (void) {
 
             case 0x8b:      /* ADC A,E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(DE);
                 acu = hreg(AF);
                 sum = acu + temp + TSTFLAG(C);
@@ -2838,7 +2851,7 @@ t_stat sim_instr (void) {
 
             case 0x8c:      /* ADC A,H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(HL);
                 acu = hreg(AF);
                 sum = acu + temp + TSTFLAG(C);
@@ -2848,7 +2861,7 @@ t_stat sim_instr (void) {
 
             case 0x8d:      /* ADC A,L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(HL);
                 acu = hreg(AF);
                 sum = acu + temp + TSTFLAG(C);
@@ -2868,14 +2881,14 @@ t_stat sim_instr (void) {
 
             case 0x8f:      /* ADC A,A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 cbits = 2 * hreg(AF) + TSTFLAG(C);
                 AF = cbitsDup8Table[cbits] | (SetPVS(cbits));
                 break;
 
             case 0x90:      /* SUB B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(BC);
                 acu = hreg(AF);
                 sum = acu - temp;
@@ -2885,7 +2898,7 @@ t_stat sim_instr (void) {
 
             case 0x91:      /* SUB C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(BC);
                 acu = hreg(AF);
                 sum = acu - temp;
@@ -2895,7 +2908,7 @@ t_stat sim_instr (void) {
 
             case 0x92:      /* SUB D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(DE);
                 acu = hreg(AF);
                 sum = acu - temp;
@@ -2905,7 +2918,7 @@ t_stat sim_instr (void) {
 
             case 0x93:      /* SUB E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(DE);
                 acu = hreg(AF);
                 sum = acu - temp;
@@ -2915,7 +2928,7 @@ t_stat sim_instr (void) {
 
             case 0x94:      /* SUB H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(HL);
                 acu = hreg(AF);
                 sum = acu - temp;
@@ -2925,7 +2938,7 @@ t_stat sim_instr (void) {
 
             case 0x95:      /* SUB L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(HL);
                 acu = hreg(AF);
                 sum = acu - temp;
@@ -2945,13 +2958,13 @@ t_stat sim_instr (void) {
 
             case 0x97:      /* SUB A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = cpu_unit.flags & UNIT_CHIP ? 0x42 : 0x46;
                 break;
 
             case 0x98:      /* SBC A,B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(BC);
                 acu = hreg(AF);
                 sum = acu - temp - TSTFLAG(C);
@@ -2961,7 +2974,7 @@ t_stat sim_instr (void) {
 
             case 0x99:      /* SBC A,C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(BC);
                 acu = hreg(AF);
                 sum = acu - temp - TSTFLAG(C);
@@ -2971,7 +2984,7 @@ t_stat sim_instr (void) {
 
             case 0x9a:      /* SBC A,D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(DE);
                 acu = hreg(AF);
                 sum = acu - temp - TSTFLAG(C);
@@ -2981,7 +2994,7 @@ t_stat sim_instr (void) {
 
             case 0x9b:      /* SBC A,E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(DE);
                 acu = hreg(AF);
                 sum = acu - temp - TSTFLAG(C);
@@ -2991,7 +3004,7 @@ t_stat sim_instr (void) {
 
             case 0x9c:      /* SBC A,H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(HL);
                 acu = hreg(AF);
                 sum = acu - temp - TSTFLAG(C);
@@ -3001,7 +3014,7 @@ t_stat sim_instr (void) {
 
             case 0x9d:      /* SBC A,L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(HL);
                 acu = hreg(AF);
                 sum = acu - temp - TSTFLAG(C);
@@ -3021,44 +3034,44 @@ t_stat sim_instr (void) {
 
             case 0x9f:      /* SBC A,A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 cbits = -TSTFLAG(C);
                 AF = subTable[cbits & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPVS(cbits));
                 break;
 
             case 0xa0:      /* AND B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF & BC) >> 8) & 0xff];
                 break;
 
             case 0xa1:      /* AND C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF >> 8) & BC) & 0xff];
                 break;
 
             case 0xa2:      /* AND D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF & DE) >> 8) & 0xff];
                 break;
 
             case 0xa3:      /* AND E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF >> 8) & DE) & 0xff];
                 break;
 
             case 0xa4:      /* AND H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF & HL) >> 8) & 0xff];
                 break;
 
             case 0xa5:      /* AND L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF >> 8) & HL) & 0xff];
                 break;
 
@@ -3070,43 +3083,43 @@ t_stat sim_instr (void) {
 
             case 0xa7:      /* AND A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = andTable[(AF >> 8) & 0xff];
                 break;
 
             case 0xa8:      /* XOR B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF ^ BC) >> 8) & 0xff];
                 break;
 
             case 0xa9:      /* XOR C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) ^ BC) & 0xff];
                 break;
 
             case 0xaa:      /* XOR D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF ^ DE) >> 8) & 0xff];
                 break;
 
             case 0xab:      /* XOR E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) ^ DE) & 0xff];
                 break;
 
             case 0xac:      /* XOR H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF ^ HL) >> 8) & 0xff];
                 break;
 
             case 0xad:      /* XOR L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) ^ HL) & 0xff];
                 break;
 
@@ -3118,43 +3131,43 @@ t_stat sim_instr (void) {
 
             case 0xaf:      /* XOR A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = 0x44;
                 break;
 
             case 0xb0:      /* OR B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF | BC) >> 8) & 0xff];
                 break;
 
             case 0xb1:      /* OR C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) | BC) & 0xff];
                 break;
 
             case 0xb2:      /* OR D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF | DE) >> 8) & 0xff];
                 break;
 
             case 0xb3:      /* OR E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) | DE) & 0xff];
                 break;
 
             case 0xb4:      /* OR H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF | HL) >> 8) & 0xff];
                 break;
 
             case 0xb5:      /* OR L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) | HL) & 0xff];
                 break;
 
@@ -3166,13 +3179,13 @@ t_stat sim_instr (void) {
 
             case 0xb7:      /* OR A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[(AF >> 8) & 0xff];
                 break;
 
             case 0xb8:      /* CP B */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(BC);
                 AF = (AF & ~0x28) | (temp & 0x28);
                 acu = hreg(AF);
@@ -3184,7 +3197,7 @@ t_stat sim_instr (void) {
 
             case 0xb9:      /* CP C */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(BC);
                 AF = (AF & ~0x28) | (temp & 0x28);
                 acu = hreg(AF);
@@ -3196,7 +3209,7 @@ t_stat sim_instr (void) {
 
             case 0xba:      /* CP D */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(DE);
                 AF = (AF & ~0x28) | (temp & 0x28);
                 acu = hreg(AF);
@@ -3208,7 +3221,7 @@ t_stat sim_instr (void) {
 
             case 0xbb:      /* CP E */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(DE);
                 AF = (AF & ~0x28) | (temp & 0x28);
                 acu = hreg(AF);
@@ -3220,7 +3233,7 @@ t_stat sim_instr (void) {
 
             case 0xbc:      /* CP H */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = hreg(HL);
                 AF = (AF & ~0x28) | (temp & 0x28);
                 acu = hreg(AF);
@@ -3232,7 +3245,7 @@ t_stat sim_instr (void) {
 
             case 0xbd:      /* CP L */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = lreg(HL);
                 AF = (AF & ~0x28) | (temp & 0x28);
                 acu = hreg(AF);
@@ -3256,13 +3269,13 @@ t_stat sim_instr (void) {
 
             case 0xbf:      /* CP A */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 Setlreg(AF, (hreg(AF) & 0x28) | (cpu_unit.flags & UNIT_CHIP ? 0x42 : 0x46));
                 break;
 
             case 0xc0:      /* RET NZ */
                 if (TSTFLAG(Z)) {
-                    sim_brk_pend = FALSE;
+                    sim_brk_pend[0] = FALSE;
                     tStates += 5;
                 }
                 else {
@@ -3280,12 +3293,12 @@ t_stat sim_instr (void) {
                 break;
 
             case 0xc2:      /* JP NZ,nnnn */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 JPC(!TSTFLAG(Z));       /* also updates tStates */
                 break;
 
             case 0xc3:      /* JP nnnn */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 JPC(1);         /* also updates tStates */
                 break;
 
@@ -3301,7 +3314,7 @@ t_stat sim_instr (void) {
 
             case 0xc6:      /* ADD A,nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = RAM_pp(PC);
                 acu = hreg(AF);
                 sum = acu + temp;
@@ -3325,7 +3338,7 @@ t_stat sim_instr (void) {
                     tStates += 11;
                 }
                 else {
-                    sim_brk_pend = FALSE;
+                    sim_brk_pend[0] = FALSE;
                     tStates += 5;
                 }
                 break;
@@ -3338,7 +3351,7 @@ t_stat sim_instr (void) {
                 break;
 
             case 0xca:      /* JP Z,nnnn */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 JPC(TSTFLAG(Z));        /* also updates tStates */
                 break;
 
@@ -3348,42 +3361,42 @@ t_stat sim_instr (void) {
                 switch ((op = GetBYTE(PC)) & 7) {
 
                     case 0:
-                        sim_brk_pend = tStateModifier = FALSE;
+                        sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
                         acu = hreg(BC);
                         tStates += 8;
                         break;
 
                     case 1:
-                        sim_brk_pend = tStateModifier = FALSE;
+                        sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
                         acu = lreg(BC);
                         tStates += 8;
                         break;
 
                     case 2:
-                        sim_brk_pend = tStateModifier = FALSE;
+                        sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
                         acu = hreg(DE);
                         tStates += 8;
                         break;
 
                     case 3:
-                        sim_brk_pend = tStateModifier = FALSE;
+                        sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
                         acu = lreg(DE);
                         tStates += 8;
                         break;
 
                     case 4:
-                        sim_brk_pend = tStateModifier = FALSE;
+                        sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
                         acu = hreg(HL);
                         tStates += 8;
                         break;
 
                     case 5:
-                        sim_brk_pend = tStateModifier = FALSE;
+                        sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
                         acu = lreg(HL);
                         tStates += 8;
@@ -3398,7 +3411,7 @@ t_stat sim_instr (void) {
                         break;
 
                     case 7:
-                        sim_brk_pend = tStateModifier = FALSE;
+                        sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
                         acu = hreg(AF);
                         tStates += 8;
@@ -3523,7 +3536,7 @@ t_stat sim_instr (void) {
 
             case 0xce:      /* ADC A,nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = RAM_pp(PC);
                 acu = hreg(AF);
                 sum = acu + temp + TSTFLAG(C);
@@ -3541,7 +3554,7 @@ t_stat sim_instr (void) {
 
             case 0xd0:      /* RET NC */
                 if (TSTFLAG(C)) {
-                    sim_brk_pend = FALSE;
+                    sim_brk_pend[0] = FALSE;
                     tStates += 5;
                 }
                 else {
@@ -3559,13 +3572,13 @@ t_stat sim_instr (void) {
                 break;
 
             case 0xd2:      /* JP NC,nnnn */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 JPC(!TSTFLAG(C));       /* also updates tStates */
                 break;
 
             case 0xd3:      /* OUT (nn),A */
                 tStates += 11;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 out(RAM_pp(PC), hreg(AF));
                 break;
 
@@ -3581,7 +3594,7 @@ t_stat sim_instr (void) {
 
             case 0xd6:      /* SUB nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = RAM_pp(PC);
                 acu = hreg(AF);
                 sum = acu - temp;
@@ -3605,14 +3618,14 @@ t_stat sim_instr (void) {
                     tStates += 11;
                 }
                 else {
-                    sim_brk_pend = FALSE;
+                    sim_brk_pend[0] = FALSE;
                     tStates += 5;
                 }
                 break;
 
             case 0xd9:      /* EXX */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 checkCPU8080;
                 temp = BC;
                 BC = BC1_S;
@@ -3626,13 +3639,13 @@ t_stat sim_instr (void) {
                 break;
 
             case 0xda:      /* JP C,nnnn */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 JPC(TSTFLAG(C));        /* also updates tStates */
                 break;
 
             case 0xdb:      /* IN A,(nn) */
                 tStates += 11;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 Sethreg(AF, in(RAM_pp(PC)));
                 break;
 
@@ -3646,7 +3659,7 @@ t_stat sim_instr (void) {
 
                     case 0x09:      /* ADD IX,BC */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IX &= ADDRMASK;
                         BC &= ADDRMASK;
                         sum = IX + BC;
@@ -3656,7 +3669,7 @@ t_stat sim_instr (void) {
 
                     case 0x19:      /* ADD IX,DE */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IX &= ADDRMASK;
                         DE &= ADDRMASK;
                         sum = IX + DE;
@@ -3666,7 +3679,7 @@ t_stat sim_instr (void) {
 
                     case 0x21:      /* LD IX,nnnn */
                         tStates += 14;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IX = GetWORD(PC);
                         PC += 2;
                         break;
@@ -3681,33 +3694,33 @@ t_stat sim_instr (void) {
 
                     case 0x23:      /* INC IX */
                         tStates += 10;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         ++IX;
                         break;
 
                     case 0x24:      /* INC IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IX += 0x100;
                         AF = (AF & ~0xfe) | incZ80Table[hreg(IX)];
                         break;
 
                     case 0x25:      /* DEC IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IX -= 0x100;
                         AF = (AF & ~0xfe) | decZ80Table[hreg(IX)];
                         break;
 
                     case 0x26:      /* LD IXH,nn */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IX, RAM_pp(PC));
                         break;
 
                     case 0x29:      /* ADD IX,IX */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IX &= ADDRMASK;
                         sum = IX + IX;
                         AF = (AF & ~0x3b) | cbitsDup16Table[sum >> 8];
@@ -3724,13 +3737,13 @@ t_stat sim_instr (void) {
 
                     case 0x2b:      /* DEC IX */
                         tStates += 10;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         --IX;
                         break;
 
                     case 0x2c:      /* INC IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IX) + 1;
                         Setlreg(IX, temp);
                         AF = (AF & ~0xfe) | incZ80Table[temp];
@@ -3738,7 +3751,7 @@ t_stat sim_instr (void) {
 
                     case 0x2d:      /* DEC IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IX) - 1;
                         Setlreg(IX, temp);
                         AF = (AF & ~0xfe) | decZ80Table[temp & 0xff];
@@ -3746,7 +3759,7 @@ t_stat sim_instr (void) {
 
                     case 0x2e:      /* LD IXL,nn */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IX, RAM_pp(PC));
                         break;
 
@@ -3777,7 +3790,7 @@ t_stat sim_instr (void) {
 
                     case 0x39:      /* ADD IX,SP */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IX &= ADDRMASK;
                         SP &= ADDRMASK;
                         sum = IX + SP;
@@ -3787,13 +3800,13 @@ t_stat sim_instr (void) {
 
                     case 0x44:      /* LD B,IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(BC, hreg(IX));
                         break;
 
                     case 0x45:      /* LD B,IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(BC, lreg(IX));
                         break;
 
@@ -3806,13 +3819,13 @@ t_stat sim_instr (void) {
 
                     case 0x4c:      /* LD C,IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(BC, hreg(IX));
                         break;
 
                     case 0x4d:      /* LD C,IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(BC, lreg(IX));
                         break;
 
@@ -3825,13 +3838,13 @@ t_stat sim_instr (void) {
 
                     case 0x54:      /* LD D,IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(DE, hreg(IX));
                         break;
 
                     case 0x55:      /* LD D,IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(DE, lreg(IX));
                         break;
 
@@ -3844,13 +3857,13 @@ t_stat sim_instr (void) {
 
                     case 0x5c:      /* LD E,IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(DE, hreg(IX));
                         break;
 
                     case 0x5d:      /* LD E,IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(DE, lreg(IX));
                         break;
 
@@ -3863,36 +3876,36 @@ t_stat sim_instr (void) {
 
                     case 0x60:      /* LD IXH,B */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IX, hreg(BC));
                         break;
 
                     case 0x61:      /* LD IXH,C */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IX, lreg(BC));
                         break;
 
                     case 0x62:      /* LD IXH,D */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IX, hreg(DE));
                         break;
 
                     case 0x63:      /* LD IXH,E */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IX, lreg(DE));
                         break;
 
                     case 0x64:      /* LD IXH,IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE; /* nop */
+                        sim_brk_pend[0] = FALSE; /* nop */
                         break;
 
                     case 0x65:      /* LD IXH,IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IX, lreg(IX));
                         break;
 
@@ -3905,43 +3918,43 @@ t_stat sim_instr (void) {
 
                     case 0x67:      /* LD IXH,A */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IX, hreg(AF));
                         break;
 
                     case 0x68:      /* LD IXL,B */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IX, hreg(BC));
                         break;
 
                     case 0x69:      /* LD IXL,C */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IX, lreg(BC));
                         break;
 
                     case 0x6a:      /* LD IXL,D */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IX, hreg(DE));
                         break;
 
                     case 0x6b:      /* LD IXL,E */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IX, lreg(DE));
                         break;
 
                     case 0x6c:      /* LD IXL,IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IX, hreg(IX));
                         break;
 
                     case 0x6d:      /* LD IXL,IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE; /* nop */
+                        sim_brk_pend[0] = FALSE; /* nop */
                         break;
 
                     case 0x6e:      /* LD L,(IX+dd) */
@@ -3953,7 +3966,7 @@ t_stat sim_instr (void) {
 
                     case 0x6f:      /* LD IXL,A */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IX, hreg(AF));
                         break;
 
@@ -4008,13 +4021,13 @@ t_stat sim_instr (void) {
 
                     case 0x7c:      /* LD A,IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(AF, hreg(IX));
                         break;
 
                     case 0x7d:      /* LD A,IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(AF, lreg(IX));
                         break;
 
@@ -4027,7 +4040,7 @@ t_stat sim_instr (void) {
 
                     case 0x84:      /* ADD A,IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = hreg(IX);
                         acu = hreg(AF);
                         sum = acu + temp;
@@ -4036,7 +4049,7 @@ t_stat sim_instr (void) {
 
                     case 0x85:      /* ADD A,IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IX);
                         acu = hreg(AF);
                         sum = acu + temp;
@@ -4055,7 +4068,7 @@ t_stat sim_instr (void) {
 
                     case 0x8c:      /* ADC A,IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = hreg(IX);
                         acu = hreg(AF);
                         sum = acu + temp + TSTFLAG(C);
@@ -4064,7 +4077,7 @@ t_stat sim_instr (void) {
 
                     case 0x8d:      /* ADC A,IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IX);
                         acu = hreg(AF);
                         sum = acu + temp + TSTFLAG(C);
@@ -4096,7 +4109,7 @@ t_stat sim_instr (void) {
 
                     case 0x9c:      /* SBC A,IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = hreg(IX);
                         acu = hreg(AF);
                         sum = acu - temp - TSTFLAG(C);
@@ -4108,7 +4121,7 @@ t_stat sim_instr (void) {
 
                     case 0x9d:      /* SBC A,IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IX);
                         acu = hreg(AF);
                         sum = acu - temp - TSTFLAG(C);
@@ -4127,13 +4140,13 @@ t_stat sim_instr (void) {
 
                     case 0xa4:      /* AND IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = andTable[((AF & IX) >> 8) & 0xff];
                         break;
 
                     case 0xa5:      /* AND IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = andTable[((AF >> 8) & IX) & 0xff];
                         break;
 
@@ -4146,13 +4159,13 @@ t_stat sim_instr (void) {
 
                     case 0xac:      /* XOR IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = xororTable[((AF ^ IX) >> 8) & 0xff];
                         break;
 
                     case 0xad:      /* XOR IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = xororTable[((AF >> 8) ^ IX) & 0xff];
                         break;
 
@@ -4165,13 +4178,13 @@ t_stat sim_instr (void) {
 
                     case 0xb4:      /* OR IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = xororTable[((AF | IX) >> 8) & 0xff];
                         break;
 
                     case 0xb5:      /* OR IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = xororTable[((AF >> 8) | IX) & 0xff];
                         break;
 
@@ -4184,7 +4197,7 @@ t_stat sim_instr (void) {
 
                     case 0xbc:      /* CP IXH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = hreg(IX);
                         AF = (AF & ~0x28) | (temp & 0x28);
                         acu = hreg(AF);
@@ -4195,7 +4208,7 @@ t_stat sim_instr (void) {
 
                     case 0xbd:      /* CP IXL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IX);
                         AF = (AF & ~0x28) | (temp & 0x28);
                         acu = hreg(AF);
@@ -4221,37 +4234,37 @@ t_stat sim_instr (void) {
                         switch ((op = GetBYTE(PC)) & 7) {
 
                             case 0:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = hreg(BC);
                                 break;
 
                             case 1:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = lreg(BC);
                                 break;
 
                             case 2:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = hreg(DE);
                                 break;
 
                             case 3:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = lreg(DE);
                                 break;
 
                             case 4:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = hreg(HL);
                                 break;
 
                             case 5:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = lreg(HL);
                                 break;
@@ -4263,7 +4276,7 @@ t_stat sim_instr (void) {
                                 break;
 
                             case 7:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = hreg(AF);
                                 break;
@@ -4399,19 +4412,19 @@ t_stat sim_instr (void) {
 
                     case 0xe9:      /* JP (IX) */
                         tStates += 8;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         PCQ_ENTRY(PC - 2);
                         PC = IX;
                         break;
 
                     case 0xf9:      /* LD SP,IX */
                         tStates += 10;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         SP = IX;
                         break;
 
                     default:        /* ignore DD */
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         checkCPUZ80;
                         PC--;
                 }
@@ -4419,7 +4432,7 @@ t_stat sim_instr (void) {
 
             case 0xde:      /* SBC A,nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = RAM_pp(PC);
                 acu = hreg(AF);
                 sum = acu - temp - TSTFLAG(C);
@@ -4437,7 +4450,7 @@ t_stat sim_instr (void) {
 
             case 0xe0:      /* RET PO */
                 if (TSTFLAG(P)) {
-                    sim_brk_pend = FALSE;
+                    sim_brk_pend[0] = FALSE;
                     tStates += 5;
                 }
                 else {
@@ -4455,7 +4468,7 @@ t_stat sim_instr (void) {
                 break;
 
             case 0xe2:      /* JP PO,nnnn */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 JPC(!TSTFLAG(P));       /* also updates tStates */
                 break;
 
@@ -4479,7 +4492,7 @@ t_stat sim_instr (void) {
 
             case 0xe6:      /* AND nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF >> 8) & RAM_pp(PC)) & 0xff];
                 break;
 
@@ -4499,26 +4512,26 @@ t_stat sim_instr (void) {
                     tStates += 11;
                 }
                 else {
-                    sim_brk_pend = FALSE;
+                    sim_brk_pend[0] = FALSE;
                     tStates += 5;
                 }
                 break;
 
             case 0xe9:      /* JP (HL) */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 PCQ_ENTRY(PC - 1);
                 PC = HL;
                 break;
 
             case 0xea:      /* JP PE,nnnn */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 JPC(TSTFLAG(P));        /* also updates tStates */
                 break;
 
             case 0xeb:      /* EX DE,HL */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 temp = HL;
                 HL = DE;
                 DE = temp;
@@ -4534,7 +4547,7 @@ t_stat sim_instr (void) {
 
                     case 0x40:      /* IN B,(C) */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = in(lreg(BC));
                         Sethreg(BC, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
@@ -4542,13 +4555,13 @@ t_stat sim_instr (void) {
 
                     case 0x41:      /* OUT (C),B */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         out(lreg(BC), hreg(BC));
                         break;
 
                     case 0x42:      /* SBC HL,BC */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         HL &= ADDRMASK;
                         BC &= ADDRMASK;
                         sum = HL - BC - TSTFLAG(C);
@@ -4581,7 +4594,7 @@ t_stat sim_instr (void) {
 
                     case 0x7C:      /* NEG, unofficial */
                         tStates += 8;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = hreg(AF);
                         AF = ((~(AF & 0xff00) + 1) & 0xff00); /* AF = (-(AF & 0xff00) & 0xff00); */
                         AF |= ((AF >> 8) & 0xa8) | (((AF & 0xff00) == 0) << 6) | negTable[temp];
@@ -4609,19 +4622,19 @@ t_stat sim_instr (void) {
 
                     case 0x46:      /* IM 0 */
                         tStates += 8;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         /* interrupt mode 0 */
                         break;
 
                     case 0x47:      /* LD I,A */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IR_S = (IR_S & 0xff) | (AF & ~0xff);
                         break;
 
                     case 0x48:      /* IN C,(C) */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = in(lreg(BC));
                         Setlreg(BC, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
@@ -4629,13 +4642,13 @@ t_stat sim_instr (void) {
 
                     case 0x49:      /* OUT (C),C */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         out(lreg(BC), lreg(BC));
                         break;
 
                     case 0x4a:      /* ADC HL,BC */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         HL &= ADDRMASK;
                         BC &= ADDRMASK;
                         sum = HL + BC + TSTFLAG(C);
@@ -4662,13 +4675,13 @@ t_stat sim_instr (void) {
 
                     case 0x4f:      /* LD R,A */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IR_S = (IR_S & ~0xff) | ((AF >> 8) & 0xff);
                         break;
 
                     case 0x50:      /* IN D,(C) */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = in(lreg(BC));
                         Sethreg(DE, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
@@ -4676,13 +4689,13 @@ t_stat sim_instr (void) {
 
                     case 0x51:      /* OUT (C),D */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         out(lreg(BC), hreg(DE));
                         break;
 
                     case 0x52:      /* SBC HL,DE */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         HL &= ADDRMASK;
                         DE &= ADDRMASK;
                         sum = HL - DE - TSTFLAG(C);
@@ -4701,19 +4714,19 @@ t_stat sim_instr (void) {
 
                     case 0x56:      /* IM 1 */
                         tStates += 8;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         /* interrupt mode 1 */
                         break;
 
                     case 0x57:      /* LD A,I */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = (AF & 0x29) | (IR_S & ~0xff) | ((IR_S >> 8) & 0x80) | (((IR_S & ~0xff) == 0) << 6) | ((IFF_S & 2) << 1);
                         break;
 
                     case 0x58:      /* IN E,(C) */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = in(lreg(BC));
                         Setlreg(DE, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
@@ -4721,13 +4734,13 @@ t_stat sim_instr (void) {
 
                     case 0x59:      /* OUT (C),E */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         out(lreg(BC), lreg(DE));
                         break;
 
                     case 0x5a:      /* ADC HL,DE */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         HL &= ADDRMASK;
                         DE &= ADDRMASK;
                         sum = HL + DE + TSTFLAG(C);
@@ -4746,20 +4759,20 @@ t_stat sim_instr (void) {
 
                     case 0x5e:      /* IM 2 */
                         tStates += 8;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         /* interrupt mode 2 */
                         break;
 
                     case 0x5f:      /* LD A,R */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = (AF & 0x29) | ((IR_S & 0xff) << 8) | (IR_S & 0x80) |
                             (((IR_S & 0xff) == 0) << 6) | ((IFF_S & 2) << 1);
                         break;
 
                     case 0x60:      /* IN H,(C) */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = in(lreg(BC));
                         Sethreg(HL, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
@@ -4767,13 +4780,13 @@ t_stat sim_instr (void) {
 
                     case 0x61:      /* OUT (C),H */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         out(lreg(BC), hreg(HL));
                         break;
 
                     case 0x62:      /* SBC HL,HL */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         HL &= ADDRMASK;
                         sum = HL - HL - TSTFLAG(C);
                         AF = (AF & ~0xff) | (((sum & ADDRMASK) == 0) << 6) |
@@ -4791,7 +4804,7 @@ t_stat sim_instr (void) {
 
                     case 0x67:      /* RRD */
                         tStates += 18;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = GetBYTE(HL);
                         acu = hreg(AF);
                         PutBYTE(HL, hdig(temp) | (ldig(acu) << 4));
@@ -4800,7 +4813,7 @@ t_stat sim_instr (void) {
 
                     case 0x68:      /* IN L,(C) */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = in(lreg(BC));
                         Setlreg(HL, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
@@ -4808,13 +4821,13 @@ t_stat sim_instr (void) {
 
                     case 0x69:      /* OUT (C),L */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         out(lreg(BC), lreg(HL));
                         break;
 
                     case 0x6a:      /* ADC HL,HL */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         HL &= ADDRMASK;
                         sum = HL + HL + TSTFLAG(C);
                         AF = (AF & ~0xff) | (((sum & ADDRMASK) == 0) << 6) |
@@ -4832,7 +4845,7 @@ t_stat sim_instr (void) {
 
                     case 0x6f:      /* RLD */
                         tStates += 18;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = GetBYTE(HL);
                         acu = hreg(AF);
                         PutBYTE(HL, (ldig(temp) << 4) | ldig(acu));
@@ -4841,7 +4854,7 @@ t_stat sim_instr (void) {
 
                     case 0x70:      /* IN (C) */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = in(lreg(BC));
                         Setlreg(temp, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
@@ -4849,13 +4862,13 @@ t_stat sim_instr (void) {
 
                     case 0x71:      /* OUT (C),0 */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         out(lreg(BC), 0);
                         break;
 
                     case 0x72:      /* SBC HL,SP */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         HL &= ADDRMASK;
                         SP &= ADDRMASK;
                         sum = HL - SP - TSTFLAG(C);
@@ -4874,7 +4887,7 @@ t_stat sim_instr (void) {
 
                     case 0x78:      /* IN A,(C) */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = in(lreg(BC));
                         Sethreg(AF, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
@@ -4882,13 +4895,13 @@ t_stat sim_instr (void) {
 
                     case 0x79:      /* OUT (C),A */
                         tStates += 12;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         out(lreg(BC), hreg(AF));
                         break;
 
                     case 0x7a:      /* ADC HL,SP */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         HL &= ADDRMASK;
                         SP &= ADDRMASK;
                         sum = HL + SP + TSTFLAG(C);
@@ -5122,14 +5135,14 @@ t_stat sim_instr (void) {
                         break;
 
                     default:        /* ignore ED and following byte */
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         checkCPUZ80;
                 }
                 break;
 
             case 0xee:      /* XOR nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) ^ RAM_pp(PC)) & 0xff];
                 break;
 
@@ -5143,7 +5156,7 @@ t_stat sim_instr (void) {
 
             case 0xf0:      /* RET P */
                 if (TSTFLAG(S)) {
-                    sim_brk_pend = FALSE;
+                    sim_brk_pend[0] = FALSE;
                     tStates += 5;
                 }
                 else {
@@ -5161,13 +5174,13 @@ t_stat sim_instr (void) {
                 break;
 
             case 0xf2:      /* JP P,nnnn */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 JPC(!TSTFLAG(S));       /* also updates tStates */
                 break;
 
             case 0xf3:      /* DI */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 IFF_S = 0;
                 break;
 
@@ -5183,7 +5196,7 @@ t_stat sim_instr (void) {
 
             case 0xf6:      /* OR nn */
                 tStates += 7;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) | RAM_pp(PC)) & 0xff];
                 break;
 
@@ -5203,25 +5216,25 @@ t_stat sim_instr (void) {
                     tStates += 11;
                 }
                 else {
-                    sim_brk_pend = FALSE;
+                    sim_brk_pend[0] = FALSE;
                     tStates += 5;
                 }
                 break;
 
             case 0xf9:      /* LD SP,HL */
                 tStates += 6;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 SP = HL;
                 break;
 
             case 0xfa:      /* JP M,nnnn */
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 JPC(TSTFLAG(S));        /* also updates tStates */
                 break;
 
             case 0xfb:      /* EI */
                 tStates += 4;
-                sim_brk_pend = FALSE;
+                sim_brk_pend[0] = FALSE;
                 IFF_S = 3;
                 break;
 
@@ -5235,7 +5248,7 @@ t_stat sim_instr (void) {
 
                     case 0x09:      /* ADD IY,BC */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IY &= ADDRMASK;
                         BC &= ADDRMASK;
                         sum = IY + BC;
@@ -5245,7 +5258,7 @@ t_stat sim_instr (void) {
 
                     case 0x19:      /* ADD IY,DE */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IY &= ADDRMASK;
                         DE &= ADDRMASK;
                         sum = IY + DE;
@@ -5255,7 +5268,7 @@ t_stat sim_instr (void) {
 
                     case 0x21:      /* LD IY,nnnn */
                         tStates += 14;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IY = GetWORD(PC);
                         PC += 2;
                         break;
@@ -5270,33 +5283,33 @@ t_stat sim_instr (void) {
 
                     case 0x23:      /* INC IY */
                         tStates += 10;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         ++IY;
                         break;
 
                     case 0x24:      /* INC IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IY += 0x100;
                         AF = (AF & ~0xfe) | incZ80Table[hreg(IY)];
                         break;
 
                     case 0x25:      /* DEC IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IY -= 0x100;
                         AF = (AF & ~0xfe) | decZ80Table[hreg(IY)];
                         break;
 
                     case 0x26:      /* LD IYH,nn */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IY, RAM_pp(PC));
                         break;
 
                     case 0x29:      /* ADD IY,IY */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IY &= ADDRMASK;
                         sum = IY + IY;
                         AF = (AF & ~0x3b) | cbitsDup16Table[sum >> 8];
@@ -5313,13 +5326,13 @@ t_stat sim_instr (void) {
 
                     case 0x2b:      /* DEC IY */
                         tStates += 10;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         --IY;
                         break;
 
                     case 0x2c:      /* INC IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IY) + 1;
                         Setlreg(IY, temp);
                         AF = (AF & ~0xfe) | incZ80Table[temp];
@@ -5327,7 +5340,7 @@ t_stat sim_instr (void) {
 
                     case 0x2d:      /* DEC IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IY) - 1;
                         Setlreg(IY, temp);
                         AF = (AF & ~0xfe) | decZ80Table[temp & 0xff];
@@ -5335,7 +5348,7 @@ t_stat sim_instr (void) {
 
                     case 0x2e:      /* LD IYL,nn */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IY, RAM_pp(PC));
                         break;
 
@@ -5366,7 +5379,7 @@ t_stat sim_instr (void) {
 
                     case 0x39:      /* ADD IY,SP */
                         tStates += 15;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         IY &= ADDRMASK;
                         SP &= ADDRMASK;
                         sum = IY + SP;
@@ -5376,13 +5389,13 @@ t_stat sim_instr (void) {
 
                     case 0x44:      /* LD B,IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(BC, hreg(IY));
                         break;
 
                     case 0x45:      /* LD B,IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(BC, lreg(IY));
                         break;
 
@@ -5395,13 +5408,13 @@ t_stat sim_instr (void) {
 
                     case 0x4c:      /* LD C,IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(BC, hreg(IY));
                         break;
 
                     case 0x4d:      /* LD C,IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(BC, lreg(IY));
                         break;
 
@@ -5414,13 +5427,13 @@ t_stat sim_instr (void) {
 
                     case 0x54:      /* LD D,IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(DE, hreg(IY));
                         break;
 
                     case 0x55:      /* LD D,IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(DE, lreg(IY));
                         break;
 
@@ -5433,13 +5446,13 @@ t_stat sim_instr (void) {
 
                     case 0x5c:      /* LD E,IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(DE, hreg(IY));
                         break;
 
                     case 0x5d:      /* LD E,IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(DE, lreg(IY));
                         break;
 
@@ -5452,36 +5465,36 @@ t_stat sim_instr (void) {
 
                     case 0x60:      /* LD IYH,B */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IY, hreg(BC));
                         break;
 
                     case 0x61:      /* LD IYH,C */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IY, lreg(BC));
                         break;
 
                     case 0x62:      /* LD IYH,D */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IY, hreg(DE));
                         break;
 
                     case 0x63:      /* LD IYH,E */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IY, lreg(DE));
                         break;
 
                     case 0x64:      /* LD IYH,IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE; /* nop */
+                        sim_brk_pend[0] = FALSE; /* nop */
                         break;
 
                     case 0x65:      /* LD IYH,IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IY, lreg(IY));
                         break;
 
@@ -5494,43 +5507,43 @@ t_stat sim_instr (void) {
 
                     case 0x67:      /* LD IYH,A */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(IY, hreg(AF));
                         break;
 
                     case 0x68:      /* LD IYL,B */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IY, hreg(BC));
                         break;
 
                     case 0x69:      /* LD IYL,C */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IY, lreg(BC));
                         break;
 
                     case 0x6a:      /* LD IYL,D */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IY, hreg(DE));
                         break;
 
                     case 0x6b:      /* LD IYL,E */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IY, lreg(DE));
                         break;
 
                     case 0x6c:      /* LD IYL,IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IY, hreg(IY));
                         break;
 
                     case 0x6d:      /* LD IYL,IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE; /* nop */
+                        sim_brk_pend[0] = FALSE; /* nop */
                         break;
 
                     case 0x6e:      /* LD L,(IY+dd) */
@@ -5542,7 +5555,7 @@ t_stat sim_instr (void) {
 
                     case 0x6f:      /* LD IYL,A */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Setlreg(IY, hreg(AF));
                         break;
 
@@ -5597,13 +5610,13 @@ t_stat sim_instr (void) {
 
                     case 0x7c:      /* LD A,IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(AF, hreg(IY));
                         break;
 
                     case 0x7d:      /* LD A,IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         Sethreg(AF, lreg(IY));
                         break;
 
@@ -5616,7 +5629,7 @@ t_stat sim_instr (void) {
 
                     case 0x84:      /* ADD A,IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = hreg(IY);
                         acu = hreg(AF);
                         sum = acu + temp;
@@ -5625,7 +5638,7 @@ t_stat sim_instr (void) {
 
                     case 0x85:      /* ADD A,IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IY);
                         acu = hreg(AF);
                         sum = acu + temp;
@@ -5644,7 +5657,7 @@ t_stat sim_instr (void) {
 
                     case 0x8c:      /* ADC A,IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = hreg(IY);
                         acu = hreg(AF);
                         sum = acu + temp + TSTFLAG(C);
@@ -5653,7 +5666,7 @@ t_stat sim_instr (void) {
 
                     case 0x8d:      /* ADC A,IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IY);
                         acu = hreg(AF);
                         sum = acu + temp + TSTFLAG(C);
@@ -5685,7 +5698,7 @@ t_stat sim_instr (void) {
 
                     case 0x9c:      /* SBC A,IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = hreg(IY);
                         acu = hreg(AF);
                         sum = acu - temp - TSTFLAG(C);
@@ -5697,7 +5710,7 @@ t_stat sim_instr (void) {
 
                     case 0x9d:      /* SBC A,IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IY);
                         acu = hreg(AF);
                         sum = acu - temp - TSTFLAG(C);
@@ -5716,13 +5729,13 @@ t_stat sim_instr (void) {
 
                     case 0xa4:      /* AND IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = andTable[((AF & IY) >> 8) & 0xff];
                         break;
 
                     case 0xa5:      /* AND IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = andTable[((AF >> 8) & IY) & 0xff];
                         break;
 
@@ -5735,13 +5748,13 @@ t_stat sim_instr (void) {
 
                     case 0xac:      /* XOR IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = xororTable[((AF ^ IY) >> 8) & 0xff];
                         break;
 
                     case 0xad:      /* XOR IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = xororTable[((AF >> 8) ^ IY) & 0xff];
                         break;
 
@@ -5754,13 +5767,13 @@ t_stat sim_instr (void) {
 
                     case 0xb4:      /* OR IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = xororTable[((AF | IY) >> 8) & 0xff];
                         break;
 
                     case 0xb5:      /* OR IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         AF = xororTable[((AF >> 8) | IY) & 0xff];
                         break;
 
@@ -5773,7 +5786,7 @@ t_stat sim_instr (void) {
 
                     case 0xbc:      /* CP IYH */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = hreg(IY);
                         AF = (AF & ~0x28) | (temp & 0x28);
                         acu = hreg(AF);
@@ -5784,7 +5797,7 @@ t_stat sim_instr (void) {
 
                     case 0xbd:      /* CP IYL */
                         tStates += 9;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         temp = lreg(IY);
                         AF = (AF & ~0x28) | (temp & 0x28);
                         acu = hreg(AF);
@@ -5810,37 +5823,37 @@ t_stat sim_instr (void) {
                         switch ((op = GetBYTE(PC)) & 7) {
 
                             case 0:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = hreg(BC);
                                 break;
 
                             case 1:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = lreg(BC);
                                 break;
 
                             case 2:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = hreg(DE);
                                 break;
 
                             case 3:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = lreg(DE);
                                 break;
 
                             case 4:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = hreg(HL);
                                 break;
 
                             case 5:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = lreg(HL);
                                 break;
@@ -5852,7 +5865,7 @@ t_stat sim_instr (void) {
                                 break;
 
                             case 7:
-                                sim_brk_pend = FALSE;
+                                sim_brk_pend[0] = FALSE;
                                 ++PC;
                                 acu = hreg(AF);
                                 break;
@@ -5988,19 +6001,19 @@ t_stat sim_instr (void) {
 
                     case 0xe9:      /* JP (IY) */
                         tStates += 8;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         PCQ_ENTRY(PC - 2);
                         PC = IY;
                         break;
 
                     case 0xf9:      /* LD SP,IY */
                         tStates += 10;
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         SP = IY;
                         break;
 
                     default:        /* ignore FD */
-                        sim_brk_pend = FALSE;
+                        sim_brk_pend[0] = FALSE;
                         checkCPUZ80;
                         PC--;
                 }
@@ -6008,7 +6021,7 @@ t_stat sim_instr (void) {
 
         case 0xfe:  /* CP nn */
             tStates += 7;
-            sim_brk_pend = FALSE;
+            sim_brk_pend[0] = FALSE;
             temp = RAM_pp(PC);
             AF = (AF & ~0x28) | (temp & 0x28);
             acu = hreg(AF);
@@ -6080,7 +6093,7 @@ void printROMMessage(const uint32 cntROM) {
 /* reset routine */
 
 t_stat cpu_reset(DEVICE *dptr) {
-    extern int32 sim_brk_types, sim_brk_dflt;   /* breakpoint info */
+    extern uint32 sim_brk_types, sim_brk_dflt;   /* breakpoint info */
     int32 i;
     AF_S = AF1_S = 0;
     BC_S = DE_S = HL_S = 0;

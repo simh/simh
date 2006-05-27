@@ -1,6 +1,6 @@
 /* h316_fhd.c: H316/516 fixed head simulator
 
-   Copyright (c) 2003-2005, Robert M. Supnik
+   Copyright (c) 2003-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fhd          516-4400 fixed head disk
 
+   15-May-06    RMS     Fixed bug in autosize attach (reported by David Gesswein)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
 
    These head-per-track devices are buffered in memory, to minimize overhead.
@@ -63,7 +64,7 @@
 #define CW2_GETCA(x)    (((x) >> CW2_V_CA) & CW2_M_CA)
 
 #define GET_POS(x)      ((int) fmod (sim_gtime() / ((double) (x)), \
-                    ((double) FH_NUMWD)))
+                        ((double) FH_NUMWD)))
 
 /* OTA states */
 
@@ -93,7 +94,6 @@ int32 fhdio (int32 inst, int32 fnc, int32 dat, int32 dev);
 t_stat fhd_svc (UNIT *uptr);
 t_stat fhd_reset (DEVICE *dptr);
 t_stat fhd_attach (UNIT *uptr, char *cptr);
-t_stat fhd_boot (int32 unitno, DEVICE *dptr);
 t_stat fhd_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 void fhd_go (uint32 dma);
 void fhd_go1 (uint32 dat);
@@ -433,18 +433,15 @@ t_stat fhd_attach (UNIT *uptr, char *cptr)
 {
 uint32 sz, sf;
 uint32 ds_bytes = FH_WDPSF * sizeof (int16);
-t_stat r;
 
-r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (uptr->fileref))) {
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     sf = (sz + ds_bytes - 1) / ds_bytes;
     if (sf >= FH_NUMSF) sf = FH_NUMSF - 1;
     uptr->flags = (uptr->flags & ~UNIT_SF) |
         (sf << UNIT_V_SF);
     }
 uptr->capac = UNIT_GETSF (uptr->flags) * FH_WDPSF;
-return SCPE_OK;
+return attach_unit (uptr, cptr);
 }
 
 /* Set size routine */

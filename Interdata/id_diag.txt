@@ -655,7 +655,7 @@ sim> boot mt0
 
 Breakpoint, PC: 00A00 (B A5E)
 
-sim> d -w a10 0101			; patch for TTY console
+sim> d -h a10 0202			; patch for TTY console
 sim> att dm0 foo.dsk
 sim> att dm1 foo1.dsk
 sim> c
@@ -904,4 +904,8 @@ Bugs found
 92. IDC: read with invalid head sets ACF, not DTE
 93. DP, IDC: write with cylinder overflow advanced selch pointer
 94. MT: read error must stop selector channel (if active)
+95. IDC: xx000000 to controller or drive are NOP's, not invalid commands
+96. IDC: WD/WH use standard Interdata write pointers
+97. SELCH: GO preserves EXA and SSTA
+98. CPU: DH overflow checking broken
 

@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2005, Robert M Supnik
+   Copyright (c) 1998-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   10-May-06    RMS     Added access check on system PTE for 11/780
+                        Added mbz check in LDPCTX for 11/780
+   22-Sep-06    RMS     Fixed declarations (from Sterling Garwood)
    30-Sep-04    RMS     Added conditionals for full VAX
                         Moved emulation to vax_cis.c
                         Moved model-specific IPRs to system module
@@ -1200,7 +1202,7 @@ return newpsl & CC_MASK;                                /* set new cc */
 
 void op_ldpctx (int32 acc)
 {
-int32 newpc, newpsl, pcbpa;
+int32 newpc, newpsl, pcbpa, t;
 
 if (PSL & PSL_CUR) RSVD_INST_FAULT;                     /* must be kernel */
 pcbpa = PCBB & PAMASK;                                  /* phys address */
@@ -1224,16 +1226,26 @@ R[12] = ReadLP (pcbpa + 64);
 R[13] = ReadLP (pcbpa + 68);
 newpc = ReadLP (pcbpa + 72);                            /* get PC, PSL */
 newpsl = ReadLP (pcbpa + 76);
-P0BR = ReadLP (pcbpa + 80);                             /* restore mem mgt */
-P0LR = ReadLP (pcbpa + 84);
-P1BR = ReadLP (pcbpa + 88);
-P1LR = ReadLP (pcbpa + 92);
-ASTLVL = (P0LR >> 24) & AST_MASK;                       /* restore AST */
-pme = (P1LR >> 31) & 1;                                 /* restore PME */
-P0BR = P0BR & BR_MASK;
-P0LR = P0LR & LR_MASK;
-P1BR = P1BR & BR_MASK;
-P1LR = P1LR & LR_MASK;
+
+t = ReadLP (pcbpa + 80);
+ML_BR_TEST (t);                                         /* validate P0BR */
+P0BR = t & BR_MASK;                                     /* restore P0BR */
+t = ReadLP (pcbpa + 84);
+LP_MBZ84_TEST (t);                                      /* test mbz */
+ML_LR_TEST (t & LR_MASK);                               /* validate P0LR */
+P0LR = t & LR_MASK;                                     /* restore P0LR */
+t = (t >> 24) & AST_MASK;
+LP_AST_TEST (t);                                        /* validate AST */
+ASTLVL = t;                                             /* restore AST */
+t = ReadLP (pcbpa + 88);
+ML_BR_TEST (t + 0x800000);                              /* validate P1BR */
+P1BR = t & BR_MASK;                                     /* restore P1BR */
+t = ReadLP (pcbpa + 92);
+LP_MBZ92_TEST (t);                                      /* test MBZ */
+ML_LR_TEST (t & LR_MASK);                               /* validate P1LR */
+P1LR = t & LR_MASK;                                     /* restore P1LR */
+pme = (t >> 31) & 1;                                    /* restore PME */
+
 zap_tb (0);                                             /* clear process TB */
 set_map_reg ();
 if (DEBUG_PRI (cpu_dev, LOG_CPU_P)) fprintf (sim_deb,
@@ -1372,46 +1384,54 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_P0BR:                                       /* P0BR */
+        ML_BR_TEST (val);                               /* validate */
         P0BR = val & BR_MASK;                           /* lw aligned */
         zap_tb (0);                                     /* clr proc TLB */
         set_map_reg ();
         break;
 
     case MT_P0LR:                                       /* P0LR */
+        ML_LR_TEST (val & LR_MASK);                     /* validate */
         P0LR = val & LR_MASK;
         zap_tb (0);                                     /* clr proc TLB */
         set_map_reg ();
         break;
 
     case MT_P1BR:                                       /* P1BR */
+        ML_BR_TEST (val + 0x800000);                    /* validate */
         P1BR = val & BR_MASK;                           /* lw aligned */
         zap_tb (0);                                     /* clr proc TLB */
         set_map_reg ();
         break;
 
     case MT_P1LR:                                       /* P1LR */
+        ML_LR_TEST (val & LR_MASK);                     /* validate */
         P1LR = val & LR_MASK;
         zap_tb (0);                                     /* clr proc TLB */
         set_map_reg ();
         break;
 
     case MT_SBR:                                        /* SBR */
+        ML_PA_TEST (val);                               /* validate */
         SBR = val & BR_MASK;                            /* lw aligned */
         zap_tb (1);                                     /* clr entire TLB */
         set_map_reg ();
         break;
 
     case MT_SLR:                                        /* SLR */
+        ML_LR_TEST (val & LR_MASK);                     /* validate */
         SLR = val & LR_MASK;
         zap_tb (1);                                     /* clr entire TLB */
         set_map_reg ();
         break;
 
     case MT_SCBB:                                       /* SCBB */
+        ML_PA_TEST (val);                               /* validate */
         SCBB = val & BR_MASK;                           /* lw aligned */
         break;
 
     case MT_PCBB:                                       /* PCBB */
+        ML_PA_TEST (val);                               /* validate */
         PCBB = val & BR_MASK;                           /* lw aligned */
         break;
 

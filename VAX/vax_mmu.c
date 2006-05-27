@@ -151,13 +151,15 @@ DEVICE tlb_dev = {
    3.   Using the two physical addresses, do an unaligned read or
         write, with three cases: unaligned long, unaligned word within
         a longword, unaligned word crossing a longword boundary.
+
+   Note that these routines do not handle quad or octa references.
 */
 
 /* Read virtual
 
    Inputs:
         va      =       virtual address
-        lnt     =       length code (BWLQ)
+        lnt     =       length code (BWL)
         acc     =       access code (KESU)
    Output:
         returned data, right justified in 32b longword
@@ -216,7 +218,7 @@ else {
    Inputs:
         va      =       virtual address
         val     =       data to be written, right justified in 32b lw
-        lnt     =       length code (BWLQ)
+        lnt     =       length code (BWL)
         acc     =       access code (KESU)
    Output:
         none
@@ -440,7 +442,8 @@ int32 tlbpte, ptead, pte, tbi, vpn;
 static TLBENT zero_pte = { 0, 0 };
 
 if (va & VA_S0) {                                       /* system space? */
-    if (ptidx >= d_slr) MM_ERR (PR_LNV);                /* system */
+    if (ptidx >= d_slr)                                 /* system */
+        MM_ERR (PR_LNV);
     ptead = d_sbr + ptidx;
     }
 else {
@@ -458,8 +461,12 @@ else {
     tbi = VA_GETTBI (vpn);
     if (stlb[tbi].tag != vpn) {                         /* in sys tlb? */
         ptidx = ((uint32) ptead) >> 7;                  /* xlate like sys */
-        if (ptidx >= d_slr) MM_ERR (PR_PLNV);
+        if (ptidx >= d_slr)
+            MM_ERR (PR_PLNV);
         pte = ReadLP (d_sbr + ptidx);                   /* get system pte */
+#if defined (VAX_780)
+        if ((pte & PTE_ACC) == 0) MM_ERR (PR_PACV);     /* spte ACV? */
+#endif
         if ((pte & PTE_V) == 0) MM_ERR (PR_PTNV);       /* spte TNV? */
         stlb[tbi].tag = vpn;                            /* set stlb tag */
         stlb[tbi].pte = cvtacc[PTE_GETACC (pte)] |

@@ -1,6 +1,6 @@
 /* pdp8_mt.c: PDP-8 magnetic tape simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           TM8E/TU10 magtape
 
+   16-Feb-06    RMS     Added tape capacity checking
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    18-Mar-05    RMS     Added attached test to detach routine
    25-Apr-03    RMS     Revised for extended file support
@@ -204,6 +205,8 @@ MTAB mt_mod[] = {
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", &mt_vlock }, 
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
       &set_dev, &show_dev, NULL },
     { 0 }
@@ -369,6 +372,7 @@ t_stat mt_svc (UNIT *uptr)
 {
 int32 f, i, p, u, wc, xma;
 t_mtrlnt tbc, cbc;
+t_bool passed_eot;
 uint16 c, c1, c2;
 t_stat st, r = SCPE_OK;
 
@@ -397,6 +401,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* if not attached */
     return IORETURN (mt_stopioe, SCPE_UNATT);
     }
 
+passed_eot = sim_tape_eot (uptr);                       /* passed eot? */
 switch (f) {                                            /* case on function */
 
     case FN_READ:                                       /* read */
@@ -460,7 +465,7 @@ switch (f) {                                            /* case on function */
                 r = mt_map_err (uptr, st);              /* map error */
                 break;                                  /* stop */
                 }
-            } while (mt_wc != 0);
+            } while ((mt_wc != 0) && (passed_eot || !sim_tape_eot (uptr)));
         break;
 
     case FN_SPACER:                                     /* space reverse */
@@ -474,6 +479,8 @@ switch (f) {                                            /* case on function */
         break;
         }                                               /* end case */
 
+if (!passed_eot && sim_tape_eot (uptr))                 /* just passed EOT? */
+    uptr->USTAT = uptr->USTAT | STA_EOT;
 mt_cu = (mt_cu & ~CU_EMA) | ((xma >> (12 - CU_V_EMA)) & CU_EMA);
 mt_ca = xma & 07777;                                    /* update mem addr */
 mt_set_done ();                                         /* set done */

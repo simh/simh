@@ -1,6 +1,6 @@
 /*  altairz80_dsk.c: MITS Altair 88-DISK Simulator
 
-    Copyright (c) 2002-2005, Peter Schorn
+    Copyright (c) 2002-2006, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -494,7 +494,7 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
 
 /* Disk Data In/Out */
 
-static INLINE int32 dskseek(const UNIT *xptr) {
+static int32 dskseek(const UNIT *xptr) {
     return fseek(xptr -> fileref, DSK_TRACSIZE * current_track[current_disk] +
         DSK_SECTSIZE * current_sector[current_disk], SEEK_SET);
 }

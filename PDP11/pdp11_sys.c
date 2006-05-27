@@ -1,6 +1,6 @@
 /* pdp11_sys.c: PDP-11 simulator interface
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    22-Jul-05    RMS     Fixed missing , in initializer (from Doug Gwyn)
    22-Dec-03    RMS     Added second DEUNA/DELUA support
@@ -57,6 +58,7 @@ extern DEVICE cpu_dev, sys_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
 extern DEVICE lpt_dev;
+extern DEVICE cr_dev;
 extern DEVICE clk_dev, pclk_dev;
 extern DEVICE dz_dev;
 extern DEVICE vh_dev;
@@ -101,6 +103,7 @@ DEVICE *sim_devices[] = {
     &ptp_dev,
     &tti_dev,
     &tto_dev,
+    &cr_dev,
     &lpt_dev,
     &clk_dev,
     &pclk_dev,

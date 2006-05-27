@@ -1,6 +1,6 @@
 /* pdp11_ry.c: RX211/RXV21/RX02 floppy disk simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ry           RX211/RXV21/RX02 floppy disk
 
+   15-May-06    RMS     Fixed bug in autosize attach (reported by David Gesswein)
    07-Jul-05    RMS     Removed extraneous externs
    18-Feb-05    RMS     Fixed bug in boot code (reported by Graham Toal)
    30-Sep-04    RMS     Revised Unibus interface
@@ -569,16 +570,13 @@ return auto_config (0, 0);                              /* run autoconfig */
 t_stat ry_attach (UNIT *uptr, char *cptr)
 {
 uint32 sz;
-t_stat r;
 
-r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (uptr->fileref))) {
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     if (sz > RX_SIZE) uptr->flags = uptr->flags | UNIT_DEN;
     else uptr->flags = uptr->flags & ~UNIT_DEN;
     }
 uptr->capac = (uptr->flags & UNIT_DEN)? RY_SIZE: RX_SIZE;
-return SCPE_OK;
+return attach_unit (uptr, cptr);
 }
 
 /* Set size routine */

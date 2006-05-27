@@ -1,6 +1,6 @@
 /* vax780_defs.h: VAX 780 model-specific definitions file
 
-   Copyright (c) 2004-2005, Robert M Supnik
+   Copyright (c) 2004-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,9 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   17-May-2006  RMS     Added CR11/CD11 support (from John Dundas)
+   10-May-2006  RMS     Added model-specific reserved operand check macros
 
    This file covers the VAX 11/780, the first VAX.
 
@@ -112,6 +115,16 @@
 #define MT_SBITA        53                              /* SBI timeout addr */
 #define MT_SBIQC        54                              /* SBI timeout clear */
 #define MT_MBRK         60                              /* microbreak */
+
+/* Machine specific reserved operand tests */
+
+#define ML_PA_TEST(r)   if ((r) & 0xC0000003) RSVD_OPND_FAULT
+#define ML_LR_TEST(r)   if ((uint32)(r) > 0x200000) RSVD_OPND_FAULT
+#define ML_BR_TEST(r)   if ((((r) & 0xC0000000) != 0x80000000) || \
+                            ((r) & 0x00000003)) RSVD_OPND_FAULT
+#define LP_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT
+#define LP_MBZ84_TEST(r) if ((r) & 0xF8C00000) RSVD_OPND_FAULT
+#define LP_MBZ92_TEST(r) if ((r) & 0x7FC00000) RSVD_OPND_FAULT
 
 /* Memory */
 
@@ -265,6 +278,8 @@ typedef struct {
 #define IOLN_TQ         004
 #define IOBA_XU         (IOPAGEBASE + 014510)           /* DEUNA/DELUA */
 #define IOLN_XU         010
+#define IOBA_CR         (IOPAGEBASE + 017160)           /* CD/CR/CM */
+#define IOLN_CR         010
 #define IOBA_RX         (IOPAGEBASE + 017170)           /* RX11 */
 #define IOLN_RX         004
 #define IOBA_RY         (IOPAGEBASE + 017170)           /* RXV21 */
@@ -295,6 +310,7 @@ typedef struct {
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
 #define INT_V_PTP       2
+#define INT_V_CR        3
 
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
@@ -305,9 +321,10 @@ typedef struct {
 #define INT_TS          (1u << INT_V_TS)
 #define INT_RY          (1u << INT_V_RY)
 #define INT_XU          (1u << INT_V_XU)
+#define INT_LPT         (1u << INT_V_LPT)
 #define INT_PTR         (1u << INT_V_PTR)
 #define INT_PTP         (1u << INT_V_PTP)
-#define INT_LPT         (1u << INT_V_LPT)
+#define INT_CR          (1u << INT_V_CR)
 
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
@@ -318,9 +335,10 @@ typedef struct {
 #define IPL_TS          (0x15 - IPL_HMIN)
 #define IPL_RY          (0x15 - IPL_HMIN)
 #define IPL_XU          (0x15 - IPL_HMIN)
+#define IPL_LPT         (0x14 - IPL_HMIN)
 #define IPL_PTR         (0x14 - IPL_HMIN)
 #define IPL_PTP         (0x14 - IPL_HMIN)
-#define IPL_LPT         (0x14 - IPL_HMIN)
+#define IPL_CR          (0x14 - IPL_HMIN)
 
 /* Device vectors */
 
@@ -334,6 +352,7 @@ typedef struct {
 #define VEC_LPT         0200
 #define VEC_HK          0210
 #define VEC_TS          0224
+#define VEC_CR          0230
 #define VEC_TQ          0260
 #define VEC_RX          0264
 #define VEC_RY          0264

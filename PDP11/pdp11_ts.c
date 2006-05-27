@@ -1,6 +1,6 @@
 /* pdp11_ts.c: TS11/TSV05 magnetic tape simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ts           TS11/TSV05 magtape
 
+   16-Feb-06    RMS     Added tape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
@@ -346,6 +347,8 @@ MTAB ts_mod[] = {
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
     { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
@@ -648,6 +651,8 @@ if (st = sim_tape_wrrecf (uptr, tsxb, fc))              /* write rec, err? */
     return ts_map_status (st);                          /* return status */
 msgxs0 = msgxs0 | XS0_MOT;                              /* tape has moved */
 msgrfc = 0;
+if (sim_tape_eot (&ts_unit))                            /* EOT on write? */
+    return XTC (XS0_EOT, TC2);
 return 0;
 }
 
@@ -658,6 +663,8 @@ t_stat st;
 if (st = sim_tape_wrtmk (uptr))                         /* write tmk, err? */
     return ts_map_status (st);                          /* return status */
 msgxs0 = msgxs0 | XS0_MOT;                              /* tape has moved */
+if (sim_tape_eot (&ts_unit))                            /* EOT on write? */
+    return XTC (XS0_EOT, TC2);
 return XTC (XS0_TMK, TC0);
 }
 
@@ -783,7 +790,7 @@ switch (fnc) {                                          /* case on func */
             }
         return SCPE_OK;
 
-    case FNC_CTL:                                               /* control */
+    case FNC_CTL:                                       /* control */
         switch (mod) {                                  /* case mode */
 
         case 00:                                        /* msg buf rls */
@@ -903,7 +910,8 @@ switch (fnc) {                                          /* case on func */
             break;
 
         case 04:                                        /* rewind */
-            if (!sim_tape_bot (uptr)) msgxs0 = msgxs0 | XS0_MOT; /* if tape moves */
+            if (!sim_tape_bot (uptr))                   /* if tape moves */
+                msgxs0 = msgxs0 | XS0_MOT;
             sim_tape_rewind (uptr);
             break;
             }
@@ -930,7 +938,10 @@ t = (t & ~(XS0_ONL | XS0_WLK | XS0_BOT | XS0_IE)) | XS0_PET;
 if (ts_unit.flags & UNIT_ATT) {
     t = t | XS0_ONL;
     if (sim_tape_wrp (&ts_unit)) t = t | XS0_WLK;
-    if (sim_tape_bot (&ts_unit)) t = (t | XS0_BOT) & ~XS0_EOT;
+    if (sim_tape_bot (&ts_unit))
+        t = (t | XS0_BOT) & ~XS0_EOT;
+    if (sim_tape_eot (&ts_unit))
+        t = (t | XS0_EOT) & ~XS0_BOT;
     }
 else t = t & ~XS0_EOT;
 if (cmdhdr & CMD_IE) t = t | XS0_IE;

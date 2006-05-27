@@ -1,6 +1,6 @@
 /* nova_cpu.c: NOVA CPU simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          Nova central processor
 
+   06-Feb-06    RMS     Fixed bug in DIVS (found by Mark Hittinger)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    25-Aug-05    RMS     Fixed DIVS case 2^31 / - 1
    14-Jan-04    RMS     Fixed device enable/disable support (found by Bruce Ray)
@@ -743,7 +744,7 @@ while (reason == 0) {                                   /* loop until halted */
                         }
                     if (pulse == iopN) {                /* divs */
                         if ((AC[2] == 0) ||             /* overflow? */
-                            ((AC[0] = 0100000) && (AC[1] == 0) && (AC[2] == 0177777)))
+                            ((AC[0] == 0100000) && (AC[1] == 0) && (AC[2] == 0177777)))
                             C = CBIT;
                         else {
                             mddata = (SEXT (AC[0]) << 16) | AC[1];

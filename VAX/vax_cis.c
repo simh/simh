@@ -26,6 +26,16 @@
    On a full VAX, this module simulates the VAX commercial instruction set (CIS).
    On a subset VAX, this module implements the emulated instruction fault.
 
+   16-May-06    RMS     Fixed bug in length calculation (found by Tim Stark)
+   03-May-06    RMS     Fixed MOVTC, MOVTUC to preserve cc's through page faults
+                        Fixed MOVTUC to stop on translated == escape
+                        Fixed CVTPL to set registers before destination reg write
+                        Fixed CVTPL to set correct cc bit on overflow
+                        Fixed EDITPC to preserve cc's through page faults
+                        Fixed EDITPC EO$BLANK_ZERO count, cc test
+                        Fixed EDITPC EO$INSERT to insert fill instead of blank
+                        Fixed EDITPC EO$LOAD_PLUS/MINUS to skip character
+                        (all reported by Tim Stark)
    12-Apr-04    RMS     Cloned from pdp11_cis.c and vax_cpu1.c
 
    Zero length decimal strings require either zero bytes (trailing) or one byte
@@ -98,8 +108,9 @@ extern int32 eval_int (void);
 int32 op_cis (int32 *op, int32 cc, int32 opc, int32 acc)
 {
 int32 i, j, c, t, pop, rpt, V;
-int32 match, fill, sign, shift, ncc;
+int32 match, fill, sign, shift;
 int32 ldivd, ldivr;
+int32 lenl, lenp;
 uint32 nc, d, result;
 t_stat r;
 DSTR accum, src1, src2, dst;
@@ -120,7 +131,7 @@ switch (opc) {                                          /* case on opcode */
         R[1]            =       source string address
         R[2]            =       number of bytes remaining to move
         R[3]            =       table address
-        R[4]            =       destination string length
+        R[4]            =       saved cc's/destination string length
         R[5]            =       destination string address
 
    Condition codes:
@@ -141,23 +152,23 @@ switch (opc) {                                          /* case on opcode */
             SETPC (fault_PC + STR_GETDPC (R[0]));       /* reset PC */
             fill = STR_GETCHR (R[0]);                   /* get fill */
             R[2] = R[2] & STR_LNMASK;                   /* remaining move */
-            R[4] = R[4] & STR_LNMASK;
+            cc = (R[4] >> 16) & CC_MASK;                /* restore cc's */
             }
         else {
+            CC_CMP_W (op[0], op[4]);                    /* set cc's */
             R[0] = STR_PACK (op[2], op[0]);             /* src len, fill */
             R[1] = op[1];                               /* src addr */
             fill = op[2];                               /* set fill */
             R[3] = op[3];                               /* table addr */
-            R[4] = op[4];                               /* dst len */
+            R[4] = op[4] | ((cc & CC_MASK) << 16);      /* dst len + cc's */
             R[5] = op[5];                               /* dst addr */
-            CC_CMP_W (op[0], op[4]);                    /* set cc's */
             R[2] = (op[0] < op[4])? op[0]: op[4];       /* remaining move */
             PSL = PSL | PSL_FPD;                        /* set FPD */
             }
         if (R[2]) {                                     /* move to do? */
             int32 mvl;
             mvl = R[0] & STR_LNMASK;                    /* orig move len */
-            if (mvl >= R[4]) mvl = R[4];
+            if (mvl >= (R[4] & STR_LNMASK)) mvl = R[4] & STR_LNMASK;
             if (((uint32) R[1]) < ((uint32) R[5])) {    /* backward? */
                 while (R[2]) {                          /* loop thru char */
                     t = Read ((R[1] + R[2] - 1) & LMASK, L_BYTE, RA);
@@ -177,17 +188,18 @@ switch (opc) {                                          /* case on opcode */
                     R[2] = (R[2] - 1) & STR_LNMASK;
                     R[5] = (R[5] + 1) & LMASK;
                     }
-                }
+                }                                       /* update lengths */
             R[0] = (R[0] & ~STR_LNMASK) | ((R[0] - mvl) & STR_LNMASK);
-            R[4] = (R[4] - mvl) & STR_LNMASK;           /* update lengths */
+            R[4] = (R[4] & ~STR_LNMASK) | ((R[4] - mvl) & STR_LNMASK);
             }
-        while (R[4]) {                                  /* fill if needed */
+        while (R[4] & STR_LNMASK) {                     /* fill if needed */
             Write (R[5], fill, L_BYTE, WA);
-            R[4] = (R[4] - 1) & STR_LNMASK;
+            R[4] = (R[4] & ~STR_LNMASK) | ((R[4] - 1) & STR_LNMASK);
             R[5] = (R[5] + 1) & LMASK;                  /* adv dst */
             }
         R[0] = R[0] & STR_LNMASK;                       /* mask off state */
-        PSL = PSL & ~PSL_FPD;                           /* all reg correct */
+        R[4] = 0;
+        PSL = PSL & ~PSL_FPD;
         return cc;
 
 /* MOVTUC
@@ -201,7 +213,7 @@ switch (opc) {                                          /* case on opcode */
    Registers if PSL<fpd> = 1:
         R[0]            =       delta-PC/match/source string length
         R[1]            =       source string address
-        R[2]            =       not used
+        R[2]            =       saved condition codes
         R[3]            =       table address
         R[4]            =       destination string length
         R[5]            =       destination string address
@@ -224,24 +236,26 @@ switch (opc) {                                          /* case on opcode */
             SETPC (fault_PC + STR_GETDPC (R[0]));       /* reset PC */
             fill = STR_GETCHR (R[0]);                   /* get match */
             R[4] = R[4] & STR_LNMASK;
+            cc = R[2] & CC_MASK;                        /* restore cc's */
             }
         else {
+            CC_CMP_W (op[0], op[4]);                    /* set cc's */
             R[0] = STR_PACK (op[2], op[0]);             /* src len, fill */
             R[1] = op[1];                               /* src addr */
             fill = op[2];                               /* set match */
             R[3] = op[3];                               /* table addr */
             R[4] = op[4];                               /* dst len */
             R[5] = op[5];                               /* dst addr */
-            CC_CMP_W (op[0], op[4]);                    /* set cc's */
+            R[2] = cc;                                  /* save cc's */
             PSL = PSL | PSL_FPD;                        /* set FPD */
             }
         while ((R[0] & STR_LNMASK) && R[4]) {           /* while src & dst */
             t = Read (R[1], L_BYTE, RA);                /* read src */
-            if (t == fill) {                            /* stop char? */
+            c = Read ((R[3] + t) & LMASK, L_BYTE, RA);  /* translate */
+            if (c == fill) {                            /* stop char? */
                 cc = cc | CC_V;                         /* set V, done */
                 break;
                 }
-            c = Read ((R[3] + t) & LMASK, L_BYTE, RA);  /* translate */
             Write (R[5], c, L_BYTE, WA);                /* write dst */
             R[0] = (R[0] & ~STR_LNMASK) | ((R[0] - 1) & STR_LNMASK);
             R[1] = (R[1] + 1) & LMASK;
@@ -708,15 +722,17 @@ switch (opc) {                                          /* case on opcode */
             }                                           /* end for */
         if (src1.sign) result = (~result + 1) & LMASK;  /* negative? */
         if (src1.sign ^ ((result & LSIGN) != 0)) V = 1; /* test for overflow */
-        if (op[2] >= 0) R[op[2]] = result;
-        else Write (op[3], result, L_LONG, WA);
-        if (V && (PSL & PSW_IV)) SET_TRAP (TRAP_INTOV); /* ovflo and IV? trap */
-        R[0] = 0;
+        if (op[2] < 0)                                  /* if mem, store result */
+            Write (op[3], result, L_LONG, WA);          /* before reg update */
+        R[0] = 0;                                       /* update registers */
         R[1] = op[1];
         R[2] = 0;
         R[3] = 0;
+        if (op[2] >= 0)                                 /* if reg, store result */
+            R[op[2]] = result;                          /* after reg update */
+        if (V && (PSL & PSW_IV)) SET_TRAP (TRAP_INTOV); /* ovflo and IV? trap */
         CC_IIZZ_L (result);
-        return cc | V;
+        return cc | (V? CC_V: 0);
 
 /* CVTLP
 
@@ -816,7 +832,8 @@ switch (opc) {                                          /* case on opcode */
     case CVTPS:
         if ((PSL & PSL_FPD) || (op[0] > 31) || (op[2] > 31))
             RSVD_OPND_FAULT;
-        ReadDstr (op[0], op[1], &dst, acc);             /* get src */
+        lenl = ReadDstr (op[0], op[1], &dst, acc);      /* get source, lw len */
+        lenp = LntDstr (&dst, lenl);                    /* get exact nz src len */
         ProbeDstr (op[2], op[3], WA);                   /* test dst write */
         Write (op[3], dst.sign? C_MINUS: C_PLUS, L_BYTE, WA);
         for (i = 1; i <= op[2]; i++) {                  /* loop thru chars */
@@ -824,7 +841,11 @@ switch (opc) {                                          /* case on opcode */
             c = d | C_ZERO;                             /* cvt to ASCII */
             Write ((op[3] + op[2] + 1 - i) & LMASK, c, L_BYTE, WA);
             }
-        cc = SetCCDstr (op[2], &dst, 0);                /* set cc's */
+        cc = SetCCDstr (op[0], &dst, 0);                /* set cc's */
+        if (lenp > op[2]) {                             /* src fit in dst? */
+            cc = cc | CC_V;                             /* set ovflo */
+            if (PSL & PSW_DV) SET_TRAP (TRAP_DECOVF);   /* if enabled, trap */
+            }
         R[0] = 0;
         R[1] = op[1];
         R[2] = 0;
@@ -898,7 +919,8 @@ switch (opc) {                                          /* case on opcode */
     case CVTPT:
         if ((PSL & PSL_FPD) || (op[0] > 31) || (op[3] > 31))
             RSVD_OPND_FAULT;
-        ReadDstr (op[0], op[1], &dst, acc);             /* get source */
+        lenl = ReadDstr (op[0], op[1], &dst, acc);      /* get source, lw len */
+        lenp = LntDstr (&dst, lenl);                    /* get exact src len */
         ProbeDstr (op[3], op[4], WA);                   /* test writeability */
         for (i = 1; i <= op[3]; i++) {                  /* loop thru chars */
             if (i != 1) {                               /* not last? */
@@ -911,7 +933,11 @@ switch (opc) {                                          /* case on opcode */
                 }
             Write ((op[4] + op[3] - i) & LMASK, c, L_BYTE, WA);
             }
-        cc = SetCCDstr (op[3], &dst, 0);                /* set cc's */
+        cc = SetCCDstr (op[0], &dst, 0);                /* set cc's from src */
+        if (lenp > op[3]) {                             /* src fit in dst? */
+            cc = cc | CC_V;                             /* set ovflo */
+            if (PSL & PSW_DV) SET_TRAP (TRAP_DECOVF);   /* if enabled, trap */
+            }
         R[0] = 0;
         R[1] = op[1];
         R[2] = 0;
@@ -936,6 +962,7 @@ switch (opc) {                                          /* case on opcode */
         R0<15:0>        =       remaining source length
         R1              =       source address
         R2<31:24>       =       delta PC
+        R2<19:16>       =       condition codes
         R2<15:8>        =       sign char
         R2<7:0>         =       fill char
         R3              =       pattern string address
@@ -957,7 +984,7 @@ switch (opc) {                                          /* case on opcode */
    - It is safe to take a memory management fault on a write-only
      operation, like fill.  After correction of the fault, the
      pattern operator is fetched and executed again.
-   - The move operators do not alter visible state (registers or cc)
+   - The move operators do not alter visible state (registers or saved cc)
      until all memory operations are complete.
 */
 
@@ -966,6 +993,7 @@ switch (opc) {                                          /* case on opcode */
             SETPC (fault_PC + STR_GETDPC (R[2]));       /* reset PC */
             fill = ED_GETFILL (R[2]);                   /* get fill */
             sign = ED_GETSIGN (R[2]);                   /* get sign */
+            cc = ED_GETCC (R[2]);                       /* get cc's */
             R[0] = R[0] & ~0xFFE0;                      /* src len <= 31 */
             }
         else {                                          /* new instr */
@@ -982,12 +1010,13 @@ switch (opc) {                                          /* case on opcode */
             fill = C_SPACE;
             R[0] = R[4] = op[0];                        /* src len */
             R[1] = op[1];                               /* src addr */
-            R[2] = STR_PACK (0, (sign << ED_V_SIGN) | (fill << ED_V_FILL));
-                                                        /* delta PC, sign, fill */
+            R[2] = STR_PACK (cc, (sign << ED_V_SIGN) | (fill << ED_V_FILL));
+                                                        /* delta PC, cc, sign, fill */
             R[3] = op[2];                               /* pattern */
             R[5] = op[3];                               /* dst addr */
             PSL = PSL | PSL_FPD;                        /* set FPD */
             }
+
         for ( ;; ) {                                    /* loop thru pattern */
             pop = Read (R[3], L_BYTE, RA);              /* rd pattern op */
             if (pop == EO_END) break;                   /* end? */
@@ -997,6 +1026,7 @@ switch (opc) {                                          /* case on opcode */
                 pop = pop & ~EO_RPT_MASK;               /* isolate op */
                 }
             switch (pop) {                              /* case on op */
+
             case EO_END_FLOAT:                          /* end float */
                 if (!(cc & CC_C)) {                     /* not signif? */
                     Write (R[5], sign, L_BYTE, WA);     /* write sign */
@@ -1004,43 +1034,59 @@ switch (opc) {                                          /* case on opcode */
                     cc = cc | CC_C;                     /* set signif */
                     }
                 break;
+
             case EO_CLR_SIGNIF:                         /* clear signif */
                 cc = cc & ~CC_C;                        /* clr C */
                 break;
+
             case EO_SET_SIGNIF:                         /* set signif */
                 cc = cc | CC_C;                         /* set C */
                 break;
+
             case EO_STORE_SIGN:                         /* store sign */
                 Write (R[5], sign, L_BYTE, WA);         /* write sign */
                 R[5] = (R[5] + 1) & LMASK;              /* now fault safe */
                 break;
+
             case EO_LOAD_FILL:                          /* load fill */
                 fill = Read ((R[3] + 1) & LMASK, L_BYTE, RA);
                 R[2] = ED_PUTFILL (R[2], fill);         /* now fault safe */
                 R[3]++;
                 break;
+
             case EO_LOAD_SIGN:                          /* load sign */
                 sign = edit_read_sign (acc);
+                R[3]++;
                 break;
+
             case EO_LOAD_PLUS:                          /* load sign if + */
                 if (!(cc & CC_N)) sign = edit_read_sign (acc);
+                R[3]++;
                 break;
+
             case EO_LOAD_MINUS:                         /* load sign if - */
                 if (cc & CC_N) sign = edit_read_sign (acc);
+                R[3]++;
                 break;
+
             case EO_INSERT:                             /* insert char */
                 c = Read ((R[3] + 1) & LMASK, L_BYTE, RA);
-                Write (R[5], ((cc & CC_C)? c: sign), L_BYTE, WA);
+                Write (R[5], ((cc & CC_C)? c: fill), L_BYTE, WA);
                 R[5] = (R[5] + 1) & LMASK;              /* now fault safe */
                 R[3]++;
                 break;
+
             case EO_BLANK_ZERO:                         /* blank zero */
                 t = Read ((R[3] + 1) & LMASK, L_BYTE, RA);
                 if (t == 0) RSVD_OPND_FAULT;
-                while (t--)                             /* repeat and blank */
-                    Write ((R[5] - t) & LMASK, fill, L_BYTE, WA);
+                if (cc & CC_Z) {                        /* zero? */
+                    do {                                /* repeat and blank */
+                        Write ((R[5] - t) & LMASK, fill, L_BYTE, WA);
+                        } while (--t);
+                    }
                 R[3]++;                                 /* now fault safe */
                 break;
+
             case EO_REPL_SIGN:                          /* replace sign */
                 t = Read ((R[3] + 1) & LMASK, L_BYTE, RA);
                 if (t == 0) RSVD_OPND_FAULT;
@@ -1048,64 +1094,67 @@ switch (opc) {                                          /* case on opcode */
                     Write ((R[5] - t) & LMASK, fill, L_BYTE, WA);
                 R[3]++;                                 /* now fault safe */
                 break;
+
             case EO_ADJUST_LNT:                         /* adjust length */
                 t = Read ((R[3] + 1) & LMASK, L_BYTE, RA);
                 if ((t == 0) || (t > 31)) RSVD_OPND_FAULT;
                 R[0] = R[0] & WMASK;                    /* clr old ld zero */
                 if (R[0] > t) {                         /* decrease */
-                    ncc = cc;                           /* copy cc's */
                     for (i = 0; i < (R[0] - t); i++) {  /* loop thru src */
                         d = edit_read_src (i, acc);     /* get nibble */
-                        if (d) ncc = (ncc | CC_V | CC_C) & ~CC_Z;
+                        if (d) cc = (cc | CC_V | CC_C) & ~CC_Z;
                         }                               /* end for */
-                    cc = ncc;                           /* now fault safe */
                     edit_adv_src (R[0] - t);            /* adv src ptr */
                     }                                   /* end else */      
                 else R[0] = R[0] | (((R[0] - t) & WMASK) << 16);
                 R[3]++;
                 break;
+
             case EO_FILL:                               /* fill */
                 for (i = 0; i < rpt; i++)               /* fill string */
                     Write ((R[5] + i) & LMASK, fill, L_BYTE, WA);
                 R[5] = (R[5] + rpt) & LMASK;            /* now fault safe */
                 break;
+
             case EO_MOVE:
-                ncc = cc;                               /* copy cc's */
                 for (i = 0; i < rpt; i++) {             /* for repeat */
                     d = edit_read_src (i, acc);         /* get nibble */
-                    if (d) ncc = (ncc | CC_C) & ~CC_Z;  /* test for non-zero */
-                    c = (ncc & CC_C)? (d | 0x30): fill; /* test for signif */
+                    if (d) cc = (cc | CC_C) & ~CC_Z;    /* test for non-zero */
+                    c = (cc & CC_C)? (d | 0x30): fill;  /* test for signif */
                     Write ((R[5] + i) & LMASK, c, L_BYTE, WA);
                     }                                   /* end for */
-                cc = ncc;                               /* now fault safe */
                 edit_adv_src (rpt);                     /* advance src */
                 R[5] = (R[5] + rpt) & LMASK;            /* advance dst */
                 break;
+
             case EO_FLOAT:
-                ncc = cc;                               /* copy cc's */
                 for (i = j = 0; i < rpt; i++, j++) {    /* for repeat */
                     d = edit_read_src (i, acc);         /* get nibble */
-                    if (d && !(ncc & CC_C)) {           /* nz, signif clear? */
+                    if (d && !(cc & CC_C)) {            /* nz, signif clear? */
                         Write ((R[5] + j) & LMASK, sign, L_BYTE, WA);
-                        ncc = (ncc | CC_C) & ~CC_Z;     /* set signif */
+                        cc = (cc | CC_C) & ~CC_Z;       /* set signif */
                         j++;                            /* extra dst char */
                         }                               /* end if */
-                    c = (ncc & CC_C)? (d | 0x30): fill; /* test for signif */
+                    c = (cc & CC_C)? (d | 0x30): fill;  /* test for signif */
                     Write ((R[5] + j) & LMASK, c, L_BYTE, WA);
                     }                                   /* end for */
-                cc = ncc;                               /* now fault safe */
                 edit_adv_src (rpt);                     /* advance src */
                 R[5] = (R[5] + j) & LMASK;              /* advance dst */
                 break;
+
             default:                                    /* undefined */
                 RSVD_OPND_FAULT;
                 }                                       /* end case pattern */
+
             R[3] = (R[3] + 1) & LMASK;                  /* next pattern byte */
+            R[2] = ED_PUTCC (R[2], cc);                 /* update cc's */
             }                                           /* end for pattern */
+
         if (R[0]) RSVD_OPND_FAULT;                      /* pattern too short */
         PSL = PSL & ~PSL_FPD;                           /* clear FPD */
         if (cc & CC_Z) cc = cc & ~CC_N;                 /* zero? clear n */
-        if ((cc & CC_V) && (PSL & PSW_DV)) SET_TRAP (TRAP_DECOVF);
+        if ((cc & CC_V) && (PSL & PSW_DV))              /* overflow & trap enabled? */
+            SET_TRAP (TRAP_DECOVF);
         R[0] = R[4];                                    /* restore src len */
         R[1] = R[1] - (R[0] >> 1);                      /* restore src addr */
         R[2] = R[4] = 0;
@@ -1146,8 +1195,8 @@ for (i = 0; i <= end; i++) {                            /* loop thru string */
         c = c & 0xF0;                                   /* erase sign */
         }
     if ((i == end) && ((lnt & 1) == 0)) c = c & 0xF;
-    if (((c & 0xF0) > 0x90) ||                          /* check hi digit */
-        ((c & 0x0F) > 0x09)) RSVD_OPND_FAULT;           /* check lo digit */    
+/*    if (((c & 0xF0) > 0x90) ||                          /* check hi digit */
+/*        ((c & 0x0F) > 0x09)) RSVD_OPND_FAULT;           /* check lo digit */    
     src->val[i / 4] = src->val[i / 4] | (c << ((i % 4) * 8));
     }                                                   /* end for */
 if ((t == 0xB) || (t == 0xD)) src->sign = 1;            /* if -, set sign */
@@ -1366,6 +1415,7 @@ int32 LntDstr (DSTR *dsrc, int32 nz)
 {
 int32 i;
 
+if (nz == 0) return 0;
 for (i = 7; i > 0; i--) {
     if ((dsrc->val[nz - 1] >> (i * 4)) & 0xF) break;
     }
@@ -1545,7 +1595,6 @@ int32 sign;
 
 sign = Read ((R[3] + 1) & LMASK, L_BYTE, RA);           /* read */
 R[2] = ED_PUTSIGN (R[2], sign);                         /* now fault safe */
-R[3] = (R[3] + 1) & LMASK;
 return sign;
 }
 

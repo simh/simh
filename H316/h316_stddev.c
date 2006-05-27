@@ -1,6 +1,6 @@
 /* h316_stddev.c: Honeywell 316/516 standard devices
 
-   Copyright (c) 1999-2005, Robert M. Supnik
+   Copyright (c) 1999-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tty          316/516-33 teleprinter
    clk/options  316/516-12 real time clocks/internal options
 
+   03-Apr-06    RMS     Fixed bugs in punch state handling (from Theo Engel)
    22-Nov-05    RMS     Revised for new terminal processing routines
    05-Feb-05    RMS     Fixed bug in OCP '0001 (found by Philipp Hachtmann)
    31-Jan-05    RMS     Fixed bug in TTY print (found by Philipp Hachtmann)
@@ -608,7 +609,7 @@ else if ((ruptr->flags & UNIT_ATT) &&                   /* TTR attached */
     (ruptr->STA & RUNNING)) {                           /* and running? */
     if (ruptr->STA & LF_PEND) {                         /* lf pending? */
         c = 0212;                                       /* char is lf */
-        ruptr->STA &= LF_PEND;                          /* clear flag */
+        ruptr->STA &= ~LF_PEND;                         /* clear flag */
         }
     else {                                              /* normal read */
         if ((c = getc (ruptr->fileref)) == EOF) {       /* read byte */
@@ -665,7 +666,7 @@ if (ttp_tape_rcvd != 0) {                               /* prev = tape? */
 else if (c7b == TAPE) ttp_tape_rcvd = 2;                /* char = TAPE? */
 if (ttp_xoff_rcvd != 0) {                               /* prev = XOFF? */
     ttp_xoff_rcvd--;                                    /* decrement state */
-    if (ttp_xoff_rcvd == 0) puptr->STA &= RUNNING;      /* stop after delay */
+    if (ttp_xoff_rcvd == 0) puptr->STA &= ~RUNNING;     /* stop after delay */
     }
 else if (c7b == XOFF) ttp_xoff_rcvd = 2;                /* char = XOFF? */
 if ((c7b == XON) && (ruptr->flags & UNIT_ATT)) {        /* char = XON? */

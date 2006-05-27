@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2005, Robert M Supnik
+   Copyright (c) 1998-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,17 @@
 
    cpu          VAX central processor
 
+   22-May-06    RMS     Fixed format error in CPU history (found by Peter Schorn)
+   10-May-06    RMS     Added -kesu switches for virtual addressing modes
+                        Fixed bugs in examine virtual
+                        Rewrote history function for greater usability
+                        Fixed bug in reported VA on faulting cross-page write
+   02-May-06    RMS     Fixed fault cleanup to clear PSL<tp>
+                        Fixed ADAWI r-mode to preserve dst<31:16>
+                        Fixed ACBD/G to test correct operand
+                        Fixed access checking on modify-class specifiers
+                        Fixed branch displacements in history buffer
+                        (all reported by Tim Stark)
    17-Nov-05    RMS     Fixed CVTfi with integer overflow to trap if PSW<iv> set
    13-Nov-05    RMS     Fixed breakpoint test with 64b addresses
    25-Oct-05    RMS     Removed cpu_extmem
@@ -158,7 +169,8 @@
 #define UNIT_MSIZE      (1u << UNIT_V_MSIZE)
 #define GET_CUR         acc = ACC_MASK (PSL_GETCUR (PSL))
 
-#define OPND_SIZE       20
+#define OPND_SIZE       16
+#define INST_SIZE       52
 #define op0             opnd[0]
 #define op1             opnd[1]
 #define op2             opnd[2]
@@ -178,7 +190,8 @@
 #define WRITE_L(r)      if (spec > (GRN | nPC)) Write (va, r, L_LONG, WA); \
                         else R[rn] = (r)
 #define WRITE_Q(rl,rh)  if (spec > (GRN | nPC)) { \
-                        if (Test (va + 7, WA, &mstat) >= 0) \
+                        if ((Test (va + 7, WA, &mstat) >= 0) || \
+                            (Test (va, WA, &mstat) < 0)) \
                             Write (va, rl, L_LONG, WA); \
                             Write (va + 4, rh, L_LONG, WA); \
                             } \
@@ -195,7 +208,7 @@ typedef struct {
     int32               iPC;
     int32               PSL;
     int32               opc;
-    int32               brdest;
+    uint8               inst[INST_SIZE];
     int32               opnd[OPND_SIZE];
     } InstHistory;
 
@@ -265,6 +278,7 @@ const uint32 align[4] = {
 
 extern int32 sim_interval;
 extern int32 sim_int_char;
+extern int32 sim_switches;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern UNIT clk_unit;
 
@@ -353,8 +367,10 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
+int32 cpu_get_vsw (int32 sw);
 int32 get_istr (int32 lnt, int32 acc);
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
+t_bool cpu_show_opnd (FILE *st, InstHistory *h, int32 line);
 
 /* CPU data structures
 
@@ -492,6 +508,7 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
             else R[rrn] = R[rrn] + rlnt;
             }
         }
+    PSL = PSL & ~PSL_TP;                                /* clear <tp> */
     recqptr = 0;                                        /* clear queue */
     delta = PC - fault_PC;                              /* save delta PC */
     SETPC (fault_PC);                                   /* restore PC */
@@ -681,27 +698,33 @@ for ( ;; ) {
             case SH3|RB: case SH3|RW: case SH3|RL:
                 opnd[j++] = spec;
                 break;
+
             case SH0|RQ: case SH1|RQ: case SH2|RQ: case SH3|RQ:
                 opnd[j++] = spec;
                 opnd[j++] = 0;
                 break;
+
             case SH0|RO: case SH1|RO: case SH2|RO: case SH3|RO:
                 opnd[j++] = spec;
                 opnd[j++] = 0;
                 opnd[j++] = 0;
                 opnd[j++] = 0;
                 break;
+
             case SH0|RF: case SH1|RF: case SH2|RF: case SH3|RF:
                 opnd[j++] = (spec << 4) | 0x4000;
                 break;
+
             case SH0|RD: case SH1|RD: case SH2|RD: case SH3|RD:
                 opnd[j++] = (spec << 4) | 0x4000;
                 opnd[j++] = 0;
                 break;
+
             case SH0|RG: case SH1|RG: case SH2|RG: case SH3|RG:
                 opnd[j++] = (spec << 1) | 0x4000;
                 opnd[j++] = 0;
                 break;
+
             case SH0|RH: case SH1|RH: case SH2|RH: case SH3|RH:
                 opnd[j++] = ((spec & 0x7) << 29) | (0x4000 | ((spec >> 3) & 0x7));
                 opnd[j++] = 0;
@@ -715,10 +738,12 @@ for ( ;; ) {
                 CHECK_FOR_PC;
                 opnd[j++] = R[rn] & BMASK;
                 break;
+
             case GRN|RW: case GRN|MW:
                 CHECK_FOR_PC;
                 opnd[j++] = R[rn] & WMASK;
                 break;
+
             case GRN|VB:
                 vfldrp1 = R[(rn + 1) & RGMASK];
             case GRN|WB: case GRN|WW: case GRN|WL: case GRN|WQ: case GRN|WO:
@@ -727,11 +752,13 @@ for ( ;; ) {
                 CHECK_FOR_PC;
                 opnd[j++] = R[rn];
                 break;
+
             case GRN|RQ: case GRN|RD: case GRN|RG: case GRN|MQ:
                 CHECK_FOR_SP;
                 opnd[j++] = R[rn];
                 opnd[j++] = R[rn + 1];
                 break;
+
             case GRN|RO: case GRN|RH: case GRN|MO:
                 CHECK_FOR_AP;
                 opnd[j++] = R[rn];
@@ -749,6 +776,7 @@ for ( ;; ) {
                 CHECK_FOR_PC;
                 va = opnd[j++] = R[rn];
                 break;
+
             case ADC|VB:
             case ADC|WB: case ADC|WW: case ADC|WL: case ADC|WQ: case ADC|WO:
                 opnd[j++] = OP_MEM;
@@ -757,29 +785,55 @@ for ( ;; ) {
                 va = opnd[j++] = R[rn] = R[rn] - DR_LNT (disp);
                 recq[recqptr++] = RQ_REC (disp, rn);
                 break;
+
             case ADC|RB: case ADC|RW: case ADC|RL: case ADC|RF:
-            case ADC|MB: case ADC|MW: case ADC|ML:
                 R[rn] = R[rn] - (DR_LNT (disp));
                 recq[recqptr++] = RQ_REC (disp, rn);
             case RGD|RB: case RGD|RW: case RGD|RL: case RGD|RF:
-            case RGD|MB: case RGD|MW: case RGD|ML:
                 CHECK_FOR_PC;
                 opnd[j++] = Read (va = R[rn], DR_LNT (disp), RA);
                 break;
-            case ADC|RQ: case ADC|RD: case ADC|RG: case ADC|MQ:
+
+            case ADC|RQ: case ADC|RD: case ADC|RG:
                 R[rn] = R[rn] - 8;
                 recq[recqptr++] = RQ_REC (disp, rn);
-            case RGD|RQ: case RGD|RD: case RGD|RG: case RGD|MQ:
+            case RGD|RQ: case RGD|RD: case RGD|RG:
                 CHECK_FOR_PC;
                 opnd[j++] = Read (va = R[rn], L_LONG, RA);
                 opnd[j++] = Read (R[rn] + 4, L_LONG, RA);
                 break;
-            case ADC|RO: case ADC|RH: case ADC|MO:
+
+            case ADC|RO: case ADC|RH:
                 R[rn] = R[rn] - 16;
                 recq[recqptr++] = RQ_REC (disp, rn);
-            case RGD|RO: case RGD|RH: case RGD|MO:
+            case RGD|RO: case RGD|RH:
                 CHECK_FOR_PC;
-                j = ReadOcta (va = R[rn], opnd, j, acc);
+                j = ReadOcta (va = R[rn], opnd, j, RA);
+                break;
+
+            case ADC|MB: case ADC|MW: case ADC|ML:
+                R[rn] = R[rn] - (DR_LNT (disp));
+                recq[recqptr++] = RQ_REC (disp, rn);
+            case RGD|MB: case RGD|MW: case RGD|ML:
+                CHECK_FOR_PC;
+                opnd[j++] = Read (va = R[rn], DR_LNT (disp), WA);
+                break;
+
+            case ADC|MQ:
+                R[rn] = R[rn] - 8;
+                recq[recqptr++] = RQ_REC (disp, rn);
+            case RGD|MQ:
+                CHECK_FOR_PC;
+                opnd[j++] = Read (va = R[rn], L_LONG, WA);
+                opnd[j++] = Read (R[rn] + 4, L_LONG, WA);
+                break;
+
+            case ADC|MO:
+                R[rn] = R[rn] - 16;
+                recq[recqptr++] = RQ_REC (disp, rn);
+            case RGD|MO:
+                CHECK_FOR_PC;
+                j = ReadOcta (va = R[rn], opnd, j, WA);
                 break;
 
 /* Autoincrement */
@@ -806,8 +860,7 @@ for ( ;; ) {
                     recq[recqptr++] = RQ_REC (disp, rn);
                     }
                 break;
-            case AIN|MB: case AIN|MW: case AIN|ML:
-/*              CHECK_FOR_PC; */
+
             case AIN|RB: case AIN|RW: case AIN|RL: case AIN|RF:
                 va = R[rn];
                 if (rn == nPC) {
@@ -819,8 +872,7 @@ for ( ;; ) {
                     recq[recqptr++] = RQ_REC (disp, rn);
                     }
                 break;
-            case AIN|MQ:
-/*              CHECK_FOR_PC; */
+
             case AIN|RQ: case AIN|RD: case AIN|RG:
                 va = R[rn];
                 if (rn == nPC) {
@@ -834,8 +886,7 @@ for ( ;; ) {
                     recq[recqptr++] = RQ_REC (disp, rn);
                     }
                 break;
-            case AIN|MO:
-/*              CHECK_FOR_PC; */
+
             case AIN|RO: case AIN|RH:
                 va = R[rn];
                 if (rn == nPC) {
@@ -845,7 +896,48 @@ for ( ;; ) {
                     GET_ISTR (opnd[j++], L_LONG);
                     }
                 else {
-                    j = ReadOcta (va, opnd, j, acc);
+                    j = ReadOcta (va, opnd, j, RA);
+                    R[rn] = R[rn] + 16;
+                    recq[recqptr++] = RQ_REC (disp, rn);
+                    }
+                break;
+
+            case AIN|MB: case AIN|MW: case AIN|ML:
+                va = R[rn];
+                if (rn == nPC) {
+                    GET_ISTR (opnd[j++], DR_LNT (disp));
+                    }
+                else {
+                    opnd[j++] = Read (R[rn], DR_LNT (disp), WA);
+                    R[rn] = R[rn] + DR_LNT (disp);
+                    recq[recqptr++] = RQ_REC (disp, rn);
+                    }
+                break;
+
+            case AIN|MQ:
+                va = R[rn];
+                if (rn == nPC) {
+                    GET_ISTR (opnd[j++], L_LONG);
+                    GET_ISTR (opnd[j++], L_LONG);
+                    }
+                else {
+                    opnd[j++] = Read (va, L_LONG, WA);
+                    opnd[j++] = Read (va + 4, L_LONG, WA);  
+                    R[rn] = R[rn] + 8;
+                    recq[recqptr++] = RQ_REC (disp, rn);
+                    }
+                break;
+
+            case AIN|MO:
+                va = R[rn];
+                if (rn == nPC) {
+                    GET_ISTR (opnd[j++], L_LONG);
+                    GET_ISTR (opnd[j++], L_LONG);
+                    GET_ISTR (opnd[j++], L_LONG);
+                    GET_ISTR (opnd[j++], L_LONG);
+                    }
+                else {
+                    j = ReadOcta (va, opnd, j, WA);
                     R[rn] = R[rn] + 16;
                     recq[recqptr++] = RQ_REC (disp, rn);
                     }
@@ -864,8 +956,8 @@ for ( ;; ) {
                     recq[recqptr++] = RQ_REC (AID|RL, rn);
                     }
                 break;
+
             case AID|RB: case AID|RW: case AID|RL: case AID|RF:
-            case AID|MB: case AID|MW: case AID|ML:
                 if (rn == nPC) {
                     GET_ISTR (va, L_LONG);
                     }
@@ -876,7 +968,8 @@ for ( ;; ) {
                     }
                 opnd[j++] = Read (va, DR_LNT (disp), RA);
                 break;
-            case AID|RQ: case AID|RD: case AID|RG: case AID|MQ:
+
+            case AID|RQ: case AID|RD: case AID|RG:
                 if (rn == nPC) {
                     GET_ISTR (va, L_LONG);
                     }
@@ -888,7 +981,8 @@ for ( ;; ) {
                 opnd[j++] = Read (va, L_LONG, RA);
                 opnd[j++] = Read (va + 4, L_LONG, RA);
                 break;
-            case AID|RO: case AID|RH: case AID|MO:
+
+            case AID|RO: case AID|RH:
                 if (rn == nPC) {
                     GET_ISTR (va, L_LONG);
                     }
@@ -897,7 +991,44 @@ for ( ;; ) {
                     R[rn] = R[rn] + 4;
                     recq[recqptr++] = RQ_REC (AID|RL, rn);
                     }
-                j = ReadOcta (va, opnd, j, acc);
+                j = ReadOcta (va, opnd, j, RA);
+                break;
+
+            case AID|MB: case AID|MW: case AID|ML:
+                if (rn == nPC) {
+                    GET_ISTR (va, L_LONG);
+                    }
+                else {
+                    va = Read (R[rn], L_LONG, RA);
+                    R[rn] = R[rn] + 4;
+                    recq[recqptr++] = RQ_REC (AID|RL, rn);
+                    }
+                opnd[j++] = Read (va, DR_LNT (disp), WA);
+                break;
+
+            case AID|MQ:
+                if (rn == nPC) {
+                    GET_ISTR (va, L_LONG);
+                    }
+                else {
+                    va = Read (R[rn], L_LONG, RA);
+                    R[rn] = R[rn] + 4;
+                    recq[recqptr++] = RQ_REC (AID|RL, rn);
+                    }
+                opnd[j++] = Read (va, L_LONG, WA);
+                opnd[j++] = Read (va + 4, L_LONG, WA);
+                break;
+
+            case AID|MO:
+                if (rn == nPC) {
+                    GET_ISTR (va, L_LONG);
+                    }
+                else {
+                    va = Read (R[rn], L_LONG, RA);
+                    R[rn] = R[rn] + 4;
+                    recq[recqptr++] = RQ_REC (AID|RL, rn);
+                    }
+                j = ReadOcta (va, opnd, j, WA);
                 break;
 
 /* Byte displacement */
@@ -909,22 +1040,43 @@ for ( ;; ) {
                 GET_ISTR (temp, L_BYTE);
                 va = opnd[j++] = R[rn] + SXTB (temp);
                 break;
+
             case BDP|RB: case BDP|RW: case BDP|RL: case BDP|RF:
-            case BDP|MB: case BDP|MW: case BDP|ML:
                 GET_ISTR (temp, L_BYTE);
                 va = R[rn] + SXTB (temp);
                 opnd[j++] = Read (va, DR_LNT (disp), RA);
                 break;
-            case BDP|RQ: case BDP|RD: case BDP|RG: case BDP|MQ:
+
+            case BDP|RQ: case BDP|RD: case BDP|RG:
                 GET_ISTR (temp, L_BYTE);        
                 va = R[rn] + SXTB (temp);
                 opnd[j++] = Read (va, L_LONG, RA);
                 opnd[j++] = Read (va + 4, L_LONG, RA);
                 break;
-            case BDP|RO: case BDP|RH: case BDP|MO:
+
+            case BDP|RO: case BDP|RH:
                 GET_ISTR (temp, L_BYTE);        
                 va = R[rn] + SXTB (temp);
-                j = ReadOcta (va, opnd, j, acc);
+                j = ReadOcta (va, opnd, j, RA);
+                break;
+
+            case BDP|MB: case BDP|MW: case BDP|ML:
+                GET_ISTR (temp, L_BYTE);
+                va = R[rn] + SXTB (temp);
+                opnd[j++] = Read (va, DR_LNT (disp), WA);
+                break;
+
+            case BDP|MQ:
+                GET_ISTR (temp, L_BYTE);        
+                va = R[rn] + SXTB (temp);
+                opnd[j++] = Read (va, L_LONG, WA);
+                opnd[j++] = Read (va + 4, L_LONG, WA);
+                break;
+
+            case BDP|MO:
+                GET_ISTR (temp, L_BYTE);        
+                va = R[rn] + SXTB (temp);
+                j = ReadOcta (va, opnd, j, WA);
                 break;
 
 /* Byte displacement deferred */
@@ -937,25 +1089,49 @@ for ( ;; ) {
                 iad = R[rn] + SXTB (temp);
                 va = opnd[j++] = Read (iad, L_LONG, RA);
                 break;
+
             case BDD|RB: case BDD|RW: case BDD|RL: case BDD|RF:
-            case BDD|MB: case BDD|MW: case BDD|ML:
                 GET_ISTR (temp, L_BYTE);        
                 iad = R[rn] + SXTB (temp);
                 va = Read (iad, L_LONG, RA);    
                 opnd[j++] = Read (va, DR_LNT (disp), RA);
                 break;
-            case BDD|RQ: case BDD|RD: case BDD|RG: case BDD|MQ:
+
+            case BDD|RQ: case BDD|RD: case BDD|RG:
                 GET_ISTR (temp, L_BYTE);
                 iad = R[rn] + SXTB (temp);
                 va = Read (iad, L_LONG, RA);
                 opnd[j++] = Read (va, L_LONG, RA);
                 opnd[j++] = Read (va + 4, L_LONG, RA);
                 break;  
-            case BDD|RO: case BDD|RH: case BDD|MO:
+
+            case BDD|RO: case BDD|RH:
                 GET_ISTR (temp, L_BYTE);
                 iad = R[rn] + SXTB (temp);
                 va = Read (iad, L_LONG, RA);
-                j = ReadOcta (va, opnd, j, acc);
+                j = ReadOcta (va, opnd, j, RA);
+                break;  
+
+            case BDD|MB: case BDD|MW: case BDD|ML:
+                GET_ISTR (temp, L_BYTE);        
+                iad = R[rn] + SXTB (temp);
+                va = Read (iad, L_LONG, RA);    
+                opnd[j++] = Read (va, DR_LNT (disp), WA);
+                break;
+
+            case BDD|MQ:
+                GET_ISTR (temp, L_BYTE);
+                iad = R[rn] + SXTB (temp);
+                va = Read (iad, L_LONG, RA);
+                opnd[j++] = Read (va, L_LONG, WA);
+                opnd[j++] = Read (va + 4, L_LONG, WA);
+                break;  
+
+            case BDD|MO:
+                GET_ISTR (temp, L_BYTE);
+                iad = R[rn] + SXTB (temp);
+                va = Read (iad, L_LONG, RA);
+                j = ReadOcta (va, opnd, j, WA);
                 break;  
 
 /* Word displacement */
@@ -967,22 +1143,43 @@ for ( ;; ) {
                 GET_ISTR (temp, L_WORD);
                 va = opnd[j++] = R[rn] + SXTW (temp);
                 break;
-            case WDP|MB: case WDP|MW: case WDP|ML:
+
             case WDP|RB: case WDP|RW: case WDP|RL: case WDP|RF:
                 GET_ISTR (temp, L_WORD);
                 va = R[rn] + SXTW (temp);
                 opnd[j++] = Read (va, DR_LNT (disp), RA);
                 break;
-            case WDP|MQ: case WDP|RQ: case WDP|RD: case WDP|RG:
+
+            case WDP|RQ: case WDP|RD: case WDP|RG:
                 GET_ISTR (temp, L_WORD);
                 va = R[rn] + SXTW (temp);
                 opnd[j++] = Read (va, L_LONG, RA);
                 opnd[j++] = Read (va + 4, L_LONG, RA);
                 break;
-            case WDP|MO: case WDP|RO: case WDP|RH:
+
+            case WDP|RO: case WDP|RH:
                 GET_ISTR (temp, L_WORD);
                 va = R[rn] + SXTW (temp);
-                j = ReadOcta (va, opnd, j, acc);
+                j = ReadOcta (va, opnd, j, RA);
+                break;
+
+            case WDP|MB: case WDP|MW: case WDP|ML:
+                GET_ISTR (temp, L_WORD);
+                va = R[rn] + SXTW (temp);
+                opnd[j++] = Read (va, DR_LNT (disp), WA);
+                break;
+
+            case WDP|MQ:
+                GET_ISTR (temp, L_WORD);
+                va = R[rn] + SXTW (temp);
+                opnd[j++] = Read (va, L_LONG, WA);
+                opnd[j++] = Read (va + 4, L_LONG, WA);
+                break;
+
+            case WDP|MO:
+                GET_ISTR (temp, L_WORD);
+                va = R[rn] + SXTW (temp);
+                j = ReadOcta (va, opnd, j, WA);
                 break;
 
 /* Word displacement deferred */
@@ -995,25 +1192,49 @@ for ( ;; ) {
                 iad = R[rn] + SXTW (temp);
                 va = opnd[j++] = Read (iad, L_LONG, RA);
                 break;
-            case WDD|MB: case WDD|MW: case WDD|ML:
+
             case WDD|RB: case WDD|RW: case WDD|RL: case WDD|RF:
                 GET_ISTR (temp, L_WORD);
                 iad = R[rn] + SXTW (temp);
                 va = Read (iad, L_LONG, RA);
                 opnd[j++] = Read (va, DR_LNT (disp), RA);
                 break;
-            case WDD|MQ: case WDD|RQ: case WDD|RD: case WDD|RG:
+
+            case WDD|RQ: case WDD|RD: case WDD|RG:
                 GET_ISTR (temp, L_WORD);        
                 iad = R[rn] + SXTW (temp);
                 va = Read (iad, L_LONG, RA);
                 opnd[j++] = Read (va, L_LONG, RA);
                 opnd[j++] = Read (va + 4, L_LONG, RA);
                 break;
-            case WDD|MO: case WDD|RO: case WDD|RH:
+
+            case WDD|RO: case WDD|RH:
                 GET_ISTR (temp, L_WORD);        
                 iad = R[rn] + SXTW (temp);
                 va = Read (iad, L_LONG, RA);
-                j = ReadOcta (va, opnd, j, acc);
+                j = ReadOcta (va, opnd, j, RA);
+                break;
+
+            case WDD|MB: case WDD|MW: case WDD|ML:
+                GET_ISTR (temp, L_WORD);
+                iad = R[rn] + SXTW (temp);
+                va = Read (iad, L_LONG, RA);
+                opnd[j++] = Read (va, DR_LNT (disp), WA);
+                break;
+
+            case WDD|MQ:
+                GET_ISTR (temp, L_WORD);        
+                iad = R[rn] + SXTW (temp);
+                va = Read (iad, L_LONG, RA);
+                opnd[j++] = Read (va, L_LONG, WA);
+                opnd[j++] = Read (va + 4, L_LONG, WA);
+                break;
+
+            case WDD|MO:
+                GET_ISTR (temp, L_WORD);        
+                iad = R[rn] + SXTW (temp);
+                va = Read (iad, L_LONG, RA);
+                j = ReadOcta (va, opnd, j, WA);
                 break;
 
 /* Longword displacement */
@@ -1025,22 +1246,43 @@ for ( ;; ) {
                 GET_ISTR (temp, L_LONG);
                 va = opnd[j++] = R[rn] + temp;
                 break;
-            case LDP|MB: case LDP|MW: case LDP|ML:
+
             case LDP|RB: case LDP|RW: case LDP|RL: case LDP|RF:
                 GET_ISTR (temp, L_LONG);
                 va = R[rn] + temp;
                 opnd[j++] = Read (va, DR_LNT (disp), RA);
                 break;
-            case LDP|MQ: case LDP|RQ: case LDP|RD: case LDP|RG:
+
+            case LDP|RQ: case LDP|RD: case LDP|RG:
                 GET_ISTR (temp, L_LONG);
                 va = R[rn] + temp;
                 opnd[j++] = Read (va, L_LONG, RA);
                 opnd[j++] = Read (va + 4, L_LONG, RA);
                 break;
-            case LDP|MO: case LDP|RO: case LDP|RH:
+
+            case LDP|RO: case LDP|RH:
                 GET_ISTR (temp, L_LONG);
                 va = R[rn] + temp;
-                j = ReadOcta (va, opnd, j, acc);
+                j = ReadOcta (va, opnd, j, RA);
+                break;
+
+            case LDP|MB: case LDP|MW: case LDP|ML:
+                GET_ISTR (temp, L_LONG);
+                va = R[rn] + temp;
+                opnd[j++] = Read (va, DR_LNT (disp), WA);
+                break;
+
+            case LDP|MQ:
+                GET_ISTR (temp, L_LONG);
+                va = R[rn] + temp;
+                opnd[j++] = Read (va, L_LONG, WA);
+                opnd[j++] = Read (va + 4, L_LONG, WA);
+                break;
+
+            case LDP|MO:
+                GET_ISTR (temp, L_LONG);
+                va = R[rn] + temp;
+                j = ReadOcta (va, opnd, j, WA);
                 break;
 
 /* Longword displacement deferred */
@@ -1053,25 +1295,49 @@ for ( ;; ) {
                 iad = R[rn] + temp;
                 va = opnd[j++] = Read (iad, L_LONG, RA);
                 break;
-            case LDD|MB: case LDD|MW: case LDD|ML:
+
             case LDD|RB: case LDD|RW: case LDD|RL: case LDD|RF:
                 GET_ISTR (temp, L_LONG);
                 iad = R[rn] + temp;
                 va = Read (iad, L_LONG, RA);
                 opnd[j++] = Read (va, DR_LNT (disp), RA);
                 break;
-            case LDD|MQ: case LDD|RQ: case LDD|RD: case LDD|RG:
+
+            case LDD|RQ: case LDD|RD: case LDD|RG:
                 GET_ISTR (temp, L_LONG);
                 iad = R[rn] + temp;
                 va = Read (iad, L_LONG, RA);
                 opnd[j++] = Read (va, L_LONG, RA);
                 opnd[j++] = Read (va + 4, L_LONG, RA);
                 break;
-            case LDD|MO: case LDD|RO: case LDD|RH:
+
+            case LDD|RO: case LDD|RH:
                 GET_ISTR (temp, L_LONG);
                 iad = R[rn] + temp;
                 va = Read (iad, L_LONG, RA);
-                j = ReadOcta (va, opnd, j, acc);
+                j = ReadOcta (va, opnd, j, RA);
+                break;
+
+            case LDD|MB: case LDD|MW: case LDD|ML:
+                GET_ISTR (temp, L_LONG);
+                iad = R[rn] + temp;
+                va = Read (iad, L_LONG, RA);
+                opnd[j++] = Read (va, DR_LNT (disp), WA);
+                break;
+
+            case LDD|MQ:
+                GET_ISTR (temp, L_LONG);
+                iad = R[rn] + temp;
+                va = Read (iad, L_LONG, RA);
+                opnd[j++] = Read (va, L_LONG, WA);
+                opnd[j++] = Read (va + 4, L_LONG, WA);
+                break;
+
+            case LDD|MO:
+                GET_ISTR (temp, L_LONG);
+                iad = R[rn] + temp;
+                va = Read (iad, L_LONG, RA);
+                j = ReadOcta (va, opnd, j, WA);
                 break;
 
 /* Index */
@@ -1094,12 +1360,14 @@ for ( ;; ) {
                     CHECK_FOR_PC;       
                     index = index + R[rn];
                     break;
+
                 case AIN:
                     CHECK_FOR_PC;
                     index = index + R[rn];
                     R[rn] = R[rn] + DR_LNT (disp);
                     recq[recqptr++] = RQ_REC (AIN | (disp & DR_LNMASK), rn);
                     break;
+
                 case AID:
                     if (rn == nPC) {
                         GET_ISTR (temp, L_LONG);
@@ -1111,30 +1379,37 @@ for ( ;; ) {
                         }
                     index = temp + index;
                     break;
+
                 case BDP:
                     GET_ISTR (temp, L_BYTE);
                     index = index + R[rn] + SXTB (temp);
                     break;
+
                 case BDD:
                     GET_ISTR (temp, L_BYTE);
                     index = index + Read (R[rn] + SXTB (temp), L_LONG, RA);
                     break;
+
                 case WDP:
                     GET_ISTR (temp, L_WORD);
                     index = index + R[rn] + SXTW (temp);
                     break;
+
                 case WDD:
                     GET_ISTR (temp, L_WORD);
                     index = index + Read (R[rn] + SXTW (temp), L_LONG, RA);
                     break;
+
                 case LDP:
                     GET_ISTR (temp, L_LONG);
                     index = index + R[rn] + temp;
                     break;
+
                 case LDD:
                     GET_ISTR (temp, L_LONG);
                     index = index + Read (R[rn] + temp, L_LONG, RA);
                     break;
+
                 default:
                     RSVD_ADDR_FAULT;                    /* end case idxspec */
 					}
@@ -1145,16 +1420,31 @@ for ( ;; ) {
                 case AB: case AW: case AL: case AQ: case AO:
                     va = opnd[j++] = index;
                     break;
-                case MB: case MW: case ML:
+
                 case RB: case RW: case RL:
                     opnd[j++] = Read (va = index, DR_LNT (disp), RA);
                     break;
-                case RQ: case MQ:
+
+                case RQ:
                     opnd[j++] = Read (va = index, L_LONG, RA);
                     opnd[j++] = Read (index + 4, L_LONG, RA);
                     break;
-                case RO: case MO:
-                    j = ReadOcta (va = index, opnd, j, acc);
+
+                case RO:
+                    j = ReadOcta (va = index, opnd, j, RA);
+                    break;
+
+                case MB: case MW: case ML:
+                    opnd[j++] = Read (va = index, DR_LNT (disp), WA);
+                    break;
+
+                case MQ:
+                    opnd[j++] = Read (va = index, L_LONG, WA);
+                    opnd[j++] = Read (index + 4, L_LONG, WA);
+                    break;
+
+                case MO:
+                    j = ReadOcta (va = index, opnd, j, WA);
                     break;
                     }                                   /* end case access/lnt */
                 break;                                  /* end index */
@@ -1169,12 +1459,24 @@ for ( ;; ) {
 /* Optionally record instruction history */
 
     if (hst_lnt) {
+        int32 lim;
+        t_value wd;
+
         hst[hst_p].iPC = fault_PC;
         hst[hst_p].PSL = PSL | cc;
         hst[hst_p].opc = opc;
-        hst[hst_p].brdest = brdisp + PC;
-        for (i = 0; i < OPND_SIZE; i++)
+        for (i = 0; i < j; i++)
             hst[hst_p].opnd[i] = opnd[i];
+        lim = PC - fault_PC;
+        if ((uint32) lim > INST_SIZE) lim = INST_SIZE;
+        for (i = 0; i < lim; i++) {
+            if ((cpu_ex (&wd, fault_PC + i, &cpu_unit, SWMASK ('V'))) == SCPE_OK)
+                hst[hst_p].inst[i] = (uint8) wd;
+            else {
+                hst[hst_p].inst[0] = hst[hst_p].inst[1] = 0xFF;
+                break;
+                }
+            }
         hst_p = hst_p + 1;
         if (hst_p >= hst_lnt) hst_p = 0;
         }
@@ -1384,16 +1686,13 @@ for ( ;; ) {
         break;
 
     case ADAWI:
-        if (op1 >= 0) {                                 /* reg? ADDW2 */
-            temp = R[op1];
-            r = R[op1] = (op0 + temp) & WMASK;
-            }
+        if (op1 >= 0) temp = R[op1] & WMASK;            /* reg? ADDW2 */
         else {
             if (op2 & 1) RSVD_OPND_FAULT;               /* mem? chk align */
             temp = Read (op2, L_WORD, WA);              /* ok, ADDW2 */
-            r = (op0 + temp) & WMASK;
-            WRITE_W (r);
             }
+        r = (op0 + temp) & WMASK;
+        WRITE_W (r);
         CC_ADD_W (r, op0, temp);                        /* set cc's */
         break;
 
@@ -2415,7 +2714,7 @@ for ( ;; ) {
         WRITE_L (r);                                    /* write result */
         CC_IIZP_FP (r);                                 /* set cc's */
         if ((temp & CC_Z) || ((op1 & FPSIGN)?           /* test br cond */
-             !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
+           !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
         break;
 
     case ACBD:
@@ -2423,8 +2722,8 @@ for ( ;; ) {
         temp = op_cmpfd (r, rh, op0, op1);
         WRITE_Q (r, rh);
         CC_IIZP_FP (r);
-        if ((temp & CC_Z) || ((op1 & FPSIGN)?           /* test br cond */
-             !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
+        if ((temp & CC_Z) || ((op2 & FPSIGN)?           /* test br cond */
+           !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
         break;
 
     case ACBG:
@@ -2432,8 +2731,8 @@ for ( ;; ) {
         temp = op_cmpg (r, rh, op0, op1);
         WRITE_Q (r, rh);
         CC_IIZP_FP (r);
-        if ((temp & CC_Z) || ((op1 & FPSIGN)?           /* test br cond */
-             !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
+        if ((temp & CC_Z) || ((op2 & FPSIGN)?           /* test br cond */
+           !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
         break;
 
 /* EMODF
@@ -2637,10 +2936,10 @@ return val;
 
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc)
 {
-opnd[j++] = Read (va, L_LONG, RA);
-opnd[j++] = Read (va + 4, L_LONG, RA);
-opnd[j++] = Read (va + 8, L_LONG, RA);  
-opnd[j++] = Read (va + 12, L_LONG, RA);  
+opnd[j++] = Read (va, L_LONG, acc);
+opnd[j++] = Read (va + 4, L_LONG, acc);
+opnd[j++] = Read (va + 8, L_LONG, acc);  
+opnd[j++] = Read (va + 12, L_LONG, acc);  
 return j;
 }
 
@@ -2672,7 +2971,10 @@ int32 st;
 uint32 addr = (uint32) exta;
 
 if (vptr == NULL) return SCPE_ARG;
-if (sw & SWMASK ('V')) addr = Test (addr, RD, &st);
+if (sw & SWMASK ('V')) {
+    int32 acc = cpu_get_vsw (sw);
+    addr = Test (addr, acc, &st);
+    }
 else addr = addr & PAMASK;
 if (ADDR_IS_MEM (addr) || ADDR_IS_CDG (addr) ||
     ADDR_IS_ROM (addr) || ADDR_IS_NVR (addr)) {
@@ -2689,7 +2991,10 @@ t_stat cpu_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw)
 int32 st;
 uint32 addr = (uint32) exta;
 
-if (sw & SWMASK ('V')) addr = Test (addr, RD, &st);
+if (sw & SWMASK ('V')) {
+    int32 acc = cpu_get_vsw (sw);
+    addr = Test (addr, acc, &st);
+    }
 else addr = addr & PAMASK;
 if (ADDR_IS_MEM (addr) || ADDR_IS_CDG (addr) ||
     ADDR_IS_NVR (addr)) {
@@ -2746,7 +3051,8 @@ static const char *mm_str[] = {
 if (cptr) {
     va = (uint32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
     if (r == SCPE_OK) {
-        pa = Test (va, RD, &st);
+        int32 acc = cpu_get_vsw (sim_switches);
+        pa = Test (va, acc, &st);
         if (st == PR_OK) fprintf (of, "Virtual %-X = physical %-X\n", va, pa);
         else fprintf (of, "Virtual %-X: %s\n", va, mm_str[st]);
         return SCPE_OK;
@@ -2754,6 +3060,21 @@ if (cptr) {
     }
 fprintf (of, "Invalid argument\n");
 return SCPE_OK;
+}
+
+/* Get access mode for examine, deposit, show virtual */
+
+int32 cpu_get_vsw (int32 sw)
+{
+int32 md;
+
+set_map_reg ();                                         /* update dyn reg */
+if (sw & SWMASK ('K')) md = KERN;
+else if (sw & SWMASK ('E')) md = EXEC;
+else if (sw & SWMASK ('S')) md = SUPV;
+else if (sw & SWMASK ('U')) md = USER;
+else md = PSL_GETCUR (PSL);
+return ACC_MASK (md);
 }
 
 /* Set history */
@@ -2788,11 +3109,14 @@ return SCPE_OK;
 
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-int32 i, j, k, di, disp, numspec, lnt;
+int32 i, k, di, lnt, numspec;
 char *cptr = (char *) desc;
 t_stat r;
 InstHistory *h;
 extern const char *opcode[];
+extern t_value *sim_eval;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
 if (cptr) {
@@ -2806,43 +3130,70 @@ fprintf (st, "PC       PSL       IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(di++) % hst_lnt];                         /* entry pointer */
     if (h->iPC == 0) continue;                          /* filled in? */
-    fprintf(st, "%08X %08X  ", h->iPC, h->PSL);         /* PC, PSL */
+    fprintf(st, "%08X %08X| ", h->iPC, h->PSL);         /* PC, PSL */
     numspec = drom[h->opc][0] & DR_NSPMASK;             /* #specifiers */
     if (opcode[h->opc] == NULL)                         /* undefined? */
         fprintf (st, "%03X (undefined)", h->opc);
     else if (h->PSL & PSL_FPD)                          /* FPD set? */
         fprintf (st, "%s FPD set", opcode[h->opc]);
     else {                                              /* normal */
-        fprintf (st, "%s", opcode[h->opc]);             /* print opcode */
-        for (i = 1, j = 0; i <= numspec; i++) {         /* loop thru specs */
-            fputc ((i == 1)? ' ': ',', st);             /* separator */
-            disp = drom[h->opc][i];                     /* specifier type */
-            if (disp == RG) disp = RQ;                  /* fix specials */
-            else if (disp >= BB) fprintf (st, "%X", h->brdest);
-            else switch (disp & (DR_LNMASK|DR_ACMASK)) {
-            case RB: case RW: case RL:                  /* read */
-            case AB: case AW: case AL: case AQ: case AO:        /* address */
-            case MB: case MW: case ML:                  /* modify */
-                fprintf (st, "%X", h->opnd[j++]);
-                break;
-            case RQ: case MQ:                           /* read, modify quad */
-                fprintf (st, "%X%08X", h->opnd[j], h->opnd[j + 1]);
-                j = j + 2;
-                break;
-            case RO: case MO:                           /* read, modify octa */
-                fprintf (st, "%X%08X%08X%08X", h->opnd[j],
-                    h->opnd[j + 1], h->opnd[j + 2], h->opnd[j + 3]);
-                j = j + 4;
-                break;
-            case WB: case WW: case WL: case WQ: case WO:        /* write */
-                if (h->opnd[j] < 0) fprintf (st, "%X", h->opnd[j + 1]);
-                else fprintf (st, "R%d", h->opnd[j]);
-                j = j + 2;
-                break;
-                }                                       /* end case */
-            }                                           /* end for */
+        for (i = 0; i < INST_SIZE; i++) sim_eval[i] = h->inst[i];
+        if ((fprint_sym (st, h->iPC, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+            fprintf (st, "%03X (undefined)", h->opc);
+        if ((numspec > 1) ||
+            ((numspec == 1) && (drom[h->opc][1] < BB))) {
+            if (cpu_show_opnd (st, h, 0)) {             /* operands; more? */
+                if (cpu_show_opnd (st, h, 1)) {         /* 2nd line; more? */
+                    cpu_show_opnd (st, h, 2);           /* octa, 3rd/4th */
+                    cpu_show_opnd (st, h, 3);
+                    }
+                }
+            }
         }                                               /* end else */
     fputc ('\n', st);                                   /* end line */
     }                                                   /* end for */
 return SCPE_OK;
 }
+
+t_bool cpu_show_opnd (FILE *st, InstHistory *h, int32 line)
+{
+
+int32 numspec, i, j, disp;
+t_bool more;
+
+numspec = drom[h->opc][0] & DR_NSPMASK;                 /* #specifiers */
+fputs ("\n                  ", st);                     /* space */
+for (i = 1, j = 0, more = FALSE; i <= numspec; i++) {   /* loop thru specs */
+    disp = drom[h->opc][i];                             /* specifier type */
+    if (disp == RG) disp = RQ;                          /* fix specials */
+    else if (disp >= BB) break;                         /* ignore branches */
+    else switch (disp & (DR_LNMASK|DR_ACMASK)) {
+
+    case RB: case RW: case RL:                          /* read */
+    case AB: case AW: case AL: case AQ: case AO:        /* address */
+    case MB: case MW: case ML:                          /* modify */
+        if (line == 0) fprintf (st, " %08X", h->opnd[j]);
+        else fputs ("         ", st);
+        j = j + 1;
+        break;
+    case RQ: case MQ:                                   /* read, modify quad */
+        if (line <= 1) fprintf (st, " %08X", h->opnd[j + line]);
+        else fputs ("         ", st);
+        if (line == 0) more = TRUE;
+        j = j + 2;
+        break;
+    case RO: case MO:                                   /* read, modify octa */
+        fprintf (st, " %08X", h->opnd[j + line]);
+        more = TRUE;
+        j = j + 4;
+        break;
+    case WB: case WW: case WL: case WQ: case WO:        /* write */
+        if (line == 0) fprintf (st, " %08X", h->opnd[j + 1]);
+        else fputs ("         ", st);
+        j = j + 2;
+        break;
+        }                                       /* end case */
+    }                                           /* end for */
+return more;
+}
+

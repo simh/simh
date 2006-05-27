@@ -1,6 +1,6 @@
 /* nova_dsk.c: 4019 fixed head disk simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dsk          fixed head disk
 
+   15-May-06    RMS     Fixed bug in autosize attach (reported by David Gesswein)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
    26-Jul-03    RMS     Fixed bug in set size routine
    14-Mar-03    RMS     Fixed variable capacity interaction with save/restore
@@ -296,17 +297,14 @@ t_stat dsk_attach (UNIT *uptr, char *cptr)
 {
 uint32 sz, p;
 uint32 ds_bytes = DSK_DKSIZE * sizeof (int16);
-t_stat r;
 
-r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize (uptr->fileref))) {
+if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     p = (sz + ds_bytes - 1) / ds_bytes;
     if (p >= DSK_NUMDK) p = DSK_NUMDK - 1;
     uptr->flags = (uptr->flags & ~UNIT_PLAT) | (p << UNIT_V_PLAT);
     }
 uptr->capac = UNIT_GETP (uptr->flags) * DSK_DKSIZE;     /* set capacity */
-return SCPE_OK;
+return attach_unit (uptr, cptr);
 }
 
 /* Change disk size */

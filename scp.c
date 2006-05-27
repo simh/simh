@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Feb-06    RMS     Upgraded save file format to V3.5
    18-Jan-06    RMS     Added fprint_stopped_gen
                         Added breakpoint spaces
                         Fixed unaligned register access (found by Doug Carman)
@@ -317,6 +318,7 @@ t_stat attach_err (UNIT *uptr, t_stat stat);
 t_stat detach_all (int32 start_device, t_bool shutdown);
 t_stat assign_device (DEVICE *dptr, char *cptr);
 t_stat deassign_device (DEVICE *dptr);
+t_stat run_boot_prep (void);
 t_stat exdep_reg_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr,
     REG *lowr, REG *highr, uint32 lows, uint32 highs);
 t_stat ex_reg (FILE *ofile, t_value val, int32 flag, REG *rptr, uint32 idx);
@@ -363,12 +365,27 @@ FILE *sim_deb = NULL;                                   /* debug file */
 static SCHTAB sim_stab;
 
 static UNIT sim_step_unit = { UDATA (&step_svc, 0, 0)  };
+#if defined USE_INT64
+static const char *sim_si64 = "64b data";
+#else
+static const char *sim_si64 = "32b data";
+#endif
+#if defined USE_ADDR64
+static const char *sim_sa64 = "64b addresses";
+#else
+static const char *sim_sa64 = "32b addresses";
+#endif
+#if defined USE_NETWORK
+static const char *sim_snet = "Ethernet support";
+#else
+static const char *sim_snet = "no Ethernet";
+#endif
 
 /* Tables and strings */
 
-const char save_vercur[] = "V3.2";
+const char save_vercur[] = "V3.5";
+const char save_ver32[] = "V3.2";
 const char save_ver30[] = "V3.0";
-const char save_ver210[] = "V2.10";
 const char *scp_error_messages[] = {
     "Address space exceeded",
     "Unit not attached",
@@ -1282,25 +1299,10 @@ return;
 t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 int32 vmaj = SIM_MAJOR, vmin = SIM_MINOR, vpat = SIM_PATCH;
-#if defined USE_INT64
-static const char *si64 = "64b data";
-#else
-static const char *si64 = "32b data";
-#endif
-#if defined USE_ADDR64
-static const char *sa64 = "64b addresses";
-#else
-static const char *sa64 = "32b addresses";
-#endif
-#if defined USE_NETWORK
-static const char *snet = "Ethernet support";
-#else
-static const char *snet = "no Ethernet";
-#endif
 
 if (cptr && (*cptr != 0)) return SCPE_2MARG;
 fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
-if (flag) fprintf (st, " [%s, %s, %s]", si64, sa64, snet);
+if (flag) fprintf (st, " [%s, %s, %s]", sim_si64, sim_sa64, sim_snet);
 fprintf (st, "\n");
 return SCPE_OK;
 }
@@ -1950,11 +1952,11 @@ REG *rptr;
 
 #define WRITE_I(xx) sim_fwrite (&(xx), sizeof (xx), 1, sfile)
 
-fputs (save_vercur, sfile);                             /* [V2.5] save format */
-fputc ('\n', sfile);
-fputs (sim_name, sfile);                                /* sim name */
-fputc ('\n', sfile);
-fprintf (sfile, "%.0f\n", sim_time);                    /* [V3.2] sim time */
+fprintf (sfile, "%s\n%s\n%s\n%s\n%s\n%.0f\n",
+    save_vercur,                                        /* [V2.5] save format */
+    sim_name,                                           /* sim name */
+    sim_si64, sim_sa64, sim_snet,                       /* [V3.5] options */
+    sim_time);                                          /* [V3.2] sim time */
 WRITE_I (sim_rtime);                                    /* [V2.6] sim rel time */
 
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru devices */
@@ -1973,6 +1975,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru devices */
         WRITE_I (uptr->u5);                             /* [V3.0] more unit */
         WRITE_I (uptr->u6);
         WRITE_I (uptr->flags);                          /* [V2.10] flags */
+        WRITE_I (uptr->capac);                          /* [V3.5] capacity */
         if (uptr->flags & UNIT_ATT) fputs (uptr->filename, sfile);
         fputc ('\n', sfile);
         if (((uptr->flags & (UNIT_FIX + UNIT_ATTABLE)) == UNIT_FIX) &&
@@ -2052,11 +2055,11 @@ char buf[CBUFSIZE];
 void *mbuf;
 int32 j, blkcnt, limit, unitno, time, flg;
 uint32 us, depth;
-t_addr k, high;
+t_addr k, high, old_capac;
 t_value val, mask;
 t_stat r;
 size_t sz;
-t_bool v32 = FALSE, v30 = FALSE;
+t_bool v35, v32;
 DEVICE *dptr;
 UNIT *uptr;
 REG *rptr;
@@ -2067,10 +2070,11 @@ REG *rptr;
     return SCPE_IOERR;
 
 READ_S (buf);                                           /* [V2.5+] read version */
-if (strcmp (buf, save_vercur) == 0) v32 = v30 = TRUE;   /* version 3.2? */      
-else if (strcmp (buf, save_ver30) == 0) v30 = TRUE;     /* version 3.0? */
-else if (strcmp (buf, save_ver210) != 0) {              /* version 2.10? */
-    printf ("Invalid file version: %s\n", buf);         /* no, unknown */
+v35 = v32 = FALSE;
+if (strcmp (buf, save_vercur) == 0) v35 = v32 = TRUE;   /* version 3.5? */      
+else if (strcmp (buf, save_ver32) == 0) v32 = TRUE;     /* version 3.2? */
+else if (strcmp (buf, save_ver30) != 0) {               /* version 3.0? */
+    printf ("Invalid file version: %s\n", buf);
     return SCPE_INCOMP;
     }
 READ_S (buf);                                           /* read sim name */
@@ -2078,7 +2082,20 @@ if (strcmp (buf, sim_name)) {                           /* name match? */
     printf ("Wrong system type: %s\n", buf);
     return SCPE_INCOMP;
     }
-if (v32) {                                              /* [V3.2] time as string */
+if (v35) {                                              /* [V3.5+] options */
+    READ_S (buf);                                       /* integer size */
+    if (strcmp (buf, sim_si64) != 0) {
+        printf ("Incompatible integer size, save file = %s\n", buf);
+        return SCPE_INCOMP;
+        }
+    READ_S (buf);                                       /* address size */
+    if (strcmp (buf, sim_sa64) != 0) {
+        printf ("Incompatible address size, save file = %s\n", buf);
+        return SCPE_INCOMP;
+        }
+    READ_S (buf);                                       /* Ethernet */
+    }
+if (v32) {                                              /* [V3.2+] time as string */
     READ_S (buf);
     sscanf (buf, "%lf", &sim_time);
     }
@@ -2092,15 +2109,13 @@ for ( ;; ) {                                            /* device loop */
         printf ("Invalid device name: %s\n", buf);
         return SCPE_INCOMP;
         }
-    if (v30) {                                          /* [V3.0+] */
-        READ_S (buf);                                   /* read logical name */
-        deassign_device (dptr);                         /* delete old name */
-        if ((buf[0] != 0) && 
-            ((r = assign_device (dptr, buf)) != SCPE_OK)) return r;
-        }
+    READ_S (buf);                                       /* [V3.0+] logical name */
+    deassign_device (dptr);                             /* delete old name */
+    if ((buf[0] != 0) && 
+        ((r = assign_device (dptr, buf)) != SCPE_OK)) return r;
     READ_I (flg);                                       /* [V2.10+] ctlr flags */
     if (!v32) flg = ((flg & DEV_UFMASK_31) << (DEV_V_UF - DEV_V_UF_31)) |
-        (flg & ~DEV_UFMASK_31);                         /* [V3.2] flags moved */
+        (flg & ~DEV_UFMASK_31);                         /* [V3.2+] flags moved */
     dptr->flags = (dptr->flags & ~DEV_RFLAGS) |         /* restore ctlr flags */
          (flg & DEV_RFLAGS);
     for ( ;; ) {                                        /* unit loop */
@@ -2116,13 +2131,15 @@ for ( ;; ) {                                            /* device loop */
         if (time > 0) sim_activate (uptr, time - 1);
         READ_I (uptr->u3);                              /* device specific */
         READ_I (uptr->u4);
-        if (v30) {                                      /* [V3.0+] */
-            READ_I (uptr->u5);                          /* more dev specific */
-            READ_I (uptr->u6);
-            }
+        READ_I (uptr->u5);                              /* [V3.0+] more dev spec */
+        READ_I (uptr->u6);
         READ_I (flg);                                   /* [V2.10+] unit flags */
+        old_capac = uptr->capac;                        /* save current capacity */
+        if (v35) {                                      /* [V3.5+] capacity */
+            READ_I (uptr->capac);
+            }
         if (!v32) flg = ((flg & UNIT_UFMASK_31) << (UNIT_V_UF - UNIT_V_UF_31)) |
-            (flg & ~UNIT_UFMASK_31);                    /* [V3.2] flags moved */
+            (flg & ~UNIT_UFMASK_31);                    /* [V3.2+] flags moved */
         uptr->flags = (uptr->flags & ~UNIT_RFLAGS) |
             (flg & UNIT_RFLAGS);                        /* restore */
         READ_S (buf);                                   /* attached file */
@@ -2148,12 +2165,13 @@ for ( ;; ) {                                            /* device loop */
                 printf ("Can't restore memory: %s%d\n", sim_dname (dptr), unitno);
                 return SCPE_INCOMP;
                 }
-            if (high != uptr->capac) {
+            if (high != old_capac) {
                 if ((dptr->flags & DEV_DYNM) &&
                     ((dptr->msize == NULL) ||
                      (dptr->msize (uptr, (int32) high, NULL, NULL) != SCPE_OK))) {
                     printf ("Can't change memory size: %s%d\n",
                         sim_dname (dptr), unitno);
+                    uptr->capac = old_capac;
                     return SCPE_INCOMP;
                     }
                 uptr->capac = high;
@@ -2228,50 +2246,53 @@ void int_handler (int signal);
 
 GET_SWITCHES (cptr);                                    /* get switches */
 sim_step = 0;
-if (((flag == RU_RUN) || (flag == RU_GO)) && (*cptr != 0)) {    /* run or go */
-    cptr = get_glyph (cptr, gbuf, 0);                   /* get next glyph */
-    if (sim_vm_parse_addr)                              /* address parser? */
-        pcv = sim_vm_parse_addr (sim_dflt_dev, gbuf, &tptr);
-    else pcv = strtotv (gbuf, &tptr, sim_PC->radix);
-    if ((tptr == gbuf) || (*tptr != 0) ||
-        (pcv > width_mask[sim_PC->width])) return SCPE_ARG;
-    put_rval (sim_PC, 0, pcv);
-    }
-
-if (flag == RU_STEP) {                                  /* step */
-    if (*cptr == 0) sim_step = 1;
-    else {
-        cptr = get_glyph (cptr, gbuf, 0);
-        sim_step = (int32) get_uint (gbuf, 10, INT_MAX, &r);
-        if ((r != SCPE_OK) || (sim_step <= 0)) return SCPE_ARG;
+if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
+    if (*cptr != 0) {                                   /* argument? */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
+        if (*cptr != 0) return SCPE_2MARG;              /* should be end */
+        if (sim_vm_parse_addr)                          /* address parser? */
+            pcv = sim_vm_parse_addr (sim_dflt_dev, gbuf, &tptr);
+        else pcv = strtotv (gbuf, &tptr, sim_PC->radix);/* parse PC */
+        if ((tptr == gbuf) || (*tptr != 0) ||           /* error? */
+            (pcv > width_mask[sim_PC->width])) return SCPE_ARG;
+        put_rval (sim_PC, 0, pcv);
         }
+    if ((flag == RU_RUN) &&                             /* run? */
+        ((r = run_boot_prep ()) != SCPE_OK)) return r;  /* reset sim */
     }
 
-if (flag == RU_BOOT) {                                  /* boot */
+else if (flag == RU_STEP) {                             /* step */
+   if (*cptr != 0) {                                    /* argument? */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
+        if (*cptr != 0) return SCPE_2MARG;              /* should be end */
+        sim_step = (int32) get_uint (gbuf, 10, INT_MAX, &r);
+        if ((r != SCPE_OK) || (sim_step <= 0))          /* error? */
+            return SCPE_ARG;
+        }
+    else sim_step = 1;
+    }
+
+else if (flag == RU_BOOT) {                             /* boot */
     if (*cptr == 0) return SCPE_2FARG;                  /* must be more */
     cptr = get_glyph (cptr, gbuf, 0);                   /* get next glyph */
+    if (*cptr != 0) return SCPE_2MARG;                  /* should be end */
     dptr = find_unit (gbuf, &uptr);                     /* locate unit */
     if (dptr == NULL) return SCPE_NXDEV;                /* found dev? */
     if (uptr == NULL) return SCPE_NXUN;                 /* valid unit? */
     if (dptr->boot == NULL) return SCPE_NOFNC;          /* can it boot? */
     if (uptr->flags & UNIT_DIS) return SCPE_UDIS;       /* disabled? */
-    if ((uptr->flags & UNIT_ATTABLE) &&
+    if ((uptr->flags & UNIT_ATTABLE) &&                 /* if attable, att? */
         !(uptr->flags & UNIT_ATT)) return SCPE_UNATT;
     unitno = (int32) (uptr - dptr->units);              /* recover unit# */
-    if ((r = dptr->boot (unitno, dptr)) != SCPE_OK) return r;
+    if ((r = run_boot_prep ()) != SCPE_OK) return r;    /* reset sim */
+    if ((r = dptr->boot (unitno, dptr)) != SCPE_OK)     /* boot device */
+        return r;
     }
 
-if (*cptr != 0) return SCPE_2MARG;                      /* now eol? */
+else if (flag != RU_CONT) return SCPE_IERR;             /* must be cont */
 
-if ((flag == RU_RUN) || (flag == RU_BOOT)) {            /* run or boot */
-    sim_interval = 0;                                   /* reset queue */
-    sim_time = sim_rtime = 0;
-    noqueue_time = 0;
-    sim_clock_queue = NULL;
-    if ((r = reset_all_p (0)) != SCPE_OK) return r;
-    }
-for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {
-    for (j = 0; j < dptr->numunits; j++) {
+for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
+    for (j = 0; j < dptr->numunits; j++) {              /* seq devices */
         uptr = dptr->units + j;
         if ((uptr->flags & (UNIT_ATT + UNIT_SEQ)) ==
             (UNIT_ATT + UNIT_SEQ))
@@ -2324,6 +2345,17 @@ printf ("\n");
 fprint_stopped (stdout, r);                             /* print msg */
 if (sim_log) fprint_stopped (sim_log, r);               /* log if enabled */
 return SCPE_OK;
+}
+
+/* Common setup for RUN or BOOT */
+
+t_stat run_boot_prep (void)
+{
+sim_interval = 0;                                       /* reset queue */
+sim_time = sim_rtime = 0;
+noqueue_time = 0;
+sim_clock_queue = NULL;
+return reset_all_p (0);
 }
 
 /* Print stopped message */

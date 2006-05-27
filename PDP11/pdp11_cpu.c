@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu          PDP-11 CPU
 
+   24-May-06    RMS     Added instruction history
+   03-May-06    RMS     Fixed XOR operand fetch order for 11/70-style systems
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    19-May-05    RMS     Replaced WAIT clock queue check with API call
@@ -228,6 +230,19 @@
 #define UNIT_V_MSIZE    (UNIT_V_UF + 0)                 /* dummy */
 #define UNIT_MSIZE      (1u << UNIT_V_MSIZE)
 
+#define HIST_MIN        64
+#define HIST_MAX        (1u << 18)
+#define HIST_VLD        1                               /* make PC odd */
+#define HIST_ILNT       4                               /* max inst length */
+
+typedef struct {
+    uint16              pc;
+    uint16              psw;
+    uint16              src;
+    uint16              dst;
+    uint16              inst[HIST_ILNT];
+    } InstHistory;
+
 /* Global state */
 
 extern FILE *sim_log;
@@ -274,12 +289,16 @@ uint16 pcq[PCQ_SIZE] = { 0 };                           /* PC queue */
 int32 pcq_p = 0;                                        /* PC queue ptr */
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 jmp_buf save_env;                                       /* abort handler */
+int32 hst_p = 0;                                        /* history pointer */
+int32 hst_lnt = 0;                                      /* history length */
+InstHistory *hst = NULL;                                /* instruction history */
 int32 dsmask[4] = { MMR3_KDS, MMR3_SDS, 0, MMR3_UDS };  /* dspace enables */
 
 extern int32 CPUERR, MAINT;
 extern int32 sim_interval;
 extern UNIT clk_unit, pclk_unit;
 extern int32 sim_int_char;
+extern uint32 sim_switches;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern DEVICE *sim_devices[];
 extern CPUTAB cpu_tab[];
@@ -289,6 +308,9 @@ extern CPUTAB cpu_tab[];
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
 int32 GeteaB (int32 spec);
 int32 GeteaW (int32 spec);
 int32 relocR (int32 addr);
@@ -586,6 +608,10 @@ MTAB cpu_mod[] = {
       &set_autocon, &show_autocon },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOAUTOCONFIG",
       &set_autocon, NULL },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
+      &cpu_set_hist, &cpu_show_hist },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
+      NULL, &cpu_show_virt },
     { 0 }
     };
 
@@ -775,12 +801,28 @@ while (reason == 0)  {
         MMR2 = PC;
         }
     IR = ReadE (PC | isenable);                         /* fetch instruction */
-    PC = (PC + 2) & 0177777;                            /* incr PC, mod 65k */
     sim_interval = sim_interval - 1;
     srcspec = (IR >> 6) & 077;                          /* src, dst specs */
     dstspec = IR & 077;
     srcreg = (srcspec <= 07);                           /* src, dst = rmode? */
     dstreg = (dstspec <= 07);
+    if (hst_lnt) {                                      /* record history? */
+        t_value val;
+        uint32 i;
+        hst[hst_p].pc = PC | HIST_VLD;
+        hst[hst_p].psw = get_PSW ();
+        hst[hst_p].src = R[srcspec & 07];
+        hst[hst_p].dst = R[dstspec & 07];
+        hst[hst_p].inst[0] = IR;
+        for (i = 1; i < HIST_ILNT; i++) {
+            if (cpu_ex (&val, (PC + (i << 1)) & 0177777, &cpu_unit, SWMASK ('V')))
+                hst[hst_p].inst[i] = 0;
+            else hst[hst_p].inst[i] = (uint16) val;
+            }
+        hst_p = (hst_p + 1);
+        if (hst_p >= hst_lnt) hst_p = 0;
+        }
+    PC = (PC + 2) & 0177777;                            /* incr PC, mod 65k */
     switch ((IR >> 12) & 017) {                         /* decode IR<15:12> */
 
 /* Opcode 0: no operands, specials, branches, JSR, SOPs */
@@ -1478,8 +1520,15 @@ while (reason == 0)  {
 
         case 4:                                         /* XOR */
             if (CPUT (HAS_SXS)) {
-                dst = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));
-                dst = dst ^ R[srcspec];
+                if (CPUT (IS_SDSD) && !dstreg) {        /* R,not R */
+                    src2 = ReadMW (GeteaW (dstspec));
+                    src = R[srcspec];
+                    }
+                else {
+                    src = R[srcspec];
+                    src2 = dstreg? R[dstspec]: ReadMW (GeteaW (dstspec));
+                    }
+                dst = src ^ src2;
                 N = GET_SIGN_W (dst);
                 Z = GET_Z (dst);
                 V = 0;
@@ -2834,4 +2883,97 @@ if (rptr == NULL) return;
 for (i = 0; i < 6; i++, rptr++) rptr->loc = (void *) &REGFILE[i][rs];
 rptr->loc = (void *) &STACKFILE[cm];
 return;
+}
+
+/* Set history */
+
+t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i, lnt;
+t_stat r;
+
+if (cptr == NULL) {
+    for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+    hst_p = 0;
+    return SCPE_OK;
+    }
+lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+hst_p = 0;
+if (hst_lnt) {
+    free (hst);
+    hst_lnt = 0;
+    hst = NULL;
+    }
+if (lnt) {
+    hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
+    if (hst == NULL) return SCPE_MEM;
+    hst_lnt = lnt;
+    }
+return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 j, k, di, lnt, ir;
+char *cptr = (char *) desc;
+t_value sim_eval[HIST_ILNT];
+t_stat r;
+InstHistory *h;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+    UNIT *uptr, int32 sw);
+
+if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
+if (cptr) {
+    lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+    if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;
+    }
+else lnt = hst_lnt;
+di = hst_p - lnt;                                       /* work forward */
+if (di < 0) di = di + hst_lnt;
+fprintf (st, "PC     PSW     src    dst     IR\n\n");
+for (k = 0; k < lnt; k++) {                             /* print specified */
+    h = &hst[(di++) % hst_lnt];                         /* entry pointer */
+    if (h->pc & HIST_VLD) {                             /* instruction? */
+        ir = h->inst[0];
+        fprintf (st, "%06o %06o|", h->pc & ~HIST_VLD, h->psw);
+        if (((ir & 0070000) != 0) ||                    /* dops, eis, fpp */
+            ((ir & 0177000) == 0004000))                /* jsr */
+            fprintf (st, "%06o %06o  ", h->src, h->dst);
+        else if ((ir >= 0000100) &&                     /* not no opnd */
+            (((ir & 0007700) <  0000300) ||             /* not branch */
+             ((ir & 0007700) >= 0004000)))
+            fprintf (st, "       %06o  ", h->dst);
+        else fprintf (st, "               ");
+        for (j = 0; j < HIST_ILNT; j++) sim_eval[j] = h->inst[j];
+        if ((fprint_sym (st, h->pc & ~HIST_VLD, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+            fprintf (st, "(undefined) %06o", h->inst[0]);
+        fputc ('\n', st);                               /* end line */
+        }                                               /* end else instruction */
+    }                                                   /* end for */
+return SCPE_OK;
+}
+
+/* Virtual address translation */
+
+t_stat cpu_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc)
+{
+t_stat r;
+char *cptr = (char *) desc;
+uint32 va, pa;
+
+if (cptr) {
+    va = (uint32) get_uint (cptr, 8, VAMASK, &r);
+    if (r == SCPE_OK) {
+        pa = relocC (va, sim_switches);                 /* relocate */
+        if (pa < MAXMEMSIZE)
+            fprintf (of, "Virtual %-o = physical %-o\n", va, pa);
+        else fprintf (of, "Virtual %-o is not valid\n", va);
+        return SCPE_OK;
+        }
+    }
+fprintf (of, "Invalid argument\n");
+return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* id_idc.c: Interdata MSM/IDC disk controller simulator
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    idc          MSM/IDC disk controller
 
+   03-Apr-06    RMS     Fixed WD/WH handling (found by Davis Johnson)
+   30-Mar-06    RMS     Fixed bug, nop command should be ignored (found by Davis Johnson)
    25-Apr-03    RMS     Revised for extended file support
    16-Feb-03    RMS     Fixed read to test transfer ok before selch operation
 
@@ -199,14 +201,16 @@ extern uint32 int_req[INTSZ], int_enb[INTSZ];
 
 uint8 idcxb[IDC_NUMBY * 3];                             /* xfer buffer */
 uint32 idc_bptr = 0;                                    /* buffer ptr */
+uint32 idc_wdptr = 0;                                   /* ctrl write data ptr */
 uint32 idc_db = 0;                                      /* ctrl buffer */
-uint32 idd_db = 0;                                      /* drive buffer */
 uint32 idc_sta = 0;                                     /* ctrl status */
 uint32 idc_sec = 0;                                     /* sector */
 uint32 idc_hcyl = 0;                                    /* head/cyl */
 uint32 idc_svun = 0;                                    /* most recent unit */
 uint32 idc_1st = 0;                                     /* first byte */
 uint32 idc_arm = 0;                                     /* ctrl armed */
+uint32 idd_db = 0;                                      /* drive buffer */
+uint32 idd_wdptr = 0;                                   /* drive write data ptr */
 uint32 idd_arm[ID_NUMDR] = { 0 };                       /* drives armed */
 uint16 idd_dcy[ID_NUMDR] = { 0 };                       /* desired cyl */
 uint32 idd_sirq = 0;                                    /* drive saved irq */
@@ -221,6 +225,7 @@ t_stat idc_svc (UNIT *uptr);
 t_stat idc_reset (DEVICE *dptr);
 t_stat idc_attach (UNIT *uptr, char *cptr);
 t_stat idc_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+void idc_wd_byte (uint32 dat);
 t_stat idc_rds (UNIT *uptr);
 t_stat idc_wds (UNIT *uptr);
 t_bool idc_dter (UNIT *uptr, uint32 first);
@@ -259,6 +264,8 @@ REG idc_reg[] = {
     { BRDATA (DBUF, idcxb, 16, 8, IDC_NUMBY * 3) },
     { HRDATA (DBPTR, idc_bptr, 10), REG_RO },
     { FLDATA (FIRST, idc_1st, 0) },
+    { HRDATA (CWDPTR, idc_wdptr, 2) },
+    { HRDATA (DWDPTR, idc_wdptr, 1) },
     { GRDATA (IREQ, int_req[l_IDC], 16, ID_NUMDR + 1, i_IDC) },
     { GRDATA (IENB, int_enb[l_IDC], 16, ID_NUMDR + 1, i_IDC) },
     { GRDATA (SIREQ, idd_sirq, 16, ID_NUMDR, i_IDC + 1), REG_RO },
@@ -358,11 +365,12 @@ switch (op) {                                           /* case IO op */
         return 0;                                       /* return data */
 
     case IO_WD:                                         /* write data */
-        idc_sec = dat;                                  /* sector */
+        idc_wd_byte (dat);                              /* one byte only */
         break;
 
     case IO_WH:                                         /* write halfword */
-        idc_hcyl = dat;                                 /* head/cylinder */
+        idc_wd_byte (dat >> 8);                         /* high byte */
+        idc_wd_byte (dat);                              /* low byte */
         break;
 
     case IO_SS:                                         /* status */
@@ -372,15 +380,17 @@ switch (op) {                                           /* case IO op */
 
     case IO_OC:                                         /* command */
         idc_arm = int_chg (v_IDC, dat, idc_arm);        /* upd int ctrl */
+        idc_wdptr = 0;                                  /* init ptr */
         f = dat & CMC_MASK;                             /* get cmd */
         uptr = idc_dev.units + idc_svun;                /* get unit */
         if (f & CMC_CLR) {                              /* clear? */
             idc_reset (&idc_dev);                       /* reset world */
             break;
             }
-        if (!(idc_sta & STC_IDL) ||                     /* if !idle, */
-            sim_is_active (uptr) ||                     /* unit busy, */
-            (f == CMC_EXP0)) break;                     /* expg, ignore */
+        if ((f == 0) ||                                 /* if nop, */
+            (f == CMC_EXP0) ||                          /* expg, */
+            !(idc_sta & STC_IDL) ||                     /* !idle, */
+            sim_is_active (uptr)) break;                /* unit busy, ignore */
         idc_sta = STA_BSY;                              /* bsy=1,idl,err=0 */
         idc_1st = 1;                                    /* xfr not started */
         idc_bptr = 0;                                   /* buffer empty */
@@ -394,11 +404,37 @@ switch (op) {                                           /* case IO op */
 return 0;
 }
 
+/* Process WD/WH data */
+
+void idc_wd_byte (uint32 dat)
+{
+dat = dat & 0xFF;
+switch (idc_wdptr) {
+
+    case 0:                                             /* byte 0 = sector */
+        idc_sec = dat;
+        idc_wdptr++;
+        break;
+
+    case 1:                                             /* byte 1 = high hd/cyl */
+        idc_hcyl = (idc_hcyl & 0xFF) | (dat << 8);
+        idc_wdptr++;
+        break;
+
+    case 2:                                             /* byte 2 = low hd/cyl */
+        idc_hcyl = (idc_hcyl & 0xFF00) | dat;
+        idc_wdptr = 0;
+        break;
+        }
+
+return;
+}
+
 /* Drives: IO routine */
 
 uint32 id (uint32 dev, uint32 op, uint32 dat)
 {
-uint32 t, u;
+uint32 t, u, f;
 UNIT *uptr;
 
 if (dev == idc_dib.dno) return idc (dev, op, dat);      /* controller? */
@@ -408,15 +444,17 @@ switch (op) {                                           /* case IO op */
 
     case IO_ADR:                                        /* select */
         if (idc_sta & STC_IDL) idc_svun = u;            /* idle? save unit */
-        return HW;                                      /* byte only */
+        return BY;                                      /* byte only */
 
     case IO_RD:                                         /* read data */
     case IO_RH:
         return 0;
 
     case IO_WD:                                         /* write data */
-    case IO_WH:                                         /* write halfword */
-        idd_db = dat;                                   /* save data */
+        if (idd_wdptr & 1)                              /* low byte? */
+            idd_db = (idd_db & 0xFF00) | dat;
+        else idd_db = (idd_db & 0xFF) | (dat << 8);     /* no, high */
+        idd_wdptr = idd_wdptr ^ 1;                      /* other byte */
         break;
 
     case IO_SS:                                         /* status */
@@ -430,12 +468,15 @@ switch (op) {                                           /* case IO op */
 
     case IO_OC:                                         /* command */
         idd_arm[u] = int_chg (v_IDC + u + 1, dat, idd_arm[u]);
+        idd_wdptr = 0;                                  /* init ptr */
         if (idd_arm[u] == 0)                            /* disarmed? */
             idd_sirq &= ~(1 << (v_IDC + u + 1));        /* clr saved req */
-        if (sim_is_active (uptr) ||                     /* if busy or */
-           !(idc_sta & STC_IDL)) break;                 /* !idle, ignore */
-        if ((dat & CMC_MASK) == CMDX_MASK) break;       /* ignore 0x30 */
-        uptr->FNC = (dat & CMC_MASK) | CMC_DRV;         /* save cmd */
+        f = dat & CMC_MASK;                             /* get cmd */
+        if ((f == 0) ||                                 /* if nop, */
+            (f == CMDX_MASK) ||                         /* 0x30, */
+            !(idc_sta & STC_IDL) ||                     /* !idle, */
+            sim_is_active (uptr)) break;                /* unit busy, ignore */
+        uptr->FNC = f | CMC_DRV;                        /* save cmd */
         idc_sta = idc_sta & ~STC_IDL;                   /* clr idle */
         sim_activate (uptr, idc_ctime);                 /* schedule */
         break;
@@ -687,6 +728,8 @@ uint32 u;
 UNIT *uptr;
 
 idc_sta = STC_IDL | STA_BSY;                            /* idle, busy */
+idc_wdptr = 0;
+idd_wdptr = 0;
 idc_1st = 0;                                            /* clear flag */
 idc_svun = idc_db = 0;                                  /* clear unit, buf */
 idc_sec = 0;                                            /* clear addr */

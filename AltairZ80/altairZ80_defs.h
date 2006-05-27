@@ -1,6 +1,6 @@
 /*  altairz80_defs.h: MITS Altair simulator definitions
 
-    Copyright (c) 2002-2005, Peter Schorn
+    Copyright (c) 2002-2006, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -73,14 +73,3 @@
     sprintf(messageBuffer,PCformat p1,PCX,p2,p3,p4,p5);     printMessage()
 #define message6(p1,p2,p3,p4,p5,p6) \
     sprintf(messageBuffer,PCformat p1,PCX,p2,p3,p4,p5,p6);  printMessage()
-
-/*  The default is to use "inline". */
-#if defined(NO_INLINE)
-#define INLINE
-#else
-#if defined(__DECC) && defined(VMS)
-#define INLINE __inline
-#else
-#define INLINE inline
-#endif
-#endif
