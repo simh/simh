@@ -1,6 +1,6 @@
 /* pdp18b_stddev.c: 18b PDP's standard devices
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,10 @@
    tto          teleprinter
    clk          clock
 
+   30-Jun-06    RMS     Fixed KSR-28 shift tracking
+   20-Jun-06    RMS     Added KSR ASCII reader support
+   13-Jun-06    RMS     Fixed Baudot letters/figures inversion for PDP-4
+                        Fixed PDP-4/PDP-7 default terminal to be local echo
    22-Nov-05    RMS     Revised for new terminal processing routines
    28-May-04    RMS     Removed SET TTI CTRL-C
    16-Feb-04    RMS     Fixed bug in hardware read-in mode bootstrap
@@ -66,6 +70,8 @@
 
 #define UNIT_V_RASCII   (UNIT_V_UF + 0)                 /* reader ASCII */
 #define UNIT_RASCII     (1 << UNIT_V_RASCII)
+#define UNIT_V_KASCII   (UNIT_V_UF + 1)                 /* KSR ASCII */
+#define UNIT_KASCII     (1 << UNIT_V_KASCII)
 #define UNIT_V_PASCII   (UNIT_V_UF + 0)                 /* punch ASCII */
 #define UNIT_PASCII     (1 << UNIT_V_PASCII)
 
@@ -78,10 +84,40 @@ extern UNIT cpu_unit;
 int32 clk_state = 0;
 int32 ptr_err = 0, ptr_stopioe = 0, ptr_state = 0;
 int32 ptp_err = 0, ptp_stopioe = 0;
-int32 tti_state = 0;
-int32 tto_state = 0;
+int32 tti_2nd = 0;                                      /* 2nd char waiting */
+int32 tty_shift = 0;                                    /* KSR28 shift state */
 int32 clk_tps = 60;                                     /* ticks/second */
 int32 tmxr_poll = 16000;                                /* term mux poll */
+
+const int32 asc_to_baud[128] = {
+    000,000,000,000,000,000,000,064,                    /* bell */
+    000,000,0110,000,000,0102,000,000,                  /* lf, cr */
+    000,000,000,000,000,000,000,000,
+    000,000,000,000,000,000,000,000,
+    0104,066,061,045,062,000,053,072,                   /* space - ' */
+    076,051,000,000,046,070,047,067,                    /* ( - / */
+    055,075,071,060,052,041,065,074,                    /* 0 - 7 */
+    054,043,056,057,000,000,000,063,                    /* 8 - ? */
+    000,030,023,016,022,020,026,013,                    /* @ - G */
+    005,014,032,036,011,007,006,003,                    /* H - O */
+    015,035,012,024,001,034,017,031,                    /* P - W */
+    027,025,021,000,000,000,000,000,                    /* X - _ */
+    000,030,023,016,022,020,026,013,                    /* ` - g */
+    005,014,032,036,011,007,006,003,                    /* h - o */
+    015,035,012,024,001,034,017,031,                    /* p - w */
+    027,025,021,000,000,000,000,000                     /* x - DEL */
+    };
+
+const char baud_to_asc[64] = {
+     0 ,'T',015,'O',' ','H','N','M',
+    012,'L','R','G','I','P','C','V',
+    'E','Z','D','B','S','Y','F','X',
+    'A','W','J', 0 ,'U','Q','K', 0,
+     0 ,'5','\r','9',' ','#',',','.',
+    012,')','4','&','8','0',':',';',
+    '3','"','$','?','\a','6','!','/',
+    '-','2','\'',0 ,'7','1','(', 0
+    };
 
 int32 ptr (int32 dev, int32 pulse, int32 dat);
 int32 ptp (int32 dev, int32 pulse, int32 dat);
@@ -181,6 +217,8 @@ REG ptr_reg[] = {
     };
 
 MTAB ptr_mod[] = {
+    { UNIT_RASCII, UNIT_RASCII, "even parity ASCII", NULL },
+    { UNIT_KASCII, UNIT_KASCII, "forced parity ASCII", NULL },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_devno },
     { 0 }
     };
@@ -220,6 +258,7 @@ REG ptp_reg[] = {
     };
 
 MTAB ptp_mod[] = {
+    { UNIT_PASCII, UNIT_PASCII, "7b ASCII", NULL },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_devno },
     { 0 }
     };
@@ -237,59 +276,35 @@ DEVICE ptp_dev = {
    tti_dev      TTI device descriptor
    tti_unit     TTI unit
    tti_reg      TTI register list
-   tti_trans    ASCII to Baudot table
 */
 
 #if defined (KSR28)
 #define TTI_WIDTH       5
 #define TTI_FIGURES     (1 << TTI_WIDTH)
-#define TTI_2ND         (1 << (TTI_WIDTH + 1))
-#define TTI_BOTH        (1 << (TTI_WIDTH + 2))
-#define BAUDOT_LETTERS  033
-#define BAUDOT_FIGURES  037
+#define TTI_BOTH        (1 << (TTI_WIDTH + 1))
+#define BAUDOT_LETTERS  037
+#define BAUDOT_FIGURES  033
 
-static const int32 tti_trans[128] = {
-    000,000,000,000,000,000,000,064,                    /* bell */
-    000,000,0210,000,000,0202,000,000,                  /* lf, cr */
-    000,000,000,000,000,000,000,000,
-    000,000,000,000,000,000,000,000,
-    0204,066,061,045,062,000,053,072,                   /* space - ' */
-    076,051,000,000,046,070,047,067,                    /* ( - / */
-    055,075,071,060,052,041,065,074,                    /* 0 - 7 */
-    054,043,056,057,000,000,000,063,                    /* 8 - ? */
-    000,030,023,016,022,020,026,013,                    /* @ - G */
-    005,014,032,036,011,007,006,003,                    /* H - O */
-    015,035,012,024,001,034,017,031,                    /* P - W */
-    027,025,021,000,000,000,000,000,                    /* X - _ */
-    000,030,023,016,022,020,026,013,                    /* ` - g */
-    005,014,032,036,011,007,006,003,                    /* h - o */
-    015,035,012,024,001,034,017,031,                    /* p - w */
-    027,025,021,000,000,000,000,000                     /* x - DEL */
-    };
 #else
 
 #define TTI_WIDTH       8
 #endif
 
 #define TTI_MASK        ((1 << TTI_WIDTH) - 1)
-#define UNIT_V_HDX      (TTUF_V_UF + 0)                 /* half duplex */
-#define UNIT_HDX        (1 << UNIT_V_HDX)
+#define TTUF_V_HDX      (TTUF_V_UF + 0)                 /* half duplex */
+#define TTUF_HDX        (1 << TTUF_V_HDX)
 
 DIB tti_dib = { DEV_TTI, 1, &tti_iors, { &tti } };
 
-#if defined (PDP4) || defined (PDP7)
-UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR, 0), KBD_POLL_WAIT };
-#else
-UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR+UNIT_HDX, 0), KBD_POLL_WAIT };
-#endif
+UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR+TTUF_HDX, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, TTI_WIDTH) },
+#if defined (KSR28)
+    { ORDATA (BUF2ND, tti_2nd, TTI_WIDTH), REG_HRO },
+#endif
     { FLDATA (INT, int_hwre[API_TTI], INT_V_TTI) },
     { FLDATA (DONE, int_hwre[API_TTI], INT_V_TTI) },
-#if defined (KSR28)
-    { ORDATA (TTI_STATE, tti_state, (TTI_WIDTH + 3)), REG_HRO },
-#endif
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
     { NULL }
@@ -301,9 +316,9 @@ MTAB tti_mod[] = {
     { TT_MODE, TT_MODE_7B,  "7b",  "7B",  &tty_set_mode },
     { TT_MODE, TT_MODE_8B,  "8b",  "8B",  &tty_set_mode },
     { TT_MODE, TT_MODE_7P,  "7b",  NULL,  NULL },
-    { UNIT_HDX, 0       , "full duplex", "FDX", NULL },
-    { UNIT_HDX, UNIT_HDX, "half duplex", "HDX", NULL },
 #endif
+    { TTUF_HDX, 0       , "full duplex", "FDX", NULL },
+    { TTUF_HDX, TTUF_HDX, "half duplex", "HDX", NULL },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_devno, NULL },
     { 0 }
     };
@@ -321,23 +336,12 @@ DEVICE tti_dev = {
    tto_dev      TTO device descriptor
    tto_unit     TTO unit
    tto_reg      TTO register list
-   tto_trans    Baudot to ASCII table
 */
 
 #if defined (KSR28)
 #define TTO_WIDTH       5
 #define TTO_FIGURES     (1 << TTO_WIDTH)
 
-static const char tto_trans[64] = {
-     0 ,'T',015,'O',' ','H','N','M',
-    012,'L','R','G','I','P','C','V',
-    'E','Z','D','B','S','Y','F','X',
-    'A','W','J', 0 ,'U','Q','K', 0,
-     0 ,'5','\r','9',' ','#',',','.',
-    012,')','4','&','8','0',':',';',
-    '3','"','$','?','\a','6','!','/',
-    '-','2','\'',0 ,'7','1','(', 0
-    };
 #else
 
 #define TTO_WIDTH       8
@@ -351,11 +355,11 @@ UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_KSR, 0), 1000 };
 
 REG tto_reg[] = {
     { ORDATA (BUF, tto_unit.buf, TTO_WIDTH) },
+#if defined (KSR28)
+    { FLDATA (SHIFT, tty_shift, 0), REG_HRO },
+#endif
     { FLDATA (INT, int_hwre[API_TTO], INT_V_TTO) },
     { FLDATA (DONE, int_hwre[API_TTO], INT_V_TTO) },
-#if defined (KSR28)
-    { FLDATA (TTO_STATE, tto_state, 0), REG_HRO },
-#endif
     { DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
     { NULL }
@@ -507,6 +511,8 @@ if (ptr_state == 0) {                                   /* ASCII */
             ptr_unit.buf = ptr_unit.buf ^ 0200;         /* count bits */
         ptr_unit.buf = ptr_unit.buf ^ 0200;             /* set even parity */
         }
+    else if (ptr_unit.flags & UNIT_KASCII)              /* KSR ASCII? */
+        ptr_unit.buf = (temp | 0200) & 0377;            /* forced parity */
     else ptr_unit.buf = temp & 0377;
     }
 else if (temp & 0200) {                                 /* binary */
@@ -550,9 +556,11 @@ t_stat reason;
 
 reason = attach_unit (uptr, cptr);
 ptr_err = (ptr_unit.flags & UNIT_ATT)? 0: 1;
-ptr_unit.flags = ptr_unit.flags & ~UNIT_RASCII;
+ptr_unit.flags = ptr_unit.flags & ~(UNIT_RASCII|UNIT_KASCII);
 if (sim_switches & SWMASK ('A'))
     ptr_unit.flags = ptr_unit.flags | UNIT_RASCII;
+if (sim_switches & SWMASK ('K'))
+    ptr_unit.flags = ptr_unit.flags | UNIT_KASCII;
 return reason;
 }
 
@@ -889,23 +897,34 @@ return dat;
 t_stat tti_svc (UNIT *uptr)
 {
 #if defined (KSR28)                                     /* Baudot... */
-int32 c;
+int32 in, c;
 
 sim_activate (uptr, uptr->wait);                        /* continue poll */
-if (tti_state & TTI_2ND) {                              /* char waiting? */
-    uptr->buf = tti_state & TTI_MASK;                   /* return char */
-    tti_state = tti_state & ~TTI_2ND;                   /* not waiting */
+if (tti_2nd) {                                          /* char waiting? */
+    uptr->buf = tti_2nd;                                /* return char */
+    tti_2nd = 0;                                        /* not waiting */
     }
 else {
-    if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;
-    c = tti_trans[c & 0177];                            /* translate char */
+    if ((in = sim_poll_kbd ()) < SCPE_KFLAG) return in;
+    c = asc_to_baud[in & 0177];                         /* translate char */
     if (c == 0) return SCPE_OK;                         /* untranslatable? */
-    if (((c & TTI_FIGURES) == (tti_state & TTI_FIGURES)) ||
-        (c & TTI_BOTH)) uptr->buf = c & TTI_MASK;
-    else {
-        uptr->buf = (c & TTI_FIGURES)?
-            BAUDOT_FIGURES: BAUDOT_LETTERS;
-        tti_state = c | TTI_2ND;                        /* set 2nd waiting */
+    if ((c & TTI_BOTH) ||                               /* case insensitive? */
+        (((c & TTI_FIGURES)? 1: 0) == tty_shift))       /* right case? */
+        uptr->buf = c & TTI_MASK;
+    else {                                              /* send case change */
+        if (c & TTI_FIGURES) {                          /* to figures? */
+            uptr->buf = BAUDOT_FIGURES;
+            tty_shift = 1;
+            }
+        else {                                          /* no, to letters */
+            uptr->buf = BAUDOT_LETTERS;
+            tty_shift = 0;
+            }
+        tti_2nd = c & TTI_MASK;                         /* save actual char */
+        }
+    if (uptr->flags & TTUF_HDX) {                       /* half duplex? */
+        sim_putchar (sim_tt_outcvt (in, TTUF_MODE_UC));
+        tto_unit.pos = tto_unit.pos + 1;
         }
     }
 
@@ -917,7 +936,7 @@ if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
 out = c & 0177;                                         /* mask echo to 7b */
 if (c & SCPE_BREAK) c = 0;                              /* break? */
 else c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
-if ((uptr->flags & UNIT_HDX) && out &&                  /* half duplex and */
+if ((uptr->flags & TTUF_HDX) && out &&                  /* half duplex and */
     ((out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags))) >= 0)) {
     sim_putchar (out);                                  /* echo */
     tto_unit.pos = tto_unit.pos + 1;
@@ -942,7 +961,8 @@ return (TST_INT (TTI)? IOS_TTI: 0);
 t_stat tti_reset (DEVICE *dptr)
 {
 tti_unit.buf = 0;                                       /* clear buffer */
-tti_state = 0;                                          /* clear state */
+tti_2nd = 0;
+tty_shift = 0;                                          /* clear state */
 CLR_INT (TTI);                                          /* clear flag */
 sim_activate (&tti_unit, tti_unit.wait);                /* activate unit */
 return SCPE_OK;
@@ -972,11 +992,11 @@ t_stat r;
 
 #if defined (KSR28)                                     /* Baudot... */
 if (uptr->buf == BAUDOT_FIGURES)                        /* set figures? */
-    tto_state = TTO_FIGURES;
+    tty_shift = 1;
 else if (uptr->buf == BAUDOT_LETTERS)                   /* set letters? */
-    tto_state = 0;
+    tty_shift = 0;
 else {
-    c = tto_trans[uptr->buf + tto_state];               /* translate */
+    c = baud_to_asc[uptr->buf | (tty_shift << 5)];      /* translate */
 
 #else
 c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags));
@@ -1006,7 +1026,7 @@ return (TST_INT (TTO)? IOS_TTO: 0);
 t_stat tto_reset (DEVICE *dptr)
 {
 tto_unit.buf = 0;                                       /* clear buffer */
-tto_state = 0;                                          /* clear state */
+tty_shift = 0;                                          /* clear state */
 CLR_INT (TTO);                                          /* clear flag */
 sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;

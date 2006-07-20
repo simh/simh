@@ -28,7 +28,7 @@
 
    cpu          Eclipse central processor
 
-   06-Feb-06    RMS     Fixed bug in DIVS (found by Mark Hittinger)
+   07-Jun-06    RMS     Fixed bug in DIVS (found by Mark Hittinger)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    25-Aug-05    RMS     Fixed DIVS overflow cases
    29-Nov-03    CEO     Corrected POPJ and Bit operations bugs
@@ -1665,7 +1665,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
     }
     if (IR == 0157710) {                                /* DIVS: Signed Divide */
         if ((AC[0] == 0) ||
-            ((AC[0] == 0100000) && (AC[1] == 0) && (AC[2] = 0177777)))
+            ((AC[0] == 0100000) && (AC[1] == 0) && (AC[2] == 0177777)))
             C = 0200000;
         else {
             sAC2 = AC[2];

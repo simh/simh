@@ -29,11 +29,71 @@
 
 #define SIM_MAJOR       3
 #define SIM_MINOR       6
-#define SIM_PATCH       0
+#define SIM_PATCH       1
 
 /* V3.6 revision history 
 
 patch   date            module(s) and fix(es)
+
+  1     25-Jul-06       sim_console.c:
+                        - implemented SET/SHOW PCHAR
+
+                        all DECtapes:
+                        - fixed conflict in ATTACH switches
+
+                        hp2100_ms.c (from Dave Bryan):
+                        - added CAPACITY as alternate for REEL
+                        - fixed EOT test for unlimited reel size
+
+                        i1620_cd.c (from Tom McBride):
+                        - fixed card reader fgets call
+                        - fixed card reader boot sequence
+
+                        i7094_cd.c:
+                        - fixed problem with 80 column full cards
+
+                        i7094_cpu.c:
+                        - fixed bug in halt IO wait loop
+
+                        i7094_sys.c:
+                        - added binary loader (courtesy of Dave Pitt)
+
+                        pdp1_cpu.c:
+                        - fixed bugs in MUS and DIV
+
+                        pdp11_cis.c:
+                        - added interrupt tests to character instructions
+                        - added 11/44 stack probe test to MOVCx (only)
+
+                        pdp11_dl.c:
+                        - first release
+
+                        pdp11_rf.c:
+                        - first release
+
+                        pdp11_stddev.c:
+                        - added UC support to TTI, TTO
+
+                        pdp18b_cpu.c:
+                        - fixed RESET to clear AC, L, and MQ
+
+                        pdp18b_dt.c:
+                        - fixed checksum calculation bug for Type 550
+
+                        pdp18b_fpp.c:
+                        - fixed bugs in left shift, multiply
+
+                        pdp18b_stddev.c:
+                        - fixed Baudot letters/figures inversion for PDP-4
+                        - fixed letters/figures tracking for PDP-4
+                        - fixed PDP-4/PDP-7 default terminal to be local echo
+
+                        pdp18b_sys.c:
+                        - added Fiodec, Baudot display
+                        - generalized LOAD to handle HRI, RIM, and BIN files
+
+                        pdp8_ttx.c:
+                        - fixed bug in DETACH routine
 
   0     15-May-06       scp.c:
                         - revised save file format to save options, unit capacity

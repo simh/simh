@@ -32,6 +32,18 @@ available on the SimH web site.
 
 - Added instruction history
 
+1.2 3.6-1
+
+1.2.1 PDP-11
+
+- Added RF11 support
+- Added multiple KL11/DL11 support
+- Added upper-case only mode to TTI, TTO
+
+1.2.2
+
+- Added binary loader (courtesy of Dave Pitt)
+
 
 2. Bugs Fixed
 

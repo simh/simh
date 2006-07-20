@@ -26,6 +26,8 @@
    cdr          711 card reader
    cdp          721 card punch
 
+   13-Jul-06    RMS     Fixed problem with 80 column full cards
+
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.  Two
    formats are supported:
@@ -204,7 +206,7 @@ return SCPE_OK;
 t_stat cdr_svc (UNIT *uptr)
 {
 uint32 i, col, row, bufw, colbin;
-char cdr_cbuf[2 * CD_CHRLNT + 1];
+char cdr_cbuf[(2 * CD_CHRLNT) + 2];
 t_uint64 dat = 0;
 
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;   /* not attached? */
@@ -213,11 +215,11 @@ switch (cdr_sta) {                                      /* case on state */
     case CDS_INIT:                                      /* initial state */
         for (i = 0; i < CD_BINLNT; i++)                 /* clear bin buf */ 
              cdr_bbuf[i] = 0;
-        for (i = 0; i < ((2 * CD_CHRLNT) + 1); i++)     /* clear char buf */
+        for (i = 0; i < ((2 * CD_CHRLNT) + 2); i++)     /* clear char buf */
             cdr_cbuf[i] = ' ';
         cdr_sta = CDS_DATA;                             /* data state */
         cdr_bptr = 0;                                   /* init buf ptr */
-        fgets (cdr_cbuf, (uptr->flags & UNIT_CBN)? (2 * CD_CHRLNT): CD_CHRLNT,
+        fgets (cdr_cbuf, (uptr->flags & UNIT_CBN)? (2 * CD_CHRLNT) + 2: CD_CHRLNT + 2,
             uptr->fileref);                             /* read card */
         if (feof (uptr->fileref))                       /* eof? */
             return ch6_err_disc (CH_A, U_CDR, CHF_EOF); /* set EOF, disc */
@@ -412,7 +414,7 @@ return SCPE_OK;
 t_stat cdp_card_end (UNIT *uptr)
 {
 uint32 i, col, row, bufw, colbin;
-char *pch, bcd, cdp_cbuf[(2 * CD_CHRLNT) + 1];
+char *pch, bcd, cdp_cbuf[(2 * CD_CHRLNT) + 2];
 t_uint64 dat;
 
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;   /* not attached? */
@@ -439,7 +441,8 @@ for (col = 0; col < 72; col++) {                        /* process 72 columns */
 for (i = ((2 * CD_CHRLNT) + 1); (i > 0) &&
     (cdp_cbuf[i - 1] == ' '); --i) ;                    /* trim spaces */
 cdp_cbuf[i++] = '\n';                                   /* append nl */
-fxwrite (cdp_cbuf, 1, i, uptr->fileref);                /* write card */
+cdp_cbuf[i++] = 0;                                      /* append nul */
+fputs (cdp_cbuf, uptr->fileref);                        /* write card */
 if (ferror (uptr->fileref)) {                           /* error? */
     perror ("CDP I/O error");
     clearerr (uptr->fileref);

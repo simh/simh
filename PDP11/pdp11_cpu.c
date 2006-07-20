@@ -336,7 +336,7 @@ void put_PSW (int32 val, t_bool prot);
 void put_PIRQ (int32 val);
 
 extern void fp11 (int32 IR);
-extern void cis11 (int32 IR);
+extern t_stat cis11 (int32 IR);
 extern t_stat fis11 (int32 IR);
 extern t_stat build_dib_tab (void);
 extern t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -1549,7 +1549,8 @@ while (reason == 0)  {
                 ReadE (PC | isenable);                  /* read immediate */
                 PC = (PC + 2) & 0177777;
                 }
-            else if (CPUO (OPT_CIS)) cis11 (IR);
+            else if (CPUO (OPT_CIS))                    /* CIS option? */
+                reason = cis11 (IR);
             else setTRAP (TRAP_ILL);
             break;
 

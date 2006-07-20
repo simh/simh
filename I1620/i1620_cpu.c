@@ -1,6 +1,6 @@
 /* i1620_cpu.c: IBM 1620 CPU simulator
 
-   Copyright (c) 2002-2005, Robert M. Supnik
+   Copyright (c) 2002-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   28-May-06    RMS     Fixed bug in cpu history (found by Peter Schorn)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Nov-04    RMS     Added instruction history
@@ -2049,7 +2050,7 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         if ((fprint_sym (st, h->pc, sim_eval, &cpu_unit, SWMASK ('M'))) > 0) {
             fprintf (st, "(undefined)");
             for (i = 0; i < INST_LEN; i++)
-                fprintf (st, "% 02X", h->inst[i]);
+                fprintf (st, "%02X", h->inst[i]);
             }
         fputc ('\n', st);                               /* end line */
         }                                               /* end else instruction */

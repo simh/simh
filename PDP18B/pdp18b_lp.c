@@ -1,6 +1,6 @@
 /* pdp18b_lp.c: 18b PDP's line printer simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    lp09         (PDP-9,15) LP09 line printer
    lp15         (PDP-15)   LP15 line printer
 
+   11-Jun-06    RMS     Made character translation table global scope
    14-Jan-04    RMS     Revised IO device call interface
    23-Jul-03    RMS     Fixed overprint bug in Type 62
    25-Apr-03    RMS     Revised for extended file support
@@ -46,6 +47,12 @@
 
 #include "pdp18b_defs.h"
 extern int32 int_hwre[API_HLVL+1];
+const char fio_to_asc[64] = {
+    ' ','1','2','3','4','5','6','7','8','9','\'','~','#','V','^','<',
+    '0','/','S','T','U','V','W','X','Y','Z','"',',','>','^','-','?',
+    'o','J','K','L','M','N','O','P','Q','R','$','=','-',')','-','(',
+    '_','A','B','C','D','E','F','G','H','I','*','.','+',']','|','['
+    };
 
 #if defined (TYPE62)
 
@@ -60,12 +67,6 @@ int32 lp62_ovrpr = 0;                                   /* overprint */
 int32 lp62_stopioe = 0;
 int32 lp62_bp = 0;                                      /* buffer ptr */
 char lp62_buf[LP62_BSIZE + 1] = { 0 };
-static const char lp62_trans[64] = {
-    ' ','1','2','3','4','5','6','7','8','9','\'','~','#','V','^','<',
-    '0','/','S','T','U','V','W','X','Y','Z','"',',','>','^','-','?',
-    'o','J','K','L','M','N','O','P','Q','R','$','=','-',')','-','(',
-    '_','A','B','C','D','E','F','G','H','I','*','.','+',']','|','['
-    };
 static const char *lp62_cc[] = {
     "\n",
     "\n\n",
@@ -138,9 +139,9 @@ if (pulse & 02) {
     if (sb == 000) CLR_INT (LPT);                       /* LPCF */
     if ((sb == 040) && (lp62_bp < BPTR_MAX)) {          /* LPLD */
         i = lp62_bp * 3;                                /* cvt to chr ptr */
-        lp62_buf[i] = lp62_trans[(dat >> 12) & 077];
-        lp62_buf[i + 1] = lp62_trans[(dat >> 6) & 077];
-        lp62_buf[i + 2] = lp62_trans[dat & 077];
+        lp62_buf[i] = fio_to_asc[(dat >> 12) & 077];
+        lp62_buf[i + 1] = fio_to_asc[(dat >> 6) & 077];
+        lp62_buf[i + 2] = fio_to_asc[dat & 077];
         lp62_bp = (lp62_bp + 1) & BPTR_MASK;
         }
     }

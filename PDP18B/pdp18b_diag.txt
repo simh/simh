@@ -1,3 +1,55 @@
+18b PDP Diagnostics
+
+1. PDP-4
+
+2. PDP-7
+
+2.1 PDP-7 Instruction Test (Maindec 701)
+
+The diagnostic must be boot loaded, as it jumps dynamically out
+of the RIM load process into its own loader.
+
+At start, set SR<1:16> to a non-zero value.  The diagnostic
+executes four HLT's as part of initial tests and then runs to
+completion.  Normal HLT is at 2623 (PC = 2624).
+
+sim> att -e ptr digital-7-54-m-rim.bin
+sim> boot ptr
+
+HALT instruction, PC: 17670 (AND 17727)
+sim> d sr 4		; any even value between 2 and 377776
+sim> run 170
+
+HALT instruction, PC: 00171 (CML CMA)
+sim> ex ac,l
+AC:     000000
+L:      0
+sim> c
+
+HALT instruction, PC: 00173 (SPA)
+sim> ex ac,l
+AC:     777777
+L:      1
+sim> c
+
+HALT instruction, PC: 00176 (SPA)
+sim> ex ac,l
+AC:     000000
+L:      0
+sim> c
+
+HALT instruction, PC: 00201 (LAC 4116)
+sim> ex ac,l
+AC:     000004
+L:      0
+sim> c
+
+HALT instruction, PC: 02624 (JMP 201)
+
+3. PDP-9
+
+4. PDP-15
+
 Operating Instructions, PDP-15 diagnostics
 
 MAINDEC-15-D0A1-PH		Instruction test 1
@@ -14,7 +66,7 @@ Breakpoint:	4437 for one pass
 
 MAINDEC-15-D0AA-PB		Index register test
 
-Read in:	17700		(binary tape, doesn't matter)
+Read in:	17700		(ignored, binary tape)
 Start:		200
 Halts:		at 214, set BANKM = 0
 Runs to:	prints END at end of pass

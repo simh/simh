@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Jul-06    RMS     Guarantee CBUFSIZE is at least 256
    07-Jan-06    RMS     Added support for breakpoint spaces
                         Added REG_FIT flag
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -160,7 +161,11 @@ typedef uint32          t_addr;
 #if !defined (PATH_MAX)                                 /* usually in limits */
 #define PATH_MAX        512
 #endif
+#if (PATH_MAX >= 128)
 #define CBUFSIZE        (128 + PATH_MAX)                /* string buf size */
+#else
+#define CBUFSIZE        256
+#endif
 
 /* Breakpoint spaces definitions */
 

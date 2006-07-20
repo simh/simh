@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jul-06    RMS     Added sim_activate_abs
    14-Feb-06    RMS     Upgraded save file format to V3.5
    18-Jan-06    RMS     Added fprint_stopped_gen
                         Added breakpoint spaces
@@ -3778,6 +3779,21 @@ uptr->time = event_time - accum;
 if (cptr != NULL) cptr->time = cptr->time - uptr->time;
 sim_interval = sim_clock_queue->time;
 return SCPE_OK;
+}
+
+/* sim_activate_abs - activate (queue) event even if event already scheduled
+
+   Inputs:
+        uptr    =       pointer to unit
+        event_time =    relative timeout
+   Outputs:
+        reason  =       result (SCPE_OK if ok)
+*/
+
+t_stat sim_activate_abs (UNIT *uptr, int32 event_time)
+{
+sim_cancel (uptr);
+return sim_activate (uptr, event_time);
 }
 
 /* sim_cancel - cancel (dequeue) event

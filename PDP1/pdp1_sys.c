@@ -388,6 +388,10 @@ if (sw & SWMASK ('A')) {                                /* ASCII? */
     fprintf (of, FMTASC (inst & 0177));
     return SCPE_OK;
     }
+if (sw & SWMASK ('F')) {
+    fputc (fiodec_to_ascii[inst & 077], of);
+    return SCPE_OK;
+    }
 if (sw & SWMASK ('C')) {                                /* character? */
     fprintf (of, "%c", SIXTOASC ((inst >> 12) & 077));
     fprintf (of, "%c", SIXTOASC ((inst >> 6) & 077));

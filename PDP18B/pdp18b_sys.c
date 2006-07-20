@@ -1,6 +1,6 @@
 /* pdp18b_sys.c: 18b PDP's simulator interface
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Jun-06    RMS     Added Fiodec, Baudot display
+                RMS     Generalized LOAD to handle HRI, RIM, or BIN files
    22-Jul-05    RMS     Removed AAS, error in V1 reference manual
    09-Jan-04    RMS     Fixed instruction table errors
    18-Oct-03    RMS     Added DECtape off reel message
@@ -96,6 +98,9 @@ extern REG cpu_reg[];
 extern int32 M[];
 extern int32 memm;
 extern int32 PC;
+extern const char asc_to_baud[128];
+extern const char baud_to_asc[64];
+extern const char fio_to_asc[64];
 
 /* SCP data structures and interface routines
 
@@ -231,7 +236,7 @@ for (;;) {
 return SCPE_OK;                                         /* done */
 }
 
-/* PDP-9/15 RIM format loader
+/* PDP-7/9/15 hardware read-in format loader
 
    Tape format (read in address specified externally)
         data
@@ -240,7 +245,7 @@ return SCPE_OK;                                         /* done */
         word to execute (bit 1 of last character set)
 */
 
-t_stat rim_load_915 (FILE *fileref, char *cptr)
+t_stat hri_load_7915 (FILE *fileref, char *cptr)
 {
 int32 bits, origin, val;
 char gbuf[CBUFSIZE];
@@ -312,34 +317,29 @@ for (;;) {                                              /* block loop */
 return SCPE_OK;
 }
 
-#if defined (PDP4) || defined (PDP7)
-
-/* PDP-4/PDP-7: RIM format only */
-
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
-{
-if (flag != 0) return SCPE_NOFNC;
-return rim_load_47 (fileref, cptr);
-}
-
-#else
-
-/* PDP-9/PDP-15: all formats */
+/* Binary loader, all formats */
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 extern int32 sim_switches;
 
 if (flag != 0) return SCPE_NOFNC;
-if (sim_switches & SWMASK ('S'))                        /* PDP-4/7 format? */
+if (sim_switches & SWMASK ('S'))                        /* RIM format? */
     return rim_load_47 (fileref, cptr);
-if ((sim_switches & SWMASK ('R')) ||                    /* RIM format? */
-    (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B'))))
-    return rim_load_915 (fileref, cptr);
+if (sim_switches & SWMASK ('R'))                        /* HRI format? */
+    return hri_load_7915 (fileref, cptr);
+if (!(sim_switches & SWMASK ('B')) &&                   /* .rim extension? */
+    match_ext (fnam, "RIM")) {
+    int32 val, bits;
+    do {                                                /* look for HRI flag */
+        val = getword (fileref, &bits);
+        } while ((val >= 0) && ((bits & 1) == 0));
+    rewind (fileref);                                   /* rewind file */
+    if (val < 0) return rim_load_47 (fileref, cptr);    /* eof reached? */
+    return hri_load_7915 (fileref, cptr);               /* no, HRI */
+    }
 return bin_load_915 (fileref, cptr);                    /* must be BIN */
 }
-
-#endif
 
 /* Symbol tables */
 
@@ -869,6 +869,12 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
 return sp;
 }
 
+static int32 rar (int32 c)
+{
+c = c & 077;
+return (c >> 1) | (c << 5);
+}
+
 /* Symbolic decode
 
    Inputs:
@@ -881,7 +887,7 @@ return sp;
         return  =       status code
 */
 
-#define FMTASC(x) (((x) < 040)? "<%03o>": "%c"), (x)
+#define FMTASC(x)   (((x) < 040)? "<%03o>": "%c"), (x)
 #define SIXTOASC(x) (((x) >= 040)? (x): ((x) + 0100))
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
@@ -902,6 +908,20 @@ if (sw & SWMASK ('C')) {                                /* character? */
     fprintf (of, "%c", SIXTOASC (inst & 077));
     return SCPE_OK;
     }
+#if defined (PDP4) || defined (PDP7)
+if (sw & SWMASK ('F')) {                                /* FIODEC? */
+    fprintf (of, "%c", fio_to_asc[(inst >> 12) & 077]);
+    fprintf (of, "%c", fio_to_asc[(inst >> 6) & 077]);
+    fprintf (of, "%c", fio_to_asc[inst & 077]);
+    return SCPE_OK;
+    }
+if (sw & SWMASK ('B')) {                                /* Baudot? */
+    fprintf (of, "%c", baud_to_asc[rar (inst >> 12) & 077]);
+    fprintf (of, "%c", baud_to_asc[rar (inst >> 6) & 077]);
+    fprintf (of, "%c", baud_to_asc[rar (inst) & 077]);
+    return SCPE_OK;
+    }
+#endif
 #if defined (PDP15)
 if (sw & SWMASK ('P')) {                                /* packed ASCII? */
     i = val[1];

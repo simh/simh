@@ -1,6 +1,6 @@
 /* pdp18b_cpu.c: 18b PDP CPU simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          PDP-4/7/9/15 central processor
 
+   27-Jun-06    RMS     Reset clears AC, L, and MQ
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    22-Jul-05    RMS     Removed AAS, error in V1 reference manual
@@ -1889,6 +1890,8 @@ return pa;
 
 t_stat cpu_reset (DEVICE *dptr)
 {
+LAC = 0;
+MQ = 0;
 SC = 0;
 eae_ac_sign = 0;
 ion = ion_defer = ion_inh = 0;

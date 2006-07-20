@@ -1,6 +1,6 @@
 /* pdp1_dt.c: 18b DECtape simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    dt           Type 550/555 DECtape
 
+   23-Jun-06    RMS     Fixed conflict in ATTACH switches
+                        Revised header format
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    25-Jan-04    RMS     Revised for device debug support
    09-Jan-04    RMS     Changed sim_fsize calling sequence, added STOP_OFFR
@@ -60,9 +62,7 @@
    A block consists of five 18b header words, a tape-specific number of data
    words, and five 18b trailer words.  All systems except the PDP-8 use a
    standard block length of 256 words; the PDP-8 uses a standard block length
-   of 86 words (x 18b = 129 words x 12b).  [A PDP-1/4/7 DECtape has only four 18b
-   header words; for consistency, the PDP-1/4/7 uses the same format as the PDP-9/15
-   but skips the missing header words.]
+   of 86 words (x 18b = 129 words x 12b).
 
    Because a DECtape file only contains data, the simulator cannot support
    write timing and mark track and can only do a limited implementation
@@ -82,8 +82,7 @@
    Write all writes only the data words and dumps the interblock words in the
    bit bucket.
 
-   The Type 550 controller has a 4b unit select field, for units 1-8; the TC02
-   has a 3b unit select field, with unit 8 being represented as 0.  The code
+   The Type 550 controller has a 4b unit select field, for units 1-8.  The code
    assumes that the GETUNIT macro returns a unit number in the range of 0-7,
    with 8 represented as 0, and an invalid unit as -1.
 */
@@ -769,8 +768,10 @@ switch (fnc) {                                          /* at speed, check fnc *
         else {
             ma = (2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_CSMWD - 1;
             wrd = relpos / DT_WSIZE;                    /* hdr start = wd 0 */
+#if defined (OLD_TYPE550)
             if ((wrd == 0) ||                           /* skip 1st, last */
                 (wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - 1))) break;
+#endif
             if ((fnc == FNC_READ) &&                    /* read, skip if not */
                 (wrd != DT_CSMWD) &&                    /* fwd, rev cksum */
                 (wrd != ma)) break;
@@ -804,8 +805,10 @@ switch (fnc) {                                          /* at speed, check fnc *
             }
         else {
             wrd = relpos / DT_WSIZE;                    /* hdr start = wd 0 */
+#if defined (OLD_TYPE550)
             if ((wrd == 0) ||                           /* skip 1st, last */
                 (wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - 1))) break;
+#endif
             if ((fnc == FNC_WRIT) &&                    /* wr, skip if !csm */
                 (wrd != ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_CSMWD - 1)))
                 break;
@@ -958,11 +961,11 @@ r = attach_unit (uptr, cptr);                           /* attach */
 if (r != SCPE_OK) return r;                             /* error? */
 if ((sim_switches & SIM_SW_REST) == 0) {                /* not from rest? */
     uptr->flags = uptr->flags & ~(UNIT_8FMT | UNIT_11FMT); /* default 18b */
-    if (sim_switches & SWMASK ('R'))                    /* att 12b? */
+    if (sim_switches & SWMASK ('T'))                    /* att 12b? */
         uptr->flags = uptr->flags | UNIT_8FMT;
     else if (sim_switches & SWMASK ('S'))               /* att 16b? */
         uptr->flags = uptr->flags | UNIT_11FMT;
-    else if (!(sim_switches & SWMASK ('T')) &&          /* autosize? */
+    else if (!(sim_switches & SWMASK ('A')) &&          /* autosize? */
         (sz = sim_fsize (uptr->fileref))) {
         if (sz == D8_FILSIZ)
             uptr->flags = uptr->flags | UNIT_8FMT;

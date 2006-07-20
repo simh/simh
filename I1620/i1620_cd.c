@@ -1,6 +1,6 @@
 /* i1620_cd.c: IBM 1622 card reader/punch
 
-   Copyright (c) 2002-2005, Robert M. Supnik
+   Copyright (c) 2002-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    cdr          1622 card reader
    cdp          1622 card punch
 
+   13-Jul-06    RMS     Fixed card reader fgets call (from Tom McBride)
+                        Fixed card reader boot sequence (from Tom McBride)
    21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
    25-Apr-03    RMS     Revised for extended file support
 
@@ -266,7 +268,7 @@ switch (op) {                                           /* case on op */
 
     default:                                            /* invalid function */
         return STOP_INVFNC;
-		}
+        }
 
 return sta;
 }
@@ -283,8 +285,8 @@ if ((cdr_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
     return SCPE_UNATT;
     }
 
-for (i = 0; i < CD_LEN + 1; i++) cdr_buf[i] = ' ';      /* clear buffer */
-fgets (cdr_buf, CD_LEN, cdr_unit.fileref);              /* read card */
+for (i = 0; i < CD_LEN + 2; i++) cdr_buf[i] = ' ';      /* clear buffer */
+fgets (cdr_buf, CD_LEN + 2, cdr_unit.fileref);          /* read card */
 if (feof (cdr_unit.fileref)) return STOP_NOCD;          /* eof? */
 if (ferror (cdr_unit.fileref)) {                        /* error? */
     ind[IN_RDCHK] = 1;                                  /* set read check */
@@ -317,24 +319,19 @@ return SCPE_OK;
 
 /* Bootstrap routine */
 
-const static uint8 boot_rom[] = {
- 3, 6, 1, 9, 9, 0, 1, 0, 0, 5, 0, 0,                    /* RNCD 19901 */
- 2, 5, 0, 0, 0, 8, 0, 1, 9, 9, 1, 0x10,                 /* TD 80,-19910 */
- 3, 1, 1, 9, 9, 0, 0x15, 1, 9, 9, 2, 0,                 /* TR -19905,19920 */
- 2, 5, 1, 9, 9, 1, 0x10, 0, 0, 0, 8, 0,                 /* TD -19910,80 */
- 4, 9, 1, 9, 9, 1, 0x15, 0, 0, 0, 0, 0                  /* BR -19915 */
- };
-
 #define BOOT_START      0
-#define BOOT_LEN        (sizeof (boot_rom) / sizeof (uint8))
 
 t_stat cdr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+t_stat r;
+int32 old_io_stop;
 extern int32 saved_PC;
 
-if ((cpu_unit.flags & IF_IA) == 0) return SCPE_NOFNC;   /* must have IA */
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
+old_io_stop = io_stop;
+io_stop = 1;
+r = cdr (OP_RN, 0, 0, 0);                               /* read card @ 0 */
+io_stop = old_io_stop;
+if (r != SCPE_OK) return r;                             /* error? */
 saved_PC = BOOT_START;
 return SCPE_OK;
 }

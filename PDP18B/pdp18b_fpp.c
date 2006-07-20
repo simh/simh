@@ -1,6 +1,6 @@
 /* pdp18b_fpp.c: FP15 floating point processor simulator
 
-   Copyright (c) 2003-2005, Robert M Supnik
+   Copyright (c) 2003-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fpp          PDP-15 floating point processor
 
+   06-Jul-06    RMS     Fixed bugs in left shift, multiply
    31-Oct-04    RMS     Fixed URFST to mask low 9b of fraction
                         Fixed exception PC setting
    10-Apr-04    RMS     JEA is 15b not 18b
@@ -663,7 +664,8 @@ if (dp_cmp (a,b) >= 0) {                                /* |a| >= |b|? */
     a->hi = (a->hi - b->hi - (a->lo < b->lo)) & UFP_FH_MASK;
     a->lo = (a->lo - b->lo) & UFP_FL_MASK;              /* a - b */
     }
-else {  a->hi = (b->hi - a->hi - (b->lo < a->lo)) & UFP_FH_MASK;
+else {
+    a->hi = (b->hi - a->hi - (b->lo < a->lo)) & UFP_FH_MASK;
     a->lo = (b->lo - a->lo) & UFP_FL_MASK;              /* b - a */
     a->sign = a->sign ^ 1;                              /* change a sign */
     }
@@ -681,7 +683,7 @@ if (a->lo > b->lo) return +1;
 return 0;
 }
 
-/* Double precision multiply - returns 70b result */
+/* Double precision multiply - returns 70b result in a'fmq */
 
 void dp_mul (UFP *a, UFP *b)
 {
@@ -690,7 +692,11 @@ int32 i;
 fmq.hi = a->hi;                                         /* FMQ <- a */
 fmq.lo = a->lo;
 a->hi = a->lo = 0;                                      /* a <- 0 */
-if (((fmq.hi | fmq.lo) == 0) || ((b->hi | b->lo) == 0)) return;
+if ((fmq.hi | fmq.lo) == 0) return;
+if ((b->hi | b->lo) == 0) {
+    fmq.hi = fmq.lo = 0;
+    return;
+    }
 for (i = 0; i < 35; i++) {                              /* 35 iterations */
     if (fmq.lo & 1) dp_add (a, b);                      /* FMQ<35>? a += b */
     dp_rsh_1 (a, &fmq);                                 /* rsh a'FMQ */
@@ -702,12 +708,12 @@ return;
 
 void dp_lsh_1 (UFP *a, UFP *b)
 {
-int32 t = b? b->lo: 0;
+int32 t = b? b->hi: 0;
 
-a->hi = (a->hi << 1) | (a->lo >> 17);
-a->lo = ((a->lo << 1) | (t >> 16)) & UFP_FL_MASK;
+a->hi = (a->hi << 1) | ((a->lo >> 17) & 1);
+a->lo = ((a->lo << 1) | ((t >> 16) & 1)) & UFP_FL_MASK;
 if (b) {
-    b->hi = ((b->hi << 1) | (b->lo >> 17)) & UFP_FH_MASK;
+    b->hi = ((b->hi << 1) | ((b->lo >> 17) & 1)) & UFP_FH_MASK;
     b->lo = (b->lo << 1) & UFP_FL_MASK;
     }
 return;
@@ -761,18 +767,23 @@ void fp15_asign (int32 fir, UFP *a)
 int32 sgnop = FI_GETSGNOP (fir);
 
 switch (sgnop) {                                        /* modify FMA sign */
+
     case 1:
         a->sign = 0;
         break;
+
     case 2:
         a->sign = 1;
         break;
+
     case 3:
         a->sign = a->sign ^ 1;
         break;
+
     default:
         break;
         }
+
 return;
 }
 
@@ -809,8 +820,8 @@ if (rnd && b && (b->hi & UFP_FH_NORM)) {                /* rounding? */
             }
         }
     }
-if (a->exp > 0377777) return FP_OVF;                    /* overflow? */
-if (a->exp < -0400000) return FP_UNF;                   /* underflow? */
+if (a->exp > (int32) 0377777) return FP_OVF;            /* overflow? */
+if (a->exp < (int32) -0400000) return FP_UNF;           /* underflow? */
 return FP_OK;
 }
 

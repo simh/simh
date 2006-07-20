@@ -1,6 +1,6 @@
 /* pdp8_ttx.c: PDP-8 additional terminals simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    PT08/KL8JA terminal input/output
 
+   06-Jul-06    RMS     Fixed bug in DETACH routine
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Jun-05    RMS     Added SET TTOXn DISCONNECT
                         Fixed bug in SET LOG/NOLOG
@@ -369,10 +370,9 @@ int32 i;
 t_stat r;
 
 r = tmxr_detach (&ttx_desc, uptr);                      /* detach */
-for (i = 0; i < TTX_LINES; i++) {                       /* all lines, */
+for (i = 0; i < TTX_LINES; i++)                         /* all lines, */
     ttx_ldsc[i].rcve = 0;                               /* disable rcv */
-    sim_cancel (&ttox_unit[i]);                         /* stop poll */
-    }
+sim_cancel (uptr);                                      /* stop poll */
 return r;
 }
 

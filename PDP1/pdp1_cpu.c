@@ -1,6 +1,6 @@
 /* pdp1_cpu.c: PDP-1 CPU simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          PDP-1 central processor
 
+   28-Jun-06    RMS     Fixed bugs in MUS and DIV
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    09-Nov-04    RMS     Added instruction history
@@ -631,7 +632,7 @@ while (reason == 0) {                                   /* loop until halted */
         else {                                          /* multiply step */
             if (IO & 1) AC = AC + M[MA];
             if (AC > 0777777) AC = (AC + 1) & 0777777;
-            if (AC == 0777777) AC = 0;
+//          if (AC == 0777777) AC = 0;
             IO = (IO >> 1) | ((AC & 1) << 17);
             AC = AC >> 1;
             }
@@ -641,12 +642,12 @@ while (reason == 0) {                                   /* loop until halted */
         if (cpu_unit.flags & UNIT_MDV) {                /* hardware */
             sign = AC ^ M[MA];                          /* result sign */
             signd = AC;                                 /* remainder sign */
+            v = ABS (M[MA]);                            /* v = |divr| */
+            if (ABS (AC) >= v) break;                   /* overflow? */
             if (AC & 0400000) {
                 AC = AC ^ 0777777;                      /* AC'IO = |AC'IO| */
                 IO = IO ^ 0777777;
                 }
-            v = ABS (M[MA]);                            /* v = |divr| */
-            if (AC >= v) break;                         /* overflow? */
             for (i = t = 0; i < 18; i++) {
                 if (t) AC = (AC + v) & 0777777;
                 else AC = (AC - v) & 0777777;

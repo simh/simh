@@ -1,6 +1,6 @@
 /* id16_dboot.c: Interdata 16b simulator disk bootstrap
 
-   Copyright (c) 2000-2005, Robert M. Supnik
+   Copyright (c) 2000-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   17-Jul-06    RMS     Fixed transcription error
 */
 
 #include "id_defs.h"
@@ -108,7 +110,8 @@ static uint8 dboot_rom[] = {
  0x48, 0x0e, 0x00, 0x10,
  0x48, 0x1e, 0x00, 0x12,
  0x0b, 0x1c,
- 0x0f, 0x0a, 0x07, 0xff,
+ 0x0f, 0x0a,
+ 0x07, 0xff,
  0x26, 0x11,
  0x0e, 0x0f,
  0xed, 0x00, 0x00, 0x08,

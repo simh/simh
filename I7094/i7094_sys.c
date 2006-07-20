@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   08-Jun-06    RMS     Added Dave Pitts' binary loader
 */
 
 #include "i7094_defs.h"
@@ -126,6 +128,10 @@ return STOP_CHBKPT;
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
+extern t_stat binloader (FILE *fd, char *file, int loadpt);
+
+if (flag == 0)
+    return binloader (fileref, cptr, 0);
 return SCPE_NOFNC;
 }
 

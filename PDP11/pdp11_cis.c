@@ -25,6 +25,8 @@
 
    This module simulates the PDP-11 commercial instruction set (CIS).
 
+   30-May-06    RMS     Added interrupt tests to character instructions
+                        Added 11/44 stack probe test to MOVCx (only)
    22-May-06    RMS     Fixed bug in decode table (found by John Dundas)
                         Fixed bug in ASHP (reported by John Dundas)
                         Fixed bug in write decimal string with mmgt enabled
@@ -91,6 +93,10 @@
 #define PACKED          0020                            /* packed */
 #define NUMERIC         0000                            /* numeric */
 
+/* Interrupt test latency */
+
+#define INT_TEST        100
+
 /* Operand type definitions */
 
 #define R0_DESC         1                               /* descr in R0:R1 */
@@ -99,7 +105,6 @@
 #define R4_ARG          4                               /* argument in R4 */
 #define IN_DESC         5                               /* inline descriptor */
 #define IN_ARG          6                               /* inline argument */
-#define IN_DESC_R0      7                               /* inline descr to R0:R1 */
 #define MAXOPN          4                               /* max # operands */
 
 /* Decimal data type definitions */
@@ -166,12 +171,12 @@ typedef struct {
 static DSTR Dstr0 = { 0, 0, 0, 0, 0 };
 
 extern int32 isenable, dsenable;
-extern int32 N, Z, V, C;
+extern int32 N, Z, V, C, fpd, ipl;
 extern int32 R[8], trap_req;
-extern int32 ReadW (int32 addr);
-extern void WriteW (int32 data, int32 addr);
-extern int32 ReadB (int32 addr);
-extern void WriteB (int32 data, int32 addr);
+extern int32 sim_interval;
+extern uint32 cpu_type;
+extern FILE *sim_deb;
+
 int32 ReadDstr (int32 *dscr, DSTR *dec, int32 flag);
 void WriteDstr (int32 *dscr, DSTR *dec, int32 flag);
 int32 AddDstr (DSTR *src1, DSTR *src2, DSTR *dst, int32 cin);
@@ -184,6 +189,16 @@ uint32 NibbleRshift (DSTR *dsrc, int32 sc, uint32 cin);
 int32 WordLshift (DSTR *dsrc, int32 sc);
 void WordRshift (DSTR *dsrc, int32 sc);
 void CreateTable (DSTR *dsrc, DSTR mtable[10]);
+t_bool cis_int_test (int32 cycles, int32 oldpc, t_stat *st);
+int32 movx_setup (int32 op, int32 *arg);
+void movx_cleanup (int32 op);
+
+extern int32 ReadW (int32 addr);
+extern void WriteW (int32 data, int32 addr);
+extern int32 ReadB (int32 addr);
+extern int32 ReadMB (int32 addr);
+extern void WriteB (int32 data, int32 addr);
+extern int32 calc_ints (int32 nipl, int32 trq);
 
 /* Table of instruction operands */
 
@@ -200,18 +215,18 @@ static int32 opntab[128][MAXOPN] = {
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
-    R0_DESC, R2_DESC, R4_ARG, 0,                        /* MOVC */
-    R0_DESC, R2_DESC, R4_ARG, 0,                        /* MOVRC */
-    R0_DESC, R2_DESC, R4_DESC, 0,                       /* MOVTC */
+    0, 0, 0, 0,                                         /* MOVC */
+    0, 0, 0, 0,                                         /* MOVRC */
+    0, 0, 0, 0,                                         /* MOVTC */
                 0, 0, 0, 0,                             /* 033 */
     0, 0, 0, 0, 0, 0, 0, 0,                             /* 034 - 037 */
     0, 0, 0, 0, 0, 0, 0, 0,
-    R4_ARG, 0, 0, 0,                                    /* LOCC */
-    R4_ARG, 0, 0, 0,                                    /* SKPC */
-    R4_DESC, 0, 0, 0,                                   /* SCANC */
-    R4_DESC, 0, 0, 0,                                   /* SPANC */
-    R0_DESC, R2_DESC, R4_ARG, 0,                        /* CMPC */
-    R2_DESC, 0, 0, 0,                                   /* MATC */
+    0, 0, 0, 0,                                         /* LOCC */
+    0, 0, 0, 0,                                         /* SKPC */
+    0, 0, 0, 0,                                         /* SCANC */
+    0, 0, 0, 0,                                         /* SPANC */
+    0, 0, 0, 0,                                         /* CMPC */
+    0, 0, 0, 0,                                         /* MATC */
     0, 0, 0, 0, 0, 0, 0, 0,                             /* 046 - 047 */
     R0_DESC, R2_DESC, R4_DESC, 0,                       /* ADDN */
     R0_DESC, R2_DESC, R4_DESC, 0,                       /* SUBN */
@@ -251,12 +266,12 @@ static int32 opntab[128][MAXOPN] = {
                 0, 0, 0, 0,                             /* 133 */
     0, 0, 0, 0, 0, 0, 0, 0,                             /* 134 - 137 */
     0, 0, 0, 0, 0, 0, 0, 0,
-    IN_DESC_R0, IN_ARG, 0, 0,                           /* LOCCI */
-    IN_DESC_R0, IN_ARG, 0, 0,                           /* SKPCI */
-    IN_DESC_R0, IN_DESC, 0, 0,                          /* SCANCI */
-    IN_DESC_R0, IN_DESC, 0, 0,                          /* SPANCI */
+    IN_DESC, IN_ARG, 0, 0,                              /* LOCCI */
+    IN_DESC, IN_ARG, 0, 0,                              /* SKPCI */
+    IN_DESC, IN_DESC, 0, 0,                             /* SCANCI */
+    IN_DESC, IN_DESC, 0, 0,                             /* SPANCI */
     IN_DESC, IN_DESC, IN_ARG, 0,                        /* CMPCI */
-    IN_DESC_R0, IN_DESC, 0, 0,                          /* MATCI */
+    IN_DESC, IN_DESC, 0, 0,                             /* MATCI */
     0, 0, 0, 0, 0, 0, 0, 0,                             /* 146 - 147 */
     IN_DESC, IN_DESC, IN_DESC, 0,                       /* ADDNI */
     IN_DESC, IN_DESC, IN_DESC, 0,                       /* SUBNI */
@@ -314,17 +329,20 @@ static unsigned char movbuf[65536];
 
 /* CIS emulator */
 
-void cis11 (int32 IR)
+t_stat cis11 (int32 IR)
 {
-int32 c, i, j, k, t, op, rn, addr;
-int32 fill, mask, match, limit, mvlnt, shift;
+int32 c, i, j, t, op, rn, addr;
+int32 match, limit, mvlnt, shift;
 int32 spc, ldivd, ldivr;
 int32 arg[6];                                           /* operands */
+int32 old_PC;
 uint32 nc, digit, result;
+t_stat st;
 static DSTR accum, src1, src2, dst;
 static DSTR mptable[10];
 static DSTR Dstr1 = { 0, 0x10, 0, 0, 0 };
 
+old_PC = (PC - 2) & 0177777;                            /* original PC */
 op = IR & 0177;                                         /* IR <6:0> */
 for (i = j = 0; (i < MAXOPN) && opntab[op][i]; i++) {   /* parse operands */
     switch (opntab[op][i]) {                            /* case on op type */
@@ -355,28 +373,29 @@ for (i = j = 0; (i < MAXOPN) && opntab[op][i]; i++) {   /* parse operands */
             arg[j++] = ReadW (((addr + 2) & 0177777) | dsenable);
             break;
 
-        case IN_DESC_R0:
-            addr = ReadW (PC | isenable);
-            PC = (PC + 2) & 0177777;
-            R[0] = ReadW (addr | dsenable);
-            R[1] = ReadW (((addr + 2) & 0177777) | dsenable);
-            break;
-
         case IN_ARG:
             arg[j++] = ReadW (PC | isenable);
             PC = (PC + 2) & 0177777;
             break;
+
+        default:
+            return SCPE_IERR;
             }                                           /* end case */
     }                                                   /* end for */
 switch (op) {                                           /* case on opcode */
 
 /* MOVC, MOVTC, MOVCI, MOVTCI
 
-   Operands:
+   Operands (MOVC, MOVTC):
+        R0, R1          =       source string descriptor
+        R2, R3          =       dest string descriptor
+        R4<7:0>         =       fill character
+        R5              =       translation table address (MOVTC only)
+   Operands (MOVCI, MOVTCI):
         A1LNT, A1ADR    =       source string descriptor
         A2LNT, A2ADR    =       dest string descriptor
         A3LNT<7:0>      =       fill character
-        A3ADR           =       translation table address (MOVTC, MOVTCI only)
+        A3ADR           =       translation table address (MOVTCI only)
 
    Condition codes:
         NZVC            =       set from src.lnt - dst.lnt
@@ -387,9 +406,6 @@ switch (op) {                                           /* case on opcode */
         R4:R5           =       unchanged
 
         Notes:   
-        - To avoid overlap problems, the entire source string is
-          buffered in movbuf.  On a modern microprocessor, for most
-          string sizes, this will be handled in the on chip cache.
         - If either the source or destination lengths are zero,
           the move loops exit immediately.
         - If the source length does not exceed the destination
@@ -397,34 +413,66 @@ switch (op) {                                           /* case on opcode */
 */
 
     case 030: case 032: case 0130: case 0132:
-        mvlnt = (A1LNT < A2LNT)? A1LNT: A2LNT;          /* calc move lnt */
-        for (i = 0; i < mvlnt; i++) {
-            movbuf[i] = ReadB (((A1ADR + i) & 0177777) | dsenable);
+        if (!fpd) {                                     /* first time? */
+            mvlnt = movx_setup (op, arg);               /* set up reg */
+            if (R[1] < R[3]) {                          /* move backwards? */
+                R[1] = (R[1] + mvlnt) & 0177777;        /* bias addresses */
+                R[3] = (R[3] + mvlnt) & 0177777;
+                }
             }
-        for (i = 0; i < mvlnt; i++) {
-            t = movbuf[i];
-            if (op & 2) t = ReadB (((A3ADR + t) & 0177777) | dsenable);
-            WriteB (t, ((A2ADR + i) & 0177777) | dsenable);
+
+/* At this point,
+
+   R0-R5    =   arguments
+   M[SP]    =   move length */
+
+        if (R[0] && R[2]) {                             /* move to do? */
+            if (R[1] < R[3]) {                          /* backwards? */
+                for (i = 0; R[0] && R[2]; ) {           /* move loop */
+                    t = ReadB (((R[1] - 1) & 0177777) | dsenable);
+                    if (op & 2) t = ReadB (((R[5] + t) & 0177777) | dsenable);
+                    WriteB (t, ((R[3] - 1) & 0177777) | dsenable);
+                    R[0]--;
+                    R[1] = (R[1] - 1) & 0177777;
+                    R[2]--;
+                    R[3] = (R[3] - 1) & 0177777;
+                    if ((++i >= INT_TEST) && R[0] && R[2]) {
+                        if (cis_int_test (i, old_PC, &st)) return st;
+                        i = 0;
+                        }
+                    }                                   /* end for lnts */
+                mvlnt = ReadW (SP | dsenable);          /* recover mvlnt */
+                R[3] = (R[3] + mvlnt) & 0177777;        /* end of dst str */
+                }                                       /* end if bkwd */
+            else {                                      /* forward */
+                for (i = 0; R[0] && R[2]; ) {           /* move loop */
+                    t = ReadB ((R[1] & 0177777) | dsenable);
+                    if (op & 2) t = ReadB (((R[5] + t) & 0177777) | dsenable);
+                    WriteB (t, (R[3] & 0177777) | dsenable);
+                    R[0]--;
+                    R[1] = (R[1] + 1) & 0177777;
+                    R[2]--;
+                    R[3] = (R[3] + 1) & 0177777;
+                    if ((++i >= INT_TEST) && R[0] && R[2]) {
+                        if (cis_int_test (i, old_PC, &st)) return st;
+                        i = 0;
+                        }
+                    }                                   /* end for lnts */
+                }                                       /* end else fwd */
+            }                                           /* end if move */
+        for (i = 0; i < R[2]; i++) {
+            WriteB (R[4], ((R[3] + i) & 0177777) | dsenable);
             }
-        fill = A3LNT & 0377;                            /* do fill, if any */
-        for (i = mvlnt; i < A2LNT; i++) {
-            WriteB (fill, ((A2ADR + i) & 0177777) | dsenable);
-            }
-        t = A1LNT - A2LNT;                              /* src.lnt - dst.lnt */
-        N = GET_SIGN_W (t);                             /* set cc's from diff */
-        Z = GET_Z (t);
-        V = GET_SIGN_W ((A1LNT ^ A2LNT) & (~A2LNT ^ t));
-        C = (A1LNT < A2LNT);
-        if ((op & INLINE) == 0) {                       /* if reg, set reg */
-            R[0] = C? 0: t & 0177777;
-            R[1] = R[2] = R[3] = 0;
-            R[4] = R[4] & 0377;
-            }
-        return;
+        movx_cleanup (op);                              /* cleanup */
+        return SCPE_OK;
 
 /* MOVRC, MOVRCI
 
-   Operands:
+   Operands (MOVC, MOVTC):
+        R0, R1          =       source string descriptor
+        R2, R3          =       dest string descriptor
+        R4<7:0>         =       fill character
+   Operands (MOVCI, MOVTCI):
         A1LNT, A1ADR    =       source string descriptor
         A2LNT, A2ADR    =       dest string descriptor
         A3LNT<7:0>      =       fill character
@@ -441,30 +489,58 @@ switch (op) {                                           /* case on opcode */
 */
 
     case 031: case 0131:
-        mvlnt = (A1LNT < A2LNT)? A1LNT: A2LNT;          /* calc move lnt */
-        addr = A1ADR + A1LNT - mvlnt;
-        for (i = 0; i < mvlnt; i++) {
-            movbuf[i] = ReadB (((addr + i) & 0177777) | dsenable);
+        if (!fpd) {                                     /* first time? */
+            mvlnt = movx_setup (op, arg);               /* set up reg */
+            R[1] = (R[1] + R[0] - mvlnt) & 0177777;     /* eff move start */
+            R[3] = (R[3] + R[2] - mvlnt) & 0177777;
+            if (R[1] < R[3]) {                          /* move backwards? */
+                R[1] = (R[1] + mvlnt) & 0177777;        /* bias addresses */
+                R[3] = (R[3] + mvlnt) & 0177777;
+                }
             }
-        addr = A2ADR + A2LNT - mvlnt;
-        for (i = 0; i < mvlnt; i++) {
-            WriteB (movbuf[i], ((addr + i) & 0177777) | dsenable);
+
+/* At this point,
+
+   R0-R5    =   arguments
+   M[SP]    =   move length */
+
+        if (R[0] && R[2]) {                             /* move to do? */
+            if (R[1] < R[3]) {                          /* backwards? */
+                for (i = 0; R[0] && R[2]; ) {           /* move loop */
+                    t = ReadB (((R[1] - 1) & 0177777) | dsenable);
+                    WriteB (t, ((R[3] - 1) & 0177777) | dsenable);
+                    R[0]--;
+                    R[1] = (R[1] - 1) & 0177777;
+                    R[2]--;
+                    R[3] = (R[3] - 1) & 0177777;
+                    if ((++i >= INT_TEST) && R[0] && R[2]) {
+                        if (cis_int_test (i, old_PC, &st)) return st;
+                        i = 0;
+                        }
+                    }                                   /* end for lnts */
+                }                                       /* end if bkwd */
+            else {                                      /* forward */
+                for (i = 0; R[0] && R[2]; ) {           /* move loop */
+                    t = ReadB ((R[1] & 0177777) | dsenable);
+                    WriteB (t, (R[3] & 0177777) | dsenable);
+                    R[0]--;
+                    R[1] = (R[1] + 1) & 0177777;
+                    R[2]--;
+                    R[3] = (R[3] + 1) & 0177777;
+                    if ((++i >= INT_TEST) && R[0] && R[2]) {
+                        if (cis_int_test (i, old_PC, &st)) return st;
+                        i = 0;
+                        }
+                    }                                   /* end for lnts */
+                mvlnt = ReadW (SP | dsenable);          /* recover mvlnt */
+                R[3] = (R[3] - mvlnt) & 0177777;        /* start of dst str */
+                }                                       /* end else fwd */
+            }                                           /* end if move */
+        for (i = 0; i < R[2]; i++) {
+            WriteB (R[4], ((R[3] - R[2] + i) & 0177777) | dsenable);
             }
-        fill = A3LNT & 0377;                            /* do fill, if any */
-        for (i = mvlnt, j = 0; i < A2LNT; i++, j++) {
-            WriteB (fill, ((A2ADR + j) & 0177777) | dsenable);
-            }
-        t = A1LNT - A2LNT;                              /* src.lnt - dst.lnt */
-        N = GET_SIGN_W (t);                             /* set cc's from diff */
-        Z = GET_Z (t);
-        V = GET_SIGN_W ((A1LNT ^ A2LNT) & (~A2LNT ^ t));
-        C = (A1LNT < A2LNT);
-        if ((op & INLINE) == 0) {                       /* if reg, set reg */
-            R[0] = C? 0: t & 0177777;
-            R[1] = R[2] = R[3] = 0;
-            R[4] = R[4] & 0377;
-            }
-        return;
+        movx_cleanup (op);                              /* cleanup */
+        return SCPE_OK;
 
 /* Load descriptors - no operands */
 
@@ -482,13 +558,16 @@ switch (op) {                                           /* case on opcode */
             R[j + 1] = ReadW (((addr + 2) & 0177777) | dsenable);
             }
         if (rn >= limit) R[rn] = (R[rn] + limit) & 0177777;
-        return;
+        return SCPE_OK;
 
 /* LOCC, SKPC, LOCCI, SKPCI 
 
-   Operands:
+   Operands (LOCC, SKPC):
         R0, R1          =       source string descriptor
-        A1LNT<7:0>      =       match character
+        R4<7:0>         =       match character
+   Operands (LOCCI, SKPCI):
+        A1LNT, A1ADR    =       source string descriptor
+        A2LNT<7:0>      =       match character
 
    Condition codes:
         NZ              =       set from R0
@@ -498,25 +577,47 @@ switch (op) {                                           /* case on opcode */
         R0:R1           =       substring descriptor where operation terminated
 */
 
-    case 040: case 041: case 0140: case 0141:
-        match = A1LNT & 0377;                           /* match character */
-        for ( ; R[0] != 0; R[0]--) {                    /* loop */
+    case 0140: case 0141:                               /* inline */
+        if (!fpd) {                                     /* FPD clear? */
+            WriteW (R[4], ((SP - 2) & 0177777) | dsenable); 
+            SP = (SP - 2) & 0177777;                    /* push R4 */
+            R[0] = A1LNT;                               /* args to registers */
+            R[1] = A1ADR;
+            R[4] = A2LNT;
+            }                                           /* fall through */
+    case 040: case 041:                                 /* register */
+        fpd = 1;                                        /* set FPD */
+        R[4] = R[4] & 0377;                             /* match character */
+        for (i = 0; R[0] != 0;) {                       /* loop */
             c = ReadB (R[1] | dsenable);                /* get char */
-            if ((c == match) ^ (op & 1)) break;         /* = + LOC, != + SKP? */
-            R[1] = (R[1] + 1) & 0177777;
+            if ((c == R[4]) ^ (op & 1)) break;          /* = + LOC, != + SKP? */
+            R[0]--;                                     /* decr count, */
+            R[1] = (R[1] + 1) & 0177777;                /* incr addr */
+            if ((++i >= INT_TEST) && R[0]) {            /* test for intr? */
+                if (cis_int_test (i, old_PC, &st)) return st;
+                i = 0;
+                }
             }
         N = GET_SIGN_W (R[0]);
         Z = GET_Z (R[0]);
         V = C = 0;
-        if ((op & INLINE) == 0) R[4] = R[4] & 0377;     /* if reg, set reg */
-        return;
+        fpd = 0;                                        /* instr done */
+        if (op & INLINE) {                              /* inline? */
+            R[4] = ReadW (SP | dsenable);               /* restore R4 */
+            SP = (SP + 2) & 0177777;
+            }
+        return SCPE_OK;
 
 /* SCANC, SPANC, SCANCI, SPANCI
 
-   Operands:
+   Operands (SCANC, SPANC):
         R0, R1          =       source string descriptor
-        A1LNT<7:0>      =       mask
-        A1ADR           =       table address
+        R4<7:0>         =       mask
+        R5              =       table address
+   Operands (SCANCI, SPANCI):
+        A1LNT, A1ADR    =       source string descriptor
+        A2LNT<7:0>      =       match character
+        A2ADR           =       table address
 
    Condition codes:
         NZ              =       set from R0
@@ -526,23 +627,48 @@ switch (op) {                                           /* case on opcode */
         R0:R1           =       substring descriptor where operation terminated
 */
 
-    case 042: case 043: case 0142: case 0143:
-        mask = A1LNT & 0377;                            /* mask character */
-        for (; R[0] != 0; R[0]--) {                     /* loop */
+    case 0142: case 0143:                               /* inline */
+        if (!fpd) {                                     /* FPD clear? */
+            WriteW (R[4], ((SP - 4) & 0177777) | dsenable);
+            WriteW (R[5], ((SP - 2) & 0177777) | dsenable);
+            SP = (SP - 4) & 0177777;                    /* push R4, R5 */
+            R[0] = A1LNT;                               /* args to registers */
+            R[1] = A1ADR;
+            R[4] = A2LNT;
+            R[5] = A2ADR;
+            }                                           /* fall through */
+    case 042: case 043:                                 /* register */
+        fpd = 1;                                        /* set FPD */
+        R[4] = R[4] & 0377;                             /* match character */
+        for (i = 0; R[0] != 0;) {                       /* loop */
             t = ReadB (R[1] | dsenable);                /* get char as index */
-            c = ReadB (((A1ADR + t) & 0177777) | dsenable);
-            if (((c & mask) != 0) ^ (op & 1)) break;    /* != + SCN, = + SPN? */
-            R[1] = (R[1] + 1) & 0177777;
+            c = ReadB (((R[5] + t) & 0177777) | dsenable);
+            if (((c & R[4]) != 0) ^ (op & 1)) break;    /* != + SCN, = + SPN? */
+            R[0]--;                                     /* decr count, */
+            R[1] = (R[1] + 1) & 0177777;                /* incr addr */
+            if ((++i >= INT_TEST) && R[0]) {            /* test for intr? */
+                if (cis_int_test (i, old_PC, &st)) return st;
+                i = 0;
+                }
             }
         N = GET_SIGN_W (R[0]);
         Z = GET_Z (R[0]);
         V = C = 0;
-        if ((op & INLINE) == 0) R[4] = R[4] & 0377;     /* if reg, set reg */
-        return;
+        fpd = 0;                                        /* instr done */
+        if (op & INLINE) {                              /* inline? */
+            R[4] = ReadW (SP | dsenable);               /* restore R4, R5 */
+            R[5] = ReadW (((SP + 2) & 0177777) | dsenable);
+            SP = (SP + 4) & 0177777;
+            }
+        return SCPE_OK;
 
 /* CMPC, CMPCI
 
-   Operands:
+   Operands (CMPC):
+        R0, R1          =       source1 string descriptor
+        R2, R3          =       source2 string descriptor
+        R4<7:0>         =       fill character
+   Operands (CMPCI):
         A1LNT, A1ADR    =       source1 string descriptor
         A2LNT, A2ADR    =       source2 string descriptor
         A3LNT<7:0>      =       fill character
@@ -556,36 +682,67 @@ switch (op) {                                           /* case on opcode */
         R2:R3           =       unmatched source2 substring descriptor
 */
 
-   case 044: case 0144:
+   case 0144:                                           /* inline */
+        if (!fpd) {                                     /* FPD clear? */
+            WriteW (R[0], ((SP - 10) & 0177777) | dsenable);
+            WriteW (R[1], ((SP - 8) & 0177777) | dsenable);
+            WriteW (R[2], ((SP - 6) & 0177777) | dsenable);
+            WriteW (R[3], ((SP - 4) & 0177777) | dsenable);
+            WriteW (R[4], ((SP - 2) & 0177777) | dsenable);
+            SP = (SP - 10) & 0177777;                   /* push R0 - R4 */
+            R[0] = A1LNT;                               /* args to registers */
+            R[1] = A1ADR;
+            R[2] = A2LNT;
+            R[3] = A2ADR;
+            R[4] = A3LNT;
+            }                                           /* fall through */
+   case 044:                                            /* register */
+        fpd = 1;                                        /* set FPD */
+        R[4] = R[4] & 0377;                             /* mask fill */
         c = t = 0;
-        for (i = 0; i < ((A1LNT > A2LNT)? A1LNT: A2LNT); i++) {
-            if (i < A1LNT) c = ReadB (((A1ADR + i) & 0177777) | dsenable);
-            else c = A3LNT & 0377;
-            if (i < A2LNT) t = ReadB (((A2ADR + i) & 0177777) | dsenable);
-            else t = A3LNT & 0377;
-            if (c != t) break;
+        for (i = 0; (R[0] || R[2]); ) {                   /* until cnts == 0 */
+            if (R[0]) c = ReadB (R[1] | dsenable);      /* get src1 or fill */
+            else c = R[4];
+            if (R[2]) t = ReadB (R[3] | dsenable);      /* get src2 or fill */
+            else t = R[4];
+            if (c != t) break;                          /* if diff, done */
+            if (R[0]) {                                 /* if more src1 */
+                R[0]--;                                 /* decr count, */
+                R[1] = (R[1] + 1) & 0177777;            /* incr addr */
+                }
+            if (R[2]) {                                 /* if more src2 */
+                R[2]--;                                 /* decr count, */
+                R[3] = (R[3] + 1) & 0177777;            /* incr addr */
+                }
+            if ((++i >= INT_TEST) && (R[0] || R[2])) {  /* test for intr? */
+                if (cis_int_test (i, old_PC, &st)) return st;
+                i = 0;
+                }
             }
         j = c - t;                                      /* last chars read */
         N = GET_SIGN_B (j);                             /* set cc's */
         Z = GET_Z (j);
         V = GET_SIGN_B ((c ^ t) & (~t ^ j));
         C = (c < t);
-        if ((op & INLINE) == 0) {                       /* if reg, set reg */
-            j = (i > A1LNT)? A1LNT: i;                  /* #src1 chars used */
-            k = (i > A2LNT)? A2LNT: i;                  /* #src2 chars used */
-            R[0] = A1LNT - j;
-            R[1] = (A1ADR + j) & 0177777;
-            R[2] = A2LNT - k;
-            R[3] = (A2ADR + k) & 0177777;
-            R[4] = R[4] & 0377;
+        fpd = 0;                                        /* instr done */
+        if (op & INLINE) {                              /* inline? */
+            R[0] = ReadW (SP | dsenable);               /* restore R0 - R4 */
+            R[1] = ReadW (((SP + 2) & 0177777) | dsenable);
+            R[2] = ReadW (((SP + 4) & 0177777) | dsenable);
+            R[3] = ReadW (((SP + 6) & 0177777) | dsenable);
+            R[4] = ReadW (((SP + 8) & 0177777) | dsenable);
+            SP = (SP + 10) & 0177777;
             }
-        return;
+        return SCPE_OK;
 
 /* MATC, MATCI
 
-   Operands:
+   Operands (MATC):
         R0, R1          =       source string descriptor
-        A1LNT, A1ADR    =       substring descriptor
+        R2, R3          =       substring descriptor
+   Operands (MATCI):
+        A1LNT, A1ADR    =       source1 string descriptor
+        A2LNT, A2ADR    =       source2 string descriptor
 
    Condition codes:
         NZ              =       set from R0
@@ -606,15 +763,28 @@ switch (op) {                                           /* case on opcode */
           is the length of the string (zero), or "no match"
 */
 
-    case 0045: case 0145:
-        for (match = 0; R[0] >= A1LNT; R[0]--) {        /* loop thru string */
-            for (i = 0, match = 1; match && (i < A1LNT); i++) {
+    case 0145:                                          /* inline */
+        if (!fpd) {                                     /* FPD clear? */
+            WriteW (R[2], ((SP - 4) & 0177777) | dsenable);
+            WriteW (R[3], ((SP - 2) & 0177777) | dsenable);
+            SP = (SP - 4) & 0177777;                    /* push R2, R3 */
+            R[0] = A1LNT;                               /* args to registers */
+            R[1] = A1ADR;
+            R[2] = A2LNT;
+            R[3] = A2ADR;
+            }                                           /* fall through */
+    case 0045:                                          /* register */
+        fpd = 1;
+        for (match = 0; R[0] >= R[2]; ) {               /* loop thru string */
+            for (i = 0, match = 1; match && (i < R[2]); i++) {
                 c = ReadB (((R[1] + i) & 0177777) | dsenable);
-                t = ReadB (((A1ADR + i) & 0177777) | dsenable);
+                t = ReadB (((R[3] + i) & 0177777) | dsenable);
                 match = (c == t);                       /* end for substring */
                 }
             if (match) break;                           /* exit if match */
-            R[1] = (R[1] + 1) & 0177777;                /* end for string */
+            R[0]--;                                     /* on to next char */
+            R[1] = (R[1] + 1) & 0177777;
+            if (cis_int_test (i, old_PC, &st)) return st;
             }
         if (!match) {                                   /* if no match */
             R[1] = (R[1] + R[0]) & 0177777;
@@ -623,7 +793,13 @@ switch (op) {                                           /* case on opcode */
         N = GET_SIGN_W (R[0]);
         Z = GET_Z (R[0]);
         V = C = 0;
-        return;
+        fpd = 0;                                        /* instr done */
+        if (op & INLINE) {                              /* inline? */
+            R[2] = ReadW (SP | dsenable);               /* restore R2, R3 */
+            R[3] = ReadW (((SP + 2) & 0177777) | dsenable);
+            SP = (SP + 4) & 0177777;
+            }
+        return SCPE_OK;
 
 /* ADDN, SUBN, ADDP, SUBP, ADDNI, SUBNI, ADDPI, SUBPI
 
@@ -664,7 +840,7 @@ switch (op) {                                           /* case on opcode */
         WriteDstr (A3, &dst, op);                       /* store result */
         if ((op & INLINE) == 0)                         /* if reg, clr reg */
             R[0] = R[1] = R[2] = R[3] = 0;
-        return;
+        return SCPE_OK;
 
 /* MULP, MULPI
 
@@ -702,7 +878,7 @@ switch (op) {                                           /* case on opcode */
         WriteDstr (A3, &dst, op);                       /* store result */
         if ((op & INLINE) == 0)                         /* if reg, clr reg */
                 R[0] = R[1] = R[2] = R[3] = 0;
-        return;
+        return SCPE_OK;
 
 /* DIVP, DIVPI
 
@@ -723,7 +899,7 @@ switch (op) {                                           /* case on opcode */
         ldivr = ReadDstr (A1, &src1, op);               /* get divisor */
         if (ldivr == 0) {                               /* divisor = 0? */
             V = C = 1;                                  /* set cc's */
-            return;
+            return SCPE_OK;
             }
         ldivr = LntDstr (&src1, ldivr);                 /* get exact length */
         ldivd = ReadDstr (A2, &src2, op);               /* get dividend */
@@ -752,7 +928,7 @@ switch (op) {                                           /* case on opcode */
         WriteDstr (A3, &dst, op);                       /* store result */
         if ((op & INLINE) == 0)                         /* if reg, clr reg */
             R[0] = R[1] = R[2] = R[3] = 0;
-        return;
+        return SCPE_OK;
 
 /* CMPN, CMPP, CMPNI, CMPPI
 
@@ -781,7 +957,7 @@ switch (op) {                                           /* case on opcode */
             }
         if ((op & INLINE) == 0)                         /* if reg, clr reg */
             R[0] = R[1] = R[2] = R[3] = 0;
-        return;
+        return SCPE_OK;
 
 /* ASHN, ASHP, ASHNI, ASHPI
 
@@ -819,7 +995,7 @@ switch (op) {                                           /* case on opcode */
         WriteDstr (A2, &src1, op);                      /* store result */
         if ((op & INLINE) == 0)                         /* if reg, clr reg */
             R[0] = R[1] = R[4] = 0;
-        return;
+        return SCPE_OK;
 
 /* CVTPN, CVTPNI
 
@@ -840,7 +1016,7 @@ switch (op) {                                           /* case on opcode */
         V = C = 0;                                      /* init cc's */
         WriteDstr (A2, &src1, NUMERIC);                 /* write dest */
         if ((op & INLINE) == 0) R[0] = R[1] = 0;        /* if reg, clr reg */
-        return;
+        return SCPE_OK;
 
 /* CVTNP, CVTNPI
 
@@ -861,7 +1037,7 @@ switch (op) {                                           /* case on opcode */
         V = C = 0;                                      /* init cc's */
         WriteDstr (A2, &src1, PACKED);                  /* write dest */
         if ((op & INLINE) == 0) R[0] = R[1] = 0;        /* if reg, clr reg */
-        return;
+        return SCPE_OK;
 
 /* CVTNL, CVTPL, CVTNLI, CVTPLI
 
@@ -904,7 +1080,7 @@ switch (op) {                                           /* case on opcode */
             R[2] = (result >> 16) & 0177777;
             R[3] = result & 0177777;
             }
-        return;
+        return SCPE_OK;
 
 /* CVTLN, CVTLP, CVTLNI, CVTLPI
 
@@ -937,13 +1113,13 @@ switch (op) {                                           /* case on opcode */
             }
         V = C = 0;
         WriteDstr (A1, &dst, op);                       /* write result */
-        return;
+        return SCPE_OK;
 
     default:
         setTRAP (TRAP_ILL);
         break;
         }                                               /* end case */
-return;
+return SCPE_OK;
 }                                                       /* end cis */
 
 /* Get decimal string
@@ -1322,4 +1498,88 @@ if (s = sc * 4) {
     return cout;
     }
 return 0;
+}
+
+/* Common setup routine for MOVC class instructions */
+
+int32 movx_setup (int32 op, int32 *arg)
+{
+int32 mvlnt, t;
+
+if (CPUT (CPUT_44)) {                                   /* 11/44? */
+    ReadMB (((SP - 0200) & 0177777) | dsenable);        /* probe both blocks */
+    ReadMB (((SP - 0100) & 0177777) | dsenable);        /* in 64W stack area */
+    }
+if (op & INLINE) {                                      /* inline */
+    mvlnt = (A1LNT < A2LNT)? A1LNT: A2LNT;
+    WriteW (mvlnt, ((SP - 14) & 0177777) | dsenable);   /* push move length */
+    WriteW (R[0], ((SP - 12) & 0177777) | dsenable);    /* push R0 - R5 */
+    WriteW (R[1], ((SP - 10) & 0177777) | dsenable);
+    WriteW (R[2], ((SP - 8) & 0177777) | dsenable);
+    WriteW (R[3], ((SP - 6) & 0177777) | dsenable);
+    WriteW (R[4], ((SP - 4) & 0177777) | dsenable);
+    WriteW (R[5], ((SP - 2) & 0177777) | dsenable);
+    SP = (SP - 14) & 0177777;
+    R[0] = A1LNT;                                       /* args to registers */
+    R[1] = A1ADR;
+    R[2] = A2LNT;
+    R[3] = A2ADR;
+    R[4] = A3LNT;
+    R[5] = A3ADR & 0177777;
+    }
+else {                                                  /* register */
+    mvlnt = (R[0] < R[2])? R[0]: R[2];
+    WriteW (mvlnt, ((SP - 2) & 0177777) | dsenable);    /* push move length */
+    SP = (SP - 2) & 0177777;
+    }
+fpd = 1;
+t = R[0] - R[2];                                        /* src.lnt - dst.lnt */
+N = GET_SIGN_W (t);                                     /* set cc's from diff */
+Z = GET_Z (t);
+V = GET_SIGN_W ((R[0] ^ R[2]) & (~R[2] ^ t));
+C = (R[0] < R[2]);
+return mvlnt;
+}
+
+/* Common cleanup routine for MOVC class instructions */
+
+void movx_cleanup (int32 op)
+{
+SP = (SP + 2) & 0177777;                                /* discard mvlnt */
+if (op & INLINE) {                                      /* inline? */
+    R[0] = ReadW (SP | dsenable);                       /* restore R0 - R5 */
+    R[1] = ReadW (((SP + 2) & 0177777) | dsenable);
+    R[2] = ReadW (((SP + 4) & 0177777) | dsenable);
+    R[3] = ReadW (((SP + 6) & 0177777) | dsenable);
+    R[4] = ReadW (((SP + 8) & 0177777) | dsenable);
+    R[5] = ReadW (((SP + 10) & 0177777) | dsenable);
+    SP = (SP + 12) & 0177777;
+    }
+else R[1] = R[2] = R[3] = 0;                            /* reg, clear R1 - R3 */
+fpd = 0;                                                /* instr done */
+return;
+}
+    
+/* Test for CIS mid-instruction interrupt - stub for now */
+
+t_bool cis_int_test (int32 cycles, int32 oldpc, t_stat *st)
+{
+while (cycles >= 0) {                                   /* until delay done */
+    if (sim_interval > cycles) {                        /* event > delay */
+        sim_interval = sim_interval - cycles;
+        break;
+        }
+    else {                                              /* event <= delay */
+        cycles = cycles - sim_interval;                 /* decr delay */
+        sim_interval = 0;                               /* process event */
+        *st = sim_process_event ();
+        trap_req = calc_ints (ipl, trap_req);           /* recalc int req */
+        if ((*st != SCPE_OK) ||                         /* bad status or */
+            trap_req & TRAP_INT) {                      /* interrupt? */
+            PC = oldpc;                                 /* back out */
+            return TRUE;
+            }                                           /* end if stop */
+        }                                               /* end else event */
+    }                                                   /* end while delay */
+return FALSE;
 }

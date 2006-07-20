@@ -1,6 +1,6 @@
 /* sim_console.c: simulator console I/O library
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Jun-06    RMS     Implemented SET/SHOW PCHAR
+   31-May-06    JDB     Fixed bug if SET CONSOLE DEBUG with no argument
    22-Nov-05    RMS     Added central input/output conversion support
    05-Nov-04    RMS     Moved SET/SHOW DEBUG under CONSOLE hierarchy
    28-Oct-04    JDB     Fixed SET CONSOLE to allow comma-separated parameters
@@ -111,6 +113,7 @@ static CTAB set_con_tab[] = {
     { "WRU", &sim_set_kmap, KMAP_WRU | KMAP_NZ },
     { "BRK", &sim_set_kmap, KMAP_BRK },
     { "DEL", &sim_set_kmap, KMAP_DEL |KMAP_NZ },
+    { "PCHAR", &sim_set_pchar, 0 },
     { "TELNET", &sim_set_telnet, 0 },
     { "NOTELNET", &sim_set_notelnet, 0 },
     { "LOG", &sim_set_logon, 0 },
@@ -124,6 +127,7 @@ static SHTAB show_con_tab[] = {
     { "WRU", &sim_show_kmap, KMAP_WRU },
     { "BRK", &sim_show_kmap, KMAP_BRK },
     { "DEL", &sim_show_kmap, KMAP_DEL },
+    { "PCHAR", &sim_show_pchar, 0 },
     { "LOG", &sim_show_log, 0 },
     { "TELNET", &sim_show_telnet, 0 },
     { "DEBUG", &sim_show_debug, 0 },
@@ -210,13 +214,37 @@ return SCPE_OK;
 
 t_stat sim_show_kmap (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-int32 rdx = 8;
+if (sim_devices[0]->dradix == 16)
+    fprintf (st, "%s = %X\n", show_con_tab[flag].name, *(cons_kmap[flag & KMAP_MASK]));
+else fprintf (st, "%s = %o\n", show_con_tab[flag].name, *(cons_kmap[flag & KMAP_MASK]));
+return SCPE_OK;
+}
 
-dptr = sim_devices[0];
+/* Set printable characters */
+
+t_stat sim_set_pchar (int32 flag, char *cptr)
+{
+DEVICE *dptr = sim_devices[0];
+uint32 val, rdx;
+t_stat r;
+
+if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;
 if (dptr->dradix == 16) rdx = 16;
-fprintf (st, "%s = ", show_con_tab[flag].name);
-fprint_val (st, *(cons_kmap[flag & KMAP_MASK]), rdx, 7, 0);
-fprintf (st, "\n");
+else rdx = 8;
+val = (uint32) get_uint (cptr, rdx, 0xFFFFFFFF, &r);
+if ((r != SCPE_OK) ||
+    ((val & 0x00002400) == 0)) return SCPE_ARG;
+sim_tt_pchar = val;
+return SCPE_OK;
+}
+
+/* Show printable characters */
+
+t_stat sim_show_pchar (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+if (sim_devices[0]->dradix == 16)
+    fprintf (st, "pchar mask = %X\n", sim_tt_pchar);
+else fprintf (st, "pchar mask = %o\n", sim_tt_pchar);
 return SCPE_OK;
 }
 
@@ -266,7 +294,7 @@ t_stat sim_set_debon (int32 flag, char *cptr)
 {
 char *tptr, gbuf[CBUFSIZE];
 
-if (*cptr == 0) return SCPE_2FARG;                      /* need arg */
+if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;  /* too few arguments? */
 tptr = get_glyph (cptr, gbuf, 0);                       /* get file name */
 if (*tptr != 0) return SCPE_2MARG;                      /* now eol? */
 sim_set_deboff (0, NULL);                               /* close cur debug */

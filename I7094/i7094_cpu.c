@@ -25,6 +25,8 @@
 
    cpu          7094 central processor
 
+   16-Jun-06    RMS     Fixed bug in halt IO wait loop
+
    The register state for the 7094 is:
 
    AC<S,Q,P,1:35>       accumulator
@@ -607,7 +609,7 @@ t_stat reason = SCPE_OK;
 t_uint64 IR, SR, t, t1, t2, sr1;
 uint32 op, fl, tag, tagi, addr, ea;
 uint32 ch, dec, xr, xec_cnt, trp;
-uint32 i, sc, s1, s2, spill;
+uint32 i, j, sc, s1, s2, spill;
 t_bool tracing;
 
 /* Restore register state */
@@ -1773,9 +1775,9 @@ while (reason == SCPE_OK) {                             /* loop until error */
                 if (r = sim_process_event ()) return r; /* process events */
                 chtr_pend = chtr_eval (NULL);           /* eval chan traps */
                 while (ch_req) {                        /* until no ch req */
-                    for (i = 0; i < NUM_CHAN; i++) {    /* loop thru channels */
-                        if (ch_req & REQ_CH (i)) {      /* channel request? */
-                            if (r = ch_proc (i)) return r;
+                    for (j = 0; i < NUM_CHAN; j++) {    /* loop thru channels */
+                        if (ch_req & REQ_CH (j)) {      /* channel request? */
+                            if (r = ch_proc (j)) return r;
                             }
                         chtr_pend = chtr_eval (NULL);
                         }

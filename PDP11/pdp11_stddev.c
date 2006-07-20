@@ -1,6 +1,6 @@
 /* pdp11_stddev.c: PDP-11 standard I/O devices simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti,tto      DL11 terminal input/output
    clk          KW11L (and other) line frequency clock
 
+   05-Jul-06    RMS     Added UC only support for early DOS/RSTS
    22-Nov-05    RMS     Revised for new terminal processing routines
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    07-Jul-05    RMS     Removed extraneous externs
@@ -121,6 +122,7 @@ REG tti_reg[] = {
     };
 
 MTAB tti_mod[] = {
+    { TT_MODE, TT_MODE_UC, "UC", "UC", &tty_set_mode },
     { TT_MODE, TT_MODE_7B, "7b", "7B", &tty_set_mode },
     { TT_MODE, TT_MODE_8B, "8b", "8B", &tty_set_mode },
     { TT_MODE, TT_MODE_7P, "7b", NULL, NULL },
@@ -166,6 +168,7 @@ REG tto_reg[] = {
     };
 
 MTAB tto_mod[] = {
+    { TT_MODE, TT_MODE_UC, "UC", "UC", &tty_set_mode },
     { TT_MODE, TT_MODE_7B, "7b", "7B", &tty_set_mode },
     { TT_MODE, TT_MODE_8B, "8b", "8B", &tty_set_mode },
     { TT_MODE, TT_MODE_7P, "7p", "7P", &tty_set_mode },
@@ -440,7 +443,8 @@ else clk_fie = clk_fnxm = 1;                            /* no, BEVENT */
 clk_tps = clk_default;                                  /* set default tps */
 clk_csr = CSR_DONE;                                     /* set done */
 CLR_INT (CLK);
-sim_activate (&clk_unit, clk_unit.wait);                /* activate unit */
+sim_rtcn_init (clk_unit.wait, TMR_CLK);                 /* init line clock */
+sim_activate_abs (&clk_unit, clk_unit.wait);            /* activate unit */
 tmr_poll = clk_unit.wait;                               /* set timer poll */
 tmxr_poll = clk_unit.wait;                              /* set mux poll */
 return SCPE_OK;

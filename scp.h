@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jul-06    RMS     Added sim_activate_abs
    06-Jan-06    RMS     Added fprint_stopped_gen
                         Changed arg type in sim_brk_test
    07-Feb-05    RMS     Added ASSERT command
@@ -76,6 +77,7 @@ t_stat echo_cmd (int32 flag, char *ptr);
 
 t_stat sim_process_event (void);
 t_stat sim_activate (UNIT *uptr, int32 interval);
+t_stat sim_activate_abs (UNIT *uptr, int32 interval);
 t_stat sim_cancel (UNIT *uptr);
 int32 sim_is_active (UNIT *uptr);
 double sim_gtime (void);

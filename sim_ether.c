@@ -1,6 +1,6 @@
 /* sim_ether.c: OS-dependent network routines
   ------------------------------------------------------------------------------
-   Copyright (c) 2002-2005, David T. Hittner
+   Copyright (c) 2002-2006, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -134,6 +134,7 @@
 
   Modification history:
 
+  10-Jul-06  RMS  Fixed linux conditionalization (from Chaskiel Grundman)
   15-Dec-05  DTH  Patched eth_host_devices [remove non-ethernet devices]
                   (from Mark Pizzolato and Galen Tackett, 08-Jun-05)
                   Patched eth_open [tun fix](from Antal Ritter, 06-Oct-05)
@@ -648,7 +649,7 @@ int eth_devices (int max, ETH_LIST* dev)
    Return value: 0=Success, -1=Failure */
 int pcap_sendpacket(pcap_t* handle, const u_char* msg, int len)
 {
-#if defined (linux)
+#if defined (__linux)
   return (send(pcap_fileno(handle), msg, len, 0) == len)? 0 : -1;
 #else
   return (write(pcap_fileno(handle), msg, len) == len)? 0 : -1;

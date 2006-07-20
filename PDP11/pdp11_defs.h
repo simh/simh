@@ -26,6 +26,8 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   06-Jul-06    RMS     Added multiple KL11/DL11 support
+   26-Jun-06    RMS     Added RF11 support
    24-May-06    RMS     Added 11/44 DR support (from CIS diagnostic)
    17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
    30-Sep-04    RMS     Added Massbus support
@@ -139,7 +141,7 @@
 
 #define CPUT_F          (CPUT_23|CPUT_23P|CPUT_24)      /* all F11's */
 #define CPUT_J          (CPUT_53|CPUT_73|CPUT_73B| \
-                     CPUT_83|CPUT_84|CPUT_93|CPUT_94)
+                         CPUT_83|CPUT_84|CPUT_93|CPUT_94)
 #define CPUT_JB         (CPUT_73B|CPUT_83|CPUT_84)      /* KDJ11B */
 #define CPUT_JE         (CPUT_93|CPUT_94)               /* KDJ11E */
 #define CPUT_JU         (CPUT_84|CPUT_94)               /* KTJ11B UBA */
@@ -465,6 +467,7 @@ typedef struct {
 #define DZ_MUXES        4                               /* max # of DZ muxes */
 #define DZ_LINES        8                               /* lines per DZ mux */
 #define VH_MUXES        4                               /* max # of VH muxes */
+#define TTX_LINES       16                              /* max # of KL11/DL11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
 #define AUTO_LNT        34                              /* autoconfig ranks */
 #define DIB_MAX         100                             /* max DIBs */
@@ -548,6 +551,8 @@ typedef struct pdp_dib DIB;
 #define IOLN_TQ         004
 #define IOBA_XU         (IOPAGEBASE + 014510)           /* DEUNA/DELUA */
 #define IOLN_XU         010
+#define IOBA_TTIX       (IOPAGEBASE + 016500)           /* extra KL11/DL11 */
+#define IOLN_TTIX       (TTX_LINES * 010)
 #define IOBA_RP         (IOPAGEBASE + 016700)           /* RP/RM */
 #define IOLN_RP         054
 #define IOBA_CR         (IOPAGEBASE + 017160)           /* CD/CR/CM */
@@ -562,6 +567,8 @@ typedef struct pdp_dib DIB;
 #define IOLN_RK         020
 #define IOBA_HK         (IOPAGEBASE + 017440)           /* RK611 */
 #define IOLN_HK         040
+#define IOBA_RF         (IOPAGEBASE + 017460)           /* RF11 */
+#define IOLN_RF         020
 #define IOBA_LPT        (IOPAGEBASE + 017514)           /* LP11 */
 #define IOLN_LPT        004
 #define IOBA_CTL        (IOPAGEBASE + 017520)           /* board ctrl */
@@ -623,7 +630,8 @@ typedef struct pdp_dib DIB;
 #define INT_V_XQ        12
 #define INT_V_XU        13
 #define INT_V_TU        14
-#define INT_V_PIR5      15
+#define INT_V_RF        15
+#define INT_V_PIR5      16
 
 #define INT_V_TTI       0                               /* BR4 */
 #define INT_V_TTO       1
@@ -633,7 +641,9 @@ typedef struct pdp_dib DIB;
 #define INT_V_VHRX      5
 #define INT_V_VHTX      6  
 #define INT_V_CR        7
-#define INT_V_PIR4      8
+#define INT_V_TTIX      8
+#define INT_V_TTOX      9
+#define INT_V_PIR4      10
 
 #define INT_V_PIR3      0                               /* BR3 */
 #define INT_V_PIR2      0                               /* BR2 */
@@ -659,6 +669,7 @@ typedef struct pdp_dib DIB;
 #define INT_XQ          (1u << INT_V_XQ)
 #define INT_XU          (1u << INT_V_XU)
 #define INT_TU          (1u << INT_V_TU)
+#define INT_RF          (1u << INT_V_RF)
 #define INT_PIR5        (1u << INT_V_PIR5)
 #define INT_PTR         (1u << INT_V_PTR)
 #define INT_PTP         (1u << INT_V_PTP)
@@ -668,6 +679,8 @@ typedef struct pdp_dib DIB;
 #define INT_VHRX        (1u << INT_V_VHRX)
 #define INT_VHTX        (1u << INT_V_VHTX)
 #define INT_CR          (1u << INT_V_CR)
+#define INT_TTIX        (1u << INT_V_TTIX)
+#define INT_TTOX        (1u << INT_V_TTOX)
 #define INT_PIR4        (1u << INT_V_PIR4)
 #define INT_PIR3        (1u << INT_V_PIR3)
 #define INT_PIR2        (1u << INT_V_PIR2)
@@ -691,6 +704,7 @@ typedef struct pdp_dib DIB;
 #define IPL_XQ          5
 #define IPL_XU          5
 #define IPL_TU          5
+#define IPL_RF          5
 #define IPL_PTR         4
 #define IPL_PTP         4
 #define IPL_TTI         4
@@ -699,6 +713,8 @@ typedef struct pdp_dib DIB;
 #define IPL_VHRX        4
 #define IPL_VHTX        4
 #define IPL_CR          4
+#define IPL_TTIX        4
+#define IPL_TTOX        4
 
 #define IPL_PIR7        7
 #define IPL_PIR6        6
@@ -723,6 +739,7 @@ typedef struct pdp_dib DIB;
 #define VEC_RQ          0154
 #define VEC_RL          0160
 #define VEC_LPT         0200
+#define VEC_RF          0204
 #define VEC_HK          0210
 #define VEC_RK          0220
 #define VEC_DTA         0214
@@ -734,6 +751,8 @@ typedef struct pdp_dib DIB;
 #define VEC_TQ          0260
 #define VEC_RX          0264
 #define VEC_RY          0264
+#define VEC_TTIX        0300
+#define VEC_TTOX        0304
 #define VEC_DZRX        0300
 #define VEC_DZTX        0304
 #define VEC_VHRX        0310

@@ -1,6 +1,6 @@
 /* pdp18b_dt.c: 18b DECtape simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,9 @@
                 (PDP-9) TC02/TU55 DECtape
                 (PDP-15) TC15/TU56 DECtape
 
+   23-Jun-06	RMS     Fixed switch conflict in ATTACH
+                    	Revised Type 550 header based on DECTOG formatter
+   13-Jun-06    RMS     Fixed checksum calculation bug in Type 550
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    25-Jan-04    RMS     Revised for device debug support
    14-Jan-04    RMS     Revised IO device call interface
@@ -65,22 +68,23 @@
 
    DECtape motion is measured in 3b lines.  Time between lines is 33.33us.
    Tape density is nominally 300 lines per inch.  The format of a DECtape (as
-   taken from the TD8E formatter) is:
+   taken from the PDP-7 formatter) is:
 
-        reverse end zone        8192 reverse end zone codes ~ 10 feet
+        reverse end zone        7144 reverse end zone codes ~ 12 feet
         reverse buffer          200 interblock codes
         block 0
          :
         block n
         forward buffer          200 interblock codes
-        forward end zone        8192 forward end zone codes ~ 10 feet
+        forward end zone        7144 forward end zone codes ~ 12 feet
 
    A block consists of five 18b header words, a tape-specific number of data
    words, and five 18b trailer words.  All systems except the PDP-8 use a
    standard block length of 256 words; the PDP-8 uses a standard block length
-   of 86 words (x 18b = 129 words x 12b).  [A PDP-4/7 DECtape has only four 18b
-   header words; for consistency, the PDP-4/7 uses the same format as the PDP-9/15
-   but skips the missing header words.]
+   of 86 words (x 18b = 129 words x 12b).  PDP-4/7 DECtapes came in two
+   formats.  The first 5 controllers used a 4 word header/trailer (missing
+   word 0/4).  All later serial numbers used the standard header.  The later,
+   standard header/trailer is simulated here.
 
    Because a DECtape file only contains data, the simulator cannot support
    write timing and mark track and can only do a limited implementation
@@ -848,9 +852,7 @@ int32 mot = DTS_GETMOT (uptr->STATE);
 int32 dir = mot & DTS_DIR;
 int32 fnc = DTS_GETFNC (uptr->STATE);
 int32 *fbuf = (int32 *) uptr->filebuf;
-#if defined (TC02)
 int32 unum = uptr - dt_dev.units;
-#endif
 int32 blk, wrd, ma, relpos;
 uint32 ba;
 
@@ -925,6 +927,8 @@ switch (fnc) {                                          /* at speed, check fnc *
         if (MEM_ADDR_OK (ma)) M[ma] = blk;              /* store block # */
         if (((dtsa & DTA_MODE) == 0) || (M[DT_WC] == 0))
                 dtsb = dtsb | DTB_DTF;                  /* set DTF */
+        if (DEBUG_PRI (dt_dev, LOG_MS))
+            fprintf (sim_deb, ">>DT%d: found block %d\n", unum, blk);
         break;
 
 /* Read has four subcases
@@ -1128,6 +1132,8 @@ switch (fnc) {                                          /* at speed, check fnc *
         sim_activate (uptr, DTU_LPERB (uptr) * dt_ltime);/* sched next block */
         dtdb = blk;                                     /* store block # */
         dtsb = dtsb | DTB_DTF;                          /* set DTF */
+        if (DEBUG_PRI (dt_dev, LOG_MS))
+            fprintf (sim_deb, ">>DT%d: search found block %d\n", unum, blk);
         break;
 
 /* Read and read all */
@@ -1149,8 +1155,10 @@ switch (fnc) {                                          /* at speed, check fnc *
         else {
             ma = (2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_CSMWD - 1;
             wrd = relpos / DT_WSIZE;                    /* hdr start = wd 0 */
+#if defined (OLD_TYPE550)
             if ((wrd == 0) ||                           /* skip 1st, last */
                 (wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - 1))) break;
+#endif
             if ((fnc == FNC_READ) &&                    /* read, skip if not */
                 (wrd != DT_CSMWD) &&                    /* fwd, rev cksum */
                 (wrd != ma)) break;
@@ -1184,8 +1192,10 @@ switch (fnc) {                                          /* at speed, check fnc *
             }
         else {
             wrd = relpos / DT_WSIZE;                    /* hdr start = wd 0 */
+#if defined (OLD_TYPE550)
             if ((wrd == 0) ||                           /* skip 1st, last */
                 (wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - 1))) break;
+#endif
             if ((fnc == FNC_WRIT) &&                    /* wr, skip if !csm */
                 (wrd != ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_CSMWD - 1)))
                 break;
@@ -1279,14 +1289,15 @@ int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos)
 int32 wrd = relpos / DT_WSIZE;
 
 if (wrd == DT_BLKWD) return blk;                        /* fwd blknum */
-if (wrd == DT_CSMWD) return 077;                        /* rev csum */
 #if defined (TC02)                                      /* TC02/TC15 */
+if (wrd == DT_CSMWD) return 077;                        /* rev csum */
 if (wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_CSMWD - 1))  /* fwd csum */
     return (dt_csum (uptr, blk) << 12);
-#else
+#else                                                   /* Type 550 */
+if (wrd == DT_CSMWD) return 0777777;                    /* rev csum */
 if (wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_CSMWD - 1))  /* fwd csum */
     return (dt_csum (uptr, blk));
-#endif                                                  /* Type 550 */
+#endif
 if (wrd == ((2 * DT_HTWRD) + DTU_BSIZE (uptr) - DT_BLKWD - 1))  /* rev blkno */
     return dt_comobv (blk);
 return 0;                                               /* all others */
@@ -1353,11 +1364,11 @@ r = attach_unit (uptr, cptr);                           /* attach */
 if (r != SCPE_OK) return r;                             /* error? */
 if ((sim_switches & SIM_SW_REST) == 0) {                /* not from rest? */
     uptr->flags = uptr->flags & ~(UNIT_8FMT | UNIT_11FMT);      /* default 18b */
-    if (sim_switches & SWMASK ('R'))                    /* att 12b? */
+    if (sim_switches & SWMASK ('T'))                    /* att 12b? */
         uptr->flags = uptr->flags | UNIT_8FMT;
     else if (sim_switches & SWMASK ('S'))               /* att 16b? */
         uptr->flags = uptr->flags | UNIT_11FMT;
-    else if (!(sim_switches & SWMASK ('T')) &&          /* autosize? */
+    else if (!(sim_switches & SWMASK ('A')) &&          /* autosize? */
         (sz = sim_fsize (uptr->fileref))) {
         if (sz == D8_FILSIZ)
             uptr->flags = uptr->flags | UNIT_8FMT;

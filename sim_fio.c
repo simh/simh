@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Jul-06    RMS     Fixed linux conditionalization (from Chaskiel Grundman)
    15-May-06    RMS     Added sim_fsize_name
    21-Apr-06    RMS     Added FreeBSD large file support (from Mark Martinec)
    19-Nov-05    RMS     Added OS/X large file support (from Peter Schorn)
@@ -160,7 +161,7 @@ FILE *sim_fopen (const char *file, const char *mode)
 #if defined (VMS)
 return fopen (file, mode, "ALQ=32", "DEQ=4096",
         "MBF=6", "MBC=127", "FOP=cbt,tef", "ROP=rah,wbh", "CTX=stm");
-#elif defined (USE_INT64) && defined (USE_ADDR64) && defined (linux)
+#elif defined (USE_INT64) && defined (USE_ADDR64) && defined (__linux)
 return fopen64 (file, mode);
 #else
 return fopen (file, mode);
@@ -280,7 +281,7 @@ return fsetpos (st, &fileaddr);
 
 /* Linux */
 
-#if defined (linux)
+#if defined (__linux)
 #define _SIM_IO_FSEEK_EXT_      1
 
 int sim_fseek (FILE *st, t_addr xpos, int origin)

@@ -26,6 +26,8 @@
    ms           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
+   07-Jul-06    JDB     Added CAPACITY as alternate for REEL
+                        Fixed EOT test for unlimited reel size
    16-Feb-06    RMS     Revised for new EOT test
    22-Jul-05    RMS     Fixed compiler warning on Solaris (from Doug Glyn)
    01-Mar-05    JDB     Added SET OFFLINE; rewind/offline now does not detach
@@ -304,9 +306,11 @@ MTAB msc_mod[] = {
     { UNIT_OFFLINE, 0, "online", "ONLINE", msc_online },
     { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
-    { MTAB_XTD|MTAB_VUN, 0, "REEL", "REEL",
+    { MTAB_XTD | MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+       &ms_set_reelsize, &ms_show_reelsize, NULL },
+    { MTAB_XTD | MTAB_VUN | MTAB_NMO, 1, "REEL", "REEL",
       &ms_set_reelsize, &ms_show_reelsize, NULL },
-    { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
+    { MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
     { MTAB_XTD | MTAB_VDV, 0, NULL, "13181A",
       &ms_settype, NULL, NULL },
@@ -446,7 +450,6 @@ switch (inst) {                                         /* case on opcode */
                 dat = dat | STA_TBSY;
             if (sim_tape_wrp (uptr))                    /* write prot? */
                 dat = dat | STA_WLK;
-            uptr->capac = (TCAP << uptr->REEL) << ms_ctype;
             if (sim_tape_eot (uptr))
                 dat = dat | STA_EOT;
             }
@@ -589,7 +592,6 @@ switch (uptr->FNC) {                                    /* case on function */
         break;
 
     case FNC_FSF:                                       /* space fwd file */
-        uptr->capac = (TCAP << uptr->REEL) << ms_ctype;
         while ((st = sim_tape_sprecf (uptr, &tbc)) == MTSE_OK) {
             if (sim_tape_eot (uptr)) break;             /* EOT stops */
             }
@@ -836,20 +838,29 @@ else fprintf (st, "13181A");
 return SCPE_OK;
 }
 
-/* Set unit reel size */
+/* Set unit reel size
 
+   val = 0 -> SET MSCn CAPACITY=n
+   val = 1 -> SET MSCn REEL=n */
+ 
 t_stat ms_set_reelsize (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 reel;
 t_stat status;
+ 
+if (val == 0) {
+    status = sim_tape_set_capac (uptr, val, cptr, desc);
+    if (status == SCPE_OK) uptr->REEL = 0;
+    return status;
+    }
 
 if (cptr == NULL) return SCPE_ARG;
 reel = (int32) get_uint (cptr, 10, 2400, &status);
 if (status != SCPE_OK) return status;
 else switch (reel) {
-
-    case 0:
-        uptr->REEL = 0;                                 /* type 0 = unlimited */
+ 
+     case 0:
+        uptr->REEL = 0;                                 /* type 0 = unlimited/custom */
         break;
 
     case 600:
@@ -868,16 +879,23 @@ else switch (reel) {
         return SCPE_ARG;
         }
 
+uptr->capac = uptr->REEL? (TCAP << uptr->REEL) << ms_ctype: 0;
 return SCPE_OK;
 }
 
-/* Show unit reel size */
+/* Show unit reel size
 
+   val = 0 -> SHOW MSC or SHOW MSCn or SHOW MSCn CAPACITY
+   val = 1 -> SHOW MSCn REEL */
+ 
 t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (uptr->REEL == 0) fputs ("unlimited size", st);
+t_stat status = SCPE_OK;
+
+if (uptr->REEL == 0) status = sim_tape_show_capac (st, uptr, val, desc);
 else fprintf (st, "%4d foot reel", 300 << uptr->REEL);
-return SCPE_OK;
+if (val == 1) fputc ('\n', st);                         /* MTAB_NMO omits \n */
+return status;
 }
 
 /* 7970B/7970E bootstrap routine (HP 12992D ROM) */

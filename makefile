@@ -83,7 +83,7 @@ PDP11 = ${PDP11D}pdp11_fp.c ${PDP11D}pdp11_cpu.c ${PDP11D}pdp11_dz.c \
 	${PDP11D}pdp11_ry.c ${PDP11D}pdp11_pt.c ${PDP11D}pdp11_hk.c \
 	${PDP11D}pdp11_xq.c ${PDP11D}pdp11_xu.c ${PDP11D}pdp11_vh.c \
 	${PDP11D}pdp11_rh.c ${PDP11D}pdp11_tu.c ${PDP11D}pdp11_cpumod.c \
-	${PDP11D}pdp11_cr.c
+	${PDP11D}pdp11_cr.c ${PDP11D}pdp11_rf.c ${PDP11D}pdp11_dl.c
 PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -175,7 +175,7 @@ I7094D = I7094/
 I7094 = ${I7094D}i7094_cpu.c ${I7094D}i7094_cpu1.c ${I7094D}i7094_io.c \
 	${I7094D}i7094_cd.c ${I7094D}i7094_clk.c ${I7094D}i7094_com.c \
 	${I7094D}i7094_drm.c ${I7094D}i7094_dsk.c ${I7094D}i7094_sys.c \
-	${I7094D}i7094_lp.c ${I7094D}i7094_mt.c
+	${I7094D}i7094_lp.c ${I7094D}i7094_mt.c ${I7094D}i7094_binloader.c
 I7094_OPT = -DUSE_INT64 -I ${I7094D}
 
 

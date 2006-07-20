@@ -25,6 +25,7 @@
 
    dt           TC08/TU56 DECtape
 
+   23-Jun-06	RMS     Fixed switch conflict in ATTACH
    07-Jan-06    RMS     Fixed unaligned register access bug (found by Doug Carman)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    25-Jan-04    RMS     Revised for device debug support
@@ -1178,11 +1179,11 @@ r = attach_unit (uptr, cptr);                           /* attach */
 if (r != SCPE_OK) return r;                             /* fail? */
 if ((sim_switches & SIM_SW_REST) == 0) {                /* not from rest? */
     uptr->flags = (uptr->flags | UNIT_8FMT) & ~UNIT_11FMT;
-    if (sim_switches & SWMASK ('T'))                    /* att 18b? */
+    if (sim_switches & SWMASK ('F'))                    /* att 18b? */
         uptr->flags = uptr->flags & ~UNIT_8FMT;
     else if (sim_switches & SWMASK ('S'))               /* att 16b? */
         uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT;
-    else if (!(sim_switches & SWMASK ('R')) &&          /* autosize? */
+    else if (!(sim_switches & SWMASK ('A')) &&          /* autosize? */
         (sz = sim_fsize (uptr->fileref))) {
         if (sz == D11_FILSIZ)
             uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT;

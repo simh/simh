@@ -1,0 +1,53 @@
+MAINDEC 1 Instruction Test
+
+sim> att -e ptr digital-1-12-m-rim.bin
+sim> boot ptr
+
+HALT instruction, PC: 000002 (JMP 3000)
+sim> c
+
+(Test runs until interrupted unless there are errors)
+
+^E
+Simulation stopped, PC: 000007 (SZS2 I)
+sim> d ss 77
+sim> run 32
+
+(Test runs until interrupted unless there are errors)
+
+^E
+Simulation stopped, PC: 000032 (SZS1)
+sim> d tw 777777
+sim> d ss 0
+sim> run 7772
+
+Undefined instruction, PC: 000001 (SZS1)
+sim> ex ac,io,pf
+AC:     000777
+IO:     777000
+PF:     77
+
+(These are the expected final values for the diagnostic)
+
+
+MAINDEC 4 Multiply/Divide Test
+
+sim> att -e ptr maindec-4_4-16-68.bin
+sim> break 0
+sim> boot ptr
+
+Breakpoint, PC: 000000 (JMP 532)
+sim> set cpu mdv
+sim> c
+
+(Test runs until interrupted unless there are errors)
+^E
+
+Simulation stopped, PC: ...
+sim> set cpu nomdv
+sim> run 1
+
+(Test runs until interrupted unless there are errors)
+^E
+
+Simulation stopped, PC: ...

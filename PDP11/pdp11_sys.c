@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jul-06    RMS     Reordered device list
+   06-Jul-06    RMS     Added multiple KL11/DL11 support
+   26-Jun-06    RMS     Added RF11 support
    17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    22-Jul-05    RMS     Fixed missing , in initializer (from Doug Gwyn)
@@ -54,23 +57,34 @@
 #include "pdp11_defs.h"
 #include <ctype.h>
 
-extern DEVICE cpu_dev, sys_dev;
-extern DEVICE ptr_dev, ptp_dev;
-extern DEVICE tti_dev, tto_dev;
+extern DEVICE cpu_dev;
+extern DEVICE sys_dev;
+extern DEVICE ptr_dev;
+extern DEVICE ptp_dev;
+extern DEVICE tti_dev;
+extern DEVICE tto_dev;
 extern DEVICE lpt_dev;
 extern DEVICE cr_dev;
-extern DEVICE clk_dev, pclk_dev;
+extern DEVICE clk_dev;
+extern DEVICE pclk_dev;
+extern DEVICE ttix_dev;
+extern DEVICE ttox_dev;
 extern DEVICE dz_dev;
 extern DEVICE vh_dev;
-extern DEVICE rk_dev, rl_dev;
-extern DEVICE hk_dev;
-extern DEVICE rx_dev, ry_dev;
-extern DEVICE mba_dev[];
-extern DEVICE rp_dev, tu_dev;
-extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE dt_dev;
-extern DEVICE tm_dev, ts_dev;
+extern DEVICE rf_dev;
+extern DEVICE rk_dev;
+extern DEVICE rl_dev;
+extern DEVICE hk_dev;
+extern DEVICE rx_dev;
+extern DEVICE ry_dev;
+extern DEVICE mba_dev[];
+extern DEVICE rp_dev;
+extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
+extern DEVICE tm_dev;
 extern DEVICE tq_dev;
+extern DEVICE ts_dev;
+extern DEVICE tu_dev;
 extern DEVICE xq_dev, xqb_dev;
 extern DEVICE xu_dev, xub_dev;
 extern UNIT cpu_unit;
@@ -99,16 +113,19 @@ DEVICE *sim_devices[] = {
     &sys_dev,
     &mba_dev[0],
     &mba_dev[1],
+    &clk_dev,
+    &pclk_dev,
     &ptr_dev,
     &ptp_dev,
     &tti_dev,
     &tto_dev,
     &cr_dev,
     &lpt_dev,
-    &clk_dev,
-    &pclk_dev,
+    &ttix_dev,
+    &ttox_dev,
     &dz_dev,
     &vh_dev,
+    &rf_dev,
     &rk_dev,
     &rl_dev,
     &hk_dev,
