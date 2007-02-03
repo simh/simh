@@ -26,6 +26,7 @@
    rf           (PDP-9) RF09/RF09
                 (PDP-15) RF15/RS09
 
+   04-Oct-06    RMS     Fixed bug, DSCD does not clear function register
    15-May-06    RMS     Fixed bug in autosize attach (reported by David Gesswein)
    14-Jan-04    RMS     Revised IO device call interface
                         Changed sim_fsize calling sequence
@@ -100,6 +101,7 @@
 #define RFS_CLR         0000170                         /* always clear */
 #define RFS_EFLGS       (RFS_HDW | RFS_APE | RFS_MXF | RFS_WCE | \
 						 RFS_DPE | RFS_WLO | RFS_NED )  /* error flags */
+#define RFS_FR          (RFS_FNC|RFS_IE)
 #define GET_FNC(x)      (((x) >> RFS_V_FNC) & RFS_M_FNC)
 #define GET_POS(x)      ((int) fmod (sim_gtime () / ((double) (x)), \
 						((double) RF_NUMWD)))
@@ -187,8 +189,8 @@ int32 t, sb;
 
 sb = pulse & 060;                                       /* subopcode */
 if (pulse & 01) {
-    if ((sb == 000)     && (rf_sta & (RFS_ERR | RFS_DON)))
-        dat = IOT_SKP | dat;                            /* DSSF */
+    if ((sb == 000) && (rf_sta & (RFS_ERR | RFS_DON)))  /* DSSF */
+        dat = IOT_SKP | dat;
     else if (sb == 020) rf_reset (&rf_dev);             /* DSCC */
     else if (sb == 040) {                               /* DSCF */
         if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;         /* busy inhibits */
@@ -237,7 +239,7 @@ if (pulse & 02) {
         (sim_is_active (&rf_unit)? 0400000: 0);
     else if (sb == 040) {                               /* DSCD */
         if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;         /* busy inhibits */
-        else rf_sta = 0;
+        else rf_sta = rf_sta & RFS_FR;
         rf_updsta (0);
         }
     else if (sb == 060) {                               /* DSRS */

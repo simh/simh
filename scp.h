@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Aug-06    JDB     Added assign_device and deassign_device
    14-Jul-06    RMS     Added sim_activate_abs
    06-Jan-06    RMS     Added fprint_stopped_gen
                         Changed arg type in sim_brk_test
@@ -85,6 +86,8 @@ uint32 sim_grtime (void);
 int32 sim_qcount (void);
 t_stat attach_unit (UNIT *uptr, char *cptr);
 t_stat detach_unit (UNIT *uptr);
+t_stat assign_device (DEVICE *dptr, char *cptr);
+t_stat deassign_device (DEVICE *dptr);
 t_stat reset_all (uint32 start_device);
 t_stat reset_all_p (uint32 start_device);
 char *sim_dname (DEVICE *dptr);

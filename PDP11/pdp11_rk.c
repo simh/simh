@@ -75,7 +75,8 @@
 #define RK_NUMTR        (RK_NUMCY * RK_NUMSF)           /* tracks/drive */
 #define RK_NUMDR        8                               /* drives/controller */
 #define RK_M_NUMDR      07
-#define RK_SIZE (RK_NUMCY * RK_NUMSF * RK_NUMSC * RK_NUMWD)  /* words/drive */
+#define RK_SIZE         (RK_NUMCY * RK_NUMSF * RK_NUMSC * RK_NUMWD)
+                                                        /* words/drive */
 #define RK_CTLI         1                               /* controller int */
 #define RK_SCPI(x)      (2u << (x))                     /* drive int */
 #define RK_MAXFR        (1 << 16)                       /* max transfer */
@@ -172,8 +173,8 @@
 
 #define RKBA_IMP        0177776                         /* implemented */
 
-#define RK_MIN 10
-#define MAX(x,y) (((x) > (y))? (x): (y))
+#define RK_MIN          10
+#define MAX(x,y)        (((x) > (y))? (x): (y))
 
 extern uint16 *M;                                       /* memory */
 extern int32 int_req[IPL_HLVL];
@@ -297,8 +298,10 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
         rkds = (rkds & RKDS_ID) | RKDS_RK05 | RKDS_SC_OK |
             (rand () % RK_NUMSC);                       /* random sector */
         uptr = rk_dev.units + GET_DRIVE (rkda);         /* selected unit */
-        if (uptr->flags & UNIT_ATT) rkds = rkds | RKDS_RDY;     /* attached? */
-        if (!sim_is_active (uptr)) rkds = rkds | RKDS_RWS;      /* idle? */
+        if (uptr->flags & UNIT_ATT)                     /* attached? */
+            rkds = rkds | RKDS_RDY;
+        if (!sim_is_active (uptr))                      /* idle? */
+            rkds = rkds | RKDS_RWS;
         if (uptr->flags & UNIT_WPRT) rkds = rkds | RKDS_WLK;
         if (GET_SECT (rkda) == (rkds & RKDS_SC)) rkds = rkds | RKDS_ON_SC;
         *data = rkds;
@@ -356,7 +359,8 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
             SET_INT (RK);                               /* set int request */
             }
         rkcs = (rkcs & ~RKCS_RW) | (data & RKCS_RW);
-        if ((rkcs & CSR_DONE) && (data & CSR_GO)) rk_go (); /* new function? */
+        if ((rkcs & CSR_DONE) && (data & CSR_GO))       /* new function? */
+            rk_go ();
         return SCPE_OK;
 
     case 3:                                             /* RKWC */
@@ -410,8 +414,9 @@ if (uptr->flags & UNIT_DIS) {                           /* not present? */
     rk_set_done (RKER_NXD);
     return;
     }
-if (((uptr->flags & UNIT_ATT) == 0) || sim_is_active (uptr)) {
-    rk_set_done (RKER_DRE);                             /* not att or busy */
+if (((uptr->flags & UNIT_ATT) == 0) ||                  /* not att or busy? */
+    sim_is_active (uptr)) {
+    rk_set_done (RKER_DRE);
     return;
     }
 if ((rkcs & RKCS_FMT) &&                                /* format and */
@@ -419,8 +424,9 @@ if ((rkcs & RKCS_FMT) &&                                /* format and */
 	rk_set_done (RKER_PGE);
 	return;
 	}
-if ((func == RKCS_WRITE) && (uptr->flags & UNIT_WPRT)) {
-    rk_set_done (RKER_WLK);                             /* write and locked? */
+if ((func == RKCS_WRITE) &&                             /* write and locked? */
+    (uptr->flags & UNIT_WPRT)) {
+    rk_set_done (RKER_WLK);
     return;
     }
 if (func == RKCS_WLK) {                                 /* write lock? */
@@ -530,7 +536,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
             for ( ; i < wc; i++) rkxb[i] = 0;           /* fill buf */
             }
         if (rkcs & RKCS_INH) {                          /* incr inhibit? */
-            if (t = Map_WriteW (ma, 2, &rkxb[wc - 1])) {        /* store last */
+            if (t = Map_WriteW (ma, 2, &rkxb[wc - 1])) { /* store last */
                 rker = rker | RKER_NXM;                 /* NXM? set flag */
                 wc = 0;                                 /* no transfer */
                 }
@@ -558,7 +564,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
                 }
             }
         if (wc) {                                       /* any xfer? */
-            awc = (wc + (RK_NUMWD - 1)) & ~(RK_NUMWD - 1);      /* clr to */
+            awc = (wc + (RK_NUMWD - 1)) & ~(RK_NUMWD - 1); /* clr to */
             for (i = wc; i < awc; i++) rkxb[i] = 0;     /* end of blk */
             fxwrite (rkxb, sizeof (int16), awc, uptr->fileref);
             err = ferror (uptr->fileref);

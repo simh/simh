@@ -1,7 +1,7 @@
 /* pdp11_xu.c: DEUNA/DELUA ethernet controller simulator
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2003-2005, David T. Hittner
+   Copyright (c) 2003-2006, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -57,6 +57,7 @@
 
   Modification history:
 
+  29-Oct-06  RMS  Synced poll and clock
   08-Dec-05  DTH  Implemented ancilliary functions 022/023/024/025
   18-Nov-05  DTH  Corrected time between system ID packets
   07-Sep-05  DTH  Corrected runt packet processing (found by Tim Chapman),
@@ -83,7 +84,7 @@
 
 #include "pdp11_xu.h"
 
-extern int32 tmr_poll, clk_tps, cpu_astop;
+extern int32 tmxr_poll, tmr_poll, clk_tps, cpu_astop;
 extern FILE *sim_log;
 
 t_stat xu_rd(int32* data, int32 PA, int32 access);
@@ -449,8 +450,8 @@ t_stat xu_svc(UNIT* uptr)
   int queue_size;
   t_stat status;
   CTLR* xu = xu_unit2ctlr(uptr);
-  const int one_second = clk_tps * tmr_poll;                  /* recalibrate timer */
   const ETH_MAC mop_multicast = {0xAB, 0x00, 0x00, 0x02, 0x00, 0x00};
+  const int one_second = clk_tps * tmr_poll;
 
   /* First pump any queued packets into the system */
   if ((xu->var->ReadQ.count > 0) && ((xu->var->pcsr1 & PCSR1_STATE) == STATE_RUNNING))
@@ -486,7 +487,7 @@ t_stat xu_svc(UNIT* uptr)
   switch (xu->var->pcsr1 & PCSR1_STATE) {
     case STATE_READY:
     case STATE_RUNNING:
-      sim_activate(&xu->unit[0], one_second/XU_SERVICE_INTERVAL);
+      sim_activate(&xu->unit[0], tmxr_poll);
       break;
   };
 
@@ -522,7 +523,6 @@ void xu_setclrint(CTLR* xu, int32 bits)
 t_stat xu_sw_reset (CTLR* xu)
 {
   t_stat status;
-  const int one_second = clk_tps * tmr_poll;                  /* recalibrate timer */
 
   sim_debug(DBG_TRC, xu->dev, "xu_sw_reset()\n");
 
@@ -564,10 +564,9 @@ t_stat xu_sw_reset (CTLR* xu)
                          &xu->var->mac, xu->var->setup.multicast,
                          xu->var->setup.promiscuous);
 
-  /* activate device if not disabled - cancel first, just in case */
+  /* activate device if not disabled */
   if ((xu->dev->flags & DEV_DIS) == 0) {
-    sim_cancel(&xu->unit[0]);
-    sim_activate(&xu->unit[0], one_second/XU_SERVICE_INTERVAL);
+    sim_activate_abs(&xu->unit[0], clk_cosched (tmxr_poll));
   }
 
   /* clear load_server address */
@@ -727,9 +726,9 @@ sim_debug(DBG_TRC, xu->dev, "FC_WAL: mtlen=%d\n", mtlen);
       xu->var->rrlen = xu->var->udb[5];
       xu->var->rxnext = 0;
       xu->var->txnext = 0;
-xu_dump_rxring(xu);
-xu_dump_txring(xu);
-/*cpu_astop=1;*/
+// xu_dump_rxring(xu);
+// xu_dump_txring(xu);
+
       break;
 
     case FC_RDCTR:      /* read counters */
@@ -1072,7 +1071,7 @@ void xu_process_receive(CTLR* xu)
 
   /* set or clear interrupt, depending on what happened */
   xu_setclrint(xu, 0);
-xu_dump_rxring(xu); /* debug receive ring */
+// xu_dump_rxring(xu); /* debug receive ring */
 
 }
 

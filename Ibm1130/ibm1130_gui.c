@@ -11,6 +11,9 @@
  * This is not a supported product, but I welcome bug reports and fixes.
  * Mail to simh@ibm1130.org
  *
+ * 30-Dec-05 BLK	Fixed mask for IAR and SAR register display and added display
+ *					of Arithmetic Factor, per Carl Claunch.
+ *
  * 09-Apr-04 BLK	Changed code to use stock windows cursor IDC_HAND if available
  *
  * 02-Dec-02 BLK	Changed display, added printer and card reader icons
@@ -33,9 +36,9 @@
 #define UPDATE_BY_TIMER
 
 #ifdef UPDATE_BY_TIMER
-#  define UPDATE_INTERVAL	20				// set to desired number of updates/second
+#  define UPDATE_INTERVAL	20				/* set to desired number of updates/second */
 #else
-#  define UPDATE_INTERVAL	5000 			// GUI: set to 100000/f where f = desired updates/second of 1130 time
+#  define UPDATE_INTERVAL	5000 			/* GUI: set to 100000/f where f = desired updates/second of 1130 time */
 #endif
 
 #define UNIT_V_CR_EMPTY	   (UNIT_V_UF + 5)			/* NOTE: THESE MUST MATCH THE DEFINITION IN ibm1130_cr.c */
@@ -46,8 +49,9 @@
 #define UNIT_V_PHYSICAL_PTR	(UNIT_V_UF + 10)		/* NOTE: THESE MUST MATCH THE DEFINITION IN ibm1130_prt.c */
 #define UNIT_PHYSICAL_PTR (1u << UNIT_V_PHYSICAL_PTR)
 
-// I think I had it wrong; Program Load actually does start the processor after
-// reading in the card?
+/* I think I had it wrong; Program Load actually does start the processor after
+ * reading in the card?
+ */
 
 #define PROGRAM_LOAD_STARTS_CPU
 
@@ -86,7 +90,7 @@ DEVICE console_dev = {
 	NULL, NULL, NULL
 };
 
-// reset for the "console" display device 
+/* reset for the "console" display device  */
 
 extern char *read_line (char *cptr, int size, FILE *stream);
 extern FILE *sim_log;
@@ -117,8 +121,8 @@ extern UNIT prt_unit;
 t_stat console_reset (DEVICE *dptr)
 {
 	if (! sim_gui) {
-		SETBIT(console_unit.flags, UNIT_DIS);			// disable the GUI
-		CLRBIT(console_unit.flags, UNIT_DISPLAY);		// turn the GUI off
+		SETBIT(console_unit.flags, UNIT_DIS);			/* disable the GUI */
+		CLRBIT(console_unit.flags, UNIT_DISPLAY);		/* turn the GUI off */
 	}
 
 	update_gui(FALSE);
@@ -158,19 +162,19 @@ void scp_panic (char *msg)
 #define IDC_RESET				14
 #define IDC_PROGRAM_LOAD		15
 
-#define IDC_TEAR				16	// standard button
-#define IDC_1442				17	// device images
+#define IDC_TEAR				16	/* standard button */
+#define IDC_1442				17	/* device images */
 #define IDC_1132				18
 
-#define LAMPTIME        500			// 500 msec delay on updating
+#define LAMPTIME        500			/* 500 msec delay on updating */
 #define FLASH_TIMER_ID    1
 #define UPDATE_TIMER_ID   2
 
-#define RUNSWITCH_X 689				// center of the run mode switch dial
+#define RUNSWITCH_X 689				/* center of the run mode switch dial */
 #define RUNSWITCH_Y 107
-#define TOGGLES_X	122				// left edge of series of toggle switches
+#define TOGGLES_X	122				/* left edge of series of toggle switches */
 
-#define TXTBOX_X 	200				// text labels showing attached devices
+#define TXTBOX_X 	200				/* text labels showing attached devices */
 #define TXTBOX_Y	300
 #define TXTBOX_WIDTH   	195
 #define TXTBOX_HEIGHT	 12
@@ -238,19 +242,18 @@ static struct tag_btn {
 	TXTBOX_X+40, TXTBOX_Y+25, 35, 12, 	"Tear",					TRUE,	FALSE,	0,					NULL, NULL, NULL,	FALSE,
 	635, 238, 110, 110,                 "EMPTY_1442",			TRUE,   FALSE,  0,					NULL, NULL, NULL,	FALSE,
 	635, 366, 110, 110,                 "EMPTY_1132",		    TRUE,   FALSE,  0,					NULL, NULL, NULL,	FALSE,
-//	635, 366, 110, 110,                 "EMPTY_1132",		    TRUE,   FALSE,  0,					NULL, NULL, NULL,	FALSE,
 };
 #define NBUTTONS (sizeof(btn) / sizeof(btn[0]))
 
-#define STATE_1442_EMPTY	0		// no cards (no file attached)
-#define STATE_1442_FULL		1		// cards in hopper (file attached at BOF)
-#define STATE_1442_MIDDLE	2		// cards in hopper and stacker (file attached, neither EOF nor BOF)
-#define STATE_1442_EOF		3		// cards in stacker (file attached, at EOF)
-#define STATE_1442_HIDDEN	4		// simulator is attached to physical card reader
+#define STATE_1442_EMPTY	0		/* no cards (no file attached) */
+#define STATE_1442_FULL		1		/* cards in hopper (file attached at BOF) */
+#define STATE_1442_MIDDLE	2		/* cards in hopper and stacker (file attached, neither EOF nor BOF) */
+#define STATE_1442_EOF		3		/* cards in stacker (file attached, at EOF) */
+#define STATE_1442_HIDDEN	4		/* simulator is attached to physical card reader */
 
-#define STATE_1132_EMPTY	0		// no paper hanging out of printer
-#define STATE_1132_FULL		1		// paper hanging out of printer
-#define STATE_1132_HIDDEN	2		// printer is attached to physical printer
+#define STATE_1132_EMPTY	0		/* no paper hanging out of printer */
+#define STATE_1132_FULL		1		/* paper hanging out of printer */
+#define STATE_1132_HIDDEN	2		/* printer is attached to physical printer */
 
 static struct tag_txtbox {
 	int x, y;
@@ -309,9 +312,9 @@ static void destroy_console_window (void)
 	int i;
 
 	if (hConsoleWnd != NULL)
-		SendMessage(hConsoleWnd, WM_CLOSE, 0, 0);	// cross thread call is OK
+		SendMessage(hConsoleWnd, WM_CLOSE, 0, 0);	/* cross thread call is OK */
 
-	if (hPump != INVALID_HANDLE_VALUE) {			// this is not the most graceful way to do it
+	if (hPump != INVALID_HANDLE_VALUE) {			/* this is not the most graceful way to do it */
 		TerminateThread(hPump, 0);
 		hPump  = INVALID_HANDLE_VALUE;
 		PumpID = 0;
@@ -338,10 +341,11 @@ static void destroy_console_window (void)
 		NIXOBJECT(btn[i].hbrDark);
 	}
 
-//	if (class_defined) {
-//		UnregisterClass(hInstance, szConsoleClassName);
-//		class_defined = FALSE;
-//	}
+/*	if (class_defined) {
+		UnregisterClass(hInstance, szConsoleClassName);
+		class_defined = FALSE;
+	}
+*/
 }
 
 /* ------------------------------------------------------------------------ 
@@ -350,7 +354,7 @@ static void destroy_console_window (void)
 
 static int shown_iar = 0, shown_sar = 0, shown_sbr = 0, shown_afr = 0, shown_acc = 0, shown_ext  = 0;
 static int shown_op  = 0, shown_tag = 0, shown_irq = 0, shown_ccc = 0, shown_cnd = 0, shown_wait = 0;
-static int shown_ces = 0, shown_runmode = MODE_RUN;
+static int shown_ces = 0, shown_arf = 0, shown_runmode = MODE_RUN;
 static int CND;
 
 /* ------------------------------------------------------------------------ 
@@ -402,7 +406,7 @@ void update_gui (BOOL force)
 	static int32 displayed = 0;
 	RECT xin;
 
-	if ((int32)(console_unit.flags & UNIT_DISPLAY) != displayed) {		// setting has changed
+	if ((int32)(console_unit.flags & UNIT_DISPLAY) != displayed) {		/* setting has changed */
 		displayed = console_unit.flags & UNIT_DISPLAY;
 		if (displayed)
 			init_console_window();
@@ -438,6 +442,8 @@ void update_gui (BOOL force)
 			{shown_iar = IAR; 		 RedrawRegion(hConsoleWnd, 75,    8, 364,  32);}	/* lamps: don't bother erasing bkgnd */
 	if (SAR != shown_sar)
 			{shown_sar = SAR; 		 RedrawRegion(hConsoleWnd, 75,   42, 364,  65);}
+	if (ARF != shown_arf)
+			{shown_arf = ARF; 		 RedrawRegion(hConsoleWnd, 75,  114, 364, 136);}
 	if (ACC != shown_acc)
 			{shown_acc = ACC; 		 RedrawRegion(hConsoleWnd, 75,  141, 364, 164);}
 	if (EXT != shown_ext)
@@ -465,7 +471,7 @@ void update_gui (BOOL force)
 
 	int_lamps = 0;
 
-	// this loop works with lamp buttons that are calculated on-the-fly only
+	/* this loop works with lamp buttons that are calculated on-the-fly only */
 	for (i = 0; i < NBUTTONS; i++) {
 		if (btn[i].pushable)
 			continue;
@@ -475,26 +481,28 @@ void update_gui (BOOL force)
 				state = hFlashTimer || (running && ! wait_state);
 				break;
 
-			// this button is always off
-//			case IDC_PARITY_CHECK:
+/* this button is always off
+			case IDC_PARITY_CHECK
+*/
 
-			// these buttons are enabled/disabled directly
-//			case IDC_POWER_ON:
-//			case IDC_FILE_READY:
-//			case IDC_FORMS_CHECK:
-//			case IDC_KEYBOARD_SELECT:
-//			case IDC_DISK_UNLOCK:
+/* these buttons are enabled/disabled directly
+			case IDC_POWER_ON:
+			case IDC_FILE_READY:
+			case IDC_FORMS_CHECK:
+			case IDC_KEYBOARD_SELECT:
+			case IDC_DISK_UNLOCK:
+*/
 			default:
 				continue;
 		}
 
-		if (state != btn[i].state) {				// state has changed
+		if (state != btn[i].state) {				/* state has changed */
 			EnableWindow(btn[i].hBtn, state);
 			btn[i].state = state;
 		}
 	}
 
-	if (force) {									// if force flag is set, update text region
+	if (force) {									/* if force flag is set, update text region */
 		SetRect(&xin, TXTBOX_X, TXTBOX_Y, TXTBOX_X+TXTBOX_WIDTH, TXTBOX_BOTTOM+2*TXTBOX_HEIGHT);
 		InvalidateRect(hConsoleWnd, &xin, TRUE);
 	}
@@ -584,9 +592,9 @@ static int occurs (char *txt, char ch)
 }
 
 /* ------------------------------------------------------------------------ 
-// turns out to get properly colored buttons you have to paint them yourself. Sheesh.
-// On the plus side, this lets do a better job of aligning the button text than
-// the button would by itself.
+ * turns out to get properly colored buttons you have to paint them yourself. Sheesh.
+ * On the plus side, this lets do a better job of aligning the button text than
+ * the button would by itself.
  * ------------------------------------------------------------------------ */
 
 void PaintButton (LPDRAWITEMSTRUCT dis)
@@ -616,7 +624,7 @@ void PaintButton (LPDRAWITEMSTRUCT dis)
 		LineTo(dis->hDC,   dis->rcItem.left,    dis->rcItem.top);
 	}
 	else if (down) {
-		// do the three-D thing
+		/* do the three-D thing */
 		hOldPen = SelectObject(dis->hDC, hDkGreyPen);
 		MoveToEx(dis->hDC, dis->rcItem.left,    dis->rcItem.bottom-2, NULL);
 		LineTo(dis->hDC,   dis->rcItem.left,    dis->rcItem.top);
@@ -776,7 +784,7 @@ static DWORD WINAPI Pump (LPVOID arg)
 
 	hcArrow    = LoadCursor(NULL,      IDC_ARROW);
 #ifdef IDC_HAND
-	hcHand     = LoadCursor(NULL, IDC_HAND);							// use stock object provided by Windows
+	hcHand     = LoadCursor(NULL, IDC_HAND);							/* use stock object provided by Windows */
 	if (hcHand == NULL)
 		hcHand = LoadCursor(hInstance, MAKEINTRESOURCE(IDC_MYHAND));
 #else
@@ -816,12 +824,13 @@ static DWORD WINAPI Pump (LPVOID arg)
 			EnableWindow(btn[i].hBtn, btn[i].state);
 	}
 
-// This isn't needed anymore, now that we have the big printer icon -- it acts like a button now
-//	i = IDC_TEAR;
-//	btn[i].hBtn = CreateWindow("BUTTON", btn[i].txt, WS_CHILD|WS_VISIBLE|BS_CENTER,
-//			btn[i].x, btn[i].y, btn[i].wx, btn[i].wy, hConsoleWnd, (HMENU) i, hInstance, NULL);
-//
-//	SendMessage(btn[i].hBtn, WM_SETFONT, (WPARAM) hTinyFont, TRUE);
+/* This isn't needed anymore, now that we have the big printer icon -- it acts like a button now
+ *	i = IDC_TEAR;
+ *	btn[i].hBtn = CreateWindow("BUTTON", btn[i].txt, WS_CHILD|WS_VISIBLE|BS_CENTER,
+ *			btn[i].x, btn[i].y, btn[i].wx, btn[i].wy, hConsoleWnd, (HMENU) i, hInstance, NULL);
+ *
+ *	SendMessage(btn[i].hBtn, WM_SETFONT, (WPARAM) hTinyFont, TRUE);
+ */
 
 	hbm1442_full   = LoadBitmap(hInstance, "FULL_1442");
 	hbm1442_empty  = LoadBitmap(hInstance, "EMPTY_1442");
@@ -836,7 +845,6 @@ static DWORD WINAPI Pump (LPVOID arg)
 			btn[i].x, btn[i].y, btn[i].wx, btn[i].wy, hConsoleWnd, (HMENU) i, hInstance, NULL);
 	btn[i].state = STATE_1442_EMPTY;
 
-//	wx = SendMessage(btn[i].hBtn, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM) hbm1442_full);
 	wx = SendMessage(btn[i].hBtn, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM) hbm1442_empty);
 
 	i = IDC_1132;
@@ -846,13 +854,6 @@ static DWORD WINAPI Pump (LPVOID arg)
 	btn[i].state = FALSE;
 
 	wx = SendMessage(btn[i].hBtn, STM_SETIMAGE, IMAGE_BITMAP, (LPARAM) hbm1132_empty);
-
-//	for (i = 0; i < NTXTBOXES; i++) {
-//		txtbox[i].hBox = CreateWindow("EDIT", txtbox[i].txt, 
-//				WS_CHILD|WS_VISIBLE|ES_LEFT|ES_READONLY,
-//				txtbox[i].x, txtbox[i].y, TXTBOX_WIDTH, TXTBOX_HEIGHT, hConsoleWnd, (HMENU) (i+100), hInstance, NULL);
-//		SendMessage(txtbox[i].hBox, WM_SETFONT, (WPARAM) hTinyFont, TRUE);
-//	}
 
 	GetWindowRect(hConsoleWnd, &r);					/* get window size as created */
 	wx = r.right  - r.left + 1;
@@ -991,7 +992,7 @@ void DrawRunmode (HDC hDC, int mode)
  * than a mouse-region test.  Return value TRUE means the cursor is over a hotspot.
  * ------------------------------------------------------------------------ */
 
-static BOOL HandleClick (HWND hWnd, int xh, int yh, BOOL actual)
+static BOOL HandleClick (HWND hWnd, int xh, int yh, BOOL actual, BOOL rightclick)
 {
 	int b, x, r, ang, i;
 
@@ -1054,9 +1055,10 @@ static void DrawConsole (HDC hDC, PAINTSTRUCT *ps)
 
 	SetBkMode(hDC, TRANSPARENT);					/* overlay letters w/o changing background */
 
-	DrawBits(hDC,  76,  15, shown_iar,    16, 0x3FFF, digits);
-	DrawBits(hDC,  76, 	48, shown_sar,    16, 0x3FFF, digits);
+	DrawBits(hDC,  76,  15, shown_iar,    16, mem_mask, digits);	/* register holds only 15 bits */
+	DrawBits(hDC,  76, 	48, shown_sar,    16, mem_mask, digits);	/* but let's display only used bits */
 	DrawBits(hDC,  76,  81, shown_sbr,    16, 0xFFFF, digits);
+	DrawBits(hDC,  76, 114, shown_arf,    16, 0xFFFF, digits);
 	DrawBits(hDC,  76, 147, shown_acc,    16, 0xFFFF, digits);
 	DrawBits(hDC,  76, 180, shown_ext,    16, 0xFFFF, digits);
 
@@ -1124,10 +1126,10 @@ static void DrawConsole (HDC hDC, PAINTSTRUCT *ps)
 
 void flash_run (void)              
 {
-	EnableWindow(btn[IDC_RUN].hBtn, TRUE);		// enable the run lamp
+	EnableWindow(btn[IDC_RUN].hBtn, TRUE);		/* enable the run lamp */
 
 	if (hFlashTimer != 0)
-		KillTimer(hConsoleWnd, FLASH_TIMER_ID);	// (re)schedule lamp update
+		KillTimer(hConsoleWnd, FLASH_TIMER_ID);	/* (re)schedule lamp update */
 
 	hFlashTimer = SetTimer(hConsoleWnd, FLASH_TIMER_ID, LAMPTIME, NULL);
 }
@@ -1154,10 +1156,12 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
 			reset_all(0);
 			if (running && ! power) {		/* turning off */
 				reason = STOP_POWER_OFF;
-// this prevents message pump from running, which unfortunately locks up
-// the emulator thread when it calls gui_run(FALSE) which calls EnableWindow on the Run lamp
-//				while (running)
-//					Sleep(10);				/* wait for execution thread to exit */
+				/* wait for execution thread to exit */
+/* this prevents message pump from running, which unfortunately locks up
+ * the emulator thread when it calls gui_run(FALSE) which calls EnableWindow on the Run lamp
+ *				while (running)
+ *					Sleep(10);
+ */				
 			}
 
 			btn[IDC_POWER_ON].state = power;
@@ -1175,7 +1179,7 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
 					case MODE_INT_RUN:
 					case MODE_RUN:
 					case MODE_SI:
-						stuff_cmd("go");
+						stuff_cmd("cont");
 						break;
 
 					case MODE_DISP:			/* display core and advance IAR */
@@ -1196,16 +1200,17 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
 		case IDC_PROGRAM_STOP:
 			if (running) {					/* potential race condition here */
 				GUI_BEGIN_CRITICAL_SECTION
-				SETBIT(cpu_dsw, CPU_DSW_PROGRAM_STOP);
-				SETBIT(ILSW[5], ILSW_5_PROGRAM_STOP);
-				int_req |= INT_REQ_5;
+				SETBIT(con_dsw, CPU_DSW_PROGRAM_STOP);
+				SETBIT(ILSW[5], ILSW_5_INT_RUN_PROGRAM_STOP);
+				int_req   |= INT_REQ_5;		/* note: calc_ints() is not needed in this case */
+				int_lamps |= INT_REQ_5;
 				GUI_END_CRITICAL_SECTION
 			}
 			break;
 
 		case IDC_LOAD_IAR:
 			if (! running) {
-				IAR = CES & 0x3FFF;			/* set IAR from console entry switches */
+				IAR = CES & mem_mask;		/* set IAR from console entry switches */
 			}
 			break;
 
@@ -1214,12 +1219,13 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
 
 		case IDC_IMM_STOP:
 			if (running) {
-				reason = STOP_WAIT;			/* terminate execution without setting wait_mode */
-
-// this prevents message pump from running, which unfortunately locks up
-// the emulator thread when it calls gui_run(FALSE) which calls EnableWindow on the Run lamp
-//				while (running)
-//					Sleep(10);				/* wait for execution thread to exit */
+				reason = STOP_IMMEDIATE;	/* terminate execution without setting wait_mode */
+				/* wait for execution thread to exit */
+/* this prevents message pump from running, which unfortunately locks up
+ * the emulator thread when it calls gui_run(FALSE) which calls EnableWindow on the Run lamp
+ *				while (running)
+ *					Sleep(10);				
+ */
 			}
 			break;
 
@@ -1290,10 +1296,6 @@ LRESULT CALLBACK ConsoleWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 			SetRect(&rbmp, 0, 0, bmwid, bmht);
 			if (IntersectRect(&xsect, &clip, &rbmp))
 				BitBlt(hDC, xsect.left, xsect.top, xsect.right-xsect.left+1, xsect.bottom-xsect.top+1, hCDC, xsect.left, xsect.top, SRCCOPY);
-//			rbmp.top = rbmp.bottom;
-//			rbmp.bottom += 200;
-//			if (IntersectRect(&xsect, &clip, &rbmp))
-//				FillRect(hDC, &xsect, hbBlack);
 			return TRUE;			/* let Paint do this so we know what the update region is (ps.rcPaint) */
 
 		case WM_PAINT:
@@ -1318,11 +1320,15 @@ LRESULT CALLBACK ConsoleWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 		case WM_SETCURSOR:
 			GetCursorPos(&p);
 			ScreenToClient(hWnd, &p);
-			SetCursor(HandleClick(hWnd, p.x, p.y, FALSE) ? hcHand : hcArrow);
+			SetCursor(HandleClick(hWnd, p.x, p.y, FALSE, FALSE) ? hcHand : hcArrow);
 			return TRUE;
 
 		case WM_LBUTTONDOWN:
-			HandleClick(hWnd, LOWORD(lParam), HIWORD(lParam), TRUE);
+			HandleClick(hWnd, LOWORD(lParam), HIWORD(lParam), TRUE, FALSE);
+			break;
+
+		case WM_RBUTTONDOWN:
+			HandleClick(hWnd, LOWORD(lParam), HIWORD(lParam), TRUE, TRUE);
 			break;
 
 		case WM_CTLCOLORBTN:
@@ -1339,7 +1345,7 @@ LRESULT CALLBACK ConsoleWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 			break;
 
 		case WM_DROPFILES:
-			accept_dropped_file((HANDLE) wParam);		// console window - dragged file is a script or card deck
+			accept_dropped_file((HANDLE) wParam);		/* console window - dragged file is a script or card deck */
 			break;
 
 		default:
@@ -1368,7 +1374,7 @@ void forms_check (int set)
 		EnableWindow(btn[IDC_FORMS_CHECK].hBtn, printerstatus);
 
 		if (btn[IDC_FORMS_CHECK].clr != oldcolor)
-			InvalidateRect(btn[IDC_FORMS_CHECK].hBtn, NULL, TRUE);		// change color in any case
+			InvalidateRect(btn[IDC_FORMS_CHECK].hBtn, NULL, TRUE);		/* change color in any case */
 	}
 }
 
@@ -1389,7 +1395,7 @@ void print_check (int set)
 		EnableWindow(btn[IDC_FORMS_CHECK].hBtn, printerstatus);
 
 		if (btn[IDC_FORMS_CHECK].clr != oldcolor)
-			InvalidateRect(btn[IDC_FORMS_CHECK].hBtn, NULL, TRUE);		// change color in any case
+			InvalidateRect(btn[IDC_FORMS_CHECK].hBtn, NULL, TRUE);		/* change color in any case */
 	}
 }
 
@@ -1425,34 +1431,34 @@ static void accept_dropped_file (HANDLE hDrop)
 	POINT pt;
 	HWND hWndDrop;
 
-	nfiles = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);		// get file count,
-	DragQueryFile(hDrop, 0, fname, sizeof(fname));			// get first filename
-	DragQueryPoint(hDrop, &pt);								// get location of drop
+	nfiles = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);		/* get file count, */
+	DragQueryFile(hDrop, 0, fname, sizeof(fname));			/* get first filename */
+	DragQueryPoint(hDrop, &pt);								/* get location of drop */
 	DragFinish(hDrop);
 
-	if (nfiles <= 0)							// hmm, this seems unlikely to occur, but better check
+	if (nfiles <= 0)							/* hmm, this seems unlikely to occur, but better check */
 		return;
 
-	if (running) {								// can only accept a drop while processor is stopped
+	if (running) {								/* can only accept a drop while processor is stopped */
 		MessageBeep(0);
 		return;
 	}
 
 	if ((hWndDrop = ChildWindowFromPoint(hConsoleWnd, pt)) == btn[IDC_1442].hBtn)
-		cardreader = TRUE;									// file was dropped onto 1442 card reader
+		cardreader = TRUE;									/* file was dropped onto 1442 card reader */
 	else if (hWndDrop == NULL || hWndDrop == hConsoleWnd)
-		cardreader = FALSE;									// file was dropped onto console window, not a button
+		cardreader = FALSE;									/* file was dropped onto console window, not a button */
 	else {
-		MessageBeep(0);										// file was dropped onto another button
+		MessageBeep(0);										/* file was dropped onto another button */
 		return;
 	}
 
-	if (nfiles > 1) {							// oops, we wouldn't know what order to read them in
+	if (nfiles > 1) {							/* oops, we wouldn't know what order to read them in */
 		MessageBox(hConsoleWnd, "You may only drop one file at a time", "", MB_OK);
 		return;
 	}
 
-												// if shift key is down, prepend @ to name (make it a deck file)
+												/* if shift key is down, prepend @ to name (make it a deck file) */
 	deckfile = ((GetKeyState(VK_SHIFT) & 0x8000) && cardreader) ? "@" : "";
 
 	sprintf(cmd, "%s \"%s%s\"", cardreader ? "attach cr" : "do", deckfile, fname);
@@ -1466,22 +1472,18 @@ static void tear_printer (void)
 	if ((prt_unit.flags & UNIT_ATT) == 0)
 		return;
 
-	strcpy(filename, prt_unit.filename);				// save current attached filename
+	strcpy(filename, prt_unit.filename);				/* save current attached filename */
 
-	if (! stuff_and_wait("detach prt", 1000, 0))		// detach it
+	if (! stuff_and_wait("detach prt", 1000, 0))		/* detach it */
 		return;
 
-	sprintf(cmd, "view \"%s\"", filename);				// spawn notepad to view it
+	sprintf(cmd, "view \"%s\"", filename);				/* spawn notepad to view it */
 	if (! stuff_and_wait(cmd, 3000, 500))
 		return;
 
-// no, now we have them click the card reader icon twice to unload the deck. more flexible that way
-//	if (! stuff_and_wait("detach cr", 1000, 0))			// detach the card reader so they can edit the deck file
-//		return;
+	remove(filename);									/* delete the file */
 
-	remove(filename);									// delete the file
-
-	sprintf(cmd, "attach prt \"%s\"", filename);		// reattach
+	sprintf(cmd, "attach prt \"%s\"", filename);		/* reattach */
 	stuff_cmd(cmd);
 }
 
@@ -1582,24 +1584,25 @@ void stuff_cmd (char *cmd)
 	SetEvent(hCmdReadyEvent);								/* notify main thread a line is ready */
 }
 
-// my_yield - process GUI messages. It's not apparent why stuff_and_wait would block,
-// since it sleeps in the GUI thread while scp runs in the main thread. However,
-// at the end of every command scp calls update_gui, which can result in messages
-// being sent to the GUI thread. So, the GUI thread has to process messages while
-// stuff_and_wait is waiting.
-
+/* my_yield - process GUI messages. It's not apparent why stuff_and_wait would block,
+ * since it sleeps in the GUI thread while scp runs in the main thread. However,
+ * at the end of every command scp calls update_gui, which can result in messages
+ * being sent to the GUI thread. So, the GUI thread has to process messages while
+ * stuff_and_wait is waiting.
+ */
 static void my_yield (void)
 {
 	MSG msg;
-					// multitask
+					/* multitask */
     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
     }
 }
 
-// stuff_and_wait -- stuff a command and wait for the emulator to process the command
-// and come back to prompt for another
+/* stuff_and_wait -- stuff a command and wait for the emulator to process the command
+ * and come back to prompt for another
+ */
 
 t_bool stuff_and_wait (char *cmd, int timeout, int delay)
 {
@@ -1650,5 +1653,5 @@ void remark_cmd (char *remark)
 	}
 }
 
-#endif 		// _WIN32 defined
-#endif		// GUI_SUPPORT defined
+#endif 		/* _WIN32 defined */
+#endif		/* GUI_SUPPORT defined */

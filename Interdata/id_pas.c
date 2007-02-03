@@ -1,6 +1,6 @@
 /* id_pas.c: Interdata programmable async line adapter simulator
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    pas          Programmable asynchronous line adapter(s)
 
+   18-Oct-06    RMS     Synced PASLA to clock
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Jun-05    RMS     Added SET PASLn DISCONNECT
    21-Jun-05    RMS     Fixed bug in SHOW CONN/STATS
@@ -49,7 +50,6 @@
 #define UNIT_V_MDM      (TTUF_V_UF + 0)                 /* modem control */
 #define UNIT_MDM        (1 << UNIT_V_MDM)
 
-#define PAS_INIT_POLL   8000
 #define PASL_WAIT       500
 
 /* Status byte */
@@ -88,6 +88,7 @@
 #define CMD_TYP         0x01                            /* command type */
 
 extern uint32 int_req[INTSZ], int_enb[INTSZ];
+extern int32 lfc_poll;
 
 uint8 pas_sta[PAS_LINES];                               /* status */
 uint16 pas_cmd[PAS_LINES];                              /* command */
@@ -96,7 +97,6 @@ uint8 pas_xbuf[PAS_LINES];                              /* xmt buf */
 uint8 pas_rarm[PAS_LINES];                              /* rcvr int armed */
 uint8 pas_xarm[PAS_LINES];                              /* xmt int armed */
 uint8 pas_rchp[PAS_LINES];                              /* rcvr chr pend */
-uint32 pas_tps = 50;                                    /* polls/second */
 uint8 pas_tplte[PAS_LINES * 2 + 1];                     /* template */
 
 TMLN pas_ldsc[PAS_LINES] = { 0 };                       /* line descriptors */
@@ -126,7 +126,7 @@ void pas_reset_ln (int32 i);
 
 DIB pas_dib = { d_PAS, -1, v_PAS, pas_tplte, &pas, &pas_ini };
 
-UNIT pas_unit = { UDATA (&pasi_svc, UNIT_ATTABLE, 0), PAS_INIT_POLL };
+UNIT pas_unit = { UDATA (&pasi_svc, UNIT_ATTABLE, 0), 0 };
 
 REG pas_nlreg = { DRDATA (NLINES, PAS_ENAB, 6), PV_LEFT };
 
@@ -312,11 +312,10 @@ return 0;
 
 t_stat pasi_svc (UNIT *uptr)
 {
-int32 ln, c, out, t;
+int32 ln, c, out;
 
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;      /* attached? */
-t = sim_rtcn_calb (pas_tps, TMR_PAS);                   /* calibrate */
-sim_activate (uptr, t);                                 /* continue poll */
+sim_activate (uptr, lfc_poll);                          /* continue poll */
 ln = tmxr_poll_conn (&pas_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? */
     if ((pasl_unit[ln].flags & UNIT_MDM) &&             /* modem control */
@@ -448,7 +447,7 @@ return c & 0xFF;
 
 t_stat pas_reset (DEVICE *dptr)
 {
-int32 i, t;
+int32 i;
 
 if (dptr->flags & DEV_DIS) {                            /* disabled? */
     pas_dev.flags = pas_dev.flags | DEV_DIS;            /* disable lines */
@@ -458,12 +457,8 @@ else {
     pas_dev.flags = pas_dev.flags & ~DEV_DIS;           /* enable lines */
     pasl_dev.flags = pasl_dev.flags & ~DEV_DIS;
     }
-if (pas_unit.flags & UNIT_ATT) {                        /* master att? */
-    if (!sim_is_active (&pas_unit)) {
-        t = sim_rtcn_init (pas_unit.wait, TMR_PAS);
-        sim_activate (&pas_unit, t);                    /* activate */
-        }
-    }
+if (pas_unit.flags & UNIT_ATT)                          /* master att? */
+    sim_activate_abs (&pas_unit, lfc_poll);             /* cosched with clock */
 else sim_cancel (&pas_unit);                            /* else stop */
 for (i = 0; i < PAS_LINES; i++) pas_reset_ln (i);
 return SCPE_OK;
@@ -477,8 +472,7 @@ t_stat r;
 
 r = tmxr_attach (&pas_desc, uptr, cptr);                /* attach */
 if (r != SCPE_OK) return r;                             /* error */
-sim_rtcn_init (pas_unit.wait, TMR_PAS);
-sim_activate (uptr, 100);                               /* quick poll */
+sim_activate_abs (uptr, 100);                           /* quick poll */
 return SCPE_OK;
 }
 

@@ -1,4 +1,4 @@
-// DMS R2V12 SLET without RPG, for debugging only
+/* DMS R2V12 SLET without RPG, for debugging only */
 
 0x0001, 0x7c50, 0x032f, 0x0008,
 0x0002, 0x11de, 0x05a2, 0x000b,

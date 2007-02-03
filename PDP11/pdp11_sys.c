@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Dec-06    RMS     Added TA11 support
+   12-Nov-06    RMS     Fixed operand order in EIS instructions (found by W.F.J. Mueller)
    14-Jul-06    RMS     Reordered device list
    06-Jul-06    RMS     Added multiple KL11/DL11 support
    26-Jun-06    RMS     Added RF11 support
@@ -85,6 +87,7 @@ extern DEVICE tm_dev;
 extern DEVICE tq_dev;
 extern DEVICE ts_dev;
 extern DEVICE tu_dev;
+extern DEVICE ta_dev;
 extern DEVICE xq_dev, xqb_dev;
 extern DEVICE xu_dev, xub_dev;
 extern UNIT cpu_unit;
@@ -141,6 +144,7 @@ DEVICE *sim_devices[] = {
     &ts_dev,
     &tq_dev,
     &tu_dev,
+    &ta_dev,
     &xq_dev,
     &xqb_dev,
     &xu_dev,
@@ -311,7 +315,7 @@ return SCPE_OK;
 /* Warning: for literals, the class number MUST equal the field width!! */
 
 #define I_V_CL          18                              /* class bits */
-#define I_M_CL          017                             /* class mask */
+#define I_M_CL          037                             /* class mask */
 #define I_V_NPN         0                               /* no operands */
 #define I_V_REG         1                               /* reg */
 #define I_V_SOP         2                               /* operand */
@@ -328,6 +332,7 @@ return SCPE_OK;
 #define I_V_DOP         13                              /* double operand */
 #define I_V_CCC         14                              /* CC clear */
 #define I_V_CCS         15                              /* CC set */
+#define I_V_SOPR        16                              /* operand, reg */
 #define I_NPN           (I_V_NPN << I_V_CL)
 #define I_REG           (I_V_REG << I_V_CL)
 #define I_3B            (I_V_3B << I_V_CL)
@@ -344,12 +349,14 @@ return SCPE_OK;
 #define I_DOP           (I_V_DOP << I_V_CL)
 #define I_CCC           (I_V_CCC << I_V_CL)
 #define I_CCS           (I_V_CCS << I_V_CL)
+#define I_SOPR          (I_V_SOPR << I_V_CL)
 
 static const int32 masks[] = {
 0177777, 0177770, 0177700, 0177770,
 0177700+I_D, 0177400+I_D, 0177700, 0177400,
 0177400, 0177000, 0177000, 0177400,
-0177400+I_D+I_L, 0170000, 0177777, 0177777
+0177400+I_D+I_L, 0170000, 0177777, 0177777,
+0177000
 };
 
 static const char *opcode[] = {
@@ -443,7 +450,7 @@ static const int32 opc_val[] = {
 0007000+I_SOP,                0007200+I_SOP, 0007300+I_SOP,
 0010000+I_DOP, 0020000+I_DOP, 0030000+I_DOP, 0040000+I_DOP,
 0050000+I_DOP, 0060000+I_DOP,
-0070000+I_RSOP, 0071000+I_RSOP, 0072000+I_RSOP, 0073000+I_RSOP,
+0070000+I_SOPR, 0071000+I_SOPR, 0072000+I_SOPR, 0073000+I_SOPR,
 0074000+I_RSOP,
 0075000+I_REG, 0075010+I_REG, 0075020+I_REG, 0075030+I_REG,
 0076020+I_REG,
@@ -662,7 +669,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
         case I_V_BR:                                    /* cond branch */
             fprintf (of, "%s ", opcode[i]);
             brdisp = (l8b + l8b + ((l8b & 0200)? 0177002: 2)) & 0177777;
-        if (cflag) fprintf (of, "%-o", (addr + brdisp) & 0177777);
+            if (cflag) fprintf (of, "%-o", (addr + brdisp) & 0177777);
             else if (brdisp < 01000) fprintf (of, ".+%-o", brdisp);
             else fprintf (of, ".-%-o", 0200000 - brdisp);
             break;
@@ -682,6 +689,12 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
         case I_V_RSOP:                                  /* rsop */
             fprintf (of, "%s %s,", opcode[i], rname[srcr]);
             wd1 = fprint_spec (of, addr, dstm, val[1], cflag, TRUE);
+            break;
+
+        case I_V_SOPR:                                  /* sopr */
+            fprintf (of, "%s ", opcode[i]);
+            wd1 = fprint_spec (of, addr, dstm, val[1], cflag, TRUE);
+            fprintf (of, ",%s", rname[srcr]);
             break;
 
         case I_V_ASOP: case I_V_ASMD:                   /* asop, asmd */
@@ -987,11 +1000,21 @@ switch (j) {                                            /* case on class */
         cptr = get_glyph (cptr, gbuf, ',');             /* get glyph */
         if ((reg = get_reg (gbuf, rname, 0)) < 0) return SCPE_ARG;
         val[0] = val[0] | (reg << 6);                   /* fall through */
-    case I_V_SOP:                                               /* sop */
+    case I_V_SOP:                                       /* sop */
         cptr = get_glyph (cptr, gbuf, 0);               /* get glyph */
         if ((n1 = get_spec (gbuf, addr, 0, &spec, &val[1], cflag, TRUE)) > 0)
             return SCPE_ARG;
         val[0] = val[0] | spec;
+        break;
+
+    case I_V_SOPR:                                      /* dop, reg */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get glyph */
+        if ((n1 = get_spec (gbuf, addr, 0, &spec, &val[1], cflag, TRUE)) > 0)
+            return SCPE_ARG;
+        val[0] = val[0] | spec;
+        cptr = get_glyph (cptr, gbuf, 0);               /* get glyph */
+        if ((reg = get_reg (gbuf, rname, 0)) < 0) return SCPE_ARG;
+        val[0] = val[0] | (reg << 6);
         break;
 
     case I_V_AFOP: case I_V_ASOP: case I_V_ASMD:        /* fac, (s)fop */

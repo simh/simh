@@ -803,8 +803,8 @@ switch (fnc) {                                          /* case on function */
             break;
             }
         if ((GET_CY (dc) >= drv_tab[dtype].cyl) ||      /* bad cylinder */
-            (GET_SF (rpda[drv]) >= drv_tab[dtype].surf) ||      /* bad surface */
-            (GET_SC (rpda[drv]) >= drv_tab[dtype].sect)) {      /* or bad sector? */
+            (GET_SF (rpda[drv]) >= drv_tab[dtype].surf) || /* bad surface */
+            (GET_SC (rpda[drv]) >= drv_tab[dtype].sect)) { /* or bad sector? */
             set_rper (ER1_IAE, drv);
             break;
             }
@@ -827,8 +827,8 @@ switch (fnc) {                                          /* case on function */
         rpcs2 = rpcs2 & ~CS2_ERR;                       /* clear errors */
         rpcs1 = rpcs1 & ~(CS1_TRE | CS1_MCPE | CS1_DONE);
         if ((GET_CY (dc) >= drv_tab[dtype].cyl) ||      /* bad cylinder */
-            (GET_SF (rpda[drv]) >= drv_tab[dtype].surf) ||      /* bad surface */
-            (GET_SC (rpda[drv]) >= drv_tab[dtype].sect)) {      /* or bad sector? */
+            (GET_SF (rpda[drv]) >= drv_tab[dtype].surf) || /* bad surface */
+            (GET_SC (rpda[drv]) >= drv_tab[dtype].sect)) { /* or bad sector? */
             set_rper (ER1_IAE, drv);
             break;
             }
@@ -909,7 +909,7 @@ switch (uptr->FUNC) {                                   /* case on function */
     case FNC_READH:                                     /* read headers */
         ba = GET_UAE (rpcs1) | rpba;                    /* get byte addr */
         wc10 = (0200000 - rpwc) >> 1;                   /* get PDP-10 wc */
-        da = GET_DA (rpdc[drv], rpda[drv], dtype) * RP_NUMWD;   /* get disk addr */
+        da = GET_DA (rpdc[drv], rpda[drv], dtype) * RP_NUMWD; /* get disk addr */
         if ((da + wc10) > drv_tab[dtype].size) {        /* disk overrun? */
             set_rper (ER1_AOE, drv);
             if (wc10 > (drv_tab[dtype].size - da))
@@ -1256,7 +1256,7 @@ extern a10 saved_PC;
 
 M[FE_UNIT] = unitno & CS2_M_UNIT;
 for (i = 0; i < BOOT_LEN; i++)
-    M[BOOT_START + i] = ITS? boot_rom_its[i]: boot_rom_dec[i];
+    M[BOOT_START + i] = Q_ITS? boot_rom_its[i]: boot_rom_dec[i];
 saved_PC = BOOT_START;
 return SCPE_OK;
 }

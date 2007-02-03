@@ -1,6 +1,6 @@
 /* pdp10_fe.c: PDP-10 front end (console terminal) simulator
 
-   Copyright (c) 1993-2004, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fe           KS10 console front end
 
+   17-Oct-06    RMS     Synced keyboard to clock for idling
    28-May-04    RMS     Removed SET FE CTRL-C
    29-Dec-03    RMS     Added console backpressure support
    25-Apr-03    RMS     Revised for extended file support
@@ -40,6 +41,7 @@
 
 extern d10 *M;
 extern int32 apr_flg;
+extern int32 tmxr_poll;
 t_stat fei_svc (UNIT *uptr);
 t_stat feo_svc (UNIT *uptr);
 t_stat fe_reset (DEVICE *dptr);
@@ -56,14 +58,14 @@ t_stat fe_stop_os (UNIT *uptr, int32 val, char *cptr, void *desc);
 #define feo_unit        fe_unit[1]
 
 UNIT fe_unit[] = {
-    { UDATA (&fei_svc, 0, 0), KBD_POLL_WAIT },
+    { UDATA (&fei_svc, 0, 0), 0 },
     { UDATA (&feo_svc, 0, 0), SERIAL_OUT_WAIT }
     };
 
 REG fe_reg[] = {
     { ORDATA (IBUF, fei_unit.buf, 8) },
     { DRDATA (ICOUNT, fei_unit.pos, T_ADDR_W), REG_RO + PV_LEFT },
-    { DRDATA (ITIME, fei_unit.wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (ITIME, fei_unit.wait, 24), PV_LEFT },
     { ORDATA (OBUF, feo_unit.buf, 8) },
     { DRDATA (OCOUNT, feo_unit.pos, T_ADDR_W), REG_RO + PV_LEFT },
     { DRDATA (OTIME, feo_unit.wait, 24), REG_NZ + PV_LEFT },
@@ -139,12 +141,12 @@ t_stat fei_svc (UNIT *uptr)
 {
 int32 temp;
 
-sim_activate (&fei_unit, fei_unit.wait);                /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, tmxr_poll));  /* continue poll */
 if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp; /* no char or error? */
 if (temp & SCPE_BREAK) return SCPE_OK;                  /* ignore break */
-fei_unit.buf = temp & 0177;
-fei_unit.pos = fei_unit.pos + 1;
-M[FE_CTYIN] = fei_unit.buf | FE_CVALID;                 /* put char in mem */
+uptr->buf = temp & 0177;
+uptr->pos = uptr->pos + 1;
+M[FE_CTYIN] = uptr->buf | FE_CVALID;                    /* put char in mem */
 apr_flg = apr_flg | APRF_CON;                           /* interrupt KS10 */
 return SCPE_OK;
 }
@@ -156,7 +158,7 @@ t_stat fe_reset (DEVICE *dptr)
 fei_unit.buf = feo_unit.buf = 0;
 M[FE_CTYIN] = M[FE_CTYOUT] = 0;
 apr_flg = apr_flg & ~(APRF_ITC | APRF_CON);
-sim_activate (&fei_unit, fei_unit.wait);                /* start input poll */
+sim_activate_abs (&fei_unit, KBD_WAIT (fei_unit.wait, tmxr_poll));
 return SCPE_OK;
 }
 

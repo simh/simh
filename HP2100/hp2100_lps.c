@@ -1,6 +1,6 @@
-/* hp2100_lps.c: HP 2100 12653A line printer simulator
+/* hp2100_lps.c: HP 2100 12653A/2767 line printer simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,8 +24,10 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    lps          12653A 2767 line printer
-                (based on 12566B microcircuit interface)
+                12566B microcircuit interface with loopback diagnostic connector
 
+   11-Jan-07    JDB     CLC cancels I/O event if DIAG (jumper W9 in "A" pos)
+                        Added ioCRS state to I/O decoders
    19-Nov-04    JDB     Added restart when set online, etc.
                         Fixed col count for non-printing chars
    01-Oct-04    JDB     Added SET OFFLINE/ONLINE, POWEROFF/POWERON
@@ -47,6 +49,18 @@
                         Added command flop
    15-Oct-00    RMS     Added variable device number support
 
+   This module simulates two different devices.  In "diagnostic mode," it
+   simulates a 12566B microcircuit interface card with a loopback connector and
+   the jumpers set as required for execution of the General Purpose Register
+   diagnostic.  In non-diagnostic mode, it simulates a 12653A line printer
+   interface card and a 2767 line printer.
+
+   The 12566B interface with the loopback connector ties the device command
+   output to the device flag input.  Setting control therefore causes device
+   flag to set almost immediately.  Device command is active only during that
+   interim.  Under simulation, the loopback occurs within the STC handler, and
+   CMD is never set.
+
    The 2767 impact printer has a rotating drum with 80 columns of 64 raised
    characters.  ASCII codes 32 through 95 (SPACE through "_") form the print
    repertoire.  The printer responds to the control characters FF, LF, and CR.
@@ -64,7 +78,7 @@
             the buffer memory.
     * LF -- same as CR, plus advances the paper one line.
     * FF -- same as CR, plus advances the paper to the top of the next form.
-   
+
    The 2767 provides two status bits via the interface:
 
      bit 15 -- printer not ready
@@ -103,6 +117,7 @@
 */
 
 #include "hp2100_defs.h"
+#include "hp2100_cpu.h"
 
 #define LPS_ZONECNT     20                              /* zone char count */
 #define LPS_PAGECNT     80                              /* page char count */
@@ -148,6 +163,13 @@ uint32 lps_power = LPS_ON;                              /* power state */
   NOTE: the printer acknowledges before the print motion has stopped to allow
         for continuous slew, so the set times are a bit less than the calculated
         operation time from the manual.
+
+  NOTE: the 2767 diagnostic checks completion times, so the realistic timing
+  must be used.  Because simulator timing is in instructions, and because the
+  diagnostic uses the TIMER instruction (~1580 executions per millisecond) when
+  running on a 1000-E/F but a software timing loop (~400-600 executions per
+  millisecond) when running on anything else, realistic timings are decreased by
+  three-fourths when not executing on an E/F.
 */
 
 int32 lps_ctime = 0;                                    /* char xfer time */
@@ -280,16 +302,28 @@ switch (inst) {                                         /* case on opcode */
             fprintf (sim_deb, ">>LPS LIx: Status %06o returned\n", dat);
         break;
 
+    case ioCRS:                                         /* control reset */
+        clrCTL (dev);                                   /* clear control */
+        clrCMD (dev);                                   /* clear command */
+        sim_cancel (&lps_unit);                         /* deactivate unit */
+        break;
+
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
-            clrCMD (dev);                               /* clear ctl, cmd */
-            clrCTL (dev);
+            clrCTL (dev);                               /* clear control */
+            if (lps_unit.flags & UNIT_DIAG) {           /* diagnostic mode? */
+                clrCMD (dev);                           /* clear command (jumper W9-A) */
+                if (IR & I_HC)                          /* clear flag too? */
+                    sim_cancel (&lps_unit);             /* prevent FLG/SRQ */
+                }
             }
         else {                                          /* STC */
-            setCMD (dev);                               /* set ctl, cmd */
-            setCTL (dev);
-            if (lps_unit.flags & UNIT_DIAG)             /* diagnostic? */
-                sim_activate (&lps_unit, 1);            /* loop back */
+            setCTL (dev);                               /* set ctl */
+            setCMD (dev);                               /* set cmd */
+            if (lps_unit.flags & UNIT_DIAG) {           /* diagnostic? */
+                lps_sta = lps_unit.buf;                 /* loop back data */
+                sim_activate (&lps_unit, 2);            /* schedule flag */
+                }
             else {                                      /* real lpt, sched */
                 if (DEBUG_PRS (lps_dev)) fprintf (sim_deb,
                     ">>LPS STC: Character %06o scheduled for line %d, column %d, ",
@@ -349,7 +383,6 @@ if (lps_power == LPS_TURNING_ON) {                      /* printer warmed up? */
     }
 dev = lps_dib.devno;                                    /* get dev no */
 if (uptr->flags & UNIT_DIAG) {                          /* diagnostic? */
-    lps_sta = uptr->buf;                                /* loop back */
     clrCMD (dev);                                       /* clear cmd */
     setFSR (dev);                                       /* set flag, fbf */
     return SCPE_OK;                                     /* done */
@@ -465,15 +498,22 @@ lps_restart (uptr, 0, NULL, NULL);                      /* restart I/O if hung *
 return attach_unit (uptr, cptr);
 }
 
-/* Set printer timing */
+/* Set printer timing
+
+   Realistic timing is factored, depending on CPU model, to account for the
+   timing method employed by the diagnostic. */
 
 t_stat lps_set_timing (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-int32 i;
+uint32 i, factor = 1;
 
 lps_timing = (val != 0);                                /* determine choice */
+if ((lps_timing == 0) &&                                /* calc speed factor */
+    (UNIT_CPU_MODEL != UNIT_1000_E) &&
+    (UNIT_CPU_MODEL != UNIT_1000_F))
+    factor = 4;
 for (i = 0; i < (sizeof (lps_timers) / sizeof (lps_timers[0])); i++)
-    *lps_timers[i] = lps_times[lps_timing][i];          /* assign times */
+    *lps_timers[i] = lps_times[lps_timing][i] / factor; /* assign times */
 return SCPE_OK;
 }
 

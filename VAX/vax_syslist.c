@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Oct-06    RMS     Re-ordered device list
    17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
    01-Oct-2004  RMS     Cloned from vax_sys.c
 */
@@ -63,11 +64,11 @@ DEVICE *sim_devices[] = {
     &nvr_dev,
     &sysd_dev,
     &qba_dev,
+    &clk_dev,
     &tti_dev,
     &tto_dev,
     &csi_dev,
     &cso_dev,
-    &clk_dev,
     &dz_dev,
     &vh_dev,
     &cr_dev,

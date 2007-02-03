@@ -25,6 +25,8 @@
 
    cpu          PDP-11 CPU
 
+   27-Oct-06    RMS     Added idle support
+   18-Oct-06    RMS     Fixed bug in ASH -32 C value
    24-May-06    RMS     Added instruction history
    03-May-06    RMS     Fixed XOR operand fetch order for 11/70-style systems
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
@@ -220,8 +222,8 @@
 #define calc_is(md)     ((md) << VA_V_MODE)
 #define calc_ds(md)     (calc_is((md)) | ((MMR3 & dsmask[(md)])? VA_DS: 0))
 #define calc_MMR1(val)  ((MMR1)? (((val) << 8) | MMR1): (val))
-#define GET_SIGN_W(v)   ((v) >> 15)
-#define GET_SIGN_B(v)   ((v) >> 7)
+#define GET_SIGN_W(v)   (((v) >> 15) & 1)
+#define GET_SIGN_B(v)   (((v) >> 7) & 1)
 #define GET_Z(v)        ((v) == 0)
 #define JMP_PC(x)       PCQ_ENTRY; PC = (x)
 #define BRANCH_F(x)     PCQ_ENTRY; PC = (PC + (((x) + (x)) & 0377)) & 0177777
@@ -300,6 +302,7 @@ extern UNIT clk_unit, pclk_unit;
 extern int32 sim_int_char;
 extern uint32 sim_switches;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern t_bool sim_idle_enab;
 extern DEVICE *sim_devices[];
 extern CPUTAB cpu_tab[];
 
@@ -376,7 +379,7 @@ int32 trap_clear[TRAP_V_MAX] = {                        /* trap clears */
    cpu_mod      CPU modifier list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, INIMEMSIZE) };
+UNIT cpu_unit = { UDATA (NULL, UNIT_FIX|UNIT_BINK, INIMEMSIZE) };
 
 REG cpu_reg[] = {
     { ORDATA (PC, saved_PC, 16) },
@@ -533,7 +536,7 @@ REG cpu_reg[] = {
     { BRDATA (IREQ, int_req, 8, 32, IPL_HLVL), REG_RO },
     { ORDATA (TRAPS, trap_req, TRAP_V_MAX) },
     { FLDATA (WAIT, wait_state, 0) },
-    { FLDATA (WAIT_ENABLE, wait_enable, 0) },
+    { FLDATA (WAIT_ENABLE, wait_enable, 0), REG_HIDDEN },
     { ORDATA (STOP_TRAPS, stop_trap, TRAP_V_MAX) },
     { FLDATA (STOP_VECA, stop_vecabort, 0) },
     { FLDATA (STOP_SPA, stop_spabort, 0) },
@@ -583,6 +586,8 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, OPT_CIS, NULL, "NOCIS", &cpu_clr_opt },
     { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "MMU", &cpu_set_opt },
     { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "NOMMU", &cpu_clr_opt },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
     { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size},
     { UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size},
     { UNIT_MSIZE, 49152, NULL, "48K", &cpu_set_size},
@@ -786,8 +791,11 @@ while (reason == 0)  {
 
     if (tbit) setTRAP (TRAP_TRC);
     if (wait_state) {                                   /* wait state? */
-        if (sim_qcount () != 0) sim_interval = 0;       /* force check */
-        else reason = STOP_WAIT;
+        if (sim_idle_enab)                              /* idle enabled? */
+            sim_idle (TMR_CLK, TRUE);
+        else if (wait_enable)                           /* old style idle? */
+            sim_interval = 0;                           /* force check */
+        else sim_interval = sim_interval - 1;           /* count cycle */
         continue;
         }
 
@@ -846,7 +854,7 @@ while (reason == 0)  {
                 else setTRAP (TRAP_ILL);                /* no, ill inst */
                 break;
             case 1:                                     /* WAIT */
-                if (wait_enable) wait_state = 1;
+                wait_state = 1;
                 break;
             case 3:                                     /* BPT */
                 setTRAP (TRAP_BPT);
@@ -1374,7 +1382,7 @@ while (reason == 0)  {
         else PWriteW (dst, last_pa);
         break;
 
-/* Opcode 07: EIS, FIS (not implemented), CIS
+/* Opcode 07: EIS, FIS, CIS
 
    Notes:
    - The code assumes that the host int length is at least 32 bits.
@@ -1471,7 +1479,8 @@ while (reason == 0)  {
                 }
             else if (src2 == 32) {                      /* [32] = -32 */
                 dst = -sign;
-                V = C = 0;
+                V = 0;
+                C = sign;
                 }
             else {                                      /* [33,63] = -31,-1 */
                 dst = (src >> (64 - src2)) | (-sign << (src2 - 32));
@@ -1505,7 +1514,7 @@ while (reason == 0)  {
             else if (src2 == 32) {                      /* [32] = -32 */
                 dst = -sign;
                 V = 0;
-                C = (src >> 31) & 1;
+                C = sign;
                 }
             else {                                      /* [33,63] = -31,-1 */
                 dst = (src >> (64 - src2)) | (-sign << (src2 - 32));
@@ -2136,7 +2145,7 @@ if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
     }
 pa = relocR (va);                                       /* relocate */
 if (ADDR_IS_MEM (pa)) return (M[pa >> 1]);              /* memory address? */
-if ((pa < IOPAGEBASE) ||                                /* I/O address */
+if ((pa < IOPAGEBASE) ||                                /* not I/O address */
     (CPUT (CPUT_J) && (pa >= IOBA_CPU))) {              /* or J11 int reg? */
         setCPUERR (CPUE_NXM);
         ABORT (TRAP_NXM);
@@ -2158,7 +2167,7 @@ if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
     }
 pa = relocR (va);                                       /* relocate */
 if (ADDR_IS_MEM (pa)) return (M[pa >> 1]);              /* memory address? */
-if (pa < IOPAGEBASE) {                                  /* I/O address? */
+if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
     }
@@ -2175,7 +2184,7 @@ int32 pa, data;
 
 pa = relocR (va);                                       /* relocate */
 if (ADDR_IS_MEM (pa)) return (va & 1? M[pa >> 1] >> 8: M[pa >> 1]) & 0377;
-if (pa < IOPAGEBASE) {                                  /* I/O address? */
+if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
     }
@@ -2196,7 +2205,7 @@ if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
     }
 last_pa = relocW (va);                                  /* reloc, wrt chk */
 if (ADDR_IS_MEM (last_pa)) return (M[last_pa >> 1]);    /* memory address? */
-if (last_pa < IOPAGEBASE) {                             /* I/O address? */
+if (last_pa < IOPAGEBASE) {                             /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
     }
@@ -2214,7 +2223,7 @@ int32 data;
 last_pa = relocW (va);                                  /* reloc, wrt chk */
 if (ADDR_IS_MEM (last_pa))
     return (va & 1? M[last_pa >> 1] >> 8: M[last_pa >> 1]) & 0377;
-if (last_pa < IOPAGEBASE) {                             /* I/O address? */
+if (last_pa < IOPAGEBASE) {                             /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
     }
@@ -2247,7 +2256,7 @@ if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
     M[pa >> 1] = data;
     return;
     }
-if (pa < IOPAGEBASE) {                                  /* I/O address? */
+if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
     }
@@ -2268,7 +2277,7 @@ if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
     else M[pa >> 1] = (M[pa >> 1] & ~0377) | data;
     return;
     }             
-if (pa < IOPAGEBASE) {                                  /* I/O address? */
+if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
     }
@@ -2285,7 +2294,7 @@ if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
     M[pa >> 1] = data;
     return;
     }
-if (pa < IOPAGEBASE) {                                  /* I/O address? */
+if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
     }
@@ -2303,7 +2312,7 @@ if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
     else M[pa >> 1] = (M[pa >> 1] & ~0377) | data;
     return;
     }             
-if (pa < IOPAGEBASE) {                                  /* I/O address? */
+if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
     }
@@ -2574,8 +2583,8 @@ switch ((pa >> 1) & 3) {                                /* decode pa<2:1> */
     case 3:                                             /* MMR2 */
         *data = MMR2;
         break;
-        }
-                                               /* end switch pa */
+        }                                               /* end switch pa */
+
 return SCPE_OK;
 }
 

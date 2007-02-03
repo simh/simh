@@ -1,6 +1,6 @@
-/* hp2100_fp1.h: HP 2100/21MX extended-precision floating point definitions
+/* hp2100_fp1.h: HP 2100/1000 multiple-precision floating point definitions
 
-   Copyright (c) 2005, J. David Bryan
+   Copyright (c) 2005-2006, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -15,38 +15,39 @@
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of the author shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from the author.
+   Except as contained in this notice, the name of the author shall not be used
+   in advertising or otherwise to promote the sale, use or other dealings in
+   this Software without prior written authorization from the author.
+
+   16-Oct-06    JDB     Generalized FP calling sequences for F-Series
+   12-Oct-06    JDB     Altered x_trun for F-Series FFP compatibility
 */
 
 #ifndef _HP2100_FP1_H_
 #define _HP2100_FP1_H_  0
 
-/* HP memory representation of an extended-precision number */
 
-typedef struct {
-    uint32      high;
-    uint32      low;
-    } XPN;
+/* Special operands. */
+
+#define ACCUM   NULL                                    /* result not returned */
+static const OP NOP = { { 0, 0, 0, 0, 0 } };            /* unneeded operand */
 
 
-#define AS_XPN(x) (*(XPN *) &(x))                       /* view as XPN */
+/* Generalized floating-point handlers. */
 
-XPN ReadX (uint32 va);
-void WriteX (uint32 va, XPN packed);
-
-uint32 x_add (XPN *sum, XPN augend, XPN addend);
-uint32 x_sub (XPN *difference, XPN minuend, XPN subtrahend);
-uint32 x_mpy (XPN *product, XPN multiplicand, XPN multiplier);
-uint32 x_div (XPN *quotient, XPN dividend, XPN divisor);
-uint32 x_pak (XPN *result, XPN mantissa, int32 exponent);
-uint32 x_com (XPN *mantissa);
-uint32 x_dcm (XPN *packed);
-void x_trun (XPN *result, XPN source);
+void   fp_prec   (uint16 opcode, OPSIZE *operand_l, OPSIZE *operand_r, OPSIZE *result);
+uint32 fp_exec   (uint16 opcode, OP *result, OP operand_l, OP operand_r);
+OP     fp_accum  (const OP *operand, OPSIZE precision);
+uint32 fp_pack   (OP *result, OP mantissa, int32 exponent, OPSIZE precision);
+uint32 fp_nrpack (OP *result, OP mantissa, int32 exponent, OPSIZE precision);
+uint32 fp_unpack (OP *mantissa, int32 *exponent, OP packed, OPSIZE precision);
+uint32 fp_ucom   (OP *mantissa, OPSIZE precision);
+uint32 fp_pcom   (OP *packed, OPSIZE precision);
+uint32 fp_trun   (OP *result, OP source, OPSIZE precision);
+uint32 fp_cvt    (OP *result, OPSIZE source_precision, OPSIZE dest_precision);
 
 #endif

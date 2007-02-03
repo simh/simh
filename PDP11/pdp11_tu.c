@@ -653,7 +653,7 @@ switch (fnc) {                                          /* case on function */
         else tutc = tutc & ~TC_FCS;
         break;
 
-    case FNC_WREOF:                                             /* write end of file */
+    case FNC_WREOF:                                     /* write end of file */
         if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
             r = tu_map_err (drv, st, 0);                /* map error */
         break;

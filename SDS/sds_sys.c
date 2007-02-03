@@ -158,7 +158,7 @@ extern int32 lpt_ccl, lpt_ccp, lpt_cct[CCT_LNT];
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
 ptr = 0;
-for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) {   /* until eof */
+for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) { /* until eof */
     mask = 0;
     if (*cptr == '(') {                                 /* repeat count? */
         cptr = get_glyph (cptr + 1, gbuf, ')');         /* get 1st field */

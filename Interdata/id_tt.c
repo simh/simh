@@ -1,6 +1,6 @@
 /* id_tt.c: Interdata teletype
 
-   Copyright (c) 2000-2005, Robert M. Supnik
+   Copyright (c) 2000-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    tt           console
 
+   18-Oct-06    RMS     Sync keyboard to LFC clock
+   30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Dec-03    RMS     Added support for console backpressure
    25-Apr-03    RMS     Revised for extended file support
@@ -49,6 +51,7 @@
 #define CMD_V_RD        2                               /* read/write */
 
 extern uint32 int_req[INTSZ], int_enb[INTSZ];
+extern int32 lfc_poll;
 
 uint32 tt_sta = STA_BSY;                                /* status */
 uint32 tt_fdpx = 1;                                     /* tt mode */
@@ -74,7 +77,7 @@ t_stat tt_set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc);
 DIB tt_dib = { d_TT, -1, v_TT, NULL, &tt, NULL };
 
 UNIT tt_unit[] = {
-    { UDATA (&tti_svc, TT_MODE_KSR, 0), KBD_POLL_WAIT },
+    { UDATA (&tti_svc, TT_MODE_KSR, 0), 0 },
     { UDATA (&tto_svc, TT_MODE_KSR, 0), SERIAL_OUT_WAIT }
     };
 
@@ -82,7 +85,7 @@ REG tt_reg[] = {
     { HRDATA (STA, tt_sta, 8) },
     { HRDATA (KBUF, tt_unit[TTI].buf, 8) },
     { DRDATA (KPOS, tt_unit[TTI].pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (KTIME, tt_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (KTIME, tt_unit[TTI].wait, 24), PV_LEFT },
     { HRDATA (TBUF, tt_unit[TTO].buf, 8) },
     { DRDATA (TPOS, tt_unit[TTO].pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TTIME, tt_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
@@ -175,7 +178,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 out, temp;
 
-sim_activate (uptr, uptr->wait);                        /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, lfc_poll));   /* continue poll */
 tt_sta = tt_sta & ~STA_BRK;                             /* clear break */
 if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp; /* no char or error? */
 if (tt_rd) {                                            /* read mode? */
@@ -192,7 +195,7 @@ if (temp & SCPE_BREAK) {                                /* break? */
 else uptr->buf = sim_tt_inpcvt (temp, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 uptr->pos = uptr->pos + 1;                              /* incr count */
 if (!tt_fdpx) {                                         /* half duplex? */
-    out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags));
+    out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags) | TTUF_KSR);
     if (out >= 0) {                                     /* valid echo? */
         sim_putchar (out);                              /* write char */
         tt_unit[TTO].pos = tt_unit[TTO].pos + 1;
@@ -206,7 +209,7 @@ t_stat tto_svc (UNIT *uptr)
 int32 ch;
 t_stat r;
 
-ch = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags));
+ch = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 if (ch >= 0) {
     if ((r = sim_putchar_s (ch)) != SCPE_OK) {          /* output; error? */
         sim_activate (uptr, uptr->wait);                /* try again */
@@ -226,7 +229,7 @@ return SCPE_OK;
 t_stat tt_reset (DEVICE *dptr)
 {
 if (dptr->flags & DEV_DIS) sim_cancel (&tt_unit[TTI]);  /* dis? cancel poll */
-else sim_activate (&tt_unit[TTI], tt_unit[TTI].wait);   /* activate input */
+else sim_activate_abs (&tt_unit[TTI], KBD_WAIT (tt_unit[TTI].wait, lfc_poll));
 sim_cancel (&tt_unit[TTO]);                             /* cancel output */
 tt_rd = tt_fdpx = 1;                                    /* read, full duplex */
 tt_chp = 0;                                             /* no char */

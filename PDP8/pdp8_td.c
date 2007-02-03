@@ -681,7 +681,7 @@ return SCPE_OK;
 
 /* Bootstrap routine - OS/8 only 
 
-   1) Read reverse until reverse end zone (mark track is complement obverse
+   1) Read reverse until reverse end zone (mark track is complement obverse)
    2) Read forward until mark track code 031.  This is a composite code from
       the last 4b of the forward block number and the first two bits of the
       reverse guard (01 -0110 01- 1010).  There are 16 lines before the first

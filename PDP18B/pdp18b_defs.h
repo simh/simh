@@ -1,6 +1,6 @@
 /* pdp18b_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Oct-06    RMS     Added infinite loop stop
    14-Jan-04    RMS     Revised IO device call interface
    18-Oct-03    RMS     Added DECtape off reel message
    18-Jul-03    RMS     Added FP15 support
@@ -113,6 +114,7 @@
 #define STOP_MME        7                               /* mem mgt error */
 #define STOP_FPDIS      8                               /* fp inst, fpp disabled */
 #define STOP_DTOFF      9                               /* DECtape off reel */
+#define STOP_LOOP       10                              /* infinite loop */
 
 /* Peripheral configuration */
 

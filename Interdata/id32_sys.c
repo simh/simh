@@ -1,6 +1,6 @@
 /* id32_sys.c: Interdata 32b simulator interface
 
-   Copyright (c) 2000-2005, Robert M. Supnik
+   Copyright (c) 2000-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Jan-07    RMS     Fixed conflict between -h (hex) and -h (halfword)
+   18-Oct-06    RMS     Re-ordered device list
    02-Jul-04    RMS     Fixed missing type in declaration
    15-Jul-03    RMS     Fixed signed/unsigned bug in get_imm
    27-Feb-03    RMS     Added relative addressing support
@@ -72,13 +74,13 @@ int32 sim_emax = 6;
 DEVICE *sim_devices[] = {
     &cpu_dev,
     &sch_dev,
+    &pic_dev,
+    &lfc_dev,
     &pt_dev,
     &tt_dev,
     &ttp_dev,
     &pas_dev,
     &pasl_dev,
-    &pic_dev,
-    &lfc_dev,
     &lpt_dev,
     &dp_dev,
     &idc_dev,
@@ -365,7 +367,7 @@ if (sw & SWMASK ('C')) {                                /* string? */
     fprintf (of, (c2 < 0x20)? "<%02X>": "%c", c2);
     return -1;
     }
-if (sw & SWMASK ('H')) {                                /* halfword? */
+if (sw & SWMASK ('W')) {                                /* halfword? */
     fprint_val (of, val[0], rdx, 16, PV_RZRO);
     return -1;
     }
@@ -584,7 +586,7 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* ASCII chars? */
     val[0] = ((t_value) cptr[0] << 8) | (t_value) cptr[1];
     return -1;
     }
-if (sw & SWMASK ('H')) {                                /* halfword? */
+if (sw & SWMASK ('W')) {                                /* halfword? */
     val[0] = (int32) get_uint (cptr, rdx, DMASK16, &r); /* get number */
     if (r != SCPE_OK) return r;
     return -1;
@@ -680,7 +682,7 @@ switch (j) {                                            /* case on class */
         val[2] = t & DMASK16;
         return -5;
 
-    case I_V_RI:                                                /* 16b immediate */
+    case I_V_RI:                                        /* 16b immediate */
         r = get_imm (gbuf, &t, &inst, DMASK16);         /* process imm */
         if (r != SCPE_OK) return r;
         val[0] = inst;

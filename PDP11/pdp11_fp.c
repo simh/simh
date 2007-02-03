@@ -145,47 +145,55 @@
 
 /* Double precision operations on 64b quantities */
 
-#define F_LOAD(qd,ac,ds) ds.h = ac.h; ds.l = (qd)? ac.l: 0
-#define F_LOAD_P(qd,ac,ds) ds->h = ac.h; ds->l = (qd)? ac.l: 0
-#define F_LOAD_FRAC(qd,ac,ds) ds.h = (ac.h & FP_FRACH) | FP_HB; \
-    ds.l = (qd)? ac.l: 0
-#define F_STORE(qd,sr,ac) ac.h = sr.h; if ((qd)) ac.l = sr.l
-#define F_STORE_P(qd,sr,ac) ac.h = sr->h; if ((qd)) ac.l = sr->l
-#define F_GET_FRAC_P(sr,ds) ds.l = sr->l; \
-    ds.h = (sr->h & FP_FRACH) | FP_HB
-#define F_ADD(s2,s1,ds) ds.l = (s1.l + s2.l) & 0xFFFFFFFF; \
-    ds.h = (s1.h + s2.h + (ds.l < s2.l)) & 0xFFFFFFFF
-#define F_SUB(s2,s1,ds) ds.h = (s1.h - s2.h - (s1.l < s2.l)) & 0xFFFFFFFF; \
-    ds.l = (s1.l - s2.l) & 0xFFFFFFFF
-#define F_LT(x,y) ((x.h < y.h) || ((x.h == y.h) && (x.l < y.l)))
-#define F_LT_AP(x,y) (((x->h & ~FP_SIGN) < (y->h & ~FP_SIGN)) || \
-    (((x->h & ~FP_SIGN) == (y->h & ~FP_SIGN)) && (x->l < y->l)))
+#define F_LOAD(qd,ac,ds) \
+                        ds.h = ac.h; ds.l = (qd)? ac.l: 0
+#define F_LOAD_P(qd,ac,ds) \
+                        ds->h = ac.h; ds->l = (qd)? ac.l: 0
+#define F_LOAD_FRAC(qd,ac,ds) \
+                        ds.h = (ac.h & FP_FRACH) | FP_HB; \
+                        ds.l = (qd)? ac.l: 0
+#define F_STORE(qd,sr,ac) \
+                        ac.h = sr.h; if ((qd)) ac.l = sr.l
+#define F_STORE_P(qd,sr,ac) \
+                        ac.h = sr->h; if ((qd)) ac.l = sr->l
+#define F_GET_FRAC_P(sr,ds) \
+                        ds.l = sr->l; \
+                        ds.h = (sr->h & FP_FRACH) | FP_HB
+#define F_ADD(s2,s1,ds) \
+                        ds.l = (s1.l + s2.l) & 0xFFFFFFFF; \
+                        ds.h = (s1.h + s2.h + (ds.l < s2.l)) & 0xFFFFFFFF
+#define F_SUB(s2,s1,ds) \
+                        ds.h = (s1.h - s2.h - (s1.l < s2.l)) & 0xFFFFFFFF; \
+                        ds.l = (s1.l - s2.l) & 0xFFFFFFFF
+#define F_LT(x,y)       ((x.h < y.h) || ((x.h == y.h) && (x.l < y.l)))
+#define F_LT_AP(x,y)    (((x->h & ~FP_SIGN) < (y->h & ~FP_SIGN)) || \
+                        (((x->h & ~FP_SIGN) == (y->h & ~FP_SIGN)) && (x->l < y->l)))
 #define F_LSH_V(sr,n,ds) \
-    ds.h = (((n) >= 32)? (sr.l << ((n) - 32)): \
-            (sr.h << (n)) | ((sr.l >> (32 - (n))) & and_mask[n])) \
-            & 0xFFFFFFFF; \
-    ds.l = ((n) >= 32)? 0: (sr.l << (n)) & 0xFFFFFFFF
+                        ds.h = (((n) >= 32)? (sr.l << ((n) - 32)): \
+                                (sr.h << (n)) | ((sr.l >> (32 - (n))) & and_mask[n])) \
+                                & 0xFFFFFFFF; \
+                        ds.l = ((n) >= 32)? 0: (sr.l << (n)) & 0xFFFFFFFF
 #define F_RSH_V(sr,n,ds) \
-    ds.l = (((n) >= 32)? (sr.h >> ((n) - 32)) & and_mask[64 - (n)]: \
-            ((sr.l >> (n)) & and_mask[32 - (n)]) | \
-            (sr.h << (32 - (n)))) & 0xFFFFFFFF; \
-    ds.h = ((n) >= 32)? 0: \
-            ((sr.h >> (n)) & and_mask[32 - (n)]) & 0xFFFFFFFF
+                        ds.l = (((n) >= 32)? (sr.h >> ((n) - 32)) & and_mask[64 - (n)]: \
+                                ((sr.l >> (n)) & and_mask[32 - (n)]) | \
+                                (sr.h << (32 - (n)))) & 0xFFFFFFFF; \
+                        ds.h = ((n) >= 32)? 0: \
+                                ((sr.h >> (n)) & and_mask[32 - (n)]) & 0xFFFFFFFF
 
 /* For the constant shift macro, arguments must in the range [2,31] */
 
-#define F_LSH_1(ds) ds.h = ((ds.h << 1) | ((ds.l >> 31) & 1)) & 0xFFFFFFFF; \
-    ds.l = (ds.l << 1) & 0xFFFFFFFF
-#define F_RSH_1(ds) ds.l = ((ds.l >> 1) & 0x7FFFFFFF) | ((ds.h & 1) << 31); \
-    ds.h = ((ds.h >> 1) & 0x7FFFFFFF)
+#define F_LSH_1(ds)     ds.h = ((ds.h << 1) | ((ds.l >> 31) & 1)) & 0xFFFFFFFF; \
+                        ds.l = (ds.l << 1) & 0xFFFFFFFF
+#define F_RSH_1(ds)     ds.l = ((ds.l >> 1) & 0x7FFFFFFF) | ((ds.h & 1) << 31); \
+                        ds.h = ((ds.h >> 1) & 0x7FFFFFFF)
 #define F_LSH_K(sr,n,ds) \
-    ds.h =      ((sr.h << (n)) | ((sr.l >> (32 - (n))) & and_mask[n])) \
-            & 0xFFFFFFFF; \
-    ds.l = (sr.l << (n)) & 0xFFFFFFFF
+                        ds.h = ((sr.h << (n)) | ((sr.l >> (32 - (n))) & and_mask[n])) \
+                                & 0xFFFFFFFF; \
+                        ds.l = (sr.l << (n)) & 0xFFFFFFFF
 #define F_RSH_K(sr,n,ds) \
-    ds.l =      (((sr.l >> (n)) & and_mask[32 - (n)]) | \
-            (sr.h << (32 - (n)))) & 0xFFFFFFFF; \
-    ds.h =      ((sr.h >> (n)) & and_mask[32 - (n)]) & 0xFFFFFFFF
+                        ds.l = (((sr.l >> (n)) & and_mask[32 - (n)]) | \
+                                (sr.h << (32 - (n)))) & 0xFFFFFFFF; \
+                        ds.h = ((sr.h >> (n)) & and_mask[32 - (n)]) & 0xFFFFFFFF
 #define F_LSH_GUARD(ds) F_LSH_K(ds,FP_GUARD,ds)
 #define F_RSH_GUARD(ds) F_RSH_K(ds,FP_GUARD,ds)
 
@@ -252,7 +260,8 @@ int32 i, qdouble, lenf, leni;
 int32 newV, exp, sign;
 fpac_t fac, fsrc, modfrac;
 static const uint32 i_limit[2][2] = {
-    { 0x80000000, 0x80010000 }, { 0x80000000, 0x80000001 }
+    { 0x80000000, 0x80010000 },
+    { 0x80000000, 0x80000001 }
     };
 
 backup_PC = PC;                                         /* save PC for FEA */
@@ -433,7 +442,7 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
         if (FPS & FPS_L) {
             leni = LONG;
             i = FP_BIAS + 32;
-        }
+            }
         else {
             leni = WORD;
             i = FP_BIAS + 16;
@@ -602,7 +611,8 @@ return 0;
 uint32 ReadI (int32 VA, int32 spec, int32 len)
 {
 if ((len == WORD) || (spec == 027)) return (ReadW (VA) << 16);
-return ((ReadW (VA) << 16) | ReadW ((VA & ~0177777) | ((VA + 2) & 0177777)));
+return ((ReadW (VA) << 16) |
+         ReadW ((VA & ~0177777) | ((VA + 2) & 0177777)));
 }
 
 /* Read floating operand

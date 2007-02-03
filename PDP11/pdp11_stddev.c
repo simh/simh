@@ -26,6 +26,8 @@
    tti,tto      DL11 terminal input/output
    clk          KW11L (and other) line frequency clock
 
+   29-Oct-06	RMS     Synced keyboard and clock
+                        Added clock coscheduling support
    05-Jul-06    RMS     Added UC only support for early DOS/RSTS
    22-Nov-05    RMS     Revised for new terminal processing routines
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
@@ -107,7 +109,7 @@ DIB tti_dib = {
     1, IVCL (TTI), VEC_TTI, { NULL }
     };
 
-UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, 0, 0), 0 };
 
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, 8) },
@@ -117,7 +119,7 @@ REG tti_reg[] = {
     { FLDATA (DONE, tti_csr, CSR_V_DONE) },
     { FLDATA (IE, tti_csr, CSR_V_IE) },
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
     { NULL }
     };
 
@@ -153,7 +155,7 @@ DIB tto_dib = {
     1, IVCL (TTO), VEC_TTO, { NULL }
     };
 
-UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
+UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_7P, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
     { ORDATA (BUF, tto_unit.buf, 8) },
@@ -281,7 +283,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, uptr->wait);                        /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, tmr_poll));   /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
 if (c & SCPE_BREAK) uptr->buf = 0;                      /* break? */
 else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
@@ -298,7 +300,7 @@ t_stat tti_reset (DEVICE *dptr)
 tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);
-sim_activate (&tti_unit, tti_unit.wait);                /* activate unit */
+sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
@@ -404,7 +406,7 @@ t_stat clk_wr (int32 data, int32 PA, int32 access)
 if (clk_fnxm) return SCPE_NXM;                          /* not there??? */
 if (PA & 1) return SCPE_OK;
 clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
-if (CPUT (HAS_LTCM) && ((data & CSR_DONE) == 0))                /* monitor bit? */
+if (CPUT (HAS_LTCM) && ((data & CSR_DONE) == 0))        /* monitor bit? */
     clk_csr = clk_csr & ~CSR_DONE;                      /* clr if zero */
 if ((((clk_csr & CSR_IE) == 0) && !clk_fie) ||          /* unless IE+DONE */
     ((clk_csr & CSR_DONE) == 0)) CLR_INT (CLK);         /* clr intr */
@@ -432,6 +434,16 @@ int32 clk_inta (void)
 {
 if (CPUT (CPUT_24)) clk_csr = clk_csr & ~CSR_DONE;
 return clk_dib.vec;
+}
+
+/* Clock coscheduling routine */
+
+int32 clk_cosched (int32 wait)
+{
+int32 t;
+
+t = sim_is_active (&clk_unit);
+return (t? t - 1: wait);
 }
 
 /* Clock reset */

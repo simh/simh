@@ -28,12 +28,174 @@
 #define _SIM_REV_H_     0
 
 #define SIM_MAJOR       3
-#define SIM_MINOR       6
-#define SIM_PATCH       1
+#define SIM_MINOR       7
+#define SIM_PATCH       0
 
-/* V3.6 revision history 
+/* V3.7 revision history 
 
 patch   date            module(s) and fix(es)
+
+  0     30-Jan-07       scp.c:
+                        - implemented throttle commands
+                        - added -e to control error processing in DO command files
+                          (from Dave Bryan)
+
+                        sim_console.c:
+                        - fixed handling of non-printable characters in KSR mode
+
+                        sim_tape.c:
+                        - fixed bug in reverse operations for P7B-format tapes
+                        - fixed bug in reverse operations across erase gaps
+
+                        sim_timer.c:
+                        - added throttle support
+                        - added idle support (based on work by Mark Pizzolato)
+
+                        gri_stddev.c, h316_stddev.c, pdp18b_tt1.c
+                        - fixed handling of non-printable characters in KSR mode
+
+                        hp2100_cpu.c, hp2100_cpu0.c, hp2100_cpu1.c, hp2100_cpu2.c,
+                        hp2100_cpu3.c, hp2100_cpu4.c (from Dave Bryan):
+                        - reorganized CPU modules for easier addition of new instructions
+                        - added Double Integer instructions, 1000-F CPU, 2114 and
+                          2115 CPUs, 12K and 24K memory sizes, 12607B and 12578A DMA
+                          controllers, and 21xx binary loader protection
+                        - fixed DMS self-test instruction execution on 1000-M
+                        - fixed indirect interrupt holdoff logic
+
+                        hp2100_ds.c:
+                        - fixed REQUEST STATUS to clear status-1 (from Dave Bryan)
+
+                        hp2100_fp1.c:
+                        - Added Floating Point Processor (from Dave Bryan)
+
+                        hp2100_lps.c:
+                        - fixed diag-mode CLC response
+
+                        i7094_cpu.c:
+                        - fixed new bug in halt IO wait loop
+                        - added IFT, EFT expanded core test instructions
+
+                        id16_cpu.c, id32_cpu.c:
+                        - removed separate multiplexor clock
+                        - added idle support
+
+                        id_pas.c:
+                        - synced multiplexor poll to real-time clock
+
+                        id_tt.c, id_ttp.c:
+                        - fixed handling of non-printable characters in KSR mode
+                        - synced keyboard poll to real-time clock
+
+                        id_uvc.c:
+                        - changed line-time clock to be free-running
+
+                        pdp1_cpu.c:
+                        - added 16-channel sequence break system (API) support
+                        - added PDP-1D support
+
+                        pdp1_clk.c:
+                        - first release
+
+                        pdp1_dcs.c:
+                        - first release
+
+                        pdp1_stddev.c:
+                        - separated TTI, TTO for API support
+
+                        pdp1_sys.c:
+                        - added PDP-1D, 16-channel SBS, clock, DCS support
+                        - fixed bugs in character input, block loader
+
+                        pdp10_cpu.c:
+                        - added idle support
+
+                        pdp10_defs.h, pdp10_sys.c:
+                        - added CR support
+
+                        pdp10_fe.c, pdp10_tim.c:
+                        - synced keyboard poll to real-time clock
+
+                        pdp11_cr.c:
+                        - revised for PDP-10 compatibility (CD11 only)
+
+                        pdp11_cpu.c:
+                        - added idle support
+                        - fixed bug in ASH -32 C value
+
+                        pdp11_rf.c:
+                        - fixed unit mask (found by John Dundas)
+
+                        pdp11_stddev.c, vax_stddev.c, vax780_stddev.c:
+                        - synced keyboard poll to real-time clock
+                        - added clock coscheduling support
+
+                        pdp11_ta.c:
+                        - first release
+
+                        pdp11_vh.c:
+                        - synced service poll to real-time clock
+                        - changed device to be off by default
+
+                        pdp11_dz.c, pdp11_xq.c, pdp11_xu.c:
+                        - synced service poll to real-time clock
+
+                        pdp11_sys.c:
+                        - fixed operand order in EIS instructions (found by W.F.J. Mueller)
+                        - added TA11 support
+
+                        pdp18b_cpu.c:
+                        - fixed incorrect value of PC on instruction fetch mem mmgt error
+                        - fixed PDP-15 handling of mem mmgt traps (sets API 3)
+                        - fixed PDP-15 handling of CAL API 4 (sets only if 0-3 inactive)
+                        - fixed PDP-15 CAF to clear memory management mode register
+                        - fixed boundary test in KT15/XVM (reported by Andrew Warkentin)
+                        - added XVM RDCLK instruction
+                        - added idle support and infinite loop detection
+
+                        pdp18b_rf.c:
+                        - fixed bug, DSCD does not clear function register
+
+                        pdp18b_stddev.c:
+                        - added PDP-15 program-selectable duplex handling instruction
+                        - fixed PDP-15 handling of reader out-of-tape
+                        - fixed handling of non-printable characters in KSR mode
+                        - added XVM RDCLK instruction
+                        - changed real-time clock to be free running
+                        - synced keyboard poll to real-time clock
+
+                        pdp18b_tt1.c
+                        - fixed handling of non-printable characters in KSR mode
+
+                        pdp18b_sys.c:
+                        - added XVM RDCLK instruction
+
+                        pdp8_cpu.c:
+                        - fixed SC value after DVI overflow (found by Don North)
+                        - added idle support and infinite loop detection
+
+                        pdp8_ct.c:
+                        - first release
+
+                        pdp8_clk.c:
+                        - changed real-time clock to be free running
+
+                        pdp8_sys.c:
+                        - added TA8E support
+                        - added ability to disambiguate overlapping IOT definitions
+
+                        pdp8_tt.c:
+                        - fixed handling of non-printable characters in KSR mode
+                        - synced keyboard poll to real-time clock
+
+                        vax_cpu.c, vax_cpu1.c:
+                        - added idle support
+
+                        vax_syscm.c:
+                        - fixed operand order in EIS instructions (found by W.F.J. Mueller)
+
+
+/* V3.6 revision history 
 
   1     25-Jul-06       sim_console.c:
                         - implemented SET/SHOW PCHAR

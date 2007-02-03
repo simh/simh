@@ -1,6 +1,6 @@
 /* vax_stddev.c: VAX 3900 standard I/O devices
 
-   Copyright (c) 1998-2005, Robert M Supnik
+   Copyright (c) 1998-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
    tto          terminal output
    clk          100Hz and TODR clock
 
+   17-Oct-06    RMS     Synced keyboard poll to real-time clock for idling
    22-Nov-05    RMS     Revised for new terminal processing routines
    09-Sep-04    RMS     Integrated powerup into RESET (with -p)
    28-May-04    RMS     Removed SET TTI CTRL-C
@@ -54,7 +55,7 @@
 #define CLKCSR_IMP      (CSR_IE)                        /* real-time clock */
 #define CLKCSR_RW       (CSR_IE)
 #define CLK_DELAY       5000                            /* 100 Hz */
-#define TMXR_MULT       2                               /* 50 Hz */
+#define TMXR_MULT       1                               /* 100 Hz */
 
 extern int32 int_req[IPL_HLVL];
 extern int32 hlt_pin;
@@ -87,7 +88,7 @@ extern int32 sysd_hlt_enb (void);
 
 DIB tti_dib = { 0, 0, NULL, NULL, 1, IVCL (TTI), SCB_TTI, { NULL } };
 
-UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_8B, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_8B, 0), 0 };
 
 REG tti_reg[] = {
     { HRDATA (BUF, tti_unit.buf, 16) },
@@ -96,7 +97,7 @@ REG tti_reg[] = {
     { FLDATA (DONE, tti_csr, CSR_V_DONE) },
     { FLDATA (IE, tti_csr, CSR_V_IE) },
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
     { NULL }
     };
 
@@ -281,7 +282,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, uptr->wait);                        /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, tmr_poll));   /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
 if (c & SCPE_BREAK) {                                   /* break? */
     if (sysd_hlt_enb ()) hlt_pin = 1;                   /* if enabled, halt */
@@ -299,7 +300,7 @@ t_stat tti_reset (DEVICE *dptr)
 tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);
-sim_activate (&tti_unit, tti_unit.wait);                /* activate unit */
+sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
@@ -356,6 +357,18 @@ if (!todr_blow) todr_reg = todr_reg + 1;                /* incr TODR */
 return SCPE_OK;
 }
 
+/* Clock coscheduling routine */
+
+int32 clk_cosched (int32 wait)
+{
+int32 t;
+
+t = sim_is_active (&clk_unit);
+return (t? t - 1: wait);
+}
+
+/* Powerup routine */
+
 t_stat todr_powerup (void)
 {
 uint32 base;
@@ -375,6 +388,8 @@ todr_blow = 0;
 return SCPE_OK;
 }
 
+/* Reset routine */
+
 t_stat clk_reset (DEVICE *dptr)
 {
 int32 t;
@@ -383,7 +398,7 @@ if (sim_switches & SWMASK ('P')) todr_powerup ();       /* powerup? */
 clk_csr = 0;
 CLR_INT (CLK);
 t = sim_rtcn_init (clk_unit.wait, TMR_CLK);             /* init timer */
-sim_activate (&clk_unit, t);                            /* activate unit */
+sim_activate_abs (&clk_unit, t);                        /* activate unit */
 tmr_poll = t;                                           /* set tmr poll */
 tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
 return SCPE_OK;

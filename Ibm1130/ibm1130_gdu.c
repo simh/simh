@@ -3,11 +3,11 @@
 /* ibm1130_gdu.c: IBM 1130 2250 Graphical Display Unit
 
    (Under construction)
-// stuff to fix:
-// "store revert" might be backwards?
-// alpha keyboard is not implemented
-// pushbuttons are not implemented
-// there is something about interrupts being deferred during a subroutine transition?
+   stuff to fix:
+   "store revert" might be backwards?
+   alpha keyboard is not implemented
+   pushbuttons are not implemented
+   there is something about interrupts being deferred during a subroutine transition?
 
    Based on the SIMH package written by Robert M Supnik
 
@@ -21,13 +21,13 @@
  * Mail to simh@ibm1130.org
  */
 
-#define BLIT_MODE					// normally defined, undefine when debugging generate_image()
-//#define DEBUG_LIGHTPEN			// normally undefined, define to visualize light-pen sensing
+#define BLIT_MODE					/* define for better performance, undefine when debugging generate_image() */
+/* #define DEBUG_LIGHTPEN */		/* define to debug light-pen sensing */
 
-#define DEFAULT_GDU_RATE      20	// default frame rate
-#define DEFAULT_PEN_THRESHOLD  3	// default looseness of light-pen hit
-#define INDWIDTH			  32	// width of an indicator (there are two columns of these)
-#define INITSIZE             512	// initial window size
+#define DEFAULT_GDU_RATE      20	/* default frame rate */
+#define DEFAULT_PEN_THRESHOLD  3	/* default looseness of light-pen hit */
+#define INDWIDTH			  32	/* width of an indicator (there are two columns of these) */
+#define INITSIZE             512	/* initial window size */
 
 #define GDU_DSW_ORDER_CONTROLLED_INTERRUPT	0x8000
 #define GDU_DSW_KEYBOARD_INTERUPT			0x4000
@@ -109,7 +109,7 @@ static t_stat gdu_reset (DEVICE *dptr)
 
 void xio_2250_display (int32 addr, int32 func, int32 modify)
 {
-	// ignore commands to nonexistent device
+	/* ignore commands if device is nonexistent */
 }
 
 t_bool gdu_active (void)
@@ -118,7 +118,7 @@ t_bool gdu_active (void)
 }
 
 /* -------------------------------------------------------------------------------------- */
-#else	// GUI_SUPPORT defined
+#else	/* GUI_SUPPORT defined */
 
 /******* PLATFORM INDEPENDENT CODE ********************************************************/
 
@@ -127,7 +127,6 @@ static int xmouse, ymouse, lpen_dist, lpen_dist2;	// current mouse pointer, scal
 static double sfactor;								// current scaling factor
 static t_bool last_abs = TRUE;						// last positioning instruction was absolute
 static t_bool mouse_present = FALSE;				// mouse is/is not in the window
-
 static void clear_interrupts (void);
 static void set_indicators (int32 new_inds);
 static void start_regeneration (void);
@@ -239,23 +238,27 @@ static void start_regeneration (void)
 {
 	SETBIT(gdu_dsw, GDU_DSW_BUSY);
 
-	if (gdu_unit.flags & UNIT_DISPLAYED) {
-		StartGDUUpdates();
-	}
-	else {
+	if ((gdu_unit.flags & UNIT_DISPLAYED) == 0) {
 		if (! CreateGDUWindow())
 			return;
+
 		SETBIT(gdu_unit.flags, UNIT_DISPLAYED);
 	}
+
+	StartGDUUpdates();
 }
 
 static void halt_regeneration (void)
 {
+			// halt_regeneration gets called at end of every refresh interation, so it should NOT black out the
+			// screen -- this is why it was flickering so badly. The lower level code (called on a timer)
+			// should check to see if GDU_DSW_BUSY is clear, and if it it still zero after several msec,
+			// only then should it black out the screen and call StopGDUUpdates.
 	if (gdu_dsw & GDU_DSW_BUSY) {
-		StopGDUUpdates();
+//		StopGDUUpdates();							// let lower level code discover this during next refresh
 		CLRBIT(gdu_dsw, GDU_DSW_BUSY);
 	}
-	EraseGDUScreen();
+//	EraseGDUScreen();								// let cessation of regeneration erase it (eventually)
 }
 
 static void notify_window_closed (void)
@@ -264,7 +267,9 @@ static void notify_window_closed (void)
 		StopGDUUpdates();
 		CLRBIT(gdu_dsw, GDU_DSW_BUSY);
 	}
+
 	CLRBIT(gdu_unit.flags, UNIT_DISPLAYED);
+
 	gdu_reset(&gdu_dev);
 }
 
@@ -671,7 +676,7 @@ static HPEN hRedPen     = NULL;
 #endif
 static HBRUSH hGrayBrush, hDarkBrush;
 static HPEN hBlackPen;
-
+static int halted = 0;								// number of time intervals that GDU has been halted w/o a regeneration
 static LRESULT APIENTRY GDUWndProc (HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
 static DWORD   WINAPI   GDUPump (LPVOID arg);
 
@@ -718,11 +723,6 @@ static void destroy_GDU_window (void)
 static t_bool CreateGDUWindow (void)
 {
 	static BOOL did_atexit = FALSE;
-
-	if (hwGDU != NULL) {				// window already exists
-		StartGDUUpdates();
-		return TRUE;
-	}
 
 	hInstance = GetModuleHandle(NULL);
 
@@ -878,7 +878,7 @@ static void gdu_WM_PAINT (HWND hWnd)
 
 static void gdu_WM_SIZE (HWND hWnd, UINT state, int cx, int cy)
 {
-	InvalidateRect(hWnd, NULL, FALSE);
+	InvalidateRect(hWnd, NULL, TRUE);
 }
 
 // tweak the sizing rectangle during a resize to guarantee a square window
@@ -912,6 +912,16 @@ static void gdu_WM_TIMER (HWND hWnd, UINT id)
 	HDC hDC;
 
 	if (running) {			// if CPU is running, update picture
+		if ((gdu_dsw & GDU_DSW_BUSY) == 0) {	// regeneration is not to occur
+			if (++halted >= 4) {				// stop the timer if four timer intervals go by with the display halted
+				EraseGDUScreen();				// screen goes black due to cessation of refreshing
+				StopGDUUpdates();				// might as well kill the timer
+				return;
+			}
+		}
+		else
+			halted = 0;
+
 #ifdef BLIT_MODE
 		hDC = GetDC(hWnd);						// blit the new image right over the old
 		PaintImage(hDC, FALSE);
@@ -964,7 +974,7 @@ static void	DrawPoint (int x, int y)
 static void UpdateGDUIndicators(void)
 {
 	if (hwGDU != NULL)
-		InvalidateRect(hwGDU, NULL, TRUE);
+		InvalidateRect(hwGDU, NULL, FALSE);			// no need to erase the background -- the draw routine fully paints the indicator
 }
 
 static void CheckGDUKeyboard (void)
@@ -981,6 +991,7 @@ static void	StartGDUUpdates (void)
 		msec = (gdu_rate == 0) ? (1000 / DEFAULT_GDU_RATE) : 1000/gdu_rate;
 		idTimer = SetTimer(hwGDU, 1, msec, NULL);
 	}
+	halted = 0;
 }
 
 static void	StopGDUUpdates (void)
@@ -988,6 +999,7 @@ static void	StopGDUUpdates (void)
 	if (idTimer != 0) {
 		KillTimer(hwGDU, 1);
 		idTimer = 0;
+		halted  = 10000;
 	}
 }
 
@@ -1086,8 +1098,6 @@ static DWORD WINAPI GDUPump (LPVOID arg)
 	ShowWindow(hwGDU, SW_SHOWNOACTIVATE);			/* display it */
 	UpdateWindow(hwGDU);
 	
-	StartGDUUpdates();
-
 	while (GetMessage(&msg, hwGDU, 0, 0)) {			/* message pump - this basically loops forevermore */
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);

@@ -1,6 +1,6 @@
 /* hp2100_dp.c: HP 2100 12557A/13210A disk simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    dp           12557A 2871 disk subsystem
                 13210A 7900 disk subsystem
 
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
    01-Mar-05    JDB     Added SET UNLOAD/LOAD
    07-Oct-04    JDB     Fixed enable/disable from either device
                         Fixed ANY ERROR status for 12557A interface
@@ -395,6 +396,7 @@ switch (inst) {                                         /* case on opcode */
         dat = dpd_ibuf;
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCTL (devd);                              /* clr ctl, cmd */
@@ -449,6 +451,7 @@ switch (inst) {                                         /* case on opcode */
         if (!dp_ctype) break;
         IR = IR | I_CTL;                                /* 13210 OTx causes CLC */
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC? */
             clrCTL (devc);                              /* clr cmd, ctl */

@@ -135,6 +135,7 @@
   Modification history:
 
   10-Jul-06  RMS  Fixed linux conditionalization (from Chaskiel Grundman)
+  02-Jun-06  JDB  Fixed compiler warning for incompatible sscanf parameter
   15-Dec-05  DTH  Patched eth_host_devices [remove non-ethernet devices]
                   (from Mark Pizzolato and Galen Tackett, 08-Jun-05)
                   Patched eth_open [tun fix](from Antal Ritter, 06-Oct-05)
@@ -243,7 +244,7 @@ extern FILE *sim_log;
 t_stat eth_mac_scan (ETH_MAC* mac, char* strmac)
 {
   int i, j;
-  short int num;
+  short unsigned int num;
   char cptr[18];
   int len = strlen(strmac);
   const ETH_MAC zeros = {0,0,0,0,0,0};

@@ -152,10 +152,14 @@ return SCPE_OK;
 
 t_stat clk_reset (DEVICE *dptr)
 {
+int32 t;
+
 dev_done = dev_done & ~INT_CLK;                         /* clear done, int */
 int_req = int_req & ~INT_CLK;
 int_enable = int_enable & ~INT_CLK;                     /* clear enable */
-sim_activate (&clk_unit, clk_unit.wait);                /* activate unit */
+t = sim_rtcn_init (clk_unit.wait, TMR_CLK);
+sim_activate_abs (&clk_unit, t);                        /* activate unit */
+tmxr_poll = t;
 return SCPE_OK;
 }
 

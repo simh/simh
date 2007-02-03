@@ -1,18 +1,19 @@
                       SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2005-03-22
+                             Last update: 2007-01-12
 
 
 The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
-Diagnostic programs were obtained from magnetic tape, HP 24396-13601 Rev. 2040.
-For each diagnostic, the recommended standard tests were selected, plus any
-available optional tests that broadened the test coverage.
+Diagnostic programs were obtained from two magnetic tapes, HP 24396-13601 Rev.
+1713 and Rev. 2326, plus a few standalone paper tapes. For each diagnostic, the
+recommended standard tests were selected, plus any available optional tests that
+broadened the test coverage.
 
-The test system configuration is the default SIMH configuration with these
-alterations (except where noted in the individual diagnostic reports):
+Except where noted in the individual diagnostic reports, the test system
+configuration is the default SIMH configuration with these alterations:
 
  * All I/O devices are enabled.
- * The CPU is configured as a 21MX-E with 128KW of memory.
+ * The CPU is configured as a 1000-E with 128KW of memory.
 
 Detailed diagnostic configuration, operation, and results are given after the
 summary table.  These may be used to duplicate the diagnostic results.
@@ -33,19 +34,23 @@ The results of the diagnostic runs are summarized below:
 
 101004  EAU Instruction Group                    1431  3.2-3  Passed
 101207  Floating Point Instruction Group         1551  3.2-3  Passed
+102001  Memory Protect                           1431  3.7-0  Passed
+102002  Memory Parity Check                      1431    -    No simulation
 102305  Memory Protect/Parity Error              1705  3.3-0  Partial
 
 101206  Power Fail/Auto Restart                  1635    -    No simulation
 141103  I/O Instruction Group                    1810  3.2-3  Passed
 143300  General Purpose Register                 1813  3.2-3  Passed
-101220  Direct Memory Access                     1705  3.2-3  Passed
+101105  Direct Memory Access (2114/15/16)        1502  3.7-0  Passed
+101220  Direct Memory Access (2100/21MX)         1705  3.2-3  Passed
 
 101011  Extended Instruction Group (Index)       1432  3.2-3  Passed
 101112  Extended Instruction Group (Word, Byte)  1728  3.2-3  Passed
 101110  2100 Fast FORTRAN Package                1632  3.4-0  Partial
 101213  M/E-Series Fast FORTRAN Package 1        1822  3.4-0  Passed
 101114  M/E-Series Fast FORTRAN Package 2        1632  3.4-0  Passed
-101121  F-Series FPP/SIS/FFP                     1926    -    No simulation
+101121  F-Series FPP/SIS/FFP                     1926  3.7-0  Passed
+101016  2000/Access Comm Processor for 2100      1526  3.2-3  Partial
 
 102103  Memory Expansion Unit                    1830  3.2-3  Passed
 102103  Semiconductor Memory Microcoded 21MX     1644    -    No simulation
@@ -66,13 +71,26 @@ The results of the diagnostic runs are summarized below:
 103121  12968 Asynchronous Comm. Interface       1602    -    No simulation
 103024  12821 ICD Disc Interface                 1928    -    No simulation
 
+104000  2600 Keyboard Display Terminal           1615    -    No simulation
+104003  Teleprinter                              1509  3.2-3  Partial
+144105  2762A/B Terminal (Terminet)              1546    -    No simulation
+104007  2615 Video Terminal                      1347    -    No simulation
+104011  2640 Interactive Terminal                1502    -    No simulation
+104012  2644 Mini Data Station (non CTU)         1542    -    No simulation
+104013  2644 Mini Data Station (CTU Only)        1542    -    No simulation
+104017  92900 Terminal Subsystem (3070, 40280)   1643    -    No simulation
+
+105000  2610/14 Line Printer                     1451    -    No simulation
+105101  2767 Line Printer                        1611  3.3-0  Passed
 105102  2607 Line Printer                        1446  3.3-0  Passed
 145103  2613/17/18 Line Printer                  1633    -    No simulation
+105104  9866 Line Printer                        1541    -    No simulation
 105106  2631 Printer                             1913    -    No simulation
 105107  2635 Printing Terminal                   1913    -    No simulation
 105105  2608 Line Printer                        2026    -    No simulation
 105104  9866 Line Printer                        1541    -    No simulation
 
+111001  Disc File (2883)                         1451  3.3-0  Partial
 111104  12732 Flexible Disc Subsystem            1708    -    No simulation
 151302  7900/01 Cartridge Disc                   1805  3.2-3  Partial
 151403  7905/06/20/25 Disc                       1805  3.3-1  Partial
@@ -86,8 +104,7 @@ The results of the diagnostic runs are summarized below:
 107000  Digital Plotter Interface (CALCOMP)      1540    -    No simulation
 113100  2892 Card Reader                         1537    -    No simulation
 113001  2894 Card Reader Punch                   1728    -    No simulation
-104003  Teleprinter                              1509  3.2-3  Partial
-104007  2615 Video Terminal                      1347    -    No simulation
+113003  7261 Card Reader                         1546    -    No simulation
 103006  12909B PROM Writer                       1420    -    No simulation
 
 
@@ -97,12 +114,9 @@ not supported by the 24396 suite:
 Paper Tape                                                    Date  SIMH
 Part Number   DSN    Diagnostic Name                          Code  Vers.  Result
 -----------  ------  ---------------------------------------  ----  -----  ----------
-12984-16001  105101  2767 Diagnostic                          1611  3.3-0  Passed
 24203-60001    --    HP2100A Cartridge Disc Memory (2871)      A    3.3-0  Partial
-12965-16001  111001  HP2100A Disc File (2883)                 1451  3.3-0  Partial
 22682-16017  177777  HP 2100 Fixed Head Disc/Drum (277x)      1612  3.3-0  Passed
-13206-16001  101016  2100 2000/Access Comm. Proc. Firmware    1526  3.2-3  Partial
-13207-16001  101217  21MX 2000/Access Comm. Proc. Firmware    1728  3.2-3  Passed
+13207-16001  101217  2000/Access Comm Processor for 21MX      1728  3.2-3  Passed
 20433-?????    --    HP 3030 Magnetic Tape Subsystem           --     -    Not tested
 
 
@@ -123,7 +137,7 @@ diagnostic:
                  model were either excluded or failed as expected, due to known
                  limitations in the simulation, e.g., the lack of "defective
                  cylinder" flags in a disc simulation.
-  
+
   Failed         One or more of the standard tests relevant to the hardware
                  model failed unexpectedly.
 
@@ -144,7 +158,7 @@ For all runs other than the diagnostic configurator pretest, the configurator
 was used in automatic mode to load the target diagnostic via its Diagnostic
 Serial Number (DSN), as follows:
 
-  sim> attach -r MSC0 24396-13601-REV-2040.tape
+  sim> attach -r MSC0 24396-13601_Rev-2326.abin.tape
   sim> deposit S 000000
   sim> boot MSC0
 
@@ -233,6 +247,7 @@ TESTED DEVICE:  CPU (hp2100_cpu.c)
 
 CONFIGURATION:  sim> set CPU 2100
                 sim> set CPU 32K
+
                 sim> deposit S 000000
                 sim> reset
                 sim> go 100
@@ -273,7 +288,7 @@ TEST NOTES:     The standard tests 00-10, plus optional tests 13, 14, and 16 are
 DSN 101004 - EAU Instruction Group
 ----------------------------------
 
-TESTED DEVICE:  CPU (hp2100_cpu.c)
+TESTED DEVICE:  CPU (hp2100_cpu1.c)
 
 CONFIGURATION:  sim> deposit S 000000
                 sim> reset
@@ -292,7 +307,7 @@ TEST RESULT:    Passed.
 DSN 101207 - Floating Point Instruction Group
 ---------------------------------------------
 
-TESTED DEVICE:  CPU (hp2100_fp.c)
+TESTED DEVICE:  CPU (hp2100_cpu2.c)
 
 CONFIGURATION:  sim> deposit S 000000
                 sim> reset
@@ -300,6 +315,44 @@ CONFIGURATION:  sim> deposit S 000000
 
 TEST REPORT:    2100-21MX FLOATING POINT DIAGNOSTIC
                 PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------
+DSN 102001 - Memory Protect
+---------------------------
+
+TESTED DEVICE:  MP (hp2100_cpu.c)
+
+CONFIGURATION:  sim> set CPU 2100
+                sim> set CPU 32K
+
+                sim> deposit S 000000
+                sim> reset
+                sim> go 100
+
+TEST REPORT:    HP 2100 SERIES MEMORY PROTECT DIAGNOSTIC
+                H07. PRESS PRESET (EXT/INT), RUN
+
+                HALT instruction 102007
+
+                sim> reset
+                sim> go
+
+                H13. PRESS HALT, PRESET(INT), RUN
+                IN LESS THAN 15 SEC.
+
+                [CTRL+E]
+                Simulation stopped
+
+                sim> reset
+                sim> go
+
+                PASS  000001
 
                 HALT instruction 102077
 
@@ -353,7 +406,7 @@ TEST REPORT:    H061 POWER DOWN COMPUTER
                 PASS 000001
 
                 H062 POWER DOWN COMPUTER
-                  SET JUMPERS TO INITIAL SETTINGS 
+                  SET JUMPERS TO INITIAL SETTINGS
                   PER TABLE 3-1 IN MOD
                   POWER UP COMPUTER
 
@@ -454,11 +507,46 @@ TEST RESULT:    Passed.
 
 
 
----------------------------------
-DSN 101220 - Direct Memory Access
----------------------------------
+----------------------------------------------
+DSN 101105 - Direct Memory Access (2114/15/16)
+----------------------------------------------
 
 TESTED DEVICE:  DMA0/DMA1 (hp2100_cpu.c)
+
+CONFIGURATION:  sim> set CPU 2116
+                sim> set CPU 16K
+                sim> set LPS diag
+
+                sim> deposit S 000014
+                sim> reset
+                sim> go 100
+
+                HALT instruction 102074
+
+                sim> deposit S 040000
+                sim> reset
+                sim> go
+
+TEST REPORT:    H0. START DMA DIAGNOSTIC
+
+                HALT instruction 102027
+
+                sim> reset
+                sim> go
+
+                H77. END DIAGNOSTIC
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------------------------
+DSN 101220 - Direct Memory Access (2100/21MX)
+---------------------------------------------
+
+TESTED DEVICE:  DCPC0/DCPC1 (hp2100_cpu.c)
 
 CONFIGURATION:  sim> set LPS diag
                 sim> deposit S 000014
@@ -492,7 +580,7 @@ TEST RESULT:    Passed.
 DSN 101011 - Extended Instruction Group (Index)
 -----------------------------------------------
 
-TESTED DEVICE:  CPU (hp2100_cpu1.c)
+TESTED DEVICE:  CPU (hp2100_cpu2.c)
 
 CONFIGURATION:  sim> deposit S 000000
                 sim> reset
@@ -511,7 +599,7 @@ TEST RESULT:    Passed.
 DSN 101112 - Extended Instruction Group (Word, Byte, Bit)
 ---------------------------------------------------------
 
-TESTED DEVICE:  CPU (hp2100_cpu1.c)
+TESTED DEVICE:  CPU (hp2100_cpu2.c)
 
 CONFIGURATION:  sim> set LPS diag
                 sim> deposit S 000014
@@ -537,7 +625,7 @@ TEST RESULT:    Passed.
 DSN 101110 - 2100 Fast FORTRAN Package
 --------------------------------------
 
-TESTED DEVICE:  CPU (hp2100_cpu1.c)
+TESTED DEVICE:  CPU (hp2100_cpu3.c)
 
 CONFIGURATION:  sim> set CPU 2100
                 sim> set CPU 32K
@@ -598,7 +686,7 @@ TEST NOTES:     Tests 07 and 11 test the interruptibility of the .XADD and .XMPY
 DSN 101213 - M/E-Series Fast FORTRAN Package 1
 ----------------------------------------------
 
-TESTED DEVICE:  CPU (hp2100_cpu1.c)
+TESTED DEVICE:  CPU (hp2100_cpu3.c)
 
 CONFIGURATION:  sim> set CPU FFP
                 sim> set LPS diag
@@ -636,10 +724,10 @@ TEST RESULT:    Passed.
 
 
 ----------------------------------------------
-DSN 101115 - M/E-Series Fast FORTRAN Package 2
+DSN 101114 - M/E-Series Fast FORTRAN Package 2
 ----------------------------------------------
 
-TESTED DEVICE:  CPU (hp2100_cpu1.c)
+TESTED DEVICE:  CPU (hp2100_cpu3.c)
 
 CONFIGURATION:  sim> set CPU FFP
                 sim> set LPS diag
@@ -675,11 +763,127 @@ TEST RESULT:    Passed.
 
 
 
+---------------------------------
+DSN 101121 - F-Series FPP/SIS/FFP
+---------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu3.c)
+
+CONFIGURATION:  sim> set CPU 1000-F
+                sim> set LPS diag
+
+                sim> deposit S 000014
+                sim> reset
+                sim> go 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> reset
+                sim> go
+
+TEST REPORT:    FPP-SIS-FFP DIAGNOSTIC  DSN 101121
+                BEGIN BASIC CONTROL TEST
+                OVFL TEST
+                CONF TEST
+                BASE RETN TEST
+                SIS1 RETN TEST
+                SIS2 RETN TEST
+                SIS3 RETN TEST
+                FPP1 RETN TEST
+                FFP2 RETN TEST
+                FFP3 RETN TEST
+                END BASIC CONTROL TEST
+                LONG  PASSES
+                FIXS TEST
+                FIXD TEST
+                FLTS TEST
+                FLTD TEST
+                ADD  TEST
+                SUB  TEST
+                MPY  TEST
+                DIV  TEST
+                ACC  TEST
+                SIS1 TEST
+                SIS2 TEST
+                SIS3 TEST
+                FFP1 TEST
+                FFP2 TEST
+                FFP3 TEST
+                PASS  00001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+------------------------------------------------
+DSN 101016 - 2000/Access Comm Processor for 2100
+------------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu2.c)
+
+BINARY TAPE:    13206-16001 Rev. 1526
+
+CONFIGURATION:  sim> set CPU 2100
+                sim> set CPU 32K
+                sim> set CPU IOP
+
+                sim> deposit S 000013
+                sim> reset
+                sim> go 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> reset
+                sim> go
+
+TEST REPORT:    2100 2000-ACCESS COMM. PROC. FIRMWARE DIAGNOSTIC
+                H030 CRC TEST
+                H040 ENQ, DEQ AND PENQ TESTS
+                H060 IAL TEST
+                H110 READF, SAVE AND RESTR TESTS
+                H120 LAI AND SAI TESTS
+                H130 PFREX TEST
+                H140 PFREI TEST
+                H150 PFRIO TEST
+                H160 STORE-LOAD BYTE, TRSLT
+                AND BYTE MOVE TEST
+
+                TEST  10
+                E165 TRSLT NOT INTERRUPTIBLE
+
+                HALT instruction 106065
+
+                sim> go
+
+                H230 WORD MOVE TEST
+
+                TEST  11
+                E234 WORD MOVE NOT INTERRUPTIBLE
+
+                HALT instruction 103034
+
+                sim> go
+
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Partially passed.
+
+TEST NOTES:     Tests 10 and 11 test the interruptibility of the TRSLT and MWORD
+                instructions.  These features are not simulated.
+
+
+
 ----------------------------------
 DSN 102103 - Memory Expansion Unit
 ----------------------------------
 
-TESTED DEVICE:  CPU (hp2100_cpu.c)
+TESTED DEVICE:  CPU (hp2100_cpu2.c)
 
 CONFIGURATION:  sim> set LPS diag
                 sim> deposit S 000014
@@ -693,7 +897,7 @@ CONFIGURATION:  sim> set LPS diag
                 sim> go
 
                 MEMORY EXPANSION MODULE DIAGNOSTIC, DSN = 102103
-                
+
                 HALT instruction 102075
 
                 sim> deposit A 177777
@@ -728,7 +932,7 @@ TEST RESULT:    Passed.
 
 TEST NOTES:     The standard tests 00-22 plus optional tests 23 and 24 are
                 executed.
-                
+
                 Test 25 (Register Crusher Test) is not executed.  This test is
                 designed specifically for the RAM chips present on the hardware
                 and isn't relevant to simulation.
@@ -809,6 +1013,109 @@ CONFIGURATION:
 TEST REPORT:
 
 TEST RESULT:    Not tested.
+
+
+
+------------------------------
+DSN 105101 - 2767 Line Printer
+------------------------------
+
+TESTED DEVICE:  LPS (hp2100_lps.c)
+
+BINARY TAPE:    12984-16001 Rev. 1611
+
+CONFIGURATION:  sim> set LPS realtime
+                sim> attach LPS scratch.2767.printer
+                sim> deposit S 000014
+                sim> reset
+                sim> go 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> reset
+                sim> go
+
+TEST REPORT:    2767 L.P. DIAGNOSTIC
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                HALT instruction 102024
+
+                sim> reset
+                sim> go
+
+                H025 BI-O COMP
+                H035 TURN OFF L.P. POWER
+
+                HALT instruction 102035
+
+                sim> set LPS poweroff
+                sim> go
+
+                H036 TURN ON L.P. POWER
+
+                HALT instruction 102036
+
+                sim> set LPS poweron
+                sim> go
+
+                H033 PUT L.P. ON-LINE
+
+                HALT instruction 102033
+
+                sim> set LPS online
+                sim> go
+
+                H034 MASTER CLEAR L.P.
+
+                HALT instruction 102034
+
+                sim> set LPS offline
+                sim> go
+
+                H033 PUT L.P. ON-LINE
+
+                HALT instruction 102033
+
+                sim> set LPS online
+                sim> go
+
+                H040 PUT L.P. OFF-LINE.  TOGGLE TOP-OF-FORM SWITCH
+
+                HALT instruction 102040
+
+                sim> set LPS offline
+                sim> go
+
+                H033 PUT L.P. ON-LINE
+
+                HALT instruction 102033
+
+                sim> set LPS online
+                sim> go
+
+                H041 PUT L.P. OFF-LINE.  TOGGLE PAPER-STEP 5 TIMES
+
+                HALT instruction 102041
+
+                sim> set LPS offline
+                sim> go
+
+                H033 PUT L.P. ON-LINE
+
+                HALT instruction 102033
+
+                sim> set LPS online
+                sim> go
+
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     The simulation provides no manual Master Clear, Top of Form, or
+                Paper Step functions, so these are merely presumed above.
 
 
 
@@ -1160,49 +1467,49 @@ CONFIGURATION:  sim> set DS0 7905
                 ENTER:(U)NIT,(?) ERRS,(H)EAD,(O)UTPUT,(P)ATT,(S)OFT,(C)YL,(M)CPU,(E)XIT
                 H
 
-                H62 HEAD TABLE;  UNIT  0  7905A , 02 HEAD(S) 0 1                
-                H62 HEAD TABLE;  UNIT  1  7906A , 02 HEAD(S) 0 1                
-                H62 HEAD TABLE;  UNIT  2  7920A , 05 HEAD(S) 0 1 2 3 4          
-                H62 HEAD TABLE;  UNIT  3  7925A , 09 HEAD(S) 0 1 2 3 4 5 6 7 8  
-                H62 HEAD TABLE;  UNIT  4  7905A , 02 HEAD(S) 0 1                
-                H62 HEAD TABLE;  UNIT  5  7906A , 02 HEAD(S) 0 1                
-                H62 HEAD TABLE;  UNIT  6  7920A , 05 HEAD(S) 0 1 2 3 4          
-                H62 HEAD TABLE;  UNIT  7  7925A , 09 HEAD(S) 0 1 2 3 4 5 6 7 8  
+                H62 HEAD TABLE;  UNIT  0  7905A , 02 HEAD(S) 0 1
+                H62 HEAD TABLE;  UNIT  1  7906A , 02 HEAD(S) 0 1
+                H62 HEAD TABLE;  UNIT  2  7920A , 05 HEAD(S) 0 1 2 3 4
+                H62 HEAD TABLE;  UNIT  3  7925A , 09 HEAD(S) 0 1 2 3 4 5 6 7 8
+                H62 HEAD TABLE;  UNIT  4  7905A , 02 HEAD(S) 0 1
+                H62 HEAD TABLE;  UNIT  5  7906A , 02 HEAD(S) 0 1
+                H62 HEAD TABLE;  UNIT  6  7920A , 05 HEAD(S) 0 1 2 3 4
+                H62 HEAD TABLE;  UNIT  7  7925A , 09 HEAD(S) 0 1 2 3 4 5 6 7 8
                 H25 WISH TO CHANGE?
                 YES
 
                 H132 TYPE UNITS YOU WISH TO CHANGE SEPERATED BY COMMAS
                 0,1,4,5
 
-                H62 HEAD TABLE;  UNIT  0  7905A , 02 HEAD(S) 0 1                
+                H62 HEAD TABLE;  UNIT  0  7905A , 02 HEAD(S) 0 1
                 H106 ENTER HEADS SEPARATED BY COMMAS
                 0,1,2
 
-                H62 HEAD TABLE;  UNIT  0  7905A , 03 HEAD(S) 0 1 2              
+                H62 HEAD TABLE;  UNIT  0  7905A , 03 HEAD(S) 0 1 2
                 H25 WISH TO CHANGE?
                 NO
 
-                H62 HEAD TABLE;  UNIT  1  7906A , 02 HEAD(S) 0 1                
+                H62 HEAD TABLE;  UNIT  1  7906A , 02 HEAD(S) 0 1
                 H106 ENTER HEADS SEPARATED BY COMMAS
                 0,1,2,3
 
-                H62 HEAD TABLE;  UNIT  1  7906A , 04 HEAD(S) 0 1 2 3            
+                H62 HEAD TABLE;  UNIT  1  7906A , 04 HEAD(S) 0 1 2 3
                 H25 WISH TO CHANGE?
                 NO
 
-                H62 HEAD TABLE;  UNIT  4  7905A , 02 HEAD(S) 0 1                
+                H62 HEAD TABLE;  UNIT  4  7905A , 02 HEAD(S) 0 1
                 H106 ENTER HEADS SEPARATED BY COMMAS
                 0,1,2
 
-                H62 HEAD TABLE;  UNIT  4  7905A , 03 HEAD(S) 0 1 2              
+                H62 HEAD TABLE;  UNIT  4  7905A , 03 HEAD(S) 0 1 2
                 H25 WISH TO CHANGE?
                 NO
 
-                H62 HEAD TABLE;  UNIT  5  7906A , 02 HEAD(S) 0 1                
+                H62 HEAD TABLE;  UNIT  5  7906A , 02 HEAD(S) 0 1
                 H106 ENTER HEADS SEPARATED BY COMMAS
                 0,1,2,3
 
-                H62 HEAD TABLE;  UNIT  5  7906A , 04 HEAD(S) 0 1 2 3            
+                H62 HEAD TABLE;  UNIT  5  7906A , 04 HEAD(S) 0 1 2 3
                 H25 WISH TO CHANGE?
                 NO
 
@@ -1262,9 +1569,9 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                 H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
                 E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
                     SHOULD BE 0 1 0 00000 XXXX XXXX / 0 000010 0 0 0 1  0  0  0  0 0
-                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"
                 START 0000/00/00-LAST 0000/00/01 WORD COUNT  00128,OLD CYL  0000,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1273,9 +1580,9 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                 H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
                 E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
                     SHOULD BE 0 1 0 00000 XXXX XXXX / 0 000010 0 0 0 1  0  0  0  0 0
-                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"
                 START 0000/00/00-LAST 0001/00/00 WORD COUNT  00048,OLD CYL  0000,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1293,7 +1600,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                     SHOULD BE 0 0 1 10001 XXXX XXXX / 0 000010 0 0 0 0  0  0  0  0 0
                 H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "DEFECTIVE TRK "
                 START 0001/00/00-LAST 0001/00/01 WORD COUNT  00128,OLD CYL  0000,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1304,7 +1611,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                     SHOULD BE 0 1 0 10110 XXXX XXXX / 0 000010 0 0 0 0  0  0  0  0 0
                 H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "WRT PROTEC TRK"
                 START 0000/00/00-LAST 0000/00/01 WORD COUNT  00128,OLD CYL  0001,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1320,9 +1627,9 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                 H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
                 E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
                     SHOULD BE 0 1 0 00000 XXXX XXXX / 0 000010 0 0 0 1  0  0  0  0 0
-                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"
                 START 0000/00/00-LAST 0000/00/08 WORD COUNT  01024,OLD CYL  0000,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1369,7 +1676,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                     SHOULD BE 0 0 0 00111 0000 0000 / 0 000010 0 0 0 X  0  0  0  0 0
                 H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "CYL CMP ERROR "
                 START 0000/00/01-LAST 0000/00/03 WORD COUNT  00138,OLD CYL  0000,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1380,7 +1687,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                     SHOULD BE 0 0 0 01001 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
                 H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "HD/SEC CMP ERR"
                 START 0000/00/01-LAST 0000/00/03 WORD COUNT  00138,OLD CYL  0000,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1391,7 +1698,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                     SHOULD BE 0 0 0 01001 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
                 H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "HD/SEC CMP ERR"
                 START 0000/00/01-LAST 0000/00/03 WORD COUNT  00138,OLD CYL  0000,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1404,7 +1711,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                     SHOULD BE 0 0 0 01111 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
                 H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "POSS CORR DATA"
                 START 0000/00/00-LAST 0000/00/03 WORD COUNT  00128,OLD CYL  0000,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1415,7 +1722,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                     SHOULD BE 0 0 0 01000 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
                 H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "UNCOR DATA ERR"
                 START 0000/00/00-LAST 0000/00/03 WORD COUNT  00276,OLD CYL  0000,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1426,7 +1733,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                     SHOULD BE 0 0 1 10001 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
                 H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "DEFECTIVE TRK "
                 START 0016/00/00-LAST 0017/00/00 WORD COUNT  00048,OLD CYL  0128,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1437,7 +1744,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                     SHOULD BE 1 0 0 10000 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
                 H137 TERMINATION STATUS IS "NORMAL COMPLET"  SHOULD BE "SPR TRK ACCESS"
                 START 0128/01/00-LAST 0129/01/00 WORD COUNT  00048,OLD CYL  0016,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1446,9 +1753,9 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                 H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
                 E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
                     SHOULD BE 1 0 0 00000 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
-                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"
                 START 0016/00/33-LAST 0016/00/34 WORD COUNT  00128,OLD CYL  0128,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1457,9 +1764,9 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                 H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
                 E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
                     SHOULD BE 1 0 0 00000 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
-                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"
                 START 0016/00/33-LAST 0016/00/34 WORD COUNT  00128,OLD CYL  0016,UNIT 00
-                  
+
                 HALT instruction 102001
 
                 sim> go
@@ -1471,7 +1778,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                 H135          S P D TSTAT XXXX UNIT / E DRTYPE X A P F DF FS SC NR B
                 E64 STATUS IS 0 0 0 00000 0000 0000 / 0 000010 0 0 0 1  0  0  0  0 0
                     SHOULD BE 1 0 0 00000 XXXX XXXX / 0 000010 0 0 0 X  0  0  0  0 0
-                H137 TERMINATION STATUS IS "NORMAL COMPLET"  
+                H137 TERMINATION STATUS IS "NORMAL COMPLET"
                 START 0016/00/33-LAST 0016/00/34 WORD COUNT  00128,OLD CYL  0016,UNIT 00
 
                 HALT instruction 102001
@@ -1859,8 +2166,8 @@ TEST REPORT:    H050 BI-O ON PUNCH
                 sim> attach PTR scratch.2895.punch
                 sim> go
 
-                H054 PLACE LOOP IN READER-PRESS RUN 
-                   TO START READ, SET BIT0 TO 1 
+                H054 PLACE LOOP IN READER-PRESS RUN
+                   TO START READ, SET BIT0 TO 1
                    TO EXIT TEST, SET BIT0 TO 0
 
                 HALT instruction 102054
@@ -1876,8 +2183,8 @@ TEST REPORT:    H050 BI-O ON PUNCH
                 sim> deposit S 000000
                 sim> go
 
-                H054 PLACE LOOP IN READER-PRESS RUN 
-                   TO START READ, SET BIT0 TO 1 
+                H054 PLACE LOOP IN READER-PRESS RUN
+                   TO START READ, SET BIT0 TO 1
                    TO EXIT TEST, SET BIT0 TO 0
 
                 HALT instruction 102054
@@ -1895,8 +2202,8 @@ TEST REPORT:    H050 BI-O ON PUNCH
 
                 H056 TURN PUNCH ON, PRESS RUN. PUNCH ROUTINE
                    WILL START. LOAD THE TAPE BEING PUNCHED
-                   INTO THE READER. 
-                   TO START READ, SET BIT0 TO 1 
+                   INTO THE READER.
+                   TO START READ, SET BIT0 TO 1
                    TO EXIT, SET BIT0 TO 0
 
                 HALT instruction 102056
@@ -2007,7 +2314,7 @@ TEST REPORT:    H024 PRESS PRESET (EXT&INT),RUN
                 sim> attach TTY2 scratch.2752.punch
                 sim> go
 
-                H045 TURN TTY PUNCH OFF 
+                H045 TURN TTY PUNCH OFF
                 PRESS RUN
 
                 HALT instruction 102045
@@ -2037,24 +2344,24 @@ TEST REPORT:    H024 PRESS PRESET (EXT&INT),RUN
                 sim> go
 
                 INPUT THE FOLLOWING:
-                1    2    3    4    5    6    7    8    9    0    :    -    
+                1    2    3    4    5    6    7    8    9    0    :    -
 
-                Q    W    E    R    T    Y    U    I    O    P    
+                Q    W    E    R    T    Y    U    I    O    P
 
-                A    S    D    F    G    H    J    K    L    ;    
+                A    S    D    F    G    H    J    K    L    ;
 
-                Z    X    C    V    B    N    M    ,    .    /    
+                Z    X    C    V    B    N    M    ,    .    /
 
                 SHIFT+
-                !    "    #    $    %    &    '    (    )    *    =    
+                !    "    #    $    %    &    '    (    )    *    =
 
-                _    @    +    ^    <    >    ?    
+                _    @    +    ^    <    >    ?
 
                 CNTRL+
-                WRU  TAPE NTAP XOFF EOT  RU   BELL TAB  VT   FORM 
+                WRU  TAPE NTAP XOFF EOT  RU   BELL TAB  VT   FORM
 
 
-                RBOT CR   LF    
+                RBOT CR   LF
 
 
                 HALT instruction 102076
@@ -2062,9 +2369,9 @@ TEST REPORT:    H024 PRESS PRESET (EXT&INT),RUN
                 sim> set console WRU=005
                 sim> go
 
-                INPUT ANY KEY 
-                T    H    I    S    040  I    S    040  A    040  
-                T    E    S    T    
+                INPUT ANY KEY
+                T    H    I    S    040  I    S    040  A    040
+                T    E    S    T
 
                 [CTRL+E]
                 Simulation stopped
@@ -2080,7 +2387,7 @@ TEST REPORT:    H024 PRESS PRESET (EXT&INT),RUN
 
                 H044 INPUT TERMINATED
 
-                ECHO MODE ANY INPUT IS ECHOED 
+                ECHO MODE ANY INPUT IS ECHOED
                 THIS IS A TEST
 
                 [CTRL+E]
@@ -2125,7 +2432,7 @@ Each execution note below presumes that the target diagnostic has been loaded.
 For all runs, the diagnostic configurator was used in automatic mode to load the
 target diagnostic from a paper tape image, as follows:
 
-  sim> attach -r MSC0 24396-13601-REV-2040.tape
+  sim> attach -r MSC0 24396-13601_Rev-2236.abin.tape
   sim> deposit S 000000
   sim> boot MSC0
 
@@ -2136,109 +2443,6 @@ target diagnostic from a paper tape image, as follows:
   sim> reset
   sim> go 100
 
-
-
-------------------------------
-DSN 105101 - 2767 Line Printer
-------------------------------
-
-TESTED DEVICE:  LPS (hp2100_lps.c)
-
-BINARY TAPE:    12984-16001 Rev. 1611
-
-CONFIGURATION:  sim> set LPS realtime
-                sim> attach LPS scratch.2767.printer
-                sim> deposit S 000014
-                sim> reset
-                sim> go 100
-
-                HALT instruction 102074
-
-                sim> deposit S 000000
-                sim> reset
-                sim> go
-
-TEST REPORT:    2767 L.P. DIAGNOSTIC
-                H024 PRESS PRESET (EXT&INT),RUN
-
-                HALT instruction 102024
-
-                sim> reset
-                sim> go
-
-                H025 BI-O COMP
-                H035 TURN OFF L.P. POWER
-
-                HALT instruction 102035
-
-                sim> set LPS poweroff
-                sim> go
-
-                H036 TURN ON L.P. POWER
-
-                HALT instruction 102036
-
-                sim> set LPS poweron
-                sim> go
-
-                H033 PUT L.P. ON-LINE
-
-                HALT instruction 102033
-
-                sim> set LPS online
-                sim> go
-
-                H034 MASTER CLEAR L.P.
-
-                HALT instruction 102034
-
-                sim> set LPS offline
-                sim> go
-
-                H033 PUT L.P. ON-LINE
-
-                HALT instruction 102033
-
-                sim> set LPS online
-                sim> go
-
-                H040 PUT L.P. OFF-LINE.  TOGGLE TOP-OF-FORM SWITCH
-
-                HALT instruction 102040
-
-                sim> set LPS offline
-                sim> go
-
-                H033 PUT L.P. ON-LINE
-
-                HALT instruction 102033
-
-                sim> set LPS online
-                sim> go
-
-                H041 PUT L.P. OFF-LINE.  TOGGLE PAPER-STEP 5 TIMES
-
-                HALT instruction 102041
-
-                sim> set LPS offline
-                sim> go
-
-                H033 PUT L.P. ON-LINE
-
-                HALT instruction 102033
-
-                sim> set LPS online
-                sim> go
-
-                PASS 000001
-
-                HALT instruction 102077
-
-TEST RESULT:    Passed.
-
-TEST NOTES:     The simulation provides no manual Master Clear, Top of Form, or
-                Paper Step functions, so these are merely presumed above.
-                
 
 
 -----------------------------------------------------------------
@@ -2264,7 +2468,7 @@ CONFIGURATION:  sim> set DPC 12557A
                 sim> reset
                 sim> go 100
 
-                H0 HP2100A CARTRIDGE DISC MEMORY DIAGNOSTIC 
+                H0 HP2100A CARTRIDGE DISC MEMORY DIAGNOSTIC
                 H34 ENTER UNIT NUMBERS(0-3)SEPARATED BY COMMAS
                 0,1,2,3
 
@@ -2276,17 +2480,17 @@ CONFIGURATION:  sim> set DPC 12557A
                 sim> go
 
                 H24 CYLINDER TABLE
-                000,001,002,004,008,016,032,064,128,202 
+                000,001,002,004,008,016,032,064,128,202
                 H25 WISH TO ALTER TABLE?
                 NO
 
-                H27 PATTERN TABLE 
-                000000  177777  125252  052525  007417  
-                170360  162745  163346  155555  022222  
+                H27 PATTERN TABLE
+                000000  177777  125252  052525  007417
+                170360  162745  163346  155555  022222
                 H25 WISH TO ALTER TABLE?
                 NO
 
-                H62 TYPE A FOR HEADS 0,1;B FOR 2,3;C FOR ALTERNATELY 0,1 THEN 2,3 
+                H62 TYPE A FOR HEADS 0,1;B FOR 2,3;C FOR ALTERNATELY 0,1 THEN 2,3
                 C
 
                 H32 RESET SWITCH 2
@@ -2297,7 +2501,7 @@ CONFIGURATION:  sim> set DPC 12557A
                 sim> reset
                 sim> go 100
 
-TEST REPORT:    H0 HP2100A CARTRIDGE DISC MEMORY DIAGNOSTIC 
+TEST REPORT:    H0 HP2100A CARTRIDGE DISC MEMORY DIAGNOSTIC
                 H65 PASS  0001
                 H65 PASS  0002
                 H65 PASS  0003
@@ -2332,7 +2536,7 @@ CONFIGURATION:  sim> set DPC 12557A
                 sim> reset
                 sim> go 100
 
-TEST REPORT:    H0 HP2100A CARTRIDGE DISC MEMORY DIAGNOSTIC 
+TEST REPORT:    H0 HP2100A CARTRIDGE DISC MEMORY DIAGNOSTIC
                 H66 SET OVERRIDE SWITCH,PUSH RUN
 
                 HALT instruction 102002
@@ -2369,7 +2573,7 @@ TEST REPORT:    H0 HP2100A CARTRIDGE DISC MEMORY DIAGNOSTIC
 
                 sim> go
 
-                H42 WRITE PROTECTED TRACK IN S0 
+                H42 WRITE PROTECTED TRACK IN S0
                 E64 STATUS IS 000000 SHOULD BE  000011
                 H51 CYL 0000 HEAD 00 SECTOR 00 WORD COUNT 0128 UNIT 00
 
@@ -2397,7 +2601,7 @@ TEST REPORT:    H0 HP2100A CARTRIDGE DISC MEMORY DIAGNOSTIC
 
                 sim> go
 
-                H70 UNLOCK UNIT 0,PUSH RUN 
+                H70 UNLOCK UNIT 0,PUSH RUN
 
                 HALT instruction 102002
 
@@ -2412,7 +2616,7 @@ TEST REPORT:    H0 HP2100A CARTRIDGE DISC MEMORY DIAGNOSTIC
                 sim> set DPC0 loaded
                 sim> go
 
-                H71 PRESS PRESET THEN PRESS RUN 
+                H71 PRESS PRESET THEN PRESS RUN
 
                 HALT instruction 102002
 
@@ -2444,14 +2648,14 @@ CONFIGURATION:  sim> attach DQC0 scratch.U0.2883.disc
 
                 H0 HP 2100 SERIES DISC FILE(2883) DIAGNOSTIC
 
-                H72 ENTER SELECT CODES,DMA CHANNEL IN SWITCH REGISTER,PRESS RUN 
+                H72 ENTER SELECT CODES,DMA CHANNEL IN SWITCH REGISTER,PRESS RUN
 
                 HALT instruction 107001
 
                 sim> deposit S 002411
                 sim> go
 
-                H1 ENTER PROGRAM OPTIONS IN SWITCH REGISTER,PRESS RUN 
+                H1 ENTER PROGRAM OPTIONS IN SWITCH REGISTER,PRESS RUN
 
                 HALT instruction 107077
 
@@ -2484,21 +2688,21 @@ CONFIGURATION:  sim> attach DQC0 scratch.U0.2883.disc
 
                 H0 HP 2100 SERIES DISC FILE(2883) DIAGNOSTIC
 
-                H72 ENTER SELECT CODES,DMA CHANNEL IN SWITCH REGISTER,PRESS RUN 
+                H72 ENTER SELECT CODES,DMA CHANNEL IN SWITCH REGISTER,PRESS RUN
 
                 HALT instruction 107001
 
                 sim> deposit S 002411
                 sim> go
 
-                H1 ENTER PROGRAM OPTIONS IN SWITCH REGISTER,PRESS RUN 
+                H1 ENTER PROGRAM OPTIONS IN SWITCH REGISTER,PRESS RUN
 
                 HALT instruction 107077
 
                 sim> deposit S 000142
                 sim> go
 
-TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN 
+TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 HALT instruction 102002
 
@@ -2520,7 +2724,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 sim> go
 
-                H33 WRITE DEFECTIVE TRACK IN S0 
+                H33 WRITE DEFECTIVE TRACK IN S0
                 E64 STATUS IS 000000 SHOULD BE  000031
                 H51 CYL 0000 HEAD 01 SECTOR 00 WORD COUNT 0128 UNIT 00
 
@@ -2536,13 +2740,13 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 sim> go
 
-                H67 CLEAR FORMAT SWITCH ON UNIT  0,PUSH RUN 
+                H67 CLEAR FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 HALT instruction 102002
 
                 sim> go
 
-                H33 WRITE DEFECTIVE TRACK IN S0 
+                H33 WRITE DEFECTIVE TRACK IN S0
                 E64 STATUS IS 000000 SHOULD BE  000031
                 H51 CYL 0000 HEAD 01 SECTOR 00 WORD COUNT 0128 UNIT 00
 
@@ -2558,7 +2762,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 sim> go
 
-                H42 WRITE PROTECTED TRACK IN S0 
+                H42 WRITE PROTECTED TRACK IN S0
                 E64 STATUS IS 000000 SHOULD BE  000011
                 H51 CYL 0000 HEAD 00 SECTOR 00 WORD COUNT 0128 UNIT 00
 
@@ -2574,19 +2778,19 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 sim> go
 
-                H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN 
+                H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 HALT instruction 102002
 
                 sim> go
 
-                H67 CLEAR FORMAT SWITCH ON UNIT  0,PUSH RUN 
+                H67 CLEAR FORMAT SWITCH ON UNIT  0,PUSH RUN
 
                 HALT instruction 102002
 
                 sim> go
 
-                H70 DISABLE UNIT   0,PUSH RUN 
+                H70 DISABLE UNIT   0,PUSH RUN
 
                 HALT instruction 102002
 
@@ -2601,7 +2805,7 @@ TEST REPORT:    H66 SET FORMAT SWITCH ON UNIT  0,PUSH RUN
                 sim> set DQC0 loaded
                 sim> go
 
-                H71 PRESS PRESET THEN PRESS RUN 
+                H71 PRESS PRESET THEN PRESS RUN
 
                 HALT instruction 102002
 
@@ -2663,7 +2867,7 @@ TEST REPORT:    H12 DEVICE HAS  90 SECTORS
                 sim> set DRC unprotected
                 sim> go
 
-                H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN 
+                H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN
 
                 HALT instruction 102002
 
@@ -2726,7 +2930,7 @@ TEST REPORT:    H12 DEVICE HAS  90 SECTORS
                 sim> set DRC unprotected
                 sim> go
 
-                H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN 
+                H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN
 
                 HALT instruction 102002
 
@@ -2788,8 +2992,8 @@ TEST REPORT:    H12 DEVICE HAS  32 SECTORS
 
                 sim> set DRC unprotected
                 sim> go
-                
-                H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN 
+
+                H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN
 
                 HALT instruction 102002
 
@@ -2852,7 +3056,7 @@ TEST REPORT:    H12 DEVICE HAS  32 SECTORS
                 sim> set DRC unprotected
                 sim> go
 
-                H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN 
+                H10 SET TRACK PROTECT SWITCH TO PROTECTED,PRESS RUN
 
                 HALT instruction 102002
 
@@ -2876,75 +3080,16 @@ TEST RESULT:    Passed.
 
 
 
--------------------------------------------------
-DSN 101016 - 2000/Access Comm. Processor Firmware
--------------------------------------------------
- 
-TESTED DEVICE:  CPU (hp2100_cpu.c)
+------------------------------------------------
+DSN 101217 - 2000/Access Comm Processor for 21MX
+------------------------------------------------
 
-BINARY TAPE:    13206-16001 Rev. 1526
-
-CONFIGURATION:  sim> set CPU 2100
-                sim> set CPU 32K
-                sim> set CPU IOP
-                sim> deposit S 000013
-                sim> reset
-                sim> go 100
-
-                HALT instruction 102074
-
-                sim> deposit S 000000
-                sim> reset
-                sim> go
-
-TEST REPORT:    2100 2000-ACCESS COMM. PROC. FIRMWARE DIAGNOSTIC
-                H030 CRC TEST
-                H040 ENQ, DEQ AND PENQ TESTS
-                H060 IAL TEST
-                H110 READF, SAVE AND RESTR TESTS
-                H120 LAI AND SAI TESTS
-                H130 PFREX TEST
-                H140 PFREI TEST
-                H150 PFRIO TEST
-                H160 STORE-LOAD BYTE, TRSLT 
-                AND BYTE MOVE TEST
-
-                TEST  10
-                E165 TRSLT NOT INTERRUPTIBLE
-
-                HALT instruction 106065
-
-                sim> go
-
-                H230 WORD MOVE TEST
-
-                TEST  11
-                E234 WORD MOVE NOT INTERRUPTIBLE
-
-                HALT instruction 103034
-
-                sim> go
-
-                PASS 000001
-
-                HALT instruction 102077
-
-TEST RESULT:    Partially passed.
-
-TEST NOTES:     Tests 10 and 11 test the interruptibility of the TRSLT and MWORD
-                instructions.  These features are not simulated.
-
-
-
--------------------------------------------------
-DSN 101217 - 2000/Access Comm. Processor Firmware
--------------------------------------------------
- 
-TESTED DEVICE:  CPU (hp2100_cpu.c)
+TESTED DEVICE:  CPU (hp2100_cpu2.c)
 
 BINARY TAPE:    13207-16001 Rev. 1728
 
 CONFIGURATION:  sim> set CPU IOP
+
                 sim> deposit S 000013
                 sim> reset
                 sim> go 100

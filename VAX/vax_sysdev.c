@@ -85,7 +85,7 @@
 #define CMERR_BUS       0x00000080                      /* bus err NI */
 #define CMERR_SYN       0x0000007F                      /* syndrome NI */
 #define CMERR_W1C       (CMERR_RDS | CMERR_FRQ | CMERR_CRD | \
-                     CMERR_DMA | CMERR_BUS)
+                         CMERR_DMA | CMERR_BUS)
 
 /* CMCTL control/status register */
 
@@ -97,7 +97,7 @@
 #define CMCSR_DCM       0x00000080                      /* diag mode NI */
 #define CMCSR_SYN       0x0000007F                      /* syndrome NI */
 #define CMCSR_MASK      (CMCSR_PMI | CMCSR_CRD | CMCSR_DET | \
-                     CMCSR_FDT | CMCSR_DCM | CMCSR_SYN)
+                         CMCSR_FDT | CMCSR_DCM | CMCSR_SYN)
 
 /* KA655 boot/diagnostic register */
 
@@ -276,6 +276,7 @@ extern void txcs_wr (int32 dat);
 extern void txdb_wr (int32 dat);
 extern void ioreset_wr (int32 dat);
 extern uint32 sim_os_msec();
+extern int32 cpu_psl_ipl (int32 newpsl);
 
 /* ROM data structures
 
@@ -901,7 +902,7 @@ struct reglink {                                        /* register linkage */
     uint32      low;                                    /* low addr */
     uint32      high;                                   /* high addr */
     t_stat      (*read)(int32 pa);                      /* read routine */
-    void        (*write)(int32 pa, int32 val, int32 lnt);       /* write routine */
+    void        (*write)(int32 pa, int32 val, int32 lnt); /* write routine */
     };
 
 struct reglink regtable[] = {
@@ -1047,10 +1048,10 @@ int32 rg = (pa - KABASE) >> 2;
 
 switch (rg) {
 
-    case 0:                                                     /* CACR */
+    case 0:                                             /* CACR */
         return ka_cacr;
 
-    case 1:                                                     /* BDR */
+    case 1:                                             /* BDR */
         return ka_bdr;
         }
 
@@ -1500,7 +1501,7 @@ else STK[temp] = SP;                                    /* save stack */
 if (mapen) conpsl = conpsl | CON_MAPON;                 /* mapping on? */
 mapen = 0;                                              /* turn off map */
 SP = IS;                                                /* set SP from IS */
-PSL = PSL_IS | PSL_IPL1F;                               /* PSL = 41F0000 */
+PSL = cpu_psl_ipl (PSL_IS | PSL_IPL1F);                 /* PSL = 41F0000 */
 JUMP (ROMBASE);                                         /* PC = 20040000 */
 return 0;                                               /* new cc = 0 */
 }
@@ -1514,7 +1515,7 @@ extern FILE *sim_log;
 t_stat r;
 
 PC = ROMBASE;
-PSL = PSL_IS | PSL_IPL1F;
+PSL = cpu_psl_ipl (PSL_IS | PSL_IPL1F);
 conpc = 0;
 conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
 if (rom == NULL) return SCPE_IERR;
@@ -1569,4 +1570,3 @@ ssc_bto = 0;
 ssc_otp = 0;
 return SCPE_OK;
 }
-

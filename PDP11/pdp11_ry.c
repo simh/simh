@@ -427,7 +427,7 @@ switch (ry_state) {                                     /* case on state */
             break;
             }
         uptr->TRACK = ry_track;                         /* now on track */
-        if ((ry_sector == 0) || (ry_sector > RX_NUMSC)) {       /* bad sect? */
+        if ((ry_sector == 0) || (ry_sector > RX_NUMSC)) { /* bad sect? */
             ry_done (0, 0070);                          /* done, error */
             break;
             }
@@ -437,7 +437,7 @@ switch (ry_state) {                                     /* case on state */
             break;
             }
         da = CALC_DA (ry_track, ry_sector, bps);        /* get disk address */
-        if (func == RYCS_WRDEL) ry_esr = ry_esr | RYES_DD;      /* del data? */
+        if (func == RYCS_WRDEL) ry_esr = ry_esr | RYES_DD; /* del data? */
         if (func == RYCS_READ) {                        /* read? */
             for (i = 0; i < bps; i++)
                 rx2xb[i] = fbuf[da + i];

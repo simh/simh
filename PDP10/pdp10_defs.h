@@ -1,6 +1,6 @@
 /* pdp10_defs.h: PDP-10 simulator definitions
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   01-Feb-07    RMS     Added CD support
+   29-Oct-06    RMS     Added clock coscheduling function
    29-Dec-03    RMS     Added Q18 definition for PDP11 compatibility
    19-May-03    RMS     Revised for new conditional compilation scheme
    09-Jan-03    RMS     Added DEUNA/DELUA support
@@ -122,10 +124,16 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 /* Operating system flags, kept in cpu_unit.flags */
 
 #define UNIT_V_ITS      (UNIT_V_UF)                     /* ITS */
+#define UNIT_V_T20      (UNIT_V_UF + 1)                 /* TOPS-20 */
+#define UNIT_V_KLAD     (UNIT_V_UF + 2)                 /* diagnostics */
 #define UNIT_ITS        (1 << UNIT_V_ITS)
-#define UNIT_V_T20V41   (UNIT_V_UF + 1)                 /* TOPS-20 V4.1 */
-#define UNIT_T20V41     (1 << UNIT_V_T20V41)
-#define ITS             (cpu_unit.flags & UNIT_ITS)
+#define UNIT_T20        (1 << UNIT_V_T20)
+#define UNIT_KLAD       (1 << UNIT_V_KLAD)
+#define Q_T10           ((cpu_unit.flags & (UNIT_ITS|UNIT_T20|UNIT_KLAD)) == 0)
+#define Q_ITS           (cpu_unit.flags & UNIT_ITS)
+#define Q_T20           (cpu_unit.flags & UNIT_T20)
+#define Q_KLAD          (cpu_unit.flags & UNIT_KLAD)
+#define Q_IDLE          (sim_idle_enab)
 
 /* Architectural constants */
 
@@ -384,7 +392,7 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 #define EBR_MASK        (EBR_T20P | EBR_PGON | (EBR_M_EBR << EBR_V_EBR))
 #define EBR_GETEBR(x)   ((int32) (((x) >> EBR_V_EBR) & PAG_M_PPN))
 #define PAGING          (ebr & EBR_PGON)
-#define T20             (ebr & EBR_T20P)
+#define T20PAG          (ebr & EBR_T20P)
 
 /* AC and mapping contexts
 
@@ -647,6 +655,8 @@ typedef struct pdp_dib DIB;
 #define IOLN_UBMNT3     001
 #define IOBA_XU         (IO_UBA3 + 0774510)             /* DEUNA/DELUA */
 #define IOLN_XU         010
+#define IOBA_CR         (IO_UBA3 + 0777160)             /* CD/CR/CM */
+#define IOLN_CR         010
 #define IOBA_RY         (IO_UBA3 + 0777170)             /* RX211 */
 #define IOLN_RY         004
 #define IOBA_TU         (IO_UBA3 + 0772440)             /* RH11/tape */
@@ -689,6 +699,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_PTR       24                              /* PC11 */
 #define INT_V_PTP       25
 #define INT_V_LP20      26                              /* LPT20 */
+#define INT_V_CR        27                              /* CD20 (CD11) */
 
 #define INT_RP          (1u << INT_V_RP)
 #define INT_TU          (1u << INT_V_TU)
@@ -699,6 +710,7 @@ typedef struct pdp_dib DIB;
 #define INT_PTR         (1u << INT_V_PTR)
 #define INT_PTP         (1u << INT_V_PTP)
 #define INT_LP20        (1u << INT_V_LP20)
+#define INT_CR          (1u << INT_V_CR)
 
 #define IPL_RP          6                               /* int levels */
 #define IPL_TU          6
@@ -709,6 +721,7 @@ typedef struct pdp_dib DIB;
 #define IPL_PTR         4
 #define IPL_PTP         4
 #define IPL_LP20        4
+#define IPL_CR          4
 
 #define INT_UB1         INT_RP                          /* on Unibus 1 */
 #define INT_UB3         (0xFFFFFFFFu & ~INT_UB1)        /* on Unibus 3 */
@@ -723,6 +736,7 @@ typedef struct pdp_dib DIB;
 #define VEC_PTP         0074
 #define VEC_XU          0120
 #define VEC_TU          0224
+#define VEC_CR          0230
 #define VEC_RP          0254
 #define VEC_RY          0264
 #define VEC_DZRX        0340
@@ -747,5 +761,11 @@ t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat auto_config (char *name, int32 num);
+
+int32 clk_cosched (int32 wait);
+
+/* Global data */
+
+extern t_bool sim_idle_enab;
 
 #endif

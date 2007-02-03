@@ -25,6 +25,13 @@
 
    cpu          PDP-4/7/9/15 central processor
 
+   26-Dec-06    RMS     Fixed boundary test in KT15/XVM (reported by Andrew Warkentin)
+   30-Oct-06    RMS     Added idle and infinite loop detection
+   08-Oct-06    RMS     Added RDCLK instruction
+                        Fixed bug, PC off by one on fetch mem mmgt error
+                        PDP-15 sets API 3 on mem mmgt trap (like PI)
+                        PDP-15 sets API 4 on CAL only if 0-3 inactive
+                        CAF clears memory management mode register
    27-Jun-06    RMS     Reset clears AC, L, and MQ
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -285,6 +292,7 @@
 #define UNIT_RELOC      (1 << UNIT_V_RELOC)
 #define UNIT_XVM        (1 << UNIT_V_XVM)
 #define UNIT_MSIZE      (1 << UNIT_V_MSIZE)
+#define OP_KSF          0700301
 
 #define HIST_API        0x40000000
 #define HIST_PI         0x20000000
@@ -373,6 +381,7 @@ InstHistory *hst = NULL;                                /* instruction history *
 extern int32 sim_int_char;
 extern int32 sim_interval;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern t_bool sim_idle_enab;
 extern DEVICE *sim_devices[];
 extern FILE *sim_log;
 
@@ -383,6 +392,7 @@ t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+void cpu_caf (void);
 void cpu_inst_hist (int32 addr, int32 inst);
 void cpu_intr_hist (int32 flag, int32 lvl);
 int32 upd_iors (void);
@@ -398,6 +408,7 @@ int32 Prot15 (int32 ma, t_bool bndchk);
 int32 Reloc15 (int32 ma, int32 acc);
 int32 RelocXVM (int32 ma, int32 acc);
 extern t_stat fp15 (int32 ir);
+extern int32 clk_task_upd (t_bool clr);
 #else
 #define INDEX(i,x)
 #endif
@@ -530,6 +541,8 @@ MTAB cpu_mod[] = {
     { UNIT_PROT+UNIT_RELOC+UNIT_XVM, UNIT_PROT+UNIT_RELOC+UNIT_XVM,
       "XVM", "XVM", NULL },
 #endif
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
 #if defined (PDP4)
     { UNIT_MSIZE, 4096, NULL, "4K", &cpu_set_size },
 #endif
@@ -566,6 +579,7 @@ t_stat sim_instr (void)
 {
 int32 api_int, api_usmd, skp;
 int32 iot_data, device, pulse;
+int32 last_IR;
 t_stat reason;
 extern UNIT clk_unit;
 
@@ -574,6 +588,7 @@ PC = PC & AMASK;                                        /* clean variables */
 LAC = LAC & LACMASK;
 MQ = MQ & DMASK;
 reason = 0;
+last_IR = -1;
 sim_rtc_init (clk_unit.wait);                           /* init calibration */
 if (cpu_unit.flags & UNIT_NOAPI) api_enb = api_req = api_act = 0;
 api_int = api_eval (&int_pend);                         /* eval API */
@@ -642,8 +657,18 @@ while (reason == 0) {                                   /* loop until halted */
     if (trap_pending) {                                 /* trap pending? */
         PCQ_ENTRY;                                      /* save old PC */
         MB = Jms_word (1);                              /* save state */
-        MA = ion? 0: 020;                               /* save in 0/20 */
-        ion = 0;                                        /* interrupts off */
+        if (ion) {                                      /* int on? */
+            ion = 0;                                    /* interrupts off */
+            MA = 0;                                     /* treat like PI */
+#if defined (PDP15)
+            ion_defer = 2;                              /* free instruction */
+            if (!(cpu_unit.flags & UNIT_NOAPI)) {       /* API? */
+                api_act = api_act | API_ML3;            /* set lev 3 active */
+                api_int = api_eval (&int_pend);         /* re-evaluate */
+                }
+#endif
+            }
+        else MA = 020;                                  /* sortof like CAL */
         emir_pending = rest_pending = trap_pending = 0; /* emir,rest,trap off */
         usmd = usmd_buf = 0;                            /* user mode off */
         Write (MA, MB, WR);                             /* physical write */
@@ -676,6 +701,7 @@ while (reason == 0) {                                   /* loop until halted */
         usmd = usmd_buf = 0;                            /* user mode off */
         emir_pending = rest_pending = 0;                /* emir, restore off */
         xct_count = 0;
+        Read (MA, &IR, FE);                             /* fetch instruction */
         goto xct_instr;
         }
 
@@ -685,10 +711,10 @@ while (reason == 0) {                                   /* loop until halted */
         if (hst_lnt) cpu_intr_hist (HIST_PI, 0);        /* record */
         MB = Jms_word (usmd);                           /* save state */
         ion = 0;                                        /* interrupts off */
+        ion_defer = 2;                                  /* free instruction */
 #if defined (PDP9)                                      /* PDP-9, */
         memm = 0;                                       /* extend off */
 #else                                                   /* PDP-15 */
-        ion_defer = 2;                                  /* free instruction */
         if (!(cpu_unit.flags & UNIT_NOAPI)) {           /* API? */
             api_act = api_act | API_ML3;                /* set lev 3 active */
             api_int = api_eval (&int_pend);             /* re-evaluate */
@@ -713,10 +739,10 @@ while (reason == 0) {                                   /* loop until halted */
 
     xct_count = 0;                                      /* track nested XCT's */
     MA = PC;                                            /* fetch at PC */
+    if (Read (MA, &IR, FE)) continue;                   /* fetch instruction */
     PC = Incr_addr (PC);                                /* increment PC */
 
-    xct_instr:                                          /* label for XCT */
-    if (Read (MA, &IR, FE)) continue;                   /* fetch instruction */
+    xct_instr:                                          /* label for API, XCT */
     if (hst_lnt) cpu_inst_hist (MA, IR);                /* history? */
     if (ion_defer) ion_defer = ion_defer - 1;           /* count down defer */
     if (sim_interval) sim_interval = sim_interval - 1;
@@ -846,6 +872,7 @@ while (reason == 0) {                                   /* loop until halted */
 #if defined (PDP9)
         ion_defer = 1;                                  /* defer intr */
 #endif
+        if (Read (MA, &IR, FE)) break;                  /* fetch inst, mm err? */
         goto xct_instr;                                 /* go execute */
 
 /* CAL: opcode 00 - api_usmd records whether usmd = 1 at start of API cycle
@@ -867,7 +894,10 @@ while (reason == 0) {                                   /* loop until halted */
 #if defined (PDP9) || defined (PDP15)
         usmd = usmd_buf = 0;                            /* clear user mode */
         if ((cpu_unit.flags & UNIT_NOAPI) == 0) {       /* if API, act lvl 4 */
-            api_act = api_act | 010;
+#if defined (PDP15)                                     /* PDP15: if 0-3 inactive */
+          if ((api_act & (API_ML0|API_ML1|API_ML2|API_ML3)) == 0)
+#endif
+            api_act = api_act | API_ML4;
             api_int = api_eval (&int_pend);
             }
 #endif
@@ -899,9 +929,29 @@ while (reason == 0) {                                   /* loop until halted */
 
     case 031:                                           /* JMP, indir */
         if (Ia (MA, &MA, 1)) break;
+        INDEX (IR, MA);
+        PCQ_ENTRY;                                      /* save old PC */
+        PC = MA & AMASK;
+        break;
+
+/* JMP direct - check for idle */
+
     case 030:                                           /* JMP, dir */
         INDEX (IR, MA);
         PCQ_ENTRY;                                      /* save old PC */
+        if (sim_idle_enab) {                            /* idling enabled? */
+            t_bool iof = (ion_inh != 0) ||              /* IOF if inhibited */
+                ((ion == 0) && (api_enb == 0));         /* or PI and api off */
+            if (((MA ^ (PC - 2)) & AMASK) == 0) {       /* 1) JMP *-1? */
+                if (iof && (last_IR == OP_KSF) &&       /*    iof, prv KSF, */
+                    !TST_INT (TTI))                     /*    no TTI flag? */
+                    sim_idle (0, FALSE);                /* we're idle */
+                }
+            else if (((MA ^ (PC - 1)) & AMASK) == 0) {  /* 2) JMP *? */
+                if (iof) reason = STOP_LOOP;            /*    iof? inf loop */
+                else sim_idle (0, FALSE);               /*    ion? idle */                
+                }
+            }                                           /* end idle */
         PC = MA & AMASK;
         break;
 
@@ -1369,12 +1419,15 @@ while (reason == 0) {                                   /* loop until halted */
 
         case 017:                                       /* mem protection */
             if (PROT) {                                 /* enabled? */
-                if ((pulse == 001) && prvn) PC = Incr_addr (PC);
-                else if ((pulse == 041) && nexm) PC = Incr_addr (PC);
-                else if (pulse == 002) prvn = 0;
-                else if (pulse == 042) usmd_buf = 1;
-                else if (pulse == 004) BR = LAC & BRMASK;
-                else if (pulse == 044) nexm = 0;
+                if ((pulse == 001) && prvn)             /* MPSK */
+                    PC = Incr_addr (PC);
+                else if ((pulse == 041) && nexm)        /* MPSNE */
+                    PC = Incr_addr (PC);
+                else if (pulse == 002) prvn = 0;        /* MPCV */
+                else if (pulse == 042) usmd_buf = 1;    /* MPEU */
+                else if (pulse == 004)                  /* MPLD */
+                    BR = LAC & BRMASK;
+                else if (pulse == 044) nexm = 0;        /* MPCNE */
                 }
             else reason = stop_inst;
             break;
@@ -1388,7 +1441,7 @@ while (reason == 0) {                                   /* loop until halted */
             if ((pulse == 001) || (pulse == 041)) PC = Incr_addr (PC);
             else if (pulse == 002) {                    /* CAF */
                 reset_all (1);                          /* reset all exc CPU */
-                api_enb = api_req = api_act = 0;        /* reset API system */
+                cpu_caf ();                             /* CAF to CPU */
                 }
             else if (pulse == 044) rest_pending = 1;    /* DBR */
             if (((cpu_unit.flags & UNIT_NOAPI) == 0) && (pulse & 004)) {
@@ -1444,13 +1497,19 @@ while (reason == 0) {                                   /* loop until halted */
         case 017:                                       /* mem protection */
             if (PROT) {                                 /* enabled? */
                 t = XVM? BRMASK_XVM: BRMASK;
-                if ((pulse == 001) && prvn) PC = Incr_addr (PC);
-                else if ((pulse == 041) && nexm) PC = Incr_addr (PC);
-                else if (pulse == 002) prvn = 0;
-                else if (pulse == 042) usmd_buf = 1;
-                else if (pulse == 004) BR = LAC & t;
-                else if (RELOC && (pulse == 024)) RR = LAC & t;
-                else if (pulse == 044) nexm = 0;
+                if ((pulse == 001) && prvn)             /* MPSK */
+                    PC = Incr_addr (PC);
+                else if ((pulse == 041) && nexm)        /* MPSNE */
+                    PC = Incr_addr (PC);
+                else if (pulse == 002) prvn = 0;        /* MPCV */
+                else if (pulse == 042)                  /* MPEU */
+                     usmd_buf = 1;
+                else if (XVM && (pulse == 062))         /* RDCLK */
+                    iot_data = clk_task_upd (TRUE);
+                else if (pulse == 004) BR = LAC & t;    /* MPLD */
+                else if (RELOC && (pulse == 024))       /* MPLR */
+                    RR = LAC & t;
+                else if (pulse == 044) nexm = 0;        /* MPCNE */
                 }
             else reason = stop_inst;
             break;
@@ -1464,7 +1523,7 @@ while (reason == 0) {                                   /* loop until halted */
             if ((pulse == 001) || (pulse == 041)) PC = Incr_addr (PC);
             else if (pulse == 002) {                    /* CAF */
                 reset_all (2);                          /* reset all exc CPU, FP15 */
-                api_enb = api_req = api_act = 0;        /* reset API system */
+                cpu_caf ();                             /* CAF to CPU */
                 }
             else if (pulse == 044) rest_pending = 1;    /* DBR */
             if (((cpu_unit.flags & UNIT_NOAPI) == 0) && (pulse & 004)) {
@@ -1519,6 +1578,7 @@ while (reason == 0) {                                   /* loop until halted */
         }                                               /* end switch opcode */
 
     api_usmd = 0;                                       /* API cycle over */
+    last_IR = IR;                                       /* save IR for next */
     }                                                   /* end while */
 
 /* Simulation halted */
@@ -1835,7 +1895,7 @@ int32 Reloc15 (int32 ma, int32 rc)
 int32 pa;
 
 ma = ma & AMASK;                                        /* 17b addressing */
-if (ma >= (BR | 0377)) {                                /* boundary viol? */
+if (ma > (BR | 0377)) {                                 /* boundary viol? */
     if (rc != REL_C) prvn = trap_pending = 1;           /* set flag, trap */
     return -1;
     }
@@ -1871,7 +1931,7 @@ else if ((MMR & MM_SH) &&                               /* shared enabled and */
 	else pa = RR + (ma & 0377);							/* no, ISAS reloc */
 	}
 else {
-    if (ma >= (BR | 0377)) {                            /* normal reloc, viol? */
+    if (ma > (BR | 0377)) {                             /* normal reloc, viol? */
         if (rc != REL_C) prvn = trap_pending = 1;       /* set flag, trap */
         return -1;
         }
@@ -1909,6 +1969,17 @@ if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
+}
+
+/* CAF routine (CPU reset isn't called by CAF) */
+
+void cpu_caf (void)
+{
+api_enb = api_req = api_act = 0;                    /* reset API system */
+nexm = prvn = trap_pending = 0;                     /* reset MM system */
+usmd = usmd_buf = usmd_defer = 0;
+MMR = 0;
+return;
 }
 
 /* Memory examine */

@@ -72,7 +72,7 @@
 #define RP_NUMWD        256                             /* words/sector */
 #define RP_MAXFR        (1 << 16)                       /* max transfer */
 #define GET_SECTOR(x,d) ((int) fmod (sim_gtime() / ((double) (x)), \
-                    ((double) drv_tab[d].sect)))
+                        ((double) drv_tab[d].sect)))
 #define RM_OF           (MBA_RMASK + 1)
 
 /* Flags in the unit flags word */

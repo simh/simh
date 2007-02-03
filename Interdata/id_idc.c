@@ -128,8 +128,8 @@
 #define HCYL_V_HD       10                              /* head/cyl word */
 #define HCYL_V_CYL      0
 
-#define GET_SA(cy,sf,sc,t) (((((cy)*drv_tab[t].surf)+(sf))* \
-						IDC_NUMSC)+(sc))
+#define GET_SA(cy,sf,sc,t) \
+                        (((((cy)*drv_tab[t].surf)+(sf))*IDC_NUMSC)+(sc))
 
 /* The MSM (IDC) controller supports (two) six different disk drive types:
 

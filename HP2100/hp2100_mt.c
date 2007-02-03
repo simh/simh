@@ -1,6 +1,6 @@
 /* hp2100_mt.c: HP 2100 12559A magnetic tape simulator
 
-   Copyright (c) 1993-2004, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           12559A 3030 nine track magnetic tape
 
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
    07-Oct-04    JDB     Allow enable/disable from either device
    14-Aug-04    RMS     Modified handling of end of medium (suggested by Dave Bryan)
    06-Jul-04    RMS     Fixed spurious timing error after CLC (found by Dave Bryan)
@@ -150,7 +151,7 @@ REG mtd_reg[] = {
 
 MTAB mtd_mod[] = {
     { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
     { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
@@ -243,6 +244,7 @@ switch (inst) {                                         /* case on opcode */
         dat = mtc_unit.buf;
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) mtc_dtf = 0;                    /* CLC: clr xfer flop */
         break;
@@ -257,7 +259,8 @@ return dat;
 
 int32 mtcio (int32 inst, int32 IR, int32 dat)
 {
-int32 i, devc, devd, valid;
+uint32 i;
+int32 devc, devd, valid;
 t_stat st;
 
 devc = IR & I_DEVMASK;                                  /* get device no */
@@ -299,7 +302,7 @@ switch (inst) {                                         /* case on opcode */
             if (dat == mtc_cmd[i]) valid = 1;
         if (!valid || sim_is_active (&mtc_unit) ||      /* is cmd valid? */
            ((mtc_sta & STA_BOT) && (dat == FNC_BSR)) ||
-           (sim_tape_wrp (&mtc_unit) && 
+           (sim_tape_wrp (&mtc_unit) &&
              ((dat == FNC_WC) || (dat == FNC_GAP) || (dat == FNC_WFM))))
             mtc_sta = mtc_sta | STA_REJ;
         else {
@@ -322,9 +325,10 @@ switch (inst) {                                         /* case on opcode */
             if (sim_is_active (&mtc_unit)) dat = dat | STA_BUSY;
             if (sim_tape_wrp (&mtc_unit)) dat = dat | STA_WLK;
             }
-        else dat = dat | STA_BUSY | STA_LOCAL;  
+        else dat = dat | STA_BUSY | STA_LOCAL;
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) { clrCTL (devc); }              /* CLC */
         else { setCTL (devc); }                         /* STC */

@@ -1,6 +1,6 @@
 /* pdp1_lp.c: PDP-1 line printer simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          Type 62 line printer for the PDP-1
 
+   21-Dec-06    RMS     Added 16-channel SBS support
    07-Sep-03    RMS     Changed ioc to ios
    23-Jul-03    RMS     Fixed bugs in instruction decoding, overprinting
                         Revised to detect I/O wait hang
@@ -43,6 +44,7 @@ int32 lpt_spc = 0;                                      /* print (0) vs spc */
 int32 lpt_ovrpr = 0;                                    /* overprint */
 int32 lpt_stopioe = 0;                                  /* stop on error */
 int32 lpt_bptr = 0;                                     /* buffer ptr */
+int32 lpt_sbs = 0;                                      /* SBS level */
 char lpt_buf[LPT_BSIZE + 1] = { 0 };
 static const unsigned char lpt_trans[64] = {
     ' ','1','2','3','4','5','6','7','8','9','\'','~','#','V','^','<',
@@ -51,7 +53,7 @@ static const unsigned char lpt_trans[64] = {
     '_','A','B','C','D','E','F','G','H','I','*','.','+',']','|','['
     };
 
-extern int32 ios, cpls, sbs, iosta;
+extern int32 ios, cpls, iosta;
 extern int32 stop_inst;
 
 t_stat lpt_svc (UNIT *uptr);
@@ -80,11 +82,18 @@ REG lpt_reg[] = {
     { DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, lpt_stopioe, 0) },
     { BRDATA (LBUF, lpt_buf, 8, 8, LPT_BSIZE) },
+    { DRDATA (SBSLVL, lpt_sbs, 4), REG_HRO },
     { NULL }
     };
 
+MTAB lpt_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
+      &dev_set_sbs, &dev_show_sbs, (void *) &lpt_sbs },
+    { 0 }
+    };
+
 DEVICE lpt_dev = {
-    "LPT", &lpt_unit, lpt_reg, NULL,
+    "LPT", &lpt_unit, lpt_reg, lpt_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &lpt_reset,
     NULL, NULL, NULL,
@@ -151,7 +160,7 @@ if (cpls & CPLS_LPT) {                                  /* completion pulse? */
     ios = 1;                                            /* restart */
     cpls = cpls & ~CPLS_LPT;                            /* clr pulse pending */
     }
-sbs = sbs | SB_RQ;                                      /* req seq break */
+dev_req_int (lpt_sbs);                                  /* req interrupt */
 if (lpt_spc) {                                          /* space? */
     iosta = iosta | IOS_SPC;                            /* set flag */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* attached? */

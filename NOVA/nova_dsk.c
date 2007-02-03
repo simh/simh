@@ -59,7 +59,8 @@
 #define DSK_NUMSC       8                               /* sectors/track */
 #define DSK_NUMTR       128                             /* tracks/disk */
 #define DSK_DKSIZE      (DSK_NUMTR*DSK_NUMSC*DSK_NUMWD) /* words/disk */
-#define DSK_AMASK       ((DSK_NUMDK*DSK_NUMTR*DSK_NUMSC) - 1)   /* address mask */
+#define DSK_AMASK       ((DSK_NUMDK*DSK_NUMTR*DSK_NUMSC) - 1)
+                                                        /* address mask */
 #define DSK_NUMDK       8                               /* disks/controller */
 #define GET_DISK(x)     (((x) / (DSK_NUMSC * DSK_NUMTR)) & (DSK_NUMDK - 1))
 

@@ -42,7 +42,8 @@
 #define RK_NUMSF        2                               /* surfaces/cylinder */
 #define RK_NUMCY        203                             /* cylinders/drive */
 #define RK_NUMWD        256                             /* words/sector */
-#define RK_SIZE (RK_NUMCY * RK_NUMSF * RK_NUMSC * RK_NUMWD) /* words/drive */
+#define RK_SIZE         (RK_NUMCY * RK_NUMSF * RK_NUMSC * RK_NUMWD)
+                                                        /* words/drive */
 #define RK_NUMDR        4                               /* drives/controller */
 #define RK_M_NUMDR      03
 
@@ -72,7 +73,7 @@
 #define RKS_DLT         00004                           /* data late error */
 #define RKS_STAT        00002                           /* drive status error */
 #define RKS_CYL         00001                           /* cyl address error */
-#define RKS_ERR (RKS_BUSY+RKS_TMO+RKS_WLK+RKS_CRC+RKS_DLT+RKS_STAT+RKS_CYL)
+#define RKS_ERR         (RKS_BUSY+RKS_TMO+RKS_WLK+RKS_CRC+RKS_DLT+RKS_STAT+RKS_CYL)
 
 /* Command register */
 
@@ -116,12 +117,12 @@
 #define RKX_CLD         2                               /* clear drive */
 #define RKX_CLSA        3                               /* clear status alt */
 
-#define RK_INT_UPDATE \
-    if (((rk_sta & (RKS_DONE + RKS_ERR)) != 0) && \
-        ((rk_cmd & RKC_IE) != 0)) int_req = int_req | INT_RK; \
-    else int_req = int_req & ~INT_RK
-#define RK_MIN 10
-#define MAX(x,y) (((x) > (y))? (x): (y))
+#define RK_INT_UPDATE   if (((rk_sta & (RKS_DONE + RKS_ERR)) != 0) && \
+                            ((rk_cmd & RKC_IE) != 0)) \
+                            int_req = int_req | INT_RK; \
+                        else int_req = int_req & ~INT_RK
+#define RK_MIN          10
+#define MAX(x,y)        (((x) > (y))? (x): (y))
 
 extern uint16 M[];
 extern int32 int_req, stop_inst;

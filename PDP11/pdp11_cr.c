@@ -1,6 +1,6 @@
 /* pdp11_cr.c: CR/CM/CD-11 card reader simulator
 
-   Copyright (c) 2005, John A. Dundas III
+   Copyright (c) 2005-2007, John A. Dundas III
    Portions derived from work by Douglas W. Jones, jones@cs.uiowa.edu
    Portions derived from work by Robert M Supnik
 
@@ -51,8 +51,8 @@
       http://www.cs.uiowa.edu/~jones/cards/
     Paul Mattes' x026 keypunch simulator
       http://x3270.bgp.nu/x026.html
-    CDRSER.MAC - TOPS card reader driver source
-      http://pdp-10.trailing-edge.com/custsupcuspmar86_bb-x130b-sb/02/cdrser.mac
+    CD2SER.MAC - TOPS card reader driver source
+      http://pdp-10.trailing-edge.com/custsupcuspmar86_bb-x130b-sb/02/cd2ser.mac
 
   The Card Image format code and documentation is adapted from Prof.
   Jones's site, with his permission.  Please see his site for additional
@@ -66,14 +66,13 @@
     3. No testing under RSX; volunteers needed
     4. No testing under Ultrix or Unix for PDP-11; volunteers needed
     5. No testing under Ultrix or Unix for VAX; volunteers needed
-    6. No PDP-10 support; volunteers needed
-    7. The simulator implements a single controller/reader combination
+    6. The simulator implements a single controller/reader combination
 
   Operating System Notes
 
     RT-11 (and CTS-300) support one CR11 or CM11, but no CD11.
 
-    VMS supports multiple CR11 controllers.
+    VMS supports multiple CR11 controllers, but no CD11.
 
     RSTS/E supports either the CR11/CM11 or CD11 but not both in
     the same SIL.  It appears to support only one unit.
@@ -84,12 +83,11 @@
     Don't have any information about Unix or Ultrix-11 yet.  Same
     for VAX Unices.
 
-    TOPS: it appears that both the CD11 and CR11 were supported.
-    I don't have any knowledge on how to make this work with the
-    PDP-10 simulation, though.
+    TOPS: only the CD11 is supported, under the name CD20.
 
   Revision History:
 
+   01-Feb-07    RMS     Added PDP-10 support
    12-May-06    JAD     Modify the DEBUG code to use the SIMH DEBUG_x
                         macros.  Modify the UNIT structure to include
                         the DEBUG bit.
@@ -168,14 +166,23 @@
 #if defined (VM_PDP10)                                  /* PDP10 version */
 #include "pdp10_defs.h"
 extern int32 int_req;
+#define DFLT_DIS        (DEV_DIS)
+#define DFLT_CR11       (0)                             /* CD11 only */
+#define DFLT_CPM        1000
 
 #elif defined (VM_VAX)                                  /* VAX version */
 #include "vax_defs.h"
 extern int32 int_req[IPL_HLVL];
+#define DFLT_DIS        (0)
+#define DFLT_CR11       (UNIT_CR11)
+#define DFLT_CPM        285
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 extern int32 int_req[IPL_HLVL];
+#define DFLT_DIS        (0)
+#define DFLT_CR11       (UNIT_CR11)
+#define DFLT_CPM        285
 #endif
 
 extern FILE *sim_deb;                                   /* sim_console.c */
@@ -294,7 +301,7 @@ static int32    blowerState = BLOW_OFF;                 /* reader vacuum/blower 
 static int32    spinUp = 3000;                          /* blower spin-up time: 3 seconds */
 static int32    spinDown = 2000;                        /* blower spin-down time: 2 seconds */
 static t_bool   EOFcard = FALSE;                        /* played special card yet? */
-static int32    cpm = 285;                              /* reader rate: cards per minute */
+static int32    cpm = DFLT_CPM;                         /* reader rate: cards per minute */
 /* card image in various formats */
 static int16    hcard[82];                              /* Hollerith format */
 static char     ccard[82];                              /* DEC compressed format */
@@ -343,8 +350,8 @@ static DIB cr_dib = { IOBA_CR, IOLN_CR, &cr_rd, &cr_wr,
 static UNIT cr_unit = {
     UDATA (&cr_svc,
       UNIT_ATTABLE+UNIT_SEQ+UNIT_ROABLE+UNIT_DISABLE+
-      UNIT_CR11+UNIT_AUTOEOF, 0),
-        (60 * 1000) / 285 };
+      DFLT_CR11+UNIT_AUTOEOF, 0),
+        (60 * 1000) / DFLT_CPM };
 
 static const REG cr_reg[] = {
     { GRDATA (BUF, cr_unit.buf, DEV_RDX, 8, 0) },
@@ -367,8 +374,13 @@ static const REG cr_reg[] = {
     { NULL }  };
 
 static const MTAB cr_mod[] = {
+#if defined (VM_PDP11)
     { UNIT_CR11, UNIT_CR11, "CR11", "CR11", &cr_set_type },
     { UNIT_CR11,         0, "CD11", "CD11", &cr_set_type },
+#else
+    { UNIT_CR11, UNIT_CR11, "CR11", NULL },
+    { UNIT_CR11,         0, "CD11", NULL },
+#endif
     { UNIT_AUTOEOF, UNIT_AUTOEOF, "auto EOF", "AUTOEOF", NULL },
     { UNIT_AUTOEOF,            0, "no auto EOF", "NOAUTOEOF", NULL },
     /* card reader RESET switch */
@@ -395,7 +407,7 @@ DEVICE cr_dev = {
     1, 10, 31, 1, DEV_RDX, 8,
     NULL, NULL, &cr_reset,
     NULL, &cr_attach, &cr_detach,
-    &cr_dib, DEV_DISABLE | DEV_UBUS | DEV_DEBUG };
+    &cr_dib, DEV_DISABLE | DFLT_DIS | DEV_UBUS | DEV_DEBUG };
 
 /* Utility routines */
 

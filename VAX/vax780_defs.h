@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Oct-2006  RMS     Added clock coscheduler function
    17-May-2006  RMS     Added CR11/CD11 support (from John Dundas)
    10-May-2006  RMS     Added model-specific reserved operand check macros
 
@@ -418,5 +419,6 @@ t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 void sbi_set_errcnf (void);
+int32 clk_cosched (int32 wait);
 
 #endif

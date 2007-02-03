@@ -3,6 +3,7 @@
    Based on PDP-11 simulator written by Robert M Supnik
 
    Revision History
+   0.27 2005Mar08 - Added sca device
    0.26 2002Apr24 - Added !BREAK in card deck file to stop simulator
    0.25	2002Apr18 - Fixed some card reader problems. It starts the reader
    					properly if you attach a deck while it's waiting to a read.
@@ -27,9 +28,9 @@
 #include <ctype.h>
 #include <stdarg.h>
 
-extern DEVICE cpu_dev, console_dev, dsk_dev, cr_dev, cp_dev, ptr_dev, ptp_dev;
-extern DEVICE tti_dev, tto_dev, prt_dev, log_dev;
-extern DEVICE gdu_dev, console_dev;
+extern DEVICE cpu_dev, console_dev, dsk_dev, cr_dev,  cp_dev, ptr_dev, ptp_dev, t2741_dev;
+extern DEVICE tti_dev, tto_dev,     prt_dev, log_dev, sca_dev;
+extern DEVICE gdu_dev, console_dev, plot_dev;
 
 extern UNIT  cpu_unit;
 extern REG   cpu_reg[];
@@ -61,8 +62,11 @@ DEVICE *sim_devices[] = {
 	&prt_dev,			/* 1132 printer */
 	&ptr_dev,			/* 1134 paper tape reader */
 	&ptp_dev,			/* 1055 paper tape punch */
+	&sca_dev,			/* Synchronous communications adapter option */
 	&console_dev,		/* console display (windows GUI) */
 	&gdu_dev,			/* 2250 display */
+	&t2741_dev,			/* nonstandard serial interface used by APL\1130 */
+	&plot_dev,			/* plotter device, in ibm1130_plot.c */
 	NULL
 };
 
@@ -76,7 +80,11 @@ const char *sim_stop_messages[] = {
 	"!BREAK in card deck file",
 	"Phase load break",
 	"Program has run amok",
-	"Run time limit exceeded"
+	"Run time limit exceeded",
+	"Immediate Stop key requested",
+	"Simulator break key pressed",
+	"Simulator step count expired",
+	"Simulator IO error",
 };
 
 /* Loader. IPL is normally performed by card reader (boot command). This function
@@ -106,13 +114,13 @@ t_stat my_load (FILE *fileref, char *cptr, char *fnam)
 	int iaddr = -1, runaddr = -1, val, nwords;
 
 	while (fgets(line, sizeof(line), fileref) != NULL) {
-		for (c = line; *c && *c <= ' '; c++)				// find first nonblank
+		for (c = line; *c && *c <= ' '; c++)			/* find first nonblank */
 			;
 
 		if (*c == '\0' || *c == '#' || *c == '/' || *c == ';')
-			continue;									// empty line or comment
+			continue;									/* empty line or comment */
 
-		if (*c == '@') {								// set load address
+		if (*c == '@') {								/* set load address */
 			if (sscanf(c+1, "%x", &iaddr) != 1)
 				return SCPE_FMT;
 		}
@@ -124,7 +132,7 @@ t_stat my_load (FILE *fileref, char *cptr, char *fnam)
 			if (sscanf(c+1, "%x", &val) != 1)
 				return SCPE_FMT;
 
-			CES = val & 0xFFFF;							// preload console entry switches
+			CES = val & 0xFFFF;							/*preload console entry switches */
 		}
 		else if (*c == 'z' || *c == 'Z') {
 			if (sscanf(c+1, "%x", &nwords) != 1)
@@ -145,11 +153,11 @@ t_stat my_load (FILE *fileref, char *cptr, char *fnam)
 			if (iaddr == -1)
 				return SCPE_FMT;
 
-			WriteW(iaddr, val);							// store data
+			WriteW(iaddr, val);							/*store data */
 			iaddr++;
 		}
 		else
-			return SCPE_FMT;							// unexpected data
+			return SCPE_FMT;							/*unexpected data */
 	}
 
 	if (runaddr != -1)
@@ -166,14 +174,14 @@ t_stat my_save (FILE *fileref, char *cptr, char *fnam)
 	fprintf(fileref, "@0000\r\n");
 	for (iaddr = 0; iaddr < nwords; iaddr++) {
 		val = ReadW(iaddr);
-		if (val == 0)						// queue up zeroes
+		if (val == 0)						/*queue up zeroes */
 			nzeroes++;
 		else {
-			if (nzeroes >= 4) {				// spit out a Z directive
+			if (nzeroes >= 4) {				/*spit out a Z directive */
 				fprintf(fileref, "Z%04x\r\n", nzeroes);
 				nzeroes = 0;
 			}
-			else {							// write queued zeroes literally
+			else {							/*write queued zeroes literally */
 				while (nzeroes > 0) {
 					fprintf(fileref, " 0000\r\n");
 					nzeroes--;
@@ -182,7 +190,7 @@ t_stat my_save (FILE *fileref, char *cptr, char *fnam)
 			fprintf(fileref, " %04x\r\n", val);
 		}
 	}
-	if (nzeroes >= 4) {						// emit any queued zeroes
+	if (nzeroes >= 4) {						/*emit any queued zeroes */
 		fprintf(fileref, "Z%04x\r\n", nzeroes);
 		nzeroes = 0;
 	}
@@ -241,7 +249,7 @@ static char *opcode[] = {
 	"AND ",		"OR  ",		"EOR ",		"?1F ",
 };
 
-static char relative[] = {						// true if short mode displacements are IAR relative
+static char relative[] = {						/*true if short mode displacements are IAR relative */
 	FALSE,		TRUE,		FALSE,		FALSE,
 	FALSE,		TRUE,		FALSE,		FALSE,
 	TRUE,		FALSE,		FALSE,		FALSE,
@@ -287,10 +295,11 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 
 	cflag = (uptr == NULL) || (uptr == &cpu_unit);
 
-//	if (sw & SWMASK ('A')) {				/* ASCII? not useful */
-//		fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
-//		return SCPE_OK;
-//	}
+/*  if (sw & SWMASK ('A')) {				// ASCII? not useful
+ 		fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
+		return SCPE_OK;
+	}
+*/
 
 	if (sw & SWMASK ('C'))					/* character? not useful -- make it EBCDIC */
 		sw |= SWMASK('E');
@@ -349,7 +358,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 		DSPLC &= 0x003F;
 		eaddr = DSPLC;
 	}
-	else if ((OP == 0x08 && F)|| OP == 0x09) {		// BSI L and BSC any
+	else if ((OP == 0x08 && F)|| OP == 0x09) {		/* BSI L and BSC any */
 		if (OP == 0x09 && (IR & 0x40))
 			mnem = "BOSC";
 
@@ -368,7 +377,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 		fprintf(of, "%04x %s %c%c %s   ", IR & 0xFFFF, mnem, F ? (INDIR ? 'I' : 'L') : ' ', tagc[TAG], tst);
 		return SCPE_OK;
 	}
-	else if (OP == 0x0e && TAG == 0) {		// MDX with no tag => MDM or jump
+	else if (OP == 0x0e && TAG == 0) {		/* MDX with no tag => MDM or jump */
 		if (F) {
 			fprintf(of, "%04x %s %c%c %04x,%x (%d)   ", IR & 0xFFFF, "MDM ", (INDIR ? 'I' : 'L'), tagc[TAG], eaddr & 0xFFFF, DSPLC & 0xFFFF, DSPLC);
 			return -1;
@@ -446,47 +455,47 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 
 #ifndef _WIN32
 
-int strnicmp (char *a, char *b, int n)
+int strnicmp (const char *a, const char *b, int n)
 {
 	int ca, cb;
 
 	for (;;) {
-		if (--n < 0)					// still equal after n characters? quit now
+		if (--n < 0)					/* still equal after n characters? quit now */
 			return 0;
 
-		if ((ca = *a) == 0)				// get character, stop on null terminator
+		if ((ca = *a) == 0)				/* get character, stop on null terminator */
 			return *b ? -1 : 0;
 
-		if (ca >= 'a' && ca <= 'z')		// fold lowercase to uppercase
+		if (ca >= 'a' && ca <= 'z')		/* fold lowercase to uppercase */
 			ca -= 32;
 
 		cb = *b;
 		if (cb >= 'a' && cb <= 'z')
 			cb -= 32;
 
-		if ((ca -= cb) != 0)			// if different, return comparison
+		if ((ca -= cb) != 0)			/* if different, return comparison */
 			return ca;
 
 		a++, b++;
 	}
 }
 
-int strcmpi (char *a, char *b)
+int strcmpi (const char *a, const char *b)
 {
 	int ca, cb;
 
 	for (;;) {
-		if ((ca = *a) == 0)				// get character, stop on null terminator
+		if ((ca = *a) == 0)				/* get character, stop on null terminator */
 			return *b ? -1 : 0;
 
-		if (ca >= 'a' && ca <= 'z')		// fold lowercase to uppercase
+		if (ca >= 'a' && ca <= 'z')		/* fold lowercase to uppercase */
 			ca -= 32;
 
 		cb = *b;
 		if (cb >= 'a' && cb <= 'z')
 			cb -= 32;
 
-		if ((ca -= cb) != 0)			// if different, return comparison
+		if ((ca -= cb) != 0)			/* if different, return comparison */
 			return ca;
 
 		a++, b++;

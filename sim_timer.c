@@ -1,6 +1,6 @@
 /* sim_timer.c: simulator timer library
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,21 +23,45 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Oct-06    RMS     Added idle support (based on work by Mark Pizzolato)
+                        Added throttle support
    21-Aug-05    RMS     Added sim_rtcn_init_all
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    02-Jan-04    RMS     Split out from SCP
 
    This library includes the following routines:
 
+   sim_timer_init -     initialize timing system
    sim_rtc_init -       initialize calibration
    sim_rtc_calb -       calibrate clock
+   sim_timer_init -     initialize timing system
+   sim_idle -           virtual machine idle
    sim_os_msec  -       return elapsed time in msec
    sim_os_sleep -       sleep specified number of seconds
+   sim_os_ms_sleep -    sleep specified number of milliseconds
 
-   The calibration routines are OS-independent; the _os_ routines are not
+   The calibration, idle, and throttle routines are OS-independent; the _os_
+   routines are not.
 */
 
 #include "sim_defs.h"
+#include <ctype.h>
+
+t_bool sim_idle_enab = FALSE;                           /* global flag */
+
+static uint32 sim_idle_rate_ms = 0;
+static uint32 sim_throt_ms_start = 0;
+static uint32 sim_throt_ms_stop = 0;
+static uint32 sim_throt_type = 0;
+static uint32 sim_throt_val = 0;
+static uint32 sim_throt_state = 0;
+static int32 sim_throt_wait = 0;
+extern int32 sim_interval, sim_switches;
+extern FILE *sim_log;
+
+t_stat sim_throt_svc (UNIT *uptr);
+
+UNIT sim_throt_unit = { UDATA (&sim_throt_svc, 0, 0) };
 
 /* OS-dependent timer and clock routines */
 
@@ -45,7 +69,7 @@
 
 #if defined (VMS)
 
-#if defined(__VAX)
+#if defined (__VAX)
 #define sys$gettim SYS$GETTIM
 #endif
 
@@ -86,6 +110,28 @@ sleep (sec);
 return;
 }
 
+uint32 sim_os_ms_sleep_init (void)
+{
+#if defined (__VAX)
+return 10;                                              /* VAX/VMS is 10ms */
+#else
+return 1;                                               /* Alpha/VMS is 1ms */
+#endif
+}
+
+uint32 sim_os_ms_sleep (unsigned int msec)
+{
+uint32 stime = sim_os_msec ();
+uint32 qtime[2];
+int32 nsfactor = -10000;
+static int32 zero = 0;
+
+lib$emul (&msec, &nsfactor, &zero, qtime);
+sys$setimr (2, qtime, 0, 0);
+sys$waitfr (2);
+return sim_os_msec () - stime;
+}
+
 /* Win32 routines */
 
 #elif defined (_WIN32)
@@ -96,13 +142,47 @@ const t_bool rtc_avail = TRUE;
 
 uint32 sim_os_msec ()
 {
-return GetTickCount ();
+if (sim_idle_rate_ms) return timeGetTime ();
+else return GetTickCount ();
 }
 
 void sim_os_sleep (unsigned int sec)
 {
 Sleep (sec * 1000);
 return;
+}
+
+void sim_timer_exit (void)
+{
+timeEndPeriod (sim_idle_rate_ms);
+return;
+}
+
+uint32 sim_os_ms_sleep_init (void)
+{
+TIMECAPS timers;
+
+if (timeGetDevCaps (&timers, sizeof (timers)) != TIMERR_NOERROR)
+    return 0;
+if ((timers.wPeriodMin == 0) || (timers.wPeriodMin > SIM_IDLE_MAX))
+    return 0;
+if (timeBeginPeriod (timers.wPeriodMin) != TIMERR_NOERROR)
+    return 0;
+atexit (sim_timer_exit);
+Sleep (1);
+Sleep (1);
+Sleep (1);
+Sleep (1);
+Sleep (1);
+return timers.wPeriodMin;                               /* sim_idle_rate_ms */
+}
+
+uint32 sim_os_ms_sleep (unsigned int msec)
+{
+uint32 stime = sim_os_msec();
+
+Sleep (msec);
+return sim_os_msec () - stime;
 }
 
 /* OS/2 routines, from Bruce Ray */
@@ -121,6 +201,16 @@ void sim_os_sleep (unsigned int sec)
 return;
 }
 
+t_bool sim_os_ms_sleep_init (void)
+{
+return FALSE;
+}
+
+uint32 sim_os_ms_sleep (unsigned int msec)
+{
+return 0;
+}
+
 /* Metrowerks CodeWarrior Macintosh routines, from Ben Supnik */
 
 #elif defined (__MWERKS__) && defined (macintosh)
@@ -130,6 +220,8 @@ return;
 #include <sioux.h>
 #include <unistd.h>
 #include <siouxglobals.h>
+#define NANOS_PER_MILLI     1000000
+#define MILLIS_PER_SEC      1000
 
 const t_bool rtc_avail = TRUE;
 
@@ -151,12 +243,32 @@ sleep (sec);
 return;
 }
 
+uint32 sim_os_ms_sleep_init (void)
+{
+return 1;
+}
+
+uint32 sim_os_ms_sleep (unsigned int milliseconds)
+{
+uint32 stime = sim_os_msec ();
+struct timespec treq;
+
+treq.tv_sec = milliseconds / MILLIS_PER_SEC;
+treq.tv_nsec = (milliseconds % MILLIS_PER_SEC) * NANOS_PER_MILLI;
+(void) nanosleep (&treq, NULL);
+return sim_os_msec () - stime;
+}
+
 #else
 
 /* UNIX routines */
 
+#include <time.h>
 #include <sys/time.h>
 #include <unistd.h>
+#define NANOS_PER_MILLI     1000000
+#define MILLIS_PER_SEC      1000
+#define sleep1Samples		100
 
 const t_bool rtc_avail = TRUE;
 
@@ -177,11 +289,54 @@ sleep (sec);
 return;
 }
 
+uint32 sim_os_ms_sleep_init (void)
+{
+#if defined (_POSIX_SOURCE)                              /* POSIX-compliant */
+
+struct timespec treq;
+uint32 msec;
+
+if (clock_getres (CLOCK_REALTIME, &treq) != 0)
+    return 0;
+msec = (treq.tv_nsec + (NANOS_PER_MILLI >> 1)) / NANOS_PER_MILLI;
+if (msec > SIM_IDLE_MAX) return 0;
+return msec;
+
+#else                                                   /* others */
+
+uint32 i, t1, t2, tot, tim;
+
+for (i = 0, tot = 0; i < sleep1Samples; i++) {
+    t1 = sim_os_msec ();
+    sim_os_ms_sleep (1);
+    t2 = sim_os_msec ();
+    tot += (t2 - t1);
+    }
+tim = (tot + (sleep1Samples - 1)) / sleep1Samples;
+if (tim == 0) tim = 1;
+else if (tim > SIM_IDLE_MAX) tim = 0;
+return tim;
+
+#endif
+}
+
+uint32 sim_os_ms_sleep (unsigned int milliseconds)
+{
+uint32 stime = sim_os_msec ();
+struct timespec treq;
+
+treq.tv_sec = milliseconds / MILLIS_PER_SEC;
+treq.tv_nsec = (milliseconds % MILLIS_PER_SEC) * NANOS_PER_MILLI;
+(void) nanosleep (&treq, NULL);
+return sim_os_msec () - stime;
+}
+
 #endif
 
 /* OS independent clock calibration package */
 
 static int32 rtc_ticks[SIM_NTIMERS] = { 0 };            /* ticks */
+static int32 rtc_hz[SIM_NTIMERS] = { 0 };               /* tick rate */
 static uint32 rtc_rtime[SIM_NTIMERS] = { 0 };           /* real time */
 static uint32 rtc_vtime[SIM_NTIMERS] = { 0 };           /* virtual time */
 static uint32 rtc_nxintv[SIM_NTIMERS] = { 0 };          /* next interval */
@@ -197,6 +352,7 @@ rtc_rtime[tmr] = sim_os_msec ();
 rtc_vtime[tmr] = rtc_rtime[tmr];
 rtc_nxintv[tmr] = 1000;
 rtc_ticks[tmr] = 0;
+rtc_hz[tmr] = 0;
 rtc_based[tmr] = time;
 rtc_currd[tmr] = time;
 rtc_initd[tmr] = time;
@@ -209,6 +365,7 @@ uint32 new_rtime, delta_rtime;
 int32 delta_vtime;
 
 if ((tmr < 0) || (tmr >= SIM_NTIMERS)) return 10000;
+rtc_hz[tmr] = ticksper;
 rtc_ticks[tmr] = rtc_ticks[tmr] + 1;                    /* count ticks */
 if (rtc_ticks[tmr] < ticksper) return rtc_currd[tmr];   /* 1 sec yet? */
 rtc_ticks[tmr] = 0;                                     /* reset ticks */
@@ -248,4 +405,227 @@ return sim_rtcn_init (time, 0);
 int32 sim_rtc_calb (int32 ticksper)
 {
 return sim_rtcn_calb (ticksper, 0);
+}
+
+/* sim_timer_init - get minimum sleep time available on this host */
+
+t_bool sim_timer_init (void)
+{
+sim_idle_enab = FALSE;                                  /* init idle off */
+sim_idle_rate_ms = sim_os_ms_sleep_init ();             /* get OS timer rate */
+return (sim_idle_rate_ms != 0);
+}
+
+/* sim_idle - idle simulator until next event or for specified interval
+
+   Inputs:
+        tmr	=	calibrated timer to use
+
+   Must solve the linear equation
+
+        ms_to_wait = w * ms_per_wait
+
+   Or
+        w = ms_to_wait / ms_per_wait
+*/
+
+t_bool sim_idle (uint32 tmr, t_bool sin_cyc)
+{
+uint32 cyc_ms, w_ms, w_idle, act_ms;
+int32 act_cyc;
+
+cyc_ms = (rtc_currd[tmr] * rtc_hz[tmr]) / 1000;         /* cycles per msec */
+if ((sim_idle_rate_ms == 0) || (cyc_ms == 0)) {         /* not possible? */
+    if (sin_cyc) sim_interval = sim_interval - 1;
+    return FALSE;
+    }
+w_ms = (uint32) sim_interval / cyc_ms;                  /* ms to wait */
+w_idle = w_ms / sim_idle_rate_ms;                       /* intervals to wait */
+if (w_idle == 0) {                                      /* none? */
+    if (sin_cyc) sim_interval = sim_interval - 1;
+    return FALSE;
+    }
+act_ms = sim_os_ms_sleep (w_idle);                      /* wait */
+act_cyc = act_ms * cyc_ms;
+if (sim_interval > act_cyc)
+    sim_interval = sim_interval - act_cyc;
+else sim_interval = 1;
+return TRUE;
+}
+
+/* Set idling - implicitly disables throttling */
+
+t_stat sim_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (sim_idle_rate_ms == 0) return SCPE_NOFNC;
+if ((val != 0) && (sim_idle_rate_ms > (uint32) val))
+    return SCPE_NOFNC;
+sim_idle_enab = TRUE;
+if (sim_throt_type != SIM_THROT_NONE) {
+    sim_set_throt (0, NULL);
+    printf ("Throttling disabled\n");
+    if (sim_log) fprintf (sim_log, "Throttling disabled\n");
+    }
+return SCPE_OK;
+}
+
+/* Clear idling */
+
+t_stat sim_clr_idle (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+sim_idle_enab = FALSE;
+return SCPE_OK;
+}
+
+/* Show idling */
+
+t_stat sim_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, sim_idle_enab? "idling enabled": "idling disabled");
+return SCPE_OK;
+}
+
+/* Throttling package */
+
+t_stat sim_set_throt (int32 arg, char *cptr)
+{
+char *tptr, c;
+t_value val;
+
+if (arg == 0) {
+    if ((cptr != 0) && (*cptr != 0)) return SCPE_ARG;
+    sim_throt_type = SIM_THROT_NONE;
+    sim_throt_cancel ();
+    }
+else if (sim_idle_rate_ms == 0) return SCPE_NOFNC;
+else {
+    val = strtotv (cptr, &tptr, 10);
+    if (cptr == tptr) return SCPE_ARG;
+    c = toupper (*tptr++);
+    if (*tptr != 0) return SCPE_ARG;
+    if (c == 'M') sim_throt_type = SIM_THROT_MCYC;
+    else if (c == 'K') sim_throt_type = SIM_THROT_KCYC;
+    else if ((c = '%') && (val > 0) && (val < 100))
+        sim_throt_type = SIM_THROT_PCT;
+    else return SCPE_ARG;
+    if (sim_idle_enab) {
+        printf ("Idling disabled\n");
+        if (sim_log) fprintf (sim_log, "Idling disabled\n");
+        sim_clr_idle (NULL, 0, NULL, NULL);
+        }
+    sim_throt_val = (uint32) val;
+    }
+return SCPE_OK;
+}
+
+t_stat sim_show_throt (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, char *cptr)
+{
+if (sim_idle_rate_ms == 0)
+    fprintf (st, "Throttling not available\n");
+else {
+    switch (sim_throt_type) {
+
+    case SIM_THROT_MCYC:
+        fprintf (st, "Throttle = %d megacycles\n", sim_throt_val);
+        break;
+
+    case SIM_THROT_KCYC:
+        fprintf (st, "Throttle = %d kilocycles\n", sim_throt_val);
+        break;
+
+    case SIM_THROT_PCT:
+        fprintf (st, "Throttle = %d%%\n", sim_throt_val);
+        break;
+
+    default:
+        fprintf (st, "Throttling disabled\n");
+        break;
+        }
+
+    if (sim_switches & SWMASK ('D')) {
+        fprintf (st, "Wait rate = %d ms\n", sim_idle_rate_ms);
+        if (sim_throt_type != 0)
+            fprintf (st, "Throttle interval = %d cycles\n", sim_throt_wait);
+        }
+    }
+return SCPE_OK;
+}
+
+void sim_throt_sched (void)
+{
+sim_throt_state = 0;
+if (sim_throt_type)
+    sim_activate (&sim_throt_unit, SIM_THROT_WINIT);
+return;
+}
+
+void sim_throt_cancel (void)
+{
+sim_cancel (&sim_throt_unit);
+}
+
+/* Throttle service
+
+   Throttle service has three distinct states
+
+   0        take initial measurement
+   1        take final measurement, calculate wait values
+   2        periodic waits to slow down the CPU
+*/
+
+t_stat sim_throt_svc (UNIT *uptr)
+{
+uint32 delta_ms;
+double a_cps, d_cps;
+
+switch (sim_throt_state) {
+
+    case 0:                                             /* take initial reading */
+        sim_throt_ms_start = sim_os_msec ();
+        sim_throt_wait = SIM_THROT_WST;
+        sim_throt_state++;                              /* next state */
+        break;                                          /* reschedule */
+
+    case 1:                                             /* take final reading */
+        sim_throt_ms_stop = sim_os_msec ();
+        delta_ms = sim_throt_ms_stop - sim_throt_ms_start;
+        if (delta_ms < SIM_THROT_MSMIN) {               /* not enough time? */
+            if (sim_throt_wait >= 100000000) {          /* too many inst? */
+                sim_throt_state = 0;                    /* fails in 32b! */
+                return SCPE_OK;
+                }
+            sim_throt_wait = sim_throt_wait * SIM_THROT_WMUL;
+            sim_throt_ms_start = sim_throt_ms_stop;
+            }
+        else {                                          /* long enough */
+            a_cps = ((double) sim_throt_wait) * 1000.0 / (double) delta_ms;
+            if (sim_throt_type == SIM_THROT_MCYC)       /* calc desired cps */
+                d_cps = (double) sim_throt_val * 1000000.0;
+            else if (sim_throt_type == SIM_THROT_KCYC)
+                d_cps = (double) sim_throt_val * 1000.0;
+            else d_cps = (a_cps * ((double) sim_throt_val)) / 100.0;
+            if (d_cps >= a_cps) {
+                sim_throt_state = 0;
+                return SCPE_OK;
+                }
+            sim_throt_wait = (int32)                    /* time between waits */
+                ((a_cps * d_cps * ((double) sim_idle_rate_ms)) /
+                 (1000.0 * (a_cps - d_cps)));
+            if (sim_throt_wait < SIM_THROT_WMIN) {      /* not long enough? */
+                sim_throt_state = 0;
+                return SCPE_OK;
+                }
+            sim_throt_state++;
+//            fprintf (stderr, "Throttle values a_cps = %f, d_cps = %f, wait = %d\n",
+//                a_cps, d_cps, sim_throt_wait);
+            }
+        break;
+
+    case 2:                                             /* throttling */
+        sim_os_ms_sleep (1);
+        break;
+        }
+
+sim_activate (uptr, sim_throt_wait);                    /* reschedule */
+return SCPE_OK;
 }

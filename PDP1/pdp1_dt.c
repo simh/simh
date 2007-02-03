@@ -25,6 +25,7 @@
 
    dt           Type 550/555 DECtape
 
+   21-Dec-06    RMS     Added 16-channel SBS support
    23-Jun-06    RMS     Fixed conflict in ATTACH switches
                         Revised header format
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -179,7 +180,7 @@
 #define DTA_RW          077
 #define DTA_GETUNIT(x)  map_unit[(((x) >> DTA_V_UNIT) & DTA_M_UNIT)]
 #define DT_UPDINT       if (dtsb & (DTB_DTF | DTB_BEF | DTB_ERF)) \
-                        sbs = sbs | SB_RQ;
+                        dev_req_int (dt_sbs);
 
 #define DTA_GETMOT(x)   (((x) >> DTA_V_MOT) & DTA_M_MOT)
 #define DTA_GETFNC(x)   (((x) >> DTA_V_FNC) & DTA_M_FNC)
@@ -247,7 +248,6 @@
 #define ABS(x)          (((x) < 0)? (-(x)): (x))
 
 extern int32 M[];
-extern int32 sbs;
 extern int32 stop_inst;
 extern UNIT cpu_unit;
 extern int32 sim_switches;
@@ -257,6 +257,7 @@ extern FILE *sim_deb;
 int32 dtsa = 0;                                         /* status A */
 int32 dtsb = 0;                                         /* status B */
 int32 dtdb = 0;                                         /* data buffer */
+int32 dt_sbs = 0;                                       /* SBS level */
 int32 dt_ltime = 12;                                    /* interline time */
 int32 dt_dctime = 40000;                                /* decel time */
 int32 dt_substate = 0;
@@ -326,10 +327,13 @@ REG dt_reg[] = {
     { URDATA (LASTT, dt_unit[0].LASTT, 10, 32, 0,
               DT_NUMDR, REG_HRO) },
     { FLDATA (STOP_OFFR, dt_stopoffr, 0) },
+    { DRDATA (SBSLVL, dt_sbs, 4), REG_HRO },
     { NULL }
     };
 
 MTAB dt_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
+      &dev_set_sbs, &dev_show_sbs, (void *) &dt_sbs },
     { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
     { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
     { UNIT_8FMT + UNIT_11FMT, 0, "18b", NULL, NULL },

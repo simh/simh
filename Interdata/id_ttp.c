@@ -1,6 +1,6 @@
 /* id_ttp.c: Interdata PASLA console interface
 
-   Copyright (c) 2000-2005, Robert M. Supnik
+   Copyright (c) 2000-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttp          console (on PAS)
 
+   18-Oct-06    RMS     Sync keyboard to LFC clock
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Dec-03    RMS     Added support for console backpressure
    25-Apr-03    RMS     Revised for extended file support
@@ -52,6 +53,8 @@
 #define CMD_TYP         0x01                            /* command type */
 
 extern uint32 int_req[INTSZ], int_enb[INTSZ];
+extern int32 pas_par (int32 cmd, int32 c);
+extern int32 lfc_poll;
 
 uint32 ttp_sta = 0;                                     /* status */
 uint32 ttp_cmd = 0;                                     /* command */
@@ -68,14 +71,12 @@ t_stat ttp_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ttp_set_break (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ttp_set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc);
 
-extern int32 pas_par (int32 cmd, int32 c);
-
 /* TTP data structures */
 
 DIB ttp_dib = { d_TTP, -1, v_TTP, ttp_tplte, &ttp, NULL };
 
 UNIT ttp_unit[] = {
-    { UDATA (&ttpi_svc, 0, 0), KBD_POLL_WAIT },
+    { UDATA (&ttpi_svc, 0, 0), 0 },
     { UDATA (&ttpo_svc, 0, 0), SERIAL_OUT_WAIT }
     };
 
@@ -83,7 +84,7 @@ REG ttp_reg[] = {
     { HRDATA (CMD, ttp_cmd, 16) },
     { HRDATA (KBUF, ttp_unit[TTI].buf, 8) },
     { DRDATA (KPOS, ttp_unit[TTI].pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (KTIME, ttp_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (KTIME, ttp_unit[TTI].wait, 24), REG_NZ + PV_LEFT + REG_HRO },
     { FLDATA (KIREQ, int_req[l_TTP], i_TTP) },
     { FLDATA (KIENB, int_enb[l_TTP], i_TTP) },
     { FLDATA (KARM, ttp_karm, 0) },
@@ -175,7 +176,7 @@ t_stat ttpi_svc (UNIT *uptr)
 {
 int32 c, out;
 
-sim_activate (uptr, uptr->wait);                        /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, lfc_poll));   /* continue poll */
 ttp_sta = ttp_sta & ~STA_FR;                            /* clear break */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
 ttp_sta = ttp_sta & ~STA_PF;                            /* clear parity err */
@@ -227,7 +228,7 @@ return SCPE_OK;
 t_stat ttp_reset (DEVICE *dptr)
 {
 if (dptr->flags & DEV_DIS) sim_cancel (&ttp_unit[TTI]);
-else sim_activate (&ttp_unit[TTI], ttp_unit[TTI].wait);
+else sim_activate_abs (&ttp_unit[TTI], KBD_WAIT (ttp_unit[TTI].wait, lfc_poll));
 sim_cancel (&ttp_unit[TTO]);
 CLR_INT (v_TTP);                                        /* clear int */
 CLR_ENB (v_TTP);

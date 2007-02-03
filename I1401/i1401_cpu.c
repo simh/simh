@@ -1478,7 +1478,7 @@ CHECK_LENGTH:
         M[BS + 3] = (M[BS + 3] & WM) | store_addr_u (t);
         M[BS + 2] = (M[BS + 2] & (WM + ZONE)) | store_addr_t (t);
         M[BS + 1] = (M[BS + 1] & WM) | store_addr_h (t);
-        if (((a % 4000) + (b % 4000)) >= 4000) BS = BS + 2;     /* carry? */
+        if (((a % 4000) + (b % 4000)) >= 4000) BS = BS + 2; /* carry? */
         break;
 
 /* Store address instructions                           A-check     B-check
@@ -1505,7 +1505,7 @@ CHECK_LENGTH:
 
 /* NOP - no validity checking, all instructions length ok */
 
-    case OP_NOP:                                                /* nop */
+    case OP_NOP:                                        /* nop */
         break;
 
 /* HALT - unless length = 4 (branch), no validity checking; all lengths ok */
@@ -1569,7 +1569,8 @@ int32 a, b, c, r;
 
 c = 0;                                                  /* init carry */
 do {
-    a = M[ap]; b = M[bp];                               /* get operands */
+    a = M[ap];                                          /* get operands */
+    b = M[bp];
     r = bcd_to_bin[b & DIGIT] +                         /* sum digits + c */
         bcd_to_bin[a & DIGIT] + c;
     c = (r >= 10);                                      /* set carry out */
@@ -1671,8 +1672,10 @@ for (i = 0; i < 64; i++) {                              /* clr indicators */
     if ((i < IN_SSB) || (i > IN_SSG)) ind[i] = 0;       /* except SSB-SSG */
     }
 ind[IN_UNC] = 1;                                        /* ind[0] always on */
-AS = 0; as_err = 1;                                     /* clear AS */
-BS = 0; bs_err = 1;                                     /* clear BS */
+AS = 0;                                                 /* clear AS */
+BS = 0;                                                 /* clear BS *
+as_err = 1;
+bs_err = 1;/
 D = 0;                                                  /* clear D */
 hb_pend = 0;                                            /* no halt br */
 pcq_r = find_reg ("ISQ", NULL, dptr);

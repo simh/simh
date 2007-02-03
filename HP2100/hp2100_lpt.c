@@ -1,6 +1,6 @@
 /* hp2100_lpt.c: HP 2100 12845B line printer simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          12845B 2607 line printer
 
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
    19-Nov-04    JDB     Added restart when set online, etc.
    29-Sep-04    JDB     Added SET OFFLINE/ONLINE, POWEROFF/POWERON
                         Fixed status returns for error conditions
@@ -190,6 +191,7 @@ switch (inst) {                                         /* case on opcode */
             }
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCMD (dev);                               /* clear ctl, cmd */

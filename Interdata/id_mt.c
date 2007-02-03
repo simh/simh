@@ -312,8 +312,8 @@ switch (uptr->UCMD) {                                   /* case on function */
 
     case MTC_RD:                                        /* read */
         if (mt_blnt == 0) {                             /* first time? */
-            st = sim_tape_rdrecf (uptr, mtxb, &tbc, MT_MAXFR);  /* read rec */
-            if (st == MTSE_RECE) mt_sta = mt_sta | STA_ERR;     /* rec in err? */
+            st = sim_tape_rdrecf (uptr, mtxb, &tbc, MT_MAXFR); /* read rec */
+            if (st == MTSE_RECE) mt_sta = mt_sta | STA_ERR;    /* rec in err? */
             else if (st != SCPE_OK) {                   /* other error? */
                 r = mt_map_err (uptr, st);              /* map error */
                 if (sch_actv (mt_dib.sch, dev))         /* if sch, stop */
@@ -343,7 +343,7 @@ switch (uptr->UCMD) {                                   /* case on function */
 
     case MTC_WR:                                        /* write */
         if (sch_actv (mt_dib.sch, dev)) {               /* sch active? */
-            mt_bptr = sch_rdmem (mt_dib.sch, mtxb, MT_MAXFR);   /* get rec */
+            mt_bptr = sch_rdmem (mt_dib.sch, mtxb, MT_MAXFR); /* get rec */
             if (sch_actv (mt_dib.sch, dev))             /* not done? */
                 sch_stop (mt_dib.sch);                  /* stop chan */
             }
@@ -357,7 +357,7 @@ switch (uptr->UCMD) {                                   /* case on function */
             }
 
         if (mt_bptr) {                                  /* any chars? */
-            if (st = sim_tape_wrrecf (uptr, mtxb, mt_bptr))     /* write, err? */
+            if (st = sim_tape_wrrecf (uptr, mtxb, mt_bptr)) /* write, err? */
                 r = mt_map_err (uptr, st);              /* map error */
             }
         break;                                          /* record done */

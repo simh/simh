@@ -25,7 +25,9 @@
 
    cpu                  Interdata 32b CPU
 
-   09-Mar-06	RMS	Added 8 register bank support for 8/32
+   27-Oct-06    RMS     Added idle support
+                        Removed separate PASLA clock
+   09-Mar-06	RMS     Added 8 register bank support for 8/32
    06-Feb-06    RMS     Fixed bug in DH (found by Mark Hittinger)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -249,7 +251,8 @@ uint32 (*dev_tab[DEVNO])(uint32 dev, uint32 op, uint32 datout) = { NULL };
 extern int32 sim_interval;
 extern int32 sim_int_char;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern UNIT pic_unit, lfc_unit, pas_unit;               /* timers */
+extern t_bool sim_idle_enab;
+extern UNIT pic_unit, lfc_unit;                         /* timers */
 extern FILE *sim_deb;
 
 uint32 ReadB (uint32 loc, uint32 rel);
@@ -566,11 +569,6 @@ REG cpu_reg[] = {
     };
 
 MTAB cpu_mod[] = {
-    { UNIT_MSIZE, 65536, NULL, "64K", &cpu_set_size },
-    { UNIT_MSIZE, 131072, NULL, "128K", &cpu_set_size },
-    { UNIT_MSIZE, 262144, NULL, "256K", &cpu_set_size },
-    { UNIT_MSIZE, 524288, NULL, "512K", &cpu_set_size },
-    { UNIT_MSIZE, 1048756, NULL, "1M", &cpu_set_size },
     { UNIT_8RS|UNIT_TYPE, 0, NULL, "732", NULL },
     { UNIT_DPFP, UNIT_DPFP, NULL, "DPFP", NULL },
     { UNIT_TYPE, 0, "7/32, single precision fp", "732", NULL },
@@ -579,6 +577,13 @@ MTAB cpu_mod[] = {
     { UNIT_8RS, 0, NULL, "2RS", NULL },
     { UNIT_8RS|UNIT_TYPE, UNIT_8RS|UNIT_DPFP|UNIT_832, "832, 8 register sets", NULL, NULL },
     { UNIT_8RS|UNIT_TYPE, UNIT_DPFP|UNIT_832, "832, 2 register sets", NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
+    { UNIT_MSIZE, 65536, NULL, "64K", &cpu_set_size },
+    { UNIT_MSIZE, 131072, NULL, "128K", &cpu_set_size },
+    { UNIT_MSIZE, 262144, NULL, "256K", &cpu_set_size },
+    { UNIT_MSIZE, 524288, NULL, "512K", &cpu_set_size },
+    { UNIT_MSIZE, 1048756, NULL, "1M", &cpu_set_size },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, NULL, "CONSINT",
       &cpu_set_consint, NULL, NULL },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
@@ -624,7 +629,6 @@ int_eval ();                                            /* eval interrupts */
 cc = newPSW (PSW & PSW_MASK);                           /* split PSW, eval wait */
 sim_rtcn_init (lfc_unit.wait, TMR_LFC);                 /* init clock */
 sim_rtcn_init (pic_unit.wait, TMR_PIC);                 /* init timer */
-sim_rtcn_init (pas_unit.wait, TMR_PAS);                 /* init pas */
 reason = 0;
 
 /* Abort handling
@@ -703,10 +707,9 @@ while (reason == 0) {                                   /* loop until halted */
             }
 
         if (PSW & PSW_WAIT) {                           /* wait state? */
-            t = sim_qcount ();                          /* events in queue */
-            if ((t == 0) || ((t == 1) && stop_wait))    /* empty, or kbd only? */
-                reason = STOP_WAIT;                     /* then stop */
-            else sim_interval = 0;                      /* force check */
+            if (sim_idle_enab)                          /* idling enabled? */
+                sim_idle (TMR_LFC, TRUE);
+            else sim_interval = sim_interval - 1;       /* no, count cycle */
             continue;
             }
 

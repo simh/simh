@@ -1,6 +1,6 @@
 /* hp2100_ipl.c: HP 2000 interprocessor link simulator
 
-   Copyright (c) 2002-2005, Robert M Supnik
+   Copyright (c) 2002-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ipli, iplo   12566B interprocessor link pair
 
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Oct-04    JDB     Fixed enable/disable from either device
    26-Apr-04    RMS     Fixed SFS x,C and SFC x,C
@@ -201,6 +202,7 @@ switch (inst) {                                         /* case on opcode */
         dat = dat | uptr->IBUF;                         /* get return data */
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCMD (dev);                               /* clear ctl, cmd */
@@ -439,7 +441,7 @@ static const uint32 pboot[IBL_LNT] = {
     0163774,                    /*BBL LDA ICK,I         ; IPL sel code */
     0027751,                    /*    JMP CFG           ; go configure */
     0107700,                    /*ST  CLC 0,C           ; intr off */
-    0002702,                    /*    CLA,CCE,SZA       ; skip in */            
+    0002702,                    /*    CLA,CCE,SZA       ; skip in */
     0063772,                    /*CN  LDA M26           ; feed frame */
     0002307,                    /*EOC CCE,INA,SZA,RSS   ; end of file? */
     0027760,                    /*    JMP EOT           ; yes */

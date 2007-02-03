@@ -469,7 +469,7 @@ int32 drv, i, j;
 
 drv = GET_UNIT (hkcs2);                                 /* get current unit */
 j = (PA >> 1) & 017;                                    /* get reg offset */
-if (reg_in_drive[j] && (hk_unit[drv].flags & UNIT_DIS)) {       /* nx disk */
+if (reg_in_drive[j] && (hk_unit[drv].flags & UNIT_DIS)) { /* nx disk */
     hkcs2 = hkcs2 | CS2_NED;                            /* set error flag */
     update_hkcs (0, drv);
     *data = 0;
@@ -705,6 +705,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_NOP:                                       /* no operation */
         update_hkcs (CS1_DONE, drv);                    /* done */
         break;
+
     case FNC_PACK:                                      /* pack acknowledge */
         hkds[drv] = hkds[drv] | DS_VV;                  /* set volume valid */
         update_hkcs (CS1_DONE, drv);                    /* done */

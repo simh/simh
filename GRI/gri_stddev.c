@@ -1,6 +1,6 @@
 /* gri_stddev.c: GRI-909 standard devices
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    hsp          S42-006 high speed punch
    rtc          real time clock
 
+   30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Dec-03    RMS     Added support for console backpressure
    25-Apr-03    RMS     Revised for extended file support
@@ -254,7 +255,7 @@ t_stat tto_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags));
+c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 if (c >= 0) {
     if ((r = sim_putchar_s (c)) != SCPE_OK) {           /* output; error? */
         sim_activate (uptr, uptr->wait);                /* try again */

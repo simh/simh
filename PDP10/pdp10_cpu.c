@@ -136,8 +136,6 @@
 #define PCQ_SIZE        64                              /* must be 2**n */
 #define PCQ_MASK        (PCQ_SIZE - 1)
 #define PCQ_ENTRY       pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
-#define UNIT_V_MSIZE    (UNIT_V_T20V41 + 1)             /* dummy mask */
-#define UNIT_MSIZE      (1 << UNIT_V_MSIZE)
 
 #define HIST_PC         0x40000000
 #define HIST_MIN        64
@@ -188,6 +186,7 @@ int32 stop_op0 = 0;                                     /* stop on 0 */
 int32 rlog = 0;                                         /* extend fixup log */
 int32 ind_max = 32;                                     /* nested ind limit */
 int32 xct_max = 32;                                     /* nested XCT limit */
+int32 t20_idlelock = 0;                                 /* TOPS-20 idle lock */
 a10 pcq[PCQ_SIZE] = { 0 };                              /* PC queue */
 int32 pcq_p = 0;                                        /* PC queue ptr */
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
@@ -321,6 +320,7 @@ extern t_bool wrpcst (a10 ea, int32 prv);
 extern t_bool spm (a10 ea, int32 prv);
 extern t_bool lpmr (a10 ea, int32 prv);
 extern int32 pi_ub_vec (int32 lvl, int32 *uba);
+extern t_stat tim_set_mod (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* CPU data structures
 
@@ -390,9 +390,14 @@ REG cpu_reg[] = {
     };
 
 MTAB cpu_mod[] = {
-    { UNIT_ITS+UNIT_T20V41, 0, "Standard microcode", "STANDARD", NULL },
-    { UNIT_ITS+UNIT_T20V41, UNIT_T20V41, "TOPS-20 V4.1", "TOPS20V41", NULL },
-    { UNIT_ITS+UNIT_T20V41, UNIT_ITS, "ITS microcode", "ITS", NULL },
+    { UNIT_KLAD+UNIT_ITS+UNIT_T20, 0,         "TOPS-10",         "TOPS-10", &tim_set_mod },
+    { UNIT_KLAD+UNIT_ITS+UNIT_T20, 0,         NULL     ,         "TOPS10",  &tim_set_mod },
+    { UNIT_KLAD+UNIT_ITS+UNIT_T20, UNIT_T20,  "TOPS-20",         "TOPS-20", &tim_set_mod },
+    { UNIT_KLAD+UNIT_ITS+UNIT_T20, UNIT_T20,  NULL,              "TOPS20",  &tim_set_mod },
+    { UNIT_KLAD+UNIT_ITS+UNIT_T20, UNIT_ITS, "ITS",              "ITS",     &tim_set_mod },
+    { UNIT_KLAD+UNIT_ITS+UNIT_T20, UNIT_KLAD, "diagnostic mode", "KLAD",    &tim_set_mod },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
       NULL, &show_iospace },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
@@ -593,11 +598,11 @@ static t_stat jrst_tab[16] = {
 #define T__N            if ((AC(ac) & mb) != 0) INCPC
 #define T__A            INCPC
 #define IOC             if (TSTF (F_USR) && !TSTF (F_UIO)) goto MUUO;
-#define IO7(x,y)        IOC; fptr = ((ITS)? x[ac]: y[ac]); \
+#define IO7(x,y)        IOC; fptr = ((Q_ITS)? x[ac]: y[ac]); \
                         if (fptr == NULL) goto MUUO; \
                         if (fptr (ea, MM_OPND)) INCPC; break;
-#define IOA             IOC; if (!ITS) ea = calc_ioea (inst, pflgs)
-#define IOAM            IOC; ea = ((ITS)? ((a10) Read (ea, MM_OPND)): \
+#define IOA             IOC; if (!Q_ITS) ea = calc_ioea (inst, pflgs)
+#define IOAM            IOC; ea = ((Q_ITS)? ((a10) Read (ea, MM_OPND)): \
                             calc_ioea (inst, pflgs))
 
 /* Flag tests */
@@ -629,7 +634,8 @@ pager_pi = FALSE;                                       /* not in pi sequence */
 rlog = 0;                                               /* not in extend */
 pi_eval ();                                             /* eval pi system */
 sim_rtc_init (tim_unit.wait);                           /* init calibration */
-if (!ITS) its_1pr = 0;                                  /* ~ITS, clr 1-proc */
+if (!Q_ITS) its_1pr = 0;                                /* ~ITS, clr 1-proc */
+t20_idlelock = 0;                                       /* clr T20 idle lock */
 
 /* Abort handling
 
@@ -656,7 +662,7 @@ else if (abortval == PAGE_FAIL) {                       /* page fail */
     if (rlog) xtcln (rlog);                             /* clean up extend */
     rlog = 0;                                           /* clear log */
     if (pager_tc) flags = pager_flags;                  /* trap? get flags */
-    if (T20) {                                          /* TOPS-20 */
+    if (T20PAG) {                                       /* TOPS-20 paging? */
         WriteP (upta + UPT_T20_PFL, pager_word);        /* write page fail wd */
         WriteP (upta + UPT_T20_OFL, XWD (flags, 0));
         WriteP (upta + UPT_T20_OPC, pager_PC);
@@ -664,7 +670,7 @@ else if (abortval == PAGE_FAIL) {                       /* page fail */
         }
     else {
         a10 ea;                                         /* TOPS-10 or ITS */
-        if (ITS) {                                      /* ITS? */
+        if (Q_ITS) {                                    /* ITS? */
             ea = epta + EPT_ITS_PAG + (pi_m2lvl[pi_act] * 3);
             if (its_1pr) flags = flags | F_1PR;         /* store 1-proc */
             its_1pr = 0;                                /* clear 1-proc */
@@ -715,7 +721,7 @@ if (qintr) {
     else inst = ReadP (epta + EPT_PIIT + (2 * qintr));
     op = GET_OP (inst);                                 /* get opcode */
     ac = GET_AC (inst);                                 /* get ac */
-    if (its_1pr && ITS) {                               /* 1-proc set? */
+    if (its_1pr && Q_ITS) {                             /* 1-proc set? */
         flags = flags | F_1PR;                          /* store 1-proc */
         its_1pr = 0;                                    /* clear 1-proc */
         }
@@ -846,12 +852,12 @@ case 0037:  Write (040, UUOWORD, MM_CUR);               /* store op, ac, ea */
 
 /* case 0100:   MUUO                                    /* UJEN */
 /* case 0101:   MUUO                                    /* unassigned */
-case 0102:  if (ITS && !TSTF (F_USR)) {                 /* GFAD (KL), XCTRI (ITS) */
+case 0102:  if (Q_ITS && !TSTF (F_USR)) {               /* GFAD (KL), XCTRI (ITS) */
                 inst = Read (ea, MM_OPND);
                 pflgs = pflgs | ac; goto XCT;
                 }
             goto MUUO;
-case 0103:  if (ITS && !TSTF (F_USR)) {                 /* GFSB (KL), XCTR (ITS) */
+case 0103:  if (Q_ITS && !TSTF (F_USR)) {               /* GFSB (KL), XCTR (ITS) */
                 inst = Read (ea, MM_OPND);
                 pflgs = pflgs | ac; goto XCT;
                 }
@@ -977,7 +983,7 @@ case 0243:  AC(P1) = jffo (AC(ac));                     /* JFFO */
 case 0244:  ashc (ac, ea); break;                       /* ASHC */
 case 0245:  rotc (ac, ea); break;                       /* ROTC */
 case 0246:  lshc (ac, ea); break;                       /* LSHC */
-case 0247:  if (ITS) circ (ac, ea); break;              /* (ITS) CIRC */
+case 0247:  if (Q_ITS) circ (ac, ea); break;            /* (ITS) CIRC */
 case 0250:  RM; WRAC; AC(ac) = mb; break;               /* EXCH */
 case 0251:  blt (ac, ea, pflgs); break;                 /* BLT */
 case 0252:  AOBAC; if (TGE (AC(ac))) JUMP (ea); break;  /* AOBJP */
@@ -991,9 +997,10 @@ case 0255:  if (flags & (ac << 14)) {                   /* JFCL */
 case 0256:  if (xct_cnt++ >= xct_max)                   /* XCT */
                 ABORT (STOP_XCT);
             inst = Read (ea, MM_OPND);
-            if (ac && !TSTF (F_USR) && !ITS) pflgs = pflgs | ac;
+            if (ac && !TSTF (F_USR) && !Q_ITS)
+                pflgs = pflgs | ac;
             goto XCT;
-case 0257:  if (ITS) goto MUUO;                         /* MAP */
+case 0257:  if (Q_ITS) goto MUUO;                       /* MAP */
             AC(ac) = map (ea, MM_OPND); break;
 case 0260:  WRP (FLPC); AOBAC;                          /* PUSHJ */
             SUBJ (ea); PUSHF; break;
@@ -1054,7 +1061,12 @@ case 0340:  AOJ; break;                                 /* AOJ */
 case 0341:  AOJ; if (TL (AC(ac))) JUMP (ea); break;     /* AOJL */
 case 0342:  AOJ; if (TE (AC(ac))) JUMP (ea); break;     /* AOJE */
 case 0343:  AOJ; if (TLE (AC(ac))) JUMP (ea); break;    /* AOJLE */
-case 0344:  AOJ; JUMP(ea); break;                       /* AOJA */
+case 0344:  AOJ; JUMP(ea);                              /* AOJA */
+            if (Q_ITS && Q_IDLE &&                      /* ITS idle? */
+                TSTF (F_USR) && (pager_PC == 017) &&    /* user mode, loc 17? */
+                (ac == 0) && (ea == 017))               /* AOJA 0,17? */
+                sim_idle (0, FALSE);
+            break;
 case 0345:  AOJ; if (TGE (AC(ac))) JUMP (ea); break;    /* AOJGE */
 case 0346:  AOJ; if (TN (AC(ac))) JUMP (ea); break;     /* AOJN */
 case 0347:  AOJ; if (TG (AC(ac))) JUMP (ea); break;     /* AOJG */
@@ -1073,7 +1085,22 @@ case 0363:  SOJ; if (TLE (AC(ac))) JUMP (ea); break;    /* SOJLE */
 case 0364:  SOJ; JUMP(ea); break;                       /* SOJA */
 case 0365:  SOJ; if (TGE (AC(ac))) JUMP (ea); break;    /* SOJGE */
 case 0366:  SOJ; if (TN (AC(ac))) JUMP (ea); break;     /* SOJN */
-case 0367:  SOJ; if (TG (AC(ac))) JUMP (ea); break;     /* SOJG */
+case 0367:  SOJ; if (TG (AC(ac))) JUMP (ea);            /* SOJG */
+            if ((ea == pager_PC) && Q_IDLE) {           /* to self, idle enab? */
+                extern int32 tmr_poll;
+                if ((ac == 6) && (ea == 1) &&           /* SOJG 6,1? */
+                    TSTF (F_USR) && Q_T10)              /* T10, user mode? */
+                    sim_idle (0, FALSE);
+                else if (!t20_idlelock &&               /* interlock off? */
+                    (ac == 2) && (ea == 3) &&           /* SOJG 2,3? */
+                    !TSTF (F_USR) && Q_T20 &&           /* T20, mon mode? */
+                    (sim_interval > (tmr_poll >> 1))) { /* >= half clock? */
+                    t20_idlelock = 1;                   /* set interlock */
+                    if (sim_os_ms_sleep (1))            /* sleep 1ms */
+                        sim_interval = 0;               /* if ok, sched event */
+                    }
+                }                    
+            break;
 case 0370:  SOS; break;                                 /* SOS */
 case 0371:  SOS; if (TL (mb)) INCPC; break;             /* SOSL */
 case 0372:  SOS; if (TE (mb)) INCPC; break;             /* SOSE */
@@ -1331,7 +1358,7 @@ case 0725:  IOA; io725 (AC(ac), ea); break;             /* BCIOB, IOWRBQ */
 default:
 MUUO:
     its_2pr = 0;                                        /* clear trap */
-    if (T20) {                                          /* TOPS20? */
+    if (T20PAG) {                                       /* TOPS20 paging? */
         int32 tf = (op << (INST_V_OP - 18)) | (ac << (INST_V_AC - 18));
         WriteP (upta + UPT_MUUO, XWD (                  /* store flags,,op+ac */
             flags & ~(F_T2 | F_T1), tf));               /* traps clear */
@@ -1425,7 +1452,7 @@ case 0254:                                              /* JRST */
         break;  
 
     case 015:                                           /* JRST 15 = XJRST */
-        if (!T20) goto MUUO;                            /* only in TOPS20 */
+        if (!T20PAG) goto MUUO;                         /* only in TOPS20 paging */
         JUMP (Read (ea, MM_OPND));                      /* jump to M[ea] */
         break;
         }                                               /* end case subop */
@@ -1434,14 +1461,14 @@ case 0254:                                              /* JRST */
 
 if (its_2pr) {                                          /* 1-proc trap? */
     its_1pr = its_2pr = 0;                              /* clear trap */
-    if (ITS) {                                          /* better be ITS */
+    if (Q_ITS) {                                        /* better be ITS */
         WriteP (upta + UPT_1PO, FLPC);                  /* wr old flgs, PC */
         mb = ReadP (upta + UPT_1PN);                    /* rd new flgs, PC */
         JUMP (mb);                                      /* set PC */
         set_newflags (mb, TRUE);                        /* set new flags */
         }
     }                                                   /* end if 2-proc */
-}                                                   /* end for */
+}                                                       /* end for */
 
 /* Should never get here */
 
@@ -2017,7 +2044,7 @@ return;
 
 t_bool aprid (a10 ea, int32 prv)
 {
-Write (ea, (ITS)? UC_AIDITS: UC_AIDDEC, prv);
+Write (ea, (Q_ITS)? UC_AIDITS: UC_AIDDEC, prv);
 return FALSE;
 }
 
@@ -2069,7 +2096,7 @@ if (jrst && TSTF (F_USR)) {                             /* if in user now */
     fl = fl | F_USR;                                    /* can't clear user */
     if (!TSTF (F_UIO)) fl = fl & ~F_UIO;                /* if !UIO, can't set */
     }
-if (ITS && (fl & F_1PR)) {                              /* ITS 1-proceed? */
+if (Q_ITS && (fl & F_1PR)) {                            /* ITS 1-proceed? */
     its_1pr = 1;                                        /* set flag */
     fl = fl & ~F_1PR;                                   /* vanish bit */
     }
@@ -2177,7 +2204,7 @@ pi_enb = pi_act = pi_prq = 0;                           /* clear PI */
 apr_enb = apr_flg = apr_lvl = 0;                        /* clear APR */
 pcst = 0;                                               /* clear PC samp */
 rlog = 0;                                               /* clear reg log */
-hsb = (ITS)? UC_HSBITS: UC_HSBDEC;                      /* set HSB */
+hsb = (Q_ITS)? UC_HSBITS: UC_HSBDEC;                    /* set HSB */
 set_dyn_ptrs ();
 set_ac_display (ac_cur);
 pi_eval ();

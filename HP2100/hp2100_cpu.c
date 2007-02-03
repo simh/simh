@@ -1,6 +1,6 @@
-/* hp2100_cpu.c: HP 2100 CPU simulator
+/* hp2100_cpu.c: HP 21xx CPU simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,10 +23,29 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   CPU          2116A/2100A/21MX-M/21MX-E central processing unit
-   MP           12892B memory protect
-   DMA0,DMA1    12895A/12897B direct memory access/dual channel port controller
+   CPU          2114C/2115A/2116C/2100A/1000-M/E/F central processing unit
+   MP           12581A/12892B memory protect
+   DMA0,DMA1    12607B/12578A/12895A direct memory access controller
+   DCPC0,DCPC1  12897B dual channel port controller
 
+   11-Jan-07    JDB     Added 12578A DMA byte packing
+   28-Dec-06    JDB     CLC 0 now sends CRS instead of CLC to devices
+   26-Dec-06    JDB     Fixed improper IRQ deferral for 21xx CPUs
+                        Fixed improper interrupt servicing in resolve
+   21-Dec-06    JDB     Added 21xx loader enable/disable support
+   16-Dec-06    JDB     Added 2114 and 2115 CPU options.
+                        Added support for 12607B (2114) and 12578A (2115/6) DMA
+   01-Dec-06    JDB     Added 1000-F CPU option (requires HAVE_INT64)
+                        SHOW CPU displays 1000-M/E instead of 21MX-M/E
+   16-Oct-06    JDB     Moved ReadF to hp2100_cpu1.c
+   12-Oct-06    JDB     Fixed INDMAX off-by-one error in resolve
+   26-Sep-06    JDB     Added iotrap parameter to UIG dispatchers for RTE microcode
+   12-Sep-06    JDB     iogrp returns NOTE_IOG to recalc interrupts
+                        resolve returns NOTE_INDINT to service held-off interrupt
+   16-Aug-06    JDB     Added support for future microcode options, future F-Series
+   09-Aug-06    JDB     Added double integer microcode, 1000-M/E synonyms
+                        Enhanced CPU option validity checking
+                        Added DCPC as a synonym for DMA for 21MX simulations
    26-Dec-05    JDB     Improved reporting in dev_conflict
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    21-Jan-05    JDB     Reorganized CPU option flags
@@ -98,10 +117,15 @@
    15-Oct-00    RMS     Added dynamic device number support
 
    References:
-   - 21MX M-Series Computer, HP 2108B and HP 2112B, Operating and Reference Manual
-       (02108-90037, Apr-1979)
+   - 2100A Computer Reference Manual (02100-90001, Dec-1971)
+   - HP 1000 M/E/F-Series Computers Technical Reference Handbook
+        (5955-0282, Mar-1980)
    - HP 1000 M/E/F-Series Computers Engineering and Reference Documentation
        (92851-90001, Mar-1981)
+   - 12607A Direct Memory Access Operating and Service Manual
+       (12607-90002, Jan-1970)
+   - 12578A/12578A-01 Direct Memory Access Operating and Service Manual
+       (12578-9001, Mar-1972)
 
    The register state for the HP 2116 CPU is:
 
@@ -125,7 +149,7 @@
    YR<15:0>             Y register
    dms_sr<15:0>         dynamic memory system status register
    dms_vr<15:0>         dynamic memory system violation register
-      
+
    The original HP 2116 has four instruction formats: memory reference,
    shift, alter/skip, and I/O.  The HP 2100 added extended memory reference
    and extended arithmetic.  The HP21MX added extended byte, bit, and word
@@ -293,7 +317,7 @@
         device controls as bit array dev_ctl[2][31..0]
         device service requests as bit array dev_srq[3][31..0]
 
-      The HP 2100 interrupt structure is based on flag, flag buffer,.
+      The HP 2100 interrupt structure is based on flag, flag buffer,
       and control.  If a device flag is set, the flag buffer is set,
       the control bit is set, and the device is the highest priority
       on the interrupt chain, it requests an interrupt.  When the
@@ -307,11 +331,14 @@
       devices don't need to track command separately from control.
 
       Service requests are used to trigger the DMA service logic.
- 
+
    3. Non-existent memory.  On the HP 2100, reads to non-existent memory
       return zero, and writes are ignored.  In the simulator, the
       largest possible memory is instantiated and initialized to zero.
-      Thus, only writes need be checked against actual memory size.
+      Thus, only writes need be checked against memory size.
+
+      On the 21xx machines, doing SET CPU LOADERDISABLE decreases available
+      memory size by 64 words.
 
    4. Adding I/O devices.  These modules must be modified:
 
@@ -327,11 +354,22 @@
       instruction, the interrupt is taken at the appropriate point; but there
       is no testing for new interrupts during execution (that is, the event
       timer is not called).
+
+   6. Interrupt deferral.  At instruction fetch time, a pending interrupt
+      request may be deferred if the previous instruction was a JMP indirect,
+      JSB indirect, STC, CLC, STF, CLF, SFS (1000 only), or SFC (1000 only), or
+      was executing from an interrupt trap cell.  If the CPU is a 1000, then the
+      request is always deferred until after the current instruction completes.
+      If the CPU is a 21xx, then the request is deferred unless the current
+      instruction is an MRG instruction other than JMP or JMP,I or JSB,I.  Note
+      that for the 21xx, SFS and SFC are not included in the deferral criteria.
 */
 
 #include "hp2100_defs.h"
 #include <setjmp.h>
 #include "hp2100_cpu.h"
+
+/* Memory protect constants */
 
 #define UNIT_V_MP_JSB   (UNIT_V_UF + 0)                 /* MP jumper W5 out */
 #define UNIT_V_MP_INT   (UNIT_V_UF + 1)                 /* MP jumper W6 out */
@@ -340,16 +378,6 @@
 #define UNIT_MP_INT     (1 << UNIT_V_MP_INT)
 #define UNIT_MP_SEL1    (1 << UNIT_V_MP_SEL1)
 
-#define MOD_211X        (1 << TYPE_211X)
-#define MOD_2100        (1 << TYPE_2100)
-#define MOD_21MX        (1 << TYPE_21MX)
-#define MOD_CURRENT     (1 << CPU_TYPE)
-
-#define UNIT_SYSTEM     (UNIT_CPU_MASK | UNIT_OPTS)
-#define UNIT_SYS_2116   (UNIT_2116)
-#define UNIT_SYS_2100   (UNIT_2100 | UNIT_EAU)
-#define UNIT_SYS_21MX_M (UNIT_21MX_M | UNIT_EAU | UNIT_FP | UNIT_DMS)
-#define UNIT_SYS_21MX_E (UNIT_21MX_E | UNIT_EAU | UNIT_FP | UNIT_DMS)
 
 #define ABORT(val)      longjmp (save_env, (val))
 
@@ -365,6 +393,7 @@ uint16 ABREG[2];                                        /* during execution */
 uint32 PC = 0;                                          /* P register */
 uint32 SR = 0;                                          /* S register */
 uint32 MR = 0;                                          /* M register */
+uint32 saved_MR = 0;                                    /* between executions */
 uint32 TR = 0;                                          /* T register */
 uint32 XR = 0;                                          /* X register */
 uint32 YR = 0;                                          /* Y register */
@@ -393,27 +422,63 @@ uint32 iop_sp = 0;                                      /* iop stack */
 uint32 ind_max = 16;                                    /* iadr nest limit */
 uint32 stop_inst = 1;                                   /* stop on ill inst */
 uint32 stop_dev = 0;                                    /* stop on ill dev */
+uint32 fwanxm = 0;                                      /* first word addr of nx mem */
 uint16 pcq[PCQ_SIZE] = { 0 };                           /* PC queue */
 uint32 pcq_p = 0;                                       /* PC queue ptr */
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 jmp_buf save_env;                                       /* abort handler */
 
-struct opt_table {                                      /* options table */
-    int32       optf;
-    int32       cpuf;
+/* Table of CPU features by model.
+
+   Fields:
+    - typ:    standard features plus typically configured options.
+    - opt:    complete list of optional features.
+    - maxmem: maximum configurable memory in 16-bit words.
+
+   Features in the "typical" list are enabled when the CPU model is selected.
+   If a feature appears in the "typical" list but NOT in the "optional" list,
+   then it is standard equipment and cannot be disabled.  If a feature appears
+   in the "optional" list, then it may be enabled or disabled as desired by the
+   user.
+*/
+
+struct FEATURE_TABLE {                                  /* CPU model feature table: */
+    uint32      typ;                                    /*  - typical features */
+    uint32      opt;                                    /*  - optional features */
+    uint32      maxmem;                                 /*  - maximum memory */
     };
 
-static struct opt_table opt_val[] = {
-    { UNIT_EAU,  MOD_211X },
-    { UNIT_FP,   MOD_2100 },
-    { UNIT_DMS,  MOD_21MX },
-    { UNIT_IOP,  MOD_2100 | MOD_21MX },
-    { UNIT_FFP,  MOD_2100 | MOD_21MX },
-    { TYPE_211X, MOD_211X | MOD_2100 | MOD_21MX },
-    { TYPE_2100, MOD_211X | MOD_2100 | MOD_21MX },
-    { TYPE_21MX, MOD_211X | MOD_2100 | MOD_21MX },
-    { 0, 0 }
-    };
+static struct FEATURE_TABLE cpu_features[] = {          /* features in UNIT_xxxx order*/
+  { UNIT_DMA | UNIT_MP,                                 /* UNIT_2116 */
+    UNIT_PFAIL | UNIT_DMA | UNIT_MP | UNIT_EAU,
+    32768 },
+  { UNIT_DMA,                                           /* UNIT_2115 */
+    UNIT_PFAIL | UNIT_DMA | UNIT_EAU,
+    8192 },
+  { UNIT_DMA,                                           /* UNIT_2114 */
+    UNIT_PFAIL | UNIT_DMA,
+    16384 },
+  { 0, 0, 0 },
+  { UNIT_PFAIL | UNIT_MP | UNIT_DMA | UNIT_EAU,         /* UNIT_2100 */
+    UNIT_DMA   | UNIT_FP | UNIT_IOP | UNIT_FFP,
+    32768 },
+  { 0, 0, 0 },
+  { 0, 0, 0 },
+  { 0, 0, 0 },
+  { UNIT_MP | UNIT_DMA | UNIT_EAU | UNIT_FP | UNIT_DMS, /* UNIT_1000_M */
+    UNIT_PFAIL | UNIT_DMA | UNIT_MP  | UNIT_DMS |
+    UNIT_IOP   | UNIT_FFP | UNIT_DBI | UNIT_DS,
+    1048576 },
+  { UNIT_MP | UNIT_DMA | UNIT_EAU | UNIT_FP | UNIT_DMS, /* UNIT_1000_E */
+    UNIT_PFAIL | UNIT_DMA | UNIT_MP  | UNIT_DMS |
+    UNIT_IOP   | UNIT_FFP | UNIT_DBI | UNIT_DS  | UNIT_EMA_VMA,
+    1048576 },
+  { UNIT_MP  | UNIT_DMA | UNIT_EAU | UNIT_FP |          /* UNIT_1000_F */
+    UNIT_FFP | UNIT_DBI | UNIT_DMS,
+    UNIT_PFAIL | UNIT_DMA | UNIT_MP     |
+    UNIT_IOP   | UNIT_DS  | UNIT_SIGNAL | UNIT_EMA_VMA,
+    1048576 }
+  };
 
 extern int32 sim_interval;
 extern int32 sim_int_char;
@@ -444,14 +509,19 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 t_stat mp_reset (DEVICE *dptr);
 t_stat dma0_reset (DEVICE *dptr);
 t_stat dma1_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_set_size (UNIT *uptr, int32 new_size, char *cptr, void *desc);
+t_stat cpu_set_model (UNIT *uptr, int32 new_model, char *cptr, void *desc);
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_opt (UNIT *uptr, int32 option, char *cptr, void *desc);
+t_stat cpu_clr_opt (UNIT *uptr, int32 option, char *cptr, void *desc);
+t_stat cpu_set_ldr (UNIT *uptr, int32 enable, char *cptr, void *desc);
 t_bool dev_conflict (void);
 void hp_post_cmd (t_bool from_scp);
 
 extern t_stat cpu_eau (uint32 IR, uint32 intrq);
-extern t_stat cpu_uig_0 (uint32 IR, uint32 intrq);
-extern t_stat cpu_uig_1 (uint32 IR, uint32 intrq);
+extern t_stat cpu_uig_0 (uint32 IR, uint32 intrq, uint32 iotrap);
+extern t_stat cpu_uig_1 (uint32 IR, uint32 intrq, uint32 iotrap);
+
 extern int32 clk_delay (int32 flg);
 extern void (*sim_vm_post) (t_bool from_scp);
 
@@ -463,7 +533,7 @@ extern void (*sim_vm_post) (t_bool from_scp);
    cpu_mod      CPU modifiers list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, VASIZE) };
+UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, 0) };
 
 REG cpu_reg[] = {
     { ORDATA (P, PC, 15) },
@@ -488,6 +558,7 @@ REG cpu_reg[] = {
     { FLDATA (STOP_INST, stop_inst, 0) },
     { FLDATA (STOP_DEV, stop_dev, 1) },
     { DRDATA (INDMAX, ind_max, 16), REG_NZ + PV_LEFT },
+    { ORDATA (FWANXM, fwanxm, 32), REG_HRO },
     { BRDATA (PCQ, pcq, 8, 15, PCQ_SIZE), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
     { ORDATA (WRU, sim_int_char, 8), REG_HRO },
@@ -506,50 +577,86 @@ REG cpu_reg[] = {
     { NULL }
     };
 
+/* CPU modifier table.
+
+   The 21MX monikers are deprecated in favor of the 1000 designations.  See the
+   "HP 1000 Series Naming History" on the back inside cover of the Technical
+   Reference Handbook. */
+
 MTAB cpu_mod[] = {
-    { UNIT_SYSTEM, UNIT_SYS_2116,   NULL, "2116",   &cpu_set_opt, NULL,
-      (void *) TYPE_211X },
-    { UNIT_SYSTEM, UNIT_SYS_2100,   NULL, "2100",   &cpu_set_opt, NULL,
-      (void *) TYPE_2100 },
-    { UNIT_SYSTEM, UNIT_SYS_21MX_E, NULL, "21MX-E", &cpu_set_opt, NULL,
-      (void *) TYPE_21MX },
-    { UNIT_SYSTEM, UNIT_SYS_21MX_M, NULL, "21MX-M", &cpu_set_opt, NULL,
-      (void *) TYPE_21MX },
+    { UNIT_MODEL_MASK, UNIT_2116,   "",   "2116",   &cpu_set_model, &cpu_show_model, "2116"   },
+    { UNIT_MODEL_MASK, UNIT_2115,   "",   "2115",   &cpu_set_model, &cpu_show_model, "2115"   },
+    { UNIT_MODEL_MASK, UNIT_2114,   "",   "2114",   &cpu_set_model, &cpu_show_model, "2114"   },
+    { UNIT_MODEL_MASK, UNIT_2100,   "",   "2100",   &cpu_set_model, &cpu_show_model, "2100"   },
+    { UNIT_MODEL_MASK, UNIT_1000_E, "",   "1000-E", &cpu_set_model, &cpu_show_model, "1000-E" },
+    { UNIT_MODEL_MASK, UNIT_1000_E, NULL, "21MX-E", &cpu_set_model, &cpu_show_model, "1000-E" },
+    { UNIT_MODEL_MASK, UNIT_1000_M, "",   "1000-M", &cpu_set_model, &cpu_show_model, "1000-M" },
+    { UNIT_MODEL_MASK, UNIT_1000_M, NULL, "21MX-M", &cpu_set_model, &cpu_show_model, "1000-M" },
 
-    { UNIT_CPU_MASK, UNIT_2116,   "2116",   NULL, NULL },
-    { UNIT_CPU_MASK, UNIT_2100,   "2100",   NULL, NULL },
-    { UNIT_CPU_MASK, UNIT_21MX_E, "21MX-E", NULL, NULL },
-    { UNIT_CPU_MASK, UNIT_21MX_M, "21MX-M", NULL, NULL },
+#if defined (HAVE_INT64)
+    { UNIT_MODEL_MASK, UNIT_1000_F, "",   "1000-F", &cpu_set_model, &cpu_show_model, "1000-F" },
+#endif
 
-    { UNIT_EAU, UNIT_EAU, "EAU",    "EAU",   &cpu_set_opt, NULL,
-      (void *) UNIT_EAU },
-    { UNIT_EAU, 0,        "no EAU", "NOEAU", &cpu_set_opt, NULL,
-      (void *) UNIT_EAU },
-    { UNIT_FP,  UNIT_FP,  "FP",     "FP",    &cpu_set_opt, NULL,
-      (void *) UNIT_FP },
-    { UNIT_FP,  0,        "no FP",  "NOFP",  &cpu_set_opt, NULL,
-      (void *) UNIT_FP },
-    { UNIT_IOP, UNIT_IOP, "IOP",    "IOP",   &cpu_set_opt, NULL,
-      (void *) UNIT_IOP },
-    { UNIT_IOP, 0,        "no IOP", "NOIOP", &cpu_set_opt, NULL,
-      (void *) UNIT_IOP },
-    { UNIT_DMS, UNIT_DMS, "DMS",    "DMS",   &cpu_set_opt, NULL,
-      (void *) UNIT_DMS },
-    { UNIT_DMS, 0,        "no DMS", "NODMS", &cpu_set_opt, NULL,
-      (void *) UNIT_DMS },
-    { UNIT_FFP, UNIT_FFP, "FFP",    "FFP",   &cpu_set_opt, NULL,
-      (void *) UNIT_FFP },
-    { UNIT_FFP, 0,        "no FFP", "NOFFP", &cpu_set_opt, NULL,
-      (void *) UNIT_FFP },
-    { MTAB_XTD | MTAB_VDV,    4096, NULL, "4K",    &cpu_set_size },
-    { MTAB_XTD | MTAB_VDV,    8192, NULL, "8K",    &cpu_set_size },
-    { MTAB_XTD | MTAB_VDV,   16384, NULL, "16K",   &cpu_set_size },
-    { MTAB_XTD | MTAB_VDV,   32768, NULL, "32K",   &cpu_set_size },
-    { MTAB_XTD | MTAB_VDV,   65536, NULL, "64K",   &cpu_set_size },
-    { MTAB_XTD | MTAB_VDV,  131072, NULL, "128K",  &cpu_set_size },
-    { MTAB_XTD | MTAB_VDV,  262144, NULL, "256K",  &cpu_set_size },
-    { MTAB_XTD | MTAB_VDV,  524288, NULL, "512K",  &cpu_set_size },
-    { MTAB_XTD | MTAB_VDV, 1048576, NULL, "1024K", &cpu_set_size },
+    { MTAB_XTD | MTAB_VDV, 1, NULL, "LOADERENABLE",  &cpu_set_ldr, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, NULL, "LOADERDISABLE", &cpu_set_ldr, NULL, NULL },
+
+    { UNIT_EAU,     UNIT_EAU,   "EAU",        "EAU",      &cpu_set_opt, NULL, NULL },
+    { UNIT_EAU,     0,          "no EAU",     NULL,       NULL,         NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_EAU,    NULL, "NOEAU",    &cpu_clr_opt, NULL, NULL },
+
+    { UNIT_FP,      UNIT_FP,    "FP",         "FP",       &cpu_set_opt, NULL, NULL },
+    { UNIT_FP,      0,          "no FP",      NULL,       NULL,         NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_FP,     NULL, "NOFP",     &cpu_clr_opt, NULL, NULL },
+
+    { UNIT_IOP,     UNIT_IOP,   "IOP",        "IOP",      &cpu_set_opt, NULL, NULL },
+    { UNIT_IOP,     0,          "no IOP",     NULL,       NULL,         NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_IOP,    NULL, "NOIOP",    &cpu_clr_opt, NULL, NULL },
+
+    { UNIT_DMS,     UNIT_DMS,   "DMS",        "DMS",      &cpu_set_opt, NULL, NULL },
+    { UNIT_DMS,     0,          "no DMS",     NULL,       NULL,         NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_DMS,    NULL, "NODMS",    &cpu_clr_opt, NULL, NULL },
+
+    { UNIT_FFP,     UNIT_FFP,   "FFP",        "FFP",      &cpu_set_opt, NULL, NULL },
+    { UNIT_FFP,     0,          "no FFP",     NULL,       NULL,         NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_FFP,    NULL, "NOFFP",    &cpu_clr_opt, NULL, NULL },
+
+    { UNIT_DBI,     UNIT_DBI,   "DBI",        "DBI",      &cpu_set_opt, NULL, NULL },
+    { UNIT_DBI,     0,          "no DBI",     NULL,       NULL,         NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_DBI,    NULL, "NODBI",    &cpu_clr_opt, NULL, NULL },
+
+/* Future microcode support.
+    { UNIT_EMA_VMA, UNIT_EMA,   "EMA",        "EMA",      &cpu_set_opt, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_EMA,    NULL, "NOEMA",    &cpu_clr_opt, NULL, NULL },
+
+    { UNIT_EMA_VMA, UNIT_VMAOS, "VMA",        "VMA",      &cpu_set_opt, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_VMAOS,  NULL, "NOVMA",    &cpu_clr_opt, NULL, NULL },
+
+    { UNIT_EMA_VMA, 0,          "no EMA/VMA", NULL,       &cpu_set_opt, NULL, NULL },
+
+    { UNIT_VIS,     UNIT_VIS,   "VIS",        "VIS",      &cpu_set_opt, NULL, NULL },
+    { UNIT_VIS,     0,          "no VIS",     NULL,       NULL,         NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_VIS,    NULL, "NOVIS",    &cpu_clr_opt, NULL, NULL },
+
+    { UNIT_DS,      UNIT_DS,    "DS",         "DS",       &cpu_set_opt, NULL, NULL },
+    { UNIT_DS,      0,          "no DS",      NULL,       NULL,         NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_DS,     NULL, "NODS",     &cpu_clr_opt, NULL, NULL },
+
+    { UNIT_SIGNAL,  UNIT_SIGNAL,"SIGNAL",     "SIGNAL",   &cpu_set_opt, NULL, NULL },
+    { UNIT_SIGNAL,  0,          "no SIGNAL",  NULL,       NULL,         NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_SIGNAL, NULL, "NOSIGNAL", &cpu_clr_opt, NULL, NULL },
+*/
+
+    { MTAB_XTD | MTAB_VDV,    4096, NULL, "4K",    &cpu_set_size, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV,    8192, NULL, "8K",    &cpu_set_size, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV,   12288, NULL, "12K",   &cpu_set_size, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV,   16384, NULL, "16K",   &cpu_set_size, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV,   24576, NULL, "24K",   &cpu_set_size, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV,   32768, NULL, "32K",   &cpu_set_size, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV,   65536, NULL, "64K",   &cpu_set_size, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV,  131072, NULL, "128K",  &cpu_set_size, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV,  262144, NULL, "256K",  &cpu_set_size, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV,  524288, NULL, "512K",  &cpu_set_size, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, 1048576, NULL, "1024K", &cpu_set_size, NULL, NULL },
     { 0 }
     };
 
@@ -616,6 +723,9 @@ REG dma0_reg[] = {
     { ORDATA (CW1, dmac[0].cw1, 16) },
     { ORDATA (CW2, dmac[0].cw2, 16) },
     { ORDATA (CW3, dmac[0].cw3, 16) },
+    { DRDATA (LATENCY, dmac[0].latency, 8) },
+    { FLDATA (BYTE, dmac[0].packer, 31) },
+    { ORDATA (PACKER, dmac[0].packer, 8) },
     { NULL }
     };
 
@@ -638,6 +748,9 @@ REG dma1_reg[] = {
     { ORDATA (CW1, dmac[1].cw1, 16) },
     { ORDATA (CW2, dmac[1].cw2, 16) },
     { ORDATA (CW3, dmac[1].cw3, 16) },
+    { DRDATA (LATENCY, dmac[1].latency, 8) },
+    { FLDATA (BYTE, dmac[1].packer, 31) },
+    { ORDATA (PACKER, dmac[1].packer, 8) },
     { NULL }
     };
 
@@ -649,9 +762,9 @@ DEVICE dma1_dev = {
     NULL, DEV_DISABLE
     };
 
-/* Interrupt defer table */
+/* Interrupt defer table (1000 version) */
 
-static const int32 defer_tab[] = { 0, 1, 1, 1, 0, 0, 0, 1 };
+static int32 defer_tab[] = { 0, 1, 1, 1, 0, 0, 0, 1 };
 
 /* Device dispatch table */
 
@@ -730,6 +843,13 @@ for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru dev */
     }
 sim_rtc_init (clk_delay (0));                           /* recalibrate clock */
 
+/* Configure interrupt deferral table */
+
+if (UNIT_CPU_FAMILY == UNIT_FAMILY_21XX)                /* 21xx series? */
+    defer_tab[ioSFC] = defer_tab[ioSFS] = 0;            /* SFC/S doesn't defer */
+else                                                    /* 1000 series */
+    defer_tab[ioSFC] = defer_tab[ioSFS] = 1;            /* SFC/S does defer */
+
 /* Abort handling
 
    If an abort occurs in memory protection, the relocation routine
@@ -765,6 +885,23 @@ while (reason == 0) {                                   /* loop until halted */
         intrq = calc_int ();                            /* recalc interrupts */
         }
 
+/* Interrupt deferral rules differ on the 21xx vs. the 1000.  The 1000 always
+   defers until the completion of the instruction following a deferring
+   instruction.  The 21xx defers unless the current instruction is an MRG
+   instruction other than JMP or JMP,I or JSB,I.  See the "Set Phase Logic
+   Flowchart" in the 2100A Computer Reference Manual for details.
+*/
+
+    if (intrq &&                                        /* interrupt pending? */
+       ion_defer &&                                     /* deferring instruction? */
+       (UNIT_CPU_FAMILY == UNIT_FAMILY_21XX)) {         /* 21xx series? */
+        IR = ReadW (PC);                                /* prefetch next instr */
+        if (((IR & 0070000) != 0000000) &&              /* MRG instruction? */
+            ((IR & 0174000) != 0114000) &&              /* JSB,I? */
+            ((IR & 0074000) != 0024000))                /* JMP or JMP,I? */
+            ion_defer = 0;                              /* no, so clear deferral */
+            }
+
 /*  (From Dave Bryan)
     Unlike most other I/O devices, the MP flag flip-flop is cleared
     automatically when the interrupt is acknowledged and not by a programmed
@@ -774,7 +911,8 @@ while (reason == 0) {                                   /* loop until halted */
     92851-90001) says:
 
       "When IAK occurs and IRQ5 is asserted, the FLAGBFF is cleared, FLAGFF
-       clocked off at next T2, and IRQ5 will no longer occur." */
+       clocked off at next T2, and IRQ5 will no longer occur."
+*/
 
     if (intrq && ((intrq <= PRO) || !ion_defer)) {      /* interrupt request? */
         iotrap = 1;                                     /* I/O trap cell instr */
@@ -827,7 +965,7 @@ while (reason == 0) {                                   /* loop until halted */
     1  0  0  0  1  0  0  1      double store (decoded as 104400)
     1  0  0  0  1  0  1  0      extended instr group 0 (A/B must be set)
     1  0  0  0  x  0  1  1      extended instr group 1 (A/B ignored) */
-    
+
     absel = (IR & I_AB)? 1: 0;                          /* get A/B select */
     switch ((IR >> 8) & 0377) {                         /* decode IR<15:8> */
 
@@ -841,10 +979,12 @@ while (reason == 0) {                                   /* loop until halted */
         AR = AR & ReadW (MA);
         break;
 
-    case 0030:case 0031:case 0032:case 0033:
-    case 0034:case 0035:case 0036:case 0037:
     case 0230:case 0231:case 0232:case 0233:
     case 0234:case 0235:case 0236:case 0237:
+        ion_defer = 1;                                  /* defer if JSB,I */
+
+    case 0030:case 0031:case 0032:case 0033:
+    case 0034:case 0035:case 0036:case 0037:
         if (reason = Ea (IR, &MA, intrq)) break;        /* JSB */
         if ((mp_unit.flags & UNIT_MP_JSB) &&            /* MP if W7 (JSB) out */
             CTL (PRO) && (MA < mp_fence))
@@ -852,7 +992,6 @@ while (reason == 0) {                                   /* loop until halted */
         WriteW (MA, PC);                                /* store PC */
         PCQ_ENTRY;
         PC = (MA + 1) & VAMASK;                         /* jump */
-        if (IR & I_IA) ion_defer = 1;                   /* ind? defer intr */
         break;
 
     case 0040:case 0041:case 0042:case 0043:
@@ -863,15 +1002,16 @@ while (reason == 0) {                                   /* loop until halted */
         AR = AR ^ ReadW (MA);
         break;
 
-    case 0050:case 0051:case 0052:case 0053:
-    case 0054:case 0055:case 0056:case 0057:
     case 0250:case 0251:case 0252:case 0253:
     case 0254:case 0255:case 0256:case 0257:
+        ion_defer = 1;                                  /* defer if JMP,I */
+
+    case 0050:case 0051:case 0052:case 0053:
+    case 0054:case 0055:case 0056:case 0057:
         if (reason = Ea (IR, &MA, intrq)) break;        /* JMP */
         mp_dms_jmp (MA);                                /* validate jump addr */
         PCQ_ENTRY;
         PC = MA;                                        /* jump */
-        if (IR & I_IA) ion_defer = 1;                   /* ind? defer int */
         break;
 
     case 0060:case 0061:case 0062:case 0063:
@@ -1025,8 +1165,6 @@ while (reason == 0) {                                   /* loop until halted */
     case 0204:case 0205:case 0206:case 0207:
     case 0214:case 0215:case 0216:case 0217:
         reason = iogrp (IR, iotrap);                    /* execute instr */
-        dmarq = calc_dma ();                            /* recalc DMA */
-        intrq = calc_int ();                            /* recalc interrupts */
         break;                                          /* end if I/O */
 
 /* Extended arithmetic */
@@ -1042,22 +1180,23 @@ while (reason == 0) {                                   /* loop until halted */
 /* Extended instructions */
 
     case 0212:                                          /* UIG 0 extension */
-        reason = cpu_uig_0 (IR, intrq);                 /* extended opcode */
-        dmarq = calc_dma ();                            /* recalc DMA masks */
-        intrq = calc_int ();                            /* recalc interrupts */
+        reason = cpu_uig_0 (IR, intrq, iotrap);         /* extended opcode */
         break;
 
     case 0203:                                          /* UIG 1 extension */
     case 0213:
-        reason = cpu_uig_1 (IR, intrq);                 /* extended opcode */
-        dmarq = calc_dma ();                            /* recalc DMA masks */
-        intrq = calc_int ();                            /* recalc interrupts */
+        reason = cpu_uig_1 (IR, intrq, iotrap);         /* extended opcode */
         break;
         }                                               /* end case IR */
 
-    if (reason == STOP_INDINT) {                        /* indirect intr? */
+    if (reason == NOTE_IOG) {                           /* I/O instr exec? */
+        dmarq = calc_dma ();                            /* recalc DMA masks */
+        intrq = calc_int ();                            /* recalc interrupts */
+        reason = 0;                                     /* continue */
+        }
+
+    else if (reason == NOTE_INDINT) {                   /* intr pend during indir? */
         PC = err_PC;                                    /* back out of inst */
-        ion_defer = 0;                                  /* clear defer */
         reason = 0;                                     /* continue */
         }
     }                                                   /* end while */
@@ -1069,9 +1208,12 @@ saved_BR = BR & DMASK;
 if (iotrap && (reason == STOP_HALT)) MR = intaddr;      /* HLT in trap cell? */
 else MR = (PC - 1) & VAMASK;                            /* no, M = P - 1 */
 TR = ReadTAB (MR);                                      /* last word fetched */
+saved_MR = MR;                                          /* save for T cmd update */
 if ((reason == STOP_RSRV) || (reason == STOP_IODV) ||   /* instr error? */
     (reason == STOP_IND)) PC = err_PC;                  /* back up PC */
 dms_upd_sr ();                                          /* update dms_sr */
+if (reason == STOP_HALT)                                /* programmed halt? */
+    cpu_set_ldr (NULL, FALSE, NULL, NULL);              /* disable loader (ignore errors) */
 for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp) {                                         /* exist? */
@@ -1087,20 +1229,36 @@ pcq_r->qptr = pcq_p;                                    /* update pc q ptr */
 return reason;
 }
 
-/* Resolve indirect addresses */
+/* Resolve indirect addresses.
+
+   An indirect chain is followed until a direct address is obtained.  Under
+   simulation, a maximum number of indirect levels are allowed (typically 16),
+   after which the instruction will be aborted.
+
+   If the memory protect feature is present, an indirect counter is used that
+   allows a pending interrupt to be serviced if more than three levels of
+   indirection are encountered.  If MP jumper W6 ("INT") is out and MP is
+   enabled, then pending interrupts are serviced immediately.  When employing
+   the indirect counter, the hardware clears a pending interrupt deferral after
+   the third indirection and aborts the instruction after the fourth.
+*/
 
 t_stat resolve (uint32 MA, uint32 *addr, uint32 irq)
 {
 uint32 i;
+t_bool pending = (irq && !(mp_unit.flags & DEV_DIS));
+t_bool int_enable = ((mp_unit.flags & UNIT_MP_INT) && CTL(PRO));
 
 for (i = 0; (i < ind_max) && (MA & I_IA); i++) {        /* resolve multilevel */
-    if (irq &&                                          /* int req? */
-        ((i >= 2) || (mp_unit.flags & UNIT_MP_INT)) &&  /* ind > 3 or W6 out? */
-        !(mp_unit.flags & DEV_DIS))                     /* MP installed? */
-        return STOP_INDINT;                             /* break out */
-    MA = ReadW (MA & VAMASK);
+    if (pending) {                                      /* interrupt pending and MP enabled? */
+        if ((i == 2) || int_enable)                     /* 3rd level indirect or INT out? */
+            ion_defer = 0;                              /* reenable interrrupts */
+        if ((i > 2) || int_enable)                      /* 4th or higher or INT out? */
+            return NOTE_INDINT;                         /* break out now */
+        }
+    MA = ReadW (MA & VAMASK);                           /* follow address chain */
     }
-if (i >= ind_max) return STOP_IND;                      /* indirect loop? */
+if (MA & I_IA) return STOP_IND;                         /* indirect loop? */
 *addr = MA;
 return SCPE_OK;
 }
@@ -1164,7 +1322,7 @@ return t;                                               /* input unchanged */
 
 t_stat iogrp (uint32 ir, uint32 iotrap)
 {
-uint32 dev, sop, iodata, ab;
+uint32 dev, sop, iodata, iostat, ab;
 
 ab = (ir & I_AB)? 1: 0;                                 /* get A/B select */
 dev = ir & I_DEVMASK;                                   /* get device */
@@ -1184,7 +1342,9 @@ if (sop == ioHLT) {                                     /* halt? */
     sprintf (&halt_msg[len - 6], "%06o", ir);           /* add the halt */
     return STOP_HALT;
     }
-return (iodata >> IOT_V_REASON);                        /* return status */
+iostat = iodata >> IOT_V_REASON;
+if (iostat == SCPE_OK) return NOTE_IOG;                 /* normal status */
+else return iostat;                                     /* abnormal status */
 }
 
 /* Device dispatch */
@@ -1304,13 +1464,6 @@ else pa = va;
 return ReadPW (pa);
 }
 
-uint32 ReadF (uint32 va)
-{
-uint32 t = ReadW (va);
-uint32 t1 = ReadW ((va + 1) & VAMASK);
-return (t << 16) | t1;
-}
-
 uint16 ReadIO (uint32 va, uint32 map)
 {
 uint32 pa;
@@ -1340,7 +1493,8 @@ else return ReadIO (addr, dms_ump);
    writable, then whether the target is below the MP fence is not checked. [The
    simulator must] do MP check on all writes after DMS translation and violation
    checks are done (so, to pass, the page must be writable AND the target must
-   be above the MP fence). */
+   be above the MP fence).
+*/
 
 #define MP_TEST(x)      (CTL (PRO) && ((x) > 1) && ((x) < mp_fence))
 
@@ -1519,7 +1673,7 @@ return;
 void dms_viol (uint32 va, uint32 st)
 {
 dms_vr = st | VA_GETPAG (va) |
-    ((st & (MVI_RPR | MVI_WPR))? MVI_MEB: 0) |          /* set MEB */   
+    ((st & (MVI_RPR | MVI_WPR))? MVI_MEB: 0) |          /* set MEB */
     (dms_enb? MVI_MEM: 0) |                             /* set MEM */
     (dms_ump? MVI_UMP: 0);                              /* set UMAP */
 if (CTL (PRO)) {                                        /* protected? */
@@ -1544,6 +1698,10 @@ return dms_sr;
 
    NOTE: LIx/MIx reads floating I/O bus (0 on all machines).
 
+   NOTE: CLC 0 issues CRS to all devices, not CLC.  While most cards react
+   identically to CRS and CLC, some do not, e.g., the 12566B when used as an
+   I/O diagnostic target.  PRESET also issues CRS (with POPIO).
+
    From Dave Bryan: RTE uses the undocumented instruction "SFS 0,C" to both test
    and turn off the interrupt system.  This is confirmed in the "RTE-6/VM
    Technical Specifications" manual (HP 92084-90015), section 2.3.1 "Process
@@ -1559,7 +1717,8 @@ return dms_sr;
     The major hole in being able to save the complete state is in saving the
     interrupt system state. In order to do this in both the 21MX and the 21XE
     the instruction 103300 was used to both test the interrupt system and
-    turn it off." */
+    turn it off."
+*/
 
 int32 cpuio (int32 inst, int32 IR, int32 dat)
 {
@@ -1584,12 +1743,9 @@ switch (inst) {                                         /* case on opcode */
         break;
 
     case ioCTL:                                         /* control */
-        if (IR & I_CTL) {                               /* =CLC 02,03,06..77 */
-            devdisp (DMALT0, inst, I_CTL + DMALT0, 0);
-            devdisp (DMALT1, inst, I_CTL + DMALT1, 0);
-            for (i = 6; i <= I_DEVMASK; i++)
-                devdisp (i, inst, I_CTL + i, 0);
-            }
+        if (IR & I_CTL)                                 /* CLC 0 sends CRS */
+            for (i = 0; i <= I_DEVMASK; i++)            /* to all devices */
+                devdisp (i, ioCRS, I_CTL + i, 0);       /* IR -> "CLC i" for convenience */
         break;
 
     default:
@@ -1600,9 +1756,11 @@ if (IR & I_HC) ion = 0;                                 /* HC option */
 return dat;
 }
 
-/* Device 1 (overflow) I/O routine
+/* Device 1 (overflow/S-register) I/O routine
 
-   NOTE: The S register is read-only on the 2115/2116. */
+   NOTE: The S register is read-only on the 2115/2116.  It is read/write on
+   the 2114, 2100, and 1000.
+*/
 
 int32 ovfio (int32 inst, int32 IR, int32 dat)
 {
@@ -1629,7 +1787,9 @@ switch (inst) {                                         /* case on opcode */
         break;
 
     case ioOTX:                                         /* output */
-        if (UNIT_CPU_TYPE != UNIT_TYPE_211X) SR = dat;
+        if ((UNIT_CPU_MODEL != UNIT_2116) &&
+            (UNIT_CPU_MODEL != UNIT_2115))
+            SR = dat;
         break;
 
     default:
@@ -1665,7 +1825,8 @@ return dat;
 
    From Dave Bryan: Examination of the schematics for the MP card in the
    engineering documentation shows that the SFS and SFC I/O backplane signals
-   gate the output of the MEVFF onto the SKF line unconditionally. */
+   gate the output of the MEVFF onto the SKF line unconditionally.
+*/
 
 int32 proio (int32 inst, int32 IR, int32 dat)
 {
@@ -1692,6 +1853,7 @@ switch (inst) {                                         /* case on opcode */
         if (cpu_unit.flags & UNIT_2100) iop_sp = mp_fence;
         break;
 
+    case ioCRS:                                         /* control reset */
     case ioCTL:                                         /* control clear/set */
         if ((IR & I_CTL) == 0) {                        /* STC */
             setCTL (PRO);
@@ -1709,7 +1871,19 @@ if (IR & I_HC) { clrFLG (PRO); }                        /* HC option */
 return dat;
 }
 
-/* Devices 2,3 (secondary DMA) I/O routine */
+/* Devices 2,3 (secondary DMA) I/O routine.
+
+   Implements control word 2 (memory address) and control word 3 (word count).
+
+   The 12607B (2114) supports 14-bit addresses and 13-bit word counts.
+   The 12578A (2115/6) supports 15-bit addresses and 14-bit word counts.
+   The 12895A (2100) and 12897B (1000) support 15-bit addresses and 16-bit word
+   counts.
+
+   Note: because the I/O bus floats to zero on 211x computers, LIA/MIA (word
+   count) returns zeros in the unused bit locations, even though the word count
+   is a negative value.
+*/
 
 int32 dmsio (int32 inst, int32 IR, int32 dat)
 {
@@ -1718,19 +1892,29 @@ int32 ch;
 ch = IR & 1;                                            /* get channel num */
 switch (inst) {                                         /* case on opcode */
 
-    case ioMIX:                                         /* merge */
-        dat = dat | dmac[ch].cw3;
-        break;
+    case ioLIX:                                         /* load remaining word count */
+        dat = 0;
 
-    case ioLIX:                                         /* load */
-        dat = dmac[ch].cw3;
+    case ioMIX:                                         /* merge */
+        if (UNIT_CPU_MODEL == UNIT_2114)                /* 2114? */
+            dat = dat | (dmac[ch].cw3 & 0017777);       /* only 13-bit count */
+        else if (UNIT_CPU_TYPE == UNIT_TYPE_211X)       /* 2115/2116? */
+            dat = dat | (dmac[ch].cw3 & 0037777);       /* only 14-bit count */
+        else
+            dat = dat | dmac[ch].cw3;                   /* rest use full value */
         break;
 
     case ioOTX:                                         /* output */
-        if (CTL (DMALT0 + ch)) dmac[ch].cw3 = dat;
-        else dmac[ch].cw2 = dat;
+        if (CTL (DMALT0 + ch))                          /* word count selected? */
+            dmac[ch].cw3 = dat;                         /* save count */
+        else                                            /* memory address selected */
+            if (UNIT_CPU_MODEL == UNIT_2114)            /* 2114? */
+                dmac[ch].cw2 = dat & 0137777;           /* 14-bit address */
+            else
+                dmac[ch].cw2 = dat;                     /* full address stored */
         break;
 
+    case ioCRS:                                         /* control reset */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) { clrCTL (DMALT0 + ch); }       /* CLC */
         else { setCTL (DMALT0 + ch); }                  /* STC */
@@ -1745,7 +1929,20 @@ return dat;
 
 /* Devices 6,7 (primary DMA) I/O routine
 
-   NOTE: LIx/MIx reads floating S-bus (1 on 21MX, 0 on 2116/2100). */
+   Implements control word 1 (device address) and DMA control.
+
+   The 12607B (2114) stores only bits 2-0 of the select code and interprets them
+   as select codes 10-16 (SRQ17 is not decoded).  The 12578A (2115/6), 12895A
+   (2100), and 12897B (1000) support the full 10-77 range of select codes.
+
+   The 12578A supports byte-sized transfers by setting bit 14.  Bit 14 is
+   ignored by all other DMA cards, which support word transfers only.
+
+   NOTE: LIx/MIx reads floating S-bus (1 on 21MX, 0 on 211x/2100).
+
+   NOTE: CRS clears control and command flip-flops, whereas CLC clears only
+   control.
+*/
 
 int32 dmpio (int32 inst, int32 IR, int32 dat)
 {
@@ -1772,17 +1969,33 @@ switch (inst) {                                         /* case on opcode */
 
     case ioLIX:                                         /* load */
         dat = 0;
+
     case ioMIX:                                         /* merge */
-        if (UNIT_CPU_TYPE == UNIT_TYPE_21MX) dat = DMASK;
+        if (UNIT_CPU_TYPE == UNIT_TYPE_1000)
+            dat = DMASK;
         break;
 
     case ioOTX:                                         /* output */
-        dmac[ch].cw1 = dat;
+        if (UNIT_CPU_MODEL == UNIT_2114)                /* 12607? */
+            dmac[ch].cw1 = (dat & 0137707) | 010;       /* mask SC, convert to 10-17 */
+        else if (UNIT_CPU_TYPE == UNIT_TYPE_211X)       /* 12578? */
+            dmac[ch].cw1 = dat;                         /* store full select code, flags */
+        else                                            /* 12895, 12897 */
+            dmac[ch].cw1 = dat & ~DMA1_PB;              /* clip byte-packing flag */
         break;
+
+    case ioCRS:                                         /* control reset */
+        clrCMD (DMA0 + ch);                             /* clear command flip-flop */
 
     case ioCTL:                                         /* control */
         if (IR & I_CTL) { clrCTL (DMA0 + ch); }         /* CLC: cmd unchgd */
         else {                                          /* STC */
+            if (UNIT_CPU_TYPE == UNIT_TYPE_211X)        /* slow DMA card? */
+                dmac[ch].latency = 1;                   /* needs startup latency */
+            else
+                dmac[ch].latency = 0;                   /* DCPC starts immediately */
+
+            dmac[ch].packer = 0;                        /* clear packing register */
             setCTL (DMA0 + ch);                         /* set ctl, cmd */
             setCMD (DMA0 + ch);
             }
@@ -1797,6 +2010,10 @@ return dat;
 }
 
 /* DMA cycle routine
+
+   The 12578A card supports byte-packing.  If bit 14 in control word 1 is set,
+   each transfer will involve one read/write from memory and two output/input
+   operations in order to transfer sequential bytes to/from the device.
 
    The last cycle (word count reaches 0) logic is quite tricky.
    Input cases:
@@ -1813,19 +2030,57 @@ void dma_cycle (uint32 ch, uint32 map)
 {
 int32 temp, dev, MA;
 int32 inp = dmac[ch].cw2 & DMA2_OI;                     /* input flag */
+int32 byt = dmac[ch].cw1 & DMA1_PB;                     /* pack bytes flag */
+
+if (dmac[ch].latency) {                                 /* start-up latency? */
+    dmac[ch].latency = dmac[ch].latency - 1;            /* decrease it */
+    return;                                             /* that's all this cycle */
+    }
 
 dev = dmac[ch].cw1 & I_DEVMASK;                         /* get device */
 MA = dmac[ch].cw2 & VAMASK;                             /* get mem addr */
-if (inp) {                                              /* input? */
+
+if (inp) {                                              /* input cycle? */
     temp = devdisp (dev, ioLIX, dev, 0);                /* do LIA dev */
-    WriteIO (MA, temp, map);                            /* store data */
+
+    if (byt) {                                          /* byte packing? */
+        if (dmac[ch].packer & DMA_OE) {                 /* second byte? */
+            temp = (dmac[ch].packer << 8) |             /* merge stored byte */
+                   (temp & DMASK8);
+            WriteIO (MA, temp, map);                    /* store word data */
+            }
+        else                                            /* first byte */
+            dmac[ch].packer = (temp & DMASK8);          /* save it */
+
+        dmac[ch].packer = dmac[ch].packer ^ DMA_OE;     /* flip odd/even bit */
+        }
+    else                                                /* no byte packing */
+        WriteIO (MA, temp, map);                        /* store word data */
     }
-else {
-    temp = ReadIO (MA, map);                            /* read data */
+else {                                                  /* output cycle */
+    if (byt) {                                          /* byte packing? */
+        if (dmac[ch].packer & DMA_OE)                   /* second byte? */
+            temp = dmac[ch].packer & DMASK8;            /* retrieve it */
+
+        else {                                          /* first byte */
+            dmac[ch].packer = ReadIO (MA, map);         /* read word data */
+            temp = (dmac[ch].packer >> 8) & DMASK8;     /* get high byte */
+            }
+
+        dmac[ch].packer = dmac[ch].packer ^ DMA_OE;     /* flip odd/even bit */
+        }
+    else                                                /* no byte packing */
+        temp = ReadIO (MA, map);                        /* read word data */
+
     devdisp (dev, ioOTX, dev, temp);                    /* do OTA dev */
     }
-dmac[ch].cw2 = (dmac[ch].cw2 & DMA2_OI) | ((dmac[ch].cw2 + 1) & VAMASK);
-dmac[ch].cw3 = (dmac[ch].cw3 + 1) & DMASK;              /* incr wcount */
+
+if ((dmac[ch].packer & DMA_OE) == 0) {                  /* new byte or no packing? */
+    dmac[ch].cw2 = (dmac[ch].cw2 & DMA2_OI) |           /* increment address */
+                   ((dmac[ch].cw2 + 1) & VAMASK);
+    dmac[ch].cw3 = (dmac[ch].cw3 + 1) & DMASK;          /* increment word count */
+    }
+
 if (dmac[ch].cw3) {                                     /* more to do? */
     if (dmac[ch].cw1 & DMA1_STC)                        /* if STC flag, */
         devdisp (dev, ioCTL, I_HC + dev, 0);            /* do STC,C dev */
@@ -1853,8 +2108,9 @@ return;
 
 /* Unimplemented device routine
 
-   NOTE: For SC < 10, LIx/MIx reads floating S-bus (-1 on 21MX, 0 on 2116/2100).
-         For SC >= 10, LIx/MIx reads floating I/O bus (0 on all machines). */
+   NOTE: For SC < 10, LIx/MIx reads floating S-bus (-1 on 21MX, 0 on 211x/2100).
+         For SC >= 10, LIx/MIx reads floating I/O bus (0 on all machines).
+*/
 
 int32 nulio (int32 inst, int32 IR, int32 dat)
 {
@@ -1871,7 +2127,7 @@ switch (inst) {                                         /* case on opcode */
         dat = 0;
 
     case ioMIX:                                         /* merge */
-        if ((devd < VARDEV) && (UNIT_CPU_TYPE == UNIT_TYPE_21MX))
+        if ((devd < VARDEV) && (UNIT_CPU_TYPE == UNIT_TYPE_1000))
             dat = DMASK;
         break;
 
@@ -1900,11 +2156,25 @@ dms_vr = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
 sim_brk_types = ALL_BKPTS;
 sim_brk_dflt = SWMASK ('E');
-if (M == NULL) M = calloc (PASIZE, sizeof (uint16));
-if (M == NULL) return SCPE_MEM;
+
+if (M == NULL) {                                        /* initial call? */
+    M = calloc (PASIZE, sizeof (uint16));               /* alloc mem */
+
+    if (M == NULL)                                      /* alloc fail? */
+        return SCPE_MEM;
+    else {                                              /* do one-time init */
+        MEMSIZE = 32768;                                /* set initial memory size */
+        cpu_set_model (NULL, UNIT_2116, NULL, NULL);    /* set initial CPU model */
+        SR = 001000;                                    /* select PTR boot ROM at SC 10 */
+        cpu_boot (0, NULL);                             /* install loader for 2116 */
+        cpu_set_ldr (NULL, FALSE, NULL, NULL);          /* disable loader (was enabled) */
+        SR = 0;                                         /* clear S */
+        sim_vm_post = &hp_post_cmd;                     /* set cmd post proc */
+        }
+}
+
 if (pcq_r) pcq_r->qptr = 0;
 else return SCPE_IERR;
-sim_vm_post = &hp_post_cmd;                             /* set cmd post proc */
 return SCPE_OK;
 }
 
@@ -1922,12 +2192,14 @@ return SCPE_OK;
 
 t_stat dma0_reset (DEVICE *tptr)
 {
-hp_enbdis_pair (&dma0_dev, &dma1_dev);                  /* make pair cons */
+if (UNIT_CPU_MODEL != UNIT_2114)                        /* 2114 has only one channel */
+    hp_enbdis_pair (&dma0_dev, &dma1_dev);              /* make pair cons */
 clrCMD (DMA0);
 clrCTL (DMA0);
 setFLG (DMA0);
 clrSRQ (DMA0);
 clrCTL (DMALT0);
+dmac[0].latency = dmac[0].packer = 0;
 if (sim_switches & SWMASK ('P'))                        /* power up? */
     dmac[0].cw1 = dmac[0].cw2 = dmac[0].cw3 = 0;
 return SCPE_OK;
@@ -1935,12 +2207,14 @@ return SCPE_OK;
 
 t_stat dma1_reset (DEVICE *tptr)
 {
-hp_enbdis_pair (&dma1_dev, &dma0_dev);                  /* make pair cons */
+if (UNIT_CPU_MODEL != UNIT_2114)                        /* 2114 has only one channel */
+    hp_enbdis_pair (&dma1_dev, &dma0_dev);              /* make pair cons */
 clrCMD (DMA1);
 clrCTL (DMA1);
 setFLG (DMA1);
 clrSRQ (DMA1);
 clrCTL (DMALT1);
+dmac[1].latency = dmac[1].packer = 0;
 if (sim_switches & SWMASK ('P'))                        /* power up? */
     dmac[1].cw1 = dmac[1].cw2 = dmac[1].cw3 = 0;
 return SCPE_OK;
@@ -1970,26 +2244,6 @@ if (addr >= MEMSIZE) return SCPE_NXM;
 if (!(sw & SIM_SW_REST) && (addr == 0)) saved_AR = val & DMASK;
 else if (!(sw & SIM_SW_REST) && (addr == 1)) saved_BR = val & DMASK;
 else M[addr] = val & DMASK;
-return SCPE_OK;
-}
-
-/* Memory size validation */
-
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-int32 mc = 0;
-uint32 i;
-
-if ((val <= 0) || (val > PASIZE) || ((val & 07777) != 0) ||
-    ((UNIT_CPU_TYPE != UNIT_TYPE_21MX) && (val > VASIZE)))
-    return SCPE_ARG;
-if (!(sim_switches & SWMASK ('F'))) {                   /* force truncation? */
-    for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
-    if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
-        return SCPE_INCOMP;
-	}
-MEMSIZE = val;
-for (i = MEMSIZE; i < PASIZE; i++) M[i] = 0;
 return SCPE_OK;
 }
 
@@ -2038,13 +2292,17 @@ else dcp->flags = dcp->flags & ~DEV_DIS;
 return;
 }
 
-/* Command post-processor
+/* VM command post-processor
 
-   Update T register to contents of memory addressed by M register. */
+   Update T register to contents of memory addressed by M register
+   if M register has changed. */
 
 void hp_post_cmd (t_bool from_scp)
 {
-TR = ReadTAB (MR);                                      /* sync T with M */
+if (MR != saved_MR) {                                   /* M changed since last update? */
+    saved_MR = MR;
+    TR = ReadTAB (MR);                                  /* sync T with new M */
+    }
 return;
 }
 
@@ -2095,43 +2353,264 @@ if (is_conflict) {
 return is_conflict;
 }
 
-/* Configuration validation
+/* Change CPU memory size.
 
-   - Checks that the current CPU type supports the option selected.
-   - Ensures that FP/FFP and IOP are mutually exclusive if CPU is 2100.
-   - Disables memory protect if 2116 is selected.
-   - Enables memory protect if 2100 or 21MX or DMS is selected.
-   - Enables DMA if 2116 or 2100 or 21MX is selected.
-   - Memory is trimmed to 32K if 2116 or 2100 is selected. */
+   On a 21xx, move the current loader to the top of the new memory size.  Then
+   clear "non-existent memory" so that reads return zero, per spec.
 
-t_bool cpu_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
+   Validation:
+   - New size <= maximum size for current CPU.
+   - New size a positive multiple of 4K (progamming error if not).
+   - If new size < old size, truncation accepted.
+*/
+
+t_stat cpu_set_size (UNIT *uptr, int32 new_size, char *cptr, void *desc)
 {
-int32 opt = (int32) desc;
-int32 i;
-uint32 mod;
+int32 mc = 0;
+uint32 i;
+uint32 model = CPU_MODEL_INDEX;                         /* current CPU model index */
+uint32 old_size = MEMSIZE;                              /* current memory size */
 
-mod = MOD_CURRENT;
-for (i = 0; opt_val[i].cpuf != 0; i++) {
-    if ((opt == opt_val[i].optf) && (mod & opt_val[i].cpuf)) {
-        if (mod == MOD_2100)
-            if ((opt == UNIT_FP) || (opt == UNIT_FFP))
-                uptr->flags = uptr->flags & ~UNIT_IOP;
-            else if (opt == UNIT_IOP)
-                uptr->flags = uptr->flags & ~(UNIT_FP | UNIT_FFP);
-        if (opt == TYPE_211X)
-            mp_dev.flags = mp_dev.flags | DEV_DIS;
-        else if ((opt == UNIT_DMS) || (opt == TYPE_2100) || (opt == TYPE_21MX))
-            mp_dev.flags = mp_dev.flags & ~DEV_DIS;
-        if ((opt == TYPE_211X) || (opt == TYPE_2100) || (opt == TYPE_21MX)) {
-            dma0_dev.flags = dma0_dev.flags & ~DEV_DIS;
-            dma1_dev.flags = dma1_dev.flags & ~DEV_DIS;
-            }
-        if (((opt == TYPE_211X) || (opt == TYPE_2100)) && (MEMSIZE > VASIZE))
-            return cpu_set_size (uptr, VASIZE, cptr, desc);
-        return SCPE_OK;
+if ((uint32) new_size > cpu_features[model].maxmem)
+    return SCPE_NOFNC;                                  /* mem size unsupported */
+
+if ((new_size <= 0) || (new_size > PASIZE) || ((new_size & 07777) != 0))
+    return SCPE_NXM;                                    /* invalid size (prog err) */
+
+if (!(sim_switches & SWMASK ('F'))) {                   /* force truncation? */
+    for (i = new_size; i < MEMSIZE; i++) mc = mc | M[i];
+    if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
+        return SCPE_INCOMP;
+	}
+
+if (UNIT_CPU_FAMILY == UNIT_FAMILY_21XX) {              /* 21xx CPU? */
+    cpu_set_ldr (uptr, FALSE, NULL, NULL);              /* save loader to shadow RAM */
+    MEMSIZE = new_size;                                 /* set new memory size */
+    fwanxm = MEMSIZE - IBL_LNT;                         /* reserve memory for loader */
+    }
+else                                                    /* loader unsupported */
+    fwanxm = MEMSIZE = new_size;                        /* set new memory size */
+
+for (i = fwanxm; i < old_size; i++) M[i] = 0;           /* zero non-existent memory */
+return SCPE_OK;
+}
+
+/* Change CPU models.
+
+   For convenience, MP and DMA are typically enabled if available; they may be
+   disabled subsequently if desired.  Note that the 2114 supports only one DMA
+   channel (channel 0).  All other models support two channels.
+
+   Validation:
+   - Sets standard equipment and convenience features.
+   - Changes DMA device name to DCPC if 1000 is selected.
+   - Enforces maximum memory allowed (doesn't change otherwise).
+   - Disables loader on 21xx machines.
+*/
+
+t_stat cpu_set_model (UNIT *uptr, int32 new_model, char *cptr, void *desc)
+{
+uint32 old_family = UNIT_CPU_FAMILY;                    /* current CPU type */
+uint32 new_family = new_model & UNIT_FAMILY_MASK;       /* new CPU family */
+uint32 new_index  = new_model >> UNIT_V_CPU;            /* new CPU model index */
+uint32 new_memsize;
+t_stat result;
+
+cpu_unit.flags = cpu_unit.flags & ~UNIT_OPTS |          /* set typical features */
+                 cpu_features[new_index].typ & UNIT_OPTS;   /* mask pseudo-opts */
+
+
+if (cpu_features[new_index].typ & UNIT_MP)              /* MP in typ config? */
+    mp_dev.flags = mp_dev.flags & ~DEV_DIS;             /* enable it */
+else
+    mp_dev.flags = mp_dev.flags |  DEV_DIS;             /* disable it */
+
+if (cpu_features[new_index].opt & UNIT_MP)              /* MP an option? */
+    mp_dev.flags = mp_dev.flags |  DEV_DISABLE;         /* make it alterable */
+else
+    mp_dev.flags = mp_dev.flags & ~DEV_DISABLE;         /* make it unalterable */
+
+
+if (cpu_features[new_index].typ & UNIT_DMA) {           /* DMA in typ config? */
+    dma0_dev.flags = dma0_dev.flags & ~DEV_DIS;         /* enable DMA channel 0 */
+
+    if (new_model == UNIT_2114)                         /* 2114 has only one channel */
+        dma1_dev.flags = dma1_dev.flags |  DEV_DIS;     /* disable channel 1 */
+    else                                                /* all others have two channels */
+        dma1_dev.flags = dma1_dev.flags & ~DEV_DIS;     /* enable it */
+    }
+else {
+    dma0_dev.flags = dma0_dev.flags | DEV_DIS;          /* disable channel 0 */
+    dma1_dev.flags = dma1_dev.flags | DEV_DIS;          /* disable channel 1 */
+    }
+
+if (cpu_features[new_index].opt & UNIT_DMA) {           /* DMA an option? */
+    dma0_dev.flags = dma0_dev.flags |  DEV_DISABLE;     /* make it alterable */
+
+    if (new_model == UNIT_2114)                         /* 2114 has only one channel */
+        dma1_dev.flags = dma1_dev.flags & ~DEV_DISABLE; /* make it unalterable */
+    else                                                /* all others have two channels */
+        dma1_dev.flags = dma1_dev.flags |  DEV_DISABLE; /* make it alterable */
+    }
+else {
+    dma0_dev.flags = dma0_dev.flags & ~DEV_DISABLE;     /* make it unalterable */
+    dma1_dev.flags = dma1_dev.flags & ~DEV_DISABLE;     /* make it unalterable */
+    }
+
+
+if ((old_family == UNIT_FAMILY_1000) &&                 /* if current family is 1000 */
+    (new_family == UNIT_FAMILY_21XX)) {                 /* and new family is 21xx */
+    deassign_device (&dma0_dev);                        /* delete DCPC names */
+    deassign_device (&dma1_dev);
+    }
+else if ((old_family == UNIT_FAMILY_21XX) &&            /* if current family is 21xx */
+         (new_family == UNIT_FAMILY_1000)) {            /* and new family is 1000 */
+    assign_device (&dma0_dev, "DCPC0");                 /* change DMA device name */
+    assign_device (&dma1_dev, "DCPC1");                 /* to DCPC for familiarity */
+    }
+
+if ((MEMSIZE == 0) ||                                   /* current mem size not set? */
+    (MEMSIZE > cpu_features[new_index].maxmem))         /* current mem size too large? */
+    new_memsize = cpu_features[new_index].maxmem;       /* set it to max supported */
+else
+    new_memsize = MEMSIZE;                              /* or leave it unchanged */
+
+result = cpu_set_size (uptr, new_memsize, NULL, NULL);  /* set memory size */
+
+if (result == SCPE_OK)                                  /* memory change OK? */
+    if (new_family == UNIT_FAMILY_21XX)                 /* 21xx CPU? */
+        fwanxm = MEMSIZE - IBL_LNT;                     /* reserve memory for loader */
+    else
+        fwanxm = MEMSIZE;                               /* loader reserved only for 21xx */
+
+return result;
+}
+
+/* Display the CPU model and optional loader status.
+
+   Loader status is displayed for 21xx models and suppressed for 1000 models.
+*/
+
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fputs ((char *) desc, st);                              /* write model name */
+
+if (UNIT_CPU_FAMILY == UNIT_FAMILY_21XX)                /* valid only for 21xx */
+    if (fwanxm < MEMSIZE)                               /* loader area non-existent? */
+        fputs (", loader disabled", st);                /* yes, so access disabled */
+    else
+        fputs (", loader enabled", st);                 /* no, so access enabled */
+return SCPE_OK;
+}
+
+/* Set a CPU option.
+
+   Validation:
+   - Checks that the current CPU model supports the option selected.
+   - If CPU is 2100, ensures that FP/FFP and IOP are mutually exclusive.
+   - If CPU is 2100, ensures that FP is enabled if FFP enabled
+     (FP is required for FFP installation).
+*/
+
+t_stat cpu_set_opt (UNIT *uptr, int32 option, char *cptr, void *desc)
+{
+uint32 model = CPU_MODEL_INDEX;                         /* current CPU model index */
+
+if ((cpu_features[model].opt & option) == 0)            /* option supported? */
+    return SCPE_NOFNC;                                  /* no */
+
+if (UNIT_CPU_TYPE == UNIT_TYPE_2100) {
+    if ((option == UNIT_FP) || (option == UNIT_FFP))    /* 2100 IOP and FP/FFP options */
+        uptr->flags = uptr->flags & ~UNIT_IOP;          /* are mutually exclusive */
+    else if (option == UNIT_IOP)
+        uptr->flags = uptr->flags & ~(UNIT_FP | UNIT_FFP);
+
+    if (option == UNIT_FFP)                             /* 2100 FFP option requires FP */
+        uptr->flags = uptr->flags | UNIT_FP;
+    }
+
+return SCPE_OK;
+}
+
+/* Clear a CPU option.
+
+   Validation:
+   - Checks that the current CPU model supports the option selected.
+   - Clears flag from unit structure (we are processing MTAB_XTD entries).
+   - If CPU is 2100, ensures that FFP is disabled if FP disabled
+     (FP is required for FFP installation).
+*/
+
+t_bool cpu_clr_opt (UNIT *uptr, int32 option, char *cptr, void *desc)
+{
+uint32 model = CPU_MODEL_INDEX;                         /* current CPU model index */
+
+if ((cpu_features[model].opt & option) == 0)            /* option supported? */
+    return SCPE_NOFNC;                                  /* no */
+
+uptr->flags = uptr->flags & ~option;                    /* disable option */
+
+if ((UNIT_CPU_TYPE == UNIT_TYPE_2100) &&                /* disabling 2100 FP? */
+    (option == UNIT_FP))
+    uptr->flags = uptr->flags & ~UNIT_FFP;              /* yes, so disable FFP too */
+
+return SCPE_OK;
+}
+
+/* 21xx loader enable/disable function.
+
+   The 21xx CPUs store their initial binary loaders in the last 64 words of
+   available memory.  This memory is protected by a LOADER ENABLE switch on the
+   front panel.  When the switch is off (disabled), main memory effectively ends
+   64 locations earlier, i.e., the loader area is treated as non-existent.
+   Because these are core machines, the loader is retained when system power is
+   off.
+
+   1000 CPUs do not have a protected loader feature.  Instead, loaders are
+   stored in PROMs and are copied into main memory for execution by the IBL
+   switch.
+
+   Under simulation, we keep both a total configured memory size (MEMSIZE) and a
+   current configured memory size (fwanxm = "first word address of non-existent
+   memory).  When the two are equal, the loader is enabled.  When the current
+   size is less than the total size, the loader is disabled.
+
+   Disabling the loader copies the last 64 words to a shadow array, zeros the
+   corresponding memory, and decreases the last word of addressable memory by
+   64.  Enabling the loader reverses this process.
+
+   Disabling may be done manually by user command or automatically when a halt
+   instruction is executed.  Enabling occurs only by user command.  This differs
+   slightly from actual machine operation, which additionally disables the
+   loader when a manual halt is performed.  We do not do this to allow
+   breakpoints within and single-stepping through the loaders.
+*/
+
+t_stat cpu_set_ldr (UNIT *uptr, int32 enable, char *cptr, void *desc)
+{
+static uint16 loader[IBL_LNT];
+int32 i;
+t_bool is_enabled = (fwanxm == MEMSIZE);
+
+if ((UNIT_CPU_FAMILY != UNIT_FAMILY_21XX) ||            /* valid only for 21xx */
+    (MEMSIZE == 0))                                     /* and for initialized memory */
+    return SCPE_NOFNC;
+
+if (is_enabled && (enable == 0)) {                      /* disable loader? */
+    fwanxm = MEMSIZE - IBL_LNT;                         /* decrease available memory */
+    for (i = 0; i < IBL_LNT; i++) {                     /* copy loader */
+        loader[i] = M[fwanxm + i];                      /* from memory */
+        M[fwanxm + i] = 0;                              /* and zero location */
         }
     }
-return SCPE_NOFNC;
+
+else if ((!is_enabled) && (enable == 1)) {              /* enable loader? */
+    for (i = 0; i < IBL_LNT; i++)                       /* copy loader */
+        M[fwanxm + i] = loader[i];                      /* to memory */
+    fwanxm = MEMSIZE;                                   /* increase available memory */
+    }
+
+return SCPE_OK;
 }
 
 /* IBL routine (CPU boot) */
@@ -2183,6 +2662,8 @@ t_stat ibl_copy (const uint16 pboot[IBL_LNT], int32 dev)
 int32 i;
 uint16 wd;
 
+cpu_set_ldr (NULL, TRUE, NULL, NULL);                   /* enable loader (ignore errors) */
+
 if (dev < 010) return SCPE_ARG;                         /* valid device? */
 PC = ((MEMSIZE - 1) & ~IBL_MASK) & VAMASK;              /* start at mem top */
 for (i = 0; i < IBL_LNT; i++) {                         /* copy bootstrap */
@@ -2197,4 +2678,3 @@ M[PC + IBL_DPC] = (M[PC + IBL_DPC] + (dev - 010)) & DMASK;      /* patch DMA ctr
 M[PC + IBL_END] = (~PC + 1) & DMASK;                    /* fill in start of boot */
 return SCPE_OK;
 }
-

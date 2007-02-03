@@ -1,6 +1,6 @@
 /* pdp1_stddev.c: PDP-1 standard devices
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tti          keyboard
    tto          teleprinter
 
+   21-Dec-06    RMS     Added 16-channel sequence break support
    29-Oct-03    RMS     Added PTR FIODEC-to-ASCII translation (from Phil Budne)
    07-Sep-03    RMS     Changed ioc to ios
    30-Aug-03    RMS     Revised PTR to conform to Maintenance Manual;
@@ -58,8 +59,6 @@
 #define BOTH            (1 << (UC_V + 1))               /* both cases */
 #define CW              (1 << (UC_V + 2))               /* char waiting */
 #define TT_WIDTH        077
-#define TTI             0
-#define TTO             1
 #define UNIT_V_ASCII    (UNIT_V_UF + 0)                 /* ASCII/binary mode */
 #define UNIT_ASCII      (1 << UNIT_V_ASCII)
 #define PTR_LEADER      20                              /* ASCII leader chars */
@@ -70,12 +69,16 @@ int32 ptr_stopioe = 0;
 int32 ptr_uc = 0;                                       /* upper/lower case */
 int32 ptr_hold = 0;                                     /* holding buffer */
 int32 ptr_leader = PTR_LEADER;                          /* leader count */
+int32 ptr_sbs = 0;                                      /* SBS level */
 int32 ptp_stopioe = 0;
+int32 ptp_sbs = 0;                                      /* SBS level */
 int32 tti_hold = 0;                                     /* tti hold buf */
+int32 tti_sbs = 0;                                      /* SBS level */
 int32 tty_buf = 0;                                      /* tty buffer */
 int32 tty_uc = 0;                                       /* tty uc/lc */
+int32 tto_sbs = 0;
 
-extern int32 sbs, ios, ioh, cpls, iosta;
+extern int32 ios, ioh, cpls, iosta;
 extern int32 PF, IO, PC, TA;
 extern int32 M[];
 
@@ -154,10 +157,13 @@ REG ptr_reg[] = {
     { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
     { DRDATA (LEADER, ptr_leader, 6), REG_HRO },
     { FLDATA (STOP_IOE, ptr_stopioe, 0) },
+    { DRDATA (SBSLVL, ptr_sbs, 4), REG_HRO },
     { NULL }
     };
 
 MTAB ptr_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
+      &dev_set_sbs, &dev_show_sbs, (void *) &ptr_sbs },
     { UNIT_ASCII, UNIT_ASCII, "ASCII", "ASCII", NULL },
     { UNIT_ASCII, 0,          "FIODEC", "FIODEC", NULL },
     { 0 }
@@ -189,46 +195,87 @@ REG ptp_reg[] = {
     { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptp_stopioe, 0) },
+    { DRDATA (SBSLVL, ptp_sbs, 4), REG_HRO },
     { NULL }
     };
 
+MTAB ptp_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
+      &dev_set_sbs, &dev_show_sbs, (void *) &ptp_sbs },
+    { 0 }
+    };
+
 DEVICE ptp_dev = {
-    "PTP", &ptp_unit, ptp_reg, NULL,
+    "PTP", &ptp_unit, ptp_reg, ptp_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptp_reset,
     NULL, NULL, NULL,
     NULL, 0
     };
 
-/* TTY data structures
+/* TTI data structures
 
-   tty_dev      TTY device descriptor
-   tty_unit     TTY unit
-   tty_reg      TTY register list
+   tti_dev      TTI device descriptor
+   tti_unit     TTI unit
+   tti_reg      TTI register list
 */
 
-UNIT tty_unit[] = {
-    { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT },
-    { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT * 10 }
-    };
+UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
 
-REG tty_reg[] = {
+REG tti_reg[] = {
     { ORDATA (BUF, tty_buf, 6) },
     { FLDATA (UC, tty_uc, UC_V) },
-    { FLDATA (RPLS, cpls, CPLS_V_TTO) },
     { ORDATA (HOLD, tti_hold, 9), REG_HRO },
-    { FLDATA (KDONE, iosta, IOS_V_TTI) },
-    { DRDATA (KPOS, tty_unit[TTI].pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (KTIME, tty_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
-    { FLDATA (TDONE, iosta, IOS_V_TTO) },
-    { DRDATA (TPOS, tty_unit[TTO].pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TTIME, tty_unit[TTO].wait, 24), PV_LEFT },
+    { FLDATA (DONE, iosta, IOS_V_TTI) },
+    { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
+    { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (SBSLVL, tti_sbs, 4), REG_HRO },
     { NULL }
     };
 
-DEVICE tty_dev = {
-    "TTY", tty_unit, tty_reg, NULL,
-    2, 10, 31, 1, 8, 8,
+MTAB tti_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
+      &dev_set_sbs, &dev_show_sbs, (void *) &tti_sbs },
+    { 0 }
+    };
+
+DEVICE tti_dev = {
+    "TTI", &tti_unit, tti_reg, tti_mod,
+    1, 10, 31, 1, 8, 8,
+    NULL, NULL, &tty_reset,
+    NULL, NULL, NULL,
+    NULL, 0
+    };
+
+/* TTO data structures
+
+   tto_dev      TTO device descriptor
+   tto_unit     TTO unit
+   tto_reg      TTO register list
+*/
+
+UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT * 10 };
+
+REG tto_reg[] = {
+    { ORDATA (BUF, tty_buf, 6) },
+    { FLDATA (UC, tty_uc, UC_V) },
+    { FLDATA (RPLS, cpls, CPLS_V_TTO) },
+    { FLDATA (DONE, iosta, IOS_V_TTO) },
+    { DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
+    { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
+    { DRDATA (SBSLVL, tto_sbs, 4), REG_HRO },
+    { NULL }
+    };
+
+MTAB tto_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
+      &dev_set_sbs, &dev_show_sbs, (void *) &tto_sbs },
+    { 0 }
+    };
+
+DEVICE tto_dev = {
+    "TTO", &tto_unit, tto_reg, tto_mod,
+    1, 10, 31, 1, 8, 8,
     NULL, NULL, &tty_reset,
     NULL, NULL, NULL,
     NULL, 0
@@ -309,7 +356,7 @@ if (ptr_state == 0) {                                   /* done? */
         }
     else {                                              /* no, interrupt */
         iosta = iosta | IOS_PTR;                        /* set flag */
-        sbs = sbs | SB_RQ;                              /* req seq break */
+        dev_req_int (ptr_sbs);                          /* req interrupt */
         }
     }
 else sim_activate (uptr, uptr->wait);                   /* get next char */
@@ -443,7 +490,7 @@ if (cpls & CPLS_PTP) {                                  /* completion pulse? */
     cpls = cpls & ~CPLS_PTP;
     }
 iosta = iosta | IOS_PTP;                                /* set flag */
-sbs = sbs | SB_RQ;                                      /* req seq break */
+dev_req_int (ptp_sbs);                                  /* req interrupt */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
     return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (uptr->buf, uptr->fileref) == EOF) {           /* I/O error? */
@@ -485,7 +532,7 @@ if (GEN_CPLS (inst)) {                                  /* comp pulse? */
     cpls = cpls | CPLS_TTO;
     }
 else cpls = cpls & ~CPLS_TTO;
-sim_activate (&tty_unit[TTO], tty_unit[TTO].wait);      /* activate unit */
+sim_activate (&tto_unit, tto_unit.wait);                /* activate unit */
 return dat;
 }
 
@@ -518,8 +565,8 @@ else {
         }
     }
 iosta = iosta | IOS_TTI;                                /* set flag */
-sbs = sbs | SB_RQ;                                      /* req seq break */
-PF = PF | 040;                                          /* set prog flag 1 */
+dev_req_int (tti_sbs);                                  /* req interrupt */
+PF = PF | PF_SS_1;                                      /* set prog flag 1 */
 uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
@@ -543,7 +590,7 @@ if (cpls & CPLS_TTO) {                                  /* completion pulse? */
     cpls = cpls & ~CPLS_TTO;
     }
 iosta = iosta | IOS_TTO;                                /* set flag */
-sbs = sbs | SB_RQ;                                      /* req seq break */
+dev_req_int (tto_sbs);                                  /* req interrupt */
 uptr->pos = uptr->pos + 1;
 if (c == '\r') {                                        /* cr? add lf */
     sim_putchar ('\n');
@@ -561,7 +608,7 @@ tty_uc = 0;                                             /* clear case */
 tti_hold = 0;                                           /* clear hold buf */
 cpls = cpls & ~CPLS_TTO;
 iosta = (iosta & ~IOS_TTI) | IOS_TTO;                   /* clear flag */
-sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);      /* activate keyboard */
-sim_cancel (&tty_unit[TTO]);                            /* stop printer */
+sim_activate (&tti_unit, tti_unit.wait);                 /* activate keyboard */
+sim_cancel (&tto_unit);                                 /* stop printer */
 return SCPE_OK;
 }

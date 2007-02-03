@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    tti,tto      KL8E terminal input/output
 
+   18-Oct-06    RMS     Synced keyboard to clock
+   30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    22-Nov-05    RMS     Revised for new terminal processing routines
    28-May-04    RMS     Removed SET TTI CTRL-C
    29-Dec-03    RMS     Added console output backpressure support
@@ -41,6 +43,7 @@
 #include <ctype.h>
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
+extern int32 tmxr_poll;
 
 int32 tti (int32 IR, int32 AC);
 int32 tto (int32 IR, int32 AC);
@@ -60,7 +63,7 @@ t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 DIB tti_dib = { DEV_TTI, 1, { &tti } };
 
-UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR, 0), 0 };
 
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, 8) },
@@ -68,7 +71,7 @@ REG tti_reg[] = {
     { FLDATA (ENABLE, int_enable, INT_V_TTI) },
     { FLDATA (INT, int_req, INT_V_TTI) },
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
     { NULL }
     };
 
@@ -170,7 +173,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, uptr->wait);                        /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, tmxr_poll));  /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
 if (c & SCPE_BREAK) uptr->buf = 0;                      /* break? */
 else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
@@ -188,7 +191,7 @@ tti_unit.buf = 0;
 dev_done = dev_done & ~INT_TTI;                         /* clear done, int */
 int_req = int_req & ~INT_TTI;
 int_enable = int_enable | INT_TTI;                      /* set enable */
-sim_activate (&tti_unit, tti_unit.wait);                /* activate unit */
+sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmxr_poll));
 return SCPE_OK;
 }
 
@@ -234,7 +237,7 @@ t_stat tto_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags));
+c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 if (c >= 0) {
     if ((r = sim_putchar_s (c)) != SCPE_OK) {           /* output char; error? */
         sim_activate (uptr, uptr->wait);                /* try again */

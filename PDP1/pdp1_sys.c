@@ -1,6 +1,6 @@
 /* pdp1_sys.c: PDP-1 simulator interface
 
-   Copyright (c) 1993-2004, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Jan-07    RMS     Fixed bugs in block loader, char input
+   21-Dec-06    RMS     Added 16-channel sequence break support, PDP-1D support
    06-Apr-04    RMS     Fixed bug in binary loader (found by Mark Crispin)
    08-Feb-04    PLB     Merged display support
    08-Dec-03    RMS     Added parallel drum support, drum mnemonics
@@ -46,13 +48,16 @@
 #include <ctype.h>
 
 extern DEVICE cpu_dev;
+extern DEVICE clk_dev;
 extern DEVICE ptr_dev;
 extern DEVICE ptp_dev;
-extern DEVICE tty_dev;
+extern DEVICE tti_dev;
+extern DEVICE tto_dev;
 extern DEVICE lpt_dev;
 extern DEVICE dt_dev;
 extern DEVICE drm_dev;
 extern DEVICE drp_dev;
+extern DEVICE dcs_dev, dcsl_dev;
 extern DEVICE dpy_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
@@ -80,13 +85,17 @@ int32 sim_emax = 1;
 
 DEVICE *sim_devices[] = {
     &cpu_dev,
+    &clk_dev,
     &ptr_dev,
     &ptp_dev,
-    &tty_dev,
+    &tti_dev,
+    &tto_dev,
     &lpt_dev,
     &dt_dev,
     &drm_dev,
     &drp_dev,
+    &dcs_dev,
+    &dcsl_dev,
 /*  &dpy_dev, */
     NULL
     };
@@ -152,13 +161,13 @@ for (;;) {
         if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
         if ((val & 0760000) != OP_DIO) return SCPE_FMT;
         csum = csum + val;
-        if (csum > 0777777) csum = (csum + 1) & 0777777;
-        count = (val & DAMASK) - start + 1;             /* block count */
+        if (csum > DMASK) csum = (csum + 1) & DMASK;
+        count = (val & DAMASK) - start;                 /* block count */
         if (count <= 0) return SCPE_FMT;
         while (count--) {                               /* loop on data */
             if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
             csum = csum + val;
-            if (csum > 0777777) csum = (csum + 1) & 0777777;
+            if (csum > DMASK) csum = (csum + 1) & DMASK;
             M[fld | start] = val;
             start = (start + 1) & DAMASK;
             }
@@ -196,7 +205,7 @@ return SCPE_OK;
 /* Symbol tables */
 
 #define I_V_FL          18                              /* inst class */
-#define I_M_FL          07                              /* class mask */
+#define I_M_FL          017                             /* class mask */
 #define I_V_NPN         0                               /* no operand */
 #define I_V_IOT         1                               /* IOT */
 #define I_V_LAW         2                               /* LAW */
@@ -205,6 +214,7 @@ return SCPE_OK;
 #define I_V_OPR         5                               /* OPR */
 #define I_V_SKP         6                               /* skip */
 #define I_V_SHF         7                               /* shift */
+#define I_V_SPC         8                               /* special */
 #define I_NPN           (I_V_NPN << I_V_FL)             /* no operand */
 #define I_IOT           (I_V_IOT << I_V_FL)             /* IOT */
 #define I_LAW           (I_V_LAW << I_V_FL)             /* LAW */
@@ -213,10 +223,12 @@ return SCPE_OK;
 #define I_OPR           (I_V_OPR << I_V_FL)             /* OPR */
 #define I_SKP           (I_V_SKP << I_V_FL)             /* skip */
 #define I_SHF           (I_V_SHF << I_V_FL)             /* shift */
+#define I_SPC           (I_V_SPC << I_V_FL)
 
 static const int32 masks[] = {
- 0777777, 0763777, 0760000, 0760000,
- 0770000, 0760017, 0760077, 0777000
+ 0777777, 0760077, 0760000, 0760000,
+ 0770000, 0760017, 0760077, 0777000,
+ 0760003
  };
 
 static const char *opcode[] = {
@@ -224,22 +236,30 @@ static const char *opcode[] = {
  "LAC", "LIO", "DAC", "DAP",
  "DIP", "DIO", "DZM", "ADD",
  "SUB", "IDX", "ISP", "SAD",
- "SAS", "MUL", "DIV", "JMP", "JSP",
+ "SAS", "MUL", "DIV", "JMP",
+ "JSP", "LCH", "DCH", "TAD",
 
  "CAL", "JDA",                                          /* mem ref no ind */
+
+ "LAW",
 
  "IOH", "RPA", "RPB", "RRB",                            /* I/O instructions */
  "PPA", "PPB", "TYO", "TYI",
  "DPY",
+ "DSC", "ASC", "ISC", "CAC",
  "LSM", "ESM", "CBS",
  "LEM", "EEM", "CKS",
  "MSE", "MLC", "MRD", "MWR", "MRS",
  "DIA", "DBA", "DWC", "DRA", "DCL",
  "DRD", "DWR", "DBL", "DCN",
  "DTD", "DSE", "DSP",
+ "LRG", "ERG", "LRM", "ERM",
+ "RNM", "RSM", "RCK", "CTB",
+ "RCH", "RCC", "TCC", "TCB",
+ "RRC", "SSB", "RSC",
 
- "SKP", "SKP I", "CLO",
- "SFT", "LAW", "OPR",
+ "SKP", "SKP I", "CLO",                                 /* base as NPNs */
+ "SFT", "SPC", "OPR",
 
  "RAL", "RIL", "RCL",                                   /* shifts */
  "SAL", "SIL", "SCL",
@@ -268,12 +288,24 @@ static const char *opcode[] = {
  "STF1", "STF2", "STF3",
  "STF4", "STF5", "STF6", "STF7",
 
- "SZA", "SPA", "SMA",                                   /* encode only */
- "SZO", "SPI", "I",
+ "FF1", "FF2", "FF3",                                   /* specials */
+
+ "SZA", "SPA", "SMA",                                   /* uprog skips */
+ "SZO", "SPI", "SNI",
+ "I",                                                   /* encode only */
+
+ "LIA", "LAI", "SWP",                                   /* uprog opers */
  "LAP", "CLA", "HLT",
  "CMA", "LAT", "CLI",
- NULL, NULL,                                            /* decode only */
- NULL
+ "CMI",
+
+ "CML", "CLL", "SZL",                                   /* uprog specials */
+ "SCF", "SCI", "SCM",
+ "IDA", "IDC", "IFI",
+ "IIF",
+
+ NULL, NULL, NULL,                                      /* decode only */
+ NULL,
  };
 
 static const int32 opc_val[] = {
@@ -281,22 +313,30 @@ static const int32 opc_val[] = {
  0200000+I_MRF, 0220000+I_MRF, 0240000+I_MRF, 0260000+I_MRF,
  0300000+I_MRF, 0320000+I_MRF, 0340000+I_MRF, 0400000+I_MRF,
  0420000+I_MRF, 0440000+I_MRF, 0460000+I_MRF, 0500000+I_MRF,
- 0520000+I_MRF, 0540000+I_MRF, 0560000+I_MRF, 0600000+I_MRF, 0620000+I_MRF,
+ 0520000+I_MRF, 0540000+I_MRF, 0560000+I_MRF, 0600000+I_MRF,
+ 0620000+I_MRF, 0120000+I_MRF, 0140000+I_MRF, 0360000+I_MRF,
 
  0160000+I_MRI, 0170000+I_MRI,
+
+ 0700000+I_LAW,
 
  0730000+I_NPN, 0720001+I_IOT, 0720002+I_IOT, 0720030+I_IOT,
  0720005+I_IOT, 0720006+I_IOT, 0720003+I_IOT, 0720004+I_IOT,
  0720007+I_IOT,
+ 0720050+I_IOT, 0720051+I_IOT, 0720052+I_IOT, 0720053+I_NPN,
  0720054+I_NPN, 0720055+I_NPN, 0720056+I_NPN,
  0720074+I_NPN, 0724074+I_NPN, 0720033+I_NPN,
  0720301+I_NPN, 0720401+I_NPN, 0720501+I_NPN, 0720601+I_NPN, 0720701+I_NPN, 
  0720061+I_NPN, 0722061+I_NPN, 0720062+I_NPN, 0722062+I_NPN, 0720063+I_NPN,
  0720161+I_NPN, 0721161+I_NPN, 0720162+I_NPN, 0721162+I_NPN,
  0720163+I_NPN, 0720164+I_NPN, 0721164+I_NPN,
+ 0720010+I_NPN, 0720011+I_NPN, 0720064+I_NPN, 0720065+I_NPN,
+ 0720066+I_IOT, 0720067+I_NPN, 0720032+I_NPN, 0720035+I_NPN,
+ 0720022+I_NPN, 0721022+I_NPN, 0725022+I_NPN, 0724022+I_NPN,
+ 0720122+I_NPN, 0724122+I_NPN, 0721122+I_NPN,
 
  0640000+I_NPN, 0650000+I_NPN, 0651600+I_NPN,
- 0660000+I_NPN, 0700000+I_LAW, 0760000+I_NPN,
+ 0660000+I_NPN, 0740000+I_NPN, 0760000+I_NPN,
 
  0661000+I_SHF, 0662000+I_SHF, 0663000+I_SHF,
  0665000+I_SHF, 0666000+I_SHF, 0667000+I_SHF,
@@ -325,12 +365,23 @@ static const int32 opc_val[] = {
  0760011+I_OPR, 0760012+I_OPR, 0760013+I_OPR,
  0760014+I_OPR, 0760015+I_OPR, 0760016+I_OPR, 0760017+I_OPR,
 
- 0640100+I_SKP, 0640200+I_SKP, 0640400+I_SKP,           /* encode only */
- 0641000+I_SKP, 0642000+I_SKP, 0010000+I_SKP,
+ 0740001+I_SPC, 0740002+I_SPC, 0740003+I_OPR,
+
+ 0640100+I_SKP, 0640200+I_SKP, 0640400+I_SKP,
+ 0641000+I_SKP, 0642000+I_SKP, 0644000+I_SKP,
+ 0010000+I_SKP,                                         /* encode only */
+
+ 0760020+I_OPR, 0760040+I_OPR, 0760060+I_NPN,
  0760100+I_OPR, 0760200+I_OPR, 0760400+I_OPR,
  0761000+I_OPR, 0762000+I_OPR, 0764000+I_OPR,
+ 0770000+I_OPR,
 
- 0640000+I_SKP, 0760000+I_OPR,                          /* decode only */
+ 0740004+I_SPC, 0740010+I_SPC, 0740020+I_SPC,
+ 0740040+I_SPC, 0740100+I_SPC, 0740200+I_SPC,
+ 0740400+I_SPC, 0741000+I_SPC, 0742000+I_SPC,
+ 0744000+I_SPC,
+
+ 0640000+I_SKP, 0740000+I_SPC, 0760000+I_OPR,           /* decode only */
  -1
  };
 
@@ -406,7 +457,7 @@ disp = inst & 007777;
 ma = (addr & EPCMASK) | disp;
 for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
-    if ((opc_val[i] & 0777777) == (inst & masks[j])) {  /* match? */
+    if ((opc_val[i] & DMASK) == (inst & masks[j])) {    /* match? */
 
         switch (j) {                                    /* case on class */
 
@@ -433,12 +484,18 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             break;
 
         case I_V_OPR:                                   /* operates */
-            sp = fprint_opr (of, inst & 007700, j, 0);
+            sp = fprint_opr (of, inst & 017760, j, 0);
             if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
             break;
 
         case I_V_SKP:                                   /* skips */
             sp = fprint_opr (of, inst & 007700, j, 0);
+            if (opcode[i]) sp = fprintf (of, (sp? " %s": "%s"), opcode[i]);
+            if (inst & IA) fprintf (of, sp? " I": "I");
+            break;
+
+        case I_V_SPC:                                   /* specials */
+            sp = fprint_opr (of, inst & 007774, j, 0);
             if (opcode[i]) sp = fprintf (of, (sp? " %s": "%s"), opcode[i]);
             if (inst & IA) fprintf (of, sp? " I": "I");
             break;
@@ -475,7 +532,7 @@ else if (*cptr == '-') {
     *sign = -1;
     cptr++;
     }
-return get_uint (cptr, 8, 0777777, status);
+return get_uint (cptr, 8, DMASK, status);
 }
 
 /* Symbolic input
@@ -508,16 +565,16 @@ if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* sixbit string? */
     if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
-    val[0] = (ASCTOSIX (cptr[0] & 077) << 12) |
-             (ASCTOSIX (cptr[1] & 077) << 6) |
-              ASCTOSIX (cptr[2] & 077);
+    val[0] = ((ASCTOSIX (cptr[0]) & 077) << 12) |
+             ((ASCTOSIX (cptr[1]) & 077) << 6) |
+              (ASCTOSIX (cptr[2]) & 077);
     return SCPE_OK;
     }
 
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
 if (opcode[i] == NULL) return SCPE_ARG;
-val[0] = opc_val[i] & 0777777;                          /* get value */
+val[0] = opc_val[i] & DMASK;                            /* get value */
 j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 
 switch (j) {                                            /* case on class */
@@ -545,13 +602,14 @@ switch (j) {                                            /* case on class */
         val[0] = val[0] | sc_enc[d];
         break;
 
-    case I_V_NPN: case I_V_IOT: case I_V_OPR: case I_V_SKP:
+    case I_V_NPN: case I_V_IOT:
+    case I_V_OPR: case I_V_SKP: case I_V_SPC:
         for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
             cptr = get_glyph (cptr, gbuf, 0)) {
             for (i = 0; (opcode[i] != NULL) &&
                         (strcmp (opcode[i], gbuf) != 0); i++) ;
             if (opcode[i] != NULL) {
-                k = opc_val[i] & 0777777;
+                k = opc_val[i] & DMASK;
                 if ((k != IA) && (((k ^ val[0]) & 0760000) != 0))
                     return SCPE_ARG;
                 val[0] = val[0] | k;

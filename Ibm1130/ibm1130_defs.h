@@ -27,11 +27,11 @@
 #define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
 
 #ifndef _WIN32
-   int strnicmp (char *a, char *b, int n);
-   int strcmpi  (char *a, char *b);
+   int strnicmp (const char *a, const char *b, int n);
+   int strcmpi  (const char *a, const char *b);
 #endif
 
-// #define GUI_SUPPORT		// uncomment to compile the GUI extensions. It's defined in the windows ibm1130.mak makefile
+/* #define GUI_SUPPORT		uncomment to compile the GUI extensions. It's defined in the windows ibm1130.mak makefile */
 
 /* ------------------------------------------------------------------------ */
 /* Architectural constants */
@@ -40,14 +40,13 @@
 #define INIMEMSIZE 	(16384)						/* 16Kwords */
 #define MEMSIZE		(cpu_unit.capac)
 
-#define UNIT_MSIZE	(1 << (UNIT_V_UF + 7))		/* flag for memory size setting */
-
 #define ILL_ADR_FLAG	0x40000000				/* an impossible 1130 address */
 
 /* ------------------------------------------------------------------------ */
 /* Global state */
 
-extern int cgi;								// TRUE if we are running as a CGI program
+extern int cgi;								/* TRUE if we are running as a CGI program */
+extern int cgiwritable;						/* TRUE if we can write the disk images back to the image file in CGI mode */
 extern int sim_gui;
 
 extern uint16 M[];							/* core memory, up to 32Kwords (note: don't even think about trying 64K) */
@@ -58,6 +57,7 @@ extern int32  SAR, SBR;						/* storage address/buffer registers */
 extern int32  OP, TAG, CCC;					/* instruction decoded pieces */
 extern int32  CES;							/* console entry switches */
 extern int32  ACC, EXT;						/* accumulator and extension */
+extern int32  ARF;							/* arithmetic factor register, a nonaddressable internal CPU register */
 extern int32  RUNMODE;						/* processor run/step mode */
 extern int32  ipl;							/* current interrupt level (-1 = not handling irq) */
 extern int32  iplpending;					/* interrupted IPL's */
@@ -71,9 +71,11 @@ extern int32  int_mask;						/* current active interrupt mask (ipl sensitive) */
 extern int32  mem_mask;
 extern int32  cpu_dsw;						/* CPU device status word */
 extern int32  sim_int_char;					/* interrupt character */
+extern int32  con_dsw;						/* has program stop and int run bits */
 extern t_bool running;
 extern t_bool power;
 extern t_bool cgi;							/* TRUE if we are running as a CGI program */
+extern t_bool cgiwritable;					/* TRUE if we can write to the disk image file in CGI mode */
 extern t_stat reason;						/* CPU execution loop control */
 
 #define WAIT_OP			 1		/* wait state causes: wait instruction, invalid instruction*/
@@ -131,15 +133,19 @@ void  WriteW (int32 a, int32 d);
 #define STOP_PHASE_BREAK	7				/* phase load break */
 #define STOP_CRASH			8				/* program has crashed badly */
 #define STOP_TIMED_OUT		9				/* simulation time limit exceeded */
+#define STOP_IMMEDIATE		10				/* simulator stop key pressed (immediate stop) */
+#define STOP_BREAK			11				/* simulator break key pressed */
+#define STOP_STEP			12				/* step count expired */
+#define STOP_OTHER			13				/* other reason, probably error returned by sim_process_event() */
 
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)	/* cond error return */
 
-#define INT_REQ_0		0x01				/* bits for interrupt levels (ipl, iplpending, int_req, int_mask) */
-#define INT_REQ_1		0x02
-#define INT_REQ_2		0x04
-#define INT_REQ_3		0x08
-#define INT_REQ_4		0x10
-#define INT_REQ_5		0x20
+#define INT_REQ_5		0x01				/* bits for interrupt levels (ipl, iplpending, int_req, int_mask) */
+#define INT_REQ_4		0x02
+#define INT_REQ_3		0x04
+#define INT_REQ_2		0x08
+#define INT_REQ_1		0x10
+#define INT_REQ_0		0x20
 
 #define XIO_UNUSED		0x00				/* XIO commands */
 #define XIO_WRITE		0x01
@@ -156,7 +162,7 @@ void  WriteW (int32 a, int32 d);
 
 #define ILSW_0_1442_CARD			0x8000			/* ILSW 0 is not really defined on the 1130 */
 
-#define ILSW_1_1132_PRINTER			0x8000			// had these backwards!
+#define ILSW_1_1132_PRINTER			0x8000			/* had these backwards! */
 #define ILSW_1_SCA					0x4000
 
 #define ILSW_2_1131_DISK			0x8000
@@ -215,13 +221,13 @@ void  WriteW (int32 a, int32 d);
 #define ILSW_4_SAC_BIT_09			0x0040
 #define ILSW_4_SAC_BIT_10			0x0020
 #define ILSW_4_SAC_BIT_11			0x0010
+#define ILSW_4_T2741_TERMINAL		0x0010	/* APL\1130 nonstandard serial interface uses this bit */
 #define ILSW_4_SAC_BIT_12			0x0008
 #define ILSW_4_SAC_BIT_13			0x0004
 #define ILSW_4_SAC_BIT_14			0x0002
 #define ILSW_4_SAC_BIT_15			0x0001
 
-#define ILSW_5_INT_RUN				0x8000
-#define ILSW_5_PROGRAM_STOP			0x8000
+#define ILSW_5_INT_RUN_PROGRAM_STOP 0x8000	/* this replaces both ILSW_5_INT_RUN and ILSW_5_PROGRAM_STOP */
 #define ILSW_5_SAC_BIT_01			0x4000
 #define ILSW_5_SAC_BIT_02			0x2000
 #define ILSW_5_SAC_BIT_03			0x1000
@@ -238,26 +244,27 @@ void  WriteW (int32 a, int32 d);
 #define ILSW_5_SAC_BIT_14			0x0002
 #define ILSW_5_SAC_BIT_15			0x0001
 
-//* CPU  DSW bits
+/* CPU  DSW bits */
 
 #define CPU_DSW_PROGRAM_STOP			0x8000
 #define CPU_DSW_INT_RUN					0x4000
 
 /* prototypes: xio handlers */
 
-void xio_1131_console	(int32 addr, int32 func, int32 modify);				// console keyboard and printer
-void xio_1142_card		(int32 addr, int32 func, int32 modify);				// standard card reader/punch
-void xio_1134_papertape	(int32 addr, int32 func, int32 modify);				// paper tape reader/punch
-void xio_disk			(int32 addr, int32 func, int32 modify, int drv);	// internal CPU disk
-void xio_1627_plotter	(int32 addr, int32 func, int32 modify);				// XY plotter
-void xio_1132_printer	(int32 addr, int32 func, int32 modify);				// standard line printer
-void xio_1131_switches	(int32 addr, int32 func, int32 modify);				// console buttons & switches
-void xio_1231_optical	(int32 addr, int32 func, int32 modify);				// optical mark page reader
-void xio_2501_card		(int32 addr, int32 func, int32 modify);				// alternate high-speed card reader
-void xio_1131_synch		(int32 addr, int32 func, int32 modify);				// synchronous communications adapter
-void xio_system7		(int32 addr, int32 func, int32 modify);				// system/7 interprocessor IO link
-void xio_1403_printer	(int32 addr, int32 func, int32 modify);				// alternate high-speed printer
-void xio_2250_display	(int32 addr, int32 func, int32 modify);				// vector display processor
+void xio_1131_console	(int32 addr, int32 func, int32 modify);				/* console keyboard and printer */
+void xio_1142_card		(int32 addr, int32 func, int32 modify);				/* standard card reader/punch */
+void xio_1134_papertape	(int32 addr, int32 func, int32 modify);				/* paper tape reader/punch */
+void xio_disk			(int32 addr, int32 func, int32 modify, int drv);	/* internal CPU disk */
+void xio_1627_plotter	(int32 addr, int32 func, int32 modify);				/* XY plotter */
+void xio_1132_printer	(int32 addr, int32 func, int32 modify);				/* standard line printer */
+void xio_1131_switches	(int32 addr, int32 func, int32 modify);				/* console buttons & switches */
+void xio_1231_optical	(int32 addr, int32 func, int32 modify);				/* optical mark page reader */
+void xio_2501_card		(int32 addr, int32 func, int32 modify);				/* alternate high-speed card reader */
+void xio_sca			(int32 addr, int32 func, int32 modify);				/* synchronous communications adapter */
+void xio_system7		(int32 addr, int32 func, int32 modify);				/* system/7 interprocessor IO link */
+void xio_1403_printer	(int32 addr, int32 func, int32 modify);				/* alternate high-speed printer */
+void xio_2250_display	(int32 addr, int32 func, int32 modify);				/* vector display processor */
+void xio_t2741_terminal (int32 addr, int32 func, int32 modify);				/* IO selectric via nonstandard serial interface for APL */
 void xio_error 			(char *msg);
 
 void   bail (char *msg);
@@ -267,6 +274,8 @@ t_stat cr_rewind (void);
 t_stat cr_detach (UNIT *uptr);
 void   calc_ints (void);							/* recalculate interrupt bitmask */
 void   trace_io (char *fmt, ...);					/* debugging printout */
+void   trace_both (char *fmt, ...);					/* debugging printout */
+t_stat register_cmd (char *name, t_stat (*action)(int32 flag, char *ptr), int arg, char *help);
 void   scp_panic (char *msg);						/* bail out of simulator */
 char  *upcase(char *str);
 void   break_simulation (t_stat reason);			/* let a device halt the simulation */

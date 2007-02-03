@@ -451,7 +451,6 @@ typedef struct {
 
 #define TMR_LFC         0                               /* LFC = timer 0 */
 #define TMR_PIC         1                               /* PIC = timer 1 */
-#define TMR_PAS         2                               /* PAS = timer 2 */
 #define LPT_WIDTH       132
 #define VFU_LNT         132
 #define MIN(x,y)        (((x) < (y))? (x): (y))

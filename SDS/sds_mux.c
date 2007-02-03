@@ -1,6 +1,6 @@
 /* sds_mux.c: SDS 940 terminal multiplexor simulator
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mux          terminal multiplexor
 
+   29-Dec-06    RMS     Revised to use console conversion routines
    29-Jun-05    RMS     Added SET MUXLn DISCONNECT
    21-Jun-05    RMS     Fixed bug in SHOW CONN/STATS
    05-Jan-04    RMS     Revised for tmxr library changes
@@ -47,8 +48,6 @@
 #define MUX_FLAGMASK    (MUX_FLAGS - 1)
 #define MUX_SCANMAX     (MUX_LINES * MUX_FLAGS)         /* flags to scan */
 #define MUX_SCANMASK    (MUX_SCANMAX - 1)
-#define UNIT_V_UC       (UNIT_V_UF + 0)                 /* UC only */
-#define UNIT_UC         (1 << UNIT_V_UC)
 #define MUX_INIT_POLL   8000
 #define MUXL_WAIT       500
 #define MUX_SETFLG(l,x) mux_flags[((l) * MUX_FLAGS) + (x)] = 1
@@ -182,43 +181,45 @@ DEVICE mux_dev = {
 */
 
 UNIT muxl_unit[] = {
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT },
-    { UDATA (&muxo_svc, UNIT_UC, 0), MUXL_WAIT }
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
+    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT }
     };
 
 MTAB muxl_mod[] = {
-    { UNIT_UC, 0, "lower case", "LC", NULL },
-    { UNIT_UC, UNIT_UC, "upper case", "UC", NULL },
+    { TT_MODE, TT_MODE_UC, "UC", "UC", NULL },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &mux_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
@@ -362,9 +363,8 @@ for (ln = 0; ln < MUX_NUMLIN; ln++) {                   /* loop thru lines */
             if (mux_sta[ln] & MUX_SCHP)                 /* already got one? */
                 mux_sta[ln] = mux_sta[ln] | MUX_SOVR;   /* overrun */
             else mux_sta[ln] = mux_sta[ln] | MUX_SCHP;  /* char pending */
-            c = c & 0177;                               /* mask to 7b */
-            if ((muxl_unit[ln].flags & UNIT_UC) &&      /* cvt to UC? */
-                 islower (c & 0x7F)) c = toupper (c);
+            if (c & SCPE_BREAK) c = 0;                  /* break? */
+            else c = sim_tt_inpcvt (c, TT_GET_MODE (muxl_unit[ln].flags));
             mux_rbuf[ln] = c;                           /* save char */
             MUX_SETFLG (ln, MUX_FRCV);                  /* set rcv flag */
             mux_scan_next ();                           /* kick scanner */
@@ -384,10 +384,8 @@ uint32 ln = uptr - muxl_unit;                           /* line # */
 
 if (mux_ldsc[ln].conn) {                                /* connected? */
     if (mux_ldsc[ln].xmte) {                            /* xmt enabled? */
-        c = mux_xbuf[ln] & 0177;                        /* get char */
-        if ((muxl_unit[ln].flags & UNIT_UC) && islower (c))
-            c = toupper (c);                            /* cvt to UC? */
-        tmxr_putc_ln (&mux_ldsc[ln], c);                /* output char */
+        c = sim_tt_outcvt (mux_xbuf[ln], TT_GET_MODE (muxl_unit[ln].flags));
+        if (c >= 0) tmxr_putc_ln (&mux_ldsc[ln], c);    /* output char */
         tmxr_poll_tx (&mux_desc);                       /* poll xmt */
         }
     else {                                              /* buf full */

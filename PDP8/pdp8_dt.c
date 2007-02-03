@@ -827,7 +827,7 @@ switch (fnc) {                                          /* at speed, check fnc *
    Wc ovf, start of block - schedule end zone
 */
 
-    case FNC_WRIT:                                              /* write */
+    case FNC_WRIT:                                      /* write */
         wrd = DT_LIN2WD (uptr->pos, uptr);              /* get word # */
         switch (dt_substate) {                          /* case on substate */
 

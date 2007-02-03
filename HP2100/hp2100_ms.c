@@ -26,6 +26,11 @@
    ms           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
+   18-Sep-06    JDB     Fixed 2nd CLR after WC causing another write
+                        Improve debug reporting, add debug flags
+   14-Sep-06    JDB     Removed local BOT flag, now uses sim_tape_bot
+   30-Aug-06    JDB     Added erase gap support, improved tape lib err reporting
    07-Jul-06    JDB     Added CAPACITY as alternate for REEL
                         Fixed EOT test for unlimited reel size
    16-Feb-06    RMS     Revised for new EOT test
@@ -90,7 +95,17 @@
 #define UST             u4                              /* unit status */
 #define REEL            u5                              /* tape reel size */
 
-#define TCAP            (300 * 12 * 800)                /* 300 ft capacity at 800bpi */
+#define BPI_13181       800                             /* 800 bpi for 13181 cntlr */
+#define BPI_13183       1600                            /* 1600 bpi for 13183 cntlr */
+#define GAP_13181       48                              /* gap is 4.8 inches for 13181 cntlr */
+#define GAP_13183       30                              /* gap is 3.0 inches for 13183 cntlr */
+#define TCAP            (300 * 12 * 800)                /* 300 ft capacity at 800 bpi */
+
+/* Debug flags */
+
+#define DEB_CMDS        (1 << 0)                        /* command init and compl */
+#define DEB_CPU         (1 << 1)                        /* CPU I/O */
+#define DEB_RWS         (1 << 2)                        /* tape reads, writes, status */
 
 /* Command - msc_fnc */
 
@@ -106,7 +121,8 @@
 #define FNC_REW         00101                           /* rewind */
 #define FNC_RWS         00105                           /* rewind and offline */
 #define FNC_WFM         00211                           /* write file mark */
-#define FNC_RFF         00223                           /* "read file fwd" */
+#define FNC_RFF         00223                           /* read file fwd (diag) */
+#define FNC_RRR         00061                           /* read record rev (diag) */
 #define FNC_CMPL        00400                           /* completion state */
 #define FNC_V_SEL       9                               /* select */
 #define FNC_M_SEL       017
@@ -132,14 +148,15 @@
 #define STA_TBSY        0001000                         /* transport busy (d) */
 #define STA_BUSY        0000400                         /* ctrl busy */
 #define STA_EOF         0000200                         /* end of file */
-#define STA_BOT         0000100                         /* beg of tape (u) */
+#define STA_BOT         0000100                         /* beg of tape (d) */
 #define STA_EOT         0000040                         /* end of tape (d) */
 #define STA_TIM         0000020                         /* timing error */
 #define STA_REJ         0000010                         /* programming error */
 #define STA_WLK         0000004                         /* write locked (d) */
 #define STA_PAR         0000002                         /* parity error */
 #define STA_LOCAL       0000001                         /* local (d) */
-#define STA_DYN         (STA_PE|STA_SEL|STA_TBSY|STA_WLK|STA_LOCAL)
+#define STA_DYN         (STA_PE  | STA_SEL | STA_TBSY | STA_BOT | \
+                         STA_EOT | STA_WLK | STA_LOCAL)
 
 extern uint32 PC, SR;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
@@ -151,13 +168,13 @@ int32 ms_timing = 1;                                    /* timing type */
 int32 msc_sta = 0;                                      /* status */
 int32 msc_buf = 0;                                      /* buffer */
 int32 msc_usl = 0;                                      /* unit select */
-int32 msc_1st = 0;
+int32 msc_1st = 0;                                      /* first service */
 int32 msc_stopioe = 1;                                  /* stop on error */
 int32 msd_buf = 0;                                      /* data buffer */
 uint8 msxb[DBSIZE] = { 0 };                             /* data buffer */
 t_mtrlnt ms_ptr = 0, ms_max = 0;                        /* buffer ptrs */
 
-/* Hardware timing at 45 IPS                  13181                  13183           
+/* Hardware timing at 45 IPS                  13181                  13183
    (based on 1580 instr/msec)          instr   msec    SCP   instr    msec    SCP
                                       --------------------   --------------------
    - BOT start delay        : btime = 161512  102.22   184   252800  160.00   288
@@ -165,7 +182,7 @@ t_mtrlnt ms_ptr = 0, ms_max = 0;                        /* buffer ptrs */
    - GAP traversal time     : gtime = 175553  111.11   200   105333   66.67   120
    - IRG traversal time     : itime =  24885   15.75     -    27387   17.33     -
    - rewind initiation time : rtime =    878    0.56     1      878    0.56     1
-   - data xfer time / word  : xtime =     88   55.56us   -       44  27.78us    - 
+   - data xfer time / word  : xtime =     88   55.56us   -       44  27.78us    -
 
    NOTE: The 13181-60001 Rev. 1629 tape diagnostic fails test 17B subtest 6 with
          "E116 BYTE TIME SHORT" if the correct data transfer time is used for
@@ -201,6 +218,7 @@ t_stat msc_attach (UNIT *uptr, char *cptr);
 t_stat msc_detach (UNIT *uptr);
 t_stat msc_online (UNIT *uptr, int32 value, char *cptr, void *desc);
 t_stat msc_boot (int32 unitno, DEVICE *dptr);
+t_stat ms_write_gap (UNIT *uptr);
 t_stat ms_map_err (UNIT *uptr, t_stat st);
 t_stat ms_settype (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ms_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -209,6 +227,7 @@ t_stat ms_show_timing (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat ms_set_reelsize (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, void *desc);
 void ms_config_timing (void);
+char *ms_cmd_name (uint32 cmd);
 
 /* MSD data structures
 
@@ -261,6 +280,7 @@ DEVICE msd_dev = {
    msc_unit     MSC unit list
    msc_reg      MSC register list
    msc_mod      MSC modifier list
+   msc_deb      MSC debug flags
 */
 
 UNIT msc_unit[] = {
@@ -305,7 +325,7 @@ MTAB msc_mod[] = {
     { UNIT_OFFLINE, UNIT_OFFLINE, "offline", "OFFLINE", NULL },
     { UNIT_OFFLINE, 0, "online", "ONLINE", msc_online },
     { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
     { MTAB_XTD | MTAB_VUN, 0, "CAPACITY", "CAPACITY",
        &ms_set_reelsize, &ms_show_reelsize, NULL },
     { MTAB_XTD | MTAB_VUN | MTAB_NMO, 1, "REEL", "REEL",
@@ -329,12 +349,20 @@ MTAB msc_mod[] = {
     { 0 }
     };
 
+DEBTAB msc_deb[] = {
+    { "CMDS", DEB_CMDS },
+    { "CPU", DEB_CPU },
+    { "RWS", DEB_RWS },
+    { NULL, 0 }
+    };
+
 DEVICE msc_dev = {
     "MSC", msc_unit, msc_reg, msc_mod,
     MS_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &msc_reset,
     &msc_boot, &msc_attach, &msc_detach,
-    &msc_dib, DEV_DISABLE | DEV_DEBUG
+    &msc_dib, DEV_DISABLE | DEV_DEBUG,
+    0, msc_deb, NULL, NULL
     };
 
 /* IO instructions */
@@ -370,6 +398,7 @@ switch (inst) {                                         /* case on opcode */
         dat = msd_buf;
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCTL (devd);                              /* clr ctl, cmd */
@@ -420,7 +449,7 @@ switch (inst) {                                         /* case on opcode */
         break;
 
     case ioOTX:                                         /* output */
-        if (DEBUG_PRS (msc_dev))
+        if (DEBUG_PRI (msc_dev, DEB_CPU))
             fprintf (sim_deb, ">>MSC OTx: Command = %06o\n", dat);
         msc_buf = dat;
         msc_sta = msc_sta & ~STA_REJ;                   /* clear reject */
@@ -432,9 +461,11 @@ switch (inst) {                                         /* case on opcode */
         if (dat & FNF_CHS) {                            /* select change */
             msc_usl = map_sel[FNC_GETSEL (dat)];        /* is immediate */
             uptr = msc_dev.units + msc_usl;
+            if (DEBUG_PRI (msc_dev, DEB_CMDS))
+                fprintf (sim_deb, ">>MSC OTx: Unit %d selected\n", msc_usl);
             }
         if (((dat & FNF_MOT) && sim_is_active (uptr)) ||
-            ((dat & FNF_REV) && (uptr->UST & STA_BOT)) ||
+            ((dat & FNF_REV) && sim_tape_bot (uptr)) ||
             ((dat & FNF_WRT) && sim_tape_wrp (uptr)))
             msc_sta = msc_sta | STA_REJ;                /* reject? */
         break;
@@ -445,30 +476,39 @@ switch (inst) {                                         /* case on opcode */
         dat = dat | (msc_sta & ~STA_DYN);               /* get card status */
         if ((uptr->flags & UNIT_OFFLINE) == 0) {        /* online? */
             dat = dat | uptr->UST;                      /* add unit status */
+            if (sim_tape_bot (uptr))                    /* BOT? */
+                dat = dat | STA_BOT;
             if (sim_is_active (uptr) &&                 /* TBSY unless RWD at BOT */
-                !((uptr->FNC & FNF_RWD) && (uptr->UST & STA_BOT)))
+                !((uptr->FNC & FNF_RWD) && sim_tape_bot (uptr)))
                 dat = dat | STA_TBSY;
             if (sim_tape_wrp (uptr))                    /* write prot? */
                 dat = dat | STA_WLK;
-            if (sim_tape_eot (uptr))
+            if (sim_tape_eot (uptr))                    /* EOT? */
                 dat = dat | STA_EOT;
             }
         else dat = dat | STA_TBSY | STA_LOCAL;
         if (ms_ctype) dat = dat | STA_PE |              /* 13183A? */
-            (msc_usl << STA_V_SEL);     
-        if (DEBUG_PRS (msc_dev))
+            (msc_usl << STA_V_SEL);
+        if (DEBUG_PRI (msc_dev, DEB_CPU))
             fprintf (sim_deb, ">>MSC LIx: Status = %06o\n", dat);
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) { clrCTL (devc); }              /* CLC */
         else if (!(msc_sta & STA_REJ)) {                /* STC, last cmd rejected? */
             if ((msc_buf & 0377) == FNC_CLR) {          /* clear? */
-                for (i = 0; i < MS_NUMDR; i++) {        /* loop thru units */
-                    if (sim_is_active (&msc_unit[i]) && /* write in prog? */
-                        (msc_unit[i].FNC == FNC_WC) && (ms_ptr > 0)) {
+                for (i = 0; i < MS_NUMDR; i++) {        /* look for write in progr */
+                    if (sim_is_active (&msc_unit[i]) && /* unit active? */
+                        (msc_unit[i].FNC == FNC_WC) &&  /* last cmd write? */
+                        (ms_ptr > 0)) {                 /* partial buffer? */
+                        if (DEBUG_PRI (msc_dev, DEB_RWS))
+                            fprintf (sim_deb,
+                                ">>MSC STC: Unit %d wrote %d word partial record\n",
+                                i, ms_ptr / 2);
                         if (st = sim_tape_wrrecf (uptr, msxb, ms_ptr | MTR_ERF))
-                            ms_map_err (uptr, st);
+                            ms_map_err (uptr, st);      /* discard any error */
+                        ms_ptr = 0;                     /* clear partial */
                         }
                     if ((msc_unit[i].UST & STA_REW) == 0)
                         sim_cancel (&msc_unit[i]);      /* stop if not rew */
@@ -476,34 +516,35 @@ switch (inst) {                                         /* case on opcode */
                 setCTL (devc);                          /* set CTL for STC */
                 setFSR (devc);                          /* set FLG for completion */
                 msc_sta = msc_1st = 0;                  /* clr ctlr status */
-                if (DEBUG_PRS (msc_dev))
+                if (DEBUG_PRI (msc_dev, DEB_CMDS))
                     fputs (">>MSC STC: Controller cleared\n", sim_deb);
                 return SCPE_OK;
                 }
             uptr->FNC = msc_buf & 0377;                 /* save function */
             if (uptr->FNC & FNF_RWD) {                  /* rewind? */
-                if (!(uptr->UST & STA_BOT))             /* not at BOT? */
+                if (!sim_tape_bot (uptr))               /* not at BOT? */
                     uptr->UST = STA_REW;                /* set rewinding */
                 sched_time = msc_rtime;                 /* set response time */
                 }
             else {
-                if (uptr-> UST & STA_BOT)               /* at BOT? */
+                if (sim_tape_bot (uptr))                /* at BOT? */
                     sched_time = msc_btime;             /* use BOT start time */
                 else if ((uptr->FNC == FNC_GAP) || (uptr->FNC == FNC_GFM))
                     sched_time = msc_gtime;             /* use gap traversal time */
                 else sched_time = 0;
                 if (uptr->FNC != FNC_GAP)
                     sched_time += msc_ctime;            /* add base command time */
-                if (uptr->FNC & FNF_MOT)                /* motion command? */
-                    uptr->UST = 0;                      /* clear BOT status */
                 }
             if (msc_buf & ~FNC_SEL) {                   /* NOP for unit sel alone */
                 sim_activate (uptr, sched_time);        /* else schedule op */
-                if (DEBUG_PRS (msc_dev)) fprintf (sim_deb,
-                    ">>MSC STC: Unit %d command %03o scheduled, time = %d\n",
-                    msc_usl, uptr->FNC, sched_time);
+                if (DEBUG_PRI (msc_dev, DEB_CMDS))
+                    fprintf (sim_deb,
+                        ">>MSC STC: Unit %d command %03o (%s) scheduled, "
+                        "pos = %d, time = %d\n",
+                        msc_usl, uptr->FNC, ms_cmd_name (uptr->FNC),
+                        uptr->pos, sched_time);
                 }
-            else if (DEBUG_PRS (msc_dev))
+            else if (DEBUG_PRI (msc_dev, DEB_CMDS))
                 fputs (">>MSC STC: Unit select (NOP)\n", sim_deb);
             msc_sta = STA_BUSY;                         /* ctrl is busy */
             msc_1st = 1;
@@ -526,9 +567,17 @@ return dat;
 /* Unit service
 
    If rewind done, reposition to start of tape, set status
-   else, do operation, set done, interrupt
+   else, do operation, set done, interrupt.
 
-   Can't be write locked, can only write lock detached unit
+   In addition to decreasing the timing intervals, the FASTTIME option enables
+   two additional optimizations: WFM for GFM substitution, and BOT gap
+   elimination.  If FASTTIME is selected, gap and file mark (GFM) commands are
+   processed as WFM (write file mark) commands.  That is, the preceding GAP is
+   not performed.  Also, the initial gap that normally precedes the first data
+   record or EOF mark at the beginning of the tape is omitted.  These omissions
+   result in smaller tape image files.  If REALTIME is selected, the gaps are
+   included.  Note that the gaps (and realistic timing) are necessary to pass
+   the 7970 diagnostics.
 */
 
 t_stat msc_svc (UNIT *uptr)
@@ -552,7 +601,7 @@ switch (uptr->FNC) {                                    /* case on function */
     case FNC_RWS:                                       /* rewind offline */
         sim_tape_rewind (uptr);                         /* rewind tape */
         uptr->flags = uptr->flags | UNIT_OFFLINE;       /* set offline */
-        uptr->UST = STA_BOT;                            /* BOT when online again */
+        uptr->UST = 0;                                  /* clear REW status */
         break;                                          /* we're done */
 
     case FNC_REW:                                       /* rewind */
@@ -564,17 +613,41 @@ switch (uptr->FNC) {                                    /* case on function */
 
     case FNC_REW | FNC_CMPL:                            /* complete rewind */
         sim_tape_rewind (uptr);                         /* rewind tape */
-        uptr->UST = STA_BOT;                            /* set BOT status */
+        uptr->UST = 0;                                  /* clear REW status */
         return SCPE_OK;                                 /* drive is free */
 
-    case FNC_GFM:                                       /* gap file mark */
+    case FNC_GFM:                                       /* gap + file mark */
+        if (ms_timing == 1)                             /* fast timing? */
+            goto DO_WFM;                                /* do plain file mark */
+                                                        /* else fall into GAP */
+    case FNC_GAP:                                       /* erase gap */
+        if (DEBUG_PRI (msc_dev, DEB_RWS))
+            fprintf (sim_deb,
+                ">>MSC svc: Unit %d wrote gap\n",
+                unum);
+        if ((r = ms_write_gap (uptr)) ||                /* write tape gap; error? */
+            (uptr->FNC != FNC_GFM))                     /* not GFM? */
+            break;                                      /* bail out now */
+                                                        /* else drop into WFM */
     case FNC_WFM:                                       /* write file mark */
+        if ((ms_timing == 0) && sim_tape_bot (uptr)) {  /* realistic timing + BOT? */
+            if (DEBUG_PRI (msc_dev, DEB_RWS))
+                fprintf (sim_deb,
+                    ">>MSC svc: Unit %d wrote initial gap\n",
+                    unum);
+            if (st = ms_write_gap (uptr)) {             /* write initial gap; error? */
+                r = ms_map_err (uptr, st);              /* map error */
+                break;                                  /* terminate operation */
+                }
+            }
+    DO_WFM:
+        if (DEBUG_PRI (msc_dev, DEB_RWS))
+            fprintf (sim_deb,
+                ">>MSC svc: Unit %d wrote file mark\n",
+                unum);
         if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
             r = ms_map_err (uptr, st);                  /* map error */
         msc_sta = STA_EOF;                              /* set EOF status */
-        break;
-
-    case FNC_GAP:                                       /* erase gap */
         break;
 
     case FNC_FSR:                                       /* space forward */
@@ -606,8 +679,12 @@ switch (uptr->FNC) {                                    /* case on function */
     case FNC_RFF:                                       /* diagnostic read */
     case FNC_RC:                                        /* read */
         if (msc_1st) {                                  /* first svc? */
-            msc_1st = ms_ptr = 0;                       /* clr 1st flop */
+            msc_1st = ms_ptr = ms_max = 0;              /* clr 1st flop */
             st = sim_tape_rdrecf (uptr, msxb, &ms_max, DBSIZE); /* read rec */
+            if (DEBUG_PRI (msc_dev, DEB_RWS))
+                fprintf (sim_deb,
+                    ">>MSC svc: Unit %d read %d word record\n",
+                    unum, ms_max / 2);
             if (st == MTSE_RECE) msc_sta = msc_sta | STA_PAR;   /* rec in err? */
             else if (st != MTSE_OK) {                   /* other error? */
                 r = ms_map_err (uptr, st);              /* map error */
@@ -619,8 +696,6 @@ switch (uptr->FNC) {                                    /* case on function */
                 break;                                  /* err, done */
                 }
             if (ms_ctype) msc_sta = msc_sta | STA_ODD;  /* set ODD for 13183A */
-            if (DEBUG_PRS (msc_dev)) fprintf (sim_deb,
-                ">>MSC svc: Unit %d read %d word record\n", unum, ms_max / 2);
             }
         if (CTL (devd) && (ms_ptr < ms_max)) {          /* DCH on, more data? */
             if (FLG (devd)) msc_sta = msc_sta | STA_TIM | STA_PAR;
@@ -638,14 +713,29 @@ switch (uptr->FNC) {                                    /* case on function */
         else uptr->FNC |= FNC_CMPL;                     /* set completion */
         return SCPE_OK;
 
+    case FNC_RFF | FNC_CMPL:                            /* diagnostic read completion */
+    case FNC_RC  | FNC_CMPL:                            /* read completion */
+        break;
+
     case FNC_WC:                                        /* write */
-        if (msc_1st) msc_1st = ms_ptr = 0;              /* no xfer on first */
+        if (msc_1st) {                                  /* first service? */
+            msc_1st = ms_ptr = 0;                       /* no data xfer on first svc */
+            if ((ms_timing == 0) && sim_tape_bot (uptr)) {  /* realistic timing + BOT? */
+                if (DEBUG_PRI (msc_dev, DEB_RWS))
+                    fprintf (sim_deb,
+                        ">>MSC svc: Unit %d wrote initial gap\n",
+                        unum);
+                if (st = ms_write_gap (uptr)) {         /* write initial gap; error? */
+                    r = ms_map_err (uptr, st);          /* map error */
+                    break;                              /* terminate operation */
+                    }
+                }
+            }
         else {                                          /* not 1st, next char */
             if (ms_ptr < DBSIZE) {                      /* room in buffer? */
                 msxb[ms_ptr] = msd_buf >> 8;            /* store 2 char */
                 msxb[ms_ptr + 1] = msd_buf & 0377;
                 ms_ptr = ms_ptr + 2;
-                uptr->UST = 0;
                 }
             else msc_sta = msc_sta | STA_PAR;
            }
@@ -655,8 +745,10 @@ switch (uptr->FNC) {                                    /* case on function */
             return SCPE_OK;
             }
         if (ms_ptr) {                                   /* any data? write */
-            if (DEBUG_PRS (msc_dev)) fprintf (sim_deb,
-                ">>MSC svc: Unit %d wrote %d word record\n", unum, ms_ptr / 2);
+            if (DEBUG_PRI (msc_dev, DEB_RWS))
+                fprintf (sim_deb,
+                    ">>MSC svc: Unit %d wrote %d word record\n",
+                    unum, ms_ptr / 2);
             if (st = sim_tape_wrrecf (uptr, msxb, ms_ptr)) {    /* write, err? */
                 r = ms_map_err (uptr, st);              /* map error */
                 break;
@@ -666,15 +758,39 @@ switch (uptr->FNC) {                                    /* case on function */
         uptr->FNC |= FNC_CMPL;                          /* set completion */
         return SCPE_OK;
 
-    default:                                            /* unknown */
+    case FNC_WC | FNC_CMPL:                             /* write completion */
+        break;
+
+    case FNC_RRR:                                       /* not supported */
+    default:                                            /* unknown command */
+        if (DEBUG_PRI (msc_dev, DEB_CMDS))
+            fprintf (sim_deb,
+                ">>MSC svc: Unit %d command %03o is unknown (NOP)\n",
+                unum, uptr->FNC);
         break;
         }
 
 setFSR (devc);                                          /* set cch flg */
 msc_sta = msc_sta & ~STA_BUSY;                          /* update status */
-if (DEBUG_PRS (msc_dev)) fprintf (sim_deb,
-    ">>MSC svc: Unit %d command %03o complete\n", unum, uptr->FNC & 0377);
+if (DEBUG_PRI (msc_dev, DEB_CMDS))
+     fprintf (sim_deb,
+        ">>MSC svc: Unit %d command %03o (%s) complete\n",
+        unum, uptr->FNC & 0377, ms_cmd_name (uptr->FNC));
 return r;
+}
+
+/* Write an erase gap */
+
+t_stat ms_write_gap (UNIT *uptr)
+{
+t_stat st;
+uint32 gap_len = ms_ctype ? GAP_13183 : GAP_13181;      /* establish gap length */
+uint32 tape_bpi = ms_ctype ? BPI_13183 : BPI_13181;     /* establish nominal bpi */
+
+if (st = sim_tape_wrgap (uptr, gap_len, tape_bpi))      /* write gap */
+    return ms_map_err (uptr, st);                       /* map error if failure */
+else
+    return SCPE_OK;
 }
 
 /* Map tape error status */
@@ -683,14 +799,22 @@ t_stat ms_map_err (UNIT *uptr, t_stat st)
 {
 int32 unum = uptr - msc_dev.units;                      /* get unit number */
 
-if (DEBUG_PRS (msc_dev)) fprintf (sim_deb,
-    ">>MSC err: Unit %d tape library status = %d\n", unum, st);
+if (DEBUG_PRI (msc_dev, DEB_RWS))
+    fprintf (sim_deb,
+        ">>MSC err: Unit %d tape library status = %d\n",
+        unum, st);
 
 switch (st) {
 
     case MTSE_FMT:                                      /* illegal fmt */
+        msc_sta = msc_sta | STA_REJ;                    /* reject cmd */
+        return SCPE_FMT;                                /* format error */
+
     case MTSE_UNATT:                                    /* unattached */
-        msc_sta = msc_sta | STA_REJ;                    /* reject */
+        msc_detach (uptr);                              /* resync status (ignore rtn) */
+        msc_sta = msc_sta | STA_REJ;                    /* reject cmd */
+        return SCPE_UNATT;                              /* unit unattached */
+
     case MTSE_OK:                                       /* no error */
         return SCPE_IERR;                               /* never get here! */
 
@@ -710,10 +834,6 @@ switch (st) {
 
     case MTSE_RECE:                                     /* record in error */
         msc_sta = msc_sta | STA_PAR;                    /* error */
-        break;
-
-    case MTSE_BOT:                                      /* reverse into BOT */
-        msc_sta = msc_sta | STA_BOT;                    /* set BOT status */
         break;
 
     case MTSE_WRP:                                      /* write protect */
@@ -745,9 +865,7 @@ for (i = 0; i < MS_NUMDR; i++) {
     uptr = msc_dev.units + i;
     sim_tape_reset (uptr);
     sim_cancel (uptr);
-    if ((uptr->flags & UNIT_ATT) && sim_tape_bot (uptr))
-        uptr->UST = STA_BOT;
-    else uptr->UST = 0;
+    uptr->UST = 0;
     }
 ms_config_timing ();
 return SCPE_OK;
@@ -760,10 +878,8 @@ t_stat msc_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);                       /* attach unit */
-if (r == SCPE_OK) {
+if (r == SCPE_OK)
     uptr->flags = uptr->flags & ~UNIT_OFFLINE;          /* set online */
-    uptr->UST = STA_BOT;                                /* tape starts at BOT */
-    }
 return r;
 }
 
@@ -771,7 +887,7 @@ return r;
 
 t_stat msc_detach (UNIT* uptr)
 {
-uptr->UST = 0;                                          /* update status */
+uptr->UST = 0;                                          /* clear status */
 uptr->flags = uptr->flags | UNIT_OFFLINE;               /* set offline */
 return sim_tape_detach (uptr);                          /* detach unit */
 }
@@ -788,7 +904,7 @@ else return SCPE_UNATT;
 
 void ms_config_timing (void)
 {
-int32 i, tset;
+uint32 i, tset;
 
 tset = (ms_timing << 1) | (ms_timing? 0 : ms_ctype);    /* select timing set */
 for (i = 0; i < (sizeof (timers) / sizeof (timers[0])); i++)
@@ -842,12 +958,12 @@ return SCPE_OK;
 
    val = 0 -> SET MSCn CAPACITY=n
    val = 1 -> SET MSCn REEL=n */
- 
+
 t_stat ms_set_reelsize (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 reel;
 t_stat status;
- 
+
 if (val == 0) {
     status = sim_tape_set_capac (uptr, val, cptr, desc);
     if (status == SCPE_OK) uptr->REEL = 0;
@@ -858,7 +974,7 @@ if (cptr == NULL) return SCPE_ARG;
 reel = (int32) get_uint (cptr, 10, 2400, &status);
 if (status != SCPE_OK) return status;
 else switch (reel) {
- 
+
      case 0:
         uptr->REEL = 0;                                 /* type 0 = unlimited/custom */
         break;
@@ -887,7 +1003,7 @@ return SCPE_OK;
 
    val = 0 -> SHOW MSC or SHOW MSCn or SHOW MSCn CAPACITY
    val = 1 -> SHOW MSCn REEL */
- 
+
 t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 t_stat status = SCPE_OK;
@@ -896,6 +1012,34 @@ if (uptr->REEL == 0) status = sim_tape_show_capac (st, uptr, val, desc);
 else fprintf (st, "%4d foot reel", 300 << uptr->REEL);
 if (val == 1) fputc ('\n', st);                         /* MTAB_NMO omits \n */
 return status;
+}
+
+/* Translate command to mnemonic for debug logging
+
+   The command names and descriptions are taken from the 13181 interface
+   manual. */
+
+char *ms_cmd_name (uint32 cmd)
+{
+
+switch (cmd & 0377) {
+    case FNC_WC:  return "WCC";         /* Write command */
+    case FNC_WFM: return "WFM";         /* Write file mark */
+    case FNC_RC:  return "RRF";         /* Read record forward */
+    case FNC_FSR: return "FSR";         /* Forward space record */
+    case FNC_FSF: return "FSF";         /* Forward space file */
+    case FNC_GAP: return "GAP";         /* Write gap */
+    case FNC_BSR: return "BSR";         /* Backspace record */
+    case FNC_BSF: return "BSF";         /* Backspace file */
+    case FNC_REW: return "REW";         /* Rewind */
+    case FNC_RWS: return "RWO";         /* Rewind off-line */
+    case FNC_CLR: return "CLR";         /* Clear controller */
+    case FNC_GFM: return "GFM";         /* Gap file mark */
+    case FNC_RFF: return "RFF";         /* Read forward until file mark (diag) */
+    case FNC_RRR: return "RRR";         /* Read record in reverse (diag) */
+
+    default:      return "???";         /* Unknown command */
+    }
 }
 
 /* 7970B/7970E bootstrap routine (HP 12992D ROM) */

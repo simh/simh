@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   29-Oct-06    RMS     Added idle support
    22-May-06    RMS     Fixed format error in CPU history (found by Peter Schorn)
    10-May-06    RMS     Added -kesu switches for virtual addressing modes
                         Fixed bugs in examine virtual
@@ -245,6 +246,8 @@ int32 cpu_astop = 0;
 int32 mchk_va, mchk_ref;                                /* mem ref param */
 int32 ibufl, ibufh;                                     /* prefetch buf */
 int32 ibcnt, ppc;                                       /* prefetch ctl */
+uint32 cpu_idle_ipl_mask = 0xB;                         /* idle if on IPL 0,1,3 */
+int32 cpu_idle_wait = 200;                              /* for this many cycles */
 jmp_buf save_env;
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 int32 pcq[PCQ_SIZE] = { 0 };                            /* PC queue */
@@ -280,6 +283,7 @@ extern int32 sim_interval;
 extern int32 sim_int_char;
 extern int32 sim_switches;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern t_bool sim_idle_enab;
 extern UNIT clk_unit;
 
 extern t_stat build_dib_tab (void);
@@ -371,6 +375,8 @@ int32 cpu_get_vsw (int32 sw);
 int32 get_istr (int32 lnt, int32 acc);
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
 t_bool cpu_show_opnd (FILE *st, InstHistory *h, int32 line);
+int32 cpu_psl_ipl (int32 newpsl);
+t_stat cpu_idle_svc (UNIT *uptr);
 
 /* CPU data structures
 
@@ -380,7 +386,9 @@ t_bool cpu_show_opnd (FILE *st, InstHistory *h, int32 line);
    cpu_mod      CPU modifier list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, INITMEMSIZE) };
+UNIT cpu_unit = {
+    UDATA (&cpu_idle_svc, UNIT_FIX|UNIT_BINK, INITMEMSIZE)
+    };
 
 REG cpu_reg[] = {
     { HRDATA (PC, R[nPC], 32) },
@@ -425,6 +433,8 @@ REG cpu_reg[] = {
     { FLDATA (CRDERR, crd_err, 0) },
     { FLDATA (MEMERR, mem_err, 0) },
     { FLDATA (HLTPIN, hlt_pin, 0) },
+    { HRDATA (IDLE_IPL, cpu_idle_ipl_mask, 16), REG_HIDDEN },
+    { DRDATA (IDLE_WAIT, cpu_idle_wait, 16), REG_HIDDEN },
     { BRDATA (PCQ, pcq, 16, 32, PCQ_SIZE), REG_RO+REG_CIRC },
     { HRDATA (PCQP, pcq_p, 6), REG_HRO },
     { HRDATA (BADABO, badabo, 32), REG_HRO },
@@ -433,6 +443,10 @@ REG cpu_reg[] = {
     };
 
 MTAB cpu_mod[] = {
+    { UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL },
+    { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
     { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size },
@@ -443,8 +457,6 @@ MTAB cpu_mod[] = {
     { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size },
 #endif
-    { UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL },
-    { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
       &cpu_set_hist, &cpu_show_hist },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
@@ -1515,8 +1527,7 @@ for ( ;; ) {
 /* Single operand instructions with source, read only - TSTx src.rx
 
         opnd[0] =       source
- */
-
+*/
 
     case TSTB:
         CC_IIZZ_B (op0);                                /* set cc's */
@@ -2943,6 +2954,30 @@ opnd[j++] = Read (va + 12, L_LONG, acc);
 return j;
 }
 
+/* Set new PSL IPL */
+
+int32 cpu_psl_ipl (int32 newpsl)
+{
+if (((newpsl ^ PSL) & PSL_IPL) != 0) {
+    sim_cancel (&cpu_unit);
+    if (sim_idle_enab && ((newpsl & PSL_CUR) == 0)) {
+        uint32 newipl = PSL_GETIPL (newpsl);
+        if (cpu_idle_ipl_mask & (1u << newipl))
+            sim_activate (&cpu_unit, cpu_idle_wait);
+        }
+    }
+return newpsl;
+}
+
+/* Idle timer has expired with no PSL change */
+
+t_stat cpu_idle_svc (UNIT *uptr)
+{
+if (sim_idle_enab)
+    sim_idle (TMR_CLK, FALSE);
+return SCPE_OK;
+}
+
 /* Reset */
 
 t_stat cpu_reset (DEVICE *dptr)
@@ -2950,7 +2985,7 @@ t_stat cpu_reset (DEVICE *dptr)
 hlt_pin = 0;
 mem_err = 0;
 crd_err = 0;
-PSL = PSL_IS | PSL_IPL1F;
+PSL = cpu_psl_ipl (PSL_IS | PSL_IPL1F);
 SISR = 0;
 ASTLVL = 4;
 mapen = 0;

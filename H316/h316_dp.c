@@ -952,7 +952,7 @@ inp = (int32) get_uint (cptr, 10, 2048, &r);
 if (r != SCPE_OK) return r;
 if (inp == 0) return SCPE_ARG;
 finp = (float) inp;
-if (sim_switches & SWMASK ('R')) {                              /* format records? */
+if (sim_switches & SWMASK ('R')) {                      /* format records? */
     nr = inp;
     nw = (int32) ((dp_tab[dp_ctype].wrds / (finp + ((finp - 1.0) / 20.0))) - REC_OVHD_WRDS);
     if (nw <= 0) return SCPE_ARG;

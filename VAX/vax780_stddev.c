@@ -29,6 +29,8 @@
    todr         TODR clock
    tmr          interval timer
 
+   29-Oct-2006  RMS     Added clock coscheduler function
+                        Synced keyboard to clock for idling
    11-May-06    RMS     Revised timer logic for EVKAE
    22-Nov-05    RMS     Revised for new terminal processing routines
    10-Mar-05    RMS     Fixed bug in timer schedule routine (from Mark Hittinger)
@@ -102,7 +104,7 @@
 #define TMR_CSR_WR      (TMR_CSR_IE | TMR_CSR_RUN)
 #define TMR_INC         10000                           /* usec/interval */
 #define CLK_DELAY       5000                            /* 100 Hz */
-#define TMXR_MULT       2                               /* 50 Hz */
+#define TMXR_MULT       1                               /* 100 Hz */
 
 /* Floppy definitions */
 
@@ -210,7 +212,7 @@ void fl_protocol_error (void);
    tti_reg      TTI register list
 */
 
-UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_8B, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_8B, 0), 0 };
 
 REG tti_reg[] = {
     { HRDATA (RXDB, tti_buf, 16) },
@@ -219,7 +221,7 @@ REG tti_reg[] = {
     { FLDATA (DONE, tti_csr, CSR_V_DONE) },
     { FLDATA (IE, tti_csr, CSR_V_IE) },
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
     { NULL }
     };
 
@@ -253,7 +255,7 @@ REG tto_reg[] = {
     { FLDATA (DONE, tto_csr, CSR_V_DONE) },
     { FLDATA (IE, tto_csr, CSR_V_IE) },
     { DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
+    { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT + REG_NZ },
     { NULL }
     };
 
@@ -416,7 +418,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, uptr->wait);                        /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, tmr_poll));   /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
 if (c & SCPE_BREAK)                                     /* break? */
     tti_buf = RXDB_ERR | RXDB_FRM;
@@ -434,7 +436,7 @@ t_stat tti_reset (DEVICE *dptr)
 tti_buf = 0;
 tti_csr = 0;
 tti_int = 0;
-sim_activate (&tti_unit, tti_unit.wait);                /* activate unit */
+sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
@@ -613,12 +615,22 @@ else tmr_use_100hz = 1;                                 /* let clk handle */
 return;
 }
 
+/* Clock coscheduling routine */
+
+int32 clk_cosched (int32 wait)
+{
+int32 t;
+
+t = sim_is_active (&clk_unit);
+return (t? t - 1: wait);
+}
+
 /* 100Hz clock reset */
 
 t_stat clk_reset (DEVICE *dptr)
 {
 tmr_poll = sim_rtcn_init (clk_unit.wait, TMR_CLK);      /* init 100Hz timer */
-sim_activate (&clk_unit, tmr_poll);                     /* activate 100Hz unit */
+sim_activate_abs (&clk_unit, tmr_poll);                 /* activate 100Hz unit */
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 return SCPE_OK;
 }

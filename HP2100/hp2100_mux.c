@@ -1,6 +1,6 @@
 /* hp2100_mux.c: HP 2100 12920A terminal multiplexor simulator
 
-   Copyright (c) 2002-2005, Robert M Supnik
+   Copyright (c) 2002-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    mux,muxl,muxc        12920A terminal multiplexor
 
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
+   02-Jun-06    JDB     Fixed compiler warning for mux_ldsc init
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Jun-05    RMS     Added SET MUXLn DISCONNECT
    07-Oct-04    JDB     Allow enable/disable from any device
@@ -157,7 +159,7 @@ uint32 muxu_obuf = 0;                                   /* upr out: chan */
 uint32 muxc_chan = 0;                                   /* ctrl chan */
 uint32 muxc_scan = 0;                                   /* ctrl scan */
 
-TMLN mux_ldsc[MUX_LINES] = { 0 };                       /* line descriptors */
+TMLN mux_ldsc[MUX_LINES] = { { 0 } };                   /* line descriptors */
 TMXR mux_desc = { MUX_LINES, 0, 0, mux_ldsc };          /* mux descriptor */
 
 DEVICE muxl_dev, muxu_dev, muxc_dev;
@@ -393,6 +395,7 @@ switch (inst) {                                         /* case on opcode */
         dat = muxl_ibuf;
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) { clrCTL (dev); }               /* CLC */
         else {                                          /* STC */
@@ -503,6 +506,7 @@ switch (inst) {                                         /* case on opcode */
         muxc_chan = (muxc_chan + 1) & LIC_M_CHAN;       /* incr channel */
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* ctrl clear/set */
         if (IR & I_CTL) { clrCTL (dev); }               /* CLC */
         else { setCTL (dev); }                          /* STC */
@@ -538,7 +542,7 @@ if (ln >= 0) {                                          /* got one? */
         (muxc_ota[ln] & DTR))                           /* DTR? */
         muxc_lia[ln] = muxc_lia[ln] | CDET;             /* set cdet */
     muxc_lia[ln] = muxc_lia[ln] | DSR;                  /* set dsr */
-    mux_ldsc[ln].rcve = 1;                              /* rcv enabled */ 
+    mux_ldsc[ln].rcve = 1;                              /* rcv enabled */
     }
 tmxr_poll_rx (&mux_desc);                               /* poll for input */
 for (ln = 0; ln < MUX_LINES; ln++) {                    /* loop thru lines */
@@ -781,7 +785,7 @@ int32 i, t;
 for (i = t = 0; i < MUX_LINES; i++) t = t + (mux_ldsc[i].conn != 0);
 if (t) {
     for (i = 0; i < MUX_LINES; i++) {
-        if (mux_ldsc[i].conn) { 
+        if (mux_ldsc[i].conn) {
             if (val) tmxr_fconns (st, &mux_ldsc[i], i);
             else tmxr_fstats (st, &mux_ldsc[i], i);
             }

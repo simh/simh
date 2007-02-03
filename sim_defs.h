@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Oct-06    RMS     Added limit check for clock synchronized keyboard waits
    13-Jul-06    RMS     Guarantee CBUFSIZE is at least 256
    07-Jan-06    RMS     Added support for breakpoint spaces
                         Added REG_FIT flag
@@ -243,9 +244,12 @@ typedef uint32          t_addr;
 /* Default timing parameters */
 
 #define KBD_POLL_WAIT   5000                            /* keyboard poll */
+#define KBD_MAX_WAIT    500000
 #define SERIAL_IN_WAIT  100                             /* serial in time */
 #define SERIAL_OUT_WAIT 100                             /* serial output */
 #define NOQUEUE_WAIT    10000                           /* min check time */
+#define KBD_LIM_WAIT(x) (((x) > KBD_MAX_WAIT)? KBD_MAX_WAIT: (x))
+#define KBD_WAIT(w,s)   ((w)? w: KBD_LIM_WAIT (s))
 
 /* Convert switch letter to bit mask */
 

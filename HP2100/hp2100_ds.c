@@ -1,6 +1,6 @@
 /* hp2100_ds.c: HP 2100 13037 disk controller simulator
 
-   Copyright (c) 2004-2005, Robert M. Supnik
+   Copyright (c) 2004-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    ds           13037 disk controller
 
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
+   03-Aug-06    JDB     Fixed REQUEST STATUS command to clear status-1
+                        Removed redundant attached test in "ds_detach"
    18-Mar-05    RMS     Added attached test to detach routine
    01-Mar-05    JDB     Added SET UNLOAD/LOAD
 
@@ -540,7 +543,7 @@ MTAB ds_mod[] = {
     { (UNIT_AUTO+UNIT_DTYPE), (D7905_DTYPE << UNIT_V_DTYPE),
       NULL, "7905", &ds_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (D7906_DTYPE << UNIT_V_DTYPE),
-      NULL, "7906", &ds_set_size }, 
+      NULL, "7906", &ds_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (D7920_DTYPE << UNIT_V_DTYPE),
       NULL, "7920", &ds_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (D7925_DTYPE << UNIT_V_DTYPE),
@@ -595,6 +598,7 @@ switch (inst) {                                         /* case on opcode */
         dat = ds_fifo_read ();
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCTL (dev);                               /* clear control */
@@ -705,7 +709,8 @@ switch (op) {
 
     case DSC_RSTA:                                      /* read status */
         dsxb[1] = ds_sr1;                               /* return SR1 */
-        if (unum < DS_NUMDR) {                          /* and SR2 */
+        ds_sr1 = 0;                                     /* clear SR1 */
+        if (unum < DS_NUMDR) {                          /* return SR2 */
             dsxb[0] = ds_updds2 (&ds_unit[unum]);
             ds_unit[unum].STA &= ~DS2_FS;               /* clear 1st */
             }
@@ -817,7 +822,7 @@ switch (op) {
         ds_reset_cmn (&ds_dev);                         /* reset ctrl */
         clrCTL (dev);                                   /* clear CTL, SRQ */
         clrSRQ (dev);
-        ds_cmd_done (1, DS1_OK);                        /* op done, set flag */ 
+        ds_cmd_done (1, DS1_OK);                        /* op done, set flag */
         break;
 
     case DSC_SFM:                                       /* set file mask */
@@ -1031,7 +1036,7 @@ switch (op) {                                           /* case on function */
 
 ds_poll ();
 return SCPE_OK;
-}       
+}
 
 /* Schedule timed wait for CPU response
 
@@ -1171,7 +1176,7 @@ if (uptr->flags & UNIT_UNLOAD) {                        /* drive down? */
     }
 if (ds_eoc) {                                           /* at end of cylinder? */
     ds_next_cyl (uptr);                                 /* auto seek to next */
-    return TRUE;                                        /* or error */  
+    return TRUE;                                        /* or error */
     }
 if (vfy && ((uint32) uptr->CYL != ds_cyl)) {            /* on wrong cylinder? */
     if (ds_cyl >= drv_tab[dtyp].cyl)                    /* seeking to bad? */
@@ -1460,8 +1465,7 @@ return SCPE_OK;
 
 t_stat ds_detach (UNIT *uptr)
 {
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;          /* attached? */
-ds_load_unload (uptr, UNIT_UNLOAD, NULL, NULL);         /* unload heads */
+ds_load_unload (uptr, UNIT_UNLOAD, NULL, NULL);         /* unload heads if attached */
 return detach_unit (uptr);
 }
 

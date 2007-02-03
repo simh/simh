@@ -29,6 +29,11 @@
    tto          teleprinter
    clk          clock
 
+   18-Oct-06    RMS     Added PDP-15 programmable duplex control
+                        Fixed handling of non-printable characters in KSR mode
+                        Changed clock to be free-running
+                        Fixed out-of-tape behavior for PDP-9 vs PDP-15
+                        Synced keyboard to clock
    30-Jun-06    RMS     Fixed KSR-28 shift tracking
    20-Jun-06    RMS     Added KSR ASCII reader support
    13-Jun-06    RMS     Fixed Baudot letters/figures inversion for PDP-4
@@ -86,8 +91,11 @@ int32 ptr_err = 0, ptr_stopioe = 0, ptr_state = 0;
 int32 ptp_err = 0, ptp_stopioe = 0;
 int32 tti_2nd = 0;                                      /* 2nd char waiting */
 int32 tty_shift = 0;                                    /* KSR28 shift state */
+int32 tti_fdpx = 0;                                     /* prog mode full duplex */
 int32 clk_tps = 60;                                     /* ticks/second */
 int32 tmxr_poll = 16000;                                /* term mux poll */
+uint32 clk_task_last = 0;
+uint32 clk_task_timer = 0;
 
 const int32 asc_to_baud[128] = {
     000,000,000,000,000,000,000,064,                    /* bell */
@@ -146,6 +154,7 @@ t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
+int32 clk_task_upd (t_bool clr);
 
 extern int32 upd_iors (void);
 
@@ -164,6 +173,10 @@ REG clk_reg[] = {
     { FLDATA (INT, int_hwre[API_CLK], INT_V_CLK) },
     { FLDATA (DONE, int_hwre[API_CLK], INT_V_CLK) },
     { FLDATA (ENABLE, clk_state, 0) },
+#if defined (PDP15)
+    { ORDATA (TASKTIMER, clk_task_timer, 18) },
+    { DRDATA (TASKLAST, clk_task_last, 32), REG_HRO },
+#endif
     { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
     { DRDATA (TPS, clk_tps, 8), PV_LEFT + REG_HRO },
     { NULL }
@@ -296,7 +309,7 @@ DEVICE ptp_dev = {
 
 DIB tti_dib = { DEV_TTI, 1, &tti_iors, { &tti } };
 
-UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR+TTUF_HDX, 0), KBD_POLL_WAIT };
+UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR+TTUF_HDX, 0), 0 };
 
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, TTI_WIDTH) },
@@ -305,8 +318,11 @@ REG tti_reg[] = {
 #endif
     { FLDATA (INT, int_hwre[API_TTI], INT_V_TTI) },
     { FLDATA (DONE, int_hwre[API_TTI], INT_V_TTI) },
+#if defined (PDP15)
+    { FLDATA (FDPX, tti_fdpx, 0) },
+#endif
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
     { NULL }
     };
 
@@ -392,14 +408,9 @@ if (pulse & 001) {                                      /* CLSF */
     if (TST_INT (CLK)) dat = dat | IOT_SKP;
     }
 if (pulse & 004) {                                      /* CLON/CLOF */
-    if (pulse & 040) {                                  /* CLON */
-        CLR_INT (CLK);                                  /* clear flag */
-        clk_state = 1;                                  /* clock on */
-        if (!sim_is_active (&clk_unit))                 /* already on? */
-            sim_activate (&clk_unit,                    /* start, calibr */
-                sim_rtc_init (clk_unit.wait));
-        }
-    else clk_reset (&clk_dev);                          /* CLOF */
+    CLR_INT (CLK);                                      /* clear flag */
+    if (pulse & 040) clk_state = 1;                     /* CLON */
+    else clk_state = 0;                                 /* CLOF */
     }
 return dat;
 }
@@ -410,15 +421,48 @@ t_stat clk_svc (UNIT *uptr)
 {
 int32 t;
 
+t = sim_rtc_calb (clk_tps);                             /* calibrate clock */
+tmxr_poll = t;                                          /* set mux poll */
+sim_activate (&clk_unit, t);                            /* reactivate unit */
+#if defined (PDP15)
+clk_task_upd (FALSE);                                   /* update task timer */
+#endif
 if (clk_state) {                                        /* clock on? */
     M[7] = (M[7] + 1) & DMASK;                          /* incr counter */
     if (M[7] == 0) SET_INT (CLK);                       /* ovrflo? set flag */
-    t = sim_rtc_calb (clk_tps);                         /* calibrate clock */
-    sim_activate (&clk_unit, t);                        /* reactivate unit */
-    tmxr_poll = t;                                      /* set mux poll */
     }
 return SCPE_OK;
 }
+
+#if defined (PDP15)
+
+/* Task timer update (PDP-15 XVM only)
+
+   The task timer increments monotonically at 100Khz. Since this can't be
+   simulated accurately, updates are done by interpolation since the last
+   reading.  The timer is also updated at clock events to keep the cycle
+   counters from wrapping around more than once between updates. */
+
+int32 clk_task_upd (t_bool clr)
+{
+uint32 delta, val, iusec10;
+uint32 cur = sim_grtime ();
+uint32 old = clk_task_timer;
+double usec10;
+
+if (cur > clk_task_last) delta = cur - clk_task_last;
+else delta = clk_task_last - cur;
+usec10 = ((((double) delta) * 100000.0) /
+    (((double) tmxr_poll) * ((double) clk_tps)));
+iusec10 = (int32) usec10;
+val = (clk_task_timer + iusec10) & DMASK;
+if (clr) clk_task_timer = 0;
+else clk_task_timer = val;
+clk_task_last = cur;
+return ((int32) val);
+}
+
+#endif
 
 /* IORS service */
 
@@ -431,11 +475,16 @@ return (TST_INT (CLK)? IOS_CLK: 0);
 
 t_stat clk_reset (DEVICE *dptr)
 {
+int32 t;
+
 CLR_INT (CLK);                                          /* clear flag */
-tmxr_poll = clk_unit.wait;                              /* set mux poll */
-if (!sim_is_running) {                                  /* RESET? */
+if (!sim_is_running) {                                  /* RESET (not CAF)? */
+    t = sim_rtc_init (clk_unit.wait);                   /* init calibration */
+    tmxr_poll = t;                                      /* set mux poll */
+    sim_activate_abs (&clk_unit, t);                    /* activate unit */
     clk_state = 0;                                      /* clock off */
-    sim_cancel (&clk_unit);                             /* stop clock */
+    clk_task_timer = 0;
+    clk_task_last = 0;
     }
 return SCPE_OK;
 }
@@ -458,6 +507,19 @@ fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;
 }
 
+/* Paper tape reader out-of-tape handling
+
+   The PDP-4 and PDP-7 readers behaved like most early DEC readers; when
+   they ran out of tape, they hung.  It was up to the program to sense this
+   condition by running a timer.
+
+   The PDP-9 reader controller synthesized the out of tape condition by
+   noticing whether there was a transition on the feed hole within a window.
+   The out-of-tape flag was treated like the reader flag in most cases.
+
+   The PDP-15 reader controller received the out-of-tape flag as a static
+   condition from the reader itself and simply reported it via IORS. */
+
 /* Paper tape reader: IOT routine */
 
 int32 ptr (int32 dev, int32 pulse, int32 dat)
@@ -466,12 +528,15 @@ if (pulse & 001) {                                      /* RSF */
     if (TST_INT (PTR)) dat = dat | IOT_SKP;
     }
 if (pulse & 002) {                                      /* RRB, RCF */
-    CLR_INT (PTR);                                      /* clear done */
+    CLR_INT (PTR);                                      /* clear flag */
     dat = dat | ptr_unit.buf;                           /* return buffer */
     }
 if (pulse & 004) {                                      /* RSA, RSB */
     ptr_state = (pulse & 040)? 18: 0;                   /* set mode */
-    CLR_INT (PTR);                                      /* clear done */
+    CLR_INT (PTR);                                      /* clear flag */
+#if !defined (PDP15)                                    /* except on PDP15 */
+    ptr_err = 0;                                        /* clear error */
+#endif
     ptr_unit.buf = 0;                                   /* clear buffer */
     sim_activate (&ptr_unit, ptr_unit.wait);
     }
@@ -486,15 +551,15 @@ int32 temp;
 
 if ((ptr_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
 #if defined (IOS_PTRERR)
-    SET_INT (PTR);                                      /* if err, set int */
-    ptr_err = 1;
+    SET_INT (PTR);                                      /* if err, set flag */
+    ptr_err = 1;                                        /* set error */
 #endif
     return IORETURN (ptr_stopioe, SCPE_UNATT);
-	}
+    }
 if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
 #if defined (IOS_PTRERR)
-    SET_INT (PTR);                                      /* if err, set done */
-    ptr_err = 1;
+    SET_INT (PTR);                                      /* if err, set flag */
+    ptr_err = 1;                                        /* set error */
 #endif
     if (feof (ptr_unit.fileref)) {
         if (ptr_stopioe) printf ("PTR end of file\n");
@@ -532,7 +597,12 @@ t_stat ptr_reset (DEVICE *dptr)
 ptr_state = 0;                                          /* clear state */
 ptr_unit.buf = 0;
 CLR_INT (PTR);                                          /* clear flag */
-ptr_err = (ptr_unit.flags & UNIT_ATT)? 0: 1;
+#if defined (PDP15)                                     /* PDP15, static err */
+if (((ptr_unit.flags & UNIT_ATT) == 0) || feof (ptr_unit.fileref))
+    ptr_err = 1;
+else
+#endif
+ptr_err = 0;                                            /* all other, clr err */
 sim_cancel (&ptr_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
@@ -555,20 +625,23 @@ t_stat ptr_attach (UNIT *uptr, char *cptr)
 t_stat reason;
 
 reason = attach_unit (uptr, cptr);
-ptr_err = (ptr_unit.flags & UNIT_ATT)? 0: 1;
+if (reason != SCPE_OK) return reason;
+ptr_err = 0;                                             /* attach clrs error */
 ptr_unit.flags = ptr_unit.flags & ~(UNIT_RASCII|UNIT_KASCII);
 if (sim_switches & SWMASK ('A'))
     ptr_unit.flags = ptr_unit.flags | UNIT_RASCII;
 if (sim_switches & SWMASK ('K'))
     ptr_unit.flags = ptr_unit.flags | UNIT_KASCII;
-return reason;
+return SCPE_OK;
 }
 
 /* Detach routine */
 
 t_stat ptr_detach (UNIT *uptr)
 {
+#if defined (PDP15)
 ptr_err = 1;
+#endif
 ptr_unit.flags = ptr_unit.flags & ~UNIT_RASCII;
 return detach_unit (uptr);
 }
@@ -606,7 +679,7 @@ for (;;) {                                              /* word loop */
             }
         else if (val == OP_HLT) return STOP_HALT;
         break;
-		}
+        }
     else if (MEM_ADDR_OK (origin)) M[origin++] = val;
     }
 return SCPE_FMT;
@@ -810,7 +883,7 @@ return dat;
 
 t_stat ptp_svc (UNIT *uptr)
 {
-SET_INT (PTP);                                          /* set done flag */
+SET_INT (PTP);                                          /* set flag */
 if ((ptp_unit.flags & UNIT_ATT) == 0) {                 /* not attached? */
     ptp_err = 1;                                        /* set error */
     return IORETURN (ptp_stopioe, SCPE_UNATT);
@@ -859,7 +932,8 @@ t_stat ptp_attach (UNIT *uptr, char *cptr)
 t_stat reason;
 
 reason = attach_unit (uptr, cptr);
-ptp_err = (ptp_unit.flags & UNIT_ATT)? 0: 1;
+if (reason != SCPE_OK) return reason;
+ptp_err = 0;
 ptp_unit.flags = ptp_unit.flags & ~UNIT_PASCII;
 if (sim_switches & SWMASK ('A'))
     ptp_unit.flags = ptp_unit.flags | UNIT_PASCII;
@@ -882,9 +956,13 @@ int32 tti (int32 dev, int32 pulse, int32 dat)
 if (pulse & 001) {                                      /* KSF */
     if (TST_INT (TTI)) dat = dat | IOT_SKP;
     }
-if (pulse & 002) {                                      /* KRB */
+if (pulse & 002) {                                      /* KRS/KRB */
     CLR_INT (TTI);                                      /* clear flag */
     dat = dat | tti_unit.buf & TTI_MASK;                /* return buffer */
+#if defined (PDP15)
+    if (pulse & 020) tti_fdpx = 1;                      /* KRS? */
+    else tti_fdpx = 0;                                  /* no, KRB */
+#endif
     }
 if (pulse & 004) {                                      /* IORS */
     dat = dat | upd_iors ();
@@ -897,9 +975,9 @@ return dat;
 t_stat tti_svc (UNIT *uptr)
 {
 #if defined (KSR28)                                     /* Baudot... */
-int32 in, c;
+int32 in, c, out;
 
-sim_activate (uptr, uptr->wait);                        /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, tmxr_poll));  /* continue poll */
 if (tti_2nd) {                                          /* char waiting? */
     uptr->buf = tti_2nd;                                /* return char */
     tti_2nd = 0;                                        /* not waiting */
@@ -922,8 +1000,9 @@ else {
             }
         tti_2nd = c & TTI_MASK;                         /* save actual char */
         }
-    if (uptr->flags & TTUF_HDX) {                       /* half duplex? */
-        sim_putchar (sim_tt_outcvt (in, TTUF_MODE_UC));
+    if ((uptr->flags & TTUF_HDX) &&                     /* half duplex? */
+        ((out = sim_tt_outcvt (in, TT_GET_MODE (uptr->flags) | TTUF_KSR)) >= 0)) {
+        sim_putchar (out);
         tto_unit.pos = tto_unit.pos + 1;
         }
     }
@@ -931,13 +1010,13 @@ else {
 #else                                                   /* ASCII... */
 int32 c, out;
 
-sim_activate (uptr, uptr->wait);                        /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, tmxr_poll));  /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
 out = c & 0177;                                         /* mask echo to 7b */
 if (c & SCPE_BREAK) c = 0;                              /* break? */
 else c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
-if ((uptr->flags & TTUF_HDX) && out &&                  /* half duplex and */
-    ((out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags))) >= 0)) {
+if ((uptr->flags & TTUF_HDX) && !tti_fdpx && out &&     /* half duplex and */
+    ((out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags) | TTUF_KSR)) >= 0)) {
     sim_putchar (out);                                  /* echo */
     tto_unit.pos = tto_unit.pos + 1;
     }
@@ -963,8 +1042,9 @@ t_stat tti_reset (DEVICE *dptr)
 tti_unit.buf = 0;                                       /* clear buffer */
 tti_2nd = 0;
 tty_shift = 0;                                          /* clear state */
+tti_fdpx = 0;                                           /* clear dpx mode */
 CLR_INT (TTI);                                          /* clear flag */
-sim_activate (&tti_unit, tti_unit.wait);                /* activate unit */
+sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmxr_poll));
 return SCPE_OK;
 }
 
@@ -999,7 +1079,7 @@ else {
     c = baud_to_asc[uptr->buf | (tty_shift << 5)];      /* translate */
 
 #else
-c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags));
+c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 if (c >= 0) {
 
 #endif

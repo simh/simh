@@ -81,7 +81,7 @@ DEVICE ptp_dev = {
 
 /* xio_1134_papertape - XIO command interpreter for the 1134 paper tape reader and 1055 paper tape punch */
 
-void xio_1134_papertape (int iocc_addr, int iocc_func, int iocc_mod)
+void xio_1134_papertape (int32 iocc_addr, int32 iocc_func, int32 iocc_mod)
 {
 	char msg[80];
 
@@ -118,7 +118,7 @@ void xio_1134_papertape (int iocc_addr, int iocc_func, int iocc_mod)
 	}
 }
 
-// ptr_svc - emulated timeout - 1134 read operation complete
+/* ptr_svc - emulated timeout - 1134 read operation complete */
 
 static t_stat ptr_svc (UNIT *uptr)
 {
@@ -141,7 +141,7 @@ static t_stat ptr_svc (UNIT *uptr)
 	return SCPE_OK;
 }
 
-// ptp_svc - emulated timeout -- 1055 punch operation complete
+/* ptp_svc - emulated timeout -- 1055 punch operation complete */
 
 static t_stat ptp_svc (UNIT *uptr)
 {
@@ -245,37 +245,37 @@ static t_stat ptr_boot (int unitno, DEVICE *dptr)
 		}
 
 		if (leader) {
-			if ((ch & 0x7F) == 0x7F)			// ignore leading rubouts or "delete" characters
+			if ((ch & 0x7F) == 0x7F)			/* ignore leading rubouts or "delete" characters */
 				continue;
 
-			leader = FALSE;						// after first nonrubout, any punch in channel 5 terminates load
+			leader = FALSE;						/* after first nonrubout, any punch in channel 5 terminates load */
 		}
 
-		// this is untested -- not sure of actual byte ordering 
+		/* this is untested -- not sure of actual byte ordering  */
 
-		val = (val << 4) | (ch & 0x0F);			// get next nybble
+		val = (val << 4) | (ch & 0x0F);			/* get next nybble */
 
-		if (++nch == 4) {						// if we now have four nybbles, store the word
+		if (++nch == 4) {						/* if we now have four nybbles, store the word */
 			M[addr & mem_mask] = (uint16) val;
 
-			addr++;								// prepare for next word
+			addr++;								/* prepare for next word */
 			nch = 0;
 			val = 0;
 		}
 
-		if (ch & 0x10) {						// channel 5 punch terminates load
+		if (ch & 0x10) {						/* channel 5 punch terminates load */
 			start = TRUE;
 			break;
 		}
 	}
 
-	if (! start)								// if we didn't get a valid load, report EOF error
+	if (! start)								/* if we didn't get a valid load, report EOF error */
 		return SCPE_EOF;
 
-	if ((rval = reset_all(0)) != SCPE_OK)		// force a reset
+	if ((rval = reset_all(0)) != SCPE_OK)		/* force a reset */
 		return rval;
 
-	IAR = 0;									// start running at address 0
+	IAR = 0;									/* start running at address 0 */
 	return SCPE_OK;
 }
 

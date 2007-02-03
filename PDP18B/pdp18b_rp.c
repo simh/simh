@@ -46,7 +46,8 @@
 #define RP_NUMSF        20                              /* surfaces/cylinder */
 #define RP_NUMCY        203                             /* cylinders/drive */
 #define RP_NUMDR        8                               /* drives/controller */
-#define RP_SIZE (RP_NUMCY * RP_NUMSF * RP_NUMSC * RP_NUMWD)  /* words/drive */
+#define RP_SIZE         (RP_NUMCY * RP_NUMSF * RP_NUMSC * RP_NUMWD)
+                                                        /* words/drive */
 
 /* Unit specific flags */
 
@@ -262,7 +263,8 @@ if (pulse & 01) {
     if (sb == 020) dat = IOT_SKP | dat;                 /* DPSN */
     }
 if (pulse & 02) {
-    if (sb == 000) dat = dat | rp_unit[GET_UNIT (rp_sta)].CYL; /* DPOU */
+    if (sb == 000)                                      /* DPOU */
+        dat = dat | rp_unit[GET_UNIT (rp_sta)].CYL;
     else if (sb == 020) dat = dat | rp_da;              /* DPOA */
     else if (sb == 040) dat = dat | rp_ma;              /* DPOC */
     else if (sb == 060) dat = dat | rp_wc;              /* DPOW */
@@ -272,9 +274,12 @@ if (pulse & 04) {
         rp_updsta (0, STB_PGE);
         return dat;
         }
-    if (sb == 000) rp_sta = rp_sta & ~STA_RW;           /* DPCF */
-    else if (sb == 020) rp_sta = rp_sta & (dat | ~STA_RW); /* DPLZ */
-    else if (sb == 040) rp_sta = rp_sta | (dat & STA_RW);  /* DPLO */
+    if (sb == 000)                                      /* DPCF */
+        rp_sta = rp_sta & ~STA_RW;
+    else if (sb == 020)                                 /* DPLZ */
+        rp_sta = rp_sta & (dat | ~STA_RW);
+    else if (sb == 040)                                 /* DPLO */
+         rp_sta = rp_sta | (dat & STA_RW);
     else if (sb == 060)                                 /* DPLF */
         rp_sta = (rp_sta & ~STA_RW) | (dat & STA_RW);
     rp_sta = rp_sta & ~STA_DON;                         /* clear done */

@@ -1,6 +1,6 @@
 /* pdp10_tim.c: PDP-10 tim subsystem simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    tim          timer subsystem
 
+   03-Nov-06    RMS     Rewritten to support idling
+   29-Oct-06    RMS     Added clock coscheduling function
    02-Feb-04    RMS     Exported variables needed by Ethernet simulator
    29-Jan-02    RMS     New data structures
    06-Jan-02    RMS     Added enable/disable support
@@ -37,41 +39,61 @@
 #include "pdp10_defs.h"
 #include <time.h>
 
-#define TIM_N_HWRE      12                              /* hwre bits */
-#define TIM_HWRE        0000000010000                   /* hwre incr */
-#define TIM_DELAY       500
-#define TIM_TPS         1001                            /* ticks per sec */
-#define DZ_MULT         (TIM_TPS / 60)                  /* DZ poll multiplier */
-#define TB_MASK         037777777777777777777;          /* 71 - 12 bits */
-#define UNIT_V_Y2K      (UNIT_V_UF)                     /* Y2K compliant OS */
+/* Invariants */
+
+#define TIM_HW_FREQ     4100000                         /* 4.1Mhz */
+#define TIM_HWRE_MASK   07777
+#define UNIT_V_Y2K      (UNIT_V_UF + 0)                 /* Y2K compliant OS */
 #define UNIT_Y2K        (1u << UNIT_V_Y2K)
+
+/* Clock mode TOPS-10/ITS */
+
+#define TIM_TPS_T10     60
+#define TIM_WAIT_T10    8000
+#define TIM_MULT_T10    1
+#define TIM_ITS_QUANT   (TIM_HW_FREQ / TIM_TPS_T10)
+
+/* Clock mode TOPS-20/KLAD */
+
+#define TIM_TPS_T20     1001
+#define TIM_WAIT_T20    500
+#define TIM_MULT_T20    16
+
+/* Probability function for TOPS-20 idlelock */
+
+#define PROB(x)         (((rand() * 100) / RAND_MAX) >= (x))
+
+d10 tim_base[2] = { 0, 0 };                             /* 71b timebase */
+d10 tim_ttg = 0;                                        /* time to go */
+d10 tim_period = 0;                                     /* period */
+d10 quant = 0;                                          /* ITS quantum */
+int32 tim_mult = TIM_MULT_T10;                          /* tmxr poll mult */
+int32 tim_t20_prob = 33;                                /* TOPS-20 prob */
+
+/* Exported variables */
+
+int32 clk_tps = TIM_TPS_T10;                            /* clock ticks/sec */
+int32 tmr_poll = TIM_WAIT_T10;                          /* clock poll */
+int32 tmxr_poll = TIM_WAIT_T10 * TIM_MULT_T10;          /* term mux poll */
 
 extern int32 apr_flg, pi_act;
 extern UNIT cpu_unit;
 extern d10 pcst;
 extern a10 pager_PC;
-t_int64 timebase = 0;                                   /* 71b timebase */
-d10 ttg = 0;                                            /* time to go */
-d10 period = 0;                                         /* period */
-d10 quant = 0;                                          /* ITS quantum */
-int32 diagflg = 0;                                      /* diagnostics? */
-int32 tmxr_poll = TIM_DELAY * DZ_MULT;                  /* term mux poll */
-
-/* Exported variables */
-
-int32 clk_tps = TIM_TPS;                                /* clock ticks/sec */
-int32 tmr_poll = TIM_DELAY;                             /* clock poll */
+extern int32 t20_idlelock;
 
 DEVICE tim_dev;
 t_stat tcu_rd (int32 *data, int32 PA, int32 access);
-extern t_stat wr_nop (int32 data, int32 PA, int32 access);
 t_stat tim_svc (UNIT *uptr);
 t_stat tim_reset (DEVICE *dptr);
+void tim_incr_base (d10 *base, d10 incr);
+
 extern d10 Read (a10 ea, int32 prv);
 extern d10 ReadM (a10 ea, int32 prv);
 extern void Write (a10 ea, d10 val, int32 prv);
 extern void WriteP (a10 ea, d10 val);
 extern int32 pi_eval (void);
+extern t_stat wr_nop (int32 data, int32 PA, int32 access);
 
 /* TIM data structures
 
@@ -82,16 +104,19 @@ extern int32 pi_eval (void);
 
 DIB tcu_dib = { IOBA_TCU, IOLN_TCU, &tcu_rd, &wr_nop, 0 };
 
-UNIT tim_unit = { UDATA (&tim_svc, 0, 0), TIM_DELAY };
+UNIT tim_unit = { UDATA (&tim_svc, 0, 0), TIM_WAIT_T10 };
 
 REG tim_reg[] = {
-    { ORDATA (TIMEBASE, timebase, 71 - TIM_N_HWRE) },
-    { ORDATA (TTG, ttg, 36) },
-    { ORDATA (PERIOD, period, 36) },
+    { BRDATA (TIMEBASE, tim_base, 8, 36, 2) },
+    { ORDATA (TTG, tim_ttg, 36) },
+    { ORDATA (PERIOD, tim_period, 36) },
     { ORDATA (QUANT, quant, 36) },
     { DRDATA (TIME, tim_unit.wait, 24), REG_NZ + PV_LEFT },
-    { FLDATA (DIAG, diagflg, 0) },
-    { FLDATA (Y2K, tim_unit.flags, UNIT_V_Y2K), REG_HRO },
+    { DRDATA (PROB, tim_t20_prob, 6), REG_NZ + PV_LEFT + REG_HIDDEN },
+    { DRDATA (POLL, tmr_poll, 32), REG_HRO + PV_LEFT },
+    { DRDATA (MUXPOLL, tmxr_poll, 32), REG_HRO + PV_LEFT },
+    { DRDATA (MULT, tim_mult, 6), REG_HRO + PV_LEFT },
+    { DRDATA (TPS, clk_tps, 12), REG_HRO + PV_LEFT },
     { NULL }
     };
 
@@ -108,79 +133,135 @@ DEVICE tim_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &tim_reset,
     NULL, NULL, NULL,
-    &tcu_dib, DEV_DISABLE | DEV_UBUS
+    &tcu_dib, DEV_UBUS
     };
 
 /* Timer instructions */
 
+/* Timer - if the timer is running at less than hardware frequency,
+   need to interpolate the value by calculating how much of the current
+   clock tick has elapsed, and what that equates to in msec. */
+
 t_bool rdtim (a10 ea, int32 prv)
 {
-ReadM (INCA (ea), prv);
-Write (ea, (timebase >> (35 - TIM_N_HWRE)) & DMASK, prv);
-Write (INCA(ea), (timebase << TIM_N_HWRE) & MMASK, prv);
+d10 tempbase[2];
+
+ReadM (INCA (ea), prv);                                 /* check 2nd word */
+tempbase[0] = tim_base[0];                              /* copy time base */
+tempbase[1] = tim_base[1];
+if (tim_mult != TIM_MULT_T20) {                         /* interpolate? */
+    int32 used;
+    d10 incr;
+    used = tmr_poll - (sim_is_active (&tim_unit) - 1);
+    incr = (d10) (((double) used * TIM_HW_FREQ) /
+        ((double) tmr_poll * (double) clk_tps));
+    tim_incr_base (tempbase, incr);
+    }
+tempbase[0] = tempbase[0] & ~((d10) TIM_HWRE_MASK);     /* clear low 12b */
+Write (ea, tempbase[0], prv);
+Write (INCA(ea), tempbase[1], prv);
 return FALSE;
 }
 
 t_bool wrtim (a10 ea, int32 prv)
 {
-timebase = (Read (ea, prv) << (35 - TIM_N_HWRE)) |
-    (CLRS (Read (INCA (ea), prv)) >> TIM_N_HWRE);
+tim_base[0] = Read (ea, prv);
+tim_base[1] = CLRS (Read (INCA (ea), prv));
 return FALSE;
 }
 
 t_bool rdint (a10 ea, int32 prv)
 {
-Write (ea, period, prv);
+Write (ea, tim_period, prv);
 return FALSE;
 }
 
 t_bool wrint (a10 ea, int32 prv)
 {
-period = Read (ea, prv);
-ttg = period;
+tim_period = Read (ea, prv);
+tim_ttg = tim_period;
 return FALSE;
 }
 
-/* Timer routines
-
-   tim_svc      process event (timer tick)
-   tim_reset    process reset
-*/
+/* Timer service - the timer is only serviced when the 'ttg' register
+   has reached 0 based on the expected frequency of clock interrupts. */
 
 t_stat tim_svc (UNIT *uptr)
 {
-int32 t;
-
-t = diagflg? tim_unit.wait: sim_rtc_calb (TIM_TPS);     /* calibrate clock */
-sim_activate (&tim_unit, t);                            /* reactivate unit */
-tmr_poll = t;                                           /* set timer poll */
-tmxr_poll = t * DZ_MULT;                                /* set mux poll */
-timebase = (timebase + 1) & TB_MASK;                    /* increment timebase */
-ttg = ttg - TIM_HWRE;                                   /* decrement timer */
-if (ttg <= 0) {                                         /* timeout? */
-    ttg = period;                                       /* reload */
-    apr_flg = apr_flg | APRF_TIM;                       /* request interrupt */
-    }
-if (ITS) {                                              /* ITS? */
-    if (pi_act == 0) quant = (quant + TIM_HWRE) & DMASK;
+if (cpu_unit.flags & UNIT_KLAD)                         /* diags? */
+    tmr_poll = uptr->wait;                              /* fixed clock */
+else tmr_poll = sim_rtc_calb (clk_tps);                 /* else calibrate */
+sim_activate (uptr, tmr_poll);                          /* reactivate unit */
+tmxr_poll = tmr_poll * tim_mult;                        /* set mux poll */
+tim_incr_base (tim_base, tim_period);                   /* incr time base */
+tim_ttg = tim_period;                                   /* reload */
+apr_flg = apr_flg | APRF_TIM;                           /* request interrupt */
+if (Q_ITS) {                                            /* ITS? */
+    if (pi_act == 0)
+	quant = (quant + TIM_ITS_QUANT) & DMASK;
     if (TSTS (pcst)) {                                  /* PC sampling? */
         WriteP ((a10) pcst & AMASK, pager_PC);          /* store sample */
         pcst = AOB (pcst);                              /* add 1,,1 */
         }
     }                                                   /* end ITS */
+else if (t20_idlelock && PROB (100 - tim_t20_prob))
+    t20_idlelock = 0;
 return SCPE_OK;
 }
 
-t_stat tim_reset (DEVICE *dptr)
+/* Clock coscheduling routine */
+
+int32 clk_cosched (int32 wait)
 {
 int32 t;
 
-period = ttg = 0;                                       /* clear timer */
+if (tim_mult == TIM_MULT_T20) return wait;
+t = sim_is_active (&tim_unit);
+return (t? t - 1: wait);
+}
+
+void tim_incr_base (d10 *base, d10 incr)
+{
+base[1] = base[1] + incr;                               /* add on incr */
+base[0] = base[0] + (base[1] >> 35);                    /* carry to high */
+base[0] = base[0] & DMASK;                              /* mask high */
+base[1] = base[1] & MMASK;                              /* mask low */
+return;
+}
+
+/* Timer reset */
+
+t_stat tim_reset (DEVICE *dptr)
+{
+tim_period = 0;                                         /* clear timer */
+tim_ttg = 0;
 apr_flg = apr_flg & ~APRF_TIM;                          /* clear interrupt */
-t = sim_rtc_init (tim_unit.wait);                       /* init timer */
-sim_activate (&tim_unit, t);                            /* activate unit */
-tmr_poll = t;                                           /* set timer poll */
-tmxr_poll = t * DZ_MULT;                                /* set mux poll */
+tmr_poll = sim_rtc_init (tim_unit.wait);                /* init timer */
+sim_activate_abs (&tim_unit, tmr_poll);                 /* activate unit */
+tmxr_poll = tmr_poll * tim_mult;                        /* set mux poll */
+return SCPE_OK;
+}
+
+/* Set timer parameters from CPU model */
+
+t_stat tim_set_mod (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (val & (UNIT_T20|UNIT_KLAD)) {
+    clk_tps = TIM_TPS_T20;
+    uptr->wait = TIM_WAIT_T20;
+    tmr_poll = TIM_WAIT_T20;
+    tim_mult = TIM_MULT_T20;
+    uptr->flags = uptr->flags | UNIT_Y2K;
+    }
+else {
+    clk_tps = TIM_TPS_T10;
+    uptr->wait = TIM_WAIT_T10;
+    tmr_poll = TIM_WAIT_T10;
+    tim_mult = TIM_MULT_T10;
+    if (Q_ITS) uptr->flags = uptr->flags | UNIT_Y2K;
+    else uptr->flags = uptr->flags & ~UNIT_Y2K;
+    }
+tmxr_poll = tmr_poll * tim_mult;
 return SCPE_OK;
 }
 

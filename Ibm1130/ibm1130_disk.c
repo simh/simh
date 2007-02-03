@@ -14,6 +14,13 @@ commands may NOT be accurate. This should probably be fixed.
  * or modifications.
  *
  * Revision History
+ * 05-dec-06	Added cgiwritable mode
+ *
+ * 19-Dec-05	We no longer issue an operation complete interrupt if an INITR, INITW
+ *				or CONTROL operation is attemped on a drive that is not online. DATA_ERROR
+ *				is now only indicated in the DSW when	
+ *
+ * 02-Nov-04	Addes -s option to boot to leave switches alone.
  * 15-jun-03	moved actual read on XIO read to end of time interval,
  *				as the APL boot card required 2 instructions to run between	the
  *				time read was initiated and the time the data was read (a jump and a wait)
@@ -29,7 +36,7 @@ commands may NOT be accurate. This should probably be fixed.
 #include "ibm1130_defs.h"
 #include "memory.h"
 
-#define TRACE_DMS_IO				// define to enable debug of DMS phase IO
+#define TRACE_DMS_IO				/* define to enable debug of DMS phase IO */
 
 #ifdef TRACE_DMS_IO
 extern int32 sim_switches;
@@ -86,7 +93,7 @@ static t_stat dsk_attach (UNIT *uptr, char *cptr);
 static t_stat dsk_detach (UNIT *uptr);
 static t_stat dsk_boot   (int unitno, DEVICE *dptr);
 
-static void diskfail (UNIT *uptr, int errflag);
+static void diskfail (UNIT *uptr, int dswflag, int unitflag, t_bool do_interrupt);
 
 /* DSK data structures
 
@@ -180,16 +187,17 @@ extern void void_backtrace (int afrom, int ato);
 void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 {
 	int i, rev, nsteps, newcyl, sec, nwords;
-	uint32 newpos;							// changed from t_addr to uint32 in anticipation of simh 64-bit development
+	uint32 newpos;									/* changed from t_addr to uint32 in anticipation of simh 64-bit development */
 	char msg[80];
 	UNIT *uptr = dsk_unit+drv;
 	int16 buf[DSK_NUMWD];
 
-	if (! BETWEEN(drv, 0, DSK_NUMDR-1)) {	// hmmm, invalid drive */
-		if (func != XIO_SENSE_DEV) {		// tried to use it, too
-		// just do nothing, as if the controller isn't there. NAMCRA at N0116300 tests for drives by attempting reads
-//			sprintf(msg, "Op %x on invalid drive number %d", func, drv);
-//			xio_error(msg);
+	if (! BETWEEN(drv, 0, DSK_NUMDR-1)) {			/* hmmm, invalid drive */
+		if (func != XIO_SENSE_DEV) {				/* tried to use it, too	 */
+		/* just do nothing, as if the controller isn't there. NAMCRA at N0116300 tests for drives by attempting reads
+			sprintf(msg, "Op %x on invalid drive number %d", func, drv);
+			xio_error(msg);
+		*/
 		}
 		return;
 	}
@@ -199,7 +207,7 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 	switch (func) {
 		case XIO_INITR:
 			if (! IS_ONLINE(uptr)) {				/* disk is offline */
-				diskfail(uptr, UNIT_HARDERR);		/* make error stick till reset or attach */
+				diskfail(uptr, 0, 0, FALSE);
 				break;
 			}
 
@@ -219,11 +227,12 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 			sec = modify & 0x07;					/* get sector on cylinder */
 
 			if ((modify & 0x0080) == 0) {			/* it's a real read if it's not a read check */
-				// ah. We have a problem. The APL boot card counts on there being time for at least one
-				// more instruction to execute between the XIO read and the time the data starts loading
-				// into core. So, we have to defer the actual read operation a bit. Might as well wait
-				// until it's time to issue the operation complete interrupt. This means saving the
-				// IO information, then performing the actual read in dsk_svc.
+				/* ah. We have a problem. The APL boot card counts on there being time for at least one
+				 * more instruction to execute between the XIO read and the time the data starts loading
+				 * into core. So, we have to defer the actual read operation a bit. Might as well wait
+				 * until it's time to issue the operation complete interrupt. This means saving the
+				 * IO information, then performing the actual read in dsk_svc.
+				 */
 
 				newpos = (uptr->CYL*DSK_NUMSC*DSK_NUMSF + sec)*2*DSK_NUMWD;
 
@@ -248,12 +257,12 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 
 		case XIO_INITW:
 			if (! IS_ONLINE(uptr)) {				/* disk is offline */
-				diskfail(uptr, UNIT_HARDERR);		/* make error stick till reset or attach */
+				diskfail(uptr, 0, 0, FALSE);
 				break;
 			}
 
-			if (uptr->flags & UNIT_RONLY) {			/* oops, write to RO disk? permanent error */
-				diskfail(uptr, UNIT_HARDERR);
+			if (uptr->flags & UNIT_RONLY) {			/* oops, write to RO disk? permanent error until disk is powered off/on */
+				diskfail(uptr, DSK_DSW_DATA_ERROR, UNIT_HARDERR, FALSE);
 				break;
 			}
 
@@ -312,7 +321,7 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 
 		case XIO_CONTROL:								/* step fwd/rev */
 			if (! IS_ONLINE(uptr)) {
-				diskfail(uptr, UNIT_HARDERR);
+				diskfail(uptr, 0, 0, FALSE);
 				break;
 			}
 
@@ -364,19 +373,24 @@ void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 
 /* diskfail - schedule an operation complete that sets the error bit */
 
-static void diskfail (UNIT *uptr, int errflag)
+static void diskfail (UNIT *uptr, int dswflag, int unitflag, t_bool do_interrupt)
 {
+	int drv = uptr - dsk_unit;
+
 	sim_cancel(uptr);					/* cancel any pending ops */
-	SETBIT(uptr->flags, errflag);		/* set the error flag */
+	SETBIT(dsk_dsw[drv], dswflag);		/* set any specified DSW bits */
+	SETBIT(uptr->flags, unitflag);		/* set any specified unit flag bits */
 	uptr->FUNC = DSK_FUNC_FAILED;		/* tell svc routine why it failed */
-	sim_activate(uptr, 1);				/* schedule an immediate op complete interrupt */
+
+	if (do_interrupt)
+		sim_activate(uptr, 1);			/* schedule an immediate op complete interrupt */
 }
 
 t_stat dsk_svc (UNIT *uptr)
 {
 	int drv = uptr - dsk_unit, i, nwords, sec;
 	int16 buf[DSK_NUMWD];
-	uint32 newpos;							// changed from t_addr to uint32 in anticipation of simh 64-bit development
+	uint32 newpos;						/* changed from t_addr to uint32 in anticipation of simh 64-bit development */
 	int32 iocc_addr;
 	
 	if (uptr->FUNC == DSK_FUNC_IDLE)					/* service function called with no activity? not good, but ignore */
@@ -415,16 +429,16 @@ t_stat dsk_svc (UNIT *uptr)
 					dsk_lastio[drv] = IO_READ;
 					uptr->pos = newpos;
 				}
-				fxread(buf, 2, DSK_NUMWD, uptr->fileref);	// read whole sector so we're in position for next read
+				fxread(buf, 2, DSK_NUMWD, uptr->fileref);			/* read whole sector so we're in position for next read */
 				uptr->pos = newpos + 2*DSK_NUMWD;
 			}
 
-			void_backtrace(iocc_addr, iocc_addr + nwords - 1);		// mark prev instruction as altered
+			void_backtrace(iocc_addr, iocc_addr + nwords - 1);		/* mark prev instruction as altered */
 
 			trace_io("* DSK%d read %d words from %d.%d (%x, %x) to M[%04x-%04x]", drv, nwords, uptr->CYL, sec, uptr->CYL*8 + sec, newpos, iocc_addr & mem_mask,
 				(iocc_addr + nwords - 1) & mem_mask);
 
-//		// this will help debug the monitor by letting me watch phase loading
+			/* this will help debug the monitor by letting me watch phase loading */
 			if (raw_disk_debug)
 				printf("* DSK%d XIO @ %04x read %d words from %d.%d (%x, %x) to M[%04x-%04x]\n", drv, prev_IAR, nwords, uptr->CYL, sec, uptr->CYL*8 + sec, newpos, iocc_addr & mem_mask,
 					(iocc_addr + nwords - 1) & mem_mask);
@@ -448,7 +462,7 @@ t_stat dsk_svc (UNIT *uptr)
 			
 	}
 
-	uptr->FUNC = DSK_FUNC_IDLE;			// we're done with this operation
+	uptr->FUNC = DSK_FUNC_IDLE;			/* we're done with this operation */
 
 	return SCPE_OK;
 }
@@ -459,8 +473,8 @@ t_stat dsk_reset (DEVICE *dptr)
 	UNIT *uptr;
 
 #ifdef TRACE_DMS_IO
-	// add the WHERE command. It finds the phase that was loaded at given address and indicates
-	// the offset in the phase
+	/* add the WHERE command. It finds the phase that was loaded at given address and indicates */
+	/* the offset in the phase */
 	register_cmd("WHERE",   &where_cmd,   0, "w{here} address          find phase and offset of an address\n");
 	register_cmd("PHDEBUG", &phdebug_cmd, 0, "ph{debug} off|phlo phhi  break on phase load\n");
 	register_cmd("FDUMP",   &fdump_cmd,   0, NULL);
@@ -487,14 +501,14 @@ static t_stat dsk_attach (UNIT *uptr, char *cptr)
 	int drv = uptr - dsk_unit;
 	t_stat rval;
 
-	sim_cancel(uptr);										// cancel current IO
+	sim_cancel(uptr);										/* cancel current IO */
 	dsk_lastio[drv] = IO_NONE;
 
-	if (uptr->flags & UNIT_ATT)								// dismount current disk
+	if (uptr->flags & UNIT_ATT)								/* dismount current disk */
 		if ((rval = dsk_detach(uptr)) != SCPE_OK)
 			return rval;
 
-	uptr->CYL    =  0;										// reset the device
+	uptr->CYL    =  0;										/* reset the device */
 	uptr->FUNC   = DSK_FUNC_IDLE;
 	dsk_dsw[drv] = DSK_DSW_CARRIAGE_HOME;
 
@@ -502,18 +516,18 @@ static t_stat dsk_attach (UNIT *uptr, char *cptr)
 	CLRBIT(ILSW[2], dsk_ilswbit[drv]);
 	calc_ints();
 
-	if (sim_switches & SWMASK('M'))							// if memory mode (e.g. for CGI), buffer the file
-		SETBIT(uptr->flags, UNIT_BUFABLE);
+	if (sim_switches & SWMASK('M'))							/* if memory mode (e.g. for CGI), buffer the file */
+		SETBIT(uptr->flags, UNIT_BUFABLE|UNIT_MUSTBUF);
 
-	if (sim_switches & SWMASK('R'))							// read lock mode
+	if (sim_switches & SWMASK('R'))							/* read lock mode */
 		SETBIT(uptr->flags, UNIT_RO|UNIT_ROABLE|UNIT_RONLY);
 
-	if (cgi && (sim_switches & SWMASK('M'))) {				// if cgi and memory mode, 
-		sim_switches |= SWMASK('R');						// have attach_unit open file in readonly mode 
-		SETBIT(uptr->flags, UNIT_ROABLE|UNIT_MUSTBUF);		// but don't set the UNIT_RONLY flag so DMS can write to the buffered image
+	if (cgi && (sim_switches & SWMASK('M')) && ! cgiwritable) {				/* if cgi and memory mode, but writable option not specified */
+		sim_switches |= SWMASK('R');						/* have attach_unit open file in readonly mode  */
+		SETBIT(uptr->flags, UNIT_ROABLE);					/* but don't set the UNIT_RONLY flag so DMS can write to the buffered image */
 	}
 
-	if ((rval = attach_unit(uptr, quotefix(cptr))) != SCPE_OK) {		// mount new disk
+	if ((rval = attach_unit(uptr, quotefix(cptr))) != SCPE_OK) {		/* mount new disk */
 		SETBIT(dsk_dsw[drv], DSK_DSW_NOT_READY);
 		return rval;
 	}
@@ -536,7 +550,7 @@ static t_stat dsk_detach (UNIT *uptr)
 
 	sim_cancel(uptr);
 
-	if ((rval = detach_unit (uptr)) != SCPE_OK)
+	if ((rval = detach_unit(uptr)) != SCPE_OK)
 		return rval;
 
 	CLRBIT(ILSW[2], dsk_ilswbit[drv]);
@@ -555,7 +569,7 @@ static t_stat dsk_detach (UNIT *uptr)
 	return SCPE_OK;
 }
 
-// boot routine - if they type BOOT DSK, load the standard boot card.
+/* boot routine - if they type BOOT DSK, load the standard boot card. */
 
 static t_stat dsk_boot (int unitno, DEVICE *dptr)
 {
@@ -585,7 +599,7 @@ struct tag_slet {
 	int16	nwords;
 	int16	sector;
 } slet[MAXSLET] = {
-#   include "dmsr2v12slet.h"		// without RPG, use this info until overwritten by actual data from disk
+#   include "dmsr2v12slet.h"		/* without RPG, use this info until overwritten by actual data from disk */
 };
 
 #pragma pack()
@@ -599,7 +613,7 @@ int nseg = 0;
 
 static void enable_dms_tracing (int newsetting)
 {
-	nseg = 0;					// clear the segment map
+	nseg = 0;						/* clear the segment map */
 
 	if ((newsetting && trace_dms) || ! (newsetting || trace_dms))
 		return;
@@ -678,7 +692,7 @@ static t_stat where_cmd (int flag, char *ptr)
 	return SCPE_OK;
 }
 
-// savesector - save info on a sector just read. THIS IS NOT YET TESTED
+/* savesector - save info on a sector just read. THIS IS NOT YET TESTED */
 
 static void addseg (int i)
 {
@@ -713,14 +727,14 @@ static void savesector (int addr, int offset, int len, int phid, char *name)
 	if (! trace_dms)
 		return;
 	
-	addr++;												// first word is sector address, so account for that
+	addr++;												/* first word is sector address, so account for that */
 	len--;
 
 	for (i = 0; i < nseg; i++) {
-		if (addr >= (mseg[i].addr+mseg[i].len))			// entirely after this entry
+		if (addr >= (mseg[i].addr+mseg[i].len))			/* entirely after this entry */
 			continue;
 
-		if (mseg[i].addr < addr) {						// old one starts before this. split it
+		if (mseg[i].addr < addr) {						/* old one starts before this. split it */
 			addseg(i);
 			mseg[i].len = addr-mseg[i].addr;
 			i++;
@@ -731,7 +745,7 @@ static void savesector (int addr, int offset, int len, int phid, char *name)
 		break;
 	}
 
-	addseg(i);										// add new segment. Old one ends up after this
+	addseg(i);											/* add new segment. Old one ends up after this */
 
 	if (i >= MAXMSEG)
 		return;
@@ -742,12 +756,12 @@ static void savesector (int addr, int offset, int len, int phid, char *name)
 	mseg[i].len    = len;
 	mseg[i].name   = name;
 
-	i++;											// delete any segments completely covered
+	i++;												/* delete any segments completely covered */
 
 	while (i < nseg && (mseg[i].addr+mseg[i].len) <= (addr+len))
 		delseg(i);
 
-	if (i < nseg && mseg[i].addr < (addr+len)) {	// old one extends past this. Retain the end
+	if (i < nseg && mseg[i].addr < (addr+len)) {		/* old one extends past this. Retain the end */
 		mseg[i].len  = (mseg[i].addr+mseg[i].len) - (addr+len);
 		mseg[i].addr = addr+len;
 	}
@@ -755,19 +769,19 @@ static void savesector (int addr, int offset, int len, int phid, char *name)
 
 static void tracesector (int iswrite, int nwords, int addr, int sector)
 {
-	int i, phid = 0, sletind = -1, offset = 0;
+	int i, phid = 0, offset = 0;
 	char *name = NULL;
 
 	if (nwords < 3 || ! trace_dms)
 		return;
 
-	switch (sector) {								// explicitly known sector name
+	switch (sector) {									/* explicitly known sector name */
 		case 0:	name = "ID/COLD START";		break;
 		case 1:	name = "DCOM";				break;
 		case 2:	name = "RESIDENT IMAGE";	break;
 		case 3:
 		case 4:
-		case 5:	name = "SLET";						// save just-read or written SLET info
+		case 5:	name = "SLET";							/* save just-read or written SLET info */
 				memmove(&slet[(320/4)*(sector-3)], &M[addr+1], nwords*2);
 				break;
 		case 6: name = "RELOAD TABLE";		break;
@@ -777,9 +791,9 @@ static void tracesector (int iswrite, int nwords, int addr, int sector)
 	printf("* %04x: %3d /%04x %c %3d.%d ",
 		prev_IAR, nwords, addr, iswrite ? 'W' : 'R', sector/8, sector%8);
 
-	if (name == NULL) {								// look up sector in SLET
+	if (name == NULL) {									/* look up sector in SLET */
 		for (i = 0; i < MAXSLET; i++) {
-			if (slet[i].phid == 0)					// not found
+			if (slet[i].phid == 0)						/* not found */
 				goto done;
 			else if (slet[i].sector > sector) {
 				if (--i >= 0) {
@@ -792,17 +806,17 @@ static void tracesector (int iswrite, int nwords, int addr, int sector)
 				goto done;
 			}
 			if (slet[i].sector == sector) {
-				phid = slet[i].phid;				// we found the starting sector
+				phid = slet[i].phid;				/* we found the starting sector */
 				break;
 			}
 		}
 
-		if (i >= MAXSLET)							// was not found
+		if (i >= MAXSLET)							/* was not found */
 			goto done;
 
 		name = "?";
 		for (i = sizeof(phase)/sizeof(phase[0]); --i >= 0; ) {
-			if (phase[i].phid == phid) {			// look up name
+			if (phase[i].phid == phid) {			/* look up name */
 				name = phase[i].name;
 				break;
 			}
@@ -816,7 +830,7 @@ done:
 	putchar('\n');
 
 	if (phid >= phdebug_lo && phid <= phdebug_hi && offset == 0)
-		break_simulation(STOP_PHASE_BREAK);			// break on read of first sector of indicated phases
+		break_simulation(STOP_PHASE_BREAK);			/* break on read of first sector of indicated phases */
 
 	if (name != NULL && *name != '?' && ! iswrite)
 		savesector(addr, offset, nwords, phid, name);
@@ -824,12 +838,12 @@ done:
 
 static t_stat fdump_cmd (int flags, char *cptr)
 {
-	int addr = 0x7a24;				// address of next statement;
+	int addr = 0x7a24;								/* address of next statement */
 	int sofst = 0x7a26, symaddr;
 	int cword, nwords, stype, has_stnum, strel = 1, laststno = 0;
 
-	addr = M[addr & mem_mask] & mem_mask;		// get address of first statement
-	sofst = M[sofst & mem_mask] & mem_mask;		// get address of symbol table
+	addr = M[addr & mem_mask] & mem_mask;			/* get address of first statement */
+	sofst = M[sofst & mem_mask] & mem_mask	;		/* get address of symbol table */
 
 	for (;;) {
 		cword     = M[addr];
@@ -851,7 +865,7 @@ static t_stat fdump_cmd (int flags, char *cptr)
 			printf(" [%04x %04x %04x]", M[symaddr], M[symaddr+1], M[symaddr+2]);
 		}
 
-		if (stype == 0x5000) {					// error record
+		if (stype == 0x5000) {							/* error record */
 			printf(" (err %d)", M[addr+1]);
 		}
 		
@@ -872,4 +886,4 @@ static t_stat fdump_cmd (int flags, char *cptr)
 	return SCPE_OK;
 }
 
-#endif // TRACE_DMS_IO
+#endif /* TRACE_DMS_IO */

@@ -1,6 +1,6 @@
 /* hp2100_fp.c: HP 2100 floating point instructions
 
-   Copyright (c) 2002-2005, Robert M. Supnik
+   Copyright (c) 2002-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,12 +23,23 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   01-Dec-06    JDB     Reworked FFP helpers for 1000-F support, deleted f_pwr2
    22-Jul-05    RMS     Fixed compiler warning in Solaris (from Doug Glyn)
    25-Feb-05    JDB     Added FFP helpers f_pack, f_unpack, f_pwr2
    11-Feb-05    JDB     Fixed missing negative overflow renorm in StoreFP
    26-Dec-04    RMS     Separated A/B from M[0/1] for DMA IO (from Dave Bryan)
    15-Jul-03    RMS     Fixed signed/unsigned warning
    21-Oct-02    RMS     Recoded for compatibility with 21MX microcode algorithms
+
+
+   Implementation note: The 2100/1000-M/E Fast FORTRAN Processor (FFP) and 1000
+   F-Series Floating Point Processor (FPP) simulations require that the host
+   compiler support 64-bit integers and the HAVE_INT64 symbol be defined during
+   compilation.  If this symbol is defined, two-word floating-point operations
+   are handled in the FPP code, and this module is not used.  If it is not
+   defined, then FFP and FPP operations are not available, and this module
+   provides the floating-point support.
+
 
    The HP2100 uses a unique binary floating point format:
 
@@ -39,7 +50,7 @@
     |     fraction low      |      exponent      |XS| : A + 1
     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
      15                    8  7                 1  0
- 
+
         where   S = 0 for plus fraction, 1 for minus fraction
                 fraction = s.bbbbb..., 24 binary digits
                 exponent = 2**+/-n
@@ -69,6 +80,10 @@
 */
 
 #include "hp2100_defs.h"
+#include "hp2100_cpu1.h"
+#include "hp2100_fp.h"
+
+#if !defined (HAVE_INT64)                               /* int64 support unavailable */
 
 struct ufp {                                            /* unpacked fp */
     int32       exp;                                    /* exp */
@@ -98,8 +113,6 @@ struct ufp {                                            /* unpacked fp */
 
 #define FPAB            ((((uint32) AR) << 16) | ((uint32) BR))
 
-#define DMASK32         0xFFFFFFFF
-
 /* Fraction shift; 0 < shift < 32 */
 
 #define FR_ARS(v,s)     (((v) >> (s)) | (((v) & FP_SIGN)? \
@@ -112,6 +125,7 @@ extern uint16 ABREG[2];
 uint32 UnpackFP (struct ufp *fop, uint32 opnd);
 void NegFP (struct ufp *fop);
 void NormFP (struct ufp *fop);
+uint32 PackFP (struct ufp *fop);
 uint32 StoreFP (struct ufp *fop);
 
 /* Floating to integer conversion */
@@ -275,47 +289,6 @@ if (fop1.fr) {                                          /* dvd != 0? */
 return StoreFP (&quo);                                  /* store result */
 }
 
-/* Fast FORTRAN Processor helpers. */
-
-/* Pack mantissa in A/B and exponent and return fp in A/B */
-
-uint32 f_pack (int32 expon)
-{
-struct ufp fop;
-
-fop.fr = FPAB;
-fop.exp = expon;
-return StoreFP (&fop);
-}
-
-/* Unpack fp number in A/B into A (exponent) and B (lower mantissa) */
-
-void f_unpack (void)
-{
-AR = FP_GETEXP (BR);                                    /* get exponent */
-if (FP_GETEXPS (BR)) AR = (AR | ~FP_M_EXP) & DMASK;     /* < 0? sext */
-BR = BR & (uint16) ~(FP_EXP | FP_EXPS);                 /* clear exp */
-return;
-}
-
-/* Multiply fp number in A/B by 2**n and return in A/B.
-   Exponent overflow or underflow wraps around. */
-
-void f_pwr2 (int32 n)
-{
-uint32 save_a;
-
-if (AR | BR) {                                          /* microcode test */
-    save_a = AR;
-    f_unpack ();                                        /* unpack exponent */
-    AR = AR + n;                                        /* multiply */
-    BR = BR | ((AR & FP_M_EXP) << FP_V_EXP) |           /* merge exponent */
-        ((AR & SIGN)? (1 << FP_V_EXPS): 0);             /* and exponent sign */
-    AR = save_a;
-    }
-return;
-}
-
 /* Utility routines */
 
 /* Unpack operand */
@@ -343,6 +316,15 @@ else fop->exp = 0;                                      /* clean 0 */
 return;
 }
 
+/* Pack fp number */
+
+uint32 PackFP (struct ufp *fop)
+{
+return (fop->fr & FP_FR) |                              /* merge frac */
+       ((fop->exp & FP_M_EXP) << FP_V_EXP) |            /* and exp */
+       ((fop->exp < 0)? (1 << FP_V_EXPS): 0);           /* add exp sign */
+}
+
 /* Round fp number, store, generate overflow */
 
 uint32 StoreFP (struct ufp *fop)
@@ -367,10 +349,58 @@ else if (fop->exp > FP_M_EXP) {                         /* overflow? */
     hi = 0x7FFFFFFE;                                    /* all 1's */
     ov = 1;
     }
-else hi = (fop->fr & FP_FR) |                           /* merge frac */
-    ((fop->exp & FP_M_EXP) << FP_V_EXP) |               /* and exp */
-    ((fop->exp < 0)? (1 << FP_V_EXPS): 0);              /* add exp sign */
+else hi = PackFP (fop);                                 /* pack mant and exp */
 AR = (hi >> 16) & DMASK;
 BR = hi & DMASK;
 return ov;
 }
+
+
+/* Single-precision Fast FORTRAN Processor helpers. */
+
+/* Pack mantissa and exponent and return fp value. */
+
+uint32 fp_pack (OP *result, OP mantissa, int32 exponent, OPSIZE precision)
+{
+struct ufp fop;
+uint32 val;
+
+fop.fr = ((uint32) mantissa.fpk[0] << 16) | mantissa.fpk[1];
+fop.exp = exponent;
+val = PackFP (&fop);
+result->fpk[0] = (int16) (val >> 16);
+result->fpk[1] = (int16) val;
+return 0;
+}
+
+/* Normalize, round, and pack mantissa and exponent and return fp value. */
+
+uint32 fp_nrpack (OP *result, OP mantissa, int32 exponent, OPSIZE precision)
+{
+struct ufp fop;
+uint32 ovf;
+
+fop.fr = ((uint32) mantissa.fpk[0] << 16) | mantissa.fpk[1];
+fop.exp = exponent;
+ovf = StoreFP (&fop);
+result->fpk[0] = AR;
+result->fpk[1] = BR;
+return ovf;
+}
+
+/* Unpack fp number in into mantissa and exponent. */
+
+uint32 fp_unpack (OP *mantissa, int32 *exponent, OP packed, OPSIZE precision)
+{
+struct ufp fop;
+uint32 operand;
+
+operand = ((uint32) packed.fpk[0] << 16) | packed.fpk[1];
+UnpackFP (&fop, operand);
+mantissa->fpk[0] = (uint16) fop.fr >> 16;
+mantissa->fpk[1] = (uint16) fop.fr;
+*exponent = fop.exp;
+return 0;
+}
+
+#endif                                                  /* int64 support unavailable */

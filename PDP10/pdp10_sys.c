@@ -1,6 +1,6 @@
 /* pdp10_sys.c: PDP-10 simulator interface
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   01-Feb-07    RMS     Added CD support
    22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
    09-Jan-03    RMS     Added DEUNA/DELUA support
    12-Sep-02    RMS     Added RX211 support
@@ -40,11 +41,18 @@
 #include "pdp10_defs.h"
 #include <ctype.h>
 
-extern DEVICE cpu_dev, pag_dev;
-extern DEVICE tim_dev, fe_dev, uba_dev;
-extern DEVICE ptr_dev, ptp_dev;
-extern DEVICE rp_dev, tu_dev;
-extern DEVICE dz_dev, ry_dev;
+extern DEVICE cpu_dev;
+extern DEVICE pag_dev;
+extern DEVICE tim_dev;
+extern DEVICE fe_dev;
+extern DEVICE uba_dev;
+extern DEVICE ptr_dev;
+extern DEVICE ptp_dev;
+extern DEVICE rp_dev;
+extern DEVICE tu_dev;
+extern DEVICE dz_dev;
+extern DEVICE ry_dev;
+extern DEVICE cr_dev;
 extern DEVICE lp20_dev;
 extern DEVICE xu_dev;
 extern UNIT cpu_unit;
@@ -78,6 +86,7 @@ DEVICE *sim_devices[] = {
     &ptp_dev,
     &ry_dev,
     &lp20_dev,
+    &cr_dev,
     &rp_dev,
     &tu_dev,
     &dz_dev,
@@ -693,7 +702,7 @@ dev = GET_DEV (inst);
 for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
     j = (int32) ((opc_val[i] >> I_V_FL) & I_M_FL);      /* get class */
     if (((opc_val[i] & DMASK) == (inst & masks[j])) &&  /* match? */
-            (((opc_val[i] & I_ITS) == 0) || ITS)) {
+            (((opc_val[i] & I_ITS) == 0) || Q_ITS)) {
         fprintf (of, "%s ", opcode[i]);                 /* opcode */
         switch (j) {                                    /* case on class */
 

@@ -369,12 +369,12 @@ switch (rx_state) {                                     /* case on state */
             break;
             }
         uptr->TRACK = rx_track;                         /* now on track */
-        if ((rx_sector == 0) || (rx_sector > RX_NUMSC)) {       /* bad sect? */
+        if ((rx_sector == 0) || (rx_sector > RX_NUMSC)) { /* bad sect? */
             rx_done (0, 0070);                          /* done, error */
             break;
             }
         da = CALC_DA (rx_track, rx_sector);             /* get disk address */
-        if (func == RXCS_WRDEL) rx_esr = rx_esr | RXES_DD;      /* del data? */
+        if (func == RXCS_WRDEL) rx_esr = rx_esr | RXES_DD; /* del data? */
         if (func == RXCS_READ) {                        /* read? */
             for (i = 0; i < RX_NUMBY; i++)
                 rx_buf[i] = fbuf[da + i];

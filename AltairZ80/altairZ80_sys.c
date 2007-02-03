@@ -1,6 +1,6 @@
 /*  altairz80_sys.c: MITS Altair system interface
 
-    Copyright (c) 2002-2006, Peter Schorn
+    Copyright (c) 2002-2007, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -39,6 +39,7 @@ extern DEVICE sio_dev;
 extern DEVICE simh_device;
 extern DEVICE ptr_dev;
 extern DEVICE ptp_dev;
+extern DEVICE net_dev;
 extern int32 saved_PC;
 
 int32 fprint_sym(FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw);
@@ -65,7 +66,7 @@ char        sim_name[]  = "Altair 8800 (Z80)";
 REG         *sim_PC     = &cpu_reg[0];
 int32       sim_emax    = 4;
 DEVICE  *sim_devices[]  = {
-    &cpu_dev, &sio_dev, &simh_device, &ptr_dev, &ptp_dev, &dsk_dev, &hdsk_dev, NULL
+    &cpu_dev, &sio_dev, &simh_device, &ptr_dev, &ptp_dev, &dsk_dev, &hdsk_dev, &net_dev, NULL
 };
 
 char memoryAccessMessage[80];

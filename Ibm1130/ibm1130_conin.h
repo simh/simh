@@ -9,15 +9,17 @@
  * Mail to sim@ibm1130.org
  */
 
-// 03 ctrl-C         => Program stop      (not handled here)
-// 05 ctrl-E		 => Simulator stop    (not handled here)
-// 08 ctrl-H         => Backspace
-// 0D ctrl-M (Enter) => EOF
-// 11 ctrl-Q         => Interrupt request (not handled here)
-// 12 ctrl-R	 	 => "cent" (R because that's where cent is on the 1130 keyboard)
-// 15 ctrl-U         => Erase Field
-// 7E ~              => "not"
-// FF Del            => Backspace again
+/*
+ * 03 ctrl-C         => Program stop      (not handled here)
+ * 05 ctrl-E		 => Simulator stop    (not handled here)
+ * 08 ctrl-H         => Backspace
+ * 0D ctrl-M (Enter) => EOF
+ * 11 ctrl-Q         => Interrupt request (not handled here)
+ * 12 ctrl-R	 	 => "cent" (R because that's where cent is on the 1130 keyboard)
+ * 15 ctrl-U         => Erase Field
+ * 7E ~              => "not"
+ * FF Del            => Backspace again
+ */
 
 static uint16 ascii_to_conin[] = 			/* ASCII to ((hollerith << 4) | special key flags)	  */
 {

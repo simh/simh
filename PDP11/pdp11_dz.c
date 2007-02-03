@@ -1,6 +1,6 @@
 /* pdp11_dz.c: DZ11 terminal multiplexor simulator
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dz           DZ11 terminal multiplexor
 
+   29-Oct-06    RMS     Synced poll and clock
    22-Nov-05    RMS     Revised for new terminal processing routines
    07-Jul-05    RMS     Removed extraneous externs
    15-Jun-05    RMS     Revised for new autoconfigure interface
@@ -304,7 +305,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             (dz_csr[dz] & 0377) | (data << 8):
             (dz_csr[dz] & ~0377) | data;
         if (data & CSR_CLR) dz_clear (dz, FALSE);       /* clr? reset */
-        if (data & CSR_MSE) sim_activate (&dz_unit, tmxr_poll);
+        if (data & CSR_MSE)                             /* MSE? start poll */
+            sim_activate (&dz_unit, clk_cosched (tmxr_poll));
         else dz_csr[dz] &= ~(CSR_SA | CSR_RDONE | CSR_TRDY);
         if ((data & CSR_RIE) == 0) dz_clr_rxint (dz);   /* RIE = 0? */
         else if (((dz_csr[dz] & CSR_IE) == 0) &&        /* RIE 0->1? */

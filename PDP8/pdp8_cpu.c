@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu          central processor
 
+   30-Oct-06    RMS     Added idle and infinite loop detection
+   30-Sep-06    RMS     Fixed SC value after DVI overflow (found by Don North)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    06-Nov-04    RMS     Added =n to SHOW HISTORY
@@ -191,8 +193,9 @@
 #define PCQ_ENTRY       pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = MA
 #define UNIT_V_NOEAE    (UNIT_V_UF)                     /* EAE absent */
 #define UNIT_NOEAE      (1 << UNIT_V_NOEAE)
-#define UNIT_V_MSIZE    (UNIT_V_UF+1)                   /* dummy mask */
+#define UNIT_V_MSIZE    (UNIT_V_UF + 1)                 /* dummy mask */
 #define UNIT_MSIZE      (1 << UNIT_V_MSIZE)
+#define OP_KSF          06031                           /* for idle */
 
 #define HIST_PC         0x40000000
 #define HIST_MIN        64
@@ -242,6 +245,7 @@ extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern DEVICE *sim_devices[];
 extern FILE *sim_log;
 extern UNIT clk_unit, ttix_unit;
+extern t_bool sim_idle_enab;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -294,6 +298,8 @@ REG cpu_reg[] = {
 MTAB cpu_mod[] = {
     { UNIT_NOEAE, UNIT_NOEAE, "no EAE", "NOEAE", NULL },
     { UNIT_NOEAE, 0, "EAE", "EAE", NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
     { UNIT_MSIZE, 4096, NULL, "4K", &cpu_set_size },
     { UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size },
     { UNIT_MSIZE, 12288, NULL, "12K", &cpu_set_size },
@@ -628,6 +634,7 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
    register and the TSC8-75 I/O flag is raised. Then the JMP is performed as usual
    (including the setting of IF, UF and clearing the interrupt inhibit flag). */
 
+
     case 024:                                           /* JMP, dir, zero */
         PCQ_ENTRY;
         MA = IR & 0177;                                 /* dir addr, page zero */
@@ -645,6 +652,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         PC = MA;
         break;
 
+/* If JMP direct, also check for idle (KSF/JMP *-1) and infinite loop */
+
     case 025:                                           /* JMP, dir, curr */
         PCQ_ENTRY;
         MA = (MA & 007600) | (IR & 0177);               /* dir addr, curr page */
@@ -656,6 +665,20 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
                 int_req = int_req | INT_TSC;            /* request intr */
                 }
             }
+        if (sim_idle_enab &&                            /* idling enabled? */
+            (IF == IB)) {                               /* to same bank? */
+            if (MA == ((PC - 2) & 07777)) {             /* 1) JMP *-1? */
+                if (!(int_req & (INT_ION|INT_TTI)) &&   /*    iof, TTI flag off? */
+                    (M[IB|((PC - 2) & 07777)] == OP_KSF)) /*  next is KSF? */
+                    sim_idle (TMR_CLK, FALSE);          /* we're idle */
+                }                                       /* end JMP *-1 */
+            else if (MA == ((PC - 1) & 07777)) {        /* 2) JMP *? */
+                if (!(int_req & INT_ION))               /*    iof? */
+                    reason = STOP_LOOP;                 /* then infinite loop */
+                else if (!(int_req & INT_ALL))          /*    ion, not intr? */
+                    sim_idle (TMR_CLK, FALSE);          /* we're idle */
+                }                                       /* end JMP */
+            }                                           /* end idle enabled */
         IF = IB;                                        /* change IF */
         UF = UB;                                        /* change UF */
         int_req = int_req | INT_NO_CIF_PENDING;         /* clr intr inhibit */
@@ -998,7 +1021,7 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
             if ((LAC & 07777) >= M[MA]) {               /* overflow? */
                 LAC = LAC | 010000;                     /* set link */
                 MQ = ((MQ << 1) + 1) & 07777;           /* rotate MQ */
-                SC = 01;                                /* 1 shift */
+                SC = 0;                                 /* no shifts */
                 }
             else {
                 temp = ((LAC & 07777) << 12) | MQ;

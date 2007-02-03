@@ -118,7 +118,7 @@
 #define MTC_FNC         (MTC_M_FNC << MTC_V_FNC)
 #define MTC_GO          (1 << CSR_V_GO)                 /* go */
 #define MTC_RW          (MTC_DEN | MTC_LPAR | MTC_UNIT | MTC_IE | \
-                     MTC_EMA | MTC_FNC)
+                         MTC_EMA | MTC_FNC)
 #define GET_EMA(x)      (((x) & MTC_EMA) << (16 - MTC_V_EMA))
 #define GET_UNIT(x)     (((x) >> MTC_V_UNIT) & MTC_M_UNIT)
 #define GET_FNC(x)      (((x) >> MTC_V_FNC) & MTC_M_FNC)
@@ -422,7 +422,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* if not attached */
     }
 
 if (DEBUG_PRS (tm_dev)) fprintf (sim_deb,
-    ">>TM: op=%o, ma=%o, bc=%o, pos=%d\n", f, xma, cbc, uptr->pos);
+    ">>TM: op=%o, ma=%o, bc=%o, pos=%d\n", f, xma, tm_bc, uptr->pos);
 switch (f) {                                            /* case on function */
 
     case MTC_READ:                                      /* read */
@@ -488,7 +488,7 @@ tm_ca = xma & 0177777;                                  /* update mem addr */
 tm_set_done ();                                         /* set done */
 tm_updcsta (uptr);                                      /* update status */
 if (DEBUG_PRS (tm_dev)) fprintf (sim_deb,
-    ">>TM: sta=%o, ma=%o, wc=%o, pos=%d\n",
+    ">>TM: sta=%o, ma=%o, bc=%o, pos=%d\n",
     tm_sta, tm_ca, tm_bc, uptr->pos);
 return r;
 }

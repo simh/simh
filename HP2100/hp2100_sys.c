@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Dec-06    JDB     Added "fwanxm" external for sim_load check
    19-Nov-04    JDB     Added STOP_OFFLINE, STOP_PWROFF messages
    25-Sep-04    JDB     Added memory protect device
                         Fixed display of CCA/CCB/CCE instructions
@@ -61,6 +62,7 @@ extern DEVICE muxl_dev, muxu_dev, muxc_dev;
 extern DEVICE ipli_dev, iplo_dev;
 extern REG cpu_reg[];
 extern uint16 *M;
+extern uint32 fwanxm;
 
 /* SCP data structures and interface routines
 
@@ -127,7 +129,7 @@ const char *sim_stop_messages[] = {
         word count-1
         checksum
 
-   The checksum includes the origin but not the count.   
+   The checksum includes the origin but not the count.
 */
 
 int32 fgetw (FILE *fileref)
@@ -325,7 +327,7 @@ static const int32 vtab[] = {
         *of     =       output stream
         addr    =       current PC
         *val    =       pointer to data
-        *uptr   =       pointer to unit 
+        *uptr   =       pointer to unit
         sw      =       switches
    Outputs:
         return  =       status code
@@ -386,7 +388,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
                     cm = TRUE;
                     fprintf (of, "%s", stab[i]);
                     }
-                }       
+                }
             if (!cm) return SCPE_ARG;                   /* nothing decoded? */
             break;
 
@@ -618,7 +620,7 @@ for (cptr = get_glyph (iptr, gbuf, ','); gbuf[0] != 0;
     for (i = 0; stab[i] != NULL; i++) {                 /* find subopcode */
         if ((strcmp (gbuf, stab[i]) == 0) &&
             ((i >= 16) || (!clef && ((val[0] & 001710) == 0)))) break;
-        } 
+        }
     if (stab[i] == NULL) return SCPE_ARG;
     if (tbits & mtab[i] & (I_AB | I_ASKP) & (vtab[i] ^ val[0]))
         return SCPE_ARG;

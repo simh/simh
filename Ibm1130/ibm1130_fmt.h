@@ -12,6 +12,6 @@
 /* ibm1130_asm.h: definition of routines in ibm1130_asm.c
  */
 
-char*	EditToAsm(char*);							// convert edit format to 1130 assembler format
-char*	EditToFortran(char*);						// convert edit format to Fortran format
-char*	EditToWhitespace(char*);					// clean white space, tabstops every 8 positions
+char*	EditToAsm(char*);							/* convert edit format to 1130 assembler format */
+char*	EditToFortran(char*);						/* convert edit format to Fortran format */
+char*	EditToWhitespace(char*);					/* clean white space, tabstops every 8 positions */

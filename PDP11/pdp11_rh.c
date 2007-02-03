@@ -31,12 +31,15 @@
    WARNING: The interupt logic of the RH11/RH70 is unusual and must be
    simulated with great precision.  The RH11 has an internal interrupt
    request flop, CSTB INTR, which is controlled as follows:
+
    - Writing IE and DONE simultaneously sets CSTB INTR
    - Controller clear, INIT, and interrupt acknowledge clear CSTB INTR
      (and also clear IE)
    - A transition of DONE from 0 to 1 sets CSTB INTR from IE
+
    The output of CSTB INTR is OR'd with the AND of RPCS1<SC,DONE,IE> to
    create the interrupt request signal.  Thus,
+
    - The DONE interrupt is edge sensitive, but the SC interrupt is
      level sensitive.
    - The DONE interrupt, once set, is not disabled if IE is cleared,

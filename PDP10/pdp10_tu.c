@@ -839,7 +839,7 @@ switch (fnc) {                                          /* case on function */
         tufs = tufs | FS_ATA;
         break;
 
-    case FNC_WREOF:                                             /* write end of file */
+    case FNC_WREOF:                                     /* write end of file */
         if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
             r = tu_map_err (uptr, st, 0);               /* map error */
         tufs = tufs | FS_ATA;
@@ -1225,7 +1225,7 @@ M[FE_UNIT] = 0;
 M[FE_MTFMT] = (unitno & TC_M_UNIT) | (TC_1600 << TC_V_DEN) | (TC_10C << TC_V_FMT);
 tu_unit[unitno].pos = 0;
 for (i = 0; i < BOOT_LEN; i++)
-    M[BOOT_START + i] = ITS? boot_rom_its[i]: boot_rom_dec[i];
+    M[BOOT_START + i] = Q_ITS? boot_rom_its[i]: boot_rom_dec[i];
 saved_PC = BOOT_START;
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* sds_cpu.c: SDS 940 CPU simulator
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cpu          central processor
    rtc          real time clock
 
+   29-Dec-06    RMS     Fixed breakpoint variable declarations
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Nov-04    RMS     Added instruction history
    01-Mar-03    RMS     Added SET/SHOW RTC FREQ support
@@ -193,7 +194,7 @@ int32 rtc_pie = 0;                                      /* rtc pulse ie */
 int32 rtc_tps = 60;                                     /* rtc ticks/sec */
 
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern UNIT mux_unit;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
@@ -429,7 +430,7 @@ while (reason == 0) {                                   /* loop until halted */
         int_reqhi = api_findreq ();                     /* recalc int req */
         }
     else {                                              /* normal instr */
-        if (sim_brk_summ && sim_brk_test (P, SWMASK ('E'))) {   /* breakpoint? */
+        if (sim_brk_summ && sim_brk_test (P, SWMASK ('E'))) { /* breakpoint? */
             reason = STOP_IBKPT;                        /* stop simulation */
             break;
             }
@@ -498,7 +499,7 @@ if (inst & I_POP) {                                     /* POP? */
             usr_mode = 0;                               /* set mon mode */
             }
         else {                                          /* normal POP */
-                dat = (OV << 23) | dat;                 /* ov in <0> */
+            dat = (OV << 23) | dat;                     /* ov in <0> */
             if (r = Write (0, dat)) return r;
             }
         }               
@@ -1369,7 +1370,7 @@ return SCPE_OK;
 t_stat rtc_svc (UNIT *uptr)
 {
 if (rtc_pie) int_req = int_req | INT_RTCP;              /* set pulse intr */
-sim_activate (&rtc_unit, sim_rtcn_calb (rtc_tps, TMR_RTC));     /* reactivate unit */
+sim_activate (&rtc_unit, sim_rtcn_calb (rtc_tps, TMR_RTC)); /* reactivate */
 return SCPE_OK;
 }
 

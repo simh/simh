@@ -283,7 +283,7 @@ switch (pulse) {                                        /* case IR<9:11> */
     case 1:                                             /* TSF */
         return (dev_done & itto)? IOT_SKP + AC: AC;
 
-    case 2:                                                     /* TCF */
+    case 2:                                             /* TCF */
         dev_done = dev_done & ~itto;                    /* clear flag */
         int_req = int_req & ~itto;                      /* clear intr */
         break;
@@ -295,7 +295,7 @@ switch (pulse) {                                        /* case IR<9:11> */
         dev_done = dev_done & ~itto;                    /* clear flag */
         int_req = int_req & ~itto;                      /* clear int req */
     case 4:                                             /* TPC */
-        sim_activate (&ttox_unit[ln], ttox_unit[ln].wait);      /* activate */
+        sim_activate (&ttox_unit[ln], ttox_unit[ln].wait); /* activate */
         ttox_buf[ln] = AC & 0377;                       /* load buffer */
         break;
 

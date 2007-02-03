@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Sep-06    RMS     Fixed non-printable characters in KSR mode
    22-Jun-06    RMS     Implemented SET/SHOW PCHAR
    31-May-06    JDB     Fixed bug if SET CONSOLE DEBUG with no argument
    22-Nov-05    RMS     Added central input/output conversion support
@@ -474,7 +475,11 @@ uint32 md = mode & TTUF_M_MODE;
 
 if (md != TTUF_MODE_8B) {
     c = c & 0177;
-    if ((md == TTUF_MODE_UC) && islower (c)) c = toupper (c);
+    if (md == TTUF_MODE_UC) {
+        if (islower (c)) c = toupper (c);
+        if ((mode & TTUF_KSR) && (c >= 0140))
+            return -1;
+        }
     if (((md == TTUF_MODE_UC) || (md == TTUF_MODE_7P)) &&
         ((c == 0177) ||
          ((c < 040) && !((sim_tt_pchar >> c) & 1))))

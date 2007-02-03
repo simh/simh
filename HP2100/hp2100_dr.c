@@ -1,6 +1,6 @@
 /* hp2100_dr.c: HP 2100 12606B/12610B fixed head disk/drum simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    dr           12606B 2770/2771 fixed head disk
                 12610B 2773/2774/2775 drum
 
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
    07-Oct-04    JDB     Fixed enable/disable from either device
                         Fixed sector return in status word
                         Provided protected tracks and "Writing Enabled" status bit
@@ -52,7 +53,7 @@
    flip-flop is not wired into the interrupt chain; accordingly, the
    simulator uses command rather than control for the data channel.  Its
    flag does not respond to SFS, SFC, or STF.
-   
+
    The drum control channel does not have any of the traditional flip-flops.
 
    The 12606 interface implements two diagnostic tests.  An SFS CC instruction
@@ -331,6 +332,7 @@ switch (inst) {                                         /* case on opcode */
         dat = drd_ibuf;
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_AB) {                                /* CLC */
             clrCMD (devd);                              /* clr "ctl" */
@@ -639,6 +641,6 @@ for (i = BOOT_BASE; i < IBL_LNT; i++) {                 /* copy bootstrap */
         M[ad + i] = (wd + (dev - 010)) & DMASK;
     else M[ad + i] = wd;
     }
-PC = ad + BOOT_START;   
+PC = ad + BOOT_START;
 return SCPE_OK;
 }

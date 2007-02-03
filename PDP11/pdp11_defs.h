@@ -26,6 +26,8 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   16-Dec-06    RMS     Added TA11 support
+   29-Oct-06    RMS     Added clock coscheduling
    06-Jul-06    RMS     Added multiple KL11/DL11 support
    26-Jun-06    RMS     Added RF11 support
    24-May-06    RMS     Added 11/44 DR support (from CIS diagnostic)
@@ -569,6 +571,8 @@ typedef struct pdp_dib DIB;
 #define IOLN_HK         040
 #define IOBA_RF         (IOPAGEBASE + 017460)           /* RF11 */
 #define IOLN_RF         020
+#define IOBA_TA         (IOPAGEBASE + 017500)           /* TA11 */
+#define IOLN_TA         004
 #define IOBA_LPT        (IOPAGEBASE + 017514)           /* LP11 */
 #define IOLN_LPT        004
 #define IOBA_CTL        (IOPAGEBASE + 017520)           /* board ctrl */
@@ -613,7 +617,8 @@ typedef struct pdp_dib DIB;
 #define INT_V_CLK       0                               /* BR6 */
 #define INT_V_PCLK      1
 #define INT_V_DTA       2
-#define INT_V_PIR6      3
+#define INT_V_TA        3
+#define INT_V_PIR6      4
 
 #define INT_V_RK        0                               /* BR5 */
 #define INT_V_RL        1
@@ -653,6 +658,7 @@ typedef struct pdp_dib DIB;
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_PCLK        (1u << INT_V_PCLK)
 #define INT_DTA         (1u << INT_V_DTA)
+#define INT_TA          (1u << INT_V_TA)
 #define INT_PIR6        (1u << INT_V_PIR6)
 #define INT_RK          (1u << INT_V_RK)
 #define INT_RL          (1u << INT_V_RL)
@@ -689,6 +695,7 @@ typedef struct pdp_dib DIB;
 #define IPL_CLK         6                               /* int pri levels */
 #define IPL_PCLK        6
 #define IPL_DTA         6
+#define IPL_TA          6
 #define IPL_RK          5
 #define IPL_RL          5
 #define IPL_RX          5
@@ -749,6 +756,7 @@ typedef struct pdp_dib DIB;
 #define VEC_CR          0230
 #define VEC_RP          0254
 #define VEC_TQ          0260
+#define VEC_TA          0260
 #define VEC_RX          0264
 #define VEC_RY          0264
 #define VEC_TTIX        0300
@@ -809,5 +817,7 @@ void mba_set_exc (uint32 mbus);
 void mba_set_don (uint32 mbus);
 void mba_set_enbdis (uint32 mb, t_bool dis);
 t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
+
+int32 clk_cosched (int32 wait);
 
 #endif

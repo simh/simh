@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Oct-06    RMS     Added infinite loop stop
+   18-Oct-06    RMS     Re-ordered device list
+   02-Oct-06    RMS     Added RDCLK instruction
    12-Jun-06    RMS     Added Fiodec, Baudot display
                 RMS     Generalized LOAD to handle HRI, RIM, or BIN files
    22-Jul-05    RMS     Removed AAS, error in V1 reference manual
@@ -128,6 +131,7 @@ int32 sim_emax = 2;
 
 DEVICE *sim_devices[] = {
     &cpu_dev,
+    &clk_dev,
 #if defined (PDP15)
     &fpp_dev,
 #endif
@@ -135,7 +139,6 @@ DEVICE *sim_devices[] = {
     &ptp_dev,
     &tti_dev,
     &tto_dev,
-    &clk_dev,
 #if defined (TYPE62)
     &lp62_dev,
 #endif
@@ -180,7 +183,8 @@ const char *sim_stop_messages[] = {
     "Non-standard device number",
     "Memory management error",
     "FP15 instruction disabled",
-    "DECtape off reel"
+    "DECtape off reel",
+    "Infinite loop"
     };
 
 /* Binary loaders */
@@ -493,7 +497,8 @@ static const char *opcode[] = {
  "SPCO", "SKP15", "RES",
  "SBA", "DBA", "EBA",
  "RDMM", "ORMM", "LDMM", "MPLR",
- "ENB", "INH", "MPRC", "IPFH",
+ "ENB", "INH",
+ "RDCLK","MPRC", "IPFH",
  "PAX", "PAL", "AAC", "PXA",
  "AXS", "PXL", "PLA", "PLX",
  "CLAC","CLX", "CLLR", "AXR",
@@ -529,7 +534,7 @@ static const char *opcode[] = {
  "DAD", "URDAD", "UNDAD", "UUDAD",
  "BZA", "BMA", "BLE", "BPA",
  "BRU", "BNA", "BAC",
- "ISB*", "ESB*",                                                /* indirect */
+ "ISB*", "ESB*",                                        /* indirect */
  "FSB*", "URFSB*", "UNFSB*", "UUFSB*",
  "DSB*", "URDSB*", "UNDSB*", "UUDSB*",
  "IRS*", "ERS*",
@@ -725,7 +730,8 @@ static const int32 opc_val[] = {
  0703341+I_NPI, 0707741+I_NPI, 0707742+I_NPI,
  0707761+I_NPI, 0707762+I_NPI, 0707764+I_NPI,
  0700032+I_NPN, 0700022+I_NPI, 0700024+I_NPI, 0701724+I_NPI,
- 0705521+I_NPI, 0705522+I_NPI, 0701722+I_NPI, 0701764+I_NPI,
+ 0705521+I_NPI, 0705522+I_NPI,
+ 0701772+I_NPN, 0701762+I_NPI, 0701764+I_NPI,
  0721000+I_XR, 0722000+I_XR, 0723000+I_XR9, 0724000+I_XR,
  0725000+I_XR9, 0726000+I_XR, 0730000+I_XR, 0731000+I_XR,
  0734000+I_XR, 0735000+I_XR, 0736000+I_XR, 0737000+I_XR9,

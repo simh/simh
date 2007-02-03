@@ -1,6 +1,6 @@
 /* pdp11_vh.c: DHQ11 asynchronous terminal multiplexor simulator
 
-   Copyright (c) 2004-2005, John A. Dundas III
+   Copyright (c) 2004-2006, John A. Dundas III
    Portions derived from work by Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    vh		    DHQ11 asynch multiplexor for SIMH
 
+   29-Oct-06    RMS     Synced poll and clock
    07-Jul-05	RMS	    Removed extraneous externs
    15-Jun-05	RMS	    Revised for new autoconfigure interface
 			            Fixed bug in vector display routine
@@ -382,7 +383,7 @@ DEVICE vh_dev = {
 	&vh_attach,	/* attach routine */
 	&vh_detach,	/* detach routine */
 	(void *)&vh_dib,	/* context */
-	DEV_FLTA | DEV_DISABLE | DEV_NET | DEV_QBUS | DEV_UBUS,	/* flags */
+	DEV_FLTA | DEV_DISABLE | DEV_DIS |DEV_NET | DEV_QBUS | DEV_UBUS,	/* flags */
 };
 
 /* Interrupt routines */
@@ -791,7 +792,7 @@ static t_stat vh_wr (	int32	data,
 		if (data & CSR_MASTER_RESET) {
 			if ((vh_unit[vh].flags & UNIT_MODEDHU) && (data & CSR_SKIP))
 				data &= ~CSR_MASTER_RESET;
-			sim_activate (&vh_unit[vh], tmxr_poll);
+			sim_activate (&vh_unit[vh], clk_cosched (tmxr_poll));
 			/* vh_mcount[vh] = 72; */ /* 1.2 seconds */
 			vh_mcount[vh] = MS2SIMH (1200);	/* 1.2 seconds */
 		}

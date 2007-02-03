@@ -1,6 +1,6 @@
 /* id_uvc.c: Interdata universal clock
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    pic          precision incremental clock
    lfc          line frequency clock
 
+   18-Oct-06    RMS     Changed LFC to be free running, export tmr_poll
    23-Jul-05    RMS     Fixed {} error in OC
    01-Mar-03    RMS     Added SET/SHOW LFC FREQ support
                         Changed precision clock algorithm for V7 UNIX
@@ -75,6 +76,7 @@ void pic_sched (t_bool strt);
 uint32 pic_rd_cic (void);
 
 int32 lfc_tps = 120;                                    /* ticks per */
+int32 lfc_poll = 8000;
 uint32 lfc_arm = 0;                                     /* int arm */
 
 DEVICE lfc_dev;
@@ -314,8 +316,6 @@ return SCPE_OK;
 
 uint32 lfc (uint32 dev, uint32 op, uint32 dat)
 {
-int32 t;
-
 switch (op) {                                           /* case IO op */
 
     case IO_ADR:                                        /* select */
@@ -323,10 +323,6 @@ switch (op) {                                           /* case IO op */
 
     case IO_OC:                                         /* command */
         lfc_arm = int_chg (v_LFC, dat, lfc_arm);        /* upd int ctrl */
-        if (lfc_arm && !sim_is_active (&lfc_unit)) {    /* starting? */
-            t = sim_rtcn_init (lfc_unit.wait, TMR_LFC);
-            sim_activate (&lfc_unit, t);                /* init clock */
-            }
         break;
         }
 return 0;
@@ -336,13 +332,10 @@ return 0;
 
 t_stat lfc_svc (UNIT *uptr)
 {
-int32 t;
-
+lfc_poll = sim_rtcn_calb (lfc_tps, TMR_LFC);            /* calibrate */
+sim_activate (uptr, lfc_poll);                          /* reactivate */
 if (lfc_arm) {                                          /* armed? */
     SET_INT (v_LFC);                                    /* req intr */
-    if (pic_unit.flags & UNIT_DIAG) t = uptr->wait;     /* diag? fixed delay */
-    else t = sim_rtcn_calb (lfc_tps, TMR_LFC);          /* else calibrate */
-    sim_activate (uptr, t);                             /* reactivate */
     }
 return SCPE_OK;
 }
@@ -351,7 +344,8 @@ return SCPE_OK;
 
 t_stat lfc_reset (DEVICE *dptr)
 {
-sim_cancel (&lfc_unit);                                 /* cancel unit */
+lfc_poll = sim_rtcn_init (lfc_unit.wait, TMR_LFC);
+sim_activate_abs (&lfc_unit, lfc_poll);                 /* init clock */
 CLR_INT (v_LFC);                                        /* clear int */
 CLR_ENB (v_LFC);                                        /* disable int */
 lfc_arm = 0;                                            /* disarm int */

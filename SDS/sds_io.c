@@ -223,7 +223,7 @@ uint32 dev_map[64][NUM_CHAN];
 
 t_stat (*dev_dsp[64][NUM_CHAN])() = { NULL };
 
-/* dev_dsp maps system device numbers to dispatch routines */
+/* dev3_dsp maps system device numbers to dispatch routines */
 
 t_stat (*dev3_dsp[64])() = { NULL };
 
@@ -324,14 +324,14 @@ switch (mod) {
             chan_war[ch] = chan_cnt[ch] = 0;            /* init chan */
             chan_flag[ch] = chan_dcr[ch] = 0;
             chan_mode[ch] = chan_uar[ch] = 0;
-            if (ch > CHAN_E) chan_mode[ch] = CHM_CE;
+            if (ch >= CHAN_E) chan_mode[ch] = CHM_CE;
             if (r = dev_dsp[dev][ch] (IO_CONN, inst, NULL)) /* connect */
                 return r;
             if ((inst & I_IND) || (ch >= CHAN_C)) {     /* C-H? alert ilc */
                 alert = POT_ILCY + ch;
                 chan_mar[ch] = chan_wcr[ch] = 0;
                 }
-            if (chan_flag[ch] & CHF_24B) chan_cpw[ch] = 0;  /* 24B? 1 ch/wd */
+            if (chan_flag[ch] & CHF_24B) chan_cpw[ch] = 0; /* 24B? 1 ch/wd */
             else if (chan_flag[ch] & CHF_12B)           /* 12B? 2 ch/wd */
                 chan_cpw[ch] = CHC_GETCPW (inst) & 1;
             else chan_cpw[ch] = CHC_GETCPW (inst);      /* 6b, 1-4 ch/wd */
@@ -704,7 +704,7 @@ uint32 chan_mar_inc (int32 ch)
 {
 uint32 t = (chan_mar[ch] + 1) & PAMASK;                 /* incr mar */
 
-if ((chan_flag[ch] & CHF_DCHN) && ((t & VA_POFF) == 0)) {       /* chain? */
+if ((chan_flag[ch] & CHF_DCHN) && ((t & VA_POFF) == 0)) { /* chain? */
     chan_flag[ch] = chan_flag[ch] & ~CHF_DCHN;          /* clr flag */
     if (chan_dcr[ch] & CHD_INT)                         /* if armed, intr */
         int_req = int_req | int_zc[ch];
@@ -896,7 +896,7 @@ for (i = 0; i < NUM_CHAN; i++) {
 
 for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru devices */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
-    if ((dibp == NULL) || (dptr->flags & DEV_DIS)) continue;    /* exist, enabled? */
+    if ((dibp == NULL) || (dptr->flags & DEV_DIS)) continue; /* exist, enabled? */
     ch = dibp->chan;                                    /* get channel */
     dev = dibp->dev;                                    /* get device num */
     if (ch < 0) dev3_dsp[dev] = dibp->iop;              /* special device */

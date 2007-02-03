@@ -1,6 +1,6 @@
 /* hp2100_defs.h: HP 2100 simulator definitions
 
-   Copyright (c) 1993-2004, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,12 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   11-Jan-07    JDB     Added 12578A DMA byte packing to DMA structure
+   28-Dec-06    JDB     Added CRS backplane signal as I/O pseudo-opcode
+                        Added DMASK32 32-bit mask value
+   21-Dec-06    JDB     Changed MEM_ADDR_OK for 21xx loader support
+   12-Sep-06    JDB     Define NOTE_IOG to recalc interrupts after instr exec
+                        Rename STOP_INDINT to NOTE_INDINT (not a stop condition)
    30-Dec-04    JDB     Added IBL_DS_HEAD head number mask
    19-Nov-04    JDB     Added STOP_OFFLINE, STOP_PWROFF stop codes
    25-Apr-04    RMS     Added additional IBL definitions
@@ -45,24 +51,25 @@
 
 #include "sim_defs.h"                                   /* simulator defns */
 
-/* Simulator stop codes */
+/* Simulator stop and notification codes */
 
 #define STOP_RSRV       1                               /* must be 1 */
 #define STOP_IODV       2                               /* must be 2 */
 #define STOP_HALT       3                               /* HALT */
 #define STOP_IBKPT      4                               /* breakpoint */
 #define STOP_IND        5                               /* indirect loop */
-#define STOP_INDINT     6                               /* indirect intr */
+#define NOTE_INDINT     6                               /* indirect intr */
 #define STOP_NOCONN     7                               /* no connection */
 #define STOP_OFFLINE    8                               /* device offline */
 #define STOP_PWROFF     9                               /* device powered off */
+#define NOTE_IOG        10                              /* I/O instr executed */
 
 #define ABORT_PRO       1                               /* protection abort */
 
 /* Memory */
 
 #define MEMSIZE         (cpu_unit.capac)                /* actual memory size */
-#define MEM_ADDR_OK(x)  (((uint32) (x)) < MEMSIZE)
+#define MEM_ADDR_OK(x)  (((uint32) (x)) < fwanxm)
 #define VA_N_SIZE       15                              /* virtual addr size */
 #define VASIZE          (1 << VA_N_SIZE)
 #define VAMASK          077777                          /* virt addr mask */
@@ -73,8 +80,10 @@
 /* Architectural constants */
 
 #define SIGN32          020000000000                    /* 32b sign */
+#define DMASK32         037777777777                    /* 32b data mask */
 #define SIGN            0100000                         /* 16b sign */
 #define DMASK           0177777                         /* 16b data mask */
+#define DMASK8          0377                            /* 8b data mask */
 #define AR              ABREG[0]                        /* A = reg 0 */
 #define BR              ABREG[1]                        /* B = reg 1 */
 #define SEXT(x)         ((int32) (((x) & SIGN)? ((x) | ~DMASK): ((x) & DMASK)))
@@ -101,7 +110,9 @@
 
 /* DMA channels */
 
+#define DMA_OE          020000000000                    /* byte packing odd/even flag */
 #define DMA1_STC        0100000                         /* DMA - issue STC */
+#define DMA1_PB         0040000                         /* DMA - pack bytes */
 #define DMA1_CLC        0020000                         /* DMA - issue CLC */
 #define DMA2_OI         0100000                         /* DMA - output/input */
 
@@ -109,6 +120,8 @@ struct DMA {                                            /* DMA channel */
     uint32      cw1;                                    /* device select */
     uint32      cw2;                                    /* direction, address */
     uint32      cw3;                                    /* word count */
+    uint32      latency;                                /* 1st cycle delay */
+    uint32      packer;                                 /* byte-packer holding reg */
     };
 
 /* Memory management */
@@ -182,6 +195,7 @@ struct DMA {                                            /* DMA channel */
 #define ioOTX           6                               /* output from A/B */
 #define ioCTL           7                               /* set/clear control */
 #define ioEDT           8                               /* DMA: end data transfer */
+#define ioCRS           9                               /* control reset ("CLC 0") */
 
 /* I/O devices - fixed assignments */
 

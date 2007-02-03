@@ -1,6 +1,6 @@
 /* pdp15_ttx.c: PDP-15 additional terminals simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    LT15/LT19 terminal input/output
 
+   30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Jun-05    RMS     Added SET TTOXn DISCONNECT
    21-Jun-05    RMS     Fixed bug in SHOW CONN/STATS
@@ -219,7 +220,7 @@ for (ln = 0; ln < TTX_MAXL; ln++) {                     /* loop thru lines */
     if (ttx_ldsc[ln].conn) {                            /* connected? */
         if (temp = tmxr_getc_ln (&ttx_ldsc[ln])) {      /* get char */
             if (temp & SCPE_BREAK) c = 0;               /* break? */
-            else c = sim_tt_inpcvt (temp, TT_GET_MODE (ttox_unit[ln].flags));
+            else c = sim_tt_inpcvt (temp, TT_GET_MODE (ttox_unit[ln].flags) | TTUF_KSR);
             ttix_buf[ln] = c;
             ttix_set_done (ln);
             }
@@ -280,7 +281,7 @@ int32 c, ln = uptr - ttox_unit;                         /* line # */
 if (ttx_ldsc[ln].conn) {                                /* connected? */
     if (ttx_ldsc[ln].xmte) {                            /* tx enabled? */
         TMLN *lp = &ttx_ldsc[ln];                       /* get line */
-        c = sim_tt_outcvt (ttox_buf[ln], TT_GET_MODE (ttox_unit[ln].flags));
+        c = sim_tt_outcvt (ttox_buf[ln], TT_GET_MODE (ttox_unit[ln].flags) | TTUF_KSR);
         if (c >= 0) tmxr_putc_ln (lp, c);               /* output char */
         tmxr_poll_tx (&ttx_desc);                       /* poll xmt */
         }

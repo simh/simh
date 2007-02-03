@@ -414,7 +414,7 @@ if (ir & FI_FP) {                                       /* fp? */
         numwd = 3;                                      /* 3 words */
         }
     else {                                              /* single */
-        if (!(ir & FI_NORND) && (a->lo & UFP_FL_SRND)) {        /* round? */
+        if (!(ir & FI_NORND) && (a->lo & UFP_FL_SRND)) { /* round? */
             a->lo = (a->lo + UFP_FL_SRND) & UFP_FL_SMASK;
             a->hi = (a->hi + (a->lo == 0)) & UFP_FH_MASK;
             if ((a->hi | a->lo) == 0) {                 /* carry out? */
@@ -424,7 +424,7 @@ if (ir & FI_FP) {                                       /* fp? */
             }
         if (a->exp > 0377) return FP_OVF;               /* sp ovf? */
         if (a->exp < -0400) return FP_UNF;              /* sp unf? */
-        wd[0] = (a->exp & 0777) | (a->lo & UFP_FL_SMASK);       /* low frac'exp */
+        wd[0] = (a->exp & 0777) | (a->lo & UFP_FL_SMASK); /* low frac'exp */
         wd[1] = (a->sign << 17) | a->hi;                /* hi frac */
         numwd = 2;                                      /* 2 words */
         }

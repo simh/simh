@@ -1,6 +1,6 @@
 /*  altairz80_cpu.c: MITS Altair CPU (8080 and Z80)
 
-    Copyright (c) 2002-2006, Peter Schorn
+    Copyright (c) 2002-2007, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -29,7 +29,9 @@
 
 #include "altairz80_defs.h"
 
-#if !defined (_WIN32)
+#if defined (_WIN32)
+#include <windows.h>
+#else
 #include <unistd.h>
 #endif
 
@@ -54,28 +56,28 @@
 #define SETFLAG(f,c)    AF = (c) ? AF | FLAG_ ## f : AF & ~FLAG_ ## f
 #define TSTFLAG(f)      ((AF & FLAG_ ## f) != 0)
 
-#define ldig(x) ((x) & 0xf)
-#define hdig(x) (((x) >> 4) & 0xf)
-#define lreg(x) ((x) & 0xff)
-#define hreg(x) (((x) >> 8) & 0xff)
+#define LOW_DIGIT(x)     ((x) & 0xf)
+#define HIGH_DIGIT(x)    (((x) >> 4) & 0xf)
+#define LOW_REGISTER(x)  ((x) & 0xff)
+#define HIGH_REGISTER(x) (((x) >> 8) & 0xff)
 
-#define Setlreg(x, v)   x = (((x) & 0xff00) | ((v) & 0xff))
-#define Sethreg(x, v)   x = (((x) & 0xff) | (((v) & 0xff) << 8))
+#define SET_LOW_REGISTER(x, v)   x = (((x) & 0xff00) | ((v) & 0xff))
+#define SET_HIGH_REGISTER(x, v)  x = (((x) & 0xff) | (((v) & 0xff) << 8))
 
-#define parity(x)   parityTable[(x) & 0xff]
-/*  SetPV and SetPV2 are used to provide correct parity flag semantics for the 8080 in cases
+#define PARITY(x)   parityTable[(x) & 0xff]
+/*  SET_PV and SET_PV2 are used to provide correct PARITY flag semantics for the 8080 in cases
     where the Z80 uses the overflow flag
 */
-#define SetPVS(s) ((cpu_unit.flags & UNIT_CHIP) ? (((cbits >> 6) ^ (cbits >> 5)) & 4) : (parity(s)))
-#define SetPV (SetPVS(sum))
-#define SetPV2(x) ((cpu_unit.flags & UNIT_CHIP) ? (((temp == (x)) << 2)) : (parity(temp)))
+#define SET_PVS(s) ((cpu_unit.flags & UNIT_CHIP) ? (((cbits >> 6) ^ (cbits >> 5)) & 4) : (PARITY(s)))
+#define SET_PV (SET_PVS(sum))
+#define SET_PV2(x) ((cpu_unit.flags & UNIT_CHIP) ? (((temp == (x)) << 2)) : (PARITY(temp)))
 
-/*  checkCPU8080 must be invoked whenever a Z80 only instruction is executed
+/*  CHECK_CPU_8080 must be invoked whenever a Z80 only instruction is executed
     In case a Z80 instruction is executed on an 8080 the following two cases exist:
     1) Trapping is enabled: execution stops
     2) Trapping is not enabled: decoding continues with the next byte
 */
-#define checkCPU8080                            \
+#define CHECK_CPU_8080                          \
     if ((cpu_unit.flags & UNIT_CHIP) == 0) {    \
         if (cpu_unit.flags & UNIT_OPSTOP) {     \
             reason = STOP_OPCODE;               \
@@ -87,23 +89,23 @@
         }                                       \
     }
 
-/* checkCPUZ80 must be invoked whenever a non Z80 instruction is executed */
-#define checkCPUZ80                             \
+/* CHECK_CPU_Z80 must be invoked whenever a non Z80 instruction is executed */
+#define CHECK_CPU_Z80                           \
     if (cpu_unit.flags & UNIT_OPSTOP) {         \
         reason = STOP_OPCODE;                   \
         goto end_decode;                        \
     }
 
 #define POP(x)  {                               \
-    register uint32 y = RAM_pp(SP);             \
-    x = y + (RAM_pp(SP) << 8);                  \
+    register uint32 y = RAM_PP(SP);             \
+    x = y + (RAM_PP(SP) << 8);                  \
 }
 
 #define JPC(cond) {                             \
     tStates += 10;                              \
     if (cond) {                                 \
         PCQ_ENTRY(PC - 1);                      \
-        PC = GetWORD(PC);                       \
+        PC = GET_WORD(PC);                       \
     }                                           \
     else {                                      \
         PC += 2;                                \
@@ -112,8 +114,8 @@
 
 #define CALLC(cond) {                           \
     if (cond) {                                 \
-        register uint32 adrr = GetWORD(PC);     \
-        CheckBreakWord(SP - 2);                 \
+        register uint32 adrr = GET_WORD(PC);     \
+        CHECK_BREAK_WORD(SP - 2);                 \
         PUSH(PC + 2);                           \
         PCQ_ENTRY(PC - 1);                      \
         PC = adrr;                              \
@@ -134,6 +136,8 @@ extern int32 sio1d      (const int32 port, const int32 io, const int32 data);
 extern int32 dsk10      (const int32 port, const int32 io, const int32 data);
 extern int32 dsk11      (const int32 port, const int32 io, const int32 data);
 extern int32 dsk12      (const int32 port, const int32 io, const int32 data);
+extern int32 netStatus  (const int32 port, const int32 io, const int32 data);
+extern int32 netData    (const int32 port, const int32 io, const int32 data);
 extern int32 nulldev    (const int32 port, const int32 io, const int32 data);
 extern int32 hdsk_io    (const int32 port, const int32 io, const int32 data);
 extern int32 simh_dev   (const int32 port, const int32 io, const int32 data);
@@ -174,8 +178,8 @@ static void checkROMBoundaries(void);
 static void reset_memory(void);
 static uint32 in(const uint32 Port);
 static void out(const uint32 Port, const uint32 Value);
-static void PutBYTE(register uint32 Addr, register uint32 Value);
-static void PutWORD(register uint32 a, register uint32 v);
+static void PutBYTE(register uint32 Addr, const register uint32 Value);
+static void PutWORD(register uint32 Addr, const register uint32 Value);
 static t_bool sim_brk_lookup (const t_addr bloc, const int32 btyp);
 static void resetCell(const int32 address, const int32 bank);
 
@@ -208,8 +212,8 @@ static  int32 IR_S;                                 /* interrupt (upper)/refresh
         int32 SR                = 0;                /* switch register                              */
 static  int32 bankSelect        = 0;                /* determines selected memory bank              */
 static  uint32 common           = 0xc000;           /* addresses >= 'common' are in common memory   */
-static  uint32 ROMLow           = defaultROMLow;    /* lowest address of ROM                        */
-static  uint32 ROMHigh          = defaultROMHigh;   /* highest address of ROM                       */
+static  uint32 ROMLow           = DEFAULT_ROM_LOW;  /* lowest address of ROM                        */
+static  uint32 ROMHigh          = DEFAULT_ROM_HIGH; /* highest address of ROM                       */
 static  uint32 previousCapacity = 0;                /* safe for previous memory capacity            */
 static  uint32 clockFrequency   = 0;                /* in kHz, 0 means as fast as possible          */
 static  uint32 sliceLength      = 10;               /* length of time-slice for CPU speed           */
@@ -315,9 +319,9 @@ static const struct idev dev_table[256] = {
     {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 1C */
     {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 20 */
     {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 24 */
-    {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 28 */
+    {&netStatus},{&netData},{&netStatus},{&netData},        /* 28 */
     {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 2C */
-    {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 30 */
+    {&nulldev}, {&nulldev}, {&netStatus},{&netData},        /* 30 */
     {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 34 */
     {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 38 */
     {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 3C */
@@ -1334,7 +1338,7 @@ static void altairz80_init(void) {
 /*
     uint32 temp, v;
     for (temp = 0; temp < 256; temp++) {
-        v = (temp & 0xa8) | (((temp & 0xff) == 0) << 6) | parity(temp);
+        v = (temp & 0xa8) | (((temp & 0xff) == 0) << 6) | PARITY(temp);
         printf("%3d,", v);
         if ( ((temp+1) & 0xf) == 0) {
             printf("\n");
@@ -1466,17 +1470,17 @@ static uint8 M[MAXMEMSIZE][MAXBANKS];   /* RAM which is present */
 static void warnUnsuccessfulWriteAttempt(const uint32 Addr) {
     if (cpu_unit.flags & UNIT_WARNROM) {
         if (addressIsInROM(Addr)) {
-            message2("Attempt to write to ROM " AddressFormat ".", Addr);
+            MESSAGE_2("Attempt to write to ROM " ADDRESS_FORMAT ".", Addr);
         }
         else {
-            message2("Attempt to write to non existing memory " AddressFormat ".", Addr);
+            MESSAGE_2("Attempt to write to non existing memory " ADDRESS_FORMAT ".", Addr);
         }
     }
 }
 
 static uint8 warnUnsuccessfulReadAttempt(const uint32 Addr) {
     if (cpu_unit.flags & UNIT_WARNROM) {
-        message2("Attempt to read from non existing memory " AddressFormat ".", Addr);
+        MESSAGE_2("Attempt to read from non existing memory " ADDRESS_FORMAT ".", Addr);
     }
     return 0xff;
 }
@@ -1486,7 +1490,7 @@ int32 addressIsInROM(const uint32 Addr) {
     uint32 addr = Addr & ADDRMASK;  /* registers are NOT guaranteed to be always 16-bit values */
     return (cpu_unit.flags & UNIT_ROM) && ( /* must have ROM enabled */
     /* in banked case we have standard Altair ROM */
-    ((cpu_unit.flags & UNIT_BANKED) && (defaultROMLow <= addr)) ||
+    ((cpu_unit.flags & UNIT_BANKED) && (DEFAULT_ROM_LOW <= addr)) ||
     /* in non-banked case we check the bounds of the ROM */
     (((cpu_unit.flags & UNIT_BANKED) == 0) && (ROMLow <= addr) && (addr <= ROMHigh)));
 }
@@ -1505,7 +1509,7 @@ static void PutBYTE(register uint32 Addr, const register uint32 Value) {
         if (Addr < common) {
             M[Addr][bankSelect] = Value;
         }
-        else if ((Addr < defaultROMLow) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
+        else if ((Addr < DEFAULT_ROM_LOW) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
             M[Addr][0] = Value;
         }
         else {
@@ -1528,7 +1532,7 @@ static void PutWORD(register uint32 Addr, const register uint32 Value) {
         if (Addr < common) {
             M[Addr][bankSelect] = Value;
         }
-        else if ((Addr < defaultROMLow) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
+        else if ((Addr < DEFAULT_ROM_LOW) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
                 M[Addr][0] = Value;
         }
         else {
@@ -1538,7 +1542,7 @@ static void PutWORD(register uint32 Addr, const register uint32 Value) {
         if (Addr < common) {
             M[Addr][bankSelect] = Value >> 8;
         }
-        else if ((Addr < defaultROMLow) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
+        else if ((Addr < DEFAULT_ROM_LOW) || ((cpu_unit.flags & UNIT_ROM) == 0)) {
             M[Addr][0] = Value >> 8;
         }
         else {
@@ -1577,12 +1581,12 @@ void PutBYTEBasic(const uint32 Addr, const uint32 Bank, const uint32 Value) {
 }
 
 int32 install_bootrom(void) {
-    extern int32 bootrom[bootrom_size];
+    extern int32 bootrom[BOOTROM_SIZE];
     int32 i, cnt = 0;
-    for (i = 0; i < bootrom_size; i++) {
-        if (M[i + defaultROMLow][0] != (bootrom[i] & 0xff)) {
+    for (i = 0; i < BOOTROM_SIZE; i++) {
+        if (M[i + DEFAULT_ROM_LOW][0] != (bootrom[i] & 0xff)) {
             cnt++;
-            M[i + defaultROMLow][0] = bootrom[i] & 0xff;
+            M[i + DEFAULT_ROM_LOW][0] = bootrom[i] & 0xff;
         }
     }
     return cnt;
@@ -1618,57 +1622,57 @@ uint32 getCommon(void) {
     return common;
 }
 
-#define Reduce(Addr) ((Addr) & ADDRMASK)
+#define REDUCE(Addr) ((Addr) & ADDRMASK)
 
-#define GetBYTE(Addr)                                                                                                               \
+#define GET_BYTE(Addr)                                                                                                               \
     ((cpu_unit.flags & UNIT_BANKED) ?                                                                                               \
-        (Reduce(Addr) < common ?                                                                                                    \
-            M[Reduce(Addr)][bankSelect]                                                                                             \
+        (REDUCE(Addr) < common ?                                                                                                    \
+            M[REDUCE(Addr)][bankSelect]                                                                                             \
         :                                                                                                                           \
-            M[Reduce(Addr)][0])                                                                                                     \
+            M[REDUCE(Addr)][0])                                                                                                     \
     :                                                                                                                               \
-        (((Reduce(Addr) < MEMSIZE) || ( (cpu_unit.flags & UNIT_ROM) && (ROMLow <= Reduce(Addr)) && (Reduce(Addr) <= ROMHigh) )) ?   \
-            M[Reduce(Addr)][0]                                                                                                      \
+        (((REDUCE(Addr) < MEMSIZE) || ( (cpu_unit.flags & UNIT_ROM) && (ROMLow <= REDUCE(Addr)) && (REDUCE(Addr) <= ROMHigh) )) ?   \
+            M[REDUCE(Addr)][0]                                                                                                      \
         :                                                                                                                           \
-           warnUnsuccessfulReadAttempt(Reduce(Addr))))
+           warnUnsuccessfulReadAttempt(REDUCE(Addr))))
 
-#define RAM_pp(Addr)                                                                                                                \
+#define RAM_PP(Addr)                                                                                                                \
     ((cpu_unit.flags & UNIT_BANKED) ?                                                                                               \
-        (Reduce(Addr) < common ?                                                                                                    \
-            M[Reduce(Addr++)][bankSelect]                                                                                           \
+        (REDUCE(Addr) < common ?                                                                                                    \
+            M[REDUCE(Addr++)][bankSelect]                                                                                           \
         :                                                                                                                           \
-            M[Reduce(Addr++)][0])                                                                                                   \
+            M[REDUCE(Addr++)][0])                                                                                                   \
     :                                                                                                                               \
-        (((Reduce(Addr) < MEMSIZE) || ( (cpu_unit.flags & UNIT_ROM) && (ROMLow <= Reduce(Addr)) && (Reduce(Addr) <= ROMHigh) )) ?   \
-            M[Reduce(Addr++)][0]                                                                                                    \
+        (((REDUCE(Addr) < MEMSIZE) || ( (cpu_unit.flags & UNIT_ROM) && (ROMLow <= REDUCE(Addr)) && (REDUCE(Addr) <= ROMHigh) )) ?   \
+            M[REDUCE(Addr++)][0]                                                                                                    \
         :                                                                                                                           \
-           warnUnsuccessfulReadAttempt(Reduce(Addr++))))
+           warnUnsuccessfulReadAttempt(REDUCE(Addr++))))
 
-#define RAM_mm(Addr)                                                                                                                \
+#define RAM_MM(Addr)                                                                                                                \
     ((cpu_unit.flags & UNIT_BANKED) ?                                                                                               \
-        (Reduce(Addr) < common ?                                                                                                    \
-            M[Reduce(Addr--)][bankSelect]                                                                                           \
+        (REDUCE(Addr) < common ?                                                                                                    \
+            M[REDUCE(Addr--)][bankSelect]                                                                                           \
         :                                                                                                                           \
-            M[Reduce(Addr--)][0])                                                                                                   \
+            M[REDUCE(Addr--)][0])                                                                                                   \
     :                                                                                                                               \
-        (((Reduce(Addr) < MEMSIZE) || ( (cpu_unit.flags & UNIT_ROM) && (ROMLow <= Reduce(Addr)) && (Reduce(Addr) <= ROMHigh) )) ?   \
-            M[Reduce(Addr--)][0]                                                                                                    \
+        (((REDUCE(Addr) < MEMSIZE) || ( (cpu_unit.flags & UNIT_ROM) && (ROMLow <= REDUCE(Addr)) && (REDUCE(Addr) <= ROMHigh) )) ?   \
+            M[REDUCE(Addr--)][0]                                                                                                    \
         :                                                                                                                           \
-           warnUnsuccessfulReadAttempt(Reduce(Addr--))))
+           warnUnsuccessfulReadAttempt(REDUCE(Addr--))))
 
-#define GetWORD(Addr) (GetBYTE(Addr) | (GetBYTE(Addr + 1) << 8))
+#define GET_WORD(Addr) (GET_BYTE(Addr) | (GET_BYTE(Addr + 1) << 8))
 
 uint8 GetBYTEWrapper(const uint32 Addr) {
-    return GetBYTE(Addr);
+    return GET_BYTE(Addr);
 }
 
 void PutBYTEWrapper(const uint32 Addr, const uint32 Value) {
     PutBYTE(Addr, Value);
 }
 
-#define PutBYTE_pp(a,v) PutBYTE(a++, v)
-#define PutBYTE_mm(a,v) PutBYTE(a--, v)
-#define mm_PutBYTE(a,v) PutBYTE(--a, v)
+#define PUT_BYTE_PP(a,v) PutBYTE(a++, v)
+#define PUT_BYTE_MM(a,v) PutBYTE(a--, v)
+#define MM_PUT_BYTE(a,v) PutBYTE(--a, v)
 
 #define MASK_BRK (TRUE + 1)
 
@@ -1700,31 +1704,31 @@ static void prepareMemoryAccessMessage(t_addr loc) {
 }
 
 #define PUSH(x) {                                               \
-    mm_PutBYTE(SP, (x) >> 8);                                   \
-    mm_PutBYTE(SP, x);                                          \
+    MM_PUT_BYTE(SP, (x) >> 8);                                  \
+    MM_PUT_BYTE(SP, x);                                         \
 }
 
-#define CheckBreakByte(a)                                       \
-    if (sim_brk_summ && sim_brk_test(a, SWMASK('M'))) {         \
+#define CHECK_BREAK_BYTE(a)                                     \
+    if (sim_brk_summ && sim_brk_test(a & 0xffff, SWMASK('M'))) {\
         reason = STOP_MEM;                                      \
-        prepareMemoryAccessMessage(a);                          \
+        prepareMemoryAccessMessage(a & 0xffff);                 \
         goto end_decode;                                        \
     }
 
-#define CheckBreakTwoBytesExtended(a1, a2, iCode)               \
+#define CHECK_BREAK_TWO_BYTES_EXTENDED(a1, a2, iCode)           \
     if (sim_brk_summ) {                                         \
-        br1 = sim_brk_lookup(a1, SWMASK('M'));                  \
-        br2 = br1 ? FALSE : sim_brk_lookup(a2, SWMASK('M'));    \
+        br1 = sim_brk_lookup(a1 & 0xffff, SWMASK('M'));         \
+        br2 = br1 ? FALSE : sim_brk_lookup(a2 & 0xffff, SWMASK('M'));\
         if ((br1 == MASK_BRK) || (br2 == MASK_BRK)) {           \
             sim_brk_pend[0] = FALSE;                            \
         }                                                       \
         else if (br1 || br2) {                                  \
             reason = STOP_MEM;                                  \
             if (br1) {                                          \
-                prepareMemoryAccessMessage(a1);                 \
+                prepareMemoryAccessMessage(a1 & 0xffff);        \
             }                                                   \
             else {                                              \
-                prepareMemoryAccessMessage(a2);                 \
+                prepareMemoryAccessMessage(a2 & 0xffff);        \
             }                                                   \
             iCode;                                              \
             goto end_decode;                                    \
@@ -1734,9 +1738,9 @@ static void prepareMemoryAccessMessage(t_addr loc) {
         }                                                       \
     }
 
-#define CheckBreakTwoBytes(a1, a2) CheckBreakTwoBytesExtended(a1, a2,;)
+#define CHECK_BREAK_TWO_BYTES(a1, a2) CHECK_BREAK_TWO_BYTES_EXTENDED(a1, a2,;)
 
-#define CheckBreakWord(a) CheckBreakTwoBytes(a, (a + 1))
+#define CHECK_BREAK_WORD(a) CHECK_BREAK_TWO_BYTES(a, (a + 1))
 
 t_stat sim_instr (void) {
     extern int32 sim_interval;
@@ -1766,7 +1770,7 @@ t_stat sim_instr (void) {
         in one microsecond on a 1MHz CPU. tStates is used for real-time simulations.    */
     register uint32 tStates;
     uint32 tStatesInSlice; /* number of t-states in 10 mSec time-slice */
-    uint32 startTime;
+    uint32 startTime, now;
     int32 br1, br2, tStateModifier = FALSE;
 
     AF = AF_S;
@@ -1789,7 +1793,12 @@ t_stat sim_instr (void) {
 
     /* main instruction fetch/decode loop */
     while (TRUE) {                          /* loop until halted    */
-        if (sim_interval <= 0) {                /* check clock queue    */
+        if (sim_interval <= 0) {            /* check clock queue    */
+#if !UNIX_PLATFORM
+            if ((reason = sim_poll_kbd()) == SCPE_STOP) {   /* poll on platforms without reliable signalling */
+                break;
+            }
+#endif
             if ( (reason = sim_process_event()) ) {
                 break;
             }
@@ -1803,23 +1812,20 @@ t_stat sim_instr (void) {
                 /* clockFrequency != 0 implies that real time clock is available */
                 startTime += sliceLength;
                 tStates -= tStatesInSlice;
+                if (startTime > (now = sim_os_msec())) {
 #if defined (_WIN32)
-                while (sim_os_msec() <= startTime) {}   /* poor man's sleep */
+                    Sleep(startTime - now);
 #else
-                {
-                    uint32 now;
-                    if (startTime > (now = sim_os_msec())) {
-                        usleep(1000 * (startTime - now));
-                    }
-                }
+                    usleep(1000 * (startTime - now));
 #endif
+                }
             }
 
             if (timerInterrupt && (IFF_S & 1)) {
                 timerInterrupt = FALSE;
                 specialProcessing = clockFrequency | sim_brk_summ;
                 IFF_S = 0; /* disable interrupts */
-                CheckBreakTwoBytesExtended(SP - 2, SP - 1, (timerInterrupt = TRUE, IFF_S |= 1));
+                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (timerInterrupt = TRUE, IFF_S |= 1));
                 PUSH(PC);
                 PCQ_ENTRY(PC - 1);
                 PC = timerInterruptHandler & ADDRMASK;
@@ -1838,7 +1844,7 @@ t_stat sim_instr (void) {
             1) Either directly to FALSE if no memory access takes place or
             2) through a call to a Check... routine
         */
-        switch(RAM_pp(PC)) {
+        switch(RAM_PP(PC)) {
 
             case 0x00:      /* NOP */
                 tStates += 4;
@@ -1848,14 +1854,14 @@ t_stat sim_instr (void) {
             case 0x01:      /* LD BC,nnnn */
                 tStates += 10;
                 sim_brk_pend[0] = FALSE;
-                BC = GetWORD(PC);
+                BC = GET_WORD(PC);
                 PC += 2;
                 break;
 
             case 0x02:      /* LD (BC),A */
                 tStates += 7;
-                CheckBreakByte(BC)
-                PutBYTE(BC, hreg(AF));
+                CHECK_BREAK_BYTE(BC)
+                PutBYTE(BC, HIGH_REGISTER(AF));
                 break;
 
             case 0x03:      /* INC BC */
@@ -1868,22 +1874,22 @@ t_stat sim_instr (void) {
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
                 BC += 0x100;
-                temp = hreg(BC);
-                AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80); /* SetPV2 uses temp */
+                temp = HIGH_REGISTER(BC);
+                AF = (AF & ~0xfe) | incTable[temp] | SET_PV2(0x80); /* SET_PV2 uses temp */
                 break;
 
             case 0x05:      /* DEC B */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
                 BC -= 0x100;
-                temp = hreg(BC);
-                AF = (AF & ~0xfe) | decTable[temp] | SetPV2(0x7f); /* SetPV2 uses temp */
+                temp = HIGH_REGISTER(BC);
+                AF = (AF & ~0xfe) | decTable[temp] | SET_PV2(0x7f); /* SET_PV2 uses temp */
                 break;
 
             case 0x06:      /* LD B,nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                Sethreg(BC, RAM_pp(PC));
+                SET_HIGH_REGISTER(BC, RAM_PP(PC));
                 break;
 
             case 0x07:      /* RLCA */
@@ -1896,7 +1902,7 @@ t_stat sim_instr (void) {
             case 0x08:      /* EX AF,AF' */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                checkCPU8080;
+                CHECK_CPU_8080;
                 temp = AF;
                 AF = AF1_S;
                 AF1_S = temp;
@@ -1914,8 +1920,8 @@ t_stat sim_instr (void) {
 
             case 0x0a:      /* LD A,(BC) */
                 tStates += 7;
-                CheckBreakByte(BC)
-                Sethreg(AF, GetBYTE(BC));
+                CHECK_BREAK_BYTE(BC)
+                SET_HIGH_REGISTER(AF, GET_BYTE(BC));
                 break;
 
             case 0x0b:      /* DEC BC */
@@ -1927,37 +1933,37 @@ t_stat sim_instr (void) {
             case 0x0c:      /* INC C */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(BC) + 1;
-                Setlreg(BC, temp);
-                AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80);
+                temp = LOW_REGISTER(BC) + 1;
+                SET_LOW_REGISTER(BC, temp);
+                AF = (AF & ~0xfe) | incTable[temp] | SET_PV2(0x80);
                 break;
 
             case 0x0d:      /* DEC C */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(BC) - 1;
-                Setlreg(BC, temp);
-                AF = (AF & ~0xfe) | decTable[temp & 0xff] | SetPV2(0x7f);
+                temp = LOW_REGISTER(BC) - 1;
+                SET_LOW_REGISTER(BC, temp);
+                AF = (AF & ~0xfe) | decTable[temp & 0xff] | SET_PV2(0x7f);
                 break;
 
             case 0x0e:      /* LD C,nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                Setlreg(BC, RAM_pp(PC));
+                SET_LOW_REGISTER(BC, RAM_PP(PC));
                 break;
 
             case 0x0f:      /* RRCA */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                AF = (AF & 0xc4) | rrcaTable[hreg(AF)];
+                AF = (AF & 0xc4) | rrcaTable[HIGH_REGISTER(AF)];
                 break;
 
             case 0x10:      /* DJNZ dd */
                 sim_brk_pend[0] = FALSE;
-                checkCPU8080;
+                CHECK_CPU_8080;
                 if ((BC -= 0x100) & 0xff00) {
                     PCQ_ENTRY(PC - 1);
-                    PC += (int8) GetBYTE(PC) + 1;
+                    PC += (int8) GET_BYTE(PC) + 1;
                     tStates += 13;
                 }
                 else {
@@ -1969,14 +1975,14 @@ t_stat sim_instr (void) {
             case 0x11:      /* LD DE,nnnn */
                 tStates += 10;
                 sim_brk_pend[0] = FALSE;
-                DE = GetWORD(PC);
+                DE = GET_WORD(PC);
                 PC += 2;
                 break;
 
             case 0x12:      /* LD (DE),A */
                 tStates += 7;
-                CheckBreakByte(DE)
-                PutBYTE(DE, hreg(AF));
+                CHECK_BREAK_BYTE(DE)
+                PutBYTE(DE, HIGH_REGISTER(AF));
                 break;
 
             case 0x13:      /* INC DE */
@@ -1989,22 +1995,22 @@ t_stat sim_instr (void) {
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
                 DE += 0x100;
-                temp = hreg(DE);
-                AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80); /* SetPV2 uses temp */
+                temp = HIGH_REGISTER(DE);
+                AF = (AF & ~0xfe) | incTable[temp] | SET_PV2(0x80); /* SET_PV2 uses temp */
                 break;
 
             case 0x15:      /* DEC D */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
                 DE -= 0x100;
-                temp = hreg(DE);
-                AF = (AF & ~0xfe) | decTable[temp] | SetPV2(0x7f); /* SetPV2 uses temp */
+                temp = HIGH_REGISTER(DE);
+                AF = (AF & ~0xfe) | decTable[temp] | SET_PV2(0x7f); /* SET_PV2 uses temp */
                 break;
 
             case 0x16:      /* LD D,nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                Sethreg(DE, RAM_pp(PC));
+                SET_HIGH_REGISTER(DE, RAM_PP(PC));
                 break;
 
             case 0x17:      /* RLA */
@@ -2017,9 +2023,9 @@ t_stat sim_instr (void) {
             case 0x18:      /* JR dd */
                 tStates += 12;
                 sim_brk_pend[0] = FALSE;
-                checkCPU8080;
+                CHECK_CPU_8080;
                 PCQ_ENTRY(PC - 1);
-                PC += (int8) GetBYTE(PC) + 1;
+                PC += (int8) GET_BYTE(PC) + 1;
                 break;
 
             case 0x19:      /* ADD HL,DE */
@@ -2034,8 +2040,8 @@ t_stat sim_instr (void) {
 
             case 0x1a:      /* LD A,(DE) */
                 tStates += 7;
-                CheckBreakByte(DE)
-                Sethreg(AF, GetBYTE(DE));
+                CHECK_BREAK_BYTE(DE)
+                SET_HIGH_REGISTER(AF, GET_BYTE(DE));
                 break;
 
             case 0x1b:      /* DEC DE */
@@ -2047,41 +2053,41 @@ t_stat sim_instr (void) {
             case 0x1c:      /* INC E */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(DE) + 1;
-                Setlreg(DE, temp);
-                AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80);
+                temp = LOW_REGISTER(DE) + 1;
+                SET_LOW_REGISTER(DE, temp);
+                AF = (AF & ~0xfe) | incTable[temp] | SET_PV2(0x80);
                 break;
 
             case 0x1d:      /* DEC E */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(DE) - 1;
-                Setlreg(DE, temp);
-                AF = (AF & ~0xfe) | decTable[temp & 0xff] | SetPV2(0x7f);
+                temp = LOW_REGISTER(DE) - 1;
+                SET_LOW_REGISTER(DE, temp);
+                AF = (AF & ~0xfe) | decTable[temp & 0xff] | SET_PV2(0x7f);
                 break;
 
             case 0x1e:      /* LD E,nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                Setlreg(DE, RAM_pp(PC));
+                SET_LOW_REGISTER(DE, RAM_PP(PC));
                 break;
 
             case 0x1f:      /* RRA */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                AF = ((AF & 1) << 15) | (AF & 0xc4) | rraTable[hreg(AF)];
+                AF = ((AF & 1) << 15) | (AF & 0xc4) | rraTable[HIGH_REGISTER(AF)];
                 break;
 
             case 0x20:      /* JR NZ,dd */
                 sim_brk_pend[0] = FALSE;
-                checkCPU8080;
+                CHECK_CPU_8080;
                 if (TSTFLAG(Z)) {
                     PC++;
                     tStates += 7;
                 }
                 else {
                     PCQ_ENTRY(PC - 1);
-                    PC += (int8) GetBYTE(PC) + 1;
+                    PC += (int8) GET_BYTE(PC) + 1;
                     tStates += 12;
                 }
                 break;
@@ -2089,14 +2095,14 @@ t_stat sim_instr (void) {
             case 0x21:      /* LD HL,nnnn */
                 tStates += 10;
                 sim_brk_pend[0] = FALSE;
-                HL = GetWORD(PC);
+                HL = GET_WORD(PC);
                 PC += 2;
                 break;
 
             case 0x22:      /* LD (nnnn),HL */
                 tStates += 16;
-                temp = GetWORD(PC);
-                CheckBreakWord(temp);
+                temp = GET_WORD(PC);
+                CHECK_BREAK_WORD(temp);
                 PutWORD(temp, HL);
                 PC += 2;
                 break;
@@ -2111,29 +2117,29 @@ t_stat sim_instr (void) {
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
                 HL += 0x100;
-                temp = hreg(HL);
-                AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80); /* SetPV2 uses temp */
+                temp = HIGH_REGISTER(HL);
+                AF = (AF & ~0xfe) | incTable[temp] | SET_PV2(0x80); /* SET_PV2 uses temp */
                 break;
 
             case 0x25:      /* DEC H */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
                 HL -= 0x100;
-                temp = hreg(HL);
-                AF = (AF & ~0xfe) | decTable[temp] | SetPV2(0x7f); /* SetPV2 uses temp */
+                temp = HIGH_REGISTER(HL);
+                AF = (AF & ~0xfe) | decTable[temp] | SET_PV2(0x7f); /* SET_PV2 uses temp */
                 break;
 
             case 0x26:      /* LD H,nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                Sethreg(HL, RAM_pp(PC));
+                SET_HIGH_REGISTER(HL, RAM_PP(PC));
                 break;
 
             case 0x27:      /* DAA */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                acu = hreg(AF);
-                temp = ldig(acu);
+                acu = HIGH_REGISTER(AF);
+                temp = LOW_DIGIT(acu);
                 cbits = TSTFLAG(C);
                 if (TSTFLAG(N)) {       /* last operation was a subtract */
                     int hd = cbits || acu > 0x99;
@@ -2162,10 +2168,10 @@ t_stat sim_instr (void) {
 
             case 0x28:      /* JR Z,dd */
                 sim_brk_pend[0] = FALSE;
-                checkCPU8080;
+                CHECK_CPU_8080;
                 if (TSTFLAG(Z)) {
                     PCQ_ENTRY(PC - 1);
-                    PC += (int8) GetBYTE(PC) + 1;
+                    PC += (int8) GET_BYTE(PC) + 1;
                     tStates += 12;
                 }
                 else {
@@ -2185,9 +2191,9 @@ t_stat sim_instr (void) {
 
             case 0x2a:      /* LD HL,(nnnn) */
                 tStates += 16;
-                temp = GetWORD(PC);
-                CheckBreakWord(temp);
-                HL = GetWORD(temp);
+                temp = GET_WORD(PC);
+                CHECK_BREAK_WORD(temp);
+                HL = GET_WORD(temp);
                 PC += 2;
                 break;
 
@@ -2200,23 +2206,23 @@ t_stat sim_instr (void) {
             case 0x2c:      /* INC L */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(HL) + 1;
-                Setlreg(HL, temp);
-                AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80);
+                temp = LOW_REGISTER(HL) + 1;
+                SET_LOW_REGISTER(HL, temp);
+                AF = (AF & ~0xfe) | incTable[temp] | SET_PV2(0x80);
                 break;
 
             case 0x2d:      /* DEC L */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(HL) - 1;
-                Setlreg(HL, temp);
-                AF = (AF & ~0xfe) | decTable[temp & 0xff] | SetPV2(0x7f);
+                temp = LOW_REGISTER(HL) - 1;
+                SET_LOW_REGISTER(HL, temp);
+                AF = (AF & ~0xfe) | decTable[temp & 0xff] | SET_PV2(0x7f);
                 break;
 
             case 0x2e:      /* LD L,nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                Setlreg(HL, RAM_pp(PC));
+                SET_LOW_REGISTER(HL, RAM_PP(PC));
                 break;
 
             case 0x2f:      /* CPL */
@@ -2227,14 +2233,14 @@ t_stat sim_instr (void) {
 
             case 0x30:      /* JR NC,dd */
                 sim_brk_pend[0] = FALSE;
-                checkCPU8080;
+                CHECK_CPU_8080;
                 if (TSTFLAG(C)) {
                     PC++;
                     tStates += 7;
                 }
                 else {
                     PCQ_ENTRY(PC - 1);
-                    PC += (int8) GetBYTE(PC) + 1;
+                    PC += (int8) GET_BYTE(PC) + 1;
                     tStates += 12;
                 }
                 break;
@@ -2242,15 +2248,15 @@ t_stat sim_instr (void) {
             case 0x31:      /* LD SP,nnnn */
                 tStates += 10;
                 sim_brk_pend[0] = FALSE;
-                SP = GetWORD(PC);
+                SP = GET_WORD(PC);
                 PC += 2;
                 break;
 
             case 0x32:      /* LD (nnnn),A */
                 tStates += 13;
-                temp = GetWORD(PC);
-                CheckBreakByte(temp);
-                PutBYTE(temp, hreg(AF));
+                temp = GET_WORD(PC);
+                CHECK_BREAK_BYTE(temp);
+                PutBYTE(temp, HIGH_REGISTER(AF));
                 PC += 2;
                 break;
 
@@ -2262,24 +2268,24 @@ t_stat sim_instr (void) {
 
             case 0x34:      /* INC (HL) */
                 tStates += 11;
-                CheckBreakByte(HL);
-                temp = GetBYTE(HL) + 1;
+                CHECK_BREAK_BYTE(HL);
+                temp = GET_BYTE(HL) + 1;
                 PutBYTE(HL, temp);
-                AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80);
+                AF = (AF & ~0xfe) | incTable[temp] | SET_PV2(0x80);
                 break;
 
             case 0x35:      /* DEC (HL) */
                 tStates += 11;
-                CheckBreakByte(HL);
-                temp = GetBYTE(HL) - 1;
+                CHECK_BREAK_BYTE(HL);
+                temp = GET_BYTE(HL) - 1;
                 PutBYTE(HL, temp);
-                AF = (AF & ~0xfe) | decTable[temp & 0xff] | SetPV2(0x7f);
+                AF = (AF & ~0xfe) | decTable[temp & 0xff] | SET_PV2(0x7f);
                 break;
 
             case 0x36:      /* LD (HL),nn */
                 tStates += 10;
-                CheckBreakByte(HL);
-                PutBYTE(HL, RAM_pp(PC));
+                CHECK_BREAK_BYTE(HL);
+                PutBYTE(HL, RAM_PP(PC));
                 break;
 
             case 0x37:      /* SCF */
@@ -2290,10 +2296,10 @@ t_stat sim_instr (void) {
 
             case 0x38:      /* JR C,dd */
                 sim_brk_pend[0] = FALSE;
-                checkCPU8080;
+                CHECK_CPU_8080;
                 if (TSTFLAG(C)) {
                     PCQ_ENTRY(PC - 1);
-                    PC += (int8) GetBYTE(PC) + 1;
+                    PC += (int8) GET_BYTE(PC) + 1;
                     tStates += 12;
                 }
                 else {
@@ -2314,9 +2320,9 @@ t_stat sim_instr (void) {
 
             case 0x3a:      /* LD A,(nnnn) */
                 tStates += 13;
-                temp = GetWORD(PC);
-                CheckBreakByte(temp);
-                Sethreg(AF, GetBYTE(temp));
+                temp = GET_WORD(PC);
+                CHECK_BREAK_BYTE(temp);
+                SET_HIGH_REGISTER(AF, GET_BYTE(temp));
                 PC += 2;
                 break;
 
@@ -2330,22 +2336,22 @@ t_stat sim_instr (void) {
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
                 AF += 0x100;
-                temp = hreg(AF);
-                AF = (AF & ~0xfe) | incTable[temp] | SetPV2(0x80); /* SetPV2 uses temp */
+                temp = HIGH_REGISTER(AF);
+                AF = (AF & ~0xfe) | incTable[temp] | SET_PV2(0x80); /* SET_PV2 uses temp */
                 break;
 
             case 0x3d:      /* DEC A */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
                 AF -= 0x100;
-                temp = hreg(AF);
-                AF = (AF & ~0xfe) | decTable[temp] | SetPV2(0x7f); /* SetPV2 uses temp */
+                temp = HIGH_REGISTER(AF);
+                AF = (AF & ~0xfe) | decTable[temp] | SET_PV2(0x7f); /* SET_PV2 uses temp */
                 break;
 
             case 0x3e:      /* LD A,nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                Sethreg(AF, RAM_pp(PC));
+                SET_HIGH_REGISTER(AF, RAM_PP(PC));
                 break;
 
             case 0x3f:      /* CCF */
@@ -2391,8 +2397,8 @@ t_stat sim_instr (void) {
 
             case 0x46:      /* LD B,(HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                Sethreg(BC, GetBYTE(HL));
+                CHECK_BREAK_BYTE(HL);
+                SET_HIGH_REGISTER(BC, GET_BYTE(HL));
                 break;
 
             case 0x47:      /* LD B,A */
@@ -2438,8 +2444,8 @@ t_stat sim_instr (void) {
 
             case 0x4e:      /* LD C,(HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                Setlreg(BC, GetBYTE(HL));
+                CHECK_BREAK_BYTE(HL);
+                SET_LOW_REGISTER(BC, GET_BYTE(HL));
                 break;
 
             case 0x4f:      /* LD C,A */
@@ -2485,8 +2491,8 @@ t_stat sim_instr (void) {
 
             case 0x56:      /* LD D,(HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                Sethreg(DE, GetBYTE(HL));
+                CHECK_BREAK_BYTE(HL);
+                SET_HIGH_REGISTER(DE, GET_BYTE(HL));
                 break;
 
             case 0x57:      /* LD D,A */
@@ -2532,8 +2538,8 @@ t_stat sim_instr (void) {
 
             case 0x5e:      /* LD E,(HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                Setlreg(DE, GetBYTE(HL));
+                CHECK_BREAK_BYTE(HL);
+                SET_LOW_REGISTER(DE, GET_BYTE(HL));
                 break;
 
             case 0x5f:      /* LD E,A */
@@ -2579,8 +2585,8 @@ t_stat sim_instr (void) {
 
             case 0x66:      /* LD H,(HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                Sethreg(HL, GetBYTE(HL));
+                CHECK_BREAK_BYTE(HL);
+                SET_HIGH_REGISTER(HL, GET_BYTE(HL));
                 break;
 
             case 0x67:      /* LD H,A */
@@ -2626,8 +2632,8 @@ t_stat sim_instr (void) {
 
             case 0x6e:      /* LD L,(HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                Setlreg(HL, GetBYTE(HL));
+                CHECK_BREAK_BYTE(HL);
+                SET_LOW_REGISTER(HL, GET_BYTE(HL));
                 break;
 
             case 0x6f:      /* LD L,A */
@@ -2638,38 +2644,38 @@ t_stat sim_instr (void) {
 
             case 0x70:      /* LD (HL),B */
                 tStates += 7;
-                CheckBreakByte(HL);
-                PutBYTE(HL, hreg(BC));
+                CHECK_BREAK_BYTE(HL);
+                PutBYTE(HL, HIGH_REGISTER(BC));
                 break;
 
             case 0x71:      /* LD (HL),C */
                 tStates += 7;
-                CheckBreakByte(HL);
-                PutBYTE(HL, lreg(BC));
+                CHECK_BREAK_BYTE(HL);
+                PutBYTE(HL, LOW_REGISTER(BC));
                 break;
 
             case 0x72:      /* LD (HL),D */
                 tStates += 7;
-                CheckBreakByte(HL);
-                PutBYTE(HL, hreg(DE));
+                CHECK_BREAK_BYTE(HL);
+                PutBYTE(HL, HIGH_REGISTER(DE));
                 break;
 
             case 0x73:      /* LD (HL),E */
                 tStates += 7;
-                CheckBreakByte(HL);
-                PutBYTE(HL, lreg(DE));
+                CHECK_BREAK_BYTE(HL);
+                PutBYTE(HL, LOW_REGISTER(DE));
                 break;
 
             case 0x74:      /* LD (HL),H */
                 tStates += 7;
-                CheckBreakByte(HL);
-                PutBYTE(HL, hreg(HL));
+                CHECK_BREAK_BYTE(HL);
+                PutBYTE(HL, HIGH_REGISTER(HL));
                 break;
 
             case 0x75:      /* LD (HL),L */
                 tStates += 7;
-                CheckBreakByte(HL);
-                PutBYTE(HL, lreg(HL));
+                CHECK_BREAK_BYTE(HL);
+                PutBYTE(HL, LOW_REGISTER(HL));
                 break;
 
             case 0x76:      /* HALT */
@@ -2681,8 +2687,8 @@ t_stat sim_instr (void) {
 
             case 0x77:      /* LD (HL),A */
                 tStates += 7;
-                CheckBreakByte(HL);
-                PutBYTE(HL, hreg(AF));
+                CHECK_BREAK_BYTE(HL);
+                PutBYTE(HL, HIGH_REGISTER(AF));
                 break;
 
             case 0x78:      /* LD A,B */
@@ -2723,8 +2729,8 @@ t_stat sim_instr (void) {
 
             case 0x7e:      /* LD A,(HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                Sethreg(AF, GetBYTE(HL));
+                CHECK_BREAK_BYTE(HL);
+                SET_HIGH_REGISTER(AF, GET_BYTE(HL));
                 break;
 
             case 0x7f:      /* LD A,A */
@@ -2735,225 +2741,225 @@ t_stat sim_instr (void) {
             case 0x80:      /* ADD A,B */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(BC);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(BC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp;
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x81:      /* ADD A,C */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(BC);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(BC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp;
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x82:      /* ADD A,D */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(DE);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(DE);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp;
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x83:      /* ADD A,E */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(DE);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(DE);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp;
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x84:      /* ADD A,H */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(HL);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp;
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x85:      /* ADD A,L */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(HL);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp;
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x86:      /* ADD A,(HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                temp = GetBYTE(HL);
-                acu = hreg(AF);
+                CHECK_BREAK_BYTE(HL);
+                temp = GET_BYTE(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp;
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x87:      /* ADD A,A */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                cbits = 2 * hreg(AF);
-                AF = cbitsDup8Table[cbits] | (SetPVS(cbits));
+                cbits = 2 * HIGH_REGISTER(AF);
+                AF = cbitsDup8Table[cbits] | (SET_PVS(cbits));
                 break;
 
             case 0x88:      /* ADC A,B */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(BC);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(BC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp + TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x89:      /* ADC A,C */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(BC);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(BC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp + TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x8a:      /* ADC A,D */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(DE);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(DE);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp + TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x8b:      /* ADC A,E */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(DE);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(DE);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp + TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x8c:      /* ADC A,H */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(HL);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp + TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x8d:      /* ADC A,L */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(HL);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp + TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x8e:      /* ADC A,(HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                temp = GetBYTE(HL);
-                acu = hreg(AF);
+                CHECK_BREAK_BYTE(HL);
+                temp = GET_BYTE(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp + TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0x8f:      /* ADC A,A */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                cbits = 2 * hreg(AF) + TSTFLAG(C);
-                AF = cbitsDup8Table[cbits] | (SetPVS(cbits));
+                cbits = 2 * HIGH_REGISTER(AF) + TSTFLAG(C);
+                AF = cbitsDup8Table[cbits] | (SET_PVS(cbits));
                 break;
 
             case 0x90:      /* SUB B */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(BC);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(BC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x91:      /* SUB C */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(BC);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(BC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x92:      /* SUB D */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(DE);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(DE);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x93:      /* SUB E */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(DE);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(DE);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x94:      /* SUB H */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(HL);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x95:      /* SUB L */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(HL);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x96:      /* SUB (HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                temp = GetBYTE(HL);
-                acu = hreg(AF);
+                CHECK_BREAK_BYTE(HL);
+                temp = GET_BYTE(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x97:      /* SUB A */
@@ -2965,78 +2971,78 @@ t_stat sim_instr (void) {
             case 0x98:      /* SBC A,B */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(BC);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(BC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x99:      /* SBC A,C */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(BC);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(BC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x9a:      /* SBC A,D */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(DE);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(DE);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x9b:      /* SBC A,E */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(DE);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(DE);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x9c:      /* SBC A,H */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(HL);
-                acu = hreg(AF);
+                temp = HIGH_REGISTER(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x9d:      /* SBC A,L */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(HL);
-                acu = hreg(AF);
+                temp = LOW_REGISTER(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x9e:      /* SBC A,(HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                temp = GetBYTE(HL);
-                acu = hreg(AF);
+                CHECK_BREAK_BYTE(HL);
+                temp = GET_BYTE(HL);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0x9f:      /* SBC A,A */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
                 cbits = -TSTFLAG(C);
-                AF = subTable[cbits & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPVS(cbits));
+                AF = subTable[cbits & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PVS(cbits));
                 break;
 
             case 0xa0:      /* AND B */
@@ -3077,8 +3083,8 @@ t_stat sim_instr (void) {
 
             case 0xa6:      /* AND (HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                AF = andTable[((AF >> 8) & GetBYTE(HL)) & 0xff];
+                CHECK_BREAK_BYTE(HL);
+                AF = andTable[((AF >> 8) & GET_BYTE(HL)) & 0xff];
                 break;
 
             case 0xa7:      /* AND A */
@@ -3125,8 +3131,8 @@ t_stat sim_instr (void) {
 
             case 0xae:      /* XOR (HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                AF = xororTable[((AF >> 8) ^ GetBYTE(HL)) & 0xff];
+                CHECK_BREAK_BYTE(HL);
+                AF = xororTable[((AF >> 8) ^ GET_BYTE(HL)) & 0xff];
                 break;
 
             case 0xaf:      /* XOR A */
@@ -3173,8 +3179,8 @@ t_stat sim_instr (void) {
 
             case 0xb6:      /* OR (HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                AF = xororTable[((AF >> 8) | GetBYTE(HL)) & 0xff];
+                CHECK_BREAK_BYTE(HL);
+                AF = xororTable[((AF >> 8) | GET_BYTE(HL)) & 0xff];
                 break;
 
             case 0xb7:      /* OR A */
@@ -3186,91 +3192,91 @@ t_stat sim_instr (void) {
             case 0xb8:      /* CP B */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(BC);
+                temp = HIGH_REGISTER(BC);
                 AF = (AF & ~0x28) | (temp & 0x28);
-                acu = hreg(AF);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
-                    (SetPV) | cbits2Table[cbits & 0x1ff];
+                    (SET_PV) | cbits2Table[cbits & 0x1ff];
                 break;
 
             case 0xb9:      /* CP C */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(BC);
+                temp = LOW_REGISTER(BC);
                 AF = (AF & ~0x28) | (temp & 0x28);
-                acu = hreg(AF);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
-                    (SetPV) | cbits2Table[cbits & 0x1ff];
+                    (SET_PV) | cbits2Table[cbits & 0x1ff];
                 break;
 
             case 0xba:      /* CP D */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(DE);
+                temp = HIGH_REGISTER(DE);
                 AF = (AF & ~0x28) | (temp & 0x28);
-                acu = hreg(AF);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
-                    (SetPV) | cbits2Table[cbits & 0x1ff];
+                    (SET_PV) | cbits2Table[cbits & 0x1ff];
                 break;
 
             case 0xbb:      /* CP E */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(DE);
+                temp = LOW_REGISTER(DE);
                 AF = (AF & ~0x28) | (temp & 0x28);
-                acu = hreg(AF);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
-                    (SetPV) | cbits2Table[cbits & 0x1ff];
+                    (SET_PV) | cbits2Table[cbits & 0x1ff];
                 break;
 
             case 0xbc:      /* CP H */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = hreg(HL);
+                temp = HIGH_REGISTER(HL);
                 AF = (AF & ~0x28) | (temp & 0x28);
-                acu = hreg(AF);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
-                    (SetPV) | cbits2Table[cbits & 0x1ff];
+                    (SET_PV) | cbits2Table[cbits & 0x1ff];
                 break;
 
             case 0xbd:      /* CP L */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                temp = lreg(HL);
+                temp = LOW_REGISTER(HL);
                 AF = (AF & ~0x28) | (temp & 0x28);
-                acu = hreg(AF);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
-                    (SetPV) | cbits2Table[cbits & 0x1ff];
+                    (SET_PV) | cbits2Table[cbits & 0x1ff];
                 break;
 
             case 0xbe:      /* CP (HL) */
                 tStates += 7;
-                CheckBreakByte(HL);
-                temp = GetBYTE(HL);
+                CHECK_BREAK_BYTE(HL);
+                temp = GET_BYTE(HL);
                 AF = (AF & ~0x28) | (temp & 0x28);
-                acu = hreg(AF);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
-                    (SetPV) | cbits2Table[cbits & 0x1ff];
+                    (SET_PV) | cbits2Table[cbits & 0x1ff];
                 break;
 
             case 0xbf:      /* CP A */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                Setlreg(AF, (hreg(AF) & 0x28) | (cpu_unit.flags & UNIT_CHIP ? 0x42 : 0x46));
+                SET_LOW_REGISTER(AF, (HIGH_REGISTER(AF) & 0x28) | (cpu_unit.flags & UNIT_CHIP ? 0x42 : 0x46));
                 break;
 
             case 0xc0:      /* RET NZ */
@@ -3279,7 +3285,7 @@ t_stat sim_instr (void) {
                     tStates += 5;
                 }
                 else {
-                    CheckBreakWord(SP);
+                    CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PC - 1);
                     POP(PC);
                     tStates += 11;
@@ -3288,7 +3294,7 @@ t_stat sim_instr (void) {
 
             case 0xc1:      /* POP BC */
                 tStates += 10;
-                CheckBreakWord(SP);
+                CHECK_BREAK_WORD(SP);
                 POP(BC);
                 break;
 
@@ -3308,23 +3314,23 @@ t_stat sim_instr (void) {
 
             case 0xc5:      /* PUSH BC */
                 tStates += 11;
-                CheckBreakWord(SP - 2);
+                CHECK_BREAK_WORD(SP - 2);
                 PUSH(BC);
                 break;
 
             case 0xc6:      /* ADD A,nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                temp = RAM_pp(PC);
-                acu = hreg(AF);
+                temp = RAM_PP(PC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp;
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0xc7:      /* RST 0 */
                 tStates += 11;
-                CheckBreakWord(SP - 2);
+                CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PC - 1);
                 PC = 0;
@@ -3332,7 +3338,7 @@ t_stat sim_instr (void) {
 
             case 0xc8:      /* RET Z */
                 if (TSTFLAG(Z)) {
-                    CheckBreakWord(SP);
+                    CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PC - 1);
                     POP(PC);
                     tStates += 11;
@@ -3345,7 +3351,7 @@ t_stat sim_instr (void) {
 
             case 0xc9:      /* RET */
                 tStates += 10;
-                CheckBreakWord(SP);
+                CHECK_BREAK_WORD(SP);
                 PCQ_ENTRY(PC - 1);
                 POP(PC);
                 break;
@@ -3356,56 +3362,56 @@ t_stat sim_instr (void) {
                 break;
 
             case 0xcb:      /* CB prefix */
-                checkCPU8080;
+                CHECK_CPU_8080;
                 adr = HL;
-                switch ((op = GetBYTE(PC)) & 7) {
+                switch ((op = GET_BYTE(PC)) & 7) {
 
                     case 0:
                         sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
-                        acu = hreg(BC);
+                        acu = HIGH_REGISTER(BC);
                         tStates += 8;
                         break;
 
                     case 1:
                         sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
-                        acu = lreg(BC);
+                        acu = LOW_REGISTER(BC);
                         tStates += 8;
                         break;
 
                     case 2:
                         sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
-                        acu = hreg(DE);
+                        acu = HIGH_REGISTER(DE);
                         tStates += 8;
                         break;
 
                     case 3:
                         sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
-                        acu = lreg(DE);
+                        acu = LOW_REGISTER(DE);
                         tStates += 8;
                         break;
 
                     case 4:
                         sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
-                        acu = hreg(HL);
+                        acu = HIGH_REGISTER(HL);
                         tStates += 8;
                         break;
 
                     case 5:
                         sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
-                        acu = lreg(HL);
+                        acu = LOW_REGISTER(HL);
                         tStates += 8;
                         break;
 
                     case 6:
-                        CheckBreakByte(adr);
+                        CHECK_BREAK_BYTE(adr);
                         ++PC;
-                        acu = GetBYTE(adr);
+                        acu = GET_BYTE(adr);
                         tStateModifier = TRUE;
                         tStates += 15;
                         break;
@@ -3413,7 +3419,7 @@ t_stat sim_instr (void) {
                     case 7:
                         sim_brk_pend[0] = tStateModifier = FALSE;
                         ++PC;
-                        acu = hreg(AF);
+                        acu = HIGH_REGISTER(AF);
                         tStates += 8;
                         break;
                 }
@@ -3493,27 +3499,27 @@ t_stat sim_instr (void) {
                 switch (op & 7) {
 
                     case 0:
-                        Sethreg(BC, temp);
+                        SET_HIGH_REGISTER(BC, temp);
                         break;
 
                     case 1:
-                        Setlreg(BC, temp);
+                        SET_LOW_REGISTER(BC, temp);
                         break;
 
                     case 2:
-                        Sethreg(DE, temp);
+                        SET_HIGH_REGISTER(DE, temp);
                         break;
 
                     case 3:
-                        Setlreg(DE, temp);
+                        SET_LOW_REGISTER(DE, temp);
                         break;
 
                     case 4:
-                        Sethreg(HL, temp);
+                        SET_HIGH_REGISTER(HL, temp);
                         break;
 
                     case 5:
-                        Setlreg(HL, temp);
+                        SET_LOW_REGISTER(HL, temp);
                         break;
 
                     case 6:
@@ -3521,7 +3527,7 @@ t_stat sim_instr (void) {
                         break;
 
                     case 7:
-                        Sethreg(AF, temp);
+                        SET_HIGH_REGISTER(AF, temp);
                         break;
                 }
                 break;
@@ -3537,16 +3543,16 @@ t_stat sim_instr (void) {
             case 0xce:      /* ADC A,nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                temp = RAM_pp(PC);
-                acu = hreg(AF);
+                temp = RAM_PP(PC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu + temp + TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = addTable[sum] | cbitsTable[cbits] | (SetPV);
+                AF = addTable[sum] | cbitsTable[cbits] | (SET_PV);
                 break;
 
             case 0xcf:      /* RST 8 */
                 tStates += 11;
-                CheckBreakWord(SP - 2);
+                CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PC - 1);
                 PC = 8;
@@ -3558,7 +3564,7 @@ t_stat sim_instr (void) {
                     tStates += 5;
                 }
                 else {
-                    CheckBreakWord(SP);
+                    CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PC - 1);
                     POP(PC);
                     tStates += 11;
@@ -3567,7 +3573,7 @@ t_stat sim_instr (void) {
 
             case 0xd1:      /* POP DE */
                 tStates += 10;
-                CheckBreakWord(SP);
+                CHECK_BREAK_WORD(SP);
                 POP(DE);
                 break;
 
@@ -3579,7 +3585,7 @@ t_stat sim_instr (void) {
             case 0xd3:      /* OUT (nn),A */
                 tStates += 11;
                 sim_brk_pend[0] = FALSE;
-                out(RAM_pp(PC), hreg(AF));
+                out(RAM_PP(PC), HIGH_REGISTER(AF));
                 break;
 
             case 0xd4:      /* CALL NC,nnnn */
@@ -3588,23 +3594,23 @@ t_stat sim_instr (void) {
 
             case 0xd5:      /* PUSH DE */
                 tStates += 11;
-                CheckBreakWord(SP - 2);
+                CHECK_BREAK_WORD(SP - 2);
                 PUSH(DE);
                 break;
 
             case 0xd6:      /* SUB nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                temp = RAM_pp(PC);
-                acu = hreg(AF);
+                temp = RAM_PP(PC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0xd7:      /* RST 10H */
                 tStates += 11;
-                CheckBreakWord(SP - 2);
+                CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PC - 1);
                 PC = 0x10;
@@ -3612,7 +3618,7 @@ t_stat sim_instr (void) {
 
             case 0xd8:      /* RET C */
                 if (TSTFLAG(C)) {
-                    CheckBreakWord(SP);
+                    CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PC - 1);
                     POP(PC);
                     tStates += 11;
@@ -3626,7 +3632,7 @@ t_stat sim_instr (void) {
             case 0xd9:      /* EXX */
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                checkCPU8080;
+                CHECK_CPU_8080;
                 temp = BC;
                 BC = BC1_S;
                 BC1_S = temp;
@@ -3646,7 +3652,7 @@ t_stat sim_instr (void) {
             case 0xdb:      /* IN A,(nn) */
                 tStates += 11;
                 sim_brk_pend[0] = FALSE;
-                Sethreg(AF, in(RAM_pp(PC)));
+                SET_HIGH_REGISTER(AF, in(RAM_PP(PC)));
                 break;
 
             case 0xdc:      /* CALL C,nnnn */
@@ -3654,8 +3660,8 @@ t_stat sim_instr (void) {
                 break;
 
             case 0xdd:      /* DD prefix */
-                checkCPU8080;
-                switch (op = RAM_pp(PC)) {
+                CHECK_CPU_8080;
+                switch (op = RAM_PP(PC)) {
 
                     case 0x09:      /* ADD IX,BC */
                         tStates += 15;
@@ -3680,14 +3686,14 @@ t_stat sim_instr (void) {
                     case 0x21:      /* LD IX,nnnn */
                         tStates += 14;
                         sim_brk_pend[0] = FALSE;
-                        IX = GetWORD(PC);
+                        IX = GET_WORD(PC);
                         PC += 2;
                         break;
 
                     case 0x22:      /* LD (nnnn),IX */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
                         PutWORD(temp, IX);
                         PC += 2;
                         break;
@@ -3702,20 +3708,20 @@ t_stat sim_instr (void) {
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
                         IX += 0x100;
-                        AF = (AF & ~0xfe) | incZ80Table[hreg(IX)];
+                        AF = (AF & ~0xfe) | incZ80Table[HIGH_REGISTER(IX)];
                         break;
 
                     case 0x25:      /* DEC IXH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
                         IX -= 0x100;
-                        AF = (AF & ~0xfe) | decZ80Table[hreg(IX)];
+                        AF = (AF & ~0xfe) | decZ80Table[HIGH_REGISTER(IX)];
                         break;
 
                     case 0x26:      /* LD IXH,nn */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IX, RAM_pp(PC));
+                        SET_HIGH_REGISTER(IX, RAM_PP(PC));
                         break;
 
                     case 0x29:      /* ADD IX,IX */
@@ -3729,9 +3735,9 @@ t_stat sim_instr (void) {
 
                     case 0x2a:      /* LD IX,(nnnn) */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
-                        IX = GetWORD(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
+                        IX = GET_WORD(temp);
                         PC += 2;
                         break;
 
@@ -3744,48 +3750,48 @@ t_stat sim_instr (void) {
                     case 0x2c:      /* INC IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IX) + 1;
-                        Setlreg(IX, temp);
+                        temp = LOW_REGISTER(IX) + 1;
+                        SET_LOW_REGISTER(IX, temp);
                         AF = (AF & ~0xfe) | incZ80Table[temp];
                         break;
 
                     case 0x2d:      /* DEC IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IX) - 1;
-                        Setlreg(IX, temp);
+                        temp = LOW_REGISTER(IX) - 1;
+                        SET_LOW_REGISTER(IX, temp);
                         AF = (AF & ~0xfe) | decZ80Table[temp & 0xff];
                         break;
 
                     case 0x2e:      /* LD IXL,nn */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IX, RAM_pp(PC));
+                        SET_LOW_REGISTER(IX, RAM_PP(PC));
                         break;
 
                     case 0x34:      /* INC (IX+dd) */
                         tStates += 23;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr) + 1;
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr) + 1;
                         PutBYTE(adr, temp);
                         AF = (AF & ~0xfe) | incZ80Table[temp];
                         break;
 
                     case 0x35:      /* DEC (IX+dd) */
                         tStates += 23;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr) - 1;
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr) - 1;
                         PutBYTE(adr, temp);
                         AF = (AF & ~0xfe) | decZ80Table[temp & 0xff];
                         break;
 
                     case 0x36:      /* LD (IX+dd),nn */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, RAM_pp(PC));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, RAM_PP(PC));
                         break;
 
                     case 0x39:      /* ADD IX,SP */
@@ -3801,101 +3807,101 @@ t_stat sim_instr (void) {
                     case 0x44:      /* LD B,IXH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(BC, hreg(IX));
+                        SET_HIGH_REGISTER(BC, HIGH_REGISTER(IX));
                         break;
 
                     case 0x45:      /* LD B,IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(BC, lreg(IX));
+                        SET_HIGH_REGISTER(BC, LOW_REGISTER(IX));
                         break;
 
                     case 0x46:      /* LD B,(IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Sethreg(BC, GetBYTE(adr));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_HIGH_REGISTER(BC, GET_BYTE(adr));
                         break;
 
                     case 0x4c:      /* LD C,IXH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(BC, hreg(IX));
+                        SET_LOW_REGISTER(BC, HIGH_REGISTER(IX));
                         break;
 
                     case 0x4d:      /* LD C,IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(BC, lreg(IX));
+                        SET_LOW_REGISTER(BC, LOW_REGISTER(IX));
                         break;
 
                     case 0x4e:      /* LD C,(IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Setlreg(BC, GetBYTE(adr));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_LOW_REGISTER(BC, GET_BYTE(adr));
                         break;
 
                     case 0x54:      /* LD D,IXH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(DE, hreg(IX));
+                        SET_HIGH_REGISTER(DE, HIGH_REGISTER(IX));
                         break;
 
                     case 0x55:      /* LD D,IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(DE, lreg(IX));
+                        SET_HIGH_REGISTER(DE, LOW_REGISTER(IX));
                         break;
 
                     case 0x56:      /* LD D,(IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Sethreg(DE, GetBYTE(adr));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_HIGH_REGISTER(DE, GET_BYTE(adr));
                         break;
 
                     case 0x5c:      /* LD E,IXH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(DE, hreg(IX));
+                        SET_LOW_REGISTER(DE, HIGH_REGISTER(IX));
                         break;
 
                     case 0x5d:      /* LD E,IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(DE, lreg(IX));
+                        SET_LOW_REGISTER(DE, LOW_REGISTER(IX));
                         break;
 
                     case 0x5e:      /* LD E,(IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Setlreg(DE, GetBYTE(adr));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_LOW_REGISTER(DE, GET_BYTE(adr));
                         break;
 
                     case 0x60:      /* LD IXH,B */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IX, hreg(BC));
+                        SET_HIGH_REGISTER(IX, HIGH_REGISTER(BC));
                         break;
 
                     case 0x61:      /* LD IXH,C */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IX, lreg(BC));
+                        SET_HIGH_REGISTER(IX, LOW_REGISTER(BC));
                         break;
 
                     case 0x62:      /* LD IXH,D */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IX, hreg(DE));
+                        SET_HIGH_REGISTER(IX, HIGH_REGISTER(DE));
                         break;
 
                     case 0x63:      /* LD IXH,E */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IX, lreg(DE));
+                        SET_HIGH_REGISTER(IX, LOW_REGISTER(DE));
                         break;
 
                     case 0x64:      /* LD IXH,IXH */
@@ -3906,50 +3912,50 @@ t_stat sim_instr (void) {
                     case 0x65:      /* LD IXH,IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IX, lreg(IX));
+                        SET_HIGH_REGISTER(IX, LOW_REGISTER(IX));
                         break;
 
                     case 0x66:      /* LD H,(IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Sethreg(HL, GetBYTE(adr));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_HIGH_REGISTER(HL, GET_BYTE(adr));
                         break;
 
                     case 0x67:      /* LD IXH,A */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IX, hreg(AF));
+                        SET_HIGH_REGISTER(IX, HIGH_REGISTER(AF));
                         break;
 
                     case 0x68:      /* LD IXL,B */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IX, hreg(BC));
+                        SET_LOW_REGISTER(IX, HIGH_REGISTER(BC));
                         break;
 
                     case 0x69:      /* LD IXL,C */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IX, lreg(BC));
+                        SET_LOW_REGISTER(IX, LOW_REGISTER(BC));
                         break;
 
                     case 0x6a:      /* LD IXL,D */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IX, hreg(DE));
+                        SET_LOW_REGISTER(IX, HIGH_REGISTER(DE));
                         break;
 
                     case 0x6b:      /* LD IXL,E */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IX, lreg(DE));
+                        SET_LOW_REGISTER(IX, LOW_REGISTER(DE));
                         break;
 
                     case 0x6c:      /* LD IXL,IXH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IX, hreg(IX));
+                        SET_LOW_REGISTER(IX, HIGH_REGISTER(IX));
                         break;
 
                     case 0x6d:      /* LD IXL,IXL */
@@ -3959,90 +3965,90 @@ t_stat sim_instr (void) {
 
                     case 0x6e:      /* LD L,(IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Setlreg(HL, GetBYTE(adr));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_LOW_REGISTER(HL, GET_BYTE(adr));
                         break;
 
                     case 0x6f:      /* LD IXL,A */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IX, hreg(AF));
+                        SET_LOW_REGISTER(IX, HIGH_REGISTER(AF));
                         break;
 
                     case 0x70:      /* LD (IX+dd),B */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, hreg(BC));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, HIGH_REGISTER(BC));
                         break;
 
                     case 0x71:      /* LD (IX+dd),C */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, lreg(BC));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, LOW_REGISTER(BC));
                         break;
 
                     case 0x72:      /* LD (IX+dd),D */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, hreg(DE));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, HIGH_REGISTER(DE));
                         break;
 
                     case 0x73:      /* LD (IX+dd),E */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, lreg(DE));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, LOW_REGISTER(DE));
                         break;
 
                     case 0x74:      /* LD (IX+dd),H */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, hreg(HL));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, HIGH_REGISTER(HL));
                         break;
 
                     case 0x75:      /* LD (IX+dd),L */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, lreg(HL));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, LOW_REGISTER(HL));
                         break;
 
                     case 0x77:      /* LD (IX+dd),A */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, hreg(AF));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, HIGH_REGISTER(AF));
                         break;
 
                     case 0x7c:      /* LD A,IXH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(AF, hreg(IX));
+                        SET_HIGH_REGISTER(AF, HIGH_REGISTER(IX));
                         break;
 
                     case 0x7d:      /* LD A,IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(AF, lreg(IX));
+                        SET_HIGH_REGISTER(AF, LOW_REGISTER(IX));
                         break;
 
                     case 0x7e:      /* LD A,(IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Sethreg(AF, GetBYTE(adr));
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_HIGH_REGISTER(AF, GET_BYTE(adr));
                         break;
 
                     case 0x84:      /* ADD A,IXH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = hreg(IX);
-                        acu = hreg(AF);
+                        temp = HIGH_REGISTER(IX);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp;
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
@@ -4050,18 +4056,18 @@ t_stat sim_instr (void) {
                     case 0x85:      /* ADD A,IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IX);
-                        acu = hreg(AF);
+                        temp = LOW_REGISTER(IX);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp;
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
 
                     case 0x86:      /* ADD A,(IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr);
-                        acu = hreg(AF);
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp;
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
@@ -4069,8 +4075,8 @@ t_stat sim_instr (void) {
                     case 0x8c:      /* ADC A,IXH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = hreg(IX);
-                        acu = hreg(AF);
+                        temp = HIGH_REGISTER(IX);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp + TSTFLAG(C);
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
@@ -4078,28 +4084,28 @@ t_stat sim_instr (void) {
                     case 0x8d:      /* ADC A,IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IX);
-                        acu = hreg(AF);
+                        temp = LOW_REGISTER(IX);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp + TSTFLAG(C);
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
 
                     case 0x8e:      /* ADC A,(IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr);
-                        acu = hreg(AF);
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp + TSTFLAG(C);
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
 
                     case 0x96:      /* SUB (IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr);
-                        acu = hreg(AF);
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp;
                         AF = addTable[sum & 0xff] | cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
                         break;
@@ -4110,8 +4116,8 @@ t_stat sim_instr (void) {
                     case 0x9c:      /* SBC A,IXH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = hreg(IX);
-                        acu = hreg(AF);
+                        temp = HIGH_REGISTER(IX);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp - TSTFLAG(C);
                         AF = addTable[sum & 0xff] | cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
                         break;
@@ -4122,18 +4128,18 @@ t_stat sim_instr (void) {
                     case 0x9d:      /* SBC A,IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IX);
-                        acu = hreg(AF);
+                        temp = LOW_REGISTER(IX);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp - TSTFLAG(C);
                         AF = addTable[sum & 0xff] | cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
                         break;
 
                     case 0x9e:      /* SBC A,(IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr);
-                        acu = hreg(AF);
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp - TSTFLAG(C);
                         AF = addTable[sum & 0xff] | cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
                         break;
@@ -4152,9 +4158,9 @@ t_stat sim_instr (void) {
 
                     case 0xa6:      /* AND (IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        AF = andTable[((AF >> 8) & GetBYTE(adr)) & 0xff];
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        AF = andTable[((AF >> 8) & GET_BYTE(adr)) & 0xff];
                         break;
 
                     case 0xac:      /* XOR IXH */
@@ -4171,9 +4177,9 @@ t_stat sim_instr (void) {
 
                     case 0xae:      /* XOR (IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        AF = xororTable[((AF >> 8) ^ GetBYTE(adr)) & 0xff];
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        AF = xororTable[((AF >> 8) ^ GET_BYTE(adr)) & 0xff];
                         break;
 
                     case 0xb4:      /* OR IXH */
@@ -4190,17 +4196,17 @@ t_stat sim_instr (void) {
 
                     case 0xb6:      /* OR (IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        AF = xororTable[((AF >> 8) | GetBYTE(adr)) & 0xff];
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        AF = xororTable[((AF >> 8) | GET_BYTE(adr)) & 0xff];
                         break;
 
                     case 0xbc:      /* CP IXH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = hreg(IX);
+                        temp = HIGH_REGISTER(IX);
                         AF = (AF & ~0x28) | (temp & 0x28);
-                        acu = hreg(AF);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp;
                         AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                             cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
@@ -4209,9 +4215,9 @@ t_stat sim_instr (void) {
                     case 0xbd:      /* CP IXL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IX);
+                        temp = LOW_REGISTER(IX);
                         AF = (AF & ~0x28) | (temp & 0x28);
-                        acu = hreg(AF);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp;
                         AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                             cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
@@ -4219,66 +4225,66 @@ t_stat sim_instr (void) {
 
                     case 0xbe:      /* CP (IX+dd) */
                         tStates += 19;
-                        adr = IX + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr);
+                        adr = IX + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr);
                         AF = (AF & ~0x28) | (temp & 0x28);
-                        acu = hreg(AF);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp;
                         AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                             cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
                         break;
 
                     case 0xcb:      /* CB prefix */
-                        adr = IX + (int8) RAM_pp(PC);
-                        switch ((op = GetBYTE(PC)) & 7) {
+                        adr = IX + (int8) RAM_PP(PC);
+                        switch ((op = GET_BYTE(PC)) & 7) {
 
                             case 0:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = hreg(BC);
+                                acu = HIGH_REGISTER(BC);
                                 break;
 
                             case 1:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = lreg(BC);
+                                acu = LOW_REGISTER(BC);
                                 break;
 
                             case 2:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = hreg(DE);
+                                acu = HIGH_REGISTER(DE);
                                 break;
 
                             case 3:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = lreg(DE);
+                                acu = LOW_REGISTER(DE);
                                 break;
 
                             case 4:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = hreg(HL);
+                                acu = HIGH_REGISTER(HL);
                                 break;
 
                             case 5:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = lreg(HL);
+                                acu = LOW_REGISTER(HL);
                                 break;
 
                             case 6:
-                                CheckBreakByte(adr);
+                                CHECK_BREAK_BYTE(adr);
                                 ++PC;
-                                acu = GetBYTE(adr);
+                                acu = GET_BYTE(adr);
                                 break;
 
                             case 7:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = hreg(AF);
+                                acu = HIGH_REGISTER(AF);
                                 break;
                         }
                         switch (op & 0xc0) {
@@ -4357,27 +4363,27 @@ t_stat sim_instr (void) {
                         switch (op & 7) {
 
                             case 0:
-                                Sethreg(BC, temp);
+                                SET_HIGH_REGISTER(BC, temp);
                                 break;
 
                             case 1:
-                                Setlreg(BC, temp);
+                                SET_LOW_REGISTER(BC, temp);
                                 break;
 
                             case 2:
-                               Sethreg(DE, temp);
+                               SET_HIGH_REGISTER(DE, temp);
                                 break;
 
                             case 3:
-                                Setlreg(DE, temp);
+                                SET_LOW_REGISTER(DE, temp);
                                 break;
 
                             case 4:
-                                Sethreg(HL, temp);
+                                SET_HIGH_REGISTER(HL, temp);
                                 break;
 
                             case 5:
-                                Setlreg(HL, temp);
+                                SET_LOW_REGISTER(HL, temp);
                                 break;
 
                             case 6:
@@ -4385,20 +4391,20 @@ t_stat sim_instr (void) {
                                 break;
 
                             case 7:
-                                Sethreg(AF, temp);
+                                SET_HIGH_REGISTER(AF, temp);
                                 break;
                         }
                         break;
 
                     case 0xe1:      /* POP IX */
                         tStates += 14;
-                        CheckBreakWord(SP);
+                        CHECK_BREAK_WORD(SP);
                         POP(IX);
                         break;
 
                     case 0xe3:      /* EX (SP),IX */
                         tStates += 23;
-                        CheckBreakWord(SP);
+                        CHECK_BREAK_WORD(SP);
                         temp = IX;
                         POP(IX);
                         PUSH(temp);
@@ -4406,7 +4412,7 @@ t_stat sim_instr (void) {
 
                     case 0xe5:      /* PUSH IX */
                         tStates += 15;
-                        CheckBreakWord(SP - 2);
+                        CHECK_BREAK_WORD(SP - 2);
                         PUSH(IX);
                         break;
 
@@ -4425,7 +4431,7 @@ t_stat sim_instr (void) {
 
                     default:        /* ignore DD */
                         sim_brk_pend[0] = FALSE;
-                        checkCPUZ80;
+                        CHECK_CPU_Z80;
                         PC--;
                 }
                 break;
@@ -4433,16 +4439,16 @@ t_stat sim_instr (void) {
             case 0xde:      /* SBC A,nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                temp = RAM_pp(PC);
-                acu = hreg(AF);
+                temp = RAM_PP(PC);
+                acu = HIGH_REGISTER(AF);
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
-                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SetPV);
+                AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
                 break;
 
             case 0xdf:      /* RST 18H */
                 tStates += 11;
-                CheckBreakWord(SP - 2);
+                CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PC - 1);
                 PC = 0x18;
@@ -4454,7 +4460,7 @@ t_stat sim_instr (void) {
                     tStates += 5;
                 }
                 else {
-                    CheckBreakWord(SP);
+                    CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PC - 1);
                     POP(PC);
                     tStates += 11;
@@ -4463,7 +4469,7 @@ t_stat sim_instr (void) {
 
             case 0xe1:      /* POP HL */
                 tStates += 10;
-                CheckBreakWord(SP);
+                CHECK_BREAK_WORD(SP);
                 POP(HL);
                 break;
 
@@ -4474,7 +4480,7 @@ t_stat sim_instr (void) {
 
             case 0xe3:      /* EX (SP),HL */
                 tStates += 19;
-                CheckBreakWord(SP);
+                CHECK_BREAK_WORD(SP);
                 temp = HL;
                 POP(HL);
                 PUSH(temp);
@@ -4486,19 +4492,19 @@ t_stat sim_instr (void) {
 
             case 0xe5:      /* PUSH HL */
                 tStates += 11;
-                CheckBreakWord(SP - 2);
+                CHECK_BREAK_WORD(SP - 2);
                 PUSH(HL);
                 break;
 
             case 0xe6:      /* AND nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                AF = andTable[((AF >> 8) & RAM_pp(PC)) & 0xff];
+                AF = andTable[((AF >> 8) & RAM_PP(PC)) & 0xff];
                 break;
 
             case 0xe7:      /* RST 20H */
                 tStates += 11;
-                CheckBreakWord(SP - 2);
+                CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PC - 1);
                 PC = 0x20;
@@ -4506,7 +4512,7 @@ t_stat sim_instr (void) {
 
             case 0xe8:      /* RET PE */
                 if (TSTFLAG(P)) {
-                    CheckBreakWord(SP);
+                    CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PC - 1);
                     POP(PC);
                     tStates += 11;
@@ -4542,21 +4548,21 @@ t_stat sim_instr (void) {
                 break;
 
             case 0xed:      /* ED prefix */
-                checkCPU8080;
-                switch (op = RAM_pp(PC)) {
+                CHECK_CPU_8080;
+                switch (op = RAM_PP(PC)) {
 
                     case 0x40:      /* IN B,(C) */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        temp = in(lreg(BC));
-                        Sethreg(BC, temp);
+                        temp = in(LOW_REGISTER(BC));
+                        SET_HIGH_REGISTER(BC, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
                         break;
 
                     case 0x41:      /* OUT (C),B */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        out(lreg(BC), hreg(BC));
+                        out(LOW_REGISTER(BC), HIGH_REGISTER(BC));
                         break;
 
                     case 0x42:      /* SBC HL,BC */
@@ -4572,8 +4578,8 @@ t_stat sim_instr (void) {
 
                     case 0x43:      /* LD (nnnn),BC */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
                         PutWORD(temp, BC);
                         PC += 2;
                         break;
@@ -4595,7 +4601,7 @@ t_stat sim_instr (void) {
                     case 0x7C:      /* NEG, unofficial */
                         tStates += 8;
                         sim_brk_pend[0] = FALSE;
-                        temp = hreg(AF);
+                        temp = HIGH_REGISTER(AF);
                         AF = ((~(AF & 0xff00) + 1) & 0xff00); /* AF = (-(AF & 0xff00) & 0xff00); */
                         AF |= ((AF >> 8) & 0xa8) | (((AF & 0xff00) == 0) << 6) | negTable[temp];
                         break;
@@ -4615,7 +4621,7 @@ t_stat sim_instr (void) {
                     case 0x7D:      /* RETN, unofficial */
                         tStates += 14;
                         IFF_S |= IFF_S >> 1;
-                        CheckBreakWord(SP);
+                        CHECK_BREAK_WORD(SP);
                         PCQ_ENTRY(PC - 2);
                         POP(PC);
                         break;
@@ -4635,15 +4641,15 @@ t_stat sim_instr (void) {
                     case 0x48:      /* IN C,(C) */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        temp = in(lreg(BC));
-                        Setlreg(BC, temp);
+                        temp = in(LOW_REGISTER(BC));
+                        SET_LOW_REGISTER(BC, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
                         break;
 
                     case 0x49:      /* OUT (C),C */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        out(lreg(BC), lreg(BC));
+                        out(LOW_REGISTER(BC), LOW_REGISTER(BC));
                         break;
 
                     case 0x4a:      /* ADC HL,BC */
@@ -4659,16 +4665,16 @@ t_stat sim_instr (void) {
 
                     case 0x4b:      /* LD BC,(nnnn) */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
-                        BC = GetWORD(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
+                        BC = GET_WORD(temp);
                         PC += 2;
                         break;
 
                     case 0x4d:      /* RETI */
                         tStates += 14;
                         IFF_S |= IFF_S >> 1;
-                        CheckBreakWord(SP);
+                        CHECK_BREAK_WORD(SP);
                         PCQ_ENTRY(PC - 2);
                         POP(PC);
                         break;
@@ -4682,15 +4688,15 @@ t_stat sim_instr (void) {
                     case 0x50:      /* IN D,(C) */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        temp = in(lreg(BC));
-                        Sethreg(DE, temp);
+                        temp = in(LOW_REGISTER(BC));
+                        SET_HIGH_REGISTER(DE, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
                         break;
 
                     case 0x51:      /* OUT (C),D */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        out(lreg(BC), hreg(DE));
+                        out(LOW_REGISTER(BC), HIGH_REGISTER(DE));
                         break;
 
                     case 0x52:      /* SBC HL,DE */
@@ -4706,8 +4712,8 @@ t_stat sim_instr (void) {
 
                     case 0x53:      /* LD (nnnn),DE */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
                         PutWORD(temp, DE);
                         PC += 2;
                         break;
@@ -4727,15 +4733,15 @@ t_stat sim_instr (void) {
                     case 0x58:      /* IN E,(C) */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        temp = in(lreg(BC));
-                        Setlreg(DE, temp);
+                        temp = in(LOW_REGISTER(BC));
+                        SET_LOW_REGISTER(DE, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
                         break;
 
                     case 0x59:      /* OUT (C),E */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        out(lreg(BC), lreg(DE));
+                        out(LOW_REGISTER(BC), LOW_REGISTER(DE));
                         break;
 
                     case 0x5a:      /* ADC HL,DE */
@@ -4751,9 +4757,9 @@ t_stat sim_instr (void) {
 
                     case 0x5b:      /* LD DE,(nnnn) */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
-                        DE = GetWORD(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
+                        DE = GET_WORD(temp);
                         PC += 2;
                         break;
 
@@ -4773,15 +4779,15 @@ t_stat sim_instr (void) {
                     case 0x60:      /* IN H,(C) */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        temp = in(lreg(BC));
-                        Sethreg(HL, temp);
+                        temp = in(LOW_REGISTER(BC));
+                        SET_HIGH_REGISTER(HL, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
                         break;
 
                     case 0x61:      /* OUT (C),H */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        out(lreg(BC), hreg(HL));
+                        out(LOW_REGISTER(BC), HIGH_REGISTER(HL));
                         break;
 
                     case 0x62:      /* SBC HL,HL */
@@ -4796,8 +4802,8 @@ t_stat sim_instr (void) {
 
                     case 0x63:      /* LD (nnnn),HL */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
                         PutWORD(temp, HL);
                         PC += 2;
                         break;
@@ -4805,24 +4811,24 @@ t_stat sim_instr (void) {
                     case 0x67:      /* RRD */
                         tStates += 18;
                         sim_brk_pend[0] = FALSE;
-                        temp = GetBYTE(HL);
-                        acu = hreg(AF);
-                        PutBYTE(HL, hdig(temp) | (ldig(acu) << 4));
-                        AF = rrdrldTable[(acu & 0xf0) | ldig(temp)] | (AF & 1);
+                        temp = GET_BYTE(HL);
+                        acu = HIGH_REGISTER(AF);
+                        PutBYTE(HL, HIGH_DIGIT(temp) | (LOW_DIGIT(acu) << 4));
+                        AF = rrdrldTable[(acu & 0xf0) | LOW_DIGIT(temp)] | (AF & 1);
                         break;
 
                     case 0x68:      /* IN L,(C) */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        temp = in(lreg(BC));
-                        Setlreg(HL, temp);
+                        temp = in(LOW_REGISTER(BC));
+                        SET_LOW_REGISTER(HL, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
                         break;
 
                     case 0x69:      /* OUT (C),L */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        out(lreg(BC), lreg(HL));
+                        out(LOW_REGISTER(BC), LOW_REGISTER(HL));
                         break;
 
                     case 0x6a:      /* ADC HL,HL */
@@ -4837,33 +4843,33 @@ t_stat sim_instr (void) {
 
                     case 0x6b:      /* LD HL,(nnnn) */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
-                        HL = GetWORD(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
+                        HL = GET_WORD(temp);
                         PC += 2;
                         break;
 
                     case 0x6f:      /* RLD */
                         tStates += 18;
                         sim_brk_pend[0] = FALSE;
-                        temp = GetBYTE(HL);
-                        acu = hreg(AF);
-                        PutBYTE(HL, (ldig(temp) << 4) | ldig(acu));
-                        AF = rrdrldTable[(acu & 0xf0) | hdig(temp)] | (AF & 1);
+                        temp = GET_BYTE(HL);
+                        acu = HIGH_REGISTER(AF);
+                        PutBYTE(HL, (LOW_DIGIT(temp) << 4) | LOW_DIGIT(acu));
+                        AF = rrdrldTable[(acu & 0xf0) | HIGH_DIGIT(temp)] | (AF & 1);
                         break;
 
                     case 0x70:      /* IN (C) */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        temp = in(lreg(BC));
-                        Setlreg(temp, temp);
+                        temp = in(LOW_REGISTER(BC));
+                        SET_LOW_REGISTER(temp, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
                         break;
 
                     case 0x71:      /* OUT (C),0 */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        out(lreg(BC), 0);
+                        out(LOW_REGISTER(BC), 0);
                         break;
 
                     case 0x72:      /* SBC HL,SP */
@@ -4879,8 +4885,8 @@ t_stat sim_instr (void) {
 
                     case 0x73:      /* LD (nnnn),SP */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
                         PutWORD(temp, SP);
                         PC += 2;
                         break;
@@ -4888,15 +4894,15 @@ t_stat sim_instr (void) {
                     case 0x78:      /* IN A,(C) */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        temp = in(lreg(BC));
-                        Sethreg(AF, temp);
+                        temp = in(LOW_REGISTER(BC));
+                        SET_HIGH_REGISTER(AF, temp);
                         AF = (AF & ~0xfe) | rotateShiftTable[temp & 0xff];
                         break;
 
                     case 0x79:      /* OUT (C),A */
                         tStates += 12;
                         sim_brk_pend[0] = FALSE;
-                        out(lreg(BC), hreg(AF));
+                        out(LOW_REGISTER(BC), HIGH_REGISTER(AF));
                         break;
 
                     case 0x7a:      /* ADC HL,SP */
@@ -4912,27 +4918,27 @@ t_stat sim_instr (void) {
 
                     case 0x7b:      /* LD SP,(nnnn) */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
-                        SP = GetWORD(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
+                        SP = GET_WORD(temp);
                         PC += 2;
                         break;
 
                     case 0xa0:      /* LDI */
                         tStates += 16;
-                        CheckBreakTwoBytes(HL, DE);
-                        acu = RAM_pp(HL);
-                        PutBYTE_pp(DE, acu);
-                        acu += hreg(AF);
+                        CHECK_BREAK_TWO_BYTES(HL, DE);
+                        acu = RAM_PP(HL);
+                        PUT_BYTE_PP(DE, acu);
+                        acu += HIGH_REGISTER(AF);
                         AF = (AF & ~0x3e) | (acu & 8) | ((acu & 2) << 4) |
                             (((--BC & ADDRMASK) != 0) << 2);
                         break;
 
                     case 0xa1:      /* CPI */
                         tStates += 16;
-                        CheckBreakByte(HL);
-                        acu = hreg(AF);
-                        temp = RAM_pp(HL);
+                        CHECK_BREAK_BYTE(HL);
+                        acu = HIGH_REGISTER(AF);
+                        temp = RAM_PP(HL);
                         sum = acu - temp;
                         cbits = acu ^ temp ^ sum;
                         AF = (AF & ~0xfe) | (sum & 0x80) | (!(sum & 0xff) << 6) |
@@ -4946,8 +4952,8 @@ t_stat sim_instr (void) {
 
                     case 0xa2:      /* INI */
                         tStates += 16;
-                        CheckBreakByte(HL);
-                        PutBYTE(HL, in(lreg(BC)));
+                        CHECK_BREAK_BYTE(HL);
+                        PutBYTE(HL, in(LOW_REGISTER(BC)));
                         ++HL;
                         SETFLAG(N, 1);
                         SETFLAG(P, (--BC & ADDRMASK) != 0);
@@ -4955,29 +4961,29 @@ t_stat sim_instr (void) {
 
                     case 0xa3:      /* OUTI */
                         tStates += 16;
-                        CheckBreakByte(HL);
-                        out(lreg(BC), GetBYTE(HL));
+                        CHECK_BREAK_BYTE(HL);
+                        out(LOW_REGISTER(BC), GET_BYTE(HL));
                         ++HL;
                         SETFLAG(N, 1);
-                        Sethreg(BC, lreg(BC) - 1);
-                        SETFLAG(Z, lreg(BC) == 0);
+                        SET_HIGH_REGISTER(BC, LOW_REGISTER(BC) - 1);
+                        SETFLAG(Z, LOW_REGISTER(BC) == 0);
                         break;
 
                     case 0xa8:      /* LDD */
                         tStates += 16;
-                        CheckBreakTwoBytes(HL, DE);
-                        acu = RAM_mm(HL);
-                        PutBYTE_mm(DE, acu);
-                        acu += hreg(AF);
+                        CHECK_BREAK_TWO_BYTES(HL, DE);
+                        acu = RAM_MM(HL);
+                        PUT_BYTE_MM(DE, acu);
+                        acu += HIGH_REGISTER(AF);
                         AF = (AF & ~0x3e) | (acu & 8) | ((acu & 2) << 4) |
                             (((--BC & ADDRMASK) != 0) << 2);
                         break;
 
                     case 0xa9:      /* CPD */
                         tStates += 16;
-                        CheckBreakByte(HL);
-                        acu = hreg(AF);
-                        temp = RAM_mm(HL);
+                        CHECK_BREAK_BYTE(HL);
+                        acu = HIGH_REGISTER(AF);
+                        temp = RAM_MM(HL);
                         sum = acu - temp;
                         cbits = acu ^ temp ^ sum;
                         AF = (AF & ~0xfe) | (sum & 0x80) | (!(sum & 0xff) << 6) |
@@ -4991,46 +4997,46 @@ t_stat sim_instr (void) {
 
                     case 0xaa:      /* IND */
                         tStates += 16;
-                        CheckBreakByte(HL);
-                        PutBYTE(HL, in(lreg(BC)));
+                        CHECK_BREAK_BYTE(HL);
+                        PutBYTE(HL, in(LOW_REGISTER(BC)));
                         --HL;
                         SETFLAG(N, 1);
-                        Sethreg(BC, lreg(BC) - 1);
-                        SETFLAG(Z, lreg(BC) == 0);
+                        SET_HIGH_REGISTER(BC, LOW_REGISTER(BC) - 1);
+                        SETFLAG(Z, LOW_REGISTER(BC) == 0);
                         break;
 
                     case 0xab:      /* OUTD */
                         tStates += 16;
-                        CheckBreakByte(HL);
-                        out(lreg(BC), GetBYTE(HL));
+                        CHECK_BREAK_BYTE(HL);
+                        out(LOW_REGISTER(BC), GET_BYTE(HL));
                         --HL;
                         SETFLAG(N, 1);
-                        Sethreg(BC, lreg(BC) - 1);
-                        SETFLAG(Z, lreg(BC) == 0);
+                        SET_HIGH_REGISTER(BC, LOW_REGISTER(BC) - 1);
+                        SETFLAG(Z, LOW_REGISTER(BC) == 0);
                         break;
 
                     case 0xb0:      /* LDIR */
                         tStates -= 5;
-                        acu = hreg(AF);
+                        acu = HIGH_REGISTER(AF);
                         BC &= ADDRMASK;
                         do {
                             tStates += 21;
-                            CheckBreakTwoBytes(HL, DE);
-                            acu = RAM_pp(HL);
-                            PutBYTE_pp(DE, acu);
+                            CHECK_BREAK_TWO_BYTES(HL, DE);
+                            acu = RAM_PP(HL);
+                            PUT_BYTE_PP(DE, acu);
                         } while (--BC);
-                        acu += hreg(AF);
+                        acu += HIGH_REGISTER(AF);
                         AF = (AF & ~0x3e) | (acu & 8) | ((acu & 2) << 4);
                         break;
 
                     case 0xb1:      /* CPIR */
                         tStates -= 5;
-                        acu = hreg(AF);
+                        acu = HIGH_REGISTER(AF);
                         BC &= ADDRMASK;
                         do {
                             tStates += 21;
-                            CheckBreakByte(HL);
-                            temp = RAM_pp(HL);
+                            CHECK_BREAK_BYTE(HL);
+                            temp = RAM_PP(HL);
                             op = --BC != 0;
                             sum = acu - temp;
                         } while (op && sum != 0);
@@ -5046,28 +5052,28 @@ t_stat sim_instr (void) {
 
                     case 0xb2:      /* INIR */
                         tStates -= 5;
-                        temp = hreg(BC);
+                        temp = HIGH_REGISTER(BC);
                         do {
                             tStates += 21;
-                            CheckBreakByte(HL);
-                            PutBYTE(HL, in(lreg(BC)));
+                            CHECK_BREAK_BYTE(HL);
+                            PutBYTE(HL, in(LOW_REGISTER(BC)));
                             ++HL;
                         } while (--temp);
-                        Sethreg(BC, 0);
+                        SET_HIGH_REGISTER(BC, 0);
                         SETFLAG(N, 1);
                         SETFLAG(Z, 1);
                         break;
 
                     case 0xb3:      /* OTIR */
                         tStates -= 5;
-                        temp = hreg(BC);
+                        temp = HIGH_REGISTER(BC);
                         do {
                             tStates += 21;
-                            CheckBreakByte(HL);
-                            out(lreg(BC), GetBYTE(HL));
+                            CHECK_BREAK_BYTE(HL);
+                            out(LOW_REGISTER(BC), GET_BYTE(HL));
                             ++HL;
                         } while (--temp);
-                        Sethreg(BC, 0);
+                        SET_HIGH_REGISTER(BC, 0);
                         SETFLAG(N, 1);
                         SETFLAG(Z, 1);
                         break;
@@ -5077,22 +5083,22 @@ t_stat sim_instr (void) {
                         BC &= ADDRMASK;
                         do {
                             tStates += 21;
-                            CheckBreakTwoBytes(HL, DE);
-                            acu = RAM_mm(HL);
-                            PutBYTE_mm(DE, acu);
+                            CHECK_BREAK_TWO_BYTES(HL, DE);
+                            acu = RAM_MM(HL);
+                            PUT_BYTE_MM(DE, acu);
                         } while (--BC);
-                        acu += hreg(AF);
+                        acu += HIGH_REGISTER(AF);
                         AF = (AF & ~0x3e) | (acu & 8) | ((acu & 2) << 4);
                         break;
 
                     case 0xb9:      /* CPDR */
                         tStates -= 5;
-                        acu = hreg(AF);
+                        acu = HIGH_REGISTER(AF);
                         BC &= ADDRMASK;
                         do {
                             tStates += 21;
-                            CheckBreakByte(HL);
-                            temp = RAM_mm(HL);
+                            CHECK_BREAK_BYTE(HL);
+                            temp = RAM_MM(HL);
                             op = --BC != 0;
                             sum = acu - temp;
                         } while (op && sum != 0);
@@ -5108,47 +5114,47 @@ t_stat sim_instr (void) {
 
                     case 0xba:      /* INDR */
                         tStates -= 5;
-                        temp = hreg(BC);
+                        temp = HIGH_REGISTER(BC);
                         do {
                             tStates += 21;
-                            CheckBreakByte(HL);
-                            PutBYTE(HL, in(lreg(BC)));
+                            CHECK_BREAK_BYTE(HL);
+                            PutBYTE(HL, in(LOW_REGISTER(BC)));
                             --HL;
                         } while (--temp);
-                        Sethreg(BC, 0);
+                        SET_HIGH_REGISTER(BC, 0);
                         SETFLAG(N, 1);
                         SETFLAG(Z, 1);
                         break;
 
                     case 0xbb:      /* OTDR */
                         tStates -= 5;
-                        temp = hreg(BC);
+                        temp = HIGH_REGISTER(BC);
                         do {
                             tStates += 21;
-                            CheckBreakByte(HL);
-                            out(lreg(BC), GetBYTE(HL));
+                            CHECK_BREAK_BYTE(HL);
+                            out(LOW_REGISTER(BC), GET_BYTE(HL));
                             --HL;
                         } while (--temp);
-                        Sethreg(BC, 0);
+                        SET_HIGH_REGISTER(BC, 0);
                         SETFLAG(N, 1);
                         SETFLAG(Z, 1);
                         break;
 
                     default:        /* ignore ED and following byte */
                         sim_brk_pend[0] = FALSE;
-                        checkCPUZ80;
+                        CHECK_CPU_Z80;
                 }
                 break;
 
             case 0xee:      /* XOR nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                AF = xororTable[((AF >> 8) ^ RAM_pp(PC)) & 0xff];
+                AF = xororTable[((AF >> 8) ^ RAM_PP(PC)) & 0xff];
                 break;
 
             case 0xef:      /* RST 28H */
                 tStates += 11;
-                CheckBreakWord(SP - 2);
+                CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PC - 1);
                 PC = 0x28;
@@ -5160,7 +5166,7 @@ t_stat sim_instr (void) {
                     tStates += 5;
                 }
                 else {
-                    CheckBreakWord(SP);
+                    CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PC - 1);
                     POP(PC);
                     tStates += 11;
@@ -5169,7 +5175,7 @@ t_stat sim_instr (void) {
 
             case 0xf1:      /* POP AF */
                 tStates += 10;
-                CheckBreakWord(SP);
+                CHECK_BREAK_WORD(SP);
                 POP(AF);
                 break;
 
@@ -5190,19 +5196,19 @@ t_stat sim_instr (void) {
 
             case 0xf5:      /* PUSH AF */
                 tStates += 11;
-                CheckBreakWord(SP - 2);
+                CHECK_BREAK_WORD(SP - 2);
                 PUSH(AF);
                 break;
 
             case 0xf6:      /* OR nn */
                 tStates += 7;
                 sim_brk_pend[0] = FALSE;
-                AF = xororTable[((AF >> 8) | RAM_pp(PC)) & 0xff];
+                AF = xororTable[((AF >> 8) | RAM_PP(PC)) & 0xff];
                 break;
 
             case 0xf7:      /* RST 30H */
                 tStates += 11;
-                CheckBreakWord(SP - 2);
+                CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PC - 1);
                 PC = 0x30;
@@ -5210,7 +5216,7 @@ t_stat sim_instr (void) {
 
             case 0xf8:      /* RET M */
                 if (TSTFLAG(S)) {
-                    CheckBreakWord(SP);
+                    CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PC - 1);
                     POP(PC);
                     tStates += 11;
@@ -5243,8 +5249,8 @@ t_stat sim_instr (void) {
                 break;
 
             case 0xfd:      /* FD prefix */
-                checkCPU8080;
-                switch (op = RAM_pp(PC)) {
+                CHECK_CPU_8080;
+                switch (op = RAM_PP(PC)) {
 
                     case 0x09:      /* ADD IY,BC */
                         tStates += 15;
@@ -5269,14 +5275,14 @@ t_stat sim_instr (void) {
                     case 0x21:      /* LD IY,nnnn */
                         tStates += 14;
                         sim_brk_pend[0] = FALSE;
-                        IY = GetWORD(PC);
+                        IY = GET_WORD(PC);
                         PC += 2;
                         break;
 
                     case 0x22:      /* LD (nnnn),IY */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
                         PutWORD(temp, IY);
                         PC += 2;
                         break;
@@ -5291,20 +5297,20 @@ t_stat sim_instr (void) {
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
                         IY += 0x100;
-                        AF = (AF & ~0xfe) | incZ80Table[hreg(IY)];
+                        AF = (AF & ~0xfe) | incZ80Table[HIGH_REGISTER(IY)];
                         break;
 
                     case 0x25:      /* DEC IYH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
                         IY -= 0x100;
-                        AF = (AF & ~0xfe) | decZ80Table[hreg(IY)];
+                        AF = (AF & ~0xfe) | decZ80Table[HIGH_REGISTER(IY)];
                         break;
 
                     case 0x26:      /* LD IYH,nn */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IY, RAM_pp(PC));
+                        SET_HIGH_REGISTER(IY, RAM_PP(PC));
                         break;
 
                     case 0x29:      /* ADD IY,IY */
@@ -5318,9 +5324,9 @@ t_stat sim_instr (void) {
 
                     case 0x2a:      /* LD IY,(nnnn) */
                         tStates += 20;
-                        temp = GetWORD(PC);
-                        CheckBreakWord(temp);
-                        IY = GetWORD(temp);
+                        temp = GET_WORD(PC);
+                        CHECK_BREAK_WORD(temp);
+                        IY = GET_WORD(temp);
                         PC += 2;
                         break;
 
@@ -5333,48 +5339,48 @@ t_stat sim_instr (void) {
                     case 0x2c:      /* INC IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IY) + 1;
-                        Setlreg(IY, temp);
+                        temp = LOW_REGISTER(IY) + 1;
+                        SET_LOW_REGISTER(IY, temp);
                         AF = (AF & ~0xfe) | incZ80Table[temp];
                         break;
 
                     case 0x2d:      /* DEC IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IY) - 1;
-                        Setlreg(IY, temp);
+                        temp = LOW_REGISTER(IY) - 1;
+                        SET_LOW_REGISTER(IY, temp);
                         AF = (AF & ~0xfe) | decZ80Table[temp & 0xff];
                         break;
 
                     case 0x2e:      /* LD IYL,nn */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IY, RAM_pp(PC));
+                        SET_LOW_REGISTER(IY, RAM_PP(PC));
                         break;
 
                     case 0x34:      /* INC (IY+dd) */
                         tStates += 23;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr) + 1;
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr) + 1;
                         PutBYTE(adr, temp);
                         AF = (AF & ~0xfe) | incZ80Table[temp];
                         break;
 
                     case 0x35:      /* DEC (IY+dd) */
                         tStates += 23;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr) - 1;
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr) - 1;
                         PutBYTE(adr, temp);
                         AF = (AF & ~0xfe) | decZ80Table[temp & 0xff];
                         break;
 
                     case 0x36:      /* LD (IY+dd),nn */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, RAM_pp(PC));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, RAM_PP(PC));
                         break;
 
                     case 0x39:      /* ADD IY,SP */
@@ -5390,101 +5396,101 @@ t_stat sim_instr (void) {
                     case 0x44:      /* LD B,IYH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(BC, hreg(IY));
+                        SET_HIGH_REGISTER(BC, HIGH_REGISTER(IY));
                         break;
 
                     case 0x45:      /* LD B,IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(BC, lreg(IY));
+                        SET_HIGH_REGISTER(BC, LOW_REGISTER(IY));
                         break;
 
                     case 0x46:      /* LD B,(IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Sethreg(BC, GetBYTE(adr));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_HIGH_REGISTER(BC, GET_BYTE(adr));
                         break;
 
                     case 0x4c:      /* LD C,IYH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(BC, hreg(IY));
+                        SET_LOW_REGISTER(BC, HIGH_REGISTER(IY));
                         break;
 
                     case 0x4d:      /* LD C,IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(BC, lreg(IY));
+                        SET_LOW_REGISTER(BC, LOW_REGISTER(IY));
                         break;
 
                     case 0x4e:      /* LD C,(IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Setlreg(BC, GetBYTE(adr));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_LOW_REGISTER(BC, GET_BYTE(adr));
                         break;
 
                     case 0x54:      /* LD D,IYH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(DE, hreg(IY));
+                        SET_HIGH_REGISTER(DE, HIGH_REGISTER(IY));
                         break;
 
                     case 0x55:      /* LD D,IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(DE, lreg(IY));
+                        SET_HIGH_REGISTER(DE, LOW_REGISTER(IY));
                         break;
 
                     case 0x56:      /* LD D,(IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Sethreg(DE, GetBYTE(adr));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_HIGH_REGISTER(DE, GET_BYTE(adr));
                         break;
 
                     case 0x5c:      /* LD E,IYH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(DE, hreg(IY));
+                        SET_LOW_REGISTER(DE, HIGH_REGISTER(IY));
                         break;
 
                     case 0x5d:      /* LD E,IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(DE, lreg(IY));
+                        SET_LOW_REGISTER(DE, LOW_REGISTER(IY));
                         break;
 
                     case 0x5e:      /* LD E,(IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Setlreg(DE, GetBYTE(adr));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_LOW_REGISTER(DE, GET_BYTE(adr));
                         break;
 
                     case 0x60:      /* LD IYH,B */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IY, hreg(BC));
+                        SET_HIGH_REGISTER(IY, HIGH_REGISTER(BC));
                         break;
 
                     case 0x61:      /* LD IYH,C */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IY, lreg(BC));
+                        SET_HIGH_REGISTER(IY, LOW_REGISTER(BC));
                         break;
 
                     case 0x62:      /* LD IYH,D */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IY, hreg(DE));
+                        SET_HIGH_REGISTER(IY, HIGH_REGISTER(DE));
                         break;
 
                     case 0x63:      /* LD IYH,E */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IY, lreg(DE));
+                        SET_HIGH_REGISTER(IY, LOW_REGISTER(DE));
                         break;
 
                     case 0x64:      /* LD IYH,IYH */
@@ -5495,50 +5501,50 @@ t_stat sim_instr (void) {
                     case 0x65:      /* LD IYH,IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IY, lreg(IY));
+                        SET_HIGH_REGISTER(IY, LOW_REGISTER(IY));
                         break;
 
                     case 0x66:      /* LD H,(IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Sethreg(HL, GetBYTE(adr));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_HIGH_REGISTER(HL, GET_BYTE(adr));
                         break;
 
                     case 0x67:      /* LD IYH,A */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(IY, hreg(AF));
+                        SET_HIGH_REGISTER(IY, HIGH_REGISTER(AF));
                         break;
 
                     case 0x68:      /* LD IYL,B */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IY, hreg(BC));
+                        SET_LOW_REGISTER(IY, HIGH_REGISTER(BC));
                         break;
 
                     case 0x69:      /* LD IYL,C */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IY, lreg(BC));
+                        SET_LOW_REGISTER(IY, LOW_REGISTER(BC));
                         break;
 
                     case 0x6a:      /* LD IYL,D */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IY, hreg(DE));
+                        SET_LOW_REGISTER(IY, HIGH_REGISTER(DE));
                         break;
 
                     case 0x6b:      /* LD IYL,E */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IY, lreg(DE));
+                        SET_LOW_REGISTER(IY, LOW_REGISTER(DE));
                         break;
 
                     case 0x6c:      /* LD IYL,IYH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IY, hreg(IY));
+                        SET_LOW_REGISTER(IY, HIGH_REGISTER(IY));
                         break;
 
                     case 0x6d:      /* LD IYL,IYL */
@@ -5548,90 +5554,90 @@ t_stat sim_instr (void) {
 
                     case 0x6e:      /* LD L,(IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Setlreg(HL, GetBYTE(adr));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_LOW_REGISTER(HL, GET_BYTE(adr));
                         break;
 
                     case 0x6f:      /* LD IYL,A */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Setlreg(IY, hreg(AF));
+                        SET_LOW_REGISTER(IY, HIGH_REGISTER(AF));
                         break;
 
                     case 0x70:      /* LD (IY+dd),B */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, hreg(BC));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, HIGH_REGISTER(BC));
                         break;
 
                     case 0x71:      /* LD (IY+dd),C */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, lreg(BC));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, LOW_REGISTER(BC));
                         break;
 
                     case 0x72:      /* LD (IY+dd),D */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, hreg(DE));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, HIGH_REGISTER(DE));
                         break;
 
                     case 0x73:      /* LD (IY+dd),E */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, lreg(DE));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, LOW_REGISTER(DE));
                         break;
 
                     case 0x74:      /* LD (IY+dd),H */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, hreg(HL));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, HIGH_REGISTER(HL));
                         break;
 
                     case 0x75:      /* LD (IY+dd),L */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, lreg(HL));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, LOW_REGISTER(HL));
                         break;
 
                     case 0x77:      /* LD (IY+dd),A */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        PutBYTE(adr, hreg(AF));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        PutBYTE(adr, HIGH_REGISTER(AF));
                         break;
 
                     case 0x7c:      /* LD A,IYH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(AF, hreg(IY));
+                        SET_HIGH_REGISTER(AF, HIGH_REGISTER(IY));
                         break;
 
                     case 0x7d:      /* LD A,IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        Sethreg(AF, lreg(IY));
+                        SET_HIGH_REGISTER(AF, LOW_REGISTER(IY));
                         break;
 
                     case 0x7e:      /* LD A,(IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        Sethreg(AF, GetBYTE(adr));
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        SET_HIGH_REGISTER(AF, GET_BYTE(adr));
                         break;
 
                     case 0x84:      /* ADD A,IYH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = hreg(IY);
-                        acu = hreg(AF);
+                        temp = HIGH_REGISTER(IY);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp;
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
@@ -5639,18 +5645,18 @@ t_stat sim_instr (void) {
                     case 0x85:      /* ADD A,IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IY);
-                        acu = hreg(AF);
+                        temp = LOW_REGISTER(IY);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp;
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
 
                     case 0x86:      /* ADD A,(IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr);
-                        acu = hreg(AF);
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp;
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
@@ -5658,8 +5664,8 @@ t_stat sim_instr (void) {
                     case 0x8c:      /* ADC A,IYH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = hreg(IY);
-                        acu = hreg(AF);
+                        temp = HIGH_REGISTER(IY);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp + TSTFLAG(C);
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
@@ -5667,28 +5673,28 @@ t_stat sim_instr (void) {
                     case 0x8d:      /* ADC A,IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IY);
-                        acu = hreg(AF);
+                        temp = LOW_REGISTER(IY);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp + TSTFLAG(C);
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
 
                     case 0x8e:      /* ADC A,(IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr);
-                        acu = hreg(AF);
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu + temp + TSTFLAG(C);
                         AF = addTable[sum] | cbitsZ80Table[acu ^ temp ^ sum];
                         break;
 
                     case 0x96:      /* SUB (IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr);
-                        acu = hreg(AF);
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp;
                         AF = addTable[sum & 0xff] | cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
                         break;
@@ -5699,8 +5705,8 @@ t_stat sim_instr (void) {
                     case 0x9c:      /* SBC A,IYH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = hreg(IY);
-                        acu = hreg(AF);
+                        temp = HIGH_REGISTER(IY);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp - TSTFLAG(C);
                         AF = addTable[sum & 0xff] | cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
                         break;
@@ -5711,18 +5717,18 @@ t_stat sim_instr (void) {
                     case 0x9d:      /* SBC A,IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IY);
-                        acu = hreg(AF);
+                        temp = LOW_REGISTER(IY);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp - TSTFLAG(C);
                         AF = addTable[sum & 0xff] | cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
                         break;
 
                     case 0x9e:      /* SBC A,(IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr);
-                        acu = hreg(AF);
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp - TSTFLAG(C);
                         AF = addTable[sum & 0xff] | cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
                         break;
@@ -5741,9 +5747,9 @@ t_stat sim_instr (void) {
 
                     case 0xa6:      /* AND (IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        AF = andTable[((AF >> 8) & GetBYTE(adr)) & 0xff];
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        AF = andTable[((AF >> 8) & GET_BYTE(adr)) & 0xff];
                         break;
 
                     case 0xac:      /* XOR IYH */
@@ -5760,9 +5766,9 @@ t_stat sim_instr (void) {
 
                     case 0xae:      /* XOR (IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        AF = xororTable[((AF >> 8) ^ GetBYTE(adr)) & 0xff];
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        AF = xororTable[((AF >> 8) ^ GET_BYTE(adr)) & 0xff];
                         break;
 
                     case 0xb4:      /* OR IYH */
@@ -5779,17 +5785,17 @@ t_stat sim_instr (void) {
 
                     case 0xb6:      /* OR (IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        AF = xororTable[((AF >> 8) | GetBYTE(adr)) & 0xff];
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        AF = xororTable[((AF >> 8) | GET_BYTE(adr)) & 0xff];
                         break;
 
                     case 0xbc:      /* CP IYH */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = hreg(IY);
+                        temp = HIGH_REGISTER(IY);
                         AF = (AF & ~0x28) | (temp & 0x28);
-                        acu = hreg(AF);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp;
                         AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                             cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
@@ -5798,9 +5804,9 @@ t_stat sim_instr (void) {
                     case 0xbd:      /* CP IYL */
                         tStates += 9;
                         sim_brk_pend[0] = FALSE;
-                        temp = lreg(IY);
+                        temp = LOW_REGISTER(IY);
                         AF = (AF & ~0x28) | (temp & 0x28);
-                        acu = hreg(AF);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp;
                         AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                             cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
@@ -5808,66 +5814,66 @@ t_stat sim_instr (void) {
 
                     case 0xbe:      /* CP (IY+dd) */
                         tStates += 19;
-                        adr = IY + (int8) RAM_pp(PC);
-                        CheckBreakByte(adr);
-                        temp = GetBYTE(adr);
+                        adr = IY + (int8) RAM_PP(PC);
+                        CHECK_BREAK_BYTE(adr);
+                        temp = GET_BYTE(adr);
                         AF = (AF & ~0x28) | (temp & 0x28);
-                        acu = hreg(AF);
+                        acu = HIGH_REGISTER(AF);
                         sum = acu - temp;
                         AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                             cbits2Z80Table[(acu ^ temp ^ sum) & 0x1ff];
                         break;
 
                     case 0xcb:      /* CB prefix */
-                        adr = IY + (int8) RAM_pp(PC);
-                        switch ((op = GetBYTE(PC)) & 7) {
+                        adr = IY + (int8) RAM_PP(PC);
+                        switch ((op = GET_BYTE(PC)) & 7) {
 
                             case 0:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = hreg(BC);
+                                acu = HIGH_REGISTER(BC);
                                 break;
 
                             case 1:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = lreg(BC);
+                                acu = LOW_REGISTER(BC);
                                 break;
 
                             case 2:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = hreg(DE);
+                                acu = HIGH_REGISTER(DE);
                                 break;
 
                             case 3:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = lreg(DE);
+                                acu = LOW_REGISTER(DE);
                                 break;
 
                             case 4:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = hreg(HL);
+                                acu = HIGH_REGISTER(HL);
                                 break;
 
                             case 5:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = lreg(HL);
+                                acu = LOW_REGISTER(HL);
                                 break;
 
                             case 6:
-                                CheckBreakByte(adr);
+                                CHECK_BREAK_BYTE(adr);
                                 ++PC;
-                                acu = GetBYTE(adr);
+                                acu = GET_BYTE(adr);
                                 break;
 
                             case 7:
                                 sim_brk_pend[0] = FALSE;
                                 ++PC;
-                                acu = hreg(AF);
+                                acu = HIGH_REGISTER(AF);
                                 break;
                         }
                         switch (op & 0xc0) {
@@ -5946,27 +5952,27 @@ t_stat sim_instr (void) {
                         switch (op & 7) {
 
                             case 0:
-                                Sethreg(BC, temp);
+                                SET_HIGH_REGISTER(BC, temp);
                                 break;
 
                             case 1:
-                                Setlreg(BC, temp);
+                                SET_LOW_REGISTER(BC, temp);
                                 break;
 
                             case 2:
-                                Sethreg(DE, temp);
+                                SET_HIGH_REGISTER(DE, temp);
                                 break;
 
                             case 3:
-                                Setlreg(DE, temp);
+                                SET_LOW_REGISTER(DE, temp);
                                 break;
 
                             case 4:
-                                Sethreg(HL, temp);
+                                SET_HIGH_REGISTER(HL, temp);
                                 break;
 
                             case 5:
-                                Setlreg(HL, temp);
+                                SET_LOW_REGISTER(HL, temp);
                                 break;
 
                             case 6:
@@ -5974,20 +5980,20 @@ t_stat sim_instr (void) {
                                 break;
 
                             case 7:
-                                Sethreg(AF, temp);
+                                SET_HIGH_REGISTER(AF, temp);
                                 break;
                         }
                         break;
 
                     case 0xe1:      /* POP IY */
                         tStates += 14;
-                        CheckBreakWord(SP);
+                        CHECK_BREAK_WORD(SP);
                         POP(IY);
                         break;
 
                     case 0xe3:      /* EX (SP),IY */
                         tStates += 23;
-                        CheckBreakWord(SP);
+                        CHECK_BREAK_WORD(SP);
                         temp = IY;
                         POP(IY);
                         PUSH(temp);
@@ -5995,7 +6001,7 @@ t_stat sim_instr (void) {
 
                     case 0xe5:      /* PUSH IY */
                         tStates += 15;
-                        CheckBreakWord(SP - 2);
+                        CHECK_BREAK_WORD(SP - 2);
                         PUSH(IY);
                         break;
 
@@ -6014,7 +6020,7 @@ t_stat sim_instr (void) {
 
                     default:        /* ignore FD */
                         sim_brk_pend[0] = FALSE;
-                        checkCPUZ80;
+                        CHECK_CPU_Z80;
                         PC--;
                 }
             break;
@@ -6022,18 +6028,18 @@ t_stat sim_instr (void) {
         case 0xfe:  /* CP nn */
             tStates += 7;
             sim_brk_pend[0] = FALSE;
-            temp = RAM_pp(PC);
+            temp = RAM_PP(PC);
             AF = (AF & ~0x28) | (temp & 0x28);
-            acu = hreg(AF);
+            acu = HIGH_REGISTER(AF);
             sum = acu - temp;
             cbits = acu ^ temp ^ sum;
             AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
-                (SetPV) | cbits2Table[cbits & 0x1ff];
+                (SET_PV) | cbits2Table[cbits & 0x1ff];
             break;
 
         case 0xff:  /* RST 38H */
             tStates += 11;
-            CheckBreakWord(SP - 2);
+            CHECK_BREAK_WORD(SP - 2);
             PUSH(PC);
             PCQ_ENTRY(PC - 1);
             PC = 0x38;
@@ -6128,13 +6134,13 @@ static void checkROMBoundaries(void) {
         ROMHigh = temp;
     }
     if (cpu_unit.flags & UNIT_ALTAIRROM) {
-        if (defaultROMLow < ROMLow) {
-            printf("ROMLOW [%04X] reset to %04X since Altair ROM was desired.\n", ROMLow, defaultROMLow);
-            ROMLow = defaultROMLow;
+        if (DEFAULT_ROM_LOW < ROMLow) {
+            printf("ROMLOW [%04X] reset to %04X since Altair ROM was desired.\n", ROMLow, DEFAULT_ROM_LOW);
+            ROMLow = DEFAULT_ROM_LOW;
         }
-        if (ROMHigh < defaultROMHigh) {
-            printf("ROMHIGH [%04X] reset to %04X since Altair ROM was desired.\n", ROMHigh, defaultROMHigh);
-            ROMHigh = defaultROMHigh;
+        if (ROMHigh < DEFAULT_ROM_HIGH) {
+            printf("ROMHIGH [%04X] reset to %04X since Altair ROM was desired.\n", ROMHigh, DEFAULT_ROM_HIGH);
+            ROMHigh = DEFAULT_ROM_HIGH;
         }
     }
 }
@@ -6154,13 +6160,13 @@ static t_stat cpu_set_norom(UNIT *uptr, int32 value, char *cptr, void *desc) {
 
 static t_stat cpu_set_altairrom(UNIT *uptr, int32 value, char *cptr, void *desc) {
     install_bootrom();
-    if (ROMLow != defaultROMLow) {
-        printf("\"D ROMLOW %04X\" also executed.\n", defaultROMLow);
-        ROMLow = defaultROMLow;
+    if (ROMLow != DEFAULT_ROM_LOW) {
+        printf("\"D ROMLOW %04X\" also executed.\n", DEFAULT_ROM_LOW);
+        ROMLow = DEFAULT_ROM_LOW;
     }
-    if (ROMHigh != defaultROMHigh) {
-        printf("\"D ROMHIGH %04X\" also executed.\n", defaultROMHigh);
-        ROMHigh = defaultROMHigh;
+    if (ROMHigh != DEFAULT_ROM_HIGH) {
+        printf("\"D ROMHIGH %04X\" also executed.\n", DEFAULT_ROM_HIGH);
+        ROMHigh = DEFAULT_ROM_HIGH;
     }
     if (!(cpu_unit.flags & UNIT_ROM)) {
         printf("\"SET CPU ROM\" also executed.\n");
@@ -6177,10 +6183,10 @@ static t_stat cpu_set_warnrom(UNIT *uptr, int32 value, char *cptr, void *desc) {
 }
 
 static t_stat cpu_set_banked(UNIT *uptr, int32 value, char *cptr, void *desc) {
-    if (common > defaultROMLow) {
+    if (common > DEFAULT_ROM_LOW) {
         printf("Warning: COMMON [%04X] must not be greater than %04X. Reset to %04X.\n",
-            common, defaultROMLow, defaultROMLow);
-        common = defaultROMLow;
+            common, DEFAULT_ROM_LOW, DEFAULT_ROM_LOW);
+        common = DEFAULT_ROM_LOW;
     }
     if (MEMSIZE != (MAXBANKS * MAXMEMSIZE)) {
         previousCapacity = MEMSIZE;
@@ -6226,7 +6232,7 @@ t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
             return SCPE_ARG;
         }
         for (j = lo; j <= hi; j++) {
-            if (putc(GetBYTE(j), fileref) == EOF) {
+            if (putc(GET_BYTE(j), fileref) == EOF) {
                 return SCPE_IOERR;
             }
         }

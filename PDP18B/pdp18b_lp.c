@@ -225,8 +225,8 @@ return SCPE_OK;
 
 int32 lp62_iors (void)
 {
-return  (TST_INT (LPT)? IOS_LPT: 0) |
-    (TST_INT (LPTSPC)? IOS_LPT1: 0);
+return (TST_INT (LPT)? IOS_LPT: 0) |
+       (TST_INT (LPTSPC)? IOS_LPT1: 0);
 }
 
 #endif
@@ -718,7 +718,7 @@ int32 header, sb;
 
 sb = pulse & 060;                                       /* subopcode */
 if (pulse & 01) {
-    if ((sb == 000) && (lp15_sta & (STA_ERR | STA_DON)))        /* LPSF */
+    if ((sb == 000) && (lp15_sta & (STA_ERR | STA_DON))) /* LPSF */
         dat = IOT_SKP | dat;
     else if ((sb == 020) || (sb == 040)) {              /* LPP1, LPPM */
         sim_activate (&lp15_unit, lp15_unit.wait);      /* activate */
@@ -732,7 +732,7 @@ if (pulse & 01) {
         }
     else if (sb == 060) lp15_ie = 0;                    /* LPDI */
     }
-if ((pulse & 02) && (sb == 040)) dat = dat | lp15_updsta (0);   /* LPOS, LPRS */
+if ((pulse & 02) && (sb == 040)) dat = dat | lp15_updsta (0); /* LPOS, LPRS */
 if ((pulse & 04) && (sb == 040)) lp15_ie = 1;           /* LPEI */
 lp15_updsta (0);                                        /* update status */
 return dat;
@@ -799,7 +799,7 @@ for (more = 1; more != 0; ) {                           /* loop until ctrl */
             lp15_bp = more = 0;
             }
         else {
-                if (lp15_bp < LP15_BSIZE) lp15_buf[lp15_bp++] = c[i];
+            if (lp15_bp < LP15_BSIZE) lp15_buf[lp15_bp++] = c[i];
             else lp15_sta = lp15_sta | STA_OVF;
             }
         }
@@ -816,7 +816,7 @@ return SCPE_OK;
 int32 lp15_updsta (int32 new)
 {
 lp15_sta = (lp15_sta | new) & ~(STA_CLR | STA_ERR | STA_BUSY);
-if (lp15_sta & STA_EFLGS) lp15_sta = lp15_sta | STA_ERR;        /* update errors */
+if (lp15_sta & STA_EFLGS) lp15_sta = lp15_sta | STA_ERR; /* update errors */
 if (sim_is_active (&lp15_unit)) lp15_sta = lp15_sta | STA_BUSY;
 if (lp15_ie && (lp15_sta & STA_DON)) SET_INT (LPT);
 else CLR_INT (LPT);                                     /* update int */

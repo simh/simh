@@ -48,7 +48,7 @@
 #define RAD_TRSCMASK    ((RAD_NUMSC * RAD_NUMTR) - 1)   /* track/sec mask */
 
 #define GET_SECTOR(x)   ((int) fmod (sim_gtime() / ((double) (x)), \
-                    ((double) RAD_NUMSC)))
+                        ((double) RAD_NUMSC)))
 
 extern uint32 xfr_req;
 extern uint32 alert;

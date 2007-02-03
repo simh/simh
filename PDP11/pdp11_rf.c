@@ -25,6 +25,7 @@
 
    rf           RF11 fixed head disk
 
+   25-Dec-06    RMS     Fixed bug in unit mask (found by John Dundas)
    26-Jun-06    RMS     Cloned from RF08 simulator
 
    The RF11 is a head-per-track disk.  To minimize overhead, the entire RF11
@@ -42,7 +43,7 @@
 
 #define UNIT_V_AUTO     (UNIT_V_UF + 0)                 /* autosize */
 #define UNIT_V_PLAT     (UNIT_V_UF + 1)                 /* #platters - 1 */
-#define UNIT_M_PLAT     03
+#define UNIT_M_PLAT     (RF_NUMDK - 1)
 #define UNIT_GETP(x)    ((((x) >> UNIT_V_PLAT) & UNIT_M_PLAT) + 1)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)
 #define UNIT_PLAT       (UNIT_M_PLAT << UNIT_V_PLAT)

@@ -66,6 +66,7 @@
 
   Modification history:
 
+  29-Oct-06  RMS  Synced poll and clock
   27-Jan-06  RMS  Fixed unaligned accesses in XQB (found by Doug Carman)
   07-Jan-06  RMS  Fixed unaligned access bugs (found by Doug Carman)
   07-Sep-05  DTH  Removed unused variable
@@ -209,7 +210,7 @@
 #include "pdp11_xq.h"
 #include "pdp11_xq_bootrom.h"
 
-extern int32 tmr_poll, clk_tps;
+extern int32 tmxr_poll;
 extern FILE* sim_deb;
 extern char* read_line (char *ptr, int32 size, FILE *stream);
 
@@ -1621,7 +1622,7 @@ t_stat xq_wr_csr(CTLR* xq, int32 data)
   /* start/stop receive timer when RE transitions */
   if ((xq->var->csr ^ data) & XQ_CSR_RE) {
     if (data & XQ_CSR_RE)
-      sim_activate(&xq->unit[0], (clk_tps * tmr_poll)/xq->var->poll);
+      sim_activate(&xq->unit[0], clock_cosched (tmxr_poll));
     else
       sim_cancel(&xq->unit[0]);
   }
@@ -1682,8 +1683,6 @@ t_stat xq_reset(DEVICE* dptr)
   t_stat status;
   CTLR* xq = xq_dev2ctlr(dptr);
   const uint16 set_bits = XQ_CSR_RL | XQ_CSR_XL;
-  /* must be recalculated each time since tmr_poll is a dynamic number */
-  const int32 one_second = clk_tps * tmr_poll;
 
   sim_debug(DBG_TRC, xq->dev, "xq_reset()\n");
 
@@ -1721,7 +1720,7 @@ t_stat xq_reset(DEVICE* dptr)
     xq_csr_set_clr(xq, XQ_CSR_OK, 0);
 
     /* start service timer */
-    sim_activate(&xq->unit[0], one_second/xq->var->poll);
+    sim_activate_abs(&xq->unit[0], tmxr_poll);
   }
 
   /* set hardware sanity controls */
@@ -1826,9 +1825,6 @@ t_stat xq_svc(UNIT* uptr)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
-  /* must be recalculated each time since tmr_poll is a dynamic number */
-  const int32 one_second = clk_tps * tmr_poll;
-
   /* if the receiver is enabled */
   if (xq->var->csr & XQ_CSR_RE) {
     t_stat status;
@@ -1867,7 +1863,7 @@ t_stat xq_svc(UNIT* uptr)
   }
 
   /* resubmit service timer */
-  sim_activate(&xq->unit[0], one_second/xq->var->poll);
+  sim_activate(&xq->unit[0], tmxr_poll);
 
   return SCPE_OK;
 }

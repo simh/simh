@@ -167,8 +167,9 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
 t = uptr->buf;                                          /* get character */
 if (lpt_spnd || ((t >= LF) && (t < CR))) {              /* spc pend or spc op? */
     lpt_spnd = 0;
-    if (lpt_bufout (uptr) != SCPE_OK) return SCPE_IOERR;        /* print */
-    if ((t == 1) || (t == LF)) lpt_spc (uptr, 1);               /* single space */
+    if (lpt_bufout (uptr) != SCPE_OK)                   /* print */
+        return SCPE_IOERR;
+    if ((t == 1) || (t == LF)) lpt_spc (uptr, 1);       /* single space */
     else if (t == VT) r = lpt_vfu (uptr, VT_VFU - 1);   /* VT->VFU */
     else if (t == 0xC) r = lpt_vfu (uptr, FF_VFU - 1);  /* FF->VFU */
     else if ((t >= SPC_BASE) && (t < VFU_BASE))
@@ -287,7 +288,7 @@ char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
 if (*cptr != 0) return SCPE_ARG;
 ptr = 0;
-for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) {   /* until eof */
+for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) { /* until eof */
     mask = 0;
     if (*cptr == '(') {                                 /* repeat count? */
         cptr = get_glyph (cptr + 1, gbuf, ')');         /* get 1st field */

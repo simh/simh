@@ -1,6 +1,6 @@
 /* pdp8_defs.h: PDP-8 simulator definitions
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Dec-06    RMS     Added TA8E support
+   30-Oct-06    RMS     Added infinite loop stop
    13-Oct-03    RMS     Added TSC8-75 support
    04-Oct-02    RMS     Added variable device number support
    20-Jan-02    RMS     Fixed bug in TTx interrupt enable initialization
@@ -50,6 +52,7 @@
 #define STOP_IBKPT      3                               /* breakpoint */
 #define STOP_NOTSTD     4                               /* non-std devno */
 #define STOP_DTOFF      5                               /* DECtape off reel */
+#define STOP_LOOP       6                               /* infinite loop */
 
 /* Memory */
 
@@ -96,6 +99,7 @@ typedef struct {
 #define DEV_RL          060                             /* RL8A */
 #define DEV_LPT         066                             /* line printer */
 #define DEV_MT          070                             /* TM8E */
+#define DEV_CT          070                             /* TA8E */
 #define DEV_RK          074                             /* RK8E */
 #define DEV_RX          075                             /* RX8E/RX28 */
 #define DEV_DTA         076                             /* TC08 */
@@ -146,10 +150,11 @@ typedef struct {
 #define INT_V_MT        (INT_V_DIRECT+4)                /* TM8E */
 #define INT_V_DTA       (INT_V_DIRECT+5)                /* TC08 */
 #define INT_V_RL        (INT_V_DIRECT+6)                /* RL8A */
-#define INT_V_PWR       (INT_V_DIRECT+7)                /* power int */
-#define INT_V_UF        (INT_V_DIRECT+8)                /* user int */
-#define INT_V_TSC       (INT_V_DIRECT+9)                /* TSC8-75 int */
-#define INT_V_OVHD      (INT_V_DIRECT+10)               /* overhead start */
+#define INT_V_CT        (INT_V_DIRECT+7)                /* TA8E int */
+#define INT_V_PWR       (INT_V_DIRECT+8)                /* power int */
+#define INT_V_UF        (INT_V_DIRECT+9)                /* user int */
+#define INT_V_TSC       (INT_V_DIRECT+10)               /* TSC8-75 int */
+#define INT_V_OVHD      (INT_V_DIRECT+11)               /* overhead start */
 #define INT_V_NO_ION_PENDING (INT_V_OVHD+0)             /* ion pending */
 #define INT_V_NO_CIF_PENDING (INT_V_OVHD+1)             /* cif pending */
 #define INT_V_ION       (INT_V_OVHD+2)                  /* interrupts on */
@@ -175,6 +180,7 @@ typedef struct {
 #define INT_MT          (1 << INT_V_MT)
 #define INT_DTA         (1 << INT_V_DTA)
 #define INT_RL          (1 << INT_V_RL)
+#define INT_CT          (1 << INT_V_CT)
 #define INT_PWR         (1 << INT_V_PWR)
 #define INT_UF          (1 << INT_V_UF)
 #define INT_TSC         (1 << INT_V_TSC)
@@ -184,8 +190,8 @@ typedef struct {
 #define INT_DEV_ENABLE  ((1 << INT_V_DIRECT) - 1)       /* devices w/enables */
 #define INT_ALL         ((1 << INT_V_OVHD) - 1)         /* all interrupts */
 #define INT_INIT_ENABLE (INT_TTI+INT_TTO+INT_PTR+INT_PTP+INT_LPT) | \
-                    (INT_TTI1+INT_TTI2+INT_TTI3+INT_TTI4) | \
-                    (INT_TTO1+INT_TTO2+INT_TTO3+INT_TTO4)
+                        (INT_TTI1+INT_TTI2+INT_TTI3+INT_TTI4) | \
+                        (INT_TTO1+INT_TTO2+INT_TTO3+INT_TTO4)
 #define INT_PENDING     (INT_ION+INT_NO_CIF_PENDING+INT_NO_ION_PENDING)
 #define INT_UPDATE      ((int_req & ~INT_DEV_ENABLE) | (dev_done & int_enable))
 

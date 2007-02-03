@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Aug-06    JDB     Added erase gap support
    14-Feb-06    RMS     Added variable tape capacity
    17-Dec-05    RMS     Added write support for Paul Pierce 7b format
    02-May-05    RMS     Added support for Paul Pierce 7b format
@@ -37,6 +38,11 @@ typedef uint32          t_mtrlnt;                       /* magtape rec lnt */
 
 #define MTR_TMK         0x00000000                      /* tape mark */
 #define MTR_EOM         0xFFFFFFFF                      /* end of medium */
+#define MTR_GAP         0xFFFFFFFE                      /* primary gap */
+#define MTR_FHGAP       0xFFFEFFFF                      /* fwd half gap (overwrite) */
+#define MTR_RHGAP       0xFFFF0000                      /* rev half gap (overwrite) */
+#define MTR_M_RHGAP     (~0x000080FF)                   /* range mask for rev gap */
+#define MTR_MAXLEN      0x00FFFFFF                      /* max len is 24b */
 #define MTR_ERF         0x80000000                      /* error flag */
 #define MTR_F(x)        ((x) & MTR_ERF)                 /* record error flg */
 #define MTR_L(x)        ((x) & ~MTR_ERF)                /* record length */
@@ -107,6 +113,7 @@ t_stat sim_tape_rdrecr (UNIT *uptr, uint8 *buf, t_mtrlnt *bc, t_mtrlnt max);
 t_stat sim_tape_wrrecf (UNIT *uptr, uint8 *buf, t_mtrlnt bc);
 t_stat sim_tape_wrtmk (UNIT *uptr);
 t_stat sim_tape_wreom (UNIT *uptr);
+t_stat sim_tape_wrgap (UNIT *uptr, uint32 gaplen, uint32 bpi);
 t_stat sim_tape_sprecf (UNIT *uptr, t_mtrlnt *bc);
 t_stat sim_tape_sprecr (UNIT *uptr, t_mtrlnt *bc);
 t_stat sim_tape_rewind (UNIT *uptr);

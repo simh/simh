@@ -1,6 +1,6 @@
 /* pdp1_drm.c: PDP-1 drum simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    drp          Type 23 parallel drum
    drm          Type 24 serial drum
 
+   21-Dec-06    RMS     Added 16-chan SBS support
    08-Dec-03    RMS     Added parallel drum support
                         Fixed bug in DBL/DCN decoding
    26-Oct-03    RMS     Cleaned up buffer copy code
@@ -71,7 +72,7 @@
                         ((double) DRM_NUMWDT)))
 
 extern int32 M[];
-extern int32 iosta, sbs;
+extern int32 iosta;
 extern int32 stop_inst;
 extern UNIT cpu_unit;
 
@@ -82,6 +83,7 @@ uint32 drm_ma = 0;                                      /* memory address */
 uint32 drm_err = 0;                                     /* error flag */
 uint32 drm_wlk = 0;                                     /* write lock */
 int32 drm_time = 4;                                     /* inter-word time */
+int32 drm_sbs = 0;                                      /* SBS level */
 int32 drm_stopioe = 1;                                  /* stop on error */
 
 /* Parallel drum variables */
@@ -123,12 +125,19 @@ REG drm_reg[] = {
     { FLDATA (ERR, drm_err, 0) },
     { ORDATA (WLK, drm_wlk, 32) },
     { DRDATA (TIME, drm_time, 24), REG_NZ + PV_LEFT },
+    { DRDATA (SBSLVL, drm_sbs, 4), REG_HRO },
     { FLDATA (STOP_IOE, drm_stopioe, 0) },
     { NULL }
     };
 
+MTAB drm_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "APILVL", "APILVL",
+      &dev_set_sbs, &dev_show_sbs, (void *) &drm_sbs },
+    { 0 }
+    };
+
 DEVICE drm_dev = {
-    "DRM", &drm_unit, drm_reg, NULL,
+    "DRM", &drm_unit, drm_reg, drm_mod,
     1, 8, 20, 1, 8, 18,
     NULL, NULL, &drm_reset,
     NULL, NULL, NULL,
@@ -159,6 +168,7 @@ REG drp_reg[] = {
     { FLDATA (ERR, drp_err, 0) },
     { DRDATA (TIME, drp_time, 24), REG_NZ + PV_LEFT },
     { FLDATA (STOP_IOE, drp_stopioe, 0) },
+    { DRDATA (SBSLVL, drm_sbs, 4), REG_HRO },
     { NULL }
     };
 
@@ -266,7 +276,7 @@ uint32 *fbuf = uptr->filebuf;
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
     drm_err = 1;                                        /* set error */
     iosta = iosta | IOS_DRM;                            /* set done */
-    sbs = sbs | SB_RQ;                                  /* req intr */
+    dev_req_int (drm_sbs);                              /* req intr */
     return IORETURN (drm_stopioe, SCPE_UNATT);
     }
 
@@ -287,7 +297,7 @@ for (i = 0; i < DRM_NUMWDS; i++, da++) {                /* do transfer */
     }
 drm_da = (drm_da + 1) & DRM_SMASK;                      /* incr dev addr */
 iosta = iosta | IOS_DRM;                                /* set done */
-sbs = sbs | SB_RQ;                                      /* req intr */
+dev_req_int (drm_sbs);                                  /* req intr */
 return SCPE_OK;
 }
 
@@ -314,7 +324,7 @@ uint32 *fbuf = uptr->filebuf;
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
     drp_err = 1;                                        /* set error */
     iosta = iosta & ~IOS_DRP;                           /* clear busy */
-    if (uptr->FUNC) sbs = sbs | SB_RQ;                  /* req intr */
+    if (uptr->FUNC) dev_req_int (drm_sbs);              /* req intr */
     return IORETURN (drp_stopioe, SCPE_UNATT);
     }
 
@@ -330,7 +340,7 @@ if (uptr->FUNC == DRP_RW) {                             /* read/write? */
         }                                               /* end for */
     }                                                   /* end if */
 iosta = iosta & ~IOS_DRP;                               /* clear busy */
-if (uptr->FUNC) sbs = sbs | SB_RQ;                      /* req intr */
+if (uptr->FUNC) dev_req_int (drm_sbs);                  /* req intr */
 return SCPE_OK;
 }
 

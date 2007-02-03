@@ -1,6 +1,6 @@
 /* pdp1_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Dec-06    RMS     Added 16-channel sequence break support
    22-Jul-05    RMS     Fixed definition of CPLS_DPY
    08-Feb-04    PLB     Added support for display
    08-Dec-03    RMS     Added support for parallel drum
@@ -61,6 +62,7 @@
 #define STOP_IND        5                               /* nested indirects */
 #define STOP_WAIT       6                               /* IO wait hang */
 #define STOP_DTOFF      7                               /* DECtape off reel */
+#define ERR_RMV         10                              /* restrict mode viol */
 
 /* Memory */
 
@@ -72,6 +74,7 @@
 
 /* Architectural constants */
 
+#define SIGN            0400000                         /* sign */
 #define DMASK           0777777                         /* data mask */
 #define DAMASK          0007777                         /* direct addr */
 #define EPCMASK         (AMASK & ~DAMASK)               /* extended addr */
@@ -82,6 +85,37 @@
 #define OP_DIO          0320000                         /* DIO */
 #define OP_JMP          0600000                         /* JMP */
 #define GEN_CPLS(x)     (((x) ^ ((x) << 1)) & IO_WAIT)  /* completion pulse? */
+
+/* Program flags/sense switches */
+
+#define PF_V_L          7
+#define PF_V_RNG        6
+#define PF_L            (1u << PF_V_L)
+#define PF_RNG          (1u << PF_V_RNG)
+#define PF_SS_1         0040
+#define PF_SS_2         0020
+#define PF_SS_3         0010
+#define PF_SS_4         0004
+#define PF_SS_5         0002
+#define PF_SS_6         0001
+#define PF_VR_ALL       0377
+#define PF_SS_ALL       0077
+
+/* Restict mode */
+
+#define RTB_IOT         0400000
+#define RTB_ILL         0200000
+#define RTB_HLT         0100000
+#define RTB_DBK         0040000
+#define RTB_CHR         0020000
+#define RTB_MB_MASK     0017777
+
+#define RM45_V_BNK      14
+#define RM45_M_BNK      003
+#define RM48_V_BNK      12
+#define RM48_M_BNK      017
+
+#define RN45_SIZE       4
 
 /* IOT subroutine return codes */
 
@@ -100,8 +134,9 @@
 #define IOS_V_PTP       13                              /* paper tape punch */
 #define IOS_V_DRM       12                              /* drum */
 #define IOS_V_SQB       11                              /* sequence break */
-#define IOS_V_PNT       2                               /* print done */
-#define IOS_V_SPC       1                               /* space done */
+#define IOS_V_PNT       3                               /* print done */
+#define IOS_V_SPC       2                               /* space done */
+#define IOS_V_DCS       1                               /* data comm sys */
 #define IOS_V_DRP       0                               /* parallel drum busy */
 
 #define IOS_LPN         (1 << IOS_V_LPN)
@@ -113,6 +148,7 @@
 #define IOS_SQB         (1 << IOS_V_SQB)
 #define IOS_PNT         (1 << IOS_V_PNT)
 #define IOS_SPC         (1 << IOS_V_SPC)
+#define IOS_DCS         (1 << IOS_V_DCS)
 #define IOS_DRP         (1 << IOS_V_DRP)
 
 /* Completion pulses */
@@ -128,7 +164,7 @@
 #define CPLS_LPT        (1 << CPLS_V_LPT)
 #define CPLS_DPY        (1 << CPLS_V_DPY)
 
-/* Sequence break flags */
+/* One channel sequence break */
 
 #define SB_V_IP         0                               /* in progress */
 #define SB_V_RQ         1                               /* request */
@@ -137,5 +173,22 @@
 #define SB_IP           (1 << SB_V_IP)
 #define SB_RQ           (1 << SB_V_RQ)
 #define SB_ON           (1 << SB_V_ON)
+
+/* 16 channel sequence break */
+
+#define SBS_LVLS        16                              /* num levels */
+#define SBS_LVL_MASK    (SBS_LVLS - 1)
+#define SBS_LVL_RMV     14                              /* restrict level */
+#define SBS_MASK(x)     (1u << (SBS_LVLS - 1 - (x)))    /* level to mask */
+
+/* Timers */
+
+#define TMR_CLK         0
+
+/* Device routines */
+
+t_stat dev_req_int (int32 lvl);
+t_stat dev_set_sbs (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dev_show_sbs (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #endif

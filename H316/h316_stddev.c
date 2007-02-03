@@ -28,6 +28,7 @@
    tty          316/516-33 teleprinter
    clk/options  316/516-12 real time clocks/internal options
 
+   30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    03-Apr-06    RMS     Fixed bugs in punch state handling (from Theo Engel)
    22-Nov-05    RMS     Revised for new terminal processing routines
    05-Feb-05    RMS     Fixed bug in OCP '0001 (found by Philipp Hachtmann)
@@ -688,7 +689,7 @@ t_stat tto_write (int32 c)
 {
 UNIT *tuptr = &tty_unit[TTO];
 
-c = sim_tt_outcvt (c, TT_GET_MODE (tuptr->flags));
+c = sim_tt_outcvt (c, TT_GET_MODE (tuptr->flags) | TTUF_KSR);
 tuptr->pos = tuptr->pos + 1;
 if (c >= 0) return sim_putchar_s (c);
 else return SCPE_OK;

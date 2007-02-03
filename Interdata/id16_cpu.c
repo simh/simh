@@ -25,6 +25,8 @@
 
    cpu                  Interdata 16b CPU
 
+   27-Oct-06    RMS     Added idle support
+                        Removed separate PASLA clock
    06-Feb-06    RMS     Fixed bug in DH (found by Mark Hittinger)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    25-Aug-05    RMS     Fixed DH integer overflow cases
@@ -219,7 +221,8 @@ uint32 (*dev_tab[DEVNO])(uint32 dev, uint32 op, uint32 datout) = { NULL };
 extern int32 sim_interval;
 extern int32 sim_int_char;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern UNIT pic_unit, lfc_unit, pas_unit;               /* timers */
+extern t_bool sim_idle_enab;
+extern UNIT pic_unit, lfc_unit;                         /* timers */
 
 uint32 ReadB (uint32 loc);
 uint32 ReadH (uint32 loc);
@@ -445,7 +448,7 @@ static uint32 s1_rel_const[16] = {                      /* addr 8000-FFFF */
 DIB cpu_dib = { d_DS, -1, v_DS, NULL, &display, NULL };
 
 UNIT cpu_unit = {
-    UDATA (NULL, UNIT_FIX + UNIT_BINK + UNIT_716, MAXMEMSIZE16)
+    UDATA (NULL, UNIT_FIX | UNIT_BINK | UNIT_716, MAXMEMSIZE16)
     };
 
 REG cpu_reg[] = {
@@ -513,6 +516,13 @@ REG cpu_reg[] = {
     };
 
 MTAB cpu_mod[] = {
+    { UNIT_TYPE, 0, "I3", "I3", &cpu_set_model },
+    { UNIT_TYPE, UNIT_ID4, "I4", "I4", &cpu_set_model },
+    { UNIT_TYPE, UNIT_716, "7/16", "716", &cpu_set_model },
+    { UNIT_TYPE, UNIT_816, "8/16", "816", &cpu_set_model },
+    { UNIT_TYPE, UNIT_816E, "8/16E", "816E", &cpu_set_model },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
     { UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size },
     { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size },
     { UNIT_MSIZE, 24576, NULL, "24K", &cpu_set_size },
@@ -521,11 +531,6 @@ MTAB cpu_mod[] = {
     { UNIT_MSIZE, 65536, NULL, "64K", &cpu_set_size },
     { UNIT_MSIZE, 131072, NULL, "128K", &cpu_set_size },
     { UNIT_MSIZE, 262144, NULL, "256K", &cpu_set_size },
-    { UNIT_TYPE, 0, "I3", "I3", &cpu_set_model },
-    { UNIT_TYPE, UNIT_ID4, "I4", "I4", &cpu_set_model },
-    { UNIT_TYPE, UNIT_716, "7/16", "716", &cpu_set_model },
-    { UNIT_TYPE, UNIT_816, "8/16", "816", &cpu_set_model },
-    { UNIT_TYPE, UNIT_816E, "8/16E", "816E", &cpu_set_model },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, NULL, "CONSINT",
       &cpu_set_consint, NULL, NULL },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
@@ -584,7 +589,6 @@ int_eval ();                                            /* eval interrupts */
 cc = newPSW (PSW & psw_mask);                           /* split PSW, eval wait */
 sim_rtcn_init (lfc_unit.wait, TMR_LFC);                 /* init clock */
 sim_rtcn_init (pic_unit.wait, TMR_PIC);                 /* init timer */
-sim_rtcn_init (pas_unit.wait, TMR_PAS);                 /* init pas */
 reason = 0;
 
 /* Process events */
@@ -641,10 +645,9 @@ while (reason == 0) {                                   /* loop until halted */
             }
 
         if (PSW & PSW_WAIT) {                           /* wait state? */
-            t = sim_qcount ();                          /* events in queue */
-            if ((t == 0) || ((t == 1) && stop_wait))    /* empty, or kbd only? */
-                reason = STOP_WAIT;                     /* then stop */
-            else sim_interval = 0;                      /* force check */
+            if (sim_idle_enab)                          /* idling enabled? */
+                sim_idle (TMR_LFC, TRUE);
+            else sim_interval = sim_interval - 1;       /* no, count cycle */
             continue;
             }
 

@@ -1,6 +1,6 @@
 /* vax_syscm.c: PDP-11 compatibility mode symbolic decode and parse
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   27-Sep-05	RMS	Fixed warnings compiling with 64b addresses
+   12-Nov-06    RMS     Fixed operand order in EIS instructions (found by W.F.J. Mueller)
+   27-Sep-05	RMS     Fixed warnings compiling with 64b addresses
    15-Sep-04    RMS     Cloned from pdp11_sys.c
 */
 
@@ -49,6 +50,7 @@ extern UNIT cpu_unit;
 #define I_V_DOP         9                               /* double operand */
 #define I_V_CCC         10                              /* CC clear */
 #define I_V_CCS         11                              /* CC set */
+#define I_V_SOPR        12                              /* operand, reg */
 #define I_NPN           (I_V_NPN << I_V_CL)
 #define I_REG           (I_V_REG << I_V_CL)
 #define I_SOP           (I_V_SOP << I_V_CL)
@@ -61,11 +63,13 @@ extern UNIT cpu_unit;
 #define I_DOP           (I_V_DOP << I_V_CL)
 #define I_CCC           (I_V_CCC << I_V_CL)
 #define I_CCS           (I_V_CCS << I_V_CL)
+#define I_SOPR          (I_V_SOPR << I_V_CL)
 
 static const int32 masks[] = {
  0177777, 0177770, 0177700, 0177770,
  0177000, 0177400, 0177700, 0177000,
- 0177400, 0170000, 0177777, 0177777
+ 0177400, 0170000, 0177777, 0177777,
+ 0177000
  };
 
 static const char *opcode[] = {
@@ -145,7 +149,7 @@ static const int32 opc_val[] = {
 0007000+I_SOP,                0007200+I_SOP, 0007300+I_SOP,
 0010000+I_DOP, 0020000+I_DOP, 0030000+I_DOP, 0040000+I_DOP,
 0050000+I_DOP, 0060000+I_DOP,
-0070000+I_RSOP, 0071000+I_RSOP, 0072000+I_RSOP, 0073000+I_RSOP,
+0070000+I_SOPR, 0071000+I_SOPR, 0072000+I_SOPR, 0073000+I_SOPR,
 0074000+I_RSOP,
 0075000+I_REG, 0075010+I_REG, 0075020+I_REG, 0075030+I_REG,
 0076020+I_REG,
@@ -333,6 +337,12 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             case I_V_RSOP:                              /* rsop */
                 fprintf (of, "%s %s,", opcode[i], rname[srcr]);
                 wd1 = fprint_spec (of, addr, dstm, val[1]);
+                break;
+
+            case I_V_SOPR:                              /* sopr */
+                fprintf (of, "%s ", opcode[i]);
+                wd1 = fprint_spec (of, addr, dstm, val[1]);
+                fprintf (of, ",%s", rname[srcr]);
                 break;
 
             case I_V_DOP:                               /* dop */
@@ -607,6 +617,16 @@ switch (j) {                                            /* case on class */
         if ((n1 = get_spec (gbuf, ad32, 0, &spec, &val[1])) > 0)
             return SCPE_ARG;
         val[0] = val[0] | spec;
+        break;
+
+    case I_V_SOPR:                                      /* dop, reg */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get glyph */
+        if ((n1 = get_spec (gbuf, ad32, 0, &spec, &val[1])) > 0)
+            return SCPE_ARG;
+        val[0] = val[0] | spec;
+        cptr = get_glyph (cptr, gbuf, 0);               /* get glyph */
+        if ((reg = get_reg (gbuf, 0)) < 0) return SCPE_ARG;
+        val[0] = val[0] | (reg << 6);
         break;
 
     case I_V_DOP:                                       /* double op */

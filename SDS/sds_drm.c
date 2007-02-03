@@ -87,7 +87,7 @@
 #define  DRM_EIU        7                               /* end int uncond */
 
 #define GET_TWORD(x)    ((int32) fmod (sim_gtime() / ((double) (x)), \
-                    ((double) (DRM_NUMSC * DRM_PHYWD))))
+                        ((double) (DRM_NUMSC * DRM_PHYWD))))
 
 extern uint32 M[];                                      /* memory */
 extern uint32 alert, int_req;

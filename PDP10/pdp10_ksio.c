@@ -188,14 +188,14 @@ DIB *std_dib[] = {                                      /* standard DIBs */
 
 /* IO 710       (DEC) TIOE - test I/O word, skip if zero
                 (ITS) IORDI - read word from Unibus 3
-                        returns TRUE if skip, FALSE otherwise
+                returns TRUE if skip, FALSE otherwise
 */
 
 t_bool io710 (int32 ac, a10 ea)
 {
 d10 val;
 
-if (ITS) AC(ac) = ReadIO (IO_UBA3 | ea);                /* IORDI */
+if (Q_ITS) AC(ac) = ReadIO (IO_UBA3 | ea);              /* IORDI */
 else {                                                  /* TIOE */
     val = ReadIO (ea);                                  /* read word */
     if ((AC(ac) & val) == 0) return TRUE;
@@ -205,14 +205,14 @@ return FALSE;
 
 /* IO 711       (DEC) TION - test I/O word, skip if non-zero
                 (ITS) IORDQ - read word from Unibus 1
-                        returns TRUE if skip, FALSE otherwise
+                returns TRUE if skip, FALSE otherwise
 */
 
 t_bool io711 (int32 ac, a10 ea)
 {
 d10 val;
 
-if (ITS) AC(ac) = ReadIO (IO_UBA1 | ea);                /* IORDQ */
+if (Q_ITS) AC(ac) = ReadIO (IO_UBA1 | ea);              /* IORDQ */
 else {                                                  /* TION */
     val = ReadIO (ea);                                  /* read word */
     if ((AC(ac) & val) != 0) return TRUE;
@@ -248,7 +248,7 @@ void io714 (d10 val, a10 ea)
 d10 temp;
 
 val = val & 0177777;
-if (ITS) WriteIO (IO_UBA3 | ea, val, WRITE);            /* IOWRI */
+if (Q_ITS) WriteIO (IO_UBA3 | ea, val, WRITE);          /* IOWRI */
 else {
     temp = ReadIO (ea);                                 /* BSIO */
     temp = temp | val;
@@ -266,7 +266,7 @@ void io715 (d10 val, a10 ea)
 d10 temp;
 
 val = val & 0177777;
-if (ITS) WriteIO (IO_UBA1 | ea, val, WRITE);            /* IOWRQ */
+if (Q_ITS) WriteIO (IO_UBA1 | ea, val, WRITE);          /* IOWRQ */
 else {
     temp = ReadIO (ea);                                 /* BCIO */
     temp = temp & ~val;
@@ -277,14 +277,14 @@ return;
 
 /* IO 720       (DEC) TIOEB - test I/O byte, skip if zero
                 (ITS) IORDBI - read byte from Unibus 3
-                        returns TRUE if skip, FALSE otherwise
+                returns TRUE if skip, FALSE otherwise
 */
 
 t_bool io720 (int32 ac, a10 ea)
 {
 d10 val;
 
-if (ITS) {                                              /* IORDBI */
+if (Q_ITS) {                                            /* IORDBI */
     val = ReadIO (IO_UBA3 | eaRB);
     AC(ac) = GETBYTE (ea, val);
     }
@@ -298,14 +298,14 @@ return FALSE;
 
 /* IO 721       (DEC) TIONB - test I/O word, skip if non-zero
                 (ITS) IORDBQ - read word from Unibus 1
-                        returns TRUE if skip, FALSE otherwise
+                returns TRUE if skip, FALSE otherwise
 */
 
 t_bool io721 (int32 ac, a10 ea)
 {
 d10 val;
 
-if (ITS) {                                              /* IORDBQ */
+if (Q_ITS) {                                            /* IORDBQ */
     val = ReadIO (IO_UBA1 | eaRB);
     AC(ac) = GETBYTE (ea, val);
     }
@@ -348,7 +348,7 @@ void io724 (d10 val, a10 ea)
 d10 temp;
 
 val = val & 0377;
-if (ITS) WriteIO (IO_UBA3 | ea, val, WRITEB);           /* IOWRBI */
+if (Q_ITS) WriteIO (IO_UBA3 | ea, val, WRITEB);         /* IOWRBI */
 else {
     temp = ReadIO (eaRB);                               /* BSIOB */
     temp = GETBYTE (ea, temp);
@@ -367,7 +367,7 @@ void io725 (d10 val, a10 ea)
 d10 temp;
 
 val = val & 0377;
-if (ITS) WriteIO (IO_UBA1 | ea, val, WRITEB);           /* IOWRBQ */
+if (Q_ITS) WriteIO (IO_UBA1 | ea, val, WRITEB);         /* IOWRBQ */
 else {
     temp = ReadIO (eaRB);                               /* BCIOB */
     temp = GETBYTE (ea, temp);

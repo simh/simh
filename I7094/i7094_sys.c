@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Oct-06    RMS     Added additional expanded core instructions
    08-Jun-06    RMS     Added Dave Pitts' binary loader
 */
 
@@ -362,6 +363,7 @@ static const char *opcode[] = {
  "TIA", "TIB",
  "LRI", "LPI",
  "SEA", "SEB",
+ "IFT", "EFT",
 
  "IOCD", "IOCDN", "TCH",
  "IORP", "IORPN",
@@ -523,6 +525,7 @@ static const t_uint64 opc_v[] = {
  0010100000000+I_MXN, 0410100000000+I_MXN,
  0056200000000+I_MXN, 0456400000000+I_MXN,
  0476100000041+I_SNS, 0476100000042+I_SNS,
+ 0476100000043+I_SNS, 0476100000044+I_SNS,
 
  01000000000000+I_IOX, 01000000200000+I_IOX, 01100000000000+I_TCH,
  01200000000000+I_IOX, 01200000200000+I_IOX,

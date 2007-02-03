@@ -1,6 +1,6 @@
 /* hp2100_stddev.c: HP2100 standard devices simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tty          12531C buffered teleprinter interface
    clk          12539C time base generator
 
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
    22-Nov-05    RMS     Revised for new terminal processing routines
    13-Sep-04    JDB     Added paper tape loop mode, DIAG/READER modifiers to PTR
                         Added PV_LEFT to PTR TRLLIM register
@@ -383,6 +384,7 @@ switch (inst) {                                         /* case on opcode */
         dat = ptr_unit.buf;
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCMD (dev);                               /* clear cmd, ctl */
@@ -420,7 +422,7 @@ while ((temp = getc (ptr_unit.fileref)) == EOF) {       /* read byte, error? */
             ptr_unit.pos = 0;
             }
         else {
-            if (ptr_trlcnt >= ptr_trllim) {             /* added all trailer? */        
+            if (ptr_trlcnt >= ptr_trllim) {             /* added all trailer? */
                 if (ptr_stopioe) {                      /* stop on error? */
                     printf ("PTR end of file\n");
                     return SCPE_IOERR;
@@ -467,7 +469,7 @@ return SCPE_OK;
 
 const uint16 ptr_rom[IBL_LNT] = {
     0107700,                    /*ST CLC 0,C            ; intr off */
-    0002401,                    /*   CLA,RSS            ; skip in */            
+    0002401,                    /*   CLA,RSS            ; skip in */
     0063756,                    /*CN LDA M11            ; feed frame */
     0006700,                    /*   CLB,CCE            ; set E to rd byte */
     0017742,                    /*   JSB READ           ; get #char */
@@ -560,6 +562,7 @@ switch (inst) {                                         /* case on opcode */
         ptp_unit.buf = dat;
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCMD (dev);                               /* clear cmd, ctl */
@@ -645,6 +648,7 @@ switch (inst) {                                         /* case on opcode */
         tty_buf = dat & 0377;
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) { clrCTL (dev); }               /* CLC */
         else {                                          /* STC */
@@ -664,27 +668,27 @@ return dat;
 
 /* Unit service routines.  Note from Dave Bryan:
 
-   Referring to the 12531C schematic, the terminal input enters on pin X 
-   ("DATA FROM EIA COMPATIBLE DEVICE").  The signal passes through four 
-   transistor inversions (Q8, Q1, Q2, and Q3) to appear on pin 12 of NAND gate 
-   U104C.  If the flag flip-flop is not set, the terminal input passes to the 
-   (inverted) output of U104C and thence to the D input of the first of the 
-   flip-flops forming the data register.  
+   Referring to the 12531C schematic, the terminal input enters on pin X
+   ("DATA FROM EIA COMPATIBLE DEVICE").  The signal passes through four
+   transistor inversions (Q8, Q1, Q2, and Q3) to appear on pin 12 of NAND gate
+   U104C.  If the flag flip-flop is not set, the terminal input passes to the
+   (inverted) output of U104C and thence to the D input of the first of the
+   flip-flops forming the data register.
 
-   In the idle condition (no key pressed), the terminal input line is marking 
-   (voltage negative), so in passing through a total of five inversions, a 
-   logic one is presented at the serial input of the data register.  During an 
-   output operation, the register is parallel loaded and serially shifted, 
-   sending the output data through the register to the device and -- this is 
-   the crux -- filling the register with logic ones from U104C.  
+   In the idle condition (no key pressed), the terminal input line is marking
+   (voltage negative), so in passing through a total of five inversions, a
+   logic one is presented at the serial input of the data register.  During an
+   output operation, the register is parallel loaded and serially shifted,
+   sending the output data through the register to the device and -- this is
+   the crux -- filling the register with logic ones from U104C.
 
-   At the end of the output operation, the card flag is set, an interrupt 
-   occurs, and the RTE driver is entered.  The driver then does an LIA SC to 
-   read the contents of the data register.  If no key has been pressed during 
-   the output operation, the register will read as all ones (octal 377).  If, 
-   however, any key was struck, at least one zero bit will be present.  If the 
-   register value doesn't equal 377, the driver sets the system "operator 
-   attention" flag, which will cause RTE to output the asterisk and initiate a 
+   At the end of the output operation, the card flag is set, an interrupt
+   occurs, and the RTE driver is entered.  The driver then does an LIA SC to
+   read the contents of the data register.  If no key has been pressed during
+   the output operation, the register will read as all ones (octal 377).  If,
+   however, any key was struck, at least one zero bit will be present.  If the
+   register value doesn't equal 377, the driver sets the system "operator
+   attention" flag, which will cause RTE to output the asterisk and initiate a
    terminal read when the current output line is completed. */
 
 t_stat tti_svc (UNIT *uptr)
@@ -783,9 +787,9 @@ t_stat tty_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 u = uptr - tty_dev.units;
 
 if (u > TTO) return SCPE_NOFNC;
-tty_unit[TTO].flags = (tty_unit[TTO].flags & ~TT_MODE) | val;
-if (val == TT_MODE_7P) val = TT_MODE_7B;
-tty_unit[TTI].flags = (tty_unit[TTI].flags & ~TT_MODE) | val;
+if ((u == TTI) && (val == TT_MODE_7P))
+    val = TT_MODE_7B;
+tty_unit[u].flags = (tty_unit[u].flags & ~TT_MODE) | val;
 return SCPE_OK;
 }
 
@@ -832,6 +836,7 @@ switch (inst) {                                         /* case on opcode */
         clrCTL (dev);                                   /* clear control */
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCTL (dev);                               /* turn off clock */

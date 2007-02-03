@@ -1,6 +1,6 @@
 /* hp2100_dq.c: HP 2100 12565A disk simulator
 
-   Copyright (c) 1993-2005, Bill McDermith
+   Copyright (c) 1993-2006, Bill McDermith
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dq           12565A 2883 disk system
 
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
    01-Mar-05    JDB     Added SET UNLOAD/LOAD
    07-Oct-04    JDB     Fixed enable/disable from either device
                         Shortened xtime from 5 to 3 (drive avg 156KW/second)
@@ -313,6 +314,7 @@ switch (inst) {                                         /* case on opcode */
         dat = dqd_ibuf;
         break;
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCTL (devd);                              /* clr ctl, cmd */
@@ -363,6 +365,7 @@ switch (inst) {                                         /* case on opcode */
     case ioMIX:                                         /* merge */
         break;                                          /* no data */
 
+    case ioCRS:                                         /* control reset (action unverif) */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC? */
             clrCMD (devc);                              /* clr cmd, ctl */

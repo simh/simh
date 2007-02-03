@@ -1,6 +1,6 @@
 /* id16_sys.c: Interdata 16b simulator interface
 
-   Copyright (c) 2000-2005, Robert M. Supnik
+   Copyright (c) 2000-2006, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Oct-06    RMS     Re-ordered device list
    26-Mar-04    RMS     Fixed warning with -std=c99
    27-Feb-03    RMS     Added relative addressing support
 */
@@ -69,13 +70,13 @@ int32 sim_emax = 2;
 DEVICE *sim_devices[] = {
     &cpu_dev,
     &sch_dev,
+    &pic_dev,
+    &lfc_dev,
     &pt_dev,
     &tt_dev,
     &ttp_dev,
     &pas_dev,
     &pasl_dev,
-    &pic_dev,
-    &lfc_dev,
     &lpt_dev,
     &dp_dev,
     &idc_dev,

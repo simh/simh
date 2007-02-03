@@ -5,6 +5,17 @@
    Brian Knittel
    Revision History
 
+   2006.12.06 - Moved CGI stuff out of this routine into cgi1130 main() module.
+
+   2006.07.06 - Made 1403 printer 132 columns wide, was 120 previously
+
+   2006.01.03 - Fixed bug in prt_attach, found and fixed by Carl Claunch. Detach followed
+   				by reattach of 1403-mode printer left device permanently not-ready.
+
+   2004.11.08 - HACK for demo mode: in physical (-p) mode, multiple consecutive formfeeds are suppressed.
+				This lets us do a formfeed at the end of a job to kick the last page out
+				without getting another blank page at the beginning of the next job.
+
    2003.12.02 - Added -p option for physical line printer output (flushes
    				output buffer after each line). When using a physical printer on
    				Windows, be sure to set printer to "send output directly to printer"
@@ -36,6 +47,7 @@
  */
 
 #include "ibm1130_defs.h"
+#include <stdlib.h>				/* needed for atexit, for cgi mode */
 
 /***************************************************************************************
  *  1132 PRINTER 
@@ -86,6 +98,8 @@ static int32 prt_cwait = 1250;								/* character rotation wait */
 static int32 prt_fwait = 100;								/* fast wait, for 1403 operations */
 static int32 prt_twait = 50;								/* transfer wait, for 1403 operations */
 #define SKIPTARGET	(uptr->u4)								/* target for skip operation */
+
+static t_bool formfed = FALSE;								/* last line printed was a formfeed */
 
 #define UNIT_V_FORMCHECK    (UNIT_V_UF + 0)					/* out of paper error */
 #define UNIT_V_DATACHECK    (UNIT_V_UF + 1)					/* printer overrun error */
@@ -145,12 +159,13 @@ DEVICE prt_dev = {
 	NULL, NULL, &prt_reset,
 	NULL, prt_attach, prt_detach};
 
-#define PRT_COLUMNS 120
-#define PRT_ROWLEN	120
-#define MAX_OVPRINT	 20
+#define MAX_COLUMNS     120								
+#define MAX_OVPRINT	     20
+#define PRT1132_COLUMNS 120
+#define PRT1403_COLUMNS 120								/* the 1130's version of the 1403 printed in 120 columns only (see Functional Characteristics) */
 
-static char prtbuf[PRT_ROWLEN*MAX_OVPRINT];
-static int  nprint[PRT_COLUMNS], ncol[MAX_OVPRINT], maxnp;
+static char prtbuf[MAX_COLUMNS*MAX_OVPRINT];
+static int  nprint[MAX_COLUMNS], ncol[MAX_OVPRINT], maxnp;
 static int  prt_nchar, prt_row;							/* current printwheel position, current page row */
 static int  prt_nnl;									/* number of queued newlines */
 
@@ -178,18 +193,18 @@ static struct tag_ccpunches {							/* list of rows and punches on tape */
 	int row, channels;
 }
 ccpunches[] = {
-      2, CC_CHANNEL_1,									// channel  1 = top of form
-	 62, CC_CHANNEL_12									// channel 12 = bottom of form
+      2, CC_CHANNEL_1,									/* channel  1 = top of form */
+	 62, CC_CHANNEL_12									/* channel 12 = bottom of form */
 },
 cccgi[] = {
-      2, CC_CHANNEL_1									// channel  1 = top of form; no bottom of form
+      2, CC_CHANNEL_1									/* channel  1 = top of form; no bottom of form */
 };
 
 #include "ibm1130_prtwheel.h"
 
 extern int32 sim_switches;
 
-// cc_format_1132 and cc_format_1403 - turn cctape bits into proper format for DSW or status read
+/* cc_format_1132 and cc_format_1403 - turn cctape bits into proper format for DSW or status read */
 
 static int cc_format_1132 (int bits)
 {
@@ -200,7 +215,7 @@ static int cc_format_1132 (int bits)
 
 #define cc_format_1403(bits) (bits)
 
-// reset_prt_line - clear the print line following paper advancement
+/* reset_prt_line - clear the print line following paper advancement */
 
 static void reset_prt_line (void)
 {
@@ -209,116 +224,116 @@ static void reset_prt_line (void)
 	maxnp = 0;
 }
 
-// save_1132_prt_line - fire hammers for character 'ch'
+/* save_1132_prt_line - fire hammers for character 'ch' */
 
 static t_bool save_1132_prt_line (int ch)
 {
 	int i, r, addr = 32;
 	int32 mask = 0, wd = 0;
 
-	for (i = 0; i < PRT_COLUMNS; i++) {
-		if (mask == 0) {					// fetch next word from memory
+	for (i = 0; i < PRT1132_COLUMNS; i++) {
+		if (mask == 0) {					/* fetch next word from memory */
 			mask = 0x8000;
 			wd   = M[addr++];
 		}
 
-		if (wd & mask) {					// hammer is to fire in this column
+		if (wd & mask) {					/* hammer is to fire in this column */
 			if ((r = nprint[i]) < MAX_OVPRINT) {
-				if (ncol[r] <= i) {				// we haven't moved this far yet
-					if (ncol[r] == 0)									// first char in this row?
-						memset(prtbuf+r*PRT_ROWLEN, ' ', PRT_COLUMNS);	// blank out the new row
-					ncol[r] = i+1;										// remember new row length
+				if (ncol[r] <= i) {			/* we haven't moved this far yet */
+					if (ncol[r] == 0)									/* first char in this row?  */
+						memset(prtbuf+r*MAX_COLUMNS, ' ', PRT1132_COLUMNS);	/* blank out the new row */
+					ncol[r] = i+1;										/* remember new row length */
 				}
-				prtbuf[r*PRT_ROWLEN + i] = (char) ch;					// save the character
+				prtbuf[r*MAX_COLUMNS + i] = (char) ch;					/* save the character */
 
-				nprint[i]++;											// remember max overprintings for this column
+				nprint[i]++;											/* remember max overprintings for this column */
 				maxnp = MAX(maxnp, nprint[i]);
 			}
 		}
 
-		mask >>= 1;														// prepare to examine next bit
+		mask >>= 1;														/* prepare to examine next bit */
 	}
 
-	return wd & 1;			// return TRUE if the last word has lsb set, which means all bits had been set
+	return wd & 1;			/* return TRUE if the last word has lsb set, which means all bits had been set */
 }
 
-// write_line - write collected line to output file. No need to trim spaces as the hammers
-// are never fired for them, so ncol[r] is the last printed position on each line.
+/* write_line - write collected line to output file. No need to trim spaces as the hammers
+ * are never fired for them, so ncol[r] is the last printed position on each line.
+ */
 
-static void newpage (FILE *fd)
+static void newpage (FILE *fd, t_bool physical_printer)
 {
 	if (cgi)
 		fputs("<HR>\n", fd);
-	else
-		putc('\f', fd);									// formfeed
+	else if (! formfed) {
+		putc('\f', fd);
+		if (physical_printer) {
+			fflush(fd);										/* send the ff out to the printer immediately */
+			formfed = TRUE;									/* hack: inhibit consecutive ff's */
+		}
+	}
 }
 
-static void flush_prt_line (FILE *fd, int spacemode, t_bool phys_flush)
+static void flush_prt_line (FILE *fd, int spacemode, t_bool physical_printer)
 {
 	int r;
 
-	if (! (spacemode || maxnp))								// nothing to do
+	if (! (spacemode || maxnp))								/* nothing to do */
 		return;
 
-	prt_row = (prt_row+1) % PRT_PAGELENGTH;					// NEXT line
+	prt_row = (prt_row+1) % PRT_PAGELENGTH;					/* NEXT line */
 
-	if (spacemode && ! maxnp) {								// spacing only
+	if (spacemode && ! maxnp) {								/* spacing only */
 		if (prt_row == 0 && prt_nnl) {
 #ifdef _WIN32
 			if (! cgi)
-				putc('\r', fd);								// DOS/Windows: end with cr/lf
+				putc('\r', fd);								/* DOS/Windows: end with cr/lf */
 #endif
-			putc('\n', fd);									// otherwise end with lf
-			if (spacemode & UNIT_SKIPPING)					// add formfeed if we crossed page boundary while skipping
-				newpage(fd);
+			putc('\n', fd);									/* otherwise end with lf */
+			if (spacemode & UNIT_SKIPPING)					/* add formfeed if we crossed page boundary while skipping */
+				newpage(fd, physical_printer);
+
 			prt_nnl = 0;
 		}
-		else
+		else {
 			prt_nnl++;
+			formfed = FALSE;
+		}
 
-		prt_unit->pos++;									// note something written
+		prt_unit->pos++;									/* note something written */
 		return;
 	}
 
-	if (prt_nnl) {											// there are queued newlines
-// if we spaced to top of form, don't emit formfeed. We'd only ever emit the formfeed if we skipped	via control tape channels
-//		if (prt_row == 0 && prt_nnl) {						// we spaced to top of form
-//#ifdef _WIN32
-//			if (! cgi)
-//				putc('\r', fd);								// DOS/Windows: end with cr/lf
-//#endif
-//			putc('\n', fd);									// otherwise end with lf
-//			newpage(fd);
-//			prt_nnl = 0;
-//		}
-//		else {
-			while (prt_nnl > 0) {							// spit out queued newlines
+	if (prt_nnl) {											/* there are queued newlines */
+		while (prt_nnl > 0) {								/* spit out queued newlines */
 #ifdef _WIN32
-				if (! cgi)
-					putc('\r', fd);							// DOS/Windows: end with cr/lf
+			if (! cgi)
+				putc('\r', fd);								/* DOS/Windows: end with cr/lf */
 #endif
-				putc('\n', fd);								// otherwise end with lf
-				prt_nnl--;
-			}
-//		}
+			putc('\n', fd);									/* otherwise end with lf */
+			prt_nnl--;
+		}
 	}
 
 	for (r = 0; r < maxnp; r++) {
 		if (r > 0)
-			putc('\r', fd);									// carriage return between overprinted lines
-		fxwrite(&prtbuf[r*PRT_ROWLEN], 1, ncol[r], fd);
+			putc('\r', fd);									/* carriage return between overprinted lines */
+
+		fxwrite(&prtbuf[r*MAX_COLUMNS], 1, ncol[r], fd);
 	}
 
 	reset_prt_line();
 
-	prt_unit->pos++;										// note something written
-	prt_nnl++;												// queue a newline
+	prt_unit->pos++;										/* note something written */
+	prt_nnl++;												/* queue a newline */
 
-	if (phys_flush)											// if physical printer, send buffered output to device
+	if (physical_printer)									/* if physical printer, send buffered output to device */
 		fflush(fd);
+
+	formfed = FALSE;										/* note that something is now on the page */
 }
 
-// 1132 printer commands
+/* 1132 printer commands */
 
 #define PRT_CMD_START_PRINTER		0x0080
 #define PRT_CMD_STOP_PRINTER		0x0040
@@ -347,7 +362,7 @@ void xio_1132_printer (int32 iocc_addr, int32 func, int32 modify)
 
 	switch (func) {
 		case XIO_READ:
-			M[iocc_addr & mem_mask] = (uint16) (codewheel1132[prt_nchar].ebcdic << 8);
+			M[iocc_addr & mem_mask] = codewheel1132[prt_nchar].ebcdic << 8;
 
 			if ((uptr->flags & UNIT_PRINTING) == 0)				/* if we're not printing, advance this after every test */
 				prt_nchar = (prt_nchar + 1) % WHEELCHARS_1132;
@@ -364,31 +379,31 @@ void xio_1132_printer (int32 iocc_addr, int32 func, int32 modify)
 		case XIO_CONTROL:
 			if (modify & PRT_CMD_START_PRINTER) {
 				SETBIT(uptr->flags, UNIT_PRINTING);
-//				mytrace(1, "printing");
+/*				mytrace(1, "printing"); */
 			}
 
 			if (modify & PRT_CMD_STOP_PRINTER) {
 				CLRBIT(uptr->flags, UNIT_PRINTING);
-//				mytrace(0, "printing");
+/*				mytrace(0, "printing"); */
 			}
 
 			if (modify & PRT_CMD_START_CARRIAGE) {
 				SETBIT(uptr->flags, UNIT_SKIPPING);
-//				mytrace(1, "skipping");
+/*				mytrace(1, "skipping"); */
 			}
 
 			if (modify & PRT_CMD_STOP_CARRIAGE) {
 				CLRBIT(uptr->flags, UNIT_SKIPPING);
-//				mytrace(0, "skipping");
+/*				mytrace(0, "skipping"); */
 			}
 
 			if (modify & PRT_CMD_SPACE) {
 				SETBIT(uptr->flags, UNIT_SPACING);
-//				mytrace(1, "space");
+/*				mytrace(1, "space"); */
 			}
 
 			sim_cancel(uptr);
-			if (uptr->flags & (UNIT_SKIPPING|UNIT_SPACING|UNIT_PRINTING)) {		// busy bits = doing something
+			if (uptr->flags & (UNIT_SKIPPING|UNIT_SPACING|UNIT_PRINTING)) {		/* busy bits = doing something */
 				SETBIT(PRT_DSW, PRT1132_DSW_PRINTER_BUSY);
 				sim_activate(uptr, prt_cwait);
 			}
@@ -419,14 +434,14 @@ static t_stat prt_svc (UNIT *uptr)
 	return IS_1403(uptr) ? prt1403_svc(uptr) : prt1132_svc(uptr);
 }
 
-// prt1132_svc - emulated timeout for 1132 operation
+/* prt1132_svc - emulated timeout for 1132 operation */
 
 static t_stat prt1132_svc (UNIT *uptr)
 {
-	if (PRT_DSW & PRT1132_DSW_NOT_READY) {					// cancel operation if printer went offline
+	if (PRT_DSW & PRT1132_DSW_NOT_READY) {					/* cancel operation if printer went offline */
 		SETBIT(uptr->flags, UNIT_FORMCHECK);
 		SET_ACTION(uptr, 0);
-		forms_check(TRUE);									// and turn on forms check lamp
+		forms_check(TRUE);									/* and turn on forms check lamp */
 		return SCPE_OK;
 	}
 
@@ -436,7 +451,7 @@ static t_stat prt1132_svc (UNIT *uptr)
 		CLRBIT(PRT_DSW, PRT1132_DSW_CHANNEL_MASK|PRT1132_DSW_PRINTER_BUSY|PRT1132_DSW_CARRIAGE_BUSY);
 		SETBIT(PRT_DSW, cc_format_1132(cctape[prt_row]) | PRT1132_DSW_SPACE_RESPONSE);
 		SETBIT(ILSW[1], ILSW_1_1132_PRINTER);
-		CLRBIT(uptr->flags, UNIT_SPACING);					// done with this
+		CLRBIT(uptr->flags, UNIT_SPACING);					/* done with this */
 		calc_ints();
 	}
 
@@ -445,7 +460,7 @@ static t_stat prt1132_svc (UNIT *uptr)
 			flush_prt_line(uptr->fileref, UNIT_SKIPPING, IS_PHYSICAL(uptr));
 			CLRBIT(PRT_DSW, PRT1132_DSW_CHANNEL_MASK);
 			SETBIT(PRT_DSW, cc_format_1132(cctape[prt_row]));
-		} while ((cctape[prt_row] & CC_1132_BITS) == 0);			// slew directly to a cc tape punch
+		} while ((cctape[prt_row] & CC_1132_BITS) == 0);			/* slew directly to a cc tape punch */
 
 		SETBIT(PRT_DSW, cc_format_1132(cctape[prt_row]) | PRT1132_DSW_SKIP_RESPONSE);
 		SETBIT(ILSW[1], ILSW_1_1132_PRINTER);
@@ -453,21 +468,21 @@ static t_stat prt1132_svc (UNIT *uptr)
 	}
 
 	if (uptr->flags & UNIT_PRINTING) {
-		if (! save_1132_prt_line(codewheel1132[prt_nchar].ascii)) {	// save previous printed line
-			SETBIT(uptr->flags, UNIT_DATACHECK);					// buffer wasn't set in time
+		if (! save_1132_prt_line(codewheel1132[prt_nchar].ascii)) {	/* save previous printed line */
+			SETBIT(uptr->flags, UNIT_DATACHECK);					/* buffer wasn't set in time */
 			SET_ACTION(uptr, 0);
-			print_check(TRUE);										// and turn on forms check lamp
+			print_check(TRUE);										/* and turn on forms check lamp */
 			return SCPE_OK;
 		}
 
-		prt_nchar = (prt_nchar + 1) % WHEELCHARS_1132;				// advance print drum
+		prt_nchar = (prt_nchar + 1) % WHEELCHARS_1132;				/* advance print drum */
 
-		SETBIT(PRT_DSW, PRT1132_DSW_READ_EMITTER_RESPONSE);			// issue interrupt to tell printer to set buffer
-		SETBIT(ILSW[1], ILSW_1_1132_PRINTER);						// we'll save the printed stuff just before next emitter response (later than on real 1130)
+		SETBIT(PRT_DSW, PRT1132_DSW_READ_EMITTER_RESPONSE);			/* issue interrupt to tell printer to set buffer */
+		SETBIT(ILSW[1], ILSW_1_1132_PRINTER);						/* we'll save the printed stuff just before next emitter response (later than on real 1130) */
 		calc_ints();
 	}
 
-	if (uptr->flags & (UNIT_SPACING|UNIT_SKIPPING|UNIT_PRINTING)) {	// still doing something
+	if (uptr->flags & (UNIT_SPACING|UNIT_SKIPPING|UNIT_PRINTING)) {	/* still doing something */
 		SETBIT(PRT_DSW, PRT1132_DSW_PRINTER_BUSY);
 		sim_activate(uptr, prt_cwait);
 	}
@@ -483,18 +498,18 @@ void save_1403_prt_line (int32 addr)
 	unsigned char ebcdic;
 	int32 wd;
 
-	for (i = 0; i < PRT_COLUMNS; i++) {
-		if (even) {										// fetch next word from memory
+	for (i = 0; i < PRT1403_COLUMNS; i++) {
+		if (even) {										/* fetch next word from memory */
 			wd     = M[addr++];
 			ebcdic = (unsigned char) ((wd >> 8) & 0x7F);
 			even   = FALSE;
 		}
 		else {
-			ebcdic = (unsigned char) (wd & 0x7F);		// use low byte of previously fetched word
+			ebcdic = (unsigned char) (wd & 0x7F);		/* use low byte of previously fetched word */
 			even   = TRUE;
 		}
 
-		ch = ' ';										// translate ebcdic to ascii. Don't bother checking for parity errors
+		ch = ' ';										/* translate ebcdic to ascii. Don't bother checking for parity errors */
 		for (j = 0; j < WHEELCHARS_1403; j++) {
 			if (codewheel1403[j].ebcdic == ebcdic) {
 				ch = codewheel1403[j].ascii;
@@ -504,14 +519,14 @@ void save_1403_prt_line (int32 addr)
 
 		if (ch > ' ') {
 			if ((r = nprint[i]) < MAX_OVPRINT) {
-				if (ncol[r] <= i) {						// we haven't moved this far yet
-					if (ncol[r] == 0)					// first char in this row?
-						memset(prtbuf+r*PRT_ROWLEN, ' ', PRT_COLUMNS);	// blank out the new row
-					ncol[r] = i+1;										// remember new row length
+				if (ncol[r] <= i) {						/* we haven't moved this far yet */
+					if (ncol[r] == 0)					/* first char in this row? */
+						memset(prtbuf+r*MAX_COLUMNS, ' ', PRT1403_COLUMNS);	/* blank out the new row */
+					ncol[r] = i+1;											/* remember new row length */
 				}
-				prtbuf[r*PRT_ROWLEN + i] = (char) ch;	// save the character
+				prtbuf[r*MAX_COLUMNS + i] = (char) ch;	/* save the character */
 
-				nprint[i]++;							// remember max overprintings for this column
+				nprint[i]++;							/* remember max overprintings for this column */
 				maxnp = MAX(maxnp, nprint[i]);
 			}
 		}
@@ -568,15 +583,15 @@ void xio_1403_printer (int32 iocc_addr, int32 func, int32 modify)
 
 static t_stat prt1403_svc(UNIT *uptr)
 {
-	if (PRT_DSW & PRT1403_DSW_NOT_READY) {					// cancel operation if printer went offline
+	if (PRT_DSW & PRT1403_DSW_NOT_READY) {					/* cancel operation if printer went offline */
 		SET_ACTION(uptr, 0);
-		forms_check(TRUE);									// and turn on forms check lamp
+		forms_check(TRUE);									/* and turn on forms check lamp */
 	}
-	else if (uptr->flags & UNIT_TRANSFERRING) {				// end of transfer
+	else if (uptr->flags & UNIT_TRANSFERRING) {				/* end of transfer */
 		CLRBIT(uptr->flags, UNIT_TRANSFERRING);
-		SETBIT(uptr->flags, UNIT_PRINTING);					// schedule "print complete"
+		SETBIT(uptr->flags, UNIT_PRINTING);					/* schedule "print complete" */
 
-		SETBIT(PRT_DSW, PRT1403_DSW_TRANSFER_COMPLETE);		// issue transfer complete interrupt
+		SETBIT(PRT_DSW, PRT1403_DSW_TRANSFER_COMPLETE);		/* issue transfer complete interrupt */
 		SETBIT(ILSW[4], ILSW_4_1403_PRINTER);
 	}
 	else if (uptr->flags & UNIT_PRINTING) {
@@ -584,14 +599,14 @@ static t_stat prt1403_svc(UNIT *uptr)
 		CLRBIT(PRT_DSW, PRT1403_DSW_PRINTER_BUSY);
 
 		SETBIT(PRT_DSW, PRT1403_DSW_PRINT_COMPLETE);
-		SETBIT(ILSW[4], ILSW_4_1403_PRINTER);				// issue print complete interrupt
+		SETBIT(ILSW[4], ILSW_4_1403_PRINTER);				/* issue print complete interrupt */
 	}
 	else if (uptr->flags & UNIT_SKIPPING) {
-		do {												// find line with exact match of tape punches
+		do {												/* find line with exact match of tape punches */
 			flush_prt_line(uptr->fileref, UNIT_SKIPPING, IS_PHYSICAL(uptr));
-		} while (cctape[prt_row] != SKIPTARGET);			// slew directly to requested cc tape punch
+		} while (cctape[prt_row] != SKIPTARGET);			/* slew directly to requested cc tape punch */
 
-		CLRBIT(uptr->flags, UNIT_SKIPPING);					// done with this
+		CLRBIT(uptr->flags, UNIT_SKIPPING);					/* done with this */
 		CLRBIT(PRT_DSW, PRT1403_DSW_CARRIAGE_BUSY);
 
 		SETBIT(PRT_DSW, PRT1403_DSW_CARRIAGE_COMPLETE);
@@ -600,7 +615,7 @@ static t_stat prt1403_svc(UNIT *uptr)
 	else if (uptr->flags & UNIT_SPACING) {
 		flush_prt_line(uptr->fileref, UNIT_SPACING, IS_PHYSICAL(uptr));
 
-		CLRBIT(uptr->flags, UNIT_SPACING);					// done with this
+		CLRBIT(uptr->flags, UNIT_SPACING);					/* done with this */
 		CLRBIT(PRT_DSW, PRT1403_DSW_CARRIAGE_BUSY);
 
 		SETBIT(PRT_DSW, PRT1403_DSW_CARRIAGE_COMPLETE);
@@ -610,7 +625,7 @@ static t_stat prt1403_svc(UNIT *uptr)
 	if (uptr->flags & (UNIT_PRINTING|UNIT_SKIPPING|UNIT_SPACING|UNIT_TRANSFERRING))
 		sim_activate(uptr, prt_fwait);
 
-	CLRBIT(PRT_DSW, PRT1403_DSW_CH9|PRT1403_DSW_CH12);		// set the two CC bits in the DSW
+	CLRBIT(PRT_DSW, PRT1403_DSW_CH9|PRT1403_DSW_CH12);		/* set the two CC bits in the DSW */
 	if (cctape[prt_row] & CC_CHANNEL_9)
 		SETBIT(PRT_DSW, PRT1403_DSW_CH9);
 	if (cctape[prt_row] & CC_CHANNEL_12)
@@ -646,16 +661,17 @@ static t_stat prt_reset (DEVICE *dptr)
 	UNIT *uptr = &prt_unit[0];
 	int i;
 
-// add a DELETE filename command so we can be sure to have clean listings
+/* add a DELETE filename command so we can be sure to have clean listings */
 	register_cmd("DELETE", &delete_cmd, 0, "del{ete} filename        remove file\n");
 
 	sim_cancel(uptr);
 
-	memset(cctape, 0, sizeof(cctape));			// copy punch list into carriage control tape image
+	memset(cctape, 0, sizeof(cctape));			/* copy punch list into carriage control tape image */
 
-	if (cgi)
+	if (cgi) {
 		for (i = 0; i < (sizeof(cccgi)/sizeof(cccgi[0])); i++)
 			cctape[cccgi[i].row-1] |= cccgi[i].channels;
+	}
 	else
 		for (i = 0; i < (sizeof(ccpunches)/sizeof(ccpunches[0])); i++)
 			cctape[ccpunches[i].row-1] |= ccpunches[i].channels;
@@ -697,6 +713,7 @@ static t_stat prt_attach (UNIT *uptr, char *cptr)
 	t_stat rval;
 														/* assume failure */
 	SETBIT(PRT_DSW, IS_1132(uptr) ? PRT1132_DSW_NOT_READY : PRT1403_DSW_NOT_READY);
+	formfed = FALSE;
 
 	if (uptr->flags & UNIT_ATT) {
 		if ((rval = prt_detach(uptr)) != SCPE_OK) {
@@ -745,7 +762,7 @@ static t_stat prt_attach (UNIT *uptr, char *cptr)
 	reset_prt_line();
 
 	if (IS_1132(uptr)) {
-		PRT_DSW = (uint16) ((PRT_DSW & ~PRT1132_DSW_CHANNEL_MASK) | cc_format_1132(cctape[prt_row]));
+		PRT_DSW = (PRT_DSW & ~PRT1132_DSW_CHANNEL_MASK) | cc_format_1132(cctape[prt_row]);
 
 		if (IS_ONLINE(uptr))
 			CLRBIT(PRT_DSW, PRT1132_DSW_NOT_READY);
@@ -758,10 +775,11 @@ static t_stat prt_attach (UNIT *uptr, char *cptr)
 			SETBIT(PRT_DSW, PRT1403_DSW_CH12);
 
 		if (IS_ONLINE(uptr))
-			CLRBIT(PRT_DSW, PRT1132_DSW_NOT_READY);
+			CLRBIT(PRT_DSW, PRT1403_DSW_NOT_READY);		/* fixed by Carl Claunch */
 	}
 
 	forms_check(FALSE);
+
 	return SCPE_OK;
 }
 
@@ -769,7 +787,8 @@ static t_stat prt_detach (UNIT *uptr)
 {
 	t_stat rval;
 
-	flush_prt_line(uptr->fileref, TRUE, TRUE);
+	if (uptr->flags & UNIT_ATT)
+		flush_prt_line(uptr->fileref, TRUE, TRUE);
 
 	if (uptr->fileref == stdout) {
 		CLRBIT(uptr->flags, UNIT_ATT);
@@ -797,3 +816,4 @@ static t_stat prt_detach (UNIT *uptr)
 	forms_check(FALSE);
 	return SCPE_OK;
 }
+

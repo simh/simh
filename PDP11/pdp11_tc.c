@@ -640,7 +640,7 @@ switch (fnc) {                                          /* case function */
 
     case DTS_OFR:                                       /* off reel */
         if (dir) newpos = -1000;                        /* rev? < start */
-        else newpos = DTU_FWDEZ (uptr) + DT_EZLIN + 1000;       /* fwd? > end */
+        else newpos = DTU_FWDEZ (uptr) + DT_EZLIN + 1000; /* fwd? > end */
         break;
 
     case FNC_SRCH:                                      /* search */
@@ -811,7 +811,7 @@ switch (mot) {
             return IORETURN (dt_stopoffr, STOP_DTOFF);
         uptr->STATE = DTS_NXTSTA (uptr->STATE);         /* advance state */
         if (uptr->STATE)                                /* not stopped? */
-            sim_activate (uptr, dt_dctime - (dt_dctime >> 2));  /* reversing */
+            sim_activate (uptr, dt_dctime - (dt_dctime >> 2)); /* reversing */
         return SCPE_OK;
 
     case DTS_ACCF: case DTS_ACCR:                       /* accelerating */
@@ -1061,9 +1061,9 @@ int32 wrd = relpos / DT_WSIZE;
 
 if (wrd == DT_BLKWD) return blk;                        /* fwd blknum */
 if (wrd == DT_CSMWD) return 077;                        /* rev csum */
-if (wrd == (2 * DT_HTWRD + DTU_BSIZE (uptr) - DT_CSMWD - 1))    /* fwd csum */
+if (wrd == (2 * DT_HTWRD + DTU_BSIZE (uptr) - DT_CSMWD - 1)) /* fwd csum */
     return (dt_csum (uptr, blk) << 12);
-if (wrd == (2 * DT_HTWRD + DTU_BSIZE (uptr) - DT_BLKWD - 1))    /* rev blkno */
+if (wrd == (2 * DT_HTWRD + DTU_BSIZE (uptr) - DT_BLKWD - 1)) /* rev blkno */
     return dt_comobv (blk);
 return 0;                                               /* all others */
 }
@@ -1107,43 +1107,43 @@ return SCPE_OK;
 #define BOOT_LEN        (sizeof (boot_rom) / sizeof (int16))
 
 static const uint16 boot_rom[] = {
-    0042124,                            /* "TD" */
-    0012706, BOOT_START,                /* MOV #boot_start, SP */
-    0012700, 0000000,                   /* MOV #unit, R0        ; unit number */
-    0010003,                            /* MOV R0, R3 */
-    0000303,                            /* SWAB R3 */
-    0012701, 0177342,                   /* MOV #TCCM, R1        ; csr */
-    0012702, 0004003,                   /* RW: MOV #4003, R2    ; rev+rnum+go */
-    0050302,                            /* BIS R3, R2 */
-    0010211,                            /* MOV R2, (R1)         ; load csr */
-    0032711, 0100200,                   /* BIT #100200, (R1)    ; wait */
-    0001775,                            /* BEQ .-4 */
-    0100370,                            /* BPL RW               ; no err, cont */
-    0005761, 0177776,                   /* TST -2(R1)           ; end zone? */
-    0100036,                            /* BPL ER               ; no, err */
-    0012702, 0000003,                   /* MOV #3, R2           ; rnum+go */
-    0050302,                            /* BIS R3, R2 */
-    0010211,                            /* MOV R2, (R1)         ; load csr */
-    0032711, 0100200,                   /* BIT #100200, (R1)    ; wait */
-    0001775,                            /* BEQ .-4 */
-    0100426,                            /* BMI ER               ; err, die */
-    0005761, 0000006,                   /* TST 6(R1)            ; blk 0? */
-    0001023,                            /* BNE ER               ; no, die */
-    0012761, 0177000, 0000002,          /* MOV #-256.*2, 2(R1)  ; load wc */
-    0005061, 0000004,                   /* CLR 4(R1)            ; clear ba */
-    0012702, 0000005,                   /* MOV #READ+GO, R2     ; read & go */
-    0050302,                            /* BIS R3, R2 */
-    0010211,                            /* MOV R2, (R1)         ; load csr */
-    0005002,                            /* CLR R2 */
-    0005003,                            /* CLR R3 */
-    0012704, BOOT_START+020,            /* MOV #START+20, R4 */
-    0005005,                            /* CLR R5 */
-    0032711, 0100200,                   /* BIT #100200, (R1)    ; wait */
-    0001775,                            /* BEQ .-4 */
-    0100401,                            /* BMI ER               ; err, die */
-    0005007,                            /* CLR PC */
-    0012711, 0000001,                   /* ER: MOV #1, (R1)     ; stop all */
-    0000000                             /* HALT */
+    0042124,                        /* "TD" */
+    0012706, BOOT_START,            /* MOV #boot_start, SP */
+    0012700, 0000000,               /* MOV #unit, R0        ; unit number */
+    0010003,                        /* MOV R0, R3 */
+    0000303,                        /* SWAB R3 */
+    0012701, 0177342,               /* MOV #TCCM, R1        ; csr */
+    0012702, 0004003,               /* RW: MOV #4003, R2    ; rev+rnum+go */
+    0050302,                        /* BIS R3, R2 */
+    0010211,                        /* MOV R2, (R1)         ; load csr */
+    0032711, 0100200,               /* BIT #100200, (R1)    ; wait */
+    0001775,                        /* BEQ .-4 */
+    0100370,                        /* BPL RW               ; no err, cont */
+    0005761, 0177776,               /* TST -2(R1)           ; end zone? */
+    0100036,                        /* BPL ER               ; no, err */
+    0012702, 0000003,               /* MOV #3, R2           ; rnum+go */
+    0050302,                        /* BIS R3, R2 */
+    0010211,                        /* MOV R2, (R1)         ; load csr */
+    0032711, 0100200,               /* BIT #100200, (R1)    ; wait */
+    0001775,                        /* BEQ .-4 */
+    0100426,                        /* BMI ER               ; err, die */
+    0005761, 0000006,               /* TST 6(R1)            ; blk 0? */
+    0001023,                        /* BNE ER               ; no, die */
+    0012761, 0177000, 0000002,      /* MOV #-256.*2, 2(R1)  ; load wc */
+    0005061, 0000004,               /* CLR 4(R1)            ; clear ba */
+    0012702, 0000005,               /* MOV #READ+GO, R2     ; read & go */
+    0050302,                        /* BIS R3, R2 */
+    0010211,                        /* MOV R2, (R1)         ; load csr */
+    0005002,                        /* CLR R2 */
+    0005003,                        /* CLR R3 */
+    0012704, BOOT_START+020,        /* MOV #START+20, R4 */
+    0005005,                        /* CLR R5 */
+    0032711, 0100200,               /* BIT #100200, (R1)    ; wait */
+    0001775,                        /* BEQ .-4 */
+    0100401,                        /* BMI ER               ; err, die */
+    0005007,                        /* CLR PC */
+    0012711, 0000001,               /* ER: MOV #1, (R1)     ; stop all */
+    0000000                         /* HALT */
     };
 
 t_stat dt_boot (int32 unitno, DEVICE *dptr)
@@ -1179,7 +1179,7 @@ t_stat r;
 r = attach_unit (uptr, cptr);                           /* attach */
 if (r != SCPE_OK) return r;                             /* fail? */
 if ((sim_switches & SIM_SW_REST) == 0) {                /* not from rest? */
-    uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT;      /* default 16b */
+    uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT; /* default 16b */
     if (sim_switches & SWMASK ('T'))                    /* att 12b? */
         uptr->flags = (uptr->flags | UNIT_8FMT) & ~UNIT_11FMT;
     else if (sim_switches & SWMASK ('F'))               /* att 18b? */

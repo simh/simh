@@ -25,6 +25,8 @@
 
    cpu          7094 central processor
 
+   29-Oct-06    RMS     Added additional expanded core instructions
+   17-Oct-06    RMS     Fixed the fix in halt IO wait loop
    16-Jun-06    RMS     Fixed bug in halt IO wait loop
 
    The register state for the 7094 is:
@@ -1576,11 +1578,22 @@ while (reason == SCPE_OK) {                             /* loop until error */
             reason = op_mse (ea);
             break;
 
-        case 01761:                                     /* (CTSS) SEA, SEB */
+        case 01761:                                     /* (CTSS) ext core */
             if (prot_trap (0)) break;                   /* user mode? */
-            if (ea == 041) data_base = 0;
-            else if (ea == 042) data_base = BCORE_BASE;
-            else if (stop_illop) reason = STOP_ILLEG;
+            if (ea == 041)                              /* SEA? */
+                data_base = 0;
+            else if (ea == 042)                         /* SEB? */
+                data_base = BCORE_BASE;
+            else if (ea == 043) {                       /* IFT? */
+                if (inst_base == 0)
+                    PC = (PC + 1) & eamask;
+                }
+            else if (ea == 044) {                       /* EFT? */
+                if (data_base == 0)
+                    PC = (PC + 1) & eamask;
+                }
+            else if (stop_illop)
+                reason = STOP_ILLEG;
             break;
 
         case 01763:                                     /* LGL */
@@ -1775,7 +1788,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
                 if (r = sim_process_event ()) return r; /* process events */
                 chtr_pend = chtr_eval (NULL);           /* eval chan traps */
                 while (ch_req) {                        /* until no ch req */
-                    for (j = 0; i < NUM_CHAN; j++) {    /* loop thru channels */
+                    for (j = 0; j < NUM_CHAN; j++) {    /* loop thru channels */
                         if (ch_req & REQ_CH (j)) {      /* channel request? */
                             if (r = ch_proc (j)) return r;
                             }

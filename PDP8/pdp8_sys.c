@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2006, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Dec-06    RMS     Added TA8E support, IOT disambiguation
+   30-Oct-06    RMS     Added infinite loop stop
+   18-Oct-06    RMS     Re-ordered device list
    17-Oct-03    RMS     Added TSC8-75, TD8E support, DECtape off reel message
    25-Apr-03    RMS     Revised for extended file support
    30-Dec-01    RMS     Revised for new TTX
@@ -52,7 +55,7 @@ extern DEVICE rk_dev, rl_dev;
 extern DEVICE rx_dev;
 extern DEVICE df_dev, rf_dev;
 extern DEVICE dt_dev, td_dev;
-extern DEVICE mt_dev;
+extern DEVICE mt_dev, ct_dev;
 extern DEVICE ttix_dev, ttox_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
@@ -78,13 +81,13 @@ int32 sim_emax = 4;
 DEVICE *sim_devices[] = {
     &cpu_dev,
     &tsc_dev,
+    &clk_dev,
     &ptr_dev,
     &ptp_dev,
     &tti_dev,
     &tto_dev,
     &ttix_dev,
     &ttox_dev,
-    &clk_dev,
     &lpt_dev,
     &rk_dev,
     &rl_dev,
@@ -94,6 +97,7 @@ DEVICE *sim_devices[] = {
     &dt_dev,
     &td_dev,
     &mt_dev,
+    &ct_dev,
     NULL
     };
 
@@ -103,8 +107,22 @@ const char *sim_stop_messages[] = {
     "HALT instruction",
     "Breakpoint",
     "Non-standard device number",
-    "DECtape off reel"
+    "DECtape off reel",
+    "Infinite loop"
     };
+
+/* Ambiguous device list - these devices have overlapped IOT codes */
+
+DEVICE *amb_dev[] = {
+    &rl_dev,
+    &ct_dev,
+    &td_dev,
+    NULL
+    };
+
+#define AMB_RL      (1 << 12)
+#define AMB_CT      (2 << 12)
+#define AMB_TD      (3 << 12)
 
 /* Binary loader
 
@@ -213,6 +231,7 @@ return SCPE_FMT;                                        /* eof? error */
 #define I_V_OP1         4                               /* operate 1 */
 #define I_V_OP2         5                               /* operate 2 */
 #define I_V_OP3         6                               /* operate 3 */
+#define I_V_IOA         7                               /* ambiguous IOT */
 #define I_NPN           (I_V_NPN << I_V_FL)
 #define I_FLD           (I_V_FLD << I_V_FL)
 #define I_MRF           (I_V_MRF << I_V_FL)
@@ -220,48 +239,55 @@ return SCPE_FMT;                                        /* eof? error */
 #define I_OP1           (I_V_OP1 << I_V_FL)
 #define I_OP2           (I_V_OP2 << I_V_FL)
 #define I_OP3           (I_V_OP3 << I_V_FL)
+#define I_IOA           (I_V_IOA << I_V_FL)
 
 static const int32 masks[] = {
  07777, 07707, 07000, 07000,
- 07416, 07571, 017457
+ 07416, 07571, 017457, 077777,
  };
 
+/* Ambiguous device mnemonics must precede default mnemonics */
+
 static const char *opcode[] = {
- "SKON", "ION", "IOF", "SRQ",
+ "SKON", "ION", "IOF", "SRQ",                           /* std IOTs */
  "GTF", "RTF", "SGT", "CAF",
- "RPE", "RSF", "RRB", "RFC", "RFC RRB",
+ "RPE", "RSF", "RRB", "RFC", "RFC RRB",                 /* reader/punch */
  "PCE", "PSF", "PCF", "PPC", "PLS",
- "KCF", "KSF", "KCC", "KRS", "KIE", "KRB",
+ "KCF", "KSF", "KCC", "KRS", "KIE", "KRB",              /* console */
  "TLF", "TSF", "TCF", "TPC", "SPI", "TLS",
- "SBE", "SPL", "CAL",
- "CLEI", "CLDI", "CLSC", "CLLE", "CLCL", "CLSK",
- "CINT", "RDF", "RIF", "RIB",
+ "SBE", "SPL", "CAL",                                   /* power fail */
+ "CLEI", "CLDI", "CLSC", "CLLE", "CLCL", "CLSK",        /* clock */
+ "CINT", "RDF", "RIF", "RIB",                           /* mem mmgt */
  "RMF", "SINT", "CUF", "SUF",
- "ADCL", "ADLM", "ADST", "ADRB",
+ "RLDC", "RLSD", "RLMA", "RLCA",                        /* RL - ambiguous */
+ "RLCB", "RLSA", "RLWC",
+ "RRER", "RRWC", "RRCA", "RRCB",
+ "RRSA", "RRSI", "RLSE",
+ "KCLR", "KSDR", "KSEN", "KSBF",                        /* CT - ambiguous */
+ "KLSA", "KSAF", "KGOA", "KRSB",
+ "SDSS", "SDST", "SDSQ",                                /* TD - ambiguous */
+ "SDLC", "SDLD", "SDRC", "SDRD",
+ "ADCL", "ADLM", "ADST", "ADRB",                        /* A/D */
  "ADSK", "ADSE", "ADLE", "ADRS",
- "DCMA", "DMAR", "DMAW",
+ "DCMA", "DMAR", "DMAW",                                /* DF/RF */
  "DCIM", "DSAC", "DIML", "DIMA",
  "DCEA",         "DEAL", "DEAC",
  "DFSE", "DFSC", "DISK", "DMAC",
  "DCXA", "DXAL", "DXAC",
- "PSKF", "PCLF", "PSKE",
+ "PSKF", "PCLF", "PSKE",                                /* LPT */
  "PSTB", "PSIE", "PCLF PSTB", "PCIE",
- "LWCR", "CWCR", "LCAR",
+ "LWCR", "CWCR", "LCAR",                                /* MT */
  "CCAR", "LCMR", "LFGR", "LDBR",
  "RWCR", "CLT", "RCAR",
  "RMSR", "RCMR", "RFSR", "RDBR",
  "SKEF", "SKCB", "SKJD", "SKTR", "CLF",
- "DSKP", "DCLR", "DLAG",
+ "DSKP", "DCLR", "DLAG",                                /* RK */
  "DLCA", "DRST", "DLDC", "DMAN",
- "LCD", "XDR", "STR",
+ "LCD", "XDR", "STR",                                   /* RX */
  "SER", "SDN", "INTR", "INIT",
- "DTRA", "DTCA", "DTXA", "DTLA",
+ "DTRA", "DTCA", "DTXA", "DTLA",                        /* DT */
  "DTSF", "DTRB", "DTLB",
- "RLDC", "RLSD", "RLMA", "RLCA",
- "RLCB", "RLSA", "RLWC",
- "RRER", "RRWC", "RRCA", "RRCB",
- "RRSA", "RRSI", "RLSE",
- "ETDS", "ESKP", "ECTF", "ECDF",
+ "ETDS", "ESKP", "ECTF", "ECDF",                        /* TSC75 */
  "ERTB", "ESME", "ERIOT", "ETEN",
 
  "CDF", "CIF", "CIF CDF",
@@ -297,31 +323,35 @@ static const int32 opc_val[] = {
  06131+I_NPN, 06132+I_NPN, 06133+I_NPN, 06135+I_NPN, 06136+I_NPN, 06137+I_NPN,
  06204+I_NPN, 06214+I_NPN, 06224+I_NPN, 06234+I_NPN,
  06244+I_NPN, 06254+I_NPN, 06264+I_NPN, 06274+I_NPN,
- 06530+I_NPN, 06531+I_NPN, 06532+I_NPN, 06533+I_NPN,
+ 06600+I_IOA+AMB_RL, 06601+I_IOA+AMB_RL, 06602+I_IOA+AMB_RL, 06603+I_IOA+AMB_RL,
+ 06604+I_IOA+AMB_RL, 06605+I_IOA+AMB_RL, 06607+I_IOA+AMB_RL,
+ 06610+I_IOA+AMB_RL, 06611+I_IOA+AMB_RL, 06612+I_IOA+AMB_RL, 06613+I_IOA+AMB_RL,
+ 06614+I_IOA+AMB_RL, 06615+I_IOA+AMB_RL, 06617+I_IOA+AMB_RL,
+ 06700+I_IOA+AMB_CT, 06701+I_IOA+AMB_CT, 06702+I_IOA+AMB_CT, 06703+I_IOA+AMB_CT,
+ 06704+I_IOA+AMB_CT, 06705+I_IOA+AMB_CT, 06706+I_IOA+AMB_CT, 06707+I_IOA+AMB_CT,
+ 06771+I_IOA+AMB_TD, 06772+I_IOA+AMB_TD, 06773+I_IOA+AMB_TD,
+ 06774+I_IOA+AMB_TD, 06775+I_IOA+AMB_TD, 06776+I_IOA+AMB_TD, 06777+I_IOA+AMB_TD,
+ 06530+I_NPN, 06531+I_NPN, 06532+I_NPN, 06533+I_NPN,    /* AD */
  06534+I_NPN, 06535+I_NPN, 06536+I_NPN, 06537+I_NPN,
- 06601+I_NPN, 06603+I_NPN, 06605+I_NPN,
+ 06601+I_NPN, 06603+I_NPN, 06605+I_NPN,                 /* DF/RF */
  06611+I_NPN, 06612+I_NPN, 06615+I_NPN, 06616+I_NPN,
  06611+I_NPN,              06615+I_NPN, 06616+I_NPN,
  06621+I_NPN, 06622+I_NPN, 06623+I_NPN, 06626+I_NPN,
  06641+I_NPN, 06643+I_NPN, 06645+I_NPN,
- 06661+I_NPN, 06662+I_NPN, 06663+I_NPN,
+ 06661+I_NPN, 06662+I_NPN, 06663+I_NPN,                 /* LPT */
  06664+I_NPN, 06665+I_NPN, 06666+I_NPN, 06667+I_NPN,
- 06701+I_NPN, 06702+I_NPN, 06703+I_NPN,
+ 06701+I_NPN, 06702+I_NPN, 06703+I_NPN,                 /* MT */
  06704+I_NPN, 06705+I_NPN, 06706+I_NPN, 06707+I_NPN,
  06711+I_NPN, 06712+I_NPN, 06713+I_NPN,
  06714+I_NPN, 06715+I_NPN, 06716+I_NPN, 06717+I_NPN,
  06721+I_NPN, 06722+I_NPN, 06723+I_NPN, 06724+I_NPN, 06725+I_NPN,
- 06741+I_NPN, 06742+I_NPN, 06743+I_NPN,
+ 06741+I_NPN, 06742+I_NPN, 06743+I_NPN,                 /* RK */
  06744+I_NPN, 06745+I_NPN, 06746+I_NPN, 06747+I_NPN,
- 06751+I_NPN, 06752+I_NPN, 06753+I_NPN,
+ 06751+I_NPN, 06752+I_NPN, 06753+I_NPN,                 /* RX */
  06754+I_NPN, 06755+I_NPN, 06756+I_NPN, 06757+I_NPN,
- 06761+I_NPN, 06762+I_NPN, 06764+I_NPN, 06766+I_NPN,
+ 06761+I_NPN, 06762+I_NPN, 06764+I_NPN, 06766+I_NPN,    /* DT */
  06771+I_NPN, 06772+I_NPN, 06774+I_NPN,
- 06600+I_NPN, 06601+I_NPN, 06602+I_NPN, 06603+I_NPN,
- 06604+I_NPN, 06605+I_NPN, 06607+I_NPN,
- 06610+I_NPN, 06611+I_NPN, 06612+I_NPN, 06613+I_NPN,
- 06614+I_NPN, 06615+I_NPN, 06617+I_NPN,
- 06360+I_NPN, 06361+I_NPN, 06362+I_NPN, 06363+I_NPN,
+ 06360+I_NPN, 06361+I_NPN, 06362+I_NPN, 06363+I_NPN,    /* TSC */
  06364+I_NPN, 06365+I_NPN, 06366+I_NPN, 06367+I_NPN,
 
  06201+I_FLD, 06202+I_FLD, 06203+I_FLD,
@@ -395,7 +425,7 @@ return sp;
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
-int32 cflag, i, j, sp, inst, disp;
+int32 cflag, i, j, sp, inst, disp, opc;
 extern int32 emode;
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
@@ -419,14 +449,32 @@ if (!(sw & SWMASK ('M'))) return SCPE_ARG;
 
 /* Instruction decode */
 
-inst = val[0] | ((emode & 1) << 12);                    /* include EAE mode */
+opc = (inst >> 9) & 07;                                 /* get major opcode */
+if (opc == 07)                                          /* operate? */
+    inst = inst | ((emode & 1) << 12);                  /* include EAE mode */
+if (opc == 06) {                                        /* IOT? */
+    DEVICE *dptr;
+    DIB *dibp;
+    uint32 dno = (inst >> 3) & 077;
+    for (i = 0; (dptr = amb_dev[i]) != NULL; i++) {     /* check amb devices */
+        if ((dptr->ctxt == NULL) ||                     /* no DIB or */
+            (dptr->flags & DEV_DIS)) continue;          /* disabled? skip */
+        dibp = (DIB *) dptr->ctxt;                      /* get DIB */
+        if ((dno >= dibp->dev) ||                       /* IOT for this dev? */
+            (dno < (dibp->dev + dibp->num))) {
+            inst = inst | ((i + 1) << 12);              /* disambiguate */
+            break;                                      /* done */
+            }
+        }
+    }
+        
 for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
-    if ((opc_val[i] & 017777) == (inst & masks[j])) {   /* match? */
+    if ((opc_val[i] & 077777) == (inst & masks[j])) {   /* match? */
 
         switch (j) {                                    /* case on class */
 
-        case I_V_NPN:                                   /* no operands */
+        case I_V_NPN: case I_V_IOA:                     /* no operands */
             fprintf (of, "%s", opcode[i]);              /* opcode */
             break;
 
@@ -454,7 +502,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             break;
 
         case I_V_OP2:                                   /* operate group 2 */
-            if (opcode[i]) fprintf (of, "%s", opcode[i]);       /* skips */
+            if (opcode[i]) fprintf (of, "%s", opcode[i]); /* skips */
             fprint_opr (of, inst & 0206, j, opcode[i] != NULL);
             break;      
 
@@ -566,7 +614,8 @@ switch (j) {                                            /* case on class */
             }
         break;
 
-    case I_V_NPN: case I_V_OP1: case I_V_OP2: case I_V_OP3:     /* operates */
+    case I_V_OP1: case I_V_OP2: case I_V_OP3:           /* operates */
+    case I_V_NPN: case I_V_IOA:
         for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
             cptr = get_glyph (cptr, gbuf, 0)) {
             for (i = 0; (opcode[i] != NULL) &&

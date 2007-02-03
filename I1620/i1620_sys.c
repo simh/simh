@@ -129,7 +129,7 @@ char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
 ptr = 0;
-for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) {   /* until eof */
+for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) { /* until eof */
     mask = 0;
     if (*cptr == '(') {                                 /* repeat count? */
         cptr = get_glyph (cptr + 1, gbuf, ')');         /* get 1st field */

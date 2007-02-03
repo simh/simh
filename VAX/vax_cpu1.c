@@ -111,6 +111,8 @@ extern t_bool chk_tb_ent (uint32 va);
 extern int32 ReadIPR (int32 rg);
 extern void WriteIPR (int32 rg, int32 val);
 extern t_bool BadCmPSL (int32 newpsl);
+extern int32 cpu_psl_ipl (int32 newpsl);
+
 extern jmp_buf save_env;
 
 /* Branch on bit and no modify
@@ -1079,9 +1081,9 @@ else {
         SP = KSP;                                       /* new stack */
         }
     }
-if (ei > 0) PSL = newpsl | (ipl << PSL_V_IPL);          /* if int, new IPL */
-else PSL = newpsl | ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) |
-    (oldcur << PSL_V_PRV);
+if (ei > 0) PSL = cpu_psl_ipl (newpsl | (ipl << PSL_V_IPL)); /* if int, new IPL */
+else PSL = cpu_psl_ipl (newpsl |
+    ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV));
 if (DEBUG_PRI (cpu_dev, LOG_CPU_I)) fprintf (sim_deb,
     ">>IEX: PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
     PC, oldpsl, oldsp, vec, PSL, SP);
@@ -1124,7 +1126,7 @@ Write (tsp - 8, PC, L_LONG, WA);                        /* push PC */
 Write (tsp - 4, PSL | cc, L_LONG, WA);                  /* push PSL */
 SP = tsp - 12;                                          /* set new stk */
 PSL = (mode << PSL_V_CUR) | (PSL & PSL_IPL) |           /* set new PSL */
-    (cur << PSL_V_PRV);
+    (cur << PSL_V_PRV);                                 /* IPL unchanged */
 last_chm = fault_PC;
 JUMP (newpc & ~03);                                     /* set new PC */
 return 0;                                               /* cc = 0 */
@@ -1184,7 +1186,7 @@ else STK[oldcur] = SP;
 if (DEBUG_PRI (cpu_dev, LOG_CPU_R)) fprintf (sim_deb,
     ">>REI: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
     PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]));
-PSL = (PSL & PSL_TP) | (newpsl & ~CC_MASK);             /* set new PSL */
+PSL = cpu_psl_ipl ((PSL & PSL_TP) | (newpsl & ~CC_MASK)); /* set new PSL */
 if (PSL & PSL_IS) SP = IS;                              /* set new stack */
 else {
     SP = STK[newcur];                                   /* if ~IS, chk AST */
@@ -1275,7 +1277,8 @@ if (PSL & PSL_IS) SP = SP + 8;                          /* int stack? */
 else {
     KSP = SP + 8;                                       /* pop kernel stack */
     SP = IS;                                            /* switch to int stk */
-    if ((PSL & PSL_IPL) == 0) PSL = PSL | PSL_IPL1;     /* make IPL > 0 */
+    if ((PSL & PSL_IPL) == 0)                           /* make IPL > 0 */
+         PSL = cpu_psl_ipl (PSL | PSL_IPL1);
     PSL = PSL | PSL_IS;                                 /* set PSL<is> */
     }
 pcbpa = PCBB & PAMASK;
@@ -1436,7 +1439,7 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_IPL:                                        /* IPL */
-        PSL = (PSL & ~PSL_IPL) | ((val & PSL_M_IPL) << PSL_V_IPL);
+        PSL = cpu_psl_ipl ((PSL & ~PSL_IPL) | ((val & PSL_M_IPL) << PSL_V_IPL));
         break;
 
     case MT_ASTLVL:                                     /* ASTLVL */

@@ -91,16 +91,13 @@
 
 static void badio (char *dev)
 {
-// the real 1130 just ignores attempts to use uninstalled devices. They get tested
-// at times, so it's best to just be quiet about this
-// printf("%s I/O is not yet supported", dev);
+/* the real 1130 just ignores attempts to use uninstalled devices. They get tested
+ * at times, so it's best to just be quiet about this
+ * printf("%s I/O is not yet supported", dev);
+ */
 }
 
-// void xio_1134_papertape	(int32 addr, int32 func, int32 modify)			{badio("papertape");}
-void xio_1627_plotter	(int32 addr, int32 func, int32 modify)			{badio("plotter");}
 void xio_1231_optical	(int32 addr, int32 func, int32 modify)			{badio("optical mark");}
-void xio_2501_card		(int32 addr, int32 func, int32 modify)			{badio("2501 card");}
-void xio_1131_synch		(int32 addr, int32 func, int32 modify)			{badio("SCA");}
 void xio_system7		(int32 addr, int32 func, int32 modify)			{badio("System 7");}
 
 /* ---------------------------------------------------------------------------- */
@@ -120,7 +117,7 @@ extern int cgi;
 
 static int32 tti_dsw = 0;					/* device status words */
 static int32 tto_dsw = 0;
-static int32 con_dsw = 0;
+       int32 con_dsw = 0;
 					
 static unsigned char conout_map[256];		/* 1130 console code to ASCII translation. 0 = undefined, 0xFF = IGNR_ = no output */
 static unsigned char conin_map[256];		/* input mapping */
@@ -211,9 +208,10 @@ DEVICE tti_dev = {
    tto_reg	TTO register list
 */
 
-		// 14-Nov-03 -- the wait time was SERIAL_OUT_WAIT, but recent versions of SIMH reduced
-		// this to 100, and wouldn't you know it, APL\1130 has about 120 instructions between the XIO WRITE
-		// to the console and the associated WAIT.
+		/* 14-Nov-03 -- the wait time was SERIAL_OUT_WAIT, but recent versions of SIMH reduced
+		 * this to 100, and wouldn't you know it, APL\1130 has about 120 instructions between the XIO WRITE
+		 * to the console and the associated WAIT.
+		 */
 
 UNIT tto_unit = { UDATA (&tto_svc, 0, 0), 200 };
 
@@ -279,7 +277,7 @@ void xio_1131_console (int32 iocc_addr, int32 func, int32 modify)
 			ch = (ReadW(iocc_addr) >> 8) & 0xFF;		/* get character to write */
 			tto_unit.buf = emit_conout_character(ch);	/* output character and save write status */
 
-//			fprintf(stderr, "[CONOUT] %02x\n", ch);
+/*			fprintf(stderr, "[CONOUT] %02x\n", ch); */
 
 			SETBIT(tto_dsw, TT_DSW_PRINTER_BUSY);
 			sim_activate(&tto_unit, tto_unit.wait);		/* schedule interrupt */
@@ -300,10 +298,10 @@ void xio_1131_console (int32 iocc_addr, int32 func, int32 modify)
 			xio_error(msg);
 	}
 
-//	fprintf(stderr, "After XIO             %04x %04x\n", tti_dsw, tto_dsw);
+/*	fprintf(stderr, "After XIO             %04x %04x\n", tti_dsw, tto_dsw); */
 }
 
-// emit_conout_character - write character with 1130 console code 'ch'
+/* emit_conout_character - write character with 1130 console code 'ch' */
 
 t_stat emit_conout_character (int ch)
 {
@@ -342,12 +340,12 @@ t_stat emit_conout_character (int ch)
 	return map_conout_character(ch);
 }
 
-static void Beep (void)			// notify user keyboard was locked or key was bad
+static void Beep (void)			/* notify user keyboard was locked or key was bad */
 {
 	sim_putchar(7);
 }
 
-// tti_svc - keyboard polling (never stops)
+/* tti_svc - keyboard polling (never stops) */
 
 static t_stat tti_svc (UNIT *uptr)
 {
@@ -386,7 +384,7 @@ static t_stat tti_svc (UNIT *uptr)
 
 	if (temp == PROGRAM_STOP_KEY) {					/* simulate the program stop button */
 		SETBIT(con_dsw, CPU_DSW_PROGRAM_STOP);
-		SETBIT(ILSW[5], ILSW_5_PROGRAM_STOP);
+		SETBIT(ILSW[5], ILSW_5_INT_RUN_PROGRAM_STOP);
 		calc_ints();
 
 #ifdef DEBUG_CONSOLE
@@ -417,16 +415,13 @@ static t_stat tti_svc (UNIT *uptr)
 	printf("[%04x]", tti_unit.buf & 0xFFFF);
 #endif
 
-//	CLRBIT(tti_dsw, TT_DSW_KEYBOARD_BUSY);		/* clear busy flag (unselect keyboard) */
-//	keyboard_selected(FALSE);
-
 	SETBIT(tti_unit.flags, KEYBOARD_LOCKED);	/* prevent further keystrokes */
 
 	SETBIT(tti_dsw, TT_DSW_KEYBOARD_RESPONSE);	/* queue interrupt */
 	SETBIT(ILSW[4], ILSW_4_CONSOLE);
 	calc_ints();
 
-//	fprintf(stderr, "TTI interrupt svc SET %04x %04x\n", tti_dsw, tto_dsw);
+/*	fprintf(stderr, "TTI interrupt svc SET %04x %04x\n", tti_dsw, tto_dsw); */
 
 	return SCPE_OK;
 }
@@ -450,14 +445,14 @@ static t_stat tti_reset (DEVICE *dptr)
 	return SCPE_OK;
 }
 
-// basic_attach - fix quotes in filename, then call standard unit attach routine
+/* basic_attach - fix quotes in filename, then call standard unit attach routine */
 
 t_stat basic_attach (UNIT *uptr, char *cptr)
 {
 	return attach_unit(uptr, quotefix(cptr));	/* fix quotes in filenames & attach */
 }
 
-// quotefix - strip off quotes around filename, if present
+/* quotefix - strip off quotes around filename, if present */
 
 char * quotefix (char * cptr)
 {
@@ -492,7 +487,7 @@ static t_stat tto_svc (UNIT *uptr)
 	SETBIT(ILSW[4], ILSW_4_CONSOLE);
 	calc_ints();
 
-//	fprintf(stderr, "TTO interrupt svc SET %04x %04x\n", tti_dsw, tto_dsw);
+/*	fprintf(stderr, "TTO interrupt svc SET %04x %04x\n", tti_dsw, tto_dsw); */
 
 	return (t_stat) tto_unit.buf;				/* return status saved during output conversion */
 }
@@ -648,7 +643,7 @@ static struct {							/* default output mapping for APLPLUS font */
 
 #define NCONOUT_TO_APL (sizeof(conout_to_APL)/sizeof(conout_to_APL[0]))
 
-static OS_MAP default_os_map[] =			// overstrike mapping for APLPLUS font
+static OS_MAP default_os_map[] =			/* overstrike mapping for APLPLUS font */
 {
 	'\x8a',	2,	"\x5e\x7e",
 	'\x8b',	2,	"\x9f\x7e",
@@ -717,12 +712,12 @@ static void strsort (int n, unsigned char *s)
 	unsigned char temp;
 	int i, big;
 
-	while (--n > 0) {				// repeatedly
-		big = 0;					// find largest value of s[0]...s[n]
+	while (--n > 0) {				/* repeatedly */
+		big = 0;					/* find largest value of s[0]...s[n] */
 		for (i = 1; i <= n; i++)
 			if (s[i] > s[big]) big = i;
 
-		temp   = s[n];				// put largest value at end of array
+		temp   = s[n];				/* put largest value at end of array */
 		s[n]   = s[big];
 		s[big] = temp;
 	}	
@@ -730,10 +725,10 @@ static void strsort (int n, unsigned char *s)
 
 /* file format:
 
-[font XXX]			// font named XXX
-OUT					// failure character
-OUT IN				// single character mapping
-OUT IN IN ...		// overstrike mapping
+[font XXX]			 font named XXX
+OUT					 failure character
+OUT IN				 single character mapping
+OUT IN IN ...		 overstrike mapping
 
 */
 
@@ -742,35 +737,35 @@ static void set_conout_mapping (int32 flags)
 	curcol = 0;
 	maxcol = 0;
 
-	// set the default mappings. We may later override them with settings from an ini file
+	/* set the default mappings. We may later override them with settings from an ini file */
 
 	set_default_mapping(flags);
 }
 
-// finish_conout_mapping - sort the finalized overstrike mapping
+/* finish_conout_mapping - sort the finalized overstrike mapping */
 
 static void finish_conout_mapping (int32 flags)
 {
 	int i, n, big;
 	OS_MAP temp;
 
-	for (i = 0; i < n_os_mappings; i++)		// sort the inlist strings individually
+	for (i = 0; i < n_os_mappings; i++)		/* sort the inlist strings individually */
 		strsort(os_map[i].nin, os_map[i].inlist);
 
-	for (n = n_os_mappings; --n > 0; ) {	// then sort the os_map array itself with insertion sort
-		big = 0;							// find largest value of s[0]...s[n]
+	for (n = n_os_mappings; --n > 0; ) {	/* then sort the os_map array itself with insertion sort */
+		big = 0;							/* find largest value of s[0]...s[n] */
 		for (i = 1; i <= n; i++)
 			if (os_map_comp(os_map+i, os_map+big) > 0) big = i;
 
 		if (big != n) {
-			temp        = os_map[n];		// put largest value at end of array
+			temp        = os_map[n];		/* put largest value at end of array */
 			os_map[n]   = os_map[big];
 			os_map[big] = temp;
 		}
 	}
 }
 
-// validate_conout_mapping - called when set command gets a new value
+/* validate_conout_mapping - called when set command gets a new value */
 
 static t_stat validate_conout_mapping (UNIT *uptr, int32 match, char *cvptr, void *desc)
 {
@@ -793,7 +788,7 @@ static void reset_mapping (void)
 		conin_map[i] = (unsigned char) i;			/* default conin_map is identity map */
 }
 
-// set_default_mapping - create standard font and overstrike map
+/* set_default_mapping - create standard font and overstrike map */
 
 static void set_default_mapping (int32 flags)
 {
@@ -824,10 +819,10 @@ static void set_default_mapping (int32 flags)
 			break;
 	}
 
-	finish_conout_mapping(flags);				// sort conout mapping if necessary
+	finish_conout_mapping(flags);				/* sort conout mapping if necessary */
 }
 
-// sim_putstr - write a string to the console
+/* sim_putstr - write a string to the console */
 
 t_stat sim_putstr (char *s)
 {
@@ -843,7 +838,7 @@ t_stat sim_putstr (char *s)
 	return SCPE_OK;
 }
 
-// map_conout_character - translate and write a single character
+/* map_conout_character - translate and write a single character */
 
 static t_stat map_conout_character (int ch)
 {
@@ -857,54 +852,54 @@ static t_stat map_conout_character (int ch)
 		return (tto_unit.flags & ENABLE_ANSI) ? sim_putstr((char *) red_ribbon)   : SCPE_OK;
 
 	if ((ch = conout_map[ch & 0xFF]) == 0)
-		ch = '?';						// unknown character? print ?
+		ch = '?';						/* unknown character? print ? */
 
-	if (ch == '\n') {					// newline: reset overstrike buffer
+	if (ch == '\n') {					/* newline: reset overstrike buffer */
 		curcol = 0;
 		maxcol = -1;
 	}
-	else if (ch == '\r') {				// carriage return: rewind to column 0
+	else if (ch == '\r') {				/* carriage return: rewind to column 0 */
 		curcol = 0;
-		maxcol = -1;					// assume it advances paper too
+		maxcol = -1;					/* assume it advances paper too */
 	}
-	else if (ch == '\b') {				// backspace: back up one character
+	else if (ch == '\b') {				/* backspace: back up one character */
 		if (curcol > 0)
 			curcol--;
 	}
 	else if (n_os_mappings && ch != (unsigned char) IGNR_) {
 		if (curcol >= MAX_OUTPUT_COLUMNS)
-			map_conout_character('\x81');		// precede with automatic carriage return/line feed, I guess
+			map_conout_character('\x81');		/* precede with automatic carriage return/line feed, I guess */
 		
-		if (curcol > maxcol) {					// first time in this column, no overstrike possible yet
+		if (curcol > maxcol) {					/* first time in this column, no overstrike possible yet */
 			os_buf[curcol].nin = 0;
 			maxcol = curcol;
 		}
 
-		if (ch != ' ' && ch != 0) {				// (if it's not a blank or unknown)
+		if (ch != ' ' && ch != 0) {				/* (if it's not a blank or unknown) */
 			os_buf[curcol].inlist[os_buf[curcol].nin] = (unsigned char) ch;
 			strsort(++os_buf[curcol].nin, os_buf[curcol].inlist);
 		}
 
-		if (os_buf[curcol].nin == 0)			// if nothing but blanks seen,
-			ch = ' ';							// output is a blank
-		else if (os_buf[curcol].nin == 1) {		// if only one printing character seen, display it
+		if (os_buf[curcol].nin == 0)			/* if nothing but blanks seen, */
+			ch = ' ';							/* output is a blank */
+		else if (os_buf[curcol].nin == 1) {		/* if only one printing character seen, display it */
 			ch = os_buf[curcol].inlist[0];
 		}
-		else {									// otherwise look up mapping
+		else {									/* otherwise look up mapping */
 			ch = '?';
 
 			for (i = 0; i < n_os_mappings; i++) {
 				cmp = os_map_comp(&os_buf[curcol], &os_map[i]);
-				if (cmp == 0) {					// a hit
+				if (cmp == 0) {					/* a hit */
 					ch = os_map[i].ch;
 					break;
 				}
-				else if (cmp < 0)				// not found
+				else if (cmp < 0)				/* not found */
 					break;
 			}
 		}
 
-		if (curcol < MAX_OUTPUT_COLUMNS)		// this should now never happen, as we automatically return
+		if (curcol < MAX_OUTPUT_COLUMNS)		/* this should now never happen, as we automatically return */
 			curcol++;
 	}
 

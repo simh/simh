@@ -312,7 +312,7 @@ int32 ptbl_fill (a10 ea, int32 *tbl, int32 mode)
    ITS has no MAP instruction, therefore, physical NXM traps are ok.
 */
 
-if (ITS) {                                              /* ITS paging */
+if (Q_ITS) {                                            /* ITS paging */
     int32 acc, decvpn, pte, vpn, ptead, xpte;
     d10 ptewd;
 
@@ -349,7 +349,7 @@ if (ITS) {                                              /* ITS paging */
    user process tables.
 */
 
-else if (!T20) {                                        /* TOPS-10 paging */
+else if (!T20PAG) {                                     /* TOPS-10 paging */
     int32 pte, vpn, ptead, xpte;
     d10 ptewd;
 
@@ -377,7 +377,7 @@ else if (!T20) {                                        /* TOPS-10 paging */
     PAGE_FAIL_TRAP;
     }                                                   /* end TOPS10 paging */
 
-/* TOPS-20 paging - checked against KS10 ucode.
+/* TOPS-20 paging - checked against KS10 microcode
 
    TOPS-20 paging has three phases:
 
@@ -549,7 +549,7 @@ else {
     }
 t = EBR_GETEBR (ebr);
 epta = t << PAG_V_PN;
-if (ITS) upta = (int32) ubr & PAMASK;
+if (Q_ITS) upta = (int32) ubr & PAMASK;
 else {
     t = UBR_GETUBR (ubr);
     upta = t << PAG_V_PN;
@@ -601,7 +601,7 @@ t_bool clrpt (a10 ea, int32 prv)
 {
 int32 vpn = PAG_GETVPN (ea);                            /* get page num */
 
-if (ITS) {                                              /* ITS? */
+if (Q_ITS) {                                            /* ITS? */
     uptbl[vpn & ~1] = 0;                                /* clear double size */
     uptbl[vpn | 1] = 0;                                 /* entries in */
     eptbl[vpn & ~1] = 0;                                /* both page tables */
@@ -631,7 +631,7 @@ return FALSE;
 t_bool wrubr (a10 ea, int32 prv)
 {
 d10 val = Read (ea, prv);
-d10 ubr_mask = (ITS)? PAMASK: UBR_UBRMASK;              /* ITS: ubr is wd addr */
+d10 ubr_mask = (Q_ITS)? PAMASK: UBR_UBRMASK;            /* ITS: ubr is wd addr */
 
 if (val & UBR_SETACB) ubr = ubr & ~UBR_ACBMASK;         /* set AC's? */
 else val = val & ~UBR_ACBMASK;                          /* no, keep old val */
@@ -647,7 +647,7 @@ return FALSE;
 
 t_bool rdubr (a10 ea, int32 prv)
 {
-ubr = ubr & (UBR_ACBMASK | (ITS? PAMASK: UBR_UBRMASK));
+ubr = ubr & (UBR_ACBMASK | (Q_ITS? PAMASK: UBR_UBRMASK));
 Write (ea, UBRWORD, prv);
 return FALSE;
 }
@@ -705,7 +705,7 @@ return FALSE;
 t_bool wrcstm (a10 ea, int32 prv)
 {
 cstm = Read (ea, prv);
-if ((cpu_unit.flags & UNIT_T20V41) && (ea == 040127))
+if ((cpu_unit.flags & UNIT_T20) && (ea == 040127))
     cstm = 0770000000000;
 return FALSE;
 }
