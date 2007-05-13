@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          central processor
 
+   28-Apr-07    RMS     Removed clock initialization
    30-Oct-06    RMS     Added idle and infinite loop detection
    30-Sep-06    RMS     Fixed SC value after DVI overflow (found by Don North)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
@@ -244,7 +245,6 @@ extern int32 sim_int_char;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern DEVICE *sim_devices[];
 extern FILE *sim_log;
-extern UNIT clk_unit, ttix_unit;
 extern t_bool sim_idle_enab;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
@@ -338,8 +338,6 @@ LAC = saved_LAC & 017777;
 MQ = saved_MQ & 07777;
 int_req = INT_UPDATE;
 reason = 0;
-sim_rtcn_init (clk_unit.wait, TMR_CLK);                 /* init clk calib */
-sim_rtcn_init (ttix_unit.wait, TMR_TTX);                /* init ttx calib */
 
 /* Main instruction fetch/decode loop */
 

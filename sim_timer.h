@@ -1,6 +1,6 @@
 /* sim_timer.h: simulator timer library headers
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-Apr-07    RMS     Added sim_rtc_init_all
    17-Oct-06    RMS     Added idle support
    02-Jan-04    RMS     Split out from SCP
 */
@@ -48,6 +49,7 @@
 
 t_bool sim_timer_init (void);
 int32 sim_rtcn_init (int32 time, int32 tmr);
+void sim_rtcn_init_all (void);
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr);
 int32 sim_rtc_init (int32 time);
 int32 sim_rtc_calb (int32 ticksper);

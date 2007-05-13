@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2006, Robert M Supnik
+   Copyright (c) 1998-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Apr-07    RMS     Separated base register access checks for 11/780
    10-May-06    RMS     Added access check on system PTE for 11/780
                         Added mbz check in LDPCTX for 11/780
    22-Sep-06    RMS     Fixed declarations (from Sterling Garwood)
@@ -1230,7 +1231,7 @@ newpc = ReadLP (pcbpa + 72);                            /* get PC, PSL */
 newpsl = ReadLP (pcbpa + 76);
 
 t = ReadLP (pcbpa + 80);
-ML_BR_TEST (t);                                         /* validate P0BR */
+ML_PXBR_TEST (t);                                       /* validate P0BR */
 P0BR = t & BR_MASK;                                     /* restore P0BR */
 t = ReadLP (pcbpa + 84);
 LP_MBZ84_TEST (t);                                      /* test mbz */
@@ -1240,7 +1241,7 @@ t = (t >> 24) & AST_MASK;
 LP_AST_TEST (t);                                        /* validate AST */
 ASTLVL = t;                                             /* restore AST */
 t = ReadLP (pcbpa + 88);
-ML_BR_TEST (t + 0x800000);                              /* validate P1BR */
+ML_PXBR_TEST (t + 0x800000);                            /* validate P1BR */
 P1BR = t & BR_MASK;                                     /* restore P1BR */
 t = ReadLP (pcbpa + 92);
 LP_MBZ92_TEST (t);                                      /* test MBZ */
@@ -1387,7 +1388,7 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_P0BR:                                       /* P0BR */
-        ML_BR_TEST (val);                               /* validate */
+        ML_PXBR_TEST (val);                             /* validate */
         P0BR = val & BR_MASK;                           /* lw aligned */
         zap_tb (0);                                     /* clr proc TLB */
         set_map_reg ();
@@ -1401,7 +1402,7 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_P1BR:                                       /* P1BR */
-        ML_BR_TEST (val + 0x800000);                    /* validate */
+        ML_PXBR_TEST (val + 0x800000);                  /* validate */
         P1BR = val & BR_MASK;                           /* lw aligned */
         zap_tb (0);                                     /* clr proc TLB */
         set_map_reg ();
@@ -1415,7 +1416,7 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_SBR:                                        /* SBR */
-        ML_PA_TEST (val);                               /* validate */
+        ML_SBR_TEST (val);                              /* validate */
         SBR = val & BR_MASK;                            /* lw aligned */
         zap_tb (1);                                     /* clr entire TLB */
         set_map_reg ();

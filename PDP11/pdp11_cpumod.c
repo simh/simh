@@ -1,6 +1,6 @@
 /* pdp11_cpumod.c: PDP-11 CPU model-specific features
 
-   Copyright (c) 2004-2005, Robert M Supnik
+   Copyright (c) 2004-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    system       PDP-11 model-specific registers
 
+   29-Apr-07    RMS     Don't run bus setup routine during RESTORE
    30-Aug-05    RMS     Added additional 11/60 registers
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    15-Feb-05    RMS     Fixed bug in SHOW MODEL (from Sergey Okhapkin)
@@ -83,6 +84,7 @@ extern FILE *sim_log;
 extern int32 STKLIM, PIRQ;
 extern uint32 cpu_model, cpu_type, cpu_opt;
 extern int32 clk_fie, clk_fnxm, clk_tps, clk_default;
+extern int32 sim_switches;
 
 t_stat CPU24_rd (int32 *data, int32 addr, int32 access);
 t_stat CPU24_wr (int32 data, int32 addr, int32 access);
@@ -1100,7 +1102,8 @@ for (i = 0; i < clim; i = i + 2) nM[i >> 1] = M[i >> 1];
 free (M);
 M = nM;
 MEMSIZE = val;
-cpu_set_bus (cpu_opt);
+if (!(sim_switches & SIM_SW_REST))                      /* unless restore, */
+    cpu_set_bus (cpu_opt);                              /* alter periph config */
 return SCPE_OK;
 }
 

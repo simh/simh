@@ -1,6 +1,6 @@
 /* hp2100_ipl.c: HP 2000 interprocessor link simulator
 
-   Copyright (c) 2002-2006, Robert M Supnik
+   Copyright (c) 2002-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,9 +23,11 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ipli, iplo   12566B interprocessor link pair
+   ipli, iplo   12875A interprocessor link
 
-   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
+   01-Mar-07    JDB     IPLI EDT delays DMA completion interrupt for TSB
+                        Added debug printouts
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Oct-04    JDB     Fixed enable/disable from either device
    26-Apr-04    RMS     Fixed SFS x,C and SFC x,C
@@ -33,6 +35,20 @@
    21-Dec-03    RMS     Adjusted ipl_ptime for TSB (from Mike Gemeny)
    09-May-03    RMS     Added network device flag
    31-Jan-03    RMS     Links are full duplex (found by Mike Gemeny)
+
+   The 12875A Processor Interconnect Kit consists four 12566A Microcircuit
+   Interface cards.  Two are used in each processor.  One card in each system is
+   used to initiate transmissions to the other, and the second card is used to
+   receive transmissions from the other.  Each pair of cards forms a
+   bidirectional link, as the sixteen data lines are cross-connected, so that
+   data sent and status returned are supported.  In each processor, data is sent
+   on the lower priority card and received on the higher priority card.  Two
+   sets of cards are used to support simultaneous transmission in both
+   directions.
+
+   Reference:
+   - 12875A Processor Interconnect Kit Operating and Service Manual
+            (12875-90002, Jan-1974)
 */
 
 #include "hp2100_defs.h"
@@ -52,9 +68,17 @@
 #define DSOCKET         u3                              /* data socket */
 #define LSOCKET         u4                              /* listening socket */
 
+/* Debug flags */
+
+#define DEB_CMDS        (1 << 0)                        /* Command initiation and completion */
+#define DEB_CPU         (1 << 1)                        /* CPU I/O */
+#define DEB_XFER        (1 << 2)                        /* Socket receive and transmit */
+
 extern uint32 PC;
 extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
 extern FILE *sim_log;
+extern FILE *sim_deb;
+int32 ipl_edtdelay = 1;                                 /* EDT delay (msec) */
 int32 ipl_ptime = 31;                                   /* polling interval */
 int32 ipl_stopioe = 0;                                  /* stop on error */
 int32 ipl_hold[2] = { 0 };                              /* holding character */
@@ -71,6 +95,14 @@ t_stat ipl_boot (int32 unitno, DEVICE *dptr);
 t_stat ipl_dscln (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ipl_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_bool ipl_check_conn (UNIT *uptr);
+
+/* Debug flags table */
+
+DEBTAB ipl_deb[] = {
+    { "CMDS", DEB_CMDS },
+    { "CPU",  DEB_CPU },
+    { "XFER", DEB_XFER },
+    { NULL, 0 }  };
 
 /* IPLI data structures
 
@@ -125,7 +157,8 @@ DEVICE ipli_dev = {
     1, 10, 31, 1, 16, 16,
     &tmxr_ex, &tmxr_dep, &ipl_reset,
     &ipl_boot, &ipl_attach, &ipl_detach,
-    &ipli_dib, DEV_NET | DEV_DISABLE | DEV_DIS
+    &ipli_dib, DEV_NET | DEV_DISABLE | DEV_DIS | DEV_DEBUG,
+    0, ipl_deb, NULL, NULL
     };
 
 /* IPLO data structures
@@ -154,7 +187,8 @@ DEVICE iplo_dev = {
     1, 10, 31, 1, 16, 16,
     &tmxr_ex, &tmxr_dep, &ipl_reset,
     &ipl_boot, &ipl_attach, &ipl_detach,
-    &iplo_dib, DEV_NET | DEV_DISABLE | DEV_DIS
+    &iplo_dib, DEV_NET | DEV_DISABLE | DEV_DIS | DEV_DEBUG,
+    0, ipl_deb, NULL, NULL
     };
 
 /* I/O instructions */
@@ -169,12 +203,61 @@ int32 iploio (int32 inst, int32 IR, int32 dat)
 return iplio (&iplo_unit, inst, IR, dat);
 }
 
+/* I/O handler for the IPLI and IPLO devices.
+
+   Implementation note: 2000 Access has a race condition that manifests itself
+   by an apparently normal boot and operational system console but no PLEASE LOG
+   IN response to terminals connected to the multiplexer.  The frequency of
+   occurrence is higher on multiprocessor host systems, where the SP and IOP
+   instances may execute concurrently.
+
+   The cause is this code in the SP disc loader source (2883.asm, 7900.asm,
+   790X.asm, 79X3.asm, and 79XX.asm):
+
+         LDA SDVTR     REQUEST
+         JSB IOPMA,I     DEVICE TABLE
+         [...]
+         STC DMAHS,C   TURN ON DMA
+         SFS DMAHS     WAIT FOR
+         JMP *-1         DEVICE TABLE
+         STC CH2,C     SET CORRECT
+         CLC CH2         FLAG DIRECTION
+
+   The STC/CLC normally would cause a second "request device table" command to
+   be recognized by the IOP, except that the IOP DMA setup routine "DMAXF" (in
+   D61.asm) has specified an end-of-block CLC that holds off the IPL interrupt,
+   and the completion interrupt routine "DMACP" ends with a STC,C that clears
+   the IPL flag.
+
+   In hardware, the two CPUs are essentially interlocked by the DMA transfer,
+   and DMA completion interrupts occur almost simultaneously.  Therefore, the
+   STC/CLC in the SP is guaranteed to occur before the STC,C in the IOP.  Under
+   simulation, and especially on multiprocessor hosts, that guarantee does not
+   hold.  If the STC/CLC occurs after the STC,C, then the IOP starts a second
+   device table DMA transfer, which the SP is not expecting.  The IOP never
+   processes the subsequent "start timesharing" command, and the muxtiplexer is
+   non-reponsive.
+
+   We employ a workaround that decreases the incidence of the problem: DMA
+   output completion interrupts are delayed to allow the other SIMH instance a
+   chance to process its own DMA completion.  We do this by processing the EDT
+   (End Data Transfer) I/O backplane signal and "sleep"ing for a short time if
+   the transfer was an output transfer ("dat" contains the DMA channel number
+   and direction flag for EDT signals).
+*/
+
 int32 iplio (UNIT *uptr, int32 inst, int32 IR, int32 dat)
 {
 uint32 u, dev, odev;
 int32 sta;
-char msg[2];
+char msg[2], uc;
+DEVICE *dbdev;                                          /* device ptr for debug */
+static const char *iotype[] = { "Status", "Command" };
 
+uc = (uptr == &ipli_unit) ? 'I' : 'O';                  /* identify unit for debug */
+dbdev = (uptr == &ipli_unit) ? &ipli_dev : &iplo_dev;   /* identify device for debug */
+
+u = (uptr - ipl_unit);                                  /* get unit number */
 dev = IR & I_DEVMASK;                                   /* get device no */
 switch (inst) {                                         /* case on opcode */
 
@@ -192,25 +275,42 @@ switch (inst) {                                         /* case on opcode */
 
     case ioOTX:                                         /* output */
         uptr->OBUF = dat;
+
+        if (DEBUG_PRJ (dbdev, DEB_CPU))
+            fprintf (sim_deb, ">>IPL%c OTx: %s = %06o\n", uc, iotype[u], dat);
         break;
 
     case ioLIX:                                         /* load */
-        dat = uptr->IBUF;                               /* return val */
-        break;
+        dat = 0;
 
     case ioMIX:                                         /* merge */
         dat = dat | uptr->IBUF;                         /* get return data */
+
+        if (DEBUG_PRJ (dbdev, DEB_CPU))
+            fprintf (sim_deb, ">>IPL%c LIx: %s = %06o\n", uc, iotype[u ^ 1], dat);
         break;
 
-    case ioCRS:                                         /* control reset (action unverif) */
+    case ioCRS:                                         /* control reset */
+        clrCMD (dev);                                   /* clear ctl, cmd */
+        clrCTL (dev);
+        break;
+
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCMD (dev);                               /* clear ctl, cmd */
             clrCTL (dev);
+
+            if (DEBUG_PRJ (dbdev, DEB_CMDS))
+                fprintf (sim_deb, ">>IPL%c CLC: Command cleared\n", uc);
             }
+
         else {                                          /* STC */
             setCMD (dev);                               /* set ctl, cmd */
             setCTL (dev);
+
+            if (DEBUG_PRJ (dbdev, DEB_CMDS))
+                fprintf (sim_deb, ">>IPL%c STC: Command set\n", uc);
+
             if (uptr->flags & UNIT_ATT) {               /* attached? */
                 if ((uptr->flags & UNIT_ESTB) == 0) {   /* established? */
                     if (!ipl_check_conn (uptr))         /* not established? */
@@ -220,6 +320,12 @@ switch (inst) {                                         /* case on opcode */
                 msg[0] = (uptr->OBUF >> 8) & 0377;
                 msg[1] = uptr->OBUF & 0377;
                 sta = sim_write_sock (uptr->DSOCKET, msg, 2);
+
+                if (DEBUG_PRJ (dbdev, DEB_XFER))
+                    fprintf (sim_deb,
+                        ">>IPL%c STC: Socket write = %06o, status = %d\n",
+                        uc, uptr->OBUF, sta);
+
                 if (sta == SOCKET_ERROR) {
                     printf ("IPL: socket write error\n");
                     return SCPE_IOERR;
@@ -236,6 +342,16 @@ switch (inst) {                                         /* case on opcode */
             }
         break;
 
+    case ioEDT:                                         /* End of DMA data transfer */
+        if ((dat & DMA2_OI) == 0) {                     /* output transfer? */
+            if (DEBUG_PRJ (dbdev, DEB_CMDS))
+                fprintf (sim_deb,
+                    ">>IPL%c EDT: Delaying DMA completion interrupt for %d msec\n",
+                    uc, ipl_edtdelay);
+            sim_os_ms_sleep (ipl_edtdelay);             /* delay completion */
+            }
+        break;
+
     default:
         break;
         }
@@ -249,7 +365,8 @@ return dat;
 t_stat ipl_svc (UNIT *uptr)
 {
 int32 u, nb, dev;
-char msg[2];
+char msg[2], uc;
+DEVICE *dbdev;                                          /* device ptr for debug */
 
 u = uptr - ipl_unit;                                    /* get link number */
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;      /* not attached? */
@@ -277,6 +394,14 @@ else uptr->IBUF = ((((int32) msg[0]) & 0377) << 8) |
 dev = ipl_dib[u].devno;                                 /* get device number */
 clrCMD (dev);                                           /* clr cmd, set flag */
 setFSR (dev);
+
+uc = (uptr == &ipli_unit) ? 'I' : 'O';                  /* identify unit for debug */
+dbdev = (uptr == &ipli_unit) ? &ipli_dev : &iplo_dev;   /* identify device for debug */
+
+if (DEBUG_PRJ (dbdev, DEB_XFER))
+    fprintf (sim_deb, ">>IPL%c svc: Socket read = %06o, status = %d\n",
+        uc, uptr->IBUF, nb);
+
 return SCPE_OK;
 }
 
@@ -524,4 +649,3 @@ M[PC + IPL_DEVA] = devi;
 M[PC + PTR_DEVA] = devp;
 return SCPE_OK;
 }
-

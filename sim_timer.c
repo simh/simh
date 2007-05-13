@@ -1,6 +1,6 @@
 /* sim_timer.c: simulator timer library
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,9 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Aug-07    RMS     Added sim_rtcn_init_all
    17-Oct-06    RMS     Added idle support (based on work by Mark Pizzolato)
                         Added throttle support
-   21-Aug-05    RMS     Added sim_rtcn_init_all
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    02-Jan-04    RMS     Split out from SCP
 
@@ -343,6 +343,16 @@ static uint32 rtc_nxintv[SIM_NTIMERS] = { 0 };          /* next interval */
 static int32 rtc_based[SIM_NTIMERS] = { 0 };            /* base delay */
 static int32 rtc_currd[SIM_NTIMERS] = { 0 };            /* current delay */
 static int32 rtc_initd[SIM_NTIMERS] = { 0 };            /* initial delay */
+
+void sim_rtcn_init_all (void)
+{
+uint32 i;
+
+for (i = 0; i < SIM_NTIMERS; i++) {
+    if (rtc_initd[i] != 0) sim_rtcn_init (rtc_initd[i], i);
+    }
+return;
+}
 
 int32 sim_rtcn_init (int32 time, int32 tmr)
 {

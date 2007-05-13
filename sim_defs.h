@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Mar-07    RMS     Added UNIT_TEXT flag
+   07-Mar-07    JDB     Added DEBUG_PRJ macro
    18-Oct-06    RMS     Added limit check for clock synchronized keyboard waits
    13-Jul-06    RMS     Guarantee CBUFSIZE is at least 256
    07-Jan-06    RMS     Added support for breakpoint spaces
@@ -363,6 +365,7 @@ struct sim_unit {
 #define UNIT_DISABLE    002000                          /* disable-able */
 #define UNIT_DIS        004000                          /* disabled */
 #define UNIT_RAW        010000                          /* raw mode */
+#define UNIT_TEXT       020000                          /* text mode */
 
 #define UNIT_UFMASK_31  (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF_31) - 1))
 #define UNIT_UFMASK     (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF) - 1))
@@ -470,6 +473,7 @@ struct sim_debtab {
 #define DEBUG_PRS(d)    (sim_deb && d.dctrl)
 #define DEBUG_PRD(d)    (sim_deb && d->dctrl)
 #define DEBUG_PRI(d,m)  (sim_deb && (d.dctrl & (m)))
+#define DEBUG_PRJ(d,m)  (sim_deb && (d->dctrl & (m)))
 
 /* The following macros define structure contents */
 

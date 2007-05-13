@@ -14,7 +14,7 @@
 
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
     PETER SCHORN BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
     IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
     CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -110,8 +110,8 @@
 
 #include "altairz80_defs.h"
 
-#define UNIT_V_DSKWLK       (UNIT_V_UF + 0)         /* write locked                             */
-#define UNIT_DSKWLK         (1 << UNIT_V_DSKWLK)
+#define UNIT_V_DSK_WLK      (UNIT_V_UF + 0)         /* write locked                             */
+#define UNIT_DSK_WLK        (1 << UNIT_V_DSK_WLK)
 #define UNIT_V_DSK_VERBOSE  (UNIT_V_UF + 1)         /* verbose mode, i.e. show error messages   */
 #define UNIT_DSK_VERBOSE    (1 << UNIT_V_DSK_VERBOSE)
 #define DSK_SECTSIZE        137                     /* size of sector                           */
@@ -129,18 +129,12 @@
 int32 dsk10(const int32 port, const int32 io, const int32 data);
 int32 dsk11(const int32 port, const int32 io, const int32 data);
 int32 dsk12(const int32 port, const int32 io, const int32 data);
-static int32 dskseek(const UNIT *xptr);
 static t_stat dsk_boot(int32 unitno, DEVICE *dptr);
 static t_stat dsk_reset(DEVICE *dptr);
-static void writebuf(void);
 static t_stat dsk_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc);
-static void resetDSKWarningFlags(void);
-static int32 hasVerbose(void);
-static char* selectInOut(const int32 io);
 
 extern int32 PCX;
 extern int32 saved_PC;
-extern FILE *sim_log;
 extern char messageBuffer[];
 extern UNIT cpu_unit;
 
@@ -149,8 +143,9 @@ extern int32 install_bootrom(void);
 
 /* global data on status */
 
-static int32 current_disk       = NUM_OF_DSK;       /* currently selected drive (values are 0 .. NUM_OF_DSK)
-    current_disk < NUM_OF_DSK implies that the corresponding disk is attached to a file */
+/* currently selected drive (values are 0 .. NUM_OF_DSK)
+   current_disk < NUM_OF_DSK implies that the corresponding disk is attached to a file */
+static int32 current_disk                   = NUM_OF_DSK;
 static int32 current_track  [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
 static int32 current_sector [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
 static int32 current_byte   [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -240,12 +235,12 @@ static REG dsk_reg[] = {
 };
 
 static MTAB dsk_mod[] = {
-    { UNIT_DSKWLK,      0,                  "write enabled",    "WRITEENABLED", NULL                },
-    { UNIT_DSKWLK,      UNIT_DSKWLK,        "write locked",     "LOCKED",       NULL                },
-    /* quiet, no warning messages           */
-    { UNIT_DSK_VERBOSE, 0,                  "QUIET",            "QUIET",        NULL                },
+    { UNIT_DSK_WLK,     0,                  "WRTENB",    "WRTENB",  NULL                },
+    { UNIT_DSK_WLK,     UNIT_DSK_WLK,       "WRTLCK",    "WRTLCK",  NULL                },
+    /* quiet, no warning messages       */
+    { UNIT_DSK_VERBOSE, 0,                  "QUIET",     "QUIET",   NULL                },
     /* verbose, show warning messages   */
-    { UNIT_DSK_VERBOSE, UNIT_DSK_VERBOSE,   "VERBOSE",          "VERBOSE",      &dsk_set_verbose    },
+    { UNIT_DSK_VERBOSE, UNIT_DSK_VERBOSE,   "VERBOSE",   "VERBOSE", &dsk_set_verbose    },
     { 0 }
 };
 
@@ -306,21 +301,55 @@ static t_stat dsk_reset(DEVICE *dptr) {
 */
 static t_stat dsk_boot(int32 unitno, DEVICE *dptr) {
     if (cpu_unit.flags & (UNIT_ALTAIRROM | UNIT_BANKED)) {
-        if (install_bootrom()) {
-            printf("ALTAIR boot ROM installed.\n");
-        }
         /* check whether we are really modifying an LD A,<> instruction */
         if ((bootrom[UNIT_NO_OFFSET_1 - 1] == LDA_INSTRUCTION) && (bootrom[UNIT_NO_OFFSET_2 - 1] == LDA_INSTRUCTION)) {
-            bootrom[UNIT_NO_OFFSET_1] = unitno & 0xff;                     /* LD A,<unitno>                */
+            bootrom[UNIT_NO_OFFSET_1] = unitno & 0xff;             /* LD A,<unitno>        */
             bootrom[UNIT_NO_OFFSET_2] = 0x80 | (unitno & 0xff);    /* LD a,80h | <unitno>  */
         }
         else { /* Attempt to modify non LD A,<> instructions is refused. */
             printf("Incorrect boot ROM offsets detected.\n");
             return SCPE_IERR;
         }
+        install_bootrom();                                         /* install modified ROM */
     }
     saved_PC = DEFAULT_ROM_LOW;
     return SCPE_OK;
+}
+
+static int32 dskseek(const UNIT *xptr) {
+    return fseek(xptr -> fileref, DSK_TRACSIZE * current_track[current_disk] +
+        DSK_SECTSIZE * current_sector[current_disk], SEEK_SET);
+}
+
+/* precondition: current_disk < NUM_OF_DSK */
+static void writebuf(void) {
+    int32 i, rtn;
+    UNIT *uptr;
+    i = current_byte[current_disk];         /* null-fill rest of sector if any */
+    while (i < DSK_SECTSIZE) {
+        dskbuf[i++] = 0;
+    }
+    uptr = dsk_dev.units + current_disk;
+    if (((uptr -> flags) & UNIT_DSK_WLK) == 0) { /* write enabled */
+        if (trace_flag & TRACE_READ_WRITE) {
+            MESSAGE_4("OUT 0x0a (WRITE) D%d T%d S%d", current_disk, current_track[current_disk], current_sector[current_disk]);
+        }
+        if (dskseek(uptr)) {
+            MESSAGE_4("fseek failed D%d T%d S%d", current_disk, current_track[current_disk], current_sector[current_disk]);
+        }
+        rtn = fwrite(dskbuf, DSK_SECTSIZE, 1, uptr -> fileref);
+        if (rtn != 1) {
+            MESSAGE_4("fwrite failed T%d S%d Return=%d", current_track[current_disk], current_sector[current_disk], rtn);
+        }
+    }
+    else if ( ((uptr -> flags) & UNIT_DSK_VERBOSE) && (warnLock[current_disk] < warnLevelDSK) ) {
+        /* write locked - print warning message if required */
+        warnLock[current_disk]++;
+/*05*/  MESSAGE_2("Attempt to write to locked DSK%d - ignored.", current_disk);
+    }
+    current_flag[current_disk]  &= 0xfe;    /* ENWD off */
+    current_byte[current_disk]  = 0xff;
+    dirty                       = FALSE;
 }
 
 /*  I/O instruction handlers, called from the CPU module when an
@@ -487,11 +516,6 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
 
 /* Disk Data In/Out */
 
-static int32 dskseek(const UNIT *xptr) {
-    return fseek(xptr -> fileref, DSK_TRACSIZE * current_track[current_disk] +
-        DSK_SECTSIZE * current_sector[current_disk], SEEK_SET);
-}
-
 int32 dsk12(const int32 port, const int32 io, const int32 data) {
     int32 i;
     UNIT *uptr;
@@ -532,35 +556,4 @@ int32 dsk12(const int32 port, const int32 io, const int32 data) {
         }
         return 0;   /* ignored since OUT */
     }
-}
-
-/* precondition: current_disk < NUM_OF_DSK */
-static void writebuf(void) {
-    int32 i, rtn;
-    UNIT *uptr;
-    i = current_byte[current_disk];         /* null-fill rest of sector if any */
-    while (i < DSK_SECTSIZE) {
-        dskbuf[i++] = 0;
-    }
-    uptr = dsk_dev.units + current_disk;
-    if (((uptr -> flags) & UNIT_DSKWLK) == 0) { /* write enabled */
-        if (trace_flag & TRACE_READ_WRITE) {
-            MESSAGE_4("OUT 0x0a (WRITE) D%d T%d S%d", current_disk, current_track[current_disk], current_sector[current_disk]);
-        }
-        if (dskseek(uptr)) {
-            MESSAGE_4("fseek failed D%d T%d S%d", current_disk, current_track[current_disk], current_sector[current_disk]);
-        }
-        rtn = fwrite(dskbuf, DSK_SECTSIZE, 1, uptr -> fileref);
-        if (rtn != 1) {
-            MESSAGE_4("fwrite failed T%d S%d Return=%d", current_track[current_disk], current_sector[current_disk], rtn);
-        }
-    }
-    else if ( ((uptr -> flags) & UNIT_DSK_VERBOSE) && (warnLock[current_disk] < warnLevelDSK) ) {
-        /* write locked - print warning message if required */
-        warnLock[current_disk]++;
-/*05*/  MESSAGE_2("Attempt to write to locked DSK%d - ignored.", current_disk);
-    }
-    current_flag[current_disk]  &= 0xfe;    /* ENWD off */
-    current_byte[current_disk]  = 0xff;
-    dirty                       = FALSE;
 }

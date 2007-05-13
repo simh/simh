@@ -1,6 +1,6 @@
 /* i1620_lp.c: IBM 1443 line printer simulator
 
-   Copyright (c) 2002-2005, Robert M. Supnik
+   Copyright (c) 2002-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          1443 line printer
 
+   19-Jan-07    RMS     Added UNIT_TEXT flag
    21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
    29-Dec-03    RMS     Fixed bug in scheduling
    25-Apr-03    RMS     Revised for extended file support
@@ -69,7 +70,7 @@ t_stat lpt_space (int32 lines, int32 lflag);
 */
 
 UNIT lpt_unit = {
-    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 50)
+    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 50)
     };
 
 REG lpt_reg[] = {

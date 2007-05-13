@@ -1,6 +1,6 @@
 /* h316_lp.c: Honeywell 316/516 line printer
 
-   Copyright (c) 1999-2006, Robert M. Supnik
+   Copyright (c) 1999-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          line printer
 
+   19-Jan-06    RMS     Added UNIT_TEXT flag
    03-Apr-06    RMS     Fixed bug in blanks backscanning (from Theo Engel)
    01-Dec-04    RMS     Fixed bug in DMA/DMC support
    24-Oct-03    RMS     Added DMA/DMC support
@@ -105,7 +106,7 @@ t_stat lpt_reset (DEVICE *dptr);
 
 DIB lpt_dib = { LPT, IOBUS, 1, &lptio };
 
-UNIT lpt_unit = { UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0) };
+UNIT lpt_unit = { UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0) };
 
 REG lpt_reg[] = {
     { DRDATA (WDPOS, lpt_wdpos, 6) },

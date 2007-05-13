@@ -1,6 +1,6 @@
 /* nova_cpu.c: NOVA CPU simulator
 
-   Copyright (c) 1993-2006, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          Nova central processor
 
+   28-Apr-07    RMS     Removed clock initialization
    06-Feb-06    RMS     Fixed bug in DIVS (found by Mark Hittinger)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    25-Aug-05    RMS     Fixed DIVS case 2^31 / - 1
@@ -332,7 +333,6 @@ extern int32 sim_interval;
 int32 PC, IR, i;
 t_stat reason;
 void mask_out (int32 mask);
-extern int32 clk_sel, clk_time[4];
 
 /* Restore register state */
 
@@ -341,7 +341,6 @@ PC = saved_PC & AMASK;                                  /* load local PC */
 C = C & CBIT;
 mask_out (pimask);                                      /* reset int system */
 reason = 0;
-sim_rtc_init (clk_time[clk_sel]);                       /* init calibration */
 
 /* Main instruction fetch/decode loop */
 

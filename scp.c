@@ -23,6 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-Apr-07    RMS     Modified sim_instr invocation to call sim_rtcn_init_all
+                        Fixed bug in get_sim_opt
+                        Fixed bug in restoration with changed memory size
+   08-Mar-07    JDB     Fixed breakpoint actions in DO command file processing
    30-Jan-07    RMS     Fixed bugs in get_ipaddr
    17-Oct-06    RMS     Added idle support
    04-Oct-06    JDB     DO cmd failure now echoes cmd unless -q
@@ -832,8 +836,10 @@ if ((fpin = fopen (do_arg[0], "r")) == NULL) {          /* file failed to open? 
 if (flag < 1) flag = 1;                                 /* start at level 1 */
 
 do {
-    ocptr = cptr = read_line (cbuf, CBUFSIZE, fpin);    /* get cmd line */
-    sub_args (cbuf, gbuf, CBUFSIZE, nargs, do_arg);
+    ocptr = cptr = sim_brk_getact (cbuf, CBUFSIZE);     /* get bkpt action */
+    if (!ocptr)                                         /* no pending action? */
+         ocptr = cptr = read_line (cbuf, CBUFSIZE, fpin); /* get cmd line */
+    sub_args (cbuf, gbuf, CBUFSIZE, nargs, do_arg);     /* substitute args */
     if (cptr == NULL) {                                 /* EOF? */
         stat = SCPE_OK;                                 /* set good return */
         break;
@@ -2169,6 +2175,7 @@ if (v32) {                                              /* [V3.2+] time as strin
 else READ_I (sim_time);                                 /* sim time */
 READ_I (sim_rtime);                                     /* [V2.6+] sim rel time */
 
+sim_switches = SIM_SW_REST;                             /* flag restore */
 for ( ;; ) {                                            /* device loop */
     READ_S (buf);                                       /* read device name */
     if (buf[0] == 0) break;                             /* last? */
@@ -2214,7 +2221,6 @@ for ( ;; ) {                                            /* device loop */
             (!(dptr->flags & DEV_NET) ||                /* not net dev or */
              !(uptr->flags & UNIT_ATT) ||               /* not currently att */
              (buf[0] == 0))) {                          /* or will not be att */
-            sim_switches = SIM_SW_REST;                 /* att-det/rest */
             r = scp_detach_unit (dptr, uptr);           /* detach old */
             if (r != SCPE_OK) return r;
             if (buf[0] != 0) {                          /* any file? */
@@ -2232,16 +2238,16 @@ for ( ;; ) {                                            /* device loop */
                 printf ("Can't restore memory: %s%d\n", sim_dname (dptr), unitno);
                 return SCPE_INCOMP;
                 }
-            if (high != old_capac) {
+            if (high != old_capac) {                    /* size change? */
+                uptr->capac = old_capac;                /* temp restore old */
                 if ((dptr->flags & DEV_DYNM) &&
                     ((dptr->msize == NULL) ||
                      (dptr->msize (uptr, (int32) high, NULL, NULL) != SCPE_OK))) {
                     printf ("Can't change memory size: %s%d\n",
                         sim_dname (dptr), unitno);
-                    uptr->capac = old_capac;
                     return SCPE_INCOMP;
                     }
-                uptr->capac = high;
+                uptr->capac = high;                     /* new memory size */
                 printf ("Memory size changed: %s%d = ", sim_dname (dptr), unitno);
                 fprint_capac (stdout, dptr, uptr);
                 printf ("\n");
@@ -2382,6 +2388,7 @@ if (sim_step) sim_activate (&sim_step_unit, sim_step);  /* set step timer */
 sim_throt_sched ();                                     /* set throttle */
 sim_is_running = 1;                                     /* flag running */
 sim_brk_clract ();                                      /* defang actions */
+sim_rtcn_init_all ();                                   /* re-init clocks */
 r = sim_instr();
 
 sim_is_running = 0;                                     /* flag idle */
@@ -3495,6 +3502,7 @@ return cptr;
 char *get_sim_opt (int32 opt, char *cptr, t_stat *st)
 {
 int32 t;
+t_bool dfdu;
 char *svptr, gbuf[CBUFSIZE];
 DEVICE *tdptr;
 UNIT *tuptr;
@@ -3508,6 +3516,7 @@ sim_stab.mask = 0;
 sim_stab.comp = 0;
 sim_dfdev = sim_dflt_dev;
 sim_dfunit = sim_dfdev->units;
+dfdu = FALSE;                                           /* no default yet */
 *st = SCPE_OK;
 while (*cptr) {                                         /* loop through modifiers */
     svptr = cptr;                                       /* save current position */
@@ -3532,13 +3541,14 @@ while (*cptr) {                                         /* loop through modifier
         sim_switches = sim_switches | t;                /* or in new switches */
         }
     else if ((opt & CMD_OPT_SCH) &&                     /* if allowed, */
-        get_search (gbuf, sim_dfdev->dradix, &sim_stab))        /* try for search */
+        get_search (gbuf, sim_dfdev->dradix, &sim_stab)) /* try for search */
         sim_schptr = &sim_stab;                         /* set search */
-    else if ((opt & CMD_OPT_DFT) &&                     /* if allowed, */
+    else if ((opt & CMD_OPT_DFT) && !dfdu &&            /* if allowed, none yet*/
         (tdptr = find_unit (gbuf, &tuptr)) &&           /* try for default */
         (tuptr != NULL)) {
         sim_dfdev = tdptr;                              /* set as default */
         sim_dfunit = tuptr;
+        dfdu = TRUE;                                    /* indicate dflt seen */
         }
     else return svptr;                                  /* not rec, break out */
     }

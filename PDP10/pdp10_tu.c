@@ -1,6 +1,6 @@
 /* pdp10_tu.c - PDP-10 RH11/TM03/TU45 magnetic tape simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tu           RH11/TM03/TU45 magtape
 
+   29-Apr-07    RMS     Fixed bug in setting FCE on TMK (found by Naoki Hamada)
    16-Feb-06    RMS     Added tape capacity checking
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
@@ -871,6 +872,7 @@ switch (fnc) {                                          /* case on function */
             tufs = tufs | FS_ID;                        /* PE BOT? ID burst */
         TXFR (ba, wc, 0);                               /* validate transfer */
         if (st = sim_tape_rdrecf (uptr, xbuf, &tbc, MT_MAXFR)) { /* read fwd */
+            if (st == MTSE_TMK) set_tuer (ER_FCE);      /* TMK also sets FCE */
             r = tu_map_err (uptr, st, 1);               /* map error */
             break;                                      /* done */
             }
@@ -924,6 +926,7 @@ switch (fnc) {                                          /* case on function */
         tufc = 0;                                       /* clear frame count */
         TXFR (ba, wc, 1);                               /* validate xfer rev */
         if (st = sim_tape_rdrecr (uptr, xbuf + 4, &tbc, MT_MAXFR)) { /* read rev */
+            if (st == MTSE_TMK) set_tuer (ER_FCE);      /* TMK also sets FCE */
             r = tu_map_err (uptr, st, 1);               /* map error */
             break;                                      /* done */
             }
@@ -1032,7 +1035,6 @@ switch (st) {
         return SCPE_IERR;
 
     case MTSE_TMK:                                      /* end of file */
-        set_tuer (ER_FCE);                              /* also sets FCE */
         tufs = tufs | FS_TMK;
         break;
 

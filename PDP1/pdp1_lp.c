@@ -1,6 +1,6 @@
 /* pdp1_lp.c: PDP-1 line printer simulator
 
-   Copyright (c) 1993-2006, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          Type 62 line printer for the PDP-1
 
+   19-Jan-07    RMS     Added UNIT_TEXT flag
    21-Dec-06    RMS     Added 16-channel SBS support
    07-Sep-03    RMS     Changed ioc to ios
    23-Jul-03    RMS     Fixed bugs in instruction decoding, overprinting
@@ -67,7 +68,7 @@ t_stat lpt_reset (DEVICE *dptr);
 */
 
 UNIT lpt_unit = {
-    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
+    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0), SERIAL_OUT_WAIT
     };
 
 REG lpt_reg[] = {
@@ -166,6 +167,7 @@ if (lpt_spc) {                                          /* space? */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* attached? */
         return IORETURN (lpt_stopioe, SCPE_UNATT);
     fputs (lpt_cc[lpt_spc & 07], uptr->fileref);        /* print cctl */
+    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
         perror ("LPT I/O error");
         clearerr (uptr->fileref);
@@ -179,6 +181,7 @@ else {
         return IORETURN (lpt_stopioe, SCPE_UNATT);
     if (lpt_ovrpr) fputc ('\r', uptr->fileref);         /* overprint? */
     fputs (lpt_buf, uptr->fileref);                     /* print buffer */
+    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* test error */
         perror ("LPT I/O error");
         clearerr (uptr->fileref);
@@ -188,7 +191,6 @@ else {
     for (i = 0; i <= LPT_BSIZE; i++) lpt_buf[i] = 0;    /* clear buffer */
     lpt_ovrpr = 1;                                      /* set overprint */
     }
-lpt_unit.pos = ftell (uptr->fileref);                   /* update position */
 return SCPE_OK;
 }
 

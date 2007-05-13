@@ -1,6 +1,6 @@
 /* i1620_cd.c: IBM 1622 card reader/punch
 
-   Copyright (c) 2002-2006, Robert M. Supnik
+   Copyright (c) 2002-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cdr          1622 card reader
    cdp          1622 card punch
 
+   19-Jan-07    RMS     Set UNIT_TEXT flag
    13-Jul-06    RMS     Fixed card reader fgets call (from Tom McBride)
                         Fixed card reader boot sequence (from Tom McBride)
    21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
@@ -63,7 +64,7 @@ t_stat cdp_num (uint32 pa, uint32 ndig, t_bool dump);
 */
 
 UNIT cdr_unit = {
-    UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0)
+    UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE+UNIT_TEXT, 0)
     };
 
 REG cdr_reg[] = {
@@ -87,7 +88,7 @@ DEVICE cdr_dev = {
 */
 
 UNIT cdp_unit = {
-    UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0)
+    UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0)
     };
 
 REG cdp_reg[] = {
@@ -421,13 +422,14 @@ while ((len > 0) && (cdp_buf[len - 1] == ' ')) --len;   /* trim spaces */
 cdp_buf[len] = '\n';                                    /* newline, null */
 cdp_buf[len + 1] = 0;
 
-if (fputs (cdp_buf, cdp_unit.fileref) == EOF) {         /* write card */
-    ind[IN_WRCHK] = 1;                                  /* error? */
+fputs (cdp_buf, cdp_unit.fileref);                      /* write card */
+cdp_unit.pos = ftell (cdp_unit.fileref);                /* count char */
+if (ferror (cdp_unit.fileref)) {                        /* error? */
+    ind[IN_WRCHK] = 1;
     perror ("CDP I/O error");
     clearerr (cdp_unit.fileref);
     return SCPE_IOERR;
     }
-cdp_unit.pos = ftell (cdp_unit.fileref);                /* count char */
 return SCPE_OK;
 }
 

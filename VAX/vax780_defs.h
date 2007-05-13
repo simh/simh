@@ -1,6 +1,6 @@
 /* vax780_defs.h: VAX 780 model-specific definitions file
 
-   Copyright (c) 2004-2006, Robert M Supnik
+   Copyright (c) 2004-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,9 +23,11 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   29-Oct-2006  RMS     Added clock coscheduler function
-   17-May-2006  RMS     Added CR11/CD11 support (from John Dundas)
-   10-May-2006  RMS     Added model-specific reserved operand check macros
+   29-Apr-07    RMS     Modified model-specific reserved operand check macros
+                        to reflect 780 microcode patches (found by Naoki Hamada)
+   29-Oct-06    RMS     Added clock coscheduler function
+   17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
+   10-May-06    RMS     Added model-specific reserved operand check macros
 
    This file covers the VAX 11/780, the first VAX.
 
@@ -119,10 +121,20 @@
 
 /* Machine specific reserved operand tests */
 
-#define ML_PA_TEST(r)   if ((r) & 0xC0000003) RSVD_OPND_FAULT
-#define ML_LR_TEST(r)   if ((uint32)(r) > 0x200000) RSVD_OPND_FAULT
-#define ML_BR_TEST(r)   if ((((r) & 0xC0000000) != 0x80000000) || \
+/* 780 microcode patch 37 - only test LR<23:0> for appropriate length */
+
+#define ML_LR_TEST(r)   if ((uint32)((r) & 0xFFFFFF) > 0x200000) RSVD_OPND_FAULT
+
+/* 780 microcode patch 38 - only test PxBR<31>=1 and xBR<1:0> = 0 */
+
+#define ML_PXBR_TEST(r) if ((((r) & 0x80000000) == 0) || \
                             ((r) & 0x00000003)) RSVD_OPND_FAULT
+#define ML_SBR_TEST(r)  if ((r) & 0x00000003) RSVD_OPND_FAULT
+
+/* 780 microcode patch 78 - only test xCBB<1:0> = 0 */
+
+#define ML_PA_TEST(r)   if ((r) & 0x00000003) RSVD_OPND_FAULT
+
 #define LP_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT
 #define LP_MBZ84_TEST(r) if ((r) & 0xF8C00000) RSVD_OPND_FAULT
 #define LP_MBZ92_TEST(r) if ((r) & 0x7FC00000) RSVD_OPND_FAULT

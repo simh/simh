@@ -14,7 +14,7 @@
 
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
     PETER SCHORN BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
     IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
     CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -91,7 +91,6 @@
 #define CONTROLG_CHAR       0x07                /* control G char., rings bell when displayed   */
 #define CONTROLZ_CHAR       0x1a                /* control Z character                          */
 
-static void resetSIOWarningFlags(void);
 static t_stat sio_set_verbose       (UNIT *uptr, int32 value, char *cptr, void *desc);
 static t_stat simh_dev_set_timeron  (UNIT *uptr, int32 value, char *cptr, void *desc);
 static t_stat simh_dev_set_timeroff (UNIT *uptr, int32 value, char *cptr, void *desc);
@@ -100,6 +99,8 @@ static t_stat sio_attach(UNIT *uptr, char *cptr);
 static t_stat sio_detach(UNIT *uptr);
 static t_stat ptr_reset(DEVICE *dptr);
 static t_stat ptp_reset(DEVICE *dptr);
+static t_stat simh_dev_reset(DEVICE *dptr);
+static t_stat simh_svc(UNIT *uptr);
 int32 nulldev   (const int32 port, const int32 io, const int32 data);
 int32 sr_dev    (const int32 port, const int32 io, const int32 data);
 int32 simh_dev  (const int32 port, const int32 io, const int32 data);
@@ -107,21 +108,7 @@ int32 sio0d     (const int32 port, const int32 io, const int32 data);
 int32 sio0s     (const int32 port, const int32 io, const int32 data);
 int32 sio1d     (const int32 port, const int32 io, const int32 data);
 int32 sio1s     (const int32 port, const int32 io, const int32 data);
-static int32 mapCharacter(int32 ch);
-static void pollConnection(void);
-static t_stat simh_dev_reset(DEVICE *dptr);
-static t_stat simh_svc(UNIT *uptr);
-static int32 simh_in(const int32 port);
-static int32 simh_out(const int32 port, const int32 data);
-static void createCPMCommandLine(void);
-static void attachCPM(UNIT *uptr);
-static void setClockZSDOS(void);
-static void setClockCPM3(void);
-static time_t mkCPM3Origin(void);
-static int32 toBCD(const int32 x);
-static int32 fromBCD(const int32 x);
 void printMessage(void);
-static void warnNoRealTimeClock(void);
 
 extern int32 getBankSelect(void);
 extern void setBankSelect(const int32 b);
@@ -352,7 +339,7 @@ DEVICE simh_device = {
     NULL, NULL, NULL
 };
 
-char messageBuffer[256];
+char messageBuffer[256] = {};
 
 void printMessage(void) {
     printf(messageBuffer);
@@ -1092,7 +1079,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                         hFind = FindFirstFile(cpmCommandLine, &FindFileData);
                         if (hFind == INVALID_HANDLE_VALUE) {
                             if (simh_unit.flags & UNIT_SIMH_VERBOSE) {
-                                MESSAGE_3("Cannot expand '%s'. Error is %u.", cpmCommandLine, GetLastError());
+                                MESSAGE_3("Cannot expand '%s'. Error is %lu.", cpmCommandLine, GetLastError());
                             }
                             globValid = FALSE;
                         }

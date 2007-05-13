@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2006, Robert M Supnik
+   Copyright (c) 1998-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   28-Apr-07    RMS     Removed clock initialization
    29-Oct-06    RMS     Added idle support
    22-May-06    RMS     Fixed format error in CPU history (found by Peter Schorn)
    10-May-06    RMS     Added -kesu switches for virtual addressing modes
@@ -284,7 +285,6 @@ extern int32 sim_int_char;
 extern int32 sim_switches;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern t_bool sim_idle_enab;
-extern UNIT clk_unit;
 
 extern t_stat build_dib_tab (void);
 extern UNIT rom_unit, nvr_unit;
@@ -501,7 +501,6 @@ set_map_reg ();                                         /* set map reg */
 GET_CUR;                                                /* set access mask */
 SET_IRQL;                                               /* eval interrupts */
 FLUSH_ISTR;                                             /* clear prefetch */
-sim_rtcn_init (clk_unit.wait, TMR_CLK);                 /* init clock */
 
 abortval = setjmp (save_env);                           /* set abort hdlr */
 if (abortval > 0) {                                     /* sim stop? */

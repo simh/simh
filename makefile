@@ -10,7 +10,11 @@ OS_CCDEFS = -lsocket -lnsl -lpthread -D_GNU_SOURCE
 else
 OS_CCDEFS = -D_GNU_SOURCE
 endif
+ifeq ($(OSTYPE),macos)
 CC = gcc -std=c99 -O2 -U__STRICT_ANSI__ -g -lm -lrt $(OS_CCDEFS) -I .
+else
+CC = gcc -std=c99 -O2 -U__STRICT_ANSI__ -g -lm $(OS_CCDEFS) -I .
+endif
 ifeq ($(USE_NETWORK),)
 else
 NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a

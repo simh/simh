@@ -1,6 +1,6 @@
 /* id32_cpu.c: Interdata 32b CPU simulator
 
-   Copyright (c) 2000-2006, Robert M. Supnik
+   Copyright (c) 2000-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu                  Interdata 32b CPU
 
+   28-Apr-07    RMS     Removed clock initialization
    27-Oct-06    RMS     Added idle support
                         Removed separate PASLA clock
    09-Mar-06	RMS     Added 8 register bank support for 8/32
@@ -252,7 +253,6 @@ extern int32 sim_interval;
 extern int32 sim_int_char;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern t_bool sim_idle_enab;
-extern UNIT pic_unit, lfc_unit;                         /* timers */
 extern FILE *sim_deb;
 
 uint32 ReadB (uint32 loc, uint32 rel);
@@ -627,8 +627,6 @@ if (cpu_unit.flags & UNIT_8RS) psw_reg_mask = 7;        /* 8 register sets */
 else psw_reg_mask = 1;                                  /* 2 register sets */
 int_eval ();                                            /* eval interrupts */
 cc = newPSW (PSW & PSW_MASK);                           /* split PSW, eval wait */
-sim_rtcn_init (lfc_unit.wait, TMR_LFC);                 /* init clock */
-sim_rtcn_init (pic_unit.wait, TMR_PIC);                 /* init timer */
 reason = 0;
 
 /* Abort handling

@@ -1,6 +1,6 @@
 /* nova_lp.c: NOVA line printer simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          line printer
 
+   19-Jan-07    RMS     Added UNIT_TEXT
    25-Apr-03    RMS     Revised for extended file support
    30-May-02    RMS     Widened POS to 32b
 */
@@ -49,7 +50,7 @@ t_stat lpt_reset (DEVICE *dptr);
 DIB lpt_dib = { DEV_LPT, INT_LPT, PI_LPT, &lpt };
 
 UNIT lpt_unit = {
-    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
+    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0), SERIAL_OUT_WAIT
     };
 
 REG lpt_reg[] = {
@@ -110,12 +111,13 @@ dev_done = dev_done | INT_LPT;                          /* set done */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
 if ((lpt_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (lpt_stopioe, SCPE_UNATT);
-if (putc (lpt_unit.buf, lpt_unit.fileref) == EOF) {
+fputc (uptr->buf, uptr->fileref);
+uptr->pos = ftell (uptr->fileref);
+if (ferror (uptr->fileref)) {
     perror ("LPT I/O error");
-    clearerr (lpt_unit.fileref);
+    clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
-lpt_unit.pos = lpt_unit.pos + 1;
 return SCPE_OK;
 }
 

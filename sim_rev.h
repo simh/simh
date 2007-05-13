@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,11 +29,66 @@
 
 #define SIM_MAJOR       3
 #define SIM_MINOR       7
-#define SIM_PATCH       0
+#define SIM_PATCH       1
 
 /* V3.7 revision history 
 
 patch   date            module(s) and fix(es)
+
+  1     tbd             scp.c:
+                        - modified sim_instr invocation to call sim_rtcn_init_all
+                        - fixed bug in get_sim_opt (reported by Don North)
+                        - fixed bug in RESTORE with changed memory size
+                        - added global 'RESTORE in progress' flag
+                        - fixed breakpoint actions in DO command file processing
+                          (from Dave Bryan)
+
+                        all CPU's with clocks:
+                        - removed clock initialization (now done in SCP)
+
+                        hp2100_cpu.c (from Dave Bryan):
+                        - EDT passes input flag and DMA channel in dat parameter
+
+                        hp2100_ipl.c (from Dave Bryan):
+                        - IPLI EDT delays DMA completion interrupt for TSB
+
+                        hp2100_mux.c (from Dave Bryan):
+                        - corrected "mux_sta" size from 16 to 21 elements
+                        - fixed "muxc_reset" to clear lines 16-20
+                        - fixed control card OTx to set current channel number
+                        - fixed to set "muxl_ibuf" in response to a transmit interrupt
+                        - changed "mux_xbuf", "mux_rbuf" declarations from 8 to 16 bits
+                        - fixed to set "mux_rchp" when a line break is received
+                        - fixed incorrect "odd_par" table values
+                        - reversed test in "RCV_PAR" to return "LIL_PAR" on odd parity
+                        - rixed mux reset (ioCRS) to clear port parameters
+                        - fixed to use PUT_DCH instead of PUT_CCH for data channel status
+                        - added DIAG/TERM modifiers to implement diagnostic mode
+
+                        pdp11_cpumod.c:
+                        - changed memory size routine to work with RESTORE
+
+                        pdp11_hk.c:
+                        - NOP and DCLR (at least) do not check drive type
+                        - MR2 and MR3 only updated on NOP
+
+                        pdp10_tu.c, pdp11_tu.c:
+                        - TMK sets FCE only on read (found by Naoki Hamada)
+
+                        pdp11_xu.c:
+                        - added missing FC_RMAL command
+                        - cleared multicast on write
+
+                        vax_moddefs.h, vax_cpu1.c:
+                        - separated PxBR and SBR mbz checks
+
+                        vax780_defs.h
+                        - separated PxBR and SBR mbz checks
+                        - modified mbz checks to reflect 780 microcode patches
+                          (found by Naoki Hamada)
+
+                        vax_mmu.c:
+                        - added address masking to all SBR-based memory reads
 
   0     30-Jan-07       scp.c:
                         - implemented throttle commands

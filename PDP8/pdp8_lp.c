@@ -1,6 +1,6 @@
 /* pdp8_lp.c: PDP-8 line printer simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          LP8E line printer
 
+   19-Jan-07    RMS     Added UNIT_TEXT
    25-Apr-03    RMS     Revised for extended file support
    04-Oct-02    RMS     Added DIB, enable/disable, device number support
    30-May-02    RMS     Widened POS to 32b
@@ -54,7 +55,7 @@ t_stat lpt_detach (UNIT *uptr);
 DIB lpt_dib = { DEV_LPT, 1, { &lpt } };
 
 UNIT lpt_unit = {
-    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
+    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0), SERIAL_OUT_WAIT
     };
 
 REG lpt_reg[] = {
@@ -135,16 +136,17 @@ t_stat lpt_svc (UNIT *uptr)
 {
 dev_done = dev_done | INT_LPT;                          /* set done */
 int_req = INT_UPDATE;                                   /* update interrupts */
-if ((lpt_unit.flags & UNIT_ATT) == 0) {
+if ((uptr->flags & UNIT_ATT) == 0) {
     lpt_err = 1;
     return IORETURN (lpt_stopioe, SCPE_UNATT);
     }
-if (putc (lpt_unit.buf, lpt_unit.fileref) == EOF) {
+fputc (uptr->buf, uptr->fileref);                       /* print char */
+uptr->pos = ftell (uptr->fileref);
+if (ferror (uptr->fileref)) {                           /* error? */
     perror ("LPT I/O error");
-    clearerr (lpt_unit.fileref);
+    clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
-lpt_unit.pos = lpt_unit.pos + 1;
 return SCPE_OK;
 }
 

@@ -1,6 +1,6 @@
 /* pdp11_lp.c: PDP-11 line printer simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          LP11 line printer
 
+   19-Jan-07    RMS     Added UNIT_TEXT flag
    07-Jul-05    RMS     Removed extraneous externs
    19-May-03    RMS     Revised for new conditional compilation scheme
    25-Apr-03    RMS     Revised for extended file support
@@ -76,7 +77,7 @@ DIB lpt_dib = {
     };
 
 UNIT lpt_unit = {
-    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
+    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0), SERIAL_OUT_WAIT
     };
 
 REG lpt_reg[] = {
@@ -151,15 +152,16 @@ t_stat lpt_svc (UNIT *uptr)
 {
 lpt_csr = lpt_csr | CSR_ERR | CSR_DONE;
 if (lpt_csr & CSR_IE) SET_INT (LPT);
-if ((lpt_unit.flags & UNIT_ATT) == 0)
+if ((uptr->flags & UNIT_ATT) == 0)
     return IORETURN (lpt_stopioe, SCPE_UNATT);
-if (putc (lpt_unit.buf & 0177, lpt_unit.fileref) == EOF) {
+fputc (uptr->buf & 0177, uptr->fileref);
+uptr->pos = ftell (uptr->fileref);
+if (ferror (uptr->fileref)) {
     perror ("LPT I/O error");
-    clearerr (lpt_unit.fileref);
+    clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
 lpt_csr = lpt_csr & ~CSR_ERR;
-lpt_unit.pos = lpt_unit.pos + 1;
 return SCPE_OK;
 }
 

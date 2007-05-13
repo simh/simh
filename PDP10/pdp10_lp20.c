@@ -1,6 +1,6 @@
 /* pdp10_lp20.c: PDP-10 LP20 line printer simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lp20         line printer
 
+   19-Jan-07    RMS     Added UNIT_TEXT flag
    04-Sep-05    RMS     Fixed missing return (found by Peter Schorn)
    07-Jul-05    RMS     Removed extraneous externs
    18-Mar-05    RMS     Added attached test to detach routine
@@ -185,7 +186,7 @@ DIB lp20_dib = {
     };
 
 UNIT lp20_unit = {
-    UDATA (&lp20_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
+    UDATA (&lp20_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0), SERIAL_OUT_WAIT
     };
 
 REG lp20_reg[] = {
@@ -527,8 +528,9 @@ else {
     if (lpcolc >= LP_WIDTH)                             /* line full? */
         r = lp20_adv (1, TRUE);                         /* adv carriage */
     }
-for (i = 0; i < rpt; i++) putc (lppdat, lp20_unit.fileref); 
-lp20_unit.pos = lp20_unit.pos + rpt;
+for (i = 0; i < rpt; i++)
+    fputc (lppdat, lp20_unit.fileref); 
+lp20_unit.pos = ftell (lp20_unit.fileref);
 lpcolc = lpcolc + rpt;
 return r;
 }
@@ -539,8 +541,9 @@ int32 i;
 
 if (cnt == 0) return TRUE;
 lpcolc = 0;                                             /* reset col cntr */
-for (i = 0; i < cnt; i++) putc ('\n', lp20_unit.fileref);
-lp20_unit.pos = lp20_unit.pos + cnt;                    /* print 'n' newlines */
+for (i = 0; i < cnt; i++)
+    fputc ('\n', lp20_unit.fileref);
+lp20_unit.pos = ftell (lp20_unit.fileref);              /* print 'n' newlines */
 if (dvuadv) dvptr = (dvptr + cnt) % dvlnt;              /* update DAVFU ptr */
 if (davfu[dvptr] & (1 << DV_TOF)) {                     /* at top of form? */
     if (lppagc = (lppagc - 1) & PAGC_MASK) {            /* decr page cntr */
@@ -566,8 +569,8 @@ for (i = 0; i < dvlnt; i++) {                           /* search DAVFU */
     if (davfu[dvptr] & (1 << cnt)) {                    /* channel stop set? */
         if (cnt) return lp20_adv (i + 1, FALSE);        /* ~TOF, adv */
         if (lpcolc) lp20_adv (1, FALSE);                /* TOF, need newline? */
-        putc ('\f', lp20_unit.fileref);                 /* print form feed */
-        lp20_unit.pos = lp20_unit.pos + 1; 
+        fputc ('\f', lp20_unit.fileref);                /* print form feed */
+        lp20_unit.pos = ftell (lp20_unit.fileref); 
         if (lppagc = (lppagc - 1) & PAGC_MASK) {        /* decr page cntr */
             lpcsa = lpcsa & ~CSA_PZRO;                  /* update status */
             return TRUE;

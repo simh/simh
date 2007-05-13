@@ -1,6 +1,6 @@
 /* i7094_cd.c: IBM 711/721 card reader/punch
 
-   Copyright (c) 2003-2006, Robert M. Supnik
+   Copyright (c) 2003-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cdr          711 card reader
    cdp          721 card punch
 
+   19-Jan-07    RMS     Added UNIT_TEXT
    13-Jul-06    RMS     Fixed problem with 80 column full cards
 
    Cards are represented as ASCII text streams terminated by newlines.
@@ -106,7 +107,7 @@ extern uint32 col_masks[12];
 DIB cdr_dib = { &cdr_chsel, NULL };
 
 UNIT cdr_unit = {
-    UDATA (&cdr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0)
+    UDATA (&cdr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE+UNIT_TEXT, 0)
     };
 
 REG cdr_reg[] = {
@@ -144,7 +145,7 @@ DEVICE cdr_dev = {
 DIB cdp_dib = { &cdp_chsel, &cdp_chwr };
 
 UNIT cdp_unit = {
-    UDATA (&cdp_svc, UNIT_SEQ+UNIT_ATTABLE, 0)
+    UDATA (&cdp_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0)
     };
 
 REG cdp_reg[] = {
@@ -443,12 +444,12 @@ for (i = ((2 * CD_CHRLNT) + 1); (i > 0) &&
 cdp_cbuf[i++] = '\n';                                   /* append nl */
 cdp_cbuf[i++] = 0;                                      /* append nul */
 fputs (cdp_cbuf, uptr->fileref);                        /* write card */
+uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     perror ("CDP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
-uptr->pos = ftell (uptr->fileref);                      /* update position */
 cdp_sta = CDS_END;                                      /* end state */
 sim_cancel (uptr);                                      /* cancel current */
 sim_activate (uptr, cdp_tstop);                         /* long timer */

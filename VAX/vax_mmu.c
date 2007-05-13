@@ -1,6 +1,6 @@
 /* vax_mmu.c - VAX memory management
 
-   Copyright (c) 1998-2005, Robert M Supnik
+   Copyright (c) 1998-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Apr-07    RMS     Added address masking for system page table reads
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    30-Sep-04    RMS     Comment and formating changes
    19-Sep-03    RMS     Fixed upper/lower case linkage problems on VMS
@@ -444,7 +445,7 @@ static TLBENT zero_pte = { 0, 0 };
 if (va & VA_S0) {                                       /* system space? */
     if (ptidx >= d_slr)                                 /* system */
         MM_ERR (PR_LNV);
-    ptead = d_sbr + ptidx;
+    ptead = (d_sbr + ptidx) & PAMASK;
     }
 else {
     if (va & VA_P1) {                                   /* P1? */
@@ -463,7 +464,7 @@ else {
         ptidx = ((uint32) ptead) >> 7;                  /* xlate like sys */
         if (ptidx >= d_slr)
             MM_ERR (PR_PLNV);
-        pte = ReadLP (d_sbr + ptidx);                   /* get system pte */
+        pte = ReadLP ((d_sbr + ptidx) & PAMASK);        /* get system pte */
 #if defined (VAX_780)
         if ((pte & PTE_ACC) == 0) MM_ERR (PR_PACV);     /* spte ACV? */
 #endif

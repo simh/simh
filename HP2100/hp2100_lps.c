@@ -26,6 +26,7 @@
    lps          12653A 2767 line printer
                 12566B microcircuit interface with loopback diagnostic connector
 
+   10-May-07    RMS     Added UNIT_TEXT flag
    11-Jan-07    JDB     CLC cancels I/O event if DIAG (jumper W9 in "A" pos)
                         Added ioCRS state to I/O decoders
    19-Nov-04    JDB     Added restart when set online, etc.
@@ -207,7 +208,7 @@ t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, void *desc);
 DIB lps_dib = { LPS, 0, 0, 0, 0, 0, &lpsio };
 
 UNIT lps_unit = {
-    UDATA (&lps_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_DISABLE, 0)
+    UDATA (&lps_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_DISABLE+UNIT_TEXT, 0)
     };
 
 REG lps_reg[] = {

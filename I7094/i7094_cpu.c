@@ -1,6 +1,6 @@
 /* i7094_cpu.c: IBM 7094 CPU simulator
 
-   Copyright (c) 2003-2006, Robert M. Supnik
+   Copyright (c) 2003-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          7094 central processor
 
+   28-Apr-07    RMS     Removed clock initialization
    29-Oct-06    RMS     Added additional expanded core instructions
    17-Oct-06    RMS     Fixed the fix in halt IO wait loop
    16-Jun-06    RMS     Fixed bug in halt IO wait loop
@@ -198,7 +199,6 @@ extern uint32 ch_sta[NUM_CHAN];
 extern uint32 ch_flags[NUM_CHAN];
 extern DEVICE mt_dev[NUM_CHAN];
 extern DEVICE ch_dev[NUM_CHAN];
-extern UNIT clk_unit;
 extern FILE *sim_deb;
 extern int32 sim_int_char;
 extern int32 sim_interval;
@@ -625,7 +625,6 @@ ind_reloc = ind_reloc & VA_BLK;                         /* canonical form */
 ind_start = ind_start & VA_BLK;
 ind_limit = (ind_limit & VA_BLK) | VA_OFF;
 chtr_pend = chtr_eval (NULL);                           /* eval chan traps */
-sim_rtcn_init (clk_unit.wait, TMR_CLK);                 /* init clock */
 tracing = ((hst_lnt != 0) || DEBUG_PRS (cpu_dev));
 
 if (ht_pend) {                                          /* HTR pending? */

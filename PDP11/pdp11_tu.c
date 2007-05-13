@@ -25,6 +25,7 @@
 
    tu           TM02/TM03 magtape
 
+   29-Apr-07    RMS     Fixed bug in setting FCE on TMK (found by Naoki Hamada)
    16-Feb-06    RMS     Added tape capacity checking
    12-Nov-05    RMS     Changed default formatter to TM03 (for VMS)
    31-Oct-05    RMS     Fixed address width for large files
@@ -671,6 +672,7 @@ switch (fnc) {                                          /* case on function */
         if ((uptr->UDENS == TC_1600) && sim_tape_bot (uptr))
             tufs = tufs | FS_ID;                        /* PE BOT? ID burst */
         if (st = sim_tape_rdrecf (uptr, xbuf, &tbc, MT_MAXFR)) { /* read fwd */
+            if (st == MTSE_TMK) tu_set_er (ER_FCE);     /* tmk also sets FCE */
             r = tu_map_err (drv, st, 1);                /* map error */
             break;                                      /* done */
             }
@@ -729,6 +731,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_WCHKR:                                     /* wcheck = read */
         tufc = 0;                                       /* clear frame count */
         if (st = sim_tape_rdrecr (uptr, xbuf + 4, &tbc, MT_MAXFR)) { /* read rev */
+            if (st == MTSE_TMK) tu_set_er (ER_FCE);     /* tmk also sets FCE */
             r = tu_map_err (drv, st, 1);                /* map error */
             break;                                      /* done */
             }
@@ -826,7 +829,6 @@ switch (st) {
 
     case MTSE_TMK:                                      /* end of file */
         tufs = tufs | FS_TMK;
-        tu_set_er (ER_FCE);                             /* also sets FCE */
         break;
 
     case MTSE_IOERR:                                    /* IO error */

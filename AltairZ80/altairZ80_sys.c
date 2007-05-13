@@ -14,7 +14,7 @@
 
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
     PETER SCHORN BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
     IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
     CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -30,28 +30,19 @@
 #include <ctype.h>
 #include "altairz80_defs.h"
 
-extern DEVICE cpu_dev;
-extern DEVICE dsk_dev;
-extern DEVICE hdsk_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
+extern DEVICE cpu_dev;
 extern DEVICE sio_dev;
 extern DEVICE simh_device;
 extern DEVICE ptr_dev;
 extern DEVICE ptp_dev;
+extern DEVICE dsk_dev;
+extern DEVICE hdsk_dev;
 extern DEVICE net_dev;
-extern int32 saved_PC;
 
 int32 fprint_sym(FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw);
-static int32 checkbase(char ch, const char *numString);
-static int32 numok(char ch, const char **numString, const int32 minvalue,
-    const int32 maxvalue, const int32 requireSign, int32 *result);
-static int32 match(const char *pattern, const char *input, char *xyFirst, char *xy, int32 *number, int32 *star, int32 *at,
-    int32 *hat, int32 *dollar);
-static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *const Mnemonics[]);
 int32 parse_sym(char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw);
-static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const int32 addr);
-static int32 checkXY(const char xy);
 
 /* SCP data structures
     sim_name            simulator name string
@@ -59,13 +50,12 @@ static int32 checkXY(const char xy);
     sim_emax            number of words needed for examine
     sim_devices         array of pointers to simulated devices
     sim_stop_messages   array of pointers to stop messages
-    sim_load            binary loader
 */
 
-char        sim_name[]  = "Altair 8800 (Z80)";
-REG         *sim_PC     = &cpu_reg[0];
-int32       sim_emax    = 4;
-DEVICE  *sim_devices[]  = {
+char        sim_name[]      = "Altair 8800 (Z80)";
+REG         *sim_PC         = &cpu_reg[0];
+int32       sim_emax        = 4;
+DEVICE      *sim_devices[]  = {
     &cpu_dev, &sio_dev, &simh_device, &ptr_dev, &ptp_dev, &dsk_dev, &hdsk_dev, &net_dev, NULL
 };
 
@@ -366,7 +356,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
         }
     }
 
-    if( (P = strchr(R, '*')) ) {
+    if ( (P = strchr(R, '*')) ) {
         strncpy(S, R, P - R);
         S[P - R] = '\0';
         sprintf(H, "%02X", val[B++]);
@@ -376,7 +366,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
     else if ( (P = strchr(R, '@')) ) {
         strncpy(S, R, P - R);
         S[P - R] = '\0';
-        if(!J) {
+        if (!J) {
             Offset = val[B++];
         }
         strcat(S, Offset & 0x80 ? "-" : "+");

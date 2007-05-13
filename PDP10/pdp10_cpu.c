@@ -1,6 +1,6 @@
 /* pdp10_cpu.c: PDP-10 CPU simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          KS10 central processor
 
+   28-Apr-07    RMS     Removed clock initialization
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
                         Fixed warning in MOVNI
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -198,7 +199,6 @@ InstHistory *hst = NULL;                                /* instruction history *
 extern int32 sim_int_char;
 extern int32 sim_interval;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern UNIT tim_unit;
 
 /* Forward and external declarations */
 
@@ -633,7 +633,6 @@ pager_tc = FALSE;                                       /* not in trap cycle */
 pager_pi = FALSE;                                       /* not in pi sequence */
 rlog = 0;                                               /* not in extend */
 pi_eval ();                                             /* eval pi system */
-sim_rtc_init (tim_unit.wait);                           /* init calibration */
 if (!Q_ITS) its_1pr = 0;                                /* ~ITS, clr 1-proc */
 t20_idlelock = 0;                                       /* clr T20 idle lock */
 

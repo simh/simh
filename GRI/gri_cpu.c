@@ -1,6 +1,6 @@
 /* gri_cpu.c: GRI-909 CPU simulator
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          GRI-909 CPU
 
+   28-Apr-07    RMS     Removed clock initialization
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    18-Jul-04    RMS     Fixed missing ao_update calls in AX, AY write
    17-Jul-04    RMS     Revised MSR, EAO based on additional documentation
@@ -380,14 +381,12 @@ t_stat sim_instr (void)
 {
 uint32 src, dst, op, t, jmp;
 t_stat reason;
-extern UNIT rtc_unit;
 
 /* Restore register state */
 
 SC = SC & AMASK;                                        /* load local PC */
 reason = 0;
 ao_update ();                                           /* update AO */
-sim_rtc_init (rtc_unit.wait);                           /* init calibration */
 
 /* Main instruction fetch/decode loop */
 

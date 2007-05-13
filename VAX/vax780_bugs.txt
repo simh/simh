@@ -51,6 +51,10 @@
 50. LDPCTX: 11/780 implements mbz tests on PCB fields.
 51. LDPCTX/MTPR: 11/780 validity checks PCBB, SCBB, SBR, SLR, P0BR, P0LR, P1BR, P1LR.
 52. TMR: tmr_inc not updated in standard (100Hz) mode.
+53. MTPR SBR/PCBB/SCBB: 11/780 only checks that bits<1:0> == 0.
+54. MTPR xLR: 11/780 excludes bits<31:24> from mbz test.
+55. MTPR PxBR: 11/780 only checks bits<31,1:0> == 1,00.
+
 
 
 

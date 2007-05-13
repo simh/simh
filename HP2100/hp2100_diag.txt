@@ -1,6 +1,6 @@
                       SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2007-01-12
+                             Last update: 2007-03-05
 
 
 The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
@@ -62,8 +62,8 @@ The results of the diagnostic runs are summarized below:
 103122  59310 Interface Bus Interface            1728    -    No simulation
 
 103003  12587 Asynchronous Data Set Interface    1553    -    No simulation
-103110  12920 Asynchronous Multiplexer (Data)    1805    -    Not tested
-103011  12920 Asynchronous Multiplexer (Cntl)    1444    -    Not tested
+103110  12920 Asynchronous Multiplexer (Data)    1805  3.7-1  Passed
+103011  12920 Asynchronous Multiplexer (Cntl)    1444  3.7-1  Passed
 103012  12621 Synchronous Data Set (Receive)     1532    -    No simulation
 103013  12621 Synchronous Data Set (Send)        1532    -    No simulation
 103116  12967 Synchronous Interface              1438    -    No simulation
@@ -114,11 +114,11 @@ not supported by the 24396 suite:
 Paper Tape                                                    Date  SIMH
 Part Number   DSN    Diagnostic Name                          Code  Vers.  Result
 -----------  ------  ---------------------------------------  ----  -----  ----------
-24203-60001    --    HP2100A Cartridge Disc Memory (2871)      A    3.3-0  Partial
-22682-16017  177777  HP 2100 Fixed Head Disc/Drum (277x)      1612  3.3-0  Passed
 13207-16001  101217  2000/Access Comm Processor for 21MX      1728  3.2-3  Passed
 20433-?????    --    HP 3030 Magnetic Tape Subsystem           --     -    Not tested
-
+24197-60001    --    12875 Processor Interconnect Cable        B    3.7-1  Passed
+24203-60001    --    HP2100A Cartridge Disc Memory (2871)      A    3.3-0  Partial
+22682-16017  177777  HP 2100 Fixed Head Disc/Drum (277x)      1612  3.3-0  Passed
 
 The "SIMH Version" is the version number of the earliest SIMH system that was
 tested with the given diagnostic.  Earlier versions may or may not work
@@ -988,31 +988,71 @@ TEST RESULT:    Passed.
 
 
 
---------------------------------------------------
-DSN 103110 - 12920 Asynchronous Multiplexer (Data)
---------------------------------------------------
+---------------------------------------------------
+DSN 103110 - 12920A Asynchronous Multiplexer (Data)
+---------------------------------------------------
 
 TESTED DEVICE:  MUX, MUXL (hp2100_mux.c)
 
-CONFIGURATION:
+CONFIGURATION:  sim> set MUX DIAG
+                sim> deposit S 004040
+                sim> reset
+                sim> go 100
 
-TEST REPORT:
+                HALT instruction 102074
 
-TEST RESULT:    Not tested.
+                sim> deposit S 000000
+                sim> reset
+                sim> go
+
+TEST REPORT:    ASYNC MULTIPLEXER DATA BOARD DIAGNOSTIC   DSN 103110
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                HALT instruction 102024
+
+                sim> reset
+                sim> go
+
+                H025 BI-O COMP
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
 
 
 
---------------------------------------------------
-DSN 103011 - 12920 Asynchronous Multiplexer (Cntl)
---------------------------------------------------
+---------------------------------------------------
+DSN 103011 - 12920A Asynchronous Multiplexer (Cntl)
+---------------------------------------------------
 
 TESTED DEVICE:  MUXM (hp2100_mux.c)
 
-CONFIGURATION:
+CONFIGURATION:  sim> set MUX DIAG
+                sim> deposit S 004042
+                sim> reset
+                sim> go 100
 
-TEST REPORT:
+                HALT instruction 102074
 
-TEST RESULT:    Not tested.
+                sim> deposit S 000000
+                sim> reset
+                sim> go
+
+TEST REPORT:    ASYNC MULTIPLEXER CONTROL BOARD DIAGNOSTIC
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                HALT instruction 102024
+
+                sim> reset
+                sim> go
+
+                H025 BI-O COMP
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
 
 
 
@@ -3110,6 +3150,41 @@ TEST REPORT:    21MX 2000 COMPUTER SYSTEM COMM. PROC. FIRMWARE DIAGNOSTIC
                 H140 PFREI TEST
                 H150 PFRIO TEST
                 PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+-----------------------------------------------
+DSN (none) - 12875 Processor Interconnect Cable
+-----------------------------------------------
+
+TESTED DEVICE:  IPLI, IPLO (hp2100_ipl.c)
+
+BINARY TAPE:    24197-60001 Rev. B
+
+CONFIGURATION:  sim> set IPLI DIAG
+                sim> set IPLO DIAG
+                sim> deposit S 003332
+                sim> reset
+                sim> go 2
+
+                HALT instruction 107076
+
+                sim> deposit S 010000
+                sim> reset
+                sim> go
+
+                HALT instruction 107077
+
+                sim> deposit S 000000
+                sim> reset
+                sim> go 100
+
+TEST REPORT:    H14. START 12875 CABLE DIAGNOSTIC
+                H77. END 12875 CABLE DIAGNOSTIC
 
                 HALT instruction 102077
 

@@ -1,6 +1,6 @@
 /* h316_cpu.c: Honeywell 316/516 CPU simulator
 
-   Copyright (c) 1999-2006, Robert M. Supnik
+   Copyright (c) 1999-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          H316/H516 CPU
 
+   28-Apr-07    RMS     Removed clock initialization
    03-Apr-06    RMS     Fixed bugs in LLL, LRL (from Theo Engel)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -370,7 +371,6 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-extern UNIT clk_unit;
 int32 AR, BR, MB, Y, t1, t2, t3, skip, dev;
 uint32 ut;
 t_stat reason;
@@ -399,7 +399,6 @@ BR = saved_BR & DMASK;
 XR = saved_XR & DMASK;
 PC = PC & ((cpu_unit.flags & UNIT_EXT)? X_AMASK: NX_AMASK); /* mask PC */
 reason = 0;
-sim_rtc_init (clk_unit.wait);                           /* init calibration */
 
 /* Main instruction fetch/decode loop */
 

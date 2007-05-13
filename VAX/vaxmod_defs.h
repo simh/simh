@@ -1,6 +1,6 @@
 /* vaxmod_defs.h: VAX model-specific definitions file
 
-   Copyright (c) 1998-2006, Robert M Supnik
+   Copyright (c) 1998-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Apr-07    RMS     Separated checks for PxBR and SBR
    17-May-06    RMS     Added CR11/CD11 support
    10-May-06    RMS     Added NOP'd reserved operand checking macros
    05-Oct-05    RMS     Added XU definitions for autoconfigure
@@ -204,7 +205,8 @@
 
 #define ML_PA_TEST(r)
 #define ML_LR_TEST(r)
-#define ML_BR_TEST(r)
+#define ML_SBR_TEST(r)
+#define ML_PXBR_TEST(r)
 #define LP_AST_TEST(r)
 #define LP_MBZ84_TEST(r)
 #define LP_MBZ92_TEST(r)

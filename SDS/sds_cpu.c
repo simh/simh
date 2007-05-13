@@ -1,6 +1,6 @@
 /* sds_cpu.c: SDS 940 CPU simulator
 
-   Copyright (c) 2001-2006, Robert M. Supnik
+   Copyright (c) 2001-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cpu          central processor
    rtc          real time clock
 
+   28-Apr-07    RMS     Removed clock initialization
    29-Dec-06    RMS     Fixed breakpoint variable declarations
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Nov-04    RMS     Added instruction history
@@ -195,7 +196,6 @@ int32 rtc_tps = 60;                                     /* rtc ticks/sec */
 
 extern int32 sim_int_char;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern UNIT mux_unit;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -373,8 +373,6 @@ api_lvl = api_lvl & ~1;                                 /* <0> reserved */
 set_dyn_map ();                                         /* set up mapping */
 int_reqhi = api_findreq ();                             /* recalc int req */
 chan_req = chan_testact ();                             /* recalc chan act */
-sim_rtcn_init (rtc_unit.wait, TMR_RTC);                 /* init calibration */
-sim_rtcn_init (mux_unit.wait, TMR_MUX);                 /* init calibration */
 
 /* Main instruction fetch/decode loop */
 

@@ -1,6 +1,6 @@
 /* i1401_lp.c: IBM 1403 line printer simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          1403 line printer
 
+   19-Jan-07    RMS     Added UNIT_TEXT flag
    07-Mar-05    RMS     Fixed bug in write_line (reported by Van Snyder)
    25-Apr-03    RMS     Revised for extended file support
    30-May-02    RMS     Widened POS to 32b
@@ -69,7 +70,7 @@ char *pch_table[4] = {
 */
 
 UNIT lpt_unit = {
-    UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0)
+    UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0)
     };
 
 REG lpt_reg[] = {
@@ -136,10 +137,10 @@ else {
     }
 lines = lflag = 0;                                      /* clear cc action */
 if (ferror (lpt_unit.fileref)) {                        /* error? */
+    ind[IN_LPT] = 1;
     perror ("Line printer I/O error");
     clearerr (lpt_unit.fileref);
     if (iochk) return SCPE_IOERR;
-    ind[IN_LPT] = 1;
     }
 return SCPE_OK;
 }

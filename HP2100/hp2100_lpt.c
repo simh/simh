@@ -1,6 +1,6 @@
 /* hp2100_lpt.c: HP 2100 12845B line printer simulator
 
-   Copyright (c) 1993-2006, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          12845B 2607 line printer
 
+   22-Jan-07    RMS     Added UNIT_TEXT flag
    28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
    19-Nov-04    JDB     Added restart when set online, etc.
    29-Sep-04    JDB     Added SET OFFLINE/ONLINE, POWEROFF/POWERON
@@ -113,7 +114,7 @@ t_stat lpt_attach (UNIT *uptr, char *cptr);
 DIB lpt_dib = { LPT, 0, 0, 0, 0, 0, &lptio };
 
 UNIT lpt_unit = {
-    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_DISABLE, 0)
+    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_DISABLE+UNIT_TEXT, 0)
     };
 
 REG lpt_reg[] = {

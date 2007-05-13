@@ -1,6 +1,6 @@
 /* i1401_cd.c: IBM 1402 card reader/punch
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,7 @@
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
 
+   19-Jan-07    RMS     Added UNIT_TEXT flag
    20-Sep-05    RMS     Revised for new code tables, compatible colbinary treatment
    30-Aug-05    RMS     Fixed read, punch to ignore modifier on 1,4 char inst
                         (reported by Van Snyder)
@@ -73,7 +74,7 @@ char colbin_to_bcd (uint32 cb);
 */
 
 UNIT cdr_unit = {
-    UDATA (&cdr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0), 100
+    UDATA (&cdr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE+UNIT_TEXT, 0), 100
     };
 
 REG cdr_reg[] = {
@@ -102,7 +103,7 @@ DEVICE cdr_dev = {
 */
 
 UNIT cdp_unit = {
-    UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0)
+    UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0)
     };
 
 REG cdp_reg[] = {
@@ -134,11 +135,11 @@ DEVICE cdp_dev = {
 */
 
 UNIT stack_unit[] = {
-    { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) },
-    { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) },
-    { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) },
+    { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0) },
+    { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0) },
+    { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0) },
     { UDATA (NULL, UNIT_DIS, 0) },                      /* unused */
-    { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE, 0) }
+    { UDATA (NULL, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0) }
     };
 
 REG stack_reg[] = {
@@ -179,10 +180,10 @@ fgets (rbuf, (cbn)? 2 * CBUFSIZE: CBUFSIZE,             /* rd bin/char card */
      cdr_unit.fileref);
 if (feof (cdr_unit.fileref)) return STOP_NOCD;          /* eof? */
 if (ferror (cdr_unit.fileref)) {                        /* error? */
+    ind[IN_READ] = 1;  
     perror ("Card reader I/O error");
     clearerr (cdr_unit.fileref);
     if (iochk) return SCPE_IOERR;
-    ind[IN_READ] = 1;  
     return SCPE_OK;
     }
 cdr_unit.pos = ftell (cdr_unit.fileref);                /* update position */
@@ -236,12 +237,12 @@ for (i = CDR_WIDTH - 1; (i >= 0) && (rbuf[i] == ' '); i--) rbuf[i] = 0;
 rbuf[CDR_WIDTH] = 0;                                    /* null at end */
 fputs (rbuf, uptr->fileref);                            /* write card */
 fputc ('\n', uptr->fileref);                            /* plus new line */
+uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     perror ("Card stacker I/O error");
     clearerr (uptr->fileref);
     if (iochk) return SCPE_IOERR;
     }
-uptr->pos = ftell (uptr->fileref);                      /* update position */
 return SCPE_OK;
 }
 
@@ -293,13 +294,13 @@ else {                                                  /* normal */
     }
 fputs (pbuf, uptr->fileref);                            /* output card */
 fputc ('\n', uptr->fileref);                            /* plus new line */
+uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     perror ("Card punch I/O error");
     clearerr (uptr->fileref);
     if (iochk) return SCPE_IOERR;
     ind[IN_PNCH] = 1;
     }
-uptr->pos = ftell (uptr->fileref);                      /* update position */
 return SCPE_OK;
 }
 

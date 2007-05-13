@@ -1,4 +1,4 @@
-Notes For V3.7-0
+Notes For V3.7
 
 
 1. New Features

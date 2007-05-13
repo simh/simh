@@ -28,6 +28,8 @@
    DMA0,DMA1    12607B/12578A/12895A direct memory access controller
    DCPC0,DCPC1  12897B dual channel port controller
 
+   28-Apr-07    RMS     Removed clock initialization
+   02-Mar-07    JDB     EDT passes input flag and DMA channel in dat parameter
    11-Jan-07    JDB     Added 12578A DMA byte packing
    28-Dec-06    JDB     CLC 0 now sends CRS instead of CLC to devices
    26-Dec-06    JDB     Fixed improper IRQ deferral for 21xx CPUs
@@ -378,7 +380,6 @@
 #define UNIT_MP_INT     (1 << UNIT_V_MP_INT)
 #define UNIT_MP_SEL1    (1 << UNIT_V_MP_SEL1)
 
-
 #define ABORT(val)      longjmp (save_env, (val))
 
 #define DMAR0           1
@@ -521,8 +522,6 @@ void hp_post_cmd (t_bool from_scp);
 extern t_stat cpu_eau (uint32 IR, uint32 intrq);
 extern t_stat cpu_uig_0 (uint32 IR, uint32 intrq, uint32 iotrap);
 extern t_stat cpu_uig_1 (uint32 IR, uint32 intrq, uint32 iotrap);
-
-extern int32 clk_delay (int32 flg);
 extern void (*sim_vm_post) (t_bool from_scp);
 
 /* CPU data structures
@@ -841,7 +840,6 @@ for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru dev */
         dtab[dev] = dibp->iot;                          /* set I/O dispatch */
         }
     }
-sim_rtc_init (clk_delay (0));                           /* recalibrate clock */
 
 /* Configure interrupt deferral table */
 
@@ -2023,7 +2021,7 @@ return dat;
    - STC requested but not CLC: issue STC,C
    - CLC requested but not STC: issue CLC,C
    - STC and CLC both requested: issue STC,C and CLC,C, in that order
-   Either: issue EDT
+   Either: issue EDT (pass DMA channel number and I/O flag)
 */
 
 void dma_cycle (uint32 ch, uint32 map)
@@ -2101,7 +2099,7 @@ else {
         }                                               /* end output */
     setFLG (DMA0 + ch);                                 /* set DMA flg */
     clrCMD (DMA0 + ch);                                 /* clr DMA cmd */
-    devdisp (dev, ioEDT, dev, 0);                       /* do EDT */
+    devdisp (dev, ioEDT, dev, inp | ch);                /* do EDT */
     }
 return;
 }

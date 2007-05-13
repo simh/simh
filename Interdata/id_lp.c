@@ -1,6 +1,6 @@
 /* id_lp.c: Interdata line printer
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          M46-206 line printer
 
+   19-Jan-07    RMS     Added UNIT_TEXT flag
    25-Apr-03    RMS     Revised for extended file support
 */
 
@@ -83,7 +84,7 @@ t_stat lpt_spc (UNIT *uptr, int32 cnt);
 
 DIB lpt_dib = { d_LPT, -1, v_LPT, NULL, &lpt, NULL };
 
-UNIT lpt_unit = { UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_UC, 0) };
+UNIT lpt_unit = { UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_UC+UNIT_TEXT, 0) };
 
 REG lpt_reg[] = {
     { HRDATA (STA, lpt_sta, 8) },

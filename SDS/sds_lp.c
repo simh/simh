@@ -1,6 +1,6 @@
 /* sds_lp.c: SDS 940 line printer simulator
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          line printer
 
+   19-Jan-07    RMS     Added UNIT_TEXT flag
    25-Apr-03    RMS     Revised for extended file support
 */
 
@@ -77,7 +78,7 @@ t_stat lpt (uint32 fnc, uint32 inst, uint32 *dat);
 DIB lpt_dib = { CHAN_W, DEV_LPT, XFR_LPT, lpt_tplt, &lpt };
 
 UNIT lpt_unit = {
-    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE, 0)
+    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0)
     };
 
 REG lpt_reg[] = {

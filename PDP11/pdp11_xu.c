@@ -32,31 +32,37 @@
   These manuals can be found online at:
     http://www.spies.com/~aek/pdf/dec/unibus
 
-
-  What this BETA version contains:
-   1) Basic Transmit/Receive packet functionality.
-   2) Promiscuous/All_Multicast/Multicast/MAC support
-
   Testing performed:
    1) Receives/Transmits single packet under custom RSX driver
    2) Passes RSTS 10.1 controller diagnostics during boot
    3) VMS 7.2 on VAX780 summary:
-        LAT    - Runs properly both in and out
-        DECNET - Starts without error, but will not do anything
-        TCP/IP - Starts with errors, will ping in/out but nothing else
-        Clustering - Not tested
+       (May/2007: WinXP x64 host; MS VC++ 2005; SIMH v3.7-0 base; WinPcap 4.0)
+        LAT    - SET HOST/LAT in/out
+        DECNET - SET HOST in/out, COPY in/out
+        TCP/IP - PING in/out; SET HOST/TELNET out, COPY/FTP out
+			   - can't seem to connect in
+			   - possible TCPIP v5.0 misconfiguration?
+			   - issues with host WinXP firewall or Domain policy?
+        Clustering - Successfully clustered with AlphaVMS 8.2
+				   - no hangs or offlines, some odd delays and jerkiness
+				   - out-of-order ring messages causing retransmits?
+				   - caused by ping times (min/avg/max) of 2/7/16 ms?
+   4) Runs VAX EVDWA diagnostic tests 1-10; tests 11-19 (M68000/ROM/RAM) fail
 
   Known issues:
    1) Transmit/Receive rings have not been thoroughly tested,
       particularly when and where the ring pointers get reset.
    2) Most auxiliary commands are not implemented yet.
-   3) System_ID broadcast is not implemented
-   4) Error/Interrupt signalling is still iffy from merge of FvK and sim_ether
+   3) System_ID broadcast is not implemented.
+   4) Error/Interrupt signalling is still iffy from merge of FvK and sim_ether.
+   5) There are residual Map_ReadB and Map_WriteB from the FvK version that
+      probably need to be converted to Map_ReadW and Map_WriteW calls.
 
   ------------------------------------------------------------------------------
 
   Modification history:
 
+  03-May-07  DTH  Added missing FC_RMAL command; cleared multicast on write
   29-Oct-06  RMS  Synced poll and clock
   08-Dec-05  DTH  Implemented ancilliary functions 022/023/024/025
   18-Nov-05  DTH  Corrected time between system ID packets
@@ -598,7 +604,7 @@ t_stat xu_reset(DEVICE* dptr)
 int32 xu_command(CTLR* xu)
 {
   uint32 udbb;
-  int fnc, mtlen;
+  int fnc, mtlen, i, j;
   uint16 value, pltlen;
   t_stat status, rstatus, wstatus, wstatus2, wstatus3;
   struct xu_stats* stats = &xu->var->stats;
@@ -666,12 +672,24 @@ int32 xu_command(CTLR* xu)
         return PCSR0_PCEI;
       break;
 
+    case FC_RMAL:   /* read multicast address list */
+      mtlen = (xu->var->pcb[2] & 0xFF00) >> 8;
+      udbb = xu->var->pcb[1] | ((xu->var->pcb[2] & 03) << 16);
+      wstatus = Map_WriteB(udbb, mtlen * 3, (uint8*) &xu->var->setup.macs[1]);
+	  break;
+
     case FC_WMAL:   /* write multicast address list */
       mtlen = (xu->var->pcb[2] & 0xFF00) >> 8;
 sim_debug(DBG_TRC, xu->dev, "FC_WAL: mtlen=%d\n", mtlen);
       if (mtlen > 10)
         return PCSR0_PCEI;
       udbb = xu->var->pcb[1] | ((xu->var->pcb[2] & 03) << 16);
+	  /* clear existing multicast list */
+	  for (i=1; i<XU_FILTER_MAX; i++) {
+		  for (j=0; j<6; j++)
+			xu->var->setup.macs[i][j] = 0;
+	  }
+	  /* get multicast list from host */
       rstatus = Map_ReadB(udbb, mtlen * 6, (uint8*) &xu->var->setup.macs[1]);
       if (rstatus == 0) {
         xu->var->setup.mac_count = mtlen + 1;

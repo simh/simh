@@ -1,6 +1,6 @@
 /* i7094_lp.c: IBM 716 line printer simulator
 
-   Copyright (c) 2003-2006, Robert M. Supnik
+   Copyright (c) 2003-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    lpt          716 line printer
+
+   19-Jan-07    RMS     Added UNIT_TEXT flag
 
    Internally, the 7094 works only with column binary and is limited to
    72 columns of data.  Each row of the printed line is represented by
@@ -142,7 +144,7 @@ extern char colbin_to_bcd (uint32 colbin);
 DIB lpt_dib = { &lpt_chsel, &lpt_chwr };
 
 UNIT lpt_unit = {
-    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_CONS, 0)
+    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_CONS+UNIT_TEXT, 0)
     };
 
 REG lpt_reg[] = {
@@ -306,7 +308,7 @@ return SCPE_OK;
 
 t_stat lpt_end_line (UNIT *uptr)
 {
-uint32 i, j, col, row, bufw, colbin;
+uint32 i, col, row, bufw, colbin;
 char *pch, bcd, lpt_cbuf[LPT_CHRLNT + 1];
 t_uint64 dat;
 
@@ -325,22 +327,23 @@ for (col = 0; col < 72; col++) {                        /* proc 72 columns */
     }
 for (i = LPT_CHRLNT; (i > 0) &&
     (lpt_cbuf[i - 1] == ' '); --i) ;                    /* trim spaces */
-lpt_cbuf[i++] = '\n';                                   /* append nl */
+lpt_cbuf[i] = 0;                                        /* append nul */
 if (uptr->flags & UNIT_ATT) {                           /* file? */
-    fxwrite (lpt_cbuf, 1, i, uptr->fileref);            /* write line */
+    fputs (lpt_cbuf, uptr->fileref);                    /* write line */
+    fputc ('\n', uptr->fileref);                        /* append nl */
+    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
         perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
-    uptr->pos = ftell (uptr->fileref);                  /* update position */
     }
 else if (uptr->flags & UNIT_CONS) {                     /* print to console? */
-    for (j = 0; j < i; j++) sim_putchar (lpt_cbuf[j]);
+    for (i = 0; lpt_cbuf[i] != 0; i++) sim_putchar (lpt_cbuf[i]);
     sim_putchar ('\r');
+    sim_putchar ('\n');
     }
 else return SCPE_UNATT;                                 /* otherwise error */
-uptr->pos = uptr->pos + strlen (lpt_cbuf);              /* count char */
 lpt_sta = LPS_END;                                      /* end line state */
 sim_cancel (uptr);                                      /* cancel current */
 sim_activate (uptr, lpt_tstop);                         /* long timer */

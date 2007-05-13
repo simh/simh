@@ -1,6 +1,6 @@
 /* pdp18b_cpu.c: 18b PDP CPU simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          PDP-4/7/9/15 central processor
 
+   28-Apr-07    RMS     Removed clock initialization
    26-Dec-06    RMS     Fixed boundary test in KT15/XVM (reported by Andrew Warkentin)
    30-Oct-06    RMS     Added idle and infinite loop detection
    08-Oct-06    RMS     Added RDCLK instruction
@@ -581,7 +582,6 @@ int32 api_int, api_usmd, skp;
 int32 iot_data, device, pulse;
 int32 last_IR;
 t_stat reason;
-extern UNIT clk_unit;
 
 if (build_dev_tab ()) return SCPE_STOP;                 /* build, chk tables */
 PC = PC & AMASK;                                        /* clean variables */
@@ -589,8 +589,8 @@ LAC = LAC & LACMASK;
 MQ = MQ & DMASK;
 reason = 0;
 last_IR = -1;
-sim_rtc_init (clk_unit.wait);                           /* init calibration */
-if (cpu_unit.flags & UNIT_NOAPI) api_enb = api_req = api_act = 0;
+if (cpu_unit.flags & UNIT_NOAPI)                        /* no API? */
+    api_enb = api_req = api_act = 0;
 api_int = api_eval (&int_pend);                         /* eval API */
 api_usmd = 0;                                           /* not API user cycle */
 

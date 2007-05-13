@@ -14,7 +14,7 @@
 
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
     PETER SCHORN BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
     IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
     CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -160,12 +160,6 @@ void PutBYTEWrapper(const uint32 Addr, const uint32 Value);
 int32 getBankSelect(void);
 void setBankSelect(const int32 b);
 uint32 getCommon(void);
-static void PutBYTEForced(uint32 Addr, const uint32 Value);
-static int32 addressIsInROM(const uint32 Addr);
-static int32 addressExists(const uint32 Addr);
-static void printROMMessage(const uint32 cntROM);
-static void warnUnsuccessfulWriteAttempt(const uint32 Addr);
-static uint8 warnUnsuccessfulReadAttempt(const uint32 Addr);
 static t_stat cpu_set_rom       (UNIT *uptr, int32 value, char *cptr, void *desc);
 static t_stat cpu_set_norom     (UNIT *uptr, int32 value, char *cptr, void *desc);
 static t_stat cpu_set_altairrom (UNIT *uptr, int32 value, char *cptr, void *desc);
@@ -173,15 +167,6 @@ static t_stat cpu_set_warnrom   (UNIT *uptr, int32 value, char *cptr, void *desc
 static t_stat cpu_set_banked    (UNIT *uptr, int32 value, char *cptr, void *desc);
 static t_stat cpu_set_nonbanked (UNIT *uptr, int32 value, char *cptr, void *desc);
 static t_stat cpu_set_size      (UNIT *uptr, int32 value, char *cptr, void *desc);
-static void prepareMemoryAccessMessage(t_addr loc);
-static void checkROMBoundaries(void);
-static void reset_memory(void);
-static uint32 in(const uint32 Port);
-static void out(const uint32 Port, const uint32 Value);
-static void PutBYTE(register uint32 Addr, const register uint32 Value);
-static void PutWORD(register uint32 Addr, const register uint32 Value);
-static t_bool sim_brk_lookup (const t_addr bloc, const int32 btyp);
-static void resetCell(const int32 address, const int32 bank);
 
 /*  CPU data structures
     cpu_dev CPU device descriptor
@@ -194,7 +179,7 @@ UNIT cpu_unit = {
     UDATA (NULL, UNIT_FIX + UNIT_BINK + UNIT_ROM + UNIT_ALTAIRROM, MAXMEMSIZE)
 };
 
-        int32 PCX;                                  /* external view of PC                          */
+        int32 PCX               = 0;                /* external view of PC                          */
         int32 saved_PC          = 0;                /* program counter                              */
 static  int32 AF_S;                                 /* AF register                                  */
 static  int32 BC_S;                                 /* BC register                                  */
@@ -1183,7 +1168,7 @@ static const uint8 cpTable[256] = {
     128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
 };
 
-/* remove comments to generate table contents
+/* remove comments to generate table contents and define globally NEED_SIM_VM_INIT
 static void altairz80_init(void);
 void (*sim_vm_init) (void) = &altairz80_init;
 static void altairz80_init(void) {
@@ -1467,6 +1452,16 @@ void protect(const int32 l, const int32 h) {
 
 static uint8 M[MAXMEMSIZE][MAXBANKS];   /* RAM which is present */
 
+/* determine whether Addr points to Read Only Memory */
+static int32 addressIsInROM(const uint32 Addr) {
+    uint32 addr = Addr & ADDRMASK;  /* registers are NOT guaranteed to be always 16-bit values */
+    return (cpu_unit.flags & UNIT_ROM) && ( /* must have ROM enabled */
+    /* in banked case we have standard Altair ROM */
+    ((cpu_unit.flags & UNIT_BANKED) && (DEFAULT_ROM_LOW <= addr)) ||
+    /* in non-banked case we check the bounds of the ROM */
+    (((cpu_unit.flags & UNIT_BANKED) == 0) && (ROMLow <= addr) && (addr <= ROMHigh)));
+}
+
 static void warnUnsuccessfulWriteAttempt(const uint32 Addr) {
     if (cpu_unit.flags & UNIT_WARNROM) {
         if (addressIsInROM(Addr)) {
@@ -1485,18 +1480,8 @@ static uint8 warnUnsuccessfulReadAttempt(const uint32 Addr) {
     return 0xff;
 }
 
-/* determine whether Addr points to Read Only Memory */
-int32 addressIsInROM(const uint32 Addr) {
-    uint32 addr = Addr & ADDRMASK;  /* registers are NOT guaranteed to be always 16-bit values */
-    return (cpu_unit.flags & UNIT_ROM) && ( /* must have ROM enabled */
-    /* in banked case we have standard Altair ROM */
-    ((cpu_unit.flags & UNIT_BANKED) && (DEFAULT_ROM_LOW <= addr)) ||
-    /* in non-banked case we check the bounds of the ROM */
-    (((cpu_unit.flags & UNIT_BANKED) == 0) && (ROMLow <= addr) && (addr <= ROMHigh)));
-}
-
 /* determine whether Addr points to a valid memory address */
-int32 addressExists(const uint32 Addr) {
+static int32 addressExists(const uint32 Addr) {
     uint32 addr = Addr & ADDRMASK;  /* registers are NOT guaranteed to be always 16-bit values */
     return (cpu_unit.flags & UNIT_BANKED) || (addr < MEMSIZE) ||
     ( ((cpu_unit.flags & UNIT_BANKED) == 0) && (cpu_unit.flags & UNIT_ROM)
@@ -5019,6 +5004,7 @@ t_stat sim_instr (void) {
                         tStates -= 5;
                         acu = HIGH_REGISTER(AF);
                         BC &= ADDRMASK;
+                        if (BC == 0) BC = 0x10000;
                         do {
                             tStates += 21;
                             CHECK_BREAK_TWO_BYTES(HL, DE);
@@ -5033,6 +5019,7 @@ t_stat sim_instr (void) {
                         tStates -= 5;
                         acu = HIGH_REGISTER(AF);
                         BC &= ADDRMASK;
+                        if (BC == 0) BC = 0x10000;
                         do {
                             tStates += 21;
                             CHECK_BREAK_BYTE(HL);
@@ -5053,6 +5040,7 @@ t_stat sim_instr (void) {
                     case 0xb2:      /* INIR */
                         tStates -= 5;
                         temp = HIGH_REGISTER(BC);
+                        if (temp == 0) temp = 0x100;
                         do {
                             tStates += 21;
                             CHECK_BREAK_BYTE(HL);
@@ -5067,6 +5055,7 @@ t_stat sim_instr (void) {
                     case 0xb3:      /* OTIR */
                         tStates -= 5;
                         temp = HIGH_REGISTER(BC);
+                        if (temp == 0) temp = 0x100;
                         do {
                             tStates += 21;
                             CHECK_BREAK_BYTE(HL);
@@ -5081,6 +5070,7 @@ t_stat sim_instr (void) {
                     case 0xb8:      /* LDDR */
                         tStates -= 5;
                         BC &= ADDRMASK;
+                        if (BC == 0) BC = 0x10000;
                         do {
                             tStates += 21;
                             CHECK_BREAK_TWO_BYTES(HL, DE);
@@ -5095,6 +5085,7 @@ t_stat sim_instr (void) {
                         tStates -= 5;
                         acu = HIGH_REGISTER(AF);
                         BC &= ADDRMASK;
+                        if (BC == 0) BC = 0x10000;
                         do {
                             tStates += 21;
                             CHECK_BREAK_BYTE(HL);
@@ -5115,6 +5106,7 @@ t_stat sim_instr (void) {
                     case 0xba:      /* INDR */
                         tStates -= 5;
                         temp = HIGH_REGISTER(BC);
+                        if (temp == 0) temp = 0x100;
                         do {
                             tStates += 21;
                             CHECK_BREAK_BYTE(HL);
@@ -5129,6 +5121,7 @@ t_stat sim_instr (void) {
                     case 0xbb:      /* OTDR */
                         tStates -= 5;
                         temp = HIGH_REGISTER(BC);
+                        if (temp == 0) temp = 0x100;
                         do {
                             tStates += 21;
                             CHECK_BREAK_BYTE(HL);
@@ -6061,6 +6054,27 @@ t_stat sim_instr (void) {
     return reason;
 }
 
+static void checkROMBoundaries(void) {
+    uint32 temp;
+    if (ROMLow > ROMHigh) {
+        printf("ROMLOW [%04X] must be less than or equal to ROMHIGH [%04X]. Values exchanged.\n",
+            ROMLow, ROMHigh);
+        temp    = ROMLow;
+        ROMLow  = ROMHigh;
+        ROMHigh = temp;
+    }
+    if (cpu_unit.flags & UNIT_ALTAIRROM) {
+        if (DEFAULT_ROM_LOW < ROMLow) {
+            printf("ROMLOW [%04X] reset to %04X since Altair ROM was desired.\n", ROMLow, DEFAULT_ROM_LOW);
+            ROMLow = DEFAULT_ROM_LOW;
+        }
+        if (ROMHigh < DEFAULT_ROM_HIGH) {
+            printf("ROMHIGH [%04X] reset to %04X since Altair ROM was desired.\n", ROMHigh, DEFAULT_ROM_HIGH);
+            ROMHigh = DEFAULT_ROM_HIGH;
+        }
+    }
+}
+
 static void reset_memory(void) {
     uint32 i, j;
     checkROMBoundaries();
@@ -6090,7 +6104,7 @@ static void reset_memory(void) {
     isProtected = FALSE;
 }
 
-void printROMMessage(const uint32 cntROM) {
+static void printROMMessage(const uint32 cntROM) {
     if (cntROM) {
         printf("Warning: %d bytes written to ROM [%04X - %04X].\n", cntROM, ROMLow, ROMHigh);
     }
@@ -6122,27 +6136,6 @@ t_stat cpu_reset(DEVICE *dptr) {
         return SCPE_IERR;
     }
     return SCPE_OK;
-}
-
-static void checkROMBoundaries(void) {
-    uint32 temp;
-    if (ROMLow > ROMHigh) {
-        printf("ROMLOW [%04X] must be less than or equal to ROMHIGH [%04X]. Values exchanged.\n",
-            ROMLow, ROMHigh);
-        temp    = ROMLow;
-        ROMLow  = ROMHigh;
-        ROMHigh = temp;
-    }
-    if (cpu_unit.flags & UNIT_ALTAIRROM) {
-        if (DEFAULT_ROM_LOW < ROMLow) {
-            printf("ROMLOW [%04X] reset to %04X since Altair ROM was desired.\n", ROMLow, DEFAULT_ROM_LOW);
-            ROMLow = DEFAULT_ROM_LOW;
-        }
-        if (ROMHigh < DEFAULT_ROM_HIGH) {
-            printf("ROMHIGH [%04X] reset to %04X since Altair ROM was desired.\n", ROMHigh, DEFAULT_ROM_HIGH);
-            ROMHigh = DEFAULT_ROM_HIGH;
-        }
-    }
 }
 
 static t_stat cpu_set_rom(UNIT *uptr, int32 value, char *cptr, void *desc) {

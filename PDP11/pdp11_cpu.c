@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          PDP-11 CPU
 
+   28-Apr-07    RMS     Removed clock initialization
    27-Oct-06    RMS     Added idle support
    18-Oct-06    RMS     Fixed bug in ASH -32 C value
    24-May-06    RMS     Added instruction history
@@ -298,7 +299,6 @@ int32 dsmask[4] = { MMR3_KDS, MMR3_SDS, 0, MMR3_UDS };  /* dspace enables */
 
 extern int32 CPUERR, MAINT;
 extern int32 sim_interval;
-extern UNIT clk_unit, pclk_unit;
 extern int32 sim_int_char;
 extern uint32 sim_switches;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
@@ -661,8 +661,6 @@ MMR0 = MMR0 | MMR0_IC;                                  /* usually on */
 trap_req = calc_ints (ipl, trap_req);                   /* upd int req */
 trapea = 0;
 reason = 0;
-sim_rtcn_init (clk_unit.wait, TMR_CLK);                 /* init line clock */
-sim_rtcn_init (pclk_unit.wait, TMR_PCLK);               /* init prog clock */
 
 /* Abort handling
 
