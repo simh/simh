@@ -1,6 +1,6 @@
 /* vax_stddev.c: VAX 3900 standard I/O devices
 
-   Copyright (c) 1998-2006, Robert M Supnik
+   Copyright (c) 1998-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
    tto          terminal output
    clk          100Hz and TODR clock
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
    17-Oct-06    RMS     Synced keyboard poll to real-time clock for idling
    22-Nov-05    RMS     Revised for new terminal processing routines
    09-Sep-04    RMS     Integrated powerup into RESET (with -p)
@@ -88,7 +89,7 @@ extern int32 sysd_hlt_enb (void);
 
 DIB tti_dib = { 0, 0, NULL, NULL, 1, IVCL (TTI), SCB_TTI, { NULL } };
 
-UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_8B, 0), 0 };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), 0 };
 
 REG tti_reg[] = {
     { HRDATA (BUF, tti_unit.buf, 16) },
@@ -164,7 +165,7 @@ DEVICE tto_dev = {
 
 DIB clk_dib = { 0, 0, NULL, NULL, 1, IVCL (CLK), SCB_INTTIM, { NULL } };
 
-UNIT clk_unit = { UDATA (&clk_svc, 0, 0), CLK_DELAY };
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), CLK_DELAY };
 
 REG clk_reg[] = {
     { HRDATA (CSR, clk_csr, 16) },

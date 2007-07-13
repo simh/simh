@@ -1,6 +1,6 @@
 /* pdp11_rq.c: MSCP disk controller simulator
 
-   Copyright (c) 2002-2005, Robert M Supnik
+   Copyright (c) 2002-2007, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    rq           RQDX3 disk controller
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag to timer thread
    31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
@@ -658,7 +659,7 @@ UNIT rq_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RX50_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RX50)) },
-    { UDATA (&rq_tmrsvc, UNIT_DIS, 0) },
+    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 

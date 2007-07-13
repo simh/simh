@@ -252,7 +252,7 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
     char result;
     net_svc(&net_unit);
     for (i = 0; i <= MAX_CONNECTIONS; i++)
-        if (serviceDescriptor[i].Z80DataPort == port)
+        if (serviceDescriptor[i].Z80DataPort == port) {
             if (io == 0) {  /* IN   */
                 if (serviceDescriptor[i].inputSize == 0) {
                     printf("re-read from %i\r\n", port);
@@ -288,5 +288,6 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
 #endif
                 return 0;
             }
+        }
     return 0;
 }

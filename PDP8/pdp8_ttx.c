@@ -1,6 +1,6 @@
 /* pdp8_ttx.c: PDP-8 additional terminals simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    PT08/KL8JA terminal input/output
 
+   07-Jun-06    RMS     Added UNIT_IDLE flag
    06-Jul-06    RMS     Fixed bug in DETACH routine
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Jun-05    RMS     Added SET TTOXn DISCONNECT
@@ -89,7 +90,7 @@ void ttx_enbdis (int32 dis);
 DIB ttix_dib = { DEV_KJ8, 8,
              { &ttix, &ttox, &ttix, &ttox, &ttix, &ttox, &ttix, &ttox } };
 
-UNIT ttix_unit = { UDATA (&ttix_svc, UNIT_ATTABLE, 0), KBD_POLL_WAIT };
+UNIT ttix_unit = { UDATA (&ttix_svc, UNIT_IDLE|UNIT_ATTABLE, 0), KBD_POLL_WAIT };
 
 REG ttix_reg[] = {
     { BRDATA (BUF, ttix_buf, 8, 8, TTX_LINES) },

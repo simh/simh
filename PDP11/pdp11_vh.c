@@ -26,6 +26,7 @@
 
    vh		    DHQ11 asynch multiplexor for SIMH
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock
    07-Jul-05	RMS	    Removed extraneous externs
    15-Jun-05	RMS	    Revised for new autoconfigure interface
@@ -316,10 +317,10 @@ static DIB vh_dib = {
 };
 
 static UNIT vh_unit[VH_MUXES] = {
-	{ UDATA (&vh_svc, UNIT_ATTABLE, 0) },
-	{ UDATA (&vh_svc, UNIT_ATTABLE, 0) },
-	{ UDATA (&vh_svc, UNIT_ATTABLE, 0) },
-	{ UDATA (&vh_svc, UNIT_ATTABLE, 0) },
+	{ UDATA (&vh_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },
+	{ UDATA (&vh_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },
+	{ UDATA (&vh_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },
+	{ UDATA (&vh_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },
 };
 
 static const REG vh_nlreg = { DRDATA (NLINES, vh_desc.lines, 6), PV_LEFT };

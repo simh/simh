@@ -1,6 +1,6 @@
 /* pdp18b_stddev.c: 18b PDP's standard devices
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    tto          teleprinter
    clk          clock
 
+   18-Jun-07    RMS     Added UNIT_IDLE to console input, clock
    18-Oct-06    RMS     Added PDP-15 programmable duplex control
                         Fixed handling of non-printable characters in KSR mode
                         Changed clock to be free-running
@@ -167,7 +168,7 @@ extern int32 upd_iors (void);
 
 DIB clk_dib = { 0, 0, &clk_iors, { NULL } };
 
-UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 16000 };
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), 16000 };
 
 REG clk_reg[] = {
     { FLDATA (INT, int_hwre[API_CLK], INT_V_CLK) },
@@ -309,7 +310,7 @@ DEVICE ptp_dev = {
 
 DIB tti_dib = { DEV_TTI, 1, &tti_iors, { &tti } };
 
-UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR+TTUF_HDX, 0), 0 };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE+TT_MODE_KSR+TTUF_HDX, 0), 0 };
 
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, TTI_WIDTH) },

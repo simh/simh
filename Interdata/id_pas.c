@@ -1,6 +1,6 @@
 /* id_pas.c: Interdata programmable async line adapter simulator
 
-   Copyright (c) 2001-2006, Robert M Supnik
+   Copyright (c) 2001-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    pas          Programmable asynchronous line adapter(s)
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag
    18-Oct-06    RMS     Synced PASLA to clock
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Jun-05    RMS     Added SET PASLn DISCONNECT
@@ -126,7 +127,7 @@ void pas_reset_ln (int32 i);
 
 DIB pas_dib = { d_PAS, -1, v_PAS, pas_tplte, &pas, &pas_ini };
 
-UNIT pas_unit = { UDATA (&pasi_svc, UNIT_ATTABLE, 0), 0 };
+UNIT pas_unit = { UDATA (&pasi_svc, UNIT_ATTABLE|UNIT_IDLE, 0), 0 };
 
 REG pas_nlreg = { DRDATA (NLINES, PAS_ENAB, 6), PV_LEFT };
 

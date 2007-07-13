@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-Jun-07    RMS     Added IA64 VMS support (from Norm Lastovica)
+   18-Jun-07    RMS     Added UNIT_IDLE flag
    18-Mar-07    RMS     Added UNIT_TEXT flag
    07-Mar-07    JDB     Added DEBUG_PRJ macro
    18-Oct-06    RMS     Added limit check for clock synchronized keyboard waits
@@ -131,7 +133,7 @@ typedef unsigned long long      t_uint64;
 #elif defined (_WIN32)                                  /* Windows */
 typedef signed __int64          t_int64;
 typedef unsigned __int64        t_uint64;
-#elif defined (__ALPHA) && defined (VMS)                /* Alpha VMS */
+#elif (defined (__ALPHA) || defined (__ia64)) && defined (VMS) /* 64b VMS */
 typedef signed __int64          t_int64;
 typedef unsigned __int64        t_uint64;
 #elif defined (__ALPHA) && defined (__unix__)           /* Alpha UNIX */
@@ -366,6 +368,7 @@ struct sim_unit {
 #define UNIT_DIS        004000                          /* disabled */
 #define UNIT_RAW        010000                          /* raw mode */
 #define UNIT_TEXT       020000                          /* text mode */
+#define UNIT_IDLE       040000                          /* idle eligible */
 
 #define UNIT_UFMASK_31  (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF_31) - 1))
 #define UNIT_UFMASK     (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF) - 1))

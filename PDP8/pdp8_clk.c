@@ -1,6 +1,6 @@
 /* pdp8_clk.c: PDP-8 real-time clock simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    clk          real time clock
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag
    01-Mar-03    RMS     Aded SET/SHOW CLK FREQ support
    04-Oct-02    RMS     Added DIB, device number support
    30-Dec-01    RMS     Removed for generalized timers
@@ -57,7 +58,7 @@ t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 DIB clk_dib = { DEV_CLK, 1, { &clk } };
 
-UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 16000 };
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), 16000 };
 
 REG clk_reg[] = {
     { FLDATA (DONE, dev_done, INT_V_CLK) },

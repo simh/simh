@@ -1,6 +1,6 @@
 /* i1401_defs.h: IBM 1401 simulator definitions
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-Jun-07    RMS     Defined character code for tape mark
    14-Nov-04    RMS     Added column binary support
    27-Oct-04    RMS     Added maximum instruction length
    16-Mar-03    RMS     Fixed mnemonic for MCS
@@ -169,6 +170,7 @@
 #define BCD_EIGHT       010
 #define BCD_NINE        011
 #define BCD_ZERO        012
+#define BCD_TAPMRK      017
 #define BCD_ALT         020
 #define BCD_S           022
 #define BCD_U           024

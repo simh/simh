@@ -1,6 +1,6 @@
 /* id_uvc.c: Interdata universal clock
 
-   Copyright (c) 2001-2006, Robert M. Supnik
+   Copyright (c) 2001-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    pic          precision incremental clock
    lfc          line frequency clock
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag
    18-Oct-06    RMS     Changed LFC to be free running, export tmr_poll
    23-Jul-05    RMS     Fixed {} error in OC
    01-Mar-03    RMS     Added SET/SHOW LFC FREQ support
@@ -95,7 +96,7 @@ t_stat lfc_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 DIB pic_dib = { d_PIC, -1, v_PIC, NULL, &pic, NULL };
 
-UNIT pic_unit = { UDATA (&pic_svc, 0, 0), 1000 };
+UNIT pic_unit = { UDATA (&pic_svc, UNIT_IDLE, 0), 1000 };
 
 REG pic_reg[] = {
     { HRDATA (BUF, pic_db, 16) },
@@ -140,7 +141,7 @@ DEVICE pic_dev = {
 
 DIB lfc_dib = { d_LFC, -1, v_LFC, NULL, &lfc, NULL };
 
-UNIT lfc_unit = { UDATA (&lfc_svc, 0, 0), 8333 };
+UNIT lfc_unit = { UDATA (&lfc_svc, UNIT_IDLE, 0), 8333 };
 
 REG lfc_reg[] = {
     { FLDATA (IREQ, int_req[l_LFC], i_LFC) },

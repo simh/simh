@@ -1,6 +1,6 @@
 /* pdp8_ct.c: PDP-8 cassette tape simulator
 
-   Copyright (c) 2006, Robert M Supnik
+   Copyright (c) 2006-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    ct           TA8E/TU60 cassette tape
+
+   30-May-2007  RMS	Fixed typo (from Norm Lastovica)
 
    Magnetic tapes are represented as a series of variable records
    of the form:
@@ -461,7 +463,7 @@ int32 srb;
 if (uptr == NULL) {                                     /* unit specified? */
     uptr = ct_busy ();                                  /* use busy unit */
     if ((uptr == NULL) && (ct_sra & SRA_ENAB))          /* none busy? */
-        uptr = uptr = ct_dev.units + GET_UNIT (ct_sra); /* use sel unit */
+        uptr = ct_dev.units + GET_UNIT (ct_sra);        /* use sel unit */
     }
 else if (ct_srb & SRB_EOF) uptr->UST |= UST_GAP;        /* save gap */
 if (uptr) {                                             /* any unit? */

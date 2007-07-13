@@ -1,6 +1,6 @@
 /* pdp11_rh.c: PDP-11 Massbus adapter simulator
 
-   Copyright (c) 2005, Robert M Supnik
+   Copyright (c) 2005-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rha, rhb             RH11/RH70 Massbus adapter
 
+   17-May-07    RMS     Moved CS1 drive enable to devices
    21-Nov-05    RMS     Added enable/disable routine
    07-Jul-05    RMS     Removed extraneous externs
 
@@ -69,7 +70,6 @@
 #define CS1_V_UAE       8                               /* Unibus addr ext */
 #define CS1_M_UAE       03
 #define CS1_UAE         (CS1_M_UAE << CS1_V_UAE)
-#define CS1_DVA         0004000                         /* drive avail NI */
 #define CS1_MCPE        0020000                         /* Mbus par err NI */
 #define CS1_TRE         0040000                         /* transfer err */
 #define CS1_SC          0100000                         /* special cond */
@@ -644,7 +644,7 @@ void mba_upd_cs1 (uint32 set, uint32 clr, uint32 mb)
 if (mb >= MBA_NUM) return;
 if ((set & ~massbus[mb].cs1) & CS1_DONE)                    /* DONE 0 to 1? */
     massbus[mb].iff = (massbus[mb].cs1 & CS1_IE)? 1: 0;     /* CSTB INTR <- IE */
-massbus[mb].cs1 = (massbus[mb].cs1 & ~(clr | CS1_MCPE | CS1_MBZ | CS1_DRV)) | CS1_DVA | set;
+massbus[mb].cs1 = (massbus[mb].cs1 & ~(clr | CS1_MCPE | CS1_MBZ | CS1_DRV)) | set;
 if (massbus[mb].cs2 & CS2_ERR) massbus[mb].cs1 = massbus[mb].cs1 | CS1_TRE | CS1_SC;
 else if (massbus[mb].cs1 & CS1_TRE) massbus[mb].cs1 = massbus[mb].cs1 | CS1_SC;
 if (massbus[mb].iff ||

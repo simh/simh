@@ -276,7 +276,6 @@ extern void txcs_wr (int32 dat);
 extern void txdb_wr (int32 dat);
 extern void ioreset_wr (int32 dat);
 extern uint32 sim_os_msec();
-extern int32 cpu_psl_ipl (int32 newpsl);
 
 /* ROM data structures
 
@@ -1501,7 +1500,7 @@ else STK[temp] = SP;                                    /* save stack */
 if (mapen) conpsl = conpsl | CON_MAPON;                 /* mapping on? */
 mapen = 0;                                              /* turn off map */
 SP = IS;                                                /* set SP from IS */
-PSL = cpu_psl_ipl (PSL_IS | PSL_IPL1F);                 /* PSL = 41F0000 */
+PSL = PSL_IS | PSL_IPL1F;                               /* PSL = 41F0000 */
 JUMP (ROMBASE);                                         /* PC = 20040000 */
 return 0;                                               /* new cc = 0 */
 }
@@ -1515,7 +1514,7 @@ extern FILE *sim_log;
 t_stat r;
 
 PC = ROMBASE;
-PSL = cpu_psl_ipl (PSL_IS | PSL_IPL1F);
+PSL = PSL_IS | PSL_IPL1F;
 conpc = 0;
 conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
 if (rom == NULL) return SCPE_IERR;

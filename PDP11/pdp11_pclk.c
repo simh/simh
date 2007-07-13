@@ -1,6 +1,6 @@
 /* pdp11_pclk.c: KW11P programmable clock simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
    Written by John Dundas, used with his gracious permission
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    pclk         KW11P line frequency clock
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag
    07-Jul-05    RMS     Removed extraneous externs
 
    KW11-P Programmable Clock
@@ -154,7 +155,7 @@ DIB pclk_dib = {
     1, IVCL (PCLK), VEC_PCLK, { NULL }
     };
 
-UNIT pclk_unit = { UDATA (&pclk_svc, 0, 0) };
+UNIT pclk_unit = { UDATA (&pclk_svc, UNIT_IDLE, 0) };
 
 REG pclk_reg[] = {
     { ORDATA (CSR, pclk_csr, 16) },

@@ -1,6 +1,6 @@
 /* pdp1_cpu.c: PDP-1 CPU simulator
 
-   Copyright (c) 1993-2006, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          PDP-1 central processor
 
+   30-May-07    RMS     Fixed typo in SBS clear (from Norm Lastovica)
    28-Dec-06    RMS     Added 16-channel SBS support, PDP-1D support
    28-Jun-06    RMS     Fixed bugs in MUS and DIV
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
@@ -534,7 +535,7 @@ if (cpu_unit.flags & UNIT_SBS) {                        /* 16-chan SBS? */
     sbs = sbs & SB_ON;                                  /* yes, only SB ON */
     sbs_lvl = sbs_eval ();                              /* eval SBS system */
     }
-else sbs_lvl = sbs_req = sbs_enb = sbs_lvl = 0;         /* no, clr SBS sys */
+else sbs_lvl = sbs_req = sbs_enb = sbs_act = 0;         /* no, clr SBS sys */
 
 /* Main instruction fetch/decode loop: check events and interrupts */
 

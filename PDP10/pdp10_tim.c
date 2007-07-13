@@ -1,6 +1,6 @@
 /* pdp10_tim.c: PDP-10 tim subsystem simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tim          timer subsystem
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag
    03-Nov-06    RMS     Rewritten to support idling
    29-Oct-06    RMS     Added clock coscheduling function
    02-Feb-04    RMS     Exported variables needed by Ethernet simulator
@@ -104,7 +105,7 @@ extern t_stat wr_nop (int32 data, int32 PA, int32 access);
 
 DIB tcu_dib = { IOBA_TCU, IOLN_TCU, &tcu_rd, &wr_nop, 0 };
 
-UNIT tim_unit = { UDATA (&tim_svc, 0, 0), TIM_WAIT_T10 };
+UNIT tim_unit = { UDATA (&tim_svc, UNIT_IDLE, 0), TIM_WAIT_T10 };
 
 REG tim_reg[] = {
     { BRDATA (TIMEBASE, tim_base, 8, 36, 2) },

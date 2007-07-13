@@ -1,6 +1,6 @@
 /* pdp11_tu.c - PDP-11 TM02/TU16 TM03/TU45/TU77 Massbus magnetic tape controller
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tu           TM02/TM03 magtape
 
+   17-May-07    RMS     CS1 DVA resides in device, not MBA
    29-Apr-07    RMS     Fixed bug in setting FCE on TMK (found by Naoki Hamada)
    16-Feb-06    RMS     Added tape capacity checking
    12-Nov-05    RMS     Changed default formatter to TM03 (for VMS)
@@ -106,6 +107,7 @@
 #define  FNC_READF      034                             /* read forward */
 #define  FNC_READR      037                             /* read reverse */
 #define CS1_RW          077
+#define CS1_DVA         04000                           /* drive avail */
 #define GET_FNC(x)      (((x) >> CS1_V_FNC) & CS1_M_FNC)
 
 /* TUFS - formatter status - offset 1
@@ -339,7 +341,7 @@ tu_update_fs (0, drv);                                  /* update status */
 switch (ofs) {                                          /* decode offset */
 
     case CS1_OF:                                        /* MTCS1 */
-        *data = tucs1 & CS1_RW;
+        *data = (tucs1 & CS1_RW) | CS1_DVA;             /* DVA always set */
         break;
 
     case FC_OF:                                         /* MTFC */

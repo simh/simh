@@ -29,13 +29,52 @@
 
 #define SIM_MAJOR       3
 #define SIM_MINOR       7
-#define SIM_PATCH       1
+#define SIM_PATCH       2
 
 /* V3.7 revision history 
 
 patch   date            module(s) and fix(es)
 
-  1     tbd             scp.c:
+  2     tbd             sim_ether.c (from Dave Hittner):
+                        - fixed non-ethernet device removal loop (from Naoki Hamada)
+                        - added dynamic loading of wpcap.dll;
+                        - corrected exceed max index bug in ethX lookup
+                        - corrected failure to look up ethernet device names in
+                          the registry on Windows XP x64
+
+                        sim_timer.c:
+                        - fixed idle timer event selection algorithm
+  
+                        h316_lp.c:
+                        - fixed loss of last print line (from Theo Engel)
+
+                        h316_mt.c:
+                        - fixed bug in write without stop (from Theo Engel)
+
+                        h316_stddev.c:
+                        - fixed bug in clock increment (from Theo Engel)
+
+                        i1401_cpu.c:
+                        - added recognition of overlapped operation modifiers
+                        - remove restriction on load-mode binary tape operations
+
+                        i1401_mt.c:
+                        - fixed read tape mark operation (found by Van Snyder)
+                        - remove restriction on load-mode binary tape operations
+
+                        pdp1_cpu.c:
+                        - fixed typo in SBS clear (from Norm Lastovica)
+
+                        pdp11_rh.c, pdp11_rp.c, pdp11_tu.c:
+                        - CS1 DVA is in the device, not the MBA
+
+                        pdp8_ct.c:
+                        - fixed typo (from Norm Lastovica)
+
+                        vax_cpu.c:
+                        - revised idle detector
+
+  1     14-May-07       scp.c:
                         - modified sim_instr invocation to call sim_rtcn_init_all
                         - fixed bug in get_sim_opt (reported by Don North)
                         - fixed bug in RESTORE with changed memory size

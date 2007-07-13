@@ -1,6 +1,6 @@
 /* h316_stddev.c: Honeywell 316/516 standard devices
 
-   Copyright (c) 1999-2006, Robert M. Supnik
+   Copyright (c) 1999-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tty          316/516-33 teleprinter
    clk/options  316/516-12 real time clocks/internal options
 
+   09-Jun-07    RMS     Fixed bug in clock increment (found by Theo Engel)
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    03-Apr-06    RMS     Fixed bugs in punch state handling (from Theo Engel)
    22-Nov-05    RMS     Revised for new terminal processing routines
@@ -829,7 +830,7 @@ return dat;
 t_stat clk_svc (UNIT *uptr)
 {
 
-M[M_CLK] = M[M_CLK + 1] & DMASK;                        /* increment mem ctr */
+M[M_CLK] = (M[M_CLK] + 1) & DMASK;                      /* increment mem ctr */
 if (M[M_CLK] == 0) SET_INT (INT_CLK);                   /* = 0? set flag */
 sim_activate (&clk_unit, sim_rtc_calb (clk_tps));       /* reactivate */
 return SCPE_OK;

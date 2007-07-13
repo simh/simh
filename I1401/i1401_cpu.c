@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2006, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Jul-07    RMS     Removed restriction on load-mode binary tape
+   28-Jun-07    RMS     Added support for SS overlap modifiers
    22-May-06    RMS     Fixed format error in CPU history (found by Peter Schorn)
    06-Mar-06    RMS     Fixed bug in divide (found by Van Snyder)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
@@ -489,7 +491,8 @@ static const int32 cry_table[100] = {
 static const int32 r_mod[] = { BCD_C, -1 };
 static const int32 p_mod[] = { BCD_C, -1 };
 static const int32 w_mod[] = { BCD_S, BCD_SQUARE, -1 };
-static const int32 ss_mod[] = { 1, 2, 4, 8, -1 };
+static const int32 ss_mod[] = { BCD_ONE, BCD_TWO, BCD_FOUR, BCD_EIGHT,
+    BCD_DOLLAR, BCD_DECIMAL, BCD_SQUARE, -1 };
 static const int32 mtf_mod[] = { BCD_B, BCD_E, BCD_M, BCD_R, BCD_U, -1 };
 
 t_stat sim_instr (void)
@@ -1655,10 +1658,8 @@ t_stat iodisp (int32 dev, int32 unit, int32 flag, int32 mod)
 if (dev == IO_INQ) return inq_io (flag, mod);           /* inq terminal? */
 if (dev == IO_DP) return dp_io (unit, flag, mod);       /* disk pack? */
 if (dev == IO_MT) return mt_io (unit, flag, mod);       /* magtape? */
-if (dev == IO_MTB) {                                    /* binary? */
-    if (flag == MD_WM) return STOP_INVM;                /* invalid */
-    return mt_io (unit, MD_BIN, mod);
-    }
+if (dev == IO_MTB)                                      /* binary magtape? */
+    return mt_io (unit, flag | MD_BIN, mod);
 return STOP_NXD;                                        /* not implemented */
 }
 

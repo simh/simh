@@ -1,6 +1,6 @@
 /* sim_ether.c: OS-dependent network routines
   ------------------------------------------------------------------------------
-   Copyright (c) 2002-2006, David T. Hittner
+   Copyright (c) 2002-2007, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -47,6 +47,10 @@
   network code be a privileged user of the host system. See the PCAP/WinPcap
   documentation for the appropriate host platform if unprivileged use of
   networking is needed - there may be known workarounds.
+
+  Define one of the two macros below to enable networking:
+    USE_NETWORK		- Create statically linked network code
+	USE_SHARED		- Create dynamically linked network code (_WIN32 only)
 
   ------------------------------------------------------------------------------
 
@@ -134,6 +138,11 @@
 
   Modification history:
 
+  17-May-07  DTH  Fixed non-ethernet device removal loop (from Naoki Hamada)
+  15-May-07  DTH  Added dynamic loading of wpcap.dll;
+				  Corrected exceed max index bug in ethX lookup
+  04-May-07  DTH  Corrected failure to look up ethernet device names in
+				  the registry on Windows XP x64
   10-Jul-06  RMS  Fixed linux conditionalization (from Chaskiel Grundman)
   02-Jun-06  JDB  Fixed compiler warning for incompatible sscanf parameter
   15-Dec-05  DTH  Patched eth_host_devices [remove non-ethernet devices]
@@ -422,7 +431,7 @@ char* eth_getname(int number, char* name)
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
 
-  if (count < number) return 0;
+  if (count <= number) return 0;
   strcpy(name, list[number].name);
   return name;
 }
@@ -600,7 +609,7 @@ void ethq_insert(ETH_QUE* que, int32 type, ETH_PACK* pack, int32 status)
 /*                        Non-implemented versions                            */
 /*============================================================================*/
 
-#if !defined (USE_NETWORK)
+#if !defined (USE_NETWORK) && !defined(USE_SHARED)
 t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
   {return SCPE_NOFNC;}
 t_stat eth_close (ETH_DEV* dev)
@@ -632,6 +641,187 @@ int eth_devices (int max, ETH_LIST* dev)
 /* Allows windows to look up user-defined adapter names */
 #if defined(_WIN32)
 #include <winreg.h>
+#endif
+
+#if defined(_WIN32) && defined(USE_SHARED)
+/* Dynamic DLL loading technique and modified source comes from
+   Etherial/WireShark capture_pcap.c */
+
+/* Dynamic DLL load variables */
+static HINSTANCE hDll = 0;			/* handle to DLL */
+static int dll_loaded = 0;			/* 0=not loaded, 1=loaded, 2=DLL load failed, 3=Func load failed */
+static char* no_wpcap = "wpcap load failure";
+
+/* define pointers to pcap functions needed */
+static void    (*p_pcap_close) (pcap_t *);
+static int     (*p_pcap_compile) (pcap_t *, struct bpf_program *, char *, int, bpf_u_int32);
+static int     (*p_pcap_datalink) (pcap_t *);
+static int     (*p_pcap_dispatch) (pcap_t *, int, pcap_handler, u_char *);
+static int     (*p_pcap_findalldevs) (pcap_if_t **, char *);
+static void    (*p_pcap_freealldevs) (pcap_if_t *);
+static void    (*p_pcap_freecode) (struct bpf_program *);
+static char*   (*p_pcap_geterr) (pcap_t *);
+static int     (*p_pcap_lookupnet) (const char *, bpf_u_int32 *, bpf_u_int32 *, char *);
+static pcap_t* (*p_pcap_open_live) (const char *, int, int, int, char *);
+static int     (*p_pcap_sendpacket) (pcap_t* handle, const u_char* msg, int len);
+static int     (*p_pcap_setfilter) (pcap_t *, struct bpf_program *);
+static char*   (*p_pcap_lib_version) (void);
+
+/* load function pointer from DLL */
+void load_function(char* function, void** func_ptr) {
+	*func_ptr = GetProcAddress(hDll, function);
+	if (*func_ptr == 0) {
+	    char* msg = "Eth: Failed to find function '%s' in wpcap.dll\r\n";
+		printf (msg, function);
+		if (sim_log) fprintf (sim_log, msg, function);
+		dll_loaded = 3;
+	}
+}
+
+/* load wpcap.dll as required */
+int load_wpcap(void) {
+	switch(dll_loaded) {
+		case 0:									/* not loaded */
+			/* attempt to load DLL */
+			hDll = LoadLibrary(TEXT("wpcap.dll"));
+			if (hDll == 0) {
+				/* failed to load DLL */
+			    char* msg  = "Eth: Failed to load wpcap.dll\r\n";
+			    char* msg2 = "Eth: You must install WinPcap 4.x to use networking\r\n";
+				printf (msg);
+				printf (msg2);
+				if (sim_log) {
+					fprintf (sim_log, msg);
+				    fprintf (sim_log, msg2);
+				}
+				dll_loaded = 2;
+				break;
+			} else {
+				/* DLL loaded OK */
+				dll_loaded = 1;
+			}
+
+			/* load required functions; sets dll_load=3 on error */
+			load_function("pcap_close",			(void**) &p_pcap_close);
+			load_function("pcap_compile",		(void**) &p_pcap_compile);
+			load_function("pcap_datalink",		(void**) &p_pcap_datalink);
+			load_function("pcap_dispatch",		(void**) &p_pcap_dispatch);
+			load_function("pcap_findalldevs",	(void**) &p_pcap_findalldevs);
+			load_function("pcap_freealldevs",	(void**) &p_pcap_freealldevs);
+			load_function("pcap_freecode",		(void**) &p_pcap_freecode);
+			load_function("pcap_geterr",		(void**) &p_pcap_geterr);
+			load_function("pcap_lookupnet",		(void**) &p_pcap_lookupnet);
+			load_function("pcap_open_live",		(void**) &p_pcap_open_live);
+			load_function("pcap_sendpacket",	(void**) &p_pcap_sendpacket);
+			load_function("pcap_setfilter",		(void**) &p_pcap_setfilter);
+			load_function("pcap_lib_version",   (void**) &p_pcap_lib_version);
+
+			if (dll_loaded == 1) {
+				/* log successful load */
+				char* version = p_pcap_lib_version();
+				printf("%s\n", version);
+				if (sim_log)
+					fprintf(sim_log, "%s\n", version);
+			}
+			break;
+		default:								/* loaded or failed */
+			break;
+	}
+	return (dll_loaded == 1) ? 1 : 0;
+}
+
+/* define functions with dynamic revectoring */
+void pcap_close(pcap_t* a) {
+	if (load_wpcap() != 0) {
+		p_pcap_close(a);
+	}
+}
+
+int pcap_compile(pcap_t* a, struct bpf_program* b, char* c, int d, bpf_u_int32 e) {
+	if (load_wpcap() != 0) {
+		return p_pcap_compile(a, b, c, d, e);
+	} else {
+		return 0;
+	}
+}
+
+int pcap_datalink(pcap_t* a) {
+	if (load_wpcap() != 0) {
+		return p_pcap_datalink(a);
+	} else {
+		return 0;
+	}
+}
+
+int pcap_dispatch(pcap_t* a, int b, pcap_handler c, u_char* d) {
+	if (load_wpcap() != 0) {
+		return p_pcap_dispatch(a, b, c, d);
+	} else {
+		return 0;
+	}
+}
+
+int pcap_findalldevs(pcap_if_t** a, char* b) {
+	if (load_wpcap() != 0) {
+		return p_pcap_findalldevs(a, b);
+	} else {
+		*a = 0;
+		strcpy(b, no_wpcap);
+		return -1;
+	}
+}
+
+void pcap_freealldevs(pcap_if_t* a) {
+	if (load_wpcap() != 0) {
+		p_pcap_freealldevs(a);
+	}
+}
+
+void pcap_freecode(struct bpf_program* a) {
+	if (load_wpcap() != 0) {
+		p_pcap_freecode(a);
+	}
+}
+
+char* pcap_geterr(pcap_t* a) {
+	if (load_wpcap() != 0) {
+		return p_pcap_geterr(a);
+	} else {
+		return (char*) 0;
+	}
+}
+
+int pcap_lookupnet(const char* a, bpf_u_int32* b, bpf_u_int32* c, char* d) {
+	if (load_wpcap() != 0) {
+		return p_pcap_lookupnet(a, b, c, d);
+	} else {
+		return 0;
+	}
+}
+
+pcap_t* pcap_open_live(const char* a, int b, int c, int d, char* e) {
+	if (load_wpcap() != 0) {
+		return p_pcap_open_live(a, b, c, d, e);
+	} else {
+		return (pcap_t*) 0;
+	}
+}
+
+int pcap_sendpacket(pcap_t* a, const u_char* b, int c) {
+	if (load_wpcap() != 0) {
+		return p_pcap_sendpacket(a, b, c);
+	} else {
+		return 0;
+	}
+}
+
+int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
+	if (load_wpcap() != 0) {
+		return p_pcap_setfilter(a, b);
+	} else {
+		return 0;
+	}
+}
 #endif
 
 /* Some platforms have always had pcap_sendpacket */
@@ -1187,7 +1377,7 @@ int eth_host_devices(int used, int max, ETH_LIST* list)
     conn = pcap_open_live(list[i].name, ETH_MAX_PACKET, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
     if (NULL != conn) datalink = pcap_datalink(conn), pcap_close(conn);
     if ((NULL == conn) || (datalink != DLT_EN10MB)) {
-      for (j=i+1; j<used; ++j)
+      for (j=i; j<used-1; ++j)
         list[j] = list[j+1];
       --used;
       --i;
@@ -1204,17 +1394,23 @@ int eth_host_devices(int used, int max, ETH_LIST* list)
     HKEY reghnd;
 
 		/* These registry keys don't seem to exist for all devices, so we simply ignore errors. */
+		/* Windows XP x64 registry uses wide characters by default,
+			so we force use of narrow characters by using the 'A'(ANSI) version of RegOpenKeyEx.
+			This could cause some problems later, if this code is internationalized. Ideally,
+			the pcap lookup will return wide characters, and we should use them to build a wide
+			registry key, rather than hardcoding the string as we do here. */
 		if(list[i].name[strlen( "\\Device\\NPF_" )] == '{') {
 			  sprintf( regkey, "SYSTEM\\CurrentControlSet\\Control\\Network\\"
 							"{4D36E972-E325-11CE-BFC1-08002BE10318}\\%hs\\Connection", list[i].name+
 							strlen( "\\Device\\NPF_" ) );
-			  if((status = RegOpenKeyEx (HKEY_LOCAL_MACHINE, regkey, 0, KEY_QUERY_VALUE, &reghnd)) != ERROR_SUCCESS) {
+			  if((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, regkey, 0, KEY_QUERY_VALUE, &reghnd)) != ERROR_SUCCESS) {
 				  continue;
 			  }
 	    reglen = sizeof(regval);
 
       /* look for user-defined adapter name, bail if not found */	
-      if((status = RegQueryValueEx (reghnd, "Name", NULL, &regtype, regval, &reglen)) != ERROR_SUCCESS) {
+		/* same comment about Windows XP x64 (above) using RegQueryValueEx */
+      if((status = RegQueryValueExA (reghnd, "Name", NULL, &regtype, regval, &reglen)) != ERROR_SUCCESS) {
 			  RegCloseKey (reghnd);
 		    continue;
 	    }

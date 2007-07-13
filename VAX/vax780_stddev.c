@@ -1,6 +1,6 @@
 /* vax780_stddev.c: VAX 11/780 standard I/O devices
 
-   Copyright (c) 1998-2006, Robert M Supnik
+   Copyright (c) 1998-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    todr         TODR clock
    tmr          interval timer
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
    29-Oct-2006  RMS     Added clock coscheduler function
                         Synced keyboard to clock for idling
    11-May-06    RMS     Revised timer logic for EVKAE
@@ -276,7 +277,7 @@ DEVICE tto_dev = {
 
 /* TODR and TMR data structures */
 
-UNIT clk_unit = { UDATA (&clk_svc, 0, 0), CLK_DELAY };          /* 100Hz */
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), CLK_DELAY };          /* 100Hz */
 
 REG clk_reg[] = {
     { DRDATA (TODR, todr_reg, 32), PV_LEFT },

@@ -1,7 +1,7 @@
 /* pdp11_xq.c: DEQNA/DELQA ethernet controller simulator
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2002-2006, David T. Hittner
+   Copyright (c) 2002-2007, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -66,6 +66,7 @@
 
   Modification history:
 
+  18-Jun-07  RMS  Added UNIT_IDLE flag
   29-Oct-06  RMS  Synced poll and clock
   27-Jan-06  RMS  Fixed unaligned accesses in XQB (found by Doug Carman)
   07-Jan-06  RMS  Fixed unaligned access bugs (found by Doug Carman)
@@ -273,7 +274,7 @@ DIB xqa_dib = { IOBA_XQ, IOLN_XQ, &xq_rd, &xq_wr,
 		1, IVCL (XQ), 0, { &xq_int } };
 
 UNIT xqa_unit[] = {
- { UDATA (&xq_svc, UNIT_ATTABLE + UNIT_DISABLE, 2047) },  /* receive timer */
+ { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
 };
 
 REG xqa_reg[] = {
@@ -304,7 +305,7 @@ DIB xqb_dib = { IOBA_XQB, IOLN_XQB, &xq_rd, &xq_wr,
 		1, IVCL (XQ), 0, { &xq_int } };
 
 UNIT xqb_unit[] = {
- { UDATA (&xq_svc, UNIT_ATTABLE + UNIT_DISABLE, 2047) },  /* receive timer */
+ { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
 };
 
 REG xqb_reg[] = {

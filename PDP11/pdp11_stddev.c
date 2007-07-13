@@ -1,6 +1,6 @@
 /* pdp11_stddev.c: PDP-11 standard I/O devices simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti,tto      DL11 terminal input/output
    clk          KW11L (and other) line frequency clock
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
    29-Oct-06	RMS     Synced keyboard and clock
                         Added clock coscheduling support
    05-Jul-06    RMS     Added UC only support for early DOS/RSTS
@@ -109,7 +110,7 @@ DIB tti_dib = {
     1, IVCL (TTI), VEC_TTI, { NULL }
     };
 
-UNIT tti_unit = { UDATA (&tti_svc, 0, 0), 0 };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE, 0), 0 };
 
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, 8) },
@@ -201,7 +202,7 @@ DIB clk_dib = {
     1, IVCL (CLK), VEC_CLK, { &clk_inta }
     };
 
-UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 8000 };
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), 8000 };
 
 REG clk_reg[] = {
     { ORDATA (CSR, clk_csr, 16) },

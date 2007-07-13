@@ -1,7 +1,7 @@
 /* pdp11_xu.c: DEUNA/DELUA ethernet controller simulator
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2003-2006, David T. Hittner
+   Copyright (c) 2003-2007, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -34,34 +34,29 @@
 
   Testing performed:
    1) Receives/Transmits single packet under custom RSX driver
-   2) Passes RSTS 10.1 controller diagnostics during boot
+   2) Passes RSTS 10.1 controller probe diagnostics during boot
    3) VMS 7.2 on VAX780 summary:
        (May/2007: WinXP x64 host; MS VC++ 2005; SIMH v3.7-0 base; WinPcap 4.0)
         LAT    - SET HOST/LAT in/out
         DECNET - SET HOST in/out, COPY in/out
-        TCP/IP - PING in/out; SET HOST/TELNET out, COPY/FTP out
-			   - can't seem to connect in
-			   - possible TCPIP v5.0 misconfiguration?
-			   - issues with host WinXP firewall or Domain policy?
+        TCP/IP - PING in/out; SET HOST/TELNET in/out, COPY/FTP in/out
         Clustering - Successfully clustered with AlphaVMS 8.2
-				   - no hangs or offlines, some odd delays and jerkiness
-				   - out-of-order ring messages causing retransmits?
-				   - caused by ping times (min/avg/max) of 2/7/16 ms?
    4) Runs VAX EVDWA diagnostic tests 1-10; tests 11-19 (M68000/ROM/RAM) fail
 
   Known issues:
-   1) Transmit/Receive rings have not been thoroughly tested,
-      particularly when and where the ring pointers get reset.
-   2) Most auxiliary commands are not implemented yet.
-   3) System_ID broadcast is not implemented.
-   4) Error/Interrupt signalling is still iffy from merge of FvK and sim_ether.
-   5) There are residual Map_ReadB and Map_WriteB from the FvK version that
+   1) Most auxiliary commands are not implemented yet.
+   2) System_ID broadcast is not implemented.
+   3) There are residual Map_ReadB and Map_WriteB from the FvK version that
       probably need to be converted to Map_ReadW and Map_WriteW calls.
+   4) Some jerkiness seen during interactive I/O with remote systems;
+      this is probably attributable to changed polling times from when
+	  the poll duration was standardized for idling support.
 
   ------------------------------------------------------------------------------
 
   Modification history:
 
+  18-Jun-07  RMS  Added UNIT_IDLE flag
   03-May-07  DTH  Added missing FC_RMAL command; cleared multicast on write
   29-Oct-06  RMS  Synced poll and clock
   08-Dec-05  DTH  Implemented ancilliary functions 022/023/024/025
@@ -122,7 +117,7 @@ DIB xua_dib = { IOBA_XU, IOLN_XU, &xu_rd, &xu_wr,
 1, IVCL (XU), VEC_XU, {&xu_int} };
 
 UNIT xua_unit[] = {
- { UDATA (&xu_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) }      /* receive timer */
+ { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) }      /* receive timer */
 };
 
 struct xu_device    xua = {
@@ -183,7 +178,7 @@ DIB xub_dib = { IOBA_XUB, IOLN_XUB, &xu_rd, &xu_wr,
 		1, IVCL (XU), 0, { &xu_int } };
 
 UNIT xub_unit[] = {
- { UDATA (&xu_svc, UNIT_ATTABLE + UNIT_DISABLE, 0) }      /* receive timer */
+ { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) }      /* receive timer */
 };
 
 struct xu_device    xub = {

@@ -157,7 +157,7 @@ DEVICE hdsk_dev = {
 /* Attach routine */
 t_stat hdsk_attach(UNIT *uptr, char *cptr) {
     t_stat r;
-    int32 i;
+    uint32 i;
     char unitChar;
 
     r = attach_unit(uptr, cptr);                        /* attach unit                          */
@@ -211,10 +211,10 @@ t_stat hdsk_attach(UNIT *uptr, char *cptr) {
     /* Step 4: Number of tracks is smallest number to accomodate capacity                       */
     uptr -> HDSK_NUMBER_OF_TRACKS = (uptr -> capac + uptr -> HDSK_SECTORS_PER_TRACK *
         uptr -> HDSK_SECTOR_SIZE - 1) / (uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE);
-    assert( ((uptr -> HDSK_NUMBER_OF_TRACKS - 1) * uptr -> HDSK_SECTORS_PER_TRACK *
-        uptr -> HDSK_SECTOR_SIZE < uptr -> capac) &&
-        (uptr -> capac <= uptr -> HDSK_NUMBER_OF_TRACKS *
-        uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE ) );
+    assert( ( (t_addr) ((uptr -> HDSK_NUMBER_OF_TRACKS - 1) * uptr -> HDSK_SECTORS_PER_TRACK *
+        uptr -> HDSK_SECTOR_SIZE) < uptr -> capac) &&
+        (uptr -> capac <= (t_addr) (uptr -> HDSK_NUMBER_OF_TRACKS *
+        uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE) ) );
     return SCPE_OK;
 }
 
@@ -457,7 +457,7 @@ static int32 doSeek(void) {
     }
 }
 
-uint8 hdskbuf[HDSK_MAX_SECTOR_SIZE] = {};    /* data buffer  */
+uint8 hdskbuf[HDSK_MAX_SECTOR_SIZE] = { 0 };    /* data buffer  */
 
 static int32 doRead(void) {
     int32 i;

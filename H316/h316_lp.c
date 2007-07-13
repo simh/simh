@@ -25,6 +25,7 @@
 
    lpt          line printer
 
+   09-Jun-07    RMS     Fixed lost last print line (from Theo Engel)
    19-Jan-06    RMS     Added UNIT_TEXT flag
    03-Apr-06    RMS     Fixed bug in blanks backscanning (from Theo Engel)
    01-Dec-04    RMS     Fixed bug in DMA/DMC support
@@ -294,20 +295,23 @@ if (lpt_dma) {                                          /* DMA/DMC? */
     }
 else lpt_rdy = 1;                                       /* IO, continue scan */
 if (lpt_dma && lpt_eor) SET_INT (INT_LPT);              /* end of range? */
-if (lpt_svcst & LPT_SVCSH) {                            /* shuttling */
+if (lpt_svcst & LPT_SVCSH) {                            /* shuttling? */
     SET_INT (INT_LPT);                                  /* interrupt */
-    if (lpt_crpos == 0) lpt_prdn = 1;
+    if (lpt_crpos == 0) {                               /* done shuttling? */
+        for (i = LPT_WIDTH - 1; i >= 0; i--)  {         /* backscan for blanks */
+            if (lpt_buf[i] != ' ') break; 
+            }
+        lpt_buf[i + 1] = 0;
+        fputs (lpt_buf, uptr->fileref);                 /* output buf */
+        uptr->pos = ftell (uptr->fileref);              /* update pos */
+        for (i = 0; i < LPT_WIDTH; i++) lpt_buf[i] = ' '; /* clear buf */
+        lpt_prdn = 1;                                   /* print done */
+        }
     }
 if (lpt_svcst & LPT_SVCPA) {                            /* paper advance */
     SET_INT (INT_LPT);                                  /* interrupt */
-    for (i = LPT_WIDTH - 1; i >= 0; i--)  {             /* backscan for blanks */
-        if (lpt_buf[i] != ' ') break; 
-        }
-    lpt_buf[i + 1] = 0;
-    fputs (lpt_buf, uptr->fileref);                     /* output buf */
     fputs (lpt_cc[lpt_svcch & 03], uptr->fileref);      /* output eol */
     uptr->pos = ftell (uptr->fileref);                  /* update pos */
-    for (i = 0; i < LPT_WIDTH; i++) lpt_buf[i] = ' ';   /* clear buf */
     }
 lpt_svcst = 0;
 return SCPE_OK;

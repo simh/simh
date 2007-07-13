@@ -1,6 +1,6 @@
 /* i1401_mt.c: IBM 1401 magnetic tape simulator
 
-   Copyright (c) 1993-2006, Robert M. Supnik
+   Copyright (c) 1993-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    mt           7-track magtape
 
+   07-Jul-07    RMS     Removed restriction on load-mode binary tape
+   28-Jun-07    RMS     Revised read tape mark behavior based on real hardware
+                        (found by Van Snyder)
    16-Feb-06    RMS     Added tape capacity checking
    15-Sep-05    RMS     Yet another fix to load read group mark plus word mark
                         Added debug printouts (from Van Snyder)
@@ -242,6 +245,11 @@ switch (mod) {
         wm_seen = 0;                                    /* no word mk seen */
         st = sim_tape_rdrecf (uptr, dbuf, &tbc, MT_MAXFR); /* read rec */
         if (st == MTSE_RECE) ind[IN_TAP] = 1;           /* rec in error? */
+        else if (st == MTSE_TMK) {                      /* tape mark? */
+            ind[IN_END] = 1;                            /* set indicator */
+            tbc = 1;                                    /* one char read */
+            dbuf[0] = BCD_TAPMRK;                       /* BCD tapemark */
+            }
         else if (st != MTSE_OK) {                       /* stop on error */
             if (DEBUG_PRS (mt_dev))
                 fprintf (sim_deb, ", stopped by status = %d\n", st);
@@ -259,15 +267,17 @@ switch (mod) {
                 return SCPE_OK;                         /* done */
                 }
             t = dbuf[i];                                /* get char */
-            if ((flag != MD_BIN) && (t == BCD_ALT)) t = BCD_BLANK;
-            if (flag == MD_WM) {                        /* word mk mode? */
-                if ((t == BCD_WM) && (wm_seen == 0)) wm_seen = WM;
+            if (!(flag & MD_BIN) && (t == BCD_ALT))     /* BCD mode alt blank? */
+                t = BCD_BLANK;                          /* real blank */
+            if (flag & MD_WM) {                         /* word mk mode? */
+                if ((t == BCD_WM) && (wm_seen == 0))    /* WM char, none prev? */
+                    wm_seen = WM;                       /* set flag */
                 else {
-                    M[BS] = wm_seen | (t & CHAR);
-                    wm_seen = 0;
+                    M[BS] = wm_seen | (t & CHAR);       /* char + wm seen */
+                    wm_seen = 0;                        /* clear flag */
                     }
                 }
-            else M[BS] = (M[BS] & WM) | (t & CHAR);
+            else M[BS] = (M[BS] & WM) | (t & CHAR);     /* preserve mem WM */
             if (!wm_seen) BS++;
             if (ADDR_ERR (BS)) {                        /* check next BS */
                 BS = BA | (BS % MAXMEMSIZE);
@@ -275,7 +285,7 @@ switch (mod) {
                 }
             }
         if (M[BS] != (BCD_GRPMRK + WM)) {               /* not GM+WM at end? */
-            if (flag == MD_WM) M[BS] = BCD_GRPMRK;      /* LCA: clear WM */
+            if (flag & MD_WM) M[BS] = BCD_GRPMRK;       /* LCA: clear WM */
             else M[BS] = (M[BS] & WM) | BCD_GRPMRK;     /* MCW: save WM */
             }
         if (DEBUG_PRS (mt_dev))
@@ -294,8 +304,9 @@ switch (mod) {
             fprintf (sim_deb, ">>MT%d: write from %d", unit, BS);
         ind[IN_TAP] = ind[IN_END] = 0;                  /* clear error */
         for (tbc = 0; (t = M[BS++]) != (BCD_GRPMRK + WM); ) {
-            if ((t & WM) && (flag == MD_WM)) dbuf[tbc++] = BCD_WM;
-            if (((t & CHAR) == BCD_BLANK) && (flag != MD_BIN))
+            if ((t & WM) && (flag & MD_WM))             /* WM in wm mode? */
+                dbuf[tbc++] = BCD_WM;
+            if (((t & CHAR) == BCD_BLANK) && !(flag & MD_BIN))
                 dbuf[tbc++] = BCD_ALT;
             else dbuf[tbc++] = t & CHAR;
             if (ADDR_ERR (BS)) {                        /* check next BS */

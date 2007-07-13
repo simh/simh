@@ -35,6 +35,7 @@
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
 
+   28-Jun-07    RMS     Added support for SS overlap modifiers
    19-Jan-07    RMS     Added UNIT_TEXT flag
    20-Sep-05    RMS     Revised for new code tables, compatible colbinary treatment
    30-Aug-05    RMS     Fixed read, punch to ignore modifier on 1,4 char inst
@@ -307,15 +308,16 @@ return SCPE_OK;
 /* Select stack routine
 
    Modifiers have been checked by the caller
-   Modifiers are 1, 2, 4, 8 for the respective stack
+   Modifiers are 1, 2, 4, 8 for the respective stack,
+   or $, ., square for overlap control (ignored).
 */
 
 t_stat select_stack (int32 ilnt, int32 mod)
 {
-if (mod == 1) s1sel = 1;
-else if (mod == 2) s2sel = 1;
-else if (mod == 4) s4sel = 1;
-else if (mod == 8) s8sel = 1;
+if (mod == BCD_ONE) s1sel = 1;
+else if (mod == BCD_TWO) s2sel = 1;
+else if (mod == BCD_FOUR) s4sel = 1;
+else if (mod == BCD_EIGHT) s8sel = 1;
 return SCPE_OK;
 }
 

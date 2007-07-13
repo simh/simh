@@ -247,8 +247,9 @@ int32 cpu_astop = 0;
 int32 mchk_va, mchk_ref;                                /* mem ref param */
 int32 ibufl, ibufh;                                     /* prefetch buf */
 int32 ibcnt, ppc;                                       /* prefetch ctl */
-uint32 cpu_idle_ipl_mask = 0xB;                         /* idle if on IPL 0,1,3 */
-int32 cpu_idle_wait = 200;                              /* for this many cycles */
+uint32 cpu_idle_ipl_mask = 0x8;                         /* idle if on IPL 3 */
+uint32 cpu_idle_type = 1;                               /* default to VMS */
+int32 cpu_idle_wait = 1000;                             /* for these cycles */
 jmp_buf save_env;
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 int32 pcq[PCQ_SIZE] = { 0 };                            /* PC queue */
@@ -371,11 +372,13 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc);
 int32 cpu_get_vsw (int32 sw);
 int32 get_istr (int32 lnt, int32 acc);
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
 t_bool cpu_show_opnd (FILE *st, InstHistory *h, int32 line);
-int32 cpu_psl_ipl (int32 newpsl);
+int32 cpu_psl_ipl_idle (int32 newpsl);
 t_stat cpu_idle_svc (UNIT *uptr);
 
 /* CPU data structures
@@ -434,6 +437,7 @@ REG cpu_reg[] = {
     { FLDATA (MEMERR, mem_err, 0) },
     { FLDATA (HLTPIN, hlt_pin, 0) },
     { HRDATA (IDLE_IPL, cpu_idle_ipl_mask, 16), REG_HIDDEN },
+    { DRDATA (IDLE_TYPE, cpu_idle_type, 4), REG_HRO },
     { DRDATA (IDLE_WAIT, cpu_idle_wait, 16), REG_HIDDEN },
     { BRDATA (PCQ, pcq, 16, 32, PCQ_SIZE), REG_RO+REG_CIRC },
     { HRDATA (PCQP, pcq_p, 6), REG_HRO },
@@ -445,7 +449,7 @@ REG cpu_reg[] = {
 MTAB cpu_mod[] = {
     { UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL },
     { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &cpu_set_idle, &cpu_show_idle },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
     { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size },
@@ -2953,9 +2957,11 @@ opnd[j++] = Read (va + 12, L_LONG, acc);
 return j;
 }
 
-/* Set new PSL IPL */
+/* Check new PSL IPL for idle start
+   Checked only on exception or REI, not on MTPR #IPL,
+   to allow for local locking within the idle loop */
 
-int32 cpu_psl_ipl (int32 newpsl)
+int32 cpu_psl_ipl_idle (int32 newpsl)
 {
 if (((newpsl ^ PSL) & PSL_IPL) != 0) {
     sim_cancel (&cpu_unit);
@@ -2984,7 +2990,7 @@ t_stat cpu_reset (DEVICE *dptr)
 hlt_pin = 0;
 mem_err = 0;
 crd_err = 0;
-PSL = cpu_psl_ipl (PSL_IS | PSL_IPL1F);
+PSL = PSL_IS | PSL_IPL1F;
 SISR = 0;
 ASTLVL = 4;
 mapen = 0;
@@ -3231,3 +3237,43 @@ for (i = 1, j = 0, more = FALSE; i <= numspec; i++) {   /* loop thru specs */
 return more;
 }
 
+struct os_idle {
+    char        *name;
+    uint32      mask;
+    };
+
+static struct os_idle os_tab[] = {
+    { "VMS", 0x8 },
+    { "NETBSD", 0x2 },
+    { "ULTRIX", 0x2 },
+    { "OPENBSD", 0x1 },
+    { "32V", 0x1 },
+    { NULL, 0 }
+    };
+
+/* Set and show idle */
+
+t_stat cpu_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+uint32 i;
+
+if (cptr != NULL) {
+    for (i = 0; os_tab[i].name != NULL; i++) {
+        if (strcmp (os_tab[i].name, cptr) == 0) {
+            cpu_idle_type = i + 1;
+            cpu_idle_ipl_mask = os_tab[i].mask;
+            return sim_set_idle (uptr, val, cptr, desc);
+            }
+        }
+    return SCPE_ARG;
+    }
+return sim_set_idle (uptr, val, cptr, desc);
+}
+
+t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if (sim_idle_enab && (cpu_idle_type != 0))
+    fprintf (st, "idle enabled=%s", os_tab[cpu_idle_type - 1].name);
+else fprintf (st, "idle disabled");
+return SCPE_OK;
+}

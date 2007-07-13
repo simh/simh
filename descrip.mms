@@ -382,8 +382,8 @@ PDP11_SOURCE1 = $(PDP11_DIR)PDP11_FP.C,$(PDP11_DIR)PDP11_CPU.C,\
                $(PDP11_DIR)PDP11_RL.C,$(PDP11_DIR)PDP11_RP.C,\
                $(PDP11_DIR)PDP11_RX.C,$(PDP11_DIR)PDP11_STDDEV.C,\
                $(PDP11_DIR)PDP11_SYS.C,$(PDP11_DIR)PDP11_TC.C, \
-               $(PDP11_DIR)PDP11_CPUMOD.C,$(PDP11_DIR)PDP11_CR.C,
-	       $(PDP11_DIR)PDP11_TA.C
+               $(PDP11_DIR)PDP11_CPUMOD.C,$(PDP11_DIR)PDP11_CR.C,\
+               $(PDP11_DIR)PDP11_TA.C
 PDP11_LIB2 = $(LIB_DIR)PDP11L2-$(ARCH).OLB
 PDP11_SOURCE2 = $(PDP11_DIR)PDP11_TM.C,$(PDP11_DIR)PDP11_TS.C,\
                $(PDP11_DIR)PDP11_IO.C,$(PDP11_DIR)PDP11_RQ.C,\
@@ -1171,8 +1171,3 @@ $(PCAP_VCMDIR)PCAPVCM.EXE : $(PCAP_VCM_SOURCES)
                             $!
                             $ @SYS$DISK:[.PCAP-VMS.PCAPVCM]BUILD_PCAPVCM
                             $ DELETE/NOLOG/NOCONFIRM $(PCAP_VCMDIR)*.OBJ;*,$(PCAP_VCMDIR)*.MAP;*
-			
-
-- - -
-norm lastovica / oracle rdb engineering / salida, colorado, usa
-reply to: norman.lastovica@oracle.com / phone: 719.339.6749

@@ -1,6 +1,6 @@
 /* pdp11_dz.c: DZ11 terminal multiplexor simulator
 
-   Copyright (c) 2001-2006, Robert M Supnik
+   Copyright (c) 2001-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dz           DZ11 terminal multiplexor
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock
    22-Nov-05    RMS     Revised for new terminal processing routines
    07-Jul-05    RMS     Removed extraneous externs
@@ -194,7 +195,7 @@ DIB dz_dib = {
     2, IVCL (DZRX), VEC_DZRX, { &dz_rxinta, &dz_txinta }
     };
 
-UNIT dz_unit = { UDATA (&dz_svc, UNIT_ATTABLE + DZ_8B_DFLT, 0) };
+UNIT dz_unit = { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) };
 
 REG dz_nlreg = { DRDATA (NLINES, dz_desc.lines, 6), PV_LEFT };
 

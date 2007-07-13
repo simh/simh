@@ -1,6 +1,6 @@
 /* pdp15_ttx.c: PDP-15 additional terminals simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    LT15/LT19 terminal input/output
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Jun-05    RMS     Added SET TTOXn DISCONNECT
@@ -95,7 +96,7 @@ DIB ttix_dib = {
     { &ttox, &ttix, &ttox, &ttix, &ttox, &ttix, &ttox, &ttix }
     };
 
-UNIT ttix_unit = { UDATA (&ttix_svc, UNIT_ATTABLE, 0), KBD_POLL_WAIT };
+UNIT ttix_unit = { UDATA (&ttix_svc, UNIT_IDLE|UNIT_ATTABLE, 0), KBD_POLL_WAIT };
 
 REG ttx_nlreg = { DRDATA (NLINES, ttx_lines, 4), PV_LEFT };
 

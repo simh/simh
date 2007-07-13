@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tti,tto      KL8E terminal input/output
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag to console input
    18-Oct-06    RMS     Synced keyboard to clock
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    22-Nov-05    RMS     Revised for new terminal processing routines
@@ -63,7 +64,7 @@ t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 DIB tti_dib = { DEV_TTI, 1, { &tti } };
 
-UNIT tti_unit = { UDATA (&tti_svc, TT_MODE_KSR, 0), 0 };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_KSR, 0), 0 };
 
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, 8) },

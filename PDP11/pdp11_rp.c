@@ -1,6 +1,6 @@
 /* pdp11_rp.c - RP04/05/06/07 RM02/03/05/80 Massbus disk controller
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp           RH/RP/RM moving head disks
 
+   17-May-07    RMS     CS1 DVA resides in device, not MBA
    21-Nov-05    RMS     Enable/disable device also enables/disables Massbus adapter
    12-Nov-05	RMS     Fixed DriveClear, does not clear disk address
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -119,6 +120,7 @@
 #define  FNC_READ       034                             /* read */
 #define  FNC_READH      035                             /* read w/ headers */
 #define CS1_RW          076
+#define CS1_DVA         04000                           /* drive avail */
 #define GET_FNC(x)      (((x) >> CS1_V_FNC) & CS1_M_FNC)
 
 /* RPDS, RMDS - drive status - offset 1 */
@@ -498,7 +500,7 @@ if (drv_tab[dtype].ctrl == RM_CTRL) ofs = ofs + RM_OF;  /* RM? convert */
 switch (ofs) {                                          /* decode offset */
 
     case RP_CS1_OF: case RM_CS1_OF:                     /* RPCS1 */
-        val = rpcs1[drv] & CS1_RW;
+        val = (rpcs1[drv] & CS1_RW) | CS1_DVA;          /* DVA always set */
         break;
 
     case RP_DA_OF: case RM_DA_OF:                       /* RPDA */

@@ -171,7 +171,7 @@ static int32 getCommonPos           = 0;        /* determines state for sending 
 /* Support for wild card expansion                                                                              */
 #if UNIX_PLATFORM
 static glob_t globS;
-static int32 globPosNameList        = 0;
+static uint32 globPosNameList       = 0;
 static int32 globPosName            = 0;
 static int32 globValid              = FALSE;
 static int32 globError              = 0;
@@ -339,7 +339,7 @@ DEVICE simh_device = {
     NULL, NULL, NULL
 };
 
-char messageBuffer[256] = {};
+char messageBuffer[256] = { 0 };
 
 void printMessage(void) {
     printf(messageBuffer);
@@ -525,11 +525,12 @@ int32 sio0d(const int32 port, const int32 io, const int32 data) {
         return mapCharacter(sio_unit.buf);                  /* return previous character                */
     }                                                       /* OUT follows                              */
     ch = sio_unit.flags & UNIT_ANSI ? data & 0x7f : data;   /* clear highest bit in ANSI mode           */
-    if ((ch != CONTROLG_CHAR) || !(sio_unit.flags & UNIT_BELL))
+    if ((ch != CONTROLG_CHAR) || !(sio_unit.flags & UNIT_BELL)) {
         if ((sio_unit.flags & UNIT_ATT) && (!sio_unit.u4))  /* attached to a port and not to a file     */
             tmxr_putc_ln(&TerminalLines[ti], ch);           /* status ignored                           */
         else
             sim_putchar(ch);
+    }
     return 0x00;                                            /* ignored since OUT                        */
 }
 
@@ -811,7 +812,7 @@ static int32 simh_in(const int32 port) {
 
         case getHostFilenames:
 #if UNIX_PLATFORM
-            if (globValid)
+            if (globValid) {
                 if (globPosNameList < globS.gl_pathc) {
                     if (!(result = globS.gl_pathv[globPosNameList][globPosName++])) {
                         globPosNameList++;
@@ -823,6 +824,7 @@ static int32 simh_in(const int32 port) {
                     lastCommand = 0;
                     globfree(&globS);
                 }
+            }
 #elif defined (_WIN32)
             if (globValid) {
                 if (globFinished) {

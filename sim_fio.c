@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-Jun-07    RMS     Added VMS IA64 support (from Norm Lastovica)
    10-Jul-06    RMS     Fixed linux conditionalization (from Chaskiel Grundman)
    15-May-06    RMS     Added sim_fsize_name
    21-Apr-06    RMS     Added FreeBSD large file support (from Mark Martinec)
@@ -172,9 +173,9 @@ return fopen (file, mode);
 
 #if defined (USE_INT64) && defined (USE_ADDR64)
 
-/* Alpha VMS */
+/* 64b VMS */
 
-#if defined (__ALPHA) && defined (VMS)                  /* Alpha VMS */
+#if (defined (__ALPHA) || defined (__ia64)) && defined (VMS) /* 64b VMS */
 #define _SIM_IO_FSEEK_EXT_      1
 
 static t_int64 fpos_t_to_int64 (fpos_t *pos)

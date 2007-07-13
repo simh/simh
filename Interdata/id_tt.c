@@ -1,6 +1,6 @@
 /* id_tt.c: Interdata teletype
 
-   Copyright (c) 2000-2006, Robert M. Supnik
+   Copyright (c) 2000-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tt           console
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag to console input
    18-Oct-06    RMS     Sync keyboard to LFC clock
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    22-Nov-05    RMS     Revised for new terminal processing routines
@@ -77,7 +78,7 @@ t_stat tt_set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc);
 DIB tt_dib = { d_TT, -1, v_TT, NULL, &tt, NULL };
 
 UNIT tt_unit[] = {
-    { UDATA (&tti_svc, TT_MODE_KSR, 0), 0 },
+    { UDATA (&tti_svc, TT_MODE_KSR|UNIT_IDLE, 0), 0 },
     { UDATA (&tto_svc, TT_MODE_KSR, 0), SERIAL_OUT_WAIT }
     };
 

@@ -1,6 +1,6 @@
 /* h316_mt.c: H316/516 magnetic tape simulator
 
-   Copyright (c) 2003-2006, Robert M. Supnik
+   Copyright (c) 2003-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           516-4100 seven track magnetic tape
 
+   09-Jun-07    RMS     Fixed bug in write without stop (from Theo Engel)
    16-Feb-06    RMS     Added tape capacity checking
    26-Aug-05    RMS     Revised to use API for write lock check
    08-Feb-05    RMS     Fixed error reporting from OCP (found by Philipp Hachtmann)
@@ -431,6 +432,7 @@ switch (uptr->FNC) {                                    /* case on function */
     case FNC_WBIN3 | FNC_2ND:
         if (mt_eor || mt_rdy) {                         /* done or no data? */
             if (!mt_rdy) mt_wrwd (uptr, mt_buf);        /* write last word */
+            else mt_rdy = 0;                            /* rdy must be clr */
             if (mt_ptr) {                               /* any data? */
                 if (st = sim_tape_wrrecf (uptr, mtxb, mt_ptr))  /* write, err? */
                     r = mt_map_err (uptr, st);          /* map error */

@@ -112,7 +112,7 @@ extern t_bool chk_tb_ent (uint32 va);
 extern int32 ReadIPR (int32 rg);
 extern void WriteIPR (int32 rg, int32 val);
 extern t_bool BadCmPSL (int32 newpsl);
-extern int32 cpu_psl_ipl (int32 newpsl);
+extern int32 cpu_psl_ipl_idle (int32 newpsl);
 
 extern jmp_buf save_env;
 
@@ -1082,8 +1082,9 @@ else {
         SP = KSP;                                       /* new stack */
         }
     }
-if (ei > 0) PSL = cpu_psl_ipl (newpsl | (ipl << PSL_V_IPL)); /* if int, new IPL */
-else PSL = cpu_psl_ipl (newpsl |
+if (ei > 0)                                             /* if int, new IPL */
+    PSL = cpu_psl_ipl_idle (newpsl | (ipl << PSL_V_IPL));
+else PSL = cpu_psl_ipl_idle (newpsl |                   /* exc, old IPL/1F */
     ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV));
 if (DEBUG_PRI (cpu_dev, LOG_CPU_I)) fprintf (sim_deb,
     ">>IEX: PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
@@ -1187,7 +1188,7 @@ else STK[oldcur] = SP;
 if (DEBUG_PRI (cpu_dev, LOG_CPU_R)) fprintf (sim_deb,
     ">>REI: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
     PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]));
-PSL = cpu_psl_ipl ((PSL & PSL_TP) | (newpsl & ~CC_MASK)); /* set new PSL */
+PSL = cpu_psl_ipl_idle ((PSL & PSL_TP) | (newpsl & ~CC_MASK)); /* set PSL */
 if (PSL & PSL_IS) SP = IS;                              /* set new stack */
 else {
     SP = STK[newcur];                                   /* if ~IS, chk AST */
@@ -1279,7 +1280,7 @@ else {
     KSP = SP + 8;                                       /* pop kernel stack */
     SP = IS;                                            /* switch to int stk */
     if ((PSL & PSL_IPL) == 0)                           /* make IPL > 0 */
-         PSL = cpu_psl_ipl (PSL | PSL_IPL1);
+         PSL = PSL | PSL_IPL1;
     PSL = PSL | PSL_IS;                                 /* set PSL<is> */
     }
 pcbpa = PCBB & PAMASK;
@@ -1440,7 +1441,7 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_IPL:                                        /* IPL */
-        PSL = cpu_psl_ipl ((PSL & ~PSL_IPL) | ((val & PSL_M_IPL) << PSL_V_IPL));
+        PSL = (PSL & ~PSL_IPL) | ((val & PSL_M_IPL) << PSL_V_IPL);
         break;
 
     case MT_ASTLVL:                                     /* ASTLVL */

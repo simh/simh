@@ -1,6 +1,6 @@
 /* pdp10_fe.c: PDP-10 front end (console terminal) simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fe           KS10 console front end
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag to console input
    17-Oct-06    RMS     Synced keyboard to clock for idling
    28-May-04    RMS     Removed SET FE CTRL-C
    29-Dec-03    RMS     Added console backpressure support
@@ -58,7 +59,7 @@ t_stat fe_stop_os (UNIT *uptr, int32 val, char *cptr, void *desc);
 #define feo_unit        fe_unit[1]
 
 UNIT fe_unit[] = {
-    { UDATA (&fei_svc, 0, 0), 0 },
+    { UDATA (&fei_svc, UNIT_IDLE, 0), 0 },
     { UDATA (&feo_svc, 0, 0), SERIAL_OUT_WAIT }
     };
 

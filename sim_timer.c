@@ -23,7 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   22-Aug-07    RMS     Added sim_rtcn_init_all
+   18-Jun-07    RMS     Modified idle to exclude counted delays
+   22-Mar-07    RMS     Added sim_rtcn_init_all
    17-Oct-06    RMS     Added idle support (based on work by Mark Pizzolato)
                         Added throttle support
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -58,6 +59,7 @@ static uint32 sim_throt_state = 0;
 static int32 sim_throt_wait = 0;
 extern int32 sim_interval, sim_switches;
 extern FILE *sim_log;
+extern UNIT *sim_clock_queue;
 
 t_stat sim_throt_svc (UNIT *uptr);
 
@@ -74,6 +76,7 @@ UNIT sim_throt_unit = { UDATA (&sim_throt_svc, 0, 0) };
 #endif
 
 #include <starlet.h>
+#include <lib$routines.h>
 #include <unistd.h>
 
 const t_bool rtc_avail = TRUE;
@@ -444,6 +447,11 @@ t_bool sim_idle (uint32 tmr, t_bool sin_cyc)
 uint32 cyc_ms, w_ms, w_idle, act_ms;
 int32 act_cyc;
 
+if ((sim_clock_queue == NULL) ||                        /* clock queue empty? */
+    ((sim_clock_queue->flags & UNIT_IDLE) == 0)) {      /* event not idle-able? */
+    if (sin_cyc) sim_interval = sim_interval - 1;
+    return FALSE;
+    }
 cyc_ms = (rtc_currd[tmr] * rtc_hz[tmr]) / 1000;         /* cycles per msec */
 if ((sim_idle_rate_ms == 0) || (cyc_ms == 0)) {         /* not possible? */
     if (sin_cyc) sim_interval = sim_interval - 1;
@@ -491,7 +499,7 @@ return SCPE_OK;
 
 t_stat sim_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf (st, sim_idle_enab? "idling enabled": "idling disabled");
+fprintf (st, sim_idle_enab? "idle enabled": "idle disabled");
 return SCPE_OK;
 }
 

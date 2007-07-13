@@ -1,6 +1,6 @@
 /* id_ttp.c: Interdata PASLA console interface
 
-   Copyright (c) 2000-2006, Robert M. Supnik
+   Copyright (c) 2000-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttp          console (on PAS)
 
+   18-Jun-07    RMS     Added UNIT_IDLE flag to console input
    18-Oct-06    RMS     Sync keyboard to LFC clock
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Dec-03    RMS     Added support for console backpressure
@@ -76,7 +77,7 @@ t_stat ttp_set_enbdis (UNIT *uptr, int32 val, char *cptr, void *desc);
 DIB ttp_dib = { d_TTP, -1, v_TTP, ttp_tplte, &ttp, NULL };
 
 UNIT ttp_unit[] = {
-    { UDATA (&ttpi_svc, 0, 0), 0 },
+    { UDATA (&ttpi_svc, UNIT_IDLE, 0), 0 },
     { UDATA (&ttpo_svc, 0, 0), SERIAL_OUT_WAIT }
     };
 
