@@ -2196,7 +2196,7 @@ return SCPE_OK;
 
 void cpu_inst_hist (int32 addr, int32 inst)
 {
-t_value word;
+t_value word = 0;
 
 hst[hst_p].pc = addr | HIST_PC;
 hst[hst_p].ir = inst;

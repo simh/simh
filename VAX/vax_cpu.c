@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   13-Aug-07    RMS     Fixed bug in read access g-format indexed specifiers
    28-Apr-07    RMS     Removed clock initialization
    29-Oct-06    RMS     Added idle support
    22-May-06    RMS     Fixed format error in CPU history (found by Peter Schorn)
@@ -1429,23 +1430,24 @@ for ( ;; ) {
                     RSVD_ADDR_FAULT;                    /* end case idxspec */
 					}
 
-                switch (disp & (DR_ACMASK|DR_LNMASK)) { /* case disp type */
+                switch (disp & (DR_ACMASK|DR_SPFLAG|DR_LNMASK)) { /* case acc+lnt */
+                case VB:
                 case WB: case WW: case WL: case WQ: case WO:
                     opnd[j++] = OP_MEM;
                 case AB: case AW: case AL: case AQ: case AO:
                     va = opnd[j++] = index;
                     break;
 
-                case RB: case RW: case RL:
+                case RB: case RW: case RL: case RF:
                     opnd[j++] = Read (va = index, DR_LNT (disp), RA);
                     break;
 
-                case RQ:
+                case RQ: case RD: case RG:
                     opnd[j++] = Read (va = index, L_LONG, RA);
                     opnd[j++] = Read (index + 4, L_LONG, RA);
                     break;
 
-                case RO:
+                case RO: case RH:
                     j = ReadOcta (va = index, opnd, j, RA);
                     break;
 
@@ -1460,6 +1462,10 @@ for ( ;; ) {
 
                 case MO:
                     j = ReadOcta (va = index, opnd, j, WA);
+                    break;
+
+                default:                                /* all others */
+                    RSVD_ADDR_FAULT;                    /* fault */
                     break;
                     }                                   /* end case access/lnt */
                 break;                                  /* end index */

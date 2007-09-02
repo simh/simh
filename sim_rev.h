@@ -29,13 +29,29 @@
 
 #define SIM_MAJOR       3
 #define SIM_MINOR       7
-#define SIM_PATCH       2
+#define SIM_PATCH       3
 
 /* V3.7 revision history 
 
 patch   date            module(s) and fix(es)
 
-  2     tbd             sim_ether.c (from Dave Hittner):
+  3     02-Sep-07       scp.c:
+                        - fixed bug in SET THROTTLE command
+
+                        pdp10_cpu.c:
+                        - fixed non-portable usage in SHOW HISTORY routine
+
+                        pdp11_ta.c:
+                        - forward op at BOT skips initial file gap
+
+                        pdp8_ct.c:
+                        - forward op at BOT skips initial file gap
+                        - fixed handling of BEOT
+
+                        vax_cpu.c:
+                        - fixed bug in read access g-format indexed specifiers
+
+  2     12-Jul-07       sim_ether.c (from Dave Hittner):
                         - fixed non-ethernet device removal loop (from Naoki Hamada)
                         - added dynamic loading of wpcap.dll;
                         - corrected exceed max index bug in ethX lookup

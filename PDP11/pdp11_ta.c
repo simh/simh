@@ -1,6 +1,6 @@
 /* pdp11_ta.c: PDP-11 cassette tape simulator
 
-   Copyright (c) 2006, Robert M Supnik
+   Copyright (c) 2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    ta           TA11/TU60 cassette tape
 
+   06-Aug-07    RMS     Foward op at BOT skips initial file gap
+
    Magnetic tapes are represented as a series of variable records
    of the form:
 
@@ -43,7 +45,9 @@
    rather than file marks.  If the controller spaces or reads into a file
    gap and then reverses direction, the file gap is not seen again.  This
    is in contrast to magnetic tapes, where the file mark is a character
-   sequence and is seen again if direction is reversed.
+   sequence and is seen again if direction is reversed.  In addition,
+   cassettes have an initial file gap which is automatically skipped on
+   forward operations from beginning of tape.
 */
 
 #include "pdp11_defs.h"
@@ -278,11 +282,19 @@ else {
     }
 ta_cs &= ~TACS_BEOT;                                    /* tape in motion */
 uptr->FNC = fnc;                                        /* save function */
-if ((fnc != TACS_REW) && !(flg & OP_WRI)) {             /* read cmd? */
+if ((fnc != TACS_REW) && !(flg & OP_WRI)) {             /* spc/read cmd? */
+    t_mtrlnt t;
+    t_stat st;
     uptr->UST = flg & UST_REV;                          /* save direction */
+    if (sim_tape_bot (uptr) && (flg & OP_FWD)) {        /* spc/read fwd bot? */
+        st = sim_tape_rdrecf (uptr, ta_xb, &t, TA_MAXFR); /* skip file gap */
+        if (st != MTSE_TMK)                             /* not there? */
+            sim_tape_rewind (uptr);                     /* restore tap pos */
+        else old_ust = 0;                               /* defang next */
+        }
     if ((old_ust ^ uptr->UST) == (UST_REV|UST_GAP)) {   /* reverse in gap? */
-        t_mtrlnt t;                                     /* skip file mark */
-        if (uptr->UST) sim_tape_rdrecr (uptr, ta_xb, &t, TA_MAXFR);
+        if (uptr->UST)                                  /* skip file gap */
+            sim_tape_rdrecr (uptr, ta_xb, &t, TA_MAXFR);
         else sim_tape_rdrecf (uptr, ta_xb, &t, TA_MAXFR);
         if (DEBUG_PRS (ta_dev)) fprintf (sim_deb,
             ">>TA skip gap: op=%o, old_sta = %o, pos=%d\n",

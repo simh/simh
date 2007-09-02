@@ -25,6 +25,7 @@
 
    cpu          KS10 central processor
 
+   17-Jul-07    RMS     Fixed non-portable usage in SHOW HISTORY
    28-Apr-07    RMS     Removed clock initialization
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
                         Fixed warning in MOVNI
@@ -2316,11 +2317,14 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */
     if (h->pc & HIST_PC) {                              /* instruction? */
         fprintf (st, "%06o  ", h->pc & AMASK);
-        fprintf (st, "%012o  ", h->ac);
+        fprint_val (st, h->ac, 8, 36, PV_RZRO);
+        fputs ("  ", st);
         fprintf (st, "%06o  ", h->ea);
         sim_eval = h->ir;
-        if ((fprint_sym (st, h->pc & AMASK, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
-            fprintf (st, "(undefined) %012o", h->ir);
+        if ((fprint_sym (st, h->pc & AMASK, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0) {
+            fputs ("(undefined) ", st);
+            fprint_val (st, h->ir, 8, 36, PV_RZRO);
+            }
         fputc ('\n', st);                               /* end line */
         }                                               /* end else instruction */
     }                                                   /* end for */

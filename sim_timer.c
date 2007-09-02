@@ -523,7 +523,7 @@ else {
     if (*tptr != 0) return SCPE_ARG;
     if (c == 'M') sim_throt_type = SIM_THROT_MCYC;
     else if (c == 'K') sim_throt_type = SIM_THROT_KCYC;
-    else if ((c = '%') && (val > 0) && (val < 100))
+    else if ((c == '%') && (val > 0) && (val < 100))
         sim_throt_type = SIM_THROT_PCT;
     else return SCPE_ARG;
     if (sim_idle_enab) {

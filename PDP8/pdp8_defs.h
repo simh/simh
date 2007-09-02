@@ -1,6 +1,6 @@
 /* pdp8_defs.h: PDP-8 simulator definitions
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Aug-07    RMS     Added FPP8 support
    13-Dec-06    RMS     Added TA8E support
    30-Oct-06    RMS     Added infinite loop stop
    13-Oct-03    RMS     Added TSC8-75 support
@@ -94,6 +95,7 @@ typedef struct {
 #define DEV_CLK         013                             /* clock */
 #define DEV_TSC         036
 #define DEV_KJ8         040                             /* extra terminals */
+#define DEV_FPP         055                             /* floating point */
 #define DEV_DF          060                             /* DF32 */
 #define DEV_RF          060                             /* RF08 */
 #define DEV_RL          060                             /* RL8A */
@@ -154,7 +156,8 @@ typedef struct {
 #define INT_V_PWR       (INT_V_DIRECT+8)                /* power int */
 #define INT_V_UF        (INT_V_DIRECT+9)                /* user int */
 #define INT_V_TSC       (INT_V_DIRECT+10)               /* TSC8-75 int */
-#define INT_V_OVHD      (INT_V_DIRECT+11)               /* overhead start */
+#define INT_V_FPP       (INT_V_DIRECT+11)               /* FPP8 */
+#define INT_V_OVHD      (INT_V_DIRECT+12)               /* overhead start */
 #define INT_V_NO_ION_PENDING (INT_V_OVHD+0)             /* ion pending */
 #define INT_V_NO_CIF_PENDING (INT_V_OVHD+1)             /* cif pending */
 #define INT_V_ION       (INT_V_OVHD+2)                  /* interrupts on */
@@ -184,6 +187,7 @@ typedef struct {
 #define INT_PWR         (1 << INT_V_PWR)
 #define INT_UF          (1 << INT_V_UF)
 #define INT_TSC         (1 << INT_V_TSC)
+#define INT_FPP         (1 << INT_V_FPP)
 #define INT_NO_ION_PENDING (1 << INT_V_NO_ION_PENDING)
 #define INT_NO_CIF_PENDING (1 << INT_V_NO_CIF_PENDING)
 #define INT_ION         (1 << INT_V_ION)

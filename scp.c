@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Jul-07    RMS     Modified match_ext for VMS ext;version support
    28-Apr-07    RMS     Modified sim_instr invocation to call sim_rtcn_init_all
                         Fixed bug in get_sim_opt
                         Fixed bug in restoration with changed memory size
@@ -3568,13 +3569,21 @@ char *match_ext (char *fnam, char *ext)
 {
 char *pptr, *fptr, *eptr;
 
-if ((fnam == NULL) || (ext == NULL)) return NULL;
-pptr = strrchr (fnam, '.');
-if (pptr) {
-    for (fptr = pptr + 1, eptr = ext; *fptr; fptr++, eptr++) {
-        if (toupper (*fptr) != toupper (*eptr)) return NULL;
-		}
-    if (*eptr) return NULL;
+if ((fnam == NULL) || (ext == NULL))                    /* bad arguments? */
+     return NULL;
+pptr = strrchr (fnam, '.');                             /* find last . */
+if (pptr) {                                             /* any? */
+    for (fptr = pptr + 1, eptr = ext;                   /* match characters */
+#if defined (VMS)                                       /* VMS: stop at ; or null */
+	(*fptr != 0) && (*fptr != ';');
+#else
+	*fptr != 0;					/* others: stop at null */
+#endif
+	fptr++, eptr++) {
+        if (toupper (*fptr) != toupper (*eptr))
+            return NULL;
+        }
+    if (*eptr != 0) return NULL;                        /* ext exhausted? */
     }
 return pptr;
 }

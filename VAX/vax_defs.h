@@ -450,11 +450,10 @@
    rd   =       d_floating, treated as rq except for short literal
    rg   =       g_floating, treated as rq except for short literal
    rh   =       h_floating, treated as ro except for short literal
-   bw   =       branch byte displacement
+   bb   =       branch byte displacement
    bw   =       branch word displacement
 
-   The 'underlying' access type and length must be correct for
-   indexing.  rg works because rq and mq are treated identically.
+   Length field must be correct
 */
 
 #define VB              (DR_SPFLAG|WB)                  /* .vb */

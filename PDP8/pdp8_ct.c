@@ -25,7 +25,9 @@
 
    ct           TA8E/TU60 cassette tape
 
-   30-May-2007  RMS	Fixed typo (from Norm Lastovica)
+   13-Aug-07    RMS     Fixed handling of BEOT
+   06-Aug-07    RMS     Foward op at BOT skips initial file gap
+   30-May-2007  RMS     Fixed typo (from Norm Lastovica)
 
    Magnetic tapes are represented as a series of variable records
    of the form:
@@ -45,7 +47,9 @@
    rather than file marks.  If the controller spaces or reads into a file
    gap and then reverses direction, the file gap is not seen again.  This
    is in contrast to magnetic tapes, where the file mark is a character
-   sequence and is seen again if direction is reversed.
+   sequence and is seen again if direction is reversed.  In addition,
+   cassettes have an initial file gap which is automatically skipped on
+   forward operations from beginning of tape.
 
    Note that the read and write sequences for the cassette are asymmetric:
 
@@ -134,6 +138,7 @@
 
 extern int32 int_req, stop_inst;
 extern UNIT cpu_unit;
+extern FILE *sim_deb;
 
 uint32 ct_sra = 0;                                      /* status reg A */
 uint32 ct_srb = 0;                                      /* status reg B */
@@ -221,7 +226,7 @@ DEVICE ct_dev = {
     CT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &ct_reset,
     &ct_boot, &ct_attach, &ct_detach,
-    &ct_dib, DEV_DISABLE | DEV_DIS
+    &ct_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG
     };
 
 /* IOT routines */
@@ -254,7 +259,7 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
     case 4:                                             /* KLSA */
         ct_sra = AC & 0377;
         ct_updsta (NULL);
-	return ct_sra ^ 0377;
+        return ct_sra ^ 0377;
 
     case 5:                                             /* KSAF */
         if (ct_df || (srb & (SRB_ALLERR|SRB_RDY)))
@@ -285,6 +290,9 @@ uint32 fnc = GET_FNC (ct_sra);
 uint32 flg = ct_fnc_tab[fnc];
 uint32 old_ust = uptr->UST;
 
+if (DEBUG_PRS (ct_dev)) fprintf (sim_deb,
+    ">>CT start: op=%o, old_sta = %o, pos=%d\n",
+    fnc, uptr->UST, uptr->pos);
 if ((ct_sra & SRA_ENAB) && (uptr->flags & UNIT_ATT)) {  /* enabled, att? */
     ct_srb &= ~(SRB_XFRERR|SRB_REW);                    /* clear err, rew */
     if (flg & OP_WRI) {                                 /* write-type op? */
@@ -299,12 +307,24 @@ if ((ct_sra & SRA_ENAB) && (uptr->flags & UNIT_ATT)) {  /* enabled, att? */
         ct_write = 0;
         ct_db = 0;
         }
+    ct_srb &= ~SRB_BEOT;                                /* tape in motion */
     if (fnc == SRA_REW) ct_srb |= SRB_REW;              /* rew? set flag */
     if ((fnc != SRA_REW) && !(flg & OP_WRI)) {          /* read cmd? */
+        t_mtrlnt t;
+        t_stat st;
         uptr->UST = flg & UST_REV;                      /* save direction */
+        if (sim_tape_bot (uptr) && (flg & OP_FWD)) {    /* spc/read fwd bot? */
+            st = sim_tape_rdrecf (uptr, ct_xb, &t, CT_MAXFR); /* skip file gap */
+            if (st != MTSE_TMK)                         /* not there? */
+                sim_tape_rewind (uptr);                 /* restore tap pos */
+            else old_ust = 0;                           /* defang next */
+            }
         if ((old_ust ^ uptr->UST) == (UST_REV|UST_GAP)) { /* rev in gap? */
-            t_mtrlnt t;                                 /* skip tape mark */
-            if (uptr->UST) sim_tape_rdrecr (uptr, ct_xb, &t, CT_MAXFR);
+            if (DEBUG_PRS (ct_dev)) fprintf (sim_deb,
+                ">>CT skip gap: op=%o, old_sta = %o, pos=%d\n",
+                fnc, uptr->UST, uptr->pos);
+            if (uptr->UST)                              /* skip file gap */
+                sim_tape_rdrecr (uptr, ct_xb, &t, CT_MAXFR);
             else sim_tape_rdrecf (uptr, ct_xb, &t, CT_MAXFR);
             }
         }
@@ -362,9 +382,10 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
     }
 if (((flgs & OP_REV) && sim_tape_bot (uptr)) ||         /* rev at BOT or */
     ((flgs & OP_FWD) && sim_tape_eot (uptr))) {         /* fwd at EOT? */
+    ct_srb |= SRB_BEOT;                                 /* error */
     ct_updsta (uptr);                                   /* op done */
     return SCPE_OK;
-}
+    }
 
 r = SCPE_OK;
 switch (uptr->FNC) {                                    /* case on function */
@@ -429,6 +450,7 @@ switch (uptr->FNC) {                                    /* case on function */
 
     case SRA_REW:                                       /* rewind */
         sim_tape_rewind (uptr);
+        ct_srb |= SRB_BEOT;                             /* set BOT */
         break;
 
     case SRA_SRB:                                       /* space rev blk */
@@ -451,6 +473,9 @@ switch (uptr->FNC) {                                    /* case on function */
         }                                               /* end case */
 
 ct_updsta (uptr);                                       /* update status */
+if (DEBUG_PRS (ct_dev)) fprintf (sim_deb,
+    ">>CT done: op=%o, statusA = %o, statusB = %o, pos=%d\n",
+    uptr->FNC, ct_sra, ct_srb, uptr->pos);
 return r;
 }
 
@@ -467,13 +492,11 @@ if (uptr == NULL) {                                     /* unit specified? */
     }
 else if (ct_srb & SRB_EOF) uptr->UST |= UST_GAP;        /* save gap */
 if (uptr) {                                             /* any unit? */
-    ct_srb &= ~(SRB_WLK|SRB_BEOT|SRB_EMP|SRB_RDY);      /* clear dyn flags */
+    ct_srb &= ~(SRB_WLK|SRB_EMP|SRB_RDY);               /* clear dyn flags */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* unattached? */
         ct_srb = (ct_srb | SRB_EMP|SRB_WLK) & ~SRB_REW; /* empty, locked */
     if (!sim_is_active (uptr)) {                        /* not busy? */
         ct_srb = (ct_srb | SRB_RDY) & ~SRB_REW;         /* ready, ~rew */
-        if (sim_tape_bot (uptr) || sim_tape_eot (uptr)) /* update BEOT */
-            ct_srb |= SRB_BEOT;
         }
     if (sim_tape_wrp (uptr) || (ct_srb & SRB_REW))      /* locked or rew? */
         ct_srb |= SRB_WLK;                              /* set locked */
@@ -572,6 +595,7 @@ switch (st) {
         break;
 
     case MTSE_BOT:                                      /* reverse into BOT */
+        ct_srb |= SRB_BEOT;                             /* set BOT */
         break;
 
     case MTSE_WRP:                                      /* write protect */
