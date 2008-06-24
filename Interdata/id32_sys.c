@@ -1,6 +1,6 @@
 /* id32_sys.c: Interdata 32b simulator interface
 
-   Copyright (c) 2000-2007, Robert M. Supnik
+   Copyright (c) 2000-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   04-Feb-08    RMS     Modified to allow -A, -B use with 8b devices
    25-Jan-07    RMS     Fixed conflict between -h (hex) and -h (halfword)
    18-Oct-06    RMS     Re-ordered device list
    02-Jul-04    RMS     Fixed missing type in declaration
@@ -337,29 +338,34 @@ return -5;
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
-int32 c1, c2, rdx;
+int32 bflag, c1, c2, rdx;
 t_stat r;
 DEVICE *dptr;
 
 if (uptr == NULL) uptr = &cpu_unit;                     /* anon = CPU */
-else if (uptr != &cpu_unit) return SCPE_ARG;            /* only for CPU */
 dptr = find_dev_from_unit (uptr);                       /* find dev */
 if (dptr == NULL) return SCPE_IERR;
+if (dptr->dwidth < 16) bflag = 1;                       /* 8b dev? */
+else bflag = 0;                                         /* assume 16b */
 if (sw & SWMASK ('D')) rdx = 10;                        /* get radix */
 else if (sw & SWMASK ('O')) rdx = 8;
 else if (sw & SWMASK ('H')) rdx = 16;
 else rdx = dptr->dradix;
 
 if (sw & SWMASK ('A')) {                                /* ASCII char? */
-    c1 = (val[0] >> ((addr & 1)? 0: 8)) & 0x7F;         /* get byte */
+    if (bflag) c1 = val[0] & 0x7F;
+    else c1 = (val[0] >> ((addr & 1)? 0: 8)) & 0x7F;    /* get byte */
     fprintf (of, (c1 < 0x20)? "<%02X>": "%c", c1);
     return 0;
     }
 if (sw & SWMASK ('B')) {                                /* byte? */
-    c1 = (val[0] >> ((addr & 1)? 0: 8)) & 0xFF;         /* get byte */
+    if (bflag) c1 = val[0] & 0xFF;
+    else c1 = (val[0] >> ((addr & 1)? 0: 8)) & 0xFF;    /* get byte */
     fprint_val (of, c1, rdx, 8, PV_RZRO);
     return 0;
     }
+if (bflag) return SCPE_ARG;                             /* 16b only */
+
 if (sw & SWMASK ('C')) {                                /* string? */
     c1 = (val[0] >> 8) & 0x7F;
     c2 = val[0] & 0x7F;
@@ -555,14 +561,15 @@ return SCPE_OK;
 
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
-int32 by, rdx, num;
+int32 bflag, by, rdx, num;
 t_stat r;
 DEVICE *dptr;
 
 if (uptr == NULL) uptr = &cpu_unit;                     /* anon = CPU */
-else if (uptr != &cpu_unit) return SCPE_ARG;            /* CPU only */
 dptr = find_dev_from_unit (uptr);                       /* find dev */
 if (dptr == NULL) return SCPE_IERR;
+if (dptr->dwidth < 16) bflag = 1;                       /* 8b device? */
+else bflag = 0;                                         /* assume 16b */
 if (sw & SWMASK ('D')) rdx = 10;                        /* get radix */
 else if (sw & SWMASK ('O')) rdx = 8;
 else if (sw & SWMASK ('H')) rdx = 16;
@@ -570,17 +577,23 @@ else rdx = dptr->dradix;
 
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
-    if (addr & 1) val[0] = (val[0] & ~0xFF) | ((t_value) cptr[0]);
-    else val[0] = (val[0] & 0xFF) | (((t_value) cptr[0]) << 8);
+    if (bflag) val[0] = (t_value) cptr[0];
+    else val[0] = (addr & 1)?
+        (val[0] & ~0xFF) | ((t_value) cptr[0]):
+        (val[0] & 0xFF) | (((t_value) cptr[0]) << 8);
     return 0;
     }
 if (sw & SWMASK ('B')) {                                /* byte? */
     by = get_uint (cptr, rdx, DMASK8, &r);              /* get byte */
     if (r != SCPE_OK) return SCPE_ARG;
-    if (addr & 1) val[0] = (val[0] & ~0xFF) | by;
-    else val[0] = (val[0] & 0xFF) | (by << 8);
+    if (bflag) val[0] = by;
+    else val[0] = (addr & 1)?
+        (val[0] & ~0xFF) | by:
+        (val[0] & 0xFF) | (by << 8);
     return 0;
     }
+if (bflag) return SCPE_ARG;                             /* 16b only */
+
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* ASCII chars? */
     if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
     val[0] = ((t_value) cptr[0] << 8) | (t_value) cptr[1];

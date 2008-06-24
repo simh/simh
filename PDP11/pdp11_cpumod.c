@@ -1,6 +1,6 @@
 /* pdp11_cpumod.c: PDP-11 CPU model-specific features
 
-   Copyright (c) 2004-2007, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    system       PDP-11 model-specific registers
 
+   20-May-08    RMS     Added JCSR default for KDJ11B, KDJ11E
+   22-Apr-08    RMS     Fixed write behavior of 11/70 MBRK, LOSIZE, HISIZE
+                        (found by Walter Mueller)
    29-Apr-07    RMS     Don't run bus setup routine during RESTORE
    30-Aug-05    RMS     Added additional 11/60 registers
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -65,6 +68,7 @@ int32 CCR = 0;                                          /* cache control reg */
 int32 HITMISS = 0;                                      /* hit/miss reg */
 int32 MAINT = 0;                                        /* maint reg */
 int32 JCSR = 0;                                         /* J11 control */
+int32 JCSR_dflt = 0;                                    /* J11 boot ctl def */
 int32 JPCR = 0;                                         /* J11 page ctrl */
 int32 JASR = 0;                                         /* J11 addtl status */
 int32 UDCR = 0;                                         /* UBA diag ctrl */
@@ -118,6 +122,8 @@ t_stat sys_reset (DEVICE *dptr);
 int32 toy_read (void);
 void toy_write (int32 bit);
 uint8 toy_set (int32 val);
+t_stat sys_set_jclk_dflt (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat sys_show_jclk_dflt (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 extern t_stat PSW_rd (int32 *data, int32 addr, int32 access);
 extern t_stat PSW_wr (int32 data, int32 addr, int32 access);
@@ -243,6 +249,10 @@ static const char *opt_name[] = {
     "RH11", "RH70",     "PARITY", "NOPARITY", "Unibus map", "No map", NULL
     };
 
+static const char *jcsr_val[4] = {
+    "LINE", "50HZ", "60HZ", "800HZ"
+    };
+
 /* SYSTEM data structures
 
    sys_dev      SYSTEM device descriptor
@@ -264,6 +274,7 @@ REG sys_reg[] = {
     { ORDATA (WCS, WCS, 16) },
     { ORDATA (SYSID, SYSID, 16) },
     { ORDATA (JCSR, JCSR, 16) },
+    { ORDATA (JCSR_DFLT, JCSR_dflt, 16), REG_HRO },
     { ORDATA (JPCR, JPCR, 16) },
     { ORDATA (JASR, JASR, 16) },
     { ORDATA (UDCR, UDCR, 16) },
@@ -276,8 +287,14 @@ REG sys_reg[] = {
     { NULL}
     };
 
+MTAB sys_mod[] = {
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "JCLK_DFLT", "JCLK_DFLT",
+      &sys_set_jclk_dflt, &sys_show_jclk_dflt },
+    { 0 }
+    };
+
 DEVICE sys_dev = {
-    "SYSTEM", &sys_unit, sys_reg, NULL,
+    "SYSTEM", &sys_unit, sys_reg, sys_mod,
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &sys_reset,
     NULL, NULL, NULL,
@@ -541,7 +558,11 @@ t_stat CPU70_rd (int32 *data, int32 pa, int32 access)
 {
 switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
 
-    case 000: case 001: case 011:                       /* LO,HI ERR, HI SIZE */
+    case 000:                                           /* low error */
+        *data = 0;
+        return SCPE_OK;
+
+    case 001:                                           /* high error */
         *data = 0;
         return SCPE_OK;
 
@@ -561,8 +582,12 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
         *data = HITMISS;
         return SCPE_OK;
 
-    case 010:                                           /* lower size */
+    case 010:                                           /* low size */
         *data = (MEMSIZE >> 6) - 1;
+        return SCPE_OK;
+
+    case 011:                                           /* high size */
+        *data = 0;
         return SCPE_OK;
 
     case 012:                                           /* system ID */
@@ -610,12 +635,19 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
     case 005:                                           /* Hit/miss */
         return SCPE_OK;
 
+    case 010:                                           /* low size */
+        return SCPE_OK;
+
+    case 011:                                           /* high size */
+        return SCPE_OK;
+
     case 013:                                           /* CPUERR */
         CPUERR = 0;
         return SCPE_OK;
 
     case 014:                                           /* MBRK */
-        MBRK = data;
+        ODD_IGN (data);
+        MBRK = data & MBRK70_WR;
         return SCPE_OK;
 
     case 015:                                           /* PIRQ */
@@ -1143,7 +1175,9 @@ MEMERR = 0;
 if (!CPUT (CPUT_J)) MAINT = 0;
 MBRK = 0;
 WCS = 0;
-JCSR = 0;
+if (CPUT (CPUT_JB|CPUT_JE))
+    JCSR = JCSR_dflt;
+else JCSR = 0;
 JPCR = 0;
 JASR = 0;
 UDCR = 0;
@@ -1154,5 +1188,30 @@ DR = 0;
 toy_state = 0;
 for (i = 0; i < UBM_LNT_LW; i++) ub_map[i] = 0;
 for (i = 0; i < TOY_LNT; i++) toy_data[i] = 0;
+return SCPE_OK;
+}
+
+/* Set/show JCLK default values */
+
+t_stat sys_set_jclk_dflt (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+uint32 i;
+
+if ((CPUT (CPUT_JB|CPUT_JE)) && cptr) {
+    for (i = 0; i < 4; i++) {
+        if (strncmp (cptr, jcsr_val[i], strlen (cptr)) == 0) {
+            JCSR_dflt = i << CSRJ_V_LTCSEL;
+            return SCPE_OK;
+            }
+        }
+    }
+return SCPE_ARG;
+}
+
+t_stat sys_show_jclk_dflt (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if (CPUT (CPUT_JB|CPUT_JE))
+    fprintf (st, "JCLK default=%s\n", jcsr_val[CSRJ_LTCSEL (JCSR_dflt)]);
+else fprintf (st, "Not implemented\n");
 return SCPE_OK;
 }

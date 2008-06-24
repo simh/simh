@@ -1,6 +1,6 @@
 /* gri_cpu.c: GRI-909 CPU simulator
 
-   Copyright (c) 2001-2007, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,24 +23,26 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   cpu          GRI-909 CPU
+   cpu          GRI-909/GRI-99 CPU
 
+   14-Jan-08    RMS     Added GRI-99 support
    28-Apr-07    RMS     Removed clock initialization
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    18-Jul-04    RMS     Fixed missing ao_update calls in AX, AY write
    17-Jul-04    RMS     Revised MSR, EAO based on additional documentation
    14-Mar-03    RMS     Fixed bug in SC queue tracking
 
-   The system state for the GRI-909 is:
+   The system state for the GRI-909/GRI-99 is:
 
-   AX<0:15>             arithmetic input
-   AY<0:15>             arithmetic input
-   BSW<0:15>            byte swapper
-   BPK<0:15>            byte packer
-   GR[0:5]<0:15>        extended general registers
-   MSR<0:15>            machine status register
-   TRP<0:15>            trap register (subroutine return)
-   SC<0:14>             sequence counter
+   AX<15:0>             arithmetic input
+   AY<15:0>             arithmetic input
+   BSW<15:0>            byte swapper
+   BPK<15:0>            byte packer
+   GR[0:5]<15:0>        extended general registers
+   MSR<15:0>            machine status register
+   TRP<15:0>            trap register (subroutine return)
+   SC<14:0>             sequence counter
+   XR<15:0>             index register (GRI-99 only)
 
    The GRI-909 has, nominally, just one instruction format: move.
 
@@ -149,10 +151,20 @@
 #define SCQ_SIZE        64                              /* must be 2**n */
 #define SCQ_MASK        (SCQ_SIZE - 1)
 #define SCQ_ENTRY       scq[scq_p = (scq_p - 1) & SCQ_MASK] = SC
-#define UNIT_V_NOEAO    (UNIT_V_UF)                     /* EAO absent */
-#define UNIT_NOEAO      (1 << UNIT_V_NOEAO)
-#define UNIT_V_MSIZE    (UNIT_V_UF + 1)                 /* dummy mask */
-#define UNIT_MSIZE      (1 << UNIT_V_MSIZE)
+#define UNIT_V_AO       (UNIT_V_UF + 0)                 /* AO */
+#define UNIT_AO         (1u << UNIT_V_AO)
+#define UNIT_V_EAO      (UNIT_V_UF + 1)                 /* EAO  */
+#define UNIT_EAO        (1u << UNIT_V_EAO)
+#define UNIT_V_GPR      (UNIT_V_UF + 2)                 /* GPR */
+#define UNIT_GPR        (1u << UNIT_V_GPR)
+#define UNIT_V_BSWPK    (UNIT_V_UF + 3)                 /* BSW-BPK */
+#define UNIT_BSWPK      (1u << UNIT_V_BSWPK)
+#define UNIT_V_GRI99    (UNIT_V_UF + 4)                 /* GRI-99 */
+#define UNIT_GRI99      (1u << UNIT_V_GRI99)
+#define UNIT_V_MSIZE    (UNIT_V_UF + 5)                 /* dummy mask */
+#define UNIT_MSIZE      (1u << UNIT_V_MSIZE)
+
+#define IDX_ADD(x)      ((((cpu_unit.flags & UNIT_GRI99) && ((x) & INDEX))? ((x) + XR): (x)) & AMASK)
 
 uint16 M[MAXMEMSIZE] = { 0 };                           /* memory */
 uint32 SC;                                              /* sequence cntr */
@@ -166,6 +178,7 @@ uint32 BSW, BPK;                                        /* byte swap, pack */
 uint32 GR[6];                                           /* extended general regs */
 uint32 SWR;                                             /* switch reg */
 uint32 DR;                                              /* display register */
+uint32 XR;                                              /* index register */
 uint32 thwh = 0;                                        /* thumbwheel */
 uint32 dev_done = 0;                                    /* device flags */
 uint32 bkp = 0;                                         /* bkpt pending */
@@ -197,6 +210,9 @@ uint32 zero_sf (uint32 op);
 uint32 ir_rd (uint32 op);
 t_stat ir_fo (uint32 op);
 uint32 trp_rd (uint32 src);
+t_stat trp_wr (uint32 dst, uint32 val);
+uint32 atrp_rd (uint32 src);
+t_stat atrp_wr (uint32 dst, uint32 val);
 uint32 isr_rd (uint32 src);
 t_stat isr_wr (uint32 dst, uint32 val);
 t_stat isr_fo (uint32 op);
@@ -224,6 +240,8 @@ uint32 bpk_rd (uint32 src);
 t_stat bpk_wr (uint32 dst, uint32 val);
 uint32 gr_rd (uint32 src);
 t_stat gr_wr (uint32 dst, uint32 val);
+uint32 xr_rd (uint32 src);
+t_stat xr_wr (uint32 dst, uint32 val);
 
 extern t_stat rtc_fo (uint32 op);
 extern uint32 rtc_sf (uint32 op);
@@ -240,9 +258,9 @@ struct gdev dev_tab[64] = {
     { &zero_rd, &zero_wr, &zero_fo, &zero_sf },         /* 00: zero */
     { &ir_rd, &zero_wr, &ir_fo, &zero_sf },             /* ir */
     { &no_rd, &no_wr, &no_fo, &no_sf },                 /* fo/sf */
-    { &trp_rd, &no_wr, &zero_fo, &zero_sf },            /* trp */
+    { &trp_rd, &trp_wr, &zero_fo, &zero_sf },           /* trp */
     { &isr_rd, &isr_wr, &isr_fo, &isr_sf },             /* isr */
-    { &ma_rd, &no_wr, &no_fo, &no_sf },                 /* MA */
+    { &ma_rd, &no_wr, &no_fo, &no_sf },                 /* ma */
     { &mem_rd, &mem_wr, &zero_fo, &zero_sf },           /* memory */
     { &sc_rd, &sc_wr, &zero_fo, &zero_sf },             /* sc */
     { &swr_rd, &no_wr, &no_fo, &no_sf },                /* swr */
@@ -255,8 +273,8 @@ struct gdev dev_tab[64] = {
     { &msr_rd, &msr_wr, &zero_fo, &zero_sf },           /* msr */
     { &no_rd, &no_wr, &no_fo, &no_sf },                 /* 20 */
     { &no_rd, &no_wr, &no_fo, &no_sf },
-    { &no_rd, &no_wr, &no_fo, &no_sf },
-    { &no_rd, &no_wr, &no_fo, &no_sf },
+    { &xr_rd, &xr_wr, &no_fo, &no_sf },                 /* xr */
+    { &atrp_rd, &atrp_wr, &no_fo, &no_sf },
     { &bsw_rd, &bsw_wr, &no_fo, &no_sf },               /* bsw */
     { &bpk_rd, &bpk_wr, &no_fo, &no_sf },               /* bpk */
     { &no_rd, &no_wr, &no_fo, &no_sf },
@@ -318,7 +336,7 @@ static const int32 vec_map[16] = {
    cpu_mod      CPU modifiers list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, MAXMEMSIZE) };
+UNIT cpu_unit = { UDATA (NULL, UNIT_FIX+UNIT_BINK+UNIT_AO+UNIT_EAO+UNIT_GPR, MAXMEMSIZE) };
 
 REG cpu_reg[] = {
     { ORDATA (SC, SC, 15) },
@@ -336,9 +354,11 @@ REG cpu_reg[] = {
     { ORDATA (GR4, GR[3], 16) },
     { ORDATA (GR5, GR[4], 16) },
     { ORDATA (GR6, GR[5], 16) },
+    { ORDATA (XR, XR, 16) },
     { FLDATA (BOV, MSR, MSR_V_BOV) },
     { FLDATA (L, MSR, MSR_V_L) },
     { GRDATA (FOA, MSR, 8, 2, MSR_V_FOA) },
+    { FLDATA (SOV, MSR, MSR_V_SOV) },
     { FLDATA (AOV, MSR, MSR_V_AOV) },
     { ORDATA (IR, IR, 16), REG_RO },
     { ORDATA (MA, MA, 16), REG_RO },
@@ -357,8 +377,16 @@ REG cpu_reg[] = {
     };
 
 MTAB cpu_mod[] = {
-    { UNIT_NOEAO, UNIT_NOEAO, "no EAO", "NOEAO", NULL },
-    { UNIT_NOEAO, 0, "EAO", "EAO", NULL },
+    { UNIT_GRI99, UNIT_GRI99, "GRI99", "GRI99", NULL },
+    { UNIT_GRI99, 0,          "GRI909", "GRI909", NULL },
+    { UNIT_AO, UNIT_AO, "AO", "AO", NULL },
+    { UNIT_AO, 0,       "no AO", "NOAO", NULL },
+    { UNIT_EAO, UNIT_EAO, "EAO", "EAO", NULL },
+    { UNIT_EAO, 0,        "no EAO", "NOEAO", NULL },
+    { UNIT_GPR, UNIT_GPR, "GPR", "GPR", NULL },
+    { UNIT_GPR, 0,        "no GPR", "NOGPR", NULL },
+    { UNIT_BSWPK, UNIT_BSWPK, "BSW-BPK", "BSW-BPK", NULL },
+    { UNIT_BSWPK, 0,          "no BSW-BPK", "NOBSW-BPK", NULL },
     { UNIT_MSIZE, 4096, NULL, "4K", &cpu_set_size },
     { UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size },
     { UNIT_MSIZE, 12288, NULL, "12K", &cpu_set_size },
@@ -488,10 +516,11 @@ while (reason == 0) {                                   /* loop until halted */
             SCQ_ENTRY;                                  /* save SC */
             SC = (SC + 1) & AMASK;                      /* incr SC once */
             MA = M[SC];                                 /* get jump addr */
+            MA = IDX_ADD (MA);                          /* index? */
             if (op & TRP_DEF) {                         /* defer? */
                 t = (M[MA] + 1) & DMASK;                /* autoinc */
                 if (MEM_ADDR_OK (MA)) M[MA] = t;
-                MA = t & AMASK;                         /* ind addr */
+                MA = IDX_ADD (t);                       /* index? */
                 }
             TRP = SC;                                   /* save SC */
             SC = MA;                                    /* load new SC */
@@ -515,17 +544,19 @@ while (reason == 0) {                                   /* loop until halted */
         switch (op & MEM_MOD) {                         /* case on addr mode */
 
             case MEM_DIR:                               /* direct */
-                MA = M[SC] & AMASK;                     /* get address */
+                MA = M[SC];                             /* get address */
+                MA = IDX_ADD (MA);                      /* index? */
                 SC = (SC + 1) & AMASK;                  /* incr SC again */
                 reason = bus_op (src, op & BUS_FNC, dst); /* xmt and modify */
                 break;
 
             case MEM_DEF:                               /* defer */
-                MA = M[SC] & AMASK;                     /* get ind addr */
+                MA = M[SC];                             /* get ind addr */
+                MA = IDX_ADD (MA);                      /* index? */
                 SC = (SC + 1) & AMASK;                  /* incr SC again */
                 t = (M[MA] + 1) & DMASK;                /* autoinc */
                 if (MEM_ADDR_OK (MA)) M[MA] = t;
-                MA = t & AMASK;                         /* ind addr */
+                MA = IDX_ADD (t);                       /* index? */
                 reason = bus_op (src, op & BUS_FNC, dst); /* xmt and modify */
                 break;
 
@@ -539,7 +570,7 @@ while (reason == 0) {                                   /* loop until halted */
                 MA = SC;                                /* get ind addr */
                 t = (M[MA] + 1) & DMASK;                /* autoinc */
                 if (MEM_ADDR_OK (MA)) M[MA] = t;
-                MA = t & AMASK;                         /* ind addr */
+                MA = IDX_ADD (t);                       /* index? */
                 SC = (SC + 1) & AMASK;                  /* incr SC again */
                 reason = bus_op (src, op & BUS_FNC, dst); /* xmt and modify */
                 break;
@@ -671,6 +702,12 @@ uint32 trp_rd (uint32 src)
 return TRP;
 }
 
+t_stat trp_wr (uint32 dst, uint32 val)
+{
+TRP = val;
+return SCPE_OK;
+}
+
 /* Interrupt status register (04) */
 
 uint32 isr_rd (uint32 src)
@@ -727,7 +764,7 @@ return SC;
 t_stat sc_wr (uint32 dst, uint32 dat)
 {
 SCQ_ENTRY;
-SC = dat & AMASK;
+SC = IDX_ADD (dat);
 return SCPE_OK;
 }
 
@@ -748,11 +785,11 @@ return MSR & MSR_RW;
 t_stat msr_wr (uint32 src, uint32 dat)
 {
 MSR = dat & MSR_RW;                                     /* new MSR */
-ao_update ();                                           /* update AOV */
+ao_update ();                                           /* update SOV,AOV */
 return SCPE_OK;
 }
 
-/* Arithmetic operators (11:14) */
+/* Arithmetic operator (11:13) */
 
 uint32 ao_update (void)
 {
@@ -787,47 +824,70 @@ return AO;
 
 uint32 ax_rd (uint32 src)
 {
-return AX;
+if (cpu_unit.flags & UNIT_AO) return AX;
+else return 0;
 }
 
 t_stat ax_wr (uint32 dst, uint32 dat)
 {
-AX = dat;
-ao_update ();
-return SCPE_OK;
+if (cpu_unit.flags & UNIT_AO) {
+    AX = dat;
+    ao_update ();
+    return SCPE_OK;
+    }
+return stop_opr;
 }
 
 uint32 ay_rd (uint32 src)
 {
-return AY;
+if (cpu_unit.flags & UNIT_AO) return AY;
+else return 0;
 }
 
 t_stat ay_wr (uint32 dst, uint32 dat)
 {
-AY = dat;
-ao_update ();
-return SCPE_OK;
+if (cpu_unit.flags & UNIT_AO) {
+    AY = dat;
+    ao_update ();
+    return SCPE_OK;
+    }
+return stop_opr;
 }
 
 uint32 ao_rd (uint32 src)
 {
-return ao_update ();
+if (cpu_unit.flags & UNIT_AO) return ao_update ();
+else return 0;
 }
 
 t_stat ao_fo (uint32 op)
 {
-uint32 t = OP_GET_FOA (op);                             /* get func */
-
-MSR = MSR_PUT_FOA (MSR, t);                             /* store in MSR */
-ao_update ();                                           /* update AOV */
-return SCPE_OK;
+if (cpu_unit.flags & UNIT_AO) {
+    uint32 t = OP_GET_FOA (op);                         /* get func */
+    MSR = MSR_PUT_FOA (MSR, t);                         /* store in MSR */
+    ao_update ();                                       /* update AOV */
+    return SCPE_OK;
+    }
+return stop_opr;
 }
+
+uint32 ao_sf (uint32 op)
+{
+if (!(cpu_unit.flags & UNIT_AO))                        /* not installed? */
+    return (stop_opr << SF_V_REASON);
+if (((op & 2) && (MSR & MSR_AOV)) ||                    /* arith carry? */
+    ((op & 4) && (MSR & MSR_SOV))) return 1;            /* arith overflow? */
+return 0;
+}
+
+/* Extended arithmetic operator (14) */
 
 t_stat eao_fo (uint32 op)
 {
 uint32 t;
 
-if (cpu_unit.flags & UNIT_NOEAO) return stop_opr;       /* EAO installed? */
+if (!(cpu_unit.flags & UNIT_EAO))                       /* EAO installed? */
+    return stop_opr;
 switch (op) {
 
     case EAO_MUL:                                       /* mul? */
@@ -869,54 +929,94 @@ switch (op) {
         break;
     }
 
+//    MSR = MSR_PUT_FOA (MSR, AO_ADD);                    /* AO fnc is add */
 ao_update ();
 return SCPE_OK;
 }
 
-uint32 ao_sf (uint32 op)
+/* Index register (GRI-99) (22) */
+
+uint32 xr_rd (uint32 src)
 {
-if (((op & 2) && (MSR & MSR_AOV)) ||                    /* arith carry? */
-    ((op & 4) && (MSR & MSR_SOV))) return 1;            /* arith overflow? */
-return 0;
+if (cpu_unit.flags & UNIT_GRI99) return XR;
+else return 0;
+}
+
+t_stat xr_wr (uint32 dst, uint32 val)
+{
+if (cpu_unit.flags & UNIT_GRI99) {
+    XR = val;
+    return SCPE_OK;
+    }
+return stop_opr;
+}
+
+/* Alternate trap (GRI-99) (23) */
+
+uint32 atrp_rd (uint32 src)
+{
+if (cpu_unit.flags & UNIT_GRI99) return TRP;
+else return 0;
+}
+
+t_stat atrp_wr (uint32 dst, uint32 val)
+{
+if (cpu_unit.flags & UNIT_GRI99) {
+    TRP = val;
+    return SCPE_OK;
+    }
+return stop_opr;
 }
 
 /* Byte swapper (24) */
 
 uint32 bsw_rd (uint32 src)
 {
-return BSW;
+if (cpu_unit.flags & UNIT_BSWPK) return BSW;
+else return 0;
 }
 
 t_stat bsw_wr (uint32 dst, uint32 val)
 {
-BSW = ((val >> 8) & 0377) | ((val & 0377) << 8);
-return SCPE_OK;
+if (cpu_unit.flags & UNIT_BSWPK) {
+    BSW = ((val >> 8) & 0377) | ((val & 0377) << 8);
+    return SCPE_OK;
+    }
+return stop_opr;
 }
 
 /* Byte packer (25) */
 
 uint32 bpk_rd (uint32 src)
 {
-return BPK;
+if (cpu_unit.flags & UNIT_BSWPK) return BPK;
+else return 0;
 }
 
 t_stat bpk_wr (uint32 dst, uint32 val)
 {
-BPK = ((BPK & 0377) << 8) | (val & 0377);
-return SCPE_OK;
+if (cpu_unit.flags & UNIT_BSWPK) {
+    BPK = ((BPK & 0377) << 8) | (val & 0377);
+    return SCPE_OK;
+    }
+return stop_opr;
 }
 
 /* General registers (30:35) */
 
 uint32 gr_rd (uint32 src)
 {
-return GR[src - U_GR];
+if (cpu_unit.flags & UNIT_GPR) return GR[src - U_GR];
+else return 0;
 }
 
 t_stat gr_wr (uint32 dst, uint32 dat)
 {
-GR[dst - U_GR] = dat;
-return SCPE_OK;
+if (cpu_unit.flags & UNIT_GPR) {
+    GR[dst - U_GR] = dat;
+    return SCPE_OK;
+    }
+return stop_opr;
 }
 
 /* Reset routine */
@@ -926,6 +1026,7 @@ t_stat cpu_reset (DEVICE *dptr)
 int32 i;
 
 AX = AY = AO = 0;
+XR = 0;
 TRP = 0;
 ISR = 0;
 MSR = 0;

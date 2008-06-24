@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2007, Robert M Supnik
+   Copyright (c) 1998-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-May-08    RMS     Inlined physical memory routines
    29-Apr-07    RMS     Separated base register access checks for 11/780
    10-May-06    RMS     Added access check on system PTE for 11/780
                         Added mbz check in LDPCTX for 11/780
@@ -100,11 +101,7 @@ extern int32 ibcnt, ppc;
 extern FILE *sim_deb;
 extern DEVICE cpu_dev;
 
-extern int32 Read (uint32 va, int32 lnt, int32 acc);
-extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
 extern int32 Test (uint32 va, int32 acc, int32 *status);
-extern int32 ReadLP (uint32 pa);
-extern void WriteLP (uint32 pa, int32 val);
 extern void set_map_reg (void);
 extern void zap_tb (int stb);
 extern void zap_tb_ent (uint32 va);

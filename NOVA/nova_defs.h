@@ -1,6 +1,6 @@
 /* nova_defs.h: NOVA/Eclipse simulator definitions 
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   04-Jul-07    BKR     BUSY/DONE/INTR "convenience" macros added,
+                        INT_TRAP added for Nova 3, 4 trap instruction handling,
+                        support for 3rd-party 64KW Nova extensions added,
+                        removed STOP_IND_TRP definition due to common INT/TRP handling
    14-Jan-04    BKR     Added support for QTY and ALM
    22-Nov-03    CEO     Added support for PIT device
    19-Jan-03    RMS     Changed CMASK to CDMASK for Apple Dev kit conflict
@@ -46,27 +50,41 @@
 #include "sim_defs.h"                                   /* simulator defns */
 
 /* Simulator stop codes */
-
+	
 #define STOP_RSRV       1                               /* must be 1 */
 #define STOP_HALT       2                               /* HALT */
 #define STOP_IBKPT      3                               /* breakpoint */
 #define STOP_IND        4                               /* indirect loop */
-#define STOP_IND_INT    5                               /* ind loop, intr */
-#define STOP_IND_TRP    6                               /* ind loop, trap */
+#define STOP_IND_INT    5                               /* ind loop, intr or trap */
+
 
 /* Memory */
 
 #if defined (ECLIPSE)
-#define MAXMEMSIZE      1048576                         /* max memory size */
-#else
-#define MAXMEMSIZE      32768                           /* max memory size */
-#endif
-#define AMASK           077777                          /* logical addr mask */
+                                /*----------------------*/
+                                /*        Eclipse       */
+                                /*----------------------*/
+
+#define MAXMEMSIZE      1048576                         /* max memory size in 16-bit words */
 #define PAMASK          (MAXMEMSIZE - 1)                /* physical addr mask */
+#define MEM_ADDR_OK(x)  (((uint32) (x)) < (uint32) MEMSIZE)
+
+#else
+                                /*----------------------*/
+                                /*          Nova        */
+                                /*----------------------*/
+
+#define MAXMEMSIZE      65536                           /* max memory size in 16-bit words: 32KW = DG max, */
+                                                        /* 64 KW = 3rd-party extended memory feature  */
+#define DFTMEMSIZE      32768                           /* default/initial mem size  */
+#define MEM_ADDR_OK(x)  (((uint32) (x)) < (uint32) MEMSIZE)
+
+#endif
+
+
 #define MEMSIZE         (cpu_unit.capac)                /* actual memory size */
 #define A_V_IND         15                              /* ind: indirect */
 #define A_IND           (1 << A_V_IND)
-#define MEM_ADDR_OK(x)  (((uint32) (x)) < MEMSIZE)
 
 /* Architectural constants */
 
@@ -82,8 +100,11 @@
 #define STK_JMP         3                               /* stack jmp @ */
 #define TRP_SAV         046                             /* trap saved PC */
 #define TRP_JMP         047                             /* trap jmp @ */
-#define AUTO_INC        020                             /* start autoinc */
+
+#define AUTO_TOP        037                             /* top of autoindex  */
 #define AUTO_DEC        030                             /* start autodec */
+#define AUTO_INC        020                             /* start autoinc */
+
 
 /* Instruction format */
 
@@ -235,6 +256,7 @@ typedef struct {
 #define INT_V_STK       17                              /* stack overflow */
 #define INT_V_NO_ION_PENDING 18                         /* ion delay */
 #define INT_V_ION       19                              /* interrupts on */
+#define INT_V_TRAP      20                              /* trap instruction */
 
 #define INT_PIT         (1 << INT_V_PIT)
 #define INT_DKP         (1 << INT_V_DKP)
@@ -256,6 +278,7 @@ typedef struct {
 #define INT_ION         (1 << INT_V_ION)
 #define INT_DEV         ((1 << INT_V_STK) - 1)          /* device ints */
 #define INT_PENDING     INT_ION+INT_NO_ION_PENDING
+#define	INT_TRAP	(1 << INT_V_TRAP)
 
 /* PI disable bits */
 
@@ -278,6 +301,18 @@ typedef struct {
 /* #define PI_DCM       0100000 */
 /* #define PI_CAS       0000040 */
 /* #define PI_ADCV      0000002 */
+
+
+        /*  Macros to clear/set BUSY/DONE/INTR bits  */
+
+#define DEV_SET_BUSY( x )    dev_busy = dev_busy |   (x)
+#define DEV_CLR_BUSY( x )    dev_busy = dev_busy & (~(x))
+#define DEV_SET_DONE( x )    dev_done = dev_done |   (x)
+#define DEV_CLR_DONE( x )    dev_done = dev_done & (~(x))
+#define DEV_UPDATE_INTR      int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable)
+
+#define DEV_IS_BUSY( x )    (dev_busy & (x))
+#define DEV_IS_DONE( x )    (dev_done & (x))
 
 /* Function prototypes */
 

@@ -1,6 +1,6 @@
 /* hp2100_cpu4.c: HP 1000 FPP/SIS
 
-   Copyright (c) 2006, J. David Bryan
+   Copyright (c) 2006-2008, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU4         Floating Point Processor and Scientific Instruction Set
 
+   18-Mar-08    JDB     Fixed B register return bug in /CMRT
    01-Dec-06    JDB     Substitutes FPP for firmware FP if HAVE_INT64
 
    Primary references:
@@ -978,7 +979,7 @@ switch (entry) {                                        /* decode IR<3:0> */
 
             if ((int16) count.word >= 0)                /* nearest even integer */
                 count.word = count.word + 1;
-            BR = count.word = count.word & ~1;
+            BR = count.word = count.word & ~1;          /* save LSBs of N */
 
             O = O | fp_exec (0122, ACCUM, count, NOP);  /* acc = FLT (count) */
 
@@ -996,6 +997,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                 (exponent - rsltexp < 5)) {             /* bits lost < 5? */
                 WriteOp (op[0].word, result, fp_t);     /* write result */
                 PC = (PC + 1) & VAMASK;                 /* P+2 return for good result */
+                op[0].fpk[1] = BR;                      /* return LSBs of N in B */
                 break;                                  /* all done! */
                 }
             }
@@ -1024,6 +1026,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         if ((int32) op[6].dword >= 0)                   /* nearest even integer */
             op[6].dword = op[6].dword + 1;
         op[6].dword = op[6].dword & ~1;
+        BR = op[6].dword & DMASK;                       /* save LSBs of N */
 
         O = fp_exec (0126, ACCUM, op[6], NOP);          /* acc = flt (op6) */
 
@@ -1046,6 +1049,7 @@ switch (entry) {                                        /* decode IR<3:0> */
 
         WriteOp (op[0].word, result, fp_t);             /* write result */
         PC = (PC + 1) & VAMASK;                         /* P+2 return for good result */
+        op[0].fpk[1] = BR;                              /* return LSBs of N in B */
         break;
 
 

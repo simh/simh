@@ -1,6 +1,6 @@
 /* vax780_fload.c: VAX780 FLOAD command
 
-   Copyright (c) 2006, Robert M Supnik
+   Copyright (c) 2006-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -37,6 +37,8 @@
              -- Assebmbly language routines added for BIOS calls etc.
 
    Thanks to Phil Budne for the original adaptation of RT11 to SimH.
+
+   28-May-08    RMS     Inlined physical memory routines
 */
 
 #include "vax_defs.h"
@@ -83,8 +85,6 @@ uint32 rtfile_lookup (uint16 *file_name, uint32 *start);
 uint32 rtfile_ator50 (uint32 ascii);
 t_bool rtfile_read (uint32 block, uint32 count, uint16 *buffer);
 uint32 rtfile_find (uint32 block, uint32 sector);
-
-extern void WriteW (uint32 pa, int32 val);
 
 /* FLOAD file_name {file_origin} */
 

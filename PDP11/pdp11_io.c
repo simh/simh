@@ -1,6 +1,6 @@
 /* pdp11_io.c: PDP-11 I/O simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   16-May-08    RMS     Added multiple DC11 support
+                        Renamed DL11 in autoconfigure
+   02-Feb-08    RMS     Fixed DMA memory address limit test (found by John Dundas)
    06-Jul-06    RMS     Added multiple KL11/DL11 support
    15-Oct-05    RMS     Fixed bug in autoconfiguration (missing XU)
    25-Jul-05    RMS     Revised autoconfiguration algorithm and interface
@@ -54,7 +57,7 @@ extern int32 autcon_enb;
 extern int32 uba_last;
 extern FILE *sim_log;
 extern DEVICE *sim_devices[], cpu_dev;
-extern UNIT cpu_unit;
+extern t_addr cpu_memsize;
 
 int32 calc_ints (int32 nipl, int32 trq);
 
@@ -239,7 +242,7 @@ if (cpu_bme) {                                          /* map enabled? */
     }
 else {                                                  /* physical */
     if (ADDR_IS_MEM (lim)) alim = lim;                  /* end ok? */
-    else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;          /* no, strt ok? */
+    else if (ADDR_IS_MEM (ba)) alim = cpu_memsize;      /* no, strt ok? */
     else return bc;                                     /* no, err */
     for ( ; ba < alim; ba++) {                          /* by bytes */
         if (ba & 1) *buf++ = (M[ba >> 1] >> 8) & 0377;  /* get byte */
@@ -265,7 +268,7 @@ if (cpu_bme) {                                          /* map enabled? */
     }
 else {                                                  /* physical */
     if (ADDR_IS_MEM (lim)) alim = lim;                  /* end ok? */
-    else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;          /* no, strt ok? */
+    else if (ADDR_IS_MEM (ba)) alim = cpu_memsize;      /* no, strt ok? */
     else return bc;                                     /* no, err */
     for ( ; ba < alim; ba = ba + 2) {                   /* by words */
         *buf++ = M[ba >> 1];
@@ -292,7 +295,7 @@ if (cpu_bme) {                                          /* map enabled? */
     }
 else {                                                  /* physical */
     if (ADDR_IS_MEM (lim)) alim = lim;                  /* end ok? */
-    else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;          /* no, strt ok? */
+    else if (ADDR_IS_MEM (ba)) alim = cpu_memsize;      /* no, strt ok? */
     else return bc;                                     /* no, err */
     for ( ; ba < alim; ba++) {                          /* by bytes */
         if (ba & 1) M[ba >> 1] = (M[ba >> 1] & 0377) |
@@ -319,7 +322,7 @@ if (cpu_bme) {                                          /* map enabled? */
     }
 else {                                                  /* physical */
     if (ADDR_IS_MEM (lim)) alim = lim;                  /* end ok? */
-    else if (ADDR_IS_MEM (ba)) alim = MEMSIZE;          /* no, strt ok? */
+    else if (ADDR_IS_MEM (ba)) alim = cpu_memsize;      /* no, strt ok? */
     else return bc;                                     /* no, err */
     for ( ; ba < alim; ba = ba + 2) {                   /* by words */
         M[ba >> 1] = *buf++;
@@ -600,7 +603,8 @@ typedef struct {
     } AUTO_CON;
 
 AUTO_CON auto_tab[] = {
-    { { "TTIX" }, TTX_LINES, 2, 0, 8, { 0 } },          /* KL11/DL11/DLV11 - fx CSRs */
+    { { "DCI" }, DCX_LINES, 2, 0, 8, { 0 } },           /* DC11 - fx CSRs */
+    { { "DLI" }, DLX_LINES, 2, 0, 8, { 0 } },           /* KL11/DL11/DLV11 - fx CSRs */
     { { NULL }, 1, 2, 8, 8 },                           /* DJ11 */
     { { NULL }, 1, 2, 16, 8 },                          /* DH11 */
     { { NULL }, 1, 2, 8, 8 },                           /* DQ11 */

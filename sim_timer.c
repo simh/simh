@@ -1,6 +1,6 @@
 /* sim_timer.c: simulator timer library
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-May-08    RMS     Fixed bug in Linux idle routines (from Walter Mueller)
    18-Jun-07    RMS     Modified idle to exclude counted delays
    22-Mar-07    RMS     Added sim_rtcn_init_all
    17-Oct-06    RMS     Added idle support (based on work by Mark Pizzolato)
@@ -204,7 +205,7 @@ void sim_os_sleep (unsigned int sec)
 return;
 }
 
-t_bool sim_os_ms_sleep_init (void)
+uint32 sim_os_ms_sleep_init (void)
 {
 return FALSE;
 }
@@ -271,7 +272,7 @@ return sim_os_msec () - stime;
 #include <unistd.h>
 #define NANOS_PER_MILLI     1000000
 #define MILLIS_PER_SEC      1000
-#define sleep1Samples		100
+#define sleep1Samples       100
 
 const t_bool rtc_avail = TRUE;
 
@@ -301,7 +302,7 @@ uint32 msec;
 
 if (clock_getres (CLOCK_REALTIME, &treq) != 0)
     return 0;
-msec = (treq.tv_nsec + (NANOS_PER_MILLI >> 1)) / NANOS_PER_MILLI;
+msec = (treq.tv_nsec + (NANOS_PER_MILLI - 1)) / NANOS_PER_MILLI;
 if (msec > SIM_IDLE_MAX) return 0;
 return msec;
 
@@ -432,7 +433,7 @@ return (sim_idle_rate_ms != 0);
 /* sim_idle - idle simulator until next event or for specified interval
 
    Inputs:
-        tmr	=	calibrated timer to use
+        tmr =   calibrated timer to use
 
    Must solve the linear equation
 

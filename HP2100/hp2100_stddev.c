@@ -1,6 +1,6 @@
 /* hp2100_stddev.c: HP2100 standard devices simulator
 
-   Copyright (c) 1993-2006, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,7 +28,15 @@
    tty          12531C buffered teleprinter interface
    clk          12539C time base generator
 
-   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
+   25-Apr-08    JDB     Changed TTY output wait from 100 to 200 for MSU BASIC
+   18-Apr-08    JDB     Removed redundant control char handling definitions
+   14-Apr-08    JDB     Changed TTY console poll to 10 msec. real time
+                        Synchronized CLK with TTY if set for 10 msec.
+                        Added UNIT_IDLE to TTY and CLK
+   09-Jan-08    JDB     Fixed PTR trailing null counter for tape re-read
+   31-Dec-07    JDB     Added IPTICK register to CLK to display CPU instr/tick
+                        Corrected and verified ioCRS actions
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders
    22-Nov-05    RMS     Revised for new terminal processing routines
    13-Sep-04    JDB     Added paper tape loop mode, DIAG/READER modifiers to PTR
                         Added PV_LEFT to PTR TRLLIM register
@@ -66,10 +74,20 @@
    upon EOF.  Normal mode EOF action is to supply TRLLIM nulls and then either
    return SCPE_IOERR or SCPE_OK without setting the device flag.
 
-   The clock autocalibrates.  If the specified clock frequency is below
-   10Hz, the clock service routine runs at 10Hz and counts down a repeat
-   counter before generating an interrupt.  Autocalibration will not work
-   if the clock is running at 1Hz or less.
+   To support CPU idling, the teleprinter interface (which doubles as the
+   simulator console) polls for input using a calibrated timer with a ten
+   millisecond period.  Other polled-keyboard input devices (multiplexers and
+   the BACI card) synchronize with the console poll to ensure maximum available
+   idle time.  The console poll is guaranteed to run, as the TTY device cannot
+   be disabled.
+
+   The clock (time base generator) autocalibrates.  If the CLK is set to a ten
+   millisecond period (e.g., as under RTE), it is synchronized to the console
+   poll.  Otherwise (e.g., as under DOS or TSB, which use 100 millisecond
+   periods), it runs asynchronously.  If the specified clock frequency is below
+   10Hz, the clock service routine runs at 10Hz and counts down a repeat counter
+   before generating an interrupt.  Autocalibration will not work if the clock
+   is running at 1Hz or less.
 
    Clock diagnostic mode corresponds to inserting jumper W2 on the 12539C.
    This turns off autocalibration and divides the longest time intervals down
@@ -80,23 +98,15 @@
    - 2748B Tape Reader Operating and Service Manual (02748-90041, Oct-1977)
    - 12597A 8-Bit Duplex Register Interface Kit Operating and Service Manual
             (12597-9002, Sep-1974)
+   - 12531C Buffered Teleprinter Interface Kit Operating and Service Manual
+            (12531-90033, Nov-1972)
    - 12539C Time Base Generator Interface Kit Operating and Service Manual
             (12539-90008, Jan-1975)
 */
 
 #include "hp2100_defs.h"
-#include <ctype.h>
 
-#define CHAR_FLAG(c)    (1u << (c))
-
-#define BEL_FLAG        CHAR_FLAG('\a')
-#define BS_FLAG         CHAR_FLAG('\b')
-#define LF_FLAG         CHAR_FLAG('\n')
-#define CR_FLAG         CHAR_FLAG('\r')
-#define HT_FLAG         CHAR_FLAG('\t')
-
-#define FULL_SET        0xFFFFFFFF
-#define CNTL_SET        (BEL_FLAG | BS_FLAG | HT_FLAG | LF_FLAG | CR_FLAG)
+#define TTY_OUT_WAIT    200                             /* TTY output wait */
 
 #define UNIT_V_DIAG     (TTUF_V_UF + 0)                 /* diag mode */
 #define UNIT_V_AUTOLF   (TTUF_V_UF + 1)                 /* auto linefeed */
@@ -125,8 +135,6 @@ int32 tty_buf = 0;                                      /* tty buffer */
 int32 tty_mode = 0;                                     /* tty mode */
 int32 tty_shin = 0377;                                  /* tty shift in */
 int32 tty_lf = 0;                                       /* lf flag */
-uint32 tty_cntlprt = CNTL_SET;                          /* tty print flags */
-uint32 tty_cntlset = CNTL_SET;                          /* tty cntl set */
 int32 clk_select = 0;                                   /* clock time select */
 int32 clk_error = 0;                                    /* clock error */
 int32 clk_ctr = 0;                                      /* clock counter */
@@ -139,6 +147,7 @@ int32 clk_tps[8] = {                                    /* clock tps */
 int32 clk_rpt[8] = {                                    /* number of repeats */
     1, 1, 1, 1, 10, 100, 1000, 10000
     };
+uint32 clk_tick = 0;                                    /* instructions per tick */
 
 DEVICE ptr_dev, ptp_dev, tty_dev, clk_dev;
 int32 ptrio (int32 inst, int32 IR, int32 dat);
@@ -266,9 +275,9 @@ DEVICE ptp_dev = {
 DIB tty_dib = { TTY, 0, 0, 0, 0, 0, &ttyio };
 
 UNIT tty_unit[] = {
-    { UDATA (&tti_svc, TT_MODE_UC, 0), KBD_POLL_WAIT },
-    { UDATA (&tto_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&tto_svc, UNIT_SEQ+UNIT_ATTABLE+TT_MODE_8B, 0), SERIAL_OUT_WAIT }
+    { UDATA (&tti_svc, UNIT_IDLE | TT_MODE_UC, 0), POLL_WAIT },
+    { UDATA (&tto_svc, TT_MODE_UC, 0), TTY_OUT_WAIT },
+    { UDATA (&tto_svc, UNIT_SEQ | UNIT_ATTABLE | TT_MODE_8B, 0), SERIAL_OUT_WAIT }
     };
 
 REG tty_reg[] = {
@@ -287,8 +296,6 @@ REG tty_reg[] = {
     { DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
     { DRDATA (PPOS, tty_unit[TTP].pos, T_ADDR_W), PV_LEFT },
     { FLDATA (STOP_IOE, ttp_stopioe, 0) },
-    { ORDATA (CNTLPRT, tty_cntlprt, 32), REG_HRO },
-    { ORDATA (CNTLSET, tty_cntlset, 32), REG_HIDDEN },
     { ORDATA (DEVNO, tty_dib.devno, 6), REG_HRO },
     { NULL }
     };
@@ -323,7 +330,7 @@ DEVICE tty_dev = {
 
 DIB clk_dib = { CLK, 0, 0, 0, 0, 0, &clkio };
 
-UNIT clk_unit = { UDATA (&clk_svc, 0, 0) };
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0) };
 
 REG clk_reg[] = {
     { ORDATA (SEL, clk_select, 3) },
@@ -335,6 +342,7 @@ REG clk_reg[] = {
     { FLDATA (SRQ, clk_dib.srq, 0) },
     { FLDATA (ERR, clk_error, CLK_V_ERROR) },
     { BRDATA (TIME, clk_time, 10, 24, 8) },
+    { DRDATA (IPTICK, clk_tick, 24), PV_RSPC | REG_RO },
     { ORDATA (DEVNO, clk_dib.devno, 6), REG_HRO },
     { NULL }
     };
@@ -384,7 +392,8 @@ switch (inst) {                                         /* case on opcode */
         dat = ptr_unit.buf;
         break;
 
-    case ioCRS:                                         /* control reset (action unverif) */
+    case ioCRS:                                         /* control reset */
+                                                        /* action same as CLC */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCMD (dev);                               /* clear cmd, ctl */
@@ -443,6 +452,10 @@ while ((temp = getc (ptr_unit.fileref)) == EOF) {       /* read byte, error? */
 setFSR (dev);                                           /* set flag */
 ptr_unit.buf = temp & 0377;                             /* put byte in buf */
 ptr_unit.pos = ftell (ptr_unit.fileref);
+
+if (temp)                                               /* character non-null? */
+    ptr_trlcnt = 0;                                     /* clear trailing null counter */
+
 return SCPE_OK;
 }
 
@@ -562,7 +575,8 @@ switch (inst) {                                         /* case on opcode */
         ptp_unit.buf = dat;
         break;
 
-    case ioCRS:                                         /* control reset (action unverif) */
+    case ioCRS:                                         /* control reset */
+                                                        /* action same as CLC */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCMD (dev);                               /* clear cmd, ctl */
@@ -577,7 +591,7 @@ switch (inst) {                                         /* case on opcode */
 
     default:
         break;
-		}
+        }
 
 if (IR & I_HC) { clrFSR (dev); }                        /* H/C option */
 return dat;
@@ -648,7 +662,15 @@ switch (inst) {                                         /* case on opcode */
         tty_buf = dat & 0377;
         break;
 
-    case ioCRS:                                         /* control reset (action unverif) */
+    case ioCRS:                                         /* control reset */
+        clrCTL (dev);                                   /* clear control */
+        setFSR (dev);                                   /* set flag */
+        tty_mode = TM_KBD;                              /* set tty, clear print/punch */
+        tty_buf = 0;                                    /* clear buffer */
+        tty_shin = 0377;                                /* input inactive */
+        tty_lf = 0;                                     /* no lf pending */
+        break;
+
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) { clrCTL (dev); }               /* CLC */
         else {                                          /* STC */
@@ -666,7 +688,23 @@ if (IR & I_HC) { clrFSR (dev); }                        /* H/C option */
 return dat;
 }
 
-/* Unit service routines.  Note from Dave Bryan:
+/* TTY input service routine.
+
+   The console input poll routine is scheduled with a ten millisecond period
+   using a calibrated timer, which is the source of event timing for all of the
+   keyboard polling routines.  Synchronizing other keyboard polls with the
+   console poll ensures maximum idle time.
+
+   Several HP operating systems require a CR and LF sequence for line
+   termination.  This is awkward on a PC, as there is no LF key (CTRL+J is
+   needed instead).  We provide an AUTOLF mode to add a LF automatically to each
+   CR input.  When this mode is set, entering CR will set a flag, which will
+   cause a LF to be supplied automatically at the next input poll.
+
+   The 12531C teleprinter interface and the later 12880A CRT interface provide a
+   clever mechanism to detect a keypress during output.  This is used by DOS and
+   RTE to allow the user to interrupt lengthy output operations to enter system
+   commands.
 
    Referring to the 12531C schematic, the terminal input enters on pin X
    ("DATA FROM EIA COMPATIBLE DEVICE").  The signal passes through four
@@ -688,15 +726,18 @@ return dat;
    the output operation, the register will read as all ones (octal 377).  If,
    however, any key was struck, at least one zero bit will be present.  If the
    register value doesn't equal 377, the driver sets the system "operator
-   attention" flag, which will cause RTE to output the asterisk and initiate a
-   terminal read when the current output line is completed. */
+   attention" flag, which will cause DOS or RTE to output an asterisk prompt and
+   initiate a terminal read when the current output line is completed.
+*/
 
 t_stat tti_svc (UNIT *uptr)
 {
 int32 c, dev;
 
-dev = tty_dib.devno;                                    /* get device no */
+uptr->wait = sim_rtcn_calb (POLL_RATE, TMR_POLL);       /* calibrate poll timer */
 sim_activate (uptr, uptr->wait);                        /* continue poll */
+
+dev = tty_dib.devno;                                    /* get device no */
 tty_shin = 0377;                                        /* assume inactive */
 if (tty_lf) {                                           /* auto lf pending? */
     c = 012;                                            /* force lf */
@@ -720,6 +761,8 @@ if (tty_mode & TM_KBD) {                                /* keyboard enabled? */
 else tty_shin = c;                                      /* no, char shifts in */
 return SCPE_OK;
 }
+
+/* TTY output service routine */
 
 t_stat tto_svc (UNIT *uptr)
 {
@@ -767,7 +810,7 @@ if (tty_mode & TM_PUN) {                                /* punching? */
 return SCPE_OK;
 }
 
-/* Reset routine */
+/* TTY reset routine */
 
 t_stat tty_reset (DEVICE *dptr)
 {
@@ -777,6 +820,8 @@ tty_mode = TM_KBD;                                      /* enable input */
 tty_buf = 0;
 tty_shin = 0377;                                        /* input inactive */
 tty_lf = 0;                                             /* no lf pending */
+tty_unit[TTI].wait = POLL_WAIT;                         /* reset initial poll */
+sim_rtcn_init (tty_unit[TTI].wait, TMR_POLL);           /* init poll timer */
 sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);      /* activate poll */
 sim_cancel (&tty_unit[TTO]);                            /* cancel output */
 return SCPE_OK;
@@ -801,7 +846,47 @@ if (u != TTI) return SCPE_NOFNC;
 return SCPE_OK;
 }
 
-/* Clock IO instructions */
+/* Synchronize polling.
+
+   Return an event time corresponding either with the amount of time remaining
+   in the current poll (mode = INITIAL) or the amount of time in a full poll
+   period (mode = SERVICE).  If the former call is made when the device service
+   routine is started, then making the latter call during unit service will
+   ensure that the polls remain synchronized.
+ */
+
+int32 sync_poll (POLLMODE poll_mode)
+{
+int32 poll_time;
+
+    if (poll_mode == INITIAL) {
+        poll_time = sim_is_active (&tty_unit[TTI]);
+
+        if (poll_time)
+            return poll_time;
+        else
+            return POLL_WAIT;
+        }
+    else
+        return tty_unit[TTI].wait;
+}
+
+
+/* Clock I/O instructions.
+
+   The time base generator (CLK) provides periodic interrupts from 100
+   microseconds to 1000 seconds.  The CLK uses a calibrated timer to provide the
+   time base.  For periods ranging from 1 to 1000 seconds, a 100 millisecond
+   timer is used, and 10 to 10000 ticks are counted before setting the device
+   flag to indicate that the period has expired.
+
+   If the period is set to ten milliseconds, the console poll timer is used
+   instead of an independent timer.  This is to maximize the idle period.
+
+   In diagnostic mode, the clock period is set to the expected number of CPU
+   instructions, rather than wall-clock time, so that the diagnostic executes as
+   expected.
+*/
 
 int32 clkio (int32 inst, int32 IR, int32 dat)
 {
@@ -836,7 +921,8 @@ switch (inst) {                                         /* case on opcode */
         clrCTL (dev);                                   /* clear control */
         break;
 
-    case ioCRS:                                         /* control reset (action unverif) */
+    case ioCRS:                                         /* control reset */
+                                                        /* action same as CLC */
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCTL (dev);                               /* turn off clock */
@@ -844,9 +930,22 @@ switch (inst) {                                         /* case on opcode */
             }
         else {                                          /* STC */
             setCTL (dev);                               /* set CTL */
+
+            if (clk_unit.flags & UNIT_DIAG)                     /* diag mode? */
+                clk_unit.flags = clk_unit.flags & ~UNIT_IDLE;   /* not calibrated */
+            else
+                clk_unit.flags = clk_unit.flags | UNIT_IDLE;    /* is calibrated */
+
             if (!sim_is_active (&clk_unit)) {           /* clock running? */
-                sim_activate (&clk_unit,
-                     sim_rtc_init (clk_delay (0)));     /* no, start clock */
+                clk_tick = clk_delay (0);               /* get tick count */
+
+                if ((clk_unit.flags & UNIT_DIAG) == 0)  /* calibrated? */
+                    if (clk_select == 2)                /* 10 msec. interval? */
+                        clk_tick = sync_poll (INITIAL); /* sync  poll */
+                    else
+                        sim_rtcn_init (clk_tick, TMR_CLK);  /* initialize timer */
+
+                sim_activate (&clk_unit, clk_tick);     /* start clock */
                 clk_ctr = clk_delay (1);                /* set repeat ctr */
                 }
             clk_error = 0;                              /* clear error */
@@ -861,21 +960,29 @@ if (IR & I_HC) { clrFSR (dev); }                        /* H/C option */
 return dat;
 }
 
-/* Unit service */
+/* CLK unit service.
+
+   As with the I/O handler, if the time base period is set to ten milliseconds,
+   the console poll timer is used instead of an independent timer.
+*/
 
 t_stat clk_svc (UNIT *uptr)
 {
-int32 tim, dev;
+int32 dev;
 
 dev = clk_dib.devno;                                    /* get device no */
 if (!CTL (dev)) return SCPE_OK;                         /* CTL off? done */
+
 if (clk_unit.flags & UNIT_DIAG)                         /* diag mode? */
-    tim = clk_delay (0);                                /* get fixed delay */
-else tim = sim_rtc_calb (clk_tps[clk_select]);          /* calibrate delay */
-sim_activate (uptr, tim);                               /* reactivate */
+    clk_tick = clk_delay (0);                           /* get fixed delay */
+else if (clk_select == 2)                               /* 10 msec period? */
+    clk_tick = sync_poll (SERVICE);                     /* sync poll */
+else
+    clk_tick = sim_rtcn_calb (clk_tps[clk_select], TMR_CLK);    /* calibrate delay */
+
+sim_activate (uptr, clk_tick);                          /* reactivate */
 clk_ctr = clk_ctr - 1;                                  /* decrement counter */
 if (clk_ctr <= 0) {                                     /* end of interval? */
-    tim = FLG (dev);
     if (FLG (dev)) clk_error = CLK_ERROR;               /* overrun? error */
     else { setFSR (dev); }                              /* else set flag */
     clk_ctr = clk_delay (1);                            /* reset counter */

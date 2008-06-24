@@ -1,6 +1,6 @@
 /* sim_tmxr.c: Telnet terminal multiplexor library
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2007, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   11-Apr-07    JDB     Worked around Telnet negotiation problem with QCTerm
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    29-Jun-05    RMS     Extended tmxr_dscln to support unit array devices
                         Fixed bug in SET LOG/NOLOG
@@ -88,6 +89,8 @@
 #define TN_SGA          3                               /* sga */
 #define TN_LINE         34                              /* line mode */
 #define TN_CR           015                             /* carriage return */
+#define TN_LF           012                             /* line feed */
+#define TN_NUL          000                             /* null */
 
 /* Telnet line states */
 
@@ -95,7 +98,8 @@
 #define TNS_IAC         001                             /* IAC seen */
 #define TNS_WILL        002                             /* WILL seen */
 #define TNS_WONT        003                             /* WONT seen */
-#define TNS_SKIP        004                             /* skip next */
+#define TNS_SKIP        004                             /* skip next cmd */
+#define TNS_CRPAD       005                             /* CR padding */
 
 void tmxr_rmvrc (TMLN *lp, int32 p);
 int32 tmxr_send_buffered_data (TMLN *lp);
@@ -247,9 +251,9 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                     lp->tsta = TNS_IAC;                 /* change state */
                     tmxr_rmvrc (lp, j);                 /* remove char */
                     break;
-					}
+                    }
                 if ((tmp == TN_CR) && lp->dstb)         /* CR, no bin */
-                    lp->tsta = TNS_SKIP;                /* skip next */
+                    lp->tsta = TNS_CRPAD;               /* skip pad char */
                 j = j + 1;                              /* advance j */
                 break;
 
@@ -278,7 +282,28 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                 if (tmp == TN_BIN) {                    /* BIN? */
                     if (lp->tsta == TNS_WILL) lp->dstb = 0;
                     else lp->dstb = 1;
-					}
+                    }
+
+            /* Negotiation with the HP terminal emulator "QCTerm" is not working.
+               QCTerm says "WONT BIN" but sends bare CRs.  RFC 854 says:
+
+                 Note that "CR LF" or "CR NUL" is required in both directions
+                 (in the default ASCII mode), to preserve the symmetry of the
+                 NVT model.  ...The protocol requires that a NUL be inserted
+                 following a CR not followed by a LF in the data stream.
+
+               Until full negotiation is implemented, we work around the problem
+               by checking the character following the CR in non-BIN mode and
+               strip it only if it is LF or NUL.  This should not affect
+               conforming clients.
+            */
+            
+            case TNS_CRPAD:                             /* only LF or NUL should follow CR */
+                lp->tsta = TNS_NORM;                    /* next normal */
+                if ((tmp == TN_LF) ||                   /* CR + LF ? */
+                    (tmp == TN_NUL))                    /* CR + NUL? */
+                    tmxr_rmvrc (lp, j);                 /* remove it */
+                break;
 
             case TNS_SKIP: default:                     /* skip char */
                 lp->tsta = TNS_NORM;                    /* next normal */
@@ -335,8 +360,8 @@ if (tmxr_tqln (lp) < (TMXR_MAXBUF - 1)) {               /* room for char (+ IAC)
     if ((char) chr == TN_IAC) {                         /* IAC? */
         lp->txb[lp->txbpi] = (char) chr;                /* IAC + IAC */
         lp->txbpi = lp->txbpi + 1;                      /* adv pointer */       
-        if (lp->txbpi >= TMXR_MAXBUF) lp->txbpi = 0;	/* wrap? */
-		}
+        if (lp->txbpi >= TMXR_MAXBUF) lp->txbpi = 0;    /* wrap? */
+        }
     if (tmxr_tqln (lp) > (TMXR_MAXBUF - TMXR_GUARD))    /* near full? */
         lp->xmte = 0;                                   /* disable line */
     return SCPE_OK;                                     /* char sent */

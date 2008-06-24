@@ -1,6 +1,6 @@
 /*  altairz80_sys.c: MITS Altair system interface
 
-    Copyright (c) 2002-2007, Peter Schorn
+    Copyright (c) 2002-2008, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,8 @@
 #include <ctype.h>
 #include "altairz80_defs.h"
 
+#define SIM_EMAX 6
+
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern DEVICE cpu_dev;
@@ -41,8 +43,38 @@ extern DEVICE dsk_dev;
 extern DEVICE hdsk_dev;
 extern DEVICE net_dev;
 
-int32 fprint_sym(FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw);
-int32 parse_sym(char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw);
+extern DEVICE mfdc_dev;
+extern DEVICE fw2_dev;
+extern DEVICE fif_dev;
+extern DEVICE vfdhd_dev;
+extern DEVICE mdsad_dev;
+extern DEVICE nsfpb_dev;
+extern DEVICE disk1a_dev;
+extern DEVICE disk2_dev;
+extern DEVICE selchan_dev;
+extern DEVICE ss1_dev;
+extern DEVICE i8272_dev;
+extern DEVICE mdriveh_dev;
+
+extern DEVICE cromfdc_dev;
+extern DEVICE wd179x_dev;
+extern DEVICE n8vem_dev;
+extern DEVICE scp300f_dev;
+
+#ifdef USE_FPC
+extern DEVICE fpc_dev;
+#endif /* USE_FPC */
+
+extern int32 chiptype;
+extern long disasm (unsigned char *data, char *output, int segsize, long offset);
+
+t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw); /* psco */
+t_stat parse_sym(char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw); /* psco */
+
+t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* SCP data structures
     sim_name            simulator name string
@@ -53,10 +85,17 @@ int32 parse_sym(char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw);
 */
 
 char        sim_name[]      = "Altair 8800 (Z80)";
-REG         *sim_PC         = &cpu_reg[0];
-int32       sim_emax        = 4;
+REG         *sim_PC         = &cpu_reg[6];
+int32       sim_emax        = SIM_EMAX;
 DEVICE      *sim_devices[]  = {
-    &cpu_dev, &sio_dev, &simh_device, &ptr_dev, &ptp_dev, &dsk_dev, &hdsk_dev, &net_dev, NULL
+    &cpu_dev, &sio_dev, &simh_device, &ptr_dev, &ptp_dev, &dsk_dev,
+    &hdsk_dev, &net_dev, &mfdc_dev, &fw2_dev, &fif_dev, &vfdhd_dev, &mdsad_dev,
+    &disk1a_dev, &disk2_dev, &selchan_dev, &ss1_dev, &i8272_dev, &mdriveh_dev,
+    &cromfdc_dev, &wd179x_dev, &n8vem_dev, &scp300f_dev,
+#ifdef USE_FPC
+    &fpc_dev,
+#endif /* USE_FPC */
+    NULL
 };
 
 char memoryAccessMessage[80];
@@ -101,7 +140,7 @@ static char *const Mnemonics8080[] = {
     "RPE",          "PCHL",         "JPE #h",       "XCHG",         "CPE #h",       "DB EDh",       "XRI *h",       "RST 5",        /*  e8-ef   */
     "RP",           "POP PSW",      "JP #h",        "DI",           "CP #h",        "PUSH PSW",     "ORI *h",       "RST 6",        /*  f0-f7   */
     "RM",           "SPHL",         "JM #h",        "EI",           "CM #h",        "DB FDh",       "CPI *h",       "RST 7"         /*  f8-ff   */
- };
+};
 
 static char *const MnemonicsZ80[256] = {
 /*  0/8             1/9             2/A             3/B             4/C             5/D             6/E             7/F                         */
@@ -303,7 +342,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
     uint8 J = 0, Offset = 0;
     uint16 B = 0;
 
-    if (useZ80Mnemonics) {
+    if (useZ80Mnemonics)
         switch(val[B]) {
 
             case 0xcb:
@@ -326,18 +365,13 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
                     J = 1;
                     T = MnemonicsXCB[val[B++]];
                 }
-                else {
-                    T = MnemonicsXX[val[B++]];
-                }
+                else T = MnemonicsXX[val[B++]];
                 break;
 
             default:
                 T = MnemonicsZ80[val[B++]];
         }
-    }
-    else {
-        T = Mnemonics8080[val[B++]];
-    }
+    else T = Mnemonics8080[val[B++]];
 
     if ( (P = strchr(T, '^')) ) {
         strncpy(R, T, P - T);
@@ -346,14 +380,10 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
         strcat(R, H);
         strcat(R, P + 1);
     }
-    else {
-        strcpy(R, T);
-    }
+    else strcpy(R, T);
     if ( (P = strchr(R, '%')) ) {
         *P = C;
-        if ( (P = strchr(P + 1, '%')) ) {
-            *P = C;
-        }
+        if ( (P = strchr(P + 1, '%')) ) *P = C;
     }
 
     if ( (P = strchr(R, '*')) ) {
@@ -366,9 +396,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
     else if ( (P = strchr(R, '@')) ) {
         strncpy(S, R, P - R);
         S[P - R] = '\0';
-        if (!J) {
-            Offset = val[B++];
-        }
+        if (!J) Offset = val[B++];
         strcat(S, Offset & 0x80 ? "-" : "+");
         J = Offset & 0x80 ? 256 - Offset : Offset;
         sprintf(H, "%02X", J);
@@ -379,7 +407,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
         strncpy(S, R, P - R);
         S[P - R] = '\0';
         Offset = val[B++];
-        sprintf(H, "%04X", addr + 2 + (Offset & 0x80 ? (Offset - 256) : Offset));
+        sprintf(H, "%04X", (addr + 2 + (Offset & 0x80 ? (Offset - 256) : Offset)) & 0xFFFF);
         strcat(S, H);
         strcat(S, P + 1);
     }
@@ -391,9 +419,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
         strcat(S, P + 1);
         B += 2;
     }
-    else {
-        strcpy(S, R);
-    }
+    else strcpy(S, R);
     return(B);
 }
 
@@ -409,61 +435,52 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
         status  =   error code
 */
 
-int32 fprint_sym(FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw) {
-    char disasm[128];
+t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw) {
+    char disasm_result[128];
     int32 ch = val[0] & 0x7f;
+    long r;
+    unsigned char vals[SIM_EMAX];
+    int32 i;
     if (sw & (SWMASK('A') | SWMASK('C'))) {
         fprintf(of, ((0x20 <= ch) && (ch < 0x7f)) ? "'%c'" : "%02x", ch);
         return SCPE_OK;
     }
-    if (!(sw & SWMASK('M'))) {
-        return SCPE_ARG;
+    if (!(sw & SWMASK('M'))) return SCPE_ARG;
+    if (chiptype == CHIP_TYPE_8086) {
+        for (i = 0; i < SIM_EMAX; i++) vals[i] = val[i] & 0xff;
+        r = disasm(vals, disasm_result, 16, addr);
     }
-    ch = DAsm(disasm, val, cpu_unit.flags & UNIT_CHIP, addr);
-    fprintf(of, "%s", disasm);
-    return 1 - ch;  /* need to return additional bytes */
+    else
+        r = DAsm(disasm_result, val, chiptype == CHIP_TYPE_Z80, addr);
+    fprintf(of, "%s", disasm_result);
+    return 1 - r;
 }
 
 /*  checkbase determines the base of the number (ch, *numString)
     and returns FALSE if the number is bad */
 static int32 checkbase(char ch, const char *numString) {
     int32 decimal = (ch <= '9');
-    if (toupper(ch) == 'H') {
-        return FALSE;
-    }
-    while (isxdigit(ch = *numString++)) {
-        if (ch > '9') {
-            decimal = FALSE;
-        }
-    }
+    if (toupper(ch) == 'H') return FALSE;
+    while (isxdigit(ch = *numString++)) if (ch > '9') decimal = FALSE;
     return toupper(ch) == 'H' ? 16 : (decimal ? 10 : FALSE);
 }
 
 static int32 numok(char ch, const char **numString, const int32 minvalue,
         const int32 maxvalue, const int32 requireSign, int32 *result) {
     int32 sign = 1, value = 0, base;
-    if (requireSign) {
-        if (ch == '+') {
-            ch = *(*numString)++;
-        }
+    if (requireSign)
+        if (ch == '+') ch = *(*numString)++;
         else if (ch == '-') {
             sign = -1;
             ch = *(*numString)++;
         }
-        else {
-            return FALSE;
-        }
-    }
-    if (!(base = checkbase(ch, *numString))) {
-        return FALSE;
-    }
+        else return FALSE;
+    if (!(base = checkbase(ch, *numString))) return FALSE;
     while (isxdigit(ch)) {
         value = base * value + ((ch <= '9') ? (ch - '0') : (toupper(ch) - 'A' + 10));
         ch = *(*numString)++;
     }
-    if (toupper(ch) != 'H') {
-        (*numString)--;
-    }
+    if (toupper(ch) != 'H') (*numString)--;
     *result = value * sign;
     return (minvalue <= value) && (value <= maxvalue);
 }
@@ -485,93 +502,57 @@ static int32 match(const char *pattern, const char *input, char *xyFirst, char *
                 }   /* otherwise fall through */
 
             case ' ':
-                if (inp != pat) {
-                    return FALSE;
-                }
+                if (inp != pat) return FALSE;
                 pat = *pattern++;
                 inp = *input++;
-                while (inp == ' ') {
-                    inp = *input++;
-                }
+                while (inp == ' ') inp = *input++;
                 continue;
 
             case '%':
                 inp = toupper(inp);
-                if ((inp == 'X') || (inp == 'Y')) {
-                    if (*xyFirst) { /* make sure that second '%' corresponds to first */
-                        if (*xyFirst == inp) {
-                            *xy = inp;
-                        }
-                        else {
-                            return FALSE;
-                        }
-                    }
+                if ((inp == 'X') || (inp == 'Y'))
+                    if (*xyFirst)   /* make sure that second '%' corresponds to first */
+                        if (*xyFirst == inp) *xy = inp;
+                        else return FALSE;
                     else { /* take note of first '%' for later */
                         *xyFirst = inp;
                         *xy = inp;
                     }
-                }
-                else {
-                    return FALSE;
-                }
+                else return FALSE;
                 break;
 
             case '#':
-                if (numok(inp, &input, 0, 65535, FALSE, number)) {
-                    pattern++; /* skip h */
-                }
-                else {
-                    return FALSE;
-                }
+                if (numok(inp, &input, 0, 65535, FALSE, number)) pattern++; /* skip h */
+                else return FALSE;
                 break;
 
             case '*':
-                if (numok(inp, &input, 0, 255, FALSE, star)) {
-                    pattern++; /* skip h */
-                }
-                else {
-                    return FALSE;
-                }
+                if (numok(inp, &input, 0, 255, FALSE, star)) pattern++;     /* skip h */
+                else return FALSE;
                 break;
 
             case '@':
-                if (numok(inp, &input, -128, 65535, TRUE, at)) {
-                    pattern++; /* skip h */
-                }
-                else {
-                    return FALSE;
-                }
+                if (numok(inp, &input, -128, 65535, TRUE, at)) pattern++;   /* skip h */
+                else return FALSE;
                 break;
 
             case '$':
-                if (numok(inp, &input, 0, 65535, FALSE, dollar)) {
-                    pattern++; /* skip h */
-                }
-                else {
-                    return FALSE;
-                }
+                if (numok(inp, &input, 0, 65535, FALSE, dollar)) pattern++; /* skip h */
+                else return FALSE;
                 break;
 
             case '^':
-                if (numok(inp, &input, 0, 255, FALSE, hat)) {
-                    pattern++; /* skip h */
-                }
-                else {
-                    return FALSE;
-                }
+                if (numok(inp, &input, 0, 255, FALSE, hat)) pattern++;      /* skip h */
+                else return FALSE;
                 break;
 
             default:
-                if (toupper(pat) != toupper(inp)) {
-                    return FALSE;
-                }
+                if (toupper(pat) != toupper(inp)) return FALSE;
         }
         pat = *pattern++;
         inp = *input++;
     }
-    while (inp == ' ') {
-        inp = *input++;
-    }
+    while (inp == ' ') inp = *input++;
     return (pat == 0) && (inp == 0);
 }
 
@@ -595,41 +576,31 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
                 val[1] = (0xff) & star;
                 return -1;              /* one additional byte returned     */
             }
-            else if (at > -129) {
+            else if (at > -129)
                 if ((-128 <= at) && (at <= 127)) {
                     val[1] = (int8)(at);
                     return -1;          /* one additional byte returned     */
                 }
-                else {
-                    return SCPE_ARG;
-                }
-            }
+                else return SCPE_ARG;
             else if (dollar >= 0) {
                 dollar -= addr + 2;     /* relative translation             */
                 if ((-128 <= dollar) && (dollar <= 127)) {
                     val[1] = (int8)(dollar);
                     return -1;          /* one additional byte returned     */
                 }
-                else {
-                    return SCPE_ARG;
-                }
+                else return SCPE_ARG;
             }
-            else {
-                return SCPE_OK;
-            }
+            else return SCPE_OK;
         }
     }
-    if (Mnemonics == Mnemonics8080) {
-        return SCPE_ARG;
-    }
+    if (Mnemonics == Mnemonics8080) return SCPE_ARG;
 
-    for (op = 0; op < 256; op++) {
+    for (op = 0; op < 256; op++)
         if (match(MnemonicsCB[op], cptr, &xyFirst, &xy, &number, &star, &at, &hat, &dollar)) {
             val[0] = 0xcb;
             val[1] = op;
             return -1;                  /* one additional byte returned     */
         }
-    }
 
     for (op = 0; op < 256; op++) {
         number = -1;
@@ -641,9 +612,7 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
                 val[3] = (0xff) & (number >> 8);
                 return -3;              /* three additional bytes returned  */
             }
-            else {
-                return -1;              /* one additional byte returned     */
-            }
+            else return -1;             /* one additional byte returned     */
         }
     }
 
@@ -652,9 +621,7 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
         xy = 0;
         if (match(MnemonicsXX[op], cptr, &xyFirst, &xy, &number, &star, &at, &hat, &dollar)) {
             /* all matches must have contained a '%' character */
-            if (!(val[0] = checkXY(xy))) {
-                return SCPE_ARG;
-            }
+            if (!(val[0] = checkXY(xy))) return SCPE_ARG;
             val[1] = op;
             if (number >= 0) {
                 val[2] = (0xff) & number;
@@ -674,9 +641,7 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
                 val[2] = (0xff) & hat;
                 return -2;              /* two additional bytes returned    */
             }
-            else {
-                return -1;              /* one additional byte returned     */
-            }
+            else return -1;             /* one additional byte returned     */
         }
     }
 
@@ -685,13 +650,9 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
         xy = 0;
         if (match(MnemonicsXCB[op], cptr, &xyFirst, &xy, &number, &star, &at, &hat, &dollar)) {
             /* all matches must have contained a '%' character */
-            if (!(val[0] = checkXY(xy))) {
-                return SCPE_ARG;
-            }
+            if (!(val[0] = checkXY(xy))) return SCPE_ARG;
             val[1] = 0xcb;
-            if (at > -129) {
-                val[2] = (int8) (at);
-            }
+            if (at > -129) val[2] = (int8) (at);
             else {
                 printf("Offset expected.\n");
                 return SCPE_ARG;
@@ -715,14 +676,115 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, char *co
     Outputs:
         status  =   error status
 */
-int32 parse_sym(char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw) {
-    while (isspace(*cptr)) cptr++;  /* absorb spaces            */
+t_stat parse_sym(char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw) {
+    while (isspace(*cptr)) cptr++;          /* absorb spaces            */
     if ((sw & (SWMASK('A') | SWMASK('C'))) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-        if (cptr[0] == 0) {
-            return SCPE_ARG;            /* must have one char               */
-        }
+        if (cptr[0] == 0) return SCPE_ARG;  /* must have one char       */
         val[0] = (uint32) cptr[0];
         return SCPE_OK;
     }
-    return parse_X80(cptr, addr, val, cpu_unit.flags & UNIT_CHIP ? MnemonicsZ80 : Mnemonics8080);
+    return parse_X80(cptr, addr, val, chiptype == CHIP_TYPE_Z80 ? MnemonicsZ80 : Mnemonics8080);
 }
+
+/* Set Memory Base Address routine */
+t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+    DEVICE *dptr;
+    PNP_INFO *pnp;
+    uint32 newba;
+    t_stat r;
+
+    if (cptr == NULL) return SCPE_ARG;
+    if (uptr == NULL) return SCPE_IERR;
+    dptr = find_dev_from_unit (uptr);
+    if (dptr == NULL) return SCPE_IERR;
+    pnp = (PNP_INFO *) dptr->ctxt;
+    if (pnp == NULL) return SCPE_IERR;
+
+    newba = get_uint (cptr, 16, 0xFFFF, &r);
+    if (r != SCPE_OK) return r;
+
+    if ((newba > 0xFFFF) ||
+        (newba % pnp->mem_size)) return SCPE_ARG;
+
+    if(dptr->flags & DEV_DIS) {
+        printf("device not enabled yet.\n");
+        pnp->mem_base = newba & ~(pnp->mem_size-1);
+    } else {
+        dptr->flags |= DEV_DIS;
+        dptr->reset(dptr);
+        pnp->mem_base = newba & ~(pnp->mem_size-1);
+        dptr->flags &= ~DEV_DIS;
+        dptr->reset(dptr);
+    }
+
+    return SCPE_OK;
+}
+
+/* Show Base Address routine */
+t_stat show_membase(FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+    DEVICE *dptr;
+    PNP_INFO *pnp;
+
+    if (uptr == NULL) return SCPE_IERR;
+    dptr = find_dev_from_unit (uptr);
+    if (dptr == NULL) return SCPE_IERR;
+    pnp = (PNP_INFO *) dptr->ctxt;
+    if (pnp == NULL) return SCPE_IERR;
+
+    fprintf(st, "MEM=0x%04X-0x%04X", pnp->mem_base, pnp->mem_base+pnp->mem_size-1);
+    return SCPE_OK;
+}
+
+/* Set Memory Base Address routine */
+t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+    DEVICE *dptr;
+    PNP_INFO *pnp;
+    uint32 newba;
+    t_stat r;
+
+    if (cptr == NULL) return SCPE_ARG;
+    if (uptr == NULL) return SCPE_IERR;
+    dptr = find_dev_from_unit (uptr);
+    if (dptr == NULL) return SCPE_IERR;
+    pnp = (PNP_INFO *) dptr->ctxt;
+    if (pnp == NULL) return SCPE_IERR;
+
+    newba = get_uint (cptr, 16, 0xFF, &r);
+    if (r != SCPE_OK) return r;
+
+    if ((newba > 0xFF) ||
+        (newba % pnp->io_size)) return SCPE_ARG;
+
+    if(dptr->flags & DEV_DIS) {
+        printf("device not enabled yet.\n");
+        pnp->io_base = newba & ~(pnp->io_size-1);
+    } else {
+        dptr->flags |= DEV_DIS;
+        dptr->reset(dptr);
+        pnp->io_base = newba & ~(pnp->io_size-1);
+        dptr->flags &= ~DEV_DIS;
+        dptr->reset(dptr);
+    }
+
+    return SCPE_OK;
+}
+
+/* Show I/O Base Address routine */
+t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+    DEVICE *dptr;
+    PNP_INFO *pnp;
+
+    if (uptr == NULL) return SCPE_IERR;
+    dptr = find_dev_from_unit (uptr);
+    if (dptr == NULL) return SCPE_IERR;
+    pnp = (PNP_INFO *) dptr->ctxt;
+    if (pnp == NULL) return SCPE_IERR;
+
+    fprintf(st, "I/O=0x%02X-0x%02X", pnp->io_base, pnp->io_base+pnp->io_size-1);
+    return SCPE_OK;
+}
+

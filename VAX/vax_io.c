@@ -1,6 +1,6 @@
 /* vax_io.c: VAX 3900 Qbus IO simulator
 
-   Copyright (c) 1998-2005, Robert M Supnik
+   Copyright (c) 1998-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    qba          Qbus adapter
 
+   28-May-08    RMS     Inlined physical memory routines
+   25-Jan-08    RMS     Fixed declarations (from Mark Pizzolato)
    03-Dec-05    RMS     Added SHOW QBA VIRT and ex/dep via map
    05-Oct-05    RMS     Fixed bug in autoconfiguration (missing XU)
    25-Jul-05    RMS     Revised autoconfiguration algorithm and interface
@@ -116,13 +118,6 @@ extern int32 ssc_bto;
 extern jmp_buf save_env;
 extern int32 sim_switches;
 extern DEVICE *sim_devices[];
-
-extern int32 ReadB (uint32 pa);
-extern int32 ReadW (uint32 pa);
-extern int32 ReadL (uint32 pa);
-extern void WriteB (uint32 pa, int32 val);
-extern void WriteW (uint32 pa, int32 val);
-extern void WriteL (uint32 pa, int32 val);
 extern FILE *sim_log;
 
 t_stat dbl_rd (int32 *data, int32 addr, int32 access);
@@ -243,7 +238,7 @@ return;
         longword of data
 */
 
-int32 ReadIO (int32 pa, int32 lnt)
+int32 ReadIO (uint32 pa, int32 lnt)
 {
 int32 iod;
 
@@ -264,7 +259,7 @@ return iod;
         none
 */
 
-void WriteIO (int32 pa, int32 val, int32 lnt)
+void WriteIO (uint32 pa, int32 val, int32 lnt)
 {
 if (lnt == L_BYTE) WriteQb (pa, val, WRITEB);
 else if (lnt == L_WORD) WriteQb (pa, val, WRITE);

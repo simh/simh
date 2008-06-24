@@ -1,3 +1,5 @@
+Bugs Found And Fixed During Simulator Debug
+
 1. RP: drive clear does not clear RPDA.
 2. TU: default formatter must be TM03.
 3. SBI: drive 'letter' is actually a 1-based number.

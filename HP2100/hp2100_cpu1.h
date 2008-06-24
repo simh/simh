@@ -1,6 +1,6 @@
 /* hp2100_cpu1.h: HP 2100/1000 firmware dispatcher definitions
 
-   Copyright (c) 2006, J. David Bryan
+   Copyright (c) 2006-2008, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,12 +23,32 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
+   30-Apr-08    JDB     Corrected OP_AFF to OP_AAFF for SIGNAL/1000
+                        Removed unused operand patterns
+   23-Feb-08    HV      Added more OP_* for SIGNAL/1000 and VIS
+   28-Nov-07    JDB     Added fprint_ops, fprint_regs for debug printouts
+   19-Oct-07    JDB     Revised OP_KKKAKK operand profile to OP_CCCACC for $LOC
    16-Oct-06    JDB     Generalized operands for F-Series FP types
    26-Sep-06    JDB     Split from hp2100_cpu1.c
 */
 
 #ifndef _HP2100_CPU1_H_
 #define _HP2100_CPU1_H_
+
+
+/* Register print encoding. */
+
+#define REG_COUNT       9                               /* count of print flags */
+
+#define REG_CIR         (1 << 0)                        /* print central interrupt register */
+#define REG_A           (1 << 1)                        /* print A register */
+#define REG_B           (1 << 2)                        /* print B register */
+#define REG_E           (1 << 3)                        /* print E register */
+#define REG_X           (1 << 4)                        /* print X register */
+#define REG_Y           (1 << 5)                        /* print Y register */
+#define REG_O           (1 << 6)                        /* print O register */
+#define REG_P           (1 << 7)                        /* print P register */
+#define REG_P_REL       (1 << 8)                        /* print P register as relative */
 
 
 /* Operand processing encoding. */
@@ -76,7 +96,6 @@
 #define OP_A            (OP_ADR << OP_V_F1)
 #define OP_K            (OP_ADK << OP_V_F1)
 #define OP_D            (OP_ADD << OP_V_F1)
-#define OP_F            (OP_ADF << OP_V_F1)
 #define OP_X            (OP_ADX << OP_V_F1)
 #define OP_T            (OP_ADT << OP_V_F1)
 #define OP_E            (OP_ADE << OP_V_F1)
@@ -87,7 +106,6 @@
 #define OP_RC           ((OP_FAB << OP_V_F1) | (OP_CON << OP_V_F2))
 #define OP_RK           ((OP_FAB << OP_V_F1) | (OP_ADK << OP_V_F2))
 #define OP_RF           ((OP_FAB << OP_V_F1) | (OP_ADF << OP_V_F2))
-#define OP_CC           ((OP_CON << OP_V_F1) | (OP_CON << OP_V_F2))
 #define OP_CV           ((OP_CON << OP_V_F1) | (OP_VAR << OP_V_F2))
 #define OP_AC           ((OP_ADR << OP_V_F1) | (OP_CON << OP_V_F2))
 #define OP_AA           ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2))
@@ -97,7 +115,6 @@
 #define OP_KV           ((OP_ADK << OP_V_F1) | (OP_VAR << OP_V_F2))
 #define OP_KA           ((OP_ADK << OP_V_F1) | (OP_ADR << OP_V_F2))
 #define OP_KK           ((OP_ADK << OP_V_F1) | (OP_ADK << OP_V_F2))
-#define OP_FF           ((OP_ADF << OP_V_F1) | (OP_ADF << OP_V_F2))
 
 #define OP_IIF          ((OP_IAR << OP_V_F1) | (OP_IAR << OP_V_F2) | \
                          (OP_ADF << OP_V_F3))
@@ -108,6 +125,9 @@
 #define OP_CVA          ((OP_CON << OP_V_F1) | (OP_VAR << OP_V_F2) | \
                          (OP_ADR << OP_V_F3))
 
+#define OP_AAA          ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
+                         (OP_ADR << OP_V_F3))
+
 #define OP_AAF          ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
                          (OP_ADF << OP_V_F3))
 
@@ -116,6 +136,9 @@
 
 #define OP_AAT          ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
                          (OP_ADT << OP_V_F3))
+
+#define OP_AKA          ((OP_ADR << OP_V_F1) | (OP_ADK << OP_V_F2) | \
+                         (OP_ADR << OP_V_F3))
 
 #define OP_AKK          ((OP_ADR << OP_V_F1) | (OP_ADK << OP_V_F2) | \
                          (OP_ADK << OP_V_F3))
@@ -132,16 +155,57 @@
 #define OP_AAXX         ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
                          (OP_ADX << OP_V_F3) | (OP_ADX << OP_V_F4))
 
+#define OP_AAFF         ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
+                         (OP_ADF << OP_V_F3) | (OP_ADF << OP_V_F4))
+
+#define OP_AAKK         ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
+                         (OP_ADK << OP_V_F3) | (OP_ADK << OP_V_F4))
+
 #define OP_KKKK         ((OP_ADK << OP_V_F1) | (OP_ADK << OP_V_F2) | \
                          (OP_ADK << OP_V_F3) | (OP_ADK << OP_V_F4))
+
+#define OP_AAAKK        ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
+                         (OP_ADR << OP_V_F3) | (OP_ADK << OP_V_F4) | \
+                         (OP_ADK << OP_V_F5))
+
+#define OP_AKAKK        ((OP_ADR << OP_V_F1) | (OP_ADK << OP_V_F2) | \
+                         (OP_ADR << OP_V_F3) | (OP_ADK << OP_V_F4) | \
+                         (OP_ADK << OP_V_F5))
+
+#define OP_AAACCC       ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
+                         (OP_ADR << OP_V_F3) | (OP_CON << OP_V_F4) | \
+                         (OP_CON << OP_V_F5) | (OP_CON << OP_V_F6))
+
+#define OP_AAFFKK       ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
+                         (OP_ADF << OP_V_F3) | (OP_ADF << OP_V_F4) | \
+                         (OP_ADK << OP_V_F5) | (OP_ADK << OP_V_F6))
+
+#define OP_AAKAKK       ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
+                         (OP_ADK << OP_V_F3) | (OP_ADR << OP_V_F4) | \
+                         (OP_ADK << OP_V_F5) | (OP_ADK << OP_V_F6))
 
 #define OP_CATAKK       ((OP_CON << OP_V_F1) | (OP_ADR << OP_V_F2) | \
                          (OP_ADT << OP_V_F3) | (OP_ADR << OP_V_F4) | \
                          (OP_ADK << OP_V_F5) | (OP_ADK << OP_V_F6))
 
-#define OP_KKKAKK       ((OP_ADK << OP_V_F1) | (OP_ADK << OP_V_F2) | \
+#define OP_CCCACC       ((OP_CON << OP_V_F1) | (OP_CON << OP_V_F2) | \
+                         (OP_CON << OP_V_F3) | (OP_ADR << OP_V_F4) | \
+                         (OP_CON << OP_V_F5) | (OP_CON << OP_V_F6))
+
+#define OP_AAAFFKK      ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
+                         (OP_ADR << OP_V_F3) | (OP_ADF << OP_V_F4) | \
+                         (OP_ADF << OP_V_F5) | (OP_ADK << OP_V_F6) | \
+                         (OP_ADK << OP_V_F7))
+
+#define OP_AKAKAKK      ((OP_ADR << OP_V_F1) | (OP_ADK << OP_V_F2) | \
+                         (OP_ADR << OP_V_F3) | (OP_ADK << OP_V_F4) | \
+                         (OP_ADR << OP_V_F5) | (OP_ADK << OP_V_F6) | \
+                         (OP_ADK << OP_V_F7))
+
+#define OP_AAKAKAKK     ((OP_ADR << OP_V_F1) | (OP_ADR << OP_V_F2) | \
                          (OP_ADK << OP_V_F3) | (OP_ADR << OP_V_F4) | \
-                         (OP_ADK << OP_V_F5) | (OP_ADK << OP_V_F6))
+                         (OP_ADK << OP_V_F5) | (OP_ADR << OP_V_F6) | \
+                         (OP_ADK << OP_V_F7) | (OP_ADK << OP_V_F8))
 
 #define OP_CCACACCA     ((OP_CON << OP_V_F1) | (OP_CON << OP_V_F2) | \
                          (OP_ADR << OP_V_F3) | (OP_CON << OP_V_F4) | \
@@ -171,7 +235,7 @@ typedef enum { in_s, in_d, fp_f, fp_x, fp_t, fp_e, fp_a } OPSIZE;
 
 /* Conversion from operand size to word count. */
 
-#define TO_COUNT(s)     ((s == fp_a) ? 0 : s + (s < fp_f))
+#define TO_COUNT(s)     ((s == fp_a) ? 0 : (uint32) (s + (s < fp_f)))
 
 
 /* HP in-memory representation of a packed floating-point number.
@@ -211,5 +275,8 @@ t_stat cpu_uig_1 (uint32 IR, uint32 intrq, uint32 iotrap);  /* UIG group 1 dispa
 OP     ReadOp  (uint32 va, OPSIZE precision);               /* generalized operand read */
 void   WriteOp (uint32 va, OP operand, OPSIZE precision);   /* generalized operand write */
 t_stat cpu_ops (OP_PAT pattern, OPS op, uint32 irq);        /* operand processor */
+
+void fprint_ops (OP_PAT pattern, OPS op);                   /* debug print operands */
+void fprint_regs (char *caption, uint32 regs, uint32 base); /* debug print CPU registers */
 
 #endif

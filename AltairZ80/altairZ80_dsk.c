@@ -1,6 +1,6 @@
 /*  altairz80_dsk.c: MITS Altair 88-DISK Simulator
 
-    Copyright (c) 2002-2007, Peter Schorn
+    Copyright (c) 2002-2008, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -109,6 +109,7 @@
 */
 
 #include "altairz80_defs.h"
+#include <assert.h>
 
 #define UNIT_V_DSK_WLK      (UNIT_V_UF + 0)         /* write locked                             */
 #define UNIT_DSK_WLK        (1 << UNIT_V_DSK_WLK)
@@ -125,6 +126,8 @@
 #define TRACE_SECTOR_STUCK  4
 #define TRACE_TRACK_STUCK   8
 #define NUM_OF_DSK_MASK     (NUM_OF_DSK - 1)
+#define BOOTROM_SIZE_DSK    256                     /* size of boot rom                         */
+
 
 int32 dsk10(const int32 port, const int32 io, const int32 data);
 int32 dsk11(const int32 port, const int32 io, const int32 data);
@@ -133,13 +136,14 @@ static t_stat dsk_boot(int32 unitno, DEVICE *dptr);
 static t_stat dsk_reset(DEVICE *dptr);
 static t_stat dsk_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc);
 
-extern int32 PCX;
-extern int32 saved_PC;
-extern char messageBuffer[];
+extern REG *sim_PC;
 extern UNIT cpu_unit;
+extern char messageBuffer[];
+extern uint32 PCX;
 
 extern void printMessage(void);
-extern int32 install_bootrom(void);
+extern t_stat install_bootrom(int32 bootrom[], int32 size, int32 addr, int32 makeROM);
+void install_ALTAIRbootROM(void);
 
 /* global data on status */
 
@@ -152,7 +156,7 @@ static int32 current_byte   [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
 static int32 current_flag   [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 tracks         [NUM_OF_DSK]    = { MAX_TRACKS, MAX_TRACKS, MAX_TRACKS, MAX_TRACKS,
                                                 MAX_TRACKS, MAX_TRACKS, MAX_TRACKS, MAX_TRACKS };
-static int32 trace_flag                     = 0;
+static int32 trace_level                     = 0;
 static int32 in9_count                      = 0;
 static int32 in9_message                    = FALSE;
 static int32 dirty                          = FALSE;    /* TRUE when buffer has unwritten data in it    */
@@ -165,7 +169,7 @@ static int32 warnDSK12                      = 0;
 static int8 dskbuf[DSK_SECTSIZE];                       /* data Buffer                                  */
 
 /* Altair MITS modified BOOT EPROM, fits in upper 256 byte of memory */
-int32 bootrom[BOOTROM_SIZE] = {
+int32 bootrom_dsk[BOOTROM_SIZE_DSK] = {
     0xf3, 0x06, 0x80, 0x3e, 0x0e, 0xd3, 0xfe, 0x05, /* ff00-ff07 */
     0xc2, 0x05, 0xff, 0x3e, 0x16, 0xd3, 0xfe, 0x3e, /* ff08-ff0f */
     0x12, 0xd3, 0xfe, 0xdb, 0xfe, 0xb7, 0xca, 0x20, /* ff10-ff17 */
@@ -220,7 +224,7 @@ static REG dsk_reg[] = {
     { BRDATA (CURBYTE,      current_byte,   10, 32, NUM_OF_DSK),    REG_CIRC + REG_RO   },
     { BRDATA (CURFLAG,      current_flag,   10, 32, NUM_OF_DSK),    REG_CIRC + REG_RO   },
     { BRDATA (TRACKS,       tracks,         10, 8,  NUM_OF_DSK),    REG_CIRC            },
-    { ORDATA (TRACE,        trace_flag, 8)                                              },
+    { HRDATA (TRACELEVEL,   trace_level, 16)                                              },
     { DRDATA (IN9COUNT,     in9_count, 4),                          REG_RO              },
     { DRDATA (IN9MESSAGE,   in9_message, 4),                        REG_RO              },
     { DRDATA (DIRTY,        dirty, 4),                              REG_RO              },
@@ -249,7 +253,7 @@ DEVICE dsk_dev = {
     8, 10, 31, 1, 8, 8,
     NULL, NULL, &dsk_reset,
     &dsk_boot, NULL, NULL,
-    NULL, 0, 0,
+    NULL, (DEV_DISABLE), 0,
     NULL, NULL, NULL
 };
 
@@ -272,11 +276,8 @@ static t_stat dsk_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc) {
 /* returns TRUE iff there exists a disk with VERBOSE */
 static int32 hasVerbose(void) {
     int32 i;
-    for (i = 0; i < NUM_OF_DSK; i++) {
-        if (((dsk_dev.units + i) -> flags) & UNIT_DSK_VERBOSE) {
-            return TRUE;
-        }
-    }
+    for (i = 0; i < NUM_OF_DSK; i++)
+        if (((dsk_dev.units + i) -> flags) & UNIT_DSK_VERBOSE) return TRUE;
     return FALSE;
 }
 
@@ -290,29 +291,33 @@ static char* selectInOut(const int32 io) {
 static t_stat dsk_reset(DEVICE *dptr) {
     resetDSKWarningFlags();
     current_disk    = NUM_OF_DSK;
-    trace_flag      = 0;
+    trace_level      = 0;
     in9_count       = 0;
     in9_message     = FALSE;
     return SCPE_OK;
+}
+
+void install_ALTAIRbootROM(void) {
+    assert(install_bootrom(bootrom_dsk, BOOTROM_SIZE_DSK, ALTAIR_ROM_LOW, TRUE) == SCPE_OK);
 }
 
 /*  The boot routine modifies the boot ROM in such a way that subsequently
     the specified disk is used for boot purposes.
 */
 static t_stat dsk_boot(int32 unitno, DEVICE *dptr) {
-    if (cpu_unit.flags & (UNIT_ALTAIRROM | UNIT_BANKED)) {
+    if (cpu_unit.flags & (UNIT_CPU_ALTAIRROM | UNIT_CPU_BANKED)) {
         /* check whether we are really modifying an LD A,<> instruction */
-        if ((bootrom[UNIT_NO_OFFSET_1 - 1] == LDA_INSTRUCTION) && (bootrom[UNIT_NO_OFFSET_2 - 1] == LDA_INSTRUCTION)) {
-            bootrom[UNIT_NO_OFFSET_1] = unitno & 0xff;             /* LD A,<unitno>        */
-            bootrom[UNIT_NO_OFFSET_2] = 0x80 | (unitno & 0xff);    /* LD a,80h | <unitno>  */
+        if ((bootrom_dsk[UNIT_NO_OFFSET_1 - 1] == LDA_INSTRUCTION) && (bootrom_dsk[UNIT_NO_OFFSET_2 - 1] == LDA_INSTRUCTION)) {
+            bootrom_dsk[UNIT_NO_OFFSET_1] = unitno & 0xff;             /* LD A,<unitno>        */
+            bootrom_dsk[UNIT_NO_OFFSET_2] = 0x80 | (unitno & 0xff);    /* LD a,80h | <unitno>  */
         }
         else { /* Attempt to modify non LD A,<> instructions is refused. */
             printf("Incorrect boot ROM offsets detected.\n");
             return SCPE_IERR;
         }
-        install_bootrom();                                         /* install modified ROM */
+        install_ALTAIRbootROM();                                         /* install modified ROM */
     }
-    saved_PC = DEFAULT_ROM_LOW;
+    *((int32 *) sim_PC->loc) = ALTAIR_ROM_LOW;
     return SCPE_OK;
 }
 
@@ -326,12 +331,11 @@ static void writebuf(void) {
     int32 i, rtn;
     UNIT *uptr;
     i = current_byte[current_disk];         /* null-fill rest of sector if any */
-    while (i < DSK_SECTSIZE) {
+    while (i < DSK_SECTSIZE)
         dskbuf[i++] = 0;
-    }
     uptr = dsk_dev.units + current_disk;
     if (((uptr -> flags) & UNIT_DSK_WLK) == 0) { /* write enabled */
-        if (trace_flag & TRACE_READ_WRITE) {
+        if (trace_level & TRACE_READ_WRITE) {
             MESSAGE_4("OUT 0x0a (WRITE) D%d T%d S%d", current_disk, current_track[current_disk], current_sector[current_disk]);
         }
         if (dskseek(uptr)) {
@@ -386,10 +390,9 @@ int32 dsk10(const int32 port, const int32 io, const int32 data) {
     }
 
     /* OUT: Controller set/reset/enable/disable */
-    if (dirty) {    /* implies that current_disk < NUM_OF_DSK */
+    if (dirty)    /* implies that current_disk < NUM_OF_DSK */
         writebuf();
-    }
-    if (trace_flag & TRACE_IN_OUT) {
+    if (trace_level & TRACE_IN_OUT) {
         MESSAGE_2("OUT 0x08: %x", data);
     }
     current_disk = data & NUM_OF_DSK_MASK; /* 0 <= current_disk < NUM_OF_DSK */
@@ -397,7 +400,7 @@ int32 dsk10(const int32 port, const int32 io, const int32 data) {
     if ((current_disk_flags & UNIT_ATT) == 0) { /* nothing attached? */
         if ( (current_disk_flags & UNIT_DSK_VERBOSE) && (warnAttached[current_disk] < warnLevelDSK) ) {
             warnAttached[current_disk]++;
-/*02*/MESSAGE_2("Attempt to select unattached DSK%d - ignored.", current_disk);
+/*02*/      MESSAGE_2("Attempt to select unattached DSK%d - ignored.", current_disk);
         }
         current_disk = NUM_OF_DSK;
     }
@@ -425,73 +428,61 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
     /* now current_disk < NUM_OF_DSK */
     if (io == 0) {  /* read sector position */
         in9_count++;
-        if ((trace_flag & TRACE_SECTOR_STUCK) && (in9_count > 2 * DSK_SECT) && (!in9_message)) {
+        if ((trace_level & TRACE_SECTOR_STUCK) && (in9_count > 2 * DSK_SECT) && (!in9_message)) {
             in9_message = TRUE;
             MESSAGE_2("Looping on sector find %d.", current_disk);
         }
-        if (trace_flag & TRACE_IN_OUT) {
+        if (trace_level & TRACE_IN_OUT) {
             MESSAGE_1("IN 0x09");
         }
-        if (dirty) {/* implies that current_disk < NUM_OF_DSK */
+        if (dirty)  /* implies that current_disk < NUM_OF_DSK */
             writebuf();
-        }
         if (current_flag[current_disk] & 0x04) {    /* head loaded? */
             current_sector[current_disk]++;
-            if (current_sector[current_disk] >= DSK_SECT) {
+            if (current_sector[current_disk] >= DSK_SECT)
                 current_sector[current_disk] = 0;
-            }
             current_byte[current_disk] = 0xff;
             return (((current_sector[current_disk] << 1) & 0x3e)    /* return 'sector true' bit = 0 (true) */
                 | 0xc0);                                            /* set on 'unused' bits */
-        } else {
-            return 0;                                               /* head not loaded - return 0 */
-        }
+        } else return 0;                                            /* head not loaded - return 0 */
     }
 
     in9_count = 0;
     /* drive functions */
 
-    if (trace_flag & TRACE_IN_OUT) {
+    if (trace_level & TRACE_IN_OUT) {
         MESSAGE_2("OUT 0x09: %x", data);
     }
     if (data & 0x01) {      /* step head in                             */
-        if (trace_flag & TRACE_TRACK_STUCK) {
-            if (current_track[current_disk] == (tracks[current_disk] - 1)) {
-                MESSAGE_2("Unnecessary step in for disk %d", current_disk);
-            }
+        if ((trace_level & TRACE_TRACK_STUCK) && (current_track[current_disk] == (tracks[current_disk] - 1))) {
+            MESSAGE_2("Unnecessary step in for disk %d", current_disk);
         }
         current_track[current_disk]++;
-        if (current_track[current_disk] > (tracks[current_disk] - 1)) {
+        if (current_track[current_disk] > (tracks[current_disk] - 1))
             current_track[current_disk] = (tracks[current_disk] - 1);
-        }
-        if (dirty) {        /* implies that current_disk < NUM_OF_DSK   */
+        if (dirty)          /* implies that current_disk < NUM_OF_DSK   */
             writebuf();
-        }
         current_sector[current_disk]    = 0xff;
         current_byte[current_disk]      = 0xff;
     }
 
     if (data & 0x02) {      /* step head out                            */
-        if (trace_flag & TRACE_TRACK_STUCK) {
-            if (current_track[current_disk] == 0) {
-                MESSAGE_2("Unnecessary step out for disk %d", current_disk);
-            }
+        if ((trace_level & TRACE_TRACK_STUCK) && (current_track[current_disk] == 0)) {
+            MESSAGE_2("Unnecessary step out for disk %d", current_disk);
         }
         current_track[current_disk]--;
         if (current_track[current_disk] < 0) {
             current_track[current_disk] = 0;
             current_flag[current_disk] |= 0x40; /* track 0 if there     */
         }
-        if (dirty) {        /* implies that current_disk < NUM_OF_DSK   */
+        if (dirty)          /* implies that current_disk < NUM_OF_DSK   */
             writebuf();
-        }
         current_sector[current_disk]    = 0xff;
         current_byte[current_disk]      = 0xff;
     }
 
-    if (dirty) {            /* implies that current_disk < NUM_OF_DSK   */
+    if (dirty)              /* implies that current_disk < NUM_OF_DSK   */
         writebuf();
-    }
 
     if (data & 0x04) {      /* head load                                */
         current_flag[current_disk] |= 0x04;         /* turn on head loaded bit          */
@@ -534,12 +525,11 @@ int32 dsk12(const int32 port, const int32 io, const int32 data) {
     if (io == 0) {
         if (current_byte[current_disk] >= DSK_SECTSIZE) {
             /* physically read the sector */
-            if (trace_flag & TRACE_READ_WRITE) {
+            if (trace_level & TRACE_READ_WRITE) {
                 MESSAGE_4("IN 0x0a (READ) D%d T%d S%d", current_disk, current_track[current_disk], current_sector[current_disk]);
             }
-            for (i = 0; i < DSK_SECTSIZE; i++) {
+            for (i = 0; i < DSK_SECTSIZE; i++)
                 dskbuf[i] = 0;
-            }
             dskseek(uptr);
             fread(dskbuf, DSK_SECTSIZE, 1, uptr -> fileref);
             current_byte[current_disk] = 0;
@@ -547,9 +537,8 @@ int32 dsk12(const int32 port, const int32 io, const int32 data) {
         return dskbuf[current_byte[current_disk]++] & 0xff;
     }
     else {
-        if (current_byte[current_disk] >= DSK_SECTSIZE) {
+        if (current_byte[current_disk] >= DSK_SECTSIZE)
             writebuf();     /* from above we have that current_disk < NUM_OF_DSK */
-        }
         else {
             dirty = TRUE;   /* this guarantees for the next call to writebuf that current_disk < NUM_OF_DSK */
             dskbuf[current_byte[current_disk]++] = data & 0xff;

@@ -1,6 +1,6 @@
 /* nova_sys.c: NOVA simulator interface
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   04-Jul-07    BKR     DEC's IOF/ION changed to DG's INTDS/INTEN mnemonic,
+                        Fixed QTY/ADCV device name,
+                        RDSW changed to DDG's READS mnemonic,
+                        fixed/enhanced 'load' command for DG-compatible binary tape format
    26-Mar-04    RMS     Fixed warning with -std=c99
    14-Jan-04    BKR     Added support for QTY and ALM
    04-Jan-04    RMS     Fixed 64b issues found by VMS 8.1
@@ -45,13 +49,6 @@
 
 extern DEVICE cpu_dev;
 extern UNIT cpu_unit;
-#if defined (ECLIPSE)
-extern DEVICE map_dev;
-extern DEVICE fpu_dev;
-extern DEVICE pit_dev;
-extern int32 Usermap;
-extern int32 MapStat;
-#endif
 extern DEVICE ptr_dev;
 extern DEVICE ptp_dev;
 extern DEVICE plt_dev;
@@ -69,6 +66,20 @@ extern DEVICE alm_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
 extern int32 saved_PC;
+extern int32 AMASK;
+
+#if defined (ECLIPSE)
+
+extern DEVICE map_dev;
+extern DEVICE fpu_dev;
+extern DEVICE pit_dev;
+extern int32 Usermap;
+extern int32 MapStat;
+
+#endif
+
+extern int32 sim_switches;
+
 
 /* SCP data structures
 
@@ -120,8 +131,7 @@ const char *sim_stop_messages[] = {
     "HALT instruction",
     "Breakpoint",
     "Nested indirect address limit exceeded",
-    "Nested indirect interrupt address limit exceeded",
-    "Nested indirect trap address limit exceeded",
+    "Nested indirect interrupt or trap address limit exceeded",
     "Read breakpoint",
     "Write breakpoint"
     };
@@ -147,29 +157,57 @@ const char *sim_stop_messages[] = {
    If the word count is [-21,-n], then the block is repeated data.
    If the word count is 1, the block is the start address.
    If the word count is >1, the block is an error block.
+
+Notes:
+    'start' block terminates loading.
+    'start' block starting address 1B0 = do not auto-start, 0B0 = auto-start.
+    'start' block starting address is saved in 'save_PC' so a "continue"
+      should start the program.
+
+    specify -i switch ignores checksum errors
+
+
+internal state machine:
+
+    0,1 get byte count (low and high), ignore leader bytes (<000>)
+    2,3 get origin
+    4,5 get checksum
+    6,7 process data block
+    8   process 'ignore' (error) block
 */
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
-int32 data, csum, count, state, i;
-uint32 origin;
+int32	data, csum, count, state, i;
+int32	origin;
+int	pos ;
+int	block_start ;
+int	done ;
 
-if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
+if ((*cptr != 0) || (flag != 0))
+    return ( SCPE_ARG ) ;
 state = 0;
-while ((i = getc (fileref)) != EOF) {
+block_start = -1 ;
+done  = 0 ;
+for ( pos = 0 ; (! done) && ((i=getc(fileref)) != EOF) ; ++pos )
+    {
+    i &= 0x00FF ;                                       /* (insure no sign extension) */
     switch (state) {
         case 0:                                         /* leader */
             count = i;
-            state = (count != 0);
+            state = (count != 0) ;
+        if ( state )
+        block_start = pos ;
             break;
         case 1:                                         /* high count */
-            csum = count = (i << 8) | count;
+            csum = count = (i << 8) | count ;
             state = 2;
             break;
         case 2:                                         /* low origin */
             origin = i;
             state = 3;
-            break;
+        break ;
+
         case 3:                                         /* high origin */
             origin = (i << 8) | origin;
             csum = csum + origin;
@@ -180,55 +218,87 @@ while ((i = getc (fileref)) != EOF) {
             state = 5;
             break;
         case 5:                                         /* high checksum */
-            csum = csum + (i << 8);
-            if (count == 1) saved_PC = origin;          /* count = 1? */
-            if (count <= 1) {                           /* count = 0/1? */
-                if (csum & 0177777) return SCPE_CSUM;
-                state = 0;
-                break;
-				}
-            if (count < 0100000) {                      /* count > 1 */
-                state = 8;
-                break;
-				}
-            count = 0200000 - count;
-            state = 6;
+            csum = (csum + (i << 8)) & 0xFFFF ;
+            if (count == 1)
+                {
+                /*  'start' block  */
+                /*  do any auto-start check or inhibit check  */
+                saved_PC = (origin & 077777) ;              /*  0B0 = auto-start program    */
+                                                            /*  1B0 = do not auto start */
+                state	= 0 ;                               /*  indicate okay state */
+                done	= 1 ;                               /*  we're done! */
+                if ( ! (origin & 0x8000) )
+                    {
+                    printf( "auto start @ %05o \n", (origin & 0x7FFF) ) ;
+                    }
+                break ;
+                }
+        if ( ((count & 0x8000) == 0) && (count > 1))
+            {
+            /*  'ignore' block  */
+            state = 8 ;
+            }
+        /*  'data' or 'repeat' block  */
+        count = 0200000 - count ;
+        if ( count <= 020 )
+            {
+            /*  'data' block  */
+            state = 6 ;
+            break ;
+            }
+        /*  'repeat' block (multiple data)  */
+
+            if (count > 020) {                           /* large block */
+                for (count = count - 1; count > 1; count--) {
+                    if (origin >= AMASK /* MEMSIZE? */)
+                        {
+                        return ( SCPE_NXM );
+                        }
+                    M[origin] = data;
+                    origin = origin + 1;
+                    }
+                state = 0 ;
+                }
+            state = 0;
             break;
         case 6:                                         /* low data  */
-            data = i;
+            data  = i;
             state = 7;
             break;
         case 7:                                         /* high data */
             data = (i << 8) | data;
-            csum = csum + data;
-            if (count > 20) {                           /* large block */
-                for (count = count - 1; count == 1; count--) {
-                    if (origin >= MEMSIZE) return SCPE_NXM;
-                    M[origin] = data;
-                    origin = origin + 1;
-                    }
-                }
-            if (origin >= MEMSIZE) return SCPE_NXM;
+            csum = (csum + data) & 0xFFFF ;
+
+            if (origin >= AMASK /* MEMSIZE? */)
+                return SCPE_NXM;
             M[origin] = data;
             origin = origin + 1;
             count = count - 1;
             if (count == 0) {
-                if (csum & 0177777) return SCPE_CSUM;
+                if ( csum )
+                    {
+                    printf( "checksum error: block start at %d [0x%x] \n", block_start, block_start ) ;
+                    printf( "calculated: 0%o [0x%4x]\n", csum, csum ) ;
+                    if ( ! (sim_switches & SWMASK('I')) )
+                        return SCPE_CSUM;
+                    }
                 state = 0;
                 break;
                 }
             state = 6;
             break;
-        case 8:                                         /* error block */
-            if (i == 0377) state = 0;
+        case 8:                                         /* error (ignore) block */
+            if (i == 0377)
+            state = 0;                                  /*  (wait for 'RUBOUT' char)  */
             break;
             }                                           /* end switch */
         }                                               /* end while */
 
 /* Ok to find end of tape between blocks or in error state */
 
-return ((state == 0) || (state == 8))? SCPE_OK: SCPE_FMT;
+return ( ((state == 0) || (state == 8)) ? SCPE_OK : SCPE_FMT ) ;
 }
+
 
 /* Symbol tables */
 
@@ -382,8 +452,8 @@ static const char *opcode[] = {
  "ANDL#", "ANDZL#", "ANDOL#", "ANDCL#",
  "ANDR#", "ANDZR#", "ANDOR#", "ANDCR#",
  "ANDS#", "ANDZS#", "ANDOS#", "ANDCS#",
- "ION", "IOF",
- "RDSW", "INTA", "MSKO", "IORST", "HALT",
+ "INTEN", "INTDS",
+ "READS", "INTA", "MSKO", "IORST", "HALT",
 #if !defined (ECLIPSE)
  "MUL", "DIV", "MULS", "DIVS",
  "PSHA", "POPA", "SAV", "RET",
@@ -517,7 +587,7 @@ static const int32 opc_val[] = {
  0061001+I_R, 0060001+I_R, 0061201+I_R, 0060201+I_R,
  0060401+I_BY, 0062001+I_BY,
 #endif
- 0060000+I_D, 0060100+I_D, 0060200+I_D, 0060300+I_D,
+ 0060000+I_RD, 0060100+I_RD, 0060200+I_RD, 0060300+I_RD,
  0060400+I_RD, 0060500+I_RD, 0060600+I_RD, 0060700+I_RD,
  0061000+I_RD, 0061100+I_RD, 0061200+I_RD, 0061300+I_RD,
  0061400+I_RD, 0061500+I_RD, 0061600+I_RD, 0061700+I_RD,
@@ -541,7 +611,7 @@ static const char *device[] = {
  "ERCC", "MAP",
 #endif
  "TTI", "TTO", "PTR", "PTP", "RTC", "PLT", "CDR", "LPT",
- "DSK", "MTA", "DCM", "ADCV", "DKP", "CAS",
+ "DSK", "MTA", "DCM", "QTY" /* "ADCV" */, "DKP", "CAS",
  "TTI1", "TTO1", "CPU",
  NULL
  };

@@ -254,7 +254,6 @@ int32 tmr1_inta (void);
 int32 parity (int32 val, int32 odd);
 t_stat sysd_powerup (void);
 
-extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 cqmap_rd (int32 pa);
 extern void cqmap_wr (int32 pa, int32 val, int32 lnt);

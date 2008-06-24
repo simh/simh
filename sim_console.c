@@ -640,7 +640,7 @@ t_stat sim_ttcmd (void)
 if (sim_log) {
     fflush (sim_log);
     _setmode (_fileno (sim_log), _O_TEXT);
-	}
+    }
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 if (!SetConsoleMode(std_input, saved_mode)) return SCPE_TTYERR;
 return SCPE_OK;
@@ -731,7 +731,7 @@ if (c != 0177) {
     putch (c);
 #endif
     fflush (stdout);
-	}
+    }
 return SCPE_OK;
 }
 

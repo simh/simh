@@ -1,6 +1,6 @@
 /* pdp11_pclk.c: KW11P programmable clock simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
    Written by John Dundas, used with his gracious permission
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    pclk         KW11P line frequency clock
 
+   20-May-08    RMS     Standardized clock delay at 1mips
    18-Jun-07    RMS     Added UNIT_IDLE flag
    07-Jul-05    RMS     Removed extraneous externs
 
@@ -133,7 +134,7 @@ uint32 pclk_csr = 0;                                    /* control/status */
 uint32 pclk_csb = 0;                                    /* count set buffer */
 uint32 pclk_ctr = 0;                                    /* counter */
 static uint32 rate[4] = { 100000, 10000, 60, 10 };      /* ticks per second */
-static uint32 xtim[4] = { 10, 100, 16000, 100000 };     /* nominal time delay */
+static uint32 xtim[4] = { 10, 100, 16667, 100000 };     /* nominal time delay */
 
 DEVICE pclk_dev;
 t_stat pclk_rd (int32 *data, int32 PA, int32 access);

@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu          PDP-11 CPU
 
+   22-Apr-08    RMS     Fixed MMR0 treatment in RESET (found by Walter Mueller)
+   02-Feb-08    RMS     Fixed DMA memory address limit test (found by John Dundas)
    28-Apr-07    RMS     Removed clock initialization
    27-Oct-06    RMS     Added idle support
    18-Oct-06    RMS     Fixed bug in ASH -32 C value
@@ -296,6 +298,7 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 int32 dsmask[4] = { MMR3_KDS, MMR3_SDS, 0, MMR3_UDS };  /* dspace enables */
+t_addr cpu_memsize = INIMEMSIZE;                        /* last mem addr */
 
 extern int32 CPUERR, MAINT;
 extern int32 sim_interval;
@@ -646,6 +649,9 @@ t_stat reason;
 
 reason = build_dib_tab ();                              /* build, chk dib_tab */
 if (reason != SCPE_OK) return reason;
+if (MEMSIZE < cpu_tab[cpu_model].maxm)                  /* mem size < max? */
+    cpu_memsize = MEMSIZE;                              /* then okay */
+else cpu_memsize = cpu_tab[cpu_model].maxm - IOPAGESIZE;/* max - io page */
 cpu_type = 1u << cpu_model;                             /* reset type mask */
 cpu_bme = (MMR3 & MMR3_BME) && (cpu_opt & OPT_UBM);     /* map enabled? */
 PC = saved_PC;
@@ -863,11 +869,11 @@ while (reason == 0)  {
             case 5:                                     /* RESET */
                 if (cm == MD_KER) {
                     reset_all (2);                      /* skip CPU, sys reg */
-                    PIRQ = 0;                           /* clear PIRQ, STKLIM, */
-                    STKLIM = 0;                         /* MMR0<15:12,0>, */
+                    PIRQ = 0;                           /* clear PIRQ */
+                    STKLIM = 0;                         /* clear STKLIM */
+                    MMR0 = 0;                           /* clear MMR0 */
+                    MMR3 = 0;                           /* clear MMR3 */
                     for (i = 0; i < IPL_HLVL; i++) int_req[i] = 0;
-                    MMR0 = MMR0 & ~(MMR0_MME | MMR0_FREEZE);
-                    MMR3 = 0;                           /* MMR3 */
                     trap_req = trap_req & ~TRAP_INT;
                     dsenable = calc_ds (cm);
                     }

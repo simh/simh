@@ -807,7 +807,7 @@ END OF TEST
 *
 
 -------------------------------------------------------------------
-Bugs found
+Bugs Found and Fixed During Simulator Debug
 
 1. CPU16: instruction decoding interpreting CPU models incorrectly
 2. CPU16: SINT should not be conditional on device existing

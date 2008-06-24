@@ -1,6 +1,6 @@
 /* hp2100_fp1.c: HP 1000 multiple-precision floating point routines
 
-   Copyright (c) 2005-2006, J. David Bryan
+   Copyright (c) 2005-2008, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   10-May-08    JDB     Fixed uninitialized return in fp_accum when setting
+   19-Mar-08    JDB     Reworked "complement" to avoid inlining bug in gcc-4.x
    01-Dec-06    JDB     Reworked into generalized multiple-precision ops for FPP
    12-Oct-06    JDB     Altered x_trun for F-Series FFP compatibility
                         Added F-Series ..TCM FFP helpers
@@ -396,7 +398,7 @@ return bits_lost;
 
 static t_int64 unpack_int (OP packed, OPSIZE precision)
 {
-int32 i;
+uint32 i;
 t_uint64 unpacked = 0;
 
 if (precision == in_s)
@@ -438,11 +440,6 @@ unpacked.mantissa =                                     /* unpack and mask manti
 
 switch (precision) {
 
-    case in_s:
-    case in_d:
-        unpacked.exponent = 0;                          /* integers don't use exponent */
-        break;
-
     case fp_f:
     case fp_x:
     case fp_t:
@@ -457,6 +454,10 @@ switch (precision) {
         break;
 
     case fp_a:                                          /* no action for value in accum */
+    case in_s:                                          /* integers don't use exponent */
+    case in_d:                                          /* integers don't use exponent */
+    default:
+        unpacked.exponent = 0;
         break;
     }
 
@@ -657,9 +658,12 @@ return overflow;
 
 static void complement (FPU *result)
 {
-result->mantissa = -result->mantissa;                   /* negate mantissa */
-if (result->mantissa == FP_MAXNMANT)                    /* maximum negative? */
-    lsrx (result, 1);                                   /* correct it */
+if (result->mantissa == FP_MAXNMANT) {                  /* maximum negative? */
+    result->mantissa = FP_ONEHALF;                      /* complement of -1.0 * 2 ^ n */
+    result->exponent = result->exponent + 1;            /* is 0.5 * 2 ^ (n + 1) */
+    }
+else
+    result->mantissa = -result->mantissa;               /* negate mantissa */
 return;
 }
 
@@ -1278,7 +1282,7 @@ return overflow;
 
 OP fp_accum (const OP *operand, OPSIZE precision)
 {
-OP result;
+OP result = NOP;
 uint16 opcode = (uint16) precision | SIGN;              /* add special mode bit */
 
 if (operand)

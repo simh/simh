@@ -54,7 +54,7 @@
 
 #define UST             u3                              /* unit status */
 #define UCMD            u4                              /* unit command */
-#define MT_MAXFR        (1 << 16)                       /* max transfer */
+#define MT_MAXFR        (1 << 24)                       /* max transfer */
 
 /* Command - in UCMD */
 

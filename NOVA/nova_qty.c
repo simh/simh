@@ -1,6 +1,6 @@
 /* nova_qty.c: NOVA multiplexor (QTY/ALM) simulator
 
-   Copyright (c) 2000-2005, Robert M. Supnik
+   Copyright (c) 2000-2008, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    qty          multiplexor: QTY = 4060, ALM = 42xx
 
+   04-Jul-07    BKR     fixed QTY output line number calculation (affected higher line numbers),
    25-Mar-04    RMS     Updated for V3.2
    12-Jan-04    BKR     Initial release
                         includes both original DG "quad" multiplexor (QTY)
@@ -197,16 +198,6 @@ DEVICE  qty_dev =
         NULL, &qty_attach, &qty_detach,
         &qty_dib, (DEV_DISABLE | DEV_DIS | DEV_NET)
         };
-
-
-        /*  <define these in 'nova_defs.h' someday...>  */
-        /*  (need to mask off non-interrupt bit devices)  */
- 
-#define DEV_SET_BUSY( dibp )        dev_busy = dev_busy |  ( (dibp)->mask ) ;
-#define DEV_CLEAR_BUSY( dibp )      dev_busy = dev_busy & ~( (dibp)->mask ) ;
-#define DEV_SET_DONE( dibp )        dev_done = dev_done |  ( (dibp)->mask ) ;  int_req = int_req & ~( (dibp)->mask ) ;
-#define DEV_CLEAR_DONE( dibp )      dev_done = dev_done & ~( (dibp)->mask ) ;  int_req = int_req & ~( (dibp)->mask ) ;
-#define DEV_UPDATE_INTR             int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable) ;
 
 #define DG_RETURN( status, data )   (int32)(((status) << IOT_V_REASON) | ((data) & 0x0FFFF) )
 
@@ -466,17 +457,17 @@ int qty_update_status( DIB * dibp, TMXR * tmxr_desc )
             }
         }
     /*  <we could check each line for TX busy to set DEV_SET_BUSY)?>  */
-    DEV_CLEAR_BUSY( dibp )
-    DEV_CLEAR_DONE( dibp )
+    DEV_CLR_BUSY( INT_QTY ) ;
+    DEV_CLR_DONE( INT_QTY ) ;
     if ( txbusy )
         {
-        DEV_SET_BUSY( dibp ) ;
+        DEV_SET_BUSY( INT_QTY ) ;
         }
     if ( status & (QTY_S_RI | QTY_S_TI) )
         {
-        DEV_SET_DONE( dibp )
+        DEV_SET_DONE( INT_QTY ) ;
         }
-    DEV_UPDATE_INTR                                     /*  update final intr status  */
+    DEV_UPDATE_INTR ;                                   /*  update final intr status  */
         return ( status ) ;
     }   /*  end of 'qty_update_status'  */
 
@@ -568,9 +559,9 @@ t_stat qty_common_reset( DIB * dibp, UNIT * unitp, DEVICE * dptr )
         else qty_dev.flags |= DEV_DIS;
         }
     qty_clear( TRUE ) ;
-    DEV_CLEAR_BUSY( dibp )                              /*  clear busy  */
-    DEV_CLEAR_DONE( dibp )                              /*  clear done, int */
-    DEV_UPDATE_INTR
+    DEV_CLR_BUSY( INT_QTY ) ;                              /*  clear busy  */
+    DEV_CLR_DONE( INT_QTY ) ;                              /*  clear done, int */
+    DEV_UPDATE_INTR ;
     if ( QTY_MASTER_ACTIVE(&qty_desc) )
         {
         sim_activate( unitp, tmxr_poll ) ;
@@ -692,7 +683,7 @@ int32 qty( int32 pulse, int32 code, int32 AC )
         break ;
 
     case ioDOA :    /*  send character to QTY  */
-        line = QTY_LINE_EXTRACT( iodata ) ;
+        line = QTY_LINE_EXTRACT( AC ) ;
         if ( line < qty_max )
             if ( QTY_LINE_BIT_SET(line,QTY_L_TXE) )
             {
@@ -979,7 +970,7 @@ int32 alm( int32 pulse, int32 code, int32 AC )
         /*  (mask with 'alm_line_mask' in case ALM mask is different than QTY */
         alm_section = 0 ;
         if ( ! ( iodata & QTY_S_RI) )
-            if ( iodata & QTY_S_TI )
+          if ( iodata & QTY_S_TI )
             {
             alm_section = 1 ;                           /*  receiver quiet - transmitter done  */
             }
@@ -1100,7 +1091,7 @@ int32 alm( int32 pulse, int32 code, int32 AC )
                  *  clear device busy
                  */
         for ( a = 0 ; a < qty_max ; ++a )
-            if ( 1 )
+          if ( 1 /* (not yet optimized) */ )
             {
             QTY_LINE_CLEAR_BIT( a, (QTY_L_RXBZ | QTY_L_RXDN | QTY_L_TXBZ | QTY_L_TXDN) ) ;
             }
@@ -1112,7 +1103,7 @@ int32 alm( int32 pulse, int32 code, int32 AC )
 
     case iopC :
         for ( a = 0 ; a < qty_max ; ++a )
-            if ( 1 )
+          if ( 1 /* (not yet optimized) */ )
             {
             QTY_LINE_CLEAR_BIT( a, (QTY_L_RXBZ | QTY_L_RXDN | QTY_L_TXBZ | QTY_L_TXDN) ) ;
             }

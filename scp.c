@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   31-Mar-08    RMS     Fixed bug in local/global register search (found by Mark Pizzolato)
+                        Fixed bug in restore of RO units (from Mark Pizzolato)
+   06-Feb-08    RMS     Added SET/SHO/NO BR with default argument
    18-Jul-07    RMS     Modified match_ext for VMS ext;version support
    28-Apr-07    RMS     Modified sim_instr invocation to call sim_rtcn_init_all
                         Fixed bug in get_sim_opt
@@ -172,11 +175,6 @@
 #include "sim_rev.h"
 #include <signal.h>
 #include <ctype.h>
-
-#if defined (HAVE_READLINE)
-#include <readline/readline.h>
-#include <readline/history.h>
-#endif
 
 #define EX_D            0                               /* deposit */
 #define EX_E            1                               /* examine */
@@ -329,6 +327,7 @@ t_stat attach_err (UNIT *uptr, t_stat stat);
 t_stat detach_all (int32 start_device, t_bool shutdown);
 t_stat assign_device (DEVICE *dptr, char *cptr);
 t_stat deassign_device (DEVICE *dptr);
+t_stat ssh_break_one (FILE *st, int32 flg, t_addr lo, int32 cnt, char *aptr);
 t_stat run_boot_prep (void);
 t_stat exdep_reg_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr,
     REG *lowr, REG *highr, uint32 lows, uint32 highs);
@@ -352,6 +351,7 @@ FILE *sim_ofile = NULL;
 SCHTAB *sim_schptr = FALSE;
 DEVICE *sim_dfdev = NULL;
 UNIT *sim_dfunit = NULL;
+int32 sim_opt_out = 0;
 int32 sim_is_running = 0;
 uint32 sim_brk_summ = 0;
 uint32 sim_brk_types = 0;
@@ -525,7 +525,7 @@ static CTAB cmd_table[] = {
       "set console arg{,arg...} set console options\n"
       "set break <list>         set breakpoints\n"
       "set nobreak <list>       clear breakpoints\n"
-      "set throttle x{M|K|%}    set simulation rate\n"
+      "set throttle x{M|K|%%}    set simulation rate\n"
       "set nothrottle           set simulation rate to maximum\n"
       "set <dev> OCT|DEC|HEX    set device display radix\n"
       "set <dev> ENABLED        enable device\n"
@@ -1372,10 +1372,11 @@ return;
 
 t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-int32 vmaj = SIM_MAJOR, vmin = SIM_MINOR, vpat = SIM_PATCH;
+int32 vmaj = SIM_MAJOR, vmin = SIM_MINOR, vpat = SIM_PATCH, vdelt = SIM_DELTA;
 
 if (cptr && (*cptr != 0)) return SCPE_2MARG;
 fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
+if (vdelt) fprintf (st, "(%d)", vdelt);
 if (flag) fprintf (st, " [%s, %s, %s]", sim_si64, sim_sa64, sim_snet);
 fprintf (st, "\n");
 return SCPE_OK;
@@ -1585,12 +1586,15 @@ t_stat r;
 t_addr lo, hi, max = uptr->capac - 1;
 int32 cnt;
 
-if (*cptr == 0) return SCPE_2FARG;
 if (sim_brk_types == 0) return SCPE_NOFNC;
 if ((dptr == NULL) || (uptr == NULL)) return SCPE_IERR;
 if (aptr = strchr (cptr, ';')) {                        /* ;action? */
     if (flg != SSH_ST) return SCPE_ARG;                 /* only on SET */
     *aptr++ = 0;                                        /* separate strings */
+    }
+if (*cptr == 0) {                                       /* no argument? */
+    lo = (t_addr) get_rval (sim_PC, 0);                 /* use PC */
+    return ssh_break_one (st, flg, lo, 0, aptr);
     }
 while (*cptr) {
     cptr = get_glyph (cptr, gbuf, ',');
@@ -1611,29 +1615,33 @@ while (*cptr) {
         }
     else {      
         for ( ; lo <= hi; lo = lo + 1) {
-            switch (flg) {
-
-            case SSH_ST:
-                r = sim_brk_set (lo, sim_switches, cnt, aptr);
-                break;
-
-            case SSH_CL:
-                r = sim_brk_clr (lo, sim_switches);
-                break;
-
-            case SSH_SH:
-                r = sim_brk_show (st, lo, sim_switches);
-                break;
-
-            default:
-                return SCPE_ARG;
-                }
-
+            r = ssh_break_one (st, flg, lo, cnt, aptr);
             if (r != SCPE_OK) return r;
             }
         }
     }
 return SCPE_OK;
+}
+
+t_stat ssh_break_one (FILE *st, int32 flg, t_addr lo, int32 cnt, char *aptr)
+{
+switch (flg) {
+
+    case SSH_ST:
+        return sim_brk_set (lo, sim_switches, cnt, aptr);
+        break;
+
+    case SSH_CL:
+        return sim_brk_clr (lo, sim_switches);
+        break;
+
+    case SSH_SH:
+        return sim_brk_show (st, lo, sim_switches);
+        break;
+
+    default:
+        return SCPE_ARG;
+    }
 }
 
 /* Reset command and routines
@@ -2176,7 +2184,6 @@ if (v32) {                                              /* [V3.2+] time as strin
 else READ_I (sim_time);                                 /* sim time */
 READ_I (sim_rtime);                                     /* [V2.6+] sim rel time */
 
-sim_switches = SIM_SW_REST;                             /* flag restore */
 for ( ;; ) {                                            /* device loop */
     READ_S (buf);                                       /* read device name */
     if (buf[0] == 0) break;                             /* last? */
@@ -2194,6 +2201,7 @@ for ( ;; ) {                                            /* device loop */
     dptr->flags = (dptr->flags & ~DEV_RFLAGS) |         /* restore ctlr flags */
          (flg & DEV_RFLAGS);
     for ( ;; ) {                                        /* unit loop */
+        sim_switches = SIM_SW_REST;                     /* flag rstr, clr RO */
         READ_I (unitno);                                /* unit number */
         if (unitno < 0) break;                          /* end units? */
         if ((uint32) unitno >= dptr->numunits) {        /* too big? */
@@ -2551,8 +2559,9 @@ for (gptr = gbuf, reason = SCPE_OK;
         continue;
         }
 
-    if ((lowr = find_reg (gptr, &tptr, tdptr)) ||
-        (lowr = find_reg_glob (gptr, &tptr, &tdptr))) {
+    if ((lowr = find_reg (gptr, &tptr, tdptr)) ||       /* local reg or */
+        (!(sim_opt_out & CMD_OPT_DFT) &&                /* no dflt, global? */
+        (lowr = find_reg_glob (gptr, &tptr, &tdptr)))) {
         low = high = 0;
         if ((*tptr == '-') || (*tptr == ':')) {
             highr = find_reg (tptr + 1, &tptr, tdptr);
@@ -2705,7 +2714,7 @@ sz = SZ_R (rptr);
 if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {
     idx = idx + rptr->qptr;
     if (idx >= rptr->depth) idx = idx - rptr->depth;
-	}
+    }
 if ((rptr->depth > 1) && (rptr->flags & REG_UNIT)) {
     uptr = ((UNIT *) rptr->loc) + idx;
 #if defined (USE_INT64)
@@ -3051,21 +3060,7 @@ char *read_line (char *cptr, int32 size, FILE *stream)
 {
 char *tptr;
 
-#if !defined (HAVE_READLINE)
 cptr = fgets (cptr, size, stream);                      /* get cmd line */
-
-#else
-if (stream != stdin) cptr = fgets (cptr, size, stream);
-else {
-    char *tmpc = readline (NULL);
-    if (tmpc == NULL) cptr = NULL;
-    else {
-        strncpy (cptr, tmpc, size);
-        free (tmpc);
-        }
-    }
-#endif
-
 if (cptr == NULL) {
     clearerr (stream);                                  /* clear error */
     return NULL;                                        /* ignore EOF */
@@ -3503,7 +3498,6 @@ return cptr;
 char *get_sim_opt (int32 opt, char *cptr, t_stat *st)
 {
 int32 t;
-t_bool dfdu;
 char *svptr, gbuf[CBUFSIZE];
 DEVICE *tdptr;
 UNIT *tuptr;
@@ -3517,7 +3511,7 @@ sim_stab.mask = 0;
 sim_stab.comp = 0;
 sim_dfdev = sim_dflt_dev;
 sim_dfunit = sim_dfdev->units;
-dfdu = FALSE;                                           /* no default yet */
+sim_opt_out = 0;                                        /* no options yet */
 *st = SCPE_OK;
 while (*cptr) {                                         /* loop through modifiers */
     svptr = cptr;                                       /* save current position */
@@ -3526,12 +3520,15 @@ while (*cptr) {                                         /* loop through modifier
             fclose (sim_ofile);                         /* one per customer */
             *st = SCPE_ARG;
             return NULL;
-			}
+            }
         cptr = get_glyph_nc (cptr + 1, gbuf, 0);
         sim_ofile = sim_fopen (gbuf, "a");              /* open for append */
-        if (sim_ofile) continue;                        /* if ok, look for more */
-        *st = SCPE_OPENERR;                             /* open failed */
-        return NULL;
+        if (sim_ofile == NULL) {                        /* open failed? */
+            *st = SCPE_OPENERR;                        
+            return NULL;
+            }
+        sim_opt_out |= CMD_OPT_OF;                      /* got output file */
+        continue;
         }
     cptr = get_glyph (cptr, gbuf, 0);
     if ((t = get_switches (gbuf)) != 0) {               /* try for switches */
@@ -3542,14 +3539,17 @@ while (*cptr) {                                         /* loop through modifier
         sim_switches = sim_switches | t;                /* or in new switches */
         }
     else if ((opt & CMD_OPT_SCH) &&                     /* if allowed, */
-        get_search (gbuf, sim_dfdev->dradix, &sim_stab)) /* try for search */
+        get_search (gbuf, sim_dfdev->dradix, &sim_stab)) { /* try for search */
         sim_schptr = &sim_stab;                         /* set search */
-    else if ((opt & CMD_OPT_DFT) && !dfdu &&            /* if allowed, none yet*/
+        sim_opt_out |= CMD_OPT_SCH;                     /* got search */
+        }
+    else if ((opt & CMD_OPT_DFT) &&                     /* default allowed? */
+        ((sim_opt_out & CMD_OPT_DFT) == 0) &&           /* none yet? */
         (tdptr = find_unit (gbuf, &tuptr)) &&           /* try for default */
         (tuptr != NULL)) {
         sim_dfdev = tdptr;                              /* set as default */
         sim_dfunit = tuptr;
-        dfdu = TRUE;                                    /* indicate dflt seen */
+        sim_opt_out |= CMD_OPT_DFT;                     /* got default */
         }
     else return svptr;                                  /* not rec, break out */
     }
@@ -3575,11 +3575,11 @@ pptr = strrchr (fnam, '.');                             /* find last . */
 if (pptr) {                                             /* any? */
     for (fptr = pptr + 1, eptr = ext;                   /* match characters */
 #if defined (VMS)                                       /* VMS: stop at ; or null */
-	(*fptr != 0) && (*fptr != ';');
+    (*fptr != 0) && (*fptr != ';');
 #else
-	*fptr != 0;					/* others: stop at null */
+    *fptr != 0;                                         /* others: stop at null */
 #endif
-	fptr++, eptr++) {
+    fptr++, eptr++) {
         if (toupper (*fptr) != toupper (*eptr))
             return NULL;
         }

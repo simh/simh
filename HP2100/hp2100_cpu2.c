@@ -785,7 +785,7 @@ switch (entry) {                                        /* decode IR<4:0> */
             if (t == v2) {                              /* term match? */
                 PC = (PC + 1) & VAMASK;
                 break;
-				}
+                }
             if (intrq) {                                /* int pending? */
                 PC = err_PC;                            /* back up PC */
                 break;

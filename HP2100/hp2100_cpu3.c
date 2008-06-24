@@ -1,6 +1,6 @@
 /* hp2100_cpu3.c: HP 2100/1000 FFP/DBI instructions
 
-   Copyright (c) 2005-2006, J. David Bryan
+   Copyright (c) 2005-2008, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    CPU3         Fast FORTRAN and Double Integer instructions
 
+   27-Feb-08    JDB     Added DBI self-test instruction
+   23-Oct-07    JDB     Fixed unsigned-divide bug in .DDI
+   17-Oct-07    JDB     Fixed unsigned-multiply bug in .DMP
    16-Oct-06    JDB     Calls FPP for extended-precision math
    12-Oct-06    JDB     Altered DBLE, DDINT for F-Series FFP compatibility
    26-Sep-06    JDB     Moved from hp2100_cpu1.c to simplify extensions
@@ -575,18 +578,14 @@ return reason;
    savings to allow programs to load in E-Series systems, in addition to
    accelerating these common operations.
 
-   M-Series microcode was never offered by HP.  However, it costs us nothing to
-   enable double-integer instructions for M-Series simulations.  This has the
-   concomitant advantage that it allows RTE-6/VM to run under SIMH (for
-   simulation, we must SET CPU 1000-M, because RTE-6/VM looks for the OS and VM
-   microcode -- which we do not implement yet -- if it detects an E- or F-Series
-   machine).
+   There was no equivalent M-Series microcode, due to the limited micromachine
+   address space on that system.
 
    Option implementation by CPU was as follows:
 
       2114    2115    2116    2100   1000-M  1000-E  1000-F
      ------  ------  ------  ------  ------  ------  ------
-      N/A     N/A     N/A     N/A     N/A    93575A   std
+      N/A     N/A     N/A     N/A     N/A    93585A   std
 
    The routines are mapped to instruction codes as follows:
 
@@ -612,15 +611,12 @@ return reason;
 
    Notes:
 
-     1. The E-Series opcodes are listed in Appendix C of the Macro/1000 manual.
-        These should be the same opcodes as given in the 93585A manual listed
-        below, but no copy of the reference below has been located to confirm
-        the proper opcodes.  This module should be corrected if needed when such
-        documentation is found.
+     1. Opcodes 105335-105337 are NOPs in the microcode.  They generate
+        unimplemented instructions stops under simulation.
 
-     2. The action of the self-test instruction (105320) is unknown.  At the
-        moment, we take an unimplemented instruction trap for this.  When
-        documentation explaining the action is located, it will be implemented.
+     2. This is an implementation of Revision 2 of the microcode, which was
+        released as ROM part numbers 93585-80003, 93585-80005, and 93585-80001
+        (Revision 1 substituted -80002 for -80005).
 
      3. The F-Series firmware executes .DMP and .DDI/.DDIR by floating the
         32-bit double integer to a 48-bit extended-precision number, calling the
@@ -629,8 +625,9 @@ return reason;
         64- or 32-bit integer arithmetic.
 
    Additional references:
-    - 93575A Double Integer Instructions Installation and Reference Manual
-      (93575-90007)
+    - 93585A Microcode Source (93585-18002 Rev. 2005)
+    - 93585A Double Integer Instructions Installation and Reference Manual
+      (93585-90007)
 */
 
 static const OP_PAT op_dbi[16] = {
@@ -659,8 +656,11 @@ if (op_dbi[entry] != OP_N)
 switch (entry) {                                        /* decode IR<3:0> */
 
     case 000:                                           /* [test] 105320 (OP_N) */
-        t = (AR << 16) | BR;                            /* set t for nop */
-        reason = stop_inst;                             /* function unknown; not impl. */
+        XR = 2;                                         /* set revision */
+        BR = 0377;                                      /* side effect of microcode */
+        SR = 0102077;                                   /* set "pass" code */
+        PC = (PC + 1) & VAMASK;                         /* return to P+1 */
+        t = (AR << 16) | BR;                            /* set t for return */
         break;
 
     case 001:                                           /* .DAD 105321 (OP_JD) */
@@ -677,8 +677,8 @@ switch (entry) {                                        /* decode IR<3:0> */
 
             t_int64 t64;
 
-            t64 = (t_int64) op[0].dword *               /* multiply values */
-                  (t_int64) op[1].dword;
+            t64 = (t_int64) INT32 (op[0].dword) *       /* multiply signed values */
+                  (t_int64) INT32 (op[1].dword);
             O = ((t64 < -(t_int64) 0x80000000) ||       /* overflow if out of range */
                  (t64 >  (t_int64) 0x7FFFFFFF));
             if (O)
@@ -752,7 +752,8 @@ switch (entry) {                                        /* decode IR<3:0> */
         if (O)
             t = ~SIGN32;                                /* rtn max pos for ovf */
         else
-            t = op[0].dword / op[1].dword;              /* else return quotient */
+            t = (uint32) (INT32 (op[0].dword) /         /* else return quotient */
+                          INT32 (op[1].dword));
         break;
 
     case 006:                                           /* .DDIR 105326 (OP_JD) */
@@ -806,7 +807,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         goto DSB;                                       /* continue at .DSB */
 
     default:                                            /* others undefined */
-        t = (AR << 16) | BR;                            /* set t for nop */
+        t = (AR << 16) | BR;                            /* set t for NOP */
         reason = stop_inst;
         }
 

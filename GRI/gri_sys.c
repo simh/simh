@@ -1,6 +1,6 @@
 /* gri_sys.c: GRI-909 simulator interface
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jan-08    RMS     Added GRI-99 support
    18-Oct-02    RMS     Fixed bug in symbolic decode (found by Hans Pufal)
 */
 
@@ -37,6 +38,8 @@ extern DEVICE rtc_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
 extern int32 sim_switches;
+
+void fprint_addr (FILE *of, uint32 val, uint32 mod, uint32 dst);
 
 /* SCP data structures and interface routines
 
@@ -210,26 +213,26 @@ static const uint32 opc_val[] = {
 static const char *unsrc[64] = {
  "0", "IR", "2", "TRP", "ISR", "MA", "MB", "SC",        /* 00 - 07 */
  "SWR", "AX", "AY", "AO", "14", "15", "16", "MSR",      /* 10 - 17 */
- "20", "21", "22", "23", "BSW", "BPK", "26", "27",      /* 20 - 27 */
+ "20", "21", "XR", "ATRP", "BSW", "BPK", "BCPA", "BCPB",/* 20 - 27 */
  "GR1", "GR2", "GR3", "GR4", "GR5", "GR6", "36", "37",  /* 30 - 37 */
  "40", "41", "42", "43", "44", "45", "46", "47",
- "50", "51", "52", "53", "54", "55", "56", "57",
- "60", "61", "62", "63", "64", "65", "66", "67",
- "70", "71", "72", "73", "74", "RTC", "HSR", "TTI"      /* 70 - 77 */
+ "50", "51", "52", "53", "54", "CDR", "56", "CADR",
+ "60", "61", "62", "63", "64", "65", "DWC", "DCA",
+ "DISK", "LPR", "72", "73", "CAS", "RTC", "HSR", "TTI"  /* 70 - 77 */
  };
 
 static const char *undst[64] = {
  "0", "IR", "2", "TRP", "ISR", "5", "MB", "SC",         /* 00 - 07 */
  "SWR", "AX", "AY", "13", "EAO", "15", "16", "MSR",     /* 10 - 17 */
- "20", "21", "22", "23", "BSW", "BPK", "26", "27",      /* 20 - 27 */
+ "20", "21", "XR", "ATRP", "BSW", "BPK", "BCPA", "BCPB",/* 20 - 27 */
  "GR1", "GR2", "GR3", "GR4", "GR5", "GR6", "36", "37",  /* 30 - 37 */
  "40", "41", "42", "43", "44", "45", "46", "47",
- "50", "51", "52", "53", "54", "55", "56", "57",
- "60", "61", "62", "63", "64", "65", "66", "67",
- "70", "71", "72", "73", "74", "RTC", "HSP", "TTO"      /* 70 - 77 */
+ "50", "51", "52", "53", "54", "CDR", "56", "CADR",
+ "60", "61", "62", "63", "64", "65", "DWC", "DCA",
+ "DISK", "LPR", "72", "73", "CAS", "RTC", "HSP", "TTO"  /* 70 - 77 */
  };
 
-                                                        /* Operators */
+/* Operators */
 
 static const char *opname[4] = {
  NULL, "P1", "L1", "R1"
@@ -296,6 +299,17 @@ for (i = nfirst = 0; fname[i] != NULL; i++) {
         }
     }
 if (op) fprintf (of, " %o", op);
+return;
+}
+
+/* Print address field with potential indexing */
+
+void fprint_addr (FILE *of, uint32 val, uint32 mode, uint32 dst)
+{
+if ((val & INDEX) &&
+    ((dst == U_SC) || (mode != MEM_IMM)))
+    fprintf (of, "#%o", val & AMASK);
+else fprintf (of, "%o", val);
 return;
 }
 
@@ -387,36 +401,40 @@ for (i = 0; opcode[i] != NULL; i++) {                   /* loop thru ops */
             break;
 
         case F_V_JC:                                    /* jump cond */
-            fprintf (of, "%s %s,%s,%o", opcode[i],
-                unsrc[src], cdname[op >> 1], val[1]);
+            fprintf (of, "%s %s,%s,",
+                opcode[i], unsrc[src], cdname[op >> 1]);
+            fprint_addr (of, val[1], 0, U_SC);
             break;
 
         case F_V_JU:                                    /* jump uncond */
-            fprintf (of, "%s %o", opcode[i], val[1]);
+            fprintf (of, "%s ", opcode[i]);
+            fprint_addr (of, val[1], 0, U_SC);
             break;
 
         case F_V_RM:                                    /* reg mem */
-            if (bop) fprintf (of, "%s %s,%s,%o", opcode[i],
-                unsrc[src], opname[bop], val[1]);
-            else fprintf (of, "%s %s,%o", opcode[i], unsrc[src], val[1]);
+            if (bop) fprintf (of, "%s %s,%s,",
+                opcode[i], unsrc[src], opname[bop]);
+            else fprintf (of, "%s %s,", opcode[i], unsrc[src]);
+            fprint_addr (of, val[1], op & MEM_MOD, dst);
             break;
 
         case F_V_ZM:                                    /* zero mem */
-            if (bop) fprintf (of, "%s %s,%o", opcode[i],
-                opname[bop], val[1]);
-            else fprintf (of, "%s %o", opcode[i], val[1]);
+            if (bop) fprintf (of, "%s %s,", opcode[i], opname[bop]);
+            else fprintf (of, "%s ", opcode[i]);
+            fprint_addr (of, val[1], op & MEM_MOD, dst);
             break;
 
         case F_V_MR:                                    /* mem reg */
-            if (bop) fprintf (of, "%s %o,%s,%s", opcode[i],
-                val[1], opname[bop], undst[dst]);
-            else fprintf (of, "%s %o,%s", opcode[i], val[1], undst[dst]);
+            fprintf (of, "%s ", opcode[i]);
+            fprint_addr (of, val[1], op & MEM_MOD, dst);
+            if (bop) fprintf (of, ",%s,%s", opname[bop], undst[dst]);
+            else fprintf (of, ",%s", undst[dst]);
             break;
 
         case F_V_MS:                                    /* mem self */
-            if (bop) fprintf (of, "%s %o,%s", opcode[i],
-                val[1], opname[bop]);
-            else fprintf (of, "%s %o", opcode[i], val[1]);
+            fprintf (of, "%s ", opcode[i]);
+            fprint_addr (of, val[1], op & MEM_MOD, dst);
+            if (bop) fprintf (of, ",%s", opname[bop]);
             break;
             }                                           /* end case */
 
@@ -475,7 +493,9 @@ t_value d;
 t_stat r;
 
 cptr = get_glyph (cptr, gbuf, term);                    /* get glyph */
-d = get_uint (gbuf, 8, DMASK, &r);                      /* [0,177777] */
+if (gbuf[0] == '#')                                     /* indexed? */
+    d = get_uint (gbuf + 1, 8, AMASK, &r) | INDEX;      /* [0, 77777] */
+else d = get_uint (gbuf, 8, DMASK, &r);                 /* [0,177777] */
 if (r != SCPE_OK) return NULL;
 val[1] = d;                                             /* second wd */
 return cptr;

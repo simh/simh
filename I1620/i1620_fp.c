@@ -1,6 +1,6 @@
 /* i1620_fp.c: IBM 1620 floating point simulator
 
-   Copyright (c) 2002-2005, Robert M. Supnik
+   Copyright (c) 2002-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,8 @@
         M.......MEE
 
    where S represents flag bits if the mantissa or exponent are negative.
+
+   31-May-2008  RMS     Fixed add_field call (found by Peter Schorn)
 */
 
 #include "i1620_defs.h"
@@ -55,7 +57,7 @@ t_stat fp_scan_mant (uint32 ad, uint32 *lnt, uint32 *zro);
 t_stat fp_zero (FPA *fp);
 
 extern t_stat xmt_field (uint32 d, uint32 s, uint32 skp);
-extern t_stat add_field (uint32 d, uint32 s, t_bool sub, t_bool sto, int32 *sta);
+extern t_stat add_field (uint32 d, uint32 s, t_bool sub, t_bool sto, uint32 skp, int32 *sta);
 extern t_stat mul_field (uint32 d, uint32 s);
 extern t_stat xmt_divd (uint32 d, uint32 s);
 extern t_stat div_field (uint32 dvd, uint32 dvr, int32 *ez);
@@ -261,7 +263,7 @@ else if (dif < 0) {                                     /* dst exp < src exp? */
     dfp.exp = sfp.exp;                                  /* res exp = src exp */
     fp_rsh (&dfp, -dif);                                /* denormalize dst */
     }
-r = add_field (dfp.addr, sfp.addr, sub, TRUE, &sta);    /* add mant, set EZ, HP */
+r = add_field (dfp.addr, sfp.addr, sub, TRUE, 0, &sta); /* add mant, set EZ, HP */
 if (dif > 0) {                                          /* src denormalized? */
     sad = sfp.addr;                                     /* restore src from */
     for (i = 0; i < sfp.lnt; i++) {                     /* save area */

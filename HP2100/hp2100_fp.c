@@ -1,6 +1,6 @@
 /* hp2100_fp.c: HP 2100 floating point instructions
 
-   Copyright (c) 2002-2006, Robert M. Supnik
+   Copyright (c) 2002-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Jan-08    JDB     Corrected fp_unpack mantissa high-word return
+                        (from Mark Pizzolato)
    01-Dec-06    JDB     Reworked FFP helpers for 1000-F support, deleted f_pwr2
    22-Jul-05    RMS     Fixed compiler warning in Solaris (from Doug Glyn)
    25-Feb-05    JDB     Added FFP helpers f_pack, f_unpack, f_pwr2
@@ -397,7 +399,7 @@ uint32 operand;
 
 operand = ((uint32) packed.fpk[0] << 16) | packed.fpk[1];
 UnpackFP (&fop, operand);
-mantissa->fpk[0] = (uint16) fop.fr >> 16;
+mantissa->fpk[0] = (uint16) (fop.fr >> 16);
 mantissa->fpk[1] = (uint16) fop.fr;
 *exponent = fop.exp;
 return 0;

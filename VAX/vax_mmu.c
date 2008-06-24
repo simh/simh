@@ -1,6 +1,6 @@
 /* vax_mmu.c - VAX memory management
 
-   Copyright (c) 1998-2007, Robert M Supnik
+   Copyright (c) 1998-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-May-08    RMS     Inlined physical memory routines
    29-Apr-07    RMS     Added address masking for system page table reads
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    30-Sep-04    RMS     Comment and formating changes
@@ -101,14 +102,6 @@ t_stat tlb_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tlb_reset (DEVICE *dptr);
 
 TLBENT fill (uint32 va, int32 lnt, int32 acc, int32 *stat);
-int32 ReadB (uint32 pa);
-void WriteB (uint32 pa, int32 val);
-int32 ReadW (uint32 pa);
-void WriteW (uint32 pa, int32 val);
-int32 ReadL (uint32 pa);
-void WriteL (uint32 pa, int32 val);
-int32 ReadLP (uint32 pa);
-void WriteLP (uint32 pa, int32 val);
 extern int32 ReadIO (uint32 pa, int32 lnt);
 extern void WriteIO (uint32 pa, int32 val, int32 lnt);
 extern int32 ReadReg (uint32 pa, int32 lnt);
@@ -313,7 +306,7 @@ return va & PAMASK;                                     /* ret phys addr */
         returned data, right justified in 32b longword
 */
 
-int32 ReadB (uint32 pa)
+SIM_INLINE int32 ReadB (uint32 pa)
 {
 int32 dat;
 
@@ -326,7 +319,7 @@ else {
 return ((dat >> ((pa & 3) << 3)) & BMASK);
 }
 
-int32 ReadW (uint32 pa)
+SIM_INLINE int32 ReadW (uint32 pa)
 {
 int32 dat;
 
@@ -339,7 +332,7 @@ else {
 return ((dat >> ((pa & 2)? 16: 0)) & WMASK);
 }
 
-int32 ReadL (uint32 pa)
+SIM_INLINE int32 ReadL (uint32 pa)
 {
 if (ADDR_IS_MEM (pa)) return M[pa >> 2];
 mchk_ref = REF_V;
@@ -347,7 +340,7 @@ if (ADDR_IS_IO (pa)) return ReadIO (pa, L_LONG);
 return ReadReg (pa, L_LONG);
 }
 
-int32 ReadLP (uint32 pa)
+SIM_INLINE int32 ReadLP (uint32 pa)
 {
 if (ADDR_IS_MEM (pa)) return M[pa >> 2];
 mchk_va = pa;
@@ -365,7 +358,7 @@ return ReadReg (pa, L_LONG);
         none
 */
 
-void WriteB (uint32 pa, int32 val)
+SIM_INLINE void WriteB (uint32 pa, int32 val)
 {
 if (ADDR_IS_MEM (pa)) {
     int32 id = pa >> 2;
@@ -381,7 +374,7 @@ else {
 return;
 }
 
-void WriteW (uint32 pa, int32 val)
+SIM_INLINE void WriteW (uint32 pa, int32 val)
 {
 if (ADDR_IS_MEM (pa)) {
     int32 id = pa >> 2;
@@ -396,7 +389,7 @@ else {
 return;
 }
 
-void WriteL (uint32 pa, int32 val)
+SIM_INLINE void WriteL (uint32 pa, int32 val)
 {
 if (ADDR_IS_MEM (pa)) M[pa >> 2] = val;
 else {

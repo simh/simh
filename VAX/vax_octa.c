@@ -1,6 +1,6 @@
 /* vax_octa.c - VAX octaword and h_floating instructions
 
-   Copyright (c) 2004-2006, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    This module simulates the VAX h_floating instruction set.
 
+   28-May-08    RMS     Inlined physical memory routines
    10-May-06    RMS     Fixed bug in reported VA on faulting cross-page write
    03-May-06    RMS     Fixed MNEGH to test negated sign, clear C
                         Fixed carry propagation in qp_inc, qp_neg, qp_add
@@ -50,8 +51,6 @@ extern int32 trpirq;
 extern int32 p1;
 extern jmp_buf save_env;
 
-extern int32 Read (uint32 va, int32 size, int32 acc);
-extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
 extern int32 Test (uint32 va, int32 acc, int32 *status);
 
 #define WORDSWAP(x)     ((((x) & WMASK) << 16) | (((x) >> 16) & WMASK))

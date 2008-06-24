@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Jun-08    RMS     Fixed bug in new rim loader (found by Don North)
+   24-May-08    RMS     Fixed signed/unsigned declaration inconsistency
+   03-Sep-07    RMS     Added FPP8 support
+                        Rewrote rim and binary loaders
    15-Dec-06    RMS     Added TA8E support, IOT disambiguation
    30-Oct-06    RMS     Added infinite loop stop
    18-Oct-06    RMS     Re-ordered device list
@@ -60,6 +64,12 @@ extern DEVICE ttix_dev, ttox_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
 extern int32 sim_switches;
+
+t_stat fprint_sym_fpp (FILE *of, t_value *val);
+t_stat parse_sym_fpp (char *cptr, t_value *val);
+char *parse_field (char *cptr, uint32 max, uint32 *val, uint32 c);
+char *parse_fpp_xr (char *cptr, uint32 *xr, t_bool inc);
+int32 test_fpp_addr (uint32 ad, uint32 max);
 
 /* SCP data structures and interface routines
 
@@ -124,100 +134,100 @@ DEVICE *amb_dev[] = {
 #define AMB_CT      (2 << 12)
 #define AMB_TD      (3 << 12)
 
-/* Binary loader
-
-   Two loader formats are supported: RIM loader (-r) and BIN (-b) loader.
-
-   RIM loader format consists of alternating pairs of addresses and 12-bit
+/* RIM loader format consists of alternating pairs of addresses and 12-bit
    words.  It can only operate in field 0 and is not checksummed.
+*/
 
-   BIN loader format consists of a string of 12-bit words (made up from
+t_stat sim_load_rim (FILE *fi)
+{
+int32 origin, hi, lo, wd;
+
+origin = 0200;
+do {                                                    /* skip leader */
+    if ((hi = getc (fi)) == EOF)
+        return SCPE_FMT;
+    } while ((hi == 0) || (hi >= 0200));
+do {                                                    /* data block */
+    if ((lo = getc (fi)) == EOF)
+        return SCPE_FMT;
+    wd = (hi << 6) | lo;
+    if (wd > 07777) origin = wd & 07777;
+    else M[origin++ & 07777] = wd;
+    if ((hi = getc (fi)) == EOF)
+        return SCPE_FMT;
+    } while (hi < 0200);                                /* until trailer */
+return SCPE_OK;
+}
+
+/* BIN loader format consists of a string of 12-bit words (made up from
    7-bit characters) between leader and trailer (200).  The last word on
    tape is the checksum.  A word with the "link" bit set is a new origin;
    a character > 0200 indicates a change of field.
 */
 
+int32 sim_bin_getc (FILE *fi, uint32 *newf)
+{
+int32 c, rubout;
+
+rubout = 0;                                             /* clear toggle */
+while ((c = getc (fi)) != EOF) {                        /* read char */
+    if (rubout)                                         /* toggle set? */
+        rubout = 0;                                     /* clr, skip */
+    else if (c == 0377)                                 /* rubout? */
+        rubout = 1;                                     /* set, skip */
+    else if (c > 0200)                                  /* channel 8 set? */
+        *newf = (c & 070) << 9;                         /* change field */
+    else return c;                                      /* otherwise ok */
+    }
+return EOF;
+}
+
+t_stat sim_load_bin (FILE *fi)
+{
+int32 hi, lo, wd, csum, t;
+uint32 field, newf, origin;
+
+do {                                                    /* skip leader */
+    if ((hi = sim_bin_getc (fi, &newf)) == EOF)
+        return SCPE_FMT;
+    } while ((hi == 0) || (hi >= 0200));
+csum = origin = field = newf = 0;                       /* init */
+for (;;) {                                              /* data blocks */
+    if ((lo = sim_bin_getc (fi, &newf)) == EOF)         /* low char */
+        return SCPE_FMT;
+    wd = (hi << 6) | lo;                                /* form word */
+    t = hi;                                             /* save for csum */
+    if ((hi = sim_bin_getc (fi, &newf)) == EOF)         /* next char */
+        return SCPE_FMT;
+    if (hi == 0200) {                                   /* end of tape? */
+        if ((csum - wd) & 07777)                        /* valid csum? */
+            return SCPE_CSUM;
+        return SCPE_OK;
+        }
+    csum = csum + t + lo;                               /* add to csum */
+    if (wd > 07777)                                     /* chan 7 set? */
+        origin = wd & 07777;                            /* new origin */
+    else {                                              /* no, data */
+        if ((field | origin) >= MEMSIZE) 
+            return SCPE_NXM;
+        M[field | origin] = wd;
+        origin = (origin + 1) & 07777;
+        }
+    field = newf;                                       /* update field */
+    }
+return SCPE_IERR;
+}
+
+/* Binary loader
+   Two loader formats are supported: RIM loader (-r) and BIN (-b) loader. */
+
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
-int32 rubout, word, low, high, csum, newf, state, i;
-uint32 origin, field;
-
 if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
-rubout = state = field = newf = origin = csum = 0;
 if ((sim_switches & SWMASK ('R')) ||                    /* RIM format? */
-    (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B')))) {
-    while ((i = getc (fileref)) != EOF) {
-        switch (state) {
-
-        case 0:                                         /* leader */
-            if ((i != 0) && (i < 0200)) state = 1;
-            high = i;
-            break;
-
-        case 1:                                         /* low byte */
-            word = (high << 6) | i;                     /* form word */
-            if (word > 07777) origin = word & 07777;
-            else M[origin] = word;
-            state = 2;
-            break;
-
-        case 2:                                         /* high byte */
-            if (i >= 0200) return SCPE_OK;              /* end of tape? */
-            high = i;                                   /* save high */
-            state = 1;
-            break;
-            }                                           /* end switch */
-        }                                               /* end while */
-    }                                                   /* end if */
-
-else {
-    while ((i = getc (fileref)) != EOF) {               /* BIN format */
-        if (rubout) {
-            rubout = 0;
-            continue;
-            }
-        if (i == 0377) {
-            rubout = 1;
-            continue;
-            }
-        if (i > 0200) {
-            newf = (i & 070) << 9;
-            continue;
-            }
-        switch (state) {
-
-        case 0:                                         /* leader */
-            if ((i != 0) && (i != 0200)) state = 1;
-            high = i;                                   /* save as high */
-            break;
-
-        case 1:                                         /* low byte */
-            low = i;
-            state = 2;
-            break;
-
-        case 2:                                         /* high with test */
-            word = (high << 6) | low;
-            if (i == 0200) {                            /* end of tape? */
-                if ((csum - word) & 07777) return SCPE_CSUM;
-                return SCPE_OK;
-                }
-            csum = csum + low + high;
-            if (word >= 010000) origin = word & 07777;
-            else {
-                if ((field | origin) >= MEMSIZE) 
-                    return SCPE_NXM;
-                M[field | origin] = word & 07777;
-                origin = (origin + 1) & 07777;
-                }
-            field = newf;
-            high = i;
-            state = 1;
-            break;
-            }                                           /* end switch */
-        }                                               /* end while */
-    }                                                   /* end else */
-return SCPE_FMT;                                        /* eof? error */
+    (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B'))))
+    return sim_load_rim (fileref);
+else return sim_load_bin (fileref);                     /* no, BIN */
 }
 
 /* Symbol tables */
@@ -242,9 +252,9 @@ return SCPE_FMT;                                        /* eof? error */
 #define I_IOA           (I_V_IOA << I_V_FL)
 
 static const int32 masks[] = {
- 07777, 07707, 07000, 07000,
- 07416, 07571, 017457, 077777,
- };
+    07777, 07707, 07000, 07000,
+    07416, 07571, 017457, 077777,
+    };
 
 /* Ambiguous device mnemonics must precede default mnemonics */
 
@@ -289,6 +299,10 @@ static const char *opcode[] = {
  "DTSF", "DTRB", "DTLB",
  "ETDS", "ESKP", "ECTF", "ECDF",                        /* TSC75 */
  "ERTB", "ESME", "ERIOT", "ETEN",
+ "FFST", "FPINT", "FPICL", "FPCOM",                     /* FPP8 */
+ "FPHLT", "FPST", "FPRST", "FPIST",
+        "FMODE",        "FMRB",
+ "FMRP", "FMDO",        "FPEP",
 
  "CDF", "CIF", "CIF CDF",
  "AND", "TAD", "ISZ", "DCA", "JMS", "JMP", "IOT",
@@ -353,6 +367,10 @@ static const int32 opc_val[] = {
  06771+I_NPN, 06772+I_NPN, 06774+I_NPN,
  06360+I_NPN, 06361+I_NPN, 06362+I_NPN, 06363+I_NPN,    /* TSC */
  06364+I_NPN, 06365+I_NPN, 06366+I_NPN, 06367+I_NPN,
+ 06550+I_NPN, 06551+I_NPN, 06552+I_NPN, 06553+I_NPN,    /* FPP8 */
+ 06554+I_NPN, 06555+I_NPN, 06556+I_NPN, 06557+I_NPN,
+              06561+I_NPN,              06563+I_NPN,
+ 06564+I_NPN, 06565+I_NPN,              06567+I_NPN,
 
  06201+I_FLD, 06202+I_FLD, 06203+I_FLD,
  00000+I_MRF, 01000+I_MRF, 02000+I_MRF, 03000+I_MRF,
@@ -379,6 +397,100 @@ static const int32 opc_val[] = {
  07000+I_OP1, 07400+I_OP2, 07401+I_OP3, 017401+I_OP3,
  -1
  };
+
+/* Symbol tables for FPP-8 */
+
+#define F_V_FL          18                              /* flag start */
+#define F_M_FL          017                             /* flag mask */
+#define F_V_NOP12       0                               /* no opnd 12b */
+#define F_V_NOP9        1                               /* no opnd 9b */
+#define F_V_AD15        2                               /* 15b dir addr */
+#define F_V_AD15X       3                               /* 15b dir addr indx */
+#define F_V_IMMX        4                               /* 12b immm indx */
+#define F_V_X           5                               /* index */
+#define F_V_MRI         6                               /* mem ref ind */
+#define F_V_MR1D        7                               /* mem ref dir 1 word */
+#define F_V_MR2D        8                               /* mem ref dir 2 word */
+#define F_V_LEMU        9                               /* LEA/IMUL */
+#define F_V_LEMUI       10                              /* LEAI/IMULI */
+#define F_V_LTR         11                              /* LTR */
+#define F_V_MRD         12                              /* mem ref direct (enc) */
+#define F_NOP12         (F_V_NOP12 << F_V_FL)
+#define F_NOP9          (F_V_NOP9 << F_V_FL)
+#define F_AD15          (F_V_AD15 << F_V_FL)
+#define F_AD15X         (F_V_AD15X << F_V_FL)
+#define F_IMMX          (F_V_IMMX << F_V_FL)
+#define F_X             (F_V_X << F_V_FL)
+#define F_MRI           (F_V_MRI << F_V_FL)
+#define F_MR1D          (F_V_MR1D << F_V_FL)
+#define F_MR2D          (F_V_MR2D << F_V_FL)
+#define F_LEMU          (F_V_LEMU << F_V_FL)
+#define F_LEMUI         (F_V_LEMUI << F_V_FL)
+#define F_LTR           (F_V_LTR << F_V_FL)
+#define F_MRD           (F_V_MRD << F_V_FL)
+
+static const uint32 fmasks[] = {
+    07777, 07770, 07770, 07600,
+    07770, 07770, 07600, 07600,
+    07600, 017600, 017600, 07670,
+    07777
+    };
+
+/* Memory references are encode dir / decode 1D / decode 2D / indirect */
+
+static const char *fopcode[] = {
+    "FEXIT",    "FPAUSE",   "FCLA",     "FNEG",
+    "FNORM",    "STARTF",   "STARTD",   "JAC",
+                "ALN",      "ATX",      "XTA",
+    "FNOP",     "STARTE",
+    "LDX",      "ADDX",
+    "FLDA",     "FLDA",     "FLDA",     "FLDAI",
+    "JEQ",      "JGE",      "JLE",      "JA",
+    "JNE",      "JLT",      "JGT",      "JAL",
+    "SETX",     "SETB",     "JSA",      "JSR",
+    "FADD",     "FADD",     "FADD",     "FADDI",
+    "JNX",
+    "FSUB",     "FSUB",     "FSUB",     "FSUBI",
+    "TRAP3",
+    "FDIV",     "FDIV",     "FDIV",     "FDIVI",
+    "TRAP4",
+    "FMUL",     "FMUL",     "FMUL",     "FMULI",
+    "LTREQ",    "LTRGE",    "LTRLE",    "LTRA",
+    "LTRNE",    "LTRLT",    "LTRGT",    "LTRAL",
+    "FADDM",    "FADDM",    "FADDM",    "FADDMI",
+    "IMUL",     "LEA",
+    "FSTA",     "FSTA",     "FSTA",     "FSTAI",
+    "IMULI",    "LEAI",
+    "FMULM",    "FMULM",    "FMULM",    "FMULMI",
+    NULL
+    };
+
+static const int32 fop_val[] = {
+    00000+F_NOP12,  00001+F_NOP12,  00002+F_NOP12,  00003+F_NOP12,
+    00004+F_NOP12,  00005+F_NOP12,  00006+F_NOP12,  00007+F_NOP12,
+                    00010+F_X,      00020+F_X,      00030+F_X,
+    00040+F_NOP9,   00050+F_NOP9,
+    00100+F_IMMX,   00110+F_IMMX,
+    00000+F_MRD,    00200+F_MR1D,   00400+F_MR2D,   00600+F_MRI,
+    01000+F_AD15,   01010+F_AD15,   01020+F_AD15,   01030+F_AD15,
+    01040+F_AD15,   01050+F_AD15,   01060+F_AD15,   01070+F_AD15,
+    01100+F_AD15,   01110+F_AD15,   01120+F_AD15,   01130+F_AD15,
+    01000+F_MRD,    01200+F_MR1D,   01400+F_MR2D,   01600+F_MRI,
+    02000+F_AD15X,
+    02000+F_MRD,    02200+F_MR1D,   02400+F_MR2D,   02600+F_MRI,
+    03000+F_AD15,
+    03000+F_MRD,    03200+F_MR1D,   03400+F_MR2D,   03600+F_MRI,
+    04000+F_AD15,
+    04000+F_MRD,    04200+F_MR1D,   04400+F_MR2D,   04600+F_MRI,
+    05000+F_LTR,    05010+F_LTR,    05020+F_LTR,    05030+F_LTR,
+    05040+F_LTR,    05050+F_LTR,    05060+F_LTR,    05070+F_LTR,
+    05000+F_MRD,    05200+F_MR1D,   05400+F_MR2D,   05600+F_MRI,
+    016000+F_LEMU,  006000+F_LEMU,
+    06000+F_MRD,    06200+F_MR1D,   06400+F_MR2D,   06600+F_MRI,
+    017000+F_LEMUI, 007000+F_LEMUI,
+    07000+F_MRD,    07200+F_MR1D,   07400+F_MR2D,   07600+F_MRI,
+    -1
+    };
 
 /* Operate decode
 
@@ -427,6 +539,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 {
 int32 cflag, i, j, sp, inst, disp, opc;
 extern int32 emode;
+t_stat r;
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 inst = val[0];
@@ -445,6 +558,9 @@ if (sw & SWMASK ('T')) {                                /* TSS8 packed? */
     fprintf (of, "%c", TSSTOASC (inst & 077));
     return SCPE_OK;
     }
+if ((sw & SWMASK ('F')) &&                              /* FPP8? */
+    ((r = fprint_sym_fpp (of, val)) != SCPE_ARG))
+    return r;
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
 
 /* Instruction decode */
@@ -532,7 +648,7 @@ return SCPE_ARG;
 
 t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
-int32 cflag, d, i, j, k;
+uint32 cflag, d, i, j, k;
 t_stat r;
 char gbuf[CBUFSIZE];
 
@@ -555,6 +671,8 @@ if ((sw & SWMASK ('T')) || ((*cptr == '"') && cptr++)) { /* TSS8 string? */
               ((t_value) (cptr[1] - 040) & 077);
     return SCPE_OK;
     }
+if ((r = parse_sym_fpp (cptr, val)) != SCPE_ARG)        /* FPP8 inst? */
+    return r;
 
 /* Instruction parse */
 
@@ -567,9 +685,8 @@ j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 switch (j) {                                            /* case on class */
 
     case I_V_IOT:                                       /* IOT */
-        cptr = get_glyph (cptr, gbuf, 0);               /* get dev+pulse */
-        d = get_uint (gbuf, 8, 0777, &r);
-        if (r != SCPE_OK) return SCPE_ARG;
+        if ((cptr = parse_field (cptr, 0777, &d, 0)) == NULL)
+            return SCPE_ARG;                            /* get dev+pulse */
         val[0] = val[0] | d;
         break;
 
@@ -599,9 +716,8 @@ switch (j) {                                            /* case on class */
             cptr = get_glyph (cptr, gbuf, 0);
             }
         if ((k = (strcmp (gbuf, "C") == 0)) || (strcmp (gbuf, "Z") == 0)) {
-            cptr = get_glyph (cptr, gbuf, 0);
-            d = get_uint (gbuf, 8, 0177, &r);
-            if (r != SCPE_OK) return SCPE_ARG;
+            if ((cptr = parse_field (cptr, 0177, &d, 0)) == NULL)
+                return SCPE_ARG;
             val[0] = val[0] | d | (k? 0200: 0);
             }
         else {
@@ -630,4 +746,234 @@ switch (j) {                                            /* case on class */
 
 if (*cptr != 0) return SCPE_ARG;                        /* junk at end? */
 return SCPE_OK;
+}
+
+/* FPP8 instruction decode */
+
+t_stat fprint_sym_fpp (FILE *of, t_value *val)
+{
+uint32 wd1, wd2, xr4b, xr3b, ad15;
+uint32 i, j;
+extern uint32 fpp_bra, fpp_cmd;
+
+wd1 = (uint32) val[0] | ((fpp_cmd & 04000) << 1);
+wd2 = (uint32) val[1];
+xr4b = (wd1 >> 3) & 017;
+xr3b = wd1 & 07;
+ad15 = (xr3b << 12) | wd2;
+
+for (i = 0; fop_val[i] >= 0; i++) {                     /* loop thru ops */
+    j = (fop_val[i] >> F_V_FL) & F_M_FL;                /* get class */
+    if ((fop_val[i] & 017777) == (wd1 & fmasks[j])) {   /* match? */
+
+        switch (j) {                                    /* case on class */
+        case F_V_NOP12:
+        case F_V_NOP9:
+        case F_V_LTR:                                   /* no operands */
+            fprintf (of, "%s", fopcode[i]);
+            break;
+
+        case F_V_X:                                     /* index */
+            fprintf (of, "%s %o", fopcode[i], xr3b);
+            break;
+
+        case F_V_IMMX:                                  /* index imm */
+            fprintf (of, "%s %-o,%o", fopcode[i], wd2, xr3b);
+            return -1;                                  /* extra word */
+
+        case F_V_AD15:                                  /* 15b address */
+            fprintf (of, "%s %-o", fopcode[i], ad15);
+            return -1;                                  /* extra word */
+
+        case F_V_AD15X:                                 /* 15b addr, indx */
+            fprintf (of, "%s %-o", fopcode[i], ad15);
+            if (xr4b >= 010)
+                fprintf (of, ",%o+", xr4b & 7);
+            else fprintf (of, ",%o", xr4b);
+            return -1;                                  /* extra word */
+
+        case F_V_MR1D:                                  /* 1 word direct */
+            ad15 = (fpp_bra + (3 * (wd1 & 0177))) & ADDRMASK;
+            fprintf (of, "%s %-o", fopcode[i], ad15);
+            break;
+
+        case F_V_LEMU:
+        case F_V_MR2D:                                  /* 2 word direct */
+            fprintf (of, "%s %-o", fopcode[i], ad15);
+            if (xr4b >= 010)
+                fprintf (of, ",%o+", xr4b & 7);
+            else if (xr4b != 0)
+                fprintf (of, ",%o", xr4b);
+            return -1;                                  /* extra word */
+
+        case F_V_LEMUI:
+        case F_V_MRI:                                   /* indirect */
+            ad15 = (fpp_bra + (3 * xr3b)) & ADDRMASK;
+            fprintf (of, "%s %-o", fopcode[i], ad15);
+            if (xr4b >= 010)
+                fprintf (of, ",%o+", xr4b & 7);
+            else if (xr4b != 0)
+                fprintf (of, ",%o", xr4b);
+            break;
+
+        case F_V_MRD:                                   /* encode only */
+            return SCPE_IERR;
+            }
+
+        return SCPE_OK;
+        }                                               /* end if */
+    }                                                   /* end for */
+return SCPE_ARG;
+}
+
+/* FPP8 instruction parse */
+
+t_stat parse_sym_fpp (char *cptr, t_value *val)
+{
+uint32 i, j, ad, xr;
+int32 broff, nwd;
+char gbuf[CBUFSIZE];
+
+cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
+for (i = 0; (fopcode[i] != NULL) && (strcmp (fopcode[i], gbuf) != 0) ; i++) ;
+if (fopcode[i] == NULL) return SCPE_ARG;
+val[0] = fop_val[i] & 07777;                            /* get value */
+j = (fop_val[i] >> F_V_FL) & F_M_FL;                    /* get class */
+xr = 0;
+nwd = 0;
+
+switch (j) {                                            /* case on class */
+
+    case F_V_NOP12:
+    case F_V_NOP9:
+    case F_V_LTR:                                       /* no operands */
+        break;
+
+    case F_V_X:                                         /* 3b XR */
+        if ((cptr = parse_field (cptr, 07, &xr, 0)) == NULL)
+            return SCPE_ARG;
+        val[0] |= xr;
+        break;
+
+    case F_V_IMMX:                                      /* 12b, XR */
+        if ((cptr = parse_field (cptr, 07777, &ad, ',')) == NULL)
+            return SCPE_ARG;
+        if ((*cptr == 0) ||
+            ((cptr = parse_fpp_xr (cptr, &xr, FALSE)) == NULL))
+            return SCPE_ARG;
+        val[0] |= xr;
+        val[++nwd] = ad;
+        break;
+
+    case F_V_AD15:                                      /* 15b addr */
+        if ((cptr = parse_field (cptr, 077777, &ad, 0)) == NULL)
+            return SCPE_ARG;
+        val[0] |= (ad >> 12) & 07;
+        val[++nwd] = ad & 07777;
+        break;
+
+    case F_V_AD15X:                                     /* 15b addr, idx */
+        if ((cptr = parse_field (cptr, 077777, &ad, ',')) == NULL)
+            return SCPE_ARG;
+        if ((*cptr == 0) ||
+            ((cptr = parse_fpp_xr (cptr, &xr, FALSE)) == NULL))
+            return SCPE_ARG;
+        val[0] |= ((xr << 3) | ((ad >> 12) & 07));
+        val[++nwd] = ad & 07777;
+        break;
+
+    case F_V_LEMUI:
+    case F_V_MRI:                                       /* indirect */
+        if ((cptr = parse_field (cptr, 077777, &ad, ',')) == NULL)
+            return SCPE_ARG;
+        if ((*cptr != 0) &&
+            ((cptr = parse_fpp_xr (cptr, &xr, TRUE)) == NULL))
+            return SCPE_ARG;
+        if ((broff = test_fpp_addr (ad, 07)) < 0)
+            return SCPE_ARG;
+        val[0] |= ((xr << 3) | broff);
+        break;
+
+    case F_V_MRD:                                       /* direct */
+        if ((cptr = parse_field (cptr, 077777, &ad, ',')) == NULL)
+            return SCPE_ARG;
+        if (((broff = test_fpp_addr (ad, 0177)) < 0) ||
+            (*cptr != 0)) {
+            if ((*cptr != 0) &&
+                ((cptr = parse_fpp_xr (cptr, &xr, TRUE)) == NULL))
+                return SCPE_ARG;
+            val[0] |= (00400 | (xr << 3) | ((ad >> 12) & 07));
+            val[++nwd] = ad & 07777;
+            }
+        else val[0] |= (00200 | broff);
+        break;
+
+    case F_V_LEMU:
+        if ((cptr = parse_field (cptr, 077777, &ad, ',')) == NULL)
+            return SCPE_ARG;
+        if ((*cptr != 0) &&
+            ((cptr = parse_fpp_xr (cptr, &xr, TRUE)) == NULL))
+            return SCPE_ARG;
+        val[0] |= ((xr << 3) | ((ad >> 12) & 07));
+        val[++nwd] = ad & 07777;
+        break;
+
+    case F_V_MR1D:
+    case F_V_MR2D:
+        return SCPE_IERR;          
+        }                                               /* end case */
+
+if (*cptr != 0) return SCPE_ARG;                        /* junk at end? */
+return -nwd;
+}
+
+/* Parse field */
+
+char *parse_field (char *cptr, uint32 max, uint32 *val, uint32 c)
+{
+char gbuf[CBUFSIZE];
+t_stat r;
+
+cptr = get_glyph (cptr, gbuf, c);                       /* get field */
+*val = get_uint (gbuf, 8, max, &r);
+if (r != SCPE_OK)
+    return NULL;
+return cptr;
+}
+
+/* Parse index register */
+
+char *parse_fpp_xr (char *cptr, uint32 *xr, t_bool inc)
+{
+char gbuf[CBUFSIZE];
+uint32 len;
+t_stat r;
+
+cptr = get_glyph (cptr, gbuf, 0);                      /* get field */
+len = strlen (gbuf);
+if (gbuf[len - 1] == '+') {
+    if (!inc)
+        return NULL;
+    gbuf[len - 1] = 0;
+    *xr = 010;
+    }
+else *xr = 0;
+*xr += get_uint (gbuf, 8, 7, &r);
+if (r != SCPE_OK)
+    return NULL;
+return cptr;
+}
+
+/* Test address in range of base register */
+
+int32 test_fpp_addr (uint32 ad, uint32 max)
+{
+uint32 off;
+extern uint32 fpp_bra;
+
+off = ad - fpp_bra;
+if (((off % 3) != 0) ||
+    (off > (max * 3)))
+    return -1;
+return ((int32) off / 3);
 }

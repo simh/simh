@@ -1,6 +1,6 @@
 /* vax780_sbi.c: VAX 11/780 SBI
 
-   Copyright (c) 2004-2006, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,9 @@
 
    sbi                  bus controller
 
+   31-May-2008  RMS     Fixed machine_check calling sequence (found by Peter Schorn)
    03-May-2006  RMS     Fixed writes to ACCS
+   28-May-08    RMS     Inlined physical memory routines
 */
 
 #include "vax_defs.h"
@@ -132,7 +134,6 @@ void uba_eval_int (void);
 t_stat vax780_boot (int32 flag, char *ptr);
 
 extern t_stat vax780_fload (int flag, char *cptr);
-extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);
@@ -151,7 +152,6 @@ extern void init_mbus_tab (void);
 extern void init_ubus_tab (void);
 extern t_stat build_mbus_tab (DEVICE *dptr, DIB *dibp);
 extern t_stat build_ubus_tab (DEVICE *dptr, DIB *dibp);
-extern void WriteLP (uint32 pa, int32 val);
 
 /* SBI data structures
 
@@ -548,7 +548,7 @@ return;
    Rest will be zero
 */
 
-int32 machine_check (int32 p1, int32 opc, int32 cc)
+int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 acc, err;
 

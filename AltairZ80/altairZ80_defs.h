@@ -1,6 +1,6 @@
 /*  altairz80_defs.h: MITS Altair simulator definitions
 
-    Copyright (c) 2002-2007, Peter Schorn
+    Copyright (c) 2002-2008, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -26,55 +26,94 @@
     Based on work by Charles E Owen (c) 1997
 */
 
-#include "sim_defs.h"                                   /* simulator definitions                        */
+#include "sim_defs.h"                                       /* simulator definitions                        */
 
-#define MAXMEMSIZE          65536                       /* maximum memory size                          */
-#define ADDRMASK            (MAXMEMSIZE - 1)            /* address mask                                 */
-#define BOOTROM_SIZE        256                         /* size of boot rom                             */
-#define MAXBANKS            8                           /* max number of memory banks                   */
-#define MAXBANKSLOG2        3                           /* log2 of MAXBANKS                             */
-#define BANKMASK            (MAXBANKS-1)                /* bank mask                                    */
-#define MEMSIZE             (cpu_unit.capac)            /* actual memory size                           */
-#define KB                  1024                        /* kilo byte                                    */
-#define DEFAULT_ROM_LOW     0xff00                      /* default for lowest address of ROM            */
-#define DEFAULT_ROM_HIGH    0xffff                      /* default for highest address of ROM           */
+#define MAXBANKSIZE             65536                       /* maximum memory size, a power of 2            */
+#define MAXBANKSIZELOG2         16                          /* log2 of MAXBANKSIZE                          */
+#define MAXBANKS                16                          /* max number of memory banks, a power of 2     */
+#define MAXBANKSLOG2            4                           /* log2 of MAXBANKS                             */
+#define MAXMEMORY               (MAXBANKS * MAXBANKSIZE)    /* maximum, total memory size                   */
+#define ADDRMASK                (MAXBANKSIZE - 1)           /* address mask                                 */
+#define ADDRMASKEXTENDED        (MAXMEMORY - 1)             /* extended address mask                        */
+#define BANKMASK                (MAXBANKS - 1)              /* bank mask                                    */
+#define MEMORYSIZE              (cpu_unit.capac)            /* actual memory size                           */
+#define KB                      1024                        /* kilo byte                                    */
+#define KBLOG2                  10                          /* log2 of KB                                   */
+#define ALTAIR_ROM_LOW          0xff00                      /* start address of regular Altair ROM          */
+#define RESOURCE_TYPE_MEMORY    1
+#define RESOURCE_TYPE_IO        2
 
-#define NUM_OF_DSK          8                           /* NUM_OF_DSK must be power of two              */
-#define LDA_INSTRUCTION     0x3e                        /* op-code for LD A,<8-bit value> instruction   */
-#define UNIT_NO_OFFSET_1    0x37                        /* LD A,<unitno>                                */
-#define UNIT_NO_OFFSET_2    0xb4                        /* LD a,80h | <unitno>                          */
+#define NUM_OF_DSK              8                           /* NUM_OF_DSK must be power of two              */
+#define LDA_INSTRUCTION         0x3e                        /* op-code for LD A,<8-bit value> instruction   */
+#define UNIT_NO_OFFSET_1        0x37                        /* LD A,<unitno>                                */
+#define UNIT_NO_OFFSET_2        0xb4                        /* LD a,80h | <unitno>                          */
 
-#define UNIT_V_OPSTOP       (UNIT_V_UF+0)               /* stop on invalid operation                    */
-#define UNIT_OPSTOP         (1 << UNIT_V_OPSTOP)
-#define UNIT_V_CHIP         (UNIT_V_UF+1)               /* 8080 or Z80 CPU                              */
-#define UNIT_CHIP           (1 << UNIT_V_CHIP)
-#define UNIT_V_MSIZE        (UNIT_V_UF+2)               /* memory size                                  */
-#define UNIT_MSIZE          (1 << UNIT_V_MSIZE)
-#define UNIT_V_BANKED       (UNIT_V_UF+3)               /* banked memory is used                        */
-#define UNIT_BANKED         (1 << UNIT_V_BANKED)
-#define UNIT_V_ROM          (UNIT_V_UF+4)               /* ROM exists                                   */
-#define UNIT_ROM            (1 << UNIT_V_ROM)
-#define UNIT_V_ALTAIRROM    (UNIT_V_UF+5)               /* ALTAIR ROM exists                            */
-#define UNIT_ALTAIRROM      (1 << UNIT_V_ALTAIRROM)
-#define UNIT_V_WARNROM      (UNIT_V_UF+6)               /* warn if ROM is written to                    */
-#define UNIT_WARNROM        (1 << UNIT_V_WARNROM)
+#define CHIP_TYPE_8080          0
+#define CHIP_TYPE_Z80           1
+#define CHIP_TYPE_8086          2
 
-#define UNIX_PLATFORM (defined (__linux) || defined(__NetBSD__) || defined (__OpenBSD__) || \
-    defined (__FreeBSD__) || defined (__APPLE__))
+/* simulator stop codes */
+#define STOP_HALT       0   /* HALT                                             */
+#define STOP_IBKPT      1   /* breakpoint   (program counter)                   */
+#define STOP_MEM        2   /* breakpoint   (memory access)                     */
+#define STOP_OPCODE     3   /* invalid operation encountered (8080, Z80, 8086)  */
 
-#define ADDRESS_FORMAT      "[%04xh]"
+#define UNIT_CPU_V_OPSTOP       (UNIT_V_UF+0)               /* stop on invalid operation                    */
+#define UNIT_CPU_OPSTOP         (1 << UNIT_CPU_V_OPSTOP)
+#define UNIT_CPU_V_BANKED       (UNIT_V_UF+1)               /* banked memory is used                        */
+#define UNIT_CPU_BANKED         (1 << UNIT_CPU_V_BANKED)
+#define UNIT_CPU_V_ALTAIRROM    (UNIT_V_UF+2)               /* ALTAIR ROM exists                            */
+#define UNIT_CPU_ALTAIRROM      (1 << UNIT_CPU_V_ALTAIRROM)
+#define UNIT_CPU_V_VERBOSE      (UNIT_V_UF+3)               /* warn if ROM is written to                    */
+#define UNIT_CPU_VERBOSE        (1 << UNIT_CPU_V_VERBOSE)
+#define UNIT_CPU_V_MMU          (UNIT_V_UF+4)               /* use MMU and slower CPU                       */
+#define UNIT_CPU_MMU            (1 << UNIT_CPU_V_MMU)
+#define UNIT_CPU_V_STOPONHALT   (UNIT_V_UF+5)               /* stop simulation on HALT                      */
+#define UNIT_CPU_STOPONHALT     (1 << UNIT_CPU_V_STOPONHALT)
+
+#ifdef CPUSWITCHER
+#define UNIT_CPU_V_SWITCHER     (UNIT_V_UF+6)               /* switcher 8086 <--> 8080/Z80 enabled          */
+#define UNIT_CPU_SWITCHER       (1 << UNIT_CPU_V_SWITCHER)
+#endif
+
+#define UNIX_PLATFORM (defined (__linux) || defined(__NetBSD__) \
+    || defined (__OpenBSD__) || defined (__FreeBSD__) || defined (__APPLE__))
+
+#define ADDRESS_FORMAT      "[0x%05x]"
 #define PC_FORMAT           "\n" ADDRESS_FORMAT " "
 #define MESSAGE_1(p1)                \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX);                 printMessage()
+    sprintf(messageBuffer,PC_FORMAT p1,PCX);                    printMessage()
 #define MESSAGE_2(p1,p2)             \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2);              printMessage()
+    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2);                 printMessage()
 #define MESSAGE_3(p1,p2,p3)          \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3);           printMessage()
+    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3);              printMessage()
 #define MESSAGE_4(p1,p2,p3,p4)       \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3,p4);        printMessage()
+    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3,p4);           printMessage()
 #define MESSAGE_5(p1,p2,p3,p4,p5)    \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3,p4,p5);     printMessage()
+    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3,p4,p5);        printMessage()
 #define MESSAGE_6(p1,p2,p3,p4,p5,p6) \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3,p4,p5,p6);  printMessage()
+    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3,p4,p5,p6);     printMessage()
 #define MESSAGE_7(p1,p2,p3,p4,p5,p6,p7) \
     sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3,p4,p5,p6,p7);  printMessage()
+
+/* use NLP for new line printing while the simulation is running */
+#if UNIX_PLATFORM
+#define NLP "\r\n"
+#else
+#define NLP "\n"
+#endif
+
+#define TRACE_PRINT(level, args)    if(trace_level & level) {   \
+                                        printf args;            \
+                                    }
+
+#if defined (__MWERKS__) && defined (macintosh)
+#define __FUNCTION__ __FILE__
+#endif
+
+typedef struct {
+    uint32 mem_base;    /* Memory Base Address */
+    uint32 mem_size;    /* Memory Address space requirement */
+    uint32 io_base;     /* I/O Base Address */
+    uint32 io_size;     /* I/O Address Space requirement */
+} PNP_INFO;

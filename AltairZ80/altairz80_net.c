@@ -1,6 +1,6 @@
 /*  altairz80_net.c: networking capability
 
-    Copyright (c) 2002-2007, Peter Schorn
+    Copyright (c) 2002-2008, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -26,13 +26,14 @@
 
 #include "altairz80_defs.h"
 #include "sim_sock.h"
+extern uint32 PCX;
+extern char messageBuffer[];
+extern void printMessage(void);
 
 #define UNIT_V_SERVER   (UNIT_V_UF + 0) /* define machine as a server   */
 #define UNIT_SERVER     (1 << UNIT_V_SERVER)
 #define NET_INIT_POLL_SERVER  16000
 #define NET_INIT_POLL_CLIENT  15000
-
-/*#define DEBUG_NETWORK  TRUE*/
 
 static t_stat net_attach    (UNIT *uptr, char *cptr);
 static t_stat net_detach    (UNIT *uptr);
@@ -42,8 +43,13 @@ static t_stat set_net       (UNIT *uptr, int32 value, char *cptr, void *desc);
 int32 netStatus             (const int32 port, const int32 io, const int32 data);
 int32 netData               (const int32 port, const int32 io, const int32 data);
 
-#define MAX_CONNECTIONS  2      /* maximal number of server connections */
-#define BUFFER_LENGTH    512    /* length of input and output buffer    */
+#define MAX_CONNECTIONS 2   /* maximal number of server connections */
+#define BUFFER_LENGTH   512 /* length of input and output buffer    */
+#define NET_ACCEPT      1   /* bit masks for trace_level            */
+#define NET_DROP        2
+#define NET_IN          4
+#define NET_OUT         8
+static int32 trace_level = 0;
 
 static struct {
     int32   Z80StatusPort;              /* Z80 status port associated with this ioSocket, read only             */
@@ -75,9 +81,10 @@ static UNIT net_unit = {
 };
 
 static REG net_reg[] = {
-    { DRDATA (POLL,     net_unit.wait,  32) },
-    { HRDATA (IPHOST,   net_unit.u4,    32),    REG_RO },
-    { DRDATA (PORT,     net_unit.u3,    32),    REG_RO },
+    { DRDATA (POLL,         net_unit.wait,  32)             },
+    { HRDATA (IPHOST,       net_unit.u4,    32),    REG_RO  },
+    { DRDATA (PORT,         net_unit.u3,    32),    REG_RO  },
+    { HRDATA (TRACELEVEL,   trace_level,    32)             },
     { NULL }
 };
 
@@ -172,7 +179,7 @@ static t_stat net_svc(UNIT *uptr) {
     int32 i, j, k, r;
     SOCKET s;
     static char svcBuffer[BUFFER_LENGTH];
-    if (net_unit.flags & UNIT_ATT) {
+    if (net_unit.flags & UNIT_ATT) { /* cannot remove due to following else */
         sim_activate(&net_unit, net_unit.wait);             /* continue poll */
         if (net_unit.flags & UNIT_SERVER) {
             for (i = 1; i <= MAX_CONNECTIONS; i++)
@@ -180,16 +187,16 @@ static t_stat net_svc(UNIT *uptr) {
                     s = sim_accept_conn(serviceDescriptor[1].masterSocket, NULL);
                     if (s != INVALID_SOCKET) {
                         serviceDescriptor[i].ioSocket = s;
-#ifdef DEBUG_NETWORK
-                        printf("Accepted connection %i with socket %i.\n\r", i, s);
-#endif
+                        if (trace_level & NET_ACCEPT) {
+                            MESSAGE_3("Accepted connection %i with socket %i.", i, s);
+                        }
                     }
                 }
         }
         else if (serviceDescriptor[0].ioSocket == 0) {
             serviceDescriptor[0].ioSocket = sim_connect_sock(net_unit.u4, net_unit.u3);
             if (serviceDescriptor[0].ioSocket == INVALID_SOCKET) return SCPE_IOERR;
-            printf("\rWaiting for server ... Type g<return> (possibly twice) when ready\n\r");
+            printf("\rWaiting for server ... Type g<return> (possibly twice) when ready" NLP);
             return SCPE_STOP;
         }
         for (i = 0; i <= MAX_CONNECTIONS; i++)
@@ -198,9 +205,9 @@ static t_stat net_svc(UNIT *uptr) {
                     r = sim_read_sock(serviceDescriptor[i].ioSocket, svcBuffer,
                         BUFFER_LENGTH - serviceDescriptor[i].inputSize);
                     if (r == -1) {
-#ifdef DEBUG_NETWORK
-                        printf("Drop connection %i with socket %i.\n\r", i, serviceDescriptor[i].ioSocket);
-#endif
+                        if (trace_level & NET_DROP) {
+                            MESSAGE_3("Drop connection %i with socket %i.", i, serviceDescriptor[i].ioSocket);
+                        }
                         sim_close_sock(serviceDescriptor[i].ioSocket, FALSE);
                         serviceDescriptor[i].ioSocket = 0;
                         serviceDescriptor_reset(i);
@@ -228,7 +235,7 @@ static t_stat net_svc(UNIT *uptr) {
                         if (serviceDescriptor[i].outputPosRead >= BUFFER_LENGTH)
                             serviceDescriptor[i].outputPosRead -= BUFFER_LENGTH;
                     }
-                    else printf("write %i\r\n", r);
+                    else printf("write %i" NLP, r);
                 }
             }
     }
@@ -237,25 +244,26 @@ static t_stat net_svc(UNIT *uptr) {
 
 int32 netStatus(const int32 port, const int32 io, const int32 data) {
     uint32 i;
+    if ((net_unit.flags & UNIT_ATT) == 0) return 0;
     net_svc(&net_unit);
-    if (io == 0) {  /* IN   */
+    if (io == 0)    /* IN   */
         for (i = 0; i <= MAX_CONNECTIONS; i++)
             if (serviceDescriptor[i].Z80StatusPort == port)
                 return (serviceDescriptor[i].inputSize > 0 ? 1 : 0) |
                     (serviceDescriptor[i].outputSize < BUFFER_LENGTH ? 2 : 0);
-    }
     return 0;
 }
 
 int32 netData(const int32 port, const int32 io, const int32 data) {
     uint32 i;
     char result;
+    if ((net_unit.flags & UNIT_ATT) == 0) return 0;
     net_svc(&net_unit);
     for (i = 0; i <= MAX_CONNECTIONS; i++)
-        if (serviceDescriptor[i].Z80DataPort == port) {
+        if (serviceDescriptor[i].Z80DataPort == port)
             if (io == 0) {  /* IN   */
                 if (serviceDescriptor[i].inputSize == 0) {
-                    printf("re-read from %i\r\n", port);
+                    printf("re-read from %i" NLP, port);
                     result = serviceDescriptor[i].inputBuffer[serviceDescriptor[i].inputPosRead > 0 ?
                         serviceDescriptor[i].inputPosRead - 1 : BUFFER_LENGTH - 1];
                 }
@@ -265,15 +273,15 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
                         serviceDescriptor[i].inputPosRead = 0;
                     serviceDescriptor[i].inputSize--;
                 }
-#ifdef DEBUG_NETWORK
-                    printf(" IN(%i)=%03xh (%c)\r\n", port, (result & 0xff),
+                if (trace_level & NET_IN) {
+                    MESSAGE_4(" IN(%i)=%03xh (%c)", port, (result & 0xff),
                         (32 <= (result & 0xff)) && ((result & 0xff) <= 127) ? (result & 0xff) : '?');
-#endif
+                }
                 return result;
             }
             else {          /* OUT  */
                 if (serviceDescriptor[i].outputSize == BUFFER_LENGTH) {
-                    printf("over-write %i to %i\r\n", data, port);
+                    printf("over-write %i to %i" NLP, data, port);
                     serviceDescriptor[i].outputBuffer[serviceDescriptor[i].outputPosWrite > 0 ?
                         serviceDescriptor[i].outputPosWrite - 1 : BUFFER_LENGTH - 1] = data;
                 }
@@ -283,11 +291,11 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
                         serviceDescriptor[i].outputPosWrite = 0;
                     serviceDescriptor[i].outputSize++;
                 }
-#ifdef DEBUG_NETWORK
-                printf("OUT(%i)=%03xh (%c)\r\n", port, data, (32 <= data) && (data <= 127) ? data : '?');
-#endif
+                if (trace_level & NET_OUT) {
+                    MESSAGE_4("OUT(%i)=%03xh (%c)", port, data,
+                        (32 <= data) && (data <= 127) ? data : '?');
+                }
                 return 0;
             }
-        }
     return 0;
 }

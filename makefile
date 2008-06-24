@@ -1,33 +1,31 @@
+#
 # CC Command
 #
-# Note: -O2 is sometimes broken in GCC when setjump/longjump is being
-# used. Try -O2 only with released simulators.
-#
 ifeq ($(WIN32),)
-#Unix Environments
-ifeq ($(OSTYPE),solaris)
-OS_CCDEFS = -lsocket -lnsl -lpthread -D_GNU_SOURCE
+  #Unix Environments
+  ifneq (,$(findstring solaris,$(OSTYPE)))
+    OS_CCDEFS = -lm -lsocket -lnsl -lrt -lpthread -D_GNU_SOURCE
+  else
+    ifneq (,$(findstring darwin,$(OSTYPE)))
+      OS_CCDEFS = -D_GNU_SOURCE
+    else
+      OS_CCDEFS = -lrt -lm -D_GNU_SOURCE
+    endif
+  endif
+  CC = gcc -std=c99 -U__STRICT_ANSI__ -g $(OS_CCDEFS) -I .
+  ifeq ($(USE_NETWORK),)
+  else
+    NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a
+  endif
 else
-OS_CCDEFS = -D_GNU_SOURCE
-endif
-ifeq ($(OSTYPE),macos)
-CC = gcc -std=c99 -O2 -U__STRICT_ANSI__ -g -lm -lrt $(OS_CCDEFS) -I .
-else
-CC = gcc -std=c99 -O2 -U__STRICT_ANSI__ -g -lm $(OS_CCDEFS) -I .
-endif
-ifeq ($(USE_NETWORK),)
-else
-NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a
-endif
-else
-#Win32 Environments
-LDFLAGS = -lm -lwsock32 -lwinmm
-CC = gcc -std=c99 -U__STRICT_ANSI__ -O0 -I.
-EXE = .exe
-ifeq ($(USE_NETWORK),)
-else
-NETWORK_OPT = -DUSE_NETWORK -lwpcap -lpacket
-endif
+  #Win32 Environments
+  LDFLAGS = -lm -lwsock32 -lwinmm
+  CC = gcc -std=c99 -U__STRICT_ANSI__ -O2 -I.
+  EXE = .exe
+  ifeq ($(USE_NETWORK),)
+  else
+    NETWORK_OPT = -DUSE_NETWORK -lwpcap -lpacket
+  endif
 endif
 
 #
@@ -85,7 +83,8 @@ PDP11 = ${PDP11D}/pdp11_fp.c ${PDP11D}/pdp11_cpu.c ${PDP11D}/pdp11_dz.c \
 	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_vh.c \
 	${PDP11D}/pdp11_rh.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_cpumod.c \
 	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_rf.c ${PDP11D}/pdp11_dl.c \
-	${PDP11D}/pdp11_ta.c
+	${PDP11D}/pdp11_ta.c ${PDP11D}/pdp11_rc.c ${PDP11D}/pdp11_kg.c \
+	${PDP11D}/pdp11_ke.c ${PDP11D}/pdp11_dc.c
 PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -125,13 +124,13 @@ PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D} ${NETWORK_OPT}
 
 
 
-PDP8D = PDP8/
+PDP8D = PDP8
 PDP8 = ${PDP8D}/pdp8_cpu.c ${PDP8D}/pdp8_clk.c ${PDP8D}/pdp8_df.c \
 	${PDP8D}/pdp8_dt.c ${PDP8D}/pdp8_lp.c ${PDP8D}/pdp8_mt.c \
 	${PDP8D}/pdp8_pt.c ${PDP8D}/pdp8_rf.c ${PDP8D}/pdp8_rk.c \
 	${PDP8D}/pdp8_rx.c ${PDP8D}/pdp8_sys.c ${PDP8D}/pdp8_tt.c \
 	${PDP8D}/pdp8_ttx.c ${PDP8D}/pdp8_rl.c ${PDP8D}/pdp8_tsc.c \
-	${PDP8D}/pdp8_td.c ${PDP8D}/pdp8_ct.c
+	${PDP8D}/pdp8_td.c ${PDP8D}/pdp8_ct.c ${PDP8D}/pdp8_fpp.c
 PDP8_OPT = -I ${PDP8D}
 
 
@@ -149,7 +148,8 @@ HP2100 = ${HP2100D}/hp2100_stddev.c ${HP2100D}/hp2100_dp.c ${HP2100D}/hp2100_dq.
 	${HP2100D}/hp2100_fp.c ${HP2100D}/hp2100_sys.c ${HP2100D}/hp2100_lpt.c \
 	${HP2100D}/hp2100_ipl.c ${HP2100D}/hp2100_ds.c ${HP2100D}/hp2100_cpu0.c \
 	${HP2100D}/hp2100_cpu1.c ${HP2100D}/hp2100_cpu2.c ${HP2100D}/hp2100_cpu3.c \
-	${HP2100D}/hp2100_cpu4.c ${HP2100D}/hp2100_fp1.c
+	${HP2100D}/hp2100_cpu4.c ${HP2100D}/hp2100_cpu5.c ${HP2100D}/hp2100_cpu6.c \
+	${HP2100D}/hp2100_cpu7.c ${HP2100D}/hp2100_fp1.c ${HP2100D}/hp2100_baci.c 
 HP2100_OPT = -DHAVE_INT64 -I ${HP2100D}
 
 
@@ -215,9 +215,20 @@ ALTAIR_OPT = -I ${ALTAIRD}
 
 
 ALTAIRZ80D = AltairZ80
-ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_dsk.c \
+ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
+	${ALTAIRZ80D}/altairz80_dsk.c ${ALTAIRZ80D}/disasm.c \
 	${ALTAIRZ80D}/altairz80_sio.c ${ALTAIRZ80D}/altairz80_sys.c \
-	${ALTAIRZ80D}/altairz80_hdsk.c ${ALTAIRZ80D}/altairz80_net.c
+	${ALTAIRZ80D}/altairz80_hdsk.c ${ALTAIRZ80D}/altairz80_net.c \
+	${ALTAIRZ80D}/flashwriter2.c ${ALTAIRZ80D}/i86_decode.c \
+	${ALTAIRZ80D}/i86_ops.c ${ALTAIRZ80D}/i86_prim_ops.c \
+	${ALTAIRZ80D}/i8272.c ${ALTAIRZ80D}/insnsa.c ${ALTAIRZ80D}/insnsd.c \
+	${ALTAIRZ80D}/mfdc.c ${ALTAIRZ80D}/n8vem.c ${ALTAIRZ80D}/vfdhd.c \
+	${ALTAIRZ80D}/s100_disk1a.c ${ALTAIRZ80D}/s100_disk2.c \
+	${ALTAIRZ80D}/s100_fif.c ${ALTAIRZ80D}/s100_mdriveh.c \
+	${ALTAIRZ80D}/s100_mdsad.c ${ALTAIRZ80D}/s100_selchan.c \
+	${ALTAIRZ80D}/s100_ss1.c ${ALTAIRZ80D}/s100_64fdc.c \
+	${ALTAIRZ80D}/s100_scp300f.c ${ALTAIRZ80D}/sim_imd.c \
+	${ALTAIRZ80D}/wd179x.c
 ALTAIRZ80_OPT = -I ${ALTAIRZ80D}
 
 

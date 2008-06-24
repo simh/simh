@@ -1,6 +1,6 @@
 /* sim_sock.h: OS-dependent socket routines header file
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2009, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   04-Jun-08    RMS     Addes sim_create_sock, for IBM 1130
    14-Apr-05    RMS     Added WSAEINPROGRESS (from Tim Riker)
    20-Aug-04    HV      Added missing definition for OS/2 (from Holger Veit)
    22-Oct-03    MP      Changed WIN32 winsock include to use winsock2.h to
@@ -76,6 +77,7 @@
 
 SOCKET sim_master_sock (int32 port);
 SOCKET sim_connect_sock (int32 ip, int32 port);
+SOCKET sim_create_sock (void);
 SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr);
 int32 sim_check_conn (SOCKET sock, t_bool rd);
 int32 sim_read_sock (SOCKET sock, char *buf, int32 nbytes);

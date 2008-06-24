@@ -1,6 +1,6 @@
 /* pdp11_cpumod.h: PDP-11 CPU model definitions
 
-   Copyright (c) 2004-2005, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Apr-08    RMS     Added 11/70 MBRK register
    30-Aug-05    RMS     Added additional 11/60 registers
 */
 
@@ -176,6 +177,10 @@
 #define MBRK60_WR       0007777                         /* microbreak */
 
 #define CPUE60_RD       (CPUE_ODD|CPUE_TMO|CPUE_RED)
+
+/* 11/70 specific registers */
+
+#define MBRK70_WR       0000377                         /* microbreak */
 
 /* J11 specific registers */
 

@@ -331,7 +331,7 @@ switch (inst) {                                         /* case on opcode */
 
     default:
         break;
-		}
+        }
 
 if (IR & I_HC) { clrFSR (devd); }                       /* H/C option */
 return dat;

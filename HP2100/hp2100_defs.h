@@ -1,6 +1,6 @@
 /* hp2100_defs.h: HP 2100 simulator definitions
 
-   Copyright (c) 1993-2007, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,12 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Apr-08    JDB     Added I_MRG_I, I_JSB, I_JSB_I, and I_JMP instruction masks
+   14-Apr-08    JDB     Changed TMR_MUX to TMR_POLL for idle support
+                        Added POLLMODE, sync_poll() declaration
+                        Added I_MRG, I_ISZ, I_IOG, I_STF, and I_SFS instruction masks
+   07-Dec-07    JDB     Added BACI device
+   10-Nov-07    JDB     Added 16/32-bit unsigned-to-signed conversions
    11-Jan-07    JDB     Added 12578A DMA byte packing to DMA structure
    28-Dec-06    JDB     Added CRS backplane signal as I/O pseudo-opcode
                         Added DMASK32 32-bit mask value
@@ -80,13 +86,21 @@
 /* Architectural constants */
 
 #define SIGN32          020000000000                    /* 32b sign */
-#define DMASK32         037777777777                    /* 32b data mask */
+#define DMASK32         037777777777                    /* 32b data mask/maximum value */
+#define DMAX32          017777777777                    /* 32b maximum signed value */
 #define SIGN            0100000                         /* 16b sign */
-#define DMASK           0177777                         /* 16b data mask */
-#define DMASK8          0377                            /* 8b data mask */
+#define DMASK           0177777                         /* 16b data mask/maximum value */
+#define DMAX            0077777                         /* 16b maximum signed value */
+#define DMASK8          0377                            /* 8b data mask/maximum value */
 #define AR              ABREG[0]                        /* A = reg 0 */
 #define BR              ABREG[1]                        /* B = reg 1 */
+
+/* Portable conversions (sign-extension, unsigned-to-signed) */
+
 #define SEXT(x)         ((int32) (((x) & SIGN)? ((x) | ~DMASK): ((x) & DMASK)))
+
+#define INT16(u)        ((u) > DMAX   ? (-(int16) (DMASK   - (u)) - 1) : (int16) (u))
+#define INT32(u)        ((u) > DMAX32 ? (-(int32) (DMASK32 - (u)) - 1) : (int32) (u))
 
 /* Memory reference instructions */
 
@@ -107,6 +121,19 @@
 #define I_HC            0001000                         /* hold/clear */
 #define I_DEVMASK       0000077                         /* device mask */
 #define I_GETIOOP(x)    (((x) >> 6) & 07)               /* I/O sub op */
+
+/* Instruction masks */
+
+#define I_MRG           0074000                         /* MRG instructions */
+#define I_MRG_I         (I_MRG | I_IA)                  /* MRG indirect instruction group */
+#define I_JSB           0014000                         /* JSB instruction */
+#define I_JSB_I         (I_JSB | I_IA)                  /* JSB,I instruction */
+#define I_JMP           0024000                         /* JMP instruction */
+#define I_ISZ           0034000                         /* ISZ instruction */
+
+#define I_IOG           0107700                         /* I/O group instruction */
+#define I_SFS           0102300                         /* SFS instruction */
+#define I_STF           0102100                         /* STF instruction */
 
 /* DMA channels */
 
@@ -182,7 +209,12 @@ struct DMA {                                            /* DMA channel */
 /* Timers */
 
 #define TMR_CLK         0                               /* clock */
-#define TMR_MUX         1                               /* multiplexor */
+#define TMR_POLL        1                               /* input polling */
+
+#define POLL_RATE       100                             /* poll 100 times per second */
+#define POLL_WAIT       15800                           /* initial poll ~ 10 msec. */
+
+typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization modes */
 
 /* I/O sub-opcodes */
 
@@ -209,9 +241,9 @@ struct DMA {                                            /* DMA channel */
 #define DMA1            007                             /* DMA channel 1 */
 #define VARDEV          (DMA1 + 1)                      /* start of var assign */
 #define M_NXDEV         (INT_M (CPU) | INT_M (OVF) | \
-                     INT_M (DMALT0) | INT_M (DMALT1))
+                         INT_M (DMALT0) | INT_M (DMALT1))
 #define M_FXDEV         (M_NXDEV | INT_M (PWR) | INT_M (PRO) | \
-                     INT_M (DMA0) | INT_M (DMA1))
+                         INT_M (DMA0) | INT_M (DMA1))
 
 /* I/O devices - variable assignment defaults */
 
@@ -234,6 +266,7 @@ struct DMA {                                            /* DMA channel */
 #define IPLI            032                             /* 12566B link in */
 #define IPLO            033                             /* 12566B link out */
 #define DS              034                             /* 13037A control */
+#define BACI            035                             /* 12966A Buffered Async Comm Interface */
 #define MUXL            040                             /* 12920A lower data */
 #define MUXU            041                             /* 12920A upper data */
 #define MUXC            042                             /* 12920A control */
@@ -300,9 +333,11 @@ typedef struct {
 
 /* Function prototypes */
 
+int32 sync_poll (POLLMODE poll_mode);
 t_stat ibl_copy (const uint16 pboot[IBL_LNT], int32 dev);
 t_stat hp_setdev (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
 void hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);
+t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 
 #endif

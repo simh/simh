@@ -366,6 +366,7 @@ int32 speed = 0;                                        /* Delay for each instru
 int32 XCT_mode = 0;                                     /* 1 if XCT mode */
 int32 XCT_inst = 0;                                     /* XCT instruction */
 int32 PPC = -1;
+int32 AMASK = 077777;
 
 struct ndev dev_table[64];                              /* dispatch table */
 

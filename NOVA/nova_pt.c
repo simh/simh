@@ -1,6 +1,6 @@
 /* nova_pt.c: NOVA paper tape read/punch simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,15 +26,30 @@
    ptr          paper tape reader
    ptp          paper tape punch
 
+   04-Jul-07    BKR     added PTR and PTP device DISABLE capability,
+                        added 7B/8B support PTR and PTP (default is 8B),
+                        DEV_SET/CLR macros now used,
+                        PTR and PTP can now be DISABLED
    25-Apr-03    RMS     Revised for extended file support
    03-Oct-02    RMS     Added DIBs
    30-May-02    RMS     Widened POS to 32b
    29-Nov-01    RMS     Added read only unit support
+
+
+Notes:
+    - data masked to 7- or 8- bits, based on 7B or 8B, default is 8-bits
+    - register TIME is the delay between character read or write operations
+    - register POS show the number of characters read from or sent to the PTR or PTP
+    - register STOP_IOE determines return value issued if output to unattached PTR or PTP is attempted
 */
 
 #include "nova_defs.h"
 
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern	int32	int_req, dev_busy, dev_done, dev_disable ;
+extern	int32	SR ;
+
+extern	t_stat  cpu_boot(int32 unitno, DEVICE * dptr ) ;
+
 
 int32 ptr_stopioe = 0, ptp_stopioe = 0;                 /* stop on error */
 
@@ -44,6 +59,14 @@ t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
+t_stat ptr_boot (int32 unitno, DEVICE *dptr);
+
+
+	/*  7 or 8 bit data mask support for either device  */
+
+#define UNIT_V_8B   (UNIT_V_UF + 0)                     /* 8b output */
+#define UNIT_8B     (1 << UNIT_V_8B)
+
 
 /* PTR data structures
 
@@ -54,8 +77,8 @@ t_stat ptp_reset (DEVICE *dptr);
 
 DIB ptr_dib = { DEV_PTR, INT_PTR, PI_PTR, &ptr };
 
-UNIT ptr_unit = {
-    UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
+UNIT ptr_unit = {   /* 2007-May-30, bkr */
+    UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE+UNIT_8B, 0),
             SERIAL_IN_WAIT
     };
 
@@ -71,12 +94,19 @@ REG ptr_reg[] = {
     { NULL }
     };
 
+MTAB ptr_mod[] =    /* 2007-May-30, bkr */
+    {
+    { UNIT_8B,       0, "7b", "7B", NULL },
+    { UNIT_8B, UNIT_8B, "8b", "8B", NULL },
+    {       0,       0, NULL, NULL, NULL }
+    } ;
+
 DEVICE ptr_dev = {
-    "PTR", &ptr_unit, ptr_reg, NULL,
+    "PTR", &ptr_unit, ptr_reg, ptr_mod /* 2007-May-30, bkr */,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptr_reset,
-    NULL, NULL, NULL,
-    &ptr_dib, 0
+    &ptr_boot, NULL, NULL,
+    &ptr_dib, DEV_DISABLE   /* 2007-May-30, bkr */
     };
 
 /* PTP data structures
@@ -88,8 +118,9 @@ DEVICE ptr_dev = {
 
 DIB ptp_dib = { DEV_PTP, INT_PTP, PI_PTP, &ptp };
 
-UNIT ptp_unit = {
-    UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
+UNIT ptp_unit =
+    {
+    UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_8B, 0), SERIAL_OUT_WAIT
     };
 
 REG ptp_reg[] = {
@@ -104,46 +135,58 @@ REG ptp_reg[] = {
     { NULL }
     };
 
-DEVICE ptp_dev = {
-    "PTP", &ptp_unit, ptp_reg, NULL,
+MTAB ptp_mod[] =
+    {
+    { UNIT_8B,       0, "7b", "7B", NULL },
+    { UNIT_8B, UNIT_8B, "8b", "8B", NULL },
+    {       0,       0, NULL, NULL, NULL }
+    } ;
+
+DEVICE ptp_dev =
+    {
+    "PTP", &ptp_unit, ptp_reg, ptp_mod /* 2007-May-30, bkr */,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptp_reset,
     NULL, NULL, NULL,
-    &ptp_dib, 0
+    &ptp_dib, DEV_DISABLE   /* 2007-May-30, bkr */
     };
+
 
 /* Paper tape reader: IOT routine */
 
 int32 ptr (int32 pulse, int32 code, int32 AC)
 {
-int32 iodata;
+int32   iodata;
 
-iodata = (code == ioDIA)? ptr_unit.buf & 0377: 0;
-switch (pulse) {                                        /* decode IR<8:9> */
+iodata = (code == ioDIA)?
+              ptr_unit.buf & 0377
+            : 0;
+switch (pulse)
+    {                                                   /* decode IR<8:9> */
+  case iopS:                                            /* start */
+    DEV_SET_BUSY( INT_PTR ) ;
+    DEV_CLR_DONE( INT_PTR ) ;
+    DEV_UPDATE_INTR ;
+    sim_activate (&ptr_unit, ptr_unit.wait);            /* activate unit */
+    break;
 
-    case iopS:                                          /* start */
-        dev_busy = dev_busy | INT_PTR;                  /* set busy */
-        dev_done = dev_done & ~INT_PTR;                 /* clear done, int */
-        int_req = int_req & ~INT_PTR;
-        sim_activate (&ptr_unit, ptr_unit.wait);        /* activate unit */
-        break;
-
-    case iopC:                                          /* clear */
-        dev_busy = dev_busy & ~INT_PTR;                 /* clear busy */
-        dev_done = dev_done & ~INT_PTR;                 /* clear done, int */
-        int_req = int_req & ~INT_PTR;
-        sim_cancel (&ptr_unit);                         /* deactivate unit */
-        break;
-        }                                               /* end switch */
+  case iopC:                                            /* clear */
+    DEV_CLR_BUSY( INT_PTR ) ;
+    DEV_CLR_DONE( INT_PTR ) ;
+    DEV_UPDATE_INTR ;
+    sim_cancel (&ptr_unit);                             /* deactivate unit */
+    break;
+    }                                                   /* end switch */
 
 return iodata;
 }
+
 
 /* Unit service */
 
 t_stat ptr_svc (UNIT *uptr)
 {
-int32 temp;
+int32   temp;
 
 if ((ptr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (ptr_stopioe, SCPE_UNATT);
@@ -156,77 +199,99 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
     clearerr (ptr_unit.fileref);
     return SCPE_IOERR;
     }
-dev_busy = dev_busy & ~INT_PTR;                         /* clear busy */
-dev_done = dev_done | INT_PTR;                          /* set done */
-int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-ptr_unit.buf = temp & 0377;
-ptr_unit.pos = ptr_unit.pos + 1;
+
+DEV_CLR_BUSY( INT_PTR ) ;
+DEV_SET_DONE( INT_PTR ) ;
+DEV_UPDATE_INTR ;
+ptr_unit.buf = temp & ((ptr_unit.flags & UNIT_8B)? 0377: 0177);
+++(ptr_unit.pos);
 return SCPE_OK;
 }
+
 
 /* Reset routine */
 
 t_stat ptr_reset (DEVICE *dptr)
 {
-ptr_unit.buf = 0;
-dev_busy = dev_busy & ~INT_PTR;                         /* clear busy */
-dev_done = dev_done & ~INT_PTR;                         /* clear done, int */
-int_req = int_req & ~INT_PTR;
+ptr_unit.buf = 0;                                       /* <not DG compatible> */
+DEV_CLR_BUSY( INT_PTR ) ;
+DEV_CLR_DONE( INT_PTR ) ;
+DEV_UPDATE_INTR ;
 sim_cancel (&ptr_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
+
+
+/* Boot routine */
+
+t_stat ptr_boot (int32 unitno, DEVICE *dptr)
+{
+ptr_reset( dptr ) ;
+/*  set position to 0?  */
+cpu_boot( unitno, dptr ) ;
+SR = /* low-speed: no high-order bit set */ DEV_PTR ;
+return ( SCPE_OK );
+}    /*  end of 'ptr_boot'  */
+
+
+
+
 
 /* Paper tape punch: IOT routine */
 
 int32 ptp (int32 pulse, int32 code, int32 AC)
 {
-if (code == ioDOA) ptp_unit.buf = AC & 0377;
-switch (pulse) {                                        /* decode IR<8:9> */
+if (code == ioDOA)
+    ptp_unit.buf = AC & 0377;
 
-    case iopS:                                          /* start */
-        dev_busy = dev_busy | INT_PTP;                  /* set busy */
-        dev_done = dev_done & ~INT_PTP;                 /* clear done, int */
-        int_req = int_req & ~INT_PTP;
-        sim_activate (&ptp_unit, ptp_unit.wait);        /* activate unit */
-        break;
+switch (pulse)
+    {                                                   /* decode IR<8:9> */
+  case iopS:                                            /* start */
+    DEV_SET_BUSY( INT_PTP ) ;
+    DEV_CLR_DONE( INT_PTP ) ;
+    DEV_UPDATE_INTR ;
+    sim_activate (&ptp_unit, ptp_unit.wait);            /* activate unit */
+    break;
 
-    case iopC:                                          /* clear */
-        dev_busy = dev_busy & ~INT_PTP;                 /* clear busy */
-        dev_done = dev_done & ~INT_PTP;                 /* clear done, int */
-        int_req = int_req & ~INT_PTP;
-        sim_cancel (&ptp_unit);                         /* deactivate unit */
-        break;
-        }                                               /* end switch */
+  case iopC:                                            /* clear */
+    DEV_CLR_BUSY( INT_PTP ) ;
+    DEV_CLR_DONE( INT_PTP ) ;
+    DEV_UPDATE_INTR ;
+    sim_cancel (&ptp_unit);                             /* deactivate unit */
+    break;
+    }                                                   /* end switch */
 
 return 0;
 }
+
 
 /* Unit service */
 
 t_stat ptp_svc (UNIT *uptr)
 {
-dev_busy = dev_busy & ~INT_PTP;                         /* clear busy */
-dev_done = dev_done | INT_PTP;                          /* set done */
-int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
+DEV_CLR_BUSY( INT_PTP ) ;
+DEV_SET_DONE( INT_PTP ) ;
+DEV_UPDATE_INTR ;
 if ((ptp_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (ptp_stopioe, SCPE_UNATT);
-if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {
+if (putc ((ptp_unit.buf & ((ptp_unit.flags & UNIT_8B)? 0377: 0177)), ptp_unit.fileref) == EOF) {
     perror ("PTP I/O error");
     clearerr (ptp_unit.fileref);
     return SCPE_IOERR;
     }
-ptp_unit.pos = ptp_unit.pos + 1;
+++(ptp_unit.pos);
 return SCPE_OK;
 }
+
 
 /* Reset routine */
 
 t_stat ptp_reset (DEVICE *dptr)
 {
-ptp_unit.buf = 0;
-dev_busy = dev_busy & ~INT_PTP;                         /* clear busy */
-dev_done = dev_done & ~INT_PTP;                         /* clear done, int */
-int_req = int_req & ~INT_PTP;
+ptp_unit.buf = 0;                                       /* <not DG compatible> */
+DEV_CLR_BUSY( INT_PTP ) ;
+DEV_CLR_DONE( INT_PTP ) ;
+DEV_UPDATE_INTR ;
 sim_cancel (&ptp_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }

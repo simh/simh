@@ -1,6 +1,6 @@
 /* vax_cis.c: VAX CIS instructions
 
-   Copyright (c) 2004-2005, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    On a full VAX, this module simulates the VAX commercial instruction set (CIS).
    On a subset VAX, this module implements the emulated instruction fault.
 
+   28-May-08    RMS     Inlined physical memory routines
    16-May-06    RMS     Fixed bug in length calculation (found by Tim Stark)
    03-May-06    RMS     Fixed MOVTC, MOVTUC to preserve cc's through page faults
                         Fixed MOVTUC to stop on translated == escape
@@ -99,8 +100,6 @@ int32 edit_read_src (int32 inc, int32 acc);
 void edit_adv_src (int32 inc);
 int32 edit_read_sign (int32 acc);
 
-extern int32 Read (uint32 va, int32 lnt, int32 acc);
-extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
 extern int32 eval_int (void);
 
 /* CIS emulator */
@@ -1613,10 +1612,6 @@ extern int32 ibcnt, ppc;
 extern int32 pcq[PCQ_SIZE];
 extern int32 pcq_p;
 extern jmp_buf save_env;
-
-extern int32 Read (uint32 va, int32 lnt, int32 acc);
-extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
-extern int32 ReadLP (uint32 pa);
 
 /* CIS instructions - invoke emulator interface
 

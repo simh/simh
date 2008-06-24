@@ -1,6 +1,6 @@
 /* vax780_mba.c: VAX 11/780 Massbus adapter
 
-   Copyright (c) 2004-2005, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    mba0, mba1           RH780 Massbus adapter
+
+   28-May-08    RMS     Inlined physical memory routines
 */
 
 #include "vax_defs.h"
@@ -170,13 +172,6 @@ void mba_set_int (uint32 mb);
 void mba_clr_int (uint32 mb);
 void mba_upd_sr (uint32 set, uint32 clr, uint32 mb);
 DIB mba0_dib, mba1_dib;
-
-extern int32 ReadB (uint32 pa);
-extern int32 ReadW (uint32 pa);
-extern int32 ReadL (uint32 pa);
-extern void WriteB (uint32 pa, int32 val);
-extern void WriteW (uint32 pa, int32 val);
-extern void WriteL (uint32 pa, int32 val);
 
 /* Massbus register dispatches */
 

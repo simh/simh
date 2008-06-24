@@ -1,6 +1,6 @@
 /* id_lp.c: Interdata line printer
 
-   Copyright (c) 2001-2007, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          M46-206 line printer
 
+   27-May-08    RMS     Fixed bug in printing test (from Davis Johnson)
    19-Jan-07    RMS     Added UNIT_TEXT flag
    25-Apr-03    RMS     Revised for extended file support
 */
@@ -189,7 +190,7 @@ else if (t == CR) {                                     /* CR? */
     lpt_spnd = 1;                                       /* set spc pend */
     return lpt_bufout (uptr);                           /* print line */
     }
-else if (t >= 0x40) {                                   /* printable? */
+else if (t >= 0x20) {                                   /* printable? */
     if ((uptr->flags & UNIT_UC) && islower (t))         /* UC only? */
         t = toupper (t);
     if (lpt_bptr < LPT_WIDTH) lpxb[lpt_bptr++] = t;

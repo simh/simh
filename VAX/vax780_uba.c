@@ -1,6 +1,6 @@
 /* vax780_uba.c: VAX 11/780 Unibus adapter
 
-   Copyright (c) 2004-2005, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,9 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    uba                  DW780 Unibus adapter
+
+   28-May-08    RMS     Inlined physical memory routines
+   25-Jan-08    RMS     Fixed declarations (from Mark Pizzolato)
 */
 
 #include "vax_defs.h"
@@ -200,12 +203,6 @@ t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat uba_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
 
-extern int32 ReadB (uint32 pa);
-extern int32 ReadW (uint32 pa);
-extern int32 ReadL (uint32 pa);
-extern void WriteB (uint32 pa, int32 val);
-extern void WriteW (uint32 pa, int32 val);
-extern void WriteL (uint32 pa, int32 val);
 extern int32 eval_int (void);
 extern t_stat build_dib_tab (void);
 
@@ -513,7 +510,7 @@ return;
         longword of data
 */
 
-int32 ReadIO (int32 pa, int32 lnt)
+int32 ReadIO (uint32 pa, int32 lnt)
 {
 uint32 iod;
 
@@ -541,7 +538,7 @@ return iod;
         none
 */
 
-void WriteIO (int32 pa, int32 val, int32 lnt)
+void WriteIO (uint32 pa, int32 val, int32 lnt)
 {
 if (lnt == L_BYTE) WriteUb (pa, val, WRITEB);           /* byte? DATOB */
 else if ((lnt == L_WORD) && ((pa & 1) == 0))            /* aligned word? */

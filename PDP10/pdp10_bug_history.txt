@@ -1,5 +1,4 @@
-Bugs Found
-----------
+Bugs Found and Fixed During Simulator Debug
 
 1. pushj cleared T2 after setting it
 2. if timer autoadjust is enabled, timer diagnostic may fail,

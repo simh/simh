@@ -1,6 +1,6 @@
 /* hp2100_cpu.h: HP 2100 CPU definitions
 
-   Copyright (c) 2005-2006, Robert M. Supnik
+   Copyright (c) 2005-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Apr-08    JDB     Added calc_defer() prototype
+   20-Apr-08    JDB     Added DEB_VIS and DEB_SIG debug flags
+   26-Nov-07    JDB     Added extern sim_deb, cpu_dev, DEB flags for debug printouts
+   05-Nov-07    JDB     Added extern intaddr, mp_viol, mp_mevff, calc_int, dev_ctl,
+                        ReadIO, WriteIO for RTE-6/VM microcode support
    16-Dec-06    JDB     Added UNIT_2115 and UNIT_2114
    16-Oct-06    JDB     Moved ReadF to hp2100_cpu1.c
    26-Sep-06    JDB     Added CPU externs for microcode simulators
@@ -78,10 +83,10 @@
 #define UNIT_V_DBI      (UNIT_V_UF + 9)                 /* DBI installed */
 #define UNIT_V_EMA      (UNIT_V_UF + 10)                /* RTE-4 EMA installed */
 #define UNIT_V_VMAOS    (UNIT_V_UF + 11)                /* RTE-6 VMA/OS installed */
-/* Future microcode expansion; reuse flags bottom-up if needed */
 #define UNIT_V_VIS      (UNIT_V_UF + 12)                /* VIS installed */
-#define UNIT_V_DS       (UNIT_V_UF + 13)                /* DS installed */
-#define UNIT_V_SIGNAL   (UNIT_V_UF + 14)                /* SIGNAL/1000 installed */
+#define UNIT_V_SIGNAL   (UNIT_V_UF + 13)                /* SIGNAL/1000 installed */
+/* Future microcode expansion; reuse flags bottom-up if needed */
+#define UNIT_V_DS       (UNIT_V_UF + 14)                /* DS installed */
 
 /* Unit models */
 
@@ -151,12 +156,24 @@
 
 #define UNIT_NONE       0                               /* no options */
 
+/* Debug flags */
+
+#define DEB_OS          (1 << 0)                        /* RTE-6/VM OS firmware non-TBG processing */
+#define DEB_OSTBG       (1 << 1)                        /* RTE-6/VM OS firmware TBG processing */
+#define DEB_VMA         (1 << 2)                        /* RTE-6/VM VMA firmware instructions */
+#define DEB_EMA         (1 << 3)                        /* RTE-6/VM EMA firmware instructions */
+#define DEB_VIS         (1 << 4)                        /* E/F-Series VIS firmware instructions */
+#define DEB_SIG         (1 << 5)                        /* F-Series SIGNAL/1000 firmware instructions */
 
 /* PC queue. */
 
 #define PCQ_SIZE        64                              /* must be 2**n */
 #define PCQ_MASK        (PCQ_SIZE - 1)
 #define PCQ_ENTRY       pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = err_PC
+
+/* simulator state */
+
+extern FILE *sim_deb;
 
 /* CPU registers */
 
@@ -169,6 +186,7 @@ extern uint32 XR;                                       /* X register */
 extern uint32 YR;                                       /* Y register */
 extern uint32 E;                                        /* E register */
 extern uint32 O;                                        /* O register */
+extern uint32 dev_ctl[2];                               /* device control */
 
 /* CPU state */
 
@@ -178,12 +196,16 @@ extern uint32 dms_ump;
 extern uint32 dms_sr;
 extern uint32 dms_vr;
 extern uint32 mp_fence;
+extern uint32 mp_viol;
+extern uint32 mp_mevff;
 extern uint32 iop_sp;
 extern uint32 ion_defer;
+extern uint32 intaddr;
 extern uint16 pcq[PCQ_SIZE];
 extern uint32 pcq_p;
 extern uint32 stop_inst;
 extern UNIT cpu_unit;
+extern DEVICE cpu_dev;
 
 /* CPU functions */
 
@@ -192,11 +214,15 @@ uint8 ReadB (uint32 addr);
 uint8 ReadBA (uint32 addr);
 uint16 ReadW (uint32 addr);
 uint16 ReadWA (uint32 addr);
+uint16 ReadIO (uint32 addr, uint32 map);
 void WriteB (uint32 addr, uint32 dat);
 void WriteBA (uint32 addr, uint32 dat);
 void WriteW (uint32 addr, uint32 dat);
 void WriteWA (uint32 addr, uint32 dat);
+void WriteIO (uint32 addr, uint32 dat, uint32 map);
 t_stat iogrp (uint32 ir, uint32 iotrap);
+uint32 calc_int (void);
+uint32 calc_defer (void);
 void mp_dms_jmp (uint32 va);
 uint16 dms_rmap (uint32 mapi);
 void dms_wmap (uint32 mapi, uint32 dat);

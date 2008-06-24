@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-May-08    RMS     Added inlining support
    28-Jun-07    RMS     Added IA64 VMS support (from Norm Lastovica)
    18-Jun-07    RMS     Added UNIT_IDLE flag
    18-Mar-07    RMS     Added UNIT_TEXT flag
@@ -159,6 +160,16 @@ typedef t_uint64        t_addr;
 typedef uint32          t_addr;
 #define T_ADDR_W        32
 #endif                                                  /* end 64b address */
+
+/* Inlining */
+
+#if defined (__GNUC__)                                  /* GCC */
+#define SIM_INLINE inline
+#elif defined (_MSC_VER)                                /* Microsoft C Compilers */
+#define SIM_INLINE __inline
+#else                                                   /* default */
+#define SIM_INLINE
+#endif
 
 /* System independent definitions */
 

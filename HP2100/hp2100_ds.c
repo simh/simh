@@ -1,6 +1,6 @@
 /* hp2100_ds.c: HP 2100 13037 disk controller simulator
 
-   Copyright (c) 2004-2006, Robert M. Supnik
+   Copyright (c) 2004-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,9 @@
 
    ds           13037 disk controller
 
-   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
+   31-Dec-07    JDB     Corrected and verified ioCRS action
+   20-Dec-07    JDB     Corrected DPTR register definition from FLDATA to DRDATA
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders
    03-Aug-06    JDB     Fixed REQUEST STATUS command to clear status-1
                         Removed redundant attached test in "ds_detach"
    18-Mar-05    RMS     Added attached test to detach routine
@@ -497,7 +499,7 @@ REG ds_reg[] = {
     { FLDATA (EOC, ds_eoc, 0) },
     { FLDATA (EOD, ds_eod, 0) },
     { BRDATA (DBUF, dsxb, 8, 16, DS_NUMWDF) },
-    { FLDATA (DPTR, ds_ptr, 8) },
+    { DRDATA (DPTR, ds_ptr, 8) },
     { DRDATA (CTIME, ds_ctime, 24), PV_LEFT + REG_NZ },
     { DRDATA (DTIME, ds_dtime, 24), PV_LEFT + REG_NZ },
     { DRDATA (STIME, ds_stime, 24), PV_LEFT + REG_NZ },
@@ -598,7 +600,13 @@ switch (inst) {                                         /* case on opcode */
         dat = ds_fifo_read ();
         break;
 
-    case ioCRS:                                         /* control reset (action unverif) */
+    case ioCRS:                                         /* control reset */
+        clrCTL (dev);                                   /* clear control */
+        ds_cmdf = 0;                                    /* not expecting command */
+        ds_cmdp = 0;                                    /* and none pending */
+        ds_reset_cmn (&ds_dev);                         /* reset ctrl */
+        break;
+
     case ioCTL:                                         /* control clear/set */
         if (IR & I_CTL) {                               /* CLC */
             clrCTL (dev);                               /* clear control */
@@ -738,15 +746,15 @@ switch (op) {
 
 /* Other controller commands */
 
-    case DSC_SFM:                                               /* set file mask */
-    case DSC_CLEAR:                                             /* clear */
-    case DSC_AREC:                                              /* address record */
-    case DSC_WAKE:                                              /* wakeup */
-    case DSC_WTIO:                                              /* write TIO */
+    case DSC_SFM:                                       /* set file mask */
+    case DSC_CLEAR:                                     /* clear */
+    case DSC_AREC:                                      /* address record */
+    case DSC_WAKE:                                      /* wakeup */
+    case DSC_WTIO:                                      /* write TIO */
         ds_sched_ctrl_op (op, 0, SET_BUSY);             /* schedule, busy */
         break;
 
-    case DSC_END:                                               /* end */
+    case DSC_END:                                       /* end */
         ds_set_idle ();                                 /* idle ctrl */
         break;
         }

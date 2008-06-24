@@ -1,6 +1,6 @@
 /*  altairz80_hdsk.c: simulated hard disk device to increase capacity
 
-    Copyright (c) 2002-2007, Peter Schorn
+    Copyright (c) 2002-2008, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -30,11 +30,13 @@
 #include <assert.h>
 
 /* The following routines are based on work from Howard M. Harte */
-t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_geom(FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_format(UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_format(FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat hdsk_attach(UNIT *uptr, char *cptr);
+static t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc);
+static t_stat show_geom(FILE *st, UNIT *uptr, int32 val, void *desc);
+static t_stat set_format(UNIT *uptr, int32 val, char *cptr, void *desc);
+static t_stat show_format(FILE *st, UNIT *uptr, int32 val, void *desc);
+
+static t_stat hdsk_reset(DEVICE *dptr);
+static t_stat hdsk_attach(UNIT *uptr, char *cptr);
 
 #define UNIT_V_HDSK_WLK         (UNIT_V_UF + 0) /* write locked                             */
 #define UNIT_HDSK_WLK           (1 << UNIT_V_HDSK_WLK)
@@ -57,19 +59,23 @@ t_stat hdsk_attach(UNIT *uptr, char *cptr);
 #define HDSK_PARAM              4
 #define HDSK_BOOT_ADDRESS       0x5c00
 #define DPB_NAME_LENGTH         15
+#define BOOTROM_SIZE_HDSK       256
 
 extern char messageBuffer[];
-extern int32 PCX;
+extern uint32 PCX;
+extern REG *sim_PC;
 extern UNIT cpu_unit;
-extern int32 saved_PC;
 
-extern int32 install_bootrom(void);
+extern void install_ALTAIRbootROM(void);
 extern void printMessage(void);
-extern void PutBYTEBasic(const uint32 Addr, const uint32 Bank, const uint32 Value);
 extern void PutBYTEWrapper(const uint32 Addr, const uint32 Value);
-extern void protect(const int32 l, const int32 h);
 extern uint8 GetBYTEWrapper(const uint32 Addr);
-extern int32 bootrom[BOOTROM_SIZE];
+extern t_stat install_bootrom(int32 bootrom[], int32 size, int32 addr, int32 makeROM);
+extern int32 bootrom_dsk[];
+extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
+extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
+        int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
 static t_stat hdsk_boot(int32 unitno, DEVICE *dptr);
 int32 hdsk_io(const int32 port, const int32 io, const int32 data);
@@ -81,7 +87,7 @@ static int32 selectedDisk;
 static int32 selectedSector;
 static int32 selectedTrack;
 static int32 selectedDMA;
-static int32 hdskTrace              = FALSE;
+static int32 trace_level            = 0;
 
 typedef struct {
     char    name[DPB_NAME_LENGTH + 1];  /* name of CP/M disk parameter block    */
@@ -100,6 +106,13 @@ typedef struct {
     uint8   phm;                        /* physical record mask, CP/M 3         */
 } DPB;
 
+typedef struct {
+    PNP_INFO    pnp;    /* Plug and Play */
+} HDSK_INFO;
+
+static HDSK_INFO hdsk_info_data = { { 0x0000, 0, 0xFD, 1 } };
+/* static HDSK_INFO *hdsk_info = &hdsk_info_data; */
+
 /* Note in the following CKS = 0 for fixed media which are not supposed to be changed while CP/M is executing */
 static DPB dpb[] = {
 /*    name      capac           spt bsh   blm   exm   dsm     drm     al0   al1   cks     off     psh   phm                             */
@@ -107,6 +120,16 @@ static DPB dpb[] = {
     { "EZ80FL", 131072,         32, 0x03, 0x07, 0x00, 127,    0x003E, 0xC0, 0x00, 0x0000, 0x0000, 0x02, 0x03 }, /* 128K FLASH           */
     { "P112",   1474560,        72, 0x04, 0x0F, 0x00, 710,    0x00FE, 0xF0, 0x00, 0x0000, 0x0002, 0x02, 0x03 }, /* 1.44M P112           */
     { "SU720",  737280,         36, 0x04, 0x0F, 0x00, 354,    0x007E, 0xC0, 0x00, 0x0020, 0x0002, 0x02, 0x03 }, /* 720K Super I/O       */
+    { "OSB1",   102400,         20, 0x04, 0x0F, 0x01, 45,     0x003F, 0x80, 0x00, 0x0000, 0x0003, 0x02, 0x03 }, /* Osborne1 5.25" SS SD    */
+    { "OSB2",   204800,         40, 0x03, 0x07, 0x00, 184,    0x003F, 0xC0, 0x00, 0x0000, 0x0003, 0x02, 0x03 }, /* Osborne1 5.25" SS DD    */
+    { "NSSS1",  179200,         40, 0x03, 0x07, 0x00, 0xA4,   0x003F, 0xC0, 0x00, 0x0010, 0x0002, 0x02, 0x03 }, /* Northstar SSDD Format 1 */
+    { "NSSS2",  179200,         40, 0x04, 0x0F, 0x01, 0x51,   0x003F, 0x80, 0x00, 0x0010, 0x0002, 0x02, 0x03 }, /* Northstar SSDD Format 2 */
+    { "NSDS2",  358400,         40, 0x04, 0x0F, 0x01, 0xA9,   0x003F, 0x80, 0x00, 0x0010, 0x0002, 0x02, 0x03 }, /* Northstar DSDD Format 2 */
+    { "VGSS",   315392,         32, 0x04, 0x0F, 0x00, 149,    0x007F, 0xC0, 0x00, 0x0020, 0x0002, 0x02, 0x03 }, /* Vector SS SD */
+    { "VGDS",   632784,         32, 0x04, 0x0F, 0x00, 299,    0x007F, 0xC0, 0x00, 0x0020, 0x0004, 0x02, 0x03 }, /* Vector DS SD */
+    /* Note on DISK1A Images: this is a bit of a mess.  The first track on the disk is 128x26 bytes (SD) and to make this work
+       I had to "move" the data from 0x2d00 in the DSK image file down to 0x4000 (2-tracks in).  I used WinHex to do it.    */
+    { "DISK1A", 630784,         64, 0x04, 0x0F, 0x00, 299,    0x007F, 0xC0, 0x00, 0x0020, 0x0002, 0x02, 0x03 }, /* CompuPro Disk1A 8" SS SD */
     { "SSSD8",  256256,         26, 0x03, 0x07, 0x00, 242,    0x003F, 0xC0, 0x00, 0x0000, 0x0002, 0x00, 0x00 }, /* Standard 8" SS SD    */
     { "", 0 }
 };
@@ -123,17 +146,18 @@ static UNIT hdsk_unit[] = {
 };
 
 static REG hdsk_reg[] = {
-    { DRDATA (HDCMD,    hdskLastCommand,        32),    REG_RO  },
-    { DRDATA (HDPOS,    hdskCommandPosition,    32),    REG_RO  },
-    { DRDATA (HDDSK,    selectedDisk,           32),    REG_RO  },
-    { DRDATA (HDSEC,    selectedSector,         32),    REG_RO  },
-    { DRDATA (HDTRK,    selectedTrack,          32),    REG_RO  },
-    { DRDATA (HDDMA,    selectedDMA,            32),    REG_RO  },
-    { DRDATA (HDTRACE,  hdskTrace,              8),             },
+    { DRDATA (HDCMD,        hdskLastCommand,        32),    REG_RO  },
+    { DRDATA (HDPOS,        hdskCommandPosition,    32),    REG_RO  },
+    { DRDATA (HDDSK,        selectedDisk,           32),    REG_RO  },
+    { DRDATA (HDSEC,        selectedSector,         32),    REG_RO  },
+    { DRDATA (HDTRK,        selectedTrack,          32),    REG_RO  },
+    { DRDATA (HDDMA,        selectedDMA,            32),    REG_RO  },
+    { HRDATA (TRACELEVEL,   trace_level,            16),            },
     { NULL }
 };
 
 static MTAB hdsk_mod[] = {
+    { MTAB_XTD|MTAB_VDV,            0,                  "IOBASE",   "IOBASE", &set_iobase, &show_iobase, NULL },
     { MTAB_XTD|MTAB_VUN|MTAB_VAL,   0,                  "FORMAT",   "FORMAT", &set_format, &show_format, NULL },
     { UNIT_HDSK_WLK,                0,                  "WRTENB",   "WRTENB", NULL  },
     { UNIT_HDSK_WLK,                UNIT_HDSK_WLK,      "WRTLCK",   "WRTLCK", NULL  },
@@ -148,14 +172,30 @@ static MTAB hdsk_mod[] = {
 DEVICE hdsk_dev = {
     "HDSK", hdsk_unit, hdsk_reg, hdsk_mod,
     8, 10, 31, 1, 8, 8,
-    NULL, NULL, NULL,
+    NULL, NULL, &hdsk_reset,
     &hdsk_boot, &hdsk_attach, NULL,
-    NULL, 0, 0,
+    &hdsk_info_data, (DEV_DISABLE), 0,
     NULL, NULL, NULL
 };
 
+/* Reset routine */
+static t_stat hdsk_reset(DEVICE *dptr)  {
+    PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
+    if (dptr->flags & DEV_DIS) {
+        sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &hdsk_io, TRUE);
+    } else {
+        /* Connect HDSK at base address */
+        if (sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &hdsk_io, FALSE) != 0) {
+            printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->mem_base);
+            dptr->flags |= DEV_DIS;
+            return SCPE_ARG;
+        }
+    }
+    return SCPE_OK;
+}
+
 /* Attach routine */
-t_stat hdsk_attach(UNIT *uptr, char *cptr) {
+static t_stat hdsk_attach(UNIT *uptr, char *cptr) {
     t_stat r;
     uint32 i;
     char unitChar;
@@ -219,7 +259,7 @@ t_stat hdsk_attach(UNIT *uptr, char *cptr) {
 }
 
 /* Set disk geometry routine */
-t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc) {
+static t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc) {
     uint32 numberOfTracks, numberOfSectors, sectorSize;
     int result, n;
 
@@ -238,7 +278,7 @@ t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc) {
 }
 
 /* Show disk geometry routine */
-t_stat show_geom(FILE *st, UNIT *uptr, int32 val, void *desc) {
+static t_stat show_geom(FILE *st, UNIT *uptr, int32 val, void *desc) {
     if (uptr == NULL) return SCPE_IERR;
     fprintf(st, "T:%d/N:%d/S:%d", uptr -> HDSK_NUMBER_OF_TRACKS,
         uptr -> HDSK_SECTORS_PER_TRACK, uptr -> HDSK_SECTOR_SIZE);
@@ -248,7 +288,7 @@ t_stat show_geom(FILE *st, UNIT *uptr, int32 val, void *desc) {
 #define QUOTE1(text) #text
 #define QUOTE2(text) QUOTE1(text)
 /* Set disk format routine */
-t_stat set_format(UNIT *uptr, int32 val, char *cptr, void *desc) {
+static t_stat set_format(UNIT *uptr, int32 val, char *cptr, void *desc) {
     char fmtname[DPB_NAME_LENGTH + 1];
     int32 i;
 
@@ -274,13 +314,13 @@ t_stat set_format(UNIT *uptr, int32 val, char *cptr, void *desc) {
 }
 
 /* Show disk format routine */
-t_stat show_format(FILE *st, UNIT *uptr, int32 val, void *desc) {
+static t_stat show_format(FILE *st, UNIT *uptr, int32 val, void *desc) {
     if (uptr == NULL) return SCPE_IERR;
     fprintf(st, "%s", dpb[uptr -> HDSK_FORMAT_TYPE].name);
     return SCPE_OK;
 }
 
-static const int32 hdskBoot[BOOTROM_SIZE] = {
+static int32 bootrom_hdsk[BOOTROM_SIZE_HDSK] = {
     0xf3, 0x06, 0x80, 0x3e, 0x0e, 0xd3, 0xfe, 0x05, /* 5c00-5c07 */
     0xc2, 0x05, 0x5c, 0x3e, 0x16, 0xd3, 0xfe, 0x3e, /* 5c08-5c0f */
     0x12, 0xd3, 0xfe, 0xdb, 0xfe, 0xb7, 0xca, 0x20, /* 5c10-5c17 */
@@ -316,38 +356,30 @@ static const int32 hdskBoot[BOOTROM_SIZE] = {
 };
 
 static t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
-    int32 i;
-    if (MEMSIZE < 24*KB) {
+    if (MEMORYSIZE < 24*KB) {
         printf("Need at least 24KB RAM to boot from hard disk.\n");
         return SCPE_ARG;
     }
-    if (cpu_unit.flags & (UNIT_ALTAIRROM | UNIT_BANKED)) {
+    if (cpu_unit.flags & (UNIT_CPU_ALTAIRROM | UNIT_CPU_BANKED)) {
         /* check whether we are really modifying an LD A,<> instruction */
-        if (bootrom[UNIT_NO_OFFSET_1 - 1] == LDA_INSTRUCTION) {
-            bootrom[UNIT_NO_OFFSET_1] = (unitno + NUM_OF_DSK) & 0xff;  /* LD A,<unitno> */
-        }
+        if (bootrom_dsk[UNIT_NO_OFFSET_1 - 1] == LDA_INSTRUCTION)
+            bootrom_dsk[UNIT_NO_OFFSET_1] = (unitno + NUM_OF_DSK) & 0xff;   /* LD A,<unitno> */
         else { /* Attempt to modify non LD A,<> instructions is refused. */
             printf("Incorrect boot ROM offset detected.\n");
             return SCPE_IERR;
         }
-        install_bootrom();                                             /* install modified ROM */
+        install_ALTAIRbootROM();                                            /* install modified ROM */
     }
-    for (i = 0; i < BOOTROM_SIZE; i++) {
-        PutBYTEBasic(i + HDSK_BOOT_ADDRESS, 0, hdskBoot[i] & 0xff);
-    }
-    saved_PC = HDSK_BOOT_ADDRESS;
-    protect(HDSK_BOOT_ADDRESS, HDSK_BOOT_ADDRESS + BOOTROM_SIZE - 1);
+    assert(install_bootrom(bootrom_hdsk, BOOTROM_SIZE_HDSK, HDSK_BOOT_ADDRESS, FALSE) == SCPE_OK);
+    *((int32 *) sim_PC->loc) = HDSK_BOOT_ADDRESS;
     return SCPE_OK;
 }
 
 /* returns TRUE iff there exists a disk with VERBOSE */
 static int32 hdsk_hasVerbose(void) {
     int32 i;
-    for (i = 0; i < HDSK_NUMBER; i++) {
-        if (hdsk_dev.units[i].flags & UNIT_HDSK_VERBOSE) {
-            return TRUE;
-        }
-    }
+    for (i = 0; i < HDSK_NUMBER; i++)
+        if (hdsk_dev.units[i].flags & UNIT_HDSK_VERBOSE) return TRUE;
     return FALSE;
 }
 
@@ -433,8 +465,8 @@ static int32 checkParameters(void) {
         selectedTrack = 0;
     }
     selectedDMA &= ADDRMASK;
-    if (hdskTrace) {
-        MESSAGE_7("%s HDSK%d Track=%04d Sector=%02d Len=%04d DMA=%04x\n",
+    if (trace_level) {
+        MESSAGE_7("%s HDSK%d Track=%04d Sector=%02d Len=%04d DMA=%04x",
             (hdskLastCommand == HDSK_READ) ? "Read" : "Write",
             selectedDisk, selectedTrack, selectedSector, uptr -> HDSK_SECTOR_SIZE, selectedDMA);
     }
@@ -452,9 +484,7 @@ static int32 doSeek(void) {
         }
         return CPM_ERROR;
     }
-    else {
-        return CPM_OK;
-    }
+    else return CPM_OK;
 }
 
 uint8 hdskbuf[HDSK_MAX_SECTOR_SIZE] = { 0 };    /* data buffer  */
@@ -462,23 +492,17 @@ uint8 hdskbuf[HDSK_MAX_SECTOR_SIZE] = { 0 };    /* data buffer  */
 static int32 doRead(void) {
     int32 i;
     UNIT *uptr = &hdsk_dev.units[selectedDisk];
-    if (doSeek()) {
-        return CPM_ERROR;
-    }
+    if (doSeek()) return CPM_ERROR;
 
     if (fread(hdskbuf, uptr -> HDSK_SECTOR_SIZE, 1, uptr -> fileref) != 1) {
-        for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++) {
-            hdskbuf[i] = CPM_EMPTY;
-        }
+        for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++) hdskbuf[i] = CPM_EMPTY;
         if ((uptr -> flags) & UNIT_HDSK_VERBOSE) {
             MESSAGE_4("Could not read HDSK%d Sector=%02d Track=%04d.",
                 selectedDisk, selectedSector, selectedTrack);
         }
         return CPM_OK; /* allows the creation of empty hard disks */
     }
-    for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++) {
-        PutBYTEWrapper(selectedDMA + i, hdskbuf[i]);
-    }
+    for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++) PutBYTEWrapper(selectedDMA + i, hdskbuf[i]);
     return CPM_OK;
 }
 
@@ -487,12 +511,8 @@ static int32 doWrite(void) {
 
     UNIT *uptr = &hdsk_dev.units[selectedDisk];
     if (((uptr -> flags) & UNIT_HDSK_WLK) == 0) { /* write enabled */
-        if (doSeek()) {
-            return CPM_ERROR;
-        }
-        for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++) {
-            hdskbuf[i] = GetBYTEWrapper(selectedDMA + i);
-        }
+        if (doSeek()) return CPM_ERROR;
+        for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++) hdskbuf[i] = GetBYTEWrapper(selectedDMA + i);
         if (fwrite(hdskbuf, uptr -> HDSK_SECTOR_SIZE, 1, uptr -> fileref) != 1) {
             if ((uptr -> flags) & UNIT_HDSK_VERBOSE) {
                 MESSAGE_4("Could not write HDSK%d Sector=%02d Track=%04d.",
@@ -535,17 +555,16 @@ static int32 hdsk_in(const int32 port) {
         params[13] = current.off & 0xff; params[14] = (current.off >> 8) & 0xff;
         params[15] = current.psh;
         params[16] = current.phm;
-        if (++paramcount >= 19) {
-            hdskLastCommand = HDSK_NONE;
-        }
+        if (++paramcount >= 19) hdskLastCommand = HDSK_NONE;
         if (paramcount <= 17)
             return params[paramcount - 1];
         else if (paramcount == 18)
             return (uptr -> HDSK_SECTOR_SIZE & 0xff);
         else if (paramcount == 19)
             return (uptr -> HDSK_SECTOR_SIZE >> 8);
-        else
+        else {
             MESSAGE_2("HDSK%d Get parameter error.", selectedDisk);
+        }
 
     }
     else if (hdsk_hasVerbose()) {
@@ -555,7 +574,7 @@ static int32 hdsk_in(const int32 port) {
     return CPM_OK;
 }
 
-static int32 hdsk_out(const int32 data) {
+static int32 hdsk_out(const int32 port, const int32 data) {
     switch(hdskLastCommand) {
 
         case HDSK_PARAM:
@@ -605,12 +624,20 @@ static int32 hdsk_out(const int32 data) {
             break;
 
         default:
-            hdskLastCommand = data;
+            if ((HDSK_RESET <= data) && (data <= HDSK_PARAM))
+                 hdskLastCommand = data;
+            else {
+                if (hdsk_hasVerbose()) {
+                    MESSAGE_3("Illegal OUT command detected (port=%03xh, cmd=%d).",
+                        port, data);
+                }
+                hdskLastCommand = HDSK_RESET;
+            }
             hdskCommandPosition = 0;
     }
     return 0; /* ignored, since OUT */
 }
 
 int32 hdsk_io(const int32 port, const int32 io, const int32 data) {
-    return io == 0 ? hdsk_in(port) : hdsk_out(data);
+    return io == 0 ? hdsk_in(port) : hdsk_out(port, data);
 }

@@ -1,6 +1,6 @@
 /* pdp11_stddev.c: PDP-11 standard I/O devices simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti,tto      DL11 terminal input/output
    clk          KW11L (and other) line frequency clock
 
+   20-May-08    RMS     Standardized clock delay at 1mips
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
    29-Oct-06	RMS     Synced keyboard and clock
                         Added clock coscheduling support
@@ -66,7 +67,7 @@
 #define TTOCSR_RW       (CSR_IE)
 #define CLKCSR_IMP      (CSR_DONE + CSR_IE)             /* real-time clock */
 #define CLKCSR_RW       (CSR_IE)
-#define CLK_DELAY       8000
+#define CLK_DELAY       16667
 
 extern int32 int_req[IPL_HLVL];
 extern uint32 cpu_type;
@@ -202,7 +203,7 @@ DIB clk_dib = {
     1, IVCL (CLK), VEC_CLK, { &clk_inta }
     };
 
-UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), 8000 };
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), CLK_DELAY };
 
 REG clk_reg[] = {
     { ORDATA (CSR, clk_csr, 16) },

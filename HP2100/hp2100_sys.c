@@ -1,6 +1,6 @@
 /* hp2100_sys.c: HP 2100 simulator interface
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Apr-08    JDB     Changed fprint_sym to handle step with irq pending
+   07-Dec-07    JDB     Added BACI device
+   27-Nov-07    JDB     Added RTE OS/VMA/EMA mnemonics
    21-Dec-06    JDB     Added "fwanxm" external for sim_load check
    19-Nov-04    JDB     Added STOP_OFFLINE, STOP_PWROFF messages
    25-Sep-04    JDB     Added memory protect device
@@ -43,6 +46,7 @@
 */
 
 #include "hp2100_defs.h"
+#include "hp2100_cpu.h"
 #include <ctype.h>
 
 extern DEVICE cpu_dev;
@@ -52,6 +56,7 @@ extern DEVICE dma0_dev, dma1_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tty_dev, clk_dev;
 extern DEVICE lps_dev, lpt_dev;
+extern DEVICE baci_dev;
 extern DEVICE mtd_dev, mtc_dev;
 extern DEVICE msd_dev, msc_dev;
 extern DEVICE dpd_dev, dpc_dev;
@@ -93,6 +98,7 @@ DEVICE *sim_devices[] = {
     &clk_dev,
     &lps_dev,
     &lpt_dev,
+    &baci_dev,
     &dpd_dev, &dpc_dev,
     &dqd_dev, &dqc_dev,
     &drd_dev, &drc_dev,
@@ -180,6 +186,7 @@ for (zerocnt = 1;; zerocnt = -10) {                     /* block loop */
 #define I_V_IO2         7                               /* I/O only */
 #define I_V_EGZ         010                             /* ext grp, 1 op + 0 */
 #define I_V_EG2         011                             /* ext grp, 2 op */
+#define I_V_ALT         012                             /* alternate use instr */
 #define I_NPN           (I_V_NPN << I_V_FL)
 #define I_NPC           (I_V_NPC << I_V_FL)
 #define I_MRF           (I_V_MRF << I_V_FL)
@@ -190,14 +197,36 @@ for (zerocnt = 1;; zerocnt = -10) {                     /* block loop */
 #define I_IO2           (I_V_IO2 << I_V_FL)
 #define I_EGZ           (I_V_EGZ << I_V_FL)
 #define I_EG2           (I_V_EG2 << I_V_FL)
+#define I_ALT           (I_V_ALT << I_V_FL)
 
 static const int32 masks[] = {
  0177777, 0176777, 0074000, 0170000,
  0177760, 0177777, 0176700, 0177700,
- 0177777, 0177777
+ 0177777, 0177777, 0177777
  };
 
 static const char *opcode[] = {
+
+/* These mnemonics are used by debug printouts, so put them first. */
+
+ "$LIBR", "$LIBX", ".TICK", ".TNAM",                /* RTE-6/VM OS firmware */
+ ".STIO", ".FNW",  ".IRT",  ".LLS", 
+ ".SIP",  ".YLD",  ".CPM",  ".ETEQ",
+ ".ENTN", "$OTST", ".ENTC", ".DSPI",
+ "$DCPC", "$MPV",  "$DEV",  "$TBG",                 /* alternates for dual-use */
+
+ ".PMAP", "$LOC",  "$VTST",/* --- */                /* RTE-6/VM VMA firmware */
+/* ---      ---      ---      --- */
+ ".IMAP", ".IMAR", ".JMAP", ".JMAR",
+ ".LPXR", ".LPX",  ".LBPR", ".LBP",
+
+ ".EMIO", "MMAP",  "$ETST",/* --- */                /* RTE-IV EMA firmware */
+/* ---      ---      ---      --- */
+/* ---      ---      ---      --- */
+/* ---      ---      --- */ ".EMAP",
+
+/* Regular mnemonics. */
+
  "NOP", "NOP", "AND", "JSB",
  "XOR", "JMP", "IOR", "ISZ",
  "ADA", "ADB" ,"CPA", "CPB",
@@ -241,6 +270,22 @@ static const char *opcode[] = {
  };
 
 static const int32 opc_val[] = {
+ 0105340+I_NPN, 0105341+I_NPN, 0105342+I_NPN, 0105343+I_NPN,    /* RTE-6/VM OS */
+ 0105344+I_NPN, 0105345+I_NPN, 0105346+I_NPN, 0105347+I_NPN,
+ 0105350+I_NPN, 0105351+I_NPN, 0105352+I_NPN, 0105353+I_NPN,
+ 0105354+I_ALT, 0105355+I_ALT, 0105356+I_ALT, 0105357+I_ALT,
+ 0105354+I_NPN, 0105355+I_NPN, 0105356+I_NPN, 0105357+I_NPN,    /* alternates */
+
+ 0105240+I_ALT, 0105241+I_ALT, 0105242+I_ALT, /*   ---     */   /* RTE-6/VM VMA */
+/*    ---            ---            ---            ---     */
+ 0105250+I_NPN, 0105251+I_NPN, 0105252+I_NPN, 0105253+I_NPN,
+ 0105254+I_NPN, 0105255+I_NPN, 0105256+I_NPN, 0105257+I_ALT,
+
+ 0105240+I_NPN, 0105241+I_NPN, 0105242+I_NPN,                   /* RTE-IV EMA */
+/*    ---            ---            ---            ---     */
+/*    ---            ---            ---            ---     */
+/*    ---            ---            ---    */ 0105257+I_NPN,
+
  0000000+I_NPN, 0002000+I_NPN, 0010000+I_MRF, 0014000+I_MRF,
  0020000+I_MRF, 0024000+I_MRF, 0030000+I_MRF, 0034000+I_MRF,
  0040000+I_MRF, 0044000+I_MRF, 0050000+I_MRF, 0054000+I_MRF,
@@ -339,6 +384,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
 int32 cflag, cm, i, j, inst, disp;
+uint32 irq;
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 inst = val[0];
@@ -353,6 +399,24 @@ if (sw & SWMASK ('C')) {                                /* characters? */
     return SCPE_OK;
     }
 if (!(sw & SWMASK ('M'))) return SCPE_ARG;
+
+/* If we are being called as a result of a VM stop to display the next
+   instruction to be executed, check to see if an interrupt is pending and not
+   deferred.  If so, then display the interrupt source and the trap cell
+   instruction as the instruction to be executed, rather than the instruction at
+   the current PC.
+*/
+
+if (sw & SIM_SW_STOP) {                                 /* simulator stop? */
+    irq = calc_int ();                                  /* check interrupt */
+
+    if (irq && (!ion_defer || !calc_defer())) {         /* pending interrupt and not deferred? */
+        inst = val[0] = ReadIO (irq, SMAP);             /* load trap cell instruction */
+        val[1] = ReadIO (irq + 1, SMAP);                /*   might be multi-word */
+        val[2] = ReadIO (irq + 2, SMAP);                /*   although it's unlikely */
+        fprintf (of, "IAK %2o: ", irq);                 /* report acknowledged interrupt */
+        }
+    }
 
 for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
     j = (opc_val[i] >> I_V_FL) & I_M_FL;                /* get class */
@@ -423,7 +487,24 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             fprintf (of, " %-o", val[2] & VAMASK);
             if (val[2] & I_IA) fprintf (of, ",I");
             return -2;                                  /* extra words */
+
+        case I_V_ALT:                                   /* alternate use instr */
+            if ((inst >= 0105354) &&
+                (inst <= 0105357) &&                    /* RTE-6/VM OS range? */
+                (addr >= 2) &&
+                (addr <= 077))                          /* in trap cell? */
+                continue;                               /* use alternate mnemonic */
+
+            else if ((inst >= 0105240) &&               /* RTE-6/VM VMA range? */
+                     (inst <= 0105257) &&
+                     (cpu_unit.flags & UNIT_EMA))       /* EMA enabled? */
+                continue;                               /* use EMA mnemonics */
+
+            else
+                fprintf (of, "%s", opcode[i]);          /* print opcode */
+            break;
             }
+
         return SCPE_OK;
         }                                               /* end if */
     }                                                   /* end for */
@@ -505,7 +586,7 @@ if (opcode[i]) {                                        /* found opcode? */
             cptr = get_glyph (cptr, gbuf, 0);
             if (strcmp (gbuf, "C")) return SCPE_ARG;
             val[0] = val[0] | I_HC;
-			}
+            }
         break;
 
     case I_V_MRF:                                       /* mem ref */

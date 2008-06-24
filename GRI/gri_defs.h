@@ -1,6 +1,6 @@
 /* gri_defs.h: GRI-909 simulator definitions 
 
-   Copyright (c) 2001-2004, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Jan-08    RMS     Added GRI-99 support
    25-Apr-03    RMS     Revised for extended file support
    19-Sep-02    RMS     Fixed declarations in gdev structure
 
@@ -37,17 +38,12 @@
       (SOV).  Answer: signed and unsigned.
    3. Ref Manual documents a ROM-subroutine multiply operator and mentions
       but does not document a "fast multiply"; MITCS uses an extended
-      arithmetic operator with multiply, divide, and shift.  The behavior
-      of the extended arithmetic operator can only be inferred partially;
-      the shift is never used, and there is no indication of how divide
-      overflow is handled.  Answer: EAO is a package of ROM subroutines
-      with just four functions: multiply, divide, arithmetic right shift,
-      and normalize.
+      arithmetic operator with multiply, divide, and shift.  Answer: EAO
+      is a package of ROM subroutines with just four functions: multiply,
+      divide, arithmetic right shift, and normalize.
    4. Is SOV testable even if the FOA is not ADD?  Answer: AOV and SOV are
       calculated regardless of the function.
    5. How does the EAO handle divide overflow?  Answer: set link.
-   6. What are the other EAO functions beside multiply and divide?
-      Answer: arithmetic right shift, normalize.
 */
 
 #include "sim_defs.h"                                   /* simulator defns */
@@ -69,6 +65,7 @@
 /* Architectural constants */
 
 #define SIGN            0100000                         /* sign */
+#define INDEX           0100000                         /* indexed (GRI-99) */
 #define DMASK           0177777                         /* data mask */
 #define CBIT            (DMASK + 1)                     /* carry bit */
 
@@ -105,9 +102,20 @@
 #define U_AO            013                             /* arith out */
 #define U_EAO           014                             /* ext arith */
 #define U_MSR           017                             /* machine status */
+#define U_XR            022                             /* GRI-99: idx reg */
+#define U_GTRP          023                             /* GRI-99: alt trap */
 #define U_BSW           024                             /* byte swap */
 #define U_BPK           025                             /* byte pack */
+#define U_BCP1          026                             /* byte compare 1 */
+#define U_BCP2          027                             /* byte compare 2 */
 #define U_GR            030                             /* hex general regs */
+#define U_CDR           055                             /* card reader */
+#define U_CADR          057
+#define U_DWC           066                             /* disk */
+#define U_DCA           067
+#define U_DISK          070
+#define U_LPR           071                             /* line printer */
+#define U_CAS           074                             /* casette */
 #define U_RTC           075                             /* clock */
 #define U_HS            076                             /* paper tape */
 #define U_TTY           077                             /* console */
@@ -173,8 +181,8 @@ struct gdev {
 #define MSR_SOV         (1u << MSR_V_SOV)
 #define MSR_AOV         (1u << MSR_V_AOV)
 #define MSR_GET_FOA(x)  (((x) >> MSR_V_FOA) & MSR_M_FOA)
-#define MSR_PUT_FOA(x,n)        (((x) & ~(MSR_M_FOA << MSR_V_FOA)) | \
-                    (((n) & MSR_M_FOA) << MSR_V_FOA))
+#define MSR_PUT_FOA(x,n) (((x) & ~(MSR_M_FOA << MSR_V_FOA)) | \
+                        (((n) & MSR_M_FOA) << MSR_V_FOA))
 #define MSR_RW          (MSR_BOV|MSR_L|MSR_FOA|MSR_SOV|MSR_AOV)
 
 /* Real time clock */
@@ -201,14 +209,24 @@ struct gdev {
 #define INT_V_TTI       1                               /* console in */
 #define INT_V_HSP       2                               /* paper tape punch */
 #define INT_V_HSR       3                               /* paper tape reader */
+#define INT_V_LPR       5                               /* line printer */
+#define INT_V_CDR       7                               /* card reader */
+#define INT_V_CASW      9                               /* casette */
+#define INT_V_CASR      10
 #define INT_V_RTC       11                              /* clock */
+#define INT_V_DISK      14                              /* disk */
 #define INT_V_NODEF     16                              /* nodefer */
 #define INT_V_ON        17                              /* enable */
 #define INT_TTO         (1u << INT_V_TTO)
 #define INT_TTI         (1u << INT_V_TTI)
 #define INT_HSP         (1u << INT_V_HSP)
 #define INT_HSR         (1u << INT_V_HSR)
+#define INT_LPR         (1u << INT_V_LPR)
+#define INT_CDR         (1u << INT_V_CDR)
+#define INT_CASW        (1u << INT_V_CAS1)
+#define INT_CASR        (1u << INT_V_CAS2)
 #define INT_RTC         (1u << INT_V_RTC)
+#define INT_DISK        (1u << INT_V_DISK)
 #define INT_NODEF       (1u << INT_V_NODEF)
 #define INT_ON          (1u << INT_V_ON)
 #define INT_PENDING     (INT_ON | INT_NODEF)
@@ -220,4 +238,9 @@ struct gdev {
 #define VEC_TTI         0014                            /* console in */
 #define VEC_HSP         0017                            /* paper tape punch */
 #define VEC_HSR         0022                            /* paper tape reader */
+#define VEC_LPR         0033                            /* line printer */
+#define VEC_CDR         0033                            /* card reader */
+#define VEC_CASW        0044                            /* casette */
+#define VEC_CASR        0047
+#define VEC_DISK        0055                            /* disk */
 #define VEC_RTC         0100                            /* clock */

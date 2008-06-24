@@ -1,6 +1,6 @@
 /* nova_clk.c: NOVA real-time clock simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    clk          real-time clock
 
+   04-Jul-07    BKR     DEV_SET/CLR macros now used,
+                        changed CLK name to RTC for DG compatiblity,
+                        device may now bw DISABLED
    01-Mar-03    RMS     Added SET/SHOW CLK FREQ support
    03-Oct-02    RMS     Added DIB
    17-Sep-01    RMS     Added terminal multiplexor support
@@ -35,7 +38,7 @@
 
 #include "nova_defs.h"
 
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 int_req, dev_busy, dev_done, dev_disable ;
 
 int32 clk_sel = 0;                                      /* selected freq */
 int32 clk_time[4] = { 16000, 100000, 10000, 1000 };     /* freq table */
@@ -43,7 +46,7 @@ int32 clk_tps[4] = { 60, 10, 100, 1000 };               /* ticks per sec */
 int32 clk_adj[4] = { 1, -5, 2, 20 };                    /* tmxr adjust */
 int32 tmxr_poll = 16000;                                /* tmxr poll */
 
-int32 clk (int32 pulse, int32 code, int32 AC);
+int32  clk (int32 pulse, int32 code, int32 AC);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
 t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -85,12 +88,13 @@ MTAB clk_mod[] = {
     };
 
 DEVICE clk_dev = {
-    "CLK", &clk_unit, clk_reg, clk_mod,
+    "RTC", &clk_unit, clk_reg, clk_mod,
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &clk_reset,
     NULL, NULL, NULL,
-    &clk_dib, 0
+    &clk_dib, DEV_DISABLE
     };
+
 
 /* IOT routine */
 
@@ -98,26 +102,27 @@ int32 clk (int32 pulse, int32 code, int32 AC)
 {
 if (code == ioDOA) {                                    /* DOA */
     clk_sel = AC & 3;                                   /* save select */
-    sim_rtc_init (clk_time[clk_sel]);                   /* init calibr */       
+    sim_rtc_init (clk_time[clk_sel]);                   /* init calibr */
     }
+
 switch (pulse) {                                        /* decode IR<8:9> */
 
-    case iopS:                                          /* start */
-        dev_busy = dev_busy | INT_CLK;                  /* set busy */
-        dev_done = dev_done & ~INT_CLK;                 /* clear done, int */
-        int_req = int_req & ~INT_CLK;
-        if (!sim_is_active (&clk_unit))                 /* not running? */
-            sim_activate (&clk_unit,                    /* activate */
-                sim_rtc_init (clk_time[clk_sel]));      /* init calibr */
-        break;
+  case iopS:                                            /* start */
+    DEV_SET_BUSY( INT_CLK ) ;
+    DEV_CLR_DONE( INT_CLK ) ;
+    DEV_UPDATE_INTR ;
+    if (!sim_is_active (&clk_unit))                     /* not running? */
+        sim_activate (&clk_unit,                        /* activate */
+            sim_rtc_init (clk_time[clk_sel]));          /* init calibr */
+    break;
 
-    case iopC:                                          /* clear */
-        dev_busy = dev_busy & ~INT_CLK;                 /* clear busy */
-        dev_done = dev_done & ~INT_CLK;                 /* clear done, int */
-        int_req = int_req & ~INT_CLK;
-        sim_cancel (&clk_unit);                         /* deactivate unit */
-        break;
-        }                                               /* end switch */
+  case iopC:                                            /* clear */
+    DEV_CLR_BUSY( INT_CLK ) ;
+    DEV_CLR_DONE( INT_CLK ) ;
+    DEV_UPDATE_INTR ;
+    sim_cancel (&clk_unit);                             /* deactivate unit */
+    break;
+    }                                                   /* end switch */
 
 return 0;
 }
@@ -128,14 +133,19 @@ t_stat clk_svc (UNIT *uptr)
 {
 int32 t;
 
-dev_done = dev_done | INT_CLK;                          /* set done */
-dev_busy = dev_busy & ~INT_CLK;                         /* clear busy */
-int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
+if ( DEV_IS_BUSY(INT_CLK) )
+    {
+    DEV_CLR_BUSY( INT_CLK ) ;
+    DEV_SET_DONE( INT_CLK ) ;
+    DEV_UPDATE_INTR ;
+    }
 t = sim_rtc_calb (clk_tps[clk_sel]);                    /* calibrate delay */
 sim_activate (&clk_unit, t);                            /* reactivate unit */
 if (clk_adj[clk_sel] > 0)                               /* clk >= 60Hz? */
     tmxr_poll = t * clk_adj[clk_sel];                   /* poll is longer */
-else tmxr_poll = t / (-clk_adj[clk_sel]);               /* poll is shorter */
+else
+    tmxr_poll = t / (-clk_adj[clk_sel]);                /* poll is shorter */
+
 return SCPE_OK;
 }
 
@@ -144,9 +154,10 @@ return SCPE_OK;
 t_stat clk_reset (DEVICE *dptr)
 {
 clk_sel = 0;
-dev_busy = dev_busy & ~INT_CLK;                         /* clear busy */
-dev_done = dev_done & ~INT_CLK;                         /* clear done, int */
-int_req = int_req & ~INT_CLK;
+DEV_CLR_BUSY( INT_CLK ) ;
+DEV_CLR_DONE( INT_CLK ) ;
+DEV_UPDATE_INTR ;
+
 sim_cancel (&clk_unit);                                 /* deactivate unit */
 tmxr_poll = clk_time[0];                                /* poll is default */
 return SCPE_OK;

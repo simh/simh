@@ -28,12 +28,187 @@
 #define _SIM_REV_H_     0
 
 #define SIM_MAJOR       3
-#define SIM_MINOR       7
-#define SIM_PATCH       3
+#define SIM_MINOR       8
+#define SIM_PATCH       0
+#define SIM_DELTA       0
 
-/* V3.7 revision history 
+/* V3.8 revision history
 
 patch   date            module(s) and fix(es)
+
+  0     tbd             scp.c:
+                        - fixed bug in local/global register search (found by Mark Pizzolato)
+                        - fixed bug in restore of RO units (from Mark Pizzolato)
+                        - added SET/SHO/NO BR with default argument (from Dave Bryan)
+
+                        sim_tmxr.c
+                        - worked around Telnet negotiation problem with QCTerm (from Dave Bryan)
+
+                        gri_defs.h, gri_cpu.c, gri_sys.c:
+                        - added GRI-99 support
+
+                        hp2100_baci.c (from Dave Bryan):
+                        - Implemented 12966A Buffered Asynchronous Communications Interface simulator
+
+                        hp2100_cpu.c (from Dave Bryan):
+                        - Memory ex/dep and bkpt type default to current map mode
+                        - Added SET CPU DEBUG and OS/VMA flags, enabled OS/VMA
+                        - Corrected MP W5 (JSB) jumper action, SET/SHOW reversal,
+                          mp_mevff clear on interrupt with I/O instruction in trap cell
+                        - Removed DBI support from 1000-M (was temporary for RTE-6/VM)
+                        - Enabled EMA and VIS, added EMA, VIS, and SIGNAL debug flags
+                        - Enabled SIGNAL instructions, SIG debug flag
+                        - Fixed single stepping through interrupts
+
+                        hp2100_cpu0.c (from Dave Bryan and Holger Veit):
+                        - Removed and implemented "cpu_rte_vma" and "cpu_rte_os"
+                        - Removed and implemented "cpu_vis" and "cpu_signal"
+                        - Removed and implemented "cpu_rte_ema"
+
+                        hp2100_cpu1.c (from Dave Bryan):
+                        - Added fprint_ops, fprint_regs for debug printouts
+                        - Enabled DIAG as NOP on 1000 F-Series
+                        - Fixed VIS and SIGNAL to depend on the FPP and HAVE_INT64
+
+                        hp2100_cpu3.c (from Dave Bryan):
+                        - Fixed unsigned divide bug in .DDI
+                        - Fixed unsigned multiply bug in .DMP
+                        - Added implementation of DBI self-test
+
+                        hp2100_cpu4.c (from Dave Bryan):
+                        - Fixed B register return bug in /CMRT
+
+                        hp2100_cpu5.c (from Holger Veit):
+                        - Implemented RTE-6/VM Virtual Memory Area firmware
+                        - Implemented RTE-IV Extended Memory Area firmware
+
+                        hp2100_cpu6.c (from Dave Bryan):
+                        - Implemented RTE-6/VM OS accelerator firmware
+
+                        hp2100_cpu7.c (from Holger Veit):
+                        - Implemented Vector Instruction Set and SIGNAL/1000 firmware
+
+                        hp2100_ds.c (from Dave Bryan):
+                        - Corrected and verified ioCRS action
+                        - Corrected DPTR register definition from FLDATA to DRDATA
+
+                        hp2100_fp.c (from Mark Pizzolato)
+                        - Corrected fp_unpack mantissa high-word return
+
+                        hp2100_fp1.c (from Dave Bryan):
+                        - Reworked "complement" to avoid inlining bug in gcc-4.x
+                        - Fixed uninitialized return in fp_accum when setting
+
+                        hp2100_mux.c (from Dave Bryan):
+                        - Sync mux poll with console poll for idle compatibility
+
+                        hp2100_stddev.c (from Dave Bryan):
+                        - Fixed PTR trailing null counter for tape re-read
+                        - Added IPTICK register to CLK to display CPU instr/tick
+                        - Corrected and verified ioCRS actions
+                        - Changed TTY console poll to 10 msec. real time
+                        - Synchronized CLK with TTY if set for 10 msec.
+                        - Added UNIT_IDLE to TTY and CLK
+                        - Removed redundant control char handling definitions
+                        - Changed TTY output wait from 100 to 200 for MSU BASIC
+
+                        hp2100_sys.c (from Dave Bryan):
+                        - Added BACI device
+                        - Added RTE OS/VMA/EMA mnemonics
+                        - Changed fprint_sym to handle step with irq pending
+
+                        hp2100_cpu.h (from Dave Bryan):
+                        - Added calc_defer() prototype
+                        - Added extern sim_deb, cpu_dev, DEB flags for debug printouts
+                        - Added extern intaddr, mp_viol, mp_mevff, calc_int, dev_ctl,
+                          ReadIO, WriteIO for RTE-6/VM microcode support
+
+                        hp2100_cpu1.h (from Dave Bryan):
+                        - Corrected OP_AFF to OP_AAFF for SIGNAL/1000
+                        - Removed unused operand patterns
+                        - Added fprint_ops, fprint_regs for debug printouts
+                        - Revised OP_KKKAKK operand profile to OP_CCCACC for $LOC
+
+                        hp2100_defs.h (from Dave Bryan):
+                        - Added BACI device
+                        - Added 16/32-bit unsigned-to-signed conversions
+                        - Changed TMR_MUX to TMR_POLL for idle support
+                        - Added POLLMODE, sync_poll() declaration
+                        - Added I_MRG, I_ISZ, I_IOG, I_STF, and I_SFS instruction masks
+                        - Added I_MRG_I, I_JSB, I_JSB_I, and I_JMP instruction masks
+
+                        nova_defs.h (from Bruce Ray):
+                        - added support for third-party 64KW memory
+
+                        nova_clk.c (from Bruce Ray):
+                        - renamed to RTC, to match DG literature
+
+                        nova_cpu.c (from Bruce Ray):
+                        - added support for third-party 64KW memory
+                        - added Nova 3 "secret" instructions
+                        - added CPU history support
+
+                        nova_dkp.c (from Bruce Ray):
+                        - renamed to DKP, to match DG literature
+                        - fixed numerous bugs in both documented and undocumented behavior
+                        - changed bootstrap code to DG official sequence
+
+                        nova_dsk.c (from Bruce Ray):
+                        - renamed to DSK, to match DG literature
+                        - added support for undocumented behavior
+                        - changed bootstrap code to DG official sequence
+
+                        nova_mta.c (from Bruce Ray):
+                        - renamed to MTA, to match DG literature
+                        - changed bootstrap code to DG official sequence
+
+                        nova_plt.c, nova_pt.c (from Bruce Ray):
+                        - added 7B/8B support
+
+                        nova_sys.c (from Bruce Ray):
+                        - fixed mistaken instruction mnemonics
+
+                        pdp11_cpu.c, pdp11_io.c, pdp11_rh.c:
+                        - fixed DMA memory address limit test (found by John Dundas)
+                        - fixed MMR0 treatment in RESET (found by Walter Mueller)
+
+                        pdp11_cpumod.h, pdp11_cpumod.c:
+                        - fixed write behavior of 11/70 MBRK, LOSIZE, HISIZE (found by Walter Mueller)
+                        - added support to set default state of KDJ11B,E clock control register
+
+                        pdp11_dc.c:
+                        - added support for DC11
+
+                        pdp11_defs.h:
+                        - added KE, KG, RC, DC support
+                        - renamed DL11 devices
+
+                        pdp11_dl.c:
+                        - renamed devices to DLI/DLO, to match DC11
+                        - added modem control
+
+                        pdp11_io.c:
+                        - added autoconfigure support for DC11
+
+                        pdp11_ke.c:
+                        - added support for KE11A
+
+                        pdp11_kg.c (from John Dundas):
+                        - added support for KG11A
+
+                        pdp11_rc.c (from John Dundas):
+                        - added support for RC11
+
+                        pdp11_sys.c:
+                        - modified to allow -A, -B use with 8b devices
+                        - added KE, KG, RC, DC support
+                        - renamed DL11 devices
+
+                        vax_cmode.c, vax_io.c, vax780_uba.c:
+                        - fixed declarations (from Mark Pizzolato)
+
+
+/* V3.7 revision history 
 
   3     02-Sep-07       scp.c:
                         - fixed bug in SET THROTTLE command

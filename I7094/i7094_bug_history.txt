@@ -1,4 +1,4 @@
-Bugs found
+Bugs Found and Fixed During Simulator Debug
 
 1. CPU: MPY tested sign of AC instead of sign of MQ.
 2. CPU: VLM, VDP, VDH need alternate opcode decode points for large counts.

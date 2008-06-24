@@ -1,6 +1,6 @@
 /* nova_dkp.c: NOVA moving head disk simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,23 @@
 
    dkp          moving head disk
 
+   04-Jul-04    BKR     device name changed to DG's DKP from DEC's DP,
+                        DEV_SET/CLR/INTR macro use started,
+                        fixed 'P' pulse code and secret quirks,
+                        added 6097 diag and size support,
+                        fixed losing unit drive type during unit change,
+                        tightened sector size determination calculations,
+                        controller DONE flag handling fixed,
+                        fixed cylinder overflow test error,
+                        seek error code fixed,
+                        restructured dkp_go() and dkp_svc() routines
+                        (for known future fixes needed),
+                        fixed DIA status calculation,
+                        fixed DKP read/write loop to properly emulate DG cylinder and sector overflows,
+                        added trace facility,
+                        changed 'stime' calculation to force delay time if no cylinders are crossed
+                        (this fixes some DG code that assumes disk seek takes some time),
+                        fixed boot code to match DG hardware standard
    04-Jan-04    RMS     Changed attach routine to use sim_fsize
    28-Nov-03    CEO     Boot from DP now puts device address in SR
    24-Nov-03    CEO     Added support for disk sizing on 6099/6103
@@ -110,14 +127,34 @@
 #define  FCCY_SEEK      2
 #define  FCCY_RECAL     3
 #define FCCY_FLAGS      0174000                         /* flags */
+
 #define GET_CMD(x,dt)   ((drv_tab[dt].newf)? \
                         (((x) >> FCCY_V_NCMD) & FCCY_M_NCMD): \
                         (((x) >> FCCY_V_OCMD) & FCCY_M_OCMD) )
+
+#define SET_CMD(x,dt)   dkp_fccy = (dkp_fccy & ((drv_tab[dt].newf)? \
+                            (FCCY_M_NCMD << FCCY_V_NCMD) : (FCCY_M_OCMD << FCCY_V_OCMD))) | \
+                        ((drv_tab[dt].newf)? \
+                        (((x) & FCCY_M_NCMD) << FCCY_V_NCMD): \
+                        (((x) & FCCY_M_OCMD) << FCCY_V_OCMD) )
+
 #define GET_CYL(x,dt)   ((drv_tab[dt].newf)? \
                         (((x) >> FCCY_V_NCYL) & FCCY_M_NCYL): \
                         ((((x) >> FCCY_V_OCYL) & FCCY_M_OCYL) | \
                         ((dt != TYPE_D44)? 0: \
                         (((x) & FCCY_OCEX) >> (FCCY_V_OCEX - FCCY_V_OCMD)))) )
+
+
+        /*  (Warning: no sector or surface masking is done!)  */
+
+#define	DKP_UPDATE_USSC( type, count, surf, sect )                                      \
+                dkp_ussc = (dkp_ussc & USSC_UNIT)                                       \
+                        | ((dkp_ussc + count) & USSC_M_COUNT)                           \
+                        | ((drv_tab[dtype].newf)?                                       \
+                                ((surf << USSC_V_NSURFACE) | (sect << USSC_V_NSECTOR)): \
+                                ((surf << USSC_V_OSURFACE) | (sect << USSC_V_OSECTOR))  \
+                          );
+
 
 /* Status */
 
@@ -154,14 +191,17 @@
 
    floppy       8               1               77              no
    DS/DD floppy 16              2               77              yes
+   (6097 "quad floppy")
    Diablo 31    12              2               203             no
    6225         20              2               245             yes
    Century 111  6               10              203             no
+   4048 (same as Century 111)
    Diablo 44    12              4               408             no
    6099         32              4               192             yes
    6227         20              6               245             yes
    6070         24              4               408             yes     
    Century 114  12              20              203             no
+   4057 (same as Century 114)
    6103         32              8               192             yes
    4231         23              19              411             yes
 
@@ -178,6 +218,7 @@
 #define NFMT_FLP        FALSE
 
 #define TYPE_DSDD       1
+#define TYPE_6097       TYPE_DSDD
 #define SECT_DSDD       16
 #define SURF_DSDD       2
 #define CYL_DSDD        77
@@ -278,9 +319,20 @@ struct drvtyp drv_tab[] = {
     { 0 }
     };
 
+#define DKP_TRACE(x)    (dkp_trace & (1<<(x)))
+#define DKP_TRACE_FP    stderr
+/*  current trace bit use (bit 0 = LSB)
+    0   I/O instructions
+    1   pre-seek/read/write event setup
+    2   seek events
+    3   read/write events
+    4   post read/write events
+ */
+
 extern uint16 M[];
 extern UNIT cpu_unit;
 extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 saved_PC, SR, AMASK;
 
 int32 dkp_ma = 0;                                       /* memory address */
 int32 dkp_map = 0;                                      /* DCH map 0=A 3=B */
@@ -291,13 +343,15 @@ int32 dkp_swait = 100;                                  /* seek latency */
 int32 dkp_rwait = 100;                                  /* rotate latency */
 int32 dkp_diagmode = 0;                                 /* diagnostic mode */
 
+int32   dkp_trace	= 0 ;
+
 DEVICE dkp_dev;
 int32 dkp (int32 pulse, int32 code, int32 AC);
 t_stat dkp_svc (UNIT *uptr);
 t_stat dkp_reset (DEVICE *dptr);
 t_stat dkp_boot (int32 unitno, DEVICE *dptr);
 t_stat dkp_attach (UNIT *uptr, char *cptr);
-t_stat dkp_go (void);
+t_stat dkp_go ( int32 pulse );
 t_stat dkp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* DKP data structures
@@ -330,7 +384,8 @@ REG dkp_reg[] = {
     { FLDATA (BUSY, dev_busy, INT_V_DKP) },
     { FLDATA (DONE, dev_done, INT_V_DKP) },
     { FLDATA (DISABLE, dev_disable, INT_V_DKP) },
-    { FLDATA (DIAG, dkp_diagmode, 0) },
+    { FLDATA (DIAG,  dkp_diagmode, 0) },
+    { DRDATA (TRACE, dkp_trace,   32) },
     { ORDATA (MAP, dkp_map, 2) },
     { DRDATA (STIME, dkp_swait, 24), PV_LEFT },
     { DRDATA (RTIME, dkp_rwait, 24), PV_LEFT },
@@ -438,12 +493,13 @@ MTAB dkp_mod[] = {
     };
 
 DEVICE dkp_dev = {
-    "DP", dkp_unit, dkp_reg, dkp_mod,
+    "DKP", dkp_unit, dkp_reg, dkp_mod,
     DKP_NUMDR, 8, 30, 1, 8, 16,
     NULL, NULL, &dkp_reset,
     &dkp_boot, &dkp_attach, NULL,
     &dkp_dib, DEV_DISABLE
     };
+
 
 /* IOT routine */
 
@@ -456,14 +512,26 @@ rval = 0;
 uptr = dkp_dev.units + GET_UNIT (dkp_ussc);             /* select unit */
 dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
 
+if ( DKP_TRACE(0) )
+    {
+    static char * f[8] =
+        { "NIO", "DIA", "DOA", "DIB", "DOB", "DIC", "DOC", "SKP" } ;
+    static char * s[4] =
+        { " ", "S", "C", "P" } ;
+
+        printf( "  [DKP  %s%s %06o ", f[code & 0x07], s[pulse & 0x03], (AC & 0xFFFF) ) ;
+        }
+
 switch (code) {                                         /* decode IR<5:7> */
 
     case ioDIA:                                         /* DIA */
-        dkp_sta = dkp_sta & ~STA_DYN;                   /* clear dynamic */
-        if (uptr->flags & UNIT_ATT) dkp_sta = dkp_sta | STA_DRDY;
+        dkp_sta = dkp_sta & (~STA_DRDY) ;		        /* keep error flags  */
+        if (uptr->flags & UNIT_ATT)                     /* update ready */
+            dkp_sta = dkp_sta | STA_DRDY;
         if (uptr->CYL >= drv_tab[dtype].cyl)
             dkp_sta = dkp_sta | STA_CYL;                /* bad cylinder? */
-        if (dkp_sta & STA_EFLGS) dkp_sta = dkp_sta | STA_ERR;
+        if (dkp_sta & STA_EFLGS)
+            dkp_sta = dkp_sta | STA_ERR;
         rval = dkp_sta;
         break;
 
@@ -474,20 +542,25 @@ switch (code) {                                         /* decode IR<5:7> */
             dkp_fccy = AC;                              /* save cmd, cyl */
             dkp_sta = dkp_sta & ~(AC & FCCY_FLAGS);
             }
-        if ((dkp_sta & STA_DFLGS) == 0)                 /* done flags = 0? */
-            dev_done = dev_done & ~INT_DKP;             /* clear intr */
+        DEV_CLR_DONE( INT_DKP )	;			            /* assume done flags 0 */
+        if ( dkp_sta & STA_DFLGS )		                /* done flags = 0? */
+            DEV_SET_DONE( INT_DKP )	;		            /* nope - set done  */
+        DEV_UPDATE_INTR	;				                /* update intr  */
         break;
 
     case ioDIB:                                         /* DIB */
-        rval = dkp_ma;                                  /* return buf addr */
+        rval = dkp_ma & 077777 ;                        /* return buf addr */
+        /* with B0 clear (no DCH B map support) */
         break;
 
     case ioDOB:                                         /* DOB */
         if ((dev_busy & INT_DKP) == 0) {
             dkp_ma = AC & (drv_tab[dtype].newf? DMASK: AMASK);
-            if (AC & 0100000) dkp_map = 3;              /* high bit is map */
-            else dkp_map = 0;
-            }
+            if (AC & 0100000)
+                dkp_map = 3;                            /* high bit is map */
+            else
+                dkp_map = 0;
+        }
         break;
 
     case ioDIC:                                         /* DIC */
@@ -495,63 +568,97 @@ switch (code) {                                         /* decode IR<5:7> */
         break;
 
     case ioDOC:                                         /* DOC */
-        if ((dev_busy & INT_DKP) == 0) dkp_ussc = AC;   /* save unit, sect */
-        if (((dtype == TYPE_6099) ||                    /* for 6099 and 6103 */
-            (dtype == TYPE_6103)) &&                    /* if data<0> set, */
-            AC & 010000) dkp_diagmode = 1;              /* set diagnostic mode */
+        if ((dev_busy & INT_DKP) == 0)			        /* if device is not busy */
+        dkp_ussc = AC ;				                    /* save unit, sect */
+        if (((dtype == TYPE_6099) ||			        /* (BKR: don't forget 6097) */
+         (dtype == TYPE_6097) ||                        /* for 6099 and 6103 */
+             (dtype == TYPE_6103)) &&                   /* if data<0> set, */
+            (AC & 010000) )
+        dkp_diagmode = 1;			                    /* set diagnostic mode */
         break;
         }                                               /* end switch code */
 
-u = GET_UNIT(dkp_ussc);                                 /* select unit */
+u = GET_UNIT(dkp_ussc);                                 /* update current unit */
+uptr = dkp_dev.units + u ;				                /* select unit */
+dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
+
+if ( DKP_TRACE(0) )
+    {
+    if ( code & 1 )
+        printf( "  [%06o]  ", (rval & 0xFFFF) ) ;
+    printf( "]  \n" ) ;
+    }
 
 switch (pulse) {                                        /* decode IR<8:9> */
 
     case iopS:                                          /* start */
-        dev_busy = dev_busy | INT_DKP;                  /* set busy */
-        dev_done = dev_done & ~INT_DKP;                 /* clear done */
-        int_req = int_req & ~INT_DKP;                   /* clear int */
+        DEV_SET_BUSY( INT_DKP ) ;                       /*  set busy    */
+        DEV_CLR_DONE( INT_DKP ) ;                       /*  clear done  */
+        DEV_UPDATE_INTR ;                               /*  update ints */
         if (dkp_diagmode) {                             /* in diagnostic mode? */
-            dkp_diagmode = 0;                           /* reset it */
+            dkp_diagmode = 0;                           /* reset it     */
+            if (dtype == TYPE_6097) dkp_ussc = 010001;  /* (BKR - quad floppy) */
             if (dtype == TYPE_6099) dkp_ussc = 010002;  /* return size bits */
             if (dtype == TYPE_6103) dkp_ussc = 010003;  /* for certain types */
             } 
         else {                                          /* normal mode ... */
-            if (dkp_go ()) break;                       /* new cmd, error? */
+            if (dkp_go (pulse))                         /* do command	*/
+                break ;                                 /* break if no error  */
             }
-        dev_busy = dev_busy & ~INT_DKP;                 /* clear busy */
-        dev_done = dev_done | INT_DKP;                  /* set done */
-        int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-        dkp_sta = dkp_sta | STA_DONE;
+        DEV_CLR_BUSY( INT_DKP ) ;                       /*  clear busy  */
+        DEV_SET_DONE( INT_DKP ) ;                       /*  set done    */
+        DEV_UPDATE_INTR ;                               /*  update ints */
+        dkp_sta = dkp_sta | STA_DONE;                   /*  set controller done  */
         break;
 
     case iopC:                                          /* clear */
-        dev_busy = dev_busy & ~INT_DKP;                 /* clear busy */
-        dev_done = dev_done & ~INT_DKP;                 /* clear done */
-        int_req = int_req & ~INT_DKP;                   /* clear int */
-        dkp_sta = dkp_sta & ~(STA_DFLGS + STA_EFLGS);
-        if (dkp_unit[u].FUNC != FCCY_SEEK) sim_cancel (&dkp_unit[u]);
+        DEV_CLR_BUSY( INT_DKP ) ;                       /*  clear busy  */
+        DEV_CLR_DONE( INT_DKP ) ;                       /*  set done    */
+        DEV_UPDATE_INTR ;                               /*  update ints */
+        dkp_sta = dkp_sta & ~(STA_DFLGS + STA_EFLGS);   /*  clear controller flags  */
+        if (dkp_unit[u].FUNC != FCCY_SEEK)
+            sim_cancel (&dkp_unit[u]);                  /*  cancel any r/w op  */
         break;
 
     case iopP:                                          /* pulse */
-        dev_done = dev_done & ~INT_DKP;                 /* clear done */
-        if (dkp_go ()) break;                           /* new seek command */
-        dev_done = dev_done | INT_DKP;                  /* set done */
-        int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-        dkp_sta = dkp_sta | (STA_SKDN0 >> u);           /* set seek done */
+        if ( dkp_diagmode )
+            {
+            dkp_diagmode = 0 ;                          /*  clear DG diagnostic mode  */
+            }
+        else
+            {
+            DEV_CLR_DONE( INT_DKP ) ;                   /*  clear done  */
+            DEV_UPDATE_INTR ;
+
+            /*  DG "undocumented feature": 'P' pulse can not start a read/write operation!
+             *  Diagnostic routines will use this crock to do 'crazy things' to size a disk
+             *  and many assume that a recal is done, other assume that they can stop the
+             *  read operation before any damage is done.  Must also [re]calculate unit, function
+             *  and type because DOx instruction may have updated the controller info after
+             *  start of this procedure and before our 'P' handler.   BKR
+             */
+            if (dkp_go(pulse))
+                    break;                              /* no error - do not set done and status  */
+            }
+
+        DEV_SET_DONE( INT_DKP ) ;                       /*  set done	*/
+        DEV_UPDATE_INTR ;                               /*  update ints */
+        dkp_sta = dkp_sta | (STA_SKDN0 >> u);           /* set controller seek done */
         break;
-        }                                               /* end case pulse */
+    }                                                   /* end case pulse */
 
 return rval;
 }
+
 
 /* New command, start vs pulse handled externally
    Returns true if command ok, false if error
 */
 
-t_stat dkp_go (void)
+t_stat dkp_go ( int32 pulse )
 {
-UNIT *uptr;
-int32 newcyl, func, u, dtype;
+UNIT *	uptr;
+int32	oldCyl, u, dtype;
 
 dkp_sta = dkp_sta & ~STA_EFLGS;                         /* clear errors */
 u = GET_UNIT (dkp_ussc);                                /* get unit number */
@@ -560,30 +667,116 @@ if (((uptr->flags & UNIT_ATT) == 0) || sim_is_active (uptr)) {
     dkp_sta = dkp_sta | STA_ERR;                        /* attached or busy? */
     return FALSE;
     }
-dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
-func = GET_CMD (dkp_fccy, dtype);                       /* get function */
-newcyl = GET_CYL (dkp_fccy, dtype);                     /* get cylinder */
 
-switch (func) {                                         /* decode command */
+if (dkp_diagmode) {                                     /* diagnostic mode? */
+    dkp_sta = (dkp_sta | STA_DONE);                     /* Set error bit only */
+    DEV_CLR_BUSY( INT_DKP ) ;                           /* clear busy  */
+    DEV_SET_DONE( INT_DKP ) ;                           /* set   done  */
+    DEV_UPDATE_INTR ;                                   /* update interrupts  */
+    return ( TRUE ) ;                                   /* do not do function */
+    }
 
-    case FCCY_READ: case FCCY_WRITE:
-        sim_activate (uptr, dkp_rwait);                 /* schedule */
+oldCyl = uptr->CYL ;                                    /* get old cylinder  */
+dtype  = GET_DTYPE (uptr->flags);                       /* get drive type */
+uptr->FUNC = GET_CMD (dkp_fccy, dtype) ;                /* save command */
+uptr->CYL  = GET_CYL (dkp_fccy, dtype) ;
+
+if ( DKP_TRACE(1) )
+	{
+	int32		xSect ;
+	int32		xSurf ;
+	int32		xCyl ;
+	int32		xCnt ;
+
+	xSect = GET_SECT(dkp_ussc, dtype) ;
+	xSurf = GET_SURF(dkp_ussc, dtype) ;
+	xCyl  = GET_CYL (dkp_fccy, dtype) ;
+	xCnt  = 16 - (GET_COUNT(dkp_ussc)) ;
+
+	fprintf( DKP_TRACE_FP,
+		"  [%s:%c  %-5s:  %3d / %2d / %2d   %2d   %06o ] \r\n",
+		"DKP",
+		(char) (u + '0'),
+		((uptr->FUNC == FCCY_READ) ?
+			  "read"
+			: ((uptr->FUNC == FCCY_WRITE) ?
+				  "write"
+				: ((uptr->FUNC == FCCY_SEEK) ?
+					  "seek"
+					: "<???>"
+				  )
+			  )
+		),
+		(unsigned) xCyl,
+		(unsigned) xSurf,
+		(unsigned) xSect,
+		(unsigned) (16 - xCnt),
+		(unsigned) (dkp_ma & 0xFFFF) /* show all 16-bits in case DCH B */
+		) ;
+	}
+
+
+switch (uptr->FUNC) {                                   /* decode command */
+
+    case FCCY_READ:
+    case FCCY_WRITE:
+    if (((uptr->flags & UNIT_ATT) == 0) ||              /* not attached? */
+        ((uptr->flags & UNIT_WPRT) && (uptr->FUNC == FCCY_WRITE)))
+            {
+            dkp_sta = dkp_sta | STA_DONE | STA_ERR;		/* error */
+            }
+    else if ( uptr->CYL  >= drv_tab[dtype].cyl )        /* bad cylinder */
+        {
+        dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_CYL ;
+        }
+    else if ( GET_SURF(dkp_ussc, dtype) >= drv_tab[dtype].surf ) /* bad surface */
+        {
+        dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_UNS;   /* older drives may not even do this... */
+        /*	dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_XCY ;  /-  newer disks give this error  */
+        }
+    else if ( GET_SECT(dkp_ussc, dtype) >= drv_tab[dtype].sect ) /* or bad sector? */
+        {
+    /*  dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_UNS;   /- older drives may not even do this... */
+        dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_XCY ;  /*  newer disks give this error  */
+        }
+    if ( (pulse != iopS) || (dkp_sta & STA_ERR) )
+        {
+        return ( FALSE ) ;
+        }
+        sim_activate (uptr, dkp_rwait);                 /* schedule read or write request */
         break;
 
     case FCCY_RECAL:                                    /* recalibrate */
-        newcyl = 0;
-        func = FCCY_SEEK;
+        uptr->FUNC = FCCY_SEEK ;                        /* save command */
+        uptr->CYL  = 0 ;
 
     case FCCY_SEEK:                                     /* seek */
-        sim_activate (uptr, dkp_swait * abs (newcyl - uptr->CYL));
+        if ( ! (uptr->flags & UNIT_ATT) )                /* not attached? */
+            {
+            dkp_sta = dkp_sta | STA_DONE | STA_ERR;     /* error */
+            }
+        else if ( uptr->CYL >= drv_tab[dtype].cyl )     /* bad cylinder? */
+            {
+            dkp_sta = dkp_sta | STA_ERR | STA_CYL;
+            }
+        if ( (pulse != iopP) || (dkp_sta & STA_ERR) )
+            {
+            return ( FALSE ) ;                          /* only 'P' pulse start seeks!  */
+            }
+
+        /*  do the seek  */
+        /* must check for "do we support seeking bits" flag before setting SEEK0'ish bits!  */
         dkp_sta = dkp_sta | (STA_SEEK0 >> u);           /* set seeking */
-        uptr->CYL = newcyl;                             /* on cylinder */
+        oldCyl = abs(oldCyl - uptr->CYL) ;
+        if ( (dkp_swait) && (! (oldCyl)) )              /* enforce minimum wait if req  */
+            oldCyl = 1 ;
+        sim_activate ( uptr, (dkp_swait * oldCyl) ) ;
         break;
         }                                               /* end case command */
 
-uptr->FUNC = func;                                      /* save command */
-return TRUE;                                            /* no error */
+return ( TRUE ) ;                                       /* no error */
 }
+
 
 /* Unit service
 
@@ -599,73 +792,127 @@ return TRUE;                                            /* no error */
 
 t_stat dkp_svc (UNIT *uptr)
 {
-int32 sc, sa, xcsa, bda;
-int32 sx, dx, pa, u;
+int32 sa, bda;
+int32 dx, pa, u;
 int32 dtype, err, newsect, newsurf;
 uint32 awc;
 t_stat rval;
 static uint16 tbuf[DKP_NUMWD];                          /* transfer buffer */
 
-rval = SCPE_OK;
+
+rval  = SCPE_OK;
 dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
-if (dkp_diagmode) {                                     /* diagnostic mode? */
-    dkp_sta = (dkp_sta | STA_DONE);                     /* Set error bit only */
-    dev_busy = dev_busy & ~INT_DKP;                     /* clear busy */
-    dev_done = dev_done | INT_DKP;                      /* set done */
-    int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-    return SCPE_OK;                                     /* do not do function */
-    }
+u     = uptr - dkp_dev.units;                           /* get unit number */
+
 if (uptr->FUNC == FCCY_SEEK) {                          /* seek? */
-    if (uptr->CYL >= drv_tab[dtype].cyl)                /* bad cylinder? */
+    if ( ! (uptr->flags & UNIT_ATT) )                   /* not attached? */
+        {
+        dkp_sta = dkp_sta | STA_DONE | STA_ERR;	        /* error (changed during queue time?) */
+        }
+    else if ( uptr->CYL >= drv_tab[dtype].cyl )         /* bad cylinder? */
+        {
         dkp_sta = dkp_sta | STA_ERR | STA_CYL;
-    dev_done = dev_done | INT_DKP;                      /* set done */
-    int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-    u = uptr - dkp_dev.units;                           /* get unit number */
+        }
+    DEV_SET_DONE( INT_DKP ) ;
+    DEV_UPDATE_INTR ;
     dkp_sta = (dkp_sta | (STA_SKDN0 >> u))              /* set seek done */
-        & ~(STA_SEEK0 >> u);                            /* clear seeking */
+                & ~(STA_SEEK0 >> u);                    /* clear seeking */
+    if ( DKP_TRACE(2) )
+        {
+        fprintf( DKP_TRACE_FP,
+            "  [%s:%c  seek : %4d ] \r\n",
+            "DKP",
+            (char) (u + '0'),
+            (unsigned) (uptr->CYL)
+            ) ;
+        }
     return SCPE_OK;
     }
 
+/*  read or write  */
+
 if (((uptr->flags & UNIT_ATT) == 0) ||                  /* not attached? */
     ((uptr->flags & UNIT_WPRT) && (uptr->FUNC == FCCY_WRITE)))
-	dkp_sta = dkp_sta | STA_DONE | STA_ERR;				/* error */
-
-else if ((uptr->CYL >= drv_tab[dtype].cyl) ||           /* bad cylinder */
-     (GET_SURF (dkp_ussc, dtype) >= drv_tab[dtype].surf) || /* bad surface */
-     (GET_SECT (dkp_ussc, dtype) >= drv_tab[dtype].sect))   /* or bad sector? */
-	dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_UNS;
-
-else if (GET_CYL (dkp_fccy, dtype) != uptr->CYL)        /* address error? */
-    dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_UNS;
-
+    {
+    dkp_sta = dkp_sta | STA_DONE | STA_ERR;		/* error */
+    }
+else if ( uptr->CYL >= drv_tab[dtype].cyl )             /* bad cylinder */
+    {
+    dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_CYL ;
+    dkp_sta  = dkp_sta | STA_ERR | STA_CYL;
+    DEV_SET_DONE( INT_DKP ) ;
+    DEV_UPDATE_INTR ;
+    return SCPE_OK ;
+    }
+else if ( GET_SURF(dkp_ussc, dtype) >= drv_tab[dtype].surf ) /* bad surface */
+    {
+    dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_UNS;   /* older drives may not even do this... */
+/*  dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_XCY ;  /- newer disks give this error  */
+/* set sector to some bad value and wait then exit?  */
+    }
+else if ( GET_SECT(dkp_ussc, dtype) >= drv_tab[dtype].sect )   /* or bad sector? */
+    {
+/*	dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_UNS;   /- older DG drives do not even give error(!), but we do */
+    dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_XCY ;  /* newer disks give this error  */
+    }
 else {
-    sc = 16 - GET_COUNT (dkp_ussc);                     /* get sector count */
-    sa = GET_SA (uptr->CYL, GET_SURF (dkp_ussc, dtype),
-        GET_SECT (dkp_ussc, dtype), dtype);             /* get disk block */
-    xcsa = GET_SA (uptr->CYL + 1, 0, 0, dtype);         /* get next cyl addr */
-    if ((sa + sc) > xcsa ) {                            /* across cylinder? */
-        sc = xcsa - sa;                                 /* limit transfer */
-        dkp_sta = dkp_sta | STA_XCY;                    /* xcyl error */
+err = 0 ;
+do  {
+    if ( DKP_TRACE(3) )
+        {
+        fprintf( DKP_TRACE_FP,
+            "  [%s:%c  %-5s:  %3d / %2d / %2d   %06o ] \r\n",
+            "DKP",
+            (char) (u + '0'),
+            ((uptr->FUNC == FCCY_READ) ?
+                  "read"
+                : ((uptr->FUNC == FCCY_WRITE) ?
+                      "write"
+                    : "<???>")
+            ),
+            (unsigned) (uptr->CYL),
+            (unsigned) (GET_SURF(dkp_ussc, dtype)),
+            (unsigned) (GET_SECT(dkp_ussc, dtype)),
+            (unsigned) (dkp_ma & 0xFFFF) /* show all 16-bits in case DCH B */
+            ) ;
         }
-    bda = sa * DKP_NUMWD * sizeof (short);              /* to words, bytes */
 
+
+    if ( GET_SECT(dkp_ussc, dtype) >= drv_tab[dtype].sect )   /* or bad sector? */
+        {
+        /* sector overflows to 0 ;
+         * surface gets incremented
+         */
+        newsurf = GET_SURF(dkp_ussc, dtype) + 1 ;
+        newsurf = newsurf & ((drv_tab[dtype].newf) ? USSC_M_NSURFACE : USSC_M_OSURFACE) ;
+        DKP_UPDATE_USSC( type, 0, newsurf, 0 )
+
+        if ( (GET_SURF(dkp_ussc, dtype)) >= drv_tab[dtype].surf )
+            {
+        /*  dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_UNS;   /- older drives may not even do this... */
+            dkp_sta = dkp_sta | STA_DONE | STA_ERR | STA_XCY ;  /*  newer disks give this error  */
+            /* DG retains overflowed surface number,
+             * other vendors have different/expanded options
+             */
+            break ;
+            }
+        }
+    sa = GET_SA (uptr->CYL, GET_SURF (dkp_ussc, dtype),
+         GET_SECT (dkp_ussc, dtype), dtype);            /* get disk block */
+    bda = sa * DKP_NUMWD * sizeof(uint16) ;             /* to words, bytes */
     err = fseek (uptr->fileref, bda, SEEK_SET);         /* position drive */
 
     if (uptr->FUNC == FCCY_READ) {                      /* read? */
-        for (sx = 0; sx < sc; sx++) {                   /* loop thru sectors */
             awc = fxread (tbuf, sizeof(uint16), DKP_NUMWD, uptr->fileref);
             for ( ; awc < DKP_NUMWD; awc++) tbuf[awc] = 0;
             if (err = ferror (uptr->fileref)) break;
-            for (dx = 0; dx < DKP_NUMWD; dx++) {        /* loop thru buffer */
+            for (dx = 0; dx < DKP_NUMWD; dx++) {            /* loop thru buffer */
                 pa = MapAddr (dkp_map, (dkp_ma & AMASK));
                 if (MEM_ADDR_OK (pa)) M[pa] = tbuf[dx];
                 dkp_ma = (dkp_ma + 1) & AMASK;
                 }
-            }
         }
-
-    if (uptr->FUNC == FCCY_WRITE) {                     /* write? */
-        for (sx = 0; sx < sc; sx++) {                   /* loop thru sectors */
+    else if (uptr->FUNC == FCCY_WRITE) {                /* write? */
             for (dx = 0; dx < DKP_NUMWD; dx++) {        /* loop into buffer */
                 pa = MapAddr (dkp_map, (dkp_ma & AMASK));
                 tbuf[dx] = M[pa];
@@ -674,27 +921,41 @@ else {
             fxwrite (tbuf, sizeof(int16), DKP_NUMWD, uptr->fileref);
             if (err = ferror (uptr->fileref)) break;
             }
-        }
 
     if (err != 0) {
         perror ("DKP I/O error");
-		clearerr (uptr->fileref);
+        clearerr (uptr->fileref);
         rval = SCPE_IOERR;
+        break ;
         }
 
-    sa = sa + sc;                                       /* update sector addr */
-    newsect = sa % drv_tab[dtype].sect;
-    newsurf = (sa / drv_tab[dtype].sect) % drv_tab[dtype].surf;
-    dkp_ussc = (dkp_ussc & USSC_UNIT) | ((dkp_ussc + sc) & USSC_M_COUNT) |
-        ((drv_tab[dtype].newf)?
-        ((newsurf << USSC_V_NSURFACE) | (newsect << USSC_V_NSECTOR)):
-        ((newsurf << USSC_V_OSURFACE) | (newsect << USSC_V_OSECTOR)) );
+newsect = GET_SECT (dkp_ussc, dtype) + 1 ;              /*  update next sector  */
+newsurf = GET_SURF (dkp_ussc, dtype) ;                  /*  and next head	*/
+                                                        /*  (count set below)	*/
+DKP_UPDATE_USSC( type, 1, newsurf, newsect )
+}  /*  end read/write loop  */
+
+    while ( (GET_COUNT(dkp_ussc)) ) ;
     dkp_sta = dkp_sta | STA_DONE;                       /* set status */
+
+    if ( DKP_TRACE(4) )
+           {
+           fprintf( DKP_TRACE_FP,
+                   "  [%s:%c  %-5s:  %3d / %2d / %2d   %06o ] \r\n",
+                   "DKP",
+                    (char) (u + '0'),
+                    "post",
+                    (unsigned) (uptr->CYL),
+                    (unsigned) (GET_SURF(dkp_ussc, dtype)),
+                    (unsigned) (GET_SECT(dkp_ussc, dtype)),
+                    (unsigned) (dkp_ma & 0xFFFF) /* show all 16-bits in case DCH B */
+                    ) ;
+            }
     }
 
-dev_busy = dev_busy & ~INT_DKP;                         /* clear busy */
-dev_done = dev_done | INT_DKP;                          /* set done */
-int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
+DEV_CLR_BUSY( INT_DKP ) ;
+DEV_SET_DONE( INT_DKP ) ;
+DEV_UPDATE_INTR ;
 return rval;
 }
 
@@ -705,9 +966,9 @@ t_stat dkp_reset (DEVICE *dptr)
 int32 u;
 UNIT *uptr;
 
-dev_busy = dev_busy & ~INT_DKP;                         /* clear busy */
-dev_done = dev_done & ~INT_DKP;                         /* clear done, int */
-int_req = int_req & ~INT_DKP;
+DEV_CLR_BUSY( INT_DKP ) ;                               /*  clear busy	*/
+DEV_CLR_DONE( INT_DKP ) ;                               /*  clear done	*/
+DEV_UPDATE_INTR ;                                       /*  update ints	*/
 dkp_fccy = dkp_ussc = dkp_ma = dkp_sta = 0;             /* clear registers */
 dkp_diagmode = 0;                                       /* clear diagnostic mode */
 dkp_map = 0;
@@ -724,7 +985,7 @@ return SCPE_OK;
 t_stat dkp_attach (UNIT *uptr, char *cptr)
 {
 int32 i, p;
-t_stat r;
+t_stat   r;
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;    /* restore capac */
 r = attach_unit (uptr, cptr);                           /* attach */
@@ -751,10 +1012,12 @@ return SCPE_OK;
 
 /* Bootstrap routine */
 
+#if defined(_OLD_CODE_)
+
 #define BOOT_START  02000
 #define BOOT_UNIT   02021
 #define BOOT_SEEK   02022
-#define BOOT_LEN    (sizeof (boot_rom) / sizeof (int))
+#define BOOT_LEN    (sizeof(boot_rom) / sizeof(int32))
 
 static const int32 boot_rom[] = {
     0060233,                    /* NIOC 0,DKP           ; clear disk */
@@ -774,11 +1037,12 @@ static const int32 boot_rom[] = {
     0101113,                    /* MOVL# 0,0,SNC        ; skip if done */
     0000776,                    /* JMP .-2 */
     0000377,                    /* JMP 377 */
-    0000016,                    /* USSC: 0.B1+0.B7+0.B11+16 */
+    0000016,                    /* USSC:   0.B1+0.B7+0.B11+16 */
     0175000,                    /* SEKCMD: 175000 */
-    0074000,                    /* SEKDN: 074000 */
+    0074000,                    /* SEKDN:  074000 */
     0174000                     /* REDCMD: 174000 */
     };
+
 
 t_stat dkp_boot (int32 unitno, DEVICE *dptr)
 {
@@ -790,6 +1054,30 @@ unitno = unitno & USSC_M_UNIT;
 dtype = GET_DTYPE (dkp_unit[unitno].flags);
 M[BOOT_UNIT] = M[BOOT_UNIT] | (unitno << USSC_V_UNIT);
 if (drv_tab[dtype].newf) M[BOOT_SEEK] = 0176000;
+saved_PC = BOOT_START;
+SR = 0100000 + DEV_DKP;
+return SCPE_OK;
+}
+
+#endif      /*  _OLD_CODE_  */
+
+
+
+#define BOOT_START  0375
+#define BOOT_LEN    (sizeof (boot_rom) / sizeof (int32))
+
+static const int32 boot_rom[] = {
+      0062677                     /* IORST                ; reset the I/O system  */
+    , 0060133                     /* NIOS DKP             ; start the disk        */
+    , 0000377                     /* JMP 377              ; wait for the world    */
+    } ;
+
+
+t_stat dkp_boot (int32 unitno, DEVICE *dptr)
+{
+int32   i;
+
+for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = (uint16) boot_rom[i];
 saved_PC = BOOT_START;
 SR = 0100000 + DEV_DKP;
 return SCPE_OK;

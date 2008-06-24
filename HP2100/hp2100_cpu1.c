@@ -1,6 +1,6 @@
 /* hp2100_cpu1.c: HP 2100/1000 EAU simulator and UIG dispatcher
 
-   Copyright (c) 2005-2007, Robert M. Supnik
+   Copyright (c) 2005-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    CPU1         Extended arithmetic and optional microcode dispatchers
 
+   20-Apr-08    JDB     Fixed VIS and SIGNAL to depend on the FPP and HAVE_INT64
+   28-Nov-07    JDB     Added fprint_ops, fprint_regs for debug printouts
+   17-Nov-07    JDB     Enabled DIAG as NOP on 1000 F-Series
    04-Jan-07    JDB     Added special DBI dispatcher for non-INT64 diagnostic
    29-Dec-06    JDB     Allows RRR as NOP if 2114 (diag config test)
    01-Dec-06    JDB     Substitutes FPP for firmware FP if HAVE_INT64
@@ -101,19 +104,19 @@
 
 #if defined (HAVE_INT64)                                /* int64 support available */
 extern t_stat cpu_fpp (uint32 IR, uint32 intrq);        /* Floating Point Processor */
-extern t_stat cpu_sis (uint32 IR, uint32 intrq);        /* Scientific Instruction */
+extern t_stat cpu_sis (uint32 IR, uint32 intrq);        /* Scientific Instruction Set */
+extern t_stat cpu_vis (uint32 IR, uint32 intrq);        /* Vector Instruction Set */
+extern t_stat cpu_signal (uint32 IR, uint32 intrq);     /* SIGNAL/1000 */
 #else                                                   /* int64 support unavailable */
-extern t_stat cpu_fp  (uint32 IR, uint32 intrq);        /* Firmware Floating Point */
+extern t_stat cpu_fp (uint32 IR, uint32 intrq);         /* Firmware Floating Point */
 #endif                                                  /* end of int64 support */
 
 extern t_stat cpu_ffp (uint32 IR, uint32 intrq);        /* Fast FORTRAN Processor */
-extern t_stat cpu_ds  (uint32 IR, uint32 intrq);        /* Distributed Systems */
-extern t_stat cpu_vis (uint32 IR, uint32 intrq);        /* Vector Instruction */
+extern t_stat cpu_ds (uint32 IR, uint32 intrq);         /* Distributed Systems */
 extern t_stat cpu_dbi (uint32 IR, uint32 intrq);        /* Double integer */
 extern t_stat cpu_rte_vma (uint32 IR, uint32 intrq);    /* RTE-4/6 EMA/VMA */
 extern t_stat cpu_rte_os (uint32 IR, uint32 intrq, uint32 iotrap);  /* RTE-6 OS */
 extern t_stat cpu_iop (uint32 IR, uint32 intrq);        /* 2000 I/O Processor */
-extern t_stat cpu_signal  (uint32 IR, uint32 intrq);    /* SIGNAL/1000 Instructions */
 extern t_stat cpu_dms (uint32 IR, uint32 intrq);        /* Dynamic mapping system */
 extern t_stat cpu_eig (uint32 IR, uint32 intrq);        /* Extended instruction group */
 
@@ -198,7 +201,8 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
         switch ((IR >> 4) & 017) {                      /* decode IR<7:4> */
 
         case 000:                                       /* DIAG 100000 */
-            if (UNIT_CPU_MODEL != UNIT_1000_E)          /* must be 1000-E */
+            if ((UNIT_CPU_MODEL != UNIT_1000_E) &&      /* must be 1000 E-series */
+                (UNIT_CPU_MODEL != UNIT_1000_F))        /* or 1000 F-series */
                 return stop_inst;                       /* trap if not */
             break;                                      /* DIAG is NOP unless halted */
 
@@ -509,17 +513,21 @@ switch ((IR >> 4) & 017) {                              /* decode IR<7:4> */
         return cpu_iop (IR, intrq);                     /* 2000 I/O Processor */
 
     case 003:                                           /* 105460-105477 */
+#if defined (HAVE_INT64)                                /* int64 support available */
         if (UNIT_CPU_MODEL == UNIT_1000_F)              /* F-series? */
             return cpu_vis (IR, intrq);                 /* Vector Instruction Set */
         else                                            /* M/E-series */
+#endif                                                  /* end of int64 support */
             return cpu_iop (IR, intrq);                 /* 2000 I/O Processor */
 
     case 005:                                           /* 105520-105537 */
         IR = IR ^ 0000620;                              /* remap to 105300-105317 */
         return cpu_ds (IR, intrq);                      /* Distributed System */
 
+#if defined (HAVE_INT64)                                /* int64 support available */
     case 010:                                           /* 105600-105617 */
         return cpu_signal (IR, intrq);                  /* SIGNAL/1000 Instructions */
+#endif                                                  /* end of int64 support */
 
     case 014:                                           /* 105700-105717 */
     case 015:                                           /* 105720-105737 */
@@ -743,4 +751,120 @@ for (i = 0; i < OP_N_F; i++) {
     pattern = pattern >> OP_N_FLAGS;                    /* move next pattern into place */
     }
 return reason;
+}
+
+
+/* Print operands to the debug device.
+
+   The values of an operand array are printed to the debug device.  The types of
+   the operands are specified by an operand pattern.  Typically, the operand
+   pattern is the same one that was used to fill the array originally.
+*/
+
+void fprint_ops (OP_PAT pattern, OPS op)
+{
+OP_PAT flags;
+uint32 i;
+
+for (i = 0; i < OP_N_F; i++) {
+    flags = pattern & OP_M_FLAGS;                       /* get operand pattern */
+
+    switch (flags) {
+        case OP_NUL:                                    /* null operand */
+            return;                                     /* no more, so quit */
+
+        case OP_IAR:                                    /* int in A */
+        case OP_CON:                                    /* inline constant operand */
+        case OP_VAR:                                    /* inline variable operand */
+        case OP_ADR:                                    /* inline address operand */
+        case OP_ADK:                                    /* address of int constant */
+            fprintf (sim_deb,
+                     ", op[%d] = %06o",
+                     i, op[i].word);
+            break;
+
+        case OP_JAB:                                    /* dbl-int in A/B */
+        case OP_ADD:                                    /* address of dbl-int constant */
+            fprintf (sim_deb,
+                     ", op[%d] = %011o",
+                     i, op[i].dword);
+            break;
+
+        case OP_FAB:                                    /* 2-word FP in A/B */
+        case OP_ADF:                                    /* address of 2-word FP const */
+            fprintf (sim_deb,
+                     ", op[%d] = (%06o, %06o)",
+                     i, op[i].fpk[0], op[i].fpk[1]);
+            break;
+
+        case OP_ADX:                                    /* address of 3-word FP const */
+            fprintf (sim_deb,
+                     ", op[%d] = (%06o, %06o, %06o)",
+                     i, op[i].fpk[0], op[i].fpk[1],
+                     op[i].fpk[2]);
+            break;
+
+        case OP_ADT:                                    /* address of 4-word FP const */
+            fprintf (sim_deb,
+                     ", op[%d] = (%06o, %06o, %06o, %06o)",
+                     i, op[i].fpk[0], op[i].fpk[1],
+                     op[i].fpk[2], op[i].fpk[3]);
+            break;
+
+        case OP_ADE:                                    /* address of 5-word FP const */
+            fprintf (sim_deb,
+                     ", op[%d] = (%06o, %06o, %06o, %06o, %06o)",
+                     i, op[i].fpk[0], op[i].fpk[1],
+                     op[i].fpk[2], op[i].fpk[3], op[i].fpk[4]);
+            break;
+
+        default:
+            fprintf (sim_deb, "UNKNOWN OPERAND TYPE");  /* not implemented */
+        }
+
+    pattern = pattern >> OP_N_FLAGS;                    /* move next pattern into place */
+    }
+}
+
+
+/* Print CPU registers to the debug device.
+
+   One or more CPU registers may be printed to the debug output device, which
+   must be valid before calling.
+*/
+
+void fprint_regs (char *caption, uint32 regs, uint32 base)
+{
+static uint32 ARX, BRX, PRL;                            /* static so addresses are constant */
+
+static const char *reg_names[] = { "CIR", "A", "B", "E", "X", "Y", "O", "P", "return" };
+static const uint32 *reg_ptrs[] = { &intaddr, &ARX, &BRX, &E, &XR, &YR, &O, &PC, &PRL };
+static const char *formats[] = { "%02o", "%06o", "%06o", "%01o", "%06o", "%06o", "%01o", "%06o", "P+%d" };
+
+static char format[20] = " %s = ";                      /* base format string */
+static const int eos = 6;                               /* length of base format string */
+
+uint32 i;
+t_bool first = TRUE;                                    /* first-time through flag */
+
+ARX = AR;                                               /* copy 16-bit value to static variable */
+BRX = BR;                                               /* copy 16-bit value to static variable */
+PRL = PC - base;                                        /* compute value in static variable */
+
+for (i = 0; i < REG_COUNT; i++) {
+    if (regs & 1) {                                     /* register requested? */
+        if (first)                                      /* first time? */
+            fputs (caption, sim_deb);                   /* print caption */
+        else
+            fputc (',', sim_deb);                       /* print separator */
+
+        strcpy (&format[eos], formats[i]);              /* copy format specifier */
+        fprintf (sim_deb, format, reg_names[i], *reg_ptrs[i]);
+
+        first = FALSE;
+        }
+
+    regs = regs >> 1;                                   /* align next register flag */
+    }
+return;
 }

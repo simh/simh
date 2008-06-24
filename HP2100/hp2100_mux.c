@@ -1,6 +1,6 @@
 /* hp2100_mux.c: HP 2100 12920A terminal multiplexor simulator
 
-   Copyright (c) 2002-2007, Robert M Supnik
+   Copyright (c) 2002-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mux,muxl,muxc        12920A terminal multiplexor
 
+   16-Apr-08    JDB     Sync mux poll with console poll for idle compatibility
    06-Mar-07    JDB     Corrected "mux_sta" size from 16 to 21 elements
                         Fixed "muxc_reset" to clear lines 16-20
    26-Feb-07    JDB     Added debug printouts
@@ -75,7 +76,6 @@
 #define UNIT_V_DIAG     (TTUF_V_UF + 1)                 /* loopback diagnostic */
 #define UNIT_MDM        (1 << UNIT_V_MDM)
 #define UNIT_DIAG       (1 << UNIT_V_DIAG)
-#define MUXU_INIT_POLL  8000
 #define MUXL_WAIT       500
 
 /* Channel number (OTA upper, LIA lower or upper) */
@@ -174,7 +174,6 @@ uint8 mux_rchp[MUX_LINES + MUX_ILINES];                 /* rcv chr pend */
 uint8 mux_xdon[MUX_LINES];                              /* xmt done */
 uint8 muxc_ota[MUX_LINES];                              /* ctrl: Cn,ESn,SSn */
 uint8 muxc_lia[MUX_LINES];                              /* ctrl: Sn */
-uint32 mux_tps = 100;                                   /* polls/second */
 uint32 muxl_ibuf = 0;                                   /* low in: rcv data */
 uint32 muxl_obuf = 0;                                   /* low out: param */
 uint32 muxu_ibuf = 0;                                   /* upr in: status */
@@ -229,7 +228,7 @@ DEBTAB mux_deb[] = {
     { "CMDS", DEB_CMDS },
     { "CPU",  DEB_CPU },
     { "XFER", DEB_XFER },
-    { NULL, 0 }  };
+    { NULL,   0 }  };
 
 DIB mux_dib[] = {
     { MUXL, 0, 0, 0, 0, 0, &muxlio },
@@ -247,7 +246,7 @@ DIB mux_dib[] = {
    muxu_mod     MUX modifiers list
 */
 
-UNIT muxu_unit = { UDATA (&muxi_svc, UNIT_ATTABLE, 0), MUXU_INIT_POLL };
+UNIT muxu_unit = { UDATA (&muxi_svc, UNIT_ATTABLE, 0), POLL_WAIT };
 
 REG muxu_reg[] = {
     { ORDATA (IBUF, muxu_ibuf, 16) },
@@ -398,7 +397,7 @@ DEVICE muxc_dev = {
     &muxc_dib, DEV_DISABLE
     };
 
-/* IO instructions: data cards
+/* I/O instructions: data cards
 
    Implementation note: the operating manual says that "at least 100
    milliseconds of CLC 0s must be programmed" by systems employing the
@@ -486,7 +485,7 @@ switch (inst) {                                         /* case on opcode */
                             fprintf (sim_deb,
                                 ">>MUXl STC: Transmit channel %d parameter %06o stored\n",
                                 ln, muxl_obuf);
-    					}
+                        }
 
                     else {                              /* data */
                         if (mux_xpar[ln] & OTL_TPAR)    /* parity requested? */
@@ -500,7 +499,7 @@ switch (inst) {                                         /* case on opcode */
                             if (DEBUG_PRI (muxu_dev, DEB_CMDS))
                                 fprintf (sim_deb,
                                     ">>MUXl STC: Transmit channel %d data overrun\n", ln);
-    					    }
+                            }
                         else {
                             if (muxu_unit.flags & UNIT_DIAG)        /* loopback? */
                                 mux_ldsc[ln].conn = 1;              /* connect this line */
@@ -509,7 +508,7 @@ switch (inst) {                                         /* case on opcode */
                                 fprintf (sim_deb,
                                     ">>MUXl STC: Transmit channel %d data %06o scheduled\n",
                                     ln, muxl_obuf);
-    					    }
+                            }
                         }
                     }
                 else if (DEBUG_PRI (muxu_dev, DEB_CMDS))    /* line invalid */
@@ -586,12 +585,12 @@ switch (inst) {                                         /* case on opcode */
 return dat;
 }
 
-/* IO instructions: control card
+/* I/O instructions: control card
 
    In diagnostic mode, the control signals C1 and C2 are looped back to status
    signals S1 and S2.  Changing the control signals may cause an interrupt, so a
    test is performed after OTx processing.
- */
+*/
 
 int32 muxcio (int32 inst, int32 IR, int32 dat)
 {
@@ -679,7 +678,7 @@ switch (inst) {                                         /* case on opcode */
 
     default:
         break;
-	}
+    }
 
 if (IR & I_HC) {                                        /* H/C option */
     clrFSR (dev);                                       /* clear flag */
@@ -696,15 +695,15 @@ return dat;
 
 t_stat muxi_svc (UNIT *uptr)
 {
-int32 ln, c, t;
+int32 ln, c;
 t_bool loopback;
 
 loopback = ((muxu_unit.flags & UNIT_DIAG) != 0);        /* diagnostic mode? */
 
 if (!loopback) {                                        /* terminal mode? */
     if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;  /* attached? */
-    t = sim_rtcn_calb (mux_tps, TMR_MUX);               /* calibrate */
-    sim_activate (uptr, t);                             /* continue poll */
+    muxu_unit.wait = sync_poll (SERVICE);               /* synchronize poll */
+    sim_activate (uptr, muxu_unit.wait);                /* continue poll */
     ln = tmxr_poll_conn (&mux_desc);                    /* look for connect */
     if (ln >= 0) {                                      /* got one? */
         if ((muxl_unit[ln].flags & UNIT_MDM) &&         /* modem ctrl? */
@@ -746,7 +745,7 @@ for (ln = 0; ln < MUX_LINES; ln++) {                    /* loop thru lines */
                         }
                     }
                 mux_rbuf[ln] = c;                       /* save char */
-				}
+                }
 
             mux_rchp[ln] = 1;                           /* char pending */
 
@@ -888,7 +887,7 @@ return;
    generated.  Depending on the scan flag, we check either all 16 lines or just
    the current line.  If an interrupt is requested, the channel counter
    indicates the interrupting channel.
- */
+*/
 
 void mux_ctrl_int (void)
 {
@@ -954,7 +953,7 @@ return;
 
 t_stat muxc_reset (DEVICE *dptr)
 {
-int32 i, t;
+int32 i;
 
 if (dptr == &muxc_dev) {                                /* make all consistent */
     hp_enbdis_pair (dptr, &muxl_dev);
@@ -977,8 +976,8 @@ muxc_dib.flg = muxc_dib.fbf = muxc_dib.srq = 1;
 muxc_chan = muxc_scan = 0;                              /* init modem scan */
 if (muxu_unit.flags & UNIT_ATT) {                       /* master att? */
     if (!sim_is_active (&muxu_unit)) {
-        t = sim_rtcn_init (muxu_unit.wait, TMR_MUX);
-        sim_activate (&muxu_unit, t);                   /* activate */
+        muxu_unit.wait = sync_poll (INITIAL);           /* synchronize poll */
+        sim_activate (&muxu_unit, muxu_unit.wait);      /* activate */
         }
     }
 else sim_cancel (&muxu_unit);                           /* else stop */
@@ -993,15 +992,14 @@ return SCPE_OK;
 t_stat mux_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
-int32 t;
 
 if (muxu_unit.flags & UNIT_DIAG)                        /* diag mode? */
     return SCPE_NOFNC;                                  /* command not allowed */
 
 r = tmxr_attach (&mux_desc, uptr, cptr);                /* attach */
 if (r != SCPE_OK) return r;                             /* error */
-t = sim_rtcn_init (muxu_unit.wait, TMR_MUX);
-sim_activate (uptr, t);                                 /* start poll */
+muxu_unit.wait = sync_poll (INITIAL);                   /* synchronize poll */
+sim_activate (uptr, muxu_unit.wait);                    /* start poll */
 return SCPE_OK;
 }
 
@@ -1035,7 +1033,7 @@ return r;
    all of the flags are set when the multiplexer is first attached.  Until then,
    the enable flags default to "not enabled," so we enable them explicitly
    here.)
- */
+*/
 
 t_stat mux_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc)
 {

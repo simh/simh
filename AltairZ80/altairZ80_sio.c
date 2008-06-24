@@ -1,6 +1,6 @@
 /*  altairz80_sio.c: MITS Altair serial I/O card
 
-    Copyright (c) 2002-2007, Peter Schorn
+    Copyright (c) 2002-2008, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -62,34 +62,45 @@
 #include <windows.h>
 #endif
 
-#define UNIT_V_ANSI         (UNIT_V_UF + 0)     /* ANSI mode, strip bit 8 on output             */
-#define UNIT_ANSI           (1 << UNIT_V_ANSI)
-#define UNIT_V_UPPER        (UNIT_V_UF + 1)     /* upper case mode                              */
-#define UNIT_UPPER          (1 << UNIT_V_UPPER)
-#define UNIT_V_BS           (UNIT_V_UF + 2)     /* map delete to backspace                      */
-#define UNIT_BS             (1 << UNIT_V_BS)
+#define UNIT_V_SIO_ANSI     (UNIT_V_UF + 0)     /* ANSI mode, strip bit 8 on output             */
+#define UNIT_SIO_ANSI       (1 << UNIT_V_SIO_ANSI)
+#define UNIT_V_SIO_UPPER    (UNIT_V_UF + 1)     /* upper case mode                              */
+#define UNIT_SIO_UPPER      (1 << UNIT_V_SIO_UPPER)
+#define UNIT_V_SIO_BS       (UNIT_V_UF + 2)     /* map delete to backspace                      */
+#define UNIT_SIO_BS         (1 << UNIT_V_SIO_BS)
 #define UNIT_V_SIO_VERBOSE  (UNIT_V_UF + 3)     /* verbose mode, i.e. show error messages       */
 #define UNIT_SIO_VERBOSE    (1 << UNIT_V_SIO_VERBOSE)
-#define UNIT_V_MAP          (UNIT_V_UF + 4)     /* mapping mode on                              */
-#define UNIT_MAP            (1 << UNIT_V_MAP)
-#define UNIT_V_BELL         (UNIT_V_UF + 5)     /* ^G (bell character) rings bell               */
-#define UNIT_BELL           (1 << UNIT_V_BELL)
+#define UNIT_V_SIO_MAP      (UNIT_V_UF + 4)     /* mapping mode on                              */
+#define UNIT_SIO_MAP        (1 << UNIT_V_SIO_MAP)
+#define UNIT_V_SIO_BELL     (UNIT_V_UF + 5)     /* ^G (bell character) rings bell               */
+#define UNIT_SIO_BELL       (1 << UNIT_V_SIO_BELL)
+#define UNIT_V_SIO_INTERRUPT (UNIT_V_UF + 6)     /* create keyboard interrupts                  */
+#define UNIT_SIO_INTERRUPT  (1 << UNIT_V_SIO_INTERRUPT)
+#define UNIT_V_SIO_SLEEP    (UNIT_V_UF + 7)     /* sleep after keyboard status check            */
+#define UNIT_SIO_SLEEP      (1 << UNIT_V_SIO_SLEEP)
 
 #define UNIT_V_SIMH_VERBOSE (UNIT_V_UF + 0)     /* verbose mode for SIMH pseudo device          */
 #define UNIT_SIMH_VERBOSE   (1 << UNIT_V_SIMH_VERBOSE)
 #define UNIT_V_SIMH_TIMERON (UNIT_V_UF + 1)     /* SIMH pseudo device timer generate interrupts */
-#define UNIT_SIMH_TIMERON   (1 << UNIT_V_SIMH_VERBOSE)
+#define UNIT_SIMH_TIMERON   (1 << UNIT_V_SIMH_TIMERON)
 
 #define TERMINALS           4                   /* lines per mux                                */
 #define SIO_CAN_READ        0x01                /* bit 0 is set iff character available         */
 #define SIO_CAN_WRITE       0x02                /* bit 1 is set iff character can be sent       */
 #define SIO_RESET           0x03                /* Command to reset SIO                         */
+#define VGSIO_CAN_READ      0x02                /* bit 1 is set iff character available         */
+#define VGSIO_CAN_WRITE     0x01                /* bit 0 is set iff character can be sent       */
+#define KBD_HAS_CHAR        0x40                /* bit 6 is set iff character available         */
+#define KBD_HAS_NO_CHAR     0x01                /* bit 0 is set iff no character is available   */
 
 #define BACKSPACE_CHAR      0x08                /* backspace character                          */
 #define DELETE_CHAR         0x7f                /* delete character                             */
 #define CONTROLC_CHAR       0x03                /* control C character                          */
 #define CONTROLG_CHAR       0x07                /* control G char., rings bell when displayed   */
 #define CONTROLZ_CHAR       0x1a                /* control Z character                          */
+
+#define PORT_TABLE_SIZE     256                 /* size of port mapping table                   */
+#define SLEEP_ALLOWED_START_DEFAULT 100         /* default initial value for sleepAllowedCounter*/
 
 static t_stat sio_set_verbose       (UNIT *uptr, int32 value, char *cptr, void *desc);
 static t_stat simh_dev_set_timeron  (UNIT *uptr, int32 value, char *cptr, void *desc);
@@ -99,6 +110,12 @@ static t_stat sio_attach(UNIT *uptr, char *cptr);
 static t_stat sio_detach(UNIT *uptr);
 static t_stat ptr_reset(DEVICE *dptr);
 static t_stat ptp_reset(DEVICE *dptr);
+static t_stat toBool(char tf, int *result);
+static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, void *desc);
+static t_stat sio_dev_set_interrupton(UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, char *cptr, void *desc);
+static t_stat sio_svc(UNIT *uptr);
 static t_stat simh_dev_reset(DEVICE *dptr);
 static t_stat simh_svc(UNIT *uptr);
 int32 nulldev   (const int32 port, const int32 io, const int32 data);
@@ -109,15 +126,23 @@ int32 sio0s     (const int32 port, const int32 io, const int32 data);
 int32 sio1d     (const int32 port, const int32 io, const int32 data);
 int32 sio1s     (const int32 port, const int32 io, const int32 data);
 void printMessage(void);
+void do_SIMH_sleep(void);
+static void pollConnection(void);
+static int32 mapCharacter(int32 ch);
+static void checkSleep(void);
+static void voidSleep(void);
 
 extern int32 getBankSelect(void);
 extern void setBankSelect(const int32 b);
 extern uint32 getCommon(void);
 extern uint8 GetBYTEWrapper(const uint32 Addr);
+extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
+        int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
-extern t_bool rtc_avail;
+extern int32 chiptype;
+extern const t_bool rtc_avail;
 extern FILE *sim_log;
-extern int32 PCX;
+extern uint32 PCX;
 extern int32 sim_switches;
 extern const char *scp_error_messages[];
 extern int32 SR;
@@ -157,10 +182,12 @@ static int32 markTimeSP             = 0;        /* stack pointer for timer stack
 #if defined (_WIN32)
 static uint32 SIMHSleep             = 1000;     /* Sleep uses milliseconds                                      */
 #elif defined (__MWERKS__) && defined (macintosh)
-static uint32 SIMHSleep             = 0;        /* No sleep on Macintosh OS9                                    */
+static uint32 SIMHSleep             = 0;        /* no sleep on Macintosh OS9                                    */
 #else
 static uint32 SIMHSleep             = 100;      /* on other platforms 100 micro seconds is good enough          */
 #endif
+static uint32 sleepAllowedCounter   = 0;        /* only sleep on no character available when == 0               */
+static uint32 sleepAllowedStart     = SLEEP_ALLOWED_START_DEFAULT;  /* default start for above counter          */
 
 /* miscellaneous                                                                                                */
 static int32 versionPos             = 0;        /* determines state for sending device identifier               */
@@ -168,7 +195,7 @@ static int32 lastCPMStatus          = 0;        /* result of last attachCPM comm
 static int32 lastCommand            = 0;        /* most recent command processed on port 0xfeh                  */
 static int32 getCommonPos           = 0;        /* determines state for sending the 'common' register           */
 
-/* Support for wild card expansion                                                                              */
+/* support for wild card expansion                                                                              */
 #if UNIX_PLATFORM
 static glob_t globS;
 static uint32 globPosNameList       = 0;
@@ -194,6 +221,9 @@ static int32 warnPTREOF             = 0;        /* display a warning message if 
 static int32 warnUnassignedPort     = 0;        /* display a warning message if < warnLevel and SIO set to
                                                 VERBOSE and attempt to perform IN or OUT on an unassigned PORT  */
 
+       int32 keyboardInterrupt = FALSE;         /* keyboard interrupt pending                                   */
+       uint32 keyboardInterruptHandler = 0x0038;/* address of keyboard interrupt handler                        */
+
 static TMLN TerminalLines[TERMINALS] = {        /* four terminals   */
     { 0 }
 };
@@ -203,8 +233,8 @@ static TMXR altairTMXR = {                      /* mux descriptor   */
 };
 
 static UNIT sio_unit = {
-    UDATA (NULL, UNIT_ATTABLE + UNIT_MAP, 0),
-    0,      /* wait = 0                                             */
+    UDATA (&sio_svc, UNIT_ATTABLE | UNIT_SIO_MAP | UNIT_SIO_SLEEP, 0),
+    100000, /* wait                                                 */
     FALSE,  /* u3 = FALSE, no character available in buffer         */
     FALSE,  /* u4 = FALSE, terminal input is not attached to a file */
     FALSE,  /* u5 = FALSE, terminal input has not yet reached EOF   */
@@ -221,23 +251,32 @@ static REG sio_reg[] = {
     { HRDATA (FILEEOF,  sio_unit.u5,        8), REG_RO },   /* TRUE iff terminal input file has reached EOF     */
     { HRDATA (TSTATUS,  sio_unit.u3,        8) },           /* TRUE iff a character available in sio_unit.buf   */
     { DRDATA (TBUFFER,  sio_unit.buf,       8) },           /* input buffer for one character                   */
+    { DRDATA (KEYBDI,   keyboardInterrupt,          3), REG_RO  },
+    { HRDATA (KEYBDH,   keyboardInterruptHandler,   16)         },
     { NULL }
 };
 
 static MTAB sio_mod[] = {
-    { UNIT_ANSI,        0,                  "TTY",      "TTY",      NULL }, /* keep bit 8 as is for output              */
-    { UNIT_ANSI,        UNIT_ANSI,          "ANSI",     "ANSI",     NULL }, /* set bit 8 to 0 before output             */
-    { UNIT_UPPER,       0,                  "ALL",      "ALL",      NULL }, /* do not change case of input characters   */
-    { UNIT_UPPER,       UNIT_UPPER,         "UPPER",    "UPPER",    NULL }, /* change input characters to upper case    */
-    { UNIT_BS,          0,                  "BS",       "BS",       NULL }, /* map delete to backspace                  */
-    { UNIT_BS,          UNIT_BS,            "DEL",      "DEL",      NULL }, /* map backspace to delete                  */
-    { UNIT_SIO_VERBOSE, 0,                  "QUIET",    "QUIET",    NULL }, /* quiet, no error messages                 */
-    { UNIT_SIO_VERBOSE, UNIT_SIO_VERBOSE,   "VERBOSE",  "VERBOSE",  &sio_set_verbose },
-                                                                            /* verbose, display warning messages        */
-    { UNIT_MAP,         0,                  "NOMAP",    "NOMAP",    NULL }, /*  disable character mapping               */
-    { UNIT_MAP,         UNIT_MAP,           "MAP",      "MAP",      NULL }, /*  enable all character mapping            */
-    { UNIT_BELL,        0,                  "BELL",     "BELL",     NULL }, /*  enable bell character                   */
-    { UNIT_BELL,        UNIT_BELL,          "NOBELL",   "NOBELL",   NULL }, /*  suppress ringing the bell               */
+    { UNIT_SIO_ANSI,        0,                  "TTY",      "TTY",      NULL }, /* keep bit 8 as is for output              */
+    { UNIT_SIO_ANSI,        UNIT_SIO_ANSI,      "ANSI",     "ANSI",     NULL }, /* set bit 8 to 0 before output             */
+    { UNIT_SIO_UPPER,       0,                  "ALL",      "ALL",      NULL }, /* do not change case of input characters   */
+    { UNIT_SIO_UPPER,       UNIT_SIO_UPPER,     "UPPER",    "UPPER",    NULL }, /* change input characters to upper case    */
+    { UNIT_SIO_BS,          0,                  "BS",       "BS",       NULL }, /* map delete to backspace                  */
+    { UNIT_SIO_BS,          UNIT_SIO_BS,        "DEL",      "DEL",      NULL }, /* map backspace to delete                  */
+    { UNIT_SIO_VERBOSE,     0,                  "QUIET",    "QUIET",    NULL }, /* quiet, no error messages                 */
+    { UNIT_SIO_VERBOSE,     UNIT_SIO_VERBOSE,   "VERBOSE",  "VERBOSE",  &sio_set_verbose },
+                                                                                /* verbose, display warning messages        */
+    { UNIT_SIO_MAP,         0,                  "NOMAP",    "NOMAP",    NULL }, /*  disable character mapping               */
+    { UNIT_SIO_MAP,         UNIT_SIO_MAP,       "MAP",      "MAP",      NULL }, /*  enable all character mapping            */
+    { UNIT_SIO_BELL,        0,                  "BELL",     "BELL",     NULL }, /*  enable bell character                   */
+    { UNIT_SIO_BELL,        UNIT_SIO_BELL,      "NOBELL",   "NOBELL",   NULL }, /*  suppress ringing the bell               */
+    { UNIT_SIO_SLEEP,       0,                  "NOSLEEP",  "NOSLEEP",  NULL }, /*  no sleep after keyboard status check    */
+    { UNIT_SIO_SLEEP,       UNIT_SIO_SLEEP,     "SLEEP",    "SLEEP",    NULL }, /*  sleep after keyboard status check       */
+                                                                                /*  no keyboard interrupts                  */
+    { UNIT_SIO_INTERRUPT,   0,                  "NOINTERRUPT","NOINTERRUPT",&sio_dev_set_interruptoff },
+                                                                                /*  create keyboard interrupts              */
+    { UNIT_SIO_INTERRUPT,   UNIT_SIO_INTERRUPT, "INTERRUPT","INTERRUPT",&sio_dev_set_interrupton },
+    { MTAB_XTD|MTAB_VDV|MTAB_VAL,   0,          "PORT",     "PORT",     &sio_dev_set_port, &sio_dev_show_port },
     { 0 }
 };
 
@@ -250,7 +289,7 @@ DEVICE sio_dev = {
     NULL, NULL, NULL };
 
 static UNIT ptr_unit = {
-    UDATA (NULL, UNIT_SEQ + UNIT_ATTABLE + UNIT_ROABLE, 0)
+    UDATA (NULL, UNIT_SEQ | UNIT_ATTABLE | UNIT_ROABLE, 0)
 };
 
 static REG ptr_reg[] = {
@@ -305,6 +344,7 @@ static REG simh_reg[] = {
     { DRDATA (TIMD,     timerDelta,             32)             },
     { DRDATA (STDP,     setTimerDeltaPos,       8),     REG_RO  },
     { DRDATA (SLEEP,    SIMHSleep,              32)             },
+    { DRDATA (VOSLP,    sleepAllowedStart,      32)             },
 
     { DRDATA (STPDT,    stopWatchDelta,         32),    REG_RO  },
     { DRDATA (STPOS,    getStopWatchDeltaPos,   8),     REG_RO  },
@@ -343,13 +383,7 @@ char messageBuffer[256] = { 0 };
 
 void printMessage(void) {
     printf(messageBuffer);
-#if UNIX_PLATFORM
-/* need to make sure that carriage return is executed - ttrunstate() of scp_tty.c
-    has disabled \n translation */
-    printf("\r\n");
-#else
-    printf("\n");
-#endif
+    printf(NLP);
     if (sim_log) {
         fprintf(sim_log, messageBuffer);
         fprintf(sim_log,"\n");
@@ -426,6 +460,20 @@ static t_stat ptp_reset(DEVICE *dptr) {
     return SCPE_OK;
 }
 
+static int32 mapCharacter(int32 ch) {
+    ch &= 0xff;
+    if (sio_unit.flags & UNIT_SIO_MAP) {
+        if (sio_unit.flags & UNIT_SIO_BS) {
+            if (ch == BACKSPACE_CHAR)
+                return DELETE_CHAR;
+        }
+        else if (ch == DELETE_CHAR)
+            return BACKSPACE_CHAR;
+        if (sio_unit.flags & UNIT_SIO_UPPER)
+            return toupper(ch);
+    }
+    return ch;
+}
 
 /*  I/O instruction handlers, called from the CPU module when an
     IN or OUT instruction is issued.
@@ -441,72 +489,105 @@ static t_stat ptp_reset(DEVICE *dptr) {
     3) SIO not attached to a port   (i.e. "regular" console I/O     )
 */
 
-int32 sio0s(const int32 port, const int32 io, const int32 data) {
-    int32 ti = 0, ch;
-    pollConnection();
-    if  (port != 0x10) {                                    /* 0x10 is default port with ti == 0        */
-        if      (port == 0x14)  ti = 1;
-        else if (port == 0x16)  ti = 2;
-        else if (port == 0x18)  ti = 3;
-        else assert(FALSE);
+typedef struct {
+    int32 port;             /* this information belongs to port number 'port'           */
+    int32 terminalLine;     /* map to this 'terminalLine'                               */
+    int32 sio_can_read;     /* bit mask to indicate that one can read from this port    */
+    int32 sio_cannot_read;  /* bit mask to indicate that one cannot read from this port */
+    int32 sio_can_write;    /* bit mask to indicate that one can write to this port     */
+    int32 hasReset;         /* TRUE iff SIO has reset command                           */
+    int32 sio_reset;        /* reset command                                            */
+    int32 hasOUT;           /* TRUE iff port supports OUT command                       */
+    int32 isBuiltin;        /* TRUE iff mapping is built in                             */
+} SIO_PORT_INFO;
+
+static SIO_PORT_INFO port_table[PORT_TABLE_SIZE] = {
+    {0x00, 0, KBD_HAS_CHAR,     KBD_HAS_NO_CHAR, SIO_CAN_WRITE, FALSE, 0, FALSE, TRUE   },
+    {0x01, 0, 0,                0,      0, FALSE, 0, FALSE, TRUE                        },
+    {0x02, 0, VGSIO_CAN_READ,   0,      VGSIO_CAN_WRITE, FALSE, 0, TRUE, TRUE           },
+    {0x03, 0, VGSIO_CAN_READ,   0,      VGSIO_CAN_WRITE, FALSE, 0, FALSE, TRUE          },
+    {0x10, 0, SIO_CAN_READ,     0,      SIO_CAN_WRITE, TRUE, SIO_RESET, FALSE, TRUE     },
+    {0x14, 1, SIO_CAN_READ,     0,      SIO_CAN_WRITE, TRUE, SIO_RESET, FALSE, TRUE     },
+    {0x16, 2, SIO_CAN_READ,     0,      SIO_CAN_WRITE, TRUE, SIO_RESET, FALSE, TRUE     },
+    {0x18, 3, SIO_CAN_READ,     0,      SIO_CAN_WRITE, TRUE, SIO_RESET, FALSE, TRUE     },
+    {0x11, 0, SIO_CAN_READ,     0,      SIO_CAN_WRITE, TRUE, SIO_RESET, TRUE, TRUE      },
+    {0x15, 1, SIO_CAN_READ,     0,      SIO_CAN_WRITE, TRUE, SIO_RESET, TRUE, TRUE      },
+    {0x17, 2, SIO_CAN_READ,     0,      SIO_CAN_WRITE, TRUE, SIO_RESET, TRUE, TRUE      },
+    {0x19, 3, SIO_CAN_READ,     0,      SIO_CAN_WRITE, TRUE, SIO_RESET, TRUE, TRUE      },
+    {-1, 0, 0, 0, 0, 0, 0, 0, 0}   /* must be last */
+};
+
+static SIO_PORT_INFO lookupPortInfo(const int32 port, int32 *position) {
+    int32 i = 0;
+    while ((port_table[i].port != -1) && (port_table[i].port != port)) i++;
+    *position = i;
+    return port_table[i];
+}
+
+/* keyboard idle detection: sleep when feature enabled, no character available
+    (duty of caller) and operation not voided (e.g. when output is available) */
+static void checkSleep(void) {
+    if (sio_unit.flags & UNIT_SIO_SLEEP) {
+        if (sleepAllowedCounter) sleepAllowedCounter--;
+        else do_SIMH_sleep();
     }
+}
+
+/* void sleep for next 'sleepAllowedStart' tests */
+static void voidSleep(void) {
+    sleepAllowedCounter = sleepAllowedStart;
+}
+
+/* generic status port for keyboard input / terminal output */
+int32 sio0s(const int32 port, const int32 io, const int32 data) {
+    int32 ch, result;
+    SIO_PORT_INFO spi = lookupPortInfo(port, &ch);
+    assert(spi.port == port);
+    pollConnection();
     if (io == 0) { /* IN */
-        if (sio_unit.u4) {                                  /* attached to a file?                      */
+        if (sio_unit.u4)                                    /* attached to a file?                      */
             if (sio_unit.u5)                                /* EOF reached?                             */
                 sio_detach(&sio_unit);                      /* detach file and switch to keyboard input */
-            else return SIO_CAN_READ | SIO_CAN_WRITE;
-        }
+            else return spi.sio_can_read | spi.sio_can_write;
         if (sio_unit.flags & UNIT_ATT) {                    /* attached to a port?                      */
-            return (tmxr_rqln(&TerminalLines[ti]) ? SIO_CAN_READ : 0x00) |
-                                                            /* read possible if character available     */
-                (TerminalLines[ti].conn && TerminalLines[ti].xmte ? SIO_CAN_WRITE : 0x00);
+            if (tmxr_rqln(&TerminalLines[spi.terminalLine]))
+                result = spi.sio_can_read;
+            else {
+                result = spi.sio_cannot_read;
+                checkSleep();
+            }
+            return result |                                 /* read possible if character available     */
+                (TerminalLines[spi.terminalLine].conn && TerminalLines[spi.terminalLine].xmte ? spi.sio_can_write : 0x00);
                                                             /* write possible if connected and transmit
                                                                 enabled                                 */
         }
         if (sio_unit.u3)                                    /* character available?                     */
-            return SIO_CAN_READ | SIO_CAN_WRITE;
+            return spi.sio_can_read | spi.sio_can_write;
         ch = sim_poll_kbd();                                /* no, try to get a character               */
         if (ch) {                                           /* character available?                     */
             if (ch == SCPE_STOP) {                          /* stop CPU in case ^E (default) was typed  */
                 stop_cpu = TRUE;
                 sim_interval = 0;                           /* detect stop condition as soon as possible*/
-                return SIO_CAN_WRITE;                       /* do not consume stop character            */
+                return spi.sio_can_write | spi.sio_cannot_read; /* do not consume stop character        */
             }
             sio_unit.u3 = TRUE;                             /* indicate character available             */
             sio_unit.buf = ch;                              /* store character in buffer                */
-            return SIO_CAN_READ | SIO_CAN_WRITE;
+            return spi.sio_can_read | spi.sio_can_write;
         }
-        return SIO_CAN_WRITE;
-    }                                                       /* OUT follows                              */
-    if (data == SIO_RESET)                                  /* reset command                            */
+        checkSleep();
+        return spi.sio_can_write | spi.sio_cannot_read;
+    }                                                       /* OUT follows, no fall-through from IN     */
+    if (spi.hasReset && (data == spi.sio_reset))            /* reset command                            */
         sio_unit.u3 = FALSE;                                /* indicate that no character is available  */
     return 0x00;                                            /* ignored since OUT                        */
 }
 
-static int32 mapCharacter(int32 ch) {
-    ch &= 0xff;
-    if (sio_unit.flags & UNIT_MAP) {
-        if (sio_unit.flags & UNIT_BS) {
-            if (ch == BACKSPACE_CHAR)
-                return DELETE_CHAR;
-        }
-        else if (ch == DELETE_CHAR)
-            return BACKSPACE_CHAR;
-        if (sio_unit.flags & UNIT_UPPER)
-            return toupper(ch);
-    }
-    return ch;
-}
-
+/* generic data port for keyboard input / terminal output */
 int32 sio0d(const int32 port, const int32 io, const int32 data) {
-    int32 ti = 0, ch;
+    int32 ch;
+    SIO_PORT_INFO spi = lookupPortInfo(port, &ch);
+    assert(spi.port == port);
     pollConnection();
-    if  (port != 0x11) {                                    /* 0x11 is default port with ti == 0        */
-        if      (port == 0x15)  ti = 1;
-        else if (port == 0x17)  ti = 2;
-        else if (port == 0x19)  ti = 3;
-        else assert(FALSE);
-    }
     if (io == 0) { /* IN */
         if (sio_unit.u4) {                                  /* attached to a file?                      */
             if (sio_unit.u5) {                              /* EOF reached?                             */
@@ -520,16 +601,19 @@ int32 sio0d(const int32 port, const int32 io, const int32 data) {
             return mapCharacter(ch);                        /* return mapped character                  */
         }
         if (sio_unit.flags & UNIT_ATT)
-            return mapCharacter(tmxr_getc_ln(&TerminalLines[ti]));
+            return mapCharacter(tmxr_getc_ln(&TerminalLines[spi.terminalLine]));
         sio_unit.u3 = FALSE;                                /* no character is available any more       */
         return mapCharacter(sio_unit.buf);                  /* return previous character                */
-    }                                                       /* OUT follows                              */
-    ch = sio_unit.flags & UNIT_ANSI ? data & 0x7f : data;   /* clear highest bit in ANSI mode           */
-    if ((ch != CONTROLG_CHAR) || !(sio_unit.flags & UNIT_BELL)) {
-        if ((sio_unit.flags & UNIT_ATT) && (!sio_unit.u4))  /* attached to a port and not to a file     */
-            tmxr_putc_ln(&TerminalLines[ti], ch);           /* status ignored                           */
-        else
-            sim_putchar(ch);
+    }                                                       /* OUT follows, no fall-through from IN     */
+    if (spi.hasOUT) {
+        ch = sio_unit.flags & UNIT_SIO_ANSI ? data & 0x7f : data;   /* clear highest bit in ANSI mode   */
+        if ((ch != CONTROLG_CHAR) || !(sio_unit.flags & UNIT_SIO_BELL)) {
+            voidSleep();
+            if ((sio_unit.flags & UNIT_ATT) && (!sio_unit.u4))  /* attached to a port and not to a file */
+                tmxr_putc_ln(&TerminalLines[spi.terminalLine], ch); /* status ignored                   */
+            else
+                sim_putchar(ch);
+        }
     }
     return 0x00;                                            /* ignored since OUT                        */
 }
@@ -543,7 +627,7 @@ int32 sio1s(const int32 port, const int32 io, const int32 data) {
         if ((ptr_unit.flags & UNIT_ATT) == 0) {             /* PTR is not attached                      */
             if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnattachedPTR < warnLevelSIO)) {
                 warnUnattachedPTR++;
-/*06*/          MESSAGE_1("Attempt to test status of unattached PTR. 0x02 returned.");
+/*06*/          MESSAGE_2("Attempt to test status of unattached PTR[0x%02x]. 0x02 returned.", port);
             }
             return SIO_CAN_WRITE;
         }
@@ -563,14 +647,14 @@ int32 sio1d(const int32 port, const int32 io, const int32 data) {
         if (ptr_unit.u3) {                                  /* EOF reached, no more data available      */
             if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnPTREOF < warnLevelSIO)) {
                 warnPTREOF++;
-/*07*/          MESSAGE_1("PTR attempted to read past EOF. 0x00 returned.");
+/*07*/          MESSAGE_2("PTR[0x%02x] attempted to read past EOF. 0x00 returned.", port);
             }
             return 0x00;
         }
         if ((ptr_unit.flags & UNIT_ATT) == 0) {             /* not attached                             */
             if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnattachedPTR < warnLevelSIO)) {
                 warnUnattachedPTR++;
-/*08*/          MESSAGE_1("Attempt to read from unattached PTR. 0x00 returned.");
+/*08*/          MESSAGE_2("Attempt to read from unattached PTR[0x%02x]. 0x00 returned.", port);
             }
             return 0x00;
         }
@@ -585,19 +669,146 @@ int32 sio1d(const int32 port, const int32 io, const int32 data) {
                                                             /* else ignore data                         */
     else if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnattachedPTP < warnLevelSIO)) {
         warnUnattachedPTP++;
-/*09*/  MESSAGE_2("Attempt to output '0x%02x' to unattached PTP - ignored.", data);
+/*09*/  MESSAGE_3("Attempt to output '0x%02x' to unattached PTP[0x%02x] - ignored.", data, port);
     }
     return 0x00;                                            /* ignored since OUT                        */
+}
+
+static t_stat toBool(char tf, int *result) {
+    if (tf == 'T') {
+        *result = TRUE;
+        return SCPE_OK;
+    }
+    if (tf == 'F') {
+        *result = FALSE;
+        return SCPE_OK;
+    }
+    return SCPE_ARG;
+}
+
+static void show_sio_port_info(FILE *st, SIO_PORT_INFO sip) {
+    if (sio_unit.flags & UNIT_SIO_VERBOSE)
+        fprintf(st, "(Port=%02x/Terminal=%1i/Read=0x%02x/NotRead=0x%02x/"
+            "Write=0x%02x/Reset?=%s/Reset=0x%02x/Data?=%s)",
+            sip.port, sip.terminalLine, sip.sio_can_read, sip.sio_cannot_read,
+            sip.sio_can_write, sip.hasReset ? "True" : "False", sip.sio_reset,
+            sip.hasOUT ? "True" : "False");
+    else
+        fprintf(st, "(%02x/%1i/%02x/%02x/%02x/%s/%02x/%s)",
+            sip.port, sip.terminalLine, sip.sio_can_read, sip.sio_cannot_read,
+            sip.sio_can_write, sip.hasReset ? "T" : "F", sip.sio_reset,
+            sip.hasOUT ? "T" : "F");
+}
+
+static uint32 equalSIP(SIO_PORT_INFO x, SIO_PORT_INFO y) {
+    /* isBuiltin is not relevant for equality, only for display */
+    return (x.port == y.port) && (x.terminalLine == y.terminalLine) &&
+    (x.sio_can_read == y.sio_can_read) && (x.sio_cannot_read == y.sio_cannot_read) &&
+    (x.sio_can_write == y.sio_can_write) && (x.hasReset == y.hasReset) &&
+    (x.sio_reset == y.sio_reset) && (x.hasOUT == y.hasOUT);
+}
+
+static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) {
+    int32 result, n, position;
+    SIO_PORT_INFO sip = { 0 }, old;
+    char hasReset, hasOUT;
+    if (cptr == NULL) return SCPE_ARG;
+    result = sscanf(cptr, "%x%n", &sip.port, &n);
+    if ((result == 1) && (cptr[n] == 0)) {
+        old = lookupPortInfo(sip.port, &position);
+        if (old.port == -1) {
+            printf("No mapping for port 0x%02x exists - cannot remove.\n", sip.port);
+            return SCPE_ARG;
+        }
+        do {
+            port_table[position] = port_table[position + 1];
+            position++;
+        }
+        while (port_table[position].port != -1);
+        sim_map_resource(sip.port, 1, RESOURCE_TYPE_IO, &nulldev, FALSE);
+        if (sio_unit.flags & UNIT_SIO_VERBOSE) {
+            printf("Removing mapping for port 0x%02x.\n\t", sip.port);
+            show_sio_port_info(stdout, old);
+        }
+        return SCPE_OK;
+    }
+    result = sscanf(cptr, "%x/%d/%x/%x/%x/%1c/%x/%1c%n", &sip.port,
+        &sip.terminalLine, &sip.sio_can_read, &sip.sio_cannot_read,
+        &sip.sio_can_write, &hasReset, &sip.sio_reset, &hasOUT, &n);
+    if ((result != 8) || (result == EOF) || (cptr[n] != 0)) return SCPE_ARG;
+    result = toBool(hasReset, &sip.hasReset);
+    if (result != SCPE_OK) return result;
+    result = toBool(hasOUT, &sip.hasOUT);
+    if (result != SCPE_OK) return result;
+    if (sip.port != (sip.port & 0xff)) {
+        printf("Truncating port 0x%x to 0x%02x.\n", sip.port, sip.port & 0xff);
+        sip.port &= 0xff;
+    }
+    old = lookupPortInfo(sip.port, &position);
+    if (old.port == sip.port) {
+        if (sio_unit.flags & UNIT_SIO_VERBOSE) {
+            printf("Replacing mapping for port 0x%02x.\n\t", sip.port);
+            show_sio_port_info(stdout, old);
+            printf("-> ");
+            show_sio_port_info(stdout, sip);
+            if (equalSIP(sip, old)) printf("[identical]");
+        }
+    }
+    else {
+        port_table[position + 1] = old;
+        if (sio_unit.flags & UNIT_SIO_VERBOSE) {
+            printf("Adding mapping for port 0x%02x.\n\t", sip.port);
+            show_sio_port_info(stdout, sip);
+        }
+    }
+    if (sio_unit.flags & UNIT_SIO_VERBOSE) printf("\n");
+    port_table[position] = sip;
+    sim_map_resource(sip.port, 1, RESOURCE_TYPE_IO, (sip.hasOUT ||
+        (sip.sio_can_read == 0) && (sip.sio_cannot_read == 0) &&
+        (sip.sio_can_write == 0)) ? &sio0d : &sio0s, FALSE);
+    return SCPE_OK;
+}
+
+static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, void *desc) {
+    int32 i, first = TRUE;
+    for (i = 0; port_table[i].port != -1; i++)
+        if (!port_table[i].isBuiltin) {
+            if (first) first = FALSE;
+            else fprintf(st, " ");
+            show_sio_port_info(st, port_table[i]);
+        }
+    if (first) fprintf(st, "no extra port");
+    return SCPE_OK;
+}
+
+static t_stat sio_dev_set_interrupton(UNIT *uptr, int32 value, char *cptr, void *desc) {
+    keyboardInterrupt = FALSE;
+    return sim_activate(&sio_unit, sio_unit.wait);          /* activate unit */
+}
+
+static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, char *cptr, void *desc) {
+    keyboardInterrupt = FALSE;
+    sim_cancel(&sio_unit);
+    return SCPE_OK;
+}
+
+static t_stat sio_svc(UNIT *uptr) {
+    if (sio0s(0, 0, 0) & KBD_HAS_CHAR) {
+        keyboardInterrupt = TRUE;
+    }
+    if (sio_unit.flags & UNIT_SIO_INTERRUPT)
+        sim_activate(&sio_unit, sio_unit.wait);             /* activate unit    */
+    return SCPE_OK;
 }
 
 int32 nulldev(const int32 port, const int32 io, const int32 data) {
     if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnassignedPort < warnLevelSIO)) {
         warnUnassignedPort++;
         if (io == 0) {
-            MESSAGE_2("Unassigned IN(%2xh) - ignored.", port);
+            MESSAGE_2("Attempt to input from unassigned port 0x%04x - ignored.", port);
         }
         else {
-            MESSAGE_3("Unassigned OUT(%2xh) -> %2xh - ignored.", port, data);
+            MESSAGE_3("Attempt to output 0x%02x to unassigned port 0x%04x - ignored.", data, port);
         }
     }
     return io == 0 ? 0xff : 0;
@@ -711,8 +922,9 @@ static t_stat simh_dev_reset(DEVICE *dptr) {
 }
 
 static void warnNoRealTimeClock(void) {
-    if (simh_unit.flags & UNIT_SIMH_VERBOSE)
-        printf("Sorry - no real time clock available.\n");
+    if (simh_unit.flags & UNIT_SIMH_VERBOSE) {
+        MESSAGE_1("Sorry - no real time clock available.");
+    }
 }
 
 static t_stat simh_dev_set_timeron(UNIT *uptr, int32 value, char *cptr, void *desc) {
@@ -762,7 +974,7 @@ static void attachCPM(UNIT *uptr) {
     lastCPMStatus = attach_unit(uptr, cpmCommandLine);
     if ((lastCPMStatus != SCPE_OK) && (simh_unit.flags & UNIT_SIMH_VERBOSE)) {
         MESSAGE_3("Cannot open '%s' (%s).", cpmCommandLine, scp_error_messages[lastCPMStatus - SCPE_BASE]);
-        /* must keep curly braces as messageX is a macro with two statements */
+        /* must keep curly braces as MESSAGE_N is a macro with two statements */
     }
 }
 
@@ -812,7 +1024,7 @@ static int32 simh_in(const int32 port) {
 
         case getHostFilenames:
 #if UNIX_PLATFORM
-            if (globValid) {
+            if (globValid)
                 if (globPosNameList < globS.gl_pathc) {
                     if (!(result = globS.gl_pathv[globPosNameList][globPosName++])) {
                         globPosNameList++;
@@ -824,12 +1036,10 @@ static int32 simh_in(const int32 port) {
                     lastCommand = 0;
                     globfree(&globS);
                 }
-            }
 #elif defined (_WIN32)
-            if (globValid) {
-                if (globFinished) {
+            if (globValid)
+                if (globFinished)
                     globValid = FALSE;
-                }
                 else if (!(result = FindFileData.cFileName[globPosName++])) {
                     globPosName = 0;
                     if (!FindNextFile(hFind, &FindFileData)) {
@@ -838,7 +1048,6 @@ static int32 simh_in(const int32 port) {
                         hFind = INVALID_HANDLE_VALUE;
                     }
                 }
-            }
 #else
             lastCommand = 0;
 #endif
@@ -852,7 +1061,7 @@ static int32 simh_in(const int32 port) {
             break;
 
         case getClockZSDOSCmd:
-            if (currentTimeValid) {
+            if (currentTimeValid)
                 switch(getClockZSDOSPos) {
 
                     case 0:
@@ -886,14 +1095,12 @@ static int32 simh_in(const int32 port) {
                         getClockZSDOSPos = lastCommand = 0;
                         break;
                 }
-            }
-            else {
+            else
                 result = getClockZSDOSPos = lastCommand = 0;
-            }
             break;
 
         case getClockCPM3Cmd:
-            if (currentTimeValid) {
+            if (currentTimeValid)
                 switch(getClockCPM3Pos) {
                     case 0:
                         result = daysCPM3SinceOrg & 0xff;
@@ -920,23 +1127,19 @@ static int32 simh_in(const int32 port) {
                         getClockCPM3Pos = lastCommand = 0;
                         break;
                 }
-            }
-            else {
+            else
                 result = getClockCPM3Pos = lastCommand = 0;
-            }
             break;
 
         case getSIMHVersionCmd:
             result = version[versionPos++];
-            if (result == 0) {
+            if (result == 0)
                 versionPos = lastCommand = 0;
-            }
             break;
 
         case getBankSelectCmd:
-            if (cpu_unit.flags & UNIT_BANKED) {
+            if (cpu_unit.flags & UNIT_CPU_BANKED)
                 result = getBankSelect();
-            }
             else {
                 result = 0;
                 if (simh_unit.flags & UNIT_SIMH_VERBOSE) {
@@ -958,7 +1161,7 @@ static int32 simh_in(const int32 port) {
             break;
 
         case hasBankedMemoryCmd:
-            result = cpu_unit.flags & UNIT_BANKED ? MAXBANKS : 0;
+            result = cpu_unit.flags & UNIT_CPU_BANKED ? MAXBANKS : 0;
             lastCommand = 0;
             break;
 
@@ -993,6 +1196,16 @@ static int32 simh_in(const int32 port) {
     return result;
 }
 
+void do_SIMH_sleep(void) {
+#if defined (_WIN32)
+    if ((SIMHSleep / 1000) && !sio_unit.u4) /* time to sleep and SIO not attached to a file */
+        Sleep(SIMHSleep / 1000);
+#else
+    if (SIMHSleep && !sio_unit.u4)          /* time to sleep and SIO not attached to a file */
+        usleep(SIMHSleep);
+#endif
+}
+
 static int32 simh_out(const int32 port, const int32 data) {
     time_t now;
     switch(lastCommand) {
@@ -1022,9 +1235,8 @@ static int32 simh_out(const int32 port, const int32 data) {
             break;
 
         case setBankSelectCmd:
-            if (cpu_unit.flags & UNIT_BANKED) {
+            if (cpu_unit.flags & UNIT_CPU_BANKED)
                 setBankSelect(data & BANKMASK);
-            }
             else if (simh_unit.flags & UNIT_SIMH_VERBOSE) {
                 MESSAGE_2("Set selected bank to %i ignored for non-banked memory.", data & 3);
             }
@@ -1090,13 +1302,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                     break;
 
                 case SIMHSleepCmd:
-#if defined (_WIN32)
-                    if ((SIMHSleep / 1000) && !sio_unit.u4) /* time to sleep and SIO not attached to a file */
-                        Sleep(SIMHSleep / 1000);
-#else
-                    if (SIMHSleep && !sio_unit.u4)          /* time to sleep and SIO not attached to a file */
-                        usleep(SIMHSleep);
-#endif
+                    do_SIMH_sleep();
                     break;
 
                 case printTimeCmd:  /* print time */
@@ -1109,21 +1315,17 @@ static int32 simh_out(const int32 port, const int32 data) {
                     break;
 
                 case startTimerCmd: /* create a new timer on top of stack */
-                    if (rtc_avail) {
-                        if (markTimeSP < TIMER_STACK_LIMIT) {
+                    if (rtc_avail)
+                        if (markTimeSP < TIMER_STACK_LIMIT)
                             markTime[markTimeSP++] = sim_os_msec();
-                        }
                         else {
                             MESSAGE_1("Timer stack overflow.");
                         }
-                    }
-                    else {
-                        warnNoRealTimeClock();
-                    }
+                    else warnNoRealTimeClock();
                     break;
 
                 case stopTimerCmd:  /* stop timer on top of stack and show time difference */
-                    if (rtc_avail) {
+                    if (rtc_avail)
                         if (markTimeSP > 0) {
                             uint32 delta = sim_os_msec() - markTime[--markTimeSP];
                             MESSAGE_2("Timer stopped. Elapsed time in milliseconds = %d.", delta);
@@ -1131,10 +1333,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                         else {
                             MESSAGE_1("No timer active.");
                         }
-                    }
-                    else {
-                        warnNoRealTimeClock();
-                    }
+                    else warnNoRealTimeClock();
                     break;
 
                 case resetPTRCmd:   /* reset ptr device */
@@ -1204,7 +1403,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                     break;
 
                 case showTimerCmd:  /* show time difference to timer on top of stack */
-                    if (rtc_avail) {
+                    if (rtc_avail)
                         if (markTimeSP > 0) {
                             uint32 delta = sim_os_msec() - markTime[markTimeSP - 1];
                             MESSAGE_2("Timer running. Elapsed in milliseconds = %d.", delta);
@@ -1212,10 +1411,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                         else {
                             MESSAGE_1("No timer active.");
                         }
-                    }
-                    else {
-                        warnNoRealTimeClock();
-                    }
+                    else warnNoRealTimeClock();
                     break;
 
                 case attachPTPCmd:  /* attach ptp to the file with name at beginning of CP/M command line */
@@ -1227,11 +1423,11 @@ static int32 simh_out(const int32 port, const int32 data) {
                     break;
 
                 case setZ80CPUCmd:
-                    cpu_unit.flags |= UNIT_CHIP;
+                    chiptype = CHIP_TYPE_Z80;
                     break;
 
                 case set8080CPUCmd:
-                    cpu_unit.flags &= ~UNIT_CHIP;
+                    chiptype = CHIP_TYPE_8080;
                     break;
 
                 case startTimerInterruptsCmd:

@@ -23,9 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ttix,ttox    DL11 terminal input/output
-*/
+   dli,dlo      DL11 terminal input/output
 
+   20-May-2008  RMS     Added modem control support
+*/
 
 #if defined (VM_PDP10)                                  /* PDP10 version */
 #error "DL11 is not supported on the PDP-10!"
@@ -39,198 +40,258 @@
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 
-#define TTX_MASK        (TTX_LINES - 1)
+#define DLX_MASK        (DLX_LINES - 1)
+#define DLI_RCI         0                               /* rcv ints */
+#define DLI_DSI         1                               /* dset ints */
 
-#define TTIXCSR_IMP     (CSR_DONE + CSR_IE)             /* terminal input */
-#define TTIXCSR_RW      (CSR_IE)
-#define TTIXBUF_ERR     0100000
-#define TTIXBUF_OVR     0040000
-#define TTIXBUF_RBRK    0020000
-#define TTOXCSR_IMP     (CSR_DONE + CSR_IE)             /* terminal output */
-#define TTOXCSR_RW      (CSR_IE)
+/* Modem control */
+
+#define DLX_V_MDM       (TTUF_V_UF + 0)
+#define DLX_MDM         (1u << DLX_V_MDM)
+
+/* registers */
+
+#define DLICSR_DSI      0100000                         /* dataset int, RO */
+#define DLICSR_RNG      0040000                         /* ring, RO */
+#define DLICSR_CTS      0020000                         /* CTS, RO */
+#define DLICSR_CDT      0010000                         /* CDT, RO */
+#define DLICSR_SEC      0002000                         /* sec rcv, RONI */
+#define DLICSR_DSIE     0000040                         /* DSI ie, RW */
+#define DLICSR_SECX     0000010                         /* sec xmt, RWNI */
+#define DLICSR_RTS      0000004                         /* RTS, RW */
+#define DLICSR_DTR      0000002                         /* DTR, RW */
+#define DLICSR_RD       (CSR_DONE|CSR_IE)               /* DL11C */
+#define DLICSR_WR       (CSR_IE)
+#define DLICSR_RD_M     (DLICSR_DSI|DLICSR_RNG|DLICSR_CTS|DLICSR_CDT|DLICSR_SEC| \
+                         CSR_DONE|CSR_IE|DLICSR_DSIE|DLICSR_SECX|DLICSR_RTS|DLICSR_DTR)
+#define DLICSR_WR_M     (CSR_IE|DLICSR_DSIE|DLICSR_SECX|DLICSR_RTS|DLICSR_DTR)
+#define DLIBUF_ERR      0100000
+#define DLIBUF_OVR      0040000
+#define DLIBUF_RBRK     0020000
+#define DLIBUF_RD       (DLIBUF_ERR|DLIBUF_OVR|DLIBUF_RBRK|0377)
+#define DLOCSR_MNT      0000004                         /* maint, RWNI */
+#define DLOCSR_XBR      0000001                         /* xmit brk, RWNI */
+#define DLOCSR_RD       (CSR_DONE|CSR_IE|DLOCSR_MNT|DLOCSR_XBR)
+#define DLOCSR_WR       (CSR_IE|DLOCSR_MNT|DLOCSR_XBR)
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmxr_poll;
 
-uint16 ttix_csr[TTX_LINES] = { 0 };                     /* control/status */
-uint16 ttix_buf[TTX_LINES] = { 0 };
-uint32 ttix_ireq = 0;
-uint16 ttox_csr[TTX_LINES] = { 0 };                     /* control/status */
-uint8 ttox_buf[TTX_LINES] = { 0 };
-uint32 ttox_ireq = 0;
-TMLN ttx_ldsc[TTX_LINES] = { 0 };                       /* line descriptors */
-TMXR ttx_desc = { TTX_LINES, 0, 0, ttx_ldsc };          /* mux descriptor */
+uint16 dli_csr[DLX_LINES] = { 0 };                      /* control/status */
+uint16 dli_buf[DLX_LINES] = { 0 };
+uint32 dli_ireq[2] = { 0, 0};
+uint16 dlo_csr[DLX_LINES] = { 0 };                      /* control/status */
+uint8 dlo_buf[DLX_LINES] = { 0 };
+uint32 dlo_ireq = 0;
+TMLN dlx_ldsc[DLX_LINES] = { 0 };                       /* line descriptors */
+TMXR dlx_desc = { DLX_LINES, 0, 0, dlx_ldsc };          /* mux descriptor */
 
-t_stat ttx_rd (int32 *data, int32 PA, int32 access);
-t_stat ttx_wr (int32 data, int32 PA, int32 access);
-t_stat ttx_reset (DEVICE *dptr);
-t_stat ttix_svc (UNIT *uptr);
-t_stat ttox_svc (UNIT *uptr);
-t_stat ttx_attach (UNIT *uptr, char *cptr);
-t_stat ttx_detach (UNIT *uptr);
-t_stat ttx_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat ttx_show (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat ttx_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat ttx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ttx_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
-void ttx_enbdis (int32 dis);
-void ttix_clr_int (uint32 ln);
-void ttix_set_int (int32 ln);
-int32 ttix_iack (void);
-void ttox_clr_int (int32 ln);
-void ttox_set_int (int32 ln);
-int32 ttox_iack (void);
-void ttx_reset_ln (uint32 ln);
+t_stat dlx_rd (int32 *data, int32 PA, int32 access);
+t_stat dlx_wr (int32 data, int32 PA, int32 access);
+t_stat dlx_reset (DEVICE *dptr);
+t_stat dli_svc (UNIT *uptr);
+t_stat dlo_svc (UNIT *uptr);
+t_stat dlx_attach (UNIT *uptr, char *cptr);
+t_stat dlx_detach (UNIT *uptr);
+t_stat dlx_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dlx_show (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dlx_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dlx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dlx_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
+void dlx_enbdis (int32 dis);
+void dli_clr_int (int32 ln, uint32 wd);
+void dli_set_int (int32 ln, uint32 wd);
+int32 dli_iack (void);
+void dlo_clr_int (int32 ln);
+void dlo_set_int (int32 ln);
+int32 dlo_iack (void);
+void dlx_reset_ln (int32 ln);
 
-/* TTIX data structures
+/* DLI data structures
 
-   ttix_dev      TTIX device descriptor
-   ttix_unit     TTIX unit descriptor
-   ttix_reg      TTIX register list
+   dli_dev      DLI device descriptor
+   dli_unit     DLI unit descriptor
+   dli_reg      DLI register list
 */
 
-DIB ttix_dib = {
-    IOBA_TTIX, IOLN_TTIX, &ttx_rd, &ttx_wr,
-    2, IVCL (TTIX), VEC_TTIX, { &ttix_iack, &ttox_iack }
+DIB dli_dib = {
+    IOBA_DL, IOLN_DL, &dlx_rd, &dlx_wr,
+    2, IVCL (DLI), VEC_DLI, { &dli_iack, &dlo_iack }
     };
 
-UNIT ttix_unit = { UDATA (&ttix_svc, 0, 0), KBD_POLL_WAIT };
+UNIT dli_unit = { UDATA (&dli_svc, 0, 0), KBD_POLL_WAIT };
 
-REG ttix_reg[] = {
-    { BRDATA (BUF, ttix_buf, DEV_RDX, 16, TTX_LINES) },
-    { BRDATA (CSR, ttix_csr, DEV_RDX, 16, TTX_LINES) },
-    { GRDATA (IREQ, ttix_ireq, DEV_RDX, TTX_LINES, 0) },
-    { DRDATA (LINES, ttx_desc.lines, 6), REG_HRO },
-    { GRDATA (DEVADDR, ttix_dib.ba, DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC, ttix_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+REG dli_reg[] = {
+    { BRDATA (BUF, dli_buf, DEV_RDX, 16, DLX_LINES) },
+    { BRDATA (CSR, dli_csr, DEV_RDX, 16, DLX_LINES) },
+    { GRDATA (IREQ, dli_ireq[DLI_RCI], DEV_RDX, DLX_LINES, 0) },
+    { GRDATA (DSI, dli_ireq[DLI_DSI], DEV_RDX, DLX_LINES, 0) },
+    { DRDATA (LINES, dlx_desc.lines, 6), REG_HRO },
+    { GRDATA (DEVADDR, dli_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA (DEVIOLN, dli_dib.lnt, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA (DEVVEC, dli_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
-MTAB ttix_mod[] = {
-    { UNIT_ATT, UNIT_ATT, "summary", NULL, NULL, &ttx_summ },
+MTAB dli_mod[] = {
+    { UNIT_ATT, UNIT_ATT, "summary", NULL, NULL, &dlx_summ },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &ttx_desc },
+      &tmxr_dscln, NULL, &dlx_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &ttx_show, NULL },
+      NULL, &dlx_show, NULL },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &ttx_show, NULL },
+      NULL, &dlx_show, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       &set_addr, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-      &set_vec, &ttx_show_vec, NULL },
+      &set_vec, &dlx_show_vec, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "lines", "LINES",
-      &ttx_set_lines, &ttx_show_lines },
+      &dlx_set_lines, &dlx_show_lines },
     { 0 }
     };
 
-DEVICE ttix_dev = {
-    "TTIX", &ttix_unit, ttix_reg, ttix_mod,
+DEVICE dli_dev = {
+    "DLI", &dli_unit, dli_reg, dli_mod,
     1, 10, 31, 1, 8, 8,
-    NULL, NULL, &ttx_reset,
-    NULL, &ttx_attach, &ttx_detach,
-    &ttix_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
+    NULL, NULL, &dlx_reset,
+    NULL, &dlx_attach, &dlx_detach,
+    &dli_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
     };
 
-/* TTOX data structures
+/* DLO data structures
 
-   ttox_dev      TTOX device descriptor
-   ttox_unit     TTOX unit descriptor
-   ttox_reg      TTOX register list
+   dlo_dev      DLO device descriptor
+   dlo_unit     DLO unit descriptor
+   dlo_reg      DLO register list
 */
 
-UNIT ttox_unit[] = {
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
-    { UDATA (&ttox_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT }
+UNIT dlo_unit[] = {
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dlo_svc, TT_MODE_UC, 0), SERIAL_OUT_WAIT }
     };
 
-REG ttox_reg[] = {
-    { BRDATA (BUF, ttox_buf, DEV_RDX, 8, TTX_LINES) },
-    { BRDATA (CSR, ttox_csr, DEV_RDX, 16, TTX_LINES) },
-    { GRDATA (IREQ, ttox_ireq, DEV_RDX, TTX_LINES, 0) },
-    { URDATA (TIME, ttox_unit[0].wait, 10, 31, 0,
-              TTX_LINES, PV_LEFT) },
+REG dlo_reg[] = {
+    { BRDATA (BUF, dlo_buf, DEV_RDX, 8, DLX_LINES) },
+    { BRDATA (CSR, dlo_csr, DEV_RDX, 16, DLX_LINES) },
+    { GRDATA (IREQ, dlo_ireq, DEV_RDX, DLX_LINES, 0) },
+    { URDATA (TIME, dlo_unit[0].wait, 10, 31, 0,
+              DLX_LINES, PV_LEFT) },
     { NULL }
     };
 
-MTAB ttox_mod[] = {
+MTAB dlo_mod[] = {
     { TT_MODE, TT_MODE_UC, "UC", "UC", NULL },
     { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
     { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
     { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
+    { DLX_MDM, 0,       "no dataset", "NODATASET", NULL },
+    { DLX_MDM, DLX_MDM, "dataset",    "DATASET",   NULL },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &ttx_desc },
+      &tmxr_dscln, NULL, &dlx_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
-      &tmxr_set_log, &tmxr_show_log, &ttx_desc },
+      &tmxr_set_log, &tmxr_show_log, &dlx_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
-      &tmxr_set_nolog, NULL, &ttx_desc },
+      &tmxr_set_nolog, NULL, &dlx_desc },
     { 0 }
     };
 
-DEVICE ttox_dev = {
-    "TTOX", ttox_unit, ttox_reg, ttox_mod,
-    1, 10, 31, 1, 8, 8,
-    NULL, NULL, &ttx_reset,
+DEVICE dlo_dev = {
+    "DLO", dlo_unit, dlo_reg, dlo_mod,
+    DLX_LINES, 10, 31, 1, 8, 8,
+    NULL, NULL, &dlx_reset,
     NULL, NULL, NULL,
     NULL, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
     };
 
 /* Terminal input routines */
 
-t_stat ttx_rd (int32 *data, int32 PA, int32 access)
+t_stat dlx_rd (int32 *data, int32 PA, int32 access)
 {
-uint32 ln = ((PA - ttix_dib.ba) >> 3) & TTX_MASK;
+int32 ln = ((PA - dli_dib.ba) >> 3) & DLX_MASK;
 
 switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
 
     case 00:                                            /* tti csr */
-        *data = ttix_csr[ln] & TTIXCSR_IMP;
+        *data = dli_csr[ln] &
+            ((dlo_unit[ln].flags & DLX_MDM)? DLICSR_RD_M: DLICSR_RD);
+        dli_csr[ln] &= ~DLICSR_DSI;                     /* clr DSI flag */
+        dli_clr_int (ln, DLI_DSI);                      /* clr dset int req */
         return SCPE_OK;
 
     case 01:                                            /* tti buf */
-        ttix_csr[ln] &= ~CSR_DONE;
-        ttix_clr_int (ln);
-        *data = ttix_buf[ln];
+        *data = dli_buf[ln] & DLIBUF_RD;
+        dli_csr[ln] &= ~CSR_DONE;                       /* clr rcv done */
+        dli_clr_int (ln, DLI_RCI);                      /* clr rcv int req */
         return SCPE_OK;
 
     case 02:                                            /* tto csr */
-        *data = ttox_csr[ln] & TTOXCSR_IMP;
+        *data = dlo_csr[ln] & DLOCSR_RD;
         return SCPE_OK;
 
     case 03:                                            /* tto buf */
-        *data = ttox_buf[ln];
+        *data = dlo_buf[ln];
         return SCPE_OK;
         }                                               /* end switch PA */
 
 return SCPE_NXM;
 }
 
-t_stat ttx_wr (int32 data, int32 PA, int32 access)
+t_stat dlx_wr (int32 data, int32 PA, int32 access)
 {
-uint32 ln = ((PA - ttix_dib.ba) >> 3) & TTX_MASK;
+int32 ln = ((PA - dli_dib.ba) >> 3) & DLX_MASK;
+TMLN *lp = &dlx_ldsc[ln];
 
 switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
 
     case 00:                                            /* tti csr */
-        if (PA & 1) return SCPE_OK;
+        if (PA & 1) return SCPE_OK;                     /* odd byte RO */
         if ((data & CSR_IE) == 0)
-            ttix_clr_int (ln);
-        else if ((ttix_csr[ln] & (CSR_DONE + CSR_IE)) == CSR_DONE)
-            ttix_set_int (ln);
-        ttix_csr[ln] = (uint16) ((ttix_csr[ln] & ~TTIXCSR_RW) | (data & TTIXCSR_RW));
+            dli_clr_int (ln, DLI_RCI);
+        else if ((dli_csr[ln] & (CSR_DONE + CSR_IE)) == CSR_DONE)
+            dli_set_int (ln, DLI_RCI);
+        if (dlo_unit[ln].flags & DLX_MDM) {             /* modem control */
+            if ((data & DLICSR_DSIE) == 0)
+                dli_clr_int (ln, DLI_DSI);
+            else if ((dli_csr[ln] & (DLICSR_DSI|DLICSR_DSIE)) == DLICSR_DSI)
+                dli_set_int (ln, DLI_DSI);
+            if ((data ^ dli_csr[ln]) & DLICSR_DTR) {    /* DTR change? */
+                if ((data & DLICSR_DTR) && lp->conn) {  /* setting DTR? */
+                    dli_csr[ln] = (dli_csr[ln] & ~DLICSR_RNG) |
+                        (DLICSR_CDT|DLICSR_CTS|DLICSR_DSI);
+                    if (data & DLICSR_DSIE)             /* if ie, req int */
+                        dli_set_int (ln, DLI_DSI);
+                    }                                   /* end DTR 0->1 + ring */
+                else {                                  /* clearing DTR */
+                    if (lp->conn) {                     /* connected? */
+                        tmxr_linemsg (lp, "\r\nLine hangup\r\n");
+                        tmxr_reset_ln (lp);             /* reset line */
+                        if (dli_csr[ln] & DLICSR_CDT) { /* carrier det? */
+                            dli_csr[ln] |= DLICSR_DSI;
+                            if (data & DLICSR_DSIE)     /* if ie, req int */
+                                dli_set_int (ln, DLI_DSI);
+                            }
+                        }
+                    dli_csr[ln] &= ~(DLICSR_CDT|DLICSR_RNG|DLICSR_CTS);
+                                                        /* clr CDT,RNG,CTS */
+                    }                                   /* end DTR 1->0 */
+                }                                       /* end DTR chg */
+            dli_csr[ln] = (uint16) ((dli_csr[ln] & ~DLICSR_WR_M) | (data & DLICSR_WR_M));
+            }                                           /* end modem */
+        dli_csr[ln] = (uint16) ((dli_csr[ln] & ~DLICSR_WR) | (data & DLICSR_WR));
         return SCPE_OK;
 
     case 01:                                            /* tti buf */
@@ -239,18 +300,18 @@ switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
     case 02:                                            /* tto csr */
         if (PA & 1) return SCPE_OK;
         if ((data & CSR_IE) == 0)
-            ttox_clr_int (ln);
-        else if ((ttox_csr[ln] & (CSR_DONE + CSR_IE)) == CSR_DONE)
-            ttox_set_int (ln);
-        ttox_csr[ln] = (uint16) ((ttox_csr[ln] & ~TTOXCSR_RW) | (data & TTOXCSR_RW));
+            dlo_clr_int (ln);
+        else if ((dlo_csr[ln] & (CSR_DONE + CSR_IE)) == CSR_DONE)
+            dlo_set_int (ln);
+        dlo_csr[ln] = (uint16) ((dlo_csr[ln] & ~DLOCSR_WR) | (data & DLOCSR_WR));
         return SCPE_OK;
 
     case 03:                                            /* tto buf */
         if ((PA & 1) == 0)
-            ttox_buf[ln] = data & 0377;
-        ttox_csr[ln] &= ~CSR_DONE;
-        ttox_clr_int (ln);
-        sim_activate (&ttox_unit[ln], ttox_unit[ln].wait);
+            dlo_buf[ln] = data & 0377;
+        dlo_csr[ln] &= ~CSR_DONE;
+        dlo_clr_int (ln);
+        sim_activate (&dlo_unit[ln], dlo_unit[ln].wait);
         return SCPE_OK;
         }                                               /* end switch PA */
 
@@ -259,29 +320,46 @@ return SCPE_NXM;
 
 /* Terminal input service */
 
-t_stat ttix_svc (UNIT *uptr)
+t_stat dli_svc (UNIT *uptr)
 {
 int32 ln, c, temp;
 
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;      /* attached? */
 sim_activate (uptr, tmxr_poll);                         /* continue poll */
-ln = tmxr_poll_conn (&ttx_desc);                        /* look for connect */
-if (ln >= 0) ttx_ldsc[ln].rcve = 1;                     /* got one? rcv enb */
-tmxr_poll_rx (&ttx_desc);                               /* poll for input */
-for (ln = 0; ln < TTX_LINES; ln++) {                    /* loop thru lines */
-    if (ttx_ldsc[ln].conn) {                            /* connected? */
-        if (temp = tmxr_getc_ln (&ttx_ldsc[ln])) {      /* get char */
+ln = tmxr_poll_conn (&dlx_desc);                        /* look for connect */
+if (ln >= 0) {                                          /* got one? rcv enb */
+    dlx_ldsc[ln].rcve = 1;
+    if (dlo_unit[ln].flags & DLX_MDM) {                 /* modem control? */
+        if (dli_csr[ln] & DLICSR_DTR)                   /* DTR already set? */
+            dli_csr[ln] |= (DLICSR_CDT|DLICSR_CTS|DLICSR_DSI);
+        else dli_csr[ln] |= (DLICSR_RNG|DLICSR_DSI);    /* no, ring */
+        if (dli_csr[ln] & DLICSR_DSIE)                  /* if ie, */
+            dli_set_int (ln, DLI_DSI);                  /* req int */
+        }                                               /* end modem */
+    }                                                   /* end new conn */
+tmxr_poll_rx (&dlx_desc);                               /* poll for input */
+for (ln = 0; ln < DLX_LINES; ln++) {                    /* loop thru lines */
+    if (dlx_ldsc[ln].conn) {                            /* connected? */
+        if (temp = tmxr_getc_ln (&dlx_ldsc[ln])) {      /* get char */
             if (temp & SCPE_BREAK)                      /* break? */
-                c = TTIXBUF_ERR|TTIXBUF_RBRK;
-            else c = sim_tt_inpcvt (temp, TT_GET_MODE (ttox_unit[ln].flags));
-            if (ttix_csr[ln] & CSR_DONE)
-                c |= TTIXBUF_ERR|TTIXBUF_OVR;
-            else {
-                ttix_csr[ln] |= CSR_DONE;
-                if (ttix_csr[ln] & CSR_IE) ttix_set_int (ln);
-                }
-            ttix_buf[ln] = c;
+                c = DLIBUF_ERR|DLIBUF_RBRK;
+            else c = sim_tt_inpcvt (temp, TT_GET_MODE (dlo_unit[ln].flags));
+            if (dli_csr[ln] & CSR_DONE)
+                c |= DLIBUF_ERR|DLIBUF_OVR;
+            else dli_csr[ln] |= CSR_DONE;
+            if (dli_csr[ln] & CSR_IE)
+                dli_set_int (ln, DLI_RCI);
+            dli_buf[ln] = c;
             }
+        }
+    else if (dlo_unit[ln].flags & DLX_MDM) {            /* discpnn & modem? */
+        if (dli_csr[ln] & DLICSR_CDT) {                 /* carrier detect? */
+            dli_csr[ln] |= DLICSR_DSI;                  /* dataset change */
+            if (dli_csr[ln] & DLICSR_DSIE)              /* if ie, */
+                dli_set_int (ln, DLI_DSI);              /* req int */
+            }
+        dli_csr[ln] &= ~(DLICSR_CDT|DLICSR_RNG|DLICSR_CTS);
+                                                        /* clr CDT,RNG,CTS */
         }
     }
 return SCPE_OK;
@@ -289,82 +367,85 @@ return SCPE_OK;
 
 /* Terminal output service */
 
-t_stat ttox_svc (UNIT *uptr)
+t_stat dlo_svc (UNIT *uptr)
 {
 int32 c;
-uint32 ln = uptr - ttox_unit;                           /* line # */
+int32 ln = uptr - dlo_unit;                             /* line # */
 
-if (ttx_ldsc[ln].conn) {                                /* connected? */
-    if (ttx_ldsc[ln].xmte) {                            /* tx enabled? */
-        TMLN *lp = &ttx_ldsc[ln];                       /* get line */
-        c = sim_tt_outcvt (ttox_buf[ln], TT_GET_MODE (ttox_unit[ln].flags));
+if (dlx_ldsc[ln].conn) {                                /* connected? */
+    if (dlx_ldsc[ln].xmte) {                            /* tx enabled? */
+        TMLN *lp = &dlx_ldsc[ln];                       /* get line */
+        c = sim_tt_outcvt (dlo_buf[ln], TT_GET_MODE (dlo_unit[ln].flags));
         if (c >= 0) tmxr_putc_ln (lp, c);               /* output char */
-        tmxr_poll_tx (&ttx_desc);                       /* poll xmt */
+        tmxr_poll_tx (&dlx_desc);                       /* poll xmt */
         }
     else {
-        tmxr_poll_tx (&ttx_desc);                       /* poll xmt */
-        sim_activate (uptr, ttox_unit[ln].wait);        /* wait */
+        tmxr_poll_tx (&dlx_desc);                       /* poll xmt */
+        sim_activate (uptr, dlo_unit[ln].wait);         /* wait */
         return SCPE_OK;
         }
     }
-ttox_csr[ln] |= CSR_DONE;                               /* set done */
-if (ttox_csr[ln] & CSR_IE) ttox_set_int (ln);
+dlo_csr[ln] |= CSR_DONE;                                /* set done */
+if (dlo_csr[ln] & CSR_IE)
+    dlo_set_int (ln);
 return SCPE_OK;
 }
 
 /* Interrupt routines */
 
-void ttix_clr_int (uint32 ln)
+void dli_clr_int (int32 ln, uint32 wd)
 {
-ttix_ireq &= ~(1 << ln);                                /* clr mux rcv int */
-if (ttix_ireq == 0) CLR_INT (TTIX);                     /* all clr? */
-else SET_INT (TTIX);                                    /* no, set intr */
+dli_ireq[wd] &= ~(1 << ln);                             /* clr rcv/dset int */
+if ((dli_ireq[DLI_RCI] | dli_ireq[DLI_DSI]) == 0)       /* all clr? */
+    CLR_INT (DLI);                                      /* all clr? */
+else SET_INT (DLI);                                     /* no, set intr */
 return;
 }
 
-void ttix_set_int (int32 ln)
+void dli_set_int (int32 ln, uint32 wd)
 {
-ttix_ireq |= (1 << ln);                                 /* clr mux rcv int */
-SET_INT (TTIX);                                         /* set master intr */
+dli_ireq[wd] |= (1 << ln);                              /* set rcv/dset int */
+SET_INT (DLI);                                          /* set master intr */
 return;
 }
 
-int32 ttix_iack (void)
+int32 dli_iack (void)
 {
 int32 ln;
 
-for (ln = 0; ln < TTX_LINES; ln++) {                    /* find 1st line */
-    if (ttix_ireq & (1 << ln)) {
-        ttix_clr_int (ln);                              /* clear intr */
-        return (ttix_dib.vec + (ln * 010));             /* return vector */
+for (ln = 0; ln < DLX_LINES; ln++) {                    /* find 1st line */
+    if ((dli_ireq[DLI_RCI] | dli_ireq[DLI_DSI]) & (1 << ln)) {
+        dli_clr_int (ln, DLI_RCI);                      /* clr both req */
+        dli_clr_int (ln, DLI_DSI);
+        return (dli_dib.vec + (ln * 010));              /* return vector */
         }
     }
 return 0;
 }
 
-void ttox_clr_int (int32 ln)
+void dlo_clr_int (int32 ln)
 {
-ttox_ireq &= ~(1 << ln);                                /* clr mux rcv int */
-if (ttox_ireq == 0) CLR_INT (TTOX);                     /* all clr? */
-else SET_INT (TTOX);                                    /* no, set intr */
+dlo_ireq &= ~(1 << ln);                                 /* clr xmit int */
+if (dlo_ireq == 0) CLR_INT (DLO);                       /* all clr? */
+else SET_INT (DLO);                                     /* no, set intr */
 return;
 }
 
-void ttox_set_int (int32 ln)
+void dlo_set_int (int32 ln)
 {
-ttox_ireq |= (1 << ln);                                 /* clr mux rcv int */
-SET_INT (TTOX);                                         /* set master intr */
+dlo_ireq |= (1 << ln);                                  /* set xmit int */
+SET_INT (DLO);                                          /* set master intr */
 return;
 }
 
-int32 ttox_iack (void)
+int32 dlo_iack (void)
 {
 int32 ln;
 
-for (ln = 0; ln < TTX_LINES; ln++) {                    /* find 1st line */
-    if (ttox_ireq & (1 << ln)) {
-        ttox_clr_int (ln);                              /* clear intr */
-        return (ttix_dib.vec + (ln * 010) + 4);         /* return vector */
+for (ln = 0; ln < DLX_LINES; ln++) {                    /* find 1st line */
+    if (dlo_ireq & (1 << ln)) {
+        dlo_clr_int (ln);                               /* clear intr */
+        return (dli_dib.vec + (ln * 010) + 4);          /* return vector */
         }
     }
 return 0;
@@ -372,40 +453,43 @@ return 0;
 
 /* Reset */
 
-t_stat ttx_reset (DEVICE *dptr)
+t_stat dlx_reset (DEVICE *dptr)
 {
 int32 ln;
 
-ttx_enbdis (dptr->flags & DEV_DIS);                     /* sync enables */
-sim_cancel (&ttix_unit);                                /* assume stop */
-if (ttix_unit.flags & UNIT_ATT)                         /* if attached, */
-    sim_activate (&ttix_unit, tmxr_poll);               /* activate */
-for (ln = 0; ln < TTX_LINES; ln++)                      /* for all lines */
-    ttx_reset_ln (ln);
-return auto_config (ttix_dev.name, ttx_desc.lines);     /* auto config */
+dlx_enbdis (dptr->flags & DEV_DIS);                     /* sync enables */
+sim_cancel (&dli_unit);                                 /* assume stop */
+if (dli_unit.flags & UNIT_ATT)                          /* if attached, */
+    sim_activate (&dli_unit, tmxr_poll);                /* activate */
+for (ln = 0; ln < DLX_LINES; ln++)                      /* for all lines */
+    dlx_reset_ln (ln);
+return auto_config (dli_dev.name, dlx_desc.lines);      /* auto config */
 }
 
 /* Reset individual line */
 
-void ttx_reset_ln (uint32 ln)
+void dlx_reset_ln (int32 ln)
 {
-ttix_buf[ln] = 0;                                       /* clear buf, */
-ttix_csr[ln] = CSR_DONE;
-ttox_buf[ln] = 0;                                       /* clear buf */
-ttox_csr[ln] = CSR_DONE;
-sim_cancel (&ttox_unit[ln]);                            /* deactivate */
-ttix_clr_int (ln);
-ttox_clr_int (ln);
+dli_buf[ln] = 0;                                        /* clear buf */
+if (dlo_unit[ln].flags & DLX_MDM)                       /* modem */
+    dli_csr[ln] &= DLICSR_DTR;                          /* dont clr DTR */
+else dli_csr[ln] = 0;
+dlo_buf[ln] = 0;                                        /* clear buf */
+dlo_csr[ln] = CSR_DONE;
+sim_cancel (&dlo_unit[ln]);                             /* deactivate */
+dli_clr_int (ln, DLI_RCI);
+dli_clr_int (ln, DLI_DSI);
+dlo_clr_int (ln);
 return;
 }
 
 /* Attach master unit */
 
-t_stat ttx_attach (UNIT *uptr, char *cptr)
+t_stat dlx_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
 
-r = tmxr_attach (&ttx_desc, uptr, cptr);                /* attach */
+r = tmxr_attach (&dlx_desc, uptr, cptr);                /* attach */
 if (r != SCPE_OK) return r;                             /* error */
 sim_activate (uptr, tmxr_poll);                         /* start poll */
 return SCPE_OK;
@@ -413,25 +497,25 @@ return SCPE_OK;
 
 /* Detach master unit */
 
-t_stat ttx_detach (UNIT *uptr)
+t_stat dlx_detach (UNIT *uptr)
 {
 int32 i;
 t_stat r;
 
-r = tmxr_detach (&ttx_desc, uptr);                      /* detach */
-for (i = 0; i < TTX_LINES; i++)                         /* all lines, */
-    ttx_ldsc[i].rcve = 0;                               /* disable rcv */
+r = tmxr_detach (&dlx_desc, uptr);                      /* detach */
+for (i = 0; i < DLX_LINES; i++)                         /* all lines, */
+    dlx_ldsc[i].rcve = 0;                               /* disable rcv */
 sim_cancel (uptr);                                      /* stop poll */
 return r;
 }
 
 /* Show summary processor */
 
-t_stat ttx_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dlx_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 int32 i, t;
 
-for (i = t = 0; i < TTX_LINES; i++) t = t + (ttx_ldsc[i].conn != 0);
+for (i = t = 0; i < DLX_LINES; i++) t = t + (dlx_ldsc[i].conn != 0);
 if (t == 1) fprintf (st, "1 connection");
 else fprintf (st, "%d connections", t);
 return SCPE_OK;
@@ -439,16 +523,16 @@ return SCPE_OK;
 
 /* SHOW CONN/STAT processor */
 
-t_stat ttx_show (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dlx_show (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 int32 i, t;
 
-for (i = t = 0; i < TTX_LINES; i++) t = t + (ttx_ldsc[i].conn != 0);
+for (i = t = 0; i < DLX_LINES; i++) t = t + (dlx_ldsc[i].conn != 0);
 if (t) {
-    for (i = 0; i < TTX_LINES; i++) {
-        if (ttx_ldsc[i].conn) { 
-            if (val) tmxr_fconns (st, &ttx_ldsc[i], i);
-            else tmxr_fstats (st, &ttx_ldsc[i], i);
+    for (i = 0; i < DLX_LINES; i++) {
+        if (dlx_ldsc[i].conn) { 
+            if (val) tmxr_fconns (st, &dlx_ldsc[i], i);
+            else tmxr_fstats (st, &dlx_ldsc[i], i);
             }
         }
     }
@@ -458,64 +542,65 @@ return SCPE_OK;
 
 /* Enable/disable device */
 
-void ttx_enbdis (int32 dis)
+void dlx_enbdis (int32 dis)
 {
 if (dis) {
-    ttix_dev.flags = ttox_dev.flags | DEV_DIS;
-    ttox_dev.flags = ttox_dev.flags | DEV_DIS;
+    dli_dev.flags = dlo_dev.flags | DEV_DIS;
+    dlo_dev.flags = dlo_dev.flags | DEV_DIS;
     }
 else {
-    ttix_dev.flags = ttix_dev.flags & ~DEV_DIS;
-    ttox_dev.flags = ttox_dev.flags & ~DEV_DIS;
+    dli_dev.flags = dli_dev.flags & ~DEV_DIS;
+    dlo_dev.flags = dlo_dev.flags & ~DEV_DIS;
     }
 return;
 }
 
 /* SHOW VECTOR processor */
 
-t_stat ttx_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dlx_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-return show_vec (st, uptr, ttx_desc.lines * 2, desc);
+return show_vec (st, uptr, dlx_desc.lines * 2, desc);
 }
 
 /* Change number of lines */
 
-t_stat ttx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dlx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 newln, i, t;
 t_stat r;
 
 if (cptr == NULL) return SCPE_ARG;
-newln = get_uint (cptr, 10, TTX_LINES, &r);
-if ((r != SCPE_OK) || (newln == ttx_desc.lines)) return r;
+newln = get_uint (cptr, 10, DLX_LINES, &r);
+if ((r != SCPE_OK) || (newln == dlx_desc.lines)) return r;
 if (newln == 0) return SCPE_ARG;
-if (newln < ttx_desc.lines) {
-    for (i = newln, t = 0; i < ttx_desc.lines; i++) t = t | ttx_ldsc[i].conn;
+if (newln < dlx_desc.lines) {
+    for (i = newln, t = 0; i < dlx_desc.lines; i++) t = t | dlx_ldsc[i].conn;
     if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
         return SCPE_OK;
-    for (i = newln; i < ttx_desc.lines; i++) {
-        if (ttx_ldsc[i].conn) {
-            tmxr_linemsg (&ttx_ldsc[i], "\r\nOperator disconnected line\r\n");
-            tmxr_reset_ln (&ttx_ldsc[i]);               /* reset line */
+    for (i = newln; i < dlx_desc.lines; i++) {
+        if (dlx_ldsc[i].conn) {
+            tmxr_linemsg (&dlx_ldsc[i], "\r\nOperator disconnected line\r\n");
+            tmxr_reset_ln (&dlx_ldsc[i]);               /* reset line */
             }
-        ttox_unit[i].flags |= UNIT_DIS;
-        ttx_reset_ln (i);
+        dlo_unit[i].flags |= UNIT_DIS;
+        dlx_reset_ln (i);
         }
     }
 else {
-    for (i = ttx_desc.lines; i < newln; i++) {
-        ttox_unit[i].flags &= ~UNIT_DIS;
-        ttx_reset_ln (i);
+    for (i = dlx_desc.lines; i < newln; i++) {
+        dlo_unit[i].flags &= ~UNIT_DIS;
+        dlx_reset_ln (i);
         }
     }
-ttx_desc.lines = newln;
-return auto_config (ttix_dev.name, newln);             /* auto config */
+dlx_desc.lines = newln;
+dli_dib.lnt = newln * 010;                             /* upd IO page lnt */
+return auto_config (dli_dev.name, newln);              /* auto config */
 }
 
 /* Show number of lines */
 
-t_stat ttx_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dlx_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf (st, "lines=%d", ttx_desc.lines);
+fprintf (st, "lines=%d", dlx_desc.lines);
 return SCPE_OK;
 }

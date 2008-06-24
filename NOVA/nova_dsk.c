@@ -1,6 +1,6 @@
 /* nova_dsk.c: 4019 fixed head disk simulator
 
-   Copyright (c) 1993-2006, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,10 @@
 
    dsk          fixed head disk
 
+   04-Jul-07    BKR     device name changed to DG's DSK from DEC's DK,
+                        DEV_xxx macros now used for consistency,
+                        added secret DG DIC function,
+                        fixed boot info table size calculation
    15-May-06    RMS     Fixed bug in autosize attach (reported by David Gesswein)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
    26-Jul-03    RMS     Fixed bug in set size routine
@@ -95,12 +99,13 @@ static const int32 sector_map[] = {
 extern uint16 M[];
 extern UNIT cpu_unit;
 extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 saved_PC, SR, AMASK;
 
 int32 dsk_stat = 0;                                     /* status register */
 int32 dsk_da = 0;                                       /* disk address */
 int32 dsk_ma = 0;                                       /* memory address */
 int32 dsk_wlk = 0;                                      /* wrt lock switches */
-int32 dsk_stopioe = 1;                                  /* stop on error */
+int32 dsk_stopioe = 0;                                  /* stop on error */
 int32 dsk_time = 100;                                   /* time per sector */
 
 DEVICE dsk_dev;
@@ -153,12 +158,13 @@ MTAB dsk_mod[] = {
     };
 
 DEVICE dsk_dev = {
-    "DK", &dsk_unit, dsk_reg, dsk_mod,
+    "DSK", &dsk_unit, dsk_reg, dsk_mod,
     1, 8, 21, 1, 8, 16,
     NULL, NULL, &dsk_reset,
     &dsk_boot, &dsk_attach, NULL,
     &dsk_dib, DEV_DISABLE
     };
+
 
 /* IOT routine */
 
@@ -184,38 +190,44 @@ switch (code) {                                         /* decode IR<5:7> */
     case ioDOB:                                         /* DOB */
         dsk_ma = AC & AMASK;                            /* save mem addr */
         break;
+
+    case ioDIC:                                         /* DIC - undocumented DG feature(!) */
+        rval = 256 ;                                    /* return fixed sector size for DG for now */
+        break ;
         }                                               /* end switch code */
 
 if (pulse) {                                            /* any pulse? */
-    dev_busy = dev_busy & ~INT_DSK;                     /* clear busy */
-    dev_done = dev_done & ~INT_DSK;                     /* clear done */
-    int_req = int_req & ~INT_DSK;                       /* clear int */
+    DEV_CLR_BUSY( INT_DSK ) ;
+    DEV_CLR_DONE( INT_DSK ) ;
+    DEV_UPDATE_INTR ;
     dsk_stat = 0;                                       /* clear status */
     sim_cancel (&dsk_unit);                             /* stop I/O */
     }
 
 if ((pulse == iopP) && ((dsk_wlk >> GET_DISK (dsk_da)) & 1)) {  /* wrt lock? */
-    dev_done = dev_done | INT_DSK;                      /* set done */
-    int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
+    DEV_SET_DONE( INT_DSK ) ;
+    DEV_UPDATE_INTR ;
     dsk_stat = DSKS_ERR + DSKS_WLS;                     /* set status */
     return rval;
     }
 
 if (pulse & 1) {                                        /* read or write? */
     if (((uint32) (dsk_da * DSK_NUMWD)) >= dsk_unit.capac) { /* inv sev? */
-        dev_done = dev_done | INT_DSK;                  /* set done */
-        int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
+        DEV_SET_DONE( INT_DSK ) ;
+        DEV_UPDATE_INTR ;
         dsk_stat = DSKS_ERR + DSKS_NSD;                 /* set status */
         return rval;                                    /* done */
         }
     dsk_unit.FUNC = pulse;                              /* save command */
-    dev_busy = dev_busy | INT_DSK;                      /* set busy */
+    DEV_SET_BUSY( INT_DSK ) ;
+    DEV_UPDATE_INTR ;
     t = sector_map[dsk_da & DSK_MMASK] - GET_SECTOR (dsk_time);
     if (t < 0) t = t + DSK_NUMSC;
     sim_activate (&dsk_unit, t * dsk_time);             /* activate */
     }
 return rval;
 }
+
 
 /* Unit service */
 
@@ -224,9 +236,9 @@ t_stat dsk_svc (UNIT *uptr)
 int32 i, da, pa;
 int16 *fbuf = uptr->filebuf;
 
-dev_busy = dev_busy & ~INT_DSK;                         /* clear busy */
-dev_done = dev_done | INT_DSK;                          /* set done */
-int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
+DEV_CLR_BUSY( INT_DSK ) ;
+DEV_SET_DONE( INT_DSK ) ;
+DEV_UPDATE_INTR ;
 
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
     dsk_stat = DSKS_ERR + DSKS_NSD;                     /* set status */
@@ -241,7 +253,7 @@ if (uptr->FUNC == iopS) {                               /* read? */
         }
     dsk_ma = (dsk_ma + DSK_NUMWD) & AMASK;
     }
-if (uptr->FUNC == iopP) {                               /* write? */
+else if (uptr->FUNC == iopP) {                          /* write? */
     for (i = 0; i < DSK_NUMWD; i++) {                   /* copy sector */
         pa = MapAddr (0, (dsk_ma + i) & AMASK);         /* map address */
         fbuf[da + i] = M[pa];
@@ -255,42 +267,42 @@ dsk_stat = 0;                                           /* set status */
 return SCPE_OK;
 }
 
+
 /* Reset routine */
 
 t_stat dsk_reset (DEVICE *dptr)
 {
 dsk_stat = dsk_da = dsk_ma = 0;
-dev_busy = dev_busy & ~INT_DSK;                         /* clear busy */
-dev_done = dev_done & ~INT_DSK;                         /* clear done */
-int_req = int_req & ~INT_DSK;                           /* clear int */
+DEV_CLR_BUSY( INT_DSK ) ;
+DEV_CLR_DONE( INT_DSK ) ;
+DEV_UPDATE_INTR ;
 sim_cancel (&dsk_unit);
 return SCPE_OK;
 }
 
+
 /* Bootstrap routine */
 
-#define BOOT_START  2000
-#define BOOT_LEN    (sizeof (boot_rom) / sizeof (int))
+#define BOOT_START  0375
+#define BOOT_LEN    (sizeof (boot_rom) / sizeof (int32))
 
 static const int32 boot_rom[] = {
-    060220,                     /* NIOC DSK             ; clear disk */
-    0102400,                    /* SUB 0,0              ; addr = 0 */
-    061020,                     /* DOA 0,DSK            ; set disk addr */
-    062120,                     /* DOBS 0,DSK           ; set mem addr, rd */
-    063620,                     /* SKPDN DSK            ; done? */
-    000776,                     /* JMP .-2 */
-    000377,                     /* JMP 377 */
-    };
+      0062677                     /* IORST                ; reset the I/O system  */
+    , 0060120                     /* NIOS DSK             ; start the disk        */
+    , 0000377                     /* JMP 377              ; wait for the world    */
+    } ;
+
 
 t_stat dsk_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
-extern int32 saved_PC;
+int32   i;
 
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
+for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = (uint16) boot_rom[i];
 saved_PC = BOOT_START;
+SR = 0100000 + DEV_DSK;
 return SCPE_OK;
 }
+
 
 /* Attach routine */
 
@@ -307,6 +319,7 @@ if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
 uptr->capac = UNIT_GETP (uptr->flags) * DSK_DKSIZE;     /* set capacity */
 return attach_unit (uptr, cptr);
 }
+
 
 /* Change disk size */
 

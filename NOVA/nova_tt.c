@@ -1,6 +1,6 @@
 /* nova_tt.c: NOVA console terminal simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
    tti          terminal input
    tto          terminal output
 
+   04-Jul-07    BKR     fixed Dasher CR/LF swap function in 'tti_svc()',
+                        DEV_SET/CLR macros now used,
+                        TTO device may now be DISABLED
    29-Dec-03    RMS     Added console backpressure support
    25-Apr-03    RMS     Revised for extended file support
    05-Jan-02    RMS     Fixed calling sequence for setmod
@@ -35,12 +38,21 @@
    17-Sep-01    RMS     Removed multiconsole support
    07-Sep-01    RMS     Moved function prototypes
    31-May-01    RMS     Added multiconsole support
+
+   Notes:
+    - TTO output is always masked to 7 bits in this rev
+    - TTO "Dasher" attribute sends '\b' to console instead of '\031'
+    - TTO may be disabled
+    - TTI input is always masked to 7 bits in this rev
+    - TTI "Dasher" attribute swaps <CR> and <LF>
+    - TTI may not be disabled
 */
 
 #include "nova_defs.h"
 
 #define UNIT_V_DASHER   (UNIT_V_UF + 0)                 /* Dasher mode */
 #define UNIT_DASHER     (1 << UNIT_V_DASHER)
+
 extern int32 int_req, dev_busy, dev_done, dev_disable;
 
 int32 tti (int32 pulse, int32 code, int32 AC);
@@ -78,7 +90,7 @@ MTAB ttx_mod[] = {
     { UNIT_DASHER, 0, "ANSI", "ANSI", &ttx_setmod },
     { UNIT_DASHER, UNIT_DASHER, "Dasher", "DASHER", &ttx_setmod },
     { 0 }
-    };
+    } ;
 
 DEVICE tti_dev = {
     "TTI", &tti_unit, tti_reg, ttx_mod,
@@ -115,7 +127,7 @@ DEVICE tto_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &tto_reset,
     NULL, NULL, NULL,
-    &tto_dib, 0
+    &tto_dib, DEV_DISABLE
     };
 
 /* Terminal input: IOT routine */
@@ -124,21 +136,25 @@ int32 tti (int32 pulse, int32 code, int32 AC)
 {
 int32 iodata;
 
-iodata = (code == ioDIA)? tti_unit.buf & 0377: 0;
-switch (pulse) {                                        /* decode IR<8:9> */
 
-    case iopS:                                          /* start */
-        dev_busy = dev_busy | INT_TTI;                  /* set busy */
-        dev_done = dev_done & ~INT_TTI;                 /* clear done, int */
-        int_req = int_req & ~INT_TTI;
-        break;
+if (code == ioDIA)
+    iodata = tti_unit.buf & 0377;
+else iodata = 0;
 
-    case iopC:                                          /* clear */
-        dev_busy = dev_busy & ~INT_TTI;                 /* clear busy */
-        dev_done = dev_done & ~INT_TTI;                 /* clear done, int */
-        int_req = int_req & ~INT_TTI;
-        break;
-        }                                               /* end switch */
+switch (pulse)
+    {                                                   /* decode IR<8:9> */
+  case iopS:                                            /* start */
+    DEV_SET_BUSY( INT_TTI ) ;
+    DEV_CLR_DONE( INT_TTI ) ;
+    DEV_UPDATE_INTR ;
+    break;
+
+  case iopC:                                            /* clear */
+    DEV_CLR_BUSY( INT_TTI ) ;
+    DEV_CLR_DONE( INT_TTI ) ;
+    DEV_UPDATE_INTR ;
+    break;
+    }                                                   /* end switch */
 
 return iodata;
 }
@@ -150,14 +166,19 @@ t_stat tti_svc (UNIT *uptr)
 int32 temp;
 
 sim_activate (&tti_unit, tti_unit.wait);                /* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp; /* no char or error? */
+if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)
+    return temp;                                        /* no char or error? */
 tti_unit.buf = temp & 0177;
-if ((tti_unit.flags & UNIT_DASHER) && (tti_unit.buf == '\r'))
-    tti_unit.buf = '\n';                                /* Dasher: cr -> nl */
-dev_busy = dev_busy & ~INT_TTI;                         /* clear busy */
-dev_done = dev_done | INT_TTI;                          /* set done */
-int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-tti_unit.pos = tti_unit.pos + 1;
+if (tti_unit.flags & UNIT_DASHER) {
+    if (tti_unit.buf == '\r')
+        tti_unit.buf = '\n';                            /* Dasher: cr -> nl */
+    else if (tti_unit.buf == '\n')
+        tti_unit.buf = '\r' ;                           /* Dasher: nl -> cr */
+    }
+DEV_CLR_BUSY( INT_TTI ) ;
+DEV_SET_DONE( INT_TTI ) ;
+DEV_UPDATE_INTR ;
+++(uptr->pos) ;
 return SCPE_OK;
 }
 
@@ -165,10 +186,10 @@ return SCPE_OK;
 
 t_stat tti_reset (DEVICE *dptr)
 {
-tti_unit.buf = 0;
-dev_busy = dev_busy & ~INT_TTI;                         /* clear busy */
-dev_done = dev_done & ~INT_TTI;                         /* clear done, int */
-int_req = int_req & ~INT_TTI;
+tti_unit.buf = 0;                                       /* <not DG compatible>  */
+DEV_CLR_BUSY( INT_TTI ) ;
+DEV_CLR_DONE( INT_TTI ) ;
+DEV_UPDATE_INTR ;
 sim_activate (&tti_unit, tti_unit.wait);                /* activate unit */
 return SCPE_OK;
 }
@@ -177,44 +198,47 @@ return SCPE_OK;
 
 int32 tto (int32 pulse, int32 code, int32 AC)
 {
-if (code == ioDOA) tto_unit.buf = AC & 0377;
-switch (pulse) {                                        /* decode IR<8:9> */
+if (code == ioDOA)
+    tto_unit.buf = AC & 0377; 
 
-    case iopS:                                          /* start */
-        dev_busy = dev_busy | INT_TTO;                  /* set busy */
-        dev_done = dev_done & ~INT_TTO;                 /* clear done, int */
-        int_req = int_req & ~INT_TTO;
-        sim_activate (&tto_unit, tto_unit.wait);        /* activate unit */
-        break;
+switch (pulse)
+    {                                                   /* decode IR<8:9> */
+  case iopS:                                            /* start */
+    DEV_SET_BUSY( INT_TTO ) ;
+    DEV_CLR_DONE( INT_TTO ) ;
+    DEV_UPDATE_INTR ;
+    sim_activate (&tto_unit, tto_unit.wait);            /* activate unit */
+    break;
 
-    case iopC:                                          /* clear */
-        dev_busy = dev_busy & ~INT_TTO;                 /* clear busy */
-        dev_done = dev_done & ~INT_TTO;                 /* clear done, int */
-        int_req = int_req & ~INT_TTO;
-        sim_cancel (&tto_unit);                         /* deactivate unit */
-        break;
-        }                                               /* end switch */
-
+  case iopC:                                            /* clear */
+    DEV_CLR_BUSY( INT_TTO ) ;
+    DEV_CLR_DONE( INT_TTO ) ;
+    DEV_UPDATE_INTR ;
+    sim_cancel (&tto_unit);                             /* deactivate unit */
+    break;
+    }                                                   /* end switch */
 return 0;
 }
+
 
 /* Unit service */
 
 t_stat tto_svc (UNIT *uptr)
 {
-int32 c;
-t_stat r;
+int32   c;
+t_stat  r;
 
 c = tto_unit.buf & 0177;
-if ((tto_unit.flags & UNIT_DASHER) && (c == 031)) c = '\b';
+if ((tto_unit.flags & UNIT_DASHER) && (c == 031))
+    c = '\b';
 if ((r = sim_putchar_s (c)) != SCPE_OK) {               /* output; error? */
     sim_activate (uptr, uptr->wait);                    /* try again */
-    return ((r == SCPE_STALL)? SCPE_OK: r);             /* !stall? report */
+    return ((r == SCPE_STALL)? SCPE_OK : r);            /* !stall? report */
     }
-dev_busy = dev_busy & ~INT_TTO;                         /* clear busy */
-dev_done = dev_done | INT_TTO;                          /* set done */
-int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
-tto_unit.pos = tto_unit.pos + 1;
+DEV_CLR_BUSY( INT_TTO ) ;
+DEV_SET_DONE( INT_TTO ) ;
+DEV_UPDATE_INTR ;
+++(tto_unit.pos);
 return SCPE_OK;
 }
 
@@ -222,10 +246,10 @@ return SCPE_OK;
 
 t_stat tto_reset (DEVICE *dptr)
 {
-tto_unit.buf = 0;
-dev_busy = dev_busy & ~INT_TTO;                         /* clear busy */
-dev_done = dev_done & ~INT_TTO;                         /* clear done, int */
-int_req = int_req & ~INT_TTO;
+tto_unit.buf = 0;                                       /* <not DG compatible!>  */
+DEV_CLR_BUSY( INT_TTO ) ;
+DEV_CLR_DONE( INT_TTO ) ;
+DEV_UPDATE_INTR ;
 sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }

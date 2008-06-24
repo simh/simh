@@ -85,8 +85,9 @@
 #include "ibm1130_defs.h"
 #include "sim_sock.h"										/* include path must include main simh directory */
 #include <ctype.h>
-
-extern SOCKET sim_create_sock (void);						/* missing from sim_sock.h */
+#ifndef INADDR_NONE
+#define INADDR_NONE ((unsigned long)-1)
+#endif
 
 #define DEBUG_SCA_FLUSH			0x0001						/* debugging options */
 #define DEBUG_SCA_TRANSMIT		0x0002

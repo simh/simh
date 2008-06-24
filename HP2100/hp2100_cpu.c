@@ -1,6 +1,6 @@
 /* hp2100_cpu.c: HP 21xx CPU simulator
 
-   Copyright (c) 1993-2007, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,14 @@
    DMA0,DMA1    12607B/12578A/12895A direct memory access controller
    DCPC0,DCPC1  12897B dual channel port controller
 
+   30-Apr-08    JDB     Enabled SIGNAL instructions, SIG debug flag
+   24-Apr-08    JDB     Fixed single stepping through interrupts
+   20-Apr-08    JDB     Enabled EMA and VIS, added EMA, VIS, and SIGNAL debug flags
+   03-Dec-07    JDB     Memory ex/dep and bkpt type default to current map mode
+   26-Nov-07    JDB     Added SET CPU DEBUG and OS/VMA flags, enabled OS/VMA
+   15-Nov-07    JDB     Corrected MP W5 (JSB) jumper action, SET/SHOW reversal,
+                        mp_mevff clear on interrupt with I/O instruction in trap cell
+   04-Nov-07    JDB     Removed DBI support from 1000-M (was temporary for RTE-6/VM)
    28-Apr-07    RMS     Removed clock initialization
    02-Mar-07    JDB     EDT passes input flag and DMA channel in dat parameter
    11-Jan-07    JDB     Added 12578A DMA byte packing
@@ -120,14 +128,17 @@
 
    References:
    - 2100A Computer Reference Manual (02100-90001, Dec-1971)
+   - Model 2100A Computer Installation and Maintenance Manual
+        (02100-90002, Aug-1972)
    - HP 1000 M/E/F-Series Computers Technical Reference Handbook
         (5955-0282, Mar-1980)
    - HP 1000 M/E/F-Series Computers Engineering and Reference Documentation
-       (92851-90001, Mar-1981)
+        (92851-90001, Mar-1981)
    - 12607A Direct Memory Access Operating and Service Manual
-       (12607-90002, Jan-1970)
+        (12607-90002, Jan-1970)
    - 12578A/12578A-01 Direct Memory Access Operating and Service Manual
-       (12578-9001, Mar-1972)
+        (12578-9001, Mar-1972)
+   - 12892B Memory Protect Installation Manual (12892-90007, Jun-1978)
 
    The register state for the HP 2116 CPU is:
 
@@ -358,13 +369,16 @@
       timer is not called).
 
    6. Interrupt deferral.  At instruction fetch time, a pending interrupt
-      request may be deferred if the previous instruction was a JMP indirect,
-      JSB indirect, STC, CLC, STF, CLF, SFS (1000 only), or SFC (1000 only), or
-      was executing from an interrupt trap cell.  If the CPU is a 1000, then the
-      request is always deferred until after the current instruction completes.
-      If the CPU is a 21xx, then the request is deferred unless the current
-      instruction is an MRG instruction other than JMP or JMP,I or JSB,I.  Note
-      that for the 21xx, SFS and SFC are not included in the deferral criteria.
+      request will be deferred if the previous instruction was a JMP indirect,
+      JSB indirect, STC, CLC, STF, CLF, or was executing from an interrupt trap
+      cell.  In addition, the following instructions will cause deferral on the
+      1000 series: SFS, SFC, JRS, DJP, DJS, SJP, SJS, UJP, and UJS.
+
+      On the HP 1000, the request is always deferred until after the current
+      instruction completes.  On the 21xx, the request is deferred unless the
+      current instruction is an MRG instruction other than JMP or JMP,I or
+      JSB,I.  Note that for the 21xx, SFS and SFC are not included in the
+      deferral criteria.
 */
 
 #include "hp2100_defs.h"
@@ -373,12 +387,12 @@
 
 /* Memory protect constants */
 
-#define UNIT_V_MP_JSB   (UNIT_V_UF + 0)                 /* MP jumper W5 out */
-#define UNIT_V_MP_INT   (UNIT_V_UF + 1)                 /* MP jumper W6 out */
-#define UNIT_V_MP_SEL1  (UNIT_V_UF + 2)                 /* MP jumper W7 out */
-#define UNIT_MP_JSB     (1 << UNIT_V_MP_JSB)
-#define UNIT_MP_INT     (1 << UNIT_V_MP_INT)
-#define UNIT_MP_SEL1    (1 << UNIT_V_MP_SEL1)
+#define UNIT_V_MP_JSB   (UNIT_V_UF + 0)                 /* MP jumper W5 */
+#define UNIT_V_MP_INT   (UNIT_V_UF + 1)                 /* MP jumper W6 */
+#define UNIT_V_MP_SEL1  (UNIT_V_UF + 2)                 /* MP jumper W7 */
+#define UNIT_MP_JSB     (1 << UNIT_V_MP_JSB)            /* 1 = W5 is out */
+#define UNIT_MP_INT     (1 << UNIT_V_MP_INT)            /* 1 = W6 is out */
+#define UNIT_MP_SEL1    (1 << UNIT_V_MP_SEL1)           /* 1 = W7 is out */
 
 #define ABORT(val)      longjmp (save_env, (val))
 
@@ -386,6 +400,7 @@
 #define DMAR1           2
 
 #define ALL_BKPTS       (SWMASK('E')|SWMASK('N')|SWMASK('S')|SWMASK('U'))
+#define ALL_MAPMODES    (SWMASK('S')|SWMASK('U')|SWMASK('P')|SWMASK('Q'))
 
 uint16 *M = NULL;                                       /* memory */
 uint32 saved_AR = 0;                                    /* A register */
@@ -467,8 +482,8 @@ static struct FEATURE_TABLE cpu_features[] = {          /* features in UNIT_xxxx
   { 0, 0, 0 },
   { 0, 0, 0 },
   { UNIT_MP | UNIT_DMA | UNIT_EAU | UNIT_FP | UNIT_DMS, /* UNIT_1000_M */
-    UNIT_PFAIL | UNIT_DMA | UNIT_MP  | UNIT_DMS |
-    UNIT_IOP   | UNIT_FFP | UNIT_DBI | UNIT_DS,
+    UNIT_PFAIL | UNIT_DMA | UNIT_MP | UNIT_DMS |
+    UNIT_IOP   | UNIT_FFP | UNIT_DS,
     1048576 },
   { UNIT_MP | UNIT_DMA | UNIT_EAU | UNIT_FP | UNIT_DMS, /* UNIT_1000_E */
     UNIT_PFAIL | UNIT_DMA | UNIT_MP  | UNIT_DMS |
@@ -476,7 +491,7 @@ static struct FEATURE_TABLE cpu_features[] = {          /* features in UNIT_xxxx
     1048576 },
   { UNIT_MP  | UNIT_DMA | UNIT_EAU | UNIT_FP |          /* UNIT_1000_F */
     UNIT_FFP | UNIT_DBI | UNIT_DMS,
-    UNIT_PFAIL | UNIT_DMA | UNIT_MP     |
+    UNIT_PFAIL | UNIT_DMA | UNIT_MP     | UNIT_VIS |
     UNIT_IOP   | UNIT_DS  | UNIT_SIGNAL | UNIT_EMA_VMA,
     1048576 }
   };
@@ -503,6 +518,7 @@ uint32 shift (uint32 inval, uint32 flag, uint32 oper);
 void dma_cycle (uint32 chan, uint32 map);
 uint32 calc_dma (void);
 uint32 calc_int (void);
+uint32 calc_defer (void);
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
@@ -530,6 +546,7 @@ extern void (*sim_vm_post) (t_bool from_scp);
    cpu_unit     CPU unit descriptor
    cpu_reg      CPU register list
    cpu_mod      CPU modifiers list
+   cpu_deb      CPU debug flags
 */
 
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, 0) };
@@ -623,7 +640,6 @@ MTAB cpu_mod[] = {
     { UNIT_DBI,     0,          "no DBI",     NULL,       NULL,         NULL, NULL },
     { MTAB_XTD | MTAB_VDV, UNIT_DBI,    NULL, "NODBI",    &cpu_clr_opt, NULL, NULL },
 
-/* Future microcode support.
     { UNIT_EMA_VMA, UNIT_EMA,   "EMA",        "EMA",      &cpu_set_opt, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, UNIT_EMA,    NULL, "NOEMA",    &cpu_clr_opt, NULL, NULL },
 
@@ -632,17 +648,20 @@ MTAB cpu_mod[] = {
 
     { UNIT_EMA_VMA, 0,          "no EMA/VMA", NULL,       &cpu_set_opt, NULL, NULL },
 
+#if defined (HAVE_INT64)
     { UNIT_VIS,     UNIT_VIS,   "VIS",        "VIS",      &cpu_set_opt, NULL, NULL },
     { UNIT_VIS,     0,          "no VIS",     NULL,       NULL,         NULL, NULL },
     { MTAB_XTD | MTAB_VDV, UNIT_VIS,    NULL, "NOVIS",    &cpu_clr_opt, NULL, NULL },
 
-    { UNIT_DS,      UNIT_DS,    "DS",         "DS",       &cpu_set_opt, NULL, NULL },
-    { UNIT_DS,      0,          "no DS",      NULL,       NULL,         NULL, NULL },
-    { MTAB_XTD | MTAB_VDV, UNIT_DS,     NULL, "NODS",     &cpu_clr_opt, NULL, NULL },
-
     { UNIT_SIGNAL,  UNIT_SIGNAL,"SIGNAL",     "SIGNAL",   &cpu_set_opt, NULL, NULL },
     { UNIT_SIGNAL,  0,          "no SIGNAL",  NULL,       NULL,         NULL, NULL },
     { MTAB_XTD | MTAB_VDV, UNIT_SIGNAL, NULL, "NOSIGNAL", &cpu_clr_opt, NULL, NULL },
+#endif
+
+/* Future microcode support.
+    { UNIT_DS,      UNIT_DS,    "DS",         "DS",       &cpu_set_opt, NULL, NULL },
+    { UNIT_DS,      0,          "no DS",      NULL,       NULL,         NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UNIT_DS,     NULL, "NODS",     &cpu_clr_opt, NULL, NULL },
 */
 
     { MTAB_XTD | MTAB_VDV,    4096, NULL, "4K",    &cpu_set_size, NULL, NULL },
@@ -659,11 +678,23 @@ MTAB cpu_mod[] = {
     { 0 }
     };
 
+DEBTAB cpu_deb[] = {
+    { "OS",    DEB_OS },
+    { "OSTBG", DEB_OSTBG },
+    { "VMA",   DEB_VMA },
+    { "EMA",   DEB_EMA },
+    { "VIS",   DEB_VIS },
+    { "SIG",   DEB_SIG },
+    { NULL,    0 }
+    };
+
 DEVICE cpu_dev = {
     "CPU", &cpu_unit, cpu_reg, cpu_mod,
     1, 8, PA_N_SIZE, 1, 8, 16,
     &cpu_ex, &cpu_dep, &cpu_reset,
-    &cpu_boot, NULL, NULL
+    &cpu_boot, NULL, NULL,
+    NULL, DEV_DEBUG, 
+    0, cpu_deb, NULL, NULL
     };
 
 /* Memory protect data structures
@@ -674,7 +705,7 @@ DEVICE cpu_dev = {
    mp_mod       MP modifiers list
 */
 
-UNIT mp_unit = { UDATA (NULL, UNIT_MP_SEL1, 0) };
+UNIT mp_unit = { UDATA (NULL, UNIT_MP_SEL1, 0) };       /* default is JSB in, INT in, SEL1 out */
 
 REG mp_reg[] = {
     { FLDATA (CTL, dev_ctl[PRO/32], INT_V (PRO)) },
@@ -688,12 +719,12 @@ REG mp_reg[] = {
     };
 
 MTAB mp_mod[] = {
-    { UNIT_MP_JSB, UNIT_MP_JSB, "JSB (W5) in", "JSBIN", NULL },
-    { UNIT_MP_JSB, 0, "JSB (W5) out", "JSBOUT", NULL },
-    { UNIT_MP_INT, UNIT_MP_INT, "INT (W6) in", "INTIN", NULL },
-    { UNIT_MP_INT, 0, "INT (W6) out", "INTOUT", NULL },
-    { UNIT_MP_SEL1, UNIT_MP_SEL1, "SEL1 (W7) in", "SEL1IN", NULL },
-    { UNIT_MP_SEL1, 0, "SEL1 (W7) out", "SEL1OUT", NULL },
+    { UNIT_MP_JSB, UNIT_MP_JSB, "JSB (W5) out", "JSBOUT", NULL },
+    { UNIT_MP_JSB, 0, "JSB (W5) in", "JSBIN", NULL },
+    { UNIT_MP_INT, UNIT_MP_INT, "INT (W6) out", "INTOUT", NULL },
+    { UNIT_MP_INT, 0, "INT (W6) in", "INTIN", NULL },
+    { UNIT_MP_SEL1, UNIT_MP_SEL1, "SEL1 (W7) out", "SEL1OUT", NULL },
+    { UNIT_MP_SEL1, 0, "SEL1 (W7) in", "SEL1IN", NULL },
     { 0 }
     };
 
@@ -883,23 +914,9 @@ while (reason == 0) {                                   /* loop until halted */
         intrq = calc_int ();                            /* recalc interrupts */
         }
 
-/* Interrupt deferral rules differ on the 21xx vs. the 1000.  The 1000 always
-   defers until the completion of the instruction following a deferring
-   instruction.  The 21xx defers unless the current instruction is an MRG
-   instruction other than JMP or JMP,I or JSB,I.  See the "Set Phase Logic
-   Flowchart" in the 2100A Computer Reference Manual for details.
-*/
-
-    if (intrq &&                                        /* interrupt pending? */
-       ion_defer &&                                     /* deferring instruction? */
-       (UNIT_CPU_FAMILY == UNIT_FAMILY_21XX)) {         /* 21xx series? */
-        IR = ReadW (PC);                                /* prefetch next instr */
-        if (((IR & 0070000) != 0000000) &&              /* MRG instruction? */
-            ((IR & 0174000) != 0114000) &&              /* JSB,I? */
-            ((IR & 0074000) != 0024000))                /* JMP or JMP,I? */
-            ion_defer = 0;                              /* no, so clear deferral */
-            }
-
+    if (intrq && ion_defer)                             /* interrupt pending but deferred? */
+        ion_defer = calc_defer ();                      /* confirm deferral */
+    
 /*  (From Dave Bryan)
     Unlike most other I/O devices, the MP flag flip-flop is cleared
     automatically when the interrupt is acknowledged and not by a programmed
@@ -930,6 +947,8 @@ while (reason == 0) {                                   /* loop until halted */
         if (((IR & I_NMRMASK) != I_IO) ||               /* if not I/O or */
             (I_GETIOOP (IR) == ioHLT))                  /* if halt, */
             clrCTL (PRO);                               /* protection off */
+        else                                            /* I/O instr leaves MP on */
+            mp_mevff = 0;                               /* but clears MEV flip-flop */
         }
 
     else {                                              /* normal instruction */
@@ -945,9 +964,10 @@ while (reason == 0) {                                   /* loop until halted */
         if (mp_evrff) mp_viol = PC;                     /* if ok, upd mp_viol */
         IR = ReadW (PC);                                /* fetch instr */
         PC = (PC + 1) & VAMASK;
-        sim_interval = sim_interval - 1;
         ion_defer = 0;
         }
+
+    sim_interval = sim_interval - 1;                    /* count instruction */
 
 /* Instruction decode.  The 21MX does a 256-way decode on IR<15:8>
 
@@ -977,6 +997,27 @@ while (reason == 0) {                                   /* loop until halted */
         AR = AR & ReadW (MA);
         break;
 
+/* JSB is a little tricky.  It is possible to generate both an MP and a DM
+   violation simultaneously.  Consider a JSB to a location under the MP fence
+   and on a write-protected page.  This situation must be reported as a DM
+   violation, because it has priority (SFS 5 and SFC 5 check only the MEVFF,
+   which sets independently of the MP fence violation).
+
+   Under simulation, this means that DM violations must be checked, and the
+   MEVFF must be set, before an MP abort is taken.  This is done for JSB by the
+   WriteW call to store the return PC.  However, WriteW only checks for fence
+   violations above location 2, as normally JSBs to locations 0 and 1 (i.e., the
+   A and B register) are allowed.  However, if the W5 (JSB) jumper is out, then
+   JSB 0 and JSB 1 are MP violations as well and must be caught.  We do this
+   with an explicit check before calling WriteW.
+
+   This would seem to violate the above requirement for DM checks before MP
+   checks.  However, a DM abort cannot occur on a write to 0/1, even if logical
+   page 0 is write-protected, because writes to 0/1 do not attempt to access
+   memory; they are intercepted and affect the A/B registers instead (micro-
+   order TAB is used in the Store field), so no MEV signal is generated.
+*/
+
     case 0230:case 0231:case 0232:case 0233:
     case 0234:case 0235:case 0236:case 0237:
         ion_defer = 1;                                  /* defer if JSB,I */
@@ -984,9 +1025,11 @@ while (reason == 0) {                                   /* loop until halted */
     case 0030:case 0031:case 0032:case 0033:
     case 0034:case 0035:case 0036:case 0037:
         if (reason = Ea (IR, &MA, intrq)) break;        /* JSB */
-        if ((mp_unit.flags & UNIT_MP_JSB) &&            /* MP if W7 (JSB) out */
-            CTL (PRO) && (MA < mp_fence))
-            ABORT (ABORT_PRO);
+
+        if ((mp_unit.flags & UNIT_MP_JSB) &&            /* if W5 (JSB) out */
+            CTL (PRO) && (MA <= 1))                     /* and MP on and JSB 0 or JSB 1 */
+            ABORT (ABORT_PRO);                          /* MP violation */
+
         WriteW (MA, PC);                                /* store PC */
         PCQ_ENTRY;
         PC = (MA + 1) & VAMASK;                         /* jump */
@@ -1224,6 +1267,10 @@ for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru dev */
         }
     }
 pcq_r->qptr = pcq_p;                                    /* update pc q ptr */
+if (dms_enb)                                            /* default breakpoint type */
+    if (dms_ump) sim_brk_dflt = SWMASK ('U');           /*   to current map mode   */
+    else sim_brk_dflt = SWMASK ('S');
+else sim_brk_dflt = SWMASK ('N');
 return reason;
 }
 
@@ -1316,7 +1363,17 @@ if (op == 06) E = (t >> 15) & 1;                        /* disabled ext lft rot 
 return t;                                               /* input unchanged */
 }
 
-/* IO instruction decode */
+/* I/O instruction decode.
+
+   If memory protect is enabled, and the instruction is not in a trap cell, then
+   HLT instructions are illegal and will cause a memory protect violation.  If
+   jumper W7 (SEL1) is in, then all other I/O instructions are legal; if W7 is
+   out, then only I/O instructions to select code 1 are legal.
+
+   We return NOTE_IOG for normal status instead of SCPE_OK to request that
+   interrupts be recalculated at the end of the instruction (execution of the
+   I/O group instructions can change the interrupt priority chain).
+*/
 
 t_stat iogrp (uint32 ir, uint32 iotrap)
 {
@@ -1327,7 +1384,7 @@ dev = ir & I_DEVMASK;                                   /* get device */
 sop = I_GETIOOP (ir);                                   /* get subopcode */
 if (!iotrap && CTL (PRO) &&                             /* protected? */
     ((sop == ioHLT) ||                                  /* halt or !ovf? */
-    ((dev != OVF) && (mp_unit.flags & UNIT_MP_SEL1)))) {
+    ((dev != OVF) && (mp_unit.flags & UNIT_MP_SEL1)))) {    /* sel code OK? */
         if (sop == ioLIX) ABREG[ab] = 0;                /* A/B writes anyway */
         ABORT (ABORT_PRO);
         }
@@ -1364,6 +1421,41 @@ if (CMD (DMA0) && SRQ (dmac[0].cw1 & I_DEVMASK))        /* check DMA0 cycle */
 if (CMD (DMA1) && SRQ (dmac[1].cw1 & I_DEVMASK))        /* check DMA1 cycle */
     r = r | DMAR1;
 return r;
+}
+
+/* Determine whether a pending interrupt deferral should be inhibited.
+
+   Execution of certain instructions generally causes a pending interrupt to be
+   deferred until the succeeding instruction completes.  However, the interrupt
+   deferral rules differ on the 21xx vs. the 1000.
+   
+   The 1000 always defers until the completion of the instruction following a
+   deferring instruction.  The 21xx defers unless the following instruction is
+   an MRG instruction other than JMP or JMP,I or JSB,I.  If it is, then the
+   deferral is inhibited, i.e., the pending interrupt will be serviced.
+   
+   See the "Set Phase Logic Flowchart," transition from phase 1A to phase 1B,
+   and the "Theory of Operation," "Control Section Detailed Theory," "Phase
+   Control Logic," "Phase 1B" paragraph in the Model 2100A Computer Installation
+   and Maintenance Manual for details.
+*/
+
+uint32 calc_defer (void)
+{
+uint16 IR;
+
+if (UNIT_CPU_FAMILY == UNIT_FAMILY_21XX) {              /* 21xx series? */
+    IR = ReadW (PC);                                    /* prefetch next instr */
+
+    if (((IR & I_MRG & ~I_AB) != 0000000) &&            /* is MRG instruction? */
+        ((IR & I_MRG_I)       != I_JSB_I) &&            /*   but not JSB,I? */
+        ((IR & I_MRG)         != I_JMP))                /*   and not JMP or JMP,I? */
+        return 0;                                       /* yes, so inhibit deferral */
+    else
+        return 1;                                       /* no, so allow deferral */
+    }
+else
+    return 1;                                           /* 1000 always allows deferral */
 }
 
 /* Calculate interrupt requests
@@ -1621,12 +1713,14 @@ uint32 dms_cons (uint32 va, int32 sw)
 {
 uint32 map_sel;
 
-if (sw & SWMASK ('V')) map_sel = dms_ump;               /* switch? select map */
+if ((dms_enb == 0) ||                                   /* DMS off? */
+    (sw & (SWMASK ('N') | SIM_SW_REST)))                /* no mapping rqst or save/rest? */
+    return va;                                          /* use physical address */
 else if (sw & SWMASK ('S')) map_sel = SMAP;
 else if (sw & SWMASK ('U')) map_sel = UMAP;
 else if (sw & SWMASK ('P')) map_sel = PAMAP;
 else if (sw & SWMASK ('Q')) map_sel = PBMAP;
-else return va;                                         /* no switch, physical */
+else map_sel = dms_ump;                                 /* dflt to log addr, cur map */
 if (va >= VASIZE) return MEMSIZE;                       /* virtual, must be 15b */
 else if (dms_enb) return dms_io (va, map_sel);          /* DMS on? go thru map */
 else return va;                                         /* else return virtual */
@@ -1824,6 +1918,11 @@ return dat;
    From Dave Bryan: Examination of the schematics for the MP card in the
    engineering documentation shows that the SFS and SFC I/O backplane signals
    gate the output of the MEVFF onto the SKF line unconditionally.
+
+   The MEVFF records memory expansion (a.k.a. dynamic mapping) violations.  It
+   is set when an DM violation is encountered.  It is cleared on POPIO, STC 5,
+   and -HLT * IOGSP * INTPT.  The latter occurs when an interrupt causes
+   execution of a non-halt I/O instruction in the interrupt trap cell.
 */
 
 int32 proio (int32 inst, int32 IR, int32 dat)
@@ -2153,7 +2252,7 @@ dms_sr = 0;
 dms_vr = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
 sim_brk_types = ALL_BKPTS;
-sim_brk_dflt = SWMASK ('E');
+sim_brk_dflt = SWMASK ('N');                            /* type is nomap as DMS is off */
 
 if (M == NULL) {                                        /* initial call? */
     M = calloc (PASIZE, sizeof (uint16));               /* alloc mem */
@@ -2224,6 +2323,8 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 int32 d;
 
+if ((sw & ALL_MAPMODES) && (dms_enb == 0))              /* req map with DMS off? */
+    return SCPE_NOFNC;                                  /* command not allowed */
 addr = dms_cons (addr, sw);
 if (addr >= MEMSIZE) return SCPE_NXM;
 if (!(sw & SIM_SW_REST) && (addr == 0)) d = saved_AR;
@@ -2237,6 +2338,8 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
+if ((sw & ALL_MAPMODES) && (dms_enb == 0))              /* req map with DMS off? */
+    return SCPE_NOFNC;                                  /* command not allowed */
 addr = dms_cons (addr, sw);
 if (addr >= MEMSIZE) return SCPE_NXM;
 if (!(sw & SIM_SW_REST) && (addr == 0)) saved_AR = val & DMASK;
@@ -2379,7 +2482,7 @@ if (!(sim_switches & SWMASK ('F'))) {                   /* force truncation? */
     for (i = new_size; i < MEMSIZE; i++) mc = mc | M[i];
     if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
         return SCPE_INCOMP;
-	}
+    }
 
 if (UNIT_CPU_FAMILY == UNIT_FAMILY_21XX) {              /* 21xx CPU? */
     cpu_set_ldr (uptr, FALSE, NULL, NULL);              /* save loader to shadow RAM */

@@ -500,7 +500,7 @@ if (sim_switches & SWMASK ('W')) {                      /* wait? */
         if ((i % 10) == 0)                              /* status every 10 sec */
             printf ("Waiting for connnection\n");
         sim_os_sleep (1);                               /* sleep 1 sec */
-		}
+        }
     if (t) printf ("Connection established\n");
     }
 return SCPE_OK;

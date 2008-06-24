@@ -1,6 +1,6 @@
 /* nova_mta.c: NOVA magnetic tape simulator
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    mta          magnetic tape
 
+   04-Jul-07    BKR     fixed boot code to properly boot self-boot tapes;
+                        boot routine now uses standard DG APL boot code;
+                        device name changed to DG's MTA from DEC's MT.
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    18-Mar-05    RMS     Added attached test to detach routine
    22-Nov-03    CEO     DIB returns # records skipped after space fwd
@@ -146,9 +149,13 @@
 #define STA_MON         (STA_REW | STA_BOT | STA_WLK | STA_RDY | \
 						 STA_PEM)                       /* set status chg */
 
-extern uint16 M[];
-extern UNIT cpu_unit;
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern	uint16	M[];
+extern	UNIT	cpu_unit;
+extern	int32	int_req, dev_busy, dev_done, dev_disable;
+extern	int32	SR, AMASK;
+
+extern	t_stat  cpu_boot(int32 unitno, DEVICE * dptr ) ;
+
 
 int32 mta_ma = 0;                                       /* memory address */
 int32 mta_wc = 0;                                       /* word count */
@@ -225,7 +232,7 @@ MTAB mta_mod[] = {
     };
 
 DEVICE mta_dev = {
-    "MT", mta_unit, mta_reg, mta_mod,
+    "MTA", mta_unit, mta_reg, mta_mod,
     MTA_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mta_reset,
     &mta_boot, &mta_attach, &mta_detach,
@@ -601,42 +608,21 @@ else mta_upddsta (uptr, uptr->USTAT & ~STA_WLK);
 return SCPE_OK;
 }
 
-/* Bootstrap routine */
 
-#define BOOT_START 02000
-#define BOOT_UNIT 02020
-#define BOOT_LEN (sizeof (boot_rom) / sizeof (int))
-
-static const int32 boot_rom[] = {
-    0060222,                    /* NIOC 0,MTA           ; clear disk */
-    0020417,                    /* LDA 0,UNIT           ; unit */
-    0024417,                    /* LDA 1,REWIND         ; cmd */
-    0107000,                    /* ADD 0,1              ; cmd + unit */
-    0065122,                    /* DOAS 1,MTA           ; start rewind */
-    0070422,                    /* DIA 2,MTA            ; get status */
-    0151213,                    /* MOVR# 2,2,SNC        ; skip if done */
-    0000776,                    /* JMP .-2 */
-    0126400,                    /* SUB 1,1              ; ma, wc = 0 */
-    0066022,                    /* DOB 1,MTA */
-    0067022,                    /* DOC 1,MTA */
-    0061122,                    /* DOAS 0,MTA           ; start read */
-    0070422,                    /* DIA 2,MTA            ; get status */
-    0151213,                    /* MOVR# 2,2,SNC        ; skip if done */
-    0000776,                    /* JMP .-2 */
-    0000377,                    /* JMP 377 */
-    0000000,                    /* UNIT: */
-    0000010                     /* REWIND: 10 */
-    };
+/*  Boot routine  */
 
 t_stat mta_boot (int32 unitno, DEVICE *dptr)
-{
-int32 i;
-extern int32 saved_PC, SR;
-
-sim_tape_rewind (&mta_unit[unitno]);
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
-M[BOOT_UNIT] = (unitno & CU_M_UNIT) << CU_V_UNIT;
-saved_PC = BOOT_START;
-SR = 0100000 + DEV_MTA;
-return SCPE_OK;
-}
+	{
+	sim_tape_rewind( &mta_unit[unitno] ) ;
+	/*
+	use common rewind/reset code
+		device reset
+		rewind 'tape' file
+		device
+		unit
+		controller
+	 */
+	cpu_boot( unitno, dptr ) ;
+	SR = 0100000 + DEV_MTA ;
+	return ( SCPE_OK );
+	}	/*  end of 'mta_boot'  */

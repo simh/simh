@@ -1,6 +1,6 @@
 /* vax_fpa.c - VAX f_, d_, g_floating instructions
 
-   Copyright (c) 1998-2006, Robert M Supnik
+   Copyright (c) 1998-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-May-08    RMS     Inlined physical memory routines
    16-May-06    RMS     Fixed bug in 32b floating multiply routine
                         Fixed bug in 64b extended modulus routine
    03-May-06    RMS     Fixed POLYD, POLYG to clear R4, R5
@@ -58,8 +59,6 @@ extern int32 R[16];
 extern int32 PSL;
 extern int32 p1;
 extern jmp_buf save_env;
-
-extern int32 Read (uint32 va, int32 size, int32 acc);
 
 #if defined (USE_INT64)
 

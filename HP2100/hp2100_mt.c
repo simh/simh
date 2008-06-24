@@ -287,7 +287,7 @@ switch (inst) {                                         /* case on opcode */
                 (mtc_fnc == FNC_WC) && (mt_ptr > 0)) {  /* yes, bad rec */
                 if (st = sim_tape_wrrecf (&mtc_unit, mtxb, mt_ptr | MTR_ERF))
                     mt_map_err (&mtc_unit, st);
-				}
+                }
             if (((mtc_fnc == FNC_REW) || (mtc_fnc == FNC_RWS)) &&
                 sim_is_active (&mtc_unit)) sim_cancel (&mtc_unit);
             mtc_1st = mtc_dtf = 0;
@@ -362,7 +362,7 @@ if ((mtc_unit.flags & UNIT_ATT) == 0) {                 /* offline? */
     mtc_sta = STA_LOCAL | STA_REJ;                      /* rejected */
     setFSR (devc);                                      /* set cch flg */
     return IORETURN (mtc_stopioe, SCPE_UNATT);
-	}
+    }
 
 switch (mtc_fnc) {                                      /* case on function */
 

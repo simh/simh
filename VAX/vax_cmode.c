@@ -1,6 +1,6 @@
 /* vax_cmode.c: VAX compatibility mode
 
-   Copyright (c) 2004-2006, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    On a full VAX, this module implements PDP-11 compatibility mode.
    On a subset VAX, this module forces a fault if REI attempts to set PSL<cm>.
 
+   28-May-08    RMS     Inlined physical memory routines
+   25-Jan-08    RMS     Fixed declaration (from Mark Pizzolato)
    03-May-06    RMS     Fixed omission of SXT
                         Fixed order of operand fetching in XOR
    24-Aug-04    RMS     Cloned from PDP-11 CPU
@@ -58,10 +60,7 @@ extern int32 pcq[];
 extern int32 pcq_p;
 extern int32 ibcnt, ppc;
 extern int32 sim_interval;
-extern int32 sim_brk_summ;
-
-extern int32 Read (uint32 va, int32 lnt, int32 access);
-extern void Write (uint32 va, int32 val, int32 lnt, int32 access);
+extern uint32 sim_brk_summ;
 extern jmp_buf save_env;
 
 int32 GeteaB (int32 spec);

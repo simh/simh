@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2007, Robert M Supnik
+   Copyright (c) 1998-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   28-May-08    RMS     Inlined instruction prefetch, physical memory routines
    13-Aug-07    RMS     Fixed bug in read access g-format indexed specifiers
    28-Apr-07    RMS     Removed clock initialization
    29-Oct-06    RMS     Added idle support
@@ -350,11 +351,6 @@ extern int32 op_cmode (int32 cc);
 extern int32 op_cis (int32 *opnd, int32 cc, int32 opc, int32 acc);
 extern int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, int32 va);
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
-extern int32 Read (uint32 va, int32 lnt, int32 acc);
-extern void Write (uint32 va, int32 val, int32 lnt, int32 acc);
-extern int32 ReadB (uint32 pa);
-extern void WriteB (uint32 pa, int32 val);
-extern int32 ReadLP (uint32 pa);
 extern int32 Test (uint32 va, int32 acc, int32 *status);
 extern int32 BadCmPSL (int32 newpsl);
 extern int32 eval_int (void);
@@ -376,7 +372,7 @@ t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc);
 int32 cpu_get_vsw (int32 sw);
-int32 get_istr (int32 lnt, int32 acc);
+SIM_INLINE int32 get_istr (int32 lnt, int32 acc);
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
 t_bool cpu_show_opnd (FILE *st, InstHistory *h, int32 line);
 int32 cpu_psl_ipl_idle (int32 newpsl);
@@ -2919,7 +2915,7 @@ ABORT (STOP_UNKNOWN);
    so any translation errors are real.
 */
 
-int32 get_istr (int32 lnt, int32 acc)
+SIM_INLINE int32 get_istr (int32 lnt, int32 acc)
 {
 int32 bo = PC & 3;
 int32 sc, val, t;

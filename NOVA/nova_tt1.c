@@ -1,6 +1,6 @@
 /* nova_tt1.c: NOVA second terminal simulator
 
-   Copyright (c) 1993-2004, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
    Written by Bruce Ray and used with his gracious permission.
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -207,7 +207,7 @@ return SCPE_OK;
 t_stat tti1_reset (DEVICE *dptr)
 {
 ttx1_enbdis (dptr->flags & DEV_DIS);                    /* sync devices */
-tti1_unit.buf = 0;
+tti1_unit.buf = 0;                                      /* <not DG compatible>  */
 dev_busy = dev_busy & ~INT_TTI1;                        /* clear busy */
 dev_done = dev_done & ~INT_TTI1;                        /* clear done, int */
 int_req = int_req & ~INT_TTI1;
@@ -275,7 +275,7 @@ return SCPE_OK;
 t_stat tto1_reset (DEVICE *dptr)
 {
 ttx1_enbdis (dptr->flags & DEV_DIS);                    /* sync devices */
-tto1_unit.buf = 0;
+tto1_unit.buf = 0;                                      /* <not DG compatible>  */
 dev_busy = dev_busy & ~INT_TTO1;                        /* clear busy */
 dev_done = dev_done & ~INT_TTO1;                        /* clear done, int */
 int_req = int_req & ~INT_TTO1;

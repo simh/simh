@@ -1,6 +1,6 @@
 /* gri_stddev.c: GRI-909 standard devices
 
-   Copyright (c) 2001-2006, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    hsp          S42-006 high speed punch
    rtc          real time clock
 
+   31-May-08    RMS     Fixed declarations (found by Peter Schorn)
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Dec-03    RMS     Added support for console backpressure
@@ -208,7 +209,7 @@ DEVICE rtc_dev = {
 
 /* Console terminal function processors */
 
-int32 tty_rd (int32 src, int32 ea)
+uint32 tty_rd (int32 src, int32 ea)
 {
 return tti_unit.buf;                                    /* return data */
 }
@@ -294,7 +295,7 @@ return SCPE_OK;
 
 /* High speed paper tape function processors */
 
-int32 hsrp_rd (int32 src, int32 ea)
+uint32 hsrp_rd (int32 src, int32 ea)
 {
 return hsr_unit.buf;                                    /* return data */
 }
@@ -386,7 +387,7 @@ if (op & RTC_OV) dev_done = dev_done & ~INT_RTC;        /* clr ovflo? */
 return SCPE_OK;
 }
 
-int32 rtc_sf (int32 op)
+uint32 rtc_sf (int32 op)
 {
 if ((op & RTC_OV) && (dev_done & INT_RTC)) return 1;
 return 0;
